@@ -19,6 +19,35 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef _PGM_H
+#define _PGM_H
+
+
+#define PGM_OPT_LENGTH				0x00		/* options length */
+#define PGM_OPT_FRAGMENT			0x01		/* fragmentation */
+#define PGM_OPT_NAK_LIST			0x02		/* list of nak entries */
+#define PGM_OPT_JOIN				0x03		/* late joining */
+#define PGM_OPT_REDIRECT			0x07		/* redirect */
+#define PGM_OPT_SYN					0x0d		/* synchronisation */
+#define PGM_OPT_FIN					0x0e		/* session end */
+#define PGM_OPT_RST					0x0f		/* session reset */
+
+#define PGM_OPT_PARITY_PRM			0x08		/* forward error correction parameters */
+#define PGM_OPT_PARITY_GRP			0x09		/*   group number */
+#define PGM_OPT_CURR_TGSIZE			0x0a		/*   group size */
+
+#define PGM_OPT_CR					0x10		/* congestion report */
+#define PGM_OPT_CRQST				0x11		/* congestion report request */
+
+#define OPT_NAK_BO_IVL				0x04		/* nak back-off interval */
+#define OPT_NAK_BO_RNG				0x05		/* nak back-off range */
+#define OPT_NBR_UNREACH				0x0b		/* neighbour unreachable */
+#define OPT_PATH_NLA				0x0c		/* path nla */
+
+#define OPT_INVALID					0x7f		/* option invalidated */
+
+
+
 /* 8.1.  Source Path Messages (SPM) */
 struct pgm_spm {
 	u_int16_t	spm_sport;			/* source port */
@@ -96,17 +125,61 @@ struct pgm_nak {
 	u_int8_t	nnak_type;
 	u_int8_t	ncf_type;
 	};
+	union {
 	u_int8_t	nak_options;		/* options */
+	u_int8_t	nnak_options;
+	u_int8_t	ncf_options;
+	};
+	union {
 	u_int16_t	nak_checksum;		/* checksum */
+	u_int16_t	nnak_checksum;
+	u_int16_t	ncf_checksum;
+	};
+	union {
 	u_int8_t	nak_gsi[6];			/* global source id */
+	u_int8_t	nnak_gsi[6];
+	u_int8_t	ncf_gsi[6];
+	};
+	union {
 	u_int16_t	nak_tsdu_length;	/* tsdu length */
+	u_int16_t	nnak_tsdu_length;
+	u_int16_t	ncf_tsdu_length;
+	};
+	union {
 	u_int32_t	nak_sqn;			/* requested sequence number */
-	u_int16_t	nak_nla_afi;		/* nla afi */
+	u_int32_t	nnak_sqn;
+	u_int32_t	ncf_sqn;
+	};
+	union {
+	u_int16_t	nak_src_nla_afi;	/* nla afi */
+	u_int16_t	nnak_src_nla_afi;
+	u_int16_t	ncf_src_nla_afi;
+	};
+	union {
 	u_int16_t	nak_reserved;		/* reserved */
+	u_int16_t	nnak_reserved;
+	u_int16_t	ncf_reserved;
+	};
+	union {
 	u_int32_t	nak_src;			/* source nla */
-	u_int16_t	nak_nla_afi;		/* nla afi */
+	u_int32_t	nnak_src;
+	u_int32_t	ncf_src;
+	};
+	union {
+	u_int16_t	nak_group_nla_afi;	/* nla afi */
+	u_int16_t	nnak_group_nla_afi;
+	u_int16_t	ncf_group_nla_afi;
+	};
+	union {
 	u_int16_t	nak_reserved2;		/* reserved */
+	u_int16_t	nnak_reserved2;
+	u_int16_t	ncf_reserved2;
+	};
+	union {
 	u_int32_t	nak_grp;			/* multicast group nla */
+	u_int32_t	nnak_grp;
+	u_int32_t	ncf_grp;
+	};
 	/* ... option extension */
 };
 
@@ -317,7 +390,7 @@ struct pgm_opt_nak_bo_rng {
 	u_int32_t	nak_min_bo_ivl;		/* minimum nak back-off interval */
 };
 
-/* 15.4.3.  Option Unreachable - OPT_NBR_UNREACH */
+/* 15.4.3.  Option Neighbour Unreachable - OPT_NBR_UNREACH */
 struct pgm_opt_crqst {
 	u_int8_t	opt_type;			/* option type */
 	u_int8_t	opt_length;			/* option length */
@@ -332,4 +405,4 @@ struct pgm_opt_crqst {
 	u_int32_t	path_nla;			/* path nla */
 };
 
-
+#endif /* _PGM_H */
