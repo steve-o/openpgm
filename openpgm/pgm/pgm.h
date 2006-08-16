@@ -1,4 +1,4 @@
-/* vim:ts=4:sts=4:sw=2:noai:noexpandtab
+/* vim:ts=4:sts=4:sw=4:noai:noexpandtab
  * 
  * PGM packet formats, RFC 3208.
  *
