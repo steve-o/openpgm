@@ -1,0 +1,32 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+EnsureSConsVersion( 0, 96 )
+
+import os
+env = Environment(ENV = os.environ,
+	CCFLAGS = ['-pipe', '-g', '-Wall', '-pedantic', '-std=gnu99', '-D_REENTRANT'])
+
+httpenv = env.Copy()
+httpenv.ParseConfig('pkg-config --cflags --libs libsoup-2.2')
+
+env.ParseConfig('pkg-config --cflags --libs glib-2.0')
+
+shared_src = Split("""
+		log.c
+		pgm.c
+""")
+
+shared_obj = []
+for src in shared_src:
+	shared_obj += env.Object(src)
+
+env.Program(['pgmdump.c'] + shared_obj)
+env.Program(['basic_send.c'] + shared_obj)
+env.Program(['spm_idle.c'] + shared_obj)
+env.Program(['stream_send.c'] + shared_obj)
+env.Program(['basic_recv.c'] + shared_obj)
+httpenv.Program(['basic_http.c'] + shared_obj)
+
+# end of file
