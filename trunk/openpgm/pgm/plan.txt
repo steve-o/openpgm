@@ -1,0 +1,92 @@
+pgmdump
+-------
+
+View all packets like tcpdump, but updated to full spec and allow dump of payload.
+
+
+pgmmon
+------
+
+Dump realtime packet statistics in a ncurses display.
+
+
+
+basic_send
+----------
+
+Send an ODATA packet and terminate.
+
+Accept string payload and network parameters on command line.
+
+Send to multicast or send to unicast AFI.
+
+IPv4/6.
+
+Define optional session start, finish, late join (?) tags.
+
+
+spm_idle
+--------
+
+Idle in an event loop sending out SPM packets.
+
+
+stream_send
+-----------
+
+Send a constant stream of ODATA and SPM packets.
+
+
+basic_http
+----------
+
+Simple embedded web server
+
+
+basic_recv
+----------
+
+Listen to packets indicating data loss, view details through web interface.
+
+
+stream_send2
+------------
+
+Respond to NAK's with RDATA.
+
+
+basic_recv2
+-----------
+
+Listen to packets and send NAK's to rebuild data.
+
+
+stream_send3
+------------
+
+Send ODATA with FEC.
+
+
+basic_recv3
+-----------
+
+Listen to packets and repair with FEC data.
+
+
+
+Scenarios to reproduce
+**********************
+
+- Packet loss in stream causing NAK generation.
+- Link saturation in sending causing API feedback.
+- Link peak stable speed.
+- Maxium NAK generation to determine NCF/RDATA throughput.
+- Corrupt packets with invalid IP checksum (? generate IP HDR in sender)
+- Corrupt packets with invalid PGM checksum.
+- Invalid packet values.
+- NAK to NCF latency.
+- NAK to RDATA latency.
+- Publish bandwidth: total, per packet type, payload, per recipient (?)
+- Subscribe bandwidth: total, per packet type, payload, per publisher (?)
+
+
