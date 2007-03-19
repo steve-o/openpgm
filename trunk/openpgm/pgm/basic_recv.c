@@ -34,6 +34,9 @@
 #include <arpa/inet.h>
 
 #include <glib.h>
+#include <libsoup/soup.h>
+#include <libsoup/soup-server.h>
+#include <libsoup/soup-address.h>
 
 #include "log.h"
 #include "pgm.h"
@@ -114,17 +117,28 @@ struct hoststat {
 
 /* globals */
 
+#define WWW_NOTFOUND    "<html><head><title>404</title></head><body>lah, 404 :)</body></html>\r\n"
+
+#define WWW_HEADER	"<html><head><title>basic_recv</title></head><body>"
+#define	WWW_FOOTER	"</body></html>\r\n"
+
+
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
+static int g_http = 4968;
+
 static GHashTable *g_hosts = NULL;
+static GMutex *g_hosts_mutex = NULL;
 
 static GIOChannel* g_io_channel = NULL;
 static GMainLoop* g_loop = NULL;
-
+static SoupServer* g_soup_server = NULL;
 
 static guint tsi_hash (gconstpointer);
 static gint tsi_equal (gconstpointer, gconstpointer);
+
+static gchar* print_tsi (gconstpointer);
 
 static void on_signal (int);
 static gboolean on_startup (gpointer);
@@ -133,6 +147,20 @@ static gboolean on_mark (gpointer);
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
+static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void tsi_callback (SoupServerContext*, SoupMessage*, gpointer);
+
+
+static void
+usage (const char* bin)
+{
+        fprintf (stderr, "Usage: %s [options]\n", bin);
+        fprintf (stderr, "  -p <port>       : IP port for web interface\n");
+        fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
+        fprintf (stderr, "  -s <port>       : IP port\n");
+        exit (1);
+}
 
 int
 main (
@@ -142,7 +170,25 @@ main (
 {
 	puts ("basic_recv");
 
+	/* parse program arguments */
+        const char* binary_name = strrchr (argv[0], '/');
+        int c;
+        while ((c = getopt (argc, argv, "p:s:n:h")) != -1)
+        {
+                switch (c) {
+                case 'p':       g_http = atoi (optarg); break;
+                case 'n':       g_network = optarg; break;
+                case 's':       g_port = atoi (optarg); break;
+
+                case 'h':
+                case '?': usage (binary_name);
+                }
+        }
+
 	log_init ();
+
+	g_type_init ();
+	g_thread_init (NULL);
 
 /* setup signal handlers */
 	signal(SIGINT, on_signal);
@@ -173,6 +219,11 @@ main (
 		g_io_channel = NULL;
 	}
 
+        if (g_soup_server) {
+                g_object_unref (g_soup_server);
+                g_soup_server = NULL;
+        }
+
 	puts ("finished.");
 	return 0;
 }
@@ -195,6 +246,30 @@ on_startup (
 	int e;
 
 	puts ("startup.");
+
+        puts ("starting soup server.");
+        g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_http,
+                                        NULL);
+        if (!g_soup_server) {
+                printf ("soup server failed: %s\n", strerror (errno));
+                g_main_loop_quit (g_loop);
+                return FALSE;
+        }
+
+        char hostname[NI_MAXHOST + 1];
+        gethostname (hostname, sizeof(hostname));
+
+        printf ("web interface: http://%s:%i\n",
+                hostname,
+                soup_server_get_port (g_soup_server));
+
+        soup_server_add_handler (g_soup_server, NULL,	NULL, default_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/",	NULL, index_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/tsi",	NULL, tsi_callback, NULL, NULL);
+
+        soup_server_run_async (g_soup_server);
+        g_object_unref (g_soup_server);
+
 
 /* find PGM protocol id */
 // TODO: fix valgrind errors
@@ -352,11 +427,14 @@ on_io_data (
 /* search for existing session */
 	if (!g_hosts) {
 		g_hosts = g_hash_table_new (tsi_hash, tsi_equal);
+		g_hosts_mutex = g_mutex_new ();
 	}
 
 	struct tsi tsi;
-	memcpy (tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_header->pgm_gsi));
+	memcpy (tsi.gsi, pgm_header->pgm_gsi, 6 * sizeof(guint8));
 	tsi.source_port = pgm_header->pgm_sport;
+
+	printf ("tsi %s\n", print_tsi (&tsi));
 
 	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
 	if (hoststat == NULL) {
@@ -365,7 +443,9 @@ on_io_data (
 
 		hoststat->session_start = tv;
 
-		g_hash_table_insert (g_hosts, (gpointer)&hoststat->tsi, (gpointer)&hoststat);
+		g_mutex_lock (g_hosts_mutex);
+		g_hash_table_insert (g_hosts, (gpointer)&hoststat->tsi, (gpointer)hoststat);
+		g_mutex_unlock (g_hosts_mutex);
 	}
 
 /* increment statistics */
@@ -473,6 +553,19 @@ on_io_error (
 	return FALSE;
 }
 
+static gchar*
+print_tsi (
+	gconstpointer v
+	)
+{
+	guint8* gsi = (guint8*)v;
+	guint16 source_port = *(guint16*)(gsi + 6);
+	static char buf[sizeof("000.000.000.000.000.000.00000")];
+	snprintf(buf, sizeof(buf), "%i.%i.%i.%i.%i.%i.%i",
+		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], source_port);
+	return buf;
+}
+
 /* convert a transport session identifier TSI to a hash value
  */
 
@@ -481,12 +574,7 @@ tsi_hash (
 	gconstpointer v
 	)
 {
-	guint8* gsi = (guint8*)v;
-	guint16 source_port = *(guint16*)(gsi + 6);
-	char buf[sizeof("000.000.000.000.000.000.00000")];
-	snprintf(buf, sizeof(buf), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
-		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], source_port);
-	return g_str_hash(buf);
+	return g_str_hash(print_tsi(v));
 }
 
 /* compare two transport session identifier TSI values and return TRUE if they are equal
@@ -500,5 +588,94 @@ tsi_equal (
 {
 	return memcmp (v, v2, (6 * sizeof(guint8)) + sizeof(guint16)) == 0;
 }
+
+/* request on web interface
+ */
+
+static void
+default_callback (
+                SoupServerContext*      context,
+                SoupMessage*            msg,
+                gpointer                data
+                )
+{
+        char *path;
+
+        path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
+        printf ("%s %s HTTP/1.%d\n", msg->method, path,
+                soup_message_get_http_version (msg));
+
+        soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
+                                        WWW_NOTFOUND, strlen(WWW_NOTFOUND));
+        soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+        soup_message_add_header (msg->response_headers, "Connection", "close");
+}
+
+/* transport session identifier TSI index
+ */
+
+static gboolean
+index_tsi_row (
+		gpointer	key,
+		gpointer	value,
+		gpointer	user_data
+		)
+{
+	struct hoststat* hoststat = value;
+	GString *response = user_data;
+
+	g_string_append_printf (response, 
+			"<tr>"
+				"<td>%s</td>"
+				"<td>%i</td>"
+				"<td>%i</td>"
+			"</tr>",
+			print_tsi(&hoststat->tsi),
+			hoststat->count_total,
+			hoststat->bytes_total);
+
+	return FALSE;
+}
+
+static void
+index_callback (
+                SoupServerContext*      context,
+                SoupMessage*            msg,
+                gpointer                data
+                )
+{
+	GString *response;
+
+	response = g_string_new (WWW_HEADER);
+
+	if (!g_hosts) {
+		g_string_append (response, "<i>No TSI's.</i>");
+	} else {
+		g_string_append (response, "<table>"
+						"<tr><th>TSI</th><th># Packets</th><th>Bytes</th></tr>");
+		g_mutex_lock (g_hosts_mutex);
+		g_hash_table_foreach (g_hosts, (GHFunc)index_tsi_row, response);
+		g_mutex_unlock (g_hosts_mutex);
+		g_string_append (response, "</table>");
+	}
+
+	g_string_append (response, WWW_FOOTER);
+
+	gchar* resp = g_string_free (response, FALSE);
+	soup_message_set_response (msg, "text/html", SOUP_BUFFER_SYSTEM_OWNED, resp, strlen(resp));
+}
+
+/* transport session identifier TSI details
+ */
+
+static void
+tsi_callback (
+                SoupServerContext*      context,
+                SoupMessage*            msg,
+                gpointer                data
+                )
+{
+}
+
 
 /* eof */

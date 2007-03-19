@@ -79,7 +79,7 @@ main (
 	while ((c = getopt (argc, argv, "p:h")) != -1)
 	{
 		switch (c) {
-		case 's':	g_port = atoi (optarg); break;
+		case 'p':	g_port = atoi (optarg); break;
 
 		case 'h':
 		case '?': usage (binary_name);
