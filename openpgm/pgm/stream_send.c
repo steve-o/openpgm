@@ -454,8 +454,8 @@ printf ("PGM header size %u\n"
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
 
-	header->pgm_sport       = g_port;
-	header->pgm_dport       = g_port;
+	header->pgm_sport       = g_htons (g_port);
+	header->pgm_dport       = g_htons (g_port);
 	header->pgm_type        = PGM_ODATA;
         header->pgm_options     = 0;
         header->pgm_checksum    = 0;
@@ -467,7 +467,7 @@ printf ("PGM header size %u\n"
         header->pgm_gsi[4]      = 5;
         header->pgm_gsi[5]      = 6;
 
-        header->pgm_tsdu_length = g_htons(strlen(payload_string) + 1);               /* transport data unit length */
+        header->pgm_tsdu_length = g_htons (strlen(payload_string) + 1);               /* transport data unit length */
 
 /* ODATA */
         odata->data_sqn         = 0;
