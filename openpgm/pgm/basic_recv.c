@@ -53,6 +53,7 @@ struct stat {
 	gulong	bytes, snap_bytes;
 	gulong	tsdu;
 
+	gulong	duplicate;
 	gulong	corrupt;
 	gulong	invalid;
 
@@ -68,16 +69,18 @@ struct hoststat {
 	struct in_addr last_addr;
 	struct in_addr nla;
 
-	guint32	txw_secs;		/* seconds of repair data */
-	guint32	txw_trail;		/* trailing edge sequence number */
-	guint32	txw_lead;		/* leading edge sequence number */
-	guint32	txw_sqns;		/* size of transmit window */
+	gulong	txw_secs;		/* seconds of repair data */
+	gulong	txw_trail;		/* trailing edge sequence number */
+	gulong	txw_lead;		/* leading edge sequence number */
+	gulong	txw_sqns;		/* size of transmit window */
 
-	guint32	rxw_trail;		/* trailing edge of receive window */
-	guint32	rxw_lead;
+	gulong	rxw_trail;		/* oldest repairable sequence number */
+	gulong	rxw_lead;		/* last sequence number */
 
-	guint32	spm_trail;
-	guint32	spm_lead;
+	gulong	rxw_trail_init;		/* first sequence number */
+	int rxw_learning;
+
+	gulong	spm_sqn;		/* independent sequence number */
 
 	struct stat	spm,
 			poll,
@@ -99,7 +102,7 @@ struct hoststat {
 
 #define	WWW_XMLDECL	"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html xmlns=\"http://www.w3.org/1999/xhtml\">"
 
-#define WWW_NOTFOUND    WWW_XMLDECL "<head><title>404</title></head><body>lah, 404 :)</body></html>\r\n"
+#define WWW_NOTFOUND    WWW_XMLDECL "<head><title>404</title></head><body><p>lah, 404: not found :)</p><p><a href=\"/\">Return to index.</a></p></body></html>\r\n"
 
 #define WWW_HEADER	WWW_XMLDECL "<head><meta http-equiv=\"refresh\" content=\"10\" /><title>basic_recv</title><link rel=\"stylesheet\" type=\"text/css\" href=\"/main.css\" /></head><body>\n"
 #define	WWW_FOOTER	"\n</body></html>\r\n"
@@ -504,6 +507,8 @@ on_io_data (
 
 	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
 	if (hoststat == NULL) {
+
+/* New TSI */
 		printf ("new tsi %s\n", print_tsi (&tsi));
 
 		hoststat = g_malloc0(sizeof(struct hoststat));
@@ -524,13 +529,32 @@ on_io_data (
 
 	gboolean err = FALSE;
         switch (pgm_header->pgm_type) {
+
+/* SPM
+ *
+ * extract: advertised NLA, used for unicast NAK's;
+ *	    SPM sequence number;
+ *	    leading and trailing edge of transmit window.
+ */
         case PGM_SPM:
+		hoststat->spm.count++;
+		hoststat->spm.bytes += len;
+		hoststat->spm.last = tv;
+
 		err = pgm_parse_spm (pgm_header, packet, packet_length, &hoststat->nla);
 
-		if (!err) {
-			hoststat->spm.count++;
-			hoststat->spm.bytes += len;
-			hoststat->spm.last = tv;
+		if (err) {
+//puts ("invalid SPM");
+			hoststat->spm.invalid++;
+			hoststat->spm.last_invalid = tv;
+		} else {
+			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)packet)->spm_sqn );
+			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)packet)->spm_trail );
+			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)packet)->spm_lead );
+			hoststat->rxw_trail = hoststat->txw_trail;
+//printf ("SPM: tx window now %lu - %lu\n", 
+//		hoststat->txw_trail, hoststat->txw_lead);
+
 		}
 		break;
 
@@ -546,12 +570,81 @@ on_io_data (
 		hoststat->polr.last = tv;
 		break;
 
-        case PGM_ODATA:
-		hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
+/* ODATA
+ *
+ * extract: trailing edge of transmit window;
+ *	    DATA sequence number.
+ *
+ * TODO: handle UINT32 wrap-arounds.
+ */
+#define ABS_IN_TRANSMIT_WINDOW(x) \
+	( (x) >= hoststat->txw_trail && (x) <= hoststat->txw_lead )
 
+#define IN_TRANSMIT_WINDOW(x) \
+	( (x) >= hoststat->txw_trail && (x) <= (hoststat->txw_trail + ((UINT32_MAX/2) - 1)) )
+
+#define IN_RECEIVE_WINDOW(x) \
+	( (x) >= hoststat->rxw_trail && (x) <= hoststat->rxw_lead )
+
+#define IS_NEXT_SEQUENCE_NUMBER(x) \
+	( (x) == (hoststat->rxw_lead + 1) )
+
+        case PGM_ODATA:
 		hoststat->odata.count++;
 		hoststat->odata.bytes += len;
 		hoststat->odata.last = tv;
+
+		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
+		((struct pgm_data*)packet)->data_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
+		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			printf ("not in tx window %lu, %lu - %lu\n",
+				((struct pgm_data*)packet)->data_sqn,
+				hoststat->txw_trail,
+				hoststat->txw_lead);
+			err = TRUE;
+			hoststat->odata.invalid++;
+			hoststat->odata.last_invalid = tv;
+			break;
+		}
+
+/* first packet */
+		if (hoststat->rxw_learning == 0)
+		{
+puts ("first packet, learning ...");
+			hoststat->rxw_trail_init = ((struct pgm_data*)packet)->data_sqn;
+			hoststat->rxw_learning++;
+
+/* we need to jump to avoid loss detection
+ * TODO: work out better arrangement */
+			hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn - 1;
+		}
+/* subsequent packets */
+		else if (hoststat->rxw_learning == 1 &&
+			((struct pgm_data*)packet)->data_trail > hoststat->rxw_trail_init )
+		{
+puts ("rx window trail is now past first packet sequence number, stop learning.");
+			hoststat->rxw_learning++;
+		}
+
+/* dupe */
+		if ( IN_RECEIVE_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			hoststat->odata.duplicate++;
+		}
+
+/* lost packets */
+		if ( !IS_NEXT_SEQUENCE_NUMBER( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			printf ("lost %lu packets.\n",
+				((struct pgm_data*)packet)->data_sqn - hoststat->rxw_lead - 1);
+		}
+
+		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
+		hoststat->rxw_trail = hoststat->txw_trail;
+		hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn;
+
+		hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
 		break;
 
         case PGM_RDATA:
@@ -884,12 +977,19 @@ tsi_callback (
 	float secs = (g_tv_now.tv_sec - g_last_snap.tv_sec) +
 			( (g_tv_now.tv_usec - g_last_snap.tv_usec) / 1000.0 / 1000.0 );
 
+	char rxw_init[100];
+	if (hoststat->rxw_learning)
+		snprintf (rxw_init, sizeof(rxw_init), " (RXW_TRAIL_INIT %lu)", hoststat->rxw_trail_init);
+
 	g_string_append_printf (response, 
 				"<p>"
 				"<table>"
 					"<tr><td><b>TSI:</b></td><td>%s</td></tr>"
 					"<tr><td><b>Last IP address:</b></td><td>%s</td></tr>"
 					"<tr><td><b>Advertised NLA:</b></td><td>%s</td></tr>"
+					"<tr><td><b>Transmit window:</b></td><td>TXW_TRAIL %lu TXW_LEAD %lu TXW_SQNS %lu</td></tr>"
+					"<tr><td><b>Receive window:</b></td><td>RXW_TRAIL %lu%s RXW_LEAD %lu</td></tr>"
+					"<tr><td><b>SPM sequence number:</b></td><td>%lu</td></tr>"
 				"</table>"
 				"</p><p>"
 				"<table>"
@@ -904,7 +1004,13 @@ tsi_callback (
 					"</tr></thead>",
 				path + strlen("/tsi/"),
 				inet_ntoa(hoststat->last_addr),
-				inet_ntoa(hoststat->nla)
+				inet_ntoa(hoststat->nla),
+				hoststat->txw_trail, hoststat->txw_lead,
+					(1 + hoststat->txw_lead) - hoststat->txw_trail,
+				hoststat->rxw_trail, 
+					hoststat->rxw_learning ? rxw_init : "",
+					hoststat->rxw_lead,
+				hoststat->spm_sqn
 				);
 
 /* per packet stats */
