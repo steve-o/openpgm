@@ -383,7 +383,7 @@ pgm_parse_spm (
 {
 	if (len < PGM_MIN_SPM_SIZE) {
 		puts ("packet truncated :(");
-		return FALSE;
+		return -1;
 	}
 
 	struct pgm_spm* spm = (struct pgm_spm*)data;
@@ -403,10 +403,10 @@ pgm_parse_spm (
 
 	default:
 		printf ("unsupported afi");
-		return FALSE;
+		return -1;
 	}
 
-	return TRUE;
+	return 0;
 }
 
 static gboolean
