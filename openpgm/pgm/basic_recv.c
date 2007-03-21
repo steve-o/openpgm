@@ -641,6 +641,8 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 		}
 
 		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
+		if (hoststat->txw_trail > hoststat->txw_lead)
+			hoststat->txw_lead = hoststat->txw_trail -1;
 		hoststat->rxw_trail = hoststat->txw_trail;
 		hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn;
 
