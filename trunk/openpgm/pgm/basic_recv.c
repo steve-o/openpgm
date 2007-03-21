@@ -49,12 +49,12 @@ struct tsi {
 };
 
 struct stat {
-	int	count;
-	int	bytes;
-	int	tsdu;
+	gulong	count, snap_count;
+	gulong	bytes, snap_bytes;
+	gulong	tsdu;
 
-	int	corrupt;
-	int	invalid;
+	gulong	corrupt;
+	gulong	invalid;
 
 	struct timeval	last;
 	struct timeval	last_valid;
@@ -97,16 +97,49 @@ struct hoststat {
 
 /* globals */
 
-#define WWW_NOTFOUND    "<html><head><title>404</title></head><body>lah, 404 :)</body></html>\r\n"
+#define	WWW_XMLDECL	"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html xmlns=\"http://www.w3.org/1999/xhtml\">"
 
-#define WWW_HEADER	"<html><head><meta http-equiv=\"refresh\" content=\"10\" /><title>basic_recv</title></head><body>"
-#define	WWW_FOOTER	"</body></html>\r\n"
+#define WWW_NOTFOUND    WWW_XMLDECL "<head><title>404</title></head><body>lah, 404 :)</body></html>\r\n"
+
+#define WWW_HEADER	WWW_XMLDECL "<head><meta http-equiv=\"refresh\" content=\"10\" /><title>basic_recv</title><link rel=\"stylesheet\" type=\"text/css\" href=\"/main.css\" /></head><body>\n"
+#define	WWW_FOOTER	"\n</body></html>\r\n"
+
+#define WWW_ROBOTS	"User-agent: *\nDisallow: /\r\n"
+
+#define WWW_CSS		"html {" \
+				"background-color: white;" \
+				"font-family: Verdana;" \
+				"font-size: 11px;" \
+				"color: black" \
+			"}\n" \
+			"table {" \
+				"border-collapse: collapse" \
+			"}\n" \
+			"thead th,tfoot th {" \
+				"background-color: #C30;" \
+				"color: #FFB3A6;" \
+				"text-align: center" \
+				"font-weight: bold" \
+			"}\n" \
+			"tbody td {" \
+				"border-bottom: 1px solid #F0F0F0" \
+			"}\n" \
+			"th,td {" \
+				"border-left: 0;" \
+				"padding: 10px" \
+			"}\n" \
+			"\r\n"
 
 
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
 static int g_http = 4968;
+
+static int g_mark_interval = 10 * 1000;
+static int g_snap_interval = 10 * 1000;
+static struct timeval g_last_snap;
+static struct timeval g_tv_now;
 
 static GHashTable *g_hosts = NULL;
 static GMutex *g_hosts_mutex = NULL;
@@ -123,11 +156,14 @@ static gchar* print_tsi (gconstpointer);
 static void on_signal (int);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
+static gboolean on_snap (gpointer);
 
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
+static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
 static int tsi_callback (SoupServerContext*, SoupMessage*, gpointer);
 
@@ -244,6 +280,8 @@ on_startup (
                 soup_server_get_port (g_soup_server));
 
         soup_server_add_handler (g_soup_server, NULL,	NULL, default_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/robots.txt",	NULL, robots_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/main.css",	NULL, css_callback, NULL, NULL);
         soup_server_add_handler (g_soup_server, "/",	NULL, index_callback, NULL, NULL);
 
         soup_server_run_async (g_soup_server);
@@ -358,7 +396,11 @@ on_startup (
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
-	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
+	g_timeout_add(g_mark_interval, (GSourceFunc)on_mark, NULL);
+
+/* periodic timer to snapshot statistics */
+	g_timeout_add(g_snap_interval, (GSourceFunc)on_snap, NULL);
+
 
 	puts ("startup complete.");
 	return FALSE;
@@ -372,6 +414,51 @@ on_mark (
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
 	printf ("%s on_mark.\n", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
+
+	return TRUE;
+}
+
+static gboolean
+snap_stat (
+		gpointer	key,
+		gpointer	value,
+		gpointer	user_data
+		)
+{
+	struct hoststat* hoststat = value;
+
+#define SNAP_STAT(name)		\
+		{ \
+			hoststat->name.snap_count = hoststat->name.count; \
+			hoststat->name.snap_bytes = hoststat->name.bytes; \
+		} 
+
+	SNAP_STAT(spm);
+	SNAP_STAT(poll);
+	SNAP_STAT(polr);
+	SNAP_STAT(odata);
+	SNAP_STAT(rdata);
+	SNAP_STAT(nak);
+	SNAP_STAT(nnak);
+	SNAP_STAT(ncf);
+	SNAP_STAT(spmr);
+
+	SNAP_STAT(general);
+
+	return FALSE;
+}
+
+static gboolean
+on_snap (
+	gpointer data
+	)
+{
+	if (!g_hosts) return TRUE;
+
+	g_mutex_lock (g_hosts_mutex);
+	gettimeofday(&g_last_snap, NULL);
+	g_hash_table_foreach (g_hosts, (GHFunc)snap_stat, NULL);
+	g_mutex_unlock (g_hosts_mutex);
 
 	return TRUE;
 }
@@ -571,6 +658,29 @@ tsi_equal (
  */
 
 static void
+robots_callback (
+                SoupServerContext*      context,
+                SoupMessage*            msg,
+                gpointer                data
+                )
+{
+	soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
+				WWW_ROBOTS, strlen(WWW_ROBOTS));
+}
+
+static void
+css_callback (
+                SoupServerContext*      context,
+                SoupMessage*            msg,
+                gpointer                data
+                )
+{
+	soup_message_set_response (msg, "text/css", SOUP_BUFFER_STATIC,
+				WWW_CSS, strlen(WWW_CSS));
+}
+
+
+static void
 default_callback (
                 SoupServerContext*      context,
                 SoupMessage*            msg,
@@ -580,8 +690,8 @@ default_callback (
         char *path;
 
         path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
-        printf ("%s %s HTTP/1.%d\n", msg->method, path,
-                soup_message_get_http_version (msg));
+//        printf ("%s %s HTTP/1.%d\n", msg->method, path,
+//                soup_message_get_http_version (msg));
 
 	int e = -1;
 	if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
@@ -601,8 +711,6 @@ default_callback (
 /* transport session identifier TSI index
  */
 
-static struct timeval g_tv_now;
-
 static const char*
 print_si (
 		float* v
@@ -619,6 +727,8 @@ print_si (
 	} else if (*v > 100) {
 		strcpy (prefix, "kilo");
 		*v /= 1000.0;
+	} else {
+		*prefix = 0;
 	}
 
 	return prefix;
@@ -634,17 +744,17 @@ index_tsi_row (
 	struct hoststat* hoststat = value;
 	GString *response = user_data;
 
-	float secs = (g_tv_now.tv_sec - hoststat->session_start.tv_sec) +
-			( (g_tv_now.tv_usec - hoststat->session_start.tv_usec) / 1000.0 / 1000.0 );
-	float bitrate = ((float)hoststat->general.bytes * 8.0 / secs);
+	float secs = (g_tv_now.tv_sec - g_last_snap.tv_sec) +
+			( (g_tv_now.tv_usec - g_last_snap.tv_usec) / 1000.0 / 1000.0 );
+	float bitrate = ((float)( hoststat->general.bytes - hoststat->general.snap_bytes ) * 8.0 / secs);
 	const char* bitprefix = print_si (&bitrate);
 	char* tsi_string = print_tsi (&hoststat->tsi);
 
 	g_string_append_printf (response, 
 			"<tr>"
 				"<td><a href=\"/tsi/%s\">%s</a></td>"
-				"<td>%i</td>"
-				"<td>%i</td>"
+				"<td>%lu</td>"
+				"<td>%lu</td>"
 				"<td>%.1f pps</td>"
 				"<td>%.1f %sbit/s</td>"
 				"<td>%3.1f%%</td>"
@@ -654,7 +764,7 @@ index_tsi_row (
 			tsi_string, tsi_string,
 			hoststat->general.count,
 			hoststat->general.bytes,
-			hoststat->general.count / secs,
+			( hoststat->general.count - hoststat->general.snap_count ) / secs,
 			bitrate, bitprefix,
 			(100.0 * hoststat->odata.tsdu) / hoststat->general.bytes,
 			hoststat->general.corrupt ? (100.0 * hoststat->general.corrupt) / hoststat->general.count : 0.0,
@@ -679,7 +789,7 @@ index_callback (
 		g_string_append (response, "<i>No TSI's.</i>");
 	} else {
 		g_string_append (response, "<table>"
-						"<tr>"
+						"<thead><tr>"
 							"<th>TSI</th>"
 							"<th># Packets</th>"
 							"<th># Bytes</th>"
@@ -688,7 +798,7 @@ index_callback (
 							"<th>% Data</th>"
 							"<th>% Corrupt</th>"
 							"<th>% Invalid</th>"
-						"</tr>");
+						"</tr></thead>");
 
 		gettimeofday(&g_tv_now, NULL);
 		g_mutex_lock (g_hosts_mutex);
@@ -714,23 +824,23 @@ print_stat (
 		)
 {
 	static char buf[1024];
-	float bitrate = ((float)stat->bytes * 8.0 / secs);
+	float bitrate = ((float)( stat->bytes - stat->snap_bytes ) * 8.0 / secs);
 	const char* bitprefix = print_si (&bitrate);
 	
 	snprintf (buf, sizeof(buf),
 		"<tr>"
 			"<%s>%s</%s>"			/* type */
-			"<%s>%i</%s>"			/* # packets */
-			"<%s>%i</%s>"			/* # bytes */
+			"<%s>%lu</%s>"			/* # packets */
+			"<%s>%lu</%s>"			/* # bytes */
 			"<%s>%.1f pps</%s>"		/* packet rate */
 			"<%s>%.1f %sbit/s</%s>"		/* bitrate */
-			"<%s>%i / %3.1f%%</%s>"		/* corrupt */
-			"<%s>%i / %3.1f%%</%s>"		/* invalid */
+			"<%s>%lu / %3.1f%%</%s>"	/* corrupt */
+			"<%s>%lu / %3.1f%%</%s>"	/* invalid */
 		"</tr>",
 		el, name, el,
 		el, stat->count, el,
 		el, stat->bytes, el,
-		el, stat->count / secs, el,
+		el, ( stat->count - stat->snap_count ) / secs, el,
 		el, bitrate, bitprefix, el,
 		el, stat->corrupt, stat->corrupt ? (100.0 * stat->corrupt) / stat->count : 0.0, el,
 		el, stat->invalid, stat->invalid ? (100.0 * stat->invalid) / stat->invalid : 0.0, el
@@ -771,15 +881,15 @@ tsi_callback (
 	response = g_string_new (WWW_HEADER);
 
 	gettimeofday(&g_tv_now, NULL);
-	float secs = (g_tv_now.tv_sec - hoststat->session_start.tv_sec) +
-			( (g_tv_now.tv_usec - hoststat->session_start.tv_usec) / 1000.0 / 1000.0 );
+	float secs = (g_tv_now.tv_sec - g_last_snap.tv_sec) +
+			( (g_tv_now.tv_usec - g_last_snap.tv_usec) / 1000.0 / 1000.0 );
 
 	g_string_append_printf (response, 
-				"<h3>%s</h3>"
 				"<p>"
 				"<table>"
+					"<tr><td><b>TSI:</b></td><td>%s</td></tr>"
 					"<tr><td><b>Last IP address:</b></td><td>%s</td></tr>"
-					"<tr><td><b>NLA:</b></td><td>%s</td></tr>"
+					"<tr><td><b>Advertised NLA:</b></td><td>%s</td></tr>"
 				"</table>"
 				"</p><p>"
 				"<table>"
