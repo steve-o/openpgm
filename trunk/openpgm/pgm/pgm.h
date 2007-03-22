@@ -293,7 +293,7 @@ struct pgm_opt_path_nla {
 extern "C" {
 #endif
 
-gboolean pgm_parse_packet (char*, int, struct pgm_header**, char**, int*);
+int pgm_parse_packet (char*, int, struct pgm_header**, char**, int*);
 gboolean pgm_print_packet (char*, int);
 
 gboolean pgm_parse_spm (struct pgm_header*, char*, int, struct in_addr*);
