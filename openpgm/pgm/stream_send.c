@@ -51,6 +51,10 @@ static int g_spm_ambient_interval = 10 * 1000;
 static int g_odata_interval = 1 * 1000;
 
 static int g_payload = 0;
+static int g_corruption = 0;
+
+static int g_txw_lead = 0;
+static int g_spm_sqn = 0;
 
 static int g_io_channel_sock = -1;
 static struct in_addr g_addr;
@@ -74,6 +78,7 @@ usage (const char* bin)
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -c <percent>    : Percentage of packets to corrupt.\n");
 	exit (1);
 }
 
@@ -88,11 +93,12 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+		case 'c':	g_corruption = atoi (optarg); break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -352,8 +358,8 @@ send_spm (
 		return;
 	}
 
-printf ("PGM header size %u\n"
-	"PGM SPM block size %u\n",
+printf ("PGM header size %lu\n"
+	"PGM SPM block size %lu\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_spm) + sizeof(struct in_addr));
 
@@ -376,9 +382,9 @@ printf ("PGM header size %u\n"
 	header->pgm_tsdu_length	= 0;		/* transport data unit length */
 
 /* SPM */
-	spm->spm_sqn		= g_htonl (0);
-	spm->spm_trail		= g_htonl (0);
-	spm->spm_lead		= g_htonl (0);
+	spm->spm_sqn		= g_htonl (g_spm_sqn++);
+	spm->spm_trail		= g_htonl (g_txw_lead);
+	spm->spm_lead		= g_htonl (g_txw_lead);
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
@@ -387,6 +393,14 @@ printf ("PGM header size %u\n"
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
+/* corrupt packet */
+	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
+	{
+		puts ("corrupting packet.");
+		*(buf + g_random_int_range (0, tpdu_length)) = 0;
+	}
+
+/* send packet */
 	int flags = MSG_CONFIRM;	/* not expecting a reply */
 
 /* IP header handled by sendto() */
@@ -470,13 +484,21 @@ printf ("PGM header size %u\n"
         header->pgm_tsdu_length = g_htons (strlen(payload_string) + 1);               /* transport data unit length */
 
 /* ODATA */
-        odata->data_sqn         = 0;
-        odata->data_trail       = 0;
+        odata->data_sqn         = g_htonl (g_txw_lead);
+        odata->data_trail       = g_htonl (g_txw_lead++);
 
         memcpy (odata + 1, payload_string, strlen(payload_string) + 1);
 
         header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
+/* corrupt packet */
+	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
+	{
+		puts ("corrupting packet.");
+		*(buf + g_random_int_range (0, tpdu_length)) = 0;
+	}
+
+/* send packet */
         int flags = MSG_CONFIRM;        /* not expecting a reply */
 
 /* IP header handled by sendto() */

@@ -54,13 +54,16 @@ struct stat {
 	gulong	tsdu;
 
 	gulong	duplicate;
-	gulong	corrupt;
 	gulong	invalid;
 
 	struct timeval	last;
 	struct timeval	last_valid;
-	struct timeval	last_corrupt;
 	struct timeval	last_invalid;
+};
+
+struct netstat {
+	struct in_addr	s_addr;
+	gulong		corrupt;
 };
 
 struct hoststat {
@@ -146,6 +149,8 @@ static struct timeval g_tv_now;
 
 static GHashTable *g_hosts = NULL;
 static GMutex *g_hosts_mutex = NULL;
+static GHashTable *g_nets = NULL;
+static GMutex *g_nets_mutex = NULL;
 
 static GIOChannel* g_io_channel = NULL;
 static GMainLoop* g_loop = NULL;
@@ -489,8 +494,38 @@ on_io_data (
 	struct pgm_header *pgm_header;
 	char *packet;
 	int packet_length;
-	if (!pgm_parse_packet(buffer, len, &pgm_header, &packet, &packet_length)) {
-		puts ("invalid packet :(");
+	int e = pgm_parse_packet(buffer, len, &pgm_header, &packet, &packet_length);
+
+	switch (e) {
+	case -2:
+/* corrupt packet:
+ *
+ * we cannot trust the content, as its corrupt, so we don't know the TSI, we could
+ * guess from the sender address/multicast group/source port combo or just list separately.
+ */ 
+		{
+			if (!g_nets) {
+				g_nets = g_hash_table_new (g_int_hash, g_int_equal);
+				g_nets_mutex = g_mutex_new ();
+			}
+
+			struct netstat* netstat = g_hash_table_lookup (g_nets, &addr.sin_addr);
+			if (netstat == NULL) {
+				netstat = g_malloc0(sizeof(struct netstat));
+				netstat->s_addr = addr.sin_addr;
+				g_mutex_lock (g_nets_mutex);
+				g_hash_table_insert (g_nets, (gpointer)&netstat->s_addr, (gpointer)netstat);
+				g_mutex_unlock (g_nets_mutex);
+			}
+
+			netstat->corrupt++;
+		}
+
+	case -1:
+		fflush(stdout);
+		return TRUE;
+
+	default: break;
 	}
 
 /* search for existing session */
@@ -548,6 +583,13 @@ on_io_data (
 			hoststat->spm.invalid++;
 			hoststat->spm.last_invalid = tv;
 		} else {
+/* TODO: protect against UINT32 wrap-around */
+			if (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ) <= hoststat->spm_sqn)
+			{
+				hoststat->general.duplicate++;
+				break;
+			}
+
 			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)packet)->spm_sqn );
 			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)packet)->spm_trail );
 			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)packet)->spm_lead );
@@ -630,7 +672,8 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 /* dupe */
 		if ( IN_RECEIVE_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
 		{
-			hoststat->odata.duplicate++;
+			hoststat->general.duplicate++;
+			break;
 		}
 
 /* lost packets */
@@ -862,8 +905,30 @@ index_tsi_row (
 			( hoststat->general.count - hoststat->general.snap_count ) / secs,
 			bitrate, bitprefix,
 			(100.0 * hoststat->odata.tsdu) / hoststat->general.bytes,
-			hoststat->general.corrupt ? (100.0 * hoststat->general.corrupt) / hoststat->general.count : 0.0,
-			hoststat->general.invalid ? (100.0 * hoststat->general.invalid) / hoststat->general.count : 0.0
+			hoststat->general.invalid ? (100.0 * hoststat->general.invalid) / hoststat->general.count : 0.0,
+			hoststat->general.duplicate ? (100.0 * hoststat->general.duplicate) / hoststat->general.count : 0.0
+			);
+
+	return FALSE;
+}
+
+static gboolean
+index_nets_row (
+		gpointer	key,
+		gpointer	value,
+		gpointer	user_data
+		)
+{
+	struct netstat* netstat = value;
+	GString *response = user_data;
+
+	g_string_append_printf (response,
+			"<tr>"
+				"<td>%s</td>"
+				"<td>%lu</td>"
+			"</tr>",
+			inet_ntoa (netstat->s_addr),
+			netstat->corrupt
 			);
 
 	return FALSE;
@@ -878,7 +943,7 @@ index_callback (
 {
 	GString *response;
 
-	response = g_string_new (WWW_HEADER);
+	response = g_string_new (WWW_HEADER "<p>");
 
 	if (!g_hosts) {
 		g_string_append (response, "<i>No TSI's.</i>");
@@ -891,8 +956,8 @@ index_callback (
 							"<th>Packet Rate</th>"
 							"<th>Bitrate</th>"
 							"<th>% Data</th>"
-							"<th>% Corrupt</th>"
 							"<th>% Invalid</th>"
+							"<th>% Duplicate</th>"
 						"</tr></thead>");
 
 		gettimeofday(&g_tv_now, NULL);
@@ -902,7 +967,23 @@ index_callback (
 		g_string_append (response, "</table>");
 	}
 
-	g_string_append (response, WWW_FOOTER);
+	g_string_append (response, "</p><p>");
+
+	if (!g_nets) {
+		g_string_append (response, "<i>No corrupted packets detected.</i>");
+	} else {
+		g_string_append (response, "<table>"
+						"<thead><tr>"
+							"<th>Host</th>"
+							"<th>Corrupt packets</th>"
+						"</tr></thead>");
+		g_mutex_lock (g_nets_mutex);
+		g_hash_table_foreach (g_nets, (GHFunc)index_nets_row, response);
+		g_mutex_unlock (g_nets_mutex);
+		g_string_append (response, "</table>");
+	}
+
+	g_string_append (response, "</p>" WWW_FOOTER);
 	gchar* resp = g_string_free (response, FALSE);
 	soup_message_set_response (msg, "text/html", SOUP_BUFFER_SYSTEM_OWNED, resp, strlen(resp));
 }
@@ -929,7 +1010,6 @@ print_stat (
 			"<%s>%lu</%s>"			/* # bytes */
 			"<%s>%.1f pps</%s>"		/* packet rate */
 			"<%s>%.1f %sbit/s</%s>"		/* bitrate */
-			"<%s>%lu / %3.1f%%</%s>"	/* corrupt */
 			"<%s>%lu / %3.1f%%</%s>"	/* invalid */
 		"</tr>",
 		el, name, el,
@@ -937,7 +1017,6 @@ print_stat (
 		el, stat->bytes, el,
 		el, ( stat->count - stat->snap_count ) / secs, el,
 		el, bitrate, bitprefix, el,
-		el, stat->corrupt, stat->corrupt ? (100.0 * stat->corrupt) / stat->count : 0.0, el,
 		el, stat->invalid, stat->invalid ? (100.0 * stat->invalid) / stat->invalid : 0.0, el
 		);
 
@@ -1001,7 +1080,6 @@ tsi_callback (
 						"<th># Bytes</th>"
 						"<th>Packet Rate</th>"
 						"<th>Bitrate</th>"
-						"<th>Corrupt</th>"
 						"<th>Invalid</th>"
 					"</tr></thead>",
 				path + strlen("/tsi/"),
