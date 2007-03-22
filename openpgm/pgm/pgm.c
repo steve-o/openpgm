@@ -49,7 +49,7 @@ static int pgm_print_options (char*, int);
 static const char *pgm_packet_type (guint8);
 
 
-gboolean
+int
 pgm_parse_packet (
 	char*	data,
 	int	len,
@@ -62,20 +62,20 @@ pgm_parse_packet (
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
 		printf ("Packet size too small: %i bytes, expecting at least %u bytes.\n", len, sizeof(struct pgm_header));
-		return FALSE;
+		return -1;
 	}
 
 /* decode IP header */
 	const struct iphdr* ip = (struct iphdr*)data;
 	if (ip->version != 4) {				/* IP version, 4 or 6 */
 		puts ("not IP4 packet :/");		/* v6 not currently handled */
-		return FALSE;
+		return -1;
 	}
 
 	guint ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
 	if (ip_header_length < sizeof(struct iphdr)) {
 		puts ("bad IP header length :(");
-		return FALSE;
+		return -1;
 	}
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
@@ -86,13 +86,13 @@ pgm_parse_packet (
 	int packet_length = g_ntohs(ip->tot_len);	/* total packet length */
 	if (len < packet_length) {				/* redundant: often handled in kernel */
 		puts ("truncated IP packet");
-		return FALSE;
+		return -1;
 	}
 
 /* TCP Segmentation Offload (TSO) might have zero length here */
 	if (packet_length < ip_header_length) {
 		puts ("bad length :(");
-		return FALSE;
+		return -1;
 	}
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
@@ -100,14 +100,15 @@ pgm_parse_packet (
 	int sum = in_cksum(data, packet_length, 0);
 	if (sum != 0) {
 		int ip_sum = g_ntohs(ip->check);
-		printf ("bad cksum! %i", ip_sum);
+		printf ("bad cksum! %i\n", ip_sum);
+		return -2;
 	}
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
 	int offset = g_ntohs(ip->frag_off);
 	if ((offset & 0x1fff) != 0) {
 		puts ("fragmented packet :/");
-		return FALSE;
+		return -1;
 	}
 
 /* PGM payload, header looks as follows:
@@ -131,7 +132,7 @@ pgm_parse_packet (
 
 	if (pgm_length < sizeof(pgm_header)) {
 		puts ("bad packet size :(");
-		return FALSE;
+		return -1;
 	}
 
 	if (pgm_header->pgm_checksum)
@@ -141,7 +142,7 @@ pgm_parse_packet (
 		int pgm_sum = pgm_cksum((const char*)pgm_header, pgm_length, 0);
 		if (pgm_sum != sum) {
 			puts ("PGM checksum bad :(");
-			return FALSE;
+			return -2;
 		}
 	} else {
 		puts ("No PGM checksum :O");
@@ -153,14 +154,14 @@ pgm_parse_packet (
 
 	if (pgm_length < 0) {
 		puts ("bad packet length :(");
-		return FALSE;
+		return -1;
 	}
 
 	*header = pgm_header;
 	*packet = pgm_data;
 	*packet_len = pgm_length;
 
-	return TRUE;
+	return 0;
 }
 
 gboolean
