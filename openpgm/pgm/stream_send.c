@@ -388,8 +388,7 @@ printf ("PGM header size %lu\n"
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
-	struct in_addr* in = (struct in_addr*)(spm + 1);
-	in->s_addr = g_htonl (g_addr.s_addr);
+	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
@@ -409,7 +408,7 @@ printf ("PGM header size %lu\n"
 	mc.sin_addr.s_addr	= g_mreqn.imr_multiaddr.s_addr;
 	mc.sin_port		= 0;
 
-	printf("sendto: %i bytes.\n", tpdu_length);
+	printf("TPDU %i bytes.\n", tpdu_length);
 	e = sendto (g_io_channel_sock,
 		buf,
 		tpdu_length,
@@ -459,7 +458,7 @@ send_odata (void)
 	}
 
 printf ("PGM header size %u\n"
-	"PGM data block size %u\n"
+	"PGM data header size %u\n"
 	"payload size %u\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
@@ -507,7 +506,7 @@ printf ("PGM header size %u\n"
         mc.sin_addr.s_addr      = g_mreqn.imr_multiaddr.s_addr;
         mc.sin_port             = 0;
 
-        printf("sendto: %i bytes.\n", tpdu_length);
+        printf("TPDU %i bytes.\n", tpdu_length);
         e = sendto (g_io_channel_sock,
                 buf,
                 tpdu_length,
