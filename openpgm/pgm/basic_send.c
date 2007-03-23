@@ -27,9 +27,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <linux/if.h>
 #include <arpa/inet.h>
 
 #include <glib.h>
@@ -45,6 +48,18 @@ static char* g_network = "226.0.0.1";
 static struct ip_mreqn g_mreqn;
 
 static char* g_payload = "banana man!";
+
+/* MTU is messy, 1500 for regular ethernet, 9000 for jumbo but various jumbo
+ * sizes in between are only supported by some hardware, similarly some IP
+ * options can reduce the maxium size, e.g. LLC/SNAP or VPN encapsulation.
+ * 1492 is good for ATM.
+ */
+static int g_mtu = 1500;
+#define g_tpdu_limit  (g_mtu - sizeof(struct iphdr))
+
+/* TSDU limit is more complicated as PGM options reduce the available size
+ */
+#define g_tsdu_limit  (g_tpdu_limit - sizeof(struct pgm_header) - sizeof(struct pgm_data))
 
 static int g_io_channel_sock = -1;
 static GIOChannel* g_io_channel = NULL;
@@ -92,6 +107,10 @@ main (
 	if (optind < argc) {
 		g_payload = argv[optind];
 		printf ("payload \"%s\"\n", g_payload);
+	}
+
+	if (strlen(g_payload) > g_tsdu_limit) {
+		printf ("WARNING: payload string is longer than the interface MTU will allow.\n");
 	}
 
 	log_init ();
@@ -235,6 +254,32 @@ on_startup (
 		return FALSE;
 	}
 
+/* query bound socket for actual interface address */
+	char hostname[NI_MAXHOST + 1];
+	gethostname (hostname, sizeof(hostname));
+	struct hostent *he = gethostbyname (hostname);
+
+	if (he == NULL) {
+		printf ("error code %i\n", errno);
+		perror("on_startup() failed");
+		close(g_io_channel_sock);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+
+	struct in_addr g_addr;
+	g_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+	printf ("socket bound to %s (%s)\n", inet_ntoa(g_addr), hostname);
+
+/* check for MTU */
+	struct ifreq ifreq;
+	e = ioctl (g_io_channel_sock, SIOCGIFMTU, &ifreq);
+	if (e < 0) {
+		perror("Cannot determine interface MTU");
+	} else {
+		printf ("interface MTU %i bytes.\n", ifreq.ifr_mtu);
+	}
+
 /* multicast */
 	memset(&g_mreqn, 0, sizeof(g_mreqn));
 	g_mreqn.imr_address.s_addr = htonl(INADDR_ANY);
@@ -317,9 +362,9 @@ banana_man (
 		return;
 	}
 
-printf ("PGM header size %u\n"
-	"PGM data header size %u\n"
-	"payload size %u\n",
+printf ("PGM header size %lu\n"
+	"PGM data header size %lu\n"
+	"payload size %lu\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
 	strlen(g_payload) + 1);
