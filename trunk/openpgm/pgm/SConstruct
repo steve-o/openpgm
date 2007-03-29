@@ -28,6 +28,8 @@ env.Program(['spm_idle.c'] + shared_obj)
 env.Program(['stream_send.c'] + shared_obj)
 httpenv.Program(['basic_recv.c'] + shared_obj)
 httpenv.Program(['basic_http.c'] + shared_obj)
-env.Program(['basic_txw.c'])
+env.Program(['basic_container.c'])
+env.Program(['basic_txw.c', 'txw.c'] + shared_obj)
+#env.Program(['stream_send_with_nak.c'] + shared_obj)
 
 # end of file
