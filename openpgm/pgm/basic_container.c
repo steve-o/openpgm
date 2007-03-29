@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * A basic transmit window 
+ * Test basic containers for alloc performance.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -68,7 +68,7 @@ main (
 	char   *argv[]
 	)
 {
-	puts ("basic_txw");
+	puts ("basic_container");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -85,14 +85,17 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	int test_size[] = { 10, 20, 100, 200, 1000, 2000, 10000, 20000, /*100000, 200000,*/ 0 };
+	int test_size[] = { 10, 20, 100, 200, 1000, 2000, 10000, 20000, 100000, 200000, 0 };
 	int test_payload[] = { 9000, 1500, 0 };
 	struct tests tests[] = {
-			{ test_alloc_list_malloc, "list/malloc" },
-			{ test_alloc_list, "list/slice" },
+//			{ test_alloc_list_malloc, "list/malloc" },
+//			{ test_alloc_list, "list/slice" },
 			{ test_alloc_list_stack, "list/stack" },
-			{ test_alloc_slist, "slist" },
-			{ test_alloc_queue, "queue" },
+//			{ test_alloc_slist, "slist" },
+//			{ test_alloc_hash, "hash" },
+//			{ test_alloc_queue, "queue" },
+//			{ test_alloc_ptr_array, "*array" },
+//			{ test_alloc_byte_array, "byte array" },
 #if HAVE_GLIB_SEQUENCE
 			{ test_alloc_sequence, "sequence" },
 #endif
@@ -134,7 +137,7 @@ _list_iterator (
 		gpointer user_data
 		)
 {
-	g_slice_free1 ( (int)user_data, data );
+	g_slice_free1 ( *(int*)user_data, data );
 }
 
 double
@@ -151,10 +154,7 @@ test_alloc_list (
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
-		if (i)
-			p = g_list_append (p, entry);
-		else
-			p = list = g_list_append (p, entry);
+		list = g_list_prepend (list, entry);
 	}
 	gettimeofday(&now, NULL);
 
@@ -180,10 +180,7 @@ test_alloc_list_malloc (
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_malloc (size_per_entry) : NULL;
-		if (i)
-			p = g_list_append (p, entry);
-		else
-			p = list = g_list_append (p, entry);
+		list = g_list_prepend (list, entry);
 	}
 	gettimeofday(&now, NULL);
 
@@ -219,10 +216,7 @@ test_alloc_list_stack (
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_trash_stack_pop (&stack) : NULL;
-		if (i)
-			p = g_list_append (p, entry);
-		else
-			p = list = g_list_append (p, entry);
+		list = g_list_prepend (list, entry);
 	}
 	gettimeofday(&now, NULL);
 
@@ -248,10 +242,7 @@ test_alloc_slist (
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
-		if (i)
-			p = g_slist_append (p, entry);
-		else
-			p = list = g_slist_append (p, entry);
+		list = g_slist_prepend (list, entry);
 	}
 	gettimeofday(&now, NULL);
 
@@ -329,7 +320,7 @@ _hash_iterator (
 		)
 {
 	g_slice_free ( int, key );
-	g_slice_free1 ( (int)user_data, value );
+	g_slice_free1 ( *(int*)user_data, value );
 }
 
 double
