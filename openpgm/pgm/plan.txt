@@ -49,6 +49,24 @@ basic_recv
 Listen to packets indicating data loss, view details through web interface.
 
 
+basic_container
+---------------
+
+Test performance of glib containers for fast allocating for a dynamic transmit window.
+
+
+basic_txw
+---------
+
+Test performance of a basic transmit window implementation.
+
+
+nak_txw
+-------
+
+Test performance of random access to packets inside the window.
+
+
 stream_send2
 ------------
 
