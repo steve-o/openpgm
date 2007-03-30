@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Test alloc on a basic transmit window 
+ * Test sequential packet retrieval from a basic transmit window 
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -58,7 +58,7 @@ main (
 	char   *argv[]
 	)
 {
-	puts ("basic_txw");
+	puts ("nak_txw");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -123,12 +123,21 @@ test_basic_txw (
 
 	txw = txw_init (size_per_entry, 0, count, 0, 0);
 
-	gettimeofday(&start, NULL);
+/* fill window up */
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_slice_alloc(size_per_entry) : NULL;
-
 		txw_push (txw, entry, size_per_entry);
+	}
+
+/* iterate through entire window requesting packet data */
+	gettimeofday(&start, NULL);
+	for (i = 0; i < count; i++)
+	{
+		char *packet;
+		int length;
+
+		txw_get (txw, i, &packet, &length);
 	}
 	gettimeofday(&now, NULL);
 

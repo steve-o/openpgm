@@ -16,6 +16,7 @@ env.ParseConfig('pkg-config --cflags --libs glib-2.0')
 shared_src = Split("""
 		log.c
 		pgm.c
+		txw.c
 """)
 
 shared_obj = []
@@ -29,7 +30,8 @@ env.Program(['stream_send.c'] + shared_obj)
 httpenv.Program(['basic_recv.c'] + shared_obj)
 httpenv.Program(['basic_http.c'] + shared_obj)
 env.Program(['basic_container.c'])
-env.Program(['basic_txw.c', 'txw.c'] + shared_obj)
+env.Program(['basic_txw.c'] + shared_obj)
+env.Program(['nak_txw.c'] + shared_obj)
 #env.Program(['stream_send_with_nak.c'] + shared_obj)
 
 # end of file

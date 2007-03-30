@@ -155,8 +155,6 @@ _list_iterator (
 	gpointer	user_data
 	)
 {
-	static int i = 0;
-
 	struct txw_packet *tp = (struct txw_packet*)data;
 	int length = tp->length;
 
@@ -221,19 +219,25 @@ txw_push (
 /* wrap offset helper */
 	if (tp->sequence_number == ( TXW_LENGTH(t) + t->offset ))
 	{
-if (txw_debug)
+if (txw_debug > 1)
 puts ("txw: wrap offset.");
 		t->offset += TXW_LENGTH(t);
 	}
 
 	int offset = tp->sequence_number - t->offset;
 
-if (txw_debug)
+if (txw_debug > 2)
 printf ("txw: add packet offset %i\n", offset);
 	g_ptr_array_index (t->pdata, offset) = tp;
 
 	t->lead			= tp->sequence_number;
 	t->next_lead		= txw_next_sequence_number (ptr);
+
+if (txw_debug > 2)
+{
+	if (TXW_LENGTH(t) == TXW_SQNS(t)) puts ("txw: now full.");
+	printf ("txw: next lead# %i\n", t->next_lead);
+}
 
 	return 0;
 }
@@ -277,9 +281,11 @@ txw_get (
 		return -1;
 	}
 
-	int offset = sequence_number > t->offset ? 
+	int offset = sequence_number >= t->offset ? 
 			( sequence_number - t->offset ) :
 			( sequence_number - ( t->offset - TXW_LENGTH(t) ) );
+if (txw_debug > 2)
+printf ("txw: get packet offset %i\n", offset);
 
 	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
 	*packet = tp->data;
@@ -306,7 +312,7 @@ txw_pop (
 		return -1;
 	}
 
-	int offset = t->trail > t->offset ? 
+	int offset = t->trail >= t->offset ? 
 			( t->trail - t->offset ) :
 			( t->trail - ( t->offset - TXW_LENGTH(t) ) );
 
