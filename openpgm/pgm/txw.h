@@ -30,7 +30,6 @@ gpointer txw_init (int, int, int, int, int);
 int txw_shutdown (gpointer);
 
 gpointer txw_alloc (gpointer);
-int txw_next_sequence_number (gpointer);
 int txw_push (gpointer, gpointer, int);
 int txw_push_copy (gpointer, gpointer, int);
 int txw_get (gpointer, int, gpointer*, int*);
