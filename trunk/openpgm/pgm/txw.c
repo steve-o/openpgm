@@ -67,6 +67,17 @@ struct txw {
 #define IN_TXW(t,x) \
 	( (x) >= (t)->trail && (x) <= ((t)->trail + ((UINT32_MAX/2) - 1)) )
 
+#define TXW_PACKET_OFFSET(t,x) \
+	( \
+		(x) >= (t)->offset ? \
+			( (x) - (t)->offset ) : \
+			( (x) - ( (t)->offset - TXW_LENGTH(t) ) ) \
+	)
+
+#define TXW_INC_SQN(x) \
+	( (x) == UINT32_MAX ? 0 : ( (x) + 1 ) )
+
+
 
 /* globals */
 int txw_debug = 0;
@@ -177,20 +188,6 @@ txw_alloc (
 }
 
 int
-txw_next_sequence_number (
-	gpointer	ptr
-	)
-{
-	if (!ptr) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
-	struct txw* t = (struct txw*)ptr;
-
-	return t->lead == UINT32_MAX ? 0 : ( t->lead + 1 );
-}
-
-int
 txw_push (
 	gpointer	ptr,
 	gpointer	packet,
@@ -231,7 +228,7 @@ printf ("txw: add packet offset %i\n", offset);
 	g_ptr_array_index (t->pdata, offset) = tp;
 
 	t->lead			= tp->sequence_number;
-	t->next_lead		= txw_next_sequence_number (ptr);
+	t->next_lead		= TXW_INC_SQN(t->lead);
 
 if (txw_debug > 2)
 {
@@ -281,12 +278,7 @@ txw_get (
 		return -1;
 	}
 
-	int offset = sequence_number >= t->offset ? 
-			( sequence_number - t->offset ) :
-			( sequence_number - ( t->offset - TXW_LENGTH(t) ) );
-if (txw_debug > 2)
-printf ("txw: get packet offset %i\n", offset);
-
+	int offset = TXW_PACKET_OFFSET(t, sequence_number);
 	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
 	*packet = tp->data;
 	*length	= tp->length;
@@ -312,15 +304,12 @@ txw_pop (
 		return -1;
 	}
 
-	int offset = t->trail >= t->offset ? 
-			( t->trail - t->offset ) :
-			( t->trail - ( t->offset - TXW_LENGTH(t) ) );
-
+	int offset = TXW_PACKET_OFFSET(t, t->trail);
 	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
 	g_slice_free1 (tp->length, tp->data);
 	g_slice_free1 (sizeof(struct txw), tp);
 
-	t->trail = t->trail == UINT32_MAX ? 0 : ( t->trail + 1 );
+	t->trail = TXW_INC_SQN(t->trail);
 
 	return 0;
 }
