@@ -137,7 +137,7 @@ test_basic_txw (
 		char *packet;
 		int length;
 
-		txw_get (txw, i, &packet, &length);
+		txw_get (txw, i, (gpointer)&packet, &length);
 	}
 	gettimeofday(&now, NULL);
 
