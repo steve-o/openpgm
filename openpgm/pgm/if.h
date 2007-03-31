@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * basic transmit window.
+ * network interface handling.
  *
  * Copyright (c) 2006 Miru Limited.
  *
@@ -19,28 +19,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _TXW_H
-#define _TXW_H
+#ifndef _IF_H
+#define _IF_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-gpointer txw_init (int, int, int, int, int);
-int txw_shutdown (gpointer);
+int if_print_all (void);
 
-int txw_next_lead (gpointer);
-int txw_lead (gpointer);
-int txw_trail (gpointer);
-
-gpointer txw_alloc (gpointer);
-int txw_push (gpointer, gpointer, int);
-int txw_push_copy (gpointer, gpointer, int);
-int txw_get (gpointer, int, gpointer*, int*);
-int txw_pop (gpointer);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _TXW_H */
+#endif /* _IF_H */

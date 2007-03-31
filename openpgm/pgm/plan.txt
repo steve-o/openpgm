@@ -67,26 +67,32 @@ nak_txw
 Test performance of random access to packets inside the window.
 
 
-stream_send2
-------------
+stream_send_with_nak
+--------------------
 
 Respond to NAK's with RDATA.
 
 
-basic_recv2
------------
+basic_recv_with_nak
+-------------------
 
 Listen to packets and send NAK's to rebuild data.
 
 
-stream_send3
-------------
+dumpif
+------
+
+Display all IP based interfaces and basic details.
+
+
+stream_send_with_fec
+--------------------
 
 Send ODATA with FEC.
 
 
-basic_recv3
------------
+basic_recv3_with_fec
+--------------------
 
 Listen to packets and repair with FEC data.
 

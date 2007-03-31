@@ -80,7 +80,7 @@ struct txw {
 
 
 /* globals */
-int txw_debug = 0;
+int txw_debug = 1;
 
 static void _list_iterator (gpointer, gpointer);
 
@@ -166,6 +166,9 @@ _list_iterator (
 	gpointer	user_data
 	)
 {
+/* iteration on empty array sized on init() */
+	if (!data) return;
+
 	struct txw_packet *tp = (struct txw_packet*)data;
 	int length = tp->length;
 
@@ -188,6 +191,48 @@ txw_alloc (
 }
 
 int
+txw_next_lead (
+	gpointer	ptr
+	)
+{
+	if (!ptr) {
+		puts ("txw: invalid parameter, major internal error.");
+		exit (-1);
+	}
+	struct txw* t = (struct txw*)ptr;
+
+	return t->next_lead;
+}
+
+int
+txw_lead (
+	gpointer	ptr
+	)
+{
+	if (!ptr) {
+		puts ("txw: invalid parameter, major internal error.");
+		exit (-1);
+	}
+	struct txw* t = (struct txw*)ptr;
+
+	return t->lead;
+}
+
+int
+txw_trail (
+	gpointer	ptr
+	)
+{
+	if (!ptr) {
+		puts ("txw: invalid parameter, major internal error.");
+		exit (-1);
+	}
+	struct txw* t = (struct txw*)ptr;
+
+	return t->trail;
+}
+
+int
 txw_push (
 	gpointer	ptr,
 	gpointer	packet,
@@ -202,8 +247,10 @@ txw_push (
 
 /* check for full window */
 	if (TXW_LENGTH(t) == TXW_SQNS(t)) {
-		puts ("txw: full :(");
-		return -1;
+		puts ("txw: full :o");
+
+/* transmit window advancement scheme dependent action here */
+		txw_pop (ptr);
 	}
 
 /* add to window */
