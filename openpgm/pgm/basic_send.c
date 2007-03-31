@@ -285,39 +285,46 @@ on_startup (
 	g_mreqn.imr_address.s_addr = htonl(INADDR_ANY);
 	printf ("sending on interface %s.\n", inet_ntoa(g_mreqn.imr_address));
 	g_mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("sending on multicast address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+	if (IN_MULTICAST(g_htonl(g_mreqn.imr_multiaddr.s_addr)))
+		printf ("sending on multicast address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+	else
+		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
 
+	if (IN_MULTICAST(g_htonl(g_mreqn.imr_multiaddr.s_addr)))
+	{
 /* IP_ADD_MEMBERSHIP = subscription
  * IP_MULTICAST_IF = send only
  */
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
-//	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
-	if (e < 0) {
-		perror("on_startup() failed");
-		close(g_io_channel_sock);
-		g_main_loop_quit(g_loop);
-		return FALSE;
-	}
+		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
+//		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
+		if (e < 0) {
+			perror("on_startup() failed");
+			close(g_io_channel_sock);
+			g_main_loop_quit(g_loop);
+			return FALSE;
+		}
 
 /* multicast loopback */
-	gboolean n = 0;
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
-	if (e < 0) {
-		perror("on_startup() failed");
-		close(g_io_channel_sock);
-		g_main_loop_quit(g_loop);
-		return FALSE;
-	}
+		gboolean n = 0;
+		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+		if (e < 0) {
+			perror("on_startup() failed");
+			close(g_io_channel_sock);
+			g_main_loop_quit(g_loop);
+			return FALSE;
+		}
 
 /* multicast ttl */
-	int ttl = 1;
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
-	if (e < 0) {
-		perror("on_startup() failed");
-		close(g_io_channel_sock);
-		g_main_loop_quit(g_loop);
-		return FALSE;
-	}
+		int ttl = 1;
+		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+		if (e < 0) {
+			perror("on_startup() failed");
+			close(g_io_channel_sock);
+			g_main_loop_quit(g_loop);
+			return FALSE;
+		}
+
+	} /* IN_MULTICAST */
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
@@ -403,7 +410,7 @@ printf ("PGM header size %lu\n"
 	mc.sin_addr.s_addr	= g_mreqn.imr_multiaddr.s_addr;
 	mc.sin_port		= 0;
 
-	printf("TPDU %i bytes.\n", tpdu_length);
+	printf("TPDU %i bytes to %s.\n", tpdu_length, inet_ntoa(mc.sin_addr));
 	e = sendto (g_io_channel_sock,
 		buf,
 		tpdu_length,
