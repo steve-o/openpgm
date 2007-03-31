@@ -94,7 +94,17 @@ struct pgm_spm {
     guint32	spm_lead;		/* leading edge sequence number */
     guint16	spm_nla_afi;		/* nla afi */
     guint16	spm_reserved;		/* reserved */
-    /* ... path nla */
+    struct in_addr spm_nla;		/* path nla */
+    /* ... option extensions */
+};
+
+struct pgm_spm6 {
+    guint32	spm6_sqn;		/* spm sequence number */
+    guint32	spm6_trail;		/* trailing edge sequence number */
+    guint32	spm6_lead;		/* leading edge sequence number */
+    guint16	spm6_nla_afi;		/* nla afi */
+    guint16	spm6_reserved;		/* reserved */
+    struct in6_addr spm6_nla;		/* path nla */
     /* ... option extensions */
 };
 
@@ -111,10 +121,21 @@ struct pgm_nak {
     guint32	nak_sqn;		/* requested sequence number */
     guint16	nak_src_nla_afi;	/* nla afi */
     guint16	nak_reserved;		/* reserved */
-    /* ... source nla */
-    /* ... nla afi */
-    /* ... reserved */
-    /* ... multicast group nla */
+    struct in_addr nak_src_nla;		/* source nla */
+    guint16	nak_grp_nla_afi;	/* nla afi */
+    guint16	nak_reserved2;		/* reserved */
+    struct in_addr nak_grp_nla;		/* multicast group nla */
+    /* ... option extension */
+};
+
+struct pgm_nak6 {
+    guint32	nak6_sqn;		/* requested sequence number */
+    guint16	nak6_src_nla_afi;	/* nla afi */
+    guint16	nak6_reserved;		/* reserved */
+    struct in6_addr nak6_src_nla;	/* source nla */
+    guint16	nak6_grp_nla_afi;	/* nla afi */
+    guint16	nak6_reserved2;		/* reserved */
+    struct in6_addr nak6_grp_nla;	/* multicast group nla */
     /* ... option extension */
 };
 
@@ -156,7 +177,14 @@ struct pgm_opt_redirect {
     guint16	opt_reserved;		/* reserved */
     guint16	opt_nla_afi;		/* nla afi */
     guint16	opt_reserved2;		/* reserved */
-    guint32	opt_nla;		/* dlr nla */
+    struct in_addr opt_nla;		/* dlr nla */
+};
+
+struct pgm_opt6_redirect {
+    guint16	opt6_reserved;		/* reserved */
+    guint16	opt6_nla_afi;		/* nla afi */
+    guint16	opt6_reserved2;		/* reserved */
+    struct in6_addr opt6_nla;		/* dlr nla */
 };
 
 /* 9.6.2.  Option Sources - OPT_SYN */
@@ -243,10 +271,23 @@ struct pgm_poll {
     guint16	poll_s_type;		/* poll sub-type */
     guint16	poll_nla_afi;		/* nla afi */
     guint16	poll_reserved;		/* reserved */
-    /* ... path nla */
-    /* ... poll back-off interval */
-    /* ... random string */
-    /* ... matching bit-mask */
+    struct in_addr poll_nla;		/* path nla */
+    guint32	poll_bo_ivl;		/* poll back-off interval */
+    gchar	poll_rand[4];		/* random string */
+    guint32	poll_mask;		/* matching bit-mask */
+    /* ... option extensions */
+};
+
+struct pgm_poll6 {
+    guint32	poll6_sqn;		/* poll sequence number */
+    guint16	poll6_round;		/* poll round */
+    guint16	poll6_s_type;		/* poll sub-type */
+    guint16	poll6_nla_afi;		/* nla afi */
+    guint16	poll6_reserved;		/* reserved */
+    struct in6_addr poll6_nla;		/* path nla */
+    guint32	poll6_bo_ivl;		/* poll back-off interval */
+    gchar	poll6_rand[4];		/* random string */
+    guint32	poll6_mask;		/* matching bit-mask */
     /* ... option extensions */
 };
 
@@ -266,15 +307,15 @@ struct pgm_polr {
 /* 15.4.1.  Option NAK Back-Off Interval - OPT_NAK_BO_IVL */
 struct pgm_opt_nak_bo_ivl {
     guint16	opt_reserved;		/* reserved */
-    guint32	nak_bo_ivl;		/* nak back-off interval */
-    guint32	nak_bo_ivl_sqn;		/* nak back-off interval sqn */
+    guint32	opt_nak_bo_ivl;		/* nak back-off interval */
+    guint32	opt_nak_bo_ivl_sqn;	/* nak back-off interval sqn */
 };
 
 /* 15.4.2.  Option NAK Back-Off Range - OPT_NAK_BO_RNG */
 struct pgm_opt_nak_bo_rng {
     guint16	opt_reserved;		/* reserved */
-    guint32	nak_max_bo_ivl;		/* maximum nak back-off interval */
-    guint32	nak_min_bo_ivl;		/* minimum nak back-off interval */
+    guint32	opt_nak_max_bo_ivl;	/* maximum nak back-off interval */
+    guint32	opt_nak_min_bo_ivl;	/* minimum nak back-off interval */
 };
 
 /* 15.4.3.  Option Neighbour Unreachable - OPT_NBR_UNREACH */
@@ -285,7 +326,12 @@ struct pgm_opt_nbr_unreach {
 /* 15.4.4.  Option Path - OPT_PATH_NLA */
 struct pgm_opt_path_nla {
     guint16	opt_reserved;		/* reserved */
-    guint32	path_nla;		/* path nla */
+    struct in_addr opt_path_nla;	/* path nla */
+};
+
+struct pgm_opt6_path_nla {
+    guint16	opt6_reserved;		/* reserved */
+    struct in6_addr opt6_path_nla;	/* path nla */
 };
 
 

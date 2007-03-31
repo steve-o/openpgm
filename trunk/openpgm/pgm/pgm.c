@@ -65,10 +65,56 @@ pgm_parse_packet (
 		return -1;
 	}
 
+/* IP packet header: IPv4
+ *
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |Version|  HL   |      ToS      |            Length             |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |           Fragment ID         |R|D|M|     Fragment Offset     |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |      TTL      |    Protocol   |           Checksum            |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                       Source IP Address                       |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                    Destination IP Address                     |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * | IP Options when present ...
+ * +-+-+-+-+-+-+-+-+-+-+-+-+ ...
+ * | Data ...
+ * +-+-+- ...
+ *
+ * IPv6
+ *
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |Version| Traffic Class |             Flow Label                |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |           Payload Length      |   Next Header |   Hop Limit   |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                                                               |
+ * |                       Source IP Address                       |
+ * |                                                               |
+ * |                                                               |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                                                               |
+ * |                     Destination IP Address                    |
+ * |                                                               |
+ * |                                                               |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * | IP Options when present ...
+ * +-+-+-+-+-+-+-+-+-+-+-+-+ ...
+ * | Data ...
+ * +-+-+- ...
+ *
+ */
+
 /* decode IP header */
 	const struct iphdr* ip = (struct iphdr*)data;
-	if (ip->version != 4) {				/* IP version, 4 or 6 */
-		puts ("not IP4 packet :/");		/* v6 not currently handled */
+	if (ip->version != 4 || ip->version != 6) {	/* IP version, 4 or 6 */
+		puts ("unknown IP version :/");	
 		return -1;
 	}
 
@@ -84,7 +130,7 @@ pgm_parse_packet (
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
 	int packet_length = g_ntohs(ip->tot_len);	/* total packet length */
-	if (len < packet_length) {				/* redundant: often handled in kernel */
+	if (len < packet_length) {			/* redundant: often handled in kernel */
 		puts ("truncated IP packet");
 		return -1;
 	}
@@ -395,7 +441,7 @@ pgm_parse_spm (
 
 	switch (g_ntohs(spm->spm_nla_afi)) {
 	case AFI_IP:
-		addr = (struct in_addr*)(spm + 1);
+		*addr = *(struct in_addr*)(spm + 1);
 		data += sizeof(struct in_addr);
 		len -= sizeof(struct in_addr);
 		break;

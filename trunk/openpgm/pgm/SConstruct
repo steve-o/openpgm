@@ -17,6 +17,7 @@ shared_src = Split("""
 		log.c
 		pgm.c
 		txw.c
+		if.c
 """)
 
 shared_obj = []
@@ -32,6 +33,8 @@ httpenv.Program(['basic_http.c'] + shared_obj)
 env.Program(['basic_container.c'])
 env.Program(['basic_txw.c'] + shared_obj)
 env.Program(['nak_txw.c'] + shared_obj)
-#env.Program(['stream_send_with_nak.c'] + shared_obj)
+env.Program(['stream_send_with_nak.c'] + shared_obj)
+httpenv.Program(['basic_recv_with_nak.c'] + shared_obj)
+env.Program(['dumpif.c'] + shared_obj)
 
 # end of file
