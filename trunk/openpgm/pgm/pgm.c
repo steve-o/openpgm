@@ -61,7 +61,7 @@ pgm_parse_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %i bytes, expecting at least %u bytes.\n", len, sizeof(struct pgm_header));
+		printf ("Packet size too small: %i bytes, expecting at least %lu bytes.\n", len, sizeof(struct pgm_header));
 		return -1;
 	}
 
@@ -219,7 +219,7 @@ pgm_print_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %i bytes, expecting at least %u bytes.\n", len, sizeof(struct pgm_header));
+		printf ("Packet size too small: %i bytes, expecting at least %lu bytes.\n", len, sizeof(struct pgm_header));
 		return FALSE;
 	}
 
@@ -418,7 +418,7 @@ pgm_print_packet (
  * => Path NLA = IP address of last network element
  */
 
-#define PGM_MIN_SPM_SIZE	(sizeof(struct pgm_spm) + sizeof(struct in_addr))
+#define PGM_MIN_SPM_SIZE	( sizeof(struct pgm_spm) )
 
 gboolean
 pgm_parse_spm (
@@ -435,23 +435,13 @@ pgm_parse_spm (
 
 	struct pgm_spm* spm = (struct pgm_spm*)data;
 
-/* path nla */
-	data += sizeof(struct pgm_spm);
-	len -= sizeof(struct pgm_spm);
-
-	switch (g_ntohs(spm->spm_nla_afi)) {
-	case AFI_IP:
-		*addr = *(struct in_addr*)(spm + 1);
-		data += sizeof(struct in_addr);
-		len -= sizeof(struct in_addr);
-		break;
-
-/* insert IPv6, etc here */
-
-	default:
-		printf ("unsupported afi");
+/* check for IPv6 */
+	if (g_ntohs(spm->spm_nla_afi) != AFI_IP) {
+		puts ("unsupported afi");
 		return -1;
 	}
+
+	*addr = spm->spm_nla;
 
 	return 0;
 }
@@ -471,30 +461,41 @@ pgm_print_spm (
 	}
 
 	struct pgm_spm* spm = (struct pgm_spm*)data;
+	struct pgm_spm6* spm6 = (struct pgm_spm6*)data;
+
+	spm->spm_nla_afi = g_ntohs (spm->spm_nla_afi);
 
 	printf ("sqn %lu trail %lu lead %lu nla-afi %u ",
 		(gulong)g_ntohl(spm->spm_sqn),
 		(gulong)g_ntohl(spm->spm_trail),
 		(gulong)g_ntohl(spm->spm_lead),
-		g_ntohs(spm->spm_nla_afi));	/* address family indicator */
+		spm->spm_nla_afi);	/* address family indicator */
 
-/* path nla */
-	data += sizeof(struct pgm_spm);
-	len -= sizeof(struct pgm_spm);
-
-	switch (g_ntohs(spm->spm_nla_afi)) {
+	char s[INET6_ADDRSTRLEN];
+	switch (spm->spm_nla_afi) {
 	case AFI_IP:
-		printf (inet_ntoa(*(struct in_addr*)(spm + 1)));
-		data += sizeof(struct in_addr);
-		len -= sizeof(struct in_addr);
+		inet_ntop ( AF_INET, &spm->spm_nla, s, sizeof (s) );
+		data += sizeof( struct pgm_spm );
+		len  -= sizeof( struct pgm_spm );
 		break;
 
-/* insert IPv6, etc here */
+	case AFI_IP6:
+		if (len < sizeof (struct pgm_spm6)) {
+			puts ("packet truncated :(");
+			return FALSE;
+		}
+
+		inet_ntop ( AF_INET6, &spm6->spm6_nla, s, sizeof (s) );
+		data += sizeof( struct pgm_spm6 );
+		len  -= sizeof( struct pgm_spm6 );
+		break;
 
 	default:
 		printf ("unsupported afi");
 		return FALSE;
 	}
+
+	printf (s);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
@@ -532,13 +533,7 @@ pgm_print_spm (
  * Sent to ODATA multicast group with IP Router Alert option.
  */
 
-#define PGM_MIN_POLL_SIZE	( \
-				sizeof(struct pgm_poll) + \
-				sizeof(struct in_addr) + \
-				sizeof(gint32) + \
-				( sizeof(char) * 4 ) + \
-				sizeof(gint32) \
-				)
+#define PGM_MIN_POLL_SIZE	( sizeof(struct pgm_poll) )
 
 static gboolean
 pgm_print_poll (
@@ -555,53 +550,67 @@ pgm_print_poll (
 	}
 
 	struct pgm_poll* poll = (struct pgm_poll*)data;
+	struct pgm_poll6* poll6 = (struct pgm_poll6*)data;
+	poll->poll_nla_afi = g_ntohs (poll->poll_nla_afi);
 
 	printf ("sqn %lu round %u sub-type %u nla-afi %u ",
 		(gulong)g_ntohl(poll->poll_sqn),
 		g_ntohs(poll->poll_round),
 		g_ntohs(poll->poll_s_type),
-		g_ntohs(poll->poll_nla_afi));	/* address family indicator */
+		poll->poll_nla_afi);	/* address family indicator */
 
-/* path nla */
-	data += sizeof(struct pgm_poll);
-	len -= sizeof(struct pgm_poll);
-
-	switch (g_ntohs(poll->poll_nla_afi)) {
+	char s[INET6_ADDRSTRLEN];
+	switch (poll->poll_nla_afi) {
 	case AFI_IP:
-		printf (inet_ntoa(*(struct in_addr*)data));
-		data += sizeof(struct in_addr);
-		len -= sizeof(struct in_addr);
+		inet_ntop ( AF_INET, &poll->poll_nla, s, sizeof (s) );
+		data += sizeof( struct pgm_poll );
+		len  -= sizeof( struct pgm_poll );
+		printf (s);
+
+/* back-off interval in microseconds */
+		printf (" bo_ivl %u", poll->poll_bo_ivl);
+
+/* random string */
+		printf (" rand [%c%c%c%c]",
+			isprint (poll->poll_rand[0]) ? poll->poll_rand[0] : '.',
+			isprint (poll->poll_rand[1]) ? poll->poll_rand[1] : '.',
+			isprint (poll->poll_rand[2]) ? poll->poll_rand[2] : '.',
+			isprint (poll->poll_rand[3]) ? poll->poll_rand[3] : '.' );
+
+/* matching bit-mask */
+		printf (" mask 0x%x", poll->poll_mask);
 		break;
 
-/* insert IPv6, etc here */
+	case AFI_IP6:
+		if (len < sizeof (struct pgm_poll6)) {
+			puts ("packet truncated :(");
+			return FALSE;
+		}
+
+		inet_ntop ( AF_INET6, &poll6->poll6_nla, s, sizeof (s) );
+		data += sizeof( struct pgm_poll6 );
+		len  -= sizeof( struct pgm_poll6 );
+		printf (s);
+
+/* back-off interval in microseconds */
+		printf (" bo_ivl %u", poll6->poll6_bo_ivl);
+
+/* random string */
+		printf (" rand [%c%c%c%c]",
+			isprint (poll6->poll6_rand[0]) ? poll6->poll6_rand[0] : '.',
+			isprint (poll6->poll6_rand[1]) ? poll6->poll6_rand[1] : '.',
+			isprint (poll6->poll6_rand[2]) ? poll6->poll6_rand[2] : '.',
+			isprint (poll6->poll6_rand[3]) ? poll6->poll6_rand[3] : '.' );
+
+/* matching bit-mask */
+		printf (" mask 0x%x", poll6->poll6_mask);
+		break;
 
 	default:
-		printf ("unknown");
-		break;
-	}
-
-	if (len < (sizeof(gint32) + ( sizeof(char) * 4 )) + sizeof(gint32)) {
-		puts ("bad length");
+		printf ("unsupported afi");
 		return FALSE;
 	}
 
-/* back-off interval in microseconds */
-	guint32 bo_ivl = g_ntohl(*(guint32*)data);
-	data += sizeof(bo_ivl);
-	len -= sizeof(bo_ivl);
-
-	printf (" bo_ivl %u", bo_ivl);
-
-/* random string */
-	char rand[4];
-	memcpy (rand, data, sizeof(rand));
-	data += sizeof(rand);
-	len -= sizeof(rand);
-
-/* matching bit-mask */
-	guint32 mask = g_ntohl(*(guint32*)data);
-	data += sizeof(mask);
-	len -= sizeof(mask);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
@@ -779,6 +788,13 @@ pgm_print_rdata (
 
 /* 8.3.  NAK
  *
+ * Technically the AFI of the source and multicast group can be different
+ * but that would be very wibbly wobbly.  One example is using a local DLR
+ * with a IPv4 address to reduce NAK cost for recovery on wide IPv6
+ * distribution.
+ *
+ * CAVEAT: assume group AFI = source AFI
+ *
  *  0                   1                   2                   3
  *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -796,12 +812,7 @@ pgm_print_rdata (
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
  */
 
-#define PGM_MIN_NAK_SIZE	( \
-				sizeof(struct pgm_nak) + \
-				sizeof(struct in_addr) + \
-				sizeof(gint16) + sizeof(gint16) + \
-				sizeof(struct in_addr) \
-				)
+#define PGM_MIN_NAK_SIZE	( sizeof(struct pgm_nak) )
 
 static gboolean
 pgm_print_nak (
@@ -817,47 +828,57 @@ pgm_print_nak (
 		return FALSE;
 	}
 
-	struct pgm_nak* nak = (struct pgm_nak*)nak;
+	struct pgm_nak* nak = (struct pgm_nak*)data;
+	struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
+	nak->nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
+
 	printf ("sqn %lu src ", 
 		(gulong)g_ntohl(nak->nak_sqn));
 
+	char s[INET6_ADDRSTRLEN];
+
 /* source nla */
-	data += sizeof(struct pgm_nak);
-	len -= sizeof(struct pgm_nak);
-	switch (g_ntohs(nak->nak_src_nla_afi)) {
+	switch (nak->nak_src_nla_afi) {
 	case AFI_IP:
-		printf (inet_ntoa(*(struct in_addr*)data));
-		data += sizeof(struct in_addr);
-		len -= sizeof(struct in_addr);
-		break;
+		nak->nak_grp_nla_afi = g_ntohs (nak->nak_grp_nla_afi);
+		if (nak->nak_grp_nla_afi != nak->nak_grp_nla_afi) {
+			puts ("different source & group afi very wibbly wobbly :(");
+			return FALSE;
+		}
 
-/* insert IPv6, etc here */
+		inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
+		data += sizeof( struct pgm_nak );
+		len  -= sizeof( struct pgm_nak );
+		printf ("%s grp ", s);
+
+		inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
+		printf (s);
+
+	case AFI_IP6:
+		if (len < sizeof (struct pgm_nak6)) {
+			puts ("packet truncated :(");
+			return FALSE;
+		}
+
+		nak6->nak6_grp_nla_afi = g_ntohs (nak6->nak6_grp_nla_afi);
+		if (nak6->nak6_grp_nla_afi != nak6->nak6_grp_nla_afi) {
+			puts ("different source & group afi very wibbly wobbly :(");
+			return FALSE;
+		}
+
+		inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
+		data += sizeof( struct pgm_nak6 );
+		len  -= sizeof( struct pgm_nak6 );
+		printf ("%s grp ", s);
+
+		inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
+		printf (s);
 
 	default:
 		printf ("unsupported afi");
 		break;
 	}
 
-	printf (" grp ");
-
-/* multicast group nla */
-	guint16 grp_nla_afi = g_ntohs(*(guint16*)data);
-	data += sizeof(guint16) + sizeof(guint16);
-	len -= sizeof(guint16) + sizeof(guint16);
-
-	switch (grp_nla_afi) {
-	case AFI_IP:
-		printf (inet_ntoa(*(struct in_addr*)data));
-		data += sizeof(struct in_addr);
-		len -= sizeof(struct in_addr);
-		break;
-
-/* insert IPv6, etc here */
-
-	default:
-		printf ("unsupported afi");
-		break;
-	}
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
@@ -887,7 +908,7 @@ pgm_print_nnak (
 		return FALSE;
 	}
 
-	struct pgm_nak* nnak = (struct pgm_nak*)nnak;
+	struct pgm_nak* nnak = (struct pgm_nak*)data;
 
 	return TRUE;
 }
@@ -909,7 +930,7 @@ pgm_print_ncf (
 		return FALSE;
 	}
 
-//	struct pgm_nak* ncf = (struct pgm_nak*)data;
+	struct pgm_nak* ncf = (struct pgm_nak*)data;
 
 	return TRUE;
 }
