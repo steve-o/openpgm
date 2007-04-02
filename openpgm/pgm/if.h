@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 int if_print_all (void);
+int if_parse_network (const char*);
 
 
 #ifdef __cplusplus
