@@ -33,6 +33,8 @@ int txw_next_lead (gpointer);
 int txw_lead (gpointer);
 int txw_trail (gpointer);
 
+int txw_in_window (gpointer, int);
+
 gpointer txw_alloc (gpointer);
 int txw_push (gpointer, gpointer, int);
 int txw_push_copy (gpointer, gpointer, int);

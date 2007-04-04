@@ -158,6 +158,7 @@ static int g_recv_sock = -1;			/* includes IP header */
 static int g_send_sock = -1;
 static int g_send_with_router_alert_sock = -1;	/* IP_ROUTER_ALERT */
 static GIOChannel* g_recv_channel = NULL;
+static struct in_addr g_addr;
 static GMainLoop* g_loop = NULL;
 static SoupServer* g_soup_server = NULL;
 
@@ -248,6 +249,11 @@ main (
 		GError *err = NULL;
 		g_io_channel_shutdown (g_recv_channel, FALSE, &err);
 		g_recv_channel = NULL;
+	}
+	if (g_recv_sock) {
+		puts ("closing receive socket.");
+		close (g_recv_sock);
+		g_recv_sock = NULL;
 	}
 	if (g_send_sock) {
 		puts ("closing send socket.");
@@ -405,6 +411,22 @@ on_startup (
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
+
+/* query bound socket for actual interface address */
+	struct hostent *he = gethostbyname (hostname);
+
+	if (he == NULL) {
+		printf ("error code %i\n", errno);
+		perror("on_startup() failed");
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+
+	g_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+	printf ("socket bound to %s (%s)\n", inet_ntoa(g_addr), hostname);
 
 /* multicast */
 	memset(&g_mreqn, 0, sizeof(g_mreqn));
@@ -780,6 +802,45 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 		hoststat->rdata.count++;
 		hoststat->rdata.bytes += len;
 		hoststat->rdata.last = tv;
+
+		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
+
+printf ("RDATA: #%u, rxw_lead %lu rxw_trail %lu\n",
+	((struct pgm_data*)packet)->data_sqn,
+	hoststat->rxw_lead,
+	hoststat->rxw_trail);
+
+		((struct pgm_data*)packet)->data_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
+		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			printf ("not in tx window %u, %lu - %lu\n",
+				((struct pgm_data*)packet)->data_sqn,
+				hoststat->txw_trail,
+				hoststat->txw_lead);
+			err = TRUE;
+			hoststat->rdata.invalid++;
+			hoststat->rdata.last_invalid = tv;
+			break;
+		}
+
+/* dupe */
+		if ( IN_RECEIVE_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			hoststat->general.duplicate++;
+			break;
+		}
+
+		gboolean required = IS_NEXT_SEQUENCE_NUMBER( ((struct pgm_data*)packet)->data_sqn );
+
+		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
+		if (hoststat->txw_trail > hoststat->txw_lead)
+			hoststat->txw_lead = hoststat->txw_trail -1;
+		hoststat->rxw_trail = hoststat->txw_trail;
+		hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn;
+
+		if (!required) break;
+
+		hoststat->rdata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
 		break;
 
         case PGM_NAK:
@@ -851,10 +912,7 @@ send_nak (
 	int e;
 
 /* construct PGM packet */
-	int tpdu_length = sizeof(struct pgm_header) +
-				sizeof(struct pgm_nak) +
-				(2 * sizeof(struct in_addr)) +
-				(3 * sizeof(guint16));
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 	gchar *buf = (gchar*)malloc( tpdu_length );
 	if (buf == NULL) {
 		perror ("oh crap.");
@@ -864,9 +922,7 @@ send_nak (
 printf ("PGM header size %lu\n"
 	"PGM NAK block size %lu\n",
 	sizeof(struct pgm_header),
-	sizeof(struct pgm_nak) +
-		(2 * sizeof(struct in_addr)) +
-		(3 * sizeof(guint16)));
+	sizeof(struct pgm_nak));
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
@@ -892,15 +948,20 @@ printf ("PGM header size %lu\n"
 	nak->nak_reserved	= 0;
 
 /* source nla */
-	((struct in_addr*)(nak + 1))->s_addr = source->s_addr;
+	nak->nak_src_nla.s_addr	= source->s_addr;	/* IPv4 */
+//	((struct in_addr*)(nak + 1))->s_addr = source->s_addr;
 
 /* nla afi */
-	*(guint16*)(nak + 1 + sizeof(struct in_addr)) = g_htons (AFI_IP);
+	nak->nak_src_nla_afi	= g_htons (AFI_IP);
+//	*(guint16*)(nak + 1 + sizeof(struct in_addr)) = g_htons (AFI_IP);
 
-	*(guint16*)(nak + 1 + sizeof(struct in_addr) + sizeof(guint16)) = 0;
+	nak->nak_reserved	= 0;
+//	*(guint16*)(nak + 1 + sizeof(struct in_addr) + sizeof(guint16)) = 0;
 
 /* multicast group nla */
-	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
+	nak->nak_grp_nla_afi	= g_htons (AFI_IP);
+	nak->nak_grp_nla.s_addr	= source->s_addr;	/* IPv4 */
+//	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 

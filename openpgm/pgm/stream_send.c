@@ -351,7 +351,7 @@ send_spm (
 	int e;
 
 /* construct PGM packet */
-	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm) + sizeof(struct in_addr);
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
 	gchar *buf = (gchar*)malloc( tpdu_length );
 	if (buf == NULL) {
 		perror ("oh crap.");
@@ -361,7 +361,7 @@ send_spm (
 printf ("PGM header size %lu\n"
 	"PGM SPM block size %lu\n",
 	sizeof(struct pgm_header),
-	sizeof(struct pgm_spm) + sizeof(struct in_addr));
+	sizeof(struct pgm_spm));
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
@@ -388,7 +388,8 @@ printf ("PGM header size %lu\n"
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
-	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
+	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
+//	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
