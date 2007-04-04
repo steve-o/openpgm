@@ -65,9 +65,11 @@ static int g_corruption = 0;
 
 static int g_spm_sqn = 0;
 
-static int g_io_channel_sock = -1;
+static int g_recv_sock = NULL;			/* includes IP header */
+static int g_send_sock = NULL;
+static int g_send_with_router_alert_sock = NULL;	/* IP_ROUTER_ALERT */
 static struct in_addr g_addr;
-static GIOChannel* g_io_channel = NULL;
+static GIOChannel* g_recv_channel = NULL;
 static GMainLoop* g_loop = NULL;
 
 static int g_max_tpdu = 1500;
@@ -82,10 +84,13 @@ static gboolean on_mark (gpointer);
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
+static gboolean on_nak (struct pgm_header*, char*, int);
+
 static gchar* print_tsi (gconstpointer);
 
 static void send_spm (void);
 static void send_odata (void);
+static void send_rdata (int, gpointer, int);
 static gboolean on_spm_timer (gpointer);
 static gboolean on_odata_timer (gpointer);
 
@@ -146,19 +151,27 @@ main (
 	g_main_loop_unref(g_loop);
 	g_loop = NULL;
 
-	if (g_io_channel) {
-		puts ("closing io channel.");
+	if (g_recv_channel) {
+		puts ("closing receive channel.");
 
 		GError *err = NULL;
-		g_io_channel_shutdown (g_io_channel, FALSE, &err);
-		g_io_channel = NULL;
+		g_io_channel_shutdown (g_recv_channel, FALSE, &err);
+		g_recv_channel = NULL;
 	}
-
-	if (g_io_channel_sock) {
-		puts ("closing socket.");
-
-		close(g_io_channel_sock);
-		g_io_channel_sock = -1;
+	if (g_recv_sock) {
+		puts ("closing receive socket.");
+		close(g_recv_sock);
+		g_recv_sock = NULL;
+	}
+	if (g_send_sock) {
+		puts ("closing send socket.");
+		close(g_send_sock);
+		g_send_sock = NULL;
+	}
+	if (g_send_with_router_alert_sock) {
+		puts ("closing send with router alert socket.");
+		close(g_send_with_router_alert_sock);
+		g_send_with_router_alert_sock = NULL;
 	}
 
 	if (g_txw) {
@@ -187,7 +200,7 @@ on_startup (
 	gpointer data
 	)
 {
-	int e;
+	int e, e2, e3;
 
 	puts ("startup.");
 
@@ -220,8 +233,13 @@ on_startup (
 
 /* open socket for snooping */
 	puts ("opening raw socket.");
-	g_io_channel_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
-	if (g_io_channel_sock < 0) {
+	g_recv_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	g_send_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	g_send_with_router_alert_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	if (    g_recv_sock < 0 ||
+		g_send_sock < 0 ||
+		g_send_with_router_alert_sock < 0       )
+	{
 		int _e = errno;
 		perror("on_startup() failed");
 
@@ -240,10 +258,12 @@ on_startup (
 	}
 
 	char _t = 0;
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
+	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
 	if (e < 0) {
 		perror("on_startup() failed");
-		close(g_io_channel_sock);
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -251,12 +271,13 @@ on_startup (
 /* buffers */
 	int buffer_size = 0;
 	socklen_t len = 0;
-	e = getsockopt(g_io_channel_sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
+	e = getsockopt(g_recv_sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("receive buffer set at %i bytes.\n", buffer_size);
 	}
-	e = getsockopt(g_io_channel_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
-	if (e == 0) {
+	e = getsockopt(g_send_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	e2 = getsockopt(g_send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	if (e == 0 && e2 == 0) {
 		printf ("send buffer set at %i bytes.\n", buffer_size);
 	}
 
@@ -267,10 +288,14 @@ on_startup (
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = htons(g_port);
 
-	e = bind(g_io_channel_sock, (struct sockaddr*)&addr, sizeof(addr));
-	if (e < 0) {
+	e = bind(g_recv_sock, (struct sockaddr*)&addr, sizeof(addr));
+	e2 = bind(g_send_sock, (struct sockaddr*)&addr, sizeof(addr));
+	e3 = bind(g_send_with_router_alert_sock, (struct sockaddr*)&addr, sizeof(addr));
+	if (e < 0 || e2 < 0 || e3 < 0) {
 		perror("on_startup() failed");
-		close(g_io_channel_sock);
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -283,7 +308,9 @@ on_startup (
 	if (he == NULL) {
 		printf ("error code %i\n", errno);
 		perror("on_startup() failed");
-		close(g_io_channel_sock);
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -302,48 +329,61 @@ on_startup (
 	printf ("sending on interface %s.\n", inet_ntoa(g_mreqn.imr_address));
 	g_mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
 	if (IN_MULTICAST(g_htonl(g_mreqn.imr_multiaddr.s_addr)))
-		printf ("sending on multicast address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
-	else
-		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+	{
+		printf ("joining multicast group %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
 
-/* IP_ADD_MEMBERSHIP = subscription -> send & receive
- * IP_MULTICAST_IF = send only
- */
-//	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
-	if (e < 0) {
-		perror("on_startup() failed");
-		close(g_io_channel_sock);
-		g_main_loop_quit(g_loop);
-		return FALSE;
-	}
+		e = setsockopt(g_recv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
+		e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn)); 
+		e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
+		if (e < 0 || e2 < 0 || e3 < 0) {
+			perror("on_startup() failed");
+			close(g_recv_sock);
+			close(g_send_sock);
+			close(g_send_with_router_alert_sock);
+			g_main_loop_quit(g_loop);
+			return FALSE;
+		}
 
 /* multicast loopback */
-	gboolean n = 0;
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
-	if (e < 0) {
-		perror("on_startup() failed");
-		close(g_io_channel_sock);
-		g_main_loop_quit(g_loop);
-		return FALSE;
-	}
+		gboolean n = 0;
+		e = setsockopt(g_recv_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+		e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+		e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+		if (e < 0 || e2 < 0 || e3 < 0) {
+			perror("on_startup() failed");
+			close(g_recv_sock);
+			close(g_send_sock);
+			close(g_send_with_router_alert_sock);
+			g_main_loop_quit(g_loop);
+			return FALSE;
+		}
 
 /* multicast ttl */
-	int ttl = 1;
-	e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
-	if (e < 0) {
-		perror("on_startup() failed");
-		close(g_io_channel_sock);
-		g_main_loop_quit(g_loop);
-		return FALSE;
+	        int ttl = 1;
+		e = setsockopt(g_recv_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+		e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+		e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+		if (e < 0 || e2 < 0 || e3 < 0) {
+			perror("on_startup() failed");
+			close(g_recv_sock);
+			close(g_send_sock);
+			close(g_send_with_router_alert_sock);
+			g_main_loop_quit(g_loop);
+			return FALSE;
+		}
+
+	}
+	else
+	{
+		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
 	}
 
 /* add socket to event manager */
-	g_io_channel = g_io_channel_unix_new (g_io_channel_sock);
-	printf ("socket opened with encoding %s.\n", g_io_channel_get_encoding(g_io_channel));
+	g_recv_channel = g_io_channel_unix_new (g_recv_sock);
+	printf ("socket opened with encoding %s.\n", g_io_channel_get_encoding(g_recv_channel));
 
-	/* guint event = */ g_io_add_watch (g_io_channel, G_IO_IN | G_IO_PRI, on_io_data, NULL);
-	/* guint event = */ g_io_add_watch (g_io_channel, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, NULL);
+	/* guint event = */ g_io_add_watch (g_recv_channel, G_IO_IN | G_IO_PRI, on_io_data, NULL);
+	/* guint event = */ g_io_add_watch (g_recv_channel, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, NULL);
 
 
 /* period timer to indicate some form of life */
@@ -403,7 +443,7 @@ on_io_data (
 	gboolean err = FALSE;
 	switch (pgm_header->pgm_type) {
 	case PGM_NAK:
-		puts ("NAK");
+		err = on_nak (pgm_header, pgm_header + 1, packet_length - sizeof(pgm_header));
 		break;
 
 	default:
@@ -429,6 +469,60 @@ on_io_error (
 	g_io_channel_shutdown (source, FALSE, &err);
 
 /* remove event */
+	return FALSE;
+}
+
+static gboolean
+on_nak (
+	struct pgm_header* header,
+	char* data,
+	int len
+	)
+{
+	printf ("NAK: ");
+
+	if (len < sizeof(struct pgm_nak) ) {
+		puts ("packet truncated :(");
+		return TRUE;
+	}
+
+	struct pgm_nak* nak = (struct pgm_nak*)data;
+	nak->nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
+
+	if (nak->nak_src_nla_afi != AFI_IP) {
+		puts ("not IPv4 :(");
+		return TRUE;
+	}
+
+	nak->nak_grp_nla_afi = g_ntohs (nak->nak_grp_nla_afi);
+	if (nak->nak_grp_nla_afi != nak->nak_grp_nla_afi) {
+		puts ("different source & group afi very wibbly wobbly :(");
+		return TRUE;
+	}
+
+	char s[INET6_ADDRSTRLEN];
+	inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
+
+	nak->nak_sqn = g_ntohl (nak->nak_sqn);
+
+	printf ("src %s for #%i", s, nak->nak_sqn);
+
+	if (txw_in_window (g_txw, nak->nak_sqn)) {
+		puts (", in window");
+
+		gpointer rdata = NULL;
+		int rlen = 0;
+		if (!txw_get (g_txw, nak->nak_sqn, &rdata, &rlen))
+		{
+			send_rdata (nak->nak_sqn, rdata, rlen);
+		} else {
+			puts (":v");
+		}
+	} else {
+		puts (", sequence number not available.");
+	}
+
+	printf ("\n");
 	return FALSE;
 }
 
@@ -510,7 +604,8 @@ printf ("PGM header size %lu\n"
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
-	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
+	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
+//	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
@@ -531,7 +626,7 @@ printf ("PGM header size %lu\n"
 	mc.sin_port		= 0;
 
 	printf("TPDU %i bytes.\n", tpdu_length);
-	e = sendto (g_io_channel_sock,
+	e = sendto (g_send_sock,
 		buf,
 		tpdu_length,
 		flags,
@@ -564,7 +659,7 @@ on_odata_timer (
 static void
 send_odata (void)
 {
-	puts ("send_data.");
+	puts ("send_odata.");
 
 	int e;
 	char payload_string[100];
@@ -613,7 +708,7 @@ printf ("PGM header size %lu\n"
         header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
 /* add to transmit window */
-	txw_push_copy (g_txw, buf, tpdu_length);
+	txw_push_copy (g_txw, payload_string, strlen(payload_string) + 1);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
@@ -632,7 +727,7 @@ printf ("PGM header size %lu\n"
         mc.sin_port             = 0;
 
         printf("TPDU %i bytes.\n", tpdu_length);
-        e = sendto (g_io_channel_sock,
+        e = sendto (g_send_sock,
                 buf,
                 tpdu_length,
                 flags,
@@ -649,6 +744,95 @@ printf ("PGM header size %lu\n"
 
         puts ("sent.");
 }
+
+static void
+send_rdata (
+	int		sequence_number,
+	gpointer	data,
+	int		len
+	)
+{
+	puts ("send_rdata.");
+
+	int e;
+	char* payload_string = (char*)data;
+
+/* construct PGM packet */
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + len;
+	gchar *buf = (gchar*)malloc( tpdu_length );
+	if (buf == NULL) {
+		perror ("oh crap.");
+		return;
+	}
+
+printf ("PGM header size %lu\n"
+	"PGM data header size %lu\n"
+	"payload size %lu\n",
+	sizeof(struct pgm_header),
+	sizeof(struct pgm_data),
+	len );
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_data *rdata = (struct pgm_data*)(header + 1);
+
+	header->pgm_sport       = g_htons (g_port);
+	header->pgm_dport       = g_htons (g_port);
+	header->pgm_type        = PGM_RDATA;
+        header->pgm_options     = 0;
+        header->pgm_checksum    = 0;
+
+        header->pgm_gsi[0]      = 1;
+        header->pgm_gsi[1]      = 2;
+        header->pgm_gsi[2]      = 3;
+        header->pgm_gsi[3]      = 4;
+        header->pgm_gsi[4]      = 5;
+        header->pgm_gsi[5]      = 6;
+
+        header->pgm_tsdu_length = g_htons (len);               /* transport data unit length */
+
+/* RDATA */
+        rdata->data_sqn         = g_htonl (sequence_number);
+        rdata->data_trail       = g_htonl (txw_trail(g_txw));
+
+        memcpy (rdata + 1, payload_string, len);
+
+        header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+
+/* corrupt packet */
+	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
+	{
+		puts ("corrupting packet.");
+		*(buf + g_random_int_range (0, tpdu_length)) = 0;
+	}
+
+/* send packet */
+        int flags = MSG_CONFIRM;        /* not expecting a reply */
+
+/* IP header handled by sendto() */
+        struct sockaddr_in mc;
+        mc.sin_family           = AF_INET;
+        mc.sin_addr.s_addr      = g_mreqn.imr_multiaddr.s_addr;
+        mc.sin_port             = 0;
+
+        printf("TPDU %i bytes.\n", tpdu_length);
+        e = sendto (g_send_sock,
+                buf,
+                tpdu_length,
+                flags,
+                (struct sockaddr*)&mc,  /* to address */
+                sizeof(mc));            /* address size */
+        if (e == EMSGSIZE) {
+                perror ("message too large for ip stack.");
+                return;
+        }
+        if (e < 0) {
+                perror ("sendto() failed.");
+                return;
+        }
+
+        puts ("sent.");
+}
+
 
 /* idle log notification
  */

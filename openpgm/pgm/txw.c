@@ -94,7 +94,7 @@ txw_init (
 	int	txw_max_rte		/* max bandwidth */
 	)
 {
-	if (txw_debug)
+	if (G_UNLIKELY(txw_debug))
 	printf ("txw: init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
 		tpdu_length, preallocate_size, txw_sqns, txw_secs, txw_max_rte);
 
@@ -118,7 +118,7 @@ txw_init (
 		txw_sqns = (txw_secs * txw_max_rte) / t->max_tpdu;
 	}
 
-	if (txw_debug)
+	if (G_UNLIKELY(txw_debug))
 	printf ("txw: %i packets.\n", txw_sqns);
 	g_ptr_array_set_size (t->pdata, txw_sqns);
 
@@ -130,16 +130,16 @@ txw_shutdown (
 	gpointer	ptr
 	)
 {
-	if (txw_debug)
+	if (G_UNLIKELY(txw_debug))
 	puts ("txw: shutdown.");
 
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid txw.");
 		return -1;
 	}
 	struct txw* t = (struct txw*)ptr;
 
-	if (t->pdata)
+	if (G_LIKELY(t->pdata))
 	{
 		g_ptr_array_foreach (t->pdata, _list_iterator, &t->max_tpdu);
 		g_ptr_array_free (t->pdata, TRUE);
@@ -167,7 +167,7 @@ _list_iterator (
 	)
 {
 /* iteration on empty array sized on init() */
-	if (!data) return;
+	if (G_UNLIKELY(!data)) return;
 
 	struct txw_packet *tp = (struct txw_packet*)data;
 	int length = tp->length;
@@ -181,7 +181,7 @@ txw_alloc (
 	gpointer	ptr
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -195,7 +195,7 @@ txw_next_lead (
 	gpointer	ptr
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -209,7 +209,7 @@ txw_lead (
 	gpointer	ptr
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -223,7 +223,7 @@ txw_trail (
 	gpointer	ptr
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -233,13 +233,28 @@ txw_trail (
 }
 
 int
+txw_in_window (
+	gpointer	ptr,
+	int		sequence_number
+	)
+{
+	if (G_UNLIKELY(!ptr)) {
+		puts ("txw: invalid parameter, major internal error.");
+		exit (-1);
+	}
+	struct txw* t = (struct txw*)ptr;
+
+	return ABS_IN_TXW(t, sequence_number);
+}
+
+int
 txw_push (
 	gpointer	ptr,
 	gpointer	packet,
 	int		length
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -263,21 +278,21 @@ txw_push (
 /* wrap offset helper */
 	if (tp->sequence_number == ( TXW_LENGTH(t) + t->offset ))
 	{
-if (txw_debug > 1)
+if (G_UNLIKELY(txw_debug > 1))
 puts ("txw: wrap offset.");
 		t->offset += TXW_LENGTH(t);
 	}
 
 	int offset = tp->sequence_number - t->offset;
 
-if (txw_debug > 2)
+if (G_UNLIKELY(txw_debug > 2))
 printf ("txw: add packet offset %i\n", offset);
 	g_ptr_array_index (t->pdata, offset) = tp;
 
 	t->lead			= tp->sequence_number;
 	t->next_lead		= TXW_INC_SQN(t->lead);
 
-if (txw_debug > 2)
+if (G_UNLIKELY(txw_debug > 2))
 {
 	if (TXW_LENGTH(t) == TXW_SQNS(t)) puts ("txw: now full.");
 	printf ("txw: next lead# %i\n", t->next_lead);
@@ -293,7 +308,7 @@ txw_push_copy (
 	int		length
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -312,7 +327,7 @@ txw_get (
 	int*		length
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}
@@ -338,7 +353,7 @@ txw_pop (
 	gpointer	ptr
 	)
 {
-	if (!ptr) {
+	if (G_UNLIKELY(!ptr)) {
 		puts ("txw: invalid parameter, major internal error.");
 		exit (-1);
 	}

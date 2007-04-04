@@ -113,8 +113,8 @@ pgm_parse_packet (
 
 /* decode IP header */
 	const struct iphdr* ip = (struct iphdr*)data;
-	if (ip->version != 4 || ip->version != 6) {	/* IP version, 4 or 6 */
-		puts ("unknown IP version :/");	
+	if (ip->version != 4 && ip->version != 6) {	/* IP version, 4 or 6 */
+		printf ("unknown IP version (%i) :/\n", ip->version);	
 		return -1;
 	}
 
