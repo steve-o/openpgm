@@ -42,6 +42,7 @@ struct tests {
 
 /* globals */
 
+double test_control (int, int);
 double test_alloc_list (int, int);
 double test_alloc_list_malloc (int, int);
 double test_alloc_list_stack (int, int);
@@ -85,47 +86,61 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	int test_size[] = { 10, 20, 100, 200, 1000, 2000, 10000, 20000, 100000, 200000, 0 };
-	int test_payload[] = { 9000, 1500, 0 };
+	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+	int test_payload[] = { /*9000,*/ 1500, 0 };
 	struct tests tests[] = {
+//			{ test_control, "control" },
 //			{ test_alloc_list_malloc, "list/malloc" },
 //			{ test_alloc_list, "list/slice" },
 			{ test_alloc_list_stack, "list/stack" },
-//			{ test_alloc_slist, "slist" },
-//			{ test_alloc_hash, "hash" },
-//			{ test_alloc_queue, "queue" },
-//			{ test_alloc_ptr_array, "*array" },
-//			{ test_alloc_byte_array, "byte array" },
+			{ test_alloc_slist, "slist" },
+			{ test_alloc_hash, "hash" },
+			{ test_alloc_queue, "queue" },
+			{ test_alloc_ptr_array, "*array" },
+			{ test_alloc_byte_array, "byte array" },
 #if HAVE_GLIB_SEQUENCE
 			{ test_alloc_sequence, "sequence" },
 #endif
 			{ NULL, NULL }
 			};
-	struct tests* p2;
 
-	p2 = tests;
+/* print header */
+	struct tests* p;
+	int* p2;
+	int* p3;
+
+	int test_count = 3;
+
+	p = tests;
 	do {
-		int *p3 = test_payload;
-
+		p2 = test_payload;
 		do {
-			printf ("%s@%i bytes\n", p2->name, *p3);
+			for (int c = 1; c <= test_count; c++)
+			{
+				printf (",%s@%ib/%i", p->name, *p2, c);
+			}
+		} while (*(++p2));
+	} while ((++p)->name);
+	putchar ('\n');
 
-			int *p = test_size; do { printf ("%i,", *p++); } while (*p); p = test_size;
-			putchar ('\n');
+/* each row is one payload size */
+	p3 = test_size;
+	do {
+		printf ("%i", *p3);
 
+		p = tests;
+		do {
+			p2 = test_payload;
 			do {
-				p2->test_func (*p, *p3);
-				double result = p2->test_func (*p, *p3);
-				printf ("%g,", result);
-				fflush (stdout);
-			} while (*(++p));
-			putchar ('\n');
+				for (int c = 1; c <= 3; c++)
+				{
+					printf (",%g", p->test_func (*p3, *p2) );
+				}
+			} while (*(++p2));
+		} while ((++p)->name);
 
-		} while (*(++p3));
-
-	} while ((++p2)->name);
-		
-/* with payload */
+		putchar ('\n');
+	} while (*(++p3));
 
 	puts ("finished.");
 	return 0;
@@ -137,7 +152,35 @@ _list_iterator (
 		gpointer user_data
 		)
 {
-	g_slice_free1 ( *(int*)user_data, data );
+	if ( *(int*)user_data )
+		g_slice_free1 ( *(int*)user_data, data );
+}
+
+void
+_list_free_iterator (
+		gpointer data,
+		gpointer user_data
+		)
+{
+	if ( *(int*)user_data )
+		free (data);
+}
+
+double
+test_control (
+		int count,
+		int size_per_entry
+		)
+{
+#if 1
+	char *p = g_slice_alloc (100);
+	g_slice_free1 (100, p);
+#else
+	char *p = malloc (100);
+	free (p);
+#endif
+
+	return 0.0;
 }
 
 double
@@ -147,7 +190,7 @@ test_alloc_list (
 		)
 {
 	struct timeval start, now;
-	GList *list = NULL, *p = list;
+	GList *list = NULL;
 	int i;
 
 	gettimeofday(&start, NULL);
@@ -160,7 +203,8 @@ test_alloc_list (
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_list_foreach (list, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_list_foreach (list, _list_iterator, &size_per_entry);
 	g_list_free (list);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -173,11 +217,10 @@ test_alloc_list_malloc (
 		)
 {
 	struct timeval start, now;
-	GList *list = NULL, *p = list;
-	int i;
+	GList *list = NULL;
 
 	gettimeofday(&start, NULL);
-	for (i = 0; i < count; i++)
+	for (int i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_malloc (size_per_entry) : NULL;
 		list = g_list_prepend (list, entry);
@@ -186,8 +229,10 @@ test_alloc_list_malloc (
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_list_foreach (list, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_list_foreach (list, _list_free_iterator, &size_per_entry);
 	g_list_free (list);
+	list = NULL;
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
@@ -199,7 +244,7 @@ test_alloc_list_stack (
 		)
 {
 	struct timeval start, now;
-	GList *list = NULL, *p = list;
+	GList *list = NULL;
 	GTrashStack *stack = NULL;
 	int i;
 
@@ -222,7 +267,8 @@ test_alloc_list_stack (
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_list_foreach (list, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_list_foreach (list, _list_iterator, &size_per_entry);
 	g_list_free (list);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -235,20 +281,31 @@ test_alloc_slist (
 		)
 {
 	struct timeval start, now;
-	GSList *list = NULL, *p = list;
+	GSList *list = NULL;
+	GTrashStack *stack = NULL;
 	int i;
+
+	if (size_per_entry)
+	{
+		for (i = 0; i < count; i++)
+		{
+			char *entry = g_slice_alloc (size_per_entry);
+			g_trash_stack_push (&stack, entry);
+		}
+	}
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
+		char *entry = size_per_entry ? g_trash_stack_pop (&stack) : NULL;
 		list = g_slist_prepend (list, entry);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_slist_foreach (list, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_slist_foreach (list, _list_iterator, &size_per_entry);
 	g_slist_free (list);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -262,21 +319,32 @@ test_alloc_queue (
 {
 	struct timeval start, now;
 	GQueue* queue = NULL;
+	GTrashStack *stack = NULL;
 	int i;
+
+	if (size_per_entry)
+	{
+		for (i = 0; i < count; i++)
+		{
+			char *entry = g_slice_alloc (size_per_entry);
+			g_trash_stack_push (&stack, entry);
+		}
+	}
 
 	queue = g_queue_new ();
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
+		char *entry = size_per_entry ? g_trash_stack_pop (&stack) : NULL;
 		g_queue_push_head (queue, entry);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_queue_foreach (queue, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_queue_foreach (queue, _list_iterator, &size_per_entry);
 	g_queue_free (queue);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -291,21 +359,32 @@ test_alloc_sequence (
 {
 	struct timeval start, now;
 	GSequence* sequence = NULL;
+	GTrashStack *stack = NULL;
 	int i;
+
+	if (size_per_entry)
+	{
+		for (i = 0; i < count; i++)
+		{
+			char *entry = g_slice_alloc (size_per_entry);
+			g_trash_stack_push (&stack, entry);
+		}
+	}
 
 	sequence = g_sequence_new (NULL);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
+		char *entry = size_per_entry ? g_trash_stack_pop (&stack) : NULL;
 		g_sequence_append (p, entry);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_sequence_foreach (sequence, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_sequence_foreach (sequence, _list_iterator, &size_per_entry);
 	g_sequence_free (sequence);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -319,8 +398,7 @@ _hash_iterator (
 		gpointer user_data
 		)
 {
-	g_slice_free ( int, key );
-	g_slice_free1 ( *(int*)user_data, value );
+	g_slice_free1 ( *(int*)user_data + sizeof(int), value );
 }
 
 double
@@ -331,22 +409,32 @@ test_alloc_hash (
 {
 	struct timeval start, now;
 	GHashTable* hash = NULL;
+	GTrashStack *stack = NULL;
 	int i;
+
+	for (i = 0; i < count; i++)
+	{
+/* we add an integer to every datum for use as the hash key */
+		char *entry = g_slice_alloc (size_per_entry + sizeof(int));
+		g_trash_stack_push (&stack, entry);
+	}
 
 	hash = g_hash_table_new (g_int_hash, g_int_equal);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
-		int *key = g_slice_new (int);
+		char *entry = g_trash_stack_pop (&stack);
+		int *key = (int*)entry;
+		*key = i;
 		g_hash_table_insert (hash, key, entry);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_hash_table_foreach (hash, _hash_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_hash_table_foreach (hash, _hash_iterator, &size_per_entry);
 	g_hash_table_destroy (hash);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -360,21 +448,32 @@ test_alloc_ptr_array (
 {
 	struct timeval start, now;
 	GPtrArray* array = NULL;
+	GTrashStack *stack = NULL;
 	int i;
+
+	if (size_per_entry)
+	{
+		for (i = 0; i < count; i++)
+		{
+			char *entry = g_slice_alloc (size_per_entry);
+			g_trash_stack_push (&stack, entry);
+		}
+	}
 
 	array = g_ptr_array_new ();
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? g_slice_alloc (size_per_entry) : NULL;
+		char *entry = size_per_entry ? g_trash_stack_pop (&stack) : NULL;
 		g_ptr_array_add (array, entry);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	g_ptr_array_foreach (array, _list_iterator, &size_per_entry);
+	if (size_per_entry)
+		g_ptr_array_foreach (array, _list_iterator, &size_per_entry);
 	g_ptr_array_free (array, TRUE);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
@@ -404,7 +503,8 @@ test_alloc_byte_array (
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
 	g_byte_array_free (array, TRUE);
-	g_slice_free1 (size_per_entry, data);
+	if (size_per_entry)
+		g_slice_free1 (size_per_entry, data);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }

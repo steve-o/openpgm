@@ -85,6 +85,12 @@ dumpif
 Display all IP based interfaces and basic details.
 
 
+testif
+------
+
+Test various combinations of network specification.
+
+
 stream_send_with_fec
 --------------------
 

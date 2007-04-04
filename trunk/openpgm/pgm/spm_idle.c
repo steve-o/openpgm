@@ -372,7 +372,7 @@ printf ("PGM header size %u\n"
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
-	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
+	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
