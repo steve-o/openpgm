@@ -4,42 +4,40 @@
 
 EnsureSConsVersion( 0, 96 )
 
+opt = Options(None, ARGUMENTS)
+opt.AddOptions (
+	(EnumOption ('BUILD', 'DEBUG, PROFILE, or RELEASE build environment', 'debug', ('release', 'debug', 'profile'))),
+)
+
 import os
 env = Environment(ENV = os.environ,
-	CCFLAGS = ['-pipe', '-g', '-Wall', '-pedantic', '-std=gnu99', '-D_REENTRANT'])
+	CCFLAGS = ['-pipe', '-Wall', '-pedantic', '-std=gnu99', '-D_REENTRANT'],
+	LINKFLAGS = ['-pipe']
+)
+opt.Update (env)
 
-httpenv = env.Copy()
-httpenv.ParseConfig('pkg-config --cflags --libs libsoup-2.2')
+# Define separate build environments
+release = env.Copy(BUILD = 'release')
+release.Append(CCFLAGS = '-O2')
 
-env.ParseConfig('pkg-config --cflags --libs glib-2.0')
+debug = env.Copy(BUILD = 'debug')
+debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
 
-shared_src = Split("""
-		log.c
-		pgm.c
-""")
+profile = env.Copy(BUILD = 'profile')
+profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
 
-txw_obj = env.Object('txw.c')
-if_obj  = env.Object('if.c')
 
-shared_obj = []
-for src in shared_src:
-	shared_obj += env.Object(src)
+# choose and environment to build
+if env['BUILD'] == 'release':
+	Export({'env':release})
+elif env['BUILD'] == 'profile':
+	Export({'env':profile})
+else:
+	Export({'env':debug})
 
-env.Program(['pgmdump.c'] + shared_obj)
-env.Program(['basic_send.c'] + shared_obj)
-env.Program(['spm_idle.c'] + shared_obj)
-env.Program(['stream_send.c'] + shared_obj)
-httpenv.Program(['basic_recv.c'] + shared_obj)
-httpenv.Program(['basic_http.c'] + shared_obj)
-env.Program(['basic_container.c'])
-env.Program(['basic_container2.c'])
-env.Program(['basic_txw.c'] + txw_obj)
-env.Program('basic_txw_byte', ['basic_txw.c', 'txw-byte.c'])
-env.Program('basic_txw_bytep', ['basic_txw.c', 'txw-bytep.c'])
-env.Program(['nak_txw.c'] + txw_obj)
-env.Program(['stream_send_with_nak.c'] + shared_obj + txw_obj)
-httpenv.Program(['basic_recv_with_nak.c'] + shared_obj)
-env.Program(['dumpif.c'] + if_obj)
-env.Program(['testif.c'] + if_obj)
+Import('env')
+ref_node = 'ref/' + env['BUILD'] + '/';
+BuildDir(ref_node, '.', duplicate=0)
+SConscript(ref_node + 'SConscript')
 
 # end of file
