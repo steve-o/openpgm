@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * A basic transmit window: pointer array implementation.
+ * A basic transmit window: byte array implementation.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -47,8 +47,7 @@ struct txw_packet {
 };
 
 struct txw {
-	GPtrArray*	pdata;
-	GTrashStack*	trash_packet;		/* sizeof(txw_packet) */
+	GByteArray*	pdata;
 	GTrashStack*	trash_data;		/* max_tpdu */
 
 	int		max_tpdu;		/* maximum packet size */
@@ -100,16 +99,14 @@ txw_init (
 		tpdu_length, preallocate_size, txw_sqns, txw_secs, txw_max_rte);
 
 	struct txw* t = g_slice_alloc0 (sizeof(struct txw));
-	t->pdata = g_ptr_array_new ();
+	t->pdata = g_byte_array_new ();
 
 	t->max_tpdu = tpdu_length;
 
 	for (int i = 0; i < preallocate_size; i++)
 	{
 		gpointer data   = g_slice_alloc (t->max_tpdu);
-		gpointer packet = g_slice_alloc (sizeof(struct txw_packet));
 		g_trash_stack_push (&t->trash_data, data);
-		g_trash_stack_push (&t->trash_packet, packet);
 	}
 
 /* calculate transmit window parameters */
@@ -123,7 +120,7 @@ txw_init (
 
 	if (G_UNLIKELY(txw_debug))
 	printf ("txw: %i packets.\n", txw_sqns);
-	g_ptr_array_set_size (t->pdata, txw_sqns);
+	g_byte_array_set_size (t->pdata, sizeof(struct txw_packet) * txw_sqns);
 
 	return (gpointer)t;
 }
@@ -144,8 +141,15 @@ txw_shutdown (
 
 	if (G_LIKELY(t->pdata))
 	{
-		g_ptr_array_foreach (t->pdata, _list_iterator, &t->max_tpdu);
-		g_ptr_array_free (t->pdata, TRUE);
+		for (int i = 0; i < t->pdata->len / sizeof(struct txw_packet); i++)
+		{
+			struct txw_packet *tp = &t->pdata->data[sizeof(struct txw_packet) * i];
+			if (tp->data) {
+				g_slice_free1 (t->max_tpdu, tp->data);
+				tp->data = NULL;
+			}
+		}
+		g_byte_array_free (t->pdata, TRUE);
 		t->pdata = NULL;
 	}
 
@@ -160,34 +164,7 @@ txw_shutdown (
 /* empty trash stack = NULL */
 	}
 
-	if (t->trash_packet)
-	{
-		gpointer *p = NULL;
-		while ( (p = g_trash_stack_pop (&t->trash_packet)) )
-			g_slice_free1 (sizeof(struct txw_packet), t->trash_packet);
-	}
-
 	return 0;
-}
-
-static void
-_list_iterator (
-	gpointer	data,
-	gpointer	user_data
-	)
-{
-/* iteration on empty array sized on init() */
-	if (G_UNLIKELY(!data)) return;
-
-	struct txw_packet *tp = (struct txw_packet*)data;
-	int length = tp->length;
-
-	int max_tpdu = *(int*)user_data;
-
-//	g_slice_free1 ( length, tp->data );
-	g_slice_free1 ( max_tpdu, tp->data );
-
-	g_slice_free1 ( sizeof(struct txw_packet), data );
 }
 
 /* alloc for the payload per packet */
@@ -284,27 +261,24 @@ txw_push (
 	}
 
 /* add to window */
-	struct txw_packet* tp = t->trash_packet ?
-					g_trash_stack_pop (&t->trash_packet) :
-					g_slice_alloc (sizeof(struct txw_packet));
-
-	tp->data		= packet;
-	tp->length		= length;
-	tp->sequence_number	= t->next_lead;
-
+	int sequence_number	= t->next_lead;
 /* wrap offset helper */
-	if (tp->sequence_number == ( TXW_LENGTH(t) + t->offset ))
+	if (sequence_number == ( TXW_LENGTH(t) + t->offset ))
 	{
 if (G_UNLIKELY(txw_debug > 1))
 puts ("txw: wrap offset.");
 		t->offset += TXW_LENGTH(t);
 	}
 
-	int offset = tp->sequence_number - t->offset;
+	int offset = sequence_number - t->offset;
 
 if (G_UNLIKELY(txw_debug > 2))
 printf ("txw: add packet offset %i\n", offset);
-	g_ptr_array_index (t->pdata, offset) = tp;
+
+	struct txw_packet* tp = &t->pdata->data[sizeof(struct txw_packet) * offset];
+	tp->data		= packet;
+	tp->length		= length;
+	tp->sequence_number	= sequence_number;
 
 	t->lead			= tp->sequence_number;
 	t->next_lead		= TXW_INC_SQN(t->lead);
@@ -359,7 +333,7 @@ txw_get (
 	}
 
 	int offset = TXW_PACKET_OFFSET(t, sequence_number);
-	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
+	struct txw_packet* tp = &t->pdata->data[sizeof(struct txw_packet) * offset];
 	*packet = tp->data;
 	*length	= tp->length;
 
@@ -385,13 +359,11 @@ txw_pop (
 	}
 
 	int offset = TXW_PACKET_OFFSET(t, t->trail);
-	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
+	struct txw_packet* tp = &t->pdata->data[sizeof(struct txw_packet) * offset];
 
 //	g_slice_free1 (tp->length, tp->data);
 	g_trash_stack_push (&t->trash_data, tp->data);
-
-//	g_slice_free1 (sizeof(struct txw), tp);
-	g_trash_stack_push (&t->trash_packet, tp);
+	tp->data = NULL;
 
 	t->trail = TXW_INC_SQN(t->trail);
 

@@ -52,6 +52,8 @@ usage (const char* bin)
 	exit (1);
 }
 
+extern int txw_debug;
+
 int
 main (
 	int	argc,
@@ -59,6 +61,7 @@ main (
 	)
 {
 	puts ("basic_txw");
+	txw_debug = 0;
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -75,37 +78,50 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	int test_size[] = { 10, 20, 100, 200, 1000, 2000, 10000, 20000, 100000, 200000, 0 };
-	int test_payload[] = { 9000, 1500, 0 };
+	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+	int test_payload[] = { /*9000,*/ 1500, 0 };
 	struct tests tests[] = {
 			{ test_basic_txw, "basic txw" },
 			{ NULL, NULL }
 			};
-	struct tests* p2;
 
-	p2 = tests;
-	do {
-		int *p3 = test_payload;
+/* print header */
+	struct tests* p;
+	int* p2;
+	int* p3;
 
-		do {
-			printf ("%s@%i bytes\n", p2->name, *p3);
+	int test_count = 3;
 
-			int *p = test_size; do { printf ("%i,", *p++); } while (*p); p = test_size;
-			putchar ('\n');
+        p = tests;
+        do {
+                p2 = test_payload;
+                do {
+                        for (int c = 1; c <= test_count; c++)
+                        {
+                                printf (",%s@%ib/%i", p->name, *p2, c);
+                        }
+                } while (*(++p2));
+        } while ((++p)->name);
+        putchar ('\n');
 
-			do {
-				p2->test_func (*p, *p3);
-				double result = p2->test_func (*p, *p3);
-				printf ("%g,", result);
-				fflush (stdout);
-			} while (*(++p));
-			putchar ('\n');
+/* each row is one payload size */
+        p3 = test_size;
+        do {
+                printf ("%i", *p3);
 
-		} while (*(++p3));
+                p = tests;
+                do {
+                        p2 = test_payload;
+                        do {
+                                for (int c = 1; c <= 3; c++)
+                                {
+                                        printf (",%g", p->test_func (*p3, *p2) );
+                                }
+                        } while (*(++p2));
+                } while ((++p)->name);
 
-	} while ((++p2)->name);
-		
-/* with payload */
+                putchar ('\n');
+        } while (*(++p3));
 
 	puts ("finished.");
 	return 0;
@@ -121,12 +137,12 @@ test_basic_txw (
 	gpointer txw;
 	int i;
 
-	txw = txw_init (size_per_entry, 0, count, 0, 0);
+	txw = txw_init (size_per_entry, size_per_entry, count, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? g_slice_alloc(size_per_entry) : NULL;
+		char *entry = size_per_entry ? txw_alloc(txw) : NULL;
 
 		txw_push (txw, entry, size_per_entry);
 	}
