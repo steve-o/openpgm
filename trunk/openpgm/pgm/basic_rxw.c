@@ -44,6 +44,8 @@ struct tests {
 /* globals */
 
 double test_basic_rxw (int, int);
+double test_double_jump (int, int);
+double test_reverse (int, int);
 
 static void
 usage (const char* bin)
@@ -82,6 +84,8 @@ main (
 	int test_payload[] = { 1500, 0 };
 	struct tests tests[] = {
 			{ test_basic_rxw, "basic rxw" },
+			{ test_double_jump, "sequence numbers in jumps" },
+			{ test_reverse, "sequence numbers in reverse " },
 			{ NULL, NULL }
 			};
 
@@ -148,7 +152,7 @@ test_basic_rxw (
 	gpointer rxw;
 	int i;
 
-	rxw = rxw_init (size_per_entry, size_per_entry, count, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
 
 	rxw_update(rxw, 0, 0);
 
@@ -167,5 +171,71 @@ test_basic_rxw (
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
+
+double
+test_double_jump (
+		int count,
+		int size_per_entry
+		)
+{
+	struct timeval start, now;
+	gpointer rxw;
+	int i, j;
+
+	rxw = rxw_init (size_per_entry, 2 * count, 2 * count, 0, 0, on_pgm_data, NULL);
+
+	rxw_update(rxw, 0, 0);
+
+	gettimeofday(&start, NULL);
+	for (i = 0, j = 1; i < count; i++)
+	{
+		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
+
+		rxw_push (rxw, entry, size_per_entry, j, 0);
+
+		j += 2;
+	}
+	gettimeofday(&now, NULL);
+
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
+
+	rxw_shutdown (rxw);
+
+	return (secs * 1000.0 * 1000.0) / (double)count;
+}
+
+double
+test_reverse (
+		int count,
+		int size_per_entry
+		)
+{
+	struct timeval start, now;
+	gpointer rxw;
+	int i, j;
+
+	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+
+	rxw_update(rxw, 0, 0);
+
+	gettimeofday(&start, NULL);
+	for (i = 0, j = count-1; i < count; i++)
+	{
+		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
+
+		if (i > 0)
+			rxw_push (rxw, entry, size_per_entry, --j, 0);
+		else
+			rxw_push (rxw, entry, size_per_entry, i, 0);
+	}
+	gettimeofday(&now, NULL);
+
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
+
+	rxw_shutdown (rxw);
+
+	return (secs * 1000.0 * 1000.0) / (double)count;
+}
+
 
 /* eof */

@@ -137,7 +137,7 @@ test_basic_txw (
 	gpointer txw;
 	int i;
 
-	txw = txw_init (size_per_entry, size_per_entry, count, 0, 0);
+	txw = txw_init (size_per_entry, count, count, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
