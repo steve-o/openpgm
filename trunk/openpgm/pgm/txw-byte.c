@@ -40,8 +40,8 @@
 struct txw_packet {
 	gpointer	data;
 
-	int		length;
-	int		sequence_number;
+	guint		length;
+	guint32		sequence_number;
 	struct timeval	expiry;
 	struct timeval	last_retransmit;
 };
@@ -50,11 +50,11 @@ struct txw {
 	GByteArray*	pdata;
 	GTrashStack*	trash_data;		/* max_tpdu */
 
-	int		max_tpdu;		/* maximum packet size */
+	guint		max_tpdu;		/* maximum packet size */
 
-	int		lead, next_lead;
-	int		trail;
-	int		offset;
+	guint32		lead, next_lead;
+	guint32		trail;
+	guint		offset;
 	
 };
 
@@ -87,11 +87,11 @@ static void _list_iterator (gpointer, gpointer);
 
 gpointer
 txw_init (
-	int	tpdu_length,
-	int	preallocate_size,
-	int	txw_sqns,		/* transmit window size in sequence numbers */
-	int	txw_secs,		/* size in seconds */
-	int	txw_max_rte		/* max bandwidth */
+	guint	tpdu_length,
+	guint32	preallocate_size,
+	guint32	txw_sqns,		/* transmit window size in sequence numbers */
+	guint	txw_secs,		/* size in seconds */
+	guint	txw_max_rte		/* max bandwidth */
 	)
 {
 	if (G_UNLIKELY(txw_debug))
@@ -103,7 +103,7 @@ txw_init (
 
 	t->max_tpdu = tpdu_length;
 
-	for (int i = 0; i < preallocate_size; i++)
+	for (guint32 i = 0; i < preallocate_size; i++)
 	{
 		gpointer data   = g_slice_alloc (t->max_tpdu);
 		g_trash_stack_push (&t->trash_data, data);
@@ -227,7 +227,7 @@ txw_trail (
 int
 txw_in_window (
 	gpointer	ptr,
-	int		sequence_number
+	guint32		sequence_number
 	)
 {
 	if (G_UNLIKELY(!ptr)) {
@@ -243,7 +243,7 @@ int
 txw_push (
 	gpointer	ptr,
 	gpointer	packet,
-	int		length
+	guint		length
 	)
 {
 	if (G_UNLIKELY(!ptr)) {
@@ -261,7 +261,7 @@ txw_push (
 	}
 
 /* add to window */
-	int sequence_number	= t->next_lead;
+	guint32 sequence_number	= t->next_lead;
 /* wrap offset helper */
 	if (sequence_number == ( TXW_LENGTH(t) + t->offset ))
 	{
@@ -270,7 +270,7 @@ puts ("txw: wrap offset.");
 		t->offset += TXW_LENGTH(t);
 	}
 
-	int offset = sequence_number - t->offset;
+	guint offset = sequence_number - t->offset;
 
 if (G_UNLIKELY(txw_debug > 2))
 printf ("txw: add packet offset %i\n", offset);
@@ -296,7 +296,7 @@ int
 txw_push_copy (
 	gpointer	ptr,
 	gpointer	packet,
-	int		length
+	guint		length
 	)
 {
 	if (G_UNLIKELY(!ptr)) {
@@ -314,9 +314,9 @@ txw_push_copy (
 int
 txw_get (
 	gpointer	ptr,
-	int		sequence_number,
+	guint32		sequence_number,
 	gpointer*	packet,
-	int*		length
+	guint*		length
 	)
 {
 	if (G_UNLIKELY(!ptr)) {
@@ -332,7 +332,7 @@ txw_get (
 		return -1;
 	}
 
-	int offset = TXW_PACKET_OFFSET(t, sequence_number);
+	guint offset = TXW_PACKET_OFFSET(t, sequence_number);
 	struct txw_packet* tp = &t->pdata->data[sizeof(struct txw_packet) * offset];
 	*packet = tp->data;
 	*length	= tp->length;
@@ -358,7 +358,7 @@ txw_pop (
 		return -1;
 	}
 
-	int offset = TXW_PACKET_OFFSET(t, t->trail);
+	guint offset = TXW_PACKET_OFFSET(t, t->trail);
 	struct txw_packet* tp = &t->pdata->data[sizeof(struct txw_packet) * offset];
 
 //	g_slice_free1 (tp->length, tp->data);
