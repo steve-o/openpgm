@@ -76,6 +76,8 @@ struct rxw {
 
 #define ABS_IN_TXW(w,x) \
 	( (x) >= (w)->txw_trail && (x) <= (w)->txw_lead )
+
+/* lead+2 in order to cope with mid-shuffling of window */
 #define IN_RXW_AHEAD(w,x) \
 	( (x) > (w)->rxw_next_lead && (x) <= (w)->rxw_ahead )
 
@@ -190,7 +192,7 @@ rxw_shutdown (
 
 /* gcc recommends parentheses around assignment used as truth value */
 		while ( (p = g_trash_stack_pop (&r->trash_data)) )
-			g_slice_free1 (r->max_tpdu, r->trash_data);
+			g_slice_free1 (r->max_tpdu, p);
 
 /* empty trash stack = NULL */
 	}
@@ -199,7 +201,7 @@ rxw_shutdown (
 	{
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&r->trash_packet)) )
-			g_slice_free1 (sizeof(struct rxw_packet), r->trash_packet);
+			g_slice_free1 (sizeof(struct rxw_packet), p);
 	}
 
 /* nak/ncf time lists */
@@ -300,7 +302,7 @@ printf ("rxw_push (#%lu trail#%lu) rxw: trail %u lead %u next-lead %u ahead %u\n
 			if (G_UNLIKELY(rxw_debug > 1))
 				printf ("rxw_trail_init=%lu\n", r->rxw_trail_init);
 
-			r->rxw_ahead = r->rxw_next_lead = r->rxw_lead + 1;
+			r->rxw_ahead = r->rxw_next_lead = r->rxw_lead ;
 		}
 		else
 		{
@@ -356,19 +358,27 @@ printf ("rxw_push (#%lu trail#%lu) rxw: trail %u lead %u next-lead %u ahead %u\n
 /* we have a packet that defines or extends the ahead buffer */
 		while ( (gint32)sequence_number - (gint32)r->rxw_ahead > 0 )
 		{
+			int offset = r->rxw_ahead - r->offset;
+			struct rxw_packet* ph = g_ptr_array_index (r->pdata, offset);
+
+			if (ph)
+			{
+				r->rxw_ahead++;
+				continue;
+			}
+
 /* check for full window */
 			if (RXW_LENGTH(r) == RXW_SQNS(r)) {
 				puts ("rxw: full, dropping packet ;(");
 				return -1;
 			}
 
-			struct rxw_packet* ph = r->trash_packet ?
-							g_trash_stack_pop (&r->trash_packet) :
-							g_slice_alloc (sizeof(struct rxw_packet));
+			ph = r->trash_packet ?
+				g_trash_stack_pop (&r->trash_packet) :
+				g_slice_alloc (sizeof(struct rxw_packet));
 			ph->data		= NULL;
 			ph->length		= 0;
-			ph->sequence_number	= r->rxw_ahead;
-			r->rxw_ahead		= r->rxw_ahead + 1;
+			ph->sequence_number	= r->rxw_ahead++;
 
 			if (G_UNLIKELY(rxw_debug > 1))
 				printf ("rxw: place holder for #%lu\n", ph->sequence_number);
@@ -380,7 +390,7 @@ printf ("rxw_push (#%lu trail#%lu) rxw: trail %u lead %u next-lead %u ahead %u\n
 				r->offset += RXW_LENGTH(r);
 			}
 
-			int offset = ph->sequence_number - r->offset;
+			offset = ph->sequence_number - r->offset;
 			g_ptr_array_index (r->pdata, offset) = ph;
 
 /* send nak by prepending to list */
