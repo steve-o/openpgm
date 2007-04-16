@@ -91,6 +91,18 @@ testif
 Test various combinations of network specification.
 
 
+sw_calc
+-------
+
+Basic calculation tests of wrap-around sliding windows and a leading edge.
+
+
+basic_recv_with_rxw
+-------------------
+
+Listen to packets buffered with a receive window.
+
+
 stream_send_with_fec
 --------------------
 

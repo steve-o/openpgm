@@ -21,6 +21,7 @@ shared_src = Split("""
 """)
 
 txw_obj = env.Object('txw.c')
+rxw_obj = env.Object('rxw.c')
 if_obj  = env.Object('if.c')
 
 shared_obj = []
@@ -43,5 +44,8 @@ env.Program(['stream_send_with_nak.c'] + shared_obj + txw_obj)
 httpenv.Program(['basic_recv_with_nak.c'] + shared_obj)
 env.Program(['dumpif.c'] + if_obj)
 env.Program(['testif.c'] + if_obj)
+env.Program('sw_calc.c')
+httpenv.Program(['basic_recv_with_rxw.c'] + shared_obj + rxw_obj)
+env.Program(['basic_rxw.c'] + rxw_obj)
 
 # end of file
