@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * basic transmit window.
+ * basic receive window.
  *
  * Copyright (c) 2006 Miru Limited.
  *
@@ -19,30 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _TXW_H
-#define _TXW_H
+#ifndef _RXW_H
+#define _RXW_H
+
+typedef int (*rxw_callback)(gpointer, guint, gpointer);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-gpointer txw_init (guint, guint32, guint32, guint, guint);
-int txw_shutdown (gpointer);
+gpointer rxw_init (guint, guint32, guint32, guint, guint, rxw_callback, gpointer);
+int rxw_shutdown (gpointer);
 
-int txw_next_lead (gpointer);
-int txw_lead (gpointer);
-int txw_trail (gpointer);
+gpointer rxw_alloc (gpointer);
+int rxw_push (gpointer, gpointer, guint, guint32, guint32);
 
-int txw_in_window (gpointer, guint32);
-
-gpointer txw_alloc (gpointer);
-int txw_push (gpointer, gpointer, guint);
-int txw_push_copy (gpointer, gpointer, guint);
-int txw_get (gpointer, guint32, gpointer*, guint*);
-int txw_pop (gpointer);
+int rxw_update (gpointer, guint32, guint32);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _TXW_H */
+#endif /* _RXW_H */
