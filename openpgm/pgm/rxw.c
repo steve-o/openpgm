@@ -75,7 +75,10 @@ struct rxw {
 #define IN_TXW(w,x) \
 	( (x) >= (w)->rxw_trail && (x) <= ((w)->rxw_trail + ((UINT32_MAX/2) - 1)) )
 #define IN_RXW(w,x) \
-	( (x) > (w)->rxw_trail && (x) <= (w)->lead )
+	( \
+		RXW_SQNS(w) && \
+		( (x) >= (w)->rxw_trail && (x) <= (w)->lead ) \
+	)
 
 #define RXW_PACKET_OFFSET(w,x) \
 	( \
@@ -351,7 +354,7 @@ printf ("rxw: #%u: trail#%u rxw_trail %u rxw_trail_init %u trail %u lead %u\n",
 		}
 		else
 		{
-			puts ("rxw: internal error :(");
+			puts ("rxw: internal error ;(");
 			return -1;
 		}
 	}
@@ -418,7 +421,7 @@ printf ("rxw: #%u: trail#%u rxw_trail %u rxw_trail_init %u trail %u lead %u\n",
 	printf ("rxw: #%u: flush window for contigious data.\n",
 		sequence_number);
 
-	for (guint32 peak = r->trail; peak <= r->lead; peak++)
+	for (guint32 peak = r->trail, peak_end = r->lead; peak <= peak_end; peak++)
 	{
 		guint offset = RXW_PACKET_OFFSET(r, peak);
 		struct rxw_packet* pp = g_ptr_array_index (r->pdata, offset);
@@ -435,6 +438,8 @@ printf ("rxw: #%u: trail#%u rxw_trail %u rxw_trail_init %u trail %u lead %u\n",
 		printf ("rxw: #%u: contigious packet found @ #%u, passing upstream.\n",
 			sequence_number, pp->sequence_number);
 
+		if (r->trail == r->lead)
+			r->lead++;
 		r->trail++;
 
 /* pass upstream */
