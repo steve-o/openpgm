@@ -219,7 +219,7 @@ test_reverse (
 	rxw_update(rxw, 0, 0);
 
 	gettimeofday(&start, NULL);
-	for (i = 0, j = count-1; i < count; i++)
+	for (i = 0, j = count; i < count; i++)
 	{
 		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
 
