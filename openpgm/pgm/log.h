@@ -19,24 +19,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _LOG_H
-#define _LOG_H
+#ifndef __PGM_LOG_H__
+#define __PGM_LOG_H__
 
 #include <glib.h>
+
+G_BEGIN_DECLS
 
 
 extern int g_timezone;
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 gboolean log_init (void);
 char* ts_format (int, int);
 
-#ifdef __cplusplus
-}
-#endif
 
-#endif /* _LOG_H */
+G_END_DECLS
+
+#endif /* __PGM_LOG_H__ */

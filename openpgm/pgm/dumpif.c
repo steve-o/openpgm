@@ -26,6 +26,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <glib.h>
+
 #include "if.h"
 
 
