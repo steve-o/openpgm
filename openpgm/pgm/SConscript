@@ -11,9 +11,9 @@ SConsignFile('scons.signatures')
 
 
 httpenv = env.Copy()
-httpenv.ParseConfig('pkg-config --cflags --libs libsoup-2.2')
+httpenv.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
 
-env.ParseConfig('pkg-config --cflags --libs glib-2.0')
+env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0')
 
 shared_src = Split("""
 		log.c

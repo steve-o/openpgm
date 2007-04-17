@@ -19,19 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _IF_H
-#define _IF_H
+#ifndef __PGM_IF_H__
+#define __PGM_IF_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+
+G_BEGIN_DECLS
 
 int if_print_all (void);
 int if_parse_network (const char*);
 
 
-#ifdef __cplusplus
-}
-#endif
+G_END_DECLS
 
-#endif /* _IF_H */
+#endif /* __PGM_IF_H__ */

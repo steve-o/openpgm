@@ -43,6 +43,8 @@ struct tests {
 
 /* globals */
 
+int on_nak (gpointer, guint, guint32, pgm_pkt_state*, gpointer);
+
 double test_basic_rxw (int, int);
 double test_double_jump (int, int);
 double test_reverse (int, int);
@@ -76,6 +78,8 @@ main (
 		case '?': usage (binary_name);
 		}
 	}
+
+	g_thread_init (NULL);
 
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
@@ -138,7 +142,7 @@ on_pgm_data (
 		gpointer	param
 		)
 {
-	puts ("on_pgm_data()");
+	g_debug ("on_pgm_data()");
 	return 0;
 }
 
@@ -154,7 +158,7 @@ test_basic_rxw (
 
 	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
 
-	rxw_update(rxw, 0, 0);
+	rxw_window_update(rxw, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
@@ -162,6 +166,7 @@ test_basic_rxw (
 		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
 
 		rxw_push (rxw, entry, size_per_entry, i, 0);
+		rxw_nak_list_foreach (rxw, on_nak, NULL);
 	}
 	gettimeofday(&now, NULL);
 
@@ -184,7 +189,7 @@ test_double_jump (
 
 	rxw = rxw_init (size_per_entry, 2 * count, 2 * count, 0, 0, on_pgm_data, NULL);
 
-	rxw_update(rxw, 0, 0);
+	rxw_window_update(rxw, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0, j = 1; i < count; i++)
@@ -192,6 +197,7 @@ test_double_jump (
 		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
 
 		rxw_push (rxw, entry, size_per_entry, j, 0);
+		rxw_nak_list_foreach (rxw, on_nak, NULL);
 
 		j += 2;
 	}
@@ -202,6 +208,22 @@ test_double_jump (
 	rxw_shutdown (rxw);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
+}
+
+int
+on_nak (
+		gpointer	data,
+		guint		length,
+		guint32		sequence_number,
+		pgm_pkt_state*	state,
+		gpointer	param
+		)
+{
+	g_debug ("send_nak(%u)", sequence_number);
+
+	*state = PGM_PKT_WAIT_NCF_STATE;
+
+	return 0;
 }
 
 double
@@ -216,7 +238,7 @@ test_reverse (
 
 	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
 
-	rxw_update(rxw, 0, 0);
+	rxw_window_update(rxw, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0, j = count; i < count; i++)
@@ -227,6 +249,8 @@ test_reverse (
 			rxw_push (rxw, entry, size_per_entry, --j, 0);
 		else
 			rxw_push (rxw, entry, size_per_entry, i, 0);
+
+		rxw_nak_list_foreach (rxw, on_nak, NULL);
 	}
 	gettimeofday(&now, NULL);
 

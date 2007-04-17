@@ -19,12 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _TXW_H
-#define _TXW_H
+#ifndef __PGM_TXW_H__
+#define __PGM_TXW_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+G_BEGIN_DECLS
+
 
 gpointer txw_init (guint, guint32, guint32, guint, guint);
 int txw_shutdown (gpointer);
@@ -41,8 +40,7 @@ int txw_push_copy (gpointer, gpointer, guint);
 int txw_get (gpointer, guint32, gpointer*, guint*);
 int txw_pop (gpointer);
 
-#ifdef __cplusplus
-}
-#endif
 
-#endif /* _TXW_H */
+G_END_DECLS
+
+#endif /* __PGM_TXW_H__ */
