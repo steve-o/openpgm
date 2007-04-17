@@ -92,7 +92,12 @@ struct rxw {
 			( (x) - ( (w)->offset - RXW_LENGTH(w) ) ) \
 	)
 #define RXW_PACKET(w,x) \
-	( (struct rxw_packet*)( g_ptr_array_index ((w)->pdata, RXW_PACKET_OFFSET((w), (x))) ) )
+	( (struct rxw_packet*)g_ptr_array_index((w)->pdata, RXW_PACKET_OFFSET((w), (x))) )
+#define RXW_SET_PACKET(w,x,v) \
+	do { \
+		int _o = RXW_PACKET_OFFSET((w), (x)); \
+		g_ptr_array_index((w)->pdata, _o) = (v); \
+	} while (0)
 
 /* is (a) greater than (b) wrt. leading edge of receive window (w) */
 #define SLIDINGWINDOW_GT(a,b,l) \
@@ -100,14 +105,8 @@ struct rxw {
 		( (gint32)(a) - (gint32)(l) ) > ( (gint32)(b) - (gint32)(l) ) \
 	)
 
-#define SLIDINGWINDOW_GTE(a,b,l) \
-	( \
-		( (gint32)(a) - (gint32)(l) ) >= ( (gint32)(b) - (gint32)(l) ) \
-	)
-
 
 /* globals */
-int rxw_debug = 1;
 #define G_LOG_DOMAIN	"rxw"
 
 static void _list_iterator (gpointer, gpointer);
@@ -453,7 +452,7 @@ rxw_push (
 //		g_slice_free1 (sizeof(struct rxw), pp);
 		g_trash_stack_push (&r->trash_packet, pp);
 
-		g_ptr_array_index (r->pdata, RXW_PACKET_OFFSET(r, peak)) = NULL;
+		RXW_SET_PACKET(r, peak, NULL);
 	}
 
 	g_debug ("#%u: push() complete.",
@@ -519,14 +518,69 @@ rxw_window_update (
 		r->rxw_trail = txw_trail;
 
 /* expire outstanding naks ... */
+		while (SLIDINGWINDOW_GT(r->rxw_trail, r->trail, txw_lead))
+		{
+			struct rxw_packet* dp = RXW_PACKET(r, r->trail);
+
+			g_warning ("lost data #%u",
+				dp->sequence_number);
+
+			if (dp->nak) {
+				r->nak_list = g_list_delete_link (r->nak_list, dp->nak);
+				dp->nak = NULL;
+			}
+			if (dp->ncf) {
+				r->ncf_list = g_list_delete_link (r->ncf_list, dp->ncf);
+				dp->ncf = NULL;
+			}
+			if (dp->data) {
+//				g_slice_free1 (rp->length, dp->data);
+				g_trash_stack_push (&r->trash_data, dp->data);
+			}
+//			g_slice_free1 (sizeof(struct rxw), dp);
+			g_trash_stack_push (&r->trash_packet, dp);
+
+			RXW_SET_PACKET(r, r->trail, NULL);
+
+			if (r->trail == r->lead)
+				r->lead++;
+			r->trail++;
+		}
 	}
 
 	if ( txw_lead > r->lead && txw_lead <= ( r->lead + ((UINT32_MAX/2) - 1)) )
 	{
-		g_debug ("advancing lead* to %u",
+		g_debug ("advancing lead to %u",
 			txw_lead);
 
 /* generate new naks ... */
+		while ( r->lead != txw_lead )
+		{
+			if (RXW_LENGTH(r) == RXW_SQNS(r)) {
+				g_warning ("full, dropping packet ;(");
+				return -1;
+			}
+
+			struct rxw_packet* ph = r->trash_packet ?
+							g_trash_stack_pop (&r->trash_packet) :
+							g_slice_alloc (sizeof(struct rxw_packet));
+			memset (ph, 0, sizeof(struct rxw_packet));
+			ph->sequence_number     = r->lead++;
+
+			if (ph->sequence_number == ( RXW_LENGTH(r) + r->offset ))
+			{
+				r->offset += RXW_LENGTH(r);
+			}
+
+			guint offset = ph->sequence_number - r->offset;
+			g_ptr_array_index (r->pdata, offset) = ph;
+			g_debug ("adding placeholder #%u",
+				ph->sequence_number);
+
+/* send nak by sending to end of expiry list */
+			g_queue_push_head (r->nak_list, ph);
+			ph->nak = r->nak_list->head;
+		}
 	}
 
 	return 0;
@@ -708,6 +762,8 @@ rxw_nak_list_foreach (
 //				g_slice_free1 (sizeof(struct rxw), dp);
 				g_trash_stack_push (&r->trash_packet, dp);
 
+				RXW_SET_PACKET(r, r->trail, NULL);
+
 				if (r->trail == r->lead)
 					r->lead++;
 				r->trail++;
@@ -790,6 +846,8 @@ rxw_ncf_list_foreach (
 				}
 //				g_slice_free1 (sizeof(struct rxw), dp);
 				g_trash_stack_push (&r->trash_packet, dp);
+
+				RXW_SET_PACKET(r, r->trail, NULL);
 
 				if (r->trail == r->lead)
 					r->lead++;
