@@ -59,32 +59,23 @@ struct rxw {
 
 	guint		max_tpdu;		/* maximum packet size */
 
-	guint32		txw_trail, txw_lead;
-	guint32		rxw_trail, rxw_lead, rxw_next_lead;
-	guint32		rxw_ahead;
-	guint32		rxw_trail_init;
+	guint32		lead, trail;
+	guint32		rxw_trail, rxw_trail_init;
 	gboolean	rxw_constrained;
+	gboolean	window_defined;
 	guint		offset;
 
 	rxw_callback	on_data;
 	gpointer	param;
 };
 
-/* between lead and ahead, as processed packets are not important receive side */
 #define RXW_LENGTH(w)	( (w)->pdata->len )
-#define RXW_SQNS(w)	( (1 + (w)->rxw_ahead) - (w)->rxw_lead )
-
-#define ABS_IN_TXW(w,x) \
-	( (x) >= (w)->txw_trail && (x) <= (w)->txw_lead )
-
-/* lead+2 in order to cope with mid-shuffling of window */
-#define IN_RXW_AHEAD(w,x) \
-	( (x) > (w)->rxw_next_lead && (x) <= (w)->rxw_ahead )
+#define RXW_SQNS(w)	( (w)->lead - (w)->trail )
 
 #define IN_TXW(w,x) \
-	( (x) >= (w)->txw_trail && (x) <= ((w)->txw_trail + ((UINT32_MAX/2) - 1)) )
+	( (x) >= (w)->rxw_trail && (x) <= ((w)->rxw_trail + ((UINT32_MAX/2) - 1)) )
 #define IN_RXW(w,x) \
-	( (x) >= (w)->rxw_trail && (x) <= (w)->rxw_lead )
+	( (x) > (w)->rxw_trail && (x) <= (w)->lead )
 
 #define RXW_PACKET_OFFSET(w,x) \
 	( \
@@ -99,9 +90,9 @@ struct rxw {
 		( (gint32)(a) - (gint32)(l) ) > ( (gint32)(b) - (gint32)(l) ) \
 	)
 
-#define SLIDINGWINDOW_LT(a,b,l) \
+#define SLIDINGWINDOW_GTE(a,b,l) \
 	( \
-		( (gint32)(a) - (gint32)(l) ) < ( (gint32)(b) - (gint32)(l) ) \
+		( (gint32)(a) - (gint32)(l) ) >= ( (gint32)(b) - (gint32)(l) ) \
 	)
 
 
@@ -153,11 +144,16 @@ rxw_init (
 	printf ("rxw: %i packets.\n", rxw_sqns);
 	g_ptr_array_set_size (r->pdata, rxw_sqns);
 
-/* set empty window */
-	r->rxw_trail = r->rxw_lead - 1;
+/* empty state:
+ *
+ * trail = lead = 0
+ * rxw_trail = rxw_trail_init = 0
+ */
 
 /* limit retransmit requests on late session joining */
 	r->rxw_constrained = TRUE;
+
+	r->window_defined = FALSE;
 
 	r->on_data = on_data;
 	r->param = param;
@@ -274,177 +270,172 @@ rxw_push (
 	}
 	struct rxw* r = (struct rxw*)ptr;
 
-printf ("rxw_push (#%lu trail#%lu) rxw: trail %u lead %u next-lead %u ahead %u\n",
-		sequence_number, trail, r->rxw_trail, r->rxw_lead, r->rxw_next_lead, r->rxw_ahead);
+printf ("rxw: #%u: trail#%u rxw_trail %u rxw_trail_init %u trail %u lead %u\n",
+		sequence_number, trail, 
+		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead);
 
-/* we need an SPM to define the transmit window before we can accept packets */
-	if ( !IN_TXW(r, sequence_number) )
+/* trail is the next packet to commit upstream, lead is the leading edge
+ * of the receive window with possible gaps inside, rxw_trail is the transmit
+ * window trail for retransmit requests.
+ */
+
+	if ( !r->window_defined )
 	{
-		printf ("not in tx window %u, %lu - %lu\n",
-			sequence_number,
-			r->txw_trail,
-			r->txw_lead);
-		return -1;
+		printf ("rxw: #%u: using packet to temporarily define window\n",
+			sequence_number);
+
+		r->lead = r->trail = r->rxw_trail = r->rxw_trail_init = sequence_number;
+		r->rxw_constrained = TRUE;
+		r->window_defined = TRUE;
 	}
-
-	if (IN_RXW(r, sequence_number))
+	else
 	{
-		printf ("rxw: dupe, #%lu win %lu-%lu\n", sequence_number, r->rxw_trail, r->rxw_lead);
-		return -1;
-	}
+/* check if packet should be discarded or processed further */
 
-/* if we are joined a session late, set rxw_trail_init to the packets sequence number */
-	if (r->rxw_constrained)
-	{
-		if (r->rxw_lead == r->rxw_next_lead)	/* special case for first packet */
+		if ( !IN_TXW(r, sequence_number) )
 		{
-			r->rxw_trail = r->rxw_lead = r->rxw_trail_init = sequence_number;
-			if (G_UNLIKELY(rxw_debug > 1))
-				printf ("rxw_trail_init=%lu\n", r->rxw_trail_init);
-
-			r->rxw_ahead = r->rxw_next_lead = r->rxw_lead ;
+			printf ("rxw: #%u: not in tx window, discarding.\n",
+				sequence_number);
+			return -1;
 		}
-		else
-		{
 
-/* constraint is removed when the trailing sequence number passes rxw_trail_init wrt rxw_lead */
-			if ( SLIDINGWINDOW_GT(trail, r->rxw_trail_init, r->rxw_lead) )
-			{
-				r->rxw_constrained = FALSE;
-				if (G_UNLIKELY(rxw_debug > 1))
-					puts ("rxw constraint removed.");
-			}
+		if ( SLIDINGWINDOW_GT(trail, r->rxw_trail, r->lead) )
+		{
+			printf ("rxw: #%u: using new rxw_trail value.\n",
+				sequence_number);
+
+			r->rxw_trail = trail;
+		}
+
+		if ( r->rxw_constrained && SLIDINGWINDOW_GT(trail, r->rxw_trail_init, r->lead) )
+		{
+			printf ("rxw: #%u: constraint removed on trail.\n",
+				sequence_number);
+
+			r->rxw_constrained = FALSE;
 		}
 	}
 
-/* check for dupe or fills in a gap in the ahead buffer */
-	if (IN_RXW_AHEAD(r, sequence_number))
+	if ( IN_RXW(r, sequence_number) )
 	{
-		if (G_UNLIKELY(rxw_debug > 1))
-			printf ("rxw: in ahead buffer #%lu, %lu-%lu\n", sequence_number, r->rxw_next_lead, r->rxw_ahead);
+/* possible duplicate */
+		printf ("rxw: #%u: in rx window, checking for duplicate.\n",
+			sequence_number);
 
 		guint offset = RXW_PACKET_OFFSET(r, sequence_number);
 		struct rxw_packet* rp = g_ptr_array_index (r->pdata, offset);
-		if (rp->length)
+
+		if (rp)
 		{
-			puts ("ahead dupe");
-			return -1;
-		}
-		else
-		{
-/* fill in ahead buffer */
+			if (rp->length)
+			{
+				printf ("rxw: #%u: already received, discarding.\n",
+				sequence_number);
+			}
+
+			printf ("rxw: #%u: filling in a gap.\n",
+				sequence_number);
+
 			rp->data	= packet;
 			rp->length	= length;
 
-/* clean up nak/ncf lists */
-			if (rp->nak)
-			{
+/* clean up lists */
+			if (rp->nak) {
 				r->nak_list = g_list_delete_link (r->nak_list, rp->nak);
 				rp->nak = NULL;
 			}
-
-			if (rp->ncf)
-			{
+			if (rp->ncf) {
 				r->ncf_list = g_list_delete_link (r->ncf_list, rp->ncf);
 				rp->ncf = NULL;
 			}
 		}
+		else
+		{
+			puts ("rxw: internal error :(");
+			return -1;
+		}
 	}
 	else
 	{
-		if (G_UNLIKELY(rxw_debug > 1))
-			printf ("rxw: add to ahead buffer #%lu, %lu-%lu\n", sequence_number, r->rxw_next_lead, r->rxw_ahead);
+/* extends receive window */
+		printf ("rxw: #%u: lead extended.\n",
+			sequence_number);
 
-/* we have a packet that defines or extends the ahead buffer */
-		while ( (gint32)sequence_number - (gint32)r->rxw_ahead > 0 )
-		{
-			int offset = r->rxw_ahead - r->offset;
-			struct rxw_packet* ph = g_ptr_array_index (r->pdata, offset);
-
-			if (ph)
-			{
-				r->rxw_ahead++;
-				continue;
-			}
-
-/* check for full window */
+		while (r->lead != sequence_number) {
 			if (RXW_LENGTH(r) == RXW_SQNS(r)) {
 				puts ("rxw: full, dropping packet ;(");
 				return -1;
 			}
 
-			ph = r->trash_packet ?
-				g_trash_stack_pop (&r->trash_packet) :
-				g_slice_alloc (sizeof(struct rxw_packet));
-			ph->data		= NULL;
-			ph->length		= 0;
-			ph->sequence_number	= r->rxw_ahead++;
-
-			if (G_UNLIKELY(rxw_debug > 1))
-				printf ("rxw: place holder for #%lu\n", ph->sequence_number);
+			struct rxw_packet* ph = r->trash_packet ?
+							g_trash_stack_pop (&r->trash_packet) :
+							g_slice_alloc (sizeof(struct rxw_packet));
+			ph->data                = NULL;
+			ph->length              = 0;
+			ph->sequence_number     = r->lead++;
 
 			if (ph->sequence_number == ( RXW_LENGTH(r) + r->offset ))
 			{
-				if (G_UNLIKELY(rxw_debug > 1))
-					puts ("rxw: wrap offset.");
 				r->offset += RXW_LENGTH(r);
 			}
 
-			offset = ph->sequence_number - r->offset;
+			guint offset = ph->sequence_number - r->offset;
 			g_ptr_array_index (r->pdata, offset) = ph;
+			printf ("rxw: #%u: adding placeholder #%u\n",
+				sequence_number, ph->sequence_number);
 
 /* send nak by prepending to list */
 			r->nak_list = g_list_prepend (r->nak_list, ph);
+
 		}
 
-/* check for full window */
+/* r->lead = sequence_number; */
+		
 		if (RXW_LENGTH(r) == RXW_SQNS(r)) {
-			puts ("rxw: full, expunging packet from ahead buffer ;(");
-
-/* data loss notification here */
-			rxw_pop (ptr);
+			puts ("rxw: full, dropping packet ;(");
+			return -1;
 		}
 
-/* add packet to receive window */
 		struct rxw_packet* rp = r->trash_packet ?
 						g_trash_stack_pop (&r->trash_packet) :
 						g_slice_alloc (sizeof(struct rxw_packet));
-		rp->data		= packet;
-		rp->length		= length;
-		rp->sequence_number	= sequence_number;
-
-		if (G_UNLIKELY(rxw_debug > 1))
-			printf ("rxw: packet added to window #%lu\n", rp->sequence_number);
+		rp->data                = packet;
+		rp->length              = length;
+		rp->sequence_number     = r->lead;
 
 		if (rp->sequence_number == ( RXW_LENGTH(r) + r->offset ))
 		{
-			if (G_UNLIKELY(rxw_debug > 1))
-				puts ("rxw: wrap offset.");
 			r->offset += RXW_LENGTH(r);
 		}
 
-		int offset = rp->sequence_number - r->offset;
+		guint offset = rp->sequence_number - r->offset;
 		g_ptr_array_index (r->pdata, offset) = rp;
+		printf ("rxw: #%u: adding packet #%u\n",
+			sequence_number, rp->sequence_number);
 	}
 
 /* check for contigious packets to pass upstream */
-	if (G_UNLIKELY(rxw_debug > 1))
-		printf ("rxw: flush rxw_lead %lu rxw_ahead %lu\n", r->rxw_lead, r->rxw_ahead);
+	printf ("rxw: #%u: flush window for contigious data.\n",
+		sequence_number);
 
-	guint32 peak = r->rxw_next_lead;
-	guint offset = RXW_PACKET_OFFSET(r, peak);
-	struct rxw_packet* pp = g_ptr_array_index (r->pdata, offset);
-
-	while (pp && pp->length)
+	for (guint32 peak = r->trail; peak <= r->lead; peak++)
 	{
-		if (G_UNLIKELY(rxw_debug > 1))
-			printf ("rxw: #%lu ", pp->sequence_number);
+		guint offset = RXW_PACKET_OFFSET(r, peak);
+		struct rxw_packet* pp = g_ptr_array_index (r->pdata, offset);
 
-		r->rxw_lead = r->rxw_next_lead;
-		if (r->rxw_ahead == r->rxw_next_lead)
-			r->rxw_ahead = r->rxw_next_lead = r->rxw_lead + 1;
-		else
-			r->rxw_next_lead = r->rxw_lead + 1;
+		if (!pp || !pp->length)
+		{
+			if (!pp)
+				printf ("rxw: #%u: pp = NULL\n", sequence_number);
+			if (!pp->length)
+				printf ("rxw: #%u: pp->length = 0\n", sequence_number);
+			break;
+		}
+
+		printf ("rxw: #%u: contigious packet found @ #%u, passing upstream.\n",
+			sequence_number, pp->sequence_number);
+
+		r->trail++;
 
 /* pass upstream */
 		if (r->on_data) r->on_data (pp->data, pp->length, r->param);
@@ -457,11 +448,10 @@ printf ("rxw_push (#%lu trail#%lu) rxw: trail %u lead %u next-lead %u ahead %u\n
 		g_trash_stack_push (&r->trash_packet, pp);
 
 		g_ptr_array_index (r->pdata, offset) = NULL;
-
-		peak++;
-		offset = RXW_PACKET_OFFSET(r, peak);
-		pp = g_ptr_array_index (r->pdata, offset);
 	}
+
+	printf ("rxw: #%u: push() complete.\n",
+		sequence_number);
 
 	return 0;
 }
@@ -479,7 +469,7 @@ rxw_pop (
 		return -1;
 	}
 
-	int offset = RXW_PACKET_OFFSET(r, r->rxw_ahead);
+	int offset = RXW_PACKET_OFFSET(r, r->lead);
 	struct rxw_packet* rp = g_ptr_array_index (r->pdata, offset);
 
 	if (rp->nak)
@@ -503,7 +493,7 @@ rxw_pop (
 //	g_slice_free1 (sizeof(struct rxw), rp);
 	g_trash_stack_push (&r->trash_packet, rp);
 
-	r->rxw_ahead--;
+	r->lead--;
 
 	return 0;
 }
@@ -525,11 +515,17 @@ rxw_update (
 	struct rxw* r = (struct rxw*)ptr;
 
 /* does the SPM advance the trail of the window? */
-	if (SLIDINGWINDOW_GT(txw_trail, r->txw_trail, txw_lead))
+	if (SLIDINGWINDOW_GT(txw_trail, r->rxw_trail, txw_lead))
 	{
-		r->txw_trail = txw_trail;
-		r->txw_lead = txw_lead;
-		return 0;
+		printf ("rxw: advancing rxw_trail to %u\n",
+			txw_trail);
+		r->rxw_trail = txw_trail;
+	}
+
+	if ( txw_lead > r->lead && txw_lead <= ( r->lead + ((UINT32_MAX/2) - 1)) )
+	{
+		printf ("rxw: advancing lead* to %u\n",
+			txw_lead);
 	}
 
 	return -1;
