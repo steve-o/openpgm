@@ -179,7 +179,7 @@ rxw_init (
 	r->wait_ncf_queue = g_queue_new ();
 	r->wait_data_queue = g_queue_new ();
 
-/* contigious packet callback */
+/* contiguous packet callback */
 	r->on_data = on_data;
 	r->param = param;
 
@@ -429,8 +429,8 @@ rxw_push (
 			sequence_number, rp->sequence_number);
 	}
 
-/* check for contigious packets to pass upstream */
-	g_debug ("#%" G_GUINT32_FORMAT ": flush window for contigious data.",
+/* check for contiguous packets to pass upstream */
+	g_debug ("#%" G_GUINT32_FORMAT ": flush window for contiguous data.",
 		sequence_number);
 
 	for (guint32 peak = r->trail, peak_end = r->lead; peak <= peak_end; peak++)
@@ -448,7 +448,7 @@ rxw_push (
 			break;
 		}
 
-		g_debug ("#%" G_GUINT32_FORMAT ": contigious packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
+		g_debug ("#%" G_GUINT32_FORMAT ": contiguous packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
 			sequence_number, pp->sequence_number);
 
 		if (r->trail == r->lead)
