@@ -44,6 +44,7 @@ struct tests {
 /* globals */
 
 int on_nak (gpointer, guint, guint32, pgm_pkt_state*, gpointer);
+int on_ncf (gpointer, guint, guint32, pgm_pkt_state*, gpointer);
 
 double test_basic_rxw (int, int);
 double test_double_jump (int, int);
@@ -223,6 +224,19 @@ on_nak (
 	return 0;
 }
 
+int
+on_ncf (
+		gpointer	data,
+		guint		length,
+		guint32		sequence_number,
+		pgm_pkt_state*	state,
+		gpointer	param
+		)
+{
+	g_debug ("WAIT_NCF_STATE: #%u", sequence_number);
+	return 0;
+}
+
 double
 test_reverse (
 		int count,
@@ -248,6 +262,7 @@ test_reverse (
 			rxw_push (rxw, entry, size_per_entry, i, 0);
 
 		rxw_nak_list_foreach (rxw, on_nak, NULL);
+		rxw_ncf_list_foreach (rxw, on_ncf, NULL);
 	}
 	gettimeofday(&now, NULL);
 
