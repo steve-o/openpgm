@@ -40,7 +40,7 @@ typedef enum
 
 
 
-/* callback for commiting contigious pgm packets */
+/* callback for commiting contiguous pgm packets */
 typedef int (*rxw_callback)(gpointer, guint, gpointer);
 
 /* callback for processing naks */
