@@ -700,7 +700,7 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 //printf ("SPM: tx window now %lu - %lu\n", 
 //		hoststat->txw_trail, hoststat->txw_lead);
 //
-			rxw_update (g_rxw, hoststat->txw_lead, hoststat->txw_lead);
+			rxw_window_update (g_rxw, hoststat->txw_lead, hoststat->txw_lead);
 
 		}
 		break;
