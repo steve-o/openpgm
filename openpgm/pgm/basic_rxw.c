@@ -56,8 +56,6 @@ usage (const char* bin)
 	exit (1);
 }
 
-extern int rxw_debug;
-
 int
 main (
 	int	argc,
@@ -65,7 +63,6 @@ main (
 	)
 {
 	puts ("basic_rxw");
-	rxw_debug = 5;
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
