@@ -44,7 +44,7 @@ typedef enum
 typedef int (*rxw_callback)(gpointer, guint, gpointer);
 
 /* callback for processing naks */
-typedef int (*rxw_nak_callback)(gpointer, guint, guint32, pgm_pkt_state*, gpointer);
+typedef int (*rxw_state_callback)(gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
 
 
 
@@ -55,14 +55,13 @@ gpointer rxw_alloc (gpointer);
 int rxw_push (gpointer, gpointer, guint, guint32, guint32);
 
 /* for NAK re/generation */
-int rxw_nak_list_foreach (gpointer, rxw_nak_callback, gpointer);
+int rxw_state_foreach (gpointer, pgm_pkt_state, rxw_state_callback, gpointer);
 
 /* from SPM */
 int rxw_window_update (gpointer, guint32, guint32);
 
 /* from NCF */
 int rxw_ncf (gpointer, guint32);
-int rxw_ncf_list_foreach (gpointer, rxw_nak_callback, gpointer);
 
 
 G_END_DECLS

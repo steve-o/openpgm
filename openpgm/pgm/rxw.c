@@ -43,12 +43,10 @@ struct rxw_packet {
 	guint		length;
 	guint32		sequence_number;
 
-	struct timeval	loss_detected;
-	struct timeval	nak_sent;
-	struct timeval	ncf_received;
-	GList*		nak;			/* pointer to GList element contained this in rxw.nak_list */
-	GList*		ncf;			/*  ... rxw.ncf_list */
-
+	gdouble		bo_start;
+	gdouble		nak_sent;
+	gdouble		ncf_received;
+	GList		link_;
 	pgm_pkt_state	state;
 	guint		ncf_retry_count;
 	guint		data_retry_count;
@@ -59,8 +57,9 @@ struct rxw {
 	GTrashStack*	trash_packet;		/* sizeof(rxw_packet) */
 	GTrashStack*	trash_data;		/* max_tpdu */
 
-	GQueue*		nak_list;
-	GQueue*		ncf_list;
+	GQueue*		backoff_queue;
+	GQueue*		wait_ncf_queue;
+	GQueue*		wait_data_queue;
 
 	guint		max_tpdu;		/* maximum packet size */
 
@@ -72,6 +71,8 @@ struct rxw {
 
 	rxw_callback	on_data;
 	gpointer	param;
+
+	GTimer*		zero;
 };
 
 #define RXW_LENGTH(w)	( (w)->pdata->len )
@@ -99,6 +100,14 @@ struct rxw {
 		g_ptr_array_index((w)->pdata, _o) = (v); \
 	} while (0)
 
+#define RXW_CHECK_WRAPAROUND(w,x) \
+	do { \
+		if ( (x) == ( RXW_LENGTH( (w) ) + (w)->offset ) ) \
+		{ \
+			(w)->offset += RXW_LENGTH( (w) ); \
+		} \
+	} while (0)
+
 /* is (a) greater than (b) wrt. leading edge of receive window (w) */
 #define SLIDINGWINDOW_GT(a,b,l) \
 	( \
@@ -111,6 +120,8 @@ struct rxw {
 
 static void _list_iterator (gpointer, gpointer);
 static int rxw_pop (struct rxw*);
+static int rxw_pkt_state_unlink (struct rxw*, struct rxw_packet*);
+static int rxw_pkt_free1 (struct rxw*, struct rxw_packet*);
 
 
 gpointer
@@ -164,11 +175,16 @@ rxw_init (
 	r->window_defined = FALSE;
 
 /* empty queue's for nak & ncfs */
-	r->nak_list = g_queue_new ();
-	r->ncf_list = g_queue_new ();
+	r->backoff_queue = g_queue_new ();
+	r->wait_ncf_queue = g_queue_new ();
+	r->wait_data_queue = g_queue_new ();
 
+/* contigious packet callback */
 	r->on_data = on_data;
 	r->param = param;
+
+/* timing */
+	r->zero = g_timer_new();
 
 	return (gpointer)r;
 }
@@ -185,7 +201,7 @@ rxw_shutdown (
 
 	if (r->pdata)
 	{
-		g_ptr_array_foreach (r->pdata, _list_iterator, &r->max_tpdu);
+		g_ptr_array_foreach (r->pdata, _list_iterator, r);
 		g_ptr_array_free (r->pdata, TRUE);
 		r->pdata = NULL;
 	}
@@ -208,16 +224,30 @@ rxw_shutdown (
 			g_slice_free1 (sizeof(struct rxw_packet), p);
 	}
 
-/* nak/ncf time lists */
-	if (r->nak_list)
+/* nak/ncf time lists,
+ * important: link items are static to each packet struct
+ */
+	if (r->backoff_queue)
 	{
-		g_queue_free (r->nak_list);
-		r->nak_list = NULL;
+		g_slice_free (GQueue, r->backoff_queue);
+		r->backoff_queue = NULL;
 	}
-	if (r->ncf_list)
+	if (r->wait_ncf_queue)
 	{
-		g_queue_free (r->ncf_list);
-		r->ncf_list = NULL;
+		g_slice_free (GQueue, r->wait_ncf_queue);
+		r->wait_ncf_queue = NULL;
+	}
+	if (r->wait_data_queue)
+	{
+		g_slice_free (GQueue, r->wait_data_queue);
+		r->wait_data_queue = NULL;
+	}
+
+/* timer reference */
+	if (r->zero)
+	{
+		g_timer_destroy (r->zero);
+		r->zero = NULL;
 	}
 
 	return 0;
@@ -232,15 +262,10 @@ _list_iterator (
 /* iteration on empty array sized on init() */
 	if (data == NULL) return;
 
+	struct rxw* r = (struct rxw*)user_data;
 	struct rxw_packet *rp = (struct rxw_packet*)data;
-//	int length = rp->length;
 
-	int max_tpdu = *(int*)user_data;
-
-//	g_slice_free1 ( length, rp->data );
-	g_slice_free1 ( max_tpdu, rp->data );
-
-	g_slice_free1 ( sizeof(struct rxw_packet), data );
+	rxw_pkt_free1 (r, rp);
 }
 
 /* alloc for the payload per packet */
@@ -339,17 +364,10 @@ rxw_push (
 
 			rp->data	= packet;
 			rp->length	= length;
-			rp->state	= PGM_PKT_HAVE_DATA_STATE;
 
-/* clean up lists */
-			if (rp->nak) {
-				g_queue_delete_link (r->nak_list, rp->nak);
-				rp->nak = NULL;
-			}
-			if (rp->ncf) {
-				g_queue_delete_link (r->ncf_list, rp->ncf);
-				rp->ncf = NULL;
-			}
+			rxw_pkt_state_unlink (r, rp);
+
+			rp->state	= PGM_PKT_HAVE_DATA_STATE;
 		}
 		else
 		{
@@ -363,6 +381,8 @@ rxw_push (
 		g_debug ("#%u: lead extended.",
 			sequence_number);
 
+		gdouble now = g_timer_elapsed (r->zero, NULL);
+
 		while (r->lead != sequence_number) {
 			if (RXW_LENGTH(r) == RXW_SQNS(r)) {
 				g_warning ("full, dropping packet ;(");
@@ -373,21 +393,19 @@ rxw_push (
 							g_trash_stack_pop (&r->trash_packet) :
 							g_slice_alloc (sizeof(struct rxw_packet));
 			memset (ph, 0, sizeof(struct rxw_packet));
+			ph->link_.data		= ph;
 			ph->sequence_number     = r->lead++;
+			ph->bo_start		= now;
 
-			if (ph->sequence_number == ( RXW_LENGTH(r) + r->offset ))
-			{
-				r->offset += RXW_LENGTH(r);
-			}
-
-			guint offset = ph->sequence_number - r->offset;
-			g_ptr_array_index (r->pdata, offset) = ph;
+			RXW_CHECK_WRAPAROUND(r, ph->sequence_number);
+			RXW_SET_PACKET(r, ph->sequence_number, ph);
 			g_debug ("#%u: adding placeholder #%u",
 				sequence_number, ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
-			g_queue_push_head (r->nak_list, ph);
-			ph->nak = r->nak_list->head;
+			g_queue_push_head_link (r->backoff_queue, &ph->link_);
+			g_debug ("#%" G_GUINT32_FORMAT ": backoff_queue now %u long",
+				sequence_number, r->backoff_queue->length);
 		}
 
 /* r->lead = sequence_number; */
@@ -405,19 +423,14 @@ rxw_push (
 		rp->sequence_number     = r->lead;
 		rp->state		= PGM_PKT_HAVE_DATA_STATE;
 
-		if (rp->sequence_number == ( RXW_LENGTH(r) + r->offset ))
-		{
-			r->offset += RXW_LENGTH(r);
-		}
-
-		guint offset = rp->sequence_number - r->offset;
-		g_ptr_array_index (r->pdata, offset) = rp;
-		g_debug ("#%u: adding packet #%u",
+		RXW_CHECK_WRAPAROUND(r, rp->sequence_number);
+		RXW_SET_PACKET(r, rp->sequence_number, rp);
+		g_debug ("#%" G_GUINT32_FORMAT ": adding packet #%" G_GUINT32_FORMAT,
 			sequence_number, rp->sequence_number);
 	}
 
 /* check for contigious packets to pass upstream */
-	g_debug ("#%u: flush window for contigious data.",
+	g_debug ("#%" G_GUINT32_FORMAT ": flush window for contigious data.",
 		sequence_number);
 
 	for (guint32 peak = r->trail, peak_end = r->lead; peak <= peak_end; peak++)
@@ -427,15 +440,15 @@ rxw_push (
 		if (!pp || pp->state != PGM_PKT_HAVE_DATA_STATE)
 		{
 			if (!pp) {
-				g_debug ("#%u: pp = NULL", sequence_number);
+				g_debug ("#%" G_GUINT32_FORMAT ": pp = NULL", sequence_number);
 			}
-			if (pp->state != PGM_PKT_HAVE_DATA_STATE) {
-				g_debug ("#%u: !have_data_state pp->length = %u", sequence_number, pp->length);
+			if (pp && pp->state != PGM_PKT_HAVE_DATA_STATE) {
+				g_debug ("#%" G_GUINT32_FORMAT ": !have_data_state pp->length = %u",sequence_number, pp->length);
 			}
 			break;
 		}
 
-		g_debug ("#%u: contigious packet found @ #%u, passing upstream.",
+		g_debug ("#%" G_GUINT32_FORMAT ": contigious packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
 			sequence_number, pp->sequence_number);
 
 		if (r->trail == r->lead)
@@ -446,17 +459,68 @@ rxw_push (
 		if (r->on_data) r->on_data (pp->data, pp->length, r->param);
 
 /* cleanup */
-//		g_slice_free1 (pp->length, pp->data);
-		g_trash_stack_push (&r->trash_data, pp->data);
-
-//		g_slice_free1 (sizeof(struct rxw), pp);
-		g_trash_stack_push (&r->trash_packet, pp);
-
+		rxw_pkt_free1 (r, pp);
 		RXW_SET_PACKET(r, peak, NULL);
 	}
 
 	g_debug ("#%u: push() complete.",
 		sequence_number);
+
+	return 0;
+}
+
+int
+rxw_pkt_state_unlink (
+	struct rxw*	r,
+	struct rxw_packet*	rp
+	)
+{
+	g_return_val_if_fail (r != NULL && rp != NULL, -1);
+
+/* remove from state queues */
+	switch (rp->state) {
+	case PGM_PKT_BACK_OFF_STATE:
+		g_queue_unlink (r->backoff_queue, &rp->link_);
+		break;
+
+	case PGM_PKT_WAIT_NCF_STATE:
+		g_queue_unlink (r->wait_ncf_queue, &rp->link_);
+		break;
+
+	case PGM_PKT_WAIT_DATA_STATE:
+		g_queue_unlink (r->wait_data_queue, &rp->link_);
+		break;
+
+	case PGM_PKT_HAVE_DATA_STATE:
+		break;
+
+	default:
+		g_assert_not_reached();
+		break;
+	}
+
+	rp->link_.prev = NULL;
+	rp->link_.next = NULL;
+
+	return 0;
+}
+
+int
+rxw_pkt_free1 (
+	struct rxw*	r,
+	struct rxw_packet*	rp
+	)
+{
+	g_return_val_if_fail (r != NULL && rp != NULL, -1);
+
+	if (rp->data)
+	{
+//		g_slice_free1 (rp->length, rp->data);
+		g_trash_stack_push (&r->trash_data, rp->data);
+	}
+
+//	g_slice_free1 (sizeof(struct rxw), rp);
+	g_trash_stack_push (&r->trash_packet, rp);
 
 	return 0;
 }
@@ -472,26 +536,8 @@ rxw_pop (
 
 	struct rxw_packet* rp = RXW_PACKET(r, r->lead);
 
-	if (rp->nak)
-	{
-		r->nak_list = g_list_delete_link (r->nak_list, rp->nak);
-		rp->nak = NULL;
-	}
-
-	if (rp->ncf)
-	{
-		r->ncf_list = g_list_delete_link (r->ncf_list, rp->ncf);
-		rp->ncf = NULL;
-	}
-
-	if (rp->data)
-	{
-//		g_slice_free1 (rp->length, rp->data);
-		g_trash_stack_push (&r->trash_data, rp->data);
-	}
-
-//	g_slice_free1 (sizeof(struct rxw), rp);
-	g_trash_stack_push (&r->trash_packet, rp);
+	rxw_pkt_state_unlink (r, rp);
+	rxw_pkt_free1 (r, rp);
 
 	r->lead--;
 
@@ -525,21 +571,8 @@ rxw_window_update (
 			g_warning ("lost data #%u",
 				dp->sequence_number);
 
-			if (dp->nak) {
-				r->nak_list = g_list_delete_link (r->nak_list, dp->nak);
-				dp->nak = NULL;
-			}
-			if (dp->ncf) {
-				r->ncf_list = g_list_delete_link (r->ncf_list, dp->ncf);
-				dp->ncf = NULL;
-			}
-			if (dp->data) {
-//				g_slice_free1 (rp->length, dp->data);
-				g_trash_stack_push (&r->trash_data, dp->data);
-			}
-//			g_slice_free1 (sizeof(struct rxw), dp);
-			g_trash_stack_push (&r->trash_packet, dp);
-
+			rxw_pkt_state_unlink (r, dp);
+			rxw_pkt_free1 (r, dp);
 			RXW_SET_PACKET(r, r->trail, NULL);
 
 			if (r->trail == r->lead)
@@ -554,6 +587,8 @@ rxw_window_update (
 			txw_lead);
 
 /* generate new naks ... */
+		gdouble now = g_timer_elapsed (r->zero, NULL);
+
 		while ( r->lead != txw_lead )
 		{
 			if (RXW_LENGTH(r) == RXW_SQNS(r)) {
@@ -565,21 +600,17 @@ rxw_window_update (
 							g_trash_stack_pop (&r->trash_packet) :
 							g_slice_alloc (sizeof(struct rxw_packet));
 			memset (ph, 0, sizeof(struct rxw_packet));
+			ph->link_.data		= ph;
 			ph->sequence_number     = r->lead++;
+			ph->bo_start		= now;
 
-			if (ph->sequence_number == ( RXW_LENGTH(r) + r->offset ))
-			{
-				r->offset += RXW_LENGTH(r);
-			}
-
-			guint offset = ph->sequence_number - r->offset;
-			g_ptr_array_index (r->pdata, offset) = ph;
+			RXW_CHECK_WRAPAROUND(r, ph->sequence_number);
+			RXW_SET_PACKET(r, ph->sequence_number, ph);
 			g_debug ("adding placeholder #%u",
 				ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
-			g_queue_push_head (r->nak_list, ph);
-			ph->nak = r->nak_list->head;
+			g_queue_push_head_link (r->backoff_queue, &ph->link_);
 		}
 	}
 
@@ -603,7 +634,7 @@ rxw_ncf (
 
 	if (rp)
 	{
-		gettimeofday (&rp->ncf_received, NULL);
+		rp->ncf_received = g_timer_elapsed (r->zero, NULL);
 
 /* already received ncf */
 		if (rp->state == PGM_PKT_WAIT_DATA_STATE)
@@ -613,9 +644,8 @@ rxw_ncf (
 
 		g_assert (rp->state == PGM_PKT_BACK_OFF_STATE || rp->state == PGM_PKT_WAIT_NCF_STATE);
 
-/* push onto head of ncf expiry list */
-		g_queue_push_head (r->ncf_list, rp);
-		rp->ncf = r->ncf_list->head;
+		rxw_pkt_state_unlink (r, rp);
+		g_queue_push_head_link (r->wait_data_queue, &rp->link_);
 
 		return 0;
 	}
@@ -631,6 +661,8 @@ rxw_ncf (
 	g_debug ("ncf extends leads to #%u",
 		sequence_number);
 
+	gdouble now = g_timer_elapsed (r->zero, NULL);
+
 	while (r->lead != sequence_number)
 	{
 		if (RXW_LENGTH(r) == RXW_SQNS(r)) {
@@ -642,21 +674,17 @@ rxw_ncf (
 						g_trash_stack_pop (&r->trash_packet) :
 						g_slice_alloc (sizeof(struct rxw_packet));
 		memset (ph, 0, sizeof(struct rxw_packet));
+		ph->link_.data		= ph;
 		ph->sequence_number     = r->lead++;
+		ph->bo_start		= now;
 
-		if (ph->sequence_number == ( RXW_LENGTH(r) + r->offset ))
-		{
-			r->offset += RXW_LENGTH(r);
-		}
-
-		guint offset = ph->sequence_number - r->offset;
-		g_ptr_array_index (r->pdata, offset) = ph;
+		RXW_CHECK_WRAPAROUND(r, ph->sequence_number);
+		RXW_SET_PACKET(r, ph->sequence_number, ph);
 		g_debug ("ncf: adding placeholder #%u",
 			ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
-		g_queue_push_tail (r->nak_list, ph);
-		ph->nak = r->nak_list->tail;
+		g_queue_push_head_link (r->backoff_queue, &ph->link_);
 	}
 
 /* r->lead = ncf sequence_number; */
@@ -670,22 +698,18 @@ rxw_ncf (
 					g_trash_stack_pop (&r->trash_packet) :
 					g_slice_alloc (sizeof(struct rxw_packet));
 	memset (ph, 0, sizeof(struct rxw_packet));
+	ph->link_.data		= ph;
 	ph->sequence_number     = r->lead;
 	ph->state		= PGM_PKT_WAIT_DATA_STATE;
+	ph->ncf_received	= now;
 
-	if (ph->sequence_number == ( RXW_LENGTH(r) + r->offset ))
-	{
-		r->offset += RXW_LENGTH(r);
-	}
-
-	guint offset = ph->sequence_number - r->offset;
-	g_ptr_array_index (r->pdata, offset) = ph;
+	RXW_CHECK_WRAPAROUND(r, ph->sequence_number);
+	RXW_SET_PACKET(r, ph->sequence_number, ph);
 	g_debug ("ncf: adding placeholder #%u",
 		ph->sequence_number);
 
 /* do not send nak, simply add to ncf list */
-	g_queue_push_head (r->ncf_list, ph);
-	ph->ncf = r->ncf_list->head;
+	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
 
 	return 0;
 }
@@ -694,137 +718,89 @@ rxw_ncf (
  */
 
 int
-rxw_nak_list_foreach (
+rxw_state_foreach (
 	gpointer	ptr,
-	rxw_nak_callback	nak_callback,
+	pgm_pkt_state	state,
+	rxw_state_callback	state_callback,
 	gpointer	param
 	)
 {
 	g_return_val_if_fail (ptr != NULL, -1);
 	struct rxw* r = (struct rxw*)ptr;
 
-	GList* list = r->nak_list->tail;
+/* minimize timer checks in the loop */
+	gdouble now = g_timer_elapsed(r->zero, NULL);
+
+	GList* list = NULL;
+	switch (state) {
+	case PGM_PKT_BACK_OFF_STATE:	list = r->backoff_queue->tail; break;
+	case PGM_PKT_WAIT_NCF_STATE:	list = r->wait_ncf_queue->tail; break;
+	case PGM_PKT_WAIT_DATA_STATE:	list = r->wait_data_queue->tail; break;
+	default: g_assert_not_reached(); break;
+	}
+
 	while (list)
 	{
+		GList* next_list = list->prev;
 		struct rxw_packet* rp = (struct rxw_packet*)list->data;
 
-		if ( (*nak_callback)(rp->data,
-					rp->length,
-					rp->sequence_number,
-					&rp->state,
-					param) )
-		{
-			break;
-		}
+		gdouble age = 0.0;
+		guint retry_count = 0;
 
-		GList* next_list = list->prev;
+		g_assert (rp->state == state);
 
-		switch (rp->state) {
+		rxw_pkt_state_unlink (r, rp);
+
+		switch (state) {
 		case PGM_PKT_BACK_OFF_STATE:
-/* send nak later */
+			age		= now - rp->bo_start;
 			break;
 
 		case PGM_PKT_WAIT_NCF_STATE:
-/* nak sent */
-			gettimeofday (&rp->nak_sent, NULL);
-
-/* transfer to ncf list */
-			g_queue_unlink (r->nak_list, list);
-			rp->nak = NULL;
-			g_queue_push_head_link (r->ncf_list, list);
-			rp->ncf = r->ncf_list->head;
+			age		= now - rp->nak_sent;
+			retry_count	= rp->ncf_retry_count;
 			break;
 
-		case PGM_PKT_LOST_DATA_STATE:
-/* cancelled */
-			g_queue_delete_link (r->nak_list, list);
-			rp->nak = NULL;
-
-			for (;;)
-			{
-				struct rxw_packet* dp = RXW_PACKET(r, r->trail);
-
-				g_warning ("lost data #%u",
-					dp->sequence_number);
-
-				if (dp->nak) {
-					r->nak_list = g_list_delete_link (r->nak_list, dp->nak);
-					dp->nak = NULL;
-				}
-				if (dp->ncf) {
-					r->ncf_list = g_list_delete_link (r->ncf_list, dp->ncf);
-					dp->ncf = NULL;
-				}
-				if (dp->data) {
-//					g_slice_free1 (rp->length, dp->data);
-					g_trash_stack_push (&r->trash_data, dp->data);
-				}
-//				g_slice_free1 (sizeof(struct rxw), dp);
-				g_trash_stack_push (&r->trash_packet, dp);
-
-				RXW_SET_PACKET(r, r->trail, NULL);
-
-				if (r->trail == r->lead)
-					r->lead++;
-				r->trail++;
-			}
+		case PGM_PKT_WAIT_DATA_STATE:
+			age		= now - rp->ncf_received;
+			retry_count	= rp->data_retry_count;
 			break;
 
 		default:
 			g_assert_not_reached();
+			break;
 		}
 
-		list = next_list;
-	}
-
-	return 0;
-}
-
-int
-rxw_ncf_list_foreach (
-	gpointer	ptr,
-	rxw_nak_callback	ncf_callback,
-	gpointer	param
-	)
-{
-	g_return_val_if_fail (ptr != NULL, -1);
-	struct rxw* r = (struct rxw*)ptr;
-
-	GList* list = r->ncf_list->tail;
-	while (list)
-	{
-		struct rxw_packet* rp = (struct rxw_packet*)list->data;
-
-		if ( (*ncf_callback)(rp->data,
+		if ( (*state_callback)(rp->data,
 					rp->length,
 					rp->sequence_number,
 					&rp->state,
+					age,
+					retry_count,
 					param) )
 		{
 			break;
 		}
 
-		GList* next_list = list->prev;
 
-		switch (rp->state) {
-		case PGM_PKT_BACK_OFF_STATE:
+/* callback should return TRUE and cease iteration for no state change */
+		g_assert (rp->state != state);
+
+		switch (rp->state) {	/* new state change */
 /* send nak later */
-			g_queue_unlink (r->ncf_list, list);
-			rp->ncf = NULL;
-			g_queue_push_head_link (r->nak_list, list);
-			rp->nak = r->nak_list->head;
+		case PGM_PKT_BACK_OFF_STATE:
+			rp->bo_start = now;
+			g_queue_push_head_link (r->backoff_queue, &rp->link_);
 			break;
 
+/* nak sent, await ncf */
 		case PGM_PKT_WAIT_NCF_STATE:
-/* nak sent */
-			gettimeofday (&rp->nak_sent, NULL);
+			rp->nak_sent = now;
+			g_queue_push_head_link (r->wait_ncf_queue, &rp->link_);
 			break;
 
-		case PGM_PKT_LOST_DATA_STATE:
 /* cancelled */
-			g_queue_delete_link (r->ncf_list, list);
-			rp->ncf = NULL;
-
+		case PGM_PKT_LOST_DATA_STATE:
 			for (;;)
 			{
 				struct rxw_packet* dp = RXW_PACKET(r, r->trail);
@@ -832,21 +808,8 @@ rxw_ncf_list_foreach (
 				g_warning ("lost data #%u",
 					dp->sequence_number);
 
-				if (dp->nak) {
-					r->nak_list = g_list_delete_link (r->nak_list, dp->nak);
-					dp->nak = NULL;
-				}
-				if (dp->ncf) {
-					r->ncf_list = g_list_delete_link (r->ncf_list, dp->ncf);
-					dp->ncf = NULL;
-				}
-				if (dp->data) {
-//					g_slice_free1 (rp->length, dp->data);
-					g_trash_stack_push (&r->trash_data, dp->data);
-				}
-//				g_slice_free1 (sizeof(struct rxw), dp);
-				g_trash_stack_push (&r->trash_packet, dp);
-
+				rxw_pkt_state_unlink (r, dp);
+				rxw_pkt_free1 (r, dp);
 				RXW_SET_PACKET(r, r->trail, NULL);
 
 				if (r->trail == r->lead)
