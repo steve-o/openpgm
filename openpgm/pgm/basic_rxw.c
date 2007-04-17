@@ -43,8 +43,9 @@ struct tests {
 
 /* globals */
 
-int on_nak (gpointer, guint, guint32, pgm_pkt_state*, gpointer);
-int on_ncf (gpointer, guint, guint32, pgm_pkt_state*, gpointer);
+int on_send_nak (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
+int on_wait_ncf (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
+int on_wait_data (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
 
 double test_basic_rxw (int, int);
 double test_double_jump (int, int);
@@ -119,7 +120,7 @@ main (
                 do {
                         p2 = test_payload;
                         do {
-                                for (int c = 1; c <= 3; c++)
+                                for (int c = 1; c <= test_count; c++)
                                 {
                                         printf (",%g", p->test_func (*p3, *p2) );
                                 }
@@ -164,7 +165,9 @@ test_basic_rxw (
 		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
 
 		rxw_push (rxw, entry, size_per_entry, i, 0);
-		rxw_nak_list_foreach (rxw, on_nak, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
 	}
 	gettimeofday(&now, NULL);
 
@@ -195,7 +198,9 @@ test_double_jump (
 		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
 
 		rxw_push (rxw, entry, size_per_entry, j, 0);
-		rxw_nak_list_foreach (rxw, on_nak, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
 
 		j += 2;
 	}
@@ -209,15 +214,18 @@ test_double_jump (
 }
 
 int
-on_nak (
+on_send_nak (
 		gpointer	data,
 		guint		length,
 		guint32		sequence_number,
 		pgm_pkt_state*	state,
+		gdouble		age,
+		guint		retry_count,
 		gpointer	param
 		)
 {
-	g_debug ("send_nak(%u)", sequence_number);
+	g_debug ("#%" G_GUINT32_FORMAT " age=%gus retry=%u send_nak()",
+		sequence_number, age * 1000.0 * 1000.0, retry_count);
 
 	*state = PGM_PKT_WAIT_NCF_STATE;
 
@@ -225,16 +233,37 @@ on_nak (
 }
 
 int
-on_ncf (
+on_wait_ncf (
 		gpointer	data,
 		guint		length,
 		guint32		sequence_number,
 		pgm_pkt_state*	state,
+		gdouble		age,
+		guint		retry_count,
 		gpointer	param
 		)
 {
-	g_debug ("WAIT_NCF_STATE: #%u", sequence_number);
-	return 0;
+	g_debug ("#%u age=%gus retry=%u WAIT_NCF_STATE",
+		sequence_number, age * 1000 * 1000, retry_count);
+	
+	return -1;
+}
+
+int
+on_wait_data (
+		gpointer	data,
+		guint		length,
+		guint32		sequence_number,
+		pgm_pkt_state*	state,
+		gdouble		age,
+		guint		retry_count,
+		gpointer	param
+		)
+{
+	g_debug ("#%u age=%gus retry=%u WAIT_DATA_STATE",
+		sequence_number, age * 1000 * 1000, retry_count);
+	
+	return -1;
 }
 
 double
@@ -261,8 +290,9 @@ test_reverse (
 		else
 			rxw_push (rxw, entry, size_per_entry, i, 0);
 
-		rxw_nak_list_foreach (rxw, on_nak, NULL);
-		rxw_ncf_list_foreach (rxw, on_ncf, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
 	}
 	gettimeofday(&now, NULL);
 
