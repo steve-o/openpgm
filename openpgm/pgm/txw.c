@@ -36,6 +36,9 @@
 
 #include "txw.h"
 
+#undef g_debug
+#define g_debug(x...)		while (0)
+
 
 struct txw_packet {
 	gpointer	data;
@@ -53,33 +56,51 @@ struct txw {
 
 	guint		max_tpdu;		/* maximum packet size */
 
-	guint32		lead, next_lead;
+	guint32		lead;
 	guint32		trail;
 	guint		offset;
 	
 };
 
-#define TXW_LENGTH(t)	( (t)->pdata->len )
-#define TXW_SQNS(t)	( (1 + (t)->lead) - (t)->trail )
+#define TXW_LENGTH(w)	( (w)->pdata->len )
+#define TXW_SQNS(w)	( (1 + (w)->lead) - (w)->trail )
 
-#define ABS_IN_TXW(t,x) \
-	( (x) >= (t)->trail && (x) <= (t)->lead )
+#define ABS_IN_TXW(w,x) \
+	( (x) >= (w)->trail && (x) <= (w)->lead )
 
-#define IN_TXW(t,x) \
-	( (x) >= (t)->trail && (x) <= ((t)->trail + ((UINT32_MAX/2) - 1)) )
+#define IN_TXW(w,x) \
+	( (x) >= (w)->trail && (x) <= ((w)->trail + ((UINT32_MAX/2) - 1)) )
 
-#define TXW_PACKET_OFFSET(t,x) \
+#define TXW_PACKET_OFFSET(w,x) \
 	( \
-		(x) >= (t)->offset ? \
-			( (x) - (t)->offset ) : \
-			( (x) - ( (t)->offset - TXW_LENGTH(t) ) ) \
+		(x) >= (w)->offset ? \
+			( (x) - (w)->offset ) : \
+			( (x) - ( (w)->offset - TXW_LENGTH(w) ) ) \
 	)
+#define TXW_PACKET(w,x) \
+	( (struct txw_packet*)g_ptr_array_index((w)->pdata, TXW_PACKET_OFFSET((w), (x))) )
+#define TXW_SET_PACKET(w,x,v) \
+	do { \
+		int _o = TXW_PACKET_OFFSET((w), (x)); \
+		g_ptr_array_index((w)->pdata, _o) = (v); \
+	} while (0)
+
+#define TXW_CHECK_WRAPAROUND(w,x) \
+	do { \
+		if ( (x) == ( TXW_LENGTH( (w) ) + (w)->offset ) ) \
+		{ \
+			(w)->offset += TXW_LENGTH( (w) ); \
+		} \
+	} while (0)
 
 
 /* globals */
-int txw_debug = 1;
+#define G_LOG_DOMAIN		"txw"
 
 static void _list_iterator (gpointer, gpointer);
+
+gpointer txw_alloc_packet (struct txw*);
+int txw_pkt_free1 (struct txw*, struct txw_packet*);
 
 
 gpointer
@@ -91,8 +112,7 @@ txw_init (
 	guint	txw_max_rte		/* max bandwidth */
 	)
 {
-	if (G_UNLIKELY(txw_debug))
-	printf ("txw: init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
+	g_debug ("init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
 		tpdu_length, preallocate_size, txw_sqns, txw_secs, txw_max_rte);
 
 	struct txw* t = g_slice_alloc0 (sizeof(struct txw));
@@ -117,9 +137,15 @@ txw_init (
 		txw_sqns = (txw_secs * txw_max_rte) / t->max_tpdu;
 	}
 
-	if (G_UNLIKELY(txw_debug))
-	printf ("txw: %i packets.\n", txw_sqns);
 	g_ptr_array_set_size (t->pdata, txw_sqns);
+
+/* empty state:
+ *
+ * trail = 1, lead = 0
+ */
+	t->trail = 1;
+
+	g_debug ("sqns %u len %u", TXW_SQNS(t), TXW_LENGTH(t) );
 
 	return (gpointer)t;
 }
@@ -129,18 +155,14 @@ txw_shutdown (
 	gpointer	ptr
 	)
 {
-	if (G_UNLIKELY(txw_debug))
-	puts ("txw: shutdown.");
+	g_debug ("shutdown.");
 
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid txw.");
-		return -1;
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
-	if (G_LIKELY(t->pdata))
+	if (t->pdata)
 	{
-		g_ptr_array_foreach (t->pdata, _list_iterator, &t->max_tpdu);
+		g_ptr_array_foreach (t->pdata, _list_iterator, t);
 		g_ptr_array_free (t->pdata, TRUE);
 		t->pdata = NULL;
 	}
@@ -151,16 +173,22 @@ txw_shutdown (
 
 /* gcc recommends parentheses around assignment used as truth value */
 		while ( (p = g_trash_stack_pop (&t->trash_data)) )
-			g_slice_free1 (t->max_tpdu, t->trash_data);
+		{
+			g_slice_free1 (t->max_tpdu, p);
+		}
 
-/* empty trash stack = NULL */
+		g_assert ( t->trash_data == NULL );
 	}
 
 	if (t->trash_packet)
 	{
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&t->trash_packet)) )
-			g_slice_free1 (sizeof(struct txw_packet), t->trash_packet);
+		{
+			g_slice_free1 (sizeof(struct txw_packet), p);
+		}
+
+		g_assert ( t->trash_packet == NULL );
 	}
 
 	return 0;
@@ -172,18 +200,12 @@ _list_iterator (
 	gpointer	user_data
 	)
 {
-/* iteration on empty array sized on init() */
-	if (G_UNLIKELY(!data)) return;
+	if (data == NULL) return;
 
-	struct txw_packet *tp = (struct txw_packet*)data;
-	guint length = tp->length;
+	struct txw* t = (struct txw*)user_data;
+	struct txw_packet* tp = (struct txw_packet*)data;
 
-	guint max_tpdu = *(int*)user_data;
-
-//	g_slice_free1 ( length, tp->data );
-	g_slice_free1 ( max_tpdu, tp->data );
-
-	g_slice_free1 ( sizeof(struct txw_packet), data );
+	txw_pkt_free1 (t, tp);
 }
 
 /* alloc for the payload per packet */
@@ -192,52 +214,74 @@ txw_alloc (
 	gpointer	ptr
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, NULL);
 	struct txw* t = (struct txw*)ptr;
 
-	return t->trash_data ? g_trash_stack_pop (&t->trash_data) : g_slice_alloc (t->max_tpdu);
+	if (G_LIKELY(t->trash_data)) {
+		return g_trash_stack_pop (&t->trash_data);
+	}
+
+	g_debug ("data trash stack exceeded");
+
+	return g_slice_alloc (t->max_tpdu);
+}
+
+gpointer
+txw_alloc_packet (
+	struct txw*	t
+	)
+{
+	g_return_val_if_fail (t != NULL, NULL);
+
+	return t->trash_packet ?  g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(struct txw_packet));
 }
 
 int
+txw_pkt_free1 (
+	struct txw*	t,
+	struct txw_packet*	tp
+	)
+{
+	g_return_val_if_fail (t != NULL && tp != NULL, -1);
+
+//	g_slice_free1 (tp->length, tp->data);
+	g_trash_stack_push (&t->trash_data, tp->data);
+	tp->data = NULL;
+
+//	g_slice_free1 (sizeof(struct txw), tp);
+	g_trash_stack_push (&t->trash_packet, tp);
+
+	return 0;
+}
+
+guint32
 txw_next_lead (
 	gpointer	ptr
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, 0);
 	struct txw* t = (struct txw*)ptr;
 
-	return t->next_lead;
+	return (guint32)(t->lead + 1);
 }
 
-int
+guint32
 txw_lead (
 	gpointer	ptr
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
 	return t->lead;
 }
 
-int
+guint32
 txw_trail (
 	gpointer	ptr
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
 	return t->trail;
@@ -249,10 +293,7 @@ txw_in_window (
 	guint32		sequence_number
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
 	return ABS_IN_TXW(t, sequence_number);
@@ -265,51 +306,27 @@ txw_push (
 	guint		length
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
 /* check for full window */
-	if (TXW_LENGTH(t) == TXW_SQNS(t)) {
-		puts ("txw: full :o");
+	if (TXW_LENGTH(t) == TXW_SQNS(t))
+	{
+		g_warning ("full :o");
 
 /* transmit window advancement scheme dependent action here */
 		txw_pop (ptr);
 	}
 
 /* add to window */
-	struct txw_packet* tp = t->trash_packet ?
-					g_trash_stack_pop (&t->trash_packet) :
-					g_slice_alloc (sizeof(struct txw_packet));
-
+	struct txw_packet* tp = txw_alloc_packet (t);
 	tp->data		= packet;
 	tp->length		= length;
-	tp->sequence_number	= t->next_lead;
+	tp->sequence_number	= ++(t->lead);
 
-/* wrap offset helper */
-	if (tp->sequence_number == ( TXW_LENGTH(t) + t->offset ))
-	{
-if (G_UNLIKELY(txw_debug > 1))
-puts ("txw: wrap offset.");
-		t->offset += TXW_LENGTH(t);
-	}
-
-	guint offset = tp->sequence_number - t->offset;
-
-if (G_UNLIKELY(txw_debug > 2))
-printf ("txw: add packet offset %i\n", offset);
-	g_ptr_array_index (t->pdata, offset) = tp;
-
-	t->lead			= tp->sequence_number;
-	t->next_lead		= t->lead + 1;
-
-if (G_UNLIKELY(txw_debug > 2))
-{
-	if (TXW_LENGTH(t) == TXW_SQNS(t)) puts ("txw: now full.");
-	printf ("txw: next lead# %i\n", t->next_lead);
-}
+	TXW_CHECK_WRAPAROUND(t, tp->sequence_number);
+	TXW_SET_PACKET(t, tp->sequence_number, tp);
+	g_debug ("#%u: adding packet", tp->sequence_number);
 
 	return 0;
 }
@@ -321,17 +338,16 @@ txw_push_copy (
 	guint		length
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
-	struct txw* t = (struct txw*)ptr;
+	g_return_val_if_fail (ptr != NULL, -1);
 
 	gpointer copy = txw_alloc (ptr);
 	memcpy (copy, packet, length);
 
 	return txw_push (ptr, copy, length);
 }
+
+/* more like txw_peek(), the packet is not removed from the window
+ */
 
 int
 txw_get (
@@ -341,21 +357,17 @@ txw_get (
 	guint*		length
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
 /* check if sequence number is in window */
-	if (!ABS_IN_TXW(t, sequence_number))
+	if (G_UNLIKELY( !ABS_IN_TXW(t, sequence_number) ))
 	{
-		printf ("txw: %i not in window.\n", sequence_number);
+		g_warning ("%u not in window.", sequence_number);
 		return -1;
 	}
 
-	guint offset = TXW_PACKET_OFFSET(t, sequence_number);
-	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
+	struct txw_packet* tp = TXW_PACKET(t, sequence_number);
 	*packet = tp->data;
 	*length	= tp->length;
 
@@ -367,27 +379,19 @@ txw_pop (
 	gpointer	ptr
 	)
 {
-	if (G_UNLIKELY(!ptr)) {
-		puts ("txw: invalid parameter, major internal error.");
-		exit (-1);
-	}
+	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
 /* check if window is not empty */
-	if (!TXW_SQNS(t))
+	if (G_UNLIKELY( !TXW_SQNS(t) ))
 	{
-		puts ("txw: empty.");
+		g_debug ("window is empty");
 		return -1;
 	}
 
-	guint offset = TXW_PACKET_OFFSET(t, t->trail);
-	struct txw_packet* tp = g_ptr_array_index (t->pdata, offset);
-
-//	g_slice_free1 (tp->length, tp->data);
-	g_trash_stack_push (&t->trash_data, tp->data);
-
-//	g_slice_free1 (sizeof(struct txw), tp);
-	g_trash_stack_push (&t->trash_packet, tp);
+	struct txw_packet* tp = TXW_PACKET(t, t->trail);
+	txw_pkt_free1 (t, tp);
+	TXW_SET_PACKET(t, t->trail, NULL);
 
 	t->trail++;
 

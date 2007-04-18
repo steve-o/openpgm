@@ -36,6 +36,9 @@
 
 #include "rxw.h"
 
+#undef g_debug
+#define g_debug(x...)		while (0)
+
 
 struct rxw_packet {
 	gpointer	data;
@@ -122,6 +125,8 @@ static void _list_iterator (gpointer, gpointer);
 static int rxw_pop (struct rxw*);
 static int rxw_pkt_state_unlink (struct rxw*, struct rxw_packet*);
 static int rxw_pkt_free1 (struct rxw*, struct rxw_packet*);
+static gpointer rxw_alloc_packet (struct rxw*);
+static gpointer rxw_alloc0_packet (struct rxw*);
 
 
 gpointer
@@ -140,7 +145,6 @@ rxw_init (
 
 	struct rxw* r = g_slice_alloc0 (sizeof(struct rxw));
 	r->pdata = g_ptr_array_new ();
-
 	r->max_tpdu = tpdu_length;
 
 	for (guint32 i = 0; i < preallocate_size; i++)
@@ -160,7 +164,6 @@ rxw_init (
 		rxw_sqns = (rxw_secs * rxw_max_rte) / r->max_tpdu;
 	}
 
-	g_debug ("%i packets.", rxw_sqns);
 	g_ptr_array_set_size (r->pdata, rxw_sqns);
 
 /* empty state:
@@ -185,6 +188,15 @@ rxw_init (
 
 /* timing */
 	r->zero = g_timer_new();
+
+	guint memory = sizeof(struct rxw) +
+			sizeof(GPtrArray) + sizeof(guint) +
+			preallocate_size * (r->max_tpdu + sizeof(struct rxw_packet)) +
+			*(guint*)( (char*)r->pdata + sizeof(gpointer) + sizeof(guint) ) +
+			3 * sizeof(GQueue) +
+			4 * sizeof(int);
+			
+	g_debug ("memory usage: %ub (%uMb)", memory, memory / (1024 * 1024));
 
 	return (gpointer)r;
 }
@@ -212,16 +224,22 @@ rxw_shutdown (
 
 /* gcc recommends parentheses around assignment used as truth value */
 		while ( (p = g_trash_stack_pop (&r->trash_data)) )
+		{
 			g_slice_free1 (r->max_tpdu, p);
+		}
 
-/* empty trash stack = NULL */
+		g_assert (r->trash_data == NULL);
 	}
 
 	if (r->trash_packet)
 	{
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&r->trash_packet)) )
+		{
 			g_slice_free1 (sizeof(struct rxw_packet), p);
+		}
+
+		g_assert (r->trash_packet == NULL);
 	}
 
 /* nak/ncf time lists,
@@ -259,7 +277,6 @@ _list_iterator (
 	gpointer	user_data
 	)
 {
-/* iteration on empty array sized on init() */
 	if (data == NULL) return;
 
 	struct rxw* r = (struct rxw*)user_data;
@@ -275,9 +292,45 @@ rxw_alloc (
 	)
 {
 	g_return_val_if_fail (ptr != NULL, NULL);
+
 	struct rxw* r = (struct rxw*)ptr;
 
-	return r->trash_data ? g_trash_stack_pop (&r->trash_data) : g_slice_alloc (r->max_tpdu);
+	if (G_LIKELY(r->trash_data)) {
+		return g_trash_stack_pop (&r->trash_data);
+	}
+
+	g_debug ("data trash stack exceeded");
+
+	return g_slice_alloc (r->max_tpdu);
+}
+
+gpointer
+rxw_alloc_packet (
+	struct rxw*	r
+	)
+{
+	g_return_val_if_fail (r != NULL, NULL);
+
+	return r->trash_packet ?  g_trash_stack_pop (&r->trash_packet) : g_slice_alloc (sizeof(struct rxw_packet));
+}
+
+gpointer
+rxw_alloc0_packet (
+	struct rxw*	r
+	)
+{
+	g_return_val_if_fail (r != NULL, NULL);
+
+	if (G_LIKELY(r->trash_packet)) {
+		gpointer p = g_trash_stack_pop (&r->trash_packet);
+		memset (p, 0, sizeof(struct rxw_packet));
+
+		return p;
+	}
+
+	g_debug ("packet trash stack exceeded.");
+
+	return g_slice_alloc0 (sizeof(struct rxw_packet));
 }
 
 /* the sequence number is inside the packet as opposed to from internal
@@ -381,31 +434,31 @@ rxw_push (
 		g_debug ("#%u: lead extended.",
 			sequence_number);
 
-		gdouble now = g_timer_elapsed (r->zero, NULL);
+		if (r->lead != sequence_number)
+		{
+			gdouble now = g_timer_elapsed (r->zero, NULL);
 
-		while (r->lead != sequence_number) {
-			if (RXW_LENGTH(r) == RXW_SQNS(r)) {
-				g_warning ("full, dropping packet ;(");
-				return -1;
-			}
+			while (r->lead != sequence_number) {
+				if (RXW_LENGTH(r) == RXW_SQNS(r)) {
+					g_warning ("full, dropping packet ;(");
+					return -1;
+				}
 
-			struct rxw_packet* ph = r->trash_packet ?
-							g_trash_stack_pop (&r->trash_packet) :
-							g_slice_alloc (sizeof(struct rxw_packet));
-			memset (ph, 0, sizeof(struct rxw_packet));
-			ph->link_.data		= ph;
-			ph->sequence_number     = r->lead++;
-			ph->bo_start		= now;
+				struct rxw_packet* ph = rxw_alloc0_packet(r);
+				ph->link_.data		= ph;
+				ph->sequence_number     = r->lead++;
+				ph->bo_start		= now;
 
-			RXW_CHECK_WRAPAROUND(r, ph->sequence_number);
-			RXW_SET_PACKET(r, ph->sequence_number, ph);
-			g_debug ("#%u: adding placeholder #%u",
-				sequence_number, ph->sequence_number);
+				RXW_CHECK_WRAPAROUND(r, ph->sequence_number);
+				RXW_SET_PACKET(r, ph->sequence_number, ph);
+				g_debug ("#%u: adding placeholder #%u",
+					sequence_number, ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
-			g_queue_push_head_link (r->backoff_queue, &ph->link_);
-			g_debug ("#%" G_GUINT32_FORMAT ": backoff_queue now %u long",
-				sequence_number, r->backoff_queue->length);
+				g_queue_push_head_link (r->backoff_queue, &ph->link_);
+				g_debug ("#%" G_GUINT32_FORMAT ": backoff_queue now %u long",
+					sequence_number, r->backoff_queue->length);
+			}
 		}
 
 /* r->lead = sequence_number; */
@@ -415,12 +468,10 @@ rxw_push (
 			return -1;
 		}
 
-		struct rxw_packet* rp = r->trash_packet ?
-						g_trash_stack_pop (&r->trash_packet) :
-						g_slice_alloc (sizeof(struct rxw_packet));
+		struct rxw_packet* rp = rxw_alloc0_packet(r);
 		rp->data                = packet;
 		rp->length              = length;
-		rp->sequence_number     = r->lead;
+		rp->sequence_number     = r->lead++;
 		rp->state		= PGM_PKT_HAVE_DATA_STATE;
 
 		RXW_CHECK_WRAPAROUND(r, rp->sequence_number);
@@ -517,6 +568,7 @@ rxw_pkt_free1 (
 	{
 //		g_slice_free1 (rp->length, rp->data);
 		g_trash_stack_push (&r->trash_data, rp->data);
+		rp->data = NULL;
 	}
 
 //	g_slice_free1 (sizeof(struct rxw), rp);
@@ -586,6 +638,9 @@ rxw_window_update (
 		g_debug ("advancing lead to %u",
 			txw_lead);
 
+		if ( r->lead == txw_lead)
+			return 0;
+
 /* generate new naks ... */
 		gdouble now = g_timer_elapsed (r->zero, NULL);
 
@@ -596,10 +651,7 @@ rxw_window_update (
 				return -1;
 			}
 
-			struct rxw_packet* ph = r->trash_packet ?
-							g_trash_stack_pop (&r->trash_packet) :
-							g_slice_alloc (sizeof(struct rxw_packet));
-			memset (ph, 0, sizeof(struct rxw_packet));
+			struct rxw_packet* ph = rxw_alloc0_packet(r);
 			ph->link_.data		= ph;
 			ph->sequence_number     = r->lead++;
 			ph->bo_start		= now;
@@ -670,10 +722,7 @@ rxw_ncf (
 			return -1;
 		}
 
-		struct rxw_packet* ph = r->trash_packet ?
-						g_trash_stack_pop (&r->trash_packet) :
-						g_slice_alloc (sizeof(struct rxw_packet));
-		memset (ph, 0, sizeof(struct rxw_packet));
+		struct rxw_packet* ph = rxw_alloc0_packet(r);
 		ph->link_.data		= ph;
 		ph->sequence_number     = r->lead++;
 		ph->bo_start		= now;
@@ -694,12 +743,9 @@ rxw_ncf (
 		return -1;
 	}
 
-	struct rxw_packet* ph = r->trash_packet ?
-					g_trash_stack_pop (&r->trash_packet) :
-					g_slice_alloc (sizeof(struct rxw_packet));
-	memset (ph, 0, sizeof(struct rxw_packet));
+	struct rxw_packet* ph = rxw_alloc0_packet(r);
 	ph->link_.data		= ph;
-	ph->sequence_number     = r->lead;
+	ph->sequence_number     = r->lead++;
 	ph->state		= PGM_PKT_WAIT_DATA_STATE;
 	ph->ncf_received	= now;
 
@@ -728,9 +774,6 @@ rxw_state_foreach (
 	g_return_val_if_fail (ptr != NULL, -1);
 	struct rxw* r = (struct rxw*)ptr;
 
-/* minimize timer checks in the loop */
-	gdouble now = g_timer_elapsed(r->zero, NULL);
-
 	GList* list = NULL;
 	switch (state) {
 	case PGM_PKT_BACK_OFF_STATE:	list = r->backoff_queue->tail; break;
@@ -738,6 +781,11 @@ rxw_state_foreach (
 	case PGM_PKT_WAIT_DATA_STATE:	list = r->wait_data_queue->tail; break;
 	default: g_assert_not_reached(); break;
 	}
+
+	if (!list) return;
+
+/* minimize timer checks in the loop */
+	gdouble now = g_timer_elapsed(r->zero, NULL);
 
 	while (list)
 	{
