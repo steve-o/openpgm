@@ -103,6 +103,12 @@ basic_recv_with_rxw
 Listen to packets buffered with a receive window.
 
 
+test_cpu_timers
+---------------
+
+Calculate drift between processors, cores, and hyper-threads.
+
+
 stream_send_with_fec
 --------------------
 
@@ -130,5 +136,26 @@ Scenarios to reproduce
 - NAK to RDATA latency.
 - Publish bandwidth: total, per packet type, payload, per recipient (?)
 - Subscribe bandwidth: total, per packet type, payload, per publisher (?)
+
+Outstanding questions
+*********************
+
+- Is it faster to use chunks containing multiple packets instead of one MTU
+  per packet.  Does aligning with system page size matter?
+- Can g_timers be dropped easily for gettimeofday and avoid floating point math?  Possible
+  to pass timer upstream with contiguous data for easy access.
+- Can time evaluation be dropped to at most once per main loop event?
+- Does code work 32 bit and is it optimal?
+- Should trash stacks be monitored and controlled externally?  For example, clearing
+  up after bursts or administrative control.
+- Should trash stacks have a upper limit to then free to the slice allocator?
+- Should lost packets be managed as ranges or individual sequence numbers, how
+  does each method affect performance?
+- Are place holders necessary?  Can state timeouts be managed without a per sequence number
+  object?  For example by the next data object, or an extra object for an ncf extended window:
+  note that nak packet generation should easily dwarfs time spent unless advantage is taken
+  of the additional 62 naks in a opt_nak_list.  Caution has to be taken with the cost of 
+  splitting a range when a packet is inserted in the middle, although idealy it should
+  be sequential from the trailing edge.
 
 
