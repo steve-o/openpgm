@@ -182,7 +182,7 @@ txw_alloc (
 	return t->trash_data ? g_trash_stack_pop (&t->trash_data) : g_slice_alloc (t->max_tpdu);
 }
 
-int
+guint32
 txw_next_lead (
 	gpointer	ptr
 	)
@@ -196,7 +196,7 @@ txw_next_lead (
 	return t->next_lead;
 }
 
-int
+guint32
 txw_lead (
 	gpointer	ptr
 	)
@@ -210,7 +210,7 @@ txw_lead (
 	return t->lead;
 }
 
-int
+guint32
 txw_trail (
 	gpointer	ptr
 	)
