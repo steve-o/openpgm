@@ -47,5 +47,6 @@ env.Program(['testif.c'] + if_obj)
 env.Program('sw_calc.c')
 httpenv.Program(['basic_recv_with_rxw.c'] + shared_obj + rxw_obj)
 env.Program(['basic_rxw.c'] + rxw_obj)
+env.Program('test_cpu_timers.c')
 
 # end of file
