@@ -28,9 +28,9 @@ G_BEGIN_DECLS
 gpointer txw_init (guint, guint32, guint32, guint, guint);
 int txw_shutdown (gpointer);
 
-int txw_next_lead (gpointer);
-int txw_lead (gpointer);
-int txw_trail (gpointer);
+guint32 txw_next_lead (gpointer);
+guint32 txw_lead (gpointer);
+guint32 txw_trail (gpointer);
 
 int txw_in_window (gpointer, guint32);
 

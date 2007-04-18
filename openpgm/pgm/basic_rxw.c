@@ -34,6 +34,9 @@
 
 #include "rxw.h"
 
+#undef g_debug
+#define g_debug(x...)	while (0)
+
 
 struct tests {
 	double (*test_func)(int, int);
@@ -48,8 +51,21 @@ int on_wait_ncf (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpoin
 int on_wait_data (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
 
 double test_basic_rxw (int, int);
-double test_double_jump (int, int);
+double test_jump (int, int);
 double test_reverse (int, int);
+double test_fill (int, int);
+
+
+static void
+my_log_handler (
+	const gchar*	log_domain,
+	GLogLevelFlags	log_level,
+	const gchar*	message,
+	gpointer	user_data
+	)
+{
+	return;
+}
 
 static void
 usage (const char* bin)
@@ -66,12 +82,16 @@ main (
 {
 	puts ("basic_rxw");
 
+	int log_debug = 0;
+
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "h")) != -1)
+	while ((c = getopt (argc, argv, "hd")) != -1)
 	{
 		switch (c) {
+
+		case 'd': log_debug = 1; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -83,12 +103,18 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	int test_size[] = { 10, 0 };
-	int test_payload[] = { 1500, 0 };
+	if (!log_debug) {
+		g_log_set_handler (NULL, G_LOG_LEVEL_DEBUG, my_log_handler, NULL);
+		g_log_set_handler ("rxw", G_LOG_LEVEL_DEBUG, my_log_handler, NULL);
+	}
+
+	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+	int test_payload[] = { /*9000,*/ 1500, 0 };
 	struct tests tests[] = {
-			{ test_basic_rxw, "basic rxw" },
-			{ test_double_jump, "sequence numbers in jumps" },
-			{ test_reverse, "sequence numbers in reverse " },
+//			{ test_basic_rxw, "basic rxw" },
+//			{ test_jump, "sequence numbers in jumps" },
+//			{ test_reverse, "sequence numbers in reverse " },
+			{ test_fill, "basic fill " },
 			{ NULL, NULL }
 			};
 
@@ -179,7 +205,7 @@ test_basic_rxw (
 }
 
 double
-test_double_jump (
+test_jump (
 		int count,
 		int size_per_entry
 		)
@@ -193,7 +219,7 @@ test_double_jump (
 	rxw_window_update(rxw, 0, 0);
 
 	gettimeofday(&start, NULL);
-	for (i = 0, j = 1; i < count; i++)
+	for (i = j = 0; i < count; i++, j+=2)
 	{
 		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
 
@@ -201,8 +227,6 @@ test_double_jump (
 		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
 		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
 		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
-
-		j += 2;
 	}
 	gettimeofday(&now, NULL);
 
@@ -303,5 +327,41 @@ test_reverse (
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
 
+double
+test_fill (
+		int count,
+		int size_per_entry
+		)
+{
+	struct timeval start, now;
+	gpointer rxw;
+	int i;
+
+	rxw = rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
+
+	rxw_window_update(rxw, 0, 0);
+
+	gettimeofday(&start, NULL);
+	for (i = 0; i < count; i++)
+	{
+		char *entry = size_per_entry ? rxw_alloc(rxw) : NULL;
+
+		rxw_push (rxw, entry, size_per_entry, i+1, 0);
+
+// immediately send naks
+		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
+
+// expire on delay
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
+	}
+	gettimeofday(&now, NULL);
+
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
+
+	rxw_shutdown (rxw);
+
+	return (secs * 1000.0 * 1000.0) / (double)count;
+}
 
 /* eof */
