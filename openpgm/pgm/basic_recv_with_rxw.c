@@ -39,6 +39,7 @@
 #include <libsoup/soup-server.h>
 #include <libsoup/soup-address.h>
 
+#include "backtrace.h"
 #include "log.h"
 #include "pgm.h"
 #include "rxw.h"
@@ -230,6 +231,7 @@ main (
 	g_thread_init (NULL);
 
 /* setup signal handlers */
+	signal(SIGSEGV, on_sigsegv);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 	signal(SIGHUP, SIG_IGN);
@@ -700,7 +702,7 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 //printf ("SPM: tx window now %lu - %lu\n", 
 //		hoststat->txw_trail, hoststat->txw_lead);
 //
-			rxw_window_update (g_rxw, hoststat->txw_lead, hoststat->txw_lead);
+			rxw_window_update (g_rxw, hoststat->txw_trail, hoststat->txw_lead);
 
 		}
 		break;
@@ -726,15 +728,15 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 
 		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
 
-printf ("ODATA: ");
+printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
-		if (rxw_push (g_rxw,
+		if (!rxw_push (g_rxw,
 				((struct pgm_data*)packet) + 1, 
 				g_ntohs (pgm_header->pgm_tsdu_length),
 				((struct pgm_data*)packet)->data_sqn,
 				g_ntohl (((struct pgm_data*)packet)->data_trail)) )
 		{
-			puts ("processed packet");
+			printf ("processed packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
 			hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
 
