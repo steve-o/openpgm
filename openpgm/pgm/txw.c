@@ -63,7 +63,12 @@ struct txw {
 };
 
 #define TXW_LENGTH(w)	( (w)->pdata->len )
-#define TXW_SQNS(w)	( (1 + (w)->lead) - (w)->trail )
+
+/* trail = lead		=> size = 1
+ * trail = lead + 1	=> size = 0
+ */
+
+#define TXW_SQNS(w)	( ( 1 + (w)->lead ) - (w)->trail )
 
 #define ABS_IN_TXW(w,x) \
 	( (x) >= (w)->trail && (x) <= (w)->lead )
@@ -143,7 +148,7 @@ txw_init (
  *
  * trail = 1, lead = 0
  */
-	t->trail = 1;
+	t->trail = t->lead + 1;
 
 	g_debug ("sqns %u len %u", TXW_SQNS(t), TXW_LENGTH(t) );
 

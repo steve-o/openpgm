@@ -35,6 +35,7 @@
 
 #include <glib.h>
 
+#include "backtrace.h"
 #include "log.h"
 #include "pgm.h"
 
@@ -67,6 +68,7 @@ main (
 	log_init ();
 
 /* setup signal handlers */
+	signal(SIGSEGV, on_sigsegv);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 	signal(SIGHUP, SIG_IGN);

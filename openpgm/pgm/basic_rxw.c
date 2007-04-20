@@ -32,10 +32,14 @@
 
 #include <glib.h>
 
+#include "backtrace.h"
 #include "rxw.h"
 
-#undef g_debug
-#define g_debug(x...)	while (0)
+#if 1
+#define g_trace(...)	while (0)
+#else
+#define g_trace(...)	g_debug(__VA_ARGS__)
+#endif
 
 
 struct tests {
@@ -45,7 +49,6 @@ struct tests {
 
 
 /* globals */
-
 int on_send_nak (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
 int on_wait_ncf (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
 int on_wait_data (gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
@@ -55,17 +58,6 @@ double test_jump (int, int);
 double test_reverse (int, int);
 double test_fill (int, int);
 
-
-static void
-my_log_handler (
-	const gchar*	log_domain,
-	GLogLevelFlags	log_level,
-	const gchar*	message,
-	gpointer	user_data
-	)
-{
-	return;
-}
 
 static void
 usage (const char* bin)
@@ -82,16 +74,12 @@ main (
 {
 	puts ("basic_rxw");
 
-	int log_debug = 0;
-
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "hd")) != -1)
+	while ((c = getopt (argc, argv, "h")) != -1)
 	{
 		switch (c) {
-
-		case 'd': log_debug = 1; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -101,19 +89,16 @@ main (
 	g_thread_init (NULL);
 
 /* setup signal handlers */
-	signal(SIGHUP, SIG_IGN);
+	signal (SIGSEGV, on_sigsegv);
+	signal (SIGHUP, SIG_IGN);
 
-	if (!log_debug) {
-		g_log_set_handler (NULL, G_LOG_LEVEL_DEBUG, my_log_handler, NULL);
-		g_log_set_handler ("rxw", G_LOG_LEVEL_DEBUG, my_log_handler, NULL);
-	}
-
-	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+//	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+	int test_size[] = { 10, 0 };
 	int test_payload[] = { /*9000,*/ 1500, 0 };
 	struct tests tests[] = {
-//			{ test_basic_rxw, "basic rxw" },
-//			{ test_jump, "sequence numbers in jumps" },
-//			{ test_reverse, "sequence numbers in reverse " },
+			{ test_basic_rxw, "basic rxw" },
+			{ test_jump, "sequence numbers in jumps" },
+			{ test_reverse, "sequence numbers in reverse " },
 			{ test_fill, "basic fill " },
 			{ NULL, NULL }
 			};
@@ -167,7 +152,7 @@ on_pgm_data (
 		gpointer	param
 		)
 {
-	g_debug ("on_pgm_data()");
+	g_trace ("on_pgm_data()");
 	return 0;
 }
 
@@ -192,8 +177,8 @@ test_basic_rxw (
 
 		rxw_push (rxw, entry, size_per_entry, i, 0);
 		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
-		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
-		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
 	}
 	gettimeofday(&now, NULL);
 
@@ -225,8 +210,8 @@ test_jump (
 
 		rxw_push (rxw, entry, size_per_entry, j, 0);
 		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
-		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
-		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
 	}
 	gettimeofday(&now, NULL);
 
@@ -248,7 +233,7 @@ on_send_nak (
 		gpointer	param
 		)
 {
-	g_debug ("#%" G_GUINT32_FORMAT " age=%gus retry=%u send_nak()",
+	g_trace ("#%" G_GUINT32_FORMAT " age=%gus retry=%u send_nak()",
 		sequence_number, age * 1000.0 * 1000.0, retry_count);
 
 	*state = PGM_PKT_WAIT_NCF_STATE;
@@ -267,7 +252,7 @@ on_wait_ncf (
 		gpointer	param
 		)
 {
-	g_debug ("#%u age=%gus retry=%u WAIT_NCF_STATE",
+	g_trace ("#%u age=%gus retry=%u WAIT_NCF_STATE",
 		sequence_number, age * 1000 * 1000, retry_count);
 	
 	return -1;
@@ -284,7 +269,7 @@ on_wait_data (
 		gpointer	param
 		)
 {
-	g_debug ("#%u age=%gus retry=%u WAIT_DATA_STATE",
+	g_trace ("#%u age=%gus retry=%u WAIT_DATA_STATE",
 		sequence_number, age * 1000 * 1000, retry_count);
 	
 	return -1;
@@ -315,8 +300,8 @@ test_reverse (
 			rxw_push (rxw, entry, size_per_entry, i, 0);
 
 		rxw_state_foreach (rxw, PGM_PKT_BACK_OFF_STATE, on_send_nak, NULL);
-		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
-		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_NCF_STATE, on_wait_ncf, NULL);
+//		rxw_state_foreach (rxw, PGM_PKT_WAIT_DATA_STATE, on_wait_data, NULL);
 	}
 	gettimeofday(&now, NULL);
 
