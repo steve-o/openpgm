@@ -18,6 +18,7 @@ env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0')
 shared_src = Split("""
 		log.c
 		pgm.c
+		backtrace.c
 """)
 
 txw_obj = env.Object('txw.c')
@@ -46,7 +47,7 @@ env.Program(['dumpif.c'] + if_obj)
 env.Program(['testif.c'] + if_obj)
 env.Program('sw_calc.c')
 httpenv.Program(['basic_recv_with_rxw.c'] + shared_obj + rxw_obj)
-env.Program(['basic_rxw.c'] + rxw_obj)
+env.Program(['basic_rxw.c'] + shared_obj + rxw_obj)
 env.Program('test_cpu_timers.c')
 
 # end of file

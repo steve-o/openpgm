@@ -38,6 +38,7 @@
 #include <libsoup/soup-server.h>
 #include <libsoup/soup-address.h>
 
+#include "backtrace.h"
 #include "log.h"
 #include "pgm.h"
 
@@ -215,6 +216,7 @@ main (
 	g_thread_init (NULL);
 
 /* setup signal handlers */
+	signal(SIGSEGV, on_sigsegv);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 	signal(SIGHUP, SIG_IGN);
