@@ -596,6 +596,24 @@ rxw_push (
 	return 0;
 }
 
+int
+rxw_push_copy (
+	gpointer	ptr,
+	gpointer	packet,
+	guint		length,
+	guint32		sequence_number,
+	guint32		trail
+	)
+{
+	g_return_val_if_fail (ptr != NULL, -1);
+	struct rxw* r = (struct rxw*)ptr;
+
+	gpointer p = rxw_alloc (r);
+	memcpy (p, packet, length);
+
+	return rxw_push (ptr, p, length, sequence_number, trail);
+}
+
 static int
 rxw_flush (
 	struct rxw*	r
@@ -723,6 +741,7 @@ rxw_pop_lead (
 
 	rxw_pkt_state_unlink (r, rp);
 	rxw_pkt_free1 (r, rp);
+	RXW_SET_PACKET(r, r->lead, NULL);
 
 	r->lead--;
 
