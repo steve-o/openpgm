@@ -86,7 +86,7 @@ main (
 		}
 	}
 
-	g_thread_init (NULL);
+//	g_thread_init (NULL);
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
@@ -166,7 +166,8 @@ test_basic_rxw (
 	gpointer rxw;
 	int i;
 
-	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+//	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
 	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
@@ -283,7 +284,8 @@ test_reverse (
 	gpointer rxw;
 	int i, j;
 
-	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+//	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
 	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
@@ -319,7 +321,8 @@ test_fill (
 	gpointer rxw;
 	int i;
 
-	rxw = rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
+//	rxw = rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, 0, count+1, 0, 0, on_pgm_data, NULL);
 	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
