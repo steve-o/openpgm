@@ -36,8 +36,11 @@
 
 #include "txw.h"
 
-#undef g_debug
-#define g_debug(x...)		while (0)
+#if 0
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
 
 
 struct txw_packet {

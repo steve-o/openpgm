@@ -58,7 +58,7 @@ on_sigsegv (
 	sprintf (cmd, "gdb --ex 'attach %ld' --ex 'info threads' --ex 'thread apply all bt' --batch", (long)getpid ());
 	if ( g_spawn_command_line_sync (cmd, &out, &err, &exit_status, NULL) )
 	{
-		fprintf (stderr, "\n======= GDB Backtrace: =========\n");
+		fprintf (stderr, "======= GDB Backtrace: =========\n");
 		fprintf (stderr, "%s\n", out);
 	}
 #endif

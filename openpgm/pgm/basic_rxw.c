@@ -167,8 +167,7 @@ test_basic_rxw (
 	int i;
 
 	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
-
-	rxw_window_update(rxw, 0, 0);
+	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
@@ -200,8 +199,7 @@ test_jump (
 	int i, j;
 
 	rxw = rxw_init (size_per_entry, 2 * count, 2 * count, 0, 0, on_pgm_data, NULL);
-
-	rxw_window_update(rxw, 0, 0);
+	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = j = 0; i < count; i++, j+=2)
@@ -286,8 +284,7 @@ test_reverse (
 	int i, j;
 
 	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
-
-	rxw_window_update(rxw, 0, 0);
+	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0, j = count; i < count; i++)
@@ -323,8 +320,7 @@ test_fill (
 	int i;
 
 	rxw = rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
-
-	rxw_window_update(rxw, 0, 0);
+	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
