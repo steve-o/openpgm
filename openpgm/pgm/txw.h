@@ -37,7 +37,7 @@ int txw_in_window (gpointer, guint32);
 gpointer txw_alloc (gpointer);
 int txw_push (gpointer, gpointer, guint);
 int txw_push_copy (gpointer, gpointer, guint);
-int txw_get (gpointer, guint32, gpointer*, guint*);
+int txw_peek (gpointer, guint32, gpointer*, guint*);
 int txw_pop (gpointer);
 
 
