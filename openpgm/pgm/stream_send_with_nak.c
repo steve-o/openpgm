@@ -514,7 +514,7 @@ on_nak (
 
 		gpointer rdata = NULL;
 		int rlen = 0;
-		if (!txw_get (g_txw, nak->nak_sqn, &rdata, &rlen))
+		if (!txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
 		{
 			send_rdata (nak->nak_sqn, rdata, rlen);
 		} else {

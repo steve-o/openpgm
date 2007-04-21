@@ -92,8 +92,8 @@ main (
 	signal (SIGSEGV, on_sigsegv);
 	signal (SIGHUP, SIG_IGN);
 
-//	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
-	int test_size[] = { 10, 0 };
+	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+//	int test_size[] = { 10, 0 };
 	int test_payload[] = { /*9000,*/ 1500, 0 };
 	struct tests tests[] = {
 			{ test_basic_rxw, "basic rxw" },
@@ -166,8 +166,8 @@ test_basic_rxw (
 	gpointer rxw;
 	int i;
 
-//	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
-	rxw = rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+//	rxw = rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
 	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
@@ -284,8 +284,8 @@ test_reverse (
 	gpointer rxw;
 	int i, j;
 
-//	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
-	rxw = rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
+//	rxw = rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
 	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);
@@ -321,8 +321,8 @@ test_fill (
 	gpointer rxw;
 	int i;
 
-//	rxw = rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
-	rxw = rxw_init (size_per_entry, 0, count+1, 0, 0, on_pgm_data, NULL);
+	rxw = rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
+//	rxw = rxw_init (size_per_entry, 0, count+1, 0, 0, on_pgm_data, NULL);
 	rxw_window_update(rxw, 1, 0);
 
 	gettimeofday(&start, NULL);

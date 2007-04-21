@@ -76,6 +76,7 @@ main (
 	signal(SIGHUP, SIG_IGN);
 
 	int test_size[] = { 100000, 200000, 100000, 200000, 0 };
+//	int test_size[] = { 10, 0 };
 	int test_payload[] = { /*9000,*/ 1500, 0 };
 	struct tests tests[] = {
 			{ test_basic_txw, "basic txw" },
