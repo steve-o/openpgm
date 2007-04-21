@@ -312,7 +312,7 @@ txw_push_copy (
 }
 
 int
-txw_get (
+txw_peek (
 	gpointer	ptr,
 	guint32		sequence_number,
 	gpointer*	packet,

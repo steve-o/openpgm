@@ -37,7 +37,7 @@
 #include "rxw.h"
 #include "sn.h"
 
-#if 0
+#ifndef RXW_DEBUG
 #define g_trace(...)		while (0)
 #else
 #define g_trace(...)		g_debug(__VA_ARGS__)
@@ -126,7 +126,7 @@ struct rxw {
 		) \
 	)
 
-
+#ifdef RXW_DEBUG
 #define ASSERT_RXW_BASE_INVARIANT(w) \
 	{ \
 /* does the array exist */ \
@@ -175,6 +175,10 @@ struct rxw {
 				     (w)->wait_data_queue->length ) == 0 ); \
 		} \
 	}
+#else
+#define ASSERT_RXW_BASE_INVARIANT(w)    while(0)
+#define ASSERT_RXW_POINTER_INVARIANT(w) while(0)
+#endif
 
 
 /* globals */
@@ -254,10 +258,14 @@ rxw_init (
 	r->zero = g_timer_new();
 
 	guint memory = sizeof(struct rxw) +
+/* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
-			preallocate_size * (r->max_tpdu + sizeof(struct rxw_packet)) +
 			*(guint*)( (char*)r->pdata + sizeof(gpointer) + sizeof(guint) ) +
+/* pre-allocated data & packets */
+			preallocate_size * (r->max_tpdu + sizeof(struct rxw_packet)) +
+/* state queues */
 			3 * sizeof(GQueue) +
+/* guess at timer */
 			4 * sizeof(int);
 			
 	g_trace ("memory usage: %ub (%uMb)", memory, memory / (1024 * 1024));
@@ -365,7 +373,6 @@ rxw_alloc (
 	gpointer p;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	g_assert (r->max_tpdu);
 
 	if (r->trash_data)
 	{

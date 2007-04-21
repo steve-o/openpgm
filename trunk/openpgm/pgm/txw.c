@@ -35,8 +35,9 @@
 #include <glib.h>
 
 #include "txw.h"
+#include "sn.h"
 
-#if 0
+#ifndef TXW_DEBUG
 #define g_trace(...)		while (0)
 #else
 #define g_trace(...)		g_debug(__VA_ARGS__)
@@ -61,7 +62,6 @@ struct txw {
 
 	guint32		lead;
 	guint32		trail;
-	guint		offset;
 	
 };
 
@@ -73,18 +73,18 @@ struct txw {
 
 #define TXW_SQNS(w)	( ( 1 + (w)->lead ) - (w)->trail )
 
+#define TXW_EMPTY(w)	( TXW_SQNS( (w) ) == 0 )
+#define TXW_FULL(w)	( TXW_LENGTH( (w) ) == TXW_SQNS( (w) ) )
+
 #define ABS_IN_TXW(w,x) \
-	( (x) >= (w)->trail && (x) <= (w)->lead )
-
-#define IN_TXW(w,x) \
-	( (x) >= (w)->trail && (x) <= ((w)->trail + ((UINT32_MAX/2) - 1)) )
-
-#define TXW_PACKET_OFFSET(w,x) \
 	( \
-		(x) >= (w)->offset ? \
-			( (x) - (w)->offset ) : \
-			( (x) - ( (w)->offset - TXW_LENGTH(w) ) ) \
+		!TXW_EMPTY( (w) ) && \
+		guint32_gte ( (x), (w)->trail ) && guint32_lte ( (x), (w)->lead ) \
 	)
+
+#define IN_TXW(w,x)	( guint32_gte ( (x), (w)->trail ) )
+
+#define TXW_PACKET_OFFSET(w,x)		( (x) % TXW_LENGTH( (w) ) )
 #define TXW_PACKET(w,x) \
 	( (struct txw_packet*)g_ptr_array_index((w)->pdata, TXW_PACKET_OFFSET((w), (x))) )
 #define TXW_SET_PACKET(w,x,v) \
@@ -93,14 +93,37 @@ struct txw {
 		g_ptr_array_index((w)->pdata, _o) = (v); \
 	} while (0)
 
-#define TXW_CHECK_WRAPAROUND(w,x) \
-	do { \
-		if ( (x) == ( TXW_LENGTH( (w) ) + (w)->offset ) ) \
+#ifdef TXW_DEBUG
+#define ASSERT_TXW_BASE_INVARIANT(w) \
+	{ \
+/* does the array exist */ \
+		g_assert ( (w)->pdata != NULL && (w)->pdata->len > 0 ); \
+\
+/* packet size has been set */ \
+		g_assert ( (w)->max_tpdu > 0 ) ; \
+\
+/* all pointers are within window bounds */ \
+		if ( !TXW_EMPTY( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
 		{ \
-			(w)->offset += TXW_LENGTH( (w) ); \
+			g_assert ( TXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata->len ); \
+			g_assert ( TXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata->len ); \
 		} \
-	} while (0)
+\
+	}
 
+#define ASSERT_TXW_POINTER_INVARIANT(w) \
+	{ \
+/* are trail & lead points valid */ \
+		if ( !TXW_EMPTY( (w) ) ) \
+		{ \
+			g_assert ( NULL != TXW_PACKET( (w) , (w)->trail ) );    /* trail points to something */ \
+			g_assert ( NULL != TXW_PACKET( (w) , (w)->lead ) );     /* lead points to something */ \
+		} \
+	} 
+#else
+#define ASSERT_TXW_BASE_INVARIANT(w)	while(0)
+#define ASSERT_TXW_POINTER_INVARIANT(w)	while(0)
+#endif
 
 /* globals */
 #define G_LOG_DOMAIN		"txw"
@@ -120,7 +143,7 @@ txw_init (
 	guint	txw_max_rte		/* max bandwidth */
 	)
 {
-	g_debug ("init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
+	g_trace ("init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
 		tpdu_length, preallocate_size, txw_sqns, txw_secs, txw_max_rte);
 
 	struct txw* t = g_slice_alloc0 (sizeof(struct txw));
@@ -153,8 +176,17 @@ txw_init (
  */
 	t->trail = t->lead + 1;
 
-	g_debug ("sqns %u len %u", TXW_SQNS(t), TXW_LENGTH(t) );
+	guint memory = sizeof(struct txw) +
+/* pointer array */
+			sizeof(GPtrArray) + sizeof(guint) +
+			*(guint*)( (char*)t->pdata + sizeof(gpointer) + sizeof(guint) ) +
+/* pre-allocated data & packets */
+			preallocate_size * (t->max_tpdu + sizeof(struct txw_packet));
 
+	g_trace ("memory usage: %ub (%uMb)", memory, memory / (1024 * 1024));
+
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 	return (gpointer)t;
 }
 
@@ -163,10 +195,12 @@ txw_shutdown (
 	gpointer	ptr
 	)
 {
-	g_debug ("shutdown.");
+	g_trace ("shutdown.");
 
 	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	if (t->pdata)
 	{
@@ -223,15 +257,25 @@ txw_alloc (
 	)
 {
 	g_return_val_if_fail (ptr != NULL, NULL);
-	struct txw* t = (struct txw*)ptr;
 
-	if (G_LIKELY(t->trash_data)) {
-		return g_trash_stack_pop (&t->trash_data);
+	struct txw* t = (struct txw*)ptr;
+	gpointer p;
+
+        ASSERT_TXW_BASE_INVARIANT(t);
+
+	if (t->trash_data)
+	{
+		p = g_trash_stack_pop (&t->trash_data);
+	}
+	else
+	{
+		g_trace ("data trash stack exceeded");
+
+		p = g_slice_alloc (t->max_tpdu);
 	}
 
-	g_debug ("data trash stack exceeded");
-
-	return g_slice_alloc (t->max_tpdu);
+	ASSERT_TXW_BASE_INVARIANT(t);
+	return p;
 }
 
 gpointer
@@ -240,8 +284,12 @@ txw_alloc_packet (
 	)
 {
 	g_return_val_if_fail (t != NULL, NULL);
+	ASSERT_TXW_BASE_INVARIANT(t);
+	
+	gpointer p = t->trash_packet ?  g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(struct txw_packet));
 
-	return t->trash_packet ?  g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(struct txw_packet));
+	ASSERT_TXW_BASE_INVARIANT(t);
+	return p;
 }
 
 int
@@ -250,7 +298,8 @@ txw_pkt_free1 (
 	struct txw_packet*	tp
 	)
 {
-	g_return_val_if_fail (t != NULL && tp != NULL, -1);
+	g_return_val_if_fail (t != NULL && tp != NULL && tp->data != NULL, -1);
+	ASSERT_TXW_BASE_INVARIANT(t);
 
 //	g_slice_free1 (tp->length, tp->data);
 	g_trash_stack_push (&t->trash_data, tp->data);
@@ -259,6 +308,7 @@ txw_pkt_free1 (
 //	g_slice_free1 (sizeof(struct txw), tp);
 	g_trash_stack_push (&t->trash_packet, tp);
 
+	ASSERT_TXW_BASE_INVARIANT(t);
 	return 0;
 }
 
@@ -317,8 +367,14 @@ txw_push (
 	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
 
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+
+	g_trace ("#%u: push: window ( trail %u lead %u )",
+		t->lead+1, t->trail, t->lead);
+
 /* check for full window */
-	if (TXW_LENGTH(t) == TXW_SQNS(t))
+	if ( TXW_FULL(t) )
 	{
 		g_warning ("full :o");
 
@@ -326,16 +382,19 @@ txw_push (
 		txw_pop (ptr);
 	}
 
+	t->lead++;
+
 /* add to window */
 	struct txw_packet* tp = txw_alloc_packet (t);
 	tp->data		= packet;
 	tp->length		= length;
-	tp->sequence_number	= ++(t->lead);
+	tp->sequence_number	= t->lead;
 
-	TXW_CHECK_WRAPAROUND(t, tp->sequence_number);
 	TXW_SET_PACKET(t, tp->sequence_number, tp);
-	g_debug ("#%u: adding packet", tp->sequence_number);
+	g_trace ("#%u: adding packet", tp->sequence_number);
 
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 	return 0;
 }
 
@@ -354,11 +413,11 @@ txw_push_copy (
 	return txw_push (ptr, copy, length);
 }
 
-/* more like txw_peek(), the packet is not removed from the window
+/* the packet is not removed from the window
  */
 
 int
-txw_get (
+txw_peek (
 	gpointer	ptr,
 	guint32		sequence_number,
 	gpointer*	packet,
@@ -367,9 +426,11 @@ txw_get (
 {
 	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 
 /* check if sequence number is in window */
-	if (G_UNLIKELY( !ABS_IN_TXW(t, sequence_number) ))
+	if ( !ABS_IN_TXW(t, sequence_number) )
 	{
 		g_warning ("%u not in window.", sequence_number);
 		return -1;
@@ -379,6 +440,8 @@ txw_get (
 	*packet = tp->data;
 	*length	= tp->length;
 
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 	return 0;
 }
 
@@ -389,11 +452,12 @@ txw_pop (
 {
 	g_return_val_if_fail (ptr != NULL, -1);
 	struct txw* t = (struct txw*)ptr;
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 
-/* check if window is not empty */
-	if (G_UNLIKELY( !TXW_SQNS(t) ))
+	if ( TXW_EMPTY(t) )
 	{
-		g_debug ("window is empty");
+		g_trace ("window is empty");
 		return -1;
 	}
 
@@ -403,6 +467,8 @@ txw_pop (
 
 	t->trail++;
 
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
 	return 0;
 }
 
