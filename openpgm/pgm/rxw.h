@@ -53,6 +53,7 @@ int rxw_shutdown (gpointer);
 
 gpointer rxw_alloc (gpointer);
 int rxw_push (gpointer, gpointer, guint, guint32, guint32);
+int rxw_push_copy (gpointer, gpointer, guint, guint32, guint32);
 
 /* for NAK re/generation */
 int rxw_state_foreach (gpointer, pgm_pkt_state, rxw_state_callback, gpointer);

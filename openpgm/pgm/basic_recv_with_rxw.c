@@ -730,7 +730,7 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 
 printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
-		if (!rxw_push (g_rxw,
+		if (!rxw_push_copy (g_rxw,
 				((struct pgm_data*)packet) + 1, 
 				g_ntohs (pgm_header->pgm_tsdu_length),
 				((struct pgm_data*)packet)->data_sqn,
