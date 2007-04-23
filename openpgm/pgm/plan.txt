@@ -109,13 +109,50 @@ test_cpu_timers
 Calculate drift between processors, cores, and hyper-threads.
 
 
-stream_send_with_fec
+pgmsend
+--------
+
+basic_send updated to use transmit window.
+
+
+pgmrecv
+--------
+
+basic_recv_with_rxw without web interface, primary displays messages from pgmsend.
+
+
+pgmping
+-------
+
+Dual mode: one to send fixed messages like pgmsend and listen for response, two to listen for
+messages and reply.
+
+
+block_send
+----------
+
+Send APDUs over ODATA.
+
+
+block_recv
+----------
+
+Receive APDUs over ODATA.
+
+
+test_fec
+--------
+
+Test fec creation and recovery.
+
+
+block_send_with_fec
 --------------------
 
-Send ODATA with FEC.
+Send APDUs over ODATA with FEC.
 
 
-basic_recv3_with_fec
+block_recv_with_fec
 --------------------
 
 Listen to packets and repair with FEC data.
