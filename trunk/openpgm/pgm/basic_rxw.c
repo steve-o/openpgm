@@ -33,7 +33,7 @@
 #include <glib.h>
 
 #include "backtrace.h"
-#include "rxw.h"
+#include "rxwi.h"
 
 #if 1
 #define g_trace(...)	while (0)

@@ -19,10 +19,17 @@ shared_src = Split("""
 		log.c
 		pgm.c
 		backtrace.c
+		timer.c
 """)
 
+# Basic versions
 txw_obj = env.Object('txw.c')
 rxw_obj = env.Object('rxw.c')
+
+# Inlined versions
+txwi_obj = env.Object('txwi.c')
+rxwi_obj = env.Object('rxwi.c')
+
 if_obj  = env.Object('if.c')
 
 shared_obj = []
@@ -37,7 +44,7 @@ httpenv.Program(['basic_recv.c'] + shared_obj)
 httpenv.Program(['basic_http.c'] + shared_obj)
 env.Program(['basic_container.c'])
 env.Program(['basic_container2.c'])
-env.Program(['basic_txw.c'] + txw_obj)
+env.Program(['basic_txw.c'] + txwi_obj)
 env.Program('basic_txw_byte', ['basic_txw.c', 'txw-byte.c'])
 env.Program('basic_txw_bytep', ['basic_txw.c', 'txw-bytep.c'])
 env.Program(['nak_txw.c'] + txw_obj)
@@ -47,7 +54,8 @@ env.Program(['dumpif.c'] + if_obj)
 env.Program(['testif.c'] + if_obj)
 env.Program('sw_calc.c')
 httpenv.Program(['basic_recv_with_rxw.c'] + shared_obj + rxw_obj)
-env.Program(['basic_rxw.c'] + shared_obj + rxw_obj)
+env.Program(['basic_rxw.c'] + shared_obj + rxwi_obj)
 env.Program('test_cpu_timers.c')
+env.Program(['test_time.c'] + shared_obj)
 
 # end of file

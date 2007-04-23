@@ -32,7 +32,7 @@
 
 #include <glib.h>
 
-#include "txw.h"
+#include "txwi.h"
 
 
 struct tests {
