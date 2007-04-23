@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * basic transmit window.
+ * high resolution timers.
  *
  * Copyright (c) 2006 Miru Limited.
  *
@@ -19,25 +19,33 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_TXW_H__
-#define __PGM_TXW_H__
+#ifndef __PGM_TIME_H__
+#define __PGM_TIME_H__
+
+#ifndef __PGM_SN_H
+#include "sn.h"
+#endif
+
 
 G_BEGIN_DECLS
 
+typedef void (*time_update_func)(void);
 
-gpointer txw_init (guint, guint32, guint32, guint, guint);
-int txw_shutdown (gpointer);
+#define time_after(a,b)	    ( guint32_lt(a,b) )
+#define time_before(a,b)    time_after(b,a)
 
-guint32 txw_next_lead (gpointer);
-guint32 txw_lead (gpointer);
-guint32 txw_trail (gpointer);
+#define time_after_eq(a,b)  ( guint32_gte(a,b) )
+#define time_before_eq(a,b) time_after_eq(b,a)
 
-gpointer txw_alloc (gpointer);
-int txw_push (gpointer, gpointer, guint);
-int txw_push_copy (gpointer, gpointer, guint);
-int txw_peek (gpointer, guint32, gpointer*, guint*);
 
+/* micro-seconds */
+extern guint64 time_now;
+
+extern time_update_func time_update_now;
+
+gboolean time_init (void);
 
 G_END_DECLS
 
-#endif /* __PGM_TXW_H__ */
+#endif /* __PGM_TIME_H__ */
+

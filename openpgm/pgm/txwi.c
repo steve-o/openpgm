@@ -31,10 +31,13 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+#ifndef TXW_DEBUG
+#define G_DISABLE_ASSERT
+#endif
 
 #include <glib.h>
 
-#include "txw.h"
+#include "txwi.h"
 #include "sn.h"
 
 #ifndef TXW_DEBUG
@@ -44,58 +47,28 @@
 #endif
 
 
-struct txw_packet {
-	gpointer	data;
-
-	guint		length;
-	guint32		sequence_number;
-	struct timeval	expiry;
-	struct timeval	last_retransmit;
-};
-
-struct txw {
-	GPtrArray*	pdata;
-	GTrashStack*	trash_packet;		/* sizeof(txw_packet) */
-	GTrashStack*	trash_data;		/* max_tpdu */
-
-	guint		max_tpdu;		/* maximum packet size */
-
-	guint32		lead;
-	guint32		trail;
-	
-};
-
-#define TXW_LENGTH(w)	( (w)->pdata->len )
-
-/* trail = lead		=> size = 1
- * trail = lead + 1	=> size = 0
- */
-
-#define TXW_SQNS(w)	( ( 1 + (w)->lead ) - (w)->trail )
-
-#define TXW_EMPTY(w)	( TXW_SQNS( (w) ) == 0 )
-#define TXW_FULL(w)	( TXW_LENGTH( (w) ) == TXW_SQNS( (w) ) )
-
 #define ABS_IN_TXW(w,x) \
 	( \
-		!TXW_EMPTY( (w) ) && \
+		!txw_empty ( (w) ) && \
 		guint32_gte ( (x), (w)->trail ) && guint32_lte ( (x), (w)->lead ) \
 	)
 
 #define IN_TXW(w,x)	( guint32_gte ( (x), (w)->trail ) )
 
-#define TXW_PACKET_OFFSET(w,x)		( (x) % TXW_LENGTH( (w) ) )
+#define TXW_PACKET_OFFSET(w,x)		( (x) % txw_len( (w) ) )
 #define TXW_PACKET(w,x) \
 	( (struct txw_packet*)g_ptr_array_index((w)->pdata, TXW_PACKET_OFFSET((w), (x))) )
 #define TXW_SET_PACKET(w,x,v) \
 	do { \
-		int _o = TXW_PACKET_OFFSET((w), (x)); \
+		register int _o = TXW_PACKET_OFFSET((w), (x)); \
 		g_ptr_array_index((w)->pdata, _o) = (v); \
 	} while (0)
 
 #ifdef TXW_DEBUG
 #define ASSERT_TXW_BASE_INVARIANT(w) \
 	{ \
+		g_assert ( (w) != NULL ); \
+\
 /* does the array exist */ \
 		g_assert ( (w)->pdata != NULL && (w)->pdata->len > 0 ); \
 \
@@ -103,7 +76,7 @@ struct txw {
 		g_assert ( (w)->max_tpdu > 0 ) ; \
 \
 /* all pointers are within window bounds */ \
-		if ( !TXW_EMPTY( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
+		if ( !txw_empty ( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
 		{ \
 			g_assert ( TXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata->len ); \
 			g_assert ( TXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata->len ); \
@@ -114,7 +87,7 @@ struct txw {
 #define ASSERT_TXW_POINTER_INVARIANT(w) \
 	{ \
 /* are trail & lead points valid */ \
-		if ( !TXW_EMPTY( (w) ) ) \
+		if ( !txw_empty ( (w) ) ) \
 		{ \
 			g_assert ( NULL != TXW_PACKET( (w) , (w)->trail ) );    /* trail points to something */ \
 			g_assert ( NULL != TXW_PACKET( (w) , (w)->lead ) );     /* lead points to something */ \
@@ -130,12 +103,12 @@ struct txw {
 
 static void _list_iterator (gpointer, gpointer);
 
-static gpointer txw_alloc_packet (struct txw*);
-static int txw_pkt_free1 (struct txw*, struct txw_packet*);
-static int txw_pop (struct txw*);
+static inline gpointer txw_alloc_packet (struct txw*);
+static inline int txw_pkt_free1 (struct txw*, struct txw_packet*);
+static inline int txw_pop (struct txw*);
 
 
-gpointer
+struct txw*
 txw_init (
 	guint	tpdu_length,
 	guint32	preallocate_size,
@@ -188,18 +161,16 @@ txw_init (
 
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
-	return (gpointer)t;
+	return t;
 }
 
 int
 txw_shutdown (
-	gpointer	ptr
+	struct txw*	t
 	)
 {
 	g_trace ("shutdown.");
 
-	g_return_val_if_fail (ptr != NULL, -1);
-	struct txw* t = (struct txw*)ptr;
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
@@ -245,46 +216,16 @@ _list_iterator (
 {
 	if (data == NULL) return;
 
-	struct txw* t = (struct txw*)user_data;
-	struct txw_packet* tp = (struct txw_packet*)data;
+	g_assert ( user_data != NULL);
 
-	txw_pkt_free1 (t, tp);
+	txw_pkt_free1 ((struct txw*)user_data, (struct txw_packet*)data);
 }
 
-/* alloc for the payload per packet */
-gpointer
-txw_alloc (
-	gpointer	ptr
-	)
-{
-	g_return_val_if_fail (ptr != NULL, NULL);
-
-	struct txw* t = (struct txw*)ptr;
-	gpointer p;
-
-        ASSERT_TXW_BASE_INVARIANT(t);
-
-	if (t->trash_data)
-	{
-		p = g_trash_stack_pop (&t->trash_data);
-	}
-	else
-	{
-		g_trace ("data trash stack exceeded");
-
-		p = g_slice_alloc (t->max_tpdu);
-	}
-
-	ASSERT_TXW_BASE_INVARIANT(t);
-	return p;
-}
-
-gpointer
+static inline gpointer
 txw_alloc_packet (
 	struct txw*	t
 	)
 {
-	g_return_val_if_fail (t != NULL, NULL);
 	ASSERT_TXW_BASE_INVARIANT(t);
 	
 	gpointer p = t->trash_packet ?  g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(struct txw_packet));
@@ -293,14 +234,14 @@ txw_alloc_packet (
 	return p;
 }
 
-int
+static inline int
 txw_pkt_free1 (
 	struct txw*	t,
 	struct txw_packet*	tp
 	)
 {
-	g_return_val_if_fail (t != NULL && tp != NULL && tp->data != NULL, -1);
 	ASSERT_TXW_BASE_INVARIANT(t);
+	g_assert ( tp != NULL );
 
 //	g_slice_free1 (tp->length, tp->data);
 	g_trash_stack_push (&t->trash_data, tp->data);
@@ -313,49 +254,13 @@ txw_pkt_free1 (
 	return 0;
 }
 
-guint32
-txw_next_lead (
-	gpointer	ptr
-	)
-{
-	g_return_val_if_fail (ptr != NULL, 0);
-	struct txw* t = (struct txw*)ptr;
-
-	return (guint32)(t->lead + 1);
-}
-
-guint32
-txw_lead (
-	gpointer	ptr
-	)
-{
-	g_return_val_if_fail (ptr != NULL, -1);
-	struct txw* t = (struct txw*)ptr;
-
-	return t->lead;
-}
-
-guint32
-txw_trail (
-	gpointer	ptr
-	)
-{
-	g_return_val_if_fail (ptr != NULL, -1);
-	struct txw* t = (struct txw*)ptr;
-
-	return t->trail;
-}
-
 int
 txw_push (
-	gpointer	ptr,
+	struct txw*	t,
 	gpointer	packet,
 	guint		length
 	)
 {
-	g_return_val_if_fail (ptr != NULL, -1);
-	struct txw* t = (struct txw*)ptr;
-
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
@@ -363,7 +268,7 @@ txw_push (
 		t->lead+1, t->trail, t->lead);
 
 /* check for full window */
-	if ( TXW_FULL(t) )
+	if ( txw_full (t) )
 	{
 		g_warning ("full :o");
 
@@ -387,34 +292,17 @@ txw_push (
 	return 0;
 }
 
-int
-txw_push_copy (
-	gpointer	ptr,
-	gpointer	packet,
-	guint		length
-	)
-{
-	g_return_val_if_fail (ptr != NULL, -1);
-
-	gpointer copy = txw_alloc (ptr);
-	memcpy (copy, packet, length);
-
-	return txw_push (ptr, copy, length);
-}
-
 /* the packet is not removed from the window
  */
 
 int
 txw_peek (
-	gpointer	ptr,
+	struct txw*	t,
 	guint32		sequence_number,
 	gpointer*	packet,
 	guint*		length
 	)
 {
-	g_return_val_if_fail (ptr != NULL, -1);
-	struct txw* t = (struct txw*)ptr;
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
@@ -434,7 +322,7 @@ txw_peek (
 	return 0;
 }
 
-static int
+static inline int
 txw_pop (
 	struct txw*	t
 	)
@@ -442,7 +330,7 @@ txw_pop (
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
-	if ( TXW_EMPTY(t) )
+	if ( txw_empty (t) )
 	{
 		g_trace ("window is empty");
 		return -1;

@@ -509,17 +509,13 @@ on_nak (
 
 	printf ("src %s for #%i", s, nak->nak_sqn);
 
-	if (txw_in_window (g_txw, nak->nak_sqn)) {
+	gpointer rdata = NULL;
+	int rlen = 0;
+	if (!txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
+	{
 		puts (", in window");
 
-		gpointer rdata = NULL;
-		int rlen = 0;
-		if (!txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
-		{
-			send_rdata (nak->nak_sqn, rdata, rlen);
-		} else {
-			puts (":v");
-		}
+		send_rdata (nak->nak_sqn, rdata, rlen);
 	} else {
 		puts (", sequence number not available.");
 	}
