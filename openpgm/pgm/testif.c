@@ -25,9 +25,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <netinet/in.h>
 
 #include <glib.h>
 
+#include "backtrace.h"
 #include "if.h"
 
 
@@ -100,14 +102,51 @@ main (
 	}
 
 /* setup signal handlers */
+	signal (SIGSEGV, on_sigsegv);
 	signal(SIGHUP, SIG_IGN);
 
 	for (char** p = tests; *p; p++)
 	{
-		printf ("#%li: [%s]\n", p - (char**)tests, *p);
-		int ret = if_parse_network (*p);
+		struct sockaddr devices[10], receive_groups[10], send_group;
 
-		printf ("\nret value %i.\n\n", ret);
+		printf ("#%li: [%s]\n", p - (char**)tests, *p);
+		int retval = if_parse_network (*p, AF_UNSPEC, devices, receive_groups, &send_group, 10);
+
+		if (retval == 0)
+		{
+			char s[INET6_ADDRSTRLEN];
+			int i = 0;
+			while (devices[i].sa_family) {
+				inet_ntop(devices[i].sa_family,
+					devices[i].sa_family == AF_INET ?
+						&((struct sockaddr_in*)(&devices[i]))->sin_addr :
+						&((struct sockaddr_in6*)(&devices[i]))->sin6_addr,
+					s,
+					sizeof(s));
+				printf ("device #%i: %s\n", i+1, s);
+				i++;
+			}
+			i = 0;
+			while (receive_groups[i].sa_family) {
+				inet_ntop(receive_groups[i].sa_family,
+					receive_groups[i].sa_family == AF_INET ?
+						&((struct sockaddr_in*)&receive_groups[i])->sin_addr :
+						&((struct sockaddr_in6*)&receive_groups[i])->sin6_addr,
+					s,
+					sizeof(s));
+				printf ("receive_groups #%i: %s\n", i+1, s);
+				i++;
+			}
+			inet_ntop(send_group.sa_family,
+				send_group.sa_family == AF_INET ?
+					&((struct sockaddr_in*)&send_group)->sin_addr :
+					&((struct sockaddr_in6*)&send_group)->sin6_addr,
+				s,
+				sizeof(s));
+			printf ("send_group: %s\n", s);
+		}
+
+		printf ("\nret value %i.\n\n", retval);
 	}
 
 	puts ("finished.");

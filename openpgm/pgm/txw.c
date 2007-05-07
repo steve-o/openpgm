@@ -299,7 +299,9 @@ txw_pkt_free1 (
 	struct txw_packet*	tp
 	)
 {
-	g_return_val_if_fail (t != NULL && tp != NULL && tp->data != NULL, -1);
+	g_return_val_if_fail (t != NULL, -1);
+	g_return_val_if_fail (tp != NULL, -1);
+	g_return_val_if_fail (tp->data != NULL, -1);
 	ASSERT_TXW_BASE_INVARIANT(t);
 
 //	g_slice_free1 (tp->length, tp->data);

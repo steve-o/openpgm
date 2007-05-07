@@ -682,7 +682,8 @@ rxw_pkt_state_unlink (
 	struct rxw_packet*	rp
 	)
 {
-	g_return_val_if_fail (r != NULL && rp != NULL, -1);
+	g_return_val_if_fail (r != NULL, -1);
+	g_return_val_if_fail (rp != NULL, -1);
 	ASSERT_RXW_BASE_INVARIANT(r);
 
 /* remove from state queues */
@@ -717,7 +718,8 @@ rxw_pkt_free1 (
 	struct rxw_packet*	rp
 	)
 {
-	g_return_val_if_fail (r != NULL && rp != NULL, -1);
+	g_return_val_if_fail (r != NULL, -1);
+	g_return_val_if_fail (rp != NULL, -1);
 	ASSERT_RXW_BASE_INVARIANT(r);
 
 	if (rp->data)

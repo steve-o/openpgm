@@ -20,6 +20,8 @@ shared_src = Split("""
 		pgm.c
 		backtrace.c
 		timer.c
+		if.c
+		gsi.c
 """)
 
 # Basic versions
@@ -30,11 +32,13 @@ rxw_obj = env.Object('rxw.c')
 txwi_obj = env.Object('txwi.c')
 rxwi_obj = env.Object('rxwi.c')
 
-if_obj  = env.Object('if.c')
+transport_obj = env.Object('transport.c')
 
 shared_obj = []
 for src in shared_src:
 	shared_obj += env.Object(src)
+
+standard_obj = shared_obj + txwi_obj + rxwi_obj + transport_obj
 
 env.Program(['pgmdump.c'] + shared_obj)
 env.Program(['basic_send.c'] + shared_obj)
@@ -50,12 +54,14 @@ env.Program('basic_txw_bytep', ['basic_txw.c', 'txw-bytep.c'])
 env.Program(['nak_txw.c'] + txw_obj)
 env.Program(['stream_send_with_nak.c'] + shared_obj + txw_obj)
 httpenv.Program(['basic_recv_with_nak.c'] + shared_obj)
-env.Program(['dumpif.c'] + if_obj)
-env.Program(['testif.c'] + if_obj)
+env.Program(['dumpif.c'] + shared_obj)
+env.Program(['testif.c'] + shared_obj)
 env.Program('sw_calc.c')
 httpenv.Program(['basic_recv_with_rxw.c'] + shared_obj + rxw_obj)
 env.Program(['basic_rxw.c'] + shared_obj + rxwi_obj)
 env.Program('test_cpu_timers.c')
 env.Program(['test_time.c'] + shared_obj)
+
+env.Program(['pgmsend.c'] + standard_obj)
 
 # end of file
