@@ -578,7 +578,9 @@ on_io_data (
 		hoststat->spm.bytes += len;
 		hoststat->spm.last = tv;
 
-		err = pgm_parse_spm (pgm_header, packet, packet_length, &hoststat->nla);
+		err = pgm_verify_spm (pgm_header, packet, packet_length);
+		g_assert (((struct pgm_spm*)packet)->spm_nla_afi == AFI_IP);
+		hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
 
 		if (err) {
 //puts ("invalid SPM");

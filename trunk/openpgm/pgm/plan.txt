@@ -22,7 +22,7 @@ Send to multicast or send to unicast AFI.
 
 IPv4/6.
 
-Define optional session start, finish, late join (?) tags.
+Define optional session start, late join tags.
 
 
 spm_idle
@@ -173,6 +173,7 @@ Scenarios to reproduce
 - NAK to RDATA latency.
 - Publish bandwidth: total, per packet type, payload, per recipient (?)
 - Subscribe bandwidth: total, per packet type, payload, per publisher (?)
+- Restarting a session with similar or dissimilar sequence numbering.
 
 Outstanding questions
 *********************
@@ -194,5 +195,16 @@ Outstanding questions
   of the additional 62 naks in a opt_nak_list.  Caution has to be taken with the cost of 
   splitting a range when a packet is inserted in the middle, although idealy it should
   be sequential from the trailing edge.
+- Is it better to have send sockets per transport, or shared, bound to each interface?
 
+Basic TODO list
+***************
 
+- Transport throttling, fine grain throttling.
+- OPT_SYN on sending.
+- SPMR on receiving.
+- Shared trash stacks between multiple receive windows.
+- APDUs.
+- FEC.
+- Heartbeat SPMs :v
+- NAK backoff learning.

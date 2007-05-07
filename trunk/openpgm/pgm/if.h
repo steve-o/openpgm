@@ -26,7 +26,7 @@
 G_BEGIN_DECLS
 
 int if_print_all (void);
-int if_parse_network (const char*);
+int if_parse_network (const char*, int, struct sockaddr*, struct sockaddr*, struct sockaddr*, int);
 
 
 G_END_DECLS

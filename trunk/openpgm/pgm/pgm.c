@@ -20,6 +20,7 @@
  */
 
 #include <ctype.h>
+#include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
@@ -420,30 +421,39 @@ pgm_print_packet (
 
 #define PGM_MIN_SPM_SIZE	( sizeof(struct pgm_spm) )
 
-gboolean
-pgm_parse_spm (
-	struct pgm_header* header,
-	char* data,
-	int len,
-	struct in_addr* addr
+int
+pgm_verify_spm (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
 	)
 {
+	int retval = 0;
+
+/* truncated packet */
 	if (len < PGM_MIN_SPM_SIZE) {
-		puts ("packet truncated :(");
-		return -1;
+		retval = -EINVAL;
+		goto out;
 	}
 
 	struct pgm_spm* spm = (struct pgm_spm*)data;
 
-/* check for IPv6 */
-	if (g_ntohs(spm->spm_nla_afi) != AFI_IP) {
-		puts ("unsupported afi");
-		return -1;
+	switch (g_ntohs(spm->spm_nla_afi)) {
+	case AFI_IP6:
+		if (len < sizeof(struct pgm_spm6)) {
+			retval = -EINVAL;
+		}
+
+	case AFI_IP:
+		break;
+
+	default:
+		retval = -EINVAL;
+		break;
 	}
 
-	*addr = spm->spm_nla;
-
-	return 0;
+out:
+	return retval;
 }
 
 static gboolean
@@ -793,8 +803,6 @@ pgm_print_rdata (
  * with a IPv4 address to reduce NAK cost for recovery on wide IPv6
  * distribution.
  *
- * CAVEAT: assume group AFI = source AFI
- *
  *  0                   1                   2                   3
  *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -813,6 +821,71 @@ pgm_print_rdata (
  */
 
 #define PGM_MIN_NAK_SIZE	( sizeof(struct pgm_nak) )
+
+int
+pgm_verify_nak (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	int retval = 0;
+
+/* truncated packet */
+	if (len < PGM_MIN_NAK_SIZE) {
+		retval = -EINVAL;
+		goto out;
+	}
+
+	struct pgm_nak* nak = (struct pgm_nak*)data;
+	int nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
+	int nak_grp_nla_afi = -1;
+
+/* check source NLA: unicast address of the ODATA sender */
+	switch (nak_src_nla_afi) {
+	case AFI_IP:
+		nak_grp_nla_afi = g_ntohs (nak->nak_grp_nla_afi);
+		break;
+
+	case AFI_IP6:
+		nak_grp_nla_afi = g_ntohs (((struct pgm_nak6*)nak)->nak6_grp_nla_afi);
+		break;
+
+	default:
+		retval = -EINVAL;
+		goto out;
+	}
+
+/* check multicast group NLA */
+	switch (nak_grp_nla_afi) {
+	case AFI_IP6:
+		switch (nak_src_nla_afi) {
+/* IPv4 + IPv6 NLA */
+		case AFI_IP:
+			if (len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )) {
+				retval = -EINVAL;
+			}
+			break;
+
+/* IPv6 + IPv6 NLA */
+		case AFI_IP6:
+			if (len < sizeof(struct pgm_nak6)) {
+				retval = -EINVAL;
+			}
+			break;
+		}
+
+	case AFI_IP:
+		break;
+
+	default:
+		retval = -EINVAL;
+		break;
+	}
+
+out:
+	return retval;
+}
 
 static gboolean
 pgm_print_nak (
