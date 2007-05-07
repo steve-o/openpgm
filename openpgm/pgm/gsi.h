@@ -1,6 +1,6 @@
-/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
- *
- * Dump all interface details.
+/* vim:ts=8:sts=4:sw=4:noai:noexpandtab
+ * 
+ * global session ID helper functions
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -8,66 +8,27 @@
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- *
+ * 
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- *
+ * 
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <netinet/in.h>
-
-#include <glib.h>
-
-#include "if.h"
+#ifndef __PGM_GSI_H__
+#define __PGM_GSI_H__
 
 
-/* globals */
+G_BEGIN_DECLS
 
-static void
-usage (const char* bin)
-{
-	fprintf (stderr, "Usage: %s [options]\n", bin);
-	exit (1);
-}
+int gsi_create_md5_id (char*);
+int gsi_create_ipv4_id (struct in_addr, char*);
 
-int
-main (
-	int	argc,
-	char   *argv[]
-	)
-{
-	puts ("dumpif");
 
-/* parse program arguments */
-	const char* binary_name = strrchr (argv[0], '/');
-	int c;
-	while ((c = getopt (argc, argv, "h")) != -1)
-	{
-		switch (c) {
+G_END_DECLS
 
-		case 'h':
-		case '?': usage (binary_name);
-		}
-	}
-
-/* setup signal handlers */
-	signal(SIGHUP, SIG_IGN);
-
-	if_print_all();
-
-	puts ("finished.");
-	return 0;
-}
-
-/* eof */
+#endif /* __PGM_GSI_H__ */

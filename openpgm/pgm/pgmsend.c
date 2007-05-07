@@ -1,0 +1,252 @@
+/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
+ *
+ * Open session with SPM, send basic ODATA block, send more SPMs to ensure
+ * delivery and end option.  Reply to NAK requests until session end.
+ *
+ * Copyright (c) 2006-2007 Miru Limited.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+
+#include <errno.h>
+#include <getopt.h>
+#include <netdb.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+
+#include <glib.h>
+
+#include "backtrace.h"
+#include "log.h"
+#include "transport.h"
+#include "gsi.h"
+
+
+/* typedefs */
+
+/* globals */
+
+static int g_port = 7500;
+static char* g_network = "226.0.0.1";
+
+static int g_odata_interval = 1 * 1000;
+static int g_payload = 0;
+static int g_max_tpdu = 1500;
+static int g_sqns = 10;
+
+static struct pgm_transport* g_transport = NULL;
+
+static GMainLoop* g_loop = NULL;
+
+
+static void on_signal (int);
+static gboolean on_startup (gpointer);
+static gboolean on_mark (gpointer);
+
+static void send_odata (void);
+static gboolean on_odata_timer (gpointer);
+
+
+static void
+usage (const char* bin)
+{
+	fprintf (stderr, "Usage: %s [options]\n", bin);
+	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
+	fprintf (stderr, "  -s <port>       : IP port\n");
+	exit (1);
+}
+
+int
+main (
+	int	argc,
+	char   *argv[]
+	)
+{
+	puts ("pgmsend");
+
+/* parse program arguments */
+	const char* binary_name = strrchr (argv[0], '/');
+	int c;
+	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
+	{
+		switch (c) {
+		case 'n':	g_network = optarg; break;
+		case 's':	g_port = atoi (optarg); break;
+
+		case 'h':
+		case '?': usage (binary_name);
+		}
+	}
+
+	log_init ();
+	pgm_init ();
+
+/* setup signal handlers */
+	signal(SIGSEGV, on_sigsegv);
+	signal(SIGINT, on_signal);
+	signal(SIGTERM, on_signal);
+	signal(SIGHUP, SIG_IGN);
+
+/* delayed startup */
+	puts ("scheduling startup.");
+	g_timeout_add(0, (GSourceFunc)on_startup, NULL);
+
+/* dispatch loop */
+	g_loop = g_main_loop_new(NULL, FALSE);
+
+	g_message ("entering main event loop ... ");
+	g_main_loop_run(g_loop);
+
+	g_message ("event loop terminated, cleaning up.");
+
+/* cleanup */
+	g_main_loop_unref(g_loop);
+	g_loop = NULL;
+
+	if (g_transport) {
+		g_message ("destroying transport.");
+
+		pgm_transport_destroy (g_transport, TRUE);
+		g_transport = NULL;
+	}
+
+	g_message ("finished.");
+	return 0;
+}
+
+static void
+on_signal (
+	int	signum
+	)
+{
+	g_message ("on_signal");
+
+	g_main_loop_quit(g_loop);
+}
+
+static gboolean
+on_startup (
+	gpointer data
+	)
+{
+	g_message ("startup.");
+	g_message ("create transport.");
+
+	char gsi[6];
+#if 0
+	char hostname[NI_MAXHOST];
+	struct addrinfo hints, *res = NULL;
+
+	gethostname (hostname, sizeof(hostname));
+	memset (&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_flags = AI_ADDRCONFIG;
+	getaddrinfo (hostname, NULL, &hints, &res);
+	gsi_create_ipv4_id (((struct sockaddr_in*)(res->ai_addr))->sin_addr, gsi);
+	freeaddrinfo (res);
+#else
+	gsi_create_md5_id (gsi);
+#endif
+
+	struct sock_mreq recv_smr, send_smr;
+	send_smr.smr_multiaddr.sa_family = AF_INET;
+	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_port;
+	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
+	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
+	send_smr.smr_multiaddr.sa_family = AF_INET;
+	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_port;
+	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
+	((struct sockaddr_in*)&send_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
+
+	pgm_transport_create (&g_transport, gsi, &recv_smr, 1, &send_smr);
+
+	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
+	pgm_transport_set_txw_sqns (g_transport, g_sqns);
+	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
+	pgm_transport_set_hops (g_transport, 16);
+	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
+	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
+	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+
+	pgm_transport_bind (g_transport);
+
+/* period timer to indicate some form of life */
+// TODO: Gnome 2.14: replace with g_timeout_add_seconds()
+	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
+
+	g_message ("scheduling ODATA broadcasts every %i secs.\n", g_odata_interval);
+	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
+
+	g_message ("startup complete.");
+	return FALSE;
+}
+
+/* we send out a stream of ODATA packets with basic changing payload
+ */
+
+static gboolean
+on_odata_timer (
+	gpointer data
+	)
+{
+	send_odata ();
+	return TRUE;
+}
+
+static void
+send_odata (void)
+{
+	puts ("send_odata.");
+
+	int e;
+	char payload_string[100];
+
+	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
+
+	e = pgm_write_copy (g_transport, payload_string, strlen(payload_string) + 1);
+        if (e < 0) {
+		g_warning ("send failed.");
+                return;
+        }
+
+        g_message ("sent.");
+}
+
+/* idle log notification
+ */
+
+static gboolean
+on_mark (
+	gpointer data
+	)
+{
+	static struct timeval tv;
+	gettimeofday(&tv, NULL);
+	printf ("%s on_mark.\n", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
+
+	return TRUE;
+}
+
+/* eof */

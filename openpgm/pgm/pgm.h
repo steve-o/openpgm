@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _PGM_H
-#define _PGM_H
+#ifndef __PGM_PACKET_H__
+#define __PGM_PACKET_H__
 
 #include <sys/types.h>
 
@@ -73,7 +73,7 @@ enum pgm_type {
 
 /* 8. PGM header */
 struct pgm_header {
-    guint16	pgm_sport;		/* source port */
+    guint16	pgm_sport;		/* source port: tsi::sport or UDP port depending on direction */
     guint16	pgm_dport;		/* destination port */
     guint8	pgm_type;		/* version / packet type */
     guint8	pgm_options;		/* options */
@@ -335,14 +335,61 @@ struct pgm_opt6_path_nla {
 };
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+G_BEGIN_DECLS
 
 int pgm_parse_packet (char*, int, struct pgm_header**, char**, int*);
 gboolean pgm_print_packet (char*, int);
 
-gboolean pgm_parse_spm (struct pgm_header*, char*, int, struct in_addr*);
+int pgm_verify_spm (struct pgm_header*, char*, int);
+int pgm_verify_nak (struct pgm_header*, char*, int);
+
+static inline int nla_to_sockaddr (const char* nla, struct sockaddr* sa)
+{
+    int retval = 0;
+
+    sa->sa_family = *(guint16*)nla;
+    switch (sa->sa_family) {
+    case AFI_IP:
+	sa->sa_family = AF_INET;
+	((struct sockaddr_in*)sa)->sin_addr.s_addr = ((struct in_addr*)(nla + sizeof(guint32)))->s_addr;
+	break;
+
+    case AFI_IP6:
+	sa->sa_family = AF_INET6;
+	memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (struct in6_addr*)(nla + sizeof(guint32)), sizeof(struct in6_addr));
+	break;
+
+    default:
+	retval = -EINVAL;
+	break;
+    }
+
+    return retval;
+}
+
+static inline int sockaddr_to_nla (const struct sockaddr* sa, char* nla)
+{
+    int retval = 0;
+
+    *(guint16*)nla = sa->sa_family;
+    switch (sa->sa_family) {
+    case AF_INET:
+	*(guint16*)nla = AFI_IP;
+	((struct in_addr*)(nla + sizeof(guint32)))->s_addr = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
+	break;
+
+    case AF_INET6:
+	*(guint16*)nla = AFI_IP6;
+	memcpy ((struct in6_addr*)(nla + sizeof(guint32)), &((struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
+	break;
+
+    default:
+	retval = -EINVAL;
+	break;
+    }
+
+    return retval;
+}
 
 const char* udpport_string (int);
 const char* getname (const struct in_addr*);
@@ -350,8 +397,6 @@ void ip_optprint (const char*, int);
 guint16 in_cksum (const char*, int, int);
 guint16 pgm_cksum (const char*, int, int);
 
-#ifdef __cplusplus
-}
-#endif
+G_END_DECLS
 
-#endif /* _PGM_H */
+#endif /* __PGM_PACKET_H__ */
