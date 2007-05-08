@@ -48,7 +48,7 @@ log_init ( void )
 	if (!dir) dir = loc->tm_yday - gmt->tm_yday;
 	g_timezone += dir * 24 * 60 * 60;
 
-	printf ("timezone offset %u seconds.\n", g_timezone);
+//	printf ("timezone offset %u seconds.\n", g_timezone);
 	return 0;
 }
 

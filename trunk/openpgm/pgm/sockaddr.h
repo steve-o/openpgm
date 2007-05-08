@@ -22,20 +22,40 @@
 #ifndef __PGM_SOCKADDR_H__
 #define __PGM_SOCKADDR_H__
 
+/* TODO: update to RFC 3678: MCAST_JOIN_(SOURCE_)GROUP */
+
 /* Combination of ip_mreq & ipv6_mreq */
 struct sock_mreq
 {
 /* Port number and IP multicast address of group. */
-    struct sockaddr	smr_multiaddr;
+    struct sockaddr_storage	smr_multiaddr;
 
 /* Local IP address of interface. */
-    struct sockaddr	smr_interface;
+    struct sockaddr_storage	smr_interface;
 };
 
 G_BEGIN_DECLS
 
 
-static inline int sockaddr_is_addr_multicast (struct sockaddr *s)
+#define sockaddr_family(src)	( ((struct sockaddr*)(src))->sa_family )
+
+#define sockaddr_port(src) \
+	    ( sockaddr_family(src) == AF_INET ? \
+		((struct sockaddr_in*)(src))->sin_port : \
+		((struct sockaddr_in6*)(src))->sin6_port )
+
+#define sockaddr_addr(src) \
+	    ( sockaddr_family(src) == AF_INET ? \
+		(const void*)&((struct sockaddr_in*)(src))->sin_addr : \
+		(const void*)&((struct sockaddr_in6*)(src))->sin6_addr )
+
+#define sockaddr_len(src) \
+	    ( sockaddr_family(src) == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
+
+#define sockaddr_ntop(src,dst,cnt) \
+	    ( inet_ntop(sockaddr_family(src), sockaddr_addr(src), (dst), (cnt)) )
+
+static inline int sockaddr_is_addr_multicast (struct sockaddr* s)
 {
     int retval = 0;
 
@@ -107,18 +127,62 @@ static inline int sockaddr_hdrincl (int s, int sa_family, gboolean v)
     return retval;
 }
 
+static inline int sockaddr_router_alert (int s, int sa_family, gboolean v)
+{
+    int retval = 0;
+
+    switch (sa_family) {
+    case AF_INET:
+	retval = setsockopt (s, IPPROTO_IP, IP_ROUTER_ALERT, &v, sizeof(v));
+	break;
+
+    case AF_INET6:
+	retval = setsockopt (s, IPPROTO_IPV6, IPV6_ROUTER_ALERT, &v, sizeof(v));
+	break;
+
+    default:
+	retval = -EINVAL;
+	break;
+    }
+
+    return retval;
+}
+
+static inline int sockaddr_tos (int s, int sa_family, int tos)
+{
+    int retval = 0;
+
+    switch (sa_family) {
+    case AF_INET:
+	retval = setsockopt (s, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+	break;
+
+    case AF_INET6:  /* TRAFFIC_CLASS not implemented */
+	break;
+
+    default:
+	retval = -EINVAL;
+	break;
+    }
+
+    return retval;
+}
+
+/* nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
+ */
 static inline int sockaddr_add_membership (int s, struct sock_mreq* smr)
 {
     int retval = 0;
 
-    switch (smr->smr_interface.sa_family) {
+    switch (sockaddr_family(&smr->smr_interface)) {
     case AF_INET:
 	{
+/* Linux: ip_mreqn preferred, ip_mreq supported for compat */
 	    struct ip_mreq mreq;
 	    memset (&mreq, 0, sizeof(mreq));
 
-	    mreq.imr_interface.s_addr = ((struct sockaddr_in*)&smr->smr_interface)->sin_addr.s_addr;
 	    mreq.imr_multiaddr.s_addr = ((struct sockaddr_in*)&smr->smr_multiaddr)->sin_addr.s_addr;
+	    mreq.imr_interface.s_addr = ((struct sockaddr_in*)&smr->smr_interface)->sin_addr.s_addr;
 
 	    retval = setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	}
@@ -129,10 +193,10 @@ static inline int sockaddr_add_membership (int s, struct sock_mreq* smr)
 	    struct ipv6_mreq mreq6;
 	    memset (&mreq6, 0, sizeof(mreq6));
 
-	    memcpy (&mreq6.ipv6mr_interface, &((struct sockaddr_in6*)&smr->smr_interface)->sin6_addr, sizeof(struct in6_addr));
 	    memcpy (&mreq6.ipv6mr_multiaddr, &((struct sockaddr_in6*)&smr->smr_multiaddr)->sin6_addr, sizeof(struct in6_addr));
+	    memcpy (&mreq6.ipv6mr_interface, &((struct sockaddr_in6*)&smr->smr_interface)->sin6_addr, sizeof(struct in6_addr));
 
-	    retval = setsockopt (s, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq6, sizeof(mreq6));
+	    retval = setsockopt (s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq6, sizeof(mreq6));
 	}
 	break;
 
@@ -148,28 +212,28 @@ static inline int sockaddr_multicast_if (int s, struct sock_mreq* smr)
 {
     int retval = 0;
 
-    switch (smr->smr_interface.sa_family) {
+    switch (sockaddr_family(&smr->smr_interface)) {
     case AF_INET:
 	{
+/* Linux: ip_mreqn or ip_mreq, many Unix just support in_addr (interface/address) */
 	    struct ip_mreq mreq;
 	    memset (&mreq, 0, sizeof(mreq));
 
-	    mreq.imr_interface.s_addr = ((struct sockaddr_in*)&smr->smr_interface)->sin_addr.s_addr;
 	    mreq.imr_multiaddr.s_addr = ((struct sockaddr_in*)&smr->smr_multiaddr)->sin_addr.s_addr;
+	    mreq.imr_interface.s_addr = ((struct sockaddr_in*)&smr->smr_interface)->sin_addr.s_addr;
 
-	    retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, &mreq, sizeof(mreq));
+//	    retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, &mreq, sizeof(mreq));
+	    retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, &mreq.imr_interface, sizeof(mreq.imr_interface));
 	}
 	break;
 
     case AF_INET6:
 	{
-	    struct ipv6_mreq mreq6;
-	    memset (&mreq6, 0, sizeof(mreq6));
+	    int interface_index = 0;
 
-	    memcpy (&mreq6.ipv6mr_interface, &((struct sockaddr_in6*)&smr->smr_interface)->sin6_addr, sizeof(struct in6_addr));
-	    memcpy (&mreq6.ipv6mr_multiaddr, &((struct sockaddr_in6*)&smr->smr_multiaddr)->sin6_addr, sizeof(struct in6_addr));
+/* TODO: calculate index or pass in from above and also use with mreqn */
 
-	    retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &mreq6, sizeof(mreq6));
+	    retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &interface_index, sizeof(interface_index));
 	}
 	break;
 
