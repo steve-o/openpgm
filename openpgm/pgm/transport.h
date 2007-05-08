@@ -40,7 +40,6 @@
 #   include "pgm.h"
 #endif
 
-
 struct pgm_transport;
 
 struct tsi {            /* transport session identifier */
@@ -50,7 +49,7 @@ struct tsi {            /* transport session identifier */
 
 struct pgm_peer {
     struct tsi		tsi;
-    struct sockaddr	nla;
+    struct sockaddr_storage	nla;
 
     GMutex*		mutex;
 
@@ -61,13 +60,11 @@ struct pgm_peer {
 
 struct pgm_transport {
     struct tsi		tsi;
-    struct sockaddr	grp_nla;	/* multicast (send) network layer address */
-    struct sockaddr	src_nla;	/* unicast (send) network layer address */
 
     GMutex*		mutex;
     gboolean		bound;
 
-    struct sock_mreq	send_smr;
+    struct sock_mreq	send_smr;			/* multicast & unicast nla */
     int			send_sock;
     int			send_with_router_alert_sock;
     struct sock_mreq	recv_smr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
@@ -97,7 +94,7 @@ int pgm_init (void);
 
 gchar* pgm_print_tsi (struct tsi*);
 
-int pgm_transport_create (struct pgm_transport**, guint8*, struct sock_mreq**, int, struct sock_mreq*);
+int pgm_transport_create (struct pgm_transport**, guint8*, struct sock_mreq*, int, struct sock_mreq*);
 int pgm_transport_bind (struct pgm_transport*);
 int pgm_transport_create_watch (struct pgm_transport*, GSource*);
 int pgm_transport_add_watch (struct pgm_transport*);
