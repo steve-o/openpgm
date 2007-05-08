@@ -84,7 +84,7 @@ main (
 	char   *argv[]
 	)
 {
-	puts ("pgmsend");
+	g_message ("pgmsend");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -110,7 +110,7 @@ main (
 	signal(SIGHUP, SIG_IGN);
 
 /* delayed startup */
-	puts ("scheduling startup.");
+	g_message ("scheduling startup.");
 	g_timeout_add(0, (GSourceFunc)on_startup, NULL);
 
 /* dispatch loop */
@@ -164,23 +164,31 @@ on_startup (
 	hints.ai_family = AF_INET;
 	hints.ai_flags = AI_ADDRCONFIG;
 	getaddrinfo (hostname, NULL, &hints, &res);
-	gsi_create_ipv4_id (((struct sockaddr_in*)(res->ai_addr))->sin_addr, gsi);
+	int e = gsi_create_ipv4_id (((struct sockaddr_in*)(res->ai_addr))->sin_addr, gsi);
+	g_assert (e == 0);
 	freeaddrinfo (res);
 #else
-	gsi_create_md5_id (gsi);
+	int e = gsi_create_md5_id (gsi);
+	g_assert (e == 0);
 #endif
 
 	struct sock_mreq recv_smr, send_smr;
-	send_smr.smr_multiaddr.sa_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_port;
+	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
+	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
+	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
+	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = 0;
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
-	send_smr.smr_multiaddr.sa_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_port;
+
+	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
+	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
+	((struct sockaddr_in*)&send_smr.smr_interface)->sin_family = AF_INET;
+	((struct sockaddr_in*)&send_smr.smr_interface)->sin_port = 0;
 	((struct sockaddr_in*)&send_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
 
-	pgm_transport_create (&g_transport, gsi, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, gsi, &recv_smr, 1, &send_smr);
+	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
@@ -190,7 +198,11 @@ on_startup (
 	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 
-	pgm_transport_bind (g_transport);
+	e = pgm_transport_bind (g_transport);
+	if (e != 0) {
+		g_critical ("pgm_transport_bind failed errno %i: \"%s\"", e, strerror(e));
+		G_BREAKPOINT();
+	}
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
@@ -218,7 +230,7 @@ on_odata_timer (
 static void
 send_odata (void)
 {
-	puts ("send_odata.");
+	g_message ("send_odata.");
 
 	int e;
 	char payload_string[100];
@@ -244,7 +256,7 @@ on_mark (
 {
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
-	printf ("%s on_mark.\n", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
+	g_message ("%s on_mark.", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
 
 	return TRUE;
 }
