@@ -53,13 +53,17 @@
 guint64 time_now = 0;
 time_update_func time_update_now;
 
-static void gettimeofday_update (void);
-static void clock_update (void);
-static void ftime_update (void);
+static gboolean time_got_initialized = FALSE;
+
+static guint64 gettimeofday_update (void);
+static guint64 clock_update (void);
+static guint64 ftime_update (void);
 
 int
 time_init ( void )
 {
+	g_return_val_if_fail (time_got_initialized == FALSE, -1);
+
 	char *cfg = getenv ("PGM_TIMER");
 	if (cfg == NULL) cfg = "GETTIMEOFDAY";
 
@@ -72,7 +76,15 @@ time_init ( void )
 	}
 
 	time_update_now();
+
+	time_got_initialized = TRUE;
 	return 0;
+}
+
+gboolean
+time_supported (void)
+{
+	return ( time_got_initialized == TRUE );
 }
 
 int
@@ -82,31 +94,37 @@ time_shutdown (void)
 	return 0;
 }
 
-static void
+static guint64
 gettimeofday_update (void)
 {
 	static struct timeval now;
 	
 	gettimeofday (&now, NULL);
 	time_now = secs_to_usecs(now.tv_sec) + now.tv_usec;
+
+	return time_now;
 }
 
-static void
+static guint64
 clock_update (void)
 {
 	static struct timespec now;
 
 	clock_gettime (CLOCK_MONOTONIC, &now);
 	time_now = secs_to_usecs(now.tv_sec) + nsecs_to_usecs(now.tv_nsec);
+
+	return time_now;
 }
 
-static void
+static guint64
 ftime_update (void)
 {
 	static struct timeb now;
 
 	ftime (&now);
 	time_now = secs_to_usecs(now.time) + msecs_to_usecs(now.millitm);
+
+	return time_now;
 }
 
 /* eof */

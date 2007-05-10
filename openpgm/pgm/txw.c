@@ -126,6 +126,7 @@ struct txw {
 #endif
 
 /* globals */
+#undef G_LOG_DOMAIN
 #define G_LOG_DOMAIN		"txw"
 
 static void _list_iterator (gpointer, gpointer);

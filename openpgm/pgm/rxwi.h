@@ -2,7 +2,7 @@
  * 
  * basic receive window.
  *
- * Copyright (c) 2006 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -41,18 +41,15 @@ typedef enum
 /* callback for commiting contiguous pgm packets */
 typedef int (*rxw_callback)(gpointer, guint, gpointer);
 
-/* callback for processing naks */
-typedef int (*rxw_state_callback)(gpointer, guint, guint32, pgm_pkt_state*, gdouble, guint, gpointer);
-
 struct rxw_packet {
         gpointer        data;
 
         guint           length;
         guint32         sequence_number;
 
-        gdouble         bo_start;
-        gdouble         nak_sent;
-        gdouble         ncf_received;
+	guint64		nak_rb_expiry;
+	guint64		nak_rpt_expiry;
+	guint64		nak_rdata_expiry;
         GList           link_;
         pgm_pkt_state   state;
         guint           ncf_retry_count;
@@ -67,6 +64,7 @@ struct rxw {
         GQueue*         backoff_queue;
         GQueue*         wait_ncf_queue;
         GQueue*         wait_data_queue;
+	guint		lost_count;
 
         guint           max_tpdu;               /* maximum packet size */
 
@@ -77,8 +75,6 @@ struct rxw {
 
         rxw_callback    on_data;
         gpointer        param;
-
-        GTimer*         zero;
 };
 
 
@@ -87,14 +83,14 @@ int rxw_shutdown (struct rxw*);
 
 int rxw_push (struct rxw*, gpointer, guint, guint32, guint32);
 
-/* for NAK re/generation */
-int rxw_state_foreach (struct rxw*, pgm_pkt_state, rxw_state_callback, gpointer);
+/* from state checking */
+int rxw_mark_lost (struct rxw*, guint32);
 
 /* from SPM */
 int rxw_window_update (struct rxw*, guint32, guint32);
 
 /* from NCF */
-int rxw_ncf (struct rxw*, guint32);
+int rxw_ncf (struct rxw*, guint32, guint64);
 
 
 static inline guint rxw_len (struct rxw* r)
@@ -128,6 +124,8 @@ static inline int rxw_push_copy (struct rxw* r, gpointer packet_, guint len, gui
     memcpy (packet, packet_, len);
     return rxw_push (r, packet, len, sn, trail);
 }
+
+int rxw_pkt_state_unlink (struct rxw*, struct rxw_packet*);
 
 G_END_DECLS
 

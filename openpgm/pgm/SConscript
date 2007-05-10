@@ -63,5 +63,6 @@ env.Program('test_cpu_timers.c')
 env.Program(['test_time.c'] + shared_obj)
 
 env.Program(['pgmsend.c'] + standard_obj)
+env.Program(['pgmrecv.c'] + standard_obj)
 
 # end of file

@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple sender using the PGM transport.
+ * Simple receiver using the PGM transport.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -50,8 +50,6 @@
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
-static int g_odata_interval = 1 * 1000;
-static int g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
 
@@ -64,12 +62,13 @@ static void on_signal (int);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
-static void send_odata (void);
-static gboolean on_odata_timer (gpointer);
+static int on_data (gpointer, guint, gpointer);
 
 
 static void
-usage (const char* bin)
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
@@ -79,11 +78,11 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
-	g_message ("pgmsend");
+	g_message ("pgmrecv");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -137,7 +136,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	int		signum
 	)
 {
 	g_message ("on_signal");
@@ -147,7 +146,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	gpointer	data
 	)
 {
 	g_message ("startup.");
@@ -176,7 +175,7 @@ on_startup (
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = 0;
+	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
 
 	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
@@ -196,6 +195,11 @@ on_startup (
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
 	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+	pgm_transport_set_nak_rb_ivl (g_transport, 50*1000);
+	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
+	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
+	pgm_transport_set_nak_data_retries (g_transport, 5);
+	pgm_transport_set_nak_ncf_retries (g_transport, 2);
 
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {
@@ -207,42 +211,11 @@ on_startup (
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
 
-	g_message ("scheduling ODATA broadcasts every %.1f secs.", g_odata_interval / 1000.0);
-	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
+	g_message ("adding PGM receiver watch");
+	pgm_transport_add_watch (g_transport, on_data, NULL);
 
 	g_message ("startup complete.");
 	return FALSE;
-}
-
-/* we send out a stream of ODATA packets with basic changing payload
- */
-
-static gboolean
-on_odata_timer (
-	gpointer data
-	)
-{
-	send_odata ();
-	return TRUE;
-}
-
-static void
-send_odata (void)
-{
-	g_message ("send_odata.");
-
-	int e;
-	char payload_string[100];
-
-	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
-
-	e = pgm_write_copy (g_transport, payload_string, strlen(payload_string) + 1);
-        if (e < 0) {
-		g_warning ("send failed.");
-                return;
-        }
-
-        g_message ("sent.");
 }
 
 /* idle log notification
@@ -250,7 +223,7 @@ send_odata (void)
 
 static gboolean
 on_mark (
-	gpointer data
+	gpointer	data
 	)
 {
 	static struct timeval tv;
@@ -258,6 +231,28 @@ on_mark (
 	g_message ("%s on_mark.", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
 
 	return TRUE;
+}
+
+static int
+on_data (
+	gpointer	data,
+	guint		len,
+	gpointer	user_data
+	)
+{
+	static struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+/* protect against non-null terminated strings */
+	char buf[1024];
+	snprintf (buf, sizeof(buf), "%s", (char*)data);
+
+	g_message ("%s: \"%s\" (%i bytes)",
+			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+			buf,
+			len);
+
+	return 0;
 }
 
 /* eof */

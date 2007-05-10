@@ -2,7 +2,7 @@
  * 
  * serial number arithmetic: rfc 1982
  *
- * Copyright (c) 2006 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,9 @@ enum {
     GUINT32_SIGN_BIT = (1<<31)
 };
 
+#define GUINT64_SIGN_BIT ((guint64)1<<63)
+
+/* 32 bit */
 static inline gboolean guint32_lt (guint32 s, guint32 t)
 {
     return ( ((s) - (t)) & GUINT32_SIGN_BIT );
@@ -49,6 +52,26 @@ static inline gboolean guint32_gte (guint32 s, guint32 t)
     return ( ((s) == (t)) || ( ((t) - (s)) & GUINT32_SIGN_BIT ) );
 }
 
+/* 64 bit */
+static inline gboolean guint64_lt (guint64 s, guint64 t)
+{
+    return ( ((s) - (t)) & GUINT64_SIGN_BIT );
+}
+
+static inline gboolean guint64_lte (guint64 s, guint64 t)
+{
+    return ( ((s) == (t)) || ( ((s) - (t)) & GUINT64_SIGN_BIT ) );
+}
+
+static inline gboolean guint64_gt (guint64 s, guint64 t)
+{
+    return ( ((t) - (s)) & GUINT64_SIGN_BIT );
+}
+
+static inline gboolean guint64_gte (guint64 s, guint64 t)
+{
+    return ( ((s) == (t)) || ( ((t) - (s)) & GUINT64_SIGN_BIT ) );
+}
 
 
 G_END_DECLS

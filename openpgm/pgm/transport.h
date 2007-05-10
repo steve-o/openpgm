@@ -58,6 +58,12 @@ struct pgm_peer {
     struct pgm_transport*   transport;
 };
 
+struct pgm_event {
+    gpointer		data;
+    guint		len;
+    struct pgm_peer*	peer;
+};
+
 struct pgm_transport {
     struct tsi		tsi;
 
@@ -73,19 +79,33 @@ struct pgm_transport {
 
     guint16		max_tpdu;
     gint		hops;
-    guint		spm_ambient_interval;	    /* microseconds */
-    guint*		spm_heartbeat_interval;	    /* zero terminated */
     guint		txw_preallocate, txw_sqns, txw_secs, txw_max_rte;
     guint		rxw_preallocate, rxw_sqns, rxw_secs, rxw_max_rte;
     int			sndbuf, rcvbuf;
 
     struct txw*		txw;
     int			spm_sqn;
+    guint		spm_ambient_interval;	    /* microseconds */
+    guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
+    guint		spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
     gchar*		spm_packet;
     int			spm_len;
 
+    guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
+    guint		nak_data_retries, nak_ncf_retries;
+    guint64		next_spm_expiry;
+    guint64		next_nak_rb_expiry;
+    guint64		next_nak_rpt_expiry;
+    guint64		next_nak_rdata_expiry;
+
     GHashTable*		peers;
+
+    GAsyncQueue*	commit_queue;
+    int			commit_pipe[2];
+    GTrashStack*	trash_event;		    /* sizeof(struct pgm_event) */
 };
+
+typedef int (*pgm_func)(gpointer, guint, gpointer);
 
 
 G_BEGIN_DECLS
@@ -96,8 +116,9 @@ gchar* pgm_print_tsi (struct tsi*);
 
 int pgm_transport_create (struct pgm_transport**, guint8*, struct sock_mreq*, int, struct sock_mreq*);
 int pgm_transport_bind (struct pgm_transport*);
-int pgm_transport_create_watch (struct pgm_transport*, GSource*);
-int pgm_transport_add_watch (struct pgm_transport*);
+GSource* pgm_transport_create_watch (struct pgm_transport*);
+int pgm_transport_add_watch_full (struct pgm_transport*, gint, pgm_func, gpointer, GDestroyNotify);
+int pgm_transport_add_watch (struct pgm_transport*, pgm_func, gpointer);
 int pgm_transport_destroy (struct pgm_transport*, gboolean);
 
 int pgm_transport_set_max_tpdu (struct pgm_transport*, guint16);
@@ -117,6 +138,12 @@ int pgm_transport_set_rxw_max_rte (struct pgm_transport*, guint);
 
 int pgm_transport_set_sndbuf (struct pgm_transport*, int);
 int pgm_transport_set_rcvbuf (struct pgm_transport*, int);
+
+int pgm_transport_set_nak_rb_ivl (struct pgm_transport*, guint);
+int pgm_transport_set_nak_rpt_ivl (struct pgm_transport*, guint);
+int pgm_transport_set_nak_rdata_ivl (struct pgm_transport*, guint);
+int pgm_transport_set_nak_data_retries (struct pgm_transport*, guint);
+int pgm_transport_set_nak_ncf_retries (struct pgm_transport*, guint);
 
 static inline gpointer pgm_alloc (struct pgm_transport*  transport)
 {

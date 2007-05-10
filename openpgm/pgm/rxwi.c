@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+//#define RXW_DEBUG
+
 #ifndef RXW_DEBUG
 #define G_DISABLE_ASSERT
 #endif
@@ -39,6 +41,7 @@
 
 #include "rxwi.h"
 #include "sn.h"
+#include "timer.h"
 
 #ifndef RXW_DEBUG
 #define g_trace(...)		while (0)
@@ -107,9 +110,6 @@
 /* upstream pointer is valid */ \
 		g_assert ( (w)->on_data != NULL ); \
 \
-/* timer exists */ \
-		g_assert ( (w)->zero != NULL ); \
-\
 	}
 
 #define ASSERT_RXW_POINTER_INVARIANT(w) \
@@ -123,13 +123,15 @@
 /* queue's contain at least one packet */ \
 			g_assert ( ( (w)->backoff_queue->length + \
 				     (w)->wait_ncf_queue->length + \
-				     (w)->wait_data_queue->length ) > 0 ); \
+				     (w)->wait_data_queue->length + \
+				     (w)->lost_count) > 0 ); \
 		} \
 		else \
 		{ \
 			g_assert ( ( (w)->backoff_queue->length + \
 				     (w)->wait_ncf_queue->length + \
-				     (w)->wait_data_queue->length ) == 0 ); \
+				     (w)->wait_data_queue->length + \
+				     (w)->lost_count ) == 0 ); \
 		} \
 	}
 #else
@@ -147,7 +149,7 @@ static inline int rxw_flush (struct rxw*);
 static inline int rxw_flush1 (struct rxw*);
 static inline int rxw_pop_lead (struct rxw*);
 static inline int rxw_pop_trail (struct rxw*);
-static inline int rxw_pkt_state_unlink (struct rxw*, struct rxw_packet*);
+static inline int rxw_pkt_remove1 (struct rxw*, struct rxw_packet*);
 static inline int rxw_pkt_free1 (struct rxw*, struct rxw_packet*);
 static inline gpointer rxw_alloc_packet (struct rxw*);
 static inline gpointer rxw_alloc0_packet (struct rxw*);
@@ -210,9 +212,6 @@ rxw_init (
 /* contiguous packet callback */
 	r->on_data = on_data;
 	r->param = param;
-
-/* timing */
-	r->zero = g_timer_new();
 
 	guint memory = sizeof(struct rxw) +
 /* pointer array */
@@ -290,13 +289,6 @@ rxw_shutdown (
 	{
 		g_slice_free (GQueue, r->wait_data_queue);
 		r->wait_data_queue = NULL;
-	}
-
-/* timer reference */
-	if (r->zero)
-	{
-		g_timer_destroy (r->zero);
-		r->zero = NULL;
 	}
 
 	return 0;
@@ -466,15 +458,12 @@ rxw_push (
 /* if packet is non-contiguous to current leading edge add place holders */
 		if (r->lead != sequence_number)
 		{
-//			gdouble now = g_timer_elapsed (r->zero, NULL);
-			gdouble now = 0.0;
-
 			while (r->lead != sequence_number)
 			{
 				struct rxw_packet* ph = rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
-				ph->bo_start		= now;
+				ph->nak_rb_expiry	= time_now;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
 				g_trace ("#%u: adding place holder #%u for missing packet",
@@ -552,29 +541,41 @@ rxw_flush1 (
 	struct rxw_packet* cp = RXW_PACKET(r, r->trail);
 	g_assert ( cp != NULL );
 
-	if (cp->state != PGM_PKT_HAVE_DATA_STATE) {
-		g_trace ("!have_data_state cp->length = %u", cp->length);
+	if (cp->state != PGM_PKT_HAVE_DATA_STATE && cp->state != PGM_PKT_LOST_DATA_STATE) {
+		g_trace ("!(have|lost)_data_state cp->length = %u", cp->length);
 		return 0;
 	}
 
-	g_assert ( cp->data != NULL && cp->length > 0 );
+	if (cp->state == PGM_PKT_LOST_DATA_STATE)
+	{
+		g_trace ("skipping lost packet @ #%" G_GUINT32_FORMAT, cp->sequence_number);
 
-	g_trace ("contiguous packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
-		cp->sequence_number);
+		r->lost_count--;
+	}
+	else
+	{
+		g_assert ( cp->data != NULL && cp->length > 0 );
+
+		g_trace ("contiguous packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
+			cp->sequence_number);
+	}
 
 	RXW_SET_PACKET(r, r->trail, NULL);
 	r->trail++;
 
-/* pass upstream */
-	r->on_data (cp->data, cp->length, r->param);
+	if (cp->state == PGM_PKT_HAVE_DATA_STATE)
+	{
+/* pass upstream, including data memory ownership */
+		r->on_data (cp->data, cp->length, r->param);
+	}
 
 /* cleanup */
-	rxw_pkt_free1 (r, cp);
+	rxw_pkt_remove1 (r, cp);
 	ASSERT_RXW_BASE_INVARIANT(r);
 	return 1;
 }
 
-static inline int
+int
 rxw_pkt_state_unlink (
 	struct rxw*	r,
 	struct rxw_packet*	rp
@@ -584,17 +585,19 @@ rxw_pkt_state_unlink (
 	g_assert ( rp != NULL );
 
 /* remove from state queues */
+	GQueue* queue = NULL;
+
 	switch (rp->state) {
 	case PGM_PKT_BACK_OFF_STATE:
-		g_queue_unlink (r->backoff_queue, &rp->link_);
+		queue = r->backoff_queue;
 		break;
 
 	case PGM_PKT_WAIT_NCF_STATE:
-		g_queue_unlink (r->wait_ncf_queue, &rp->link_);
+		queue = r->wait_ncf_queue;
 		break;
 
 	case PGM_PKT_WAIT_DATA_STATE:
-		g_queue_unlink (r->wait_data_queue, &rp->link_);
+		queue = r->wait_data_queue;
 		break;
 
 	case PGM_PKT_HAVE_DATA_STATE:
@@ -604,6 +607,34 @@ rxw_pkt_state_unlink (
 		g_assert_not_reached();
 		break;
 	}
+
+	if (queue)
+		g_queue_unlink (queue, &rp->link_);
+
+	ASSERT_RXW_BASE_INVARIANT(r);
+	return 0;
+}
+
+/* similar to rxw_pkt_free1 but ignore the data payload, used to transfer
+ * ownership upstream.
+ */
+
+static inline int
+rxw_pkt_remove1 (
+	struct rxw*	r,
+	struct rxw_packet*	rp
+	)
+{
+	ASSERT_RXW_BASE_INVARIANT(r);
+	g_assert ( rp != NULL );
+
+	if (rp->data)
+	{
+		rp->data = NULL;
+	}
+
+//	g_slice_free1 (sizeof(struct rxw), rp);
+	g_trash_stack_push (&r->trash_packet, rp);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	return 0;
@@ -696,8 +727,6 @@ rxw_window_update (
 		if ( r->lead != txw_lead)
 		{
 /* generate new naks, should rarely if ever occur? */
-//			gdouble now = g_timer_elapsed (r->zero, NULL);
-			gdouble now = 0.0;
 	
 			while ( r->lead != txw_lead )
 			{
@@ -712,7 +741,7 @@ rxw_window_update (
 				struct rxw_packet* ph = rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
-				ph->bo_start		= now;
+				ph->nak_rb_expiry	= time_now;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
 				g_trace ("adding placeholder #%u", ph->sequence_number);
@@ -783,6 +812,31 @@ rxw_window_update (
 	return 0;
 }
 
+/* mark a packet lost due to failed recovery, this either advances the trailing edge
+ * or creates a hole to later skip.
+ */
+
+int
+rxw_mark_lost (
+	struct rxw*	r,
+	guint32		sequence_number
+	)
+{
+	ASSERT_RXW_BASE_INVARIANT(r);
+	ASSERT_RXW_POINTER_INVARIANT(r);
+
+	struct rxw_packet* rp = RXW_PACKET(r, sequence_number);
+	rp->state = PGM_PKT_LOST_DATA_STATE;
+
+	r->lost_count++;
+
+	rxw_flush (r);
+
+	ASSERT_RXW_BASE_INVARIANT(r);
+	ASSERT_RXW_POINTER_INVARIANT(r);
+	return 0;
+}
+
 /* received a uni/multicast ncf, search for a matching nak & tag or extend window if
  * beyond lead
  */
@@ -790,7 +844,8 @@ rxw_window_update (
 int
 rxw_ncf (
 	struct rxw*	r,
-	guint32		sequence_number
+	guint32		sequence_number,
+	guint64		nak_rdata_ivl
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -800,18 +855,23 @@ rxw_ncf (
 
 	if (rp)
 	{
-//		rp->ncf_received = g_timer_elapsed (r->zero, NULL);
-		rp->ncf_received = 0.0;
-
+		switch (rp->state) {
 /* already received ncf */
-		if (rp->state == PGM_PKT_WAIT_DATA_STATE)
+		case PGM_PKT_WAIT_DATA_STATE:
 		{
 			ASSERT_RXW_BASE_INVARIANT(r);
 			ASSERT_RXW_POINTER_INVARIANT(r);
 			return 0;	/* ignore */
 		}
 
-		g_assert (rp->state == PGM_PKT_BACK_OFF_STATE || rp->state == PGM_PKT_WAIT_NCF_STATE);
+		case PGM_PKT_BACK_OFF_STATE:
+		case PGM_PKT_WAIT_NCF_STATE:
+			rp->nak_rdata_expiry = time_now + nak_rdata_ivl;
+			break;
+
+		default:
+			g_assert_not_reached();
+		}
 
 		rxw_pkt_state_unlink (r, rp);
 		g_queue_push_head_link (r->wait_data_queue, &rp->link_);
@@ -833,8 +893,7 @@ rxw_ncf (
 
 	g_trace ("ncf extends leads to #%u", sequence_number);
 
-//	gdouble now = g_timer_elapsed (r->zero, NULL);
-	gdouble now = 0.0;
+/* mark all sequence numbers to ncf # in BACK-OFF_STATE */
 
 	while (r->lead != sequence_number)
 	{
@@ -849,7 +908,7 @@ rxw_ncf (
 		struct rxw_packet* ph = rxw_alloc0_packet(r);
 		ph->link_.data		= ph;
 		ph->sequence_number     = r->lead;
-		ph->bo_start		= now;
+		ph->nak_rb_expiry	= time_now;
 
 		RXW_SET_PACKET(r, ph->sequence_number, ph);
 		g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
@@ -859,6 +918,8 @@ rxw_ncf (
 
 		r->lead++;
 	}
+
+/* create WAIT_DATA state placeholder for ncf # */
 
 	g_assert ( r->lead == sequence_number );
 
@@ -874,7 +935,7 @@ rxw_ncf (
 	ph->link_.data		= ph;
 	ph->sequence_number     = r->lead;
 	ph->state		= PGM_PKT_WAIT_DATA_STATE;
-	ph->ncf_received	= now;
+	ph->nak_rdata_expiry	= time_now + nak_rdata_ivl;
 
 	RXW_SET_PACKET(r, ph->sequence_number, ph);
 	g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
@@ -883,128 +944,6 @@ rxw_ncf (
 	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
 
 	rxw_flush (r);
-
-	ASSERT_RXW_BASE_INVARIANT(r);
-	ASSERT_RXW_POINTER_INVARIANT(r);
-	return 0;
-}
-
-/* iterate tail of queue, with #s to send naks on, then expired naks to re-send.
- */
-
-int
-rxw_state_foreach (
-	struct rxw*	r,
-	pgm_pkt_state	state,
-	rxw_state_callback	state_callback,
-	gpointer	param
-	)
-{
-	ASSERT_RXW_BASE_INVARIANT(r);
-	ASSERT_RXW_POINTER_INVARIANT(r);
-
-	GList* list = NULL;
-	switch (state) {
-	case PGM_PKT_BACK_OFF_STATE:	list = r->backoff_queue->tail; break;
-	case PGM_PKT_WAIT_NCF_STATE:	list = r->wait_ncf_queue->tail; break;
-	case PGM_PKT_WAIT_DATA_STATE:	list = r->wait_data_queue->tail; break;
-	default: g_assert_not_reached(); break;
-	}
-
-	if (!list) return 0;
-
-/* minimize timer checks in the loop */
-//	gdouble now = g_timer_elapsed(r->zero, NULL);
-	gdouble now = 0.0;
-
-	while (list)
-	{
-		GList* next_list = list->prev;
-		struct rxw_packet* rp = (struct rxw_packet*)list->data;
-
-		gdouble age = 0.0;
-		guint retry_count = 0;
-
-		g_assert (rp->state == state);
-
-		rxw_pkt_state_unlink (r, rp);
-
-		switch (state) {
-		case PGM_PKT_BACK_OFF_STATE:
-			age		= now - rp->bo_start;
-			break;
-
-		case PGM_PKT_WAIT_NCF_STATE:
-			age		= now - rp->nak_sent;
-			retry_count	= rp->ncf_retry_count;
-			break;
-
-		case PGM_PKT_WAIT_DATA_STATE:
-			age		= now - rp->ncf_received;
-			retry_count	= rp->data_retry_count;
-			break;
-
-		default:
-			g_assert_not_reached();
-			break;
-		}
-
-		if ( (*state_callback)(rp->data,
-					rp->length,
-					rp->sequence_number,
-					&rp->state,
-					age,
-					retry_count,
-					param) )
-		{
-			break;
-		}
-
-
-/* callback should return TRUE and cease iteration for no state change */
-		g_assert (rp->state != state);
-
-		switch (rp->state) {	/* new state change */
-/* send nak later */
-		case PGM_PKT_BACK_OFF_STATE:
-			rp->bo_start = now;
-			g_queue_push_head_link (r->backoff_queue, &rp->link_);
-			break;
-
-/* nak sent, await ncf */
-		case PGM_PKT_WAIT_NCF_STATE:
-			rp->nak_sent = now;
-			g_queue_push_head_link (r->wait_ncf_queue, &rp->link_);
-			break;
-
-/* cancelled */
-		case PGM_PKT_LOST_DATA_STATE:
-			{
-				guint sequence_number = rp->sequence_number;
-
-				g_warning ("lost data #%u due to cancellation.", sequence_number);
-
-				rxw_pkt_state_unlink (r, rp);
-				rxw_pkt_free1 (r, rp);
-				RXW_SET_PACKET(r, sequence_number, NULL);
-
-				if (sequence_number == r->trail)
-				{
-					r->trail++;
-				}
-				else if (sequence_number == r->lead)
-				{
-					r->lead--;
-				}
-			}
-			break;
-
-		default:
-			g_assert_not_reached();
-		}
-
-		list = next_list;
-	}
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
