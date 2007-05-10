@@ -372,6 +372,7 @@ static inline int sockaddr_to_nla (const struct sockaddr* sa, char* nla)
     int retval = 0;
 
     *(guint16*)nla = sa->sa_family;
+    *(guint16*)(nla + sizeof(guint16)) = 0;	/* reserved 16bit space */
     switch (sa->sa_family) {
     case AF_INET:
 	*(guint16*)nla = AFI_IP;

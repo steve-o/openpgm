@@ -2,7 +2,7 @@
  * 
  * high resolution timers.
  *
- * Copyright (c) 2006 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,12 +29,12 @@
 
 G_BEGIN_DECLS
 
-typedef void (*time_update_func)(void);
+typedef guint64 (*time_update_func)(void);
 
-#define time_after(a,b)	    ( guint32_lt(a,b) )
+#define time_after(a,b)	    ( guint64_lt(a,b) )
 #define time_before(a,b)    time_after(b,a)
 
-#define time_after_eq(a,b)  ( guint32_gte(a,b) )
+#define time_after_eq(a,b)  ( guint64_gte(a,b) )
 #define time_before_eq(a,b) time_after_eq(b,a)
 
 
@@ -44,6 +44,7 @@ extern guint64 time_now;
 extern time_update_func time_update_now;
 
 gboolean time_init (void);
+gboolean time_supported (void);
 
 G_END_DECLS
 
