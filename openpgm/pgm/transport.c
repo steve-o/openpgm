@@ -1576,6 +1576,7 @@ nak_rb_state (
 
 			send_nak (transport, peer, rp->sequence_number);
 
+			rp->state = PGM_PKT_WAIT_NCF_STATE;
 			g_queue_push_head_link (peer->rxw->wait_ncf_queue, &rp->link_);
 			rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
 			if (!transport->next_nak_rpt_expiry) {
@@ -1591,9 +1592,17 @@ nak_rb_state (
 		list = next_list_el;
 	}
 
-	if (peer->rxw->backoff_queue->length == 0) {
+	if (peer->rxw->backoff_queue->length == 0)
+	{
+		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->head == NULL);
+		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->tail == NULL);
+
 		transport->next_nak_rb_expiry = 0;
-	} else {
+	}
+	else
+	{
+		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->head);
+		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->tail);
 
 /* next next expiration time */
 
@@ -1634,6 +1643,8 @@ nak_rpt_state (
 	struct pgm_transport* transport = (struct pgm_transport*)transport_;
 	GList* list = peer->rxw->wait_ncf_queue->tail;
 
+	guint dropped = 0;
+
 	while (list)
 	{
 		GList* next_list_el = list->prev;
@@ -1648,11 +1659,13 @@ nak_rpt_state (
 			if (++rp->ncf_retry_count > transport->nak_ncf_retries)
 			{
 /* cancellation */
-				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
+				dropped++;
+//				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
 				rxw_mark_lost (peer->rxw, rp->sequence_number);
 			}
 			else
 			{	/* retry */
+				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (peer->rxw->backoff_queue, &rp->link_);
 				rp->nak_rb_expiry = rp->nak_rpt_expiry + transport->nak_rb_ivl;
 				if (!transport->next_nak_rb_expiry) {
@@ -1669,9 +1682,17 @@ nak_rpt_state (
 		list = next_list_el;
 	}
 
-	if (peer->rxw->wait_ncf_queue->length == 0) {
+	if (peer->rxw->wait_ncf_queue->length == 0)
+	{
+		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->head == NULL);
+		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail == NULL);
+
 		transport->next_nak_rpt_expiry = 0;
-	} else {
+	}
+	else
+	{
+		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->head);
+		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail);
 
 /* next next expiration time */
 
@@ -1679,6 +1700,10 @@ nak_rpt_state (
 		{
 			transport->next_nak_rpt_expiry = ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail)->nak_rpt_expiry;
 		}
+	}
+
+	if (dropped) {
+		g_message ("dropped %u messages due to cancellation.", dropped);
 	}
 }
 
@@ -1728,6 +1753,7 @@ nak_rdata_state (
 			}
 			else
 			{	/* retry */
+				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (peer->rxw->backoff_queue, &rp->link_);
 				rp->nak_rb_expiry = rp->nak_rdata_expiry + transport->nak_rb_ivl;
 				if (!transport->next_nak_rb_expiry) {
@@ -1744,9 +1770,17 @@ nak_rdata_state (
 		list = next_list_el;
 	}
 
-	if (peer->rxw->wait_data_queue->length == 0) {
+	if (peer->rxw->wait_data_queue->length == 0)
+	{
+		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->head == NULL);
+		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->tail == NULL);
+
 		transport->next_nak_rdata_expiry = 0;
-	} else {
+	}
+	else
+	{
+		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->head);
+		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->tail);
 
 /* next next expiration time */
 
@@ -1897,7 +1931,7 @@ pgm_add_timer (
 	struct pgm_transport*	transport
 	)
 {
-	return pgm_add_timer_full (transport, G_PRIORITY_DEFAULT);
+	return pgm_add_timer_full (transport, G_PRIORITY_HIGH);
 }
 
 /* determine which timer fires next: spm (ihb_tmr), nak_rb_ivl, nak_rpt_ivl, or nak_rdata_ivl

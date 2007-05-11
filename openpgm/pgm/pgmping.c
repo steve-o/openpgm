@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple sender using the PGM transport.
+ * Simple send/reply ping tool using the PGM transport.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -50,10 +50,12 @@
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
-static int g_odata_interval = 1 * 100;
+static int g_odata_interval = 1 * 100 * 1000;	/* 100 ms */
 static int g_payload = 0;
 static int g_max_tpdu = 1500;
-static int g_sqns = 10;
+static int g_sqns = 200 * 1000;
+
+static gboolean g_send_mode = TRUE;
 
 static struct pgm_transport* g_transport = NULL;
 
@@ -66,6 +68,7 @@ static gboolean on_mark (gpointer);
 
 static void send_odata (void);
 static gboolean on_odata_timer (gpointer);
+static int on_data (gpointer, guint, gpointer);
 
 
 static void
@@ -74,6 +77,8 @@ usage (const char* bin)
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -f <frequency>  : Number of message to send per second\n");
+	fprintf (stderr, "  -l              : Listen mode (default send mode)\n");
 	exit (1);
 }
 
@@ -83,16 +88,20 @@ main (
 	char   *argv[]
 	)
 {
-	g_message ("pgmsend");
+	g_message ("pgmping");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:f:lh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+
+		case 'f':	g_odata_interval = (1000 * 1000) / atoi (optarg); break;
+
+		case 'l':	g_send_mode = FALSE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -176,7 +185,7 @@ on_startup (
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = 0;
+	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
 
 	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
@@ -196,6 +205,11 @@ on_startup (
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
 	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+	pgm_transport_set_nak_rb_ivl (g_transport, 50*1000);
+	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
+	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
+	pgm_transport_set_nak_data_retries (g_transport, 5);
+	pgm_transport_set_nak_ncf_retries (g_transport, 2);
 
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {
@@ -207,8 +221,16 @@ on_startup (
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
 
-	g_message ("scheduling ODATA broadcasts every %.1f secs.", g_odata_interval / 1000.0);
-	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
+	if (g_send_mode)
+	{
+		g_message ("scheduling ODATA broadcasts every %i ms.", g_odata_interval / 1000);
+		g_timeout_add(g_odata_interval / 1000, (GSourceFunc)on_odata_timer, NULL);
+	}
+	else
+	{
+		g_message ("adding PGM receiver watch");
+		pgm_transport_add_watch (g_transport, on_data, NULL);
+	}
 
 	g_message ("startup complete.");
 	return FALSE;
@@ -230,15 +252,29 @@ static void
 send_odata (void)
 {
 	int e;
-	char payload_string[100];
 
-	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
-
-	e = pgm_write_copy (g_transport, payload_string, strlen(payload_string) + 1);
+	e = pgm_write_copy (g_transport, &g_payload, sizeof(g_payload));
         if (e < 0) {
 		g_warning ("send failed.");
                 return;
         }
+
+	g_payload++;
+}
+
+static int
+on_data (
+	gpointer	data,
+	guint		len,
+	gpointer	user_data
+	)
+{
+	if (len == sizeof(g_payload))
+		g_payload = *(int*)data;
+	else
+		g_warning ("payload size %i bytes", len);
+
+	return 0;
 }
 
 /* idle log notification
