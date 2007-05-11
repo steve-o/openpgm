@@ -358,6 +358,8 @@ rxw_push (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
+	guint dropped = 0;
+
 	g_trace ("#%u: data trail #%u: push: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number, trail, 
 		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead);
@@ -427,7 +429,6 @@ rxw_push (
 			rp->length	= length;
 
 			rxw_pkt_state_unlink (r, rp);
-
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
 		}
 		else
@@ -447,7 +448,8 @@ rxw_push (
 
 		if ( rxw_full(r) )
 		{
-			g_warning ("#%u: dropping #%u due to full window.", sequence_number, r->trail);
+			dropped++;
+//			g_warning ("#%u: dropping #%u due to full window.", sequence_number, r->trail);
 
 			rxw_pop_trail (r);
 			rxw_flush (r);
@@ -476,7 +478,8 @@ rxw_push (
 
 				if ( rxw_full(r) )
 				{
-					g_warning ("dropping #%u due to full window.", r->trail);
+					dropped++;
+//					g_warning ("dropping #%u due to full window.", r->trail);
 
 					rxw_pop_trail (r);
 					rxw_flush (r);
@@ -504,6 +507,10 @@ rxw_push (
 	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number,
 		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead);
+
+	if (dropped) {
+		g_warning ("dropped %u messages due to full window.", dropped);
+	}
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
@@ -609,7 +616,17 @@ rxw_pkt_state_unlink (
 	}
 
 	if (queue)
+	{
+#ifdef RXW_DEBUG
+		guint original_length = queue->length;
+#endif
 		g_queue_unlink (queue, &rp->link_);
+#ifdef RXW_DEBUG
+		g_assert (queue->length == original_length - 1);
+#endif
+	}
+
+	rp->state = PGM_PKT_ERROR_STATE;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	return 0;
@@ -720,6 +737,8 @@ rxw_window_update (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
+	guint dropped = 0;
+
 	if ( guint32_gt (txw_lead, r->lead) )
 	{
 		g_trace ("advancing lead to %u", txw_lead);
@@ -732,7 +751,8 @@ rxw_window_update (
 			{
 				if ( rxw_full(r) )
 				{
-					g_warning ("dropping #%u due to full window.", r->trail);
+					dropped++;
+//					g_warning ("dropping #%u due to full window.", r->trail);
 
 					rxw_pop_trail (r);
 					rxw_flush (r);
@@ -788,7 +808,8 @@ rxw_window_update (
 			}
 			else
 			{
-				g_warning ("dropping #%u due to advancing transmit window.", r->trail);
+				dropped++;
+//				g_warning ("dropping #%u due to advancing transmit window.", r->trail);
 				rxw_pop_trail (r);
 				rxw_flush (r);
 			}
@@ -805,6 +826,10 @@ rxw_window_update (
 				g_warning ("rxw_trail stepped backwards, ignoring.");
 			}
 		}
+	}
+
+	if (dropped) {
+		g_warning ("dropped %u messages due to full window.", dropped);
 	}
 
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -826,8 +851,10 @@ rxw_mark_lost (
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 	struct rxw_packet* rp = RXW_PACKET(r, sequence_number);
-	rp->state = PGM_PKT_LOST_DATA_STATE;
 
+/* remove current state */
+	rxw_pkt_state_unlink (r, rp);
+	rp->state = PGM_PKT_LOST_DATA_STATE;
 	r->lost_count++;
 
 	rxw_flush (r);
@@ -874,6 +901,7 @@ rxw_ncf (
 		}
 
 		rxw_pkt_state_unlink (r, rp);
+		rp->state = PGM_PKT_WAIT_DATA_STATE;
 		g_queue_push_head_link (r->wait_data_queue, &rp->link_);
 
 		ASSERT_RXW_BASE_INVARIANT(r);
@@ -895,11 +923,14 @@ rxw_ncf (
 
 /* mark all sequence numbers to ncf # in BACK-OFF_STATE */
 
+	guint dropped = 0;
+
 	while (r->lead != sequence_number)
 	{
 		if ( rxw_full(r) )
 		{
-			g_warning ("dropping #%u due to full window.", r->trail);
+			dropped++;
+//			g_warning ("dropping #%u due to full window.", r->trail);
 
 			rxw_pop_trail (r);
 			rxw_flush (r);
@@ -925,7 +956,8 @@ rxw_ncf (
 
 	if ( rxw_full(r) )
 	{
-		g_warning ("dropping #%u due to full window.", r->trail);
+		dropped++;
+//		g_warning ("dropping #%u due to full window.", r->trail);
 
 		rxw_pop_trail (r);
 		rxw_flush (r);
@@ -944,6 +976,10 @@ rxw_ncf (
 	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
 
 	rxw_flush (r);
+
+	if (dropped) {
+		g_warning ("dropped %u messages due to full window.", dropped);
+	}
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);

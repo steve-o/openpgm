@@ -270,7 +270,7 @@ txw_push (
 /* check for full window */
 	if ( txw_full (t) )
 	{
-		g_warning ("full :o");
+//		g_warning ("full :o");
 
 /* transmit window advancement scheme dependent action here */
 		txw_pop (t);
