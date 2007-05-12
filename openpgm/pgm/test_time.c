@@ -51,17 +51,12 @@ main (
 {
 	puts ("test_time");
 
-	enum { SLEEP_USEC, SLEEP_NSEC } sleep_mode = SLEEP_NSEC;
-
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "hnu")) != -1)
+	while ((c = getopt (argc, argv, "h")) != -1)
 	{
 		switch (c) {
-
-		case 'n': sleep_mode = SLEEP_NSEC; break;
-		case 'u': sleep_mode = SLEEP_USEC; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -73,9 +68,6 @@ main (
 
 	time_init();
 
-	struct timespec rem;
-	rem.tv_sec = 0; rem.tv_nsec = 1;
-
 	guint64 start, end;
 
 	guint64 min_diff = UINT32_MAX;
@@ -83,18 +75,11 @@ main (
 
 	for (int i = 0; i < 1000; i++)
 	{
-		time_update_now();
-		start = time_now;
+		start = time_update_now();
 
-		if (sleep_mode == SLEEP_USEC)
-		{
-			usleep (1);
-		} else {
-			while ( nanosleep (&rem, &rem) == EINTR );
-		}
+		time_sleep (7);
 
-		time_update_now();
-		end = time_now;
+		end = time_update_now();
 
 		guint64 elapsed = end - start;
 
@@ -104,7 +89,7 @@ main (
 
 	printf ("time elapsed max %lu us, min %lu us\n", max_diff, min_diff);
 
-	time_shutdown();	
+	time_destroy();	
 
 	puts ("finished.");
 	return 0;

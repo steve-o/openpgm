@@ -30,6 +30,7 @@
 G_BEGIN_DECLS
 
 typedef guint64 (*time_update_func)(void);
+typedef void (*time_sleep_func)(guint64);
 
 #define time_after(a,b)	    ( guint64_lt(a,b) )
 #define time_before(a,b)    time_after(b,a)
@@ -42,8 +43,10 @@ typedef guint64 (*time_update_func)(void);
 extern guint64 time_now;
 
 extern time_update_func time_update_now;
+extern time_sleep_func time_sleep;
 
-gboolean time_init (void);
+int time_init (void);
+int time_destroy (void);
 gboolean time_supported (void);
 
 G_END_DECLS
