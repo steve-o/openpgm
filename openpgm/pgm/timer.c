@@ -102,14 +102,14 @@ time_init ( void )
 	case 'U':	time_sleep = usleep; break;	/* direct to glibc, function is deprecated */
 	}
 
-	if (time_update_now == rtc_update || time_sleep == rtc_sleep)
+	if (time_update_now == rtc_update || time_sleep == rtc_sleep ||
+		time_update_now == tsc_update || time_sleep == tsc_sleep)
 	{
 		rtc_init();
 	}
 
 	if (time_update_now == tsc_update || time_sleep == tsc_sleep)
 	{
-		rtc_init();
 		tsc_init();
 	}
 
@@ -128,11 +128,8 @@ time_supported (void)
 int
 time_destroy (void)
 {
-	if (time_update_now == rtc_update || time_sleep == rtc_sleep)
-	{
-		rtc_destroy();
-	}
-	if (time_update_now == tsc_update || time_sleep == tsc_sleep)
+	if (time_update_now == rtc_update || time_sleep == rtc_sleep ||
+		time_update_now == tsc_update || time_sleep == tsc_sleep)
 	{
 		rtc_destroy();
 	}
