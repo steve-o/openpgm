@@ -41,6 +41,7 @@
 #include "log.h"
 #include "transport.h"
 #include "gsi.h"
+#include "signal.h"
 
 
 /* typedefs */
@@ -101,21 +102,21 @@ main (
 	log_init ();
 	pgm_init ();
 
+	g_loop = g_main_loop_new (NULL, FALSE);
+
 /* setup signal handlers */
-	signal(SIGSEGV, on_sigsegv);
-	signal(SIGINT, on_signal);
-	signal(SIGTERM, on_signal);
-	signal(SIGHUP, SIG_IGN);
+	signal_install(SIGSEGV, on_sigsegv);
+	signal_install(SIGINT, on_signal);
+	signal_install(SIGTERM, on_signal);
+	signal_install(SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
-	g_timeout_add(0, (GSourceFunc)on_startup, NULL);
+	g_timeout_add (0, (GSourceFunc)on_startup, NULL);
 
 /* dispatch loop */
-	g_loop = g_main_loop_new(NULL, FALSE);
-
 	g_message ("entering main event loop ... ");
-	g_main_loop_run(g_loop);
+	g_main_loop_run (g_loop);
 
 	g_message ("event loop terminated, cleaning up.");
 

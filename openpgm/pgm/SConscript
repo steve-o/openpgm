@@ -22,6 +22,7 @@ shared_src = Split("""
 		timer.c
 		if.c
 		gsi.c
+		signal.c
 """)
 
 # Basic versions
