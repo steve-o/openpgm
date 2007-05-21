@@ -124,14 +124,16 @@
 			g_assert ( ( (w)->backoff_queue->length + \
 				     (w)->wait_ncf_queue->length + \
 				     (w)->wait_data_queue->length + \
-				     (w)->lost_count) > 0 ); \
+				     (w)->lost_count + \
+				     (w)->fragment_count) > 0 ); \
 		} \
 		else \
 		{ \
 			g_assert ( ( (w)->backoff_queue->length + \
 				     (w)->wait_ncf_queue->length + \
 				     (w)->wait_data_queue->length + \
-				     (w)->lost_count ) == 0 ); \
+				     (w)->lost_count + \
+				     (w)->fragment_count) == 0 ); \
 		} \
 	}
 #else
@@ -344,15 +346,20 @@ rxw_alloc0_packet (
 /* the sequence number is inside the packet as opposed to from internal
  * counters, this means one push on the receive window can actually translate
  * as many: the extra's acting as place holders and NAK containers
+ *
+ * returns 0 if packet added to window
  */
 
 int
-rxw_push (
+rxw_push_fragment (
 	struct rxw*	r,
 	gpointer	packet,
 	guint		length,
 	guint32		sequence_number,
-	guint32		trail
+	guint32		trail,
+	guint32		apdu_first_sqn,
+	guint32		fragment_offset,	/* in bytes from beginning of apdu */
+	guint32		apdu_len		/* in bytes */
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -371,6 +378,9 @@ rxw_push (
 
 	if ( !r->window_defined )
 	{
+/* if this packet is a fragment of an apdu, and not the first, we continue on as per spec but careful to
+ * advance the trailing edge to discard the remaining fragments.
+ */
 		g_trace ("#%u: using packet to temporarily define window", sequence_number);
 
 		r->lead = sequence_number - 1;
@@ -385,7 +395,7 @@ rxw_push (
 
 		if ( !IN_TXW(r, sequence_number) )
 		{
-			g_warning ("#%u: not in tx window, discarding.", sequence_number);
+			g_warning ("#%u: not in transmit window, discarding.", sequence_number);
 
 			ASSERT_RXW_BASE_INVARIANT(r);
 			ASSERT_RXW_POINTER_INVARIANT(r);
@@ -405,7 +415,7 @@ rxw_push (
 	{
 		g_trace ("#%u: already committed, discarding.", sequence_number);
 
-		return 0;
+		return -1;
 	}
 
 /* check for duplicate */
@@ -420,13 +430,59 @@ rxw_push (
 			if (rp->length)
 			{
 				g_trace ("#%u: already received, discarding.", sequence_number);
-				return 0;
+				return -1;
+			}
+
+/* for fragments check that apdu is valid */
+			if ( apdu_len && 
+				apdu_first_sqn != sequence_number &&
+				( rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
+					)
+			{
+				g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
+				rxw_mark_lost (r, sequence_number);
+				goto out;
+			}
+
+			if ( apdu_len && guint32_gt (apdu_first_sqn, sequence_number) )
+			{
+				g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
+					sequence_number, apdu_first_sqn);
+				rxw_mark_lost (r, apdu_first_sqn);
+				goto out;
 			}
 
 			g_trace ("#%u: filling in a gap.", sequence_number);
 
-			rp->data	= packet;
-			rp->length	= length;
+			if (apdu_len)	/* a fragment */
+			{
+				r->fragment_count++;
+
+				if (sequence_number == apdu_first_sqn)
+				{
+/* TODO: add sanity check on apdu size, max tsdu * min(rxw_sqns, txw_sqns) is one ceiling */
+					rp->data	= g_malloc (apdu_len);
+					rp->length	= length;
+					memcpy (rp->data, packet, length);
+				}
+				else
+				{	/* not first fragment in apdu */
+/* no change:
+ *					rp->data	= NULL;
+ *					rp->length	= 0;
+ */
+					struct rxw_packet* head_rp = RXW_PACKET(r, apdu_first_sqn);
+					memcpy ((char*)head_rp->data + fragment_offset, packet, length);
+				}
+
+				rp->apdu_first_sqn = apdu_first_sqn;
+				rp->apdu_len	= apdu_len;
+			}
+			else
+			{
+				rp->data	= packet;
+				rp->length	= length;
+			}
 
 			rxw_pkt_state_unlink (r, rp);
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
@@ -490,10 +546,54 @@ rxw_push (
 		}
 
 		g_assert ( r->lead == sequence_number );
-	
+
+/* for fragments check that apdu is valid: dupe code to above */
+		if ( apdu_len && 
+			apdu_first_sqn != sequence_number &&
+			( rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
+				)
+		{
+			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
+			rxw_mark_lost (r, sequence_number);
+			goto out;
+		}
+
+		if ( apdu_len && guint32_gt (apdu_first_sqn, sequence_number) )
+		{
+			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
+				sequence_number, apdu_first_sqn);
+			rxw_mark_lost (r, apdu_first_sqn);
+			goto out;
+		}
+
 		struct rxw_packet* rp = rxw_alloc0_packet(r);
-		rp->data                = packet;
-		rp->length              = length;
+
+		if (apdu_len)	/* fragment */
+		{
+			r->fragment_count++;
+
+			if (sequence_number == apdu_first_sqn)
+			{
+				rp->data	= g_malloc (apdu_len);
+
+				memcpy (rp->data, packet, length);
+			}
+			else
+			{	/* not first fragment */
+				struct rxw_packet* head_rp = RXW_PACKET(r, apdu_first_sqn);
+				memcpy ((char*)head_rp->data + fragment_offset, packet, length);
+
+/* leave check for complete apdu at flush */
+			}
+
+			rp->apdu_first_sqn = apdu_first_sqn;
+			rp->apdu_len	= apdu_len;
+		}
+		else
+		{	/* regular tpdu */
+			rp->data	= packet;
+		}
+		rp->length		= length;
 		rp->sequence_number     = r->lead;
 		rp->state		= PGM_PKT_HAVE_DATA_STATE;
 
@@ -502,6 +602,7 @@ rxw_push (
 			sequence_number, rp->sequence_number);
 	}
 
+out:
 	rxw_flush (r);
 
 	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
@@ -538,11 +639,17 @@ rxw_flush (
 	return 0;
 }
 
+/* flush one apdu from contiguous data from the trailing edge of the window
+ *
+ * returns 1 if a packet was flushed and possibly more exist.
+ */
+
 static inline int
 rxw_flush1 (
 	struct rxw*	r
 	)
 {
+	int retval = 0;
 	ASSERT_RXW_BASE_INVARIANT(r);
 
 	struct rxw_packet* cp = RXW_PACKET(r, r->trail);
@@ -550,36 +657,150 @@ rxw_flush1 (
 
 	if (cp->state != PGM_PKT_HAVE_DATA_STATE && cp->state != PGM_PKT_LOST_DATA_STATE) {
 		g_trace ("!(have|lost)_data_state cp->length = %u", cp->length);
-		return 0;
+		goto out;
 	}
 
 	if (cp->state == PGM_PKT_LOST_DATA_STATE)
 	{
-		g_trace ("skipping lost packet @ #%" G_GUINT32_FORMAT, cp->sequence_number);
+/* check for lost apdu */
+		if ( cp->apdu_len )
+		{
+			guint32 dropped = 0;
+			guint32 apdu_first_sqn = cp->apdu_first_sqn;
 
-		r->lost_count--;
-	}
-	else
-	{
-		g_assert ( cp->data != NULL && cp->length > 0 );
+/* drop the first fragment, then others follow through as its no longer in the window */
+			if ( r->trail == apdu_first_sqn )
+			{
+				dropped++;
+				r->lost_count--;
+				RXW_SET_PACKET(r, r->trail, NULL);
+				r->trail++;
+				rxw_pkt_remove1 (r, cp);
+			}
 
-		g_trace ("contiguous packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
-			cp->sequence_number);
-	}
+/* flush others, make sure to check each packet is an apdu packet and not simply a zero match */
+			while (!rxw_empty(r))
+			{
+				cp = RXW_PACKET(r, r->trail);
+				if (cp->apdu_len && cp->apdu_first_sqn == apdu_first_sqn)
+				{
+					dropped++;
+					if ( cp->state == PGM_PKT_LOST_DATA_STATE ) {
+						r->lost_count--;
+					} else {
+						g_assert (cp->state == PGM_PKT_HAVE_DATA_STATE);
+						r->fragment_count--;
+					}
+					RXW_SET_PACKET(r, r->trail, NULL);
+					r->trail++;
+					rxw_pkt_remove1 (r, cp);
+				}
+				else
+				{	/* another apdu or tpdu exists */
+					retval = 1;
+					break;
+				}
+			}
+		}
+		else
+		{	/* plain tpdu */
+			g_trace ("skipping lost packet @ #%" G_GUINT32_FORMAT, cp->sequence_number);
 
-	RXW_SET_PACKET(r, r->trail, NULL);
-	r->trail++;
+			r->lost_count--;
 
-	if (cp->state == PGM_PKT_HAVE_DATA_STATE)
-	{
-/* pass upstream, including data memory ownership */
-		r->on_data (cp->data, cp->length, r->param);
-	}
+			RXW_SET_PACKET(r, r->trail, NULL);
+			r->trail++;
 
 /* cleanup */
-	rxw_pkt_remove1 (r, cp);
+			rxw_pkt_remove1 (r, cp);
+
+/* one tpdu lost */
+			retval = 1;
+		}
+	}
+	else
+	{	/* not lost */
+		g_assert ( cp->data != NULL && cp->length > 0 );
+
+/* check for contiguous apdu */
+		if ( cp->apdu_len )
+		{
+			if ( cp->apdu_first_sqn != cp->sequence_number )
+			{
+				g_trace ("partial apdu at trailing edge");
+				goto out;
+			}
+
+			guint32 frag = cp->apdu_first_sqn;
+			guint32 apdu_len = 0;
+			struct rxw_packet* ap = NULL;
+			while ( ABS_IN_RXW(r, frag) && apdu_len < cp->apdu_len )
+			{
+g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
+				ap = RXW_PACKET(r, frag);
+				g_assert ( ap != NULL );
+				if (ap->state != PGM_PKT_HAVE_DATA_STATE)
+				{
+					break;
+				}
+				apdu_len += ap->length;
+				frag++;
+			}
+
+			if (apdu_len == cp->apdu_len)
+			{
+				g_trace ("contiguous apdu found @ #%" G_GUINT32_FORMAT " - #%" G_GUINT32_FORMAT 
+						", passing upstream.",
+					cp->apdu_first_sqn, ap->sequence_number);
+
+/* remove from window */
+				for (guint32 i = cp->apdu_first_sqn; i < frag; i++)
+				{
+					r->fragment_count--;
+					r->trail++;
+				}
+
+/* pass upstream */
+				r->on_data (cp->data, cp->length, r->param);
+
+/* cleanup */
+				for (guint32 i = cp->apdu_first_sqn; i < frag; i++)
+				{
+					ap = RXW_PACKET(r, i);
+					rxw_pkt_remove1 (r, ap);
+					RXW_SET_PACKET(r, i, NULL);
+				}
+			}
+			else
+			{	/* incomplete apdu */
+				g_trace ("partial apdu found %u of %u bytes.",
+					apdu_len, cp->apdu_len);
+				retval = 0;
+				goto out;
+			}
+		}
+		else
+		{	/* plain tpdu */
+			g_trace ("contiguous packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
+				cp->sequence_number);
+
+			RXW_SET_PACKET(r, r->trail, NULL);
+			r->trail++;
+
+/* pass upstream, including data memory ownership */
+			r->on_data (cp->data, cp->length, r->param);
+
+/* cleanup */
+			rxw_pkt_remove1 (r, cp);
+		}
+
+/* one apdu or tpdu processed */
+		retval = 1;
+	}
+
+out:
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 1;
+	return retval;
 }
 
 int
@@ -668,8 +889,15 @@ rxw_pkt_free1 (
 
 	if (rp->data)
 	{
-//		g_slice_free1 (rp->length, rp->data);
-		g_trash_stack_push (&r->trash_data, rp->data);
+		if (rp->apdu_len)
+		{
+			g_free (rp->data);
+		}
+		else
+		{
+//			g_slice_free1 (rp->length, rp->data);
+			g_trash_stack_push (&r->trash_data, rp->data);
+		}
 		rp->data = NULL;
 	}
 
@@ -828,7 +1056,19 @@ rxw_window_update (
 		}
 	}
 
-	if (dropped) {
+	if (dropped)
+	{
+/* check trailing packet to see if fragment of an apdu that has just been dropped */
+		if (!rxw_empty (r))
+		{
+			struct rxw_packet* rp = RXW_PACKET(r, r->trail);
+			while (!rxw_empty (r) && rp->apdu_len && !ABS_IN_RXW(r, rp->apdu_first_sqn))
+			{
+				rxw_pop_trail (r);
+				dropped++;
+			}
+		}
+
 		g_warning ("dropped %u messages due to full window.", dropped);
 	}
 

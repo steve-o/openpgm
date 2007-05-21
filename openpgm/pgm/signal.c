@@ -45,7 +45,7 @@ static gboolean on_io_signal (GIOChannel*, GIOCondition, gpointer);
 /* install signal handler and return unix fd to add to event loop
  */
 
-int
+__sighandler_t
 signal_install (
 	int		signum,
 	__sighandler_t	handler
@@ -55,29 +55,29 @@ signal_install (
 	{
 		if (pipe (g_signal_pipe))
 		{
-			return -errno;
+			return SIG_ERR;
 		}
 
 /* write-end */
 		int fd_flags = fcntl (g_signal_pipe[1], F_GETFL);
 		if (fd_flags < 0)
 		{
-			return -errno;
+			return SIG_ERR;
 		}
 		if (fcntl (g_signal_pipe[1], F_SETFL, fd_flags | O_NONBLOCK))
 		{
-			return -errno;
+			return SIG_ERR;
 		}
 
 /* read-end */
 		fd_flags = fcntl (g_signal_pipe[0], F_GETFL);
 		if (fd_flags < 0)
 		{
-			return -errno;
+			return SIG_ERR;
 		}
 		if (fcntl (g_signal_pipe[0], F_SETFL, fd_flags | O_NONBLOCK))
 		{
-			return -errno;
+			return SIG_ERR;
 		}
 
 /* add to evm */
@@ -86,9 +86,7 @@ signal_install (
 	}
 
 	g_signal_list[signum] = handler;
-	signal (signum, on_signal);
-
-	return 0;
+	return signal (signum, on_signal);
 }
 
 /* process signal from operating system
