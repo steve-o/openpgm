@@ -132,13 +132,13 @@ pgm_parse_packet (
  */
 	int packet_length = g_ntohs(ip->tot_len);	/* total packet length */
 	if (len < packet_length) {			/* redundant: often handled in kernel */
-		puts ("truncated IP packet");
+		printf ("truncated IP packet: %i < %i\n", (int)len, (int)packet_length);
 		return -1;
 	}
 
 /* TCP Segmentation Offload (TSO) might have zero length here */
 	if (packet_length < ip_header_length) {
-		puts ("bad length :(");
+		printf ("bad length: %i < %i\n", (int)packet_length, (int)ip_header_length);
 		return -1;
 	}
 
@@ -726,12 +726,12 @@ pgm_print_odata (
 		if (opt_len < 0) {
 			return FALSE;
 		}
-		data += opt_len;
-		len -= opt_len;
+		payload	+= opt_len;
+		len	-= opt_len;
 	}
 
 /* data */
-	char* end = data + len;
+	char* end = payload + g_ntohs (header->pgm_tsdu_length);
 	while (payload < end) {
 		if (isprint(*payload))
 			putchar(*payload);
@@ -1048,23 +1048,24 @@ pgm_print_options (
 	int len
 	)
 {
-	printf ("OPTIONS: ");
+	printf ("OPTIONS:");
 
 	if (len < sizeof(struct pgm_opt_length)) {
-		puts ("packet truncated :(");
+		puts (" packet truncated :(");
 		return -1;
 	}
 
 	struct pgm_opt_header* opt = (struct pgm_opt_header*)data;
 
 	if (opt->opt_length != 4) {
-		puts ("bad opt_length length");
+		printf (" bad opt_length length %u\n", (unsigned)opt->opt_length);
 		return -1;
 	}
 
-	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)data;
+	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(opt + 1);
+	opt_len->opt_total_length = g_ntohs (opt_len->opt_total_length);
 
-	printf (" total len %u", opt_len->opt_total_length);
+	printf (" total len %u ", opt_len->opt_total_length);
 
 	if (opt_len->opt_total_length < 4 || opt_len->opt_total_length > len) {
 		puts ("bad total length");
@@ -1072,7 +1073,7 @@ pgm_print_options (
 	}
 
 /* total length includes opt_length option */
-	opt_len->opt_total_length -= sizeof(struct pgm_opt_length);
+	opt_len->opt_total_length -= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
 	opt = (struct pgm_opt_header*)(opt_len + 1);
 
 /* iterate through options (max 16) */

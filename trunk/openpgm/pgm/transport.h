@@ -159,6 +159,19 @@ static inline int pgm_write_copy (struct pgm_transport* transport, const gchar* 
     return pgm_write (transport, pkt, count);
 }
 
+int pgm_write_copy_fragment (struct pgm_transport*, const gchar*, gsize);
+
+static inline int pgm_write_copy_ex (struct pgm_transport* transport, const gchar* buf, gsize count)
+{
+    if ( count <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+					    sizeof(struct pgm_data) ) ) )
+    {
+	return pgm_write_copy (transport, buf, count);
+    }
+
+    return pgm_write_copy_fragment (transport, buf, count);
+}
+
 /* TODO: contexts, hooks */
 
 G_END_DECLS

@@ -67,4 +67,6 @@ env.Program(['pgmsend.c'] + standard_obj)
 env.Program(['pgmrecv.c'] + standard_obj)
 env.Program(['pgmping.c'] + standard_obj)
 
+env.Program(['block_send.c'] + standard_obj)
+
 # end of file

@@ -47,6 +47,10 @@ struct rxw_packet {
         guint           length;
         guint32         sequence_number;
 
+	guint32		apdu_first_sqn;
+/*	guint32		frag_offset;	*/
+	guint32		apdu_len;
+
 	guint64		nak_rb_expiry;
 	guint64		nak_rpt_expiry;
 	guint64		nak_rdata_expiry;
@@ -65,6 +69,7 @@ struct rxw {
         GQueue*         wait_ncf_queue;
         GQueue*         wait_data_queue;
 	guint		lost_count;
+	guint		fragment_count;
 
         guint           max_tpdu;               /* maximum packet size */
 
@@ -81,7 +86,7 @@ struct rxw {
 struct rxw* rxw_init (guint, guint32, guint32, guint, guint, rxw_callback, gpointer);
 int rxw_shutdown (struct rxw*);
 
-int rxw_push (struct rxw*, gpointer, guint, guint32, guint32);
+int rxw_push_fragment (struct rxw*, gpointer, guint, guint32, guint32, guint32, guint32, guint32);
 
 /* from state checking */
 int rxw_mark_lost (struct rxw*, guint32);
@@ -118,11 +123,16 @@ static inline gpointer rxw_alloc (struct rxw* r)
     return r->trash_data ? g_trash_stack_pop (&r->trash_data) : g_slice_alloc (r->max_tpdu);
 }
 
-static inline int rxw_push_copy (struct rxw* r, gpointer packet_, guint len, guint32 sn, guint32 trail)
+static inline int rxw_push (struct rxw* r, gpointer packet, guint len, guint32 sqn, guint32 trail)
+{
+    return rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0);
+}
+
+static inline int rxw_push_copy (struct rxw* r, gpointer packet_, guint len, guint32 sqn, guint32 trail)
 {
     gpointer packet = rxw_alloc (r);
     memcpy (packet, packet_, len);
-    return rxw_push (r, packet, len, sn, trail);
+    return rxw_push (r, packet, len, sqn, trail);
 }
 
 int rxw_pkt_state_unlink (struct rxw*, struct rxw_packet*);

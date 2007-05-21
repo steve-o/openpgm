@@ -936,7 +936,7 @@ pgm_transport_bind (
 		
 
 	g_trace ("construct transmit window.");
-	transport->txw = txw_init (transport->max_tpdu,
+	transport->txw = txw_init (transport->max_tpdu - sizeof(struct iphdr),
 					transport->txw_preallocate,
 					transport->txw_sqns,
 					transport->txw_secs,
@@ -1235,7 +1235,9 @@ on_io_data (
 
 	struct pgm_transport* transport = data;
 
-/* read the data */
+/* read the data:
+ * TODO: pre-allocate buffer based on max_tpdu size
+ */
 	int fd = g_io_channel_unix_get_fd (source);
 	char buffer[1500];
 	struct sockaddr_storage addr;
@@ -1285,9 +1287,10 @@ on_io_data (
 		g_hash_table_insert (transport->peers, &sender->tsi, sender);
 	}
 
-/* handle PGM packet type */
 	char *pgm_data = (char*)(pgm_header + 1);
 	int pgm_len = packet_len - sizeof(pgm_header);
+
+/* handle PGM packet type */
 	switch (pgm_header->pgm_type) {
 	case PGM_SPM:	on_spm (sender, pgm_header, pgm_data, pgm_len); break;
 	case PGM_NAK:	on_nak (sender, pgm_header, pgm_data, pgm_len); break;
@@ -1354,8 +1357,6 @@ on_spm (
 /* check for advancing sequence number */
 		if ( guint32_gte (spm->spm_sqn, sender->spm_sqn) )
 		{
-			spm->spm_nla_afi = g_ntohl (spm->spm_nla_afi);
-
 /* copy NLA for replies */
 			nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
 
@@ -1473,8 +1474,8 @@ send_spm (
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
 
 	spm->spm_sqn		= g_htonl (transport->spm_sqn++);
-	spm->spm_trail		= g_htonl (txw_lead(transport->txw));
-	spm->spm_lead		= g_htonl (txw_trail(transport->txw));
+	spm->spm_trail		= g_htonl (txw_trail(transport->txw));
+	spm->spm_lead		= g_htonl (txw_lead(transport->txw));
 
 /* checksum optional for SPMs */
 	header->pgm_checksum	= 0;
@@ -1857,6 +1858,93 @@ pgm_write (
 	return retval;
 }
 
+/* copy application data (apdu) to multiple tx window (tpdu) entries and send.
+ *
+ * TODO: generic wrapper to determine fragmentation from tpdu_length.
+ */
+
+int
+pgm_write_copy_fragment (
+	struct pgm_transport*	transport,
+	const gchar*		buf,
+	gsize			count)
+{
+	int retval = 0;
+	guint offset = 0;
+	guint32 opt_sqn = txw_next_lead(transport->txw);
+
+	do {
+/* retrieve packet storage from transmit window */
+		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		int tsdu_length = MIN(transport->max_tpdu - sizeof(struct iphdr) - header_length, count - offset);
+		int tpdu_length = header_length + tsdu_length;
+
+		char *pkt = txw_alloc(transport->txw);
+		struct pgm_header *header = (struct pgm_header*)pkt;
+		memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+		header->pgm_sport	= transport->tsi.sport;
+		header->pgm_dport	= sockaddr_port(&transport->send_smr.smr_multiaddr);
+		header->pgm_type        = PGM_ODATA;
+	        header->pgm_options     = PGM_OPT_PRESENT;
+	        header->pgm_tsdu_length = g_htons (tsdu_length);
+
+/* ODATA */
+		struct pgm_data *odata = (struct pgm_data*)(header + 1);
+	        odata->data_sqn         = g_htonl (txw_next_lead(transport->txw));
+	        odata->data_trail       = g_htonl (txw_trail(transport->txw));
+
+/* OPT_LENGTH */
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(odata + 1);
+		opt_header->opt_type	= PGM_OPT_LENGTH;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_length);
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+		opt_length->opt_total_length	= g_htons (sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_length) +
+							sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_fragment));
+
+/* OPT_FRAGMENT */
+		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+		opt_header->opt_type	= PGM_OPT_FRAGMENT | PGM_OPT_END;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_fragment);
+		struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+		opt_fragment->opt_reserved	= 0;
+		opt_fragment->opt_sqn		= g_htonl (opt_sqn);
+		opt_fragment->opt_frag_off	= g_htonl (offset);
+		opt_fragment->opt_frag_len	= g_htonl (count);
+
+		memcpy (opt_fragment + 1, buf + offset, tsdu_length);
+
+	        header->pgm_checksum    = 0;
+	        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+
+/* add to transmit window */
+		txw_push (transport->txw, pkt, tpdu_length);
+
+		retval = sendto (transport->send_sock,
+					header,
+					tpdu_length,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+					sockaddr_len(&transport->send_smr.smr_multiaddr));
+
+		g_trace ("%i bytes sent", tpdu_length);
+
+		offset += tsdu_length;
+
+	} while (offset < count);
+
+/* re-set spm timer */
+	transport->spm_heartbeat_state = 1;
+	transport->next_spm_expiry = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+
+	return retval;
+}
+
 static int
 send_rdata (
 	struct pgm_transport*	transport,
@@ -2172,6 +2260,44 @@ g_trace ("peer is %s", pgm_print_tsi(&event->peer->tsi));
 	return TRUE;
 }
 
+/* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
+ */
+
+static int
+get_opt_fragment (
+	struct pgm_opt_header*	opt_header,
+	struct pgm_opt_fragment**	opt_fragment
+	)
+{
+	int retval = 0;
+
+	g_assert (opt_header->opt_type == PGM_OPT_LENGTH);
+	g_assert (opt_header->opt_length == sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length));
+	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+
+/* always at least two options, first is always opt_length */
+	do {
+		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+
+		if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_FRAGMENT)
+		{
+			*opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+			retval = 1;
+			goto out;
+		}
+
+	} while (!(opt_header->opt_type & PGM_OPT_END));
+
+	*opt_fragment = NULL;
+
+out:
+	return retval;
+}
+
+/* ODATA packet with any of the following options:
+ *
+ * OPT_FRAGMENT - this TPDU part of a larger APDU.
+ */
 
 static int
 on_odata (
@@ -2185,28 +2311,56 @@ on_odata (
 
 /* OD_SPORT matches SPM_SPORT */
 	if (header->pgm_sport != sender->tsi.sport) {
-g_trace("1: %u %u", header->pgm_sport, sender->transport->tsi.sport);
 		retval = -EINVAL;
 		goto out;
 	}
 
 /* OD_DPORT contains our transport DPORT */
 	if (header->pgm_dport != sockaddr_port(&sender->transport->recv_smr[0].smr_multiaddr)) {
-g_trace("2: %u %u", header->pgm_sport, sender->transport->tsi.sport);
 		retval = -EINVAL;
 		goto out;
 	}
 
 	struct pgm_data* odata = (struct pgm_data*)data;
-
 	odata->data_sqn = g_ntohl (odata->data_sqn);
 
-g_trace("psh copy");
-	if (!rxw_push_copy (sender->rxw,
-				odata + 1,
-				g_ntohs (header->pgm_tsdu_length),
-				odata->data_sqn,
-				g_ntohl (odata->data_trail)))
+/* pre-allocate from glib allocator (not slice allocator) full APDU packet for first new fragment, re-use
+ * through to event handler.
+ */
+	gboolean flush_naks = FALSE;
+
+	struct pgm_opt_fragment* opt_fragment;
+	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment(odata + 1, &opt_fragment))
+	{
+		guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(struct pgm_opt_header)));
+
+		g_trace ("push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
+			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
+		if (!rxw_push_fragment (sender->rxw,
+					(char*)(odata + 1) + opt_total_length,
+					g_ntohs (header->pgm_tsdu_length),
+					odata->data_sqn,
+					g_ntohl (odata->data_trail),
+					g_ntohl (opt_fragment->opt_sqn),
+					g_ntohl (opt_fragment->opt_frag_off),
+					g_ntohl (opt_fragment->opt_frag_len)))
+		{
+			flush_naks = TRUE;
+		}
+	}
+	else
+	{
+		if (!rxw_push_copy (sender->rxw,
+					odata + 1,
+					g_ntohs (header->pgm_tsdu_length),
+					odata->data_sqn,
+					g_ntohl (odata->data_trail)))
+		{
+			flush_naks = TRUE;
+		}
+	}
+
+	if (flush_naks)
 	{
 /* flush out 1st time nak packets */
 		nak_rb_state (&sender->tsi, sender, sender->transport);
@@ -2242,14 +2396,42 @@ on_rdata (
 	}
 
 	struct pgm_data* rdata = (struct pgm_data*)data;
-
 	rdata->data_sqn = g_ntohl (rdata->data_sqn);
 
-	if (!rxw_push_copy (sender->rxw,
-				rdata + 1,
-				g_ntohs (header->pgm_tsdu_length),
-				rdata->data_sqn,
-				g_ntohl (rdata->data_trail)))
+	gboolean flush_naks = FALSE;
+
+	struct pgm_opt_fragment* opt_fragment;
+	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment(rdata + 1, &opt_fragment))
+	{
+		guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( rdata + 1 ) + sizeof(struct pgm_opt_header)));
+
+		g_trace ("push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
+			 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
+		if (!rxw_push_fragment (sender->rxw,
+					(char*)(rdata + 1) + opt_total_length,
+					g_ntohs (header->pgm_tsdu_length),
+					rdata->data_sqn,
+					g_ntohl (rdata->data_trail),
+					g_ntohl (opt_fragment->opt_sqn),
+					g_ntohl (opt_fragment->opt_frag_off),
+					g_ntohl (opt_fragment->opt_frag_len)))
+		{
+			flush_naks = TRUE;
+		}
+	}
+	else
+	{
+		if (!rxw_push_copy (sender->rxw,
+					rdata + 1,
+					g_ntohs (header->pgm_tsdu_length),
+					rdata->data_sqn,
+					g_ntohl (rdata->data_trail)))
+		{
+			flush_naks = TRUE;
+		}
+	}
+
+	if (flush_naks)
 	{
 /* flush out 1st time nak packets */
 		nak_rb_state (&sender->tsi, sender, sender->transport);

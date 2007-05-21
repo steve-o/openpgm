@@ -347,7 +347,7 @@ static inline int nla_to_sockaddr (const char* nla, struct sockaddr* sa)
 {
     int retval = 0;
 
-    sa->sa_family = *(guint16*)nla;
+    sa->sa_family = g_ntohs (*(guint16*)nla);
     switch (sa->sa_family) {
     case AFI_IP:
 	sa->sa_family = AF_INET;
@@ -375,12 +375,12 @@ static inline int sockaddr_to_nla (const struct sockaddr* sa, char* nla)
     *(guint16*)(nla + sizeof(guint16)) = 0;	/* reserved 16bit space */
     switch (sa->sa_family) {
     case AF_INET:
-	*(guint16*)nla = AFI_IP;
+	*(guint16*)nla = g_htons (AFI_IP);
 	((struct in_addr*)(nla + sizeof(guint32)))->s_addr = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
 	break;
 
     case AF_INET6:
-	*(guint16*)nla = AFI_IP6;
+	*(guint16*)nla = g_htons (AFI_IP6);
 	memcpy ((struct in6_addr*)(nla + sizeof(guint32)), &((struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
 	break;
 
