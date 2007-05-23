@@ -133,11 +133,7 @@ block_send
 Send APDUs over ODATA.
 
 
-block_recv
-----------
-
-Receive APDUs over ODATA.
-
+(pgmrecv can receive APDUs)
 
 test_fec
 --------

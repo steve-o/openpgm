@@ -23,6 +23,7 @@ shared_src = Split("""
 		if.c
 		gsi.c
 		signal.c
+		reed_solomon.c
 """)
 
 # Basic versions
@@ -68,5 +69,7 @@ env.Program(['pgmrecv.c'] + standard_obj)
 env.Program(['pgmping.c'] + standard_obj)
 
 env.Program(['block_send.c'] + standard_obj)
+
+env.Program(['test_rs.c'] + standard_obj)
 
 # end of file
