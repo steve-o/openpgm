@@ -1980,6 +1980,33 @@ send_rdata (
 	return retval;
 }
 
+/* enable FEC for this transport
+ *
+ * 2t can be greater than k but usually only for very bad transmission lines where parity
+ * packets are also lost.
+ */
+
+int
+pgm_transport_set_fec (
+	struct pgm_transport*	transport,
+	gboolean		enable_proactive_parity,
+	gboolean		enable_ondemand_parity,
+	guint			default_tgsize,		/* k, tg = transmission group */
+	guint			default_h		/* 2t : parity packet length per tg */
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	g_mutex_lock (transport->mutex);
+	transport->proactive_parity	= enable_proactive_parity;
+	transport->ondemand_parity	= enable_ondemand_parity;
+	transport->default_tgsize	= default_tgsize;
+	transport->default_h		= default_h;
+	g_mutex_unlock (transport->mutex);
+
+	return 0;
+}
+
 static GSource*
 pgm_create_timer (
 	struct pgm_transport*	transport

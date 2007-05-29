@@ -22,7 +22,11 @@
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
+#include <errno.h>
+#include <netinet/in.h>
 #include <sys/types.h>
+
+#include <glib.h>
 
 
 #ifndef IPPROTO_PGM

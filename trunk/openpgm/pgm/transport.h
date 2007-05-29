@@ -98,6 +98,11 @@ struct pgm_transport {
     guint64		next_nak_rpt_expiry;
     guint64		next_nak_rdata_expiry;
 
+    gboolean		proactive_parity;
+    gboolean		ondemand_parity;
+    guint		default_tgsize;		    /* k */
+    guint		default_h;		    /* 2t */
+
     GHashTable*		peers;
 
     GAsyncQueue*	commit_queue;
@@ -173,6 +178,8 @@ static inline int pgm_write_copy_ex (struct pgm_transport* transport, const gcha
 }
 
 /* TODO: contexts, hooks */
+
+int pgm_transport_set_fec (struct pgm_transport*, gboolean, gboolean, guint, guint);
 
 G_END_DECLS
 
