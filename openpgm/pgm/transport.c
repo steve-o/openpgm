@@ -109,13 +109,19 @@ static GSourceFuncs g_pgm_timer_funcs = {
 
 static int send_spm (struct pgm_transport*);
 static int send_nak (struct pgm_transport*, struct pgm_peer*, guint32);
-static int check_nak_rb_state (struct pgm_transport*);
-static int check_nak_rpt_state (struct pgm_transport*);
-static int check_nak_rdata_state (struct pgm_transport*);
+
+static void nak_rb_state (gpointer, gpointer);
+static void nak_rpt_state (gpointer, gpointer);
+static void nak_rdata_state (gpointer, gpointer);
+static void check_peer_nak_state (gpointer, gpointer, gpointer);
+static guint64 min_nak_expiry (guint64, struct pgm_transport*);
 
 static int send_rdata (struct pgm_transport*, int, gpointer, int);
 
-static void destroy_peer (gpointer, gpointer, gpointer);
+static struct pgm_peer* peer_ref (struct pgm_peer*);
+static void peer_unref_unlocked (struct pgm_peer*);
+static void peer_unref (struct pgm_peer*);
+static void peer_unref_hfunc (gpointer, gpointer, gpointer);
 
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
@@ -207,6 +213,11 @@ pgm_init (void)
 
 /* destroy a pgm_transport object and contents, if last transport also destroy
  * associated event loop
+ *
+ * TODO: clear up locks on destruction: 1: flushing, 2: destroying:, 3: destroyed.
+ *
+ * If application calls a function on the transport after destroy() it is a
+ * programmer error: segv likely to occur on unlock.
  */
 
 int
@@ -217,7 +228,20 @@ pgm_transport_destroy (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
+/* terminate & join internal thread */
+#ifndef PGM_SINGLE_THREAD
+	if (transport->thread) {
+		g_main_loop_quit (transport->loop);
+		g_thread_join (transport->thread);
+	}
+#endif /* !PGM_SINGLE_THREAD */
+
 	g_mutex_lock (transport->mutex);
+
+/* assume lock from create() if not bound */
+	if (transport->bound) {
+		g_mutex_lock (transport->tx_mutex);
+	}
 
 /* flush data by sending heartbeat SPMs & processing NAKs until ambient */
 	if (flush) {
@@ -230,14 +254,19 @@ pgm_transport_destroy (
 		GError *err = NULL;
 		g_io_channel_shutdown (transport->recv_channel, flush, &err);
 
+		if (err) {
+			g_warning ("i/o shutdown error %i %s", err->code, err->message);
+		}
+
 /* TODO: flush GLib main loop with context specific to the recv channel */
 
 		transport->recv_channel = NULL;
 	}
+
 	if (transport->peers) {
 		g_trace ("destroying peer data.");
 
-		g_hash_table_foreach (transport->peers, destroy_peer, transport);
+		g_hash_table_foreach (transport->peers, peer_unref_hfunc, transport);
 		g_hash_table_destroy (transport->peers);
 		transport->peers = NULL;
 	}
@@ -249,18 +278,18 @@ pgm_transport_destroy (
 	}
 
 	if (transport->recv_sock) {
-		puts ("closing receive socket.");
+		g_trace ("closing receive socket.");
 		close(transport->recv_sock);
 		transport->recv_sock = 0;
 	}
 
 	if (transport->send_sock) {
-		puts ("closing send socket.");
+		g_trace ("closing send socket.");
 		close(transport->send_sock);
 		transport->send_sock = 0;
 	}
 	if (transport->send_with_router_alert_sock) {
-		puts ("closing send with router alert socket.");
+		g_trace ("closing send with router alert socket.");
 		close(transport->send_with_router_alert_sock);
 		transport->send_with_router_alert_sock = 0;
 	}
@@ -294,10 +323,55 @@ pgm_transport_destroy (
 
 	g_mutex_unlock (transport->mutex);
 	g_mutex_free (transport->mutex);
+
+	g_mutex_unlock (transport->tx_mutex);
+	g_mutex_free (transport->tx_mutex);
+
 	g_free (transport);
 
 	g_trace ("finished.");
 	return 0;
+}
+
+static struct pgm_peer*
+peer_ref (
+	struct pgm_peer*	peer
+	)
+{
+	g_return_val_if_fail (peer != NULL, NULL);
+
+	g_atomic_int_inc (&peer->ref_count);
+
+	return peer;
+}
+
+static void
+peer_unref (
+	struct pgm_peer*	peer
+	)
+{
+	g_mutex_lock (peer->transport->mutex);
+	peer_unref (peer);
+	g_mutex_unlock (peer->transport->mutex);
+}
+
+static void
+peer_unref_unlocked (
+	struct pgm_peer*	peer
+	)
+{
+	gboolean is_zero;
+
+	g_return_if_fail (peer != NULL);
+
+	is_zero = g_atomic_int_dec_and_test (&peer->ref_count);
+
+	if (G_UNLIKELY (is_zero))
+	{
+		rxw_shutdown (peer->rxw);
+		peer->rxw = NULL;
+		g_free (peer);
+	}
 }
 
 /* each transport object has a list of peers, one for each host sending PGM data.
@@ -305,17 +379,13 @@ pgm_transport_destroy (
  */
 
 static void
-destroy_peer (
+peer_unref_hfunc (
 	gpointer	tsi,
 	gpointer	peer,
 	gpointer	transport
 	)
 {
-	rxw_shutdown (((struct pgm_peer*)peer)->rxw);
-	((struct pgm_peer*)peer)->rxw = NULL;
-
-	g_free (peer);
-	peer = NULL;
+	peer_unref_unlocked ((struct pgm_peer*)peer);
 }
 
 static inline gpointer
@@ -328,11 +398,34 @@ pgm_alloc_event (
 	return transport->trash_event ?  g_trash_stack_pop (&transport->trash_event) : g_slice_alloc (sizeof(struct pgm_event));
 }
 
+/* internal receiver thread, sits in a glib event loop processing incoming packets and related
+ * timers for the transport.
+ */
+
+static gpointer
+pgm_receiver_thread (
+	gpointer		data
+	)
+{
+	struct pgm_transport* transport = (struct pgm_transport*)data;
+
+	transport->context = g_main_context_new ();
+	transport->loop = g_main_loop_new (transport->context, FALSE);
+
+	g_main_loop_run (transport->loop);
+
+/* cleanup */
+	g_main_loop_unref (transport->loop);
+	g_main_context_unref (transport->context);
+
+	return NULL;
+}
+
 
 /* create a pgm_transport object.  create sockets that require superuser priviledges, if this is
  * the first instance also create a real-time priority receiving thread.
  *
- * if send == recv only two sockets need to be created.
+ * if send == recv only two sockets need to be created iff ip headers are not required (IPv6).
  *
  * all receiver addresses must be the same family.
  * interface and multiaddr must be the same family.
@@ -372,7 +465,11 @@ pgm_transport_create (
 
 /* create transport object */
 	transport = g_malloc0 (sizeof(struct pgm_transport));
+	transport->tx_mutex = g_mutex_new ();
 	transport->mutex = g_mutex_new ();
+
+/* lock tx until bound */
+	g_mutex_lock (transport->tx_mutex);
 
 	memcpy (transport->tsi.gsi, gsi, 6);
 	transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
@@ -414,21 +511,24 @@ pgm_transport_create (
 	}
 
 /* create receiving thread */
-#if 0
+#ifndef PGM_SINGLE_THREAD
 	GError* err;
 	GThread* thread;
-	static GStaticMutex mutex = G_STATIC_MUTEX_INIT;
 
-	g_static_mutex_lock (&mutex);
-	thread = g_thread_create_full (pgm_thread,	/* function to call in new thread */
-					NULL,
+	thread = g_thread_create_full (pgm_receiver_thread,	/* function to call in new thread */
+					transport,
 					0,		/* stack size */
 					TRUE,		/* joinable */
 					TRUE,		/* native thread */
 					G_THREAD_PRIORITY_URGENT,	/* highest priority */
 					&err);
-	g_static_mutex_unlock (&mutex);
-#endif
+	if (thread) {
+		transport->thread = thread;
+	} else {
+		g_error ("thread failed: %i %s", err->code, err->message);
+		goto err_destroy;
+	}
+#endif /* !PGM_SINGLE_THREAD */
 
 	*transport_ = transport;
 
@@ -886,6 +986,36 @@ pgm_transport_set_nak_ncf_retries (
 	return 0;
 }
 
+/* context aware g_io helpers
+ */
+static guint
+g_io_add_watch_context_full (
+	GIOChannel*		channel,
+	GMainContext*		context,
+	gint			priority,
+	GIOCondition		condition,
+	GIOFunc			func,
+	gpointer		user_data,
+	GDestroyNotify		notify
+	)
+{
+	GSource *source;
+	guint id;
+  
+	g_return_val_if_fail (channel != NULL, 0);
+
+	source = g_io_create_watch (channel, condition);
+
+	if (priority != G_PRIORITY_DEFAULT)
+		g_source_set_priority (source, priority);
+	g_source_set_callback (source, (GSourceFunc)func, user_data, notify);
+
+	id = g_source_attach (source, context);
+	g_source_unref (source);
+
+	return id;
+}
+
 /* bind the sockets to the link layer to start receiving data.
  */
 
@@ -1179,8 +1309,13 @@ pgm_transport_bind (
 /* add receive socket(s) to event manager */
 	transport->recv_channel = g_io_channel_unix_new (transport->recv_sock);
 
+#if 0
 	/* guint event = */ g_io_add_watch (transport->recv_channel, G_IO_IN | G_IO_PRI, on_io_data, transport);
 	/* guint event = */ g_io_add_watch (transport->recv_channel, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, transport);
+#else
+	g_io_add_watch_context_full (transport->recv_channel, transport->context, G_PRIORITY_DEFAULT, G_IO_IN | G_IO_PRI, on_io_data, transport, NULL);
+	g_io_add_watch_context_full (transport->recv_channel, transport->context, G_PRIORITY_DEFAULT, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, transport, NULL);
+#endif
 
 /* create recyclable SPM packet */
 	switch (sockaddr_family(&transport->recv_smr[0].smr_interface)) {
@@ -1209,6 +1344,7 @@ pgm_transport_bind (
 
 /* cleanup */
 	transport->bound = TRUE;
+	g_mutex_unlock (transport->tx_mutex);
 	g_mutex_unlock (transport->mutex);
 
 	g_trace ("transport successfully created.");
@@ -1276,6 +1412,9 @@ on_io_data (
 		sender->mutex = g_mutex_new();
 		sender->transport = transport;
 		memcpy (&sender->tsi, &tsi, sizeof(tsi));
+
+/* lock on rx window */
+		g_mutex_lock (transport->mutex);
 		sender->rxw = rxw_init (transport->max_tpdu,
 					transport->rxw_preallocate,
 					transport->rxw_sqns,
@@ -1283,8 +1422,9 @@ on_io_data (
 					transport->rxw_max_rte,
 					on_pgm_data,
 					sender);
+		g_mutex_unlock (transport->mutex);
 
-		g_hash_table_insert (transport->peers, &sender->tsi, sender);
+		g_hash_table_insert (transport->peers, &sender->tsi, peer_ref(sender));
 	}
 
 	char *pgm_data = (char*)(pgm_header + 1);
@@ -1364,9 +1504,11 @@ on_spm (
 			sender->spm_sqn = spm->spm_sqn;
 
 /* update receive window */
+			g_mutex_lock (sender->transport->mutex);
 			rxw_window_update (sender->rxw,
 						g_ntohl (spm->spm_trail),
 						g_ntohl (spm->spm_lead));
+			g_mutex_unlock (sender->transport->mutex);
 		}
 		else
 		{	/* does not advance SPM sequence number */
@@ -1439,6 +1581,8 @@ on_nak (
 
 		gpointer rdata = NULL;
 		int rlen = 0;
+
+		g_mutex_lock (sender->transport->tx_mutex);
 		if (!txw_peek (sender->transport->txw, nak->nak_sqn, &rdata, &rlen))
 		{
 			send_rdata (sender->transport, nak->nak_sqn, rdata, rlen);
@@ -1449,6 +1593,8 @@ on_nak (
 /* not available */
 
 		}
+
+		g_mutex_unlock (sender->transport->tx_mutex);
 	}
 
 out:
@@ -1472,6 +1618,8 @@ send_spm (
 /* recycles a transport global packet */
 	struct pgm_header *header = (struct pgm_header*)transport->spm_packet;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
+
+	g_mutex_lock (transport->tx_mutex);
 
 	spm->spm_sqn		= g_htonl (transport->spm_sqn++);
 	spm->spm_trail		= g_htonl (txw_trail(transport->txw));
@@ -1500,6 +1648,8 @@ send_spm (
 		transport->spm_heartbeat_state = 0;
 		transport->next_spm_expiry = time_now + transport->spm_ambient_interval;
 	}
+
+	g_mutex_unlock (transport->tx_mutex);
 
 	return retval;
 }
@@ -1549,6 +1699,83 @@ send_nak (
 	return retval;
 }
 
+/* A NAK packet with a OPT_NAK_LIST option extension
+ */
+
+#ifndef PGM_SINGLE_NAK
+static int
+send_nak_list (
+	struct pgm_transport*	transport,
+	struct pgm_peer*	peer,
+	guint32*		sequence_numbers,
+	guint			len
+	)
+{
+	g_assert (len <= 63);
+
+	int retval = 0;
+	gchar buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) 
+			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
+			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+			+ (len-1) * sizeof(guint32) ];
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
+			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
+			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+			+ (len-1) * sizeof(guint32);
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+/* dport & sport swap over for a nak */
+	header->pgm_sport	= sockaddr_port(&transport->recv_smr[0].smr_multiaddr);
+	header->pgm_dport	= peer->tsi.sport;
+	header->pgm_type        = PGM_NAK;
+        header->pgm_options     = PGM_OPT_PRESENT;
+        header->pgm_tsdu_length = 0;
+
+/* NAK */
+	nak->nak_sqn		= g_htonl (sequence_numbers[0]);
+
+/* source nla */
+	sockaddr_to_nla ((struct sockaddr*)&peer->nla, (char*)&nak->nak_src_nla_afi);
+
+/* group nla */
+	sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+
+/* OPT_NAK_LIST */
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
+	opt_header->opt_type	= PGM_OPT_LENGTH;
+	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
+	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+	opt_length->opt_total_length = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
+				+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+				+ (len-1) * sizeof(guint32);
+	opt_header = (struct pgm_opt_header*)(opt_length + 1);
+	opt_header->opt_type	= PGM_OPT_NAK_LIST;
+	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+				+ (len-1) * sizeof(guint32);
+	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
+	opt_nak_list->opt_reserved = 0;
+
+	for (int i = 1; i < len; i++) {
+		opt_nak_list->opt_sqn[i-1] = g_htonl (sequence_numbers[i]);
+	}
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+
+	retval = sendto (transport->send_sock,
+				header,
+				tpdu_length,
+				MSG_CONFIRM,		/* not expecting a reply */
+				(struct sockaddr*)&peer->nla,
+				sockaddr_len(&peer->nla));
+
+	g_trace ("%i bytes sent", tpdu_length);
+
+	return retval;
+}
+#endif /* !PGM_SINGLE_NAK */
+
 /* check all receiver windows for packets in BACK-OFF_STATE, on expiration send a NAK.
  * update transport::next_nak_rb_timestamp for next expiration time.
  */
@@ -1556,13 +1783,24 @@ send_nak (
 static void
 nak_rb_state (
 	gpointer		tsi,
-	gpointer		peer_,
-	gpointer		transport_
+	gpointer		peer_
 	)
 {
 	struct pgm_peer* peer = (struct pgm_peer*)peer_;
-	struct pgm_transport* transport = (struct pgm_transport*)transport_;
 	GList* list = peer->rxw->backoff_queue->tail;
+#ifndef PGM_SINGLE_NAK
+	guint32 nak_list[63];
+	int nak_count = 0;
+#endif
+
+/* send all NAKs first, lack of data is blocking contiguous processing and its 
+ * better to get the notification out a.s.a.p. even though it might be waiting
+ * in a kernel queue.
+ *
+ * alternative: after each packet check for incoming data and return to the
+ * event loop.  bias for shorter loops as retry count increases.
+ */
+	g_mutex_lock (peer->transport->tx_mutex);
 
 	while (list)
 	{
@@ -1575,58 +1813,127 @@ nak_rb_state (
 /* remove from this state */
 			rxw_pkt_state_unlink (peer->rxw, rp);
 
-			send_nak (transport, peer, rp->sequence_number);
+#if PGM_SINGLE_NAK
+			send_nak (peer->transport, peer, rp->sequence_number);
+#else
+			nak_list[nak_count++] = rp->sequence_number;
+#endif
 
 			rp->state = PGM_PKT_WAIT_NCF_STATE;
 			g_queue_push_head_link (peer->rxw->wait_ncf_queue, &rp->link_);
-			rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
-			if (!transport->next_nak_rpt_expiry) {
-				transport->next_nak_rpt_expiry = rp->nak_rpt_expiry;
+			rp->nak_rpt_expiry = rp->nak_rb_expiry + peer->transport->nak_rpt_ivl;
+
+#ifndef PGM_SINGLE_NAK
+			if (nak_count == G_N_ELEMENTS(nak_list)) {
+				break;
 			}
+#endif
 		}
 		else
 		{	/* packet expires some time later */
 			break;
 		}
-		
 
 		list = next_list_el;
 	}
+
+#ifndef PGM_SINGLE_NAK
+	if (nak_count) {
+		send_nak_list (peer->transport, peer, nak_list, nak_count);
+	}
+#endif
+
+	g_mutex_unlock (peer->transport->tx_mutex);
 
 	if (peer->rxw->backoff_queue->length == 0)
 	{
 		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->head == NULL);
 		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->tail == NULL);
-
-		transport->next_nak_rb_expiry = 0;
 	}
 	else
 	{
 		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->head);
 		g_assert ((struct rxw_packet*)peer->rxw->backoff_queue->tail);
+	}
+}
 
-/* next next expiration time */
+/* check this peer for NAK state timers, uses the tail of each queue for the nearest
+ * timer execution.
+ */
 
-		if (time_after(transport->next_nak_rb_expiry, ((struct rxw_packet*)peer->rxw->backoff_queue->tail)->nak_rb_expiry))
+static void
+check_peer_nak_state (
+	gpointer		tsi,
+	gpointer		peer,
+	gpointer		user_data
+	)
+{
+	if (((struct pgm_peer*)peer)->rxw->backoff_queue->tail)
+	{
+		if (time_after_eq (time_now, next_nak_rb_expiry(peer)))
 		{
-			transport->next_nak_rb_expiry = ((struct rxw_packet*)peer->rxw->backoff_queue->tail)->nak_rb_expiry;
+			nak_rb_state (tsi, peer);
+		}
+	}
+		
+	if (((struct pgm_peer*)peer)->rxw->wait_ncf_queue->tail)
+	{
+		if (time_after_eq (time_now, next_nak_rpt_expiry(peer)))
+		{
+			nak_rpt_state (tsi, peer);
+		}
+	}
+
+	if (((struct pgm_peer*)peer)->rxw->wait_data_queue->tail)
+	{
+		if (time_after_eq (time_now, next_nak_rdata_expiry(peer)))
+		{
+			nak_rdata_state (tsi, peer);
 		}
 	}
 }
 
-static int
-check_nak_rb_state (
+static void
+min_peer_nak_expiry (
+	gpointer		tsi,
+	gpointer		peer,
+	gpointer		expiration
+	)
+{
+	if (((struct pgm_peer*)peer)->rxw->backoff_queue->tail)
+	{
+		if (time_after_eq (*(guint64*)expiration, next_nak_rb_expiry(peer)))
+		{
+			*(guint64*)expiration = next_nak_rb_expiry(peer);
+		}
+	}
+
+	if (((struct pgm_peer*)peer)->rxw->wait_ncf_queue->tail)
+	{
+		if (time_after_eq (*(guint64*)expiration, next_nak_rpt_expiry(peer)))
+		{
+			*(guint64*)expiration = next_nak_rpt_expiry(peer);
+		}
+	}
+
+	if (((struct pgm_peer*)peer)->rxw->wait_data_queue->tail)
+	{
+		if (time_after_eq (*(guint64*)expiration, next_nak_rdata_expiry(peer)))
+		{
+			*(guint64*)expiration = next_nak_rdata_expiry(peer);
+		}
+	}
+}
+
+static guint64
+min_nak_expiry (
+	guint64			expiration,
 	struct pgm_transport*	transport
 	)
 {
-	int retval = 0;
+	g_hash_table_foreach (transport->peers, min_peer_nak_expiry, &expiration);
 
-/* each peer has its own receive window & lists
- * TODO: extract out a rx context to share one list in each state
- */
-	g_hash_table_foreach (transport->peers, nak_rb_state, transport);
-
-	return retval;
+	return expiration;
 }
 
 /* check WAIT_NCF_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_NCF_RETRIES
@@ -1636,12 +1943,10 @@ check_nak_rb_state (
 static void
 nak_rpt_state (
 	gpointer		tsi,
-	gpointer		peer_,
-	gpointer		transport_
+	gpointer		peer_
 	)
 {
 	struct pgm_peer* peer = (struct pgm_peer*)peer_;
-	struct pgm_transport* transport = (struct pgm_transport*)transport_;
 	GList* list = peer->rxw->wait_ncf_queue->tail;
 
 	guint dropped = 0;
@@ -1657,9 +1962,12 @@ nak_rpt_state (
 /* remove from this state */
 			rxw_pkt_state_unlink (peer->rxw, rp);
 
-			if (++rp->ncf_retry_count > transport->nak_ncf_retries)
+			if (++rp->ncf_retry_count > peer->transport->nak_ncf_retries)
 			{
 /* cancellation */
+				if (!dropped) {
+					g_mutex_lock (peer->transport->mutex);
+				}
 				dropped++;
 //				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
 				rxw_mark_lost (peer->rxw, rp->sequence_number);
@@ -1668,10 +1976,7 @@ nak_rpt_state (
 			{	/* retry */
 				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (peer->rxw->backoff_queue, &rp->link_);
-				rp->nak_rb_expiry = rp->nak_rpt_expiry + transport->nak_rb_ivl;
-				if (!transport->next_nak_rb_expiry) {
-					transport->next_nak_rb_expiry = rp->nak_rb_expiry;
-				}
+				rp->nak_rb_expiry = rp->nak_rpt_expiry + peer->transport->nak_rb_ivl;
 			}
 		}
 		else
@@ -1687,37 +1992,18 @@ nak_rpt_state (
 	{
 		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->head == NULL);
 		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail == NULL);
-
-		transport->next_nak_rpt_expiry = 0;
 	}
 	else
 	{
 		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->head);
 		g_assert ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail);
-
-/* next next expiration time */
-
-		if (time_after(transport->next_nak_rpt_expiry, ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail)->nak_rpt_expiry))
-		{
-			transport->next_nak_rpt_expiry = ((struct rxw_packet*)peer->rxw->wait_ncf_queue->tail)->nak_rpt_expiry;
-		}
 	}
 
 	if (dropped) {
+		g_mutex_unlock (peer->transport->mutex);
+
 		g_message ("dropped %u messages due to cancellation.", dropped);
 	}
-}
-
-static int
-check_nak_rpt_state (
-	struct pgm_transport*	transport
-	)
-{
-	int retval = 0;
-
-	g_hash_table_foreach (transport->peers, nak_rpt_state, transport);
-
-	return retval;
 }
 
 /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
@@ -1727,13 +2013,13 @@ check_nak_rpt_state (
 static void
 nak_rdata_state (
 	gpointer		tsi,
-	gpointer		peer_,
-	gpointer		transport_
+	gpointer		peer_
 	)
 {
 	struct pgm_peer* peer = (struct pgm_peer*)peer_;
-	struct pgm_transport* transport = (struct pgm_transport*)transport_;
 	GList* list = peer->rxw->wait_data_queue->tail;
+
+	guint dropped = 0;
 
 	while (list)
 	{
@@ -1746,20 +2032,21 @@ nak_rdata_state (
 /* remove from this state */
 			rxw_pkt_state_unlink (peer->rxw, rp);
 
-			if (++rp->data_retry_count > transport->nak_data_retries)
+			if (++rp->data_retry_count > peer->transport->nak_data_retries)
 			{
 /* cancellation */
-				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
+				if (!dropped) {
+					g_mutex_lock (peer->transport->mutex);
+				}
+				dropped++;
+//				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
 				rxw_mark_lost (peer->rxw, rp->sequence_number);
 			}
 			else
 			{	/* retry */
 				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (peer->rxw->backoff_queue, &rp->link_);
-				rp->nak_rb_expiry = rp->nak_rdata_expiry + transport->nak_rb_ivl;
-				if (!transport->next_nak_rb_expiry) {
-					transport->next_nak_rb_expiry = rp->nak_rb_expiry;
-				}
+				rp->nak_rb_expiry = rp->nak_rdata_expiry + peer->transport->nak_rb_ivl;
 			}
 		}
 		else
@@ -1775,33 +2062,18 @@ nak_rdata_state (
 	{
 		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->head == NULL);
 		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->tail == NULL);
-
-		transport->next_nak_rdata_expiry = 0;
 	}
 	else
 	{
 		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->head);
 		g_assert ((struct rxw_packet*)peer->rxw->wait_data_queue->tail);
-
-/* next next expiration time */
-
-		if (time_after(transport->next_nak_rdata_expiry, ((struct rxw_packet*)peer->rxw->wait_data_queue->tail)->nak_rdata_expiry))
-		{
-			transport->next_nak_rdata_expiry = ((struct rxw_packet*)peer->rxw->wait_data_queue->tail)->nak_rdata_expiry;
-		}
 	}
-}
 
-static int
-check_nak_rdata_state (
-	struct pgm_transport*	transport
-	)
-{
-	int retval = 0;
+	if (dropped) {
+		g_mutex_unlock (peer->transport->mutex);
 
-	g_hash_table_foreach (transport->peers, nak_rdata_state, transport);
-
-	return retval;
+		g_message ("dropped %u messages due to cancellation.", dropped);
+	}
 }
 
 /* can be called from any thread, it needs to update the transmit window with the new
@@ -1812,7 +2084,7 @@ check_nak_rdata_state (
  */
 
 int
-pgm_write (
+pgm_write_unlocked (
 	struct pgm_transport*	transport,
 	const gchar*		buf,
 	gsize			count)
@@ -1864,7 +2136,7 @@ pgm_write (
  */
 
 int
-pgm_write_copy_fragment (
+pgm_write_copy_fragment_unlocked (
 	struct pgm_transport*	transport,
 	const gchar*		buf,
 	gsize			count)
@@ -2035,7 +2307,7 @@ pgm_add_timer_full (
 	if (priority != G_PRIORITY_DEFAULT)
 		g_source_set_priority (source, priority);
 
-	guint id = g_source_attach (source, NULL);
+	guint id = g_source_attach (source, transport->context);
 	g_source_unref (source);
 
 	return id;
@@ -2068,20 +2340,7 @@ pgm_timer_prepare (
 
 	g_trace ("spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
 
-	if (transport->next_nak_rb_expiry) {
-		expiration = MIN(expiration, transport->next_nak_rb_expiry);
-		g_trace ("nak_rb %" G_GUINT64_FORMAT " us", (gint64)transport->next_nak_rb_expiry - (gint64)now);
-	}
-
-	if (transport->next_nak_rpt_expiry) {
-		expiration = MIN(expiration, transport->next_nak_rpt_expiry);
-		g_trace ("nak_rpt %" G_GUINT64_FORMAT " us", (gint64)transport->next_nak_rpt_expiry - (gint64)now);
-	}
-
-	if (transport->next_nak_rdata_expiry) {
-		expiration = MIN(expiration, transport->next_nak_rdata_expiry);
-		g_trace ("nak_rdata %" G_GUINT64_FORMAT " us", (gint64)transport->next_nak_rdata_expiry - (gint64)now);
-	}
+	expiration = min_nak_expiry (expiration, transport);
 
 /* advance time again to adjust for processing time out of the event loop, this
  * could cause further timers to expire even before checking for new wire data.
@@ -2133,14 +2392,7 @@ pgm_timer_dispatch (
 	if ( time_after_eq (time_now, transport->next_spm_expiry) )
 		send_spm (transport);
 
-	if ( transport->next_nak_rb_expiry && time_after_eq (time_now, transport->next_nak_rb_expiry) )
-		check_nak_rb_state (transport);
-
-	if ( transport->next_nak_rpt_expiry && time_after_eq (time_now, transport->next_nak_rpt_expiry) )
-		check_nak_rpt_state (transport);
-
-	if ( transport->next_nak_rdata_expiry && time_after_eq (time_now, transport->next_nak_rdata_expiry) )
-		check_nak_rdata_state (transport);
+	g_hash_table_foreach (transport->peers, check_peer_nak_state, NULL);
 
 	return TRUE;
 }
@@ -2163,6 +2415,10 @@ pgm_transport_create_watch (
 
 	return source;
 }
+
+/* pgm transport attaches to the callees context: the default context instead of
+ * any internal contexts.
+ */
 
 int
 pgm_transport_add_watch_full (
@@ -2278,9 +2534,12 @@ g_trace ("peer is %s", pgm_print_tsi(&event->peer->tsi));
 		gboolean retval = (*func) (event->data, event->len, user_data);
 
 /* return memory to receive window */
+		g_mutex_lock (watch->transport->mutex);
 		g_trash_stack_push (&event->peer->rxw->trash_data, event->data);
 		event->data = NULL;
+		peer_unref_unlocked (event->peer);
 		g_trash_stack_push (&watch->transport->trash_event, event);
+		g_mutex_unlock (watch->transport->mutex);
 
 	} while (TRUE);
 
@@ -2363,6 +2622,7 @@ on_odata (
 
 		g_trace ("push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
+		g_mutex_lock (sender->transport->mutex);
 		if (!rxw_push_fragment (sender->rxw,
 					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
@@ -2374,9 +2634,11 @@ on_odata (
 		{
 			flush_naks = TRUE;
 		}
+		g_mutex_unlock (sender->transport->mutex);
 	}
 	else
 	{
+		g_mutex_lock (sender->transport->mutex);
 		if (!rxw_push_copy (sender->rxw,
 					odata + 1,
 					g_ntohs (header->pgm_tsdu_length),
@@ -2385,12 +2647,13 @@ on_odata (
 		{
 			flush_naks = TRUE;
 		}
+		g_mutex_unlock (sender->transport->mutex);
 	}
 
 	if (flush_naks)
 	{
 /* flush out 1st time nak packets */
-		nak_rb_state (&sender->tsi, sender, sender->transport);
+		nak_rb_state (&sender->tsi, sender);
 	}
 
 out:
@@ -2434,6 +2697,7 @@ on_rdata (
 
 		g_trace ("push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
+		g_mutex_lock (sender->transport->mutex);
 		if (!rxw_push_fragment (sender->rxw,
 					(char*)(rdata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
@@ -2445,9 +2709,11 @@ on_rdata (
 		{
 			flush_naks = TRUE;
 		}
+		g_mutex_unlock (sender->transport->mutex);
 	}
 	else
 	{
+		g_mutex_lock (sender->transport->mutex);
 		if (!rxw_push_copy (sender->rxw,
 					rdata + 1,
 					g_ntohs (header->pgm_tsdu_length),
@@ -2456,12 +2722,13 @@ on_rdata (
 		{
 			flush_naks = TRUE;
 		}
+		g_mutex_unlock (sender->transport->mutex);
 	}
 
 	if (flush_naks)
 	{
 /* flush out 1st time nak packets */
-		nak_rb_state (&sender->tsi, sender, sender->transport);
+		nak_rb_state (&sender->tsi, sender);
 	}
 
 out:
@@ -2482,7 +2749,7 @@ on_pgm_data (
 	struct pgm_event* event = pgm_alloc_event(transport);
 	event->data = data;
 	event->len = len;
-	event->peer = (struct pgm_peer*)peer;
+	event->peer = peer_ref ((struct pgm_peer*)peer);
 
 g_trace ("peer is %s", pgm_print_tsi(&event->peer->tsi));
 char buf[1024];

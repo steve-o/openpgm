@@ -164,10 +164,13 @@ struct pgm_opt_fragment {
     guint32	opt_frag_len;		/* length */
 };
 
-/* 9.3.5.  Option NAK List - OPT_NAK_LIST */
+/* 9.3.5.  Option NAK List - OPT_NAK_LIST
+ *
+ * GNU C allows opt_sqn[0], ISO C89 requireqs opt_sqn[1], ISO C99 permits opt_sqn[]
+ */
 struct pgm_opt_nak_list {
     guint16	opt_reserved;		/* reserved */
-    guint32	opt_sqn;		/* requested sequence number [62] */
+    guint32	opt_sqn[];		/* requested sequence number [62] */
 };
 
 /* 9.4.2.  Option Join - OPT_JOIN */

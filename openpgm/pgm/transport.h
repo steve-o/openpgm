@@ -48,6 +48,8 @@ struct tsi {            /* transport session identifier */
 };
 
 struct pgm_peer {
+    gint		ref_count;
+
     struct tsi		tsi;
     struct sockaddr_storage	nla;
 
@@ -56,6 +58,10 @@ struct pgm_peer {
     struct rxw*	    	rxw;
     int			spm_sqn;
     struct pgm_transport*   transport;
+
+#define next_nak_rb_expiry(p)	    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->backoff_queue->tail)->nak_rb_expiry )
+#define next_nak_rpt_expiry(p)	    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->wait_ncf_queue->tail)->nak_rpt_expiry )
+#define next_nak_rdata_expiry(p)    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->wait_data_queue->tail)->nak_rdata_expiry )
 };
 
 struct pgm_event {
@@ -67,7 +73,10 @@ struct pgm_event {
 struct pgm_transport {
     struct tsi		tsi;
 
-    GMutex*		mutex;
+    GMutex*		tx_mutex, *mutex;
+    GThread*		thread;
+    GMainLoop*		loop;
+    GMainContext*	context;
     gboolean		bound;
 
     struct sock_mreq	send_smr;			/* multicast & unicast nla */
@@ -91,12 +100,9 @@ struct pgm_transport {
     gchar*		spm_packet;
     int			spm_len;
 
-    guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
     guint		nak_data_retries, nak_ncf_retries;
+    guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
     guint64		next_spm_expiry;
-    guint64		next_nak_rb_expiry;
-    guint64		next_nak_rpt_expiry;
-    guint64		next_nak_rdata_expiry;
 
     gboolean		proactive_parity;
     gboolean		ondemand_parity;
@@ -152,19 +158,39 @@ int pgm_transport_set_nak_ncf_retries (struct pgm_transport*, guint);
 
 static inline gpointer pgm_alloc (struct pgm_transport*  transport)
 {
-    return ((gchar*)txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
+    g_mutex_lock (transport->tx_mutex);
+    gpointer ptr = ((gchar*)txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
+    g_mutex_unlock (transport->tx_mutex);
+    return ptr;
 }
 
-int pgm_write (struct pgm_transport*, const gchar*, gsize);
+int pgm_write_unlocked (struct pgm_transport*, const gchar*, gsize);
+static inline int pgm_write (struct pgm_transport* transport, const gchar* buf, gsize count)
+{
+    g_mutex_lock (transport->tx_mutex);
+    int retval = pgm_write_unlocked (transport, buf, count);
+    g_mutex_unlock (transport->tx_mutex);
+    return retval;
+}
 
 static inline int pgm_write_copy (struct pgm_transport* transport, const gchar* buf, gsize count)
 {
-    gchar *pkt = pgm_alloc (transport);
+    g_mutex_lock (transport->tx_mutex);
+    gchar *pkt = ((gchar*)txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
     memcpy (pkt, buf, count);
-    return pgm_write (transport, pkt, count);
+    int retval = pgm_write_unlocked (transport, pkt, count);
+    g_mutex_unlock (transport->tx_mutex);
+    return retval;
 }
 
-int pgm_write_copy_fragment (struct pgm_transport*, const gchar*, gsize);
+int pgm_write_copy_fragment_unlocked (struct pgm_transport*, const gchar*, gsize);
+static inline int pgm_write_copy_fragment (struct pgm_transport* transport, const gchar* buf, gsize count)
+{
+    g_mutex_lock (transport->tx_mutex);
+    int retval = pgm_write_copy_fragment_unlocked (transport, buf, count);
+    g_mutex_unlock (transport->tx_mutex);
+    return retval;
+}
 
 static inline int pgm_write_copy_ex (struct pgm_transport* transport, const gchar* buf, gsize count)
 {

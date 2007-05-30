@@ -76,22 +76,32 @@ main (
 	for (int i = 0; i < G_N_ELEMENTS(data8); i++)
 		data8[i] = i % 255;
 
-/* FEC engine:
- *
- * symbol size:			8 bits
- * primitive polynomial:	x^8 + x^4 + x^3 + x^2 + 1
- * first consecutive root:	?
- * primitive element for roots:	?
- * number of roots:		32 (2t roots)
- */
-	struct rs_control *rs = init_rs (8, 0x171, 0, 1, 32);
-
 /* parity block: must be set to 0 */
 	guint16 parity[32];
 	memset (parity, 0, sizeof(parity));
 
+/* FEC engine:
+ *
+ * symbol size:			8 bits
+ * primitive polynomial:	1 + x^2 + x^3 + x^4 + x^8
+ * first consecutive root:	?
+ * primitive element for roots:	?
+ * number of roots:		32 (2t roots)
+ *
+ *
+ * poly = (1*x^0) + (0*x^1) + (1*x^2) + (1*x^3) + (1*x^4) + (0*x^5) + (0*x^6) + (0*x^7) + (1*x^8)
+ *      =  1         0         1         1         1         0         0         0         1
+ *      = 101110001
+ *      = 0x171
+ */
+
+	struct rs_control *rs = init_rs (8, 0x171, 0, 1, G_N_ELEMENTS(parity));
+
 	guint64 start, end, elapsed;
 
+	puts (	"\n"
+		"encoding\n"
+		"--------\n" );
 
 /* test encoding */
 	start = time_update_now();
@@ -102,6 +112,9 @@ main (
 	elapsed = end - start;
 	printf ("encoding time %lu us\n", elapsed);
 
+	puts (	"\n"
+		"errors\n"
+		"------\n" );
 
 /* corrupt packets */
 	int corrupt = 3;
@@ -109,25 +122,49 @@ main (
 	{
 		data8[g_random_int_range (0, sizeof(data8) - 1)] = g_random_int_range (0, 255);
 	}
-	printf ("corrupted %i packets\n", corrupt);
+	printf ("corrupted %i symbols (bytes)\n", corrupt);
 
 /* test decoding */
 
 	start = time_update_now();
-
 	int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, 0, NULL, 0, NULL);
-
 	end = time_update_now();
 	elapsed = end - start;
 	printf ("decoding time %lu us\n", elapsed);
 
-	printf ("\nnumerr = %i\n", numerr);
+	printf ("numerr = %i\n", numerr);
+
+/* test erasures if errors didn't fail */
+	if (numerr > 0)
+	{
+		puts (	"\n"
+			"erasures\n"
+			"--------\n" );
+		int erasures = G_N_ELEMENTS(parity);
+		int eras_pos[erasures];
+		for (int i = 0; i < erasures; i++)
+		{
+			data8[i] = 0;
+			eras_pos[i] = i;
+		}
+		printf ("erased %i symbols\n", erasures);
+
+/* test decoding part 2 */
+
+		start = time_update_now();
+		int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, erasures, eras_pos, 0, NULL);
+		end = time_update_now();
+		elapsed = end - start;
+		printf ("decoding time %lu us\n", elapsed);
+
+		printf ("numerr = %i\n", numerr);
+	}
 
 /* clean up */
 	free_rs (rs);
 	time_destroy();	
 
-	puts ("finished.");
+	puts ("\n\nfinished.");
 	return 0;
 }
 
