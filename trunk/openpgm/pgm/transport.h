@@ -56,8 +56,10 @@ struct pgm_peer {
     GMutex*		mutex;
 
     struct rxw*	    	rxw;
-    int			spm_sqn;
     struct pgm_transport*   transport;
+
+    int			spm_sqn;
+    guint64		expiry;
 
 #define next_nak_rb_expiry(p)	    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->backoff_queue->tail)->nak_rb_expiry )
 #define next_nak_rpt_expiry(p)	    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->wait_ncf_queue->tail)->nak_rpt_expiry )
@@ -100,6 +102,8 @@ struct pgm_transport {
     gchar*		spm_packet;
     int			spm_len;
 
+    guint		peer_expiry;
+
     guint		nak_data_retries, nak_ncf_retries;
     guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
     guint64		next_spm_expiry;
@@ -136,6 +140,8 @@ int pgm_transport_set_max_tpdu (struct pgm_transport*, guint16);
 int pgm_transport_set_hops (struct pgm_transport*, gint);
 int pgm_transport_set_ambient_spm (struct pgm_transport*, guint);
 int pgm_transport_set_heartbeat_spm (struct pgm_transport*, guint*, int);
+
+int pgm_transport_set_peer_expiry (struct pgm_transport*, guint);
 
 int pgm_transport_set_txw_preallocate (struct pgm_transport*, guint);
 int pgm_transport_set_txw_sqns (struct pgm_transport*, guint);
