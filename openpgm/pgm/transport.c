@@ -661,6 +661,29 @@ pgm_transport_set_heartbeat_spm (
 	return 0;
 }
 
+/* set interval timer & expiration timeout for peer expiration, very lax checking.
+ *
+ * 0 < 2 * spm_ambient_interval <= peer_expiry
+ */
+
+int
+pgm_transport_set_peer_expiry (
+	struct pgm_transport*	transport,
+	guint			peer_expiry
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (!transport->bound, -EINVAL);
+	g_return_val_if_fail (peer_expiry > 0, -EINVAL);
+	g_return_val_if_fail (peer_expiry >= 2 * transport->spm_ambient_interval, -EINVAL);
+
+	g_mutex_lock (transport->mutex);
+	transport->peer_expiry = peer_expiry;
+	g_mutex_unlock (transport->mutex);
+
+	return 0;
+}
+
 /* 0 < txw_preallocate <= txw_sqns 
  *
  * can only be enforced at bind.
@@ -1409,6 +1432,7 @@ on_io_data (
 		g_trace ("new peer");
 
 		sender = g_malloc0 (sizeof(struct pgm_peer));
+		sender->expiry = time_now + transport->peer_expiry;
 		sender->mutex = g_mutex_new();
 		sender->transport = transport;
 		memcpy (&sender->tsi, &tsi, sizeof(tsi));
@@ -1514,6 +1538,9 @@ on_spm (
 		{	/* does not advance SPM sequence number */
 			retval = -EINVAL;
 		}
+
+/* either way bump expiration timer */
+		sender->expiry = time_now + sender->transport->peer_expiry;
 	}
 
 	return retval;
@@ -1523,6 +1550,8 @@ on_spm (
  * sequence number(s) still in transmission window.
  *
  * we can potentially have different IP versions for the NAK packet to the send group.
+ *
+ * TODO: fix IPv6 AFIs
  */
 
 static int
@@ -1579,10 +1608,42 @@ on_nak (
 
 		nak->nak_sqn = g_ntohl (nak->nak_sqn);
 
+/* check NAK list */
+		guint32* nak_list = NULL;
+		int nak_list_len = 0;
+		if (header->pgm_options & PGM_OPT_PRESENT)
+		{
+			struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
+			if (opt_header->opt_type != PGM_OPT_LENGTH)
+			{
+				retval = -EINVAL;
+				goto out;
+			}
+			if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
+			{
+				retval = -EINVAL;
+				goto out;
+			}
+			struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+/* TODO: check for > 16 options & past packet end */
+			do {
+				opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+
+				if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
+				{
+					nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
+					nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+					break;
+				}
+			} while (!(opt_header->opt_type & PGM_OPT_END));
+		}
+
 		gpointer rdata = NULL;
 		int rlen = 0;
 
 		g_mutex_lock (sender->transport->tx_mutex);
+
+/* first nak number */
 		if (!txw_peek (sender->transport->txw, nak->nak_sqn, &rdata, &rlen))
 		{
 			send_rdata (sender->transport, nak->nak_sqn, rdata, rlen);
@@ -1592,6 +1653,17 @@ on_nak (
 
 /* not available */
 
+		}
+
+/* nak list numbers */
+		while (nak_list_len--)
+		{
+			if (!txw_peek (sender->transport->txw, *nak_list, &rdata, &rlen))
+			{
+				send_rdata (sender->transport, *nak_list, rdata, rlen);
+			}
+
+			nak_list++;
 		}
 
 		g_mutex_unlock (sender->transport->tx_mutex);
@@ -1743,7 +1815,7 @@ send_nak_list (
 
 /* OPT_NAK_LIST */
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
-	opt_header->opt_type	= PGM_OPT_LENGTH;
+	opt_header->opt_type	= PGM_OPT_LENGTH | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
 	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
 	opt_length->opt_total_length = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
@@ -1890,6 +1962,12 @@ check_peer_nak_state (
 		{
 			nak_rdata_state (tsi, peer);
 		}
+	}
+
+	if (time_after_eq (time_now, ((struct pgm_peer*)peer)->expiry))
+	{
+		g_hash_table_remove (((struct pgm_peer*)peer)->transport->peers, tsi);
+		peer_unref (peer);
 	}
 }
 
