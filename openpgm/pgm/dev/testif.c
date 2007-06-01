@@ -29,8 +29,8 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "if.h"
+#include "pgm/backtrace.h"
+#include "pgm/if.h"
 
 
 /* globals */

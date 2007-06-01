@@ -37,7 +37,7 @@
 #endif
 
 #ifndef __PGM_PACKET__H
-#   include "pgm.h"
+#   include "packet.h"
 #endif
 
 struct pgm_transport;

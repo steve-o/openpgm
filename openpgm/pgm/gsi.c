@@ -30,7 +30,7 @@
 
 #include <glib.h>
 
-#include "gsi.h"
+#include "pgm/gsi.h"
 
 //#define IF_DEBUG
 

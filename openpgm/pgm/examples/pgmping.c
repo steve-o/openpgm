@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple receiver using the PGM transport.
+ * Simple send/reply ping tool using the PGM transport.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -37,11 +37,11 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "transport.h"
-#include "gsi.h"
-#include "signal.h"
+#include <pgm/backtrace.h>
+#include <pgm/log.h>
+#include <pgm/transport.h>
+#include <pgm/gsi.h>
+#include <pgm/signal.h>
 
 
 /* typedefs */
@@ -51,8 +51,12 @@
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
+static int g_odata_interval = 1 * 100 * 1000;	/* 100 ms */
+static int g_payload = 0;
 static int g_max_tpdu = 1500;
-static int g_sqns = 10;
+static int g_sqns = 200 * 1000;
+
+static gboolean g_send_mode = TRUE;
 
 static struct pgm_transport* g_transport = NULL;
 
@@ -63,36 +67,42 @@ static void on_signal (int);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
+static void send_odata (void);
+static gboolean on_odata_timer (gpointer);
 static int on_data (gpointer, guint, gpointer);
 
 
 static void
-usage (
-	const char*	bin
-	)
+usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -f <frequency>  : Number of message to send per second\n");
+	fprintf (stderr, "  -l              : Listen mode (default send mode)\n");
 	exit (1);
 }
 
 int
 main (
-	int		argc,
-	char*		argv[]
+	int	argc,
+	char   *argv[]
 	)
 {
-	g_message ("pgmrecv");
+	g_message ("pgmping");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:f:lh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+
+		case 'f':	g_odata_interval = (1000 * 1000) / atoi (optarg); break;
+
+		case 'l':	g_send_mode = FALSE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -105,10 +115,10 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* setup signal handlers */
-	signal(SIGSEGV, on_sigsegv);
-	signal_install(SIGINT, on_signal);
-	signal_install(SIGTERM, on_signal);
-	signal_install(SIGHUP, SIG_IGN);
+	signal_install (SIGSEGV, on_sigsegv);
+	signal_install (SIGINT, on_signal);
+	signal_install (SIGTERM, on_signal);
+	signal_install (SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -137,7 +147,7 @@ main (
 
 static void
 on_signal (
-	int		signum
+	int	signum
 	)
 {
 	g_message ("on_signal");
@@ -147,7 +157,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer	data
+	gpointer data
 	)
 {
 	g_message ("startup.");
@@ -213,26 +223,45 @@ on_startup (
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
 
-	g_message ("adding PGM receiver watch");
-	pgm_transport_add_watch (g_transport, on_data, NULL);
+	if (g_send_mode)
+	{
+		g_message ("scheduling ODATA broadcasts every %i ms.", g_odata_interval / 1000);
+		g_timeout_add(g_odata_interval / 1000, (GSourceFunc)on_odata_timer, NULL);
+	}
+	else
+	{
+		g_message ("adding PGM receiver watch");
+		pgm_transport_add_watch (g_transport, on_data, NULL);
+	}
 
 	g_message ("startup complete.");
 	return FALSE;
 }
 
-/* idle log notification
+/* we send out a stream of ODATA packets with basic changing payload
  */
 
 static gboolean
-on_mark (
-	gpointer	data
+on_odata_timer (
+	gpointer data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-	g_message ("%s on_mark.", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
-
+	send_odata ();
 	return TRUE;
+}
+
+static void
+send_odata (void)
+{
+	int e;
+
+	e = pgm_write_copy (g_transport, &g_payload, sizeof(g_payload));
+        if (e < 0) {
+		g_warning ("send failed.");
+                return;
+        }
+
+	g_payload++;
 }
 
 static int
@@ -242,19 +271,27 @@ on_data (
 	gpointer	user_data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-
-/* protect against non-null terminated strings */
-	char buf[1024];
-	snprintf (buf, sizeof(buf), "%s", (char*)data);
-
-	g_message ("%s: \"%s\" (%i bytes)",
-			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
-			buf,
-			len);
+	if (len == sizeof(g_payload))
+		g_payload = *(int*)data;
+	else
+		g_warning ("payload size %i bytes", len);
 
 	return 0;
+}
+
+/* idle log notification
+ */
+
+static gboolean
+on_mark (
+	gpointer data
+	)
+{
+	static struct timeval tv;
+	gettimeofday(&tv, NULL);
+	g_message ("%s counter: %i", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec), g_payload);
+
+	return TRUE;
 }
 
 /* eof */

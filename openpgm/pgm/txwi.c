@@ -37,8 +37,8 @@
 
 #include <glib.h>
 
-#include "txwi.h"
-#include "sn.h"
+#include "pgm/txwi.h"
+#include "pgm/sn.h"
 
 #ifndef TXW_DEBUG
 #define g_trace(...)		while (0)
@@ -99,6 +99,7 @@
 #endif
 
 /* globals */
+#undef G_LOG_DOMAIN
 #define G_LOG_DOMAIN		"txw"
 
 static void _list_iterator (gpointer, gpointer);

@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "log.h"
+#include "pgm/log.h"
 
 
 /* globals */

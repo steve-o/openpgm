@@ -34,7 +34,7 @@
 
 #include <glib.h>
 
-#include "if.h"
+#include "pgm/if.h"
 
 //#define IF_DEBUG
 

@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Sit periodically sending SPM broadcasts.
+ * Sit periodically sending ODATA with interleaved ambient SPM's.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -37,9 +37,9 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "pgm.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
+#include "pgm/packet.h"
 
 
 /* globals */
@@ -47,6 +47,15 @@
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 static struct ip_mreqn g_mreqn;
+
+static int g_spm_ambient_interval = 10 * 1000;
+static int g_odata_interval = 1 * 1000;
+
+static int g_payload = 0;
+static int g_corruption = 0;
+
+static int g_txw_lead = 0;
+static int g_spm_sqn = 0;
 
 static int g_io_channel_sock = -1;
 static struct in_addr g_addr;
@@ -59,7 +68,9 @@ static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
 static void send_spm (void);
+static void send_odata (void);
 static gboolean on_spm_timer (gpointer);
+static gboolean on_odata_timer (gpointer);
 
 
 static void
@@ -68,6 +79,7 @@ usage (const char* bin)
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -c <percent>    : Percentage of packets to corrupt.\n");
 	exit (1);
 }
 
@@ -77,16 +89,17 @@ main (
 	char   *argv[]
 	)
 {
-	puts ("spm_idle");
+	puts ("stream_send");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+		case 'c':	g_corruption = atoi (optarg); break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -303,8 +316,11 @@ on_startup (
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
 
-	puts ("scheduling SPM broadcasts.");
-	g_timeout_add(1 * 1000, (GSourceFunc)on_spm_timer, NULL);
+	printf ("scheduling ODATA broadcasts every %i secs.\n", g_odata_interval);
+	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
+
+	printf ("scheduling SPM ambient broadcasts every %i secs.\n", g_spm_ambient_interval);
+	g_timeout_add(g_spm_ambient_interval, (GSourceFunc)on_spm_timer, NULL);
 
 	puts ("startup complete.");
 	return FALSE;
@@ -337,17 +353,17 @@ send_spm (
 	int e;
 
 /* construct PGM packet */
-	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm) + sizeof(struct in_addr);
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
 	gchar *buf = (gchar*)malloc( tpdu_length );
 	if (buf == NULL) {
 		perror ("oh crap.");
 		return;
 	}
 
-printf ("PGM header size %u\n"
-	"PGM SPM block size %u\n",
+printf ("PGM header size %lu\n"
+	"PGM SPM block size %lu\n",
 	sizeof(struct pgm_header),
-	sizeof(struct pgm_spm) + sizeof(struct in_addr));
+	sizeof(struct pgm_spm));
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
@@ -368,16 +384,25 @@ printf ("PGM header size %u\n"
 	header->pgm_tsdu_length	= 0;		/* transport data unit length */
 
 /* SPM */
-	spm->spm_sqn		= g_htonl (0);
-	spm->spm_trail		= g_htonl (0);
-	spm->spm_lead		= g_htonl (0);
+	spm->spm_sqn		= g_htonl (g_spm_sqn++);
+	spm->spm_trail		= g_htonl (g_txw_lead);
+	spm->spm_lead		= g_htonl (g_txw_lead);
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
 	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
+//	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
 	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
 
+/* corrupt packet */
+	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
+	{
+		puts ("corrupting packet.");
+		*(buf + g_random_int_range (0, tpdu_length)) = 0;
+	}
+
+/* send packet */
 	int flags = MSG_CONFIRM;	/* not expecting a reply */
 
 /* IP header handled by sendto() */
@@ -386,7 +411,7 @@ printf ("PGM header size %u\n"
 	mc.sin_addr.s_addr	= g_mreqn.imr_multiaddr.s_addr;
 	mc.sin_port		= 0;
 
-	printf("sendto: %i bytes.\n", tpdu_length);
+	printf("TPDU %i bytes.\n", tpdu_length);
 	e = sendto (g_io_channel_sock,
 		buf,
 		tpdu_length,
@@ -404,6 +429,107 @@ printf ("PGM header size %u\n"
 
 	puts ("sent.");
 }
+
+/* we send out a stream of ODATA packets with basic changing payload
+ */
+
+static gboolean
+on_odata_timer (
+	gpointer data
+	)
+{
+	send_odata ();
+	return TRUE;
+}
+
+static void
+send_odata (void)
+{
+	puts ("send_data.");
+
+	int e;
+	char payload_string[100];
+
+	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
+
+/* construct PGM packet */
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + strlen(payload_string) + 1;
+	gchar *buf = (gchar*)malloc( tpdu_length );
+	if (buf == NULL) {
+		perror ("oh crap.");
+		return;
+	}
+
+printf ("PGM header size %u\n"
+	"PGM data header size %u\n"
+	"payload size %u\n",
+	sizeof(struct pgm_header),
+	sizeof(struct pgm_data),
+	strlen(payload_string) + 1);
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_data *odata = (struct pgm_data*)(header + 1);
+
+	header->pgm_sport       = g_htons (g_port);
+	header->pgm_dport       = g_htons (g_port);
+	header->pgm_type        = PGM_ODATA;
+        header->pgm_options     = 0;
+        header->pgm_checksum    = 0;
+
+        header->pgm_gsi[0]      = 1;
+        header->pgm_gsi[1]      = 2;
+        header->pgm_gsi[2]      = 3;
+        header->pgm_gsi[3]      = 4;
+        header->pgm_gsi[4]      = 5;
+        header->pgm_gsi[5]      = 6;
+
+        header->pgm_tsdu_length = g_htons (strlen(payload_string) + 1);               /* transport data unit length */
+
+/* ODATA */
+        odata->data_sqn         = g_htonl (g_txw_lead);
+        odata->data_trail       = g_htonl (g_txw_lead++);
+
+        memcpy (odata + 1, payload_string, strlen(payload_string) + 1);
+
+        header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+
+/* corrupt packet */
+	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
+	{
+		puts ("corrupting packet.");
+		*(buf + g_random_int_range (0, tpdu_length)) = 0;
+	}
+
+/* send packet */
+        int flags = MSG_CONFIRM;        /* not expecting a reply */
+
+/* IP header handled by sendto() */
+        struct sockaddr_in mc;
+        mc.sin_family           = AF_INET;
+        mc.sin_addr.s_addr      = g_mreqn.imr_multiaddr.s_addr;
+        mc.sin_port             = 0;
+
+        printf("TPDU %i bytes.\n", tpdu_length);
+        e = sendto (g_io_channel_sock,
+                buf,
+                tpdu_length,
+                flags,
+                (struct sockaddr*)&mc,  /* to address */
+                sizeof(mc));            /* address size */
+        if (e == EMSGSIZE) {
+                perror ("message too large for ip stack.");
+                return;
+        }
+        if (e < 0) {
+                perror ("sendto() failed.");
+                return;
+        }
+
+        puts ("sent.");
+}
+
+/* idle log notification
+ */
 
 static gboolean
 on_mark (

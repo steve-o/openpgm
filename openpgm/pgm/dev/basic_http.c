@@ -36,8 +36,8 @@
 #include <libsoup/soup-server.h>
 #include <libsoup/soup-address.h>
 
-#include "backtrace.h"
-#include "log.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
 
 
 /* globals */

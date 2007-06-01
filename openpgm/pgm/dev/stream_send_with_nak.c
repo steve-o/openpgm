@@ -38,10 +38,10 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "pgm.h"
-#include "txw.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
+#include "pgm/packet.h"
+#include "pgm/txwi.h"
 
 
 
