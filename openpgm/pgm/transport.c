@@ -2473,6 +2473,7 @@ pgm_timer_dispatch (
 
 	g_hash_table_foreach (transport->peers, check_peer_nak_state, NULL);
 
+	g_thread_yield();
 	return TRUE;
 }
 
