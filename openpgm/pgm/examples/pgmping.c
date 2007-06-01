@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <netdb.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,9 +43,15 @@
 #include <pgm/transport.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
+#include <pgm/timer.h>
 
 
 /* typedefs */
+
+struct idle_source {
+	GSource		source;
+	guint64		expiration;
+};
 
 /* globals */
 
@@ -70,6 +77,10 @@ static gboolean on_mark (gpointer);
 static void send_odata (void);
 static gboolean on_odata_timer (gpointer);
 static int on_data (gpointer, guint, gpointer);
+
+static gboolean idle_prepare (GSource*, gint*);
+static gboolean idle_check (GSource*);
+static gboolean idle_dispatch (GSource*, GSourceFunc, gpointer);
 
 
 static void
@@ -115,7 +126,7 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* setup signal handlers */
-	signal_install (SIGSEGV, on_sigsegv);
+	signal (SIGSEGV, on_sigsegv);
 	signal_install (SIGINT, on_signal);
 	signal_install (SIGTERM, on_signal);
 	signal_install (SIGHUP, SIG_IGN);
@@ -225,8 +236,25 @@ on_startup (
 
 	if (g_send_mode)
 	{
-		g_message ("scheduling ODATA broadcasts every %i ms.", g_odata_interval / 1000);
-		g_timeout_add(g_odata_interval / 1000, (GSourceFunc)on_odata_timer, NULL);
+		if ((g_odata_interval / 1000) > 0)
+			g_message ("scheduling ODATA broadcasts every %i ms.", g_odata_interval / 1000);
+		else
+			g_message ("scheduling ODATA broadcasts every %i us.", g_odata_interval);
+//		g_timeout_add(g_odata_interval / 1000, (GSourceFunc)on_odata_timer, NULL);
+
+// create an idle source with non-glib timing
+		static GSourceFuncs idle_funcs = {
+			idle_prepare,
+			idle_check,
+			idle_dispatch,
+			NULL
+		};
+		GSource* source = g_source_new (&idle_funcs, sizeof(struct idle_source));
+		struct idle_source* idle_source = (struct idle_source*)source;
+		idle_source->expiration = time_update_now() + g_odata_interval;
+		g_source_set_priority (source, G_PRIORITY_LOW);
+		guint id = g_source_attach (source, NULL);
+		g_source_unref (source);
 	}
 	else
 	{
@@ -236,6 +264,52 @@ on_startup (
 
 	g_message ("startup complete.");
 	return FALSE;
+}
+
+static gboolean
+idle_prepare (
+	GSource*	source,
+	gint*		timeout
+	)
+{
+	struct idle_source* idle_source = (struct idle_source*)source;
+
+	guint64 now = time_update_now();
+	glong msec = ((gint64)idle_source->expiration - (gint64)now) / 1000;
+	if (msec < 0)
+		msec = 0;
+	else
+		msec = MIN (G_MAXINT, (guint)msec);
+	*timeout = (gint)msec;
+	return (msec == 0);
+}
+
+static gboolean
+idle_check (
+	GSource*	source
+	)
+{
+	struct idle_source* idle_source = (struct idle_source*)source;
+	guint64 now = time_update_now();
+	return ( time_after_eq(now, idle_source->expiration) );
+}
+
+static gboolean
+idle_dispatch (
+	GSource*	source,
+	GSourceFunc	callback,
+	gpointer	user_data
+	)
+{
+	struct idle_source* idle_source = (struct idle_source*)source;
+
+	send_odata ();
+	idle_source->expiration += g_odata_interval;
+
+	if ( time_after_eq(idle_source->expiration, time_now) )
+		sched_yield();
+
+	return TRUE;
 }
 
 /* we send out a stream of ODATA packets with basic changing payload

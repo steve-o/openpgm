@@ -2397,7 +2397,7 @@ pgm_add_timer (
 	struct pgm_transport*	transport
 	)
 {
-	return pgm_add_timer_full (transport, G_PRIORITY_HIGH);
+	return pgm_add_timer_full (transport, G_PRIORITY_LOW);
 }
 
 /* determine which timer fires next: spm (ihb_tmr), nak_rb_ivl, nak_rpt_ivl, or nak_rdata_ivl
