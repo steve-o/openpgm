@@ -29,7 +29,7 @@
 
 #include <glib.h>
 
-#include "if.h"
+#include "pgm/if.h"
 
 
 /* globals */

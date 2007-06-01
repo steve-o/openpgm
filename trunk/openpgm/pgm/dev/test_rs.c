@@ -28,9 +28,9 @@
 
 #include <glib.h>
 
-#include "reed_solomon.h"
-#include "timer.h"
-#include "pgm.h"
+#include "pgm/reed_solomon.h"
+#include "pgm/timer.h"
+#include "pgm/packet.h"
 
 
 /* globals */

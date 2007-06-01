@@ -39,10 +39,10 @@
 #include <libsoup/soup-server.h>
 #include <libsoup/soup-address.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "pgm.h"
-#include "rxw.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
+#include "pgm/packet.h"
+#include "pgm/rxwi.h"
 
 
 /* typedefs */

@@ -1,6 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Listen to PGM packets, note per host details and data loss.
+ * Listen to PGM packets, note per host details, on data loss request
+ * missing data with NAKs.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -38,9 +39,9 @@
 #include <libsoup/soup-server.h>
 #include <libsoup/soup-address.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "pgm.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
+#include "pgm/packet.h"
 
 
 /* typedefs */
@@ -140,6 +141,7 @@ struct hoststat {
 
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
+static struct ip_mreqn g_mreqn;
 
 static int g_http = 4968;
 
@@ -153,7 +155,11 @@ static GMutex *g_hosts_mutex = NULL;
 static GHashTable *g_nets = NULL;
 static GMutex *g_nets_mutex = NULL;
 
-static GIOChannel* g_io_channel = NULL;
+static int g_recv_sock = -1;			/* includes IP header */
+static int g_send_sock = -1;
+static int g_send_with_router_alert_sock = -1;	/* IP_ROUTER_ALERT */
+static GIOChannel* g_recv_channel = NULL;
+static struct in_addr g_addr;
 static GMainLoop* g_loop = NULL;
 static SoupServer* g_soup_server = NULL;
 
@@ -169,6 +175,8 @@ static gboolean on_snap (gpointer);
 
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
+
+static void send_nak (int, struct in_addr*);
 
 static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
@@ -193,7 +201,7 @@ main (
 	char   *argv[]
 	)
 {
-	puts ("basic_recv");
+	puts ("basic_recv_with_nak");
 
 	/* parse program arguments */
         const char* binary_name = strrchr (argv[0], '/');
@@ -237,12 +245,27 @@ main (
 	g_main_loop_unref(g_loop);
 	g_loop = NULL;
 
-	if (g_io_channel) {
-		puts ("closing socket.");
+	if (g_recv_channel) {
+		puts ("closing receive channel.");
 
 		GError *err = NULL;
-		g_io_channel_shutdown (g_io_channel, FALSE, &err);
-		g_io_channel = NULL;
+		g_io_channel_shutdown (g_recv_channel, FALSE, &err);
+		g_recv_channel = NULL;
+	}
+	if (g_recv_sock) {
+		puts ("closing receive socket.");
+		close (g_recv_sock);
+		g_recv_sock = NULL;
+	}
+	if (g_send_sock) {
+		puts ("closing send socket.");
+		close (g_send_sock);
+		g_send_sock = NULL;
+	}
+	if (g_send_with_router_alert_sock) {
+		puts ("closing send with router alert socket.");
+		close (g_send_with_router_alert_sock);
+		g_send_with_router_alert_sock = NULL;
 	}
 
         if (g_soup_server) {
@@ -269,7 +292,7 @@ on_startup (
 	gpointer data
 	)
 {
-	int e;
+	int e, e2, e3;
 
 	puts ("startup.");
 
@@ -323,9 +346,14 @@ on_startup (
 #endif
 
 /* open socket for snooping */
-	puts ("opening raw socket.");
-	int sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
-	if (sock < 0) {
+	puts ("opening raw sockets.");
+	g_recv_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	g_send_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	g_send_with_router_alert_sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	if (	g_recv_sock < 0 ||
+		g_send_sock < 0 ||
+		g_send_with_router_alert_sock < 0	)
+	{
 		int _e = errno;
 		perror("on_startup() failed");
 
@@ -343,11 +371,13 @@ on_startup (
 		setgid((uid_t)65534);
 	}
 
-	char _t = 1;
-	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
+	char _t = 0;
+	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
 	if (e < 0) {
 		perror("on_startup() failed");
-		close(sock);
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -355,12 +385,13 @@ on_startup (
 /* buffers */
 	int buffer_size = 0;
 	socklen_t len = 0;
-	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
+	e = getsockopt(g_recv_sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("receive buffer set at %i bytes.\n", buffer_size);
 	}
-	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
-	if (e == 0) {
+	e = getsockopt(g_send_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	e2 = getsockopt(g_send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	if (e == 0 && e2 == 0) {
 		printf ("send buffer set at %i bytes.\n", buffer_size);
 	}
 
@@ -371,38 +402,86 @@ on_startup (
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = htons(g_port);
 
-	e = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
-	if (e < 0) {
+	e = bind(g_recv_sock, (struct sockaddr*)&addr, sizeof(addr));
+	e2 = bind(g_send_sock, (struct sockaddr*)&addr, sizeof(addr));
+	e3 = bind(g_send_with_router_alert_sock, (struct sockaddr*)&addr, sizeof(addr));
+	if (e < 0 || e2 < 0 || e3 < 0) {
 		perror("on_startup() failed");
-		close(sock);
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
-/* multicast */
-	struct ip_mreqn mreqn;
-	memset(&mreqn, 0, sizeof(mreqn));
-	mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("listening on interface %s.\n", inet_ntoa(mreqn.imr_address));
-	mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("subscription on multicast address %s.\n", inet_ntoa(mreqn.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn));
-	if (e < 0) {
+/* query bound socket for actual interface address */
+	struct hostent *he = gethostbyname (hostname);
+
+	if (he == NULL) {
+		printf ("error code %i\n", errno);
 		perror("on_startup() failed");
-		close(sock);
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+
+	g_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+	printf ("socket bound to %s (%s)\n", inet_ntoa(g_addr), hostname);
+
+/* multicast */
+	memset(&g_mreqn, 0, sizeof(g_mreqn));
+	g_mreqn.imr_address.s_addr = htonl(INADDR_ANY);
+	printf ("listening on interface %s.\n", inet_ntoa(g_mreqn.imr_address));
+	g_mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
+	printf ("joining multicast group address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
+	e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
+	e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
+	if (e < 0 || e2 < 0 || e3 < 0) {
+		perror("on_startup() failed");
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
 /* multicast loopback */
+	gboolean n = 0;
+	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+	e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+	e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &n, sizeof(n));
+	if (e < 0 || e2 < 0 || e3 < 0) {
+		perror("on_startup() failed");
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+
 /* multicast ttl */
+	int ttl = 1;
+	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+	e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+	e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+	if (e < 0 || e2 < 0 || e3 < 0) {
+		perror("on_startup() failed");
+		close(g_recv_sock);
+		close(g_send_sock);
+		close(g_send_with_router_alert_sock);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
 
 /* add socket to event manager */
-	g_io_channel = g_io_channel_unix_new (sock);
-	printf ("socket opened with encoding %s.\n", g_io_channel_get_encoding(g_io_channel));
+	g_recv_channel = g_io_channel_unix_new (g_recv_sock);
+	printf ("socket opened with encoding %s.\n", g_io_channel_get_encoding(g_recv_channel));
 
-	/* guint event = */ g_io_add_watch (g_io_channel, G_IO_IN | G_IO_PRI, on_io_data, NULL);
-	/* guint event = */ g_io_add_watch (g_io_channel, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, NULL);
+	/* guint event = */ g_io_add_watch (g_recv_channel, G_IO_IN | G_IO_PRI, on_io_data, NULL);
+	/* guint event = */ g_io_add_watch (g_recv_channel, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, NULL);
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
@@ -410,7 +489,6 @@ on_startup (
 
 /* periodic timer to snapshot statistics */
 	g_timeout_add(g_snap_interval, (GSourceFunc)on_snap, NULL);
-
 
 	puts ("startup complete.");
 	return FALSE;
@@ -578,9 +656,16 @@ on_io_data (
 		hoststat->spm.bytes += len;
 		hoststat->spm.last = tv;
 
+puts ("SPM");
+
 		err = pgm_verify_spm (pgm_header, packet, packet_length);
-		g_assert (((struct pgm_spm*)packet)->spm_nla_afi == AFI_IP);
 		hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
+
+if (!err && (hoststat->nla.s_addr != NULL)) {
+	printf ("senders nla: %s\n", inet_ntoa(hoststat->nla));
+} else {
+	puts ("invalid nla");
+}
 
 		if (err) {
 //puts ("invalid SPM");
@@ -641,10 +726,16 @@ on_io_data (
 		hoststat->odata.last = tv;
 
 		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
+
+printf ("ODATA: #%u, rxw_lead %lu rxw_trail %lu\n",
+	((struct pgm_data*)packet)->data_sqn,
+	hoststat->rxw_lead,
+	hoststat->rxw_trail);
+
 		((struct pgm_data*)packet)->data_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
 		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
 		{
-			printf ("not in tx window %lu, %lu - %lu\n",
+			printf ("not in tx window %u, %lu - %lu\n",
 				((struct pgm_data*)packet)->data_sqn,
 				hoststat->txw_trail,
 				hoststat->txw_lead);
@@ -685,6 +776,20 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 		{
 			printf ("lost %lu packets.\n",
 				((struct pgm_data*)packet)->data_sqn - hoststat->rxw_lead - 1);
+
+/* request NAK for lost packets and do not increment rxw_lead */
+			if (hoststat->nla.s_addr)
+			{
+				send_nak (hoststat->rxw_lead + 1, &hoststat->nla);
+			}
+			else
+			{
+				puts ("have not learnt senders nla yet :(");
+			}
+		}
+		else
+		{
+			hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn;
 		}
 
 		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
@@ -700,6 +805,45 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 		hoststat->rdata.count++;
 		hoststat->rdata.bytes += len;
 		hoststat->rdata.last = tv;
+
+		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
+
+printf ("RDATA: #%u, rxw_lead %lu rxw_trail %lu\n",
+	((struct pgm_data*)packet)->data_sqn,
+	hoststat->rxw_lead,
+	hoststat->rxw_trail);
+
+		((struct pgm_data*)packet)->data_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
+		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			printf ("not in tx window %u, %lu - %lu\n",
+				((struct pgm_data*)packet)->data_sqn,
+				hoststat->txw_trail,
+				hoststat->txw_lead);
+			err = TRUE;
+			hoststat->rdata.invalid++;
+			hoststat->rdata.last_invalid = tv;
+			break;
+		}
+
+/* dupe */
+		if ( IN_RECEIVE_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		{
+			hoststat->general.duplicate++;
+			break;
+		}
+
+		gboolean required = IS_NEXT_SEQUENCE_NUMBER( ((struct pgm_data*)packet)->data_sqn );
+
+		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
+		if (hoststat->txw_trail > hoststat->txw_lead)
+			hoststat->txw_lead = hoststat->txw_trail -1;
+		hoststat->rxw_trail = hoststat->txw_trail;
+		hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn;
+
+		if (!required) break;
+
+		hoststat->rdata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
 		break;
 
         case PGM_NAK:
@@ -758,6 +902,101 @@ on_io_error (
 
 /* remove event */
 	return FALSE;
+}
+
+static void
+send_nak (
+	int sequence_number,
+	struct in_addr* source
+	)
+{
+	printf ("send_nak (%i)\n", sequence_number);
+
+	int e;
+
+/* construct PGM packet */
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	gchar *buf = (gchar*)malloc( tpdu_length );
+	if (buf == NULL) {
+		perror ("oh crap.");
+		return;
+	}
+
+printf ("PGM header size %lu\n"
+	"PGM NAK block size %lu\n",
+	sizeof(struct pgm_header),
+	sizeof(struct pgm_nak));
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+
+	header->pgm_sport	= g_htons (g_port);
+	header->pgm_dport	= g_htons (g_port);
+	header->pgm_type	= PGM_NAK;
+	header->pgm_options	= 0;
+	header->pgm_checksum	= 0;
+
+	header->pgm_gsi[0]	= 1;
+	header->pgm_gsi[1]	= 2;
+	header->pgm_gsi[2]	= 3;
+	header->pgm_gsi[3]	= 4;
+	header->pgm_gsi[4]	= 5;
+	header->pgm_gsi[5]	= 6;
+
+	header->pgm_tsdu_length = 0;		/* transport data unit length */
+
+/* NAK */
+	nak->nak_sqn		= g_htonl (sequence_number);
+	nak->nak_src_nla_afi	= g_htons (AFI_IP);
+	nak->nak_reserved	= 0;
+
+/* source nla */
+	nak->nak_src_nla.s_addr	= source->s_addr;	/* IPv4 */
+//	((struct in_addr*)(nak + 1))->s_addr = source->s_addr;
+
+/* nla afi */
+	nak->nak_src_nla_afi	= g_htons (AFI_IP);
+//	*(guint16*)(nak + 1 + sizeof(struct in_addr)) = g_htons (AFI_IP);
+
+	nak->nak_reserved	= 0;
+//	*(guint16*)(nak + 1 + sizeof(struct in_addr) + sizeof(guint16)) = 0;
+
+/* multicast group nla */
+	nak->nak_grp_nla_afi	= g_htons (AFI_IP);
+	nak->nak_grp_nla.s_addr	= source->s_addr;	/* IPv4 */
+//	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
+
+	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+
+/* send packet */
+	int flags = MSG_CONFIRM;	/* expecting a reply over multicast not unicast */
+
+/* IP header handled by sendto() */
+	struct sockaddr_in uc;
+	memset (&uc, 0, sizeof(uc));
+	uc.sin_family		= AF_INET;
+	uc.sin_addr.s_addr	= source->s_addr;
+	uc.sin_port		= 0;		/* standard port, or that learned from TSI, or PGM header? */
+
+	printf("TPDU %i bytes to %s.\n", tpdu_length, inet_ntoa(uc.sin_addr));
+	e = sendto (g_send_sock,
+			buf,
+			tpdu_length,
+			flags,
+			(struct sockaddr*)&uc,		/* to address */
+			sizeof(uc));			/* address size */
+	if (e == EMSGSIZE) {
+		perror ("message too large for ip stack.");
+		return;
+	}
+	if (e < 0) {
+		perror ("sendto() failed.");
+		return;
+	}
+
+	puts ("sent.");
+
+	free (buf);
 }
 
 static gchar*

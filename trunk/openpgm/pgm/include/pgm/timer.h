@@ -23,7 +23,7 @@
 #define __PGM_TIME_H__
 
 #ifndef __PGM_SN_H
-#include "sn.h"
+#include "pgm/sn.h"
 #endif
 
 

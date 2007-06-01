@@ -5,7 +5,8 @@
  * License.  See the file COPYING in the main directory of this archive
  * for more details. No warranty for anything given at all.
  */
- 	#include <linux/linkage.h>
+// only found in linux source tree, doesn't appear to be required.
+// 	#include <linux/linkage.h>
 	#include <asm/errno.h>
 
 /*

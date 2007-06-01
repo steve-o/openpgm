@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple sender using the PGM transport.
+ * Large APDU sender using the PGM transport, similar to pgmsend.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -37,11 +37,11 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "transport.h"
-#include "gsi.h"
-#include "signal.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
+#include "pgm/transport.h"
+#include "pgm/gsi.h"
+#include "pgm/signal.h"
 
 
 /* typedefs */
@@ -51,7 +51,7 @@
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
-static int g_odata_interval = 1 * 100;
+static int g_odata_interval = 1 * 1000;
 static int g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
@@ -84,7 +84,7 @@ main (
 	char   *argv[]
 	)
 {
-	g_message ("pgmsend");
+	g_message ("block_send");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -232,11 +232,19 @@ static void
 send_odata (void)
 {
 	int e;
-	char payload_string[100];
+	char payload_string[2000];
+	char number[100];
 
-	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
+	snprintf (number, sizeof(number), "%i ", g_payload++);
 
-	e = pgm_write_copy (g_transport, payload_string, strlen(payload_string) + 1);
+	payload_string[0] = 0;
+	int count = 2000 / strlen (number);
+	for (int i = 0; i < count; i++)
+	{
+		strcat (payload_string, number);
+	}
+
+	e = pgm_write_copy_ex (g_transport, payload_string, strlen(payload_string) + 1);
         if (e < 0) {
 		g_warning ("send failed.");
                 return;
