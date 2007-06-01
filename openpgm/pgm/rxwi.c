@@ -39,9 +39,9 @@
 
 #include <glib.h>
 
-#include "rxwi.h"
-#include "sn.h"
-#include "timer.h"
+#include "pgm/rxwi.h"
+#include "pgm/sn.h"
+#include "pgm/timer.h"
 
 #ifndef RXW_DEBUG
 #define g_trace(...)		while (0)

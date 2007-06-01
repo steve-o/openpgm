@@ -1,0 +1,38 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+import os
+Import('env')
+
+e = env.Copy(
+		LIBS = env['LIBS'] + ['libpgm'],
+		);
+
+
+httpe = e.Copy()
+httpe.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+
+httpe.Program(['basic_recv.c'])
+httpe.Program(['basic_http.c'])
+httpe.Program(['basic_recv_with_nak.c'])
+httpe.Program(['basic_recv_with_rxw.c'])
+
+e.Program(['basic_send.c'])
+e.Program(['spm_idle.c'])
+e.Program(['stream_send.c'])
+e.Program(['basic_container.c'])
+e.Program(['basic_container2.c'])
+e.Program(['basic_txw.c'])
+e.Program(['nak_txw.c'])
+e.Program(['stream_send_with_nak.c'])
+e.Program(['dumpif.c'])
+e.Program(['testif.c'])
+e.Program('sw_calc.c')
+e.Program(['basic_rxw.c'])
+e.Program('test_cpu_timers.c')
+e.Program(['test_time.c'])
+e.Program(['block_send.c'])
+e.Program(['test_rs.c'])
+
+# end of file

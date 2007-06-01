@@ -32,8 +32,8 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "rxwi.h"
+#include "pgm/backtrace.h"
+#include "pgm/rxwi.h"
 
 #if 1
 #define g_trace(...)	while (0)

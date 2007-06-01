@@ -40,14 +40,14 @@
 
 #include <glib.h>
 
-#include "backtrace.h"
-#include "log.h"
-#include "pgm.h"
-#include "txwi.h"
-#include "rxwi.h"
-#include "transport.h"
-#include "sn.h"
-#include "timer.h"
+#include "pgm/backtrace.h"
+#include "pgm/log.h"
+#include "pgm/packet.h"
+#include "pgm/txwi.h"
+#include "pgm/rxwi.h"
+#include "pgm/transport.h"
+#include "pgm/sn.h"
+#include "pgm/timer.h"
 
 //#define TRANSPORT_DEBUG
 
@@ -2267,6 +2267,7 @@ pgm_write_copy_fragment_unlocked (
 		opt_fragment->opt_frag_off	= g_htonl (offset);
 		opt_fragment->opt_frag_len	= g_htonl (count);
 
+/* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
 		memcpy (opt_fragment + 1, buf + offset, tsdu_length);
 
 	        header->pgm_checksum    = 0;

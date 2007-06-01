@@ -31,7 +31,7 @@
 
 #include <glib.h>
 
-#include "timer.h"
+#include "pgm/timer.h"
 
 
 /* globals */

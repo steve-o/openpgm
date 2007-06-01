@@ -31,7 +31,7 @@
 
 #include <glib.h>
 
-#include "pgm.h"
+#include "pgm/packet.h"
 
 
 /* globals */
