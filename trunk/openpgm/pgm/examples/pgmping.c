@@ -61,7 +61,7 @@ static char* g_network = "226.0.0.1";
 static int g_odata_interval = 1 * 100 * 1000;	/* 100 ms */
 static int g_payload = 0;
 static int g_max_tpdu = 1500;
-static int g_sqns = 200 * 1000;
+static int g_sqns = 100 * 1000;
 
 static gboolean g_send_mode = TRUE;
 
