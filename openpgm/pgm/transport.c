@@ -1845,7 +1845,7 @@ send_nak_list (
 #ifdef TRANSPORT_DEBUG
 		char nak2[1024];
 		sprintf (nak2, "%u ", sequence_numbers[i]);
-		strcat (debugsz, nak2);
+		strcat (nak1, nak2);
 #endif
 	}
 
