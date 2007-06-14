@@ -1,0 +1,14 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+e = env.Copy(
+		LIBS = env['LIBS'] + ['libpgm'],
+		);
+
+e.Program(['monitor.c', 'dump-json.c'])
+e.Program(['app.c'])
+#e.Program(['sim.c'])
+
+# end of file
