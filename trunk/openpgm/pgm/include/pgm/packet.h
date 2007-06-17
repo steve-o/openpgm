@@ -399,6 +399,7 @@ static inline int sockaddr_to_nla (const struct sockaddr* sa, char* nla)
     return retval;
 }
 
+const char* pgm_type_string (guint8);
 const char* udpport_string (int);
 const char* getname (const struct in_addr*);
 void ip_optprint (const char*, int);

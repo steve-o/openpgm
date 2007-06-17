@@ -76,7 +76,7 @@ time_init ( void )
 
 /* current time */
 	char *cfg = getenv ("PGM_TIMER");
-	if (cfg == NULL) cfg = "GETTIMEOFDAY";
+	if (cfg == NULL) cfg = "TSC";
 
 	switch (cfg[0]) {
 	case 'C':	time_update_now = clock_update; break;
@@ -90,7 +90,7 @@ time_init ( void )
 
 /* sleeping */
 	cfg = getenv ("PGM_SLEEP");
-	if (cfg == NULL) cfg = "MICROSLEEP";
+	if (cfg == NULL) cfg = "RTC";
 
 	switch (cfg[0]) {
 	case 'N':	time_sleep = nano_sleep; break;

@@ -201,7 +201,6 @@ on_startup (
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	addr.sin_port = htons(g_port);
 
 	e = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
 	if (e < 0) {
@@ -277,7 +276,7 @@ on_io_data (
 	socklen_t addr_len = sizeof(addr);
 	int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
 
-	if (g_filter.s_addr && g_filter.s_addr == addr.sin_addr.s_addr) {
+	if (g_filter.s_addr && g_filter.s_addr != addr.sin_addr.s_addr) {
 		return TRUE;
 	}
 
@@ -330,7 +329,7 @@ on_stdin_data (
 			unsigned a, b, c, d;
 			int retval = sscanf(str, "filter %u.%u.%u.%u", &a, &b, &c, &d);
 			if (retval == 4) {
-				g_filter.s_addr = (a << 24) | (b << 16) | (c << 8) | d;
+				g_filter.s_addr = (d << 24) | (c << 16) | (b << 8) | a;
 				puts ("READY");
 			} else {
 				printf ("invalid syntax for filter command.");
@@ -340,6 +339,7 @@ on_stdin_data (
 		}
 	}
 
+	fflush (stdout);
 	g_free (str);
 	return TRUE;
 }

@@ -59,9 +59,9 @@ static int g_port = 7500;
 static char* g_network = "226.0.0.1";
 
 static int g_odata_interval = 1 * 100 * 1000;	/* 100 ms */
-static int g_payload = 0;
+static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
-static int g_sqns = 100 * 1000;
+static int g_sqns = 200 * 1000;
 
 static gboolean g_send_mode = TRUE;
 
@@ -72,6 +72,7 @@ static GMainLoop* g_loop = NULL;
 
 static void on_signal (int);
 static gboolean on_startup (gpointer);
+static gboolean on_shutdown (gpointer);
 static gboolean on_mark (gpointer);
 
 static void send_odata (void);
@@ -101,17 +102,19 @@ main (
 	)
 {
 	g_message ("pgmping");
+	int timeout = 0;
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:f:lh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:f:lt:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 
 		case 'f':	g_odata_interval = (1000 * 1000) / atoi (optarg); break;
+		case 't':	timeout = 1000 * atoi (optarg); break;
 
 		case 'l':	g_send_mode = FALSE; break;
 
@@ -134,6 +137,11 @@ main (
 /* delayed startup */
 	g_message ("scheduling startup.");
 	g_timeout_add (0, (GSourceFunc)on_startup, NULL);
+
+	if (timeout) {
+		g_message ("scheduling shutdown.");
+		g_timeout_add (timeout, (GSourceFunc)on_shutdown, NULL);
+	}
 
 /* dispatch loop */
 	g_message ("entering main event loop ... ");
@@ -167,6 +175,16 @@ on_signal (
 }
 
 static gboolean
+on_shutdown (
+	gpointer data
+	)
+{
+	g_message ("shutdown");
+	g_main_loop_quit(g_loop);
+	return FALSE;
+}
+
+static gboolean
 on_startup (
 	gpointer data
 	)
@@ -193,26 +211,35 @@ on_startup (
 #endif
 
 	struct sock_mreq recv_smr, send_smr;
+#if 0
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
 
 	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_port);
 	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
 	((struct sockaddr_in*)&send_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_port = 0;
 	((struct sockaddr_in*)&send_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
+#else
+	char network[1024];
+	sprintf (network, ";%s", g_network);
+	int smr_len = 1;
+	e = if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	g_assert (e == 0);
+	g_assert (smr_len == 1);
+#endif
 
-	e = pgm_transport_create (&g_transport, gsi, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
+	if (g_send_mode)
+		pgm_transport_set_txw_preallocate (g_transport, g_sqns);
+	else
+		pgm_transport_set_rxw_preallocate (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
 	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
@@ -220,9 +247,9 @@ on_startup (
 	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
 	pgm_transport_set_nak_rb_ivl (g_transport, 50*1000);
 	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
-	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
-	pgm_transport_set_nak_data_retries (g_transport, 5);
-	pgm_transport_set_nak_ncf_retries (g_transport, 2);
+	pgm_transport_set_nak_rdata_ivl (g_transport, 500*1000);
+	pgm_transport_set_nak_data_retries (g_transport, 2);
+	pgm_transport_set_nak_ncf_retries (g_transport, 5);
 
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {
@@ -291,7 +318,9 @@ idle_check (
 {
 	struct idle_source* idle_source = (struct idle_source*)source;
 	guint64 now = time_update_now();
-	return ( time_after_eq(now, idle_source->expiration) );
+	gboolean retval = ( time_after_eq(now, idle_source->expiration) );
+	if (!retval) sched_yield();
+	return retval;
 }
 
 static gboolean
@@ -305,10 +334,6 @@ idle_dispatch (
 
 	send_odata ();
 	idle_source->expiration += g_odata_interval;
-
-	if ( time_after_eq(idle_source->expiration, time_now) )
-		sched_yield();
-
 	return TRUE;
 }
 
@@ -328,8 +353,10 @@ static void
 send_odata (void)
 {
 	int e;
+	char b[100];
+	sprintf (b, "%" G_GUINT32_FORMAT, g_payload);
 
-	e = pgm_write_copy (g_transport, &g_payload, sizeof(g_payload));
+	e = pgm_write_copy (g_transport, &b, sizeof(b));
         if (e < 0) {
 		g_warning ("send failed.");
                 return;
@@ -345,10 +372,12 @@ on_data (
 	gpointer	user_data
 	)
 {
-	if (len == sizeof(g_payload))
-		g_payload = *(int*)data;
+	if (len == 100)
+		g_payload = strtol ((char*)data, NULL, 10);
 	else
 		g_warning ("payload size %i bytes", len);
+
+//	g_message ("payload: %s", (char*)data);
 
 	return 0;
 }

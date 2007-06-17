@@ -201,8 +201,8 @@ print "received 3 odata's from app\n";
 
 # tell sim to publish nak #2
 
-print "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 1,2,3\n";
-print SIM_WRITER "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 1,2,3\n";
+print "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 2\n";
+print SIM_WRITER "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 2\n";
 wait_for_ready (\*SIM_READER, "sim");
 
 # tail monitor for rdata

@@ -310,7 +310,7 @@ txw_peek (
 /* check if sequence number is in window */
 	if ( !ABS_IN_TXW(t, sequence_number) )
 	{
-		g_warning ("%u not in window.", sequence_number);
+		g_trace ("%u not in window.", sequence_number);
 		return -1;
 	}
 

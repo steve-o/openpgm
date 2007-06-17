@@ -49,7 +49,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = ";226.0.0.1";
 
 static int g_odata_interval = 1 * 1000;
 static int g_payload = 0;
@@ -173,21 +173,12 @@ on_startup (
 #endif
 
 	struct sock_mreq recv_smr, send_smr;
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_port = g_htons (g_port);
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = 0;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
+	int smr_len = 1;
+	e = if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	g_assert (e == 0);
+	g_assert (smr_len == 1);
 
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_port);
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_port = 0;
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
-
-	e = pgm_transport_create (&g_transport, gsi, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);

@@ -47,8 +47,6 @@ static gboolean pgm_print_ncf (struct pgm_header*, char*, int);
 static gboolean pgm_print_spmr (struct pgm_header*, char*, int);
 static int pgm_print_options (char*, int);
 
-static const char *pgm_packet_type (guint8);
-
 
 int
 pgm_parse_packet (
@@ -342,7 +340,7 @@ pgm_print_packet (
 		"tsdu length: %i\n",
 
 		/* packet type */		/* packet version */			/* reserved = 0x0 */
-		pgm_packet_type(pgm_header->pgm_type & 0xf),
+		pgm_type_string(pgm_header->pgm_type & 0xf),
 		(pgm_header->pgm_type & 0xf),	((pgm_header->pgm_type & 0xc0) >> 6),	((pgm_header->pgm_type & 0x30) >> 4),
 
 /* bit 0 set => one or more option extensions are present */
@@ -1104,25 +1102,32 @@ pgm_print_options (
 	return ((char*)opt - data);
 }
 
-static const char
-*pgm_packet_type (
-	guint8 type
+const char*
+pgm_type_string (
+	guint8		type
 	)
 {
 	const char* c;
 
-	if (type <= 0x3)	c = "SPM";
-	else if (type <= 0x7)	c = "DATA";
-	else if (type <= 0xb)	c = "NAK";
-	else if (type <= 0xf)	c = "SPMR";
-	else			c = "Unknown";
+	switch (type) {
+	case PGM_SPM:		c = "PGM_SPM"; break;
+	case PGM_POLL:		c = "PGM_POLL"; break;
+	case PGM_POLR:		c = "PGM_POLR"; break;
+	case PGM_ODATA:		c = "PGM_ODATA"; break;
+	case PGM_RDATA:		c = "PGM_RDATA"; break;
+	case PGM_NAK:		c = "PGM_NAK"; break;
+	case PGM_NNAK:		c = "PGM_NNAK"; break;
+	case PGM_NCF:		c = "PGM_NCF"; break;
+	case PGM_SPMR:		c = "PGM_SPMR"; break;
+	default: c = "(unknown)"; break;
+	}
 
 	return c;
 }
 
 const char*
 udpport_string (
-	int port
+	int		port
 	)
 {
 	static GHashTable *services = NULL;
