@@ -84,23 +84,9 @@ print APP_WRITER "bind moo\n";
 wait_for_ready (\*APP_READER, "app");
 print "app ready.\n";
 
-wait_for_spm (\*MON_READER);
-print "link monitor seen SPM\n";
-
-while (<SIM_READER>) {
-	print;
-	chomp();
-	last if (/new peer$/);
-}
-print "simulator seen new peer\n";
-
 # tell app to publish odata
 
-print APP_WRITER "send moo ringo\n";
-wait_for_ready (\*APP_READER, "app");
 print APP_WRITER "send moo ichigo\n";
-wait_for_ready (\*APP_READER, "app");
-print APP_WRITER "send moo momo\n";
 wait_for_ready (\*APP_READER, "app");
 
 sub wait_for_block {
@@ -131,22 +117,6 @@ sub wait_for_block {
 	}
 }
 
-sub wait_for_spm {
-	my $fh = shift;
-	my $json = new JSON;
-
-	print "wait_for_spm ...\n";
-	for (;;) {
-		my $block = wait_for_block ($fh);
-		my $obj = $json->jsonToObj($block);
-		if ($obj->{PGM}->{type} =~ /SPM/) {
-			print "spm packet seen: ";
-			print $json->objToJson($obj) . "\n";
-			return $obj;
-		}
-	}
-}
-
 sub wait_for_odata {
 	my $fh = shift;
 	my $json = new JSON;
@@ -163,60 +133,19 @@ sub wait_for_odata {
 	}
 }
 
-sub wait_for_rdata {
-	my $fh = shift;
-	my $json = new JSON;
-
-	print "wait_for_rdata ...\n";
-	for (;;) {
-		my $block = wait_for_block ($fh);
-		my $obj = $json->jsonToObj($block);
-		if ($obj->{PGM}->{type} =~ /RDATA/) {
-			print "rdata packet seen: ";
-			print $json->objToJson($obj) . "\n";
-			return $obj;
-		}
-	}
-}
-
 my $odata = "";
-for (my $i = 1; $i <= 3; $i++)
-{
 # tail monitor for odata, newline is required on die.
-	eval {
-		local $SIG{ALRM} = sub { die "alarm\n" };
-
-		alarm 10;
-		$odata = wait_for_odata(\*MON_READER);
-		alarm 0;
-	};
-	if ($@) {
-		close_ssh();
-		die unless $@ eq "alarm\n";
-		die "alarm terminated test.\n";
-	}
-}
-
-print "received 3 odata's from app\n";
-
-# tell sim to publish nak #2
-
-print "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 1,2,3\n";
-print SIM_WRITER "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 1,2,3\n";
-wait_for_ready (\*SIM_READER, "sim");
-
-# tail monitor for rdata
-
 eval {
 	local $SIG{ALRM} = sub { die "alarm\n" };
 
 	alarm 10;
-	wait_for_rdata(\*MON_READER);
+	$odata = wait_for_odata(\*MON_READER);
 	alarm 0;
 };
 if ($@) {
-	print "alarm terminated test, flushing output.\n" if $@ eq "alarm\n";
-	flush_ssh();
+	close_ssh();
+	die unless $@ eq "alarm\n";
+	die "alarm terminated test.\n";
 }
 
 print "test completed successfully, terminating.\n";

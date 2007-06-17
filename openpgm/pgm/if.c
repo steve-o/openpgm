@@ -124,7 +124,7 @@ if_inet_network (
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
 
-g_trace ("moo[%s]\n", s);
+	g_trace ("if_inet_network (%s)", s);
 	in->s_addr = INADDR_ANY;
 
 	char *p = s;
@@ -142,7 +142,7 @@ g_trace ("moo[%s]\n", s);
 				return -1;
 			}
 
-g_trace ("elem %i\n", val);
+//g_trace ("elem %i", val);
 			
 			in->s_addr |= val << shift;
 			val = 0;
@@ -157,7 +157,7 @@ g_trace ("elem %i\n", val);
 				in->s_addr = INADDR_NONE;
 				return -1;
 			}
-g_trace ("elem %i\n", val);
+//g_trace ("elem %i", val);
 			in->s_addr |= val << shift;
 			p++; val = 0;
 			while (p < e)
@@ -174,14 +174,12 @@ g_trace ("elem %i\n", val);
 				in->s_addr = INADDR_NONE;
 				return -1;
 			}
-g_trace ("bit mask %i\n", val);
+//g_trace ("bit mask %i", val);
 
 /* zero out host bits */
 			in->s_addr = htonl(in->s_addr);
 			while (val < 32) {
-g_trace ("s_addr=%s &= ~(1 << %i)\n",
-	inet_ntoa(*in),
-	val);
+//g_trace ("s_addr=%s &= ~(1 << %i)", inet_ntoa(*in), val);
 				in->s_addr &= ~(1 << val++);
 			}
 			return 0;
@@ -217,7 +215,7 @@ if_inet6_network (
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
 
-g_trace ("moo6[%s]\n", s);
+	g_trace ("if_inet6_network (%s)", s);
 
 	char s2[INET6_ADDRSTRLEN];
 	char *p = s, *p2 = s2;
@@ -232,14 +230,14 @@ g_trace ("moo6[%s]\n", s);
 		return -1;
 	}
 
-g_trace ("net part %s\n", s2);
+//	g_trace ("net part %s", s2);
 	if (!inet_pton (AF_INET6, s2, in6)) {
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
 		char s3[INET6_ADDRSTRLEN];
-		g_trace ("IPv6 network address: %s\n", inet_ntop(AF_INET6, in6, s3, sizeof(s3)));
+		g_trace ("IPv6 network address: %s", inet_ntop(AF_INET6, in6, s3, sizeof(s3)));
 
 	p++;
 	int val = 0;
@@ -257,7 +255,7 @@ g_trace ("net part %s\n", s2);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
-g_trace ("bit mask %i\n", val);
+//	g_trace ("bit mask %i", val);
 
 /* zero out host bits */
 	while (val < 128) {
@@ -268,7 +266,7 @@ g_trace ("bit mask %i\n", val);
 		val++;
 	}
 
-		g_trace ("IPv6 network address: %s\n", inet_ntop(AF_INET6, in6, s3, sizeof(s3)));
+	g_trace ("IPv6 network address: %s", inet_ntop(AF_INET6, in6, s3, sizeof(s3)));
 
 	return 0;
 }
@@ -300,6 +298,8 @@ if_parse_interface (
 	)
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
+
+	g_trace ("if_parse_interface (%s, %i)", s, ai_family);
 
 	int retval = 0;
 	struct ifaddrs *ifap, *ifa;
@@ -370,7 +370,7 @@ if_parse_interface (
 #if 0
 	in.s_addr = inet_network (s);
 	if (in.s_addr != -1) {
-		g_trace ("network address calculated: %s\n", inet_ntoa (in));
+		g_trace ("network address calculated: %s", inet_ntoa (in));
 	}
 #else
 	e = if_inet_network (s, &in);
@@ -541,7 +541,7 @@ if_parse_interface (
 					int invalid = 0;
 					for (int i = 0; i < 16; i++)
 					{
-						if (netaddr6.s6_addr[i] & ipaddr6.s6_addr[i] != in6.s6_addr[i])
+						if ((netaddr6.s6_addr[i] & ipaddr6.s6_addr[i]) != in6.s6_addr[i])
 						{
 							invalid = 1;
 							break;
@@ -603,6 +603,8 @@ if_parse_multicast (
 	)
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
+
+	g_trace ("if_parse_multicast (%s, %i)", s, ai_family);
 
 	int retval = 0;
 	char s2[INET6_ADDRSTRLEN];
@@ -1000,5 +1002,73 @@ out:
 	return retval;
 }
 
+/* create sock_mreq as used by pgm_transport_create which specify port, address & interface.
+ */
+
+int
+if_parse_transport (
+	const char*		s,
+	int			ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
+	struct sock_mreq*	send_smr,
+	struct sock_mreq*	recv_smr,
+	int*			len		/* length of incoming mreq and filled in returning */
+	)
+{
+	g_return_val_if_fail (s != NULL, -EINVAL);
+	g_return_val_if_fail (ai_family == AF_UNSPEC || ai_family == AF_INET || ai_family == AF_INET6, -EINVAL);
+	g_return_val_if_fail (send_smr != NULL, -EINVAL);
+	g_return_val_if_fail (recv_smr != NULL, -EINVAL);
+	g_return_val_if_fail (len > 0, -EINVAL);
+
+	g_trace ("if_parse_transport (%s, %i, ..., %i)", s, ai_family, *len);
+	int retval = 0;
+
+/* resolve network string */
+	struct sockaddr* devices = g_malloc ( sizeof(struct sockaddr_storage) * *len );
+	struct sockaddr* receive_groups = g_malloc ( sizeof(struct sockaddr_storage) * *len );
+	struct sockaddr* send_group = g_malloc ( sizeof(struct sockaddr_storage) );
+	retval = if_parse_network (s, ai_family, devices, receive_groups, send_group, *len);
+	if (retval == 0)
+	{
+/* receive groups: possible confusion over mismatch length of devices & receive_groups
+ *
+ * all ports are ignored because this is a new IP protocol.
+ */
+		int i = 0;
+		while (receive_groups[i].sa_family)
+		{
+			memset (&recv_smr[i], 0, sizeof(struct sock_mreq));
+			memcpy (&recv_smr[i].smr_multiaddr, &receive_groups[i], sockaddr_len(&receive_groups[i]));
+
+			if (devices[0].sa_family) {
+				memcpy (&recv_smr[i].smr_interface, &devices[0], sockaddr_len(&devices[0]));
+			} else {
+				((struct sockaddr_in*)&recv_smr[i].smr_interface)->sin_family = AF_INET;
+				((struct sockaddr_in*)&recv_smr[i].smr_interface)->sin_addr.s_addr = INADDR_ANY;
+			}
+			i++;
+		}
+
+/* send group */
+		memset (&send_smr[0], 0, sizeof(struct sock_mreq));
+		memcpy (&send_smr[0].smr_multiaddr, &send_group[0], sockaddr_len(&send_group[0]));
+
+		if (devices[0].sa_family) {
+			memcpy (&send_smr->smr_interface, &devices[0], sockaddr_len(&devices[0]));
+		} else {
+			((struct sockaddr_in*)&send_smr[0].smr_interface)->sin_family = AF_INET;
+			((struct sockaddr_in*)&send_smr[0].smr_interface)->sin_addr.s_addr = INADDR_ANY;
+		}
+
+/* pass back number of filled in smr objects */
+		*len = i;
+	}
+
+	g_free (devices);
+	g_free (receive_groups);
+	g_free (send_group);
+out:
+	return retval;
+}
 
 /* eof */

@@ -522,15 +522,14 @@ rxw_push_fragment (
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
 				ph->nak_rb_expiry	= time_now;
+				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
-				g_trace ("#%u: adding place holder #%u for missing packet",
-					sequence_number, ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
 				g_queue_push_head_link (r->backoff_queue, &ph->link_);
-				g_trace ("#%" G_GUINT32_FORMAT ": backoff_queue now %u long",
-					sequence_number, r->backoff_queue->length);
+				g_trace ("#%" G_GUINT32_FORMAT ": adding place holder for missing packet, backoff_queue now %" G_GUINT32_FORMAT " long, rxw_sqns %u",
+					sequence_number, r->backoff_queue->length, rxw_sqns(r));
 
 				if ( rxw_full(r) )
 				{
@@ -567,6 +566,7 @@ rxw_push_fragment (
 		}
 
 		struct rxw_packet* rp = rxw_alloc0_packet(r);
+		rp->link_.data = rp;
 
 		if (apdu_len)	/* fragment */
 		{
@@ -598,8 +598,8 @@ rxw_push_fragment (
 		rp->state		= PGM_PKT_HAVE_DATA_STATE;
 
 		RXW_SET_PACKET(r, rp->sequence_number, rp);
-		g_trace ("#%" G_GUINT32_FORMAT ": adding packet #%" G_GUINT32_FORMAT,
-			sequence_number, rp->sequence_number);
+		g_trace ("#%" G_GUINT32_FORMAT ": added packet #%" G_GUINT32_FORMAT ", rxw_sqns %" G_GUINT32_FORMAT,
+			sequence_number, rp->sequence_number, rxw_sqns(r));
 	}
 
 out:
@@ -656,7 +656,7 @@ rxw_flush1 (
 	g_assert ( cp != NULL );
 
 	if (cp->state != PGM_PKT_HAVE_DATA_STATE && cp->state != PGM_PKT_LOST_DATA_STATE) {
-		g_trace ("!(have|lost)_data_state cp->length = %u", cp->length);
+		g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->trail, rxw_state_string(cp->state), cp->state, cp->length);
 		goto out;
 	}
 
@@ -986,18 +986,19 @@ rxw_window_update (
 					rxw_flush (r);
 				}
 
+				r->lead++;
+
 				struct rxw_packet* ph = rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
 				ph->nak_rb_expiry	= time_now;
+				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
 				g_trace ("adding placeholder #%u", ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
 				g_queue_push_head_link (r->backoff_queue, &ph->link_);
-
-				r->lead++;
 			}
 		}
 	}
@@ -1030,6 +1031,7 @@ rxw_window_update (
 			{
 				guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
 
+				dropped  += distance;
 				r->trail += distance;
 				r->lead  += distance;
 				break;
@@ -1071,6 +1073,9 @@ rxw_window_update (
 
 		g_warning ("dropped %u messages due to full window.", dropped);
 	}
+
+	g_trace ("window ( rxw_trail %u rxw_trail_init %u trail %u lead %u rxw_sqns %u )",
+		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead, rxw_sqns(r));
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
@@ -1180,6 +1185,7 @@ rxw_ncf (
 		ph->link_.data		= ph;
 		ph->sequence_number     = r->lead;
 		ph->nak_rb_expiry	= time_now;
+		ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 		RXW_SET_PACKET(r, ph->sequence_number, ph);
 		g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
@@ -1206,8 +1212,8 @@ rxw_ncf (
 	struct rxw_packet* ph = rxw_alloc0_packet(r);
 	ph->link_.data		= ph;
 	ph->sequence_number     = r->lead;
-	ph->state		= PGM_PKT_WAIT_DATA_STATE;
 	ph->nak_rdata_expiry	= time_now + nak_rdata_ivl;
+	ph->state		= PGM_PKT_WAIT_DATA_STATE;
 
 	RXW_SET_PACKET(r, ph->sequence_number, ph);
 	g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
@@ -1224,6 +1230,29 @@ rxw_ncf (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 	return 0;
+}
+
+/* state string helper
+ */
+
+const char*
+rxw_state_string (
+	pgm_pkt_state		state
+	)
+{
+	const char* c;
+
+	switch (state) {
+	case PGM_PKT_BACK_OFF_STATE:	c = "PGM_PKT_BACK_OFF_STATE"; break;
+	case PGM_PKT_WAIT_NCF_STATE:	c = "PGM_PKT_WAIT_NCF_STATE"; break;
+	case PGM_PKT_WAIT_DATA_STATE:	c = "PGM_PKT_WAIT_DATA_STATE"; break;
+	case PGM_PKT_HAVE_DATA_STATE:	c = "PGM_PKT_HAVE_DATA_STATE"; break;
+	case PGM_PKT_LOST_DATA_STATE:	c = "PGM_PKT_LOST_DATA_STATE"; break;
+	case PGM_PKT_ERROR_STATE:	c = "PGM_PKT_ERROR_STATE"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
 }
 
 /* eof */

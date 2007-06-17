@@ -43,7 +43,6 @@ int verify_ip_header (struct iphdr*, int);
 void print_ip_header (struct iphdr*);
 int verify_pgm_header (struct pgm_header*, int);
 void print_pgm_header (struct pgm_header*);
-const char* pgm_type_string (guint8);
 int verify_spm (struct pgm_header*, char*, int);
 void print_spm (struct pgm_header*, char*);
 int verify_poll (struct pgm_header*, char*, int);
@@ -338,27 +337,6 @@ print_pgm_header (
 		pgm->pgm_gsi[5]);
 	printf ("\t\t\"tsduLength\": %i", g_ntohs(pgm->pgm_tsdu_length));
 }
-
-const char*
-pgm_type_string (guint8 type)
-{
-	const char* s;
-	switch (type) {
-	case PGM_SPM:	s = "SPM"; break;
-	case PGM_POLL:	s = "POLL"; break;
-	case PGM_POLR:	s = "POLR"; break;
-	case PGM_ODATA:	s = "ODATA"; break;
-	case PGM_RDATA:	s = "RDATA"; break;
-	case PGM_NAK:	s = "NAK"; break;
-	case PGM_NNAK:	s = "NNAK"; break;
-	case PGM_NCF:	s = "NCF"; break;
-	case PGM_SPMR:	s = "SPMR"; break;
-	default:	s = "unknown"; break;
-	}
-
-	return s;
-}
-
 
 /* 8.1.  Source Path Messages (SPM)
  *
@@ -675,6 +653,7 @@ print_rdata (
 	struct pgm_data* rdata = (struct pgm_data*)data;
 	char* tsdu = data + sizeof(struct pgm_data);
 
+	puts (",");
 	printf ("\t\t\"rdSqn\": %lu,\n", (gulong)g_ntohl(rdata->data_sqn));
 	printf ("\t\t\"rdTrail\": %lu,\n", (gulong)g_ntohl(rdata->data_trail));
 
