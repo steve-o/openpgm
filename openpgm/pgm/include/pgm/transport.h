@@ -74,11 +74,12 @@ struct pgm_event {
 
 struct pgm_transport {
     struct tsi		tsi;
+    guint16		dport;
 
-    GMutex*		tx_mutex, *mutex;
-    GThread*		thread;
-    GMainLoop*		loop;
-    GMainContext*	context;
+    GMutex		*tx_mutex, *mutex;
+    GThread		*rx_thread, *timer_thread;
+    GMainLoop		*rx_loop, *timer_loop;
+    GMainContext	*rx_context, *timer_context;
     gboolean		bound;
 
     struct sock_mreq	send_smr;			/* multicast & unicast nla */
@@ -129,7 +130,7 @@ int pgm_init (void);
 
 gchar* pgm_print_tsi (struct tsi*);
 
-int pgm_transport_create (struct pgm_transport**, guint8*, struct sock_mreq*, int, struct sock_mreq*);
+int pgm_transport_create (struct pgm_transport**, guint8*, guint16, struct sock_mreq*, int, struct sock_mreq*);
 int pgm_transport_bind (struct pgm_transport*);
 GSource* pgm_transport_create_watch (struct pgm_transport*);
 int pgm_transport_add_watch_full (struct pgm_transport*, gint, pgm_func, gpointer, GDestroyNotify);
@@ -173,28 +174,34 @@ static inline gpointer pgm_alloc (struct pgm_transport*  transport)
 int pgm_write_unlocked (struct pgm_transport*, const gchar*, gsize);
 static inline int pgm_write (struct pgm_transport* transport, const gchar* buf, gsize count)
 {
+    g_mutex_lock (transport->mutex);
     g_mutex_lock (transport->tx_mutex);
     int retval = pgm_write_unlocked (transport, buf, count);
     g_mutex_unlock (transport->tx_mutex);
+    g_mutex_unlock (transport->mutex);
     return retval;
 }
 
 static inline int pgm_write_copy (struct pgm_transport* transport, const gchar* buf, gsize count)
 {
+    g_mutex_lock (transport->mutex);
     g_mutex_lock (transport->tx_mutex);
     gchar *pkt = ((gchar*)txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
     memcpy (pkt, buf, count);
     int retval = pgm_write_unlocked (transport, pkt, count);
     g_mutex_unlock (transport->tx_mutex);
+    g_mutex_unlock (transport->mutex);
     return retval;
 }
 
 int pgm_write_copy_fragment_unlocked (struct pgm_transport*, const gchar*, gsize);
 static inline int pgm_write_copy_fragment (struct pgm_transport* transport, const gchar* buf, gsize count)
 {
+    g_mutex_lock (transport->mutex);
     g_mutex_lock (transport->tx_mutex);
     int retval = pgm_write_copy_fragment_unlocked (transport, buf, count);
     g_mutex_unlock (transport->tx_mutex);
+    g_mutex_unlock (transport->mutex);
     return retval;
 }
 

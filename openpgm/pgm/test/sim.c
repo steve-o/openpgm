@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * PGM conformance test application.
+ * PGM conformance endpoint simulator.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -54,7 +54,7 @@ struct idle_source {
 	guint64		expiration;
 };
 
-struct app_session {
+struct sim_session {
 	char*		name;
 	char		gsi[6];
 	struct pgm_transport* transport;
@@ -107,7 +107,7 @@ main (
 	char   *argv[]
 	)
 {
-	g_message ("app");
+	g_message ("sim");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -172,7 +172,7 @@ destroy_session (
                 )
 {
 	printf ("destroying transport \"%s\"\n", (char*)key);
-	struct app_session* sess = (struct app_session*)value;
+	struct sim_session* sess = (struct sim_session*)value;
 	pgm_transport_destroy (sess->transport, TRUE);
 	sess->transport = NULL;
 	g_free (sess->name);
@@ -279,14 +279,14 @@ session_create (
 	)
 {
 /* check for duplicate */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess != NULL) {
 		puts ("FAILED: duplicate session");
 		return;
 	}
 
 /* create new and fill in bits */
-	sess = g_malloc0(sizeof(struct app_session));
+	sess = g_malloc0(sizeof(struct sim_session));
 	sess->name = g_memdup (name, strlen(name)+1);
 	int e = gsi_create_md5_id (sess->gsi);
 	if (e != 0) {
@@ -325,7 +325,7 @@ session_bind (
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
 		puts ("FAILED: session not found");
 		return;
@@ -361,7 +361,7 @@ session_send (
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
 		puts ("FAILED: session not found");
 		return;
@@ -382,7 +382,7 @@ session_destroy (
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
 		puts ("FAILED: session not found");
 		return;
@@ -393,6 +393,65 @@ session_destroy (
 	g_free (sess->name);
 	sess->name = NULL;
 	g_free (sess);
+
+	puts ("READY");
+}
+
+void
+net_send_nak (
+	char*		name,
+	struct tsi*	tsi,
+	guint32		sqn
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+/* check that the peer exists */
+	struct pgm_transport* transport = sess->transport;
+	struct pgm_peer* peer = g_hash_table_lookup (transport->peers, tsi);
+	if (peer == NULL) {
+		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
+		return;
+	}
+
+/* send */
+        int retval = 0;
+        gchar buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) ];
+        int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+
+        struct pgm_header *header = (struct pgm_header*)buf;
+        struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+        memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+/* dport & sport swap over for a nak */
+        header->pgm_sport       = sockaddr_port(&transport->recv_smr[0].smr_multiaddr);
+        header->pgm_dport       = peer->tsi.sport;
+        header->pgm_type        = PGM_NAK;
+        header->pgm_options     = 0;
+        header->pgm_tsdu_length = 0;
+
+/* NAK */
+        nak->nak_sqn            = g_htonl (sqn);
+
+/* source nla */
+        sockaddr_to_nla ((struct sockaddr*)&peer->nla, (char*)&nak->nak_src_nla_afi);
+
+/* group nla */
+        sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum    = pgm_cksum((char*)header, tpdu_length, 0);
+
+        retval = sendto (transport->send_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+                                (struct sockaddr*)&peer->nla,
+                                sockaddr_len(&peer->nla));
 
 	puts ("READY");
 }
@@ -423,8 +482,47 @@ on_stdin_data (
 		}
 
 		regex_t preg;
-		regmatch_t pmatch[3];
-		char *re = "^create[[:space:]]+([[:alnum:]]+)$";
+		regmatch_t pmatch[10];
+		char *re;
+
+/* endpoint simulator specific: */
+
+		re = "^net +send +nak +([0-9a-z]+) +([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+) +([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			struct tsi tsi;
+			char *p = str + pmatch[2].rm_so;
+			tsi.gsi[0] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi[1] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi[2] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi[3] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi[4] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi[5] = strtol (p, &p, 10);
+			++p;
+			tsi.sport = g_htons ( strtol (p, NULL, 10) );
+
+			guint32 sqn = strtol (str + pmatch[3].rm_so, NULL, 10);
+
+			net_send_nak (name, &tsi, sqn);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* same as test application: */
+
+		re = "^create[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{

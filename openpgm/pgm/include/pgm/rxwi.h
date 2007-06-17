@@ -38,6 +38,8 @@ typedef enum
     PGM_PKT_ERROR_STATE
 } pgm_pkt_state;
 
+const char* rxw_state_string (pgm_pkt_state);
+
 /* callback for commiting contiguous pgm packets */
 typedef int (*rxw_callback)(gpointer, guint, gpointer);
 

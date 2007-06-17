@@ -22,12 +22,21 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
+#ifndef __PGM_SOCKADDR_H__
+#   include "pgm/sockaddr.h"
+#endif
 
 G_BEGIN_DECLS
 
 int if_print_all (void);
-int if_parse_network (const char*, int, struct sockaddr*, struct sockaddr*, struct sockaddr*, int);
 
+int if_parse_network (const char*, int, struct sockaddr*, struct sockaddr*, struct sockaddr*, int);
+int if_parse_transport (const char*, int, struct sock_mreq*, struct sock_mreq*, int*);
+
+int if_inet_network (const char*, struct in_addr*);
+int if_inet6_network (const char*, struct in6_addr*);
+int if_parse_interface (const char*, int, struct sockaddr*);
+int if_parse_multicast (const char*, int, struct sockaddr*);
 
 G_END_DECLS
 
