@@ -51,7 +51,8 @@ struct pgm_peer {
     gint		ref_count;
 
     struct tsi		tsi;
-    struct sockaddr_storage	nla;
+    struct sockaddr_storage	nla, local_nla;	    /* nla = advertised, local_nla = from packet */
+    guint64		spmr_expiry;
 
     GMutex*		mutex;
 
@@ -103,11 +104,13 @@ struct pgm_transport {
     gchar*		spm_packet;
     int			spm_len;
 
-    guint		peer_expiry;
+    guint		peer_expiry;		    /* from absence of SPMs */
+    guint		spmr_expiry;		    /* waiting for peer SPMRs */
 
     guint		nak_data_retries, nak_ncf_retries;
     guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
     guint64		next_spm_expiry;
+    guint64		next_spmr_expiry;
 
     gboolean		proactive_parity;
     gboolean		ondemand_parity;
@@ -119,6 +122,7 @@ struct pgm_transport {
     GAsyncQueue*	commit_queue;
     int			commit_pipe[2];
     GTrashStack*	trash_event;		    /* sizeof(struct pgm_event) */
+    guint		event_preallocate;
 };
 
 typedef int (*pgm_func)(gpointer, guint, gpointer);
@@ -128,7 +132,7 @@ G_BEGIN_DECLS
 
 int pgm_init (void);
 
-gchar* pgm_print_tsi (struct tsi*);
+gchar* pgm_print_tsi (const struct tsi*);
 
 int pgm_transport_create (struct pgm_transport**, guint8*, guint16, struct sock_mreq*, int, struct sock_mreq*);
 int pgm_transport_bind (struct pgm_transport*);
@@ -143,6 +147,7 @@ int pgm_transport_set_ambient_spm (struct pgm_transport*, guint);
 int pgm_transport_set_heartbeat_spm (struct pgm_transport*, guint*, int);
 
 int pgm_transport_set_peer_expiry (struct pgm_transport*, guint);
+int pgm_transport_set_spmr_expiry (struct pgm_transport*, guint);
 
 int pgm_transport_set_txw_preallocate (struct pgm_transport*, guint);
 int pgm_transport_set_txw_sqns (struct pgm_transport*, guint);
@@ -156,6 +161,7 @@ int pgm_transport_set_rxw_max_rte (struct pgm_transport*, guint);
 
 int pgm_transport_set_sndbuf (struct pgm_transport*, int);
 int pgm_transport_set_rcvbuf (struct pgm_transport*, int);
+int pgm_transport_set_event_preallocate (struct pgm_transport*, guint);
 
 int pgm_transport_set_nak_rb_ivl (struct pgm_transport*, guint);
 int pgm_transport_set_nak_rpt_ivl (struct pgm_transport*, guint);

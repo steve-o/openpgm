@@ -344,10 +344,26 @@ struct pgm_opt6_path_nla {
 
 G_BEGIN_DECLS
 
-int pgm_parse_packet (char*, int, struct pgm_header**, char**, int*);
+int pgm_parse_packet (char*, int, struct sockaddr*, socklen_t*, struct pgm_header**, char**, int*);
 gboolean pgm_print_packet (char*, int);
 
+static inline gboolean pgm_is_upstream (guint8 type)
+{
+    return (type == PGM_NAK || type == PGM_SPMR || type == PGM_POLR);
+}
+
+static inline gboolean pgm_is_peer (guint8 type)
+{
+    return (type == PGM_SPMR);
+}
+
+static inline gboolean pgm_is_downstream (guint8 type)
+{
+    return (type == PGM_SPM || type == PGM_ODATA || type == PGM_RDATA || type == PGM_POLL);
+}
+
 int pgm_verify_spm (struct pgm_header*, char*, int);
+int pgm_verify_spmr (struct pgm_header*, char*, int);
 int pgm_verify_nak (struct pgm_header*, char*, int);
 
 static inline int nla_to_sockaddr (const char* nla, struct sockaddr* sa)

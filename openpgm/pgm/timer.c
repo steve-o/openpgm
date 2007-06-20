@@ -64,7 +64,9 @@ static int rtc_destroy (void);
 static guint64 rtc_update (void);
 static int tsc_init (void);
 static guint64 tsc_update (void);
+static int clock_init (void);
 
+static void clock_nano_sleep (guint64);
 static void nano_sleep (guint64);
 static void rtc_sleep (guint64);
 static void tsc_sleep (guint64);
@@ -93,6 +95,7 @@ time_init ( void )
 	if (cfg == NULL) cfg = "RTC";
 
 	switch (cfg[0]) {
+	case 'C':	time_sleep = clock_nano_sleep; break;
 	case 'N':	time_sleep = nano_sleep; break;
 	case 'R':	time_sleep = rtc_sleep; break;
 	case 'T':	time_sleep = tsc_sleep; break;
@@ -111,6 +114,11 @@ time_init ( void )
 	if (time_update_now == tsc_update || time_sleep == tsc_sleep)
 	{
 		tsc_init();
+	}
+
+	if (time_sleep == clock_nano_sleep)
+	{
+		clock_init();
 	}
 
 	time_update_now();
@@ -325,6 +333,44 @@ tsc_sleep (guint64 usec)
 	do {
 		now = rdtsc();
 	} while ( now < end );
+}
+
+static clockid_t g_clock_id;
+
+static int
+clock_init (void)
+{
+	g_clock_id = CLOCK_REALTIME;
+//	g_clock_id = CLOCK_MONOTONIC;
+//	g_clock_id = CLOCK_PROCESS_CPUTIME_ID;
+//	g_clock_id = CLOCK_THREAD_CPUTIME_ID;
+
+//	clock_getcpuclockid (0, &g_clock_id);
+//	pthread_getcpuclockid (pthread_self(), &g_clock_id);
+
+	struct timespec ts;
+	if (clock_getres (g_clock_id, &ts) > 0) {
+		g_critical ("clock_getres failed on clock id %i", (int)g_clock_id);
+		return -1;
+	}
+	g_message ("clock resolution %lu.%.9lu", ts.tv_sec, ts.tv_nsec);
+	return 0;
+}
+
+static void
+clock_nano_sleep (guint64 usec)
+{
+	struct timespec ts;
+#if 0
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	clock_nanosleep (g_clock_id, 0, &ts, NULL);
+#else
+	usec += time_now;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	clock_nanosleep (g_clock_id, TIMER_ABSTIME, &ts, NULL);
+#endif
 }
 
 static void
