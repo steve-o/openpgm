@@ -50,11 +50,13 @@ static int pgm_print_options (char*, int);
 
 int
 pgm_parse_packet (
-	char*	data,
-	int	len,
-	struct pgm_header** header,
-	char**	packet,
-	int*	packet_len
+	char*			data,
+	int			len,
+	struct sockaddr*	dst_addr,
+	socklen_t*		dst_addr_len,
+	struct pgm_header**	header,
+	char**			packet,
+	int*			packet_len
 	)
 {
 /* minimum size should be IP header plus PGM header */
@@ -112,7 +114,20 @@ pgm_parse_packet (
 
 /* decode IP header */
 	const struct iphdr* ip = (struct iphdr*)data;
-	if (ip->version != 4 && ip->version != 6) {	/* IP version, 4 or 6 */
+	switch (ip->version) {
+	case 4:
+		((struct sockaddr_in*)dst_addr)->sin_family = AF_INET;
+		((struct sockaddr_in*)dst_addr)->sin_addr.s_addr = ip->daddr;
+		*dst_addr_len = sizeof(struct sockaddr_in);
+		break;
+
+	case 6:
+		((struct sockaddr_in6*)dst_addr)->sin6_family = AF_INET6;
+		puts ("FIXME: IPv6 packet headers are not included.");
+		*dst_addr_len = sizeof(struct sockaddr_in6);
+		return -1;
+
+	default:
 		printf ("unknown IP version (%i) :/\n", ip->version);	
 		return -1;
 	}
@@ -142,12 +157,14 @@ pgm_parse_packet (
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
+#if PGM_CHECK_IN_CKSUM
 	int sum = in_cksum(data, packet_length, 0);
 	if (sum != 0) {
 		int ip_sum = g_ntohs(ip->check);
 		printf ("bad cksum! %i\n", ip_sum);
 		return -2;
 	}
+#endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
 	int offset = g_ntohs(ip->frag_off);
@@ -180,9 +197,10 @@ pgm_parse_packet (
 		return -1;
 	}
 
+/* pgm_checksum == 0 means no transmitted checksum */
 	if (pgm_header->pgm_checksum)
 	{
-		sum = pgm_header->pgm_checksum;
+		int sum = pgm_header->pgm_checksum;
 		pgm_header->pgm_checksum = 0;
 		int pgm_sum = pgm_cksum((const char*)pgm_header, pgm_length, 0);
 		if (pgm_sum != sum) {
@@ -190,6 +208,10 @@ pgm_parse_packet (
 			return -2;
 		}
 	} else {
+		if (pgm_header->pgm_type == PGM_ODATA || pgm_header->pgm_type == PGM_RDATA) {
+			puts ("PGM checksum mandatory for ODATA and RDATA packets :(");
+			return -1;
+		}
 		puts ("No PGM checksum :O");
 	}
 
@@ -1014,6 +1036,19 @@ pgm_print_ncf (
  * | Option Extensions when present ...
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
  */
+
+int
+pgm_verify_spmr (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	int retval = 0;
+
+out:
+	return retval;
+}
 
 static gboolean
 pgm_print_spmr (

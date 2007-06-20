@@ -587,10 +587,12 @@ on_io_data (
 
 //	printf ("%i bytes received from %s.\n", len, inet_ntoa(addr.sin_addr));
 
+	struct sockaddr_in dst_addr;
+	socklen_t dst_addr_len;
 	struct pgm_header *pgm_header;
 	char *packet;
 	int packet_length;
-	int e = pgm_parse_packet(buffer, len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_packet(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 
 	switch (e) {
 	case -2:

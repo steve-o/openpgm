@@ -45,6 +45,7 @@
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
 #include <pgm/timer.h>
+#include <pgm/if.h>
 
 
 /* typedefs */
@@ -339,6 +340,7 @@ session_bind (
 	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
 	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (sess->transport, 5*8192*1000);
+	pgm_transport_set_spmr_expiry (sess->transport, 250*1000);
 	pgm_transport_set_nak_rb_ivl (sess->transport, 50*1000);
 	pgm_transport_set_nak_rpt_ivl (sess->transport, 200*1000);
 	pgm_transport_set_nak_rdata_ivl (sess->transport, 200*1000);
