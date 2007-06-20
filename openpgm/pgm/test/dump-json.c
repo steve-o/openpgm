@@ -896,6 +896,17 @@ verify_spmr (
 	int			len
 	)
 {
+	int retval = 0;
+
+	char* opt_offset = data;
+	int opt_len = len;
+
+/* option extensions */
+	if (header->pgm_options & PGM_OPT_PRESENT)
+	{
+		retval = verify_options (opt_offset, opt_len);
+	}
+
 	return -1;
 }
 
@@ -905,6 +916,16 @@ print_spmr (
 	char*			data
 	)
 {
+	char* opt_offset = data;
+
+/* option extensions */
+	if (header->pgm_options & PGM_OPT_PRESENT)
+	{
+		print_options (opt_offset);
+		puts ("");
+	}
+
+	puts ("\t}");
 }
 
 /* Parse PGM options fields:
