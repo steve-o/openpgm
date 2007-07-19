@@ -816,20 +816,10 @@ rxw_pkt_state_unlink (
 	GQueue* queue = NULL;
 
 	switch (rp->state) {
-	case PGM_PKT_BACK_OFF_STATE:
-		queue = r->backoff_queue;
-		break;
-
-	case PGM_PKT_WAIT_NCF_STATE:
-		queue = r->wait_ncf_queue;
-		break;
-
-	case PGM_PKT_WAIT_DATA_STATE:
-		queue = r->wait_data_queue;
-		break;
-
-	case PGM_PKT_HAVE_DATA_STATE:
-		break;
+	case PGM_PKT_BACK_OFF_STATE:  queue = r->backoff_queue; break;
+	case PGM_PKT_WAIT_NCF_STATE:  queue = r->wait_ncf_queue; break;
+	case PGM_PKT_WAIT_DATA_STATE: queue = r->wait_data_queue; break;
+	case PGM_PKT_HAVE_DATA_STATE: break; 
 
 	default:
 		g_assert_not_reached();
@@ -966,6 +956,20 @@ rxw_window_update (
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 	guint dropped = 0;
+
+/* SPM is first message seen, define new window parameters */
+	if (!r->window_defined)
+	{
+		g_trace ("SPM defining receive window");
+
+		r->lead = txw_lead;
+		r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
+
+		r->rxw_constrained = TRUE;
+		r->window_defined = TRUE;
+
+		return 0;
+	}
 
 	if ( guint32_gt (txw_lead, r->lead) )
 	{
@@ -1117,11 +1121,13 @@ int
 rxw_ncf (
 	struct rxw*	r,
 	guint32		sequence_number,
-	guint64		nak_rdata_ivl
+	pgm_time_t	rdata_expiry
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
+
+	if (!r->window_defined) return -1;
 
 	struct rxw_packet* rp = RXW_PACKET(r, sequence_number);
 
@@ -1138,7 +1144,7 @@ rxw_ncf (
 
 		case PGM_PKT_BACK_OFF_STATE:
 		case PGM_PKT_WAIT_NCF_STATE:
-			rp->nak_rdata_expiry = time_now + nak_rdata_ivl;
+			rp->nak_rdata_expiry = rdata_expiry;
 			break;
 
 		default:
@@ -1212,7 +1218,7 @@ rxw_ncf (
 	struct rxw_packet* ph = rxw_alloc0_packet(r);
 	ph->link_.data		= ph;
 	ph->sequence_number     = r->lead;
-	ph->nak_rdata_expiry	= time_now + nak_rdata_ivl;
+	ph->nak_rdata_expiry	= rdata_expiry;
 	ph->state		= PGM_PKT_WAIT_DATA_STATE;
 
 	RXW_SET_PACKET(r, ph->sequence_number, ph);

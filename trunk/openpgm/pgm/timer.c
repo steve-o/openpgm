@@ -50,26 +50,26 @@
 #define nsecs_to_msecs(t)	( (t) / 1000000UL )
 #define nsecs_to_usecs(t)	( (t) / 1000 )
 
-guint64 time_now = 0;
+pgm_time_t time_now = 0;
 time_update_func time_update_now;
 time_sleep_func time_sleep;
 
 static gboolean time_got_initialized = FALSE;
 
-static guint64 gettimeofday_update (void);
-static guint64 clock_update (void);
-static guint64 ftime_update (void);
+static pgm_time_t gettimeofday_update (void);
+static pgm_time_t clock_update (void);
+static pgm_time_t ftime_update (void);
 static int rtc_init (void);
 static int rtc_destroy (void);
-static guint64 rtc_update (void);
+static pgm_time_t rtc_update (void);
 static int tsc_init (void);
-static guint64 tsc_update (void);
+static pgm_time_t tsc_update (void);
 static int clock_init (void);
 
-static void clock_nano_sleep (guint64);
-static void nano_sleep (guint64);
-static void rtc_sleep (guint64);
-static void tsc_sleep (guint64);
+static void clock_nano_sleep (gulong);
+static void nano_sleep (gulong);
+static void rtc_sleep (gulong);
+static void tsc_sleep (gulong);
 
 int
 time_init ( void )
@@ -145,7 +145,7 @@ time_destroy (void)
 	return 0;
 }
 
-static guint64
+static pgm_time_t
 gettimeofday_update (void)
 {
 	static struct timeval now;
@@ -156,7 +156,7 @@ gettimeofday_update (void)
 	return time_now;
 }
 
-static guint64
+static pgm_time_t
 clock_update (void)
 {
 	static struct timespec now;
@@ -167,7 +167,7 @@ clock_update (void)
 	return time_now;
 }
 
-static guint64
+static pgm_time_t
 ftime_update (void)
 {
 	static struct timeb now;
@@ -187,7 +187,7 @@ ftime_update (void)
 
 static int rtc_fd = -1;
 static int rtc_frequency = 8192;
-static guint64 rtc_count = 0;
+static pgm_time_t rtc_count = 0;
 
 static int
 rtc_init (void)
@@ -224,7 +224,7 @@ rtc_destroy (void)
 	return 0;
 }
 
-static guint64
+static pgm_time_t
 rtc_update (void)
 {
 	unsigned long data;
@@ -242,7 +242,7 @@ rtc_update (void)
  */
 
 static void
-rtc_sleep (guint64 usec)
+rtc_sleep (gulong usec)
 {
 	unsigned long data;
 
@@ -256,7 +256,7 @@ rtc_sleep (guint64 usec)
 		rtc_count += data >> 8;
 	}
 
-	guint64 count = 0;
+	pgm_time_t count = 0;
 	do {
 		read (rtc_fd, &data, sizeof(data));
 
@@ -270,7 +270,7 @@ rtc_sleep (guint64 usec)
 /* read time stamp counter, count of ticks from processor reset.
  *  */
 
-__inline__ guint64
+__inline__ pgm_time_t
 rdtsc (void)
 {
 	guint32 lo, hi;
@@ -278,7 +278,7 @@ rdtsc (void)
 /* We cannot use "=A", since this would use %rax on x86_64 */
 	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
 
-	return (guint64)hi << 32 | lo;
+	return (pgm_time_t)hi << 32 | lo;
 }
 
 /* determine ratio of ticks to nano-seconds, use /dev/rtc for high accuracy
@@ -292,15 +292,17 @@ static int tsc_us_scaler = 0;
 static int
 tsc_init (void)
 {
-	guint64 start, stop;
-	int calibration_usec = 20 * 1000;
+	pgm_time_t start, stop;
+	gulong calibration_usec = 20 * 1000;
 
 	start = rdtsc();
 	rtc_sleep (calibration_usec);
 	stop = rdtsc();
 
+	g_assert (stop >= start);
+
 /* TODO: this math needs to be scaled to reduce rounding errors */
-	int tsc_diff = stop - start;
+	pgm_time_t tsc_diff = stop - start;
 	if (tsc_diff > calibration_usec) {
 /* cpu > 1 Ghz */
 		tsc_us_scaler = tsc_diff / calibration_usec;
@@ -312,10 +314,10 @@ tsc_init (void)
 	return 0;
 }
 
-static guint64
+static pgm_time_t
 tsc_update (void)
 {
-	guint64 count = rdtsc();
+	pgm_time_t count = rdtsc();
 
 	time_now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
 
@@ -323,15 +325,18 @@ tsc_update (void)
 }	
 
 static void
-tsc_sleep (guint64 usec)
+tsc_sleep (gulong usec)
 {
-	guint64 start, now, end;
+	pgm_time_t start, now, end;
 
 	start = rdtsc();
 	end = start + ( tsc_us_scaler > 0 ? (usec * tsc_us_scaler) : (usec / tsc_us_scaler) );
 
 	do {
 		now = rdtsc();
+
+		if (now < end) g_thread_yield();
+
 	} while ( now < end );
 }
 
@@ -358,7 +363,7 @@ clock_init (void)
 }
 
 static void
-clock_nano_sleep (guint64 usec)
+clock_nano_sleep (gulong usec)
 {
 	struct timespec ts;
 #if 0
@@ -374,7 +379,7 @@ clock_nano_sleep (guint64 usec)
 }
 
 static void
-nano_sleep (guint64 usec)
+nano_sleep (gulong usec)
 {
 	struct timespec ts;
 	ts.tv_sec	= usec / 1000000UL;

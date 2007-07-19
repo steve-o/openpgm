@@ -22,6 +22,10 @@
 #ifndef __PGM_RXW_H__
 #define __PGM_RXW_H__
 
+#ifndef __PGM_TIMER_H__
+#   include "pgm/timer.h"
+#endif
+
 G_BEGIN_DECLS
 
 
@@ -53,9 +57,9 @@ struct rxw_packet {
 /*	guint32		frag_offset;	*/
 	guint32		apdu_len;
 
-	guint64		nak_rb_expiry;
-	guint64		nak_rpt_expiry;
-	guint64		nak_rdata_expiry;
+	pgm_time_t	nak_rb_expiry;
+	pgm_time_t	nak_rpt_expiry;
+	pgm_time_t	nak_rdata_expiry;
         GList           link_;
         pgm_pkt_state   state;
         guint           ncf_retry_count;
@@ -97,7 +101,7 @@ int rxw_mark_lost (struct rxw*, guint32);
 int rxw_window_update (struct rxw*, guint32, guint32);
 
 /* from NCF */
-int rxw_ncf (struct rxw*, guint32, guint64);
+int rxw_ncf (struct rxw*, guint32, pgm_time_t);
 
 
 static inline guint rxw_len (struct rxw* r)
