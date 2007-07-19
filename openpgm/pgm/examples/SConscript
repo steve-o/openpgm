@@ -12,4 +12,10 @@ e.Program(['pgmsend.c'])
 e.Program(['pgmrecv.c'])
 e.Program(['pgmping.c'])
 
+ne = e.Copy(
+		LIBS = e['LIBS'] + ['panel', 'ncurses'],
+		);
+
+ne.Program(['pgmtop.c'])
+
 # end of file

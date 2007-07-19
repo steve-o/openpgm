@@ -57,13 +57,13 @@ struct idle_source {
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = ";226.0.0.1";
 
 static int g_odata_rate = 10;					/* 10 per second */
 static int g_odata_interval = (1000 * 1000) / 10;	/* 100 ms */
 static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
-static int g_sqns = 200 * 1000;
+static int g_sqns = 100 * 1000;
 
 static gboolean g_send_mode = TRUE;
 
@@ -215,10 +215,8 @@ on_startup (
 #endif
 
 	struct sock_mreq recv_smr, send_smr;
-	char network[1024];
-	sprintf (network, ";%s", g_network);
 	int smr_len = 1;
-	e = if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
@@ -242,7 +240,7 @@ on_startup (
 	pgm_transport_set_nak_data_retries (g_transport, 2);
 	pgm_transport_set_nak_ncf_retries (g_transport, 5);
 
-#if 1
+#if 0
 	if (g_send_mode)
 		pgm_transport_set_txw_preallocate (g_transport, g_sqns);
 	else {

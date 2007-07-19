@@ -19,18 +19,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_TIME_H__
-#define __PGM_TIME_H__
+#ifndef __PGM_TIMER_H__
+#define __PGM_TIMER_H__
 
 #ifndef __PGM_SN_H
 #include "pgm/sn.h"
 #endif
 
 
+typedef guint64 pgm_time_t;
+
 G_BEGIN_DECLS
 
-typedef guint64 (*time_update_func)(void);
-typedef void (*time_sleep_func)(guint64);
+typedef pgm_time_t (*time_update_func)(void);
+typedef void (*time_sleep_func)(gulong);
 
 #define time_after(a,b)	    ( guint64_lt(a,b) )
 #define time_before(a,b)    time_after(b,a)
@@ -40,7 +42,7 @@ typedef void (*time_sleep_func)(guint64);
 
 
 /* micro-seconds */
-extern guint64 time_now;
+extern pgm_time_t time_now;
 
 extern time_update_func time_update_now;
 extern time_sleep_func time_sleep;
@@ -51,5 +53,5 @@ gboolean time_supported (void);
 
 G_END_DECLS
 
-#endif /* __PGM_TIME_H__ */
+#endif /* __PGM_TIMER_H__ */
 

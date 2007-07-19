@@ -198,7 +198,6 @@ Basic TODO list
 
 - Transport throttling, fine grain throttling.
 - OPT_SYN on sending side.
-- SPMR on receiving side to request state.
 - Shared trash stacks between multiple receive windows (contexts).
 - Shared trash stacks between transmit and receive windows.
 - FEC: to be or not to be Reed Solomon.
