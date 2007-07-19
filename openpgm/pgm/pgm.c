@@ -1009,6 +1009,16 @@ pgm_print_nnak (
 /* 8.3.  NCF
  */
 
+int
+pgm_verify_ncf (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	return pgm_verify_nak (header, data, len);
+}
+
 gboolean
 pgm_print_ncf (
 	struct pgm_header* header,
