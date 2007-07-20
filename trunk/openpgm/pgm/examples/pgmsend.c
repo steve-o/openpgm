@@ -57,6 +57,10 @@ static int g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
 
+static gboolean g_fec = FALSE;
+static int g_k = 0;
+static int g_2t = 0;
+
 static struct pgm_transport* g_transport = NULL;
 
 static GMainLoop* g_loop = NULL;
@@ -76,6 +80,9 @@ usage (const char* bin)
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
+	fprintf (stderr, "  -k <k>          : Configure FEC with k data packets, 2t parity\n");
+	fprintf (stderr, "  -t <2t>\n");
 	exit (1);
 }
 
@@ -90,15 +97,24 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:f:k:t:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 
+		case 'f':	g_fec = TRUE; break;
+		case 'k':	g_k = atoi (optarg); break;
+		case 't':	g_2t = atoi (optarg); break;
+
 		case 'h':
 		case '?': usage (binary_name);
 		}
+	}
+
+	if (g_fec && ( !g_k || !g_2t )) {
+		puts ("Invalid FEC parameters.");
+		usage (binary_name);
 	}
 
 	log_init ();
@@ -205,6 +221,10 @@ on_startup (
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
+
+	if (g_fec) {
+		pgm_transport_set_fec (g_transport, TRUE, TRUE, g_k, g_2t);
+	}
 
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {
