@@ -3231,11 +3231,64 @@ pgm_transport_set_fec (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
+/* check validity of parameters */
+	if ( default_tgsize > 223
+		&& ( (default_h * 223.0) / default_tgsize ) < 1.0 )
+	{
+		g_error ("k/2t ratio too low to generate parity data.");
+		return -EINVAL;
+	}
+
 	g_static_mutex_lock (&transport->mutex);
 	transport->proactive_parity	= enable_proactive_parity;
 	transport->ondemand_parity	= enable_ondemand_parity;
-	transport->default_tgsize	= default_tgsize;
-	transport->default_h		= default_h;
+
+/* derive FEC values from requested parameters:
+ *
+ * n = 255
+ * m = 8 
+ *
+ * for CCSDS we work from k = 223 by using shortened RS codes
+ */
+
+	{
+		float tgsize = default_tgsize;
+		float h = default_h;
+
+		if (default_tgsize > 223)
+		{
+			float ratio2 = tgsize / h;
+			tgsize /= (int)ratio2;
+			h /= (int)ratio2;
+		}
+
+		float fec_n = 255.0;
+		float fec_h = (int)( fec_n / (tgsize + h) ) * h;
+		float fec_k = (int)(fec_n - fec_h);
+
+		int each_packet = (fec_n - fec_k) / h;
+		int total_packet = each_packet * (tgsize + h);
+
+		int fec_padding = fec_n - total_packet;
+
+		if (fec_padding > 0.0)
+		{
+			transport->fec_n = 255 - fec_padding;
+			transport->fec_k = fec_n - (int)fec_h;
+			transport->fec_padding = fec_padding;
+		}
+		else
+		{
+			transport->fec_n = fec_n;
+			transport->fec_k = fec_k;
+			transport->fec_padding = 0;
+		}
+
+		g_message ("fec: n %i k %i padding %i", transport->fec_n, transport->fec_k, transport->fec_padding);
+	}
+
+	exit (0);
+
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;

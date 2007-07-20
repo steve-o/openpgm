@@ -4,10 +4,10 @@ pgmdump
 View all packets like tcpdump, but updated to full spec and allow dump of payload.
 
 
-pgmmon
+pgmtop
 ------
 
-Dump realtime packet statistics in a ncurses display.
+Dump realtime packet statistics in a ncurses display, mix of top/htop/netop.
 
 
 basic_send
