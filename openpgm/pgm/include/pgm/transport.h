@@ -118,8 +118,9 @@ struct pgm_transport {
 
     gboolean		proactive_parity;
     gboolean		ondemand_parity;
-    guint		default_tgsize;		    /* k */
-    guint		default_h;		    /* 2t */
+    guint		fec_n;
+    guint		fec_k;
+    guint		fec_padding;
 
     GStaticRWLock	peers_lock;
     GHashTable*		peers;

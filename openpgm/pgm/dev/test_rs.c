@@ -72,12 +72,19 @@ main (
 	time_init();
 
 /* data block for CCSDS(255,223) */
-	guint8 data8[223];
-	for (int i = 0; i < G_N_ELEMENTS(data8); i++)
-		data8[i] = i % 255;
+	int n = 255;
+	int p = 15;
+	int n_minus_k = 200;
+	int k = n - n_minus_k;
+
+	gchar source[] = "Ayumi Lee (Hangul: 이 아유미, Japanese name: Ito Ayumi 伊藤亜由美, born August 25, 1984, Tottori Prefecture, Japan[1]), from former Korean girl-group Sugar, was raised in Japan for much of her younger life and is the reason for her Japanese accent, although she is now fluent in both languages. Although Ayumi's name is commonly believed to be Japanese in origin, she has explained that her name is hanja-based.";
+
+	guint8 data8[k];
+	for (int i = 0, j = 0; i < G_N_ELEMENTS(data8); i++)
+		data8[i] = (i < p) ? 0 : source[j++];
 
 /* parity block: must be set to 0 */
-	guint16 parity[32];
+	guint16 parity[n_minus_k];
 	memset (parity, 0, sizeof(parity));
 
 /* FEC engine:
@@ -99,9 +106,14 @@ main (
 
 	guint64 start, end, elapsed;
 
-	puts (	"\n"
+	printf ("\n"
 		"encoding\n"
-		"--------\n" );
+		"--------\n"
+		"\n"
+		"GF(8), RS (%i,%i)", n, k );
+	if (p)
+		printf (" %i bytes padding for shortened RS (%i,%i)", p, 255 - p, (255 - p) - n_minus_k);
+	putchar ('\n');
 
 /* test encoding */
 	start = time_update_now();
@@ -142,22 +154,44 @@ main (
 			"--------\n" );
 		int erasures = G_N_ELEMENTS(parity);
 		int eras_pos[erasures];
-		for (int i = 0; i < erasures; i++)
+		int i;
+		for (i = 0; i < erasures && i < G_N_ELEMENTS(data8); i++)
 		{
 			data8[i] = 0;
 			eras_pos[i] = i;
 		}
-		printf ("erased %i symbols\n", erasures);
+		int actual_erasures = i;
+		printf ("erased %i symbols\n", actual_erasures);
+
+		if (actual_erasures < erasures)
+		{
+/* erasures also affect parity as n >> k */
+			int j;
+			for (j = 0; i < erasures; i++, j++)
+			{
+				parity[j] = 0;
+				eras_pos[i] = i;
+				actual_erasures++;
+			}
+
+			printf ("erased %i parity symbols\n", j);
+		}
 
 /* test decoding part 2 */
 
 		start = time_update_now();
-		int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, erasures, eras_pos, 0, NULL);
+		int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, actual_erasures, eras_pos, 0, NULL);
 		end = time_update_now();
 		elapsed = end - start;
 		printf ("decoding time %lu us\n", elapsed);
 
 		printf ("numerr = %i\n", numerr);
+
+/* display final string */
+		gchar final[G_N_ELEMENTS(data8) + 1];
+		memcpy (final, data8, G_N_ELEMENTS(data8));
+		final[sizeof(final)] = 0;
+		printf ("final string:\n[%s]\n", final + p);
 	}
 
 /* clean up */
