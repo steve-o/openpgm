@@ -122,7 +122,7 @@ main (
 
 	end = time_update_now();
 	elapsed = end - start;
-	printf ("encoding time %lu us\n", elapsed);
+	printf ("encoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
 	puts (	"\n"
 		"errors\n"
@@ -142,7 +142,7 @@ main (
 	int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, 0, NULL, 0, NULL);
 	end = time_update_now();
 	elapsed = end - start;
-	printf ("decoding time %lu us\n", elapsed);
+	printf ("decoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
 	printf ("numerr = %i\n", numerr);
 
@@ -183,7 +183,7 @@ main (
 		int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, actual_erasures, eras_pos, 0, NULL);
 		end = time_update_now();
 		elapsed = end - start;
-		printf ("decoding time %lu us\n", elapsed);
+		printf ("decoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
 		printf ("numerr = %i\n", numerr);
 

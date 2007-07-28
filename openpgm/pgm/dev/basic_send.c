@@ -370,9 +370,9 @@ banana_man (
 		return;
 	}
 
-printf ("PGM header size %lu\n"
-	"PGM data header size %lu\n"
-	"payload size %lu\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM data header size %" G_GSIZE_FORMAT "\n"
+	"payload size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
 	strlen(g_payload) + 1);

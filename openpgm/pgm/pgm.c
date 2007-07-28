@@ -62,7 +62,7 @@ pgm_parse_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %i bytes, expecting at least %lu bytes.\n", len, sizeof(struct pgm_header));
+		printf ("Packet size too small: %i bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n", len, sizeof(struct pgm_header));
 		return -1;
 	}
 
@@ -240,7 +240,7 @@ pgm_print_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %i bytes, expecting at least %lu bytes.\n", len, sizeof(struct pgm_header));
+		printf ("Packet size too small: %i bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n", len, sizeof(struct pgm_header));
 		return FALSE;
 	}
 
