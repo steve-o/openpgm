@@ -359,8 +359,8 @@ send_spm (
 		return;
 	}
 
-printf ("PGM header size %lu\n"
-	"PGM SPM block size %lu\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM SPM block size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_spm));
 

@@ -268,7 +268,7 @@ test_alloc_queue (
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *packet = g_queue_peek_nth (queue, i) + sizeof(int);
+		char *packet = (char*)g_queue_peek_nth (queue, i) + sizeof(int);
 	}
 	gettimeofday(&now, NULL);
 

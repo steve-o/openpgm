@@ -145,7 +145,7 @@ verify_ip_header (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
-		printf ("\t\"message\": \"IP: packet size too small: %i bytes, expecting at least %lu bytes.\",\n", len, sizeof(struct pgm_header));
+		printf ("\t\"message\": \"IP: packet size too small: %i bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_header));
 		return -1;
 	}
 
@@ -180,7 +180,7 @@ verify_ip_header (
 
 	guint ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
 	if (ip_header_length < sizeof(struct iphdr)) {
-		printf ("\t\"message\": \"IP: bad IP header length %i, should be at least %lu bytes.\",\n", ip_header_length, sizeof(struct iphdr));
+		printf ("\t\"message\": \"IP: bad IP header length %i, should be at least %" G_GSIZE_FORMAT "lu bytes.\",\n", ip_header_length, sizeof(struct iphdr));
 		return -1;
 	}
 
@@ -372,7 +372,7 @@ verify_spm (
 
 /* truncated packet */
 	if (len < sizeof(struct pgm_spm)) {
-		printf ("\t\"message\": \"SPM: packet length: %i less than minimum SPM length: %lu bytes.\",\n", len, sizeof(struct pgm_spm));
+		printf ("\t\"message\": \"SPM: packet length: %i less than minimum SPM length: %" G_GSIZE_FORMAT "lu bytes.\",\n", len, sizeof(struct pgm_spm));
 		retval = -1;
 		goto out;
 	}
@@ -384,7 +384,7 @@ verify_spm (
 	switch (g_ntohs(spm->spm_nla_afi)) {
 	case AFI_IP6:
 		if (len < sizeof(struct pgm_spm6)) {
-			printf ("\t\"message\": \"SPM: packet length: %i less than minimum IPv6 SPM length: %lu bytes.\",\n", len, sizeof(struct pgm_spm6));
+			printf ("\t\"message\": \"SPM: packet length: %i less than minimum IPv6 SPM length: %" G_GSIZE_FORMAT "lu bytes.\",\n", len, sizeof(struct pgm_spm6));
 			retval = -1;
 			goto out;
 		}
@@ -551,7 +551,7 @@ verify_odata (
 	int retval = 0;
 
 	if (len < sizeof(struct pgm_data)) {
-		printf ("\t\"message\": \"ODATA: packet length: %i less than minimum ODATA length: %lu bytes.\",\n", len, sizeof(struct pgm_data));
+		printf ("\t\"message\": \"ODATA: packet length: %i less than minimum ODATA length: %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_data));
 		retval = -1;
 		goto out;
 	}
@@ -622,7 +622,7 @@ verify_rdata (
 	int retval = 0;
 
 	if (len < sizeof(struct pgm_data)) {
-		printf ("\t\"message\": \"RDATA: packet length: %i less than minimum RDATA length: %lu bytes.\",\n", len, sizeof(struct pgm_data));
+		printf ("\t\"message\": \"RDATA: packet length: %i less than minimum RDATA length: %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_data));
 		retval = -1;
 		goto out;
 	}
@@ -715,7 +715,7 @@ verify_nak (
 
 /* truncated packet */
 	if (len < sizeof(struct pgm_nak)) {
-		printf ("\t\"message\": \"NAK: packet length: %i less than minimum NAK length: %lu bytes.\",\n", len, sizeof(struct pgm_nak));
+		printf ("\t\"message\": \"NAK: packet length: %i less than minimum NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_nak));
 		retval = -1;
 		goto out;
 	}
@@ -747,7 +747,7 @@ verify_nak (
 /* IPv4 + IPv6 NLA */
 		case AFI_IP:
 			if (len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )) {
-				printf ("\t\"message\": \"NAK: packet length: %i less than joint IPv4/6 NAK length: %lu bytes.\",\n", len, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
+				printf ("\t\"message\": \"NAK: packet length: %i less than joint IPv4/6 NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
 				retval = -1;
 			}
 			break;
@@ -755,7 +755,7 @@ verify_nak (
 /* IPv6 + IPv6 NLA */
 		case AFI_IP6:
 			if (len < sizeof(struct pgm_nak6)) {
-				printf ("\t\"message\": \"NAK: packet length: %i less than IPv6 NAK length: %lu bytes.\",\n", len, sizeof(struct pgm_nak6));
+				printf ("\t\"message\": \"NAK: packet length: %i less than IPv6 NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_nak6));
 				retval = -1;
 			}
 			break;
@@ -764,7 +764,7 @@ verify_nak (
 	case AFI_IP:
 		if (nak_src_nla_afi == AFI_IP6) {
 			if (len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )) {
-				printf ("\t\"message\": \"NAK: packet length: %i less than joint IPv6/4 NAK length: %lu bytes.\",\n", len, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
+				printf ("\t\"message\": \"NAK: packet length: %i less than joint IPv6/4 NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
 				retval = -1;
 			}
 		}
@@ -959,7 +959,7 @@ verify_options (
 	}
 
 	if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)) {
-		printf ("\t\"message\": \"PGM options: OPT_LENGTH incorrect option length: %i, expecting %lu bytes.\",\n", opt_header->opt_length, sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length));
+		printf ("\t\"message\": \"PGM options: OPT_LENGTH incorrect option length: %i, expecting %" G_GSIZE_FORMAT " bytes.\",\n", opt_header->opt_length, sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length));
 		retval = -1;
 		goto out;
 	}

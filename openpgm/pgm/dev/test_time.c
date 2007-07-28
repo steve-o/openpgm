@@ -87,7 +87,7 @@ main (
 		else if (elapsed < min_diff) min_diff = elapsed;
 	}
 
-	printf ("time elapsed max %lu us, min %lu us\n", max_diff, min_diff);
+	printf ("time elapsed max %" G_GUINT64_FORMAT " us, min %" G_GUINT64_FORMAT " us\n", max_diff, min_diff);
 
 	time_destroy();	
 
