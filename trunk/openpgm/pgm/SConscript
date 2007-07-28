@@ -6,7 +6,7 @@ import os;
 Import('env');
 SConsignFile('scons.signatures');
 
-env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
 env['CPPPATH'] = env['CPPPATH'] + [os.getcwd() + '/include'];
 env['LIBPATH'] = env['LIBPATH'] + [os.getcwd() + '/ref/' + env['BUILD']];
 

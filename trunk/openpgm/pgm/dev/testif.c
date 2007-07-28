@@ -109,7 +109,7 @@ main (
 	{
 		struct sockaddr devices[10], receive_groups[10], send_group;
 
-		printf ("#%li: [%s]\n", p - (char**)tests, *p);
+		printf ("#%i: [%s]\n", p - (char**)tests, *p);
 		int retval = if_parse_network (*p, AF_UNSPEC, devices, receive_groups, &send_group, 10);
 
 		if (retval == 0)

@@ -923,8 +923,8 @@ send_nak (
 		return;
 	}
 
-printf ("PGM header size %lu\n"
-	"PGM NAK block size %lu\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM NAK block size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_nak));
 

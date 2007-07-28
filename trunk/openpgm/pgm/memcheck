@@ -1,6 +1,6 @@
 #!/bin/sh
 
-_SLICE=always-malloc \
+G_SLICE=always-malloc \
 G_DEBUG=gc-friendly \
 	valgrind \
 		-v \

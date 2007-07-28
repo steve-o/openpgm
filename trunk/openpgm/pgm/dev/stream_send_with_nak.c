@@ -573,8 +573,8 @@ send_spm (
 		return;
 	}
 
-printf ("PGM header size %lu\n"
-	"PGM SPM block size %lu\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM SPM block size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_spm) + sizeof(struct in_addr));
 
@@ -673,9 +673,9 @@ send_odata (void)
 		return;
 	}
 
-printf ("PGM header size %lu\n"
-	"PGM data header size %lu\n"
-	"payload size %lu\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM data header size %" G_GSIZE_FORMAT "\n"
+	"payload size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
 	strlen(payload_string) + 1);
@@ -764,9 +764,9 @@ send_rdata (
 		return;
 	}
 
-printf ("PGM header size %lu\n"
-	"PGM data header size %lu\n"
-	"payload size %lu\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM data header size %" G_GSIZE_FORMAT "\n"
+	"payload size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
 	len );

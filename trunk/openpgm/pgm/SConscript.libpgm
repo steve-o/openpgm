@@ -16,12 +16,19 @@ lib_src = Split("""
 		txwi.c
 		rxwi.c
 		transport.c
+""")
+
+only64_src = Split("""
 		csum-copy64.S
 """)
 
 lib_obj = []
 for src in lib_src:
 	lib_obj += env.SharedObject(src)
+
+if env['BUILD'] != 'thirtytwo':
+	for src in only64_src:
+		lib_obj += env.SharedObject(src)
 
 env.StaticLibrary('libpgm', lib_src);
 #env.SharedLibrary('libpgm', lib_obj);
