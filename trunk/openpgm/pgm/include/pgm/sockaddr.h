@@ -23,6 +23,8 @@
 #define __PGM_SOCKADDR_H__
 
 #include <errno.h>
+#include <string.h>
+#include <netinet/in.h>
 
 
 /* TODO: update to RFC 3678: MCAST_JOIN_(SOURCE_)GROUP */

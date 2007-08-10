@@ -453,7 +453,10 @@ pgm_receiver_thread (
 	struct pgm_transport* transport = (struct pgm_transport*)data;
 
 	transport->rx_context = g_main_context_new ();
+	g_mutex_lock (transport->thread_mutex);
 	transport->rx_loop = g_main_loop_new (transport->rx_context, FALSE);
+	g_cond_signal (transport->thread_cond);
+	g_mutex_unlock (transport->thread_mutex);
 
 	g_main_loop_run (transport->rx_loop);
 
@@ -472,9 +475,14 @@ pgm_timer_thread (
 	struct pgm_transport* transport = (struct pgm_transport*)data;
 
 	transport->timer_context = g_main_context_new ();
+	g_mutex_lock (transport->thread_mutex);
 	transport->timer_loop = g_main_loop_new (transport->timer_context, FALSE);
+	g_cond_signal (transport->thread_cond);
+	g_mutex_unlock (transport->thread_mutex);
 
+	g_trace ("INFO", "pgm_timer_thread entering event loop.");
 	g_main_loop_run (transport->timer_loop);
+	g_trace ("INFO", "pgm_timer_thread leaving event loop.");
 
 /* cleanup */
 	g_main_loop_unref (transport->timer_loop);
@@ -593,6 +601,10 @@ pgm_transport_create (
 	GError* err;
 	GThread* thread;
 
+/* set up condition for thread context & loop being ready */
+	transport->thread_mutex = g_mutex_new ();
+	transport->thread_cond = g_cond_new ();
+
 	thread = g_thread_create_full (pgm_receiver_thread,	/* function to call in new thread */
 					transport,
 					0,		/* stack size */
@@ -607,6 +619,12 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
+/* spin lock around condition waiting for thread startup */
+	g_mutex_lock (transport->thread_mutex);
+	while (!transport->rx_loop)
+		g_cond_wait (transport->thread_cond, transport->thread_mutex);
+	g_mutex_unlock (transport->thread_mutex);
+
 	thread = g_thread_create_full (pgm_timer_thread,
 					transport,
 					0,
@@ -620,6 +638,17 @@ pgm_transport_create (
 		g_error ("thread failed: %i %s", err->code, err->message);
 		goto err_destroy;
 	}
+
+	g_mutex_lock (transport->thread_mutex);
+	while (!transport->timer_loop)
+		g_cond_wait (transport->thread_cond, transport->thread_mutex);
+	g_mutex_unlock (transport->thread_mutex);
+
+	g_mutex_free (transport->thread_mutex);
+	transport->thread_mutex = NULL;
+	g_cond_free (transport->thread_cond);
+	transport->thread_cond = NULL;
+
 #endif /* !PGM_SINGLE_THREAD */
 
 	*transport_ = transport;
@@ -627,6 +656,14 @@ pgm_transport_create (
 	return retval;
 
 err_destroy:
+	if (transport->thread_mutex) {
+		g_mutex_free (transport->thread_mutex);
+		transport->thread_mutex = NULL;
+	}
+	if (transport->thread_cond) {
+		g_cond_free (transport->thread_cond);
+		transport->thread_cond = NULL;
+	}
 	if (transport->timer_thread) {
 	}
 	if (transport->rx_thread) {
@@ -1577,7 +1614,7 @@ pgm_transport_bind (
 	sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
 	g_trace ("INFO","adding dynamic timer");
-	transport->next_spm_expiry = time_update_now() + transport->spm_ambient_interval;
+	transport->next_ambient_spm = time_update_now() + transport->spm_ambient_interval;
 	pgm_add_timer (transport);
 
 /* announce new transport by sending out SPMs */
@@ -2036,7 +2073,7 @@ on_nak (
 
 	guint32* req_sqn = &sqn_list->sqn[1];
 
-	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, rdata->sqn[0]);
+	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, sqn_list->sqn[0]);
 
 /* check NAK list */
 	guint32* nak_list = NULL;
@@ -2267,19 +2304,6 @@ send_spm_unlocked (
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
-
-/* advance spm timer */
-	if (!transport->spm_heartbeat_state)
-	{	/* ambient */
-		transport->next_spm_expiry = time_now + transport->spm_ambient_interval;
-	} else if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
-	{	/* heartbeat */
-		transport->next_spm_expiry = time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-	} else
-	{	/* transition heartbeat to ambient */
-		transport->spm_heartbeat_state = 0;
-		transport->next_spm_expiry = time_now + transport->spm_ambient_interval;
-	}
 
 	return retval;
 }
@@ -2523,14 +2547,14 @@ send_nak_list (
 
 #ifdef TRANSPORT_DEBUG
 	char nak1[1024];
-	sprintf (nak1, "send_nak_list( %lu + [", sqn_list->sqn[0]);
+	sprintf (nak1, "send_nak_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
 #endif
 	for (int i = 1; i < len; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
 
 #ifdef TRANSPORT_DEBUG
 		char nak2[1024];
-		sprintf (nak2, "%lu ", sqn_list->sqn[i]);
+		sprintf (nak2, "%" G_GUINT32_FORMAT " ", sqn_list->sqn[i]);
 		strcat (nak1, nak2);
 #endif
 	}
@@ -2610,14 +2634,14 @@ send_ncf_list (
 
 #ifdef TRANSPORT_DEBUG
 	char nak1[1024];
-	sprintf (nak1, "send_ncf_list( %lu + [", sqn_list->sqn[0]);
+	sprintf (nak1, "send_ncf_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
 #endif
 	for (int i = 1; i < len; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
 
 #ifdef TRANSPORT_DEBUG
 		char nak2[1024];
-		sprintf (nak2, "%lu ", sqn_list->sqn[i]);
+		sprintf (nak2, "%" G_GUINT32_FORMAT " ", sqn_list->sqn[i]);
 		strcat (nak1, nak2);
 #endif
 	}
@@ -2806,6 +2830,7 @@ check_peer_nak_state (
 
 	if (time_after_eq (time_now, peer->expiry))
 	{
+		g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
 		g_hash_table_remove (transport->peers, tsi);
 		g_static_mutex_unlock (&peer->mutex);
 		peer_unref (peer);
@@ -3074,7 +3099,7 @@ pgm_write_unlocked (
 	g_static_mutex_lock (&transport->mutex);
 /* re-set spm timer */
 	transport->spm_heartbeat_state = 1;
-	transport->next_spm_expiry = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3169,7 +3194,7 @@ pgm_write_copy_fragment_unlocked (
 	g_static_mutex_lock (&transport->mutex);
 /* re-set spm timer */
 	transport->spm_heartbeat_state = 1;
-	transport->next_spm_expiry = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3208,7 +3233,7 @@ send_rdata (
 /* re-set spm timer */
 	g_static_mutex_lock (&transport->mutex);
 	transport->spm_heartbeat_state = 1;
-	transport->next_spm_expiry = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3351,7 +3376,7 @@ pgm_timer_prepare (
 	glong msec;
 
 	g_static_mutex_lock (&transport->mutex);
-	pgm_time_t expiration = transport->next_spm_expiry;
+	pgm_time_t expiration = transport->spm_heartbeat_state ? MIN(transport->next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
 	pgm_time_t now = time_update_now();
 
 	g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
@@ -3409,8 +3434,26 @@ pgm_timer_dispatch (
 
 	g_static_mutex_lock (&transport->mutex);
 /* find which timers have expired and call each */
-	if ( time_after_eq (time_now, transport->next_spm_expiry) )
+	if ( time_after_eq (time_now, transport->next_ambient_spm) )
+	{
 		send_spm_unlocked (transport);
+		transport->spm_heartbeat_state = 0;
+		transport->next_ambient_spm = time_now + transport->spm_ambient_interval;
+	}
+	else if ( transport->spm_heartbeat_state &&
+		 time_after_eq (time_now, transport->next_heartbeat_spm) )
+	{
+		send_spm_unlocked (transport);
+	
+		if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
+		{
+			transport->next_heartbeat_spm = time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
+		} else
+		{	/* transition heartbeat to ambient */
+			transport->spm_heartbeat_state = 0;
+		}
+
+	}
 
 	if ( transport->next_spmr_expiry && time_after_eq (time_now, transport->next_spmr_expiry) )
 		transport->next_spmr_expiry = 0;
@@ -3568,6 +3611,31 @@ pgm_src_dispatch (
 	} while (TRUE);
 
 out:
+	return TRUE;
+}
+
+/* release event memory for custom async queue dispatch handlers
+ */
+
+int
+pgm_event_unref (
+	struct pgm_transport*	transport,
+	struct pgm_event*	event
+	)
+{
+	struct pgm_peer* peer = event->peer;
+
+/* return memory to receive window */
+	g_static_mutex_lock (&peer->mutex);
+	g_trash_stack_push (&peer->rxw->trash_data, event->data);
+	g_static_mutex_unlock (&peer->mutex);
+
+	peer_unref (peer);
+
+	g_static_mutex_lock (&transport->event_mutex);
+	g_trash_stack_push (&transport->trash_event, event);
+	g_static_mutex_unlock (&transport->event_mutex);
+
 	return TRUE;
 }
 
@@ -3763,10 +3831,19 @@ on_pgm_data (
 	event->len = len;
 	event->peer = peer_ref ((struct pgm_peer*)peer);
 
-#if TRANSPORT_DEBUG
+#ifdef TRANSPORT_DEBUG
 	g_trace ("INFO","peer is %s", pgm_print_tsi(&event->peer->tsi));
 	char buf[1024];
-	snprintf (buf, sizeof(buf), "%s", (char*)data);
+	{
+		char *dst = buf, *src = data;
+		while (*src) {
+			*dst++ = isprint(*src) ? *src : '?';
+			src++;
+		}
+		*dst = 0;
+	}
+			
+//	snprintf (buf, sizeof(buf), "%s", (char*)data);
 	g_trace ("INFO","msg: \"%s\" (%i bytes)", buf, len);
 #endif
 
@@ -3781,6 +3858,14 @@ on_pgm_data (
 		}
 	}
 	g_async_queue_unlock (transport->commit_queue);
+
+/*
+ * In thread starvation cases a yield is necessary here for the application to
+ * get some time to process the data.  Optionally it could be performed when more
+ * than one event is in the queue.  Generally it should not be necessary as the
+ * thread should wake up from a select() or poll() call on the pipe signal.
+ */
+//	g_thread_yield();
 
 	return retval;
 }
