@@ -84,6 +84,9 @@ struct pgm_transport {
     GMainContext	*rx_context, *timer_context;
     gboolean		bound;
 
+    GCond		*thread_cond;
+    GMutex		*thread_mutex;
+
     struct sock_mreq	send_smr;			/* multicast & unicast nla */
     GStaticMutex	send_mutex;
     int			send_sock;
@@ -113,7 +116,7 @@ struct pgm_transport {
 
     guint		nak_data_retries, nak_ncf_retries;
     guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
-    pgm_time_t		next_spm_expiry;
+    pgm_time_t		next_heartbeat_spm, next_ambient_spm;
     pgm_time_t		next_spmr_expiry;
 
     gboolean		proactive_parity;
@@ -144,6 +147,8 @@ typedef int (*pgm_func)(gpointer, guint, gpointer);
 G_BEGIN_DECLS
 
 int pgm_init (void);
+
+int pgm_event_unref (struct pgm_transport*, struct pgm_event*);
 
 gchar* pgm_print_tsi (const struct tsi*);
 
