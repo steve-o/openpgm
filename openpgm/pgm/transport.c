@@ -49,7 +49,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -492,7 +492,8 @@ pgm_timer_thread (
 }
 
 /* create a pgm_transport object.  create sockets that require superuser priviledges, if this is
- * the first instance also create a real-time priority receiving thread.
+ * the first instance also create a real-time priority receiving thread.  if interface ports
+ * are specified then UDP encapsulation will be used instead of raw protocol.
  *
  * if send == recv only two sockets need to be created iff ip headers are not required (IPv6).
  *
@@ -514,6 +515,8 @@ pgm_transport_create (
 	struct sock_mreq*	send_smr	/* send ... */
 	)
 {
+	guint16 udp_encap_port = ((struct sockaddr_in*)&send_smr->smr_multiaddr)->sin_port;
+
 	g_return_val_if_fail (transport_ != NULL, -EINVAL);
 	g_return_val_if_fail (recv_smr != NULL, -EINVAL);
 	g_return_val_if_fail (recv_len > 0, -EINVAL);
@@ -560,6 +563,9 @@ pgm_transport_create (
 		transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
 	} while (transport->tsi.sport == transport->dport);
 
+/* network data ports */
+	transport->udp_encap_port = udp_encap_port;
+
 /* copy network parameters */
 	memcpy (&transport->send_smr, send_smr, sizeof(struct sock_mreq));
 	for (int i = 0; i < recv_len; i++)
@@ -567,11 +573,21 @@ pgm_transport_create (
 		memcpy (&transport->recv_smr[i], &recv_smr[i], sizeof(struct sock_mreq));
 	}
 
-/* open raw sockets to implement PGM at application layer */
-	g_trace ("INFO","opening raw sockets.");
+/* open sockets to implement PGM */
+	int socket_type, protocol;
+	if (transport->udp_encap_port) {
+		g_trace ("INFO", "opening UDP encapsulated sockets.");
+		socket_type = SOCK_DGRAM;
+		protocol = IPPROTO_UDP;
+	} else {
+		g_trace ("INFO", "opening raw sockets.");
+		socket_type = SOCK_RAW;
+		protocol = ipproto_pgm;
+	}
+
 	if ((transport->recv_sock = socket(sockaddr_family(&recv_smr[0].smr_interface),
-						SOCK_RAW,
-						ipproto_pgm)) < 0)
+						socket_type,
+						protocol)) < 0)
 	{
 		retval = errno;
 		if (retval == EPERM && 0 != getuid()) {
@@ -581,16 +597,16 @@ pgm_transport_create (
 	}
 
 	if ((transport->send_sock = socket(sockaddr_family(&send_smr->smr_interface),
-						SOCK_RAW,
-						ipproto_pgm)) < 0)
+						socket_type,
+						protocol)) < 0)
 	{
 		retval = errno;
 		goto err_destroy;
 	}
 
 	if ((transport->send_with_router_alert_sock = socket(sockaddr_family(&send_smr->smr_interface),
-						SOCK_RAW,
-						ipproto_pgm)) < 0)
+						socket_type,
+						protocol)) < 0)
 	{
 		retval = errno;
 		goto err_destroy;
@@ -1314,11 +1330,14 @@ pgm_transport_bind (
 /* create peer list */
 	transport->peers = g_hash_table_new (tsi_hash, tsi_equal);
 
+	if (!transport->udp_encap_port)
+	{
 /* include IP header only for incoming data */
-	retval = sockaddr_hdrincl (transport->recv_sock, sockaddr_family(&transport->recv_smr[0].smr_interface), TRUE);
-	if (retval < 0) {
-		retval = errno;
-		goto out;
+		retval = sockaddr_hdrincl (transport->recv_sock, sockaddr_family(&transport->recv_smr[0].smr_interface), TRUE);
+		if (retval < 0) {
+			retval = errno;
+			goto out;
+		}
 	}
 
 /* buffers, set size first then re-read to confirm actual value */
@@ -1710,9 +1729,17 @@ on_io_data (
 	char *packet;
 	int packet_len;
 	int e;
-	if ((e = pgm_parse_packet(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
-	{
-		goto out;
+
+	if (transport->udp_encap_port) {
+		if ((e = pgm_parse_udp_encap(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
+		{
+			goto out;
+		}
+	} else {
+		if ((e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
+		{
+			goto out;
+		}
 	}
 
 /* calculate senders TSI */

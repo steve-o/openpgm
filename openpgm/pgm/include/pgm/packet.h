@@ -39,6 +39,12 @@
 #define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
+/*
+ * Udp port for UDP encapsulation
+ */
+#define DEFAULT_UDP_ENCAP_UCAST_PORT 3055
+#define DEFAULT_UDP_ENCAP_MCAST_PORT 3056
+
 enum pgm_type {
     PGM_SPM = 0x00,	/* 8.1: source path message */
     PGM_POLL = 0x01,	/* 14.7.1: poll request */
@@ -344,7 +350,9 @@ struct pgm_opt6_path_nla {
 
 G_BEGIN_DECLS
 
-int pgm_parse_packet (char*, int, struct sockaddr*, socklen_t*, struct pgm_header**, char**, int*);
+int pgm_parse (struct pgm_header*, int, struct pgm_header**, char**, int*);
+int pgm_parse_raw (char*, int, struct sockaddr*, socklen_t*, struct pgm_header**, char**, int*);
+int pgm_parse_udp_encap (char*, int, struct sockaddr*, socklen_t*, struct pgm_header**, char**, int*);
 gboolean pgm_print_packet (char*, int);
 
 static inline gboolean pgm_is_upstream (guint8 type)
