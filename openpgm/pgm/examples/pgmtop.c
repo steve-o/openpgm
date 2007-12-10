@@ -743,7 +743,7 @@ on_io_data (
 	struct pgm_header *pgm_header;
 	char *packet;
 	int packet_length;
-	int e = pgm_parse_packet(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_raw(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 	if (e == -2)
 	{
 /* corrupt packet */

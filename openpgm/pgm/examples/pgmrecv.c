@@ -50,6 +50,7 @@
 
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
+static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
@@ -74,6 +75,7 @@ usage (
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	exit (1);
 }
 
@@ -88,11 +90,12 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:c:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+		case 'p':	g_udp_encap_port = atoi (optarg); break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -190,6 +193,11 @@ on_startup (
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 #endif
+
+	if (g_udp_encap_port) {
+		((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_udp_encap_port);
+	}
 
 	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
