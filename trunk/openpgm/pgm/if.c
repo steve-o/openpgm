@@ -1024,9 +1024,9 @@ if_parse_transport (
 	int retval = 0;
 
 /* resolve network string */
-	struct sockaddr* devices = g_malloc ( sizeof(struct sockaddr_storage) * *len );
-	struct sockaddr* receive_groups = g_malloc ( sizeof(struct sockaddr_storage) * *len );
-	struct sockaddr* send_group = g_malloc ( sizeof(struct sockaddr_storage) );
+	struct sockaddr* devices = g_malloc0 ( sizeof(struct sockaddr_storage) * *len );
+	struct sockaddr* receive_groups = g_malloc0 ( sizeof(struct sockaddr_storage) * *len );
+	struct sockaddr* send_group = g_malloc0 ( sizeof(struct sockaddr_storage) );
 	retval = if_parse_network (s, ai_family, devices, receive_groups, send_group, *len);
 	if (retval == 0)
 	{

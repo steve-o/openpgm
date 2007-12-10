@@ -49,7 +49,7 @@ static int pgm_print_options (char*, int);
 
 
 int
-pgm_parse_packet (
+pgm_parse_raw (
 	char*			data,
 	int			len,
 	struct sockaddr*	dst_addr,
@@ -62,7 +62,8 @@ pgm_parse_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %i bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n", len, sizeof(struct pgm_header));
+		printf ("Packet size too small: %i bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+			len, (sizeof(struct iphdr) + sizeof(struct pgm_header)));
 		return -1;
 	}
 
@@ -192,6 +193,32 @@ pgm_parse_packet (
 	struct pgm_header* pgm_header = (struct pgm_header*)((char*)data + ip_header_length);
 	int pgm_length = packet_length - ip_header_length;
 
+	return pgm_parse (pgm_header, pgm_length, header, packet, packet_len);
+}
+
+int
+pgm_parse_udp_encap (
+	char*			data,
+	int			len,
+	struct sockaddr*	dst_addr,
+	socklen_t*		dst_addr_len,
+	struct pgm_header**	header,
+	char**			packet,
+	int*			packet_len
+	)
+{
+	return pgm_parse ((struct pgm_header*)data, len, header, packet, packet_len);
+}
+
+int
+pgm_parse (
+	struct pgm_header*	pgm_header,
+	int			pgm_length,
+	struct pgm_header**	header,
+	char**			packet,
+	int*			packet_len
+	)
+{
 	if (pgm_length < sizeof(pgm_header)) {
 		puts ("bad packet size :(");
 		return -1;

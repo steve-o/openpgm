@@ -78,6 +78,8 @@ struct pgm_transport {
     struct tsi		tsi;
     guint16		dport;
 
+    guint16		udp_encap_port;
+
     GStaticMutex	mutex;
     GThread		*rx_thread, *timer_thread;
     GMainLoop		*rx_loop, *timer_loop;
@@ -153,6 +155,7 @@ int pgm_event_unref (struct pgm_transport*, struct pgm_event*);
 gchar* pgm_print_tsi (const struct tsi*);
 
 int pgm_transport_create (struct pgm_transport**, guint8*, guint16, struct sock_mreq*, int, struct sock_mreq*);
+int pgm_transport_create_udp_encap (struct pgm_transport**, guint8*, guint16, guint16, guint16, struct sock_mreq*, int, struct sock_mreq*);
 int pgm_transport_bind (struct pgm_transport*);
 GSource* pgm_transport_create_watch (struct pgm_transport*);
 int pgm_transport_add_watch_full (struct pgm_transport*, gint, pgm_func, gpointer, GDestroyNotify);

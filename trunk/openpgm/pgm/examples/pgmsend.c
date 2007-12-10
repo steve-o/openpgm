@@ -51,6 +51,7 @@
 
 static int g_port = 7500;
 static char* g_network = "226.0.0.1";
+static int g_udp_encap_port = 0;
 
 static int g_odata_interval = 1 * 100;
 static int g_payload = 0;
@@ -80,6 +81,7 @@ usage (const char* bin)
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
+	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
 	fprintf (stderr, "  -k <k>          : Configure FEC with k data packets, 2t parity\n");
 	fprintf (stderr, "  -t <2t>\n");
@@ -97,11 +99,12 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:f:k:t:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:f:k:t:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+		case 'p':	g_udp_encap_port = atoi (optarg); break;
 
 		case 'f':	g_fec = TRUE; break;
 		case 'k':	g_k = atoi (optarg); break;
@@ -208,6 +211,11 @@ on_startup (
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 #endif
+
+	if (g_udp_encap_port) {
+		((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_udp_encap_port);
+	}
 
 	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
