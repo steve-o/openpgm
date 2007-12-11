@@ -12,6 +12,8 @@ e.Program(['pgmsend.c'])
 e.Program(['pgmrecv.c'])
 e.Program(['pgmping.c'])
 
+e.Program(['syncrecv.c'])
+
 ne = e.Copy(
 		LIBS = e['LIBS'] + ['panel', 'ncurses'],
 		);
