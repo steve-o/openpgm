@@ -49,7 +49,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
