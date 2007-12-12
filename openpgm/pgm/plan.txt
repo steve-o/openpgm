@@ -120,6 +120,12 @@ pgmrecv
 basic_recv_with_rxw without web interface, primary displays messages from pgmsend.
 
 
+syncrecv
+--------
+
+pgmrecv implemented outside GLib with a synchronous coding paradigm.
+
+
 pgmping
 -------
 
@@ -192,15 +198,21 @@ Outstanding questions
 - Is it better to have send sockets per transport, or shared, bound to each interface?
 - Cost of sharing state helper lists between receive windows?  On culling a peer the lists
   have to be purged.  Saves iterating the hash list of receivers.
+- Encapsulated UDP lists two ports, 3305 for broadcast, 3306 for unicast, how is this 
+  supposed to map to regular PGM, and why the split?
 
 Basic TODO list
 ***************
 
-- Transport throttling, fine grain throttling.
-- OPT_SYN on sending side.
+- Ensure standardised error handling and status reporting.
+- Implement mechanism for data-loss feedback.
+- Add interface for synchronous reading instead of directly accessing transport.
+- Add statistics back from basic_recv with some method to query and reset.
+- Transport throttling, fine grain throttling: ODATA to RDATA, and priority.
+- OPT_SYN & OPT_FIN on sending side.
 - Shared trash stacks between multiple receive windows (contexts).
 - Shared trash stacks between transmit and receive windows.
-- FEC: to be or not to be Reed Solomon.
+- FEC: to be or not to be Reed Solomon, compatibility with SmartPGM FEC?
 - NAK backoff learning.
 - Full conformance testing.
 - Unit testing.
@@ -217,4 +229,4 @@ Optionals
 - Unicast delivery inside a transport with either array or list based transmit windows per peer.
 - SNMP statistics for external poll based management.
 - Some form of broadcast statistics for passive monitoring.
-- Web interface from basic_recv for transporty monitoring.
+- Web interface from basic_recv for transport monitoring.
