@@ -62,26 +62,33 @@
 #	endif
 #endif
 
-struct pgm_sqn_list {
+struct pgm_sqn_list_t {
 	guint32		sqn[63];
 };
 
+typedef struct pgm_sqn_list_t pgm_sqn_list_t;
+
 /* external: Glib event loop GSource of pgm contiguous data */
-struct pgm_watch {
+struct pgm_watch_t {
 	GSource		source;
 	GPollFD		pollfd;
-	struct pgm_transport*	transport;
+	pgm_transport_t* transport;
 };
+
+typedef struct pgm_watch_t pgm_watch_t;
 
 /* internal: Glib event loop GSource of spm & rx state timers */
-struct pgm_timer {
+struct pgm_timer_t {
 	GSource		source;
 	pgm_time_t	expiration;
-	struct pgm_transport*	transport;
+	pgm_transport_t* transport;
 };
 
+typedef struct pgm_timer_t pgm_timer_t;
+
+
 /* callback for pgm timer events */
-typedef int (*timer_callback)(struct pgm_transport*);
+typedef int (*pgm_timer_callback)(pgm_transport_t*);
 
 
 /* global locals */
@@ -101,9 +108,9 @@ static GSourceFuncs g_pgm_watch_funcs = {
 	NULL
 };
 
-static GSource* pgm_create_timer (struct pgm_transport*);
-static int pgm_add_timer_full (struct pgm_transport*, gint);
-static int pgm_add_timer (struct pgm_transport*);
+static GSource* pgm_create_timer (pgm_transport_t*);
+static int pgm_add_timer_full (pgm_transport_t*, gint);
+static int pgm_add_timer (pgm_transport_t*);
 
 static gboolean pgm_timer_prepare (GSource*, gint*);
 static gboolean pgm_timer_check (GSource*);
@@ -116,48 +123,48 @@ static GSourceFuncs g_pgm_timer_funcs = {
 	NULL
 };
 
-static int send_spm_unlocked (struct pgm_transport*);
-static inline int send_spm (struct pgm_transport*);
-static int send_spmr (struct pgm_peer*);
-static int send_nak (struct pgm_peer*, guint32);
-static int send_nak_list (struct pgm_peer*, struct pgm_sqn_list*, guint);
-static int send_ncf (struct pgm_peer*, struct sockaddr*, struct sockaddr*, guint32);
-static int send_ncf_list (struct pgm_transport*, struct sockaddr*, struct sockaddr*, struct pgm_sqn_list*, int);
+static int send_spm_unlocked (pgm_transport_t*);
+static inline int send_spm (pgm_transport_t*);
+static int send_spmr (pgm_peer_t*);
+static int send_nak (pgm_peer_t*, guint32);
+static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*, guint);
+static int send_ncf (pgm_peer_t*, struct sockaddr*, struct sockaddr*, guint32);
+static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*, int);
 
 static void nak_rb_state (gpointer, gpointer);
 static void nak_rpt_state (gpointer, gpointer);
 static void nak_rdata_state (gpointer, gpointer);
 static void check_peer_nak_state (gpointer, gpointer, gpointer);
-static pgm_time_t min_nak_expiry (pgm_time_t, struct pgm_transport*);
+static pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
-static int send_rdata (struct pgm_transport*, int, gpointer, int);
+static int send_rdata (pgm_transport_t*, int, gpointer, int);
 
-static inline struct pgm_peer* peer_ref (struct pgm_peer*);
-static inline void peer_unref (struct pgm_peer*);
-static void peer_unref_hfunc (gpointer, gpointer, gpointer);
+static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
+static inline void pgm_peer_unref (pgm_peer_t*);
+static void pgm_peer_unref_hfunc (gpointer, gpointer, gpointer);
 
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
 static gboolean on_nak_pipe (GIOChannel*, GIOCondition, gpointer);
 
-static int on_spm (struct pgm_peer*, struct pgm_header*, char*, int);
-static int on_spmr (struct pgm_transport*, struct pgm_peer*, struct pgm_header*, char*, int);
-static int on_nak (struct pgm_transport*, struct tsi*, struct pgm_header*, char*, int);
-static int on_ncf (struct pgm_peer*, struct pgm_header*, char*, int);
-static int on_odata (struct pgm_peer*, struct pgm_header*, char*, int);
-static int on_rdata (struct pgm_peer*, struct pgm_header*, char*, int);
+static int on_spm (pgm_peer_t*, struct pgm_header*, char*, int);
+static int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, char*, int);
+static int on_nak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int);
+static int on_ncf (pgm_peer_t*, struct pgm_header*, char*, int);
+static int on_odata (pgm_peer_t*, struct pgm_header*, char*, int);
+static int on_rdata (pgm_peer_t*, struct pgm_header*, char*, int);
 
 static int on_pgm_data (gpointer, guint, gpointer);
 
 
 gchar*
 pgm_print_tsi (
-	const struct tsi*	tsi
+	const pgm_tsi_t*	tsi
 	)
 {
 	guint8* gsi = (guint8*)tsi;
-	guint16 source_port = *(guint16*)(gsi + 6);
+	guint16 source_port = tsi->sport;
 	static char buf[sizeof("000.000.000.000.000.000.00000")];
 	snprintf(buf, sizeof(buf), "%i.%i.%i.%i.%i.%i.%i",
 		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
@@ -168,18 +175,18 @@ pgm_print_tsi (
  *  */
 
 static guint
-tsi_hash (
+pgm_tsi_hash (
 	gconstpointer v
         )
 {
-	return g_str_hash(pgm_print_tsi((struct tsi*)v));
+	return g_str_hash(pgm_print_tsi((pgm_tsi_t*)v));
 }
 
 /* compare two transport session identifier TSI values and return TRUE if they are equal
  *  */
 
 static gint
-tsi_equal (
+pgm_tsi_equal (
 	gconstpointer   v,
 	gconstpointer   v2
         )
@@ -187,9 +194,9 @@ tsi_equal (
 	return memcmp (v, v2, (6 * sizeof(guint8)) + sizeof(guint16)) == 0;
 }
 
-static inline gpointer sqn_list_alloc (struct pgm_transport* t)
+static inline gpointer pgm_sqn_list_alloc (pgm_transport_t* t)
 {
-	return t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(struct pgm_sqn_list));
+	return t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(pgm_sqn_list_t));
 }
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -204,7 +211,7 @@ pgm_init (void)
 	if (!g_thread_supported ()) g_thread_init (NULL);
 
 /* ensure timer enabled */
-	if (!time_supported ()) time_init();
+	if (!pgm_time_supported ()) pgm_time_init();
 
 
 /* find PGM protocol id */
@@ -244,7 +251,7 @@ pgm_init (void)
 
 int
 pgm_transport_destroy (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	gboolean		flush
 	)
 {
@@ -294,14 +301,14 @@ pgm_transport_destroy (
 	if (transport->peers) {
 		g_trace ("INFO","destroying peer data.");
 
-		g_hash_table_foreach (transport->peers, peer_unref_hfunc, transport);
+		g_hash_table_foreach (transport->peers, pgm_peer_unref_hfunc, transport);
 		g_hash_table_destroy (transport->peers);
 		transport->peers = NULL;
 	}
 
 	if (transport->txw) {
 		g_trace ("INFO","destroying transmit window.");
-		txw_shutdown (transport->txw);
+		pgm_txw_shutdown (transport->txw);
 		transport->txw = NULL;
 	}
 
@@ -343,7 +350,7 @@ pgm_transport_destroy (
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&transport->trash_rdata)) )
 		{
-			g_slice_free1 (sizeof(struct pgm_sqn_list), p);
+			g_slice_free1 (sizeof(pgm_sqn_list_t), p);
 		}
 
 		g_assert (transport->trash_rdata == NULL);
@@ -365,7 +372,7 @@ pgm_transport_destroy (
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&transport->trash_event)) )
 		{
-			g_slice_free1 (sizeof(struct pgm_event), p);
+			g_slice_free1 (sizeof(pgm_event_t), p);
 		}
 
 		g_assert (transport->trash_event == NULL);
@@ -384,9 +391,9 @@ pgm_transport_destroy (
 	return 0;
 }
 
-static inline struct pgm_peer*
-peer_ref (
-	struct pgm_peer*	peer
+static inline pgm_peer_t*
+pgm_peer_ref (
+	pgm_peer_t*	peer
 	)
 {
 	g_return_val_if_fail (peer != NULL, NULL);
@@ -397,8 +404,8 @@ peer_ref (
 }
 
 static inline void
-peer_unref (
-	struct pgm_peer*	peer
+pgm_peer_unref (
+	pgm_peer_t*	peer
 	)
 {
 	gboolean is_zero;
@@ -409,7 +416,7 @@ peer_unref (
 
 	if (G_UNLIKELY (is_zero))
 	{
-		rxw_shutdown (peer->rxw);
+		pgm_rxw_shutdown (peer->rxw);
 		peer->rxw = NULL;
 		g_free (peer);
 	}
@@ -420,23 +427,23 @@ peer_unref (
  */
 
 static void
-peer_unref_hfunc (
+pgm_peer_unref_hfunc (
 	gpointer	tsi,
 	gpointer	peer,
 	gpointer	transport
 	)
 {
-	peer_unref ((struct pgm_peer*)peer);
+	pgm_peer_unref ((pgm_peer_t*)peer);
 }
 
 static inline gpointer
 pgm_alloc_event (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	g_return_val_if_fail (transport != NULL, NULL);
 
-	return transport->trash_event ?  g_trash_stack_pop (&transport->trash_event) : g_slice_alloc (sizeof(struct pgm_event));
+	return transport->trash_event ?  g_trash_stack_pop (&transport->trash_event) : g_slice_alloc (sizeof(pgm_event_t));
 }
 
 /* internal receiver thread, sits in a glib event loop processing incoming packets and related
@@ -450,7 +457,7 @@ pgm_receiver_thread (
 	gpointer		data
 	)
 {
-	struct pgm_transport* transport = (struct pgm_transport*)data;
+	pgm_transport_t* transport = (pgm_transport_t*)data;
 
 	transport->rx_context = g_main_context_new ();
 	g_mutex_lock (transport->thread_mutex);
@@ -472,7 +479,7 @@ pgm_timer_thread (
 	gpointer		data
 	)
 {
-	struct pgm_transport* transport = (struct pgm_transport*)data;
+	pgm_transport_t* transport = (pgm_transport_t*)data;
 
 	transport->timer_context = g_main_context_new ();
 	g_mutex_lock (transport->thread_mutex);
@@ -507,12 +514,12 @@ pgm_timer_thread (
 
 int
 pgm_transport_create (
-	struct pgm_transport**	transport_,
-	guint8*			gsi,
+	pgm_transport_t**	transport_,
+	pgm_gsi_t*		gsi,
 	guint16			dport,
-	struct sock_mreq*	recv_smr,	/* receive port, multicast group & interface address */
+	struct pgm_sock_mreq*	recv_smr,	/* receive port, multicast group & interface address */
 	int			recv_len,
-	struct sock_mreq*	send_smr	/* send ... */
+	struct pgm_sock_mreq*	send_smr	/* send ... */
 	)
 {
 	guint16 udp_encap_port = ((struct sockaddr_in*)&send_smr->smr_multiaddr)->sin_port;
@@ -524,16 +531,16 @@ pgm_transport_create (
 	g_return_val_if_fail (send_smr != NULL, -EINVAL);
 	for (int i = 0; i < recv_len; i++)
 	{
-		g_return_val_if_fail (sockaddr_family(&recv_smr[i].smr_multiaddr) == sockaddr_family(&recv_smr[0].smr_multiaddr), -EINVAL);
-		g_return_val_if_fail (sockaddr_family(&recv_smr[i].smr_multiaddr) == sockaddr_family(&recv_smr[i].smr_interface), -EINVAL);
+		g_return_val_if_fail (pgm_sockaddr_family(&recv_smr[i].smr_multiaddr) == pgm_sockaddr_family(&recv_smr[0].smr_multiaddr), -EINVAL);
+		g_return_val_if_fail (pgm_sockaddr_family(&recv_smr[i].smr_multiaddr) == pgm_sockaddr_family(&recv_smr[i].smr_interface), -EINVAL);
 	}
-	g_return_val_if_fail (sockaddr_family(&send_smr->smr_multiaddr) == sockaddr_family(&send_smr->smr_interface), -EINVAL);
+	g_return_val_if_fail (pgm_sockaddr_family(&send_smr->smr_multiaddr) == pgm_sockaddr_family(&send_smr->smr_interface), -EINVAL);
 
 	int retval = 0;
-	struct pgm_transport* transport;
+	pgm_transport_t* transport;
 
 /* create transport object */
-	transport = g_malloc0 (sizeof(struct pgm_transport));
+	transport = g_malloc0 (sizeof(pgm_transport_t));
 
 /* regular send lock */
 	g_static_mutex_init (&transport->send_mutex);
@@ -557,7 +564,7 @@ pgm_transport_create (
 /* lock tx until bound */
 	g_static_mutex_lock (&transport->send_mutex);
 
-	memcpy (transport->tsi.gsi, gsi, 6);
+	memcpy (&transport->tsi.gsi, gsi, 6);
 	transport->dport = g_htons (dport);
 	do {
 		transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
@@ -567,10 +574,10 @@ pgm_transport_create (
 	transport->udp_encap_port = udp_encap_port;
 
 /* copy network parameters */
-	memcpy (&transport->send_smr, send_smr, sizeof(struct sock_mreq));
+	memcpy (&transport->send_smr, send_smr, sizeof(struct pgm_sock_mreq));
 	for (int i = 0; i < recv_len; i++)
 	{
-		memcpy (&transport->recv_smr[i], &recv_smr[i], sizeof(struct sock_mreq));
+		memcpy (&transport->recv_smr[i], &recv_smr[i], sizeof(struct pgm_sock_mreq));
 	}
 
 /* open sockets to implement PGM */
@@ -585,7 +592,7 @@ pgm_transport_create (
 		protocol = ipproto_pgm;
 	}
 
-	if ((transport->recv_sock = socket(sockaddr_family(&recv_smr[0].smr_interface),
+	if ((transport->recv_sock = socket(pgm_sockaddr_family(&recv_smr[0].smr_interface),
 						socket_type,
 						protocol)) < 0)
 	{
@@ -596,7 +603,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if ((transport->send_sock = socket(sockaddr_family(&send_smr->smr_interface),
+	if ((transport->send_sock = socket(pgm_sockaddr_family(&send_smr->smr_interface),
 						socket_type,
 						protocol)) < 0)
 	{
@@ -604,7 +611,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if ((transport->send_with_router_alert_sock = socket(sockaddr_family(&send_smr->smr_interface),
+	if ((transport->send_with_router_alert_sock = socket(pgm_sockaddr_family(&send_smr->smr_interface),
 						socket_type,
 						protocol)) < 0)
 	{
@@ -707,7 +714,7 @@ err_destroy:
 
 /* drop out of setuid 0 */
 void
-drop_superuser (void)
+pgm_drop_superuser (void)
 {
 	if (0 == getuid()) {
 		setuid((gid_t)65534);
@@ -723,7 +730,7 @@ drop_superuser (void)
 
 int
 pgm_transport_set_max_tpdu (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint16			max_tpdu
 	)
 {
@@ -743,7 +750,7 @@ pgm_transport_set_max_tpdu (
 
 int
 pgm_transport_set_hops (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	gint			hops
 	)
 {
@@ -766,7 +773,7 @@ pgm_transport_set_hops (
 
 int
 pgm_transport_set_ambient_spm (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			spm_ambient_interval	/* in microseconds */
 	)
 {
@@ -788,7 +795,7 @@ pgm_transport_set_ambient_spm (
 
 int
 pgm_transport_set_heartbeat_spm (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint*			spm_heartbeat_interval,
 	int			len
 	)
@@ -818,7 +825,7 @@ pgm_transport_set_heartbeat_spm (
 
 int
 pgm_transport_set_peer_expiry (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			peer_expiry
 	)
 {
@@ -841,7 +848,7 @@ pgm_transport_set_peer_expiry (
 
 int
 pgm_transport_set_spmr_expiry (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			spmr_expiry
 	)
 {
@@ -864,7 +871,7 @@ pgm_transport_set_spmr_expiry (
 
 int
 pgm_transport_set_txw_preallocate (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			sqns
 	)
 {
@@ -884,7 +891,7 @@ pgm_transport_set_txw_preallocate (
 
 int
 pgm_transport_set_txw_sqns (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			sqns
 	)
 {
@@ -907,7 +914,7 @@ pgm_transport_set_txw_sqns (
 
 int
 pgm_transport_set_txw_secs (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			secs
 	)
 {
@@ -933,7 +940,7 @@ pgm_transport_set_txw_secs (
 
 int
 pgm_transport_set_txw_max_rte (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			max_rte
 	)
 {
@@ -955,7 +962,7 @@ pgm_transport_set_txw_max_rte (
 
 int
 pgm_transport_set_rxw_preallocate (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			sqns
 	)
 {
@@ -972,7 +979,7 @@ pgm_transport_set_rxw_preallocate (
 
 int
 pgm_transport_set_event_preallocate (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			events
 	)
 {
@@ -992,7 +999,7 @@ pgm_transport_set_event_preallocate (
 
 int
 pgm_transport_set_rxw_sqns (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			sqns
 	)
 {
@@ -1015,7 +1022,7 @@ pgm_transport_set_rxw_sqns (
 
 int
 pgm_transport_set_rxw_secs (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			secs
 	)
 {
@@ -1041,7 +1048,7 @@ pgm_transport_set_rxw_secs (
 
 int
 pgm_transport_set_rxw_max_rte (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			max_rte
 	)
 {
@@ -1064,7 +1071,7 @@ pgm_transport_set_rxw_max_rte (
 
 int
 pgm_transport_set_sndbuf (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	int			size
 	)
 {
@@ -1094,7 +1101,7 @@ pgm_transport_set_sndbuf (
 
 int
 pgm_transport_set_rcvbuf (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	int			size
 	)
 {
@@ -1121,7 +1128,7 @@ pgm_transport_set_rcvbuf (
 
 int
 pgm_transport_set_nak_rb_ivl (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			usec
 	)
 {
@@ -1137,7 +1144,7 @@ pgm_transport_set_nak_rb_ivl (
 
 int
 pgm_transport_set_nak_rpt_ivl (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			usec
 	)
 {
@@ -1153,7 +1160,7 @@ pgm_transport_set_nak_rpt_ivl (
 
 int
 pgm_transport_set_nak_rdata_ivl (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			usec
 	)
 {
@@ -1169,7 +1176,7 @@ pgm_transport_set_nak_rdata_ivl (
 
 int
 pgm_transport_set_nak_data_retries (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			cnt
 	)
 {
@@ -1185,7 +1192,7 @@ pgm_transport_set_nak_data_retries (
 
 int
 pgm_transport_set_nak_ncf_retries (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	guint			cnt
 	)
 {
@@ -1207,7 +1214,7 @@ g_io_add_watch_context_full (
 	GMainContext*		context,
 	gint			priority,
 	GIOCondition		condition,
-	GIOFunc			func,
+	GIOFunc			function,
 	gpointer		user_data,
 	GDestroyNotify		notify
 	)
@@ -1221,7 +1228,7 @@ g_io_add_watch_context_full (
 
 	if (priority != G_PRIORITY_DEFAULT)
 		g_source_set_priority (source, priority);
-	g_source_set_callback (source, (GSourceFunc)func, user_data, notify);
+	g_source_set_callback (source, (GSourceFunc)function, user_data, notify);
 
 	id = g_source_attach (source, context);
 	g_source_unref (source);
@@ -1234,7 +1241,7 @@ g_io_add_watch_context_full (
 
 int
 pgm_transport_bind (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -1282,7 +1289,7 @@ pgm_transport_bind (
 	g_trace ("INFO","preallocate event queue.");
 	for (guint32 i = 0; i < transport->event_preallocate; i++)
 	{
-		gpointer event = g_slice_alloc (sizeof(struct pgm_event));
+		gpointer event = g_slice_alloc (sizeof(pgm_event_t));
 		g_trash_stack_push (&transport->trash_event, event);
 	}
 
@@ -1321,19 +1328,19 @@ pgm_transport_bind (
 		
 
 	g_trace ("INFO","construct transmit window.");
-	transport->txw = txw_init (transport->max_tpdu - sizeof(struct iphdr),
+	transport->txw = pgm_txw_init (transport->max_tpdu - sizeof(struct iphdr),
 					transport->txw_preallocate,
 					transport->txw_sqns,
 					transport->txw_secs,
 					transport->txw_max_rte);
 
 /* create peer list */
-	transport->peers = g_hash_table_new (tsi_hash, tsi_equal);
+	transport->peers = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 
 	if (!transport->udp_encap_port)
 	{
 /* include IP header only for incoming data */
-		retval = sockaddr_hdrincl (transport->recv_sock, sockaddr_family(&transport->recv_smr[0].smr_interface), TRUE);
+		retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), TRUE);
 		if (retval < 0) {
 			retval = errno;
 			goto out;
@@ -1392,12 +1399,12 @@ pgm_transport_bind (
 /* TODO: different ports requires a new bound socket */
 	retval = bind (transport->recv_sock,
 			(struct sockaddr*)&transport->recv_smr[0].smr_interface,
-			sockaddr_len(&transport->recv_smr[0].smr_interface));
+			pgm_sockaddr_len(&transport->recv_smr[0].smr_interface));
 	if (retval < 0) {
 		retval = errno;
 #ifdef TRANSPORT_DEBUG
 		char s[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->recv_smr[0].smr_interface, s, sizeof(s));
+		pgm_sockaddr_ntop (&transport->recv_smr[0].smr_interface, s, sizeof(s));
 		g_trace ("INFO","bind failed on recv_smr[0] %s", s);
 #endif
 		goto out;
@@ -1421,19 +1428,19 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->recv_smr[0].smr_interface, s, sizeof(s));
+		pgm_sockaddr_ntop (&transport->recv_smr[0].smr_interface, s, sizeof(s));
 		g_trace ("INFO","bind succeeded on recv_smr[0] %s", s);
 	}
 #endif
 
 	retval = bind (transport->send_sock,
 			(struct sockaddr*)&transport->send_smr.smr_interface,
-			sockaddr_len(&transport->send_smr.smr_interface));
+			pgm_sockaddr_len(&transport->send_smr.smr_interface));
 	if (retval < 0) {
 		retval = errno;
 #ifdef TRANSPORT_DEBUG
 		char s[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
 		g_trace ("INFO","bind failed on send_smr %s", s);
 #endif
 		goto out;
@@ -1457,19 +1464,19 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
 		g_trace ("INFO","bind succeeded on send_smr %s", s);
 	}
 #endif
 
 	retval = bind (transport->send_with_router_alert_sock,
 			(struct sockaddr*)&transport->send_smr.smr_interface,
-			sockaddr_len(&transport->send_smr.smr_interface));
+			pgm_sockaddr_len(&transport->send_smr.smr_interface));
 	if (retval < 0) {
 		retval = errno;
 #ifdef TRANSPORT_DEBUG
 		char s[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
 		g_trace ("INFO","bind (router alert) failed on send_smr %s", s);
 #endif
 		goto out;
@@ -1478,23 +1485,23 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
 		g_trace ("INFO","bind (router alert) succeeded on send_smr %s", s);
 	}
 #endif
 
 /* receiving groups (multiple) */
 /* TODO: add IPv6 multicast membership? */
-	struct sock_mreq* p = transport->recv_smr;
+	struct pgm_sock_mreq* p = transport->recv_smr;
 	int i = 1;
 	do {
-		retval = sockaddr_add_membership (transport->recv_sock, p);
+		retval = pgm_sockaddr_add_membership (transport->recv_sock, p);
 		if (retval < 0) {
 			retval = errno;
 #ifdef TRANSPORT_DEBUG
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-			sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
-			sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
+			pgm_sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
+			pgm_sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
 			g_trace ("INFO","sockaddr_add_membership failed on recv_smr[%i] %s %s", i-1, s1, s2);
 #endif
 			goto out;
@@ -1503,22 +1510,22 @@ pgm_transport_bind (
 		else
 		{
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-			sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
-			sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
+			pgm_sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
+			pgm_sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
 			g_trace ("INFO","sockaddr_add_membership succeeded on recv_smr[%i] %s %s", i-1, s1, s2);
 		}
 #endif
 
-	} while ((i++) < IP_MAX_MEMBERSHIPS && sockaddr_family(&(++p)->smr_multiaddr) != 0);
+	} while ((i++) < IP_MAX_MEMBERSHIPS && pgm_sockaddr_family(&(++p)->smr_multiaddr) != 0);
 
 /* send group (singular) */
-	retval = sockaddr_multicast_if (transport->send_sock, &transport->send_smr);
+	retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_smr);
 	if (retval < 0) {
 		retval = errno;
 #ifdef TRANSPORT_DEBUG
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
-		sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
 		g_trace ("INFO","sockaddr_multicast_if failed on send_smr %s %s", s1, s2);
 #endif
 		goto out;
@@ -1527,18 +1534,18 @@ pgm_transport_bind (
 	else
 	{
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
-		sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
 		g_trace ("INFO","sockaddr_multicast_if succeeded on send_smr %s %s", s1, s2);
 	}
 #endif
-	retval = sockaddr_multicast_if (transport->send_with_router_alert_sock, &transport->send_smr);
+	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, &transport->send_smr);
 	if (retval < 0) {
 		retval = errno;
 #ifdef TRANSPORT_DEBUG
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
-		sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
 		g_trace ("INFO","sockaddr_multicast_if (router alert) failed on send_smr %s %s", s1, s2);
 #endif
 		goto out;
@@ -1547,41 +1554,41 @@ pgm_transport_bind (
 	else
 	{
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
-		sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
+		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
 		g_trace ("INFO","sockaddr_multicast_if (router alert) succeeded on send_smr %s %s", s1, s2);
 	}
 #endif
 
 /* multicast loopback */
-	retval = sockaddr_multicast_loop (transport->recv_sock, sockaddr_family(&transport->recv_smr[0].smr_interface), FALSE);
+	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), FALSE);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
 	}
-	retval = sockaddr_multicast_loop (transport->send_sock, sockaddr_family(&transport->send_smr.smr_interface), FALSE);
+	retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
 	}
-	retval = sockaddr_multicast_loop (transport->send_with_router_alert_sock, sockaddr_family(&transport->send_smr.smr_interface), FALSE);
+	retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
-	retval = sockaddr_multicast_hops (transport->recv_sock, sockaddr_family(&transport->recv_smr[0].smr_interface), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), transport->hops);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
 	}
-	retval = sockaddr_multicast_hops (transport->send_sock, sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
 	}
-	retval = sockaddr_multicast_hops (transport->send_with_router_alert_sock, sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
@@ -1589,12 +1596,12 @@ pgm_transport_bind (
 
 /* set low packet latency preference for network elements */
 	int tos = IPTOS_LOWDELAY;
-	retval = sockaddr_tos (transport->send_sock, sockaddr_family(&transport->send_smr.smr_interface), tos);
+	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), tos);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
 	}
-	retval = sockaddr_tos (transport->send_with_router_alert_sock, sockaddr_family(&transport->send_smr.smr_interface), tos);
+	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), tos);
 	if (retval < 0) {
 		retval = errno;
 		goto out;
@@ -1612,7 +1619,7 @@ pgm_transport_bind (
 
 
 /* create recyclable SPM packet */
-	switch (sockaddr_family(&transport->recv_smr[0].smr_interface)) {
+	switch (pgm_sockaddr_family(&transport->recv_smr[0].smr_interface)) {
 	case AF_INET:
 		transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
 		break;
@@ -1625,15 +1632,15 @@ pgm_transport_bind (
 
 	struct pgm_header* header = (struct pgm_header*)transport->spm_packet;
 	struct pgm_spm* spm = (struct pgm_spm*)( header + 1 );
-	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 	header->pgm_type	= PGM_SPM;
 
-	sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
 	g_trace ("INFO","adding dynamic timer");
-	transport->next_ambient_spm = time_update_now() + transport->spm_ambient_interval;
+	transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
 	pgm_add_timer (transport);
 
 /* announce new transport by sending out SPMs */
@@ -1655,27 +1662,27 @@ out:
 
 static struct pgm_peer*
 new_peer (
-	struct pgm_transport*	transport,
-	struct tsi*		tsi,
+	pgm_transport_t*	transport,
+	pgm_tsi_t*		tsi,
 	struct sockaddr*	src_addr,
 	int			src_addr_len
 	)
 {
-	struct pgm_peer* peer;
+	pgm_peer_t* peer;
 
 	g_trace ("INFO","new peer, tsi %s, local nla %s", pgm_print_tsi (tsi), inet_ntoa(((struct sockaddr_in*)src_addr)->sin_addr));
 	g_message ("new peer, tsi %s, local nla %s", pgm_print_tsi (tsi), inet_ntoa(((struct sockaddr_in*)src_addr)->sin_addr));
 
-	peer = g_malloc0 (sizeof(struct pgm_peer));
-	peer->expiry = time_update_now() + transport->peer_expiry;
+	peer = g_malloc0 (sizeof(pgm_peer_t));
+	peer->expiry = pgm_time_update_now() + transport->peer_expiry;
 	g_static_mutex_init (&peer->mutex);
 	peer->transport = transport;
-	memcpy (&peer->tsi, tsi, sizeof(struct tsi));
+	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
 	((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
 
 /* lock on rx window */
-	peer->rxw = rxw_init (transport->max_tpdu,
+	peer->rxw = pgm_rxw_init (transport->max_tpdu,
 				transport->rxw_preallocate,
 				transport->rxw_sqns,
 				transport->rxw_secs,
@@ -1684,7 +1691,7 @@ new_peer (
 				peer);
 
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
-	g_hash_table_insert (transport->peers, &peer->tsi, peer_ref(peer));
+	g_hash_table_insert (transport->peers, &peer->tsi, pgm_peer_ref(peer));
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
 
 	return peer;
@@ -1705,7 +1712,7 @@ on_io_data (
 {
 //	g_trace ("INFO","on_io_data");
 
-	struct pgm_transport* transport = data;
+	pgm_transport_t* transport = data;
 
 /* read the data:
  * TODO: pre-allocate buffer based on max_tpdu size
@@ -1718,7 +1725,7 @@ on_io_data (
 
 #ifdef TRANSPORT_DEBUG
 	char s[INET6_ADDRSTRLEN];
-	sockaddr_ntop ((struct sockaddr*)&src_addr, s, sizeof(s));
+	pgm_sockaddr_ntop ((struct sockaddr*)&src_addr, s, sizeof(s));
 //	g_trace ("INFO","%i bytes received from %s", len, s);
 #endif
 
@@ -1743,8 +1750,8 @@ on_io_data (
 	}
 
 /* calculate senders TSI */
-	struct tsi tsi;
-	memcpy (tsi.gsi, pgm_header->pgm_gsi, 6 * sizeof(guint8));
+	pgm_tsi_t tsi;
+	memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
 	tsi.sport = pgm_header->pgm_sport;
 
 //	g_trace ("INFO","tsi %s", pgm_print_tsi (&tsi));
@@ -1766,10 +1773,10 @@ on_io_data (
 			goto out;
 		}
 
-		struct pgm_peer* source = NULL;
+		pgm_peer_t* source = NULL;
 
 		if ( pgm_is_peer (pgm_header->pgm_type)
-			&& sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr) )
+			&& pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr) )
 		{
 
 /* its a multicast peer-to-peer message */
@@ -1787,8 +1794,8 @@ on_io_data (
 
 /* check to see the source this peer-to-peer message is about is in our peer list */
 
-				struct tsi source_tsi;
-				memcpy (source_tsi.gsi, tsi.gsi, 6 * sizeof(guint8));
+				pgm_tsi_t source_tsi;
+				memcpy (&source_tsi.gsi, &tsi.gsi, sizeof(pgm_gsi_t));
 				source_tsi.sport = pgm_header->pgm_dport;
 
 				g_static_rw_lock_reader_lock (&transport->peers_lock);
@@ -1804,7 +1811,7 @@ on_io_data (
 			}
 		}
 		else if ( pgm_is_upstream (pgm_header->pgm_type)
-			&& !sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)
+			&& !pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)
 			&& ( pgm_header->pgm_dport == transport->tsi.sport ) )
 		{
 
@@ -1848,7 +1855,7 @@ on_io_data (
 
 /* search for TSI peer context or create a new one */
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		struct pgm_peer* sender = g_hash_table_lookup (transport->peers, &tsi);
+		pgm_peer_t* sender = g_hash_table_lookup (transport->peers, &tsi);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		if (sender == NULL)
 		{
@@ -1908,7 +1915,7 @@ on_nak_pipe (
 	gpointer data
 	)
 {
-	struct pgm_transport* transport = data;
+	pgm_transport_t* transport = data;
 
 /* empty pipe */
 	char buf;
@@ -1919,7 +1926,7 @@ on_nak_pipe (
  */
 	for (;;)
 	{
-		struct pgm_sqn_list* sqn_list = g_async_queue_try_pop (transport->rdata_queue);
+		pgm_sqn_list_t* sqn_list = g_async_queue_try_pop (transport->rdata_queue);
 		if (sqn_list == NULL) {
 			break;
 		}
@@ -1929,7 +1936,7 @@ on_nak_pipe (
 		do {
 			gpointer rdata = NULL;
 			int rlen = 0;
-			if (!txw_peek (transport->txw, *req, &rdata, &rlen))
+			if (!pgm_txw_peek (transport->txw, *req, &rdata, &rlen))
 			{
 				send_rdata (transport, *req, rdata, rlen);
 			}
@@ -1954,7 +1961,7 @@ on_nak_pipe (
 
 static int
 on_spm (
-	struct pgm_peer*	sender,
+	pgm_peer_t*		sender,
 	struct pgm_header*	header,
 	char*			data,		/* data will be changed to host order on demand */
 	int			len
@@ -1970,16 +1977,16 @@ on_spm (
 
 /* check for advancing sequence number */
 		g_static_mutex_lock (&sender->mutex);
-		if ( guint32_gte (spm->spm_sqn, sender->spm_sqn) )
+		if ( pgm_uint32_gte (spm->spm_sqn, sender->spm_sqn) )
 		{
 /* copy NLA for replies */
-			nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
+			pgm_nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
 
 /* save sequence number */
 			sender->spm_sqn = spm->spm_sqn;
 
 /* update receive window */
-			rxw_window_update (sender->rxw,
+			pgm_rxw_window_update (sender->rxw,
 						g_ntohl (spm->spm_trail),
 						g_ntohl (spm->spm_lead));
 		}
@@ -1989,7 +1996,7 @@ on_spm (
 		}
 
 /* either way bump expiration timer */
-		sender->expiry = time_update_now() + sender->transport->peer_expiry;
+		sender->expiry = pgm_time_update_now() + sender->transport->peer_expiry;
 		sender->spmr_expiry = 0;
 		g_static_mutex_unlock (&sender->mutex);
 	}
@@ -2004,8 +2011,8 @@ on_spm (
 
 static int
 on_spmr (
-	struct pgm_transport*	transport,
-	struct pgm_peer*	peer,
+	pgm_transport_t*	transport,
+	pgm_peer_t*		peer,
 	struct pgm_header*	header,
 	char*			data,
 	int			len
@@ -2048,8 +2055,8 @@ out:
 
 static int
 on_nak (
-	struct pgm_transport*	transport,
-	struct tsi*		tsi,
+	pgm_transport_t*	transport,
+	pgm_tsi_t*		tsi,
 	struct pgm_header*	header,
 	char*			data,
 	int			len
@@ -2068,33 +2075,33 @@ on_nak (
 		
 /* NAK_SRC_NLA contains our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
-	nla_to_sockaddr ((const char*)&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
+	pgm_nla_to_sockaddr ((const char*)&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 
-	if (sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
 		retval = -EINVAL;
 		goto out;
 	}
 
 /* NAK_GRP_NLA containers our transport multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	switch (sockaddr_family(&nak_src_nla)) {
+	switch (pgm_sockaddr_family(&nak_src_nla)) {
 	case AF_INET:
-		nla_to_sockaddr ((const char*)&nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		pgm_nla_to_sockaddr ((const char*)&nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 		break;
 
 	case AF_INET6:
-		nla_to_sockaddr ((const char*)&((struct pgm_nak6*)nak)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		pgm_nla_to_sockaddr ((const char*)&((struct pgm_nak6*)nak)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 		break;
 	}
 
-	if (sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
 		retval = -EINVAL;
 		goto out;
 	}
 
 /* create queue object */
 	g_static_mutex_lock (&transport->rdata_mutex);
-	struct pgm_sqn_list* sqn_list = sqn_list_alloc (transport);
+	pgm_sqn_list_t* sqn_list = pgm_sqn_list_alloc (transport);
 	g_static_mutex_unlock (&transport->rdata_mutex);
 	sqn_list->sqn[0] = g_ntohl (nak->nak_sqn);
 
@@ -2188,7 +2195,7 @@ out:
 
 static int
 on_ncf (
-	struct pgm_peer*	peer,
+	pgm_peer_t*		peer,
 	struct pgm_header*	header,
 	char*			data,
 	int			len
@@ -2197,7 +2204,7 @@ on_ncf (
 	g_trace ("INFO","on_ncf()");
 
 	int retval;
-	struct pgm_transport* transport = peer->transport;
+	pgm_transport_t* transport = peer->transport;
 
 	if ((retval = pgm_verify_ncf (header, data, len)) != 0)
 	{
@@ -2208,10 +2215,10 @@ on_ncf (
 		
 /* NCF_SRC_NLA may contain our transport unicast NLA, we don't really care */
 	struct sockaddr_storage nak_src_nla;
-	nla_to_sockaddr ((const char*)&ncf->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
+	pgm_nla_to_sockaddr ((const char*)&ncf->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 
 #if 0
-	if (sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
 		retval = -EINVAL;
 		goto out;
 	}
@@ -2219,17 +2226,17 @@ on_ncf (
 
 /* NAK_GRP_NLA containers our transport multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	switch (sockaddr_family(&nak_src_nla)) {
+	switch (pgm_sockaddr_family(&nak_src_nla)) {
 	case AF_INET:
-		nla_to_sockaddr ((const char*)&ncf->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		pgm_nla_to_sockaddr ((const char*)&ncf->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 		break;
 
 	case AF_INET6:
-		nla_to_sockaddr ((const char*)&((struct pgm_nak6*)ncf)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		pgm_nla_to_sockaddr ((const char*)&((struct pgm_nak6*)ncf)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 		break;
 	}
 
-	if (sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
 		retval = -EINVAL;
 		goto out;
 	}
@@ -2237,8 +2244,8 @@ on_ncf (
 	g_static_mutex_lock (&transport->mutex);
 	g_static_mutex_lock (&peer->mutex);
 
-	pgm_time_t now = time_update_now();
-	rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), now + transport->nak_rdata_ivl);
+	pgm_time_t now = pgm_time_update_now();
+	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), now + transport->nak_rdata_ivl);
 
 /* check NAK list */
 	guint32* nak_list = NULL;
@@ -2272,7 +2279,7 @@ on_ncf (
 
 	while (nak_list_len--)
 	{
-		rxw_ncf (peer->rxw, g_ntohl (*nak_list), now + transport->nak_rdata_ivl);
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), now + transport->nak_rdata_ivl);
 		nak_list++;
 	}
 
@@ -2292,7 +2299,7 @@ out:
 
 static inline int
 send_spm (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	g_static_mutex_lock (&transport->mutex);
@@ -2303,7 +2310,7 @@ send_spm (
 
 static int
 send_spm_unlocked (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	int retval = 0;
@@ -2315,13 +2322,13 @@ send_spm_unlocked (
 
 	spm->spm_sqn		= g_htonl (transport->spm_sqn++);
 	g_static_rw_lock_reader_lock (&transport->txw_lock);
-	spm->spm_trail		= g_htonl (txw_trail(transport->txw));
-	spm->spm_lead		= g_htonl (txw_lead(transport->txw));
+	spm->spm_trail		= g_htonl (pgm_txw_trail(transport->txw));
+	spm->spm_lead		= g_htonl (pgm_txw_lead(transport->txw));
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
 /* checksum optional for SPMs */
 	header->pgm_checksum	= 0;
-	header->pgm_checksum	= pgm_cksum((char*)header, transport->spm_len, 0);
+	header->pgm_checksum	= pgm_checksum((char*)header, transport->spm_len, 0);
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -2329,7 +2336,7 @@ send_spm_unlocked (
 				transport->spm_len,
 				MSG_CONFIRM,			/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-				sockaddr_len(&transport->send_smr.smr_multiaddr));
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	return retval;
@@ -2340,13 +2347,13 @@ send_spm_unlocked (
 
 static int
 send_spmr (
-	struct pgm_peer*	peer
+	pgm_peer_t*	peer
 	)
 {
 	g_trace ("INFO","send_spmr");
 
 	int retval = 0;
-	struct pgm_transport* transport = peer->transport;
+	pgm_transport_t* transport = peer->transport;
 
 /* lock and cache peer information */
 	g_static_mutex_lock (&peer->mutex);
@@ -2358,7 +2365,7 @@ send_spmr (
 	int tpdu_length = sizeof(struct pgm_header);
 	char buf[ tpdu_length ];
 	struct pgm_header *header = (struct pgm_header*)buf;
-	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 /* dport & sport reversed communicating upstream */
 	header->pgm_sport	= transport->dport;
 	header->pgm_dport	= peer_sport;
@@ -2366,29 +2373,29 @@ send_spmr (
 	header->pgm_options	= 0;
 	header->pgm_tsdu_length	= 0;
 	header->pgm_checksum	= 0;
-	header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+	header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 	g_static_mutex_lock (&transport->send_mutex);
 
 /* send multicast SPMR TTL 1 */
 g_message ("send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transport->send_smr.smr_multiaddr)->sin_addr ));
-	sockaddr_multicast_hops (transport->send_sock, sockaddr_family(&transport->send_smr.smr_interface), 1);
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), 1);
 	retval = sendto (transport->send_sock,
 				header,
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-				sockaddr_len(&transport->send_smr.smr_multiaddr));
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* send unicast SPMR with regular TTL */
 g_message ("send unicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&peer->local_nla)->sin_addr ));
-	sockaddr_multicast_hops (transport->send_sock, sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
 	retval = sendto (transport->send_sock,
 				header,
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
-				sockaddr_len(&peer_nla));
+				pgm_sockaddr_len(&peer_nla));
 
 	g_static_mutex_unlock (&transport->send_mutex);
 
@@ -2400,20 +2407,20 @@ out:
 
 static int
 send_nak (
-	struct pgm_peer*	peer,
+	pgm_peer_t*		peer,
 	guint32			sequence_number
 	)
 {
 	g_trace ("INFO", "send_nak(%" G_GUINT32_FORMAT ")", sequence_number);
 
 	int retval = 0;
-	struct pgm_transport* transport = peer->transport;
+	pgm_transport_t* transport = peer->transport;
 	gchar buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) ];
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
@@ -2430,13 +2437,13 @@ send_nak (
 	nak->nak_sqn		= g_htonl (sequence_number);
 
 /* source nla */
-	sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-	sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -2444,7 +2451,7 @@ send_nak (
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
-				sockaddr_len(&peer_nla));
+				pgm_sockaddr_len(&peer_nla));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
@@ -2458,7 +2465,7 @@ out:
 
 static int
 send_ncf (
-	struct pgm_peer*	peer,
+	pgm_peer_t*		peer,
 	struct sockaddr*	nak_src_nla,
 	struct sockaddr*	nak_grp_nla,
 	guint32			sequence_number
@@ -2467,7 +2474,7 @@ send_ncf (
 	g_trace ("INFO", "send_ncf()");
 
 	int retval = 0;
-	struct pgm_transport* transport = peer->transport;
+	pgm_transport_t* transport = peer->transport;
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 	gchar buf[ tpdu_length ];
 
@@ -2476,7 +2483,7 @@ send_ncf (
 
 /* lock and cache peer information */
 	g_static_mutex_lock (&peer->mutex);
-	memcpy (&header->pgm_gsi, peer->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 	g_static_mutex_unlock (&peer->mutex);
 	
 	header->pgm_sport	= transport->tsi.sport;
@@ -2489,13 +2496,13 @@ send_ncf (
 	ncf->nak_sqn		= g_htonl (sequence_number);
 
 /* source nla */
-	sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
+	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-	sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -2503,7 +2510,7 @@ send_ncf (
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-				sockaddr_len(&transport->send_smr.smr_multiaddr));
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
@@ -2518,15 +2525,15 @@ out:
 #ifndef PGM_SINGLE_NAK
 static int
 send_nak_list (
-	struct pgm_peer*	peer,
-	struct pgm_sqn_list*	sqn_list,
+	pgm_peer_t*	peer,
+	pgm_sqn_list_t*	sqn_list,
 	guint			len
 	)
 {
 	g_assert (len <= 63);
 
 	int retval = 0;
-	struct pgm_transport* transport = peer->transport;
+	pgm_transport_t* transport = peer->transport;
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
@@ -2535,7 +2542,7 @@ send_nak_list (
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
@@ -2552,10 +2559,10 @@ send_nak_list (
 	nak->nak_sqn		= g_htonl (sqn_list->sqn[0]);
 
 /* source nla */
-	sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-	sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
 
 /* OPT_NAK_LIST */
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
@@ -2591,7 +2598,7 @@ send_nak_list (
 #endif
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 	g_static_mutex_lock (&transport->send_mutex);
 	retval = sendto (transport->send_sock,
@@ -2599,7 +2606,7 @@ send_nak_list (
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
-				sockaddr_len(&peer_nla));
+				pgm_sockaddr_len(&peer_nla));
 	g_static_mutex_unlock (&transport->send_mutex);
 
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
@@ -2609,10 +2616,10 @@ send_nak_list (
 
 static int
 send_ncf_list (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	struct sockaddr*	nak_src_nla,
 	struct sockaddr*	nak_grp_nla,
-	struct pgm_sqn_list*	sqn_list,
+	pgm_sqn_list_t*		sqn_list,
 	int			len
 	)
 {
@@ -2627,7 +2634,7 @@ send_ncf_list (
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
-	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
@@ -2639,10 +2646,10 @@ send_ncf_list (
 	ncf->nak_sqn		= g_htonl (sqn_list->sqn[0]);
 
 /* source nla */
-	sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
+	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-	sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
 
 /* OPT_NAK_LIST */
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(ncf + 1);
@@ -2678,7 +2685,7 @@ send_ncf_list (
 #endif
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -2686,7 +2693,7 @@ send_ncf_list (
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-				sockaddr_len(&transport->send_smr.smr_multiaddr));
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
@@ -2707,12 +2714,12 @@ nak_rb_state (
 	gpointer		user_data
 	)
 {
-	struct pgm_peer* peer = (struct pgm_peer*)user_data;
-	struct pgm_transport* transport = peer->transport;
+	pgm_peer_t* peer = (pgm_peer_t*)user_data;
+	pgm_transport_t* transport = peer->transport;
 	GList* list;
-	pgm_time_t now = time_now;
+	pgm_time_t now = pgm_time_now;
 #ifndef PGM_SINGLE_NAK
-	struct pgm_sqn_list nak_list;
+	pgm_sqn_list_t nak_list;
 	int nak_count = 0;
 #endif
 
@@ -2735,13 +2742,13 @@ nak_rb_state (
 	while (list)
 	{
 		GList* next_list_el = list->prev;
-		struct rxw_packet* rp = (struct rxw_packet*)list->data;
+		pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
 
 /* check this packet for state expiration */
-		if (time_after_eq(now, rp->nak_rb_expiry))
+		if (pgm_time_after_eq(now, rp->nak_rb_expiry))
 		{
 /* remove from this state */
-			rxw_pkt_state_unlink (peer->rxw, rp);
+			pgm_rxw_pkt_state_unlink (peer->rxw, rp);
 
 #if PGM_SINGLE_NAK
 			send_nak (transport, peer, rp->sequence_number);
@@ -2759,7 +2766,7 @@ nak_rb_state (
  */
 #ifdef PGM_ABSOLUTE_EXPIRY
 			rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
-			while (time_after_eq(now, rp->nak_rpt_expiry){
+			while (pgm_time_after_eq(now, rp->nak_rpt_expiry){
 				rp->nak_rpt_expiry += transport->nak_rpt_ivl;
 				rp->ncf_retry_count++;
 			}
@@ -2770,7 +2777,7 @@ nak_rb_state (
 #ifndef PGM_SINGLE_NAK
 			if (nak_count == G_N_ELEMENTS(nak_list.sqn)) {
 				send_nak_list (peer, &nak_list, nak_count);
-				now = time_update_now();
+				now = pgm_time_update_now();
 				nak_count = 0;
 			}
 #endif
@@ -2818,14 +2825,14 @@ check_peer_nak_state (
 	gpointer		user_data
 	)
 {
-	struct pgm_peer* peer = peer_;
-	struct pgm_transport* transport = peer->transport;
+	pgm_peer_t* peer = peer_;
+	pgm_transport_t* transport = peer->transport;
 
 	g_static_mutex_lock (&peer->mutex);
 
 	if (peer->spmr_expiry)
 	{
-		if (time_after_eq (time_now, peer->spmr_expiry))
+		if (pgm_time_after_eq (pgm_time_now, peer->spmr_expiry))
 		{
 			send_spmr (peer);
 		}
@@ -2833,7 +2840,7 @@ check_peer_nak_state (
 
 	if (peer->rxw->backoff_queue->tail)
 	{
-		if (time_after_eq (time_now, next_nak_rb_expiry(peer)))
+		if (pgm_time_after_eq (pgm_time_now, next_nak_rb_expiry(peer)))
 		{
 			nak_rb_state (tsi, peer);
 		}
@@ -2841,7 +2848,7 @@ check_peer_nak_state (
 		
 	if (peer->rxw->wait_ncf_queue->tail)
 	{
-		if (time_after_eq (time_now, next_nak_rpt_expiry(peer)))
+		if (pgm_time_after_eq (pgm_time_now, next_nak_rpt_expiry(peer)))
 		{
 			nak_rpt_state (tsi, peer);
 		}
@@ -2849,18 +2856,18 @@ check_peer_nak_state (
 
 	if (peer->rxw->wait_data_queue->tail)
 	{
-		if (time_after_eq (time_now, next_nak_rdata_expiry(peer)))
+		if (pgm_time_after_eq (pgm_time_now, next_nak_rdata_expiry(peer)))
 		{
 			nak_rdata_state (tsi, peer);
 		}
 	}
 
-	if (time_after_eq (time_now, peer->expiry))
+	if (pgm_time_after_eq (pgm_time_now, peer->expiry))
 	{
 		g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
 		g_hash_table_remove (transport->peers, tsi);
 		g_static_mutex_unlock (&peer->mutex);
-		peer_unref (peer);
+		pgm_peer_unref (peer);
 	}
 	else
 	{
@@ -2875,13 +2882,13 @@ min_peer_nak_expiry (
 	gpointer		expiration
 	)
 {
-	struct pgm_peer* peer = peer_;
+	pgm_peer_t* peer = peer_;
 
 	g_static_mutex_lock (&peer->mutex);
 
 	if (peer->spmr_expiry)
 	{
-		if (time_after_eq (*(pgm_time_t*)expiration, peer->spmr_expiry))
+		if (pgm_time_after_eq (*(pgm_time_t*)expiration, peer->spmr_expiry))
 		{
 			*(pgm_time_t*)expiration = peer->spmr_expiry;
 		}
@@ -2889,7 +2896,7 @@ min_peer_nak_expiry (
 
 	if (peer->rxw->backoff_queue->tail)
 	{
-		if (time_after_eq (*(pgm_time_t*)expiration, next_nak_rb_expiry(peer)))
+		if (pgm_time_after_eq (*(pgm_time_t*)expiration, next_nak_rb_expiry(peer)))
 		{
 			*(pgm_time_t*)expiration = next_nak_rb_expiry(peer);
 		}
@@ -2897,7 +2904,7 @@ min_peer_nak_expiry (
 
 	if (peer->rxw->wait_ncf_queue->tail)
 	{
-		if (time_after_eq (*(pgm_time_t*)expiration, next_nak_rpt_expiry(peer)))
+		if (pgm_time_after_eq (*(pgm_time_t*)expiration, next_nak_rpt_expiry(peer)))
 		{
 			*(pgm_time_t*)expiration = next_nak_rpt_expiry(peer);
 		}
@@ -2905,7 +2912,7 @@ min_peer_nak_expiry (
 
 	if (peer->rxw->wait_data_queue->tail)
 	{
-		if (time_after_eq (*(pgm_time_t*)expiration, next_nak_rdata_expiry(peer)))
+		if (pgm_time_after_eq (*(pgm_time_t*)expiration, next_nak_rdata_expiry(peer)))
 		{
 			*(pgm_time_t*)expiration = next_nak_rdata_expiry(peer);
 		}
@@ -2917,7 +2924,7 @@ min_peer_nak_expiry (
 static pgm_time_t
 min_nak_expiry (
 	pgm_time_t		expiration,
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	g_hash_table_foreach (transport->peers, min_peer_nak_expiry, &expiration);
@@ -2935,8 +2942,8 @@ nak_rpt_state (
 	gpointer		user_data
 	)
 {
-	struct pgm_peer* peer = (struct pgm_peer*)user_data;
-	struct pgm_transport* transport = peer->transport;
+	pgm_peer_t* peer = (pgm_peer_t*)user_data;
+	pgm_transport_t* transport = peer->transport;
 	GList* list = peer->rxw->wait_ncf_queue->tail;
 
 	guint dropped = 0;
@@ -2944,10 +2951,10 @@ nak_rpt_state (
 	while (list)
 	{
 		GList* next_list_el = list->prev;
-		struct rxw_packet* rp = (struct rxw_packet*)list->data;
+		pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
 
 /* check this packet for state expiration */
-		if (time_after_eq(time_now, rp->nak_rpt_expiry))
+		if (pgm_time_after_eq(pgm_time_now, rp->nak_rpt_expiry))
 		{
 
 			if (++rp->ncf_retry_count > transport->nak_ncf_retries)
@@ -2955,15 +2962,15 @@ nak_rpt_state (
 /* cancellation */
 				dropped++;
 //				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
-				rxw_mark_lost (peer->rxw, rp->sequence_number);
+				pgm_rxw_mark_lost (peer->rxw, rp->sequence_number);
 			}
 			else
 			{	/* retry */
-				rxw_pkt_state_unlink (peer->rxw, rp);
+				pgm_rxw_pkt_state_unlink (peer->rxw, rp);
 				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (peer->rxw->backoff_queue, &rp->link_);
 //				rp->nak_rb_expiry = rp->nak_rpt_expiry + transport->nak_rb_ivl;
-				rp->nak_rb_expiry = time_now + transport->nak_rb_ivl;
+				rp->nak_rb_expiry = pgm_time_now + transport->nak_rb_ivl;
 			}
 		}
 		else
@@ -2995,7 +3002,7 @@ nak_rpt_state (
 				" lost %" G_GUINT32_FORMAT
 				" frag %" G_GUINT32_FORMAT,
 				dropped,
-				rxw_sqns(peer->rxw),
+				pgm_rxw_sqns(peer->rxw),
 				peer->rxw->backoff_queue->length,
 				peer->rxw->wait_ncf_queue->length,
 				peer->rxw->wait_data_queue->length,
@@ -3014,8 +3021,8 @@ nak_rdata_state (
 	gpointer		peer_
 	)
 {
-	struct pgm_peer* peer = (struct pgm_peer*)peer_;
-	struct pgm_transport* transport = peer->transport;
+	pgm_peer_t* peer = (pgm_peer_t*)peer_;
+	pgm_transport_t* transport = peer->transport;
 	GList* list = peer->rxw->wait_data_queue->tail;
 
 	guint dropped = 0;
@@ -3023,27 +3030,27 @@ nak_rdata_state (
 	while (list)
 	{
 		GList* next_list_el = list->prev;
-		struct rxw_packet* rp = (struct rxw_packet*)list->data;
+		pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
 
 /* check this packet for state expiration */
-		if (time_after_eq(time_now, rp->nak_rdata_expiry))
+		if (pgm_time_after_eq(pgm_time_now, rp->nak_rdata_expiry))
 		{
 /* remove from this state */
-			rxw_pkt_state_unlink (peer->rxw, rp);
+			pgm_rxw_pkt_state_unlink (peer->rxw, rp);
 
 			if (++rp->data_retry_count > transport->nak_data_retries)
 			{
 /* cancellation */
 				dropped++;
 //				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
-				rxw_mark_lost (peer->rxw, rp->sequence_number);
+				pgm_rxw_mark_lost (peer->rxw, rp->sequence_number);
 			}
 			else
 			{	/* retry */
 				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (peer->rxw->backoff_queue, &rp->link_);
 //				rp->nak_rb_expiry = rp->nak_rdata_expiry + transport->nak_rb_ivl;
-				rp->nak_rb_expiry = time_now + transport->nak_rb_ivl;
+				rp->nak_rb_expiry = pgm_time_now + transport->nak_rb_ivl;
 			}
 		}
 		else
@@ -3080,7 +3087,7 @@ nak_rdata_state (
 
 int
 pgm_write_unlocked (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	const gchar*		buf,
 	gsize			count)
 {
@@ -3092,7 +3099,7 @@ pgm_write_unlocked (
 
 	struct pgm_header *header = (struct pgm_header*)pkt;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
-	memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_ODATA;
@@ -3100,14 +3107,14 @@ pgm_write_unlocked (
         header->pgm_tsdu_length = g_htons (count);
 
 /* ODATA */
-        odata->data_sqn         = g_htonl (txw_next_lead(transport->txw));
-        odata->data_trail       = g_htonl (txw_trail(transport->txw));
+        odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+        odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 /* add to transmit window */
-	txw_push (transport->txw, pkt, tpdu_length);
+	pgm_txw_push (transport->txw, pkt, tpdu_length);
 
 	g_static_mutex_lock (&transport->send_mutex);
 	retval = sendto (transport->send_sock,
@@ -3115,7 +3122,7 @@ pgm_write_unlocked (
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-				sockaddr_len(&transport->send_smr.smr_multiaddr));
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_mutex);
 
 /* release txw lock here in order to allow spms to lock mutex */
@@ -3126,7 +3133,7 @@ pgm_write_unlocked (
 	g_static_mutex_lock (&transport->mutex);
 /* re-set spm timer */
 	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3139,13 +3146,13 @@ pgm_write_unlocked (
 
 int
 pgm_write_copy_fragment_unlocked (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	const gchar*		buf,
 	gsize			count)
 {
 	int retval = 0;
 	guint offset = 0;
-	guint32 opt_sqn = txw_next_lead(transport->txw);
+	guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
 
 	do {
 /* retrieve packet storage from transmit window */
@@ -3155,9 +3162,9 @@ pgm_write_copy_fragment_unlocked (
 		int tsdu_length = MIN(transport->max_tpdu - sizeof(struct iphdr) - header_length, count - offset);
 		int tpdu_length = header_length + tsdu_length;
 
-		char *pkt = txw_alloc(transport->txw);
+		char *pkt = pgm_txw_alloc(transport->txw);
 		struct pgm_header *header = (struct pgm_header*)pkt;
-		memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
 		header->pgm_sport	= transport->tsi.sport;
 		header->pgm_dport	= transport->dport;
 		header->pgm_type        = PGM_ODATA;
@@ -3166,8 +3173,8 @@ pgm_write_copy_fragment_unlocked (
 
 /* ODATA */
 		struct pgm_data *odata = (struct pgm_data*)(header + 1);
-	        odata->data_sqn         = g_htonl (txw_next_lead(transport->txw));
-	        odata->data_trail       = g_htonl (txw_trail(transport->txw));
+	        odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+	        odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
 /* OPT_LENGTH */
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(odata + 1);
@@ -3195,10 +3202,10 @@ pgm_write_copy_fragment_unlocked (
 		memcpy (opt_fragment + 1, buf + offset, tsdu_length);
 
 	        header->pgm_checksum    = 0;
-	        header->pgm_checksum	= pgm_cksum((char*)header, tpdu_length, 0);
+	        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
 
 /* add to transmit window */
-		txw_push (transport->txw, pkt, tpdu_length);
+		pgm_txw_push (transport->txw, pkt, tpdu_length);
 
 		g_static_mutex_lock (&transport->send_mutex);
 		retval = sendto (transport->send_sock,
@@ -3206,7 +3213,7 @@ pgm_write_copy_fragment_unlocked (
 					tpdu_length,
 					MSG_CONFIRM,		/* not expecting a reply */
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-					sockaddr_len(&transport->send_smr.smr_multiaddr));
+					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 		g_static_mutex_unlock (&transport->send_mutex);
 
 //		g_trace ("INFO","%i bytes sent", tpdu_length);
@@ -3221,7 +3228,7 @@ pgm_write_copy_fragment_unlocked (
 	g_static_mutex_lock (&transport->mutex);
 /* re-set spm timer */
 	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3229,7 +3236,7 @@ pgm_write_copy_fragment_unlocked (
 
 static int
 send_rdata (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	int			sequence_number,
 	gpointer		data,
 	int			len
@@ -3243,10 +3250,10 @@ send_rdata (
 	header->pgm_type        = PGM_RDATA;
 
 /* RDATA */
-        rdata->data_trail       = g_htonl (txw_trail(transport->txw));
+        rdata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_cksum((char*)header, len, 0);
+        header->pgm_checksum	= pgm_checksum((char*)header, len, 0);
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -3254,13 +3261,13 @@ send_rdata (
 				len,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
-				sockaddr_len(&transport->send_smr.smr_multiaddr));
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 /* re-set spm timer */
 	g_static_mutex_lock (&transport->mutex);
 	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3274,7 +3281,7 @@ send_rdata (
 
 int
 pgm_transport_set_fec (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	gboolean		enable_proactive_parity,
 	gboolean		enable_ondemand_parity,
 	guint			default_tgsize,		/* k, tg = transmission group */
@@ -3348,13 +3355,13 @@ pgm_transport_set_fec (
 
 static GSource*
 pgm_create_timer (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	g_return_val_if_fail (transport != NULL, NULL);
 
-	GSource *source = g_source_new (&g_pgm_timer_funcs, sizeof(struct pgm_timer));
-	struct pgm_timer *timer = (struct pgm_timer*)source;
+	GSource *source = g_source_new (&g_pgm_timer_funcs, sizeof(pgm_timer_t));
+	pgm_timer_t *timer = (pgm_timer_t*)source;
 
 	timer->transport = transport;
 
@@ -3363,7 +3370,7 @@ pgm_create_timer (
 
 static int
 pgm_add_timer_full (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	gint			priority
 	)
 {
@@ -3382,7 +3389,7 @@ pgm_add_timer_full (
 
 static int
 pgm_add_timer (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	return pgm_add_timer_full (transport, G_PRIORITY_HIGH_IDLE);
@@ -3398,13 +3405,13 @@ pgm_timer_prepare (
 	gint*			timeout
 	)
 {
-	struct pgm_timer* pgm_timer = (struct pgm_timer*)source;
-	struct pgm_transport* transport = pgm_timer->transport;
+	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
+	pgm_transport_t* transport = pgm_timer->transport;
 	glong msec;
 
 	g_static_mutex_lock (&transport->mutex);
 	pgm_time_t expiration = transport->spm_heartbeat_state ? MIN(transport->next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
-	pgm_time_t now = time_update_now();
+	pgm_time_t now = pgm_time_update_now();
 
 	g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
 
@@ -3435,10 +3442,10 @@ pgm_timer_check (
 {
 	g_trace ("SPM","pgm_timer_check");
 
-	struct pgm_timer* pgm_timer = (struct pgm_timer*)source;
-	pgm_time_t now = time_update_now();
+	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
+	pgm_time_t now = pgm_time_update_now();
 
-	gboolean retval = ( time_after_eq(now, pgm_timer->expiration) );
+	gboolean retval = ( pgm_time_after_eq(now, pgm_timer->expiration) );
 	if (!retval) g_thread_yield();
 	return retval;
 }
@@ -3456,25 +3463,25 @@ pgm_timer_dispatch (
 {
 	g_trace ("SPM","pgm_timer_dispatch");
 
-	struct pgm_timer* pgm_timer = (struct pgm_timer*)source;
-	struct pgm_transport* transport = pgm_timer->transport;
+	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
+	pgm_transport_t* transport = pgm_timer->transport;
 
 	g_static_mutex_lock (&transport->mutex);
 /* find which timers have expired and call each */
-	if ( time_after_eq (time_now, transport->next_ambient_spm) )
+	if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
 	{
 		send_spm_unlocked (transport);
 		transport->spm_heartbeat_state = 0;
-		transport->next_ambient_spm = time_now + transport->spm_ambient_interval;
+		transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
 	}
 	else if ( transport->spm_heartbeat_state &&
-		 time_after_eq (time_now, transport->next_heartbeat_spm) )
+		 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm) )
 	{
 		send_spm_unlocked (transport);
 	
 		if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
 		{
-			transport->next_heartbeat_spm = time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
+			transport->next_heartbeat_spm = pgm_time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 		} else
 		{	/* transition heartbeat to ambient */
 			transport->spm_heartbeat_state = 0;
@@ -3482,7 +3489,7 @@ pgm_timer_dispatch (
 
 	}
 
-	if ( transport->next_spmr_expiry && time_after_eq (time_now, transport->next_spmr_expiry) )
+	if ( transport->next_spmr_expiry && pgm_time_after_eq (pgm_time_now, transport->next_spmr_expiry) )
 		transport->next_spmr_expiry = 0;
 
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
@@ -3495,13 +3502,13 @@ pgm_timer_dispatch (
 
 GSource*
 pgm_transport_create_watch (
-	struct pgm_transport*	transport
+	pgm_transport_t*	transport
 	)
 {
 	g_return_val_if_fail (transport != NULL, NULL);
 
-	GSource *source = g_source_new (&g_pgm_watch_funcs, sizeof(struct pgm_watch));
-	struct pgm_watch *watch = (struct pgm_watch*)source;
+	GSource *source = g_source_new (&g_pgm_watch_funcs, sizeof(pgm_watch_t));
+	pgm_watch_t *watch = (pgm_watch_t*)source;
 
 	watch->transport = transport;
 	watch->pollfd.fd = transport->commit_pipe[0];
@@ -3518,22 +3525,22 @@ pgm_transport_create_watch (
 
 int
 pgm_transport_add_watch_full (
-	struct pgm_transport*	transport,
+	pgm_transport_t*	transport,
 	gint			priority,
-	pgm_func		func,
+	pgm_eventfn_t		function,
 	gpointer		user_data,
 	GDestroyNotify		notify
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (func != NULL, -EINVAL);
+	g_return_val_if_fail (function != NULL, -EINVAL);
 
 	GSource* source = pgm_transport_create_watch (transport);
 
 	if (priority != G_PRIORITY_DEFAULT)
 		g_source_set_priority (source, priority);
 
-	g_source_set_callback (source, (GSourceFunc)func, user_data, notify);
+	g_source_set_callback (source, (GSourceFunc)function, user_data, notify);
 
 	guint id = g_source_attach (source, NULL);
 	g_source_unref (source);
@@ -3543,12 +3550,12 @@ pgm_transport_add_watch_full (
 
 int
 pgm_transport_add_watch (
-	struct pgm_transport*	transport,
-	pgm_func		func,
+	pgm_transport_t*	transport,
+	pgm_eventfn_t		function,
 	gpointer		user_data
 	)
 {
-	return pgm_transport_add_watch_full (transport, G_PRIORITY_HIGH, func, user_data, NULL);
+	return pgm_transport_add_watch_full (transport, G_PRIORITY_HIGH, function, user_data, NULL);
 }
 
 /* returns TRUE if source has data ready, i.e. async queue is not empty
@@ -3562,7 +3569,7 @@ pgm_src_prepare (
 	gint*			timeout
 	)
 {
-	struct pgm_watch* watch = (struct pgm_watch*)source;
+	pgm_watch_t* watch = (pgm_watch_t*)source;
 
 /* infinite timeout */
 	*timeout = -1;
@@ -3582,7 +3589,7 @@ pgm_src_check (
 {
 //	g_trace ("INFO","pgm_src_check");
 
-	struct pgm_watch* watch = (struct pgm_watch*)source;
+	pgm_watch_t* watch = (pgm_watch_t*)source;
 
 	return ( g_async_queue_length(watch->transport->commit_queue) > 0 );
 }
@@ -3599,9 +3606,9 @@ pgm_src_dispatch (
 {
 	g_trace ("INFO","pgm_src_dispatch");
 
-	pgm_func func = (pgm_func)callback;
-	struct pgm_watch* watch = (struct pgm_watch*)source;
-	struct pgm_transport* transport = watch->transport;
+	pgm_eventfn_t function = (pgm_eventfn_t)callback;
+	pgm_watch_t* watch = (pgm_watch_t*)source;
+	pgm_transport_t* transport = watch->transport;
 
 /* empty pipe */
 	char buf;
@@ -3609,7 +3616,7 @@ pgm_src_dispatch (
 
 /* loop to purge multiple messages from asynchronous queue */
 	do {
-		struct pgm_event* event = g_async_queue_try_pop (transport->commit_queue);
+		pgm_event_t* event = g_async_queue_try_pop (transport->commit_queue);
 		if (event == NULL) {
 			break;
 		}
@@ -3617,19 +3624,19 @@ pgm_src_dispatch (
 		if (event->len)
 			g_assert (event->len > 0 && event->data != NULL);
 
-		struct pgm_peer* peer = event->peer;
+		pgm_peer_t* peer = event->peer;
 
 //g_trace ("INFO","peer is %s", pgm_print_tsi(&peer->tsi));
 
 /* important that callback occurs out of lock to allow PGM layer to add more messages */
-		gboolean retval = (*func) (event->data, event->len, user_data);
+		gboolean retval = (*function) (event->data, event->len, user_data);
 
 /* return memory to receive window */
 		g_static_mutex_lock (&peer->mutex);
 		g_trash_stack_push (&peer->rxw->trash_data, event->data);
 		g_static_mutex_unlock (&peer->mutex);
 
-		peer_unref (peer);
+		pgm_peer_unref (peer);
 
 		g_static_mutex_lock (&transport->event_mutex);
 		g_trash_stack_push (&transport->trash_event, event);
@@ -3646,18 +3653,18 @@ out:
 
 int
 pgm_event_unref (
-	struct pgm_transport*	transport,
-	struct pgm_event*	event
+	pgm_transport_t*	transport,
+	pgm_event_t*		event
 	)
 {
-	struct pgm_peer* peer = event->peer;
+	pgm_peer_t* peer = event->peer;
 
 /* return memory to receive window */
 	g_static_mutex_lock (&peer->mutex);
 	g_trash_stack_push (&peer->rxw->trash_data, event->data);
 	g_static_mutex_unlock (&peer->mutex);
 
-	peer_unref (peer);
+	pgm_peer_unref (peer);
 
 	g_static_mutex_lock (&transport->event_mutex);
 	g_trash_stack_push (&transport->trash_event, event);
@@ -3707,7 +3714,7 @@ out:
 
 static int
 on_odata (
-	struct pgm_peer*	sender,
+	pgm_peer_t*		sender,
 	struct pgm_header*	header,
 	char*			data,
 	int			len)
@@ -3715,7 +3722,7 @@ on_odata (
 	g_trace ("INFO","on_odata");
 
 	int retval = 0;
-	struct pgm_transport* transport = sender->transport;
+	pgm_transport_t* transport = sender->transport;
 	struct pgm_data* odata = (struct pgm_data*)data;
 	odata->data_sqn = g_ntohl (odata->data_sqn);
 
@@ -3732,7 +3739,7 @@ on_odata (
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
-		if (!rxw_push_fragment (sender->rxw,
+		if (!pgm_rxw_push_fragment (sender->rxw,
 					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
@@ -3747,7 +3754,7 @@ on_odata (
 	else
 	{
 		g_static_mutex_lock (&sender->mutex);
-		if (!rxw_push_copy (sender->rxw,
+		if (!pgm_rxw_push_copy (sender->rxw,
 					odata + 1,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
@@ -3763,7 +3770,7 @@ on_odata (
 /* flush out 1st time nak packets */
 		g_static_mutex_lock (&transport->mutex);
 		g_static_mutex_lock (&sender->mutex);
-		time_update_now();
+		pgm_time_update_now();
 		nak_rb_state (&sender->tsi, sender);
 		g_static_mutex_unlock (&sender->mutex);
 		g_static_mutex_unlock (&transport->mutex);
@@ -3778,7 +3785,7 @@ out:
 
 static int
 on_rdata (
-	struct pgm_peer*	sender,
+	pgm_peer_t*		sender,
 	struct pgm_header*	header,
 	char*			data,
 	int			len)
@@ -3799,7 +3806,7 @@ on_rdata (
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
-		if (!rxw_push_fragment (sender->rxw,
+		if (!pgm_rxw_push_fragment (sender->rxw,
 					(char*)(rdata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					rdata->data_sqn,
@@ -3814,7 +3821,7 @@ on_rdata (
 	else
 	{
 		g_static_mutex_lock (&sender->mutex);
-		if (!rxw_push_copy (sender->rxw,
+		if (!pgm_rxw_push_copy (sender->rxw,
 					rdata + 1,
 					g_ntohs (header->pgm_tsdu_length),
 					rdata->data_sqn,
@@ -3830,7 +3837,7 @@ on_rdata (
 /* flush out 1st time nak packets */
 		g_static_mutex_unlock (&sender->transport->mutex);
 		g_static_mutex_unlock (&sender->mutex);
-		time_update_now();
+		pgm_time_update_now();
 		nak_rb_state (&sender->tsi, sender);
 		g_static_mutex_unlock (&sender->mutex);
 		g_static_mutex_unlock (&sender->transport->mutex);
@@ -3850,13 +3857,13 @@ on_pgm_data (
 	int retval = 0;
 	g_trace ("INFO","on_pgm_data");
 
-	struct pgm_transport* transport = ((struct pgm_peer*)peer)->transport;
+	pgm_transport_t* transport = ((pgm_peer_t*)peer)->transport;
 	g_static_mutex_lock (&transport->event_mutex);
-	struct pgm_event* event = pgm_alloc_event(transport);
+	pgm_event_t* event = pgm_alloc_event(transport);
 	g_static_mutex_unlock (&transport->event_mutex);
 	event->data = data;
 	event->len = len;
-	event->peer = peer_ref ((struct pgm_peer*)peer);
+	event->peer = pgm_peer_ref ((struct pgm_peer*)peer);
 
 #ifdef TRANSPORT_DEBUG
 	g_trace ("INFO","peer is %s", pgm_print_tsi(&event->peer->tsi));

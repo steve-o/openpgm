@@ -967,7 +967,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	nak->nak_grp_nla.s_addr	= source->s_addr;	/* IPv4 */
 //	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
 
-	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* send packet */
 	int flags = MSG_CONFIRM;	/* expecting a reply over multicast not unicast */

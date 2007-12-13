@@ -152,7 +152,10 @@ errrs:
  *  @rs:	the control structure which is not longer used by the
  *		caller
  */
-void free_rs(struct rs_control *rs)
+void
+pgm_free_rs (
+	struct rs_control *rs
+	)
 {
 	g_static_mutex_lock (&g_rslistlock);
 	rs->users--;
@@ -177,8 +180,14 @@ void free_rs(struct rs_control *rs)
  *  @prim:	primitive element to generate polynomial roots
  *  @nroots:	RS code generator polynomial degree (number of roots)
  */
-struct rs_control *init_rs(int symsize, int gfpoly, int fcr, int prim,
-			   int nroots)
+struct rs_control*
+pgm_init_rs (
+	int	symsize,
+	int	gfpoly,
+	int	fcr,
+	int	prim,
+	int	nroots
+	)
 {
 	GList* tmp;
 	struct rs_control	*rs;
@@ -240,8 +249,14 @@ out:
  *  symbol size > 8. The calling code must take care of encoding of the
  *  syndrome result for storage itself.
  */
-int encode_rs8(struct rs_control *rs, guint8 *data, int len, guint16 *par,
-	       guint16 invmsk)
+int
+pgm_encode_rs8 (
+	struct rs_control*	rs,
+	guint8*			data,
+	int			len,
+	guint16*		par,
+	guint16			invmsk
+	)
 {
 #include "encode_rs.c"
 }
@@ -264,9 +279,18 @@ int encode_rs8(struct rs_control *rs, guint8 *data, int len, guint16 *par,
  *  symbol size > 8. The calling code must take care of decoding of the
  *  syndrome result and the received parity before calling this code.
  */
-int decode_rs8(struct rs_control *rs, guint8 *data, guint16 *par, int len,
-	       guint16 *s, int no_eras, int *eras_pos, guint16 invmsk,
-	       guint16 *corr)
+int
+pgm_decode_rs8 (
+	struct rs_control*	rs,
+	guint8*			data,
+	guint16*		par,
+	int			len,
+	guint16*		s,
+	int			no_eras,
+	int*			eras_pos,
+	guint16			invmsk,
+	guint16*		corr
+	)
 {
 #include "decode_rs.c"
 }
@@ -283,8 +307,14 @@ int decode_rs8(struct rs_control *rs, guint8 *data, guint16 *par, int len,
  *
  *  Each field in the data array contains up to symbol size bits of valid data.
  */
-int encode_rs16(struct rs_control *rs, guint16 *data, int len, guint16 *par,
-	guint16 invmsk)
+int
+pgm_encode_rs16 (
+	struct rs_control*	rs,
+	guint16*		data,
+	int			len,
+	guint16*		par,
+	guint16			invmsk
+	)
 {
 #include "encode_rs.c"
 }
@@ -305,9 +335,18 @@ int encode_rs16(struct rs_control *rs, guint16 *data, int len, guint16 *par,
  *
  *  Each field in the data array contains up to symbol size bits of valid data.
  */
-int decode_rs16(struct rs_control *rs, guint16 *data, guint16 *par, int len,
-		guint16 *s, int no_eras, int *eras_pos, guint16 invmsk,
-		guint16 *corr)
+int
+pgm_decode_rs16 (
+	struct rs_control*	rs,
+	guint16*		data,
+	guint16*		par,
+	int			len,
+	guint16*		s,
+	int			no_eras,
+	int*			eras_pos,
+	guint16			invmsk,
+	guint16*		corr
+	)
 {
 #include "decode_rs.c"
 }

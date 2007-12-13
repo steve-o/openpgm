@@ -73,9 +73,9 @@ main (
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
-	signal_install(SIGINT, on_signal);
-	signal_install(SIGTERM, on_signal);
-	signal_install(SIGHUP, SIG_IGN);
+	pgm_signal_install(SIGINT, on_signal);
+	pgm_signal_install(SIGTERM, on_signal);
+	pgm_signal_install(SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	puts ("scheduling startup.");

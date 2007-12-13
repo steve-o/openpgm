@@ -55,25 +55,25 @@ struct rs_control {
 
 /* General purpose RS codec, 8-bit data width, symbol width 1-15 bit  */
 #ifdef CONFIG_REED_SOLOMON_ENC8
-int encode_rs8 (struct rs_control*, guint8*, int, guint16*, guint16);
+int pgm_encode_rs8 (struct rs_control*, guint8*, int, guint16*, guint16);
 #endif
 #ifdef CONFIG_REED_SOLOMON_DEC8
-int decode_rs8 (struct rs_control*, guint8*, guint16*, int, guint16*, int, int*, guint16, guint16*);
+int pgm_decode_rs8 (struct rs_control*, guint8*, guint16*, int, guint16*, int, int*, guint16, guint16*);
 #endif
 
 /* General purpose RS codec, 16-bit data width, symbol width 1-15 bit  */
 #ifdef CONFIG_REED_SOLOMON_ENC16
-int encode_rs16 (struct rs_control*, guint16*, int, guint16*, guint16);
+int pgm_encode_rs16 (struct rs_control*, guint16*, int, guint16*, guint16);
 #endif
 #ifdef CONFIG_REED_SOLOMON_DEC16
-int decode_rs16 (struct rs_control*, guint16*, guint16*, int, guint16*, int, int*, guint16, guint16*);
+int pgm_decode_rs16 (struct rs_control*, guint16*, guint16*, int, guint16*, int, int*, guint16, guint16*);
 #endif
 
 /* Create or get a matching rs control structure */
-struct rs_control *init_rs (int, int, int, int, int);
+struct rs_control *pgm_init_rs (int, int, int, int, int);
 
 /* Release a rs control structure */
-void free_rs(struct rs_control*);
+void pgm_free_rs(struct rs_control*);
 
 /** modulo replacement for galois field arithmetics
  *

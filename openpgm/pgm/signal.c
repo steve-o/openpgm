@@ -46,7 +46,7 @@ static gboolean on_io_signal (GIOChannel*, GIOCondition, gpointer);
  */
 
 __sighandler_t
-signal_install (
+pgm_signal_install (
 	int		signum,
 	__sighandler_t	handler
 	)

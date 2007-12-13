@@ -24,6 +24,10 @@
 
 #include <glib.h>
 
+#ifndef __PGM_GSI_H__
+#   include "gsi.h"
+#endif
+
 #ifndef __PGM_SOCKADDR_H__
 #   include "sockaddr.h"
 #endif
@@ -40,42 +44,47 @@
 #   include "packet.h"
 #endif
 
-struct pgm_transport;
+typedef struct pgm_transport_t pgm_transport_t;
 
-struct tsi {            /* transport session identifier */
-    guint8      gsi[6];	    /* global session ID */
+struct pgm_tsi_t {            /* transport session identifier */
+    pgm_gsi_t   gsi;	    /* global session identifier */
     guint16     sport;	    /* source port: a random number to help detect session re-starts */
 };
 
-struct pgm_peer {
+typedef struct pgm_tsi_t pgm_tsi_t;
+
+struct pgm_peer_t {
     gint		ref_count;
 
-    struct tsi		tsi;
+    pgm_tsi_t           tsi;
     struct sockaddr_storage	nla, local_nla;	    /* nla = advertised, local_nla = from packet */
     struct sockaddr_storage	redirect_nla;	    /* from dlr */
     pgm_time_t		spmr_expiry;
 
     GStaticMutex	mutex;
 
-    struct rxw*	    	rxw;
-    struct pgm_transport*   transport;
+    pgm_rxw_t*          rxw;
+    pgm_transport_t*    transport;
 
     int			spm_sqn;
     pgm_time_t		expiry;
 
-#define next_nak_rb_expiry(p)	    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->backoff_queue->tail)->nak_rb_expiry )
-#define next_nak_rpt_expiry(p)	    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->wait_ncf_queue->tail)->nak_rpt_expiry )
-#define next_nak_rdata_expiry(p)    ( ((struct rxw_packet*)((struct pgm_peer*)(p))->rxw->wait_data_queue->tail)->nak_rdata_expiry )
+#define next_nak_rb_expiry(p)	    ( ((pgm_rxw_packet_t*)((pgm_peer_t*)(p))->rxw->backoff_queue->tail)->nak_rb_expiry )
+#define next_nak_rpt_expiry(p)	    ( ((pgm_rxw_packet_t*)((pgm_peer_t*)(p))->rxw->wait_ncf_queue->tail)->nak_rpt_expiry )
+#define next_nak_rdata_expiry(p)    ( ((pgm_rxw_packet_t*)((pgm_peer_t*)(p))->rxw->wait_data_queue->tail)->nak_rdata_expiry )
 };
 
-struct pgm_event {
+typedef struct pgm_peer_t pgm_peer_t;
+typedef struct pgm_event_t pgm_event_t;
+
+struct pgm_event_t {
     gpointer		data;
     guint		len;
-    struct pgm_peer*	peer;
+    struct pgm_peer_t*	peer;
 };
 
-struct pgm_transport {
-    struct tsi		tsi;
+struct pgm_transport_t {
+    pgm_tsi_t           tsi;
     guint16		dport;
 
     guint16		udp_encap_port;
@@ -89,12 +98,12 @@ struct pgm_transport {
     GCond		*thread_cond;
     GMutex		*thread_mutex;
 
-    struct sock_mreq	send_smr;			/* multicast & unicast nla */
+    struct pgm_sock_mreq send_smr;			/* multicast & unicast nla */
     GStaticMutex	send_mutex;
     int			send_sock;
     GStaticMutex	send_with_router_alert_mutex;
     int			send_with_router_alert_sock;
-    struct sock_mreq	recv_smr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
+    struct pgm_sock_mreq recv_smr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
     int			recv_sock;
     GIOChannel*		recv_channel;
 
@@ -105,7 +114,7 @@ struct pgm_transport {
     int			sndbuf, rcvbuf;
 
     GStaticRWLock	txw_lock;
-    struct txw*		txw;
+    pgm_txw_t*          txw;
     int			spm_sqn;
     guint		spm_ambient_interval;	    /* microseconds */
     guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
@@ -143,63 +152,62 @@ struct pgm_transport {
     GStaticMutex	rdata_mutex;
 };
 
-typedef int (*pgm_func)(gpointer, guint, gpointer);
+typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
 
 
 G_BEGIN_DECLS
 
 int pgm_init (void);
 
-int pgm_event_unref (struct pgm_transport*, struct pgm_event*);
+int pgm_event_unref (pgm_transport_t*, pgm_event_t*);
 
-gchar* pgm_print_tsi (const struct tsi*);
+gchar* pgm_print_tsi (const pgm_tsi_t*);
 
-int pgm_transport_create (struct pgm_transport**, guint8*, guint16, struct sock_mreq*, int, struct sock_mreq*);
-int pgm_transport_create_udp_encap (struct pgm_transport**, guint8*, guint16, guint16, guint16, struct sock_mreq*, int, struct sock_mreq*);
-int pgm_transport_bind (struct pgm_transport*);
-GSource* pgm_transport_create_watch (struct pgm_transport*);
-int pgm_transport_add_watch_full (struct pgm_transport*, gint, pgm_func, gpointer, GDestroyNotify);
-int pgm_transport_add_watch (struct pgm_transport*, pgm_func, gpointer);
-int pgm_transport_destroy (struct pgm_transport*, gboolean);
+int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, int, struct pgm_sock_mreq*);
+int pgm_transport_bind (pgm_transport_t*);
+GSource* pgm_transport_create_watch (pgm_transport_t*);
+int pgm_transport_add_watch_full (pgm_transport_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
+int pgm_transport_add_watch (pgm_transport_t*, pgm_eventfn_t, gpointer);
+int pgm_transport_destroy (pgm_transport_t*, gboolean);
 
-int pgm_transport_set_max_tpdu (struct pgm_transport*, guint16);
-int pgm_transport_set_hops (struct pgm_transport*, gint);
-int pgm_transport_set_ambient_spm (struct pgm_transport*, guint);
-int pgm_transport_set_heartbeat_spm (struct pgm_transport*, guint*, int);
+int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
+int pgm_transport_set_hops (pgm_transport_t*, gint);
+int pgm_transport_set_ambient_spm (pgm_transport_t*, guint);
+int pgm_transport_set_heartbeat_spm (pgm_transport_t*, guint*, int);
 
-int pgm_transport_set_peer_expiry (struct pgm_transport*, guint);
-int pgm_transport_set_spmr_expiry (struct pgm_transport*, guint);
+int pgm_transport_set_peer_expiry (pgm_transport_t*, guint);
+int pgm_transport_set_spmr_expiry (pgm_transport_t*, guint);
 
-int pgm_transport_set_txw_preallocate (struct pgm_transport*, guint);
-int pgm_transport_set_txw_sqns (struct pgm_transport*, guint);
-int pgm_transport_set_txw_secs (struct pgm_transport*, guint);
-int pgm_transport_set_txw_max_rte (struct pgm_transport*, guint);
+int pgm_transport_set_txw_preallocate (pgm_transport_t*, guint);
+int pgm_transport_set_txw_sqns (pgm_transport_t*, guint);
+int pgm_transport_set_txw_secs (pgm_transport_t*, guint);
+int pgm_transport_set_txw_max_rte (pgm_transport_t*, guint);
 
-int pgm_transport_set_rxw_preallocate (struct pgm_transport*, guint);
-int pgm_transport_set_rxw_sqns (struct pgm_transport*, guint);
-int pgm_transport_set_rxw_secs (struct pgm_transport*, guint);
-int pgm_transport_set_rxw_max_rte (struct pgm_transport*, guint);
+int pgm_transport_set_rxw_preallocate (pgm_transport_t*, guint);
+int pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
+int pgm_transport_set_rxw_secs (pgm_transport_t*, guint);
+int pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
 
-int pgm_transport_set_sndbuf (struct pgm_transport*, int);
-int pgm_transport_set_rcvbuf (struct pgm_transport*, int);
-int pgm_transport_set_event_preallocate (struct pgm_transport*, guint);
+int pgm_transport_set_sndbuf (pgm_transport_t*, int);
+int pgm_transport_set_rcvbuf (pgm_transport_t*, int);
+int pgm_transport_set_event_preallocate (pgm_transport_t*, guint);
 
-int pgm_transport_set_nak_rb_ivl (struct pgm_transport*, guint);
-int pgm_transport_set_nak_rpt_ivl (struct pgm_transport*, guint);
-int pgm_transport_set_nak_rdata_ivl (struct pgm_transport*, guint);
-int pgm_transport_set_nak_data_retries (struct pgm_transport*, guint);
-int pgm_transport_set_nak_ncf_retries (struct pgm_transport*, guint);
+int pgm_transport_set_nak_rb_ivl (pgm_transport_t*, guint);
+int pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
+int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
+int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
+int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
-static inline gpointer pgm_alloc (struct pgm_transport*  transport)
+static inline gpointer pgm_alloc (pgm_transport_t* transport)
 {
     g_static_rw_lock_writer_lock (&transport->txw_lock);
-    gpointer ptr = ((gchar*)txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
+    gpointer ptr = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
     g_static_rw_lock_writer_unlock (&transport->txw_lock);
     return ptr;
 }
 
-int pgm_write_unlocked (struct pgm_transport*, const gchar*, gsize);
-static inline int pgm_write (struct pgm_transport* transport, const gchar* buf, gsize count)
+int pgm_write_unlocked (pgm_transport_t*, const gchar*, gsize);
+static inline int pgm_write (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
     g_static_rw_lock_writer_lock (&transport->txw_lock);
     int retval = pgm_write_unlocked (transport, buf, count);
@@ -207,18 +215,18 @@ static inline int pgm_write (struct pgm_transport* transport, const gchar* buf, 
     return retval;
 }
 
-static inline int pgm_write_copy (struct pgm_transport* transport, const gchar* buf, gsize count)
+static inline int pgm_write_copy (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
     g_static_rw_lock_writer_lock (&transport->txw_lock);
-    gchar *pkt = ((gchar*)txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
+    gchar *pkt = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
     memcpy (pkt, buf, count);
     int retval = pgm_write_unlocked (transport, pkt, count);
 //    g_static_rw_lock_writer_unlock (&transport->txw_lock);
     return retval;
 }
 
-int pgm_write_copy_fragment_unlocked (struct pgm_transport*, const gchar*, gsize);
-static inline int pgm_write_copy_fragment (struct pgm_transport* transport, const gchar* buf, gsize count)
+int pgm_write_copy_fragment_unlocked (pgm_transport_t*, const gchar*, gsize);
+static inline int pgm_write_copy_fragment (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
     g_static_rw_lock_writer_lock (&transport->txw_lock);
     int retval = pgm_write_copy_fragment_unlocked (transport, buf, count);
@@ -226,7 +234,7 @@ static inline int pgm_write_copy_fragment (struct pgm_transport* transport, cons
     return retval;
 }
 
-static inline int pgm_write_copy_ex (struct pgm_transport* transport, const gchar* buf, gsize count)
+static inline int pgm_write_copy_ex (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
     if ( count <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
 					    sizeof(struct pgm_data) ) ) )
@@ -239,7 +247,7 @@ static inline int pgm_write_copy_ex (struct pgm_transport* transport, const gcha
 
 /* TODO: contexts, hooks */
 
-int pgm_transport_set_fec (struct pgm_transport*, gboolean, gboolean, guint, guint);
+int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, guint, guint);
 
 G_END_DECLS
 
