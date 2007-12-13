@@ -58,7 +58,7 @@ G_BEGIN_DECLS
 	    ( pgm_sockaddr_family(src) == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
 
 #define pgm_sockaddr_ntop(src,dst,cnt) \
-	    ( inet_ntop(pgm_sockaddr_family(src), sockaddr_addr(src), (dst), (cnt)) )
+	    ( inet_ntop(pgm_sockaddr_family(src), pgm_sockaddr_addr(src), (dst), (cnt)) )
 
 static inline int pgm_sockaddr_is_addr_multicast (struct sockaddr* s)
 {
