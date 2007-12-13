@@ -370,8 +370,8 @@ md5_finish_ctx (
  */
 
 int
-gsi_create_md5_id (
-	char*		gsi
+pgm_create_md5_gsi (
+	pgm_gsi_t*	gsi
 	)
 {
 	int retval = 0;
@@ -397,9 +397,9 @@ out:
  */
 
 int
-gsi_create_ipv4_id (
+pgm_create_ipv4_gsi (
 	struct in_addr	addr,
-	char*		gsi
+	pgm_gsi_t*	gsi
 	)
 {
 	int retval = 0;

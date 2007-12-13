@@ -37,6 +37,7 @@
 
 #include <glib.h>
 
+#include <pgm/if.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/transport.h>
@@ -54,7 +55,7 @@ static int g_udp_encap_port = 0;
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
 
-static struct pgm_transport* g_transport = NULL;
+static pgm_transport_t* g_transport = NULL;
 static gboolean g_quit = FALSE;
 
 static void on_signal (int);
@@ -116,12 +117,12 @@ main (
 		while (1 == read (g_transport->commit_pipe[0], &c, sizeof(c)));
 
 		do {
-			struct pgm_event* event = g_async_queue_try_pop (g_transport->commit_queue);
+			pgm_event_t* event = g_async_queue_try_pop (g_transport->commit_queue);
 			if (event == NULL) {
 				break;
 			}
 
-			struct pgm_peer* peer = event->peer;
+			pgm_peer_t* peer = event->peer;
 			g_message ("peer is %s", pgm_print_tsi(&peer->tsi));
 
 			on_data (event->data, event->len, NULL);
@@ -160,7 +161,7 @@ on_startup (void)
 	g_message ("startup.");
 	g_message ("create transport.");
 
-	char gsi[6];
+	pgm_gsi_t gsi;
 #if 0
 	char hostname[NI_MAXHOST];
 	struct addrinfo hints, *res = NULL;
@@ -170,15 +171,15 @@ on_startup (void)
 	hints.ai_family = AF_INET;
 	hints.ai_flags = AI_ADDRCONFIG;
 	getaddrinfo (hostname, NULL, &hints, &res);
-	int e = gsi_create_ipv4_id (((struct sockaddr_in*)(res->ai_addr))->sin_addr, gsi);
+	int e = pgm_create_ipv4_gsi (((struct sockaddr_in*)(res->ai_addr))->sin_addr, &gsi);
 	g_assert (e == 0);
 	freeaddrinfo (res);
 #else
-	int e = gsi_create_md5_id (gsi);
+	int e = pgm_create_md5_gsi (&gsi);
 	g_assert (e == 0);
 #endif
 
-	struct sock_mreq recv_smr, send_smr;
+	struct pgm_sock_mreq recv_smr, send_smr;
 #if 0
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
@@ -193,7 +194,7 @@ on_startup (void)
 	char network[1024];
 	sprintf (network, ";%s", g_network);
 	int smr_len = 1;
-	e = if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 #endif
@@ -203,7 +204,7 @@ on_startup (void)
 		((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_udp_encap_port);
 	}
 
-	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);

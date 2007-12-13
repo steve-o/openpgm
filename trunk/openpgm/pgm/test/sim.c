@@ -39,6 +39,7 @@
 
 #include <glib.h>
 
+#include <pgm/if.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/transport.h>
@@ -56,8 +57,8 @@ struct idle_source {
 
 struct sim_session {
 	char*		name;
-	char		gsi[6];
-	struct pgm_transport* transport;
+	pgm_gsi_t	gsi;
+	pgm_transport_t* transport;
 };
 
 /* globals */
@@ -130,9 +131,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal_install (SIGINT, on_signal);
-	signal_install (SIGTERM, on_signal);
-	signal_install (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGINT, on_signal);
+	pgm_signal_install (SIGTERM, on_signal);
+	pgm_signal_install (SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -222,7 +223,7 @@ idle_prepare (
 {
 	struct idle_source* idle_source = (struct idle_source*)source;
 
-	guint64 now = time_update_now();
+	guint64 now = pgm_time_update_now();
 	glong msec = ((gint64)idle_source->expiration - (gint64)now) / 1000;
 	if (msec < 0)
 		msec = 0;
@@ -238,8 +239,8 @@ idle_check (
 	)
 {
 	struct idle_source* idle_source = (struct idle_source*)source;
-	guint64 now = time_update_now();
-	return ( time_after_eq(now, idle_source->expiration) );
+	guint64 now = pgm_time_update_now();
+	return ( pgm_time_after_eq(now, idle_source->expiration) );
 }
 
 static gboolean
@@ -254,7 +255,7 @@ idle_dispatch (
 //	send_odata ();
 	idle_source->expiration += g_odata_interval;
 
-	if ( time_after_eq(idle_source->expiration, time_now) )
+	if ( pgm_time_after_eq(idle_source->expiration, pgm_time_now) )
 		sched_yield();
 
 	return TRUE;
@@ -288,20 +289,20 @@ session_create (
 /* create new and fill in bits */
 	sess = g_malloc0(sizeof(struct sim_session));
 	sess->name = g_memdup (name, strlen(name)+1);
-	int e = gsi_create_md5_id (sess->gsi);
+	int e = pgm_create_md5_gsi (&sess->gsi);
 	if (e != 0) {
-		puts ("FAILED: gsi_create_md5_id()");
+		puts ("FAILED: pgm_create_md5_gsi()");
 		goto err_free;
 	}
 
 /* temp fixed addresses */
-	struct sock_mreq recv_smr, send_smr;
+	struct pgm_sock_mreq recv_smr, send_smr;
 	int smr_len = 1;
-	e = if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
-	e = pgm_transport_create (&sess->transport, sess->gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_smr, 1, &send_smr);
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_create()");
 		goto err_free;
@@ -401,7 +402,7 @@ session_destroy (
 void
 net_send_nak (
 	char*		name,
-	struct tsi*	tsi,
+	pgm_tsi_t*	tsi,
 	guint32		sqn
 	)
 {
@@ -413,8 +414,8 @@ net_send_nak (
 	}
 
 /* check that the peer exists */
-	struct pgm_transport* transport = sess->transport;
-	struct pgm_peer* peer = g_hash_table_lookup (transport->peers, tsi);
+	pgm_transport_t* transport = sess->transport;
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
 		return;
@@ -427,9 +428,9 @@ net_send_nak (
 
         struct pgm_header *header = (struct pgm_header*)buf;
         struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-        memcpy (&header->pgm_gsi, transport->tsi.gsi, 6);
+        memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 /* dport & sport swap over for a nak */
-        header->pgm_sport       = sockaddr_port(&transport->recv_smr[0].smr_multiaddr);
+        header->pgm_sport       = pgm_sockaddr_port(&transport->recv_smr[0].smr_multiaddr);
         header->pgm_dport       = peer->tsi.sport;
         header->pgm_type        = PGM_NAK;
         header->pgm_options     = 0;
@@ -439,20 +440,20 @@ net_send_nak (
         nak->nak_sqn            = g_htonl (sqn);
 
 /* source nla */
-        sockaddr_to_nla ((struct sockaddr*)&peer->nla, (char*)&nak->nak_src_nla_afi);
+        pgm_sockaddr_to_nla ((struct sockaddr*)&peer->nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-        sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+        pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum    = pgm_cksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
 
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
                                 (struct sockaddr*)&peer->nla,
-                                sockaddr_len(&peer->nla));
+                                pgm_sockaddr_len(&peer->nla));
 
 	puts ("READY");
 }
@@ -495,19 +496,19 @@ on_stdin_data (
 			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
 			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
 
-			struct tsi tsi;
+			pgm_tsi_t tsi;
 			char *p = str + pmatch[2].rm_so;
-			tsi.gsi[0] = strtol (p, &p, 10);
+			tsi.gsi.identifier[0] = strtol (p, &p, 10);
 			++p;
-			tsi.gsi[1] = strtol (p, &p, 10);
+			tsi.gsi.identifier[1] = strtol (p, &p, 10);
 			++p;
-			tsi.gsi[2] = strtol (p, &p, 10);
+			tsi.gsi.identifier[2] = strtol (p, &p, 10);
 			++p;
-			tsi.gsi[3] = strtol (p, &p, 10);
+			tsi.gsi.identifier[3] = strtol (p, &p, 10);
 			++p;
-			tsi.gsi[4] = strtol (p, &p, 10);
+			tsi.gsi.identifier[4] = strtol (p, &p, 10);
 			++p;
-			tsi.gsi[5] = strtol (p, &p, 10);
+			tsi.gsi.identifier[5] = strtol (p, &p, 10);
 			++p;
 			tsi.sport = g_htons ( strtol (p, NULL, 10) );
 

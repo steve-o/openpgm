@@ -72,7 +72,7 @@ const struct in6_addr if6_default_group = IF6_DEFAULT_INIT;
  */
 
 int
-if_print_all (void)
+pgm_if_print_all (void)
 {
 	struct ifaddrs *ifap, *ifa;
 
@@ -117,7 +117,7 @@ if_print_all (void)
  */
 
 int
-if_inet_network (
+pgm_if_inet_network (
 	const char* s,
 	struct in_addr* in
 	)
@@ -208,7 +208,7 @@ if_inet_network (
  */
 
 int
-if_inet6_network (
+pgm_if_inet6_network (
 	const char* s,
 	struct in6_addr* in6
 	)
@@ -291,7 +291,7 @@ if_inet6_network (
  */
 
 int
-if_parse_interface (
+pgm_if_parse_interface (
 	const char*		s,
 	int			ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	struct sockaddr*	interface
@@ -373,14 +373,14 @@ if_parse_interface (
 		g_trace ("network address calculated: %s", inet_ntoa (in));
 	}
 #else
-	e = if_inet_network (s, &in);
+	e = pgm_if_inet_network (s, &in);
 	if (e != -1) {
 		g_trace ("IPv4 network address calculated: %s", inet_ntoa (in));
 		valid_net4 = 1;
 	}
 
 	struct in6_addr in6;
-	e = if_inet6_network (s, &in6);
+	e = pgm_if_inet6_network (s, &in6);
 	if (e != -1) {
 		char s[INET6_ADDRSTRLEN];
 		g_trace ("IPv6 network address calculated: %s", inet_ntop(AF_INET6, &in6, s, sizeof(s)));
@@ -596,7 +596,7 @@ out:
  */
 
 int
-if_parse_multicast (
+pgm_if_parse_multicast (
 	const char*		s,
 	int			ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	struct sockaddr*	addr
@@ -740,7 +740,7 @@ if_parse_multicast (
 			)
 
 int
-if_parse_network (
+pgm_if_parse_network (
 	const char*		s,
 	int			ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	struct sockaddr*	devices,
@@ -836,7 +836,7 @@ if_parse_network (
 				int j = 0;
 				while (tokens && tokens[j])
 				{
-					retval = if_parse_interface (tokens[j], ai_family, &devices[j]);
+					retval = pgm_if_parse_interface (tokens[j], ai_family, &devices[j]);
 					if (retval != 0) {
 						g_strfreev (tokens);
 						goto out;
@@ -856,7 +856,7 @@ if_parse_network (
 				int j = 0;
 				while (tokens && tokens[j])
 				{
-					retval = if_parse_multicast (tokens[j], ai_family, &receive_groups[j]);
+					retval = pgm_if_parse_multicast (tokens[j], ai_family, &receive_groups[j]);
 					if (retval != 0) {
 						g_strfreev (tokens);
 						goto out;
@@ -873,7 +873,7 @@ if_parse_network (
 
 			case ENTITY_SEND:
 			{
-				retval = if_parse_multicast (dup, ai_family, send_group);
+				retval = pgm_if_parse_multicast (dup, ai_family, send_group);
 				if (retval != 0) goto out;
 			}
 			break;
@@ -901,7 +901,7 @@ if_parse_network (
 			int j = 0;
 			while (tokens && tokens[j])
 			{
-				retval = if_parse_interface (tokens[j], ai_family, &devices[j]);
+				retval = pgm_if_parse_interface (tokens[j], ai_family, &devices[j]);
 				if (retval != 0) {
 					g_strfreev (tokens);
 					goto out;
@@ -921,7 +921,7 @@ if_parse_network (
 			int j = 0;
 			while (tokens && tokens[j])
 			{
-				retval = if_parse_multicast (tokens[j], ai_family, &receive_groups[j]);
+				retval = pgm_if_parse_multicast (tokens[j], ai_family, &receive_groups[j]);
 				if (retval != 0) {
 					g_strfreev (tokens);
 					goto out;
@@ -937,7 +937,7 @@ if_parse_network (
 
 		case ENTITY_SEND:
 		{
-			retval = if_parse_multicast (b, ai_family, send_group);
+			retval = pgm_if_parse_multicast (b, ai_family, send_group);
 			break;
 		}
 
@@ -1006,11 +1006,11 @@ out:
  */
 
 int
-if_parse_transport (
+pgm_if_parse_transport (
 	const char*		s,
 	int			ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
-	struct sock_mreq*	send_smr,
-	struct sock_mreq*	recv_smr,
+	struct pgm_sock_mreq*	send_smr,
+	struct pgm_sock_mreq*	recv_smr,
 	int*			len		/* length of incoming mreq and filled in returning */
 	)
 {
@@ -1027,7 +1027,7 @@ if_parse_transport (
 	struct sockaddr* devices = g_malloc0 ( sizeof(struct sockaddr_storage) * *len );
 	struct sockaddr* receive_groups = g_malloc0 ( sizeof(struct sockaddr_storage) * *len );
 	struct sockaddr* send_group = g_malloc0 ( sizeof(struct sockaddr_storage) );
-	retval = if_parse_network (s, ai_family, devices, receive_groups, send_group, *len);
+	retval = pgm_if_parse_network (s, ai_family, devices, receive_groups, send_group, *len);
 	if (retval == 0)
 	{
 /* receive groups: possible confusion over mismatch length of devices & receive_groups
@@ -1037,11 +1037,11 @@ if_parse_transport (
 		int i = 0;
 		while (receive_groups[i].sa_family)
 		{
-			memset (&recv_smr[i], 0, sizeof(struct sock_mreq));
-			memcpy (&recv_smr[i].smr_multiaddr, &receive_groups[i], sockaddr_len(&receive_groups[i]));
+			memset (&recv_smr[i], 0, sizeof(struct pgm_sock_mreq));
+			memcpy (&recv_smr[i].smr_multiaddr, &receive_groups[i], pgm_sockaddr_len(&receive_groups[i]));
 
 			if (devices[0].sa_family) {
-				memcpy (&recv_smr[i].smr_interface, &devices[0], sockaddr_len(&devices[0]));
+				memcpy (&recv_smr[i].smr_interface, &devices[0], pgm_sockaddr_len(&devices[0]));
 			} else {
 				((struct sockaddr_in*)&recv_smr[i].smr_interface)->sin_family = AF_INET;
 				((struct sockaddr_in*)&recv_smr[i].smr_interface)->sin_addr.s_addr = INADDR_ANY;
@@ -1050,11 +1050,11 @@ if_parse_transport (
 		}
 
 /* send group */
-		memset (&send_smr[0], 0, sizeof(struct sock_mreq));
-		memcpy (&send_smr[0].smr_multiaddr, &send_group[0], sockaddr_len(&send_group[0]));
+		memset (&send_smr[0], 0, sizeof(struct pgm_sock_mreq));
+		memcpy (&send_smr[0].smr_multiaddr, &send_group[0], pgm_sockaddr_len(&send_group[0]));
 
 		if (devices[0].sa_family) {
-			memcpy (&send_smr->smr_interface, &devices[0], sockaddr_len(&devices[0]));
+			memcpy (&send_smr->smr_interface, &devices[0], pgm_sockaddr_len(&devices[0]));
 		} else {
 			((struct sockaddr_in*)&send_smr[0].smr_interface)->sin_family = AF_INET;
 			((struct sockaddr_in*)&send_smr[0].smr_interface)->sin_addr.s_addr = INADDR_ANY;

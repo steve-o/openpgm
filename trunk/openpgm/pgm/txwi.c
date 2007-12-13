@@ -49,15 +49,15 @@
 
 #define ABS_IN_TXW(w,x) \
 	( \
-		!txw_empty ( (w) ) && \
-		guint32_gte ( (x), (w)->trail ) && guint32_lte ( (x), (w)->lead ) \
+		!pgm_txw_empty ( (w) ) && \
+		pgm_uint32_gte ( (x), (w)->trail ) && pgm_uint32_lte ( (x), (w)->lead ) \
 	)
 
-#define IN_TXW(w,x)	( guint32_gte ( (x), (w)->trail ) )
+#define IN_TXW(w,x)	( pgm_uint32_gte ( (x), (w)->trail ) )
 
-#define TXW_PACKET_OFFSET(w,x)		( (x) % txw_len( (w) ) )
+#define TXW_PACKET_OFFSET(w,x)		( (x) % pgm_txw_len( (w) ) )
 #define TXW_PACKET(w,x) \
-	( (struct txw_packet*)g_ptr_array_index((w)->pdata, TXW_PACKET_OFFSET((w), (x))) )
+	( (pgm_txw_packet_t*)g_ptr_array_index((w)->pdata, TXW_PACKET_OFFSET((w), (x))) )
 #define TXW_SET_PACKET(w,x,v) \
 	do { \
 		register int _o = TXW_PACKET_OFFSET((w), (x)); \
@@ -76,7 +76,7 @@
 		g_assert ( (w)->max_tpdu > 0 ) ; \
 \
 /* all pointers are within window bounds */ \
-		if ( !txw_empty ( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
+		if ( !pgm_txw_empty ( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
 		{ \
 			g_assert ( TXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata->len ); \
 			g_assert ( TXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata->len ); \
@@ -87,7 +87,7 @@
 #define ASSERT_TXW_POINTER_INVARIANT(w) \
 	{ \
 /* are trail & lead points valid */ \
-		if ( !txw_empty ( (w) ) ) \
+		if ( !pgm_txw_empty ( (w) ) ) \
 		{ \
 			g_assert ( NULL != TXW_PACKET( (w) , (w)->trail ) );    /* trail points to something */ \
 			g_assert ( NULL != TXW_PACKET( (w) , (w)->lead ) );     /* lead points to something */ \
@@ -104,13 +104,13 @@
 
 static void _list_iterator (gpointer, gpointer);
 
-static inline gpointer txw_alloc_packet (struct txw*);
-static inline int txw_pkt_free1 (struct txw*, struct txw_packet*);
-static inline int txw_pop (struct txw*);
+static inline gpointer pgm_txw_alloc_packet (pgm_txw_t*);
+static inline int pgm_txw_pkt_free1 (pgm_txw_t*, pgm_txw_packet_t*);
+static inline int pgm_txw_pop (pgm_txw_t*);
 
 
-struct txw*
-txw_init (
+pgm_txw_t*
+pgm_txw_init (
 	guint	tpdu_length,
 	guint32	preallocate_size,
 	guint32	txw_sqns,		/* transmit window size in sequence numbers */
@@ -121,7 +121,7 @@ txw_init (
 	g_trace ("init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
 		tpdu_length, preallocate_size, txw_sqns, txw_secs, txw_max_rte);
 
-	struct txw* t = g_slice_alloc0 (sizeof(struct txw));
+	pgm_txw_t* t = g_slice_alloc0 (sizeof(pgm_txw_t));
 	t->pdata = g_ptr_array_new ();
 
 	t->max_tpdu = tpdu_length;
@@ -129,7 +129,7 @@ txw_init (
 	for (guint32 i = 0; i < preallocate_size; i++)
 	{
 		gpointer data   = g_slice_alloc (t->max_tpdu);
-		gpointer packet = g_slice_alloc (sizeof(struct txw_packet));
+		gpointer packet = g_slice_alloc (sizeof(pgm_txw_packet_t));
 		g_trash_stack_push (&t->trash_data, data);
 		g_trash_stack_push (&t->trash_packet, packet);
 	}
@@ -151,12 +151,12 @@ txw_init (
  */
 	t->trail = t->lead + 1;
 
-	guint memory = sizeof(struct txw) +
+	guint memory = sizeof(pgm_txw_t) +
 /* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
 			*(guint*)( (char*)t->pdata + sizeof(gpointer) + sizeof(guint) ) +
 /* pre-allocated data & packets */
-			preallocate_size * (t->max_tpdu + sizeof(struct txw_packet));
+			preallocate_size * (t->max_tpdu + sizeof(pgm_txw_packet_t));
 
 	g_trace ("memory usage: %ub (%uMb)", memory, memory / (1024 * 1024));
 
@@ -166,8 +166,8 @@ txw_init (
 }
 
 int
-txw_shutdown (
-	struct txw*	t
+pgm_txw_shutdown (
+	pgm_txw_t*	t
 	)
 {
 	g_trace ("shutdown.");
@@ -200,7 +200,7 @@ txw_shutdown (
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&t->trash_packet)) )
 		{
-			g_slice_free1 (sizeof(struct txw_packet), p);
+			g_slice_free1 (sizeof(pgm_txw_packet_t), p);
 		}
 
 		g_assert ( t->trash_packet == NULL );
@@ -219,26 +219,26 @@ _list_iterator (
 
 	g_assert ( user_data != NULL);
 
-	txw_pkt_free1 ((struct txw*)user_data, (struct txw_packet*)data);
+	pgm_txw_pkt_free1 ((pgm_txw_t*)user_data, (pgm_txw_packet_t*)data);
 }
 
 static inline gpointer
-txw_alloc_packet (
-	struct txw*	t
+pgm_txw_alloc_packet (
+	pgm_txw_t*	t
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
 	
-	gpointer p = t->trash_packet ?  g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(struct txw_packet));
+	gpointer p = t->trash_packet ? g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(pgm_txw_packet_t));
 
 	ASSERT_TXW_BASE_INVARIANT(t);
 	return p;
 }
 
 static inline int
-txw_pkt_free1 (
-	struct txw*	t,
-	struct txw_packet*	tp
+pgm_txw_pkt_free1 (
+	pgm_txw_t*		t,
+	pgm_txw_packet_t*	tp
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
@@ -256,8 +256,8 @@ txw_pkt_free1 (
 }
 
 int
-txw_push (
-	struct txw*	t,
+pgm_txw_push (
+	pgm_txw_t*	t,
 	gpointer	packet,
 	guint		length
 	)
@@ -269,18 +269,18 @@ txw_push (
 		t->lead+1, t->trail, t->lead);
 
 /* check for full window */
-	if ( txw_full (t) )
+	if ( pgm_txw_full (t) )
 	{
 //		g_warning ("full :o");
 
 /* transmit window advancement scheme dependent action here */
-		txw_pop (t);
+		pgm_txw_pop (t);
 	}
 
 	t->lead++;
 
 /* add to window */
-	struct txw_packet* tp = txw_alloc_packet (t);
+	pgm_txw_packet_t* tp = pgm_txw_alloc_packet (t);
 	tp->data		= packet;
 	tp->length		= length;
 	tp->sequence_number	= t->lead;
@@ -297,8 +297,8 @@ txw_push (
  */
 
 int
-txw_peek (
-	struct txw*	t,
+pgm_txw_peek (
+	pgm_txw_t*	t,
 	guint32		sequence_number,
 	gpointer*	packet,
 	guint*		length
@@ -314,7 +314,7 @@ txw_peek (
 		return -1;
 	}
 
-	struct txw_packet* tp = TXW_PACKET(t, sequence_number);
+	pgm_txw_packet_t* tp = TXW_PACKET(t, sequence_number);
 	*packet = tp->data;
 	*length	= tp->length;
 
@@ -324,21 +324,21 @@ txw_peek (
 }
 
 static inline int
-txw_pop (
-	struct txw*	t
+pgm_txw_pop (
+	pgm_txw_t*	t
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
-	if ( txw_empty (t) )
+	if ( pgm_txw_empty (t) )
 	{
 		g_trace ("window is empty");
 		return -1;
 	}
 
-	struct txw_packet* tp = TXW_PACKET(t, t->trail);
-	txw_pkt_free1 (t, tp);
+	pgm_txw_packet_t* tp = TXW_PACKET(t, t->trail);
+	pgm_txw_pkt_free1 (t, tp);
 	TXW_SET_PACKET(t, t->trail, NULL);
 
 	t->trail++;

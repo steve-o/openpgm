@@ -4,7 +4,7 @@
 
 Import('env')
 e = env.Copy(
-		LIBS = env['LIBS'] + ['libpgm'],
+		LIBS = env['LIBS'] + ['libpgm', 'libpgmex'],
 		);
 
 e.Program(['monitor.c', 'dump-json.c'])

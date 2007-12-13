@@ -50,21 +50,21 @@
 #endif
 
 
-#define IN_TXW(w,x)	( guint32_gte ( (x), (w)->rxw_trail ) )
+#define IN_TXW(w,x)	( pgm_uint32_gte ( (x), (w)->rxw_trail ) )
 #define IN_RXW(w,x) \
 	( \
-		guint32_gte ( (x), (w)->rxw_trail ) && guint32_lte ( (x), (w)->lead ) \
+		pgm_uint32_gte ( (x), (w)->rxw_trail ) && pgm_uint32_lte ( (x), (w)->lead ) \
 	)
 
 #define ABS_IN_RXW(w,x) \
 	( \
-		!rxw_empty( (w) ) && \
-		guint32_gte ( (x), (w)->trail ) && guint32_lte ( (x), (w)->lead ) \
+		!pgm_rxw_empty( (w) ) && \
+		pgm_uint32_gte ( (x), (w)->trail ) && pgm_uint32_lte ( (x), (w)->lead ) \
 	)
 
-#define RXW_PACKET_OFFSET(w,x)		( (x) % rxw_len ((w)) ) 
+#define RXW_PACKET_OFFSET(w,x)		( (x) % pgm_rxw_len ((w)) ) 
 #define RXW_PACKET(w,x) \
-	( (struct rxw_packet*)g_ptr_array_index((w)->pdata, RXW_PACKET_OFFSET((w), (x))) )
+	( (pgm_rxw_packet_t*)g_ptr_array_index((w)->pdata, RXW_PACKET_OFFSET((w), (x))) )
 #define RXW_SET_PACKET(w,x,v) \
 	do { \
 		register int _o = RXW_PACKET_OFFSET((w), (x)); \
@@ -74,7 +74,7 @@
 /* is (a) greater than (b) wrt. leading edge of receive window (w) */
 #define SLIDINGWINDOW_GT(w,a,b) \
 	( \
-		rxw_empty( (w) ) ? \
+		pgm_rxw_empty( (w) ) ? \
 		( \
 			( (gint32)(a) - (gint32)( (w)->trail ) ) > ( (gint32)(b) - (gint32)( (w)->trail ) ) \
 		) \
@@ -115,7 +115,7 @@
 #define ASSERT_RXW_POINTER_INVARIANT(w) \
 	{ \
 /* are trail & lead points valid */ \
-		if ( !rxw_empty( (w) ) ) \
+		if ( !pgm_rxw_empty( (w) ) ) \
 		{ \
 			g_assert ( NULL != RXW_PACKET( (w) , (w)->trail ) );	/* trail points to something */ \
 			g_assert ( NULL != RXW_PACKET( (w) , (w)->lead ) );	/* lead points to something */ \
@@ -147,38 +147,38 @@
 #define G_LOG_DOMAIN	"rxw"
 
 static void _list_iterator (gpointer, gpointer);
-static inline int rxw_flush (struct rxw*);
-static inline int rxw_flush1 (struct rxw*);
-static inline int rxw_pop_lead (struct rxw*);
-static inline int rxw_pop_trail (struct rxw*);
-static inline int rxw_pkt_remove1 (struct rxw*, struct rxw_packet*);
-static inline int rxw_pkt_free1 (struct rxw*, struct rxw_packet*);
-static inline gpointer rxw_alloc_packet (struct rxw*);
-static inline gpointer rxw_alloc0_packet (struct rxw*);
+static inline int pgm_rxw_flush (pgm_rxw_t*);
+static inline int pgm_rxw_flush1 (pgm_rxw_t*);
+static inline int pgm_rxw_pop_lead (pgm_rxw_t*);
+static inline int pgm_rxw_pop_trail (pgm_rxw_t*);
+static inline int pgm_rxw_pkt_remove1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline int pgm_rxw_pkt_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline gpointer pgm_rxw_alloc_packet (pgm_rxw_t*);
+static inline gpointer pgm_rxw_alloc0_packet (pgm_rxw_t*);
 
 
-struct rxw*
-rxw_init (
-	guint	tpdu_length,
-	guint32	preallocate_size,
-	guint32	rxw_sqns,		/* transmit window size in sequence numbers */
-	guint	rxw_secs,		/* size in seconds */
-	guint	rxw_max_rte,		/* max bandwidth */
-	rxw_callback	on_data,	/* upstream callback */
+pgm_rxw_t*
+pgm_rxw_init (
+	guint		tpdu_length,
+	guint32		preallocate_size,
+	guint32		rxw_sqns,		/* transmit window size in sequence numbers */
+	guint		rxw_secs,		/* size in seconds */
+	guint		rxw_max_rte,		/* max bandwidth */
+	pgm_rxw_commitfn_t on_data,	/* upstream callback */
 	gpointer	param		/* upstream parameter */
 	)
 {
 	g_trace ("init (tpdu %i pre-alloc %i rxw_sqns %i rxw_secs %i rxw_max_rte %i).",
 		tpdu_length, preallocate_size, rxw_sqns, rxw_secs, rxw_max_rte);
 
-	struct rxw* r = g_slice_alloc0 (sizeof(struct rxw));
+	pgm_rxw_t* r = g_slice_alloc0 (sizeof(pgm_rxw_t));
 	r->pdata = g_ptr_array_new ();
 	r->max_tpdu = tpdu_length;
 
 	for (guint32 i = 0; i < preallocate_size; i++)
 	{
 		gpointer data   = g_slice_alloc (r->max_tpdu);
-		gpointer packet = g_slice_alloc (sizeof(struct rxw_packet));
+		gpointer packet = g_slice_alloc (sizeof(pgm_rxw_packet_t));
 		g_trash_stack_push (&r->trash_data, data);
 		g_trash_stack_push (&r->trash_packet, packet);
 	}
@@ -215,12 +215,12 @@ rxw_init (
 	r->on_data = on_data;
 	r->param = param;
 
-	guint memory = sizeof(struct rxw) +
+	guint memory = sizeof(pgm_rxw_t) +
 /* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
 			*(guint*)( (char*)r->pdata + sizeof(gpointer) + sizeof(guint) ) +
 /* pre-allocated data & packets */
-			preallocate_size * (r->max_tpdu + sizeof(struct rxw_packet)) +
+			preallocate_size * (r->max_tpdu + sizeof(pgm_rxw_packet_t)) +
 /* state queues */
 			3 * sizeof(GQueue) +
 /* guess at timer */
@@ -234,8 +234,8 @@ rxw_init (
 }
 
 int
-rxw_shutdown (
-	struct rxw*	r
+pgm_rxw_shutdown (
+	pgm_rxw_t*	r
 	)
 {
 	g_trace ("rxw: shutdown.");
@@ -268,7 +268,7 @@ rxw_shutdown (
 		gpointer *p = NULL;
 		while ( (p = g_trash_stack_pop (&r->trash_packet)) )
 		{
-			g_slice_free1 (sizeof(struct rxw_packet), p);
+			g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
 		}
 
 		g_assert (r->trash_packet == NULL);
@@ -306,21 +306,21 @@ _list_iterator (
 
 	g_assert ( user_data != NULL);
 
-	rxw_pkt_free1 ((struct rxw*)user_data, (struct rxw_packet*)data);
+	pgm_rxw_pkt_free1 ((pgm_rxw_t*)user_data, (pgm_rxw_packet_t*)data);
 }
 
 static inline gpointer
-rxw_alloc_packet (
-	struct rxw*	r
+pgm_rxw_alloc_packet (
+	pgm_rxw_t*	r
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return r->trash_packet ?  g_trash_stack_pop (&r->trash_packet) : g_slice_alloc (sizeof(struct rxw_packet));
+	return r->trash_packet ?  g_trash_stack_pop (&r->trash_packet) : g_slice_alloc (sizeof(pgm_rxw_packet_t));
 }
 
 static inline gpointer
-rxw_alloc0_packet (
-	struct rxw*	r
+pgm_rxw_alloc0_packet (
+	pgm_rxw_t*	r
 	)
 {
 	gpointer p;
@@ -330,13 +330,13 @@ rxw_alloc0_packet (
 	if (r->trash_packet)
 	{
 		p = g_trash_stack_pop (&r->trash_packet);
-		memset (p, 0, sizeof(struct rxw_packet));
+		memset (p, 0, sizeof(pgm_rxw_packet_t));
 	}
 	else
 	{
 		g_trace ("packet trash stack exceeded.");
 	
-		p = g_slice_alloc0 (sizeof(struct rxw_packet));
+		p = g_slice_alloc0 (sizeof(pgm_rxw_packet_t));
 	}
 
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -351,8 +351,8 @@ rxw_alloc0_packet (
  */
 
 int
-rxw_push_fragment (
-	struct rxw*	r,
+pgm_rxw_push_fragment (
+	pgm_rxw_t*	r,
 	gpointer	packet,
 	guint		length,
 	guint32		sequence_number,
@@ -402,7 +402,7 @@ rxw_push_fragment (
 			return -1;
 		}
 
-		rxw_window_update (r, trail, r->lead);
+		pgm_rxw_window_update (r, trail, r->lead);
 	}
 
 	g_trace ("#%u: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
@@ -411,7 +411,7 @@ rxw_push_fragment (
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 /* already committed */
-	if ( guint32_lt (sequence_number, r->trail) )
+	if ( pgm_uint32_lt (sequence_number, r->trail) )
 	{
 		g_trace ("#%u: already committed, discarding.", sequence_number);
 
@@ -419,11 +419,11 @@ rxw_push_fragment (
 	}
 
 /* check for duplicate */
-	if ( guint32_lte (sequence_number, r->lead) )
+	if ( pgm_uint32_lte (sequence_number, r->lead) )
 	{
 		g_trace ("#%u: in rx window, checking for duplicate.", sequence_number);
 
-		struct rxw_packet* rp = RXW_PACKET(r, sequence_number);
+		pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 		if (rp)
 		{
@@ -436,19 +436,19 @@ rxw_push_fragment (
 /* for fragments check that apdu is valid */
 			if ( apdu_len && 
 				apdu_first_sqn != sequence_number &&
-				( rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
+				( pgm_rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
 					)
 			{
 				g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
-				rxw_mark_lost (r, sequence_number);
+				pgm_rxw_mark_lost (r, sequence_number);
 				goto out;
 			}
 
-			if ( apdu_len && guint32_gt (apdu_first_sqn, sequence_number) )
+			if ( apdu_len && pgm_uint32_gt (apdu_first_sqn, sequence_number) )
 			{
 				g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
 					sequence_number, apdu_first_sqn);
-				rxw_mark_lost (r, apdu_first_sqn);
+				pgm_rxw_mark_lost (r, apdu_first_sqn);
 				goto out;
 			}
 
@@ -471,7 +471,7 @@ rxw_push_fragment (
  *					rp->data	= NULL;
  *					rp->length	= 0;
  */
-					struct rxw_packet* head_rp = RXW_PACKET(r, apdu_first_sqn);
+					pgm_rxw_packet_t* head_rp = RXW_PACKET(r, apdu_first_sqn);
 					memcpy ((char*)head_rp->data + fragment_offset, packet, length);
 				}
 
@@ -484,7 +484,7 @@ rxw_push_fragment (
 				rp->length	= length;
 			}
 
-			rxw_pkt_state_unlink (r, rp);
+			pgm_rxw_pkt_state_unlink (r, rp);
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
 		}
 		else
@@ -500,15 +500,15 @@ rxw_push_fragment (
 	{
 /* extends receive window */
 		g_trace ("#%u: lead extended.", sequence_number);
-		g_assert ( guint32_gt (sequence_number, r->lead) );
+		g_assert ( pgm_uint32_gt (sequence_number, r->lead) );
 
-		if ( rxw_full(r) )
+		if ( pgm_rxw_full(r) )
 		{
 			dropped++;
 //			g_warning ("#%u: dropping #%u due to full window.", sequence_number, r->trail);
 
-			rxw_pop_trail (r);
-			rxw_flush (r);
+			pgm_rxw_pop_trail (r);
+			pgm_rxw_flush (r);
 		}
 
 		r->lead++;
@@ -518,10 +518,10 @@ rxw_push_fragment (
 		{
 			while (r->lead != sequence_number)
 			{
-				struct rxw_packet* ph = rxw_alloc0_packet(r);
+				pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
-				ph->nak_rb_expiry	= time_now;
+				ph->nak_rb_expiry	= pgm_time_now;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
@@ -531,13 +531,13 @@ rxw_push_fragment (
 				g_trace ("#%" G_GUINT32_FORMAT ": adding place holder for missing packet, backoff_queue now %" G_GUINT32_FORMAT " long, rxw_sqns %u",
 					sequence_number, r->backoff_queue->length, rxw_sqns(r));
 
-				if ( rxw_full(r) )
+				if ( pgm_rxw_full(r) )
 				{
 					dropped++;
 //					g_warning ("dropping #%u due to full window.", r->trail);
 
-					rxw_pop_trail (r);
-					rxw_flush (r);
+					pgm_rxw_pop_trail (r);
+					pgm_rxw_flush (r);
 				}
 
 				r->lead++;
@@ -549,23 +549,23 @@ rxw_push_fragment (
 /* for fragments check that apdu is valid: dupe code to above */
 		if ( apdu_len && 
 			apdu_first_sqn != sequence_number &&
-			( rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
+			( pgm_rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
 				)
 		{
 			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
-			rxw_mark_lost (r, sequence_number);
+			pgm_rxw_mark_lost (r, sequence_number);
 			goto out;
 		}
 
-		if ( apdu_len && guint32_gt (apdu_first_sqn, sequence_number) )
+		if ( apdu_len && pgm_uint32_gt (apdu_first_sqn, sequence_number) )
 		{
 			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
 				sequence_number, apdu_first_sqn);
-			rxw_mark_lost (r, apdu_first_sqn);
+			pgm_rxw_mark_lost (r, apdu_first_sqn);
 			goto out;
 		}
 
-		struct rxw_packet* rp = rxw_alloc0_packet(r);
+		pgm_rxw_packet_t* rp = pgm_rxw_alloc0_packet(r);
 		rp->link_.data = rp;
 
 		if (apdu_len)	/* fragment */
@@ -580,7 +580,7 @@ rxw_push_fragment (
 			}
 			else
 			{	/* not first fragment */
-				struct rxw_packet* head_rp = RXW_PACKET(r, apdu_first_sqn);
+				pgm_rxw_packet_t* head_rp = RXW_PACKET(r, apdu_first_sqn);
 				memcpy ((char*)head_rp->data + fragment_offset, packet, length);
 
 /* leave check for complete apdu at flush */
@@ -599,11 +599,11 @@ rxw_push_fragment (
 
 		RXW_SET_PACKET(r, rp->sequence_number, rp);
 		g_trace ("#%" G_GUINT32_FORMAT ": added packet #%" G_GUINT32_FORMAT ", rxw_sqns %" G_GUINT32_FORMAT,
-			sequence_number, rp->sequence_number, rxw_sqns(r));
+			sequence_number, rp->sequence_number, pgm_rxw_sqns(r));
 	}
 
 out:
-	rxw_flush (r);
+	pgm_rxw_flush (r);
 
 	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number,
@@ -619,8 +619,8 @@ out:
 }
 
 static inline int
-rxw_flush (
-	struct rxw*	r
+pgm_rxw_flush (
+	pgm_rxw_t*	r
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -628,9 +628,9 @@ rxw_flush (
 /* check for contiguous packets to pass upstream */
 	g_trace ("flush window for contiguous data.");
 
-	while ( !rxw_empty( r ) )
+	while ( !pgm_rxw_empty( r ) )
 	{
-		if ( rxw_flush1 (r) != 1 )
+		if ( pgm_rxw_flush1 (r) != 1 )
 			break;
 	}
 
@@ -645,14 +645,14 @@ rxw_flush (
  */
 
 static inline int
-rxw_flush1 (
-	struct rxw*	r
+pgm_rxw_flush1 (
+	pgm_rxw_t*	r
 	)
 {
 	int retval = 0;
 	ASSERT_RXW_BASE_INVARIANT(r);
 
-	struct rxw_packet* cp = RXW_PACKET(r, r->trail);
+	pgm_rxw_packet_t* cp = RXW_PACKET(r, r->trail);
 	g_assert ( cp != NULL );
 
 	if (cp->state != PGM_PKT_HAVE_DATA_STATE && cp->state != PGM_PKT_LOST_DATA_STATE) {
@@ -675,11 +675,11 @@ rxw_flush1 (
 				r->lost_count--;
 				RXW_SET_PACKET(r, r->trail, NULL);
 				r->trail++;
-				rxw_pkt_remove1 (r, cp);
+				pgm_rxw_pkt_remove1 (r, cp);
 			}
 
 /* flush others, make sure to check each packet is an apdu packet and not simply a zero match */
-			while (!rxw_empty(r))
+			while (!pgm_rxw_empty(r))
 			{
 				cp = RXW_PACKET(r, r->trail);
 				if (cp->apdu_len && cp->apdu_first_sqn == apdu_first_sqn)
@@ -693,7 +693,7 @@ rxw_flush1 (
 					}
 					RXW_SET_PACKET(r, r->trail, NULL);
 					r->trail++;
-					rxw_pkt_remove1 (r, cp);
+					pgm_rxw_pkt_remove1 (r, cp);
 				}
 				else
 				{	/* another apdu or tpdu exists */
@@ -712,7 +712,7 @@ rxw_flush1 (
 			r->trail++;
 
 /* cleanup */
-			rxw_pkt_remove1 (r, cp);
+			pgm_rxw_pkt_remove1 (r, cp);
 
 /* one tpdu lost */
 			retval = 1;
@@ -733,7 +733,7 @@ rxw_flush1 (
 
 			guint32 frag = cp->apdu_first_sqn;
 			guint32 apdu_len = 0;
-			struct rxw_packet* ap = NULL;
+			pgm_rxw_packet_t* ap = NULL;
 			while ( ABS_IN_RXW(r, frag) && apdu_len < cp->apdu_len )
 			{
 g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
@@ -767,7 +767,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 				for (guint32 i = cp->apdu_first_sqn; i < frag; i++)
 				{
 					ap = RXW_PACKET(r, i);
-					rxw_pkt_remove1 (r, ap);
+					pgm_rxw_pkt_remove1 (r, ap);
 					RXW_SET_PACKET(r, i, NULL);
 				}
 			}
@@ -791,7 +791,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 			r->on_data (cp->data, cp->length, r->param);
 
 /* cleanup */
-			rxw_pkt_remove1 (r, cp);
+			pgm_rxw_pkt_remove1 (r, cp);
 		}
 
 /* one apdu or tpdu processed */
@@ -804,9 +804,9 @@ out:
 }
 
 int
-rxw_pkt_state_unlink (
-	struct rxw*	r,
-	struct rxw_packet*	rp
+pgm_rxw_pkt_state_unlink (
+	pgm_rxw_t*		r,
+	pgm_rxw_packet_t*	rp
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -848,9 +848,9 @@ rxw_pkt_state_unlink (
  */
 
 static inline int
-rxw_pkt_remove1 (
-	struct rxw*	r,
-	struct rxw_packet*	rp
+pgm_rxw_pkt_remove1 (
+	pgm_rxw_t*		r,
+	pgm_rxw_packet_t*	rp
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -861,7 +861,7 @@ rxw_pkt_remove1 (
 		rp->data = NULL;
 	}
 
-//	g_slice_free1 (sizeof(struct rxw), rp);
+//	g_slice_free1 (sizeof(pgm_rxw_t), rp);
 	g_trash_stack_push (&r->trash_packet, rp);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -869,9 +869,9 @@ rxw_pkt_remove1 (
 }
 
 static inline int
-rxw_pkt_free1 (
-	struct rxw*	r,
-	struct rxw_packet*	rp
+pgm_rxw_pkt_free1 (
+	pgm_rxw_t*		r,
+	pgm_rxw_packet_t*	rp
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -891,7 +891,7 @@ rxw_pkt_free1 (
 		rp->data = NULL;
 	}
 
-//	g_slice_free1 (sizeof(struct rxw), rp);
+//	g_slice_free1 (sizeof(pgm_rxw_t), rp);
 	g_trash_stack_push (&r->trash_packet, rp);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -900,18 +900,18 @@ rxw_pkt_free1 (
 
 /* remove from leading edge of ahead side of receive window */
 static int
-rxw_pop_lead (
-	struct rxw*	r
+pgm_rxw_pop_lead (
+	pgm_rxw_t*	r
 	)
 {
 /* check if window is not empty */
 	ASSERT_RXW_BASE_INVARIANT(r);
-	g_assert ( !rxw_empty (r) );
+	g_assert ( !pgm_rxw_empty (r) );
 
-	struct rxw_packet* rp = RXW_PACKET(r, r->lead);
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->lead);
 
-	rxw_pkt_state_unlink (r, rp);
-	rxw_pkt_free1 (r, rp);
+	pgm_rxw_pkt_state_unlink (r, rp);
+	pgm_rxw_pkt_free1 (r, rp);
 	RXW_SET_PACKET(r, r->lead, NULL);
 
 	r->lead--;
@@ -922,18 +922,18 @@ rxw_pop_lead (
 
 /* remove from trailing edge of non-contiguous receive window causing data loss */
 static inline int
-rxw_pop_trail (
-	struct rxw*	r
+pgm_rxw_pop_trail (
+	pgm_rxw_t*	r
 	)
 {
 /* check if window is not empty */
 	ASSERT_RXW_BASE_INVARIANT(r);
 	g_assert ( !rxw_empty (r) );
 
-	struct rxw_packet* rp = RXW_PACKET(r, r->trail);
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->trail);
 
-	rxw_pkt_state_unlink (r, rp);
-	rxw_pkt_free1 (r, rp);
+	pgm_rxw_pkt_state_unlink (r, rp);
+	pgm_rxw_pkt_free1 (r, rp);
 	RXW_SET_PACKET(r, r->trail, NULL);
 
 	r->trail++;
@@ -946,8 +946,8 @@ rxw_pop_trail (
  * can generate data loss by excluding outstanding NAK requests.
  */
 int
-rxw_window_update (
-	struct rxw*	r,
+pgm_rxw_window_update (
+	pgm_rxw_t*	r,
 	guint32		txw_trail,
 	guint32		txw_lead
 	)
@@ -971,7 +971,7 @@ rxw_window_update (
 		return 0;
 	}
 
-	if ( guint32_gt (txw_lead, r->lead) )
+	if ( pgm_uint32_gt (txw_lead, r->lead) )
 	{
 		g_trace ("advancing lead to %u", txw_lead);
 
@@ -981,21 +981,21 @@ rxw_window_update (
 	
 			while ( r->lead != txw_lead )
 			{
-				if ( rxw_full(r) )
+				if ( pgm_rxw_full(r) )
 				{
 					dropped++;
 //					g_warning ("dropping #%u due to full window.", r->trail);
 
-					rxw_pop_trail (r);
-					rxw_flush (r);
+					pgm_rxw_pop_trail (r);
+					pgm_rxw_flush (r);
 				}
 
 				r->lead++;
 
-				struct rxw_packet* ph = rxw_alloc0_packet(r);
+				pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
-				ph->nak_rb_expiry	= time_now;
+				ph->nak_rb_expiry	= pgm_time_now;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
@@ -1028,10 +1028,10 @@ rxw_window_update (
 		r->rxw_trail = txw_trail;
 
 /* expire outstanding naks ... */
-		while ( guint32_gt(r->rxw_trail, r->trail) )
+		while ( pgm_uint32_gt(r->rxw_trail, r->trail) )
 		{
 /* jump remaining sequence numbers if window is empty */
-			if ( rxw_empty(r) )
+			if ( pgm_rxw_empty(r) )
 			{
 				guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
 
@@ -1044,8 +1044,8 @@ rxw_window_update (
 			{
 				dropped++;
 //				g_warning ("dropping #%u due to advancing transmit window.", r->trail);
-				rxw_pop_trail (r);
-				rxw_flush (r);
+				pgm_rxw_pop_trail (r);
+				pgm_rxw_flush (r);
 			}
 		}
 	}
@@ -1065,12 +1065,12 @@ rxw_window_update (
 	if (dropped)
 	{
 /* check trailing packet to see if fragment of an apdu that has just been dropped */
-		if (!rxw_empty (r))
+		if (!pgm_rxw_empty (r))
 		{
-			struct rxw_packet* rp = RXW_PACKET(r, r->trail);
-			while (!rxw_empty (r) && rp->apdu_len && !ABS_IN_RXW(r, rp->apdu_first_sqn))
+			pgm_rxw_packet_t* rp = RXW_PACKET(r, r->trail);
+			while (!pgm_rxw_empty (r) && rp->apdu_len && !ABS_IN_RXW(r, rp->apdu_first_sqn))
 			{
-				rxw_pop_trail (r);
+				pgm_rxw_pop_trail (r);
 				dropped++;
 			}
 		}
@@ -1079,7 +1079,7 @@ rxw_window_update (
 	}
 
 	g_trace ("window ( rxw_trail %u rxw_trail_init %u trail %u lead %u rxw_sqns %u )",
-		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead, rxw_sqns(r));
+		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead, pgm_rxw_sqns(r));
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
@@ -1091,22 +1091,22 @@ rxw_window_update (
  */
 
 int
-rxw_mark_lost (
-	struct rxw*	r,
+pgm_rxw_mark_lost (
+	pgm_rxw_t*	r,
 	guint32		sequence_number
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
-	struct rxw_packet* rp = RXW_PACKET(r, sequence_number);
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 /* remove current state */
-	rxw_pkt_state_unlink (r, rp);
+	pgm_rxw_pkt_state_unlink (r, rp);
 	rp->state = PGM_PKT_LOST_DATA_STATE;
 	r->lost_count++;
 
-	rxw_flush (r);
+	pgm_rxw_flush (r);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
@@ -1118,8 +1118,8 @@ rxw_mark_lost (
  */
 
 int
-rxw_ncf (
-	struct rxw*	r,
+pgm_rxw_ncf (
+	pgm_rxw_t*	r,
 	guint32		sequence_number,
 	pgm_time_t	rdata_expiry
 	)
@@ -1129,7 +1129,7 @@ rxw_ncf (
 
 	if (!r->window_defined) return -1;
 
-	struct rxw_packet* rp = RXW_PACKET(r, sequence_number);
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 	if (rp)
 	{
@@ -1151,7 +1151,7 @@ rxw_ncf (
 			g_assert_not_reached();
 		}
 
-		rxw_pkt_state_unlink (r, rp);
+		pgm_rxw_pkt_state_unlink (r, rp);
 		rp->state = PGM_PKT_WAIT_DATA_STATE;
 		g_queue_push_head_link (r->wait_data_queue, &rp->link_);
 
@@ -1178,19 +1178,19 @@ rxw_ncf (
 
 	while (r->lead != sequence_number)
 	{
-		if ( rxw_full(r) )
+		if ( pgm_rxw_full(r) )
 		{
 			dropped++;
 //			g_warning ("dropping #%u due to full window.", r->trail);
 
-			rxw_pop_trail (r);
-			rxw_flush (r);
+			pgm_rxw_pop_trail (r);
+			pgm_rxw_flush (r);
 		}
 
-		struct rxw_packet* ph = rxw_alloc0_packet(r);
+		pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 		ph->link_.data		= ph;
 		ph->sequence_number     = r->lead;
-		ph->nak_rb_expiry	= time_now;
+		ph->nak_rb_expiry	= pgm_time_now;
 		ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 		RXW_SET_PACKET(r, ph->sequence_number, ph);
@@ -1206,16 +1206,16 @@ rxw_ncf (
 
 	g_assert ( r->lead == sequence_number );
 
-	if ( rxw_full(r) )
+	if ( pgm_rxw_full(r) )
 	{
 		dropped++;
 //		g_warning ("dropping #%u due to full window.", r->trail);
 
-		rxw_pop_trail (r);
-		rxw_flush (r);
+		pgm_rxw_pop_trail (r);
+		pgm_rxw_flush (r);
 	}
 
-	struct rxw_packet* ph = rxw_alloc0_packet(r);
+	pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 	ph->link_.data		= ph;
 	ph->sequence_number     = r->lead;
 	ph->nak_rdata_expiry	= rdata_expiry;
@@ -1227,7 +1227,7 @@ rxw_ncf (
 /* do not send nak, simply add to ncf list */
 	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
 
-	rxw_flush (r);
+	pgm_rxw_flush (r);
 
 	if (dropped) {
 		g_warning ("dropped %u messages due to full window.", dropped);
@@ -1242,8 +1242,8 @@ rxw_ncf (
  */
 
 const char*
-rxw_state_string (
-	pgm_pkt_state		state
+pgm_rxw_state_string (
+	pgm_pkt_state_e		state
 	)
 {
 	const char* c;

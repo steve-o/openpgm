@@ -50,9 +50,9 @@
 #define nsecs_to_msecs(t)	( (t) / 1000000UL )
 #define nsecs_to_usecs(t)	( (t) / 1000 )
 
-pgm_time_t time_now = 0;
-time_update_func time_update_now;
-time_sleep_func time_sleep;
+pgm_time_t pgm_time_now = 0;
+pgm_time_update_func pgm_time_update_now;
+pgm_time_sleep_func pgm_time_sleep;
 
 static gboolean time_got_initialized = FALSE;
 
@@ -72,7 +72,7 @@ static void rtc_sleep (gulong);
 static void tsc_sleep (gulong);
 
 int
-time_init ( void )
+pgm_time_init ( void )
 {
 	g_return_val_if_fail (time_got_initialized == FALSE, -1);
 
@@ -81,13 +81,13 @@ time_init ( void )
 	if (cfg == NULL) cfg = "TSC";
 
 	switch (cfg[0]) {
-	case 'C':	time_update_now = clock_update; break;
-	case 'F':	time_update_now = ftime_update; break;
-	case 'R':	time_update_now = rtc_update; break;
-	case 'T':	time_update_now = tsc_update; break;
+	case 'C':	pgm_time_update_now = clock_update; break;
+	case 'F':	pgm_time_update_now = ftime_update; break;
+	case 'R':	pgm_time_update_now = rtc_update; break;
+	case 'T':	pgm_time_update_now = tsc_update; break;
 
 	default:
-	case 'G':	time_update_now = gettimeofday_update; break;
+	case 'G':	pgm_time_update_now = gettimeofday_update; break;
 	}
 
 /* sleeping */
@@ -95,49 +95,49 @@ time_init ( void )
 	if (cfg == NULL) cfg = "RTC";
 
 	switch (cfg[0]) {
-	case 'C':	time_sleep = clock_nano_sleep; break;
-	case 'N':	time_sleep = nano_sleep; break;
-	case 'R':	time_sleep = rtc_sleep; break;
-	case 'T':	time_sleep = tsc_sleep; break;
+	case 'C':	pgm_time_sleep = clock_nano_sleep; break;
+	case 'N':	pgm_time_sleep = nano_sleep; break;
+	case 'R':	pgm_time_sleep = rtc_sleep; break;
+	case 'T':	pgm_time_sleep = tsc_sleep; break;
 
 	default:
 	case 'M':
-	case 'U':	time_sleep = usleep; break;	/* direct to glibc, function is deprecated */
+	case 'U':	pgm_time_sleep = usleep; break;	/* direct to glibc, function is deprecated */
 	}
 
-	if (time_update_now == rtc_update || time_sleep == rtc_sleep ||
-		time_update_now == tsc_update || time_sleep == tsc_sleep)
+	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep ||
+		pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
 	{
 		rtc_init();
 	}
 
-	if (time_update_now == tsc_update || time_sleep == tsc_sleep)
+	if (pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
 	{
 		tsc_init();
 	}
 
-	if (time_sleep == clock_nano_sleep)
+	if (pgm_time_sleep == clock_nano_sleep)
 	{
 		clock_init();
 	}
 
-	time_update_now();
+	pgm_time_update_now();
 
 	time_got_initialized = TRUE;
 	return 0;
 }
 
 gboolean
-time_supported (void)
+pgm_time_supported (void)
 {
 	return ( time_got_initialized == TRUE );
 }
 
 int
-time_destroy (void)
+pgm_time_destroy (void)
 {
-	if (time_update_now == rtc_update || time_sleep == rtc_sleep ||
-		time_update_now == tsc_update || time_sleep == tsc_sleep)
+	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep ||
+		pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
 	{
 		rtc_destroy();
 	}
@@ -151,9 +151,9 @@ gettimeofday_update (void)
 	static struct timeval now;
 	
 	gettimeofday (&now, NULL);
-	time_now = secs_to_usecs(now.tv_sec) + now.tv_usec;
+	pgm_time_now = secs_to_usecs(now.tv_sec) + now.tv_usec;
 
-	return time_now;
+	return pgm_time_now;
 }
 
 static pgm_time_t
@@ -162,9 +162,9 @@ clock_update (void)
 	static struct timespec now;
 
 	clock_gettime (CLOCK_MONOTONIC, &now);
-	time_now = secs_to_usecs(now.tv_sec) + nsecs_to_usecs(now.tv_nsec);
+	pgm_time_now = secs_to_usecs(now.tv_sec) + nsecs_to_usecs(now.tv_nsec);
 
-	return time_now;
+	return pgm_time_now;
 }
 
 static pgm_time_t
@@ -173,9 +173,9 @@ ftime_update (void)
 	static struct timeb now;
 
 	ftime (&now);
-	time_now = secs_to_usecs(now.time) + msecs_to_usecs(now.millitm);
+	pgm_time_now = secs_to_usecs(now.time) + msecs_to_usecs(now.millitm);
 
-	return time_now;
+	return pgm_time_now;
 }
 
 /* Old PC/AT-Compatible driver:  /dev/rtc
@@ -233,9 +233,9 @@ rtc_update (void)
 	read (rtc_fd, &data, sizeof(data));
 
 	rtc_count += data >> 8;
-	time_now = rtc_count * 1000000UL / rtc_frequency;
+	pgm_time_now = rtc_count * 1000000UL / rtc_frequency;
 
-	return time_now;
+	return pgm_time_now;
 }
 
 /* use a select to check if we have to clear the current interrupt count
@@ -319,9 +319,9 @@ tsc_update (void)
 {
 	pgm_time_t count = rdtsc();
 
-	time_now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
+	pgm_time_now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
 
-	return time_now;
+	return pgm_time_now;
 }	
 
 static void
@@ -350,6 +350,7 @@ clock_init (void)
 //	g_clock_id = CLOCK_PROCESS_CPUTIME_ID;
 //	g_clock_id = CLOCK_THREAD_CPUTIME_ID;
 
+#if 0
 //	clock_getcpuclockid (0, &g_clock_id);
 //	pthread_getcpuclockid (pthread_self(), &g_clock_id);
 
@@ -359,6 +360,7 @@ clock_init (void)
 		return -1;
 	}
 	g_message ("clock resolution %lu.%.9lu", ts.tv_sec, ts.tv_nsec);
+#endif
 	return 0;
 }
 
@@ -371,7 +373,7 @@ clock_nano_sleep (gulong usec)
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	clock_nanosleep (g_clock_id, 0, &ts, NULL);
 #else
-	usec += time_now;
+	usec += pgm_time_now;
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	clock_nanosleep (g_clock_id, TIMER_ABSTIME, &ts, NULL);

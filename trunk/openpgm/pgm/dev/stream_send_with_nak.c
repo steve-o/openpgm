@@ -179,7 +179,7 @@ main (
 	if (g_txw) {
 		puts ("destroying transmit window.");
 
-		txw_shutdown (g_txw);
+		pgm_txw_shutdown (g_txw);
 		g_txw = NULL;
 	}
 
@@ -207,7 +207,7 @@ on_startup (
 	puts ("startup.");
 
 	puts ("construct transmit window.");
-	g_txw = txw_init (g_max_tpdu, 0, g_txw_sqns, 0, 0);
+	g_txw = pgm_txw_init (g_max_tpdu, 0, g_txw_sqns, 0, 0);
 
 /* find PGM protocol id */
 // TODO: fix valgrind errors
@@ -512,7 +512,7 @@ on_nak (
 
 	gpointer rdata = NULL;
 	int rlen = 0;
-	if (!txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
+	if (!pgm_txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
 	{
 		puts (", in window");
 
@@ -598,15 +598,15 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 /* SPM */
 	spm->spm_sqn		= g_htonl (g_spm_sqn++);
-	spm->spm_trail		= g_htonl (txw_lead(g_txw));
-	spm->spm_lead		= g_htonl (txw_trail(g_txw));
+	spm->spm_trail		= g_htonl (pgm_txw_lead(g_txw));
+	spm->spm_lead		= g_htonl (pgm_txw_trail(g_txw));
 	spm->spm_nla_afi	= g_htons (AFI_IP);
 	spm->spm_reserved	= 0;
 
 	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
 //	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
-	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
@@ -699,15 +699,15 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
         header->pgm_tsdu_length = g_htons (strlen(payload_string) + 1);               /* transport data unit length */
 
 /* ODATA */
-        odata->data_sqn         = g_htonl (txw_next_lead(g_txw));
-        odata->data_trail       = g_htonl (txw_trail(g_txw));
+        odata->data_sqn         = g_htonl (pgm_txw_next_lead(g_txw));
+        odata->data_trail       = g_htonl (pgm_txw_trail(g_txw));
 
         memcpy (odata + 1, payload_string, strlen(payload_string) + 1);
 
-        header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+        header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* add to transmit window */
-	txw_push_copy (g_txw, payload_string, strlen(payload_string) + 1);
+	pgm_txw_push_copy (g_txw, payload_string, strlen(payload_string) + 1);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
@@ -791,11 +791,11 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 /* RDATA */
         rdata->data_sqn         = g_htonl (sequence_number);
-        rdata->data_trail       = g_htonl (txw_trail(g_txw));
+        rdata->data_trail       = g_htonl (pgm_txw_trail(g_txw));
 
         memcpy (rdata + 1, payload_string, len);
 
-        header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+        header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)

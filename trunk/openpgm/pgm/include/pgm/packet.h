@@ -45,7 +45,7 @@
 #define DEFAULT_UDP_ENCAP_UCAST_PORT 3055
 #define DEFAULT_UDP_ENCAP_MCAST_PORT 3056
 
-enum pgm_type {
+enum pgm_type_e {
     PGM_SPM = 0x00,	/* 8.1: source path message */
     PGM_POLL = 0x01,	/* 14.7.1: poll request */
     PGM_POLR = 0x02,	/* 14.7.2: poll response */
@@ -375,7 +375,7 @@ int pgm_verify_spmr (struct pgm_header*, char*, int);
 int pgm_verify_nak (struct pgm_header*, char*, int);
 int pgm_verify_ncf (struct pgm_header*, char*, int);
 
-static inline int nla_to_sockaddr (const char* nla, struct sockaddr* sa)
+static inline int pgm_nla_to_sockaddr (const char* nla, struct sockaddr* sa)
 {
     int retval = 0;
 
@@ -399,7 +399,7 @@ static inline int nla_to_sockaddr (const char* nla, struct sockaddr* sa)
     return retval;
 }
 
-static inline int sockaddr_to_nla (const struct sockaddr* sa, char* nla)
+static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, char* nla)
 {
     int retval = 0;
 
@@ -425,11 +425,11 @@ static inline int sockaddr_to_nla (const struct sockaddr* sa, char* nla)
 }
 
 const char* pgm_type_string (guint8);
-const char* udpport_string (int);
-const char* getname (const struct in_addr*);
-void ip_optprint (const char*, int);
-guint16 in_cksum (const char*, int, int);
-guint16 pgm_cksum (const char*, int, int);
+const char* pgm_udpport_string (int);
+const char* pgm_gethostbyaddr (const struct in_addr*);
+void pgm_ipopt_print (const char*, int);
+guint16 pgm_inet_checksum (const char*, int, int);
+guint16 pgm_checksum (const char*, int, int);
 
 G_END_DECLS
 

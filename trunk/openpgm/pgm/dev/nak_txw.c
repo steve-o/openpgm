@@ -121,13 +121,13 @@ test_basic_txw (
 	gpointer txw;
 	int i;
 
-	txw = txw_init (size_per_entry, 0, count, 0, 0);
+	txw = pgm_txw_init (size_per_entry, 0, count, 0, 0);
 
 /* fill window up */
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? g_slice_alloc(size_per_entry) : NULL;
-		txw_push (txw, entry, size_per_entry);
+		pgm_txw_push (txw, entry, size_per_entry);
 	}
 
 /* iterate through entire window requesting packet data */
@@ -137,13 +137,13 @@ test_basic_txw (
 		char *packet;
 		int length;
 
-		txw_peek (txw, i, (gpointer)&packet, &length);
+		pgm_txw_peek (txw, i, (gpointer)&packet, &length);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	txw_shutdown (txw);
+	pgm_txw_shutdown (txw);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }

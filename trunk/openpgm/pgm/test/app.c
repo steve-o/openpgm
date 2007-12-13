@@ -57,8 +57,8 @@ struct idle_source {
 
 struct app_session {
 	char*		name;
-	char		gsi[6];
-	struct pgm_transport* transport;
+	pgm_gsi_t	gsi;
+	pgm_transport_t* transport;
 };
 
 /* globals */
@@ -131,9 +131,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal_install (SIGINT, on_signal);
-	signal_install (SIGTERM, on_signal);
-	signal_install (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGINT, on_signal);
+	pgm_signal_install (SIGTERM, on_signal);
+	pgm_signal_install (SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -223,7 +223,7 @@ idle_prepare (
 {
 	struct idle_source* idle_source = (struct idle_source*)source;
 
-	guint64 now = time_update_now();
+	guint64 now = pgm_time_update_now();
 	glong msec = ((gint64)idle_source->expiration - (gint64)now) / 1000;
 	if (msec < 0)
 		msec = 0;
@@ -239,8 +239,8 @@ idle_check (
 	)
 {
 	struct idle_source* idle_source = (struct idle_source*)source;
-	guint64 now = time_update_now();
-	return ( time_after_eq(now, idle_source->expiration) );
+	guint64 now = pgm_time_update_now();
+	return ( pgm_time_after_eq(now, idle_source->expiration) );
 }
 
 static gboolean
@@ -255,8 +255,8 @@ idle_dispatch (
 //	send_odata ();
 	idle_source->expiration += g_odata_interval;
 
-	if ( time_after_eq(idle_source->expiration, time_now) )
-		sched_yield();
+	if ( pgm_time_after_eq(idle_source->expiration, pgm_time_now) )
+		g_thread_yield();
 
 	return TRUE;
 }
@@ -289,20 +289,20 @@ session_create (
 /* create new and fill in bits */
 	sess = g_malloc0(sizeof(struct app_session));
 	sess->name = g_memdup (name, strlen(name)+1);
-	int e = gsi_create_md5_id (sess->gsi);
+	int e = pgm_create_md5_gsi (&sess->gsi);
 	if (e != 0) {
-		puts ("FAILED: gsi_create_md5_id()");
+		puts ("FAILED: pgm_create_md5_gsi()");
 		goto err_free;
 	}
 
 /* temp fixed addresses */
-	struct sock_mreq recv_smr, send_smr;
+	struct pgm_sock_mreq recv_smr, send_smr;
 	int smr_len = 1;
-	e = if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
-	e = pgm_transport_create (&sess->transport, sess->gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_smr, 1, &send_smr);
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_create()");
 		goto err_free;

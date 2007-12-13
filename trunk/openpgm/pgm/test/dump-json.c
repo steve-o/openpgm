@@ -203,7 +203,7 @@ verify_ip_header (
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
-	int sum = in_cksum((char*)ip, ip_header_length, 0);
+	int sum = pgm_inet_checksum((char*)ip, ip_header_length, 0);
 	if (sum != 0) {
 		int ip_sum = g_ntohs(ip->check);
 		printf ("\t\"message\": \"IP: IP header checksum incorrect: 0x%x.\",\n", ip_sum);
@@ -280,7 +280,7 @@ verify_pgm_header (
 	{
 		int sum = pgm->pgm_checksum;
 		pgm->pgm_checksum = 0;
-		int pgm_sum = pgm_cksum((const char*)pgm, pgm_len, 0);
+		int pgm_sum = pgm_checksum((const char*)pgm, pgm_len, 0);
 		if (pgm_sum != sum) {
 			printf ("\t\"message\": \"PGM: PGM packet checksum incorrect: 0x%x.\",\n", sum);
 			return -2;

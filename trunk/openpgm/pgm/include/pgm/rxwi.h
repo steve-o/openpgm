@@ -40,14 +40,14 @@ typedef enum
     PGM_PKT_LOST_DATA_STATE,	    /* if recovery fails, but packet has not yet been commited */
 
     PGM_PKT_ERROR_STATE
-} pgm_pkt_state;
+} pgm_pkt_state_e;
 
-const char* rxw_state_string (pgm_pkt_state);
+const char* pgm_rxw_state_string (pgm_pkt_state_e);
 
 /* callback for commiting contiguous pgm packets */
-typedef int (*rxw_callback)(gpointer, guint, gpointer);
+typedef int (*pgm_rxw_commitfn_t)(gpointer, guint, gpointer);
 
-struct rxw_packet {
+struct pgm_rxw_packet_t {
         gpointer        data;
 
         guint           length;
@@ -61,12 +61,14 @@ struct rxw_packet {
 	pgm_time_t	nak_rpt_expiry;
 	pgm_time_t	nak_rdata_expiry;
         GList           link_;
-        pgm_pkt_state   state;
+        pgm_pkt_state_e state;
         guint           ncf_retry_count;
         guint           data_retry_count;
 };
 
-struct rxw {
+typedef struct pgm_rxw_packet_t pgm_rxw_packet_t;
+
+struct pgm_rxw_t {
         GPtrArray*      pdata;
         GTrashStack*    trash_packet;           /* sizeof(rxw_packet) */
         GTrashStack*    trash_data;             /* max_tpdu */
@@ -84,64 +86,65 @@ struct rxw {
         gboolean        rxw_constrained;
         gboolean        window_defined;
 
-        rxw_callback    on_data;
+        pgm_rxw_commitfn_t on_data;
         gpointer        param;
 };
 
+typedef struct pgm_rxw_t pgm_rxw_t;
 
-struct rxw* rxw_init (guint, guint32, guint32, guint, guint, rxw_callback, gpointer);
-int rxw_shutdown (struct rxw*);
+pgm_rxw_t* pgm_rxw_init (guint, guint32, guint32, guint, guint, pgm_rxw_commitfn_t, gpointer);
+int pgm_rxw_shutdown (pgm_rxw_t*);
 
-int rxw_push_fragment (struct rxw*, gpointer, guint, guint32, guint32, guint32, guint32, guint32);
+int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, guint32, guint32, guint32);
 
 /* from state checking */
-int rxw_mark_lost (struct rxw*, guint32);
+int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
 
 /* from SPM */
-int rxw_window_update (struct rxw*, guint32, guint32);
+int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32);
 
 /* from NCF */
-int rxw_ncf (struct rxw*, guint32, pgm_time_t);
+int pgm_rxw_ncf (pgm_rxw_t*, guint32, pgm_time_t);
 
 
-static inline guint rxw_len (struct rxw* r)
+static inline guint pgm_rxw_len (pgm_rxw_t* r)
 {
     return r->pdata->len;
 }
 
-static inline guint32 rxw_sqns (struct rxw* r)
+static inline guint32 pgm_rxw_sqns (pgm_rxw_t* r)
 {
     return ( 1 + r->lead ) - r->trail;
 }
 
-static inline gboolean rxw_empty (struct rxw* r)
+static inline gboolean pgm_rxw_empty (pgm_rxw_t* r)
 {
-    return rxw_sqns (r) == 0;
+    return pgm_rxw_sqns (r) == 0;
 }
 
-static inline gboolean rxw_full (struct rxw* r)
+static inline gboolean pgm_rxw_full (pgm_rxw_t* r)
 {
-    return rxw_len (r) == rxw_sqns (r);
+    return pgm_rxw_len (r) == pgm_rxw_sqns (r);
 }
 
-static inline gpointer rxw_alloc (struct rxw* r)
+static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
 {
     return r->trash_data ? g_trash_stack_pop (&r->trash_data) : g_slice_alloc (r->max_tpdu);
 }
 
-static inline int rxw_push (struct rxw* r, gpointer packet, guint len, guint32 sqn, guint32 trail)
+static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail)
 {
-    return rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0);
+    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0);
 }
 
-static inline int rxw_push_copy (struct rxw* r, gpointer packet_, guint len, guint32 sqn, guint32 trail)
+static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail)
 {
-    gpointer packet = rxw_alloc (r);
+    gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);
-    return rxw_push (r, packet, len, sqn, trail);
+    return pgm_rxw_push (r, packet, len, sqn, trail);
 }
 
-int rxw_pkt_state_unlink (struct rxw*, struct rxw_packet*);
+int pgm_rxw_pkt_state_unlink (pgm_rxw_t*, pgm_rxw_packet_t*);
 
 G_END_DECLS
 

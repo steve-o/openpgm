@@ -392,7 +392,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
 //	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
-	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
@@ -490,7 +490,7 @@ printf ("PGM header size %u\n"
 
         memcpy (odata + 1, payload_string, strlen(payload_string) + 1);
 
-        header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+        header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)

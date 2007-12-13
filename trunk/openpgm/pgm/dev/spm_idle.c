@@ -375,7 +375,7 @@ printf ("PGM header size %u\n"
 
 	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
 
-	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 	int flags = MSG_CONFIRM;	/* not expecting a reply */
 
