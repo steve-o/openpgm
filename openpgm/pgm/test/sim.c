@@ -42,6 +42,7 @@
 #include <pgm/if.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/packet.h>
 #include <pgm/transport.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
