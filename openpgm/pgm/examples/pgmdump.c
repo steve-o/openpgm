@@ -43,7 +43,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "";
 
 static GIOChannel* g_io_channel = NULL;
 static GMainLoop* g_loop = NULL;
