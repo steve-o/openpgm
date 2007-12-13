@@ -37,6 +37,7 @@
 
 #include <glib.h>
 
+#include "pgm/if.h"
 #include "pgm/backtrace.h"
 #include "pgm/log.h"
 #include "pgm/transport.h"

@@ -32,17 +32,10 @@
 #   include "sockaddr.h"
 #endif
 
-#ifndef __PGM_RXW_H__
-#   include "rxwi.h"
+#ifndef __PGM_TIMER_H__
+#   include "timer.h"
 #endif
 
-#ifndef __PGM_TXW_H__
-#   include "txwi.h"
-#endif
-
-#ifndef __PGM_PACKET__H
-#   include "packet.h"
-#endif
 
 typedef struct pgm_transport_t pgm_transport_t;
 
@@ -63,15 +56,11 @@ struct pgm_peer_t {
 
     GStaticMutex	mutex;
 
-    pgm_rxw_t*          rxw;
+    gpointer            rxw;		/* pgm_rxw_t */
     pgm_transport_t*    transport;
 
     int			spm_sqn;
     pgm_time_t		expiry;
-
-#define next_nak_rb_expiry(p)	    ( ((pgm_rxw_packet_t*)((pgm_peer_t*)(p))->rxw->backoff_queue->tail)->nak_rb_expiry )
-#define next_nak_rpt_expiry(p)	    ( ((pgm_rxw_packet_t*)((pgm_peer_t*)(p))->rxw->wait_ncf_queue->tail)->nak_rpt_expiry )
-#define next_nak_rdata_expiry(p)    ( ((pgm_rxw_packet_t*)((pgm_peer_t*)(p))->rxw->wait_data_queue->tail)->nak_rdata_expiry )
 };
 
 typedef struct pgm_peer_t pgm_peer_t;
@@ -114,7 +103,7 @@ struct pgm_transport_t {
     int			sndbuf, rcvbuf;
 
     GStaticRWLock	txw_lock;
-    pgm_txw_t*          txw;
+    gpointer            txw;		   	    /* pgm_txw_t */
     int			spm_sqn;
     guint		spm_ambient_interval;	    /* microseconds */
     guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
@@ -198,52 +187,35 @@ int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
-static inline gpointer pgm_alloc (pgm_transport_t* transport)
-{
-    g_static_rw_lock_writer_lock (&transport->txw_lock);
-    gpointer ptr = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
-    g_static_rw_lock_writer_unlock (&transport->txw_lock);
-    return ptr;
-}
-
+gpointer pgm_alloc (pgm_transport_t*);
 int pgm_write_unlocked (pgm_transport_t*, const gchar*, gsize);
 static inline int pgm_write (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
     g_static_rw_lock_writer_lock (&transport->txw_lock);
     int retval = pgm_write_unlocked (transport, buf, count);
-//    g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+/* unlocked in pgm_write_unlocked()
+ *   g_static_rw_lock_writer_unlock (&transport->txw_lock);
+ */
+
     return retval;
 }
 
-static inline int pgm_write_copy (pgm_transport_t* transport, const gchar* buf, gsize count)
-{
-    g_static_rw_lock_writer_lock (&transport->txw_lock);
-    gchar *pkt = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
-    memcpy (pkt, buf, count);
-    int retval = pgm_write_unlocked (transport, pkt, count);
-//    g_static_rw_lock_writer_unlock (&transport->txw_lock);
-    return retval;
-}
-
+int pgm_write_copy (pgm_transport_t*, const gchar*, gsize);
 int pgm_write_copy_fragment_unlocked (pgm_transport_t*, const gchar*, gsize);
 static inline int pgm_write_copy_fragment (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
     g_static_rw_lock_writer_lock (&transport->txw_lock);
     int retval = pgm_write_copy_fragment_unlocked (transport, buf, count);
-//    g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+/* unlocked in pgm_write_unlocked()
+ *   g_static_rw_lock_writer_unlock (&transport->txw_lock);
+ */
+
     return retval;
 }
 
-static inline int pgm_write_copy_ex (pgm_transport_t* transport, const gchar* buf, gsize count)
-{
-    if ( count <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
-					    sizeof(struct pgm_data) ) ) )
-    {
-	return pgm_write_copy (transport, buf, count);
-    }
-
-    return pgm_write_copy_fragment (transport, buf, count);
-}
+int pgm_write_copy_ex (pgm_transport_t*, const gchar*, gsize);
 
 /* TODO: contexts, hooks */
 
