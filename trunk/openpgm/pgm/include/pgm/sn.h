@@ -29,7 +29,7 @@ enum {
     PGM_UINT32_SIGN_BIT = (1<<31)
 };
 
-#define PGM_UINT64_SIGN_BIT ((guint64)1<<63)
+#define PGM_UINT64_SIGN_BIT (1ULL<<63)
 
 /* 32 bit */
 static inline gboolean pgm_uint32_lt (guint32 s, guint32 t)
