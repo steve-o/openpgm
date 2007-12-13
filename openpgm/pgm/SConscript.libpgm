@@ -5,9 +5,7 @@
 Import('env')
 
 lib_src = Split("""
-		log.c
 		pgm.c
-		backtrace.c
 		timer.c
 		if.c
 		gsi.c
@@ -22,6 +20,11 @@ only64_src = Split("""
 		csum-copy64.S
 """)
 
+libex_src = Split("""
+		log.c
+		backtrace.c
+""")
+
 lib_obj = []
 for src in lib_src:
 	lib_obj += env.SharedObject(src)
@@ -33,5 +36,7 @@ if env['BUILD'] != 'thirtytwo':
 env.StaticLibrary('libpgm', lib_src);
 #env.SharedLibrary('libpgm', lib_obj);
 env.StaticLibrary('libpgmpic', lib_obj);
+
+env.StaticLibrary('libpgmex', libex_src);
 
 # end of file

@@ -229,7 +229,7 @@ pgm_parse (
 	{
 		int sum = pgm_header->pgm_checksum;
 		pgm_header->pgm_checksum = 0;
-		int pgm_sum = pgm_cksum((const char*)pgm_header, pgm_length, 0);
+		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
 		if (pgm_sum != sum) {
 			puts ("PGM checksum bad :(");
 			return -2;
@@ -335,13 +335,13 @@ pgm_print_packet (
 /* IP options */
 	if ((ip_header_length - sizeof(struct iphdr)) > 0) {
 		printf (", options (");
-		ip_optprint((const char*)(ip + 1), ip_header_length - sizeof(struct iphdr));
+		pgm_ipopt_print((const char*)(ip + 1), ip_header_length - sizeof(struct iphdr));
 		printf (" )");
 	}
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
-	int sum = in_cksum(data, packet_length, 0);
+	int sum = pgm_inet_checksum(data, packet_length, 0);
 	if (sum != 0) {
 		int ip_sum = g_ntohs(ip->check);
 		printf (", bad cksum! %i", ip_sum);
@@ -380,8 +380,8 @@ pgm_print_packet (
 	}
 
 	printf ("%s.%s > %s.%s: PGM\n",
-		getname((struct in_addr*)&ip->saddr), udpport_string(pgm_header->pgm_sport),
-		getname((struct in_addr*)&ip->daddr), udpport_string(pgm_header->pgm_dport));
+		pgm_gethostbyaddr((struct in_addr*)&ip->saddr), pgm_udpport_string(pgm_header->pgm_sport),
+		pgm_gethostbyaddr((struct in_addr*)&ip->daddr), pgm_udpport_string(pgm_header->pgm_dport));
 
 	printf ("type: %s [%i] (version=%i, reserved=%i)\n"
 		"options: extensions=%s, network-significant=%s, parity packet=%s (variable size=%s)\n"
@@ -408,7 +408,7 @@ pgm_print_packet (
 	{
 		sum = pgm_header->pgm_checksum;
 		pgm_header->pgm_checksum = 0;
-		int pgm_sum = pgm_cksum((const char*)pgm_header, pgm_length, 0);
+		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
 		if (pgm_sum != sum) {
 			puts ("PGM checksum bad :(");
 			return FALSE;
@@ -1198,7 +1198,7 @@ pgm_type_string (
 }
 
 const char*
-udpport_string (
+pgm_udpport_string (
 	int		port
 	)
 {
@@ -1226,7 +1226,7 @@ udpport_string (
 }
 
 const char*
-getname (
+pgm_gethostbyaddr (
 	const struct in_addr* ap
 	)
 {
@@ -1254,7 +1254,7 @@ getname (
 }
 
 void
-ip_optprint (
+pgm_ipopt_print (
 	const char* cp,
 	int length
 	)
@@ -1278,7 +1278,7 @@ ip_optprint (
 }
 
 guint16
-in_cksum (
+pgm_inet_checksum (
 	const char* addr,
 	int len,
 	int csum
@@ -1303,7 +1303,7 @@ in_cksum (
 }
 
 guint16
-pgm_cksum (
+pgm_checksum (
 	const char* head,
 	int len,
 	int csum

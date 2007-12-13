@@ -24,7 +24,7 @@
 
 G_BEGIN_DECLS
 
-struct txw_packet {
+struct pgm_txw_packet_t {
         gpointer        data;
 
         guint           length;
@@ -33,7 +33,9 @@ struct txw_packet {
         struct timeval  last_retransmit;
 };
 
-struct txw {
+typedef struct pgm_txw_packet_t pgm_txw_packet_t;
+
+struct pgm_txw_t {
         GPtrArray*      pdata;
         GTrashStack*    trash_packet;           /* sizeof(txw_packet) */
         GTrashStack*    trash_data;             /* max_tpdu */
@@ -42,61 +44,62 @@ struct txw {
 
         guint32         lead;
         guint32         trail;
-
 };
 
+typedef struct pgm_txw_t pgm_txw_t;
 
-struct txw* txw_init (guint, guint32, guint32, guint, guint);
-int txw_shutdown (struct txw*);
 
-int txw_push (struct txw*, gpointer, guint);
-int txw_peek (struct txw*, guint32, gpointer*, guint*);
+pgm_txw_t* pgm_txw_init (guint, guint32, guint32, guint, guint);
+int pgm_txw_shutdown (pgm_txw_t*);
 
-static inline guint txw_len (struct txw* t)
+int pgm_txw_push (pgm_txw_t*, gpointer, guint);
+int pgm_txw_peek (pgm_txw_t*, guint32, gpointer*, guint*);
+
+static inline guint pgm_txw_len (pgm_txw_t* t)
 {
     return t->pdata->len;
 }
 
-static inline guint32 txw_sqns (struct txw* t)
+static inline guint32 pgm_txw_sqns (pgm_txw_t* t)
 {
     return ( 1 + t->lead ) - t->trail;
 }
 
-static inline gboolean txw_empty (struct txw* t)
+static inline gboolean pgm_txw_empty (pgm_txw_t* t)
 {
-    return txw_sqns (t) == 0;
+    return pgm_txw_sqns (t) == 0;
 }
 
-static inline gboolean txw_full (struct txw* t)
+static inline gboolean pgm_txw_full (pgm_txw_t* t)
 {
-    return txw_len (t) == txw_sqns (t);
+    return pgm_txw_len (t) == pgm_txw_sqns (t);
 }
 
-static inline gpointer txw_alloc (struct txw* t)
+static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
 {
     return t->trash_data ? g_trash_stack_pop (&t->trash_data) : g_slice_alloc (t->max_tpdu);
 }
 
-static inline guint32 txw_next_lead (struct txw* t)
+static inline guint32 pgm_txw_next_lead (pgm_txw_t* t)
 {
     return (guint32)(t->lead + 1);
 }
 
-static inline guint32 txw_lead (struct txw* t)
+static inline guint32 pgm_txw_lead (pgm_txw_t* t)
 {
     return t->lead;
 }
 
-static inline guint32 txw_trail (struct txw* t)
+static inline guint32 pgm_txw_trail (pgm_txw_t* t)
 {
     return t->trail;
 }
 
-static inline int txw_push_copy (struct txw* t, gpointer packet_, guint len)
+static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint len)
 {
-    gpointer packet = txw_alloc (t);
+    gpointer packet = pgm_txw_alloc (t);
     memcpy (packet, packet_, len);
-    return txw_push (t, packet, len);
+    return pgm_txw_push (t, packet, len);
 }
 
 

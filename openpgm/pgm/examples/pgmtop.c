@@ -76,7 +76,7 @@ struct netstat {
 };
 
 struct hoststat {
-	struct tsi	tsi;
+	pgm_tsi_t	tsi;
 
 	struct in_addr	last_addr;
 	struct in_addr	nla;
@@ -178,9 +178,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal_install (SIGINT, on_signal);
-	signal_install (SIGTERM, on_signal);
-	signal_install (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGINT, on_signal);
+	pgm_signal_install (SIGTERM, on_signal);
+	pgm_signal_install (SIGHUP, SIG_IGN);
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -774,8 +774,8 @@ on_io_data (
 		g_hosts = g_hash_table_new (tsi_hash, tsi_equal);
 	}
 
-	struct tsi tsi;
-	memcpy (tsi.gsi, pgm_header->pgm_gsi, 6 * sizeof(guint8));
+	pgm_tsi_t tsi;
+	memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
 	tsi.sport = pgm_header->pgm_sport;
 
 	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
@@ -783,7 +783,7 @@ on_io_data (
 		write_status ("new tsi %s with local nla %s", pgm_print_tsi (&tsi), inet_ntoa(src_addr.sin_addr));
 
 		hoststat = g_malloc0(sizeof(struct hoststat));
-		memcpy (&hoststat->tsi, &tsi, sizeof(struct tsi));
+		memcpy (&hoststat->tsi, &tsi, sizeof(pgm_tsi_t));
 		hoststat->session_start = now;
 
 		g_hash_table_insert (g_hosts, (gpointer)&hoststat->tsi, (gpointer)hoststat);
@@ -809,7 +809,7 @@ on_io_data (
 			hoststat->spm.last_invalid = now;
 		} else {
 			hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
-			if (guint32_lte (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ), hoststat->spm_sqn)) {
+			if (pgm_uint32_lte (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ), hoststat->spm_sqn)) {
 				hoststat->general.duplicate++;
 				break;
 			}
@@ -832,7 +832,7 @@ on_io_data (
 			hoststat->rxw_constrained = TRUE;
 			hoststat->window_defined = TRUE;
 		} else {
-			if (! guint32_gte( g_ntohl (((struct pgm_data*)packet)->data_sqn) , hoststat->rxw_trail ) )
+			if (! pgm_uint32_gte( g_ntohl (((struct pgm_data*)packet)->data_sqn) , hoststat->rxw_trail ) )
 			{
 				hoststat->odata.invalid++;
 				hoststat->odata.last_invalid = now;
@@ -841,11 +841,11 @@ on_io_data (
 			hoststat->rxw_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
 		}
 
-		if (hoststat->rxw_constrained && txw_trail > hoststat->rxw_trail_init) {
+		if (hoststat->rxw_constrained && hoststat->txw_trail > hoststat->rxw_trail_init) {
 			hoststat->rxw_constrained = FALSE;
 		}
 
-		if ( guint32_lte ( g_ntohl (((struct pgm_data*)packet)->data_sqn), hoststat->rxw_lead ) ) {
+		if ( pgm_uint32_lte ( g_ntohl (((struct pgm_data*)packet)->data_sqn), hoststat->rxw_lead ) ) {
 			hoststat->general.duplicate++;
 			break;
 		} else {

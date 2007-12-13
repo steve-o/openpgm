@@ -283,7 +283,7 @@ main (
 	if (g_rxw) {
 		puts ("destroying receive window.");
 
-		rxw_shutdown (g_rxw);
+		pgm_rxw_shutdown (g_rxw);
 		g_rxw = NULL;
 	}
 
@@ -311,7 +311,7 @@ on_startup (
 	puts ("startup.");
 
 	puts ("construct receive window.");
-	g_rxw = rxw_init (g_max_tpdu, 0, g_rxw_sqns, 0, 0, on_pgm_data, NULL);
+	g_rxw = pgm_rxw_init (g_max_tpdu, 0, g_rxw_sqns, 0, 0, on_pgm_data, NULL);
 
         puts ("starting soup server.");
         g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_http,
@@ -704,7 +704,7 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 //printf ("SPM: tx window now %lu - %lu\n", 
 //		hoststat->txw_trail, hoststat->txw_lead);
 //
-			rxw_window_update (g_rxw, hoststat->txw_trail, hoststat->txw_lead);
+			pgm_rxw_window_update (g_rxw, hoststat->txw_trail, hoststat->txw_lead);
 
 		}
 		break;
@@ -732,7 +732,7 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 
 printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
-		if (!rxw_push_copy (g_rxw,
+		if (!pgm_rxw_push_copy (g_rxw,
 				((struct pgm_data*)packet) + 1, 
 				g_ntohs (pgm_header->pgm_tsdu_length),
 				((struct pgm_data*)packet)->data_sqn,
@@ -899,7 +899,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	nak->nak_grp_nla.s_addr	= source->s_addr;	/* IPv4 */
 //	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
 
-	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 /* send packet */
 	int flags = MSG_CONFIRM;	/* expecting a reply over multicast not unicast */

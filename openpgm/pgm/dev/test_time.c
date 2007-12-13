@@ -66,7 +66,7 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	time_init();
+	pgm_time_init();
 
 	guint64 start, end;
 
@@ -75,11 +75,11 @@ main (
 
 	for (int i = 0; i < 1000; i++)
 	{
-		start = time_update_now();
+		start = pgm_time_update_now();
 
-		time_sleep (7);
+		pgm_time_sleep (7);
 
-		end = time_update_now();
+		end = pgm_time_update_now();
 
 		guint64 elapsed = end - start;
 
@@ -89,7 +89,7 @@ main (
 
 	printf ("time elapsed max %" G_GUINT64_FORMAT " us, min %" G_GUINT64_FORMAT " us\n", max_diff, min_diff);
 
-	time_destroy();	
+	pgm_time_destroy();	
 
 	puts ("finished.");
 	return 0;

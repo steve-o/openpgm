@@ -62,7 +62,7 @@ static gboolean g_fec = FALSE;
 static int g_k = 0;
 static int g_2t = 0;
 
-static struct pgm_transport* g_transport = NULL;
+static pgm_transport_t* g_transport = NULL;
 
 static GMainLoop* g_loop = NULL;
 
@@ -127,9 +127,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal_install (SIGINT, on_signal);
-	signal_install (SIGTERM, on_signal);
-	signal_install (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGINT, on_signal);
+	pgm_signal_install (SIGTERM, on_signal);
+	pgm_signal_install (SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -174,7 +174,7 @@ on_startup (
 	g_message ("startup.");
 	g_message ("create transport.");
 
-	char gsi[6];
+	pgm_gsi_t gsi;
 #if 0
 	char hostname[NI_MAXHOST];
 	struct addrinfo hints, *res = NULL;
@@ -184,15 +184,15 @@ on_startup (
 	hints.ai_family = AF_INET;
 	hints.ai_flags = AI_ADDRCONFIG;
 	getaddrinfo (hostname, NULL, &hints, &res);
-	int e = gsi_create_ipv4_id (((struct sockaddr_in*)(res->ai_addr))->sin_addr, gsi);
+	int e = pgm_create_ipv4_gsi (((struct sockaddr_in*)(res->ai_addr))->sin_addr, &gsi);
 	g_assert (e == 0);
 	freeaddrinfo (res);
 #else
-	int e = gsi_create_md5_id (gsi);
+	int e = pgm_create_md5_gsi (&gsi);
 	g_assert (e == 0);
 #endif
 
-	struct sock_mreq recv_smr, send_smr;
+	struct pgm_sock_mreq recv_smr, send_smr;
 #if 0
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
 	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
@@ -207,7 +207,7 @@ on_startup (
 	char network[1024];
 	sprintf (network, ";%s", g_network);
 	int smr_len = 1;
-	e = if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 #endif
@@ -217,7 +217,7 @@ on_startup (
 		((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_udp_encap_port);
 	}
 
-	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);

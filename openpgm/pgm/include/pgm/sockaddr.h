@@ -30,7 +30,7 @@
 /* TODO: update to RFC 3678: MCAST_JOIN_(SOURCE_)GROUP */
 
 /* Combination of ip_mreq & ipv6_mreq */
-struct sock_mreq
+struct pgm_sock_mreq
 {
 /* Port number and IP multicast address of group. */
     struct sockaddr_storage	smr_multiaddr;
@@ -42,25 +42,25 @@ struct sock_mreq
 G_BEGIN_DECLS
 
 
-#define sockaddr_family(src)	( ((struct sockaddr*)(src))->sa_family )
+#define pgm_sockaddr_family(src)	( ((struct sockaddr*)(src))->sa_family )
 
-#define sockaddr_port(src) \
-	    ( sockaddr_family(src) == AF_INET ? \
+#define pgm_sockaddr_port(src) \
+	    ( pgm_sockaddr_family(src) == AF_INET ? \
 		((struct sockaddr_in*)(src))->sin_port : \
 		((struct sockaddr_in6*)(src))->sin6_port )
 
-#define sockaddr_addr(src) \
-	    ( sockaddr_family(src) == AF_INET ? \
+#define pgm_sockaddr_addr(src) \
+	    ( pgm_sockaddr_family(src) == AF_INET ? \
 		(const void*)&((struct sockaddr_in*)(src))->sin_addr : \
 		(const void*)&((struct sockaddr_in6*)(src))->sin6_addr )
 
-#define sockaddr_len(src) \
-	    ( sockaddr_family(src) == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
+#define pgm_sockaddr_len(src) \
+	    ( pgm_sockaddr_family(src) == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
 
-#define sockaddr_ntop(src,dst,cnt) \
-	    ( inet_ntop(sockaddr_family(src), sockaddr_addr(src), (dst), (cnt)) )
+#define pgm_sockaddr_ntop(src,dst,cnt) \
+	    ( inet_ntop(pgm_sockaddr_family(src), sockaddr_addr(src), (dst), (cnt)) )
 
-static inline int sockaddr_is_addr_multicast (struct sockaddr* s)
+static inline int pgm_sockaddr_is_addr_multicast (struct sockaddr* s)
 {
     int retval = 0;
 
@@ -81,7 +81,7 @@ static inline int sockaddr_is_addr_multicast (struct sockaddr* s)
     return retval;
 }
 
-static inline int sockaddr_cmp (struct sockaddr *a, struct sockaddr *b)
+static inline int pgm_sockaddr_cmp (struct sockaddr *a, struct sockaddr *b)
 {
     int retval = 0;
 
@@ -112,7 +112,7 @@ static inline int sockaddr_cmp (struct sockaddr *a, struct sockaddr *b)
     return retval;
 }
 
-static inline int sockaddr_hdrincl (int s, int sa_family, gboolean v)
+static inline int pgm_sockaddr_hdrincl (int s, int sa_family, gboolean v)
 {
     int retval = 0;
 
@@ -132,7 +132,7 @@ static inline int sockaddr_hdrincl (int s, int sa_family, gboolean v)
     return retval;
 }
 
-static inline int sockaddr_router_alert (int s, int sa_family, gboolean v)
+static inline int pgm_sockaddr_router_alert (int s, int sa_family, gboolean v)
 {
     int retval = 0;
 
@@ -153,7 +153,7 @@ static inline int sockaddr_router_alert (int s, int sa_family, gboolean v)
     return retval;
 }
 
-static inline int sockaddr_tos (int s, int sa_family, int tos)
+static inline int pgm_sockaddr_tos (int s, int sa_family, int tos)
 {
     int retval = 0;
 
@@ -175,11 +175,11 @@ static inline int sockaddr_tos (int s, int sa_family, int tos)
 
 /* nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
  */
-static inline int sockaddr_add_membership (int s, struct sock_mreq* smr)
+static inline int pgm_sockaddr_add_membership (int s, struct pgm_sock_mreq* smr)
 {
     int retval = 0;
 
-    switch (sockaddr_family(&smr->smr_interface)) {
+    switch (pgm_sockaddr_family(&smr->smr_interface)) {
     case AF_INET:
 	{
 /* Linux: ip_mreqn preferred, ip_mreq supported for compat */
@@ -213,11 +213,11 @@ static inline int sockaddr_add_membership (int s, struct sock_mreq* smr)
     return retval;
 }
 
-static inline int sockaddr_multicast_if (int s, struct sock_mreq* smr)
+static inline int pgm_sockaddr_multicast_if (int s, struct pgm_sock_mreq* smr)
 {
     int retval = 0;
 
-    switch (sockaddr_family(&smr->smr_interface)) {
+    switch (pgm_sockaddr_family(&smr->smr_interface)) {
     case AF_INET:
 	{
 /* Linux: ip_mreqn or ip_mreq, many Unix just support in_addr (interface/address) */
@@ -250,7 +250,7 @@ static inline int sockaddr_multicast_if (int s, struct sock_mreq* smr)
     return retval;
 }
 
-static inline int sockaddr_multicast_loop (int s, int sa_family, gboolean v)
+static inline int pgm_sockaddr_multicast_loop (int s, int sa_family, gboolean v)
 {
     int retval = 0;
 
@@ -271,7 +271,7 @@ static inline int sockaddr_multicast_loop (int s, int sa_family, gboolean v)
     return retval;
 }
 
-static inline int sockaddr_multicast_hops (int s, int sa_family, gint hops)
+static inline int pgm_sockaddr_multicast_hops (int s, int sa_family, gint hops)
 {
     int retval = 0;
 

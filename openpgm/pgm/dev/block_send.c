@@ -56,7 +56,7 @@ static int g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
 
-static struct pgm_transport* g_transport = NULL;
+static pgm_transport_t* g_transport = NULL;
 
 static GMainLoop* g_loop = NULL;
 
@@ -106,10 +106,10 @@ main (
 	g_loop = g_main_loop_new(NULL, FALSE);
 
 /* setup signal handlers */
-	signal_install (SIGSEGV, on_sigsegv);
-	signal_install (SIGINT, on_signal);
-	signal_install (SIGTERM, on_signal);
-	signal_install (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGSEGV, on_sigsegv);
+	pgm_signal_install (SIGINT, on_signal);
+	pgm_signal_install (SIGTERM, on_signal);
+	pgm_signal_install (SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -154,7 +154,7 @@ on_startup (
 	g_message ("startup.");
 	g_message ("create transport.");
 
-	char gsi[6];
+	pgm_gsi_t gsi;
 #if 0
 	char hostname[NI_MAXHOST];
 	struct addrinfo hints, *res = NULL;
@@ -164,21 +164,21 @@ on_startup (
 	hints.ai_family = AF_INET;
 	hints.ai_flags = AI_ADDRCONFIG;
 	getaddrinfo (hostname, NULL, &hints, &res);
-	int e = gsi_create_ipv4_id (((struct sockaddr_in*)(res->ai_addr))->sin_addr, gsi);
+	int e = pgm (((struct sockaddr_in*)(res->ai_addr))->sin_addr, &gsi);
 	g_assert (e == 0);
 	freeaddrinfo (res);
 #else
-	int e = gsi_create_md5_id (gsi);
+	int e = pgm_create_md5_gsi (&gsi);
 	g_assert (e == 0);
 #endif
 
-	struct sock_mreq recv_smr, send_smr;
+	struct pgm_sock_mreq recv_smr, send_smr;
 	int smr_len = 1;
-	e = if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
-	e = pgm_transport_create (&g_transport, gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);

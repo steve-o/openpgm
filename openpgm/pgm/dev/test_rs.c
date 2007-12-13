@@ -69,7 +69,7 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	time_init();
+	pgm_time_init();
 
 /* data block for CCSDS(255,223) */
 	int n = 255;
@@ -102,7 +102,7 @@ main (
  *      = 0x171
  */
 
-	struct rs_control *rs = init_rs (8, 0x171, 0, 1, G_N_ELEMENTS(parity));
+	struct rs_control *rs = pgm_init_rs (8, 0x171, 0, 1, G_N_ELEMENTS(parity));
 
 	guint64 start, end, elapsed;
 
@@ -116,11 +116,11 @@ main (
 	putchar ('\n');
 
 /* test encoding */
-	start = time_update_now();
+	start = pgm_time_update_now();
 
-	encode_rs8 (rs, data8, sizeof(data8), parity, 0);
+	pgm_encode_rs8 (rs, data8, sizeof(data8), parity, 0);
 
-	end = time_update_now();
+	end = pgm_time_update_now();
 	elapsed = end - start;
 	printf ("encoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
@@ -138,9 +138,9 @@ main (
 
 /* test decoding */
 
-	start = time_update_now();
-	int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, 0, NULL, 0, NULL);
-	end = time_update_now();
+	start = pgm_time_update_now();
+	int numerr = pgm_decode_rs8 (rs, data8, parity, sizeof(data8), NULL, 0, NULL, 0, NULL);
+	end = pgm_time_update_now();
 	elapsed = end - start;
 	printf ("decoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
@@ -179,9 +179,9 @@ main (
 
 /* test decoding part 2 */
 
-		start = time_update_now();
-		int numerr = decode_rs8 (rs, data8, parity, sizeof(data8), NULL, actual_erasures, eras_pos, 0, NULL);
-		end = time_update_now();
+		start = pgm_time_update_now();
+		int numerr = pgm_decode_rs8 (rs, data8, parity, sizeof(data8), NULL, actual_erasures, eras_pos, 0, NULL);
+		end = pgm_time_update_now();
 		elapsed = end - start;
 		printf ("decoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
@@ -195,8 +195,8 @@ main (
 	}
 
 /* clean up */
-	free_rs (rs);
-	time_destroy();	
+	pgm_free_rs (rs);
+	pgm_time_destroy();	
 
 	puts ("\n\nfinished.");
 	return 0;

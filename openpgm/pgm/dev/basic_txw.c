@@ -135,20 +135,20 @@ test_basic_txw (
 	gpointer txw;
 	int i;
 
-	txw = txw_init (size_per_entry, count, count, 0, 0);
+	txw = pgm_txw_init (size_per_entry, count, count, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? txw_alloc(txw) : NULL;
+		char *entry = size_per_entry ? pgm_txw_alloc(txw) : NULL;
 
-		txw_push (txw, entry, size_per_entry);
+		pgm_txw_push (txw, entry, size_per_entry);
 	}
 	gettimeofday(&now, NULL);
 
         double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 
-	txw_shutdown (txw);
+	pgm_txw_shutdown (txw);
 
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }

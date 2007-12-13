@@ -23,10 +23,16 @@
 #define __PGM_GSI_H__
 
 
+typedef struct pgm_gsi_t pgm_gsi_t;
+
+struct pgm_gsi_t {
+	char	identifier[6];
+};
+
 G_BEGIN_DECLS
 
-int gsi_create_md5_id (char*);
-int gsi_create_ipv4_id (struct in_addr, char*);
+int pgm_create_md5_gsi (pgm_gsi_t*);
+int pgm_create_ipv4_gsi (struct in_addr, pgm_gsi_t*);
 
 
 G_END_DECLS

@@ -31,25 +31,25 @@ typedef guint64 pgm_time_t;
 
 G_BEGIN_DECLS
 
-typedef pgm_time_t (*time_update_func)(void);
-typedef void (*time_sleep_func)(gulong);
+typedef pgm_time_t (*pgm_time_update_func)(void);
+typedef void (*pgm_time_sleep_func)(gulong);
 
-#define time_after(a,b)	    ( guint64_lt(a,b) )
-#define time_before(a,b)    time_after(b,a)
+#define pgm_time_after(a,b)	( pgm_uint64_lt(a,b) )
+#define pgm_time_before(a,b)    pgm_time_after(b,a)
 
-#define time_after_eq(a,b)  ( guint64_gte(a,b) )
-#define time_before_eq(a,b) time_after_eq(b,a)
+#define pgm_time_after_eq(a,b)  ( pgm_uint64_gte(a,b) )
+#define pgm_time_before_eq(a,b) pgm_time_after_eq(b,a)
 
 
 /* micro-seconds */
-extern pgm_time_t time_now;
+extern pgm_time_t pgm_time_now;
 
-extern time_update_func time_update_now;
-extern time_sleep_func time_sleep;
+extern pgm_time_update_func pgm_time_update_now;
+extern pgm_time_sleep_func pgm_time_sleep;
 
-int time_init (void);
-int time_destroy (void);
-gboolean time_supported (void);
+int pgm_time_init (void);
+int pgm_time_destroy (void);
+gboolean pgm_time_supported (void);
 
 G_END_DECLS
 

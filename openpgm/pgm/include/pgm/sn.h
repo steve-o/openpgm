@@ -26,51 +26,51 @@
 G_BEGIN_DECLS
 
 enum {
-    GUINT32_SIGN_BIT = (1<<31)
+    PGM_UINT32_SIGN_BIT = (1<<31)
 };
 
-#define GUINT64_SIGN_BIT ((guint64)1<<63)
+#define PGM_UINT64_SIGN_BIT ((guint64)1<<63)
 
 /* 32 bit */
-static inline gboolean guint32_lt (guint32 s, guint32 t)
+static inline gboolean pgm_uint32_lt (guint32 s, guint32 t)
 {
-    return ( ((s) - (t)) & GUINT32_SIGN_BIT );
+    return ( ((s) - (t)) & PGM_UINT32_SIGN_BIT );
 }
 
-static inline gboolean guint32_lte (guint32 s, guint32 t)
+static inline gboolean pgm_uint32_lte (guint32 s, guint32 t)
 {
-    return ( ((s) == (t)) || ( ((s) - (t)) & GUINT32_SIGN_BIT ) );
+    return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT32_SIGN_BIT ) );
 }
 
-static inline gboolean guint32_gt (guint32 s, guint32 t)
+static inline gboolean pgm_uint32_gt (guint32 s, guint32 t)
 {
-    return ( ((t) - (s)) & GUINT32_SIGN_BIT );
+    return ( ((t) - (s)) & PGM_UINT32_SIGN_BIT );
 }
 
-static inline gboolean guint32_gte (guint32 s, guint32 t)
+static inline gboolean pgm_uint32_gte (guint32 s, guint32 t)
 {
-    return ( ((s) == (t)) || ( ((t) - (s)) & GUINT32_SIGN_BIT ) );
+    return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT32_SIGN_BIT ) );
 }
 
 /* 64 bit */
-static inline gboolean guint64_lt (guint64 s, guint64 t)
+static inline gboolean pgm_uint64_lt (guint64 s, guint64 t)
 {
-    return ( ((s) - (t)) & GUINT64_SIGN_BIT );
+    return ( ((s) - (t)) & PGM_UINT64_SIGN_BIT );
 }
 
-static inline gboolean guint64_lte (guint64 s, guint64 t)
+static inline gboolean pgm_uint64_lte (guint64 s, guint64 t)
 {
-    return ( ((s) == (t)) || ( ((s) - (t)) & GUINT64_SIGN_BIT ) );
+    return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) );
 }
 
-static inline gboolean guint64_gt (guint64 s, guint64 t)
+static inline gboolean pgm_uint64_gt (guint64 s, guint64 t)
 {
-    return ( ((t) - (s)) & GUINT64_SIGN_BIT );
+    return ( ((t) - (s)) & PGM_UINT64_SIGN_BIT );
 }
 
-static inline gboolean guint64_gte (guint64 s, guint64 t)
+static inline gboolean pgm_uint64_gte (guint64 s, guint64 t)
 {
-    return ( ((s) == (t)) || ( ((t) - (s)) & GUINT64_SIGN_BIT ) );
+    return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) );
 }
 
 

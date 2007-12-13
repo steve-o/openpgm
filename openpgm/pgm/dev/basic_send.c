@@ -401,7 +401,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 	memcpy (odata + 1, g_payload, strlen(g_payload) + 1);
 
-	header->pgm_checksum = pgm_cksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
 
 	int flags = MSG_CONFIRM;	/* not expecting a reply */
 

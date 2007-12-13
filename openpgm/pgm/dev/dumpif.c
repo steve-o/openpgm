@@ -64,7 +64,7 @@ main (
 /* setup signal handlers */
 	signal(SIGHUP, SIG_IGN);
 
-	if_print_all();
+	pgm_if_print_all();
 
 	puts ("finished.");
 	return 0;
