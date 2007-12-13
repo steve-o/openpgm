@@ -101,7 +101,7 @@
 		g_assert ( (w)->max_tpdu > 0 ) ; \
 \
 /* all pointers are within window bounds */ \
-		if ( !rxw_empty( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
+		if ( !pgm_rxw_empty( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
 		{ \
 			g_assert ( RXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata->len ); \
 			g_assert ( RXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata->len ); \
@@ -529,7 +529,7 @@ pgm_rxw_push_fragment (
 /* send nak by sending to end of expiry list */
 				g_queue_push_head_link (r->backoff_queue, &ph->link_);
 				g_trace ("#%" G_GUINT32_FORMAT ": adding place holder for missing packet, backoff_queue now %" G_GUINT32_FORMAT " long, rxw_sqns %u",
-					sequence_number, r->backoff_queue->length, rxw_sqns(r));
+					sequence_number, r->backoff_queue->length, pgm_rxw_sqns(r));
 
 				if ( pgm_rxw_full(r) )
 				{
@@ -656,7 +656,7 @@ pgm_rxw_flush1 (
 	g_assert ( cp != NULL );
 
 	if (cp->state != PGM_PKT_HAVE_DATA_STATE && cp->state != PGM_PKT_LOST_DATA_STATE) {
-		g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->trail, rxw_state_string(cp->state), cp->state, cp->length);
+		g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->trail, pgm_rxw_state_string(cp->state), cp->state, cp->length);
 		goto out;
 	}
 
@@ -928,7 +928,7 @@ pgm_rxw_pop_trail (
 {
 /* check if window is not empty */
 	ASSERT_RXW_BASE_INVARIANT(r);
-	g_assert ( !rxw_empty (r) );
+	g_assert ( !pgm_rxw_empty (r) );
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->trail);
 

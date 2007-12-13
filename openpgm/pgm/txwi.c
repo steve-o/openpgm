@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+//#define TXW_DEBUG
+
 #ifndef TXW_DEBUG
 #define G_DISABLE_ASSERT
 #endif
