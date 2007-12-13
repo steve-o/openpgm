@@ -57,7 +57,7 @@ struct idle_source {
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = ";226.0.0.1";
+static char* g_network = ";";
 
 static int g_odata_rate = 10;					/* 10 per second */
 static int g_odata_interval = (1000 * 1000) / 10;	/* 100 ms */
