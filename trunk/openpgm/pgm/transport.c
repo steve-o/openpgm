@@ -1701,13 +1701,27 @@ pgm_transport_bind (
 
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
-/* setup rate control (10Hz) */
+/* setup rate control */
 	if (transport->txw_max_rte)
 	{
-		g_trace ("INFO","Setting rate regulation to %i bytes per 100ms.",
-				transport->txw_max_rte/10);
+		g_trace ("INFO","Setting rate regulation to %i bytes per second.",
+				transport->txw_max_rte);
 	
-		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte/10, 100*1000);
+/* determine IP header size for rate regulation engine */
+		guint iphdr_len = 0;
+
+		switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
+		case AF_INET:
+			iphdr_len = sizeof(struct iphdr);
+			break;
+
+		case AF_INET6:
+			iphdr_len = 40;	/* sizeof(struct ipv6hdr) */
+			break;
+		}
+		g_trace ("INFO","assuming IP header size of %i bytes", iphdr_len);
+
+		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, iphdr_len);
 		if (retval < 0) {
 			retval = errno;
 			goto out;
@@ -3497,7 +3511,7 @@ pgm_timer_prepare (
 /* advance time again to adjust for processing time out of the event loop, this
  * could cause further timers to expire even before checking for new wire data.
  */
-	msec = ((gint64)expiration - (gint64)now) / 1000;
+	msec = pgm_to_msecs((gint64)expiration - (gint64)now);
 	if (msec < 0)
 		msec = 0;
 	else
