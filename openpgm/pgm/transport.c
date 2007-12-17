@@ -46,6 +46,7 @@
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
 #include "pgm/transport.h"
+#include "pgm/rate_control.h"
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
@@ -237,6 +238,23 @@ int pgm_write_copy_ex (pgm_transport_t* transport, const gchar* buf, gsize count
     return pgm_write_copy_fragment (transport, buf, count);
 }
 
+/* locked and rate regulated sendto
+ */
+
+static inline ssize_t
+pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len, int flags, const struct sockaddr* to, socklen_t tolen)
+{
+	int retval;
+	GStaticMutex* mutex = ra ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
+	int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
+
+	g_static_mutex_lock (mutex);
+	pgm_rate_check (transport->rate_control, len);
+	retval = sendto (sock, buf, len, flags, to, tolen);
+	g_static_mutex_unlock (mutex);
+
+	return retval;
+}
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  */
@@ -351,6 +369,11 @@ pgm_transport_destroy (
 		transport->txw = NULL;
 	}
 
+	if (transport->rate_control) {
+		g_trace ("INFO","destroying rate control.");
+		pgm_rate_destroy (transport->rate_control);
+		transport->rate_control = NULL;
+	}
 	if (transport->recv_sock) {
 		g_trace ("INFO","closing receive socket.");
 		close(transport->recv_sock);
@@ -1678,6 +1701,19 @@ pgm_transport_bind (
 
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
+/* setup rate control (10Hz) */
+	if (transport->txw_max_rte)
+	{
+		g_trace ("INFO","Setting rate regulation to %i bytes per 100ms.",
+				transport->txw_max_rte/10);
+	
+		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte/10, 100*1000);
+		if (retval < 0) {
+			retval = errno;
+			goto out;
+		}
+	}
+
 	g_trace ("INFO","adding dynamic timer");
 	transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
 	pgm_add_timer (transport);
@@ -2369,14 +2405,13 @@ send_spm_unlocked (
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_checksum((char*)header, transport->spm_len, 0);
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
-	retval = sendto (transport->send_with_router_alert_sock,
+	retval = pgm_sendto (transport,
+				TRUE,				/* with router alert */
 				header,
 				transport->spm_len,
 				MSG_CONFIRM,			/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	return retval;
 }
@@ -3160,14 +3195,13 @@ pgm_write_unlocked (
 /* add to transmit window */
 	pgm_txw_push (transport->txw, pkt, tpdu_length);
 
-	g_static_mutex_lock (&transport->send_mutex);
-	retval = sendto (transport->send_sock,
+	retval = pgm_sendto (transport,
+				FALSE,
 				header,
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-	g_static_mutex_unlock (&transport->send_mutex);
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
@@ -3251,14 +3285,13 @@ pgm_write_copy_fragment_unlocked (
 /* add to transmit window */
 		pgm_txw_push (transport->txw, pkt, tpdu_length);
 
-		g_static_mutex_lock (&transport->send_mutex);
-		retval = sendto (transport->send_sock,
+		retval = pgm_sendto (transport,
+					FALSE,
 					header,
 					tpdu_length,
 					MSG_CONFIRM,		/* not expecting a reply */
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-		g_static_mutex_unlock (&transport->send_mutex);
 
 //		g_trace ("INFO","%i bytes sent", tpdu_length);
 
@@ -3299,14 +3332,13 @@ send_rdata (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_checksum((char*)header, len, 0);
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
-	retval = sendto (transport->send_with_router_alert_sock,
+	retval = pgm_sendto (transport,
+				TRUE,			/* with router alert */
 				header,
 				len,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 /* re-set spm timer */
 	g_static_mutex_lock (&transport->mutex);
