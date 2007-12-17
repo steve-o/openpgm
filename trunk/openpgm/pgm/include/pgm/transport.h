@@ -104,6 +104,8 @@ struct pgm_transport_t {
 
     GStaticRWLock	txw_lock;
     gpointer            txw;		   	    /* pgm_txw_t */
+    gpointer		rate_control;		    /* rate_t */
+
     int			spm_sqn;
     guint		spm_ambient_interval;	    /* microseconds */
     guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
