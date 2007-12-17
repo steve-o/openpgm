@@ -248,7 +248,7 @@ on_startup (
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
 
-	g_message ("scheduling ODATA broadcasts every %.1f secs.", g_odata_interval / 1000.0);
+	g_message ("scheduling ODATA broadcasts every %.1g secs.", (double)pgm_to_secs((double)g_odata_interval));
 	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
 
 	g_message ("startup complete.");

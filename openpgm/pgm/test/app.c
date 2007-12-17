@@ -66,10 +66,10 @@ struct app_session {
 static int g_port = 7500;
 static char* g_network = ";226.0.0.1";
 
-static int g_odata_interval = 1 * 100 * 1000;	/* 100 ms */
-static int g_payload = 0;
-static int g_max_tpdu = 1500;
-static int g_sqns = 100 * 1000;
+static guint g_odata_interval = pgm_msecs(100);	/* 100 ms */
+static guint g_payload = 0;
+static guint g_max_tpdu = 1500;
+static guint g_sqns = 100 * 1000;
 
 static GHashTable* g_sessions = NULL;
 static GMainLoop* g_loop = NULL;
@@ -224,7 +224,7 @@ idle_prepare (
 	struct idle_source* idle_source = (struct idle_source*)source;
 
 	guint64 now = pgm_time_update_now();
-	glong msec = ((gint64)idle_source->expiration - (gint64)now) / 1000;
+	glong msec = pgm_msecs((gint64)idle_source->expiration - (gint64)now);
 	if (msec < 0)
 		msec = 0;
 	else
@@ -336,14 +336,14 @@ session_bind (
 	pgm_transport_set_txw_sqns (sess->transport, g_sqns);
 	pgm_transport_set_rxw_sqns (sess->transport, g_sqns);
 	pgm_transport_set_hops (sess->transport, 16);
-	pgm_transport_set_ambient_spm (sess->transport, 8192*1000);
-	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
+	pgm_transport_set_ambient_spm (sess->transport, pgm_msecs(8192));
+	guint spm_heartbeat[] = { pgm_msecs(1), pgm_msecs(1), pgm_msecs(2), pgm_msecs(4), pgm_msecs(8), pgm_msecs(16), pgm_msecs(32), pgm_msecs(64), pgm_msecs(128), pgm_msecs(256), pgm_msecs(512), pgm_msecs(1024), pgm_msecs(2048), pgm_msecs(4096), pgm_msecs(8192) };
 	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
-	pgm_transport_set_peer_expiry (sess->transport, 5*8192*1000);
-	pgm_transport_set_spmr_expiry (sess->transport, 250*1000);
-	pgm_transport_set_nak_rb_ivl (sess->transport, 50*1000);
-	pgm_transport_set_nak_rpt_ivl (sess->transport, 200*1000);
-	pgm_transport_set_nak_rdata_ivl (sess->transport, 200*1000);
+	pgm_transport_set_peer_expiry (sess->transport, 5*pgm_msecs(8192));
+	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
+	pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(50));
+	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_msecs(200));
+	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_msecs(200));
 	pgm_transport_set_nak_data_retries (sess->transport, 5);
 	pgm_transport_set_nak_ncf_retries (sess->transport, 2);
 
