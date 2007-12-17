@@ -53,9 +53,10 @@ static int g_port = 7500;
 static char* g_network = "";
 static int g_udp_encap_port = 0;
 
-static int g_odata_interval = 1 * 100;
+static int g_odata_interval = 1 * 10;	/* every 10ms */
 static int g_payload = 0;
 static int g_max_tpdu = 1500;
+static int g_max_rte = 400*1000;
 static int g_sqns = 10;
 
 static gboolean g_fec = FALSE;
@@ -82,6 +83,7 @@ usage (const char* bin)
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
 	fprintf (stderr, "  -k <k>          : Configure FEC with k data packets, 2t parity\n");
 	fprintf (stderr, "  -t <2t>\n");
@@ -99,12 +101,13 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:f:k:t:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:t:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
+		case 'r':	g_max_rte = atoi (optarg); break;
 
 		case 'f':	g_fec = TRUE; break;
 		case 'k':	g_k = atoi (optarg); break;
@@ -222,6 +225,7 @@ on_startup (
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
+	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
