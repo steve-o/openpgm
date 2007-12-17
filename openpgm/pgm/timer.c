@@ -46,7 +46,7 @@
 #define msecs_to_usecs(t)	( (t) * 1000 )
 #define msecs_to_nsecs(t)	( (t) * 1000000UL )
 #define usecs_to_msecs(t)	( (t) / 1000 )
-#define usecs_to_nsecs(t)	( (t) / 1000000UL )
+#define usecs_to_nsecs(t)	( (t) * 1000 )
 #define nsecs_to_msecs(t)	( (t) / 1000000UL )
 #define nsecs_to_usecs(t)	( (t) / 1000 )
 

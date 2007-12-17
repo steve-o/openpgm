@@ -40,6 +40,16 @@ typedef void (*pgm_time_sleep_func)(gulong);
 #define pgm_time_after_eq(a,b)  ( pgm_uint64_gte(a,b) )
 #define pgm_time_before_eq(a,b) pgm_time_after_eq(b,a)
 
+#define pgm_to_secs(t)	( (t) / 1000000UL )
+#define pgm_to_msecs(t)	( (t) / 1000 )
+#define pgm_to_usecs(t)	(t)
+#define pgm_to_nsecs(t)	( (t) * 1000 )
+
+#define pgm_secs(t)	( (t) * 1000000UL )
+#define pgm_msecs(t)	( (t) * 1000 )
+#define pgm_usecs(t)	(t)
+#define pgm_nsecs(t)	( (t) / 1000 )
+
 
 /* micro-seconds */
 extern pgm_time_t pgm_time_now;
