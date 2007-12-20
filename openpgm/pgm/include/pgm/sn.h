@@ -22,6 +22,8 @@
 #ifndef __PGM_SN_H__
 #define __PGM_SN_H__
 
+#include <glib.h>
+
 
 G_BEGIN_DECLS
 
@@ -72,7 +74,6 @@ static inline gboolean pgm_uint64_gte (guint64 s, guint64 t)
 {
     return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) );
 }
-
 
 G_END_DECLS
 

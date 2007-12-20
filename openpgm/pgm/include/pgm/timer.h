@@ -22,6 +22,8 @@
 #ifndef __PGM_TIMER_H__
 #define __PGM_TIMER_H__
 
+#include <glib.h>
+
 #ifndef __PGM_SN_H
 #include "pgm/sn.h"
 #endif

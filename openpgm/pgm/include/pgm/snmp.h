@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * Dump back trace to stderr and try gdb.
+ * SNMP
  *
- * Copyright (c) 2006 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,17 +19,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_BACKTRACE_H__
-#define __PGM_BACKTRACE_H__
+#ifndef __PGM_SNMP_H__
+#define __PGM_SNMP_H__
 
 #include <glib.h>
 
 
 G_BEGIN_DECLS
 
-void on_sigsegv (int);
-
+int pgm_snmp_init (void);
+int pgm_snmp_shutdown (void);
 
 G_END_DECLS
 
-#endif /* __PGM_BACKTRACE_H__ */
+#endif /* __PGM_SNMP_H__ */
