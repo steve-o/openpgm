@@ -22,12 +22,14 @@
 #ifndef __PGM_RXW_H__
 #define __PGM_RXW_H__
 
+#include <glib.h>
+
 #ifndef __PGM_TIMER_H__
 #   include "pgm/timer.h"
 #endif
 
-G_BEGIN_DECLS
 
+G_BEGIN_DECLS
 
 typedef enum
 {

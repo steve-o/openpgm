@@ -21,6 +21,9 @@
 
 #include <glib.h>
 
+
+G_BEGIN_DECLS
+
 /**
  * struct rs_control - rs control structure
  *
@@ -52,6 +55,7 @@ struct rs_control {
 
 	GList*		link;
 };
+
 
 /* General purpose RS codec, 8-bit data width, symbol width 1-15 bit  */
 #ifdef CONFIG_REED_SOLOMON_ENC8
@@ -95,5 +99,7 @@ static inline int rs_modnn(struct rs_control *rs, int x)
 	}
 	return x;
 }
+
+G_END_DECLS
 
 #endif /* __PGM_REED_SOLOMON_H__ */

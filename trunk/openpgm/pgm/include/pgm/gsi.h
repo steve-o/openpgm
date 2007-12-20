@@ -22,6 +22,8 @@
 #ifndef __PGM_GSI_H__
 #define __PGM_GSI_H__
 
+#include <glib.h>
+
 
 typedef struct pgm_gsi_t pgm_gsi_t;
 

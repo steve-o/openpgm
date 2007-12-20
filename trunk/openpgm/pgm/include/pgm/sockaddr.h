@@ -26,6 +26,10 @@
 #include <string.h>
 #include <netinet/in.h>
 
+#include <glib.h>
+
+
+G_BEGIN_DECLS
 
 /* TODO: update to RFC 3678: MCAST_JOIN_(SOURCE_)GROUP */
 
@@ -38,8 +42,6 @@ struct pgm_sock_mreq
 /* Local IP address of interface. */
     struct sockaddr_storage	smr_interface;
 };
-
-G_BEGIN_DECLS
 
 
 #define pgm_sockaddr_family(src)	( ((struct sockaddr*)(src))->sa_family )
@@ -291,7 +293,6 @@ static inline int pgm_sockaddr_multicast_hops (int s, int sa_family, gint hops)
 
     return retval;
 }
-
 
 G_END_DECLS
 
