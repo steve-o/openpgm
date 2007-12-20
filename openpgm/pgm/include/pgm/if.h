@@ -22,9 +22,12 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
+#include <glib.h>
+
 #ifndef __PGM_SOCKADDR_H__
 #   include "pgm/sockaddr.h"
 #endif
+
 
 G_BEGIN_DECLS
 

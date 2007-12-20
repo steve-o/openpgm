@@ -31,7 +31,6 @@ G_BEGIN_DECLS
 
 __sighandler_t pgm_signal_install (int, __sighandler_t);
 
-
 G_END_DECLS
 
 #endif /* __PGM_SIGNAL_H__ */

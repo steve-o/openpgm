@@ -22,6 +22,9 @@
 #ifndef __PGM_TXW_H__
 #define __PGM_TXW_H__
 
+#include <glib.h>
+
+
 G_BEGIN_DECLS
 
 struct pgm_txw_packet_t {
@@ -101,7 +104,6 @@ static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint len)
     memcpy (packet, packet_, len);
     return pgm_txw_push (t, packet, len);
 }
-
 
 G_END_DECLS
 
