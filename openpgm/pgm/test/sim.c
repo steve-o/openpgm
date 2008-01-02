@@ -152,7 +152,8 @@ main (
 
 	if (g_sessions) {
 		g_message ("destroying sessions.");
-		g_hash_table_foreach (g_sessions, (GHFunc)destroy_session, NULL);
+		g_hash_table_foreach_remove (g_sessions, (GHFunc)destroy_session, NULL);
+		g_hash_table_unref (g_sessions);
 		g_sessions = NULL;
 	}
 
@@ -390,6 +391,9 @@ session_destroy (
 		puts ("FAILED: session not found");
 		return;
 	}
+
+/* remove from hash table */
+	g_hash_table_remove (g_sessions, name);
 
 	pgm_transport_destroy (sess->transport, TRUE);
 	sess->transport = NULL;
