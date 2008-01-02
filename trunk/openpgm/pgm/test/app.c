@@ -390,6 +390,9 @@ session_destroy (
 		return;
 	}
 
+/* remove from hash table */
+	g_hash_table_remove (g_sessions, name);
+
 	pgm_transport_destroy (sess->transport, TRUE);
 	sess->transport = NULL;
 	g_free (sess->name);
