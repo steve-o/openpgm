@@ -1129,6 +1129,14 @@ pgm_rxw_ncf (
 
 	if (!r->window_defined) return -1;
 
+/* already committed */
+	if ( pgm_uint32_lt (sequence_number, r->trail) )
+	{
+		g_trace ("ncf #%u: already committed, discarding.", sequence_number);
+
+		return -1;
+	}
+
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 	if (rp)
