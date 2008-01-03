@@ -62,9 +62,11 @@ struct app_session {
 };
 
 /* globals */
+#undef G_LOG_DOMAIN
+#define G_LOG_DOMAIN	"app"
 
 static int g_port = 7500;
-static char* g_network = ";226.0.0.1";
+static char* g_network = ";239.192.0.1";
 
 static guint g_odata_interval = pgm_msecs(100);	/* 100 ms */
 static guint g_payload = 0;

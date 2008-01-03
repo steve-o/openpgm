@@ -44,7 +44,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "239.192.0.1";
 static struct in_addr g_filter = { 0 };
 
 static GIOChannel* g_io_channel = NULL;

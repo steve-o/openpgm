@@ -333,6 +333,7 @@ pgm_transport_destroy (
 /* assume lock from create() if not bound */
 	if (transport->bound) {
 		g_static_mutex_lock (&transport->send_mutex);
+		g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	}
 
 /* flush data by sending heartbeat SPMs & processing NAKs until ambient */
@@ -440,9 +441,19 @@ pgm_transport_destroy (
 		g_assert (transport->trash_event == NULL);
 	}
 
-	if (transport->bound) 
+	g_static_rw_lock_free (&transport->peers_lock);
+
+	g_static_rw_lock_free (&transport->txw_lock);
+
+	g_static_mutex_free (&transport->rdata_mutex);
+	g_static_mutex_free (&transport->event_mutex);
+
+	if (transport->bound) {
 		g_static_mutex_unlock (&transport->send_mutex);
+		g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
+	}
 	g_static_mutex_free (&transport->send_mutex);
+	g_static_mutex_free (&transport->send_with_router_alert_mutex);
 
 	g_static_mutex_unlock (&transport->mutex);
 	g_static_mutex_free (&transport->mutex);
