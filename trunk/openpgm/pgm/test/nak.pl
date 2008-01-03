@@ -8,14 +8,8 @@ BEGIN { require "test.conf.pl"; }
 $| = 1;
 
 my $mon = PGM::Test->new(tag => 'mon', host => $config{mon}{host}, cmd => $config{mon}{cmd});
-my $monin = $mon->{in};
-my $monout = $mon->{out};
 my $sim = PGM::Test->new(tag => 'sim', host => $config{sim}{host}, cmd => $config{sim}{cmd});
-my $simin = $sim->{in};
-my $simout = $sim->{out};
 my $app = PGM::Test->new(tag => 'app', host => $config{app}{host}, cmd => $config{app}{cmd});
-my $appin = $app->{in};
-my $appout = $app->{out};
 
 $mon->connect;
 $sim->connect;
