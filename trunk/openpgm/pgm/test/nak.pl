@@ -8,7 +8,7 @@ use strict;
 
 my $app_host = 'ayaka';
 my $app_ip = '10.6.28.31';
-my $mon_host = 'hikari';
+my $mon_host = 'kiku';
 my $sim_host = 'sora';
 my $mon = '/miru/projects/openpgm/pgm/ref/debug/test/monitor';
 my $app = '/miru/projects/openpgm/pgm/ref/debug/test/app';
@@ -52,7 +52,7 @@ sub close_ssh {
 	HUNTSMAN();
 }
 
-$SIG{'INT'} = sub { close_ssh(); };
+$SIG{'INT'} = sub { print "interrupt caught.\n"; close_ssh(); };
 
 
 # wait all spawned programs to become ready
@@ -68,34 +68,25 @@ sub wait_for_ready {
 wait_for_ready (\*MON_READER, "mon");
 print MON_WRITER "filter $app_ip\n";
 wait_for_ready (\*MON_READER, "mon");
-print "monitor ready.\n";
+print "mon: ready.\n";
 
 wait_for_ready (\*SIM_READER, "sim");
 print SIM_WRITER "create baa\n";
 wait_for_ready (\*SIM_READER, "sim");
 print SIM_WRITER "bind baa\n";
 wait_for_ready (\*SIM_READER, "sim");
-print "sim ready.\n";
+print "sim: ready.\n";
 
 wait_for_ready (\*APP_READER, "app");
 print APP_WRITER "create moo\n";
 wait_for_ready (\*APP_READER, "app");
 print APP_WRITER "bind moo\n";
 wait_for_ready (\*APP_READER, "app");
-print "app ready.\n";
-
-wait_for_spm (\*MON_READER);
-print "link monitor seen SPM\n";
-
-while (<SIM_READER>) {
-	print;
-	chomp();
-	last if (/new peer$/);
-}
-print "simulator seen new peer\n";
+print "app: ready.\n";
 
 # tell app to publish odata
 
+print "app: publish data\n";
 print APP_WRITER "send moo ringo\n";
 wait_for_ready (\*APP_READER, "app");
 print APP_WRITER "send moo ichigo\n";
@@ -104,11 +95,10 @@ print APP_WRITER "send moo momo\n";
 wait_for_ready (\*APP_READER, "app");
 
 sub wait_for_block {
-	my($fh) = @_;
+	my($fh, $tag) = @_;
 	my $b = '';
 	my $state = 0;
 
-#	print "wait_for_block ...\n";
 	while (<$fh>) {
 		chomp();
 		my $l = $_;
@@ -116,7 +106,7 @@ sub wait_for_block {
 			if ($l =~ /^{$/) {
 				$state = 1;
 			} else {
-				print "$l\n";
+				print "$tag: $l\n";
 			}
 		}
 
@@ -135,12 +125,11 @@ sub wait_for_spm {
 	my $fh = shift;
 	my $json = new JSON;
 
-	print "wait_for_spm ...\n";
 	for (;;) {
-		my $block = wait_for_block ($fh);
+		my $block = wait_for_block ($fh, "wait_for_spm");
 		my $obj = $json->jsonToObj($block);
 		if ($obj->{PGM}->{type} =~ /SPM/) {
-			print "spm packet seen: ";
+			print "spm received: ";
 			print $json->objToJson($obj) . "\n";
 			return $obj;
 		}
@@ -151,12 +140,11 @@ sub wait_for_odata {
 	my $fh = shift;
 	my $json = new JSON;
 
-	print "wait_for_odata ...\n";
 	for (;;) {
-		my $block = wait_for_block ($fh);
+		my $block = wait_for_block ($fh, "wait_for_odata");
 		my $obj = $json->jsonToObj($block);
 		if ($obj->{PGM}->{type} =~ /ODATA/) {
-			print "odata packet seen: ";
+			print "odata received: ";
 			print $json->objToJson($obj) . "\n";
 			return $obj;
 		}
@@ -167,18 +155,18 @@ sub wait_for_rdata {
 	my $fh = shift;
 	my $json = new JSON;
 
-	print "wait_for_rdata ...\n";
 	for (;;) {
-		my $block = wait_for_block ($fh);
+		my $block = wait_for_block ($fh, "wait_for_rdata");
 		my $obj = $json->jsonToObj($block);
 		if ($obj->{PGM}->{type} =~ /RDATA/) {
-			print "rdata packet seen: ";
+			print "rdata received: ";
 			print $json->objToJson($obj) . "\n";
 			return $obj;
 		}
 	}
 }
 
+print "mon: wait for odata ...\n";
 my $odata = "";
 for (my $i = 1; $i <= 3; $i++)
 {
@@ -197,11 +185,11 @@ for (my $i = 1; $i <= 3; $i++)
 	}
 }
 
-print "received 3 odata's from app\n";
+print "mon: received 3 x odata\n";
 
 # tell sim to publish nak #2
 
-print "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 2\n";
+print "sim: net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 2\n";
 print SIM_WRITER "net send nak baa " . $odata->{PGM}->{gsi} . "." . $odata->{PGM}->{sourcePort} . " 2\n";
 wait_for_ready (\*SIM_READER, "sim");
 
@@ -226,12 +214,14 @@ print "test completed successfully, terminating.\n";
 sub flush_ssh {
 	print APP_WRITER "quit\n";
 	print SIM_WRITER "quit\n";
-	print MON_WRITER "quit\n";
 	while (<APP_READER>) { print "app: $_"; }
 	print "app terminated.\n";
 	while (<SIM_READER>) { print "sim: $_"; }
 	print "sim terminated.\n";
-	while (<MON_READER>) { print "mon: $_"; }
+
+# ignore monitor output, usually excess SPMs
+	print MON_WRITER "quit\n";
+	while (<MON_READER>) {}
 	print "mon terminated.\n";
 	close_ssh();
 }

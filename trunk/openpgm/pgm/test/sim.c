@@ -63,9 +63,11 @@ struct sim_session {
 };
 
 /* globals */
+#undef G_LOG_DOMAIN
+#define G_LOG_DOMAIN	"sim"
 
 static int g_port = 7500;
-static char* g_network = ";226.0.0.1";
+static char* g_network = ";239.192.0.1";
 
 static int g_odata_interval = pgm_msecs(100);	/* 100 ms */
 static int g_payload = 0;
@@ -434,9 +436,14 @@ net_send_nak (
         struct pgm_header *header = (struct pgm_header*)buf;
         struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
         memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+
+	guint16 peer_sport = peer->tsi.sport;
+	struct sockaddr_storage peer_nla;
+	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
+
 /* dport & sport swap over for a nak */
-        header->pgm_sport       = pgm_sockaddr_port(&transport->recv_smr[0].smr_multiaddr);
-        header->pgm_dport       = peer->tsi.sport;
+        header->pgm_sport       = transport->dport;
+        header->pgm_dport       = peer_sport;
         header->pgm_type        = PGM_NAK;
         header->pgm_options     = 0;
         header->pgm_tsdu_length = 0;
@@ -445,7 +452,7 @@ net_send_nak (
         nak->nak_sqn            = g_htonl (sqn);
 
 /* source nla */
-        pgm_sockaddr_to_nla ((struct sockaddr*)&peer->nla, (char*)&nak->nak_src_nla_afi);
+        pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
         pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
@@ -453,12 +460,14 @@ net_send_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
 
-        retval = sendto (transport->send_sock,
+	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
+        retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
-                                (struct sockaddr*)&peer->nla,
-                                pgm_sockaddr_len(&peer->nla));
+                                (struct sockaddr*)&peer_nla,
+                                pgm_sockaddr_len(&peer_nla));
+	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	puts ("READY");
 }
