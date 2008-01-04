@@ -36,7 +36,7 @@ G_BEGIN_DECLS
 typedef pgm_time_t (*pgm_time_update_func)(void);
 typedef void (*pgm_time_sleep_func)(gulong);
 
-#define pgm_time_after(a,b)	( pgm_uint64_lt(a,b) )
+#define pgm_time_after(a,b)	( pgm_uint64_gt(a,b) )
 #define pgm_time_before(a,b)    pgm_time_after(b,a)
 
 #define pgm_time_after_eq(a,b)  ( pgm_uint64_gte(a,b) )

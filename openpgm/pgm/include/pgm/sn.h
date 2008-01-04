@@ -57,22 +57,40 @@ static inline gboolean pgm_uint32_gte (guint32 s, guint32 t)
 /* 64 bit */
 static inline gboolean pgm_uint64_lt (guint64 s, guint64 t)
 {
-    return ( ((s) - (t)) & PGM_UINT64_SIGN_BIT );
+    return (
+		( ((s) - (t)) & PGM_UINT64_SIGN_BIT )
+		> 0	/* need to force boolean conversion when int = 32bits */
+	   );
 }
 
 static inline gboolean pgm_uint64_lte (guint64 s, guint64 t)
 {
-    return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) );
+    return (
+		((s) == (t))
+	    ||  (
+		( ((s) - (t)) & PGM_UINT64_SIGN_BIT )
+		> 0	/* need to force boolean conversion when int = 32bits */
+		)
+	   );
 }
 
 static inline gboolean pgm_uint64_gt (guint64 s, guint64 t)
 {
-    return ( ((t) - (s)) & PGM_UINT64_SIGN_BIT );
+    return (
+		( ((t) - (s)) & PGM_UINT64_SIGN_BIT )
+		> 0	/* need to force boolean conversion when int = 32bits */
+	   );
 }
 
 static inline gboolean pgm_uint64_gte (guint64 s, guint64 t)
 {
-    return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) );
+    return (
+		((s) == (t))
+	    ||	(
+		( ((t) - (s)) & PGM_UINT64_SIGN_BIT )
+		> 0	/* need to force boolean conversion when int = 32bits */
+		)
+	   );
 }
 
 G_END_DECLS
