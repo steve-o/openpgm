@@ -339,16 +339,16 @@ session_bind (
 	pgm_transport_set_txw_sqns (sess->transport, g_sqns);
 	pgm_transport_set_rxw_sqns (sess->transport, g_sqns);
 	pgm_transport_set_hops (sess->transport, 16);
-	pgm_transport_set_ambient_spm (sess->transport, pgm_msecs(8192));
-	guint spm_heartbeat[] = { pgm_msecs(1), pgm_msecs(1), pgm_msecs(2), pgm_msecs(4), pgm_msecs(8), pgm_msecs(16), pgm_msecs(32), pgm_msecs(64), pgm_msecs(128), pgm_msecs(256), pgm_msecs(512), pgm_msecs(1024), pgm_msecs(2048), pgm_msecs(4096), pgm_msecs(8192) };
+	pgm_transport_set_ambient_spm (sess->transport, pgm_secs(30));
+	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
-	pgm_transport_set_peer_expiry (sess->transport, 5*pgm_msecs(8192));
+	pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300));
 	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
 	pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(50));
-	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_msecs(200));
-	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_msecs(200));
-	pgm_transport_set_nak_data_retries (sess->transport, 5);
-	pgm_transport_set_nak_ncf_retries (sess->transport, 2);
+	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
+	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2));
+	pgm_transport_set_nak_data_retries (sess->transport, 50);
+	pgm_transport_set_nak_ncf_retries (sess->transport, 50);
 
 	int e = pgm_transport_bind (sess->transport);
 	if (e != 0) {
