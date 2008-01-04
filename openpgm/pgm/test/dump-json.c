@@ -53,6 +53,8 @@ int verify_odata (struct pgm_header*, char*, int);
 void print_odata (struct pgm_header*, char*);
 int verify_rdata (struct pgm_header*, char*, int);
 void print_rdata (struct pgm_header*, char*);
+static int generic_verify_nak (const char*, struct pgm_header*, char*, int);
+static void generic_print_nak (const char*, struct pgm_header*, char*);
 int verify_nak (struct pgm_header*, char*, int);
 void print_nak (struct pgm_header*, char*);
 int verify_nnak (struct pgm_header*, char*, int);
@@ -711,11 +713,43 @@ verify_nak (
 	int			len
 	)
 {
+	return generic_verify_nak ("NAK", header, data, len);
+}
+
+int
+verify_ncf (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	return generic_verify_nak ("NCF", header, data, len);
+}
+
+int
+verify_nnak (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	return generic_verify_nak ("NNAK", header, data, len);
+}
+
+static int
+generic_verify_nak (
+	const char*		name,		/* upper case */
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
 	int retval = 0;
 
 /* truncated packet */
 	if (len < sizeof(struct pgm_nak)) {
-		printf ("\t\"message\": \"NAK: packet length: %i less than minimum NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_nak));
+		printf ("\t\"message\": \"%s: packet length: %i less than minimum %s length: %" G_GSIZE_FORMAT " bytes.\",\n",
+			name, len, name, sizeof(struct pgm_nak));
 		retval = -1;
 		goto out;
 	}
@@ -735,7 +769,8 @@ verify_nak (
 		break;
 
 	default:
-		printf ("\t\"message\": \"NAK: invalid AFI of source NLA: %i.\",\n", nak_src_nla_afi);
+		printf ("\t\"message\": \"%s: invalid AFI of source NLA: %i.\",\n",
+			name, nak_src_nla_afi);
 		retval = -1;
 		goto out;
 	}
@@ -747,7 +782,8 @@ verify_nak (
 /* IPv4 + IPv6 NLA */
 		case AFI_IP:
 			if (len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )) {
-				printf ("\t\"message\": \"NAK: packet length: %i less than joint IPv4/6 NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
+				printf ("\t\"message\": \"%s: packet length: %i less than joint IPv4/6 %s length: %" G_GSIZE_FORMAT " bytes.\",\n",
+					name, len, name, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
 				retval = -1;
 			}
 			break;
@@ -755,23 +791,27 @@ verify_nak (
 /* IPv6 + IPv6 NLA */
 		case AFI_IP6:
 			if (len < sizeof(struct pgm_nak6)) {
-				printf ("\t\"message\": \"NAK: packet length: %i less than IPv6 NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_nak6));
+				printf ("\t\"message\": \"%s: packet length: %i less than IPv6 %s length: %" G_GSIZE_FORMAT " bytes.\",\n",
+					name, len, name, sizeof(struct pgm_nak6));
 				retval = -1;
 			}
 			break;
 		}
+		break;
 
 	case AFI_IP:
 		if (nak_src_nla_afi == AFI_IP6) {
 			if (len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )) {
-				printf ("\t\"message\": \"NAK: packet length: %i less than joint IPv6/4 NAK length: %" G_GSIZE_FORMAT " bytes.\",\n", len, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
+				printf ("\t\"message\": \"%s: packet length: %i less than joint IPv6/4 %s length: %" G_GSIZE_FORMAT " bytes.\",\n",
+					name, len, name, ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ));
 				retval = -1;
 			}
 		}
 		break;
 
 	default:
-		printf ("\t\"message\": \"NAK: invalid AFI of group NLA: %i.\",\n", nak_grp_nla_afi);
+		printf ("\t\"message\": \"%s: invalid AFI of group NLA: %i.\",\n",
+			name, nak_grp_nla_afi);
 		retval = -1;
 		break;
 	}
@@ -786,17 +826,46 @@ print_nak (
 	char*			data
 	)
 {
+	generic_print_nak ("nak", header, data);
+}
+
+void
+print_ncf (
+	struct pgm_header*	header,
+	char*			data
+	)
+{
+	generic_print_nak ("ncf", header, data);
+}
+
+void
+print_nnak (
+	struct pgm_header*	header,
+	char*			data
+	)
+{
+	generic_print_nak ("nnak", header, data);
+}
+
+static void
+generic_print_nak (
+	const char*		name,		/* lower case */
+	struct pgm_header*	header,
+	char*			data
+	)
+{
 	struct pgm_nak* nak = (struct pgm_nak*)data;
 	struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
 	char* opt_offset = (char*)(nak + 1);
 
-	printf ("\t\t\"nakSqn\": %lu,\n", (gulong)g_ntohl(nak->nak_sqn));
+	puts (",");
+	printf ("\t\t\"%sSqn\": %lu,\n", name, (gulong)g_ntohl(nak->nak_sqn));
 
 	guint16 nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
 	guint16 nak_grp_nla_afi;
 	char s[INET6_ADDRSTRLEN];
 
-	printf ("\t\t\"nakSourceNlaAfi\": %i,\n", nak_src_nla_afi);
+	printf ("\t\t\"%sSourceNlaAfi\": %i,\n", name, nak_src_nla_afi);
 
 /* source nla */
 	switch (nak_src_nla_afi) {
@@ -812,21 +881,41 @@ print_nak (
 		break;
 	}
 
-	printf ("\t\t\"nakSourceNla\": \"%s\",\n", s);
-	printf ("\t\t\"nakGroupNlaAfi\": %i,\n", nak_grp_nla_afi);
+	printf ("\t\t\"%sSourceNla\": \"%s\",\n", name, s);
+	printf ("\t\t\"%sGroupNlaAfi\": %i,\n", name, nak_grp_nla_afi);
 
 	switch (nak_grp_nla_afi) {
-	case AFI_IP:
-		inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
+	case AFI_IP6:
+		switch (nak_src_nla_afi) {
+/* IPv4 + IPv6 NLA */
+		case AFI_IP:
+			inet_ntop ( AF_INET6, &nak->nak_grp_nla, s, sizeof(s) );
+			break;
+
+/* IPv6 + IPv6 NLA */
+		case AFI_IP6:
+			inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
+			break;
+		}
+		opt_offset += sizeof(struct in6_addr) - sizeof(struct in_addr);
 		break;
 
-	case AFI_IP6:
-		inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
-		opt_offset += sizeof(struct in6_addr) - sizeof(struct in_addr);
+	case AFI_IP:
+		switch (nak_src_nla_afi) {
+/* IPv4 + IPv4 NLA */
+		case AFI_IP:
+			inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
+			break;
+
+/* IPv6 + IPv4 NLA */
+		case AFI_IP6:
+			inet_ntop ( AF_INET, &nak6->nak6_grp_nla, s, sizeof(s) );
+			break;
+		}
 		break;
 	}
 
-	printf ("\t\t\"nakGroupNla\": \"%s\",\n", s);
+	printf ("\t\t\"%sGroupNla\": \"%s\",\n", name, s);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT)
@@ -838,47 +927,6 @@ print_nak (
 	puts ("\t}");
 }
 
-/* 8.3.  N-NAK
- */
-
-int
-verify_nnak (
-	struct pgm_header*	header,
-	char*			data,
-	int			len
-	)
-{
-	return -1;
-}
-
-void
-print_nnak (
-	struct pgm_header*	header,
-	char*			data
-	)
-{
-}
-
-/* 8.3.  NCF
- */
-
-int
-verify_ncf (
-	struct pgm_header*	header,
-	char*			data,
-	int			len
-	)
-{
-	return -1;
-}
-
-void
-print_ncf (
-	struct pgm_header*	header,
-	char*			data
-	)
-{
-}
 
 /* 13.6.  SPM Request
  *
@@ -1118,6 +1166,12 @@ print_options (
 			break;
 		}
 
+		default:
+		{
+		}
+			puts ("\t\t\t{");
+			printf ("\t\t\t\t\"type\": 0x%x\n", opt_header->opt_type);
+			printf ("\t\t\t}");
 		}
 
 	} while (!(opt_header->opt_type & PGM_OPT_END));

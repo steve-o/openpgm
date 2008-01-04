@@ -50,7 +50,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -2629,6 +2629,7 @@ send_nak_list (
 	guint			len
 	)
 {
+	g_assert (len > 1);
 	g_assert (len <= 63);
 
 	int retval = 0;
@@ -2668,9 +2669,11 @@ send_nak_list (
 	opt_header->opt_type	= PGM_OPT_LENGTH;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
 	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
-	opt_length->opt_total_length = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
-				+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-				+ ( (len-1) * sizeof(guint32) );
+	opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_length) +
+						sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_nak_list) +
+						( (len-1) * sizeof(guint32) ));
 	opt_header = (struct pgm_opt_header*)(opt_length + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
@@ -2755,9 +2758,11 @@ send_ncf_list (
 	opt_header->opt_type	= PGM_OPT_LENGTH;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
 	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
-	opt_length->opt_total_length = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
-				+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-				+ ( (len-1) * sizeof(guint32) );
+	opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_length) +
+						sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_nak_list) +
+						( (len-1) * sizeof(guint32) ));
 	opt_header = (struct pgm_opt_header*)(opt_length + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)

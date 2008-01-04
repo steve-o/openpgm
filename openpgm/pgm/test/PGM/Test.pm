@@ -202,6 +202,27 @@ sub wait_for_rdata {
 	return $obj;
 }
 
+sub wait_for_ncf {
+	my $self = shift;
+	my $obj = undef;
+
+	eval {
+		local $SIG{ALRM} = sub { die "alarm\n"; };
+		alarm 10;
+		for (;;) {
+			my $block = $self->wait_for_block;
+			$obj = $json->jsonToObj($block);
+			last if ($obj->{PGM}->{type} =~ /NCF/);
+		}
+		alarm 0;
+	};
+	if ($@) {
+		confess "$self->{tag}: alarm raised waiting for ncf.\n";
+	}
+
+	return $obj;
+}
+
 sub print {
 	my $self = shift;
 	my $out = $self->{out};
