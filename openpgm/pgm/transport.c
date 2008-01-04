@@ -134,7 +134,7 @@ static inline int send_spm (pgm_transport_t*);
 static int send_spmr (pgm_peer_t*);
 static int send_nak (pgm_peer_t*, guint32);
 static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*, guint);
-static int send_ncf (pgm_peer_t*, struct sockaddr*, struct sockaddr*, guint32);
+static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32);
 static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*, int);
 
 static void nak_rb_state (gpointer, gpointer);
@@ -2270,7 +2270,11 @@ on_nak (
 /* send NAK confirm packet immediately, then defer to timer thread for a.s.a.p
  * delivery of the actual RDATA packets.
  */
-	send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list, nak_list_len+1);
+	if (nak_list_len) {
+		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list, nak_list_len+1);
+	} else {
+		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list->sqn[0]);
+	}
 
 	g_async_queue_lock (transport->rdata_queue);
 	g_async_queue_push_unlocked (transport->rdata_queue, sqn_list);
@@ -2564,7 +2568,7 @@ out:
 
 static int
 send_ncf (
-	pgm_peer_t*		peer,
+	pgm_transport_t*	transport,
 	struct sockaddr*	nak_src_nla,
 	struct sockaddr*	nak_grp_nla,
 	guint32			sequence_number
@@ -2573,17 +2577,12 @@ send_ncf (
 	g_trace ("INFO", "send_ncf()");
 
 	int retval = 0;
-	pgm_transport_t* transport = peer->transport;
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 	gchar buf[ tpdu_length ];
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
-
-/* lock and cache peer information */
-	g_static_mutex_lock (&peer->mutex);
-	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
-	g_static_mutex_unlock (&peer->mutex);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
@@ -2725,6 +2724,7 @@ send_ncf_list (
 	int			len
 	)
 {
+	g_assert (len > 1);
 	g_assert (len <= 63);
 
 	int retval = 0;

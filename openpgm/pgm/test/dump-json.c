@@ -915,16 +915,16 @@ generic_print_nak (
 		break;
 	}
 
-	printf ("\t\t\"%sGroupNla\": \"%s\",\n", name, s);
+	printf ("\t\t\"%sGroupNla\": \"%s\"", name, s);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
+		puts (",");
 		print_options (opt_offset);
-		puts ("");
 	}
 
-	puts ("\t}");
+	puts ("\n\t}");
 }
 
 
