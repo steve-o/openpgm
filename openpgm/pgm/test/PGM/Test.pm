@@ -91,6 +91,7 @@ sub DESTROY {
 			alarm 0;
 		};
 		if ($@) {
+			die unless $@ eq "alarm\n";
 			local($SIG{CHLD}) = 'IGNORE';
 			print "$self->{tag}: killing SSH connection ...\n";
 			kill 'INT' => $self->{pid};
@@ -154,6 +155,7 @@ sub wait_for_spm {
 		alarm 0;
 	};
 	if ($@) {
+		die unless $@ eq "alarm\n";
 		confess "$self->{tag}: alarm raised waiting for spm.\n";
 	}
 
@@ -175,6 +177,7 @@ sub wait_for_odata {
 		alarm 0;
 	};
 	if ($@) {
+		die unless $@ eq "alarm\n";
 		confess "$self->{tag}: alarm raised waiting for odata.\n";
 	}
 
@@ -196,6 +199,7 @@ sub wait_for_rdata {
 		alarm 0;
 	};
 	if ($@) {
+		die unless $@ eq "alarm\n";
 		confess "$self->{tag}: alarm raised waiting for odata.\n";
 	}
 
@@ -217,6 +221,7 @@ sub wait_for_ncf {
 		alarm 0;
 	};
 	if ($@) {
+		die unless $@ eq "alarm\n";
 		confess "$self->{tag}: alarm raised waiting for ncf.\n";
 	}
 
@@ -236,6 +241,7 @@ sub print {
 		alarm 0;
 	};
 	if ($@) {
+		die unless $@ eq "alarm\n";
 		confess "$self->{tag}: alarm raised.\n";
 	}
 }
