@@ -31,6 +31,7 @@ print "app: ready.\n";
 
 print "mon: wait for spm ...\n";
 $mon->wait_for_spm;
+print "mon: received spm.\n";
 
 print "test completed successfully.\n";
 

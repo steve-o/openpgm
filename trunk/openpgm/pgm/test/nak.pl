@@ -1,4 +1,6 @@
 #!/usr/bin/perl
+# nak.pl
+# 3.6.3.1. NAKs - Negative Acknowledgments
 
 use strict;
 use PGM::Test;
@@ -32,7 +34,7 @@ print "sim: ready.\n";
 $app->say ("create ao");
 $app->say ("bind ao");
 
-print "app: publish test data\n";
+print "app: publish test data.\n";
 $app->say ("send ao ringo");
 $app->say ("send ao ichigo");
 $app->say ("send ao momo");
@@ -43,14 +45,15 @@ for (1..3) {
 	print "mon: wait for odata ...\n";
 	$odata = $mon->wait_for_odata;
 	$ocnt++;
-	print "mon: received $ocnt x odata\n";
+	print "mon: received $ocnt x odata.\n";
 }
 
-print "sim: send nak to app\n";
+print "sim: send nak to app.\n";
 $sim->say ("net send nak ao $odata->{PGM}->{gsi}.$odata->{PGM}->{sourcePort} 2");
 
 print "mon: wait for rdata ...\n";
 $mon->wait_for_rdata;
+print "mon: rdata received.\n";
 
 print "test completed successfully.\n";
 
