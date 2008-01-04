@@ -50,7 +50,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -63,11 +63,6 @@
 #	endif
 #endif
 
-struct pgm_sqn_list_t {
-	guint32		sqn[63];
-};
-
-typedef struct pgm_sqn_list_t pgm_sqn_list_t;
 
 /* external: Glib event loop GSource of pgm contiguous data */
 struct pgm_watch_t {
@@ -133,9 +128,9 @@ static int send_spm_unlocked (pgm_transport_t*);
 static inline int send_spm (pgm_transport_t*);
 static int send_spmr (pgm_peer_t*);
 static int send_nak (pgm_peer_t*, guint32);
-static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*, guint);
+static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*);
 static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32);
-static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*, int);
+static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*);
 
 static void nak_rb_state (gpointer, gpointer);
 static void nak_rpt_state (gpointer, gpointer);
@@ -202,7 +197,9 @@ pgm_tsi_equal (
 
 static inline gpointer pgm_sqn_list_alloc (pgm_transport_t* t)
 {
-	return t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(pgm_sqn_list_t));
+	pgm_sqn_list_t* p = t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(pgm_sqn_list_t));
+	p->len = 0;
+	return p;
 }
 
 gpointer pgm_alloc (pgm_transport_t* transport)
@@ -2031,18 +2028,16 @@ on_nak_pipe (
 			break;
 		}
 
-		guint32* req = sqn_list->sqn;
 		g_static_rw_lock_reader_lock (&transport->txw_lock);
-		do {
+		for (int i = 0; i < sqn_list->len; i++)
+		{
 			gpointer rdata = NULL;
 			guint rlen = 0;
-			if (!pgm_txw_peek (transport->txw, *req, &rdata, &rlen))
+			if (!pgm_txw_peek (transport->txw, sqn_list->sqn[i], &rdata, &rlen))
 			{
-				send_rdata (transport, *req, rdata, rlen);
+				send_rdata (transport, sqn_list->sqn[i], rdata, rlen);
 			}
-
-			req++;
-		} while (req < (sqn_list->sqn + 1) && *req);
+		}
 		g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
 		g_static_mutex_lock (&transport->rdata_mutex);
@@ -2204,8 +2199,7 @@ on_nak (
 	pgm_sqn_list_t* sqn_list = pgm_sqn_list_alloc (transport);
 	g_static_mutex_unlock (&transport->rdata_mutex);
 	sqn_list->sqn[0] = g_ntohl (nak->nak_sqn);
-
-	guint32* req_sqn = &sqn_list->sqn[1];
+	sqn_list->len++;
 
 	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, sqn_list->sqn[0]);
 
@@ -2259,19 +2253,15 @@ on_nak (
 #endif
 	for (int i = 0; i < nak_list_len; i++)
 	{
-		*req_sqn++ = g_ntohl (*nak_list);
+		sqn_list->sqn[sqn_list->len++] = g_ntohl (*nak_list);
 		nak_list++;
 	}
-
-/* null end of list iff < 63 packets */
-	if ((nak_list_len + 1) < G_N_ELEMENTS(sqn_list->sqn))
-		*req_sqn = 0;
 
 /* send NAK confirm packet immediately, then defer to timer thread for a.s.a.p
  * delivery of the actual RDATA packets.
  */
 	if (nak_list_len) {
-		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list, nak_list_len+1);
+		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list);
 	} else {
 		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list->sqn[0]);
 	}
@@ -2624,19 +2614,18 @@ out:
 static int
 send_nak_list (
 	pgm_peer_t*	peer,
-	pgm_sqn_list_t*	sqn_list,
-	guint			len
+	pgm_sqn_list_t*	sqn_list
 	)
 {
-	g_assert (len > 1);
-	g_assert (len <= 63);
+	g_assert (sqn_list->len > 1);
+	g_assert (sqn_list->len <= 63);
 
 	int retval = 0;
 	pgm_transport_t* transport = peer->transport;
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-			+ ( (len-1) * sizeof(guint32) );
+			+ ( (sqn_list->len-1) * sizeof(guint32) );
 	gchar buf[ tpdu_length ];
 
 	struct pgm_header *header = (struct pgm_header*)buf;
@@ -2672,11 +2661,11 @@ send_nak_list (
 						sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
 						sizeof(struct pgm_opt_nak_list) +
-						( (len-1) * sizeof(guint32) ));
+						( (sqn_list->len-1) * sizeof(guint32) ));
 	opt_header = (struct pgm_opt_header*)(opt_length + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-				+ ( (len-1) * sizeof(guint32) );
+				+ ( (sqn_list->len-1) * sizeof(guint32) );
 	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;
 
@@ -2684,7 +2673,7 @@ send_nak_list (
 	char nak1[1024];
 	sprintf (nak1, "send_nak_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
 #endif
-	for (int i = 1; i < len; i++) {
+	for (int i = 1; i < sqn_list->len; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
 
 #ifdef TRANSPORT_DEBUG
@@ -2695,7 +2684,7 @@ send_nak_list (
 	}
 
 #ifdef TRANSPORT_DEBUG
-	g_trace ("INFO", "%s]%i )", nak1, len);
+	g_trace ("INFO", "%s]%i )", nak1, sqn_list->len);
 #endif
 
         header->pgm_checksum    = 0;
@@ -2720,18 +2709,17 @@ send_ncf_list (
 	pgm_transport_t*	transport,
 	struct sockaddr*	nak_src_nla,
 	struct sockaddr*	nak_grp_nla,
-	pgm_sqn_list_t*		sqn_list,
-	int			len
+	pgm_sqn_list_t*		sqn_list
 	)
 {
-	g_assert (len > 1);
-	g_assert (len <= 63);
+	g_assert (sqn_list->len > 1);
+	g_assert (sqn_list->len <= 63);
 
 	int retval = 0;
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-			+ ( (len-1) * sizeof(guint32) );
+			+ ( (sqn_list->len-1) * sizeof(guint32) );
 	gchar buf[ tpdu_length ];
 
 	struct pgm_header *header = (struct pgm_header*)buf;
@@ -2762,11 +2750,11 @@ send_ncf_list (
 						sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
 						sizeof(struct pgm_opt_nak_list) +
-						( (len-1) * sizeof(guint32) ));
+						( (sqn_list->len-1) * sizeof(guint32) ));
 	opt_header = (struct pgm_opt_header*)(opt_length + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-				+ ( (len-1) * sizeof(guint32) );
+				+ ( (sqn_list->len-1) * sizeof(guint32) );
 	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;
 
@@ -2774,7 +2762,7 @@ send_ncf_list (
 	char nak1[1024];
 	sprintf (nak1, "send_ncf_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
 #endif
-	for (int i = 1; i < len; i++) {
+	for (int i = 1; i < sqn_list->len; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
 
 #ifdef TRANSPORT_DEBUG
@@ -2785,7 +2773,7 @@ send_ncf_list (
 	}
 
 #ifdef TRANSPORT_DEBUG
-	g_trace ("INFO", "%s]%i )", nak1, len);
+	g_trace ("INFO", "%s]%i )", nak1, sqn_list->len);
 #endif
 
         header->pgm_checksum    = 0;
@@ -2825,7 +2813,7 @@ nak_rb_state (
 	pgm_time_t now = pgm_time_now;
 #ifndef PGM_SINGLE_NAK
 	pgm_sqn_list_t nak_list;
-	int nak_count = 0;
+	nak_list.len = 0;
 #endif
 
 /* have not learned this peers NLA */
@@ -2859,7 +2847,7 @@ nak_rb_state (
 			send_nak (transport, peer, rp->sequence_number);
 			now = pgm_time_update_now();
 #else
-			nak_list.sqn[nak_count++] = rp->sequence_number;
+			nak_list.sqn[nak_list.len++] = rp->sequence_number;
 #endif
 
 			rp->state = PGM_PKT_WAIT_NCF_STATE;
@@ -2880,10 +2868,10 @@ nak_rb_state (
 #endif
 
 #ifndef PGM_SINGLE_NAK
-			if (nak_count == G_N_ELEMENTS(nak_list.sqn)) {
-				send_nak_list (peer, &nak_list, nak_count);
+			if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
+				send_nak_list (peer, &nak_list);
 				now = pgm_time_update_now();
-				nak_count = 0;
+				nak_list.len = 0;
 			}
 #endif
 		}
@@ -2896,12 +2884,12 @@ nak_rb_state (
 	}
 
 #ifndef PGM_SINGLE_NAK
-	if (nak_count)
+	if (nak_list.len)
 	{
-		if (nak_count > 1) {
-			send_nak_list (peer, &nak_list, nak_count);
+		if (nak_list.len > 1) {
+			send_nak_list (peer, &nak_list);
 		} else {
-			g_assert (nak_count == 1);
+			g_assert (nak_list.len == 1);
 			send_nak (peer, nak_list.sqn[0]);
 		}
 	}
