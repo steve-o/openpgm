@@ -56,6 +56,7 @@
 #ifndef TRANSPORT_DEBUG
 #	define g_trace(m,...)		while (0)
 #else
+#include <ctype.h>
 #	ifdef TRANSPORT_SPM_DEBUG
 #		define g_trace(m,...)		g_debug(__VA_ARGS__)
 #	else
@@ -109,6 +110,7 @@ static GSourceFuncs g_pgm_watch_funcs = {
 	NULL
 };
 
+static int pgm_set_nonblocking (int filedes[2]);
 static GSource* pgm_create_timer (pgm_transport_t*);
 static int pgm_add_timer_full (pgm_transport_t*, gint);
 static int pgm_add_timer (pgm_transport_t*);
@@ -148,6 +150,7 @@ static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
 static gboolean on_nak_pipe (GIOChannel*, GIOCondition, gpointer);
+static gboolean on_timer_pipe (GIOChannel*, GIOCondition, gpointer);
 
 static int on_spm (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, char*, int);
@@ -252,6 +255,38 @@ pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len
 
 	return retval;
 }
+
+static int
+pgm_set_nonblocking (int filedes[2])
+{
+	int retval = 0;
+
+/* set write end non-blocking */
+	int fd_flags = fcntl (filedes[1], F_GETFL);
+	if (fd_flags < 0) {
+		retval = errno;
+		goto out;
+	}
+	retval = fcntl (filedes[1], F_SETFL, fd_flags | O_NONBLOCK);
+	if (retval < 0) {
+		retval = errno;
+		goto out;
+	}
+/* set read end non-blocking */
+	fcntl (filedes[0], F_GETFL);
+	if (fd_flags < 0) {
+		retval = errno;
+		goto out;
+	}
+	retval = fcntl (filedes[0], F_SETFL, fd_flags | O_NONBLOCK);
+	if (retval < 0) {
+		retval = errno;
+		goto out;
+	}
+
+out:
+	return retval;
+}		
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  */
@@ -414,6 +449,14 @@ pgm_transport_destroy (
 		}
 
 		g_assert (transport->trash_rdata == NULL);
+	}
+	if (transport->timer_pipe[0]) {
+		close (transport->timer_pipe[0]);
+		transport->timer_pipe[0] = 0;
+	}
+	if (transport->timer_pipe[1]) {
+		close (transport->timer_pipe[1]);
+		transport->timer_pipe[1] = 0;
 	}
 
 	if (transport->commit_queue) {
@@ -1331,27 +1374,19 @@ pgm_transport_bind (
 		retval = errno;
 		goto out;
 	}
+	g_trace ("INFO","create timer pipe.");
+	retval = pipe (transport->timer_pipe);
+	if (retval < 0) {
+		retval = errno;
+		goto out;
+	}
 
-/* set write end non-blocking */
-	int fd_flags = fcntl (transport->rdata_pipe[1], F_GETFL);
-	if (fd_flags < 0) {
-		retval = errno;
+	retval = pgm_set_nonblocking (transport->rdata_pipe);
+	if (retval) {
 		goto out;
 	}
-	retval = fcntl (transport->rdata_pipe[1], F_SETFL, fd_flags | O_NONBLOCK);
+	retval = pgm_set_nonblocking (transport->timer_pipe);
 	if (retval < 0) {
-		retval = errno;
-		goto out;
-	}
-/* set read end non-blocking */
-	fcntl (transport->rdata_pipe[0], F_GETFL);
-	if (fd_flags < 0) {
-		retval = errno;
-		goto out;
-	}
-	retval = fcntl (transport->rdata_pipe[0], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 		
@@ -1373,29 +1408,10 @@ pgm_transport_bind (
 		goto out;
 	}
 
-/* set write end non-blocking */
-	fd_flags = fcntl (transport->commit_pipe[1], F_GETFL);
-	if (fd_flags < 0) {
-		retval = errno;
+	retval = pgm_set_nonblocking (transport->commit_pipe);
+	if (retval) {
 		goto out;
 	}
-	retval = fcntl (transport->commit_pipe[1], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = errno;
-		goto out;
-	}
-/* set read end non-blocking */
-	fcntl (transport->commit_pipe[0], F_GETFL);
-	if (fd_flags < 0) {
-		retval = errno;
-		goto out;
-	}
-	retval = fcntl (transport->commit_pipe[0], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = errno;
-		goto out;
-	}
-		
 
 	g_trace ("INFO","construct transmit window.");
 	transport->txw = pgm_txw_init (transport->max_tpdu - sizeof(struct iphdr),
@@ -1687,6 +1703,9 @@ pgm_transport_bind (
 	transport->rdata_channel = g_io_channel_unix_new (transport->rdata_pipe[0]);
 	g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_pipe, transport, NULL);
 
+/* tx to timer pipe */
+	transport->timer_channel = g_io_channel_unix_new (transport->timer_pipe[0]);
+	g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_pipe, transport, NULL);
 
 /* create recyclable SPM packet */
 	switch (pgm_sockaddr_family(&transport->recv_smr[0].smr_interface)) {
@@ -1737,7 +1756,7 @@ pgm_transport_bind (
 	}
 
 	g_trace ("INFO","adding dynamic timer");
-	transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
+	transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
 	pgm_add_timer (transport);
 
 /* announce new transport by sending out SPMs */
@@ -2044,6 +2063,25 @@ on_nak_pipe (
 		g_trash_stack_push (&transport->trash_rdata, sqn_list);
 		g_static_mutex_unlock (&transport->rdata_mutex);
 	}
+
+	return TRUE;
+}
+
+/* prod to wakeup timer thread
+ */
+
+static gboolean
+on_timer_pipe (
+	GIOChannel* source,
+	GIOCondition condition,
+	gpointer data
+	)
+{
+	pgm_transport_t* transport = data;
+
+/* empty pipe */
+	char buf;
+	while (1 == read (transport->timer_pipe[0], &buf, sizeof(buf)));
 
 	return TRUE;
 }
@@ -3175,6 +3213,33 @@ nak_rdata_state (
 	}
 }
 
+static int
+pgm_reset_heartbeat_spm (pgm_transport_t* transport)
+{
+	int retval = 0;
+
+	g_static_mutex_lock (&transport->mutex);
+
+/* re-set spm timer */
+	transport->spm_heartbeat_state = 1;
+	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
+
+/* prod timer thread if sleeping */
+	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
+	{
+		g_trace ("INFO","pgm_reset_heartbeat_spm: prod timer thread");
+		const char one = '1';
+		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+			g_critical ("write to pipe failed :(");
+			retval = -EINVAL;
+		}
+	}
+
+	g_static_mutex_unlock (&transport->mutex);
+
+	return retval;
+}
+
 /* can be called from any thread, it needs to update the transmit window with the new
  * data and then send on the wire, only then can control return to the callee.
  *
@@ -3223,14 +3288,9 @@ pgm_write_unlocked (
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
-
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
 
-	g_static_mutex_lock (&transport->mutex);
-/* re-set spm timer */
-	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
-	g_static_mutex_unlock (&transport->mutex);
+	pgm_reset_heartbeat_spm (transport);
 
 	return retval;
 }
@@ -3320,11 +3380,7 @@ pgm_write_copy_fragment_unlocked (
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
-	g_static_mutex_lock (&transport->mutex);
-/* re-set spm timer */
-	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
-	g_static_mutex_unlock (&transport->mutex);
+	pgm_reset_heartbeat_spm (transport);
 
 	return retval;
 }
@@ -3358,10 +3414,11 @@ send_rdata (
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
-/* re-set spm timer */
+/* re-set spm timer: we are already in the timer thread, no need to prod timers
+ */
 	g_static_mutex_lock (&transport->mutex);
 	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state];
+	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	g_static_mutex_unlock (&transport->mutex);
 
 	return retval;
@@ -3522,7 +3579,7 @@ pgm_timer_prepare (
 		msec = MIN (G_MAXINT, (guint)msec);
 
 	*timeout = (gint)msec;
-	pgm_timer->expiration = expiration;	/* save the nearest timer */
+	transport->next_poll = pgm_timer->expiration = expiration;	/* save the nearest timer */
 
 	g_trace ("SPM","expiration in %i msec", (gint)msec);
 

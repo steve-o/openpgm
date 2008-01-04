@@ -148,6 +148,10 @@ struct pgm_transport_t {
     GTrashStack*	trash_rdata;
     GIOChannel*		rdata_channel;
     GStaticMutex	rdata_mutex;
+
+    pgm_time_t		next_poll;
+    int			timer_pipe[2];
+    GIOChannel*		timer_channel;
 };
 
 typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
