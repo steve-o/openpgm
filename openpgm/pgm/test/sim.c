@@ -154,7 +154,7 @@ main (
 
 	if (g_sessions) {
 		g_message ("destroying sessions.");
-		g_hash_table_foreach_remove (g_sessions, (GHFunc)destroy_session, NULL);
+		g_hash_table_foreach_remove (g_sessions, (GHRFunc)destroy_session, NULL);
 		g_hash_table_unref (g_sessions);
 		g_sessions = NULL;
 	}
@@ -410,7 +410,7 @@ void
 net_send_nak (
 	char*		name,
 	pgm_tsi_t*	tsi,
-	guint32		sqn
+	pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
 	)
 {
 /* check that session exists */
@@ -430,8 +430,15 @@ net_send_nak (
 
 /* send */
         int retval = 0;
-        gchar buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) ];
         int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+
+	if (sqn_list->len > 1) {
+		tpdu_length += sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
+				( (sqn_list->len-1) * sizeof(guint32) );
+	}
+
+	gchar buf[ tpdu_length ];
 
         struct pgm_header *header = (struct pgm_header*)buf;
         struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
@@ -445,17 +452,40 @@ net_send_nak (
         header->pgm_sport       = transport->dport;
         header->pgm_dport       = peer_sport;
         header->pgm_type        = PGM_NAK;
-        header->pgm_options     = 0;
+        header->pgm_options     = (sqn_list->len > 1) ? PGM_OPT_PRESENT : 0;
         header->pgm_tsdu_length = 0;
 
 /* NAK */
-        nak->nak_sqn            = g_htonl (sqn);
+        nak->nak_sqn            = g_htonl (sqn_list->sqn[0]);
 
 /* source nla */
         pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
         pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+
+/* OPT_NAK_LIST */
+	if (sqn_list->len > 1)
+	{
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
+		opt_header->opt_type    = PGM_OPT_LENGTH;
+		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_length) +
+							sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_nak_list) +
+							( (sqn_list->len-1) * sizeof(guint32) ));
+		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+		opt_header->opt_type    = PGM_OPT_NAK_LIST | PGM_OPT_END;
+		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+						+ ( (sqn_list->len-1) * sizeof(guint32) );
+		struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
+		opt_nak_list->opt_reserved = 0;
+		for (int i = 1; i < sqn_list->len; i++) {
+			opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
+		}
+	}
 
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
@@ -503,7 +533,7 @@ on_stdin_data (
 
 /* endpoint simulator specific: */
 
-		re = "^net +send +nak +([0-9a-z]+) +([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+) +([0-9]+)$";
+		re = "^net +send +nak +([0-9a-z]+) +([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+) +([0-9,]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
@@ -526,9 +556,19 @@ on_stdin_data (
 			++p;
 			tsi.sport = g_htons ( strtol (p, NULL, 10) );
 
-			guint32 sqn = strtol (str + pmatch[3].rm_so, NULL, 10);
+/* parse list of sequence numbers */
+			pgm_sqn_list_t sqn_list;
+			sqn_list.len = 0;
+			{
+				char* saveptr;
+				for (p = str + pmatch[3].rm_so; ; p = NULL) {
+					char* token = strtok_r (p, ",", &saveptr);
+					if (!token) break;
+					sqn_list.sqn[sqn_list.len++] = strtol (token, NULL, 10);
+				}
+			}
 
-			net_send_nak (name, &tsi, sqn);
+			net_send_nak (name, &tsi, &sqn_list);
 
 			g_free (name);
 			regfree (&preg);

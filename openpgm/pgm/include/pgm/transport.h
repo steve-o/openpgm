@@ -46,6 +46,13 @@ struct pgm_tsi_t {            /* transport session identifier */
 
 typedef struct pgm_tsi_t pgm_tsi_t;
 
+struct pgm_sqn_list_t {
+    gint	    len;
+    guint32         sqn[63];	/* list of sequence numbers */
+};
+
+typedef struct pgm_sqn_list_t pgm_sqn_list_t;
+
 struct pgm_peer_t {
     gint		ref_count;
 

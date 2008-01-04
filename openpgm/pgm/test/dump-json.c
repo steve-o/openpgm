@@ -1052,7 +1052,7 @@ verify_options (
 		}
 
 /* check option types */
-		switch (opt_header->opt_type) {
+		switch (opt_header->opt_type & PGM_OPT_MASK) {
 		case PGM_OPT_FRAGMENT:
 		{
 			if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment)) {
@@ -1126,6 +1126,7 @@ print_options (
 
 	puts ("\t\t\"pgmOptions\": [");
 	puts ("\t\t\t{");
+	printf ("\t\t\t\t\"length\": 0x%x,\n", opt_header->opt_length);
 	puts ("\t\t\t\t\"type\": \"OPT_LENGTH\",");
 	printf ("\t\t\t\t\"totalLength\": %i\n", g_ntohs (opt_length->opt_total_length));
 	printf ("\t\t\t}");
@@ -1133,17 +1134,19 @@ print_options (
 /* iterate through options */
 	do {
 		opt_header = (struct pgm_opt_header*)( ((char*)opt_header) + opt_header->opt_length );
+
 		puts (",");
-		switch (opt_header->opt_type) {
+		puts ("\t\t\t{");
+		printf ("\t\t\t\t\"length\": 0x%x,\n", opt_header->opt_length);
+
+		switch (opt_header->opt_type & PGM_OPT_MASK) {
 		case PGM_OPT_FRAGMENT:
 		{
 			struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
-			puts ("\t\t\t{");
-			puts ("\t\t\t\t\"type\": \"OPT_FRAGMENT\",");
+			printf ("\t\t\t\t\"type\": \"OPT_FRAGMENT%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
 			printf ("\t\t\t\t\"firstSqn\": %i,\n", g_ntohl(opt_fragment->opt_sqn));
 			printf ("\t\t\t\t\"fragmentOffset\": %i,\n", g_ntohl(opt_fragment->opt_frag_off));
 			printf ("\t\t\t\t\"originalLength\": %i\n", g_ntohl(opt_fragment->opt_frag_len));
-			printf ("\t\t\t}");
 			break;
 		}
 
@@ -1151,28 +1154,24 @@ print_options (
 		{
 			struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 			char* end = (char*)opt_header + opt_header->opt_length;
-			puts ("\t\t\t{");
-			puts ("\t\t\t\t\"type\": \"OPT_NAK_LIST\",");
+			printf ("\t\t\t\t\"type\": \"OPT_NAK_LIST%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
 			char sqns[1024] = "";
 			int i = 0;
 			do {
 				char sqn[1024];
-				sprintf (sqn, "%s%i", (i>0)?", ":"", opt_nak_list->opt_sqn[i]);
+				sprintf (sqn, "%s%i", (i>0)?", ":"", g_ntohl(opt_nak_list->opt_sqn[i]));
 				strcat (sqns, sqn);
 				i++;
 			} while ((char*)&opt_nak_list->opt_sqn[i] < end);
 			printf ("\t\t\t\t\"sqn\": [%s]\n", sqns);
-			printf ("\t\t\t}");
 			break;
 		}
 
 		default:
-		{
+			printf ("\t\t\t\t\"type\": 0x%x%s\n", opt_header->opt_type, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			break;
 		}
-			puts ("\t\t\t{");
-			printf ("\t\t\t\t\"type\": 0x%x\n", opt_header->opt_type);
-			printf ("\t\t\t}");
-		}
+		printf ("\t\t\t}");
 
 	} while (!(opt_header->opt_type & PGM_OPT_END));
 
