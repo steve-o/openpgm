@@ -57,6 +57,7 @@ if (my $pid = fork) {
 	my $rout = undef;
 
 # hide stdout
+	open(OLDOUT, ">&STDOUT");
 	open(STDOUT, ">/dev/null") or die "Can't redirect stdout: $!";
 
 # send every ~50ms
@@ -65,8 +66,10 @@ if (my $pid = fork) {
 		$app->say ("send ao ringo");
 	}
 
-	close(STDOUT) or die "Can't close STDOUT: $!";
 # restore stdout
+	close(STDOUT) or die "Can't close STDOUT: $!";
+	open(STDOUT, ">&OLDOUT") or die "Can't restore stdout: $!";
+	close(OLDOUT) or die "Can't close OLDOUT: $!";
 
 	print "app: loop finished.\n";
 	close FROM_PARENT;
