@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # ncf.pl
-# 3.6.4.1. NCFs - NAK confirmations
+# 5.2. Negative Acknowledgment Confirmation
 
 use strict;
 use PGM::Test;
