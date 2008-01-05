@@ -142,11 +142,12 @@ sub wait_for_block {
 
 sub wait_for_spm {
 	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
 	my $obj = undef;
 
 	eval {
 		local $SIG{ALRM} = sub { die "alarm\n"; };
-		alarm 10;
+		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
@@ -164,11 +165,12 @@ sub wait_for_spm {
 
 sub wait_for_odata {
 	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
 	my $obj = undef;
 
 	eval {
 		local $SIG{ALRM} = sub { die "alarm\n"; };
-		alarm 10;
+		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
@@ -186,11 +188,12 @@ sub wait_for_odata {
 
 sub wait_for_rdata {
 	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
 	my $obj = undef;
 
 	eval {
 		local $SIG{ALRM} = sub { die "alarm\n"; };
-		alarm 10;
+		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
@@ -208,11 +211,12 @@ sub wait_for_rdata {
 
 sub wait_for_ncf {
 	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
 	my $obj = undef;
 
 	eval {
 		local $SIG{ALRM} = sub { die "alarm\n"; };
-		alarm 10;
+		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
@@ -230,12 +234,13 @@ sub wait_for_ncf {
 
 sub print {
 	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
 	my $out = $self->{out};
 
 	print "$self->{tag}> @_";
 	eval {
 		local($SIG{ALRM}) = sub { die "alarm\n"; };
-		alarm 10;
+		alarm $timeout;
 		print $out "@_";
 		$self->wait_for_ready;
 		alarm 0;
