@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # nak.pl
-# 3.6.3.1. NAKs - Negative Acknowledgments
+# 5.3. Repairs
 
 use strict;
 use PGM::Test;

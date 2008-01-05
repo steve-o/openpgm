@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # spm.pl 
-# 3.6.1.1. SPMs - Source Path Messages
+# 5.1.4. Ambient SPMs
 
 use strict;
 use PGM::Test;
