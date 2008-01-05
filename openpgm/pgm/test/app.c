@@ -324,6 +324,23 @@ err_free:
 }
 
 void
+session_set_txw_max_rte (
+	char*		name,
+	guint		max_txw_rte
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_txw_max_rte (sess->transport, max_txw_rte);
+	puts ("READY");
+}
+
+void
 session_bind (
 	char*		name
 	)
@@ -424,6 +441,7 @@ on_stdin_data (
         if (len > 0) {
                 if (term) str[term] = 0;
 
+/* quit */
                 if (strcmp(str, "quit") == 0)
 		{
                         g_main_loop_quit(g_loop);
@@ -432,6 +450,8 @@ on_stdin_data (
 
 		regex_t preg;
 		regmatch_t pmatch[3];
+
+/* create transport */
 		char *re = "^create[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -447,6 +467,26 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
+/* set TXW_MAX_RTE */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+TXW_MAX_RTE[[:space:]]+([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			guint txw_max_rte = strtol (p, &p, 10);
+
+			session_set_txw_max_rte (name, txw_max_rte);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* bind transport */
 		re = "^bind[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -462,6 +502,7 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
+/* send packet */
 		re = "^send[[:space:]]+([[:alnum:]]+)[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -480,6 +521,7 @@ on_stdin_data (
 			goto out;
                 }
 
+/* destroy transport */
 		re = "^destroy[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))

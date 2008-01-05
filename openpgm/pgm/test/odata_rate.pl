@@ -3,6 +3,7 @@
 # 5.1.1. Maximum Cumulative Transmit Rate
 
 use strict;
+use Time::HiRes qw( gettimeofday tv_interval );
 use PGM::Test;
 
 BEGIN { require "test.conf.pl"; }
@@ -26,28 +27,37 @@ $mon->say ("filter $config{app}{ip}");
 print "mon: ready.\n";
 
 $app->say ("create ao");
+$app->say ("set ao TXW_MAX_RTE 1000");
 $app->say ("bind ao");
 
-print "app: send 1000 data packets ...\n";
+print "app: send 50 data packets ...\n";
+my $t0 = [gettimeofday];
+
 # hide stdout
 open(OLDOUT, ">&STDOUT");
 open(STDOUT, ">/dev/null") or die "Can't redirect stdout: $!";
 
-for (1..1000)
+my $payload = "ringo" x 100;
+my $bytes = 0;
+for (1..50)
 {
-	my $i = $_;
-	$app->say ("send ao $i");
+	$app->say ("send ao $payload");
 	my $odata = $mon->wait_for_odata;
-
-	die "out of sequence ODATA, received $odata->{PGM}->{odSqn} expected $i\n" unless $odata->{PGM}->{odSqn} == $i;
+	$bytes += $odata->{IP}->{length};
 }
 
-# restore stdout
 close(STDOUT) or die "Can't close STDOUT: $!";
 open(STDOUT, ">&OLDOUT") or die "Can't restore stdout: $!";
 close(OLDOUT) or die "Can't close OLDOUT: $!";
 
-print "mon: received 1000 x odata.\n";
+my $elapsed = tv_interval ( $t0, [gettimeofday] );
+print "mon: received 50 x odata, $bytes bytes in $elapsed seconds.\n";
+
+my $rate = $bytes / $elapsed;
+$rate = $bytes if ($rate > $bytes);
+print "mon: incoming data rate $rate bps.\n";
+
+die "incoming rate exceeds set TXW_MAX_RTE\n" unless $rate < 1000;
 
 print "test completed successfully.\n";
 
