@@ -2119,9 +2119,19 @@ on_spm (
 			sender->spm_sqn = spm->spm_sqn;
 
 /* update receive window */
-			pgm_rxw_window_update (sender->rxw,
-						g_ntohl (spm->spm_trail),
-						g_ntohl (spm->spm_lead));
+			guint naks = pgm_rxw_window_update (sender->rxw,
+								g_ntohl (spm->spm_trail),
+								g_ntohl (spm->spm_lead));
+			if (naks)
+			{
+/* TODO: take time from backoff_queue */
+				g_trace ("INFO","on_spm: prod timer thread");
+				const char one = '1';
+				if (1 != write (sender->transport->timer_pipe[1], &one, sizeof(one))) {
+					g_critical ("write to pipe failed :(");
+					retval = -EINVAL;
+				}
+			}
 		}
 		else
 		{	/* does not advance SPM sequence number */
@@ -3921,8 +3931,17 @@ on_odata (
 /* flush out 1st time nak packets */
 		g_static_mutex_lock (&transport->mutex);
 		g_static_mutex_lock (&sender->mutex);
+
 		pgm_time_update_now();
 		nak_rb_state (&sender->tsi, sender);
+
+		g_trace ("INFO","on_odata: prod timer thread");
+		const char one = '1';
+		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+			g_critical ("write to pipe failed :(");
+			retval = -EINVAL;
+		}
+
 		g_static_mutex_unlock (&sender->mutex);
 		g_static_mutex_unlock (&transport->mutex);
 	}
@@ -3988,8 +4007,17 @@ on_rdata (
 /* flush out 1st time nak packets */
 		g_static_mutex_unlock (&sender->transport->mutex);
 		g_static_mutex_unlock (&sender->mutex);
+
 		pgm_time_update_now();
 		nak_rb_state (&sender->tsi, sender);
+
+		g_trace ("INFO","on_odata: prod timer thread");
+		const char one = '1';
+		if (1 != write (sender->transport->timer_pipe[1], &one, sizeof(one))) {
+			g_critical ("write to pipe failed :(");
+			retval = -EINVAL;
+		}
+
 		g_static_mutex_unlock (&sender->mutex);
 		g_static_mutex_unlock (&sender->transport->mutex);
 	}

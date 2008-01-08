@@ -955,6 +955,7 @@ pgm_rxw_window_update (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
+	guint naks = 0;
 	guint dropped = 0;
 
 /* SPM is first message seen, define new window parameters */
@@ -995,6 +996,7 @@ pgm_rxw_window_update (
 				pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
+/* TODO: backoff interval ? */
 				ph->nak_rb_expiry	= pgm_time_now;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
@@ -1003,6 +1005,7 @@ pgm_rxw_window_update (
 
 /* send nak by sending to end of expiry list */
 				g_queue_push_head_link (r->backoff_queue, &ph->link_);
+				naks++;
 			}
 		}
 	}
@@ -1083,7 +1086,7 @@ pgm_rxw_window_update (
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
-	return 0;
+	return naks;
 }
 
 /* mark a packet lost due to failed recovery, this either advances the trailing edge
