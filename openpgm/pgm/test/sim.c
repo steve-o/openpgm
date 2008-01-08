@@ -540,7 +540,7 @@ session_send (
 	}
 
 /* send message */
-        int e = pgm_write_copy (sess->transport, string, strlen(string) + 1);
+        int e = pgm_write_copy_ex (sess->transport, string, strlen(string) + 1);
         if (e < 0) {
 		puts ("FAILED: pgm_write_copy()");
         }
@@ -978,6 +978,33 @@ on_stdin_data (
 			regfree (&preg);
 			goto out;
                 }
+		regfree (&preg);
+
+		re = "^send[[:space:]]+([[:alnum:]]+)[[:space:]]+([[:alnum:]]+)[[:space:]]+x[[:space:]]([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char* p = str + pmatch[3].rm_so;
+			int factor = strtol (p, &p, 10);
+			int src_len = pmatch[2].rm_eo - pmatch[2].rm_so;
+			char *string = g_malloc ( (factor * src_len) + 1 );
+			for (int i = 0; i < factor; i++)
+			{
+				memcpy (string + (i * src_len), str + pmatch[2].rm_so, src_len);
+			}
+			string[ factor * src_len ] = 0;
+
+			session_send (name, string);
+
+			g_free (name);
+			g_free (string);
+			regfree (&preg);
+			goto out;
+                }
+		regfree (&preg);
 
 /* destroy transport */
 		re = "^destroy[[:space:]]+([[:alnum:]]+)$";
