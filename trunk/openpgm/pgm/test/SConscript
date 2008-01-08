@@ -9,6 +9,6 @@ e = env.Copy(
 
 e.Program(['monitor.c', 'dump-json.c'])
 e.Program(['app.c'])
-e.Program(['sim.c'])
+e.Program(['sim.c', 'dump-json.c'])
 
 # end of file

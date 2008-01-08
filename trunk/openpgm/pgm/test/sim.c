@@ -268,6 +268,17 @@ fake_pgm_transport_create (
                 protocol = IPPROTO_PGM;
         }
 
+	if ((transport->recv_sock = socket(pgm_sockaddr_family(&recv_smr[0].smr_interface),
+                                                socket_type,
+                                                protocol)) < 0)
+        {
+                retval = errno;
+                if (retval == EPERM && 0 != getuid()) {
+                        g_critical ("PGM protocol requires this program to run as superuser.");
+                }
+                goto err_destroy;
+        }
+
         if ((transport->send_sock = socket(pgm_sockaddr_family(&send_smr->smr_interface),
                                                 socket_type,
                                                 protocol)) < 0)
@@ -288,6 +299,10 @@ fake_pgm_transport_create (
 	return retval;
 
 err_destroy:
+	if (transport->recv_sock) {
+                close(transport->recv_sock);
+                transport->recv_sock = 0;
+        }
         if (transport->send_sock) {
                 close(transport->send_sock);
                 transport->send_sock = 0;
@@ -301,6 +316,43 @@ err_destroy:
         transport = NULL;
 
         return retval;
+}
+
+static gboolean
+on_io_data (
+        GIOChannel* source,
+        GIOCondition condition,
+        gpointer data
+        )
+{
+        char buffer[4096];
+        int fd = g_io_channel_unix_get_fd(source);
+        struct sockaddr_in addr;
+        socklen_t addr_len = sizeof(addr);
+        int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+
+        printf ("%i bytes received from %s.\n", len, inet_ntoa(addr.sin_addr));
+
+        monitor_packet (buffer, len);
+        fflush (stdout);
+
+        return TRUE;
+}
+
+static gboolean
+on_io_error (
+        GIOChannel* source,
+        GIOCondition condition,
+        gpointer data
+        )
+{
+        puts ("on_error.");
+
+        GError *err;
+        g_io_channel_shutdown (source, FALSE, &err);
+
+/* remove event */
+        return FALSE;
 }
 
 int
@@ -318,6 +370,29 @@ fake_pgm_transport_bind (
  *
  * after binding default interfaces (0.0.0.0) are resolved
  */
+	retval = bind (transport->recv_sock,
+                        (struct sockaddr*)&transport->recv_smr[0].smr_interface,
+                        pgm_sockaddr_len(&transport->recv_smr[0].smr_interface));
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+
+/* resolve bound address if 0.0.0.0 */
+        if (((struct sockaddr_in*)&transport->recv_smr[0].smr_interface)->sin_addr.s_addr == INADDR_ANY)
+        {
+                char hostname[NI_MAXHOST + 1];
+                gethostname (hostname, sizeof(hostname));
+                struct hostent *he = gethostbyname (hostname);
+                if (he == NULL) {
+                        retval = errno;
+                        puts ("gethostbyname failed on local hostname");
+                        goto out;
+                }
+
+                ((struct sockaddr_in*)(&transport->recv_smr[0].smr_interface))->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+        }
+
 	retval = bind (transport->send_sock,
                         (struct sockaddr*)&transport->send_smr.smr_interface,
                         pgm_sockaddr_len(&transport->send_smr.smr_interface));
@@ -349,6 +424,17 @@ fake_pgm_transport_bind (
 		goto out;
         }
 
+/* receiving groups (multiple) */
+	struct pgm_sock_mreq* p = transport->recv_smr;
+        int i = 1;
+        do {
+                retval = pgm_sockaddr_add_membership (transport->recv_sock, p);
+                if (retval < 0) {
+                        retval = errno;
+			goto out;
+                }
+	} while ((i++) < IP_MAX_MEMBERSHIPS && pgm_sockaddr_family(&(++p)->smr_multiaddr) != 0);
+
 /* send group (singular) */
         retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_smr);
         if (retval < 0) {
@@ -363,6 +449,11 @@ fake_pgm_transport_bind (
         }
 
 /* multicast loopback */
+	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), FALSE);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
         retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
         if (retval < 0) {
                 retval = errno;
@@ -375,6 +466,11 @@ fake_pgm_transport_bind (
         }
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
+	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), transport->hops);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
         retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
         if (retval < 0) {
                 retval = errno;
@@ -399,6 +495,20 @@ fake_pgm_transport_bind (
                 goto out;
         }
 
+/* add receive socket(s) to event manager */
+        transport->recv_channel = g_io_channel_unix_new (transport->recv_sock);
+
+	GSource *source;
+	source = g_io_create_watch (transport->recv_channel, G_IO_IN | G_IO_PRI);
+	g_source_set_callback (source, (GSourceFunc)on_io_data, transport, NULL);
+	g_source_attach (source, NULL);
+	g_source_unref (source);
+
+	source = g_io_create_watch (transport->recv_channel, G_IO_ERR | G_IO_HUP);
+	g_source_set_callback (source, (GSourceFunc)on_io_error, transport, NULL);
+	g_source_attach (source, NULL);
+	g_source_unref (source);
+
 /* cleanup */
 	transport->bound = TRUE;
 
@@ -414,6 +524,27 @@ fake_pgm_transport_destroy (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
+/* close down receive side first to stop new data incoming */
+        if (transport->recv_channel) { 
+                puts ("closing receive channel.");
+
+                GError *err = NULL;
+                g_io_channel_shutdown (transport->recv_channel, flush, &err);
+
+                if (err) {
+                        g_warning ("i/o shutdown error %i %s", err->code, err->message);
+                }
+
+/* TODO: flush GLib main loop with context specific to the recv channel */
+
+                transport->recv_channel = NULL;
+        }
+
+	if (transport->recv_sock) {
+                puts ("closing receive socket.");
+                close(transport->recv_sock);
+                transport->recv_sock = 0;
+        }
 	if (transport->send_sock) {
                 puts ("closing send socket.");
                 close(transport->send_sock);
