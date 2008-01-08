@@ -38,7 +38,9 @@ print "sim: publish SPM txw_trail 90,000.\n";
 $sim->say ("net send spm ao 1 90001 90000");
 
 # no NAKs should be generated.
-# TODO: test for silence in {mon}
+print "mon: waiting 10 seconds for erroneous NAKs ...\n";
+$mon->die_on_nak;
+print "mon: no NAKs received.\n";
 
 print "sim: publish ODATA sqn 90,001.\n";
 $sim->say ("net send odata ao 90001 90000 ichigo");

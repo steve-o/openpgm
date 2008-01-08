@@ -237,6 +237,29 @@ sub wait_for_rdata {
 	return $obj;
 }
 
+sub die_on_nak {
+	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
+	my $obj = undef;
+
+	eval {
+		local $SIG{ALRM} = sub { die "alarm\n"; };
+		alarm $timeout;
+		for (;;) {
+			my $block = $self->wait_for_block;
+			$obj = $json->jsonToObj($block);
+			last if ($obj->{PGM}->{type} =~ /NAK/);
+		}
+		alarm 0;
+	};
+	if ($@) {
+		die unless $@ eq "alarm\n";
+		return $obj;
+	}
+
+	confess "$self->{tag}: nak received during blackout.\n";
+}
+
 sub wait_for_ncf {
 	my $self = shift;
 	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
