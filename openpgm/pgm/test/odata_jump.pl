@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-# spm_reception.pl
-# 6.1. Data Reception
+# odata_jump.pl
+# 6.3. Data Recovery by Negative Acknowledgment
 
 use strict;
 use PGM::Test;
@@ -34,8 +34,8 @@ $app->say ("listen ao");
 $sim->say ("create fake ao");
 $sim->say ("bind ao");
 
-print "sim: publish SPM txw_trail 90,000.\n";
-$sim->say ("net send spm ao 1 90001 90000");
+print "sim: publish SPM txw_trail 90,001 txw_lead 90,000 at spm_sqn 3200.\n";
+$sim->say ("net send spm ao 3200 90001 90000");
 
 # no NAKs should be generated.
 print "sim: waiting 10 seconds for erroneous NAKs ...\n";
@@ -43,10 +43,23 @@ $sim->die_on_nak;
 print "sim: no NAKs received.\n";
 
 print "sim: publish ODATA sqn 90,001.\n";
-$sim->say ("net send odata ao 90001 90000 ichigo");
+$sim->say ("net send odata ao 90001 90001 ringo");
+
 print "app: wait for data ...\n";
 my $data = $app->wait_for_data;
-print "app: received data [$data].\n";
+print "app: data received [$data].\n";
+
+# no NAKs should be generated.
+print "sim: waiting 10 seconds for erroneous NAKs ...\n";
+$sim->die_on_nak;
+print "sim: no NAKs received.\n";
+
+print "sim: publish ODATA sqn 90,003.\n";
+$sim->say ("net send odata ao 90003 90001 ichigo");
+
+print "sim: waiting for valid NAK.\n";
+$sim->wait_for_nak;
+print "sim: NAK received.\n";
 
 print "test completed successfully.\n";
 
