@@ -563,8 +563,10 @@ verify_odata (
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		retval = verify_options (tsdu, tsdu_len);
-		tsdu += OPTIONS_TOTAL_LEN(tsdu);
-		tsdu_len -= OPTIONS_TOTAL_LEN(tsdu);
+
+		int opt_total_len = g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
+		tsdu     += opt_total_len;
+		tsdu_len -= opt_total_len;
 	}
 
 	if (!retval && g_ntohs(header->pgm_tsdu_length) != tsdu_len) {
@@ -592,7 +594,7 @@ print_odata (
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		print_options (tsdu);
-		tsdu += OPTIONS_TOTAL_LEN(tsdu);
+		tsdu += g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
 		puts (",");
 	}
 
@@ -634,8 +636,10 @@ verify_rdata (
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		retval = verify_options (tsdu, tsdu_len);
-		tsdu += OPTIONS_TOTAL_LEN(tsdu);
-		tsdu_len -= OPTIONS_TOTAL_LEN(tsdu);
+
+		int opt_total_len = g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
+		tsdu     += opt_total_len;
+		tsdu_len -= opt_total_len;
 	}
 
 	if (!retval && g_ntohs(header->pgm_tsdu_length) != tsdu_len) {
@@ -663,7 +667,7 @@ print_rdata (
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		print_options (tsdu);
-		tsdu += OPTIONS_TOTAL_LEN(tsdu);
+		tsdu += g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
 		puts (",");
 	}
 
