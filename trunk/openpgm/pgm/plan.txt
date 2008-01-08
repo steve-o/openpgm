@@ -208,7 +208,7 @@ Basic TODO list
 - Implement mechanism for data-loss feedback.
 - Add interface for synchronous reading instead of directly accessing transport.
 - Add statistics back from basic_recv with some method to query and reset.
-- Transport throttling, fine grain throttling: ODATA to RDATA, and priority.
+- Transport throttling, fine grain throttling: ODATA to RDATA, and priority. *
 - OPT_SYN & OPT_FIN on sending side.
 - Shared trash stacks between multiple receive windows (contexts).
 - Shared trash stacks between transmit and receive windows.
@@ -222,6 +222,8 @@ Basic TODO list
 - Setup doxygen's doxyfile & update code with correct formatting.
 - Complete IPv6 support.
 - Basic DLR.
+- Convert timer thread from a GLib mainloop to a g_cond_wait / g_cond_timed_wait based loop,
+  using mutex/cond pairs instead of shuffling bytes over a pipe.
 
 Optionals
 *********
