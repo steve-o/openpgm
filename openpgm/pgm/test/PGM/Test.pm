@@ -163,6 +163,34 @@ sub wait_for_spm {
 	return $obj;
 }
 
+# data to {app}
+sub wait_for_data {
+	my $self = shift;
+	my $fh = $self->{in};
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
+	my $data = undef;
+
+	eval {
+		local $SIG{ALRM} = sub { die "alarm\n"; };
+		alarm $timeout;
+		while (<$fh>) {
+			chomp;
+			if (/^DATA: (.+)$/) {
+				$data = $1;
+				last;
+			}
+			print "$self->{tag} [$_]\n";
+		}
+		alarm 0;
+	};
+	if ($@) {
+		die unless $@ eq "alarm\n";
+		confess "$self->{tag}: alarm raised waiting for data.\n";
+	}
+
+	return $data;
+}
+
 sub wait_for_odata {
 	my $self = shift;
 	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;

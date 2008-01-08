@@ -32,6 +32,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -60,6 +61,7 @@ struct sim_session {
 	char*		name;
 	pgm_gsi_t	gsi;
 	pgm_transport_t* transport;
+	gboolean	transport_is_fake;
 };
 
 /* globals */
@@ -69,8 +71,6 @@ struct sim_session {
 static int g_port = 7500;
 static char* g_network = ";239.192.0.1";
 
-static int g_odata_interval = pgm_msecs(100);	/* 100 ms */
-static int g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_sqns = 100 * 1000;
 
@@ -85,16 +85,7 @@ static gboolean on_mark (gpointer);
 
 static void destroy_session (gpointer, gpointer, gpointer);
 
-static void send_odata (void);
-static gboolean on_odata_timer (gpointer);
-static int on_data (gpointer, guint, gpointer);
-
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
-
-static gboolean idle_prepare (GSource*, gint*);
-static gboolean idle_check (GSource*);
-static gboolean idle_dispatch (GSource*, GSourceFunc, gpointer);
-
 
 static void
 usage (const char* bin)
@@ -219,68 +210,229 @@ on_startup (
 	return FALSE;
 }
 
-static gboolean
-idle_prepare (
-	GSource*	source,
-	gint*		timeout
+int
+fake_pgm_transport_create (
+	pgm_transport_t**	transport_,
+	pgm_gsi_t*		gsi,
+	guint16			dport,
+	struct pgm_sock_mreq*	recv_smr,	/* receive port, multicast group & interface address */
+	int			recv_len,
+	struct pgm_sock_mreq*	send_smr	/* send ... */
 	)
 {
-	struct idle_source* idle_source = (struct idle_source*)source;
+	guint16 udp_encap_port = ((struct sockaddr_in*)&send_smr->smr_multiaddr)->sin_port;
 
-	guint64 now = pgm_time_update_now();
-	glong msec = pgm_msecs((gint64)idle_source->expiration - (gint64)now);
-	if (msec < 0)
-		msec = 0;
-	else
-		msec = MIN (G_MAXINT, (guint)msec);
-	*timeout = (gint)msec;
-	return (msec == 0);
+	g_return_val_if_fail (transport_ != NULL, -EINVAL);
+	g_return_val_if_fail (recv_smr != NULL, -EINVAL);
+	g_return_val_if_fail (recv_len > 0, -EINVAL);
+	g_return_val_if_fail (recv_len <= IP_MAX_MEMBERSHIPS, -EINVAL);
+	g_return_val_if_fail (send_smr != NULL, -EINVAL);
+	for (int i = 0; i < recv_len; i++)
+	{
+		g_return_val_if_fail (pgm_sockaddr_family(&recv_smr[i].smr_multiaddr) == pgm_sockaddr_family(&recv_smr[0].smr_multiaddr), -EINVAL);
+		g_return_val_if_fail (pgm_sockaddr_family(&recv_smr[i].smr_multiaddr) == pgm_sockaddr_family(&recv_smr[i].smr_interface), -EINVAL);
+	}
+	g_return_val_if_fail (pgm_sockaddr_family(&send_smr->smr_multiaddr) == pgm_sockaddr_family(&send_smr->smr_interface), -EINVAL);
+
+	int retval = 0;
+	pgm_transport_t* transport;
+
+/* create transport object */
+	transport = g_malloc0 (sizeof(pgm_transport_t));
+
+	memcpy (&transport->tsi.gsi, gsi, 6);
+	transport->dport = g_htons (dport);
+	do {
+		transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
+	} while (transport->tsi.sport == transport->dport);
+
+/* network data ports */
+	transport->udp_encap_port = udp_encap_port;
+
+/* copy network parameters */
+	memcpy (&transport->send_smr, send_smr, sizeof(struct pgm_sock_mreq));
+	for (int i = 0; i < recv_len; i++)
+	{
+		memcpy (&transport->recv_smr[i], &recv_smr[i], sizeof(struct pgm_sock_mreq));
+	}
+
+/* open sockets to implement PGM */
+	int socket_type, protocol;
+	if (transport->udp_encap_port) {
+                puts ("opening UDP encapsulated sockets.");
+                socket_type = SOCK_DGRAM;
+                protocol = IPPROTO_UDP;
+        } else {
+                puts ("opening raw sockets.");
+                socket_type = SOCK_RAW;
+                protocol = IPPROTO_PGM;
+        }
+
+        if ((transport->send_sock = socket(pgm_sockaddr_family(&send_smr->smr_interface),
+                                                socket_type,
+                                                protocol)) < 0)
+        {
+                retval = errno;
+                goto err_destroy;
+        }
+
+        if ((transport->send_with_router_alert_sock = socket(pgm_sockaddr_family(&send_smr->smr_interface),
+                                                socket_type,
+                                                protocol)) < 0)
+        {
+                retval = errno;
+                goto err_destroy;
+        }
+
+	*transport_ = transport;
+	return retval;
+
+err_destroy:
+        if (transport->send_sock) {
+                close(transport->send_sock);
+                transport->send_sock = 0;
+        }
+        if (transport->send_with_router_alert_sock) {
+                close(transport->send_with_router_alert_sock);
+                transport->send_with_router_alert_sock = 0;
+        }
+
+        g_free (transport);
+        transport = NULL;
+
+        return retval;
 }
 
-static gboolean
-idle_check (
-	GSource*	source
+int
+fake_pgm_transport_bind (
+	pgm_transport_t*	transport
 	)
 {
-	struct idle_source* idle_source = (struct idle_source*)source;
-	guint64 now = pgm_time_update_now();
-	return ( pgm_time_after_eq(now, idle_source->expiration) );
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (!transport->bound, -EINVAL);
+
+	int retval = 0;
+
+/* bind udp unicast sockets to interfaces, note multicast on a bound interface is
+ * fruity on some platforms so callee should specify any interface.
+ *
+ * after binding default interfaces (0.0.0.0) are resolved
+ */
+	retval = bind (transport->send_sock,
+                        (struct sockaddr*)&transport->send_smr.smr_interface,
+                        pgm_sockaddr_len(&transport->send_smr.smr_interface));
+        if (retval < 0) {
+                retval = errno;
+		goto out;
+        }
+
+/* resolve bound address if 0.0.0.0 */
+        if (((struct sockaddr_in*)&transport->send_smr.smr_interface)->sin_addr.s_addr == INADDR_ANY)
+        {
+                char hostname[NI_MAXHOST + 1];
+                gethostname (hostname, sizeof(hostname));
+                struct hostent *he = gethostbyname (hostname);
+                if (he == NULL) {
+                        retval = errno;
+                        puts ("gethostbyname failed on local hostname");
+                        goto out;
+                }
+
+                ((struct sockaddr_in*)&transport->send_smr.smr_interface)->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+        }
+
+	retval = bind (transport->send_with_router_alert_sock,
+                        (struct sockaddr*)&transport->send_smr.smr_interface,
+                        pgm_sockaddr_len(&transport->send_smr.smr_interface));
+        if (retval < 0) {
+                retval = errno;
+		goto out;
+        }
+
+/* send group (singular) */
+        retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_smr);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+
+	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, &transport->send_smr);
+        if (retval < 0) {
+                retval = errno;
+		goto out;
+        }
+
+/* multicast loopback */
+        retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+        retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+
+/* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
+        retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+        retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+
+/* set low packet latency preference for network elements */
+        int tos = IPTOS_LOWDELAY;
+        retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), tos);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+        retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), tos);
+        if (retval < 0) {
+                retval = errno;
+                goto out;
+        }
+
+/* cleanup */
+	transport->bound = TRUE;
+
+out:
+	return retval;
 }
 
-static gboolean
-idle_dispatch (
-	GSource*	source,
-	GSourceFunc	callback,
-	gpointer	user_data
+int
+fake_pgm_transport_destroy (
+	pgm_transport_t*	transport,
+	gboolean		flush
 	)
 {
-	struct idle_source* idle_source = (struct idle_source*)source;
+	g_return_val_if_fail (transport != NULL, -EINVAL);
 
-//	send_odata ();
-	idle_source->expiration += g_odata_interval;
+	if (transport->send_sock) {
+                puts ("closing send socket.");
+                close(transport->send_sock);
+                transport->send_sock = 0;
+        }
+        if (transport->send_with_router_alert_sock) {
+                puts ("closing send with router alert socket.");
+                close(transport->send_with_router_alert_sock);
+                transport->send_with_router_alert_sock = 0;
+        }
 
-	if ( pgm_time_after_eq(idle_source->expiration, pgm_time_now) )
-		sched_yield();
-
-	return TRUE;
-}
-
-static int
-on_data (
-	gpointer	data,
-	guint		len,
-	gpointer	user_data
-	)
-{
-	printf ("DATA: %s\n", (char*)data);
-	fflush (stdout);
-
+	g_free (transport);
 	return 0;
 }
 
 void
 session_create (
-	char*		name
+	char*		name,
+	gboolean	is_fake
 	)
 {
 /* check for duplicate */
@@ -306,7 +458,12 @@ session_create (
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
-	e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_smr, 1, &send_smr);
+	if (is_fake) {
+		sess->transport_is_fake = TRUE;
+		e = fake_pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_smr, 1, &send_smr);
+	} else {
+		e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_smr, 1, &send_smr);
+	}
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_create()");
 		goto err_free;
@@ -351,7 +508,16 @@ session_bind (
 	pgm_transport_set_nak_data_retries (sess->transport, 50);
 	pgm_transport_set_nak_ncf_retries (sess->transport, 50);
 
-	int e = pgm_transport_bind (sess->transport);
+	int e = 0;
+	if (sess->transport_is_fake)
+	{
+		e = fake_pgm_transport_bind (sess->transport);
+	}
+	else
+	{
+		e = pgm_transport_bind (sess->transport);
+	}
+
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_bind()");
 		return;
@@ -397,7 +563,14 @@ session_destroy (
 /* remove from hash table */
 	g_hash_table_remove (g_sessions, name);
 
-	pgm_transport_destroy (sess->transport, TRUE);
+	if (sess->transport_is_fake)
+	{
+		fake_pgm_transport_destroy (sess->transport, TRUE);
+	}
+	else
+	{
+		pgm_transport_destroy (sess->transport, TRUE);
+	}
 	sess->transport = NULL;
 	g_free (sess->name);
 	sess->name = NULL;
@@ -405,6 +578,120 @@ session_destroy (
 
 	puts ("READY");
 }
+
+void
+net_send_data (
+	char*		name,
+	guint8		pgm_type,		/* PGM_ODATA or PGM_RDATA */
+	guint32		data_sqn,
+	guint32		txw_trail,
+	char*		string
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_t* transport = sess->transport;
+
+/* payload is string including terminating null. */
+	int count = strlen(string) + 1;
+
+/* send */
+        int retval = 0;
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
+
+	gchar buf[ tpdu_length ];
+
+        struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_data *data = (struct pgm_data*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->tsi.sport;
+	header->pgm_dport       = transport->dport;
+	header->pgm_type        = pgm_type;
+	header->pgm_options     = 0;
+	header->pgm_tsdu_length = g_htons (count);
+
+/* O/RDATA */
+	data->data_sqn		= g_htonl (data_sqn);
+	data->data_trail	= g_htonl (txw_trail);
+
+	memcpy (data + 1, string, count);
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+
+	g_static_mutex_lock (&transport->send_mutex);
+        retval = sendto (transport->send_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+	g_static_mutex_unlock (&transport->send_mutex);
+
+	puts ("READY");
+}
+
+void
+net_send_spm (
+	char*		name,
+	guint32		spm_sqn,
+	guint32		txw_trail,
+	guint32		txw_lead
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_t* transport = sess->transport;
+
+/* send */
+        int retval = 0;
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
+
+	gchar buf[ tpdu_length ];
+
+        struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->tsi.sport;
+	header->pgm_dport       = transport->dport;
+	header->pgm_type        = PGM_SPM;
+	header->pgm_options	= 0;
+	header->pgm_tsdu_length	= 0;
+
+/* SPM */
+	spm->spm_sqn		= g_htonl (spm_sqn);
+	spm->spm_trail		= g_htonl (txw_trail);
+	spm->spm_lead		= g_htonl (txw_lead);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+
+	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
+        retval = sendto (transport->send_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
+
+	puts ("READY");
+}
+
+/* Send a NAK on a valid transport.  A fake transport would need to specify the senders NLA,
+ * we use the peer list to bypass extracting it from the monitor output.
+ */
 
 void
 net_send_nak (
@@ -521,6 +808,7 @@ on_stdin_data (
         if (len > 0) {
                 if (term) str[term] = 0;
 
+/* quit */
                 if (strcmp(str, "quit") == 0)
 		{
                         g_main_loop_quit(g_loop);
@@ -533,6 +821,68 @@ on_stdin_data (
 
 /* endpoint simulator specific: */
 
+/* send odata or rdata */
+		re = "^net[[:space:]]+send[[:space:]]+([or])data[[:space:]]+"
+			"([[:alnum:]]+)[[:space:]]+"	/* transport */
+			"([0-9]+)[[:space:]]+"		/* sequence number */
+			"([0-9]+)[[:space:]]+"		/* txw_trail */
+			"([[:alnum:]]+)$";		/* payload */
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			guint8 pgm_type = *(str + pmatch[1].rm_so) == 'o' ? PGM_ODATA : PGM_RDATA;
+
+			char *name = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
+			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
+
+			char* p = str + pmatch[3].rm_so;
+			guint32 data_sqn = strtoul (p, &p, 10);
+
+			p = str + pmatch[4].rm_so;
+			guint txw_trail = strtoul (p, &p, 10);
+
+			char *string = g_memdup (str + pmatch[5].rm_so, pmatch[5].rm_eo - pmatch[5].rm_so + 1 );
+			string[ pmatch[5].rm_eo - pmatch[5].rm_so ] = 0;
+
+			net_send_data (name, pgm_type, data_sqn, txw_trail, string);
+
+			g_free (name);
+			g_free (string);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* send spm */
+		re = "^net[[:space:]]+send[[:space:]]+spm[[:space:]]+"
+			"([[:alnum:]]+)[[:space:]]+"	/* transport */
+			"([0-9]+)[[:space:]]+"		/* spm sequence number */
+			"([0-9]+)[[:space:]]+"		/* txw_trail */
+			"([0-9]+)$";			/* txw_lead */
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char* p = str + pmatch[2].rm_so;
+			guint32 spm_sqn = strtoul (p, &p, 10);
+
+			p = str + pmatch[3].rm_so;
+			guint txw_trail = strtoul (p, &p, 10);
+
+			p = str + pmatch[4].rm_so;
+			guint txw_lead = strtoul (p, &p, 10);
+
+			net_send_spm (name, spm_sqn, txw_trail, txw_lead);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* send nak */
 		re = "^net +send +nak +([0-9a-z]+) +([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+) +([0-9,]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -564,7 +914,7 @@ on_stdin_data (
 				for (p = str + pmatch[3].rm_so; ; p = NULL) {
 					char* token = strtok_r (p, ",", &saveptr);
 					if (!token) break;
-					sqn_list.sqn[sqn_list.len++] = strtol (token, NULL, 10);
+					sqn_list.sqn[sqn_list.len++] = strtoul (token, NULL, 10);
 				}
 			}
 
@@ -576,16 +926,17 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
-/* same as test application: */
+/** same as test application: **/
 
-		re = "^create[[:space:]]+([[:alnum:]]+)$";
+/* create transport */
+		re = "^create[[:space:]]+(fake[[:space:]]+)?([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
-			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+			char *name = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
+			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
 
-			session_create (name);
+			session_create (name, (pmatch[1].rm_eo > pmatch[1].rm_so));
 
 			g_free (name);
 			regfree (&preg);
@@ -593,6 +944,7 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
+/* bind transport */
 		re = "^bind[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -608,6 +960,7 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
+/* send packet */
 		re = "^send[[:space:]]+([[:alnum:]]+)[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -626,6 +979,7 @@ on_stdin_data (
 			goto out;
                 }
 
+/* destroy transport */
 		re = "^destroy[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
