@@ -68,8 +68,6 @@ struct app_session {
 static int g_port = 7500;
 static char* g_network = ";239.192.0.1";
 
-static guint g_odata_interval = pgm_msecs(100);	/* 100 ms */
-static guint g_payload = 0;
 static guint g_max_tpdu = 1500;
 static guint g_sqns = 100 * 1000;
 
@@ -84,15 +82,9 @@ static gboolean on_mark (gpointer);
 
 static void destroy_session (gpointer, gpointer, gpointer);
 
-static void send_odata (void);
-static gboolean on_odata_timer (gpointer);
 static int on_data (gpointer, guint, gpointer);
 
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
-
-static gboolean idle_prepare (GSource*, gint*);
-static gboolean idle_check (GSource*);
-static gboolean idle_dispatch (GSource*, GSourceFunc, gpointer);
 
 
 static void
@@ -153,7 +145,7 @@ main (
 
 	if (g_sessions) {
 		g_message ("destroying sessions.");
-		g_hash_table_foreach_remove (g_sessions, (GHFunc)destroy_session, NULL);
+		g_hash_table_foreach_remove (g_sessions, (GHRFunc)destroy_session, NULL);
 		g_hash_table_unref (g_sessions);
 		g_sessions = NULL;
 	}
@@ -216,52 +208,6 @@ on_startup (
 	puts ("READY");
 	fflush (stdout);
 	return FALSE;
-}
-
-static gboolean
-idle_prepare (
-	GSource*	source,
-	gint*		timeout
-	)
-{
-	struct idle_source* idle_source = (struct idle_source*)source;
-
-	guint64 now = pgm_time_update_now();
-	glong msec = pgm_msecs((gint64)idle_source->expiration - (gint64)now);
-	if (msec < 0)
-		msec = 0;
-	else
-		msec = MIN (G_MAXINT, (guint)msec);
-	*timeout = (gint)msec;
-	return (msec == 0);
-}
-
-static gboolean
-idle_check (
-	GSource*	source
-	)
-{
-	struct idle_source* idle_source = (struct idle_source*)source;
-	guint64 now = pgm_time_update_now();
-	return ( pgm_time_after_eq(now, idle_source->expiration) );
-}
-
-static gboolean
-idle_dispatch (
-	GSource*	source,
-	GSourceFunc	callback,
-	gpointer	user_data
-	)
-{
-	struct idle_source* idle_source = (struct idle_source*)source;
-
-//	send_odata ();
-	idle_source->expiration += g_odata_interval;
-
-	if ( pgm_time_after_eq(idle_source->expiration, pgm_time_now) )
-		g_thread_yield();
-
-	return TRUE;
 }
 
 static int
@@ -399,6 +345,24 @@ session_send (
 }
 
 void
+session_listen (
+	char*		name
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+/* listen */
+	pgm_transport_add_watch (sess->transport, on_data, NULL);
+
+	puts ("READY");
+}
+
+void
 session_destroy (
 	char*		name
 	)
@@ -520,6 +484,23 @@ on_stdin_data (
 			regfree (&preg);
 			goto out;
                 }
+		regfree (&preg);
+
+/* listen */
+		re = "^listen[[:space:]]+([[:alnum:]]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			session_listen (name);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
 
 /* destroy transport */
 		re = "^destroy[[:space:]]+([[:alnum:]]+)$";
