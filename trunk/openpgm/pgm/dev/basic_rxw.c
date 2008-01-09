@@ -197,14 +197,14 @@ test_basic_rxw (
 
 	rxw = pgm_rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
 //	rxw = pgm_rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
-	pgm_rxw_window_update(rxw, 1, 0);
+	pgm_rxw_window_update(rxw, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
 
-		pgm_rxw_push (rxw, entry, size_per_entry, i, 0);
+		pgm_rxw_push (rxw, entry, size_per_entry, i, 0, pgm_time_now);
 		backoff_state_foreach (rxw);
 	}
 	gettimeofday(&now, NULL);
@@ -227,14 +227,14 @@ test_jump (
 	int i, j;
 
 	rxw = pgm_rxw_init (size_per_entry, 2 * count, 2 * count, 0, 0, on_pgm_data, NULL);
-	pgm_rxw_window_update(rxw, 1, 0);
+	pgm_rxw_window_update(rxw, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = j = 0; i < count; i++, j+=2)
 	{
 		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
 
-		pgm_rxw_push (rxw, entry, size_per_entry, j, 0);
+		pgm_rxw_push (rxw, entry, size_per_entry, j, 0, pgm_time_now);
 		backoff_state_foreach (rxw);
 	}
 	gettimeofday(&now, NULL);
@@ -258,7 +258,7 @@ test_reverse (
 
 	rxw = pgm_rxw_init (size_per_entry, count, count, 0, 0, on_pgm_data, NULL);
 //	rxw = pgm_rxw_init (size_per_entry, 0, count, 0, 0, on_pgm_data, NULL);
-	pgm_rxw_window_update(rxw, 1, 0);
+	pgm_rxw_window_update(rxw, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0, j = count; i < count; i++)
@@ -266,9 +266,9 @@ test_reverse (
 		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
 
 		if (i > 0)
-			pgm_rxw_push (rxw, entry, size_per_entry, --j, 0);
+			pgm_rxw_push (rxw, entry, size_per_entry, --j, 0, pgm_time_now);
 		else
-			pgm_rxw_push (rxw, entry, size_per_entry, i, 0);
+			pgm_rxw_push (rxw, entry, size_per_entry, i, 0, pgm_time_now);
 
 		backoff_state_foreach (rxw);
 	}
@@ -293,14 +293,14 @@ test_fill (
 
 	rxw = pgm_rxw_init (size_per_entry, count+1, count+1, 0, 0, on_pgm_data, NULL);
 //	rxw = pgm_rxw_init (size_per_entry, 0, count+1, 0, 0, on_pgm_data, NULL);
-	pgm_rxw_window_update(rxw, 1, 0);
+	pgm_rxw_window_update(rxw, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
 		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
 
-		pgm_rxw_push (rxw, entry, size_per_entry, i+1, 0);
+		pgm_rxw_push (rxw, entry, size_per_entry, i+1, 0, pgm_time_now);
 
 // immediately send naks
 		backoff_state_foreach (rxw);

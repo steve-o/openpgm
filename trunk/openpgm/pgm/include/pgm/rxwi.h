@@ -97,16 +97,16 @@ typedef struct pgm_rxw_t pgm_rxw_t;
 pgm_rxw_t* pgm_rxw_init (guint, guint32, guint32, guint, guint, pgm_rxw_commitfn_t, gpointer);
 int pgm_rxw_shutdown (pgm_rxw_t*);
 
-int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, guint32, guint32, guint32);
+int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, guint32, guint32, guint32, pgm_time_t);
 
 /* from state checking */
 int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
 
 /* from SPM */
-int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32);
+int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32, pgm_time_t);
 
 /* from NCF */
-int pgm_rxw_ncf (pgm_rxw_t*, guint32, pgm_time_t);
+int pgm_rxw_ncf (pgm_rxw_t*, guint32, pgm_time_t, pgm_time_t);
 
 
 static inline guint pgm_rxw_len (pgm_rxw_t* r)
@@ -134,16 +134,16 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
     return r->trash_data ? g_trash_stack_pop (&r->trash_data) : g_slice_alloc (r->max_tpdu);
 }
 
-static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail)
+static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
-    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0);
+    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0, nak_rb_expiry);
 }
 
-static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail)
+static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);
-    return pgm_rxw_push (r, packet, len, sqn, trail);
+    return pgm_rxw_push (r, packet, len, sqn, trail, nak_rb_expiry);
 }
 
 int pgm_rxw_pkt_state_unlink (pgm_rxw_t*, pgm_rxw_packet_t*);

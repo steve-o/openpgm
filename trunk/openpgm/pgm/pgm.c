@@ -230,6 +230,7 @@ pgm_parse (
 		int sum = pgm_header->pgm_checksum;
 		pgm_header->pgm_checksum = 0;
 		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
+		pgm_header->pgm_checksum = sum;
 		if (pgm_sum != sum) {
 			puts ("PGM checksum bad :(");
 			return -2;

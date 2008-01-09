@@ -283,6 +283,7 @@ verify_pgm_header (
 		int sum = pgm->pgm_checksum;
 		pgm->pgm_checksum = 0;
 		int pgm_sum = pgm_checksum((const char*)pgm, pgm_len, 0);
+		pgm->pgm_checksum = sum;
 		if (pgm_sum != sum) {
 			printf ("\t\"message\": \"PGM: PGM packet checksum incorrect: 0x%x.\",\n", sum);
 			return -2;

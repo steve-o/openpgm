@@ -164,6 +164,8 @@ int pgm_init (void);
 int pgm_event_unref (pgm_transport_t*, pgm_event_t*);
 
 gchar* pgm_print_tsi (const pgm_tsi_t*);
+guint pgm_tsi_hash (gconstpointer);
+gint pgm_tsi_equal (gconstpointer, gconstpointer);
 
 int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, int, struct pgm_sock_mreq*);
 int pgm_transport_bind (pgm_transport_t*);

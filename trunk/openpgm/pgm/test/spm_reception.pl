@@ -38,8 +38,8 @@ print "sim: publish SPM txw_trail 90,000.\n";
 $sim->say ("net send spm ao 1 90001 90000");
 
 # no NAKs should be generated.
-print "sim: waiting 10 seconds for erroneous NAKs ...\n";
-$sim->die_on_nak;
+print "sim: waiting 2 seconds for erroneous NAKs ...\n";
+$sim->die_on_nak({ 'timeout' => 2 });
 print "sim: no NAKs received.\n";
 
 print "sim: publish ODATA sqn 90,001.\n";
