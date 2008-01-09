@@ -347,7 +347,9 @@ pgm_rxw_alloc0_packet (
  * counters, this means one push on the receive window can actually translate
  * as many: the extra's acting as place holders and NAK containers
  *
- * returns 0 if packet added to window
+ * returns 0 if place holders have been created in the window
+ * returns 1 if packet contingiously extended the window
+ * returns -1 if invalid
  */
 
 int
@@ -359,13 +361,15 @@ pgm_rxw_push_fragment (
 	guint32		trail,
 	guint32		apdu_first_sqn,
 	guint32		fragment_offset,	/* in bytes from beginning of apdu */
-	guint32		apdu_len		/* in bytes */
+	guint32		apdu_len,		/* in bytes */
+	pgm_time_t	nak_rb_expiry
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 	guint dropped = 0;
+	int retval = -1;
 
 	g_trace ("#%u: data trail #%u: push: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number, trail, 
@@ -399,10 +403,10 @@ pgm_rxw_push_fragment (
 
 			ASSERT_RXW_BASE_INVARIANT(r);
 			ASSERT_RXW_POINTER_INVARIANT(r);
-			return -1;
+			return retval;
 		}
 
-		pgm_rxw_window_update (r, trail, r->lead);
+		pgm_rxw_window_update (r, trail, r->lead, nak_rb_expiry);
 	}
 
 	g_trace ("#%u: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
@@ -415,7 +419,7 @@ pgm_rxw_push_fragment (
 	{
 		g_trace ("#%u: already committed, discarding.", sequence_number);
 
-		return -1;
+		return retval;
 	}
 
 /* check for duplicate */
@@ -430,7 +434,7 @@ pgm_rxw_push_fragment (
 			if (rp->length)
 			{
 				g_trace ("#%u: already received, discarding.", sequence_number);
-				return -1;
+				return retval;
 			}
 
 /* for fragments check that apdu is valid */
@@ -486,6 +490,7 @@ pgm_rxw_push_fragment (
 
 			pgm_rxw_pkt_state_unlink (r, rp);
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
+			retval		= 1;
 		}
 		else
 		{
@@ -521,7 +526,7 @@ pgm_rxw_push_fragment (
 				pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
-				ph->nak_rb_expiry	= pgm_time_now;
+				ph->nak_rb_expiry	= nak_rb_expiry;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
@@ -542,6 +547,11 @@ pgm_rxw_push_fragment (
 
 				r->lead++;
 			}
+			retval = 0;
+		}
+		else
+		{
+			retval = 1;
 		}
 
 		g_assert ( r->lead == sequence_number );
@@ -554,6 +564,7 @@ pgm_rxw_push_fragment (
 		{
 			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
 			pgm_rxw_mark_lost (r, sequence_number);
+			retval = -1;
 			goto out;
 		}
 
@@ -562,6 +573,7 @@ pgm_rxw_push_fragment (
 			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
 				sequence_number, apdu_first_sqn);
 			pgm_rxw_mark_lost (r, apdu_first_sqn);
+			retval = -1;
 			goto out;
 		}
 
@@ -615,7 +627,7 @@ out:
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
-	return 0;
+	return retval;
 }
 
 static inline int
@@ -949,7 +961,8 @@ int
 pgm_rxw_window_update (
 	pgm_rxw_t*	r,
 	guint32		txw_trail,
-	guint32		txw_lead
+	guint32		txw_lead,
+	pgm_time_t	nak_rb_expiry
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -997,7 +1010,7 @@ pgm_rxw_window_update (
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
 /* TODO: backoff interval ? */
-				ph->nak_rb_expiry	= pgm_time_now;
+				ph->nak_rb_expiry	= nak_rb_expiry;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
@@ -1124,7 +1137,8 @@ int
 pgm_rxw_ncf (
 	pgm_rxw_t*	r,
 	guint32		sequence_number,
-	pgm_time_t	rdata_expiry
+	pgm_time_t	nak_rdata_expiry,
+	pgm_time_t	nak_rb_expiry
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -1155,7 +1169,7 @@ pgm_rxw_ncf (
 
 		case PGM_PKT_BACK_OFF_STATE:
 		case PGM_PKT_WAIT_NCF_STATE:
-			rp->nak_rdata_expiry = rdata_expiry;
+			rp->nak_rdata_expiry = nak_rdata_expiry;
 			break;
 
 		default:
@@ -1201,7 +1215,7 @@ pgm_rxw_ncf (
 		pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 		ph->link_.data		= ph;
 		ph->sequence_number     = r->lead;
-		ph->nak_rb_expiry	= pgm_time_now;
+		ph->nak_rb_expiry	= nak_rb_expiry;
 		ph->state		= PGM_PKT_BACK_OFF_STATE;
 
 		RXW_SET_PACKET(r, ph->sequence_number, ph);
@@ -1229,7 +1243,7 @@ pgm_rxw_ncf (
 	pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 	ph->link_.data		= ph;
 	ph->sequence_number     = r->lead;
-	ph->nak_rdata_expiry	= rdata_expiry;
+	ph->nak_rdata_expiry	= nak_rdata_expiry;
 	ph->state		= PGM_PKT_WAIT_DATA_STATE;
 
 	RXW_SET_PACKET(r, ph->sequence_number, ph);

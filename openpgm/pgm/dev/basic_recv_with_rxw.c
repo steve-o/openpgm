@@ -592,7 +592,7 @@ on_io_data (
 	struct pgm_header *pgm_header;
 	char *packet;
 	int packet_length;
-	int e = pgm_parse_raw(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 
 	switch (e) {
 	case -2:
@@ -704,7 +704,7 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 //printf ("SPM: tx window now %lu - %lu\n", 
 //		hoststat->txw_trail, hoststat->txw_lead);
 //
-			pgm_rxw_window_update (g_rxw, hoststat->txw_trail, hoststat->txw_lead);
+			pgm_rxw_window_update (g_rxw, hoststat->txw_trail, hoststat->txw_lead, pgm_time_update_now());
 
 		}
 		break;
@@ -733,10 +733,11 @@ if (!err && (hoststat->nla.s_addr != NULL)) {
 printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
 		if (!pgm_rxw_push_copy (g_rxw,
-				((struct pgm_data*)packet) + 1, 
-				g_ntohs (pgm_header->pgm_tsdu_length),
-				((struct pgm_data*)packet)->data_sqn,
-				g_ntohl (((struct pgm_data*)packet)->data_trail)) )
+					((struct pgm_data*)packet) + 1, 
+					g_ntohs (pgm_header->pgm_tsdu_length),
+					((struct pgm_data*)packet)->data_sqn,
+					g_ntohl (((struct pgm_data*)packet)->data_trail),
+					pgm_time_update_now()) )
 		{
 			printf ("processed packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
