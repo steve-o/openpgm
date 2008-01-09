@@ -87,6 +87,9 @@ static void destroy_session (gpointer, gpointer, gpointer);
 
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
+void generic_net_send_nak (guint8, char*, pgm_tsi_t*, pgm_sqn_list_t*);
+	
+
 static void
 usage (const char* bin)
 {
@@ -325,17 +328,76 @@ on_io_data (
         gpointer data
         )
 {
-        char buffer[4096];
-        int fd = g_io_channel_unix_get_fd(source);
-        struct sockaddr_in addr;
-        socklen_t addr_len = sizeof(addr);
-        int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+	pgm_transport_t* transport = data;
 
-        printf ("%i bytes received from %s.\n", len, inet_ntoa(addr.sin_addr));
+        int fd = g_io_channel_unix_get_fd(source);
+	char buffer[transport->max_tpdu];
+	struct sockaddr_storage src_addr;
+	socklen_t src_addr_len = sizeof(src_addr);
+        int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
+
+        printf ("%i bytes received from %s.\n", len, inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
         monitor_packet (buffer, len);
         fflush (stdout);
 
+/* parse packet to maintain peer database */
+	struct sockaddr_storage dst_addr;
+        socklen_t dst_addr_len = sizeof(dst_addr);
+        struct pgm_header *pgm_header;
+        char *packet;
+        int packet_len;
+	int e;
+
+	if (transport->udp_encap_port) {
+		if ((e = pgm_parse_udp_encap(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
+                {
+                        goto out;
+                }
+        } else {
+                if ((e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
+                {
+                        goto out;
+                }
+        }
+
+/* calculate senders TSI */
+        pgm_tsi_t tsi;
+        memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
+        tsi.sport = pgm_header->pgm_sport;
+
+	if (pgm_is_upstream (pgm_header->pgm_type) || pgm_is_peer (pgm_header->pgm_type))
+	{
+		goto out;	/* ignore */
+	}
+
+/* downstream = source to receivers */
+	if (!pgm_is_downstream (pgm_header->pgm_type))
+	{
+		goto out;
+	}
+
+/* pgm packet DPORT contains our transport DPORT */
+        if (pgm_header->pgm_dport != transport->dport) {
+                goto out;
+        }
+
+/* search for TSI peer context or create a new one */
+        pgm_peer_t* sender = g_hash_table_lookup (transport->peers, &tsi);
+        if (sender == NULL)
+        {
+		printf ("new peer, tsi %s, local nla %s\n", pgm_print_tsi (&tsi), inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
+
+		pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
+		peer->transport = transport;
+		memcpy (&peer->tsi, &tsi, sizeof(pgm_tsi_t));
+		((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
+		memcpy (&peer->local_nla, &src_addr, src_addr_len);
+
+		g_hash_table_insert (transport->peers, &peer->tsi, peer);
+        }
+	
+out:
         return TRUE;
 }
 
@@ -364,6 +426,9 @@ fake_pgm_transport_bind (
 	g_return_val_if_fail (!transport->bound, -EINVAL);
 
 	int retval = 0;
+
+/* create peer list */
+	transport->peers = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 
 /* bind udp unicast sockets to interfaces, note multicast on a bound interface is
  * fruity on some platforms so callee should specify any interface.
@@ -825,6 +890,101 @@ net_send_spm (
  */
 
 void
+net_send_ncf (
+	char*		name,
+	pgm_tsi_t*	tsi,
+	pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+/* check that the peer exists */
+	pgm_transport_t* transport = sess->transport;
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
+	if (peer == NULL) {
+		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
+		return;
+	}
+
+/* send */
+        int retval = 0;
+        int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+
+	if (sqn_list->len > 1) {
+		tpdu_length += sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
+				( (sqn_list->len-1) * sizeof(guint32) );
+	}
+
+	gchar buf[ tpdu_length ];
+
+        struct pgm_header *header = (struct pgm_header*)buf;
+        struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
+        memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+
+	struct sockaddr_storage peer_nla;
+	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
+
+/* dport & sport swap over for a nak */
+        header->pgm_sport       = transport->tsi.sport;
+        header->pgm_dport       = transport->dport;
+        header->pgm_type        = PGM_NCF;
+        header->pgm_options     = (sqn_list->len > 1) ? PGM_OPT_PRESENT : 0;
+        header->pgm_tsdu_length = 0;
+
+/* NCF */
+        ncf->nak_sqn            = g_htonl (sqn_list->sqn[0]);
+
+/* source nla */
+        pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&ncf->nak_src_nla_afi);
+
+/* group nla */
+        pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&ncf->nak_grp_nla_afi);
+
+/* OPT_NAK_LIST */
+	if (sqn_list->len > 1)
+	{
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(ncf + 1);
+		opt_header->opt_type    = PGM_OPT_LENGTH;
+		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_length) +
+							sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_nak_list) +
+							( (sqn_list->len-1) * sizeof(guint32) ));
+		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+		opt_header->opt_type    = PGM_OPT_NAK_LIST | PGM_OPT_END;
+		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+						+ ( (sqn_list->len-1) * sizeof(guint32) );
+		struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
+		opt_nak_list->opt_reserved = 0;
+		for (int i = 1; i < sqn_list->len; i++) {
+			opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
+		}
+	}
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+
+	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
+        retval = sendto (transport->send_with_router_alert_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
+
+	puts ("READY");
+}
+
+void
 net_send_nak (
 	char*		name,
 	pgm_tsi_t*	tsi,
@@ -1014,15 +1174,18 @@ on_stdin_data (
 		regfree (&preg);
 
 /* send nak */
-		re = "^net +send +nak +([0-9a-z]+) +([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+) +([0-9,]+)$";
+		re = "^net[[:space:]]+send[[:space:]]n(ak|cf)[[:space:]]+"
+			"([[:alnum:]]+)[[:space:]]+"	/* transport */
+			"([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)[[:space:]]+"	/* TSI */
+			"([0-9,]+)$";			/* sequence number or list */
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
-			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+			char *name = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
+			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
 
 			pgm_tsi_t tsi;
-			char *p = str + pmatch[2].rm_so;
+			char *p = str + pmatch[3].rm_so;
 			tsi.gsi.identifier[0] = strtol (p, &p, 10);
 			++p;
 			tsi.gsi.identifier[1] = strtol (p, &p, 10);
@@ -1042,14 +1205,21 @@ on_stdin_data (
 			sqn_list.len = 0;
 			{
 				char* saveptr;
-				for (p = str + pmatch[3].rm_so; ; p = NULL) {
+				for (p = str + pmatch[4].rm_so; ; p = NULL) {
 					char* token = strtok_r (p, ",", &saveptr);
 					if (!token) break;
 					sqn_list.sqn[sqn_list.len++] = strtoul (token, NULL, 10);
 				}
 			}
 
-			net_send_nak (name, &tsi, &sqn_list);
+			if ( *(str + pmatch[1].rm_so) == 'a' )
+			{
+				net_send_nak (name, &tsi, &sqn_list);
+			}
+			else
+			{
+				net_send_ncf (name, &tsi, &sqn_list);
+			}
 
 			g_free (name);
 			regfree (&preg);

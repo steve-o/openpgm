@@ -178,7 +178,7 @@ pgm_print_tsi (
 /* convert a transport session identifier TSI to a hash value
  *  */
 
-static guint
+inline guint
 pgm_tsi_hash (
 	gconstpointer v
         )
@@ -189,7 +189,7 @@ pgm_tsi_hash (
 /* compare two transport session identifier TSI values and return TRUE if they are equal
  *  */
 
-static gint
+inline gint
 pgm_tsi_equal (
 	gconstpointer   v,
 	gconstpointer   v2
@@ -2102,48 +2102,57 @@ on_spm (
 {
 	int retval;
 
-	if ((retval = pgm_verify_spm (header, data, len)) == 0)
+	if ((retval = pgm_verify_spm (header, data, len)) != 0)
 	{
-		struct pgm_spm* spm = (struct pgm_spm*)data;
-
-		spm->spm_sqn = g_ntohl (spm->spm_sqn);
-
-/* check for advancing sequence number */
-		g_static_mutex_lock (&sender->mutex);
-		if ( pgm_uint32_gte (spm->spm_sqn, sender->spm_sqn) )
-		{
-/* copy NLA for replies */
-			pgm_nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
-
-/* save sequence number */
-			sender->spm_sqn = spm->spm_sqn;
-
-/* update receive window */
-			guint naks = pgm_rxw_window_update (sender->rxw,
-								g_ntohl (spm->spm_trail),
-								g_ntohl (spm->spm_lead));
-			if (naks)
-			{
-/* TODO: take time from backoff_queue */
-				g_trace ("INFO","on_spm: prod timer thread");
-				const char one = '1';
-				if (1 != write (sender->transport->timer_pipe[1], &one, sizeof(one))) {
-					g_critical ("write to pipe failed :(");
-					retval = -EINVAL;
-				}
-			}
-		}
-		else
-		{	/* does not advance SPM sequence number */
-			retval = -EINVAL;
-		}
-
-/* either way bump expiration timer */
-		sender->expiry = pgm_time_update_now() + sender->transport->peer_expiry;
-		sender->spmr_expiry = 0;
-		g_static_mutex_unlock (&sender->mutex);
+		goto out;
 	}
 
+	struct pgm_transport_t* transport = sender->transport;
+	struct pgm_spm* spm = (struct pgm_spm*)data;
+	pgm_time_t now = pgm_time_update_now ();
+
+	spm->spm_sqn = g_ntohl (spm->spm_sqn);
+
+/* check for advancing sequence number */
+	g_static_mutex_lock (&sender->mutex);
+	if ( pgm_uint32_gte (spm->spm_sqn, sender->spm_sqn) )
+	{
+/* copy NLA for replies */
+		pgm_nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
+
+/* save sequence number */
+		sender->spm_sqn = spm->spm_sqn;
+
+/* update receive window */
+		pgm_time_t nak_rb_expiry = now + transport->nak_rb_ivl;
+		guint naks = pgm_rxw_window_update (sender->rxw,
+							g_ntohl (spm->spm_trail),
+							g_ntohl (spm->spm_lead),
+							nak_rb_expiry);
+		g_static_mutex_lock (&transport->mutex);
+		if (naks && pgm_time_after(transport->next_poll, nak_rb_expiry))
+		{
+			transport->next_poll = nak_rb_expiry;
+			g_trace ("INFO","on_spm: prod timer thread");
+			const char one = '1';
+			if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+				g_critical ("write to pipe failed :(");
+				retval = -EINVAL;
+			}
+		}
+		g_static_mutex_unlock (&transport->mutex);
+	}
+	else
+	{	/* does not advance SPM sequence number */
+		retval = -EINVAL;
+	}
+
+/* either way bump expiration timer */
+	sender->expiry = now + transport->peer_expiry;
+	sender->spmr_expiry = 0;
+	g_static_mutex_unlock (&sender->mutex);
+
+out:
 	return retval;
 }
 
@@ -2387,7 +2396,7 @@ on_ncf (
 	g_static_mutex_lock (&peer->mutex);
 
 	pgm_time_t now = pgm_time_update_now();
-	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), now + transport->nak_rdata_ivl);
+	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), now + transport->nak_rdata_ivl, now + transport->nak_rb_ivl);
 
 /* check NAK list */
 	guint32* nak_list = NULL;
@@ -2421,7 +2430,7 @@ on_ncf (
 
 	while (nak_list_len--)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), now + transport->nak_rdata_ivl);
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), now + transport->nak_rdata_ivl, now + transport->nak_rb_ivl);
 		nak_list++;
 	}
 
@@ -3237,6 +3246,7 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 /* prod timer thread if sleeping */
 	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
 	{
+		transport->next_poll = transport->next_heartbeat_spm;
 		g_trace ("INFO","pgm_reset_heartbeat_spm: prod timer thread");
 		const char one = '1';
 		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
@@ -3576,7 +3586,8 @@ pgm_timer_prepare (
 
 	g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
 
-	expiration = min_nak_expiry (expiration, transport);
+/* save the nearest timer */
+	transport->next_poll = pgm_timer->expiration = expiration = min_nak_expiry (expiration, transport);
 	g_static_mutex_unlock (&transport->mutex);
 
 /* advance time again to adjust for processing time out of the event loop, this
@@ -3589,7 +3600,6 @@ pgm_timer_prepare (
 		msec = MIN (G_MAXINT, (guint)msec);
 
 	*timeout = (gint)msec;
-	transport->next_poll = pgm_timer->expiration = expiration;	/* save the nearest timer */
 
 	g_trace ("SPM","expiration in %i msec", (gint)msec);
 
@@ -3892,6 +3902,7 @@ on_odata (
  */
 	gboolean flush_naks = FALSE;
 	struct pgm_opt_fragment* opt_fragment;
+	pgm_time_t nak_rb_expiry = pgm_time_update_now () + transport->nak_rb_ivl;
 
 	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(odata + 1), &opt_fragment))
 	{
@@ -3907,7 +3918,8 @@ on_odata (
 					g_ntohl (odata->data_trail),
 					g_ntohl (opt_fragment->opt_sqn),
 					g_ntohl (opt_fragment->opt_frag_off),
-					g_ntohl (opt_fragment->opt_frag_len)))
+					g_ntohl (opt_fragment->opt_frag_len),
+					nak_rb_expiry))
 		{
 			flush_naks = TRUE;
 		}
@@ -3919,7 +3931,8 @@ on_odata (
 					odata + 1,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
-					g_ntohl (odata->data_trail)))
+					g_ntohl (odata->data_trail),
+					nak_rb_expiry))
 		{
 			flush_naks = TRUE;
 		}
@@ -3930,19 +3943,18 @@ on_odata (
 	{
 /* flush out 1st time nak packets */
 		g_static_mutex_lock (&transport->mutex);
-		g_static_mutex_lock (&sender->mutex);
 
-		pgm_time_update_now();
-		nak_rb_state (&sender->tsi, sender);
-
-		g_trace ("INFO","on_odata: prod timer thread");
-		const char one = '1';
-		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to pipe failed :(");
-			retval = -EINVAL;
+		if (pgm_time_after (transport->next_poll, nak_rb_expiry))
+		{
+			transport->next_poll = nak_rb_expiry;
+			g_trace ("INFO","on_odata: prod timer thread");
+			const char one = '1';
+			if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+				g_critical ("write to pipe failed :(");
+				retval = -EINVAL;
+			}
 		}
 
-		g_static_mutex_unlock (&sender->mutex);
 		g_static_mutex_unlock (&transport->mutex);
 	}
 
@@ -3963,11 +3975,13 @@ on_rdata (
 	g_trace ("INFO","on_rdata");
 
 	int retval = 0;
+	struct pgm_transport_t* transport = sender->transport;
 	struct pgm_data* rdata = (struct pgm_data*)data;
 	rdata->data_sqn = g_ntohl (rdata->data_sqn);
 
 	gboolean flush_naks = FALSE;
 	struct pgm_opt_fragment* opt_fragment;
+	pgm_time_t nak_rb_expiry = pgm_time_update_now () + transport->nak_rb_ivl;
 
 	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(rdata + 1), &opt_fragment))
 	{
@@ -3983,7 +3997,8 @@ on_rdata (
 					g_ntohl (rdata->data_trail),
 					g_ntohl (opt_fragment->opt_sqn),
 					g_ntohl (opt_fragment->opt_frag_off),
-					g_ntohl (opt_fragment->opt_frag_len)))
+					g_ntohl (opt_fragment->opt_frag_len),
+					nak_rb_expiry))
 		{
 			flush_naks = TRUE;
 		}
@@ -3995,7 +4010,8 @@ on_rdata (
 					rdata + 1,
 					g_ntohs (header->pgm_tsdu_length),
 					rdata->data_sqn,
-					g_ntohl (rdata->data_trail)))
+					g_ntohl (rdata->data_trail),
+					nak_rb_expiry))
 		{
 			flush_naks = TRUE;
 		}
@@ -4005,21 +4021,20 @@ on_rdata (
 	if (flush_naks)
 	{
 /* flush out 1st time nak packets */
-		g_static_mutex_unlock (&sender->transport->mutex);
-		g_static_mutex_unlock (&sender->mutex);
+		g_static_mutex_lock (&transport->mutex);
 
-		pgm_time_update_now();
-		nak_rb_state (&sender->tsi, sender);
-
-		g_trace ("INFO","on_odata: prod timer thread");
-		const char one = '1';
-		if (1 != write (sender->transport->timer_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to pipe failed :(");
-			retval = -EINVAL;
+		if (pgm_time_after (transport->next_poll, nak_rb_expiry))
+		{
+			transport->next_poll = nak_rb_expiry;
+			g_trace ("INFO","on_odata: prod timer thread");
+			const char one = '1';
+			if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+				g_critical ("write to pipe failed :(");
+				retval = -EINVAL;
+			}
 		}
 
-		g_static_mutex_unlock (&sender->mutex);
-		g_static_mutex_unlock (&sender->transport->mutex);
+		g_static_mutex_unlock (&transport->mutex);
 	}
 
 out:
