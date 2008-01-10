@@ -2113,9 +2113,10 @@ on_spm (
 
 	spm->spm_sqn = g_ntohl (spm->spm_sqn);
 
-/* check for advancing sequence number */
+/* check for advancing sequence number, or first SPM */
 	g_static_mutex_lock (&sender->mutex);
-	if ( pgm_uint32_gte (spm->spm_sqn, sender->spm_sqn) )
+	if ( pgm_uint32_gte (spm->spm_sqn, sender->spm_sqn)
+		|| ( ((struct sockaddr*)&sender->nla)->sa_family == 0 ) )
 	{
 /* copy NLA for replies */
 		pgm_nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
@@ -2359,6 +2360,7 @@ on_ncf (
 
 	if ((retval = pgm_verify_ncf (header, data, len)) != 0)
 	{
+		g_trace ("INFO", "Invalid NCF, ignoring.");
 		goto out;
 	}
 
@@ -2388,6 +2390,7 @@ on_ncf (
 	}
 
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
+		g_trace ("INFO", "NCF not destined for this multicast group.");
 		retval = -EINVAL;
 		goto out;
 	}
@@ -2395,8 +2398,8 @@ on_ncf (
 	g_static_mutex_lock (&transport->mutex);
 	g_static_mutex_lock (&peer->mutex);
 
-	pgm_time_t now = pgm_time_update_now();
-	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), now + transport->nak_rdata_ivl, now + transport->nak_rb_ivl);
+	pgm_time_update_now();
+	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
 
 /* check NAK list */
 	guint32* nak_list = NULL;
@@ -2406,11 +2409,13 @@ on_ncf (
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(ncf + 1);
 		if (opt_header->opt_type != PGM_OPT_LENGTH)
 		{
+			g_trace ("INFO", "First PGM Option in NCF incorrect, ignoring.");
 			retval = -EINVAL;
 			goto out_unlock;
 		}
 		if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
 		{
+			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
 			retval = -EINVAL;
 			goto out_unlock;
 		}
@@ -2428,10 +2433,12 @@ on_ncf (
 		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
 
-	while (nak_list_len--)
+	g_trace ("INFO", "NCF contains 1+%i sequence numbers.", nak_list_len);
+	while (nak_list_len)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), now + transport->nak_rdata_ivl, now + transport->nak_rb_ivl);
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
 		nak_list++;
+		nak_list_len--;
 	}
 
 out_unlock:
@@ -2867,7 +2874,6 @@ nak_rb_state (
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
 	GList* list;
-	pgm_time_t now = pgm_time_now;
 #ifndef PGM_SINGLE_NAK
 	pgm_sqn_list_t nak_list;
 	nak_list.len = 0;
@@ -2899,7 +2905,7 @@ nak_rb_state (
 		pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
 
 /* check this packet for state expiration */
-		if (pgm_time_after_eq(now, rp->nak_rb_expiry))
+		if (pgm_time_after_eq(pgm_time_now, rp->nak_rb_expiry))
 		{
 			if (!is_valid_nla) {
 				dropped_invalid++;
@@ -2914,7 +2920,7 @@ nak_rb_state (
 
 #if PGM_SINGLE_NAK
 			send_nak (transport, peer, rp->sequence_number);
-			now = pgm_time_update_now();
+			pgm_time_update_now();
 #else
 			nak_list.sqn[nak_list.len++] = rp->sequence_number;
 #endif
@@ -2928,18 +2934,20 @@ nak_rb_state (
  */
 #ifdef PGM_ABSOLUTE_EXPIRY
 			rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
-			while (pgm_time_after_eq(now, rp->nak_rpt_expiry){
+			while (pgm_time_after_eq(pgm_time_now, rp->nak_rpt_expiry){
 				rp->nak_rpt_expiry += transport->nak_rpt_ivl;
 				rp->ncf_retry_count++;
 			}
 #else
-			rp->nak_rpt_expiry = now + transport->nak_rpt_ivl;
+			rp->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
+g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
+		pgm_to_secsf( rp->nak_rpt_expiry - pgm_time_now ) );
 #endif
 
 #ifndef PGM_SINGLE_NAK
 			if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
 				send_nak_list (peer, &nak_list);
-				now = pgm_time_update_now();
+				pgm_time_update_now();
 				nak_list.len = 0;
 			}
 #endif
@@ -3138,7 +3146,7 @@ nak_rpt_state (
 		{
 			if (!is_valid_nla) {
 				dropped_invalid++;
-				g_trace ("lost data #%u due to no peer NLA.", rp->sequence_number);
+				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
 				list = next_list_el;
 				continue;
@@ -3226,11 +3234,12 @@ nak_rdata_state (
 	gpointer		peer_
 	)
 {
-	g_trace ("INFO", "nak_rdata_state()");
 	pgm_peer_t* peer = (pgm_peer_t*)peer_;
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
 	GList* list = rxw->wait_data_queue->tail;
+
+	g_trace ("INFO", "nak_rdata_state(len=%u)", g_list_length(rxw->wait_data_queue->tail));
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -3248,7 +3257,17 @@ nak_rdata_state (
 		{
 			if (!is_valid_nla) {
 				dropped_invalid++;
-				g_trace ("lost data #%u due to no peer NLA.", rp->sequence_number);
+				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
+				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+				list = next_list_el;
+				continue;
+			}
+
+			if (++rp->data_retry_count > transport->nak_data_retries)
+			{
+/* cancellation */
+				dropped++;
+				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
 				list = next_list_el;
 				continue;
@@ -3257,20 +3276,12 @@ nak_rdata_state (
 /* remove from this state */
 			pgm_rxw_pkt_state_unlink (rxw, rp);
 
-			if (++rp->data_retry_count > transport->nak_data_retries)
-			{
-/* cancellation */
-				dropped++;
-//				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
-				pgm_rxw_mark_lost (rxw, rp->sequence_number);
-			}
-			else
-			{	/* retry */
-				rp->state = PGM_PKT_BACK_OFF_STATE;
-				g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
-//				rp->nak_rb_expiry = rp->nak_rdata_expiry + transport->nak_rb_ivl;
-				rp->nak_rb_expiry = pgm_time_now + transport->nak_rb_ivl;
-			}
+/* retry back to back-off state */
+			g_trace("INFO", "retry #%u attempt %u/%u.", rp->sequence_number, rp->data_retry_count, transport->nak_data_retries);
+			rp->state = PGM_PKT_BACK_OFF_STATE;
+			g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
+//			rp->nak_rb_expiry = rp->nak_rdata_expiry + transport->nak_rb_ivl;
+			rp->nak_rb_expiry = pgm_time_now + transport->nak_rb_ivl;
 		}
 		else
 		{	/* packet expires some time later */
