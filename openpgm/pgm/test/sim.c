@@ -918,14 +918,26 @@ net_send_spmr (
 
 /* check that the peer exists */
 	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
-	if (peer == NULL) {
-		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
-		return;
-	}
-	
 	struct sockaddr_storage peer_nla;
-	memcpy (&peer_nla, &peer->local_nla, sizeof(struct sockaddr_storage));
-	guint16 peer_sport = peer->tsi.sport;
+	guint16 peer_sport;
+
+	if (peer == NULL) {
+/* ourself */
+		if (pgm_tsi_equal (tsi, &transport->tsi))
+		{
+			peer_sport = transport->tsi.sport;
+		}
+		else
+		{
+			printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
+			return;
+		}
+	}
+	else
+	{
+		memcpy (&peer_nla, &peer->local_nla, sizeof(struct sockaddr_storage));
+		peer_sport = peer->tsi.sport;
+	}
 
 /* send */
         int retval = 0;
@@ -953,12 +965,17 @@ net_send_spmr (
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 /* default TTL */
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
-        retval = sendto (transport->send_sock,
-                                header,
-                                tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
-				(struct sockaddr*)&peer_nla,
-				pgm_sockaddr_len(&peer_nla));
+
+	if (!pgm_tsi_equal (tsi, &transport->tsi))
+	{
+	        retval = sendto (transport->send_sock,
+	                                header,
+	                                tpdu_length,
+	                                MSG_CONFIRM,            /* not expecting a reply */
+					(struct sockaddr*)&peer_nla,
+					pgm_sockaddr_len(&peer_nla));
+	}
+
 	g_static_mutex_unlock (&transport->send_mutex);
 
 	puts ("READY");
