@@ -186,6 +186,29 @@ sub wait_for_spmr {
 	return $obj;
 }
 
+sub die_on_spmr {
+	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
+	my $obj = undef;
+
+	eval {
+		local $SIG{ALRM} = sub { die "alarm\n"; };
+		alarm $timeout;
+		for (;;) {
+			my $block = $self->wait_for_block;
+			$obj = $json->jsonToObj($block);
+			last if ($obj->{PGM}->{type} =~ /SPMR/);
+		}
+		alarm 0;
+	};
+	if ($@) {
+		die unless $@ eq "alarm\n";
+		return $obj;
+	}
+
+	confess "$self->{tag}: spmr received during blackout.\n";
+}
+
 # data to {app}
 sub wait_for_data {
 	my $self = shift;

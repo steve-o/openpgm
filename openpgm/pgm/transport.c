@@ -2202,6 +2202,7 @@ on_spmr (
 		else
 		{
 /* we are a peer */
+			g_trace ("INFO", "suppressing SPMR due to peer multicast SPMR.");
 			g_static_mutex_lock (&peer->mutex);
 			peer->spmr_expiry = 0;
 			g_static_mutex_unlock (&peer->mutex);
