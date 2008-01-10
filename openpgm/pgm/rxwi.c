@@ -1144,6 +1144,8 @@ pgm_rxw_ncf (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
+	g_trace ("pgm_rxw_ncf(#%u)", sequence_number);
+
 	if (!r->window_defined) return -1;
 
 /* already committed */
@@ -1164,12 +1166,14 @@ pgm_rxw_ncf (
 		{
 			ASSERT_RXW_BASE_INVARIANT(r);
 			ASSERT_RXW_POINTER_INVARIANT(r);
+			g_trace ("ncf ignored as sequence number already in wait_data_state.");
 			return 0;	/* ignore */
 		}
 
 		case PGM_PKT_BACK_OFF_STATE:
 		case PGM_PKT_WAIT_NCF_STATE:
 			rp->nak_rdata_expiry = nak_rdata_expiry;
+			g_trace ("nak_rdata_expiry in %f seconds.", pgm_to_secsf( rp->nak_rdata_expiry - pgm_time_now ));
 			break;
 
 		default:

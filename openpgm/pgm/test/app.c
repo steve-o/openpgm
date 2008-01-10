@@ -270,9 +270,9 @@ err_free:
 }
 
 void
-session_set_txw_max_rte (
+session_set_nak_rb_ivl (
 	char*		name,
-	guint		max_txw_rte
+	guint		nak_rb_ivl		/* milliseconds */
 	)
 {
 /* check that session exists */
@@ -282,7 +282,92 @@ session_set_txw_max_rte (
 		return;
 	}
 
-	pgm_transport_set_txw_max_rte (sess->transport, max_txw_rte);
+	pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(nak_rb_ivl));
+	puts ("READY");
+}
+
+void
+session_set_nak_rpt_ivl (
+	char*		name,
+	guint		nak_rpt_ivl		/* milliseconds */
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_msecs(nak_rpt_ivl));
+	puts ("READY");
+}
+
+void
+session_set_nak_rdata_ivl (
+	char*		name,
+	guint		nak_rdata_ivl		/* milliseconds */
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_msecs(nak_rdata_ivl));
+	puts ("READY");
+}
+
+void
+session_set_nak_ncf_retries (
+	char*		name,
+	guint		nak_ncf_retries
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_nak_ncf_retries (sess->transport, nak_ncf_retries);
+	puts ("READY");
+}
+
+void
+session_set_nak_data_retries (
+	char*		name,
+	guint		nak_data_retries
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_nak_data_retries (sess->transport, nak_data_retries);
+	puts ("READY");
+}
+
+void
+session_set_txw_max_rte (
+	char*		name,
+	guint		txw_max_rte
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_txw_max_rte (sess->transport, txw_max_rte);
 	puts ("READY");
 }
 
@@ -307,11 +392,16 @@ session_bind (
 	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300));
 	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
-	pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(50));
-	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
-	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2));
-	pgm_transport_set_nak_data_retries (sess->transport, 50);
-	pgm_transport_set_nak_ncf_retries (sess->transport, 50);
+	if (!sess->transport->nak_rb_ivl)
+		pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(50));
+	if (!sess->transport->nak_rpt_ivl)
+		pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
+	if (!sess->transport->nak_rdata_ivl)
+		pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2));
+	if (!sess->transport->nak_data_retries)
+		pgm_transport_set_nak_data_retries (sess->transport, 50);
+	if (!sess->transport->nak_ncf_retries)
+		pgm_transport_set_nak_ncf_retries (sess->transport, 50);
 
 	int e = pgm_transport_bind (sess->transport);
 	if (e != 0) {
@@ -424,6 +514,101 @@ on_stdin_data (
 			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
 
 			session_create (name);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* set NAK_RB_IVL */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_RB_IVL[[:space:]]+([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			guint nak_rb_ivl = strtol (p, &p, 10);
+
+			session_set_nak_rb_ivl (name, nak_rb_ivl);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* set NAK_RPT_IVL */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_RPT_IVL[[:space:]]+([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			guint nak_rpt_ivl = strtol (p, &p, 10);
+
+			session_set_nak_rpt_ivl (name, nak_rpt_ivl);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* set NAK_RDATA_IVL */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_RDATA_IVL[[:space:]]+([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			guint nak_rdata_ivl = strtol (p, &p, 10);
+
+			session_set_nak_rdata_ivl (name, nak_rdata_ivl);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* set NAK_NCF_RETRIES */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_NCF_RETRIES[[:space:]]+([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			guint nak_ncf_retries = strtol (p, &p, 10);
+
+			session_set_nak_ncf_retries (name, nak_ncf_retries);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* set NAK_DATA_RETRIES */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_DATA_RETRIES[[:space:]]+([0-9]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			guint nak_data_retries = strtol (p, &p, 10);
+
+			session_set_nak_data_retries (name, nak_data_retries);
 
 			g_free (name);
 			regfree (&preg);
