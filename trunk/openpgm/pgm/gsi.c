@@ -55,7 +55,7 @@ struct md5_ctx
 
 /* globals */
 #undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN		"gsi"
+#define G_LOG_DOMAIN		"pgmgsi"
 
 /* This array contains the bytes used to pad the buffer to the next
  * 64-byte boundary.  (RFC 1321, 3.1: Step 1)  */
