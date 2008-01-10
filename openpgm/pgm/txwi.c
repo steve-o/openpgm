@@ -102,7 +102,7 @@
 
 /* globals */
 #undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN		"txw"
+#define G_LOG_DOMAIN		"pgmtxw"
 
 static void _list_iterator (gpointer, gpointer);
 

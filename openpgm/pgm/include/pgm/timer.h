@@ -36,20 +36,25 @@ G_BEGIN_DECLS
 typedef pgm_time_t (*pgm_time_update_func)(void);
 typedef void (*pgm_time_sleep_func)(gulong);
 
-#define pgm_time_after(a,b)	( pgm_uint64_gt(a,b) )
-#define pgm_time_before(a,b)    pgm_time_after(b,a)
+#define pgm_time_after(a,b)	( (a) > (b) )
+#define pgm_time_before(a,b)    ( pgm_time_after((b),(a)) )
 
-#define pgm_time_after_eq(a,b)  ( pgm_uint64_gte(a,b) )
-#define pgm_time_before_eq(a,b) pgm_time_after_eq(b,a)
+#define pgm_time_after_eq(a,b)  ( (a) >= (b) )
+#define pgm_time_before_eq(a,b) ( pgm_time_after_eq((b),(a)) )
 
 #define pgm_to_secs(t)	( (t) / 1000000UL )
 #define pgm_to_msecs(t)	( (t) / 1000 )
-#define pgm_to_usecs(t)	(t)
+#define pgm_to_usecs(t)	( (t) )
 #define pgm_to_nsecs(t)	( (t) * 1000 )
+
+#define pgm_to_secsf(t)	 ( (double)(t) / 1000000.0 )
+#define pgm_to_msecsf(t) ( (double)(t) / 1000.0 )
+#define pgm_to_usecsf(t) ( (double)(t) )
+#define pgm_to_nsecsf(t) ( (double)(t) * 1000.0 )
 
 #define pgm_secs(t)	( (t) * 1000000UL )
 #define pgm_msecs(t)	( (t) * 1000 )
-#define pgm_usecs(t)	(t)
+#define pgm_usecs(t)	( (t) )
 #define pgm_nsecs(t)	( (t) / 1000 )
 
 
