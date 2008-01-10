@@ -144,7 +144,7 @@
 
 /* globals */
 #undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN	"rxw"
+#define G_LOG_DOMAIN	"pgmrxw"
 
 static void _list_iterator (gpointer, gpointer);
 static inline int pgm_rxw_flush (pgm_rxw_t*);
@@ -844,6 +844,7 @@ pgm_rxw_pkt_state_unlink (
 		guint original_length = queue->length;
 #endif
 		g_queue_unlink (queue, &rp->link_);
+		rp->link_.prev = rp->link_.next = NULL;
 #ifdef RXW_DEBUG
 		g_assert (queue->length == original_length - 1);
 #endif
@@ -1009,7 +1010,6 @@ pgm_rxw_window_update (
 				pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
 				ph->link_.data		= ph;
 				ph->sequence_number     = r->lead;
-/* TODO: backoff interval ? */
 				ph->nak_rb_expiry	= nak_rb_expiry;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
 

@@ -47,7 +47,7 @@
 
 /* globals */
 #undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN		"if"
+#define G_LOG_DOMAIN		"pgmif"
 
 #define IF_DEFAULT_GROUP	((in_addr_t) 0xefc00001) /* 239.192.0.1 */
 

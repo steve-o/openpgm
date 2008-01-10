@@ -90,14 +90,14 @@ typedef int (*pgm_timer_callback)(pgm_transport_t*);
 
 /* global locals */
 #undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN		"transport"
+#define G_LOG_DOMAIN		"pgmtransport"
 
 static int ipproto_pgm = IPPROTO_PGM;
 
 /* helpers for pgm_peer_t */
-#define next_nak_rb_expiry(r)       ( ((pgm_rxw_packet_t*)(r)->backoff_queue->tail)->nak_rb_expiry )
-#define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue->tail)->nak_rpt_expiry )
-#define next_nak_rdata_expiry(r)    ( ((pgm_rxw_packet_t*)(r)->wait_data_queue->tail)->nak_rdata_expiry )
+#define next_nak_rb_expiry(r)       ( ((pgm_rxw_packet_t*)(r)->backoff_queue->tail->data)->nak_rb_expiry )
+#define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue->tail->data)->nak_rpt_expiry )
+#define next_nak_rdata_expiry(r)    ( ((pgm_rxw_packet_t*)(r)->wait_data_queue->tail->data)->nak_rdata_expiry )
 
 static gboolean pgm_src_prepare (GSource*, gint*);
 static gboolean pgm_src_check (GSource*);
@@ -939,7 +939,7 @@ pgm_transport_set_heartbeat_spm (
 int
 pgm_transport_set_peer_expiry (
 	pgm_transport_t*	transport,
-	guint			peer_expiry
+	guint			peer_expiry	/* in microseconds */
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -962,7 +962,7 @@ pgm_transport_set_peer_expiry (
 int
 pgm_transport_set_spmr_expiry (
 	pgm_transport_t*	transport,
-	guint			spmr_expiry
+	guint			spmr_expiry	/* in microseconds */
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -1242,7 +1242,7 @@ pgm_transport_set_rcvbuf (
 int
 pgm_transport_set_nak_rb_ivl (
 	pgm_transport_t*	transport,
-	guint			usec
+	guint			usec		/* microseconds */
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -1258,7 +1258,7 @@ pgm_transport_set_nak_rb_ivl (
 int
 pgm_transport_set_nak_rpt_ivl (
 	pgm_transport_t*	transport,
-	guint			usec
+	guint			usec		/* microseconds */
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -1274,7 +1274,7 @@ pgm_transport_set_nak_rpt_ivl (
 int
 pgm_transport_set_nak_rdata_ivl (
 	pgm_transport_t*	transport,
-	guint			usec
+	guint			usec		/* microseconds */
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -2873,11 +2873,7 @@ nak_rb_state (
 	nak_list.len = 0;
 #endif
 
-/* have not learned this peers NLA */
-	if (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr == INADDR_ANY)
-	{
-		return;
-	}
+	g_trace ("INFO", "nak_rb_state(len=%u)", g_list_length(rxw->backoff_queue->tail));
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
  * better to get the notification out a.s.a.p. even though it might be waiting
@@ -2887,7 +2883,15 @@ nak_rb_state (
  * event loop.  bias for shorter loops as retry count increases.
  */
 	list = rxw->backoff_queue->tail;
-	if (!list) return;
+	if (!list) {
+		g_warning ("backoff queue is empty in nak_rb_state.");
+		return;
+	}
+
+	guint dropped_invalid = 0;
+
+/* have not learned this peers NLA */
+	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
 	while (list)
 	{
@@ -2897,6 +2901,14 @@ nak_rb_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq(now, rp->nak_rb_expiry))
 		{
+			if (!is_valid_nla) {
+				dropped_invalid++;
+				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
+				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+				list = next_list_el;
+				continue;
+			}
+
 /* remove from this state */
 			pgm_rxw_pkt_state_unlink (rxw, rp);
 
@@ -2952,6 +2964,10 @@ nak_rb_state (
 	}
 #endif
 
+	if (dropped_invalid) {
+		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+	}
+
 	if (rxw->backoff_queue->length == 0)
 	{
 		g_assert ((struct rxw_packet*)rxw->backoff_queue->head == NULL);
@@ -2962,6 +2978,11 @@ nak_rb_state (
 		g_assert ((struct rxw_packet*)rxw->backoff_queue->head != NULL);
 		g_assert ((struct rxw_packet*)rxw->backoff_queue->tail != NULL);
 	}
+
+	if (rxw->backoff_queue->tail)
+		g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf((float)next_nak_rb_expiry(rxw) - (float)pgm_time_now));
+	else
+		g_trace ("INFO", "backoff queue empty.");
 }
 
 /* check this peer for NAK state timers, uses the tail of each queue for the nearest
@@ -3099,7 +3120,13 @@ nak_rpt_state (
 	pgm_transport_t* transport = peer->transport;
 	GList* list = rxw->wait_ncf_queue->tail;
 
+	g_trace ("INFO", "nak_rpt_state(len=%u)", g_list_length(rxw->wait_ncf_queue->tail));
+
+	guint dropped_invalid = 0;
 	guint dropped = 0;
+
+/* have not learned this peers NLA */
+	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
 	while (list)
 	{
@@ -3109,16 +3136,25 @@ nak_rpt_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq(pgm_time_now, rp->nak_rpt_expiry))
 		{
+			if (!is_valid_nla) {
+				dropped_invalid++;
+				g_trace ("lost data #%u due to no peer NLA.", rp->sequence_number);
+				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+				list = next_list_el;
+				continue;
+			}
 
 			if (++rp->ncf_retry_count > transport->nak_ncf_retries)
 			{
 /* cancellation */
 				dropped++;
-//				g_warning ("lost data #%u due to cancellation.", rp->sequence_number);
+				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
 			}
 			else
-			{	/* retry */
+			{
+/* retry */
+				g_trace("INFO", "retry #%u attempt %u/%u.", rp->sequence_number, rp->ncf_retry_count, transport->nak_ncf_retries);
 				pgm_rxw_pkt_state_unlink (rxw, rp);
 				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
@@ -3127,7 +3163,9 @@ nak_rpt_state (
 			}
 		}
 		else
-		{	/* packet expires some time later */
+		{
+/* packet expires some time later */
+			g_trace("INFO", "#%u retry is delayed %f seconds.", rp->sequence_number, pgm_to_secsf(rp->nak_rpt_expiry - pgm_time_now));
 			break;
 		}
 		
@@ -3146,6 +3184,10 @@ nak_rpt_state (
 		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue->tail);
 	}
 
+	if (dropped_invalid) {
+		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+	}
+
 	if (dropped) {
 		g_message ("dropped %u messages due to ncf cancellation, "
 				"rxw_sqns %" G_GUINT32_FORMAT
@@ -3162,6 +3204,16 @@ nak_rpt_state (
 				rxw->lost_count,
 				rxw->fragment_count);
 	}
+
+	if (rxw->wait_ncf_queue->tail) {
+		if (next_nak_rpt_expiry(rxw) > pgm_time_now)
+		{
+			g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf(next_nak_rpt_expiry(rxw) - pgm_time_now));
+		} else {
+			g_trace ("INFO", "next expiry set in -%f seconds.", pgm_to_secsf(pgm_time_now - next_nak_rpt_expiry(rxw)));
+		}
+	} else
+		g_trace ("INFO", "wait ncf queue empty.");
 }
 
 /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
@@ -3174,12 +3226,17 @@ nak_rdata_state (
 	gpointer		peer_
 	)
 {
+	g_trace ("INFO", "nak_rdata_state()");
 	pgm_peer_t* peer = (pgm_peer_t*)peer_;
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
 	GList* list = rxw->wait_data_queue->tail;
 
+	guint dropped_invalid = 0;
 	guint dropped = 0;
+
+/* have not learned this peers NLA */
+	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
 	while (list)
 	{
@@ -3189,6 +3246,14 @@ nak_rdata_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq(pgm_time_now, rp->nak_rdata_expiry))
 		{
+			if (!is_valid_nla) {
+				dropped_invalid++;
+				g_trace ("lost data #%u due to no peer NLA.", rp->sequence_number);
+				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+				list = next_list_el;
+				continue;
+			}
+
 /* remove from this state */
 			pgm_rxw_pkt_state_unlink (rxw, rp);
 
@@ -3227,9 +3292,18 @@ nak_rdata_state (
 		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue->tail);
 	}
 
+	if (dropped_invalid) {
+		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+	}
+
 	if (dropped) {
 		g_message ("dropped %u messages due to data cancellation.", dropped);
 	}
+
+	if (rxw->wait_data_queue->tail)
+		g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf(next_nak_rdata_expiry(rxw) - pgm_time_now));
+	else
+		g_trace ("INFO", "wait data queue empty.");
 }
 
 static int
