@@ -3,6 +3,7 @@
 # 13.3.1. SPM Requests
 
 use strict;
+use Time::HiRes qw( gettimeofday tv_interval );
 use PGM::Test;
 
 BEGIN { require "test.conf.pl"; }
@@ -39,13 +40,26 @@ $app->say ("send ao nashi");
 print "mon: wait for odata ...\n";
 my $odata = $mon->wait_for_odata;
 print "mon: odata received.\n";
+my $t0 = [gettimeofday];
+my $elapsed;
+
+## spm hearbeats are going to clear out the data, lets wait for some quiet
+print "mon: wait for SPM interval > 5 seconds ...\n";
+do {
+	$mon->wait_for_spm;
+	$elapsed = tv_interval ( $t0, [gettimeofday] );
+	print "mon: received SPM after $elapsed seconds.\n";
+} while ($elapsed < 5);
 
 print "sim: request SPM via SPMR.\n";
 $sim->say ("net send spmr ao $odata->{PGM}->{gsi}.$odata->{PGM}->{sourcePort}");
+$t0 = [gettimeofday];
 
 print "mon: wait for SPM ...\n";
 $mon->wait_for_spm;
-print "mon: SPM received.\n";
+$elapsed = tv_interval ( $t0, [gettimeofday] );
+print "mon: SPM received after $elapsed seconds.\n";
+die "SPM interval too large, indicates heartbeat not SPMR induced.\n" unless ($elapsed < 5.0);
 
 print "test completed successfully.\n";
 
