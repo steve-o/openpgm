@@ -2535,7 +2535,7 @@ send_spmr (
 	g_static_mutex_lock (&transport->send_mutex);
 
 /* send multicast SPMR TTL 1 */
-g_message ("send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transport->send_smr.smr_multiaddr)->sin_addr ));
+	g_trace ("INFO", "send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transport->send_smr.smr_multiaddr)->sin_addr ));
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), 1);
 	retval = sendto (transport->send_sock,
 				header,
@@ -2545,7 +2545,7 @@ g_message ("send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transp
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* send unicast SPMR with regular TTL */
-g_message ("send unicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&peer->local_nla)->sin_addr ));
+	g_trace ("INFO", "send unicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&peer->local_nla)->sin_addr ));
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
 	retval = sendto (transport->send_sock,
 				header,

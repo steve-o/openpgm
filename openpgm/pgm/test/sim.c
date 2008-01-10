@@ -901,6 +901,69 @@ net_send_spm (
 	puts ("READY");
 }
 
+void
+net_send_spmr (
+	char*		name,
+	pgm_tsi_t*	tsi
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_t* transport = sess->transport;
+
+/* check that the peer exists */
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
+	if (peer == NULL) {
+		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
+		return;
+	}
+	
+	struct sockaddr_storage peer_nla;
+	memcpy (&peer_nla, &peer->local_nla, sizeof(struct sockaddr_storage));
+	guint16 peer_sport = peer->tsi.sport;
+
+/* send */
+        int retval = 0;
+	int tpdu_length = sizeof(struct pgm_header);
+	gchar buf[ tpdu_length ];
+
+        struct pgm_header *header = (struct pgm_header*)buf;
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->dport;
+	header->pgm_dport       = peer_sport;
+	header->pgm_type        = PGM_SPMR;
+	header->pgm_options     = 0;
+	header->pgm_tsdu_length = 0;
+        header->pgm_checksum    = 0;
+        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+
+	g_static_mutex_lock (&transport->send_mutex);
+/* TTL 1 */
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), 1);
+        retval = sendto (transport->send_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+/* default TTL */
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
+        retval = sendto (transport->send_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+				(struct sockaddr*)&peer_nla,
+				pgm_sockaddr_len(&peer_nla));
+	g_static_mutex_unlock (&transport->send_mutex);
+
+	puts ("READY");
+}
+
 /* Send a NAK on a valid transport.  A fake transport would need to specify the senders NLA,
  * we use the peer list to bypass extracting it from the monitor output.
  */
@@ -1188,6 +1251,40 @@ on_stdin_data (
 			guint txw_lead = strtoul (p, &p, 10);
 
 			net_send_spm (name, spm_sqn, txw_trail, txw_lead);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* send spmr */
+		re = "^net[[:space:]]+send[[:space:]]+spmr[[:space:]]+"
+			"([[:alnum:]]+)[[:space:]]+"		/* transport */
+			"([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)$";	/* TSI */
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			pgm_tsi_t tsi;
+			char *p = str + pmatch[2].rm_so;
+			tsi.gsi.identifier[0] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi.identifier[1] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi.identifier[2] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi.identifier[3] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi.identifier[4] = strtol (p, &p, 10);
+			++p;
+			tsi.gsi.identifier[5] = strtol (p, &p, 10);
+			++p;
+			tsi.sport = g_htons ( strtol (p, NULL, 10) );
+
+			net_send_spmr (name, &tsi);
 
 			g_free (name);
 			regfree (&preg);
