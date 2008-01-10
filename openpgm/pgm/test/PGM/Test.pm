@@ -151,13 +151,36 @@ sub wait_for_spm {
 		for (;;) {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
-			last if ($obj->{PGM}->{type} =~ /SPM/);
+			last if ($obj->{PGM}->{type} =~ /SPM"/);
 		}
 		alarm 0;
 	};
 	if ($@) {
 		die unless $@ eq "alarm\n";
 		confess "$self->{tag}: alarm raised waiting for spm.\n";
+	}
+
+	return $obj;
+}
+
+sub wait_for_spmr {
+	my $self = shift;
+	my $timeout = ref($_[0]) ? $_[0]->{'timeout'} : 10;
+	my $obj = undef;
+
+	eval {
+		local $SIG{ALRM} = sub { die "alarm\n"; };
+		alarm $timeout;
+		for (;;) {
+			my $block = $self->wait_for_block;
+			$obj = $json->jsonToObj($block);
+			last if ($obj->{PGM}->{type} =~ /SPMR/);
+		}
+		alarm 0;
+	};
+	if ($@) {
+		die unless $@ eq "alarm\n";
+		confess "$self->{tag}: alarm raised waiting for spmr.\n";
 	}
 
 	return $obj;

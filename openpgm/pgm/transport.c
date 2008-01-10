@@ -1806,6 +1806,22 @@ new_peer (
 				on_pgm_data,
 				peer);
 
+	peer->spmr_expiry = pgm_time_update_now() + transport->spmr_expiry;
+
+/* prod timer thread if sleeping */
+	g_static_mutex_lock (&transport->mutex);
+	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
+	{
+		transport->next_poll = peer->spmr_expiry;
+		g_trace ("INFO","new_peer: prod timer thread");
+		const char one = '1';
+		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+			g_critical ("write to pipe failed :(");
+			/* retval = -EINVAL; */
+		}
+	}
+	g_static_mutex_unlock (&transport->mutex);
+
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
 	g_hash_table_insert (transport->peers, &peer->tsi, pgm_peer_ref(peer));
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
@@ -2512,12 +2528,10 @@ send_spmr (
 	int retval = 0;
 	pgm_transport_t* transport = peer->transport;
 
-/* lock and cache peer information */
-	g_static_mutex_lock (&peer->mutex);
+/* cache peer information */
 	guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->local_nla, sizeof(struct sockaddr_storage));
-	g_static_mutex_unlock (&peer->mutex);
 
 	int tpdu_length = sizeof(struct pgm_header);
 	char buf[ tpdu_length ];
@@ -3744,9 +3758,6 @@ pgm_timer_dispatch (
 		}
 
 	}
-
-	if ( transport->next_spmr_expiry && pgm_time_after_eq (pgm_time_now, transport->next_spmr_expiry) )
-		transport->next_spmr_expiry = 0;
 
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
 	g_hash_table_foreach (transport->peers, check_peer_nak_state, NULL);

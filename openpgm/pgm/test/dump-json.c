@@ -960,7 +960,7 @@ verify_spmr (
 		retval = verify_options (opt_offset, opt_len);
 	}
 
-	return -1;
+	return retval;
 }
 
 void

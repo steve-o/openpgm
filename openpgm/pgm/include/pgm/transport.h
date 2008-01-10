@@ -126,7 +126,6 @@ struct pgm_transport_t {
     guint		nak_data_retries, nak_ncf_retries;
     guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
     pgm_time_t		next_heartbeat_spm, next_ambient_spm;
-    pgm_time_t		next_spmr_expiry;
 
     gboolean		proactive_parity;
     gboolean		ondemand_parity;
