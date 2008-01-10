@@ -395,7 +395,23 @@ on_io_data (
 		memcpy (&peer->local_nla, &src_addr, src_addr_len);
 
 		g_hash_table_insert (transport->peers, &peer->tsi, peer);
+		sender = peer;
         }
+
+/* handle SPMs for advertised NLA */
+	if (pgm_header->pgm_type == PGM_SPM)
+	{
+		char *pgm_data = (char*)(pgm_header + 1);
+		struct pgm_spm* spm = (struct pgm_spm*)pgm_data;
+		guint32 spm_sqn = g_ntohl (spm->spm_sqn);
+
+		if ( pgm_uint32_gte (spm_sqn, sender->spm_sqn) 
+			|| ( ((struct sockaddr*)&sender->nla)->sa_family == 0 ) )
+		{
+			pgm_nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
+			sender->spm_sqn = spm_sqn;
+		}
+	}
 	
 out:
         return TRUE;
@@ -908,6 +924,12 @@ net_send_ncf (
 	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
+		return;
+	}
+
+/* check for valid nla */
+	if (((struct sockaddr*)&peer->nla)->sa_family == 0 ) {
+		puts ("FAILED: peer NLA unknown, cannot send NCF.");
 		return;
 	}
 
