@@ -94,6 +94,10 @@ typedef int (*pgm_timer_callback)(pgm_transport_t*);
 
 static int ipproto_pgm = IPPROTO_PGM;
 
+static GStaticMutex transport_list_mutex;		/* list of all transports for admin interfaces */
+static GSList* transport_list = NULL;
+
+
 /* helpers for pgm_peer_t */
 #define next_nak_rb_expiry(r)       ( ((pgm_rxw_packet_t*)(r)->backoff_queue->tail->data)->nak_rb_expiry )
 #define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue->tail->data)->nak_rpt_expiry )
@@ -345,6 +349,10 @@ pgm_transport_destroy (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	g_static_mutex_lock (&transport_list_mutex);
+	transport_list = g_slist_remove (&transport_list, transport);
+	g_static_mutex_unlock (&transport_list_mutex);
 
 /* terminate & join internal thread */
 #ifndef PGM_SINGLE_THREAD
@@ -788,6 +796,10 @@ pgm_transport_create (
 #endif /* !PGM_SINGLE_THREAD */
 
 	*transport_ = transport;
+
+	g_static_mutex_lock (&transport_list_mutex);
+	transport_list = g_slist_append (&transport_list, transport);
+	g_static_mutex_unlock (&transport_list_mutex);
 
 	return retval;
 
