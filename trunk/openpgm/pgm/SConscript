@@ -11,6 +11,9 @@ env['CPPPATH'] = env['CPPPATH'] + [os.getcwd() + '/include'];
 env['LIBPATH'] = env['LIBPATH'] + [os.getcwd() + '/ref/' + env['BUILD']];
 
 SConscript('SConscript.libpgm');
+SConscript('SConscript.libpgmex');
+SConscript('SConscript.libpgmhttp');
+SConscript('SConscript.libpgmsnmp');
 SConscript('test/SConscript');
 SConscript('dev/SConscript');
 SConscript('examples/SConscript');

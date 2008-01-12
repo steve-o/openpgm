@@ -3718,6 +3718,30 @@ pgm_timer_prepare (
 	return (msec == 0);
 }
 
+static int
+pgm_timer_signal (
+	pgm_transport_t*	transport,
+	pgm_time_t		expiration
+	)
+{
+	int retval = 0;
+
+	g_static_mutex_lock (&transport->mutex);
+	if (pgm_time_after( transport->next_poll, expiration ))
+	{
+		transport->next_poll = expiration;
+		g_trace ("INFO","new_peer: prod timer thread");
+		const char one = '1';
+		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+			g_critical ("write to pipe failed :(");
+			retval = -EINVAL;
+		}
+	}
+	g_static_mutex_unlock (&transport->mutex);
+
+	return retval;
+}
+
 static gboolean
 pgm_timer_check (
 	GSource*		source
