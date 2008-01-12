@@ -42,6 +42,7 @@
 #include <pgm/transport.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
+#include <pgm/http.h>
 
 
 /* typedefs */
@@ -102,8 +103,9 @@ main (
 		}
 	}
 
-	log_init ();
-	pgm_init ();
+	log_init();
+	pgm_init();
+	pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -133,6 +135,8 @@ main (
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
+
+	pgm_http_shutdown();
 
 	g_message ("finished.");
 	return 0;

@@ -3,9 +3,11 @@
 # $Id$
 
 Import('env')
-e = env.Copy(
-		LIBS = env['LIBS'] + ['libpgm', 'libpgmex'],
-		);
+e = env.Copy()
+e.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+e.Append(
+		LIBS = env['LIBS'] + ['libpgm', 'libpgmhttp', 'libpgmex'],
+	);
 
 e.Program(['pgmdump.c'])
 e.Program(['pgmsend.c'])

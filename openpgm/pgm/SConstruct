@@ -16,6 +16,10 @@ env = Environment(ENV = os.environ,
 )
 opt.Update (env)
 
+# define Builder for translating HTML documents for inlining.
+bld = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')
+env.Append(BUILDERS = {'HtmlC' : bld})
+
 # Define separate build environments
 release = env.Copy(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')

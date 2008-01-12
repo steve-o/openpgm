@@ -15,18 +15,12 @@ lib_src = Split("""
 		rxwi.c
 		transport.c
 		rate_control.c
-		snmp.c
-		pgmMIB.c
 """)
 
 only64_src = Split("""
 		csum-copy64.S
 """)
 
-libex_src = Split("""
-		log.c
-		backtrace.c
-""")
 
 lib_obj = []
 for src in lib_src:
@@ -37,9 +31,6 @@ if env['BUILD'] != 'thirtytwo':
 		lib_obj += env.SharedObject(src)
 
 env.StaticLibrary('libpgm', lib_src);
-#env.SharedLibrary('libpgm', lib_obj);
 env.StaticLibrary('libpgmpic', lib_obj);
-
-env.StaticLibrary('libpgmex', libex_src);
 
 # end of file
