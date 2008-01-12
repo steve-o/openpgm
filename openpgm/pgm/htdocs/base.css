@@ -1,0 +1,23 @@
+html {
+	background-color: white;
+	font-family: Verdana;
+	font-size: 11px;
+	color: black;
+}
+
+table {
+	border-collapse: collapse;
+}
+thead th,tfoot th {
+	background-color: #C30;
+	color: #FFB3A6;
+	text-align: center;
+	font-weight: bold;
+}
+tbody td {
+	border-bottom: 1px solid #F0F0F0;
+}
+th,td {
+	border-left: 0;
+	padding: 10px;
+}
