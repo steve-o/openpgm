@@ -373,6 +373,7 @@ static inline gboolean pgm_is_downstream (guint8 type)
 int pgm_verify_spm (struct pgm_header*, char*, int);
 int pgm_verify_spmr (struct pgm_header*, char*, int);
 int pgm_verify_nak (struct pgm_header*, char*, int);
+int pgm_verify_nnak (struct pgm_header*, char*, int);
 int pgm_verify_ncf (struct pgm_header*, char*, int);
 
 static inline int pgm_nla_to_sockaddr (const char* nla, struct sockaddr* sa)

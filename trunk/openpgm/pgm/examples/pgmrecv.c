@@ -40,9 +40,11 @@
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/transport.h>
+#include <pgm/if.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
 #include <pgm/http.h>
+#include <pgm/snmp.h>
 
 
 /* typedefs */
@@ -77,6 +79,8 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
+	fprintf (stderr, "  -x              : Enable SNMP interface\n");
 	exit (1);
 }
 
@@ -87,16 +91,21 @@ main (
 	)
 {
 	g_message ("pgmrecv");
+	gboolean enable_http = FALSE;
+	gboolean enable_snmpx = FALSE;
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:xth")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
+
+		case 't':	enable_http = TRUE; break;
+		case 'x':	enable_snmpx = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -105,7 +114,11 @@ main (
 
 	log_init();
 	pgm_init();
-	pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+
+	if (enable_http)
+		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+	if (enable_snmpx)
+		pgm_snmp_init();
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -136,7 +149,10 @@ main (
 		g_transport = NULL;
 	}
 
-	pgm_http_shutdown();
+	if (enable_http)
+		pgm_http_shutdown();
+	if (enable_snmpx)
+		pgm_snmp_shutdown();
 
 	g_message ("finished.");
 	return 0;

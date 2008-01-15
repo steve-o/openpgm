@@ -27,3 +27,8 @@ $ env MIBS="+ALL" mib2c pgmMIB
 
 ...
 
+To run with SNMP install snmpd, enable "master agentx" and walk:
+
+$ env MIBS="+ALL" snmpwalk -v 1 -c public localhost pgmMIB
+End of MIB
+

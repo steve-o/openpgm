@@ -36,6 +36,8 @@ G_BEGIN_DECLS
 int pgm_create_md5_gsi (pgm_gsi_t*);
 int pgm_create_ipv4_gsi (struct in_addr, pgm_gsi_t*);
 
+gint pgm_gsi_equal (gconstpointer, gconstpointer);
+
 
 G_END_DECLS
 

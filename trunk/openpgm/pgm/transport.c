@@ -94,8 +94,8 @@ typedef int (*pgm_timer_callback)(pgm_transport_t*);
 
 static int ipproto_pgm = IPPROTO_PGM;
 
-static GStaticMutex transport_list_mutex;		/* list of all transports for admin interfaces */
-static GSList* transport_list = NULL;
+GStaticRWLock pgm_transport_list_lock;		/* list of all transports for admin interfaces */
+GSList* pgm_transport_list = NULL;
 
 
 /* helpers for pgm_peer_t */
@@ -160,6 +160,7 @@ static int on_spm (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_nak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int);
 static int on_ncf (pgm_peer_t*, struct pgm_header*, char*, int);
+static int on_nnak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int);
 static int on_odata (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_rdata (pgm_peer_t*, struct pgm_header*, char*, int);
 
@@ -350,9 +351,9 @@ pgm_transport_destroy (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
-	g_static_mutex_lock (&transport_list_mutex);
-	transport_list = g_slist_remove (&transport_list, transport);
-	g_static_mutex_unlock (&transport_list_mutex);
+	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
+	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
+	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 
 /* terminate & join internal thread */
 #ifndef PGM_SINGLE_THREAD
@@ -797,9 +798,9 @@ pgm_transport_create (
 
 	*transport_ = transport;
 
-	g_static_mutex_lock (&transport_list_mutex);
-	transport_list = g_slist_append (&transport_list, transport);
-	g_static_mutex_unlock (&transport_list_mutex);
+	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
+	pgm_transport_list = g_slist_append (pgm_transport_list, transport);
+	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 
 	return retval;
 
@@ -1740,27 +1741,25 @@ pgm_transport_bind (
 
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
+/* determine IP header size for rate regulation engine & stats */
+	switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
+	case AF_INET:
+		transport->iphdr_len = sizeof(struct iphdr);
+		break;
+
+	case AF_INET6:
+		transport->iphdr_len = 40;	/* sizeof(struct ipv6hdr) */
+		break;
+	}
+	g_trace ("INFO","assuming IP header size of %i bytes", transport->iphdr_len);
+
 /* setup rate control */
 	if (transport->txw_max_rte)
 	{
 		g_trace ("INFO","Setting rate regulation to %i bytes per second.",
 				transport->txw_max_rte);
 	
-/* determine IP header size for rate regulation engine */
-		guint iphdr_len = 0;
-
-		switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
-		case AF_INET:
-			iphdr_len = sizeof(struct iphdr);
-			break;
-
-		case AF_INET6:
-			iphdr_len = 40;	/* sizeof(struct ipv6hdr) */
-			break;
-		}
-		g_trace ("INFO","assuming IP header size of %i bytes", iphdr_len);
-
-		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, iphdr_len);
+		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
 		if (retval < 0) {
 			retval = errno;
 			goto out;
@@ -1882,15 +1881,17 @@ on_io_data (
 	int e;
 
 	if (transport->udp_encap_port) {
-		if ((e = pgm_parse_udp_encap(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
-		{
-			goto out;
-		}
+		e = pgm_parse_udp_encap(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	} else {
-		if ((e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
-		{
-			goto out;
-		}
+		e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+	}
+
+	if (e < 0)
+	{
+		if (e == -2)
+			transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+		goto out;
 	}
 
 /* calculate senders TSI */
@@ -1914,6 +1915,7 @@ on_io_data (
 
 /* its upstream/peer-to-peer for another session */
 
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
 		}
 
@@ -1968,6 +1970,7 @@ on_io_data (
 
 /* its a mystery! */
 
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
 		}
 
@@ -1976,9 +1979,11 @@ on_io_data (
 
 		switch (pgm_header->pgm_type) {
 		case PGM_NAK:	on_nak (transport, &tsi, pgm_header, pgm_data, pgm_len); break;
+		case PGM_NNAK:	on_nnak (transport, &tsi, pgm_header, pgm_data, pgm_len); break;
 		case PGM_SPMR:	on_spmr (transport, source, pgm_header, pgm_data, pgm_len); break;
 		case PGM_POLR:
 		default:
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			break;
 		}
 	}
@@ -1989,11 +1994,13 @@ on_io_data (
 
 		if (!pgm_is_downstream (pgm_header->pgm_type))
 		{
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
 		}
 
 /* pgm packet DPORT contains our transport DPORT */
 		if (pgm_header->pgm_dport != transport->dport) {
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
 		}
 
@@ -2017,6 +2024,7 @@ on_io_data (
 		case PGM_SPM:	on_spm (sender, pgm_header, pgm_data, pgm_len); break;
 			break;
 		default:
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			break;
 		}
 
@@ -2220,6 +2228,10 @@ on_spmr (
 			g_static_mutex_unlock (&peer->mutex);
 		}
 	}
+	else
+	{
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+	}
 
 out:
 	return retval;
@@ -2245,11 +2257,13 @@ on_nak (
 	)
 {
 	g_trace ("INFO","on_nak()");
+	transport->cumulative_stats[PGM_PC_SOURCE_RAW_NAKS_RECEIVED]++;
 
 	int retval;
-
 	if ((retval = pgm_verify_nak (header, data, len)) != 0)
 	{
+		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 		goto out;
 	}
 
@@ -2261,6 +2275,8 @@ on_nak (
 
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
 		retval = -EINVAL;
+		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 		goto out;
 	}
 
@@ -2278,6 +2294,8 @@ on_nak (
 
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
 		retval = -EINVAL;
+		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 		goto out;
 	}
 
@@ -2299,11 +2317,15 @@ on_nak (
 		if (opt_header->opt_type != PGM_OPT_LENGTH)
 		{
 			retval = -EINVAL;
+			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
 		}
 		if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
 		{
 			retval = -EINVAL;
+			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
 		}
 		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
@@ -2478,6 +2500,98 @@ out:
 	return retval;
 }
 
+/* Null-NAK, or N-NAK propogated by a DLR for hand waving excitement
+ */
+
+static int
+on_nnak (
+	pgm_transport_t*	transport,
+	pgm_tsi_t*		tsi,
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	g_trace ("INFO","on_nnak()");
+	transport->cumulative_stats[PGM_PC_SOURCE_NNAK_PACKETS_RECEIVED]++;
+
+	int retval;
+	if ((retval = pgm_verify_nnak (header, data, len)) != 0)
+	{
+		transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+		goto out;
+	}
+
+	struct pgm_nak* nnak = (struct pgm_nak*)data;
+		
+/* NAK_SRC_NLA contains our transport unicast NLA */
+	struct sockaddr_storage nnak_src_nla;
+	pgm_nla_to_sockaddr ((const char*)&nnak->nak_src_nla_afi, (struct sockaddr*)&nnak_src_nla);
+
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nnak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
+		retval = -EINVAL;
+		transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+		goto out;
+	}
+
+/* NAK_GRP_NLA containers our transport multicast group */ 
+	struct sockaddr_storage nnak_grp_nla;
+	switch (pgm_sockaddr_family(&nnak_src_nla)) {
+	case AF_INET:
+		pgm_nla_to_sockaddr ((const char*)&nnak->nak_grp_nla_afi, (struct sockaddr*)&nnak_grp_nla);
+		break;
+
+	case AF_INET6:
+		pgm_nla_to_sockaddr ((const char*)&((struct pgm_nak6*)nnak)->nak6_grp_nla_afi, (struct sockaddr*)&nnak_grp_nla);
+		break;
+	}
+
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nnak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
+		retval = -EINVAL;
+		transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+		goto out;
+	}
+
+/* check NNAK list */
+	guint nnak_list_len = 0;
+	if (header->pgm_options & PGM_OPT_PRESENT)
+	{
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nnak + 1);
+		if (opt_header->opt_type != PGM_OPT_LENGTH)
+		{
+			retval = -EINVAL;
+			transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			goto out;
+		}
+		if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
+		{
+			retval = -EINVAL;
+			transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			goto out;
+		}
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+/* TODO: check for > 16 options & past packet end */
+		do {
+			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+
+			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
+			{
+				nnak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				break;
+			}
+		} while (!(opt_header->opt_type & PGM_OPT_END));
+	}
+
+	transport->cumulative_stats[PGM_PC_SOURCE_NNAKS_RECEIVED] += 1 + nnak_list_len;
+
+out:
+	return retval;
+}
 
 /* ambient/heartbeat SPM's
  *
@@ -2524,6 +2638,7 @@ send_spm_unlocked (
 				MSG_CONFIRM,			/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += transport->spm_len;
 
 	return retval;
 }
@@ -2584,6 +2699,8 @@ send_spmr (
 	g_static_mutex_unlock (&transport->send_mutex);
 
 	peer->spmr_expiry = 0;
+
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length * 2;
 
 out:
 	return retval;
@@ -2692,6 +2809,7 @@ send_ncf (
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
 
 out:
@@ -2879,6 +2997,7 @@ send_ncf_list (
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
 
 	return retval;
@@ -3420,9 +3539,13 @@ pgm_write_unlocked (
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
-//	g_trace ("INFO","%i bytes sent", tpdu_length);
 
 	pgm_reset_heartbeat_spm (transport);
+
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += count;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]++;
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length + transport->iphdr_len;
+//	g_trace ("INFO","%i bytes sent", tpdu_length);
 
 	return retval;
 }
@@ -3441,13 +3564,15 @@ pgm_write_copy_fragment_unlocked (
 	int retval = 0;
 	guint offset = 0;
 	guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
+	guint packets = 0;
+	guint bytes_sent = 0;
 
 	do {
 /* retrieve packet storage from transmit window */
 		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-		int tsdu_length = MIN(transport->max_tpdu - sizeof(struct iphdr) - header_length, count - offset);
+		int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - offset);
 		int tpdu_length = header_length + tsdu_length;
 
 		char *pkt = pgm_txw_alloc(transport->txw);
@@ -3502,7 +3627,8 @@ pgm_write_copy_fragment_unlocked (
 					MSG_CONFIRM,		/* not expecting a reply */
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-
+		packets++;
+		bytes_sent += tpdu_length + transport->iphdr_len;
 //		g_trace ("INFO","%i bytes sent", tpdu_length);
 
 		offset += tsdu_length;
@@ -3513,6 +3639,10 @@ pgm_write_copy_fragment_unlocked (
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	pgm_reset_heartbeat_spm (transport);
+
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += count;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
 
 	return retval;
 }
@@ -3552,6 +3682,10 @@ send_rdata (
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	g_static_mutex_unlock (&transport->mutex);
+
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_RETRANSMITTED] += header->pgm_tsdu_length;
+	transport->cumulative_stats[PGM_PC_SOURCE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += len + transport->iphdr_len;
 
 	return retval;
 }
