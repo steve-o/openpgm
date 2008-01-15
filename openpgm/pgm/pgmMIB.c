@@ -12,8 +12,20 @@
 static oid snmptrap_oid[] = {1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0};
 
 int
-pgm_init_mib (void)
+pgm_mib_init (void)
 {
+/*
+ * here we initialize all the tables we're planning on supporting
+ */
+#if 0
+	initialize_table_pgmSourceTable();
+	initialize_table_pgmSourceConfigTable();
+	initialize_table_pgmSourcePerformanceTable();
+	initialize_table_pgmReceiverTable();
+	initialize_table_pgmReceiverConfigTable();
+	initialize_table_pgmReceiverPerformanceTable();
+#endif
+
 	return 0;
 }
 

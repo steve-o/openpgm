@@ -411,5 +411,17 @@ pgm_create_ipv4_gsi (
 	return retval;
 }
 
+/* compare two global session identifier GSI values and return TRUE if they are equal
+ */
+
+inline gint
+pgm_gsi_equal (
+        gconstpointer   v,
+        gconstpointer   v2
+        )
+{
+        return memcmp (v, v2, 6 * sizeof(guint8)) == 0;
+}
+
 
 /* eof */

@@ -1015,6 +1015,16 @@ pgm_print_nak (
 /* 8.3.  N-NAK
  */
 
+int
+pgm_verify_nnak (
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	return pgm_verify_nak (header, data, len);
+}
+
 static gboolean
 pgm_print_nnak (
 	struct pgm_header* header,

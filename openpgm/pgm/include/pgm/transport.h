@@ -79,6 +79,27 @@ struct pgm_event_t {
     struct pgm_peer_t*	peer;
 };
 
+/* Performance Counters */
+
+typedef enum {
+    PGM_PC_SOURCE_DATA_BYTES_SENT,
+    PGM_PC_SOURCE_DATA_MSGS_SENT,
+    PGM_PC_SOURCE_BYTES_RETRANSMITTED,
+    PGM_PC_SOURCE_MSGS_RETRANSMITTED,
+    PGM_PC_SOURCE_BYTES_SENT,
+    PGM_PC_SOURCE_RAW_NAKS_RECEIVED,
+    PGM_PC_SOURCE_NAKS_IGNORED,
+    PGM_PC_SOURCE_CKSUM_ERRORS,
+    PGM_PC_SOURCE_MALFORMED_NAKS,
+    PGM_PC_SOURCE_PACKETS_DISCARDED,
+    PGM_PC_SOURCE_NAKS_RECEIVED,
+    PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE,
+    PGM_PC_SOURCE_NNAK_PACKETS_RECEIVED,
+    PGM_PC_SOURCE_NNAKS_RECEIVED,
+    PGM_PC_SOURCE_NNAK_ERRORS,
+    PGM_PC_COUNT
+} pgm_pc_e;
+
 struct pgm_transport_t {
     pgm_tsi_t           tsi;
     guint16		dport;
@@ -104,6 +125,7 @@ struct pgm_transport_t {
     GIOChannel*		recv_channel;
 
     guint16		max_tpdu;
+    guint		iphdr_len;
     gint		hops;
     guint		txw_preallocate, txw_sqns, txw_secs, txw_max_rte;
     guint		rxw_preallocate, rxw_sqns, rxw_secs, rxw_max_rte;
@@ -151,9 +173,16 @@ struct pgm_transport_t {
     pgm_time_t		next_poll;
     int			timer_pipe[2];
     GIOChannel*		timer_channel;
+
+    guint32		cumulative_stats[PGM_PC_COUNT];
+    guint32		snap_stats[PGM_PC_COUNT];
+    pgm_time_t		snap_time;
 };
 
 typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
+
+extern GStaticRWLock pgm_transport_list_lock;
+extern GSList* pgm_transport_list;
 
 
 G_BEGIN_DECLS

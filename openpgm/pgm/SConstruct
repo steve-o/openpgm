@@ -12,7 +12,8 @@ opt.AddOptions (
 import os
 env = Environment(ENV = os.environ,
 	CCFLAGS = ['-pipe', '-Wall', '-pedantic', '-std=gnu99', '-D_REENTRANT', '-DCONFIG_REED_SOLOMON_ENC8', '-DCONFIG_REED_SOLOMON_DEC8'],
-	LINKFLAGS = ['-pipe']
+	LINKFLAGS = ['-pipe'],
+	NETSNMP_LIBS = ['libnetsnmpagent', 'libnetsnmpmibs', 'libnetsnmphelpers', 'libnetsnmp']
 )
 opt.Update (env)
 
