@@ -6,7 +6,7 @@ Import('env')
 e = env.Copy()
 e.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
 e.Append(
-		LIBS = env['LIBS'] + ['libpgm', 'libpgmhttp', 'libpgmex'],
+		LIBS = env['LIBS'] + env['NETSNMP_LIBS'] + ['libpgm', 'libpgmhttp', 'libpgmsnmp', 'libpgmex'],
 	);
 
 e.Program(['pgmdump.c'])
