@@ -36,6 +36,79 @@
 #   include "timer.h"
 #endif
 
+/* Performance Counters */
+
+typedef enum {
+/* source side */
+    PGM_PC_SOURCE_DATA_BYTES_SENT,
+    PGM_PC_SOURCE_DATA_MSGS_SENT,	    /* msgs = packets not APDUs */
+/*  PGM_PC_SOURCE_BYTES_BUFFERED, */	    /* tx window contents in bytes */
+/*  PGM_PC_SOURCE_MSGS_BUFFERED, */
+    PGM_PC_SOURCE_BYTES_SENT,
+    PGM_PC_SOURCE_RAW_NAKS_RECEIVED,	    /* total packets */
+    PGM_PC_SOURCE_CKSUM_ERRORS,
+    PGM_PC_SOURCE_MALFORMED_NAKS,
+    PGM_PC_SOURCE_PACKETS_DISCARDED,
+    PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED,
+    PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED,
+    PGM_PC_SOURCE_SELECTIVE_NAK_PACKETS_RECEIVED,
+    PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED,  /* serial numbers */
+    PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED,
+/*  PGM_PC_SOURCE_ACK_ERRORS, */
+/*  PGM_PC_SOURCE_PGMCC_ACKER, */
+    PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE,
+/*  PGM_PC_SOURCE_ACK_PACKETS_RECEIVED, */
+    PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED,
+    PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED,
+    PGM_PC_SOURCE_NNAK_ERRORS,
+
+/* marker */
+    PGM_PC_SOURCE_MAX
+} pgm_pc_source_e;
+
+typedef enum {
+/* receiver side */
+    PGM_PC_RECEIVER_DATA_BYTES_RECEIVED,
+    PGM_PC_RECEIVER_DATA_MSGS_RECEIVED,
+    PGM_PC_RECEIVER_NAK_FAILURES,
+    PGM_PC_RECEIVER_BYTES_RECEIVED,
+/*  PGM_PC_RECEIVER_CKSUM_ERRORS, */	    /* inherently same as source */
+    PGM_PC_RECEIVER_MALFORMED_SPMS,
+    PGM_PC_RECEIVER_MALFORMED_ODATA,
+    PGM_PC_RECEIVER_MALFORMED_RDATA,
+    PGM_PC_RECEIVER_MALFORMED_NCFS,
+    PGM_PC_RECEIVER_PACKETS_DISCARDED,
+    PGM_PC_RECEIVER_LOSSES,
+    PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP,
+    PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP,
+    PGM_PC_RECEIVER_DUP_SPMS,
+    PGM_PC_RECEIVER_DUP_DATAS,
+    PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT,
+    PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT,
+    PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED,
+    PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED,
+    PGM_PC_RECEIVER_NAKS_FAILED_RXW_ADVANCED,
+    PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED,
+    PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED,
+/*  PGM_PC_RECEIVER_NAKS_FAILED_GEN_EXPIRED */
+    PGM_PC_RECEIVER_NAK_FAILURES_DELIVERED,
+    PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED,
+    PGM_PC_RECEIVER_NAK_ERRORS,
+    PGM_PC_RECEIVER_LAST_ACTIVITY,
+/*  PGM_PC_RECEIVER_NAK_SVC_TIME_MIN, */
+    PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN,
+/*  PGM_PC_RECEIVER_NAK_SVC_TIME_MAX, */
+/*  PGM_PC_RECEIVER_NAK_FAIL_TIME_MIN, */
+    PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN,
+/*  PGM_PC_RECEIVER_NAK_FAIL_TIME_MAX, */
+/*  PGM_PC_RECEIVER_TRANSMIT_MIN, */
+    PGM_PC_RECEIVER_TRANSMIT_MEAN,
+/*  PGM_PC_RECEIVER_TRANSMIT_MAX, */
+/*  PGM_PC_RECEIVER_ACKS_SENT, */
+
+/* marker */
+    PGM_PC_RECEIVER_MAX
+} pgm_pc_receiver_e;
 
 typedef struct pgm_transport_t pgm_transport_t;
 
@@ -57,6 +130,7 @@ struct pgm_peer_t {
     gint		ref_count;
 
     pgm_tsi_t           tsi;
+    struct sockaddr_storage	group_nla;
     struct sockaddr_storage	nla, local_nla;	    /* nla = advertised, local_nla = from packet */
     struct sockaddr_storage	redirect_nla;	    /* from dlr */
     pgm_time_t		spmr_expiry;
@@ -68,6 +142,13 @@ struct pgm_peer_t {
 
     int			spm_sqn;
     pgm_time_t		expiry;
+
+    pgm_time_t		last_packet;
+    guint32		cumulative_stats[PGM_PC_RECEIVER_MAX];
+    guint32		snap_stats[PGM_PC_RECEIVER_MAX];
+
+    gint		min_fail_time;
+    gint		max_fail_time;
 };
 
 typedef struct pgm_peer_t pgm_peer_t;
@@ -78,27 +159,6 @@ struct pgm_event_t {
     guint		len;
     struct pgm_peer_t*	peer;
 };
-
-/* Performance Counters */
-
-typedef enum {
-    PGM_PC_SOURCE_DATA_BYTES_SENT,
-    PGM_PC_SOURCE_DATA_MSGS_SENT,
-    PGM_PC_SOURCE_BYTES_RETRANSMITTED,
-    PGM_PC_SOURCE_MSGS_RETRANSMITTED,
-    PGM_PC_SOURCE_BYTES_SENT,
-    PGM_PC_SOURCE_RAW_NAKS_RECEIVED,
-    PGM_PC_SOURCE_NAKS_IGNORED,
-    PGM_PC_SOURCE_CKSUM_ERRORS,
-    PGM_PC_SOURCE_MALFORMED_NAKS,
-    PGM_PC_SOURCE_PACKETS_DISCARDED,
-    PGM_PC_SOURCE_NAKS_RECEIVED,
-    PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE,
-    PGM_PC_SOURCE_NNAK_PACKETS_RECEIVED,
-    PGM_PC_SOURCE_NNAKS_RECEIVED,
-    PGM_PC_SOURCE_NNAK_ERRORS,
-    PGM_PC_COUNT
-} pgm_pc_e;
 
 struct pgm_transport_t {
     pgm_tsi_t           tsi;
@@ -174,8 +234,8 @@ struct pgm_transport_t {
     int			timer_pipe[2];
     GIOChannel*		timer_channel;
 
-    guint32		cumulative_stats[PGM_PC_COUNT];
-    guint32		snap_stats[PGM_PC_COUNT];
+    guint32		cumulative_stats[PGM_PC_SOURCE_MAX];
+    guint32		snap_stats[PGM_PC_SOURCE_MAX];
     pgm_time_t		snap_time;
 };
 
