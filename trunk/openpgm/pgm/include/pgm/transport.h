@@ -181,6 +181,7 @@ struct pgm_transport_t {
     GStaticMutex	send_with_router_alert_mutex;
     int			send_with_router_alert_sock;
     struct pgm_sock_mreq recv_smr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
+    guint		recv_smr_len;
     int			recv_sock;
     GIOChannel*		recv_channel;
 

@@ -159,6 +159,7 @@ static gboolean on_timer_pipe (GIOChannel*, GIOCondition, gpointer);
 static int on_spm (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_nak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int);
+static int on_peer_nak (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_ncf (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_nnak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int);
 static int on_odata (pgm_peer_t*, struct pgm_header*, char*, int);
@@ -701,6 +702,7 @@ pgm_transport_create (
 	{
 		memcpy (&transport->recv_smr[i], &recv_smr[i], sizeof(struct pgm_sock_mreq));
 	}
+	transport->recv_smr_len = recv_len;
 
 /* open sockets to implement PGM */
 	int socket_type, protocol;
@@ -1591,9 +1593,9 @@ pgm_transport_bind (
 
 /* receiving groups (multiple) */
 /* TODO: add IPv6 multicast membership? */
-	struct pgm_sock_mreq* p = transport->recv_smr;
-	int i = 1;
-	do {
+	for (int i = 0; i < transport->recv_smr_len; i++)
+	{
+		struct pgm_sock_mreq* p = &transport->recv_smr[i];
 		retval = pgm_sockaddr_add_membership (transport->recv_sock, p);
 		if (retval < 0) {
 			retval = errno;
@@ -1601,7 +1603,7 @@ pgm_transport_bind (
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
-			g_trace ("INFO","sockaddr_add_membership failed on recv_smr[%i] %s %s", i-1, s1, s2);
+			g_trace ("INFO","sockaddr_add_membership failed on recv_smr[%i] %s %s", i, s1, s2);
 #endif
 			goto out;
 		}
@@ -1611,11 +1613,10 @@ pgm_transport_bind (
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
-			g_trace ("INFO","sockaddr_add_membership succeeded on recv_smr[%i] %s %s", i-1, s1, s2);
+			g_trace ("INFO","sockaddr_add_membership succeeded on recv_smr[%i] %s %s", i, s1, s2);
 		}
 #endif
-
-	} while ((i++) < IP_MAX_MEMBERSHIPS && pgm_sockaddr_family(&(++p)->smr_multiaddr) != 0);
+	}
 
 /* send group (singular) */
 	retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_smr);
@@ -1973,7 +1974,7 @@ on_io_data (
 		else
 		{
 
-/* its a mystery! */
+/* it is a mystery! */
 
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto out;
@@ -1983,7 +1984,17 @@ on_io_data (
 		int pgm_len = packet_len - sizeof(pgm_header);
 
 		switch (pgm_header->pgm_type) {
-		case PGM_NAK:	on_nak (transport, &tsi, pgm_header, pgm_data, pgm_len); break;
+		case PGM_NAK:
+			if (source) {
+				on_peer_nak (source, pgm_header, pgm_data, pgm_len);
+			} else if (!pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)) {
+				on_nak (transport, &tsi, pgm_header, pgm_data, pgm_len);
+			} else {
+/* ignore multicast NAKs as the source */
+				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			}
+			break;
+
 		case PGM_NNAK:	on_nnak (transport, &tsi, pgm_header, pgm_data, pgm_len); break;
 		case PGM_SPMR:	on_spmr (transport, source, pgm_header, pgm_data, pgm_len); break;
 		case PGM_POLR:
@@ -2409,6 +2420,129 @@ out:
 	return retval;
 }
 
+/* Multicast peer-to-peer NAK handling, pretty much the same as a NCF but different direction
+ */
+
+static int
+on_peer_nak (
+	pgm_peer_t*		peer,
+	struct pgm_header*	header,
+	char*			data,
+	int			len
+	)
+{
+	g_trace ("INFO","on_peer_nak()");
+
+	int retval;
+	pgm_transport_t* transport = peer->transport;
+
+	if ((retval = pgm_verify_nak (header, data, len)) != 0)
+	{
+		g_trace ("INFO", "Invalid NAK, ignoring.");
+		peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS]++;
+		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		goto out;
+	}
+
+	struct pgm_nak* nak = (struct pgm_nak*)data;
+		
+/* NAK_SRC_NLA must not contain our transport unicast NLA */
+	struct sockaddr_storage nak_src_nla;
+	pgm_nla_to_sockaddr ((const char*)&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
+
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) == 0) {
+		retval = -EINVAL;
+		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		goto out;
+	}
+
+/* NAK_GRP_NLA contains one of our transport receive multicast groups: the sources send multicast group */ 
+	struct sockaddr_storage nak_grp_nla;
+	switch (pgm_sockaddr_family(&nak_src_nla)) {
+	case AF_INET:
+		pgm_nla_to_sockaddr ((const char*)&nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		break;
+
+	case AF_INET6:
+		pgm_nla_to_sockaddr ((const char*)&((struct pgm_nak6*)nak)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		break;
+	}
+
+	gboolean found = FALSE;
+	for (int i = 0; i < transport->recv_smr_len; i++)
+	{
+		if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->recv_smr[i].smr_multiaddr) == 0)
+		{
+			found = TRUE;
+		}
+	}
+
+	if (!found) {
+		g_trace ("INFO", "NAK not destined for this multicast group.");
+		retval = -EINVAL;
+		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		goto out;
+	}
+
+	g_static_mutex_lock (&transport->mutex);
+	g_static_mutex_lock (&peer->mutex);
+
+/* handle as NCF */
+	pgm_time_update_now();
+	pgm_rxw_ncf (peer->rxw, g_ntohl (nak->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+
+/* check NAK list */
+	guint32* nak_list = NULL;
+	int nak_list_len = 0;
+	if (header->pgm_options & PGM_OPT_PRESENT)
+	{
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
+		if (opt_header->opt_type != PGM_OPT_LENGTH)
+		{
+			g_trace ("INFO", "First PGM Option in NAK incorrect, ignoring.");
+			retval = -EINVAL;
+			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
+			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+			goto out_unlock;
+		}
+		if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
+		{
+			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
+			retval = -EINVAL;
+			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
+			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+			goto out_unlock;
+		}
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+/* TODO: check for > 16 options & past packet end */
+		do {
+			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+
+			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
+			{
+				nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
+				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				break;
+			}
+		} while (!(opt_header->opt_type & PGM_OPT_END));
+	}
+
+	g_trace ("INFO", "NAK contains 1+%i sequence numbers.", nak_list_len);
+	while (nak_list_len)
+	{
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+		nak_list++;
+		nak_list_len--;
+	}
+
+out_unlock:
+	g_static_mutex_unlock (&peer->mutex);
+	g_static_mutex_unlock (&transport->mutex);
+
+out:
+	return retval;
+}
+
 /* NCF confirming receipt of a NAK from this transport or another on the LAN segment.
  *
  * Packet contents will match exactly the sent NAK, although not really that helpful.
@@ -2438,30 +2572,30 @@ on_ncf (
 	struct pgm_nak* ncf = (struct pgm_nak*)data;
 		
 /* NCF_SRC_NLA may contain our transport unicast NLA, we don't really care */
-	struct sockaddr_storage nak_src_nla;
-	pgm_nla_to_sockaddr ((const char*)&ncf->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
+	struct sockaddr_storage ncf_src_nla;
+	pgm_nla_to_sockaddr ((const char*)&ncf->nak_src_nla_afi, (struct sockaddr*)&ncf_src_nla);
 
 #if 0
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
 		retval = -EINVAL;
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
 	}
 #endif
 
-/* NAK_GRP_NLA containers our transport multicast group */ 
-	struct sockaddr_storage nak_grp_nla;
-	switch (pgm_sockaddr_family(&nak_src_nla)) {
+/* NCF_GRP_NLA contains our transport multicast group */ 
+	struct sockaddr_storage ncf_grp_nla;
+	switch (pgm_sockaddr_family(&ncf_src_nla)) {
 	case AF_INET:
-		pgm_nla_to_sockaddr ((const char*)&ncf->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		pgm_nla_to_sockaddr ((const char*)&ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
 		break;
 
 	case AF_INET6:
-		pgm_nla_to_sockaddr ((const char*)&((struct pgm_nak6*)ncf)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+		pgm_nla_to_sockaddr ((const char*)&((struct pgm_nak6*)ncf)->nak6_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
 		break;
 	}
 
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
 		g_trace ("INFO", "NCF not destined for this multicast group.");
 		retval = -EINVAL;
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
@@ -2474,9 +2608,9 @@ on_ncf (
 	pgm_time_update_now();
 	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
 
-/* check NAK list */
-	guint32* nak_list = NULL;
-	int nak_list_len = 0;
+/* check NCF list */
+	guint32* ncf_list = NULL;
+	int ncf_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(ncf + 1);
@@ -2503,19 +2637,19 @@ on_ncf (
 
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
-				nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
-				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				ncf_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
+				ncf_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
 
-	g_trace ("INFO", "NCF contains 1+%i sequence numbers.", nak_list_len);
-	while (nak_list_len)
+	g_trace ("INFO", "NCF contains 1+%i sequence numbers.", ncf_list_len);
+	while (ncf_list_len)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
-		nak_list++;
-		nak_list_len--;
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*ncf_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+		ncf_list++;
+		ncf_list_len--;
 	}
 
 out_unlock:
@@ -2766,8 +2900,10 @@ send_nak (
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
-/* group nla */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+/* group nla: we match the NAK NLA to the same as advertised by the source, we might
+ * be listening to multiple multicast groups
+ */
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
@@ -2887,7 +3023,7 @@ send_nak_list (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_multiaddr, (char*)&nak->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
 
 /* OPT_NAK_LIST */
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
