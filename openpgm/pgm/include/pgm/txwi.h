@@ -47,6 +47,9 @@ struct pgm_txw_t {
 
         guint32         lead;
         guint32         trail;
+
+	guint32		bytes_in_window;
+	guint32		packets_in_window;
 };
 
 typedef struct pgm_txw_t pgm_txw_t;
