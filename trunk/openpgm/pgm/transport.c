@@ -1819,6 +1819,10 @@ new_peer (
 
 	peer->spmr_expiry = pgm_time_update_now() + transport->spmr_expiry;
 
+/* statistics */
+	peer->min_fail_time = G_MAXINT;
+	peer->max_fail_time = G_MININT;
+
 /* prod timer thread if sleeping */
 	g_static_mutex_lock (&transport->mutex);
 	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
@@ -1888,6 +1892,7 @@ on_io_data (
 
 	if (e < 0)
 	{
+/* TODO: difference between PGM_PC_SOURCE_CKSUM_ERRORS & PGM_PC_RECEIVER_CKSUM_ERRORS */
 		if (e == -2)
 			transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -2013,6 +2018,9 @@ on_io_data (
 			sender = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, src_addr_len);
 		}
 
+		sender->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += len;
+		sender->last_packet = pgm_time_now;
+
 		char *pgm_data = (char*)(pgm_header + 1);
 		int pgm_len = packet_len - sizeof(pgm_header);
 
@@ -2021,7 +2029,13 @@ on_io_data (
 		case PGM_ODATA:	on_odata (sender, pgm_header, pgm_data, pgm_len); break;
 		case PGM_NCF:	on_ncf (sender, pgm_header, pgm_data, pgm_len); break;
 		case PGM_RDATA: on_rdata (sender, pgm_header, pgm_data, pgm_len); break;
-		case PGM_SPM:	on_spm (sender, pgm_header, pgm_data, pgm_len); break;
+		case PGM_SPM:
+			on_spm (sender, pgm_header, pgm_data, pgm_len);
+
+/* update group NLA if appropriate */
+			if (pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)) {
+				memcpy (&sender->group_nla, &dst_addr, dst_addr_len);
+			}
 			break;
 		default:
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -2140,6 +2154,8 @@ on_spm (
 
 	if ((retval = pgm_verify_spm (header, data, len)) != 0)
 	{
+		sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
+		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
 	}
 
@@ -2181,6 +2197,8 @@ on_spm (
 	}
 	else
 	{	/* does not advance SPM sequence number */
+		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS]++;
+		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		retval = -EINVAL;
 	}
 
@@ -2412,6 +2430,8 @@ on_ncf (
 	if ((retval = pgm_verify_ncf (header, data, len)) != 0)
 	{
 		g_trace ("INFO", "Invalid NCF, ignoring.");
+		peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
+		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
 	}
 
@@ -2424,6 +2444,7 @@ on_ncf (
 #if 0
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_smr.smr_interface) != 0) {
 		retval = -EINVAL;
+		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
 	}
 #endif
@@ -2443,6 +2464,7 @@ on_ncf (
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_smr.smr_multiaddr) != 0) {
 		g_trace ("INFO", "NCF not destined for this multicast group.");
 		retval = -EINVAL;
+		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
 	}
 
@@ -2462,12 +2484,16 @@ on_ncf (
 		{
 			g_trace ("INFO", "First PGM Option in NCF incorrect, ignoring.");
 			retval = -EINVAL;
+			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
+			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 			goto out_unlock;
 		}
 		if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
 		{
 			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
 			retval = -EINVAL;
+			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
+			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 			goto out_unlock;
 		}
 		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
@@ -2513,7 +2539,7 @@ on_nnak (
 	)
 {
 	g_trace ("INFO","on_nnak()");
-	transport->cumulative_stats[PGM_PC_SOURCE_NNAK_PACKETS_RECEIVED]++;
+	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED]++;
 
 	int retval;
 	if ((retval = pgm_verify_nnak (header, data, len)) != 0)
@@ -2587,7 +2613,7 @@ on_nnak (
 		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
 
-	transport->cumulative_stats[PGM_PC_SOURCE_NNAKS_RECEIVED] += 1 + nnak_list_len;
+	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED] += 1 + nnak_list_len;
 
 out:
 	return retval;
@@ -2756,6 +2782,8 @@ send_nak (
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
+	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
+	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT]++;
 
 out:
 	return retval;
@@ -2909,6 +2937,8 @@ send_nak_list (
 	g_static_mutex_unlock (&transport->send_mutex);
 
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
+	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
+	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT] += 1 + sqn_list->len;
 
 	return retval;
 }
@@ -3070,6 +3100,8 @@ nak_rb_state (
 #else
 			nak_list.sqn[nak_list.len++] = rp->sequence_number;
 #endif
+
+			rp->nak_transmit_count++;
 
 			rp->state = PGM_PKT_WAIT_NCF_STATE;
 			g_queue_push_head_link (rxw->wait_ncf_queue, &rp->link_);
@@ -3303,7 +3335,13 @@ nak_rpt_state (
 /* cancellation */
 				dropped++;
 				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
+
+				gint fail_time = pgm_time_now - rp->t0;
+				if (fail_time > peer->max_fail_time)		peer->max_fail_time = fail_time;
+				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
+
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED]++;
 			}
 			else
 			{
@@ -3414,7 +3452,14 @@ nak_rdata_state (
 /* cancellation */
 				dropped++;
 				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
+
+				gint fail_time = pgm_time_now - rp->t0;
+				if (fail_time > peer->max_fail_time)		peer->max_fail_time = fail_time;
+				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
+
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED]++;
+
 				list = next_list_el;
 				continue;
 			}
@@ -3683,8 +3728,8 @@ send_rdata (
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	g_static_mutex_unlock (&transport->mutex);
 
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_RETRANSMITTED] += header->pgm_tsdu_length;
-	transport->cumulative_stats[PGM_PC_SOURCE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
+	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += header->pgm_tsdu_length;
+	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += len + transport->iphdr_len;
 
 	return retval;
@@ -4148,6 +4193,10 @@ out:
 /* ODATA packet with any of the following options:
  *
  * OPT_FRAGMENT - this TPDU part of a larger APDU.
+ *
+ * returns:
+ *	0
+ *	-EINVAL if pipe proding failed
  */
 
 static int
@@ -4167,7 +4216,6 @@ on_odata (
 /* pre-allocate from glib allocator (not slice allocator) full APDU packet for first new fragment, re-use
  * through to event handler.
  */
-	gboolean flush_naks = FALSE;
 	struct pgm_opt_fragment* opt_fragment;
 	pgm_time_t nak_rb_expiry = pgm_time_update_now () + transport->nak_rb_ivl;
 
@@ -4178,7 +4226,7 @@ on_odata (
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
-		if (!pgm_rxw_push_fragment (sender->rxw,
+		retval = pgm_rxw_push_fragment (sender->rxw,
 					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
@@ -4186,25 +4234,46 @@ on_odata (
 					g_ntohl (opt_fragment->opt_sqn),
 					g_ntohl (opt_fragment->opt_frag_off),
 					g_ntohl (opt_fragment->opt_frag_len),
-					nak_rb_expiry))
-		{
-			flush_naks = TRUE;
-		}
+					nak_rb_expiry);
 	}
 	else
 	{
 		g_static_mutex_lock (&sender->mutex);
-		if (!pgm_rxw_push_copy (sender->rxw,
+		retval = pgm_rxw_push_copy (sender->rxw,
 					odata + 1,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
 					g_ntohl (odata->data_trail),
-					nak_rb_expiry))
-		{
-			flush_naks = TRUE;
-		}
+					nak_rb_expiry);
 	}
 	g_static_mutex_unlock (&sender->mutex);
+
+	gboolean flush_naks = FALSE;
+
+	switch (retval) {
+	case PGM_RXW_CREATED_PLACEHOLDER:
+		flush_naks = TRUE;
+		break;
+
+	case PGM_RXW_DUPLICATE:
+		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS]++;
+		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		break;
+
+	case PGM_RXW_MALFORMED_APDU:
+		sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA]++;
+
+	case PGM_RXW_NOT_IN_TXW:
+	case PGM_RXW_APDU_LOST:
+		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		break;
+
+	default:
+		break;
+	}
+
+	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += g_ntohs (header->pgm_tsdu_length);
+	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]++;
 
 	if (flush_naks)
 	{
@@ -4246,7 +4315,6 @@ on_rdata (
 	struct pgm_data* rdata = (struct pgm_data*)data;
 	rdata->data_sqn = g_ntohl (rdata->data_sqn);
 
-	gboolean flush_naks = FALSE;
 	struct pgm_opt_fragment* opt_fragment;
 	pgm_time_t nak_rb_expiry = pgm_time_update_now () + transport->nak_rb_ivl;
 
@@ -4257,7 +4325,7 @@ on_rdata (
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
-		if (!pgm_rxw_push_fragment (sender->rxw,
+		retval = pgm_rxw_push_fragment (sender->rxw,
 					(char*)(rdata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					rdata->data_sqn,
@@ -4265,25 +4333,46 @@ on_rdata (
 					g_ntohl (opt_fragment->opt_sqn),
 					g_ntohl (opt_fragment->opt_frag_off),
 					g_ntohl (opt_fragment->opt_frag_len),
-					nak_rb_expiry))
-		{
-			flush_naks = TRUE;
-		}
+					nak_rb_expiry);
 	}
 	else
 	{
 		g_static_mutex_lock (&sender->mutex);
-		if (!pgm_rxw_push_copy (sender->rxw,
+		retval = pgm_rxw_push_copy (sender->rxw,
 					rdata + 1,
 					g_ntohs (header->pgm_tsdu_length),
 					rdata->data_sqn,
 					g_ntohl (rdata->data_trail),
-					nak_rb_expiry))
-		{
-			flush_naks = TRUE;
-		}
+					nak_rb_expiry);
 	}
 	g_static_mutex_unlock (&sender->mutex);
+
+	gboolean flush_naks = FALSE;
+
+	switch (retval) {
+	case PGM_RXW_CREATED_PLACEHOLDER:
+		flush_naks = TRUE;
+		break;
+
+	case PGM_RXW_DUPLICATE:
+		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS]++;
+		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		break;
+
+	case PGM_RXW_MALFORMED_APDU:
+		sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA]++;
+
+	case PGM_RXW_NOT_IN_TXW:
+	case PGM_RXW_APDU_LOST:
+		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+		break;
+
+	default:
+		break;
+	}
+
+	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += g_ntohs (header->pgm_tsdu_length);
+	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]++;
 
 	if (flush_naks)
 	{
@@ -4312,19 +4401,20 @@ static int
 on_pgm_data (
 	gpointer	data,
 	guint		len,
-	gpointer	peer
+	gpointer	peer_
 	)
 {
 	int retval = 0;
 	g_trace ("INFO","on_pgm_data");
 
-	pgm_transport_t* transport = ((pgm_peer_t*)peer)->transport;
+	pgm_peer_t* peer = peer_;
+	pgm_transport_t* transport = peer->transport;
 	g_static_mutex_lock (&transport->event_mutex);
 	pgm_event_t* event = pgm_alloc_event(transport);
 	g_static_mutex_unlock (&transport->event_mutex);
 	event->data = data;
 	event->len = len;
-	event->peer = pgm_peer_ref ((pgm_peer_t*)peer);
+	event->peer = pgm_peer_ref (peer);
 
 #ifdef TRANSPORT_DEBUG
 	g_trace ("INFO","peer is %s", pgm_print_tsi(&event->peer->tsi));
@@ -4354,6 +4444,8 @@ on_pgm_data (
 	}
 	g_async_queue_unlock (transport->commit_queue);
 
+	peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP] += len;
+	peer->cumulative_stats[PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP]++;
 /*
  * In thread starvation cases a yield is necessary here for the application to
  * get some time to process the data.  Optionally it could be performed when more

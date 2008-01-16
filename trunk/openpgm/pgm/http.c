@@ -35,6 +35,8 @@
 
 #include <pgm/http.h>
 #include <pgm/transport.h>
+#include <pgm/txwi.h>
+#include <pgm/rxwi.h>
 
 #include "htdocs/404.html.h"
 #include "htdocs/base.css.h"
@@ -56,14 +58,16 @@ static GCond* http_cond;
 static GMutex* http_mutex;
 
 static gpointer http_thread (gpointer);
-static int http_gsi_response (pgm_gsi_t*, SoupMessage*);
+static int http_tsi_response (pgm_tsi_t*, SoupMessage*);
 
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void transports_callback (SoupServerContext*, SoupMessage*, gpointer);
-static void gsi_callback (SoupServerContext*, SoupMessage*, gpointer);
+
+static void http_each_receiver (gpointer, gpointer, gpointer);
+static int http_receiver_response (pgm_peer_t*, SoupMessage*);
 
 
 int
@@ -379,13 +383,14 @@ transports_callback (
 		g_string_append_printf (response,	"<tr>"
 								"<td>%s</td>"
 								"<td>%i</td>"
-								"<td><a href=\"/%s\">%s</a></td>"
-								"<td>%i</td>"
+								"<td><a href=\"/%s.%hu\">%s</a></td>"
+								"<td><a href==\"/%s.%hu\">%hu</a></td>"
 							"</tr>",
 					group_address,
 					dport,
+					gsi, sport,
 					gsi,
-					gsi,
+					gsi, sport,
 					sport);
 
 		list = next;
@@ -412,18 +417,20 @@ default_callback (
 /* magical mysterious GSI hunting from path */
 	char *path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
 
-	pgm_gsi_t gsi;
-	int count = sscanf (path, "/%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
-				(unsigned char*)&gsi.identifier[0],
-				(unsigned char*)&gsi.identifier[1],
-				(unsigned char*)&gsi.identifier[2],
-				(unsigned char*)&gsi.identifier[3],
-				(unsigned char*)&gsi.identifier[4],
-				(unsigned char*)&gsi.identifier[5]);
+	pgm_tsi_t tsi;
+	int count = sscanf (path, "/%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
+				(unsigned char*)&tsi.gsi.identifier[0],
+				(unsigned char*)&tsi.gsi.identifier[1],
+				(unsigned char*)&tsi.gsi.identifier[2],
+				(unsigned char*)&tsi.gsi.identifier[3],
+				(unsigned char*)&tsi.gsi.identifier[4],
+				(unsigned char*)&tsi.gsi.identifier[5],
+				&tsi.sport);
+	tsi.sport = g_htons (tsi.sport);
 	g_free (path);
-	if (count == 6)
+	if (count == 7)
 	{
-		int retval = http_gsi_response (&gsi, msg);
+		int retval = http_tsi_response (&tsi, msg);
 		if (!retval) return;
 	}
 
@@ -434,25 +441,38 @@ default_callback (
 }
 
 static int
-http_gsi_response (
-	pgm_gsi_t*	query_gsi,
+http_tsi_response (
+	pgm_tsi_t*	tsi,
 	SoupMessage*	msg
 	)
 {
-/* first verify this is a valid GSI */
+/* first verify this is a valid TSI */
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	pgm_transport_t* transport = NULL;
 	GSList* list = pgm_transport_list;
 	while (list)
 	{
+		pgm_transport_t* list_transport = (pgm_transport_t*)list->data;
 		GSList* next = list->next;
 
-		if (pgm_gsi_equal (query_gsi, &((pgm_transport_t*)list->data)->tsi.gsi))
+/* check source */
+		if (pgm_tsi_equal (tsi, &list_transport->tsi))
 		{
-			transport = list->data;
+			transport = list_transport;
 			break;
 		}
+
+/* check receivers */
+		g_static_rw_lock_reader_lock (&list_transport->peers_lock);
+		pgm_peer_t* receiver = g_hash_table_lookup (list_transport->peers, tsi);
+		if (receiver) {
+			int retval = http_receiver_response (receiver, msg);
+			g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
+			g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+			return retval;
+		}
+		g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
 
 		list = next;
 	}
@@ -462,7 +482,7 @@ http_gsi_response (
 		return -1;
 	}
 
-/* transport now contains valid matching GSI */
+/* transport now contains valid matching TSI */
 	char gsi[sizeof("000.000.000.000.000.000")];
 	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
 			transport->tsi.gsi.identifier[0],
@@ -475,7 +495,7 @@ http_gsi_response (
 	char title[ sizeof("Transport 000.000.000.000.000.000.00000") ];
 	sprintf (title, "Transport %s.%i",
 		gsi,
-		transport->tsi.sport);
+		g_ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
 	inet_ntop (	pgm_sockaddr_family( &transport->send_smr.smr_interface ),
@@ -494,11 +514,16 @@ http_gsi_response (
 
 	gint ihb_min = 0;			/* need to bind first */
 	gint ihb_max = 0;
-	char* spm_path = source_address;	/* the difference? */
+
+	char spm_path[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &transport->recv_smr[0].smr_interface ),
+			pgm_sockaddr_addr( &transport->recv_smr[0].smr_interface ),
+			spm_path,
+			sizeof(spm_path) );
 
 	GString* response = http_create_response (title);
 	g_string_append_printf (response,	"<h1>%s</h1>"
-						"<h2>General information</h2>"
+						"<h2>Source information</h2>"
 						"<table>"
 						"<tr>"
 							"<td>Source address</td><td>%s</td>"
@@ -519,7 +544,28 @@ http_gsi_response (
 				gsi,
 				sport);
 
-	g_string_append_printf (response,	"<h2>Sender information</h2>"
+/* list receivers in a table */
+	g_string_append (response,		"<h2>Receivers</h2>"
+						"<table>"
+						"<tr>"
+							"<th>Group address</th>"
+							"<th>Dest port</th>"
+							"<th>Source address</th>"
+							"<th>Last hop</th>"
+							"<th>Source GSI</th>"
+							"<th>Source port</th>"
+						"</tr>"
+			);
+
+	g_static_rw_lock_reader_lock (&transport->peers_lock);
+	g_hash_table_foreach (transport->peers, http_each_receiver, response);
+	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+
+	g_string_append (response,		"</table>");
+
+/* continue with source information */
+
+	g_string_append_printf (response,	"<h2>Configuration information</h2>"
 						"<table>"
 						"<tr>"
 							"<td>Ttl</td><td>%i</td>"
@@ -561,17 +607,15 @@ http_gsi_response (
 						"<tr>"
 							"<td>Data bytes sent</td><td>%i</td>"
 						"</tr><tr>"
-							"<td>Data msgs sent</td><td>%i</td>"
+							"<td>Data packets sent</td><td>%i</td>"
 						"</tr><tr>"
-							"<td>Bytes retransmitted</td><td>%i</td>"
+							"<td>Bytes buffered</td><td>%i</td>"
 						"</tr><tr>"
-							"<td>Msgs retransmitted</td><td>%i</td>"
+							"<td>Packets buffered</td><td>%i</td>"
 						"</tr><tr>"
 							"<td>Bytes sent</td><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs received</td><td>%i</td>"
-						"</tr><tr>"
-							"<td>NAKs ignored</td><td>%i</td>"
+							"<td>Raw NAKs received</td><td>%i</td>"
 						"</tr><tr>"
 							"<td>Checksum errors</td><td>%i</td>"
 						"</tr><tr>"
@@ -579,31 +623,39 @@ http_gsi_response (
 						"</tr><tr>"
 							"<td>Packets discarded</td><td>%i</td>"
 						"</tr><tr>"
-							"<td>SNs NAKed</td><td>%i</td>"
+							"<td>Bytes retransmitted</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Packets retransmitted</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs received</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs ignored</td><td>%i</td>"
 						"</tr><tr>"
 							"<td>Transmission rate</td><td>%i bps</td>"
 						"</tr><tr>"
-							"<td>NNAKs received</td><td>%i</td>"
+							"<td>NNAK packets received</td><td>%i</td>"
 						"</tr><tr>"
-							"<td>SNs NAKed in NNAKs</td><td>%i</td>"
+							"<td>NNAKs received</td><td>%i</td>"
 						"</tr><tr>"
 							"<td>Malformed NNAKs</td><td>%i</td>"
 						"</tr>"
 						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_RETRANSMITTED],
-						transport->cumulative_stats[PGM_PC_SOURCE_MSGS_RETRANSMITTED],
+						((pgm_txw_t*)transport->txw)->bytes_in_window,	/* minus IP & any UDP header */
+						((pgm_txw_t*)transport->txw)->packets_in_window,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_RAW_NAKS_RECEIVED],
-						transport->cumulative_stats[PGM_PC_SOURCE_NAKS_IGNORED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
 						transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS],
 						transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED],
-						transport->cumulative_stats[PGM_PC_SOURCE_NAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED],
 						transport->cumulative_stats[PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE],
-						transport->cumulative_stats[PGM_PC_SOURCE_NNAK_PACKETS_RECEIVED],
-						transport->cumulative_stats[PGM_PC_SOURCE_NNAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]);
 
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
@@ -612,5 +664,297 @@ http_gsi_response (
 
 	return 0;
 }
+
+static void
+http_each_receiver (
+	gpointer	tsi,
+	gpointer	peer_,
+	gpointer	response_
+	)
+{
+	pgm_peer_t* peer = peer_;
+	GString* response = response_;
+
+	char group_address[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
+			pgm_sockaddr_addr( &peer->group_nla ),
+			group_address,
+			sizeof(group_address) );
+
+	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
+
+	char source_address[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &peer->nla ),
+			pgm_sockaddr_addr( &peer->nla ),
+			source_address,
+			sizeof(source_address) );
+
+	char last_hop[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &peer->local_nla ),
+			pgm_sockaddr_addr( &peer->local_nla ),
+			last_hop,
+			sizeof(last_hop) );
+
+	char gsi[sizeof("000.000.000.000.000.000")];
+	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+			peer->tsi.gsi.identifier[0],
+			peer->tsi.gsi.identifier[1],
+			peer->tsi.gsi.identifier[2],
+			peer->tsi.gsi.identifier[3],
+			peer->tsi.gsi.identifier[4],
+			peer->tsi.gsi.identifier[5]);
+
+	int sport = g_ntohs (peer->tsi.sport);
+
+	g_string_append_printf (response,	"<tr>"
+							"<td>%s</td>"
+							"<td>%i</td>"
+							"<td>%s</td>"
+							"<td>%s</td>"
+							"<td><a href=\"/%s.%hu\">%s</a></td>"
+							"<td><a href=\"/%s.%hu\">%hu</a></td>"
+						"</tr>",
+				group_address,
+				dport,
+				source_address,
+				last_hop,
+				gsi, sport,
+				gsi,
+				gsi, sport,
+				sport
+			);
+}
+
+static int
+http_receiver_response (
+	pgm_peer_t*	peer,
+	SoupMessage*	msg
+	)
+{
+	char gsi[sizeof("000.000.000.000.000.000")];
+	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+			peer->tsi.gsi.identifier[0],
+			peer->tsi.gsi.identifier[1],
+			peer->tsi.gsi.identifier[2],
+			peer->tsi.gsi.identifier[3],
+			peer->tsi.gsi.identifier[4],
+			peer->tsi.gsi.identifier[5]);
+
+	char title[ sizeof("Receiver 000.000.000.000.000.000.00000") ];
+	sprintf (title, "Receiver %s.%hu",
+		gsi,
+		g_ntohs (peer->tsi.sport));
+
+	char group_address[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
+			pgm_sockaddr_addr( &peer->group_nla ),
+			group_address,
+			sizeof(group_address) );
+
+	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
+
+	char source_address[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &peer->nla ),
+			pgm_sockaddr_addr( &peer->nla ),
+			source_address,
+			sizeof(source_address) );
+
+	char last_hop[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( &peer->local_nla ),
+			pgm_sockaddr_addr( &peer->local_nla ),
+			last_hop,
+			sizeof(last_hop) );
+
+	int sport = g_ntohs (peer->tsi.sport);
+
+	guint outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue->length 
+				+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue->length
+				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue->length;
+
+	char buf[100];
+	time_t last_activity_time = pgm_to_secs(peer->last_packet);
+	struct tm last_activity_tm;
+	localtime_r (&last_activity_time, &last_activity_tm);
+	gsize ret = strftime (buf, sizeof(buf), "%c", &last_activity_tm);
+	gsize bytes_written;
+	gchar* last_activity = g_locale_to_utf8 (buf, ret, NULL, &bytes_written, NULL);
+
+
+	GString* response = http_create_response (title);
+	g_string_append_printf (response,	"<h1>%s</h1>"
+						"<h2>Receiver information</h2>"
+						"<table>"
+						"<tr>"
+							"<td>Group address</td><td>%s</td>"
+						"</tr><tr>"
+							"<td>Dest port</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Source address</td><td>%s</td>"
+						"</tr><tr>"
+							"<td>Last hop</td><td>%s</td>"
+						"</tr><tr>"
+							"<td>Source GSI</td><td>%s</td>"
+						"</tr><tr>"
+							"<td>Source port</td><td>%i</td>"
+						"</tr>"
+						"</table>",
+				title,
+				group_address,
+				dport,
+				source_address,
+				last_hop,
+				gsi,
+				sport);
+
+	g_string_append_printf (response,	"<h2>Configuration information</h2>"
+						"<table>"
+						"<tr>"
+							"<td>NAK_RB_IVL</td><td>%i ms</td>"
+						"</tr><tr>"
+							"<td>NAK_RPT_IVL</td><td>%i ms</td>"
+						"</tr><tr>"
+							"<td>NAK_NCF_RETRIES</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK_RDATA_IVL</td><td>%i ms</td>"
+						"</tr><tr>"
+							"<td>NAK_DATA_RETRIES</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Send NAKs</td><td>enabled(1)</td>"
+						"</tr><tr>"
+							"<td>Late join</td><td>disabled(2)</td>"
+						"</tr><tr>"
+							"<td>NAK TTL</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Delivery order</td><td>ordered(2)</td>"
+						"</tr><tr>"
+							"<td>Multicast NAKs</td><td>disabled(2)</td>"
+						"<tr>",
+						pgm_to_msecs(peer->transport->nak_rb_ivl),
+						pgm_to_msecs(peer->transport->nak_rpt_ivl),
+						peer->transport->nak_ncf_retries,
+						pgm_to_msecs(peer->transport->nak_rdata_ivl),
+						peer->transport->nak_data_retries,
+						peer->transport->hops);
+
+	g_string_append_printf (response,	"<h2>Performance information</h2>"
+						"<table>"
+						"<tr>"
+							"<td>Data bytes received</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Data packets received</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK failures</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Bytes received</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Checksum errors</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Malformed SPMs</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Malformed ODATA</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Malformed RDATA</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Malformed NCFs</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Packets discarded</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Losses</td><td>%i</td>"	/* detected missed packets */
+						"</tr><tr>"
+							"<td>Bytes delivered to app</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Packets delivered to app</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Duplicate SPMs</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Duplicate ODATA/RDATA</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK packets sent</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs sent</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs retransmitted</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs failed</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs failed due to RXW advance</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs failed due to NCF retries</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs failed due to DATA retries</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK failures delivered to app</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAKs suppressed</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Malformed NAKs</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Outstanding NAKs</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>Last activity</td><td>%s</td>"
+						"</tr><tr>"
+							"<td>NAK repair min time</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK repair mean time</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK repair max time</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK fail min time</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK fail mean time</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK fail max time</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK min retransmit count</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK mean retransmit count</td><td>%i</td>"
+						"</tr><tr>"
+							"<td>NAK max retransmit count</td><td>%i</td>"
+						"</tr>"
+						"</table>",
+						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES],
+						peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED],
+						peer->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
+						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS],
+						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA],
+						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
+						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS],
+						peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_LOSSES],
+						peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP],
+						peer->cumulative_stats[PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP],
+						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS],
+						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS],
+						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT],
+						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT],
+						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_RXW_ADVANCED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES_DELIVERED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED],
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS],
+						outstanding_naks,
+						last_activity,
+						((pgm_rxw_t*)peer->rxw)->min_fill_time,
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN],
+						((pgm_rxw_t*)peer->rxw)->max_fill_time,
+						peer->min_fail_time,
+						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN],
+						peer->max_fail_time,
+						((pgm_rxw_t*)peer->rxw)->min_nak_transmit_count,
+						peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN],
+						((pgm_rxw_t*)peer->rxw)->max_nak_transmit_count);
+
+	http_finalize_response (response, msg);
+
+	g_free( last_activity );
+
+	return 0;
+}
+
 
 /* eof */

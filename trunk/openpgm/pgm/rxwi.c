@@ -129,11 +129,11 @@
 		} \
 		else \
 		{ \
-			g_assert ( ( (w)->backoff_queue->length + \
-				     (w)->wait_ncf_queue->length + \
-				     (w)->wait_data_queue->length + \
-				     (w)->lost_count + \
-				     (w)->fragment_count) == 0 ); \
+			g_assert ( (w)->backoff_queue->length == 0 ); \
+			g_assert ( (w)->wait_ncf_queue->length == 0 ); \
+			g_assert ( (w)->wait_data_queue->length == 0 ); \
+			g_assert ( (w)->lost_count == 0 ); \
+			g_assert ( (w)->fragment_count == 0 ); \
 		} \
 	}
 #else
@@ -210,6 +210,12 @@ pgm_rxw_init (
 	r->backoff_queue = g_queue_new ();
 	r->wait_ncf_queue = g_queue_new ();
 	r->wait_data_queue = g_queue_new ();
+
+/* statistics */
+	r->min_fill_time = G_MAXINT;
+	r->max_fill_time = G_MININT;
+	r->min_nak_transmit_count = G_MAXINT;
+	r->max_nak_transmit_count = G_MININT;
 
 /* contiguous packet callback */
 	r->on_data = on_data;
@@ -293,7 +299,7 @@ pgm_rxw_shutdown (
 		r->wait_data_queue = NULL;
 	}
 
-	return 0;
+	return PGM_RXW_OK;
 }
 
 static void
@@ -335,7 +341,6 @@ pgm_rxw_alloc0_packet (
 	else
 	{
 		g_trace ("packet trash stack exceeded.");
-	
 		p = g_slice_alloc0 (sizeof(pgm_rxw_packet_t));
 	}
 
@@ -347,9 +352,14 @@ pgm_rxw_alloc0_packet (
  * counters, this means one push on the receive window can actually translate
  * as many: the extra's acting as place holders and NAK containers
  *
- * returns 0 if place holders have been created in the window
- * returns 1 if packet contingiously extended the window
- * returns -1 if invalid
+ * returns:
+ *	PGM_RXW_CREATED_PLACEHOLDER
+ *	PGM_RXW_FILLED_PLACEHOLDER
+ *	PGM_RXW_ADVANCED_WINDOW
+ *	PGM_RXW_NOT_IN_TXW if sequence number is very wibbly wobbly
+ *	PGM_RXW_DUPLICATE
+ *	PGM_RXW_APDU_LOST
+ *	PGM_RXW_MALFORMED_APDU
  */
 
 int
@@ -369,7 +379,7 @@ pgm_rxw_push_fragment (
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 	guint dropped = 0;
-	int retval = -1;
+	int retval = PGM_RXW_UNKNOWN;
 
 	g_trace ("#%u: data trail #%u: push: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number, trail, 
@@ -401,9 +411,8 @@ pgm_rxw_push_fragment (
 		{
 			g_warning ("#%u: not in transmit window, discarding.", sequence_number);
 
-			ASSERT_RXW_BASE_INVARIANT(r);
-			ASSERT_RXW_POINTER_INVARIANT(r);
-			return retval;
+			retval = PGM_RXW_NOT_IN_TXW;
+			goto out;
 		}
 
 		pgm_rxw_window_update (r, trail, r->lead, nak_rb_expiry);
@@ -419,7 +428,8 @@ pgm_rxw_push_fragment (
 	{
 		g_trace ("#%u: already committed, discarding.", sequence_number);
 
-		return retval;
+		retval = PGM_RXW_DUPLICATE;
+		goto out;
 	}
 
 /* check for duplicate */
@@ -434,7 +444,8 @@ pgm_rxw_push_fragment (
 			if (rp->length)
 			{
 				g_trace ("#%u: already received, discarding.", sequence_number);
-				return retval;
+				retval = PGM_RXW_DUPLICATE;
+				goto out;
 			}
 
 /* for fragments check that apdu is valid */
@@ -445,7 +456,8 @@ pgm_rxw_push_fragment (
 			{
 				g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
 				pgm_rxw_mark_lost (r, sequence_number);
-				goto out;
+				retval = PGM_RXW_APDU_LOST;
+				goto out_flush;
 			}
 
 			if ( apdu_len && pgm_uint32_gt (apdu_first_sqn, sequence_number) )
@@ -453,7 +465,8 @@ pgm_rxw_push_fragment (
 				g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
 					sequence_number, apdu_first_sqn);
 				pgm_rxw_mark_lost (r, apdu_first_sqn);
-				goto out;
+				retval = PGM_RXW_MALFORMED_APDU;
+				goto out_flush;
 			}
 
 			g_trace ("#%u: filling in a gap.", sequence_number);
@@ -490,7 +503,14 @@ pgm_rxw_push_fragment (
 
 			pgm_rxw_pkt_state_unlink (r, rp);
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
-			retval		= 1;
+			retval		= PGM_RXW_FILLED_PLACEHOLDER;
+
+			gint fill_time = pgm_time_now - rp->t0;
+			if (fill_time > r->max_fill_time)	r->max_fill_time = fill_time;
+			else if (fill_time < r->min_fill_time)	r->min_fill_time = fill_time;
+
+			if (rp->nak_transmit_count > r->max_nak_transmit_count)		r->max_nak_transmit_count = rp->nak_transmit_count;
+			else if (rp->nak_transmit_count < r->min_nak_transmit_count)	r->min_nak_transmit_count = rp->nak_transmit_count;
 		}
 		else
 		{
@@ -528,6 +548,7 @@ pgm_rxw_push_fragment (
 				ph->sequence_number     = r->lead;
 				ph->nak_rb_expiry	= nak_rb_expiry;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
+				ph->t0			= pgm_time_now;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
 
@@ -547,11 +568,11 @@ pgm_rxw_push_fragment (
 
 				r->lead++;
 			}
-			retval = 0;
+			retval = PGM_RXW_CREATED_PLACEHOLDER;
 		}
 		else
 		{
-			retval = 1;
+			retval = PGM_RXW_ADVANCED_WINDOW;
 		}
 
 		g_assert ( r->lead == sequence_number );
@@ -564,8 +585,8 @@ pgm_rxw_push_fragment (
 		{
 			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
 			pgm_rxw_mark_lost (r, sequence_number);
-			retval = -1;
-			goto out;
+			retval = PGM_RXW_APDU_LOST;
+			goto out_flush;
 		}
 
 		if ( apdu_len && pgm_uint32_gt (apdu_first_sqn, sequence_number) )
@@ -573,8 +594,8 @@ pgm_rxw_push_fragment (
 			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
 				sequence_number, apdu_first_sqn);
 			pgm_rxw_mark_lost (r, apdu_first_sqn);
-			retval = -1;
-			goto out;
+			retval = PGM_RXW_MALFORMED_APDU;
+			goto out_flush;
 		}
 
 		pgm_rxw_packet_t* rp = pgm_rxw_alloc0_packet(r);
@@ -614,7 +635,7 @@ pgm_rxw_push_fragment (
 			sequence_number, rp->sequence_number, pgm_rxw_sqns(r));
 	}
 
-out:
+out_flush:
 	pgm_rxw_flush (r);
 
 	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
@@ -625,6 +646,7 @@ out:
 		g_warning ("dropped %u messages due to full window.", dropped);
 	}
 
+out:
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 	return retval;
@@ -642,18 +664,18 @@ pgm_rxw_flush (
 
 	while ( !pgm_rxw_empty( r ) )
 	{
-		if ( pgm_rxw_flush1 (r) != 1 )
+		if ( pgm_rxw_flush1 (r) == 0 )
 			break;
 	}
 
 	g_trace ("flush window complete.");
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 /* flush one apdu from contiguous data from the trailing edge of the window
  *
- * returns 1 if a packet was flushed and possibly more exist.
+ * returns >0  if a packet was flushed and possibly more exist.
  */
 
 static inline int
@@ -661,7 +683,7 @@ pgm_rxw_flush1 (
 	pgm_rxw_t*	r
 	)
 {
-	int retval = 0;
+	int flushed = 0;
 	ASSERT_RXW_BASE_INVARIANT(r);
 
 	pgm_rxw_packet_t* cp = RXW_PACKET(r, r->trail);
@@ -709,7 +731,7 @@ pgm_rxw_flush1 (
 				}
 				else
 				{	/* another apdu or tpdu exists */
-					retval = 1;
+					flushed++;
 					break;
 				}
 			}
@@ -727,7 +749,7 @@ pgm_rxw_flush1 (
 			pgm_rxw_pkt_remove1 (r, cp);
 
 /* one tpdu lost */
-			retval = 1;
+			flushed++;
 		}
 	}
 	else
@@ -787,7 +809,6 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 			{	/* incomplete apdu */
 				g_trace ("partial apdu found %u of %u bytes.",
 					apdu_len, cp->apdu_len);
-				retval = 0;
 				goto out;
 			}
 		}
@@ -807,12 +828,12 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 		}
 
 /* one apdu or tpdu processed */
-		retval = 1;
+		flushed++;
 	}
 
 out:
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return retval;
+	return flushed;
 }
 
 int
@@ -853,7 +874,7 @@ pgm_rxw_pkt_state_unlink (
 	rp->state = PGM_PKT_ERROR_STATE;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 /* similar to rxw_pkt_free1 but ignore the data payload, used to transfer
@@ -878,7 +899,7 @@ pgm_rxw_pkt_remove1 (
 	g_trash_stack_push (&r->trash_packet, rp);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 static inline int
@@ -908,7 +929,7 @@ pgm_rxw_pkt_free1 (
 	g_trash_stack_push (&r->trash_packet, rp);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 /* remove from leading edge of ahead side of receive window */
@@ -930,7 +951,7 @@ pgm_rxw_pop_lead (
 	r->lead--;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 /* remove from trailing edge of non-contiguous receive window causing data loss */
@@ -952,11 +973,13 @@ pgm_rxw_pop_trail (
 	r->trail++;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 /* update receiving window with new trailing and leading edge parameters of transmit window
  * can generate data loss by excluding outstanding NAK requests.
+ *
+ * returns number of place holders (NAKs) generated
  */
 int
 pgm_rxw_window_update (
@@ -1012,6 +1035,7 @@ pgm_rxw_window_update (
 				ph->sequence_number     = r->lead;
 				ph->nak_rb_expiry	= nak_rb_expiry;
 				ph->state		= PGM_PKT_BACK_OFF_STATE;
+				ph->t0			= pgm_time_now;
 
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
 				g_trace ("adding placeholder #%u", ph->sequence_number);
@@ -1126,11 +1150,16 @@ pgm_rxw_mark_lost (
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
-	return 0;
+	return PGM_RXW_OK;
 }
 
 /* received a uni/multicast ncf, search for a matching nak & tag or extend window if
  * beyond lead
+ *
+ * returns:
+ *	PGM_RXW_WINDOW_UNDEFINED	- still waiting for SPM 
+ *	PGM_RXW_DUPLICATE
+ *	PGM_RXW_CREATED_PLACEHOLDER
  */
 
 int
@@ -1141,19 +1170,24 @@ pgm_rxw_ncf (
 	pgm_time_t	nak_rb_expiry
 	)
 {
+	int retval = PGM_RXW_UNKNOWN;
+
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 	g_trace ("pgm_rxw_ncf(#%u)", sequence_number);
 
-	if (!r->window_defined) return -1;
+	if (!r->window_defined) {
+		retval = PGM_RXW_WINDOW_UNDEFINED;
+		goto out;
+	}
 
 /* already committed */
 	if ( pgm_uint32_lt (sequence_number, r->trail) )
 	{
 		g_trace ("ncf #%u: already committed, discarding.", sequence_number);
-
-		return -1;
+		retval = PGM_RXW_DUPLICATE;
+		goto out;
 	}
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
@@ -1167,7 +1201,8 @@ pgm_rxw_ncf (
 			ASSERT_RXW_BASE_INVARIANT(r);
 			ASSERT_RXW_POINTER_INVARIANT(r);
 			g_trace ("ncf ignored as sequence number already in wait_data_state.");
-			return 0;	/* ignore */
+			retval = PGM_RXW_DUPLICATE;
+			goto out;
 		}
 
 		case PGM_PKT_BACK_OFF_STATE:
@@ -1184,19 +1219,16 @@ pgm_rxw_ncf (
 		rp->state = PGM_PKT_WAIT_DATA_STATE;
 		g_queue_push_head_link (r->wait_data_queue, &rp->link_);
 
-		ASSERT_RXW_BASE_INVARIANT(r);
-		ASSERT_RXW_POINTER_INVARIANT(r);
-		return 0;
+		retval = PGM_RXW_CREATED_PLACEHOLDER;
+		goto out;
 	}
 
 /* not an expected ncf, extend receive window to pre-empt loss detection */
 	if ( !IN_TXW(r, sequence_number) )
 	{
 		g_warning ("ncf #%u not in tx window, discarding.", sequence_number);
-
-		ASSERT_RXW_BASE_INVARIANT(r);
-		ASSERT_RXW_POINTER_INVARIANT(r);
-		return -1;
+		retval = PGM_RXW_NOT_IN_TXW;
+		goto out;
 	}
 
 	g_trace ("ncf extends leads to #%u", sequence_number);
@@ -1221,6 +1253,7 @@ pgm_rxw_ncf (
 		ph->sequence_number     = r->lead;
 		ph->nak_rb_expiry	= nak_rb_expiry;
 		ph->state		= PGM_PKT_BACK_OFF_STATE;
+		ph->t0			= pgm_time_now;
 
 		RXW_SET_PACKET(r, ph->sequence_number, ph);
 		g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
@@ -1249,7 +1282,8 @@ pgm_rxw_ncf (
 	ph->sequence_number     = r->lead;
 	ph->nak_rdata_expiry	= nak_rdata_expiry;
 	ph->state		= PGM_PKT_WAIT_DATA_STATE;
-
+	ph->t0			= pgm_time_now;
+		
 	RXW_SET_PACKET(r, ph->sequence_number, ph);
 	g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
 
@@ -1262,9 +1296,12 @@ pgm_rxw_ncf (
 		g_warning ("dropped %u messages due to full window.", dropped);
 	}
 
+	retval = PGM_RXW_CREATED_PLACEHOLDER;
+
+out:
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
-	return 0;
+	return retval;
 }
 
 /* state string helper
@@ -1284,6 +1321,30 @@ pgm_rxw_state_string (
 	case PGM_PKT_HAVE_DATA_STATE:	c = "PGM_PKT_HAVE_DATA_STATE"; break;
 	case PGM_PKT_LOST_DATA_STATE:	c = "PGM_PKT_LOST_DATA_STATE"; break;
 	case PGM_PKT_ERROR_STATE:	c = "PGM_PKT_ERROR_STATE"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
+}
+
+const char*
+pgm_rxw_returns_string (
+	pgm_rxw_returns_e	retval
+	)
+{
+	const char* c;
+
+	switch (retval) {
+	case PGM_RXW_OK:			c = "PGM_RXW_OK"; break;
+	case PGM_RXW_CREATED_PLACEHOLDER:	c = "PGM_RXW_CREATED_PLACEHOLDER"; break;
+	case PGM_RXW_FILLED_PLACEHOLDER:	c = "PGM_RXW_FILLED_PLACEHOLDER"; break;
+	case PGM_RXW_ADVANCED_WINDOW:		c = "PGM_RXW_ADVANCED_WINDOW"; break;
+	case PGM_RXW_NOT_IN_TXW:		c = "PGM_RXW_NOT_IN_TXW"; break;
+	case PGM_RXW_WINDOW_UNDEFINED:		c = "PGM_RXW_WINDOW_UNDEFINED"; break;
+	case PGM_RXW_DUPLICATE:			c = "PGM_RXW_DUPLICATE"; break;
+	case PGM_RXW_APDU_LOST:			c = "PGM_RXW_APDU_LOST"; break;
+	case PGM_RXW_MALFORMED_APDU:		c = "PGM_RXW_MALFORMED_APDU"; break;
+	case PGM_RXW_UNKNOWN:			c = "PGM_RXW_UNKNOWN"; break;
 	default: c = "(unknown)"; break;
 	}
 

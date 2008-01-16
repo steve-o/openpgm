@@ -82,6 +82,11 @@
 		{ \
 			g_assert ( TXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata->len ); \
 			g_assert ( TXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata->len ); \
+			g_assert ( (w)->bytes_in_window > 0 ); \
+			g_assert ( (w)->packets_in_window > 0 ); \
+		} else { \
+			g_assert ( (w)->bytes_in_window == 0 ); \
+			g_assert ( (w)->packets_in_window == 0 ); \
 		} \
 \
 	}
@@ -290,6 +295,9 @@ pgm_txw_push (
 	TXW_SET_PACKET(t, tp->sequence_number, tp);
 	g_trace ("#%u: adding packet", tp->sequence_number);
 
+	t->bytes_in_window += length;
+	t->packets_in_window++;
+
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 	return 0;
@@ -340,6 +348,10 @@ pgm_txw_pop (
 	}
 
 	pgm_txw_packet_t* tp = TXW_PACKET(t, t->trail);
+
+	t->bytes_in_window -= tp->length;
+	t->packets_in_window--;
+
 	pgm_txw_pkt_free1 (t, tp);
 	TXW_SET_PACKET(t, t->trail, NULL);
 

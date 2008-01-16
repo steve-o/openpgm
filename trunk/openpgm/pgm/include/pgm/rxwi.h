@@ -44,6 +44,20 @@ typedef enum
     PGM_PKT_ERROR_STATE
 } pgm_pkt_state_e;
 
+typedef enum
+{
+    PGM_RXW_OK = 0,
+    PGM_RXW_CREATED_PLACEHOLDER,
+    PGM_RXW_FILLED_PLACEHOLDER,
+    PGM_RXW_ADVANCED_WINDOW,
+    PGM_RXW_NOT_IN_TXW,
+    PGM_RXW_WINDOW_UNDEFINED,
+    PGM_RXW_DUPLICATE,
+    PGM_RXW_APDU_LOST,
+    PGM_RXW_MALFORMED_APDU,
+    PGM_RXW_UNKNOWN
+} pgm_rxw_returns_e;
+
 const char* pgm_rxw_state_string (pgm_pkt_state_e);
 
 /* callback for commiting contiguous pgm packets */
@@ -59,11 +73,15 @@ struct pgm_rxw_packet_t {
 /*	guint32		frag_offset;	*/
 	guint32		apdu_len;
 
+	pgm_time_t	t0;
 	pgm_time_t	nak_rb_expiry;
 	pgm_time_t	nak_rpt_expiry;
 	pgm_time_t	nak_rdata_expiry;
+
         GList           link_;
         pgm_pkt_state_e state;
+
+	guint		nak_transmit_count;
         guint           ncf_retry_count;
         guint           data_retry_count;
 };
@@ -87,6 +105,11 @@ struct pgm_rxw_t {
         guint32         rxw_trail, rxw_trail_init;
         gboolean        rxw_constrained;
         gboolean        window_defined;
+
+	gint		min_fill_time;
+	gint		max_fill_time;
+	gint		min_nak_transmit_count;
+	gint		max_nak_transmit_count;
 
         pgm_rxw_commitfn_t on_data;
         gpointer        param;
