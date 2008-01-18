@@ -4,14 +4,15 @@
 
 import os
 Import('env')
+Import('xtenv')
 
-e = env.Copy(
-		LIBS = env['LIBS'] + ['libpgm', 'libpgmex'],
-		);
+e = env.Copy()
+e.Append(LIBS = ['libpgm', 'libpgmex']);
 
+httpe = xtenv.Copy()
+httpe.Append(LIBS = ['libpgm', 'libpgmex']);
 
-httpe = e.Copy()
-httpe.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+# source:
 
 httpe.Program(['basic_recv.c'])
 httpe.Program(['basic_http.c'])

@@ -3,9 +3,8 @@
 # $Id$
 
 Import('env')
-e = env.Copy(
-		LIBS = env['LIBS'] + ['libpgm', 'libpgmex'],
-		);
+e = env.Copy();
+e.Append(LIBS = ['libpgm', 'libpgmex']);
 
 e.Program(['monitor.c', 'dump-json.c'])
 e.Program(['app.c'])

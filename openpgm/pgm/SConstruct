@@ -45,6 +45,37 @@ else:
 	Export({'env':debug})
 
 Import('env')
+
+# vanilla environment
+env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
+
+# environment for libpgmsnmp, libpgmhttp
+xtenv = env.Copy()
+xtenv.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+xtenv.Append(LIBS = env['NETSNMP_LIBS']);
+
+snmp_test_source = """
+int main(int argc, char**argv)
+{
+	netsnmp_enable_subagent();
+	return 0;
+}
+"""
+
+def CheckSNMP(context):
+	context.Message('Checking to see if Net-SNMP had a happy accident...');
+	result = context.TryLink(snmp_test_source, '.c');
+	context.Result(result);
+	return result;
+
+conf = Configure(xtenv, custom_tests = {'CheckSNMP': CheckSNMP});
+if not conf.CheckSNMP():
+	print 'Enabling extra libraries for Net-SNMP.';
+	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
+	conf.env.Append(LIBS = ['librpm', 'libsensors', 'libdl', 'libwrap']);
+xtenv = conf.Finish();
+Export('xtenv');
+
 ref_node = 'ref/' + env['BUILD'] + '/';
 BuildDir(ref_node, '.', duplicate=0)
 SConscript(ref_node + 'SConscript')

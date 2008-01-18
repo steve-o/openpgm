@@ -2,34 +2,9 @@
 # OpenPGM build script
 # $Id$
 
-Import('env')
-e = env.Copy()
-e.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
-e.Append(
-		LIBS = env['LIBS'] + env['NETSNMP_LIBS'] + ['libpgm', 'libpgmhttp', 'libpgmsnmp', 'libpgmex'],
-	);
-
-# RedHat likes to party likes it's 1889
-snmp_test_source = """
-int main(int argc, char**argv)
-{
-	netsnmp_enable_subagent();
-	return 0;
-}
-"""
-
-def CheckSNMP(context):
-	context.Message('Checking to see if Net-SNMP had a happy accident...');
-	result = context.TryLink(snmp_test_source, '.c');
-	context.Result(result);
-	return result;
-
-conf = Configure(e, custom_tests = {'CheckSNMP': CheckSNMP});
-if not conf.CheckSNMP():
-	print 'Embedded party pack to the rescue, go go go!';
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
-	conf.env.Append(LIBS = ['librpm', 'libsensors', 'libdl', 'libwrap']);
-e = conf.Finish()
+Import('xtenv')
+e = xtenv.Copy()
+e.Append(LIBS = ['libpgm', 'libpgmhttp', 'libpgmsnmp', 'libpgmex']);
 
 e.Program(['pgmdump.c'])
 e.Program(['pgmsend.c'])
@@ -38,10 +13,8 @@ e.Program(['pgmping.c'])
 
 e.Program(['syncrecv.c'])
 
-ne = e.Copy(
-		LIBS = e['LIBS'] + ['panel', 'ncurses'],
-		);
-
+ne = e.Copy()
+ne.Append(LIBS = ['panel', 'ncurses']);
 ne.Program(['pgmtop.c'])
 
 # end of file
