@@ -2,8 +2,8 @@
 # OpenPGM build script
 # $Id$
 
-Import('xtenv')
-e = xtenv.Copy()
+Import('snmphttp_env')
+e = snmphttp_env.Copy()
 e.Append(LIBS = ['libpgm', 'libpgmhttp', 'libpgmsnmp', 'libpgmex']);
 
 e.Program(['pgmdump.c'])

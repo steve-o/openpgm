@@ -4,13 +4,13 @@
 
 import os;
 Import('env');
-Import('xtenv');
+Import('snmphttp_env');
 SConsignFile('scons.signatures');
 
 env['CPPPATH'] = env['CPPPATH'] + [os.getcwd() + '/include'];
 env['LIBPATH'] = env['LIBPATH'] + [os.getcwd() + '/ref/' + env['BUILD']];
-xtenv['CPPPATH'] = xtenv['CPPPATH'] + [os.getcwd() + '/include'];
-xtenv['LIBPATH'] = xtenv['LIBPATH'] + [os.getcwd() + '/ref/' + xtenv['BUILD']];
+snmphttp_env['CPPPATH'] = snmphttp_env['CPPPATH'] + [os.getcwd() + '/include'];
+snmphttp_env['LIBPATH'] = snmphttp_env['LIBPATH'] + [os.getcwd() + '/ref/' + snmphttp_env['BUILD']];
 
 SConscript('SConscript.libpgm');
 SConscript('SConscript.libpgmex');
