@@ -9,6 +9,28 @@ e.Append(
 		LIBS = env['LIBS'] + env['NETSNMP_LIBS'] + ['libpgm', 'libpgmhttp', 'libpgmsnmp', 'libpgmex'],
 	);
 
+# RedHat likes to party likes it's 1889
+snmp_test_source = """
+int main(int argc, char**argv)
+{
+	netsnmp_enable_subagent();
+	return 0;
+}
+"""
+
+def CheckSNMP(context):
+	context.Message('Checking to see if Net-SNMP had a happy accident...');
+	result = context.TryLink(snmp_test_source, '.c');
+	context.Result(result);
+	return result;
+
+conf = Configure(e, custom_tests = {'CheckSNMP': CheckSNMP});
+if not conf.CheckSNMP():
+	print 'Embedded party pack to the rescue, go go go!';
+	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
+	conf.env.Append(LIBS = ['librpm', 'libsensors', 'libdl', 'libwrap']);
+e = conf.Finish()
+
 e.Program(['pgmdump.c'])
 e.Program(['pgmsend.c'])
 e.Program(['pgmrecv.c'])
