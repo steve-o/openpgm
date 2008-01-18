@@ -4,11 +4,13 @@
 
 import os;
 Import('env');
+Import('xtenv');
 SConsignFile('scons.signatures');
 
-env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
 env['CPPPATH'] = env['CPPPATH'] + [os.getcwd() + '/include'];
 env['LIBPATH'] = env['LIBPATH'] + [os.getcwd() + '/ref/' + env['BUILD']];
+xtenv['CPPPATH'] = xtenv['CPPPATH'] + [os.getcwd() + '/include'];
+xtenv['LIBPATH'] = xtenv['LIBPATH'] + [os.getcwd() + '/ref/' + xtenv['BUILD']];
 
 SConscript('SConscript.libpgm');
 SConscript('SConscript.libpgmex');
