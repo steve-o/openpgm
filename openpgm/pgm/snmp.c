@@ -20,6 +20,9 @@
  */
 
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <glib.h>
 
 #include <net-snmp/net-snmp-config.h>
@@ -37,8 +40,8 @@ char* pgm_agentx_socket = NULL;
 gboolean pgm_snmp_syslog = FALSE;
 char* pgm_snmp_appname = "PGM";
 
-static GThread*	thread;
-static gboolean is_running = FALSE;
+static GThread*	g_thread;
+static int g_pipe[2];
 
 static gpointer agent_thread(gpointer);
 
@@ -92,7 +95,24 @@ pgm_snmp_init (void)
 		}
 	}
 
-	is_running = TRUE;
+/* create shutdown pipe */
+	if (pipe (g_pipe))
+		goto err_destroy;
+
+/* write-end */
+	int fd_flags = fcntl (g_pipe[1], F_GETFL);
+	if (fd_flags < 0)
+		goto err_destroy;
+	if (fcntl (g_pipe[1], F_SETFL, fd_flags | O_NONBLOCK))
+		goto err_destroy;
+
+/* read-end */
+	fd_flags = fcntl (g_pipe[0], F_GETFL);
+	if (fd_flags < 0)
+		goto err_destroy;
+	if (fcntl (g_pipe[0], F_SETFL, fd_flags | O_NONBLOCK))
+		goto err_destroy;
+
 	tmp_thread = g_thread_create_full (agent_thread,
 					NULL,
 					0,		/* stack size */
@@ -105,7 +125,7 @@ pgm_snmp_init (void)
 		goto err_destroy;
 	}
 
-	thread = tmp_thread;
+	g_thread = tmp_thread;
 
 out:
 	return retval;
@@ -117,14 +137,22 @@ err_destroy:
 int
 pgm_snmp_shutdown (void)
 {
-	is_running = FALSE;
+/* prod agent thread via pipe */
+	const char one = '1';
+	if (write (g_pipe[1], &one, sizeof(one)) != sizeof(one))
+	{
+		g_critical ("write to pipe failed :(");
+	}
 
-	if (thread) {
-		g_thread_join (thread);
-		thread = NULL;
+	if (g_thread) {
+		g_thread_join (g_thread);
+		g_thread = NULL;
 	}
 
 	snmp_shutdown (pgm_snmp_appname);
+
+	close (g_pipe[0]);
+	close (g_pipe[1]);
 
 	return 0;
 }
@@ -134,10 +162,27 @@ agent_thread (
 	gpointer	data
 	)
 {
-	while (is_running) {
-		agent_check_and_process (1);
+	for (;;)
+	{
+		int fds = 0, block = 1;
+		fd_set fdset;
+		struct timeval timeout;
+
+		FD_ZERO(&fdset);
+		snmp_select_info(&fds, &fdset, &timeout, &block);
+		FD_SET(g_pipe[0], &fdset);
+		if (g_pipe[0]+1 > fds)
+			fds = g_pipe[0]+1;
+		fds = select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
+		if (FD_ISSET(g_pipe[0], &fdset))
+			break;
+		if (fds)
+			snmp_read(&fdset);
+		else
+			snmp_timeout();
 	}
 
+/* cleanup */
 	return NULL;
 }
 

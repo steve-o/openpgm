@@ -224,6 +224,8 @@ Basic TODO list
 - Basic DLR.
 - Convert timer thread from a GLib mainloop to a g_cond_wait / g_cond_timed_wait based loop,
   using mutex/cond pairs instead of shuffling bytes over a pipe.
+- Convert rx thread to simple recvfrom loop.
+- Investigate vector handling: rx thread -> app listener.
 
 Optionals
 *********

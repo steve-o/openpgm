@@ -8,17 +8,42 @@
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
 #include "pgm/pgmMIB.h"
+#include "pgm/pgmMIB_columns.h"
+#include "pgm/transport.h"
 
+
+struct pgm_snmp_context_t {
+	GSList* list;
+};
+
+typedef struct pgm_snmp_context_t pgm_snmp_context_t;
+
+
+/* local globals */
 static oid snmptrap_oid[] = {1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0};
+
+
+/* functions */
+
+static int initialize_table_pgmSourceTable(void);
+static Netsnmp_Node_Handler pgmSourceTable_handler;
+static Netsnmp_First_Data_Point pgmSourceTable_get_first_data_point;
+static Netsnmp_Next_Data_Point pgmSourceTable_get_next_data_point;
+static Netsnmp_Free_Loop_Context pgmSourceTable_free_loop_context;
+
 
 int
 pgm_mib_init (void)
 {
-/*
- * here we initialize all the tables we're planning on supporting
- */
+	int retval = 0;
+
+	retval = initialize_table_pgmSourceTable();
+	if (retval != MIB_REGISTERED_OK) {
+		g_error ("pgmSourceTable registration failed.");
+		goto out;
+	}
+
 #if 0
-	initialize_table_pgmSourceTable();
 	initialize_table_pgmSourceConfigTable();
 	initialize_table_pgmSourcePerformanceTable();
 	initialize_table_pgmReceiverTable();
@@ -26,8 +51,226 @@ pgm_mib_init (void)
 	initialize_table_pgmReceiverPerformanceTable();
 #endif
 
-	return 0;
+out:
+	return retval;
 }
+
+/*
+ * pgmSourceTable
+ *
+ * returns MIB_REGISTERED_OK on success, failures include:
+ * 	MIB_REGISTRATION_FAILED
+ * 	MIB_DUPLICATE_REGISTRATION
+ * 	SNMPERR_GENERR
+ */
+
+static int
+initialize_table_pgmSourceTable(void)
+{
+	static oid pgmSourceTable_oid[] = {1,3,6,1,3,112,1,2,100,2};
+	netsnmp_table_registration_info* table_info = NULL;
+	netsnmp_iterator_info* iinfo = NULL;
+	netsnmp_handler_registration* reg = NULL;
+
+	reg = netsnmp_create_handler_registration(
+						"pgmSourceTable",	pgmSourceTable_handler,
+						pgmSourceTable_oid,	OID_LENGTH(pgmSourceTable_oid),
+						HANDLER_CAN_RONLY
+						);
+	if (!reg)
+		goto error;
+
+	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
+	if (!table_info)
+		goto error;
+
+	table_info->min_column = COLUMN_PGMSOURCESOURCEADDRESS;
+	table_info->max_column = COLUMN_PGMSOURCESOURCEPORTNUMBER;
+
+	netsnmp_table_helper_add_indexes(table_info,
+						ASN_OCTET_STR,  /* index: pgmSourceGlobalId */
+						ASN_UNSIGNED,  /* index: pgmSourceSourcePort */
+						0);
+
+	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
+	if (!iinfo)
+		goto error;
+
+	iinfo->get_first_data_point = pgmSourceTable_get_first_data_point;
+	iinfo->get_next_data_point  = pgmSourceTable_get_next_data_point;
+	iinfo->free_loop_context_at_end = pgmSourceTable_free_loop_context;
+	iinfo->table_reginfo        = table_info;
+
+	return netsnmp_register_table_iterator( reg, iinfo );
+
+error:
+	if (table_info && table_info->indexes)		/* table_data_free_func() is internal */
+		snmp_free_var(table_info->indexes);
+	SNMP_FREE(table_info);
+	SNMP_FREE(iinfo);
+	netsnmp_handler_registration_free (reg);
+
+	return -1;
+}
+
+/* called for first row of data in SNMP table
+ *
+ * goal is to cache all the relevant data for subsequent get_next_data_point (row) calls in my_loop_context,
+ * optionally returns my_data_context.
+ *
+ * returns answer or NULL
+ */
+
+static netsnmp_variable_list*
+pgmSourceTable_get_first_data_point(
+	void**			my_loop_context,	/* valid through one query of multiple "data points" */
+	void**			my_data_context,	/* answer blob which is passed to handler() */
+	netsnmp_variable_list*	put_index_data,		/* answer */
+	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+{
+	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+
+	if (pgm_transport_list == NULL) {
+		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		return NULL;
+	}
+
+/* create our own context for this SNMP loop */
+	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	context->list = pgm_transport_list;
+	*my_loop_context = context;
+
+/* pass on for generic row access */
+	return pgmSourceTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
+}
+
+static netsnmp_variable_list*
+pgmSourceTable_get_next_data_point(
+	void**			my_loop_context,
+	void**			my_data_context,
+	netsnmp_variable_list*	put_index_data,
+	netsnmp_iterator_info*	mydata)
+{
+	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
+	netsnmp_variable_list *idx = put_index_data;
+
+	if ( context->list )
+	{
+		pgm_transport_t* transport = context->list->data;
+
+/* pgmSourceGlobalId */
+		char gsi[sizeof("000" "000" "000" "000" "000" "000")];
+		snprintf(gsi, sizeof(gsi), "%hhu%hhu%hhu%hhu%hhu%hhu",
+			transport->tsi.gsi.identifier[0],
+			transport->tsi.gsi.identifier[1],
+			transport->tsi.gsi.identifier[2],
+			transport->tsi.gsi.identifier[3],
+			transport->tsi.gsi.identifier[4],
+			transport->tsi.gsi.identifier[5]);
+		snmp_set_var_typed_value( idx, ASN_OCTET_STR, (u_char*)&gsi, sizeof(gsi) );
+		idx = idx->next_variable;
+
+/* pgmSourceSourcePort */
+		unsigned long sport = g_ntohs (transport->tsi.sport);
+		snmp_set_var_typed_value( idx, ASN_UNSIGNED, (u_char*)&sport, sizeof(sport) );
+		idx = idx->next_variable;
+
+		*my_data_context = transport;
+		context->list = context->list->next;
+	} else {
+		return NULL;
+	}
+
+	return put_index_data;
+}
+
+static void
+pgmSourceTable_free_loop_context (
+	void*			my_loop_context,
+	netsnmp_iterator_info*	mydata)
+{
+	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
+	g_free(context);
+	my_loop_context = NULL;
+
+	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+}
+
+static int
+pgmSourceTable_handler (
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
+	netsnmp_agent_request_info*	reqinfo,
+	netsnmp_request_info*		requests)
+{
+	switch (reqinfo->mode)
+	{
+
+/* Read-support (also covers GetNext requests) */
+
+	case MODE_GET:
+		for (netsnmp_request_info* request=requests; request; request=request->next)
+		{
+			netsnmp_variable_list *var = request->requestvb;
+			pgm_transport_t* transport = (pgm_transport_t*)netsnmp_extract_iterator_context(request);
+			netsnmp_table_request_info* table_info = netsnmp_extract_table_info(request);
+
+			switch (table_info->colnum)
+			{
+			case COLUMN_PGMSOURCESOURCEADDRESS:
+				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
+								(u_char*)pgm_sockaddr_addr( &transport->send_smr.smr_interface ),
+								pgm_sockaddr_len( &transport->send_smr.smr_interface ));
+				break;
+
+			case COLUMN_PGMSOURCEGROUPADDRESS:
+				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
+								(u_char*)pgm_sockaddr_addr( &transport->send_smr.smr_multiaddr ),
+								pgm_sockaddr_len( &transport->send_smr.smr_multiaddr ));
+				break;
+
+			case COLUMN_PGMSOURCEDESTPORT:
+				{
+				unsigned long dport = g_ntohs (transport->dport);
+				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
+								(u_char*)&dport, sizeof(dport) );
+				}
+				break;
+
+			case COLUMN_PGMSOURCESOURCEGSI:
+/* copy index[0] */
+				snmp_set_var_typed_value(	var, ASN_OCTET_STR,
+								(u_char*)table_info->indexes->val.string,
+								table_info->indexes->val_len);
+				break;
+
+			case COLUMN_PGMSOURCESOURCEPORTNUMBER:
+/* copy index[1] */
+				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
+								(u_char*)table_info->indexes->next_variable->val.integer,
+								table_info->indexes->next_variable->val_len);
+				break;
+
+			default:
+				snmp_log (LOG_ERR, "pgmSourceTable_handler: unknown column.\n");
+				break;
+			}
+		}
+		break;
+
+	case MODE_SET_RESERVE1:
+	default:
+		snmp_log (LOG_ERR, "pgmSourceTable_handler: unsupported mode.\n");
+		break;
+
+	}
+
+	return SNMP_ERR_NOERROR;
+}
+
+/*
+ * SNMP TRAPS
+ */
 
 int
 send_pgmStart_trap( void )

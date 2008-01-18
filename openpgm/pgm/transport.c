@@ -360,6 +360,11 @@ pgm_transport_destroy (
 #ifndef PGM_SINGLE_THREAD
 	if (transport->rx_thread) {
 		g_main_loop_quit (transport->rx_loop);
+	}
+	if (transport->timer_thread) {
+		g_main_loop_quit (transport->timer_loop);
+	}
+	if (transport->rx_thread) {
 		g_thread_join (transport->rx_thread);
 		transport->rx_thread = NULL;
 	}
