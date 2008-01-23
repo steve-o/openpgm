@@ -645,7 +645,7 @@ http_tsi_response (
 						((pgm_txw_t*)transport->txw)->bytes_in_window,	/* minus IP & any UDP header */
 						((pgm_txw_t*)transport->txw)->packets_in_window,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
-						transport->cumulative_stats[PGM_PC_SOURCE_RAW_NAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
 						transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS],
 						transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED],
