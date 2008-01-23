@@ -1745,7 +1745,7 @@ pgm_transport_bind (
 	header->pgm_dport	= transport->dport;
 	header->pgm_type	= PGM_SPM;
 
-	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_interface, (char*)&spm->spm_nla_afi);
 
 /* determine IP header size for rate regulation engine & stats */
 	switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
@@ -2291,7 +2291,7 @@ on_nak (
 	)
 {
 	g_trace ("INFO","on_nak()");
-	transport->cumulative_stats[PGM_PC_SOURCE_RAW_NAKS_RECEIVED]++;
+	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED]++;
 
 	int retval;
 	if ((retval = pgm_verify_nak (header, data, len)) != 0)
