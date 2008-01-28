@@ -1226,7 +1226,6 @@ pgmReceiverTable_get_first_data_point(
 	netsnmp_variable_list*	put_index_data,		/* answer */
 	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
 {
-g_message ("first_data_point");
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -1279,13 +1278,11 @@ pgmReceiverTable_get_next_data_point(
 	netsnmp_variable_list*	put_index_data,
 	netsnmp_iterator_info*	mydata)
 {
-g_message("next_data_point");
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
 	if ( context->list == NULL )
 	{
-g_message("return NULL transport");
 		return NULL;
 	}
 
@@ -1293,7 +1290,6 @@ g_message("return NULL transport");
 
 	if ( context->node == NULL )
 	{
-g_message("return NULL node");
 		return NULL;
 	}
 
@@ -1381,7 +1377,6 @@ pgmReceiverTable_handler (
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests)
 {
-g_message("receiver handler");
 	switch (reqinfo->mode)
 	{
 
@@ -1405,7 +1400,6 @@ g_message("receiver handler");
 				continue;
 			}
 
-g_message("request %i on %p", table_info->colnum, peer);
 			switch (table_info->colnum)
 			{
 			case COLUMN_PGMRECEIVERGROUPADDRESS:
@@ -1694,7 +1688,6 @@ pgmReceiverConfigTable_handler (
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests)
 {
-g_message("receiver handler");
 	switch (reqinfo->mode)
 	{
 
@@ -1718,7 +1711,6 @@ g_message("receiver handler");
 				continue;
 			}
 
-g_message("request %i on %p", table_info->colnum, peer);
 			switch (table_info->colnum)
 			{
 /* nak_rb_ivl from transport */
@@ -2058,7 +2050,6 @@ pgmReceiverPerformanceTable_handler (
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests)
 {
-g_message("receiver handler");
 	switch (reqinfo->mode)
 	{
 
@@ -2082,7 +2073,6 @@ g_message("receiver handler");
 				continue;
 			}
 
-g_message("request %i on %p", table_info->colnum, peer);
 			switch (table_info->colnum)
 			{
 			case COLUMN_PGMRECEIVERDATABYTESRECEIVED:
