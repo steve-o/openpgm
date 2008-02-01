@@ -22,18 +22,26 @@
 #ifndef __PGM_TRANSPORT_H__
 #define __PGM_TRANSPORT_H__
 
+#include <poll.h>
+#include <sys/epoll.h>
+
 #include <glib.h>
 
+
 #ifndef __PGM_GSI_H__
-#   include "gsi.h"
+#   include "pgm/gsi.h"
 #endif
 
 #ifndef __PGM_SOCKADDR_H__
-#   include "sockaddr.h"
+#   include "pgm/sockaddr.h"
 #endif
 
 #ifndef __PGM_TIMER_H__
-#   include "timer.h"
+#   include "pgm/timer.h"
+#endif
+
+#ifndef __PGM_MSGV_H__
+#   include "pgm/msgv.h"
 #endif
 
 /* Performance Counters */
@@ -152,13 +160,6 @@ struct pgm_peer_t {
 };
 
 typedef struct pgm_peer_t pgm_peer_t;
-typedef struct pgm_event_t pgm_event_t;
-
-struct pgm_event_t {
-    gpointer		data;
-    guint		len;
-    struct pgm_peer_t*	peer;
-};
 
 struct pgm_transport_t {
     pgm_tsi_t           tsi;
@@ -167,9 +168,9 @@ struct pgm_transport_t {
     guint16		udp_encap_port;
 
     GStaticMutex	mutex;
-    GThread		*rx_thread, *timer_thread;
-    GMainLoop		*rx_loop, *timer_loop;
-    GMainContext	*rx_context, *timer_context;
+    GThread		*timer_thread;
+    GMainLoop		*timer_loop;
+    GMainContext	*timer_context;
     gboolean		bound;
 
     GCond		*thread_cond;
@@ -183,7 +184,6 @@ struct pgm_transport_t {
     struct pgm_sock_mreq recv_smr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
     guint		recv_smr_len;
     int			recv_sock;
-    GIOChannel*		recv_channel;
 
     guint16		max_tpdu;
     guint		iphdr_len;
@@ -216,14 +216,19 @@ struct pgm_transport_t {
     guint		fec_k;
     guint		fec_padding;
 
+    gpointer		rx_buffer;
+    struct iovec*	piov;
+    int			piov_len;		    /* # elements in piov */
+    int			iov_len;		    /* length of piov in bytes */
+
+    GTrashStack*	rx_data;		    /* shared between all receivers for this instance */
+    GTrashStack*	rx_packet;
+    GStaticMutex	rx_mutex;
+
     GStaticRWLock	peers_lock;
     GHashTable*		peers;
-
-    GAsyncQueue*	commit_queue;
-    int			commit_pipe[2];
-    GTrashStack*	trash_event;		    /* sizeof(struct pgm_event) */
-    guint		event_preallocate;
-    GStaticMutex	event_mutex;
+    GSList*		peers_waiting;		    /* have or lost data */
+    GStaticMutex	waiting_mutex;
 
     GAsyncQueue*	rdata_queue;
     int			rdata_pipe[2];
@@ -240,8 +245,8 @@ struct pgm_transport_t {
     pgm_time_t		snap_time;
 };
 
-typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
 
+/* global variables */
 extern GStaticRWLock pgm_transport_list_lock;
 extern GSList* pgm_transport_list;
 
@@ -250,17 +255,12 @@ G_BEGIN_DECLS
 
 int pgm_init (void);
 
-int pgm_event_unref (pgm_transport_t*, pgm_event_t*);
-
 gchar* pgm_print_tsi (const pgm_tsi_t*);
 guint pgm_tsi_hash (gconstpointer);
 gint pgm_tsi_equal (gconstpointer, gconstpointer);
 
 int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, int, struct pgm_sock_mreq*);
 int pgm_transport_bind (pgm_transport_t*);
-GSource* pgm_transport_create_watch (pgm_transport_t*);
-int pgm_transport_add_watch_full (pgm_transport_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
-int pgm_transport_add_watch (pgm_transport_t*, pgm_eventfn_t, gpointer);
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
 
 int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
@@ -283,7 +283,6 @@ int pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
 
 int pgm_transport_set_sndbuf (pgm_transport_t*, int);
 int pgm_transport_set_rcvbuf (pgm_transport_t*, int);
-int pgm_transport_set_event_preallocate (pgm_transport_t*, guint);
 
 int pgm_transport_set_nak_rb_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
@@ -291,6 +290,11 @@ int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
+int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, guint, guint);
+
+int pgm_set_nonblocking (int filedes[2]);
+
+/* send side */
 gpointer pgm_alloc (pgm_transport_t*);
 int pgm_write_unlocked (pgm_transport_t*, const gchar*, gsize);
 static inline int pgm_write (pgm_transport_t* transport, const gchar* buf, gsize count)
@@ -319,11 +323,14 @@ static inline int pgm_write_copy_fragment (pgm_transport_t* transport, const gch
     return retval;
 }
 
-int pgm_write_copy_ex (pgm_transport_t*, const gchar*, gsize);
+/* receiver side */
+int pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
+int pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, int, int);
+int pgm_transport_recv (pgm_transport_t*, gpointer, int, int);
 
-/* TODO: contexts, hooks */
+int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*);
+int pgm_transport_epoll_ctl (pgm_transport_t*, int, int);
 
-int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, guint, guint);
 
 G_END_DECLS
 

@@ -46,6 +46,7 @@
 #include <pgm/signal.h>
 #include <pgm/timer.h>
 #include <pgm/if.h>
+#include <pgm/async.h>
 
 
 /* typedefs */
@@ -59,6 +60,7 @@ struct app_session {
 	char*		name;
 	pgm_gsi_t	gsi;
 	pgm_transport_t* transport;
+	pgm_async_t*	async;
 };
 
 /* globals */
@@ -447,7 +449,8 @@ session_listen (
 	}
 
 /* listen */
-	pgm_transport_add_watch (sess->transport, on_data, NULL);
+	pgm_async_create (&sess->async, sess->transport, 0);
+	pgm_async_add_watch (sess->async, on_data, NULL);
 
 	puts ("READY");
 }
@@ -466,6 +469,12 @@ session_destroy (
 
 /* remove from hash table */
 	g_hash_table_remove (g_sessions, name);
+
+/* stop any async thread */
+	if (sess->async) {
+		pgm_async_destroy (sess->async);
+		sess->async = NULL;
+	}
 
 	pgm_transport_destroy (sess->transport, TRUE);
 	sess->transport = NULL;

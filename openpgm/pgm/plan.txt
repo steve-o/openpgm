@@ -226,6 +226,7 @@ Basic TODO list
   using mutex/cond pairs instead of shuffling bytes over a pipe.
 - Convert rx thread to simple recvfrom loop.
 - Investigate vector handling: rx thread -> app listener.
+- Determine handling of zero length data packets.
 
 Optionals
 *********

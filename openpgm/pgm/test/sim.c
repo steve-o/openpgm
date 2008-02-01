@@ -62,6 +62,7 @@ struct sim_session {
 	pgm_gsi_t	gsi;
 	pgm_transport_t* transport;
 	gboolean	transport_is_fake;
+	GIOChannel*	recv_channel;
 };
 
 /* globals */
@@ -576,20 +577,6 @@ fake_pgm_transport_bind (
                 goto out;
         }
 
-/* add receive socket(s) to event manager */
-        transport->recv_channel = g_io_channel_unix_new (transport->recv_sock);
-
-	GSource *source;
-	source = g_io_create_watch (transport->recv_channel, G_IO_IN | G_IO_PRI);
-	g_source_set_callback (source, (GSourceFunc)on_io_data, transport, NULL);
-	g_source_attach (source, NULL);
-	g_source_unref (source);
-
-	source = g_io_create_watch (transport->recv_channel, G_IO_ERR | G_IO_HUP);
-	g_source_set_callback (source, (GSourceFunc)on_io_error, transport, NULL);
-	g_source_attach (source, NULL);
-	g_source_unref (source);
-
 /* cleanup */
 	transport->bound = TRUE;
 
@@ -604,22 +591,6 @@ fake_pgm_transport_destroy (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-
-/* close down receive side first to stop new data incoming */
-        if (transport->recv_channel) { 
-                puts ("closing receive channel.");
-
-                GError *err = NULL;
-                g_io_channel_shutdown (transport->recv_channel, flush, &err);
-
-                if (err) {
-                        g_warning ("i/o shutdown error %i %s", err->code, err->message);
-                }
-
-/* TODO: flush GLib main loop with context specific to the recv channel */
-
-                transport->recv_channel = NULL;
-        }
 
 	if (transport->recv_sock) {
                 puts ("closing receive socket.");
@@ -735,6 +706,15 @@ session_bind (
 		return;
 	}
 
+/* add receive socket(s) to event manager */
+	sess->recv_channel = g_io_channel_unix_new (sess->transport->recv_sock);
+
+	GSource *source;
+	source = g_io_create_watch (sess->recv_channel, G_IO_IN);
+	g_source_set_callback (source, (GSourceFunc)on_io_data, sess->transport, NULL);
+	g_source_attach (source, NULL);
+	g_source_unref (source);
+
 	puts ("READY");
 }
 
@@ -774,6 +754,22 @@ session_destroy (
 
 /* remove from hash table */
 	g_hash_table_remove (g_sessions, name);
+
+/* close down receive side first to stop new data incoming */
+        if (sess->recv_channel) { 
+                puts ("closing receive channel.");
+
+                GError *err = NULL;
+                g_io_channel_shutdown (sess->recv_channel, TRUE, &err);
+
+                if (err) {
+                        g_warning ("i/o shutdown error %i %s", err->code, err->message);
+                }
+
+/* TODO: flush GLib main loop with context specific to the recv channel */
+
+                sess->recv_channel = NULL;
+        }
 
 	if (sess->transport_is_fake)
 	{

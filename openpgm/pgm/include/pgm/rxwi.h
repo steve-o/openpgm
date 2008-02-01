@@ -2,7 +2,7 @@
  * 
  * basic receive window.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,10 @@
 
 #ifndef __PGM_TIMER_H__
 #   include "pgm/timer.h"
+#endif
+
+#ifndef __PGM_MSGV_H__
+#   include "pgm/msgv.h"
 #endif
 
 
@@ -61,13 +65,12 @@ typedef enum
 const char* pgm_rxw_state_string (pgm_pkt_state_e);
 
 /* callback for commiting contiguous pgm packets */
-typedef int (*pgm_rxw_commitfn_t)(gpointer, guint, gpointer);
+typedef int (*pgm_rxw_commitfn_t)(guint32, gpointer, guint, gpointer);
 
 struct pgm_rxw_packet_t {
-        gpointer        data;
-
-        guint           length;
-        guint32         sequence_number;
+	gpointer        data;
+	guint           length;
+	guint32         sequence_number;
 
 	guint32		apdu_first_sqn;
 /*	guint32		frag_offset;	*/
@@ -90,8 +93,12 @@ typedef struct pgm_rxw_packet_t pgm_rxw_packet_t;
 
 struct pgm_rxw_t {
         GPtrArray*      pdata;
-        GTrashStack*    trash_packet;           /* sizeof(rxw_packet) */
-        GTrashStack*    trash_data;             /* max_tpdu */
+	GTrashStack**	trash_data;		/* owned by transport */
+	GTrashStack**	trash_packet;
+	GStaticMutex*	trash_mutex;
+
+	GSList		waiting_link;
+	gboolean	waiting;
 
         GQueue*         backoff_queue;
         GQueue*         wait_ncf_queue;
@@ -110,17 +117,17 @@ struct pgm_rxw_t {
 	gint		max_fill_time;
 	gint		min_nak_transmit_count;
 	gint		max_nak_transmit_count;
-
-        pgm_rxw_commitfn_t on_data;
-        gpointer        param;
 };
 
 typedef struct pgm_rxw_t pgm_rxw_t;
 
-pgm_rxw_t* pgm_rxw_init (guint, guint32, guint32, guint, guint, pgm_rxw_commitfn_t, gpointer);
+
+pgm_rxw_t* pgm_rxw_init (guint, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
 int pgm_rxw_shutdown (pgm_rxw_t*);
 
 int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, guint32, guint32, guint32, pgm_time_t);
+
+int pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, int, struct iovec**, int);
 
 /* from state checking */
 int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
@@ -154,7 +161,22 @@ static inline gboolean pgm_rxw_full (pgm_rxw_t* r)
 
 static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
 {
-    return r->trash_data ? g_trash_stack_pop (&r->trash_data) : g_slice_alloc (r->max_tpdu);
+    gpointer p;
+    g_static_mutex_lock (r->trash_mutex);
+    if (*r->trash_data) {
+	p = g_trash_stack_pop (r->trash_data);
+    } else {
+	p = g_slice_alloc (r->max_tpdu);
+    }
+    g_static_mutex_unlock (r->trash_mutex);
+    return p;
+}
+
+static inline void pgm_rxw_data_unref (GTrashStack** trash, GStaticMutex* mutex, gpointer data)
+{
+    g_static_mutex_lock (mutex);
+    g_trash_stack_push (trash, data);
+    g_static_mutex_unlock (mutex);
 }
 
 static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
