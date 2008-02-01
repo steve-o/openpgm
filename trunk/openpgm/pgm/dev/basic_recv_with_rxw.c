@@ -167,6 +167,9 @@ static SoupServer* g_soup_server = NULL;
 static gpointer g_rxw = NULL;			/* receive window */
 static int g_max_tpdu = 1500;
 static int g_rxw_sqns = 10;
+static GTrashStack* g_trash_data = NULL;
+static GTrashStack* g_trash_packet = NULL;
+static GStaticMutex g_trash_mutex = G_STATIC_MUTEX_INIT;
 
 static guint tsi_hash (gconstpointer);
 static gint tsi_equal (gconstpointer, gconstpointer);
@@ -262,17 +265,17 @@ main (
 	if (g_recv_sock) {
 		puts ("closing receive socket.");
 		close (g_recv_sock);
-		g_recv_sock = NULL;
+		g_recv_sock = 0;
 	}
 	if (g_send_sock) {
 		puts ("closing send socket.");
 		close (g_send_sock);
-		g_send_sock = NULL;
+		g_send_sock = 0;
 	}
 	if (g_send_with_router_alert_sock) {
 		puts ("closing send with router alert socket.");
 		close (g_send_with_router_alert_sock);
-		g_send_with_router_alert_sock = NULL;
+		g_send_with_router_alert_sock = 0;
 	}
 
         if (g_soup_server) {
@@ -311,7 +314,7 @@ on_startup (
 	puts ("startup.");
 
 	puts ("construct receive window.");
-	g_rxw = pgm_rxw_init (g_max_tpdu, 0, g_rxw_sqns, 0, 0, on_pgm_data, NULL);
+	g_rxw = pgm_rxw_init (g_max_tpdu, 0, g_rxw_sqns, 0, 0, &g_trash_data, &g_trash_packet, &g_trash_mutex);
 
         puts ("starting soup server.");
         g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_http,
@@ -806,6 +809,18 @@ printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 	} else {
 		hoststat->general.last_valid = tv;
 	}
+
+/* flush packets from receive window */
+	pgm_msgv_t msgv[ IOV_MAX ];
+	struct iovec iov[ IOV_MAX ];
+	int bytes_read = 0;
+	do {
+		pgm_msgv_t* pmsgv = msgv;
+		struct iovec* piov = iov;
+		bytes_read = pgm_rxw_readv (g_rxw, &pmsgv, G_N_ELEMENTS(msgv), &piov, G_N_ELEMENTS(iov));
+	} while (bytes_read > 0);
+
+/* ignore actual data, we don't care */
 
 	fflush(stdout);
 

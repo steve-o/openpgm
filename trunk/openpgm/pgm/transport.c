@@ -20,11 +20,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
 #include <netdb.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,8 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/udp.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -50,7 +53,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -64,15 +67,6 @@
 #	endif
 #endif
 
-
-/* external: Glib event loop GSource of pgm contiguous data */
-struct pgm_watch_t {
-	GSource		source;
-	GPollFD		pollfd;
-	pgm_transport_t* transport;
-};
-
-typedef struct pgm_watch_t pgm_watch_t;
 
 /* internal: Glib event loop GSource of spm & rx state timers */
 struct pgm_timer_t {
@@ -94,7 +88,7 @@ typedef int (*pgm_timer_callback)(pgm_transport_t*);
 
 static int ipproto_pgm = IPPROTO_PGM;
 
-GStaticRWLock pgm_transport_list_lock;		/* list of all transports for admin interfaces */
+GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
 GSList* pgm_transport_list = NULL;
 
 
@@ -103,18 +97,7 @@ GSList* pgm_transport_list = NULL;
 #define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue->tail->data)->nak_rpt_expiry )
 #define next_nak_rdata_expiry(r)    ( ((pgm_rxw_packet_t*)(r)->wait_data_queue->tail->data)->nak_rdata_expiry )
 
-static gboolean pgm_src_prepare (GSource*, gint*);
-static gboolean pgm_src_check (GSource*);
-static gboolean pgm_src_dispatch (GSource*, GSourceFunc, gpointer);
 
-static GSourceFuncs g_pgm_watch_funcs = {
-	pgm_src_prepare,
-	pgm_src_check,
-	pgm_src_dispatch,
-	NULL
-};
-
-static int pgm_set_nonblocking (int filedes[2]);
 static GSource* pgm_create_timer (pgm_transport_t*);
 static int pgm_add_timer_full (pgm_transport_t*, gint);
 static int pgm_add_timer (pgm_transport_t*);
@@ -150,8 +133,7 @@ static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static inline void pgm_peer_unref (pgm_peer_t*);
 static void pgm_peer_unref_hfunc (gpointer, gpointer, gpointer);
 
-static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
-static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
+static int on_pgm_data (gpointer, guint, gpointer);
 
 static gboolean on_nak_pipe (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_timer_pipe (GIOChannel*, GIOCondition, gpointer);
@@ -164,8 +146,6 @@ static int on_ncf (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_nnak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int);
 static int on_odata (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_rdata (pgm_peer_t*, struct pgm_header*, char*, int);
-
-static int on_pgm_data (gpointer, guint, gpointer);
 
 
 gchar*
@@ -262,7 +242,7 @@ pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len
 	return retval;
 }
 
-static int
+int
 pgm_set_nonblocking (int filedes[2])
 {
 	int retval = 0;
@@ -358,15 +338,8 @@ pgm_transport_destroy (
 
 /* terminate & join internal thread */
 #ifndef PGM_SINGLE_THREAD
-	if (transport->rx_thread) {
-		g_main_loop_quit (transport->rx_loop);
-	}
 	if (transport->timer_thread) {
 		g_main_loop_quit (transport->timer_loop);
-	}
-	if (transport->rx_thread) {
-		g_thread_join (transport->rx_thread);
-		transport->rx_thread = NULL;
 	}
 	if (transport->timer_thread) {
 		g_main_loop_quit (transport->timer_loop);
@@ -387,28 +360,33 @@ pgm_transport_destroy (
 	if (flush) {
 	}
 
-/* close down receive side first to stop new data incoming */
-	if (transport->recv_channel) {
-		g_trace ("INFO","closing receive channel.");
-
-		GError *err = NULL;
-		g_io_channel_shutdown (transport->recv_channel, flush, &err);
-
-		if (err) {
-			g_warning ("i/o shutdown error %i %s", err->code, err->message);
-		}
-
-/* TODO: flush GLib main loop with context specific to the recv channel */
-
-		transport->recv_channel = NULL;
-	}
-
 	if (transport->peers) {
 		g_trace ("INFO","destroying peer data.");
 
 		g_hash_table_foreach (transport->peers, pgm_peer_unref_hfunc, transport);
 		g_hash_table_destroy (transport->peers);
 		transport->peers = NULL;
+	}
+
+/* clean up receiver trash stacks */
+	if (transport->rx_data) {
+		gpointer* p = NULL;
+		while ( (p = g_trash_stack_pop (&transport->rx_data)) )
+		{
+			g_slice_free1 (transport->max_tpdu - transport->iphdr_len, p);
+		}
+
+		transport->rx_data = NULL;
+	}
+
+	if (transport->rx_packet) {
+		gpointer* p = NULL;
+		while ( (p = g_trash_stack_pop (&transport->rx_packet)) )
+		{
+			g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
+		}
+
+		transport->rx_packet = NULL;
 	}
 
 	if (transport->txw) {
@@ -474,34 +452,11 @@ pgm_transport_destroy (
 		transport->timer_pipe[1] = 0;
 	}
 
-	if (transport->commit_queue) {
-		g_async_queue_unref (transport->commit_queue);
-		transport->commit_queue = NULL;
-	}
-	if (transport->commit_pipe[0]) {
-		close (transport->commit_pipe[0]);
-		transport->commit_pipe[0] = 0;
-	}
-	if (transport->commit_pipe[1]) {
-		close (transport->commit_pipe[1]);
-		transport->commit_pipe[1] = 0;
-	}
-	if (transport->trash_event) {
-		gpointer *p = NULL;
-		while ( (p = g_trash_stack_pop (&transport->trash_event)) )
-		{
-			g_slice_free1 (sizeof(pgm_event_t), p);
-		}
-
-		g_assert (transport->trash_event == NULL);
-	}
-
 	g_static_rw_lock_free (&transport->peers_lock);
 
 	g_static_rw_lock_free (&transport->txw_lock);
 
 	g_static_mutex_free (&transport->rdata_mutex);
-	g_static_mutex_free (&transport->event_mutex);
 
 	if (transport->bound) {
 		g_static_mutex_unlock (&transport->send_mutex);
@@ -512,6 +467,16 @@ pgm_transport_destroy (
 
 	g_static_mutex_unlock (&transport->mutex);
 	g_static_mutex_free (&transport->mutex);
+
+	if (transport->rx_buffer) {
+		g_free (transport->rx_buffer);
+		transport->rx_buffer = NULL;
+	}
+
+	if (transport->piov) {
+		g_free (transport->piov);
+		transport->piov = NULL;
+	}
 
 	g_free (transport);
 
@@ -556,50 +521,12 @@ pgm_peer_unref (
 
 static void
 pgm_peer_unref_hfunc (
-	gpointer	tsi,
+	gpointer 	tsi,
 	gpointer	peer,
 	gpointer	transport
 	)
 {
 	pgm_peer_unref ((pgm_peer_t*)peer);
-}
-
-static inline gpointer
-pgm_alloc_event (
-	pgm_transport_t*	transport
-	)
-{
-	g_return_val_if_fail (transport != NULL, NULL);
-
-	return transport->trash_event ?  g_trash_stack_pop (&transport->trash_event) : g_slice_alloc (sizeof(pgm_event_t));
-}
-
-/* internal receiver thread, sits in a glib event loop processing incoming packets and related
- * timers for the transport.
- *
- * TODO: how to kill thread. :-)
- */
-
-static gpointer
-pgm_receiver_thread (
-	gpointer		data
-	)
-{
-	pgm_transport_t* transport = (pgm_transport_t*)data;
-
-	transport->rx_context = g_main_context_new ();
-	g_mutex_lock (transport->thread_mutex);
-	transport->rx_loop = g_main_loop_new (transport->rx_context, FALSE);
-	g_cond_signal (transport->thread_cond);
-	g_mutex_unlock (transport->thread_mutex);
-
-	g_main_loop_run (transport->rx_loop);
-
-/* cleanup */
-	g_main_loop_unref (transport->rx_loop);
-	g_main_context_unref (transport->rx_context);
-
-	return NULL;
 }
 
 static gpointer
@@ -679,8 +606,7 @@ pgm_transport_create (
 /* timer lock */
 	g_static_mutex_init (&transport->mutex);
 
-/* event & rdata queue locks */
-	g_static_mutex_init (&transport->event_mutex);
+/* rdata queue locks */
 	g_static_mutex_init (&transport->rdata_mutex);
 
 /* transmit window read/write lock */
@@ -748,7 +674,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-/* create receiving thread */
+/* create timer thread */
 #ifndef PGM_SINGLE_THREAD
 	GError* err;
 	GThread* thread;
@@ -756,26 +682,6 @@ pgm_transport_create (
 /* set up condition for thread context & loop being ready */
 	transport->thread_mutex = g_mutex_new ();
 	transport->thread_cond = g_cond_new ();
-
-	thread = g_thread_create_full (pgm_receiver_thread,	/* function to call in new thread */
-					transport,
-					0,		/* stack size */
-					TRUE,		/* joinable */
-					TRUE,		/* native thread */
-					G_THREAD_PRIORITY_URGENT,	/* highest priority */
-					&err);
-	if (thread) {
-		transport->rx_thread = thread;
-	} else {
-		g_error ("thread failed: %i %s", err->code, err->message);
-		goto err_destroy;
-	}
-
-/* spin lock around condition waiting for thread startup */
-	g_mutex_lock (transport->thread_mutex);
-	while (!transport->rx_loop)
-		g_cond_wait (transport->thread_cond, transport->thread_mutex);
-	g_mutex_unlock (transport->thread_mutex);
 
 	thread = g_thread_create_full (pgm_timer_thread,
 					transport,
@@ -821,8 +727,6 @@ err_destroy:
 		transport->thread_cond = NULL;
 	}
 	if (transport->timer_thread) {
-	}
-	if (transport->rx_thread) {
 	}
 		
 	if (transport->recv_sock) {
@@ -1105,23 +1009,6 @@ pgm_transport_set_rxw_preallocate (
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->rxw_preallocate = sqns;
-	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
-}
-
-int
-pgm_transport_set_event_preallocate (
-	pgm_transport_t*	transport,
-	guint			events
-	)
-{
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->bound, -EINVAL);
-	g_return_val_if_fail (events > 0, -EINVAL);
-
-	g_static_mutex_lock (&transport->mutex);
-	transport->event_preallocate = events;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
@@ -1410,29 +1297,6 @@ pgm_transport_bind (
 		goto out;
 	}
 		
-/* transport to application queue */
-	g_trace ("INFO","preallocate event queue.");
-	for (guint32 i = 0; i < transport->event_preallocate; i++)
-	{
-		gpointer event = g_slice_alloc (sizeof(pgm_event_t));
-		g_trash_stack_push (&transport->trash_event, event);
-	}
-
-	g_trace ("INFO","create asynchronous commit queue.");
-	transport->commit_queue = g_async_queue_new();
-
-	g_trace ("INFO","create commit pipe.");
-	retval = pipe (transport->commit_pipe);
-	if (retval < 0) {
-		retval = errno;
-		goto out;
-	}
-
-	retval = pgm_set_nonblocking (transport->commit_pipe);
-	if (retval) {
-		goto out;
-	}
-
 	g_trace ("INFO","construct transmit window.");
 	transport->txw = pgm_txw_init (transport->max_tpdu - sizeof(struct iphdr),
 					transport->txw_preallocate,
@@ -1712,12 +1576,6 @@ pgm_transport_bind (
 		goto out;
 	}
 
-/* add receive socket(s) to event manager */
-	transport->recv_channel = g_io_channel_unix_new (transport->recv_sock);
-
-	g_io_add_watch_context_full (transport->recv_channel, transport->rx_context, G_PRIORITY_HIGH, G_IO_IN | G_IO_PRI, on_io_data, transport, NULL);
-	g_io_add_watch_context_full (transport->recv_channel, transport->rx_context, G_PRIORITY_HIGH, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, transport, NULL);
-
 /* rx to timer pipe */
 	transport->rdata_channel = g_io_channel_unix_new (transport->rdata_pipe[0]);
 	g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_pipe, transport, NULL);
@@ -1759,6 +1617,13 @@ pgm_transport_bind (
 	}
 	g_trace ("INFO","assuming IP header size of %i bytes", transport->iphdr_len);
 
+	if (transport->udp_encap_port)
+	{
+		guint udphdr_len = sizeof( struct udphdr );
+		g_trace ("INFO","assuming UDP header size of %i bytes", udphdr_len);
+		transport->iphdr_len += udphdr_len;
+	}
+
 /* setup rate control */
 	if (transport->txw_max_rte)
 	{
@@ -1780,6 +1645,16 @@ pgm_transport_bind (
 	send_spm_unlocked (transport);
 	send_spm_unlocked (transport);
 	send_spm_unlocked (transport);
+
+/* allocate first incoming packet buffer */
+	transport->rx_buffer = g_malloc ( transport->max_tpdu );
+
+/* scatter/gather vector for contiguous reading from the window */
+	transport->piov_len = IOV_MAX;
+	transport->piov = g_malloc ( transport->piov_len * sizeof( struct iovec ) );
+
+/* receiver trash */
+	g_static_mutex_init (&transport->rx_mutex);
 
 /* cleanup */
 	transport->bound = TRUE;
@@ -1815,13 +1690,14 @@ new_peer (
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
 
 /* lock on rx window */
-	peer->rxw = pgm_rxw_init (transport->max_tpdu,
+	peer->rxw = pgm_rxw_init (transport->max_tpdu - transport->iphdr_len,
 				transport->rxw_preallocate,
 				transport->rxw_sqns,
 				transport->rxw_secs,
 				transport->rxw_max_rte,
-				on_pgm_data,
-				peer);
+				&transport->rx_data,
+				&transport->rx_packet,
+				&transport->rx_mutex);
 
 	peer->spmr_expiry = pgm_time_update_now() + transport->spmr_expiry;
 
@@ -1853,28 +1729,71 @@ new_peer (
 /* data incoming on receive sockets, can be from a sender or receiver, or simply bogus.
  * for IPv4 we receive the IP header to handle fragmentation, for IPv6 we cannot so no idea :(
  *
- * return TRUE to keep the event, FALSE to destroy the event.
+ * returns bytes read.
  */
 
-static gboolean
-on_io_data (
-	GIOChannel*	source,
-	GIOCondition	condition,
-	gpointer	data
+int
+pgm_transport_recvmsgv (
+	pgm_transport_t*	transport,
+	pgm_msgv_t*		pmsg,
+	int			msg_len,
+	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
-//	g_trace ("INFO","on_io_data");
+	g_trace ("INFO", "pgm_transport_recvmsgv");
+	int bytes_read = 0;
+	pgm_msgv_t* msg_end = pmsg + msg_len;
+	struct iovec* piov = transport->piov;
+	struct iovec* iov_end = piov + transport->piov_len;
 
-	pgm_transport_t* transport = data;
+/* first return any previous blocks to the trash */
+	int iovi = 0;
+	while (transport->iov_len)
+	{
+		pgm_rxw_data_unref (&transport->rx_data, &transport->rx_mutex, transport->piov[iovi].iov_base);
+		transport->iov_len -= transport->piov[iovi].iov_len;
+
+		iovi++;
+	}
+
+/* second, flush any remaining contiguous messages from previous call(s) */
+	g_static_mutex_lock (&transport->waiting_mutex);
+	while (transport->peers_waiting)
+	{
+		pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
+		bytes_read += pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+
+		if (pmsg == msg_end || piov == iov_end)	/* commit full */
+		{
+			break;
+		}
+
+		transport->peers_waiting->data = NULL;
+		transport->peers_waiting = transport->peers_waiting->next;
+	}
+	g_static_mutex_unlock (&transport->waiting_mutex);
 
 /* read the data:
- * TODO: pre-allocate buffer based on max_tpdu size
+ *
+ * Buffer is always max_tpdu in length.  Ideally we have zero copy but the recv includes the ip & pgm headers and
+ * the pgm options.  Over thousands of messages the gains by using less receive window memory are more conducive.
  */
-	int fd = g_io_channel_unix_get_fd (source);
-	char buffer[transport->max_tpdu];
 	struct sockaddr_storage src_addr;
 	socklen_t src_addr_len = sizeof(src_addr);
-	int len = recvfrom (fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
+	int len;
+	int bytes_received = 0;
+
+recv_again:
+	len = recvfrom (transport->recv_sock, transport->rx_buffer, transport->max_tpdu, flags, (struct sockaddr*)&src_addr, &src_addr_len);
+	bytes_received += len;
+
+	if (len < 0) {
+		if (bytes_received) {
+			goto flush_waiting;
+		} else {
+			goto out;
+		}
+	}
 
 #ifdef TRANSPORT_DEBUG
 	char s[INET6_ADDRSTRLEN];
@@ -1891,9 +1810,9 @@ on_io_data (
 	int e;
 
 	if (transport->udp_encap_port) {
-		e = pgm_parse_udp_encap(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+		e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	} else {
-		e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+		e = pgm_parse_raw(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	}
 
 	if (e < 0)
@@ -1902,7 +1821,7 @@ on_io_data (
 		if (e == -2)
 			transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-		goto out;
+		goto check_for_repeat;
 	}
 
 /* calculate senders TSI */
@@ -1911,6 +1830,7 @@ on_io_data (
 	tsi.sport = pgm_header->pgm_sport;
 
 //	g_trace ("INFO","tsi %s", pgm_print_tsi (&tsi));
+	pgm_peer_t* source = NULL;
 
 	if (pgm_is_upstream (pgm_header->pgm_type) || pgm_is_peer (pgm_header->pgm_type))
 	{
@@ -1927,10 +1847,8 @@ on_io_data (
 /* its upstream/peer-to-peer for another session */
 
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-			goto out;
+			goto check_for_repeat;
 		}
-
-		pgm_peer_t* source = NULL;
 
 		if ( pgm_is_peer (pgm_header->pgm_type)
 			&& pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr) )
@@ -1963,7 +1881,7 @@ on_io_data (
 
 /* this source is unknown, we don't care about messages about it */
 
-					goto out;
+					goto check_for_repeat;
 				}
 			}
 		}
@@ -1982,7 +1900,7 @@ on_io_data (
 /* it is a mystery! */
 
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-			goto out;
+			goto check_for_repeat;
 		}
 
 		char *pgm_data = (char*)(pgm_header + 1);
@@ -1994,9 +1912,11 @@ on_io_data (
 				on_peer_nak (source, pgm_header, pgm_data, pgm_len);
 			} else if (!pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)) {
 				on_nak (transport, &tsi, pgm_header, pgm_data, pgm_len);
+				goto check_for_repeat;
 			} else {
 /* ignore multicast NAKs as the source */
 				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+				goto check_for_repeat;
 			}
 			break;
 
@@ -2005,7 +1925,7 @@ on_io_data (
 		case PGM_POLR:
 		default:
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-			break;
+			goto check_for_repeat;
 		}
 	}
 	else
@@ -2016,55 +1936,192 @@ on_io_data (
 		if (!pgm_is_downstream (pgm_header->pgm_type))
 		{
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-			goto out;
+			goto check_for_repeat;
 		}
 
 /* pgm packet DPORT contains our transport DPORT */
 		if (pgm_header->pgm_dport != transport->dport) {
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-			goto out;
+			goto check_for_repeat;
 		}
 
 /* search for TSI peer context or create a new one */
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		pgm_peer_t* sender = g_hash_table_lookup (transport->peers, &tsi);
+		source = g_hash_table_lookup (transport->peers, &tsi);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
-		if (sender == NULL)
+		if (source == NULL)
 		{
-			sender = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, src_addr_len);
+			source = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, src_addr_len);
 		}
 
-		sender->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += len;
-		sender->last_packet = pgm_time_now;
+		source->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += len;
+		source->last_packet = pgm_time_now;
 
 		char *pgm_data = (char*)(pgm_header + 1);
 		int pgm_len = packet_len - sizeof(pgm_header);
 
 /* handle PGM packet type */
 		switch (pgm_header->pgm_type) {
-		case PGM_ODATA:	on_odata (sender, pgm_header, pgm_data, pgm_len); break;
-		case PGM_NCF:	on_ncf (sender, pgm_header, pgm_data, pgm_len); break;
-		case PGM_RDATA: on_rdata (sender, pgm_header, pgm_data, pgm_len); break;
+		case PGM_ODATA:	on_odata (source, pgm_header, pgm_data, pgm_len); break;
+		case PGM_NCF:	on_ncf (source, pgm_header, pgm_data, pgm_len); break;
+		case PGM_RDATA: on_rdata (source, pgm_header, pgm_data, pgm_len); break;
 		case PGM_SPM:
-			on_spm (sender, pgm_header, pgm_data, pgm_len);
+			on_spm (source, pgm_header, pgm_data, pgm_len);
 
 /* update group NLA if appropriate */
 			if (pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)) {
-				memcpy (&sender->group_nla, &dst_addr, dst_addr_len);
+				memcpy (&source->group_nla, &dst_addr, dst_addr_len);
 			}
 			break;
 		default:
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
-			break;
+			goto check_for_repeat;
 		}
 
 	} /* downstream message */
 
-	return TRUE;
+/* check whether source has waiting data */
+	if (source && ((pgm_rxw_t*)source->rxw)->waiting && !((pgm_rxw_t*)source->rxw)->waiting_link.data)
+	{
+		g_static_mutex_lock (&transport->waiting_mutex);
+		((pgm_rxw_t*)source->rxw)->waiting_link.data = source->rxw;
+		((pgm_rxw_t*)source->rxw)->waiting_link.next = transport->peers_waiting;
+		transport->peers_waiting = &((pgm_rxw_t*)source->rxw)->waiting_link;
+		goto flush_locked;	/* :D */
+	}
+
+flush_waiting:
+/* flush any congtiguous packets generated by the receipt of this packet */
+	g_static_mutex_lock (&transport->waiting_mutex);
+flush_locked:
+	while (transport->peers_waiting)
+	{
+		pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
+		bytes_read += pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+
+		if (pmsg == msg_end || piov == iov_end)
+		{
+			break;
+		}
+
+		transport->peers_waiting->data = NULL;
+		transport->peers_waiting = transport->peers_waiting->next;
+	}
+	g_static_mutex_unlock (&transport->waiting_mutex);
+
+check_for_repeat:
+/* repeat if non-blocking and not full */
+	if (flags & MSG_DONTWAIT)
+	{
+		if (len > 0 && pmsg < msg_end)
+		{
+			goto recv_again;		/* \:D/ */
+		}
+	}
+	else
+	{
+/* repeat if blocking and empty, i.e. received non data packet */
+		if (bytes_read == 0)
+		{
+			goto recv_again;
+		}
+	}
 
 out:
-	g_trace ("INFO","packet ignored.");
-	return TRUE;
+	transport->iov_len = bytes_read;
+	if (transport->iov_len == 0) {
+		errno = EAGAIN;
+		return -1;
+	}
+
+	return transport->iov_len;
+}
+
+int
+pgm_transport_recvmsg (
+	pgm_transport_t*	transport,
+	pgm_msgv_t*		msgv,
+	int			flags		/* MSG_DONTWAIT for non-blocking */
+	)
+{
+	return pgm_transport_recvmsgv (transport, msgv, 1, flags);
+}
+
+int
+pgm_transport_recv (
+	pgm_transport_t*	transport,
+	gpointer		data,
+	int			len,
+	int			flags		/* MSG_DONTWAIT for non-blocking */
+	)
+{
+	pgm_msgv_t msgv;
+
+	int bytes_read = pgm_transport_recvmsg (transport, &msgv, flags);
+
+/* merge apdu packets together */
+	if (bytes_read) {
+		int bytes_copied = 0;
+		struct iovec* p = msgv.msgv_iov;
+
+		do {
+			int src_bytes = msgv.msgv_iov->iov_len;
+
+			if (bytes_copied + src_bytes > len) {
+				src_bytes = len - bytes_copied;
+				memcpy (data, p->iov_base, src_bytes);
+				break;
+			}
+
+			memcpy (data, p->iov_base, src_bytes);
+
+			data += src_bytes;
+			p++;
+			bytes_copied += src_bytes;
+
+		} while (bytes_copied < bytes_read);
+	}
+
+	return bytes_read;
+}
+
+/* add poll parameters for this transports receive socket(s)
+ */
+
+int
+pgm_transport_poll_info (
+	pgm_transport_t*	transport,
+	struct pollfd*		fds,
+	int*			n_fds		/* in: #fds, out: used #fds */
+	)
+{
+/* we currently only support one incoming socket */
+	fds[0].fd = transport->recv_sock;
+	fds[0].events = POLLIN;
+
+	return *n_fds = 1;
+}
+
+/* add epoll parameters for this transports recieve socket(s)
+ */
+
+int
+pgm_transport_epoll_ctl (
+	pgm_transport_t*	transport,
+	int			epfd,
+	int			op
+	)
+{
+	if (op != EPOLL_CTL_ADD) {	/* only add currently supported */
+		errno = EINVAL;
+		return -1;
+	}
+
+	struct epoll_event event;
+	event.events = EPOLLIN | EPOLLET;
+	event.data.fd = transport->recv_sock;
+
+	return epoll_ctl (epfd, op, transport->recv_sock, &event);
 }
 
 static gboolean
@@ -2084,6 +2141,7 @@ on_io_error (
 /* remove event */
 	return FALSE;
 }
+
 
 /* a deferred request for RDATA, now processing in the timer thread, we check the transmit
  * window to see if the packet exists and forward on, maintaining a lock until the queue is
@@ -3228,6 +3286,17 @@ nak_rb_state (
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+
+/* mark receiver window for flushing on next recv() */
+				if (!rxw->waiting_link.data)
+				{
+					g_static_mutex_lock (&transport->waiting_mutex);
+					rxw->waiting_link.data = rxw;
+					rxw->waiting_link.next = transport->peers_waiting;
+					transport->peers_waiting = &rxw->waiting_link;
+					g_static_mutex_unlock (&transport->waiting_mutex);
+				}
+
 				list = next_list_el;
 				continue;
 			}
@@ -3467,6 +3536,17 @@ nak_rpt_state (
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+
+/* mark receiver window for flushing on next recv() */
+				if (!rxw->waiting_link.data)
+				{
+					g_static_mutex_lock (&transport->waiting_mutex);
+					rxw->waiting_link.data = rxw;
+					rxw->waiting_link.next = transport->peers_waiting;
+					transport->peers_waiting = &rxw->waiting_link;
+					g_static_mutex_unlock (&transport->waiting_mutex);
+				}
+
 				list = next_list_el;
 				continue;
 			}
@@ -3482,6 +3562,17 @@ nak_rpt_state (
 				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
 
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+
+/* mark receiver window for flushing on next recv() */
+				if (!rxw->waiting_link.data)
+				{
+					g_static_mutex_lock (&transport->waiting_mutex);
+					rxw->waiting_link.data = rxw;
+					rxw->waiting_link.next = transport->peers_waiting;
+					transport->peers_waiting = &rxw->waiting_link;
+					g_static_mutex_unlock (&transport->waiting_mutex);
+				}
+
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED]++;
 			}
 			else
@@ -3584,6 +3675,17 @@ nak_rdata_state (
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+
+/* mark receiver window for flushing on next recv() */
+				if (!rxw->waiting_link.data)
+				{
+					g_static_mutex_lock (&transport->waiting_mutex);
+					rxw->waiting_link.data = rxw;
+					rxw->waiting_link.next = transport->peers_waiting;
+					transport->peers_waiting = &rxw->waiting_link;
+					g_static_mutex_unlock (&transport->waiting_mutex);
+				}
+
 				list = next_list_el;
 				continue;
 			}
@@ -3599,6 +3701,17 @@ nak_rdata_state (
 				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
 
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+
+/* mark receiver window for flushing on next recv() */
+				if (!rxw->waiting_link.data)
+				{
+					g_static_mutex_lock (&transport->waiting_mutex);
+					rxw->waiting_link.data = rxw;
+					rxw->waiting_link.next = transport->peers_waiting;
+					transport->peers_waiting = &rxw->waiting_link;
+					g_static_mutex_unlock (&transport->waiting_mutex);
+				}
+
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED]++;
 
 				list = next_list_el;
@@ -4124,179 +4237,6 @@ pgm_timer_dispatch (
 	return TRUE;
 }
 
-GSource*
-pgm_transport_create_watch (
-	pgm_transport_t*	transport
-	)
-{
-	g_return_val_if_fail (transport != NULL, NULL);
-
-	GSource *source = g_source_new (&g_pgm_watch_funcs, sizeof(pgm_watch_t));
-	pgm_watch_t *watch = (pgm_watch_t*)source;
-
-	watch->transport = transport;
-	watch->pollfd.fd = transport->commit_pipe[0];
-	watch->pollfd.events = G_IO_IN;
-
-	g_source_add_poll (source, &watch->pollfd);
-
-	return source;
-}
-
-/* pgm transport attaches to the callees context: the default context instead of
- * any internal contexts.
- */
-
-int
-pgm_transport_add_watch_full (
-	pgm_transport_t*	transport,
-	gint			priority,
-	pgm_eventfn_t		function,
-	gpointer		user_data,
-	GDestroyNotify		notify
-	)
-{
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (function != NULL, -EINVAL);
-
-	GSource* source = pgm_transport_create_watch (transport);
-
-	if (priority != G_PRIORITY_DEFAULT)
-		g_source_set_priority (source, priority);
-
-	g_source_set_callback (source, (GSourceFunc)function, user_data, notify);
-
-	guint id = g_source_attach (source, NULL);
-	g_source_unref (source);
-
-	return id;
-}
-
-int
-pgm_transport_add_watch (
-	pgm_transport_t*	transport,
-	pgm_eventfn_t		function,
-	gpointer		user_data
-	)
-{
-	return pgm_transport_add_watch_full (transport, G_PRIORITY_HIGH, function, user_data, NULL);
-}
-
-/* returns TRUE if source has data ready, i.e. async queue is not empty
- *
- * called before event loop poll()
- */
-
-static gboolean
-pgm_src_prepare (
-	GSource*		source,
-	gint*			timeout
-	)
-{
-	pgm_watch_t* watch = (pgm_watch_t*)source;
-
-/* infinite timeout */
-	*timeout = -1;
-
-	return ( g_async_queue_length(watch->transport->commit_queue) > 0 );
-}
-
-/* called after event loop poll()
- *
- * return TRUE if ready to dispatch.
- */
-
-static gboolean
-pgm_src_check (
-	GSource*		source
-	)
-{
-//	g_trace ("INFO","pgm_src_check");
-
-	pgm_watch_t* watch = (pgm_watch_t*)source;
-
-	return ( g_async_queue_length(watch->transport->commit_queue) > 0 );
-}
-
-/* called when TRUE returned from prepare or check
- */
-
-static gboolean
-pgm_src_dispatch (
-	GSource*		source,
-	GSourceFunc		callback,
-	gpointer		user_data
-	)
-{
-	g_trace ("INFO","pgm_src_dispatch");
-
-	pgm_eventfn_t function = (pgm_eventfn_t)callback;
-	pgm_watch_t* watch = (pgm_watch_t*)source;
-	pgm_transport_t* transport = watch->transport;
-
-/* empty pipe */
-	char buf;
-	while (1 == read (transport->commit_pipe[0], &buf, sizeof(buf)));
-
-/* loop to purge multiple messages from asynchronous queue */
-	do {
-		pgm_event_t* event = g_async_queue_try_pop (transport->commit_queue);
-		if (event == NULL) {
-			break;
-		}
-
-		if (event->len)
-			g_assert (event->len > 0 && event->data != NULL);
-
-		pgm_peer_t* peer = event->peer;
-
-//g_trace ("INFO","peer is %s", pgm_print_tsi(&peer->tsi));
-
-/* important that callback occurs out of lock to allow PGM layer to add more messages */
-		gboolean retval = (*function) (event->data, event->len, user_data);
-
-/* return memory to receive window */
-		g_static_mutex_lock (&peer->mutex);
-		g_trash_stack_push (&((pgm_rxw_t*)peer->rxw)->trash_data, event->data);
-		g_static_mutex_unlock (&peer->mutex);
-
-		pgm_peer_unref (peer);
-
-		g_static_mutex_lock (&transport->event_mutex);
-		g_trash_stack_push (&transport->trash_event, event);
-		g_static_mutex_unlock (&transport->event_mutex);
-
-	} while (TRUE);
-
-out:
-	return TRUE;
-}
-
-/* release event memory for custom async queue dispatch handlers
- */
-
-int
-pgm_event_unref (
-	pgm_transport_t*	transport,
-	pgm_event_t*		event
-	)
-{
-	pgm_peer_t* peer = event->peer;
-
-/* return memory to receive window */
-	g_static_mutex_lock (&peer->mutex);
-	g_trash_stack_push (&((pgm_rxw_t*)peer->rxw)->trash_data, event->data);
-	g_static_mutex_unlock (&peer->mutex);
-
-	pgm_peer_unref (peer);
-
-	g_static_mutex_lock (&transport->event_mutex);
-	g_trash_stack_push (&transport->trash_event, event);
-	g_static_mutex_unlock (&transport->event_mutex);
-
-	return TRUE;
-}
-
 /* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
  */
 
@@ -4535,66 +4475,6 @@ on_rdata (
 	}
 
 out:
-	return retval;
-}
-
-static int
-on_pgm_data (
-	gpointer	data,
-	guint		len,
-	gpointer	peer_
-	)
-{
-	int retval = 0;
-	g_trace ("INFO","on_pgm_data");
-
-	pgm_peer_t* peer = peer_;
-	pgm_transport_t* transport = peer->transport;
-	g_static_mutex_lock (&transport->event_mutex);
-	pgm_event_t* event = pgm_alloc_event(transport);
-	g_static_mutex_unlock (&transport->event_mutex);
-	event->data = data;
-	event->len = len;
-	event->peer = pgm_peer_ref (peer);
-
-#ifdef TRANSPORT_DEBUG
-	g_trace ("INFO","peer is %s", pgm_print_tsi(&event->peer->tsi));
-	char buf[1024];
-	{
-		char *dst = buf, *src = data;
-		while (*src) {
-			*dst++ = isprint(*src) ? *src : '?';
-			src++;
-		}
-		*dst = 0;
-	}
-			
-//	snprintf (buf, sizeof(buf), "%s", (char*)data);
-	g_trace ("INFO","msg: \"%s\" (%i bytes)", buf, len);
-#endif
-
-	g_async_queue_lock (transport->commit_queue);
-	g_async_queue_push_unlocked (transport->commit_queue, event);
-
-	if (g_async_queue_length_unlocked (transport->commit_queue) == 1) {
-		const char one = '1';
-		if (1 != write (transport->commit_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to pipe failed :(");
-			retval = -EINVAL;
-		}
-	}
-	g_async_queue_unlock (transport->commit_queue);
-
-	peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP] += len;
-	peer->cumulative_stats[PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP]++;
-/*
- * In thread starvation cases a yield is necessary here for the application to
- * get some time to process the data.  Optionally it could be performed when more
- * than one event is in the queue.  Generally it should not be necessary as the
- * thread should wake up from a select() or poll() call on the pipe signal.
- */
-//	g_thread_yield();
-
 	return retval;
 }
 

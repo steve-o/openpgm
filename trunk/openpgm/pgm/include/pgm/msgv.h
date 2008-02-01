@@ -1,8 +1,8 @@
-/* vim:ts=8:sts=4:sw=4:noai:noexpandtab
+/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
- * global session ID helper functions
+ * Vector message container
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,30 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_GSI_H__
-#define __PGM_GSI_H__
+#ifndef __PGM_MSGV_H__
+#define __PGM_MSGV_H__
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-
-#include <glib.h>
-
-
-typedef struct pgm_gsi_t pgm_gsi_t;
-
-struct pgm_gsi_t {
-	char	identifier[6];
+struct pgm_msgv_t {
+	struct iovec*	msgv_iov;	/* scatter/gather array */
+	size_t		msgv_iovlen;	/* # elements in iov */
 };
 
-G_BEGIN_DECLS
-
-int pgm_create_md5_gsi (pgm_gsi_t*);
-int pgm_create_ipv4_gsi (struct in_addr, pgm_gsi_t*);
-
-gint pgm_gsi_equal (gconstpointer, gconstpointer);
+typedef struct pgm_msgv_t pgm_msgv_t;
 
 
-G_END_DECLS
-
-#endif /* __PGM_GSI_H__ */
+#endif /* __PGM_MSGV_H__ */
