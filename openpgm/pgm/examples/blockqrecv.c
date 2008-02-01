@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple receiver using the PGM transport and synchronous coding.
+ * Simple PGM: receiver: blocking asynchronous-queue.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -42,6 +42,7 @@
 #include <pgm/log.h>
 #include <pgm/transport.h>
 #include <pgm/gsi.h>
+#include <pgm/async.h>
 
 
 /* typedefs */
@@ -110,30 +111,27 @@ main (
 
 	on_startup();
 
+/* asynchronous receiver thread */
+	pgm_async_t* async = NULL;
+	pgm_async_create (&async, g_transport, 0);
+
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
-		char c;
-		while (1 == read (g_transport->commit_pipe[0], &c, sizeof(c)));
-
-		do {
-			pgm_event_t* event = g_async_queue_try_pop (g_transport->commit_queue);
-			if (event == NULL) {
-				break;
-			}
-
-			pgm_peer_t* peer = event->peer;
-			g_message ("peer is %s", pgm_print_tsi(&peer->tsi));
-
-			on_data (event->data, event->len, NULL);
-
-			pgm_event_unref (g_transport, event);
-		} while (TRUE);
+		gpointer data;
+		int len = pgm_async_recv (async, &data, 0 /* blocking */);
+		if (len)
+		{
+			on_data (data, len, NULL);
+			pgm_async_unref (async, data);
+		}
 	} while (!g_quit);
 
 	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
+	pgm_async_destroy (async);
+
 	if (g_transport) {
 		g_message ("destroying transport.");
 

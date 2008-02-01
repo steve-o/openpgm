@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple receiver using the PGM transport.
+ * Simple receiver using the PGM transport, based on enonblocksyncrecvmsgv :/
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -30,9 +30,11 @@
 #include <time.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <arpa/inet.h>
 
 #include <glib.h>
@@ -51,6 +53,15 @@
 
 /* globals */
 
+#ifndef SC_IOV_MAX
+#ifdef _SC_IOV_MAX
+#	define SC_IOV_MAX	_SC_IOV_MAX
+#else
+#	SC_IOV_MAX and _SC_IOV_MAX undefined too, please fix.
+#endif
+#endif
+
+
 static int g_port = 7500;
 static char* g_network = "";
 static int g_udp_encap_port = 0;
@@ -59,15 +70,16 @@ static int g_max_tpdu = 1500;
 static int g_sqns = 10;
 
 static pgm_transport_t* g_transport = NULL;
-
+static GThread* g_thread = NULL;
 static GMainLoop* g_loop = NULL;
-
+static gboolean g_quit = FALSE;
 
 static void on_signal (int);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
-static int on_data (gpointer, guint, gpointer);
+static gpointer receiver_thread (gpointer);
+static int on_msgv (pgm_msgv_t*, guint, gpointer);
 
 
 static void
@@ -139,6 +151,9 @@ main (
 	g_message ("event loop terminated, cleaning up.");
 
 /* cleanup */
+	g_quit = TRUE;
+	g_thread_join (g_thread);
+
 	g_main_loop_unref(g_loop);
 	g_loop = NULL;
 
@@ -240,15 +255,28 @@ on_startup (
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {
 		g_critical ("pgm_transport_bind failed errno %i: \"%s\"", e, strerror(e));
-		G_BREAKPOINT();
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+
+/* create receiver thread */
+	GError* err;
+	g_thread = g_thread_create_full (receiver_thread,
+					g_transport,
+					0,
+					TRUE,
+					TRUE,
+					G_THREAD_PRIORITY_HIGH,
+					&err);
+	if (!g_thread) {
+		g_critical ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
+		g_main_loop_quit(g_loop);
+		return FALSE;
 	}
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
-
-	g_message ("adding PGM receiver watch");
-	pgm_transport_add_watch (g_transport, on_data, NULL);
 
 	g_message ("startup complete.");
 	return FALSE;
@@ -269,9 +297,62 @@ on_mark (
 	return TRUE;
 }
 
+static gpointer
+receiver_thread (
+	gpointer	data
+	)
+{
+	pgm_transport_t* transport = (pgm_transport_t*)data;
+	long iov_max = sysconf( SC_IOV_MAX );
+	pgm_msgv_t msgv[iov_max];
+
+	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
+	if (efd < 0) {
+		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit(g_loop);
+		return NULL;
+	}
+
+	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD);
+	if (retval < 0) {
+		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit(g_loop);
+		return NULL;
+	}
+
+	do {
+		int len = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
+		if (len > 0)
+		{
+			g_message ("read %i bytes", len);
+			on_msgv (msgv, len, NULL);
+		}
+		else if (len == 0)		/* socket(s) closed */
+		{
+			g_error ("pgm socket closed in receiver_thread.");
+			g_main_loop_quit(g_loop);
+			break;
+		}
+		else if (errno == EAGAIN)	/* len == -1, an error occured */
+		{
+			struct epoll_event events[1];	/* wait for maximum 1 event */
+			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
+		}
+		else
+		{
+			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
+			g_main_loop_quit(g_loop);
+			break;
+		}
+	} while (!g_quit);
+
+	close (efd);
+	return NULL;
+}
+
 static int
-on_data (
-	gpointer	data,
+on_msgv (
+	pgm_msgv_t*	msgv,		/* an array of msgvs */
 	guint		len,
 	gpointer	user_data
 	)
@@ -279,14 +360,33 @@ on_data (
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
 
-/* protect against non-null terminated strings */
-	char buf[1024];
-	snprintf (buf, sizeof(buf), "%s", (char*)data);
+        g_message ("%s: (%i bytes)",
+                        ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+                        len);
 
-	g_message ("%s: \"%s\" (%i bytes)",
-			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
-			buf,
-			len);
+/* protect against non-null terminated strings */
+
+/* for each apdu display each fragment */
+        int i = 0;
+        while (len)
+        {
+                g_message ("\t%i: (%" G_GSIZE_FORMAT " elements)", ++i, msgv->msgv_iovlen);
+
+                struct iovec* msgv_iov = msgv->msgv_iov;
+                int msgv_iovlen = msgv->msgv_iovlen;
+                int j = 0;
+                while (msgv_iovlen)
+                {
+                        char buf[1024];
+                        snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
+                        g_message ("\t\t%i: %s (%" G_GSIZE_FORMAT " bytes)", ++j, buf, msgv_iov->iov_len);
+                        msgv_iovlen--;
+                        len -= msgv_iov->iov_len;
+                        msgv_iov++;
+                }
+
+                msgv++;
+        }
 
 	return 0;
 }

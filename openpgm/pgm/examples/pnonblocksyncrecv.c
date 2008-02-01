@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple sender using the PGM transport.
+ * Simple PGM receiver: poll based non-blocking synchronous receiver.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <netdb.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,14 +38,11 @@
 
 #include <glib.h>
 
+#include <pgm/if.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/transport.h>
 #include <pgm/gsi.h>
-#include <pgm/signal.h>
-#include <pgm/if.h>
-#include <pgm/http.h>
-#include <pgm/snmp.h>
 
 
 /* typedefs */
@@ -52,116 +50,90 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "";
+static char* g_network = "226.0.0.1";
 static int g_udp_encap_port = 0;
 
-static int g_odata_interval = 1 * 1000;	/* every 10ms */
-static int g_payload = 0;
 static int g_max_tpdu = 1500;
-static int g_max_rte = 400*1000;
 static int g_sqns = 10;
 
-static gboolean g_fec = FALSE;
-static int g_k = 0;
-static int g_2t = 0;
-
 static pgm_transport_t* g_transport = NULL;
-
-static GMainLoop* g_loop = NULL;
-
+static gboolean g_quit = FALSE;
 
 static void on_signal (int);
-static gboolean on_startup (gpointer);
-static gboolean on_mark (gpointer);
+static gboolean on_startup (void);
 
-static void send_odata (void);
-static gboolean on_odata_timer (gpointer);
+static int on_data (gpointer, guint, gpointer);
 
 
 static void
-usage (const char* bin)
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
-	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-	fprintf (stderr, "  -k <k>          : Configure FEC with k data packets, 2t parity\n");
-	fprintf (stderr, "  -2 <2t>\n");
-	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
-	fprintf (stderr, "  -x              : Enable SNMP interface\n");
 	exit (1);
 }
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
-	g_message ("pgmsend");
-	gboolean enable_http = FALSE;
-	gboolean enable_snmpx = FALSE;
+	g_message ("syncrecv");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:2:xth")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
-		case 'r':	g_max_rte = atoi (optarg); break;
-
-		case 'f':	g_fec = TRUE; break;
-		case 'k':	g_k = atoi (optarg); break;
-		case '2':	g_2t = atoi (optarg); break;
-
-		case 't':	enable_http = TRUE; break;
-		case 'x':	enable_snmpx = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
 		}
 	}
 
-	if (g_fec && ( !g_k || !g_2t )) {
-		puts ("Invalid FEC parameters.");
-		usage (binary_name);
-	}
-
 	log_init ();
 	pgm_init ();
 
-	if (enable_http)
-		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
-	if (enable_snmpx)
-		pgm_snmp_init();
-
-	g_loop = g_main_loop_new(NULL, FALSE);
-
 /* setup signal handlers */
-	signal (SIGSEGV, on_sigsegv);
-	pgm_signal_install (SIGINT, on_signal);
-	pgm_signal_install (SIGTERM, on_signal);
-	pgm_signal_install (SIGHUP, SIG_IGN);
+	signal(SIGSEGV, on_sigsegv);
+	signal(SIGINT, on_signal);
+	signal(SIGTERM, on_signal);
+	signal(SIGHUP, SIG_IGN);
 
-/* delayed startup */
-	g_message ("scheduling startup.");
-	g_timeout_add (0, (GSourceFunc)on_startup, NULL);
+	on_startup();
 
 /* dispatch loop */
-	g_message ("entering main event loop ... ");
-	g_main_loop_run (g_loop);
+	g_message ("entering PGM message loop ... ");
+	do {
+		char buffer[4096];
+		int len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */);
+		if (len)
+		{
+			on_data (buffer, len, NULL);
+		}
+		else
+		{
+/* poll for next event */
+			int n_fds = IP_MAX_MEMBERSHIPS;
+			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
+			memset (fds, 0, sizeof(fds));
+			pgm_transport_poll_info (g_transport, fds, &n_fds);
+			poll (fds, n_fds, 0);
+		}
+	} while (!g_quit);
 
-	g_message ("event loop terminated, cleaning up.");
+	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
-	g_main_loop_unref (g_loop);
-	g_loop = NULL;
-
 	if (g_transport) {
 		g_message ("destroying transport.");
 
@@ -169,29 +141,22 @@ main (
 		g_transport = NULL;
 	}
 
-	if (enable_http)
-		pgm_http_shutdown();
-	if (enable_snmpx)
-		pgm_snmp_shutdown();
-
 	g_message ("finished.");
 	return 0;
 }
 
 static void
 on_signal (
-	int	signum
+	int		signum
 	)
 {
 	g_message ("on_signal");
 
-	g_main_loop_quit(g_loop);
+	g_quit = TRUE;
 }
 
 static gboolean
-on_startup (
-	gpointer data
-	)
+on_startup (void)
 {
 	g_message ("startup.");
 	g_message ("create transport.");
@@ -244,7 +209,6 @@ on_startup (
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
-	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
@@ -252,10 +216,11 @@ on_startup (
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
-
-	if (g_fec) {
-		pgm_transport_set_fec (g_transport, TRUE, TRUE, g_k, g_2t);
-	}
+	pgm_transport_set_nak_rb_ivl (g_transport, 50*1000);
+	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
+	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
+	pgm_transport_set_nak_data_retries (g_transport, 5);
+	pgm_transport_set_nak_ncf_retries (g_transport, 2);
 
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {
@@ -263,57 +228,30 @@ on_startup (
 		G_BREAKPOINT();
 	}
 
-/* period timer to indicate some form of life */
-// TODO: Gnome 2.14: replace with g_timeout_add_seconds()
-	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
-
-	g_message ("scheduling ODATA broadcasts every %.1g secs.", (double)pgm_to_secs((double)g_odata_interval));
-	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
-
 	g_message ("startup complete.");
 	return FALSE;
 }
 
-/* we send out a stream of ODATA packets with basic changing payload
- */
-
-static gboolean
-on_odata_timer (
-	gpointer data
-	)
-{
-	send_odata ();
-	return TRUE;
-}
-
-static void
-send_odata (void)
-{
-	int e;
-	char payload_string[100];
-
-	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
-
-	e = pgm_write_copy (g_transport, payload_string, strlen(payload_string) + 1);
-        if (e < 0) {
-		g_warning ("send failed.");
-                return;
-        }
-}
-
-/* idle log notification
- */
-
-static gboolean
-on_mark (
-	gpointer data
+static int
+on_data (
+	gpointer	data,
+	guint		len,
+	gpointer	user_data
 	)
 {
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
-	g_message ("%s counter: %i", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec), g_payload);
 
-	return TRUE;
+/* protect against non-null terminated strings */
+	char buf[1024];
+	snprintf (buf, sizeof(buf), "%s", (char*)data);
+
+	g_message ("%s: \"%s\" (%i bytes)",
+			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+			buf,
+			len);
+
+	return 0;
 }
 
 /* eof */

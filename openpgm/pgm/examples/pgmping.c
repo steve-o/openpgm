@@ -68,6 +68,7 @@ static int g_sqns = 100 * 1000;
 static gboolean g_send_mode = TRUE;
 
 static pgm_transport_t* g_transport = NULL;
+static GIOChannel* g_io_channel = NULL;
 
 static GMainLoop* g_loop = NULL;
 
@@ -79,6 +80,7 @@ static gboolean on_mark (gpointer);
 
 static void send_odata (void);
 static gboolean on_odata_timer (gpointer);
+static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static int on_data (gpointer, guint, gpointer);
 
 static gboolean idle_prepare (GSource*, gint*);
@@ -278,13 +280,14 @@ on_startup (
 		struct idle_source* idle_source = (struct idle_source*)source;
 		idle_source->expiration = pgm_time_update_now() + g_odata_interval;
 		g_source_set_priority (source, G_PRIORITY_LOW);
-		guint id = g_source_attach (source, NULL);
+		/* guint id = */ g_source_attach (source, NULL);
 		g_source_unref (source);
 	}
 	else
 	{
 		g_message ("adding PGM receiver watch");
-		pgm_transport_add_watch (g_transport, on_data, NULL);
+		g_io_channel = g_io_channel_unix_new (g_transport->recv_sock);
+		/* guint event = */ g_io_add_watch (g_io_channel, G_IO_IN, on_io_data, NULL);
 	}
 
 	g_message ("startup complete.");
@@ -361,6 +364,25 @@ send_odata (void)
         }
 
 	g_payload++;
+}
+
+static gboolean
+on_io_data (
+	GIOChannel*	source,
+	GIOCondition	condition,
+	gpointer	data
+	)
+{
+	char buffer[4096];
+	int len;
+	do {
+		if ( (len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), 0 /* blocking */)) )
+		{
+			on_data (buffer, len, NULL);
+		}
+	} while (len > 0);
+
+	return TRUE;
 }
 
 static int
