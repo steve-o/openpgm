@@ -60,7 +60,7 @@
 #endif
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -144,15 +144,25 @@ main (
 	g_message ("entering PGM message loop ... ");
 	do {
 		int len = pgm_transport_recvmsgv (g_transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
-		if (len)
+		if (len > 0)
 		{
 			on_msgv (msgv, len, NULL);
 		}
-		else
+		else if (len == 0)		/* socket(s) closed */
+		{
+			g_error ("pgm socket closed in receiver_thread.");
+			break;
+		}
+		else if (errno == EAGAIN)
 		{
 /* poll for next event */
 			struct epoll_event events[1];	/* wait for maximum 1 event */
-			epoll_wait (efd, events, G_N_ELEMENTS(events), -1 /* blocking */);
+			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
+		}
+		else
+		{
+			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
+			break;
 		}
 	} while (!g_quit);
 
@@ -277,21 +287,25 @@ on_msgv (
 	int i = 0;
 	while (len)
 	{
-		g_message ("\t%i: (%" G_GSIZE_FORMAT " bytes)", ++i, msgv->msgv_iovlen);
-
 		struct iovec* msgv_iov = msgv->msgv_iov;
-		int msgv_iovlen = msgv->msgv_iovlen;
-		int j = 0;
-		while (msgv_iovlen)
-		{
-			char buf[1024];
-			snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
-			g_message ("\t\t%i: %s (%" G_GSIZE_FORMAT " bytes)", ++j, buf, msgv_iov->iov_len);
-			msgv_iovlen -= msgv_iov->iov_len;
-			len -= msgv_iov->iov_len;
-			msgv_iov++;
+
+		int apdu_len = 0; 
+		struct iovec* p = msgv_iov;
+		for (int j = 0; j < msgv->msgv_iovlen; j++) {	/* # elements */
+			apdu_len += p->iov_len;
+			p++;
 		}
 
+/* truncate to first fragment to make GLib printing happy */
+		char buf[1024];
+		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
+		if (msgv->msgv_iovlen > 1) {
+			g_message ("\t%i: \"%s\" ... (%i bytes)", ++i, buf, apdu_len);
+		} else {
+			g_message ("\t%i: \"%s\" (%i bytes)", ++i, buf, apdu_len);
+		}
+
+		len -= apdu_len;
 		msgv++;
 	}
 

@@ -370,7 +370,7 @@ on_msgv (
 
 		int apdu_len = 0;
 		struct iovec* p = msgv_iov;
-		for (int j = 0; j < msgv->msgv_iovlen; j++) {	/* # elemenets */
+		for (int j = 0; j < msgv->msgv_iovlen; j++) {	/* # elements */
 			apdu_len += p->iov_len;
 			p++;
 		}

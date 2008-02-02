@@ -30,6 +30,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -49,7 +50,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -110,22 +111,43 @@ main (
 
 	on_startup();
 
+/* epoll file descriptor */
+	int efd = epoll_create (20);
+	if (efd < 0) {
+		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
+		exit(1);
+	}
+
+	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD);
+	if (retval < 0) {
+		g_error ("pgm_epoll_ctl failed.");
+		exit(1);
+	}
+
 /* incoming message buffer */
 	pgm_msgv_t msgv;
 
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
-		int len = pgm_transport_recvmsg (g_transport, &msgv, 0 /* blocking */);
-		if (len)
+		int len = pgm_transport_recvmsg (g_transport, &msgv, MSG_DONTWAIT /* non-blocking */);
+		if (len > 0)
 		{
 			on_datav (&msgv, len, NULL);
+		}
+		else
+		{
+/* poll for next event */
+			struct epoll_event events[1];	/* wait for maximum 1 event */
+			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
 		}
 	} while (!g_quit);
 
 	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
+	close (efd);
+
 	if (g_transport) {
 		g_message ("destroying transport.");
 
