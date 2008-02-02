@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple PGM receiver: poll based non-blocking synchronous receiver.
+ * Simple PGM receiver: select based non-blocking synchronous receiver.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
@@ -83,7 +83,7 @@ main (
 	char*		argv[]
 	)
 {
-	g_message ("syncrecv");
+	g_message ("snonblocksyncrecv");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -122,12 +122,13 @@ main (
 		}
 		else
 		{
-/* poll for next event */
-			int n_fds = IP_MAX_MEMBERSHIPS;
-			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
-			memset (fds, 0, sizeof(fds));
-			pgm_transport_poll_info (g_transport, fds, &n_fds);
-			poll (fds, n_fds, 1000 /* ms */);
+/* select for next event */
+			int fds = 0, block = 0;
+			fd_set readfds;
+			struct timeval timeout = {0, 100 * 1000000UL};
+			FD_ZERO(&readfds);
+			pgm_transport_select_info (g_transport, &readfds, &fds);
+			fds = select (fds, &readfds, NULL, NULL, block ? NULL : &timeout);
 		}
 	} while (!g_quit);
 

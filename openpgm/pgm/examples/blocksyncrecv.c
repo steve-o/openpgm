@@ -49,7 +49,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -82,7 +82,7 @@ main (
 	char*		argv[]
 	)
 {
-	g_message ("syncrecv");
+	g_message ("blocksyncrecv");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -115,7 +115,7 @@ main (
 	do {
 		char buffer[4096];
 		int len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), 0 /* blocking */);
-		if (len)
+		if (len > 0)
 		{
 			on_data (buffer, len, NULL);
 		}
