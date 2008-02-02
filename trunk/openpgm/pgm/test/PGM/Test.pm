@@ -151,7 +151,7 @@ sub wait_for_spm {
 		for (;;) {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
-			last if ($obj->{PGM}->{type} =~ /SPM"/);
+			last if ($obj->{PGM}->{type} =~ /SPM$/);
 		}
 		alarm 0;
 	};
