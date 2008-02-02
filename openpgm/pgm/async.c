@@ -108,6 +108,7 @@ pgm_receiver_thread (
 	)
 {
 	pgm_async_t* async = (pgm_async_t*)data;
+	g_async_queue_ref (async->commit_queue);
 
 /* incoming message buffer */
 	pgm_msgv_t msgv;
@@ -146,6 +147,7 @@ pgm_receiver_thread (
 	} while (!async->quit);
 
 /* cleanup */
+	g_async_queue_unref (async->commit_queue);
 	return NULL;
 }
 
@@ -160,7 +162,7 @@ pgm_async_create (
 	pgm_async_t* async;
 
 	async = g_malloc0 (sizeof(pgm_async_t));
-
+	async->transport = transport;
 	async->event_preallocate = preallocate;
 	g_trace ("INFO","preallocate event queue.");
 	for (guint32 i = 0; i < async->event_preallocate; i++)

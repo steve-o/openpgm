@@ -42,6 +42,7 @@
 #include <pgm/log.h>
 #include <pgm/transport.h>
 #include <pgm/gsi.h>
+#include <pgm/signal.h>
 #include <pgm/async.h>
 
 
@@ -50,14 +51,14 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
 static int g_sqns = 10;
 
 static pgm_transport_t* g_transport = NULL;
-static gboolean g_quit = FALSE;
+static GMainLoop* g_loop = NULL;
 
 static void on_signal (int);
 static gboolean on_startup (void);
@@ -107,9 +108,9 @@ main (
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
-	pgm_signal(SIGINT, on_signal);
-	pgm_signal(SIGTERM, on_signal);
-	pgm_signal(SIGHUP, SIG_IGN);
+	pgm_signal_install(SIGINT, on_signal);
+	pgm_signal_install(SIGTERM, on_signal);
+	pgm_signal_install(SIGHUP, SIG_IGN);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -142,8 +143,7 @@ on_signal (
 	)
 {
 	g_message ("on_signal");
-
-	g_quit = TRUE;
+	g_main_loop_quit (g_loop);
 }
 
 static gboolean
@@ -222,7 +222,7 @@ on_startup (void)
 /* asynchronous receiver thread */
 	pgm_async_t* async = NULL;
 	pgm_async_create (&async, g_transport, 0);
-	pgm_async_add_watch (&async, on_data, NULL);
+	pgm_async_add_watch (async, on_data, NULL);
 
 	g_message ("startup complete.");
 	return FALSE;

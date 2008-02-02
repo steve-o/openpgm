@@ -21,8 +21,8 @@ e.Program(['enonblocksyncrecvmsg.c'])
 e.Program(['enonblocksyncrecvmsgv.c'])
 
 # async examples
-#e.Program(['asyncqrecv.c'])
-#e.Program(['blockqrecv.c'])
+e.Program(['asyncqrecv.c'])
+e.Program(['blockqrecv.c'])
 
 ne = e.Copy()
 ne.Append(LIBS = ['panel', 'ncurses']);
