@@ -328,6 +328,7 @@ int pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
 int pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, int, int);
 int pgm_transport_recv (pgm_transport_t*, gpointer, int, int);
 
+int pgm_transport_select_info (pgm_transport_t*, fd_set*, int*);
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*);
 int pgm_transport_epoll_ctl (pgm_transport_t*, int, int);
 

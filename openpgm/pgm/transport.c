@@ -53,7 +53,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -1776,7 +1776,9 @@ pgm_transport_recvmsgv (
 /* read the data:
  *
  * Buffer is always max_tpdu in length.  Ideally we have zero copy but the recv includes the ip & pgm headers and
- * the pgm options.  Over thousands of messages the gains by using less receive window memory are more conducive.
+ * the pgm options.  Over thousands of messages the gains by using less receive window memory are more conducive (maybe).
+ *
+ * We cannot actually block here as packets pushed by the timers need to be addressed too.
  */
 	struct sockaddr_storage src_addr;
 	socklen_t src_addr_len = sizeof(src_addr);
@@ -1784,7 +1786,7 @@ pgm_transport_recvmsgv (
 	int bytes_received = 0;
 
 recv_again:
-	len = recvfrom (transport->recv_sock, transport->rx_buffer, transport->max_tpdu, flags, (struct sockaddr*)&src_addr, &src_addr_len);
+	len = recvfrom (transport->recv_sock, transport->rx_buffer, transport->max_tpdu, MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
 	bytes_received += len;
 
 	if (len < 0) {
@@ -1793,7 +1795,11 @@ recv_again:
 		} else {
 			goto out;
 		}
+	} else if (len == 0) {
+		goto out;
 	}
+
+g_message ("%i bytes", len);
 
 #ifdef TRANSPORT_DEBUG
 	char s[INET6_ADDRSTRLEN];
@@ -2020,9 +2026,12 @@ check_for_repeat:
 	}
 	else
 	{
-/* repeat if blocking and empty, i.e. received non data packet */
+/* repeat if blocking and empty, i.e. received non data packet.
+ * highly inefficient method as this thread needs to check for incoming data and timer induced packets.
+ */
 		if (bytes_read == 0)
 		{
+			g_thread_yield();
 			goto recv_again;
 		}
 	}
@@ -2060,7 +2069,7 @@ pgm_transport_recv (
 	int bytes_read = pgm_transport_recvmsg (transport, &msgv, flags);
 
 /* merge apdu packets together */
-	if (bytes_read) {
+	if (bytes_read > 0) {
 		int bytes_copied = 0;
 		struct iovec* p = msgv.msgv_iov;
 
@@ -2083,6 +2092,21 @@ pgm_transport_recv (
 	}
 
 	return bytes_read;
+}
+
+/* add select parameters for the transports receive socket(s)
+ */
+
+int
+pgm_transport_select_info (
+	pgm_transport_t*	transport,
+	fd_set*			readfds,
+	int*			n_fds
+	)
+{
+	FD_SET(transport->recv_sock, readfds);
+
+	return *n_fds = transport->recv_sock + 1;
 }
 
 /* add poll parameters for this transports receive socket(s)
