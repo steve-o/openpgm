@@ -14,6 +14,7 @@ e.Program(['pgmping.c'])
 
 # sync examples
 e.Program(['blocksyncrecv.c'])
+e.Program(['snonblocksyncrecv.c'])
 e.Program(['pnonblocksyncrecv.c'])
 e.Program(['enonblocksyncrecv.c'])
 e.Program(['enonblocksyncrecvmsg.c'])
