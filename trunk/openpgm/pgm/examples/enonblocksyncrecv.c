@@ -50,7 +50,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -129,7 +129,7 @@ main (
 	do {
 		char buffer[4096];
 		int len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */);
-		if (len)
+		if (len > 0)
 		{
 			on_data (buffer, len, NULL);
 		}
@@ -137,7 +137,7 @@ main (
 		{
 /* poll for next event */
 			struct epoll_event events[1];	/* wait for maximum 1 event */
-			epoll_wait (efd, events, G_N_ELEMENTS(events), -1 /* blocking */);
+			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
 		}
 	} while (!g_quit);
 
