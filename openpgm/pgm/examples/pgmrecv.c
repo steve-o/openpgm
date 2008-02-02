@@ -324,7 +324,6 @@ receiver_thread (
 		int len = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
 		if (len > 0)
 		{
-			g_message ("read %i bytes", len);
 			on_msgv (msgv, len, NULL);
 		}
 		else if (len == 0)		/* socket(s) closed */
@@ -364,27 +363,28 @@ on_msgv (
                         ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
                         len);
 
-/* protect against non-null terminated strings */
-
-/* for each apdu display each fragment */
         int i = 0;
         while (len)
         {
-                g_message ("\t%i: (%" G_GSIZE_FORMAT " elements)", ++i, msgv->msgv_iovlen);
-
                 struct iovec* msgv_iov = msgv->msgv_iov;
-                int msgv_iovlen = msgv->msgv_iovlen;
-                int j = 0;
-                while (msgv_iovlen)
-                {
-                        char buf[1024];
-                        snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
-                        g_message ("\t\t%i: %s (%" G_GSIZE_FORMAT " bytes)", ++j, buf, msgv_iov->iov_len);
-                        msgv_iovlen--;
-                        len -= msgv_iov->iov_len;
-                        msgv_iov++;
-                }
 
+		int apdu_len = 0;
+		struct iovec* p = msgv_iov;
+		for (int j = 0; j < msgv->msgv_iovlen; j++) {	/* # elemenets */
+			apdu_len += p->iov_len;
+			p++;
+		}
+
+/* truncate to first fragment to make GLib printing happy */
+		char buf[1024];
+		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
+		if (msgv->msgv_iovlen > 1) {
+			g_message ("\t%i: \"%s\" ... (%i bytes)", ++i, buf, apdu_len);
+		} else {
+			g_message ("\t%i: \"%s\" (%i bytes)", ++i, buf, apdu_len);
+		}
+
+		len -= apdu_len;
                 msgv++;
         }
 
