@@ -57,7 +57,7 @@ struct idle_source {
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = ";";
+static char* g_network = "";
 
 static int g_odata_rate = 10;					/* 10 per second */
 static int g_odata_interval = (1000 * 1000) / 10;	/* 100 ms */
@@ -217,8 +217,10 @@ on_startup (
 #endif
 
 	struct pgm_sock_mreq recv_smr, send_smr;
+	char network[1024];
+	sprintf (network, ";%s", g_network);
 	int smr_len = 1;
-	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
@@ -366,6 +368,9 @@ send_odata (void)
 	g_payload++;
 }
 
+/* this can significantly starve the event loop if everything is running in parallel.
+ */
+
 static gboolean
 on_io_data (
 	GIOChannel*	source,
@@ -373,10 +378,11 @@ on_io_data (
 	gpointer	data
 	)
 {
-	char buffer[4096];
-	int len;
+	int len = 0;
 	do {
-		if ( (len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), 0 /* blocking */)) )
+		char buffer[4096];
+		len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */);
+		if (len > 0)
 		{
 			on_data (buffer, len, NULL);
 		}

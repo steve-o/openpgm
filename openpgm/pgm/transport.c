@@ -53,7 +53,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -1798,8 +1798,6 @@ recv_again:
 	} else if (len == 0) {
 		goto out;
 	}
-
-g_message ("%i bytes", len);
 
 #ifdef TRANSPORT_DEBUG
 	char s[INET6_ADDRSTRLEN];
