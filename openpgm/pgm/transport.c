@@ -53,7 +53,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -124,14 +124,13 @@ static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, 
 static void nak_rb_state (gpointer, gpointer);
 static void nak_rpt_state (gpointer, gpointer);
 static void nak_rdata_state (gpointer, gpointer);
-static void check_peer_nak_state (gpointer, gpointer, gpointer);
+static void check_peer_nak_state (pgm_transport_t*);
 static pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
 static int send_rdata (pgm_transport_t*, int, gpointer, int);
 
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static inline void pgm_peer_unref (pgm_peer_t*);
-static void pgm_peer_unref_hfunc (gpointer, gpointer, gpointer);
 
 static int on_pgm_data (gpointer, guint, gpointer);
 
@@ -360,12 +359,19 @@ pgm_transport_destroy (
 	if (flush) {
 	}
 
-	if (transport->peers) {
+	if (transport->peers_hashtable) {
+		g_hash_table_destroy (transport->peers_hashtable);
+		transport->peers_hashtable = NULL;
+	}
+	if (transport->peers_list) {
 		g_trace ("INFO","destroying peer data.");
 
-		g_hash_table_foreach (transport->peers, pgm_peer_unref_hfunc, transport);
-		g_hash_table_destroy (transport->peers);
-		transport->peers = NULL;
+		do {
+			GList* next = transport->peers_list->next;
+			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
+
+			transport->peers_list = next;
+		} while (transport->peers_list);
 	}
 
 /* clean up receiver trash stacks */
@@ -515,20 +521,6 @@ pgm_peer_unref (
 	}
 }
 
-/* each transport object has a list of peers, one for each host sending PGM data.
- * this function is called to destroy each peer when the peer list is destroyed
- */
-
-static void
-pgm_peer_unref_hfunc (
-	gpointer 	tsi,
-	gpointer	peer,
-	gpointer	transport
-	)
-{
-	pgm_peer_unref ((pgm_peer_t*)peer);
-}
-
 static gpointer
 pgm_timer_thread (
 	gpointer		data
@@ -612,7 +604,7 @@ pgm_transport_create (
 /* transmit window read/write lock */
 	g_static_rw_lock_init (&transport->txw_lock);
 
-/* peer hash map lock */
+/* peer hash map & list lock */
 	g_static_rw_lock_init (&transport->peers_lock);
 
 /* lock tx until bound */
@@ -1305,7 +1297,7 @@ pgm_transport_bind (
 					transport->txw_max_rte);
 
 /* create peer list */
-	transport->peers = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 
 	if (!transport->udp_encap_port)
 	{
@@ -1719,8 +1711,13 @@ new_peer (
 	}
 	g_static_mutex_unlock (&transport->mutex);
 
+/* add peer to hash table and linked list */
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
-	g_hash_table_insert (transport->peers, &peer->tsi, pgm_peer_ref(peer));
+	gpointer entry = pgm_peer_ref(peer);
+	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
+	peer->link_.next = transport->peers_list;
+	peer->link_.data = peer;
+	transport->peers_list = &peer->link_;
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
 
 	return peer;
@@ -1878,7 +1875,7 @@ recv_again:
 				source_tsi.sport = pgm_header->pgm_dport;
 
 				g_static_rw_lock_reader_lock (&transport->peers_lock);
-				source = g_hash_table_lookup (transport->peers, &source_tsi);
+				source = g_hash_table_lookup (transport->peers_hashtable, &source_tsi);
 				g_static_rw_lock_reader_unlock (&transport->peers_lock);
 				if (source == NULL)
 				{
@@ -1951,7 +1948,7 @@ recv_again:
 
 /* search for TSI peer context or create a new one */
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		source = g_hash_table_lookup (transport->peers, &tsi);
+		source = g_hash_table_lookup (transport->peers_hashtable, &tsi);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		if (source == NULL)
 		{
@@ -3409,107 +3406,70 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 static void
 check_peer_nak_state (
-	gpointer		tsi,
-	gpointer		peer_,
-	gpointer		user_data
+	pgm_transport_t*	transport
 	)
 {
-	pgm_peer_t* peer = peer_;
-	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
-	pgm_transport_t* transport = peer->transport;
-
-	g_static_mutex_lock (&peer->mutex);
-
-	if (peer->spmr_expiry)
-	{
-		if (pgm_time_after_eq (pgm_time_now, peer->spmr_expiry))
-		{
-			send_spmr (peer);
-		}
+	if (!transport->peers_list) {
+		return;
 	}
 
-	if (rxw->backoff_queue->tail)
-	{
-		if (pgm_time_after_eq (pgm_time_now, next_nak_rb_expiry(rxw)))
+	GList* list = transport->peers_list;
+	do {
+		GList* next = list->next;
+		pgm_peer_t* peer = list->data;
+		pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
+		pgm_transport_t* transport = peer->transport;
+
+		g_static_mutex_lock (&peer->mutex);
+
+		if (peer->spmr_expiry)
 		{
-			nak_rb_state (tsi, peer);
+			if (pgm_time_after_eq (pgm_time_now, peer->spmr_expiry))
+			{
+				send_spmr (peer);
+			}
 		}
-	}
+
+		if (rxw->backoff_queue->tail)
+		{
+			if (pgm_time_after_eq (pgm_time_now, next_nak_rb_expiry(rxw)))
+			{
+				nak_rb_state (&peer->tsi, peer);
+			}
+		}
 		
-	if (rxw->wait_ncf_queue->tail)
-	{
-		if (pgm_time_after_eq (pgm_time_now, next_nak_rpt_expiry(rxw)))
+		if (rxw->wait_ncf_queue->tail)
 		{
-			nak_rpt_state (tsi, peer);
+			if (pgm_time_after_eq (pgm_time_now, next_nak_rpt_expiry(rxw)))
+			{
+				nak_rpt_state (&peer->tsi, peer);
+			}
 		}
-	}
 
-	if (rxw->wait_data_queue->tail)
-	{
-		if (pgm_time_after_eq (pgm_time_now, next_nak_rdata_expiry(rxw)))
+		if (rxw->wait_data_queue->tail)
 		{
-			nak_rdata_state (tsi, peer);
+			if (pgm_time_after_eq (pgm_time_now, next_nak_rdata_expiry(rxw)))
+			{
+				nak_rdata_state (&peer->tsi, peer);
+			}
 		}
-	}
 
-	if (pgm_time_after_eq (pgm_time_now, peer->expiry))
-	{
-		g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
-		g_hash_table_remove (transport->peers, tsi);
-		g_static_mutex_unlock (&peer->mutex);
-		pgm_peer_unref (peer);
-	}
-	else
-	{
-		g_static_mutex_unlock (&peer->mutex);
-	}
-}
-
-static void
-min_peer_nak_expiry (
-	gpointer		tsi,
-	gpointer		peer_,
-	gpointer		expiration
-	)
-{
-	pgm_peer_t* peer = peer_;
-	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
-
-	g_static_mutex_lock (&peer->mutex);
-
-	if (peer->spmr_expiry)
-	{
-		if (pgm_time_after_eq (*(pgm_time_t*)expiration, peer->spmr_expiry))
+/* expired, remove from hash table and linked list */
+		if (pgm_time_after_eq (pgm_time_now, peer->expiry))
 		{
-			*(pgm_time_t*)expiration = peer->spmr_expiry;
+			g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
+			g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
+			transport->peers_list = g_list_remove_link (transport->peers_list, &peer->link_);
+			g_static_mutex_unlock (&peer->mutex);
+			pgm_peer_unref (peer);
 		}
-	}
-
-	if (rxw->backoff_queue->tail)
-	{
-		if (pgm_time_after_eq (*(pgm_time_t*)expiration, next_nak_rb_expiry(rxw)))
+		else
 		{
-			*(pgm_time_t*)expiration = next_nak_rb_expiry(rxw);
+			g_static_mutex_unlock (&peer->mutex);
 		}
-	}
 
-	if (rxw->wait_ncf_queue->tail)
-	{
-		if (pgm_time_after_eq (*(pgm_time_t*)expiration, next_nak_rpt_expiry(rxw)))
-		{
-			*(pgm_time_t*)expiration = next_nak_rpt_expiry(rxw);
-		}
-	}
-
-	if (rxw->wait_data_queue->tail)
-	{
-		if (pgm_time_after_eq (*(pgm_time_t*)expiration, next_nak_rdata_expiry(rxw)))
-		{
-			*(pgm_time_t*)expiration = next_nak_rdata_expiry(rxw);
-		}
-	}
-
-	g_static_mutex_unlock (&peer->mutex);
+		list = next;
+	} while (list);
 }
 
 static pgm_time_t
@@ -3518,8 +3478,58 @@ min_nak_expiry (
 	pgm_transport_t*	transport
 	)
 {
-	g_hash_table_foreach (transport->peers, min_peer_nak_expiry, &expiration);
+	if (!transport->peers_list) {
+		goto out;
+	}
 
+	g_trace ("INFO", "transport peers list %i", (int)g_list_length (transport->peers_list));
+
+	GList* list = transport->peers_list;
+	do {
+		GList* next = list->next;
+		pgm_peer_t* peer = (pgm_peer_t*)list->data;
+		pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
+	
+		g_static_mutex_lock (&peer->mutex);
+
+		if (peer->spmr_expiry)
+		{
+			if (pgm_time_after_eq (expiration, peer->spmr_expiry))
+			{
+				expiration = peer->spmr_expiry;
+			}
+		}
+
+		if (rxw->backoff_queue->tail)
+		{
+			if (pgm_time_after_eq (expiration, next_nak_rb_expiry(rxw)))
+			{
+				expiration = next_nak_rb_expiry(rxw);
+			}
+		}
+
+		if (rxw->wait_ncf_queue->tail)
+		{
+			if (pgm_time_after_eq (expiration, next_nak_rpt_expiry(rxw)))
+			{
+				expiration = next_nak_rpt_expiry(rxw);
+			}
+		}
+
+		if (rxw->wait_data_queue->tail)
+		{
+			if (pgm_time_after_eq (expiration, next_nak_rdata_expiry(rxw)))
+			{
+				expiration = next_nak_rdata_expiry(rxw);
+			}
+		}
+	
+		g_static_mutex_unlock (&peer->mutex);
+
+		list = next;
+	} while (list);
+
+out:
 	return expiration;
 }
 
@@ -4252,7 +4262,7 @@ pgm_timer_dispatch (
 	}
 
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	g_hash_table_foreach (transport->peers, check_peer_nak_state, NULL);
+	check_peer_nak_state (transport);
 	g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	g_static_mutex_unlock (&transport->mutex);
 

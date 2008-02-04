@@ -384,7 +384,7 @@ on_io_data (
         }
 
 /* search for TSI peer context or create a new one */
-        pgm_peer_t* sender = g_hash_table_lookup (transport->peers, &tsi);
+        pgm_peer_t* sender = g_hash_table_lookup (transport->peers_hashtable, &tsi);
         if (sender == NULL)
         {
 		printf ("new peer, tsi %s, local nla %s\n", pgm_print_tsi (&tsi), inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
@@ -395,7 +395,7 @@ on_io_data (
 		((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 		memcpy (&peer->local_nla, &src_addr, src_addr_len);
 
-		g_hash_table_insert (transport->peers, &peer->tsi, peer);
+		g_hash_table_insert (transport->peers_hashtable, &peer->tsi, peer);
 		sender = peer;
         }
 
@@ -445,7 +445,7 @@ fake_pgm_transport_bind (
 	int retval = 0;
 
 /* create peer list */
-	transport->peers = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 
 /* bind udp unicast sockets to interfaces, note multicast on a bound interface is
  * fruity on some platforms so callee should specify any interface.
@@ -913,7 +913,7 @@ net_send_spmr (
 	pgm_transport_t* transport = sess->transport;
 
 /* check that the peer exists */
-	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	struct sockaddr_storage peer_nla;
 	guint16 peer_sport;
 
@@ -997,7 +997,7 @@ net_send_ncf (
 
 /* check that the peer exists */
 	pgm_transport_t* transport = sess->transport;
-	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
 		return;
@@ -1098,7 +1098,7 @@ net_send_nak (
 
 /* check that the peer exists */
 	pgm_transport_t* transport = sess->transport;
-	pgm_peer_t* peer = g_hash_table_lookup (transport->peers, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_print_tsi(tsi));
 		return;
