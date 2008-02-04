@@ -66,7 +66,7 @@ static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void transports_callback (SoupServerContext*, SoupMessage*, gpointer);
 
-static void http_each_receiver (gpointer, gpointer, gpointer);
+static void http_each_receiver (pgm_peer_t*, GString*);
 static int http_receiver_response (pgm_peer_t*, SoupMessage*);
 
 
@@ -465,7 +465,7 @@ http_tsi_response (
 
 /* check receivers */
 		g_static_rw_lock_reader_lock (&list_transport->peers_lock);
-		pgm_peer_t* receiver = g_hash_table_lookup (list_transport->peers, tsi);
+		pgm_peer_t* receiver = g_hash_table_lookup (list_transport->peers_hashtable, tsi);
 		if (receiver) {
 			int retval = http_receiver_response (receiver, msg);
 			g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
@@ -558,7 +558,12 @@ http_tsi_response (
 			);
 
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	g_hash_table_foreach (transport->peers, http_each_receiver, response);
+	GList* peers_list = transport->peers_list;
+	do { 
+		GList* next = peers_list->next;
+		http_each_receiver (peers_list->data, response);
+		peers_list = next;
+	} while (peers_list);
 	g_static_rw_lock_reader_unlock (&transport->peers_lock);
 
 	g_string_append (response,		"</table>");
@@ -667,14 +672,10 @@ http_tsi_response (
 
 static void
 http_each_receiver (
-	gpointer	tsi,
-	gpointer	peer_,
-	gpointer	response_
+	pgm_peer_t*	peer,
+	GString*	response
 	)
 {
-	pgm_peer_t* peer = peer_;
-	GString* response = response_;
-
 	char group_address[INET6_ADDRSTRLEN];
 	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
 			pgm_sockaddr_addr( &peer->group_nla ),
