@@ -188,15 +188,18 @@ pgm_rxw_init (
 	r->trash_packet = trash_packet;
 	r->trash_mutex = trash_mutex;
 
-	g_static_mutex_lock (r->trash_mutex);
-	for (guint32 i = 0; i < preallocate_size; i++)
+	if (preallocate_size)
 	{
-		gpointer data   = g_slice_alloc (r->max_tpdu);
-		gpointer packet = g_slice_alloc (sizeof(pgm_rxw_packet_t));
-		g_trash_stack_push (r->trash_data, data);
-		g_trash_stack_push (r->trash_packet, packet);
+		g_static_mutex_lock (r->trash_mutex);
+		for (guint32 i = 0; i < preallocate_size; i++)
+		{
+			gpointer data   = g_slice_alloc (r->max_tpdu);
+			gpointer packet = g_slice_alloc (sizeof(pgm_rxw_packet_t));
+			g_trash_stack_push (r->trash_data, data);
+			g_trash_stack_push (r->trash_packet, packet);
+		}
+		g_static_mutex_unlock (r->trash_mutex);
 	}
-	g_static_mutex_unlock (r->trash_mutex);
 
 /* calculate receive window parameters as per transmit window */
 	if (rxw_sqns)

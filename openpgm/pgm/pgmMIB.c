@@ -15,29 +15,9 @@
 #include "pgm/transport.h"
 
 
-/* hash table internals from GLib in order to simplify iteration of receivers
- * inside a SNMP request loop context 
- */
-
-typedef struct _GHashNode GHashNode;
-
-struct _GHashNode
-{
-	gpointer   key;
-	gpointer   value;
-	GHashNode *next;
-};
-
-struct _GHashTable
-{
-	gint             size;
-	gint             nnodes;
-	GHashNode      **nodes;
-};
-
 struct pgm_snmp_context_t {
 	GSList*		list;
-	GHashNode*	node;
+	GList*		node;
 	gint		index;		/* table index */
 	unsigned long	instance;	/* unique number per node */
 };
@@ -1235,7 +1215,6 @@ pgmReceiverTable_get_first_data_point(
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
-	context->instance = 0;
 
 /* hunt to find first node, through all transports */
 	for (context->list = pgm_transport_list; context->list; context->list = context->list->next)
@@ -1243,17 +1222,11 @@ pgmReceiverTable_get_first_data_point(
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-
-		for (context->index = 0; context->index < ((struct _GHashTable*)transport->peers)->size; context->index++)
-		{
-			context->node = ((struct _GHashTable*)transport->peers)->nodes[ context->index ];
-			if (context->node) {
-				break;
-			}
-		}
-
-		if (context->node)
+		context->node = transport->peers_list;
+		if (context->node) {
+/* maintain this transport's peers lock */
 			break;
+		}
 
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	}
@@ -1293,7 +1266,7 @@ pgmReceiverTable_get_next_data_point(
 		return NULL;
 	}
 
-	pgm_peer_t* peer = context->node->value;
+	pgm_peer_t* peer = context->node->data;
 
 /* pgmReceiverGlobalId */
 	char gsi[sizeof("000" "000" "000" "000" "000" "000")];
@@ -1324,28 +1297,17 @@ pgmReceiverTable_get_next_data_point(
 		context->node = context->node->next;
 	} else {
 		context->node = NULL;
-		do {
-			while (++(context->index) < ((struct _GHashTable*)transport->peers)->size)
-			{
-				context->node = ((struct _GHashTable*)transport->peers)->nodes[ context->index ];
-				if (context->node) {
-					break;
-				}
-			}
-
-			if (context->node)
-				break;
-
+		while (context->list->next)
+		{
 			g_static_rw_lock_reader_unlock (&transport->peers_lock);
-
-/* lock ahead of next loop */
-			if ( (context->list = context->list->next) )
-			{
-				transport = context->list->data;
-				g_static_rw_lock_reader_lock (&transport->peers_lock);
+			transport = context->list = context->list->next;
+			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			context->node = transport->peers_list;
+			if (context->node) {
+/* keep lock */
+				break;
 			}
-				
-		} while (context->list);
+		}
 	}
 
 	return put_index_data;
@@ -1546,7 +1508,6 @@ pgmReceiverConfigTable_get_first_data_point(
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
-	context->instance = 0;
 
 /* hunt to find first node, through all transports */
 	for (context->list = pgm_transport_list; context->list; context->list = context->list->next)
@@ -1554,15 +1515,7 @@ pgmReceiverConfigTable_get_first_data_point(
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-
-		for (context->index = 0; context->index < ((struct _GHashTable*)transport->peers)->size; context->index++)
-		{
-			context->node = ((struct _GHashTable*)transport->peers)->nodes[ context->index ];
-			if (context->node) {
-				break;
-			}
-		}
-
+		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
@@ -1604,7 +1557,7 @@ pgmReceiverConfigTable_get_next_data_point(
 		return NULL;
 	}
 
-	pgm_peer_t* peer = context->node->value;
+	pgm_peer_t* peer = context->node->data;
 
 /* pgmReceiverGlobalId */
 	char gsi[sizeof("000" "000" "000" "000" "000" "000")];
@@ -1635,28 +1588,17 @@ pgmReceiverConfigTable_get_next_data_point(
 		context->node = context->node->next;
 	} else {
 		context->node = NULL;
-		do {
-			while (++(context->index) < ((struct _GHashTable*)transport->peers)->size)
-			{
-				context->node = ((struct _GHashTable*)transport->peers)->nodes[ context->index ];
-				if (context->node) {
-					break;
-				}
-			}
-
-			if (context->node)
-				break;
-
+		while (context->list->next)
+		{
 			g_static_rw_lock_reader_unlock (&transport->peers_lock);
-
-/* lock ahead of next loop */
-			if ( (context->list = context->list->next) )
-			{
-				transport = context->list->data;
-				g_static_rw_lock_reader_lock (&transport->peers_lock);
+			transport = context->list = context->list->next;
+			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			context->node = transport->peers_list;
+			if (context->node) {
+/* keep lock */
+				break;
 			}
-
-		} while (context->list);
+		}
 	}
 
 	return put_index_data;
@@ -1908,7 +1850,6 @@ pgmReceiverPerformanceTable_get_first_data_point(
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
-	context->instance = 0;
 
 /* hunt to find first node, through all transports */
 	for (context->list = pgm_transport_list; context->list; context->list = context->list->next)
@@ -1916,15 +1857,7 @@ pgmReceiverPerformanceTable_get_first_data_point(
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-
-		for (context->index = 0; context->index < ((struct _GHashTable*)transport->peers)->size; context->index++)
-		{
-			context->node = ((struct _GHashTable*)transport->peers)->nodes[ context->index ];
-			if (context->node) {
-				break;
-			}
-		}
-
+		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
@@ -1966,7 +1899,7 @@ pgmReceiverPerformanceTable_get_next_data_point(
 		return NULL;
 	}
 
-	pgm_peer_t* peer = context->node->value;
+	pgm_peer_t* peer = context->node->data;
 
 /* pgmReceiverGlobalId */
 	char gsi[sizeof("000" "000" "000" "000" "000" "000")];
@@ -1997,28 +1930,16 @@ pgmReceiverPerformanceTable_get_next_data_point(
 		context->node = context->node->next;
 	} else {
 		context->node = NULL;
-		do {
-			while (++(context->index) < ((struct _GHashTable*)transport->peers)->size)
-			{
-				context->node = ((struct _GHashTable*)transport->peers)->nodes[ context->index ];
-				if (context->node) {
-					break;
-				}
-			}
+		while (context->list->next)
+		{
+			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			transport = context->list = context->list->next;
+			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			context->node = transport->peers_list;
 
 			if (context->node)
 				break;
-
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
-
-/* lock ahead of next loop */
-			if ( (context->list = context->list->next) )
-			{
-				transport = context->list->data;
-				g_static_rw_lock_reader_lock (&transport->peers_lock);
-			}
-
-		} while (context->list);
+		}
 	}
 
 	return put_index_data;

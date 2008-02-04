@@ -214,7 +214,7 @@ Basic TODO list
 - Shared trash stacks between transmit and receive windows.
 - FEC: to be or not to be Reed Solomon, compatibility with SmartPGM FEC?
 - NAK backoff learning.
-- Full conformance testing.
+- Full conformance testing. (nak backoffs remaining)
 - Unit testing.
 - System testing with valgrind.
 - Performance testing with oprofile.
@@ -224,14 +224,11 @@ Basic TODO list
 - Basic DLR.
 - Convert timer thread from a GLib mainloop to a g_cond_wait / g_cond_timed_wait based loop,
   using mutex/cond pairs instead of shuffling bytes over a pipe.
-- Convert rx thread to simple recvfrom loop.
-- Investigate vector handling: rx thread -> app listener.
+  * thread synchronisationt not necessary so probably bad idea *
 - Determine handling of zero length data packets.
+- Implement PGM sender (only) support thread?
 
 Optionals
 *********
 
-- Unicast delivery inside a transport with either array or list based transmit windows per peer.
-- SNMP statistics for external poll based management.
 - Some form of broadcast statistics for passive monitoring.
-- Web interface from basic_recv for transport monitoring.

@@ -147,6 +147,7 @@ struct pgm_peer_t {
 
     gpointer            rxw;		/* pgm_rxw_t */
     pgm_transport_t*    transport;
+    GList		link_;
 
     int			spm_sqn;
     pgm_time_t		expiry;
@@ -226,8 +227,9 @@ struct pgm_transport_t {
     GStaticMutex	rx_mutex;
 
     GStaticRWLock	peers_lock;
-    GHashTable*		peers;
-    GSList*		peers_waiting;		    /* have or lost data */
+    GHashTable*		peers_hashtable;	    /* fast lookup */
+    GList*		peers_list;		    /* easy iteration */
+    GSList*		peers_waiting;		    /* rxw: have or lost data */
     GStaticMutex	waiting_mutex;
 
     GAsyncQueue*	rdata_queue;
@@ -310,6 +312,7 @@ static inline int pgm_write (pgm_transport_t* transport, const gchar* buf, gsize
 }
 
 int pgm_write_copy (pgm_transport_t*, const gchar*, gsize);
+int pgm_write_copy_ex (pgm_transport_t*, const gchar*, gsize);
 int pgm_write_copy_fragment_unlocked (pgm_transport_t*, const gchar*, gsize);
 static inline int pgm_write_copy_fragment (pgm_transport_t* transport, const gchar* buf, gsize count)
 {
