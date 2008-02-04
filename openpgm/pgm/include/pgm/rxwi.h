@@ -163,7 +163,7 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
 {
     gpointer p;
     g_static_mutex_lock (r->trash_mutex);
-    if (*r->trash_data) {
+    if (g_trash_stack_height(r->trash_data)) {
 	p = g_trash_stack_pop (r->trash_data);
     } else {
 	p = g_slice_alloc (r->max_tpdu);
@@ -182,6 +182,13 @@ static inline void pgm_rxw_data_unref (GTrashStack** trash, GStaticMutex* mutex,
 static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
     return pgm_rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0, nak_rb_expiry);
+}
+
+static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, guint32 apdu_first_sqn, guint32 fragment_offset, guint32 apdu_len, pgm_time_t nak_rb_expiry)
+{
+    gpointer packet = pgm_rxw_alloc (r);
+    memcpy (packet, packet_, len);
+    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, apdu_first_sqn, fragment_offset, apdu_len, nak_rb_expiry);
 }
 
 static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)

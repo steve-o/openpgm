@@ -382,7 +382,7 @@ pgm_transport_destroy (
 			g_slice_free1 (transport->max_tpdu - transport->iphdr_len, p);
 		}
 
-		transport->rx_data = NULL;
+		g_assert (transport->rx_data == NULL);
 	}
 
 	if (transport->rx_packet) {
@@ -392,7 +392,7 @@ pgm_transport_destroy (
 			g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
 		}
 
-		transport->rx_packet = NULL;
+		g_assert (transport->rx_packet == NULL);
 	}
 
 	if (transport->txw) {
@@ -3482,8 +3482,6 @@ min_nak_expiry (
 		goto out;
 	}
 
-	g_trace ("INFO", "transport peers list %i", (int)g_list_length (transport->peers_list));
-
 	GList* list = transport->peers_list;
 	do {
 		GList* next = list->next;
@@ -4339,7 +4337,7 @@ on_odata (
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
-		retval = pgm_rxw_push_fragment (sender->rxw,
+		retval = pgm_rxw_push_fragment_copy (sender->rxw,
 					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
@@ -4359,6 +4357,7 @@ on_odata (
 					g_ntohl (odata->data_trail),
 					nak_rb_expiry);
 	}
+
 	g_static_mutex_unlock (&sender->mutex);
 
 	gboolean flush_naks = FALSE;

@@ -32,7 +32,7 @@
 #include <sys/time.h>
 #include <sys/uio.h>
 
-//#define RXW_DEBUG
+#define RXW_DEBUG
 
 #ifndef RXW_DEBUG
 #define G_DISABLE_ASSERT
@@ -97,7 +97,7 @@
 /* does the array exist */ \
 		g_assert ( (w)->pdata != NULL && (w)->pdata->len > 0 ); \
 \
-/* do the trash stacks point somewhere */ \
+/* do the trash stacks point somewhere (the transport object) */ \
 		g_assert ( (w)->trash_data != NULL ); \
 		g_assert ( (w)->trash_packet != NULL ); \
 \
@@ -584,28 +584,10 @@ exit(1);
 		if (apdu_len)	/* fragment */
 		{
 			r->fragment_count++;
-
-			if (sequence_number == apdu_first_sqn)
-			{
-				rp->data	= g_malloc (apdu_len);
-
-				memcpy (rp->data, packet, length);
-			}
-			else
-			{	/* not first fragment */
-				pgm_rxw_packet_t* head_rp = RXW_PACKET(r, apdu_first_sqn);
-				memcpy ((char*)head_rp->data + fragment_offset, packet, length);
-
-/* leave check for complete apdu at flush */
-			}
-
 			rp->apdu_first_sqn = apdu_first_sqn;
 			rp->apdu_len	= apdu_len;
 		}
-		else
-		{	/* regular tpdu */
-			rp->data	= packet;
-		}
+		rp->data		= packet;
 		rp->length		= length;
 		rp->sequence_number     = r->lead;
 		rp->state		= PGM_PKT_HAVE_DATA_STATE;
@@ -701,7 +683,7 @@ pgm_rxw_readv (
 					}
 					else
 					{	/* another apdu or tpdu exists */
-						continue;
+						break;
 					}
 				}
 			}
@@ -729,7 +711,7 @@ pgm_rxw_readv (
 				if ( cp->apdu_first_sqn != cp->sequence_number )
 				{
 					g_trace ("partial apdu at trailing edge");
-					continue;
+					break;
 				}
 
 				guint32 frag = cp->apdu_first_sqn;
@@ -774,6 +756,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 					{
 						ap = RXW_PACKET(r, i);
 
+g_message ("iov_base: %p iov_len: %i", ap->data, ap->length);
 						(*piov)->iov_base = ap->data;
 						(*piov)->iov_len  = ap->length;
 						++(*piov);
@@ -798,7 +781,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 				{	/* incomplete apdu */
 					g_trace ("partial apdu found %u of %u bytes.",
 						apdu_len, cp->apdu_len);
-					continue;
+					break;
 				}
 			}
 			else
@@ -814,6 +797,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 				(*pmsg)->msgv_iov    = *piov;
 				(*piov)->iov_base = cp->data;
 				(*piov)->iov_len  = cp->length;
+				++(*piov);
 				bytes_read += cp->length;
 /* cleanup */
 				pgm_rxw_pkt_remove1 (r, cp);
@@ -823,7 +807,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 					break;
 				}
 
-				if (++(*piov) == iov_end) {
+				if (*piov == iov_end) {
 					break;
 				}
 			}
