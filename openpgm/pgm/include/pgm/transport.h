@@ -207,8 +207,9 @@ struct pgm_transport_t {
     guint		peer_expiry;		    /* from absence of SPMs */
     guint		spmr_expiry;		    /* waiting for peer SPMRs */
 
+    GRand*		rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
     guint		nak_data_retries, nak_ncf_retries;
-    guint		nak_rb_ivl, nak_rpt_ivl, nak_rdata_ivl;
+    guint		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
     pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
     gboolean		proactive_parity;
@@ -287,7 +288,7 @@ int pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
 int pgm_transport_set_sndbuf (pgm_transport_t*, int);
 int pgm_transport_set_rcvbuf (pgm_transport_t*, int);
 
-int pgm_transport_set_nak_rb_ivl (pgm_transport_t*, guint);
+int pgm_transport_set_nak_bo_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);

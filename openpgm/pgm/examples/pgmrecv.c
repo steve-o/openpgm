@@ -246,7 +246,7 @@ on_startup (
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
-	pgm_transport_set_nak_rb_ivl (g_transport, 50*1000);
+	pgm_transport_set_nak_bo_ivl (g_transport, 50*1000);
 	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
 	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
 	pgm_transport_set_nak_data_retries (g_transport, 5);
