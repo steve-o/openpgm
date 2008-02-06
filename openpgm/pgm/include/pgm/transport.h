@@ -299,33 +299,9 @@ int pgm_set_nonblocking (int filedes[2]);
 
 /* send side */
 gpointer pgm_alloc (pgm_transport_t*);
-int pgm_write_unlocked (pgm_transport_t*, const gchar*, gsize);
-static inline int pgm_write (pgm_transport_t* transport, const gchar* buf, gsize count)
-{
-    g_static_rw_lock_writer_lock (&transport->txw_lock);
-    int retval = pgm_write_unlocked (transport, buf, count);
 
-/* unlocked in pgm_write_unlocked()
- *   g_static_rw_lock_writer_unlock (&transport->txw_lock);
- */
-
-    return retval;
-}
-
-int pgm_write_copy (pgm_transport_t*, const gchar*, gsize);
-int pgm_write_copy_ex (pgm_transport_t*, const gchar*, gsize);
-int pgm_write_copy_fragment_unlocked (pgm_transport_t*, const gchar*, gsize);
-static inline int pgm_write_copy_fragment (pgm_transport_t* transport, const gchar* buf, gsize count)
-{
-    g_static_rw_lock_writer_lock (&transport->txw_lock);
-    int retval = pgm_write_copy_fragment_unlocked (transport, buf, count);
-
-/* unlocked in pgm_write_unlocked()
- *   g_static_rw_lock_writer_unlock (&transport->txw_lock);
- */
-
-    return retval;
-}
+int pgm_transport_send (pgm_transport_t*, const gchar*, gsize, int);
+int pgm_transport_sendv (pgm_transport_t*, const struct iovec*, int);
 
 /* receiver side */
 int pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);

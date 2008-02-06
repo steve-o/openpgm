@@ -29,7 +29,7 @@ G_BEGIN_DECLS
 
 int pgm_rate_create (gpointer*, guint, guint);
 int pgm_rate_destroy (gpointer);
-int pgm_rate_check (gpointer, guint);
+int pgm_rate_check (gpointer, guint, int);
 
 G_END_DECLS
 

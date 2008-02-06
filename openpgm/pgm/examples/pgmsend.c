@@ -294,9 +294,9 @@ send_odata (void)
 
 	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
 
-	e = pgm_write_copy (g_transport, payload_string, strlen(payload_string) + 1);
+	e = pgm_transport_send (g_transport, payload_string, strlen(payload_string) + 1, 0);
         if (e < 0) {
-		g_warning ("send failed.");
+		g_warning ("pgm_transport_send failed.");
                 return;
         }
 }
