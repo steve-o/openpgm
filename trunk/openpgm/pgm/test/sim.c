@@ -685,7 +685,7 @@ session_bind (
 	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300));
 	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
-	pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(50));
+	pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(50));
 	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
 	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2));
 	pgm_transport_set_nak_data_retries (sess->transport, 50);

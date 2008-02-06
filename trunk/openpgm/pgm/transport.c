@@ -183,6 +183,11 @@ pgm_tsi_equal (
 	return memcmp (v, v2, (6 * sizeof(guint8)) + sizeof(guint16)) == 0;
 }
 
+static inline guint32 nak_rb_ivl (pgm_transport_t* transport)
+{
+	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
+}
+
 static inline gpointer pgm_sqn_list_alloc (pgm_transport_t* t)
 {
 	pgm_sqn_list_t* p = t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(pgm_sqn_list_t));
@@ -424,6 +429,10 @@ pgm_transport_destroy (
 		transport->spm_heartbeat_interval = NULL;
 	}
 
+	if (transport->rand_) {
+		g_rand_free (transport->rand_);
+		transport->rand_ = NULL;
+	}
 	if (transport->rdata_queue) {
 		g_async_queue_unref (transport->rdata_queue);
 		transport->rdata_queue = NULL;
@@ -1144,7 +1153,7 @@ pgm_transport_set_rcvbuf (
 }
 
 int
-pgm_transport_set_nak_rb_ivl (
+pgm_transport_set_nak_bo_ivl (
 	pgm_transport_t*	transport,
 	guint			usec		/* microseconds */
 	)
@@ -1153,7 +1162,7 @@ pgm_transport_set_nak_rb_ivl (
 	g_return_val_if_fail (!transport->bound, -EINVAL);
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->nak_rb_ivl = usec;
+	transport->nak_bo_ivl = usec;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
@@ -1267,6 +1276,9 @@ pgm_transport_bind (
 	int retval = 0;
 
 	g_static_mutex_lock (&transport->mutex);
+
+	g_trace ("INFO","creating new random number generator.");
+	transport->rand_ = g_rand_new();
 
 /* receiver to timer thread queue, aka RDATA todo list */
 	g_trace ("INFO","create asynchronous receiver to timer queue.");
@@ -2313,7 +2325,7 @@ on_spm (
 		sender->spm_sqn = spm->spm_sqn;
 
 /* update receive window */
-		pgm_time_t nak_rb_expiry = now + transport->nak_rb_ivl;
+		pgm_time_t nak_rb_expiry = now + nak_rb_ivl(transport);
 		guint naks = pgm_rxw_window_update (sender->rxw,
 							g_ntohl (spm->spm_trail),
 							g_ntohl (spm->spm_lead),
@@ -2614,7 +2626,7 @@ on_peer_nak (
 
 /* handle as NCF */
 	pgm_time_update_now();
-	pgm_rxw_ncf (peer->rxw, g_ntohl (nak->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+	pgm_rxw_ncf (peer->rxw, g_ntohl (nak->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 
 /* check NAK list */
 	guint32* nak_list = NULL;
@@ -2655,7 +2667,7 @@ on_peer_nak (
 	g_trace ("INFO", "NAK contains 1+%i sequence numbers.", nak_list_len);
 	while (nak_list_len)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 		nak_list++;
 		nak_list_len--;
 	}
@@ -2731,7 +2743,7 @@ on_ncf (
 	g_static_mutex_lock (&peer->mutex);
 
 	pgm_time_update_now();
-	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 
 /* check NCF list */
 	guint32* ncf_list = NULL;
@@ -2772,7 +2784,7 @@ on_ncf (
 	g_trace ("INFO", "NCF contains 1+%i sequence numbers.", ncf_list_len);
 	while (ncf_list_len)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*ncf_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + transport->nak_rb_ivl);
+		pgm_rxw_ncf (peer->rxw, g_ntohl (*ncf_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 		ncf_list++;
 		ncf_list_len--;
 	}
@@ -3664,8 +3676,8 @@ nak_rpt_state (
 				pgm_rxw_pkt_state_unlink (rxw, rp);
 				rp->state = PGM_PKT_BACK_OFF_STATE;
 				g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
-//				rp->nak_rb_expiry = rp->nak_rpt_expiry + transport->nak_rb_ivl;
-				rp->nak_rb_expiry = pgm_time_now + transport->nak_rb_ivl;
+//				rp->nak_rb_expiry = rp->nak_rpt_expiry + nak_rb_ivl(transport);
+				rp->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
 			}
 		}
 		else
@@ -3807,8 +3819,8 @@ nak_rdata_state (
 			g_trace("INFO", "retry #%u attempt %u/%u.", rp->sequence_number, rp->data_retry_count, transport->nak_data_retries);
 			rp->state = PGM_PKT_BACK_OFF_STATE;
 			g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
-//			rp->nak_rb_expiry = rp->nak_rdata_expiry + transport->nak_rb_ivl;
-			rp->nak_rb_expiry = pgm_time_now + transport->nak_rb_ivl;
+//			rp->nak_rb_expiry = rp->nak_rdata_expiry + nak_rb_ivl(transport);
+			rp->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
 		}
 		else
 		{	/* packet expires some time later */
@@ -4439,7 +4451,7 @@ on_odata (
  * through to event handler.
  */
 	struct pgm_opt_fragment* opt_fragment;
-	pgm_time_t nak_rb_expiry = pgm_time_update_now () + transport->nak_rb_ivl;
+	pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
 
 	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(odata + 1), &opt_fragment))
 	{
@@ -4539,7 +4551,7 @@ on_rdata (
 	rdata->data_sqn = g_ntohl (rdata->data_sqn);
 
 	struct pgm_opt_fragment* opt_fragment;
-	pgm_time_t nak_rb_expiry = pgm_time_update_now () + transport->nak_rb_ivl;
+	pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
 
 	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(rdata + 1), &opt_fragment))
 	{

@@ -35,7 +35,7 @@ $mon->say ("filter $config{app}{ip}");
 print "mon: ready.\n";
 
 $app->say ("create ao");
-$app->say ("set ao NAK_RB_IVL 5000");	# increase to count for test system latency
+$app->say ("set ao NAK_BO_IVL 5000");	# increase to count for test system latency
 $app->say ("set ao NAK_RPT_IVL 10000");
 $app->say ("set ao NAK_RDATA_IVL 10000");
 $app->say ("set ao NAK_NCF_RETRIES 15");

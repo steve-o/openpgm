@@ -272,9 +272,9 @@ err_free:
 }
 
 void
-session_set_nak_rb_ivl (
+session_set_nak_bo_ivl (
 	char*		name,
-	guint		nak_rb_ivl		/* milliseconds */
+	guint		nak_bo_ivl		/* milliseconds */
 	)
 {
 /* check that session exists */
@@ -284,7 +284,7 @@ session_set_nak_rb_ivl (
 		return;
 	}
 
-	pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(nak_rb_ivl));
+	pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(nak_bo_ivl));
 	puts ("READY");
 }
 
@@ -394,8 +394,8 @@ session_bind (
 	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300));
 	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
-	if (!sess->transport->nak_rb_ivl)
-		pgm_transport_set_nak_rb_ivl (sess->transport, pgm_msecs(50));
+	if (!sess->transport->nak_bo_ivl)
+		pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(50));
 	if (!sess->transport->nak_rpt_ivl)
 		pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
 	if (!sess->transport->nak_rdata_ivl)
@@ -530,8 +530,8 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
-/* set NAK_RB_IVL */
-		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_RB_IVL[[:space:]]+([0-9]+)$";
+/* set NAK_BO_IVL */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+NAK_BO_IVL[[:space:]]+([0-9]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
@@ -539,9 +539,9 @@ on_stdin_data (
 			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
 
 			char *p = str + pmatch[2].rm_so;
-			guint nak_rb_ivl = strtol (p, &p, 10);
+			guint nak_bo_ivl = strtol (p, &p, 10);
 
-			session_set_nak_rb_ivl (name, nak_rb_ivl);
+			session_set_nak_bo_ivl (name, nak_bo_ivl);
 
 			g_free (name);
 			regfree (&preg);
