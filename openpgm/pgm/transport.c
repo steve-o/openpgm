@@ -198,29 +198,25 @@ gpointer pgm_alloc (pgm_transport_t* transport)
 	return ptr;
 }
 
-inline int pgm_write_copy (pgm_transport_t* transport, const gchar* buf, gsize count)
+static inline int pgm_transport_send_one_copy_unlocked (pgm_transport_t* transport, const gchar* buf, gsize count, int flags)
 {
-	g_static_rw_lock_writer_lock (&transport->txw_lock);
+	int retval = 0;
+
+	if (flags & MSG_DONTWAIT)
+	{
+	        int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
+		int retval = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+		if (retval == -1) {
+			goto out;
+		}
+	}
+
 	gchar *pkt = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	memcpy (pkt, buf, count);
-	int retval = pgm_write_unlocked (transport, pkt, count);
+	retval = pgm_transport_send_one_unlocked (transport, pkt, count, flags);
 
-/* unlocked in pgm_write_unlocked()
- *	g_static_rw_lock_writer_unlock (&transport->txw_lock);
- */
-
+out:
 	return retval;
-}
-
-int pgm_write_copy_ex (pgm_transport_t* transport, const gchar* buf, gsize count)
-{
-    if ( count <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
-                                            sizeof(struct pgm_data) ) ) )
-    {
-        return pgm_write_copy (transport, buf, count);
-    }
-
-    return pgm_write_copy_fragment (transport, buf, count);
 }
 
 /* locked and rate regulated sendto
@@ -234,7 +230,7 @@ pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len
 	int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
 
 	g_static_mutex_lock (mutex);
-	pgm_rate_check (transport->rate_control, len);
+	pgm_rate_check (transport->rate_control, len, 0);
 	retval = sendto (sock, buf, len, flags, to, tolen);
 	g_static_mutex_unlock (mutex);
 
@@ -3889,10 +3885,11 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
  */
 
 int
-pgm_write_unlocked (
+pgm_transport_send_one_unlocked (
 	pgm_transport_t*	transport,
 	const gchar*		buf,
-	gsize			count)
+	gsize			count
+	)
 {
 	int retval = 0;
 
@@ -3946,7 +3943,7 @@ pgm_write_unlocked (
  */
 
 int
-pgm_write_copy_fragment_unlocked (
+pgm_transport_send_fragment_unlocked (
 	pgm_transport_t*	transport,
 	const gchar*		buf,
 	gsize			count)
@@ -4035,6 +4032,64 @@ pgm_write_copy_fragment_unlocked (
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
 
 	return retval;
+}
+
+/* send an apdu.
+ *
+ * copy into receive window one or more fragments.
+ */
+
+int pgm_transport_send (
+	pgm_transport_t*	transport,
+	const gchar*		data,
+	gsize			len,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	g_static_rw_lock_writer_lock (&transport->txw_lock);
+	if ( len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+                                               sizeof(struct pgm_data) ) ) )
+	{
+		return pgm_transport_send_one_copy_unlocked (transport, data, len, flags);
+	}
+
+	return pgm_transport_send_fragment_unlocked (transport, data, len);
+}
+
+/* send a vector of apdu's, lock spins per APDU to allow SPM and RDATA generation.
+ */
+
+int pgm_transport_sendv (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	int			count
+	)
+{
+	int bytes_sent = 0;
+
+	for (int i = 0; i < count; i++)
+	{
+		int retval;
+
+		g_static_rw_lock_writer_lock (&transport->txw_lock);
+		if ( vector[i].iov_len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+    	  	                                                     sizeof(struct pgm_data) ) ) )
+		{
+			retval = pgm_transport_send_one_copy_unlocked (transport, vector[i].iov_base, vector[i].iov_len, 0);
+		}
+		else
+		{
+			retval = pgm_transport_send_fragment_unlocked (transport, vector[i].iov_base, vector[i].iov_len);
+		}
+
+		if (retval > 0) {
+			bytes_sent += retval;
+		} else {
+			break;
+		}
+	}
+
+	return bytes_sent >= 0 ? bytes_sent : -1;
 }
 
 static int

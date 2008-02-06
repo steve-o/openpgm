@@ -237,7 +237,7 @@ send_odata (void)
 		strcat (payload_string, number);
 	}
 
-	e = pgm_write_copy_ex (g_transport, payload_string, strlen(payload_string) + 1);
+	e = pgm_transport_send (g_transport, payload_string, strlen(payload_string) + 1, 0);
         if (e < 0) {
 		g_warning ("send failed.");
                 return;

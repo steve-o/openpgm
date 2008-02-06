@@ -22,6 +22,8 @@
 
 #include <errno.h>
 #include <glib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include "pgm/timer.h"
 #include "pgm/rate_control.h"
@@ -73,13 +75,14 @@ pgm_rate_destroy (
 	return 0;
 }
 
-/* return when leaky bucket permits
+/* return when leaky bucket permits unless non-blocking.
  */
 
 int
 pgm_rate_check (
 	gpointer	bucket,
-	guint		data_size
+	guint		data_size,
+	int		flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
 	if (!bucket || !(BUCKET->rate_per_sec > 0)) return 0;
@@ -92,7 +95,16 @@ pgm_rate_check (
 		BUCKET->rate_limit = BUCKET->rate_per_sec;
 	BUCKET->last_rate_check = pgm_time_now;
 
-	BUCKET->rate_limit -= BUCKET->iphdr_len + data_size;
+	guint new_rate_limit = BUCKET->rate_limit - ( BUCKET->iphdr_len + data_size );
+	if (flags & MSG_DONTWAIT &&
+		new_rate_limit < 0)
+	{
+		g_static_mutex_unlock (&BUCKET->mutex);
+		errno = EAGAIN;
+		return -1;
+	}
+
+	BUCKET->rate_limit = new_rate_limit;
 	if (BUCKET->rate_limit < 0) {
 		gint sleep_amount;
 		do {

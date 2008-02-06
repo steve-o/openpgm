@@ -428,9 +428,9 @@ session_send (
 	}
 
 /* send message */
-        int e = pgm_write_copy (sess->transport, string, strlen(string) + 1);
+        int e = pgm_transport_send (sess->transport, string, strlen(string) + 1, 0);
         if (e < 0) {
-		puts ("FAILED: pgm_write_copy()");
+		puts ("FAILED: pgm_transport_send()");
         }
 
 	puts ("READY");
