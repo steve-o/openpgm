@@ -2224,20 +2224,15 @@ on_nak_pipe (
 {
 	pgm_transport_t* transport = data;
 
-/* empty pipe */
+/* remove one event from pipe */
 	char buf;
-	while (1 == read (transport->rdata_pipe[0], &buf, sizeof(buf)));
+	read (transport->rdata_pipe[0], &buf, sizeof(buf));
 
 /* We can flush queue and block all odata, or process one set, or process each
  * sequence number individually.
  */
-	for (;;)
-	{
-		pgm_sqn_list_t* sqn_list = g_async_queue_try_pop (transport->rdata_queue);
-		if (sqn_list == NULL) {
-			break;
-		}
-
+	pgm_sqn_list_t* sqn_list = g_async_queue_try_pop (transport->rdata_queue);
+	if (sqn_list) {
 		g_static_rw_lock_reader_lock (&transport->txw_lock);
 		for (int i = 0; i < sqn_list->len; i++)
 		{
@@ -2537,7 +2532,7 @@ on_nak (
 	g_async_queue_lock (transport->rdata_queue);
 	g_async_queue_push_unlocked (transport->rdata_queue, sqn_list);
 
-	if (g_async_queue_length_unlocked (transport->rdata_queue) == 1) {
+	{
 		const char one = '1';
 		if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
 			g_critical ("write to pipe failed :(");
