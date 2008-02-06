@@ -231,15 +231,16 @@ struct pgm_transport_t {
     GList*		peers_list;		    /* easy iteration */
     GSList*		peers_waiting;		    /* rxw: have or lost data */
     GStaticMutex	waiting_mutex;
+    int			waiting_pipe[2];	    /* timer to rx */
 
     GAsyncQueue*	rdata_queue;
-    int			rdata_pipe[2];
+    int			rdata_pipe[2];		    /* rx to timer */
     GTrashStack*	trash_rdata;
     GIOChannel*		rdata_channel;
     GStaticMutex	rdata_mutex;
 
     pgm_time_t		next_poll;
-    int			timer_pipe[2];
+    int			timer_pipe[2];		    /* any to timer */
     GIOChannel*		timer_channel;
 
     guint32		cumulative_stats[PGM_PC_SOURCE_MAX];
