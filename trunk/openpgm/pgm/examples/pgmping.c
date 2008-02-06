@@ -359,9 +359,9 @@ send_odata (void)
 	char b[100];
 	sprintf (b, "%" G_GUINT32_FORMAT, g_payload);
 
-	e = pgm_write_copy (g_transport, (gpointer)&b, sizeof(b));
+	e = pgm_transport_send (g_transport, (gpointer)&b, sizeof(b), 0);
         if (e < 0) {
-		g_warning ("pgm_write_copy failed: %i/%s.", errno, strerror(errno));
+		g_warning ("pgm_transport_send failed: %i/%s.", errno, strerror(errno));
                 return;
         }
 
