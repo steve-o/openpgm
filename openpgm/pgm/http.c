@@ -591,7 +591,7 @@ http_tsi_response (
 						"</tr><tr>"
 							"<td>IHB_MAX</td><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>NAK_RB_IVL</td><td>%i ms</td>"
+							"<td>NAK_BO_IVL</td><td>%i ms</td>"
 						"</tr><tr>"
 							"<td>FEC</td><td>disabled(1)</td>"
 						"</tr><tr>"
@@ -604,7 +604,7 @@ http_tsi_response (
 				pgm_to_msecs(transport->spm_ambient_interval),
 				ihb_min,
 				ihb_max,
-				pgm_to_msecs(transport->nak_rb_ivl),
+				pgm_to_msecs(transport->nak_bo_ivl),
 				spm_path);
 
 	g_string_append_printf (response,	"<h2>Performance information</h2>"
@@ -810,7 +810,7 @@ http_receiver_response (
 	g_string_append_printf (response,	"<h2>Configuration information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>NAK_RB_IVL</td><td>%i ms</td>"
+							"<td>NAK_BO_IVL</td><td>%i ms</td>"
 						"</tr><tr>"
 							"<td>NAK_RPT_IVL</td><td>%i ms</td>"
 						"</tr><tr>"
@@ -830,7 +830,7 @@ http_receiver_response (
 						"</tr><tr>"
 							"<td>Multicast NAKs</td><td>disabled(2)</td>"
 						"<tr>",
-						pgm_to_msecs(peer->transport->nak_rb_ivl),
+						pgm_to_msecs(peer->transport->nak_bo_ivl),
 						pgm_to_msecs(peer->transport->nak_rpt_ivl),
 						peer->transport->nak_ncf_retries,
 						pgm_to_msecs(peer->transport->nak_rdata_ivl),

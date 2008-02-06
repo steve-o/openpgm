@@ -590,12 +590,12 @@ pgmSourceConfigTable_handler (
 				}
 				break;
 
-/* NAK_RB_IVL */
+/* NAK_BO_IVL */
 			case COLUMN_PGMSOURCERDATABACKOFFIVL:
 				{
-				unsigned long nak_rb_ivl = pgm_to_msecs(transport->nak_rb_ivl);
+				unsigned long nak_bo_ivl = pgm_to_msecs(transport->nak_bo_ivl);
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
-								(u_char*)&nak_rb_ivl, sizeof(nak_rb_ivl) );
+								(u_char*)&nak_bo_ivl, sizeof(nak_bo_ivl) );
 				}
 				break;
 
@@ -1655,10 +1655,10 @@ pgmReceiverConfigTable_handler (
 
 			switch (table_info->colnum)
 			{
-/* nak_rb_ivl from transport */
+/* nak_bo_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKBACKOFFIVL:
 				{
-				unsigned long nak_bo_ivl = g_ntohs (peer->transport->nak_rb_ivl);
+				unsigned long nak_bo_ivl = g_ntohs (peer->transport->nak_bo_ivl);
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
 								(u_char*)&nak_bo_ivl, sizeof(nak_bo_ivl) );
 				}
