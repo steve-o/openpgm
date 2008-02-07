@@ -3953,13 +3953,33 @@ int
 pgm_transport_send_fragment_unlocked (
 	pgm_transport_t*	transport,
 	const gchar*		buf,
-	gsize			count)
+	gsize			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */)
 {
 	int retval = 0;
 	guint offset = 0;
 	guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
 	guint packets = 0;
 	guint bytes_sent = 0;
+
+	if (flags & MSG_DONTWAIT)
+	{
+		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		int tpdu_length = 0;
+		guint offset_ = 0;
+		do {
+			int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - offset_);
+			tpdu_length += header_length + tsdu_length;
+			offset_ += tsdu_length;
+		} while (offset_ < count);
+
+		int retval = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+		if (retval == -1) {
+			goto out;
+		}
+	}
 
 	do {
 /* retrieve packet storage from transmit window */
@@ -4038,6 +4058,7 @@ pgm_transport_send_fragment_unlocked (
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
 
+out:
 	return retval;
 }
 
@@ -4060,19 +4081,47 @@ int pgm_transport_send (
 		return pgm_transport_send_one_copy_unlocked (transport, data, len, flags);
 	}
 
-	return pgm_transport_send_fragment_unlocked (transport, data, len);
+	return pgm_transport_send_fragment_unlocked (transport, data, len, flags);
 }
 
 /* send a vector of apdu's, lock spins per APDU to allow SPM and RDATA generation.
+ *
+ * non-blocking only works roughly at the rate control layer, other packets might get in as the
+ * locks spin.
  */
 
 int pgm_transport_sendv (
 	pgm_transport_t*	transport,
 	const struct iovec*	vector,
-	int			count
+	int			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
 	int bytes_sent = 0;
+
+        if (flags & MSG_DONTWAIT)
+        {
+		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) +
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+                int tpdu_length = 0;
+		for (int i = 0; i < count; i++)
+		{
+/* for each apdu */
+			guint offset_ = 0;
+			gsize count_ = vector[i].iov_len;
+			do {
+				int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count_ - offset_);
+				tpdu_length += header_length + tsdu_length;
+				offset_ += tsdu_length;
+			} while (offset_ < count_);
+		}
+
+                int retval = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+                if (retval == -1) {
+			return retval;
+                }
+        }
 
 	for (int i = 0; i < count; i++)
 	{
@@ -4086,7 +4135,7 @@ int pgm_transport_sendv (
 		}
 		else
 		{
-			retval = pgm_transport_send_fragment_unlocked (transport, vector[i].iov_base, vector[i].iov_len);
+			retval = pgm_transport_send_fragment_unlocked (transport, vector[i].iov_base, vector[i].iov_len, 0);
 		}
 
 		if (retval > 0) {
