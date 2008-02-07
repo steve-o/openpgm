@@ -2,7 +2,7 @@
  *
  * Simple PGM receiver: epoll based non-blocking synchronous receiver.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -112,7 +112,7 @@ main (
 	on_startup();
 
 /* epoll file descriptor */
-	int efd = epoll_create (20);
+	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
 		exit(1);
