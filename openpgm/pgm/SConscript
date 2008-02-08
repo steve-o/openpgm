@@ -7,10 +7,10 @@ Import('env');
 Import('snmphttp_env');
 SConsignFile('scons.signatures');
 
-env['CPPPATH'] = env['CPPPATH'] + [os.getcwd() + '/include'];
-env['LIBPATH'] = env['LIBPATH'] + [os.getcwd() + '/ref/' + env['BUILD']];
-snmphttp_env['CPPPATH'] = snmphttp_env['CPPPATH'] + [os.getcwd() + '/include'];
-snmphttp_env['LIBPATH'] = snmphttp_env['LIBPATH'] + [os.getcwd() + '/ref/' + snmphttp_env['BUILD']];
+env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(LIBPATH = os.getcwd() + '/ref/' + env['BUILD']);
+snmphttp_env.Append(CPPPATH = os.getcwd() + '/include');
+snmphttp_env.Append(LIBPATH = os.getcwd() + '/ref/' + env['BUILD']);
 
 SConscript('SConscript.libpgm');
 SConscript('SConscript.libpgmex');
