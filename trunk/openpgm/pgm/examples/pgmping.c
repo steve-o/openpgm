@@ -217,10 +217,8 @@ on_startup (
 #endif
 
 	struct pgm_sock_mreq recv_smr, send_smr;
-	char network[1024];
-	sprintf (network, ";%s", g_network);
 	int smr_len = 1;
-	e = pgm_if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 

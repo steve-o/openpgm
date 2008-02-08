@@ -210,24 +210,10 @@ on_startup (
 #endif
 
 	struct pgm_sock_mreq recv_smr, send_smr;
-#if 0
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
-
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
-#else
-	char network[1024];
-	sprintf (network, ";%s", g_network);
 	int smr_len = 1;
-	e = pgm_if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
-#endif
 
 	if (g_udp_encap_port) {
 		((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_udp_encap_port);
