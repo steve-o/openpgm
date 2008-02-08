@@ -1386,9 +1386,19 @@ pgm_transport_bind (
  * after binding default interfaces (0.0.0.0) are resolved
  */
 /* TODO: different ports requires a new bound socket */
+
+#ifdef CONFIG_BIND_INADDR_ANY
+	struct sockaddr_storage bind_sockaddr;
+	memcpy (&bind_sockaddr, &transport->recv_smr[0].smr_interface, pgm_sockaddr_len(&transport->recv_smr[0].smr_interface));
+	((struct sockaddr_in*)&bind_sockaddr)->sin_addr.s_addr = INADDR_ANY;
+	retval = bind (transport->recv_sock,
+			(struct sockaddr*)&bind_sockaddr,
+			pgm_sockaddr_len(&transport->recv_smr[0].smr_interface));
+#else
 	retval = bind (transport->recv_sock,
 			(struct sockaddr*)&transport->recv_smr[0].smr_interface,
 			pgm_sockaddr_len(&transport->recv_smr[0].smr_interface));
+#endif
 	if (retval < 0) {
 		retval = errno;
 #ifdef TRANSPORT_DEBUG
