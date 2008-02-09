@@ -115,7 +115,6 @@ pgm_receiver_thread (
 
 	do {
 		int len = pgm_transport_recvmsg (async->transport, &msgv, 0 /* blocking */);
-g_message ("read %i bytes", len);
 		if (len >= 0)
 		{
 /* append to queue */
@@ -127,7 +126,6 @@ g_message ("read %i bytes", len);
 			struct iovec* src = msgv.msgv_iov;
 			while (len)
 			{
-g_message ("iov at %p:%p: %i bytes", src, src->iov_base, src->iov_len);
 				memcpy (dst, src->iov_base, src->iov_len);
 				dst += src->iov_len;
 				len -= src->iov_len;
