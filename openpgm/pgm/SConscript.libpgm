@@ -27,9 +27,9 @@ lib_obj = []
 for src in lib_src:
 	lib_obj += env.SharedObject(src)
 
-if env['BUILD'] != 'thirtytwo':
-	for src in only64_src:
-		lib_obj += env.SharedObject(src)
+#if env['BUILD'] != 'thirtytwo':
+#	for src in only64_src:
+#		lib_obj += env.SharedObject(src)
 
 env.StaticLibrary('libpgm', lib_src);
 env.StaticLibrary('libpgmpic', lib_obj);
