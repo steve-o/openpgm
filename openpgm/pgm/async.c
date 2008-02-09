@@ -29,6 +29,8 @@
 #include "pgm/async.h"
 
 
+//#define ASYNC_DEBUG
+
 #ifndef ASYNC_DEBUG
 #       define g_trace(m,...)           while (0)
 #else

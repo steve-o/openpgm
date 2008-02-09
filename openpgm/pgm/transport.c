@@ -53,7 +53,7 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -2060,7 +2060,10 @@ check_for_repeat:
 /* repeat if non-blocking and not full */
 	if (flags & MSG_DONTWAIT)
 	{
-		if (len > 0 && pmsg < msg_end)
+		if (len > 0 && pmsg < msg_end &&
+			( ( bytes_read == 0 && msg_len == 1 ) ||	/* leave early with one apdu */
+			( msg_len > 1 ) )				/* or wait for vector to fill up */
+		)
 		{
 			goto recv_again;		/* \:D/ */
 		}
