@@ -930,6 +930,14 @@ pgm_rxw_pop_lead (
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->lead);
 
+/* cleanup state counters */
+	if ( rp->state == PGM_PKT_LOST_DATA_STATE ) {
+		r->lost_count--;
+	} else {
+		g_assert (rp->state == PGM_PKT_HAVE_DATA_STATE);
+		r->fragment_count--;
+	}
+
 	pgm_rxw_pkt_state_unlink (r, rp);
 	pgm_rxw_pkt_free1 (r, rp);
 	RXW_SET_PACKET(r, r->lead, NULL);
@@ -951,6 +959,14 @@ pgm_rxw_pop_trail (
 	g_assert ( !pgm_rxw_empty (r) );
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->trail);
+
+/* cleanup state counters */
+	if ( rp->state == PGM_PKT_LOST_DATA_STATE ) {
+		r->lost_count--;
+	} else {
+		g_assert (rp->state == PGM_PKT_HAVE_DATA_STATE);
+		r->fragment_count--;
+	}
 
 	pgm_rxw_pkt_state_unlink (r, rp);
 	pgm_rxw_pkt_free1 (r, rp);
