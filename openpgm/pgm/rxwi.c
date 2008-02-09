@@ -933,8 +933,7 @@ pgm_rxw_pop_lead (
 /* cleanup state counters */
 	if ( rp->state == PGM_PKT_LOST_DATA_STATE ) {
 		r->lost_count--;
-	} else {
-		g_assert (rp->state == PGM_PKT_HAVE_DATA_STATE);
+	} else if ( rp->state == PGM_PKT_HAVE_DATA_STATE ) {
 		r->fragment_count--;
 	}
 
@@ -963,8 +962,7 @@ pgm_rxw_pop_trail (
 /* cleanup state counters */
 	if ( rp->state == PGM_PKT_LOST_DATA_STATE ) {
 		r->lost_count--;
-	} else {
-		g_assert (rp->state == PGM_PKT_HAVE_DATA_STATE);
+	} else if ( rp->state == PGM_PKT_HAVE_DATA_STATE ) {
 		r->fragment_count--;
 	}
 
