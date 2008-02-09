@@ -2121,19 +2121,20 @@ pgm_transport_recv (
 		struct iovec* p = msgv.msgv_iov;
 
 		do {
-			int src_bytes = msgv.msgv_iov->iov_len;
+			int src_bytes = p->iov_len;
+			g_assert (src_bytes > 0);
 
 			if (bytes_copied + src_bytes > len) {
+				g_error ("APDU truncated as provided buffer too small %i > %i", bytes_read, len);
 				src_bytes = len - bytes_copied;
-				memcpy (data, p->iov_base, src_bytes);
-				break;
+				bytes_read = bytes_copied + src_bytes;
 			}
 
 			memcpy (data, p->iov_base, src_bytes);
 
 			data += src_bytes;
-			p++;
 			bytes_copied += src_bytes;
+			p++;
 
 		} while (bytes_copied < bytes_read);
 	}
@@ -2324,6 +2325,7 @@ on_spm (
 	spm->spm_sqn = g_ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
+	g_static_mutex_lock (&transport->mutex);
 	g_static_mutex_lock (&sender->mutex);
 	if ( pgm_uint32_gte (spm->spm_sqn, sender->spm_sqn)
 		|| ( ((struct sockaddr*)&sender->nla)->sa_family == 0 ) )
@@ -2340,7 +2342,6 @@ on_spm (
 							g_ntohl (spm->spm_trail),
 							g_ntohl (spm->spm_lead),
 							nak_rb_expiry);
-		g_static_mutex_lock (&transport->mutex);
 		if (naks && pgm_time_after(transport->next_poll, nak_rb_expiry))
 		{
 			transport->next_poll = nak_rb_expiry;
@@ -2351,7 +2352,6 @@ on_spm (
 				retval = -EINVAL;
 			}
 		}
-		g_static_mutex_unlock (&transport->mutex);
 	}
 	else
 	{	/* does not advance SPM sequence number */
@@ -2364,6 +2364,7 @@ on_spm (
 	sender->expiry = now + transport->peer_expiry;
 	sender->spmr_expiry = 0;
 	g_static_mutex_unlock (&sender->mutex);
+	g_static_mutex_unlock (&transport->mutex);
 
 out:
 	return retval;
@@ -4344,7 +4345,9 @@ pgm_timer_prepare (
 	g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
 
 /* save the nearest timer */
+	g_static_rw_lock_reader_lock (&transport->peers_lock);
 	transport->next_poll = pgm_timer->expiration = expiration = min_nak_expiry (expiration, transport);
+	g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	g_static_mutex_unlock (&transport->mutex);
 
 /* advance time again to adjust for processing time out of the event loop, this
@@ -4619,7 +4622,7 @@ on_rdata (
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
-		retval = pgm_rxw_push_fragment (sender->rxw,
+		retval = pgm_rxw_push_fragment_copy (sender->rxw,
 					(char*)(rdata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					rdata->data_sqn,
