@@ -2529,7 +2529,7 @@ on_nak (
 		guint32 *nakp = nak_list, *nake = nak_list + nak_list_len;
 		while (nakp < nake) {
 			char tmp[1024];
-			sprintf (tmp, "%" G_GUINT32_FORMAT " ", *nakp);
+			sprintf (tmp, "%" G_GUINT32_FORMAT " ", g_ntohl(*nakp));
 			strcat (nak_sz, tmp);
 			nakp++;
 		}
