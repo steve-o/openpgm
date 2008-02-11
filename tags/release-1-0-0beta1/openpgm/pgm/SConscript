@@ -1,0 +1,23 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+import os;
+Import('env');
+Import('snmphttp_env');
+SConsignFile('scons.signatures');
+
+env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(LIBPATH = os.getcwd() + '/ref/' + env['BUILD']);
+snmphttp_env.Append(CPPPATH = os.getcwd() + '/include');
+snmphttp_env.Append(LIBPATH = os.getcwd() + '/ref/' + env['BUILD']);
+
+SConscript('SConscript.libpgm');
+SConscript('SConscript.libpgmex');
+SConscript('SConscript.libpgmhttp');
+SConscript('SConscript.libpgmsnmp');
+SConscript('test/SConscript');
+SConscript('dev/SConscript');
+SConscript('examples/SConscript');
+
+# end of file

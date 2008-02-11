@@ -1,0 +1,37 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+lib_src = Split("""
+		pgm.c
+		timer.c
+		if.c
+		gsi.c
+		signal.c
+		reed_solomon.c
+		txwi.c
+		rxwi.c
+		transport.c
+		rate_control.c
+		async.c
+""")
+
+only64_src = Split("""
+		csum-copy64.S
+""")
+
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += env.SharedObject(src)
+
+#if env['BUILD'] != 'thirtytwo':
+#	for src in only64_src:
+#		lib_obj += env.SharedObject(src)
+
+env.StaticLibrary('libpgm', lib_src);
+env.StaticLibrary('libpgmpic', lib_obj);
+
+# end of file
