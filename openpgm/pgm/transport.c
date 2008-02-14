@@ -4066,6 +4066,10 @@ pgm_transport_send_fragment_unlocked (
 
 	} while (offset < count);
 
+	if (bytes_sent > 0) {
+		retval = bytes_sent;
+	}
+
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
