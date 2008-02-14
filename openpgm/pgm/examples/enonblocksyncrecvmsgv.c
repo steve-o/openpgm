@@ -134,7 +134,7 @@ main (
 		exit(1);
 	}
 
-	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD);
+	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN);
 	if (retval < 0) {
 		g_error ("pgm_epoll_ctl failed.");
 		exit(1);
