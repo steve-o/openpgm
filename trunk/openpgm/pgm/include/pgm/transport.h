@@ -313,7 +313,7 @@ int pgm_transport_recv (pgm_transport_t*, gpointer, int, int);
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, int*);
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*);
-int pgm_transport_epoll_ctl (pgm_transport_t*, int, int);
+int pgm_transport_epoll_ctl (pgm_transport_t*, int, int, int);
 
 
 G_END_DECLS
