@@ -146,6 +146,8 @@ static int on_nnak (pgm_transport_t*, pgm_tsi_t*, struct pgm_header*, char*, int
 static int on_odata (pgm_peer_t*, struct pgm_header*, char*, int);
 static int on_rdata (pgm_peer_t*, struct pgm_header*, char*, int);
 
+static int pgm_transport_send_one_unlocked (pgm_transport_t*, const gchar*, gsize, int);
+
 
 gchar*
 pgm_print_tsi (
@@ -239,7 +241,7 @@ pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len
 	retval = sendto (sock, buf, len, flags, to, tolen);
 	g_static_mutex_unlock (mutex);
 
-	return retval;
+	return retval > 0 ? tolen : retval;
 }
 
 int
@@ -3905,11 +3907,12 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
  * from the transmit window, and offset to include the pgm header.
  */
 
-int
+static int
 pgm_transport_send_one_unlocked (
 	pgm_transport_t*	transport,
 	const gchar*		buf,
-	gsize			count
+	gsize			count,
+	int			flags
 	)
 {
 	int retval = 0;
