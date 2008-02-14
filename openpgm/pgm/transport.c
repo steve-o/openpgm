@@ -2194,7 +2194,8 @@ int
 pgm_transport_epoll_ctl (
 	pgm_transport_t*	transport,
 	int			epfd,
-	int			op
+	int			op,		/* EPOLL_CTL_ADD, ... */
+	int			events		/* EPOLLIN, EPOLLOUT */
 	)
 {
 	int retval = 0;
@@ -2206,17 +2207,30 @@ pgm_transport_epoll_ctl (
 	}
 
 	struct epoll_event event;
-	event.events = EPOLLIN | EPOLLET;
-	event.data.ptr = transport;
-	retval = epoll_ctl (epfd, op, transport->recv_sock, &event);
-	if (retval) {
-		goto out;
+
+	if (events & EPOLLIN)
+	{
+		event.events = EPOLLIN | EPOLLET;
+		event.data.ptr = transport;
+		retval = epoll_ctl (epfd, op, transport->recv_sock, &event);
+		if (retval) {
+			goto out;
+		}
+
+		event.events = EPOLLIN | EPOLLET;
+		event.data.ptr = transport;
+		retval = epoll_ctl (epfd, op, transport->waiting_pipe[0], &event);
+		if (retval) {
+			goto out;
+		}
 	}
 
-	event.events = EPOLLIN | EPOLLET;
-	event.data.ptr = transport;
-	retval = epoll_ctl (epfd, op, transport->waiting_pipe[0], &event);
-
+	if (events & EPOLLOUT)
+	{
+		event.events = EPOLLOUT | EPOLLET;
+		event.data.ptr = transport;
+		retval = epoll_ctl (epfd, op, transport->send_sock, &event);
+	}
 out:
 	return retval;
 }
