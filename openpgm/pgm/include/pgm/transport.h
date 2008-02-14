@@ -304,6 +304,8 @@ gpointer pgm_alloc (pgm_transport_t*);
 int pgm_transport_send (pgm_transport_t*, const gchar*, gsize, int);
 int pgm_transport_sendv (pgm_transport_t*, const struct iovec*, int, int);
 
+int pgm_transport_send_fragment (pgm_transport_t*, const gchar*, gsize, int, int*, int*);
+
 /* receiver side */
 int pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
 int pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, int, int);
