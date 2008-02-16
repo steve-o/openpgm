@@ -232,7 +232,7 @@ pgm_parse (
 		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
 		pgm_header->pgm_checksum = sum;
 		if (pgm_sum != sum) {
-			puts ("PGM checksum bad :(");
+			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", sum, pgm_sum);
 			return -2;
 		}
 	} else {
@@ -411,7 +411,7 @@ pgm_print_packet (
 		pgm_header->pgm_checksum = 0;
 		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
 		if (pgm_sum != sum) {
-			puts ("PGM checksum bad :(");
+			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", sum, pgm_sum);
 			return FALSE;
 		}
 	} else {
