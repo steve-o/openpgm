@@ -17,6 +17,9 @@ env = Environment(ENV = os.environ,
 )
 opt.Update (env)
 
+# GPL version
+env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY')
+
 # define Builder for translating HTML documents for inlining.
 bld = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')
 env.Append(BUILDERS = {'HtmlC' : bld})
