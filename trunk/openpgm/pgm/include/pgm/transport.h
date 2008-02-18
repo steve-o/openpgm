@@ -298,9 +298,6 @@ int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, guint, guint);
 
 int pgm_set_nonblocking (int filedes[2]);
 
-/* send side */
-gpointer pgm_alloc (pgm_transport_t*);
-
 int pgm_transport_send (pgm_transport_t*, const gchar*, gsize, int);
 int pgm_transport_sendv (pgm_transport_t*, const struct iovec*, int, int);
 

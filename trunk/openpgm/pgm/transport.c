@@ -3,7 +3,7 @@
  * PGM transport: manage incoming & outgoing sockets with ambient SPMs, 
  * transmit & receive windows.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -168,9 +168,8 @@ pgm_print_tsi (
 	return buf;
 }
 
-/* convert a transport session identifier TSI to a hash value
- *  */
-
+/* convert a transport session identifier TSI to a hash value for use with GLib hash tables.
+ */
 inline guint
 pgm_tsi_hash (
 	gconstpointer v
@@ -180,8 +179,7 @@ pgm_tsi_hash (
 }
 
 /* compare two transport session identifier TSI values and return TRUE if they are equal
- *  */
-
+ */
 inline gint
 pgm_tsi_equal (
 	gconstpointer   v,
@@ -191,11 +189,17 @@ pgm_tsi_equal (
 	return memcmp (v, v2, (6 * sizeof(guint8)) + sizeof(guint16)) == 0;
 }
 
+/* calculate NAK_RB_IVL as random time interval 1 - NAK_BO_IVL.
+ */
 static inline guint32 nak_rb_ivl (pgm_transport_t* transport)
 {
 	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
 }
 
+/* sequence lists (pgm_sqn_list_t) are used to store NAK requests received in the Rx thread and
+ * passed to the Timer thread for RDATA generation.  objects are recycled in a trash stack to reduce
+ * page fault overheads. 
+ */
 static inline gpointer pgm_sqn_list_alloc (pgm_transport_t* t)
 {
 	pgm_sqn_list_t* p = t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(pgm_sqn_list_t));
@@ -203,17 +207,8 @@ static inline gpointer pgm_sqn_list_alloc (pgm_transport_t* t)
 	return p;
 }
 
-gpointer pgm_alloc (pgm_transport_t* transport)
-{
-	g_static_rw_lock_writer_lock (&transport->txw_lock);
-	gpointer ptr = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
-	g_static_rw_lock_writer_unlock (&transport->txw_lock);
-	return ptr;
-}
-
 /* locked and rate regulated sendto
  */
-
 static inline ssize_t
 pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len, int flags, const struct sockaddr* to, socklen_t tolen)
 {
@@ -229,6 +224,8 @@ pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len
 	return retval > 0 ? tolen : retval;
 }
 
+/* socket helper, for setting pipe ends non-blocking
+ */
 int
 pgm_set_nonblocking (int filedes[2])
 {
@@ -263,7 +260,6 @@ out:
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  */
-
 int
 pgm_init (void)
 {
@@ -742,7 +738,8 @@ err_destroy:
 	return retval;
 }
 
-/* drop out of setuid 0 */
+/* helper to drop out of setuid 0 after creating PGM sockets
+ */
 void
 pgm_drop_superuser (void)
 {
@@ -1138,6 +1135,10 @@ pgm_transport_set_rcvbuf (
 
 	return 0;
 }
+
+/* Actual NAK back-off, NAK_RB_IVL, is random time interval 1 < NAK_BO_IVL,
+ * randomized to reduce storms.
+ */
 
 int
 pgm_transport_set_nak_bo_ivl (
@@ -1684,6 +1685,11 @@ out:
 	return retval;
 }
 
+/* a peer in the context of the transport is another party on the network sending PGM
+ * packets.  for each peer we need a receive window and network layer address (nla) to
+ * which nak requests can be forwarded to.
+ */
+
 static pgm_peer_t*
 new_peer (
 	pgm_transport_t*	transport,
@@ -1749,6 +1755,8 @@ new_peer (
 
 /* data incoming on receive sockets, can be from a sender or receiver, or simply bogus.
  * for IPv4 we receive the IP header to handle fragmentation, for IPv6 we cannot so no idea :(
+ *
+ * recvmsgv reads a vector of apdus each contained in a IO scatter/gather array.
  *
  * can be called due to event from incoming socket(s) or timer induced data loss.
  *
@@ -2083,6 +2091,10 @@ out:
 	return transport->iov_len;
 }
 
+/* read one contiguous apdu and return as a IO scatter/gather array.  msgv is owned by
+ * the caller, tpdu contents are owned by the receive window.
+ */
+
 int
 pgm_transport_recvmsg (
 	pgm_transport_t*	transport,
@@ -2092,6 +2104,11 @@ pgm_transport_recvmsg (
 {
 	return pgm_transport_recvmsgv (transport, msgv, 1, flags);
 }
+
+/* vanilla read function.  copies from the receive window to the provided buffer
+ * location.  the caller must provide an adequately sized buffer to store the largest
+ * expected apdu or else it will be truncated.
+ */
 
 int
 pgm_transport_recv (
@@ -2170,7 +2187,9 @@ pgm_transport_poll_info (
 	return *n_fds = 2;
 }
 
-/* add epoll parameters for this transports recieve socket(s)
+/* add epoll parameters for this transports recieve socket(s), events should
+ * be set to EPOLLIN to wait for incoming events (data), and EPOLLOUT to wait
+ * for non-blocking write.
  */
 
 int
