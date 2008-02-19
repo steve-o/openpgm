@@ -7,10 +7,10 @@ Import('env')
 Import('snmphttp_env')
 
 e = env.Copy()
-e.Append(LIBS = ['libpgm', 'libpgmex']);
+e.Append(LIBS = ['libpgmplus', 'libpgmex']);
 
 httpe = snmphttp_env.Copy()
-httpe.Append(LIBS = ['libpgm', 'libpgmex']);
+httpe.Append(LIBS = ['libpgmplus', 'libpgmex']);
 
 # source:
 
