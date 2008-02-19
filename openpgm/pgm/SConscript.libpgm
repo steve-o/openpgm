@@ -10,7 +10,6 @@ lib_src = Split("""
 		if.c
 		gsi.c
 		signal.c
-		reed_solomon.c
 		txwi.c
 		rxwi.c
 		transport.c
@@ -18,31 +17,54 @@ lib_src = Split("""
 		async.c
 """)
 
-gpl32_src = Split("""
+lib_env = env.Copy();
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += lib_env.SharedObject(src)
+
+lib_env.StaticLibrary('libpgm', lib_src);
+lib_env.StaticLibrary('libpgm-pic', lib_obj);
+
+
+# GPL license, aka plus version
+#
+
+plus_src = Split("""
+		reed_solomon.c
+""")
+
+plus32_src = Split("""
 		checksum32.S
 """)
 
-gpl64_src = Split("""
+plus64_src = Split("""
 		csum-copy64.S
 		csum-partial64.c
 """)
 
+plus_env = env.Copy();
+plus_env['SHOBJSUFFIX'] = '.plus' + plus_env['SHOBJSUFFIX'];
+plus_env['OBJSUFFIX'] = '.plus' + plus_env['OBJSUFFIX'];
+plus_env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+plus_env.Append(CCFLAGS = '-DCONFIG_REED_SOLOMON');
 
-lib_obj = []
+plus_obj = []
 for src in lib_src:
-	lib_obj += env.SharedObject(src)
+	plus_obj += plus_env.SharedObject(src)
+for src in plus_src:
+	plus_obj += plus_env.SharedObject(src)
 
-if '-DCONFIG_CKSUM_COPY' in env['CCFLAGS']:
-	if env['BUILD'] == 'thirtytwo':
-		for src in gpl32_src:
-			lib_src += env.StaticObject(src)
-			lib_obj += env.SharedObject(src)
-	if env['BUILD'] != 'thirtytwo':
-		for src in gpl64_src:
-			lib_src += env.StaticObject(src)
-			lib_obj += env.SharedObject(src)
+if env['BUILD'] == 'thirtytwo':
+	for src in plus32_src:
+		plus_src += plus_env.StaticObject(src)
+		plus_obj += plus_env.SharedObject(src)
+if env['BUILD'] != 'thirtytwo':
+	for src in plus64_src:
+		plus_src += plus_env.StaticObject(src)
+		plus_obj += plus_env.SharedObject(src)
 
-env.StaticLibrary('libpgm', lib_src);
-env.StaticLibrary('libpgmpic', lib_obj);
+plus_env.StaticLibrary('libpgmplus', lib_src + plus_src);
+plus_env.StaticLibrary('libpgmplus-pic', plus_obj);
 
 # end of file
