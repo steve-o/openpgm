@@ -33,6 +33,10 @@
 
 #include "pgm/packet.h"
 
+#ifdef CONFIG_CKSUM_COPY
+#	include "pgm/csum-copy.h"
+#endif
+
 
 /* globals */
 
@@ -1320,6 +1324,12 @@ pgm_checksum (
 	int csum
 	)
 {
+#ifdef CONFIG_CKSUM_COPY
+
+	return csum_fold (csum_partial (head, len, csum));
+
+#else
+
 	guint sum = csum;
 	guint16 odd_byte;
 
@@ -1344,6 +1354,8 @@ pgm_checksum (
 		sum = ~sum;
 
 	return ~sum;
+
+#endif /* CONFIG_CKSUM_COPY */
 }
 
 /* eof */

@@ -272,7 +272,6 @@ sub wait_for_rdata {
 			my $block = $self->wait_for_block;
 			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /RDATA/);
-print "received: $block\n\n";
 		}
 		alarm 0;
 	};
