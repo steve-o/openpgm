@@ -4,7 +4,7 @@
 
 Import('snmphttp_env')
 e = snmphttp_env.Copy()
-e.Append(LIBS = ['libpgm', 'libpgmhttp', 'libpgmsnmp', 'libpgmex']);
+e.Append(LIBS = ['libpgmplus', 'libpgmhttp', 'libpgmsnmp', 'libpgmex']);
 
 # core preferred examples
 e.Program(['pgmdump.c'])
