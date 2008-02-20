@@ -234,11 +234,8 @@ struct pgm_transport_t {
     GStaticMutex	waiting_mutex;
     int			waiting_pipe[2];	    /* timer to rx */
 
-    GAsyncQueue*	rdata_queue;
     int			rdata_pipe[2];		    /* rx to timer */
-    GTrashStack*	trash_rdata;
     GIOChannel*		rdata_channel;
-    GStaticMutex	rdata_mutex;
 
     pgm_time_t		next_poll;
     int			timer_pipe[2];		    /* any to timer */
