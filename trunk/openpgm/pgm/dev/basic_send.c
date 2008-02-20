@@ -2,7 +2,7 @@
  *
  * Send very basic packets.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,6 +40,7 @@
 #include "pgm/backtrace.h"
 #include "pgm/log.h"
 #include "pgm/packet.h"
+#include "pgm/checksum.h"
 
 
 /* globals */
@@ -401,7 +402,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 	memcpy (odata + 1, g_payload, strlen(g_payload) + 1);
 
-	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
 	int flags = MSG_CONFIRM;	/* not expecting a reply */
 

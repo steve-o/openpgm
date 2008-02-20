@@ -52,10 +52,7 @@
 #include "pgm/rate_control.h"
 #include "pgm/sn.h"
 #include "pgm/timer.h"
-
-#ifdef CONFIG_CKSUM_COPY
-#	include "pgm/csum-copy.h"
-#endif
+#include "pgm/checksum.h"
 
 //#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
@@ -2960,7 +2957,7 @@ send_spm_unlocked (
 
 /* checksum optional for SPMs */
 	header->pgm_checksum	= 0;
-	header->pgm_checksum	= pgm_checksum((char*)header, transport->spm_len, 0);
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, transport->spm_len, 0));
 
 	retval = pgm_sendto (transport,
 				TRUE,				/* with router alert */
@@ -3003,7 +3000,7 @@ send_spmr (
 	header->pgm_options	= 0;
 	header->pgm_tsdu_length	= 0;
 	header->pgm_checksum	= 0;
-	header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_mutex);
 
@@ -3077,7 +3074,7 @@ send_nak (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -3133,7 +3130,7 @@ send_ncf (
 	pgm_sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -3232,7 +3229,7 @@ send_nak_list (
 #endif
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_mutex);
 	retval = sendto (transport->send_sock,
@@ -3323,7 +3320,7 @@ send_ncf_list (
 #endif
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	retval = sendto (transport->send_with_router_alert_sock,
@@ -3953,7 +3950,7 @@ pgm_transport_send_one_unlocked (
         odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 /* add to transmit window */
 	pgm_txw_push (transport->txw, pkt, tpdu_length);
@@ -4003,8 +4000,6 @@ pgm_transport_send_one_copy_unlocked (
 /* offset to payload */
 	gchar *data = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
 
-#ifdef CONFIG_CKSUM_COPY
-
 /* retrieve packet storage from transmit window */
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
 	char *pkt = (char*)data - sizeof(struct pgm_header) - sizeof(struct pgm_data);
@@ -4025,11 +4020,9 @@ pgm_transport_send_one_copy_unlocked (
         header->pgm_checksum    = 0;
 
 	int pgm_header_len	= (char*)(odata + 1) - (char*)header;
-	guint32 unfolded_header	= csum_partial (header, pgm_header_len, 0);
-
-	guint32 unfolded_odata	= csum_partial_copy_generic (buf, odata + 1, count, 0, NULL, NULL);
-
-	header->pgm_checksum	= csum_fold (csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+	guint32 unfolded_header	= pgm_csum_partial (header, pgm_header_len, 0);
+	guint32 unfolded_odata	= pgm_csum_partial_copy (buf, odata + 1, count, 0);
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
 	pgm_txw_push (transport->txw, pkt, tpdu_length);
@@ -4057,13 +4050,6 @@ pgm_transport_send_one_copy_unlocked (
 
 /* return data payload length sent */
 	if (retval > 0) retval = count;
-
-#else
-
-	memcpy (data, buf, count);
-	retval = pgm_transport_send_one_unlocked (transport, data, count, flags);
-
-#endif /* CONFIG_CKSUM_COPY */
 
 out:
 	return retval;
@@ -4156,20 +4142,10 @@ pgm_transport_send_apdu_unlocked (
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
 	        header->pgm_checksum    = 0;
 
-#ifdef CONFIG_CKSUM_COPY
-
 		int pgm_header_len	= (char*)(opt_fragment + 1) - (char*)header;
-		guint32 unfolded_header = csum_partial (header, pgm_header_len, 0);
-
-		guint32 unfolded_odata	= csum_partial_copy_generic (buf + offset, opt_fragment + 1, tsdu_length, 0, NULL, NULL);
-
-		header->pgm_checksum	= csum_fold (csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
-
-#else
-		memcpy (opt_fragment + 1, buf + offset, tsdu_length);
-	        header->pgm_checksum = pgm_checksum((char*)header, tpdu_length, 0);
-
-#endif /* CONFIG_CKSUM_COPY */
+		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
+		guint32 unfolded_odata	= pgm_csum_partial_copy (buf + offset, opt_fragment + 1, tsdu_length, 0);
+		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
 		pgm_txw_push (transport->txw, pkt, tpdu_length);
@@ -4182,10 +4158,8 @@ pgm_transport_send_apdu_unlocked (
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
-#ifdef CONFIG_CKSUM_COPY
 /* save unfolded odata for retransmissions */
 		*(guint32*)&header->pgm_sport	= unfolded_odata;
-#endif
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
@@ -4383,20 +4357,10 @@ pgm_transport_send_fragment_unlocked (
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
 	        header->pgm_checksum    = 0;
 
-#ifdef CONFIG_CKSUM_COPY
-
 		int pgm_header_len	= (char*)(opt_fragment + 1) - (char*)header;
-		guint32 unfolded_header	= csum_partial (header, pgm_header_len, 0);
-
-		guint32 unfolded_odata	= csum_partial_copy_generic (buf + *offset, opt_fragment + 1, tsdu_length, 0, NULL, NULL);
-
-		header->pgm_checksum	= csum_fold (csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
-
-#else
-		memcpy (opt_fragment + 1, buf + *offset, tsdu_length);
-	        header->pgm_checksum = pgm_checksum((char*)header, tpdu_length, 0);
-
-#endif /* CONFIG_CKSUM_COPY */
+		guint32 unfolded_header	= pgm_csum_partial (header, pgm_header_len, 0);
+		guint32 unfolded_odata	= pgm_csum_partial_copy (buf + *offset, opt_fragment + 1, tsdu_length, 0);
+		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
 		pgm_txw_push (transport->txw, pkt, tpdu_length);
@@ -4409,10 +4373,8 @@ pgm_transport_send_fragment_unlocked (
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
-#ifdef CONFIG_CKSUM_COPY
 /* save unfolded odata for retransmissions */
 		*(guint32*)&header->pgm_sport	= unfolded_odata;
-#endif
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
@@ -4482,28 +4444,16 @@ send_rdata (
 /* RDATA */
         rdata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
-#ifdef CONFIG_CKSUM_COPY
-
 	guint32 unfolded_odata	= *(guint32*)&header->pgm_sport;
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
         header->pgm_checksum    = 0;
-g_message ("stored odata %x", unfolded_odata);
 
 	int pgm_header_len	= len - g_ntohs(header->pgm_tsdu_length);
-	guint32 unfolded_header = csum_partial (header, pgm_header_len, 0);
-		unfolded_odata	= csum_partial ((char*)header + pgm_header_len, g_ntohs(header->pgm_tsdu_length), 0);
+	guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
+		unfolded_odata	= pgm_csum_partial ((char*)header + pgm_header_len, g_ntohs(header->pgm_tsdu_length), 0);
 
-g_message ("calculated odata %x", unfolded_odata);
-
-	header->pgm_checksum	= csum_fold (csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
-
-#else
-
-        header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_checksum((char*)header, len, 0);
-
-#endif /* CONFIG_CKSUM_COPY */
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 	retval = pgm_sendto (transport,
 				TRUE,			/* with router alert */

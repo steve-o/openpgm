@@ -11,15 +11,6 @@
 
 #include "pgm/csum-copy.h"
 
-static inline unsigned add32_with_carry (unsigned a, unsigned b)
-{
-    asm("addl %2,%0\n\t"
-            "adcl $0,%0"
-            : "=r" (a)
-            : "0" (a), "r" (b));
-        return a;
-}
-
 static inline unsigned short from32to16(unsigned a)
 {
         unsigned short b = a >> 16;
@@ -30,7 +21,7 @@ static inline unsigned short from32to16(unsigned a)
         return b;
 }
 
-static unsigned do_csum(const unsigned char *buff, unsigned len)
+unsigned do_csum(const unsigned char *buff, unsigned len)
 {
         unsigned odd, count;
         unsigned long result = 0;
@@ -115,11 +106,6 @@ static unsigned do_csum(const unsigned char *buff, unsigned len)
                 result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
         }
         return result;
-}
-
-guint32 csum_partial(const void *buff, int len, guint32 sum)
-{
-        return (guint32)add32_with_carry(do_csum(buff, len), sum);
 }
 
 /* eof */
