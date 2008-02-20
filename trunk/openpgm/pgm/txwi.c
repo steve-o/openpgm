@@ -158,6 +158,9 @@ pgm_txw_init (
  */
 	t->trail = t->lead + 1;
 
+	t->retransmit_queue = g_queue_new();
+	g_static_mutex_init (&t->retransmit_mutex);
+
 	guint memory = sizeof(pgm_txw_t) +
 /* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
@@ -212,6 +215,13 @@ pgm_txw_shutdown (
 
 		g_assert ( t->trash_packet == NULL );
 	}
+
+	if (t->retransmit_queue)
+	{
+		g_queue_free (t->retransmit_queue);
+		t->retransmit_queue = NULL;
+	}
+	g_static_mutex_free (&t->retransmit_mutex);
 
 	return 0;
 }
@@ -349,6 +359,15 @@ pgm_txw_pop (
 
 	pgm_txw_packet_t* tp = TXW_PACKET(t, t->trail);
 
+/* packet is waiting for retransmission */
+	g_static_mutex_lock (&t->retransmit_mutex);
+	if (tp->link_.data)
+	{
+		g_queue_unlink (t->retransmit_queue, &tp->link_);
+		tp->link_.data = NULL;
+	}
+	g_static_mutex_unlock (&t->retransmit_mutex);
+
 	t->bytes_in_window -= tp->length;
 	t->packets_in_window--;
 
@@ -356,6 +375,83 @@ pgm_txw_pop (
 	TXW_SET_PACKET(t, t->trail, NULL);
 
 	t->trail++;
+
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+	return 0;
+}
+
+/* Try to add a sequence number to the retransmit queue, ignore if
+ * already there or no longer in the transmit window
+ *
+ * returns > 0 if sequence number added to queue.
+ */
+
+int
+pgm_txw_retransmit_push (
+	pgm_txw_t*	t,
+	guint32		sequence_number
+	)
+{
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+
+/* check if sequence number is in window */
+	if ( !ABS_IN_TXW(t, sequence_number) )
+	{
+		g_trace ("%u not in window.", sequence_number);
+		return -1;
+	}
+
+	pgm_txw_packet_t* tp = TXW_PACKET(t, sequence_number);
+
+	g_static_mutex_lock (&t->retransmit_mutex);
+	if (tp->link_.data)
+	{
+		g_static_mutex_unlock (&t->retransmit_mutex);
+		g_trace ("%u already queued for retransmission.", sequence_number);
+		return -1;
+	}
+
+	tp->link_.data = tp;
+	g_queue_push_head_link (t->retransmit_queue, &tp->link_);
+	g_static_mutex_unlock (&t->retransmit_mutex);
+
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+	return 1;
+}
+
+/* try to pop a packet from the retransmit queue (peek from window)
+ *
+ * return 0 if packet popped
+ */
+
+int
+pgm_txw_retransmit_try_pop (
+	pgm_txw_t*	t,
+	guint32*	sequence_number,
+	gpointer*	packet,
+	guint*		length
+	)
+{
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+
+	g_static_mutex_lock (&t->retransmit_mutex);
+	GList* link = g_queue_pop_tail_link (t->retransmit_queue);
+	if (!link) {
+		g_static_mutex_unlock (&t->retransmit_mutex);
+		return -1;
+	}
+
+	pgm_txw_packet_t* tp = link->data;
+	link->data = NULL;
+	g_static_mutex_unlock (&t->retransmit_mutex);
+
+	*sequence_number = tp->sequence_number;
+	*packet = tp->data;
+	*length	= tp->length;
 
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
