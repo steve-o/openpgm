@@ -2,7 +2,7 @@
  *
  * PGM conformance endpoint simulator.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -48,6 +48,7 @@
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
 #include <pgm/timer.h>
+#include <pgm/checksum.h>
 
 
 /* typedefs */
@@ -830,7 +831,7 @@ net_send_data (
 	memcpy (data + 1, string, count);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_mutex);
         retval = sendto (transport->send_sock,
@@ -883,7 +884,7 @@ net_send_spm (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
         retval = sendto (transport->send_sock,
@@ -948,7 +949,7 @@ net_send_spmr (
 	header->pgm_options     = 0;
 	header->pgm_tsdu_length = 0;
         header->pgm_checksum    = 0;
-        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_mutex);
 /* TTL 1 */
@@ -1068,7 +1069,7 @@ net_send_ncf (
 	}
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
         retval = sendto (transport->send_with_router_alert_sock,
@@ -1164,7 +1165,7 @@ net_send_nak (
 	}
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum    = pgm_checksum((char*)header, tpdu_length, 0);
+        header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
         retval = sendto (transport->send_with_router_alert_sock,

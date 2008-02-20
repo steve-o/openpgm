@@ -429,8 +429,6 @@ const char* pgm_type_string (guint8);
 const char* pgm_udpport_string (int);
 const char* pgm_gethostbyaddr (const struct in_addr*);
 void pgm_ipopt_print (const char*, int);
-guint16 pgm_inet_checksum (const char*, int, int);
-guint16 pgm_checksum (const char*, int, int);
 
 G_END_DECLS
 
