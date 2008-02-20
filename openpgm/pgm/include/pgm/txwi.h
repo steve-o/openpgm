@@ -32,8 +32,12 @@ struct pgm_txw_packet_t {
 
         guint           length;
         guint32         sequence_number;
-        struct timeval  expiry;
-        struct timeval  last_retransmit;
+
+#if 0
+        struct timeval  expiry;			/* Advance with time */
+        struct timeval  last_retransmit;	/* NAK elimination */
+#endif
+	GList		link_;
 };
 
 typedef struct pgm_txw_packet_t pgm_txw_packet_t;
@@ -47,6 +51,9 @@ struct pgm_txw_t {
 
         guint32         lead;
         guint32         trail;
+
+        GQueue*		retransmit_queue;
+	GStaticMutex	retransmit_mutex;
 
 	guint32		bytes_in_window;
 	guint32		packets_in_window;
@@ -107,6 +114,9 @@ static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint len)
     memcpy (packet, packet_, len);
     return pgm_txw_push (t, packet, len);
 }
+
+int pgm_txw_retransmit_push (pgm_txw_t*, guint32);
+int pgm_txw_retransmit_try_pop (pgm_txw_t*, guint32*, gpointer*, guint*);
 
 G_END_DECLS
 

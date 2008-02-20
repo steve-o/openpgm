@@ -193,17 +193,6 @@ static inline guint32 nak_rb_ivl (pgm_transport_t* transport)
 	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
 }
 
-/* sequence lists (pgm_sqn_list_t) are used to store NAK requests received in the Rx thread and
- * passed to the Timer thread for RDATA generation.  objects are recycled in a trash stack to reduce
- * page fault overheads. 
- */
-static inline gpointer pgm_sqn_list_alloc (pgm_transport_t* t)
-{
-	pgm_sqn_list_t* p = t->trash_rdata ? g_trash_stack_pop (&t->trash_rdata) : g_slice_alloc (sizeof(pgm_sqn_list_t));
-	p->len = 0;
-	return p;
-}
-
 /* locked and rate regulated sendto
  */
 static inline ssize_t
@@ -413,10 +402,6 @@ pgm_transport_destroy (
 		g_rand_free (transport->rand_);
 		transport->rand_ = NULL;
 	}
-	if (transport->rdata_queue) {
-		g_async_queue_unref (transport->rdata_queue);
-		transport->rdata_queue = NULL;
-	}
 	if (transport->rdata_pipe[0]) {
 		close (transport->rdata_pipe[0]);
 		transport->rdata_pipe[0] = 0;
@@ -424,15 +409,6 @@ pgm_transport_destroy (
 	if (transport->rdata_pipe[1]) {
 		close (transport->rdata_pipe[1]);
 		transport->rdata_pipe[1] = 0;
-	}
-	if (transport->trash_rdata) {
-		gpointer *p = NULL;
-		while ( (p = g_trash_stack_pop (&transport->trash_rdata)) )
-		{
-			g_slice_free1 (sizeof(pgm_sqn_list_t), p);
-		}
-
-		g_assert (transport->trash_rdata == NULL);
 	}
 	if (transport->timer_pipe[0]) {
 		close (transport->timer_pipe[0]);
@@ -455,8 +431,6 @@ pgm_transport_destroy (
 	g_static_rw_lock_free (&transport->peers_lock);
 
 	g_static_rw_lock_free (&transport->txw_lock);
-
-	g_static_mutex_free (&transport->rdata_mutex);
 
 	if (transport->bound) {
 		g_static_mutex_unlock (&transport->send_mutex);
@@ -591,9 +565,6 @@ pgm_transport_create (
 
 /* timer lock */
 	g_static_mutex_init (&transport->mutex);
-
-/* rdata queue locks */
-	g_static_mutex_init (&transport->rdata_mutex);
 
 /* transmit window read/write lock */
 	g_static_rw_lock_init (&transport->txw_lock);
@@ -1264,10 +1235,6 @@ pgm_transport_bind (
 
 	g_trace ("INFO","creating new random number generator.");
 	transport->rand_ = g_rand_new();
-
-/* receiver to timer thread queue, aka RDATA todo list */
-	g_trace ("INFO","create asynchronous receiver to timer queue.");
-	transport->rdata_queue = g_async_queue_new();
 
 	g_trace ("INFO","create rdata pipe.");
 	retval = pipe (transport->rdata_pipe);
@@ -2274,24 +2241,16 @@ on_nak_pipe (
 /* We can flush queue and block all odata, or process one set, or process each
  * sequence number individually.
  */
-	pgm_sqn_list_t* sqn_list = g_async_queue_try_pop (transport->rdata_queue);
-	if (sqn_list) {
-		g_static_rw_lock_reader_lock (&transport->txw_lock);
-		for (int i = 0; i < sqn_list->len; i++)
-		{
-			gpointer rdata = NULL;
-			guint rlen = 0;
-			if (!pgm_txw_peek (transport->txw, sqn_list->sqn[i], &rdata, &rlen))
-			{
-				send_rdata (transport, sqn_list->sqn[i], rdata, rlen);
-			}
-		}
-		g_static_rw_lock_reader_unlock (&transport->txw_lock);
+	guint32 sqn;
+	gpointer rdata = NULL;
+	guint rlen = 0;
 
-		g_static_mutex_lock (&transport->rdata_mutex);
-		g_trash_stack_push (&transport->trash_rdata, sqn_list);
-		g_static_mutex_unlock (&transport->rdata_mutex);
+	g_static_rw_lock_reader_lock (&transport->txw_lock);
+	if (!pgm_txw_retransmit_try_pop (transport->txw, &sqn, &rdata, &rlen));
+	{
+		send_rdata (transport, sqn, rdata, rlen);
 	}
+	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
 	return TRUE;
 }
@@ -2497,13 +2456,11 @@ on_nak (
 	}
 
 /* create queue object */
-	g_static_mutex_lock (&transport->rdata_mutex);
-	pgm_sqn_list_t* sqn_list = pgm_sqn_list_alloc (transport);
-	g_static_mutex_unlock (&transport->rdata_mutex);
-	sqn_list->sqn[0] = g_ntohl (nak->nak_sqn);
-	sqn_list->len++;
+	pgm_sqn_list_t sqn_list;
+	sqn_list.sqn[0] = g_ntohl (nak->nak_sqn);
+	sqn_list.len = 1;
 
-	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, sqn_list->sqn[0]);
+	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, sqn_list.sqn[0]);
 
 /* check NAK list */
 	guint32* nak_list = NULL;
@@ -2559,7 +2516,7 @@ on_nak (
 #endif
 	for (int i = 0; i < nak_list_len; i++)
 	{
-		sqn_list->sqn[sqn_list->len++] = g_ntohl (*nak_list);
+		sqn_list.sqn[sqn_list.len++] = g_ntohl (*nak_list);
 		nak_list++;
 	}
 
@@ -2567,22 +2524,24 @@ on_nak (
  * delivery of the actual RDATA packets.
  */
 	if (nak_list_len) {
-		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list);
+		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, &sqn_list);
 	} else {
-		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list->sqn[0]);
+		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list.sqn[0]);
 	}
 
-	g_async_queue_lock (transport->rdata_queue);
-	g_async_queue_push_unlocked (transport->rdata_queue, sqn_list);
-
+/* queue retransmit requests */
+	for (int i = 0; i < sqn_list.len; i++)
 	{
-		const char one = '1';
-		if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to pipe failed :(");
-			retval = -EINVAL;
+		int cnt = pgm_txw_retransmit_push (transport->txw, sqn_list.sqn[i]);
+		if (cnt > 0)
+		{
+			const char one = '1';
+			if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
+				g_critical ("write to pipe failed :(");
+				retval = -EINVAL;
+			}
 		}
 	}
-	g_async_queue_unlock (transport->rdata_queue);
 
 out:
 	return retval;
