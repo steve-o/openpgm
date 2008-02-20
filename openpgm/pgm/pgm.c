@@ -2,7 +2,7 @@
  *
  * PGM packet formats, RFC 3208.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,10 +32,7 @@
 #include <glib.h>
 
 #include "pgm/packet.h"
-
-#ifdef CONFIG_CKSUM_COPY
-#	include "pgm/csum-copy.h"
-#endif
+#include "pgm/checksum.h"
 
 
 /* globals */
@@ -233,7 +230,7 @@ pgm_parse (
 	{
 		int sum = pgm_header->pgm_checksum;
 		pgm_header->pgm_checksum = 0;
-		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
+		int pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)pgm_header, pgm_length, 0));
 		pgm_header->pgm_checksum = sum;
 		if (pgm_sum != sum) {
 			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", sum, pgm_sum);
@@ -413,7 +410,7 @@ pgm_print_packet (
 	{
 		sum = pgm_header->pgm_checksum;
 		pgm_header->pgm_checksum = 0;
-		int pgm_sum = pgm_checksum((const char*)pgm_header, pgm_length, 0);
+		int pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)pgm_header, pgm_length, 0));
 		if (pgm_sum != sum) {
 			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", sum, pgm_sum);
 			return FALSE;
@@ -1290,72 +1287,6 @@ pgm_ipopt_print (
 			return;
 		}
 	}
-}
-
-guint16
-pgm_inet_checksum (
-	const char* addr,
-	int len,
-	int csum
-	)
-{
-	int nleft = len;
-	const guint16 *w = (guint16*)addr;
-	guint answer;
-	int sum = csum;
-
-	while (nleft > 1) {
-		sum += *w++;
-		nleft -= 2;
-	}
-	if (nleft == 1)
-		sum += htons(*(guchar *)w<<8);
-
-	sum = (sum >> 16) + (sum & 0xffff);
-	sum += (sum >> 16);
-	answer = ~sum;
-	return (answer);
-}
-
-guint16
-pgm_checksum (
-	const char* head,
-	int len,
-	int csum
-	)
-{
-#ifdef CONFIG_CKSUM_COPY
-
-	return csum_fold (csum_partial (head, len, csum));
-
-#else
-
-	guint sum = csum;
-	guint16 odd_byte;
-
-	while (len > 1) {
-		sum += *(guint16*)head;
-		head += 2;
-		if (sum & 0x80000000)
-			sum = (sum & 0xFFFF) + (sum >> 16);
-		len -= 2;
-	}
-
-	if (len) {
-		odd_byte = 0;
-		*(guchar*)&odd_byte = *head;
-		sum += odd_byte;
-	}
-
-	while (sum >> 16)
-		sum = (sum & 0xffff) + (sum >> 16);
-
-	if (sum == 0xffff)
-		sum = ~sum;
-
-	return ~sum;
-
-#endif /* CONFIG_CKSUM_COPY */
 }
 
 /* eof */

@@ -2,7 +2,7 @@
  *
  * Sit periodically sending ODATA with interleaved ambient SPM's.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,6 +40,7 @@
 #include "pgm/backtrace.h"
 #include "pgm/log.h"
 #include "pgm/packet.h"
+#include "pgm/checksum.h"
 
 
 /* globals */
@@ -392,7 +393,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
 //	((struct in_addr*)(spm + 1))->s_addr = g_addr.s_addr;
 
-	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
@@ -490,7 +491,7 @@ printf ("PGM header size %u\n"
 
         memcpy (odata + 1, payload_string, strlen(payload_string) + 1);
 
-        header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
+        header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)

@@ -2,7 +2,7 @@
  *
  * JSON packet dump.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,6 +32,7 @@
 #include <glib.h>
 
 #include "pgm/packet.h"
+#include "pgm/checksum.h"
 
 
 /* globals */
@@ -282,7 +283,7 @@ verify_pgm_header (
 	{
 		int sum = pgm->pgm_checksum;
 		pgm->pgm_checksum = 0;
-		int pgm_sum = pgm_checksum((const char*)pgm, pgm_len, 0);
+		int pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)pgm, pgm_len, 0));
 		pgm->pgm_checksum = sum;
 		if (pgm_sum != sum) {
 			printf ("\t\"message\": \"PGM: PGM packet checksum incorrect, packet 0x%x calculated 0x%x.\",\n", sum, pgm_sum);

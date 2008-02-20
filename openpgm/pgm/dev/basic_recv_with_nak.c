@@ -3,7 +3,7 @@
  * Listen to PGM packets, note per host details, on data loss request
  * missing data with NAKs.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,6 +42,7 @@
 #include "pgm/backtrace.h"
 #include "pgm/log.h"
 #include "pgm/packet.h"
+#include "pgm/checksum.h"
 
 
 /* typedefs */
@@ -967,7 +968,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	nak->nak_grp_nla.s_addr	= source->s_addr;	/* IPv4 */
 //	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
 
-	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
 /* send packet */
 	int flags = MSG_CONFIRM;	/* expecting a reply over multicast not unicast */

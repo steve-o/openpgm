@@ -2,7 +2,7 @@
  *
  * Sit periodically sending SPM broadcasts.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,6 +40,7 @@
 #include "pgm/backtrace.h"
 #include "pgm/log.h"
 #include "pgm/packet.h"
+#include "pgm/checksum.h"
 
 
 /* globals */
@@ -375,7 +376,7 @@ printf ("PGM header size %u\n"
 
 	spm->spm_nla.s_addr	= g_addr.s_addr;	/* IPv4 */
 
-	header->pgm_checksum = pgm_checksum(buf, tpdu_length, 0);
+	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
 	int flags = MSG_CONFIRM;	/* not expecting a reply */
 
