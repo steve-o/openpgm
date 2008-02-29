@@ -16,9 +16,14 @@ lib_src = Split("""
 		rate_control.c
 		async.c
 		checksum.c
+		reed_solomon.c
+		galois_tables.c
 """)
 
 lib_env = env.Copy();
+
+# Galois tables
+lib_env.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
 
 lib_obj = []
 for src in lib_src:
@@ -32,7 +37,6 @@ lib_env.StaticLibrary('libpgm-pic', lib_obj);
 #
 
 plus_src = Split("""
-		reed_solomon.c
 """)
 
 plus32_src = Split("""

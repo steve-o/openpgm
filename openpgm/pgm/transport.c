@@ -151,17 +151,32 @@ static int pgm_transport_send_one_unlocked (pgm_transport_t*, const gchar*, gsiz
 static int pgm_transport_send_one_copy_unlocked (pgm_transport_t*, const gchar*, gsize, int);
 static int pgm_transport_send_fragment_unlocked (pgm_transport_t*, const gchar*, gsize, int, int*, int*);
 
+int
+pgm_print_tsi_r (
+	const pgm_tsi_t*	tsi,
+	char*			buf,
+	size_t			bufsize
+	)
+{
+	g_return_val_if_fail (tsi != NULL, -EINVAL);
+	g_return_val_if_fail (buf != NULL, -EINVAL);
+
+	guint8* gsi = (guint8*)tsi;
+	guint16 source_port = tsi->sport;
+	snprintf(buf, bufsize, "%i.%i.%i.%i.%i.%i.%i",
+		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
+	return 0;
+}
 
 gchar*
 pgm_print_tsi (
 	const pgm_tsi_t*	tsi
 	)
 {
-	guint8* gsi = (guint8*)tsi;
-	guint16 source_port = tsi->sport;
+	g_return_val_if_fail (tsi != NULL, NULL);
+
 	static char buf[sizeof("000.000.000.000.000.000.00000")];
-	snprintf(buf, sizeof(buf), "%i.%i.%i.%i.%i.%i.%i",
-		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
+	pgm_print_tsi_r (tsi, buf, sizeof(buf));
 	return buf;
 }
 
@@ -1643,8 +1658,6 @@ pgm_transport_bind (
 	g_static_mutex_unlock (&transport->mutex);
 
 	g_trace ("INFO","transport successfully created.");
-	return retval;
-
 out:
 	return retval;
 }
@@ -4436,10 +4449,20 @@ send_rdata (
 	return retval;
 }
 
-/* enable FEC for this transport
+/* Enable FEC for this transport, specifically Reed Solmon encoding RS(n,k), common
+ * setting is RS(255, 223).
  *
- * 2t can be greater than k but usually only for very bad transmission lines where parity
- * packets are also lost.
+ * inputs:
+ *
+ * n = FEC Block size = [k+1, 255]
+ * k = original data packets == transmission group size = [2, 4, 8, 16, 32, 64, 128]
+ * m = symbol size = 8 bits
+ *
+ * outputs:
+ *
+ * h = 2t = n - k = parity packets
+ *
+ * when h > k parity packets can be lost.
  */
 
 int
@@ -4447,17 +4470,22 @@ pgm_transport_set_fec (
 	pgm_transport_t*	transport,
 	gboolean		enable_proactive_parity,
 	gboolean		enable_ondemand_parity,
-	guint			default_tgsize,		/* k, tg = transmission group */
-	guint			default_h		/* 2t : parity packet length per tg */
+	guint			default_n,
+	guint			default_k
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (default_k & (default_k -1) == 0, -EINVAL);
+	g_return_val_if_fail (default_k >= 2 && default_k <= 128, -EINVAL);
+	g_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, -EINVAL);
+
+	guint default_h = default_n - default_k;
 
 /* check validity of parameters */
-	if ( default_tgsize > 223
-		&& ( (default_h * 223.0) / default_tgsize ) < 1.0 )
+	if ( default_k > 223 &&
+		( (default_h * 223.0) / default_k ) < 1.0 )
 	{
-		g_error ("k/2t ratio too low to generate parity data.");
+		g_error ("k/h ratio too low to generate parity data.");
 		return -EINVAL;
 	}
 
@@ -4465,51 +4493,7 @@ pgm_transport_set_fec (
 	transport->proactive_parity	= enable_proactive_parity;
 	transport->ondemand_parity	= enable_ondemand_parity;
 
-/* derive FEC values from requested parameters:
- *
- * n = 255
- * m = 8 
- *
- * for CCSDS we work from k = 223 by using shortened RS codes
- */
-
-	{
-		float tgsize = default_tgsize;
-		float h = default_h;
-
-		if (default_tgsize > 223)
-		{
-			float ratio2 = tgsize / h;
-			tgsize /= (int)ratio2;
-			h /= (int)ratio2;
-		}
-
-		float fec_n = 255.0;
-		float fec_h = (int)( fec_n / (tgsize + h) ) * h;
-		float fec_k = (int)(fec_n - fec_h);
-
-		int each_packet = (fec_n - fec_k) / h;
-		int total_packet = each_packet * (tgsize + h);
-
-		int fec_padding = fec_n - total_packet;
-
-		if (fec_padding > 0.0)
-		{
-			transport->fec_n = 255 - fec_padding;
-			transport->fec_k = fec_n - (int)fec_h;
-			transport->fec_padding = fec_padding;
-		}
-		else
-		{
-			transport->fec_n = fec_n;
-			transport->fec_k = fec_k;
-			transport->fec_padding = 0;
-		}
-
-		g_message ("fec: n %i k %i padding %i", transport->fec_n, transport->fec_k, transport->fec_padding);
-	}
-
-	exit (0);
+//	transport->fec = pgm_fec_create (default_n, default_k);
 
 	g_static_mutex_unlock (&transport->mutex);
 

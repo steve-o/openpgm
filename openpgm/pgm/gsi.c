@@ -23,6 +23,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <errno.h>
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
@@ -374,6 +375,8 @@ pgm_create_md5_gsi (
 	pgm_gsi_t*	gsi
 	)
 {
+	g_return_val_if_fail (gsi != NULL, -EINVAL);
+
 	int retval = 0;
 	struct md5_ctx ctx;
 	char hostname[NI_MAXHOST];
@@ -402,6 +405,7 @@ pgm_create_ipv4_gsi (
 	pgm_gsi_t*	gsi
 	)
 {
+	g_return_val_if_fail (gsi != NULL, -EINVAL);
 	int retval = 0;
 
 	memcpy (gsi, &addr, sizeof(addr));

@@ -60,7 +60,8 @@ int pgm_async_destroy (pgm_async_t*);
 
 static inline int pgm_async_get_fd (pgm_async_t* async)
 {
-     return async->commit_pipe[0];
+    g_return_val_if_fail (async != NULL, -EINVAL);
+    return async->commit_pipe[0];
 }
 
 int pgm_async_recv (pgm_async_t* async, gpointer, int, int);
