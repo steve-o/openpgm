@@ -35,7 +35,7 @@
 
 /* globals */
 
-static int g_max_tpdu = 1500;
+static int g_max_tpdu = 1400;	/* minus PGM and FEC overhead */
 
 
 
@@ -71,131 +71,124 @@ main (
 
 	pgm_time_init();
 
-/* data block for CCSDS(255,223) */
-	int n = 255;
-	int p = 15;
-	int n_minus_k = 200;
-	int k = n - n_minus_k;
+/* Reed-Solomon code */
+	int n = 255;		/* [ k+1 .. 255 ] */
+	int k = 64;		/* [ 2 .. 128 ] */
 
-	gchar source[] = "Ayumi Lee (Hangul: 이 아유미, Japanese name: Ito Ayumi 伊藤亜由美, born August 25, 1984, Tottori Prefecture, Japan[1]), from former Korean girl-group Sugar, was raised in Japan for much of her younger life and is the reason for her Japanese accent, although she is now fluent in both languages. Although Ayumi's name is commonly believed to be Japanese in origin, she has explained that her name is hanja-based.";
+	const gchar source[] = "Ayumi Lee (Hangul: 이 아유미, Japanese name: Ito Ayumi 伊藤亜由美, born August 25, 1984, Tottori Prefecture, Japan[1]), from former Korean girl-group Sugar, was raised in Japan for much of her younger life and is the reason for her Japanese accent, although she is now fluent in both languages. Although Ayumi's name is commonly believed to be Japanese in origin, she has explained that her name is hanja-based.";
+	int source_len = strlen (source);		/* chars: g_utf8_strlen() */
+	int block_len = 0;
+	int source_offset = 0;
+	guint8* packet_block[k];
+	for (int i = 0; i < k; i++) {
+		packet_block[i] = g_malloc0 (g_max_tpdu);
 
-	guint8 data8[k];
-	for (int i = 0, j = 0; i < G_N_ELEMENTS(data8); i++)
-		data8[i] = (i < p) ? 0 : source[j++];
+/* fill with source text */
+		int packet_offset = 0;
+		do {
+			int copy_len = MIN( source_len - source_offset, g_max_tpdu - packet_offset );
+/* adjust for unicode borders */
+			gchar* p = source + source_offset + copy_len;
+			if (*p)
+			{
+				int new_copy_len = g_utf8_find_prev_char (source + source_offset, p + 1) - (source + source_offset);
+				if (new_copy_len != copy_len) {
+					printf ("ERROR: shuffle on packet border not implemented.\n");
+				}
+			}
+			memcpy (packet_block[i] + packet_offset, source + source_offset, copy_len);
+			packet_offset += copy_len;
+			source_offset += copy_len;
+			if (source_offset >= source_len) source_offset = 0;
+			block_len += copy_len;
+		} while (packet_offset < g_max_tpdu);
+	}
 
-/* parity block: must be set to 0 */
-	guint16 parity[n_minus_k];
-	memset (parity, 0, sizeof(parity));
+/* parity packet */
+	guint8* parity = g_slice_alloc (g_max_tpdu);
 
-/* FEC engine:
+/* Start Reed-Solomon engine
  *
  * symbol size:			8 bits
  * primitive polynomial:	1 + x^2 + x^3 + x^4 + x^8
- * first consecutive root:	?
- * primitive element for roots:	?
- * number of roots:		32 (2t roots)
- *
  *
  * poly = (1*x^0) + (0*x^1) + (1*x^2) + (1*x^3) + (1*x^4) + (0*x^5) + (0*x^6) + (0*x^7) + (1*x^8)
  *      =  1         0         1         1         1         0         0         0         1
  *      = 101110001
- *      = 0x171
+ *      = 0x171 / 0x11D (reversed)
  */
 
-	struct rs_control *rs = pgm_init_rs (8, 0x171, 0, 1, G_N_ELEMENTS(parity));
+	void* rs;
+	pgm_rs_create (&rs, n, k);
 
-	guint64 start, end, elapsed;
+/* select random packet to erase:
+ *   erasure_index is offset in FEC block of parity packet [k .. n-1]
+ *   erasure is offset of erased packet [0 .. k-1]
+ */
+	int erasure_index = k;
+	int erasure = g_random_int_range (0, k);
+
+	pgm_time_t start, end, elapsed;
 
 	printf ("\n"
 		"encoding\n"
 		"--------\n"
 		"\n"
-		"GF(8), RS (%i,%i)", n, k );
-	if (p)
-		printf (" %i bytes padding for shortened RS (%i,%i)", p, 255 - p, (255 - p) - n_minus_k);
-	putchar ('\n');
+		"GF(2⁸), RS (%i,%i)\n", n, k );
 
 /* test encoding */
 	start = pgm_time_update_now();
 
-	pgm_encode_rs8 (rs, data8, sizeof(data8), parity, 0);
+	pgm_rs_encode (rs, packet_block, erasure_index, parity, g_max_tpdu);
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
 	printf ("encoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
+/* test erasure decoding (no errors) */
 	puts (	"\n"
-		"errors\n"
-		"------\n" );
+		"decoding\n"
+		"--------\n" );
+	printf ("erased %i packet at %i\n", 1, erasure);
 
-/* corrupt packets */
-	int corrupt = 3;
-	for (int i = 0; i < corrupt; i++)
-	{
-		data8[g_random_int_range (0, sizeof(data8) - 1)] = g_random_int_range (0, 255);
-	}
-	printf ("corrupted %i symbols (bytes)\n", corrupt);
+	int offsets[ k ];
+	for (int i = 0; i < k; i++)
+		offsets[i] = i;
+	offsets[erasure] = erasure_index;
+	g_slice_free1 (g_max_tpdu, packet_block[erasure]);
+	packet_block[erasure] = parity;		/* place parity packet into original data block */
 
 /* test decoding */
-
 	start = pgm_time_update_now();
-	int numerr = pgm_decode_rs8 (rs, data8, parity, sizeof(data8), NULL, 0, NULL, 0, NULL);
+
+	int retval = pgm_rs_decode_ondemand (rs, packet_block, offsets, g_max_tpdu);
+
 	end = pgm_time_update_now();
 	elapsed = end - start;
 	printf ("decoding time %" G_GUINT64_FORMAT " us\n", elapsed);
 
-	printf ("numerr = %i\n", numerr);
-
-/* test erasures if errors didn't fail */
-	if (numerr > 0)
-	{
-		puts (	"\n"
-			"erasures\n"
-			"--------\n" );
-		int erasures = G_N_ELEMENTS(parity);
-		int eras_pos[erasures];
-		int i;
-		for (i = 0; i < erasures && i < G_N_ELEMENTS(data8); i++)
-		{
-			data8[i] = 0;
-			eras_pos[i] = i;
-		}
-		int actual_erasures = i;
-		printf ("erased %i symbols\n", actual_erasures);
-
-		if (actual_erasures < erasures)
-		{
-/* erasures also affect parity as n >> k */
-			int j;
-			for (j = 0; i < erasures; i++, j++)
-			{
-				parity[j] = 0;
-				eras_pos[i] = i;
-				actual_erasures++;
-			}
-
-			printf ("erased %i parity symbols\n", j);
-		}
-
-/* test decoding part 2 */
-
-		start = pgm_time_update_now();
-		int numerr = pgm_decode_rs8 (rs, data8, parity, sizeof(data8), NULL, actual_erasures, eras_pos, 0, NULL);
-		end = pgm_time_update_now();
-		elapsed = end - start;
-		printf ("decoding time %" G_GUINT64_FORMAT " us\n", elapsed);
-
-		printf ("numerr = %i\n", numerr);
-
 /* display final string */
-		gchar final[G_N_ELEMENTS(data8) + 1];
-		memcpy (final, data8, G_N_ELEMENTS(data8));
-		final[sizeof(final)] = 0;
-		printf ("final string:\n[%s]\n", final + p);
+	gchar* final = g_malloc ( (k * g_max_tpdu) + 1 );
+	final[0] = 0;
+	for (int i = 0; i < k; i++)
+		strncat (final, packet_block[i], g_max_tpdu);
+	final[ k * g_max_tpdu ] = 0;
+	printf ("decoded string:\n[%.15s...]%i cf. %i\n", final, strlen(final), block_len);
+
+	if (strlen(final) == block_len) {
+		puts ("Test success.");
+	} else {
+		puts ("Test failed.");
 	}
+	g_free (final);
 
 /* clean up */
-	pgm_free_rs (rs);
+	for (int i = 0; i < k; i++) {
+		g_slice_free1 (g_max_tpdu, packet_block[i]);
+		packet_block[i] = NULL;
+	}
+	
+	pgm_rs_destroy (rs);
 	pgm_time_destroy();	
 
 	puts ("\n\nfinished.");

@@ -257,6 +257,7 @@ G_BEGIN_DECLS
 int pgm_init (void);
 
 gchar* pgm_print_tsi (const pgm_tsi_t*);
+int pgm_print_tsi_r (const pgm_tsi_t*, char*, size_t);
 guint pgm_tsi_hash (gconstpointer);
 gint pgm_tsi_equal (gconstpointer, gconstpointer);
 
