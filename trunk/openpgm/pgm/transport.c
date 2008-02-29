@@ -226,6 +226,8 @@ pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len
 }
 
 /* socket helper, for setting pipe ends non-blocking
+ *
+ * returns 0 on success, -1 on error and sets errno appropriately.
  */
 int
 pgm_set_nonblocking (int filedes[2])
@@ -235,23 +237,23 @@ pgm_set_nonblocking (int filedes[2])
 /* set write end non-blocking */
 	int fd_flags = fcntl (filedes[1], F_GETFL);
 	if (fd_flags < 0) {
-		retval = errno;
+		retval = fd_flags;
 		goto out;
 	}
 	retval = fcntl (filedes[1], F_SETFL, fd_flags | O_NONBLOCK);
 	if (retval < 0) {
-		retval = errno;
+		retval = fd_flags;
 		goto out;
 	}
 /* set read end non-blocking */
 	fcntl (filedes[0], F_GETFL);
 	if (fd_flags < 0) {
-		retval = errno;
+		retval = fd_flags;
 		goto out;
 	}
 	retval = fcntl (filedes[0], F_SETFL, fd_flags | O_NONBLOCK);
 	if (retval < 0) {
-		retval = errno;
+		retval = fd_flags;
 		goto out;
 	}
 
@@ -536,6 +538,8 @@ pgm_timer_thread (
  *
  * all receiver addresses must be the same family.
  * interface and multiaddr must be the same family.
+ *
+ * returns 0 on success, or -1 on error and sets errno appropriately.
  */
 
 #if ( AF_INET != PF_INET ) || ( AF_INET6 != PF_INET6 )
@@ -623,7 +627,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		retval = errno;
+		retval = transport->recv_sock;
 		if (retval == EPERM && 0 != getuid()) {
 			g_critical ("PGM protocol requires this program to run as superuser.");
 		}
@@ -634,7 +638,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		retval = errno;
+		retval = transport->send_sock;
 		goto err_destroy;
 	}
 
@@ -642,7 +646,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		retval = errno;
+		retval = transport->send_with_router_alert_sock;
 		goto err_destroy;
 	}
 
@@ -1234,6 +1238,9 @@ g_io_add_watch_context_full (
 }
 
 /* bind the sockets to the link layer to start receiving data.
+ *
+ * returns 0 on success, or -1 on error and sets errno appropriately,
+ *			 or -2 on NS lookup error and sets h_errno appropriately.
  */
 
 int
@@ -1254,19 +1261,16 @@ pgm_transport_bind (
 	g_trace ("INFO","create rdata pipe.");
 	retval = pipe (transport->rdata_pipe);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	g_trace ("INFO","create timer pipe.");
 	retval = pipe (transport->timer_pipe);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	g_trace ("INFO","create waiting pipe.");
 	retval = pipe (transport->waiting_pipe);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 
@@ -1298,7 +1302,6 @@ pgm_transport_bind (
 /* include IP header only for incoming data */
 		retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), TRUE);
 		if (retval < 0) {
-			retval = errno;
 			goto out;
 		}
 	}
@@ -1308,7 +1311,6 @@ pgm_transport_bind (
 	{
 		retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (char*)&transport->rcvbuf, sizeof(transport->rcvbuf));
 		if (retval < 0) {
-			retval = errno;
 			goto out;
 		}
 	}
@@ -1316,12 +1318,10 @@ pgm_transport_bind (
 	{
 		retval = setsockopt(transport->send_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf));
 		if (retval < 0) {
-			retval = errno;
 			goto out;
 		}
 		retval = setsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf));
 		if (retval < 0) {
-			retval = errno;
 			goto out;
 		}
 	}
@@ -1330,19 +1330,16 @@ pgm_transport_bind (
 	socklen_t len = sizeof(buffer_size);
 	retval = getsockopt(transport->recv_sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	g_trace ("INFO","receive buffer set at %i bytes.", buffer_size);
 
 	retval = getsockopt(transport->send_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	retval = getsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	g_trace ("INFO","send buffer set at %i bytes.", buffer_size);
@@ -1367,11 +1364,12 @@ pgm_transport_bind (
 			pgm_sockaddr_len(&transport->recv_smr[0].smr_interface));
 #endif
 	if (retval < 0) {
-		retval = errno;
 #ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->recv_smr[0].smr_interface, s, sizeof(s));
-		g_trace ("INFO","bind failed on recv_smr[0] %s", s);
+		g_trace ("INFO","bind failed on recv_smr[0] interface %s: %s", s, strerror(errno_));
+		errno = errno_;
 #endif
 		goto out;
 	}
@@ -1383,8 +1381,8 @@ pgm_transport_bind (
 		gethostname (hostname, sizeof(hostname));
 		struct hostent *he = gethostbyname (hostname);
 		if (he == NULL) {
-			retval = errno;
-			g_trace ("INFO","gethostbyname failed on local hostname");
+			retval = -2;
+			g_trace ("INFO","gethostbyname failed on local hostname: %s", hstrerror (h_errno));
 			goto out;
 		}
 
@@ -1395,7 +1393,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->recv_smr[0].smr_interface, s, sizeof(s));
-		g_trace ("INFO","bind succeeded on recv_smr[0] %s", s);
+		g_trace ("INFO","bind succeeded on recv_smr[0] interface %s", s);
 	}
 #endif
 
@@ -1403,11 +1401,12 @@ pgm_transport_bind (
 			(struct sockaddr*)&transport->send_smr.smr_interface,
 			pgm_sockaddr_len(&transport->send_smr.smr_interface));
 	if (retval < 0) {
-		retval = errno;
 #ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
-		g_trace ("INFO","bind failed on send_smr %s", s);
+		g_trace ("INFO","bind failed on send_smr interface %s: %s", s, strerror(errno_));
+		errno = errno_;
 #endif
 		goto out;
 	}
@@ -1419,8 +1418,8 @@ pgm_transport_bind (
 		gethostname (hostname, sizeof(hostname));
 		struct hostent *he = gethostbyname (hostname);
 		if (he == NULL) {
-			retval = errno;
-			g_trace ("INFO","gethostbyname failed on local hostname");
+			retval = -2;
+			g_trace ("INFO","gethostbyname failed on local hostname: %s", hstrerror (h_errno));
 			goto out;
 		}
 
@@ -1431,7 +1430,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
-		g_trace ("INFO","bind succeeded on send_smr %s", s);
+		g_trace ("INFO","bind succeeded on send_smr interface %s", s);
 	}
 #endif
 
@@ -1439,11 +1438,12 @@ pgm_transport_bind (
 			(struct sockaddr*)&transport->send_smr.smr_interface,
 			pgm_sockaddr_len(&transport->send_smr.smr_interface));
 	if (retval < 0) {
-		retval = errno;
 #ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
-		g_trace ("INFO","bind (router alert) failed on send_smr %s", s);
+		g_trace ("INFO","bind (router alert) failed on send_smr interface %s: %s", s, strerror(errno_));
+		errno = errno_;
 #endif
 		goto out;
 	}
@@ -1452,7 +1452,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s, sizeof(s));
-		g_trace ("INFO","bind (router alert) succeeded on send_smr %s", s);
+		g_trace ("INFO","bind (router alert) succeeded on send_smr interface %s", s);
 	}
 #endif
 
@@ -1463,12 +1463,13 @@ pgm_transport_bind (
 		struct pgm_sock_mreq* p = &transport->recv_smr[i];
 		retval = pgm_sockaddr_add_membership (transport->recv_sock, p);
 		if (retval < 0) {
-			retval = errno;
 #ifdef TRANSPORT_DEBUG
+			int errno_ = errno;
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
-			g_trace ("INFO","sockaddr_add_membership failed on recv_smr[%i] %s %s", i, s1, s2);
+			g_trace ("INFO","sockaddr_add_membership failed on recv_smr[%i] multiaddr %s interface %s: %s", i, s1, s2, strerror(errno_));
+			errno = errno_;
 #endif
 			goto out;
 		}
@@ -1478,7 +1479,7 @@ pgm_transport_bind (
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->smr_multiaddr, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->smr_interface, s2, sizeof(s2));
-			g_trace ("INFO","sockaddr_add_membership succeeded on recv_smr[%i] %s %s", i, s1, s2);
+			g_trace ("INFO","sockaddr_add_membership succeeded on recv_smr[%i] multiaddr %s interface %s", i, s1, s2);
 		}
 #endif
 	}
@@ -1486,12 +1487,13 @@ pgm_transport_bind (
 /* send group (singular) */
 	retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_smr);
 	if (retval < 0) {
-		retval = errno;
 #ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if failed on send_smr %s %s", s1, s2);
+		g_trace ("INFO","sockaddr_multicast_if failed on send_smr multiaddr %s interface %s: %s", s1, s2, strerror(errno_));
+		errno = errno_;
 #endif
 		goto out;
 	}
@@ -1501,17 +1503,18 @@ pgm_transport_bind (
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if succeeded on send_smr %s %s", s1, s2);
+		g_trace ("INFO","sockaddr_multicast_if succeeded on send_smr multiaddr %s interface %s", s1, s2);
 	}
 #endif
 	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, &transport->send_smr);
 	if (retval < 0) {
-		retval = errno;
 #ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if (router alert) failed on send_smr %s %s", s1, s2);
+		g_trace ("INFO","sockaddr_multicast_if (router alert) failed on send_smr multiaddr %s interface %s: %s", s1, s2, strerror(errno_));
+		errno = errno_;
 #endif
 		goto out;
 	}
@@ -1521,41 +1524,35 @@ pgm_transport_bind (
 		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_smr.smr_multiaddr, s1, sizeof(s1));
 		pgm_sockaddr_ntop (&transport->send_smr.smr_interface, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if (router alert) succeeded on send_smr %s %s", s1, s2);
+		g_trace ("INFO","sockaddr_multicast_if (router alert) succeeded on send_smr multiaddr %s interface %s", s1, s2);
 	}
 #endif
 
 /* multicast loopback */
 	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), FALSE);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), FALSE);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_smr[0].smr_interface), transport->hops);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), transport->hops);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 
@@ -1563,12 +1560,10 @@ pgm_transport_bind (
 	int tos = IPTOS_LOWDELAY;
 	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), tos);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), tos);
 	if (retval < 0) {
-		retval = errno;
 		goto out;
 	}
 
@@ -1628,7 +1623,6 @@ pgm_transport_bind (
 	
 		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
 		if (retval < 0) {
-			retval = errno;
 			goto out;
 		}
 	}
@@ -2127,6 +2121,8 @@ pgm_transport_recv (
 }
 
 /* add select parameters for the transports receive socket(s)
+ *
+ * returns highest file descriptor used plus one.
  */
 
 int
@@ -2143,6 +2139,8 @@ pgm_transport_select_info (
 }
 
 /* add poll parameters for this transports receive socket(s)
+ *
+ * returns number of pollfd structures filled.
  */
 
 int
@@ -2167,6 +2165,8 @@ pgm_transport_poll_info (
 /* add epoll parameters for this transports recieve socket(s), events should
  * be set to EPOLLIN to wait for incoming events (data), and EPOLLOUT to wait
  * for non-blocking write.
+ *
+ * returns 0 on success, -1 on failure and sets errno appropriately.
  */
 
 int
@@ -4475,7 +4475,7 @@ pgm_transport_set_fec (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (default_k & (default_k -1) == 0, -EINVAL);
+	g_return_val_if_fail ((default_k & (default_k -1)) == 0, -EINVAL);
 	g_return_val_if_fail (default_k >= 2 && default_k <= 128, -EINVAL);
 	g_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, -EINVAL);
 
