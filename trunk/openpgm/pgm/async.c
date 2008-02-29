@@ -160,6 +160,9 @@ pgm_async_create (
 	guint			preallocate
 	)
 {
+	g_return_val_if_fail (async_ != NULL, -EINVAL);
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+
 	int retval = 0;
 	pgm_async_t* async;
 
@@ -245,6 +248,8 @@ pgm_async_destroy (
 	pgm_async_t*		async
 	)
 {
+	g_return_val_if_fail (async != NULL, -EINVAL);
+
 	if (async->thread) {
 		async->quit = TRUE;
 		g_thread_join (async->thread);
@@ -418,6 +423,10 @@ pgm_async_recv (
 	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
+        g_return_val_if_fail (async != NULL, -EINVAL);
+	if (len)
+	        g_return_val_if_fail (len > 0 && data != NULL, -EINVAL);
+
 	int bytes_read;
 	pgm_event_t* event;
 
