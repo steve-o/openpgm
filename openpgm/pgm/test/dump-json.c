@@ -1100,6 +1100,23 @@ verify_options (
 			break;
 		}
 
+		case PGM_OPT_PARITY_PRM:
+		{
+			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
+			if ((opt_parity_prm->opt_reserved & 0x3) == 0) {
+				printf ("\t\"message\": \"PGM options: neither pro-active or on-demand parity set in OPT_PARITY_PRM.\",\n");
+				retval = -1;
+				goto out;
+			}
+			guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
+			if (parity_prm_tgs < 2 || parity_prm_tgs > 128) {
+				printf ("\t\"message\": \"PGM options: transmission group size out of bounds: %i.\",\n", parity_prm_tgs);
+				retval = -1;
+				goto out;
+			}
+			break;
+		}
+
 		default:
 			printf ("\t\"message\": \"PGM options: unknown option: %i.\",\n", opt_header->opt_type);
 			retval = -1;
@@ -1170,6 +1187,16 @@ print_options (
 				i++;
 			} while ((char*)&opt_nak_list->opt_sqn[i] < end);
 			printf ("\t\t\t\t\"sqn\": [%s]\n", sqns);
+			break;
+		}
+
+		case PGM_OPT_PARITY_PRM:
+		{
+			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
+			printf ("\t\t\t\t\"type\": \"OPT_PARITY_PRM%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"P-bit\": %s,\n", (opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO) ? "true" : "false");
+			printf ("\t\t\t\t\"O-bit\": %s,\n", (opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND) ? "true" : "false");
+			printf ("\t\t\t\t\"transmissionGroupSize\": %i\n", g_ntohl(opt_parity_prm->parity_prm_tgs));
 			break;
 		}
 
