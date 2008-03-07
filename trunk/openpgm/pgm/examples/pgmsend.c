@@ -62,8 +62,8 @@ static int g_max_rte = 400*1000;
 static int g_sqns = 10;
 
 static gboolean g_fec = FALSE;
-static int g_k = 0;
-static int g_2t = 0;
+static int g_k = 64;
+static int g_n = 255;
 
 static pgm_transport_t* g_transport = NULL;
 
@@ -87,8 +87,8 @@ usage (const char* bin)
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-	fprintf (stderr, "  -k <k>          : Configure FEC with k data packets, 2t parity\n");
-	fprintf (stderr, "  -2 <2t>\n");
+	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
+	fprintf (stderr, "  -g <n>\n");
 	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
 	fprintf (stderr, "  -x              : Enable SNMP interface\n");
 	exit (1);
@@ -107,7 +107,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:2:xth")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:xth")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -117,7 +117,7 @@ main (
 
 		case 'f':	g_fec = TRUE; break;
 		case 'k':	g_k = atoi (optarg); break;
-		case '2':	g_2t = atoi (optarg); break;
+		case 'g':	g_n = atoi (optarg); break;
 
 		case 't':	enable_http = TRUE; break;
 		case 'x':	enable_snmpx = TRUE; break;
@@ -127,8 +127,8 @@ main (
 		}
 	}
 
-	if (g_fec && ( !g_k || !g_2t )) {
-		puts ("Invalid FEC parameters.");
+	if (g_fec && ( !g_k || !g_n )) {
+		puts ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
 
@@ -240,7 +240,7 @@ on_startup (
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
 
 	if (g_fec) {
-		pgm_transport_set_fec (g_transport, TRUE, TRUE, g_k, g_2t);
+		pgm_transport_set_fec (g_transport, FALSE, TRUE, g_n, g_k);
 	}
 
 	e = pgm_transport_bind (g_transport);

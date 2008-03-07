@@ -558,7 +558,7 @@ pgm_print_spm (
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
-		pgm_print_options (data, len) > 0 )
+		pgm_print_options (data, len) < 0 )
 	{
 		return FALSE;
 	}
@@ -673,7 +673,7 @@ pgm_print_poll (
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
-		pgm_print_options (data, len) > 0 )
+		pgm_print_options (data, len) < 0 )
 	{
 		return FALSE;
 	}
@@ -720,7 +720,7 @@ pgm_print_polr (
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
-		pgm_print_options (data, len) > 0 )
+		pgm_print_options (data, len) < 0 )
 	{
 		return FALSE;
 	}
@@ -1004,7 +1004,7 @@ pgm_print_nak (
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
-		pgm_print_options (data, len) > 0 )
+		pgm_print_options (data, len) < 0 )
 	{
 		return FALSE;
 	}
@@ -1110,7 +1110,7 @@ pgm_print_spmr (
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
-		pgm_print_options (data, len) > 0 )
+		pgm_print_options (data, len) < 0 )
 	{
 		return FALSE;
 	}
@@ -1130,7 +1130,7 @@ pgm_print_options (
 	int len
 	)
 {
-	printf ("OPTIONS:");
+	printf (" OPTIONS:");
 
 	if (len < sizeof(struct pgm_opt_length)) {
 		puts (" packet truncated :(");
@@ -1180,7 +1180,7 @@ pgm_print_options (
 
 	if (!count) {
 		puts ("too many options found");
-		return FALSE;
+		return -1;
 	}
 
 	return ((char*)opt - data);
