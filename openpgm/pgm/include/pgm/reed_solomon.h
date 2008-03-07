@@ -28,8 +28,18 @@ G_BEGIN_DECLS
 int pgm_rs_create (gpointer*, int, int);
 int pgm_rs_destroy (gpointer);
 
-int pgm_rs_encode (gpointer, const void*, void*, int, int);
-int pgm_rs_decode_proactive (gpointer, void*, int*, int);
+int pgm_rs_encode (gpointer, const void**, int, void*, int);
+int pgm_rs_decode_parity_inline (gpointer, void**, int*, int);
+int pgm_rs_decode_parity_appended (gpointer, void**, int*, int);
+
+#if 0
+int pgm_rs_bch_create (gpointer*, int, int);
+int pgm_rs_bch_destroy (gpointer);
+
+int pgm_rs_bch_encode (gpointer, const void**, void**, int);
+int pgm_rs_bch_decode_parity_inline (gpointer, void*, int*, int);
+int pgm_rs_bch_decode_parity_appended (gpointer, void*, int*, int);
+#endif
 
 
 G_END_DECLS

@@ -35,6 +35,7 @@ e.Program('test_cpu_timers.c')
 e.Program(['test_time.c'])
 e.Program(['block_send.c'])
 e.Program(['test_rs.c'])
+e.Program(['test_rs2.c'])
 e.Program(['sock_name.c'])
 
 # end of file

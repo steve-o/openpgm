@@ -52,7 +52,7 @@ main (
 	char   *argv[]
 	)
 {
-	puts ("test_rs");
+	puts ("test_rs2");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -79,7 +79,7 @@ main (
 	int source_len = strlen (source);		/* chars: g_utf8_strlen() */
 	int block_len = 0;
 	int source_offset = 0;
-	guint8* packet_block[k];
+	guint8* packet_block[n];
 	for (int i = 0; i < k; i++) {
 		packet_block[i] = g_malloc0 (g_max_tpdu);
 
@@ -155,13 +155,13 @@ main (
 	for (int i = 0; i < k; i++)
 		offsets[i] = i;
 	offsets[erasure] = erasure_index;
-	g_slice_free1 (g_max_tpdu, packet_block[erasure]);
-	packet_block[erasure] = parity;		/* place parity packet into original data block */
+	memset (packet_block[erasure], 0, g_max_tpdu);
+	packet_block[k] = parity;		/* place parity packet after original data block */
 
 /* test decoding */
 	start = pgm_time_update_now();
 
-	int retval = pgm_rs_decode_parity_inline (rs, packet_block, offsets, g_max_tpdu);
+	int retval = pgm_rs_decode_parity_appended (rs, packet_block, offsets, g_max_tpdu);
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
@@ -183,7 +183,7 @@ main (
 	g_free (final);
 
 /* clean up */
-	for (int i = 0; i < k; i++) {
+	for (int i = 0; i <= k; i++) {
 		g_slice_free1 (g_max_tpdu, packet_block[i]);
 		packet_block[i] = NULL;
 	}

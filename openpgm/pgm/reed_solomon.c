@@ -2,6 +2,8 @@
  *
  * Reed-Solomon forward error correction based on Vandermonde matrices.
  *
+ * Output is incompatible with BCH style Reed-Solomon encoding.
+ *
  * draft-ietf-rmt-bb-fec-rs-05.txt
  * + rfc5052
  *
@@ -51,7 +53,7 @@ static void
 gf_vec_addmul (
 	gf8_t*			d,
 	const gf8_t		b,
-	gf8_t*			s,
+	const gf8_t*		s,
 	size_t			len		/* length of vectors */
 	)
 {
@@ -82,7 +84,8 @@ gf_vec_addmul (
 	}
 
 	while (len--) {
-		d[i++] ^= gfmul( b, s[i] );
+		d[i] ^= gfmul( b, s[i] );
+		i++;
 	}
 }
 
@@ -421,20 +424,19 @@ pgm_rs_destroy (
 int
 pgm_rs_encode (
 	rs_t*		rs,
-	gf8_t*		src[],		/* length rs_t::k */
+	const gf8_t*	src[],		/* length rs_t::k */
 	int		offset,
-	gf8_t*		dst,
+	gf8_t*		dst,		/* must be zeroed */
 	int		len
 	)
 {
 	g_assert (offset >= rs->k && offset < rs->n);	/* parity packet */
 
-	memset (dst, 0, len);
+//	memset (dst, 0, len);
 	for (int i = 0; i < rs->k; i++)
 	{
 		gf8_t c = rs->GM[ (offset * rs->k) + i ];
-		if (c)
-			gf_vec_addmul (dst, c, src[i], len);
+		gf_vec_addmul (dst, c, src[i], len);
 	}
 
 	return 0;
@@ -444,7 +446,7 @@ pgm_rs_encode (
  * with on-demand parity packets.
  */
 int
-pgm_rs_decode_ondemand (
+pgm_rs_decode_parity_inline (
 	rs_t*		rs,
 	gf8_t*		block[],	/* length rs_t::k */
 	int		offsets[],	/* offsets within FEC block, 0 < offset < n */
@@ -466,7 +468,7 @@ pgm_rs_decode_ondemand (
 /* invert */
 	matinv (rs->RM, rs->k);
 
-	gf8_t* newblocks[ rs->k ];
+	gf8_t* repairs[ rs->k ];
 
 /* multiply out, through the length of erasures[] */
 	for (int j = 0; j < rs->k; j++)
@@ -474,24 +476,23 @@ pgm_rs_decode_ondemand (
 		if (offsets[ j ] < rs->k)
 			continue;
 
-		gf8_t* erasure = newblocks[ j ] = g_slice_alloc0 (len);
+		gf8_t* erasure = repairs[ j ] = g_slice_alloc0 (len);
 		for (int i = 0; i < rs->k; i++)
 		{
 			gf8_t* src = block[ i ];
 			gf8_t c = rs->RM[ (j * rs->k) + i ];
-			if (c)
-				gf_vec_addmul (erasure, c, src, len);
+			gf_vec_addmul (erasure, c, src, len);
 		}
 	}
 
-/* move newblocks over parity packets */
+/* move repaired over parity packets */
 	for (int j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
 
-		memcpy (block[ j ], newblocks[ j ], len * sizeof(gf8_t));
-		g_slice_free1 (len, newblocks[ j ]);
+		memcpy (block[ j ], repairs[ j ], len * sizeof(gf8_t));
+		g_slice_free1 (len, repairs[ j ]);
 	}
 
 	return 0;
@@ -502,13 +503,49 @@ pgm_rs_decode_ondemand (
  * erased packet buffers must be zeroed.
  */
 int
-pgm_rs_decode_proactive (
+pgm_rs_decode_parity_appended (
 	rs_t*		rs,
 	gf8_t*		block[],	/* length rs_t::n, the FEC block */
 	int		offsets[],	/* ordered index of packets */
 	int		len		/* packet length */
 	)
 {
+/* create new recovery matrix from generator
+ */
+	for (int i = 0; i < rs->k; i++)
+	{
+		if (offsets[i] < rs->k) {
+			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(gf8_t));
+			rs->RM[ (i * rs->k) + i ] = 1;
+			continue;
+		}
+		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(gf8_t));
+	}
+
+/* invert */
+	matinv (rs->RM, rs->k);
+
+/* multiply out, through the length of erasures[] */
+	for (int j = 0; j < rs->k; j++)
+	{
+		if (offsets[ j ] < rs->k)
+			continue;
+
+		int p = rs->k;
+		gf8_t* erasure = block[ j ];
+		for (int i = 0; i < rs->k; i++)
+		{
+			gf8_t* src;
+			if (offsets[ i ] < rs->k)
+				src = block[ i ];
+			else
+				src = block[ p++ ];
+			gf8_t c = rs->RM[ (j * rs->k) + i ];
+			gf_vec_addmul (erasure, c, src, len);
+		}
+	}
+
+	return 0;
 }
 
 /* eof */

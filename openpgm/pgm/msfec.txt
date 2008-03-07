@@ -24,3 +24,8 @@ RS(255, 16)	90/104
 RS(255, 32)	177/194
 RS(255, 64)	353/374
 RS(255, 128)	697/fail
+
+
+Implementation exact copy of Luigi Rizzo FEC code as demonstrated in RMDP:
+
+http://info.iet.unipi.it/~luigi/fec.html

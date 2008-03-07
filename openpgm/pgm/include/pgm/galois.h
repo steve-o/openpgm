@@ -98,11 +98,12 @@ gfmul (
         gf8_t           b
         )
 {
-	if (a && b) {
-		guint sum = gflog[ a ] + gflog[ b ];
-		return sum >= GF_MAX ? gfantilog[ sum - GF_MAX ] : gfantilog[ sum ];
+	if (G_UNLIKELY( !(a && b) )) {
+		return 0;
 	}
-	return 0;
+
+	guint sum = gflog[ a ] + gflog[ b ];
+	return sum >= GF_MAX ? gfantilog[ sum - GF_MAX ] : gfantilog[ sum ];
 }
 
 static inline gf8_t
@@ -111,11 +112,12 @@ gfdiv (
         gf8_t           b
         )
 {
-	if (a) {
-		gint sum = gflog[ a ] - gflog[ b ];
-		return sum < 0 ? gfantilog[ sum + GF_MAX ] : gfantilog[ sum ];
+	if (G_UNLIKELY( !a )) {
+		return 0;
 	}
-	return 0;
+
+	gint sum = gflog[ a ] - gflog[ b ];
+	return sum < 0 ? gfantilog[ sum + GF_MAX ] : gfantilog[ sum ];
 }
 
 G_END_DECLS

@@ -227,8 +227,13 @@ Basic TODO list
   * thread synchronisationt not necessary so probably bad idea *
 - Determine handling of zero length data packets.
 - Implement PGM sender (only) support thread?
+- Parity SPMs.
+- Parity NAKs.
+- Parity RDATA.
+- Parity repair.
 
 Optionals
 *********
 
 - Some form of broadcast statistics for passive monitoring.
+- (fix) BCH Reed-Solomon codec as possibly faster alternative, albeit incompatible with Microsoft.
