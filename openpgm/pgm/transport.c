@@ -1585,6 +1585,15 @@ pgm_transport_bind (
 		transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm6);
 		break;
 	}
+
+	if (transport->proactive_parity || transport->ondemand_parity)
+	{
+		transport->spm_len += sizeof(struct pgm_opt_header) + 
+				      sizeof(struct pgm_opt_length) +
+				      sizeof(struct pgm_opt_header) +
+				      sizeof(struct pgm_opt_parity_prm);
+	}
+
 	transport->spm_packet = g_slice_alloc0 (transport->spm_len);
 
 	struct pgm_header* header = (struct pgm_header*)transport->spm_packet;
@@ -1595,6 +1604,28 @@ pgm_transport_bind (
 	header->pgm_type	= PGM_SPM;
 
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_interface, (char*)&spm->spm_nla_afi);
+
+/* OPT_PARITY_PRM */
+	if (transport->proactive_parity || transport->ondemand_parity)
+	{
+		header->pgm_options     = PGM_OPT_PRESENT;
+
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(spm + 1);
+		opt_header->opt_type	= PGM_OPT_LENGTH;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) + 
+							sizeof(struct pgm_opt_length) +
+							sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_parity_prm));
+		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+		opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
+		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_nak_list*)(opt_header + 1);
+		opt_parity_prm->opt_reserved = (transport->proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
+					       (transport->ondemand_parity ? PGM_PARITY_PRM_OND : 0);
+		opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
+	}
 
 /* determine IP header size for rate regulation engine & stats */
 	switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
@@ -4492,6 +4523,8 @@ pgm_transport_set_fec (
 	g_static_mutex_lock (&transport->mutex);
 	transport->proactive_parity	= enable_proactive_parity;
 	transport->ondemand_parity	= enable_ondemand_parity;
+	transport->rs_n			= default_n;
+	transport->rs_k			= default_k;
 
 //	transport->fec = pgm_fec_create (default_n, default_k);
 

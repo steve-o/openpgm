@@ -214,9 +214,8 @@ struct pgm_transport_t {
 
     gboolean		proactive_parity;
     gboolean		ondemand_parity;
-    guint		fec_n;
-    guint		fec_k;
-    guint		fec_padding;
+    guint		rs_n;
+    guint		rs_k;
 
     gpointer		rx_buffer;
     struct iovec*	piov;

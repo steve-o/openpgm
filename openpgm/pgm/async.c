@@ -129,7 +129,7 @@ pgm_receiver_thread (
 			while (len)
 			{
 				memcpy (dst, src->iov_base, src->iov_len);
-				dst += src->iov_len;
+				dst = (char*)dst + src->iov_len;
 				len -= src->iov_len;
 				src++;
 			}

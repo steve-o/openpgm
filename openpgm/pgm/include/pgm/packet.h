@@ -155,6 +155,11 @@ struct pgm_opt_header {
 #define PGM_OPT_MASK	0x7f
 #define PGM_OPT_END	0x80		/* end of options flag */
     guint8	opt_length;		/* option length */
+#define PGM_OP_ENCODED		0x4	/* F-bit */
+#define PGM_OPX_IGNORE		0x0	/* extensibility bits */
+#define PGM_OPX_INVALIDATE	0x1
+#define PGM_OPX_DISCARD		0x2
+#define PGM_OP_ENCODED_NULL	0xf	/* U-bit */
 };
 
 /* 9.1.  Option extension length - OPT_LENGTH */
@@ -223,6 +228,8 @@ struct pgm_opt_rst {
 /* 11.8.1.  Option Parity - OPT_PARITY_PRM */
 struct pgm_opt_parity_prm {
     guint16	opt_reserved;		/* reserved */
+#define PGM_PARITY_PRM_PRO  0x1		/* source provides pro-active parity packets */
+#define PGM_PARITY_PRM_OND  0x2		/*                 on-demand parity packets */
     guint32	parity_prm_tgs;		/* transmission group size */
 };
 
@@ -232,7 +239,7 @@ struct pgm_opt_parity_grp {
     guint32	prm_group;		/* parity group number */
 };
 
-/* 11.8.3.  Option Current Transmission Gropu Size - OPT_CURR_TGSIZE */
+/* 11.8.3.  Option Current Transmission Group Size - OPT_CURR_TGSIZE */
 struct pgm_opt_curr_tgsize {
     guint16	opt_reserved;		/* reserved */
     guint32	prm_atgsize;		/* actual transmission group size */
