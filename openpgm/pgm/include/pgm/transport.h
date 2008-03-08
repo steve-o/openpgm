@@ -149,6 +149,10 @@ struct pgm_peer_t {
     pgm_transport_t*    transport;
     GList		link_;
 
+    gboolean		proactive_parity;	    /* indicating availability from this source */
+    gboolean		ondemand_parity;
+    guint		rs_k;
+
     int			spm_sqn;
     pgm_time_t		expiry;
 

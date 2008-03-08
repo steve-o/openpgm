@@ -1103,7 +1103,7 @@ verify_options (
 		case PGM_OPT_PARITY_PRM:
 		{
 			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
-			if ((opt_parity_prm->opt_reserved & 0x3) == 0) {
+			if ((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0) {
 				printf ("\t\"message\": \"PGM options: neither pro-active or on-demand parity set in OPT_PARITY_PRM.\",\n");
 				retval = -1;
 				goto out;
