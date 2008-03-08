@@ -228,6 +228,7 @@ struct pgm_opt_rst {
 /* 11.8.1.  Option Parity - OPT_PARITY_PRM */
 struct pgm_opt_parity_prm {
     guint16	opt_reserved;		/* reserved */
+#define PGM_PARITY_PRM_MASK 0x3
 #define PGM_PARITY_PRM_PRO  0x1		/* source provides pro-active parity packets */
 #define PGM_PARITY_PRM_OND  0x2		/*                 on-demand parity packets */
     guint32	parity_prm_tgs;		/* transmission group size */

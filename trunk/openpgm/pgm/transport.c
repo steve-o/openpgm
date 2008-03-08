@@ -1621,7 +1621,7 @@ pgm_transport_bind (
 		opt_header = (struct pgm_opt_header*)(opt_length + 1);
 		opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
 		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
-		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_nak_list*)(opt_header + 1);
+		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
 		opt_parity_prm->opt_reserved = (transport->proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
 					       (transport->ondemand_parity ? PGM_PARITY_PRM_OND : 0);
 		opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
@@ -2141,7 +2141,7 @@ pgm_transport_recv (
 
 			memcpy (data, p->iov_base, src_bytes);
 
-			data += src_bytes;
+			data = (char*)data + src_bytes;
 			bytes_copied += src_bytes;
 			p++;
 
@@ -2181,7 +2181,7 @@ pgm_transport_poll_info (
 	int*			n_fds		/* in: #fds, out: used #fds */
 	)
 {
-	g_assert (n_fds > 2);
+	g_assert (*n_fds > 2);
 
 /* we currently only support one incoming socket */
 	fds[0].fd = transport->recv_sock;
@@ -2381,6 +2381,58 @@ on_spm (
 		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS]++;
 		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		retval = -EINVAL;
+	}
+
+/* check whether peer can generate parity packets */
+	if (header->pgm_options & PGM_OPT_PRESENT)
+	{
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(spm + 1);
+		if (opt_header->opt_type != PGM_OPT_LENGTH)
+		{
+			retval = -EINVAL;
+			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
+			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+			goto out;
+		}
+		if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length))
+		{
+			retval = -EINVAL;
+			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
+			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+			goto out;
+		}
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+/* TODO: check for > 16 options & past packet end */
+		do {
+			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+
+			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_PARITY_PRM)
+			{
+				struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
+
+				if ((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0)
+				{
+					retval = -EINVAL;
+					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
+					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+					goto out;
+				}
+
+				guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
+				if (parity_prm_tgs < 2 || parity_prm_tgs > 128)
+				{
+					retval = -EINVAL;
+					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
+					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
+					goto out;
+				}
+			
+				sender->proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
+				sender->ondemand_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
+				sender->rs_k = parity_prm_tgs;
+				break;
+			}
+		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
 
 /* either way bump expiration timer */
