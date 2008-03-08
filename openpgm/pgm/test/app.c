@@ -374,6 +374,24 @@ session_set_txw_max_rte (
 }
 
 void
+session_set_fec (
+	char*		name,
+	guint		default_n,
+	guint		default_k
+	)
+{
+/* check that session exists */
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, default_n, default_k);
+	puts ("READY");
+}
+
+void
 session_bind (
 	char*		name
 	)
@@ -512,7 +530,7 @@ on_stdin_data (
 		}
 
 		regex_t preg;
-		regmatch_t pmatch[3];
+		regmatch_t pmatch[10];
 
 /* create transport */
 		char *re = "^create[[:space:]]+([[:alnum:]]+)$";
@@ -637,6 +655,29 @@ on_stdin_data (
 			guint txw_max_rte = strtol (p, &p, 10);
 
 			session_set_txw_max_rte (name, txw_max_rte);
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* enable Reed-Solomon Forward Error Correction */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+FEC[[:space:]]+RS[[:space:]]*\\([[:space:]]*([0-9]+)[[:space:]]*,[[:space:]]*([0-9]+)[[:space:]]*\\)$";
+		regcomp (&preg, re, REG_EXTENDED);
+
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			*(str + pmatch[2].rm_eo) = 0;
+			guint n = strtol (p, &p, 10);
+			p = str + pmatch[3].rm_so;
+			*(str + pmatch[3].rm_eo) = 0;
+			guint k = strtol (p, &p, 10);
+			session_set_fec (name, n, k);
 
 			g_free (name);
 			regfree (&preg);
