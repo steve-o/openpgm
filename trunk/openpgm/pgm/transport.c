@@ -118,6 +118,7 @@ static int send_spm_unlocked (pgm_transport_t*);
 static inline int send_spm (pgm_transport_t*);
 static int send_spmr (pgm_peer_t*);
 static int send_nak (pgm_peer_t*, guint32);
+static int send_parity_nak (pgm_peer_t*, guint, guint);
 static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*);
 static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32);
 static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*);
@@ -199,6 +200,18 @@ pgm_tsi_equal (
         )
 {
 	return memcmp (v, v2, (6 * sizeof(guint8)) + sizeof(guint16)) == 0;
+}
+
+/* fast log base 2 of power of 2
+ */
+
+static inline guint power2_log2 (guint v)
+{
+	static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
+	unsigned int r = (v & b[0]) != 0;
+	for (int i = 4; i > 0; i--) {
+		r |= ((v & b[i]) != 0) << i;
+	}
 }
 
 /* calculate NAK_RB_IVL as random time interval 1 - NAK_BO_IVL.
@@ -1703,7 +1716,6 @@ new_peer (
 	pgm_peer_t* peer;
 
 	g_trace ("INFO","new peer, tsi %s, local nla %s", pgm_print_tsi (tsi), inet_ntoa(((struct sockaddr_in*)src_addr)->sin_addr));
-	g_message ("new peer, tsi %s, local nla %s", pgm_print_tsi (tsi), inet_ntoa(((struct sockaddr_in*)src_addr)->sin_addr));
 
 	peer = g_malloc0 (sizeof(pgm_peer_t));
 	peer->expiry = pgm_time_update_now() + transport->peer_expiry;
@@ -2430,6 +2442,7 @@ on_spm (
 				sender->proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
 				sender->ondemand_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
 				sender->rs_k = parity_prm_tgs;
+				sender->tg_sqn_shift = power2_log2 (sender->rs_k);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -3089,6 +3102,8 @@ out:
 	return retval;
 }
 
+/* send selective NAK for one sequence number.
+ */
 static int
 send_nak (
 	pgm_peer_t*		peer,
@@ -3198,6 +3213,68 @@ send_ncf (
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
 //	g_trace ("INFO","%i bytes sent", tpdu_length);
+
+out:
+	return retval;
+}
+
+/* Send a parity NAK requesting on-demand parity packet generation.
+ */
+static int
+send_parity_nak (
+	pgm_peer_t*		peer,
+	guint			nak_tg_sqn,	/* transmission group (shifted) */
+	guint			nak_pkt_cnt	/* count of parity packets to request */
+	)
+{
+	g_trace ("INFO", "send_parity_nak(%" G_GUINT_FORMAT ", %" G_GUINT_FORMAT ")", nak_tg_sqn, nak_pkt_cnt);
+
+	int retval = 0;
+	pgm_transport_t* transport = peer->transport;
+	gchar buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) ];
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+
+	guint16	peer_sport = peer->tsi.sport;
+	struct sockaddr_storage peer_nla;
+	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
+
+/* dport & sport swap over for a nak */
+	header->pgm_sport	= transport->dport;
+	header->pgm_dport	= peer_sport;
+	header->pgm_type        = PGM_NAK;
+        header->pgm_options     = PGM_OPT_PARITY;	/* this is a parity packet */
+        header->pgm_tsdu_length = 0;
+
+/* NAK */
+	nak->nak_sqn		= g_htonl (nak_tg_sqn | (nak_pkt_cnt - 1) );
+
+/* source nla */
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
+
+/* group nla: we match the NAK NLA to the same as advertised by the source, we might
+ * be listening to multiple multicast groups
+ */
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
+
+	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
+	retval = sendto (transport->send_with_router_alert_sock,
+				header,
+				tpdu_length,
+				MSG_CONFIRM,		/* not expecting a reply */
+				(struct sockaddr*)&peer_nla,
+				pgm_sockaddr_len(&peer_nla));
+	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
+
+//	g_trace ("INFO","%i bytes sent", tpdu_length);
+	peer->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT]++;
+	peer->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAKS_SENT]++;
 
 out:
 	return retval;
@@ -3434,91 +3511,181 @@ nak_rb_state (
 /* have not learned this peers NLA */
 	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
-	while (list)
+/* calculate current transmission group for parity enabled peers */
+	if (peer->ondemand_parity)
 	{
-		GList* next_list_el = list->prev;
-		pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
+		guint32 tg_sqn_mask = 0xffffffff << peer->tg_sqn_shift;
+		guint32 pkt_cnt_mask = ~tg_sqn_mask;
+
+/* NAKs only generated previous to current transmission group */
+		guint32 current_tg_sqn = ((pgm_rxw_t*)peer->rxw)->lead & tg_sqn_mask;
+
+		guint32 nak_tg_sqn;
+		guint32 nak_pkt_cnt = 0;
+
+/* parity NAK generation */
+
+		while (list)
+		{
+			GList* next_list_el = list->prev;
+			pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
 
 /* check this packet for state expiration */
-		if (pgm_time_after_eq(pgm_time_now, rp->nak_rb_expiry))
-		{
-			if (!is_valid_nla) {
-				dropped_invalid++;
-				g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
-				pgm_rxw_mark_lost (rxw, rp->sequence_number);
+			if (pgm_time_after_eq(pgm_time_now, rp->nak_rb_expiry))
+			{
+				if (!is_valid_nla) {
+					dropped_invalid++;
+					g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
+					pgm_rxw_mark_lost (rxw, rp->sequence_number);
 
 /* mark receiver window for flushing on next recv() */
-				if (!rxw->waiting_link.data)
-				{
-					g_static_mutex_lock (&transport->waiting_mutex);
-					rxw->waiting_link.data = rxw;
-					rxw->waiting_link.next = transport->peers_waiting;
-					transport->peers_waiting = &rxw->waiting_link;
-					g_static_mutex_unlock (&transport->waiting_mutex);
+					if (!rxw->waiting_link.data)
+					{
+						g_static_mutex_lock (&transport->waiting_mutex);
+						rxw->waiting_link.data = rxw;
+						rxw->waiting_link.next = transport->peers_waiting;
+						transport->peers_waiting = &rxw->waiting_link;
+						g_static_mutex_unlock (&transport->waiting_mutex);
+					}
+
+					list = next_list_el;
+					continue;
 				}
 
-				list = next_list_el;
-				continue;
+				guint tg_sqn = rp->sequence_number & tg_sqn_mask;
+				if (	( nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
+					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
+				{
+/* remove from this state */
+					pgm_rxw_pkt_state_unlink (rxw, rp);
+
+					if (!nak_pkt_cnt++)
+						nak_tg_sqn = tg_sqn;
+					rp->nak_transmit_count++;
+
+					rp->state = PGM_PKT_WAIT_NCF_STATE;
+					g_queue_push_head_link (rxw->wait_ncf_queue, &rp->link_);
+
+#ifdef PGM_ABSOLUTE_EXPIRY
+					rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
+					while (pgm_time_after_eq(pgm_time_now, rp->nak_rpt_expiry){
+						rp->nak_rpt_expiry += transport->nak_rpt_ivl;
+						rp->ncf_retry_count++;
+					}
+#else
+					rp->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
+#endif
+				}
+				else
+				{	/* different transmission group */
+					break;
+				}
+			}
+			else
+			{	/* packet expires some time later */
+				break;
 			}
 
+			list = next_list_el;
+		}
+
+		if (nak_pkt_cnt)
+		{
+			send_parity_nak (peer, nak_tg_sqn, nak_pkt_cnt);
+		}
+	}
+	else
+	{
+
+/* select NAK generation */
+
+		while (list)
+		{
+			GList* next_list_el = list->prev;
+			pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
+
+/* check this packet for state expiration */
+			if (pgm_time_after_eq(pgm_time_now, rp->nak_rb_expiry))
+			{
+				if (!is_valid_nla) {
+					dropped_invalid++;
+					g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
+					pgm_rxw_mark_lost (rxw, rp->sequence_number);
+
+/* mark receiver window for flushing on next recv() */
+					if (!rxw->waiting_link.data)
+					{
+						g_static_mutex_lock (&transport->waiting_mutex);
+						rxw->waiting_link.data = rxw;
+						rxw->waiting_link.next = transport->peers_waiting;
+						transport->peers_waiting = &rxw->waiting_link;
+						g_static_mutex_unlock (&transport->waiting_mutex);
+					}
+
+					list = next_list_el;
+					continue;
+				}
+
 /* remove from this state */
-			pgm_rxw_pkt_state_unlink (rxw, rp);
+				pgm_rxw_pkt_state_unlink (rxw, rp);
 
 #if PGM_SINGLE_NAK
-			send_nak (transport, peer, rp->sequence_number);
-			pgm_time_update_now();
+				send_nak (transport, peer, rp->sequence_number);
+				pgm_time_update_now();
 #else
-			nak_list.sqn[nak_list.len++] = rp->sequence_number;
+				nak_list.sqn[nak_list.len++] = rp->sequence_number;
 #endif
 
-			rp->nak_transmit_count++;
+				rp->nak_transmit_count++;
 
-			rp->state = PGM_PKT_WAIT_NCF_STATE;
-			g_queue_push_head_link (rxw->wait_ncf_queue, &rp->link_);
+				rp->state = PGM_PKT_WAIT_NCF_STATE;
+				g_queue_push_head_link (rxw->wait_ncf_queue, &rp->link_);
 
 /* we have two options here, calculate the expiry time in the new state relative to the current
  * state execution time, skipping missed expirations due to delay in state processing, or base
  * from the actual current time.
  */
 #ifdef PGM_ABSOLUTE_EXPIRY
-			rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
-			while (pgm_time_after_eq(pgm_time_now, rp->nak_rpt_expiry){
-				rp->nak_rpt_expiry += transport->nak_rpt_ivl;
-				rp->ncf_retry_count++;
-			}
+				rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
+				while (pgm_time_after_eq(pgm_time_now, rp->nak_rpt_expiry){
+					rp->nak_rpt_expiry += transport->nak_rpt_ivl;
+					rp->ncf_retry_count++;
+				}
 #else
-			rp->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
+				rp->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
 g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 		pgm_to_secsf( rp->nak_rpt_expiry - pgm_time_now ) );
 #endif
 
 #ifndef PGM_SINGLE_NAK
-			if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
-				send_nak_list (peer, &nak_list);
-				pgm_time_update_now();
-				nak_list.len = 0;
-			}
+				if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
+					send_nak_list (peer, &nak_list);
+					pgm_time_update_now();
+					nak_list.len = 0;
+				}
 #endif
-		}
-		else
-		{	/* packet expires some time later */
-			break;
-		}
+			}
+			else
+			{	/* packet expires some time later */
+				break;
+			}
 
-		list = next_list_el;
-	}
+			list = next_list_el;
+		}
 
 #ifndef PGM_SINGLE_NAK
-	if (nak_list.len)
-	{
-		if (nak_list.len > 1) {
-			send_nak_list (peer, &nak_list);
-		} else {
-			g_assert (nak_list.len == 1);
-			send_nak (peer, nak_list.sqn[0]);
+		if (nak_list.len)
+		{
+			if (nak_list.len > 1) {
+				send_nak_list (peer, &nak_list);
+			} else {
+				g_assert (nak_list.len == 1);
+				send_nak (peer, nak_list.sqn[0]);
+			}
 		}
-	}
 #endif
+
+	}
 
 	if (dropped_invalid) {
 		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);

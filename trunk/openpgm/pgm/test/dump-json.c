@@ -327,9 +327,9 @@ print_pgm_header (
 	printf ("\t\t\"type\": \"%s\",\n", pgm_type_string(pgm->pgm_type & 0xf));
 	printf ("\t\t\"version\": %i,\n", (pgm->pgm_type & 0xc0) >> 6);
 	puts ("\t\t\"options\": {");
-	printf ("\t\t\t\"networkSignificant\": %s,\n", (pgm->pgm_options & (0x1 << 6)) ? "true" : "false");
-	printf ("\t\t\t\"parityPacket\": %s,\n", (pgm->pgm_options & (0x1 << 0)) ? "true" : "false");
-	printf ("\t\t\t\"variableLength\": %s\n", (pgm->pgm_options & (0x1 << 1)) ? "true" : "false");
+	printf ("\t\t\t\"networkSignificant\": %s,\n", (pgm->pgm_options & PGM_OPT_NETWORK) ? "true" : "false");
+	printf ("\t\t\t\"parityPacket\": %s,\n", (pgm->pgm_options & PGM_OPT_PARITY) ? "true" : "false");
+	printf ("\t\t\t\"variableLength\": %s\n", (pgm->pgm_options & PGM_OPT_VAR_PKTLEN) ? "true" : "false");
 	puts ("\t\t},");
 	printf ("\t\t\"checksum\": %i,\n", pgm->pgm_checksum);
 	printf ("\t\t\"gsi\": \"%i.%i.%i.%i.%i.%i\",\n",
@@ -442,16 +442,16 @@ print_spm (
 		break;
 	}
 
-	printf ("\t\t\"spmNla\": \"%s\"\n", s);
+	printf ("\t\t\"spmNla\": \"%s\"", s);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
+		puts (",");
 		print_options (opt_offset);
-		puts ("");
 	}
 
-	puts ("\t}");
+	puts ("\n\t}");
 }
 
 /* 14.7.1.  Poll Request

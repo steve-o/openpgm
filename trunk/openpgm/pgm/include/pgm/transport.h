@@ -91,9 +91,13 @@ typedef enum {
     PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP,
     PGM_PC_RECEIVER_DUP_SPMS,
     PGM_PC_RECEIVER_DUP_DATAS,
+    PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT,
     PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT,
+    PGM_PC_RECEIVER_PARITY_NAKS_SENT,
     PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT,
+    PGM_PC_RECEIVER_PARITY_NAKS_RETRANSMITTED,
     PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED,
+    PGM_PC_RECEIVER_PARITY_NAKS_FAILED,
     PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED,
     PGM_PC_RECEIVER_NAKS_FAILED_RXW_ADVANCED,
     PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED,
@@ -152,6 +156,7 @@ struct pgm_peer_t {
     gboolean		proactive_parity;	    /* indicating availability from this source */
     gboolean		ondemand_parity;
     guint		rs_k;
+    guint32		tg_sqn_shift;		    /* log2 (rs_k) */
 
     int			spm_sqn;
     pgm_time_t		expiry;
