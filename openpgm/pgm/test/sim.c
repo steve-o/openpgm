@@ -850,7 +850,10 @@ net_send_spm (
 	char*		name,
 	guint32		spm_sqn,
 	guint32		txw_trail,
-	guint32		txw_lead
+	guint32		txw_lead,
+	gboolean	proactive_parity,
+	gboolean	ondemand_parity,
+	guint		k
 	)
 {
 /* check that session exists */
@@ -866,6 +869,13 @@ net_send_spm (
         int retval = 0;
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
 
+	if (proactive_parity || ondemand_parity) {
+		tpdu_length += sizeof(struct pgm_opt_header) +
+				sizeof(struct pgm_opt_length) +
+				sizeof(struct pgm_opt_header) +
+				sizeof(struct pgm_opt_parity_prm);
+	}
+
 	gchar buf[ tpdu_length ];
 
         struct pgm_header *header = (struct pgm_header*)buf;
@@ -874,7 +884,7 @@ net_send_spm (
 	header->pgm_sport       = transport->tsi.sport;
 	header->pgm_dport       = transport->dport;
 	header->pgm_type        = PGM_SPM;
-	header->pgm_options	= 0;
+	header->pgm_options	= (proactive_parity || ondemand_parity) ? PGM_OPT_PRESENT : 0;
 	header->pgm_tsdu_length	= 0;
 
 /* SPM */
@@ -882,6 +892,24 @@ net_send_spm (
 	spm->spm_trail		= g_htonl (txw_trail);
 	spm->spm_lead		= g_htonl (txw_lead);
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
+
+	if (proactive_parity || ondemand_parity) {
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(spm + 1);
+		opt_header->opt_type	= PGM_OPT_LENGTH;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
+		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_length) +
+							sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_parity_prm));
+		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+		opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
+		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
+		opt_parity_prm->opt_reserved = (proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
+					       (ondemand_parity ? PGM_PARITY_PRM_OND : 0);
+		opt_parity_prm->parity_prm_tgs = g_htonl (k);
+	}
 
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -1087,7 +1115,8 @@ void
 net_send_nak (
 	char*		name,
 	pgm_tsi_t*	tsi,
-	pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
+	pgm_sqn_list_t*	sqn_list,	/* list of sequence numbers */
+	gboolean	is_parity	/* TRUE = parity, FALSE = selective */
 	)
 {
 /* check that session exists */
@@ -1129,7 +1158,12 @@ net_send_nak (
         header->pgm_sport       = transport->dport;
         header->pgm_dport       = peer_sport;
         header->pgm_type        = PGM_NAK;
-        header->pgm_options     = (sqn_list->len > 1) ? PGM_OPT_PRESENT : 0;
+	if (is_parity) {
+	        header->pgm_options     = (sqn_list->len > 1) ? (PGM_OPT_PRESENT | PGM_OPT_PARITY)
+							      : PGM_OPT_PARITY;
+	} else {
+	        header->pgm_options     = (sqn_list->len > 1) ? PGM_OPT_PRESENT : 0;
+	}
         header->pgm_tsdu_length = 0;
 
 /* NAK */
@@ -1248,7 +1282,10 @@ on_stdin_data (
 			"([[:alnum:]]+)[[:space:]]+"	/* transport */
 			"([0-9]+)[[:space:]]+"		/* spm sequence number */
 			"([0-9]+)[[:space:]]+"		/* txw_trail */
-			"([0-9]+)$";			/* txw_lead */
+			"([0-9]+)"			/* txw_lead */
+			"([[:space:]]+pro-active)?"	/* pro-active parity */
+			"([[:space:]]+on-demand)?"	/* on-demand parity */
+			"([[:space:]]+[0-9]+)$";	/* transmission group size */
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
@@ -1264,7 +1301,13 @@ on_stdin_data (
 			p = str + pmatch[4].rm_so;
 			guint txw_lead = strtoul (p, &p, 10);
 
-			net_send_spm (name, spm_sqn, txw_trail, txw_lead);
+			gboolean proactive_parity = pmatch[5].rm_eo > pmatch[5].rm_so;
+			gboolean ondemand_parity = pmatch[6].rm_eo > pmatch[6].rm_so;
+
+			p = str + pmatch[7].rm_so;
+			guint k = (pmatch[7].rm_eo > pmatch[7].rm_so) ? strtoul (p, &p, 10) : 0;
+
+			net_send_spm (name, spm_sqn, txw_trail, txw_lead, proactive_parity, ondemand_parity, k);
 
 			g_free (name);
 			regfree (&preg);
@@ -1306,19 +1349,19 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
-/* send nak */
-		re = "^net[[:space:]]+send[[:space:]]n(ak|cf)[[:space:]]+"
+/* send nak/ncf */
+		re = "^net[[:space:]]+send[[:space:]](parity[[:space:]])?n(ak|cf)[[:space:]]+"
 			"([[:alnum:]]+)[[:space:]]+"	/* transport */
 			"([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)[[:space:]]+"	/* TSI */
 			"([0-9,]+)$";			/* sequence number or list */
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
-			char *name = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
-			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
+			char *name = g_memdup (str + pmatch[3].rm_so, pmatch[3].rm_eo - pmatch[3].rm_so + 1 );
+			name[ pmatch[3].rm_eo - pmatch[3].rm_so ] = 0;
 
 			pgm_tsi_t tsi;
-			char *p = str + pmatch[3].rm_so;
+			char *p = str + pmatch[4].rm_so;
 			tsi.gsi.identifier[0] = strtol (p, &p, 10);
 			++p;
 			tsi.gsi.identifier[1] = strtol (p, &p, 10);
@@ -1338,16 +1381,16 @@ on_stdin_data (
 			sqn_list.len = 0;
 			{
 				char* saveptr;
-				for (p = str + pmatch[4].rm_so; ; p = NULL) {
+				for (p = str + pmatch[5].rm_so; ; p = NULL) {
 					char* token = strtok_r (p, ",", &saveptr);
 					if (!token) break;
 					sqn_list.sqn[sqn_list.len++] = strtoul (token, NULL, 10);
 				}
 			}
 
-			if ( *(str + pmatch[1].rm_so) == 'a' )
+			if ( *(str + pmatch[2].rm_so) == 'a' )
 			{
-				net_send_nak (name, &tsi, &sqn_list);
+				net_send_nak (name, &tsi, &sqn_list, (pmatch[1].rm_eo > pmatch[1].rm_so));
 			}
 			else
 			{
