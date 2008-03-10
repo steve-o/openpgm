@@ -53,8 +53,9 @@
 #include "pgm/sn.h"
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
+#include "pgm/reed_solomon.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -120,8 +121,8 @@ static int send_spmr (pgm_peer_t*);
 static int send_nak (pgm_peer_t*, guint32);
 static int send_parity_nak (pgm_peer_t*, guint, guint);
 static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*);
-static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32);
-static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*);
+static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32, gboolean);
+static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*, gboolean);
 
 static void nak_rb_state (gpointer, gpointer);
 static void nak_rpt_state (gpointer, gpointer);
@@ -129,7 +130,7 @@ static void nak_rdata_state (gpointer, gpointer);
 static void check_peer_nak_state (pgm_transport_t*);
 static pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
-static int send_rdata (pgm_transport_t*, int, gpointer, int);
+static int send_rdata (pgm_transport_t*, guint32, gpointer, guint, gboolean, guint);
 
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static inline void pgm_peer_unref (pgm_peer_t*);
@@ -205,13 +206,15 @@ pgm_tsi_equal (
 /* fast log base 2 of power of 2
  */
 
-static inline guint power2_log2 (guint v)
+inline guint
+pgm_power2_log2 (guint v)
 {
 	static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
 	unsigned int r = (v & b[0]) != 0;
 	for (int i = 4; i > 0; i--) {
 		r |= ((v & b[i]) != 0) << i;
 	}
+	return r;
 }
 
 /* calculate NAK_RB_IVL as random time interval 1 - NAK_BO_IVL.
@@ -471,6 +474,15 @@ pgm_transport_destroy (
 
 	g_static_mutex_unlock (&transport->mutex);
 	g_static_mutex_free (&transport->mutex);
+
+	if (transport->parity_buffer) {
+		g_free (transport->parity_buffer);
+		transport->parity_buffer = NULL;
+	}
+	if (transport->rs) {
+		pgm_rs_destroy (transport->rs);
+		transport->rs = NULL;
+	}
 
 	if (transport->rx_buffer) {
 		g_free (transport->rx_buffer);
@@ -1680,6 +1692,13 @@ pgm_transport_bind (
 	send_spm_unlocked (transport);
 	send_spm_unlocked (transport);
 
+/* parity buffer for odata/rdata transmission */
+	if (transport->proactive_parity || transport->ondemand_parity) {
+		transport->parity_buffer = g_malloc ( transport->max_tpdu );
+
+		pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
+	}
+
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = g_malloc ( transport->max_tpdu );
 
@@ -2275,6 +2294,22 @@ on_io_error (
 	return FALSE;
 }
 
+int
+pgm_schedule_proactive_nak (
+	pgm_transport_t*	transport,
+	guint32			sqn
+	)
+{
+	int retval = 0;
+
+	pgm_txw_retransmit_push (transport->txw, sqn, TRUE, transport->tg_sqn_shift);
+	const char one = '1';
+	if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
+		g_critical ("write to pipe failed :(");
+		retval = -EINVAL;
+	}
+	return retval;
+}
 
 /* a deferred request for RDATA, now processing in the timer thread, we check the transmit
  * window to see if the packet exists and forward on, maintaining a lock until the queue is
@@ -2300,11 +2335,70 @@ on_nak_pipe (
 	guint32 sqn;
 	gpointer rdata = NULL;
 	guint rlen = 0;
+	gboolean is_parity = FALSE;
+	guint rs_h = 0;
+	guint rs_2t = transport->rs_n - transport->rs_k;
 
+/* parity packets are re-numbered across the transmission group with index h, sharing the space
+ * with the original packets.  beyond the transmission group size (k), the PGM option OPT_PARITY_GRP
+ * provides the extra offset value.
+ */
+
+/* TODO: peek instead of pop, calculate parity outside of lock, pop after sending RDATA to stop accrual
+ * of NAKs on same numbers
+ */
 	g_static_rw_lock_reader_lock (&transport->txw_lock);
-	if (!pgm_txw_retransmit_try_pop (transport->txw, &sqn, &rdata, &rlen));
+	if (!pgm_txw_retransmit_try_pop (transport->txw, &sqn, &rdata, &rlen, &is_parity, &rs_h, rs_2t));
 	{
-		send_rdata (transport, sqn, rdata, rlen);
+/* calculate parity packet */
+		if (is_parity) {
+			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+			guint32 tg_sqn = sqn & tg_sqn_mask;
+printf ("calculate parity packet for tg_sqn %i\n", (int)tg_sqn);
+
+			guint16 parity_length = 0;
+			guint8* src[ transport->rs_k ];
+			for (int i = tg_sqn; i < (tg_sqn + transport->rs_k); i++) {
+				gpointer packet;
+				guint length;
+				pgm_txw_peek (transport->txw, i, &packet, &length);
+
+				struct pgm_header* header = packet;
+				guint16 tsdu_length = g_ntohs (header->pgm_tsdu_length);
+				if (tsdu_length > parity_length) parity_length = tsdu_length;
+
+				struct pgm_data* rdata = (struct pgm_data*)(header + 1);
+/* TODO: encode options separately */
+				if (header->pgm_options & PGM_OPT_PRESENT)
+				{
+					guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( rdata + 1 ) + sizeof(struct pgm_opt_header)));
+					src[i] = (char*)(rdata + 1) + opt_total_length;
+				}
+				else
+				{
+					src[i] = (char*)(rdata + 1);
+				}
+printf ("src packet %i: %p,%i\n", i, src[i], (int)tsdu_length);
+			}
+
+/* construct basic PGM header to be completed by send_rdata() */
+			struct pgm_header *header = (struct pgm_header*)transport->parity_buffer;
+			struct pgm_data *data = (struct pgm_data*)(header + 1);
+			memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+			header->pgm_tsdu_length = g_htons (parity_length);
+			data->data_sqn		= g_htonl ( tg_sqn | rs_h );
+
+printf ("encoding packet, length %i\n", parity_length);
+			pgm_rs_encode (transport->rs, src, transport->rs_k + rs_h, data + 1, parity_length);
+puts ("encoding finished.");
+
+			rdata = header;
+			rlen = sizeof(struct pgm_header) + sizeof(struct pgm_data) + parity_length;
+		}
+else
+printf ("selective nak ... ");
+
+		send_rdata (transport, sqn, rdata, rlen, is_parity, rs_h);
 	}
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
@@ -2442,7 +2536,7 @@ on_spm (
 				sender->proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
 				sender->ondemand_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
 				sender->rs_k = parity_prm_tgs;
-				sender->tg_sqn_shift = power2_log2 (sender->rs_k);
+				sender->tg_sqn_shift = pgm_power2_log2 (sender->rs_k);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -2522,7 +2616,20 @@ on_nak (
 	)
 {
 	g_trace ("INFO","on_nak()");
-	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED]++;
+
+	gboolean is_parity = header->pgm_options & PGM_OPT_PARITY;
+
+	if (is_parity) {
+		transport->cumulative_stats[PGM_PC_SOURCE_PARITY_NAKS_RECEIVED]++;
+
+		if (!transport->ondemand_parity) {
+			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			goto out;
+		}
+	} else {
+		transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED]++;
+	}
 
 	int retval;
 	if ((retval = pgm_verify_nak (header, data, len)) != 0)
@@ -2633,15 +2740,15 @@ on_nak (
  * delivery of the actual RDATA packets.
  */
 	if (nak_list_len) {
-		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, &sqn_list);
+		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, &sqn_list, is_parity);
 	} else {
-		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list.sqn[0]);
+		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list.sqn[0], is_parity);
 	}
 
 /* queue retransmit requests */
 	for (int i = 0; i < sqn_list.len; i++)
 	{
-		int cnt = pgm_txw_retransmit_push (transport->txw, sqn_list.sqn[i]);
+		int cnt = pgm_txw_retransmit_push (transport->txw, sqn_list.sqn[i], is_parity, transport->tg_sqn_shift);
 		if (cnt > 0)
 		{
 			const char one = '1';
@@ -3171,7 +3278,8 @@ send_ncf (
 	pgm_transport_t*	transport,
 	struct sockaddr*	nak_src_nla,
 	struct sockaddr*	nak_grp_nla,
-	guint32			sequence_number
+	guint32			sequence_number,
+	gboolean		is_parity		/* send parity NCF */
 	)
 {
 	g_trace ("INFO", "send_ncf()");
@@ -3187,7 +3295,7 @@ send_ncf (
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_NCF;
-        header->pgm_options     = 0;
+        header->pgm_options     = is_parity ? PGM_OPT_PARITY : 0;
         header->pgm_tsdu_length = 0;
 
 /* NCF */
@@ -3227,7 +3335,7 @@ send_parity_nak (
 	guint			nak_pkt_cnt	/* count of parity packets to request */
 	)
 {
-	g_trace ("INFO", "send_parity_nak(%" G_GUINT_FORMAT ", %" G_GUINT_FORMAT ")", nak_tg_sqn, nak_pkt_cnt);
+	g_trace ("INFO", "send_parity_nak(%u, %u)", nak_tg_sqn, nak_pkt_cnt);
 
 	int retval = 0;
 	pgm_transport_t* transport = peer->transport;
@@ -3384,7 +3492,8 @@ send_ncf_list (
 	pgm_transport_t*	transport,
 	struct sockaddr*	nak_src_nla,
 	struct sockaddr*	nak_grp_nla,
-	pgm_sqn_list_t*		sqn_list
+	pgm_sqn_list_t*		sqn_list,
+	gboolean		is_parity		/* send parity NCF */
 	)
 {
 	g_assert (sqn_list->len > 1);
@@ -3404,7 +3513,7 @@ send_ncf_list (
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_NCF;
-        header->pgm_options     = PGM_OPT_PRESENT;
+        header->pgm_options     = is_parity ? (PGM_OPT_PRESENT | PGM_OPT_PARITY) : PGM_OPT_PRESENT;
         header->pgm_tsdu_length = 0;
 
 /* NCF */
@@ -3510,6 +3619,8 @@ nak_rb_state (
 
 /* have not learned this peers NLA */
 	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
+
+/* TODO: process BOTH selective and parity NAKs */
 
 /* calculate current transmission group for parity enabled peers */
 	if (peer->ondemand_parity)
@@ -4651,9 +4762,11 @@ pgm_transport_send_fragment (
 static int
 send_rdata (
 	pgm_transport_t*	transport,
-	int			sequence_number,
+	guint32			sequence_number,
 	gpointer		data,
-	int			len
+	guint			len,
+	gboolean		is_parity,		/* parity RDATA */
+	guint			rs_h			/* offset from k */
 	)
 {
 	int retval = 0;
@@ -4669,6 +4782,11 @@ send_rdata (
 	guint32 unfolded_odata	= *(guint32*)&header->pgm_sport;
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
+
+	if (is_parity) {
+		header->pgm_options = PGM_OPT_PARITY;
+	}
+
         header->pgm_checksum    = 0;
 
 	int pgm_header_len	= len - g_ntohs(header->pgm_tsdu_length);
@@ -4744,6 +4862,7 @@ pgm_transport_set_fec (
 	transport->ondemand_parity	= enable_ondemand_parity;
 	transport->rs_n			= default_n;
 	transport->rs_k			= default_k;
+	transport->tg_sqn_shift		= pgm_power2_log2 (transport->rs_k);
 
 //	transport->fec = pgm_fec_create (default_n, default_k);
 
