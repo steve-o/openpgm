@@ -451,6 +451,14 @@ session_send (
 		puts ("FAILED: pgm_transport_send()");
         }
 
+#if 0
+if (strcmp (string, "kaki") == 0) {
+	puts ("scheduling parity packet generation ...");
+	guint32 sqn = 0 /* transmission group */ | 1 /* packet count */;
+	pgm_schedule_proactive_nak (sess->transport, sqn);
+}
+#endif
+
 	puts ("READY");
 }
 
