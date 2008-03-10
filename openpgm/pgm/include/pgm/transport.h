@@ -57,16 +57,23 @@ typedef enum {
     PGM_PC_SOURCE_CKSUM_ERRORS,
     PGM_PC_SOURCE_MALFORMED_NAKS,
     PGM_PC_SOURCE_PACKETS_DISCARDED,
+    PGM_PC_SOURCE_PARITY_BYTES_RETRANSMITTED,
     PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED,
+    PGM_PC_SOURCE_PARITY_MSGS_RETRANSMITTED,
     PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED,
+    PGM_PC_SOURCE_PARITY_NAK_PACKETS_RECEIVED,
     PGM_PC_SOURCE_SELECTIVE_NAK_PACKETS_RECEIVED,   /* total packets */
+    PGM_PC_SOURCE_PARITY_NAKS_RECEIVED,
     PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED,	    /* serial numbers */
+    PGM_PC_SOURCE_PARITY_NAKS_IGNORED,
     PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED,
 /*  PGM_PC_SOURCE_ACK_ERRORS, */
 /*  PGM_PC_SOURCE_PGMCC_ACKER, */
     PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE,
 /*  PGM_PC_SOURCE_ACK_PACKETS_RECEIVED, */
+    PGM_PC_SOURCE_PARITY_NNAK_PACKETS_RECEIVED,
     PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED,
+    PGM_PC_SOURCE_PARITY_NNAKS_RECEIVED,
     PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED,
     PGM_PC_SOURCE_NNAK_ERRORS,
 
@@ -221,10 +228,13 @@ struct pgm_transport_t {
     guint		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
     pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
+    gpointer		rs;
     gboolean		proactive_parity;
     gboolean		ondemand_parity;
     guint		rs_n;
     guint		rs_k;
+    guint32		tg_sqn_shift;
+    gpointer		parity_buffer;		    /* for parity odata/rdata generation */
 
     gpointer		rx_buffer;
     struct iovec*	piov;
@@ -268,6 +278,7 @@ gchar* pgm_print_tsi (const pgm_tsi_t*);
 int pgm_print_tsi_r (const pgm_tsi_t*, char*, size_t);
 guint pgm_tsi_hash (gconstpointer);
 gint pgm_tsi_equal (gconstpointer, gconstpointer);
+guint pgm_power2_log2 (guint);
 
 int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, int, struct pgm_sock_mreq*);
 int pgm_transport_bind (pgm_transport_t*);

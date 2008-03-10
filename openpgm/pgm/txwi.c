@@ -31,7 +31,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-//#define TXW_DEBUG
+#define TXW_DEBUG
 
 #ifndef TXW_DEBUG
 #define G_DISABLE_ASSERT
@@ -152,10 +152,11 @@ pgm_txw_init (
 
 	g_ptr_array_set_size (t->pdata, txw_sqns);
 
-/* empty state:
+/* empty state for transmission group boundaries to align.
  *
- * trail = 1, lead = 0
+ * trail = 0, lead = -1	
  */
+	t->lead = -1;
 	t->trail = t->lead + 1;
 
 	t->retransmit_queue = g_queue_new();
@@ -244,11 +245,13 @@ pgm_txw_alloc_packet (
 	pgm_txw_t*	t
 	)
 {
-	ASSERT_TXW_BASE_INVARIANT(t);
-	
-	gpointer p = t->trash_packet ? g_trash_stack_pop (&t->trash_packet) : g_slice_alloc (sizeof(pgm_txw_packet_t));
-
-	ASSERT_TXW_BASE_INVARIANT(t);
+	gpointer p;
+	if (t->trash_packet) {
+		p = g_trash_stack_pop (&t->trash_packet);
+		memset (p, 0, sizeof(pgm_txw_packet_t));
+	} else {
+		p = g_slice_alloc0 (sizeof(pgm_txw_packet_t));
+	}
 	return p;
 }
 
@@ -382,7 +385,13 @@ pgm_txw_pop (
 }
 
 /* Try to add a sequence number to the retransmit queue, ignore if
- * already there or no longer in the transmit window
+ * already there or no longer in the transmit window.
+ *
+ * For parity NAKs, we deal on the transmission group sequence number
+ * rather than the packet sequence number.  To simplify managment we
+ * use the leading window packet to store the details of the entire
+ * transmisison group.  Parity NAKs are ignored if the packet count is
+ * less than or equal to the count already queued for retransmission.
  *
  * returns > 0 if sequence number added to queue.
  */
@@ -390,39 +399,93 @@ pgm_txw_pop (
 int
 pgm_txw_retransmit_push (
 	pgm_txw_t*	t,
-	guint32		sequence_number
+	guint32		sequence_number,
+	gboolean	is_parity,		/* parity NAK ⇒ sequence_number = transmission group | packet count */
+	guint		tg_sqn_shift
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
-/* check if sequence number is in window */
-	if ( !ABS_IN_TXW(t, sequence_number) )
-	{
-		g_trace ("%u not in window.", sequence_number);
-		return -1;
-	}
+printf ("pgm_txw_retransmit_push (%i, %s, %i)\n", (int)sequence_number, is_parity ? "TRUE" : "FALSE", (int)tg_sqn_shift);
 
-	pgm_txw_packet_t* tp = TXW_PACKET(t, sequence_number);
-
-	g_static_mutex_lock (&t->retransmit_mutex);
-	if (tp->link_.data)
+	if (is_parity)
 	{
+		guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
+
+/* check if transmission group is in window */
+		guint nak_tg_sqn = sequence_number & tg_sqn_mask;	/* left unshifted */
+		guint nak_pkt_cnt = sequence_number & ~tg_sqn_mask;
+
+printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
+		
+		if ( !ABS_IN_TXW(t, nak_tg_sqn) )
+		{
+			g_trace ("transmission group lead, %u not in window.", sequence_number);
+			return -1;
+		}
+
+		pgm_txw_packet_t* tp = TXW_PACKET(t, nak_tg_sqn);
+
+		g_static_mutex_lock (&t->retransmit_mutex);
+		if (tp->link_.data)
+		{
+			if (tp->pkt_cnt_requested >= nak_pkt_cnt)
+			{
+				g_static_mutex_unlock (&t->retransmit_mutex);
+				g_trace ("%u already queued for retransmission.", sequence_number);
+				return -1;
+			}
+
+/* more parity packets requested than currently scheduled, simply bump up the count */
+			tp->pkt_cnt_requested = nak_pkt_cnt;
+			return 0;
+		}
+
+/* new request */
+		tp->pkt_cnt_requested++;
+		tp->link_.data = tp;
+		g_queue_push_head_link (t->retransmit_queue, &tp->link_);
 		g_static_mutex_unlock (&t->retransmit_mutex);
-		g_trace ("%u already queued for retransmission.", sequence_number);
-		return -1;
-	}
 
-	tp->link_.data = tp;
-	g_queue_push_head_link (t->retransmit_queue, &tp->link_);
-	g_static_mutex_unlock (&t->retransmit_mutex);
+	}
+	else
+	{
+
+/* check if sequence number is in window */
+
+		if ( !ABS_IN_TXW(t, sequence_number) )
+		{
+			g_trace ("%u not in window.", sequence_number);
+			return -1;
+		}
+
+		pgm_txw_packet_t* tp = TXW_PACKET(t, sequence_number);
+
+		g_static_mutex_lock (&t->retransmit_mutex);
+		if (tp->link_.data)
+		{
+			g_static_mutex_unlock (&t->retransmit_mutex);
+			g_trace ("%u already queued for retransmission.", sequence_number);
+			return -1;
+		}
+
+		tp->link_.data = tp;
+		g_queue_push_head_link (t->retransmit_queue, &tp->link_);
+		g_static_mutex_unlock (&t->retransmit_mutex);
+
+	}
 
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 	return 1;
 }
 
-/* try to pop a packet from the retransmit queue (peek from window)
+/* try to pop a packet from the retransmit queue (peek from window).
+ *
+ * parity NAKs specify a count of parity packets to transmit, as such
+ * the count needs to be only reduced by one and the NAK node left on
+ * the queue if count remains non-zero.
  *
  * return 0 if packet popped
  */
@@ -432,26 +495,53 @@ pgm_txw_retransmit_try_pop (
 	pgm_txw_t*	t,
 	guint32*	sequence_number,
 	gpointer*	packet,
-	guint*		length
+	guint*		length,
+	gboolean*	is_parity,
+	guint*		rs_h,			/* parity packet offset */
+	guint		rs_2t			/* maximum h */
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	GList* link = g_queue_pop_tail_link (t->retransmit_queue);
+	GList* link = g_queue_peek_tail_link (t->retransmit_queue);
 	if (!link) {
 		g_static_mutex_unlock (&t->retransmit_mutex);
 		return -1;
 	}
 
 	pgm_txw_packet_t* tp = link->data;
-	link->data = NULL;
-	g_static_mutex_unlock (&t->retransmit_mutex);
-
 	*sequence_number = tp->sequence_number;
-	*packet = tp->data;
-	*length	= tp->length;
+
+	if (tp->pkt_cnt_requested) {
+		*is_parity = TRUE;
+		*rs_h = tp->pkt_cnt_sent;
+
+/* remove if all requested parity packets have been sent */
+		if (--(tp->pkt_cnt_requested) == 0)
+		{
+			g_queue_pop_tail_link (t->retransmit_queue);
+			link->data = NULL;
+		}
+
+/* wrap around parity generation in unlikely event that more packets requested than are available
+ * under the Reed-Solomon code definition.
+ */
+		if (++(tp->pkt_cnt_sent) == rs_2t) {
+			tp->pkt_cnt_sent = 0;
+		}
+	}
+	else
+	{
+/* selective NAK, therefore pop node */
+		*packet = tp->data;
+		*length	= tp->length;
+		g_queue_pop_tail_link (t->retransmit_queue);
+		link->data = NULL;
+	}
+
+	g_static_mutex_unlock (&t->retransmit_mutex);
 
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
