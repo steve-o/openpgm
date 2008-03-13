@@ -1249,7 +1249,9 @@ pgm_rxw_ncf (
 /* ignore what we have or have not */
 		case PGM_PKT_HAVE_DATA_STATE:
 		case PGM_PKT_LOST_DATA_STATE:
-			break;
+			g_trace ("ncf ignored as sequence number already closed.");
+			retval = PGM_RXW_DUPLICATE;
+			goto out;
 
 		default:
 			g_assert_not_reached();
