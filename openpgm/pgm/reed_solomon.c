@@ -426,13 +426,13 @@ pgm_rs_encode (
 	rs_t*		rs,
 	const gf8_t*	src[],		/* length rs_t::k */
 	int		offset,
-	gf8_t*		dst,
+	gf8_t*		dst,		/* must be zeroed */
 	int		len
 	)
 {
 	g_assert (offset >= rs->k && offset < rs->n);	/* parity packet */
 
-	memset (dst, 0, len);
+//	memset (dst, 0, len);
 	for (int i = 0; i < rs->k; i++)
 	{
 		gf8_t c = rs->GM[ (offset * rs->k) + i ];

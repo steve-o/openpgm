@@ -69,7 +69,7 @@ typedef int (*pgm_rxw_commitfn_t)(guint32, gpointer, guint, gpointer);
 
 struct pgm_rxw_packet_t {
 	gpointer        data;
-	guint16         length;
+	guint           length;
 	guint32         sequence_number;
 
 	guint32		apdu_first_sqn;
