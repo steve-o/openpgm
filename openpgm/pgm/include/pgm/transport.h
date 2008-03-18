@@ -239,7 +239,6 @@ struct pgm_transport_t {
     gpointer		rx_buffer;
     struct iovec*	piov;
     int			piov_len;		    /* # elements in piov */
-    int			iov_len;		    /* length of piov in bytes */
 
     GTrashStack*	rx_data;		    /* shared between all receivers for this instance */
     GTrashStack*	rx_packet;
@@ -249,6 +248,8 @@ struct pgm_transport_t {
     GHashTable*		peers_hashtable;	    /* fast lookup */
     GList*		peers_list;		    /* easy iteration */
     GSList*		peers_waiting;		    /* rxw: have or lost data */
+    GSList*		peers_last_waiting;
+    GSList*		peers_committed;	    /* rxw: waiting to free */
     GStaticMutex	waiting_mutex;
     int			waiting_pipe[2];	    /* timer to rx */
 

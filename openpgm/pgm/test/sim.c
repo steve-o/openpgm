@@ -49,6 +49,7 @@
 #include <pgm/signal.h>
 #include <pgm/timer.h>
 #include <pgm/checksum.h>
+#include <pgm/reed_solomon.h>
 
 
 /* typedefs */
@@ -578,6 +579,11 @@ fake_pgm_transport_bind (
                 goto out;
         }
 
+/* parity buffer for odata/rdata transmission */
+	if (transport->proactive_parity || transport->ondemand_parity) {
+		pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
+	}
+
 /* cleanup */
 	transport->bound = TRUE;
 
@@ -608,6 +614,11 @@ fake_pgm_transport_destroy (
                 close(transport->send_with_router_alert_sock);
                 transport->send_with_router_alert_sock = 0;
         }
+	if (transport->rs) {
+		puts ("destroying Reed-Solomon engine.");
+		pgm_rs_destroy (transport->rs);
+		transport->rs = NULL;
+	}
 
 	g_free (transport);
 	return 0;
@@ -663,6 +674,24 @@ session_create (
 err_free:
 	g_free(sess->name);
 	g_free(sess);
+}
+
+void
+session_set_fec (
+	char*		name,
+	guint		default_n,
+	guint		default_k
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, default_n, default_k);
+	puts ("READY");
 }
 
 void
@@ -841,6 +870,96 @@ net_send_data (
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	g_static_mutex_unlock (&transport->send_mutex);
+
+	puts ("READY");
+}
+
+/* differs to net_send_data in that the string parameters contains every payload
+ * for the transmission group.  this is required to calculate the correct parity
+ * as the fake transport does not own a transmission window.
+ *
+ * all payloads must be the same length unless variable TSDU support is enabled.
+ */
+void
+net_send_parity (
+	char*		name,
+	guint8		pgm_type,		/* PGM_ODATA or PGM_RDATA */
+	guint32		data_sqn,
+	guint32		txw_trail,
+	char*		string
+	)
+{
+/* check that session exists */
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
+	if (sess == NULL) {
+		puts ("FAILED: session not found");
+		return;
+	}
+
+	pgm_transport_t* transport = sess->transport;
+
+/* split string into individual payloads */
+	guint16 parity_length = 0;
+	guint8** src;
+	src = g_strsplit (string, " ", transport->rs_k);
+
+/* payload is string including terminating null. */
+	parity_length = strlen(*src) + 1;
+
+/* verify length of payload array */
+	int i;
+	for (i = 0; src[i]; i++) {
+		if ((strlen(src[i]) + 1) != parity_length) {
+			printf ("FAILED: payload length mismatch \"%s\" (%i) vs. \"%s\" (%i)\n", src[i], strlen(src[i]), *src, strlen(*src));
+			return;
+		}
+	}
+
+	if ( i != transport->rs_k ) {
+		printf ("FAILED: payload array length %i, whilst rs_k is %i.\n", i, transport->rs_k);
+		return;
+	}
+
+/* calculate FEC block offset */
+	guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+	guint rs_h = data_sqn & ~tg_sqn_mask;
+
+/* send */
+        int retval = 0;
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + parity_length;
+
+	gchar buf[ tpdu_length ];
+
+        struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_data *data = (struct pgm_data*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->tsi.sport;
+	header->pgm_dport       = transport->dport;
+	header->pgm_type        = pgm_type;
+	header->pgm_options     = PGM_OPT_PARITY;
+	header->pgm_tsdu_length = g_htons (parity_length);
+
+/* O/RDATA */
+	data->data_sqn		= g_htonl (data_sqn);
+	data->data_trail	= g_htonl (txw_trail);
+
+	memset (data + 1, 0, parity_length);
+	pgm_rs_encode (transport->rs, src, transport->rs_k + rs_h, data + 1, parity_length);
+
+        header->pgm_checksum    = 0;
+        header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
+
+	g_static_mutex_lock (&transport->send_mutex);
+        retval = sendto (transport->send_sock,
+                                header,
+                                tpdu_length,
+                                MSG_CONFIRM,            /* not expecting a reply */
+				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+	g_static_mutex_unlock (&transport->send_mutex);
+
+	g_strfreev (src);
+	src = NULL;
 
 	puts ("READY");
 }
@@ -1277,6 +1396,39 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
+/* send parity odata or rdata */
+		re = "^net[[:space:]]+send[[:space:]]+parity[[:space:]]+([or])data[[:space:]]+"
+			"([[:alnum:]]+)[[:space:]]+"	/* transport */
+			"([0-9]+)[[:space:]]+"		/* sequence number */
+			"([0-9]+)[[:space:]]+"		/* txw_trail */
+			"([a-z0-9 ]+)$";		/* payloads */
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			guint8 pgm_type = *(str + pmatch[1].rm_so) == 'o' ? PGM_ODATA : PGM_RDATA;
+
+			char *name = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
+			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
+
+			char* p = str + pmatch[3].rm_so;
+			guint32 data_sqn = strtoul (p, &p, 10);
+
+			p = str + pmatch[4].rm_so;
+			guint txw_trail = strtoul (p, &p, 10);
+
+/* ideally confirm number of payloads matches sess->transport::rs_k ... */
+			char *string = g_memdup (str + pmatch[5].rm_so, pmatch[5].rm_eo - pmatch[5].rm_so + 1 );
+			string[ pmatch[5].rm_eo - pmatch[5].rm_so ] = 0;
+
+			net_send_parity (name, pgm_type, data_sqn, txw_trail, string);
+
+			g_free (name);
+			g_free (string);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
 /* send spm */
 		re = "^net[[:space:]]+send[[:space:]]+spm[[:space:]]+"
 			"([[:alnum:]]+)[[:space:]]+"	/* transport */
@@ -1414,6 +1566,28 @@ on_stdin_data (
 			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
 
 			session_create (name, (pmatch[1].rm_eo > pmatch[1].rm_so));
+
+			g_free (name);
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
+/* enable Reed-Solomon Forward Error Correction */
+		re = "^set[[:space:]]+([[:alnum:]]+)[[:space:]]+FEC[[:space:]]+RS[[:space:]]*\\([[:space:]]*([0-9]+)[[:space:]]*,[[:space:]]*([0-9]+)[[:space:]]*\\)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+
+			char *p = str + pmatch[2].rm_so;
+			*(str + pmatch[2].rm_eo) = 0;
+			guint n = strtol (p, &p, 10);
+			p = str + pmatch[3].rm_so;
+			*(str + pmatch[3].rm_eo) = 0;
+			guint k = strtol (p, &p, 10);
+			session_set_fec (name, n, k);
 
 			g_free (name);
 			regfree (&preg);

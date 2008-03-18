@@ -37,12 +37,15 @@ G_BEGIN_DECLS
 
 typedef enum
 {
-    PGM_PKT_BACK_OFF_STATE,
+    PGM_PKT_BACK_OFF_STATE,	    /* PGM protocol recovery states */
     PGM_PKT_WAIT_NCF_STATE,
     PGM_PKT_WAIT_DATA_STATE,
 
-    PGM_PKT_HAVE_DATA_STATE,
+    PGM_PKT_HAVE_DATA_STATE,	    /* data received waiting to commit to application layer */
 
+    PGM_PKT_HAVE_PARITY_STATE,	    /* contains parity information not original data */
+    PGM_PKT_COMMIT_DATA_STATE,	    /* packet data at application layer */
+    PGM_PKT_PARITY_DATA_STATE,	    /* packet available for parity calculation */
     PGM_PKT_LOST_DATA_STATE,	    /* if recovery fails, but packet has not yet been commited */
 
     PGM_PKT_ERROR_STATE
@@ -71,7 +74,6 @@ struct pgm_rxw_packet_t {
 	gpointer        data;
 	guint16         length;
 	guint32         sequence_number;
-
 	guint32		apdu_first_sqn;
 /*	guint32		frag_offset;	*/
 	guint32		apdu_len;
@@ -99,17 +101,25 @@ struct pgm_rxw_t {
 
 	GSList		waiting_link;
 	gboolean	waiting;
+	GSList		commit_link;
 
         GQueue*         backoff_queue;
         GQueue*         wait_ncf_queue;
         GQueue*         wait_data_queue;
-	guint		lost_count;
-	guint		fragment_count;
+	guint		lost_count;		/* failed to repair */
+	guint		fragment_count;		/* incomplete apdu */
+	guint		parity_count;		/* parity for repairs */
+	guint		committed_count;	/* but still in window */
+	guint		parity_data_count;	/* to re-construct missing packets */
 
         guint           max_tpdu;               /* maximum packet size */
+	guint		tg_size;		/* transmission group size for parity recovery */
+	guint		tg_sqn_shift;
 
         guint32         lead, trail;
         guint32         rxw_trail, rxw_trail_init;
+	guint32		commit_lead;
+	guint32		commit_trail;
         gboolean        rxw_constrained;
         gboolean        window_defined;
 
@@ -133,7 +143,7 @@ int pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, int, struct iovec**, int);
 int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
 
 /* from SPM */
-int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32, pgm_time_t);
+int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32, guint, guint, pgm_time_t);
 
 /* from NCF */
 int pgm_rxw_ncf (pgm_rxw_t*, guint32, pgm_time_t, pgm_time_t);
@@ -199,6 +209,21 @@ static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, 
 }
 
 int pgm_rxw_pkt_state_unlink (pgm_rxw_t*, pgm_rxw_packet_t*);
+
+int pgm_rxw_peek (pgm_rxw_t*, guint32, gpointer*, guint*, gboolean*);
+
+int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, gpointer, guint);
+int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, gpointer, guint);
+
+static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, gpointer packet_, guint len)
+{
+    gpointer packet = pgm_rxw_alloc (r);
+    memcpy (packet, packet_, len);
+    return pgm_rxw_push_nth_parity (r, sqn, packet, len);
+}
+
+int pgm_rxw_release_committed (pgm_rxw_t*);
+int pgm_rxw_free_committed (pgm_rxw_t*);
 
 G_END_DECLS
 
