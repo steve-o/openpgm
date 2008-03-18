@@ -136,7 +136,10 @@
 					     (w)->wait_ncf_queue->length + \
 					     (w)->wait_data_queue->length + \
 					     (w)->lost_count + \
-					     (w)->fragment_count) > 0 ); \
+					     (w)->fragment_count + \
+					     (w)->parity_count + \
+					     (w)->committed_count + \
+					     (w)->parity_data_count ) > 0 ); \
 			} \
 		} \
 		else \
@@ -146,6 +149,9 @@
 			g_assert ( (w)->wait_data_queue->length == 0 ); \
 			g_assert ( (w)->lost_count == 0 ); \
 			g_assert ( (w)->fragment_count == 0 ); \
+			g_assert ( (w)->parity_count == 0 ); \
+			g_assert ( (w)->committed_count == 0 ); \
+			g_assert ( (w)->parity_data_count == 0 ); \
 		} \
 	}
 #else
@@ -160,9 +166,38 @@ static void _list_iterator (gpointer, gpointer);
 static inline int pgm_rxw_pop_lead (pgm_rxw_t*);
 static inline int pgm_rxw_pop_trail (pgm_rxw_t*);
 static inline int pgm_rxw_pkt_remove1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline int pgm_rxw_data_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
 static inline int pgm_rxw_pkt_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
 static inline gpointer pgm_rxw_alloc_packet (pgm_rxw_t*);
 static inline gpointer pgm_rxw_alloc0_packet (pgm_rxw_t*);
+
+
+/* sub-windows of the receive window
+ *                                      r->lead
+ *  | Parity-data | Commit |   Incoming   |
+ *  |<----------->|<------>|<------------>|
+ *  |             |        |              |
+ * r->trail    r->commit_trail
+ *                       r->commit_lead
+ */
+
+static inline guint32
+pgm_rxw_incoming_empty (pgm_rxw_t* r)
+{
+	return r->commit_lead == r->lead + 1;
+}
+
+static inline guint32
+pgm_rxw_commit_empty (pgm_rxw_t* r)
+{
+	return r->commit_trail == r->commit_lead;
+}
+
+static inline guint32
+pgm_rxw_parity_data_empty (pgm_rxw_t* r)
+{
+	return r->trail == r->commit_trail;
+}
 
 
 pgm_rxw_t*
@@ -214,9 +249,10 @@ pgm_rxw_init (
 
 /* empty state:
  *
- * trail = 1, lead = 0
- * rxw_trail = rxw_trail_init = 0
+ * trail = 0, lead = -1
+ * commit_trail = commit_lead = rxw_trail = rxw_trail_init = 0
  */
+	r->lead = -1;
 	r->trail = r->lead + 1;
 
 /* limit retransmit requests on late session joining */
@@ -398,7 +434,7 @@ pgm_rxw_push_fragment (
 		g_trace ("#%u: using packet to temporarily define window", sequence_number);
 
 		r->lead = sequence_number - 1;
-		r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
+		r->commit_trail = r->commit_lead = r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
 
 		r->rxw_constrained = TRUE;
 		r->window_defined = TRUE;
@@ -415,16 +451,16 @@ exit(1);
 			goto out;
 		}
 
-		pgm_rxw_window_update (r, trail, r->lead, nak_rb_expiry);
+		pgm_rxw_window_update (r, trail, r->lead, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
 	}
 
-	g_trace ("#%u: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
-		sequence_number, r->rxw_trail, r->rxw_trail_init, r->trail, r->lead);
+	g_trace ("#%u: window ( rxw_trail %u rxw_trail_init %u trail %u commit_trail %u commit_lead %u lead %u )",
+		sequence_number, r->rxw_trail, r->rxw_trail_init, r->trail, r->commit_trail, r->commit_lead, r->lead);
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 /* already committed */
-	if ( pgm_uint32_lt (sequence_number, r->trail) )
+	if ( pgm_uint32_lt (sequence_number, r->commit_lead) )
 	{
 		g_trace ("#%u: already committed, discarding.", sequence_number);
 
@@ -480,8 +516,46 @@ exit(1);
 				goto out_flush;
 			}
 
-
+/* destination should not contain a data packet, although it may contain parity */
+			g_assert( rp->state == PGM_PKT_BACK_OFF_STATE ||
+				  rp->state == PGM_PKT_WAIT_NCF_STATE ||
+				  rp->state == PGM_PKT_WAIT_DATA_STATE ||
+				  rp->state == PGM_PKT_HAVE_PARITY_STATE ||
+				  rp->state == PGM_PKT_LOST_DATA_STATE );
 			g_trace ("#%u: filling in a gap.", sequence_number);
+
+			if ( rp->state == PGM_PKT_HAVE_PARITY_STATE )
+			{
+				g_trace ("#%u: destination contains parity, shuffling to next available entry.", sequence_number);
+/* find if any other packets are lost in this transmission group */
+				guint32 next_tg_sqn;
+				if (sequence_number != next_tg_sqn)
+				for (guint32 i = sequence_number + 1; i != next_tg_sqn; i++)
+				{
+					pgm_rxw_packet_t* pp = RXW_PACKET(r, i);
+					if ( pp->state == PGM_PKT_BACK_OFF_STATE ||
+					     pp->state == PGM_PKT_WAIT_NCF_STATE ||
+					     pp->state == PGM_PKT_WAIT_DATA_STATE ||
+					     pp->state == PGM_PKT_LOST_DATA_STATE )
+					{
+/* move parity to this new sequence number */
+						pp->data	= rp->data;
+						pp->length	= rp->length;
+						pp->state	= rp->state;
+						rp->data	= NULL;
+						rp->length	= 0;
+						rp->state	= PGM_PKT_WAIT_DATA_STATE;
+						break;
+					}
+				}
+
+/* no incomplete packet found, therefore parity is no longer required */
+				if (rp->state != PGM_PKT_WAIT_DATA_STATE)
+				{
+					pgm_rxw_data_free1 (r, rp);
+					rp->state = PGM_PKT_WAIT_DATA_STATE;
+				}
+			}
 
 			if (apdu_len)	/* a fragment */
 			{
@@ -506,8 +580,8 @@ exit(1);
 		}
 		else
 		{
-			g_debug ("sequence_number %u points to (null) in window (trail %u lead %u).",
-				sequence_number, r->trail, r->lead);
+			g_debug ("sequence_number %u points to (null) in window (trail %u commit_trail %u commit_lead %u lead %u).",
+				sequence_number, r->trail, r->commit_trail, r->commit_lead, r->lead);
 			ASSERT_RXW_BASE_INVARIANT(r);
 			ASSERT_RXW_POINTER_INVARIANT(r);
 			g_assert_not_reached();
@@ -643,9 +717,9 @@ out_flush:
 //	pgm_rxw_flush (r);
 	r->waiting = TRUE;
 
-	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
+	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u commit_trail %u commit_lead %u lead %u )",
 		sequence_number,
-		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead);
+		r->rxw_trail, r->rxw_trail_init, r->trail, r->commit_trail, r->commit_lead, r->lead);
 
 	if (dropped) {
 		g_warning ("dropped %u messages due to full window.", dropped);
@@ -658,9 +732,13 @@ out:
 }
 
 /* flush packets but instead of calling on_data append the contiguous data packets
- * to the provided scatter/gather vector
+ * to the provided scatter/gather vector.
+ *
+ * when transmission groups are enabled, packets remain in the windows tagged committed
+ * until the transmission group has been completely committed.  this allows the packet
+ * data to be used in parity calculations to recover the missing packets.
  */
-
+gpointer* global_async;
 int
 pgm_rxw_readv (
 	pgm_rxw_t*		r,
@@ -674,26 +752,29 @@ pgm_rxw_readv (
 
 	g_trace ("pgm_rxw_readv");
 
+	guint dropped = 0;
 	int bytes_read = 0;
 	pgm_msgv_t* msg_end = *pmsg + msg_len;
 	struct iovec* iov_end = *piov + iov_len;
 
-	while ( !pgm_rxw_empty( r ) )
+	while ( !pgm_rxw_incoming_empty (r) )
 	{
-		pgm_rxw_packet_t* cp = RXW_PACKET(r, r->trail);
+		pgm_rxw_packet_t* cp = RXW_PACKET(r, r->commit_lead);
 		g_assert ( cp != NULL );
 
-		if (cp->state != PGM_PKT_HAVE_DATA_STATE && cp->state != PGM_PKT_LOST_DATA_STATE) {
-			g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->trail, pgm_rxw_state_string(cp->state), cp->state, cp->length);
-			break;
-		}
+		switch (cp->state) {
+		case PGM_PKT_LOST_DATA_STATE:
+/* if packets are being held drop them all as group is now unrecoverable */
+			while (r->commit_lead != r->trail) {
+				dropped++;
+				pgm_rxw_pop_trail (r);
+			}
 
-		if (cp->state == PGM_PKT_LOST_DATA_STATE)
-		{
+/* from now on r->commit_lead ≡ r->trail */
+
 /* check for lost apdu */
 			if ( cp->apdu_len )
 			{
-				guint32 dropped = 0;
 				guint32 apdu_first_sqn = cp->apdu_first_sqn;
 
 /* drop the first fragment, then others follow through as its no longer in the window */
@@ -742,9 +823,12 @@ pgm_rxw_readv (
 				pgm_rxw_pkt_remove1 (r, cp);
 /* one tpdu lost */
 			}
-		}
-		else
-		{	/* not lost */
+
+			r->commit_lead = r->trail;
+			continue;
+		
+		case PGM_PKT_HAVE_DATA_STATE:
+			/* not lost */
 			g_assert ( cp->data != NULL && cp->length > 0 );
 
 /* check for contiguous apdu */
@@ -784,13 +868,6 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 							", passing upstream.",
 						cp->apdu_first_sqn, ap->sequence_number);
 
-/* remove from window */
-					for (guint32 i = cp->apdu_first_sqn; i < frag; i++)
-					{
-						r->fragment_count--;
-						r->trail++;
-					}
-
 /* pass upstream & cleanup */
 					(*pmsg)->msgv_iovlen = 0;
 					(*pmsg)->msgv_iov    = *piov;
@@ -798,24 +875,29 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 					{
 						ap = RXW_PACKET(r, i);
 
-						(*piov)->iov_base = ap->data;
+						(*piov)->iov_base = ap->data;	/* copy */
 						(*piov)->iov_len  = ap->length;
-						++(*piov);
 						(*pmsg)->msgv_iovlen++;
 
-						bytes_read += ap->length;
+						++(*piov);
 
-						pgm_rxw_pkt_remove1 (r, ap);
-						RXW_SET_PACKET(r, i, NULL);
+						bytes_read += ap->length;	/* stats */
+
+						ap->state = PGM_PKT_COMMIT_DATA_STATE;
+						r->fragment_count--;		/* accounting */
+						r->commit_lead++;
+						r->committed_count++;
 					}
 
 /* end of commit buffer */
-					if (++(*pmsg) == msg_end) {
-						break;
+					++(*pmsg);
+
+					if (*pmsg == msg_end) {
+						goto out;
 					}
 
 					if (*piov == iov_end) {
-						break;
+						goto out;
 					}
 				}
 				else
@@ -827,42 +909,112 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 			}
 			else
 			{	/* plain tpdu */
-				g_trace ("contiguous packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
+				g_trace ("one packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
 					cp->sequence_number);
-	
-				RXW_SET_PACKET(r, r->trail, NULL);
-				r->trail++;
 
 /* pass upstream, including data memory ownership */
 				(*pmsg)->msgv_iovlen = 1;
 				(*pmsg)->msgv_iov    = *piov;
 				(*piov)->iov_base = cp->data;
 				(*piov)->iov_len  = cp->length;
-				++(*piov);
 				bytes_read += cp->length;
-/* cleanup */
-				pgm_rxw_pkt_remove1 (r, cp);
+
+/* move to commit window */
+				cp->state = PGM_PKT_COMMIT_DATA_STATE;
+				r->commit_lead++;
+				r->committed_count++;
 
 /* end of commit buffer */
-				if (++(*pmsg) == msg_end) {
-					break;
+				++(*pmsg);
+				++(*piov);
+
+				if (*pmsg == msg_end) {
+					goto out;
 				}
 
 				if (*piov == iov_end) {
-					break;
+					goto out;
 				}
 			}
 
 /* one apdu or tpdu processed */
-		}
+			break;
 
+		default:
+			g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->trail, pgm_rxw_state_string(cp->state), cp->state, cp->length);
+			goto out;
+		}
 	}
 
+out:
 	ASSERT_RXW_BASE_INVARIANT(r);
 
 	return bytes_read;
 }
 
+/* used to indicate application layer has released interest in packets in committed-data state,
+ * move to parity-data state until transmission group has completed.
+ */
+int
+pgm_rxw_release_committed (
+	pgm_rxw_t*		r
+	)
+{
+	if (G_UNLIKELY( pgm_rxw_empty (r) ))		/* first call to read */
+	{
+		g_trace ("no commit packets to release");
+		return PGM_RXW_OK;
+	}
+
+	pgm_rxw_packet_t* pp = RXW_PACKET(r, r->commit_trail);
+	while ( pp->state == PGM_PKT_COMMIT_DATA_STATE )
+	{
+		g_trace ("releasing commit sqn %u", pp->sequence_number);
+		pp->state = PGM_PKT_PARITY_DATA_STATE;
+		r->committed_count--;
+		r->parity_data_count++;
+		r->commit_trail++;
+		pp = RXW_PACKET(r, r->commit_trail);
+	}
+
+	g_assert( r->committed_count == 0 );
+	return PGM_RXW_OK;
+}
+
+/* used to flush completed transmission groups of any parity-data state packets.
+ */
+int
+pgm_rxw_free_committed (
+	pgm_rxw_t*		r
+	)
+{
+	if ( !r->parity_data_count ) {
+		g_trace ("no parity-data packets free'd");
+		return;
+	}
+
+	g_assert( r->commit_trail != r->trail );
+
+/* calculate transmission group at commit trailing edge */
+	guint32 tg_sqn_mask = 0xffffffff << r->tg_sqn_shift;
+	guint32 tg_sqn = r->commit_trail & tg_sqn_mask;
+	guint32 pkt_sqn = r->commit_trail & ~tg_sqn_mask;
+
+	guint32 new_rx_trail = tg_sqn;
+	if (pkt_sqn == r->tg_size - 1)	/* end of group */
+		new_rx_trail++;
+
+	pgm_rxw_packet_t* pp = RXW_PACKET(r, r->trail);
+	while ( new_rx_trail != r->trail )
+	{
+		g_trace ("free committed sqn %u", pp->sequence_number);
+		g_assert( pp->state == PGM_PKT_PARITY_DATA_STATE );
+		pgm_rxw_pop_trail (r);
+		pp = RXW_PACKET(r, r->trail);
+	}
+
+	return PGM_RXW_OK;
+}
 
 int
 pgm_rxw_pkt_state_unlink (
@@ -880,8 +1032,12 @@ pgm_rxw_pkt_state_unlink (
 	case PGM_PKT_BACK_OFF_STATE:  queue = r->backoff_queue; break;
 	case PGM_PKT_WAIT_NCF_STATE:  queue = r->wait_ncf_queue; break;
 	case PGM_PKT_WAIT_DATA_STATE: queue = r->wait_data_queue; break;
-	case PGM_PKT_HAVE_DATA_STATE: break; 
-	case PGM_PKT_LOST_DATA_STATE: break;
+	case PGM_PKT_HAVE_DATA_STATE:
+	case PGM_PKT_HAVE_PARITY_STATE:
+	case PGM_PKT_COMMIT_DATA_STATE:
+	case PGM_PKT_PARITY_DATA_STATE:
+	case PGM_PKT_LOST_DATA_STATE:
+		break;
 
 	default:
 		g_critical ("rp->state = %i", rp->state);
@@ -934,7 +1090,22 @@ pgm_rxw_pkt_remove1 (
 	return PGM_RXW_OK;
 }
 
-inline int
+static inline int
+pgm_rxw_data_free1 (
+	pgm_rxw_t*		r,
+	pgm_rxw_packet_t*	rp
+	)
+{
+//	g_slice_free1 (rp->length, rp->data);
+	g_static_mutex_lock (r->trash_mutex);
+	g_trash_stack_push (r->trash_data, rp->data);
+	g_static_mutex_unlock (r->trash_mutex);
+	rp->data = NULL;
+
+	return PGM_RXW_OK;
+}
+
+static inline int
 pgm_rxw_pkt_free1 (
 	pgm_rxw_t*		r,
 	pgm_rxw_packet_t*	rp
@@ -945,17 +1116,105 @@ pgm_rxw_pkt_free1 (
 
 	if (rp->data)
 	{
-//		g_slice_free1 (rp->length, rp->data);
-		g_static_mutex_lock (r->trash_mutex);
-		g_trash_stack_push (r->trash_data, rp->data);
-		g_static_mutex_unlock (r->trash_mutex);
-		rp->data = NULL;
+		pgm_rxw_data_free1 (r, rp);
 	}
 
 //	g_slice_free1 (sizeof(pgm_rxw_t), rp);
 	g_static_mutex_lock (r->trash_mutex);
 	g_trash_stack_push (r->trash_packet, rp);
 	g_static_mutex_unlock (r->trash_mutex);
+
+	ASSERT_RXW_BASE_INVARIANT(r);
+	return PGM_RXW_OK;
+}
+
+/* peek contents of of window entry, allow writing of data and parity members
+ * to store temporary repair data.
+ */
+int
+pgm_rxw_peek (
+	pgm_rxw_t*	r,
+	guint32		sequence_number,
+	gpointer*	data,
+	guint*		length,
+	gboolean*	is_parity
+	)
+{
+	ASSERT_RXW_BASE_INVARIANT(r);
+/* check if window is not empty */
+	g_assert ( !pgm_rxw_empty (r) );
+	g_assert ( ABS_IN_RXW(r, sequence_number) );
+
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+
+	*data		= rp->data;
+	*length		= rp->length;
+	*is_parity	= rp->state == PGM_PKT_HAVE_PARITY_STATE;
+
+	ASSERT_RXW_BASE_INVARIANT(r);
+	return PGM_RXW_OK;
+}
+
+int
+pgm_rxw_push_nth_parity (
+	pgm_rxw_t*	r,
+	guint32		sequence_number,
+	gpointer	data,
+	guint		length
+	)
+{
+	ASSERT_RXW_BASE_INVARIANT(r);
+/* check if window is not empty */
+	g_assert ( !pgm_rxw_empty (r) );
+	g_assert ( ABS_IN_RXW(r, sequence_number) );
+
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+
+/* cannot push parity over original data or existing parity */
+	g_assert ( rp->state == PGM_PKT_BACK_OFF_STATE ||
+		   rp->state == PGM_PKT_WAIT_NCF_STATE ||
+		   rp->state == PGM_PKT_WAIT_DATA_STATE ||
+		   rp->state == PGM_PKT_LOST_DATA_STATE );
+
+	pgm_rxw_pkt_state_unlink (r, rp);
+
+	rp->data	= data;
+	rp->length	= length;
+	rp->state	= PGM_PKT_HAVE_PARITY_STATE;
+
+	r->parity_count++;
+
+	ASSERT_RXW_BASE_INVARIANT(r);
+	return PGM_RXW_OK;
+}
+
+/* overwrite parity-data with a calculated repair payload
+ */
+int
+pgm_rxw_push_nth_repair (
+	pgm_rxw_t*	r,
+	guint32		sequence_number,
+	gpointer	data,
+	guint		length
+	)
+{
+	ASSERT_RXW_BASE_INVARIANT(r);
+/* check if window is not empty */
+	g_assert ( !pgm_rxw_empty (r) );
+	g_assert ( ABS_IN_RXW(r, sequence_number) );
+
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+
+	g_assert ( rp->state == PGM_PKT_HAVE_PARITY_STATE );
+
+/* return parity block */
+	pgm_rxw_data_free1 (r, rp);
+
+	rp->data	= data;
+	rp->length	= length;
+	rp->state	= PGM_PKT_HAVE_DATA_STATE;
+
+	r->parity_count--;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	return PGM_RXW_OK;
@@ -974,10 +1233,28 @@ pgm_rxw_pop_lead (
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->lead);
 
 /* cleanup state counters */
-	if ( rp->state == PGM_PKT_LOST_DATA_STATE ) {
+	switch (rp->state) {
+	case PGM_PKT_LOST_DATA_STATE:
 		r->lost_count--;
-	} else if ( rp->state == PGM_PKT_HAVE_DATA_STATE ) {
+		break;
+
+	case PGM_PKT_HAVE_DATA_STATE:
 		r->fragment_count--;
+		break;
+
+	case PGM_PKT_HAVE_PARITY_STATE:
+		r->parity_count--;
+		break;
+
+	case PGM_PKT_COMMIT_DATA_STATE:
+		r->committed_count--;
+		break;
+
+	case PGM_PKT_PARITY_DATA_STATE:
+		r->parity_data_count--;
+		break;
+
+	default: break;
 	}
 
 	pgm_rxw_pkt_state_unlink (r, rp);
@@ -1003,17 +1280,38 @@ pgm_rxw_pop_trail (
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, r->trail);
 
 /* cleanup state counters */
-	if ( rp->state == PGM_PKT_LOST_DATA_STATE ) {
+	switch (rp->state) {
+	case PGM_PKT_LOST_DATA_STATE:
 		r->lost_count--;
-	} else if ( rp->state == PGM_PKT_HAVE_DATA_STATE ) {
+		break;
+
+	case PGM_PKT_HAVE_DATA_STATE:
 		r->fragment_count--;
+		break;
+
+	case PGM_PKT_HAVE_PARITY_STATE:
+		r->parity_count--;
+		break;
+
+	case PGM_PKT_COMMIT_DATA_STATE:
+		r->committed_count--;
+		break;
+
+	case PGM_PKT_PARITY_DATA_STATE:
+		r->parity_data_count--;
+		break;
+
+	default: break;
 	}
 
 	pgm_rxw_pkt_state_unlink (r, rp);
 	pgm_rxw_pkt_free1 (r, rp);
 	RXW_SET_PACKET(r, r->trail, NULL);
 
-	r->trail++;
+/* advance trailing pointers as necessary */
+	if (r->trail++ == r->commit_trail)
+		if (r->commit_trail++ == r->commit_lead)
+			r->commit_lead++;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	return PGM_RXW_OK;
@@ -1029,6 +1327,8 @@ pgm_rxw_window_update (
 	pgm_rxw_t*	r,
 	guint32		txw_trail,
 	guint32		txw_lead,
+	guint		tg_size,		/* transmission group size, 1 = no groups */
+	guint		tg_sqn_shift,		/*			    0 = no groups */
 	pgm_time_t	nak_rb_expiry
 	)
 {
@@ -1044,7 +1344,10 @@ pgm_rxw_window_update (
 		g_trace ("SPM defining receive window");
 
 		r->lead = txw_lead;
-		r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
+		r->commit_trail = r->commit_lead = r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
+
+		r->tg_size = tg_size;
+		r->tg_sqn_shift = tg_sqn_shift;
 
 		r->rxw_constrained = TRUE;
 		r->window_defined = TRUE;
@@ -1111,8 +1414,8 @@ pgm_rxw_window_update (
 		g_trace ("advancing rxw_trail to %u", txw_trail);
 		r->rxw_trail = txw_trail;
 
-/* expire outstanding naks ... */
-		while ( pgm_uint32_gt(r->rxw_trail, r->trail) )
+/* expire outstanding naks, commit_trail may be higher than trail and so defer expunging. */
+		while ( pgm_uint32_gt(r->rxw_trail, r->commit_lead) )
 		{
 /* jump remaining sequence numbers if window is empty */
 			if ( pgm_rxw_empty(r) )
@@ -1120,7 +1423,7 @@ pgm_rxw_window_update (
 				guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
 
 				dropped  += distance;
-				r->trail += distance;
+				r->commit_trail = r->commit_lead = r->trail += distance;
 				r->lead  += distance;
 				break;
 			}
@@ -1152,8 +1455,14 @@ pgm_rxw_window_update (
 		g_warning ("dropped %u messages due to full window.", dropped);
 	}
 
-	g_trace ("window ( rxw_trail %u rxw_trail_init %u trail %u lead %u rxw_sqns %u )",
-		r->rxw_trail, r->rxw_trail_init, r->trail, r->lead, pgm_rxw_sqns(r));
+	if (r->tg_size != tg_size) {
+		g_trace ("window transmission group size updated %i -> %i.", r->tg_size, tg_size);
+		r->tg_size = tg_size;
+		r->tg_sqn_shift = tg_sqn_shift;
+	}
+
+	g_trace ("window ( rxw_trail %u rxw_trail_init %u trail %u commit_trail %u commit_lead %u lead %u rxw_sqns %u )",
+		r->rxw_trail, r->rxw_trail_init, r->trail, r->commit_trail, r->commit_lead, r->lead, pgm_rxw_sqns(r));
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
@@ -1177,6 +1486,12 @@ pgm_rxw_mark_lost (
 
 /* remove current state */
 	pgm_rxw_pkt_state_unlink (r, rp);
+
+/* invalid if we already have data or parity */
+	g_assert( rp->state == PGM_PKT_BACK_OFF_STATE ||
+		  rp->state == PGM_PKT_WAIT_NCF_STATE ||
+		  rp->state == PGM_PKT_WAIT_DATA_STATE );
+
 	rp->state = PGM_PKT_LOST_DATA_STATE;
 	r->lost_count++;
 
@@ -1218,7 +1533,7 @@ pgm_rxw_ncf (
 	}
 
 /* already committed */
-	if ( pgm_uint32_lt (sequence_number, r->trail) )
+	if ( pgm_uint32_lt (sequence_number, r->commit_lead) )
 	{
 		g_trace ("ncf #%u: already committed, discarding.", sequence_number);
 		retval = PGM_RXW_DUPLICATE;
@@ -1248,8 +1563,13 @@ pgm_rxw_ncf (
 
 /* ignore what we have or have not */
 		case PGM_PKT_HAVE_DATA_STATE:
+		case PGM_PKT_HAVE_PARITY_STATE:
+		case PGM_PKT_COMMIT_DATA_STATE:
+		case PGM_PKT_PARITY_DATA_STATE:
 		case PGM_PKT_LOST_DATA_STATE:
-			break;
+			g_trace ("ncf ignored as sequence number already closed.");
+			retval = PGM_RXW_DUPLICATE;
+			goto out;
 
 		default:
 			g_assert_not_reached();
@@ -1362,6 +1682,9 @@ pgm_rxw_state_string (
 	case PGM_PKT_WAIT_NCF_STATE:	c = "PGM_PKT_WAIT_NCF_STATE"; break;
 	case PGM_PKT_WAIT_DATA_STATE:	c = "PGM_PKT_WAIT_DATA_STATE"; break;
 	case PGM_PKT_HAVE_DATA_STATE:	c = "PGM_PKT_HAVE_DATA_STATE"; break;
+	case PGM_PKT_HAVE_PARITY_STATE:	c = "PGM_PKT_HAVE_PARITY_STATE"; break;
+	case PGM_PKT_COMMIT_DATA_STATE: c = "PGM_PKT_COMMIT_DATA_STATE"; break;
+	case PGM_PKT_PARITY_DATA_STATE:	c = "PGM_PKT_PARITY_DATA_STATE"; break;
 	case PGM_PKT_LOST_DATA_STATE:	c = "PGM_PKT_LOST_DATA_STATE"; break;
 	case PGM_PKT_ERROR_STATE:	c = "PGM_PKT_ERROR_STATE"; break;
 	default: c = "(unknown)"; break;

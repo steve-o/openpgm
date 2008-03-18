@@ -224,7 +224,7 @@ test_basic_rxw (
 	rxw = pgm_rxw_init (size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 //	rxw = pgm_rxw_init (size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
-	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, pgm_time_update_now());
+	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
@@ -272,7 +272,7 @@ test_jump (
 
 	rxw = pgm_rxw_init (size_per_entry, 2 * count, 2 * count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
-	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, pgm_time_update_now());
+	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = j = 0; i < count; i++, j+=2)
@@ -321,7 +321,7 @@ test_reverse (
 	rxw = pgm_rxw_init (size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 //	rxw = pgm_rxw_init (size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
-	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, pgm_time_update_now());
+	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0, j = count; i < count; i++)
@@ -374,7 +374,7 @@ test_fill (
 	rxw = pgm_rxw_init (size_per_entry, count+1, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 //	rxw = pgm_rxw_init (size_per_entry, 0, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
-	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, pgm_time_update_now());
+	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
