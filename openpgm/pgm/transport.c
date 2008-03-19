@@ -4290,7 +4290,6 @@ pgm_transport_send_apdu_unlocked (
 	int			flags		/* MSG_DONTWAIT = non-blocking */)
 {
 	int retval = 0;
-	guint offset = 0;
 	guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
 	guint packets = 0;
 	guint bytes_sent = 0;
@@ -4322,7 +4321,7 @@ pgm_transport_send_apdu_unlocked (
 		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-		int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - offset);
+		int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - data_bytes_sent);
 		int tpdu_length = header_length + tsdu_length;
 
 		char *pkt = pgm_txw_alloc(transport->txw);
@@ -4358,7 +4357,7 @@ pgm_transport_send_apdu_unlocked (
 		struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
 		opt_fragment->opt_reserved	= 0;
 		opt_fragment->opt_sqn		= g_htonl (opt_sqn);
-		opt_fragment->opt_frag_off	= g_htonl (offset);
+		opt_fragment->opt_frag_off	= g_htonl (data_bytes_sent);
 		opt_fragment->opt_frag_len	= g_htonl (count);
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
@@ -4366,7 +4365,7 @@ pgm_transport_send_apdu_unlocked (
 
 		int pgm_header_len	= (char*)(opt_fragment + 1) - (char*)header;
 		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
-		guint32 unfolded_odata	= pgm_csum_partial_copy (buf + offset, opt_fragment + 1, tsdu_length, 0);
+		guint32 unfolded_odata	= pgm_csum_partial_copy (buf + data_bytes_sent, opt_fragment + 1, tsdu_length, 0);
 		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
@@ -4385,11 +4384,10 @@ pgm_transport_send_apdu_unlocked (
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
-		data_bytes_sent += tpdu_length;
 
-		offset += tsdu_length;
+		data_bytes_sent += tsdu_length;
 
-	} while (offset < count);
+	} while (data_bytes_sent < count);
 
 	if (data_bytes_sent > 0) {
 		retval = data_bytes_sent;
