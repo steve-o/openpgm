@@ -81,6 +81,9 @@ enum pgm_type_e {
 
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
+/* byte alignment for packet memory maps */
+#pragma pack(push, 1)
+
 /* 8. PGM header */
 struct pgm_header {
     guint16	pgm_sport;		/* source port: tsi::sport or UDP port depending on direction */
@@ -354,6 +357,8 @@ struct pgm_opt6_path_nla {
     guint16	opt6_reserved;		/* reserved */
     struct in6_addr opt6_path_nla;	/* path nla */
 };
+
+#pragma pack(pop)
 
 
 G_BEGIN_DECLS
