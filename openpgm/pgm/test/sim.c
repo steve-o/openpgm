@@ -906,18 +906,38 @@ net_send_parity (
 /* payload is string including terminating null. */
 	parity_length = strlen(*src) + 1;
 
-/* verify length of payload array */
+/* check length of payload array */
+	gboolean is_var_pktlen = FALSE;
 	int i;
-	for (i = 0; src[i]; i++) {
-		if ((strlen(src[i]) + 1) != parity_length) {
-			printf ("FAILED: payload length mismatch \"%s\" (%i) vs. \"%s\" (%i)\n", src[i], strlen(src[i]), *src, strlen(*src));
-			return;
+	for (i = 0; src[i]; i++)
+	{
+		guint tsdu_length = strlen(src[i]) + 1;
+		if (tsdu_length != parity_length) {
+			is_var_pktlen = TRUE;
+
+			if (tsdu_length > parity_length)
+				parity_length = tsdu_length;
 		}
 	}
 
 	if ( i != transport->rs_k ) {
 		printf ("FAILED: payload array length %i, whilst rs_k is %i.\n", i, transport->rs_k);
 		return;
+	}
+
+/* add padding and append TSDU lengths */
+	if (is_var_pktlen)
+	{
+		for (i = 0; src[i]; i++)
+		{
+			guint tsdu_length = strlen(src[i]) + 1;
+			gchar* new_string = g_new0 (gchar, parity_length + 2);
+			strncpy (new_string, src[i], parity_length);
+			*(guint16*)(new_string + parity_length) = tsdu_length;
+			g_free (src[i]);
+			src[i] = new_string;
+		}
+		parity_length += 2;
 	}
 
 /* calculate FEC block offset */
@@ -936,7 +956,7 @@ net_send_parity (
 	header->pgm_sport       = transport->tsi.sport;
 	header->pgm_dport       = transport->dport;
 	header->pgm_type        = pgm_type;
-	header->pgm_options     = PGM_OPT_PARITY;
+	header->pgm_options     = is_var_pktlen ? (PGM_OPT_PARITY | PGM_OPT_VAR_PKTLEN) : PGM_OPT_PARITY;
 	header->pgm_tsdu_length = g_htons (parity_length);
 
 /* O/RDATA */
@@ -1003,7 +1023,7 @@ net_send_spm (
 	header->pgm_sport       = transport->tsi.sport;
 	header->pgm_dport       = transport->dport;
 	header->pgm_type        = PGM_SPM;
-	header->pgm_options	= (proactive_parity || ondemand_parity) ? PGM_OPT_PRESENT : 0;
+	header->pgm_options	= (proactive_parity || ondemand_parity) ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK) : 0;
 	header->pgm_tsdu_length	= 0;
 
 /* SPM */
@@ -1180,7 +1200,7 @@ net_send_ncf (
         header->pgm_sport       = transport->tsi.sport;
         header->pgm_dport       = transport->dport;
         header->pgm_type        = PGM_NCF;
-        header->pgm_options     = (sqn_list->len > 1) ? PGM_OPT_PRESENT : 0;
+        header->pgm_options     = (sqn_list->len > 1) ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK) : 0;
         header->pgm_tsdu_length = 0;
 
 /* NCF */
@@ -1278,10 +1298,10 @@ net_send_nak (
         header->pgm_dport       = peer_sport;
         header->pgm_type        = PGM_NAK;
 	if (is_parity) {
-	        header->pgm_options     = (sqn_list->len > 1) ? (PGM_OPT_PRESENT | PGM_OPT_PARITY)
+	        header->pgm_options     = (sqn_list->len > 1) ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK | PGM_OPT_PARITY)
 							      : PGM_OPT_PARITY;
 	} else {
-	        header->pgm_options     = (sqn_list->len > 1) ? PGM_OPT_PRESENT : 0;
+	        header->pgm_options     = (sqn_list->len > 1) ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK) : 0;
 	}
         header->pgm_tsdu_length = 0;
 
