@@ -4598,9 +4598,9 @@ pgm_transport_send_fragment_unlocked (
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
-		data_bytes_sent += tpdu_length;
 
 		*offset += tsdu_length;
+		data_bytes_sent += tsdu_length;
 
 	} while (*offset < count);
 
