@@ -51,7 +51,7 @@ print "sim: waiting 2 seconds for erroneous NAKs ...\n";
 $sim->die_on_nak ({ 'timeout' => 2 });
 print "sim: no NAKs received.\n";
 
-print "sim: publish ODATA sqn 32,769.\n";
+print "sim: publish ODATA sqn 32,768.\n";
 $sim->say ("net send odata ao 32768 32768 ringo000");
 
 print "app: wait for data ...\n";
