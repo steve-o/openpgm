@@ -4549,7 +4549,7 @@ pgm_transport_send_apdu_unlocked (
 
 		data_bytes_sent += tsdu_length;
 
-	} while (offset < count);
+	} while (data_bytes_sent < count);
 
 	if (data_bytes_sent > 0) {
 		retval = data_bytes_sent;
