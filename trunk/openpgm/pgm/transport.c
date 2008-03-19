@@ -93,7 +93,6 @@ static int ipproto_pgm = IPPROTO_PGM;
 GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
 GSList* pgm_transport_list = NULL;
 
-
 /* helpers for pgm_peer_t */
 #define next_nak_rb_expiry(r)       ( ((pgm_rxw_packet_t*)(r)->backoff_queue->tail->data)->nak_rb_expiry )
 #define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue->tail->data)->nak_rpt_expiry )
@@ -130,7 +129,7 @@ static void nak_rdata_state (gpointer, gpointer);
 static void check_peer_nak_state (pgm_transport_t*);
 static pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
-static int send_rdata (pgm_transport_t*, guint32, gpointer, guint, gboolean, guint);
+static int send_rdata (pgm_transport_t*, guint32, gpointer, guint, gboolean, guint, gboolean);
 
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static inline void pgm_peer_unref (pgm_peer_t*);
@@ -1311,9 +1310,28 @@ pgm_transport_bind (
 	if (retval < 0) {
 		goto out;
 	}
-		
+
+/* determine IP header size for rate regulation engine & stats */
+	switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
+	case AF_INET:
+		transport->iphdr_len = sizeof(struct iphdr);
+		break;
+
+	case AF_INET6:
+		transport->iphdr_len = 40;	/* sizeof(struct ipv6hdr) */
+		break;
+	}
+	g_trace ("INFO","assuming IP header size of %i bytes", transport->iphdr_len);
+
+	if (transport->udp_encap_port)
+	{
+		guint udphdr_len = sizeof( struct udphdr );
+		g_trace ("INFO","assuming UDP header size of %i bytes", udphdr_len);
+		transport->iphdr_len += udphdr_len;
+	}
+
 	g_trace ("INFO","construct transmit window.");
-	transport->txw = pgm_txw_init (transport->max_tpdu - sizeof(struct iphdr),
+	transport->txw = pgm_txw_init (transport->max_tpdu - transport->iphdr_len,
 					transport->txw_preallocate,
 					transport->txw_sqns,
 					transport->txw_secs,
@@ -1650,25 +1668,6 @@ pgm_transport_bind (
 		opt_parity_prm->opt_reserved = (transport->proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
 					       (transport->ondemand_parity ? PGM_PARITY_PRM_OND : 0);
 		opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
-	}
-
-/* determine IP header size for rate regulation engine & stats */
-	switch (pgm_sockaddr_family(&transport->send_smr.smr_interface)) {
-	case AF_INET:
-		transport->iphdr_len = sizeof(struct iphdr);
-		break;
-
-	case AF_INET6:
-		transport->iphdr_len = 40;	/* sizeof(struct ipv6hdr) */
-		break;
-	}
-	g_trace ("INFO","assuming IP header size of %i bytes", transport->iphdr_len);
-
-	if (transport->udp_encap_port)
-	{
-		guint udphdr_len = sizeof( struct udphdr );
-		g_trace ("INFO","assuming UDP header size of %i bytes", udphdr_len);
-		transport->iphdr_len += udphdr_len;
 	}
 
 /* setup rate control */
@@ -2399,6 +2398,8 @@ on_nak_pipe (
 	g_static_rw_lock_reader_lock (&transport->txw_lock);
 	if (!pgm_txw_retransmit_try_pop (transport->txw, &sqn, &rdata, &rlen, &is_parity, &rs_h, rs_2t));
 	{
+		gboolean is_var_pktlen = FALSE;
+
 /* calculate parity packet */
 		if (is_parity) {
 			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
@@ -2406,16 +2407,24 @@ on_nak_pipe (
 
 			guint16 parity_length = 0;
 			guint8* src[ transport->rs_k ];
-			for (int i = tg_sqn; i < (tg_sqn + transport->rs_k); i++) {
+			for (int i = 0; i < transport->rs_k; i++) {
 				gpointer packet;
 				guint length;
-				pgm_txw_peek (transport->txw, i, &packet, &length);
+				pgm_txw_peek (transport->txw, tg_sqn + i, &packet, &length);
 
 				struct pgm_header* header = packet;
 				guint16 tsdu_length = g_ntohs (header->pgm_tsdu_length);
-				if (tsdu_length > parity_length) parity_length = tsdu_length;
+				if (!parity_length && tsdu_length > parity_length)
+				{
+					parity_length = tsdu_length;
+				}
+				else if (tsdu_length != parity_length)
+				{
+					is_var_pktlen = TRUE;
+				}
 
 				struct pgm_data* rdata = (struct pgm_data*)(header + 1);
+
 /* TODO: encode options separately */
 				if (header->pgm_options & PGM_OPT_PRESENT)
 				{
@@ -2426,6 +2435,22 @@ on_nak_pipe (
 				{
 					src[i] = (char*)(rdata + 1);
 				}
+			}
+
+/* append actual TSDU length if variable length packets, zero pad as necessary.
+ */
+			if (is_var_pktlen)
+			{
+				for (int i = 0; i < transport->rs_k; i++) {
+					gpointer packet;
+					guint length;
+					pgm_txw_peek (transport->txw, tg_sqn + i, &packet, &length);
+					struct pgm_header* header = packet;
+					guint16 tsdu_length = g_ntohs (header->pgm_tsdu_length);
+					pgm_txw_zero_pad (transport->txw, packet, tsdu_length, parity_length);
+					*(guint16*)(packet + parity_length) = tsdu_length;
+				}
+				parity_length += 2;
 			}
 
 /* construct basic PGM header to be completed by send_rdata() */
@@ -2441,7 +2466,7 @@ on_nak_pipe (
 			rlen = sizeof(struct pgm_header) + sizeof(struct pgm_data) + parity_length;
 		}
 
-		send_rdata (transport, sqn, rdata, rlen, is_parity, rs_h);
+		send_rdata (transport, sqn, rdata, rlen, is_parity, rs_h, is_var_pktlen);
 	}
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
@@ -4383,7 +4408,8 @@ pgm_transport_send_one_copy_unlocked (
 	g_static_rw_lock_writer_lock (&transport->txw_lock);
 
 /* offset to payload */
-	gchar *data = ((gchar*)pgm_txw_alloc (transport->txw)) + sizeof(struct pgm_header) + sizeof(struct pgm_data);
+	gchar *data = pgm_txw_alloc (transport->txw);
+	data += sizeof(struct pgm_header) + sizeof(struct pgm_data);
 
 /* retrieve packet storage from transmit window */
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
@@ -4816,7 +4842,8 @@ send_rdata (
 	gpointer		data,
 	guint			len,
 	gboolean		is_parity,		/* parity RDATA */
-	guint			rs_h			/* offset from k */
+	guint			rs_h,			/* offset from k */
+	gboolean		is_var_pktlen		/* variable TSDU length */
 	)
 {
 	int retval = 0;
@@ -4834,7 +4861,7 @@ send_rdata (
 	header->pgm_dport	= transport->dport;
 
 	if (is_parity) {
-		header->pgm_options = PGM_OPT_PARITY;
+		header->pgm_options = is_var_pktlen ? (PGM_OPT_PARITY | PGM_OPT_VAR_PKTLEN) : PGM_OPT_PARITY;
 	}
 
         header->pgm_checksum    = 0;
@@ -5260,6 +5287,8 @@ on_rdata (
 		guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
 		guint32 tg_sqn = rdata->data_sqn & tg_sqn_mask;
 
+		gboolean is_var_pktlen = header->pgm_options & PGM_OPT_VAR_PKTLEN;
+
 /* create list of sequence numbers for each k packet in the FEC block */
 		guint rs_h = 0;
 		guint parity_length = g_ntohs (header->pgm_tsdu_length);
@@ -5300,10 +5329,12 @@ on_rdata (
 			} else {				/* original data */
 				src[ i - tg_sqn ] = packet;
 				offsets[ i - tg_sqn ] = i - tg_sqn;
-				if (length != parity_length) {
+				if (!is_var_pktlen && length != parity_length) {
 					g_warning ("Variable TSDU length without OPT_VAR_PKTLEN.\n");
 					goto out;
 				}
+
+				pgm_rxw_zero_pad (sender->rxw, packet, length, parity_length);
 			}
 		}
 
@@ -5323,14 +5354,21 @@ on_rdata (
 		pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
 
 		g_static_mutex_lock (&sender->mutex);
+		guint repair_length = parity_length;
 		for (int i = 0; i < transport->rs_k; i++)
 		{
 			if (offsets[ i ] >= transport->rs_k)
 			{
+/* extract TSDU length is variable packet option was found on parity packet */
+				if (is_var_pktlen)
+				{
+					repair_length = *(guint16*)( src[i] + parity_length - 2 );
+				}
+
 				retval = pgm_rxw_push_nth_repair (sender->rxw,
 							tg_sqn + i,
 							src[ i ],
-							parity_length);
+							repair_length);
 				switch (retval) {
 				case PGM_RXW_CREATED_PLACEHOLDER:
 				case PGM_RXW_DUPLICATE:
@@ -5349,7 +5387,7 @@ on_rdata (
 					break;
 				}
 
-				sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += parity_length;
+				sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += repair_length;
 				sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]++;
 			}
 		}
