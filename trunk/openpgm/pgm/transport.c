@@ -1633,7 +1633,7 @@ pgm_transport_bind (
 /* OPT_PARITY_PRM */
 	if (transport->proactive_parity || transport->ondemand_parity)
 	{
-		header->pgm_options     = PGM_OPT_PRESENT;
+		header->pgm_options     = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
 
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(spm + 1);
 		opt_header->opt_type	= PGM_OPT_LENGTH;
@@ -3466,7 +3466,7 @@ send_nak_list (
 	header->pgm_sport	= transport->dport;
 	header->pgm_dport	= peer_sport;
 	header->pgm_type        = PGM_NAK;
-        header->pgm_options     = PGM_OPT_PRESENT;
+        header->pgm_options     = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
         header->pgm_tsdu_length = 0;
 
 /* NAK */
@@ -3558,7 +3558,7 @@ send_ncf_list (
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_NCF;
-        header->pgm_options     = is_parity ? (PGM_OPT_PRESENT | PGM_OPT_PARITY) : PGM_OPT_PRESENT;
+        header->pgm_options     = is_parity ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK | PGM_OPT_PARITY) : (PGM_OPT_PRESENT | PGM_OPT_NETWORK);
         header->pgm_tsdu_length = 0;
 
 /* NCF */
@@ -3665,7 +3665,7 @@ nak_rb_state (
 /* have not learned this peers NLA */
 	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
-/* TODO: process BOTH selective and parity NAKs */
+/* TODO: process BOTH selective and parity NAKs? */
 
 /* calculate current transmission group for parity enabled peers */
 	if (peer->ondemand_parity)
@@ -3708,6 +3708,7 @@ nak_rb_state (
 					continue;
 				}
 
+/* TODO: parity nak lists */
 				guint tg_sqn = rp->sequence_number & tg_sqn_mask;
 				if (	( nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
 					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
