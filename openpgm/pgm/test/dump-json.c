@@ -37,7 +37,7 @@
 
 /* globals */
 
-#define OPTIONS_TOTAL_LEN(x)	*(guint16*)( ((char*)(x)) + sizeof(struct pgm_opt_header) )
+#define OPTIONS_TOTAL_LEN(x)	*(guint16*)( ((char*)(x)) + sizeof(guint16) )
 
 
 int verify_ip_header (struct iphdr*, int);
