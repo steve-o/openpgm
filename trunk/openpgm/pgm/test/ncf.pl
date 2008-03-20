@@ -33,6 +33,7 @@ print "sim: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("listen ao");
 
 print "app: publish test data.\n";
 $app->say ("send ao ringo");

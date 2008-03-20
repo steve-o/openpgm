@@ -1614,7 +1614,7 @@ on_stdin_data (
 			"([0-9]+)"			/* txw_lead */
 			"([[:space:]]+pro-active)?"	/* pro-active parity */
 			"([[:space:]]+on-demand)?"	/* on-demand parity */
-			"([[:space:]]+[0-9]+)$";	/* transmission group size */
+			"([[:space:]]+[0-9]+)?$";	/* transmission group size */
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
