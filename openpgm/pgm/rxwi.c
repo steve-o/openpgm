@@ -405,9 +405,7 @@ pgm_rxw_push_fragment (
 	guint		length,
 	guint32		sequence_number,
 	guint32		trail,
-	guint32		apdu_first_sqn,
-	guint32		fragment_offset,	/* in bytes from beginning of apdu */
-	guint32		apdu_len,		/* in bytes */
+	struct pgm_opt_fragment* opt_fragment,
 	pgm_time_t	nak_rb_expiry
 	)
 {
@@ -416,6 +414,10 @@ pgm_rxw_push_fragment (
 
 	guint dropped = 0;
 	int retval = PGM_RXW_UNKNOWN;
+
+/* convert to more apparent names */
+	guint32 apdu_first_sqn	= opt_fragment ? opt_fragment->opt_sqn : 0;
+	guint32 apdu_len	= opt_fragment ? opt_fragment->opt_frag_len : 0;
 
 	g_trace ("#%u: data trail #%u: push: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number, trail, 
@@ -539,6 +541,7 @@ exit(1);
 					     pp->state == PGM_PKT_LOST_DATA_STATE )
 					{
 /* move parity to this new sequence number */
+						memcpy (&pp->opt_fragment, &rp->opt_fragment, sizeof(struct pgm_opt_fragment));
 						pp->data	= rp->data;
 						pp->length	= rp->length;
 						pp->state	= rp->state;
@@ -560,8 +563,7 @@ exit(1);
 			if (apdu_len)	/* a fragment */
 			{
 				r->fragment_count++;
-				rp->apdu_first_sqn = apdu_first_sqn;
-				rp->apdu_len	= apdu_len;
+				memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 			}
 
 			rp->data	= packet;
@@ -701,8 +703,7 @@ exit(1);
 		if (apdu_len)	/* fragment */
 		{
 			r->fragment_count++;
-			rp->apdu_first_sqn = apdu_first_sqn;
-			rp->apdu_len	= apdu_len;
+			memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 		}
 		rp->data		= packet;
 		rp->length		= length;
@@ -773,9 +774,9 @@ pgm_rxw_readv (
 /* from now on r->commit_lead ≡ r->trail */
 
 /* check for lost apdu */
-			if ( cp->apdu_len )
+			if ( g_ntohl (cp->of_apdu_len) )
 			{
-				guint32 apdu_first_sqn = cp->apdu_first_sqn;
+				guint32 apdu_first_sqn = g_ntohl (cp->of_apdu_first_sqn);
 
 /* drop the first fragment, then others follow through as its no longer in the window */
 				if ( r->trail == apdu_first_sqn )
@@ -791,7 +792,7 @@ pgm_rxw_readv (
 				while (!pgm_rxw_empty(r))
 				{
 					cp = RXW_PACKET(r, r->trail);
-					if (cp->apdu_len && cp->apdu_first_sqn == apdu_first_sqn)
+					if (g_ntohl (cp->of_apdu_len) && g_ntohl (cp->of_apdu_first_sqn) == apdu_first_sqn)
 					{
 						dropped++;
 						if ( cp->state == PGM_PKT_LOST_DATA_STATE ) {
@@ -832,20 +833,20 @@ pgm_rxw_readv (
 			g_assert ( cp->data != NULL && cp->length > 0 );
 
 /* check for contiguous apdu */
-			if ( cp->apdu_len )
+			if ( g_ntohl (cp->of_apdu_len) )
 			{
-				if ( cp->apdu_first_sqn != cp->sequence_number )
+				if ( g_ntohl (cp->of_apdu_first_sqn) != cp->sequence_number )
 				{
 					g_trace ("partial apdu at trailing edge");
 					break;
 				}
 
-				guint32 frag = cp->apdu_first_sqn;
+				guint32 frag = g_ntohl (cp->of_apdu_first_sqn);
 				guint32 apdu_len = 0;
 				pgm_rxw_packet_t* ap = NULL;
-				while ( ABS_IN_RXW(r, frag) && apdu_len < cp->apdu_len )
+				while ( ABS_IN_RXW(r, frag) && apdu_len < g_ntohl (cp->of_apdu_len) )
 				{
-g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
+g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu_first_sqn));
 					ap = RXW_PACKET(r, frag);
 					g_assert ( ap != NULL );
 					if (ap->state != PGM_PKT_HAVE_DATA_STATE)
@@ -856,22 +857,22 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 					frag++;
 				}
 
-				if (apdu_len == cp->apdu_len)
+				if (apdu_len == g_ntohl (cp->of_apdu_len))
 				{
 /* check if sufficient room for apdu */
-					guint32 apdu_len_in_frags = frag - cp->apdu_first_sqn + 1;
+					guint32 apdu_len_in_frags = frag - g_ntohl (cp->of_apdu_first_sqn) + 1;
 					if (*piov + apdu_len_in_frags > iov_end) {
 						break;
 					}
 
 					g_trace ("contiguous apdu found @ #%" G_GUINT32_FORMAT " - #%" G_GUINT32_FORMAT 
 							", passing upstream.",
-						cp->apdu_first_sqn, ap->sequence_number);
+						g_ntohl (cp->of_apdu_first_sqn), ap->sequence_number);
 
 /* pass upstream & cleanup */
 					(*pmsg)->msgv_iovlen = 0;
 					(*pmsg)->msgv_iov    = *piov;
-					for (guint32 i = cp->apdu_first_sqn; i < frag; i++)
+					for (guint32 i = g_ntohl (cp->of_apdu_first_sqn); i < frag; i++)
 					{
 						ap = RXW_PACKET(r, i);
 
@@ -903,7 +904,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, cp->apdu_first_sqn);
 				else
 				{	/* incomplete apdu */
 					g_trace ("partial apdu found %u of %u bytes.",
-						apdu_len, cp->apdu_len);
+						apdu_len, g_ntohl (cp->of_apdu_len));
 					break;
 				}
 			}
@@ -1135,6 +1136,7 @@ int
 pgm_rxw_peek (
 	pgm_rxw_t*	r,
 	guint32		sequence_number,
+	struct pgm_opt_fragment**	opt_fragment,
 	gpointer*	data,
 	guint*		length,
 	gboolean*	is_parity
@@ -1147,6 +1149,7 @@ pgm_rxw_peek (
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
+	*opt_fragment	= &rp->opt_fragment;
 	*data		= rp->data;
 	*length		= rp->length;
 	*is_parity	= rp->state == PGM_PKT_HAVE_PARITY_STATE;
@@ -1155,10 +1158,13 @@ pgm_rxw_peek (
 	return PGM_RXW_OK;
 }
 
+/* overwrite an existing packet entry with parity repair data.
+ */
 int
 pgm_rxw_push_nth_parity (
 	pgm_rxw_t*	r,
 	guint32		sequence_number,
+	struct pgm_opt_fragment* opt_fragment,			/* in network order */
 	gpointer	data,
 	guint		length
 	)
@@ -1178,6 +1184,9 @@ pgm_rxw_push_nth_parity (
 
 	pgm_rxw_pkt_state_unlink (r, rp);
 
+	if (opt_fragment) {
+		memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
+	}
 	rp->data	= data;
 	rp->length	= length;
 	rp->state	= PGM_PKT_HAVE_PARITY_STATE;
@@ -1194,6 +1203,7 @@ int
 pgm_rxw_push_nth_repair (
 	pgm_rxw_t*	r,
 	guint32		sequence_number,
+	struct pgm_opt_fragment* opt_fragment,			/* in network order */
 	gpointer	data,
 	guint		length
 	)
@@ -1210,6 +1220,11 @@ pgm_rxw_push_nth_repair (
 /* return parity block */
 	pgm_rxw_data_free1 (r, rp);
 
+	if (opt_fragment) {
+		memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
+		g_assert( g_ntohl (rp->of_apdu_len) > 0 );
+		r->fragment_count++;
+	}
 	rp->data	= data;
 	rp->length	= length;
 	rp->state	= PGM_PKT_HAVE_DATA_STATE;
