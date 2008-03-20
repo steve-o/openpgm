@@ -158,21 +158,24 @@ struct pgm_opt_header {
 #define PGM_OPT_MASK	0x7f
 #define PGM_OPT_END	0x80		/* end of options flag */
     guint8	opt_length;		/* option length */
-#define PGM_OP_ENCODED		0x4	/* F-bit */
+    guint8	opt_reserved;
+#define PGM_OP_ENCODED		0x8	/* F-bit */
 #define PGM_OPX_IGNORE		0x0	/* extensibility bits */
 #define PGM_OPX_INVALIDATE	0x1
 #define PGM_OPX_DISCARD		0x2
-#define PGM_OP_ENCODED_NULL	0xf	/* U-bit */
+#define PGM_OP_ENCODED_NULL	0x80	/* U-bit */
 };
 
 /* 9.1.  Option extension length - OPT_LENGTH */
 struct pgm_opt_length {
+    guint8	opt_type;		/* include header as total length overwrites reserved/OPX bits */
+    guint8	opt_length;
     guint16	opt_total_length;	/* total length of all options */
 };
 
 /* 9.2.  Option fragment - OPT_FRAGMENT */
 struct pgm_opt_fragment {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	opt_sqn;		/* first sequence number */
     guint32	opt_frag_off;		/* offset */
     guint32	opt_frag_len;		/* length */
@@ -183,26 +186,26 @@ struct pgm_opt_fragment {
  * GNU C allows opt_sqn[0], ISO C89 requireqs opt_sqn[1], ISO C99 permits opt_sqn[]
  */
 struct pgm_opt_nak_list {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	opt_sqn[];		/* requested sequence number [62] */
 };
 
 /* 9.4.2.  Option Join - OPT_JOIN */
 struct pgm_opt_join {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	opt_join_min;		/* minimum sequence number */
 };
 
 /* 9.5.5.  Option Redirect - OPT_REDIRECT */
 struct pgm_opt_redirect {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint16	opt_nla_afi;		/* nla afi */
     guint16	opt_reserved2;		/* reserved */
     struct in_addr opt_nla;		/* dlr nla */
 };
 
 struct pgm_opt6_redirect {
-    guint16	opt6_reserved;		/* reserved */
+    guint8	opt6_reserved;		/* reserved */
     guint16	opt6_nla_afi;		/* nla afi */
     guint16	opt6_reserved2;		/* reserved */
     struct in6_addr opt6_nla;		/* dlr nla */
@@ -210,17 +213,17 @@ struct pgm_opt6_redirect {
 
 /* 9.6.2.  Option Sources - OPT_SYN */
 struct pgm_opt_syn {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 /* 9.7.4.  Option End Session - OPT_FIN */
 struct pgm_opt_fin {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 /* 9.8.4.  Option Reset - OPT_RST */
 struct pgm_opt_rst {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 
@@ -230,7 +233,7 @@ struct pgm_opt_rst {
 
 /* 11.8.1.  Option Parity - OPT_PARITY_PRM */
 struct pgm_opt_parity_prm {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 #define PGM_PARITY_PRM_MASK 0x3
 #define PGM_PARITY_PRM_PRO  0x1		/* source provides pro-active parity packets */
 #define PGM_PARITY_PRM_OND  0x2		/*                 on-demand parity packets */
@@ -239,13 +242,13 @@ struct pgm_opt_parity_prm {
 
 /* 11.8.2.  Option Parity Group - OPT_PARITY_GRP */
 struct pgm_opt_parity_grp {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	prm_group;		/* parity group number */
 };
 
 /* 11.8.3.  Option Current Transmission Group Size - OPT_CURR_TGSIZE */
 struct pgm_opt_curr_tgsize {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	prm_atgsize;		/* actual transmission group size */
 };
 
@@ -255,7 +258,7 @@ struct pgm_opt_curr_tgsize {
 
 /* 12.7.1.  Option Congestion Report - OPT_CR */
 struct pgm_opt_cr {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	opt_cr_lead;		/* congestion report reference sqn */
     guint16	opt_cr_ne_wl;		/* ne worst link */
     guint16	opt_cr_ne_wp;		/* ne worst path */
@@ -268,7 +271,7 @@ struct pgm_opt_cr {
 
 /* 12.7.2.  Option Congestion Report Request - OPT_CRQST */
 struct pgm_opt_crqst {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 
@@ -330,31 +333,31 @@ struct pgm_polr {
 
 /* 15.4.1.  Option NAK Back-Off Interval - OPT_NAK_BO_IVL */
 struct pgm_opt_nak_bo_ivl {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	opt_nak_bo_ivl;		/* nak back-off interval */
     guint32	opt_nak_bo_ivl_sqn;	/* nak back-off interval sqn */
 };
 
 /* 15.4.2.  Option NAK Back-Off Range - OPT_NAK_BO_RNG */
 struct pgm_opt_nak_bo_rng {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     guint32	opt_nak_max_bo_ivl;	/* maximum nak back-off interval */
     guint32	opt_nak_min_bo_ivl;	/* minimum nak back-off interval */
 };
 
 /* 15.4.3.  Option Neighbour Unreachable - OPT_NBR_UNREACH */
 struct pgm_opt_nbr_unreach {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 /* 15.4.4.  Option Path - OPT_PATH_NLA */
 struct pgm_opt_path_nla {
-    guint16	opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
     struct in_addr opt_path_nla;	/* path nla */
 };
 
 struct pgm_opt6_path_nla {
-    guint16	opt6_reserved;		/* reserved */
+    guint8	opt6_reserved;		/* reserved */
     struct in6_addr opt6_path_nla;	/* path nla */
 };
 

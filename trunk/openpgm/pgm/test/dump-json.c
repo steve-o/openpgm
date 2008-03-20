@@ -987,7 +987,7 @@ print_spmr (
  * assume at least two options, one the mandatory OPT_LENGTH
  */
 
-#define PGM_MIN_OPT_SIZE	( 2 * (sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)) )
+#define PGM_MIN_OPT_SIZE	( sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) )
 
 int
 verify_options (
@@ -1004,42 +1004,42 @@ verify_options (
 	}
 
 /* OPT_LENGTH first */	
-	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)data;
-	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
-	if ((opt_header->opt_type & PGM_OPT_MASK) != PGM_OPT_LENGTH) {
+	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)data;
+	if ((opt_len->opt_type & PGM_OPT_MASK) != PGM_OPT_LENGTH) {
 		printf ("\t\"message\": \"PGM options: first option not OPT_LENGTH.\",\n");
 		retval = -1;
 		goto out;
 	}
 
-	if (opt_header->opt_length != sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length)) {
-		printf ("\t\"message\": \"PGM options: OPT_LENGTH incorrect option length: %i, expecting %" G_GSIZE_FORMAT " bytes.\",\n", opt_header->opt_length, sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length));
+	if (opt_len->opt_length != sizeof(struct pgm_opt_length)) {
+		printf ("\t\"message\": \"PGM options: OPT_LENGTH incorrect option length: %i, expecting %" G_GSIZE_FORMAT " bytes.\",\n", opt_len->opt_length, sizeof(struct pgm_opt_length));
 		retval = -1;
 		goto out;
 	}
 
-	if (g_ntohs(opt_length->opt_total_length) < PGM_MIN_OPT_SIZE) {
-		printf ("\t\"message\": \"PGM options: OPT_LENGTH total length too short: %i bytes.\",\n", g_ntohs(opt_length->opt_total_length));
+	if (g_ntohs(opt_len->opt_total_length) < PGM_MIN_OPT_SIZE) {
+		printf ("\t\"message\": \"PGM options: OPT_LENGTH total length too short: %i bytes.\",\n", g_ntohs(opt_len->opt_total_length));
 		retval = -1;
 		goto out;
 	}
 
-	if (g_ntohs(opt_length->opt_total_length) > len) {
-		printf ("\t\"message\": \"PGM options: OPT_LENGTH total length longer than packet allows: %i bytes.\",\n", g_ntohs(opt_length->opt_total_length));
+	if (g_ntohs(opt_len->opt_total_length) > len) {
+		printf ("\t\"message\": \"PGM options: OPT_LENGTH total length longer than packet allows: %i bytes.\",\n", g_ntohs(opt_len->opt_total_length));
 		retval = -1;
 		goto out;
 	}
 
 /* iterate through options (max 16) */
 	int count = 0;
-	int total_length = g_ntohs(opt_length->opt_total_length);
+	int total_length = g_ntohs(opt_len->opt_total_length);
 
 	int opt_counters[256];
 	memset (&opt_counters, 0, sizeof(opt_counters));
 
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)data;
 	for (;;) {
 		total_length -= opt_header->opt_length;
-		if (total_length < (sizeof(struct pgm_opt_header) + sizeof(guint16))) {
+		if (total_length < sizeof(struct pgm_opt_header)) {
 			printf ("\t\"message\": \"PGM options: option #%i shorter than minimum option size.\",\n", count + 1);
 			retval = -1;
 			goto out;
@@ -1144,17 +1144,17 @@ print_options (
 	char*		data
 	)
 {
-	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)data;
-	struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
+	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)data;
 
 	puts ("\t\t\"pgmOptions\": [");
 	puts ("\t\t\t{");
-	printf ("\t\t\t\t\"length\": 0x%x,\n", opt_header->opt_length);
+	printf ("\t\t\t\t\"length\": 0x%x,\n", opt_len->opt_length);
 	puts ("\t\t\t\t\"type\": \"OPT_LENGTH\",");
-	printf ("\t\t\t\t\"totalLength\": %i\n", g_ntohs (opt_length->opt_total_length));
+	printf ("\t\t\t\t\"totalLength\": %i\n", g_ntohs (opt_len->opt_total_length));
 	printf ("\t\t\t}");
 
 /* iterate through options */
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)data;
 	do {
 		opt_header = (struct pgm_opt_header*)( ((char*)opt_header) + opt_header->opt_length );
 
