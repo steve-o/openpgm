@@ -1119,7 +1119,7 @@ pgm_print_spmr (
 	return TRUE;
 }
 
-/* Parse PGM options fields
+/* Parse PGM options fields, alters contents of packet.
  * 
  * returns -1 on failure, or total length in octets of the option fields
  */
@@ -1137,43 +1137,42 @@ pgm_print_options (
 		return -1;
 	}
 
-	struct pgm_opt_header* opt = (struct pgm_opt_header*)data;
+	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)data;
 
-	if (opt->opt_length != 4) {
-		printf (" bad opt_length length %u\n", (unsigned)opt->opt_length);
+	if (opt_len->opt_length != sizeof(struct pgm_opt_length)) {
+		printf (" bad opt_length length %hhu\n", opt_len->opt_length);
 		return -1;
 	}
 
-	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(opt + 1);
 	opt_len->opt_total_length = g_ntohs (opt_len->opt_total_length);
 
-	printf (" total len %u ", opt_len->opt_total_length);
+	printf (" total len %" G_GUINT16_FORMAT " ", opt_len->opt_total_length);
 
-	if (opt_len->opt_total_length < 4 || opt_len->opt_total_length > len) {
+	if (opt_len->opt_total_length < (sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header)) || opt_len->opt_total_length > len) {
 		puts ("bad total length");
 		return -1;
 	}
 
 /* total length includes opt_length option */
-	opt_len->opt_total_length -= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
-	opt = (struct pgm_opt_header*)(opt_len + 1);
+	opt_len->opt_total_length -= sizeof(struct pgm_opt_length);
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 
 /* iterate through options (max 16) */
 	int count = 16;
 	while (opt_len->opt_total_length && count) {
-		if (opt_len->opt_total_length < 4 || opt->opt_length > opt_len->opt_total_length) {
+		if (opt_len->opt_total_length < sizeof(struct pgm_opt_header) || opt_header->opt_length > opt_len->opt_total_length) {
 			puts ("short on option data :o");
 			return -1;
 		}
 
-		if (opt->opt_type & PGM_OPT_END) {
+		if (opt_header->opt_type & PGM_OPT_END) {
 			printf ("OPT_END ");
 		}
 
-		printf ("OPT-%u{%u} ", opt->opt_type & PGM_OPT_MASK, opt->opt_length);
+		printf ("OPT-%u{%u} ", opt_header->opt_type & PGM_OPT_MASK, opt_header->opt_length);
 
-		opt_len->opt_total_length -= opt->opt_length;
-		opt = (struct pgm_opt_header*)((char*)opt + opt->opt_length);
+		opt_len->opt_total_length -= opt_header->opt_length;
+		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
 		count--;
 	}
@@ -1183,7 +1182,7 @@ pgm_print_options (
 		return -1;
 	}
 
-	return ((char*)opt - data);
+	return ((char*)opt_header - data);
 }
 
 const char*
@@ -1253,7 +1252,7 @@ pgm_gethostbyaddr (
 		return host_string;
 	}
 
-	struct hostent* he = gethostbyaddr(ap, 4, AF_INET);
+	struct hostent* he = gethostbyaddr(ap, sizeof(struct in_addr), AF_INET);
 	if (he == NULL) {
 		struct in_addr in;
 		memcpy (&in, ap, sizeof(in));

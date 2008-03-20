@@ -1009,8 +1009,7 @@ net_send_spm (
 	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
 
 	if (proactive_parity || ondemand_parity) {
-		tpdu_length += sizeof(struct pgm_opt_header) +
-				sizeof(struct pgm_opt_length) +
+		tpdu_length +=	sizeof(struct pgm_opt_length) +
 				sizeof(struct pgm_opt_header) +
 				sizeof(struct pgm_opt_parity_prm);
 	}
@@ -1033,15 +1032,13 @@ net_send_spm (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_smr.smr_interface, (char*)&spm->spm_nla_afi);
 
 	if (proactive_parity || ondemand_parity) {
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(spm + 1);
-		opt_header->opt_type	= PGM_OPT_LENGTH;
-		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
-		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
-		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
-							sizeof(struct pgm_opt_length) +
+		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
+		opt_len->opt_type	= PGM_OPT_LENGTH;
+		opt_len->opt_length	= sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
-							sizeof(struct pgm_opt_parity_prm));
-		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+							sizeof(struct pgm_opt_parity_prm) );
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
 		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
 		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
@@ -1182,7 +1179,7 @@ net_send_ncf (
         int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 
 	if (sqn_list->len > 1) {
-		tpdu_length += sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+		tpdu_length += sizeof(struct pgm_opt_length) +		/* includes header */
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
 				( (sqn_list->len-1) * sizeof(guint32) );
 	}
@@ -1215,16 +1212,14 @@ net_send_ncf (
 /* OPT_NAK_LIST */
 	if (sqn_list->len > 1)
 	{
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(ncf + 1);
-		opt_header->opt_type    = PGM_OPT_LENGTH;
-		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
-		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
-		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
-							sizeof(struct pgm_opt_length) +
+		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(ncf + 1);
+		opt_len->opt_type    = PGM_OPT_LENGTH;
+		opt_len->opt_length  = sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
 							sizeof(struct pgm_opt_nak_list) +
-							( (sqn_list->len-1) * sizeof(guint32) ));
-		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+							( (sqn_list->len-1) * sizeof(guint32) ) );
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type    = PGM_OPT_NAK_LIST | PGM_OPT_END;
 		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
 						+ ( (sqn_list->len-1) * sizeof(guint32) );
@@ -1278,7 +1273,7 @@ net_send_nak (
         int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 
 	if (sqn_list->len > 1) {
-		tpdu_length += sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length) +
+		tpdu_length += sizeof(struct pgm_opt_length) +		/* includes header */
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
 				( (sqn_list->len-1) * sizeof(guint32) );
 	}
@@ -1317,16 +1312,14 @@ net_send_nak (
 /* OPT_NAK_LIST */
 	if (sqn_list->len > 1)
 	{
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
-		opt_header->opt_type    = PGM_OPT_LENGTH;
-		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_length);
-		struct pgm_opt_length* opt_length = (struct pgm_opt_length*)(opt_header + 1);
-		opt_length->opt_total_length = g_htons (sizeof(struct pgm_opt_header) +
-							sizeof(struct pgm_opt_length) +
+		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(nak + 1);
+		opt_len->opt_type    = PGM_OPT_LENGTH;
+		opt_len->opt_length  = sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
 							sizeof(struct pgm_opt_nak_list) +
-							( (sqn_list->len-1) * sizeof(guint32) ));
-		opt_header = (struct pgm_opt_header*)(opt_length + 1);
+							( (sqn_list->len-1) * sizeof(guint32) ) );
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type    = PGM_OPT_NAK_LIST | PGM_OPT_END;
 		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
 						+ ( (sqn_list->len-1) * sizeof(guint32) );

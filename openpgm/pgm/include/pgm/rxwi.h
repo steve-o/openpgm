@@ -32,8 +32,12 @@
 #   include "pgm/msgv.h"
 #endif
 
-#ifndef __PGM_ZERO_H
+#ifndef __PGM_ZERO_H__
 #   include "pgm/zero.h"
+#endif
+
+#ifndef __PGM_PACKET_H__
+#   include "pgm/packet.h"
 #endif
 
 
@@ -78,9 +82,11 @@ struct pgm_rxw_packet_t {
 	gpointer        data;
 	guint16         length;
 	guint32         sequence_number;
-	guint32		apdu_first_sqn;
-/*	guint32		frag_offset;	*/
-	guint32		apdu_len;
+
+	struct pgm_opt_fragment opt_fragment;	    /* in network order for parity */
+#define of_apdu_first_sqn	opt_fragment.opt_sqn
+#define of_frag_offset		opt_fragment.opt_frag_off
+#define of_apdu_len		opt_fragment.opt_frag_len
 
 	pgm_time_t	t0;
 	pgm_time_t	nak_rb_expiry;
@@ -139,7 +145,7 @@ typedef struct pgm_rxw_t pgm_rxw_t;
 pgm_rxw_t* pgm_rxw_init (guint, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
 int pgm_rxw_shutdown (pgm_rxw_t*);
 
-int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, guint32, guint32, guint32, pgm_time_t);
+int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
 
 int pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, int, struct iovec**, int);
 
@@ -210,14 +216,14 @@ static inline void pgm_rxw_data_unref (GTrashStack** trash, GStaticMutex* mutex,
 
 static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
-    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, 0, 0, 0, nak_rb_expiry);
+    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, NULL, nak_rb_expiry);
 }
 
-static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, guint32 apdu_first_sqn, guint32 fragment_offset, guint32 apdu_len, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);
-    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, apdu_first_sqn, fragment_offset, apdu_len, nak_rb_expiry);
+    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, opt_fragment, nak_rb_expiry);
 }
 
 static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
@@ -229,16 +235,16 @@ static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, 
 
 int pgm_rxw_pkt_state_unlink (pgm_rxw_t*, pgm_rxw_packet_t*);
 
-int pgm_rxw_peek (pgm_rxw_t*, guint32, gpointer*, guint*, gboolean*);
+int pgm_rxw_peek (pgm_rxw_t*, guint32, struct pgm_opt_fragment** ,gpointer*, guint*, gboolean*);
 
-int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, gpointer, guint);
-int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, gpointer, guint);
+int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, struct pgm_opt_fragment*, gpointer, guint);
+int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, struct pgm_opt_fragment*, gpointer, guint);
 
-static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, gpointer packet_, guint len)
+static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, struct pgm_opt_fragment* opt_fragment, gpointer packet_, guint len)
 {
     gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);
-    return pgm_rxw_push_nth_parity (r, sqn, packet, len);
+    return pgm_rxw_push_nth_parity (r, sqn, opt_fragment, packet, len);
 }
 
 int pgm_rxw_release_committed (pgm_rxw_t*);
