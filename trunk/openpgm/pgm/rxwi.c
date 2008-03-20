@@ -32,7 +32,7 @@
 #include <sys/time.h>
 #include <sys/uio.h>
 
-//#define RXW_DEBUG
+#define RXW_DEBUG
 
 #ifndef RXW_DEBUG
 #define G_DISABLE_ASSERT
@@ -905,7 +905,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 				{	/* incomplete apdu */
 					g_trace ("partial apdu found %u of %u bytes.",
 						apdu_len, g_ntohl (cp->of_apdu_len));
-					break;
+					goto out;
 				}
 			}
 			else
