@@ -407,8 +407,6 @@ pgm_txw_retransmit_push (
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
-printf ("pgm_txw_retransmit_push (%i, %s, %i)\n", (int)sequence_number, is_parity ? "TRUE" : "FALSE", (int)tg_sqn_shift);
-
 	if (is_parity)
 	{
 		guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
@@ -534,6 +532,8 @@ pgm_txw_retransmit_try_pop (
 	}
 	else
 	{
+		*is_parity = FALSE;
+
 /* selective NAK, therefore pop node */
 		*packet = tp->data;
 		*length	= tp->length;
