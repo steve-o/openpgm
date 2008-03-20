@@ -815,12 +815,10 @@ pgm_rxw_readv (
 			{	/* plain tpdu */
 				g_trace ("skipping lost packet @ #%" G_GUINT32_FORMAT, cp->sequence_number);
 
+				dropped++;
 				r->lost_count--;
-
 				RXW_SET_PACKET(r, r->trail, NULL);
 				r->trail++;
-
-/* cleanup */
 				pgm_rxw_pkt_remove1 (r, cp);
 /* one tpdu lost */
 			}
@@ -942,7 +940,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 			break;
 
 		default:
-			g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->trail, pgm_rxw_state_string(cp->state), cp->state, cp->length);
+			g_trace ("!(have|lost)_data_state, sqn %" G_GUINT32_FORMAT " packet state %s(%i) cp->length %u", r->commit_lead, pgm_rxw_state_string(cp->state), cp->state, cp->length);
 			goto out;
 		}
 	}
@@ -961,7 +959,7 @@ pgm_rxw_release_committed (
 	pgm_rxw_t*		r
 	)
 {
-	if (G_UNLIKELY( pgm_rxw_empty (r) ))		/* first call to read */
+	if (r->committed_count == 0)		/* first call to read */
 	{
 		g_trace ("no commit packets to release");
 		return PGM_RXW_OK;
@@ -978,7 +976,6 @@ pgm_rxw_release_committed (
 		pp = RXW_PACKET(r, r->commit_trail);
 	}
 
-	g_assert( r->committed_count == 0 );
 	return PGM_RXW_OK;
 }
 
@@ -1499,13 +1496,13 @@ pgm_rxw_mark_lost (
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
-/* remove current state */
-	pgm_rxw_pkt_state_unlink (r, rp);
-
 /* invalid if we already have data or parity */
 	g_assert( rp->state == PGM_PKT_BACK_OFF_STATE ||
 		  rp->state == PGM_PKT_WAIT_NCF_STATE ||
 		  rp->state == PGM_PKT_WAIT_DATA_STATE );
+
+/* remove current state */
+	pgm_rxw_pkt_state_unlink (r, rp);
 
 	rp->state = PGM_PKT_LOST_DATA_STATE;
 	r->lost_count++;
