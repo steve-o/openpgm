@@ -26,8 +26,9 @@ unsigned do_csum(const unsigned char *buff, unsigned len)
         unsigned odd, count;
         unsigned long result = 0;
 
-        if (G_UNLIKELY(len == 0))
+        if (G_UNLIKELY(len == 0)) {
                 return result;
+	}
         odd = 1 & (unsigned long) buff;
         if (G_UNLIKELY(odd)) {
                 result = *buff << 8;
