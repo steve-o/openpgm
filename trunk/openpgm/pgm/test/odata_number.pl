@@ -27,13 +27,14 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("listen ao");
 
 print "app: send 1000 data packets ...\n";
 # hide stdout
 open(OLDOUT, ">&STDOUT");
 open(STDOUT, ">/dev/null") or die "Can't redirect stdout: $!";
 
-for (1..1000)
+for (0..999)
 {
 	my $i = $_;
 	$app->say ("send ao $i");
