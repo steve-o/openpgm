@@ -50,6 +50,7 @@
 #include <pgm/timer.h>
 #include <pgm/checksum.h>
 #include <pgm/reed_solomon.h>
+#include <pgm/txwi.h>
 
 
 /* typedefs */
@@ -748,10 +749,168 @@ session_bind (
 	puts ("READY");
 }
 
+static inline ssize_t
+pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len, int flags, const struct sockaddr* to, socklen_t tolen)
+{
+        int retval;
+        GStaticMutex* mutex = ra ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
+        int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
+
+        g_static_mutex_lock (mutex);
+        retval = sendto (sock, buf, len, flags, to, tolen);
+        g_static_mutex_unlock (mutex);
+
+        return retval > 0 ? tolen : retval;
+}
+
+static int
+pgm_reset_heartbeat_spm (pgm_transport_t* transport)
+{
+        int retval = 0;
+
+        g_static_mutex_lock (&transport->mutex);
+
+/* re-set spm timer */
+        transport->spm_heartbeat_state = 1;
+        transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
+
+/* prod timer thread if sleeping */
+        if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
+        {
+                transport->next_poll = transport->next_heartbeat_spm;
+                const char one = '1';
+                if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+                        g_critical ("write to timer pipe failed :(");
+                        retval = -EINVAL;
+                }
+        }
+
+        g_static_mutex_unlock (&transport->mutex);
+
+        return retval;
+}
+
+static inline int
+brokn_send_apdu_unlocked (
+        pgm_transport_t*        transport,
+        const gchar*            buf,
+        gsize                   count,  
+        int                     flags           /* MSG_DONTWAIT = non-blocking */)
+{
+        int retval = 0;
+        guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
+        guint packets = 0;
+        guint bytes_sent = 0;
+        guint data_bytes_sent = 0;
+
+        g_static_rw_lock_writer_lock (&transport->txw_lock);
+
+        do {
+/* retrieve packet storage from transmit window */
+                int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
+                                sizeof(struct pgm_opt_length) +         /* includes header */
+                                sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+                int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - data_bytes_sent);
+                int tpdu_length = header_length + tsdu_length;
+
+                char *pkt = pgm_txw_alloc(transport->txw);
+                struct pgm_header *header = (struct pgm_header*)pkt;
+                memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+                header->pgm_sport       = transport->tsi.sport;
+                header->pgm_dport       = transport->dport;
+                header->pgm_type        = PGM_ODATA;
+                header->pgm_options     = PGM_OPT_PRESENT;
+                header->pgm_tsdu_length = g_htons (tsdu_length);
+
+/* ODATA */
+                struct pgm_data *odata = (struct pgm_data*)(header + 1);
+                odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+                odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
+
+/* OPT_LENGTH */
+                struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(odata + 1);
+                opt_len->opt_type       = PGM_OPT_LENGTH;
+                opt_len->opt_length     = sizeof(struct pgm_opt_length);
+                opt_len->opt_total_length       = g_htons (     sizeof(struct pgm_opt_length) +
+                                                                sizeof(struct pgm_opt_header) +
+                                                                sizeof(struct pgm_opt_fragment) );
+/* OPT_FRAGMENT */
+                struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+                opt_header->opt_type    = PGM_OPT_FRAGMENT | PGM_OPT_END;
+                opt_header->opt_length  = sizeof(struct pgm_opt_header) +
+                                                sizeof(struct pgm_opt_fragment);
+                struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+                opt_fragment->opt_reserved      = 0;
+                opt_fragment->opt_sqn           = g_htonl (opt_sqn);
+                opt_fragment->opt_frag_off      = g_htonl (data_bytes_sent);
+                opt_fragment->opt_frag_len      = g_htonl (count);
+
+/* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
+                header->pgm_checksum    = 0;
+
+                int pgm_header_len      = (char*)(opt_fragment + 1) - (char*)header;
+                guint32 unfolded_header = pgm_csum_partial ((const void*)header, pgm_header_len, 0);
+                guint32 unfolded_odata  = pgm_csum_partial_copy ((const void*)(buf + data_bytes_sent), (void*)(opt_fragment + 1), tsdu_length, 0);
+                header->pgm_checksum    = pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+
+/* add to transmit window */
+                pgm_txw_push (transport->txw, pkt, tpdu_length);
+
+/* do not send send packet */
+		if (packets != 1)
+                retval = pgm_sendto (transport,
+                                        FALSE,
+                                        header,
+                                        tpdu_length,
+                                        MSG_CONFIRM,            /* not expecting a reply */
+                                        (struct sockaddr*)&transport->send_smr.smr_multiaddr,
+                                        pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+
+/* save unfolded odata for retransmissions */
+                *(guint32*)&header->pgm_sport   = unfolded_odata;
+
+                packets++;
+                bytes_sent += tpdu_length + transport->iphdr_len;
+
+                data_bytes_sent += tsdu_length;
+
+        } while (data_bytes_sent < count);
+
+        if (data_bytes_sent > 0) {
+                retval = data_bytes_sent;
+        }
+
+/* release txw lock here in order to allow spms to lock mutex */
+        g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+        pgm_reset_heartbeat_spm (transport);
+
+out:
+        return retval;
+}
+
+int brokn_send (
+        pgm_transport_t*        transport,      
+        const gchar*            data,
+        gsize                   len,
+        int                     flags           /* MSG_DONTWAIT = non-blocking */
+        )
+{
+        if ( len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+                                               sizeof(struct pgm_data) ) ) )
+        {
+		puts ("FAILED: cannot send brokn single TPDU length APDU");
+		return -1;
+        }
+
+        return brokn_send_apdu_unlocked (transport, data, len, flags);
+}
+
 void
 session_send (
 	char*		name,
-	char*		string
+	char*		string,
+	gboolean	is_brokn		/* send broken apdu */
 	)
 {
 /* check that session exists */
@@ -762,7 +921,12 @@ session_send (
 	}
 
 /* send message */
-        int e = pgm_transport_send (sess->transport, string, strlen(string) + 1, 0);
+        int e;
+	if (is_brokn) {
+		e = brokn_send (sess->transport, string, strlen(string) + 1, 0);
+	} else {
+		e = pgm_transport_send (sess->transport, string, strlen(string) + 1, 0);
+	}
         if (e < 0) {
 		puts ("FAILED: pgm_transport_send()");
         }
@@ -1635,7 +1799,7 @@ on_stdin_data (
 			char *string = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
 			string[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
 
-			session_send (name, string);
+			session_send (name, string, FALSE);
 
 			g_free (name);
 			g_free (string);
@@ -1644,24 +1808,24 @@ on_stdin_data (
                 }
 		regfree (&preg);
 
-		re = "^send[[:space:]]+([[:alnum:]]+)[[:space:]]+([[:alnum:]]+)[[:space:]]+x[[:space:]]([0-9]+)$";
+		re = "^send[[:space:]]+(brokn[[:space:]]+)?([[:alnum:]]+)[[:space:]]+([[:alnum:]]+)[[:space:]]+x[[:space:]]([0-9]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
-			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+			char *name = g_memdup (str + pmatch[2].rm_so, pmatch[2].rm_eo - pmatch[2].rm_so + 1 );
+			name[ pmatch[2].rm_eo - pmatch[2].rm_so ] = 0;
 
-			char* p = str + pmatch[3].rm_so;
+			char* p = str + pmatch[4].rm_so;
 			int factor = strtol (p, &p, 10);
-			int src_len = pmatch[2].rm_eo - pmatch[2].rm_so;
+			int src_len = pmatch[3].rm_eo - pmatch[3].rm_so;
 			char *string = g_malloc ( (factor * src_len) + 1 );
 			for (int i = 0; i < factor; i++)
 			{
-				memcpy (string + (i * src_len), str + pmatch[2].rm_so, src_len);
+				memcpy (string + (i * src_len), str + pmatch[3].rm_so, src_len);
 			}
 			string[ factor * src_len ] = 0;
 
-			session_send (name, string);
+			session_send (name, string, (pmatch[1].rm_eo > pmatch[1].rm_so));
 
 			g_free (name);
 			g_free (string);
