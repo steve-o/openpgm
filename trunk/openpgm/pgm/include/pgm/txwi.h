@@ -100,11 +100,11 @@ static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
     if (g_trash_stack_height(&t->trash_data)) {
 	p = g_trash_stack_pop (&t->trash_data);
     } else {
-	g_slice_alloc (t->max_tpdu);
+	p = g_slice_alloc (t->max_tpdu);
     }
 
 /* mark non-zeroed */
-    *( (guint8*)p + t->max_tpdu - 1 ) = PGM_PACKET_DIRTY;
+    ( (guint8*)p )[ t->max_tpdu - 1 ] = PGM_PACKET_DIRTY;
 
     return p;
 }
@@ -112,12 +112,12 @@ static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
 static inline void pgm_txw_zero_pad (pgm_txw_t* t, gpointer data, guint offset, guint len)
 {
     if ( offset == len ||
-	 PGM_PACKET_ZERO_PADDED == *( (guint8*)data + t->max_tpdu - 1 ) )
+	 PGM_PACKET_ZERO_PADDED == ( (guint8*)data )[ t->max_tpdu - 1 ] )
     {
 	return;
     }
     memset ( (gchar*)data + offset, 0, len - offset );
-    *( (guint8*)data + t->max_tpdu - 1 ) = PGM_PACKET_ZERO_PADDED;
+    ( (guint8*)data )[ t->max_tpdu - 1 ] = PGM_PACKET_ZERO_PADDED;
 }
 
 static inline guint32 pgm_txw_next_lead (pgm_txw_t* t)

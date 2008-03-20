@@ -191,7 +191,7 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
     g_static_mutex_unlock (r->trash_mutex);
 
 /* mark non-zeroed */
-    *( (guint8*)p + r->max_tpdu - 1 ) = PGM_PACKET_DIRTY;
+    ( (guint8*)p )[ r->max_tpdu - 1 ] = PGM_PACKET_DIRTY;
 
     return p;
 }
@@ -199,12 +199,12 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
 static inline void pgm_rxw_zero_pad (pgm_rxw_t* r, gpointer data, guint offset, guint len)
 {
     if ( offset == len ||
-	 PGM_PACKET_ZERO_PADDED == *( (guint8*)data + r->max_tpdu - 1 ) )
+	 PGM_PACKET_ZERO_PADDED == ( (guint8*)data )[ r->max_tpdu - 1 ] )
     {
 	return;
     }
     memset ( (gchar*)data + offset, 0, len - offset );
-    *( (guint8*)data + r->max_tpdu - 1 ) = PGM_PACKET_ZERO_PADDED;
+    ( (guint8*)data )[ r->max_tpdu - 1 ] = PGM_PACKET_ZERO_PADDED;
 }
 
 static inline void pgm_rxw_data_unref (GTrashStack** trash, GStaticMutex* mutex, gpointer data)
