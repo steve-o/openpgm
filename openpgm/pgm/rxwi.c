@@ -965,8 +965,10 @@ pgm_rxw_release_committed (
 		return PGM_RXW_OK;
 	}
 
+	g_assert( !pgm_rxw_empty(r) );
+
 	pgm_rxw_packet_t* pp = RXW_PACKET(r, r->commit_trail);
-	while ( pp->state == PGM_PKT_COMMIT_DATA_STATE )
+	while ( r->committed_count && pp->state == PGM_PKT_COMMIT_DATA_STATE )
 	{
 		g_trace ("releasing commit sqn %u", pp->sequence_number);
 		pp->state = PGM_PKT_PARITY_DATA_STATE;
@@ -975,6 +977,8 @@ pgm_rxw_release_committed (
 		r->commit_trail++;
 		pp = RXW_PACKET(r, r->commit_trail);
 	}
+
+	g_assert( r->committed_count == 0 );
 
 	return PGM_RXW_OK;
 }
@@ -986,7 +990,7 @@ pgm_rxw_free_committed (
 	pgm_rxw_t*		r
 	)
 {
-	if ( !r->parity_data_count ) {
+	if ( r->parity_data_count == 0 ) {
 		g_trace ("no parity-data packets free'd");
 		return;
 	}
