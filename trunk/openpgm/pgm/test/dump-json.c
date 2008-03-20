@@ -1078,7 +1078,7 @@ verify_options (
 
 		case PGM_OPT_NAK_LIST:
 		{
-			int list_len = opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16);
+			int list_len = opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8);
 			if (list_len & 1) {
 				printf ("\t\"message\": \"PGM options: OPT_NAK_LIST invalid odd length: %i bytes.\",\n", opt_header->opt_length);
 				retval = -1;

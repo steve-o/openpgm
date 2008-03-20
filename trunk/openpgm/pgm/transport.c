@@ -2832,7 +2832,7 @@ on_nak (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
-				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -2987,7 +2987,7 @@ on_peer_nak (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
-				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -3104,7 +3104,7 @@ on_ncf (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				ncf_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
-				ncf_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				ncf_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -3207,7 +3207,7 @@ on_nnak (
 
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
-				nnak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint16) ) / sizeof(guint32);
+				nnak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));

@@ -33,6 +33,7 @@ print "sim: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("listen ao");
 
 print "app: publish test data.\n";
 $app->say ("send ao ringo");
@@ -49,12 +50,13 @@ for (1..3) {
 }
 
 print "sim: send nak to app.\n";
-$sim->say ("net send nak ao $odata->{PGM}->{gsi}.$odata->{PGM}->{sourcePort} 1,2,3");
+$sim->say ("net send nak ao $odata->{PGM}->{gsi}.$odata->{PGM}->{sourcePort} 0,1,2");
 
 my $rcnt = 0;
 for (1..3) {
 	print "mon: wait for rdata ...\n";
 	$mon->wait_for_rdata;
+	$rcnt++;
 	print "mon: received $rcnt x rdata.\n";
 }
 
