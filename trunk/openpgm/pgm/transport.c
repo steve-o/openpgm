@@ -200,7 +200,7 @@ pgm_tsi_equal (
 	gconstpointer   v2
         )
 {
-	return memcmp (v, v2, (6 * sizeof(guint8)) + sizeof(guint16)) == 0;
+	return memcmp (v, v2, sizeof(struct pgm_tsi_t)) == 0;
 }
 
 /* fast log base 2 of power of 2
@@ -1777,8 +1777,13 @@ new_peer (
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
 	gpointer entry = pgm_peer_ref(peer);
 	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
+/* there is no g_list_prepend_link(): */
 	peer->link_.next = transport->peers_list;
 	peer->link_.data = peer;
+/* update next entries previous link */
+	if (transport->peers_list)
+		transport->peers_list->prev = &peer->link_;
+/* update head */
 	transport->peers_list = &peer->link_;
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
 
