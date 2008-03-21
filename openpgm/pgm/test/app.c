@@ -85,7 +85,6 @@ static gboolean on_mark (gpointer);
 static void destroy_session (gpointer, gpointer, gpointer);
 
 static int on_data (gpointer, guint, gpointer);
-
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
 
