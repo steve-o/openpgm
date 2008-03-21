@@ -51,6 +51,7 @@
 #include <pgm/checksum.h>
 #include <pgm/reed_solomon.h>
 #include <pgm/txwi.h>
+#include <pgm/async.h>
 
 
 /* typedefs */
@@ -66,6 +67,7 @@ struct sim_session {
 	pgm_transport_t* transport;
 	gboolean	transport_is_fake;
 	GIOChannel*	recv_channel;
+	pgm_async_t*	async;
 };
 
 /* globals */
@@ -89,6 +91,7 @@ static gboolean on_mark (gpointer);
 
 static void destroy_session (gpointer, gpointer, gpointer);
 
+static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
 void generic_net_send_nak (guint8, char*, pgm_tsi_t*, pgm_sqn_list_t*);
@@ -737,14 +740,22 @@ session_bind (
 		return;
 	}
 
+	if (sess->transport_is_fake)
+	{
 /* add receive socket(s) to event manager */
-	sess->recv_channel = g_io_channel_unix_new (sess->transport->recv_sock);
+		sess->recv_channel = g_io_channel_unix_new (sess->transport->recv_sock);
 
-	GSource *source;
-	source = g_io_create_watch (sess->recv_channel, G_IO_IN);
-	g_source_set_callback (source, (GSourceFunc)on_io_data, sess->transport, NULL);
-	g_source_attach (source, NULL);
-	g_source_unref (source);
+		GSource *source;
+		source = g_io_create_watch (sess->recv_channel, G_IO_IN);
+		g_source_set_callback (source, (GSourceFunc)on_io_data, sess->transport, NULL);
+		g_source_attach (source, NULL);
+		g_source_unref (source);
+	}
+	else
+	{
+		pgm_async_create (&sess->async, sess->transport, 0);
+		pgm_async_add_watch (sess->async, on_data, NULL);
+	}
 
 	puts ("READY");
 }
@@ -1507,6 +1518,19 @@ net_send_nak (
 	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	puts ("READY");
+}
+
+static int
+on_data (
+        gpointer        data,
+        guint           len,
+        gpointer        user_data
+        )
+{
+        printf ("DATA: %s\n", (char*)data);
+        fflush (stdout);
+
+        return 0;
 }
 
 /* process input commands from stdin/fd 
