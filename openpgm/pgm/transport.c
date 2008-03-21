@@ -55,7 +55,7 @@
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -5388,6 +5388,10 @@ on_rdata (
 			{
 				src[ i ] = pgm_rxw_alloc (sender->rxw);
 				memset (src[ i ], 0, parity_length);
+
+				if (is_op_encoded) {
+					src_opts[ i ] = g_slice_alloc0 (sizeof(struct pgm_opt_fragment));
+				}
 			}
 		}
 
@@ -5397,7 +5401,7 @@ on_rdata (
 /* decode opt_fragment option */
 		if (is_op_encoded)
 		{
-			pgm_rs_decode_parity_appended (transport->rs, (void**)src_opts, offsets, sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
+			pgm_rs_decode_parity_appended (transport->rs, (void**)src_opts, offsets, sizeof(struct pgm_opt_fragment));
 		}
 
 /* treat decoded packet as selective repair(s) */
@@ -5422,6 +5426,7 @@ on_rdata (
 								(struct pgm_opt_fragment*)src_opts[ i ],
 								src[ i ],
 								repair_length);
+					g_slice_free1 (sizeof(struct pgm_opt_fragment), src_opts[ i ]);
 				}
 				else
 				{
