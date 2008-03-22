@@ -448,7 +448,6 @@ pgm_rxw_push_fragment (
 		if ( !IN_TXW(r, sequence_number) )
 		{
 			g_warning ("#%u: not in transmit window, discarding.", sequence_number);
-exit(1);
 			retval = PGM_RXW_NOT_IN_TXW;
 			goto out;
 		}

@@ -1818,7 +1818,7 @@ pgm_transport_recvmsgv (
 	struct iovec* iov_end = piov + transport->piov_len;
 
 /* second, flush any remaining contiguous messages from previous call(s) */
-	if (transport->peers_waiting)
+	if (transport->peers_waiting || transport->peers_committed)
 	{
 		g_static_mutex_lock (&transport->waiting_mutex);
 		while (transport->peers_committed)
@@ -1841,11 +1841,12 @@ pgm_transport_recvmsgv (
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 	
-			if (peer_bytes_read == 0) {
-				waiting_rxw->commit_link.data = waiting_rxw;
-				waiting_rxw->commit_link.next = transport->peers_committed;
-				transport->peers_committed = &waiting_rxw->commit_link;
-			} else {
+/* add to release list */
+			waiting_rxw->commit_link.data = waiting_rxw;
+			waiting_rxw->commit_link.next = transport->peers_committed;
+			transport->peers_committed = &waiting_rxw->commit_link;
+
+			if (peer_bytes_read) {
 				bytes_read += peer_bytes_read;
 	
 				if (pmsg == msg_end || piov == iov_end)	/* commit full */
@@ -1854,11 +1855,6 @@ pgm_transport_recvmsgv (
 					g_static_mutex_unlock (&transport->waiting_mutex);
 					goto out;
 				}
-
-/* add to release list */
-				waiting_rxw->commit_link.data = waiting_rxw;
-				waiting_rxw->commit_link.next = transport->peers_committed;
-				transport->peers_committed = &waiting_rxw->commit_link;
 			}
 
 /* next */
@@ -2106,11 +2102,12 @@ flush_locked:
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (peer_bytes_read == 0) {
-				waiting_rxw->commit_link.data = waiting_rxw;
-				waiting_rxw->commit_link.next = transport->peers_committed;
-				transport->peers_committed = &waiting_rxw->commit_link;
-			} else {
+/* add to release list */
+			waiting_rxw->commit_link.data = waiting_rxw;
+			waiting_rxw->commit_link.next = transport->peers_committed;
+			transport->peers_committed = &waiting_rxw->commit_link;
+
+			if (peer_bytes_read) {
 				bytes_read += peer_bytes_read;
 
 				if (pmsg == msg_end || piov == iov_end)
@@ -2119,11 +2116,6 @@ flush_locked:
 					g_static_mutex_unlock (&transport->waiting_mutex);
 					goto out;
 				}
-
-/* add to release list */
-				waiting_rxw->commit_link.data = waiting_rxw;
-				waiting_rxw->commit_link.next = transport->peers_committed;
-				transport->peers_committed = &waiting_rxw->commit_link;
 			}
  
 /* next */
