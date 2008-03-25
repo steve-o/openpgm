@@ -25,7 +25,7 @@ for src in lib_src:
 	lib_obj += httpe.SharedObject(src)
 
 libpgmhttp = httpe.StaticLibrary('libpgmhttp', lib_src);
-libpgmhttppic = httpe.StaticLibrary('libpgmhttppic', lib_obj);
+libpgmhttppic = httpe.StaticLibrary('libpgmhttp-pic', lib_obj);
 
 # convert HTML files to C include files
 for src in html_src:

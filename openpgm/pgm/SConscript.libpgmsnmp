@@ -15,6 +15,6 @@ for src in lib_src:
 	lib_obj += env.SharedObject(src)
 
 env.StaticLibrary('libpgmsnmp', lib_src);
-env.StaticLibrary('libpgmsnmppic', lib_obj);
+env.StaticLibrary('libpgmsnmp-pic', lib_obj);
 
 # end of file
