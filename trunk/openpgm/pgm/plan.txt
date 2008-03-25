@@ -189,6 +189,14 @@ Outstanding questions
 - Should trash stacks have a upper limit to then free to the slice allocator?
 - Should lost packets be managed as ranges or individual sequence numbers, how
   does each method affect performance?
+
+* The initial draft of PGM included OPT_RANGE option for NAKs to specify a range of lost
+  packets, this was replaced in the final draft with NAK lists.  Some research hints that
+  ranges are suitable:
+
+  http://www.isoc.org/inet2001/CD_proceedings/T54/T54.htm
+  http://tools.ietf.org/html/draft-speakman-pgm-spec-01
+
 - Are place holders necessary?  Can state timeouts be managed without a per sequence number
   object?  For example by the next data object, or an extra object for an ncf extended window:
   note that nak packet generation should easily dwarfs time spent unless advantage is taken
