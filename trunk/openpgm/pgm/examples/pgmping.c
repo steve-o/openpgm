@@ -45,6 +45,8 @@
 #include <pgm/signal.h>
 #include <pgm/timer.h>
 #include <pgm/if.h>
+#include <pgm/http.h>
+#include <pgm/snmp.h>
 
 
 /* typedefs */
@@ -58,12 +60,18 @@ struct idle_source {
 
 static int g_port = 7500;
 static char* g_network = "";
+static int g_udp_encap_port = 0;
 
 static int g_odata_rate = 10;					/* 10 per second */
 static int g_odata_interval = (1000 * 1000) / 10;	/* 100 ms */
 static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
+static int g_max_rte = 400*1000;
 static int g_sqns = 100 * 1000;
+
+static gboolean g_fec = FALSE;
+static int g_k = 64;
+static int g_n = 255;
 
 static gboolean g_send_mode = TRUE;
 
@@ -94,9 +102,16 @@ usage (const char* bin)
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
-	fprintf (stderr, "  -t <seconds>    : Terminate transport after time period.\n");
-	fprintf (stderr, "  -f <frequency>  : Number of message to send per second\n");
+        fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -d <seconds>    : Terminate transport after duration.\n");
+	fprintf (stderr, "  -m <frequency>  : Number of message to send per second\n");
 	fprintf (stderr, "  -l              : Listen mode (default send mode)\n");
+        fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
+        fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
+        fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
+        fprintf (stderr, "  -g <n>\n");
+        fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
+        fprintf (stderr, "  -x              : Enable SNMP interface\n");
 	exit (1);
 }
 
@@ -107,20 +122,32 @@ main (
 	)
 {
 	g_message ("pgmping");
+	gboolean enable_http = FALSE;
+	gboolean enable_snmpx = FALSE;
+
 	int timeout = 0;
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:f:lt:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:ld:r:e:k:g:txh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
+		case 'p':	g_udp_encap_port = atoi (optarg); break;
+		case 'r':	g_max_rte = atoi (optarg); break;
 
-		case 'f':	g_odata_rate = atoi (optarg);
+		case 'f':	g_fec = TRUE; break;
+		case 'k':	g_k = atoi (optarg); break;
+		case 'g':	g_n = atoi (optarg); break;
+
+		case 't':	enable_http = TRUE; break;
+		case 'x':	enable_snmpx = TRUE; break;
+
+		case 'm':	g_odata_rate = atoi (optarg);
 				g_odata_interval = (1000 * 1000) / g_odata_rate; break;
-		case 't':	timeout = 1000 * atoi (optarg); break;
+		case 'd':	timeout = 1000 * atoi (optarg); break;
 
 		case 'l':	g_send_mode = FALSE; break;
 
@@ -129,8 +156,18 @@ main (
 		}
 	}
 
+	if (g_fec && ( !g_k || !g_n )) {
+		puts ("Invalid Reed-Solomon parameters.");
+		usage (binary_name);
+	}
+
 	log_init ();
 	pgm_init ();
+
+	if (enable_http)
+		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+	if (enable_snmpx)
+		pgm_snmp_init();
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -165,6 +202,11 @@ main (
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
+
+	if (enable_http)
+		pgm_http_shutdown();
+	if (enable_snmpx)
+		pgm_snmp_shutdown();
 
 	g_message ("finished.");
 	return 0;
@@ -222,6 +264,11 @@ on_startup (
 	g_assert (e == 0);
 	g_assert (smr_len == 1);
 
+	if (g_udp_encap_port) {
+		((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_udp_encap_port);
+	}
+
 	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
@@ -229,6 +276,7 @@ on_startup (
 	pgm_transport_set_rcvbuf (g_transport, 1024 * 1024);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
+	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
@@ -250,6 +298,10 @@ on_startup (
 		pgm_transport_set_event_preallocate (g_transport, g_odata_rate * 2);
 	}
 #endif
+
+	if (g_fec) {
+		pgm_transport_set_fec (g_transport, FALSE, TRUE, g_n, g_k);
+	}
 
 	e = pgm_transport_bind (g_transport);
 	if (e != 0) {

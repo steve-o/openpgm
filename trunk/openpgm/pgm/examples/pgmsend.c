@@ -43,8 +43,6 @@
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
 #include <pgm/if.h>
-#include <pgm/http.h>
-#include <pgm/snmp.h>
 
 
 /* typedefs */
@@ -55,8 +53,6 @@ static int g_port = 7500;
 static char* g_network = "";
 static int g_udp_encap_port = 0;
 
-static int g_odata_interval = 1 * 1000;	/* every 10ms */
-static int g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_max_rte = 400*1000;
 static int g_sqns = 10;
@@ -67,21 +63,13 @@ static int g_n = 255;
 
 static pgm_transport_t* g_transport = NULL;
 
-static GMainLoop* g_loop = NULL;
-
-
-static void on_signal (int);
-static gboolean on_startup (gpointer);
-static gboolean on_mark (gpointer);
-
-static void send_odata (void);
-static gboolean on_odata_timer (gpointer);
+static gboolean create_transport (void);
 
 
 static void
 usage (const char* bin)
 {
-	fprintf (stderr, "Usage: %s [options]\n", bin);
+	fprintf (stderr, "Usage: %s [options] message\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
@@ -100,14 +88,10 @@ main (
 	char   *argv[]
 	)
 {
-	g_message ("pgmsend");
-	gboolean enable_http = FALSE;
-	gboolean enable_snmpx = FALSE;
-
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:xth")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -118,9 +102,6 @@ main (
 		case 'f':	g_fec = TRUE; break;
 		case 'k':	g_k = atoi (optarg); break;
 		case 'g':	g_n = atoi (optarg); break;
-
-		case 't':	enable_http = TRUE; break;
-		case 'x':	enable_snmpx = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -135,84 +116,39 @@ main (
 	log_init ();
 	pgm_init ();
 
-	if (enable_http)
-		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
-	if (enable_snmpx)
-		pgm_snmp_init();
-
-	g_loop = g_main_loop_new(NULL, FALSE);
-
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	pgm_signal_install (SIGINT, on_signal);
-	pgm_signal_install (SIGTERM, on_signal);
-	pgm_signal_install (SIGHUP, SIG_IGN);
+	signal (SIGHUP, SIG_IGN);
 
-/* delayed startup */
-	g_message ("scheduling startup.");
-	g_timeout_add (0, (GSourceFunc)on_startup, NULL);
+	if (!create_transport ())
+	{
+		while (optind < argc)
+		{
+			int e = pgm_transport_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0);
+		        if (e < 0) {
+				g_warning ("pgm_transport_send failed.");
+		        }
 
-/* dispatch loop */
-	g_message ("entering main event loop ... ");
-	g_main_loop_run (g_loop);
-
-	g_message ("event loop terminated, cleaning up.");
+			optind++;
+		}
+	}
 
 /* cleanup */
-	g_main_loop_unref (g_loop);
-	g_loop = NULL;
-
 	if (g_transport) {
-		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
 
-	if (enable_http)
-		pgm_http_shutdown();
-	if (enable_snmpx)
-		pgm_snmp_shutdown();
-
-	g_message ("finished.");
 	return 0;
 }
 
-static void
-on_signal (
-	int	signum
-	)
-{
-	g_message ("on_signal");
-
-	g_main_loop_quit(g_loop);
-}
-
 static gboolean
-on_startup (
-	gpointer data
-	)
+create_transport (void)
 {
-	g_message ("startup.");
-	g_message ("create transport.");
-
 	pgm_gsi_t gsi;
-#if 0
-	char hostname[NI_MAXHOST];
-	struct addrinfo hints, *res = NULL;
 
-	gethostname (hostname, sizeof(hostname));
-	memset (&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_flags = AI_ADDRCONFIG;
-	getaddrinfo (hostname, NULL, &hints, &res);
-	int e = pgm_create_ipv4_gsi (((struct sockaddr_in*)(res->ai_addr))->sin_addr, &gsi);
-	g_assert (e == 0);
-	freeaddrinfo (res);
-#else
 	int e = pgm_create_md5_gsi (&gsi);
 	g_assert (e == 0);
-#endif
 
 	struct pgm_sock_mreq recv_smr, send_smr;
 	int smr_len = 1;
@@ -249,57 +185,7 @@ on_startup (
 		G_BREAKPOINT();
 	}
 
-/* period timer to indicate some form of life */
-// TODO: Gnome 2.14: replace with g_timeout_add_seconds()
-	g_timeout_add(10 * 1000, (GSourceFunc)on_mark, NULL);
-
-	g_message ("scheduling ODATA broadcasts every %.1g secs.", (double)pgm_to_secs((double)g_odata_interval));
-	g_timeout_add(g_odata_interval, (GSourceFunc)on_odata_timer, NULL);
-
-	g_message ("startup complete.");
 	return FALSE;
-}
-
-/* we send out a stream of ODATA packets with basic changing payload
- */
-
-static gboolean
-on_odata_timer (
-	gpointer data
-	)
-{
-	send_odata ();
-	return TRUE;
-}
-
-static void
-send_odata (void)
-{
-	int e;
-	char payload_string[100];
-
-	snprintf (payload_string, sizeof(payload_string), "%i", g_payload++);
-
-	e = pgm_transport_send (g_transport, payload_string, strlen(payload_string) + 1, 0);
-        if (e < 0) {
-		g_warning ("pgm_transport_send failed.");
-                return;
-        }
-}
-
-/* idle log notification
- */
-
-static gboolean
-on_mark (
-	gpointer data
-	)
-{
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-	g_message ("%s counter: %i", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec), g_payload);
-
-	return TRUE;
 }
 
 /* eof */

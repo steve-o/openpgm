@@ -107,6 +107,7 @@ for (my $i = 0; $i < $GF_NO_ELEMENTS; $i++)
 print<<MOO;
 };
 
+#ifdef CONFIG_GALOIS_MUL_LUT
 const gf8_t gftable[GF_NO_ELEMENTS * GF_NO_ELEMENTS] =
 {
 MOO
@@ -132,6 +133,7 @@ for (my $i = 0; $i < $GF_NO_ELEMENTS; $i++)
 
 print<<MOO;
 };
+#endif
 
 /* eof */
 MOO
