@@ -28,6 +28,7 @@ $mon->say ("filter $config{app}{ip}");
 print "mon: ready.\n";
 
 $sim->say ("create ao");
+$sim->say ("set ao FEC RS(255,4)");
 $sim->say ("bind ao");
 print "sim: ready.\n";
 
