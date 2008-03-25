@@ -1143,9 +1143,27 @@ pgm_rxw_peek (
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
+
+/* already committed */
+	if ( pgm_uint32_lt (sequence_number, r->trail) )
+	{
+g_message ("#%u less than trail #%u", sequence_number, r->trail);
+		return PGM_RXW_DUPLICATE;
+	}
+
+/* not in window */
+	if ( !IN_TXW(r, sequence_number) )
+	{
+		return PGM_RXW_NOT_IN_TXW;
+	}
+
+	if ( !ABS_IN_RXW(r, sequence_number) )
+	{
+		return PGM_RXW_ADVANCED_WINDOW;
+	}
+
 /* check if window is not empty */
 	g_assert ( !pgm_rxw_empty (r) );
-	g_assert ( ABS_IN_RXW(r, sequence_number) );
 
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
@@ -1164,12 +1182,21 @@ int
 pgm_rxw_push_nth_parity (
 	pgm_rxw_t*	r,
 	guint32		sequence_number,
+	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,			/* in network order */
 	gpointer	data,
-	guint		length
+	guint		length,
+	pgm_time_t	nak_rb_expiry
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
+
+/* advances window */
+	if ( !ABS_IN_RXW(r, sequence_number) )
+	{
+		pgm_rxw_window_update (r, trail, r->lead, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
+	}
+
 /* check if window is not empty */
 	g_assert ( !pgm_rxw_empty (r) );
 	g_assert ( ABS_IN_RXW(r, sequence_number) );
@@ -1203,12 +1230,21 @@ int
 pgm_rxw_push_nth_repair (
 	pgm_rxw_t*	r,
 	guint32		sequence_number,
+	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,			/* in network order */
 	gpointer	data,
-	guint		length
+	guint		length,
+	pgm_time_t	nak_rb_expiry
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
+
+/* advances window */
+	if ( !ABS_IN_RXW(r, sequence_number) )
+	{
+		pgm_rxw_window_update (r, trail, r->lead, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
+	}
+
 /* check if window is not empty */
 	g_assert ( !pgm_rxw_empty (r) );
 	g_assert ( ABS_IN_RXW(r, sequence_number) );

@@ -2411,13 +2411,16 @@ on_nak_pipe (
 
 				struct pgm_header* header = packet;
 				guint16 tsdu_length = g_ntohs (header->pgm_tsdu_length);
-				if (!parity_length && tsdu_length > parity_length)
+				if (!parity_length)
 				{
 					parity_length = tsdu_length;
 				}
 				else if (tsdu_length != parity_length)
 				{
 					is_var_pktlen = TRUE;
+
+					if (tsdu_length > parity_length)
+						parity_length = tsdu_length;
 				}
 
 				struct pgm_data* rdata = (struct pgm_data*)(header + 1);
@@ -5339,7 +5342,12 @@ on_rdata (
 			gpointer packet = NULL;
 			guint length = 0;
 			gboolean is_parity = FALSE;
-			pgm_rxw_peek (sender->rxw, i, &opt_fragment, &packet, &length, &is_parity);
+			int status = pgm_rxw_peek (sender->rxw, i, &opt_fragment, &packet, &length, &is_parity);
+
+			if (status == PGM_RXW_DUPLICATE)	/* already committed */
+				goto out;
+			if (status == PGM_RXW_NOT_IN_TXW)
+				goto out;
 
 			if (length == 0 && !is_parity) {	/* nothing */
 
@@ -5352,7 +5360,13 @@ on_rdata (
 					offsets[ i - tg_sqn ] = transport->rs_k + rs_h++;
 
 /* move repair to receive window ownership */
-					pgm_rxw_push_nth_parity_copy (sender->rxw, i, rdata_opt_fragment, rdata_bytes, parity_length);
+					pgm_rxw_push_nth_parity_copy (sender->rxw,
+									i,
+									g_ntohl (rdata->data_trail),
+									rdata_opt_fragment,
+									rdata_bytes,
+									parity_length,
+									nak_rb_expiry);
 				}
 				else
 				{
@@ -5420,18 +5434,22 @@ on_rdata (
 				{
 					retval = pgm_rxw_push_nth_repair (sender->rxw,
 								tg_sqn + i,
+								g_ntohl (rdata->data_trail),
 								(struct pgm_opt_fragment*)src_opts[ i ],
 								src[ i ],
-								repair_length);
+								repair_length,
+								nak_rb_expiry);
 					g_slice_free1 (sizeof(struct pgm_opt_fragment), src_opts[ i ]);
 				}
 				else
 				{
 					retval = pgm_rxw_push_nth_repair (sender->rxw,
 								tg_sqn + i,
+								g_ntohl (rdata->data_trail),
 								NULL,
 								src[ i ],
-								repair_length);
+								repair_length,
+								nak_rb_expiry);
 				}
 				switch (retval) {
 				case PGM_RXW_CREATED_PLACEHOLDER:

@@ -47,7 +47,9 @@ typedef guint8 gf8_t;
 extern const gf8_t gflog[GF_NO_ELEMENTS];
 extern const gf8_t gfantilog[GF_NO_ELEMENTS];
 
+#ifdef CONFIG_GALOIS_MUL_LUT
 extern const gf8_t gftable[GF_NO_ELEMENTS * GF_NO_ELEMENTS];
+#endif
 
 
 G_BEGIN_DECLS
@@ -102,8 +104,12 @@ gfmul (
 		return 0;
 	}
 
+#ifdef CONFIG_GALOIS_MUL_LUT
+	return gftable[ (guint16)a << 8 | (guint16)b ];
+#else
 	guint sum = gflog[ a ] + gflog[ b ];
 	return sum >= GF_MAX ? gfantilog[ sum - GF_MAX ] : gfantilog[ sum ];
+#endif
 }
 
 static inline gf8_t

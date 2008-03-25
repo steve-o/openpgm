@@ -111,6 +111,7 @@ static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
 
 static inline void pgm_txw_zero_pad (pgm_txw_t* t, gpointer data, guint offset, guint len)
 {
+    g_assert ( offset <= len );
     if ( offset == len ||
 	 PGM_PACKET_ZERO_PADDED == ( (guint8*)data )[ t->max_tpdu - 1 ] )
     {
