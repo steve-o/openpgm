@@ -29,19 +29,19 @@
 
 
 #ifndef __PGM_GSI_H__
-#   include "pgm/gsi.h"
+#   include <pgm/gsi.h>
 #endif
 
 #ifndef __PGM_SOCKADDR_H__
-#   include "pgm/sockaddr.h"
+#   include <pgm/sockaddr.h>
 #endif
 
 #ifndef __PGM_TIMER_H__
-#   include "pgm/timer.h"
+#   include <pgm/timer.h>
 #endif
 
 #ifndef __PGM_MSGV_H__
-#   include "pgm/msgv.h"
+#   include <pgm/msgv.h>
 #endif
 
 /* Performance Counters */

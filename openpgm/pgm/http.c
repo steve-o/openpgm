@@ -33,10 +33,11 @@
 #include <libsoup/soup-server-message.h>
 #include <libsoup/soup-address.h>
 
-#include <pgm/http.h>
-#include <pgm/transport.h>
-#include <pgm/txwi.h>
-#include <pgm/rxwi.h>
+#include "pgm/http.h"
+#include "pgm/transport.h"
+#include "pgm/txwi.h"
+#include "pgm/rxwi.h"
+#include "pgm/version.h"
 
 #include "htdocs/404.html.h"
 #include "htdocs/base.css.h"
@@ -202,7 +203,7 @@ http_create_response (
 					"<body>"
 					"<div id=\"header\">"
 						"<div id=\"hostname\">%s</div>"
-						"<div id=\"banner\">OpenPGM - $version</div>"
+						"<div id=\"banner\">OpenPGM - %u.%u.%u</div>"
 						"<div id=\"timestamp\">%s</div>"
 					"</div>"
 					"<div id=\"navigation\">"
@@ -214,6 +215,7 @@ http_create_response (
 				hostname,
 				subtitle,
 				hostname,
+				pgm_major_version, pgm_minor_version, pgm_micro_version,
 				timestamp );
 
 	g_free (timestamp);

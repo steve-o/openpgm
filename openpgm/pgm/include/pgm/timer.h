@@ -25,7 +25,7 @@
 #include <glib.h>
 
 #ifndef __PGM_SN_H
-#include "pgm/sn.h"
+#   include <pgm/sn.h>
 #endif
 
 

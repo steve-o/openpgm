@@ -11,7 +11,17 @@ opt.AddOptions (
 
 import os
 env = Environment(ENV = os.environ,
-	CCFLAGS = ['-pipe', '-Wall', '-pedantic', '-std=gnu99', '-D_REENTRANT', '-D__need_IOV_MAX', '-DCONFIG_REED_SOLOMON_ENC8', '-DCONFIG_REED_SOLOMON_DEC8', '-DCONFIG_BIND_INADDR_ANY', '-DCONFIG_GALOIS_MUL_LUT'],
+	CCFLAGS = [	'-pipe',
+			'-Wall',
+			'-pedantic',
+			'-std=gnu99',
+			'-D_REENTRANT',
+			'-D__need_IOV_MAX',
+			'-DCONFIG_BIND_INADDR_ANY',
+			'-DCONFIG_GALOIS_MUL_LUT',
+			'-DPGM_MAJOR_VERSION=1',
+			'-DPGM_MINOR_VERSION=0',
+			'-DPGM_MICRO_VERSION=0'	],
 	LINKFLAGS = ['-pipe'],
 	NETSNMP_LIBS = ['libnetsnmpagent', 'libnetsnmpmibs', 'libnetsnmphelpers', 'libnetsnmp']
 )
