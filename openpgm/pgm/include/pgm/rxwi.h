@@ -25,19 +25,19 @@
 #include <glib.h>
 
 #ifndef __PGM_TIMER_H__
-#   include "pgm/timer.h"
+#   include <pgm/timer.h>
 #endif
 
 #ifndef __PGM_MSGV_H__
-#   include "pgm/msgv.h"
+#   include <pgm/msgv.h>
 #endif
 
 #ifndef __PGM_ZERO_H__
-#   include "pgm/zero.h"
+#   include <pgm/zero.h>
 #endif
 
 #ifndef __PGM_PACKET_H__
-#   include "pgm/packet.h"
+#   include <pgm/packet.h>
 #endif
 
 

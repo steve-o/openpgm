@@ -25,7 +25,7 @@
 #include <glib.h>
 
 #ifndef __PGM_ZERO_H
-#   include "pgm/zero.h"
+#   include <pgm/zero.h>
 #endif
 
 
