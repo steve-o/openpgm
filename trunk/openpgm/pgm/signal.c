@@ -29,7 +29,7 @@
 
 #include <glib.h>
 
-#include "signal.h"
+#include "pgm/signal.h"
 
 
 /* globals */

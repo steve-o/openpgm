@@ -245,3 +245,5 @@ Optionals
 
 - Some form of broadcast statistics for passive monitoring.
 - (fix) BCH Reed-Solomon codec as possibly faster alternative, albeit incompatible with Microsoft.
+- Recommendations as per the RMT working group of the IETF for AL-FEC codecs: Raptor codes, LDPC-
+  staircase and LDPC-triangle codes.

@@ -25,7 +25,7 @@
 #include <glib.h>
 
 #ifndef __PGM_TRANSPORT_H__
-#   include "transport.h"
+#   include <pgm/transport.h>
 #endif
 
 typedef struct pgm_event_t pgm_event_t;
