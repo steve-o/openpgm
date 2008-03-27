@@ -1,0 +1,37 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+httpe = env.Copy()
+httpe.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+httpe.Append(CPPPATH = '.')
+
+lib_src = Split("""
+		http.c
+""")
+
+html_src = Split("""
+		htdocs/404.html
+		htdocs/base.css
+		htdocs/robots.txt
+		htdocs/xhtml10_strict.doctype
+""")
+
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += httpe.SharedObject(src)
+
+libpgmhttp = httpe.StaticLibrary('libpgmhttp', lib_src);
+libpgmhttppic = httpe.StaticLibrary('libpgmhttp-pic', lib_obj);
+
+# convert HTML files to C include files
+for src in html_src:
+	dst = src + '.h'
+	httpe.HtmlC(dst, src)
+	httpe.Depends(libpgmhttp, dst)
+	httpe.Depends(libpgmhttppic, dst)
+
+# end of file

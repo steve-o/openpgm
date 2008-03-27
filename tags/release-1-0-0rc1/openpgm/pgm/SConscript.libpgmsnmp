@@ -1,0 +1,20 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+lib_src = Split("""
+		snmp.c
+		pgmMIB.c
+""")
+
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += env.SharedObject(src)
+
+env.StaticLibrary('libpgmsnmp', lib_src);
+env.StaticLibrary('libpgmsnmp-pic', lib_obj);
+
+# end of file
