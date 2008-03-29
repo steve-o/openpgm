@@ -178,9 +178,15 @@ out:
 /* add xhtml doctype and head, populate with runtime values
  */
 
+typedef enum {
+	HTTP_TAB_GENERAL_INFORMATION,
+	HTTP_TAB_TRANSPORTS
+} http_tab_e;
+
 static GString*
 http_create_response (
-	const gchar*		subtitle
+	const gchar*		subtitle,
+	http_tab_e		tab
 	)
 {
 	char hostname[NI_MAXHOST + 1];
@@ -198,25 +204,27 @@ http_create_response (
 	GString* response = g_string_new (WWW_XHTML10_STRICT_DOCTYPE);
 	g_string_append_printf (response, "<head>"
 						"<title>%s - %s</title>"
-						"<link ref=\"stylesheet\" href=\"/base.css\" type=\"text/css\" charset=\"utf-8\" />"
+						"<link rel=\"stylesheet\" href=\"/base.css\" type=\"text/css\" charset=\"utf-8\" />"
 					"</head>"
 					"<body>"
 					"<div id=\"header\">"
-						"<div id=\"hostname\">%s</div>"
-						"<div id=\"banner\">OpenPGM - %u.%u.%u</div>"
-						"<div id=\"timestamp\">%s</div>"
+						"<span id=\"hostname\">%s</span>"
+						" | <span id=\"banner\"><a href=\"http://developer.novell.com/wiki/index.php/OpenPGM\">OpenPGM</a> %u.%u.%u</span>"
+						" | <span id=\"timestamp\">%s</span>"
 					"</div>"
 					"<div id=\"navigation\">"
-						"<ul>"
-							"<li><a href=\"/\">General Information</a></li>"
-							"<li><a href=\"/transports\">Transports</a></li>"
-						"</ul>"
+						"<a href=\"/\"><div class=\"tab\" id=\"tab%s\">General Information</div></a>"
+						"<a href=\"/transports\"><div class=\"tab\" id=\"tab%s\">Transports</div></a>"
+						"<div id=\"tabline\"></div>"
+					"</div>"
 					"<div id=\"content\">",
 				hostname,
 				subtitle,
 				hostname,
 				pgm_major_version, pgm_minor_version, pgm_micro_version,
-				timestamp );
+				timestamp,
+				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
+				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom");
 
 	g_free (timestamp);
 
@@ -230,6 +238,9 @@ http_finalize_response (
 	)
 {
 	g_string_append (response,	"</div>"
+					"<div id=\"footer\">"
+						"&copy;2008 Miru"
+					"</div>"
 					"</body>"
 					"</html>");
 
@@ -310,19 +321,18 @@ index_callback (
 
 	int pid = getpid();
 
-	response = http_create_response ("OpenPGM");
-	g_string_append_printf (response,	"<h1>General Information</h1>"
-						"<table>"
+	response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
+	g_string_append_printf (response,	"<table>"
 						"<tr>"
-							"<td>host name:</td><td>%s</td>"
+							"<th>host name:</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>user name:</td><td>%s</td>"
+							"<th>user name:</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>IP address:</td><td>%s</td>"
+							"<th>IP address:</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>transports:</td><td><a href=\"/transports\">%i</a></td>"
+							"<th>transports:</th><td><a href=\"/transports\">%i</a></td>"
 						"</tr><tr>"
-							"<td>process ID:</td><td>%i</td>"
+							"<th>process ID:</th><td>%i</td>"
 						"</tr>"
 						"</table>",
 				hostname,
@@ -343,15 +353,14 @@ transports_callback (
 {
 	GString *response;
 
-	response = http_create_response ("Transports");
-	g_string_append (response,	"<h1>Transports</h1>"
-						"<table>"
-						"<tr>"
-							"<th>Group address</th>"
-							"<th>Dest port</th>"
-							"<th>Source GSI</th>"
-							"<th>Source port</th>"
-						"</tr>"
+	response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
+	g_string_append (response,	"<table>"
+					"<tr>"
+						"<th>Group address</th>"
+						"<th>Dest port</th>"
+						"<th>Source GSI</th>"
+						"<th>Source port</th>"
+					"</tr>"
 				);
 
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
@@ -386,7 +395,7 @@ transports_callback (
 								"<td>%s</td>"
 								"<td>%i</td>"
 								"<td><a href=\"/%s.%hu\">%s</a></td>"
-								"<td><a href==\"/%s.%hu\">%hu</a></td>"
+								"<td><a href=\"/%s.%hu\">%hu</a></td>"
 							"</tr>",
 					group_address,
 					dport,
@@ -523,23 +532,26 @@ http_tsi_response (
 			spm_path,
 			sizeof(spm_path) );
 
-	GString* response = http_create_response (title);
-	g_string_append_printf (response,	"<h1>%s</h1>"
+	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
+	g_string_append_printf (response,	"<div class=\"heading\">"
+							"<strong>Transport: </strong>"
+							"%s.%i"
+						"</div>"
 						"<h2>Source information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>Source address</td><td>%s</td>"
+							"<th>Source address</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Group address</td><td>%s</td>"
+							"<th>Group address</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Dest port</td><td>%i</td>"
+							"<th>Dest port</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Source GSI</td><td>%s</td>"
+							"<th>Source GSI</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Source port</td><td>%i</td>"
+							"<th>Source port</th><td>%i</td>"
 						"</tr>"
 						"</table>",
-				title,
+				gsi, sport,
 				source_address,
 				group_address,
 				dport,
@@ -575,29 +587,29 @@ http_tsi_response (
 	g_string_append_printf (response,	"<h2>Configuration information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>Ttl</td><td>%i</td>"
+							"<th>Ttl</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Adv Mode</td><td>data(1)</td>"
+							"<th>Adv Mode</th><td>data(1)</td>"
 						"</tr><tr>"
-							"<td>Late join</td><td>disable(2)</td>"
+							"<th>Late join</th><td>disable(2)</td>"
 						"</tr><tr>"
-							"<td>TXW_MAX_RTE</td><td>%i</td>"
+							"<th>TXW_MAX_RTE</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>TXW_SECS</td><td>%i</td>"
+							"<th>TXW_SECS</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>TXW_ADV_SECS</td><td>0</td>"
+							"<th>TXW_ADV_SECS</th><td>0</td>"
 						"</tr><tr>"
-							"<td>Ambient SPM interval</td><td>%i ms</td>"
+							"<th>Ambient SPM interval</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>IHB_MIN</td><td>%i ms</td>"
+							"<th>IHB_MIN</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>IHB_MAX</td><td>%i ms</td>"
+							"<th>IHB_MAX</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>NAK_BO_IVL</td><td>%i ms</td>"
+							"<th>NAK_BO_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>FEC</td><td>disabled(1)</td>"
+							"<th>FEC</th><td>disabled(1)</td>"
 						"</tr><tr>"
-							"<td>Source Path Address</td><td>%s</td>"
+							"<th>Source Path Address</th><td>%s</td>"
 						"</tr>"
 						"</table>",
 				transport->hops,
@@ -612,39 +624,39 @@ http_tsi_response (
 	g_string_append_printf (response,	"<h2>Performance information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>Data bytes sent</td><td>%i</td>"
+							"<th>Data bytes sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Data packets sent</td><td>%i</td>"
+							"<th>Data packets sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Bytes buffered</td><td>%i</td>"
+							"<th>Bytes buffered</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Packets buffered</td><td>%i</td>"
+							"<th>Packets buffered</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Bytes sent</td><td>%i</td>"
+							"<th>Bytes sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Raw NAKs received</td><td>%i</td>"
+							"<th>Raw NAKs received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Checksum errors</td><td>%i</td>"
+							"<th>Checksum errors</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed NAKs</td><td>%i</td>"
+							"<th>Malformed NAKs</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Packets discarded</td><td>%i</td>"
+							"<th>Packets discarded</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Bytes retransmitted</td><td>%i</td>"
+							"<th>Bytes retransmitted</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Packets retransmitted</td><td>%i</td>"
+							"<th>Packets retransmitted</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs received</td><td>%i</td>"
+							"<th>NAKs received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs ignored</td><td>%i</td>"
+							"<th>NAKs ignored</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Transmission rate</td><td>%i bps</td>"
+							"<th>Transmission rate</th><td>%i bps</td>"
 						"</tr><tr>"
-							"<td>NNAK packets received</td><td>%i</td>"
+							"<th>NNAK packets received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NNAKs received</td><td>%i</td>"
+							"<th>NNAKs received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed NNAKs</td><td>%i</td>"
+							"<th>Malformed NNAKs</th><td>%i</td>"
 						"</tr>"
 						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
@@ -783,25 +795,28 @@ http_receiver_response (
 	gchar* last_activity = g_locale_to_utf8 (buf, ret, NULL, &bytes_written, NULL);
 
 
-	GString* response = http_create_response (title);
-	g_string_append_printf (response,	"<h1>%s</h1>"
+	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
+	g_string_append_printf (response,	"<div class=\"heading\">"
+							"<strong>Receiver: </strong>"
+							"%s.%i"
+						"</div>"
 						"<h2>Receiver information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>Group address</td><td>%s</td>"
+							"<th>Group address</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Dest port</td><td>%i</td>"
+							"<th>Dest port</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Source address</td><td>%s</td>"
+							"<th>Source address</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Last hop</td><td>%s</td>"
+							"<th>Last hop</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Source GSI</td><td>%s</td>"
+							"<th>Source GSI</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>Source port</td><td>%i</td>"
+							"<th>Source port</th><td>%i</td>"
 						"</tr>"
 						"</table>",
-				title,
+				gsi, sport,
 				group_address,
 				dport,
 				source_address,
@@ -812,26 +827,27 @@ http_receiver_response (
 	g_string_append_printf (response,	"<h2>Configuration information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>NAK_BO_IVL</td><td>%i ms</td>"
+							"<th>NAK_BO_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>NAK_RPT_IVL</td><td>%i ms</td>"
+							"<th>NAK_RPT_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>NAK_NCF_RETRIES</td><td>%i</td>"
+							"<th>NAK_NCF_RETRIES</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK_RDATA_IVL</td><td>%i ms</td>"
+							"<th>NAK_RDATA_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<td>NAK_DATA_RETRIES</td><td>%i</td>"
+							"<th>NAK_DATA_RETRIES</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Send NAKs</td><td>enabled(1)</td>"
+							"<th>Send NAKs</th><td>enabled(1)</td>"
 						"</tr><tr>"
-							"<td>Late join</td><td>disabled(2)</td>"
+							"<th>Late join</th><td>disabled(2)</td>"
 						"</tr><tr>"
-							"<td>NAK TTL</td><td>%i</td>"
+							"<th>NAK TTL</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Delivery order</td><td>ordered(2)</td>"
+							"<th>Delivery order</th><td>ordered(2)</td>"
 						"</tr><tr>"
-							"<td>Multicast NAKs</td><td>disabled(2)</td>"
-						"<tr>",
+							"<th>Multicast NAKs</th><td>disabled(2)</td>"
+						"<tr>"
+						"</table>",
 						pgm_to_msecs(peer->transport->nak_bo_ivl),
 						pgm_to_msecs(peer->transport->nak_rpt_ivl),
 						peer->transport->nak_ncf_retries,
@@ -842,77 +858,77 @@ http_receiver_response (
 	g_string_append_printf (response,	"<h2>Performance information</h2>"
 						"<table>"
 						"<tr>"
-							"<td>Data bytes received</td><td>%i</td>"
+							"<th>Data bytes received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Data packets received</td><td>%i</td>"
+							"<th>Data packets received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK failures</td><td>%i</td>"
+							"<th>NAK failures</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Bytes received</td><td>%i</td>"
+							"<th>Bytes received</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Checksum errors</td><td>%i</td>"
+							"<th>Checksum errors</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed SPMs</td><td>%i</td>"
+							"<th>Malformed SPMs</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed ODATA</td><td>%i</td>"
+							"<th>Malformed ODATA</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed RDATA</td><td>%i</td>"
+							"<th>Malformed RDATA</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed NCFs</td><td>%i</td>"
+							"<th>Malformed NCFs</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Packets discarded</td><td>%i</td>"
+							"<th>Packets discarded</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Losses</td><td>%i</td>"	/* detected missed packets */
+							"<th>Losses</th><td>%i</td>"	/* detected missed packets */
 						"</tr><tr>"
-							"<td>Bytes delivered to app</td><td>%i</td>"
+							"<th>Bytes delivered to app</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Packets delivered to app</td><td>%i</td>"
+							"<th>Packets delivered to app</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Duplicate SPMs</td><td>%i</td>"
+							"<th>Duplicate SPMs</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Duplicate ODATA/RDATA</td><td>%i</td>"
+							"<th>Duplicate ODATA/RDATA</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK packets sent</td><td>%i</td>"
+							"<th>NAK packets sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs sent</td><td>%i</td>"
+							"<th>NAKs sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs retransmitted</td><td>%i</td>"
+							"<th>NAKs retransmitted</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs failed</td><td>%i</td>"
+							"<th>NAKs failed</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs failed due to RXW advance</td><td>%i</td>"
+							"<th>NAKs failed due to RXW advance</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs failed due to NCF retries</td><td>%i</td>"
+							"<th>NAKs failed due to NCF retries</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs failed due to DATA retries</td><td>%i</td>"
+							"<th>NAKs failed due to DATA retries</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK failures delivered to app</td><td>%i</td>"
+							"<th>NAK failures delivered to app</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAKs suppressed</td><td>%i</td>"
+							"<th>NAKs suppressed</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Malformed NAKs</td><td>%i</td>"
+							"<th>Malformed NAKs</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Outstanding NAKs</td><td>%i</td>"
+							"<th>Outstanding NAKs</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>Last activity</td><td>%s</td>"
+							"<th>Last activity</th><td>%s</td>"
 						"</tr><tr>"
-							"<td>NAK repair min time</td><td>%i</td>"
+							"<th>NAK repair min time</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK repair mean time</td><td>%i</td>"
+							"<th>NAK repair mean time</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK repair max time</td><td>%i</td>"
+							"<th>NAK repair max time</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK fail min time</td><td>%i</td>"
+							"<th>NAK fail min time</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK fail mean time</td><td>%i</td>"
+							"<th>NAK fail mean time</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK fail max time</td><td>%i</td>"
+							"<th>NAK fail max time</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK min retransmit count</td><td>%i</td>"
+							"<th>NAK min retransmit count</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK mean retransmit count</td><td>%i</td>"
+							"<th>NAK mean retransmit count</th><td>%i</td>"
 						"</tr><tr>"
-							"<td>NAK max retransmit count</td><td>%i</td>"
+							"<th>NAK max retransmit count</th><td>%i</td>"
 						"</tr>"
 						"</table>",
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED],
