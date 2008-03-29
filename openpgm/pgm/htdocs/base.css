@@ -1,8 +1,80 @@
 html {
 	background-color: white;
 	font-family: Verdana;
-	font-size: 11px;
+	font-size: 12px;
 	color: black;
+}
+
+a, a:link, a:visited {
+	color: #0033cc;
+	text-decoration: none;
+}
+
+#header {
+	text-align: right;
+}
+
+#header #hostname {
+	font-weight: bold;
+}
+
+#header a {
+	color: black;
+}
+
+#header a:hover {
+	text-decoration: underline;
+}
+
+#footer {
+	clear: both;
+	margin-top: 3.5em;
+	margin-bottom: 1em;
+	padding-top: 20px;
+	text-align: center;
+}
+
+#navigation a {
+	color: black;
+}
+
+#navigation .tab {
+	-moz-border-radius-topleft: 4px;
+	-moz-border-radius-topright: 4px;
+	padding: 4px 1em 2px;
+	margin-right: 8px;
+	float: left;
+	font-weight: bold;
+}
+
+#navigation #tabtop,#tabline {
+	background-color: #fb879c;
+}
+
+#navigation #tabbottom {
+	background-color: #fbc1a9;
+}
+
+#navigation #tabline {
+	clear: left;
+	-moz-border-radius-topright: 4px;
+	height: 4px;
+}
+
+#content {
+	margin-top: 6px;
+	padding: 3px;
+}
+
+#content a:hover {
+	background: #ffffaa;
+}
+
+.heading {
+	-moz-border-radius-topleft: 4px;
+	-moz-border-radius-topright: 4px;
+	background-color: #fb879c;
+	padding: 6px;
 }
 
 table {
@@ -14,8 +86,9 @@ thead th,tfoot th {
 	text-align: center;
 	font-weight: bold;
 }
-tbody td {
+tbody th,td {
 	border-bottom: 1px solid #F0F0F0;
+	text-align: left;
 }
 th,td {
 	border-left: 0;
