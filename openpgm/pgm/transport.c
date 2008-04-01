@@ -4643,9 +4643,10 @@ out:
  * copy into receive window one or more fragments.
  */
 
-int pgm_transport_send (
+int
+pgm_transport_send (
 	pgm_transport_t*	transport,
-	const gchar*		data,
+	const gpointer		data,
 	gsize			len,
 	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
@@ -4665,7 +4666,8 @@ int pgm_transport_send (
  * locks spin.
  */
 
-int pgm_transport_sendv (
+int
+pgm_transport_sendv (
 	pgm_transport_t*	transport,
 	const struct iovec*	vector,
 	int			count,
@@ -4856,7 +4858,7 @@ out:
 int
 pgm_transport_send_fragment (
 	pgm_transport_t*	transport,
-	const gchar*		data,
+	const gpointer		data,
 	gsize			len,
 	int			flags,		/* MSG_DONTWAIT = non-blocking */
 	int*			offset,

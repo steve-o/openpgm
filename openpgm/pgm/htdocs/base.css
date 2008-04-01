@@ -75,22 +75,62 @@ a, a:link, a:visited {
 	-moz-border-radius-topright: 4px;
 	background-color: #fb879c;
 	padding: 6px;
+	margin-bottom: 3px;
 }
 
 table {
-	border-collapse: collapse;
+	border-collapse: separate;
 }
-thead th,tfoot th {
-	background-color: #C30;
-	color: #FFB3A6;
-	text-align: center;
-	font-weight: bold;
-}
-tbody th,td {
-	border-bottom: 1px solid #F0F0F0;
+
+th {
 	text-align: left;
 }
-th,td {
-	border-left: 0;
-	padding: 10px;
+
+#information {
+	float: right;
+}
+
+.rounded {
+	background-color: #fbc1a9;
+	-moz-border-radius: 4px;
+	padding: 5px;
+	margin-top: 6px;
+	margin-bottom: 6px;
+	width: 25em;
+}
+
+.break {
+	border-top: 3px solid white;
+	margin-top: 1em;
+	padding-top: 6px;
+}
+
+.bubbly {
+	background-color: #fb879c;
+	-moz-border-radius: 4px;
+	padding: 4px;
+}
+
+.bubbly table {
+	width: 100%;
+}
+
+.bubbly th,.bubbly td {
+	border-bottom: 1px solid #bbbbbb;
+}
+
+.bubbly th {
+	background-color: #fbc1a9;
+	border-left: 1px solid #bbbbbb;
+	padding: 2px 1px 2px 2px;
+}
+
+.bubbly td {
+	background-color: white;
+	padding: 4px;
+}
+
+.bubbly .empty {
+	padding: 3em;
+	text-align: center;
 }
