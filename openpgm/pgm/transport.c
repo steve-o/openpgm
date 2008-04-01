@@ -4513,6 +4513,124 @@ out:
 	return retval;
 }
 
+static inline int
+pgm_transport_send_one_iov_unlocked (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	int			count,
+	int			flags
+	)
+{
+	int retval = 0;
+
+/* determine APDU length */
+	int apdu_length = 0;
+	for (int i = 0; i < count; i++)
+	{
+		apdu_length += vector[i].iov_len;
+	}
+
+	if (flags & MSG_DONTWAIT)
+	{
+	        int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + apdu_length;
+		int retval = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+		if (retval == -1) {
+			goto out;
+		}
+	}
+
+	g_static_rw_lock_writer_lock (&transport->txw_lock);
+
+/* offset to payload */
+	char* pkt = pgm_txw_alloc (transport->txw);
+	char* data = pkt + sizeof(struct pgm_header) + sizeof(struct pgm_data);
+
+/* retrieve packet storage from transmit window */
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + apdu_length;
+
+	struct pgm_header *header = (struct pgm_header*)pkt;
+	struct pgm_data *odata = (struct pgm_data*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport	= transport->tsi.sport;
+	header->pgm_dport	= transport->dport;
+	header->pgm_type        = PGM_ODATA;
+        header->pgm_options     = 0;
+        header->pgm_tsdu_length = g_htons (apdu_length);
+
+/* ODATA */
+        odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+        odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
+
+        header->pgm_checksum    = 0;
+	int pgm_header_len	= (char*)(odata + 1) - (char*)header;
+	guint32 unfolded_header	= pgm_csum_partial ((const void*)header, pgm_header_len, 0);
+	guint32 unfolded_odata = 0;
+
+	guint vector_index = 0;
+	guint vector_offset = 0;
+
+/* iterate over one or more vector elements to perform scatter/gather checksum & copy */
+	guint src_offset = 0;
+	guint copy_length = apdu_length;
+	for (;;)
+	{
+		guint element_length = vector[vector_index].iov_len - vector_offset;
+
+		if (copy_length <= element_length)
+		{
+			unfolded_odata = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, copy_length, unfolded_odata);
+			if (copy_length == element_length) {
+				vector_index++;
+				vector_offset = 0;
+			} else {
+				vector_offset += copy_length;
+			}
+			break;
+		}
+		else
+		{
+/* copy part of TSDU */
+			unfolded_odata = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, element_length, unfolded_odata);
+			src_offset += element_length;
+			copy_length -= element_length;
+			vector_index++;
+			vector_offset = 0;
+		}
+	}
+
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+
+/* add to transmit window */
+	pgm_txw_push (transport->txw, pkt, tpdu_length);
+
+	retval = pgm_sendto (transport,
+				FALSE,
+				header,
+				tpdu_length,
+				MSG_CONFIRM,		/* not expecting a reply */
+				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+
+/* save unfolded odata for retransmissions */
+	*(guint32*)&header->pgm_sport	= unfolded_odata;
+
+/* release txw lock here in order to allow spms to lock mutex */
+	g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+	pgm_reset_heartbeat_spm (transport);
+
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += apdu_length;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]++;
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length + transport->iphdr_len;
+//	g_trace ("INFO","%i bytes sent", tpdu_length);
+
+/* return data payload length sent */
+	if (retval > 0) retval = apdu_length;
+
+out:
+	return retval;
+}
+
 /* copy application data (apdu) to multiple tx window (tpdu) entries and send.
  *
  * TODO: generic wrapper to determine fragmentation from tpdu_length.
@@ -4638,6 +4756,171 @@ out:
 	return retval;
 }
 
+/* copy application data (apdu) from a scatter/gather IO vector
+ * to multiple tx window (tpdu) entries and send.
+ */
+static inline int
+pgm_transport_send_iov_apdu_unlocked (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	int			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	int retval = 0;
+	guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
+	guint packets = 0;
+	guint bytes_sent = 0;
+	guint data_bytes_sent = 0;
+
+/* determine APDU length */
+	int apdu_length = 0;
+	for (int i = 0; i < count; i++)
+	{
+		apdu_length += vector[i].iov_len;
+	}
+
+	guint vector_index = 0;
+	guint vector_offset = 0;
+
+/* rate limit */
+	if (flags & MSG_DONTWAIT)
+	{
+		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
+				sizeof(struct pgm_opt_length) +		/* includes header */
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		int tpdu_length = 0;
+		guint offset_ = 0;
+		do {
+			int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, apdu_length - offset_);
+			tpdu_length += header_length + tsdu_length;
+			offset_ += tsdu_length;
+		} while (offset_ < apdu_length);
+
+		int retval = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+		if (retval == -1) {
+			goto out;
+		}
+	}
+
+	g_static_rw_lock_writer_lock (&transport->txw_lock);
+
+	do {
+/* retrieve packet storage from transmit window */
+		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
+				sizeof(struct pgm_opt_length) +		/* includes header */
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, apdu_length - data_bytes_sent);
+		int tpdu_length = header_length + tsdu_length;
+
+		char *pkt = pgm_txw_alloc(transport->txw);
+		struct pgm_header *header = (struct pgm_header*)pkt;
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+		header->pgm_sport	= transport->tsi.sport;
+		header->pgm_dport	= transport->dport;
+		header->pgm_type        = PGM_ODATA;
+	        header->pgm_options     = PGM_OPT_PRESENT;
+	        header->pgm_tsdu_length = g_htons (tsdu_length);
+
+/* ODATA */
+		struct pgm_data *odata = (struct pgm_data*)(header + 1);
+	        odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+	        odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
+
+/* OPT_LENGTH */
+		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(odata + 1);
+		opt_len->opt_type	= PGM_OPT_LENGTH;
+		opt_len->opt_length	= sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length	= g_htons (	sizeof(struct pgm_opt_length) +
+								sizeof(struct pgm_opt_header) +
+								sizeof(struct pgm_opt_fragment) );
+/* OPT_FRAGMENT */
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+		opt_header->opt_type	= PGM_OPT_FRAGMENT | PGM_OPT_END;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_fragment);
+		struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+		opt_fragment->opt_reserved	= 0;
+		opt_fragment->opt_sqn		= g_htonl (opt_sqn);
+		opt_fragment->opt_frag_off	= g_htonl (data_bytes_sent);
+		opt_fragment->opt_frag_len	= g_htonl (count);
+
+/* checksum & copy */
+	        header->pgm_checksum    = 0;
+		int pgm_header_len	= (char*)(opt_fragment + 1) - (char*)header;
+		guint32 unfolded_header = pgm_csum_partial ((const void*)header, pgm_header_len, 0);
+		guint32 unfolded_odata  = 0;
+
+/* iterate over one or more vector elements to perform scatter/gather checksum & copy */
+		guint src_offset = 0;
+		guint copy_length = tsdu_length;
+		for (;;)
+		{
+			guint element_length = vector[vector_index].iov_len - vector_offset;
+
+			if (copy_length <= element_length)
+			{
+				unfolded_odata = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(opt_fragment + 1) + src_offset, copy_length, unfolded_odata);
+				if (copy_length == element_length) {
+					vector_index++;
+					vector_offset = 0;
+				} else {
+					vector_offset += copy_length;
+				}
+				break;
+			}
+			else
+			{
+/* copy part of TSDU */
+				unfolded_odata = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(opt_fragment + 1) + src_offset, element_length, unfolded_odata);
+				src_offset += element_length;
+				copy_length -= element_length;
+				vector_index++;
+				vector_offset = 0;
+			}
+		}
+
+		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+
+/* add to transmit window */
+		pgm_txw_push (transport->txw, pkt, tpdu_length);
+
+		retval = pgm_sendto (transport,
+					FALSE,
+					header,
+					tpdu_length,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+
+/* save unfolded odata for retransmissions */
+		*(guint32*)&header->pgm_sport	= unfolded_odata;
+
+		packets++;
+		bytes_sent += tpdu_length + transport->iphdr_len;
+
+		data_bytes_sent += tsdu_length;
+
+	} while (data_bytes_sent < apdu_length);
+
+	if (data_bytes_sent > 0) {
+		retval = data_bytes_sent;
+	}
+
+/* release txw lock here in order to allow spms to lock mutex */
+	g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+	pgm_reset_heartbeat_spm (transport);
+
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
+
+out:
+	return retval;
+}
+
+
 /* send an apdu.
  *
  * copy into receive window one or more fragments.
@@ -4664,6 +4947,10 @@ pgm_transport_send (
  *
  * non-blocking only works roughly at the rate control layer, other packets might get in as the
  * locks spin.
+ *
+ *    ⎢ APDU₀ ⎢                            ⎢ ⋯ TSDU₁,₀ TSDU₀,₀ ⎢
+ *    ⎢ APDU₁ ⎢ → pgm_transport_sendv() →  ⎢ ⋯ TSDU₁,₁ TSDU₀,₁ ⎢ → kernel
+ *    ⎢   ⋮   ⎢                            ⎢     ⋮       ⋮     ⎢
  */
 
 int
@@ -4873,6 +5160,100 @@ pgm_transport_send_fragment (
 	}
 
 	return pgm_transport_send_fragment_unlocked (transport, data, len, flags, offset, first_sqn);
+}
+
+/* send a vector of tsdu's owned by the transmit window
+ *
+ *    ⎢ TSDU₀ ⎢
+ *    ⎢ TSDU₁ ⎢ → pgm_transport_sendv2() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → kernel
+ *    ⎢   ⋮   ⎢
+ */
+int
+pgm_transport_sendv2 (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	int			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	return 0;	/* not-implemented */
+}
+
+/* send a vector of tsdu's owned by the application
+ *
+ *    ⎢ TSDU₀ ⎢
+ *    ⎢ TSDU₁ ⎢ → pgm_transport_sendv2_copy() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → kernel
+ *    ⎢   ⋮   ⎢
+ */
+int
+pgm_transport_sendv2_copy (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	int			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	return 0;	/* not-implemented */
+}
+
+/* combine and send a scatter/gather vector of application buffers
+ *
+ *    ⎢ DATA₀ ⎢
+ *    ⎢ DATA₁ ⎢ → pgm_transport_sendv3() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → kernel
+ *    ⎢   ⋮   ⎢
+ */
+int
+pgm_transport_sendv3 (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	int			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	int data_bytes_sent = 0;
+
+/* determine APDU length */
+	int apdu_length = 0;
+	for (int i = 0; i < count; i++)
+	{
+		apdu_length += vector[i].iov_len;
+	}
+
+        if (flags & MSG_DONTWAIT)
+        {
+		int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) +
+				sizeof(struct pgm_opt_length) +		/* includes header */
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+                int tpdu_length = 0;
+		guint offset = 0;
+		do {
+			int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, apdu_length - offset);
+			tpdu_length += header_length + tsdu_length;
+			offset += tsdu_length;
+		} while (offset < apdu_length);
+
+                int retval = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+                if (retval == -1) {
+			return retval;
+                }
+        }
+
+	int retval;
+	if ( apdu_length <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+    	 	                                       sizeof(struct pgm_data) ) ) )
+	{
+		retval = pgm_transport_send_one_iov_unlocked (transport, vector, count, 0);
+	}
+	else
+	{
+		retval = pgm_transport_send_iov_apdu_unlocked (transport, vector, count, 0);
+	}
+
+	if (retval > 0) {
+		data_bytes_sent += retval;
+	}
+
+	return data_bytes_sent >= 0 ? data_bytes_sent : -1;
 }
 
 /* send a vector of apdu's, lock spins per APDU to allow SPM and RDATA generation. */
