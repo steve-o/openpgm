@@ -354,7 +354,8 @@ transports_callback (
 	GString *response;
 
 	response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
-	g_string_append (response,	"<table>"
+	g_string_append (response,	"<div class=\"bubbly\">"
+					"<table cellspacing=\"0\">"
 					"<tr>"
 						"<th>Group address</th>"
 						"<th>Dest port</th>"
@@ -363,51 +364,63 @@ transports_callback (
 					"</tr>"
 				);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
-
-	GSList* list = pgm_transport_list;
-	while (list)
+	if (pgm_transport_list)
 	{
-		GSList* next = list->next;
-		pgm_transport_t* transport = list->data;
+		g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
-		char group_address[INET6_ADDRSTRLEN];
-		inet_ntop (	pgm_sockaddr_family( &transport->send_smr.smr_multiaddr ),
-				pgm_sockaddr_addr( &transport->send_smr.smr_multiaddr ),
-				group_address,
-				sizeof(group_address) );
+		GSList* list = pgm_transport_list;
+		while (list)
+		{
+			GSList* next = list->next;
+			pgm_transport_t* transport = list->data;
 
-		int dport = g_ntohs (transport->dport);
-
-		char gsi[sizeof("000.000.000.000.000.000")];
-		snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
-			transport->tsi.gsi.identifier[0],
-			transport->tsi.gsi.identifier[1],
-			transport->tsi.gsi.identifier[2],
-			transport->tsi.gsi.identifier[3],
-			transport->tsi.gsi.identifier[4],
-			transport->tsi.gsi.identifier[5]);
-
-		int sport = g_ntohs (transport->tsi.sport);
-
-
-		g_string_append_printf (response,	"<tr>"
-								"<td>%s</td>"
-								"<td>%i</td>"
-								"<td><a href=\"/%s.%hu\">%s</a></td>"
-								"<td><a href=\"/%s.%hu\">%hu</a></td>"
-							"</tr>",
+			char group_address[INET6_ADDRSTRLEN];
+			inet_ntop (	pgm_sockaddr_family( &transport->send_smr.smr_multiaddr ),
+					pgm_sockaddr_addr( &transport->send_smr.smr_multiaddr ),
 					group_address,
-					dport,
-					gsi, sport,
-					gsi,
-					gsi, sport,
-					sport);
+					sizeof(group_address) );
 
-		list = next;
+			int dport = g_ntohs (transport->dport);
+
+			char gsi[sizeof("000.000.000.000.000.000")];
+			snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+				transport->tsi.gsi.identifier[0],
+				transport->tsi.gsi.identifier[1],
+				transport->tsi.gsi.identifier[2],
+				transport->tsi.gsi.identifier[3],
+				transport->tsi.gsi.identifier[4],
+				transport->tsi.gsi.identifier[5]);
+
+			int sport = g_ntohs (transport->tsi.sport);
+
+	
+			g_string_append_printf (response,	"<tr>"
+									"<td>%s</td>"
+									"<td>%i</td>"
+									"<td><a href=\"/%s.%hu\">%s</a></td>"
+									"<td><a href=\"/%s.%hu\">%hu</a></td>"
+								"</tr>",
+						group_address,
+						dport,
+						gsi, sport,
+						gsi,
+						gsi, sport,
+						sport);
+
+			list = next;
+		}
+
+		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 	}
+	else
+	{
+/* no transports */
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		g_string_append (response,		"<tr>"
+							"<td colspan=\"6\"><div class=\"empty\">This transport has no peers.</div></td>"
+							"</tr>"
+				);
+	}
 
 	g_string_append (response,		"</table>");
 	http_finalize_response (response, msg);
@@ -536,8 +549,51 @@ http_tsi_response (
 	g_string_append_printf (response,	"<div class=\"heading\">"
 							"<strong>Transport: </strong>"
 							"%s.%i"
-						"</div>"
-						"<h2>Source information</h2>"
+						"</div>",
+				gsi, sport);
+
+/* peers */
+
+	g_string_append (response,		"<div class=\"bubbly\">"
+						"<table cellspacing=\"0\">"
+						"<tr>"
+							"<th>Group address</th>"
+							"<th>Dest port</th>"
+							"<th>Source address</th>"
+							"<th>Last hop</th>"
+							"<th>Source GSI</th>"
+							"<th>Source port</th>"
+						"</tr>"
+			);
+
+	if (transport->peers_list)
+	{
+		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		GList* peers_list = transport->peers_list;
+		while (peers_list) {
+			GList* next = peers_list->next;
+			http_each_receiver (peers_list->data, response);
+			peers_list = next;
+		}
+		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	}
+	else
+	{
+/* no peers */
+
+		g_string_append (response,	"<tr>"
+							"<td colspan=\"6\"><div class=\"empty\">This transport has no peers.</div></td>"
+						"</tr>"
+				);
+
+	}
+
+	g_string_append (response,		"</table>"
+						"</div>");
+
+/* source and configuration information */
+
+	g_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
 						"<table>"
 						"<tr>"
 							"<th>Source address</th><td>%s</td>"
@@ -549,44 +605,18 @@ http_tsi_response (
 							"<th>Source GSI</th><td>%s</td>"
 						"</tr><tr>"
 							"<th>Source port</th><td>%i</td>"
-						"</tr>"
-						"</table>",
-				gsi, sport,
+						"</tr>",
 				source_address,
 				group_address,
 				dport,
 				gsi,
 				sport);
 
-/* list receivers in a table */
-	g_string_append (response,		"<h2>Receivers</h2>"
-						"<table>"
-						"<tr>"
-							"<th>Group address</th>"
-							"<th>Dest port</th>"
-							"<th>Source address</th>"
-							"<th>Last hop</th>"
-							"<th>Source GSI</th>"
-							"<th>Source port</th>"
-						"</tr>"
-			);
-
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	GList* peers_list = transport->peers_list;
-	while (peers_list) {
-		GList* next = peers_list->next;
-		http_each_receiver (peers_list->data, response);
-		peers_list = next;
-	}
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
-
-	g_string_append (response,		"</table>");
-
 /* continue with source information */
 
-	g_string_append_printf (response,	"<h2>Configuration information</h2>"
-						"<table>"
-						"<tr>"
+	g_string_append_printf (response,	"<tr>"
+							"<td colspan=\"2\"><div class=\"break\"></div></td>"
+						"</tr><tr>"
 							"<th>Ttl</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Adv Mode</th><td>data(1)</td>"
@@ -611,7 +641,8 @@ http_tsi_response (
 						"</tr><tr>"
 							"<th>Source Path Address</th><td>%s</td>"
 						"</tr>"
-						"</table>",
+						"</table>"
+						"</div>",
 				transport->hops,
 				transport->txw_max_rte,
 				transport->txw_secs,
@@ -620,6 +651,8 @@ http_tsi_response (
 				ihb_max,
 				pgm_to_msecs(transport->nak_bo_ivl),
 				spm_path);
+
+/* performance information */
 
 	g_string_append_printf (response,	"<h2>Performance information</h2>"
 						"<table>"
@@ -755,8 +788,8 @@ http_receiver_response (
 			peer->tsi.gsi.identifier[4],
 			peer->tsi.gsi.identifier[5]);
 
-	char title[ sizeof("Receiver 000.000.000.000.000.000.00000") ];
-	sprintf (title, "Receiver %s.%hu",
+	char title[ sizeof("Peer 000.000.000.000.000.000.00000") ];
+	sprintf (title, "Peer %s.%hu",
 		gsi,
 		g_ntohs (peer->tsi.sport));
 
@@ -797,10 +830,14 @@ http_receiver_response (
 
 	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
 	g_string_append_printf (response,	"<div class=\"heading\">"
-							"<strong>Receiver: </strong>"
+							"<strong>Peer: </strong>"
 							"%s.%i"
-						"</div>"
-						"<h2>Receiver information</h2>"
+						"</div>",
+				gsi, sport);
+
+
+/* peer information */
+	g_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
 						"<table>"
 						"<tr>"
 							"<th>Group address</th><td>%s</td>"
@@ -814,9 +851,7 @@ http_receiver_response (
 							"<th>Source GSI</th><td>%s</td>"
 						"</tr><tr>"
 							"<th>Source port</th><td>%i</td>"
-						"</tr>"
-						"</table>",
-				gsi, sport,
+						"</tr>",
 				group_address,
 				dport,
 				source_address,
@@ -824,9 +859,9 @@ http_receiver_response (
 				gsi,
 				sport);
 
-	g_string_append_printf (response,	"<h2>Configuration information</h2>"
-						"<table>"
-						"<tr>"
+	g_string_append_printf (response,	"<tr>"
+							"<td colspan=\"2\"><div class=\"break\"></div></td>"
+						"</tr><tr>"
 							"<th>NAK_BO_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
 							"<th>NAK_RPT_IVL</th><td>%i ms</td>"
@@ -847,7 +882,8 @@ http_receiver_response (
 						"</tr><tr>"
 							"<th>Multicast NAKs</th><td>disabled(2)</td>"
 						"<tr>"
-						"</table>",
+						"</table>"
+						"</div>",
 						pgm_to_msecs(peer->transport->nak_bo_ivl),
 						pgm_to_msecs(peer->transport->nak_rpt_ivl),
 						peer->transport->nak_ncf_retries,
