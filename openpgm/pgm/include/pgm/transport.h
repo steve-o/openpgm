@@ -318,6 +318,9 @@ int pgm_set_nonblocking (int filedes[2]);
 
 int pgm_transport_send (pgm_transport_t*, const gpointer, gsize, int);
 int pgm_transport_sendv (pgm_transport_t*, const struct iovec*, int, int);
+int pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, int, int);
+int pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, int, int);
+int pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, int, int);
 
 int pgm_transport_send_fragment (pgm_transport_t*, const gpointer, gsize, int, int*, int*);
 
