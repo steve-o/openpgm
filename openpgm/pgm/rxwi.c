@@ -416,8 +416,8 @@ pgm_rxw_push_fragment (
 	int retval = PGM_RXW_UNKNOWN;
 
 /* convert to more apparent names */
-	guint32 apdu_first_sqn	= opt_fragment ? opt_fragment->opt_sqn : 0;
-	guint32 apdu_len	= opt_fragment ? opt_fragment->opt_frag_len : 0;
+	guint32 apdu_first_sqn	= opt_fragment ? g_ntohl (opt_fragment->opt_sqn) : 0;
+	guint32 apdu_len	= opt_fragment ? g_ntohl (opt_fragment->opt_frag_len) : 0;
 
 	g_trace ("#%u: data trail #%u: push: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number, trail, 
