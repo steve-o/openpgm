@@ -213,8 +213,8 @@ http_create_response (
 						" | <span id=\"timestamp\">%s</span>"
 					"</div>"
 					"<div id=\"navigation\">"
-						"<a href=\"/\"><div class=\"tab\" id=\"tab%s\">General Information</div></a>"
-						"<a href=\"/transports\"><div class=\"tab\" id=\"tab%s\">Transports</div></a>"
+						"<a href=\"/\"><span class=\"tab\" id=\"tab%s\">General Information</span></a>"
+						"<a href=\"/transports\"><span class=\"tab\" id=\"tab%s\">Transports</span></a>"
 						"<div id=\"tabline\"></div>"
 					"</div>"
 					"<div id=\"content\">",
@@ -422,7 +422,8 @@ transports_callback (
 				);
 	}
 
-	g_string_append (response,		"</table>");
+	g_string_append (response,		"</table>"
+						"</div>");
 	http_finalize_response (response, msg);
 }
 
@@ -820,7 +821,8 @@ http_receiver_response (
 				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue->length;
 
 	char buf[100];
-	time_t last_activity_time = pgm_to_secs(peer->last_packet);
+	time_t last_activity_time;
+	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
 	struct tm last_activity_tm;
 	localtime_r (&last_activity_time, &last_activity_tm);
 	gsize ret = strftime (buf, sizeof(buf), "%c", &last_activity_tm);
@@ -881,7 +883,7 @@ http_receiver_response (
 							"<th>Delivery order</th><td>ordered(2)</td>"
 						"</tr><tr>"
 							"<th>Multicast NAKs</th><td>disabled(2)</td>"
-						"<tr>"
+						"</tr>"
 						"</table>"
 						"</div>",
 						pgm_to_msecs(peer->transport->nak_bo_ivl),
@@ -948,17 +950,17 @@ http_receiver_response (
 						"</tr><tr>"
 							"<th>Last activity</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>NAK repair min time</th><td>%i</td>"
+							"<th>NAK repair min time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair mean time</th><td>%i</td>"
+							"<th>NAK repair mean time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair max time</th><td>%i</td>"
+							"<th>NAK repair max time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail min time</th><td>%i</td>"
+							"<th>NAK fail min time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail mean time</th><td>%i</td>"
+							"<th>NAK fail mean time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail max time</th><td>%i</td>"
+							"<th>NAK fail max time</th><td>%i μs</td>"
 						"</tr><tr>"
 							"<th>NAK min retransmit count</th><td>%i</td>"
 						"</tr><tr>"
@@ -971,7 +973,7 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED],
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES],
 						peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED],
-						peer->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
+						peer->transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
