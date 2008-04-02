@@ -5,7 +5,7 @@
 Import('env')
 
 lib_src = Split("""
-		pgm.c
+		packet.c
 		timer.c
 		if.c
 		gsi.c

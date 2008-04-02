@@ -1756,8 +1756,10 @@ new_peer (
 	peer->spmr_expiry = pgm_time_update_now() + transport->spmr_expiry;
 
 /* statistics */
+#if 0
 	peer->min_fail_time = G_MAXINT;
 	peer->max_fail_time = G_MININT;
+#endif
 
 /* prod timer thread if sleeping */
 	g_static_mutex_lock (&transport->mutex);
@@ -4141,8 +4143,16 @@ nak_rpt_state (
 				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
 
 				gint fail_time = pgm_time_now - rp->t0;
-				if (fail_time > peer->max_fail_time)		peer->max_fail_time = fail_time;
-				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
+				if (!peer->max_fail_time) {
+					peer->max_fail_time = peer->min_fail_time = fail_time;
+				}
+				else
+				{
+					if (fail_time > peer->max_fail_time)
+						peer->max_fail_time = fail_time;
+					else if (fail_time < peer->min_fail_time)
+						peer->min_fail_time = fail_time;
+				}
 
 				pgm_rxw_mark_lost (rxw, rp->sequence_number);
 
