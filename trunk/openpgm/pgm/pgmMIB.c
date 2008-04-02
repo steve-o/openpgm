@@ -2327,7 +2327,8 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERLASTACTIVITY:
 				{
-				unsigned long last_activity = pgm_to_secs(peer->last_packet);
+				unsigned long last_activity;
+				pgm_time_since_epoch (&peer->last_packet, &last_activity);
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&last_activity, sizeof(last_activity) );
 				}

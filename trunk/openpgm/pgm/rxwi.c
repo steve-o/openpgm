@@ -266,10 +266,12 @@ pgm_rxw_init (
 	r->wait_data_queue = g_queue_new ();
 
 /* statistics */
+#if 0
 	r->min_fill_time = G_MAXINT;
 	r->max_fill_time = G_MININT;
 	r->min_nak_transmit_count = G_MAXINT;
 	r->max_nak_transmit_count = G_MININT;
+#endif
 
 	guint memory = sizeof(pgm_rxw_t) +
 /* pointer array */
@@ -573,11 +575,27 @@ pgm_rxw_push_fragment (
 			retval		= PGM_RXW_FILLED_PLACEHOLDER;
 
 			gint fill_time = pgm_time_now - rp->t0;
-			if (fill_time > r->max_fill_time)	r->max_fill_time = fill_time;
-			else if (fill_time < r->min_fill_time)	r->min_fill_time = fill_time;
+			if (!r->max_fill_time) {
+				r->max_fill_time = r->min_fill_time = fill_time;
+			}
+			else
+			{
+				if (fill_time > r->max_fill_time)
+					r->max_fill_time = fill_time;
+				else if (fill_time < r->min_fill_time)
+					r->min_fill_time = fill_time;
 
-			if (rp->nak_transmit_count > r->max_nak_transmit_count)		r->max_nak_transmit_count = rp->nak_transmit_count;
-			else if (rp->nak_transmit_count < r->min_nak_transmit_count)	r->min_nak_transmit_count = rp->nak_transmit_count;
+				if (!r->max_nak_transmit_count) {
+					r->max_nak_transmit_count = r->min_nak_transmit_count = rp->nak_transmit_count;
+				}
+				else
+				{
+					if (rp->nak_transmit_count > r->max_nak_transmit_count)
+						r->max_nak_transmit_count = rp->nak_transmit_count;
+					else if (rp->nak_transmit_count < r->min_nak_transmit_count)
+						r->min_nak_transmit_count = rp->nak_transmit_count;
+				}
+			}
 		}
 		else
 		{

@@ -53,8 +53,10 @@
 pgm_time_t pgm_time_now = 0;
 pgm_time_update_func pgm_time_update_now;
 pgm_time_sleep_func pgm_time_sleep;
+pgm_time_since_epoch_func pgm_time_since_epoch;
 
 static gboolean time_got_initialized = FALSE;
+static pgm_time_t rel_offset = 0;
 
 static pgm_time_t gettimeofday_update (void);
 static pgm_time_t clock_update (void);
@@ -71,6 +73,9 @@ static void nano_sleep (gulong);
 static void rtc_sleep (gulong);
 static void tsc_sleep (gulong);
 
+static void pgm_time_conv (pgm_time_t*, time_t*);
+static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
+
 int
 pgm_time_init ( void )
 {
@@ -80,11 +85,18 @@ pgm_time_init ( void )
 	char *cfg = getenv ("PGM_TIMER");
 	if (cfg == NULL) cfg = "TSC";
 
+	pgm_time_since_epoch = pgm_time_conv;
+
 	switch (cfg[0]) {
 	case 'C':	pgm_time_update_now = clock_update; break;
 	case 'F':	pgm_time_update_now = ftime_update; break;
-	case 'R':	pgm_time_update_now = rtc_update; break;
-	case 'T':	pgm_time_update_now = tsc_update; break;
+
+	case 'R':	pgm_time_update_now = rtc_update;
+			pgm_time_since_epoch = pgm_time_conv_from_reset;
+			break;
+	case 'T':	pgm_time_update_now = tsc_update;
+			pgm_time_since_epoch = pgm_time_conv_from_reset;
+			break;
 
 	default:
 	case 'G':	pgm_time_update_now = gettimeofday_update; break;
@@ -122,6 +134,12 @@ pgm_time_init ( void )
 	}
 
 	pgm_time_update_now();
+
+/* calculate relative time offset */
+	if (pgm_time_update_now == rtc_update || pgm_time_update_now == tsc_update)
+	{
+		rel_offset = gettimeofday_update() - pgm_time_update_now();
+	}
 
 	time_got_initialized = TRUE;
 	return 0;
@@ -389,5 +407,26 @@ nano_sleep (gulong usec)
 	nanosleep (&ts, NULL);
 }
 
+/* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
+ */
+static void
+pgm_time_conv (
+	pgm_time_t*	pgm_time_t_time,
+	time_t*		time_t_time
+	)
+{
+	*time_t_time = pgm_to_secs (*pgm_time_t_time);
+}
+
+/* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the core started.
+ */
+static void
+pgm_time_conv_from_reset (
+	pgm_time_t*	pgm_time_t_time,
+	time_t*		time_t_time
+	)
+{
+	*time_t_time = pgm_to_secs (*pgm_time_t_time + rel_offset);
+}
 
 /* eof */
