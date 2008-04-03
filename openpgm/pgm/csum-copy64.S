@@ -79,9 +79,9 @@
 	.endm
 	
 				
-	.globl csum_partial_copy_generic
+	.globl pgm_csum_partial_copy_generic
 	.p2align 4
-ENTRY(csum_partial_copy_generic)
+ENTRY(pgm_csum_partial_copy_generic)
 	CFI_STARTPROC
 	cmpl	 $3*64,%edx
 	jle	 .Lignore
@@ -273,4 +273,4 @@ ENTRY(csum_partial_copy_generic)
 	movl $-EFAULT,(%rax)
 	jmp .Lende
 	CFI_ENDPROC
-ENDPROC(csum_partial_copy_generic)
+ENDPROC(pgm_csum_partial_copy_generic)
