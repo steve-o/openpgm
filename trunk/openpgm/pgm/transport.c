@@ -2527,7 +2527,12 @@ on_nak_pipe (
 				opt_header->opt_reserved = PGM_OP_ENCODED;
 				struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
 
-				pgm_rs_encode (transport->rs, (const void**)src, transport->rs_k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
+/* The cast below is the correct way to handle the problem. 
+ * The (void *) cast is to avoid a GCC warning like: 
+ *
+ *   "warning: dereferencing type-punned pointer will break strict-aliasing rules"
+ */
+				pgm_rs_encode (transport->rs, (const void**)(void*)src, transport->rs_k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
 
 				data_bytes = opt_fragment + 1;
 
@@ -2535,7 +2540,7 @@ on_nak_pipe (
 			}
 
 /* encode payload */
-			pgm_rs_encode (transport->rs, (const void**)src, transport->rs_k + rs_h, data_bytes, parity_length);
+			pgm_rs_encode (transport->rs, (const void**)(void*)src, transport->rs_k + rs_h, data_bytes, parity_length);
 		}
 
 		send_rdata (transport, sqn, rdata, rlen);
@@ -3765,7 +3770,7 @@ nak_rb_state (
 /* NAKs only generated previous to current transmission group */
 		guint32 current_tg_sqn = ((pgm_rxw_t*)peer->rxw)->lead & tg_sqn_mask;
 
-		guint32 nak_tg_sqn;
+		guint32 nak_tg_sqn = 0;
 		guint32 nak_pkt_cnt = 0;
 
 /* parity NAK generation */
@@ -4518,7 +4523,7 @@ pgm_transport_send_one_copy_unlocked (
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* save unfolded odata for retransmissions */
-	*(guint32*)&header->pgm_sport	= unfolded_odata;
+	*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
@@ -4636,7 +4641,7 @@ pgm_transport_send_one_iov_unlocked (
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* save unfolded odata for retransmissions */
-	*(guint32*)&header->pgm_sport	= unfolded_odata;
+	*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
@@ -4760,7 +4765,7 @@ pgm_transport_send_apdu_unlocked (
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* save unfolded odata for retransmissions */
-		*(guint32*)&header->pgm_sport	= unfolded_odata;
+		*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
@@ -4930,7 +4935,7 @@ pgm_transport_send_iov_apdu_unlocked (
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* save unfolded odata for retransmissions */
-		*(guint32*)&header->pgm_sport	= unfolded_odata;
+		*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
@@ -5150,7 +5155,7 @@ pgm_transport_send_fragment_unlocked (
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* save unfolded odata for retransmissions */
-		*(guint32*)&header->pgm_sport	= unfolded_odata;
+		*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
 
 		packets++;
 		bytes_sent += tpdu_length + transport->iphdr_len;
@@ -5315,7 +5320,7 @@ send_rdata (
 /* RDATA */
         rdata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
-	guint32 unfolded_odata	= *(guint32*)&header->pgm_sport;
+	guint32 unfolded_odata	= *(guint32*)(void*)&header->pgm_sport;
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 
@@ -5832,12 +5837,12 @@ on_rdata (
 		}
 
 /* decode payload */
-		pgm_rs_decode_parity_appended (transport->rs, (void**)src, offsets, parity_length);
+		pgm_rs_decode_parity_appended (transport->rs, (void**)(void*)src, offsets, parity_length);
 
 /* decode opt_fragment option */
 		if (is_op_encoded)
 		{
-			pgm_rs_decode_parity_appended (transport->rs, (void**)src_opts, offsets, sizeof(struct pgm_opt_fragment));
+			pgm_rs_decode_parity_appended (transport->rs, (void**)(void*)src_opts, offsets, sizeof(struct pgm_opt_fragment));
 		}
 
 /* treat decoded packet as selective repair(s) */

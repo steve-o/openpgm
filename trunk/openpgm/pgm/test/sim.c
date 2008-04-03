@@ -878,7 +878,7 @@ brokn_send_apdu_unlocked (
                                         pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 
 /* save unfolded odata for retransmissions */
-                *(guint32*)&header->pgm_sport   = unfolded_odata;
+                *(guint32*)(void*)&header->pgm_sport   = unfolded_odata;
 
                 packets++;
                 bytes_sent += tpdu_length + transport->iphdr_len;

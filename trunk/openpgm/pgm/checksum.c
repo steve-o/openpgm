@@ -66,17 +66,17 @@ pgm_inet_checksum (
 
 guint32
 pgm_csum_partial_ (
-	const void*	src,
+	const void*	addr,
 	guint		len,
 	guint32		csum
 	)
 {
+	const guint16 *w = (guint16*)addr;
 	guint32 sum = csum;
 	guint16 odd_byte;
 
 	while (len > 1) {
-		sum += *(guint16*)src;
-		src += 2;
+		sum += *w++;
 		if (sum & 0x80000000)
 			sum = (sum & 0xFFFF) + (sum >> 16);
 		len -= 2;
@@ -84,7 +84,7 @@ pgm_csum_partial_ (
 
 	if (len) {
 		odd_byte = 0;
-		*(guchar*)&odd_byte = *(guchar*)src;
+		*(guchar*)&odd_byte = *(guchar*)w;
 		sum += odd_byte;
 	}
 

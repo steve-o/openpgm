@@ -144,7 +144,7 @@ matinv (
 
 	for (int i = 0; i < n; i++)
 	{
-		int row, col;
+		int row = 0, col = 0;
 
 /* check diagonal for new pivot */
 		if (!pivots[ i ] &&
