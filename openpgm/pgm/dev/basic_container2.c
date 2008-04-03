@@ -421,7 +421,7 @@ test_alloc_byte_array (
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *packet = &array->data[size_per_entry * i];
+		char *packet = (char*)&array->data[size_per_entry * i];
 	}
 	gettimeofday(&now, NULL);
 
