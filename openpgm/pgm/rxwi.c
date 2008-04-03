@@ -531,7 +531,10 @@ pgm_rxw_push_fragment (
 			{
 				g_trace ("#%u: destination contains parity, shuffling to next available entry.", sequence_number);
 /* find if any other packets are lost in this transmission group */
-				guint32 next_tg_sqn;
+
+				guint32 tg_sqn_mask = 0xffffffff << r->tg_sqn_shift;
+				guint32 next_tg_sqn = (sequence_number & tg_sqn_mask) + 1;
+
 				if (sequence_number != next_tg_sqn)
 				for (guint32 i = sequence_number + 1; i != next_tg_sqn; i++)
 				{

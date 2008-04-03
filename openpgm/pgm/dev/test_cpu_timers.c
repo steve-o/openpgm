@@ -98,7 +98,7 @@ main (
 	CPU_SET(0, &cpu0);
 	CPU_SET(1, &cpu1);
 
-	uint64_t h0, h1, diff = 0;
+	uint64_t h0 = 0, h1 = 0, diff = 0;
 
 	for (int i = 0; i < 100000; i++)
 	{

@@ -52,7 +52,8 @@ plus64_src = Split("""
 plus_env = env.Copy();
 plus_env['SHOBJSUFFIX'] = '.plus' + plus_env['SHOBJSUFFIX'];
 plus_env['OBJSUFFIX'] = '.plus' + plus_env['OBJSUFFIX'];
-plus_env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+if env['BUILD'] != 'thirtytwo':
+	plus_env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
 plus_env.Append(CCFLAGS = '-DCONFIG_REED_SOLOMON');
 
 plus_obj = []
