@@ -45,9 +45,11 @@
 .text
 
 /* Pentium-Pro and above happy version 
+ *
+unsigned int pgm_csum_partial (const unsigned char* buf, int len, unsigned int sum)
  */
 
-ENTRY(csum_partial)
+ENTRY(pgm_csum_partial)
 	CFI_STARTPROC
 	pushl %esi
 	CFI_ADJUST_CFA_OFFSET 4
@@ -169,7 +171,7 @@ ENTRY(csum_partial)
 	CFI_RESTORE esi
 	ret
 	CFI_ENDPROC
-ENDPROC(csum_partial)
+ENDPROC(pgm_csum_partial)
 				
 
 #define SRC(y...)			\
@@ -195,8 +197,13 @@ ENDPROC(csum_partial)
 	DST(movl %ebx, x(%edi)	)	;
 
 #define ARGBASE 12
+
+/*
+unsigned int pgm_csum_partial_copy_generic (const char *src, char *dst, int len, int sum, int *src_err_ptr, int *dst_err_ptr
+)
+ */
 		
-ENTRY(csum_partial_copy_generic)
+ENTRY(pgm_csum_partial_copy_generic)
 	CFI_STARTPROC
 	pushl %ebx
 	CFI_ADJUST_CFA_OFFSET 4
@@ -277,7 +284,7 @@ DST(	movb %dl, (%edi)         )
 	CFI_RESTORE ebx
 	ret
 	CFI_ENDPROC
-ENDPROC(csum_partial_copy_generic)
+ENDPROC(pgm_csum_partial_copy_generic)
 				
 #undef ROUND
 #undef ROUND1		

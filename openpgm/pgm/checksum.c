@@ -25,10 +25,6 @@
 
 #include "pgm/checksum.h"
 
-#ifdef CONFIG_CKSUM_COPY
-#	include "pgm/csum-copy.h"
-#endif
-
 
 /* globals */
 
@@ -65,7 +61,7 @@ pgm_inet_checksum (
  */
 
 guint32
-pgm_csum_partial_ (
+pgm_compat_csum_partial (
 	const void*	addr,
 	guint		len,
 	guint32		csum
@@ -95,7 +91,7 @@ pgm_csum_partial_ (
  */
 
 guint32
-pgm_csum_partial_copy_ (
+pgm_compat_csum_partial_copy (
 	const void*	src,
 	void*		dst,
 	guint		len,

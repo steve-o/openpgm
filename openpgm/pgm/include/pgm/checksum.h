@@ -29,22 +29,54 @@ G_BEGIN_DECLS
 
 guint16 pgm_inet_checksum (const void*, guint, int);
 
-#ifdef CONFIG_CKSUM_COPY
-#   define pgm_csum_partial		csum_partial
-#   define pgm_csum_partial_copy	csum_partial_copy_nocheck
-#   include "pgm/csum-copy.h"
-#else
-
-#   define pgm_csum_partial		pgm_csum_partial_
-#   define pgm_csum_partial_copy	pgm_csum_partial_copy_
-
-guint32 pgm_csum_partial_ (const void*, guint, guint32);
-guint32 pgm_csum_partial_copy_ (const void*, void*, guint, guint32);
-
-#endif
-
 guint16 pgm_csum_fold (guint32);
 guint32 pgm_csum_block_add (guint32, guint32, guint);
+
+#ifdef CONFIG_CKSUM_COPY
+
+#ifdef __x86_64__
+
+static inline unsigned add32_with_carry (unsigned a, unsigned b)
+{
+    asm("addl %2,%0\n\t"
+	    "adcl $0,%0"
+	    : "=r" (a)
+	    : "0" (a), "r" (b));
+    return a;
+}
+
+unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len);
+
+static inline guint32 pgm_csum_partial(const void *buff, guint len, guint32 sum)
+{
+    return (guint32)add32_with_carry(pgm_asm64_csum_partial(buff, len), sum);
+}
+
+#else
+
+guint32 pgm_csum_partial(const void *buff, guint len, guint32 sum);
+
+#endif /* __x86_64__ */
+
+guint32 pgm_csum_partial_copy_generic (const unsigned char *src, const unsigned char *dst,
+					unsigned len,
+					unsigned sum, 
+					int *src_err_ptr, int *dst_err_ptr);
+
+static inline guint32 pgm_csum_partial_copy (const void *src, void *dst, unsigned len, unsigned sum)
+{
+    return pgm_csum_partial_copy_generic (src, dst, len, sum, NULL, NULL);
+}
+
+#else
+
+#   define pgm_csum_partial            pgm_compat_csum_partial
+#   define pgm_csum_partial_copy       pgm_compat_csum_partial_copy
+
+guint32 pgm_compat_csum_partial (const void*, guint, guint32);
+guint32 pgm_compat_csum_partial_copy (const void*, void*, guint, guint32);
+
+#endif /* CONFIG_CKSUM_COPY */
 
 G_END_DECLS
 
