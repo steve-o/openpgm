@@ -9,7 +9,9 @@
  * for more details. No warranty for anything given at all.
  */
 
-#include "pgm/csum-copy.h"
+#include <glib.h>
+
+#include "pgm/checksum.h"
 
 static inline unsigned short from32to16(unsigned a)
 {
@@ -21,7 +23,7 @@ static inline unsigned short from32to16(unsigned a)
         return b;
 }
 
-unsigned do_csum(const unsigned char *buff, unsigned len)
+unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len)
 {
         unsigned odd, count;
         unsigned long result = 0;

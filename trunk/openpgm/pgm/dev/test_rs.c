@@ -139,7 +139,7 @@ main (
 /* test encoding */
 	start = pgm_time_update_now();
 
-	pgm_rs_encode (rs, (const void**)packet_block, erasure_index, parity, g_max_tpdu);
+	pgm_rs_encode (rs, (const void**)(void*)packet_block, erasure_index, parity, g_max_tpdu);
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
@@ -161,7 +161,7 @@ main (
 /* test decoding */
 	start = pgm_time_update_now();
 
-	int retval = pgm_rs_decode_parity_inline (rs, (void**)packet_block, offsets, g_max_tpdu);
+	int retval = pgm_rs_decode_parity_inline (rs, (void**)(void*)packet_block, offsets, g_max_tpdu);
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
