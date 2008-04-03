@@ -53,7 +53,7 @@ struct pgm_txw_t {
         GTrashStack*    trash_packet;           /* sizeof(txw_packet) */
         GTrashStack*    trash_data;             /* max_tpdu */
 
-        guint           max_tpdu;               /* maximum packet size */
+        guint16         max_tpdu;               /* maximum packet size */
 
         guint32         lead;
         guint32         trail;
@@ -68,12 +68,13 @@ struct pgm_txw_t {
 typedef struct pgm_txw_t pgm_txw_t;
 
 
-pgm_txw_t* pgm_txw_init (guint, guint32, guint32, guint, guint);
+pgm_txw_t* pgm_txw_init (guint16, guint32, guint32, guint, guint);
 int pgm_txw_shutdown (pgm_txw_t*);
 
-int pgm_txw_push (pgm_txw_t*, gpointer, guint);
-int pgm_txw_peek (pgm_txw_t*, guint32, gpointer*, guint*);
+int pgm_txw_push (pgm_txw_t*, gpointer, guint16);
+int pgm_txw_peek (pgm_txw_t*, guint32, gpointer*, guint16*);
 
+/* return type as defined in garray.h */
 static inline guint pgm_txw_len (pgm_txw_t* t)
 {
     return t->pdata->len;
@@ -109,7 +110,7 @@ static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
     return p;
 }
 
-static inline void pgm_txw_zero_pad (pgm_txw_t* t, gpointer data, guint offset, guint len)
+static inline void pgm_txw_zero_pad (pgm_txw_t* t, gpointer data, guint16 offset, guint16 len)
 {
     g_assert ( offset <= len );
     if ( offset == len ||
@@ -136,7 +137,7 @@ static inline guint32 pgm_txw_trail (pgm_txw_t* t)
     return t->trail;
 }
 
-static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint len)
+static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint16 len)
 {
     gpointer packet = pgm_txw_alloc (t);
     memcpy (packet, packet_, len);
@@ -144,7 +145,7 @@ static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint len)
 }
 
 int pgm_txw_retransmit_push (pgm_txw_t*, guint32, gboolean, guint);
-int pgm_txw_retransmit_try_pop (pgm_txw_t*, guint32*, gpointer*, guint*, gboolean*, guint*, guint);
+int pgm_txw_retransmit_try_pop (pgm_txw_t*, guint32*, gpointer*, guint16*, gboolean*, guint*, guint);
 
 G_END_DECLS
 

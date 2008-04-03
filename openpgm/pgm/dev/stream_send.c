@@ -384,7 +384,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	header->pgm_tsdu_length	= 0;		/* transport data unit length */
 
 /* SPM */
-	spm->spm_sqn		= g_htonl (g_spm_sqn++);
+	spm->spm_sqn		= g_htonl (g_spm_sqn); g_spm_sqn++;
 	spm->spm_trail		= g_htonl (g_txw_lead);
 	spm->spm_lead		= g_htonl (g_txw_lead);
 	spm->spm_nla_afi	= g_htons (AFI_IP);
@@ -460,9 +460,9 @@ send_odata (void)
 		return;
 	}
 
-printf ("PGM header size %u\n"
-	"PGM data header size %u\n"
-	"payload size %u\n",
+printf ("PGM header size %" G_GSIZE_FORMAT "\n"
+	"PGM data header size %" G_GSIZE_FORMAT "\n"
+	"payload size %" G_GSIZE_FORMAT "\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
 	strlen(payload_string) + 1);
@@ -487,7 +487,7 @@ printf ("PGM header size %u\n"
 
 /* ODATA */
         odata->data_sqn         = g_htonl (g_txw_lead);
-        odata->data_trail       = g_htonl (g_txw_lead++);
+        odata->data_trail       = g_htonl (g_txw_lead); g_txw_lead++;
 
         memcpy (odata + 1, payload_string, strlen(payload_string) + 1);
 

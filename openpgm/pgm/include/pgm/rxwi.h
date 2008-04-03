@@ -96,9 +96,9 @@ struct pgm_rxw_packet_t {
         GList           link_;
         pgm_pkt_state_e state;
 
-	guint		nak_transmit_count;
-        guint           ncf_retry_count;
-        guint           data_retry_count;
+	guint8		nak_transmit_count;
+        guint8          ncf_retry_count;
+        guint8          data_retry_count;
 };
 
 typedef struct pgm_rxw_packet_t pgm_rxw_packet_t;
@@ -110,20 +110,20 @@ struct pgm_rxw_t {
 	GStaticMutex*	trash_mutex;
 
 	GSList		waiting_link;
-	gboolean	waiting;
+	gboolean	is_waiting;
 	GSList		commit_link;
 
         GQueue*         backoff_queue;
         GQueue*         wait_ncf_queue;
         GQueue*         wait_data_queue;
-	guint		lost_count;		/* failed to repair */
-	guint		fragment_count;		/* incomplete apdu */
-	guint		parity_count;		/* parity for repairs */
-	guint		committed_count;	/* but still in window */
-	guint		parity_data_count;	/* to re-construct missing packets */
+	guint32		lost_count;		/* failed to repair */
+	guint32		fragment_count;		/* incomplete apdu */
+	guint32		parity_count;		/* parity for repairs */
+	guint32		committed_count;	/* but still in window */
+	guint32		parity_data_count;	/* to re-construct missing packets */
 
-        guint           max_tpdu;               /* maximum packet size */
-	guint		tg_size;		/* transmission group size for parity recovery */
+        guint16         max_tpdu;               /* maximum packet size */
+	guint32		tg_size;		/* transmission group size for parity recovery */
 	guint		tg_sqn_shift;
 
         guint32         lead, trail;
@@ -133,32 +133,33 @@ struct pgm_rxw_t {
         gboolean        rxw_constrained;
         gboolean        window_defined;
 
-	gint		min_fill_time;
-	gint		max_fill_time;
-	gint		min_nak_transmit_count;
-	gint		max_nak_transmit_count;
+	guint32		min_fill_time;
+	guint32		max_fill_time;
+	guint32		min_nak_transmit_count;
+	guint32		max_nak_transmit_count;
 };
 
 typedef struct pgm_rxw_t pgm_rxw_t;
 
 
-pgm_rxw_t* pgm_rxw_init (guint, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
+pgm_rxw_t* pgm_rxw_init (guint16, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
 int pgm_rxw_shutdown (pgm_rxw_t*);
 
-int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
+int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, gsize, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
 
-int pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, int, struct iovec**, int);
+int pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, guint, struct iovec**, guint);
 
 /* from state checking */
 int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
 
 /* from SPM */
-int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32, guint, guint, pgm_time_t);
+int pgm_rxw_window_update (pgm_rxw_t*, guint32, guint32, guint32, guint32, pgm_time_t);
 
 /* from NCF */
 int pgm_rxw_ncf (pgm_rxw_t*, guint32, pgm_time_t, pgm_time_t);
 
 
+/* type determined by garray.h */
 static inline guint pgm_rxw_len (pgm_rxw_t* r)
 {
     return r->pdata->len;
@@ -196,7 +197,7 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
     return p;
 }
 
-static inline void pgm_rxw_zero_pad (pgm_rxw_t* r, gpointer data, guint offset, guint len)
+static inline void pgm_rxw_zero_pad (pgm_rxw_t* r, gpointer data, guint16 offset, guint16 len)
 {
     g_assert ( offset <= len );
     if ( offset == len ||
@@ -215,19 +216,19 @@ static inline void pgm_rxw_data_unref (GTrashStack** trash, GStaticMutex* mutex,
     g_static_mutex_unlock (mutex);
 }
 
-static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
     return pgm_rxw_push_fragment (r, packet, len, sqn, trail, NULL, nak_rb_expiry);
 }
 
-static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint16 len, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);
     return pgm_rxw_push_fragment (r, packet, len, sqn, trail, opt_fragment, nak_rb_expiry);
 }
 
-static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);
@@ -236,12 +237,12 @@ static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint len, 
 
 int pgm_rxw_pkt_state_unlink (pgm_rxw_t*, pgm_rxw_packet_t*);
 
-int pgm_rxw_peek (pgm_rxw_t*, guint32, struct pgm_opt_fragment** ,gpointer*, guint*, gboolean*);
+int pgm_rxw_peek (pgm_rxw_t*, guint32, struct pgm_opt_fragment** ,gpointer*, guint16*, gboolean*);
 
-int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint, pgm_time_t);
-int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint, pgm_time_t);
+int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint16, pgm_time_t);
+int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint16, pgm_time_t);
 
-static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, gpointer packet_, guint len, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, gpointer packet_, guint16 len, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
     memcpy (packet, packet_, len);

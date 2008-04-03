@@ -88,7 +88,7 @@ main (
 		do {
 			int copy_len = MIN( source_len - source_offset, g_max_tpdu - packet_offset );
 /* adjust for unicode borders */
-			gchar* p = source + source_offset + copy_len;
+			gchar* p = (gchar*)source + source_offset + copy_len;
 			if (*p)
 			{
 				int new_copy_len = g_utf8_find_prev_char (source + source_offset, p + 1) - (source + source_offset);
@@ -139,7 +139,7 @@ main (
 /* test encoding */
 	start = pgm_time_update_now();
 
-	pgm_rs_encode (rs, packet_block, erasure_index, parity, g_max_tpdu);
+	pgm_rs_encode (rs, (const void**)packet_block, erasure_index, parity, g_max_tpdu);
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
@@ -161,7 +161,7 @@ main (
 /* test decoding */
 	start = pgm_time_update_now();
 
-	int retval = pgm_rs_decode_parity_inline (rs, packet_block, offsets, g_max_tpdu);
+	int retval = pgm_rs_decode_parity_inline (rs, (void**)packet_block, offsets, g_max_tpdu);
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
@@ -171,9 +171,9 @@ main (
 	gchar* final = g_malloc ( (k * g_max_tpdu) + 1 );
 	final[0] = 0;
 	for (int i = 0; i < k; i++)
-		strncat (final, packet_block[i], g_max_tpdu);
+		strncat (final, (char*)packet_block[i], g_max_tpdu);
 	final[ k * g_max_tpdu ] = 0;
-	printf ("decoded string:\n[%.15s...]%i cf. %i\n", final, strlen(final), block_len);
+	printf ("decoded string:\n[%.15s...]%" G_GSIZE_FORMAT " cf. %i\n", final, strlen(final), block_len);
 
 	if (strlen(final) == block_len) {
 		puts ("Test success.");
