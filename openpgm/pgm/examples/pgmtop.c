@@ -350,7 +350,7 @@ paint_peer (
 	}
 }
 
-static const char*
+static char*
 print_si (
 	float*			v
 	)
@@ -741,8 +741,8 @@ on_io_data (
 	struct sockaddr_in dst_addr;
 	socklen_t dst_addr_len;
 	struct pgm_header *pgm_header;
-	char *packet;
-	int packet_length;
+	gpointer packet;
+	gsize packet_length;
 	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 	if (e == -2)
 	{

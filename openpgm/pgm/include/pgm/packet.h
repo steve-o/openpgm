@@ -366,10 +366,10 @@ struct pgm_opt6_path_nla {
 
 G_BEGIN_DECLS
 
-int pgm_parse (struct pgm_header*, int, struct pgm_header**, char**, int*);
-int pgm_parse_raw (char*, int, struct sockaddr*, socklen_t*, struct pgm_header**, char**, int*);
-int pgm_parse_udp_encap (char*, int, struct sockaddr*, socklen_t*, struct pgm_header**, char**, int*);
-gboolean pgm_print_packet (char*, int);
+int pgm_parse (struct pgm_header*, gsize, struct pgm_header**, gpointer*, gsize*);
+int pgm_parse_raw (gpointer, gsize, struct sockaddr*, socklen_t*, struct pgm_header**, gpointer*, gsize*);
+int pgm_parse_udp_encap (gpointer, gsize, struct sockaddr*, socklen_t*, struct pgm_header**, gpointer*, gsize*);
+gboolean pgm_print_packet (gpointer, gsize);
 
 static inline gboolean pgm_is_upstream (guint8 type)
 {
@@ -386,13 +386,13 @@ static inline gboolean pgm_is_downstream (guint8 type)
     return (type == PGM_SPM || type == PGM_ODATA || type == PGM_RDATA || type == PGM_POLL || type == PGM_NCF);
 }
 
-int pgm_verify_spm (struct pgm_header*, char*, int);
-int pgm_verify_spmr (struct pgm_header*, char*, int);
-int pgm_verify_nak (struct pgm_header*, char*, int);
-int pgm_verify_nnak (struct pgm_header*, char*, int);
-int pgm_verify_ncf (struct pgm_header*, char*, int);
+int pgm_verify_spm (struct pgm_header*, gpointer, gsize);
+int pgm_verify_spmr (struct pgm_header*, gpointer, gsize);
+int pgm_verify_nak (struct pgm_header*, gpointer, gsize);
+int pgm_verify_nnak (struct pgm_header*, gpointer, gsize);
+int pgm_verify_ncf (struct pgm_header*, gpointer, gsize);
 
-static inline int pgm_nla_to_sockaddr (const char* nla, struct sockaddr* sa)
+static inline int pgm_nla_to_sockaddr (const gpointer nla, struct sockaddr* sa)
 {
     int retval = 0;
 
@@ -400,12 +400,12 @@ static inline int pgm_nla_to_sockaddr (const char* nla, struct sockaddr* sa)
     switch (sa->sa_family) {
     case AFI_IP:
 	sa->sa_family = AF_INET;
-	((struct sockaddr_in*)sa)->sin_addr.s_addr = ((struct in_addr*)(nla + sizeof(guint32)))->s_addr;
+	((struct sockaddr_in*)sa)->sin_addr.s_addr = ((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr;
 	break;
 
     case AFI_IP6:
 	sa->sa_family = AF_INET6;
-	memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (struct in6_addr*)(nla + sizeof(guint32)), sizeof(struct in6_addr));
+	memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (struct in6_addr*)((guint8*)nla + sizeof(guint32)), sizeof(struct in6_addr));
 	break;
 
     default:
@@ -416,21 +416,21 @@ static inline int pgm_nla_to_sockaddr (const char* nla, struct sockaddr* sa)
     return retval;
 }
 
-static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, char* nla)
+static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla)
 {
     int retval = 0;
 
     *(guint16*)nla = sa->sa_family;
-    *(guint16*)(nla + sizeof(guint16)) = 0;	/* reserved 16bit space */
+    *(guint16*)((guint8*)nla + sizeof(guint16)) = 0;	/* reserved 16bit space */
     switch (sa->sa_family) {
     case AF_INET:
 	*(guint16*)nla = g_htons (AFI_IP);
-	((struct in_addr*)(nla + sizeof(guint32)))->s_addr = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
+	((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
 	break;
 
     case AF_INET6:
 	*(guint16*)nla = g_htons (AFI_IP6);
-	memcpy ((struct in6_addr*)(nla + sizeof(guint32)), &((struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
+	memcpy ((struct in6_addr*)((guint8*)nla + sizeof(guint32)), &((struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
 	break;
 
     default:
@@ -444,7 +444,7 @@ static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, char* nla)
 const char* pgm_type_string (guint8);
 const char* pgm_udpport_string (int);
 const char* pgm_gethostbyaddr (const struct in_addr*);
-void pgm_ipopt_print (const char*, int);
+void pgm_ipopt_print (gpointer, gsize);
 
 G_END_DECLS
 

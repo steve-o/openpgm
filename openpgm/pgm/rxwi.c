@@ -130,7 +130,7 @@
 			g_assert ( NULL != RXW_PACKET( (w) , (w)->lead ) );	/* lead points to something */ \
 \
 /* queue's contain at least one packet */ \
-			if ( !(w)->waiting ) \
+			if ( !(w)->is_waiting ) \
 			{ \
 				g_assert ( ( (w)->backoff_queue->length + \
 					     (w)->wait_ncf_queue->length + \
@@ -202,7 +202,7 @@ pgm_rxw_parity_data_empty (pgm_rxw_t* r)
 
 pgm_rxw_t*
 pgm_rxw_init (
-	guint		tpdu_length,
+	guint16		tpdu_length,
 	guint32		preallocate_size,
 	guint32		rxw_sqns,		/* transmit window size in sequence numbers */
 	guint		rxw_secs,		/* size in seconds */
@@ -404,7 +404,7 @@ int
 pgm_rxw_push_fragment (
 	pgm_rxw_t*	r,
 	gpointer	packet,
-	guint		length,
+	gsize		length,
 	guint32		sequence_number,
 	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,
@@ -574,7 +574,7 @@ pgm_rxw_push_fragment (
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
 			retval		= PGM_RXW_FILLED_PLACEHOLDER;
 
-			gint fill_time = pgm_time_now - rp->t0;
+			guint32 fill_time = pgm_time_now - rp->t0;
 			if (!r->max_fill_time) {
 				r->max_fill_time = r->min_fill_time = fill_time;
 			}
@@ -679,7 +679,7 @@ pgm_rxw_push_fragment (
 			r->lost_count++;
 			RXW_SET_PACKET(r, rp->sequence_number, rp);
 //			pgm_rxw_flush (r);
-			r->waiting = TRUE;
+			r->is_waiting = TRUE;
 
 			retval = PGM_RXW_APDU_LOST;
 			goto out_flush;
@@ -694,7 +694,7 @@ pgm_rxw_push_fragment (
 			r->lost_count++;
 			RXW_SET_PACKET(r, rp->sequence_number, rp);
 //			pgm_rxw_flush (r);
-			r->waiting = TRUE;
+			r->is_waiting = TRUE;
 
 			retval = PGM_RXW_MALFORMED_APDU;
 			goto out_flush;
@@ -711,7 +711,7 @@ pgm_rxw_push_fragment (
 			r->lost_count++;
 			RXW_SET_PACKET(r, rp->sequence_number, rp);
 //			pgm_rxw_flush (r);
-			r->waiting = TRUE;
+			r->is_waiting = TRUE;
 
 			retval = PGM_RXW_APDU_LOST;
 			goto out_flush;
@@ -733,7 +733,7 @@ pgm_rxw_push_fragment (
 
 out_flush:
 //	pgm_rxw_flush (r);
-	r->waiting = TRUE;
+	r->is_waiting = TRUE;
 
 	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u commit_trail %u commit_lead %u lead %u )",
 		sequence_number,
@@ -761,9 +761,9 @@ int
 pgm_rxw_readv (
 	pgm_rxw_t*		r,
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
-	int			msg_len,	/* length of array */
+	guint			msg_len,	/* number of items in pmsg */
 	struct iovec**		piov,		/* underlying iov storage */
-	int			iov_len		/* length of piov */
+	guint			iov_len		/* number of items in piov */
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -771,7 +771,7 @@ pgm_rxw_readv (
 	g_trace ("pgm_rxw_readv");
 
 	guint dropped = 0;
-	int bytes_read = 0;
+	gsize bytes_read = 0;
 	pgm_msgv_t* msg_end = *pmsg + msg_len;
 	struct iovec* iov_end = *piov + iov_len;
 
@@ -1009,7 +1009,7 @@ pgm_rxw_free_committed (
 {
 	if ( r->parity_data_count == 0 ) {
 		g_trace ("no parity-data packets free'd");
-		return;
+		return PGM_RXW_OK;
 	}
 
 	g_assert( r->commit_trail != r->trail );
@@ -1156,7 +1156,7 @@ pgm_rxw_peek (
 	guint32		sequence_number,
 	struct pgm_opt_fragment**	opt_fragment,
 	gpointer*	data,
-	guint*		length,
+	guint16*	length,			/* matched to underlying type size */
 	gboolean*	is_parity
 	)
 {
@@ -1203,7 +1203,7 @@ pgm_rxw_push_nth_parity (
 	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,			/* in network order */
 	gpointer	data,
-	guint		length,
+	guint16		length,
 	pgm_time_t	nak_rb_expiry
 	)
 {
@@ -1251,7 +1251,7 @@ pgm_rxw_push_nth_repair (
 	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,			/* in network order */
 	gpointer	data,
-	guint		length,
+	guint16		length,
 	pgm_time_t	nak_rb_expiry
 	)
 {
@@ -1396,7 +1396,7 @@ pgm_rxw_window_update (
 	pgm_rxw_t*	r,
 	guint32		txw_trail,
 	guint32		txw_lead,
-	guint		tg_size,		/* transmission group size, 1 = no groups */
+	guint32		tg_size,		/* transmission group size, 1 = no groups */
 	guint		tg_sqn_shift,		/*			    0 = no groups */
 	pgm_time_t	nak_rb_expiry
 	)
@@ -1441,7 +1441,7 @@ pgm_rxw_window_update (
 
 					pgm_rxw_pop_trail (r);
 //					pgm_rxw_flush (r);
-					r->waiting = TRUE;
+					r->is_waiting = TRUE;
 				}
 
 				r->lead++;
@@ -1502,7 +1502,7 @@ pgm_rxw_window_update (
 //				g_warning ("dropping #%u due to advancing transmit window.", r->trail);
 				pgm_rxw_pop_trail (r);
 //				pgm_rxw_flush (r);
-				r->waiting = TRUE;
+				r->is_waiting = TRUE;
 			}
 		}
 	}
@@ -1565,7 +1565,7 @@ pgm_rxw_mark_lost (
 	r->lost_count++;
 
 //	pgm_rxw_flush (r);
-	r->waiting = TRUE;
+	r->is_waiting = TRUE;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
@@ -1675,7 +1675,7 @@ pgm_rxw_ncf (
 
 			pgm_rxw_pop_trail (r);
 //			pgm_rxw_flush (r);
-			r->waiting = TRUE;
+			r->is_waiting = TRUE;
 		}
 
 		pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
@@ -1705,7 +1705,7 @@ pgm_rxw_ncf (
 
 		pgm_rxw_pop_trail (r);
 //		pgm_rxw_flush (r);
-		r->waiting = TRUE;
+		r->is_waiting = TRUE;
 	}
 
 	pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
@@ -1722,7 +1722,7 @@ pgm_rxw_ncf (
 	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
 
 //	pgm_rxw_flush (r);
-	r->waiting = TRUE;
+	r->is_waiting = TRUE;
 
 	if (dropped) {
 		g_warning ("dropped %u messages due to full window.", dropped);

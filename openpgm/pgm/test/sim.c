@@ -352,8 +352,8 @@ on_io_data (
 	struct sockaddr_storage dst_addr;
         socklen_t dst_addr_len = sizeof(dst_addr);
         struct pgm_header *pgm_header;
-        char *packet;
-        int packet_len;
+        gpointer packet;
+        gsize packet_len;
 	int e;
 
 	if (transport->udp_encap_port) {
@@ -415,7 +415,7 @@ on_io_data (
 		if ( pgm_uint32_gte (spm_sqn, sender->spm_sqn) 
 			|| ( ((struct sockaddr*)&sender->nla)->sa_family == 0 ) )
 		{
-			pgm_nla_to_sockaddr ((const char*)&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
+			pgm_nla_to_sockaddr (&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
 			sender->spm_sqn = spm_sqn;
 		}
 	}
@@ -446,7 +446,7 @@ fake_pgm_transport_bind (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->bound, -EINVAL);
+	g_return_val_if_fail (!transport->is_bound, -EINVAL);
 
 	int retval = 0;
 
@@ -584,12 +584,12 @@ fake_pgm_transport_bind (
         }
 
 /* parity buffer for odata/rdata transmission */
-	if (transport->proactive_parity || transport->ondemand_parity) {
+	if (transport->use_proactive_parity || transport->use_ondemand_parity) {
 		pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
 	}
 
 /* cleanup */
-	transport->bound = TRUE;
+	transport->is_bound = TRUE;
 
 out:
 	return retval;
@@ -694,7 +694,7 @@ session_set_fec (
 		return;
 	}
 
-	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, default_n, default_k);
+	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k);
 	puts ("READY");
 }
 
@@ -1075,7 +1075,7 @@ net_send_parity (
 
 /* split string into individual payloads */
 	guint16 parity_length = 0;
-	guint8** src;
+	gchar** src;
 	src = g_strsplit (string, " ", transport->rs_k);
 
 /* payload is string including terminating null. */
@@ -1139,7 +1139,7 @@ net_send_parity (
 	data->data_trail	= g_htonl (txw_trail);
 
 	memset (data + 1, 0, parity_length);
-	pgm_rs_encode (transport->rs, src, transport->rs_k + rs_h, data + 1, parity_length);
+	pgm_rs_encode (transport->rs, (const void**)src, transport->rs_k + rs_h, data + 1, parity_length);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
