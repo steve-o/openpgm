@@ -386,7 +386,7 @@ session_set_fec (
 		return;
 	}
 
-	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, default_n, default_k);
+	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k);
 	puts ("READY");
 }
 

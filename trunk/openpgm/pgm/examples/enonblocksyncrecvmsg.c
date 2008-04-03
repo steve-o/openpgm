@@ -267,7 +267,7 @@ on_datav (
 	{
 		char buf[1024];
 		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
-		g_message ("\t%i: %s (%i bytes)", ++i, buf, msgv_iov->iov_len);
+		g_message ("\t%i: %s (%" G_GSIZE_FORMAT " bytes)", ++i, buf, msgv_iov->iov_len);
 		len -= msgv_iov->iov_len;
 		msgv_iov++;
 	}

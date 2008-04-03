@@ -139,14 +139,14 @@ struct pgm_tsi_t {            /* transport session identifier */
 typedef struct pgm_tsi_t pgm_tsi_t;
 
 struct pgm_sqn_list_t {
-    gint	    len;
+    guint	    len;
     guint32         sqn[63];	/* list of sequence numbers */
 };
 
 typedef struct pgm_sqn_list_t pgm_sqn_list_t;
 
 struct pgm_peer_t {
-    gint		ref_count;
+    gint		ref_count;		    /* atomic integer */
 
     pgm_tsi_t           tsi;
     struct sockaddr_storage	group_nla;
@@ -160,20 +160,20 @@ struct pgm_peer_t {
     pgm_transport_t*    transport;
     GList		link_;
 
-    gboolean		proactive_parity;	    /* indicating availability from this source */
-    gboolean		ondemand_parity;
+    gboolean		use_proactive_parity;	    /* indicating availability from this source */
+    gboolean		use_ondemand_parity;
     guint		rs_k;
     guint32		tg_sqn_shift;		    /* log2 (rs_k) */
 
-    int			spm_sqn;
+    guint32		spm_sqn;
     pgm_time_t		expiry;
 
     pgm_time_t		last_packet;
     guint32		cumulative_stats[PGM_PC_RECEIVER_MAX];
     guint32		snap_stats[PGM_PC_RECEIVER_MAX];
 
-    gint		min_fail_time;
-    gint		max_fail_time;
+    guint32		min_fail_time;
+    guint32		max_fail_time;
 };
 
 typedef struct pgm_peer_t pgm_peer_t;
@@ -188,7 +188,7 @@ struct pgm_transport_t {
     GThread		*timer_thread;
     GMainLoop		*timer_loop;
     GMainContext	*timer_context;
-    gboolean		bound;
+    gboolean		is_bound;
 
     GCond		*thread_cond;
     GMutex		*thread_mutex;
@@ -203,22 +203,22 @@ struct pgm_transport_t {
     int			recv_sock;
 
     guint16		max_tpdu;
-    guint		iphdr_len;
-    gint		hops;
+    gsize		iphdr_len;
+    guint		hops;
     guint		txw_preallocate, txw_sqns, txw_secs, txw_max_rte;
     guint		rxw_preallocate, rxw_sqns, rxw_secs, rxw_max_rte;
-    int			sndbuf, rcvbuf;
+    int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
     GStaticRWLock	txw_lock;
     gpointer            txw;		   	    /* pgm_txw_t */
     gpointer		rate_control;		    /* rate_t */
 
-    int			spm_sqn;
+    guint32		spm_sqn;
     guint		spm_ambient_interval;	    /* microseconds */
     guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
     guint		spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
     gchar*		spm_packet;
-    int			spm_len;
+    gsize		spm_len;
 
     guint		peer_expiry;		    /* from absence of SPMs */
     guint		spmr_expiry;		    /* waiting for peer SPMRs */
@@ -229,16 +229,17 @@ struct pgm_transport_t {
     pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
     gpointer		rs;
-    gboolean		proactive_parity;
-    gboolean		ondemand_parity;
+    gboolean		use_proactive_parity;
+    gboolean		use_ondemand_parity;
+    gboolean		use_varpkt_len;
     guint		rs_n;
     guint		rs_k;
-    guint32		tg_sqn_shift;
+    guint		tg_sqn_shift;
     gpointer		parity_buffer;		    /* for parity odata/rdata generation */
 
     gpointer		rx_buffer;
     struct iovec*	piov;
-    int			piov_len;		    /* # elements in piov */
+    guint		piov_len;		    /* # elements in piov */
 
     GTrashStack*	rx_data;		    /* shared between all receivers for this instance */
     GTrashStack*	rx_packet;
@@ -276,12 +277,12 @@ G_BEGIN_DECLS
 int pgm_init (void);
 
 gchar* pgm_print_tsi (const pgm_tsi_t*);
-int pgm_print_tsi_r (const pgm_tsi_t*, char*, size_t);
+int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);
 guint pgm_tsi_hash (gconstpointer);
 gint pgm_tsi_equal (gconstpointer, gconstpointer);
 guint pgm_power2_log2 (guint);
 
-int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, int, struct pgm_sock_mreq*);
+int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, gsize, struct pgm_sock_mreq*);
 int pgm_transport_bind (pgm_transport_t*);
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
 
@@ -312,22 +313,22 @@ int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
-int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, guint, guint);
+int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint, guint);
 
 int pgm_set_nonblocking (int filedes[2]);
 
-int pgm_transport_send (pgm_transport_t*, const gpointer, gsize, int);
-int pgm_transport_sendv (pgm_transport_t*, const struct iovec*, int, int);
-int pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, int, int);
-int pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, int, int);
-int pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, int, int);
+gsize pgm_transport_send (pgm_transport_t*, const gpointer, gsize, int);
+gsize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int);
+gsize pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, guint, int);
+gsize pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, guint, int);
+gsize pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, guint, int);
 
-int pgm_transport_send_fragment (pgm_transport_t*, const gpointer, gsize, int, int*, int*);
+gsize pgm_transport_send_fragment (pgm_transport_t*, const gpointer, gsize, int, guint32*, guint32*);
 
 /* receiver side */
-int pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
-int pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, int, int);
-int pgm_transport_recv (pgm_transport_t*, gpointer, int, int);
+gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
+gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int);
+gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int);
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, int*);
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*);

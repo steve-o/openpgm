@@ -27,7 +27,7 @@
 
 G_BEGIN_DECLS
 
-guint16 pgm_inet_checksum (const void*, int, int);
+guint16 pgm_inet_checksum (const void*, guint, int);
 
 #ifdef CONFIG_CKSUM_COPY
 #   define pgm_csum_partial		csum_partial
@@ -38,13 +38,13 @@ guint16 pgm_inet_checksum (const void*, int, int);
 #   define pgm_csum_partial		pgm_csum_partial_
 #   define pgm_csum_partial_copy	pgm_csum_partial_copy_
 
-guint32 pgm_csum_partial_ (const void*, int, guint32);
-guint32 pgm_csum_partial_copy_ (const void*, void*, int, guint32);
+guint32 pgm_csum_partial_ (const void*, guint, guint32);
+guint32 pgm_csum_partial_copy_ (const void*, void*, guint, guint32);
 
 #endif
 
 guint16 pgm_csum_fold (guint32);
-guint32 pgm_csum_block_add (guint32, guint32, int);
+guint32 pgm_csum_block_add (guint32, guint32, guint);
 
 G_END_DECLS
 

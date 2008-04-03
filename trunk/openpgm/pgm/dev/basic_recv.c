@@ -74,17 +74,17 @@ struct hoststat {
 	struct in_addr nla;
 
 	gulong	txw_secs;		/* seconds of repair data */
-	gulong	txw_trail;		/* trailing edge sequence number */
-	gulong	txw_lead;		/* leading edge sequence number */
+	guint32	txw_trail;		/* trailing edge sequence number */
+	guint32	txw_lead;		/* leading edge sequence number */
 	gulong	txw_sqns;		/* size of transmit window */
 
-	gulong	rxw_trail;		/* oldest repairable sequence number */
-	gulong	rxw_lead;		/* last sequence number */
+	guint32	rxw_trail;		/* oldest repairable sequence number */
+	guint32	rxw_lead;		/* last sequence number */
 
-	gulong	rxw_trail_init;		/* first sequence number */
+	guint32	rxw_trail_init;		/* first sequence number */
 	int rxw_learning;
 
-	gulong	spm_sqn;		/* independent sequence number */
+	guint32	spm_sqn;		/* independent sequence number */
 
 	struct stat	spm,
 			poll,
@@ -495,9 +495,9 @@ on_io_data (
 	struct sockaddr_in dst_addr;
 	socklen_t dst_addr_len;
 	struct pgm_header *pgm_header;
-	char *packet;
-	int packet_length;
-	int e = pgm_parse_raw(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	gpointer packet;
+	gsize packet_length;
+	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 
 	switch (e) {
 	case -2:
@@ -645,7 +645,7 @@ on_io_data (
 		((struct pgm_data*)packet)->data_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
 		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
 		{
-			printf ("not in tx window %lu, %lu - %lu\n",
+			printf ("not in tx window %" G_GUINT32_FORMAT ", %" G_GUINT32_FORMAT " - %" G_GUINT32_FORMAT "\n",
 				((struct pgm_data*)packet)->data_sqn,
 				hoststat->txw_trail,
 				hoststat->txw_lead);
@@ -684,8 +684,8 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 /* lost packets */
 		if ( !IS_NEXT_SEQUENCE_NUMBER( ((struct pgm_data*)packet)->data_sqn ) )
 		{
-			printf ("lost %lu packets.\n",
-				((struct pgm_data*)packet)->data_sqn - hoststat->rxw_lead - 1);
+			printf ("lost %i packets.\n",
+				(int)( ((struct pgm_data*)packet)->data_sqn - hoststat->rxw_lead - 1 ));
 		}
 
 		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
@@ -1065,7 +1065,7 @@ tsi_callback (
 
 	char rxw_init[100];
 	if (hoststat->rxw_learning)
-		snprintf (rxw_init, sizeof(rxw_init), " (RXW_TRAIL_INIT %lu)", hoststat->rxw_trail_init);
+		snprintf (rxw_init, sizeof(rxw_init), " (RXW_TRAIL_INIT %" G_GUINT32_FORMAT ")", hoststat->rxw_trail_init);
 
 	g_string_append_printf (response, 
 				"<p>"
@@ -1073,9 +1073,9 @@ tsi_callback (
 					"<tr><td><b>TSI:</b></td><td>%s</td></tr>"
 					"<tr><td><b>Last IP address:</b></td><td>%s</td></tr>"
 					"<tr><td><b>Advertised NLA:</b></td><td>%s</td></tr>"
-					"<tr><td><b>Transmit window:</b></td><td>TXW_TRAIL %lu TXW_LEAD %lu TXW_SQNS %lu</td></tr>"
-					"<tr><td><b>Receive window:</b></td><td>RXW_TRAIL %lu%s RXW_LEAD %lu</td></tr>"
-					"<tr><td><b>SPM sequence number:</b></td><td>%lu</td></tr>"
+					"<tr><td><b>Transmit window:</b></td><td>TXW_TRAIL %" G_GUINT32_FORMAT " TXW_LEAD %" G_GUINT32_FORMAT " TXW_SQNS %i</td></tr>"
+					"<tr><td><b>Receive window:</b></td><td>RXW_TRAIL %" G_GUINT32_FORMAT "%s RXW_LEAD %" G_GUINT32_FORMAT "</td></tr>"
+					"<tr><td><b>SPM sequence number:</b></td><td>%" G_GUINT32_FORMAT "</td></tr>"
 				"</table>"
 				"</p><p>"
 				"<table>"
@@ -1091,7 +1091,7 @@ tsi_callback (
 				inet_ntoa(hoststat->last_addr),
 				inet_ntoa(hoststat->nla),
 				hoststat->txw_trail, hoststat->txw_lead,
-					(1 + hoststat->txw_lead) - hoststat->txw_trail,
+					(int)( (1 + hoststat->txw_lead) - hoststat->txw_trail ),
 				hoststat->rxw_trail, 
 					hoststat->rxw_learning ? rxw_init : "",
 					hoststat->rxw_lead,

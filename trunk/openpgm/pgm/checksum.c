@@ -39,11 +39,11 @@
 guint16
 pgm_inet_checksum (
 	const void*	addr,
-	int		len,
+	guint		len,
 	int		csum
 	)
 {
-	int nleft = len;
+	guint nleft = len;
 	const guint16 *w = (guint16*)addr;
 	guint answer;
 	int sum = csum;
@@ -67,7 +67,7 @@ pgm_inet_checksum (
 guint32
 pgm_csum_partial_ (
 	const void*	src,
-	int		len,
+	guint		len,
 	guint32		csum
 	)
 {
@@ -98,7 +98,7 @@ guint32
 pgm_csum_partial_copy_ (
 	const void*	src,
 	void*		dst,
-	int		len,
+	guint		len,
 	guint32		csum
 	)
 {
@@ -127,7 +127,7 @@ guint32
 pgm_csum_block_add (
 	guint32		csum,
 	guint32		csum2,
-	int		offset
+	guint		offset
 	)
 {
 	if (offset & 1)			/* byte magic on odd offset */

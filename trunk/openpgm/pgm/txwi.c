@@ -118,11 +118,11 @@ static inline int pgm_txw_pop (pgm_txw_t*);
 
 pgm_txw_t*
 pgm_txw_init (
-	guint	tpdu_length,
-	guint32	preallocate_size,
-	guint32	txw_sqns,		/* transmit window size in sequence numbers */
-	guint	txw_secs,		/* size in seconds */
-	guint	txw_max_rte		/* max bandwidth */
+	guint16		tpdu_length,
+	guint32		preallocate_size,
+	guint32		txw_sqns,		/* transmit window size in sequence numbers */
+	guint		txw_secs,		/* size in seconds */
+	guint		txw_max_rte		/* max bandwidth */
 	)
 {
 	g_trace ("init (tpdu %i pre-alloc %i txw_sqns %i txw_secs %i txw_max_rte %i).\n",
@@ -279,7 +279,7 @@ int
 pgm_txw_push (
 	pgm_txw_t*	t,
 	gpointer	packet,
-	guint		length
+	guint16		length
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
@@ -324,7 +324,7 @@ pgm_txw_peek (
 	pgm_txw_t*	t,
 	guint32		sequence_number,
 	gpointer*	packet,
-	guint*		length
+	guint16*	length
 	)
 {
 	ASSERT_TXW_BASE_INVARIANT(t);
@@ -412,8 +412,8 @@ pgm_txw_retransmit_push (
 		guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
 
 /* check if transmission group is in window */
-		guint nak_tg_sqn = sequence_number & tg_sqn_mask;	/* left unshifted */
-		guint nak_pkt_cnt = sequence_number & ~tg_sqn_mask;
+		guint32 nak_tg_sqn = sequence_number & tg_sqn_mask;	/* left unshifted */
+		guint32 nak_pkt_cnt = sequence_number & ~tg_sqn_mask;
 
 printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 		
@@ -493,7 +493,7 @@ pgm_txw_retransmit_try_pop (
 	pgm_txw_t*	t,
 	guint32*	sequence_number,
 	gpointer*	packet,
-	guint*		length,
+	guint16*	length,
 	gboolean*	is_parity,
 	guint*		rs_h,			/* parity packet offset */
 	guint		rs_2t			/* maximum h */

@@ -256,17 +256,17 @@ main (
 	if (g_recv_sock) {
 		puts ("closing receive socket.");
 		close (g_recv_sock);
-		g_recv_sock = NULL;
+		g_recv_sock = 0;
 	}
 	if (g_send_sock) {
 		puts ("closing send socket.");
 		close (g_send_sock);
-		g_send_sock = NULL;
+		g_send_sock = 0;
 	}
 	if (g_send_with_router_alert_sock) {
 		puts ("closing send with router alert socket.");
 		close (g_send_with_router_alert_sock);
-		g_send_with_router_alert_sock = NULL;
+		g_send_with_router_alert_sock = 0;
 	}
 
         if (g_soup_server) {
@@ -574,9 +574,9 @@ on_io_data (
 	struct sockaddr_in dst_addr;
 	socklen_t dst_addr_len;
 	struct pgm_header *pgm_header;
-	char *packet;
-	int packet_length;
-	int e = pgm_parse_raw(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	gpointer packet;
+	gsize packet_length;
+	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 
 	switch (e) {
 	case -2:

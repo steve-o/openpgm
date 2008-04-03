@@ -66,9 +66,9 @@ static int g_corruption = 0;
 
 static int g_spm_sqn = 0;
 
-static int g_recv_sock = NULL;			/* includes IP header */
-static int g_send_sock = NULL;
-static int g_send_with_router_alert_sock = NULL;	/* IP_ROUTER_ALERT */
+static int g_recv_sock = 0;			/* includes IP header */
+static int g_send_sock = 0;
+static int g_send_with_router_alert_sock = 0;	/* IP_ROUTER_ALERT */
 static struct in_addr g_addr;
 static GIOChannel* g_recv_channel = NULL;
 static GMainLoop* g_loop = NULL;
@@ -85,7 +85,7 @@ static gboolean on_mark (gpointer);
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
-static gboolean on_nak (struct pgm_header*, char*, int);
+static gboolean on_nak (struct pgm_header*, gpointer, gsize);
 
 static gchar* print_tsi (gconstpointer);
 
@@ -163,17 +163,17 @@ main (
 	if (g_recv_sock) {
 		puts ("closing receive socket.");
 		close(g_recv_sock);
-		g_recv_sock = NULL;
+		g_recv_sock = 0;
 	}
 	if (g_send_sock) {
 		puts ("closing send socket.");
 		close(g_send_sock);
-		g_send_sock = NULL;
+		g_send_sock = 0;
 	}
 	if (g_send_with_router_alert_sock) {
 		puts ("closing send with router alert socket.");
 		close(g_send_with_router_alert_sock);
-		g_send_with_router_alert_sock = NULL;
+		g_send_with_router_alert_sock = 0;
 	}
 
 	if (g_txw) {
@@ -424,9 +424,9 @@ on_io_data (
 	struct sockaddr_in dst_addr;
 	socklen_t dst_addr_len;
 	struct pgm_header *pgm_header;
-	char *packet;
-	int packet_length;
-	int e = pgm_parse_raw(buffer, len, &dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	gpointer packet;
+	gsize packet_length;
+	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
 
 	switch (e) {
 	case -2:
@@ -477,9 +477,9 @@ on_io_error (
 
 static gboolean
 on_nak (
-	struct pgm_header* header,
-	char* data,
-	int len
+	struct pgm_header*	header,
+	gpointer		data,
+	gsize			len
 	)
 {
 	printf ("NAK: ");
@@ -511,7 +511,7 @@ on_nak (
 	printf ("src %s for #%i", s, nak->nak_sqn);
 
 	gpointer rdata = NULL;
-	int rlen = 0;
+	guint16 rlen = 0;
 	if (!pgm_txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
 	{
 		puts (", in window");
@@ -597,7 +597,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	header->pgm_tsdu_length	= 0;		/* transport data unit length */
 
 /* SPM */
-	spm->spm_sqn		= g_htonl (g_spm_sqn++);
+	spm->spm_sqn		= g_htonl (g_spm_sqn); g_spm_sqn++;
 	spm->spm_trail		= g_htonl (pgm_txw_lead(g_txw));
 	spm->spm_lead		= g_htonl (pgm_txw_trail(g_txw));
 	spm->spm_nla_afi	= g_htons (AFI_IP);
@@ -766,7 +766,7 @@ send_rdata (
 
 printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	"PGM data header size %" G_GSIZE_FORMAT "\n"
-	"payload size %" G_GSIZE_FORMAT "\n",
+	"payload size %i\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
 	len );

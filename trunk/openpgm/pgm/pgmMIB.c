@@ -1300,7 +1300,8 @@ pgmReceiverTable_get_next_data_point(
 		while (context->list->next)
 		{
 			g_static_rw_lock_reader_unlock (&transport->peers_lock);
-			transport = context->list = context->list->next;
+			context->list = context->list->next;
+			transport = context->list->data;
 			g_static_rw_lock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 			if (context->node) {
@@ -1591,7 +1592,8 @@ pgmReceiverConfigTable_get_next_data_point(
 		while (context->list->next)
 		{
 			g_static_rw_lock_reader_unlock (&transport->peers_lock);
-			transport = context->list = context->list->next;
+			context->list = context->list->next;
+			transport = context->list->data;
 			g_static_rw_lock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 			if (context->node) {
@@ -1933,7 +1935,8 @@ pgmReceiverPerformanceTable_get_next_data_point(
 		while (context->list->next)
 		{
 			g_static_rw_lock_reader_unlock (&transport->peers_lock);
-			transport = context->list = context->list->next;
+			context->list = context->list->next;
+			transport = context->list->data;
 			g_static_rw_lock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 
@@ -2328,7 +2331,7 @@ pgmReceiverPerformanceTable_handler (
 			case COLUMN_PGMRECEIVERLASTACTIVITY:
 				{
 				unsigned long last_activity;
-				pgm_time_since_epoch (&peer->last_packet, &last_activity);
+				pgm_time_since_epoch (&peer->last_packet, (time_t*)&last_activity);
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&last_activity, sizeof(last_activity) );
 				}
@@ -2474,7 +2477,7 @@ send_pgmStart_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmStart_oid, sizeof(pgmStart_oid));
+        (const u_char*)pgmStart_oid, sizeof(pgmStart_oid));
     
 
     /*
@@ -2502,7 +2505,7 @@ send_pgmStop_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmStop_oid, sizeof(pgmStop_oid));
+        (const u_char*)pgmStop_oid, sizeof(pgmStop_oid));
     
 
     /*
@@ -2532,7 +2535,7 @@ send_pgmNewSourceTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmNewSourceTrap_oid, sizeof(pgmNewSourceTrap_oid));
+        (const u_char*)pgmNewSourceTrap_oid, sizeof(pgmNewSourceTrap_oid));
     
     /*
      * Add any objects from the trap definition
@@ -2575,7 +2578,7 @@ send_pgmClosedSourceTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmClosedSourceTrap_oid, sizeof(pgmClosedSourceTrap_oid));
+        (const u_char*)pgmClosedSourceTrap_oid, sizeof(pgmClosedSourceTrap_oid));
     
     /*
      * Add any objects from the trap definition
@@ -2619,7 +2622,7 @@ send_pgmNewReceiverTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmNewReceiverTrap_oid, sizeof(pgmNewReceiverTrap_oid));
+        (const u_char*)pgmNewReceiverTrap_oid, sizeof(pgmNewReceiverTrap_oid));
     
     /*
      * Add any objects from the trap definition
@@ -2668,7 +2671,7 @@ send_pgmClosedReceiverTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmClosedReceiverTrap_oid, sizeof(pgmClosedReceiverTrap_oid));
+        (const u_char*)pgmClosedReceiverTrap_oid, sizeof(pgmClosedReceiverTrap_oid));
     
     /*
      * Add any objects from the trap definition
@@ -2721,7 +2724,7 @@ send_pgmNakFailuresTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmNakFailuresTrap_oid, sizeof(pgmNakFailuresTrap_oid));
+        (const u_char*)pgmNakFailuresTrap_oid, sizeof(pgmNakFailuresTrap_oid));
     
     /*
      * Add any objects from the trap definition
@@ -2789,7 +2792,7 @@ send_pgmNewDlrSourceTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmNewDlrSourceTrap_oid, sizeof(pgmNewDlrSourceTrap_oid));
+        (const u_char*)pgmNewDlrSourceTrap_oid, sizeof(pgmNewDlrSourceTrap_oid));
     
     /*
      * Add any objects from the trap definition
@@ -2832,7 +2835,7 @@ send_pgmClosedDlrSourceTrap_trap( void )
     snmp_varlist_add_variable(&var_list,
         snmptrap_oid, OID_LENGTH(snmptrap_oid),
         ASN_OBJECT_ID,
-        pgmClosedDlrSourceTrap_oid, sizeof(pgmClosedDlrSourceTrap_oid));
+        (const u_char*)pgmClosedDlrSourceTrap_oid, sizeof(pgmClosedDlrSourceTrap_oid));
     
     /*
      * Add any objects from the trap definition

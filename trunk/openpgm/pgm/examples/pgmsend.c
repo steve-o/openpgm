@@ -176,7 +176,7 @@ create_transport (void)
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
 
 	if (g_fec) {
-		pgm_transport_set_fec (g_transport, FALSE, TRUE, g_n, g_k);
+		pgm_transport_set_fec (g_transport, FALSE, TRUE, TRUE, g_n, g_k);
 	}
 
 	e = pgm_transport_bind (g_transport);
