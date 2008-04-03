@@ -125,9 +125,11 @@ on_io_signal (
 	}
 	else
 	{
-		g_critical ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %i.",
+		g_critical ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
 				bytes_read, bytes_read > 1 ? "s" : "", sizeof(signum));
 	}
+
+	return TRUE;
 }
 
 /* eof */
