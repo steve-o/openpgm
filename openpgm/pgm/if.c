@@ -93,8 +93,8 @@ pgm_if_print_all (void)
 		char s[INET6_ADDRSTRLEN];
 		inet_ntop (ifa->ifa_addr->sa_family,
 				ifa->ifa_addr->sa_family == AF_INET ?
-					&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr :
-					&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
+					(struct sockaddr*)&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr :
+					(struct sockaddr*)&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
 				s,
 				sizeof(s));
 		g_message ("name %-5.5s IPv%i %-46.46s status %s loop %s b/c %s m/c %s",
@@ -127,7 +127,7 @@ pgm_if_inet_network (
 	g_trace ("if_inet_network (%s)", s);
 	in->s_addr = INADDR_ANY;
 
-	char *p = s;
+	char *p = (char*)s;
 	char *e = p + strlen(s);
 	int val = 0;
 	int shift = 24;
@@ -218,7 +218,7 @@ pgm_if_inet6_network (
 	g_trace ("if_inet6_network (%s)", s);
 
 	char s2[INET6_ADDRSTRLEN];
-	char *p = s, *p2 = s2;
+	char *p = (char*)s, *p2 = s2;
 	char *e = p + strlen(s);
 	while (*p) {
 		if (*p == '/') break;
@@ -749,7 +749,7 @@ pgm_if_parse_network (
 	int			len			/* length of device & receive_groups fields */
 	)
 {
-	char *p = s;
+	char *p = (char*)s;
 	char *e = p + strlen(s);
 	enum { ENTITY_INTERFACE, ENTITY_RECEIVE, ENTITY_SEND, ENTITY_ERROR } ec = ENTITY_INTERFACE;
 	char *b = p;		/* begin of entity */
