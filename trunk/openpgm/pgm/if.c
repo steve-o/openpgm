@@ -127,8 +127,8 @@ pgm_if_inet_network (
 	g_trace ("if_inet_network (%s)", s);
 	in->s_addr = INADDR_ANY;
 
-	char *p = (char*)s;
-	char *e = p + strlen(s);
+	const char *p = s;
+	const char *e = p + strlen(s);
 	int val = 0;
 	int shift = 24;
 
@@ -218,8 +218,9 @@ pgm_if_inet6_network (
 	g_trace ("if_inet6_network (%s)", s);
 
 	char s2[INET6_ADDRSTRLEN];
-	char *p = (char*)s, *p2 = s2;
-	char *e = p + strlen(s);
+	const char *p = s;
+	char* p2 = s2;
+	const char *e = p + strlen(s);
 	while (*p) {
 		if (*p == '/') break;
 		*p2++ = *p++;
@@ -236,8 +237,10 @@ pgm_if_inet6_network (
 		return -1;
 	}
 
-		char s3[INET6_ADDRSTRLEN];
-		g_trace ("IPv6 network address: %s", inet_ntop(AF_INET6, in6, s3, sizeof(s3)));
+#ifdef IF_DEBUG
+	char sdebug[INET6_ADDRSTRLEN];
+	g_trace ("IPv6 network address: %s", inet_ntop(AF_INET6, in6, sdebug, sizeof(sdebug)));
+#endif
 
 	p++;
 	int val = 0;
@@ -382,8 +385,10 @@ pgm_if_parse_interface (
 	struct in6_addr in6;
 	e = pgm_if_inet6_network (s, &in6);
 	if (e != -1) {
-		char s[INET6_ADDRSTRLEN];
-		g_trace ("IPv6 network address calculated: %s", inet_ntop(AF_INET6, &in6, s, sizeof(s)));
+#ifdef IF_DEBUG
+		char sdebug[INET6_ADDRSTRLEN];
+		g_trace ("IPv6 network address calculated: %s", inet_ntop(AF_INET6, &in6, sdebug, sizeof(sdebug)));
+#endif
 		valid_net6 = 1;
 	}
 
@@ -407,12 +412,14 @@ pgm_if_parse_interface (
 
 			case AF_INET6:
 			{
-				char s[INET6_ADDRSTRLEN];
 				g_trace ("found IPv6 network by NSS: %s", ne->n_name);
 				memcpy (&((struct sockaddr_in6*)&addr)->sin6_addr,
 					&ne->n_net,
 					sizeof(struct in6_addr));
-				g_trace ("address %s", inet_ntop (ne->n_addrtype, &((struct sockaddr_in6*)&addr)->sin6_addr, s, sizeof(s)));
+#ifdef IF_DEBUG
+				char sdebug[INET6_ADDRSTRLEN];
+				g_trace ("address %s", inet_ntop (ne->n_addrtype, &((struct sockaddr_in6*)&addr)->sin6_addr, sdebug, sizeof(sdebug)));
+#endif
 				valid_ipv6 = 1;
 			}
 			break;
@@ -607,7 +614,6 @@ pgm_if_parse_multicast (
 	g_trace ("if_parse_multicast (%s, %i)", s, ai_family);
 
 	int retval = 0;
-	char s2[INET6_ADDRSTRLEN];
 
 /* IPv4 address */
 	if (inet_pton (AF_INET, s, &((struct sockaddr_in*)addr)->sin_addr))
@@ -652,13 +658,16 @@ pgm_if_parse_multicast (
 		int err = getaddrinfo (s, NULL, &hints, &res);
 
 		if (!err) {
+#ifdef IF_DEBUG
+			char s2[INET6_ADDRSTRLEN];
 			g_trace ("DNS hostname: (A) %s address %s",
 				res->ai_canonname,
 				inet_ntop (res->ai_family, 
 						res->ai_family == AF_INET ?
 							&((struct sockaddr_in*)(res->ai_addr))->sin_addr :
 							&((struct sockaddr_in6*)(res->ai_addr))->sin6_addr,
-						s2, sizeof(s2)) );
+						sdebug, sizeof(sdebug)) );
+#endif
 
 			if (res->ai_family == AF_INET)
 			{
@@ -749,10 +758,10 @@ pgm_if_parse_network (
 	int			len			/* length of device & receive_groups fields */
 	)
 {
-	char *p = (char*)s;
-	char *e = p + strlen(s);
+	const char *p = s;
+	const char *e = p + strlen(s);
 	enum { ENTITY_INTERFACE, ENTITY_RECEIVE, ENTITY_SEND, ENTITY_ERROR } ec = ENTITY_INTERFACE;
-	char *b = p;		/* begin of entity */
+	const char *b = p;		/* begin of entity */
 	int retval = 0;
 
 	while (p < e)
@@ -1018,7 +1027,7 @@ pgm_if_parse_transport (
 	g_return_val_if_fail (ai_family == AF_UNSPEC || ai_family == AF_INET || ai_family == AF_INET6, -EINVAL);
 	g_return_val_if_fail (send_smr != NULL, -EINVAL);
 	g_return_val_if_fail (recv_smr != NULL, -EINVAL);
-	g_return_val_if_fail (len > 0, -EINVAL);
+	g_return_val_if_fail (len != NULL || *len > 0, -EINVAL);
 
 	g_trace ("if_parse_transport (%s, %i, ..., %i)", s, ai_family, *len);
 	int retval = 0;
