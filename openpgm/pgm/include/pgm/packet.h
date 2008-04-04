@@ -425,12 +425,12 @@ static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla)
     switch (sa->sa_family) {
     case AF_INET:
 	*(guint16*)nla = g_htons (AFI_IP);
-	((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr = ((struct sockaddr_in*)sa)->sin_addr.s_addr;
+	((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr = ((const struct sockaddr_in*)sa)->sin_addr.s_addr;
 	break;
 
     case AF_INET6:
 	*(guint16*)nla = g_htons (AFI_IP6);
-	memcpy ((struct in6_addr*)((guint8*)nla + sizeof(guint32)), &((struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
+	memcpy ((struct in6_addr*)((guint8*)nla + sizeof(guint32)), &((const struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
 	break;
 
     default:
@@ -444,7 +444,7 @@ static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla)
 const char* pgm_type_string (guint8);
 const char* pgm_udpport_string (int);
 const char* pgm_gethostbyaddr (const struct in_addr*);
-void pgm_ipopt_print (gpointer, gsize);
+void pgm_ipopt_print (gconstpointer, gsize);
 
 G_END_DECLS
 

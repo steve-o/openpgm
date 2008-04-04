@@ -27,7 +27,7 @@
 
 G_BEGIN_DECLS
 
-void on_sigsegv (int);
+G_GNUC_NORETURN void on_sigsegv (int);
 
 
 G_END_DECLS
