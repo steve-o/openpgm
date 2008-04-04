@@ -82,7 +82,7 @@ pgm_time_init ( void )
 	g_return_val_if_fail (time_got_initialized == FALSE, -1);
 
 /* current time */
-	char *cfg = getenv ("PGM_TIMER");
+	const char *cfg = getenv ("PGM_TIMER");
 	if (cfg == NULL) cfg = "TSC";
 
 	pgm_time_since_epoch = pgm_time_conv;
@@ -114,7 +114,7 @@ pgm_time_init ( void )
 
 	default:
 	case 'M':
-	case 'U':	pgm_time_sleep = usleep; break;	/* direct to glibc, function is deprecated */
+	case 'U':	pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
 	}
 
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep ||
@@ -288,7 +288,7 @@ rtc_sleep (gulong usec)
 /* read time stamp counter, count of ticks from processor reset.
  *  */
 
-__inline__ pgm_time_t
+static inline pgm_time_t
 rdtsc (void)
 {
 	guint32 lo, hi;
