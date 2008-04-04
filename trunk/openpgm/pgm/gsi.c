@@ -315,7 +315,7 @@ md5_process_bytes (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
-void *
+static void *
 md5_read_ctx (
 	const struct md5_ctx	*ctx,
 	void*			resbuf

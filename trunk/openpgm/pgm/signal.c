@@ -109,13 +109,12 @@ on_signal (
 static gboolean
 on_io_signal (
 	GIOChannel*	source,
-	GIOCondition	cond,
-	gpointer	user_data
+	G_GNUC_UNUSED GIOCondition	cond,
+	G_GNUC_UNUSED gpointer		user_data
 	)
 {
 	int signum;
 	gsize bytes_read;
-	GError* err;
 
 	bytes_read = read (g_io_channel_unix_get_fd (source), &signum, sizeof(signum));
 
