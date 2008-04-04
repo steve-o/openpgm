@@ -2212,7 +2212,7 @@ pgm_transport_recv (
 {
 	pgm_msgv_t msgv;
 
-	gsize bytes_read = pgm_transport_recvmsg (transport, &msgv, flags);
+	gssize bytes_read = pgm_transport_recvmsg (transport, &msgv, flags);
 
 /* merge apdu packets together */
 	if (bytes_read > 0) {
