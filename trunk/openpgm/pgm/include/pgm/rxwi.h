@@ -148,7 +148,7 @@ int pgm_rxw_shutdown (pgm_rxw_t*);
 
 int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, gsize, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
 
-int pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, guint, struct iovec**, guint);
+gsize pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, guint, struct iovec**, guint);
 
 /* from state checking */
 int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
