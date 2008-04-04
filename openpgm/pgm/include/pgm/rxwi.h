@@ -74,6 +74,7 @@ typedef enum
 } pgm_rxw_returns_e;
 
 const char* pgm_rxw_state_string (pgm_pkt_state_e);
+const char* pgm_rxw_returns_string (pgm_rxw_returns_e);
 
 /* callback for commiting contiguous pgm packets */
 typedef int (*pgm_rxw_commitfn_t)(guint32, gpointer, guint, gpointer);

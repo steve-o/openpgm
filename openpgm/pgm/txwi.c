@@ -162,6 +162,7 @@ pgm_txw_init (
 	t->retransmit_queue = g_queue_new();
 	g_static_mutex_init (&t->retransmit_mutex);
 
+#ifdef TXW_DEBUG
 	guint memory = sizeof(pgm_txw_t) +
 /* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
@@ -170,6 +171,7 @@ pgm_txw_init (
 			preallocate_size * (t->max_tpdu + sizeof(pgm_txw_packet_t));
 
 	g_trace ("memory usage: %ub (%uMb)", memory, memory / (1024 * 1024));
+#endif
 
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);

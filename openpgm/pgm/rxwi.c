@@ -273,6 +273,7 @@ pgm_rxw_init (
 	r->max_nak_transmit_count = G_MININT;
 #endif
 
+#ifdef RXW_DEBUG
 	guint memory = sizeof(pgm_rxw_t) +
 /* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
@@ -285,6 +286,7 @@ pgm_rxw_init (
 			4 * sizeof(int);
 			
 	g_trace ("memory usage: %ub (%uMb)", memory, memory / (1024 * 1024));
+#endif
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
