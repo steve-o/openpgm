@@ -3470,8 +3470,6 @@ send_spmr (
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_mutex);
-
 /* send multicast SPMR TTL 1 */
 	g_trace ("INFO", "send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transport->send_smr.smr_multiaddr)->sin_addr ));
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_smr.smr_interface), 1);
@@ -3495,8 +3493,6 @@ send_spmr (
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
 				pgm_sockaddr_len(&peer_nla));
-
-	g_static_mutex_unlock (&transport->send_mutex);
 
 	peer->spmr_expiry = 0;
 
@@ -3556,7 +3552,6 @@ send_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	gssize sent = pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
@@ -3565,7 +3560,6 @@ send_nak (
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
 				pgm_sockaddr_len(&peer_nla));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	if ( sent != (gssize)tpdu_length )
 	{
@@ -3620,7 +3614,6 @@ send_ncf (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	gssize sent = pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
@@ -3629,7 +3622,6 @@ send_ncf (
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	if ( sent != (gssize)tpdu_length )
 	{
@@ -3688,7 +3680,6 @@ send_parity_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	gssize sent = pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
@@ -3697,7 +3688,6 @@ send_parity_nak (
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
 				pgm_sockaddr_len(&peer_nla));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	if ( sent != (gssize)tpdu_length )
 	{
@@ -3793,7 +3783,6 @@ send_nak_list (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_mutex);
 	gssize sent = pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				FALSE,			/* regular socket */
@@ -3802,7 +3791,6 @@ send_nak_list (
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&peer_nla,
 				pgm_sockaddr_len(&peer_nla));
-	g_static_mutex_unlock (&transport->send_mutex);
 
 	if ( sent != (gssize)tpdu_length )
 	{
@@ -3893,7 +3881,6 @@ send_ncf_list (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
 	gssize sent = pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
@@ -3902,7 +3889,6 @@ send_ncf_list (
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	if ( sent != (gssize)tpdu_length )
 	{
