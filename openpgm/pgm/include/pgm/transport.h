@@ -279,8 +279,10 @@ int pgm_init (void);
 gchar* pgm_print_tsi (const pgm_tsi_t*);
 int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);
 guint pgm_tsi_hash (gconstpointer);
-gint pgm_tsi_equal (gconstpointer, gconstpointer);
+gboolean pgm_tsi_equal (gconstpointer, gconstpointer);
 guint pgm_power2_log2 (guint);
+
+void pgm_drop_superuser (void);
 
 int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, gsize, struct pgm_sock_mreq*);
 int pgm_transport_bind (pgm_transport_t*);
@@ -317,13 +319,13 @@ int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint
 
 int pgm_set_nonblocking (int filedes[2]);
 
-gsize pgm_transport_send (pgm_transport_t*, const gpointer, gsize, int);
-gsize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int);
-gsize pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, guint, int);
-gsize pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, guint, int);
-gsize pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, guint, int);
+gssize pgm_transport_send (pgm_transport_t*, const gpointer, gsize, int);
+gssize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int);
+gssize pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, guint, int);
+gssize pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, guint, int);
+gssize pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, guint, int);
 
-gsize pgm_transport_send_fragment (pgm_transport_t*, const gpointer, gsize, int, guint32*, guint32*);
+gssize pgm_transport_send_fragment (pgm_transport_t*, const gpointer, gsize, int, guint32*, guint32*);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);

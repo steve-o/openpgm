@@ -33,7 +33,7 @@
 
 
 struct rs_t {
-	int		n, k;		/* RS(n, k) */
+	guint		n, k;		/* RS(n, k) */
 	gf8_t*		GM;		/* Generator Matrix */
 	gf8_t*		RM;		/* Recovery Matrix */
 };
@@ -42,6 +42,12 @@ typedef struct rs_t rs_t;
 
 
 /* globals */
+
+int pgm_rs_create (rs_t**, guint, guint);
+int pgm_rs_destroy (rs_t*);
+int pgm_rs_encode (rs_t*, const gf8_t**, guint, gf8_t*, gsize);
+int pgm_rs_decode_parity_inline (rs_t*, gf8_t**, guint*, gsize);
+int pgm_rs_decode_parity_appended (rs_t*, gf8_t**, guint*, gsize);
 
 
 /* Vector GF(2⁸) plus-equals multiplication.
@@ -54,7 +60,7 @@ gf_vec_addmul (
 	gf8_t*			d,
 	const gf8_t		b,
 	const gf8_t*		s,
-	size_t			len		/* length of vectors */
+	guint			len		/* length of vectors */
 	)
 {
 	unsigned i;
@@ -102,18 +108,18 @@ matmul (
 	const gf8_t*		a,	/* m-by-n */
 	const gf8_t*		b,	/* n-by-p */
 	gf8_t*			c,	/* ∴ m-by-p */
-	const gint		m,
-	const gint		n,
-	const gint		p
+	const guint		m,
+	const guint		n,
+	const guint		p
 	)
 {
-	for (int j = 0; j < m; j++)
+	for (guint j = 0; j < m; j++)
 	{
-		for (int i = 0; i < p; i++)
+		for (guint i = 0; i < p; i++)
 		{
 			gf8_t sum = 0;
 
-			for (int k = 0; k < n; k++)
+			for (guint k = 0; k < n; k++)
 			{
 				sum ^= gfmul( a[ (j * n) + k ], b[ (k * p) + i ] );
 			}
@@ -134,17 +140,17 @@ matinv (
 	const guint		n
 	)
 {
-	int pivot_rows[ n ];
-	int pivot_cols[ n ];
+	guint pivot_rows[ n ];
+	guint pivot_cols[ n ];
 	gboolean pivots[ n ];
 	memset (pivots, 0, sizeof(pivots));
 
 	gf8_t identity[ n ];
 	memset (identity, 0, sizeof(identity));
 
-	for (int i = 0; i < n; i++)
+	for (guint i = 0; i < n; i++)
 	{
-		int row = 0, col = 0;
+		guint row = 0, col = 0;
 
 /* check diagonal for new pivot */
 		if (!pivots[ i ] &&
@@ -154,11 +160,11 @@ matinv (
 		}
 		else
 		{
-			for (int j = 0; j < n; j++)
+			for (guint j = 0; j < n; j++)
 			{
 				if (pivots[ j ]) continue;
 
-				for (int x = 0; x < n; x++)
+				for (guint x = 0; x < n; x++)
 				{
 					if (!pivots[ x ] &&
 						M[ (j * n) + x ])
@@ -177,7 +183,7 @@ found:
 /* pivot */
 		if (row != col)
 		{
-			for (int x = 0; x < n; x++)
+			for (guint x = 0; x < n; x++)
 			{
 				SWAP( M[ (row * n) + x ],
 				      M[ (col * n) + x ] );
@@ -194,7 +200,7 @@ found:
 			gf8_t c = M[ (col * n) + col ];
 			M[ (col * n) + col ] = 1;
 
-			for (int x = 0; x < n; x++)
+			for (guint x = 0; x < n; x++)
 			{
 				M[ (col * n) + x ] = gfdiv( M[ (col * n) + x ], c );
 			}
@@ -204,7 +210,7 @@ found:
 		identity[ col ] = 1;
 		if (memcmp (&M[ (col * n) ], identity, n * sizeof(gf8_t)))
 		{
-			for (	int y = 0, x = 0;
+			for (	guint y = 0, x = 0;
 				x < n;
 				x++, y++ )
 			{
@@ -221,11 +227,11 @@ found:
 	}
 
 /* revert all pivots */
-	for (int i = (n - 1); i >= 0; i--)
+	for (int i = ((int)n - 1); i >= 0; i--)
 	{
 		if (pivot_rows[ i ] != pivot_cols[ i ])
 		{
-			for (int j = 0; j < n; j++)
+			for (guint j = 0; j < n; j++)
 			{
 				SWAP( M[ (j * n) + pivot_rows[ i ] ],
 				      M[ (j * n) + pivot_cols[ i ] ] );
@@ -271,7 +277,7 @@ matinv_vandermonde (
 	memset (P, 0, sizeof(P));
 
 /* copy across second row, i.e. j = 2 */
-	for (int i = 0; i < n; i++)
+	for (guint i = 0; i < n; i++)
 	{
 		P[ i ] = V[ (i * n) + 1 ];
 	}
@@ -280,9 +286,9 @@ matinv_vandermonde (
 	memset (alpha, 0, sizeof(alpha));
 
 	alpha[ n - 1 ] = P[ 0 ];
-	for (int i = 1; i < n; i++)
+	for (guint i = 1; i < n; i++)
 	{
-		for (int j = (n - i); j < (n - 1); j++)
+		for (guint j = (n - i); j < (n - 1); j++)
 		{
 			alpha[ j ] ^= gfmul( P[ i ], alpha[ j + 1 ] );
 		}
@@ -294,19 +300,19 @@ matinv_vandermonde (
 
 	gf8_t b[ n ];
 	b[ n - 1 ] = 1;
-	for (int j = 0; j < n; j++)
+	for (guint j = 0; j < n; j++)
 	{
 		gf8_t xx = P[ j ];
 		gf8_t t = 1;
 
 /* skip first iteration */
-		for (int i = (n - 2); i >= 0; i--)
+		for (int i = ((int)n - 2); i >= 0; i--)
 		{
 			b[ i ] = alpha[ i + 1 ] ^ gfmul( xx, b[ i + 1 ] );
 			t = gfmul( xx, t ) ^ b[ i ];
 		}
 
-		for (int i = 0; i < n; i++)
+		for (guint i = 0; i < n; i++)
 		{
 			V[ (i * n) + j ] = gfdiv ( b[ i ], t );
 		}
@@ -328,8 +334,8 @@ matinv_vandermonde (
 int
 pgm_rs_create (
 	rs_t**			rs_,
-	gint			n,
-	gint			k
+	guint			n,
+	guint			k
 	)
 {
 	g_return_val_if_fail (rs_ != NULL, -EINVAL);
@@ -351,9 +357,9 @@ pgm_rs_create (
 	gf8_t* V = g_malloc0 (n * k * sizeof(gf8_t));
 	gf8_t* p = V + k;
 	V[0] = 1;
-	for (int j = 0; j < (n - 1); j++)
+	for (guint j = 0; j < (n - 1); j++)
 	{
-		for (int i = 0; i < k; i++)
+		for (guint i = 0; i < k; i++)
 		{
 /* the {i, j} entry of V_{k,n} is v_{i,j} = α^^(i×j),
  * where 0 <= i <= k - 1 and 0 <= j <= n - 1.
@@ -386,7 +392,7 @@ pgm_rs_create (
 /* 4: set identity matrix for original data
  */
 	p = rs->GM;
-	for (int i = 0; i < k; i++)
+	for (guint i = 0; i < k; i++)
 	{
 		p[ (i * k) + i ] = 1;
 	}
@@ -425,15 +431,15 @@ int
 pgm_rs_encode (
 	rs_t*		rs,
 	const gf8_t*	src[],		/* length rs_t::k */
-	int		offset,
+	guint		offset,
 	gf8_t*		dst,
-	int		len
+	gsize		len
 	)
 {
 	g_assert (offset >= rs->k && offset < rs->n);	/* parity packet */
 
 	memset (dst, 0, len);
-	for (int i = 0; i < rs->k; i++)
+	for (guint i = 0; i < rs->k; i++)
 	{
 		gf8_t c = rs->GM[ (offset * rs->k) + i ];
 		gf_vec_addmul (dst, c, src[i], len);
@@ -449,13 +455,13 @@ int
 pgm_rs_decode_parity_inline (
 	rs_t*		rs,
 	gf8_t*		block[],	/* length rs_t::k */
-	int		offsets[],	/* offsets within FEC block, 0 < offset < n */
-	int		len		/* packet length */
+	guint		offsets[],	/* offsets within FEC block, 0 < offset < n */
+	gsize		len		/* packet length */
 	)
 {
 /* create new recovery matrix from generator
  */
-	for (int i = 0; i < rs->k; i++)
+	for (guint i = 0; i < rs->k; i++)
 	{
 		if (offsets[i] < rs->k) {
 			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(gf8_t));
@@ -471,13 +477,13 @@ pgm_rs_decode_parity_inline (
 	gf8_t* repairs[ rs->k ];
 
 /* multiply out, through the length of erasures[] */
-	for (int j = 0; j < rs->k; j++)
+	for (guint j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
 
 		gf8_t* erasure = repairs[ j ] = g_slice_alloc0 (len);
-		for (int i = 0; i < rs->k; i++)
+		for (guint i = 0; i < rs->k; i++)
 		{
 			gf8_t* src = block[ i ];
 			gf8_t c = rs->RM[ (j * rs->k) + i ];
@@ -486,7 +492,7 @@ pgm_rs_decode_parity_inline (
 	}
 
 /* move repaired over parity packets */
-	for (int j = 0; j < rs->k; j++)
+	for (guint j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
@@ -506,13 +512,13 @@ int
 pgm_rs_decode_parity_appended (
 	rs_t*		rs,
 	gf8_t*		block[],	/* length rs_t::n, the FEC block */
-	int		offsets[],	/* ordered index of packets */
-	int		len		/* packet length */
+	guint		offsets[],	/* ordered index of packets */
+	gsize		len		/* packet length */
 	)
 {
 /* create new recovery matrix from generator
  */
-	for (int i = 0; i < rs->k; i++)
+	for (guint i = 0; i < rs->k; i++)
 	{
 		if (offsets[i] < rs->k) {
 			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(gf8_t));
@@ -526,14 +532,14 @@ pgm_rs_decode_parity_appended (
 	matinv (rs->RM, rs->k);
 
 /* multiply out, through the length of erasures[] */
-	for (int j = 0; j < rs->k; j++)
+	for (guint j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
 
 		int p = rs->k;
 		gf8_t* erasure = block[ j ];
-		for (int i = 0; i < rs->k; i++)
+		for (guint i = 0; i < rs->k; i++)
 		{
 			gf8_t* src;
 			if (offsets[ i ] < rs->k)

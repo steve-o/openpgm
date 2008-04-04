@@ -761,8 +761,7 @@ out:
  * until the transmission group has been completely committed.  this allows the packet
  * data to be used in parity calculations to recover the missing packets.
  */
-gpointer* global_async;
-int
+gsize
 pgm_rxw_readv (
 	pgm_rxw_t*		r,
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */

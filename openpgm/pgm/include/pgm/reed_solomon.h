@@ -25,12 +25,12 @@
 
 G_BEGIN_DECLS
 
-int pgm_rs_create (gpointer*, int, int);
+int pgm_rs_create (gpointer*, guint, guint);
 int pgm_rs_destroy (gpointer);
 
-int pgm_rs_encode (gpointer, const void**, int, void*, int);
-int pgm_rs_decode_parity_inline (gpointer, void**, int*, int);
-int pgm_rs_decode_parity_appended (gpointer, void**, int*, int);
+int pgm_rs_encode (gpointer, const void**, guint, void*, gsize);
+int pgm_rs_decode_parity_inline (gpointer, void**, guint*, gsize);
+int pgm_rs_decode_parity_appended (gpointer, void**, guint*, gsize);
 
 #if 0
 int pgm_rs_bch_create (gpointer*, int, int);
