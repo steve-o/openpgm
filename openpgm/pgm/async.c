@@ -61,10 +61,11 @@ static gboolean pgm_src_check (GSource*);
 static gboolean pgm_src_dispatch (GSource*, GSourceFunc, gpointer);
 
 static GSourceFuncs g_pgm_watch_funcs = {
-	pgm_src_prepare,
-	pgm_src_check,
-	pgm_src_dispatch,
-	NULL
+	.prepare		= pgm_src_prepare,
+	.check			= pgm_src_check,
+	.dispatch		= pgm_src_dispatch,
+	.finalize		= NULL,
+	.closure_callback	= NULL
 };
 
 

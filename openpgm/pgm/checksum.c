@@ -40,7 +40,7 @@ pgm_inet_checksum (
 	)
 {
 	guint nleft = len;
-	const guint16 *w = (guint16*)addr;
+	const guint16 *w = (const guint16*)addr;
 	guint answer;
 	int sum = csum;
 
@@ -49,7 +49,7 @@ pgm_inet_checksum (
 		nleft -= 2;
 	}
 	if (nleft == 1)
-		sum += g_htons(*(guchar *)w<<8);
+		sum += g_htons(*(const guchar *)w<<8);
 
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
@@ -67,7 +67,7 @@ pgm_compat_csum_partial (
 	guint32		csum
 	)
 {
-	const guint16 *w = (guint16*)addr;
+	const guint16 *w = (const guint16*)addr;
 	guint32 sum = csum;
 	guint16 odd_byte;
 
@@ -80,7 +80,7 @@ pgm_compat_csum_partial (
 
 	if (len) {
 		odd_byte = 0;
-		*(guchar*)&odd_byte = *(guchar*)w;
+		*(guchar*)&odd_byte = *(const guchar*)w;
 		sum += odd_byte;
 	}
 

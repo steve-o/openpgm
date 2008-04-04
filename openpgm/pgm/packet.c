@@ -248,16 +248,16 @@ pgm_parse (
 
 /* now decode PGM packet types */
 	gpointer pgm_data = pgm_header + 1;
-	pgm_length -= sizeof(pgm_header);		/* can equal zero for SPMR's */
+	gssize pgm_data_length = (gssize)pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
 
-	if (pgm_length < 0) {
+	if (pgm_data_length < 0) {
 		puts ("bad packet length :(");
 		return -1;
 	}
 
 	*header = pgm_header;
 	*packet = pgm_data;
-	*packet_len = pgm_length;
+	*packet_len = (gsize)pgm_data_length;
 
 	return 0;
 }
@@ -339,7 +339,7 @@ pgm_print_packet (
 /* IP options */
 	if ((ip_header_length - sizeof(struct iphdr)) > 0) {
 		printf (", options (");
-		pgm_ipopt_print((gpointer)(ip + 1), ip_header_length - sizeof(struct iphdr));
+		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct iphdr));
 		printf (" )");
 	}
 
@@ -384,8 +384,8 @@ pgm_print_packet (
 	}
 
 	printf ("%s.%s > %s.%s: PGM\n",
-		pgm_gethostbyaddr((struct in_addr*)&ip->saddr), pgm_udpport_string(pgm_header->pgm_sport),
-		pgm_gethostbyaddr((struct in_addr*)&ip->daddr), pgm_udpport_string(pgm_header->pgm_dport));
+		pgm_gethostbyaddr((const struct in_addr*)&ip->saddr), pgm_udpport_string(pgm_header->pgm_sport),
+		pgm_gethostbyaddr((const struct in_addr*)&ip->daddr), pgm_udpport_string(pgm_header->pgm_dport));
 
 	printf ("type: %s [%i] (version=%i, reserved=%i)\n"
 		"options: extensions=%s, network-significant=%s, parity packet=%s (variable size=%s)\n"
@@ -423,24 +423,24 @@ pgm_print_packet (
 
 /* now decode PGM packet types */
 	gpointer pgm_data = pgm_header + 1;
-	pgm_length -= sizeof(pgm_header);		/* can equal zero for SPMR's */
+	gssize pgm_data_length = (gssize)pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
 
-	if (pgm_length < 0) {
+	if (pgm_data_length < 0) {
 		puts ("bad packet length :(");
 		return FALSE;
 	}
 
 	gboolean err = FALSE;
 	switch (pgm_header->pgm_type) {
-	case PGM_SPM:	err = pgm_print_spm (pgm_header, pgm_data, pgm_length); break;
-	case PGM_POLL:	err = pgm_print_poll (pgm_header, pgm_data, pgm_length); break;
-	case PGM_POLR:	err = pgm_print_polr (pgm_header, pgm_data, pgm_length); break;
-	case PGM_ODATA:	err = pgm_print_odata (pgm_header, pgm_data, pgm_length); break;
-	case PGM_RDATA:	err = pgm_print_rdata (pgm_header, pgm_data, pgm_length); break;
-	case PGM_NAK:	err = pgm_print_nak (pgm_header, pgm_data, pgm_length); break;
-	case PGM_NNAK:	err = pgm_print_nnak (pgm_header, pgm_data, pgm_length); break;
-	case PGM_NCF:	err = pgm_print_ncf (pgm_header, pgm_data, pgm_length); break;
-	case PGM_SPMR:	err = pgm_print_spmr (pgm_header, pgm_data, pgm_length); break;
+	case PGM_SPM:	err = pgm_print_spm (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_POLL:	err = pgm_print_poll (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_POLR:	err = pgm_print_polr (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_ODATA:	err = pgm_print_odata (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_RDATA:	err = pgm_print_rdata (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_NAK:	err = pgm_print_nak (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_NNAK:	err = pgm_print_nnak (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_NCF:	err = pgm_print_ncf (pgm_header, pgm_data, (gsize)pgm_data_length); break;
+	case PGM_SPMR:	err = pgm_print_spmr (pgm_header, pgm_data, (gsize)pgm_data_length); break;
 	default:	puts ("unknown packet type :("); break;
 	}
 
@@ -1262,17 +1262,17 @@ pgm_gethostbyaddr (
 	} else {
 		host_string = g_strdup(he->h_name);
 	}
-	g_hash_table_insert (hosts, (gpointer)ap, (gpointer)host_string);
+	g_hash_table_insert (hosts, ap, host_string);
 	return host_string;
 }
 
 void
 pgm_ipopt_print (
-	gpointer		ipopt,
+	gconstpointer		ipopt,
 	gsize			length
 	)
 {
-	char* op = ipopt;
+	const char* op = ipopt;
 
 	while (length)
 	{

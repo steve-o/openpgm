@@ -40,7 +40,7 @@ unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len)
         count = len >> 1;               /* nr of 16-bit words.. */
         if (count) {
                 if (2 & (unsigned long) buff) {
-                        result += *(unsigned short *)buff;
+                        result += *(const unsigned short *)buff;
                         count--;
                         len -= 2;
                         buff += 2;
@@ -50,7 +50,7 @@ unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len)
                         unsigned long zero;
                         unsigned count64;
                         if (4 & (unsigned long) buff) {
-                                result += *(unsigned int *) buff;
+                                result += *(const unsigned int *) buff;
                                 count--;
                                 len -= 4;
                                 buff += 4;
@@ -83,7 +83,7 @@ unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len)
                                 asm("addq %1,%0\n\t"
                                     "adcq %2,%0\n"
                                             : "=r" (result)
-                                    : "m" (*(unsigned long *)buff),
+                                    : "m" (*(const unsigned long *)buff),
                                     "r" (zero),  "0" (result));
                                 --count;
                                         buff += 8;
@@ -92,12 +92,12 @@ unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len)
                                                   result&0xffffffff);
 
                         if (len & 4) {
-                                result += *(unsigned int *) buff;
+                                result += *(const unsigned int *) buff;
                                 buff += 4;
                         }
                 }
                 if (len & 2) {
-                        result += *(unsigned short *) buff;
+                        result += *(const unsigned short *) buff;
                         buff += 2;
                 }
         }
