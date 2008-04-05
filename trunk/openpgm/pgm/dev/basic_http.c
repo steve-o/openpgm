@@ -58,8 +58,10 @@ static gboolean on_mark (gpointer);
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
 
 
-static void
-usage (const char* bin)
+G_GNUC_NORETURN static void
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -p <port>       : IP port for web interface\n");
@@ -68,8 +70,8 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
 	puts ("basic_http");
@@ -125,7 +127,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	puts ("on_signal");
@@ -135,7 +137,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	puts ("startup.");
@@ -173,7 +175,7 @@ on_startup (
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
@@ -188,9 +190,9 @@ on_mark (
 
 static void
 default_callback (
-		SoupServerContext*	context,
-		SoupMessage*		msg,
-		gpointer		data
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*		msg,
+	G_GNUC_UNUSED gpointer	data
 		)
 {
 	char *path;

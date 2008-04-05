@@ -36,8 +36,8 @@
 
 
 struct tests {
-	double (*test_func)(int, int);
-	char*	name;
+	double	      (*test_func)(int, int);
+	const char*	name;
 };
 
 
@@ -45,8 +45,10 @@ struct tests {
 
 double test_basic_txw (int, int);
 
-static void
-usage (const char* bin)
+G_GNUC_NORETURN static void
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	exit (1);
@@ -54,8 +56,8 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
 	puts ("basic_txw");
@@ -94,7 +96,7 @@ main (
         do {
                 p2 = test_payload;
                 do {
-                        for (int c = 1; c <= test_count; c++)
+                        for (int test = 1; test <= test_count; test++)
                         {
                                 printf (",%s@%ib/%i", p->name, *p2, c);
                         }
@@ -111,7 +113,7 @@ main (
                 do {
                         p2 = test_payload;
                         do {
-                                for (int c = 1; c <= 3; c++)
+                                for (int test = 1; test <= 3; test++)
                                 {
                                         printf (",%g", p->test_func (*p3, *p2) );
                                 }
@@ -127,9 +129,9 @@ main (
 
 double
 test_basic_txw (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	gpointer txw;

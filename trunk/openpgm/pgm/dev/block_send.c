@@ -50,7 +50,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = ";226.0.0.1";
+static const char* g_network = ";226.0.0.1";
 
 static int g_odata_interval = 1 * 1000;
 static int g_payload = 0;
@@ -70,7 +70,7 @@ static void send_odata (void);
 static gboolean on_odata_timer (gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -139,7 +139,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	g_message ("on_signal");
@@ -149,7 +149,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	g_message ("startup.");
@@ -214,7 +214,7 @@ on_startup (
 
 static gboolean
 on_odata_timer (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	send_odata ();
@@ -249,7 +249,7 @@ send_odata (void)
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;

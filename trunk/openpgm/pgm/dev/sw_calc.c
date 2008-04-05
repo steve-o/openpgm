@@ -41,8 +41,8 @@
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	G_GNUC_UNUSED int	argc,
+	G_GNUC_UNUSED char   *argv[]
 	)
 {
 	puts ("sw_calc");
@@ -67,7 +67,7 @@ main (
 		{	10,	30,	30,	FALSE	},
 	};
 
-	for (int i = 0; i < G_N_ELEMENTS(tests); i++)
+	for (unsigned i = 0; i < G_N_ELEMENTS(tests); i++)
 	{
 		guint32 a = tests[i][0], b = tests[i][1], l = tests[i][2], expected = tests[i][3];
 

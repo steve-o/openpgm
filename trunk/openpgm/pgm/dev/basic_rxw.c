@@ -44,8 +44,8 @@
 
 
 struct tests {
-	double (*test_func)(int, int);
-	char*	name;
+	double	      (*test_func)(int, int);
+	const char*	name;
 };
 
 
@@ -60,8 +60,10 @@ double test_reverse (int, int);
 double test_fill (int, int);
 
 
-static void
-usage (const char* bin)
+G_GNUC_NORETURN static void
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	exit (1);
@@ -69,8 +71,8 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
 	puts ("basic_rxw");
@@ -116,9 +118,9 @@ main (
         do {
                 p2 = test_payload;
                 do {
-                        for (int c = 1; c <= test_count; c++)
+                        for (int test = 1; test <= test_count; test++)
                         {
-                                printf (",%s@%ib/%i", p->name, *p2, c);
+                                printf (",%s@%ib/%i", p->name, *p2, test);
                         }
                 } while (*(++p2));
         } while ((++p)->name);
@@ -133,7 +135,7 @@ main (
                 do {
                         p2 = test_payload;
                         do {
-                                for (int c = 1; c <= test_count; c++)
+                                for (int test = 1; test <= test_count; test++)
                                 {
                                         printf (",%g", p->test_func (*p3, *p2) );
                                 }
@@ -147,18 +149,18 @@ main (
 	return 0;
 }
 
-int
+static int
 on_pgm_data (
-	gpointer	data,
-	guint		length,
-	gpointer	param
+	G_GNUC_UNUSED gpointer data,
+	G_GNUC_UNUSED guint length,
+	G_GNUC_UNUSED gpointer param
 	)
 {
 	g_trace ("on_pgm_data()");
 	return 0;
 }
 
-int
+static int
 flush_rxw (
 	pgm_rxw_t*	r
 	)
@@ -178,7 +180,7 @@ flush_rxw (
 	return 0;
 }
 
-int
+static int
 backoff_state_foreach (
 	pgm_rxw_t*	r
 	)
@@ -209,8 +211,8 @@ backoff_state_foreach (
 
 double
 test_basic_rxw (
-	int	count,
-	int	size_per_entry
+	int		count,
+	int		size_per_entry
 	)
 {
 	struct timeval start, now;
@@ -258,8 +260,8 @@ test_basic_rxw (
 
 double
 test_jump (
-	int	count,
-	int	size_per_entry
+	int		count,
+	int		size_per_entry
 	)
 {
 	struct timeval start, now;
@@ -306,8 +308,8 @@ test_jump (
 
 double
 test_reverse (
-	int	count,
-	int	size_per_entry
+	int		count,
+	int		size_per_entry
 	)
 {
 	struct timeval start, now;
@@ -359,8 +361,8 @@ test_reverse (
 
 double
 test_fill (
-	int	count,
-	int	size_per_entry
+	int		count,
+	int		size_per_entry
 	)
 {
 	struct timeval start, now;
