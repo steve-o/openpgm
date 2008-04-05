@@ -26,6 +26,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
 
@@ -74,7 +77,7 @@ static const char *tests[] =
 		};
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -105,11 +108,11 @@ main (
 	signal (SIGSEGV, on_sigsegv);
 	signal(SIGHUP, SIG_IGN);
 
-	for (char** p = (char**)tests; *p; p++)
+	for (const char** p = tests; *p; p++)
 	{
 		struct sockaddr devices[10], receive_groups[10], send_group;
 
-		printf ("#%i: [%s]\n", (int)( p - (char**)tests ), *p);
+		printf ("#%i: [%s]\n", (int)( p - tests ), *p);
 		int retval = pgm_if_parse_network (*p, AF_UNSPEC, devices, receive_groups, &send_group, 10);
 
 		if (retval == 0)

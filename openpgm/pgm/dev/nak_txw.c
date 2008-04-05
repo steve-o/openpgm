@@ -36,8 +36,8 @@
 
 
 struct tests {
-	double (*test_func)(int, int);
-	char*	name;
+	double	      (*test_func)(int, int);
+	const char*	name;
 };
 
 
@@ -45,7 +45,7 @@ struct tests {
 
 double test_basic_txw (int, int);
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);

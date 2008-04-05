@@ -46,10 +46,10 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static const char* g_network = "226.0.0.1";
 static struct ip_mreqn g_mreqn;
 
-static char* g_payload = "banana man!";
+static const char* g_payload = "banana man!";
 
 /* MTU is messy, 1500 for regular ethernet, 9000 for jumbo but various jumbo
  * sizes in between are only supported by some hardware, similarly some IP
@@ -75,8 +75,10 @@ static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
 
-static void
-usage (const char* bin)
+G_GNUC_NORETURN static void
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options] message...\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
@@ -86,8 +88,8 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
 	puts ("basic_send");
@@ -160,7 +162,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	puts ("on_signal");
@@ -170,7 +172,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	int e;
@@ -340,7 +342,7 @@ on_startup (
 
 static gboolean
 on_shutdown (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	puts ("on_shutdown()");
@@ -436,7 +438,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
