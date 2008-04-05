@@ -68,7 +68,7 @@ struct app_session {
 #define G_LOG_DOMAIN	"app"
 
 static int g_port = 7500;
-static char* g_network = ";239.192.0.1";
+static const char* g_network = ";239.192.0.1";
 
 static guint g_max_tpdu = 1500;
 static guint g_sqns = 100 * 1000;
@@ -88,7 +88,7 @@ static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -165,7 +165,7 @@ static void
 destroy_session (
                 gpointer        key,		/* session name */
                 gpointer        value,		/* transport_session object */
-                gpointer        user_data
+                G_GNUC_UNUSED gpointer        user_data
                 )
 {
 	printf ("destroying transport \"%s\"\n", (char*)key);
@@ -179,7 +179,7 @@ destroy_session (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	g_message ("on_signal");
@@ -189,7 +189,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	g_message ("startup.");
@@ -214,8 +214,8 @@ on_startup (
 static int
 on_data (
 	gpointer	data,
-	guint		len,
-	gpointer	user_data
+	G_GNUC_UNUSED guint		len,
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	printf ("DATA: %s\n", (char*)data);
@@ -224,7 +224,7 @@ on_data (
 	return 0;
 }
 
-void
+static void
 session_create (
 	char*		name
 	)
@@ -270,7 +270,7 @@ err_free:
 	g_free(sess);
 }
 
-void
+static void
 session_set_nak_bo_ivl (
 	char*		name,
 	guint		nak_bo_ivl		/* milliseconds */
@@ -287,7 +287,7 @@ session_set_nak_bo_ivl (
 	puts ("READY");
 }
 
-void
+static void
 session_set_nak_rpt_ivl (
 	char*		name,
 	guint		nak_rpt_ivl		/* milliseconds */
@@ -304,7 +304,7 @@ session_set_nak_rpt_ivl (
 	puts ("READY");
 }
 
-void
+static void
 session_set_nak_rdata_ivl (
 	char*		name,
 	guint		nak_rdata_ivl		/* milliseconds */
@@ -321,7 +321,7 @@ session_set_nak_rdata_ivl (
 	puts ("READY");
 }
 
-void
+static void
 session_set_nak_ncf_retries (
 	char*		name,
 	guint		nak_ncf_retries
@@ -338,7 +338,7 @@ session_set_nak_ncf_retries (
 	puts ("READY");
 }
 
-void
+static void
 session_set_nak_data_retries (
 	char*		name,
 	guint		nak_data_retries
@@ -355,7 +355,7 @@ session_set_nak_data_retries (
 	puts ("READY");
 }
 
-void
+static void
 session_set_txw_max_rte (
 	char*		name,
 	guint		txw_max_rte
@@ -372,7 +372,7 @@ session_set_txw_max_rte (
 	puts ("READY");
 }
 
-void
+static void
 session_set_fec (
 	char*		name,
 	guint		default_n,
@@ -390,7 +390,7 @@ session_set_fec (
 	puts ("READY");
 }
 
-void
+static void
 session_bind (
 	char*		name
 	)
@@ -431,7 +431,7 @@ session_bind (
 	puts ("READY");
 }
 
-void
+static void
 session_send (
 	char*		name,
 	char*		string
@@ -453,7 +453,7 @@ session_send (
 	puts ("READY");
 }
 
-void
+static void
 session_listen (
 	char*		name
 	)
@@ -472,7 +472,7 @@ session_listen (
 	puts ("READY");
 }
 
-void
+static void
 session_destroy (
 	char*		name
 	)
@@ -508,8 +508,8 @@ session_destroy (
 static gboolean
 on_stdin_data (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	gchar* str = NULL;
@@ -532,7 +532,7 @@ on_stdin_data (
 		regmatch_t pmatch[10];
 
 /* create transport */
-		char *re = "^create[[:space:]]+([[:alnum:]]+)$";
+		const char *re = "^create[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
 		{
@@ -766,7 +766,7 @@ out:
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;

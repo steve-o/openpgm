@@ -75,7 +75,7 @@ struct sim_session {
 #define G_LOG_DOMAIN	"sim"
 
 static int g_port = 7500;
-static char* g_network = ";239.192.0.1";
+static const char* g_network = ";239.192.0.1";
 
 static int g_max_tpdu = 1500;
 static int g_sqns = 100 * 1000;
@@ -97,7 +97,7 @@ static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 void generic_net_send_nak (guint8, char*, pgm_tsi_t*, pgm_sqn_list_t*);
 	
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -174,7 +174,7 @@ static void
 destroy_session (
                 gpointer        key,		/* session name */
                 gpointer        value,		/* transport_session object */
-                gpointer        user_data
+                G_GNUC_UNUSED gpointer        user_data
                 )
 {
 	printf ("destroying transport \"%s\"\n", (char*)key);
@@ -188,7 +188,7 @@ destroy_session (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	g_message ("on_signal");
@@ -198,7 +198,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	g_message ("startup.");
@@ -220,7 +220,7 @@ on_startup (
 	return FALSE;
 }
 
-int
+static int
 fake_pgm_transport_create (
 	pgm_transport_t**	transport_,
 	pgm_gsi_t*		gsi,
@@ -331,7 +331,7 @@ err_destroy:
 static gboolean
 on_io_data (
         GIOChannel* source,
-        GIOCondition condition,
+        G_GNUC_UNUSED GIOCondition condition,
         gpointer data
         )
 {
@@ -427,8 +427,8 @@ out:
 static gboolean
 on_io_error (
         GIOChannel* source,
-        GIOCondition condition,
-        gpointer data
+        G_GNUC_UNUSED GIOCondition condition,
+        G_GNUC_UNUSED gpointer data
         )
 {
         puts ("on_error.");
@@ -440,7 +440,7 @@ on_io_error (
         return FALSE;
 }
 
-int
+static int
 fake_pgm_transport_bind (
 	pgm_transport_t*	transport
 	)
@@ -595,10 +595,10 @@ out:
 	return retval;
 }
 
-int
+static int
 fake_pgm_transport_destroy (
 	pgm_transport_t*	transport,
-	gboolean		flush
+	G_GNUC_UNUSED gboolean		flush
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
@@ -628,7 +628,7 @@ fake_pgm_transport_destroy (
 	return 0;
 }
 
-void
+static void
 session_create (
 	char*		name,
 	gboolean	is_fake
@@ -680,7 +680,7 @@ err_free:
 	g_free(sess);
 }
 
-void
+static void
 session_set_fec (
 	char*		name,
 	guint		default_n,
@@ -698,7 +698,7 @@ session_set_fec (
 	puts ("READY");
 }
 
-void
+static void
 session_bind (
 	char*		name
 	)
@@ -760,18 +760,17 @@ session_bind (
 	puts ("READY");
 }
 
-static inline ssize_t
-pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, size_t len, int flags, const struct sockaddr* to, socklen_t tolen)
+static inline gssize
+pgm_sendto (pgm_transport_t* transport, gboolean ra, const void* buf, gsize len, int flags, const struct sockaddr* to, socklen_t tolen)
 {
-        int retval;
         GStaticMutex* mutex = ra ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
         int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
 
         g_static_mutex_lock (mutex);
-        retval = sendto (sock, buf, len, flags, to, tolen);
+        ssize_t sent = sendto (sock, buf, len, flags, to, tolen);
         g_static_mutex_unlock (mutex);
 
-        return retval > 0 ? tolen : retval;
+        return sent > 0 ? (gssize)len : (gssize)sent;
 }
 
 static int
@@ -806,7 +805,7 @@ brokn_send_apdu_unlocked (
         pgm_transport_t*        transport,
         const gchar*            buf,
         gsize                   count,  
-        int                     flags           /* MSG_DONTWAIT = non-blocking */)
+        G_GNUC_UNUSED int                     flags           /* MSG_DONTWAIT = non-blocking */)
 {
         int retval = 0;
         guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
@@ -896,11 +895,11 @@ brokn_send_apdu_unlocked (
 
         pgm_reset_heartbeat_spm (transport);
 
-out:
         return retval;
 }
 
-int brokn_send (
+static int
+brokn_send (
         pgm_transport_t*        transport,      
         const gchar*            data,
         gsize                   len,
@@ -917,7 +916,7 @@ int brokn_send (
         return brokn_send_apdu_unlocked (transport, data, len, flags);
 }
 
-void
+static void
 session_send (
 	char*		name,
 	char*		string,
@@ -945,7 +944,7 @@ session_send (
 	puts ("READY");
 }
 
-void
+static void
 session_destroy (
 	char*		name
 	)
@@ -992,7 +991,7 @@ session_destroy (
 	puts ("READY");
 }
 
-void
+static void
 net_send_data (
 	char*		name,
 	guint8		pgm_type,		/* PGM_ODATA or PGM_RDATA */
@@ -1055,7 +1054,7 @@ net_send_data (
  *
  * all payloads must be the same length unless variable TSDU support is enabled.
  */
-void
+static void
 net_send_parity (
 	char*		name,
 	guint8		pgm_type,		/* PGM_ODATA or PGM_RDATA */
@@ -1083,7 +1082,7 @@ net_send_parity (
 
 /* check length of payload array */
 	gboolean is_var_pktlen = FALSE;
-	int i;
+	guint i;
 	for (i = 0; src[i]; i++)
 	{
 		guint tsdu_length = strlen(src[i]) + 1;
@@ -1096,7 +1095,7 @@ net_send_parity (
 	}
 
 	if ( i != transport->rs_k ) {
-		printf ("FAILED: payload array length %i, whilst rs_k is %i.\n", i, transport->rs_k);
+		printf ("FAILED: payload array length %u, whilst rs_k is %u.\n", i, transport->rs_k);
 		return;
 	}
 
@@ -1159,7 +1158,7 @@ net_send_parity (
 	puts ("READY");
 }
 
-void
+static void
 net_send_spm (
 	char*		name,
 	guint32		spm_sqn,
@@ -1237,7 +1236,7 @@ net_send_spm (
 	puts ("READY");
 }
 
-void
+static void
 net_send_spmr (
 	char*		name,
 	pgm_tsi_t*	tsi
@@ -1321,7 +1320,7 @@ net_send_spmr (
  * we use the peer list to bypass extracting it from the monitor output.
  */
 
-void
+static void
 net_send_ncf (
 	char*		name,
 	pgm_tsi_t*	tsi,
@@ -1400,7 +1399,7 @@ net_send_ncf (
 						+ ( (sqn_list->len-1) * sizeof(guint32) );
 		struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 		opt_nak_list->opt_reserved = 0;
-		for (int i = 1; i < sqn_list->len; i++) {
+		for (guint i = 1; i < sqn_list->len; i++) {
 			opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
 		}
 	}
@@ -1420,7 +1419,7 @@ net_send_ncf (
 	puts ("READY");
 }
 
-void
+static void
 net_send_nak (
 	char*		name,
 	pgm_tsi_t*	tsi,
@@ -1500,7 +1499,7 @@ net_send_nak (
 						+ ( (sqn_list->len-1) * sizeof(guint32) );
 		struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 		opt_nak_list->opt_reserved = 0;
-		for (int i = 1; i < sqn_list->len; i++) {
+		for (guint i = 1; i < sqn_list->len; i++) {
 			opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
 		}
 	}
@@ -1523,8 +1522,8 @@ net_send_nak (
 static int
 on_data (
         gpointer        data,
-        guint           len,
-        gpointer        user_data
+        G_GNUC_UNUSED guint           len,
+        G_GNUC_UNUSED gpointer        user_data
         )
 {
         printf ("DATA: %s\n", (char*)data);
@@ -1539,8 +1538,8 @@ on_data (
 static gboolean
 on_stdin_data (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	gchar* str = NULL;
@@ -1561,7 +1560,7 @@ on_stdin_data (
 
 		regex_t preg;
 		regmatch_t pmatch[10];
-		char *re;
+		const char *re;
 
 /* endpoint simulator specific: */
 
@@ -1888,7 +1887,7 @@ out:
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
