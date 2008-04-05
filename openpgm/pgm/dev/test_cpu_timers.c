@@ -40,7 +40,7 @@
 /* read time stamp counter, count of ticks from processor reset.
  */
 
-__inline__ uint64_t
+static __inline__ uint64_t
 rdtsc (void)
 {
 	uint32_t lo, hi;
@@ -52,7 +52,7 @@ rdtsc (void)
 }
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);

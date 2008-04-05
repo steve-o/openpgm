@@ -35,8 +35,8 @@
 
 
 struct tests {
-	double (*test_func)(int, int);
-	char*	name;
+	double	      (*test_func)(int, int);
+	const char*	name;
 };
 
 
@@ -56,8 +56,10 @@ double test_alloc_byte_array (int, int);
 double test_alloc_sequence (int, int);
 #endif
 
-static void
-usage (const char* bin)
+G_GNUC_NORETURN static void
+usage (
+	const char*	bin
+	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	exit (1);
@@ -65,8 +67,8 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
 	puts ("basic_container");
@@ -115,9 +117,9 @@ main (
 	do {
 		p2 = test_payload;
 		do {
-			for (int c = 1; c <= test_count; c++)
+			for (int test = 1; test <= test_count; test++)
 			{
-				printf (",%s@%ib/%i", p->name, *p2, c);
+				printf (",%s@%ib/%i", p->name, *p2, test);
 			}
 		} while (*(++p2));
 	} while ((++p)->name);
@@ -132,7 +134,7 @@ main (
 		do {
 			p2 = test_payload;
 			do {
-				for (int c = 1; c <= 3; c++)
+				for (int test = 1; test <= 3; test++)
 				{
 					printf (",%g", p->test_func (*p3, *p2) );
 				}
@@ -146,21 +148,21 @@ main (
 	return 0;
 }
 
-void
+static void
 _list_iterator (
-		gpointer data,
-		gpointer user_data
-		)
+	gpointer	data,
+	gpointer	user_data
+	)
 {
 	if ( *(int*)user_data )
 		g_slice_free1 ( *(int*)user_data, data );
 }
 
-void
+static void
 _list_free_iterator (
-		gpointer data,
-		gpointer user_data
-		)
+	gpointer	data,
+	gpointer	user_data
+	)
 {
 	if ( *(int*)user_data )
 		free (data);
@@ -168,9 +170,9 @@ _list_free_iterator (
 
 double
 test_control (
-		int count,
-		int size_per_entry
-		)
+	G_GNUC_UNUSED int count,
+	G_GNUC_UNUSED int size_per_entry
+	)
 {
 #if 1
 	char *p = g_slice_alloc (100);
@@ -185,9 +187,9 @@ test_control (
 
 double
 test_alloc_list (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GList *list = NULL;
@@ -212,9 +214,9 @@ test_alloc_list (
 
 double
 test_alloc_list_malloc (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GList *list = NULL;
@@ -239,9 +241,9 @@ test_alloc_list_malloc (
 
 double
 test_alloc_list_stack (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GList *list = NULL;
@@ -276,9 +278,9 @@ test_alloc_list_stack (
 
 double
 test_alloc_slist (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GSList *list = NULL;
@@ -313,9 +315,9 @@ test_alloc_slist (
 
 double
 test_alloc_queue (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GQueue* queue = NULL;
@@ -353,9 +355,9 @@ test_alloc_queue (
 #if HAVE_GLIB_SEQUENCE
 double
 test_alloc_sequence (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GSequence* sequence = NULL;
@@ -391,21 +393,21 @@ test_alloc_sequence (
 }
 #endif
 
-void
+static void
 _hash_iterator (
-		gpointer key,
-		gpointer value,
-		gpointer user_data
-		)
+	G_GNUC_UNUSED gpointer key,
+	gpointer	value,
+	gpointer	user_data
+	)
 {
 	g_slice_free1 ( *(int*)user_data + sizeof(int), value );
 }
 
 double
 test_alloc_hash (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GHashTable* hash = NULL;
@@ -442,9 +444,9 @@ test_alloc_hash (
 
 double
 test_alloc_ptr_array (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GPtrArray* array = NULL;
@@ -481,9 +483,9 @@ test_alloc_ptr_array (
 
 double
 test_alloc_byte_array (
-		int count,
-		int size_per_entry
-		)
+	int		count,
+	int		size_per_entry
+	)
 {
 	struct timeval start, now;
 	GByteArray* array = NULL;

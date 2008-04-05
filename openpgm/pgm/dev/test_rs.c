@@ -35,11 +35,11 @@
 
 /* globals */
 
-static int g_max_tpdu = 1400;	/* minus PGM and FEC overhead */
+static guint g_max_tpdu = 1400;	/* minus PGM and FEC overhead */
 
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -72,26 +72,26 @@ main (
 	pgm_time_init();
 
 /* Reed-Solomon code */
-	int n = 255;		/* [ k+1 .. 255 ] */
-	int k = 64;		/* [ 2 .. 128 ] */
+	guint n = 255;		/* [ k+1 .. 255 ] */
+	guint k = 64;		/* [ 2 .. 128 ] */
 
 	const gchar source[] = "Ayumi Lee (Hangul: 이 아유미, Japanese name: Ito Ayumi 伊藤亜由美, born August 25, 1984, Tottori Prefecture, Japan[1]), from former Korean girl-group Sugar, was raised in Japan for much of her younger life and is the reason for her Japanese accent, although she is now fluent in both languages. Although Ayumi's name is commonly believed to be Japanese in origin, she has explained that her name is hanja-based.";
-	int source_len = strlen (source);		/* chars: g_utf8_strlen() */
-	int block_len = 0;
-	int source_offset = 0;
+	guint source_len = strlen (source);		/* chars: g_utf8_strlen() */
+	guint block_len = 0;
+	guint source_offset = 0;
 	guint8* packet_block[k];
-	for (int i = 0; i < k; i++) {
+	for (guint i = 0; i < k; i++) {
 		packet_block[i] = g_malloc0 (g_max_tpdu);
 
 /* fill with source text */
-		int packet_offset = 0;
+		guint packet_offset = 0;
 		do {
-			int copy_len = MIN( source_len - source_offset, g_max_tpdu - packet_offset );
+			guint copy_len = MIN( source_len - source_offset, g_max_tpdu - packet_offset );
 /* adjust for unicode borders */
-			gchar* p = (gchar*)source + source_offset + copy_len;
+			const gchar* p = source + source_offset + copy_len;
 			if (*p)
 			{
-				int new_copy_len = g_utf8_find_prev_char (source + source_offset, p + 1) - (source + source_offset);
+				guint new_copy_len = g_utf8_find_prev_char (source + source_offset, p + 1) - (source + source_offset);
 				if (new_copy_len != copy_len) {
 					printf ("ERROR: shuffle on packet border not implemented.\n");
 				}
@@ -125,8 +125,8 @@ main (
  *   erasure_index is offset in FEC block of parity packet [k .. n-1]
  *   erasure is offset of erased packet [0 .. k-1]
  */
-	int erasure_index = k;
-	int erasure = g_random_int_range (0, k);
+	guint erasure_index = k;
+	guint erasure = g_random_int_range (0, k);
 
 	pgm_time_t start, end, elapsed;
 
@@ -151,8 +151,8 @@ main (
 		"--------\n" );
 	printf ("erased %i packet at %i\n", 1, erasure);
 
-	int offsets[ k ];
-	for (int i = 0; i < k; i++)
+	guint offsets[ k ];
+	for (guint i = 0; i < k; i++)
 		offsets[i] = i;
 	offsets[erasure] = erasure_index;
 	g_slice_free1 (g_max_tpdu, packet_block[erasure]);
@@ -162,6 +162,7 @@ main (
 	start = pgm_time_update_now();
 
 	int retval = pgm_rs_decode_parity_inline (rs, (void**)(void*)packet_block, offsets, g_max_tpdu);
+	g_assert( retval == 0 );
 
 	end = pgm_time_update_now();
 	elapsed = end - start;
@@ -170,7 +171,7 @@ main (
 /* display final string */
 	gchar* final = g_malloc ( (k * g_max_tpdu) + 1 );
 	final[0] = 0;
-	for (int i = 0; i < k; i++)
+	for (guint i = 0; i < k; i++)
 		strncat (final, (char*)packet_block[i], g_max_tpdu);
 	final[ k * g_max_tpdu ] = 0;
 	printf ("decoded string:\n[%.15s...]%" G_GSIZE_FORMAT " cf. %i\n", final, strlen(final), block_len);
@@ -183,7 +184,7 @@ main (
 	g_free (final);
 
 /* clean up */
-	for (int i = 0; i < k; i++) {
+	for (guint i = 0; i < k; i++) {
 		g_slice_free1 (g_max_tpdu, packet_block[i]);
 		packet_block[i] = NULL;
 	}

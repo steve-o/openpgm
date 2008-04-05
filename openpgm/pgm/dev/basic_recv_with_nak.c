@@ -141,7 +141,7 @@ struct hoststat {
 
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static const char* g_network = "226.0.0.1";
 static struct ip_mreqn g_mreqn;
 
 static int g_http = 4968;
@@ -186,8 +186,10 @@ static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
 static int tsi_callback (SoupServerContext*, SoupMessage*, gpointer);
 
 
-static void
-usage (const char* bin)
+G_GNUC_NORETURN static void
+usage (
+	const char*	bin
+	)
 {
         fprintf (stderr, "Usage: %s [options]\n", bin);
         fprintf (stderr, "  -p <port>       : IP port for web interface\n");
@@ -198,8 +200,8 @@ usage (const char* bin)
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	int		argc,
+	char*		argv[]
 	)
 {
 	puts ("basic_recv_with_nak");
@@ -280,7 +282,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	puts ("on_signal");
@@ -290,7 +292,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	int e, e2, e3;
@@ -496,7 +498,7 @@ on_startup (
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
@@ -508,10 +510,10 @@ on_mark (
 
 static gboolean
 snap_stat (
-		gpointer	key,
-		gpointer	value,
-		gpointer	user_data
-		)
+	G_GNUC_UNUSED gpointer key,
+	gpointer	value,
+	G_GNUC_UNUSED gpointer user_data
+	)
 {
 	struct hoststat* hoststat = value;
 
@@ -538,7 +540,7 @@ snap_stat (
 
 static gboolean
 on_snap (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	if (!g_hosts) return TRUE;
@@ -553,9 +555,9 @@ on_snap (
 
 static gboolean
 on_io_data (
-	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	GIOChannel*	source,
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 //	printf ("on_data: ");
@@ -663,7 +665,7 @@ puts ("SPM");
 		err = pgm_verify_spm (pgm_header, packet, packet_length);
 		hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
 
-if (!err && (hoststat->nla.s_addr != NULL)) {
+if (!err && (hoststat->nla.s_addr != 0)) {
 	printf ("senders nla: %s\n", inet_ntoa(hoststat->nla));
 } else {
 	puts ("invalid nla");
@@ -892,9 +894,9 @@ printf ("RDATA: #%u, rxw_lead %lu rxw_trail %lu\n",
 
 static gboolean
 on_io_error (
-	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	GIOChannel*	source,
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	puts ("on_error.");
@@ -908,7 +910,7 @@ on_io_error (
 
 static void
 send_nak (
-	int sequence_number,
+	int		sequence_number,
 	struct in_addr* source
 	)
 {
@@ -1003,11 +1005,11 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 static gchar*
 print_tsi (
-	gconstpointer v
+	gconstpointer	v
 	)
 {
-	guint8* gsi = (guint8*)v;
-	guint16 source_port = *(guint16*)(gsi + 6);
+	const guint8* gsi = v;
+	guint16 source_port = *(const guint16*)(gsi + 6);
 	static char buf[sizeof("000.000.000.000.000.000.00000")];
 	snprintf(buf, sizeof(buf), "%i.%i.%i.%i.%i.%i.%i",
 		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
@@ -1019,7 +1021,7 @@ print_tsi (
 
 static guint
 tsi_hash (
-	gconstpointer v
+	gconstpointer	v
 	)
 {
 	return g_str_hash(print_tsi(v));
@@ -1042,10 +1044,10 @@ tsi_equal (
 
 static void
 robots_callback (
-                SoupServerContext*      context,
-                SoupMessage*            msg,
-                gpointer                data
-                )
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*	msg,
+	G_GNUC_UNUSED gpointer data
+	)
 {
 	soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
 				WWW_ROBOTS, strlen(WWW_ROBOTS));
@@ -1053,10 +1055,10 @@ robots_callback (
 
 static void
 css_callback (
-                SoupServerContext*      context,
-                SoupMessage*            msg,
-                gpointer                data
-                )
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*	msg,
+	G_GNUC_UNUSED gpointer data
+	)
 {
 	soup_message_set_response (msg, "text/css", SOUP_BUFFER_STATIC,
 				WWW_CSS, strlen(WWW_CSS));
@@ -1065,10 +1067,10 @@ css_callback (
 
 static void
 default_callback (
-                SoupServerContext*      context,
-                SoupMessage*            msg,
-                gpointer                data
-                )
+	SoupServerContext* context,
+	SoupMessage*	msg,
+	gpointer	data
+	)
 {
         char *path;
 
@@ -1096,8 +1098,8 @@ default_callback (
 
 static const char*
 print_si (
-		float* v
-		)
+	float*		v
+	)
 {
 	static char prefix[5] = "";
 
@@ -1119,10 +1121,10 @@ print_si (
 
 static gboolean
 index_tsi_row (
-		gpointer	key,
-		gpointer	value,
-		gpointer	user_data
-		)
+	G_GNUC_UNUSED gpointer key,
+	gpointer	value,
+	gpointer	user_data
+	)
 {
 	struct hoststat* hoststat = value;
 	GString *response = user_data;
@@ -1159,10 +1161,10 @@ index_tsi_row (
 
 static gboolean
 index_nets_row (
-		gpointer	key,
-		gpointer	value,
-		gpointer	user_data
-		)
+	G_GNUC_UNUSED gpointer key,
+	gpointer	value,
+	gpointer	user_data
+	)
 {
 	struct netstat* netstat = value;
 	GString *response = user_data;
@@ -1181,10 +1183,10 @@ index_nets_row (
 
 static void
 index_callback (
-                SoupServerContext*      context,
-                SoupMessage*            msg,
-                gpointer                data
-                )
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*	msg,
+	G_GNUC_UNUSED gpointer data
+	)
 {
 	GString *response;
 
@@ -1238,11 +1240,11 @@ index_callback (
 
 static char*
 print_stat (
-		const char*	name,
-		struct stat*	stat,
-		float		secs,
-		const char*	el		/* xml element name */
-		)
+	const char*	name,
+	struct stat*	stat,
+	float		secs,
+	const char*	el		/* xml element name */
+	)
 {
 	static char buf[1024];
 	float bitrate = ((float)( stat->bytes - stat->snap_bytes ) * 8.0 / secs);
@@ -1270,10 +1272,10 @@ print_stat (
 
 static int
 tsi_callback (
-                SoupServerContext*      context,
-                SoupMessage*            msg,
-                gpointer                data
-                )
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*	msg,
+	G_GNUC_UNUSED gpointer data
+	)
 {
         char *path;
 	struct hoststat* hoststat = NULL;

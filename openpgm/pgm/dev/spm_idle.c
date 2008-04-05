@@ -46,7 +46,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static const char* g_network = "226.0.0.1";
 static struct ip_mreqn g_mreqn;
 
 static int g_io_channel_sock = -1;
@@ -63,7 +63,7 @@ static void send_spm (void);
 static gboolean on_spm_timer (gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -139,7 +139,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	puts ("on_signal");
@@ -149,7 +149,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	int e;
@@ -320,7 +320,7 @@ on_startup (
 
 static gboolean
 on_spm_timer (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	send_spm ();
@@ -407,7 +407,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;

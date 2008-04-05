@@ -55,7 +55,7 @@ struct tsi {
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "226.0.0.1";
+static const char* g_network = "226.0.0.1";
 static struct ip_mreqn g_mreqn;
 
 static int g_spm_ambient_interval = 10 * 1000;
@@ -96,7 +96,7 @@ static gboolean on_spm_timer (gpointer);
 static gboolean on_odata_timer (gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -189,7 +189,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	puts ("on_signal");
@@ -199,7 +199,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	int e, e2, e3;
@@ -404,8 +404,8 @@ on_startup (
 static gboolean
 on_io_data (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	printf ("on_data: ");
@@ -462,8 +462,8 @@ on_io_data (
 static gboolean
 on_io_error (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	puts ("on_error.");
@@ -477,7 +477,7 @@ on_io_error (
 
 static gboolean
 on_nak (
-	struct pgm_header*	header,
+	G_GNUC_UNUSED struct pgm_header*	header,
 	gpointer		data,
 	gsize			len
 	)
@@ -530,8 +530,8 @@ print_tsi (
 	gconstpointer v
 	)
 {
-	guint8* gsi = (guint8*)v;
-	guint16 source_port = *(guint16*)(gsi + 6);
+	const guint8* gsi = v;
+	guint16 source_port = *(const guint16*)(gsi + 6);
 	static char buf[sizeof("000.000.000.000.000.000.00000")];
 	snprintf(buf, sizeof(buf), "%i.%i.%i.%i.%i.%i.%i",
 		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
@@ -549,7 +549,7 @@ print_tsi (
 
 static gboolean
 on_spm_timer (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	send_spm ();
@@ -648,7 +648,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 static gboolean
 on_odata_timer (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	send_odata ();
@@ -838,7 +838,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
