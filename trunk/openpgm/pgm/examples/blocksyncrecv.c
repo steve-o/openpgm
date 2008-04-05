@@ -49,7 +49,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "";
+static const char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -64,7 +64,7 @@ static gboolean on_startup (void);
 static int on_data (gpointer, guint, gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (
 	const char*	bin
 	)
@@ -137,7 +137,7 @@ main (
 
 static void
 on_signal (
-	int		signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	g_message ("on_signal");
@@ -226,7 +226,7 @@ static int
 on_data (
 	gpointer	data,
 	guint		len,
-	gpointer	user_data
+	G_GNUC_UNUSED gpointer user_data
 	)
 {
 	static struct timeval tv;
