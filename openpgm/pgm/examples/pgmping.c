@@ -59,7 +59,7 @@ struct idle_source {
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "";
+static const char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_odata_rate = 10;					/* 10 per second */
@@ -96,7 +96,7 @@ static gboolean idle_check (GSource*);
 static gboolean idle_dispatch (GSource*, GSourceFunc, gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -214,7 +214,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	g_message ("on_signal");
@@ -224,7 +224,7 @@ on_signal (
 
 static gboolean
 on_shutdown (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	g_message ("shutdown");
@@ -234,7 +234,7 @@ on_shutdown (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	g_message ("startup.");
@@ -323,10 +323,11 @@ on_startup (
 
 // create an idle source with non-glib timing
 		static GSourceFuncs idle_funcs = {
-			idle_prepare,
-			idle_check,
-			idle_dispatch,
-			NULL
+			.prepare	= idle_prepare,
+			.check		= idle_check,
+			.dispatch	= idle_dispatch,
+			.finalize	= NULL,
+			.closure_callback = NULL
 		};
 		GSource* source = g_source_new (&idle_funcs, sizeof(struct idle_source));
 		struct idle_source* idle_source = (struct idle_source*)source;
@@ -379,8 +380,8 @@ idle_check (
 static gboolean
 idle_dispatch (
 	GSource*	source,
-	GSourceFunc	callback,
-	gpointer	user_data
+	G_GNUC_UNUSED GSourceFunc	callback,
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	struct idle_source* idle_source = (struct idle_source*)source;
@@ -395,7 +396,7 @@ idle_dispatch (
 
 static gboolean
 on_odata_timer (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	send_odata ();
@@ -423,9 +424,9 @@ send_odata (void)
 
 static gboolean
 on_io_data (
-	GIOChannel*	source,
-	GIOCondition	condition,
-	gpointer	data
+	G_GNUC_UNUSED GIOChannel*	source,
+	G_GNUC_UNUSED GIOCondition	condition,
+	G_GNUC_UNUSED gpointer	data
 	)
 {
 	int len = 0;
@@ -445,7 +446,7 @@ static int
 on_data (
 	gpointer	data,
 	guint		len,
-	gpointer	user_data
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	if (len == 100)
@@ -463,7 +464,7 @@ on_data (
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
