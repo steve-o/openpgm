@@ -114,7 +114,7 @@ struct hoststat {
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "239.192.0.1";
+static const char* g_network = "239.192.0.1";
 static struct in_addr g_filter = { 0 };
 
 static GIOChannel* g_io_channel = NULL;
@@ -122,14 +122,14 @@ static GIOChannel* g_stdin_channel = NULL;
 
 static GMainLoop* g_loop = NULL;
 
-static int g_status_height = 6;
-static int g_info_width = 10;
+static guint g_status_height = 6;
+static guint g_info_width = 10;
 static time_t start_time;
 
 static struct ncurses_window *g_peer, *g_info, *g_status, *g_active;
 static GList* g_window_list = NULL;
-static int g_paint_interval = ( 1 * 1000 ) / 15;
-static int g_snap_interval = 10 * 1000;
+static guint g_paint_interval = ( 1 * 1000 ) / 15;
+static guint g_snap_interval = 10 * 1000;
 static struct timeval g_last_snap, g_now;
 
 static GList* g_status_list = NULL;
@@ -167,8 +167,8 @@ static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	G_GNUC_UNUSED int	argc,
+	G_GNUC_UNUSED char   *argv[]
 	)
 {
 	puts ("pgmtop");
@@ -375,7 +375,7 @@ print_si (
 
 static gboolean
 tsi_row (
-	gpointer		key,
+	G_GNUC_UNUSED gpointer		key,
 	gpointer		value,
 	gpointer		user_data
 	)
@@ -485,7 +485,7 @@ resize_info (
 
 static void
 paint_status (
-	struct ncurses_window*	nw
+	G_GNUC_UNUSED struct ncurses_window*	nw
 	)
 {
 	if (!g_status_list) return;
@@ -543,7 +543,7 @@ write_statusv (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	puts ("on_signal");
@@ -556,7 +556,7 @@ on_signal (
 
 static void
 on_winch (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	paint_ncurses ();
@@ -564,7 +564,7 @@ on_winch (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	int e;
@@ -696,7 +696,7 @@ on_startup (
 
 static gboolean
 on_paint (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	paint_ncurses();
@@ -724,8 +724,8 @@ tsi_equal (
 static gboolean
 on_io_data (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	struct timeval now;
@@ -929,8 +929,8 @@ on_io_data (
 static gboolean
 on_io_error (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	puts ("on_error.");
@@ -947,9 +947,9 @@ on_io_error (
 
 static gboolean
 on_stdin_data (
-	GIOChannel*	source,
-	GIOCondition	condition,
-	gpointer	data
+	G_GNUC_UNUSED GIOChannel*	source,
+	G_GNUC_UNUSED GIOCondition	condition,
+	G_GNUC_UNUSED gpointer	data
 	)
 {
 	int ch = wgetch (g_active->window);
@@ -974,9 +974,9 @@ out:
 
 static gboolean
 snap_stat (
-	gpointer	key,
+	G_GNUC_UNUSED gpointer	key,
 	gpointer	value,
-	gpointer	user_data
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	struct hoststat* hoststat = value;

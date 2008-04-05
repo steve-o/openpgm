@@ -66,7 +66,7 @@ static pgm_transport_t* g_transport = NULL;
 static gboolean create_transport (void);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options] message\n", bin);

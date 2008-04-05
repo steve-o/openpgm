@@ -63,7 +63,7 @@
 
 
 static int g_port = 7500;
-static char* g_network = "";
+static const char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -82,7 +82,7 @@ static gpointer receiver_thread (gpointer);
 static int on_msgv (pgm_msgv_t*, guint, gpointer);
 
 
-static void
+G_GNUC_NORETURN static void
 usage (
 	const char*	bin
 	)
@@ -175,7 +175,7 @@ main (
 
 static void
 on_signal (
-	int		signum
+	G_GNUC_UNUSED int signum
 	)
 {
 	g_message ("on_signal");
@@ -185,7 +185,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer	data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	g_message ("startup.");
@@ -273,7 +273,7 @@ on_startup (
 
 static gboolean
 on_mark (
-	gpointer	data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
@@ -339,7 +339,7 @@ static int
 on_msgv (
 	pgm_msgv_t*	msgv,		/* an array of msgvs */
 	guint		len,
-	gpointer	user_data
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	static struct timeval tv;
@@ -349,14 +349,14 @@ on_msgv (
                         ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
                         len);
 
-        int i = 0;
+        guint i = 0;
         while (len)
         {
                 struct iovec* msgv_iov = msgv->msgv_iov;
 
-		int apdu_len = 0;
+		guint apdu_len = 0;
 		struct iovec* p = msgv_iov;
-		for (int j = 0; j < msgv->msgv_iovlen; j++) {	/* # elements */
+		for (guint j = 0; j < msgv->msgv_iovlen; j++) {	/* # elements */
 			apdu_len += p->iov_len;
 			p++;
 		}
@@ -365,9 +365,9 @@ on_msgv (
 		char buf[1024];
 		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
 		if (msgv->msgv_iovlen > 1) {
-			g_message ("\t%i: \"%s\" ... (%i bytes)", ++i, buf, apdu_len);
+			g_message ("\t%u: \"%s\" ... (%u bytes)", ++i, buf, apdu_len);
 		} else {
-			g_message ("\t%i: \"%s\" (%i bytes)", ++i, buf, apdu_len);
+			g_message ("\t%u: \"%s\" (%u bytes)", ++i, buf, apdu_len);
 		}
 
 		len -= apdu_len;
