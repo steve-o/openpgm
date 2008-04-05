@@ -40,38 +40,38 @@
 #define OPTIONS_TOTAL_LEN(x)	*(guint16*)( ((char*)(x)) + sizeof(guint16) )
 
 
-int verify_ip_header (struct iphdr*, int);
+int verify_ip_header (struct iphdr*, guint);
 void print_ip_header (struct iphdr*);
-int verify_pgm_header (struct pgm_header*, int);
+int verify_pgm_header (struct pgm_header*, guint);
 void print_pgm_header (struct pgm_header*);
-int verify_spm (struct pgm_header*, char*, int);
+int verify_spm (struct pgm_header*, char*, guint);
 void print_spm (struct pgm_header*, char*);
-int verify_poll (struct pgm_header*, char*, int);
+int verify_poll (struct pgm_header*, char*, guint);
 void print_poll (struct pgm_header*, char*);
-int verify_polr (struct pgm_header*, char*, int);
+int verify_polr (struct pgm_header*, char*, guint);
 void print_polr (struct pgm_header*, char*);
-int verify_odata (struct pgm_header*, char*, int);
+int verify_odata (struct pgm_header*, char*, guint);
 void print_odata (struct pgm_header*, char*);
-int verify_rdata (struct pgm_header*, char*, int);
+int verify_rdata (struct pgm_header*, char*, guint);
 void print_rdata (struct pgm_header*, char*);
-static int generic_verify_nak (const char*, struct pgm_header*, char*, int);
+static int generic_verify_nak (const char*, struct pgm_header*, char*, guint);
 static void generic_print_nak (const char*, struct pgm_header*, char*);
-int verify_nak (struct pgm_header*, char*, int);
+int verify_nak (struct pgm_header*, char*, guint);
 void print_nak (struct pgm_header*, char*);
-int verify_nnak (struct pgm_header*, char*, int);
+int verify_nnak (struct pgm_header*, char*, guint);
 void print_nnak (struct pgm_header*, char*);
-int verify_ncf (struct pgm_header*, char*, int);
+int verify_ncf (struct pgm_header*, char*, guint);
 void print_ncf (struct pgm_header*, char*);
-int verify_spmr (struct pgm_header*, char*, int);
+int verify_spmr (struct pgm_header*, char*, guint);
 void print_spmr (struct pgm_header*, char*);
-int verify_options (char*, int);
+int verify_options (char*, guint);
 void print_options (char*);
 
 
 int
 monitor_packet (
 	char*	data,
-	int	len
+	guint	len
 	)
 {
 	static int count = 0;
@@ -88,8 +88,8 @@ monitor_packet (
 		goto out;
 	}
 
-	struct pgm_header* pgm = data + (ip->ihl * 4);
-	int pgm_len = len - (ip->ihl * 4);
+	struct pgm_header* pgm = (struct pgm_header*)(data + (ip->ihl * 4));
+	guint pgm_len = len - (ip->ihl * 4);
 	if (verify_pgm_header (pgm, pgm_len) < 0) {
 		puts ("\t\"valid\": false");
 		retval = -1;
@@ -97,17 +97,17 @@ monitor_packet (
 	}
 
 	char* pgm_data = (char*)(pgm + 1);
-	pgm_len -= sizeof(struct pgm_header);
+	guint pgm_data_len = pgm_len - sizeof(struct pgm_header);
 	switch (pgm->pgm_type) {
-	case PGM_SPM:	retval = verify_spm (pgm, pgm_data, pgm_len); break;
-	case PGM_POLL:	retval = verify_poll (pgm, pgm_data, pgm_len); break;
-	case PGM_POLR:	retval = verify_polr (pgm, pgm_data, pgm_len); break;
-	case PGM_ODATA:	retval = verify_odata (pgm, pgm_data, pgm_len); break;
-	case PGM_RDATA:	retval = verify_rdata (pgm, pgm_data, pgm_len); break;
-	case PGM_NAK:	retval = verify_nak (pgm, pgm_data, pgm_len); break;
-	case PGM_NNAK:	retval = verify_nnak (pgm, pgm_data, pgm_len); break;
-	case PGM_NCF:	retval = verify_ncf (pgm, pgm_data, pgm_len); break;
-	case PGM_SPMR:	retval = verify_spmr (pgm, pgm_data, pgm_len); break;
+	case PGM_SPM:	retval = verify_spm (pgm, pgm_data, pgm_data_len); break;
+	case PGM_POLL:	retval = verify_poll (pgm, pgm_data, pgm_data_len); break;
+	case PGM_POLR:	retval = verify_polr (pgm, pgm_data, pgm_data_len); break;
+	case PGM_ODATA:	retval = verify_odata (pgm, pgm_data, pgm_data_len); break;
+	case PGM_RDATA:	retval = verify_rdata (pgm, pgm_data, pgm_data_len); break;
+	case PGM_NAK:	retval = verify_nak (pgm, pgm_data, pgm_data_len); break;
+	case PGM_NNAK:	retval = verify_nnak (pgm, pgm_data, pgm_data_len); break;
+	case PGM_NCF:	retval = verify_ncf (pgm, pgm_data, pgm_data_len); break;
+	case PGM_SPMR:	retval = verify_spmr (pgm, pgm_data, pgm_data_len); break;
 	}
 
 	if (retval < 0) {
@@ -142,7 +142,7 @@ out:
 int
 verify_ip_header (
 	struct iphdr*	ip,
-	int		len
+	guint		len
 	)
 {
 /* minimum size should be IP header plus PGM header */
@@ -192,7 +192,7 @@ verify_ip_header (
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
-	int packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+	guint packet_length = g_ntohs(ip->tot_len);	/* total packet length */
 	if (len < packet_length) {			/* redundant: often handled in kernel */
 		printf ("\t\"message\": \"IP: truncated IP packet: header reports %i actual length %i bytes.\",\n", (int)len, (int)packet_length);
 		return -1;
@@ -254,7 +254,7 @@ print_ip_header (
 int
 verify_pgm_header (
 	struct pgm_header*	pgm,
-	int		pgm_len
+	guint		pgm_len
 	)
 {
 
@@ -369,7 +369,7 @@ int
 verify_spm (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	int retval = 0;
@@ -383,7 +383,7 @@ verify_spm (
 
 	struct pgm_spm* spm = (struct pgm_spm*)data;
 	char* opt_offset = (char*)(spm + 1);
-	int opt_len = len - sizeof(spm);
+	guint opt_len = len - sizeof(spm);
 
 	switch (g_ntohs(spm->spm_nla_afi)) {
 	case AFI_IP6:
@@ -483,9 +483,9 @@ print_spm (
 
 int
 verify_poll (
-	struct pgm_header*	header,
-	char*			data,
-	int			len
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED char*			data,
+	G_GNUC_UNUSED guint			len
 	)
 {
 	return -1;
@@ -493,8 +493,8 @@ verify_poll (
 
 void
 print_poll (
-	struct pgm_header*	header,
-	char*			data
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED char*			data
 	)
 {
 }
@@ -514,9 +514,9 @@ print_poll (
 
 int
 verify_polr (
-	struct pgm_header*	header,
-	char*			data,
-	int			len
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED char*			data,
+	G_GNUC_UNUSED guint			len
 	)
 {
 	return -1;
@@ -524,8 +524,8 @@ verify_polr (
 
 void
 print_polr (
-	struct pgm_header*	header,
-	char*			data
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED char*			data
 	)
 {
 }
@@ -549,7 +549,7 @@ int
 verify_odata (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	int retval = 0;
@@ -561,12 +561,12 @@ verify_odata (
 	}
 
 	char* tsdu = data + sizeof(struct pgm_data);
-	int tsdu_len = len - sizeof(struct pgm_data);
+	guint tsdu_len = len - sizeof(struct pgm_data);
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		retval = verify_options (tsdu, tsdu_len);
 
-		int opt_total_len = g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
+		guint opt_total_len = g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
 		tsdu     += opt_total_len;
 		tsdu_len -= opt_total_len;
 	}
@@ -622,7 +622,7 @@ int
 verify_rdata (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	int retval = 0;
@@ -634,12 +634,12 @@ verify_rdata (
 	}
 
 	char* tsdu = data + sizeof(struct pgm_data);
-	int tsdu_len = len - sizeof(struct pgm_data);
+	guint tsdu_len = len - sizeof(struct pgm_data);
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
 		retval = verify_options (tsdu, tsdu_len);
 
-		int opt_total_len = g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
+		guint opt_total_len = g_ntohs( OPTIONS_TOTAL_LEN(tsdu) );
 		tsdu     += opt_total_len;
 		tsdu_len -= opt_total_len;
 	}
@@ -716,7 +716,7 @@ int
 verify_nak (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	return generic_verify_nak ("NAK", header, data, len);
@@ -726,7 +726,7 @@ int
 verify_ncf (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	return generic_verify_nak ("NCF", header, data, len);
@@ -736,7 +736,7 @@ int
 verify_nnak (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	return generic_verify_nak ("NNAK", header, data, len);
@@ -745,9 +745,9 @@ verify_nnak (
 static int
 generic_verify_nak (
 	const char*		name,		/* upper case */
-	struct pgm_header*	header,
+	G_GNUC_UNUSED struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	int retval = 0;
@@ -947,13 +947,13 @@ int
 verify_spmr (
 	struct pgm_header*	header,
 	char*			data,
-	int			len
+	guint			len
 	)
 {
 	int retval = 0;
 
 	char* opt_offset = data;
-	int opt_len = len;
+	guint opt_len = len;
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT)
@@ -992,7 +992,7 @@ print_spmr (
 int
 verify_options (
 	char*		data,
-	int		len
+	guint		len
 	)
 {
 	int retval = 0;
@@ -1030,10 +1030,10 @@ verify_options (
 	}
 
 /* iterate through options (max 16) */
-	int count = 0;
-	int total_length = g_ntohs(opt_len->opt_total_length);
+	guint count = 0;
+	guint total_length = g_ntohs(opt_len->opt_total_length);
 
-	int opt_counters[256];
+	guint opt_counters[256];
 	memset (&opt_counters, 0, sizeof(opt_counters));
 
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)data;
@@ -1045,7 +1045,7 @@ verify_options (
 			goto out;
 		}
 		opt_header = (struct pgm_opt_header*)( ((char*)opt_header) + opt_header->opt_length );
-		if ((total_length - opt_header->opt_length) < 0) {
+		if (((int)total_length - (int)opt_header->opt_length) < 0) {
 			printf ("\t\"message\": \"PGM options: option #%i shorter than embedded size.\",\n", count + 1);
 			retval = -1;
 			goto out;
@@ -1078,7 +1078,7 @@ verify_options (
 
 		case PGM_OPT_NAK_LIST:
 		{
-			int list_len = opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8);
+			guint list_len = opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8);
 			if (list_len & 1) {
 				printf ("\t\"message\": \"PGM options: OPT_NAK_LIST invalid odd length: %i bytes.\",\n", opt_header->opt_length);
 				retval = -1;
@@ -1179,7 +1179,7 @@ print_options (
 			char* end = (char*)opt_header + opt_header->opt_length;
 			printf ("\t\t\t\t\"type\": \"OPT_NAK_LIST%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
 			char sqns[1024] = "";
-			int i = 0;
+			guint i = 0;
 			do {
 				char sqn[1024];
 				sprintf (sqn, "%s%i", (i>0)?", ":"", g_ntohl(opt_nak_list->opt_sqn[i]));

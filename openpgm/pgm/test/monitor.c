@@ -44,7 +44,7 @@
 /* globals */
 
 static int g_port = 7500;
-static char* g_network = "239.192.0.1";
+static const char* g_network = "239.192.0.1";
 static struct in_addr g_filter = { 0 };
 
 static GIOChannel* g_io_channel = NULL;
@@ -63,8 +63,8 @@ static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
 int
 main (
-	int	argc,
-	char   *argv[]
+	G_GNUC_UNUSED int	argc,
+	G_GNUC_UNUSED char   *argv[]
 	)
 {
 	puts ("monitor");
@@ -113,7 +113,7 @@ main (
 
 static void
 on_signal (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	puts ("on_signal");
@@ -123,7 +123,7 @@ on_signal (
 
 static gboolean
 on_startup (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	int e;
@@ -252,7 +252,7 @@ on_startup (
 
 static gboolean
 on_mark (
-	gpointer data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	static struct timeval tv;
@@ -266,8 +266,8 @@ on_mark (
 static gboolean
 on_io_data (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	char buffer[4096];
@@ -291,8 +291,8 @@ on_io_data (
 static gboolean
 on_io_error (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	puts ("on_error.");
@@ -310,8 +310,8 @@ on_io_error (
 static gboolean
 on_stdin_data (
 	GIOChannel* source,
-	GIOCondition condition,
-	gpointer data
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	gchar* str = NULL;
