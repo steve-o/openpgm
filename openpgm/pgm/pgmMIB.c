@@ -184,7 +184,8 @@ pgmSourceTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
 	netsnmp_variable_list*	put_index_data,		/* answer */
-	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+	netsnmp_iterator_info*	mydata			/* iinfo on init() */
+	)
 {
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
@@ -207,7 +208,8 @@ pgmSourceTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
@@ -244,7 +246,8 @@ pgmSourceTable_get_next_data_point(
 static void
 pgmSourceTable_free_loop_context (
 	void*			my_loop_context,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 	g_free(context);
@@ -255,10 +258,11 @@ pgmSourceTable_free_loop_context (
 
 static int
 pgmSourceTable_handler (
-	netsnmp_mib_handler*		handler,
-	netsnmp_handler_registration*	reginfo,
+	G_GNUC_UNUSED netsnmp_mib_handler* handler,
+	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
 	netsnmp_agent_request_info*	reqinfo,
-	netsnmp_request_info*		requests)
+	netsnmp_request_info*		requests
+	)
 {
 	switch (reqinfo->mode)
 	{
@@ -403,7 +407,8 @@ pgmSourceConfigTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
 	netsnmp_variable_list*	put_index_data,		/* answer */
-	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+	netsnmp_iterator_info*	mydata			/* iinfo on init() */
+	)
 {
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
@@ -426,7 +431,8 @@ pgmSourceConfigTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
@@ -463,7 +469,8 @@ pgmSourceConfigTable_get_next_data_point(
 static void
 pgmSourceConfigTable_free_loop_context (
 	void*			my_loop_context,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 	g_free(context);
@@ -474,10 +481,11 @@ pgmSourceConfigTable_free_loop_context (
 
 static int
 pgmSourceConfigTable_handler (
-	netsnmp_mib_handler*		handler,
-	netsnmp_handler_registration*	reginfo,
+	G_GNUC_UNUSED netsnmp_mib_handler* handler,
+	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
 	netsnmp_agent_request_info*	reqinfo,
-	netsnmp_request_info*		requests)
+	netsnmp_request_info*		requests
+	)
 {
 	switch (reqinfo->mode)
 	{
@@ -715,7 +723,8 @@ pgmSourcePerformanceTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
 	netsnmp_variable_list*	put_index_data,		/* answer */
-	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+	netsnmp_iterator_info*	mydata			/* iinfo on init() */
+	)
 {
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
@@ -738,7 +747,8 @@ pgmSourcePerformanceTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
@@ -775,7 +785,8 @@ pgmSourcePerformanceTable_get_next_data_point(
 static void
 pgmSourcePerformanceTable_free_loop_context (
 	void*			my_loop_context,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 	g_free(context);
@@ -786,10 +797,11 @@ pgmSourcePerformanceTable_free_loop_context (
 
 static int
 pgmSourcePerformanceTable_handler (
-	netsnmp_mib_handler*		handler,
-	netsnmp_handler_registration*	reginfo,
+	G_GNUC_UNUSED netsnmp_mib_handler* handler,
+	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
 	netsnmp_agent_request_info*	reqinfo,
-	netsnmp_request_info*		requests)
+	netsnmp_request_info*		requests
+	)
 {
 	switch (reqinfo->mode)
 	{
@@ -1204,7 +1216,8 @@ pgmReceiverTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
 	netsnmp_variable_list*	put_index_data,		/* answer */
-	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+	netsnmp_iterator_info*	mydata			/* iinfo on init() */
+	)
 {
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
@@ -1249,7 +1262,8 @@ pgmReceiverTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
@@ -1317,7 +1331,8 @@ pgmReceiverTable_get_next_data_point(
 static void
 pgmReceiverTable_free_loop_context (
 	void*			my_loop_context,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 
@@ -1335,10 +1350,11 @@ pgmReceiverTable_free_loop_context (
 
 static int
 pgmReceiverTable_handler (
-	netsnmp_mib_handler*		handler,
-	netsnmp_handler_registration*	reginfo,
+	G_GNUC_UNUSED netsnmp_mib_handler* handler,
+	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
 	netsnmp_agent_request_info*	reqinfo,
-	netsnmp_request_info*		requests)
+	netsnmp_request_info*		requests
+	)
 {
 	switch (reqinfo->mode)
 	{
@@ -1498,7 +1514,8 @@ pgmReceiverConfigTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
 	netsnmp_variable_list*	put_index_data,		/* answer */
-	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+	netsnmp_iterator_info*	mydata			/* iinfo on init() */
+	)
 {
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
@@ -1541,7 +1558,8 @@ pgmReceiverConfigTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
@@ -1609,7 +1627,8 @@ pgmReceiverConfigTable_get_next_data_point(
 static void
 pgmReceiverConfigTable_free_loop_context (
 	void*			my_loop_context,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 
@@ -1627,10 +1646,11 @@ pgmReceiverConfigTable_free_loop_context (
 
 static int
 pgmReceiverConfigTable_handler (
-	netsnmp_mib_handler*		handler,
-	netsnmp_handler_registration*	reginfo,
+	G_GNUC_UNUSED netsnmp_mib_handler* handler,
+	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
 	netsnmp_agent_request_info*	reqinfo,
-	netsnmp_request_info*		requests)
+	netsnmp_request_info*		requests
+	)
 {
 	switch (reqinfo->mode)
 	{
@@ -1841,7 +1861,8 @@ pgmReceiverPerformanceTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
 	netsnmp_variable_list*	put_index_data,		/* answer */
-	netsnmp_iterator_info*	mydata)			/* iinfo on init() */
+	netsnmp_iterator_info*	mydata			/* iinfo on init() */
+	)
 {
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
@@ -1884,7 +1905,8 @@ pgmReceiverPerformanceTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
@@ -1951,7 +1973,8 @@ pgmReceiverPerformanceTable_get_next_data_point(
 static void
 pgmReceiverPerformanceTable_free_loop_context (
 	void*			my_loop_context,
-	netsnmp_iterator_info*	mydata)
+	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	)
 {
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 
@@ -1969,10 +1992,11 @@ pgmReceiverPerformanceTable_free_loop_context (
 
 static int
 pgmReceiverPerformanceTable_handler (
-	netsnmp_mib_handler*		handler,
-	netsnmp_handler_registration*	reginfo,
+	G_GNUC_UNUSED netsnmp_mib_handler* handler,
+	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
 	netsnmp_agent_request_info*	reqinfo,
-	netsnmp_request_info*		requests)
+	netsnmp_request_info*		requests
+	)
 {
 	switch (reqinfo->mode)
 	{
