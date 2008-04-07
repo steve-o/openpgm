@@ -319,13 +319,13 @@ int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint
 
 int pgm_set_nonblocking (int filedes[2]);
 
-gssize pgm_transport_send (pgm_transport_t*, const gpointer, gsize, int);
+gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
 gssize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int);
 gssize pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, guint, int);
 gssize pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, guint, int);
 gssize pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, guint, int);
 
-gssize pgm_transport_send_fragment (pgm_transport_t*, const gpointer, gsize, int, guint32*, guint32*);
+gssize pgm_transport_send_fragment (pgm_transport_t*, gconstpointer, gsize, int, guint32*, guint32*);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);

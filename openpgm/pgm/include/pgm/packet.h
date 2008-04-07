@@ -392,20 +392,20 @@ int pgm_verify_nak (struct pgm_header*, gpointer, gsize);
 int pgm_verify_nnak (struct pgm_header*, gpointer, gsize);
 int pgm_verify_ncf (struct pgm_header*, gpointer, gsize);
 
-static inline int pgm_nla_to_sockaddr (const gpointer nla, struct sockaddr* sa)
+static inline int pgm_nla_to_sockaddr (gconstpointer nla, struct sockaddr* sa)
 {
     int retval = 0;
 
-    sa->sa_family = g_ntohs (*(guint16*)nla);
+    sa->sa_family = g_ntohs (*(const guint16*)nla);
     switch (sa->sa_family) {
     case AFI_IP:
 	sa->sa_family = AF_INET;
-	((struct sockaddr_in*)sa)->sin_addr.s_addr = ((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr;
+	((struct sockaddr_in*)sa)->sin_addr.s_addr = ((const struct in_addr*)((const guint8*)nla + sizeof(guint32)))->s_addr;
 	break;
 
     case AFI_IP6:
 	sa->sa_family = AF_INET6;
-	memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (struct in6_addr*)((guint8*)nla + sizeof(guint32)), sizeof(struct in6_addr));
+	memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (const struct in6_addr*)((const guint8*)nla + sizeof(guint32)), sizeof(struct in6_addr));
 	break;
 
     default:

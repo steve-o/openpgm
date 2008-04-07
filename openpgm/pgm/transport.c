@@ -147,9 +147,9 @@ static int on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
 static int on_odata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_rdata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 
-static gssize pgm_transport_send_one_unlocked (pgm_transport_t*, const gpointer, gsize, int);
-static gssize pgm_transport_send_one_copy_unlocked (pgm_transport_t*, const gpointer, gsize, int);
-static gssize pgm_transport_send_fragment_unlocked (pgm_transport_t*, const gpointer, gsize, int, guint32*, guint32*);
+static gssize pgm_transport_send_one_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
+static gssize pgm_transport_send_one_copy_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
+static gssize pgm_transport_send_fragment_unlocked (pgm_transport_t*, gconstpointer, gsize, int, guint32*, guint32*);
 
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
@@ -4597,14 +4597,15 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 static gssize
 pgm_transport_send_one_unlocked (
 	pgm_transport_t*	transport,
-	const gpointer		buf,		/* offset to payload, no options */
+	gconstpointer		buf,		/* offset to payload, no options */
 	gsize			count,
 	G_GNUC_UNUSED int	flags
 	)
 {
-/* retrieve packet storage from transmit window */
+/* retrieve packet storage from transmit window, intentional convert const void* to void*
+ */
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
-	gpointer pkt = (guint8*)buf - sizeof(struct pgm_header) - sizeof(struct pgm_data);
+	gpointer pkt = (const guint8*)buf - sizeof(struct pgm_header) - sizeof(struct pgm_data);
 
 	struct pgm_header *header = (struct pgm_header*)pkt;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
@@ -4658,7 +4659,7 @@ pgm_transport_send_one_unlocked (
 static inline gssize
 pgm_transport_send_one_copy_unlocked (
 	pgm_transport_t*	transport,
-	const gpointer		buf,		/* payload */
+	gconstpointer		buf,		/* payload */
 	gsize			count,
 	int			flags
 	)
@@ -4859,7 +4860,7 @@ pgm_transport_send_one_iov_unlocked (
 static inline gssize
 pgm_transport_send_apdu_unlocked (
 	pgm_transport_t*	transport,
-	const gpointer		buf,
+	gconstpointer		buf,
 	guint			count,
 	int			flags		/* MSG_DONTWAIT = non-blocking */)
 {
@@ -4941,7 +4942,7 @@ pgm_transport_send_apdu_unlocked (
 
 		gsize pgm_header_len	= (guint8*)(opt_fragment + 1) - (guint8*)header;
 		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
-		guint32 unfolded_odata	= pgm_csum_partial_copy ((guint8*)buf + data_bytes_offset, opt_fragment + 1, tsdu_length, 0);
+		guint32 unfolded_odata	= pgm_csum_partial_copy ((const guint8*)buf + data_bytes_offset, opt_fragment + 1, tsdu_length, 0);
 		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
@@ -5169,7 +5170,7 @@ pgm_transport_send_iov_apdu_unlocked (
 gssize
 pgm_transport_send (
 	pgm_transport_t*	transport,
-	const gpointer		data,
+	gconstpointer		data,
 	gsize			len,
 	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
@@ -5264,7 +5265,7 @@ pgm_transport_sendv (
 static inline gssize
 pgm_transport_send_fragment_unlocked (
 	pgm_transport_t*	transport,
-	const gpointer		buf,
+	gconstpointer		buf,
 	gsize			count,
 	int			flags,		/* MSG_DONTWAIT = non-blocking */
 	guint32*		offset,
@@ -5345,7 +5346,7 @@ pgm_transport_send_fragment_unlocked (
 
 		gsize pgm_header_len	= (guint8*)(opt_fragment + 1) - (guint8*)header;
 		guint32 unfolded_header	= pgm_csum_partial (header, pgm_header_len, 0);
-		guint32 unfolded_odata	= pgm_csum_partial_copy ((guint8*)buf + *offset, opt_fragment + 1, tsdu_length, 0);
+		guint32 unfolded_odata	= pgm_csum_partial_copy ((const guint8*)buf + *offset, opt_fragment + 1, tsdu_length, 0);
 		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
@@ -5399,7 +5400,7 @@ pgm_transport_send_fragment_unlocked (
 gssize
 pgm_transport_send_fragment (
 	pgm_transport_t*	transport,
-	const gpointer		data,
+	gconstpointer		data,
 	gsize			len,
 	int			flags,		/* MSG_DONTWAIT = non-blocking */
 	guint32*		offset,
