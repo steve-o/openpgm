@@ -800,7 +800,7 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
         return retval;
 }
 
-static inline int
+static inline gssize
 brokn_send_apdu_unlocked (
         pgm_transport_t*        transport,
         const gchar*            buf,
@@ -898,7 +898,7 @@ brokn_send_apdu_unlocked (
         return retval;
 }
 
-static int
+static gssize
 brokn_send (
         pgm_transport_t*        transport,      
         const gchar*            data,
@@ -931,7 +931,7 @@ session_send (
 	}
 
 /* send message */
-        int e;
+        gssize e;
 	if (is_brokn) {
 		e = brokn_send (sess->transport, string, strlen(string) + 1, 0);
 	} else {

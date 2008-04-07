@@ -445,7 +445,7 @@ session_send (
 	}
 
 /* send message */
-        int e = pgm_transport_send (sess->transport, string, strlen(string) + 1, 0);
+        gssize e = pgm_transport_send (sess->transport, string, strlen(string) + 1, 0);
         if (e < 0) {
 		puts ("FAILED: pgm_transport_send()");
         }
