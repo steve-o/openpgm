@@ -931,7 +931,7 @@ pgm_transport_set_ambient_spm (
 int
 pgm_transport_set_heartbeat_spm (
 	pgm_transport_t*	transport,
-	guint*			spm_heartbeat_interval,
+	const guint*		spm_heartbeat_interval,
 	int			len
 	)
 {
