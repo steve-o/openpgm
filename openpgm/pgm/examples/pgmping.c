@@ -304,10 +304,17 @@ on_startup (
 	}
 
 	e = pgm_transport_bind (g_transport);
-	if (e != 0) {
-		g_critical ("pgm_transport_bind failed errno %i: \"%s\"", e, strerror(e));
-		G_BREAKPOINT();
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		g_main_loop_quit(g_loop);
+		return FALSE;
 	}
+	g_assert (e == 0);
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
@@ -406,11 +413,11 @@ on_odata_timer (
 static void
 send_odata (void)
 {
-	int e;
+	gssize e;
 	char b[100];
 	sprintf (b, "%" G_GUINT32_FORMAT, g_payload);
 
-	e = pgm_transport_send (g_transport, (gpointer)&b, sizeof(b), 0);
+	e = pgm_transport_send (g_transport, &b, sizeof(b), 0);
         if (e < 0) {
 		g_warning ("pgm_transport_send failed: %i/%s.", errno, strerror(errno));
                 return;
@@ -429,7 +436,7 @@ on_io_data (
 	G_GNUC_UNUSED gpointer	data
 	)
 {
-	int len = 0;
+	gssize len = 0;
 	do {
 		char buffer[4096];
 		len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */);

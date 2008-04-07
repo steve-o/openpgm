@@ -114,8 +114,8 @@ main (
 	g_message ("entering PGM message loop ... ");
 	do {
 		char buffer[4096];
-		int len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), 0 /* blocking */);
-		if (len > 0)
+		gssize len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), 0 /* blocking */);
+		if (len >= 0)
 		{
 			on_data (buffer, len, NULL);
 		}
@@ -213,10 +213,16 @@ on_startup (void)
 	pgm_transport_set_nak_ncf_retries (g_transport, 2);
 
 	e = pgm_transport_bind (g_transport);
-	if (e != 0) {
-		g_critical ("pgm_transport_bind failed errno %i: \"%s\"", e, strerror(e));
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
 		G_BREAKPOINT();
 	}
+	g_assert (e == 0);
 
 	g_message ("startup complete.");
 	return FALSE;

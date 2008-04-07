@@ -64,7 +64,7 @@ static inline int pgm_async_get_fd (pgm_async_t* async)
     return async->commit_pipe[0];
 }
 
-int pgm_async_recv (pgm_async_t* async, gpointer, int, int);
+gssize pgm_async_recv (pgm_async_t* async, gpointer, gsize, int);
 
 GSource* pgm_async_create_watch (pgm_async_t*);
 int pgm_async_add_watch_full (pgm_async_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
