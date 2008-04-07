@@ -201,8 +201,8 @@ int
 pgm_parse_udp_encap (
 	gpointer		data,
 	gsize			len,
-	struct sockaddr*	dst_addr,
-	socklen_t*		dst_addr_len,
+	G_GNUC_UNUSED struct sockaddr*	dst_addr,
+	G_GNUC_UNUSED socklen_t*	dst_addr_len,
 	struct pgm_header**	header,
 	gpointer*		packet,
 	gsize*			packet_len
@@ -474,7 +474,7 @@ pgm_print_packet (
 
 int
 pgm_verify_spm (
-	struct pgm_header*	header,
+	G_GNUC_UNUSED struct pgm_header* header,
 	gpointer		data,
 	gsize			len
 	)
@@ -875,7 +875,7 @@ pgm_print_rdata (
 
 int
 pgm_verify_nak (
-	struct pgm_header*	header,
+	G_GNUC_UNUSED struct pgm_header* header,
 	gpointer		data,
 	gsize			len
 	)
@@ -1030,8 +1030,8 @@ pgm_verify_nnak (
 
 static gboolean
 pgm_print_nnak (
-	struct pgm_header*	header,
-	gpointer		data,
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED gpointer			data,
 	gsize			len
 	)
 {
@@ -1042,7 +1042,7 @@ pgm_print_nnak (
 		return FALSE;
 	}
 
-	struct pgm_nak* nnak = (struct pgm_nak*)data;
+//	struct pgm_nak* nnak = (struct pgm_nak*)data;
 
 	return TRUE;
 }
@@ -1062,8 +1062,8 @@ pgm_verify_ncf (
 
 gboolean
 pgm_print_ncf (
-	struct pgm_header*	header,
-	gpointer		data,
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED gpointer			data,
 	gsize			len
 	)
 {
@@ -1074,7 +1074,7 @@ pgm_print_ncf (
 		return FALSE;
 	}
 
-	struct pgm_nak* ncf = (struct pgm_nak*)data;
+//	struct pgm_nak* ncf = (struct pgm_nak*)data;
 
 	return TRUE;
 }
@@ -1090,14 +1090,13 @@ pgm_print_ncf (
 
 int
 pgm_verify_spmr (
-	struct pgm_header*	header,
-	gpointer		data,
-	gsize			len
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED gpointer			data,
+	G_GNUC_UNUSED gsize			len
 	)
 {
 	int retval = 0;
 
-out:
 	return retval;
 }
 

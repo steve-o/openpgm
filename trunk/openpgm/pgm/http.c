@@ -115,7 +115,6 @@ pgm_http_init (
 	g_cond_free (http_cond);
 	http_cond = NULL;
 
-out:
 	return retval;
 
 err_destroy:
@@ -135,7 +134,7 @@ pgm_http_shutdown (void)
 
 static gpointer
 http_thread (
-	gpointer	data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	GMainContext* context = g_main_context_new ();
@@ -256,7 +255,7 @@ robots_callback (
 	SoupServerContext*	context,
 	SoupMessage*		msg,
 	gpointer		data
-		)
+	)
 {
 	if (context->method_id != SOUP_METHOD_ID_GET) {
 		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
@@ -273,8 +272,8 @@ static void
 css_callback (
 	SoupServerContext*	context,
 	SoupMessage*		msg,
-	gpointer		data
-		)
+	G_GNUC_UNUSED gpointer	data
+	)
 {
 	if (context->method_id != SOUP_METHOD_ID_GET) {
 		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
@@ -289,10 +288,10 @@ css_callback (
 
 static void
 index_callback (
-	SoupServerContext*	context,
+	G_GNUC_UNUSED SoupServerContext* context,
 	SoupMessage*		msg,
-	gpointer		data
-		)
+	G_GNUC_UNUSED gpointer	data
+	)
 {
 	GString *response;
 
@@ -346,10 +345,10 @@ index_callback (
 
 static void
 transports_callback (
-	SoupServerContext*	context,
+	G_GNUC_UNUSED SoupServerContext* context,
 	SoupMessage*		msg,
-	gpointer		data
-		)
+	G_GNUC_UNUSED gpointer	data
+	)
 {
 	GString *response;
 
@@ -431,8 +430,8 @@ static void
 default_callback (
 	SoupServerContext*	context,
 	SoupMessage*		msg,
-	gpointer		data
-		)
+	G_GNUC_UNUSED gpointer	data
+	)
 {
 	if (context->method_id != SOUP_METHOD_ID_GET) {
 		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
