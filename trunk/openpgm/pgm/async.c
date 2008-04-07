@@ -154,6 +154,11 @@ pgm_receiver_thread (
 	return NULL;
 }
 
+/* create asynchronous thread handler
+ *
+ * on success, 0 is returned.  on error, -1 is returned, and errno set appropriately.
+ * on invalid parameters, -EINVAL is returned.
+ */
 int
 pgm_async_create (
 	pgm_async_t**		async_,
@@ -164,7 +169,7 @@ pgm_async_create (
 	g_return_val_if_fail (async_ != NULL, -EINVAL);
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
-	int retval = 0;
+	int pgm_errno = 0;
 	pgm_async_t* async;
 
 	async = g_malloc0 (sizeof(pgm_async_t));
@@ -182,14 +187,15 @@ pgm_async_create (
 	async->commit_queue = g_async_queue_new();
 
 	g_trace ("INFO","create commit pipe.");
-	retval = pipe (async->commit_pipe);
-	if (retval < 0) {
-		retval = errno;
+	int e = pipe (async->commit_pipe);
+	if (e < 0) {
+		pgm_errno = errno;
 		goto err_destroy;
 	}
 
-	retval = pgm_set_nonblocking (async->commit_pipe);
-	if (retval) {
+	e = pgm_set_nonblocking (async->commit_pipe);
+	if (e) {
+		pgm_errno = errno;
 		goto err_destroy;
 	}
 
@@ -203,7 +209,7 @@ pgm_async_create (
 						G_THREAD_PRIORITY_HIGH,
 						&err);
 	if (!async->thread) {
-		retval = errno;
+		pgm_errno = errno;
 		g_error ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
 		goto err_destroy;
 	}
@@ -211,7 +217,7 @@ pgm_async_create (
 /* return new object */
 	*async_ = async;
 
-	return retval;
+	return 0;
 
 err_destroy:
 	if (async->commit_queue) {
@@ -241,9 +247,14 @@ err_destroy:
 	g_free (async);
 	async = NULL;
 
-	return retval;
+	errno = pgm_errno;
+	return -1;
 }
 
+/* tell async thread to stop, wait for it to stop, then cleanup.
+ *
+ * on success, 0 is returned.  if async is invalid, -EINVAL is returned.
+ */
 int
 pgm_async_destroy (
 	pgm_async_t*		async
@@ -403,7 +414,7 @@ pgm_src_dispatch (
 	if (event)
 	{
 /* important that callback occurs out of lock to allow PGM layer to add more messages */
-		gboolean retval = (*function) (event->data, event->len, user_data);
+		(*function) (event->data, event->len, user_data);
 
 /* return memory to receive window */
 		if (event->len) g_free (event->data);
@@ -413,14 +424,17 @@ pgm_src_dispatch (
         return TRUE;
 }
 
-/* synchronous reading from the queue
+/* synchronous reading from the queue.
+ *
+ * on success, returns number of bytes read.  on error, -1 is returned, and errno set
+ * appropriately.  on invalid parameters, -EINVAL is returned.
  */
 
-int
+gssize
 pgm_async_recv (
 	pgm_async_t*		async,
 	gpointer		data,
-	int			len,
+	gsize			len,
 	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
@@ -428,7 +442,6 @@ pgm_async_recv (
 	if (len)
 	        g_return_val_if_fail (len > 0 && data != NULL, -EINVAL);
 
-	int bytes_read;
 	pgm_event_t* event;
 
 	if (flags & MSG_DONTWAIT)
@@ -438,8 +451,7 @@ pgm_async_recv (
 		{
 			g_async_queue_unlock (async->commit_queue);
 			errno = EAGAIN;
-			bytes_read = -1;
-			goto out;
+			return -1;
 		}
 
 		event = g_async_queue_pop_unlocked (async->commit_queue);
@@ -451,7 +463,7 @@ pgm_async_recv (
 	}
 
 /* pass data back to callee */
-	bytes_read = event->len;
+	gsize bytes_read = event->len;
 	if (bytes_read > len) bytes_read = len;
 
 	memcpy (data, event->data, bytes_read);
@@ -460,8 +472,7 @@ pgm_async_recv (
 	if (event->len) g_free (event->data);
 	pgm_event_unref (async, event);
 
-out:
-	return bytes_read;	
+	return (gssize)bytes_read;	
 }
 
 /* eof */

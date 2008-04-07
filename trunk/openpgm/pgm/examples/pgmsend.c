@@ -124,7 +124,7 @@ main (
 	{
 		while (optind < argc)
 		{
-			int e = pgm_transport_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0);
+			gssize e = pgm_transport_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0);
 		        if (e < 0) {
 				g_warning ("pgm_transport_send failed.");
 		        }
@@ -180,10 +180,16 @@ create_transport (void)
 	}
 
 	e = pgm_transport_bind (g_transport);
-	if (e != 0) {
-		g_critical ("pgm_transport_bind failed errno %i: \"%s\"", e, strerror(e));
-		G_BREAKPOINT();
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		return TRUE;
 	}
+	g_assert (e == 0);
 
 	return FALSE;
 }
