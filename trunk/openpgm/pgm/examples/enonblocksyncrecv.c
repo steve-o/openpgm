@@ -234,6 +234,8 @@ on_startup (void)
 	pgm_transport_set_nak_data_retries (g_transport, 5);
 	pgm_transport_set_nak_ncf_retries (g_transport, 2);
 
+	pgm_transport_set_recv_only (g_transport, FALSE);
+
 	e = pgm_transport_bind (g_transport);
 	if (e < 0) {
 		if      (e == -1)

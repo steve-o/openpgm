@@ -179,6 +179,8 @@ create_transport (void)
 		pgm_transport_set_fec (g_transport, FALSE, TRUE, TRUE, g_n, g_k);
 	}
 
+	pgm_transport_set_send_only (g_transport);
+
 	e = pgm_transport_bind (g_transport);
 	if (e < 0) {
 		if      (e == -1)
