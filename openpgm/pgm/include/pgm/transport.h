@@ -190,6 +190,10 @@ struct pgm_transport_t {
     GMainContext	*timer_context;
     gboolean		is_bound;
 
+    gboolean		can_send;
+    gboolean		can_recv;
+    gboolean		is_passive;
+
     GCond		*thread_cond;
     GMutex		*thread_mutex;
 
@@ -316,6 +320,9 @@ int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
 int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint, guint);
+
+int pgm_transport_set_send_only (pgm_transport_t*);
+int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
 
 int pgm_set_nonblocking (int filedes[2]);
 
