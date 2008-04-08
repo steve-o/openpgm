@@ -421,9 +421,6 @@ pgm_transport_destroy (
 #ifndef PGM_SINGLE_THREAD
 	if (transport->timer_thread) {
 		g_main_loop_quit (transport->timer_loop);
-	}
-	if (transport->timer_thread) {
-		g_main_loop_quit (transport->timer_loop);
 		g_thread_join (transport->timer_thread);
 		transport->timer_thread = NULL;
 	}
