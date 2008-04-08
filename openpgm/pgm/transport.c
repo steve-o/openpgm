@@ -686,6 +686,11 @@ pgm_transport_create (
 /* create transport object */
 	transport = g_malloc0 (sizeof(pgm_transport_t));
 
+/* transport defaults */
+	transport->can_send = TRUE;
+	transport->can_recv = TRUE;
+	transport->is_passive = FALSE;
+
 /* regular send lock */
 	g_static_mutex_init (&transport->send_mutex);
 
@@ -1422,20 +1427,26 @@ pgm_transport_bind (
 	g_trace ("INFO","creating new random number generator.");
 	transport->rand_ = g_rand_new();
 
-	g_trace ("INFO","create rdata pipe.");
-	retval = pipe (transport->rdata_pipe);
-	if (retval < 0) {
-		goto out;
+	if (transport->can_send)
+	{
+		g_trace ("INFO","create rx to timer pipe.");
+		retval = pipe (transport->rdata_pipe);
+		if (retval < 0) {
+			goto out;
+		}
+		g_trace ("INFO","create tx to timer pipe.");
+		retval = pipe (transport->timer_pipe);
+		if (retval < 0) {
+			goto out;
+		}
 	}
-	g_trace ("INFO","create timer pipe.");
-	retval = pipe (transport->timer_pipe);
-	if (retval < 0) {
-		goto out;
-	}
-	g_trace ("INFO","create waiting pipe.");
-	retval = pipe (transport->waiting_pipe);
-	if (retval < 0) {
-		goto out;
+	if (transport->can_recv)
+	{
+		g_trace ("INFO","create waiting notify pipe.");
+		retval = pipe (transport->waiting_pipe);
+		if (retval < 0) {
+			goto out;
+		}
 	}
 
 	retval = pgm_set_nonblocking (transport->rdata_pipe);
@@ -1470,15 +1481,21 @@ pgm_transport_bind (
 		transport->iphdr_len += udphdr_len;
 	}
 
-	g_trace ("INFO","construct transmit window.");
-	transport->txw = pgm_txw_init (transport->max_tpdu - transport->iphdr_len,
-					transport->txw_preallocate,
-					transport->txw_sqns,
-					transport->txw_secs,
-					transport->txw_max_rte);
+	if (transport->can_send)
+	{
+		g_trace ("INFO","construct transmit window.");
+		transport->txw = pgm_txw_init (transport->max_tpdu - transport->iphdr_len,
+						transport->txw_preallocate,
+						transport->txw_sqns,
+						transport->txw_secs,
+						transport->txw_max_rte);
+	}
 
 /* create peer list */
-	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	if (transport->can_recv)
+	{
+		transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	}
 
 	if (!transport->udp_encap_port)
 	{
@@ -1752,90 +1769,93 @@ pgm_transport_bind (
 	}
 
 /* rx to timer pipe */
-	transport->rdata_channel = g_io_channel_unix_new (transport->rdata_pipe[0]);
-	g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_pipe, transport, NULL);
+	if (transport->can_send)
+	{
+		transport->rdata_channel = g_io_channel_unix_new (transport->rdata_pipe[0]);
+		g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_pipe, transport, NULL);
 
 /* tx to timer pipe */
-	transport->timer_channel = g_io_channel_unix_new (transport->timer_pipe[0]);
-	g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_pipe, transport, NULL);
+		transport->timer_channel = g_io_channel_unix_new (transport->timer_pipe[0]);
+		g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_pipe, transport, NULL);
 
 /* create recyclable SPM packet */
-	switch (pgm_sockaddr_family(&transport->recv_smr[0].smr_interface)) {
-	case AF_INET:
-		transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
-		break;
+		switch (pgm_sockaddr_family(&transport->recv_smr[0].smr_interface)) {
+		case AF_INET:
+			transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
+			break;
 
-	case AF_INET6:
-		transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm6);
-		break;
-	}
+		case AF_INET6:
+			transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm6);
+			break;
+		}
 
-	if (transport->use_proactive_parity || transport->use_ondemand_parity)
-	{
-		transport->spm_len += sizeof(struct pgm_opt_length) +
-				      sizeof(struct pgm_opt_header) +
-				      sizeof(struct pgm_opt_parity_prm);
-	}
+		if (transport->use_proactive_parity || transport->use_ondemand_parity)
+		{
+			transport->spm_len += sizeof(struct pgm_opt_length) +
+					      sizeof(struct pgm_opt_header) +
+					      sizeof(struct pgm_opt_parity_prm);
+		}
 
-	transport->spm_packet = g_slice_alloc0 (transport->spm_len);
+		transport->spm_packet = g_slice_alloc0 (transport->spm_len);
 
-	struct pgm_header* header = (struct pgm_header*)transport->spm_packet;
-	struct pgm_spm* spm = (struct pgm_spm*)( header + 1 );
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
-	header->pgm_sport	= transport->tsi.sport;
-	header->pgm_dport	= transport->dport;
-	header->pgm_type	= PGM_SPM;
+		struct pgm_header* header = (struct pgm_header*)transport->spm_packet;
+		struct pgm_spm* spm = (struct pgm_spm*)( header + 1 );
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+		header->pgm_sport	= transport->tsi.sport;
+		header->pgm_dport	= transport->dport;
+		header->pgm_type	= PGM_SPM;
 
-	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_interface, (char*)&spm->spm_nla_afi);
+		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_smr[0].smr_interface, (char*)&spm->spm_nla_afi);
 
 /* OPT_PARITY_PRM */
-	if (transport->use_proactive_parity || transport->use_ondemand_parity)
-	{
-		header->pgm_options     = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
+		if (transport->use_proactive_parity || transport->use_ondemand_parity)
+		{
+			header->pgm_options     = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
 
-		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
-		opt_len->opt_type	= PGM_OPT_LENGTH;
-		opt_len->opt_length	= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
-							sizeof(struct pgm_opt_header) +
-							sizeof(struct pgm_opt_parity_prm) );
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
-		opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
-		opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
-		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
-		opt_parity_prm->opt_reserved = (transport->use_proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
-					       (transport->use_ondemand_parity ? PGM_PARITY_PRM_OND : 0);
-		opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
-	}
+			struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
+			opt_len->opt_type	= PGM_OPT_LENGTH;
+			opt_len->opt_length	= sizeof(struct pgm_opt_length);
+			opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
+								sizeof(struct pgm_opt_header) +
+								sizeof(struct pgm_opt_parity_prm) );
+			struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+			opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
+			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
+			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
+			opt_parity_prm->opt_reserved = (transport->use_proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
+						       (transport->use_ondemand_parity ? PGM_PARITY_PRM_OND : 0);
+			opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
+		}
 
 /* setup rate control */
-	if (transport->txw_max_rte)
-	{
-		g_trace ("INFO","Setting rate regulation to %i bytes per second.",
-				transport->txw_max_rte);
+		if (transport->txw_max_rte)
+		{
+			g_trace ("INFO","Setting rate regulation to %i bytes per second.",
+					transport->txw_max_rte);
 	
-		retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
-		if (retval < 0) {
-			goto out;
+			retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
+			if (retval < 0) {
+				goto out;
+			}
 		}
-	}
 
-	g_trace ("INFO","adding dynamic timer");
-	transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
-	pgm_add_timer (transport);
+		g_trace ("INFO","adding dynamic timer");
+		transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
+		pgm_add_timer (transport);
 
 /* announce new transport by sending out SPMs */
-	send_spm_unlocked (transport);
-	send_spm_unlocked (transport);
-	send_spm_unlocked (transport);
+		send_spm_unlocked (transport);
+		send_spm_unlocked (transport);
+		send_spm_unlocked (transport);
 
 /* parity buffer for odata/rdata transmission */
-	if (transport->use_proactive_parity || transport->use_ondemand_parity)
-	{
-		g_trace ("INFO","Enabling Reed-Solomon forward error correction, RS(%i,%i).",
-				transport->rs_n, transport->rs_k);
-		transport->parity_buffer = g_malloc ( transport->max_tpdu );
-		pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
+		if (transport->use_proactive_parity || transport->use_ondemand_parity)
+		{
+			g_trace ("INFO","Enabling Reed-Solomon forward error correction, RS(%i,%i).",
+					transport->rs_n, transport->rs_k);
+			transport->parity_buffer = g_malloc ( transport->max_tpdu );
+			pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
+		}
 	}
 
 /* allocate first incoming packet buffer */
@@ -2100,10 +2120,22 @@ recv_again:
 /* we are the source, propagate null as the source */
 
 				source = NULL;
+
+				if (!transport->can_send)
+				{
+					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+					goto check_for_repeat;
+				}
 			}
 			else
 			{
 /* we are not the source */
+
+				if (!transport->can_recv)
+				{
+					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+					goto check_for_repeat;
+				}
 
 /* check to see the source this peer-to-peer message is about is in our peer list */
 
@@ -2119,6 +2151,7 @@ recv_again:
 
 /* this source is unknown, we don't care about messages about it */
 
+					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 					goto check_for_repeat;
 				}
 			}
@@ -2131,6 +2164,12 @@ recv_again:
 /* unicast upstream message, note that dport & sport are reversed */
 
 			source = NULL;
+
+			if (!transport->can_send)
+			{
+				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+				goto check_for_repeat;
+			}
 		}
 		else
 		{
@@ -2178,7 +2217,14 @@ recv_again:
 		}
 
 /* pgm packet DPORT contains our transport DPORT */
-		if (pgm_header->pgm_dport != transport->dport) {
+		if (pgm_header->pgm_dport != transport->dport)
+		{
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			goto check_for_repeat;
+		}
+
+		if (!transport->can_recv)
+		{
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -4058,7 +4104,8 @@ nak_rb_state (
 				pgm_rxw_pkt_state_unlink (rxw, rp);
 
 #if PGM_SINGLE_NAK
-				send_nak (transport, peer, rp->sequence_number);
+				if (!transport->is_passive)
+					send_nak (transport, peer, rp->sequence_number);
 				pgm_time_update_now();
 #else
 				nak_list.sqn[nak_list.len++] = rp->sequence_number;
@@ -4087,7 +4134,8 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 #ifndef PGM_SINGLE_NAK
 				if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
-					send_nak_list (peer, &nak_list);
+					if (!transport->is_passive)
+						send_nak_list (peer, &nak_list);
 					pgm_time_update_now();
 					nak_list.len = 0;
 				}
@@ -4102,7 +4150,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 		}
 
 #ifndef PGM_SINGLE_NAK
-		if (nak_list.len)
+		if (!transport->is_passive && nak_list.len)
 		{
 			if (nak_list.len > 1) {
 				send_nak_list (peer, &nak_list);
@@ -4161,7 +4209,10 @@ check_peer_nak_state (
 		{
 			if (pgm_time_after_eq (pgm_time_now, peer->spmr_expiry))
 			{
-				send_spmr (peer);
+				if (transport->is_passive)
+					peer->spmr_expiry = 0;
+				else
+					send_spmr (peer);
 			}
 		}
 
@@ -5172,6 +5223,8 @@ pgm_transport_send (
 	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
+	g_assert( transport->can_send );
+
 	if ( len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
                                                sizeof(struct pgm_data) ) ) )
 	{
@@ -5203,6 +5256,8 @@ pgm_transport_sendv (
 	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
+	g_assert( transport->can_send );
+
 	gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
 
         if (flags & MSG_DONTWAIT)
@@ -5404,6 +5459,8 @@ pgm_transport_send_fragment (
 	guint32*		first_sqn
 	)
 {
+	g_assert( transport->can_send );
+
 	gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
 
 	g_static_rw_lock_writer_lock (&transport->txw_lock);
@@ -5435,6 +5492,8 @@ pgm_transport_sendv2 (
 	G_GNUC_UNUSED int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
+	g_assert( transport->can_send );
+
 	return 0;	/* not-implemented */
 }
 
@@ -5456,6 +5515,8 @@ pgm_transport_sendv2_copy (
 	G_GNUC_UNUSED int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
+	g_assert( transport->can_send );
+
 	return 0;	/* not-implemented */
 }
 
@@ -5477,6 +5538,8 @@ pgm_transport_sendv3 (
 	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
+	g_assert( transport->can_send );
+
 	gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
 
 /* determine APDU length */
@@ -5639,6 +5702,42 @@ pgm_transport_set_fec (
 	return 0;
 }
 
+/* declare transport only for sending, discard any incoming SPM, ODATA,
+ * RDATA, etc, packets.
+ */
+int
+pgm_transport_set_send_only (
+	pgm_transport_t*	transport
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	g_static_mutex_lock (&transport->mutex);
+	transport->can_recv	= FALSE;
+	g_static_mutex_unlock (&transport->mutex);
+
+	return 0;
+}
+
+/* declare transport only for receiving, no transmit window will be created
+ * and no SPM broadcasts sent.
+ */
+int
+pgm_transport_set_recv_only (
+	pgm_transport_t*	transport,
+	gboolean		is_passive	/* don't send any request or responses */
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	g_static_mutex_lock (&transport->mutex);
+	transport->can_send	= FALSE;
+	transport->is_passive	= is_passive;
+	g_static_mutex_unlock (&transport->mutex);
+
+	return 0;
+}
+
 static GSource*
 pgm_create_timer (
 	pgm_transport_t*	transport
@@ -5698,15 +5797,24 @@ pgm_timer_prepare (
 	glong msec;
 
 	g_static_mutex_lock (&transport->mutex);
-	pgm_time_t expiration = transport->spm_heartbeat_state ? MIN(transport->next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
 	pgm_time_t now = pgm_time_update_now();
+	pgm_time_t expiration = now + pgm_secs( 30 );
 
-	g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
+	if (transport->can_send)
+	{
+		expiration = transport->spm_heartbeat_state ? MIN(transport->next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
+		g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
+	}
 
 /* save the nearest timer */
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	transport->next_poll = pgm_timer->expiration = expiration = min_nak_expiry (expiration, transport);
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	if (transport->can_recv)
+	{
+		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		expiration = min_nak_expiry (expiration, transport);
+		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	}
+
+	transport->next_poll = pgm_timer->expiration = expiration;
 	g_static_mutex_unlock (&transport->mutex);
 
 /* advance time again to adjust for processing time out of the event loop, this
@@ -5782,30 +5890,36 @@ pgm_timer_dispatch (
 
 	g_static_mutex_lock (&transport->mutex);
 /* find which timers have expired and call each */
-	if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
+	if (transport->can_send)
 	{
-		send_spm_unlocked (transport);
-		transport->spm_heartbeat_state = 0;
-		transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
-	}
-	else if ( transport->spm_heartbeat_state &&
-		 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm) )
-	{
-		send_spm_unlocked (transport);
-	
-		if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
+		if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
 		{
-			transport->next_heartbeat_spm = pgm_time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-		} else
-		{	/* transition heartbeat to ambient */
+			send_spm_unlocked (transport);
 			transport->spm_heartbeat_state = 0;
+			transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
 		}
-
+		else if ( transport->spm_heartbeat_state &&
+			 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm) )
+		{
+			send_spm_unlocked (transport);
+		
+			if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
+			{
+				transport->next_heartbeat_spm = pgm_time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
+			}
+			else
+			{	/* transition heartbeat to ambient */
+				transport->spm_heartbeat_state = 0;
+			}
+		}
 	}
 
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	check_peer_nak_state (transport);
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	if (transport->can_recv)
+	{
+		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		check_peer_nak_state (transport);
+		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	}
 	g_static_mutex_unlock (&transport->mutex);
 
 	return TRUE;
