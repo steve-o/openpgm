@@ -149,7 +149,6 @@ static int on_rdata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 
 static gssize pgm_transport_send_one_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
 static gssize pgm_transport_send_one_copy_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
-static gssize pgm_transport_send_fragment_unlocked (pgm_transport_t*, gconstpointer, gsize, int, guint32*, guint32*);
 
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
@@ -220,6 +219,19 @@ pgm_tsi_equal (
 	return memcmp (v, v2, sizeof(struct pgm_tsi_t)) == 0;
 }
 
+gsize
+pgm_transport_pkt_offset (
+	gboolean		can_fragment
+	)
+{
+	return can_fragment ? ( sizeof(struct pgm_header) + sizeof(struct pgm_data) )
+			    : ( sizeof(struct pgm_header)
+			      + sizeof(struct pgm_data)
+			      + sizeof(struct pgm_opt_length)
+	                      + sizeof(struct pgm_opt_header)
+			      + sizeof(struct pgm_opt_fragment) );
+}
+
 /* fast log base 2 of power of 2
  */
 
@@ -267,14 +279,22 @@ pgm_sendto (
 	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
 	if (use_rate_limit)
-		pgm_rate_check (transport->rate_control, len, 0);
+	{
+		int check = pgm_rate_check (transport->rate_control, len, flags);
+		if (check < 0 && errno == EAGAIN)
+		{
+			return (gssize)check;
+		}
+	}
 
 	g_static_mutex_lock (mutex);
 
 	ssize_t sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
-		errno != EHOSTUNREACH	)	/* No route to host */
+		errno != EHOSTUNREACH &&	/* No route to host */
+		!( errno == EAGAIN && flags & MSG_DONTWAIT )	/* would block on non-blocking send */
+	   )
 	{
 /* poll for cleared socket */
 		struct pollfd p = {
@@ -416,6 +436,14 @@ pgm_transport_destroy (
 	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
 	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
 	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
+
+/* rollback any pkt_dontwait APDU */
+	if (transport->has_txw_writer_lock)
+	{
+		((pgm_txw_t*)transport->txw)->lead = transport->pkt_dontwait_state.first_sqn - 1;
+		g_static_rw_lock_writer_unlock (&transport->txw_lock);
+		transport->has_txw_writer_lock = FALSE;
+	}
 
 /* terminate & join internal thread */
 #ifndef PGM_SINGLE_THREAD
@@ -2335,7 +2363,7 @@ check_for_repeat:
 			int fds = 0;
 			fd_set readfds;
 			FD_ZERO(&readfds);
-			pgm_transport_select_info (transport, &readfds, &fds);
+			pgm_transport_select_info (transport, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, NULL);
 			if (fds == -1) {
 				return fds;
@@ -2426,13 +2454,31 @@ int
 pgm_transport_select_info (
 	pgm_transport_t*	transport,
 	fd_set*			readfds,
-	int*			n_fds
+	fd_set*			writefds,
+	int*			n_fds		/* in: max fds, out: max (in:fds, transport:fds) */
 	)
 {
-	FD_SET(transport->recv_sock, readfds);
-	FD_SET(transport->waiting_pipe[0], readfds);
+	g_assert (transport);
+	g_assert (n_fds);
 
-	return *n_fds = MAX(transport->recv_sock, transport->waiting_pipe[0]) + 1;
+	int fds = 0;
+
+	if (readfds)
+	{
+		FD_SET(transport->recv_sock, readfds);
+		FD_SET(transport->waiting_pipe[0], readfds);
+
+		fds = MAX(transport->recv_sock, transport->waiting_pipe[0]) + 1;
+	}
+
+	if (transport->can_send && writefds)
+	{
+		FD_SET(transport->send_sock, writefds);
+
+		fds = MAX(transport->send_sock + 1, fds);
+	}
+
+	return *n_fds = MAX(fds, *n_fds);
 }
 
 /* add poll parameters for this transports receive socket(s)
@@ -2444,19 +2490,47 @@ int
 pgm_transport_poll_info (
 	pgm_transport_t*	transport,
 	struct pollfd*		fds,
-	int*			n_fds		/* in: #fds, out: used #fds */
+	int*			n_fds,		/* in: #fds, out: used #fds */
+	int			events		/* EPOLLIN, EPOLLOUT */
 	)
 {
-	g_assert (*n_fds > 2);
+	g_assert (transport);
+	g_assert (fds);
+	g_assert (n_fds);
+
+	int moo = 0;
 
 /* we currently only support one incoming socket */
-	fds[0].fd = transport->recv_sock;
-	fds[0].events = POLLIN;
+	if (events & EPOLLIN)
+	{
+		g_assert ( (*n_fds - 2) >= 0 );
+		fds[moo].fd = transport->recv_sock;
+		fds[moo].events = POLLIN;
+		moo++;
+#ifdef TRANSPORT_DEBUG
+		*n_fds--;
+#endif
+		fds[moo].fd = transport->waiting_pipe[0];
+		fds[moo].events = POLLIN;
+		moo++;
+#ifdef TRANSPORT_DEBUG
+		*n_fds--;
+#endif
+	}
 
-	fds[1].fd = transport->waiting_pipe[0];
-	fds[1].events = POLLIN;
+/* ODATA only published on regular socket, no need to poll router-alert sock */
+	if (transport->can_send && events & EPOLLOUT)
+	{
+		g_assert ( (*n_fds - 1) >= 0 );
+		fds[moo].fd = transport->send_sock;
+		fds[moo].events = POLLOUT;
+		moo++;
+#ifdef TRANSPORT_DEBUG
+		*n_fds--;
+#endif
+	}
 
-	return *n_fds = 2;
+	return *n_fds = moo;
 }
 
 /* add epoll parameters for this transports recieve socket(s), events should
@@ -2501,7 +2575,7 @@ pgm_transport_epoll_ctl (
 		}
 	}
 
-	if (events & EPOLLOUT)
+	if (transport->can_send && events & EPOLLOUT)
 	{
 		event.events = EPOLLOUT | EPOLLET;
 		event.data.ptr = transport;
@@ -5046,7 +5120,6 @@ pgm_transport_send_iov_apdu_unlocked (
 	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
-	guint32 opt_sqn = pgm_txw_next_lead(transport->txw);
 	guint packets = 0;
 	gsize bytes_sent = 0;
 	gsize data_bytes_sent = 0;
@@ -5090,6 +5163,8 @@ pgm_transport_send_iov_apdu_unlocked (
 
 	g_static_rw_lock_writer_lock (&transport->txw_lock);
 
+	guint32 first_sqn = pgm_txw_next_lead(transport->txw);
+
 	do {
 /* retrieve packet storage from transmit window */
 		gsize header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
@@ -5126,7 +5201,7 @@ pgm_transport_send_iov_apdu_unlocked (
 						sizeof(struct pgm_opt_fragment);
 		struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
 		opt_fragment->opt_reserved	= 0;
-		opt_fragment->opt_sqn		= g_htonl (opt_sqn);
+		opt_fragment->opt_sqn		= g_htonl (first_sqn);
 		opt_fragment->opt_frag_off	= g_htonl (data_bytes_offset);
 		opt_fragment->opt_frag_len	= g_htonl (count);
 
@@ -5205,6 +5280,162 @@ pgm_transport_send_iov_apdu_unlocked (
 	return (gssize)apdu_length;
 }
 
+/* vector of one packet = one buffer.
+ *
+ * on success, returns number of data bytes pushed into the transmit window and
+ * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
+ * if the packet sizes would exceed the current rate limit.
+ */
+static inline gssize
+pgm_transport_send_iov_tsdu_unlocked (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,		/* packet */
+	gsize			count,
+	int			flags,
+	gboolean		is_one_apdu	/* does the vector represent one APDU */
+	)
+{
+	guint packets = 0;
+	gsize bytes_sent = 0;
+	gsize data_bytes_sent = 0;
+	gsize data_bytes_offset = 0;
+
+/* if parity is enabled a 16-bit word is necessary to store actual TSDU length for 
+ * variable TSDU length transmission groups.
+ */
+	if (flags & MSG_DONTWAIT)
+	{
+		gsize header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
+		if (is_one_apdu) {
+			header_length += sizeof(struct pgm_opt_length) +		/* includes header */
+					 sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		}
+		gsize total_tpdu_length = 0;
+		for (guint i = 0; i < count; i++)
+		{
+			total_tpdu_length += transport->iphdr_len + header_length + vector[i].iov_len;
+		}
+
+/* calculation includes one iphdr length already */
+		int result = pgm_rate_check (transport->rate_control, total_tpdu_length - transport->iphdr_len, flags);
+		if (result == -1) {
+			return (gssize)result;
+		}
+	}
+
+	guint32 first_sqn = 0;
+	gsize apdu_length = 0;
+
+	if (is_one_apdu)
+	{
+		first_sqn = pgm_txw_next_lead(transport->txw);
+		for (guint i = 0; i < count; i++)
+		{
+			apdu_length += vector[i].iov_len;
+		}
+	}
+
+	g_static_rw_lock_writer_lock (&transport->txw_lock);
+
+	for (guint i = 0; i < count; i++)
+	{
+/* retrieve packet storage from transmit window */
+		gsize header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
+		if (is_one_apdu) {
+			header_length += sizeof(struct pgm_opt_length) +		/* includes header */
+					 sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		}
+		gsize tsdu_length = vector[i].iov_len;
+		gsize tpdu_length = header_length + tsdu_length;
+
+		gpointer pkt = pgm_txw_alloc(transport->txw);
+		struct pgm_header *header = (struct pgm_header*)pkt;
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+		header->pgm_sport	= transport->tsi.sport;
+		header->pgm_dport	= transport->dport;
+		header->pgm_type        = PGM_ODATA;
+	        header->pgm_options     = is_one_apdu ? PGM_OPT_PRESENT : 0;
+	        header->pgm_tsdu_length = g_htons (tsdu_length);
+
+/* ODATA */
+		struct pgm_data *odata = (struct pgm_data*)(header + 1);
+	        odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+	        odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
+
+		gpointer dst = NULL;
+
+		if (is_one_apdu)
+		{
+/* OPT_LENGTH */
+			struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(odata + 1);
+			opt_len->opt_type	= PGM_OPT_LENGTH;
+			opt_len->opt_length	= sizeof(struct pgm_opt_length);
+			opt_len->opt_total_length	= g_htons (	sizeof(struct pgm_opt_length) +
+									sizeof(struct pgm_opt_header) +
+									sizeof(struct pgm_opt_fragment) );
+/* OPT_FRAGMENT */
+			struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+			opt_header->opt_type	= PGM_OPT_FRAGMENT | PGM_OPT_END;
+			opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+							sizeof(struct pgm_opt_fragment);
+			struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+			opt_fragment->opt_reserved	= 0;
+			opt_fragment->opt_sqn		= g_htonl (first_sqn);
+			opt_fragment->opt_frag_off	= g_htonl (data_bytes_offset);
+			opt_fragment->opt_frag_len	= g_htonl (apdu_length);
+
+			dst = opt_fragment + 1;
+		}
+		else
+		{
+			dst = odata + 1;
+		}
+
+/* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
+	        header->pgm_checksum    = 0;
+
+		gsize pgm_header_len	= (guint8*)dst - (guint8*)header;
+		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
+		guint32 unfolded_odata	= pgm_csum_partial_copy ((guint8*)vector[i].iov_base + data_bytes_offset, dst, tsdu_length, 0);
+		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+
+/* add to transmit window */
+		pgm_txw_push (transport->txw, pkt, tpdu_length);
+
+		gssize sent = pgm_sendto (transport,
+					TRUE,			/* rate limited */
+					FALSE,			/* regular socket */
+					header,
+					tpdu_length,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+
+/* save unfolded odata for retransmissions */
+		*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
+
+		if (sent == (gssize)tpdu_length)
+		{
+			packets++;
+			bytes_sent += tpdu_length + transport->iphdr_len;
+			data_bytes_sent += tsdu_length;
+		}
+
+		data_bytes_offset += tsdu_length;
+
+	} while (data_bytes_offset < count);
+
+/* release txw lock here in order to allow spms to lock mutex */
+	g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+	pgm_reset_heartbeat_spm (transport);
+
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
+
+	return (gssize)data_bytes_sent;
+}
 
 /* send an apdu.
  *
@@ -5225,8 +5456,7 @@ pgm_transport_send (
 {
 	g_assert( transport->can_send );
 
-	if ( len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
-                                               sizeof(struct pgm_data) ) ) )
+	if ( len <= pgm_transport_max_tsdu (transport, FALSE) )
 	{
 		return pgm_transport_send_one_copy_unlocked (transport, data, len, flags);
 	}
@@ -5289,7 +5519,8 @@ pgm_transport_sendv (
 	{
 		gssize sent;
 
-		if ( vector[i].iov_len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+		if ( vector[i].iov_len <= ( transport->max_tpdu - (  transport->iphdr_len +
+								     sizeof(struct pgm_header) +
     	  	                                                     sizeof(struct pgm_data) +
 								     varpkt_reserve ) ) )
 		{
@@ -5315,60 +5546,51 @@ pgm_transport_sendv (
  */
 
 static inline gssize
-pgm_transport_send_fragment_unlocked (
+pgm_transport_send_pkt_dontwait_unlocked (
 	pgm_transport_t*	transport,
 	gconstpointer		buf,
 	gsize			count,
-	int			flags,		/* MSG_DONTWAIT = non-blocking */
-	guint32*		offset,
-	guint32*		first_sqn
+	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
 	guint packets = 0;
 	gsize bytes_sent = 0;
 	gsize data_bytes_sent = 0;
-	gsize data_bytes_offset = 0;	/* count this run of assumed sent */
 
 	gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
 
-	g_static_rw_lock_writer_lock (&transport->txw_lock);
+/* try again call */
+	if (transport->has_blocking_send)
+	{
+		goto try_send_again;
+	}
 
 /* first call */
-	if (offset == 0)
+	if (!transport->has_txw_writer_lock)
 	{
-		*first_sqn = pgm_txw_next_lead(transport->txw);
+		g_static_rw_lock_writer_lock (&transport->txw_lock);
+
+#define STATE(x)	(transport->pkt_dontwait_state.x)
+		STATE(data_bytes_offset) = 0;
+		STATE(first_sqn)	 = pgm_txw_next_lead(transport->txw);
 	}
 
 	do {
-		if (flags & MSG_DONTWAIT)
-		{
-			gsize header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
-					sizeof(struct pgm_opt_length) +		/* includes header */
-					sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-			gsize tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length - varpkt_reserve, count);
-			gsize tpdu_length = header_length + tsdu_length;
-
-			int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
-			if (result == -1) {
-				return (gssize)result;
-			}
-		}
-
 /* retrieve packet storage from transmit window */
 		gsize header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
 				sizeof(struct pgm_opt_length) +		/* includes header */
 				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-		gsize tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length - varpkt_reserve, count - *offset);
-		gsize tpdu_length = header_length + tsdu_length;
+		STATE(tsdu_length) = MIN(transport->max_tpdu - transport->iphdr_len - header_length - varpkt_reserve, count - STATE(data_bytes_offset));
+		STATE(tpdu_length) = header_length + STATE(tsdu_length);
 
-		gpointer pkt = pgm_txw_alloc(transport->txw);
-		struct pgm_header *header = (struct pgm_header*)pkt;
+		STATE(pkt) = pgm_txw_alloc(transport->txw);
+		struct pgm_header *header = (struct pgm_header*)STATE(pkt);
 		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
 		header->pgm_sport	= transport->tsi.sport;
 		header->pgm_dport	= transport->dport;
 		header->pgm_type        = PGM_ODATA;
 	        header->pgm_options     = PGM_OPT_PRESENT;
-	        header->pgm_tsdu_length = g_htons (tsdu_length);
+	        header->pgm_tsdu_length = g_htons (STATE(tsdu_length));
 
 /* ODATA */
 		struct pgm_data *odata = (struct pgm_data*)(header + 1);
@@ -5389,8 +5611,8 @@ pgm_transport_send_fragment_unlocked (
 						sizeof(struct pgm_opt_fragment);
 		struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
 		opt_fragment->opt_reserved	= 0;
-		opt_fragment->opt_sqn		= g_htonl (*first_sqn);
-		opt_fragment->opt_frag_off	= g_htonl (*offset);
+		opt_fragment->opt_sqn		= g_htonl (STATE(first_sqn));
+		opt_fragment->opt_frag_off	= g_htonl (STATE(data_bytes_offset));
 		opt_fragment->opt_frag_len	= g_htonl (count);
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
@@ -5398,50 +5620,69 @@ pgm_transport_send_fragment_unlocked (
 
 		gsize pgm_header_len	= (guint8*)(opt_fragment + 1) - (guint8*)header;
 		guint32 unfolded_header	= pgm_csum_partial (header, pgm_header_len, 0);
-		guint32 unfolded_odata	= pgm_csum_partial_copy ((const guint8*)buf + *offset, opt_fragment + 1, tsdu_length, 0);
-		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+		STATE(unfolded_odata)	= pgm_csum_partial_copy ((const guint8*)buf + STATE(data_bytes_offset), opt_fragment + 1, STATE(tsdu_length), 0);
+		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
-		pgm_txw_push (transport->txw, pkt, tpdu_length);
+		pgm_txw_push (transport->txw, STATE(pkt), STATE(tpdu_length));
 
-		gssize sent = pgm_sendto (transport,
+		gssize sent;
+
+try_send_again:
+		sent = pgm_sendto (transport,
 					TRUE,			/* rate limited */
 					FALSE,			/* regular socket */
-					header,
-					tpdu_length,
-					MSG_CONFIRM,		/* not expecting a reply */
+					STATE(pkt),
+					STATE(tpdu_length),
+					MSG_DONTWAIT | MSG_CONFIRM,	/* not expecting a reply */
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
-
-/* save unfolded odata for retransmissions */
-		*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
-
-		if ( sent == (gssize)tpdu_length )
+		if (sent < 0 && errno == EAGAIN)
 		{
-			packets++;
-			bytes_sent += tpdu_length + transport->iphdr_len;
-			data_bytes_sent += tsdu_length;
+			transport->has_blocking_send = TRUE;
+			goto blocked;
 		}
 
-		*offset += tsdu_length;
-		data_bytes_offset += tsdu_length;
+/* save unfolded odata for retransmissions */
+		*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
 
-	} while (*offset < count);
+		if ( sent == (gssize)STATE(tpdu_length) )
+		{
+			packets++;
+			bytes_sent += STATE(tpdu_length) + transport->iphdr_len;
+			data_bytes_sent += STATE(tsdu_length);
+		}
 
-/* release txw lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->txw_lock);
+		STATE(data_bytes_offset) += STATE(tsdu_length);
+
+	} while (STATE(data_bytes_offset) < count);
 
 /* only cleanup on trailing packet */
-	if (*offset == count)
+	if (STATE(data_bytes_offset) == count)
 	{
+/* release txw lock here in order to allow spms to lock mutex */
+		g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
 		pgm_reset_heartbeat_spm (transport);
+
+		transport->has_txw_writer_lock = FALSE;
 	}
+
+	transport->has_blocking_send = FALSE;
 
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
 
-	return data_bytes_offset;
+	return STATE(data_bytes_offset);
+#undef STATE
+
+blocked:
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
+
+	return -1;
 }
 
 /*
@@ -5450,28 +5691,22 @@ pgm_transport_send_fragment_unlocked (
  * if the packet sizes would exceed the current rate limit.
  */
 gssize
-pgm_transport_send_fragment (
+pgm_transport_send_pkt_dontwait (
 	pgm_transport_t*	transport,
 	gconstpointer		data,
 	gsize			len,
-	int			flags,		/* MSG_DONTWAIT = non-blocking */
-	guint32*		offset,
-	guint32*		first_sqn
+	int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
 	g_assert( transport->can_send );
 
-	gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
-
-	g_static_rw_lock_writer_lock (&transport->txw_lock);
-	if ( len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
-                                               sizeof(struct pgm_data) +
-					       varpkt_reserve ) ) )
+	if ( len <= pgm_transport_max_tsdu (transport, FALSE) )
 	{
+		g_static_rw_lock_writer_lock (&transport->txw_lock);
 		return pgm_transport_send_one_copy_unlocked (transport, data, len, flags);
 	}
 
-	return pgm_transport_send_fragment_unlocked (transport, data, len, flags, offset, first_sqn);
+	return pgm_transport_send_pkt_dontwait_unlocked (transport, data, len, flags);
 }
 
 /* send a vector of tsdu's owned by the transmit window
@@ -5494,6 +5729,13 @@ pgm_transport_sendv2 (
 {
 	g_assert( transport->can_send );
 
+	if ( count == 1 ) {
+		return pgm_transport_send_one_unlocked (transport,
+							vector->iov_base,
+							vector->iov_len,
+							flags);
+	}
+
 	return 0;	/* not-implemented */
 }
 
@@ -5510,14 +5752,203 @@ pgm_transport_sendv2 (
 gssize
 pgm_transport_sendv2_copy (
 	G_GNUC_UNUSED pgm_transport_t*		transport,
-	G_GNUC_UNUSED const struct iovec*	vector,
+	G_GNUC_UNUSED const struct iovec*	vector,		/* packet not payload */
 	G_GNUC_UNUSED guint			count,
 	G_GNUC_UNUSED int			flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
 	g_assert( transport->can_send );
 
+	if ( count == 1 ) {
+		return pgm_transport_send_one_copy_unlocked (transport,
+							(guint8*)vector->iov_base + pgm_transport_pkt_offset(FALSE),
+							vector->iov_len,
+							flags);
+	}
+
 	return 0;	/* not-implemented */
+}
+
+static inline gsize
+pgm_transport_send_iov_apdu_pkt_dontwait_unlocked (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	guint			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	guint packets = 0;
+	gsize bytes_sent = 0;
+	gsize data_bytes_sent = 0;
+
+/* if parity is enabled a 16-bit word is necessary to store actual TSDU length for 
+ * variable TSDU length transmission groups.
+ */
+	gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
+
+/* try again call */
+	if (transport->has_blocking_send)
+	{
+		goto try_send_again;
+	}
+
+/* first call */
+	if (!transport->has_txw_writer_lock)
+	{
+		g_static_rw_lock_writer_lock (&transport->txw_lock);
+
+#define STATE(x)	(transport->pkt_dontwait_state.x)
+		STATE(data_bytes_offset)= 0;
+		STATE(first_sqn)	= pgm_txw_next_lead(transport->txw);
+
+/* determine APDU length */
+		STATE(apdu_length)	= 0;
+		for (unsigned i = 0; i < count; i++)
+		{
+			STATE(apdu_length) += vector[i].iov_len;
+		}
+
+		STATE(vector_index)	= 0;
+		STATE(vector_offset)	= 0;
+	}
+
+	do {
+/* retrieve packet storage from transmit window */
+		gsize header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
+				sizeof(struct pgm_opt_length) +		/* includes header */
+				sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		STATE(tsdu_length) = MIN(transport->max_tpdu - transport->iphdr_len - header_length - varpkt_reserve, STATE(apdu_length) - STATE(data_bytes_offset));
+		STATE(tpdu_length) = header_length + STATE(tsdu_length);
+
+		STATE(pkt) = pgm_txw_alloc(transport->txw);
+		struct pgm_header *header = (struct pgm_header*)STATE(pkt);
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+		header->pgm_sport	= transport->tsi.sport;
+		header->pgm_dport	= transport->dport;
+		header->pgm_type        = PGM_ODATA;
+	        header->pgm_options     = PGM_OPT_PRESENT;
+	        header->pgm_tsdu_length = g_htons (STATE(tsdu_length));
+
+/* ODATA */
+		struct pgm_data *odata = (struct pgm_data*)(header + 1);
+	        odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+	        odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
+
+/* OPT_LENGTH */
+		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(odata + 1);
+		opt_len->opt_type	= PGM_OPT_LENGTH;
+		opt_len->opt_length	= sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length	= g_htons (	sizeof(struct pgm_opt_length) +
+								sizeof(struct pgm_opt_header) +
+								sizeof(struct pgm_opt_fragment) );
+/* OPT_FRAGMENT */
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+		opt_header->opt_type	= PGM_OPT_FRAGMENT | PGM_OPT_END;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_fragment);
+		struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+		opt_fragment->opt_reserved	= 0;
+		opt_fragment->opt_sqn		= g_htonl (STATE(first_sqn));
+		opt_fragment->opt_frag_off	= g_htonl (STATE(data_bytes_offset));
+		opt_fragment->opt_frag_len	= g_htonl (count);
+
+/* checksum & copy */
+	        header->pgm_checksum    = 0;
+		gsize pgm_header_len	= (guint8*)(opt_fragment + 1) - (guint8*)header;
+		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
+		STATE(unfolded_odata)   = 0;
+
+/* iterate over one or more vector elements to perform scatter/gather checksum & copy */
+		guint src_offset = 0;
+		gsize copy_length = STATE(tsdu_length);
+		for (;;)
+		{
+			gsize element_length = vector[STATE(vector_index)].iov_len - STATE(vector_offset);
+
+			if (copy_length <= element_length)
+			{
+				STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, copy_length, STATE(unfolded_odata));
+				if (copy_length == element_length) {
+					STATE(vector_index)++;
+					STATE(vector_offset) = 0;
+				} else {
+					STATE(vector_offset) += copy_length;
+				}
+				break;
+			}
+			else
+			{
+/* copy part of TSDU */
+				STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, element_length, STATE(unfolded_odata));
+				src_offset += element_length;
+				copy_length -= element_length;
+				STATE(vector_index)++;
+				STATE(vector_offset) = 0;
+			}
+		}
+
+		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+
+/* add to transmit window */
+		pgm_txw_push (transport->txw, STATE(pkt), STATE(tpdu_length));
+
+		gssize sent;
+
+try_send_again:
+		sent = pgm_sendto (transport,
+					TRUE,			/* rate limited */
+					FALSE,			/* regular socket */
+					STATE(pkt),
+					STATE(tpdu_length),
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
+					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
+		if (sent < 0 && errno == EAGAIN)
+		{
+			transport->has_blocking_send = TRUE;
+			goto blocked;
+		}
+
+/* save unfolded odata for retransmissions */
+		*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+
+		if ( sent == (gssize)STATE(tpdu_length))
+		{
+			packets++;
+			bytes_sent += STATE(tpdu_length) + transport->iphdr_len;
+			data_bytes_sent += STATE(tsdu_length);
+		}
+
+		STATE(data_bytes_offset) += STATE(tsdu_length);
+
+	} while (STATE(data_bytes_offset) < STATE(apdu_length));
+
+/* only cleanup on trailing packet */
+	if (STATE(data_bytes_offset) == STATE(apdu_length))
+	{
+/* release txw lock here in order to allow spms to lock mutex */
+		g_static_rw_lock_writer_unlock (&transport->txw_lock);
+
+		pgm_reset_heartbeat_spm (transport);
+
+		transport->has_txw_writer_lock = FALSE;
+	}
+
+	transport->has_blocking_send = FALSE;
+
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
+
+	return (gssize)STATE(apdu_length);
+#undef STATE
+
+blocked:
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
+	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT] += packets;	/* assuming packets not APDUs */
+	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += bytes_sent;
+
+	return (gssize)-1;
 }
 
 /* combine and send a scatter/gather vector of application buffers
@@ -5569,7 +6000,8 @@ pgm_transport_sendv3 (
         }
 
 	gssize sent;
-	if ( apdu_length <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+	if ( apdu_length <= ( transport->max_tpdu - (  transport->iphdr_len +
+						       sizeof(struct pgm_header) +
     	 	                                       sizeof(struct pgm_data) +
 						       varpkt_reserve ) ) )
 	{
@@ -5578,6 +6010,36 @@ pgm_transport_sendv3 (
 	else
 	{
 		sent = pgm_transport_send_iov_apdu_unlocked (transport, vector, count, 0);
+	}
+
+	return sent;
+}
+
+gssize
+pgm_transport_sendv3_pkt_dontwait (
+	pgm_transport_t*	transport,
+	const struct iovec*	vector,
+	guint			count,
+	int			flags		/* MSG_DONTWAIT = non-blocking */
+	)
+{
+	g_assert( transport->can_send );
+
+/* determine APDU length */
+	gsize apdu_length = 0;
+	for (unsigned i = 0; i < count; i++)
+	{
+		apdu_length += vector[i].iov_len;
+	}
+	
+	gssize sent;
+	if ( apdu_length <= pgm_transport_max_tsdu (transport, FALSE) )
+	{
+		sent = pgm_transport_send_one_iov_unlocked (transport, vector, count, flags);
+	}
+	else
+	{
+		sent = pgm_transport_send_iov_apdu_pkt_dontwait_unlocked (transport, vector, count, flags);
 	}
 
 	return sent;

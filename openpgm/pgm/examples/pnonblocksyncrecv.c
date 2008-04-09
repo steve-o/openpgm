@@ -126,7 +126,7 @@ main (
 			int n_fds = IP_MAX_MEMBERSHIPS;
 			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
 			memset (fds, 0, sizeof(fds));
-			pgm_transport_poll_info (g_transport, fds, &n_fds);
+			pgm_transport_poll_info (g_transport, fds, &n_fds, EPOLLIN);
 			poll (fds, n_fds, 1000 /* ms */);
 		}
 	} while (!g_quit);

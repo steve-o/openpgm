@@ -217,6 +217,22 @@ struct pgm_transport_t {
     gpointer            txw;		   	    /* pgm_txw_t */
     gpointer		rate_control;		    /* rate_t */
 
+    gboolean		has_txw_writer_lock;	    /* writer-lock on txw_lock exists */
+    gboolean		has_blocking_send;	    /* send would block */
+
+    struct {
+	gsize		    data_bytes_offset;
+	guint32		    first_sqn;
+	gpointer	    pkt;
+	gsize		    tsdu_length;
+	gsize		    tpdu_length;
+	guint32		    unfolded_odata;
+/* v3 */
+	gsize		    apdu_length;
+	guint		    vector_index;
+	gsize		    vector_offset;
+    } pkt_dontwait_state;
+
     guint32		spm_sqn;
     guint		spm_ambient_interval;	    /* microseconds */
     guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
@@ -324,6 +340,14 @@ int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint
 int pgm_transport_set_send_only (pgm_transport_t*);
 int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
 
+gsize pgm_transport_pkt_offset (gboolean);
+static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
+{
+    gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
+    gsize header_length = pgm_transport_pkt_offset (can_fragment);
+    return transport->max_tpdu - transport->iphdr_len - header_length - varpkt_reserve;
+}
+
 int pgm_set_nonblocking (int filedes[2]);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
@@ -332,15 +356,16 @@ gssize pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, guint, int);
 gssize pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, guint, int);
 gssize pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, guint, int);
 
-gssize pgm_transport_send_fragment (pgm_transport_t*, gconstpointer, gsize, int, guint32*, guint32*);
+gssize pgm_transport_send_pkt_dontwait (pgm_transport_t*, gconstpointer, gsize, int);
+gssize pgm_transport_sendv3_pkt_dontwait (pgm_transport_t*, const struct iovec*, guint, int);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
 gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int);
 gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int);
 
-int pgm_transport_select_info (pgm_transport_t*, fd_set*, int*);
-int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*);
+int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
+int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
 int pgm_transport_epoll_ctl (pgm_transport_t*, int, int, int);
 
 
