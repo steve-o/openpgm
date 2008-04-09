@@ -127,7 +127,7 @@ main (
 			fd_set readfds;
 			struct timeval timeout = {0, 100 * 1000000UL};
 			FD_ZERO(&readfds);
-			pgm_transport_select_info (g_transport, &readfds, &fds);
+			pgm_transport_select_info (g_transport, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, block ? NULL : &timeout);
 		}
 	} while (!g_quit);
