@@ -224,12 +224,12 @@ pgm_transport_pkt_offset (
 	gboolean		can_fragment
 	)
 {
-	return can_fragment ? ( sizeof(struct pgm_header) + sizeof(struct pgm_data) )
-			    : ( sizeof(struct pgm_header)
+	return can_fragment ? ( sizeof(struct pgm_header)
 			      + sizeof(struct pgm_data)
 			      + sizeof(struct pgm_opt_length)
 	                      + sizeof(struct pgm_opt_header)
-			      + sizeof(struct pgm_opt_fragment) );
+			      + sizeof(struct pgm_opt_fragment) )
+			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
 }
 
 /* fast log base 2 of power of 2
@@ -4724,6 +4724,10 @@ pgm_transport_send_one_unlocked (
 	G_GNUC_UNUSED int	flags
 	)
 {
+	g_assert( transport );
+	g_assert( buf );
+	g_assert( count > 0 );	/* count cannot be 0, 0 = recv() means closed socket */
+
 /* retrieve packet storage from transmit window, intentional convert const void* to void*
  */
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
