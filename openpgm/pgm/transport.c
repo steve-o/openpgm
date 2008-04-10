@@ -147,7 +147,7 @@ static int on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
 static int on_odata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_rdata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 
-static gssize pgm_transport_send_one_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
+static gssize pgm_transport_send_one_unlocked (pgm_transport_t*, gpointer, gsize, int);
 static gssize pgm_transport_send_one_copy_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
 
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
@@ -1508,6 +1508,9 @@ pgm_transport_bind (
 		g_trace ("INFO","assuming UDP header size of %i bytes", udphdr_len);
 		transport->iphdr_len += udphdr_len;
 	}
+
+	transport->max_tsdu = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (FALSE);
+	transport->max_tsdu_fragment = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (TRUE);
 
 	if (transport->can_send)
 	{
@@ -4714,24 +4717,24 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
  * from the transmit window, and offset to include the pgm header.
  *
  * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.
+ * attempted to send to the socket layer.  on invalid arguments, -EINVAL is returned.
  */
 static gssize
 pgm_transport_send_one_unlocked (
 	pgm_transport_t*	transport,
-	gconstpointer		buf,		/* offset to payload, no options */
+	gpointer		buf,		/* offset to payload, no options */
 	gsize			count,
 	G_GNUC_UNUSED int	flags
 	)
 {
-	g_assert( transport );
-	g_assert( buf );
-	g_assert( count > 0 );	/* count cannot be 0, 0 = recv() means closed socket */
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (buf != NULL, -EINVAL);
+	g_return_val_if_fail (count <= transport->max_tsdu, -EINVAL);
 
-/* retrieve packet storage from transmit window, intentional convert const void* to void*
+/* retrieve packet storage from transmit window
  */
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
-	gpointer pkt = (const guint8*)buf - sizeof(struct pgm_header) - sizeof(struct pgm_data);
+	gpointer pkt = (guint8*)buf - sizeof(struct pgm_header) - sizeof(struct pgm_data);
 
 	struct pgm_header *header = (struct pgm_header*)pkt;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);

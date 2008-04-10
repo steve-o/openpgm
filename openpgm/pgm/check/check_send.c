@@ -8,6 +8,7 @@
 #include <../transport.c>
 
 static pgm_transport_t* g_transport = NULL;
+static gsize max_tsdu = 0;
 
 
 static void
@@ -84,7 +85,7 @@ START_TEST (test_pgm_transport_send_one_unlocked)
 			"Invalid transport.");
 
 	gconstpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
-	gsize		tsdu_length	= 2;
+	gsize		tsdu_length	= _i;
 	int		flags		= 0;
 
 	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
@@ -93,6 +94,22 @@ START_TEST (test_pgm_transport_send_one_unlocked)
 	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
 }
 END_TEST
+
+START_TEST (test_pgm_transport_send_one_unlocked_fail)
+{
+	fail_unless (g_transport,
+			"Invalid transport.");
+
+	gconstpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	gsize		tsdu_length	= max_tsdu + 1;
+	int		flags		= 0;
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	fail_unless ((gssize)tsdu_length != pgm_transport_send_one_unlocked (g_transport, pkt, tsdu_length, flags));
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+}
+END_TEST
+
 
 Suite*
 make_send_suite (void)
@@ -103,8 +120,11 @@ make_send_suite (void)
 
 	tcase_add_checked_fixture (tc_send, setup, teardown);
 
+	max_tsdu = 1500 - 20 - pgm_transport_pkt_offset (FALSE);
+
 	suite_add_tcase (s, tc_send);
-	tcase_add_test (tc_send, test_pgm_transport_send_one_unlocked);
+	tcase_add_loop_test (tc_send, test_pgm_transport_send_one_unlocked, 0, max_tsdu);
+	tcase_add_test (tc_send, test_pgm_transport_send_one_unlocked_fail);
 
 	return s;
 }
