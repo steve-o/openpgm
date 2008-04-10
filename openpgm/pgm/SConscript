@@ -19,5 +19,6 @@ SConscript('SConscript.libpgmsnmp');
 SConscript('test/SConscript');
 SConscript('dev/SConscript');
 SConscript('examples/SConscript');
+SConscript('check/SConscript');
 
 # end of file
