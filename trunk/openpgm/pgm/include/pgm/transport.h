@@ -207,6 +207,8 @@ struct pgm_transport_t {
     int			recv_sock;
 
     guint16		max_tpdu;
+    guint16		max_tsdu;		    /* excluding optional varpkt_len word */
+    guint16		max_tsdu_fragment;
     gsize		iphdr_len;
     guint		hops;
     guint		txw_preallocate, txw_sqns, txw_secs, txw_max_rte;
@@ -343,9 +345,10 @@ int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
 gsize pgm_transport_pkt_offset (gboolean);
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
 {
-    gsize varpkt_reserve = transport->use_varpkt_len ? sizeof(guint16) : 0;
-    gsize header_length = pgm_transport_pkt_offset (can_fragment);
-    return transport->max_tpdu - transport->iphdr_len - header_length - varpkt_reserve;
+    gsize max_tsdu = can_fragment ? transport->max_tsdu_fragment : transport->max_tsdu;
+    if (transport->use_varpkt_len)
+	max_tsdu -= sizeof (guint16);
+    return max_tsdu;
 }
 
 int pgm_set_nonblocking (int filedes[2]);
