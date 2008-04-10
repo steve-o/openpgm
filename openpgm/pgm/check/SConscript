@@ -1,0 +1,17 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+e = env.Copy();
+e.ParseConfig('pkg-config --static --cflags --libs check');
+
+e2 = e.Copy();
+e2.Append(LIBS = ['libpgm', 'libpgmex']);
+e2.Program('check_pgm', ['check_pgm.c', 'check_send.c'])
+
+e3 = e.Copy();
+e2.Append(LIBS = ['libpgmplus', 'libpgmex']);
+e2.Program('check_pgmplus', ['check_pgm.c', 'check_send.c'])
+
+# end of file
