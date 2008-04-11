@@ -67,10 +67,49 @@ teardown (void)
 	g_transport = NULL;
 }
 
-/* target: pgm_transport_send_one_unlocked (
+/* target: pgm_transport_send_one (
  * 		   pgm_transport_t*        transport,
- * 		   gconstpointer           buf,
- * 		   gsize                   count,
+ * 		   gconstpointer           tsdu,
+ * 		   gsize                   tsdu_length,
+ * 		   G_GNUC_UNUSED int       flags
+ * 		   )
+ *
+ *  pre-condition: transport is valid,
+ *		   buf is offset to payload from txw allocated packet.
+ * post-condition: return value equals count.
+ */
+START_TEST (test_send_one)
+{
+	fail_unless (g_transport);
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	gpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	gsize		tsdu_length	= _i;
+	int		flags		= 0;
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_one (g_transport, pkt, tsdu_length, flags));
+}
+END_TEST
+
+START_TEST (test_send_one_fail)
+{
+	fail_unless (g_transport);
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	gpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	gsize		tsdu_length	= max_tsdu + 1;
+	int		flags		= 0;
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+
+	fail_unless (-EINVAL == pgm_transport_send_one (g_transport, pkt, tsdu_length, flags));
+}
+END_TEST
+
+/* target: pgm_transport_send_one_copy (
+ * 		   pgm_transport_t*        transport,
+ * 		   gconstpointer           tsdu,
+ * 		   gsize                   tsdu_length,
  * 		   G_GNUC_UNUSED int       flags
  * 		   )
  *
@@ -78,35 +117,65 @@ teardown (void)
  *                 txw_lock
  * post-condition: txw_lock unlocked
  */
-
-START_TEST (test_pgm_transport_send_one_unlocked)
+START_TEST (test_send_one_copy)
 {
-	fail_unless (g_transport,
-			"Invalid transport.");
+	fail_unless (g_transport);
 
-	gconstpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	guint8		buffer[ 1500 ];
 	gsize		tsdu_length	= _i;
 	int		flags		= 0;
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_one_unlocked (g_transport, pkt, tsdu_length, flags));
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_one_copy (g_transport, buffer, tsdu_length, flags));
 }
 END_TEST
 
-START_TEST (test_pgm_transport_send_one_unlocked_fail)
+START_TEST (test_send_one_copy_fail)
 {
-	fail_unless (g_transport,
-			"Invalid transport.");
+	fail_unless (g_transport);
 
-	gconstpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	guint8		buffer[ 1500 ];
 	gsize		tsdu_length	= max_tsdu + 1;
 	int		flags		= 0;
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	fail_unless ((gssize)tsdu_length != pgm_transport_send_one_unlocked (g_transport, pkt, tsdu_length, flags));
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+	fail_unless (-EINVAL == pgm_transport_send_one (g_transport, buffer, tsdu_length, flags));
+}
+END_TEST
+
+/* target: pgm_transport_send_onev (
+ * 		   pgm_transport_t*        transport,
+ * 		   const struct iovec*     vector,
+ * 		   gsize                   count,
+ * 		   G_GNUC_UNUSED int       flags
+ * 		   )
+ *
+ *  pre-condition: transport is valid,
+ *		   buf is offset to payload from txw allocated packet.
+ * post-condition: return value equals count.
+ */
+START_TEST (test_send_onev)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = _i } };
+	gsize		count		= 1;
+	gsize		tsdu_length	= _i;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+START_TEST (test_send_onev_fail)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = max_tsdu + 1 } };
+	gsize		count		= 1;
+	int		flags		= 0;
+
+	fail_unless (-EINVAL == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
 END_TEST
 
@@ -116,15 +185,30 @@ make_send_suite (void)
 {
 	Suite* s = suite_create ("Send");
 
-	TCase* tc_send = tcase_create ("Basic");
+	TCase* tc_send_one = tcase_create ("send_one");
+	TCase* tc_send_one_copy = tcase_create ("send_one_copy");
+	TCase* tc_send_onev = tcase_create ("send_onev");
 
-	tcase_add_checked_fixture (tc_send, setup, teardown);
+	tcase_add_checked_fixture (tc_send_one, setup, teardown);
+	tcase_add_checked_fixture (tc_send_one_copy, setup, teardown);
+	tcase_add_checked_fixture (tc_send_onev, setup, teardown);
 
 	max_tsdu = 1500 - 20 - pgm_transport_pkt_offset (FALSE);
 
-	suite_add_tcase (s, tc_send);
-	tcase_add_loop_test (tc_send, test_pgm_transport_send_one_unlocked, 0, max_tsdu);
-	tcase_add_test (tc_send, test_pgm_transport_send_one_unlocked_fail);
+	suite_add_tcase (s, tc_send_one);
+	tcase_add_loop_test (tc_send_one, test_send_one, 0, 4);
+	tcase_add_loop_test (tc_send_one, test_send_one, max_tsdu - 4, max_tsdu);
+	tcase_add_test (tc_send_one, test_send_one_fail);
+
+	suite_add_tcase (s, tc_send_one_copy);
+	tcase_add_loop_test (tc_send_one_copy, test_send_one_copy, 0, 4);
+	tcase_add_loop_test (tc_send_one_copy, test_send_one_copy, max_tsdu - 4, max_tsdu);
+	tcase_add_test (tc_send_one_copy, test_send_one_copy_fail);
+
+	suite_add_tcase (s, tc_send_onev);
+	tcase_add_loop_test (tc_send_onev, test_send_onev, 0, 4);
+	tcase_add_loop_test (tc_send_onev, test_send_onev, max_tsdu - 4, max_tsdu);
+	tcase_add_test (tc_send_onev, test_send_onev_fail);
 
 	return s;
 }
