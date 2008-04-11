@@ -147,8 +147,8 @@ static int on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
 static int on_odata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_rdata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 
-static gssize pgm_transport_send_one_unlocked (pgm_transport_t*, gpointer, gsize, int);
-static gssize pgm_transport_send_one_copy_unlocked (pgm_transport_t*, gconstpointer, gsize, int);
+static gssize pgm_transport_send_one (pgm_transport_t*, gpointer, gsize, int);
+static gssize pgm_transport_send_one_copy (pgm_transport_t*, gconstpointer, gsize, int);
 
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
@@ -4717,24 +4717,39 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
  * from the transmit window, and offset to include the pgm header.
  *
  * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on invalid arguments, -EINVAL is returned.
+ * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
+ * if the packet sizes would exceed the current rate limit. on invalid arguments,
+ * -EINVAL is returned.
+ *
+ * ! always returns successful if data is pushed into the transmit window, even if
+ * sendto() double fails ¡  we don't want the application to try again as that is the
+ * reliable transports role.
  */
 static gssize
-pgm_transport_send_one_unlocked (
+pgm_transport_send_one (
 	pgm_transport_t*	transport,
-	gpointer		buf,		/* offset to payload, no options */
-	gsize			count,
+	gpointer		tsdu,
+	gsize			tsdu_length,
 	G_GNUC_UNUSED int	flags
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (buf != NULL, -EINVAL);
-	g_return_val_if_fail (count <= transport->max_tsdu, -EINVAL);
+	g_return_val_if_fail (tsdu != NULL, -EINVAL);
+	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
+
+	if (flags & MSG_DONTWAIT)
+	{
+	        gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + tsdu_length;
+		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
+		if (result == -1) {
+			return (gssize)result;
+		}
+	}
 
 /* retrieve packet storage from transmit window
  */
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
-	gpointer pkt = (guint8*)buf - sizeof(struct pgm_header) - sizeof(struct pgm_data);
+	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + tsdu_length;
+	gpointer pkt = (guint8*)tsdu - sizeof(struct pgm_header) - sizeof(struct pgm_data);
 
 	struct pgm_header *header = (struct pgm_header*)pkt;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
@@ -4743,7 +4758,9 @@ pgm_transport_send_one_unlocked (
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_ODATA;
         header->pgm_options     = 0;
-        header->pgm_tsdu_length = g_htons (count);
+        header->pgm_tsdu_length = g_htons (tsdu_length);
+
+	g_static_rw_lock_writer_lock (&transport->txw_lock);
 
 /* ODATA */
         odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
@@ -4758,7 +4775,7 @@ pgm_transport_send_one_unlocked (
 	gssize sent = pgm_sendto (transport,
 				TRUE,			/* rate limited */
 				FALSE,			/* regular socket */
-				header,
+				pkt,
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
@@ -4769,14 +4786,14 @@ pgm_transport_send_one_unlocked (
 
 	pgm_reset_heartbeat_spm (transport);
 
-	if ( sent == (gssize)count )
+	if ( sent == (gssize)tpdu_length )
 	{
-		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += count;
+		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length + transport->iphdr_len;
 	}
 
-	return (gssize)count;
+	return (gssize)tsdu_length;
 }
 
 /* one packet, one buffer.
@@ -4786,16 +4803,20 @@ pgm_transport_send_one_unlocked (
  * if the packet sizes would exceed the current rate limit.
  */
 static inline gssize
-pgm_transport_send_one_copy_unlocked (
+pgm_transport_send_one_copy (
 	pgm_transport_t*	transport,
-	gconstpointer		buf,		/* payload */
-	gsize			count,
+	gconstpointer		tsdu,
+	gsize			tsdu_length,
 	int			flags
 	)
 {
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (tsdu != NULL, -EINVAL);
+	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
+
 	if (flags & MSG_DONTWAIT)
 	{
-	        gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
+	        gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + tsdu_length;
 		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
 		if (result == -1) {
 			return (gssize)result;
@@ -4807,7 +4828,7 @@ pgm_transport_send_one_copy_unlocked (
 	gpointer pkt = pgm_txw_alloc (transport->txw);
 
 /* retrieve packet storage from transmit window */
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + count;
+	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + tsdu_length;
 
 	struct pgm_header *header = (struct pgm_header*)pkt;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
@@ -4816,7 +4837,7 @@ pgm_transport_send_one_copy_unlocked (
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_ODATA;
         header->pgm_options     = 0;
-        header->pgm_tsdu_length = g_htons (count);
+        header->pgm_tsdu_length = g_htons (tsdu_length);
 
 /* ODATA */
         odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
@@ -4826,7 +4847,7 @@ pgm_transport_send_one_copy_unlocked (
 
 	gsize pgm_header_len	= (guint8*)(odata + 1) - (guint8*)header;
 	guint32 unfolded_header	= pgm_csum_partial (header, pgm_header_len, 0);
-	guint32 unfolded_odata	= pgm_csum_partial_copy (buf, odata + 1, count, 0);
+	guint32 unfolded_odata	= pgm_csum_partial_copy (tsdu, odata + 1, tsdu_length, 0);
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
@@ -4851,13 +4872,13 @@ pgm_transport_send_one_copy_unlocked (
 
 	if ( sent == (gssize)tpdu_length )
 	{
-		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += count;
+		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length + transport->iphdr_len;
 	}
 
 /* return data payload length sent */
-	return (gssize)count;
+	return (gssize)tsdu_length;
 }
 
 /* one packet spread across a scatter/gather io vector
@@ -4867,23 +4888,32 @@ pgm_transport_send_one_copy_unlocked (
  * if the packet sizes would exceed the current rate limit.
  */
 static inline gssize
-pgm_transport_send_one_iov_unlocked (
+pgm_transport_send_onev (
 	pgm_transport_t*	transport,
 	const struct iovec*	vector,
 	guint			count,		/* number of items in vector */
 	int			flags
 	)
 {
-/* determine APDU length */
-	gsize apdu_length = 0;
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (count > 0 && vector != NULL, -EINVAL);
+
+	gsize tsdu_length = 0;
 	for (unsigned i = 0; i < count; i++)
 	{
-		apdu_length += vector[i].iov_len;
+#ifdef TRANSPORT_DEBUG
+		if (vector[i].iov_len)
+		{
+			g_assert( vector[i].iov_base );
+		}
+#endif
+		tsdu_length += vector[i].iov_len;
 	}
+	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
 
 	if (flags & MSG_DONTWAIT)
 	{
-	        gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + apdu_length;
+	        gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + tsdu_length;
 		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
 		if (result == -1) {
 			return (gssize)result;
@@ -4895,7 +4925,7 @@ pgm_transport_send_one_iov_unlocked (
 	gpointer pkt = pgm_txw_alloc (transport->txw);
 
 /* retrieve packet storage from transmit window */
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + apdu_length;
+	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + tsdu_length;
 
 	struct pgm_header *header = (struct pgm_header*)pkt;
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
@@ -4904,7 +4934,7 @@ pgm_transport_send_one_iov_unlocked (
 	header->pgm_dport	= transport->dport;
 	header->pgm_type        = PGM_ODATA;
         header->pgm_options     = 0;
-        header->pgm_tsdu_length = g_htons (apdu_length);
+        header->pgm_tsdu_length = g_htons (tsdu_length);
 
 /* ODATA */
         odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
@@ -4920,7 +4950,7 @@ pgm_transport_send_one_iov_unlocked (
 
 /* iterate over one or more vector elements to perform scatter/gather checksum & copy */
 	guint src_offset = 0;
-	gsize copy_length = apdu_length;
+	gsize copy_length = tsdu_length;
 	for (;;)
 	{
 		gsize element_length = vector[vector_index].iov_len - vector_offset;
@@ -4955,7 +4985,7 @@ pgm_transport_send_one_iov_unlocked (
 	gssize sent = pgm_sendto (transport,
 				TRUE,			/* rate limited */
 				FALSE,			/* regular socket */
-				header,
+				pkt,
 				tpdu_length,
 				MSG_CONFIRM,		/* not expecting a reply */
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
@@ -4971,13 +5001,13 @@ pgm_transport_send_one_iov_unlocked (
 
 	if ( sent == (gssize)tpdu_length )
 	{
-		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += apdu_length;
+		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length + transport->iphdr_len;
 	}
 
 /* return data payload length sent */
-	return (gssize)apdu_length;
+	return (gssize)tsdu_length;
 }
 
 /* copy application data (apdu) to multiple tx window (tpdu) entries and send.
@@ -5465,7 +5495,7 @@ pgm_transport_send (
 
 	if ( len <= pgm_transport_max_tsdu (transport, FALSE) )
 	{
-		return pgm_transport_send_one_copy_unlocked (transport, data, len, flags);
+		return pgm_transport_send_one_copy (transport, data, len, flags);
 	}
 
 	return pgm_transport_send_apdu_unlocked (transport, data, len, flags);
@@ -5531,7 +5561,7 @@ pgm_transport_sendv (
     	  	                                                     sizeof(struct pgm_data) +
 								     varpkt_reserve ) ) )
 		{
-			sent = pgm_transport_send_one_copy_unlocked (transport, vector[i].iov_base, vector[i].iov_len, 0);
+			sent = pgm_transport_send_one_copy (transport, vector[i].iov_base, vector[i].iov_len, 0);
 		}
 		else
 		{
@@ -5709,8 +5739,7 @@ pgm_transport_send_pkt_dontwait (
 
 	if ( len <= pgm_transport_max_tsdu (transport, FALSE) )
 	{
-		g_static_rw_lock_writer_lock (&transport->txw_lock);
-		return pgm_transport_send_one_copy_unlocked (transport, data, len, flags);
+		return pgm_transport_send_one_copy (transport, data, len, flags);
 	}
 
 	return pgm_transport_send_pkt_dontwait_unlocked (transport, data, len, flags);
@@ -5737,10 +5766,10 @@ pgm_transport_sendv2 (
 	g_assert( transport->can_send );
 
 	if ( count == 1 ) {
-		return pgm_transport_send_one_unlocked (transport,
-							vector->iov_base,
-							vector->iov_len,
-							flags);
+		return pgm_transport_send_one (transport,
+						vector->iov_base,
+						vector->iov_len,
+						flags);
 	}
 
 	return 0;	/* not-implemented */
@@ -5767,7 +5796,7 @@ pgm_transport_sendv2_copy (
 	g_assert( transport->can_send );
 
 	if ( count == 1 ) {
-		return pgm_transport_send_one_copy_unlocked (transport,
+		return pgm_transport_send_one_copy (transport,
 							(guint8*)vector->iov_base + pgm_transport_pkt_offset(FALSE),
 							vector->iov_len,
 							flags);
@@ -6012,7 +6041,7 @@ pgm_transport_sendv3 (
     	 	                                       sizeof(struct pgm_data) +
 						       varpkt_reserve ) ) )
 	{
-		sent = pgm_transport_send_one_iov_unlocked (transport, vector, count, 0);
+		sent = pgm_transport_send_onev (transport, vector, count, 0);
 	}
 	else
 	{
@@ -6042,7 +6071,7 @@ pgm_transport_sendv3_pkt_dontwait (
 	gssize sent;
 	if ( apdu_length <= pgm_transport_max_tsdu (transport, FALSE) )
 	{
-		sent = pgm_transport_send_one_iov_unlocked (transport, vector, count, flags);
+		sent = pgm_transport_send_onev (transport, vector, count, flags);
 	}
 	else
 	{
