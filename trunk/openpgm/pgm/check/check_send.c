@@ -117,7 +117,7 @@ END_TEST
  *                 txw_lock
  * post-condition: txw_lock unlocked
  */
-START_TEST (test_send_one_copy)
+START_TEST (test_send_one_copy_000)
 {
 	fail_unless (g_transport);
 
@@ -126,6 +126,20 @@ START_TEST (test_send_one_copy)
 	int		flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_one_copy (g_transport, buffer, tsdu_length, flags));
+}
+END_TEST
+
+/* null pointer
+ */
+START_TEST (test_send_one_copy_001)
+{
+	fail_unless (g_transport);
+
+	gpointer	ptr		= NULL;
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_one_copy (g_transport, ptr, tsdu_length, flags));
 }
 END_TEST
 
@@ -144,7 +158,7 @@ END_TEST
 /* target: pgm_transport_send_onev (
  * 		   pgm_transport_t*        transport,
  * 		   const struct iovec*     vector,
- * 		   gsize                   count,
+ * 		   guint                   count,
  * 		   G_GNUC_UNUSED int       flags
  * 		   )
  *
@@ -152,13 +166,13 @@ END_TEST
  *		   buf is offset to payload from txw allocated packet.
  * post-condition: return value equals count.
  */
-START_TEST (test_send_onev)
+START_TEST (test_send_onev_000)
 {
 	fail_unless (g_transport);
 
 	guint8		buffer[ 1500 ];
 	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = _i } };
-	gsize		count		= 1;
+	guint		count		= 1;
 	gsize		tsdu_length	= _i;
 	int		flags		= 0;
 
@@ -166,13 +180,117 @@ START_TEST (test_send_onev)
 }
 END_TEST
 
+/* zero length TSDU in non-zero vector
+ */
+START_TEST (test_send_onev_001)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
+	guint		count		= 1;
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+/* zero length vector
+ */
+START_TEST (test_send_onev_002)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
+	guint		count		= 0;
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+/* null vector
+ */
+START_TEST (test_send_onev_003)
+{
+	fail_unless (g_transport);
+
+	struct iovec*	vector		= NULL;
+	guint		count		= 0;
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+/* zero lead vector
+ */
+START_TEST (test_send_onev_004)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 2 ]	= { { .iov_base = NULL,   .iov_len =  0 },
+					    { .iov_base = buffer, .iov_len = _i } };
+	guint		count		= 2;
+	gsize		tsdu_length	= _i;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+/* zero trail vector
+ */
+START_TEST (test_send_onev_005)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 2 ]	= { { .iov_base = buffer, .iov_len = _i },
+					    { .iov_base = NULL,   .iov_len =  0 } };
+	guint		count		= 2;
+	gsize		tsdu_length	= _i;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+/* flattened vector
+ */
+START_TEST (test_send_onev_006)
+{
+	fail_unless (g_transport);
+
+	guint8		buffer[ 1500 ];
+	struct iovec	vector[ 1500 ];
+	for (int _j = 0; _j < _i; _j++)
+	{
+		vector[_j].iov_base = &buffer[ _j ];
+		vector[_j].iov_len  = 1;
+	}
+	guint		count		= _i;
+	gsize		tsdu_length	= _i;
+	int		flags		= 0;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
+}
+END_TEST
+
+/* too long
+ */
 START_TEST (test_send_onev_fail)
 {
 	fail_unless (g_transport);
 
 	guint8		buffer[ 1500 ];
 	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = max_tsdu + 1 } };
-	gsize		count		= 1;
+	guint		count		= 1;
 	int		flags		= 0;
 
 	fail_unless (-EINVAL == pgm_transport_send_onev (g_transport, vector, count, flags));
@@ -201,13 +319,23 @@ make_send_suite (void)
 	tcase_add_test (tc_send_one, test_send_one_fail);
 
 	suite_add_tcase (s, tc_send_one_copy);
-	tcase_add_loop_test (tc_send_one_copy, test_send_one_copy, 0, 4);
-	tcase_add_loop_test (tc_send_one_copy, test_send_one_copy, max_tsdu - 4, max_tsdu);
+	tcase_add_loop_test (tc_send_one_copy, test_send_one_copy_000, 0, 4);
+	tcase_add_loop_test (tc_send_one_copy, test_send_one_copy_000, max_tsdu - 4, max_tsdu);
+	tcase_add_test (tc_send_one_copy, test_send_one_copy_001);
 	tcase_add_test (tc_send_one_copy, test_send_one_copy_fail);
 
 	suite_add_tcase (s, tc_send_onev);
-	tcase_add_loop_test (tc_send_onev, test_send_onev, 0, 4);
-	tcase_add_loop_test (tc_send_onev, test_send_onev, max_tsdu - 4, max_tsdu);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_000, 0, 4);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_000, max_tsdu - 4, max_tsdu);
+	tcase_add_test (tc_send_onev, test_send_onev_001);
+	tcase_add_test (tc_send_onev, test_send_onev_002);
+	tcase_add_test (tc_send_onev, test_send_onev_003);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_004, 0, 4);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_004, max_tsdu - 4, max_tsdu);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_005, 0, 4);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_005, max_tsdu - 4, max_tsdu);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_006, 0, 4);
+	tcase_add_loop_test (tc_send_onev, test_send_onev_006, max_tsdu - 4, max_tsdu);
 	tcase_add_test (tc_send_onev, test_send_onev_fail);
 
 	return s;

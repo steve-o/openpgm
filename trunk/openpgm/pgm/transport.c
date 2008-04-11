@@ -4811,8 +4811,10 @@ pgm_transport_send_one_copy (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (tsdu != NULL, -EINVAL);
-	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
+	if (tsdu_length) {
+		g_return_val_if_fail (tsdu != NULL, -EINVAL);
+		g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
+	}
 
 	if (flags & MSG_DONTWAIT)
 	{
@@ -4896,7 +4898,13 @@ pgm_transport_send_onev (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (count > 0 && vector != NULL, -EINVAL);
+	if (count) {
+		g_return_val_if_fail (vector != NULL, -EINVAL);
+	} else {
+/* pass on zero length call so we don't have to check count on first iteration. */
+		return pgm_transport_send_one_copy (transport, NULL, 0, flags);
+	}
+	g_return_val_if_fail (transport != NULL, -EINVAL);
 
 	gsize tsdu_length = 0;
 	for (unsigned i = 0; i < count; i++)
