@@ -4743,6 +4743,8 @@ pgm_transport_send_one (
 	g_return_val_if_fail (tsdu != NULL, -EINVAL);
 	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
 
+	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+
 /* continue if send would block */
 	if (transport->is_apdu_eagain) {
 		goto retry_send;
@@ -4793,7 +4795,9 @@ retry_send:
 				FALSE,			/* regular socket */
 				STATE(pkt),
 				STATE(tpdu_length),
-				flags & ~MSG_WAITALL,
+				(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
+					flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
+					flags,
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	if (sent < 0 && errno == EAGAIN)
@@ -4840,6 +4844,8 @@ pgm_transport_send_one_copy (
 		g_return_val_if_fail (tsdu != NULL, -EINVAL);
 		g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
 	}
+
+	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain) {
@@ -4891,7 +4897,9 @@ retry_send:
 				FALSE,			/* regular socket */
 				STATE(pkt),
 				STATE(tpdu_length),
-				flags & ~MSG_WAITALL,
+				(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
+					flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
+					flags,
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	if (sent < 0 && errno == EAGAIN)
@@ -4946,6 +4954,8 @@ pgm_transport_send_onev (
 		return pgm_transport_send_one_copy (transport, NULL, 0, flags);
 	}
 	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
 /* continue if blocked on send */
 	if (transport->is_apdu_eagain) {
@@ -5042,7 +5052,9 @@ retry_send:
 				FALSE,			/* regular socket */
 				STATE(pkt),
 				STATE(tpdu_length),
-				flags & ~MSG_WAITALL,
+				(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
+					flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
+					flags,
 				(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 				pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 	if (sent < 0 && errno == EAGAIN)
@@ -5094,6 +5106,8 @@ pgm_transport_send (
 	}
 	g_return_val_if_fail (apdu != NULL, -EINVAL);
 	g_return_val_if_fail (apdu_length <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EINVAL);
+
+	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
 	gsize bytes_sent	= 0;		/* counted at IP layer */
 	guint packets_sent	= 0;		/* IP packets */
@@ -5184,7 +5198,9 @@ retry_send:
 					FALSE,			/* regular socket */
 					STATE(pkt),
 					STATE(tpdu_length),
-					flags & ~MSG_WAITALL,
+					(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
+						flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
+						flags,
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 		if (sent < 0 && errno == EAGAIN)
@@ -5270,6 +5286,8 @@ pgm_transport_sendv (
 		return pgm_transport_send_one_copy (transport, NULL, count, flags);
 	}
 	g_return_val_if_fail (vector != NULL, -EINVAL);
+
+	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
@@ -5441,7 +5459,9 @@ retry_one_apdu_send:
 					FALSE,			/* regular socket */
 					STATE(pkt),
 					STATE(tpdu_length),
-					flags & ~MSG_WAITALL,
+					(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
+						flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
+						flags,
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 		if (sent < 0 && errno == EAGAIN)
@@ -5518,6 +5538,8 @@ pgm_transport_send_packetv (
 	if (count == 0) {
 		return pgm_transport_send_one (transport, vector->iov_base, count, flags);
 	}
+
+	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
@@ -5620,7 +5642,9 @@ retry_send:
 					FALSE,			/* regular socket */
 					STATE(pkt),
 					STATE(tpdu_length),
-					flags & ~MSG_WAITALL,
+					(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
+						flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
+						flags,
 					(struct sockaddr*)&transport->send_smr.smr_multiaddr,
 					pgm_sockaddr_len(&transport->send_smr.smr_multiaddr));
 		if (sent < 0 && errno == EAGAIN)
