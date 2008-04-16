@@ -190,9 +190,9 @@ struct pgm_transport_t {
     GMainContext	*timer_context;
     gboolean		is_bound;
 
-    gboolean		can_send;
+    gboolean		can_send_data;			/* and SPMs */
+    gboolean		can_send_nak;
     gboolean		can_recv;
-    gboolean		is_passive;
 
     GCond		*thread_cond;
     GMutex		*thread_mutex;
@@ -219,17 +219,17 @@ struct pgm_transport_t {
     gpointer            txw;		   	    /* pgm_txw_t */
     gpointer		rate_control;		    /* rate_t */
 
-    gboolean		has_txw_writer_lock;	    /* writer-lock on txw_lock exists */
-    gboolean		has_blocking_send;	    /* send would block */
+    gboolean		is_apdu_eagain;		    /* writer-lock on txw_lock exists
+						       as send would block */
 
     struct {
+	guint		    data_pkt_offset;
 	gsize		    data_bytes_offset;
 	guint32		    first_sqn;
 	gpointer	    pkt;
 	gsize		    tsdu_length;
 	gsize		    tpdu_length;
 	guint32		    unfolded_odata;
-/* v3 */
 	gsize		    apdu_length;
 	guint		    vector_index;
 	gsize		    vector_offset;
@@ -354,13 +354,8 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 int pgm_set_nonblocking (int filedes[2]);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
-gssize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int);
-gssize pgm_transport_sendv2 (pgm_transport_t*, const struct iovec*, guint, int);
-gssize pgm_transport_sendv2_copy (pgm_transport_t*, const struct iovec*, guint, int);
-gssize pgm_transport_sendv3 (pgm_transport_t*, const struct iovec*, guint, int);
-
-gssize pgm_transport_send_pkt_dontwait (pgm_transport_t*, gconstpointer, gsize, int);
-gssize pgm_transport_sendv3_pkt_dontwait (pgm_transport_t*, const struct iovec*, guint, int);
+gssize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int, gboolean);
+gssize pgm_transport_send_packetv (pgm_transport_t*, const struct iovec*, guint, int, gboolean);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
