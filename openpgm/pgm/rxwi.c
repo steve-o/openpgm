@@ -490,10 +490,14 @@ pgm_rxw_push_fragment (
 			}
 
 /* for fragments check that apdu is valid */
-			if ( apdu_len && 
+			if (	apdu_len && 
 				apdu_first_sqn != sequence_number &&
-				( pgm_rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
-					)
+				(
+					pgm_rxw_empty (r) ||
+				       !ABS_IN_RXW(r, apdu_first_sqn) ||
+					RXW_PACKET(r, apdu_first_sqn)->state == PGM_PKT_LOST_DATA_STATE
+				)
+			   )
 			{
 				g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
 				pgm_rxw_mark_lost (r, sequence_number);
@@ -505,20 +509,8 @@ pgm_rxw_push_fragment (
 			{
 				g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, ignoring packet.",
 					sequence_number, apdu_first_sqn);
-				pgm_rxw_mark_lost (r, sequence_number);
 				retval = PGM_RXW_MALFORMED_APDU;
-				goto out_flush;
-			}
-
-			if ( apdu_len && 
-				apdu_first_sqn != sequence_number &&
-				RXW_PACKET(r, apdu_first_sqn)->state == PGM_PKT_LOST_DATA_STATE )
-			{
-				g_trace ("#%u: first apdu fragment sequence number: #%u marked lost, ignoring packet.",
-					sequence_number, apdu_first_sqn);
-				pgm_rxw_mark_lost (r, sequence_number);
-				retval = PGM_RXW_APDU_LOST;
-				goto out_flush;
+				goto out;
 			}
 
 /* destination should not contain a data packet, although it may contain parity */
@@ -667,58 +659,35 @@ pgm_rxw_push_fragment (
 
 		g_assert ( r->lead == sequence_number );
 
-		pgm_rxw_packet_t* rp = pgm_rxw_alloc0_packet(r);
-		rp->link_.data = rp;
+/* sanity check on sequence number distance */
+		if ( apdu_len && pgm_uint32_gt (apdu_first_sqn, sequence_number) )
+		{
+			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, ignoring packet.",
+				sequence_number, apdu_first_sqn);
+			retval = PGM_RXW_MALFORMED_APDU;
+			goto out;
+		}
 
+		pgm_rxw_packet_t* rp	= pgm_rxw_alloc0_packet(r);
+		rp->link_.data		= rp;
 		rp->sequence_number     = r->lead;
 
 /* for fragments check that apdu is valid: dupe code to above */
-		if ( apdu_len && 
+		if (    apdu_len && 
 			apdu_first_sqn != sequence_number &&
-			( pgm_rxw_empty (r) || !ABS_IN_RXW(r, apdu_first_sqn) )
-				)
+			(	
+				pgm_rxw_empty (r) ||
+			       !ABS_IN_RXW(r, apdu_first_sqn) ||
+				RXW_PACKET(r, apdu_first_sqn)->state == PGM_PKT_LOST_DATA_STATE
+			)
+		   )
 		{
 			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
-//			pgm_rxw_mark_lost (r, sequence_number);
 			rp->state = PGM_PKT_LOST_DATA_STATE;
 			r->lost_count++;
 			RXW_SET_PACKET(r, rp->sequence_number, rp);
-//			pgm_rxw_flush (r);
-			r->is_waiting = TRUE;
-
 			retval = PGM_RXW_APDU_LOST;
-			goto out_flush;
-		}
-
-		if ( apdu_len && pgm_uint32_gt (apdu_first_sqn, sequence_number) )
-		{
-			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, dropping apdu.",
-				sequence_number, apdu_first_sqn);
-//			pgm_rxw_mark_lost (r, sequence_number);
-			rp->state = PGM_PKT_LOST_DATA_STATE;
-			r->lost_count++;
-			RXW_SET_PACKET(r, rp->sequence_number, rp);
-//			pgm_rxw_flush (r);
 			r->is_waiting = TRUE;
-
-			retval = PGM_RXW_MALFORMED_APDU;
-			goto out_flush;
-		}
-
-		if ( apdu_len && 
-			apdu_first_sqn != sequence_number &&
-			RXW_PACKET(r, apdu_first_sqn)->state == PGM_PKT_LOST_DATA_STATE ) 
-		{
-			g_trace ("#%u: first apdu fragment sequence number: #%u marked lost, ignoring packet.", 
-				sequence_number, apdu_first_sqn);
-//			pgm_rxw_mark_lost (r, sequence_number);
-			rp->state = PGM_PKT_LOST_DATA_STATE;
-			r->lost_count++;
-			RXW_SET_PACKET(r, rp->sequence_number, rp);
-//			pgm_rxw_flush (r);
-			r->is_waiting = TRUE;
-
-			retval = PGM_RXW_APDU_LOST;
 			goto out_flush;
 		}
 
@@ -736,10 +705,9 @@ pgm_rxw_push_fragment (
 			sequence_number, rp->sequence_number, pgm_rxw_sqns(r));
 	}
 
-out_flush:
-//	pgm_rxw_flush (r);
 	r->is_waiting = TRUE;
 
+out_flush:
 	g_trace ("#%u: push complete: window ( rxw_trail %u rxw_trail_init %u trail %u commit_trail %u commit_lead %u lead %u )",
 		sequence_number,
 		r->rxw_trail, r->rxw_trail_init, r->trail, r->commit_trail, r->commit_lead, r->lead);
@@ -1444,7 +1412,6 @@ pgm_rxw_window_update (
 //					g_warning ("dropping #%u due to full window.", r->trail);
 
 					pgm_rxw_pop_trail (r);
-//					pgm_rxw_flush (r);
 					r->is_waiting = TRUE;
 				}
 
@@ -1505,7 +1472,6 @@ pgm_rxw_window_update (
 				dropped++;
 //				g_warning ("dropping #%u due to advancing transmit window.", r->trail);
 				pgm_rxw_pop_trail (r);
-//				pgm_rxw_flush (r);
 				r->is_waiting = TRUE;
 			}
 		}
@@ -1567,8 +1533,6 @@ pgm_rxw_mark_lost (
 
 	rp->state = PGM_PKT_LOST_DATA_STATE;
 	r->lost_count++;
-
-//	pgm_rxw_flush (r);
 	r->is_waiting = TRUE;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -1678,7 +1642,6 @@ pgm_rxw_ncf (
 //			g_warning ("dropping #%u due to full window.", r->trail);
 
 			pgm_rxw_pop_trail (r);
-//			pgm_rxw_flush (r);
 			r->is_waiting = TRUE;
 		}
 
@@ -1708,7 +1671,6 @@ pgm_rxw_ncf (
 //		g_warning ("dropping #%u due to full window.", r->trail);
 
 		pgm_rxw_pop_trail (r);
-//		pgm_rxw_flush (r);
 		r->is_waiting = TRUE;
 	}
 
@@ -1725,7 +1687,6 @@ pgm_rxw_ncf (
 /* do not send nak, simply add to ncf list */
 	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
 
-//	pgm_rxw_flush (r);
 	r->is_waiting = TRUE;
 
 	if (dropped) {
