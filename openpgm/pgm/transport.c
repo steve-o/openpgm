@@ -5665,7 +5665,7 @@ retry_send:
 
 		STATE(data_bytes_offset) += STATE(tsdu_length);
 
-	} while ( STATE(data_bytes_offset)  < STATE(apdu_length) );
+	}
 	g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 
 /* release txw lock here in order to allow spms to lock mutex */
