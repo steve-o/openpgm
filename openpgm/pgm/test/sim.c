@@ -825,7 +825,7 @@ brokn_send_apdu_unlocked (
 
                 char *pkt = pgm_txw_alloc(transport->txw);
                 struct pgm_header *header = (struct pgm_header*)pkt;
-                memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+                memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
                 header->pgm_sport       = transport->tsi.sport;
                 header->pgm_dport       = transport->dport;
                 header->pgm_type        = PGM_ODATA;
