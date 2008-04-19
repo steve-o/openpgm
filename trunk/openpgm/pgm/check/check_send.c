@@ -86,7 +86,7 @@ START_TEST (test_send_one)
 	fail_unless (g_transport);
 
 	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
 	gsize		tsdu_length	= _i;
 	int		flags		= 0;
 	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
@@ -100,7 +100,7 @@ START_TEST (test_send_one_fail)
 	fail_unless (g_transport);
 
 	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= (guint8*)pgm_txw_alloc (g_transport->txw) + pgm_transport_pkt_offset (FALSE);
+	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
 	gsize		tsdu_length	= g_max_tsdu + 1;
 	int		flags		= 0;
 	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
@@ -513,6 +513,37 @@ START_TEST (test_sendv_fail)
 }
 END_TEST
 
+/* target: pgm_transport_send_packetv (
+ * 		   pgm_transport_t*        transport,
+ * 		   const struct iovec*     vector,
+ * 		   guint                   count,
+ * 		   int			   flags,
+ * 		   gboolean		   is_one_apdu
+ * 		   )
+ *
+ *  pre-condition: transport is valid,
+ *                 vector must point to something valid if count > 0.
+ *                 vector::iov_base must be offset to payload in packets.
+ * post-condition: return value equals apdu_length.
+ */
+START_TEST (test_send_packetv_000)
+{
+	fail_unless (g_transport);
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+
+	gsize		tsdu_length	= _i;
+	int		flags		= 0;
+	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = _i } };
+	guint		count		= 1;
+	gboolean	is_one_apdu	= FALSE;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+}
+END_TEST
+
 
 Suite*
 make_send_suite (void)
@@ -524,12 +555,14 @@ make_send_suite (void)
 	TCase* tc_send_onev = tcase_create ("send_onev");
 	TCase* tc_send = tcase_create ("send");
 	TCase* tc_sendv = tcase_create ("sendv");
+	TCase* tc_send_packetv = tcase_create ("send_packetv");
 
 	tcase_add_checked_fixture (tc_send_one, setup, teardown);
 	tcase_add_checked_fixture (tc_send_one_copy, setup, teardown);
 	tcase_add_checked_fixture (tc_send_onev, setup, teardown);
 	tcase_add_checked_fixture (tc_send, setup, teardown);
 	tcase_add_checked_fixture (tc_sendv, setup, teardown);
+	tcase_add_checked_fixture (tc_send_packetv, setup, teardown);
 
 	g_max_tsdu = PGM_MAX_TPDU - 20 - pgm_transport_pkt_offset (FALSE);
 	g_max_apdu = ( PGM_MAX_TPDU - 20 - pgm_transport_pkt_offset (TRUE) ) * PGM_TXW_SQNS;
@@ -588,6 +621,10 @@ make_send_suite (void)
 	tcase_add_loop_test (tc_sendv, test_sendv_006, g_max_apdu - 4, g_max_apdu);
 	tcase_add_loop_test (tc_sendv, test_sendv_007, 0, pgm_power2_log2 (PGM_TXW_SQNS));
 	tcase_add_test (tc_sendv, test_sendv_fail);
+
+/* zero-copy api */
+	suite_add_tcase (s, tc_send_packetv);
+	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, 0, 4);
 
 	return s;
 }
