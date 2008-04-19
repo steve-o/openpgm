@@ -5588,6 +5588,7 @@ pgm_transport_send_packetv (
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->txw);
 		for (guint i = 0; i < count; i++)
 		{
+			g_return_val_if_fail (vector[i].iov_len <= transport->max_tsdu_fragment, -EINVAL);
 			STATE(apdu_length) += vector[i].iov_len;
 		}
 	}
