@@ -5678,7 +5678,12 @@ retry_send:
 		STATE(data_bytes_offset) += STATE(tsdu_length);
 
 	}
-	g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
+#ifdef TRANSPORT_DEBUG
+	if (is_one_apdu)
+	{
+		g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
+	}
+#endif
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
