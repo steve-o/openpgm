@@ -5547,8 +5547,8 @@ pgm_transport_send_packetv (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (vector != NULL, -EINVAL);
 /* pass on zero length as cannot count vector lengths */
-	if (count == 0) {
-		return pgm_transport_send_one (transport, vector->iov_base, count, flags);
+	if (count <= 1) {
+		return pgm_transport_send_one (transport, vector->iov_base, vector->iov_len, flags);
 	}
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
