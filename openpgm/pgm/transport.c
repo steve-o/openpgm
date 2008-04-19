@@ -5150,7 +5150,7 @@ pgm_transport_send (
 
 		STATE(pkt) = pgm_txw_alloc(transport->txw);
 		struct pgm_header *header = (struct pgm_header*)STATE(pkt);
-		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		header->pgm_sport	= transport->tsi.sport;
 		header->pgm_dport	= transport->dport;
 		header->pgm_type        = PGM_ODATA;
@@ -5382,7 +5382,7 @@ retry_send:
 
 		STATE(pkt) = pgm_txw_alloc(transport->txw);
 		struct pgm_header *header = (struct pgm_header*)STATE(pkt);
-		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		header->pgm_sport	= transport->tsi.sport;
 		header->pgm_dport	= transport->dport;
 		header->pgm_type        = PGM_ODATA;
@@ -5584,7 +5584,7 @@ pgm_transport_send_packetv (
 
 		STATE(pkt) = (guint8*)vector[i].iov_base - pgm_transport_pkt_offset (is_one_apdu);
 		struct pgm_header *header = (struct pgm_header*)STATE(pkt);
-		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_tsi_t));
+		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		header->pgm_sport	= transport->tsi.sport;
 		header->pgm_dport	= transport->dport;
 		header->pgm_type        = PGM_ODATA;
