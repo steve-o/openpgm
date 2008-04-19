@@ -564,6 +564,51 @@ START_TEST (test_send_packetv_001)
 }
 END_TEST
 
+/* zero length vector
+ */
+START_TEST (test_send_packetv_002)
+{
+	fail_unless (g_transport);
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = 0 } };
+	guint		count		= 0;
+	gboolean	is_one_apdu	= TRUE;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+}
+END_TEST
+
+/* multiple packet apdus
+ */
+START_TEST (test_send_packetv_003)
+{
+	fail_unless (g_transport);
+
+	struct iovec	vector[ PGM_TXW_SQNS ];
+	int		count		= _i;
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+	gboolean	is_one_apdu	= TRUE;
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	for (int _j = 0; _j < count; _j++)
+	{
+		vector[_j].iov_base = pgm_packetv_alloc (g_transport, count > 1);
+		vector[_j].iov_len  = pgm_transport_max_tsdu (g_transport, count > 1);
+		tsdu_length	   += pgm_transport_max_tsdu (g_transport, count > 1);
+	}
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+}
+END_TEST
+
 Suite*
 make_send_suite (void)
 {
@@ -646,6 +691,8 @@ make_send_suite (void)
 	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, 0, 4);
 	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, g_max_tsdu - 4, g_max_tsdu);
 	tcase_add_test (tc_send_packetv, test_send_packetv_001);
+	tcase_add_test (tc_send_packetv, test_send_packetv_002);
+	tcase_add_loop_test (tc_send_packetv, test_send_packetv_003, 0, PGM_TXW_SQNS);
 
 	return s;
 }

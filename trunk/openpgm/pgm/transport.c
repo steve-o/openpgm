@@ -5545,9 +5545,12 @@ pgm_transport_send_packetv (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (vector != NULL, -EINVAL);
 /* pass on zero length as cannot count vector lengths */
-	if (count <= 1) {
+	if (count == 0) {
+		return pgm_transport_send_one_copy (transport, NULL, count, flags);
+	}
+	g_return_val_if_fail (vector != NULL, -EINVAL);
+	if (count == 1) {
 		return pgm_transport_send_one (transport, vector->iov_base, vector->iov_len, flags);
 	}
 
@@ -5642,7 +5645,7 @@ pgm_transport_send_packetv (
 
 		gsize pgm_header_len	= (guint8*)dst - (guint8*)header;
 		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
-		STATE(unfolded_odata)	= pgm_csum_partial ((guint8*)vector[i].iov_base + STATE(data_bytes_offset), STATE(tsdu_length), 0);
+		STATE(unfolded_odata)	= pgm_csum_partial ((guint8*)vector[i].iov_base, STATE(tsdu_length), 0);
 		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
