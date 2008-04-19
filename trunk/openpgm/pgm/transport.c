@@ -232,6 +232,18 @@ pgm_transport_pkt_offset (
 			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
 }
 
+/* memory allocation for zero-copy packetv api
+ * returned packets are offset to the payload location
+ */
+gpointer
+pgm_packetv_alloc (
+	pgm_transport_t*	transport,
+	gboolean		can_fragment
+	)
+{
+	return (guint8*)pgm_txw_alloc (transport->txw) + pgm_transport_pkt_offset (can_fragment);
+}
+
 /* fast log base 2 of power of 2
  */
 
