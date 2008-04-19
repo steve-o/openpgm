@@ -538,12 +538,31 @@ START_TEST (test_send_packetv_000)
 	int		flags		= 0;
 	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = _i } };
 	guint		count		= 1;
-	gboolean	is_one_apdu	= FALSE;
+	gboolean	is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
 }
 END_TEST
 
+/* zero length TSDU in non-zero vector
+ */
+START_TEST (test_send_packetv_001)
+{
+	fail_unless (g_transport);
+
+	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
+	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
+	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+
+	gsize		tsdu_length	= 0;
+	int		flags		= 0;
+	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = 0 } };
+	guint		count		= 1;
+	gboolean	is_one_apdu	= TRUE;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+}
+END_TEST
 
 Suite*
 make_send_suite (void)
@@ -625,6 +644,8 @@ make_send_suite (void)
 /* zero-copy api */
 	suite_add_tcase (s, tc_send_packetv);
 	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, 0, 4);
+	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, g_max_tsdu - 4, g_max_tsdu);
+	tcase_add_test (tc_send_packetv, test_send_packetv_001);
 
 	return s;
 }
