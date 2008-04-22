@@ -241,7 +241,24 @@ pgm_packetv_alloc (
 	gboolean		can_fragment
 	)
 {
+	g_assert (transport);
 	return (guint8*)pgm_txw_alloc (transport->txw) + pgm_transport_pkt_offset (can_fragment);
+}
+
+/* return memory to the slab
+ */
+void
+pgm_packetv_free1 (
+	pgm_transport_t*	transport,
+	gpointer		tsdu,
+	gboolean		can_fragment
+	)
+{
+	g_assert (transport);
+	gpointer pkt = (guint8*)tsdu - pgm_transport_pkt_offset (can_fragment);
+	g_static_rw_lock_writer_lock (&transport->txw_lock);
+	g_trash_stack_push (&((pgm_txw_t*)transport->txw)->trash_data, pkt);
+	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 }
 
 /* fast log base 2 of power of 2
