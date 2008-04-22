@@ -358,6 +358,7 @@ gssize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int, g
 gssize pgm_transport_send_packetv (pgm_transport_t*, const struct iovec*, guint, int, gboolean);
 
 gpointer pgm_packetv_alloc (pgm_transport_t*, gboolean);
+void pgm_packetv_free1 (pgm_transport_t*, gpointer, gboolean);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
