@@ -205,13 +205,10 @@ on_startup (void)
 	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
 	g_assert (e == 0);
 
+	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
-	pgm_transport_set_txw_sqns (g_transport, g_sqns);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
-	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
-	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
-	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
 	pgm_transport_set_nak_bo_ivl (g_transport, 50*1000);
@@ -219,8 +216,6 @@ on_startup (void)
 	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
 	pgm_transport_set_nak_data_retries (g_transport, 5);
 	pgm_transport_set_nak_ncf_retries (g_transport, 2);
-
-	pgm_transport_set_recv_only (g_transport, FALSE);
 
 	e = pgm_transport_bind (g_transport);
 	if (e < 0) {
