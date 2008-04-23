@@ -1059,7 +1059,9 @@ pgm_transport_set_spmr_expiry (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (!transport->is_bound, -EINVAL);
 	g_return_val_if_fail (spmr_expiry > 0, -EINVAL);
-	g_return_val_if_fail (transport->spm_ambient_interval > spmr_expiry, -EINVAL);
+	if (transport->can_send_data) {
+		g_return_val_if_fail (transport->spm_ambient_interval > spmr_expiry, -EINVAL);
+	}
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->spmr_expiry = spmr_expiry;
