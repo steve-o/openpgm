@@ -2112,7 +2112,7 @@ recv_again:
 		if (bytes_received) {
 			goto flush_waiting;
 		} else {
-			goto out;
+			goto check_for_repeat;
 		}
 	} else if (len == 0) {
 		goto out;
