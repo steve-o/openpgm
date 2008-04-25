@@ -1506,17 +1506,27 @@ pgm_transport_bind (
 
 	if (transport->can_send_data)
 	{
-		g_trace ("INFO","create rx to timer pipe.");
+		g_trace ("INFO","create rx to nak processor pipe.");
 		retval = pipe (transport->rdata_pipe);
 		if (retval < 0) {
 			goto out;
 		}
-		g_trace ("INFO","create tx to timer pipe.");
-		retval = pipe (transport->timer_pipe);
-		if (retval < 0) {
+		retval = pgm_set_nonblocking (transport->rdata_pipe);
+		if (retval) {
 			goto out;
 		}
 	}
+
+	g_trace ("INFO","create any to timer pipe.");
+	retval = pipe (transport->timer_pipe);
+	if (retval < 0) {
+		goto out;
+	}
+	retval = pgm_set_nonblocking (transport->timer_pipe);
+	if (retval < 0) {
+		goto out;
+	}
+
 	if (transport->can_recv)
 	{
 		g_trace ("INFO","create waiting notify pipe.");
@@ -1524,19 +1534,10 @@ pgm_transport_bind (
 		if (retval < 0) {
 			goto out;
 		}
-	}
-
-	retval = pgm_set_nonblocking (transport->rdata_pipe);
-	if (retval) {
-		goto out;
-	}
-	retval = pgm_set_nonblocking (transport->timer_pipe);
-	if (retval < 0) {
-		goto out;
-	}
-	retval = pgm_set_nonblocking (transport->waiting_pipe);
-	if (retval < 0) {
-		goto out;
+		retval = pgm_set_nonblocking (transport->waiting_pipe);
+		if (retval < 0) {
+			goto out;
+		}
 	}
 
 /* determine IP header size for rate regulation engine & stats */
@@ -1848,15 +1849,15 @@ pgm_transport_bind (
 		goto out;
 	}
 
-/* rx to timer pipe */
+/* any to timer pipe */
+	transport->timer_channel = g_io_channel_unix_new (transport->timer_pipe[0]);
+	g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_pipe, transport, NULL);
+
+/* rx to nak processor pipe */
 	if (transport->can_send_data)
 	{
 		transport->rdata_channel = g_io_channel_unix_new (transport->rdata_pipe[0]);
 		g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_pipe, transport, NULL);
-
-/* tx to timer pipe */
-		transport->timer_channel = g_io_channel_unix_new (transport->timer_pipe[0]);
-		g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_pipe, transport, NULL);
 
 /* create recyclable SPM packet */
 		switch (pgm_sockaddr_family(&transport->recv_smr[0].smr_interface)) {
@@ -2993,6 +2994,7 @@ on_spm (
 				sender->use_ondemand_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
 				if (sender->rs_k != parity_prm_tgs)
 				{
+					sender->rs_n = PGM_RS_DEFAULT_N;
 					sender->rs_k = parity_prm_tgs;
 					sender->tg_sqn_shift = pgm_power2_log2 (sender->rs_k);
 					if (sender->rs) {
@@ -3000,8 +3002,8 @@ on_spm (
 						pgm_rs_destroy (sender->rs);
 					}
 					g_trace ("INFO", "Enabling Reed-Solomon forward error correction for peer, RS(%i,%i)",
-						PGM_RS_DEFAULT_N, sender->rs_k);
-					pgm_rs_create (&sender->rs, PGM_RS_DEFAULT_N, sender->rs_k);
+						sender->rs_n, sender->rs_k);
+					pgm_rs_create (&sender->rs, sender->rs_n, sender->rs_k);
 				}
 				break;
 			}
@@ -6305,10 +6307,10 @@ on_rdata (
 		guint rs_h = 0;
 		gsize parity_length = g_ntohs (header->pgm_tsdu_length);
 		guint32 target_sqn = tg_sqn - 1;
-		guint8* src[ transport->rs_n ];
-		guint8* src_opts[ transport->rs_n ];
-		guint32 offsets[ transport->rs_k ];
-		for (guint32 i = tg_sqn; i != (tg_sqn + transport->rs_k); i++)
+		guint8* src[ sender->rs_n ];
+		guint8* src_opts[ sender->rs_n ];
+		guint32 offsets[ sender->rs_k ];
+		for (guint32 i = tg_sqn; i != (tg_sqn + sender->rs_k); i++)
 		{
 			struct pgm_opt_fragment* opt_fragment = NULL;
 			gpointer packet = NULL;
@@ -6327,9 +6329,9 @@ on_rdata (
 				{
 /* keep parity packet here */
 					target_sqn = i;
-					src[ transport->rs_k + rs_h ] = rdata_bytes;
-					src_opts[ transport->rs_k + rs_h ] = (guint8*)rdata_opt_fragment;
-					offsets[ i - tg_sqn ] = transport->rs_k + rs_h++;
+					src[ sender->rs_k + rs_h ] = rdata_bytes;
+					src_opts[ sender->rs_k + rs_h ] = (guint8*)rdata_opt_fragment;
+					offsets[ i - tg_sqn ] = sender->rs_k + rs_h++;
 
 /* move repair to receive window ownership */
 					pgm_rxw_push_nth_parity_copy (sender->rxw,
@@ -6348,9 +6350,9 @@ on_rdata (
 				}
 
 			} else if (is_parity) {			/* repair data */
-				src[ transport->rs_k + rs_h ] = packet;
-				src_opts[ transport->rs_k + rs_h ] = (guint8*)opt_fragment;
-				offsets[ i - tg_sqn ] = transport->rs_k + rs_h++;
+				src[ sender->rs_k + rs_h ] = packet;
+				src_opts[ sender->rs_k + rs_h ] = (guint8*)opt_fragment;
+				offsets[ i - tg_sqn ] = sender->rs_k + rs_h++;
 			} else {				/* original data */
 				src[ i - tg_sqn ] = packet;
 				src_opts[ i - tg_sqn ] = (guint8*)opt_fragment;
@@ -6365,9 +6367,9 @@ on_rdata (
 		}
 
 /* full transmission group, now allocate new packets */
-		for (unsigned i = 0; i < transport->rs_k; i++)
+		for (unsigned i = 0; i < sender->rs_k; i++)
 		{
-			if (offsets[ i ] >= transport->rs_k)
+			if (offsets[ i ] >= sender->rs_k)
 			{
 				src[ i ] = pgm_rxw_alloc (sender->rxw);
 				memset (src[ i ], 0, parity_length);
@@ -6379,20 +6381,20 @@ on_rdata (
 		}
 
 /* decode payload */
-		pgm_rs_decode_parity_appended (transport->rs, (void**)(void*)src, offsets, parity_length);
+		pgm_rs_decode_parity_appended (sender->rs, (void**)(void*)src, offsets, parity_length);
 
 /* decode opt_fragment option */
 		if (is_op_encoded)
 		{
-			pgm_rs_decode_parity_appended (transport->rs, (void**)(void*)src_opts, offsets, sizeof(struct pgm_opt_fragment));
+			pgm_rs_decode_parity_appended (sender->rs, (void**)(void*)src_opts, offsets, sizeof(struct pgm_opt_fragment));
 		}
 
 /* treat decoded packet as selective repair(s) */
 		g_static_mutex_lock (&sender->mutex);
 		gsize repair_length = parity_length;
-		for (unsigned i = 0; i < transport->rs_k; i++)
+		for (unsigned i = 0; i < sender->rs_k; i++)
 		{
-			if (offsets[ i ] >= transport->rs_k)
+			if (offsets[ i ] >= sender->rs_k)
 			{
 /* extract TSDU length is variable packet option was found on parity packet */
 				if (is_var_pktlen)
