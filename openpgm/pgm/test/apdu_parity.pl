@@ -23,7 +23,7 @@ sub close_ssh {
 $SIG{'INT'} = sub { print "interrupt caught.\n"; close_ssh(); };
 
 $app->say ("create ao");
-$app->say ("set ao FEC RS(255,4)");
+##$app->say ("set ao FEC RS(255,4)");
 $app->say ("bind ao");
 $app->say ("listen ao");
 
