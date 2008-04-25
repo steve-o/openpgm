@@ -4,7 +4,9 @@ use strict;
 our($VERSION);
 use Carp;
 use IO::File;
+use IPC::Open2;
 use Net::SSH qw(sshopen2);
+use Sys::Hostname;
 use POSIX ":sys_wait_h";
 use JSON;
 
@@ -41,13 +43,26 @@ sub new {
 
 sub connect {
 	my $self = shift;
+	my $host = hostname;
 
-	print "$self->{tag}: opening SSH connection to $self->{host} ...\n";
-	$self->{pid} = sshopen2 ($self->{host},
-				 $self->{in},
-				 $self->{out},
-				 "uname -a && sudo $self->{cmd}")
-		or croak "SSH failed: $!";
+	if ($self->{host} =~ /^(localhost|127\.1|127\.0\.0\.1|$host)$/)
+	{
+		print "$self->{tag}: opening local connection\n";
+		$self->{pid} = open2 ($self->{in},
+				      $self->{out},
+				      "uname -a && sudo $self->{cmd}")
+			or croak "open2 failed $!";
+	}
+	else
+	{
+		print "$self->{tag}: opening SSH connection to $self->{host} ...\n";
+		$self->{pid} = sshopen2 ($self->{host},
+					 $self->{in},
+					 $self->{out},
+					 "uname -a && sudo $self->{cmd}")
+			or croak "SSH failed: $!";
+	}
+
 	print "$self->{tag}: connected.\n";
 	$self->wait_for_ready;
 }
@@ -93,7 +108,7 @@ sub DESTROY {
 		if ($@) {
 			die unless $@ eq "alarm\n";
 			local($SIG{CHLD}) = 'IGNORE';
-			print "$self->{tag}: killing SSH connection ...\n";
+			print "$self->{tag}: killing child ...\n";
 			kill 'INT' => $self->{pid};
 			print "$self->{tag}: killed.\n";
 		} else {
