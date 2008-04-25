@@ -4530,7 +4530,7 @@ nak_rpt_state (
 				continue;
 			}
 
-			if (++rp->ncf_retry_count > transport->nak_ncf_retries)
+			if (++rp->ncf_retry_count >= transport->nak_ncf_retries)
 			{
 /* cancellation */
 				dropped++;
@@ -4674,7 +4674,7 @@ nak_rdata_state (
 				continue;
 			}
 
-			if (++rp->data_retry_count > transport->nak_data_retries)
+			if (++rp->data_retry_count >= transport->nak_data_retries)
 			{
 /* cancellation */
 				dropped++;
