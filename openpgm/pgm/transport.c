@@ -1907,10 +1907,6 @@ pgm_transport_bind (
 			}
 		}
 
-		g_trace ("INFO","adding dynamic timer");
-		transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
-		pgm_add_timer (transport);
-
 /* announce new transport by sending out SPMs */
 		send_spm_unlocked (transport);
 		send_spm_unlocked (transport);
@@ -1924,7 +1920,17 @@ pgm_transport_bind (
 			transport->parity_buffer = g_malloc ( transport->max_tpdu );
 			pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
 		}
+
+		transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
 	}
+	else
+	{
+		g_assert (transport->can_recv);
+		transport->next_poll = pgm_time_update_now() + pgm_secs( 30 );
+	}
+
+	g_trace ("INFO","adding dynamic timer");
+	pgm_add_timer (transport);
 
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = g_malloc ( transport->max_tpdu );
