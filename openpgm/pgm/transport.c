@@ -4870,7 +4870,7 @@ retry_send:
 	}
 
 /* save unfolded odata for retransmissions */
-	*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+	*(guint32*)(void*)&((struct pgm_header*)STATE(pkt))->pgm_sport = STATE(unfolded_odata);
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
@@ -4894,7 +4894,7 @@ retry_send:
  * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
  * if the packet sizes would exceed the current rate limit.
  */
-static inline gssize
+static gssize
 pgm_transport_send_one_copy (
 	pgm_transport_t*	transport,
 	gconstpointer		tsdu,
@@ -4930,7 +4930,7 @@ pgm_transport_send_one_copy (
 /* retrieve packet storage from transmit window */
 	STATE(tpdu_length) = pgm_transport_pkt_offset (FALSE) + tsdu_length;
 
-	struct pgm_header *header = (struct pgm_header*)STATE(pkt);
+	struct pgm_header* header = (struct pgm_header*)STATE(pkt);
 	struct pgm_data *odata = (struct pgm_data*)(header + 1);
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	header->pgm_sport	= transport->tsi.sport;
@@ -4972,7 +4972,7 @@ retry_send:
 	}
 
 /* save unfolded odata for retransmissions */
-	*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+	*(guint32*)(void*)&((struct pgm_header*)STATE(pkt))->pgm_sport = STATE(unfolded_odata);
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
@@ -5001,7 +5001,7 @@ retry_send:
  * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
  * if the packet sizes would exceed the current rate limit.
  */
-static inline gssize
+static gssize
 pgm_transport_send_onev (
 	pgm_transport_t*	transport,
 	const struct iovec*	vector,
@@ -5129,7 +5129,7 @@ retry_send:
 	}
 
 /* save unfolded odata for retransmissions */
-	*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+	*(guint32*)(void*)&((struct pgm_header*)STATE(pkt))->pgm_sport = STATE(unfolded_odata);
 
 /* release txw lock here in order to allow spms to lock mutex */
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
@@ -5275,7 +5275,7 @@ retry_send:
 		}
 
 /* save unfolded odata for retransmissions */
-		*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+		*(guint32*)(void*)&((struct pgm_header*)STATE(pkt))->pgm_sport = STATE(unfolded_odata);
 
 		if (sent == (gssize)STATE(tpdu_length))
 		{
@@ -5538,7 +5538,7 @@ retry_one_apdu_send:
 		}
 
 /* save unfolded odata for retransmissions */
-		*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+		*(guint32*)(void*)&((struct pgm_header*)STATE(pkt))->pgm_sport = STATE(unfolded_odata);
 
 		if ( sent == (gssize)STATE(tpdu_length))
 		{
@@ -5648,12 +5648,12 @@ pgm_transport_send_packetv (
 		}
 	}
 
-	for (guint i = 0; i < count; i++)
+	for (STATE(vector_index) = 0; STATE(vector_index) < count; STATE(vector_index)++)
 	{
-		STATE(tsdu_length) = vector[i].iov_len;
+		STATE(tsdu_length) = vector[STATE(vector_index)].iov_len;
 		STATE(tpdu_length) = pgm_transport_pkt_offset (is_one_apdu) + STATE(tsdu_length);
 
-		STATE(pkt) = (guint8*)vector[i].iov_base - pgm_transport_pkt_offset (is_one_apdu);
+		STATE(pkt) = (guint8*)vector[STATE(vector_index)].iov_base - pgm_transport_pkt_offset (is_one_apdu);
 		struct pgm_header *header = (struct pgm_header*)STATE(pkt);
 		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		header->pgm_sport	= transport->tsi.sport;
@@ -5701,7 +5701,7 @@ pgm_transport_send_packetv (
 
 		gsize pgm_header_len	= (guint8*)dst - (guint8*)header;
 		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
-		STATE(unfolded_odata)	= pgm_csum_partial ((guint8*)vector[i].iov_base, STATE(tsdu_length), 0);
+		STATE(unfolded_odata)	= pgm_csum_partial ((guint8*)vector[STATE(vector_index)].iov_base, STATE(tsdu_length), 0);
 		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
@@ -5725,7 +5725,7 @@ retry_send:
 		}
 
 /* save unfolded odata for retransmissions */
-		*(guint32*)(void*)&header->pgm_sport = STATE(unfolded_odata);
+		*(guint32*)(void*)&((struct pgm_header*)STATE(pkt))->pgm_sport = STATE(unfolded_odata);
 
 		if (sent == (gssize)STATE(tpdu_length))
 		{
