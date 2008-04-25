@@ -25,6 +25,9 @@
 
 G_BEGIN_DECLS
 
+#define PGM_RS_DEFAULT_N	255
+
+
 int pgm_rs_create (gpointer*, guint, guint);
 int pgm_rs_destroy (gpointer);
 
