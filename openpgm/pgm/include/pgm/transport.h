@@ -160,6 +160,7 @@ struct pgm_peer_t {
     pgm_transport_t*    transport;
     GList		link_;
 
+    gpointer		rs;
     gboolean		use_proactive_parity;	    /* indicating availability from this source */
     gboolean		use_ondemand_parity;
     guint		rs_k;

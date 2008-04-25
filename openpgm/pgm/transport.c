@@ -130,7 +130,7 @@ static void nak_rdata_state (pgm_peer_t*);
 static void check_peer_nak_state (pgm_transport_t*);
 static pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
-static int send_rdata (pgm_transport_t*, guint32, gpointer, gsize);
+static int send_rdata (pgm_transport_t*, guint32, gpointer, gsize, gboolean);
 
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static inline void pgm_peer_unref (pgm_peer_t*);
@@ -668,8 +668,20 @@ pgm_peer_unref (
 
 	if (G_UNLIKELY (is_zero))
 	{
+/* peer lock */
+		g_static_mutex_free (&peer->mutex);
+
+/* receive window */
 		pgm_rxw_shutdown (peer->rxw);
 		peer->rxw = NULL;
+
+/* reed solomon state */
+		if (peer->rs) {
+			pgm_rs_destroy (peer->rs);
+			peer->rs = NULL;
+		}
+
+/* object */
 		g_free (peer);
 	}
 }
@@ -2692,6 +2704,7 @@ on_nak_pipe (
 	if (!pgm_txw_retransmit_try_pop (transport->txw, &r_sqn, &r_packet, &r_length, &is_parity, &rs_h, rs_2t))
 	{
 		gboolean is_var_pktlen = FALSE;
+		gboolean has_saved_partial_csum = TRUE;
 
 /* calculate parity packet */
 		if (is_parity)
@@ -2834,9 +2847,10 @@ on_nak_pipe (
 
 /* encode payload */
 			pgm_rs_encode (transport->rs, (const void**)(void*)src, transport->rs_k + rs_h, data_bytes, parity_length);
+			has_saved_partial_csum = FALSE;
 		}
 
-		send_rdata (transport, r_sqn, r_packet, r_length);
+		send_rdata (transport, r_sqn, r_packet, r_length, has_saved_partial_csum);
 	}
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
@@ -2977,8 +2991,18 @@ on_spm (
 			
 				sender->use_proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
 				sender->use_ondemand_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
-				sender->rs_k = parity_prm_tgs;
-				sender->tg_sqn_shift = pgm_power2_log2 (sender->rs_k);
+				if (sender->rs_k != parity_prm_tgs)
+				{
+					sender->rs_k = parity_prm_tgs;
+					sender->tg_sqn_shift = pgm_power2_log2 (sender->rs_k);
+					if (sender->rs) {
+						g_trace ("INFO", "Destroying existing Reed-Solomon state for peer.");
+						pgm_rs_destroy (sender->rs);
+					}
+					g_trace ("INFO", "Enabling Reed-Solomon forward error correction for peer, RS(%i,%i)",
+						PGM_RS_DEFAULT_N, sender->rs_k);
+					pgm_rs_create (&sender->rs, PGM_RS_DEFAULT_N, sender->rs_k);
+				}
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -5058,6 +5082,7 @@ pgm_transport_send_onev (
 		if (copy_length <= element_length)
 		{
 			STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, copy_length, STATE(unfolded_odata));
+//			STATE(unfolded_odata) = pgm_csum_block_add (pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, copy_length, 0), STATE(unfolded_odata));
 			if (copy_length == element_length) {
 				vector_index++;
 				vector_offset = 0;
@@ -5070,6 +5095,7 @@ pgm_transport_send_onev (
 		{
 /* copy part of TSDU */
 			STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, element_length, STATE(unfolded_odata));
+//			STATE(unfolded_odata) = pgm_csum_block_add (pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, element_length, 0), STATE(unfolded_odata));
 			src_offset += element_length;
 			copy_length -= element_length;
 			vector_index++;
@@ -5465,6 +5491,7 @@ retry_send:
 			if (copy_length <= element_length)
 			{
 				STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, copy_length, STATE(unfolded_odata));
+//				STATE(unfolded_odata) = pgm_csum_fold (pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, copy_length, 0), STATE(unfolded_odata));
 				if (copy_length == element_length) {
 					STATE(vector_index)++;
 					STATE(vector_offset) = 0;
@@ -5477,6 +5504,7 @@ retry_send:
 			{
 /* copy part of TSDU */
 				STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, element_length, STATE(unfolded_odata));
+//				STATE(unfolded_odata) = pgm_csum_block_add (pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, element_length, 0), STATE(unfolded_odata));
 				src_offset += element_length;
 				copy_length -= element_length;
 				STATE(vector_index)++;
@@ -5754,7 +5782,8 @@ send_rdata (
 	pgm_transport_t*	transport,
 	G_GNUC_UNUSED guint32	sequence_number,
 	gpointer		data,
-	gsize			len
+	gsize			len,
+	gboolean		has_saved_partial_csum
 	)
 {
 /* update previous odata/rdata contents */
@@ -5765,7 +5794,11 @@ send_rdata (
 /* RDATA */
         rdata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
-	guint32 unfolded_odata	= *(guint32*)(void*)&header->pgm_sport;
+	guint32 unfolded_odata;
+	if (has_saved_partial_csum)
+	{
+		unfolded_odata	= *(guint32*)(void*)&header->pgm_sport;
+	}
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
 
@@ -5773,6 +5806,10 @@ send_rdata (
 
 	gsize pgm_header_len	= len - g_ntohs(header->pgm_tsdu_length);
 	guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
+	if (!has_saved_partial_csum)
+	{
+		unfolded_odata	= pgm_csum_partial ((guint8*)data + pgm_header_len, g_ntohs(header->pgm_tsdu_length), 0);
+	}
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 	gssize sent = pgm_sendto (transport,
