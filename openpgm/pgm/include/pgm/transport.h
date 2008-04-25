@@ -163,6 +163,7 @@ struct pgm_peer_t {
     gpointer		rs;
     gboolean		use_proactive_parity;	    /* indicating availability from this source */
     gboolean		use_ondemand_parity;
+    guint		rs_n;
     guint		rs_k;
     guint32		tg_sqn_shift;		    /* log2 (rs_k) */
 
