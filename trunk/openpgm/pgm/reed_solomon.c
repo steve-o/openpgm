@@ -69,11 +69,25 @@ gf_vec_addmul (
 	if (G_UNLIKELY(b == 0))
 		return;
 
+#ifdef CONFIG_GALOIS_MUL_LUT
+        const gf8_t* gfmul_b = &gftable[ (guint16)b << 8 ];
+#endif
+
 	i = 0;
 	count8 = len >> 3;		/* 8-way unrolls */
 	if (count8)
 	{
 		while (count8--) {
+#ifdef CONFIG_GALOIS_MUL_LUT
+			d[i  ] ^= gfmul_b[ s[i  ] ];
+			d[i+1] ^= gfmul_b[ s[i+1] ];
+			d[i+2] ^= gfmul_b[ s[i+2] ];
+			d[i+3] ^= gfmul_b[ s[i+3] ];
+			d[i+4] ^= gfmul_b[ s[i+4] ];
+			d[i+5] ^= gfmul_b[ s[i+5] ];
+			d[i+6] ^= gfmul_b[ s[i+6] ];
+			d[i+7] ^= gfmul_b[ s[i+7] ];
+#else
 			d[i  ] ^= gfmul( b, s[i  ] );
 			d[i+1] ^= gfmul( b, s[i+1] );
 			d[i+2] ^= gfmul( b, s[i+2] );
@@ -82,6 +96,7 @@ gf_vec_addmul (
 			d[i+5] ^= gfmul( b, s[i+5] );
 			d[i+6] ^= gfmul( b, s[i+6] );
 			d[i+7] ^= gfmul( b, s[i+7] );
+#endif
 			i += 8;
 		}
 
@@ -90,7 +105,11 @@ gf_vec_addmul (
 	}
 
 	while (len--) {
+#ifdef CONFIG_GALOIS_MUL_LUT
+		d[i] ^= gfmul_b[ s[i] ];
+#else
 		d[i] ^= gfmul( b, s[i] );
+#endif
 		i++;
 	}
 }
