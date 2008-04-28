@@ -2134,7 +2134,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERLOSSES:
 				{
-				unsigned long losses = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_LOSSES]);
+				unsigned long losses = ((pgm_rxw_t*)peer->rxw)->cumulative_losses;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&losses, sizeof(losses) );
 				}

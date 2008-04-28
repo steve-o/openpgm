@@ -978,7 +978,7 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED],
-						peer->cumulative_stats[PGM_PC_RECEIVER_LOSSES],
+						((pgm_rxw_t*)peer->rxw)->cumulative_losses,
 						peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP],
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS],
