@@ -1957,6 +1957,7 @@ pgm_transport_bind (
 
 /* cleanup */
 	transport->is_bound = TRUE;
+	transport->is_open = TRUE;
 	g_static_mutex_unlock (&transport->send_mutex);
 	g_static_mutex_unlock (&transport->mutex);
 
@@ -2056,6 +2057,11 @@ pgm_transport_recvmsgv (
 	g_trace ("INFO", "pgm_transport_recvmsgv");
 	g_assert( msg_len > 0 );
 
+	if (!transport->is_open) {
+		errno = ECONNRESET;
+		return -1;
+	}
+
 	gsize bytes_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	pgm_msgv_t* msg_end = msg_start + msg_len;
@@ -2085,6 +2091,13 @@ pgm_transport_recvmsgv (
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
+
+			if (transport->may_close_on_failure &&
+			    waiting_rxw->cumulative_losses &&
+			   !transport->is_open)
+			{
+				transport->is_open = FALSE;
+			}
 	
 /* add to release list */
 			waiting_rxw->commit_link.data = waiting_rxw;
@@ -2375,6 +2388,13 @@ flush_locked:
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
+			if (transport->may_close_on_failure &&
+			    waiting_rxw->cumulative_losses &&
+			   !transport->is_open)
+			{
+				transport->is_open = FALSE;
+			}
+
 /* add to release list */
 			waiting_rxw->commit_link.data = waiting_rxw;
 			waiting_rxw->commit_link.next = transport->peers_committed;
@@ -2550,7 +2570,7 @@ pgm_transport_poll_info (
 	pgm_transport_t*	transport,
 	struct pollfd*		fds,
 	int*			n_fds,		/* in: #fds, out: used #fds */
-	int			events		/* EPOLLIN, EPOLLOUT */
+	int			events		/* POLLIN, POLLOUT */
 	)
 {
 	g_assert (transport);
@@ -2560,7 +2580,7 @@ pgm_transport_poll_info (
 	int moo = 0;
 
 /* we currently only support one incoming socket */
-	if (events & EPOLLIN)
+	if (events & POLLIN)
 	{
 		g_assert ( (*n_fds - 2) >= 0 );
 		fds[moo].fd = transport->recv_sock;
@@ -2578,7 +2598,7 @@ pgm_transport_poll_info (
 	}
 
 /* ODATA only published on regular socket, no need to poll router-alert sock */
-	if (transport->can_send_data && events & EPOLLOUT)
+	if (transport->can_send_data && events & POLLOUT)
 	{
 		g_assert ( (*n_fds - 1) >= 0 );
 		fds[moo].fd = transport->send_sock;
@@ -2937,6 +2957,13 @@ on_spm (
 				g_critical ("write to timer pipe failed :(");
 				retval = -EINVAL;
 			}
+		}
+
+		if (transport->may_close_on_failure &&
+		    ((pgm_rxw_t*)sender->rxw)->cumulative_losses &&
+		   !transport->is_open)
+		{
+			transport->is_open = FALSE;
 		}
 	}
 	else
@@ -3347,6 +3374,13 @@ on_peer_nak (
 		nak_list_len--;
 	}
 
+	if (transport->may_close_on_failure &&
+	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
+	   !transport->is_open)
+	{
+		transport->is_open = FALSE;
+	}
+
 out_unlock:
 	g_static_mutex_unlock (&peer->mutex);
 	g_static_mutex_unlock (&transport->mutex);
@@ -3464,6 +3498,13 @@ on_ncf (
 		pgm_rxw_ncf (peer->rxw, g_ntohl (*ncf_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 		ncf_list++;
 		ncf_list_len--;
+	}
+
+	if (transport->may_close_on_failure &&
+	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
+	   !transport->is_open)
+	{
+		transport->is_open = FALSE;
 	}
 
 out_unlock:
@@ -4152,7 +4193,8 @@ nak_rb_state (
 /* check this packet for state expiration */
 			if (pgm_time_after_eq(pgm_time_now, rp->nak_rb_expiry))
 			{
-				if (!is_valid_nla) {
+				if (!is_valid_nla)
+				{
 					dropped_invalid++;
 					g_trace ("INFO", "lost data #%u due to no peer NLA.", rp->sequence_number);
 					pgm_rxw_mark_lost (rxw, rp->sequence_number);
@@ -4309,8 +4351,16 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 	}
 
-	if (dropped_invalid) {
+	if (dropped_invalid)
+	{
 		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+
+		if (transport->may_close_on_failure &&
+		    rxw->cumulative_losses &&
+		   !transport->is_open)
+		{
+			transport->is_open = FALSE;
+		}
 	}
 
 	if (rxw->backoff_queue->length == 0)
@@ -4616,6 +4666,13 @@ nak_rpt_state (
 				rxw->fragment_count);
 	}
 
+	if (transport->may_close_on_failure &&
+	    rxw->cumulative_losses &&
+	   !transport->is_open)
+	{
+		transport->is_open = FALSE;
+	}
+
 	if (rxw->wait_ncf_queue->tail) {
 		if (next_nak_rpt_expiry(rxw) > pgm_time_now)
 		{
@@ -4738,6 +4795,13 @@ nak_rdata_state (
 
 	if (dropped) {
 		g_message ("dropped %u messages due to data cancellation.", dropped);
+	}
+
+	if (transport->may_close_on_failure &&
+	    rxw->cumulative_losses &&
+	   !transport->is_open)
+	{
+		transport->is_open = FALSE;
 	}
 
 	if (rxw->wait_data_queue->tail)
@@ -5165,6 +5229,12 @@ pgm_transport_send (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	if (!transport->is_open) {
+		errno = ECONNRESET;
+		return -1;
+	}
+
 /* pass on non-fragment calls */
 	if (apdu_length < transport->max_tsdu) {
 		return pgm_transport_send_one_copy (transport, apdu, apdu_length, flags);
@@ -5346,6 +5416,12 @@ pgm_transport_sendv (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	if (!transport->is_open) {
+		errno = ECONNRESET;
+		return -1;
+	}
+
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0) {
 		return pgm_transport_send_one_copy (transport, NULL, count, flags);
@@ -5600,6 +5676,12 @@ pgm_transport_send_packetv (
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	if (!transport->is_open) {
+		errno = ECONNRESET;
+		return -1;
+	}
+
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0) {
 		return pgm_transport_send_one_copy (transport, NULL, count, flags);
@@ -5931,6 +6013,23 @@ pgm_transport_set_recv_only (
 	g_static_mutex_lock (&transport->mutex);
 	transport->can_send_data	= FALSE;
 	transport->can_send_nak		= !is_passive;
+	g_static_mutex_unlock (&transport->mutex);
+
+	return 0;
+}
+
+/* on unrecoverable data loss shutdown transport from further transmission or
+ * receiving.
+ */
+int
+pgm_transport_set_close_on_failure (
+	pgm_transport_t*	transport
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+
+	g_static_mutex_lock (&transport->mutex);
+	transport->may_close_on_failure = TRUE;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;

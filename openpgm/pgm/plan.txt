@@ -214,31 +214,19 @@ Basic TODO list
 
 - Ensure standardised error handling and status reporting.
 - Implement mechanism for data-loss feedback.
-- Add interface for synchronous reading instead of directly accessing transport.
-- Add statistics back from basic_recv with some method to query and reset.
-- Transport throttling, fine grain throttling: ODATA to RDATA, and priority. *
 - OPT_SYN & OPT_FIN on sending side.
 - Shared trash stacks between multiple receive windows (contexts).
 - Shared trash stacks between transmit and receive windows.
-- FEC: to be or not to be Reed Solomon, compatibility with SmartPGM FEC?
+- FEC: compatibility with SmartPGM FEC, MS FEC?
 - NAK backoff learning.
 - Full conformance testing. (nak backoffs remaining)
 - Unit testing.
 - System testing with valgrind.
 - Performance testing with oprofile.
-- Clean up demo app logging by implementing a g_log hook.
-- Setup doxygen's doxyfile & update code with correct formatting.
 - Complete IPv6 support.
 - Basic DLR.
-- Convert timer thread from a GLib mainloop to a g_cond_wait / g_cond_timed_wait based loop,
-  using mutex/cond pairs instead of shuffling bytes over a pipe.
-  * thread synchronisationt not necessary so probably bad idea *
-- Determine handling of zero length data packets.
+- Determine handling of zero length data packets: 0 ok.
 - Implement PGM sender (only) support thread?
-- Parity SPMs.
-- Parity NAKs.
-- Parity RDATA.
-- Parity repair.
 
 Optionals
 *********
