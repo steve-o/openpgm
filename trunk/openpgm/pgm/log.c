@@ -21,14 +21,23 @@
 
 
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <netdb.h>
 
 #include "pgm/log.h"
 
 
 /* globals */
 
-int g_timezone = 0;
+#define TIME_FORMAT		"%Y-%m-%d %H:%M:%S "
+
+static int g_timezone = 0;
+static char g_hostname[NI_MAXHOST + 1];
+
+static void log_handler (const gchar*, GLogLevelFlags, const gchar*, gpointer);
 
 
 /* calculate time zone offset in seconds
@@ -49,23 +58,65 @@ log_init ( void )
 	g_timezone += dir * 24 * 60 * 60;
 
 //	printf ("timezone offset %u seconds.\n", g_timezone);
+
+	gethostname (g_hostname, sizeof(g_hostname));
+
+	g_log_set_handler ("pgmasync",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("pgmgsi",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("pgmhttp",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("pgmif",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("pgmrxw",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("pgmtxw",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("pgmtransport",	G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler (NULL,		G_LOG_LEVEL_MASK, log_handler, NULL);
+
 	return 0;
 }
 
-/* format a timestamp with usecs
+/* log callback
  */
-
-char*
-ts_format (
-	int sec,
-	int usec
+static void
+log_handler (
+	const gchar*	log_domain,
+	G_GNUC_UNUSED GLogLevelFlags	log_level,
+	const gchar*	message,
+	G_GNUC_UNUSED gpointer		unused_data
 	)
 {
-	static char buf[sizeof("00:00:00.000000")];
-	snprintf(buf, sizeof(buf), "%02d:%02d:%02d.%06u",
-		sec / 3600, (sec % 3600) / 60, sec % 60, usec);
+	struct iovec iov[6];
+	struct iovec* v = iov;
+	time_t now;
+	time (&now);
+	const struct tm* time_ptr = localtime(&now);
+	char tbuf[1024];
+	strftime(tbuf, sizeof(tbuf), TIME_FORMAT, time_ptr);
+	v->iov_base = tbuf;
+	v->iov_len = strlen(tbuf);
+	v++;
+	v->iov_base = g_hostname;
+	v->iov_len = strlen(g_hostname);
+	v++;
 
-	return buf;
+	if (log_domain) {
+		v->iov_base = " ";
+		v->iov_len = 1;
+		v++;
+		v->iov_base = log_domain;
+		v->iov_len = strlen(log_domain);
+		v++;
+	}
+
+	v->iov_base = ": ";
+	v->iov_len = 2;
+	v++;
+	v->iov_base = message;
+	v->iov_len = strlen(message);
+	v++;
+	v->iov_base = "\n";
+	v->iov_len = 1;
+	v++;
+
+	writev (STDOUT_FILENO, iov, v - iov);
 }
 
 /* eof */

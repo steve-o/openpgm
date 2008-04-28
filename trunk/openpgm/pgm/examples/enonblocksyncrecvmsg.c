@@ -256,11 +256,7 @@ on_datav (
 	G_GNUC_UNUSED gpointer user_data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-
-	g_message ("%s: (%i bytes)",
-			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+	g_message ("(%i bytes)",
 			len);
 
 /* protect against non-null terminated strings */

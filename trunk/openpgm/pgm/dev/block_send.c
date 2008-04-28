@@ -252,9 +252,7 @@ on_mark (
 	G_GNUC_UNUSED gpointer data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-	g_message ("%s counter: %i", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec), g_payload);
+	g_message ("counter: %i", g_payload);
 
 	return TRUE;
 }

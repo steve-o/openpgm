@@ -769,11 +769,7 @@ on_mark (
 	G_GNUC_UNUSED gpointer data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-	printf ("MARK %s\n", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
-	fflush (stdout);
-
+	g_message ("-- MARK --");
 	return TRUE;
 }
 

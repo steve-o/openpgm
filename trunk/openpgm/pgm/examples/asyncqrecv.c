@@ -246,8 +246,7 @@ on_data (
 	char buf[1024];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
 
-	g_message ("%s: \"%s\" (%i bytes)",
-			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+	g_message ("\"%s\" (%i bytes)",
 			buf,
 			len);
 
