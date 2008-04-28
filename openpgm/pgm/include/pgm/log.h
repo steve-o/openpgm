@@ -27,10 +27,7 @@
 
 G_BEGIN_DECLS
 
-extern int g_timezone;
-
 gboolean log_init (void);
-char* ts_format (int, int);
 
 G_END_DECLS
 

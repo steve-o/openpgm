@@ -17,13 +17,15 @@ Specifies whether the sender is enabled for sending parity repair packets. When 
 Reed Solomon codes:
 
 		encode/decode time (us)
-RS(255, 2)	11/20
-RS(255, 4)	23/32
-RS(255, 8)	45/58
-RS(255, 16)	90/104
-RS(255, 32)	177/194
-RS(255, 64)	353/374
-RS(255, 128)	697/fail
+RS(255, 2)	4/6
+RS(255, 4)	7/10
+RS(255, 8)	14/18
+RS(255, 16)	29/34
+RS(255, 32)	57/64
+RS(255, 64)	119/134
+RS(255, 128)	236/fail(278)
+
+reference platform: Intel Xeon CPU 3.20Ghz
 
 
 Implementation exact copy of Luigi Rizzo FEC code as demonstrated in RMDP:
