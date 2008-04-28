@@ -256,9 +256,8 @@ pgm_rxw_init (
 	r->trail = r->lead + 1;
 
 /* limit retransmit requests on late session joining */
-	r->rxw_constrained = TRUE;
-
-	r->window_defined = FALSE;
+	r->is_rxw_constrained = TRUE;
+	r->is_window_defined = FALSE;
 
 /* empty queue's for nak & ncfs */
 	r->backoff_queue = g_queue_new ();
@@ -432,7 +431,7 @@ pgm_rxw_push_fragment (
  * window trail for retransmit requests.
  */
 
-	if ( !r->window_defined )
+	if ( !r->is_window_defined )
 	{
 /* if this packet is a fragment of an apdu, and not the first, we continue on as per spec but careful to
  * advance the trailing edge to discard the remaining fragments.
@@ -442,8 +441,8 @@ pgm_rxw_push_fragment (
 		r->lead = sequence_number - 1;
 		r->commit_trail = r->commit_lead = r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
 
-		r->rxw_constrained = TRUE;
-		r->window_defined = TRUE;
+		r->is_rxw_constrained = TRUE;
+		r->is_window_defined = TRUE;
 	}
 	else
 	{
@@ -714,6 +713,7 @@ out_flush:
 
 	if (dropped) {
 		g_warning ("dropped %u messages due to full window.", dropped);
+		r->cumulative_losses += dropped;
 	}
 
 out:
@@ -935,6 +935,8 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 	}
 
 out:
+	r->cumulative_losses += dropped;
+
 	ASSERT_RXW_BASE_INVARIANT(r);
 
 	return bytes_read;
@@ -1380,7 +1382,7 @@ pgm_rxw_window_update (
 	guint dropped = 0;
 
 /* SPM is first message seen, define new window parameters */
-	if (!r->window_defined)
+	if (!r->is_window_defined)
 	{
 		g_trace ("SPM defining receive window");
 
@@ -1390,8 +1392,8 @@ pgm_rxw_window_update (
 		r->tg_size = tg_size;
 		r->tg_sqn_shift = tg_sqn_shift;
 
-		r->rxw_constrained = TRUE;
-		r->window_defined = TRUE;
+		r->is_rxw_constrained = TRUE;
+		r->is_window_defined = TRUE;
 
 		return 0;
 	}
@@ -1443,13 +1445,13 @@ pgm_rxw_window_update (
 		}
 	}
 
-	if ( r->rxw_constrained && SLIDINGWINDOW_GT(r, txw_trail, r->rxw_trail_init) )
+	if ( r->is_rxw_constrained && SLIDINGWINDOW_GT(r, txw_trail, r->rxw_trail_init) )
 	{
 		g_trace ("constraint removed on trail.");
-		r->rxw_constrained = FALSE;
+		r->is_rxw_constrained = FALSE;
 	}
 
-	if ( !r->rxw_constrained && SLIDINGWINDOW_GT(r, txw_trail, r->rxw_trail) )
+	if ( !r->is_rxw_constrained && SLIDINGWINDOW_GT(r, txw_trail, r->rxw_trail) )
 	{
 		g_trace ("advancing rxw_trail to %u", txw_trail);
 		r->rxw_trail = txw_trail;
@@ -1480,7 +1482,7 @@ pgm_rxw_window_update (
 	{
 		g_trace ("rxw_trail not advanced.");
 
-		if (!r->rxw_constrained)
+		if (!r->is_rxw_constrained)
 		{
 			if (txw_trail != r->rxw_trail)
 			{
@@ -1492,6 +1494,7 @@ pgm_rxw_window_update (
 	if (dropped)
 	{
 		g_warning ("dropped %u messages due to full window.", dropped);
+		r->cumulative_losses += dropped;
 	}
 
 	if (r->tg_size != tg_size) {
@@ -1533,6 +1536,7 @@ pgm_rxw_mark_lost (
 
 	rp->state = PGM_PKT_LOST_DATA_STATE;
 	r->lost_count++;
+	r->cumulative_losses++;
 	r->is_waiting = TRUE;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -1564,7 +1568,7 @@ pgm_rxw_ncf (
 
 	g_trace ("pgm_rxw_ncf(#%u)", sequence_number);
 
-	if (!r->window_defined) {
+	if (!r->is_window_defined) {
 		retval = PGM_RXW_WINDOW_UNDEFINED;
 		goto out;
 	}
@@ -1691,6 +1695,7 @@ pgm_rxw_ncf (
 
 	if (dropped) {
 		g_warning ("dropped %u messages due to full window.", dropped);
+		r->cumulative_losses += dropped;
 	}
 
 	retval = PGM_RXW_CREATED_PLACEHOLDER;

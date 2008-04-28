@@ -191,6 +191,8 @@ struct pgm_transport_t {
     GMainLoop		*timer_loop;
     GMainContext	*timer_context;
     gboolean		is_bound;
+    gboolean		is_open;
+    gboolean		may_close_on_failure;
 
     gboolean		can_send_data;			/* and SPMs */
     gboolean		can_send_nak;
@@ -343,6 +345,8 @@ int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint
 
 int pgm_transport_set_send_only (pgm_transport_t*);
 int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
+
+int pgm_transport_set_close_on_failure (pgm_transport_t*);
 
 gsize pgm_transport_pkt_offset (gboolean);
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)

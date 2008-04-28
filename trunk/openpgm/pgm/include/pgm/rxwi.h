@@ -117,6 +117,7 @@ struct pgm_rxw_t {
         GQueue*         backoff_queue;
         GQueue*         wait_ncf_queue;
         GQueue*         wait_data_queue;
+/* window context counters */
 	guint32		lost_count;		/* failed to repair */
 	guint32		fragment_count;		/* incomplete apdu */
 	guint32		parity_count;		/* parity for repairs */
@@ -131,13 +132,16 @@ struct pgm_rxw_t {
         guint32         rxw_trail, rxw_trail_init;
 	guint32		commit_lead;
 	guint32		commit_trail;
-        gboolean        rxw_constrained;
-        gboolean        window_defined;
+        gboolean        is_rxw_constrained;
+        gboolean        is_window_defined;
 
 	guint32		min_fill_time;
 	guint32		max_fill_time;
 	guint32		min_nak_transmit_count;
 	guint32		max_nak_transmit_count;
+
+/* runtime context counters */
+	guint32		cumulative_losses;
 };
 
 typedef struct pgm_rxw_t pgm_rxw_t;
