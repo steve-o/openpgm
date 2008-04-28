@@ -279,10 +279,7 @@ on_mark (
 	G_GNUC_UNUSED gpointer data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-	g_message ("%s on_mark.", ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec));
-
+	g_message ("-- MARK --");
 	return TRUE;
 }
 
@@ -345,11 +342,7 @@ on_msgv (
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-
-        g_message ("%s: (%i bytes)",
-                        ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+        g_message ("(%i bytes)",
                         len);
 
         guint i = 0;

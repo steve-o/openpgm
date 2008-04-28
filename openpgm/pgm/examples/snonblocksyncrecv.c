@@ -243,15 +243,11 @@ on_data (
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {
-	static struct timeval tv;
-	gettimeofday(&tv, NULL);
-
 /* protect against non-null terminated strings */
 	char buf[1024];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
 
-	g_message ("%s: \"%s\" (%i bytes)",
-			ts_format((tv.tv_sec + g_timezone) % 86400, tv.tv_usec),
+	g_message ("\"%s\" (%i bytes)",
 			buf,
 			len);
 
