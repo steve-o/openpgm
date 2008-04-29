@@ -2453,7 +2453,7 @@ check_for_repeat:
 
 out:
 	if (bytes_read == 0) {
-		errno = EAGAIN;
+		errno = transport->is_open ? EAGAIN : ECONNRESET;
 		return -1;
 	}
 
@@ -4673,15 +4673,19 @@ nak_rpt_state (
 		transport->is_open = FALSE;
 	}
 
-	if (rxw->wait_ncf_queue->tail) {
+	if (rxw->wait_ncf_queue->tail)
+	{
 		if (next_nak_rpt_expiry(rxw) > pgm_time_now)
 		{
 			g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf(next_nak_rpt_expiry(rxw) - pgm_time_now));
 		} else {
 			g_trace ("INFO", "next expiry set in -%f seconds.", pgm_to_secsf(pgm_time_now - next_nak_rpt_expiry(rxw)));
 		}
-	} else
+	}
+	else
+	{
 		g_trace ("INFO", "wait ncf queue empty.");
+	}
 }
 
 /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
