@@ -2057,6 +2057,7 @@ pgm_transport_recvmsgv (
 	g_trace ("INFO", "pgm_transport_recvmsgv");
 	g_assert( msg_len > 0 );
 
+/* reject on closed transport */
 	if (!transport->is_open) {
 		errno = ECONNRESET;
 		return -1;
@@ -2094,7 +2095,7 @@ pgm_transport_recvmsgv (
 
 			if (transport->may_close_on_failure &&
 			    waiting_rxw->cumulative_losses &&
-			   !transport->is_open)
+			    transport->is_open)
 			{
 				transport->is_open = FALSE;
 			}
@@ -2390,7 +2391,7 @@ flush_locked:
 
 			if (transport->may_close_on_failure &&
 			    waiting_rxw->cumulative_losses &&
-			   !transport->is_open)
+			    transport->is_open)
 			{
 				transport->is_open = FALSE;
 			}
@@ -2452,7 +2453,9 @@ check_for_repeat:
 	}
 
 out:
-	if (bytes_read == 0) {
+	if (bytes_read == 0)
+	{
+/* return reset on zero bytes instead of waiting for next call */
 		errno = transport->is_open ? EAGAIN : ECONNRESET;
 		return -1;
 	}
@@ -2961,7 +2964,7 @@ on_spm (
 
 		if (transport->may_close_on_failure &&
 		    ((pgm_rxw_t*)sender->rxw)->cumulative_losses &&
-		   !transport->is_open)
+		    transport->is_open)
 		{
 			transport->is_open = FALSE;
 		}
@@ -3376,7 +3379,7 @@ on_peer_nak (
 
 	if (transport->may_close_on_failure &&
 	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
-	   !transport->is_open)
+	    transport->is_open)
 	{
 		transport->is_open = FALSE;
 	}
@@ -3502,7 +3505,7 @@ on_ncf (
 
 	if (transport->may_close_on_failure &&
 	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
-	   !transport->is_open)
+	    transport->is_open)
 	{
 		transport->is_open = FALSE;
 	}
@@ -4357,7 +4360,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 		if (transport->may_close_on_failure &&
 		    rxw->cumulative_losses &&
-		   !transport->is_open)
+		    transport->is_open)
 		{
 			transport->is_open = FALSE;
 		}
@@ -4668,7 +4671,7 @@ nak_rpt_state (
 
 	if (transport->may_close_on_failure &&
 	    rxw->cumulative_losses &&
-	   !transport->is_open)
+	    transport->is_open)
 	{
 		transport->is_open = FALSE;
 	}
@@ -4803,7 +4806,7 @@ nak_rdata_state (
 
 	if (transport->may_close_on_failure &&
 	    rxw->cumulative_losses &&
-	   !transport->is_open)
+	    transport->is_open)
 	{
 		transport->is_open = FALSE;
 	}
@@ -5234,6 +5237,7 @@ pgm_transport_send (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
+/* reject on closed transport */
 	if (!transport->is_open) {
 		errno = ECONNRESET;
 		return -1;
@@ -5421,6 +5425,7 @@ pgm_transport_sendv (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
+/* reject on closed transport */
 	if (!transport->is_open) {
 		errno = ECONNRESET;
 		return -1;
@@ -5681,6 +5686,7 @@ pgm_transport_send_packetv (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
+/* reject on closed transport */
 	if (!transport->is_open) {
 		errno = ECONNRESET;
 		return -1;
