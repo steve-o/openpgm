@@ -87,7 +87,6 @@ static gboolean on_shutdown (gpointer);
 static gboolean on_mark (gpointer);
 
 static void send_odata (void);
-static gboolean on_odata_timer (gpointer);
 static gboolean on_io_data (GIOChannel*, GIOCondition, gpointer);
 static int on_data (gpointer, guint, gpointer);
 
@@ -326,7 +325,6 @@ on_startup (
 			g_message ("scheduling ODATA broadcasts every %i ms.", g_odata_interval / 1000);
 		else
 			g_message ("scheduling ODATA broadcasts every %i us.", g_odata_interval);
-//		g_timeout_add(g_odata_interval / 1000, (GSourceFunc)on_odata_timer, NULL);
 
 // create an idle source with non-glib timing
 		static GSourceFuncs idle_funcs = {
@@ -400,15 +398,6 @@ idle_dispatch (
 
 /* we send out a stream of ODATA packets with basic changing payload
  */
-
-static gboolean
-on_odata_timer (
-	G_GNUC_UNUSED gpointer data
-	)
-{
-	send_odata ();
-	return TRUE;
-}
 
 static void
 send_odata (void)

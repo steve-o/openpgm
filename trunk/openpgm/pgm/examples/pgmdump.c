@@ -42,7 +42,6 @@
 
 /* globals */
 
-static int g_port = 7500;
 static const char* g_network = "239.192.0.1";
 
 static GIOChannel* g_io_channel = NULL;

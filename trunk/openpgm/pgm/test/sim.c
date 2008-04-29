@@ -1732,7 +1732,7 @@ on_stdin_data (
 			pgm_sqn_list_t sqn_list;
 			sqn_list.len = 0;
 			{
-				char* saveptr;
+				char* saveptr = NULL;
 				for (p = str + pmatch[5].rm_so; ; p = NULL) {
 					char* token = strtok_r (p, ",", &saveptr);
 					if (!token) break;
