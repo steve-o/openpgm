@@ -21,6 +21,8 @@
 
 #include <glib.h>
 
+#include "pgm/version.h"
+
 
 /* globals */
 

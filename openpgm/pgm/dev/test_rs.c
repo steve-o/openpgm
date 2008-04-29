@@ -73,7 +73,7 @@ main (
 
 /* Reed-Solomon code */
 	guint n = 255;		/* [ k+1 .. 255 ] */
-	guint k = 64;		/* [ 2 .. 128 ] */
+	guint k = 128;		/* [ 2 .. 128 ] */
 
 	const gchar source[] = "Ayumi Lee (Hangul: 이 아유미, Japanese name: Ito Ayumi 伊藤亜由美, born August 25, 1984, Tottori Prefecture, Japan[1]), from former Korean girl-group Sugar, was raised in Japan for much of her younger life and is the reason for her Japanese accent, although she is now fluent in both languages. Although Ayumi's name is commonly believed to be Japanese in origin, she has explained that her name is hanja-based.";
 	guint source_len = strlen (source);		/* chars: g_utf8_strlen() */

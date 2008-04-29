@@ -868,7 +868,7 @@ generic_print_nak (
 	printf ("\t\t\"%sSqn\": %lu,\n", name, (gulong)g_ntohl(nak->nak_sqn));
 
 	guint16 nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
-	guint16 nak_grp_nla_afi;
+	guint16 nak_grp_nla_afi = 0;
 	char s[INET6_ADDRSTRLEN];
 
 	printf ("\t\t\"%sSourceNlaAfi\": %i,\n", name, nak_src_nla_afi);

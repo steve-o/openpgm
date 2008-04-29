@@ -5888,7 +5888,7 @@ send_rdata (
 /* RDATA */
         rdata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
-	guint32 unfolded_odata;
+	guint32 unfolded_odata	= 0;
 	if (has_saved_partial_csum)
 	{
 		unfolded_odata	= *(guint32*)(void*)&header->pgm_sport;
