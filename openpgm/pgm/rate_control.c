@@ -30,7 +30,7 @@
 
 
 struct rate_t {
-	guint rate_per_sec;
+	gint rate_per_sec;
 	guint iphdr_len;
 
 	gint rate_limit;		/* signed for math */
@@ -52,7 +52,7 @@ pgm_rate_create (
 	g_return_val_if_fail (bucket_ != NULL, -EINVAL);
 
 	rate_t* bucket = g_malloc0 (sizeof(rate_t));
-	bucket->rate_per_sec = rate_per_sec;
+	bucket->rate_per_sec = (gint)rate_per_sec;
 	bucket->iphdr_len = iphdr_len;
 	g_static_mutex_init (&bucket->mutex);
 	*bucket_ = bucket;
@@ -95,7 +95,7 @@ pgm_rate_check (
 		BUCKET->rate_limit = BUCKET->rate_per_sec;
 	BUCKET->last_rate_check = pgm_time_now;
 
-	guint new_rate_limit = BUCKET->rate_limit - ( BUCKET->iphdr_len + data_size );
+	gint new_rate_limit = BUCKET->rate_limit - ( BUCKET->iphdr_len + data_size );
 	if (flags & MSG_DONTWAIT &&
 		new_rate_limit < 0)
 	{

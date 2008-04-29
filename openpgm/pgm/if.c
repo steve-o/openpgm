@@ -755,7 +755,7 @@ pgm_if_parse_network (
 	struct sockaddr*	devices,
 	struct sockaddr*	receive_groups,
 	struct sockaddr*	send_group,
-	int			len			/* length of device & receive_groups fields */
+	G_GNUC_UNUSED int	len			/* length of device & receive_groups fields */
 	)
 {
 	const char *p = s;
@@ -1076,7 +1076,6 @@ pgm_if_parse_transport (
 	g_free (devices);
 	g_free (receive_groups);
 	g_free (send_group);
-out:
 	return retval;
 }
 

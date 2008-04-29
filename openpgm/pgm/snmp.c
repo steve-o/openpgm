@@ -38,7 +38,7 @@
 gboolean pgm_agentx_subagent = TRUE;
 char* pgm_agentx_socket = NULL;
 gboolean pgm_snmp_syslog = FALSE;
-char* pgm_snmp_appname = "PGM";
+const char* pgm_snmp_appname = "PGM";
 
 static GThread*	g_thread;
 static int g_pipe[2];
@@ -159,7 +159,7 @@ pgm_snmp_shutdown (void)
 
 static gpointer
 agent_thread (
-	gpointer	data
+	G_GNUC_UNUSED	gpointer	data
 	)
 {
 	for (;;)

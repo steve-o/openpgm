@@ -35,7 +35,7 @@
 
 void
 on_sigsegv (
-	int	signum
+	G_GNUC_UNUSED int	signum
 	)
 {
 	void* array[256];
