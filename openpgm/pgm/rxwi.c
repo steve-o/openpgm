@@ -159,8 +159,6 @@
 #define ASSERT_RXW_POINTER_INVARIANT(w) while(0)
 #endif
 
-#undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN	"pgmrxw"
 
 static void _list_iterator (gpointer, gpointer);
 static inline int pgm_rxw_pop_lead (pgm_rxw_t*);

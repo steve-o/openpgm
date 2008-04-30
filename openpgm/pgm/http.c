@@ -48,8 +48,6 @@
 /* globals */
 
 /* local globals */
-#undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN            "pgmhttp"
 
 static guint16 g_server_port;
 

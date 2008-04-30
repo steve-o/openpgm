@@ -61,13 +61,9 @@ log_init ( void )
 
 	gethostname (g_hostname, sizeof(g_hostname));
 
-	g_log_set_handler ("pgmasync",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("pgmgsi",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("pgmhttp",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("pgmif",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("pgmrxw",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("pgmtxw",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("pgmtransport",	G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("Pgm",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("Pgm-Http",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("Pgm-Snmp",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler (NULL,		G_LOG_LEVEL_MASK, log_handler, NULL);
 
 	return 0;

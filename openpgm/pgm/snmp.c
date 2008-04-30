@@ -46,6 +46,31 @@ static int g_pipe[2];
 static gpointer agent_thread(gpointer);
 
 
+static int
+log_handler (
+	G_GNUC_UNUSED netsnmp_log_handler*	logh,
+	int			pri,
+	const char*		string
+	)
+{
+	GLogLevelFlags log_level = G_LOG_LEVEL_DEBUG;
+	switch (pri) {
+	case LOG_EMERG:
+	case LOG_ALERT:
+	case LOG_CRIT:		log_level = G_LOG_LEVEL_CRITICAL; break;
+	case LOG_ERR:		log_level = G_LOG_LEVEL_ERROR; break;
+	case LOG_WARNING:	log_level = G_LOG_LEVEL_WARNING; break;
+	case LOG_NOTICE:	log_level = G_LOG_LEVEL_MESSAGE; break;
+	case LOG_INFO:		log_level = G_LOG_LEVEL_INFO; break;
+	}
+	int len = strlen(string);
+	if ( string[len - 1] == '\n' ) len--;
+	char sbuf[1024];
+	strncpy (sbuf, string, len);
+	g_log (G_LOG_DOMAIN, log_level, sbuf);
+	return 1;
+}
+
 int
 pgm_snmp_init (void)
 {
@@ -55,6 +80,11 @@ pgm_snmp_init (void)
 
 /* ensure threading enabled */
 	if (!g_thread_supported ()) g_thread_init (NULL);
+
+/* redirect snmp logging */
+	snmp_disable_log();
+	netsnmp_log_handler* logh = netsnmp_register_loghandler (NETSNMP_LOGHANDLER_CALLBACK, LOG_DEBUG);
+	logh->handler = log_handler;
 
 	if (pgm_agentx_subagent)
 	{
@@ -66,13 +96,6 @@ pgm_snmp_init (void)
 						pgm_agentx_socket);
 		}
 	}
-
-/* redirect logging */
-	snmp_disable_log();
-	if (pgm_snmp_syslog)
-		snmp_enable_calllog();
-	else
-		snmp_enable_stderrlog();
 
 /* initialise */
 	retval = init_agent (pgm_snmp_appname);
