@@ -4,11 +4,13 @@
 
 Import('env')
 
+e = env.Copy();
+
 libex_src = Split("""
 		log.c
 		backtrace.c
 """)
 
-env.StaticLibrary('libpgmex', libex_src);
+e.StaticLibrary('libpgmex', libex_src);
 
 # end of file
