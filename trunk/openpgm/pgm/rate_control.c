@@ -42,6 +42,7 @@ typedef struct rate_t rate_t;
 
 /* globals */
 
+
 int
 pgm_rate_create (
 	gpointer*	bucket_,

@@ -85,8 +85,6 @@ typedef int (*pgm_timer_callback)(pgm_transport_t*);
 
 
 /* global locals */
-#undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN		"pgmtransport"
 
 static int ipproto_pgm = IPPROTO_PGM;
 

@@ -7,6 +7,7 @@ Import('env')
 httpe = env.Copy()
 httpe.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
 httpe.Append(CPPPATH = '.')
+httpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\\"Pgm-Http\\"');
 
 lib_src = Split("""
 		http.c

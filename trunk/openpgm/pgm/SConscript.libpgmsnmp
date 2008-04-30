@@ -4,6 +4,9 @@
 
 Import('env')
 
+snmpe = env.Copy()
+snmpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\\"Pgm-Snmp\\"');
+
 lib_src = Split("""
 		snmp.c
 		pgmMIB.c
@@ -12,9 +15,9 @@ lib_src = Split("""
 
 lib_obj = []
 for src in lib_src:
-	lib_obj += env.SharedObject(src)
+	lib_obj += snmpe.SharedObject(src)
 
-env.StaticLibrary('libpgmsnmp', lib_src);
-env.StaticLibrary('libpgmsnmp-pic', lib_obj);
+snmpe.StaticLibrary('libpgmsnmp', lib_src);
+snmpe.StaticLibrary('libpgmsnmp-pic', lib_obj);
 
 # end of file

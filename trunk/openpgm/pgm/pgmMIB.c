@@ -26,6 +26,7 @@ typedef struct pgm_snmp_context_t pgm_snmp_context_t;
 
 
 /* local globals */
+
 static oid snmptrap_oid[] = {1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0};
 
 

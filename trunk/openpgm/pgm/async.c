@@ -43,8 +43,6 @@
 
 
 /* global locals */
-#undef G_LOG_DOMAIN
-#define G_LOG_DOMAIN		"pgmasync"
 
 /* external: Glib event loop GSource of pgm contiguous data */
 struct pgm_watch_t {
