@@ -2657,26 +2657,26 @@ pgm_transport_epoll_ctl (
 
 	if (events & EPOLLIN)
 	{
-		event.events = EPOLLIN | EPOLLET;
+		event.events = events & (EPOLLIN | EPOLLET);
 		event.data.ptr = transport;
 		retval = epoll_ctl (epfd, op, transport->recv_sock, &event);
 		if (retval) {
 			goto out;
 		}
 
-		event.events = EPOLLIN | EPOLLET;
-		event.data.ptr = transport;
 		retval = epoll_ctl (epfd, op, transport->waiting_pipe[0], &event);
 		if (retval) {
 			goto out;
 		}
 
-		transport->is_edge_triggered_recv = TRUE;
+		if (events & EPOLLET) {
+			transport->is_edge_triggered_recv = TRUE;
+		}
 	}
 
 	if (transport->can_send_data && events & EPOLLOUT)
 	{
-		event.events = EPOLLOUT | EPOLLET;
+		event.events = events & (EPOLLOUT | EPOLLET);
 		event.data.ptr = transport;
 		retval = epoll_ctl (epfd, op, transport->send_sock, &event);
 	}
