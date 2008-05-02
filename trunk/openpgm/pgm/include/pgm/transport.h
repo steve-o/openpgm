@@ -197,6 +197,7 @@ struct pgm_transport_t {
     gboolean		can_send_data;			/* and SPMs */
     gboolean		can_send_nak;
     gboolean		can_recv;
+    gboolean		is_edge_triggered_recv;
 
     GCond		*thread_cond;
     GMutex		*thread_mutex;
@@ -275,10 +276,10 @@ struct pgm_transport_t {
     GHashTable*		peers_hashtable;	    /* fast lookup */
     GList*		peers_list;		    /* easy iteration */
     GSList*		peers_waiting;		    /* rxw: have or lost data */
-    GSList*		peers_last_waiting;
     GSList*		peers_committed;	    /* rxw: waiting to free */
     GStaticMutex	waiting_mutex;
     int			waiting_pipe[2];	    /* timer to rx */
+    gboolean		is_waiting_read;
 
     int			rdata_pipe[2];		    /* rx to timer */
     GIOChannel*		rdata_channel;
