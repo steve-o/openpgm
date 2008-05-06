@@ -709,12 +709,12 @@ out_flush:
 		sequence_number,
 		r->rxw_trail, r->rxw_trail_init, r->trail, r->commit_trail, r->commit_lead, r->lead);
 
+out:
 	if (dropped) {
 		g_warning ("dropped %u messages due to full window.", dropped);
 		r->cumulative_losses += dropped;
 	}
 
-out:
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 	return retval;
