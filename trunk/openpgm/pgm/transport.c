@@ -2089,7 +2089,7 @@ pgm_transport_recvmsgv (
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piovy_close_on_failure);
+			gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
