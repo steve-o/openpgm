@@ -192,7 +192,7 @@ struct pgm_transport_t {
     GMainContext	*timer_context;
     gboolean		is_bound;
     gboolean		is_open;
-    gboolean		may_close_on_failure;
+    gboolean		will_close_on_failure;
 
     gboolean		can_send_data;			/* and SPMs */
     gboolean		can_send_nak;

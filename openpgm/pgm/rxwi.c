@@ -207,7 +207,8 @@ pgm_rxw_init (
 	guint		rxw_max_rte,		/* max bandwidth */
 	GTrashStack**	trash_data,
 	GTrashStack**	trash_packet,
-	GStaticMutex*	trash_mutex
+	GStaticMutex*	trash_mutex,
+	gboolean	will_return_on_drop
 	)
 {
 	g_trace ("init (tpdu %i pre-alloc %i rxw_sqns %i rxw_secs %i rxw_max_rte %i).",
@@ -269,6 +270,8 @@ pgm_rxw_init (
 	r->min_nak_transmit_count = G_MAXINT;
 	r->max_nak_transmit_count = G_MININT;
 #endif
+
+	r->will_return_on_drop = will_return_on_drop;
 
 #ifdef RXW_DEBUG
 	guint memory = sizeof(pgm_rxw_t) +
@@ -811,6 +814,10 @@ pgm_rxw_readv (
 			}
 
 			r->commit_lead = r->trail;
+			if (r->will_return_on_drop)
+			{
+				goto out;
+			}
 			continue;
 		
 		case PGM_PKT_HAVE_DATA_STATE:
