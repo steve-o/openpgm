@@ -1999,7 +1999,8 @@ new_peer (
 				transport->rxw_max_rte,
 				&transport->rx_data,
 				&transport->rx_packet,
-				&transport->rx_mutex);
+				&transport->rx_mutex,
+				transport->will_close_on_failure);
 
 	peer->spmr_expiry = pgm_time_update_now() + transport->spmr_expiry;
 
@@ -2088,16 +2089,17 @@ pgm_transport_recvmsgv (
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piovy_close_on_failure);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (transport->may_close_on_failure &&
+			if (transport->will_close_on_failure &&
 			    waiting_rxw->cumulative_losses &&
 			    transport->is_open)
 			{
 				transport->is_open = FALSE;
+				goto out;
 			}
 	
 /* add to release list */
@@ -2381,11 +2383,12 @@ flush_waiting:
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (transport->may_close_on_failure &&
+			if (transport->will_close_on_failure &&
 			    waiting_rxw->cumulative_losses &&
 			    transport->is_open)
 			{
 				transport->is_open = FALSE;
+				goto out;
 			}
 
 /* add to release list */
@@ -2979,7 +2982,7 @@ on_spm (
 			}
 		}
 
-		if (transport->may_close_on_failure &&
+		if (transport->will_close_on_failure &&
 		    ((pgm_rxw_t*)sender->rxw)->cumulative_losses &&
 		    transport->is_open)
 		{
@@ -3394,7 +3397,7 @@ on_peer_nak (
 		nak_list_len--;
 	}
 
-	if (transport->may_close_on_failure &&
+	if (transport->will_close_on_failure &&
 	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
 	    transport->is_open)
 	{
@@ -3520,7 +3523,7 @@ on_ncf (
 		ncf_list_len--;
 	}
 
-	if (transport->may_close_on_failure &&
+	if (transport->will_close_on_failure &&
 	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
 	    transport->is_open)
 	{
@@ -4375,7 +4378,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 	{
 		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
 
-		if (transport->may_close_on_failure &&
+		if (transport->will_close_on_failure &&
 		    rxw->cumulative_losses &&
 		    transport->is_open)
 		{
@@ -4686,7 +4689,7 @@ nak_rpt_state (
 				rxw->fragment_count);
 	}
 
-	if (transport->may_close_on_failure &&
+	if (transport->will_close_on_failure &&
 	    rxw->cumulative_losses &&
 	    transport->is_open)
 	{
@@ -4821,7 +4824,7 @@ nak_rdata_state (
 		g_message ("dropped %u messages due to data cancellation.", dropped);
 	}
 
-	if (transport->may_close_on_failure &&
+	if (transport->will_close_on_failure &&
 	    rxw->cumulative_losses &&
 	    transport->is_open)
 	{
@@ -6056,7 +6059,7 @@ pgm_transport_set_close_on_failure (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->may_close_on_failure = TRUE;
+	transport->will_close_on_failure = TRUE;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
