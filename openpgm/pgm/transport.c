@@ -2689,15 +2689,18 @@ out:
 
 /* prototype of function to send pro-active parity NAKs.
  */
-static int
+static inline int
 pgm_schedule_proactive_nak (
 	pgm_transport_t*	transport,
-	guint32			sqn
+	guint32			nak_tg_sqn	/* transmission group (shifted) */
 	)
 {
 	int retval = 0;
 
-	pgm_txw_retransmit_push (transport->txw, sqn, TRUE, transport->tg_sqn_shift);
+	pgm_txw_retransmit_push (transport->txw,
+				 nak_tg_sqn | transport->rs_proactive_h,
+				 TRUE /* is_parity */,
+				 transport->tg_sqn_shift);
 	const char one = '1';
 	if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
 		g_critical ("write to rdata pipe failed :(");
@@ -4976,6 +4979,17 @@ retry_send:
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]	   += STATE(tpdu_length) + transport->iphdr_len;
 	}
 
+/* check for end of transmission group */
+	if (transport->use_proactive_parity)
+	{
+		guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+		guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+		if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
+		{
+			pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
+		}
+	}
+
 	return (gssize)tsdu_length;
 }
 
@@ -5076,6 +5090,17 @@ retry_send:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]	   += STATE(tpdu_length) + transport->iphdr_len;
+	}
+
+/* check for end of transmission group */
+	if (transport->use_proactive_parity)
+	{
+		guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+		guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+		if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
+		{
+			pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
+		}
 	}
 
 /* return data payload length sent */
@@ -5235,6 +5260,17 @@ retry_send:
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]	   += STATE(tpdu_length) + transport->iphdr_len;
 	}
 
+/* check for end of transmission group */
+	if (transport->use_proactive_parity)
+	{
+		guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+		guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+		if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
+		{
+			pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
+		}
+	}
+
 /* return data payload length sent */
 	return (gssize)STATE(tsdu_length);
 }
@@ -5383,6 +5419,17 @@ retry_send:
 		}
 
 		STATE(data_bytes_offset) += STATE(tsdu_length);
+
+/* check for end of transmission group */
+		if (transport->use_proactive_parity)
+		{
+			guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+			if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
+			{
+				pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
+			}
+		}
 
 	} while ( STATE(data_bytes_offset)  < apdu_length);
 	g_assert( STATE(data_bytes_offset) == apdu_length );
@@ -5654,6 +5701,17 @@ retry_one_apdu_send:
 
 		STATE(data_bytes_offset) += STATE(tsdu_length);
 
+/* check for end of transmission group */
+		if (transport->use_proactive_parity)
+		{
+			guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+			if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
+			{
+				pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
+			}
+		}
+
 	} while ( STATE(data_bytes_offset)  < STATE(apdu_length) );
 	g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 
@@ -5848,6 +5906,17 @@ retry_send:
 
 		STATE(data_bytes_offset) += STATE(tsdu_length);
 
+/* check for end of transmission group */
+		if (transport->use_proactive_parity)
+		{
+			guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+			if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
+			{
+				pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
+			}
+		}
+
 	}
 #ifdef TRANSPORT_DEBUG
 	if (is_one_apdu)
@@ -5975,7 +6044,7 @@ send_rdata (
 int
 pgm_transport_set_fec (
 	pgm_transport_t*	transport,
-	gboolean		use_proactive_parity,
+	guint			proactive_h,		/* 0 == no pro-active parity */
 	gboolean		use_ondemand_parity,
 	gboolean		use_varpkt_len,
 	guint			default_n,
@@ -5989,6 +6058,8 @@ pgm_transport_set_fec (
 
 	guint default_h = default_n - default_k;
 
+	g_return_val_if_fail (proactive_h <= default_h, -EINVAL);
+
 /* check validity of parameters */
 	if ( default_k > 223 &&
 		( (default_h * 223.0) / default_k ) < 1.0 )
@@ -5998,14 +6069,13 @@ pgm_transport_set_fec (
 	}
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->use_proactive_parity	= use_proactive_parity;
+	transport->use_proactive_parity	= proactive_h > 0;
 	transport->use_ondemand_parity	= use_ondemand_parity;
 	transport->use_varpkt_len	= use_varpkt_len;
 	transport->rs_n			= default_n;
 	transport->rs_k			= default_k;
+	transport->rs_proactive_h	= proactive_h;
 	transport->tg_sqn_shift		= pgm_power2_log2 (transport->rs_k);
-
-//	transport->fec = pgm_fec_create (default_n, default_k);
 
 	g_static_mutex_unlock (&transport->mutex);
 

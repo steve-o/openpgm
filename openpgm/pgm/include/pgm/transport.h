@@ -261,6 +261,7 @@ struct pgm_transport_t {
     gboolean		use_varpkt_len;
     guint		rs_n;
     guint		rs_k;
+    guint		rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
     guint		tg_sqn_shift;
     gpointer		parity_buffer;		    /* for parity odata/rdata generation */
 
@@ -342,7 +343,7 @@ int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
-int pgm_transport_set_fec (pgm_transport_t*, gboolean, gboolean, gboolean, guint, guint);
+int pgm_transport_set_fec (pgm_transport_t*, guint, gboolean, gboolean, guint, guint);
 
 int pgm_transport_set_send_only (pgm_transport_t*);
 int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);

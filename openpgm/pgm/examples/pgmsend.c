@@ -174,7 +174,7 @@ create_transport (void)
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 
 	if (g_fec) {
-		pgm_transport_set_fec (g_transport, FALSE, TRUE, TRUE, g_n, g_k);
+		pgm_transport_set_fec (g_transport, 0, TRUE, TRUE, g_n, g_k);
 	}
 
 	e = pgm_transport_bind (g_transport);
