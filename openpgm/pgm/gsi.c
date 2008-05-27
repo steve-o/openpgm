@@ -416,7 +416,7 @@ pgm_create_ipv4_gsi (
 /* compare two global session identifier GSI values and return TRUE if they are equal
  */
 
-inline gint
+gint
 pgm_gsi_equal (
         gconstpointer   v,
         gconstpointer   v2
