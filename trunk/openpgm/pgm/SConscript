@@ -19,6 +19,9 @@ SConscript('SConscript.libpgmsnmp');
 SConscript('test/SConscript');
 SConscript('dev/SConscript');
 SConscript('examples/SConscript');
-SConscript('check/SConscript');
+
+# unit testing framework optional.
+if snmphttp_env['CHECK'] == 1:
+ 	SConscript('check/SConscript');
 
 # end of file

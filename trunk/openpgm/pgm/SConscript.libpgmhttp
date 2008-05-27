@@ -2,10 +2,9 @@
 # OpenPGM build script
 # $Id$
 
-Import('env')
+Import('snmphttp_env')
 
-httpe = env.Copy()
-httpe.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+httpe = snmphttp_env.Copy()
 httpe.Append(CPPPATH = '.')
 httpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\\"Pgm-Http\\"');
 
