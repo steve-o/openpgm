@@ -98,18 +98,9 @@ def CheckSNMP(context):
 	context.Result(result);
 	return result;
 
-check_test_source = """
-int main(int argc, char**argv)
-{
-	suite_create ("autoconf");
-	return 0;
-}
-"""
-
 def CheckCheck(context):
 	context.Message('Checking to see if Check unit test framework is installed...');
-	context.env.ParseConfig('pkg-config --static --cflags --libs check');
-	result = context.TryLink(check_test_source, '.c');
+	result = context.TryAction('pkg-config --static --cflags --libs check')[0];
 	context.Result(result);
 	return result;
 
