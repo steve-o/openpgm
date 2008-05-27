@@ -191,7 +191,7 @@ pgm_print_tsi (
  * on success, returns a hash value corresponding to the TSI.  on error, fails
  * on assert.
  */
-inline guint
+guint
 pgm_tsi_hash (
 	gconstpointer v
         )
@@ -208,7 +208,7 @@ pgm_tsi_hash (
  *
  * returns TRUE if they are equal, FALSE if they are not.
  */
-inline gboolean
+gboolean
 pgm_tsi_equal (
 	gconstpointer   v,
 	gconstpointer   v2
@@ -262,7 +262,7 @@ pgm_packetv_free1 (
 /* fast log base 2 of power of 2
  */
 
-inline guint
+guint
 pgm_power2_log2 (
 	guint		v
 	)
