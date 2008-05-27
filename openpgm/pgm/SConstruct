@@ -98,12 +98,32 @@ def CheckSNMP(context):
 	context.Result(result);
 	return result;
 
-conf = Configure(snmphttp_env, custom_tests = {'CheckSNMP': CheckSNMP});
+check_test_source = """
+int main(int argc, char**argv)
+{
+	suite_create ("autoconf");
+	return 0;
+}
+"""
+
+def CheckCheck(context):
+	context.Message('Checking to see if Check unit test framework is installed...');
+	context.env.ParseConfig('pkg-config --static --cflags --libs check');
+	result = context.TryLink(check_test_source, '.c');
+	context.Result(result);
+	return result;
+
+conf = Configure(snmphttp_env, custom_tests = {'CheckSNMP': CheckSNMP, 'CheckCheck': CheckCheck});
 if not conf.CheckSNMP():
 	print 'Enabling extra libraries for Net-SNMP.';
 	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
 	conf.env.Append(LIBS = ['librpm', 'libsensors', 'libdl', 'libwrap']);
-snmpttp_env = conf.Finish();
+if conf.CheckCheck():
+	print 'Enabling Check unit tests.';
+	conf.env['CHECK'] = 1;
+else:
+	conf.env['CHECK'] = 0;
+snmphttp_env = conf.Finish();
 Export('snmphttp_env');
 
 ref_node = 'ref/' + env['BUILD'] + '/';
