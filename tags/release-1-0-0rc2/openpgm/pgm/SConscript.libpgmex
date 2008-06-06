@@ -1,0 +1,16 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+e = env.Copy();
+
+libex_src = Split("""
+		log.c
+		backtrace.c
+""")
+
+e.StaticLibrary('libpgmex', libex_src);
+
+# end of file

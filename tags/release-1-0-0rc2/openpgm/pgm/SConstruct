@@ -1,0 +1,124 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+EnsureSConsVersion( 0, 96 )
+
+opt = Options(None, ARGUMENTS)
+opt.AddOptions (
+	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile', 'thirtytwo'))),
+)
+
+import os
+env = Environment(ENV = os.environ,
+	CCFLAGS = [	'-pipe',
+			'-Wall',
+				'-Wextra',
+				'-Wfloat-equal',
+				'-Wshadow',
+				'-Wunsafe-loop-optimizations',
+				'-Wpointer-arith',
+				'-Wbad-function-cast',
+				'-Wcast-qual',
+				'-Wcast-align',
+				'-Wwrite-strings',
+				'-Waggregate-return',
+				'-Wstrict-prototypes',
+				'-Wold-style-definition',
+				'-Wmissing-prototypes',
+				'-Wmissing-declarations',
+				'-Wmissing-noreturn',
+				'-Wmissing-format-attribute',
+				'-Wredundant-decls',
+				'-Wnested-externs',
+				'-Winline',
+			'-pedantic',
+			'-std=gnu99',
+			'--param', 'max-inline-insns-single=600',
+			'-D_REENTRANT',
+			'-D__need_IOV_MAX',
+			'-DCONFIG_BIND_INADDR_ANY',
+			'-DCONFIG_GALOIS_MUL_LUT',
+			'-DPGM_MAJOR_VERSION=1',
+			'-DPGM_MINOR_VERSION=0',
+			'-DPGM_MICRO_VERSION=0'	],
+	LINKFLAGS = ['-pipe'],
+	NETSNMP_LIBS = ['libnetsnmpagent', 'libnetsnmpmibs', 'libnetsnmphelpers', 'libnetsnmp']
+)
+opt.Update (env)
+
+# define Builder for translating HTML documents for inlining.
+bld = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')
+env.Append(BUILDERS = {'HtmlC' : bld})
+
+# Define separate build environments
+release = env.Copy(BUILD = 'release')
+release.Append(CCFLAGS = '-O2')
+
+debug = env.Copy(BUILD = 'debug')
+debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
+
+profile = env.Copy(BUILD = 'profile')
+profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
+
+thirtytwo = release.Copy(BUILD = 'thirtytwo')
+thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
+
+# choose and environment to build
+if env['BUILD'] == 'release':
+	Export({'env':release})
+elif env['BUILD'] == 'profile':
+	Export({'env':profile})
+elif env['BUILD'] == 'thirtytwo':
+	Export({'env':thirtytwo})
+else:
+	Export({'env':debug})
+
+Import('env')
+
+# vanilla environment
+env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
+
+# environment for libpgmsnmp, libpgmhttp
+snmphttp_env = env.Copy()
+snmphttp_env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
+snmphttp_env.Append(LIBS = env['NETSNMP_LIBS']);
+
+snmp_test_source = """
+int main(int argc, char**argv)
+{
+	netsnmp_enable_subagent();
+	return 0;
+}
+"""
+
+def CheckSNMP(context):
+	context.Message('Checking to see if Net-SNMP had a happy accident...');
+	result = context.TryLink(snmp_test_source, '.c');
+	context.Result(result);
+	return result;
+
+def CheckCheck(context):
+	context.Message('Checking to see if Check unit test framework is installed...');
+	result = context.TryAction('pkg-config --static --cflags --libs check')[0];
+	context.Result(result);
+	return result;
+
+conf = Configure(snmphttp_env, custom_tests = {'CheckSNMP': CheckSNMP, 'CheckCheck': CheckCheck});
+if not conf.CheckSNMP():
+	print 'Enabling extra libraries for Net-SNMP.';
+	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
+	conf.env.Append(LIBS = ['librpm', 'libsensors', 'libdl', 'libwrap']);
+if conf.CheckCheck():
+	print 'Enabling Check unit tests.';
+	conf.env['CHECK'] = 1;
+else:
+	conf.env['CHECK'] = 0;
+snmphttp_env = conf.Finish();
+Export('snmphttp_env');
+
+ref_node = 'ref/' + env['BUILD'] + '/';
+BuildDir(ref_node, '.', duplicate=0)
+SConscript(ref_node + 'SConscript')
+
+# end of file

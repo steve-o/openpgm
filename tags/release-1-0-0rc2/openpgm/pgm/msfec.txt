@@ -1,0 +1,33 @@
+FEC parameters for Microsoft's PGM stack
+
+
+FECBlockSize (n) [FECGroupSize+1, 255]
+Maximum number of packets that can be sent for any group, including original data and parity packets. Maximum and default value is 255.
+
+FECProActivePackets
+Number of packets to send proactively with each group. Use this option when the network is dispersed, and upstream NAK requests are expensive.
+
+FECGroupSize (k) [2, 128]
+Number of packets to be treated as one group for the purpose of computing parity packets. Group size must be a power of two. In lossy networks, keep the group size relatively small.
+
+fFECOnDemandParityEnabled
+Specifies whether the sender is enabled for sending parity repair packets. When TRUE, receivers should only request parity repair packets.
+
+
+Reed Solomon codes:
+
+		encode/decode time (us)
+RS(255, 2)	4/6
+RS(255, 4)	7/10
+RS(255, 8)	14/18
+RS(255, 16)	29/34
+RS(255, 32)	57/64
+RS(255, 64)	119/134
+RS(255, 128)	236/fail(278)
+
+reference platform: Intel Xeon CPU 3.20Ghz
+
+
+Implementation exact copy of Luigi Rizzo FEC code as demonstrated in RMDP:
+
+http://info.iet.unipi.it/~luigi/fec.html
