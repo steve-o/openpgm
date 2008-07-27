@@ -7,6 +7,7 @@ EnsureSConsVersion( 0, 96 )
 opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile', 'thirtytwo'))),
+	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
 )
 
 import os
@@ -41,11 +42,21 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_GALOIS_MUL_LUT',
 			'-DPGM_MAJOR_VERSION=1',
 			'-DPGM_MINOR_VERSION=0',
-			'-DPGM_MICRO_VERSION=0'	],
-	LINKFLAGS = ['-pipe'],
+			'-DPGM_MICRO_VERSION=0'
+		 ],
+	LINKFLAGS = [	'-pipe',
+		    ],
 	NETSNMP_LIBS = ['libnetsnmpagent', 'libnetsnmpmibs', 'libnetsnmphelpers', 'libnetsnmp']
 )
 opt.Update (env)
+
+# Branch prediction
+if env['BRANCH'] == 'profile':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+elif env['BRANCH'] == 'seed':
+	env.Append(CCFLAGS = '-fbranch-probabilities')
+
 
 # define Builder for translating HTML documents for inlining.
 bld = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')

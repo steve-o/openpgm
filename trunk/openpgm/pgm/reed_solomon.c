@@ -151,7 +151,11 @@ matmul (
 /* Generic square matrix inversion
  */
 
-#define SWAP(a, b) (((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b)))
+#ifdef CONFIG_XOR_SWAP
+#define SWAP(a, b)	(((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b)))
+#else
+#define SWAP(a, b)	do { gf8_t _t = (b); (b) = (a); (a) = _t; } while (0)
+#endif
 
 static void
 matinv (
@@ -204,8 +208,9 @@ found:
 		{
 			for (guint x = 0; x < n; x++)
 			{
-				SWAP( M[ (row * n) + x ],
-				      M[ (col * n) + x ] );
+				gf8_t *pivot_row = &M[ (row * n) + x ],
+				      *pivot_col = &M[ (col * n) + x ];
+				SWAP( *pivot_row, *pivot_col );
 			}
 		}
 
@@ -233,13 +238,12 @@ found:
 				x < n;
 				x++, y++ )
 			{
-				if (x != col)
-				{
-					gf8_t c = M[ (y * n) + col ];
-					M[ (y * n) + col ] = 0;
+				if (x == col) continue;
 
-					gf_vec_addmul (&M[ y * n ], c, &M[ col * n ], n);
-				}
+				gf8_t c = M[ (y * n) + col ];
+				M[ (y * n) + col ] = 0;
+
+				gf_vec_addmul (&M[ y * n ], c, &M[ col * n ], n);
 			}
 		}
 		identity[ col ] = 0;
@@ -252,8 +256,9 @@ found:
 		{
 			for (guint j = 0; j < n; j++)
 			{
-				SWAP( M[ (j * n) + pivot_rows[ i ] ],
-				      M[ (j * n) + pivot_cols[ i ] ] );
+				gf8_t *pivot_row = &M[ (j * n) + pivot_rows[ i ] ],
+				      *pivot_col = &M[ (j * n) + pivot_cols[ i ] ];
+				SWAP( *pivot_row, *pivot_col );
 			}
 		}
 	}
