@@ -1578,7 +1578,7 @@ pgm_transport_bind (
 
 	if (!transport->udp_encap_port)
 	{
-/* include IP header only for incoming data */
+/* include IP header only for incoming data, only works for IPv4 */
 		retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), TRUE);
 		if (retval < 0) {
 			goto out;
@@ -2200,7 +2200,12 @@ recv_again:
 	if (transport->udp_encap_port) {
 		e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	} else {
-		e = pgm_parse_raw(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+/* IPv6 cannot read raw headers, re-use encapsulated UDP path */
+		if (((struct sockaddr*)&src_addr)->sa_family == AF_INET6) {
+			e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+		} else {
+			e = pgm_parse_raw(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+		}
 	}
 
 	if (e < 0)

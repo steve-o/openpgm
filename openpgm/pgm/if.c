@@ -36,7 +36,7 @@
 
 #include "pgm/if.h"
 
-#define IF_DEBUG
+//#define IF_DEBUG
 
 #ifndef IF_DEBUG
 #define g_trace(...)		while (0)
