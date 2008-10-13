@@ -193,32 +193,32 @@ on_startup (void)
 	g_assert (e == 0);
 #endif
 
-	struct pgm_sock_mreq recv_smr, send_smr;
+	struct group_source_req recv_gsr, send_gsr;
 #if 0
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
+	((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_family = AF_INET;
+	((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_addr.s_addr = inet_addr(g_network);
+	((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_family = AF_INET;
+	((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_addr.s_addr = INADDR_ANY;
 
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_smr.smr_interface)->sin_addr.s_addr = INADDR_ANY;
+	((struct sockaddr_in*)&send_gsr.gsr_group)->sin_family = AF_INET;
+	((struct sockaddr_in*)&send_gsr.gsr_group)->sin_addr.s_addr = inet_addr(g_network);
+	((struct sockaddr_in*)&send_gsr.gsr_source)->sin_family = AF_INET;
+	((struct sockaddr_in*)&send_gsr.gsr_source)->sin_addr.s_addr = INADDR_ANY;
 #else
 	char network[1024];
 	sprintf (network, ";%s", g_network);
-	int smr_len = 1;
-	e = pgm_if_parse_transport (network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	int gsr_len = 1;
+	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
 	g_assert (e == 0);
-	g_assert (smr_len == 1);
+	g_assert (gsr_len == 1);
 #endif
 
 	if (g_udp_encap_port) {
-		((struct sockaddr_in*)&send_smr.smr_multiaddr)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_smr.smr_interface)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
 	}
 
-	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_gsr, 1, &send_gsr);
 	g_assert (e == 0);
 
 	pgm_transport_set_recv_only (g_transport, FALSE);
