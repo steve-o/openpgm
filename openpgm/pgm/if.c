@@ -826,6 +826,14 @@ pgm_if_parse_entity_receive (
 			g_assert_not_reached();
 		}
 
+		if (((struct sockaddr*)&devices[0].gr_group)->sa_family == 0)
+		{
+			g_trace ("re-evaluate default interface to family %s [%i]",
+				receive_groups[0].sa_family == AF_INET ? "AF_INET" : "AF_INET6",
+				receive_groups[0].sa_family);
+			((struct sockaddr*)&devices[0].gr_group)->sa_family = receive_groups[0].sa_family;
+		}
+
 		if (*multiprotocol_list && ((struct sockaddr*)&devices[0].gr_group)->sa_family == AF_BRIDGE)
 		{
 			g_trace ("re-evaluate interface entity to family %s [%i]",
@@ -855,6 +863,14 @@ pgm_if_parse_entity_receive (
 		}
 
 /* reparse interfaces if undecided */
+		if (((struct sockaddr*)&devices[j].gr_group)->sa_family == 0)
+		{
+			g_trace ("re-evaluate default interface to family %s [%i]",
+				receive_groups[j].sa_family == AF_INET ? "AF_INET" : "AF_INET6",
+				receive_groups[j].sa_family);
+			((struct sockaddr*)&devices[j].gr_group)->sa_family = receive_groups[j].sa_family;
+		}
+
 		if (*multiprotocol_list && ((struct sockaddr*)&devices[j].gr_group)->sa_family == AF_BRIDGE)
 		{
 			g_trace ("re-evaluate interface entity to family %s [%i]",
