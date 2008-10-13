@@ -33,12 +33,12 @@ G_BEGIN_DECLS
 
 int pgm_if_print_all (void);
 
-int pgm_if_parse_network (const char*, int, struct sockaddr*, struct sockaddr*, struct sockaddr*, int);
-int pgm_if_parse_transport (const char*, int, struct pgm_sock_mreq*, struct pgm_sock_mreq*, int*);
+int pgm_if_parse_network (const char*, int, struct group_req*, struct sockaddr*, struct sockaddr*, int);
+int pgm_if_parse_transport (const char*, int, struct group_source_req*, struct group_source_req*, int*);
 
 int pgm_if_inet_network (const char*, struct in_addr*);
 int pgm_if_inet6_network (const char*, struct in6_addr*);
-int pgm_if_parse_interface (const char*, int, struct sockaddr*);
+int pgm_if_parse_interface (const char*, int, struct group_req*);
 int pgm_if_parse_multicast (const char*, int, struct sockaddr*);
 
 G_END_DECLS

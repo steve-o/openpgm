@@ -202,13 +202,13 @@ struct pgm_transport_t {
     GCond		*thread_cond;
     GMutex		*thread_mutex;
 
-    struct pgm_sock_mreq send_smr;			/* multicast & unicast nla */
+    struct group_source_req send_gsr;			/* multicast & unicast nla */
     GStaticMutex	send_mutex;
     int			send_sock;
     GStaticMutex	send_with_router_alert_mutex;
     int			send_with_router_alert_sock;
-    struct pgm_sock_mreq recv_smr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
-    guint		recv_smr_len;
+    struct group_source_req recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
+    guint		recv_gsr_len;
     int			recv_sock;
 
     guint16		max_tpdu;
@@ -312,7 +312,7 @@ guint pgm_power2_log2 (guint);
 
 void pgm_drop_superuser (void);
 
-int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct pgm_sock_mreq*, gsize, struct pgm_sock_mreq*);
+int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct group_source_req*, gsize, struct group_source_req*);
 int pgm_transport_bind (pgm_transport_t*);
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
 
