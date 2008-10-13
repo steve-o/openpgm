@@ -372,8 +372,8 @@ transports_callback (
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
-			inet_ntop (	pgm_sockaddr_family( &transport->send_smr.smr_multiaddr ),
-					pgm_sockaddr_addr( &transport->send_smr.smr_multiaddr ),
+			inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_group ),
+					pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
 					group_address,
 					sizeof(group_address) );
 
@@ -520,14 +520,14 @@ http_tsi_response (
 		g_ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &transport->send_smr.smr_interface ),
-			pgm_sockaddr_addr( &transport->send_smr.smr_interface ),
+	inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_source ),
+			pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
 			source_address,
 			sizeof(source_address) );
 
 	char group_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &transport->send_smr.smr_multiaddr ),
-			pgm_sockaddr_addr( &transport->send_smr.smr_multiaddr ),
+	inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_group ),
+			pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
 			group_address,
 			sizeof(group_address) );
 
@@ -538,8 +538,8 @@ http_tsi_response (
 	gint ihb_max = 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &transport->recv_smr[0].smr_interface ),
-			pgm_sockaddr_addr( &transport->recv_smr[0].smr_interface ),
+	inet_ntop (	pgm_sockaddr_family( &transport->recv_gsr[0].gsr_source ),
+			pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
 			spm_path,
 			sizeof(spm_path) );
 

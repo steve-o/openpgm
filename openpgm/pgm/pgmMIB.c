@@ -292,14 +292,14 @@ pgmSourceTable_handler (
 			{
 			case COLUMN_PGMSOURCESOURCEADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &transport->send_smr.smr_interface ),
-								pgm_sockaddr_len( &transport->send_smr.smr_interface ));
+								(u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
+								pgm_sockaddr_len( &transport->send_gsr.gsr_source ));
 				break;
 
 			case COLUMN_PGMSOURCEGROUPADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &transport->send_smr.smr_multiaddr ),
-								pgm_sockaddr_len( &transport->send_smr.smr_multiaddr ));
+								(u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
+								pgm_sockaddr_len( &transport->send_gsr.gsr_group ));
 				break;
 
 			case COLUMN_PGMSOURCEDESTPORT:
@@ -637,8 +637,8 @@ pgmSourceConfigTable_handler (
 
 			case COLUMN_PGMSOURCESPMPATHADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &transport->recv_smr[0].smr_interface ),
-								pgm_sockaddr_len( &transport->recv_smr[0].smr_interface ));
+								(u_char*)pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
+								pgm_sockaddr_len( &transport->recv_gsr[0].gsr_source ));
 				break;
 
 			default:

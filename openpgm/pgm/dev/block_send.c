@@ -173,13 +173,13 @@ on_startup (
 	g_assert (e == 0);
 #endif
 
-	struct pgm_sock_mreq recv_smr, send_smr;
-	int smr_len = 1;
-	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	struct group_source_req recv_gsr, send_gsr;
+	int gsr_len = 1;
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
 	g_assert (e == 0);
-	g_assert (smr_len == 1);
+	g_assert (gsr_len == 1);
 
-	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_gsr, 1, &send_gsr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);

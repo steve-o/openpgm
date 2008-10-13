@@ -246,13 +246,13 @@ session_create (
 	}
 
 /* temp fixed addresses */
-	struct pgm_sock_mreq recv_smr, send_smr;
-	int smr_len = 1;
-	e = pgm_if_parse_transport (g_network, AF_INET, &recv_smr, &send_smr, &smr_len);
+	struct group_source_req recv_gsr, send_gsr;
+	int gsr_len = 1;
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
 	g_assert (e == 0);
-	g_assert (smr_len == 1);
+	g_assert (gsr_len == 1);
 
-	e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_smr, 1, &send_smr);
+	e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_gsr, 1, &send_gsr);
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_create()");
 		goto err_free;

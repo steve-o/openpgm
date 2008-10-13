@@ -34,16 +34,16 @@ setup (void)
 	g_assert( NULL == g_transport );
 
 	pgm_gsi_t	gsi;
-	struct pgm_sock_mreq recv_smr, send_smr;
-	int		smr_len = 1;
+	struct group_source_req recv_gsr, send_gsr;
+	int		gsr_len = 1;
 	const guint	spm_heartbeat[] = PGM_SPM_HEARTBEAT_INIT;
 
 	pgm_init();
 
 	g_assert( 0 == pgm_create_md5_gsi (&gsi) );
-	g_assert( 0 == pgm_if_parse_transport (PGM_NETWORK, AF_INET, &recv_smr, &send_smr, &smr_len) );
-	g_assert( 1 == smr_len );
-	g_assert( 0 == pgm_transport_create (&g_transport, &gsi, PGM_PORT, &recv_smr, 1, &send_smr) );
+	g_assert( 0 == pgm_if_parse_transport (PGM_NETWORK, AF_INET, &recv_gsr, &send_gsr, &gsr_len) );
+	g_assert( 1 == gsr_len );
+	g_assert( 0 == pgm_transport_create (&g_transport, &gsi, PGM_PORT, &recv_gsr, 1, &send_gsr) );
 	g_assert( 0 == pgm_transport_set_max_tpdu (g_transport, PGM_MAX_TPDU) );
 	g_assert( 0 == pgm_transport_set_txw_sqns (g_transport, PGM_TXW_SQNS) );
 	g_assert( 0 == pgm_transport_set_rxw_sqns (g_transport, PGM_RXW_SQNS) );
