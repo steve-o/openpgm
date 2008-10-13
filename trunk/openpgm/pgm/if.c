@@ -36,7 +36,7 @@
 
 #include "pgm/if.h"
 
-//#define IF_DEBUG
+#define IF_DEBUG
 
 #ifndef IF_DEBUG
 #define g_trace(...)		while (0)
@@ -481,8 +481,10 @@ pgm_if_parse_interface (
 			case AF_INET6:
 				((struct sockaddr_in6*)&addr)->sin6_addr = ((struct sockaddr_in6*)(res->ai_addr))->sin6_addr;
 				valid_ipv6 = 1;
+				break;
 
 			default:
+				g_trace ("getaddrinfo returned %i on ai_family", res->ai_family);
 				g_assert_not_reached();
 			}
 
