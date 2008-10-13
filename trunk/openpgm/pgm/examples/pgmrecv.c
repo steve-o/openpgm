@@ -211,7 +211,7 @@ on_startup (
 
 	struct group_source_req recv_gsr, send_gsr;
 	int gsr_len = 1;
-	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
+	e = pgm_if_parse_transport (g_network, AF_UNSPEC, &recv_gsr, &send_gsr, &gsr_len);
 	g_assert (e == 0);
 	g_assert (gsr_len == 1);
 
