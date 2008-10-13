@@ -715,7 +715,7 @@ pgm_if_parse_multicast (
 			{
 				addr->sa_family = AF_INET6;
 
-				if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)addr)->sin6_addr))
+				if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 				{
 					g_trace ("IPv6 multicast");
 
