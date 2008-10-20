@@ -1769,7 +1769,6 @@ pgm_transport_bind (
 #endif
 
 /* receiving groups (multiple) */
-/* TODO: add IPv6 multicast membership? */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		struct group_source_req* p = &transport->recv_gsr[i];
@@ -2068,7 +2067,8 @@ new_peer (
 }
 
 /* data incoming on receive sockets, can be from a sender or receiver, or simply bogus.
- * for IPv4 we receive the IP header to handle fragmentation, for IPv6 we cannot so no idea :(
+ * for IPv4 we receive the IP header to handle fragmentation, for IPv6 we cannot, but the
+ * underlying stack handles this for us.
  *
  * recvmsgv reads a vector of apdus each contained in a IO scatter/gather array.
  *
@@ -2987,6 +2987,7 @@ on_spm (
 
 	struct pgm_transport_t* transport = sender->transport;
 	struct pgm_spm* spm = (struct pgm_spm*)data;
+	struct pgm_spm6* spm6 = (struct pgm_spm6*)data;
 	pgm_time_t now = pgm_time_update_now ();
 
 	spm->spm_sqn = g_ntohl (spm->spm_sqn);
@@ -3039,7 +3040,9 @@ on_spm (
 /* check whether peer can generate parity packets */
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
+		struct pgm_opt_length* opt_len = (spm->spm_nla_afi == AFI_IP6) ?
+							(struct pgm_opt_length*)(spm6 + 1) :
+							(struct pgm_opt_length*)(spm + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			retval = -EINVAL;
@@ -3055,7 +3058,7 @@ on_spm (
 			goto out;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(spm + 1);
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
@@ -3200,6 +3203,7 @@ on_nak (
 	}
 
 	struct pgm_nak* nak = (struct pgm_nak*)data;
+	struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
 		
 /* NAK_SRC_NLA contains our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
@@ -3214,15 +3218,8 @@ on_nak (
 
 /* NAK_GRP_NLA containers our transport multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	switch (pgm_sockaddr_family(&nak_src_nla)) {
-	case AF_INET:
-		pgm_nla_to_sockaddr (&nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
-		break;
-
-	case AF_INET6:
-		pgm_nla_to_sockaddr (&((struct pgm_nak6*)nak)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
-		break;
-	}
+	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi,
+				(struct sockaddr*)&nak_grp_nla);
 
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0) {
 		retval = -EINVAL;
@@ -3243,7 +3240,9 @@ on_nak (
 	guint nak_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(nak + 1);
+		struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
+							(struct pgm_opt_length*)(nak6 + 1) :
+							(struct pgm_opt_length*)(nak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			retval = -EINVAL;
@@ -3259,7 +3258,7 @@ on_nak (
 			goto out;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
@@ -3347,6 +3346,7 @@ on_peer_nak (
 	}
 
 	struct pgm_nak* nak = (struct pgm_nak*)data;
+	struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
 		
 /* NAK_SRC_NLA must not contain our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
@@ -3360,15 +3360,8 @@ on_peer_nak (
 
 /* NAK_GRP_NLA contains one of our transport receive multicast groups: the sources send multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	switch (pgm_sockaddr_family(&nak_src_nla)) {
-	case AF_INET:
-		pgm_nla_to_sockaddr (&nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
-		break;
-
-	case AF_INET6:
-		pgm_nla_to_sockaddr (&((struct pgm_nak6*)nak)->nak6_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
-		break;
-	}
+	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi,
+				(struct sockaddr*)&nak_grp_nla);
 
 	gboolean found = FALSE;
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
@@ -3398,7 +3391,9 @@ on_peer_nak (
 	guint nak_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(nak + 1);
+		struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
+							(struct pgm_opt_length*)(nak6 + 1) :
+							(struct pgm_opt_length*)(nak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			g_trace ("INFO", "First PGM Option in NAK incorrect, ignoring.");
@@ -3416,7 +3411,7 @@ on_peer_nak (
 			goto out_unlock;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nak + 1);
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
@@ -3481,6 +3476,7 @@ on_ncf (
 	}
 
 	struct pgm_nak* ncf = (struct pgm_nak*)data;
+	struct pgm_nak6* ncf6 = (struct pgm_nak6*)data;
 		
 /* NCF_SRC_NLA may contain our transport unicast NLA, we don't really care */
 	struct sockaddr_storage ncf_src_nla;
@@ -3496,15 +3492,8 @@ on_ncf (
 
 /* NCF_GRP_NLA contains our transport multicast group */ 
 	struct sockaddr_storage ncf_grp_nla;
-	switch (pgm_sockaddr_family(&ncf_src_nla)) {
-	case AF_INET:
-		pgm_nla_to_sockaddr (&ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
-		break;
-
-	case AF_INET6:
-		pgm_nla_to_sockaddr (&((struct pgm_nak6*)ncf)->nak6_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
-		break;
-	}
+	pgm_nla_to_sockaddr ((ncf->nak_src_nla_afi == AFI_IP6) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi,
+				(struct sockaddr*)&ncf_grp_nla);
 
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0) {
 		g_trace ("INFO", "NCF not destined for this multicast group.");
@@ -3524,7 +3513,9 @@ on_ncf (
 	guint ncf_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(ncf + 1);
+		struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
+							(struct pgm_opt_length*)(ncf6 + 1) :
+							(struct pgm_opt_length*)(ncf + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			g_trace ("INFO", "First PGM Option in NCF incorrect, ignoring.");
@@ -3542,7 +3533,7 @@ on_ncf (
 			goto out_unlock;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(ncf + 1);
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
@@ -3603,6 +3594,7 @@ on_nnak (
 	}
 
 	struct pgm_nak* nnak = (struct pgm_nak*)data;
+	struct pgm_nak6* nnak6 = (struct pgm_nak6*)data;
 		
 /* NAK_SRC_NLA contains our transport unicast NLA */
 	struct sockaddr_storage nnak_src_nla;
@@ -3617,15 +3609,8 @@ on_nnak (
 
 /* NAK_GRP_NLA containers our transport multicast group */ 
 	struct sockaddr_storage nnak_grp_nla;
-	switch (pgm_sockaddr_family(&nnak_src_nla)) {
-	case AF_INET:
-		pgm_nla_to_sockaddr (&nnak->nak_grp_nla_afi, (struct sockaddr*)&nnak_grp_nla);
-		break;
-
-	case AF_INET6:
-		pgm_nla_to_sockaddr (&((struct pgm_nak6*)nnak)->nak6_grp_nla_afi, (struct sockaddr*)&nnak_grp_nla);
-		break;
-	}
+	pgm_nla_to_sockaddr ((nnak->nak_src_nla_afi == AFI_IP6) ? &nnak6->nak6_grp_nla_afi : &nnak->nak_grp_nla_afi,
+				(struct sockaddr*)&nnak_grp_nla);
 
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nnak_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0) {
 		retval = -EINVAL;
@@ -3638,7 +3623,9 @@ on_nnak (
 	guint nnak_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(nnak + 1);
+		struct pgm_opt_length* opt_len = (nnak->nak_src_nla_afi == AFI_IP6) ?
+							(struct pgm_opt_length*)(nnak6 + 1) :
+							(struct pgm_opt_length*)(nnak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			retval = -EINVAL;
@@ -3654,7 +3641,7 @@ on_nnak (
 			goto out;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(nnak + 1);
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
@@ -3813,16 +3800,21 @@ send_nak (
 	g_trace ("INFO", "send_nak(%" G_GUINT32_FORMAT ")", sequence_number);
 
 	pgm_transport_t* transport = peer->transport;
-	guint8 buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) ];
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
-
-	struct pgm_header *header = (struct pgm_header*)buf;
-	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
+
+	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	if (pgm_sockaddr_family(&peer_nla) == AF_INET6) {
+		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
+	}
+	guint8 buf[ tpdu_length ];
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
 	header->pgm_sport	= transport->dport;
@@ -3840,7 +3832,9 @@ send_nak (
 /* group nla: we match the NAK NLA to the same as advertised by the source, we might
  * be listening to multiple multicast groups
  */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (nak->nak_src_nla_afi == AFI_IP6) ?
+								(char*)&nak6->nak6_grp_nla_afi :
+								(char*)&nak->nak_grp_nla_afi );
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -3883,10 +3877,14 @@ send_ncf (
 	g_trace ("INFO", "send_ncf()");
 
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	if (pgm_sockaddr_family(nak_src_nla) == AF_INET6) {
+		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
+	}
 	guint8 buf[ tpdu_length ];
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
+	struct pgm_nak6 *ncf6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	
 	header->pgm_sport	= transport->tsi.sport;
@@ -3902,7 +3900,9 @@ send_ncf (
 	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla (nak_grp_nla, (ncf->nak_src_nla_afi == AFI_IP6) ?
+						(char*)&ncf6->nak6_grp_nla_afi :
+						(char*)&ncf->nak_grp_nla_afi );
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -3941,16 +3941,21 @@ send_parity_nak (
 	g_trace ("INFO", "send_parity_nak(%u, %u)", nak_tg_sqn, nak_pkt_cnt);
 
 	pgm_transport_t* transport = peer->transport;
-	guint8 buf[ sizeof(struct pgm_header) + sizeof(struct pgm_nak) ];
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
-
-	struct pgm_header *header = (struct pgm_header*)buf;
-	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
+
+	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	if (pgm_sockaddr_family(&peer_nla) == AF_INET6) {
+		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
+	}
+	guint8 buf[ tpdu_length ];
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
 	header->pgm_sport	= transport->dport;
@@ -3968,7 +3973,9 @@ send_parity_nak (
 /* group nla: we match the NAK NLA to the same as advertised by the source, we might
  * be listening to multiple multicast groups
  */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (nak->nak_src_nla_afi == AFI_IP6) ?
+									(char*)&nak6->nak6_grp_nla_afi :
+									(char*)&nak->nak_grp_nla_afi );
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -4010,19 +4017,24 @@ send_nak_list (
 	g_assert (sqn_list->len <= 63);
 
 	pgm_transport_t* transport = peer->transport;
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
-			+ sizeof(struct pgm_opt_length)		/* includes header */
-			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-			+ ( (sqn_list->len-1) * sizeof(guint32) );
-	guint8 buf[ tpdu_length ];
-
-	struct pgm_header *header = (struct pgm_header*)buf;
-	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
+
+	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
+			+ sizeof(struct pgm_opt_length)		/* includes header */
+			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+			+ ( (sqn_list->len-1) * sizeof(guint32) );
+	if (pgm_sockaddr_family(&peer_nla) == AFI_IP6) {
+		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
+	}
+	guint8 buf[ tpdu_length ];
+
+	struct pgm_header *header = (struct pgm_header*)buf;
+	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
+	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
 	header->pgm_sport	= transport->dport;
@@ -4038,10 +4050,14 @@ send_nak_list (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (char*)&nak->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&peer->group_nla, (nak->nak_src_nla_afi == AFI_IP6) ? 
+								(char*)&nak6->nak6_grp_nla_afi :
+								(char*)&nak->nak_grp_nla_afi );
 
 /* OPT_NAK_LIST */
-	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(nak + 1);
+	struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ? 
+						(struct pgm_opt_length*)(nak6 + 1) :
+						(struct pgm_opt_length*)(nak + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
@@ -4112,15 +4128,20 @@ send_ncf_list (
 {
 	g_assert (sqn_list->len > 1);
 	g_assert (sqn_list->len <= 63);
+	g_assert (pgm_sockaddr_family(nak_src_nla) == pgm_sockaddr_family(nak_grp_nla));
 
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
 			+ sizeof(struct pgm_opt_length)		/* includes header */
 			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
 			+ ( (sqn_list->len-1) * sizeof(guint32) );
+	if (pgm_sockaddr_family(nak_src_nla) == AFI_IP6) {
+		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
+	}
 	guint8 buf[ tpdu_length ];
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
+	struct pgm_nak6 *ncf6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	header->pgm_sport	= transport->tsi.sport;
@@ -4136,10 +4157,14 @@ send_ncf_list (
 	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla (nak_grp_nla, (char*)&ncf->nak_grp_nla_afi);
+	pgm_sockaddr_to_nla (nak_grp_nla, (ncf->nak_src_nla_afi == AFI_IP6) ? 
+						(char*)&ncf6->nak6_grp_nla_afi :
+						(char*)&ncf->nak_grp_nla_afi );
 
 /* OPT_NAK_LIST */
-	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(ncf + 1);
+	struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
+						(struct pgm_opt_length*)(ncf6 + 1) :
+						(struct pgm_opt_length*)(ncf + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
