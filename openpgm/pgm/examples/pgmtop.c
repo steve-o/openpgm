@@ -37,12 +37,10 @@
 
 #include <glib.h>
 
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
-#include <pgm/signal.h>
 #include <pgm/log.h>
 #include <pgm/packet.h>
-#include <pgm/transport.h>
-#include <pgm/sn.h>
 
 struct ncurses_window;
 
