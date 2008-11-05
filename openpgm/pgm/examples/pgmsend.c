@@ -37,12 +37,9 @@
 
 #include <glib.h>
 
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-#include <pgm/transport.h>
-#include <pgm/gsi.h>
-#include <pgm/signal.h>
-#include <pgm/if.h>
 
 
 /* typedefs */
