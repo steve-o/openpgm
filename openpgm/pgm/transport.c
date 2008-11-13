@@ -2458,6 +2458,7 @@ check_for_repeat:
 			( msg_len > 1 ) )				/* or wait for vector to fill up */
 		)
 		{
+			g_trace ("SPM","recv again on not-full");
 			goto recv_again;		/* \:D/ */
 		}
 	}
@@ -2465,22 +2466,44 @@ check_for_repeat:
 	{
 /* repeat if blocking and empty, i.e. received non data packet.
  */
-		if (bytes_read == 0)
+		if (0 == bytes_read)
 		{
-			int fds = 0;
-			fd_set readfds;
-			FD_ZERO(&readfds);
-			pgm_transport_select_info (transport, &readfds, NULL, &fds);
-			fds = select (fds, &readfds, NULL, NULL, NULL);
-			if (fds == -1) {
+			int n_fds = IP_MAX_MEMBERSHIPS;
+			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
+			memset (fds, 0, sizeof(fds));
+			pgm_transport_poll_info (transport, fds, &n_fds, EPOLLIN);
+
+/* flush any waiting pipe */
+			if (transport->is_waiting_read) {
+				char buf;
+				while (1 == read (transport->waiting_pipe[0], &buf, sizeof(buf)));
+				transport->is_waiting_read = FALSE;
+			}
+
+/* spin the locks to allow other thread to set waiting state,
+ * first run should trigger waiting pipe event which will flush and loop.
+ */
+			g_static_mutex_unlock (&transport->waiting_mutex);
+			int events = poll (fds, n_fds, -1 /* timeout=∞ */);
+
+			if (-1 == events) {
+				g_trace ("SPM","poll returned errno=%i",errno);
 				return fds;
 			}
-			goto recv_again;
+			g_static_mutex_lock (&transport->waiting_mutex);
+
+			if (fds[0].revents) {
+				g_trace ("SPM","recv again on empty");
+				goto recv_again;
+			} else {
+				g_trace ("SPM","state generated event");
+				goto flush_waiting;
+			}
 		}
 	}
 
 out:
-	if (bytes_read == 0)
+	if (0 == bytes_read)
 	{
 		if (transport->is_waiting_read) {
 			char buf;
