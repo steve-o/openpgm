@@ -223,10 +223,9 @@ Basic TODO list
 - Unit testing.
 - System testing with valgrind.
 - Performance testing with oprofile.
-- Complete IPv6 support.
 - Basic DLR.
-- Determine handling of zero length data packets: 0 ok.
 - Implement PGM sender (only) support thread?
+- eventfd instead of pipes for recent Linux kernels.
 
 Optionals
 *********
