@@ -56,7 +56,7 @@ plus64_src = Split("""
 plus_env = env.Clone();
 plus_env['SHOBJSUFFIX'] = '.plus' + plus_env['SHOBJSUFFIX'];
 plus_env['OBJSUFFIX'] = '.plus' + plus_env['OBJSUFFIX'];
-plus_env.Append(CCFLAGS = '-DG_LOG_DOMAIN=\\"Pgm\\"');
+plus_env.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 plus_env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
 plus_env.Append(CCFLAGS = '-DCONFIG_REED_SOLOMON');
 
