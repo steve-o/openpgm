@@ -11,6 +11,9 @@ opt.AddOptions (
 )
 
 import os
+import time
+import sys
+
 env = Environment(ENV = os.environ,
 	CCFLAGS = [	'-pipe',
 			'-Wall',
@@ -42,13 +45,22 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_GALOIS_MUL_LUT',
 			'-DPGM_MAJOR_VERSION=1',
 			'-DPGM_MINOR_VERSION=0',
-			'-DPGM_MICRO_VERSION=0'
+			'-DPGM_MICRO_VERSION=1'
 		 ],
 	LINKFLAGS = [	'-pipe',
 		    ],
 	NETSNMP_LIBS = ['libnetsnmpagent', 'libnetsnmpmibs', 'libnetsnmphelpers', 'libnetsnmp']
 )
 opt.Update (env)
+
+# Build details
+build_date = time.strftime ("%Y-%m-%d")
+build_time = time.strftime ("%H:%M:%S")
+build_rev = os.popen('svnversion -n').read();
+env.Append(BUILDCCFLAGS = [	'-DPGM_BUILD_DATE=\'"%s"\''%(build_date),
+				'-DPGM_BUILD_TIME=\'"%s"\''%(build_time),
+				'-DPGM_BUILD_PLATFORM=\'"%s"\''%(sys.platform),
+				'-DPGM_BUILD_REVISION=\'"%s"\''%(build_rev)	]);
 
 # Branch prediction
 if env['BRANCH'] == 'profile':

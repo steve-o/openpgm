@@ -29,6 +29,10 @@
 const guint pgm_major_version = PGM_MAJOR_VERSION;
 const guint pgm_minor_version = PGM_MINOR_VERSION;
 const guint pgm_micro_version = PGM_MICRO_VERSION;
+const char* pgm_build_date = PGM_BUILD_DATE;
+const char* pgm_build_time = PGM_BUILD_TIME;
+const char* pgm_build_platform = PGM_BUILD_PLATFORM;
+const char* pgm_build_revision = PGM_BUILD_REVISION;
 
 
 const gchar*
