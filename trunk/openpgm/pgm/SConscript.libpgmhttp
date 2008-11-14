@@ -4,7 +4,7 @@
 
 Import('snmphttp_env')
 
-httpe = snmphttp_env.Copy()
+httpe = snmphttp_env.Clone()
 httpe.Append(CPPPATH = '.')
 httpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\\"Pgm-Http\\"');
 

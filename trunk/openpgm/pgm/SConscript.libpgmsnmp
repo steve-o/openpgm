@@ -4,7 +4,7 @@
 
 Import('env')
 
-snmpe = env.Copy()
+snmpe = env.Clone()
 snmpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\\"Pgm-Snmp\\"');
 
 lib_src = Split("""
