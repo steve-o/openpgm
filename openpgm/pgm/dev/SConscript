@@ -6,10 +6,10 @@ import os
 Import('env')
 Import('snmphttp_env')
 
-e = env.Copy()
+e = env.Clone()
 e.Append(LIBS = ['libpgmplus', 'libpgmex']);
 
-httpe = snmphttp_env.Copy()
+httpe = snmphttp_env.Clone()
 httpe.Append(LIBS = ['libpgmplus', 'libpgmex']);
 
 # source:

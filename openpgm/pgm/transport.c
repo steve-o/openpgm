@@ -133,8 +133,8 @@ static int send_rdata (pgm_transport_t*, guint32, gpointer, gsize, gboolean);
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static inline void pgm_peer_unref (pgm_peer_t*);
 
-static gboolean on_nak_pipe (GIOChannel*, GIOCondition, gpointer);
-static gboolean on_timer_pipe (GIOChannel*, GIOCondition, gpointer);
+static gboolean on_nak_notify (GIOChannel*, GIOCondition, gpointer);
+static gboolean on_timer_notify (GIOChannel*, GIOCondition, gpointer);
 
 static int on_spm (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, gpointer, gsize);
@@ -572,31 +572,10 @@ pgm_transport_destroy (
 		g_rand_free (transport->rand_);
 		transport->rand_ = NULL;
 	}
-	if (transport->rdata_pipe[0]) {
-		close (transport->rdata_pipe[0]);
-		transport->rdata_pipe[0] = 0;
-	}
-	if (transport->rdata_pipe[1]) {
-		close (transport->rdata_pipe[1]);
-		transport->rdata_pipe[1] = 0;
-	}
-	if (transport->timer_pipe[0]) {
-		close (transport->timer_pipe[0]);
-		transport->timer_pipe[0] = 0;
-	}
-	if (transport->timer_pipe[1]) {
-		close (transport->timer_pipe[1]);
-		transport->timer_pipe[1] = 0;
-	}
 
-	if (transport->waiting_pipe[0]) {
-		close (transport->waiting_pipe[0]);
-		transport->waiting_pipe[0] = 0;
-	}
-	if (transport->waiting_pipe[1]) {
-		close (transport->waiting_pipe[1]);
-		transport->waiting_pipe[1] = 1;
-	}
+	pgm_notify_destroy (&transport->rdata_notify);
+	pgm_notify_destroy (&transport->timer_notify);
+	pgm_notify_destroy (&transport->waiting_notify);
 
 	g_static_rw_lock_free (&transport->peers_lock);
 
@@ -1504,35 +1483,23 @@ pgm_transport_bind (
 
 	if (transport->can_send_data)
 	{
-		g_trace ("INFO","create rx to nak processor pipe.");
-		retval = pipe (transport->rdata_pipe);
+		g_trace ("INFO","create rx to nak processor notify channel.");
+		retval = pgm_notify_init (&transport->rdata_notify);
 		if (retval < 0) {
-			goto out;
-		}
-		retval = pgm_set_nonblocking (transport->rdata_pipe);
-		if (retval) {
 			goto out;
 		}
 	}
 
-	g_trace ("INFO","create any to timer pipe.");
-	retval = pipe (transport->timer_pipe);
-	if (retval < 0) {
-		goto out;
-	}
-	retval = pgm_set_nonblocking (transport->timer_pipe);
+	g_trace ("INFO","create any to timer notify channel.");
+	retval = pgm_notify_init (&transport->timer_notify);
 	if (retval < 0) {
 		goto out;
 	}
 
 	if (transport->can_recv)
 	{
-		g_trace ("INFO","create waiting notify pipe.");
-		retval = pipe (transport->waiting_pipe);
-		if (retval < 0) {
-			goto out;
-		}
-		retval = pgm_set_nonblocking (transport->waiting_pipe);
+		g_trace ("INFO","create waiting notify channel.");
+		retval = pgm_notify_init (&transport->waiting_notify);
 		if (retval < 0) {
 			goto out;
 		}
@@ -1878,15 +1845,15 @@ pgm_transport_bind (
 		goto out;
 	}
 
-/* any to timer pipe */
-	transport->timer_channel = g_io_channel_unix_new (transport->timer_pipe[0]);
-	g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_pipe, transport, NULL);
+/* any to timer notify channel */
+	transport->timer_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_notify));
+	g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_notify, transport, NULL);
 
-/* rx to nak processor pipe */
+/* rx to nak processor notify channel */
 	if (transport->can_send_data)
 	{
-		transport->rdata_channel = g_io_channel_unix_new (transport->rdata_pipe[0]);
-		g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_pipe, transport, NULL);
+		transport->rdata_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->rdata_notify));
+		g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_notify, transport, NULL);
 
 /* create recyclable SPM packet */
 		switch (pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source)) {
@@ -2041,9 +2008,8 @@ new_peer (
 	{
 		transport->next_poll = peer->spmr_expiry;
 		g_trace ("INFO","new_peer: prod timer thread");
-		const char one = '1';
-		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to timer pipe failed :(");
+		if (!pgm_notify_send (&transport->timer_notify)) {
+			g_critical ("notify to timer channel failed :(");
 			/* retval = -EINVAL; */
 		}
 	}
@@ -2473,10 +2439,9 @@ check_for_repeat:
 			memset (fds, 0, sizeof(fds));
 			pgm_transport_poll_info (transport, fds, &n_fds, EPOLLIN);
 
-/* flush any waiting pipe */
+/* flush any waiting notifications */
 			if (transport->is_waiting_read) {
-				char buf;
-				while (1 == read (transport->waiting_pipe[0], &buf, sizeof(buf)));
+				pgm_notify_clear (&transport->waiting_notify);
 				transport->is_waiting_read = FALSE;
 			}
 
@@ -2488,7 +2453,7 @@ check_for_repeat:
 
 			if (-1 == events) {
 				g_trace ("SPM","poll returned errno=%i",errno);
-				return fds;
+				return events;
 			}
 			g_static_mutex_lock (&transport->waiting_mutex);
 
@@ -2506,8 +2471,7 @@ out:
 	if (0 == bytes_read)
 	{
 		if (transport->is_waiting_read) {
-			char buf;
-			while (1 == read (transport->waiting_pipe[0], &buf, sizeof(buf)));
+			pgm_notify_clear (&transport->waiting_notify);
 			transport->is_waiting_read = FALSE;
 		}
 
@@ -2522,16 +2486,14 @@ out:
 		if (transport->is_waiting_read && transport->is_edge_triggered_recv)
 		{
 /* empty waiting-pipe */
-			char buf;
-			while (1 == read (transport->waiting_pipe[0], &buf, sizeof(buf)));
+			pgm_notify_clear (&transport->waiting_notify);
 			transport->is_waiting_read = FALSE;
 		}
 		else if (!transport->is_waiting_read && !transport->is_edge_triggered_recv)
 		{
 /* fill waiting-pipe */
-			const char one = '1';
-			if (1 != write (transport->waiting_pipe[1], &one, sizeof(one))) {
-				g_critical ("write to waiting pipe failed :(");
+			if (!pgm_notify_send (&transport->waiting_notify)) {
+				g_critical ("send to waiting notify channel failed :(");
 			}
 			transport->is_waiting_read = TRUE;
 		}
@@ -2626,9 +2588,13 @@ pgm_transport_select_info (
 	if (readfds)
 	{
 		FD_SET(transport->recv_sock, readfds);
-		FD_SET(transport->waiting_pipe[0], readfds);
+		fds = transport->recv_sock + 1;
 
-		fds = MAX(transport->recv_sock, transport->waiting_pipe[0]) + 1;
+		if (transport->can_recv) {
+			int waiting_fd = pgm_notify_get_fd (&transport->waiting_notify);
+			FD_SET(waiting_fd, readfds);
+			fds = MAX(fds, waiting_fd + 1);
+		}
 	}
 
 	if (transport->can_send_data && writefds)
@@ -2663,19 +2629,23 @@ pgm_transport_poll_info (
 /* we currently only support one incoming socket */
 	if (events & POLLIN)
 	{
-		g_assert ( (*n_fds - 2) >= 0 );
+		g_assert ( (*n_fds - 1) >= 0 );
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
 #ifdef TRANSPORT_DEBUG
 		(*n_fds)--;
 #endif
-		fds[moo].fd = transport->waiting_pipe[0];
-		fds[moo].events = POLLIN;
-		moo++;
+		if (transport->can_recv)
+		{
+			g_assert ( (*n_fds - 2) >= 0 );
+			fds[moo].fd = pgm_notify_get_fd (&transport->waiting_notify);
+			fds[moo].events = POLLIN;
+			moo++;
 #ifdef TRANSPORT_DEBUG
-		(*n_fds)--;
+			(*n_fds)--;
 #endif
+		}
 	}
 
 /* ODATA only published on regular socket, no need to poll router-alert sock */
@@ -2727,9 +2697,12 @@ pgm_transport_epoll_ctl (
 			goto out;
 		}
 
-		retval = epoll_ctl (epfd, op, transport->waiting_pipe[0], &event);
-		if (retval) {
-			goto out;
+		if (transport->can_recv)
+		{
+			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->waiting_notify), &event);
+			if (retval) {
+				goto out;
+			}
 		}
 
 		if (events & EPOLLET) {
@@ -2761,9 +2734,8 @@ pgm_schedule_proactive_nak (
 				 nak_tg_sqn | transport->rs_proactive_h,
 				 TRUE /* is_parity */,
 				 transport->tg_sqn_shift);
-	const char one = '1';
-	if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
-		g_critical ("write to rdata pipe failed :(");
+	if (!pgm_notify_send (&transport->rdata_notify)) {
+		g_critical ("send to rdata notify channel failed :(");
 		retval = -EINVAL;
 	}
 	return retval;
@@ -2777,7 +2749,7 @@ pgm_schedule_proactive_nak (
  */
 
 static gboolean
-on_nak_pipe (
+on_nak_notify (
 	G_GNUC_UNUSED GIOChannel*	source,
 	G_GNUC_UNUSED GIOCondition	condition,
 	gpointer			data
@@ -2785,9 +2757,8 @@ on_nak_pipe (
 {
 	pgm_transport_t* transport = data;
 
-/* remove one event from pipe */
-	char buf;
-	read (transport->rdata_pipe[0], &buf, sizeof(buf));
+/* remove one event from notify channel */
+	pgm_notify_read (&transport->rdata_notify);
 
 /* We can flush queue and block all odata, or process one set, or process each
  * sequence number individually.
@@ -2970,7 +2941,7 @@ on_nak_pipe (
  */
 
 static gboolean
-on_timer_pipe (
+on_timer_notify (
 	G_GNUC_UNUSED GIOChannel*	source,
 	G_GNUC_UNUSED GIOCondition	condition,
 	gpointer			data
@@ -2978,9 +2949,8 @@ on_timer_pipe (
 {
 	pgm_transport_t* transport = data;
 
-/* empty pipe */
-	char buf;
-	while (1 == read (transport->timer_pipe[0], &buf, sizeof(buf)));
+/* empty notify channel */
+	pgm_notify_clear (&transport->timer_notify);
 
 	return TRUE;
 }
@@ -3039,9 +3009,8 @@ on_spm (
 		{
 			transport->next_poll = nak_rb_expiry;
 			g_trace ("INFO","on_spm: prod timer thread");
-			const char one = '1';
-			if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-				g_critical ("write to timer pipe failed :(");
+			if (!pgm_notify_send (&transport->timer_notify)) {
+				g_critical ("send to timer notify channel failed :(");
 				retval = -EINVAL;
 			}
 		}
@@ -3330,9 +3299,8 @@ on_nak (
 		int cnt = pgm_txw_retransmit_push (transport->txw, sqn_list.sqn[i], is_parity, transport->tg_sqn_shift);
 		if (cnt > 0)
 		{
-			const char one = '1';
-			if (1 != write (transport->rdata_pipe[1], &one, sizeof(one))) {
-				g_critical ("write to rdata pipe failed :(");
+			if (!pgm_notify_send (&transport->rdata_notify)) {
+				g_critical ("send to rdata notify channel failed :(");
 				retval = -EINVAL;
 			}
 		}
@@ -4570,9 +4538,8 @@ check_peer_nak_state (
 		if (transport->peers_waiting && !transport->is_waiting_read)
 		{
 			g_trace ("INFO","prod rx thread");
-			const char one = '1';
-			if (1 != write (transport->waiting_pipe[1], &one, sizeof(one))) {
-				g_critical ("write to waiting pipe failed :(");
+			if (!pgm_notify_send (&transport->waiting_notify)) {
+				g_critical ("send to waiting notify channel failed :(");
 			}
 			transport->is_waiting_read = TRUE;
 		}
@@ -4946,9 +4913,8 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 	{
 		transport->next_poll = transport->next_heartbeat_spm;
 		g_trace ("INFO","pgm_reset_heartbeat_spm: prod timer thread");
-		const char one = '1';
-		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to timer pipe failed :(");
+		if (!pgm_notify_send (&transport->timer_notify)) {
+			g_critical ("send to timer notify channel failed :(");
 			retval = -EINVAL;
 		}
 	}
@@ -6315,30 +6281,6 @@ pgm_timer_prepare (
 	return (msec == 0);
 }
 
-static int
-pgm_timer_signal (
-	pgm_transport_t*	transport,
-	pgm_time_t		expiration
-	)
-{
-	int retval = 0;
-
-	g_static_mutex_lock (&transport->mutex);
-	if (pgm_time_after( transport->next_poll, expiration ))
-	{
-		transport->next_poll = expiration;
-		g_trace ("INFO","new_peer: prod timer thread");
-		const char one = '1';
-		if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-			g_critical ("write to timer pipe failed :(");
-			retval = -EINVAL;
-		}
-	}
-	g_static_mutex_unlock (&transport->mutex);
-
-	return retval;
-}
-
 static gboolean
 pgm_timer_check (
 	GSource*		source
@@ -6535,9 +6477,8 @@ on_odata (
 		{
 			transport->next_poll = nak_rb_expiry;
 			g_trace ("INFO","on_odata: prod timer thread");
-			const char one = '1';
-			if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-				g_critical ("write to timer pipe failed :(");
+			if (!pgm_notify_send (&transport->timer_notify)) {
+				g_critical ("send to timer notify channel failed :(");
 				retval = -EINVAL;
 			}
 		}
@@ -6799,8 +6740,7 @@ on_rdata (
 		{
 			transport->next_poll = nak_rb_expiry;
 			g_trace ("INFO","on_odata: prod timer thread");
-			const char one = '1';
-			if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
+			if (!pgm_notify_send (&transport->timer_notify)) {
 				g_critical ("write to timer pipe failed :(");
 				retval = -EINVAL;
 			}

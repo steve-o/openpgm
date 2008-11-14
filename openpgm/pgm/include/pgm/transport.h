@@ -44,6 +44,10 @@
 #   include <pgm/msgv.h>
 #endif
 
+#ifndef __PGM_NOTIFY_H__
+#   include <pgm/notify.h>
+#endif
+
 /* Performance Counters */
 
 typedef enum {
@@ -279,14 +283,14 @@ struct pgm_transport_t {
     GSList*		peers_waiting;		    /* rxw: have or lost data */
     GSList*		peers_committed;	    /* rxw: waiting to free */
     GStaticMutex	waiting_mutex;
-    int			waiting_pipe[2];	    /* timer to rx */
+    pgm_notify_t	waiting_notify;		    /* timer to rx */
     gboolean		is_waiting_read;
 
-    int			rdata_pipe[2];		    /* rx to timer */
+    pgm_notify_t	rdata_notify;		    /* rx to timer */
     GIOChannel*		rdata_channel;
 
     pgm_time_t		next_poll;
-    int			timer_pipe[2];		    /* any to timer */
+    pgm_notify_t	timer_notify;		    /* any to timer */
     GIOChannel*		timer_channel;
 
     guint32		cumulative_stats[PGM_PC_SOURCE_MAX];

@@ -63,16 +63,16 @@ bld = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')
 env.Append(BUILDERS = {'HtmlC' : bld})
 
 # Define separate build environments
-release = env.Copy(BUILD = 'release')
+release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
-debug = env.Copy(BUILD = 'debug')
+debug = env.Clone(BUILD = 'debug')
 debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
 
-profile = env.Copy(BUILD = 'profile')
+profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
 
-thirtytwo = release.Copy(BUILD = 'thirtytwo')
+thirtytwo = release.Clone(BUILD = 'thirtytwo')
 thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
 
 # choose and environment to build
@@ -91,7 +91,7 @@ Import('env')
 env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
 
 # environment for libpgmsnmp, libpgmhttp
-snmphttp_env = env.Copy()
+snmphttp_env = env.Clone()
 snmphttp_env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
 snmphttp_env.Append(LIBS = env['NETSNMP_LIBS']);
 
@@ -99,6 +99,14 @@ snmp_test_source = """
 int main(int argc, char**argv)
 {
 	netsnmp_enable_subagent();
+	return 0;
+}
+"""
+
+eventfd_test_source = """
+int main(int argc, char**argv)
+{
+	eventfd(0,0);
 	return 0;
 }
 """
@@ -115,18 +123,37 @@ def CheckCheck(context):
 	context.Result(result);
 	return result;
 
-conf = Configure(snmphttp_env, custom_tests = {'CheckSNMP': CheckSNMP, 'CheckCheck': CheckCheck});
+def CheckEventFD(context):
+	context.Message('Checking for eventfd support in Lib C...');
+	result = context.TryLink(eventfd_test_source, '.c');
+	context.Result(result);
+	return result;
+
+conf = Configure(snmphttp_env, custom_tests = {'CheckSNMP': CheckSNMP});
+env.Append(LDFLAGS = '-Werror-implicit-funtion-declaration');
+
 if not conf.CheckSNMP():
 	print 'Enabling extra libraries for Net-SNMP.';
 	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
 	conf.env.Append(LIBS = ['librpm', 'libsensors', 'libdl', 'libwrap']);
+
+snmphttp_env = conf.Finish();
+Export('snmphttp_env');
+
+conf = Configure(env, custom_tests = {'CheckCheck': CheckCheck, 'CheckEventFD': CheckEventFD});
+env.Append(LDFLAGS = '-Werror-implicit-funtion-declaration');
+
 if conf.CheckCheck():
 	print 'Enabling Check unit tests.';
 	conf.env['CHECK'] = 1;
 else:
 	conf.env['CHECK'] = 0;
-snmphttp_env = conf.Finish();
-Export('snmphttp_env');
+
+if conf.CheckEventFD():
+	print 'Enabling kernel eventfd notification mechanism.';
+	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
+
+env = conf.Finish();
 
 ref_node = 'ref/' + env['BUILD'] + '/';
 BuildDir(ref_node, '.', duplicate=0)

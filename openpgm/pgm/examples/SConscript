@@ -3,7 +3,7 @@
 # $Id$
 
 Import('snmphttp_env')
-e = snmphttp_env.Copy()
+e = snmphttp_env.Clone()
 e.Append(LIBS = ['libpgmhttp', 'libpgmsnmp', 'libpgmex', 'libpgmplus']);
 
 # core preferred examples
@@ -24,7 +24,7 @@ e.Program(['enonblocksyncrecvmsgv.c'])
 e.Program(['asyncqrecv.c'])
 e.Program(['blockqrecv.c'])
 
-ne = e.Copy()
+ne = e.Clone()
 ne.Append(LIBS = ['panel', 'ncurses']);
 ne.Program(['pgmtop.c'])
 

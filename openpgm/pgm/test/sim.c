@@ -788,9 +788,8 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
         if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
         {
                 transport->next_poll = transport->next_heartbeat_spm;
-                const char one = '1';
-                if (1 != write (transport->timer_pipe[1], &one, sizeof(one))) {
-                        g_critical ("write to timer pipe failed :(");
+		if (!pgm_notify_send (&transport->timer_notify)) {
+                        g_critical ("send to timer notify channel failed :(");
                         retval = -EINVAL;
                 }
         }
