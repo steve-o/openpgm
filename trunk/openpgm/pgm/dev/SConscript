@@ -37,5 +37,6 @@ e.Program(['block_send.c'])
 e.Program(['test_rs.c'])
 e.Program(['test_rs2.c'])
 e.Program(['sock_name.c'])
+e.Program(['pgmversion.c'])
 
 # end of file

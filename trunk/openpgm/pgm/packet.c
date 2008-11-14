@@ -125,7 +125,7 @@ pgm_parse_raw (
 
 	case 6:
 		((struct sockaddr_in6*)dst_addr)->sin6_family = AF_INET6;
-		puts ("FIXME: IPv6 packet headers are not included.");
+		g_warning ("IPv6 packet headers are not provided by PF_PACKET capture.");
 		*dst_addr_len = sizeof(struct sockaddr_in6);
 		return -1;
 
