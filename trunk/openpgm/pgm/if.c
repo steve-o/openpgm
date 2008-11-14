@@ -263,7 +263,7 @@ pgm_if_inet6_network (
 		int byte_index = val / 8;
 		int bit_index  = val % 8;
 
-		in6->in6_u.u6_addr8[byte_index] &= ~(1 << bit_index);
+		in6->s6_addr[byte_index] &= ~(1 << bit_index);
 		val++;
 	}
 
