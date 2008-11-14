@@ -21,7 +21,7 @@ SConscript('dev/SConscript');
 SConscript('examples/SConscript');
 
 # unit testing framework optional.
-if snmphttp_env['CHECK'] == 1:
+if env['CHECK'] == 1:
  	SConscript('check/SConscript');
 
 # end of file
