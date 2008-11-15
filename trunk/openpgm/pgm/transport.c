@@ -2775,11 +2775,11 @@ on_nak_notify (
  * provides the extra offset value.
  */
 
-/* TODO: peek instead of pop, calculate parity outside of lock, pop after sending RDATA to stop accrual
- * of NAKs on same numbers
+/* peek from the retransmit queue so we can eliminate duplicate NAKs up until the repair packet
+ * has been retransmitted.
  */
 	g_static_rw_lock_reader_lock (&transport->txw_lock);
-	if (!pgm_txw_retransmit_try_pop (transport->txw, &r_sqn, &r_packet, &r_length, &is_parity, &rs_h, rs_2t))
+	if (!pgm_txw_retransmit_try_peek (transport->txw, &r_sqn, &r_packet, &r_length, &is_parity, &rs_h))
 	{
 		gboolean is_var_pktlen = FALSE;
 		gboolean has_saved_partial_csum = TRUE;
@@ -2929,6 +2929,9 @@ on_nak_notify (
 		}
 
 		send_rdata (transport, r_sqn, r_packet, r_length, has_saved_partial_csum);
+
+/* now remove sequence number from retransmit queue, re-enabling NAK requests for this packet */
+		pgm_txw_retransmit_pop (transport->txw, rs_2t);
 	}
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 

@@ -479,6 +479,53 @@ printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 	return 1;
 }
 
+/* try to peek a packet from the retransmit queue
+ *
+ * return 0 if packet peeked.
+ */
+
+int
+pgm_txw_retransmit_try_peek (
+	pgm_txw_t*	t,
+	guint32*	sequence_number,
+	gpointer*	packet,
+	guint16*	length,
+	gboolean*	is_parity,
+	guint*		rs_h			/* parity packet offset */
+	)
+{
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+
+	g_static_mutex_lock (&t->retransmit_mutex);
+	GList* link = g_queue_peek_tail_link (t->retransmit_queue);
+	if (!link) {
+		g_static_mutex_unlock (&t->retransmit_mutex);
+		return -1;
+	}
+
+	pgm_txw_packet_t* tp = link->data;
+	*sequence_number = tp->sequence_number;
+
+	if (tp->pkt_cnt_requested)
+	{
+		*is_parity = TRUE;
+		*rs_h = tp->pkt_cnt_sent;
+	}
+	else
+	{
+		*is_parity = FALSE;
+		*packet = tp->data;
+		*length	= tp->length;
+	}
+
+	g_static_mutex_unlock (&t->retransmit_mutex);
+
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+	return 0;
+}
+
 /* try to pop a packet from the retransmit queue (peek from window).
  *
  * parity NAKs specify a count of parity packets to transmit, as such
@@ -537,6 +584,53 @@ pgm_txw_retransmit_try_pop (
 /* selective NAK, therefore pop node */
 		*packet = tp->data;
 		*length	= tp->length;
+		g_queue_pop_tail_link (t->retransmit_queue);
+		link->data = NULL;
+	}
+
+	g_static_mutex_unlock (&t->retransmit_mutex);
+
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+	return 0;
+}
+
+/* pop a previously peeked retransmit entry
+ */
+
+int
+pgm_txw_retransmit_pop (
+	pgm_txw_t*	t,
+	guint		rs_2t			/* maximum h */
+	)
+{
+	ASSERT_TXW_BASE_INVARIANT(t);
+	ASSERT_TXW_POINTER_INVARIANT(t);
+
+	g_static_mutex_lock (&t->retransmit_mutex);
+	GList* link = g_queue_peek_tail_link (t->retransmit_queue);
+	g_assert (link);
+
+	pgm_txw_packet_t* tp = link->data;
+
+	if (tp->pkt_cnt_requested)
+	{
+/* remove if all requested parity packets have been sent */
+		if (--(tp->pkt_cnt_requested) == 0)
+		{
+			g_queue_pop_tail_link (t->retransmit_queue);
+			link->data = NULL;
+		}
+
+/* wrap around parity generation in unlikely event that more packets requested than are available
+ * under the Reed-Solomon code definition.
+ */
+		if (++(tp->pkt_cnt_sent) == rs_2t) {
+			tp->pkt_cnt_sent = 0;
+		}
+	}
+	else
+	{
 		g_queue_pop_tail_link (t->retransmit_queue);
 		link->data = NULL;
 	}
