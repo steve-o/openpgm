@@ -145,7 +145,9 @@ static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint16 len
 }
 
 int pgm_txw_retransmit_push (pgm_txw_t*, guint32, gboolean, guint);
+int pgm_txw_retransmit_try_peek (pgm_txw_t*, guint32*, gpointer*, guint16*, gboolean*, guint*);
 int pgm_txw_retransmit_try_pop (pgm_txw_t*, guint32*, gpointer*, guint16*, gboolean*, guint*, guint);
+int pgm_txw_retransmit_pop (pgm_txw_t*, guint);
 
 G_END_DECLS
 
