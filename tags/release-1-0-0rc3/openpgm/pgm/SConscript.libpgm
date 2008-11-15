@@ -1,0 +1,85 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+lib_src = Split("""
+		packet.c
+		timer.c
+		if.c
+		gsi.c
+		signal.c
+		txwi.c
+		rxwi.c
+		transport.c
+		rate_control.c
+		async.c
+		checksum.c
+		reed_solomon.c
+		galois_tables.c
+""")
+
+lib_env = env.Clone();
+lib_env.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
+
+# Galois tables
+lib_env.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += lib_env.SharedObject(src)
+
+# version stamp
+libver_env = lib_env.Clone();
+libver_env.Append(CCFLAGS = lib_env['BUILDCCFLAGS']);
+
+lib_env.StaticLibrary('libpgm', lib_src + libver_env.StaticObject('version.c'));
+lib_env.StaticLibrary('libpgm-pic', lib_obj + libver_env.SharedObject('version.c'));
+
+
+# GPL license, aka plus version
+#
+
+plus_src = Split("""
+""")
+
+plus32_src = Split("""
+		checksum32.S
+""")
+
+plus64_src = Split("""
+		csum-copy64.S
+		csum-partial64.c
+""")
+
+plus_env = env.Clone();
+plus_env['SHOBJSUFFIX'] = '.plus' + plus_env['SHOBJSUFFIX'];
+plus_env['OBJSUFFIX'] = '.plus' + plus_env['OBJSUFFIX'];
+plus_env.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
+plus_env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+plus_env.Append(CCFLAGS = '-DCONFIG_REED_SOLOMON');
+
+plus_obj = []
+for src in lib_src:
+	plus_obj += plus_env.SharedObject(src)
+for src in plus_src:
+	plus_obj += plus_env.SharedObject(src)
+
+if env['BUILD'] == 'thirtytwo':
+	for src in plus32_src:
+		plus_src += plus_env.StaticObject(src)
+		plus_obj += plus_env.SharedObject(src)
+if env['BUILD'] != 'thirtytwo':
+	for src in plus64_src:
+		plus_src += plus_env.StaticObject(src)
+		plus_obj += plus_env.SharedObject(src)
+
+# version stamp
+plusver_env = plus_env.Clone();
+plusver_env.Append(CCFLAGS = plus_env['BUILDCCFLAGS']);
+
+plus_env.StaticLibrary('libpgmplus', lib_src + plus_src + plusver_env.StaticObject('version.c'));
+plus_env.StaticLibrary('libpgmplus-pic', plus_obj + plusver_env.SharedObject('version.c'));
+
+# end of file

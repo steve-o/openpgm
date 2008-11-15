@@ -1,0 +1,37 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('snmphttp_env')
+
+httpe = snmphttp_env.Clone()
+httpe.Append(CPPPATH = '.')
+httpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm-Http"\'');
+
+lib_src = Split("""
+		http.c
+""")
+
+html_src = Split("""
+		htdocs/404.html
+		htdocs/base.css
+		htdocs/robots.txt
+		htdocs/xhtml10_strict.doctype
+""")
+
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += httpe.SharedObject(src)
+
+libpgmhttp = httpe.StaticLibrary('libpgmhttp', lib_src);
+libpgmhttppic = httpe.StaticLibrary('libpgmhttp-pic', lib_obj);
+
+# convert HTML files to C include files
+for src in html_src:
+	dst = src + '.h'
+	httpe.HtmlC(dst, src)
+	httpe.Depends(libpgmhttp, dst)
+	httpe.Depends(libpgmhttppic, dst)
+
+# end of file
