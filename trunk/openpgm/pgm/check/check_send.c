@@ -43,7 +43,7 @@ setup (void)
 	g_assert( 0 == pgm_create_md5_gsi (&gsi) );
 	g_assert( 0 == pgm_if_parse_transport (PGM_NETWORK, AF_INET, &recv_gsr, &send_gsr, &gsr_len) );
 	g_assert( 1 == gsr_len );
-	g_assert( 0 == pgm_transport_create (&g_transport, &gsi, PGM_PORT, &recv_gsr, 1, &send_gsr) );
+	g_assert( 0 == pgm_transport_create (&g_transport, &gsi, 0, PGM_PORT, &recv_gsr, 1, &send_gsr) );
 	g_assert( 0 == pgm_transport_set_max_tpdu (g_transport, PGM_MAX_TPDU) );
 	g_assert( 0 == pgm_transport_set_txw_sqns (g_transport, PGM_TXW_SQNS) );
 	g_assert( 0 == pgm_transport_set_rxw_sqns (g_transport, PGM_RXW_SQNS) );

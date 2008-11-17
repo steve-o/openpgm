@@ -145,6 +145,10 @@ pgm_receiver_thread (
 			}
 			g_async_queue_unlock (async->commit_queue);
 		}
+		else if (ECONNRESET == errno)
+		{
+			break;
+		}
 	} while (!async->quit);
 
 /* cleanup */
