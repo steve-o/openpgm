@@ -53,8 +53,8 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 #define pgm_to_usecsf(t) ( (double)(t) )
 #define pgm_to_nsecsf(t) ( (double)(t) * 1000.0 )
 
-#define pgm_secs(t)	( (t) * 1000000UL )
-#define pgm_msecs(t)	( (t) * 1000 )
+#define pgm_secs(t)	( (pgm_time_t)(t) * 1000000UL )
+#define pgm_msecs(t)	( (pgm_time_t)(t) * 1000 )
 #define pgm_usecs(t)	( (t) )
 #define pgm_nsecs(t)	( (t) / 1000 )
 

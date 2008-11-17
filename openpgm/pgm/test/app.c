@@ -168,10 +168,18 @@ destroy_session (
                 G_GNUC_UNUSED gpointer        user_data
                 )
 {
-	printf ("destroying transport \"%s\"\n", (char*)key);
 	struct app_session* sess = (struct app_session*)value;
+
+	g_message ("destroying transport \"%s\"", (char*)key);
 	pgm_transport_destroy (sess->transport, TRUE);
 	sess->transport = NULL;
+
+	if (sess->async) {
+		g_message ("destroying asynchronous session on \"%s\"", (char*)key);
+		pgm_async_destroy (sess->async);
+		sess->async = NULL;
+	}
+
 	g_free (sess->name);
 	sess->name = NULL;
 	g_free (sess);
@@ -252,7 +260,7 @@ session_create (
 	g_assert (e == 0);
 	g_assert (gsr_len == 1);
 
-	e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_gsr, 1, &send_gsr);
+	e = pgm_transport_create (&sess->transport, &sess->gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_create()");
 		goto err_free;

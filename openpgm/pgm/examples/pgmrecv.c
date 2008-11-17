@@ -61,6 +61,7 @@
 
 static int g_port = 7500;
 static const char* g_network = "";
+static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -88,6 +89,7 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
 	fprintf (stderr, "  -x              : Enable SNMP interface\n");
 	exit (1);
@@ -106,13 +108,14 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:xth")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:lxth")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
 
+		case 'l':	g_multicast_loop = TRUE; break;
 		case 't':	enable_http = TRUE; break;
 		case 'x':	enable_snmpx = TRUE; break;
 
@@ -122,6 +125,15 @@ main (
 	}
 
 	log_init();
+
+/* non-superuser friendly configuration */
+	if (g_multicast_loop)
+	{
+		g_message ("setting low resolution timers for multicast loopback.");
+		setenv ("PGM_TIMER", "GETTIMEOFDAY", TRUE);
+		setenv ("PGM_SLEEP", "USLEEP", TRUE);
+	}
+
 	pgm_init();
 
 	if (enable_http)
@@ -217,12 +229,13 @@ on_startup (
 		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
 	}
 
-	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_gsr, 1, &send_gsr);
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	g_assert (e == 0);
 
 	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
+	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
 	pgm_transport_set_spmr_expiry (g_transport, 250*1000);

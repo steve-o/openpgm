@@ -201,13 +201,20 @@ int
 pgm_parse_udp_encap (
 	gpointer		data,
 	gsize			len,
-	G_GNUC_UNUSED struct sockaddr*	dst_addr,
-	G_GNUC_UNUSED socklen_t*	dst_addr_len,
+	struct sockaddr*	dst_addr,
+	socklen_t*		dst_addr_len,
 	struct pgm_header**	header,
 	gpointer*		packet,
 	gsize*			packet_len
 	)
 {
+/* default to basic IPv4 any address as we cannot find the real destination address */
+	struct sockaddr_in* addr = (struct sockaddr_in*)dst_addr;
+	addr->sin_family	= AF_INET;
+	addr->sin_port		= 0;
+	addr->sin_addr.s_addr	= INADDR_ANY;
+	*dst_addr_len = sizeof(struct sockaddr_in);
+
 	return pgm_parse ((struct pgm_header*)data, len, header, packet, packet_len);
 }
 

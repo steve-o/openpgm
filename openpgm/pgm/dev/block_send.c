@@ -179,7 +179,7 @@ on_startup (
 	g_assert (e == 0);
 	g_assert (gsr_len == 1);
 
-	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_gsr, 1, &send_gsr);
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	g_assert (e == 0);
 
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);

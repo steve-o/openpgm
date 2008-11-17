@@ -219,6 +219,7 @@ struct pgm_transport_t {
     guint16		max_tsdu;		    /* excluding optional varpkt_len word */
     guint16		max_tsdu_fragment;
     gsize		iphdr_len;
+    gboolean		use_multicast_loop;    /* and reuseaddr for UDP encapsulation */
     guint		hops;
     guint		txw_preallocate, txw_sqns, txw_secs, txw_max_rte;
     guint		rxw_preallocate, rxw_sqns, rxw_secs, rxw_max_rte;
@@ -316,11 +317,12 @@ guint pgm_power2_log2 (guint);
 
 void pgm_drop_superuser (void);
 
-int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, struct group_source_req*, gsize, struct group_source_req*);
+int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, guint16, struct group_source_req*, gsize, struct group_source_req*);
 int pgm_transport_bind (pgm_transport_t*);
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
 
 int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
+int pgm_transport_set_multicast_loop (pgm_transport_t*, gboolean);
 int pgm_transport_set_hops (pgm_transport_t*, gint);
 int pgm_transport_set_ambient_spm (pgm_transport_t*, guint);
 int pgm_transport_set_heartbeat_spm (pgm_transport_t*, const guint*, int);
