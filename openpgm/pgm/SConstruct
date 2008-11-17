@@ -45,7 +45,7 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_GALOIS_MUL_LUT',
 			'-DPGM_MAJOR_VERSION=1',
 			'-DPGM_MINOR_VERSION=0',
-			'-DPGM_MICRO_VERSION=1'
+			'-DPGM_MICRO_VERSION=2'
 		 ],
 	LINKFLAGS = [	'-pipe',
 		    ],
