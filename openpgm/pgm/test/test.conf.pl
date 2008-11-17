@@ -12,7 +12,7 @@ use vars qw ( %config );
 		cmd	=> '/miru/projects/openpgm/pgm/ref/debug/test/monitor',
 	},
 	sim => {
-		host	=> 'sora',
+		host	=> 'kiku',
 		cmd	=> '/miru/projects/openpgm/pgm/ref/debug/test/sim',
 	},
 );

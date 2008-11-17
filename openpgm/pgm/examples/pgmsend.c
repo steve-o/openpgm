@@ -48,6 +48,7 @@
 
 static int g_port = 7500;
 static const char* g_network = "";
+static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -74,8 +75,7 @@ usage (const char* bin)
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
 	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
 	fprintf (stderr, "  -g <n>\n");
-	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
-	fprintf (stderr, "  -x              : Enable SNMP interface\n");
+	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	exit (1);
 }
 
@@ -88,7 +88,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -99,6 +99,8 @@ main (
 		case 'f':	g_fec = TRUE; break;
 		case 'k':	g_k = atoi (optarg); break;
 		case 'g':	g_n = atoi (optarg); break;
+
+		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -111,6 +113,15 @@ main (
 	}
 
 	log_init ();
+
+/* non-superuser friendly configuration */
+	if (g_multicast_loop)
+	{
+		g_message ("setting low resolution timers for multicast loopback.");
+		setenv ("PGM_TIMER", "GETTIMEOFDAY", TRUE);
+		setenv ("PGM_SLEEP", "USLEEP", TRUE);
+	}
+
 	pgm_init ();
 
 /* setup signal handlers */
@@ -158,13 +169,14 @@ create_transport (void)
 		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
 	}
 
-	e = pgm_transport_create (&g_transport, &gsi, g_port, &recv_gsr, 1, &send_gsr);
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	g_assert (e == 0);
 
 	pgm_transport_set_send_only (g_transport);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
 	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
+	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
 	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };

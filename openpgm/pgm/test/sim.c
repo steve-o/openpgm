@@ -224,6 +224,7 @@ static int
 fake_pgm_transport_create (
 	pgm_transport_t**		transport_,
 	pgm_gsi_t*			gsi,
+	guint16				sport,
 	guint16				dport,
 	struct group_source_req*	recv_gsr,	/* receive port, multicast group & interface address */
 	int				recv_len,
@@ -252,9 +253,13 @@ fake_pgm_transport_create (
 
 	memcpy (&transport->tsi.gsi, gsi, 6);
 	transport->dport = g_htons (dport);
-	do {
-		transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
-	} while (transport->tsi.sport == transport->dport);
+	if (sport) {
+		transport->tsi.sport = sport;
+	} else {
+		do {
+			transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
+		} while (transport->tsi.sport == transport->dport);
+	}
 
 /* network data ports */
 	transport->udp_encap_port = udp_encap_port;
@@ -659,9 +664,9 @@ session_create (
 
 	if (is_fake) {
 		sess->transport_is_fake = TRUE;
-		e = fake_pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_gsr, 1, &send_gsr);
+		e = fake_pgm_transport_create (&sess->transport, &sess->gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	} else {
-		e = pgm_transport_create (&sess->transport, &sess->gsi, g_port, &recv_gsr, 1, &send_gsr);
+		e = pgm_transport_create (&sess->transport, &sess->gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	}
 	if (e != 0) {
 		puts ("FAILED: pgm_transport_create()");

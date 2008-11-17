@@ -692,8 +692,8 @@ http_tsi_response (
 						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						((pgm_txw_t*)transport->txw)->bytes_in_window,	/* minus IP & any UDP header */
-						((pgm_txw_t*)transport->txw)->packets_in_window,
+						transport->txw ? ((pgm_txw_t*)transport->txw)->bytes_in_window : 0,	/* minus IP & any UDP header */
+						transport->txw ? ((pgm_txw_t*)transport->txw)->packets_in_window : 0,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
@@ -772,6 +772,51 @@ http_each_receiver (
 }
 
 static int
+http_time_summary (
+	const time_t* activity_time,
+	char* sz
+	)
+{
+	time_t now_time = time(NULL);
+
+	if (*activity_time > now_time) {
+		return sprintf (sz, "clock skew");
+	}
+
+	struct tm activity_tm;
+	localtime_r (activity_time, &activity_tm);
+
+	now_time -= *activity_time;
+
+	if (now_time < (24 * 60 * 60))
+	{
+		char hourmin[6];
+		strftime (hourmin, sizeof(hourmin), "%H:%M", &activity_tm);
+
+		if (now_time < 60) {
+			return sprintf (sz, "%s (%li second%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
+		}
+		now_time /= 60;
+		if (now_time < 60) {
+			return sprintf (sz, "%s (%li minute%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
+		}
+		now_time /= 60;
+		return sprintf (sz, "%s (%li hour%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
+	}
+	else
+	{
+		char daymonth[32];
+		strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
+		now_time /= 24;
+		if (now_time < 14) {
+			return sprintf (sz, "%s (%li day%s ago)", daymonth, now_time, now_time > 1 ? "s" : "");
+		} else {
+			return sprintf (sz, daymonth);
+		}
+	}
+}
+
+static int
 http_receiver_response (
 	pgm_peer_t*	peer,
 	SoupMessage*	msg
@@ -817,14 +862,14 @@ http_receiver_response (
 				+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue->length
 				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue->length;
 
-	char buf[100];
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
-	struct tm last_activity_tm;
-	localtime_r (&last_activity_time, &last_activity_tm);
-	gsize ret = strftime (buf, sizeof(buf), "%c", &last_activity_tm);
+
+	char buf[100];
+	http_time_summary (&last_activity_time, buf);
+
 	gsize bytes_written;
-	gchar* last_activity = g_locale_to_utf8 (buf, ret, NULL, &bytes_written, NULL);
+	gchar* last_activity = g_locale_to_utf8 (buf, strlen(buf), NULL, &bytes_written, NULL);
 
 
 	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);

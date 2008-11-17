@@ -89,6 +89,17 @@ main (
 
 	printf ("time elapsed max %" G_GUINT64_FORMAT " us, min %" G_GUINT64_FORMAT " us\n", max_diff, min_diff);
 
+	pgm_time_t now_pgm_time = pgm_time_update_now();
+        time_t now_time;
+        pgm_time_since_epoch (&now_pgm_time, &now_time);
+        struct tm now_tm;
+        localtime_r (&now_time, &now_tm);
+	char buf[100];
+        gsize ret = strftime (buf, sizeof(buf), "%c", &now_tm);
+        gsize bytes_written;
+        gchar* now_utf8 = g_locale_to_utf8 (buf, ret, NULL, &bytes_written, NULL);
+	printf ("current time is %s\n", now_utf8);
+
 	pgm_time_destroy();	
 
 	puts ("finished.");

@@ -470,6 +470,8 @@ pgm_transport_destroy (
 	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
 	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 
+	transport->is_open = FALSE;
+
 /* rollback any pkt_dontwait APDU */
 	if (transport->is_apdu_eagain)
 	{
@@ -712,6 +714,7 @@ int
 pgm_transport_create (
 	pgm_transport_t**		transport_,
 	pgm_gsi_t*			gsi,
+	guint16				sport,		/* set to 0 to randomly select */
 	guint16				dport,
 	struct group_source_req*	recv_gsr,	/* receive port, multicast group & interface address */
 	gsize				recv_len,
@@ -721,6 +724,8 @@ pgm_transport_create (
 	guint16 udp_encap_port = ((struct sockaddr_in*)&send_gsr->gsr_group)->sin_port;
 
 	g_return_val_if_fail (transport_ != NULL, -EINVAL);
+	g_return_val_if_fail (gsi != NULL, -EINVAL);
+	if (sport) g_return_val_if_fail (sport != dport, -EINVAL);
 	g_return_val_if_fail (recv_gsr != NULL, -EINVAL);
 	g_return_val_if_fail (recv_len > 0, -EINVAL);
 	g_return_val_if_fail (recv_len <= IP_MAX_MEMBERSHIPS, -EINVAL);
@@ -763,9 +768,13 @@ pgm_transport_create (
 
 	memcpy (&transport->tsi.gsi, gsi, 6);
 	transport->dport = g_htons (dport);
-	do {
-		transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
-	} while (transport->tsi.sport == transport->dport);
+	if (sport) {
+		transport->tsi.sport = g_htons (sport);
+	} else {
+		do {
+			transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
+		} while (transport->tsi.sport == transport->dport);
+	}
 
 /* network data ports */
 	transport->udp_encap_port = udp_encap_port;
@@ -923,6 +932,28 @@ pgm_transport_set_max_tpdu (
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->max_tpdu = max_tpdu;
+	g_static_mutex_unlock (&transport->mutex);
+
+	return 0;
+}
+
+/* TRUE = enable multicast loopback and for UDP encapsulation SO_REUSEADDR,
+ * FALSE = default, to disable.
+ *
+ * on success, returns 0.  on invalid setting, returns -EINVAL.
+ */
+
+int
+pgm_transport_set_multicast_loop (
+	pgm_transport_t*	transport,
+	gboolean		use_multicast_loop
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+
+	g_static_mutex_lock (&transport->mutex);
+	transport->use_multicast_loop = use_multicast_loop;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
@@ -1543,7 +1574,27 @@ pgm_transport_bind (
 		transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 	}
 
-	if (!transport->udp_encap_port)
+	if (transport->udp_encap_port)
+	{
+/* set socket sharing if loopback enabled, needs to be performed pre-bind */
+		if (transport->use_multicast_loop)
+		{
+			gboolean v = TRUE;
+			retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
+			if (retval < 0) {
+				goto out;
+			}
+			retval = setsockopt(transport->send_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
+			if (retval < 0) {
+				goto out;
+			}
+			retval = setsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
+			if (retval < 0) {
+				goto out;
+			}
+		}
+	}
+	else
 	{
 /* include IP header only for incoming data, only works for IPv4 */
 		retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), TRUE);
@@ -1807,17 +1858,20 @@ pgm_transport_bind (
 #endif
 
 /* multicast loopback */
-	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), FALSE);
-	if (retval < 0) {
-		goto out;
-	}
-	retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), FALSE);
-	if (retval < 0) {
-		goto out;
-	}
-	retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), FALSE);
-	if (retval < 0) {
-		goto out;
+	if (!transport->use_multicast_loop)
+	{
+		retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), transport->use_multicast_loop);
+		if (retval < 0) {
+			goto out;
+		}
+		retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->use_multicast_loop);
+		if (retval < 0) {
+			goto out;
+		}
+		retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->use_multicast_loop);
+		if (retval < 0) {
+			goto out;
+		}
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
@@ -1974,19 +2028,35 @@ new_peer (
 	pgm_transport_t*	transport,
 	pgm_tsi_t*		tsi,
 	struct sockaddr*	src_addr,
-	gsize			src_addr_len
+	gsize			src_addr_len,
+	struct sockaddr*	dst_addr,
+	gsize			dst_addr_len
 	)
 {
 	pgm_peer_t* peer;
 
-	g_trace ("INFO","new peer, tsi %s, local nla %s", pgm_print_tsi (tsi), inet_ntoa(((struct sockaddr_in*)src_addr)->sin_addr));
+#ifdef TRANSPORT_DEBUG
+	char localnla[INET6_ADDRSTRLEN];
+	char groupnla[INET6_ADDRSTRLEN];
+	inet_ntop (	pgm_sockaddr_family( src_addr ),
+			pgm_sockaddr_addr( src_addr ),
+			localnla,
+			sizeof(localnla) );
+	inet_ntop (	pgm_sockaddr_family( dst_addr ),
+			pgm_sockaddr_addr( dst_addr ),
+			groupnla,
+			sizeof(groupnla) );
+	g_trace ("INFO","new peer, tsi %s, group nla %s, local nla %s", pgm_print_tsi (tsi), groupnla, localnla);
+#endif
 
 	peer = g_malloc0 (sizeof(pgm_peer_t));
-	peer->expiry = pgm_time_update_now() + transport->peer_expiry;
+	peer->last_packet = pgm_time_update_now();
+	peer->expiry = peer->last_packet + transport->peer_expiry;
 	g_static_mutex_init (&peer->mutex);
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
 	((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
+	memcpy (&peer->group_nla, dst_addr, dst_addr_len);
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
 
 /* lock on rx window */
@@ -2000,7 +2070,7 @@ new_peer (
 				&transport->rx_mutex,
 				transport->will_close_on_failure);
 
-	peer->spmr_expiry = pgm_time_update_now() + transport->spmr_expiry;
+	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 
 /* prod timer thread if sleeping */
 	g_static_mutex_lock (&transport->mutex);
@@ -2336,7 +2406,11 @@ recv_again:
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		if (source == NULL)
 		{
-			source = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, src_addr_len);
+			source = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, src_addr_len, (struct sockaddr*)&dst_addr, dst_addr_len);
+		}
+		else
+		{
+			source->last_packet = pgm_time_now;
 		}
 
 		source->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += len;
@@ -2437,7 +2511,10 @@ check_for_repeat:
 			int n_fds = IP_MAX_MEMBERSHIPS;
 			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
 			memset (fds, 0, sizeof(fds));
-			pgm_transport_poll_info (transport, fds, &n_fds, EPOLLIN);
+			if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, EPOLLIN)) {
+				g_trace ("SPM", "poll_info returned errno=%i",errno);
+				return -1;
+			}
 
 /* flush any waiting notifications */
 			if (transport->is_waiting_read) {
@@ -2583,6 +2660,11 @@ pgm_transport_select_info (
 	g_assert (transport);
 	g_assert (n_fds);
 
+	if (!transport->is_open) {
+		errno = EBADF;
+		return -1;
+	}
+
 	int fds = 0;
 
 	if (readfds)
@@ -2623,6 +2705,11 @@ pgm_transport_poll_info (
 	g_assert (transport);
 	g_assert (fds);
 	g_assert (n_fds);
+
+	if (!transport->is_open) {
+		errno = EBADF;
+		return -1;
+	}
 
 	int moo = 0;
 
@@ -2678,15 +2765,19 @@ pgm_transport_epoll_ctl (
 	int			events		/* EPOLLIN, EPOLLOUT */
 	)
 {
-	int retval = 0;
-
-	if (op != EPOLL_CTL_ADD) {	/* only add currently supported */
+	if (op != EPOLL_CTL_ADD)	/* only addition currently supported */
+	{
 		errno = EINVAL;
-		retval = -1;
-		goto out;
+		return -1;
+	}
+	else if (!transport->is_open)
+	{
+		errno = EBADF;
+		return -1;
 	}
 
 	struct epoll_event event;
+	int retval = 0;
 
 	if (events & EPOLLIN)
 	{
