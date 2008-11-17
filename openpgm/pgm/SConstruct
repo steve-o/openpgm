@@ -107,25 +107,15 @@ snmphttp_env = env.Clone()
 snmphttp_env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0 libsoup-2.2')
 snmphttp_env.Append(LIBS = env['NETSNMP_LIBS']);
 
-snmp_test_source = """
+def CheckSNMP(context):
+	context.Message('Checking to see if Net-SNMP requires additional libraries...');
+	result = context.TryLink("""
 int main(int argc, char**argv)
 {
 	netsnmp_enable_subagent();
 	return 0;
 }
-"""
-
-eventfd_test_source = """
-int main(int argc, char**argv)
-{
-	eventfd(0,0);
-	return 0;
-}
-"""
-
-def CheckSNMP(context):
-	context.Message('Checking to see if Net-SNMP had a happy accident...');
-	result = context.TryLink(snmp_test_source, '.c');
+""", '.c')
 	context.Result(result);
 	return result;
 
@@ -137,12 +127,18 @@ def CheckCheck(context):
 
 def CheckEventFD(context):
 	context.Message('Checking for eventfd support in Lib C...');
-	result = context.TryLink(eventfd_test_source, '.c');
+	result = context.TryLink("""
+#include <sys/eventfd.h>
+int main(int argc, char**argv)
+{
+	eventfd(0,0);
+	return 0;
+}
+""", '.c')
 	context.Result(result);
 	return result;
 
 conf = Configure(snmphttp_env, custom_tests = {'CheckSNMP': CheckSNMP});
-env.Append(LDFLAGS = '-Werror-implicit-funtion-declaration');
 
 if not conf.CheckSNMP():
 	print 'Enabling extra libraries for Net-SNMP.';
@@ -153,7 +149,6 @@ snmphttp_env = conf.Finish();
 Export('snmphttp_env');
 
 conf = Configure(env, custom_tests = {'CheckCheck': CheckCheck, 'CheckEventFD': CheckEventFD});
-env.Append(LDFLAGS = '-Werror-implicit-funtion-declaration');
 
 if conf.CheckCheck():
 	print 'Enabling Check unit tests.';
