@@ -1,0 +1,23 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+snmpe = env.Clone()
+snmpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm-Snmp"\'');
+
+lib_src = Split("""
+		snmp.c
+		pgmMIB.c
+""")
+
+
+lib_obj = []
+for src in lib_src:
+	lib_obj += snmpe.SharedObject(src)
+
+snmpe.StaticLibrary('libpgmsnmp', lib_src);
+snmpe.StaticLibrary('libpgmsnmp-pic', lib_obj);
+
+# end of file
