@@ -1593,13 +1593,34 @@ pgm_transport_bind (
 				goto out;
 			}
 		}
+
+/* request extra packet information to determine destination address on each packet */
+		gboolean v = TRUE;
+		retval = setsockopt (transport->recv_sock, IPPROTO_IP, IP_PKTINFO, &v, sizeof(v));
+		if (retval < 0) {
+			goto out;
+		}
 	}
 	else
 	{
+		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source);
+
+		if (AF_INET == recv_family)
+		{
 /* include IP header only for incoming data, only works for IPv4 */
-		retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), TRUE);
-		if (retval < 0) {
-			goto out;
+			retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), TRUE);
+			if (retval < 0) {
+				goto out;
+			}
+		}
+		else
+		{
+			g_assert (AF_INET6 == recv_family);
+			gboolean v = TRUE;
+			retval = setsockopt (transport->recv_sock, IPPROTO_IPV6, IPV6_PKTINFO, &v, sizeof(v));
+			if (retval < 0) {
+				goto out;
+			}
 		}
 	}
 
@@ -2199,13 +2220,25 @@ pgm_transport_recvmsgv (
  * We cannot actually block here as packets pushed by the timers need to be addressed too.
  */
 	struct sockaddr_storage src_addr;
-	socklen_t src_addr_len = sizeof(src_addr);
 	ssize_t len;
 	gsize bytes_received = 0;
+	struct iovec iov = {
+		.iov_base	= transport->rx_buffer,
+		.iov_len	= transport->max_tpdu
+	};
+	size_t aux[1024 / sizeof(size_t)];
+	struct msghdr msg = {
+		.msg_name	= &src_addr,
+		.msg_namelen	= sizeof(src_addr),
+		.msg_iov	= &iov,
+		.msg_iovlen	= 1,
+		.msg_control	= aux,
+		.msg_controllen = sizeof(aux),
+		.msg_flags	= 0
+	};
 
 recv_again:
-	len = recvfrom (transport->recv_sock, transport->rx_buffer, transport->max_tpdu, MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
-
+	len = recvmsg (transport->recv_sock, &msg, MSG_DONTWAIT);
 	if (len < 0) {
 		if (bytes_received) {
 			goto flush_waiting;
@@ -2216,32 +2249,65 @@ recv_again:
 		goto out;
 	}
 
-/* succesfully read packet */
 	bytes_received += len;
 
-#ifdef TRANSPORT_DEBUG
-	char s[INET6_ADDRSTRLEN];
-	pgm_sockaddr_ntop ((struct sockaddr*)&src_addr, s, sizeof(s));
-//	g_trace ("INFO","%i bytes received from %s", len, s);
-#endif
-
-/* verify IP and PGM header */
 	struct sockaddr_storage dst_addr;
-	socklen_t dst_addr_len = sizeof(dst_addr);
+	socklen_t dst_addr_len;
 	struct pgm_header *pgm_header;
 	gpointer packet;
 	gsize packet_len;
 	int e;
 
-	if (transport->udp_encap_port) {
-		e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
-	} else {
-/* IPv6 cannot read raw headers, re-use encapsulated UDP path */
-		if (((struct sockaddr*)&src_addr)->sa_family == AF_INET6) {
-			e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
-		} else {
-			e = pgm_parse_raw(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+/* successfully read packet */
+
+	if (!transport->udp_encap_port &&
+	    AF_INET == pgm_sockaddr_family(&src_addr))
+	{
+/* IPv4 PGM includes IP packet header which we can easily parse to grab destination multicast group
+ */
+		e = pgm_parse_raw(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+	}
+	else
+	{
+/* UDP and IPv6 PGM requires use of IP control messages to get destination address
+ */
+		struct cmsghdr* cmsg;
+		gboolean found_dstaddr = FALSE;
+
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
+		{
+			if (IPPROTO_IP == cmsg->cmsg_level && 
+			    IP_PKTINFO == cmsg->cmsg_type)
+			{
+				struct in_pktinfo *in = (struct in_pktinfo*) CMSG_DATA(cmsg);
+				dst_addr_len = sizeof(struct sockaddr_in);
+				((struct sockaddr_in*)&dst_addr)->sin_family		= AF_INET;
+				((struct sockaddr_in*)&dst_addr)->sin_addr.s_addr	= in->ipi_addr.s_addr;
+				found_dstaddr = TRUE;
+				break;
+			}
+
+			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
+			    IPV6_PKTINFO == cmsg->cmsg_type)
+			{
+				struct in6_pktinfo *in6 = (struct in6_pktinfo*) CMSG_DATA(cmsg);
+				dst_addr_len = sizeof(struct sockaddr_in6);
+				((struct sockaddr_in6*)&dst_addr)->sin6_family		= AF_INET6;
+				memcpy (&((struct sockaddr_in6*)&dst_addr)->sin6_addr, &in6->ipi6_addr, dst_addr_len);
+				found_dstaddr = TRUE;
+				break;
+			}
 		}
+
+/* set any empty address if no headers found */
+		if (!found_dstaddr)
+		{
+			((struct sockaddr_in*)&dst_addr)->sin_family		= AF_INET;
+			((struct sockaddr_in*)&dst_addr)->sin_addr.s_addr	= INADDR_ANY;
+			dst_addr_len = sizeof(struct sockaddr_in);
+		}
+
+		e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	}
 
 	if (e < 0)
@@ -2406,7 +2472,7 @@ recv_again:
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		if (source == NULL)
 		{
-			source = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, src_addr_len, (struct sockaddr*)&dst_addr, dst_addr_len);
+			source = new_peer (transport, &tsi, (struct sockaddr*)&src_addr, pgm_sockaddr_len(&src_addr), (struct sockaddr*)&dst_addr, dst_addr_len);
 		}
 		else
 		{
