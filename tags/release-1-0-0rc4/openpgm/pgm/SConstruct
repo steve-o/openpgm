@@ -1,0 +1,233 @@
+# -*- mode: python -*-
+# OpenPGM build script
+
+import os
+import time
+import sys
+
+EnsureSConsVersion( 0, 97 )
+SConsignFile('scons.signatures');
+
+opt = Options(None, ARGUMENTS)
+opt.AddOptions (
+	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
+	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
+)
+
+#-----------------------------------------------------------------------------
+# Dependencies
+
+env = Environment();
+
+def CheckPKGConfig(context, version):
+	context.Message( 'Checking for pkg-config... ' )
+	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	context.Result( ret )
+	return ret
+
+def CheckPKG(context, name):
+	context.Message( 'Checking for %s... ' % name )
+	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
+	context.Result( ret )
+	return ret
+
+conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
+				       'CheckPKG' : CheckPKG })
+
+if not conf.CheckPKGConfig('0.15.0'):
+	print 'pkg-config >= 0.15.0 not found.'
+	Exit(1)
+
+if not conf.CheckPKG('glib-2.0 >= 2.10'):
+	print 'glib-2.0 >= 2.10 not found.'
+	Exit(1)
+
+if not conf.CheckPKG('gthread-2.0'):
+	print 'gthread-2.0 not found.'
+	Exit(1)
+
+if not conf.CheckPKG('libsoup-2.2'):
+	print 'libsoup-2.2 not found.'
+	Exit(1)
+
+env = conf.Finish();
+
+#-----------------------------------------------------------------------------
+# Platform specifics
+
+env = Environment(ENV = os.environ,
+	CCFLAGS = [	'-pipe',
+			'-Wall',
+				'-Wextra',
+				'-Wfloat-equal',
+				'-Wshadow',
+				'-Wunsafe-loop-optimizations',
+				'-Wpointer-arith',
+				'-Wbad-function-cast',
+				'-Wcast-qual',
+				'-Wcast-align',
+				'-Wwrite-strings',
+				'-Waggregate-return',
+				'-Wstrict-prototypes',
+				'-Wold-style-definition',
+				'-Wmissing-prototypes',
+				'-Wmissing-declarations',
+				'-Wmissing-noreturn',
+				'-Wmissing-format-attribute',
+				'-Wredundant-decls',
+				'-Wnested-externs',
+				'-Winline',
+			'-pedantic',
+			'-std=gnu99',
+			'--param', 'max-inline-insns-single=600',
+			'-D_REENTRANT',
+			'-D__need_IOV_MAX',
+			'-DCONFIG_BIND_INADDR_ANY',
+			'-DCONFIG_GALOIS_MUL_LUT',
+		 ],
+	LINKFLAGS = [	'-pipe',
+		    ]
+)
+opt.Update (env)
+
+# Branch prediction
+if env['BRANCH'] == 'profile':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+elif env['BRANCH'] == 'seed':
+	env.Append(CCFLAGS = '-fbranch-probabilities')
+
+# Define separate build environments
+release = env.Clone(BUILD = 'release')
+release.Append(CCFLAGS = '-O2')
+
+debug = env.Clone(BUILD = 'debug')
+debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
+
+profile = env.Clone(BUILD = 'profile')
+profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
+
+thirtytwo = release.Clone(BUILD = 'thirtytwo')
+thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
+
+# choose and environment to build
+if env['BUILD'] == 'release':
+	Export({'env':release})
+elif env['BUILD'] == 'profile':
+	Export({'env':profile})
+elif env['BUILD'] == 'thirtytwo':
+	Export({'env':thirtytwo})
+else:
+	Export({'env':debug})
+
+#-----------------------------------------------------------------------------
+# Re-analyse dependencies
+
+Import('env')
+
+# vanilla environment
+env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
+
+# managed environment for libpgmsnmp, libpgmhttp
+env['SNMP_FLAGS'] = { 
+        'CFLAGS'        : [],
+        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
+};
+env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.2');
+
+def CheckSNMP(context):
+	context.Message('Checking Net-SNMP...');
+	lastLIBS = context.env['LIBS'];
+	lastCFLAGS= context.env['CFLAGS'];
+	context.env.MergeFlags(env['SNMP_FLAGS']);
+	result = context.TryLink("""
+int main(int argc, char**argv)
+{
+	netsnmp_enable_subagent();
+	return 0;
+}
+""", '.c');
+	context.env.Replace(LIBS = lastLIBS, CFLAGS=lastCFLAGS);
+	context.Result(not result);
+	return result;
+
+def CheckCheck(context):
+	context.Message('Checking Check unit test framework...');
+	result = context.TryAction('pkg-config --static --cflags --libs check')[0];
+	context.Result(result);
+	return result;
+
+def CheckEventFD(context):
+	context.Message('Checking eventfd...');
+	result = context.TryLink("""
+#include <sys/eventfd.h>
+int main(int argc, char**argv)
+{
+	eventfd(0,0);
+	return 0;
+}
+""", '.c')
+	context.Result(result);
+	return result;
+
+conf = Configure(env, custom_tests = {	'CheckSNMP':	CheckSNMP,
+					'CheckCheck':	CheckCheck,
+					'CheckEventFD': CheckEventFD	});
+
+if not conf.CheckSNMP():
+	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
+	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
+	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
+	if not conf.CheckSNMP():
+		print 'Net-SNMP libraries not compatible.';
+		Exit(1);
+
+if conf.CheckCheck():
+	print 'Enabling Check unit tests.';
+	conf.env['CHECK'] = 1;
+else:
+	print 'Disabling Check unit tests.';
+	conf.env['CHECK'] = 0;
+
+if conf.CheckEventFD():
+	print 'Enabling kernel eventfd notification mechanism.';
+	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
+
+env = conf.Finish();
+
+# add builder to create PIC static libraries for including in shared libraries
+action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
+if env.Detect('ranlib'):
+	ranlib_action = Action("$RANLIBCOM", "$RANLIBCOMSTR");
+	action_list.append(ranlib_action);
+pic_lib = Builder(	action = action_list,
+			emitter = '$LIBEMITTER',
+			prefix = '$LIBPREFIX',
+			suffix = '$LIBSUFFIX',
+			src_suffix = '$OBJSUFFIX',
+			src_builder = 'SharedObject')
+env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
+
+
+#-----------------------------------------------------------------------------
+
+ref_node = 'ref/' + env['BUILD'] + '/';
+BuildDir(ref_node, '.', duplicate=0)
+
+env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
+
+SConscript(ref_node + 'SConscript.libpgm');
+SConscript(ref_node + 'SConscript.libpgmex');
+SConscript(ref_node + 'SConscript.libpgmhttp');
+SConscript(ref_node + 'SConscript.libpgmsnmp');
+SConscript(ref_node + 'test/SConscript');
+SConscript(ref_node + 'dev/SConscript');
+SConscript(ref_node + 'examples/SConscript');
+
+# unit testing framework optional.
+if env['CHECK'] == 1:
+ 	SConscript(ref_node + 'check/SConscript');
+
+
+# end of file
