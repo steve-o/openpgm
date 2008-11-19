@@ -2,36 +2,36 @@
 # OpenPGM build script
 # $Id$
 
-Import('snmphttp_env')
+Import('env')
 
-httpe = snmphttp_env.Clone()
-httpe.Append(CPPPATH = '.')
-httpe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm-Http"\'');
+e = env.Clone()
+e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm-Http"\'');
 
-lib_src = Split("""
+# add binary tree to include path to find embedded htdocs
+e.Append(CPPPATH = '.');
+
+e.MergeFlags(e['LIBSOUP_FLAGS']);
+
+src = Split("""
 		http.c
 """)
 
-html_src = Split("""
+htdocs = Split("""
 		htdocs/404.html
 		htdocs/base.css
 		htdocs/robots.txt
 		htdocs/xhtml10_strict.doctype
 """)
 
+pgmhttp = e.StaticLibrary('libpgmhttp', src);
+pgmhttppic = e.StaticSharedLibrary('libpgmhttp-pic', src);
 
-lib_obj = []
-for src in lib_src:
-	lib_obj += httpe.SharedObject(src)
+# embed htdocs into C headers
+embed_htdoc = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')
+e.Append(BUILDERS = {'EmbedHtdoc' : embed_htdoc})
 
-libpgmhttp = httpe.StaticLibrary('libpgmhttp', lib_src);
-libpgmhttppic = httpe.StaticLibrary('libpgmhttp-pic', lib_obj);
-
-# convert HTML files to C include files
-for src in html_src:
-	dst = src + '.h'
-	httpe.HtmlC(dst, src)
-	httpe.Depends(libpgmhttp, dst)
-	httpe.Depends(libpgmhttppic, dst)
+for htdoc in htdocs:
+	embedded = htdoc + '.h'
+	e.EmbedHtdoc(embedded, htdoc)
 
 # end of file

@@ -4,13 +4,9 @@
 
 import os;
 Import('env');
-Import('snmphttp_env');
-SConsignFile('scons.signatures');
 
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/ref/' + env['BUILD']);
-snmphttp_env.Append(CPPPATH = os.getcwd() + '/include');
-snmphttp_env.Append(LIBPATH = os.getcwd() + '/ref/' + env['BUILD']);
 
 SConscript('SConscript.libpgm');
 SConscript('SConscript.libpgmex');
