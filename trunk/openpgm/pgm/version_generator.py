@@ -1,3 +1,14 @@
+#!/usr/bin/python
+
+import os
+import sys
+import time
+
+build_date = time.strftime ("%Y-%m-%d")
+build_time = time.strftime ("%H:%M:%S")
+build_rev = os.popen('svnversion -n').read();
+
+print """
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
  * OpenPGM version.
@@ -26,33 +37,16 @@
 
 /* globals */
 
-const guint pgm_major_version = PGM_MAJOR_VERSION;
-const guint pgm_minor_version = PGM_MINOR_VERSION;
-const guint pgm_micro_version = PGM_MICRO_VERSION;
-const char* pgm_build_date = PGM_BUILD_DATE;
-const char* pgm_build_time = PGM_BUILD_TIME;
-const char* pgm_build_platform = PGM_BUILD_PLATFORM;
-const char* pgm_build_revision = PGM_BUILD_REVISION;
-
-
-const gchar*
-pgm_check_version (
-	guint	required_major,
-	guint	required_minor,
-	guint	required_micro
-	)
-{
-	gint pgm_effective_micro = 100 * PGM_MINOR_VERSION + PGM_MICRO_VERSION;
-	gint required_effective_micro = 100 * required_minor + required_micro;
-
-	if (required_major > PGM_MAJOR_VERSION)
-		return "OpenPGM version too old (major mismatch)";
-	if (required_major < PGM_MAJOR_VERSION)
-		return "OpenPGM version too new (major mismatch)";
-	if (required_effective_micro > pgm_effective_micro)
-		return "OpenPGM version too old (micro mismatch)";
-	return NULL;
-}
+const guint pgm_major_version = 1;
+const guint pgm_minor_version = 0;
+const guint pgm_micro_version = 2;
+const char* pgm_build_date = "%s";
+const char* pgm_build_time = "%s";
+const char* pgm_build_platform = "%s";
+const char* pgm_build_revision = "%s";
 
 
 /* eof */
+"""%(build_date, build_time, sys.platform, build_rev)
+
+# end of file

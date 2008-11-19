@@ -36,7 +36,6 @@ extern const char* pgm_build_time;
 extern const char* pgm_build_platform;
 extern const char* pgm_build_revision;
 
-const gchar* pgm_check_version (guint, guint, guint);
 
 G_END_DECLS
 

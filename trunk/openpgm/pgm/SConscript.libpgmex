@@ -6,11 +6,11 @@ Import('env')
 
 e = env.Clone();
 
-libex_src = Split("""
+src = Split("""
 		log.c
 		backtrace.c
 """)
 
-e.StaticLibrary('libpgmex', libex_src);
+e.StaticLibrary('libpgmex', src);
 
 # end of file
