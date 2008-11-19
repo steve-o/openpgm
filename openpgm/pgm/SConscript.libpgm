@@ -2,9 +2,10 @@
 # OpenPGM build script
 # $Id$
 
+import os;
 Import('env')
 
-lib_src = Split("""
+src = Split("""
 		packet.c
 		timer.c
 		if.c
@@ -20,66 +21,40 @@ lib_src = Split("""
 		galois_tables.c
 """)
 
-lib_env = env.Clone();
-lib_env.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
+e = env.Clone();
+e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 
 # Galois tables
-lib_env.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
+e.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
 
-lib_obj = []
-for src in lib_src:
-	lib_obj += lib_env.SharedObject(src)
+# Version stamping
+e.Command ('version.c', 'version_generator.py', "python $SOURCE > $TARGET");
+e.Depends ('version.c', src);
+src += ['version.c'];
 
-# version stamp
-libver_env = lib_env.Clone();
-libver_env.Append(CCFLAGS = lib_env['BUILDCCFLAGS']);
-
-lib_env.StaticLibrary('libpgm', lib_src + libver_env.StaticObject('version.c'));
-lib_env.StaticLibrary('libpgm-pic', lib_obj + libver_env.SharedObject('version.c'));
+e.StaticLibrary('libpgm', src);
+e.StaticSharedLibrary('libpgm-pic', src);
 
 
+#-----------------------------------------------------------------------------
 # GPL license, aka plus version
-#
 
-plus_src = Split("""
-""")
+pe = env.Clone();
+pe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 
-plus32_src = Split("""
-		checksum32.S
-""")
+# add new suffix so objects don't interfere with LGPL license library
+pe['SHOBJSUFFIX'] = '.plus' + pe['SHOBJSUFFIX'];
+pe['OBJSUFFIX']   = '.plus' + pe['OBJSUFFIX'];
 
-plus64_src = Split("""
-		csum-copy64.S
-		csum-partial64.c
-""")
+uname_m = os.uname()[4];
+if uname_m == 'x86_64':
+	pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+	src += ['csum-copy64.S', 'csum-partial64.c'];
+else:
+	pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+	src += ['checksum32.S'];
 
-plus_env = env.Clone();
-plus_env['SHOBJSUFFIX'] = '.plus' + plus_env['SHOBJSUFFIX'];
-plus_env['OBJSUFFIX'] = '.plus' + plus_env['OBJSUFFIX'];
-plus_env.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
-plus_env.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
-plus_env.Append(CCFLAGS = '-DCONFIG_REED_SOLOMON');
-
-plus_obj = []
-for src in lib_src:
-	plus_obj += plus_env.SharedObject(src)
-for src in plus_src:
-	plus_obj += plus_env.SharedObject(src)
-
-if env['BUILD'] == 'thirtytwo':
-	for src in plus32_src:
-		plus_src += plus_env.StaticObject(src)
-		plus_obj += plus_env.SharedObject(src)
-if env['BUILD'] != 'thirtytwo':
-	for src in plus64_src:
-		plus_src += plus_env.StaticObject(src)
-		plus_obj += plus_env.SharedObject(src)
-
-# version stamp
-plusver_env = plus_env.Clone();
-plusver_env.Append(CCFLAGS = plus_env['BUILDCCFLAGS']);
-
-plus_env.StaticLibrary('libpgmplus', lib_src + plus_src + plusver_env.StaticObject('version.c'));
-plus_env.StaticLibrary('libpgmplus-pic', plus_obj + plusver_env.SharedObject('version.c'));
+pe.StaticLibrary('libpgmplus', src);
+pe.StaticSharedLibrary('libpgmplus-pic', src);
 
 # end of file
