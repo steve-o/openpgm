@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <net/if.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -53,6 +54,105 @@
 #define IF6_DEFAULT_INIT { { { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 const struct in6_addr if6_default_group = IF6_DEFAULT_INIT;
 
+
+
+/* return node primary address
+ *
+ * returns > 0 on success, or -1 on error and sets errno appropriately,
+ * 			   or -2 on NS lookup error and sets h_errno appropriately.
+ */
+
+int
+pgm_if_getnodeaddr (
+	int			af,
+	struct sockaddr*	addr,
+	socklen_t		cnt
+	)
+{
+	g_return_val_if_fail (af == AF_INET || af == AF_INET6, -EINVAL);
+	g_return_val_if_fail (NULL != addr, -EINVAL);
+
+	char hostname[NI_MAXHOST + 1];
+	struct hostent* he;
+
+	gethostname (hostname, sizeof(hostname));
+
+	if (AF_INET == af)
+	{
+		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), -EINVAL);
+		he = gethostbyname (hostname);
+		if (NULL == he) {
+			g_trace ("gethostbyname failed on local hostname: %s", hstrerror (h_errno));
+			return -2;
+		}
+		((struct sockaddr_in*)addr)->sin_family = af;
+		((struct sockaddr_in*)addr)->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+		cnt = sizeof(struct sockaddr_in);
+	}
+	else
+	{
+		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), -EINVAL);
+		he = gethostbyname2 (hostname, AF_INET6);
+		if (NULL == he)
+		{
+/* try link scope via IPv4 nodename */
+			he = gethostbyname (hostname);
+			if (NULL == he)
+			{
+				g_trace ("gethostbyname2 and gethostbyname failed on local hostname: %s", hstrerror (h_errno));
+				return -2;
+			}
+
+			struct ifaddrs *ifap, *ifa, *ifa6;
+			int e = getifaddrs (&ifap);
+			if (e < 0) {
+				g_trace ("getifaddrs failed when trying to resolve link scope interfaces");
+				return -1;
+			}
+
+/* hunt for IPv4 interface */
+			for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+			{
+				if (AF_INET != ifa->ifa_addr->sa_family) {
+					continue;
+				}
+				if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == ((struct in_addr*)(he->h_addr_list[0]))->s_addr)
+				{
+					goto ipv4_found;
+				}
+			}
+			g_trace ("node IPv4 interface not found!");
+			freeifaddrs (ifap);
+			errno = ENONET;
+			return -1;
+ipv4_found:
+
+/* hunt for IPv6 interface */
+			for (ifa6 = ifap; ifa6; ifa6 = ifa6->ifa_next)
+			{
+				if (AF_INET6 != ifa6->ifa_addr->sa_family) {
+					continue;
+				}
+				if (0 == strcmp(ifa->ifa_name, ifa6->ifa_name))
+				{
+					goto ipv6_found;
+				}
+			}
+			g_trace ("node IPv6 interface not found!");
+			freeifaddrs (ifap);
+			errno = ENONET;
+			return -1;
+ipv6_found:
+			*(struct in6_addr*)(he->h_addr_list[0]) = ((struct sockaddr_in6 *)ifa6->ifa_addr)->sin6_addr;
+			freeifaddrs (ifap);
+		}
+		((struct sockaddr_in6*)addr)->sin6_family = af;
+		((struct sockaddr_in6*)addr)->sin6_addr = *(struct in6_addr*)(he->h_addr_list[0]);
+		cnt = sizeof(struct sockaddr_in6);
+	}
+
+	return cnt;
+}
 
 /* recommended address space for multicast:
  * rfc4607, rfc3180, rfc2365
@@ -95,7 +195,7 @@ pgm_if_print_all (void)
 					(struct sockaddr*)&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
 				s,
 				sizeof(s));
-		g_message ("name %-5.5s IPv%i %-46.46s status %s loop %s b/c %s m/c %s",
+		g_message ("name %-10.10s IPv%i %-46.46s status %s loop %s b/c %s m/c %s",
 			ifa->ifa_name,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
 			s,
@@ -215,6 +315,9 @@ pgm_if_inet6_network (
 
 	g_trace ("if_inet6_network (\"%s\")", s);
 
+/* inet_pton cannot parse IPv6 addresses with subnet declarations, so
+ * chop them off.
+ */
 	char s2[INET6_ADDRSTRLEN];
 	const char *p = s;
 	char* p2 = s2;
@@ -225,12 +328,15 @@ pgm_if_inet6_network (
 	}
 	if (p == e) {
 		if (inet_pton (AF_INET6, s, in6)) return 0;
+		g_trace ("inet_pton failed");
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
+	*p2 = 0;
 //	g_trace ("net part %s", s2);
 	if (!inet_pton (AF_INET6, s2, in6)) {
+		g_trace ("inet_pton failed parsing network part %s", s2);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
@@ -247,16 +353,18 @@ pgm_if_inet6_network (
 		if (isdigit(*p)) {
 			val = 10 * val + (*p - '0');
 		} else {
+			g_trace ("failed parsing subnet size due to character '%c'", *p);
 			memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 			return -1;
 		}
 		p++;
 	}
 	if (val == 0 || val > 128) {
+		g_trace ("subnet size invalid (%d)", val);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
-//	g_trace ("bit mask %i", val);
+	g_trace ("subnet size %i", val);
 
 /* zero out host bits */
 	while (val < 128) {
@@ -267,7 +375,7 @@ pgm_if_inet6_network (
 		val++;
 	}
 
-	g_trace ("IPv6 network address: %s", inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
+	g_trace ("effective IPv6 network address after subnet mask: %s", inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
 
 	return 0;
 }
@@ -289,6 +397,9 @@ pgm_if_inet6_network (
  *
  * We could use if_nametoindex() but we might as well check that the interface is
  * actually UP and capable of multicast traffic.
+ *
+ * returns 0 on success, -EINVAL on invalid input, -ENODEV on interface not found,
+ * -EXDEV if multicast address instead of interface found.
  */
 
 int
@@ -299,6 +410,7 @@ pgm_if_parse_interface (
 	)
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
+	g_return_val_if_fail (interface != NULL, -EINVAL);
 
 	g_trace ("if_parse_interface (\"%s\", %s [%i])", 
 		s, 
@@ -381,17 +493,29 @@ pgm_if_parse_interface (
 	}
 
 /* check if a valid ipv4 or ipv6 address */
-	struct sockaddr addr;
+	struct sockaddr_storage addr;
 	int valid_ipv4 = 0, valid_ipv6 = 0;
 	int valid_net4 = 0, valid_net6 = 0;
 
 	if (inet_pton (AF_INET, s, &((struct sockaddr_in*)&addr)->sin_addr))
 	{
 		valid_ipv4 = 1;
+		if (IN_MULTICAST(g_ntohl(((struct sockaddr_in*)&addr)->sin_addr.s_addr)))
+		{
+			g_trace ("found IPv4 multicast address instead of interface");
+			retval = -EXDEV;
+			goto out;
+		}
 	}
 	else if (inet_pton (AF_INET6, s, &((struct sockaddr_in6*)&addr)->sin6_addr))
 	{
 		valid_ipv6 = 1;
+		if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)&addr)->sin6_addr))
+		{
+			g_trace ("found IPv6 multicast address instead of interface");
+			retval = -EXDEV;
+			goto out;
+		}
 	}
 
 /* IPv6 friendly version??? */
@@ -497,6 +621,7 @@ pgm_if_parse_interface (
 /* iterate through interface list again to match ip or net address */
 	if (valid_ipv4 || valid_ipv6 || valid_net4 || valid_net6)
 	{
+		g_trace ("searching for matching interface");
 		for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 		{
 			switch (ifa->ifa_addr->sa_family) {
@@ -596,9 +721,13 @@ pgm_if_parse_interface (
 			default: continue;
 			}
 		}
+		g_trace ("no matching interfaces found!");
+		retval = -ENODEV;
 	}
-
-	retval = -EINVAL;
+	else
+	{
+		retval = -EINVAL;
+	}
 
 out:
 
@@ -645,8 +774,7 @@ pgm_if_parse_multicast (
 	if (inet_pton (AF_INET, s, &((struct sockaddr_in*)addr)->sin_addr))
 	{
 		addr->sa_family = AF_INET;
-		
-		if (IN_MULTICAST(htonl(((struct sockaddr_in*)addr)->sin_addr.s_addr)))
+		if (IN_MULTICAST(ntohl(((struct sockaddr_in*)addr)->sin_addr.s_addr)))
 		{
 			g_trace ("IPv4 multicast: %s", s);
 		}
@@ -699,7 +827,7 @@ pgm_if_parse_multicast (
 			{
 				addr->sa_family = AF_INET;
 
-				if (IN_MULTICAST(htonl(((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+				if (IN_MULTICAST(ntohl(((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 				{
 					g_trace ("IPv4 multicast");
 					((struct sockaddr_in*)addr)->sin_addr.s_addr = 
@@ -1014,6 +1142,7 @@ pgm_if_parse_network (
 		{
 			if (b == p)	/* empty entity */
 			{
+				g_trace ("empty entity");
 				switch (ec++) {
 				case ENTITY_INTERFACE:
 					retval = pgm_if_parse_entity_interface (NULL, ai_family, devices, &multiprotocol_list);
@@ -1047,12 +1176,19 @@ pgm_if_parse_network (
 
 			dup[p - b] = 0;
 
-			g_trace ("entity '%s'", dup);
+			g_trace ("entity:0 '%s'", dup);
 			switch (ec++) {
 			case ENTITY_INTERFACE:
 				retval = pgm_if_parse_entity_interface (dup, ai_family, devices, &multiprotocol_list);
+/* fall through on multicast */
+				if (-EXDEV != retval)
+				{
+					if (!(retval == 0 || retval == -ERANGE)) goto out;
+					break;
+				}
+				retval = pgm_if_parse_entity_interface (NULL, ai_family, devices, &multiprotocol_list);
 				if (!(retval == 0 || retval == -ERANGE)) goto out;
-				break;
+				ec++;
 
 			case ENTITY_RECEIVE:
 				retval = pgm_if_parse_entity_receive (dup, ai_family, devices, receive_groups, &multiprotocol_list);
@@ -1079,12 +1215,19 @@ pgm_if_parse_network (
 	}
 
 	if (b < e) {
-		g_trace ("entity '%s'", b);
+		g_trace ("entity:1 '%s'", b);
 		switch (ec++) {
 		case ENTITY_INTERFACE:
 			retval = pgm_if_parse_entity_interface (b, ai_family, devices, &multiprotocol_list);
+/* fall through on multicast */
+			if (-EXDEV != retval)
+			{
+				if (!(retval == 0 || retval == -ERANGE)) goto out;
+				break;
+			}
+			retval = pgm_if_parse_entity_interface (NULL, ai_family, devices, &multiprotocol_list);
 			if (!(retval == 0 || retval == -ERANGE)) goto out;
-			break;
+			ec++;
 
 		case ENTITY_RECEIVE:
 			retval = pgm_if_parse_entity_receive (b, ai_family, devices, receive_groups, &multiprotocol_list);
@@ -1103,8 +1246,9 @@ pgm_if_parse_network (
 	}
 
 
-	while (ec < (ENTITY_SEND+1))
+	while (ec <= ENTITY_SEND)
 	{
+		g_trace ("assumed entity");
 		switch (ec++) {
 		case ENTITY_INTERFACE:
 			retval = pgm_if_parse_entity_interface (NULL, ai_family, devices, &multiprotocol_list);

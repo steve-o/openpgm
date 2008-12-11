@@ -55,7 +55,7 @@ static inline int pgm_sockaddr_is_addr_multicast (struct sockaddr* s)
 
     switch (s->sa_family) {
     case AF_INET:
-	retval = IN_MULTICAST(g_htonl( ((struct sockaddr_in*)s)->sin_addr.s_addr ));
+	retval = IN_MULTICAST(g_ntohl( ((struct sockaddr_in*)s)->sin_addr.s_addr ));
 	break;
 
     case AF_INET6:
@@ -120,6 +120,28 @@ static inline int pgm_sockaddr_hdrincl (int s, int sa_family, gboolean v)
 
     return retval;
 }
+
+static inline int pgm_sockaddr_pktinfo (int s, int sa_family, gboolean v)
+{
+    int retval = 0;
+
+    switch (sa_family) {
+    case AF_INET:
+	retval = setsockopt (s, IPPROTO_IP, IP_PKTINFO, &v, sizeof(v));
+	break;
+
+    case AF_INET6:
+	retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &v, sizeof(v));
+	break;
+
+    default:
+	retval = -EINVAL;
+	break;
+    }
+
+    return retval;
+}
+
 
 static inline int pgm_sockaddr_router_alert (int s, int sa_family, gboolean v)
 {

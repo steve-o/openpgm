@@ -31,6 +31,7 @@
 
 G_BEGIN_DECLS
 
+int pgm_if_getnodeaddr (int, struct sockaddr*, socklen_t);
 int pgm_if_print_all (void);
 
 int pgm_if_parse_network (const char*, int, struct group_req*, struct sockaddr*, struct sockaddr*, int);
