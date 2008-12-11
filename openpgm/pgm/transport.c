@@ -43,8 +43,7 @@
 
 #include <glib.h>
 
-#include "pgm/backtrace.h"
-#include "pgm/log.h"
+#include "pgm/if.h"
 #include "pgm/packet.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
@@ -1595,8 +1594,8 @@ pgm_transport_bind (
 		}
 
 /* request extra packet information to determine destination address on each packet */
-		gboolean v = TRUE;
-		retval = setsockopt (transport->recv_sock, IPPROTO_IP, IP_PKTINFO, &v, sizeof(v));
+		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source);
+		retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 		if (retval < 0) {
 			goto out;
 		}
@@ -1604,11 +1603,10 @@ pgm_transport_bind (
 	else
 	{
 		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source);
-
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
-			retval = pgm_sockaddr_hdrincl (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), TRUE);
+			retval = pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE);
 			if (retval < 0) {
 				goto out;
 			}
@@ -1616,8 +1614,7 @@ pgm_transport_bind (
 		else
 		{
 			g_assert (AF_INET6 == recv_family);
-			gboolean v = TRUE;
-			retval = setsockopt (transport->recv_sock, IPPROTO_IPV6, IPV6_PKTINFO, &v, sizeof(v));
+			retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 			if (retval < 0) {
 				goto out;
 			}
@@ -1671,21 +1668,23 @@ pgm_transport_bind (
 /* TODO: different ports requires a new bound socket */
 
 #ifdef CONFIG_BIND_INADDR_ANY
-	struct sockaddr_storage bind_sockaddr;
-	memcpy (&bind_sockaddr, &transport->recv_gsr[0].gsr_source, pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
 
-	switch (pgm_sockaddr_family(&bind_sockaddr)) {
+/* force default interface for bind-only, source address is still valid for multicast membership */
+	struct sockaddr_storage recv_sockaddr;
+	memcpy (&recv_sockaddr, &transport->recv_gsr[0].gsr_source, pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
+
+	switch (pgm_sockaddr_family(&recv_sockaddr)) {
 	case AF_INET:
-		((struct sockaddr_in*)&bind_sockaddr)->sin_addr.s_addr = INADDR_ANY;
+		((struct sockaddr_in*)&recv_sockaddr)->sin_addr.s_addr = INADDR_ANY;
 		break;
 
 	case AF_INET6:
-		((struct sockaddr_in6*)&bind_sockaddr)->sin6_addr = in6addr_any;
+		((struct sockaddr_in6*)&recv_sockaddr)->sin6_addr = in6addr_any;
 		break;
 	}
 
 	retval = bind (transport->recv_sock,
-			(struct sockaddr*)&bind_sockaddr,
+			(struct sockaddr*)&recv_sockaddr,
 			pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
 #else
 	retval = bind (transport->recv_sock,
@@ -1704,41 +1703,27 @@ pgm_transport_bind (
 	}
 
 /* resolve bound address if 0.0.0.0 */
-#ifdef CONFIG_BIND_INADDR_ANY
-	switch (pgm_sockaddr_family(&bind_sockaddr)) {
+	switch (pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source)) {
 	case AF_INET:
 		if (((struct sockaddr_in*)&transport->recv_gsr[0].gsr_source)->sin_addr.s_addr == INADDR_ANY)
 		{
-			char hostname[NI_MAXHOST + 1];
-			gethostname (hostname, sizeof(hostname));
-			struct hostent *he = gethostbyname (hostname);
-			if (he == NULL) {
-				retval = -2;
-				g_trace ("INFO","gethostbyname failed on local hostname: %s", hstrerror (h_errno));
+			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&transport->recv_gsr[0].gsr_source, sizeof(transport->recv_gsr[0].gsr_source));
+			if (retval < 0) {
 				goto out;
 			}
-
-			((struct sockaddr_in*)(&transport->recv_gsr[0].gsr_source))->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
 		}
 		break;
 
 	case AF_INET6:
-		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&bind_sockaddr)->sin6_addr, sizeof(in6addr_any)) == 0)
+		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&transport->recv_gsr[0].gsr_source)->sin6_addr, sizeof(in6addr_any)) == 0)
 		{
-			char hostname[NI_MAXHOST + 1];
-			gethostname (hostname, sizeof(hostname));
-			struct hostent *he = gethostbyname2 (hostname, AF_INET6);
-			if (he == NULL) {
-				retval = -2;
-				g_trace ("INFO","gethostbyname2 failed on local hostname: %s", hstrerror (h_errno));
+			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&transport->recv_gsr[0].gsr_source, sizeof(transport->recv_gsr[0].gsr_source));
+			if (retval < 0) {
 				goto out;
 			}
-
-			((struct sockaddr_in6*)(&transport->recv_gsr[0].gsr_source))->sin6_addr = *(struct in6_addr*)(he->h_addr_list[0]);
 		}
 		break;
 	}
-#endif
 
 #ifdef TRANSPORT_DEBUG
 	{
@@ -1747,6 +1732,10 @@ pgm_transport_bind (
 		g_trace ("INFO","bind succeeded on recv_gsr[0] interface %s", s);
 	}
 #endif
+
+/* keep a copy of the original address source to re-use for router alert bind */
+	struct sockaddr_storage send_sockaddr;
+	memcpy (&send_sockaddr, &transport->send_gsr.gsr_source, pgm_sockaddr_len(&transport->send_gsr.gsr_source));
 
 	retval = bind (transport->send_sock,
 			(struct sockaddr*)&transport->send_gsr.gsr_source,
@@ -1763,18 +1752,26 @@ pgm_transport_bind (
 	}
 
 /* resolve bound address if 0.0.0.0 */
-	if (((struct sockaddr_in*)&transport->send_gsr.gsr_source)->sin_addr.s_addr == INADDR_ANY)
-	{
-		char hostname[NI_MAXHOST + 1];
-		gethostname (hostname, sizeof(hostname));
-		struct hostent *he = gethostbyname (hostname);
-		if (he == NULL) {
-			retval = -2;
-			g_trace ("INFO","gethostbyname failed on local hostname: %s", hstrerror (h_errno));
-			goto out;
+	switch (pgm_sockaddr_family(&transport->send_gsr.gsr_source)) {
+	case AF_INET:
+		if (((struct sockaddr_in*)&transport->send_gsr.gsr_source)->sin_addr.s_addr == INADDR_ANY)
+		{
+			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&transport->send_gsr.gsr_source, sizeof(transport->send_gsr.gsr_source));
+			if (retval < 0) {
+				goto out;
+			}
 		}
+		break;
 
-		((struct sockaddr_in*)&transport->send_gsr.gsr_source)->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+	case AF_INET6:
+		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&transport->send_gsr.gsr_source)->sin6_addr, sizeof(in6addr_any)) == 0)
+		{
+			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&transport->send_gsr.gsr_source, sizeof(transport->send_gsr.gsr_source));
+			if (retval < 0) {
+				goto out;
+			}
+		}
+		break;
 	}
 
 #ifdef TRANSPORT_DEBUG
@@ -1786,8 +1783,8 @@ pgm_transport_bind (
 #endif
 
 	retval = bind (transport->send_with_router_alert_sock,
-			(struct sockaddr*)&transport->send_gsr.gsr_source,
-			pgm_sockaddr_len(&transport->send_gsr.gsr_source));
+			(struct sockaddr*)&send_sockaddr,
+			pgm_sockaddr_len(&send_sockaddr));
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
@@ -2238,6 +2235,13 @@ pgm_transport_recvmsgv (
 	};
 
 recv_again:
+
+/* reset msghdr */
+	msg.msg_namelen		= sizeof(src_addr);
+	msg.msg_iov[0].iov_len	= transport->max_tpdu;
+	msg.msg_iovlen		= 1;
+	msg.msg_controllen	= sizeof(aux);
+
 	len = recvmsg (transport->recv_sock, &msg, MSG_DONTWAIT);
 	if (len < 0) {
 		if (bytes_received) {
@@ -2276,6 +2280,7 @@ recv_again:
 
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
 		{
+			g_trace ("INFO", "cmsg: level=%d type=%d", cmsg->cmsg_level, cmsg->cmsg_type);
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
@@ -2302,6 +2307,7 @@ recv_again:
 /* set any empty address if no headers found */
 		if (!found_dstaddr)
 		{
+			g_trace("INFO","no destination address found in header");
 			((struct sockaddr_in*)&dst_addr)->sin_family		= AF_INET;
 			((struct sockaddr_in*)&dst_addr)->sin_addr.s_addr	= INADDR_ANY;
 			dst_addr_len = sizeof(struct sockaddr_in);
