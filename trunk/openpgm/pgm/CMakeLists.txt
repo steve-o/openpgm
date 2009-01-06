@@ -72,6 +72,7 @@ SET(PLATFORM_CFLAGS " 	-pipe
 			-std=gnu99
 			--param max-inline-insns-single=600
 			-D_REENTRANT
+			-D_GNU_SOURCE
 			-D__need_IOV_MAX
 			-DCONFIG_BIND_INADDR_ANY
 			-DCONFIG_GALOIS_MUL_LUT
