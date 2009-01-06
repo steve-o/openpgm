@@ -2150,9 +2150,9 @@ pgm_transport_recvmsgv (
 
 	gsize bytes_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
-	pgm_msgv_t* msg_end = msg_start + msg_len;
+	const pgm_msgv_t* msg_end = msg_start + msg_len;
 	struct iovec* piov = transport->piov;
-	struct iovec* iov_end = piov + transport->piov_len;
+	const struct iovec* iov_end = piov + transport->piov_len;
 
 /* lock waiting so extra events are not generated during call */
 	g_static_mutex_lock (&transport->waiting_mutex);
@@ -2175,7 +2175,7 @@ pgm_transport_recvmsgv (
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			const gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
@@ -2284,7 +2284,7 @@ recv_again:
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
-				struct in_pktinfo *in = (struct in_pktinfo*) CMSG_DATA(cmsg);
+				const struct in_pktinfo *in = (struct in_pktinfo*) CMSG_DATA(cmsg);
 				dst_addr_len = sizeof(struct sockaddr_in);
 				((struct sockaddr_in*)&dst_addr)->sin_family		= AF_INET;
 				((struct sockaddr_in*)&dst_addr)->sin_addr.s_addr	= in->ipi_addr.s_addr;
@@ -2295,7 +2295,7 @@ recv_again:
 			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
 			    IPV6_PKTINFO == cmsg->cmsg_type)
 			{
-				struct in6_pktinfo *in6 = (struct in6_pktinfo*) CMSG_DATA(cmsg);
+				const struct in6_pktinfo *in6 = (struct in6_pktinfo*) CMSG_DATA(cmsg);
 				dst_addr_len = sizeof(struct sockaddr_in6);
 				((struct sockaddr_in6*)&dst_addr)->sin6_family		= AF_INET6;
 				memcpy (&((struct sockaddr_in6*)&dst_addr)->sin6_addr, &in6->ipi6_addr, dst_addr_len);
@@ -2488,8 +2488,8 @@ recv_again:
 		source->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += len;
 		source->last_packet = pgm_time_now;
 
-		gpointer pgm_data = pgm_header + 1;
-		gsize pgm_len = packet_len - sizeof(pgm_header);
+		const gpointer pgm_data = pgm_header + 1;
+		const gsize pgm_len = packet_len - sizeof(pgm_header);
 
 /* handle PGM packet type */
 		switch (pgm_header->pgm_type) {
@@ -2527,7 +2527,7 @@ flush_waiting:
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			const gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
@@ -2931,7 +2931,7 @@ on_nak_notify (
 	guint16		r_length = 0;
 	gboolean	is_parity = FALSE;
 	guint		rs_h = 0;
-	guint		rs_2t = transport->rs_n - transport->rs_k;
+	const guint	rs_2t = transport->rs_n - transport->rs_k;
 
 /* parity packets are re-numbered across the transmission group with index h, sharing the space
  * with the original packets.  beyond the transmission group size (k), the PGM option OPT_PARITY_GRP
@@ -2950,13 +2950,13 @@ on_nak_notify (
 /* calculate parity packet */
 		if (is_parity)
 		{
-			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
-			guint32 tg_sqn = r_sqn & tg_sqn_mask;
+			const guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+			const guint32 tg_sqn = r_sqn & tg_sqn_mask;
 
 			gboolean is_op_encoded = FALSE;
 
 			guint16 parity_length = 0;
-			guint8* src[ transport->rs_k ];
+			const guint8* src[ transport->rs_k ];
 			for (unsigned i = 0; i < transport->rs_k; i++)
 			{
 				gpointer	o_packet;
@@ -2964,8 +2964,8 @@ on_nak_notify (
 
 				pgm_txw_peek (transport->txw, tg_sqn + i, &o_packet, &o_length);
 
-				struct pgm_header*	o_header = o_packet;
-				guint16			o_tsdu_length = g_ntohs (o_header->pgm_tsdu_length);
+				const struct pgm_header*	o_header = o_packet;
+				guint16				o_tsdu_length = g_ntohs (o_header->pgm_tsdu_length);
 
 				if (!parity_length)
 				{
@@ -2979,17 +2979,17 @@ on_nak_notify (
 						parity_length = o_tsdu_length;
 				}
 
-				struct pgm_data* odata = (struct pgm_data*)(o_header + 1);
+				const struct pgm_data* odata = (const struct pgm_data*)(o_header + 1);
 
 				if (o_header->pgm_options & PGM_OPT_PRESENT)
 				{
-					guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(guint16)));
-					src[i] = (guint8*)(odata + 1) + opt_total_length;
+					const guint16 opt_total_length = g_ntohs(*(const guint16*)( (const char*)( odata + 1 ) + sizeof(guint16)));
+					src[i] = (const guint8*)(odata + 1) + opt_total_length;
 					is_op_encoded = TRUE;
 				}
 				else
 				{
-					src[i] = (guint8*)(odata + 1);
+					src[i] = (const guint8*)(odata + 1);
 				}
 			}
 
@@ -3012,8 +3012,8 @@ on_nak_notify (
 
 					pgm_txw_peek (transport->txw, tg_sqn + i, &o_packet, &o_length);
 
-					struct pgm_header*	o_header = o_packet;
-					guint16			o_tsdu_length = g_ntohs (o_header->pgm_tsdu_length);
+					const struct pgm_header*	o_header = o_packet;
+					const guint16			o_tsdu_length = g_ntohs (o_header->pgm_tsdu_length);
 
 					pgm_txw_zero_pad (transport->txw, o_packet, o_tsdu_length, parity_length);
 					*(guint16*)((guint8*)o_packet + parity_length) = o_tsdu_length;
@@ -3147,7 +3147,7 @@ on_spm (
 	struct pgm_transport_t* transport = sender->transport;
 	struct pgm_spm* spm = (struct pgm_spm*)data;
 	struct pgm_spm6* spm6 = (struct pgm_spm6*)data;
-	pgm_time_t now = pgm_time_update_now ();
+	const pgm_time_t now = pgm_time_update_now ();
 
 	spm->spm_sqn = g_ntohl (spm->spm_sqn);
 
@@ -3338,7 +3338,7 @@ on_nak (
 {
 	g_trace ("INFO","on_nak()");
 
-	gboolean is_parity = header->pgm_options & PGM_OPT_PARITY;
+	const gboolean is_parity = header->pgm_options & PGM_OPT_PARITY;
 
 	if (is_parity) {
 		transport->cumulative_stats[PGM_PC_SOURCE_PARITY_NAKS_RECEIVED]++;
@@ -3360,8 +3360,8 @@ on_nak (
 		goto out;
 	}
 
-	struct pgm_nak* nak = (struct pgm_nak*)data;
-	struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
+	const struct pgm_nak* nak = (struct pgm_nak*)data;
+	const struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
 		
 /* NAK_SRC_NLA contains our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
@@ -3394,13 +3394,13 @@ on_nak (
 	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, sqn_list.sqn[0]);
 
 /* check NAK list */
-	guint32* nak_list = NULL;
+	const guint32* nak_list = NULL;
 	guint nak_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
-							(struct pgm_opt_length*)(nak6 + 1) :
-							(struct pgm_opt_length*)(nak + 1);
+		const struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
+							(const struct pgm_opt_length*)(nak6 + 1) :
+							(const struct pgm_opt_length*)(nak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			retval = -EINVAL;
@@ -3416,13 +3416,13 @@ on_nak (
 			goto out;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
+		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
-			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
-				nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
+				nak_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
 				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
@@ -3502,8 +3502,8 @@ on_peer_nak (
 		goto out;
 	}
 
-	struct pgm_nak* nak = (struct pgm_nak*)data;
-	struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
+	const struct pgm_nak* nak = (struct pgm_nak*)data;
+	const struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
 		
 /* NAK_SRC_NLA must not contain our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
@@ -3544,13 +3544,13 @@ on_peer_nak (
 	pgm_rxw_ncf (peer->rxw, g_ntohl (nak->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 
 /* check NAK list */
-	guint32* nak_list = NULL;
+	const guint32* nak_list = NULL;
 	guint nak_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
-							(struct pgm_opt_length*)(nak6 + 1) :
-							(struct pgm_opt_length*)(nak + 1);
+		const struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
+							(const struct pgm_opt_length*)(nak6 + 1) :
+							(const struct pgm_opt_length*)(nak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			g_trace ("INFO", "First PGM Option in NAK incorrect, ignoring.");
@@ -3568,13 +3568,13 @@ on_peer_nak (
 			goto out_unlock;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
+		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
-			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
-				nak_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
+				nak_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
 				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
@@ -3632,8 +3632,8 @@ on_ncf (
 		goto out;
 	}
 
-	struct pgm_nak* ncf = (struct pgm_nak*)data;
-	struct pgm_nak6* ncf6 = (struct pgm_nak6*)data;
+	const struct pgm_nak* ncf = (struct pgm_nak*)data;
+	const struct pgm_nak6* ncf6 = (struct pgm_nak6*)data;
 		
 /* NCF_SRC_NLA may contain our transport unicast NLA, we don't really care */
 	struct sockaddr_storage ncf_src_nla;
@@ -3666,13 +3666,13 @@ on_ncf (
 	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
 
 /* check NCF list */
-	guint32* ncf_list = NULL;
+	const guint32* ncf_list = NULL;
 	guint ncf_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
-							(struct pgm_opt_length*)(ncf6 + 1) :
-							(struct pgm_opt_length*)(ncf + 1);
+		const struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
+							(const struct pgm_opt_length*)(ncf6 + 1) :
+							(const struct pgm_opt_length*)(ncf + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			g_trace ("INFO", "First PGM Option in NCF incorrect, ignoring.");
@@ -3690,13 +3690,13 @@ on_ncf (
 			goto out_unlock;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
+		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
-			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
-				ncf_list = ((struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
+				ncf_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
 				ncf_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
 				break;
 			}
@@ -3750,8 +3750,8 @@ on_nnak (
 		goto out;
 	}
 
-	struct pgm_nak* nnak = (struct pgm_nak*)data;
-	struct pgm_nak6* nnak6 = (struct pgm_nak6*)data;
+	const struct pgm_nak* nnak = (struct pgm_nak*)data;
+	const struct pgm_nak6* nnak6 = (struct pgm_nak6*)data;
 		
 /* NAK_SRC_NLA contains our transport unicast NLA */
 	struct sockaddr_storage nnak_src_nla;
@@ -3780,9 +3780,9 @@ on_nnak (
 	guint nnak_list_len = 0;
 	if (header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (nnak->nak_src_nla_afi == AFI_IP6) ?
-							(struct pgm_opt_length*)(nnak6 + 1) :
-							(struct pgm_opt_length*)(nnak + 1);
+		const struct pgm_opt_length* opt_len = (nnak->nak_src_nla_afi == AFI_IP6) ?
+							(const struct pgm_opt_length*)(nnak6 + 1) :
+							(const struct pgm_opt_length*)(nnak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			retval = -EINVAL;
@@ -3798,9 +3798,9 @@ on_nnak (
 			goto out;
 		}
 /* TODO: check for > 16 options & past packet end */
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
+		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
-			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
@@ -3890,11 +3890,11 @@ send_spmr (
 	pgm_transport_t* transport = peer->transport;
 
 /* cache peer information */
-	guint16	peer_sport = peer->tsi.sport;
+	const guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->local_nla, sizeof(struct sockaddr_storage));
 
-	gsize tpdu_length = sizeof(struct pgm_header);
+	const gsize tpdu_length = sizeof(struct pgm_header);
 	guint8 buf[ tpdu_length ];
 	struct pgm_header *header = (struct pgm_header*)buf;
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
@@ -3958,7 +3958,7 @@ send_nak (
 
 	pgm_transport_t* transport = peer->transport;
 
-	guint16	peer_sport = peer->tsi.sport;
+	const guint16	peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
 
@@ -4413,17 +4413,17 @@ nak_rb_state (
 	guint dropped_invalid = 0;
 
 /* have not learned this peers NLA */
-	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
+	const gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
 /* TODO: process BOTH selective and parity NAKs? */
 
 /* calculate current transmission group for parity enabled peers */
 	if (peer->use_ondemand_parity)
 	{
-		guint32 tg_sqn_mask = 0xffffffff << peer->tg_sqn_shift;
+		const guint32 tg_sqn_mask = 0xffffffff << peer->tg_sqn_shift;
 
 /* NAKs only generated previous to current transmission group */
-		guint32 current_tg_sqn = ((pgm_rxw_t*)peer->rxw)->lead & tg_sqn_mask;
+		const guint32 current_tg_sqn = ((pgm_rxw_t*)peer->rxw)->lead & tg_sqn_mask;
 
 		guint32 nak_tg_sqn = 0;
 		guint32 nak_pkt_cnt = 0;
@@ -4459,7 +4459,7 @@ nak_rb_state (
 				}
 
 /* TODO: parity nak lists */
-				guint32 tg_sqn = rp->sequence_number & tg_sqn_mask;
+				const guint32 tg_sqn = rp->sequence_number & tg_sqn_mask;
 				if (	( nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
 					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
 				{
@@ -4795,7 +4795,7 @@ nak_rpt_state (
 	guint dropped = 0;
 
 /* have not learned this peers NLA */
-	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
+	const gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
 	while (list)
 	{
@@ -4830,7 +4830,7 @@ nak_rpt_state (
 				dropped++;
 				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
 
-				guint32 fail_time = pgm_time_now - rp->t0;
+				const guint32 fail_time = pgm_time_now - rp->t0;
 				if (!peer->max_fail_time) {
 					peer->max_fail_time = peer->min_fail_time = fail_time;
 				}
@@ -4950,7 +4950,7 @@ nak_rdata_state (
 	guint dropped = 0;
 
 /* have not learned this peers NLA */
-	gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
+	const gboolean is_valid_nla = (((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr != INADDR_ANY);
 
 	while (list)
 	{
@@ -4985,7 +4985,7 @@ nak_rdata_state (
 				dropped++;
 				g_trace ("INFO", "lost data #%u due to cancellation.", rp->sequence_number);
 
-				guint32 fail_time = pgm_time_now - rp->t0;
+				const guint32 fail_time = pgm_time_now - rp->t0;
 				if (fail_time > peer->max_fail_time)		peer->max_fail_time = fail_time;
 				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
 
@@ -5126,7 +5126,7 @@ pgm_transport_send_one (
 
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
 	{
-	        gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + tsdu_length;
+	        const gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + tsdu_length;
 		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
 		if (result == -1) {
 			return (gssize)result;
@@ -5199,8 +5199,8 @@ retry_send:
 /* check for end of transmission group */
 	if (transport->use_proactive_parity)
 	{
-		guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
-		guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+		const guint32 odata_sqn = ((struct pgm_data*)(((struct pgm_header*)STATE(pkt)) + 1))->data_sqn;
+		const guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
 		if (!((g_ntohl(odata_sqn) + 1) & ~tg_sqn_mask))
 		{
 			pgm_schedule_proactive_nak (transport, g_ntohl(odata_sqn) & tg_sqn_mask);
@@ -5239,7 +5239,7 @@ pgm_transport_send_one_copy (
 
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
 	{
-	        gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + tsdu_length;
+	        const gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + tsdu_length;
 		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
 		if (result == -1) {
 			return (gssize)result;
@@ -6455,7 +6455,7 @@ pgm_timer_check (
 	g_trace ("SPM","pgm_timer_check");
 
 	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
-	pgm_time_t now = pgm_time_update_now();
+	const pgm_time_t now = pgm_time_update_now();
 
 	gboolean retval = ( pgm_time_after_eq(now, pgm_timer->expiration) );
 	if (!retval) g_thread_yield();
@@ -6577,11 +6577,11 @@ on_odata (
  * through to event handler.
  */
 	struct pgm_opt_fragment* opt_fragment;
-	pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
+	const pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
 
 	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(odata + 1), &opt_fragment))
 	{
-		guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(guint16)));
+		const guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(guint16)));
 
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
@@ -6674,16 +6674,16 @@ on_rdata (
 	rdata->data_sqn = g_ntohl (rdata->data_sqn);
 
 	gboolean flush_naks = FALSE;
-	pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
+	const pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
 
 /* parity RDATA needs to be decoded */
 	if (header->pgm_options & PGM_OPT_PARITY)
 	{
-		guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
-		guint32 tg_sqn = rdata->data_sqn & tg_sqn_mask;
+		const guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
+		const guint32 tg_sqn = rdata->data_sqn & tg_sqn_mask;
 
-		gboolean is_var_pktlen = header->pgm_options & PGM_OPT_VAR_PKTLEN;
-		gboolean is_op_encoded = header->pgm_options & PGM_OPT_PRESENT;		/* non-encoded options? */
+		const gboolean is_var_pktlen = header->pgm_options & PGM_OPT_VAR_PKTLEN;
+		const gboolean is_op_encoded = header->pgm_options & PGM_OPT_PRESENT;		/* non-encoded options? */
 
 /* determine payload location */
 		guint8* rdata_bytes = (guint8*)(rdata + 1);
@@ -6696,7 +6696,7 @@ on_rdata (
 
 /* create list of sequence numbers for each k packet in the FEC block */
 		guint rs_h = 0;
-		gsize parity_length = g_ntohs (header->pgm_tsdu_length);
+		const gsize parity_length = g_ntohs (header->pgm_tsdu_length);
 		guint32 target_sqn = tg_sqn - 1;
 		guint8* src[ sender->rs_n ];
 		guint8* src_opts[ sender->rs_n ];
@@ -6846,7 +6846,7 @@ on_rdata (
 
 		if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(rdata + 1), &opt_fragment))
 		{
-			guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( rdata + 1 ) + sizeof(guint16)));
+			const guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( rdata + 1 ) + sizeof(guint16)));
 
 			g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 				 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));

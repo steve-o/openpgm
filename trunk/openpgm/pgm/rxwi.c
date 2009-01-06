@@ -420,8 +420,8 @@ pgm_rxw_push_fragment (
 	int retval = PGM_RXW_UNKNOWN;
 
 /* convert to more apparent names */
-	guint32 apdu_first_sqn	= opt_fragment ? g_ntohl (opt_fragment->opt_sqn) : 0;
-	guint32 apdu_len	= opt_fragment ? g_ntohl (opt_fragment->opt_frag_len) : 0;
+	const guint32 apdu_first_sqn	= opt_fragment ? g_ntohl (opt_fragment->opt_sqn) : 0;
+	const guint32 apdu_len		= opt_fragment ? g_ntohl (opt_fragment->opt_frag_len) : 0;
 
 	g_trace ("#%u: data trail #%u: push: window ( rxw_trail %u rxw_trail_init %u trail %u lead %u )",
 		sequence_number, trail, 
@@ -526,8 +526,8 @@ pgm_rxw_push_fragment (
 				g_trace ("#%u: destination contains parity, shuffling to next available entry.", sequence_number);
 /* find if any other packets are lost in this transmission group */
 
-				guint32 tg_sqn_mask = 0xffffffff << r->tg_sqn_shift;
-				guint32 next_tg_sqn = (sequence_number & tg_sqn_mask) + 1;
+				const guint32 tg_sqn_mask = 0xffffffff << r->tg_sqn_shift;
+				const guint32 next_tg_sqn = (sequence_number & tg_sqn_mask) + 1;
 
 				if (sequence_number != next_tg_sqn)
 				for (guint32 i = sequence_number + 1; i != next_tg_sqn; i++)
@@ -571,7 +571,7 @@ pgm_rxw_push_fragment (
 			rp->state	= PGM_PKT_HAVE_DATA_STATE;
 			retval		= PGM_RXW_FILLED_PLACEHOLDER;
 
-			guint32 fill_time = pgm_time_now - rp->t0;
+			const guint32 fill_time = pgm_time_now - rp->t0;
 			if (!r->max_fill_time) {
 				r->max_fill_time = r->min_fill_time = fill_time;
 			}
@@ -745,8 +745,8 @@ pgm_rxw_readv (
 
 	guint dropped = 0;
 	gsize bytes_read = 0;
-	pgm_msgv_t* msg_end = *pmsg + msg_len;
-	struct iovec* iov_end = *piov + iov_len;
+	const pgm_msgv_t* msg_end = *pmsg + msg_len;
+	const struct iovec* iov_end = *piov + iov_len;
 
 	while ( !pgm_rxw_incoming_empty (r) )
 	{
@@ -766,7 +766,7 @@ pgm_rxw_readv (
 /* check for lost apdu */
 			if ( g_ntohl (cp->of_apdu_len) )
 			{
-				guint32 apdu_first_sqn = g_ntohl (cp->of_apdu_first_sqn);
+				const guint32 apdu_first_sqn = g_ntohl (cp->of_apdu_first_sqn);
 
 /* drop the first fragment, then others follow through as its no longer in the window */
 				if ( r->trail == apdu_first_sqn )
@@ -852,7 +852,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 				if (apdu_len == g_ntohl (cp->of_apdu_len))
 				{
 /* check if sufficient room for apdu */
-					guint32 apdu_len_in_frags = frag - g_ntohl (cp->of_apdu_first_sqn) + 1;
+					const guint32 apdu_len_in_frags = frag - g_ntohl (cp->of_apdu_first_sqn) + 1;
 					if (*piov + apdu_len_in_frags > iov_end) {
 						break;
 					}
@@ -994,9 +994,9 @@ pgm_rxw_free_committed (
 	g_assert( r->commit_trail != r->trail );
 
 /* calculate transmission group at commit trailing edge */
-	guint32 tg_sqn_mask = 0xffffffff << r->tg_sqn_shift;
-	guint32 tg_sqn = r->commit_trail & tg_sqn_mask;
-	guint32 pkt_sqn = r->commit_trail & ~tg_sqn_mask;
+	const guint32 tg_sqn_mask = 0xffffffff << r->tg_sqn_shift;
+	const guint32 tg_sqn = r->commit_trail & tg_sqn_mask;
+	const guint32 pkt_sqn = r->commit_trail & ~tg_sqn_mask;
 
 	guint32 new_rx_trail = tg_sqn;
 	if (pkt_sqn == r->tg_size - 1)	/* end of group */
@@ -1162,7 +1162,7 @@ g_message ("#%u less than trail #%u", sequence_number, r->trail);
 /* check if window is not empty */
 	g_assert ( !pgm_rxw_empty (r) );
 
-	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+	const pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 	*opt_fragment	= &rp->opt_fragment;
 	*data		= rp->data;
@@ -1467,7 +1467,7 @@ pgm_rxw_window_update (
 /* jump remaining sequence numbers if window is empty */
 			if ( pgm_rxw_empty(r) )
 			{
-				guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
+				const guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
 
 				dropped  += distance;
 				r->commit_trail = r->commit_lead = r->trail += distance;
