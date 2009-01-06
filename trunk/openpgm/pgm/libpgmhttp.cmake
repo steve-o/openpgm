@@ -24,6 +24,8 @@ MACRO(PACKHTDOC
 		COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/htdocs/convert_to_macro.pl "${CMAKE_CURRENT_SOURCE_DIR}/htdocs/${htdoc}" > "${CMAKE_CURRENT_BINARY_DIR}/htdocs/${htdoc}.h"
 		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/htdocs/${htdoc}"
 	)
+# 2.4 forward compatibility
+	SET(SRC ${SRC} "${CMAKE_CURRENT_BINARY_DIR}/htdocs/${htdoc}.h")
 ENDMACRO(PACKHTDOC)
 
 FOREACH(htdoc ${HTDOCS})
