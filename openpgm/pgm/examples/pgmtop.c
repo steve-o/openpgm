@@ -55,7 +55,7 @@ struct ncurses_window {
 	resize_func	resize;
 };
 
-struct stat {
+struct pgm_stat {
 	gulong		count, snap_count;
 	gulong		bytes, snap_bytes;
 	gulong		tsdu;
@@ -68,12 +68,12 @@ struct stat {
 	struct timeval	last_invalid;
 };
 
-struct netstat {
+struct pgm_netstat {
 	struct in_addr	s_addr;
 	gulong		corrupt;
 };
 
-struct hoststat {
+struct pgm_hoststat {
 	pgm_tsi_t	tsi;
 
 	struct in_addr	last_addr;
@@ -93,7 +93,7 @@ struct hoststat {
 
 	gulong		spm_sqn;
 
-	struct stat	spm,
+	struct pgm_stat	spm,
 			poll,
 			polr,
 			odata,
@@ -378,7 +378,7 @@ tsi_row (
 	gpointer		user_data
 	)
 {
-	struct hoststat* hoststat = value;
+	struct pgm_hoststat* hoststat = value;
 	int* row = user_data;
 
 	float secs = (g_now.tv_sec - g_last_snap.tv_sec) +
@@ -749,10 +749,10 @@ on_io_data (
 			g_nets = g_hash_table_new (g_int_hash, g_int_equal);
 		}
 
-		struct netstat* netstat = g_hash_table_lookup (g_nets, &src_addr.sin_addr);
+		struct pgm_netstat* netstat = g_hash_table_lookup (g_nets, &src_addr.sin_addr);
 		if (netstat == NULL) {
 			write_status ("new host publishing corrupt data, local nla %s", inet_ntoa(src_addr.sin_addr));
-			netstat = g_malloc0(sizeof(struct netstat));
+			netstat = g_malloc0(sizeof(struct pgm_netstat));
 			netstat->s_addr = src_addr.sin_addr;
 			g_hash_table_insert (g_nets, (gpointer)&netstat->s_addr, (gpointer)netstat);
 		}
@@ -776,11 +776,11 @@ on_io_data (
 	memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
 	tsi.sport = pgm_header->pgm_sport;
 
-	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
+	struct pgm_hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
 	if (hoststat == NULL) {
 		write_status ("new tsi %s with local nla %s", pgm_print_tsi (&tsi), inet_ntoa(src_addr.sin_addr));
 
-		hoststat = g_malloc0(sizeof(struct hoststat));
+		hoststat = g_malloc0(sizeof(struct pgm_hoststat));
 		memcpy (&hoststat->tsi, &tsi, sizeof(pgm_tsi_t));
 		hoststat->session_start = now;
 
@@ -977,7 +977,7 @@ snap_stat (
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {
-	struct hoststat* hoststat = value;
+	struct pgm_hoststat* hoststat = value;
 
 #define SNAP_STAT(name) \
 	{ \
