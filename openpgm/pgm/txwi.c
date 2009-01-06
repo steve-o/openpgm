@@ -337,7 +337,7 @@ pgm_txw_peek (
 		return -1;
 	}
 
-	pgm_txw_packet_t* tp = TXW_PACKET(t, sequence_number);
+	const pgm_txw_packet_t* tp = TXW_PACKET(t, sequence_number);
 	*packet = tp->data;
 	*length	= tp->length;
 
@@ -409,11 +409,11 @@ pgm_txw_retransmit_push (
 
 	if (is_parity)
 	{
-		guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
+		const guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
 
 /* check if transmission group is in window */
-		guint32 nak_tg_sqn = sequence_number & tg_sqn_mask;	/* left unshifted */
-		guint32 nak_pkt_cnt = sequence_number & ~tg_sqn_mask;
+		const guint32 nak_tg_sqn = sequence_number & tg_sqn_mask;	/* left unshifted */
+		const guint32 nak_pkt_cnt = sequence_number & ~tg_sqn_mask;
 
 printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 		
@@ -498,13 +498,13 @@ pgm_txw_retransmit_try_peek (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	GList* link = g_queue_peek_tail_link (t->retransmit_queue);
+	const GList* link = g_queue_peek_tail_link (t->retransmit_queue);
 	if (!link) {
 		g_static_mutex_unlock (&t->retransmit_mutex);
 		return -1;
 	}
 
-	pgm_txw_packet_t* tp = link->data;
+	const pgm_txw_packet_t* tp = link->data;
 	*sequence_number = tp->sequence_number;
 
 	if (tp->pkt_cnt_requested)
