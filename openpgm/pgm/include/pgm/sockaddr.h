@@ -28,6 +28,11 @@
 
 #include <glib.h>
 
+/* glibc 2.3 on debian etch doesn't include this */
+#ifndef IPV6_RECVPKTINFO
+#	define IPV6_RECVPKTINFO		49
+#endif
+
 
 G_BEGIN_DECLS
 
