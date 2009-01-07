@@ -39,7 +39,8 @@ SET(LIBRARY_OUTPUT_PATH  ${CMAKE_BINARY_DIR}/lib)
 #-----------------------------------------------------------------------------
 # Dependencies
 
-INCLUDE(${CMAKE_ROOT}/Modules/FindPkgConfig.cmake)
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_ROOT}/Modules ${CMAKE_SOURCE_DIR}/CMake)
+INCLUDE(FindPkgConfig)
 pkg_check_modules (GLIB2 REQUIRED	glib-2.0>=2.10 gthread-2.0)
 pkg_check_modules (LIBSOUP REQUIRED	libsoup-2.2)
 pkg_check_modules (CHECK 		check)
