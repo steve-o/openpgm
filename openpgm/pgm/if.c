@@ -457,8 +457,8 @@ pgm_if_parse_interface (
 		if ( strcmp (s, ifa->ifa_name ) == 0 )
 		{
 			int i = if_nametoindex (ifa->ifa_name);
-			if (i > 0) {
-#ifdef IF_DEBUG
+			if (i > 0)
+			{
 				if (ai_family == AF_UNSPEC) {
 					g_trace ("match on interface #%i, %s %s [%i]",
 							i, ifa->ifa_name,
@@ -469,7 +469,6 @@ pgm_if_parse_interface (
 				} else {
 					continue;
 				}
-#endif /* IF_DEBUG */
 
 				interface_matches++;
 				interface->gr_interface = i;
@@ -479,6 +478,7 @@ pgm_if_parse_interface (
 				continue;
 			}
 
+			g_trace("failed lookup via if_nametoindex(\"%s\")", ifa->ifa_name);
 			retval = -EINVAL;
 			goto out;
 		}
@@ -488,6 +488,7 @@ pgm_if_parse_interface (
 		retval = 0;
 		goto out;
 	} else if (interface_matches > 1) {
+		g_trace ("multiple interfaces match");
 		retval = -ERANGE;
 		goto out;
 	}
