@@ -292,13 +292,13 @@ pgmSourceTable_handler (
 			{
 			case COLUMN_PGMSOURCESOURCEADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
+								(const u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
 								pgm_sockaddr_len( &transport->send_gsr.gsr_source ));
 				break;
 
 			case COLUMN_PGMSOURCEGROUPADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
+								(const u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
 								pgm_sockaddr_len( &transport->send_gsr.gsr_group ));
 				break;
 
@@ -637,7 +637,7 @@ pgmSourceConfigTable_handler (
 
 			case COLUMN_PGMSOURCESPMPATHADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
+								(const u_char*)pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
 								pgm_sockaddr_len( &transport->recv_gsr[0].gsr_source ));
 				break;
 
@@ -1384,7 +1384,7 @@ pgmReceiverTable_handler (
 			{
 			case COLUMN_PGMRECEIVERGROUPADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &peer->group_nla ),
+								(const u_char*)pgm_sockaddr_addr( &peer->group_nla ),
 								pgm_sockaddr_len( &peer->group_nla ));
 				break;
 
@@ -1399,13 +1399,13 @@ pgmReceiverTable_handler (
 
 			case COLUMN_PGMRECEIVERSOURCEADDRESS:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &peer->nla ),
+								(const u_char*)pgm_sockaddr_addr( &peer->nla ),
 								pgm_sockaddr_len( &peer->nla ));
 				break;
 
 			case COLUMN_PGMRECEIVERLASTHOP:
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(u_char*)pgm_sockaddr_addr( &peer->local_nla ),
+								(const u_char*)pgm_sockaddr_addr( &peer->local_nla ),
 								pgm_sockaddr_len( &peer->local_nla ));
 				break;
 
