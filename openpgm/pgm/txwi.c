@@ -498,13 +498,13 @@ pgm_txw_retransmit_try_peek (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	const GList* link = g_queue_peek_tail_link (t->retransmit_queue);
-	if (!link) {
+	const GList* tail_link = g_queue_peek_tail_link (t->retransmit_queue);
+	if (!tail_link) {
 		g_static_mutex_unlock (&t->retransmit_mutex);
 		return -1;
 	}
 
-	const pgm_txw_packet_t* tp = link->data;
+	const pgm_txw_packet_t* tp = tail_link->data;
 	*sequence_number = tp->sequence_number;
 
 	if (tp->pkt_cnt_requested)
@@ -550,13 +550,13 @@ pgm_txw_retransmit_try_pop (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	GList* link = g_queue_peek_tail_link (t->retransmit_queue);
-	if (!link) {
+	GList* tail_link = g_queue_peek_tail_link (t->retransmit_queue);
+	if (!tail_link) {
 		g_static_mutex_unlock (&t->retransmit_mutex);
 		return -1;
 	}
 
-	pgm_txw_packet_t* tp = link->data;
+	pgm_txw_packet_t* tp = tail_link->data;
 	*sequence_number = tp->sequence_number;
 
 	if (tp->pkt_cnt_requested) {
@@ -567,7 +567,7 @@ pgm_txw_retransmit_try_pop (
 		if (--(tp->pkt_cnt_requested) == 0)
 		{
 			g_queue_pop_tail_link (t->retransmit_queue);
-			link->data = NULL;
+			tail_link->data = NULL;
 		}
 
 /* wrap around parity generation in unlikely event that more packets requested than are available
@@ -585,7 +585,7 @@ pgm_txw_retransmit_try_pop (
 		*packet = tp->data;
 		*length	= tp->length;
 		g_queue_pop_tail_link (t->retransmit_queue);
-		link->data = NULL;
+		tail_link->data = NULL;
 	}
 
 	g_static_mutex_unlock (&t->retransmit_mutex);
@@ -608,10 +608,10 @@ pgm_txw_retransmit_pop (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	GList* link = g_queue_peek_tail_link (t->retransmit_queue);
-	g_assert (link);
+	GList* tail_link = g_queue_peek_tail_link (t->retransmit_queue);
+	g_assert (tail_link);
 
-	pgm_txw_packet_t* tp = link->data;
+	pgm_txw_packet_t* tp = tail_link->data;
 
 	if (tp->pkt_cnt_requested)
 	{
@@ -619,7 +619,7 @@ pgm_txw_retransmit_pop (
 		if (--(tp->pkt_cnt_requested) == 0)
 		{
 			g_queue_pop_tail_link (t->retransmit_queue);
-			link->data = NULL;
+			tail_link->data = NULL;
 		}
 
 /* wrap around parity generation in unlikely event that more packets requested than are available
@@ -632,7 +632,7 @@ pgm_txw_retransmit_pop (
 	else
 	{
 		g_queue_pop_tail_link (t->retransmit_queue);
-		link->data = NULL;
+		tail_link->data = NULL;
 	}
 
 	g_static_mutex_unlock (&t->retransmit_mutex);

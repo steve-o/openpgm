@@ -1169,18 +1169,18 @@ pgm_if_parse_network (
 			}
 
 			/* entity from b to p-1 */
-			char dup[1024];
-			strncpy (dup, b, sizeof(dup));
+			char entity[1024];
+			strncpy (entity, b, sizeof(entity));
 
-//			char *dup = malloc (p - b + 1);
-//			strncpy (dup, b, p - b);
+//			char *entity = malloc (p - b + 1);
+//			strncpy (entity, b, p - b);
 
-			dup[p - b] = 0;
+			entity[p - b] = 0;
 
-			g_trace ("entity:0 '%s'", dup);
+			g_trace ("entity:0 '%s'", entity);
 			switch (ec++) {
 			case ENTITY_INTERFACE:
-				retval = pgm_if_parse_entity_interface (dup, ai_family, devices, &multiprotocol_list);
+				retval = pgm_if_parse_entity_interface (entity, ai_family, devices, &multiprotocol_list);
 /* fall through on multicast */
 				if (-EXDEV != retval)
 				{
@@ -1192,12 +1192,12 @@ pgm_if_parse_network (
 				ec++;
 
 			case ENTITY_RECEIVE:
-				retval = pgm_if_parse_entity_receive (dup, ai_family, devices, receive_groups, &multiprotocol_list);
+				retval = pgm_if_parse_entity_receive (entity, ai_family, devices, receive_groups, &multiprotocol_list);
 				if (retval != 0) goto out;
 				break;
 
 			case ENTITY_SEND:
-				retval = pgm_if_parse_entity_send (dup, ai_family, receive_groups, send_group);
+				retval = pgm_if_parse_entity_send (entity, ai_family, receive_groups, send_group);
 				if (retval != 0) goto out;
 				break;
 
@@ -1206,7 +1206,7 @@ pgm_if_parse_network (
 				break;
 			}
 				
-//			free (dup);
+//			free (entity);
 
 			b = ++p;
 			continue;

@@ -1162,7 +1162,7 @@ g_message ("#%u less than trail #%u", sequence_number, r->trail);
 /* check if window is not empty */
 	g_assert ( !pgm_rxw_empty (r) );
 
-	const pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 	*opt_fragment	= &rp->opt_fragment;
 	*data		= rp->data;
