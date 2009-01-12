@@ -1289,9 +1289,9 @@ int
 pgm_if_parse_transport (
 	const char*			s,
 	int				ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
-	struct group_source_req*	send_gsr,
+	struct group_source_req*	recv_gsr,
 	int*				recv_len,	/* length of incoming mreq and filled in returning */
-	struct group_source_req*	recv_gsr
+	struct group_source_req*	send_gsr
 	)
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
