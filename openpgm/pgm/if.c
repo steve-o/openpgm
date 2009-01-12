@@ -1290,15 +1290,15 @@ pgm_if_parse_transport (
 	const char*			s,
 	int				ai_family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	struct group_source_req*	send_gsr,
-	struct group_source_req*	recv_gsr,
-	int*				len		/* length of incoming mreq and filled in returning */
+	int*				recv_len,	/* length of incoming mreq and filled in returning */
+	struct group_source_req*	recv_gsr
 	)
 {
 	g_return_val_if_fail (s != NULL, -EINVAL);
 	g_return_val_if_fail (ai_family == AF_UNSPEC || ai_family == AF_INET || ai_family == AF_INET6, -EINVAL);
 	g_return_val_if_fail (send_gsr != NULL, -EINVAL);
 	g_return_val_if_fail (recv_gsr != NULL, -EINVAL);
-	g_return_val_if_fail (len != NULL || *len > 0, -EINVAL);
+	g_return_val_if_fail (recv_len != NULL || *recv_len > 0, -EINVAL);
 
 	g_trace ("if_parse_transport (\"%s\", %s [%i], ..., %i)", 
 		s, 
@@ -1306,14 +1306,14 @@ pgm_if_parse_transport (
 			( ai_family == AF_INET ? "AF_INET" :
 				( ai_family == AF_INET6 ? "AF_INET6" : "UNKNOWN" )
 			),
-		ai_family, *len);
+		ai_family, *recv_len);
 	int retval = 0;
 
 /* resolve network string */
-	struct group_req* devices = g_malloc0 ( sizeof(struct group_req) * (1 + *len) );
-	struct sockaddr* receive_groups = g_malloc0 ( sizeof(struct sockaddr_storage) * (1 + *len) );
+	struct group_req* devices = g_malloc0 ( sizeof(struct group_req) * (1 + *recv_len) );
+	struct sockaddr* receive_groups = g_malloc0 ( sizeof(struct sockaddr_storage) * (1 + *recv_len) );
 	struct sockaddr* send_group = g_malloc0 ( sizeof(struct sockaddr_storage) );
-	retval = pgm_if_parse_network (s, ai_family, devices, receive_groups, send_group, *len);
+	retval = pgm_if_parse_network (s, ai_family, devices, receive_groups, send_group, *recv_len);
 	if (retval == 0)
 	{
 /* receive groups: possible confusion over mismatch length of devices & receive_groups
@@ -1349,7 +1349,7 @@ pgm_if_parse_transport (
 		}
 
 /* pass back number of filled in gsr objects */
-		*len = i;
+		*recv_len = i;
 	}
 
 	g_free (devices);
