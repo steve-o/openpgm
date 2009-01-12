@@ -203,10 +203,10 @@ on_startup (void)
 #else
 	char network[1024];
 	sprintf (network, ";%s", g_network);
-	int gsr_len = 1;
-	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
+	int recv_len = 1;
+	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
-	g_assert (gsr_len == 1);
+	g_assert (recv_len == 1);
 #endif
 
 	if (g_udp_encap_port) {

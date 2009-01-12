@@ -254,10 +254,10 @@ on_startup (
 #endif
 
 	struct group_source_req recv_gsr, send_gsr;
-	int gsr_len = 1;
-	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
+	int recv_len = 1;
+	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
-	g_assert (gsr_len == 1);
+	g_assert (recv_len == 1);
 
 	if (g_udp_encap_port) {
 		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
