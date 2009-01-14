@@ -500,6 +500,7 @@ pgm_if_parse_interface (
 
 	if (inet_pton (AF_INET, s, &((struct sockaddr_in*)&addr)->sin_addr))
 	{
+		((struct sockaddr_in*)&addr)->sin_family = AF_INET;
 		valid_ipv4 = 1;
 		if (IN_MULTICAST(g_ntohl(((struct sockaddr_in*)&addr)->sin_addr.s_addr)))
 		{
@@ -510,6 +511,7 @@ pgm_if_parse_interface (
 	}
 	else if (inet_pton (AF_INET6, s, &((struct sockaddr_in6*)&addr)->sin6_addr))
 	{
+		((struct sockaddr_in6*)&addr)->sin6_family = AF_INET6;
 		valid_ipv6 = 1;
 		if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)&addr)->sin6_addr))
 		{
@@ -555,23 +557,35 @@ pgm_if_parse_interface (
 			case AF_INET:
 			{
 				g_trace ("found IPv4 network by NSS: %s", ne->n_name);
-				((struct sockaddr_in*)&addr)->sin_addr.s_addr = ne->n_net;
-				g_trace ("address %s", inet_ntoa (((struct sockaddr_in*)&addr)->sin_addr));
-				valid_ipv4 = 1;
+				in.s_addr = g_htonl(ne->n_net);
+				g_trace ("address %s", inet_ntoa (in));
+				valid_net4 = 1;
+				if (IN_MULTICAST(g_ntohl(in.s_addr)))
+				{
+					g_trace ("NSS erroneously contains IPv4 multicast group instead of network address.");
+					retval = -EINVAL;
+					goto out;
+				}
 			}
 			break;
 
 			case AF_INET6:
 			{
 				g_trace ("found IPv6 network by NSS: %s", ne->n_name);
-				memcpy (&((struct sockaddr_in6*)&addr)->sin6_addr,
+				memcpy (&in6,
 					&ne->n_net,
 					sizeof(struct in6_addr));
 #ifdef IF_DEBUG
 				char sdebug[INET6_ADDRSTRLEN];
-				g_trace ("address %s", inet_ntop (ne->n_addrtype, &((struct sockaddr_in6*)&addr)->sin6_addr, sdebug, sizeof(sdebug)));
+				g_trace ("address %s", inet_ntop (ne->n_addrtype, &in6, sdebug, sizeof(sdebug)));
 #endif
-				valid_ipv6 = 1;
+				valid_net6 = 1;
+				if (IN6_IS_ADDR_MULTICAST(&in6))
+				{
+					g_trace ("NSS erroneously contains IPv6 multicast group instead of network address.");
+					retval = -EINVAL;
+					goto out;
+				}
 			}
 			break;
 
@@ -584,6 +598,7 @@ pgm_if_parse_interface (
 
 	if (! (valid_ipv4 || valid_ipv6 || valid_net4 || valid_net6) )
 	{
+		g_trace ("cannot find valid node or network address, trying DNS resolution on entity.");
 
 /* DNS resolve to see if valid hostname */
 		struct addrinfo hints;
@@ -600,12 +615,28 @@ pgm_if_parse_interface (
 			switch (res->ai_family) {
 			case AF_INET:
 				((struct sockaddr_in*)&addr)->sin_addr = ((struct sockaddr_in*)(res->ai_addr))->sin_addr;
+				((struct sockaddr_in*)&addr)->sin_family = res->ai_family;
 				valid_ipv4 = 1;
+				g_trace ("entity resolved as a IPv4 address");
+				if (IN_MULTICAST(g_ntohl(((struct sockaddr_in*)&addr)->sin_addr.s_addr)))
+				{
+					g_trace ("entity is a IPv4 multicast DNS name.");
+					retval = -EXDEV;
+					goto out;
+				}
 				break;
 
 			case AF_INET6:
 				((struct sockaddr_in6*)&addr)->sin6_addr = ((struct sockaddr_in6*)(res->ai_addr))->sin6_addr;
+				((struct sockaddr_in6*)&addr)->sin6_family = res->ai_family;
 				valid_ipv6 = 1;
+				g_trace ("entity resolved as a IPv6 address");
+				if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)&addr)->sin6_addr))
+				{
+					g_trace ("found IPv6 multicast address instead of interface");
+					retval = -EXDEV;
+					goto out;
+				}
 				break;
 
 			default:
