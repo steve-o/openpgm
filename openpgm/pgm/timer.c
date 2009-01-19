@@ -23,6 +23,7 @@
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <linux/rtc.h>
@@ -54,6 +55,8 @@ pgm_time_t pgm_time_now = 0;
 pgm_time_update_func pgm_time_update_now;
 pgm_time_sleep_func pgm_time_sleep;
 pgm_time_since_epoch_func pgm_time_since_epoch;
+
+static int tsc_us_scaler = 0;
 
 static gboolean time_got_initialized = FALSE;
 static pgm_time_t rel_offset = 0;
@@ -117,15 +120,47 @@ pgm_time_init ( void )
 	case 'U':	pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
 	}
 
-	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep ||
-		pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
+	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 	{
 		rtc_init();
 	}
 
 	if (pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
 	{
-		tsc_init();
+/* attempt to parse clock ticks from kernel
+ */
+		FILE* fp = fopen ("/proc/cpuinfo", "r");
+		char buffer[1024];
+
+		if (fp)
+		{
+			while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
+			{
+				if (strstr (buffer, "cpu MHz"))
+				{
+					char *p = strchr (buffer, ':');
+					if (p) tsc_us_scaler = atoi (p + 1);
+					break;
+				}
+			}
+			fclose (fp);
+		}
+
+/* e.g. export RDTSC_FREQUENCY=3200.000000
+ */
+		if (0 >= tsc_us_scaler)
+		{
+			const char *scaler = getenv ("RDTSC_FREQUENCY");
+			if (scaler) {
+				tsc_us_scaler = atoi (scaler);
+			}
+		}
+
+/* calibrate */
+		if (0 >= tsc_us_scaler)
+		{
+			tsc_init();
+		}
 	}
 
 	if (pgm_time_sleep == clock_nano_sleep)
@@ -305,16 +340,16 @@ rdtsc (void)
  * WARNING: time is relative to start of timer.
  */
 
-static int tsc_us_scaler = 0;
-
 static int
 tsc_init (void)
 {
 	pgm_time_t start, stop;
-	gulong calibration_usec = 20 * 1000;
+	gulong calibration_usec = 4000 * 1000;
+
+	g_message ("Running a benchmark to measure system clock frequency...");
 
 	start = rdtsc();
-	rtc_sleep (calibration_usec);
+	pgm_time_sleep (calibration_usec);
 	stop = rdtsc();
 
 	g_assert (stop >= start);
@@ -328,6 +363,12 @@ tsc_init (void)
 /* cpu < 1 Ghz */
 		tsc_us_scaler = -( calibration_usec / tsc_diff );
 	}
+
+	g_message ("Finished RDTSC test. To prevent the startup delay from this benchmark, "
+		   "set the environment variable RDTSC_FREQUENCY to %i on this "
+		   "system. This value is dependent upon the CPU clock speed and "
+		   "architecture and should be determined separately for each server.",
+		   tsc_us_scaler);
 
 	return 0;
 }
