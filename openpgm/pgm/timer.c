@@ -147,13 +147,12 @@ pgm_time_init ( void )
 		}
 
 /* e.g. export RDTSC_FREQUENCY=3200.000000
+ *
+ * Value can be used to override kernel tick rate as well as internal calibration
  */
-		if (0 >= tsc_us_scaler)
-		{
-			const char *scaler = getenv ("RDTSC_FREQUENCY");
-			if (scaler) {
-				tsc_us_scaler = atoi (scaler);
-			}
+		const char *scaler = getenv ("RDTSC_FREQUENCY");
+		if (scaler) {
+			tsc_us_scaler = atoi (scaler);
 		}
 
 /* calibrate */
