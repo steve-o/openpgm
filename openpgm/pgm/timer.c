@@ -188,8 +188,7 @@ pgm_time_supported (void)
 int
 pgm_time_destroy (void)
 {
-	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep ||
-		pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
+	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 	{
 		rtc_destroy();
 	}
@@ -351,7 +350,21 @@ tsc_init (void)
 	pgm_time_sleep (calibration_usec);
 	stop = rdtsc();
 
-	g_assert (stop >= start);
+	if (stop < start)
+	{
+		g_warning ("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
+			   "non-monotonic time response rendering the TSC unsuitable for high resolution "
+			   "timing.  To prevent the start delay from this benchmark and use a stable clock "
+			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP.");
+
+/* force both to stable clocks even though one might be OK */
+		pgm_time_destroy();
+
+		pgm_time_update_now = gettimeofday_update;
+		pgm_time_sleep = (pgm_time_sleep_func)usleep;
+
+		return 0;
+	}
 
 /* TODO: this math needs to be scaled to reduce rounding errors */
 	pgm_time_t tsc_diff = stop - start;
@@ -363,7 +376,7 @@ tsc_init (void)
 		tsc_us_scaler = -( calibration_usec / tsc_diff );
 	}
 
-	g_message ("Finished RDTSC test. To prevent the startup delay from this benchmark, "
+	g_warning ("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %i on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server.",
