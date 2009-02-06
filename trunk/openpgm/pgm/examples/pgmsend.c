@@ -172,7 +172,7 @@ create_transport (void)
 	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
 	g_assert (e == 0);
 
-	pgm_transport_set_send_only (g_transport);
+	pgm_transport_set_send_only (g_transport, TRUE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
 	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);

@@ -57,7 +57,7 @@ setup (void)
 	g_assert( 0 == pgm_transport_set_nak_rdata_ivl (g_transport, PGM_NAK_RDATA_IVL) );
 	g_assert( 0 == pgm_transport_set_nak_data_retries (g_transport, PGM_NAK_DATA_RETRIES) );
 	g_assert( 0 == pgm_transport_set_nak_ncf_retries (g_transport, PGM_NAK_NCF_RETRIES) );
-	g_assert( 0 == pgm_transport_set_send_only (g_transport) );
+	g_assert( 0 == pgm_transport_set_send_only (g_transport, TRUE) );
 	g_assert( 0 == pgm_transport_bind (g_transport) );
 }
 
