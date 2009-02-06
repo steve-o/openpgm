@@ -20,6 +20,7 @@
  */
 
 #include <fcntl.h>
+#include <poll.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,6 +76,8 @@ static void clock_nano_sleep (gulong);
 static void nano_sleep (gulong);
 static void rtc_sleep (gulong);
 static void tsc_sleep (gulong);
+static void select_sleep (gulong);
+static void poll_sleep (gulong);
 
 static void pgm_time_conv (pgm_time_t*, time_t*);
 static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
@@ -114,6 +117,8 @@ pgm_time_init ( void )
 	case 'N':	pgm_time_sleep = nano_sleep; break;
 	case 'R':	pgm_time_sleep = rtc_sleep; break;
 	case 'T':	pgm_time_sleep = tsc_sleep; break;
+	case 'S':	pgm_time_sleep = select_sleep; break;			/* mainly for testing glib loop */
+	case 'P':	pgm_time_sleep = poll_sleep; break;
 
 	default:
 	case 'M':
@@ -458,6 +463,24 @@ nano_sleep (gulong usec)
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	nanosleep (&ts, NULL);
+}
+
+static void
+select_sleep (gulong usec)
+{
+	struct timespec ts;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	pselect (0, NULL, NULL, NULL, &ts, NULL);
+}
+
+static void
+poll_sleep (gulong usec)
+{
+	struct timespec ts;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	ppoll (NULL, 0, &ts, NULL);
 }
 
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
