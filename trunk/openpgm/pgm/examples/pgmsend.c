@@ -179,7 +179,7 @@ create_transport (void)
 	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
-	guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
+	guint spm_heartbeat[] = { 4*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 
 	if (g_fec) {
