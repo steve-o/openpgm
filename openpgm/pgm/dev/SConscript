@@ -27,6 +27,7 @@ e.Program(['test_rs.c'])
 e.Program(['test_rs2.c'])
 e.Program(['sock_name.c'])
 e.Program(['pgmversion.c'])
+e.Program(['test_partial_csum.c'])
 
 # merge SNMP and LIBSOUP libraries into new environment
 me = e.Clone();
