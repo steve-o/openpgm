@@ -351,10 +351,10 @@ int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
 int pgm_transport_set_fec (pgm_transport_t*, guint, gboolean, gboolean, guint, guint);
 
-int pgm_transport_set_send_only (pgm_transport_t*);
+int pgm_transport_set_send_only (pgm_transport_t*, gboolean);
 int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
 
-int pgm_transport_set_close_on_failure (pgm_transport_t*);
+int pgm_transport_set_close_on_failure (pgm_transport_t*, gboolean);
 
 gsize pgm_transport_pkt_offset (gboolean);
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)

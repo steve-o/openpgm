@@ -6310,13 +6310,14 @@ pgm_transport_set_fec (
  */
 int
 pgm_transport_set_send_only (
-	pgm_transport_t*	transport
+	pgm_transport_t*	transport,
+	gboolean		send_only
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->can_recv	= FALSE;
+	transport->can_recv	= !send_only;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
@@ -6346,13 +6347,14 @@ pgm_transport_set_recv_only (
  */
 int
 pgm_transport_set_close_on_failure (
-	pgm_transport_t*	transport
+	pgm_transport_t*	transport,
+	gboolean		close_on_failure
 	)
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->will_close_on_failure = TRUE;
+	transport->will_close_on_failure = close_on_failure;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
