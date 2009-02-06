@@ -6221,6 +6221,12 @@ send_rdata (
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 
+/* re-save unfolded payload for further retransmissions */
+	if (has_saved_partial_csum)
+	{
+		*(guint32*)(void*)&header->pgm_sport = unfolded_odata;
+	}
+
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */
 	g_static_mutex_lock (&transport->mutex);
