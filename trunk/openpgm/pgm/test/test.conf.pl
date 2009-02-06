@@ -8,7 +8,7 @@ use vars qw ( %config );
 		cmd	=> '/miru/projects/openpgm/pgm/ref/debug/test/app',
 	},
 	mon => {
-		host	=> 'kiku',
+		host	=> 'sora',
 		cmd	=> '/miru/projects/openpgm/pgm/ref/debug/test/monitor',
 	},
 	sim => {
