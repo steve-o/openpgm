@@ -1069,26 +1069,30 @@ pgm_if_parse_entity_receive (
 /* find the default address family for this node using the hostname
  */
 				char hostname[NI_MAXHOST + 1];
-				struct source_req sr;
+				struct addrinfo hints;
+				struct addrinfo *res = NULL;
 				gethostname (hostname, sizeof(hostname));
-
-				retval = pgm_if_parse_interface (hostname, AF_UNSPEC, &sr);
+				memset (&hints, 0, sizeof(hints));
+				hints.ai_family = AF_UNSPEC;
+				hints.ai_flags  = AI_ADDRCONFIG | AI_CANONNAME;
+				retval = getaddrinfo (hostname, NULL, &hints, &res);
 				if (0 > retval)
 				{
-					g_trace ("Cannot resolve default address family of this node, this can occur when hostname resolves to both IPv4 and IPv6 addresses.  Solution is to explicitly specify which address family to use by IP or network address.");
+					g_trace ("Cannot resolve nodename");
 					g_free (gsr);
 					return -ENODEV;
 				}
-g_trace ("retval %d", retval);
 
 				g_trace ("Assuming address family %s from node address.",
-						((struct sockaddr*)&sr.sr_source)->sa_family == AF_INET ? "AF_INET" :
-							( ((struct sockaddr*)&sr.sr_source)->sa_family == AF_INET6 ? "AF_INET6" : "UNKNOWN" ));
-				((struct sockaddr*)&gsr->gsr_group)->sa_family = ((struct sockaddr*)&sr.sr_source)->sa_family;
+					res->ai_family == AF_INET ? "AF_INET" :
+						( res->ai_family == AF_INET6 ? "AF_INET6" : "UNKNOWN" ));
+				((struct sockaddr*)&gsr->gsr_group)->sa_family = res->ai_family;
+				freeaddrinfo (res);
 
 /* was an interface actually specified */
 				if (source_interface->sr_interface_name[0] != '\0')
 				{
+					struct source_req sr;
 					g_trace ("Re-resolving interface name using nodename address family.");
 					retval = pgm_if_parse_interface (source_interface->sr_interface_name, ((struct sockaddr*)&gsr->gsr_group)->sa_family, &sr);
 					if (0 > retval)
