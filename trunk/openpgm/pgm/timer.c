@@ -77,7 +77,9 @@ static void nano_sleep (gulong);
 static void rtc_sleep (gulong);
 static void tsc_sleep (gulong);
 static void select_sleep (gulong);
+#ifdef CONFIG_TIMER_PPOLL
 static void poll_sleep (gulong);
+#endif
 
 static void pgm_time_conv (pgm_time_t*, time_t*);
 static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
@@ -110,7 +112,7 @@ pgm_time_init ( void )
 
 /* sleeping */
 	cfg = getenv ("PGM_SLEEP");
-	if (cfg == NULL) cfg = "RTC";
+	if (cfg == NULL) cfg = "USLEEP";
 
 	switch (cfg[0]) {
 	case 'C':	pgm_time_sleep = clock_nano_sleep; break;

@@ -701,6 +701,7 @@ pgm_timer_thread (
  *
  * all receiver addresses must be the same family.
  * interface and multiaddr must be the same family.
+ * family cannot be AF_UNSPEC!
  *
  * returns 0 on success, or -1 on error and sets errno appropriately.
  */
