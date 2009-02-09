@@ -920,8 +920,10 @@ pgm_if_parse_multicast (
 	return retval;
 }
 
-/* parse an interface entity from a network parameter.  for every multi-family interface return
- * the name through multiprotocol_list.
+/* parse an interface entity from a network parameter.
+ *
+ * family can be unspecified - AF_UNSPEC, can return interfaces with the unspecified
+ * address family
  *
  * examples:  "eth0"
  * 	      "hme0,hme1"
@@ -993,6 +995,7 @@ out:
 	return retval;
 }
 
+#if 0
 static
 int 
 strcnt (
@@ -1012,7 +1015,7 @@ strcnt (
 
 	return tokens;
 }
-
+#endif
 
 /* parse a receive multicast group entity.  can contain more than one multicast group to
  * support asymmetric fan-out.
@@ -1024,6 +1027,8 @@ strcnt (
  *
  * e.g. "239.192.0.1"
  * 	"239.192.0.100,239.192.0.101"
+ *
+ * unspecified address family interfaces are forced to AF_INET or AF_INET6.
  */
 
 static
@@ -1143,6 +1148,12 @@ g_trace ("retval %d", retval);
 				gsr->gsr_interface = sr.sr_interface;
 				memcpy(&gsr->gsr_source, &sr.sr_source, pgm_sockaddr_len(&sr.sr_source));
 			}
+			else
+			{
+/* force unspecified interface to receive group address family */
+				g_trace ("Forcing source interface address family.");
+				((struct sockaddr*)&gsr->gsr_source)->sa_family = ((struct sockaddr*)&gsr->gsr_group)->sa_family;
+			}
 		}
 
 /* copy default PGM multicast group */
@@ -1237,6 +1248,12 @@ g_trace ("retval %d", retval);
 				gsr->gsr_interface = sr.sr_interface;
 				memcpy(&gsr->gsr_source, &sr.sr_source, pgm_sockaddr_len(&sr.sr_source));
 			}
+			else
+			{
+/* force unspecified interface to receive group address family */
+				g_trace ("Forcing source interface address family.");
+				((struct sockaddr*)&gsr->gsr_source)->sa_family = ((struct sockaddr*)&gsr->gsr_group)->sa_family;
+			}
 		}
 
 		*recv_list = g_list_append (*recv_list, gsr);
@@ -1313,6 +1330,12 @@ pgm_if_parse_entity_send (
 
 			gsr->gsr_interface = sr.sr_interface;
 			memcpy(&gsr->gsr_source, &sr.sr_source, pgm_sockaddr_len(&sr.sr_source));
+		}
+		else
+		{
+/* force unspecified interface to send group address family */
+			g_trace ("Forcing source interface address family.");
+			((struct sockaddr*)&gsr->gsr_source)->sa_family = ((struct sockaddr*)&gsr->gsr_group)->sa_family;
 		}
 	}
 

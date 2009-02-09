@@ -108,7 +108,9 @@ match_any_source (
 
 	switch (ai_family) {
 	case AF_UNSPEC:
+#if 0
 		return ai_family == pgm_sockaddr_family(&gsr->gsr_source);
+#endif
 
 	case AF_INET:
 		return 0 == pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_source, (const struct sockaddr*)&if_any_source);
