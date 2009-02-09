@@ -125,15 +125,6 @@ main (
 	}
 
 	log_init();
-
-/* non-superuser friendly configuration */
-	if (g_multicast_loop)
-	{
-		g_message ("setting low resolution timers for multicast loopback.");
-		setenv ("PGM_TIMER", "GETTIMEOFDAY", TRUE);
-		setenv ("PGM_SLEEP", "USLEEP", TRUE);
-	}
-
 	pgm_init();
 
 	if (enable_http)
