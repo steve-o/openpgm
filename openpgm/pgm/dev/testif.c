@@ -36,6 +36,9 @@
 #include "pgm/if.h"
 
 
+#include "../if.c"
+
+
 /* globals */
 static const char *tests[] = 
 		{
@@ -110,43 +113,45 @@ main (
 
 	for (const char** p = tests; *p; p++)
 	{
-		struct sockaddr devices[10], receive_groups[10], send_group;
+		GList *recv_list = NULL, *send_list = NULL;
 
 		printf ("#%i: [%s]\n", (int)( p - tests ), *p);
-		int retval = pgm_if_parse_network (*p, AF_UNSPEC, devices, receive_groups, &send_group, 10);
+		int retval = pgm_if_parse_network (*p, AF_UNSPEC, &recv_list, &send_list);
 
 		if (retval == 0)
 		{
 			char s[INET6_ADDRSTRLEN];
+			char s2[INET6_ADDRSTRLEN];
 			int i = 0;
-			while (devices[i].sa_family) {
-				inet_ntop(devices[i].sa_family,
-					devices[i].sa_family == AF_INET ?
-						(struct sockaddr*)&((struct sockaddr_in*)(&devices[i]))->sin_addr :
-						(struct sockaddr*)&((struct sockaddr_in6*)(&devices[i]))->sin6_addr,
-					s,
-					sizeof(s));
-				printf ("device #%i: %s\n", i+1, s);
+/* receive entity */
+			while (recv_list)
+			{
+				struct sockaddr* source = &((struct group_source_req*)recv_list->data)->gsr_source;
+				struct sockaddr* group  = &((struct group_source_req*)recv_list->data)->gsr_group;
+
+				inet_ntop (source->sa_family, pgm_sockaddr_addr(source), s, sizeof(s));
+				inet_ntop (group->sa_family, pgm_sockaddr_addr(group), s2, sizeof(s2));
+				printf ("receive #%i: %s;%s\n", i+1, s, s2);
 				i++;
+
+				g_free(recv_list->data);
+				recv_list = g_list_delete_link (recv_list, recv_list);
 			}
+/* send entity */
 			i = 0;
-			while (receive_groups[i].sa_family) {
-				inet_ntop(receive_groups[i].sa_family,
-					receive_groups[i].sa_family == AF_INET ?
-						(struct sockaddr*)&((struct sockaddr_in*)&receive_groups[i])->sin_addr :
-						(struct sockaddr*)&((struct sockaddr_in6*)&receive_groups[i])->sin6_addr,
-					s,
-					sizeof(s));
-				printf ("receive_groups #%i: %s\n", i+1, s);
+			while (send_list)
+			{
+				struct sockaddr* source = &((struct group_source_req*)send_list->data)->gsr_source;
+				struct sockaddr* group  = &((struct group_source_req*)send_list->data)->gsr_group;
+
+				inet_ntop (source->sa_family, pgm_sockaddr_addr(source), s, sizeof(s));
+				inet_ntop (group->sa_family, pgm_sockaddr_addr(group), s2, sizeof(s2));
+				printf ("send #%i: %s;%s\n", i+1, s, s2);
 				i++;
+
+				g_free(send_list->data);
+				send_list = g_list_delete_link (send_list, send_list);
 			}
-			inet_ntop(send_group.sa_family,
-				send_group.sa_family == AF_INET ?
-					(struct sockaddr*)&((struct sockaddr_in*)&send_group)->sin_addr :
-					(struct sockaddr*)&((struct sockaddr_in6*)&send_group)->sin6_addr,
-				s,
-				sizeof(s));
-			printf ("send_group: %s\n", s);
 		}
 
 		printf ("\nret value %i.\n\n", retval);
