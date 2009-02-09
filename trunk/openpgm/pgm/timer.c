@@ -118,7 +118,9 @@ pgm_time_init ( void )
 	case 'R':	pgm_time_sleep = rtc_sleep; break;
 	case 'T':	pgm_time_sleep = tsc_sleep; break;
 	case 'S':	pgm_time_sleep = select_sleep; break;			/* mainly for testing glib loop */
+#ifdef CONFIG_TIMER_PPOLL
 	case 'P':	pgm_time_sleep = poll_sleep; break;
+#endif
 
 	default:
 	case 'M':
@@ -474,6 +476,7 @@ select_sleep (gulong usec)
 	pselect (0, NULL, NULL, NULL, &ts, NULL);
 }
 
+#ifdef CONFIG_TIMER_PPOLL
 static void
 poll_sleep (gulong usec)
 {
@@ -482,6 +485,7 @@ poll_sleep (gulong usec)
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	ppoll (NULL, 0, &ts, NULL);
 }
+#endif
 
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
  */
