@@ -67,6 +67,8 @@ log_handler (
 	if ( string[len - 1] == '\n' ) len--;
 	char sbuf[1024];
 	strncpy (sbuf, string, len);
+	if (len > 0)
+		sbuf[len - 1] = '\0';
 	g_log (G_LOG_DOMAIN, log_level, sbuf);
 	return 1;
 }
