@@ -177,8 +177,11 @@ conf = Configure(env, custom_tests = {	'CheckSNMP':	CheckSNMP,
 
 if not conf.CheckSNMP():
 	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
 	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
+	lastLIBS = conf.env['LIBS'];
+	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
+	conf.env['SNMP_FLAGS']['LIBS'].append(conf.env['LIBS']);
+	conf.env.Replace(LIBS = lastLIBS);
 	if not conf.CheckSNMP():
 		print 'Net-SNMP libraries not compatible.';
 		Exit(1);
