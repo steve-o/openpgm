@@ -1167,10 +1167,18 @@ pgm_print_options (
 		}
 
 		if (opt_header->opt_type & PGM_OPT_END) {
-			printf ("OPT_END ");
+			printf ("OPT_END+");
 		}
 
-		printf ("OPT-%u{%u} ", opt_header->opt_type & PGM_OPT_MASK, opt_header->opt_length);
+		switch (opt_header->opt_type & PGM_OPT_MASK) {
+		case PGM_OPT_SYN:
+			printf ("OPT_SYN ");
+			break;
+
+		default:
+			printf ("OPT-%u{%u} ", opt_header->opt_type & PGM_OPT_MASK, opt_header->opt_length);
+			break;
+		}
 
 		opt_len->opt_total_length -= opt_header->opt_length;
 		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);

@@ -6587,11 +6587,10 @@ on_odata (
  */
 	struct pgm_opt_fragment* opt_fragment;
 	const pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
+	const guint16 opt_total_length = (header->pgm_options & PGM_OPT_PRESENT) ? g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(guint16))) : 0;
 
-	if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(odata + 1), &opt_fragment))
+	if (opt_total_length > 0 && get_opt_fragment((gpointer)(odata + 1), &opt_fragment))
 	{
-		const guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(guint16)));
-
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 		g_static_mutex_lock (&sender->mutex);
@@ -6607,7 +6606,7 @@ on_odata (
 	{
 		g_static_mutex_lock (&sender->mutex);
 		retval = pgm_rxw_push_copy (sender->rxw,
-					odata + 1,
+					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
 					g_ntohl (odata->data_trail),
@@ -6852,11 +6851,10 @@ on_rdata (
 /* selective RDATA */
 
 		struct pgm_opt_fragment* opt_fragment;
+		const guint16 opt_total_length = (header->pgm_options & PGM_OPT_PRESENT) ? g_ntohs(*(guint16*)( (char*)( rdata + 1 ) + sizeof(guint16))) : 0;
 
-		if ((header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((gpointer)(rdata + 1), &opt_fragment))
+		if (opt_total_length > 0 && get_opt_fragment((gpointer)(rdata + 1), &opt_fragment))
 		{
-			const guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( rdata + 1 ) + sizeof(guint16)));
-
 			g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 				 rdata->data_sqn, g_ntohl (rdata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
 			g_static_mutex_lock (&sender->mutex);
@@ -6872,7 +6870,7 @@ on_rdata (
 		{
 			g_static_mutex_lock (&sender->mutex);
 			retval = pgm_rxw_push_copy (sender->rxw,
-						rdata + 1,
+						(char*)(rdata + 1) + opt_total_length,
 						g_ntohs (header->pgm_tsdu_length),
 						rdata->data_sqn,
 						g_ntohl (rdata->data_trail),
