@@ -252,7 +252,7 @@ static void
 robots_callback (
 	SoupServerContext*	context,
 	SoupMessage*		msg,
-	gpointer		data
+	G_GNUC_UNUSED gpointer	data
 	)
 {
 	if (context->method_id != SOUP_METHOD_ID_GET) {
