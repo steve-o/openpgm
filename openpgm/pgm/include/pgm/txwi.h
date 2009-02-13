@@ -95,10 +95,14 @@ static inline gboolean pgm_txw_full (pgm_txw_t* t)
     return pgm_txw_len (t) == pgm_txw_sqns (t);
 }
 
+#ifndef g_trash_stack_empty
+#       define g_trash_stack_empty(stack_p)     (NULL == *(GTrashStack**)(stack_p))
+#endif
+
 static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
 {
     gpointer p;
-    if (g_trash_stack_height(&t->trash_data)) {
+    if (!g_trash_stack_empty(&t->trash_data)) {
 	p = g_trash_stack_pop (&t->trash_data);
     } else {
 	p = g_slice_alloc (t->max_tpdu);
