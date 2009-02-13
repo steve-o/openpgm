@@ -186,11 +186,15 @@ static inline gboolean pgm_rxw_full (pgm_rxw_t* r)
     return pgm_rxw_len (r) == pgm_rxw_sqns (r);
 }
 
+#ifndef g_trash_stack_empty
+#	define g_trash_stack_empty(stack_p)	(NULL == *(GTrashStack**)(stack_p))
+#endif
+
 static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
 {
     gpointer p;
     g_static_mutex_lock (r->trash_mutex);
-    if (g_trash_stack_height(r->trash_data)) {
+    if (!g_trash_stack_empty(r->trash_data)) {
 	p = g_trash_stack_pop (r->trash_data);
     } else {
 	p = g_slice_alloc (r->max_tpdu);
