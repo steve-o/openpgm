@@ -2581,8 +2581,8 @@ check_for_repeat:
  */
 		if (0 == bytes_read)
 		{
-			int n_fds = IP_MAX_MEMBERSHIPS;
-			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
+			int n_fds = 2;
+			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
 			if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, EPOLLIN)) {
 				g_trace ("SPM", "poll_info returned errno=%i",errno);
@@ -2789,35 +2789,26 @@ pgm_transport_poll_info (
 /* we currently only support one incoming socket */
 	if (events & POLLIN)
 	{
-		g_assert ( (*n_fds - 1) >= 0 );
+		g_assert ( (1 + moo) <= n_fds );
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
-#ifdef TRANSPORT_DEBUG
-		(*n_fds)--;
-#endif
 		if (transport->can_recv)
 		{
-			g_assert ( (*n_fds - 2) >= 0 );
+			g_assert ( (1 + moo) <= n_fds );
 			fds[moo].fd = pgm_notify_get_fd (&transport->waiting_notify);
 			fds[moo].events = POLLIN;
 			moo++;
-#ifdef TRANSPORT_DEBUG
-			(*n_fds)--;
-#endif
 		}
 	}
 
 /* ODATA only published on regular socket, no need to poll router-alert sock */
 	if (transport->can_send_data && events & POLLOUT)
 	{
-		g_assert ( (*n_fds - 1) >= 0 );
+		g_assert ( (1 + moo) <= n_fds );
 		fds[moo].fd = transport->send_sock;
 		fds[moo].events = POLLOUT;
 		moo++;
-#ifdef TRANSPORT_DEBUG
-		(*n_fds)--;
-#endif
 	}
 
 	return *n_fds = moo;

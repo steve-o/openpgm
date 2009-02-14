@@ -121,8 +121,8 @@ main (
 		else
 		{
 /* poll for next event */
-			int n_fds = IP_MAX_MEMBERSHIPS;
-			struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
+			int n_fds = 2;
+			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
 			pgm_transport_poll_info (g_transport, fds, &n_fds, EPOLLIN);
 			poll (fds, n_fds, 1000 /* ms */);
