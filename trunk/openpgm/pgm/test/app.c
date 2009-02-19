@@ -255,7 +255,7 @@ session_create (
 
 /* temp fixed addresses */
 	struct group_source_req recv_gsr, send_gsr;
-	int recv_len = 1;
+	gsize recv_len = 1;
 	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
 	g_assert (recv_len == 1);
