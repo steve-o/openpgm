@@ -2789,13 +2789,13 @@ pgm_transport_poll_info (
 /* we currently only support one incoming socket */
 	if (events & POLLIN)
 	{
-		g_assert ( (1 + moo) <= n_fds );
+		g_assert ( (1 + moo) <= *n_fds );
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
 		if (transport->can_recv)
 		{
-			g_assert ( (1 + moo) <= n_fds );
+			g_assert ( (1 + moo) <= *n_fds );
 			fds[moo].fd = pgm_notify_get_fd (&transport->waiting_notify);
 			fds[moo].events = POLLIN;
 			moo++;
@@ -2805,7 +2805,7 @@ pgm_transport_poll_info (
 /* ODATA only published on regular socket, no need to poll router-alert sock */
 	if (transport->can_send_data && events & POLLOUT)
 	{
-		g_assert ( (1 + moo) <= n_fds );
+		g_assert ( (1 + moo) <= *n_fds );
 		fds[moo].fd = transport->send_sock;
 		fds[moo].events = POLLOUT;
 		moo++;
@@ -6350,6 +6350,116 @@ pgm_transport_set_close_on_failure (
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
+}
+
+/* for any-source applications (ASM), join a new group
+ *
+ * unspecified what to do with multiple receive interfaces.
+ */
+
+#define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
+#define TRANSPORT_TO_LEVEL(t)	SOCKADDR_TO_LEVEL( &(t)->recv_gsr[0].gsr_group )
+
+int
+pgm_transport_join_group (
+	pgm_transport_t*	transport,
+	struct group_req*	gr,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gr != NULL, -EINVAL);
+	g_return_val_if_fail (sizeof(struct group_req) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, gr, len);
+}
+
+/* for any-source applications (ASM), leave a joined group.
+ */
+int
+pgm_transport_leave_group (
+	pgm_transport_t*	transport,
+	struct group_req*	gr,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gr != NULL, -EINVAL);
+	g_return_val_if_fail (sizeof(struct group_req) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
+}
+
+/* for any-source applications (ASM), turn off a given source
+ */
+int
+pgm_transport_block_source (
+	pgm_transport_t*	transport,
+	struct group_source_req* gsr,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gsr != NULL, -EINVAL);
+	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_BLOCK_SOURCE, gsr, len);
+}
+
+/* for any-source applications (ASM), re-allow a blocked source
+ */
+int
+pgm_transport_unblock_source (
+	pgm_transport_t*	transport,
+	struct group_source_req* gsr,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gsr != NULL, -EINVAL);
+	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_UNBLOCK_SOURCE, gsr, len);
+}
+
+/* for controlled-source applications (SSM), join each group/source pair
+ */
+int
+pgm_transport_join_source_group (
+	pgm_transport_t*	transport,
+	struct group_source_req* gsr,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gsr != NULL, -EINVAL);
+	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_SOURCE_GROUP, gsr, len);
+}
+
+/* for controlled-source applications (SSM), leave each group/source pair
+ */
+int
+pgm_transport_leave_source_group (
+	pgm_transport_t*	transport,
+	struct group_source_req* gsr,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gsr != NULL, -EINVAL);
+	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_SOURCE_GROUP, gsr, len);
+}
+
+int
+pgm_transport_msfilter (
+	pgm_transport_t*	transport,
+	struct group_filter*	gf_list,
+	gsize			len
+	)
+{
+	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (gf_list != NULL, -EINVAL);
+	g_return_val_if_fail (len > 0, -EINVAL);
+	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, -EINVAL);
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_MSFILTER, gf_list, len);
 }
 
 static GSource*
