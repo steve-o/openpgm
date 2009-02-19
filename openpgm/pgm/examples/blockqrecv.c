@@ -190,7 +190,7 @@ on_startup (void)
 #else
 	char network[1024];
 	sprintf (network, ";%s", g_network);
-	int recv_len = 1;
+	gsize recv_len = 1;
 	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
 	g_assert (recv_len == 1);

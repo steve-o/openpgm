@@ -383,6 +383,13 @@ int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
 int pgm_transport_epoll_ctl (pgm_transport_t*, int, int, int);
 
+int pgm_transport_join_group (pgm_transport_t*, struct group_req*, gsize);
+int pgm_transport_leave_group (pgm_transport_t*, struct group_req*, gsize);
+int pgm_transport_block_source (pgm_transport_t*, struct group_source_req*, gsize);
+int pgm_transport_unblock_source (pgm_transport_t*, struct group_source_req*, gsize);
+int pgm_transport_join_source_group (pgm_transport_t*, struct group_source_req*, gsize);
+int pgm_transport_leave_source_group (pgm_transport_t*, struct group_source_req*, gsize);
+int pgm_transport_msfilter (pgm_transport_t*, struct group_filter*, gsize);
 
 G_END_DECLS
 

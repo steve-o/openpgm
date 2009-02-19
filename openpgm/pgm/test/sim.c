@@ -227,7 +227,7 @@ fake_pgm_transport_create (
 	guint16				sport,
 	guint16				dport,
 	struct group_source_req*	recv_gsr,	/* receive port, multicast group & interface address */
-	int				recv_len,
+	gsize				recv_len,
 	struct group_source_req*	send_gsr	/* send ... */
 	)
 {
@@ -238,7 +238,7 @@ fake_pgm_transport_create (
 	g_return_val_if_fail (recv_len > 0, -EINVAL);
 	g_return_val_if_fail (recv_len <= IP_MAX_MEMBERSHIPS, -EINVAL);
 	g_return_val_if_fail (send_gsr != NULL, -EINVAL);
-	for (int i = 0; i < recv_len; i++)
+	for (gsize i = 0; i < recv_len; i++)
 	{
 		g_return_val_if_fail (pgm_sockaddr_family(&recv_gsr[i].gsr_group) == pgm_sockaddr_family(&recv_gsr[0].gsr_group), -EINVAL);
 		g_return_val_if_fail (pgm_sockaddr_family(&recv_gsr[i].gsr_group) == pgm_sockaddr_family(&recv_gsr[i].gsr_source), -EINVAL);
@@ -266,7 +266,7 @@ fake_pgm_transport_create (
 
 /* copy network parameters */
 	memcpy (&transport->send_gsr, send_gsr, sizeof(struct group_source_req));
-	for (int i = 0; i < recv_len; i++)
+	for (gsize i = 0; i < recv_len; i++)
 	{
 		memcpy (&transport->recv_gsr[i], &recv_gsr[i], sizeof(struct group_source_req));
 	}
@@ -657,7 +657,7 @@ session_create (
 
 /* temp fixed addresses */
 	struct group_source_req recv_gsr, send_gsr;
-	int recv_len = 1;
+	gsize recv_len = 1;
 	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
 	g_assert (recv_len == 1);
