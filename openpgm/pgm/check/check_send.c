@@ -35,7 +35,7 @@ setup (void)
 
 	pgm_gsi_t	gsi;
 	struct group_source_req recv_gsr, send_gsr;
-	int		gsr_len = 1;
+	gsize		gsr_len = 1;
 	const guint	spm_heartbeat[] = PGM_SPM_HEARTBEAT_INIT;
 
 	pgm_init();

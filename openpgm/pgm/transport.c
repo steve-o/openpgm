@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <ifaddrs.h>
 #include <limits.h>
 #include <netdb.h>
 #include <poll.h>
@@ -1955,7 +1956,7 @@ pgm_transport_bind (
 		header->pgm_dport	= transport->dport;
 		header->pgm_type	= PGM_SPM;
 
-		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, (char*)&spm->spm_nla_afi);
+		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_gsr.gsr_source, (char*)&spm->spm_nla_afi);
 
 /* OPT_PARITY_PRM */
 		if (transport->use_proactive_parity || transport->use_ondemand_parity)
@@ -6353,12 +6354,56 @@ pgm_transport_set_close_on_failure (
 }
 
 /* for any-source applications (ASM), join a new group
- *
- * unspecified what to do with multiple receive interfaces.
  */
 
 #define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
 #define TRANSPORT_TO_LEVEL(t)	SOCKADDR_TO_LEVEL( &(t)->recv_gsr[0].gsr_group )
+
+static
+int
+pgm_if_indextosockaddr(
+	unsigned int		ifindex,
+	int			iffamily,
+	struct sockaddr*	ifsa
+	)
+{
+	if (0 == ifindex)	/* any interface or address */
+	{
+		switch (iffamily) {
+		case AF_INET:
+			((struct sockaddr_in*)ifsa)->sin_addr.s_addr = INADDR_ANY;
+			break;
+
+		case AF_INET6:
+			((struct sockaddr_in6*)ifsa)->sin6_addr = in6addr_any;
+			break;
+		}
+	}
+	else
+	{
+		struct ifaddrs *ifap, *ifa;
+		int e = getifaddrs (&ifap);
+		if (e < 0) {
+			g_trace ("INFO", "getifaddrs failed when trying to resolve link scope interfaces");
+			return -1;
+		}
+
+		unsigned int i = 1;
+		for (ifa = ifap; ifa; ifa = ifa->ifa_next, i++)
+		{
+			if (i == ifindex)
+			{
+				memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
+				freeifaddrs (ifap);
+				return 0;
+			}
+		}
+
+		freeifaddrs (ifap);
+	}
+
+	return -1;
+}
 
 int
 pgm_transport_join_group (
@@ -6370,6 +6415,31 @@ pgm_transport_join_group (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (gr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_req) == len, -EINVAL);
+	g_return_val_if_fail (transport->recv_gsr_len == IP_MAX_MEMBERSHIPS, -EINVAL);
+
+/* verify not duplicate group/interface pairing */
+	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+	{
+		if (pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0 &&
+			(gr->gr_interface == transport->recv_gsr[i].gsr_interface ||
+			                0 == transport->recv_gsr[i].gsr_interface    )
+                   )
+		{
+			return -EINVAL;
+		}
+	}
+
+	struct group_source_req gsr = { .gsr_interface = 0 };
+	memcpy (&gsr.gsr_group, &gr->gr_group, pgm_sockaddr_len(&gr->gr_group));
+
+/* retrieve source address */
+	struct sockaddr_storage source;
+	if (0 != pgm_if_indextosockaddr(gr->gr_interface, pgm_sockaddr_family(&gr->gr_group), (struct sockaddr*)&source)) {
+		return -EINVAL;
+	}
+
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len], &source, pgm_sockaddr_len(&source));
+	transport->recv_gsr_len++;
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, gr, len);
 }
 
