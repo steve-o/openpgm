@@ -4440,11 +4440,9 @@ nak_rb_state (
 /* mark receiver window for flushing on next recv() */
 					if (!rxw->waiting_link.data)
 					{
-						g_static_mutex_lock (&transport->waiting_mutex);
 						rxw->waiting_link.data = rxw;
 						rxw->waiting_link.next = transport->peers_waiting;
 						transport->peers_waiting = &rxw->waiting_link;
-						g_static_mutex_unlock (&transport->waiting_mutex);
 					}
 
 					list = next_list_el;
@@ -4515,11 +4513,9 @@ nak_rb_state (
 /* mark receiver window for flushing on next recv() */
 					if (!rxw->waiting_link.data)
 					{
-						g_static_mutex_lock (&transport->waiting_mutex);
 						rxw->waiting_link.data = rxw;
 						rxw->waiting_link.next = transport->peers_waiting;
 						transport->peers_waiting = &rxw->waiting_link;
-						g_static_mutex_unlock (&transport->waiting_mutex);
 					}
 
 					list = next_list_el;
@@ -4692,17 +4688,13 @@ check_peer_nak_state (
 	} while (list);
 
 /* check for waiting contiguous packets */
-	if (g_static_mutex_trylock (&transport->waiting_mutex))
+	if (transport->peers_waiting && !transport->is_waiting_read)
 	{
-		if (transport->peers_waiting && !transport->is_waiting_read)
-		{
-			g_trace ("INFO","prod rx thread");
-			if (!pgm_notify_send (&transport->waiting_notify)) {
-				g_critical ("send to waiting notify channel failed :(");
-			}
-			transport->is_waiting_read = TRUE;
+		g_trace ("INFO","prod rx thread");
+		if (!pgm_notify_send (&transport->waiting_notify)) {
+			g_critical ("send to waiting notify channel failed :(");
 		}
-		g_static_mutex_unlock (&transport->waiting_mutex);
+		transport->is_waiting_read = TRUE;
 	}
 }
 
@@ -4806,11 +4798,9 @@ nak_rpt_state (
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
 				{
-					g_static_mutex_lock (&transport->waiting_mutex);
 					rxw->waiting_link.data = rxw;
 					rxw->waiting_link.next = transport->peers_waiting;
 					transport->peers_waiting = &rxw->waiting_link;
-					g_static_mutex_unlock (&transport->waiting_mutex);
 				}
 
 				list = next_list_el;
@@ -4840,11 +4830,9 @@ nak_rpt_state (
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
 				{
-					g_static_mutex_lock (&transport->waiting_mutex);
 					rxw->waiting_link.data = rxw;
 					rxw->waiting_link.next = transport->peers_waiting;
 					transport->peers_waiting = &rxw->waiting_link;
-					g_static_mutex_unlock (&transport->waiting_mutex);
 				}
 
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED]++;
@@ -4961,11 +4949,9 @@ nak_rdata_state (
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
 				{
-					g_static_mutex_lock (&transport->waiting_mutex);
 					rxw->waiting_link.data = rxw;
 					rxw->waiting_link.next = transport->peers_waiting;
 					transport->peers_waiting = &rxw->waiting_link;
-					g_static_mutex_unlock (&transport->waiting_mutex);
 				}
 
 				list = next_list_el;
@@ -4987,11 +4973,9 @@ nak_rdata_state (
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
 				{
-					g_static_mutex_lock (&transport->waiting_mutex);
 					rxw->waiting_link.data = rxw;
 					rxw->waiting_link.next = transport->peers_waiting;
 					transport->peers_waiting = &rxw->waiting_link;
-					g_static_mutex_unlock (&transport->waiting_mutex);
 				}
 
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED]++;
@@ -6658,10 +6642,10 @@ pgm_timer_dispatch (
 	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
 	pgm_transport_t* transport = pgm_timer->transport;
 
-	g_static_mutex_lock (&transport->mutex);
 /* find which timers have expired and call each */
 	if (transport->can_send_data)
 	{
+		g_static_mutex_lock (&transport->mutex);
 		if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
 		{
 			send_spm_unlocked (transport);
@@ -6682,15 +6666,19 @@ pgm_timer_dispatch (
 				transport->spm_heartbeat_state = 0;
 			}
 		}
+		g_static_mutex_unlock (&transport->mutex);
 	}
 
 	if (transport->can_recv)
 	{
+		g_static_mutex_lock (&transport->waiting_mutex);
+		g_static_mutex_lock (&transport->mutex);
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
 		check_peer_nak_state (transport);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		g_static_mutex_unlock (&transport->mutex);
+		g_static_mutex_unlock (&transport->waiting_mutex);
 	}
-	g_static_mutex_unlock (&transport->mutex);
 
 	return TRUE;
 }
