@@ -251,6 +251,11 @@ fake_pgm_transport_create (
 /* create transport object */
 	transport = g_malloc0 (sizeof(pgm_transport_t));
 
+/* transport defaults */
+	transport->can_send_data = TRUE;
+	transport->can_send_nak  = FALSE;
+	transport->can_recv = TRUE;
+
 	memcpy (&transport->tsi.gsi, gsi, 6);
 	transport->dport = g_htons (dport);
 	if (sport) {
