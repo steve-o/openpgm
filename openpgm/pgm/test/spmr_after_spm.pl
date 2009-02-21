@@ -28,10 +28,6 @@ $SIG{'INT'} = sub { print "interrupt caught.\n"; close_ssh(); };
 $mon->say ("filter $config{app}{ip}");
 print "mon: ready.\n";
 
-$sim->say ("create fake ao");
-$sim->say ("bind ao");
-print "sim: ready.\n";
-
 $app->say ("create ao");
 $app->say ("bind ao");
 $app->say ("listen ao");
@@ -44,15 +40,23 @@ print "mon: odata received.\n";
 my $t0 = [gettimeofday];
 my $elapsed;
 
-$mon->disconnect (1);
-
 ## spm hearbeats are going to clear out the data, lets wait for some quiet
-print "sim: wait for SPM interval > 5 seconds ...\n";
+print "mon: wait for SPM interval > 5 seconds ...\n";
 do {
-	$sim->wait_for_spm;
+	$mon->wait_for_spm;
 	$elapsed = tv_interval ( $t0, [gettimeofday] );
-	print "sim: received SPM after $elapsed seconds.\n";
+	print "mon: received SPM after $elapsed seconds.\n";
 } while ($elapsed < 5);
+
+$sim->say ("create fake ao");
+$sim->say ("bind ao");
+print "sim: ready.\n";
+
+## app needs to send packet for sim to learn of local NLA
+$app->say ("send ao budo");
+print "sim: wait for odata ...\n";
+$odata = $sim->wait_for_odata;
+print "sim: odata received.\n";
 
 print "sim: request SPM via SPMR.\n";
 $sim->say ("net send spmr ao $odata->{PGM}->{gsi}.$odata->{PGM}->{sourcePort}");
@@ -66,6 +70,7 @@ die "SPM interval too large, indicates heartbeat not SPMR induced.\n" unless ($e
 
 print "test completed successfully.\n";
 
+$mon->disconnect (1);
 $sim->disconnect;
 $app->disconnect;
 close_ssh;
