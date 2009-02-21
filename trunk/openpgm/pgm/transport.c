@@ -2092,19 +2092,6 @@ new_peer (
 
 	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 
-/* prod timer thread if sleeping */
-	g_static_mutex_lock (&transport->mutex);
-	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
-	{
-		transport->next_poll = peer->spmr_expiry;
-		g_trace ("INFO","new_peer: prod timer thread");
-		if (!pgm_notify_send (&transport->timer_notify)) {
-			g_critical ("notify to timer channel failed :(");
-			/* retval = -EINVAL; */
-		}
-	}
-	g_static_mutex_unlock (&transport->mutex);
-
 /* add peer to hash table and linked list */
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
 	gpointer entry = pgm_peer_ref(peer);
@@ -2118,6 +2105,19 @@ new_peer (
 /* update head */
 	transport->peers_list = &peer->link_;
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
+
+/* prod timer thread if sleeping */
+	g_static_mutex_lock (&transport->mutex);
+	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
+	{
+		transport->next_poll = peer->spmr_expiry;
+		g_trace ("INFO","new_peer: prod timer thread");
+		if (!pgm_notify_send (&transport->timer_notify)) {
+			g_critical ("notify to timer channel failed :(");
+			/* retval = -EINVAL; */
+		}
+	}
+	g_static_mutex_unlock (&transport->mutex);
 
 	return peer;
 }
