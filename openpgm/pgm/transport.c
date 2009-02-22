@@ -3427,7 +3427,7 @@ on_nak (
 	if (nak_list)
 	{
 		char nak_sz[1024] = "";
-		guint32 *nakp = nak_list, *nake = nak_list + nak_list_len;
+		const guint32 *nakp = nak_list, *nake = nak_list + nak_list_len;
 		while (nakp < nake) {
 			char tmp[1024];
 			sprintf (tmp, "%" G_GUINT32_FORMAT " ", g_ntohl(*nakp));
@@ -5804,37 +5804,48 @@ retry_send:
 	        header->pgm_checksum    = 0;
 		gsize pgm_header_len	= (guint8*)(opt_fragment + 1) - (guint8*)header;
 		guint32 unfolded_header = pgm_csum_partial (header, pgm_header_len, 0);
-		STATE(unfolded_odata)	= 0;
 
-/* iterate over one or more vector elements to perform scatter/gather checksum & copy */
-		gsize src_offset	= 0;
-		gsize copy_length	= STATE(tsdu_length);
-		for (;;)
+/* iterate over one or more vector elements to perform scatter/gather checksum & copy
+ *
+ * STATE(vector_index)	- index into application scatter/gather vector
+ * STATE(vector_offset) - current offset into current vector element
+ * STATE(unfolded_odata)- checksum accumulator
+ */
+		const guint8* src	= (const guint8*)vector[STATE(vector_index)].iov_base + STATE(vector_offset);
+		guint8* dst		= (guint8*)(opt_fragment + 1);
+		gsize src_length	= vector[STATE(vector_index)].iov_len - STATE(vector_offset);
+		gsize dst_length	= 0;
+		gsize copy_length	= MIN( STATE(tsdu_length), src_length );
+		STATE(unfolded_odata)	= pgm_csum_partial_copy (src, dst, copy_length, 0);
+
+		for(;;)
 		{
-			gsize element_length = vector[STATE(vector_index)].iov_len - STATE(vector_offset);
-
-			if (copy_length <= element_length)
+			if (copy_length == src_length)
 			{
-				STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, copy_length, STATE(unfolded_odata));
-//				STATE(unfolded_odata) = pgm_csum_fold (pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, copy_length, 0), STATE(unfolded_odata));
-				if (copy_length == element_length) {
-					STATE(vector_index)++;
-					STATE(vector_offset) = 0;
-				} else {
-					STATE(vector_offset) += copy_length;
-				}
-				break;
-			}
-			else
-			{
-/* copy part of TSDU */
-				STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, element_length, STATE(unfolded_odata));
-//				STATE(unfolded_odata) = pgm_csum_block_add (pgm_csum_partial_copy ((char*)(vector[STATE(vector_index)].iov_base) + STATE(vector_offset), (char*)(opt_fragment + 1) + src_offset, element_length, 0), STATE(unfolded_odata));
-				src_offset += element_length;
-				copy_length -= element_length;
+/* application packet complete */
 				STATE(vector_index)++;
 				STATE(vector_offset) = 0;
 			}
+			else
+			{
+/* data still remaining */
+				STATE(vector_offset) += copy_length;
+			}
+
+			dst_length += copy_length;
+
+			if (dst_length == STATE(tsdu_length))
+			{
+/* transport packet complete */
+				break;
+			}
+
+			src		= (const guint8*)vector[STATE(vector_index)].iov_base + STATE(vector_offset);
+			dst	       += copy_length;
+			src_length	= vector[STATE(vector_index)].iov_len - STATE(vector_offset);
+			copy_length	= MIN( STATE(tsdu_length) - dst_length, src_length );
+			guint32 unfolded_element = pgm_csum_partial_copy (src, dst, copy_length, 0);
+			STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, dst_length);
 		}
 
 		header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
