@@ -5364,7 +5364,6 @@ pgm_transport_send_onev (
 	STATE(tpdu_length) = pgm_transport_pkt_offset (FALSE) + STATE(tsdu_length);
 
 	struct pgm_header *header = (struct pgm_header*)STATE(pkt);
-	struct pgm_data *odata = (struct pgm_data*)(header + 1);
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	header->pgm_sport	= transport->tsi.sport;
 	header->pgm_dport	= transport->dport;
@@ -5373,46 +5372,24 @@ pgm_transport_send_onev (
         header->pgm_tsdu_length = g_htons (STATE(tsdu_length));
 
 /* ODATA */
+	struct pgm_data *odata = (struct pgm_data*)(header + 1);
         odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
         odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
         header->pgm_checksum    = 0;
 	gsize pgm_header_len	= (guint8*)(odata + 1) - (guint8*)header;
-	guint32 unfolded_header	= pgm_csum_partial ((const void*)header, pgm_header_len, 0);
-	STATE(unfolded_odata)	= 0;
+	guint32 unfolded_header	= pgm_csum_partial (header, pgm_header_len, 0);
 
-	guint vector_index	= 0;
-	gsize vector_offset	= 0;
+/* unroll first iteration to make friendly branch prediction */
+	guint8*	dst		= (guint8*)(odata + 1);
+	STATE(unfolded_odata)	= pgm_csum_partial_copy ((const guint8*)vector[0].iov_base, dst, vector[0].iov_len, 0);
 
 /* iterate over one or more vector elements to perform scatter/gather checksum & copy */
-	gsize src_offset	= 0;
-	gsize copy_length	= STATE(tsdu_length);
-	for (;;)
+	for (unsigned i = 1; i < count; i++)
 	{
-		gsize element_length = vector[vector_index].iov_len - vector_offset;
-
-		if (copy_length <= element_length)
-		{
-			STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, copy_length, STATE(unfolded_odata));
-//			STATE(unfolded_odata) = pgm_csum_block_add (pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, copy_length, 0), STATE(unfolded_odata));
-			if (copy_length == element_length) {
-				vector_index++;
-				vector_offset = 0;
-			} else {
-				vector_offset += copy_length;
-			}
-			break;
-		}
-		else
-		{
-/* copy part of TSDU */
-			STATE(unfolded_odata) = pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, element_length, STATE(unfolded_odata));
-//			STATE(unfolded_odata) = pgm_csum_block_add (pgm_csum_partial_copy ((char*)(vector[vector_index].iov_base) + vector_offset, (char*)(odata + 1) + src_offset, element_length, 0), STATE(unfolded_odata));
-			src_offset += element_length;
-			copy_length -= element_length;
-			vector_index++;
-			vector_offset = 0;
-		}
+		dst += vector[i-1].iov_len;
+		guint32 unfolded_element = pgm_csum_partial_copy ((const guint8*)vector[i].iov_base, dst, vector[i].iov_len, 0);
+		STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, vector[i-1].iov_len);
 	}
 
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
