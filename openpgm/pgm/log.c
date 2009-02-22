@@ -79,7 +79,7 @@ log_handler (
 	G_GNUC_UNUSED gpointer		unused_data
 	)
 {
-	struct iovec iov[6];
+	struct iovec iov[7];
 	struct iovec* v = iov;
 	time_t now;
 	time (&now);
