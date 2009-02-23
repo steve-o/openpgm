@@ -6539,6 +6539,9 @@ pgm_transport_join_source_group (
 }
 
 /* for controlled-source applications (SSM), leave each group/source pair
+ *
+ * NB: transport does not track IGMPv3 sources and so group must be left
+ *     using pgm_transport_leave_group() to update internal state.
  */
 int
 pgm_transport_leave_source_group (
@@ -6550,6 +6553,7 @@ pgm_transport_leave_source_group (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (gsr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
+	g_return_val_if_fail (transport->recv_gsr_len == 0, -EINVAL);
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_SOURCE_GROUP, gsr, len);
 }
 
