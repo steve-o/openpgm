@@ -157,7 +157,6 @@ create_transport (void)
 
 	if (g_udp_encap_port) {
 		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
 	}
 
 	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
