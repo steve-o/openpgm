@@ -288,7 +288,7 @@ fake_pgm_transport_create (
                 protocol = IPPROTO_PGM;
         }
 
-	if ((transport->recv_sock = socket(pgm_sockaddr_family(&recv_gsr[0].gsr_source),
+	if ((transport->recv_sock = socket(pgm_sockaddr_family(&recv_gsr[0].gsr_group),
                                                 socket_type,
                                                 protocol)) < 0)
         {
@@ -299,7 +299,7 @@ fake_pgm_transport_create (
                 goto err_destroy;
         }
 
-        if ((transport->send_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_source),
+        if ((transport->send_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_group),
                                                 socket_type,
                                                 protocol)) < 0)
         {
@@ -307,7 +307,7 @@ fake_pgm_transport_create (
                 goto err_destroy;
         }
 
-        if ((transport->send_with_router_alert_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_source),
+        if ((transport->send_with_router_alert_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_group),
                                                 socket_type,
                                                 protocol)) < 0)
         {
@@ -468,113 +468,110 @@ fake_pgm_transport_bind (
  *
  * after binding default interfaces (0.0.0.0) are resolved
  */
+	struct sockaddr_storage recv_addr;
+	memset (&recv_addr, 0, sizeof(recv_addr));
+	((struct sockaddr*)&recv_addr)->sa_family = AF_INET;
+	((struct sockaddr_in*)&recv_addr)->sin_addr.s_addr = INADDR_ANY;
+
 	retval = bind (transport->recv_sock,
-                        (struct sockaddr*)&transport->recv_gsr[0].gsr_source,
-                        pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
+			(struct sockaddr*)&recv_addr,
+			pgm_sockaddr_len(&recv_addr));
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
 
-/* resolve bound address if 0.0.0.0 */
-        if (((struct sockaddr_in*)&transport->recv_gsr[0].gsr_source)->sin_addr.s_addr == INADDR_ANY)
-        {
-                char hostname[NI_MAXHOST + 1];
-                gethostname (hostname, sizeof(hostname));
-                struct hostent *he = gethostbyname (hostname);
-                if (he == NULL) {
-                        retval = errno;
-                        puts ("gethostbyname failed on local hostname");
-                        goto out;
-                }
-
-                ((struct sockaddr_in*)(&transport->recv_gsr[0].gsr_source))->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+	struct sockaddr_storage send_addr, send_with_router_alert_addr;
+	memset (&send_addr, 0, sizeof(send_addr));
+	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
+        if (retval < 0) {
+                retval = errno;
+		goto out;
         }
-
+	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len(&send_addr));
 	retval = bind (transport->send_sock,
-                        (struct sockaddr*)&transport->send_gsr.gsr_source,
-                        pgm_sockaddr_len(&transport->send_gsr.gsr_source));
+			(struct sockaddr*)&send_addr,
+			pgm_sockaddr_len(&send_addr));
         if (retval < 0) {
                 retval = errno;
 		goto out;
         }
 
 /* resolve bound address if 0.0.0.0 */
-        if (((struct sockaddr_in*)&transport->send_gsr.gsr_source)->sin_addr.s_addr == INADDR_ANY)
+        if (((struct sockaddr_in*)&send_addr)->sin_addr.s_addr == INADDR_ANY)
         {
-                char hostname[NI_MAXHOST + 1];
-                gethostname (hostname, sizeof(hostname));
-                struct hostent *he = gethostbyname (hostname);
-                if (he == NULL) {
-                        retval = errno;
-                        puts ("gethostbyname failed on local hostname");
-                        goto out;
-                }
-
-                ((struct sockaddr_in*)&transport->send_gsr.gsr_source)->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
+		retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr));
+		if (retval < 0) {
+                	retval = errno;
+			goto out;
+		}
         }
 
 	retval = bind (transport->send_with_router_alert_sock,
-                        (struct sockaddr*)&transport->send_gsr.gsr_source,
-                        pgm_sockaddr_len(&transport->send_gsr.gsr_source));
+			(struct sockaddr*)&send_with_router_alert_addr,
+			pgm_sockaddr_len(&send_with_router_alert_addr));
         if (retval < 0) {
                 retval = errno;
 		goto out;
         }
 
+	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len(&send_addr));
+
 /* receiving groups (multiple) */
-	struct group_source_req* p = transport->recv_gsr;
-        int i = 1;
-        do {
-                retval = pgm_sockaddr_add_membership (transport->recv_sock, p);
+	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+	{
+		struct group_source_req* p = &transport->recv_gsr[i];
+		int optname = (pgm_sockaddr_cmp ((struct sockaddr*)&p->gsr_group, (struct sockaddr*)&p->gsr_source) == 0)
+				? MCAST_JOIN_GROUP : MCAST_JOIN_SOURCE_GROUP;
+		setsockopt(transport->recv_sock, IPPROTO_IP, optname, p, sizeof(struct group_source_req));
                 if (retval < 0) {
-                        retval = errno;
+			retval = errno;
 			goto out;
-                }
-	} while ((i++) < IP_MAX_MEMBERSHIPS && pgm_sockaddr_family(&(++p)->gsr_group) != 0);
+		}
+	}
 
 /* send group (singular) */
-        retval = pgm_sockaddr_multicast_if (transport->send_sock, (struct sockaddr*)&transport->send_gsr.gsr_source, 0);
+        retval = pgm_sockaddr_multicast_if (transport->send_sock, (struct sockaddr*)&transport->send_addr, transport->send_gsr.gsr_interface);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
 
-	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, (struct sockaddr*)&transport->send_gsr.gsr_source, 0);
+	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, (struct sockaddr*)&transport->send_addr, transport->send_gsr.gsr_interface);
         if (retval < 0) {
                 retval = errno;
 		goto out;
         }
 
 /* multicast loopback */
-	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), FALSE);
+	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), FALSE);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
-        retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), FALSE);
+        retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), FALSE);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
-        retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), FALSE);
+        retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), FALSE);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
-	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->hops);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
-        retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->hops);
+        retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
-        retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->hops);
+        retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
         if (retval < 0) {
                 retval = errno;
                 goto out;
@@ -582,12 +579,12 @@ fake_pgm_transport_bind (
 
 /* set low packet latency preference for network elements */
         int tos = IPTOS_LOWDELAY;
-        retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), tos);
+        retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
-        retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), tos);
+        retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
         if (retval < 0) {
                 retval = errno;
                 goto out;
@@ -1212,7 +1209,7 @@ net_send_spm (
 	spm->spm_sqn		= g_htonl (spm_sqn);
 	spm->spm_trail		= g_htonl (txw_trail);
 	spm->spm_lead		= g_htonl (txw_lead);
-	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_gsr.gsr_source, (char*)&spm->spm_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_addr, (char*)&spm->spm_nla_afi);
 
 	if (proactive_parity || ondemand_parity) {
 		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
@@ -1300,7 +1297,7 @@ net_send_spmr (
 
 	g_static_mutex_lock (&transport->send_mutex);
 /* TTL 1 */
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), 1);
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), 1);
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
@@ -1308,7 +1305,7 @@ net_send_spmr (
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 /* default TTL */
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->hops);
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
 
 	if (!pgm_tsi_equal (tsi, &transport->tsi))
 	{
