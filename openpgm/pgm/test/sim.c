@@ -231,8 +231,6 @@ fake_pgm_transport_create (
 	struct group_source_req*	send_gsr	/* send ... */
 	)
 {
-	guint16 udp_encap_port = ((struct sockaddr_in*)&send_gsr->gsr_group)->sin_port;
-
 	g_return_val_if_fail (transport_ != NULL, -EINVAL);
 	g_return_val_if_fail (recv_gsr != NULL, -EINVAL);
 	g_return_val_if_fail (recv_len > 0, -EINVAL);
@@ -267,7 +265,7 @@ fake_pgm_transport_create (
 	}
 
 /* network data ports */
-	transport->udp_encap_port = udp_encap_port;
+	transport->udp_encap_port = ((struct sockaddr_in*)&send_gsr->gsr_group)->sin_port;
 
 /* copy network parameters */
 	memcpy (&transport->send_gsr, send_gsr, sizeof(struct group_source_req));
@@ -275,6 +273,7 @@ fake_pgm_transport_create (
 	{
 		memcpy (&transport->recv_gsr[i], &recv_gsr[i], sizeof(struct group_source_req));
 	}
+	transport->recv_gsr_len = recv_len;
 
 /* open sockets to implement PGM */
 	int socket_type, protocol;
@@ -471,6 +470,7 @@ fake_pgm_transport_bind (
 	struct sockaddr_storage recv_addr;
 	memset (&recv_addr, 0, sizeof(recv_addr));
 	((struct sockaddr*)&recv_addr)->sa_family = AF_INET;
+	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
 	((struct sockaddr_in*)&recv_addr)->sin_addr.s_addr = INADDR_ANY;
 
 	retval = bind (transport->recv_sock,
@@ -523,7 +523,8 @@ fake_pgm_transport_bind (
 		struct group_source_req* p = &transport->recv_gsr[i];
 		int optname = (pgm_sockaddr_cmp ((struct sockaddr*)&p->gsr_group, (struct sockaddr*)&p->gsr_source) == 0)
 				? MCAST_JOIN_GROUP : MCAST_JOIN_SOURCE_GROUP;
-		setsockopt(transport->recv_sock, IPPROTO_IP, optname, p, sizeof(struct group_source_req));
+		socklen_t plen = MCAST_JOIN_GROUP == optname ? sizeof(struct group_req) : sizeof(struct group_source_req);
+		retval = setsockopt(transport->recv_sock, SOL_IP, optname, p, plen);
                 if (retval < 0) {
 			retval = errno;
 			goto out;
