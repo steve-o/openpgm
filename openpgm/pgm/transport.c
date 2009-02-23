@@ -1733,7 +1733,6 @@ pgm_transport_bind (
 /* keep a copy of the original address source to re-use for router alert bind */
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
-	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
 
 	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
 	if (retval < 0) {
