@@ -6427,7 +6427,43 @@ pgm_transport_leave_group (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (gr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_req) == len, -EINVAL);
-	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
+	g_return_val_if_fail (transport->recv_gsr_len == 0, -EINVAL);
+
+	if (0 == gr->gr_interface)
+	{
+/* drop all matching receiver entries */
+		for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+		{
+			if (pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0)
+			{
+				transport->recv_gsr_len--;
+				if (i < (IP_MAX_MEMBERSHIPS-1))
+				{
+					memmove (&transport->recv_gsr[i], &transport->recv_gsr[i+1], (transport->recv_gsr_len - i) * sizeof(struct group_source_req));
+				}
+			}
+		}
+		return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
+	}
+	else
+	{
+/* drop just one entry */
+		for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+		{
+			if ((pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0) &&
+		            (gr->gr_interface == transport->recv_gsr[i].gsr_interface))
+			{
+				transport->recv_gsr_len--;
+				if (i < (IP_MAX_MEMBERSHIPS-1))
+				{
+					memmove (&transport->recv_gsr[i], &transport->recv_gsr[i+1], (transport->recv_gsr_len - i) * sizeof(struct group_source_req));
+				}
+				return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
+			}
+		}
+	}
+	
+	return -EINVAL;
 }
 
 /* for any-source applications (ASM), turn off a given source
