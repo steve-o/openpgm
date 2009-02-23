@@ -1670,7 +1670,6 @@ pgm_transport_bind (
 
 	struct sockaddr_storage recv_addr;
 	memset (&recv_addr, 0, sizeof(recv_addr));
-	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
 
 #ifdef CONFIG_BIND_INADDR_ANY
 
@@ -1706,6 +1705,9 @@ pgm_transport_bind (
 		g_trace ("INFO","binding receive socket to interface index %i", transport->recv_gsr[0].gsr_interface);
 	}
 #endif
+
+	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
+
 #endif /* CONFIG_BIND_INADDR_ANY */
 
 	retval = bind (transport->recv_sock,
