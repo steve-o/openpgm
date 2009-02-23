@@ -61,6 +61,7 @@
 
 static int g_port = 7500;
 static const char* g_network = "";
+static const char* g_source = "";
 static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
@@ -87,6 +88,7 @@ usage (
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
+	fprintf (stderr, "  -a <ip address> : Source unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
@@ -108,10 +110,11 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:lxth")) != -1)
+	while ((c = getopt (argc, argv, "a:s:n:p:lxth")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
+		case 'a':	g_source = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
 
@@ -215,9 +218,12 @@ on_startup (
 	g_assert (e == 0);
 	g_assert (recv_len == 1);
 
+	if (g_source[0]) {
+		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_addr.s_addr = inet_addr(g_source);
+	}
+
 	if (g_udp_encap_port) {
 		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
 	}
 
 	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);

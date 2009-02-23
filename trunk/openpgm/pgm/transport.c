@@ -33,6 +33,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
@@ -149,6 +150,8 @@ static gssize pgm_transport_send_one (pgm_transport_t*, gpointer, gsize, int);
 static gssize pgm_transport_send_one_copy (pgm_transport_t*, gconstpointer, gsize, int);
 
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
+
+static int pgm_if_indextosockaddr (unsigned int, int, struct sockaddr*);
 
 
 /* re-entrant form of pgm_print_tsi()
@@ -800,7 +803,7 @@ pgm_transport_create (
 		protocol = ipproto_pgm;
 	}
 
-	if ((transport->recv_sock = socket(pgm_sockaddr_family(&recv_gsr[0].gsr_source),
+	if ((transport->recv_sock = socket(pgm_sockaddr_family(&recv_gsr[0].gsr_group),
 						socket_type,
 						protocol)) < 0)
 	{
@@ -811,7 +814,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if ((transport->send_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_source),
+	if ((transport->send_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_group),
 						socket_type,
 						protocol)) < 0)
 	{
@@ -819,7 +822,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if ((transport->send_with_router_alert_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_source),
+	if ((transport->send_with_router_alert_sock = socket(pgm_sockaddr_family(&send_gsr->gsr_group),
 						socket_type,
 						protocol)) < 0)
 	{
@@ -1538,7 +1541,7 @@ pgm_transport_bind (
 	}
 
 /* determine IP header size for rate regulation engine & stats */
-	switch (pgm_sockaddr_family(&transport->send_gsr.gsr_source)) {
+	switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
 	case AF_INET:
 		transport->iphdr_len = sizeof(struct iphdr);
 		break;
@@ -1596,7 +1599,7 @@ pgm_transport_bind (
 		}
 
 /* request extra packet information to determine destination address on each packet */
-		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source);
+		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group);
 		retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 		if (retval < 0) {
 			goto out;
@@ -1604,7 +1607,7 @@ pgm_transport_bind (
 	}
 	else
 	{
-		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source);
+		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group);
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
@@ -1669,84 +1672,102 @@ pgm_transport_bind (
  */
 /* TODO: different ports requires a new bound socket */
 
+	struct sockaddr_storage recv_addr;
+	memset (&recv_addr, 0, sizeof(recv_addr));
+
 #ifdef CONFIG_BIND_INADDR_ANY
 
 /* force default interface for bind-only, source address is still valid for multicast membership */
-	struct sockaddr_storage recv_sockaddr;
-	memcpy (&recv_sockaddr, &transport->recv_gsr[0].gsr_source, pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
-
-	switch (pgm_sockaddr_family(&recv_sockaddr)) {
+	((struct sockaddr*)&recv_addr)->sa_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group);
+	switch (pgm_sockaddr_family(&recv_addr)) {
 	case AF_INET:
-		((struct sockaddr_in*)&recv_sockaddr)->sin_addr.s_addr = INADDR_ANY;
+		((struct sockaddr_in*)&recv_addr)->sin_addr.s_addr = INADDR_ANY;
 		break;
 
 	case AF_INET6:
-		((struct sockaddr_in6*)&recv_sockaddr)->sin6_addr = in6addr_any;
+		((struct sockaddr_in6*)&recv_addr)->sin6_addr = in6addr_any;
 		break;
 	}
+#else
+	retval = pgm_if_indextosockaddr (transport->recv_gsr[0].gsr_interface, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), &recv_addr);
+	if (retval < 0) {
+#ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
+		g_trace ("INFO","pgm_if_indextosockaddr failed on recv_gsr[0] interface %i, family %s, %s",
+				transport->recv_gsr[0].gsr_interface,
+				AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET" :
+					( AF_INET6 == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET6" :
+					  "AF_UNKNOWN" ),
+				strerror(errno_));
+		errno = errno_;
+#endif
+		goto out;
+	}
+#ifdef TRANSPORT_DEBUG
+	else
+	{
+		g_trace ("INFO","binding receive socket to interface index %i", transport->recv_gsr[0].gsr_interface);
+	}
+#endif
+#endif /* CONFIG_BIND_INADDR_ANY */
 
 	retval = bind (transport->recv_sock,
-			(struct sockaddr*)&recv_sockaddr,
-			pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
-#else
-	retval = bind (transport->recv_sock,
-			(struct sockaddr*)&transport->recv_gsr[0].gsr_source,
-			pgm_sockaddr_len(&transport->recv_gsr[0].gsr_source));
-#endif
+			(struct sockaddr*)&recv_addr,
+			pgm_sockaddr_len(&recv_addr));
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->recv_gsr[0].gsr_source, s, sizeof(s));
+		pgm_sockaddr_ntop (&recv_addr, s, sizeof(s));
 		g_trace ("INFO","bind failed on recv_gsr[0] interface \"%s\" %s", s, strerror(errno_));
 		errno = errno_;
 #endif
 		goto out;
 	}
 
-/* resolve bound address if 0.0.0.0 */
-	switch (pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source)) {
-	case AF_INET:
-		if (((struct sockaddr_in*)&transport->recv_gsr[0].gsr_source)->sin_addr.s_addr == INADDR_ANY)
-		{
-			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&transport->recv_gsr[0].gsr_source, sizeof(transport->recv_gsr[0].gsr_source));
-			if (retval < 0) {
-				goto out;
-			}
-		}
-		break;
-
-	case AF_INET6:
-		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&transport->recv_gsr[0].gsr_source)->sin6_addr, sizeof(in6addr_any)) == 0)
-		{
-			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&transport->recv_gsr[0].gsr_source, sizeof(transport->recv_gsr[0].gsr_source));
-			if (retval < 0) {
-				goto out;
-			}
-		}
-		break;
-	}
-
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->recv_gsr[0].gsr_source, s, sizeof(s));
+		pgm_sockaddr_ntop (&recv_addr, s, sizeof(s));
 		g_trace ("INFO","bind succeeded on recv_gsr[0] interface %s", s);
 	}
 #endif
 
 /* keep a copy of the original address source to re-use for router alert bind */
-	struct sockaddr_storage send_sockaddr;
-	memcpy (&send_sockaddr, &transport->send_gsr.gsr_source, pgm_sockaddr_len(&transport->send_gsr.gsr_source));
+	struct sockaddr_storage send_addr, send_with_router_alert_addr;
+	memset (&send_addr, 0, sizeof(send_addr));
+
+	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
+	if (retval < 0) {
+#ifdef TRANSPORT_DEBUG
+		int errno_ = errno;
+		g_trace ("INFO","pgm_if_indextosockaddr failed on send_gsr interface %i, family %s, %s",
+				transport->send_gsr.gsr_interface,
+				AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET" :
+					( AF_INET6 == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET6" :
+					  "AF_UNKNOWN" ),
+				strerror(errno_));
+		errno = errno_;
+#endif
+		goto out;
+	}
+#ifdef TRANSPORT_DEBUG
+	else
+	{
+		g_trace ("INFO","binding send socket to interface index %i", transport->send_gsr.gsr_interface);
+	}
+#endif
+
+	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len(&send_addr));
 
 	retval = bind (transport->send_sock,
-			(struct sockaddr*)&transport->send_gsr.gsr_source,
-			pgm_sockaddr_len(&transport->send_gsr.gsr_source));
+			(struct sockaddr*)&send_addr,
+			pgm_sockaddr_len(&send_addr));
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s, sizeof(s));
+		pgm_sockaddr_ntop (&send_addr, s, sizeof(s));
 		g_trace ("INFO","bind failed on send_gsr interface %s: %s", s, strerror(errno_));
 		errno = errno_;
 #endif
@@ -1754,11 +1775,11 @@ pgm_transport_bind (
 	}
 
 /* resolve bound address if 0.0.0.0 */
-	switch (pgm_sockaddr_family(&transport->send_gsr.gsr_source)) {
+	switch (pgm_sockaddr_family(&send_addr)) {
 	case AF_INET:
-		if (((struct sockaddr_in*)&transport->send_gsr.gsr_source)->sin_addr.s_addr == INADDR_ANY)
+		if (((struct sockaddr_in*)&send_addr)->sin_addr.s_addr == INADDR_ANY)
 		{
-			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&transport->send_gsr.gsr_source, sizeof(transport->send_gsr.gsr_source));
+			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr));
 			if (retval < 0) {
 				goto out;
 			}
@@ -1766,9 +1787,9 @@ pgm_transport_bind (
 		break;
 
 	case AF_INET6:
-		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&transport->send_gsr.gsr_source)->sin6_addr, sizeof(in6addr_any)) == 0)
+		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0)
 		{
-			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&transport->send_gsr.gsr_source, sizeof(transport->send_gsr.gsr_source));
+			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr));
 			if (retval < 0) {
 				goto out;
 			}
@@ -1779,19 +1800,19 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s, sizeof(s));
+		pgm_sockaddr_ntop (&send_addr, s, sizeof(s));
 		g_trace ("INFO","bind succeeded on send_gsr interface %s", s);
 	}
 #endif
 
 	retval = bind (transport->send_with_router_alert_sock,
-			(struct sockaddr*)&send_sockaddr,
-			pgm_sockaddr_len(&send_sockaddr));
+			(struct sockaddr*)&send_with_router_alert_addr,
+			pgm_sockaddr_len(&send_with_router_alert_addr));
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s, sizeof(s));
+		pgm_sockaddr_ntop (&send_with_router_alert_addr, s, sizeof(s));
 		g_trace ("INFO","bind (router alert) failed on send_gsr interface %s: %s", s, strerror(errno_));
 		errno = errno_;
 #endif
@@ -1801,23 +1822,32 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s, sizeof(s));
+		pgm_sockaddr_ntop (&send_with_router_alert_addr, s, sizeof(s));
 		g_trace ("INFO","bind (router alert) succeeded on send_gsr interface %s", s);
 	}
 #endif
+
+/* save send side address for broadcasting as source nla */
+	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len(&send_addr));
+	
 
 /* receiving groups (multiple) */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		struct group_source_req* p = &transport->recv_gsr[i];
-		retval = pgm_sockaddr_add_membership (transport->recv_sock, p);
+		int recv_level = ( (AF_INET == pgm_sockaddr_family((&p->gsr_group))) ? IPPROTO_IP : IPPROTO_IPV6 );
+		int optname = (pgm_sockaddr_cmp ((struct sockaddr*)&p->gsr_group, (struct sockaddr*)&p->gsr_source) == 0)
+				? MCAST_JOIN_GROUP : MCAST_JOIN_SOURCE_GROUP;
+		setsockopt(transport->recv_sock, recv_level, optname, p, sizeof(struct group_source_req));
 		if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 			int errno_ = errno;
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
-			g_trace ("INFO","sockaddr_add_membership failed on recv_gsr[%i] multiaddr %s interface %s: %s", i, s1, s2, strerror(errno_));
+			g_trace ("INFO","MCAST_JOIN_%sGROUP failed on recv_gsr[%i] interface %i group %s source %s: %s",
+					optname == MCAST_JOIN_GROUP ? "" : "SOURCE_",
+					i, p->gsr_interface, s1, s2, strerror(errno_));
 			errno = errno_;
 #endif
 			goto out;
@@ -1828,20 +1858,22 @@ pgm_transport_bind (
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
-			g_trace ("INFO","sockaddr_add_membership succeeded on recv_gsr[%i] multiaddr %s interface %s", i, s1, s2);
+			g_trace ("INFO","MCAST_JOIN_%sGROUP succeeded on recv_gsr[%i] interface %i group %s source %s",
+					optname == MCAST_JOIN_GROUP ? "" : "SOURCE_",
+					i, p->gsr_interface, s1, s2);
 		}
 #endif
 	}
 
 /* send group (singular) */
-	retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_gsr);
+	retval = pgm_sockaddr_multicast_if (transport->send_sock, (struct sockaddr*)&transport->send_addr, transport->send_gsr.gsr_interface);
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
-		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_group, s1, sizeof(s1));
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if failed on send_gsr multiaddr %s interface %s: %s", s1, s2, strerror(errno_));
+		char s[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
+		g_trace ("INFO","pgm_sockaddr_multicast_if failed on send_gsr address %s interface %i: %s",
+					s, transport->send_gsr.gsr_interface, strerror(errno_));
 		errno = errno_;
 #endif
 		goto out;
@@ -1849,20 +1881,20 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	else
 	{
-		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_group, s1, sizeof(s1));
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if succeeded on send_gsr multiaddr %s interface %s", s1, s2);
+		char s[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
+		g_trace ("INFO","pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %i",
+					s, transport->send_gsr.gsr_interface);
 	}
 #endif
-	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, &transport->send_gsr);
+	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, (struct sockaddr*)&transport->send_addr, transport->send_gsr.gsr_interface);
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
-		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_group, s1, sizeof(s1));
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if (router alert) failed on send_gsr multiaddr %s interface %s: %s", s1, s2, strerror(errno_));
+		char s[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
+		g_trace ("INFO","pgm_sockaddr_multicast_if (router alert) failed on send_gsr address %s interface %i: %s",
+					s, transport->send_gsr.gsr_interface, strerror(errno_));
 		errno = errno_;
 #endif
 		goto out;
@@ -1870,51 +1902,51 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	else
 	{
-		char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_group, s1, sizeof(s1));
-		pgm_sockaddr_ntop (&transport->send_gsr.gsr_source, s2, sizeof(s2));
-		g_trace ("INFO","sockaddr_multicast_if (router alert) succeeded on send_gsr multiaddr %s interface %s", s1, s2);
+		char s[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
+		g_trace ("INFO","pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %i",
+					s, transport->send_gsr.gsr_interface);
 	}
 #endif
 
 /* multicast loopback */
 	if (!transport->use_multicast_loop)
 	{
-		retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), transport->use_multicast_loop);
+		retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
 			goto out;
 		}
-		retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->use_multicast_loop);
+		retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
 			goto out;
 		}
-		retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->use_multicast_loop);
+		retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
 			goto out;
 		}
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
-	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->hops);
 	if (retval < 0) {
 		goto out;
 	}
-	retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
 	if (retval < 0) {
 		goto out;
 	}
-	retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
 	if (retval < 0) {
 		goto out;
 	}
 
 /* set low packet latency preference for network elements */
 	int tos = IPTOS_LOWDELAY;
-	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), tos);
+	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
 	if (retval < 0) {
 		goto out;
 	}
-	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), tos);
+	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
 	if (retval < 0) {
 		goto out;
 	}
@@ -1930,7 +1962,7 @@ pgm_transport_bind (
 		g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_notify, transport, NULL);
 
 /* create recyclable SPM packet */
-		switch (pgm_sockaddr_family(&transport->recv_gsr[0].gsr_source)) {
+		switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
 		case AF_INET:
 			transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
 			break;
@@ -1956,7 +1988,7 @@ pgm_transport_bind (
 		header->pgm_dport	= transport->dport;
 		header->pgm_type	= PGM_SPM;
 
-		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_gsr.gsr_source, (char*)&spm->spm_nla_afi);
+		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_addr, (char*)&spm->spm_nla_afi);
 
 /* OPT_PARITY_PRM */
 		if (transport->use_proactive_parity || transport->use_ondemand_parity)
@@ -3360,7 +3392,7 @@ on_nak (
 	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_gsr.gsr_source) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) != 0) {
 		retval = -EINVAL;
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -3502,7 +3534,7 @@ on_peer_nak (
 	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_gsr.gsr_source) == 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0) {
 		retval = -EINVAL;
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
@@ -3633,7 +3665,7 @@ on_ncf (
 	pgm_nla_to_sockaddr (&ncf->nak_src_nla_afi, (struct sockaddr*)&ncf_src_nla);
 
 #if 0
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_gsr.gsr_source) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_addr) != 0) {
 		retval = -EINVAL;
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		goto out;
@@ -3750,7 +3782,7 @@ on_nnak (
 	struct sockaddr_storage nnak_src_nla;
 	pgm_nla_to_sockaddr (&nnak->nak_src_nla_afi, (struct sockaddr*)&nnak_src_nla);
 
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nnak_src_nla, (struct sockaddr*)&transport->send_gsr.gsr_source) != 0) {
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nnak_src_nla, (struct sockaddr*)&transport->send_addr) != 0) {
 		retval = -EINVAL;
 		transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -3902,7 +3934,7 @@ send_spmr (
 
 /* send multicast SPMR TTL 1 */
 	g_trace ("INFO", "send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr ));
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), 1);
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), 1);
 	gssize sent = pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				FALSE,			/* regular socket */
@@ -3914,7 +3946,7 @@ send_spmr (
 
 /* send unicast SPMR with regular TTL */
 	g_trace ("INFO", "send unicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&peer->local_nla)->sin_addr ));
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_source), transport->hops);
+	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
 	sent += pgm_sendto (transport,
 				FALSE,
 				FALSE,
@@ -6325,12 +6357,14 @@ pgm_transport_set_close_on_failure (
 	return 0;
 }
 
-/* for any-source applications (ASM), join a new group
- */
 
 #define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
 #define TRANSPORT_TO_LEVEL(t)	SOCKADDR_TO_LEVEL( &(t)->recv_gsr[0].gsr_group )
 
+/* interfaces indexes refer to the link layer, we want to find the internet layer address.
+ * the big problem is that multiple IPv6 addresses can be bound to one link - called scopes.
+ * we can just pick the first scope and let IP routing handle the rest.
+ */
 static
 int
 pgm_if_indextosockaddr(
@@ -6341,6 +6375,7 @@ pgm_if_indextosockaddr(
 {
 	if (0 == ifindex)	/* any interface or address */
 	{
+		ifsa->sa_family = iffamily;
 		switch (iffamily) {
 		case AF_INET:
 			((struct sockaddr_in*)ifsa)->sin_addr.s_addr = INADDR_ANY;
@@ -6350,6 +6385,7 @@ pgm_if_indextosockaddr(
 			((struct sockaddr_in6*)ifsa)->sin6_addr = in6addr_any;
 			break;
 		}
+		return 0;
 	}
 	else
 	{
@@ -6360,9 +6396,12 @@ pgm_if_indextosockaddr(
 			return -1;
 		}
 
-		unsigned int i = 1;
-		for (ifa = ifap; ifa; ifa = ifa->ifa_next, i++)
+		for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 		{
+			if ( ifa->ifa_addr->sa_family != iffamily )
+				continue;
+
+			unsigned i = if_nametoindex(ifa->ifa_name);
 			if (i == ifindex)
 			{
 				memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
@@ -6377,6 +6416,8 @@ pgm_if_indextosockaddr(
 	return -1;
 }
 
+/* for any-source applications (ASM), join a new group
+ */
 int
 pgm_transport_join_group (
 	pgm_transport_t*	transport,
@@ -6387,30 +6428,33 @@ pgm_transport_join_group (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (gr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_req) == len, -EINVAL);
-	g_return_val_if_fail (transport->recv_gsr_len == IP_MAX_MEMBERSHIPS, -EINVAL);
+	g_return_val_if_fail (transport->recv_gsr_len < IP_MAX_MEMBERSHIPS, -EINVAL);
 
 /* verify not duplicate group/interface pairing */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
-		if (pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0 &&
+		if (pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group)  == 0 &&
+		    pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0 &&
 			(gr->gr_interface == transport->recv_gsr[i].gsr_interface ||
 			                0 == transport->recv_gsr[i].gsr_interface    )
                    )
 		{
+#ifdef TRANSPORT_DEBUG
+			char s[INET6_ADDRSTRLEN];
+			pgm_sockaddr_ntop (&gr->gr_group, s, sizeof(s));
+			if (transport->recv_gsr[i].gsr_interface) {
+				g_trace("INFO", "transport has already joined group %s on interface %i.", s, gr->gr_interface);
+			} else {
+				g_trace("INFO", "transport has already joined group %s on all interfaces.", s);
+			}
+#endif
 			return -EINVAL;
 		}
 	}
 
-	struct group_source_req gsr = { .gsr_interface = 0 };
-	memcpy (&gsr.gsr_group, &gr->gr_group, pgm_sockaddr_len(&gr->gr_group));
-
-/* retrieve source address */
-	struct sockaddr_storage source;
-	if (0 != pgm_if_indextosockaddr(gr->gr_interface, pgm_sockaddr_family(&gr->gr_group), (struct sockaddr*)&source)) {
-		return -EINVAL;
-	}
-
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len], &source, pgm_sockaddr_len(&source));
+	transport->recv_gsr[transport->recv_gsr_len].gsr_interface = 0;
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len(&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len(&gr->gr_group));
 	transport->recv_gsr_len++;
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, gr, len);
 }
@@ -6429,41 +6473,24 @@ pgm_transport_leave_group (
 	g_return_val_if_fail (sizeof(struct group_req) == len, -EINVAL);
 	g_return_val_if_fail (transport->recv_gsr_len == 0, -EINVAL);
 
-	if (0 == gr->gr_interface)
+	for (unsigned i = 0; i < transport->recv_gsr_len;)
 	{
+		if ((pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0) &&
 /* drop all matching receiver entries */
-		for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+		            (gr->gr_interface == 0 ||
+/* drop all sources with matching interface */
+			     gr->gr_interface == transport->recv_gsr[i].gsr_interface) )
 		{
-			if (pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0)
+			transport->recv_gsr_len--;
+			if (i < (IP_MAX_MEMBERSHIPS-1))
 			{
-				transport->recv_gsr_len--;
-				if (i < (IP_MAX_MEMBERSHIPS-1))
-				{
-					memmove (&transport->recv_gsr[i], &transport->recv_gsr[i+1], (transport->recv_gsr_len - i) * sizeof(struct group_source_req));
-				}
+				memmove (&transport->recv_gsr[i], &transport->recv_gsr[i+1], (transport->recv_gsr_len - i) * sizeof(struct group_source_req));
+				continue;
 			}
 		}
-		return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
+		i++;
 	}
-	else
-	{
-/* drop just one entry */
-		for (unsigned i = 0; i < transport->recv_gsr_len; i++)
-		{
-			if ((pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0) &&
-		            (gr->gr_interface == transport->recv_gsr[i].gsr_interface))
-			{
-				transport->recv_gsr_len--;
-				if (i < (IP_MAX_MEMBERSHIPS-1))
-				{
-					memmove (&transport->recv_gsr[i], &transport->recv_gsr[i+1], (transport->recv_gsr_len - i) * sizeof(struct group_source_req));
-				}
-				return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
-			}
-		}
-	}
-	
-	return -EINVAL;
+	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, gr, len);
 }
 
 /* for any-source applications (ASM), turn off a given source
@@ -6496,7 +6523,9 @@ pgm_transport_unblock_source (
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_UNBLOCK_SOURCE, gsr, len);
 }
 
-/* for controlled-source applications (SSM), join each group/source pair
+/* for controlled-source applications (SSM), join each group/source pair.
+ *
+ * SSM joins are allowed on top of ASM in order to merge a remote source onto the local segment.
  */
 int
 pgm_transport_join_source_group (
@@ -6508,10 +6537,9 @@ pgm_transport_join_source_group (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (gsr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
-	g_return_val_if_fail (transport->recv_gsr_len == IP_MAX_MEMBERSHIPS, -EINVAL);
+	g_return_val_if_fail (transport->recv_gsr_len < IP_MAX_MEMBERSHIPS, -EINVAL);
 
 /* verify if existing group/interface pairing */
-	gboolean found = FALSE;
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0 &&
@@ -6519,29 +6547,30 @@ pgm_transport_join_source_group (
 			                  0 == transport->recv_gsr[i].gsr_interface    )
                    )
 		{
-			found = TRUE;
+			if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0)
+			{
+#ifdef TRANSPORT_DEBUG
+				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop (&gsr->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop (&gsr->gsr_source, s2, sizeof(s2));
+				if (transport->recv_gsr[i].gsr_interface) {
+					g_trace("INFO", "transport has already joined group %s from source %s on interface %i.", s1, s2, gsr->gsr_interface);
+				} else {
+					g_trace("INFO", "transport has already joined group %s from source %s on all interfaces.", s1, s2);
+				}
+#endif
+				return -EINVAL;
+			}
 			break;
 		}
 	}
 
-/* retrieve source address */
-	struct sockaddr_storage source;
-	if (0 != pgm_if_indextosockaddr(gsr->gsr_interface, pgm_sockaddr_family(&gsr->gsr_group), (struct sockaddr*)&source))
-	{
-		return -EINVAL;
-	}
-
-	if (!found) {
-		memcpy (&transport->recv_gsr[transport->recv_gsr_len], &source, pgm_sockaddr_len(&source));
-		transport->recv_gsr_len++;
-	}
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len], &gsr, sizeof(struct group_source_req));
+	transport->recv_gsr_len++;
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_SOURCE_GROUP, gsr, len);
 }
 
 /* for controlled-source applications (SSM), leave each group/source pair
- *
- * NB: transport does not track IGMPv3 sources and so group must be left
- *     using pgm_transport_leave_group() to update internal state.
  */
 int
 pgm_transport_leave_source_group (
@@ -6554,6 +6583,23 @@ pgm_transport_leave_source_group (
 	g_return_val_if_fail (gsr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
 	g_return_val_if_fail (transport->recv_gsr_len == 0, -EINVAL);
+
+/* verify if existing group/interface pairing */
+	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+	{
+		if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group)   == 0 &&
+		    pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0 &&
+		    gsr->gsr_interface == transport->recv_gsr[i].gsr_interface)
+		{
+			transport->recv_gsr_len--;
+			if (i < (IP_MAX_MEMBERSHIPS-1))
+			{
+				memmove (&transport->recv_gsr[i], &transport->recv_gsr[i+1], (transport->recv_gsr_len - i) * sizeof(struct group_source_req));
+				break;
+			}
+		}
+	}
+
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_SOURCE_GROUP, gsr, len);
 }
 

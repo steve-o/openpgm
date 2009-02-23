@@ -534,13 +534,13 @@ fake_pgm_transport_bind (
 	} while ((i++) < IP_MAX_MEMBERSHIPS && pgm_sockaddr_family(&(++p)->gsr_group) != 0);
 
 /* send group (singular) */
-        retval = pgm_sockaddr_multicast_if (transport->send_sock, &transport->send_gsr);
+        retval = pgm_sockaddr_multicast_if (transport->send_sock, (struct sockaddr*)&transport->send_gsr.gsr_source, 0);
         if (retval < 0) {
                 retval = errno;
                 goto out;
         }
 
-	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, &transport->send_gsr);
+	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, (struct sockaddr*)&transport->send_gsr.gsr_source, 0);
         if (retval < 0) {
                 retval = errno;
 		goto out;

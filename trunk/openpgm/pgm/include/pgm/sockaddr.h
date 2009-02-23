@@ -229,29 +229,20 @@ static inline int pgm_sockaddr_add_membership (int s, const struct group_source_
 	return retval;
 }
 
-static inline int pgm_sockaddr_multicast_if (int s, const struct group_source_req* gsr)
+static inline int pgm_sockaddr_multicast_if (int s, const struct sockaddr* address, int ifindex)
 {
 	int retval = 0;
 
-	switch (pgm_sockaddr_family(&gsr->gsr_source)) {
+	switch (pgm_sockaddr_family(address)) {
 	case AF_INET:
 	{
-/* Linux: ip_mreqn or ip_mreq, many Unix just support in_addr (interface/address) */
-		struct ip_mreq mreq;
-		memset (&mreq, 0, sizeof(mreq));
-
-		mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
-		mreq.imr_interface.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
-
-//		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, &mreq, sizeof(mreq));
-		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, &mreq.imr_interface, sizeof(mreq.imr_interface));
+		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, address, sizeof(struct sockaddr_in));
 	}
 	break;
 
 	case AF_INET6:
 	{
-		int interface_index = gsr->gsr_interface;
-		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &interface_index, sizeof(interface_index));
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex, sizeof(ifindex));
 	}
 	break;
 
