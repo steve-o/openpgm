@@ -56,7 +56,7 @@
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -1517,6 +1517,7 @@ pgm_transport_bind (
 		g_trace ("INFO","create rx to nak processor notify channel.");
 		retval = pgm_notify_init (&transport->rdata_notify);
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 	}
@@ -1524,6 +1525,7 @@ pgm_transport_bind (
 	g_trace ("INFO","create any to timer notify channel.");
 	retval = pgm_notify_init (&transport->timer_notify);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 
@@ -1532,6 +1534,7 @@ pgm_transport_bind (
 		g_trace ("INFO","create waiting notify channel.");
 		retval = pgm_notify_init (&transport->waiting_notify);
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 	}
@@ -1582,14 +1585,17 @@ pgm_transport_bind (
 			gboolean v = TRUE;
 			retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 			retval = setsockopt(transport->send_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 			retval = setsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 		}
@@ -1598,6 +1604,7 @@ pgm_transport_bind (
 		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group);
 		retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 	}
@@ -1609,6 +1616,7 @@ pgm_transport_bind (
 /* include IP header only for incoming data, only works for IPv4 */
 			retval = pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE);
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 		}
@@ -1617,6 +1625,7 @@ pgm_transport_bind (
 			g_assert (AF_INET6 == recv_family);
 			retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 		}
@@ -1627,6 +1636,7 @@ pgm_transport_bind (
 	{
 		retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (char*)&transport->rcvbuf, sizeof(transport->rcvbuf));
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 	}
@@ -1634,10 +1644,12 @@ pgm_transport_bind (
 	{
 		retval = setsockopt(transport->send_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf));
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 		retval = setsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf));
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 	}
@@ -1647,16 +1659,19 @@ pgm_transport_bind (
 	socklen_t len = sizeof(buffer_size);
 	retval = getsockopt(transport->recv_sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 	g_trace ("INFO","receive buffer set at %i bytes.", buffer_size);
 
 	retval = getsockopt(transport->send_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 	retval = getsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 	g_trace ("INFO","send buffer set at %i bytes.", buffer_size);
@@ -1697,6 +1712,7 @@ pgm_transport_bind (
 				strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -1721,6 +1737,7 @@ pgm_transport_bind (
 		g_trace ("INFO","bind failed on recv_gsr[0] interface \"%s\" %s", s, strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 
@@ -1748,6 +1765,7 @@ pgm_transport_bind (
 				strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -1770,6 +1788,7 @@ pgm_transport_bind (
 		g_trace ("INFO","bind failed on send_gsr interface %s: %s", s, strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 
@@ -1780,6 +1799,7 @@ pgm_transport_bind (
 		{
 			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr));
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 		}
@@ -1790,6 +1810,7 @@ pgm_transport_bind (
 		{
 			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr));
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 		}
@@ -1815,6 +1836,7 @@ pgm_transport_bind (
 		g_trace ("INFO","bind (router alert) failed on send_gsr interface %s: %s", s, strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 
@@ -1853,6 +1875,7 @@ pgm_transport_bind (
 					i, p->gsr_interface, s1, s2, strerror(errno_));
 			errno = errno_;
 #endif
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 #ifdef TRANSPORT_DEBUG
@@ -1882,6 +1905,7 @@ pgm_transport_bind (
 					s, transport->send_gsr.gsr_interface, strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -1903,6 +1927,7 @@ pgm_transport_bind (
 					s, transport->send_gsr.gsr_interface, strerror(errno_));
 		errno = errno_;
 #endif
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -1920,14 +1945,17 @@ pgm_transport_bind (
 	{
 		retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 		retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 		retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
+			g_static_mutex_unlock (&transport->mutex);
 			goto out;
 		}
 	}
@@ -1935,14 +1963,17 @@ pgm_transport_bind (
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->hops);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 	retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 	retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 
@@ -1950,10 +1981,12 @@ pgm_transport_bind (
 	int tos = IPTOS_LOWDELAY;
 	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
 	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
 
@@ -2024,6 +2057,7 @@ pgm_transport_bind (
 	
 			retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
 			if (retval < 0) {
+				g_static_mutex_unlock (&transport->mutex);
 				goto out;
 			}
 		}
