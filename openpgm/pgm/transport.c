@@ -6508,6 +6508,33 @@ pgm_transport_join_source_group (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (gsr != NULL, -EINVAL);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, -EINVAL);
+	g_return_val_if_fail (transport->recv_gsr_len == IP_MAX_MEMBERSHIPS, -EINVAL);
+
+/* verify if existing group/interface pairing */
+	gboolean found = FALSE;
+	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+	{
+		if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0 &&
+			(gsr->gsr_interface == transport->recv_gsr[i].gsr_interface ||
+			                  0 == transport->recv_gsr[i].gsr_interface    )
+                   )
+		{
+			found = TRUE;
+			break;
+		}
+	}
+
+/* retrieve source address */
+	struct sockaddr_storage source;
+	if (0 != pgm_if_indextosockaddr(gsr->gsr_interface, pgm_sockaddr_family(&gsr->gsr_group), (struct sockaddr*)&source))
+	{
+		return -EINVAL;
+	}
+
+	if (!found) {
+		memcpy (&transport->recv_gsr[transport->recv_gsr_len], &source, pgm_sockaddr_len(&source));
+		transport->recv_gsr_len++;
+	}
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_SOURCE_GROUP, gsr, len);
 }
 
