@@ -56,7 +56,7 @@
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -150,8 +150,6 @@ static gssize pgm_transport_send_one (pgm_transport_t*, gpointer, gsize, int);
 static gssize pgm_transport_send_one_copy (pgm_transport_t*, gconstpointer, gsize, int);
 
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
-
-static int pgm_if_indextosockaddr (unsigned int, int, struct sockaddr*);
 
 
 /* re-entrant form of pgm_print_tsi()
@@ -725,8 +723,6 @@ pgm_transport_create (
 	struct group_source_req*	send_gsr	/* send ... */
 	)
 {
-	guint16 udp_encap_port = ((struct sockaddr_in*)&send_gsr->gsr_group)->sin_port;
-
 	g_return_val_if_fail (transport_ != NULL, -EINVAL);
 	g_return_val_if_fail (gsi != NULL, -EINVAL);
 	if (sport) g_return_val_if_fail (sport != dport, -EINVAL);
@@ -781,7 +777,7 @@ pgm_transport_create (
 	}
 
 /* network data ports */
-	transport->udp_encap_port = udp_encap_port;
+	transport->udp_encap_port = ((struct sockaddr_in*)&send_gsr->gsr_group)->sin_port;
 
 /* copy network parameters */
 	memcpy (&transport->send_gsr, send_gsr, sizeof(struct group_source_req));
@@ -1674,6 +1670,7 @@ pgm_transport_bind (
 
 	struct sockaddr_storage recv_addr;
 	memset (&recv_addr, 0, sizeof(recv_addr));
+	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
 
 #ifdef CONFIG_BIND_INADDR_ANY
 
@@ -1736,6 +1733,7 @@ pgm_transport_bind (
 /* keep a copy of the original address source to re-use for router alert bind */
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
+	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
 
 	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
 	if (retval < 0) {
@@ -1835,18 +1833,22 @@ pgm_transport_bind (
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		struct group_source_req* p = &transport->recv_gsr[i];
-		int recv_level = ( (AF_INET == pgm_sockaddr_family((&p->gsr_group))) ? IPPROTO_IP : IPPROTO_IPV6 );
+		int recv_level = ( (AF_INET == pgm_sockaddr_family((&p->gsr_group))) ? SOL_IP : SOL_IPV6 );
 		int optname = (pgm_sockaddr_cmp ((struct sockaddr*)&p->gsr_group, (struct sockaddr*)&p->gsr_source) == 0)
 				? MCAST_JOIN_GROUP : MCAST_JOIN_SOURCE_GROUP;
-		setsockopt(transport->recv_sock, recv_level, optname, p, sizeof(struct group_source_req));
+		socklen_t plen = MCAST_JOIN_GROUP == optname ? sizeof(struct group_req) : sizeof(struct group_source_req);
+		retval = setsockopt(transport->recv_sock, recv_level, optname, p, plen);
 		if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 			int errno_ = errno;
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
-			g_trace ("INFO","MCAST_JOIN_%sGROUP failed on recv_gsr[%i] interface %i group %s source %s: %s",
-					optname == MCAST_JOIN_GROUP ? "" : "SOURCE_",
+			if (optname == MCAST_JOIN_GROUP)
+				g_trace ("INFO","MCAST_JOIN_GROUP failed on recv_gsr[%i] interface %i group %s: %s",
+					i, p->gsr_interface, s1, strerror(errno_));
+			else
+				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP failed on recv_gsr[%i] interface %i group %s source %s: %s",
 					i, p->gsr_interface, s1, s2, strerror(errno_));
 			errno = errno_;
 #endif
@@ -1858,8 +1860,11 @@ pgm_transport_bind (
 			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
-			g_trace ("INFO","MCAST_JOIN_%sGROUP succeeded on recv_gsr[%i] interface %i group %s source %s",
-					optname == MCAST_JOIN_GROUP ? "" : "SOURCE_",
+			if (optname == MCAST_JOIN_GROUP)
+				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %i group %s",
+					i, p->gsr_interface, s1);
+			else
+				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %i group %s source %s",
 					i, p->gsr_interface, s1, s2);
 		}
 #endif
@@ -6361,60 +6366,6 @@ pgm_transport_set_close_on_failure (
 #define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
 #define TRANSPORT_TO_LEVEL(t)	SOCKADDR_TO_LEVEL( &(t)->recv_gsr[0].gsr_group )
 
-/* interfaces indexes refer to the link layer, we want to find the internet layer address.
- * the big problem is that multiple IPv6 addresses can be bound to one link - called scopes.
- * we can just pick the first scope and let IP routing handle the rest.
- */
-static
-int
-pgm_if_indextosockaddr(
-	unsigned int		ifindex,
-	int			iffamily,
-	struct sockaddr*	ifsa
-	)
-{
-	if (0 == ifindex)	/* any interface or address */
-	{
-		ifsa->sa_family = iffamily;
-		switch (iffamily) {
-		case AF_INET:
-			((struct sockaddr_in*)ifsa)->sin_addr.s_addr = INADDR_ANY;
-			break;
-
-		case AF_INET6:
-			((struct sockaddr_in6*)ifsa)->sin6_addr = in6addr_any;
-			break;
-		}
-		return 0;
-	}
-	else
-	{
-		struct ifaddrs *ifap, *ifa;
-		int e = getifaddrs (&ifap);
-		if (e < 0) {
-			g_trace ("INFO", "getifaddrs failed when trying to resolve link scope interfaces");
-			return -1;
-		}
-
-		for (ifa = ifap; ifa; ifa = ifa->ifa_next)
-		{
-			if ( ifa->ifa_addr->sa_family != iffamily )
-				continue;
-
-			unsigned i = if_nametoindex(ifa->ifa_name);
-			if (i == ifindex)
-			{
-				memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
-				freeifaddrs (ifap);
-				return 0;
-			}
-		}
-
-		freeifaddrs (ifap);
-	}
-
-	return -1;
-}
 
 /* for any-source applications (ASM), join a new group
  */

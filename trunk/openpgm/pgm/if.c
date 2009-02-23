@@ -243,6 +243,60 @@ pgm_if_print_all (void)
 	return 0;
 }
 
+/* interfaces indexes refer to the link layer, we want to find the internet layer address.
+ * the big problem is that multiple IPv6 addresses can be bound to one link - called scopes.
+ * we can just pick the first scope and let IP routing handle the rest.
+ */
+int
+pgm_if_indextosockaddr(
+	unsigned int		ifindex,
+	int			iffamily,
+	struct sockaddr*	ifsa
+        )
+{
+	if (0 == ifindex)		/* any interface or address */
+	{
+		ifsa->sa_family = iffamily;
+		switch (iffamily) {
+		case AF_INET:
+			((struct sockaddr_in*)ifsa)->sin_addr.s_addr = INADDR_ANY;
+			break;
+
+		case AF_INET6:
+			((struct sockaddr_in6*)ifsa)->sin6_addr = in6addr_any;
+			break;
+		}
+		return 0;
+	}
+	else
+	{
+		struct ifaddrs *ifap, *ifa;
+		int e = getifaddrs (&ifap);
+		if (e < 0) {
+			g_trace ("INFO", "getifaddrs failed when trying to resolve link scope interfaces");
+			return -1;
+		}
+
+		for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+		{
+			if ( ifa->ifa_addr->sa_family != iffamily )
+				continue;
+
+			unsigned i = if_nametoindex(ifa->ifa_name);
+			if (i == ifindex)
+			{
+				memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
+				freeifaddrs (ifap);
+				return 0;
+			}
+		}
+
+		freeifaddrs (ifap);
+	}
+
+	return -1;
+}
+
 /* 127		=> 127.0.0.0
  * 127.1/8	=> 127.0.0.0
  */
