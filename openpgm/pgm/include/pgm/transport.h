@@ -206,7 +206,8 @@ struct pgm_transport_t {
     GCond		*thread_cond;
     GMutex		*thread_mutex;
 
-    struct group_source_req send_gsr;			/* multicast & unicast nla */
+    struct group_source_req send_gsr;			/* multicast */
+    struct sockaddr_storage send_addr;			/* unicast nla */
     GStaticMutex	send_mutex;
     int			send_sock;
     GStaticMutex	send_with_router_alert_mutex;
