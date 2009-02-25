@@ -2147,6 +2147,7 @@ new_peer (
 	g_static_mutex_init (&peer->mutex);
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
+	((struct sockaddr_in*)&peer->nla)->sin_port = transport->udp_encap_port;
 	((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 	memcpy (&peer->group_nla, dst_addr, dst_addr_len);
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
@@ -4019,7 +4020,11 @@ send_nak (
 	guint32			sequence_number
 	)
 {
-	g_trace ("INFO", "send_nak(%" G_GUINT32_FORMAT ")", sequence_number);
+#ifdef TRANSPORT_DEBUG
+	char s[INET6_ADDRSTRLEN];
+	pgm_sockaddr_ntop(&peer->nla, s, sizeof(s));
+	g_trace ("INFO", "send_nak(%" G_GUINT32_FORMAT ") -> %s:%hu", sequence_number, s, g_ntohs(((struct sockaddr_in*)&peer->nla)->sin_port));
+#endif
 
 	pgm_transport_t* transport = peer->transport;
 
@@ -4294,6 +4299,8 @@ send_nak_list (
 	opt_nak_list->opt_reserved = 0;
 
 #ifdef TRANSPORT_DEBUG
+	char s[INET6_ADDRSTRLEN];
+	pgm_sockaddr_ntop(&peer->nla, s, sizeof(s));
 	char nak1[1024];
 	sprintf (nak1, "send_nak_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
 #endif
@@ -4308,7 +4315,7 @@ send_nak_list (
 	}
 
 #ifdef TRANSPORT_DEBUG
-	g_trace ("INFO", "%s]%i )", nak1, sqn_list->len);
+	g_trace ("INFO", "%s]%i ) -> %s:%hu", nak1, sqn_list->len, s, g_ntohs(((struct sockaddr_in*)&peer->nla)->sin_port));
 #endif
 
         header->pgm_checksum    = 0;
