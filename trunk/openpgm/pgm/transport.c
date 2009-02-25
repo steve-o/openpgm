@@ -5180,7 +5180,7 @@ pgm_transport_send_one (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (tsdu != NULL, -EINVAL);
-	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
+	g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EMSGSIZE);
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
@@ -5292,7 +5292,7 @@ pgm_transport_send_one_copy (
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	if (tsdu_length) {
 		g_return_val_if_fail (tsdu != NULL, -EINVAL);
-		g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EINVAL);
+		g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EMSGSIZE);
 	}
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
@@ -5434,7 +5434,7 @@ pgm_transport_send_onev (
 #endif
 		STATE(tsdu_length) += vector[i].iov_len;
 	}
-	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, -EINVAL);
+	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, -EMSGSIZE);
 
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
 	{
@@ -5563,7 +5563,7 @@ pgm_transport_send (
 		return pgm_transport_send_one_copy (transport, apdu, apdu_length, flags);
 	}
 	g_return_val_if_fail (apdu != NULL, -EINVAL);
-	g_return_val_if_fail (apdu_length <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EINVAL);
+	g_return_val_if_fail (apdu_length <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
 
@@ -5799,7 +5799,7 @@ pgm_transport_sendv (
 	if (is_one_apdu && STATE(apdu_length) < transport->max_tsdu) {
 		return pgm_transport_send_onev (transport, vector, count, flags);
 	}
-	g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EINVAL);
+	g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
 
 /* if non-blocking calculate total wire size and check rate limit */
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
@@ -6083,7 +6083,7 @@ pgm_transport_send_packetv (
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->txw);
 		for (guint i = 0; i < count; i++)
 		{
-			g_return_val_if_fail (vector[i].iov_len <= transport->max_tsdu_fragment, -EINVAL);
+			g_return_val_if_fail (vector[i].iov_len <= transport->max_tsdu_fragment, -EMSGSIZE);
 			STATE(apdu_length) += vector[i].iov_len;
 		}
 	}
