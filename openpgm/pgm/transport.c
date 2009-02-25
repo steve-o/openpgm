@@ -4745,11 +4745,20 @@ check_peer_nak_state (
 /* expired, remove from hash table and linked list */
 		if (pgm_time_after_eq (pgm_time_now, peer->expiry))
 		{
-			g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
-			g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
-			transport->peers_list = g_list_remove_link (transport->peers_list, &peer->link_);
-			g_static_mutex_unlock (&peer->mutex);
-			pgm_peer_unref (peer);
+			if (((pgm_rxw_t*)peer->rxw)->committed_count)
+			{
+				g_message ("peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
+				peer->expiry += transport->peer_expiry;
+				g_static_mutex_unlock (&peer->mutex);
+			}
+			else
+			{
+				g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
+				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
+				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->link_);
+				g_static_mutex_unlock (&peer->mutex);
+				pgm_peer_unref (peer);
+			}
 		}
 		else
 		{
