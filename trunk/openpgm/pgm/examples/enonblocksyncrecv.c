@@ -52,7 +52,7 @@ static const char* g_network = "";
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
-static int g_sqns = 10;
+static int g_sqns = 100;
 
 static pgm_transport_t* g_transport = NULL;
 static gboolean g_quit = FALSE;
@@ -221,13 +221,13 @@ on_startup (void)
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
-	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
-	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
-	pgm_transport_set_nak_bo_ivl (g_transport, 50*1000);
-	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
-	pgm_transport_set_nak_rdata_ivl (g_transport, 200*1000);
-	pgm_transport_set_nak_data_retries (g_transport, 5);
-	pgm_transport_set_nak_ncf_retries (g_transport, 2);
+	pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
+	pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
+	pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));
+	pgm_transport_set_nak_rpt_ivl (g_transport, pgm_secs(2));
+	pgm_transport_set_nak_rdata_ivl (g_transport, pgm_secs(2));
+	pgm_transport_set_nak_data_retries (g_transport, 50);
+	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 	e = pgm_transport_bind (g_transport);
 	if (e < 0) {

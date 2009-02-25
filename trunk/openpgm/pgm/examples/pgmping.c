@@ -63,7 +63,7 @@ static int g_odata_interval = (1000 * 1000) / 10;	/* 100 ms */
 static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_max_rte = 400*1000;
-static int g_sqns = 100 * 1000;
+static int g_sqns = 1000;
 
 static gboolean g_fec = FALSE;
 static int g_k = 64;
@@ -72,7 +72,7 @@ static int g_n = 255;
 static gboolean g_send_mode = TRUE;
 
 static pgm_transport_t* g_transport = NULL;
-static GIOChannel* g_io_channel = NULL;
+static GIOChannel* g_io_channel_recv = NULL, *g_io_channel_notify = NULL;
 
 static GMainLoop* g_loop = NULL;
 
@@ -261,7 +261,7 @@ on_startup (
 
 	if (g_udp_encap_port) {
 		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
 	}
 
 	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
@@ -274,16 +274,17 @@ on_startup (
 	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
-	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
-	guint spm_heartbeat[] = { 4*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
+	pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
+	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
+), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
-	pgm_transport_set_peer_expiry (g_transport, 5*8192*1000);
-	pgm_transport_set_spmr_expiry (g_transport, 250*1000);
-	pgm_transport_set_nak_bo_ivl (g_transport, 50*1000);
-	pgm_transport_set_nak_rpt_ivl (g_transport, 200*1000);
-	pgm_transport_set_nak_rdata_ivl (g_transport, 500*1000);
-	pgm_transport_set_nak_data_retries (g_transport, 2);
-	pgm_transport_set_nak_ncf_retries (g_transport, 5);
+	pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
+	pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
+	pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));
+	pgm_transport_set_nak_rpt_ivl (g_transport, pgm_secs(2));
+	pgm_transport_set_nak_rdata_ivl (g_transport, pgm_secs(2));
+	pgm_transport_set_nak_data_retries (g_transport, 50);
+	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 #if 0
 	if (g_send_mode)
@@ -337,12 +338,15 @@ on_startup (
 		/* guint id = */ g_source_attach (source, NULL);
 		g_source_unref (source);
 	}
-	else
-	{
-		g_message ("adding PGM receiver watch");
-		g_io_channel = g_io_channel_unix_new (g_transport->recv_sock);
-		/* guint event = */ g_io_add_watch (g_io_channel, G_IO_IN, on_io_data, NULL);
-	}
+	g_message ("adding PGM receiver watch");
+	int n_fds = 2;
+	struct pollfd fds[ n_fds ];
+	memset (fds, 0, sizeof(fds));
+	pgm_transport_poll_info (g_transport, fds, &n_fds, EPOLLIN);
+	g_io_channel_recv = g_io_channel_unix_new (fds[0].fd);
+	g_io_channel_notify = g_io_channel_unix_new (fds[1].fd);
+	/* guint event = */ g_io_add_watch (g_io_channel_recv, G_IO_IN, on_io_data, NULL);
+	/* guint event = */ g_io_add_watch (g_io_channel_notify, G_IO_IN, on_io_data, NULL);
 
 	g_message ("startup complete.");
 	return FALSE;

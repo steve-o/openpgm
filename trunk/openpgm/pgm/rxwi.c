@@ -774,7 +774,8 @@ pgm_rxw_readv (
 					dropped++;
 					r->lost_count--;
 					RXW_SET_PACKET(r, r->trail, NULL);
-					r->trail++;
+					if (r->trail++ == r->commit_trail)
+						r->commit_trail++;
 					pgm_rxw_pkt_remove1 (r, cp);
 				}
 
@@ -792,7 +793,8 @@ pgm_rxw_readv (
 							r->fragment_count--;
 						}
 						RXW_SET_PACKET(r, r->trail, NULL);
-						r->trail++;
+						if (r->trail++ == r->commit_trail)
+							r->commit_trail++;
 						pgm_rxw_pkt_remove1 (r, cp);
 					}
 					else
@@ -808,7 +810,8 @@ pgm_rxw_readv (
 				dropped++;
 				r->lost_count--;
 				RXW_SET_PACKET(r, r->trail, NULL);
-				r->trail++;
+				if (r->trail++ == r->commit_trail)
+					r->commit_trail++;
 				pgm_rxw_pkt_remove1 (r, cp);
 /* one tpdu lost */
 			}
