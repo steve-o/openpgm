@@ -53,7 +53,7 @@ static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
 static int g_max_rte = 400*1000;
-static int g_sqns = 10;
+static int g_sqns = 100;
 
 static gboolean g_fec = FALSE;
 static int g_k = 64;
@@ -169,8 +169,9 @@ create_transport (void)
 	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
 	pgm_transport_set_hops (g_transport, 16);
-	pgm_transport_set_ambient_spm (g_transport, 8192*1000);
-	guint spm_heartbeat[] = { 4*1000, 4*1000, 8*1000, 16*1000, 32*1000, 64*1000, 128*1000, 256*1000, 512*1000, 1024*1000, 2048*1000, 4096*1000, 8192*1000 };
+	pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
+	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
+), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 
 	if (g_fec) {
