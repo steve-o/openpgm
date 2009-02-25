@@ -1722,9 +1722,9 @@ pgm_transport_bind (
 	}
 #endif
 
-	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_port;
-
 #endif /* CONFIG_BIND_INADDR_ANY */
+
+	((struct sockaddr_in*)&recv_addr)->sin_port = ((struct sockaddr_in*)&transport->recv_gsr[0].gsr_group)->sin_port;
 
 	retval = bind (transport->recv_sock,
 			(struct sockaddr*)&recv_addr,
