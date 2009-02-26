@@ -25,6 +25,7 @@
 
 #include <errno.h>
 #include <netdb.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
@@ -395,22 +396,72 @@ out:
 }
 
 /* create a global session ID based on the IP address.
+ *
+ * GLib random API will need warming up before g_random_int_range returns
+ * numbers that actually vary.
  */
 
 int
 pgm_create_ipv4_gsi (
-	struct in_addr	addr,
 	pgm_gsi_t*	gsi
 	)
 {
 	g_return_val_if_fail (gsi != NULL, -EINVAL);
 	int retval = 0;
+	char hostname[NI_MAXHOST];
+	struct addrinfo hints, *res = NULL;
 
-	memcpy (gsi, &addr, sizeof(addr));
+	if ((retval = gethostname (hostname, sizeof(hostname))) != 0) {
+		goto out;
+	}
+
+	memset (&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_flags = AI_ADDRCONFIG;
+	if ((retval = getaddrinfo (hostname, NULL, &hints, &res)) != 0) {
+		goto out;
+	}
+	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
+	freeaddrinfo (res);
 	guint16 random = g_random_int_range (0, UINT16_MAX);
-	memcpy (gsi + sizeof(addr), &random, sizeof(random));
+	memcpy (gsi + sizeof(struct in_addr), &random, sizeof(random));
 
+out:
 	return retval;
+}
+
+/* re-entrant form of pgm_print_gsi()
+ */
+int
+pgm_print_gsi_r (
+	const pgm_gsi_t*	gsi_,
+	char*			buf,
+	gsize			bufsize
+	)
+{
+	g_return_val_if_fail (gsi_ != NULL, -EINVAL);
+	g_return_val_if_fail (buf != NULL, -EINVAL);
+
+	const guint8* gsi = (const guint8*)gsi_;
+	snprintf(buf, bufsize, "%i.%i.%i.%i.%i.%i",
+		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5]);
+	return 0;
+}
+
+/* transform GSI to ASCII string form.
+ *
+ * on success, returns pointer to ASCII string.  on error, returns NULL.
+ */
+gchar*
+pgm_print_gsi (
+	const pgm_gsi_t*	gsi
+	)
+{
+	g_return_val_if_fail (gsi != NULL, NULL);
+
+	static char buf[sizeof("000.000.000.000.000.000")];
+	pgm_print_gsi_r (gsi, buf, sizeof(buf));
+	return buf;
 }
 
 /* compare two global session identifier GSI values and return TRUE if they are equal

@@ -38,8 +38,10 @@ struct pgm_gsi_t {
 G_BEGIN_DECLS
 
 int pgm_create_md5_gsi (pgm_gsi_t*);
-int pgm_create_ipv4_gsi (struct in_addr, pgm_gsi_t*);
+int pgm_create_ipv4_gsi (pgm_gsi_t*);
 
+int pgm_print_gsi_r (const pgm_gsi_t*, char*, gsize);
+gchar* pgm_print_gsi (const pgm_gsi_t*);
 gint pgm_gsi_equal (gconstpointer, gconstpointer);
 
 
