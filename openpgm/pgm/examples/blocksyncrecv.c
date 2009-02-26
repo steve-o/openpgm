@@ -117,6 +117,11 @@ main (
 		{
 			on_data (buffer, len, NULL);
 		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
+			break;
+		}
 		else if (errno == ECONNRESET)
 		{
 			g_warning ("pgm socket detected dataloss.");
