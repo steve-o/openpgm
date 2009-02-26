@@ -143,6 +143,11 @@ main (
 		{
 			g_warning ("pgm socket detected dataloss.");
 		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
+			break;
+		}
 		else
 		{
 			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
