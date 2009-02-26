@@ -2233,7 +2233,7 @@ pgm_transport_recvmsgv (
 	}
 
 	gsize bytes_read = 0;
-	gsize data_read = 0;
+	guint data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len;
 	struct iovec* piov = transport->piov;
