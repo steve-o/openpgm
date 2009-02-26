@@ -118,7 +118,7 @@ main (
 		{
 			on_data (buffer, len, NULL);
 		}
-		else
+		else if (errno == EAGAIN)
 		{
 /* select for next event */
 			int fds = 0, block = 0;
@@ -127,6 +127,15 @@ main (
 			FD_ZERO(&readfds);
 			pgm_transport_select_info (g_transport, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, block ? NULL : &timeout);
+		}
+		else if (errno == ECONNRESET)
+		{
+			g_warning ("pgm socket detected dataloss.");
+		}
+		else
+		{
+			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
+			break;
 		}
 	} while (!g_quit);
 
@@ -161,46 +170,20 @@ on_startup (void)
 	g_message ("create transport.");
 
 	pgm_gsi_t gsi;
-#if 0
-	char hostname[NI_MAXHOST];
-	struct addrinfo hints, *res = NULL;
-
-	gethostname (hostname, sizeof(hostname));
-	memset (&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_flags = AI_ADDRCONFIG;
-	getaddrinfo (hostname, NULL, &hints, &res);
-	int e = pgm_create_ipv4_gsi (((struct sockaddr_in*)(res->ai_addr))->sin_addr, &gsi);
-	g_assert (e == 0);
-	freeaddrinfo (res);
-#else
 	int e = pgm_create_md5_gsi (&gsi);
 	g_assert (e == 0);
-#endif
 
 	struct group_source_req recv_gsr, send_gsr;
-#if 0
-	((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_family = AF_INET;
-	((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_addr.s_addr = INADDR_ANY;
-
-	((struct sockaddr_in*)&send_gsr.gsr_group)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_gsr.gsr_group)->sin_addr.s_addr = inet_addr(g_network);
-	((struct sockaddr_in*)&send_gsr.gsr_source)->sin_family = AF_INET;
-	((struct sockaddr_in*)&send_gsr.gsr_source)->sin_addr.s_addr = INADDR_ANY;
-#else
 	char network[1024];
 	sprintf (network, ";%s", g_network);
 	gsize recv_len = 1;
 	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
 	g_assert (recv_len == 1);
-#endif
 
 	if (g_udp_encap_port) {
 		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
 	}
 
 	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);

@@ -2222,6 +2222,11 @@ pgm_transport_recvmsgv (
 		errno = ECONNRESET;
 		return -1;
 	}
+	if (transport->has_lost_data) {
+		transport->has_lost_data = !transport->has_lost_data;
+		errno = ECONNRESET;
+		return -1;
+	}
 
 	gsize bytes_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
@@ -2255,12 +2260,19 @@ pgm_transport_recvmsgv (
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (transport->will_close_on_failure &&
-			    waiting_rxw->cumulative_losses &&
-			    transport->is_open)
-			{
-				transport->is_open = FALSE;
-				goto out;
+			if (transport->will_close_on_failure) {
+				if (waiting_rxw->cumulative_losses)
+				{
+					transport->is_open = FALSE;
+					goto out;
+				}
+			} else {
+				if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
+				{
+					transport->has_lost_data = TRUE;
+					waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
+					goto out;
+				}
 			}
 	
 /* add to release list */
@@ -2607,12 +2619,19 @@ flush_waiting:
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (transport->will_close_on_failure &&
-			    waiting_rxw->cumulative_losses &&
-			    transport->is_open)
-			{
-				transport->is_open = FALSE;
-				goto out;
+			if (transport->will_close_on_failure) {
+				if (waiting_rxw->cumulative_losses)
+				{
+					transport->is_open = FALSE;
+					goto out;
+				}
+			} else {
+				if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
+				{
+					transport->has_lost_data = TRUE;
+					waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
+					goto out;
+				}
 			}
 
 /* add to release list */
@@ -2702,7 +2721,7 @@ out:
 		g_static_mutex_unlock (&transport->waiting_mutex);
 
 /* return reset on zero bytes instead of waiting for next call */
-		errno = transport->is_open ? EAGAIN : ECONNRESET;
+		errno = transport->is_open ? ( transport->has_lost_data ? ECONNRESET : EAGAIN ) : ECONNRESET;
 		return -1;
 	}
 	else if (transport->peers_waiting)
