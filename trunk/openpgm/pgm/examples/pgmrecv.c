@@ -195,22 +195,8 @@ on_startup (
 	g_message ("create transport.");
 
 	pgm_gsi_t gsi;
-#if 0
-	char hostname[NI_MAXHOST];
-	struct addrinfo hints, *res = NULL;
-
-	gethostname (hostname, sizeof(hostname));
-	memset (&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_flags = AI_ADDRCONFIG;
-	getaddrinfo (hostname, NULL, &hints, &res);
-	int e = pgm_create_ipv4_gsi (((struct sockaddr_in*)(res->ai_addr))->sin_addr, &gsi);
-	g_assert (e == 0);
-	freeaddrinfo (res);
-#else
 	int e = pgm_create_md5_gsi (&gsi);
 	g_assert (e == 0);
-#endif
 
 	struct group_source_req recv_gsr, send_gsr;
 	gsize recv_len = 1;
@@ -331,6 +317,10 @@ receiver_thread (
 			struct epoll_event events[1];	/* wait for maximum 1 event */
 			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
 		}
+		else if (errno == ECONNRESET)
+		{
+			g_warning ("pgm socket detected dataloss.");
+		} 
 		else
 		{
 			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
