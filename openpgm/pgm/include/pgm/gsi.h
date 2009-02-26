@@ -32,7 +32,7 @@
 typedef struct pgm_gsi_t pgm_gsi_t;
 
 struct pgm_gsi_t {
-	char	identifier[6];
+	guint8	identifier[6];
 };
 
 G_BEGIN_DECLS
