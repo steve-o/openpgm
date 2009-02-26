@@ -145,7 +145,7 @@ pgm_receiver_thread (
 			}
 			g_async_queue_unlock (async->commit_queue);
 		}
-		else if (ECONNRESET == errno)
+		else if (ECONNRESET == errno && async->transport->will_close_on_failure)
 		{
 			break;
 		}
