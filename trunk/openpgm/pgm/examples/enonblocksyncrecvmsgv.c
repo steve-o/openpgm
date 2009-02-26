@@ -142,14 +142,9 @@ main (
 	g_message ("entering PGM message loop ... ");
 	do {
 		gssize len = pgm_transport_recvmsgv (g_transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
-		if (len > 0)
+		if (len >= 0)
 		{
 			on_msgv (msgv, len, NULL);
-		}
-		else if (len == 0)		/* socket(s) closed */
-		{
-			g_error ("pgm socket closed in receiver_thread.");
-			break;
 		}
 		else if (errno == EAGAIN)
 		{
@@ -160,6 +155,10 @@ main (
 		else if (errno == ECONNRESET)
 		{
 			g_warning ("pgm socket detected dataloss.");
+		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
 		}
 		else
 		{

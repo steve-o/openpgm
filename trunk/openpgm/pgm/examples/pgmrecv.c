@@ -301,16 +301,10 @@ receiver_thread (
 	}
 
 	do {
-		int len = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
-		if (len > 0)
+		gssize len = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
+		if (len >= 0)
 		{
 			on_msgv (msgv, len, NULL);
-		}
-		else if (len == 0)		/* socket(s) closed */
-		{
-			g_error ("pgm socket closed in receiver_thread.");
-			g_main_loop_quit(g_loop);
-			break;
 		}
 		else if (errno == EAGAIN)	/* len == -1, an error occured */
 		{
@@ -321,6 +315,12 @@ receiver_thread (
 		{
 			g_warning ("pgm socket detected dataloss.");
 		} 
+		else if (errno == ENOTCONN)		/* socket(s) closed */
+		{
+			g_error ("pgm socket closed.");
+			g_main_loop_quit(g_loop);
+			break;
+		}
 		else
 		{
 			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));

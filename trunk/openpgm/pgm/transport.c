@@ -2219,16 +2219,21 @@ pgm_transport_recvmsgv (
 
 /* reject on closed transport */
 	if (!transport->is_open) {
-		errno = ECONNRESET;
+		errno = ENOTCONN;
 		return -1;
 	}
 	if (transport->has_lost_data) {
-		transport->has_lost_data = !transport->has_lost_data;
+		if (transport->will_close_on_failure) {
+			transport->is_open = FALSE;
+		} else {
+			transport->has_lost_data = !transport->has_lost_data;
+		}
 		errno = ECONNRESET;
 		return -1;
 	}
 
 	gsize bytes_read = 0;
+	gsize data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len;
 	struct iovec* piov = transport->piov;
@@ -2255,24 +2260,16 @@ pgm_transport_recvmsgv (
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			const gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (transport->will_close_on_failure) {
-				if (waiting_rxw->cumulative_losses)
-				{
-					transport->is_open = FALSE;
-					goto out;
-				}
-			} else {
-				if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
-				{
-					transport->has_lost_data = TRUE;
-					waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
-					goto out;
-				}
+			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
+			{
+				transport->has_lost_data = TRUE;
+				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
+				goto out;
 			}
 	
 /* add to release list */
@@ -2280,8 +2277,9 @@ pgm_transport_recvmsgv (
 			waiting_rxw->commit_link.next = transport->peers_committed;
 			transport->peers_committed = &waiting_rxw->commit_link;
 
-			if (peer_bytes_read) {
+			if (peer_bytes_read >= 0) {
 				bytes_read += peer_bytes_read;
+				data_read++;
 	
 				if (pmsg == msg_end || piov == iov_end)	/* commit full */
 				{
@@ -2614,24 +2612,16 @@ flush_waiting:
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			const gsize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
 
-			if (transport->will_close_on_failure) {
-				if (waiting_rxw->cumulative_losses)
-				{
-					transport->is_open = FALSE;
-					goto out;
-				}
-			} else {
-				if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
-				{
-					transport->has_lost_data = TRUE;
-					waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
-					goto out;
-				}
+			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
+			{
+				transport->has_lost_data = TRUE;
+				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
+				goto out;
 			}
 
 /* add to release list */
@@ -2639,8 +2629,9 @@ flush_waiting:
 			waiting_rxw->commit_link.next = transport->peers_committed;
 			transport->peers_committed = &waiting_rxw->commit_link;
 
-			if (peer_bytes_read) {
+			if (peer_bytes_read >= 0) {
 				bytes_read += peer_bytes_read;
+				data_read++;
 
 				if (pmsg == msg_end || piov == iov_end)
 				{
@@ -2660,7 +2651,7 @@ check_for_repeat:
 	if (flags & MSG_DONTWAIT)
 	{
 		if (len > 0 && pmsg < msg_end &&
-			( ( bytes_read == 0 && msg_len == 1 ) ||	/* leave early with one apdu */
+			( ( data_read == 0 && msg_len == 1 ) ||		/* leave early with one apdu */
 			( msg_len > 1 ) )				/* or wait for vector to fill up */
 		)
 		{
@@ -2672,7 +2663,7 @@ check_for_repeat:
 	{
 /* repeat if blocking and empty, i.e. received non data packet.
  */
-		if (0 == bytes_read)
+		if (0 == data_read)
 		{
 			int n_fds = 2;
 			struct pollfd fds[ n_fds ];
@@ -2711,7 +2702,7 @@ check_for_repeat:
 	}
 
 out:
-	if (0 == bytes_read)
+	if (0 == data_read)
 	{
 		if (transport->is_waiting_read) {
 			pgm_notify_clear (&transport->waiting_notify);
@@ -2721,7 +2712,7 @@ out:
 		g_static_mutex_unlock (&transport->waiting_mutex);
 
 /* return reset on zero bytes instead of waiting for next call */
-		errno = transport->is_open ? ( transport->has_lost_data ? ECONNRESET : EAGAIN ) : ECONNRESET;
+		errno = transport->has_lost_data ? ECONNRESET : EAGAIN;
 		return -1;
 	}
 	else if (transport->peers_waiting)

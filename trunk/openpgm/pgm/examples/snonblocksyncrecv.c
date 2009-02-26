@@ -114,7 +114,7 @@ main (
 	do {
 		char buffer[4096];
 		gssize len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */);
-		if (len > 0)
+		if (len >= 0)
 		{
 			on_data (buffer, len, NULL);
 		}
@@ -131,6 +131,10 @@ main (
 		else if (errno == ECONNRESET)
 		{
 			g_warning ("pgm socket detected dataloss.");
+		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
 		}
 		else
 		{
