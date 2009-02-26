@@ -747,7 +747,7 @@ pgm_rxw_readv (
 
 	guint dropped = 0;
 	gsize bytes_read = 0;
-	gsize packets_read = 0;
+	guint packets_read = 0;
 	const pgm_msgv_t* msg_end = *pmsg + msg_len;
 	const struct iovec* iov_end = *piov + iov_len;
 
