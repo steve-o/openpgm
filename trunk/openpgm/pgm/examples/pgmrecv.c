@@ -313,7 +313,8 @@ receiver_thread (
 		}
 		else if (errno == ECONNRESET)
 		{
-			g_warning ("pgm socket detected dataloss.");
+/* data loss detected */
+			continue;
 		} 
 		else if (errno == ENOTCONN)		/* socket(s) closed */
 		{

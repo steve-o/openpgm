@@ -2160,8 +2160,7 @@ new_peer (
 				transport->rxw_max_rte,
 				&transport->rx_data,
 				&transport->rx_packet,
-				&transport->rx_mutex,
-				transport->will_close_on_failure);
+				&transport->rx_mutex);
 
 	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 
@@ -2280,6 +2279,11 @@ pgm_transport_recvmsgv (
 			if (peer_bytes_read >= 0) {
 				bytes_read += peer_bytes_read;
 				data_read++;
+
+				if (pgm_rxw_full(waiting_rxw)) 		/* window full */
+				{
+					goto out;
+				}
 	
 				if (pmsg == msg_end || piov == iov_end)	/* commit full */
 				{
@@ -2633,7 +2637,12 @@ flush_waiting:
 				bytes_read += peer_bytes_read;
 				data_read++;
 
-				if (pmsg == msg_end || piov == iov_end)
+				if (pgm_rxw_full(waiting_rxw)) 		/* window full */
+				{
+					goto out;
+				}
+
+				if (pmsg == msg_end || piov == iov_end) /* commit full */
 				{
 					goto out;
 				}
