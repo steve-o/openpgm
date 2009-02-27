@@ -2162,6 +2162,7 @@ new_peer (
 				&transport->rx_packet,
 				&transport->rx_mutex);
 
+	memcpy (((pgm_rxw_t*)peer->rxw)->pgm_err.identifier, &peer->tsi, sizeof(pgm_tsi_t));
 	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 
 /* add peer to hash table and linked list */
@@ -2222,6 +2223,9 @@ pgm_transport_recvmsgv (
 		return -1;
 	}
 	if (transport->has_lost_data) {
+		pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
+		msg_start[0].msgv_iov = &transport->piov[0];
+		transport->piov[0].iov_base = &lost_rxw->pgm_err;
 		if (transport->will_close_on_failure) {
 			transport->is_open = FALSE;
 		} else {
@@ -2267,16 +2271,17 @@ pgm_transport_recvmsgv (
 			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
 			{
 				transport->has_lost_data = TRUE;
+				waiting_rxw->pgm_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
 				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
-				goto out;
 			}
 	
+			if (peer_bytes_read >= 0)
+			{
 /* add to release list */
-			waiting_rxw->commit_link.data = waiting_rxw;
-			waiting_rxw->commit_link.next = transport->peers_committed;
-			transport->peers_committed = &waiting_rxw->commit_link;
+				waiting_rxw->commit_link.data = waiting_rxw;
+				waiting_rxw->commit_link.next = transport->peers_committed;
+				transport->peers_committed = &waiting_rxw->commit_link;
 
-			if (peer_bytes_read >= 0) {
 				bytes_read += peer_bytes_read;
 				data_read++;
 
@@ -2289,6 +2294,10 @@ pgm_transport_recvmsgv (
 				{
 					goto out;
 				}
+			}
+			if (transport->has_lost_data)
+			{
+				goto out;
 			}
 
 /* next */
@@ -2624,16 +2633,17 @@ flush_waiting:
 			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
 			{
 				transport->has_lost_data = TRUE;
+				waiting_rxw->pgm_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
 				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
-				goto out;
 			}
 
+			if (peer_bytes_read >= 0)
+			{
 /* add to release list */
-			waiting_rxw->commit_link.data = waiting_rxw;
-			waiting_rxw->commit_link.next = transport->peers_committed;
-			transport->peers_committed = &waiting_rxw->commit_link;
+				waiting_rxw->commit_link.data = waiting_rxw;
+				waiting_rxw->commit_link.next = transport->peers_committed;
+				transport->peers_committed = &waiting_rxw->commit_link;
 
-			if (peer_bytes_read >= 0) {
 				bytes_read += peer_bytes_read;
 				data_read++;
 
@@ -2646,6 +2656,10 @@ flush_waiting:
 				{
 					goto out;
 				}
+			}
+			if (transport->has_lost_data)
+			{
+				goto out;
 			}
  
 /* next */
@@ -2720,8 +2734,21 @@ out:
 
 		g_static_mutex_unlock (&transport->waiting_mutex);
 
+		if (transport->has_lost_data) {
+			pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
+			msg_start[0].msgv_iov = &transport->piov[0];
+			transport->piov[0].iov_base = &lost_rxw->pgm_err;
+			if (transport->will_close_on_failure) {
+				transport->is_open = FALSE;
+			} else {
+				transport->has_lost_data = !transport->has_lost_data;
+			}
+			errno = ECONNRESET;
+		} else {
+			errno = EAGAIN;
+		}
+
 /* return reset on zero bytes instead of waiting for next call */
-		errno = transport->has_lost_data ? ECONNRESET : EAGAIN;
 		return -1;
 	}
 	else if (transport->peers_waiting)
