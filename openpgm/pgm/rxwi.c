@@ -207,8 +207,7 @@ pgm_rxw_init (
 	guint		rxw_max_rte,		/* max bandwidth */
 	GTrashStack**	trash_data,
 	GTrashStack**	trash_packet,
-	GStaticMutex*	trash_mutex,
-	gboolean	will_return_on_drop
+	GStaticMutex*	trash_mutex
 	)
 {
 	g_trace ("init (tpdu %i pre-alloc %i rxw_sqns %i rxw_secs %i rxw_max_rte %i).",
@@ -270,8 +269,6 @@ pgm_rxw_init (
 	r->min_nak_transmit_count = G_MAXINT;
 	r->max_nak_transmit_count = G_MININT;
 #endif
-
-	r->will_return_on_drop = will_return_on_drop;
 
 #ifdef RXW_DEBUG
 	guint memory = sizeof(pgm_rxw_t) +
@@ -606,6 +603,16 @@ pgm_rxw_push_fragment (
 	else	/* sequence_number > lead */
 	{
 /* extends receive window */
+
+/* check bounds of commit window */
+                if ( !pgm_rxw_commit_empty (r) &&
+		     (( 1 + sequence_number ) - r->commit_trail) > pgm_rxw_sqns (r) )
+                {
+			pgm_rxw_window_update (r, r->rxw_trail, sequence_number, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
+			goto out;
+                }
+
+
 		g_trace ("#%u: lead extended.", sequence_number);
 		g_assert ( pgm_uint32_gt (sequence_number, r->lead) );
 
@@ -746,7 +753,7 @@ pgm_rxw_readv (
 	g_trace ("pgm_rxw_readv");
 
 	guint dropped = 0;
-	gsize bytes_read = 0;
+	gssize bytes_read = 0;
 	guint msgs_read = 0;
 	const pgm_msgv_t* msg_end = *pmsg + msg_len;
 	const struct iovec* iov_end = *piov + iov_len;
@@ -820,10 +827,7 @@ pgm_rxw_readv (
 			}
 
 			r->commit_lead = r->trail;
-			if (r->will_return_on_drop)
-			{
-				goto out;
-			}
+			goto out;
 			continue;
 		
 		case PGM_PKT_HAVE_DATA_STATE:
@@ -844,7 +848,6 @@ pgm_rxw_readv (
 				pgm_rxw_packet_t* ap = NULL;
 				while ( ABS_IN_RXW(r, frag) && apdu_len < g_ntohl (cp->of_apdu_len) )
 				{
-g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu_first_sqn));
 					ap = RXW_PACKET(r, frag);
 					g_assert ( ap != NULL );
 					if (ap->state != PGM_PKT_HAVE_DATA_STATE)
@@ -1154,7 +1157,6 @@ pgm_rxw_peek (
 /* already committed */
 	if ( pgm_uint32_lt (sequence_number, r->trail) )
 	{
-g_message ("#%u less than trail #%u", sequence_number, r->trail);
 		return PGM_RXW_DUPLICATE;
 	}
 
@@ -1415,6 +1417,16 @@ pgm_rxw_window_update (
 
 	if ( pgm_uint32_gt (txw_lead, r->lead) )
 	{
+/* check bounds of commit window */
+		if ( !pgm_rxw_commit_empty (r) &&
+		     (( 1 + txw_lead ) - r->commit_trail) > pgm_rxw_sqns (r) )
+		{
+			guint32 constrained_lead = r->commit_trail + pgm_rxw_sqns (r);
+			g_trace ("constraining advertised lead %u to commit window, new lead %u",
+				txw_lead, constrained_lead);
+			txw_lead = constrained_lead;
+		}
+
 		g_trace ("advancing lead to %u", txw_lead);
 
 		if ( r->lead != txw_lead)
@@ -1471,25 +1483,30 @@ pgm_rxw_window_update (
 		g_trace ("advancing rxw_trail to %u", txw_trail);
 		r->rxw_trail = txw_trail;
 
-/* expire outstanding naks, commit_trail may be higher than trail and so defer expunging. */
-		while ( pgm_uint32_gt(r->rxw_trail, r->commit_lead) )
-		{
 /* jump remaining sequence numbers if window is empty */
-			if ( pgm_rxw_empty(r) )
-			{
-				const guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
+		if ( pgm_rxw_empty(r) )
+		{
+			const guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
 
-				dropped  += distance;
-				r->commit_trail = r->commit_lead = r->trail += distance;
-				r->lead  += distance;
-				break;
-			}
-			else
+			dropped  += distance;
+			r->commit_trail = r->commit_lead = r->trail += distance;
+			r->lead  += distance;
+		}
+		else
+		{
+/* mark lost all non-received sequence numbers between commit lead and new rxw_trail */
+			for (guint32 sequence_number = r->commit_lead;
+			     IN_TXW(r, sequence_number) && SLIDINGWINDOW_GT(r, r->rxw_trail, sequence_number);
+			     sequence_number++)
 			{
-				dropped++;
-//				g_warning ("dropping #%u due to advancing transmit window.", r->trail);
-				pgm_rxw_pop_trail (r);
-				r->is_waiting = TRUE;
+				pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+				if (rp->state == PGM_PKT_BACK_OFF_STATE ||
+				    rp->state == PGM_PKT_WAIT_NCF_STATE ||
+				    rp->state == PGM_PKT_WAIT_DATA_STATE)
+				{
+					dropped++;
+					pgm_rxw_mark_lost (r, sequence_number);
+				}
 			}
 		}
 	}
@@ -1709,7 +1726,7 @@ pgm_rxw_ncf (
 	r->is_waiting = TRUE;
 
 	if (dropped) {
-		g_warning ("dropped %u messages due to full window.", dropped);
+		g_warning ("ncf: dropped %u messages due to full window.", dropped);
 		r->cumulative_losses += dropped;
 	}
 
