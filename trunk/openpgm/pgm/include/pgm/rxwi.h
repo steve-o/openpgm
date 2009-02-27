@@ -144,6 +144,8 @@ struct pgm_rxw_t {
 /* runtime context counters */
 	guint32		cumulative_losses;
 	guint32		ack_cumulative_losses;
+	guint32		bytes_delivered;
+	guint32		msgs_delivered;
 };
 
 typedef struct pgm_rxw_t pgm_rxw_t;
