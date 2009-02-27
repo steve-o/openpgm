@@ -55,6 +55,7 @@
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
+#include "pgm/err.h"
 
 //#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
@@ -2162,7 +2163,7 @@ new_peer (
 				&transport->rx_packet,
 				&transport->rx_mutex);
 
-	memcpy (((pgm_rxw_t*)peer->rxw)->pgm_err.identifier, &peer->tsi, sizeof(pgm_tsi_t));
+	memcpy (((pgm_rxw_t*)peer->rxw)->pgm_sock_err.identifier, &peer->tsi, sizeof(pgm_tsi_t));
 	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 
 /* add peer to hash table and linked list */
@@ -2225,7 +2226,7 @@ pgm_transport_recvmsgv (
 	if (transport->has_lost_data) {
 		pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
 		msg_start[0].msgv_iov = &transport->piov[0];
-		transport->piov[0].iov_base = &lost_rxw->pgm_err;
+		transport->piov[0].iov_base = &lost_rxw->pgm_sock_err;
 		if (transport->will_close_on_failure) {
 			transport->is_open = FALSE;
 		} else {
@@ -2271,7 +2272,7 @@ pgm_transport_recvmsgv (
 			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
 			{
 				transport->has_lost_data = TRUE;
-				waiting_rxw->pgm_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
+				waiting_rxw->pgm_sock_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
 				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
 			}
 	
@@ -2633,7 +2634,7 @@ flush_waiting:
 			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
 			{
 				transport->has_lost_data = TRUE;
-				waiting_rxw->pgm_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
+				waiting_rxw->pgm_sock_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
 				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
 			}
 
@@ -2737,7 +2738,7 @@ out:
 		if (transport->has_lost_data) {
 			pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
 			msg_start[0].msgv_iov = &transport->piov[0];
-			transport->piov[0].iov_base = &lost_rxw->pgm_err;
+			transport->piov[0].iov_base = &lost_rxw->pgm_sock_err;
 			if (transport->will_close_on_failure) {
 				transport->is_open = FALSE;
 			} else {

@@ -1,8 +1,8 @@
-/* vim:ts=8:sts=4:sw=4:noai:noexpandtab
+/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
- * OpenPGM, an implementation of the PGM network protocol.
+ * PGM error structure ala MSG_ERRQUEUE
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,19 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_H__
-#define __PGM_H__
+#ifndef __PGM_ERR_H__
+#define __PGM_ERR_H__
 
-#include <pgm/async.h>
-#include <pgm/err.h>
-#include <pgm/gsi.h>
-#include <pgm/if.h>
-#include <pgm/msgv.h>
-#include <pgm/signal.h>
-#include <pgm/sn.h>
-#include <pgm/sockaddr.h>
-#include <pgm/timer.h>
-#include <pgm/transport.h>
-#include <pgm/version.h>
+#pragma pack(push, 1)
 
-#endif /* __PGM_H__ */
+struct pgm_sock_err_t {
+	char	identifier[8];		/* TSI */
+	guint32	lost_count;
+};
+
+typedef struct pgm_sock_err_t pgm_sock_err_t;
+
+#pragma pack(pop)
+
+
+#endif /* __PGM_ERR_H__ */
