@@ -958,7 +958,7 @@ out:
 	r->bytes_delivered   += bytes_read;
 	r->msgs_delivered    += msgs_read;
 
-	r->pgm_err.lost_count = dropped;
+	r->pgm_sock_err.lost_count = dropped;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 
