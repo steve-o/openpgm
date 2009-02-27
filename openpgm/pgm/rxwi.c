@@ -747,7 +747,7 @@ pgm_rxw_readv (
 
 	guint dropped = 0;
 	gsize bytes_read = 0;
-	guint packets_read = 0;
+	guint msgs_read = 0;
 	const pgm_msgv_t* msg_end = *pmsg + msg_len;
 	const struct iovec* iov_end = *piov + iov_len;
 
@@ -881,7 +881,6 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 						++(*piov);
 
 						bytes_read += ap->length;	/* stats */
-						packets_read++;
 
 						ap->state = PGM_PKT_COMMIT_DATA_STATE;
 						r->fragment_count--;		/* accounting */
@@ -891,6 +890,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 
 /* end of commit buffer */
 					++(*pmsg);
+					msgs_read++;
 
 					if (*pmsg == msg_end) {
 						goto out;
@@ -918,7 +918,7 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 				(*piov)->iov_base = cp->data;
 				(*piov)->iov_len  = cp->length;
 				bytes_read += cp->length;
-				packets_read++;
+				msgs_read++;
 
 /* move to commit window */
 				cp->state = PGM_PKT_COMMIT_DATA_STATE;
@@ -949,10 +949,12 @@ g_trace ("check for contiguous tpdu #%u in apdu #%u", frag, g_ntohl (cp->of_apdu
 
 out:
 	r->cumulative_losses += dropped;
+	r->bytes_delivered   += bytes_read;
+	r->msgs_delivered    += msgs_read;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 
-	return packets_read ? bytes_read : -1;
+	return msgs_read ? bytes_read : -1;
 }
 
 /* used to indicate application layer has released interest in packets in committed-data state,

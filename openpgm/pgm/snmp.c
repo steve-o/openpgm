@@ -57,8 +57,8 @@ log_handler (
 	switch (pri) {
 	case LOG_EMERG:
 	case LOG_ALERT:
-	case LOG_CRIT:		log_level = G_LOG_LEVEL_CRITICAL; break;
-	case LOG_ERR:		log_level = G_LOG_LEVEL_ERROR; break;
+	case LOG_CRIT:		/*log_level = G_LOG_LEVEL_CRITICAL; break;*/	/* net-snmp 5.4.1 borken */
+	case LOG_ERR:		/*log_level = G_LOG_LEVEL_ERROR; break;*/
 	case LOG_WARNING:	log_level = G_LOG_LEVEL_WARNING; break;
 	case LOG_NOTICE:	log_level = G_LOG_LEVEL_MESSAGE; break;
 	case LOG_INFO:		log_level = G_LOG_LEVEL_INFO; break;
@@ -90,13 +90,15 @@ pgm_snmp_init (void)
 
 	if (pgm_agentx_subagent)
 	{
-		netsnmp_enable_subagent();
 		if (pgm_agentx_socket)
 		{
 			netsnmp_ds_set_string (NETSNMP_DS_APPLICATION_ID,
 						NETSNMP_DS_AGENT_X_SOCKET,
 						pgm_agentx_socket);
 		}
+		netsnmp_ds_set_boolean (NETSNMP_DS_APPLICATION_ID,
+					NETSNMP_DS_AGENT_ROLE,
+					TRUE);
 	}
 
 /* initialise */
