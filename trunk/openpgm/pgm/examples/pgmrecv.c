@@ -313,7 +313,9 @@ receiver_thread (
 		}
 		else if (errno == ECONNRESET)
 		{
-/* data loss detected */
+			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
+					*(guint32*)( (guint8*)msgv[0].msgv_iov->iov_base + sizeof(pgm_tsi_t) ),
+					pgm_print_tsi((pgm_tsi_t*)msgv[0].msgv_iov->iov_base));
 			continue;
 		} 
 		else if (errno == ENOTCONN)		/* socket(s) closed */
