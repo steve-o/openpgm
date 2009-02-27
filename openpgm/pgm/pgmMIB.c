@@ -1683,7 +1683,7 @@ pgmReceiverConfigTable_handler (
 /* nak_bo_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKBACKOFFIVL:
 				{
-				unsigned long nak_bo_ivl = g_ntohs (peer->transport->nak_bo_ivl);
+				unsigned long nak_bo_ivl = peer->transport->nak_bo_ivl;
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
 								(u_char*)&nak_bo_ivl, sizeof(nak_bo_ivl) );
 				}
@@ -1692,7 +1692,7 @@ pgmReceiverConfigTable_handler (
 /* nak_rpt_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKREPEATIVL:
 				{
-				unsigned long nak_rpt_ivl = g_ntohs (peer->transport->nak_rpt_ivl);
+				unsigned long nak_rpt_ivl = peer->transport->nak_rpt_ivl;
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
 								(u_char*)&nak_rpt_ivl, sizeof(nak_rpt_ivl) );
 				}
@@ -1701,7 +1701,7 @@ pgmReceiverConfigTable_handler (
 /* nak_ncf_retries from transport */
 			case COLUMN_PGMRECEIVERNAKNCFRETRIES:
 				{
-				unsigned long nak_ncf_retries = g_ntohs (peer->transport->nak_ncf_retries);
+				unsigned long nak_ncf_retries = peer->transport->nak_ncf_retries;
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
 								(u_char*)&nak_ncf_retries, sizeof(nak_ncf_retries) );
 				}
@@ -1710,7 +1710,7 @@ pgmReceiverConfigTable_handler (
 /* nak_rdata_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKRDATAIVL:
 				{
-				unsigned long nak_rdata_ivl = g_ntohs (peer->transport->nak_rdata_ivl);
+				unsigned long nak_rdata_ivl = peer->transport->nak_rdata_ivl;
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
 								(u_char*)&nak_rdata_ivl, sizeof(nak_rdata_ivl) );
 				}
@@ -1719,7 +1719,7 @@ pgmReceiverConfigTable_handler (
 /* nak_data_retries from transport */
 			case COLUMN_PGMRECEIVERNAKDATARETRIES:
 				{
-				unsigned long nak_data_retries = g_ntohs (peer->transport->nak_data_retries);
+				unsigned long nak_data_retries = peer->transport->nak_data_retries;
 				snmp_set_var_typed_value(	var, ASN_UNSIGNED,
 								(u_char*)&nak_data_retries, sizeof(nak_data_retries) );
 				}
@@ -2028,7 +2028,7 @@ pgmReceiverPerformanceTable_handler (
 			{
 			case COLUMN_PGMRECEIVERDATABYTESRECEIVED:
 				{
-				unsigned long data_bytes = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED]);
+				unsigned long data_bytes = peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&data_bytes, sizeof(data_bytes) );
 				}
@@ -2036,7 +2036,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERDATAMSGSRECEIVED:
 				{
-				unsigned long data_msgs = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]);
+				unsigned long data_msgs = peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&data_msgs, sizeof(data_msgs) );
 				}
@@ -2045,7 +2045,7 @@ pgmReceiverPerformanceTable_handler (
 /* total */
 			case COLUMN_PGMRECEIVERNAKSSENT:
 				{
-				unsigned long naks_sent = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT]);
+				unsigned long naks_sent = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_sent, sizeof(naks_sent) );
 				}
@@ -2054,7 +2054,7 @@ pgmReceiverPerformanceTable_handler (
 /* total */	
 			case COLUMN_PGMRECEIVERNAKSRETRANSMITTED:
 				{
-				unsigned long naks_resent = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED]);
+				unsigned long naks_resent = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_resent, sizeof(naks_resent) );
 				}
@@ -2063,7 +2063,7 @@ pgmReceiverPerformanceTable_handler (
 /* total */	
 			case COLUMN_PGMRECEIVERNAKFAILURES:
 				{
-				unsigned long nak_failures = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED]);
+				unsigned long nak_failures = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&nak_failures, sizeof(nak_failures) );
 				}
@@ -2071,7 +2071,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERBYTESRECEIVED:
 				{
-				unsigned long bytes_received = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED]);
+				unsigned long bytes_received = peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&bytes_received, sizeof(bytes_received) );
 				}
@@ -2080,7 +2080,7 @@ pgmReceiverPerformanceTable_handler (
 /* total */	
 			case COLUMN_PGMRECEIVERNAKSSUPPRESSED:
 				{
-				unsigned long naks_suppressed = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]);
+				unsigned long naks_suppressed = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_suppressed, sizeof(naks_suppressed) );
 				}
@@ -2089,7 +2089,7 @@ pgmReceiverPerformanceTable_handler (
 /* bogus: same as source checksum errors */	
 			case COLUMN_PGMRECEIVERCKSUMERRORS:
 				{
-				unsigned long cksum_errors = g_ntohs (peer->transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]);
+				unsigned long cksum_errors = peer->transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&cksum_errors, sizeof(cksum_errors) );
 				}
@@ -2097,7 +2097,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERMALFORMEDSPMS:
 				{
-				unsigned long malformed_spms = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]);
+				unsigned long malformed_spms = peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&malformed_spms, sizeof(malformed_spms) );
 				}
@@ -2105,7 +2105,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERMALFORMEDODATA:
 				{
-				unsigned long malformed_odata = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA]);
+				unsigned long malformed_odata = peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&malformed_odata, sizeof(malformed_odata) );
 				}
@@ -2113,7 +2113,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERMALFORMEDRDATA:
 				{
-				unsigned long malformed_rdata = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA]);
+				unsigned long malformed_rdata = peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&malformed_rdata, sizeof(malformed_rdata) );
 				}
@@ -2121,7 +2121,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERMALFORMEDNCFS:
 				{
-				unsigned long malformed_ncfs = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]);
+				unsigned long malformed_ncfs = peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&malformed_ncfs, sizeof(malformed_ncfs) );
 				}
@@ -2129,7 +2129,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERPACKETSDISCARDED:
 				{
-				unsigned long packets_discarded = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]);
+				unsigned long packets_discarded = peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&packets_discarded, sizeof(packets_discarded) );
 				}
@@ -2161,7 +2161,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERDUPSPMS:
 				{
-				unsigned long dup_spms = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS]);
+				unsigned long dup_spms = peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&dup_spms, sizeof(dup_spms) );
 				}
@@ -2169,7 +2169,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERDUPDATAS:
 				{
-				unsigned long dup_data = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS]);
+				unsigned long dup_data = peer->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&dup_data, sizeof(dup_data) );
 				}
@@ -2187,7 +2187,7 @@ pgmReceiverPerformanceTable_handler (
 /* COLUMN_PGMRECEIVERPARITYNAKPACKETSSENT + COLUMN_PGMRECEIVERSELECTIVENAKPACKETSSENT */	
 			case COLUMN_PGMRECEIVERNAKPACKETSSENT:
 				{
-				unsigned long nak_packets = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]);
+				unsigned long nak_packets = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&nak_packets, sizeof(nak_packets) );
 				}
@@ -2204,7 +2204,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERSELECTIVENAKPACKETSSENT:
 				{
-				unsigned long nak_packets = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]);
+				unsigned long nak_packets = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&nak_packets, sizeof(nak_packets) );
 				}
@@ -2221,7 +2221,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERSELECTIVENAKSSENT:
 				{
-				unsigned long naks_sent = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT]);
+				unsigned long naks_sent = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_sent, sizeof(naks_sent) );
 				}
@@ -2238,7 +2238,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERSELECTIVENAKSRETRANSMITTED:
 				{
-				unsigned long naks_resent = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED]);
+				unsigned long naks_resent = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_resent, sizeof(naks_resent) );
 				}
@@ -2247,7 +2247,7 @@ pgmReceiverPerformanceTable_handler (
 /* COLUMN_PGMRECEIVERPARITYNAKSFAILED + COLUMN_PGMRECEIVERSELECTIVENAKSFAILED */	
 			case COLUMN_PGMRECEIVERNAKSFAILED:
 				{
-				unsigned long naks_failed = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED]);
+				unsigned long naks_failed = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_failed, sizeof(naks_failed) );
 				}
@@ -2264,7 +2264,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERSELECTIVENAKSFAILED:
 				{
-				unsigned long naks_failed = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED]);
+				unsigned long naks_failed = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&naks_failed, sizeof(naks_failed) );
 				}
@@ -2272,7 +2272,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKSFAILEDRXWADVANCED:
 				{
-				unsigned long rxw_failed = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_RXW_ADVANCED]);
+				unsigned long rxw_failed = peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_RXW_ADVANCED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&rxw_failed, sizeof(rxw_failed) );
 				}
@@ -2280,7 +2280,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKSFALEDNCFRETRIESEXCEEDED:
 				{
-				unsigned long ncf_retries = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED]);
+				unsigned long ncf_retries = peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&ncf_retries, sizeof(ncf_retries) );
 				}
@@ -2288,7 +2288,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKSFAILEDDATARETRIESEXCEEDED:
 				{
-				unsigned long data_retries = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED]);
+				unsigned long data_retries = peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&data_retries, sizeof(data_retries) );
 				}
@@ -2305,7 +2305,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKFAILURESDELIVERED:
 				{
-				unsigned long delivered = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES_DELIVERED]);
+				unsigned long delivered = peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES_DELIVERED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&delivered, sizeof(delivered) );
 				}
@@ -2322,7 +2322,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERSELECTIVENAKSSUPPRESSED:
 				{
-				unsigned long suppressed = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]);
+				unsigned long suppressed = peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&suppressed, sizeof(suppressed) );
 				}
@@ -2330,7 +2330,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKERRORS:
 				{
-				unsigned long malformed_naks = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS]);
+				unsigned long malformed_naks = peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&malformed_naks, sizeof(malformed_naks) );
 				}
@@ -2374,7 +2374,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKSVCTIMEMEAN:
 				{
-				unsigned long mean_repair_time = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN]);
+				unsigned long mean_repair_time = peer->cumulative_stats[PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&mean_repair_time, sizeof(mean_repair_time) );
 				}
@@ -2398,7 +2398,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKFAILTIMEMEAN:
 				{
-				unsigned long mean_fail_time = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN]);
+				unsigned long mean_fail_time = peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&mean_fail_time, sizeof(mean_fail_time) );
 				}
@@ -2422,7 +2422,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKTRANSMITMEAN:
 				{
-				unsigned long mean_transmit_count = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN]);
+				unsigned long mean_transmit_count = peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN];
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&mean_transmit_count, sizeof(mean_transmit_count) );
 				}
