@@ -40,6 +40,10 @@
 #   include <pgm/packet.h>
 #endif
 
+#ifndef __PGM_ERR_H__
+#   include <pgm/err.h>
+#endif
+
 
 G_BEGIN_DECLS
 
@@ -109,13 +113,7 @@ struct pgm_rxw_t {
 	GTrashStack**	trash_data;		/* owned by transport */
 	GTrashStack**	trash_packet;
 	GStaticMutex*	trash_mutex;
-
-#pragma pack(push, 1)
-	struct {
-		char	identifier[8];		/* TSI */
-		guint32 lost_count;
-	} pgm_err;
-#pragma pack(pop)
+	pgm_sock_err_t	pgm_sock_err;
 
 	GSList		waiting_link;
 	gboolean	is_waiting;
