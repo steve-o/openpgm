@@ -847,7 +847,8 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEBYTESBUFFERED:
 				{
-				unsigned long bytes_buffered = ((pgm_txw_t*)transport->txw)->bytes_in_window;
+				pgm_txw_t* txw = (pgm_txw_t*)transport->txw;
+				unsigned long bytes_buffered = transport->can_send_data ? txw->bytes_in_window : 0;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&bytes_buffered, sizeof(bytes_buffered) );
 				}
@@ -855,7 +856,8 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEMSGSBUFFERED:
 				{
-				unsigned long msgs_buffered = ((pgm_txw_t*)transport->txw)->packets_in_window;
+				pgm_txw_t* txw = (pgm_txw_t*)transport->txw;
+				unsigned long msgs_buffered = transport->can_send_data ? txw->packets_in_window : 0;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&msgs_buffered, sizeof(msgs_buffered) );
 				}
@@ -2143,7 +2145,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERBYTESDELIVEREDTOAPP:
 				{
-				unsigned long bytes_delivered = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP]);
+				unsigned long bytes_delivered = ((pgm_rxw_t*)peer->rxw)->bytes_delivered;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&bytes_delivered, sizeof(bytes_delivered) );
 				}
@@ -2151,7 +2153,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERMSGSDELIVEREDTOAPP:
 				{
-				unsigned long msgs_delivered = g_ntohs (peer->cumulative_stats[PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP]);
+				unsigned long msgs_delivered = ((pgm_rxw_t*)peer->rxw)->msgs_delivered;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&msgs_delivered, sizeof(msgs_delivered) );
 				}
