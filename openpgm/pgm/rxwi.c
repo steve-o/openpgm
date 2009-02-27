@@ -434,7 +434,7 @@ pgm_rxw_push_fragment (
 /* if this packet is a fragment of an apdu, and not the first, we continue on as per spec but careful to
  * advance the trailing edge to discard the remaining fragments.
  */
-		g_trace ("#%u: using packet to temporarily define window", sequence_number);
+		g_trace ("#%u: using odata to temporarily define window", sequence_number);
 
 		r->lead = sequence_number - 1;
 		r->commit_trail = r->commit_lead = r->rxw_trail = r->rxw_trail_init = r->trail = r->lead + 1;
@@ -605,8 +605,9 @@ pgm_rxw_push_fragment (
 /* extends receive window */
 
 /* check bounds of commit window */
+		guint32 new_commit_sqns = ( 1 + sequence_number ) - r->commit_trail;
                 if ( !pgm_rxw_commit_empty (r) &&
-		     (( 1 + sequence_number ) - r->commit_trail) > pgm_rxw_sqns (r) )
+		     (new_commit_sqns >= pgm_rxw_len (r)) )
                 {
 			pgm_rxw_window_update (r, r->rxw_trail, sequence_number, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
 			goto out;
@@ -619,7 +620,7 @@ pgm_rxw_push_fragment (
 		if ( pgm_rxw_full(r) )
 		{
 			dropped++;
-//			g_warning ("#%u: dropping #%u due to full window.", sequence_number, r->trail);
+//			g_warning ("#%u: dropping #%u due to odata filling window.", sequence_number, r->trail);
 
 			pgm_rxw_pop_trail (r);
 //			pgm_rxw_flush (r);
@@ -630,6 +631,8 @@ pgm_rxw_push_fragment (
 /* if packet is non-contiguous to current leading edge add place holders */
 		if (r->lead != sequence_number)
 		{
+/* TODO: can be rather inefficient on packet loss looping through dropped sequence numbers
+ */
 			while (r->lead != sequence_number)
 			{
 				pgm_rxw_packet_t* ph = pgm_rxw_alloc0_packet(r);
@@ -643,13 +646,13 @@ pgm_rxw_push_fragment (
 
 /* send nak by sending to end of expiry list */
 				g_queue_push_head_link (r->backoff_queue, &ph->link_);
-				g_trace ("#%" G_GUINT32_FORMAT ": adding place holder for missing packet, backoff_queue now %" G_GUINT32_FORMAT " long, rxw_sqns %u",
-					sequence_number, r->backoff_queue->length, pgm_rxw_sqns(r));
+				g_trace ("#%" G_GUINT32_FORMAT ": place holder, backoff_queue %" G_GUINT32_FORMAT "/%u lead %" G_GUINT32_FORMAT,
+					sequence_number, r->backoff_queue->length, pgm_rxw_sqns(r), r->lead);
 
 				if ( pgm_rxw_full(r) )
 				{
 					dropped++;
-//					g_warning ("dropping #%u due to full window.", r->trail);
+//					g_warning ("dropping #%u due to odata filling window.", r->trail);
 
 					pgm_rxw_pop_trail (r);
 //					pgm_rxw_flush (r);
@@ -721,7 +724,7 @@ out_flush:
 
 out:
 	if (dropped) {
-		g_warning ("dropped %u messages due to full window.", dropped);
+		g_trace ("dropped %u messages due to odata filling window.", dropped);
 		r->cumulative_losses += dropped;
 	}
 
@@ -954,6 +957,8 @@ out:
 	r->cumulative_losses += dropped;
 	r->bytes_delivered   += bytes_read;
 	r->msgs_delivered    += msgs_read;
+
+	r->pgm_err.lost_count = dropped;
 
 	ASSERT_RXW_BASE_INVARIANT(r);
 
@@ -1418,10 +1423,11 @@ pgm_rxw_window_update (
 	if ( pgm_uint32_gt (txw_lead, r->lead) )
 	{
 /* check bounds of commit window */
+		guint32 new_commit_sqns = ( 1 + txw_lead ) - r->commit_trail;
 		if ( !pgm_rxw_commit_empty (r) &&
-		     (( 1 + txw_lead ) - r->commit_trail) > pgm_rxw_sqns (r) )
+		     (new_commit_sqns >= pgm_rxw_len (r)) )
 		{
-			guint32 constrained_lead = r->commit_trail + pgm_rxw_sqns (r);
+			guint32 constrained_lead = r->commit_trail + pgm_rxw_len (r) - 1;
 			g_trace ("constraining advertised lead %u to commit window, new lead %u",
 				txw_lead, constrained_lead);
 			txw_lead = constrained_lead;
@@ -1525,7 +1531,7 @@ pgm_rxw_window_update (
 
 	if (dropped)
 	{
-		g_warning ("dropped %u messages due to full window.", dropped);
+		g_trace ("dropped %u messages due to full window.", dropped);
 		r->cumulative_losses += dropped;
 	}
 
@@ -1726,7 +1732,7 @@ pgm_rxw_ncf (
 	r->is_waiting = TRUE;
 
 	if (dropped) {
-		g_warning ("ncf: dropped %u messages due to full window.", dropped);
+		g_trace ("ncf: dropped %u messages due to full window.", dropped);
 		r->cumulative_losses += dropped;
 	}
 

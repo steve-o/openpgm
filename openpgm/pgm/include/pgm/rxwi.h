@@ -110,6 +110,13 @@ struct pgm_rxw_t {
 	GTrashStack**	trash_packet;
 	GStaticMutex*	trash_mutex;
 
+#pragma pack(push, 1)
+	struct {
+		char	identifier[8];		/* TSI */
+		guint32 lost_count;
+	} pgm_err;
+#pragma pack(pop)
+
 	GSList		waiting_link;
 	gboolean	is_waiting;
 	GSList		commit_link;
