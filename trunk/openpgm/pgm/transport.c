@@ -6861,11 +6861,14 @@ on_odata (
 	const pgm_time_t nak_rb_expiry = pgm_time_update_now () + nak_rb_ivl(transport);
 	const guint16 opt_total_length = (header->pgm_options & PGM_OPT_PRESENT) ? g_ntohs(*(guint16*)( (char*)( odata + 1 ) + sizeof(guint16))) : 0;
 
+	guint msg_count = 0;
+
+	g_static_mutex_lock (&sender->mutex);
 	if (opt_total_length > 0 && get_opt_fragment((gpointer)(odata + 1), &opt_fragment))
 	{
 		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
 			odata->data_sqn, g_ntohl (odata->data_trail), g_ntohl (opt_fragment->opt_sqn), g_ntohl (opt_fragment->opt_frag_off), g_ntohl (opt_fragment->opt_frag_len));
-		g_static_mutex_lock (&sender->mutex);
+		guint32 lead_before_push = ((pgm_rxw_t*)sender->rxw)->lead;
 		retval = pgm_rxw_push_fragment_copy (sender->rxw,
 					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
@@ -6873,16 +6876,21 @@ on_odata (
 					g_ntohl (odata->data_trail),
 					opt_fragment,
 					nak_rb_expiry);
+/* new APDU only when reported first APDU sequence number extends the window lead */
+		if ( pgm_uint32_lte (lead_before_push, g_ntohl (opt_fragment->opt_sqn) ) )
+		{
+			msg_count++;
+		}
 	}
 	else
 	{
-		g_static_mutex_lock (&sender->mutex);
 		retval = pgm_rxw_push_copy (sender->rxw,
 					(char*)(odata + 1) + opt_total_length,
 					g_ntohs (header->pgm_tsdu_length),
 					odata->data_sqn,
 					g_ntohl (odata->data_trail),
 					nak_rb_expiry);
+		msg_count++;
 	}
 
 	g_static_mutex_unlock (&sender->mutex);
@@ -6912,7 +6920,7 @@ on_odata (
 	}
 
 	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += g_ntohs (header->pgm_tsdu_length);
-	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]++;
+	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]  += msg_count;
 
 	if (flush_naks)
 	{
