@@ -45,11 +45,11 @@
 
 #include <glib.h>
 
+#include "pgm/transport.h"
 #include "pgm/if.h"
 #include "pgm/packet.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
-#include "pgm/transport.h"
 #include "pgm/rate_control.h"
 #include "pgm/sn.h"
 #include "pgm/timer.h"
@@ -2163,7 +2163,7 @@ new_peer (
 				&transport->rx_packet,
 				&transport->rx_mutex);
 
-	memcpy (((pgm_rxw_t*)peer->rxw)->pgm_sock_err.identifier, &peer->tsi, sizeof(pgm_tsi_t));
+	memcpy (&((pgm_rxw_t*)peer->rxw)->pgm_sock_err.tsi, &peer->tsi, sizeof(pgm_tsi_t));
 	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 
 /* add peer to hash table and linked list */
@@ -2812,7 +2812,8 @@ pgm_transport_recv (
 	gssize bytes_read = pgm_transport_recvmsg (transport, &msgv, flags);
 
 /* merge apdu packets together */
-	if (bytes_read > 0) {
+	if (bytes_read > 0)
+	{
 		gssize bytes_copied = 0;
 		struct iovec* p = msgv.msgv_iov;
 
@@ -2833,6 +2834,10 @@ pgm_transport_recv (
 			p++;
 
 		} while (bytes_copied < bytes_read);
+	}
+	else if (errno == ECONNRESET)
+	{
+		memcpy (data, msgv.msgv_iov->iov_base, MIN(sizeof(pgm_sock_err_t), len));
 	}
 
 	return bytes_read;
