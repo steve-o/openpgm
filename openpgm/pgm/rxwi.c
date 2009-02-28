@@ -1675,6 +1675,16 @@ pgm_rxw_ncf (
 /* mark all sequence numbers to ncf # in BACK-OFF_STATE */
 
 	guint dropped = 0;
+	
+/* check bounds of commit window */
+	guint32 new_commit_sqns = ( 1 + sequence_number ) - r->commit_trail;
+	if ( !pgm_rxw_commit_empty (r) &&
+		(new_commit_sqns >= pgm_rxw_len (r)) )
+	{
+		pgm_rxw_window_update (r, r->rxw_trail, sequence_number, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
+		retval = PGM_RXW_CREATED_PLACEHOLDER;
+		goto out;
+	}
 
 	while (r->lead != sequence_number)
 	{
