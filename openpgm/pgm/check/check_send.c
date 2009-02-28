@@ -4,8 +4,7 @@
 
 #include "check_pgm.h"
 
-#include "pgm/if.h"
-#include <../transport.c>
+#include "../transport.c"
 
 #define PGM_NETWORK		""
 #define PGM_PORT		7500

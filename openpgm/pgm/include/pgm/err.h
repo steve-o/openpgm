@@ -25,8 +25,12 @@
 #pragma pack(push, 1)
 
 struct pgm_sock_err_t {
-	char	identifier[8];		/* TSI */
-	guint32	lost_count;
+#ifdef __PGM_TRANSPORT_H__
+	pgm_tsi_t	tsi;
+#else
+	char		identifier[8];		/* TSI */
+#endif
+	guint32		lost_count;
 };
 
 typedef struct pgm_sock_err_t pgm_sock_err_t;
