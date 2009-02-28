@@ -316,7 +316,7 @@ receiver_thread (
 			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_iov->iov_base;
 			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
 					pgm_sock_err->lost_count,
-					pgm_print_tsi((pgm_tsi_t*)pgm_sock_err->identifier));
+					pgm_print_tsi(&pgm_sock_err->tsi));
 			continue;
 		} 
 		else if (errno == ENOTCONN)		/* socket(s) closed */
