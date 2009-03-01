@@ -1118,9 +1118,8 @@ verify_options (
 		}
 
 		default:
-			printf ("\t\"message\": \"PGM options: unknown option: %i.\",\n", opt_header->opt_type);
-			retval = -1;
-			goto out;
+/* unknown option, skip */
+			break;
 		}
 /* end option types */
 
@@ -1138,6 +1137,13 @@ verify_options (
 out:
 	return retval;
 }
+
+static const char *opx_text[4] = {
+	"OPX_IGNORE",
+	"OPX_INVALIDATE",
+	"OPX_DISCARD",
+	"OPX_UNKNOWN"
+};
 
 void
 print_options (
@@ -1167,6 +1173,9 @@ print_options (
 		{
 			struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
 			printf ("\t\t\t\t\"type\": \"OPT_FRAGMENT%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
+			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
+			printf ("\t\t\t\t\"U-bit\": %s,\n", (opt_fragment->opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
 			printf ("\t\t\t\t\"firstSqn\": %i,\n", g_ntohl(opt_fragment->opt_sqn));
 			printf ("\t\t\t\t\"fragmentOffset\": %i,\n", g_ntohl(opt_fragment->opt_frag_off));
 			printf ("\t\t\t\t\"originalLength\": %i\n", g_ntohl(opt_fragment->opt_frag_len));
@@ -1178,6 +1187,9 @@ print_options (
 			struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 			char* end = (char*)opt_header + opt_header->opt_length;
 			printf ("\t\t\t\t\"type\": \"OPT_NAK_LIST%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
+			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
+			printf ("\t\t\t\t\"U-bit\": %s,\n", (opt_nak_list->opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
 			char sqns[1024] = "";
 			guint i = 0;
 			do {
@@ -1194,15 +1206,34 @@ print_options (
 		{
 			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
 			printf ("\t\t\t\t\"type\": \"OPT_PARITY_PRM%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
+			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
+			printf ("\t\t\t\t\"U-bit\": %s,\n", (opt_parity_prm->opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
 			printf ("\t\t\t\t\"P-bit\": %s,\n", (opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO) ? "true" : "false");
 			printf ("\t\t\t\t\"O-bit\": %s,\n", (opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND) ? "true" : "false");
 			printf ("\t\t\t\t\"transmissionGroupSize\": %i\n", g_ntohl(opt_parity_prm->parity_prm_tgs));
 			break;
 		}
 
-		default:
-			printf ("\t\t\t\t\"type\": 0x%x%s\n", opt_header->opt_type, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+		case PGM_OPT_SYN:
+		{
+			struct pgm_opt_syn* opt_syn = (struct pgm_opt_syn*)(opt_header + 1);
+			printf ("\t\t\t\t\"type\": \"OPT_SYN%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
+			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
+			printf ("\t\t\t\t\"U-bit\": %s\n", (opt_syn->opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
 			break;
+		}
+
+		default:
+		{
+			guint8 opt_reserved = *(guint8*)(opt_header + 1);
+			printf ("\t\t\t\t\"type\": 0x%x%s,\n", opt_header->opt_type, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
+			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
+			printf ("\t\t\t\t\"U-bit\": %s\n", (opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
+			break;
+		}
 		}
 		printf ("\t\t\t}");
 
