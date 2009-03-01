@@ -2,6 +2,10 @@
 use vars qw ( %config );
 
 %config = (
+	msapp => {
+		host	=> 'momo',
+		ip	=> '10.6.28.34',
+	},
 	app => {
 		host	=> 'ayaka',
 		ip	=> '10.6.28.31',

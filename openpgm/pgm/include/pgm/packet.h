@@ -160,6 +160,7 @@ struct pgm_opt_header {
     guint8	opt_length;		/* option length */
     guint8	opt_reserved;
 #define PGM_OP_ENCODED		0x8	/* F-bit */
+#define PGM_OPX_MASK		0x3
 #define PGM_OPX_IGNORE		0x0	/* extensibility bits */
 #define PGM_OPX_INVALIDATE	0x1
 #define PGM_OPX_DISCARD		0x2
