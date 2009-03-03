@@ -1287,7 +1287,7 @@ net_send_spmr (
 	gchar buf[ tpdu_length ];
 
         struct pgm_header *header = (struct pgm_header*)buf;
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 	header->pgm_sport       = transport->dport;
 	header->pgm_dport       = peer_sport;
 	header->pgm_type        = PGM_SPMR;
