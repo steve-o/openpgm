@@ -2500,7 +2500,8 @@ recv_again:
 		}
 		else if ( pgm_is_upstream (pgm_header->pgm_type)
 			&& !pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst_addr)
-			&& ( pgm_header->pgm_dport == transport->tsi.sport ) )
+			&& ( pgm_header->pgm_dport == transport->tsi.sport )
+			&& pgm_gsi_equal (&tsi.gsi, &transport->tsi.gsi) )
 		{
 
 /* unicast upstream message, note that dport & sport are reversed */
@@ -4015,7 +4016,7 @@ send_spmr (
 	const gsize tpdu_length = sizeof(struct pgm_header);
 	guint8 buf[ tpdu_length ];
 	struct pgm_header *header = (struct pgm_header*)buf;
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 /* dport & sport reversed communicating upstream */
 	header->pgm_sport	= transport->dport;
 	header->pgm_dport	= peer_sport;
@@ -4093,7 +4094,7 @@ send_nak (
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
 	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
 	header->pgm_sport	= transport->dport;

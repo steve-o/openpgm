@@ -1463,7 +1463,7 @@ net_send_nak (
 
         struct pgm_header *header = (struct pgm_header*)buf;
         struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
-        memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+        memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 
 	guint16 peer_sport = peer->tsi.sport;
 	struct sockaddr_storage peer_nla;

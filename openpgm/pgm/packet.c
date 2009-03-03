@@ -1175,6 +1175,10 @@ pgm_print_options (
 			printf ("OPT_SYN ");
 			break;
 
+		case PGM_OPT_FIN:
+			printf ("OPT_FIN ");
+			break;
+
 		case PGM_OPT_RST:
 			printf ("OPT_RST ");
 			break;
