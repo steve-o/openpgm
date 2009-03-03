@@ -201,6 +201,7 @@ backoff_state_foreach (
 		/* -- pretend to send nak here -- */
 
 /* nak sent, await ncf */
+		rp->state = PGM_PKT_WAIT_NCF_STATE;
 		g_queue_push_head_link (r->wait_ncf_queue, &rp->link_);
 
 		list = next_list_el;

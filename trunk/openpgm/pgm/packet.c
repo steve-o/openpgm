@@ -1175,6 +1175,18 @@ pgm_print_options (
 			printf ("OPT_SYN ");
 			break;
 
+		case PGM_OPT_RST:
+			printf ("OPT_RST ");
+			break;
+
+		case PGM_OPT_PARITY_PRM:
+			printf ("OPT_PARITY_PRM ");
+			break;
+
+		case PGM_OPT_CURR_TGSIZE:
+			printf ("OPT_CURR_TGSIZE ");
+			break;
+
 		default:
 			printf ("OPT-%u{%u} ", opt_header->opt_type & PGM_OPT_MASK, opt_header->opt_length);
 			break;
