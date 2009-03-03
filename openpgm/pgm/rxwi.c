@@ -620,7 +620,7 @@ pgm_rxw_push_fragment (
 		if ( pgm_rxw_full(r) )
 		{
 			dropped++;
-//			g_warning ("#%u: dropping #%u due to odata filling window.", sequence_number, r->trail);
+//			g_trace ("#%u: dropping #%u due to odata filling window.", sequence_number, r->trail);
 
 			pgm_rxw_pop_trail (r);
 //			pgm_rxw_flush (r);
@@ -652,7 +652,7 @@ pgm_rxw_push_fragment (
 				if ( pgm_rxw_full(r) )
 				{
 					dropped++;
-//					g_warning ("dropping #%u due to odata filling window.", r->trail);
+//					g_trace ("dropping #%u due to odata filling window.", r->trail);
 
 					pgm_rxw_pop_trail (r);
 //					pgm_rxw_flush (r);
@@ -1425,7 +1425,7 @@ pgm_rxw_window_update (
 /* check bounds of commit window */
 		guint32 new_commit_sqns = ( 1 + txw_lead ) - r->commit_trail;
 		if ( !pgm_rxw_commit_empty (r) &&
-		     (new_commit_sqns >= pgm_rxw_len (r)) )
+		     (new_commit_sqns > pgm_rxw_len (r)) )
 		{
 			guint32 constrained_lead = r->commit_trail + pgm_rxw_len (r) - 1;
 			g_trace ("constraining advertised lead %u to commit window, new lead %u",
@@ -1444,7 +1444,7 @@ pgm_rxw_window_update (
 				if ( pgm_rxw_full(r) )
 				{
 					dropped++;
-//					g_warning ("dropping #%u due to full window.", r->trail);
+//					g_trace ("dropping #%u due to full window.", r->trail);
 
 					pgm_rxw_pop_trail (r);
 					r->is_waiting = TRUE;
@@ -1679,7 +1679,7 @@ pgm_rxw_ncf (
 /* check bounds of commit window */
 	guint32 new_commit_sqns = ( 1 + sequence_number ) - r->commit_trail;
 	if ( !pgm_rxw_commit_empty (r) &&
-		(new_commit_sqns >= pgm_rxw_len (r)) )
+		(new_commit_sqns > pgm_rxw_len (r)) )
 	{
 		pgm_rxw_window_update (r, r->rxw_trail, sequence_number, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
 		retval = PGM_RXW_CREATED_PLACEHOLDER;
@@ -1691,7 +1691,7 @@ pgm_rxw_ncf (
 		if ( pgm_rxw_full(r) )
 		{
 			dropped++;
-//			g_warning ("dropping #%u due to full window.", r->trail);
+//			g_trace ("dropping #%u due to full window.", r->trail);
 
 			pgm_rxw_pop_trail (r);
 			r->is_waiting = TRUE;
@@ -1720,7 +1720,7 @@ pgm_rxw_ncf (
 	if ( pgm_rxw_full(r) )
 	{
 		dropped++;
-//		g_warning ("dropping #%u due to full window.", r->trail);
+//		g_trace ("dropping #%u due to full window.", r->trail);
 
 		pgm_rxw_pop_trail (r);
 		r->is_waiting = TRUE;

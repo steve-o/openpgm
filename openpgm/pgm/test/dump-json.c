@@ -1215,6 +1215,17 @@ print_options (
 			break;
 		}
 
+		case PGM_OPT_CURR_TGSIZE:
+		{
+			struct pgm_opt_curr_tgsize* opt_curr_tgsize = (struct pgm_opt_curr_tgsize*)(opt_header + 1);
+			printf ("\t\t\t\t\"type\": \"OPT_CURR_TGSIZE%s\",\n", (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
+			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
+			printf ("\t\t\t\t\"U-bit\": %s,\n", (opt_curr_tgsize->opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
+			printf ("\t\t\t\t\"actualTransmissionGroupSize\": %i\n", g_ntohl(opt_curr_tgsize->prm_atgsize));
+			break;
+		}
+
 		case PGM_OPT_SYN:
 		{
 			struct pgm_opt_syn* opt_syn = (struct pgm_opt_syn*)(opt_header + 1);
@@ -1228,7 +1239,7 @@ print_options (
 		default:
 		{
 			guint8 opt_reserved = *(guint8*)(opt_header + 1);
-			printf ("\t\t\t\t\"type\": 0x%x%s,\n", opt_header->opt_type, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"type\": \"0x%x%s\",\n", opt_header->opt_type, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
 			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
 			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
 			printf ("\t\t\t\t\"U-bit\": %s\n", (opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");
