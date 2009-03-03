@@ -1489,32 +1489,37 @@ pgm_rxw_window_update (
 		g_trace ("advancing rxw_trail to %u", txw_trail);
 		r->rxw_trail = txw_trail;
 
-/* jump remaining sequence numbers if window is empty */
-		if ( pgm_rxw_empty(r) )
+		if (SLIDINGWINDOW_GT(r, r->rxw_trail, r->trail))
 		{
-			const guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
+			g_trace ("advancing trail to rxw_trail");
 
-			dropped  += distance;
-			r->commit_trail = r->commit_lead = r->trail += distance;
-			r->lead  += distance;
-		}
-		else
-		{
-/* mark lost all non-received sequence numbers between commit lead and new rxw_trail */
-			for (guint32 sequence_number = r->commit_lead;
-			     IN_TXW(r, sequence_number) && SLIDINGWINDOW_GT(r, r->rxw_trail, sequence_number);
-			     sequence_number++)
+/* jump remaining sequence numbers if window is empty */
+			if ( pgm_rxw_empty(r) )
 			{
-				pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
-				if (rp->state == PGM_PKT_BACK_OFF_STATE ||
-				    rp->state == PGM_PKT_WAIT_NCF_STATE ||
-				    rp->state == PGM_PKT_WAIT_DATA_STATE)
+				const guint32 distance = ( (gint32)(r->rxw_trail) - (gint32)(r->trail) );
+
+				dropped  += distance;
+				r->commit_trail = r->commit_lead = r->trail += distance;
+				r->lead  += distance;
+			}
+			else
+			{
+/* mark lost all non-received sequence numbers between commit lead and new rxw_trail */
+				for (guint32 sequence_number = r->commit_lead;
+				     IN_TXW(r, sequence_number) && SLIDINGWINDOW_GT(r, r->rxw_trail, sequence_number);
+				     sequence_number++)
 				{
-					dropped++;
-					pgm_rxw_mark_lost (r, sequence_number);
+					pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
+					if (rp->state == PGM_PKT_BACK_OFF_STATE ||
+					    rp->state == PGM_PKT_WAIT_NCF_STATE ||
+					    rp->state == PGM_PKT_WAIT_DATA_STATE)
+					{
+						dropped++;
+						pgm_rxw_mark_lost (r, sequence_number);
+					}
 				}
 			}
-		}
+		} /* trail > commit_lead */
 	}
 	else
 	{
