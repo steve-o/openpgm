@@ -4235,7 +4235,7 @@ send_parity_nak (
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
 	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
 	header->pgm_sport	= transport->dport;
@@ -4314,7 +4314,7 @@ send_nak_list (
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
 	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
-	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
 	header->pgm_sport	= transport->dport;
