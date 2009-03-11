@@ -482,7 +482,31 @@ pgm_transport_destroy (
 		transport->is_apdu_eagain = FALSE;
 	}
 
+/* cleanup rdata-transmit channel in timer thread */
+	if (transport->rdata_id) {
+		g_source_remove (transport->rdata_id);
+		transport->rdata_id = 0;
+	}
+	if (transport->rdata_channel) {
+		g_io_channel_unref (transport->rdata_channel);
+		transport->rdata_channel = NULL;
+	}
+
 /* terminate & join internal thread */
+	if (transport->notify_id) {
+		g_source_remove (transport->notify_id);
+		transport->notify_id = 0;
+	}
+	if (transport->notify_channel) {
+		g_io_channel_unref (transport->notify_channel);
+		transport->notify_channel = NULL;
+	}
+
+	if (transport->timer_id) {
+		g_source_remove (transport->timer_id);
+		transport->timer_id = 0;
+	}
+
 #ifndef PGM_SINGLE_THREAD
 	if (transport->timer_thread) {
 		g_main_loop_quit (transport->timer_loop);
@@ -1992,14 +2016,14 @@ pgm_transport_bind (
 	}
 
 /* any to timer notify channel */
-	transport->timer_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_notify));
-	g_io_add_watch_context_full (transport->timer_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_notify, transport, NULL);
+	transport->notify_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_notify));
+	transport->notify_id = g_io_add_watch_context_full (transport->notify_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_notify, transport, NULL);
 
 /* rx to nak processor notify channel */
 	if (transport->can_send_data)
 	{
 		transport->rdata_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->rdata_notify));
-		g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_notify, transport, NULL);
+		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_notify, transport, NULL);
 
 /* create recyclable SPM packet */
 		switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
@@ -2086,7 +2110,7 @@ pgm_transport_bind (
 	}
 
 	g_trace ("INFO","adding dynamic timer");
-	pgm_add_timer (transport);
+	transport->timer_id = pgm_add_timer (transport);
 
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = g_malloc ( transport->max_tpdu );
@@ -3300,11 +3324,18 @@ on_spm (
 			}
 		}
 
-		if (transport->will_close_on_failure &&
-		    ((pgm_rxw_t*)sender->rxw)->cumulative_losses &&
-		    transport->is_open)
+/* mark receiver window for flushing on next recv() */
+		pgm_rxw_t* sender_rxw = (pgm_rxw_t*)sender->rxw;
+		if (sender_rxw->cumulative_losses != sender_rxw->ack_cumulative_losses &&
+		    !sender_rxw->waiting_link.data)
 		{
-			transport->is_open = FALSE;
+			transport->has_lost_data = TRUE;
+			sender_rxw->pgm_sock_err.lost_count = sender_rxw->cumulative_losses - sender_rxw->ack_cumulative_losses;
+			sender_rxw->ack_cumulative_losses = sender_rxw->cumulative_losses;
+
+			sender_rxw->waiting_link.data = sender_rxw;
+			sender_rxw->waiting_link.next = transport->peers_waiting;
+			transport->peers_waiting = &sender_rxw->waiting_link;
 		}
 	}
 	else
@@ -3708,11 +3739,18 @@ on_peer_nak (
 		nak_list_len--;
 	}
 
-	if (transport->will_close_on_failure &&
-	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
-	    transport->is_open)
+/* mark receiver window for flushing on next recv() */
+	pgm_rxw_t* peer_rxw = (pgm_rxw_t*)peer->rxw;
+	if (peer_rxw->cumulative_losses != peer_rxw->ack_cumulative_losses &&
+	    !peer_rxw->waiting_link.data)
 	{
-		transport->is_open = FALSE;
+		transport->has_lost_data = TRUE;
+		peer_rxw->pgm_sock_err.lost_count = peer_rxw->cumulative_losses - peer_rxw->ack_cumulative_losses;
+		peer_rxw->ack_cumulative_losses = peer_rxw->cumulative_losses;
+
+		peer_rxw->waiting_link.data = peer_rxw;
+		peer_rxw->waiting_link.next = transport->peers_waiting;
+		transport->peers_waiting = &peer_rxw->waiting_link;
 	}
 
 out_unlock:
@@ -3830,11 +3868,18 @@ on_ncf (
 		ncf_list_len--;
 	}
 
-	if (transport->will_close_on_failure &&
-	    ((pgm_rxw_t*)peer->rxw)->cumulative_losses &&
-	    transport->is_open)
+/* mark receiver window for flushing on next recv() */
+	pgm_rxw_t* peer_rxw = (pgm_rxw_t*)peer->rxw;
+	if (peer_rxw->cumulative_losses != peer_rxw->ack_cumulative_losses &&
+	    !peer_rxw->waiting_link.data)
 	{
-		transport->is_open = FALSE;
+		transport->has_lost_data = TRUE;
+		peer_rxw->pgm_sock_err.lost_count = peer_rxw->cumulative_losses - peer_rxw->ack_cumulative_losses;
+		peer_rxw->ack_cumulative_losses = peer_rxw->cumulative_losses;
+
+		peer_rxw->waiting_link.data = peer_rxw;
+		peer_rxw->waiting_link.next = transport->peers_waiting;
+		transport->peers_waiting = &peer_rxw->waiting_link;
 	}
 
 out_unlock:
@@ -4719,13 +4764,19 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 	if (dropped_invalid)
 	{
-		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
 
-		if (transport->will_close_on_failure &&
-		    rxw->cumulative_losses &&
-		    transport->is_open)
+/* mark receiver window for flushing on next recv() */
+		if (rxw->cumulative_losses != rxw->ack_cumulative_losses &&
+		    !rxw->waiting_link.data)
 		{
-			transport->is_open = FALSE;
+			transport->has_lost_data = TRUE;
+			rxw->pgm_sock_err.lost_count = rxw->cumulative_losses - rxw->ack_cumulative_losses;
+			rxw->ack_cumulative_losses = rxw->cumulative_losses;
+
+			rxw->waiting_link.data = rxw;
+			rxw->waiting_link.next = transport->peers_waiting;
+			transport->peers_waiting = &rxw->waiting_link;
 		}
 	}
 
@@ -5032,11 +5083,17 @@ nak_rpt_state (
 				rxw->fragment_count);
 	}
 
-	if (transport->will_close_on_failure &&
-	    rxw->cumulative_losses &&
-	    transport->is_open)
+/* mark receiver window for flushing on next recv() */
+	if (rxw->cumulative_losses != rxw->ack_cumulative_losses &&
+	    !rxw->waiting_link.data)
 	{
-		transport->is_open = FALSE;
+		transport->has_lost_data = TRUE;
+		rxw->pgm_sock_err.lost_count = rxw->cumulative_losses - rxw->ack_cumulative_losses;
+		rxw->ack_cumulative_losses = rxw->cumulative_losses;
+
+		rxw->waiting_link.data = rxw;
+		rxw->waiting_link.next = transport->peers_waiting;
+		transport->peers_waiting = &rxw->waiting_link;
 	}
 
 	if (rxw->wait_ncf_queue->tail)
@@ -5163,11 +5220,17 @@ nak_rdata_state (
 		g_message ("dropped %u messages due to data cancellation.", dropped);
 	}
 
-	if (transport->will_close_on_failure &&
-	    rxw->cumulative_losses &&
-	    transport->is_open)
+/* mark receiver window for flushing on next recv() */
+	if (rxw->cumulative_losses != rxw->ack_cumulative_losses &&
+	    !rxw->waiting_link.data)
 	{
-		transport->is_open = FALSE;
+		transport->has_lost_data = TRUE;
+		rxw->pgm_sock_err.lost_count = rxw->cumulative_losses - rxw->ack_cumulative_losses;
+		rxw->ack_cumulative_losses = rxw->cumulative_losses;
+
+		rxw->waiting_link.data = rxw;
+		rxw->waiting_link.next = transport->peers_waiting;
+		transport->peers_waiting = &rxw->waiting_link;
 	}
 
 	if (rxw->wait_data_queue->tail)
@@ -6838,6 +6901,7 @@ pgm_timer_dispatch (
 
 	return TRUE;
 }
+
 
 /* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
  */
