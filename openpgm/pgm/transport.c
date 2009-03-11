@@ -150,6 +150,7 @@ static int on_rdata (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static gssize pgm_transport_send_one (pgm_transport_t*, gpointer, gsize, int);
 static gssize pgm_transport_send_one_copy (pgm_transport_t*, gconstpointer, gsize, int);
 
+static gboolean g_source_remove_context (GMainContext*, guint);
 static int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
 
@@ -484,10 +485,7 @@ pgm_transport_destroy (
 
 /* cleanup rdata-transmit channel in timer thread */
 	if (transport->rdata_id > 0) {
-		GSource* source = g_main_context_find_source_by_id (transport->timer_context, transport->rdata_id);
-		if (source)
-			g_source_destroy (source);
-		transport->rdata_id = 0;
+		g_source_remove_context (transport->timer_context, transport->rdata_id);
 	}
 	if (transport->rdata_channel) {
 		g_io_channel_unref (transport->rdata_channel);
@@ -496,9 +494,7 @@ pgm_transport_destroy (
 
 /* terminate & join internal thread */
 	if (transport->notify_id > 0) {
-		GSource* source = g_main_context_find_source_by_id (transport->timer_context, transport->notify_id);
-		if (source)
-			g_source_destroy (source);
+		g_source_remove_context (transport->timer_context, transport->notify_id);
 		transport->notify_id = 0;
 	}
 	if (transport->notify_channel) {
@@ -507,9 +503,7 @@ pgm_transport_destroy (
 	}
 
 	if (transport->timer_id > 0) {
-		GSource* source = g_main_context_find_source_by_id (transport->timer_context, transport->timer_id);
-		if (source)
-			g_source_destroy (source);
+		g_source_remove_context (transport->timer_context, transport->timer_id);
 		transport->timer_id = 0;
 	}
 
@@ -1520,6 +1514,23 @@ g_io_add_watch_context_full (
 	g_source_unref (source);
 
 	return id;
+}
+
+static gboolean
+g_source_remove_context (
+	GMainContext*		context,
+	guint			tag
+	)
+{
+	GSource* source;
+
+	g_return_val_if_fail (tag > 0, FALSE);
+
+	source = g_main_context_find_source_by_id (context, tag);
+	if (source)
+		g_source_destroy (source);
+
+	return source != NULL;
 }
 
 /* bind the sockets to the link layer to start receiving data.
