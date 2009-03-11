@@ -483,8 +483,10 @@ pgm_transport_destroy (
 	}
 
 /* cleanup rdata-transmit channel in timer thread */
-	if (transport->rdata_id) {
-		g_source_remove (transport->rdata_id);
+	if (transport->rdata_id > 0) {
+		GSource* source = g_main_context_find_source_by_id (transport->timer_context, transport->rdata_id);
+		if (source)
+			g_source_destroy (source);
 		transport->rdata_id = 0;
 	}
 	if (transport->rdata_channel) {
@@ -493,8 +495,10 @@ pgm_transport_destroy (
 	}
 
 /* terminate & join internal thread */
-	if (transport->notify_id) {
-		g_source_remove (transport->notify_id);
+	if (transport->notify_id > 0) {
+		GSource* source = g_main_context_find_source_by_id (transport->timer_context, transport->notify_id);
+		if (source)
+			g_source_destroy (source);
 		transport->notify_id = 0;
 	}
 	if (transport->notify_channel) {
@@ -502,8 +506,10 @@ pgm_transport_destroy (
 		transport->notify_channel = NULL;
 	}
 
-	if (transport->timer_id) {
-		g_source_remove (transport->timer_id);
+	if (transport->timer_id > 0) {
+		GSource* source = g_main_context_find_source_by_id (transport->timer_context, transport->timer_id);
+		if (source)
+			g_source_destroy (source);
 		transport->timer_id = 0;
 	}
 
