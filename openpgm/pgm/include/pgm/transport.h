@@ -194,6 +194,7 @@ struct pgm_transport_t {
     GThread		*timer_thread;
     GMainLoop		*timer_loop;
     GMainContext	*timer_context;
+    guint               timer_id;
     gboolean		is_bound;
     gboolean		is_open;
     gboolean            has_lost_data;
@@ -291,10 +292,12 @@ struct pgm_transport_t {
 
     pgm_notify_t	rdata_notify;		    /* rx to timer */
     GIOChannel*		rdata_channel;
+    guint		rdata_id;
 
     pgm_time_t		next_poll;
     pgm_notify_t	timer_notify;		    /* any to timer */
-    GIOChannel*		timer_channel;
+    GIOChannel*		notify_channel;
+    guint               notify_id;
 
     guint32		cumulative_stats[PGM_PC_SOURCE_MAX];
     guint32		snap_stats[PGM_PC_SOURCE_MAX];
