@@ -4875,13 +4875,13 @@ check_peer_nak_state (
 		{
 			if (((pgm_rxw_t*)peer->rxw)->committed_count)
 			{
-				g_message ("peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
+				g_trace ("peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
 				peer->expiry += transport->peer_expiry;
 				g_static_mutex_unlock (&peer->mutex);
 			}
 			else
 			{
-				g_message ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
+				g_warning ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
 				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
 				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->link_);
 				g_static_mutex_unlock (&peer->mutex);
@@ -5080,11 +5080,11 @@ nak_rpt_state (
 	}
 
 	if (dropped_invalid) {
-		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
 	}
 
 	if (dropped) {
-		g_message ("dropped %u messages due to ncf cancellation, "
+		g_trace ("dropped %u messages due to ncf cancellation, "
 				"rxw_sqns %" G_GUINT32_FORMAT
 				" bo %" G_GUINT32_FORMAT
 				" ncf %" G_GUINT32_FORMAT
@@ -5230,11 +5230,11 @@ nak_rdata_state (
 	}
 
 	if (dropped_invalid) {
-		g_message ("dropped %u messages due to invalid NLA.", dropped_invalid);
+		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
 	}
 
 	if (dropped) {
-		g_message ("dropped %u messages due to data cancellation.", dropped);
+		g_trace ("dropped %u messages due to data cancellation.", dropped);
 	}
 
 /* mark receiver window for flushing on next recv() */
@@ -5320,15 +5320,6 @@ pgm_transport_send_one (
 /* continue if send would block */
 	if (transport->is_apdu_eagain) {
 		goto retry_send;
-	}
-
-	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
-	{
-	        const gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + tsdu_length;
-		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
-		if (result == -1) {
-			return (gssize)result;
-		}
 	}
 
 /* retrieve packet storage from transmit window
@@ -5433,15 +5424,6 @@ pgm_transport_send_one_copy (
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain) {
 		goto retry_send;
-	}
-
-	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
-	{
-	        const gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + tsdu_length;
-		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
-		if (result == -1) {
-			return (gssize)result;
-		}
 	}
 
 	g_static_rw_lock_writer_lock (&transport->txw_lock);
@@ -5568,15 +5550,6 @@ pgm_transport_send_onev (
 		STATE(tsdu_length) += vector[i].iov_len;
 	}
 	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, -EMSGSIZE);
-
-	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
-	{
-	        gsize tpdu_length = pgm_transport_pkt_offset (FALSE) + STATE(tsdu_length);
-		int result = pgm_rate_check (transport->rate_control, tpdu_length, flags);
-		if (result == -1) {
-			return (gssize)result;
-		}
-	}
 
 	g_static_rw_lock_writer_lock (&transport->txw_lock);
 	STATE(pkt) = pgm_txw_alloc (transport->txw);
@@ -5710,6 +5683,7 @@ pgm_transport_send (
 	}
 
 /* if non-blocking calculate total wire size and check rate limit */
+	STATE(is_rate_limited) = FALSE;
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
 	{
 		gsize header_length = pgm_transport_pkt_offset (TRUE);
@@ -5726,6 +5700,8 @@ pgm_transport_send (
 		if (result == -1) {
 			return (gssize)result;
 		}
+
+		STATE(is_rate_limited) = TRUE;
 	}
 
 	STATE(data_bytes_offset) = 0;
@@ -5785,8 +5761,8 @@ pgm_transport_send (
 		gssize sent;
 retry_send:
 		sent = pgm_sendto (transport,
-					TRUE,			/* rate limited */
-					FALSE,			/* regular socket */
+					!STATE(is_rate_limited),	/* rate limit on blocking */
+					FALSE,				/* regular socket */
 					STATE(pkt),
 					STATE(tpdu_length),
 					(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
@@ -5935,6 +5911,7 @@ pgm_transport_sendv (
 	g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
 
 /* if non-blocking calculate total wire size and check rate limit */
+	STATE(is_rate_limited) = FALSE;
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
         {
 		gsize header_length = pgm_transport_pkt_offset (TRUE);
@@ -5951,6 +5928,7 @@ pgm_transport_sendv (
                 if (result == -1) {
 			return (gssize)result;
                 }
+		STATE(is_rate_limited) = TRUE;
         }
 
 /* non-fragmented packets can be forwarded onto basic send() */
@@ -6077,8 +6055,8 @@ retry_send:
 		gssize sent;
 retry_one_apdu_send:
 		sent = pgm_sendto (transport,
-					TRUE,			/* rate limited */
-					FALSE,			/* regular socket */
+					!STATE(is_rate_limited),	/* rate limited on blocking */
+					FALSE,				/* regular socket */
 					STATE(pkt),
 					STATE(tpdu_length),
 					(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
@@ -6193,6 +6171,7 @@ pgm_transport_send_packetv (
 		goto retry_send;
 	}
 
+	STATE(is_rate_limited) = FALSE;
 	if (flags & MSG_DONTWAIT && flags & MSG_WAITALL)
 	{
 		gsize total_tpdu_length = 0;
@@ -6206,6 +6185,8 @@ pgm_transport_send_packetv (
 		if (result == -1) {
 			return (gssize)result;
 		}
+
+		STATE(is_rate_limited) = TRUE;
 	}
 
 	g_static_rw_lock_writer_lock (&transport->txw_lock);
@@ -6282,8 +6263,8 @@ pgm_transport_send_packetv (
 		gssize sent;
 retry_send:
 		sent = pgm_sendto (transport,
-					TRUE,			/* rate limited */
-					FALSE,			/* regular socket */
+					!STATE(is_rate_limited),	/* rate limited on blocking */
+					FALSE,				/* regular socket */
 					STATE(pkt),
 					STATE(tpdu_length),
 					(flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
