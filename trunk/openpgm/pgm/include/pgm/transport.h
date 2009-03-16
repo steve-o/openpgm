@@ -246,6 +246,7 @@ struct pgm_transport_t {
 	gsize		    apdu_length;
 	guint		    vector_index;
 	gsize		    vector_offset;
+	gboolean	    is_rate_limited;
     } pkt_dontwait_state;
 
     guint32		spm_sqn;

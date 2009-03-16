@@ -291,7 +291,7 @@ pgm_txw_push (
 /* check for full window */
 	if ( pgm_txw_full (t) )
 	{
-//		g_warning ("full :o");
+//		g_trace ("full :o");
 
 /* transmit window advancement scheme dependent action here */
 		pgm_txw_pop (t);
