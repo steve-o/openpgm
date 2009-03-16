@@ -92,8 +92,9 @@ pgm_rate_check (
 	pgm_time_t time_since_last_rate_check = pgm_time_update_now() - BUCKET->last_rate_check;
 
 	BUCKET->rate_limit += (double)BUCKET->rate_per_sec * (double)pgm_to_secs((double)time_since_last_rate_check);
-	if (BUCKET->rate_limit > BUCKET->rate_per_sec) 
-		BUCKET->rate_limit = BUCKET->rate_per_sec;
+/* per milli-second */
+	if (BUCKET->rate_limit > (BUCKET->rate_per_sec / 1000)) 
+		BUCKET->rate_limit = BUCKET->rate_per_sec / 1000;
 	BUCKET->last_rate_check = pgm_time_now;
 
 	gint new_rate_limit = BUCKET->rate_limit - ( BUCKET->iphdr_len + data_size );

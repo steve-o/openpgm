@@ -448,7 +448,7 @@ pgm_rxw_push_fragment (
 
 		if ( !IN_TXW(r, sequence_number) )
 		{
-			g_warning ("#%u: not in transmit window, discarding.", sequence_number);
+			g_trace ("#%u: not in transmit window, discarding.", sequence_number);
 			retval = PGM_RXW_NOT_IN_TXW;
 			goto out;
 		}
@@ -1529,7 +1529,7 @@ pgm_rxw_window_update (
 		{
 			if (txw_trail != r->rxw_trail)
 			{
-				g_warning ("rxw_trail stepped backwards, ignoring.");
+				g_trace ("rxw_trail stepped backwards, ignoring.");
 			}
 		}
 	}
@@ -1670,7 +1670,7 @@ pgm_rxw_ncf (
 /* not an expected ncf, extend receive window to pre-empt loss detection */
 	if ( !IN_TXW(r, sequence_number) )
 	{
-		g_warning ("ncf #%u not in tx window, discarding.", sequence_number);
+		g_trace ("ncf #%u not in tx window, discarding.", sequence_number);
 		retval = PGM_RXW_NOT_IN_TXW;
 		goto out;
 	}
