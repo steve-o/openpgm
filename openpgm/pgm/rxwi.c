@@ -842,7 +842,8 @@ pgm_rxw_readv (
 			{
 				if ( g_ntohl (cp->of_apdu_first_sqn) != cp->sequence_number )
 				{
-					g_trace ("partial apdu at trailing edge");
+					g_trace ("partial apdu at trailing edge, marking lost.");
+					pgm_rxw_mark_lost (r, cp->sequence_number);
 					break;
 				}
 
