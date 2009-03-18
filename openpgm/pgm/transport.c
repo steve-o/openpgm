@@ -2844,11 +2844,12 @@ pgm_transport_recvmsg (
  */
 
 gssize
-pgm_transport_recv (
+pgm_transport_recvfrom (
 	pgm_transport_t*	transport,
 	gpointer		data,
 	gsize			len,
-	int			flags		/* MSG_DONTWAIT for non-blocking */
+	int			flags,		/* MSG_DONTWAIT for non-blocking */
+	pgm_tsi_t*		from
 	)
 {
 	pgm_msgv_t msgv;
@@ -2860,6 +2861,11 @@ pgm_transport_recv (
 	{
 		gssize bytes_copied = 0;
 		struct iovec* p = msgv.msgv_iov;
+
+/* copy sender TSI to application buffer */
+		if (from) {
+			memcpy (from, msgv.msgv_tsi, sizeof(pgm_tsi_t));
+		}
 
 		do {
 			size_t src_bytes = p->iov_len;
@@ -2885,6 +2891,17 @@ pgm_transport_recv (
 	}
 
 	return bytes_read;
+}
+
+gssize
+pgm_transport_recv (
+	pgm_transport_t*	transport,
+	gpointer		data,
+	gsize			len,
+	int			flags		/* MSG_DONTWAIT for non-blocking */
+	)
+{
+	return pgm_transport_recvfrom (transport, data, len, flags, NULL);
 }
 
 /* add select parameters for the transports receive socket(s)

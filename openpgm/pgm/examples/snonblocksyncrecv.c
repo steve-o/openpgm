@@ -60,7 +60,7 @@ static gboolean g_quit = FALSE;
 static void on_signal (int);
 static gboolean on_startup (void);
 
-static int on_data (gpointer, guint, gpointer);
+static int on_data (gpointer, guint, pgm_tsi_t*);
 
 
 G_GNUC_NORETURN static void
@@ -112,11 +112,12 @@ main (
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
+		pgm_tsi_t from;
 		char buffer[4096];
-		gssize len = pgm_transport_recv (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */);
+		gssize len = pgm_transport_recvfrom (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */, &from);
 		if (len >= 0)
 		{
-			on_data (buffer, len, NULL);
+			on_data (buffer, len, &from);
 		}
 		else if (errno == EAGAIN)
 		{
@@ -229,16 +230,18 @@ static int
 on_data (
 	gpointer	data,
 	guint		len,
-	G_GNUC_UNUSED gpointer	user_data
+	pgm_tsi_t*	from
 	)
 {
 /* protect against non-null terminated strings */
-	char buf[1024];
+	char buf[1024], tsi[PGM_TSISTRLEN];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
+	pgm_print_tsi_r (from, tsi, sizeof(tsi));
 
-	g_message ("\"%s\" (%i bytes)",
+	g_message ("\"%s\" (%i bytes from %s)",
 			buf,
-			len);
+			len,
+			tsi);
 
 	return 0;
 }
