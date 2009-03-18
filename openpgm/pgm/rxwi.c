@@ -200,6 +200,7 @@ pgm_rxw_parity_data_empty (pgm_rxw_t* r)
 
 pgm_rxw_t*
 pgm_rxw_init (
+	const void*	identifier,		/* TSI */
 	guint16		tpdu_length,
 	guint32		preallocate_size,
 	guint32		rxw_sqns,		/* transmit window size in sequence numbers */
@@ -214,6 +215,7 @@ pgm_rxw_init (
 		tpdu_length, preallocate_size, rxw_sqns, rxw_secs, rxw_max_rte);
 
 	pgm_rxw_t* r = g_slice_alloc0 (sizeof(pgm_rxw_t));
+	r->identifier = identifier;
 	r->pdata = g_ptr_array_new ();
 	r->max_tpdu = tpdu_length;
 
@@ -875,8 +877,9 @@ pgm_rxw_readv (
 						g_ntohl (cp->of_apdu_first_sqn), ap->sequence_number);
 
 /* pass upstream & cleanup */
-					(*pmsg)->msgv_iovlen = 0;
-					(*pmsg)->msgv_iov    = *piov;
+					(*pmsg)->msgv_identifier = r->identifier;
+					(*pmsg)->msgv_iovlen     = 0;
+					(*pmsg)->msgv_iov        = *piov;
 					for (guint32 i = g_ntohl (cp->of_apdu_first_sqn); i < frag; i++)
 					{
 						ap = RXW_PACKET(r, i);
@@ -920,8 +923,9 @@ pgm_rxw_readv (
 					cp->sequence_number);
 
 /* pass upstream, including data memory ownership */
-				(*pmsg)->msgv_iovlen = 1;
-				(*pmsg)->msgv_iov    = *piov;
+				(*pmsg)->msgv_identifier = r->identifier;
+				(*pmsg)->msgv_iovlen     = 1;
+				(*pmsg)->msgv_iov        = *piov;
 				(*piov)->iov_base = cp->data;
 				(*piov)->iov_len  = cp->length;
 				bytes_read += cp->length;

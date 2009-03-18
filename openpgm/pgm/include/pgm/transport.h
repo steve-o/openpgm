@@ -40,13 +40,14 @@
 #   include <pgm/timer.h>
 #endif
 
-#ifndef __PGM_MSGV_H__
-#   include <pgm/msgv.h>
-#endif
-
 #ifndef __PGM_NOTIFY_H__
 #   include <pgm/notify.h>
 #endif
+
+
+/* maximum length of TSI as a string */
+#define PGM_TSISTRLEN		(sizeof("000.000.000.000.000.000.00000"))
+
 
 /* Performance Counters */
 
@@ -141,6 +142,10 @@ struct pgm_tsi_t {            /* transport session identifier */
 };
 
 typedef struct pgm_tsi_t pgm_tsi_t;
+
+#ifndef __PGM_MSGV_H__
+#   include <pgm/msgv.h>
+#endif
 
 struct pgm_sqn_list_t {
     guint	    len;

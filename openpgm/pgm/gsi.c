@@ -459,7 +459,7 @@ pgm_print_gsi (
 {
 	g_return_val_if_fail (gsi != NULL, NULL);
 
-	static char buf[sizeof("000.000.000.000.000.000")];
+	static char buf[PGM_GSISTRLEN];
 	pgm_print_gsi_r (gsi, buf, sizeof(buf));
 	return buf;
 }

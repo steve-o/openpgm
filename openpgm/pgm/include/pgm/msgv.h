@@ -23,6 +23,11 @@
 #define __PGM_MSGV_H__
 
 struct pgm_msgv_t {
+#ifdef __PGM_TRANSPORT_H__
+	const pgm_tsi_t*	msgv_tsi;
+#else
+	const void*	msgv_identifier;
+#endif
 	struct iovec*	msgv_iov;	/* scatter/gather array */
 	size_t		msgv_iovlen;	/* # elements in iov */
 };

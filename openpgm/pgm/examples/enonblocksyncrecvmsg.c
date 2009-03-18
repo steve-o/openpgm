@@ -246,8 +246,9 @@ on_datav (
 	G_GNUC_UNUSED gpointer user_data
 	)
 {
-	g_message ("(%i bytes)",
-			len);
+	char tsi[PGM_TSISTRLEN];
+	pgm_print_tsi_r (datav->msgv_tsi, tsi, sizeof(tsi));
+	g_message ("(%i bytes from %s)", len, tsi);
 
 /* protect against non-null terminated strings */
 	struct iovec* msgv_iov = datav->msgv_iov;
