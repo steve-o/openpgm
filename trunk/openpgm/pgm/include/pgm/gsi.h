@@ -29,6 +29,9 @@
 #include <glib.h>
 
 
+#define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
+
+
 typedef struct pgm_gsi_t pgm_gsi_t;
 
 struct pgm_gsi_t {

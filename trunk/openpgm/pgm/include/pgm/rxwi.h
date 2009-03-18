@@ -113,6 +113,7 @@ struct pgm_rxw_t {
 	GTrashStack**	trash_data;		/* owned by transport */
 	GTrashStack**	trash_packet;
 	GStaticMutex*	trash_mutex;
+	const void*	identifier;
 	pgm_sock_err_t	pgm_sock_err;
 
 	GSList		waiting_link;
@@ -155,7 +156,7 @@ struct pgm_rxw_t {
 typedef struct pgm_rxw_t pgm_rxw_t;
 
 
-pgm_rxw_t* pgm_rxw_init (guint16, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
+pgm_rxw_t* pgm_rxw_init (const void*, guint16, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
 int pgm_rxw_shutdown (pgm_rxw_t*);
 
 int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, gsize, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);

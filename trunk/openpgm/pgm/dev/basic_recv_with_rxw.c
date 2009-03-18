@@ -315,7 +315,7 @@ on_startup (
 	puts ("startup.");
 
 	puts ("construct receive window.");
-	g_rxw = pgm_rxw_init (g_max_tpdu, 0, g_rxw_sqns, 0, 0, &g_trash_data, &g_trash_packet, &g_trash_mutex);
+	g_rxw = pgm_rxw_init (NULL, g_max_tpdu, 0, g_rxw_sqns, 0, 0, &g_trash_data, &g_trash_packet, &g_trash_mutex);
 
         puts ("starting soup server.");
         g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_http,
