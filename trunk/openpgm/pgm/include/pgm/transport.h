@@ -389,6 +389,7 @@ void pgm_packetv_free1 (pgm_transport_t*, gpointer, gboolean);
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
 gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int);
 gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int);
+gssize pgm_transport_recvfrom (pgm_transport_t*, gpointer, gsize, int, pgm_tsi_t*);
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
