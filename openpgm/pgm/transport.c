@@ -184,7 +184,7 @@ pgm_print_tsi (
 {
 	g_return_val_if_fail (tsi != NULL, NULL);
 
-	static char buf[sizeof("000.000.000.000.000.000.00000")];
+	static char buf[PGM_TSISTRLEN];
 	pgm_print_tsi_r (tsi, buf, sizeof(buf));
 	return buf;
 }
@@ -201,7 +201,7 @@ pgm_tsi_hash (
 {
 	g_assert( v != NULL );
 	const pgm_tsi_t* tsi = v;
-	char buf[sizeof("000.000.000.000.000.000.00000")];
+	char buf[PGM_TSISTRLEN];
 	int valid = pgm_print_tsi_r(tsi, buf, sizeof(buf));
 	g_assert( valid == 0 );
 	return g_str_hash( buf );
@@ -2195,7 +2195,9 @@ new_peer (
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
 
 /* lock on rx window */
-	peer->rxw = pgm_rxw_init (transport->max_tpdu - transport->iphdr_len,
+	peer->rxw = pgm_rxw_init (
+				&peer->tsi,
+				transport->max_tpdu - transport->iphdr_len,
 				transport->rxw_preallocate,
 				transport->rxw_sqns,
 				transport->rxw_secs,

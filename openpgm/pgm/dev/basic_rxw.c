@@ -224,8 +224,8 @@ test_basic_rxw (
 	GTrashStack* trash_packet = NULL;
 	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
 
-	rxw = pgm_rxw_init (size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
-//	rxw = pgm_rxw_init (size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+//	rxw = pgm_rxw_init (NULL, size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
@@ -273,7 +273,7 @@ test_jump (
 	GTrashStack* trash_packet = NULL;
 	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
 
-	rxw = pgm_rxw_init (size_per_entry, 2 * count, 2 * count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, 2 * count, 2 * count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
@@ -321,8 +321,8 @@ test_reverse (
 	GTrashStack* trash_packet = NULL;
 	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
 
-	rxw = pgm_rxw_init (size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
-//	rxw = pgm_rxw_init (size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+//	rxw = pgm_rxw_init (NULL, size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
@@ -374,8 +374,8 @@ test_fill (
 	GTrashStack* trash_packet = NULL;
 	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
 
-	rxw = pgm_rxw_init (size_per_entry, count+1, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
-//	rxw = pgm_rxw_init (size_per_entry, 0, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, count+1, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+//	rxw = pgm_rxw_init (NULL, size_per_entry, 0, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
