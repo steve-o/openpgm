@@ -1,0 +1,34 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+e = env.Clone()
+e.Append(LIBS = ['libpgmhttp', 'libpgmsnmp', 'libpgmex', 'libpgmplus']);
+e.MergeFlags(e['SNMP_FLAGS']);
+e.MergeFlags(e['LIBSOUP_FLAGS']);
+
+# core preferred examples
+e.Program(['pgmdump.c'])
+e.Program(['pgmsend.c'])
+e.Program(['pgmrecv.c'])
+e.Program(['pgmping.c'])
+
+# sync examples
+e.Program(['blocksyncrecv.c'])
+e.Program(['snonblocksyncrecv.c'])
+e.Program(['pnonblocksyncrecv.c'])
+e.Program(['enonblocksyncrecv.c'])
+e.Program(['enonblocksyncrecvmsg.c'])
+e.Program(['enonblocksyncrecvmsgv.c'])
+
+# async examples
+e.Program(['asyncqrecv.c'])
+e.Program(['blockqrecv.c'])
+
+# ncurses examples
+ne = e.Clone()
+ne.Append(LIBS = ['panel', 'ncurses']);
+ne.Program(['pgmtop.c'])
+
+# end of file
