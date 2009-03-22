@@ -304,6 +304,9 @@ struct pgm_transport_t {
     pgm_notify_t	timer_notify;		    /* any to timer */
     GIOChannel*		notify_channel;
     guint               notify_id;
+    pgm_notify_t	timer_shutdown;
+    GIOChannel*		shutdown_channel;
+    guint               shutdown_id;
 
     guint32		cumulative_stats[PGM_PC_SOURCE_MAX];
     guint32		snap_stats[PGM_PC_SOURCE_MAX];

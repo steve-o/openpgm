@@ -24,10 +24,9 @@
 
 #ifdef CONFIG_EVENTFD
 #	include <sys/eventfd.h>
-#else
-#	include <unistd.h>
-#	include <fcntl.h>
 #endif
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <glib.h>
 
@@ -54,25 +53,28 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 		return retval;
 	}
 	notify->eventfd = retval;
+	int fd_flags = fcntl (notify->eventfd, F_GETFL);
+	if (fd_flags != -1) {
+		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
+	}
 	return 0;
 #else
 	int retval = pipe (notify->pipefd);
 	g_assert (0 == retval);
-	if (0 == retval) {
+
 /* set non-blocking */
 /* write-end */
-		int fd_flags = fcntl (notify->pipefd[1], F_GETFL);
-		if (fd_flags != -1) {
-			retval = fcntl (notify->pipefd[1], F_SETFL, fd_flags | O_NONBLOCK);
-		}
-		g_assert (notify->pipefd[1]);
-/* read-end */
-		fd_flags = fcntl (notify->pipefd[0], F_GETFL);
-		if (fd_flags != -1) {
-			retval = fcntl (notify->pipefd[0], F_SETFL, fd_flags | O_NONBLOCK);
-		}
-		g_assert (notify->pipefd[0]);
+	int fd_flags = fcntl (notify->pipefd[1], F_GETFL);
+	if (fd_flags != -1) {
+		retval = fcntl (notify->pipefd[1], F_SETFL, fd_flags | O_NONBLOCK);
 	}
+	g_assert (notify->pipefd[1]);
+/* read-end */
+	fd_flags = fcntl (notify->pipefd[0], F_GETFL);
+	if (fd_flags != -1) {
+		retval = fcntl (notify->pipefd[0], F_SETFL, fd_flags | O_NONBLOCK);
+	}
+	g_assert (notify->pipefd[0]);
 	return retval;
 #endif
 }

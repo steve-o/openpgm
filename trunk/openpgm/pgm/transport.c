@@ -137,6 +137,7 @@ static inline void pgm_peer_unref (pgm_peer_t*);
 
 static gboolean on_nak_notify (GIOChannel*, GIOCondition, gpointer);
 static gboolean on_timer_notify (GIOChannel*, GIOCondition, gpointer);
+static gboolean on_timer_shutdown (GIOChannel*, GIOCondition, gpointer);
 
 static int on_spm (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, gpointer, gsize);
@@ -489,31 +490,32 @@ pgm_transport_destroy (
 	}
 	if (transport->rdata_channel) {
 		g_io_channel_unref (transport->rdata_channel);
-		transport->rdata_channel = NULL;
 	}
 
 /* terminate & join internal thread */
 	if (transport->notify_id > 0) {
 		g_source_remove_context (transport->timer_context, transport->notify_id);
-		transport->notify_id = 0;
 	}
 	if (transport->notify_channel) {
 		g_io_channel_unref (transport->notify_channel);
-		transport->notify_channel = NULL;
 	}
 
 	if (transport->timer_id > 0) {
 		g_source_remove_context (transport->timer_context, transport->timer_id);
-		transport->timer_id = 0;
 	}
 
 #ifndef PGM_SINGLE_THREAD
 	if (transport->timer_thread) {
-		g_main_loop_quit (transport->timer_loop);
+		pgm_notify_send (&transport->timer_shutdown);
 		g_thread_join (transport->timer_thread);
 		transport->timer_thread = NULL;
 	}
 #endif /* !PGM_SINGLE_THREAD */
+
+/* cleanup shutdown comms */
+	if (transport->shutdown_channel) {
+		g_io_channel_unref (transport->shutdown_channel);
+	}
 
 	g_static_mutex_lock (&transport->mutex);
 
@@ -1571,6 +1573,13 @@ pgm_transport_bind (
 		goto out;
 	}
 
+	g_trace ("INFO","create timer shutdown channel.");
+	retval = pgm_notify_init (&transport->timer_shutdown);
+	if (retval < 0) {
+		g_static_mutex_unlock (&transport->mutex);
+		goto out;
+	}
+
 	if (transport->can_recv)
 	{
 		g_trace ("INFO","create waiting notify channel.");
@@ -2035,6 +2044,10 @@ pgm_transport_bind (
 /* any to timer notify channel */
 	transport->notify_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_notify));
 	transport->notify_id = g_io_add_watch_context_full (transport->notify_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_notify, transport, NULL);
+
+/* timer shutdown channel */
+	transport->shutdown_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_shutdown));
+	transport->shutdown_id = g_io_add_watch_context_full (transport->shutdown_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_shutdown, transport, NULL);
 
 /* rx to nak processor notify channel */
 	if (transport->can_send_data)
@@ -3299,6 +3312,19 @@ on_timer_notify (
 
 	return TRUE;
 }
+
+static gboolean
+on_timer_shutdown (
+	G_GNUC_UNUSED GIOChannel*	source,
+	G_GNUC_UNUSED GIOCondition	condition,
+	gpointer			data
+	)
+{
+	pgm_transport_t* transport = data;
+	g_main_loop_quit (transport->timer_loop);
+	return FALSE;
+}
+	
 
 /* SPM indicate start of a session, continued presence of a session, or flushing final packets
  * of a session.
