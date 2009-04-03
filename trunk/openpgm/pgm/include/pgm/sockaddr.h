@@ -41,6 +41,7 @@
 
 /* OpenSolaris differences */
 #ifndef MCAST_MSFILTER
+#	include <sys/ioctl.h>
 #	define MCAST_MSFILTER		SIOCSMSFILTER
 #endif
 #ifndef SOL_IP
@@ -53,9 +54,11 @@
 #	define MSG_CONFIRM		0
 #endif
 #ifndef IP_ROUTER_ALERT
+#	include <netinet/ip.h>
 #	define IP_ROUTER_ALERT		IPOPT_RTRALERT
 #endif
 #ifndef IPV6_ROUTER_ALERT
+#	include <netinet/ip6.h>
 #	define IPV6_ROUTER_ALERT	IP6OPT_ROUTER_ALERT
 #endif
 #ifndef IP_MAX_MEMBERSHIPS
