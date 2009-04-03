@@ -4,7 +4,7 @@
 
 Import('env')
 e = env.Clone()
-e.Append(LIBS = ['libpgmhttp', 'libpgmsnmp', 'libpgmex', 'libpgmplus']);
+e.Append(LIBS = ['libpgmhttp', 'libpgmsnmp', 'libpgmex', 'libpgm']);
 e.MergeFlags(e['SNMP_FLAGS']);
 e.MergeFlags(e['LIBSOUP_FLAGS']);
 

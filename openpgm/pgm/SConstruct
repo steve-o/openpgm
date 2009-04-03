@@ -48,8 +48,8 @@ if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
 	Exit(1)
 
-if not conf.CheckPKG('libsoup-2.2'):
-	print 'libsoup-2.2 not found.'
+if not conf.CheckPKG('libsoup-2.4'):
+	print 'libsoup-2.4 not found.'
 	Exit(1)
 
 env = conf.Finish();
@@ -145,7 +145,7 @@ env['SNMP_FLAGS'] = {
         'CFLAGS'        : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
-env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.2');
+env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -155,7 +155,7 @@ def CheckSNMP(context):
 	result = context.TryLink("""
 int main(int argc, char**argv)
 {
-	netsnmp_enable_subagent();
+	init_agent("PGM");
 	return 0;
 }
 """, '.c');

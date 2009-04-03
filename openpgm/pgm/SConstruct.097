@@ -91,6 +91,7 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_HAVE_GETHOSTBYNAME2',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_SIGHANDLER_T',
+			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
@@ -152,7 +153,7 @@ def CheckSNMP(context):
 	result = context.TryLink("""
 int main(int argc, char**argv)
 {
-	netsnmp_enable_subagent();
+	init_agent("PGM");
 	return 0;
 }
 """, '.c');
