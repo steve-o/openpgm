@@ -2749,7 +2749,7 @@ check_for_repeat:
 			int n_fds = 2;
 			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
-			if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, EPOLLIN)) {
+			if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, POLLIN)) {
 				g_trace ("SPM", "poll_info returned errno=%i",errno);
 				return -1;
 			}

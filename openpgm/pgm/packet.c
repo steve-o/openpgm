@@ -300,6 +300,10 @@ pgm_print_packet (
 		return FALSE;
 	}
 
+	if (len == packet_length + ip_header_length) {	/* SYSV */
+		packet_length += ip_header_length;
+	}
+
 /* TCP Segmentation Offload (TSO) might have zero length here */
 	if (packet_length < ip_header_length) {
 		puts ("bad length :(");

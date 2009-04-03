@@ -29,7 +29,7 @@
 
 G_BEGIN_DECLS
 
-__sighandler_t pgm_signal_install (int, __sighandler_t);
+sighandler_t pgm_signal_install (int, sighandler_t);
 
 G_END_DECLS
 

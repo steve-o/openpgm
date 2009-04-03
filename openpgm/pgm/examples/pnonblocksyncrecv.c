@@ -125,7 +125,7 @@ main (
 			int n_fds = 2;
 			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
-			pgm_transport_poll_info (g_transport, fds, &n_fds, EPOLLIN);
+			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
 			poll (fds, n_fds, 1000 /* ms */);
 		}
 		else if (errno == ECONNRESET)
