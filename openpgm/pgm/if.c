@@ -21,7 +21,7 @@
 
 #include <ctype.h>
 #include <errno.h>
-#ifdef CONFIG_GETIFADDRS
+#ifdef CONFIG_HAVE_GETIFADDRS
 #	include <ifaddrs.h>
 #endif
 #include <netdb.h>
@@ -60,7 +60,7 @@ struct interface_req {
 	struct sockaddr_storage ir_addr;		/* interface address */
 };
 
-#ifdef CONFIG_GETIFADDRS
+#ifdef CONFIG_HAVE_GETIFADDRS
 #	define pgm_ifaddrs	ifaddrs
 #else
 struct pgm_ifaddrs
@@ -93,7 +93,7 @@ struct _pgm_ifaddrs
 const struct in6_addr if6_default_group_addr = IF6_DEFAULT_INIT;
 
 
-#ifdef CONFIG_GETHOSTBYNAME2
+#ifdef CONFIG_HAVE_GETHOSTBYNAME2
 #	define pgm_gethostbyname2	gethostbyname2
 #else
 static struct hostent*
@@ -111,7 +111,7 @@ pgm_gethostbyname2 (
 }
 #endif
 
-#ifdef CONFIG_GETIFADDRS
+#ifdef CONFIG_HAVE_GETIFADDRS
 #	define pgm_if_getifaddrs(ifap)	( getifaddrs ((struct ifaddrs**)(ifap)) )
 #	define pgm_if_freeifaddrs(ifap)	( freeifaddrs ((struct ifaddrs*)(ifa)) )
 #else
@@ -185,7 +185,7 @@ pgm_if_getifaddrs (
 /* netmask */
 		if (ioctl (sock, SIOCGIFNETMASK, ifr) != -1) {
 			ift->_ifa.ifa_netmask = &ift->_netmask;
-#ifdef CONFIG_IFR_NETMASK
+#ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, sizeof(struct sockaddr));
 #else
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, sizeof(struct sockaddr));
@@ -199,7 +199,7 @@ pgm_if_getifaddrs (
 		}
 	}
 
-#ifdef CONFIG_IPV6_SIOCGIFADDR
+#ifdef CONFIG_HAVE_IPV6_SIOCGIFADDR
 /* repeat for IPv6 */
 	ifr  = ifc6.ifc_req;
 	lifr = (struct ifreq *)&ifc6.ifc_buf[ifc6.ifc_len];
@@ -229,7 +229,7 @@ pgm_if_getifaddrs (
 
 /* netmask */
 		if (ioctl (sock6, SIOCGIFNETMASK, ifr) != -1) {
-#ifdef CONFIG_IFR_NETMASK
+#ifdef CONFIG_HAVE_IFR_NETMASK
 			ift->_ifa.ifa_netmask = &ift->_netmask;
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, sizeof(struct sockaddr));
 #else
@@ -257,7 +257,7 @@ pgm_if_freeifaddrs (
 	free (ifa);
 }
 
-#endif /* CONFIG_GETIFADDRS */
+#endif /* CONFIG_HAVE_GETIFADDRS */
 
 /* return node primary address on multi-address family interfaces.
  *

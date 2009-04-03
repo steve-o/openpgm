@@ -22,7 +22,7 @@
 #ifndef __PGM_NOTIFY_H__
 #define __PGM_NOTIFY_H__
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 #	include <sys/eventfd.h>
 #endif
 #include <unistd.h>
@@ -34,11 +34,11 @@
 G_BEGIN_DECLS
 
 struct pgm_notify_t {
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	int eventfd;
 #else
 	int pipefd[2];
-#endif /* CONFIG_EVENTFD */
+#endif /* CONFIG_HAVE_EVENTFD */
 };
 
 typedef struct pgm_notify_t pgm_notify_t;
@@ -47,7 +47,7 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	int retval = eventfd (0, 0);
 	if (-1 == retval) {
 		return retval;
@@ -83,7 +83,7 @@ static inline int pgm_notify_destroy (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	if (notify->eventfd) {
 		close (notify->eventfd);
 		notify->eventfd = 0;
@@ -105,7 +105,7 @@ static inline int pgm_notify_send (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	g_assert (notify->eventfd);
 	uint64_t u = 1;
 	ssize_t s = write (notify->eventfd, &u, sizeof(u));
@@ -121,7 +121,7 @@ static inline int pgm_notify_read (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	g_assert (notify->eventfd);
 	uint64_t u;
 	return (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
@@ -136,7 +136,7 @@ static inline void pgm_notify_clear (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	g_assert (notify->eventfd);
 	uint64_t u;
 	while (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
@@ -151,7 +151,7 @@ static inline int pgm_notify_get_fd (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
-#ifdef CONFIG_EVENTFD
+#ifdef CONFIG_HAVE_EVENTFD
 	g_assert (notify->eventfd);
 	return notify->eventfd;
 #else
