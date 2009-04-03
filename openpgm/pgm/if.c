@@ -21,15 +21,18 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <ifaddrs.h>
+#ifdef CONFIG_GETIFADDRS
+#	include <ifaddrs.h>
+#endif
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <net/if.h>
-#include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -57,6 +60,29 @@ struct interface_req {
 	struct sockaddr_storage ir_addr;		/* interface address */
 };
 
+#ifdef CONFIG_GETIFADDRS
+#	define pgm_ifaddrs	ifaddrs
+#else
+struct pgm_ifaddrs
+{
+	struct pgm_ifaddrs *ifa_next;	/* Pointer to the next structure.  */
+
+	char *ifa_name;			/* Name of this network interface.  */
+	unsigned int ifa_flags;		/* Flags as from SIOCGIFFLAGS ioctl.  */
+
+	struct sockaddr *ifa_addr;	/* Network address of this interface.  */
+	struct sockaddr *ifa_netmask;	/* Netmask of this interface.  */
+};
+
+struct _pgm_ifaddrs
+{
+	struct pgm_ifaddrs	_ifa;
+	char			_name[IF_NAMESIZE];
+	struct sockaddr		_addr;
+	struct sockaddr		_netmask;
+};
+#endif
+
 
 /* globals */
 
@@ -66,6 +92,172 @@ struct interface_req {
 #define IF6_DEFAULT_INIT { { { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 const struct in6_addr if6_default_group_addr = IF6_DEFAULT_INIT;
 
+
+#ifdef CONFIG_GETHOSTBYNAME2
+#	define pgm_gethostbyname2	gethostbyname2
+#else
+static struct hostent*
+pgm_gethostbyname2 (
+	const char*		name,
+	int			af
+	)
+{
+	int error_num;
+	static struct hostent* ip = NULL;
+
+	if (ip)
+		freehostent (ip);
+	return (ip = getipnodebyname (name, af, 0, &error_num));
+}
+#endif
+
+#ifdef CONFIG_GETIFADDRS
+#	define pgm_if_getifaddrs(ifap)	( getifaddrs ((struct ifaddrs**)(ifap)) )
+#	define pgm_if_freeifaddrs(ifap)	( freeifaddrs ((struct ifaddrs*)(ifa)) )
+#else
+
+static int
+pgm_if_getifaddrs (
+	struct pgm_ifaddrs**	ifap
+	)
+{
+	int sock = socket (AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		return -1;
+	}
+
+	int sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
+	if (sock6 < 0) {
+		close (sock6);
+		return -1;
+	}
+
+/* get count of interfaces */
+	char buf[1024], buf6[1024];
+	struct ifconf ifc, ifc6;
+
+	ifc.ifc_buf = buf;
+	ifc.ifc_len = sizeof(buf);
+	if (ioctl (sock, SIOCGIFCONF, &ifc) < 0) {
+		close (sock);
+		close (sock6);
+		return -1;
+	}
+
+	ifc6.ifc_buf = buf6;
+	ifc6.ifc_len = sizeof(buf6);
+	if (ioctl (sock6, SIOCGIFCONF, &ifc6) < 0) {
+		close (sock);
+		close (sock6);
+		return -1;
+	}
+
+/* alloc a contiguous block for entire list */
+	int n = (ifc.ifc_len + ifc6.ifc_len) / sizeof(struct ifreq);
+	struct _pgm_ifaddrs* ifa = malloc (n * sizeof(struct _pgm_ifaddrs));
+	memset (ifa, 0, n * sizeof(struct _pgm_ifaddrs));
+
+/* foreach interface */
+	struct ifreq *ifr  = ifc.ifc_req;
+	struct ifreq *lifr = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
+	struct _pgm_ifaddrs* ift = ifa;
+
+	g_assert (IF_NAMESIZE >= sizeof(ifr->ifr_name));
+
+	while (ifr < lifr)
+	{
+/* address */
+		if (ioctl (sock, SIOCGIFADDR, ifr) != -1) {
+			ift->_ifa.ifa_addr = &ift->_addr;
+			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, sizeof(struct sockaddr));
+		}
+
+/* name */
+		ift->_ifa.ifa_name = ift->_name;
+		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
+		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
+
+/* flags */
+		if (ioctl (sock, SIOCGIFFLAGS, ifr) != -1) {
+			ift->_ifa.ifa_flags = ifr->ifr_flags;
+		}
+
+/* netmask */
+		if (ioctl (sock, SIOCGIFNETMASK, ifr) != -1) {
+			ift->_ifa.ifa_netmask = &ift->_netmask;
+#ifdef CONFIG_IFR_NETMASK
+			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, sizeof(struct sockaddr));
+#else
+			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, sizeof(struct sockaddr));
+#endif
+		}
+
+		++ifr;
+		if (ifr < lifr) {
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+		}
+	}
+
+#ifdef CONFIG_IPV6_SIOCGIFADDR
+/* repeat for IPv6 */
+	ifr  = ifc6.ifc_req;
+	lifr = (struct ifreq *)&ifc6.ifc_buf[ifc6.ifc_len];
+
+	while (ifr < lifr)
+	{
+		if (ift != ifa) {
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+		}
+
+/* address, note this does not work on Linux as struct ifreq is too small for an IPv6 address */
+		if (ioctl (sock6, SIOCGIFADDR, ifr) != -1) {
+			ift->_ifa.ifa_addr = &ift->_addr;
+			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, sizeof(struct sockaddr));
+		}
+
+/* name */
+		ift->_ifa.ifa_name = ift->_name;
+		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
+		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
+
+/* flags */
+		if (ioctl (sock6, SIOCGIFFLAGS, ifr) != -1) {
+			ift->_ifa.ifa_flags = ifr->ifr_flags;
+		}
+
+/* netmask */
+		if (ioctl (sock6, SIOCGIFNETMASK, ifr) != -1) {
+#ifdef CONFIG_IFR_NETMASK
+			ift->_ifa.ifa_netmask = &ift->_netmask;
+			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, sizeof(struct sockaddr));
+#else
+			ift->_ifa.ifa_netmask = &ift->_addr;
+			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, sizeof(struct sockaddr));
+#endif
+		}
+
+		++ifr;
+	}
+#endif
+
+	*ifap = (struct pgm_ifaddrs*)ifa;
+
+	close (sock);
+	close (sock6);
+	return 0;
+}
+
+static void
+pgm_if_freeifaddrs (
+	struct pgm_ifaddrs*	ifa
+	)
+{
+	free (ifa);
+}
+
+#endif /* CONFIG_GETIFADDRS */
 
 /* return node primary address on multi-address family interfaces.
  *
@@ -103,7 +295,7 @@ pgm_if_getnodeaddr (
 	else
 	{
 		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), -EINVAL);
-		he = gethostbyname2 (hostname, AF_INET6);
+		he = pgm_gethostbyname2 (hostname, AF_INET6);
 		if (NULL == he)
 		{
 /* try link scope via IPv4 nodename */
@@ -114,10 +306,10 @@ pgm_if_getnodeaddr (
 				return -2;
 			}
 
-			struct ifaddrs *ifap, *ifa, *ifa6;
-			int e = getifaddrs (&ifap);
+			struct pgm_ifaddrs *ifap, *ifa, *ifa6;
+			int e = pgm_if_getifaddrs (&ifap);
 			if (e < 0) {
-				g_trace ("getifaddrs failed when trying to resolve link scope interfaces");
+				g_trace ("pgm_if_getifaddrs failed when trying to resolve link scope interfaces");
 				return -1;
 			}
 
@@ -133,7 +325,7 @@ pgm_if_getnodeaddr (
 				}
 			}
 			g_trace ("node IPv4 interface not found!");
-			freeifaddrs (ifap);
+			pgm_if_freeifaddrs (ifap);
 			errno = ENONET;
 			return -1;
 ipv4_found:
@@ -150,12 +342,12 @@ ipv4_found:
 				}
 			}
 			g_trace ("node IPv6 interface not found!");
-			freeifaddrs (ifap);
+			pgm_if_freeifaddrs (ifap);
 			errno = ENONET;
 			return -1;
 ipv6_found:
 			*(struct in6_addr*)(he->h_addr_list[0]) = ((struct sockaddr_in6 *)ifa6->ifa_addr)->sin6_addr;
-			freeifaddrs (ifap);
+			pgm_if_freeifaddrs (ifap);
 		}
 		((struct sockaddr_in6*)addr)->sin6_family = af;
 		((struct sockaddr_in6*)addr)->sin6_addr = *(struct in6_addr*)(he->h_addr_list[0]);
@@ -189,11 +381,11 @@ ipv6_found:
 int
 pgm_if_print_all (void)
 {
-	struct ifaddrs *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 
-	int e = getifaddrs (&ifap);
+	int e = pgm_if_getifaddrs (&ifap);
 	if (e < 0) {
-		perror("getifaddrs");
+		perror("pgm_if_getifaddrs");
 		return -1;
 	}
 
@@ -240,7 +432,7 @@ pgm_if_print_all (void)
 			);
 	}
 
-	freeifaddrs (ifap);
+	pgm_if_freeifaddrs (ifap);
 	return 0;
 }
 
@@ -271,10 +463,10 @@ pgm_if_indextosockaddr(
 	}
 	else
 	{
-		struct ifaddrs *ifap, *ifa;
-		int e = getifaddrs (&ifap);
+		struct pgm_ifaddrs *ifap, *ifa;
+		int e = pgm_if_getifaddrs (&ifap);
 		if (e < 0) {
-			g_trace ("INFO", "getifaddrs failed when trying to resolve link scope interfaces");
+			g_trace ("INFO", "pgm_if_getifaddrs failed when trying to resolve link scope interfaces");
 			return -1;
 		}
 
@@ -287,12 +479,12 @@ pgm_if_indextosockaddr(
 			if (i == ifindex)
 			{
 				memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
-				freeifaddrs (ifap);
+				pgm_if_freeifaddrs (ifap);
 				return 0;
 			}
 		}
 
-		freeifaddrs (ifap);
+		pgm_if_freeifaddrs (ifap);
 	}
 
 	return -1;
@@ -509,11 +701,11 @@ pgm_if_parse_interface (
 		ai_family);
 
 	int retval = 0;
-	struct ifaddrs *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 
-	int e = getifaddrs (&ifap);
+	int e = pgm_if_getifaddrs (&ifap);
 	if (e < 0) {
-		g_critical ("getifaddrs failed: %s", strerror(e));
+		g_critical ("pgm_if_getifaddrs failed: %s", strerror(e));
 		return -EINVAL;
 	}
 
@@ -855,8 +1047,8 @@ pgm_if_parse_interface (
 
 out:
 
-/* cleanup after getifaddrs() */
-	freeifaddrs (ifap);
+/* cleanup after pgm_getifaddrs() */
+	pgm_if_freeifaddrs (ifap);
 
 	return retval;
 }
