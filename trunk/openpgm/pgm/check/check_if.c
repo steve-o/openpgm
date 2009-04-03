@@ -9,7 +9,7 @@
 #include "check_pgm.h"
 
 #include "pgm/if.h"
-
+#include "pgm/sockaddr.h"
 
 /* parameters to hardcode to the running host
  */

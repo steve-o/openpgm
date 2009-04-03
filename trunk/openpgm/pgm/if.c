@@ -36,6 +36,7 @@
 #include <glib.h>
 
 #include "pgm/if.h"
+#include "pgm/sockaddr.h"
 
 //#define IF_DEBUG
 
