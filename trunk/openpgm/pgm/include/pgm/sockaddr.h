@@ -52,6 +52,15 @@
 #ifndef MSG_CONFIRM
 #	define MSG_CONFIRM		0
 #endif
+#ifndef IP_ROUTER_ALERT
+#	define IP_ROUTER_ALERT		IPOPT_RTRALERT
+#endif
+#ifndef IPV6_ROUTER_ALERT
+#	define IPV6_ROUTER_ALERT	IP6OPT_ROUTER_ALERT
+#endif
+#ifndef IP_MAX_MEMBERSHIPS
+#	define IP_MAX_MEMBERSHIPS	20
+#endif
 
 
 G_BEGIN_DECLS

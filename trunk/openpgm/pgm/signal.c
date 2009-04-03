@@ -32,7 +32,7 @@
 
 /* globals */
 
-static sighandler_t g_signal_list[_NSIG];
+static pgm_sighandler_t g_signal_list[NSIG];
 static int g_signal_pipe[2];
 static GIOChannel* g_signal_io = NULL;
 
@@ -43,10 +43,10 @@ static gboolean on_io_signal (GIOChannel*, GIOCondition, gpointer);
 /* install signal handler and return unix fd to add to event loop
  */
 
-sighandler_t
+pgm_sighandler_t
 pgm_signal_install (
 	int		signum,
-	sighandler_t	handler
+	pgm_sighandler_t	handler
 	)
 {
 	if (g_signal_io == NULL)
