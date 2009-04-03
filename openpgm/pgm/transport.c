@@ -23,7 +23,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <ifaddrs.h>
 #include <limits.h>
 #include <netdb.h>
 #include <poll.h>
@@ -37,7 +36,9 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
-#include <sys/epoll.h>
+#ifdef CONFIG_HAVE_EPOLL
+#	include <sys/epoll.h>
+#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -427,10 +428,10 @@ pgm_init (void)
 /* find PGM protocol id */
 
 // TODO: fix valgrind errors
-#if HAVE_GETPROTOBYNAME_R
+#ifdef CONFIG_HAVE_GETPROTOBYNAME_R
 	char b[1024];
 	struct protoent protobuf, *proto;
-	e = getprotobyname_r("pgm", &protobuf, b, sizeof(b), &proto);
+	int e = getprotobyname_r("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
 			g_trace("INFO","Setting PGM protocol number to %i from /etc/protocols.");
@@ -3028,7 +3029,7 @@ pgm_transport_poll_info (
  *
  * returns 0 on success, -1 on failure and sets errno appropriately.
  */
-
+#ifdef CONFIG_HAVE_EPOLL
 int
 pgm_transport_epoll_ctl (
 	pgm_transport_t*	transport,
@@ -3082,6 +3083,7 @@ pgm_transport_epoll_ctl (
 out:
 	return retval;
 }
+#endif
 
 /* prototype of function to send pro-active parity NAKs.
  */

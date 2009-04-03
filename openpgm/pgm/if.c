@@ -30,9 +30,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <net/if.h>
-#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -714,7 +714,9 @@ pgm_if_parse_interface (
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
 /* ignore raw entries */
+#ifdef CONFIG_HAVE_GETIFADDRS
 		if ( ifa->ifa_addr->sa_family == AF_PACKET ) continue;
+#endif
 
 		if (	ifa->ifa_addr->sa_family != AF_INET && 
 			ifa->ifa_addr->sa_family != AF_INET6	)

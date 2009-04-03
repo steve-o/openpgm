@@ -27,10 +27,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <linux/rtc.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/timeb.h>
+#ifdef CONFIG_HAVE_RTC
+#	include <linux/rtc.h>
+#endif
 
 #include <glib.h>
 
@@ -69,8 +71,6 @@ static void nano_sleep (gulong);
 static void select_sleep (gulong);
 
 #ifdef CONFIG_HAVE_RTC
-static int tsc_us_scaler = 0;
-
 static int rtc_init (void);
 static int rtc_destroy (void);
 static pgm_time_t rtc_update (void);
@@ -78,6 +78,7 @@ static void rtc_sleep (gulong);
 #endif
 
 #ifdef CONFIG_HAVE_TSC
+static int tsc_us_scaler = 0;
 static int tsc_init (void);
 static pgm_time_t tsc_update (void);
 static void tsc_sleep (gulong);

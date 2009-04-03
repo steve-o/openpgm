@@ -26,10 +26,15 @@
 
 #include <glib.h>
 
+#ifdef CONFIG_HAVE_SIGHANDLER_T
+#	define pgm_sighandler_t		sighandler_t
+#else
+typedef void (*pgm_sighandler_t)(int);
+#endif
 
 G_BEGIN_DECLS
 
-sighandler_t pgm_signal_install (int, sighandler_t);
+pgm_sighandler_t pgm_signal_install (int, pgm_sighandler_t);
 
 G_END_DECLS
 

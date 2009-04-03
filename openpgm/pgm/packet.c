@@ -341,10 +341,10 @@ pgm_print_packet (
 
 #ifdef __USE_BSD
 	gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct iphdr)) 
+	if (ip_header_length < sizeof(struct ip)) 
 #else
 	gsize ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct ip)) 
+	if (ip_header_length < sizeof(struct iphdr)) 
 #endif
 	{
 		puts ("bad IP header length :(");
@@ -713,36 +713,36 @@ pgm_print_poll (
 		return FALSE;
 	}
 
-	struct pgm_poll* poll = (struct pgm_poll*)data;
+	struct pgm_poll* poll4 = (struct pgm_poll*)data;
 	struct pgm_poll6* poll6 = (struct pgm_poll6*)data;
-	poll->poll_nla_afi = g_ntohs (poll->poll_nla_afi);
+	poll4->poll_nla_afi = g_ntohs (poll4->poll_nla_afi);
 
 	printf ("sqn %lu round %u sub-type %u nla-afi %u ",
-		(gulong)g_ntohl(poll->poll_sqn),
-		g_ntohs(poll->poll_round),
-		g_ntohs(poll->poll_s_type),
-		poll->poll_nla_afi);	/* address family indicator */
+		(gulong)g_ntohl(poll4->poll_sqn),
+		g_ntohs(poll4->poll_round),
+		g_ntohs(poll4->poll_s_type),
+		poll4->poll_nla_afi);	/* address family indicator */
 
 	char s[INET6_ADDRSTRLEN];
-	switch (poll->poll_nla_afi) {
+	switch (poll4->poll_nla_afi) {
 	case AFI_IP:
-		inet_ntop ( AF_INET, &poll->poll_nla, s, sizeof (s) );
+		inet_ntop ( AF_INET, &poll4->poll_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_poll );
 		len  -= sizeof( struct pgm_poll );
 		printf ("%s", s);
 
 /* back-off interval in microseconds */
-		printf (" bo_ivl %u", poll->poll_bo_ivl);
+		printf (" bo_ivl %u", poll4->poll_bo_ivl);
 
 /* random string */
 		printf (" rand [%c%c%c%c]",
-			isprint (poll->poll_rand[0]) ? poll->poll_rand[0] : '.',
-			isprint (poll->poll_rand[1]) ? poll->poll_rand[1] : '.',
-			isprint (poll->poll_rand[2]) ? poll->poll_rand[2] : '.',
-			isprint (poll->poll_rand[3]) ? poll->poll_rand[3] : '.' );
+			isprint (poll4->poll_rand[0]) ? poll4->poll_rand[0] : '.',
+			isprint (poll4->poll_rand[1]) ? poll4->poll_rand[1] : '.',
+			isprint (poll4->poll_rand[2]) ? poll4->poll_rand[2] : '.',
+			isprint (poll4->poll_rand[3]) ? poll4->poll_rand[3] : '.' );
 
 /* matching bit-mask */
-		printf (" mask 0x%x", poll->poll_mask);
+		printf (" mask 0x%x", poll4->poll_mask);
 		break;
 
 	case AFI_IP6:
