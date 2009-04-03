@@ -46,15 +46,16 @@ pe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 pe['SHOBJSUFFIX'] = '.plus' + pe['SHOBJSUFFIX'];
 pe['OBJSUFFIX']   = '.plus' + pe['OBJSUFFIX'];
 
-uname_m = os.uname()[4];
-if uname_m == 'x86_64':
-	pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
-	src += ['csum-copy64.S', 'csum-partial64.c'];
-else:
-	pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
-	src += ['checksum32.S'];
-
-pe.StaticLibrary('libpgmplus', src);
-pe.StaticSharedLibrary('libpgmplus-pic', src);
+uname_s = os.uname()[0];
+if uname_s == 'Linux':
+	uname_m = os.uname()[4];
+	if uname_m == 'x86_64':
+		pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+		src += ['csum-copy64.S', 'csum-partial64.c'];
+	else:
+		pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+		src += ['checksum32.S'];
+	pe.StaticLibrary('libpgmplus', src);
+	pe.StaticSharedLibrary('libpgmplus-pic', src);
 
 # end of file

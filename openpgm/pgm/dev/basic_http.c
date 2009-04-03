@@ -56,7 +56,11 @@ static void on_signal (int);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
+#ifdef CONFIG_LIBSOUP22
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
+#else
+static void default_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+#endif
 
 
 G_GNUC_NORETURN static void
@@ -159,8 +163,13 @@ on_startup (
 		hostname,
 		soup_server_get_port (g_soup_server));
 
+#ifdef CONFIG_LIBSOUP22
 	soup_server_add_handler (g_soup_server, NULL, NULL, 
 				default_callback, NULL, NULL);
+#else
+	soup_server_add_handler (g_soup_server, NULL, 
+				default_callback, NULL, NULL);
+#endif
 
 	soup_server_run_async (g_soup_server);
 	g_object_unref (g_soup_server);
@@ -186,6 +195,7 @@ on_mark (
 /* request on web interface
  */
 
+#ifdef CONFIG_LIBSOUP22
 static void
 default_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
@@ -203,6 +213,27 @@ default_callback (
 					WWW_NOTFOUND, strlen(WWW_NOTFOUND));
 	soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
 	soup_message_add_header (msg->response_headers, "Connection", "close");
+	g_free (path);
 }
+#else
+static void
+default_callback (
+	G_GNUC_UNUSED SoupServer* server,
+	SoupMessage*		msg,
+	const char*		path,
+	G_GNUC_UNUSED GHashTable* query,
+	G_GNUC_UNUSED SoupClientContext* client,
+	G_GNUC_UNUSED gpointer data
+		)
+{
+	printf ("%s %s HTTP/1.%d\n", msg->method, path,
+		soup_message_get_http_version (msg));
+
+	soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+					WWW_NOTFOUND, strlen(WWW_NOTFOUND));
+	soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+	soup_message_headers_append (msg->response_headers, "Connection", "close");
+}
+#endif
 
 /* eof */

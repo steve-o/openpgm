@@ -92,6 +92,7 @@ env = Environment(
 			'-D__need_IOV_MAX',
 			'-D__USE_BSD',
 			'-DCONFIG_HAVE_TSC',
+			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
@@ -152,7 +153,7 @@ def CheckSNMP(context):
 	result = context.TryLink("""
 int main(int argc, char**argv)
 {
-	netsnmp_enable_subagent();
+	init_agent("PGM");
 	return 0;
 }
 """, '.c');
