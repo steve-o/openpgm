@@ -8,12 +8,10 @@ import sys
 EnsureSConsVersion( 0, 97 )
 SConsignFile('scons.signatures');
 
-vars = Variables()
-vars.AddVariables (
-	EnumVariable ('BUILD', 'build environment', 'debug',
-			allowed_values=('release', 'debug', 'profile')),
-	EnumVariable ('BRANCH', 'branch prediction', 'none',
-			allowed_values=('none', 'profile', 'seed')),
+opt = Options(None, ARGUMENTS)
+opt.AddOptions (
+	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
+	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
 )
 
 #-----------------------------------------------------------------------------
@@ -57,9 +55,7 @@ env = conf.Finish();
 #-----------------------------------------------------------------------------
 # Platform specifics
 
-env = Environment(
-	variables = vars,
-	ENV = os.environ,
+env = Environment(ENV = os.environ,
 	CCFLAGS = [	'-pipe',
 			'-Wall',
 				'-Wextra',
@@ -93,6 +89,7 @@ env = Environment(
 	LINKFLAGS = [	'-pipe',
 		    ]
 )
+opt.Update (env)
 
 # Branch prediction
 if env['BRANCH'] == 'profile':

@@ -560,7 +560,7 @@ pgm_print_spm (
 		return FALSE;
 	}
 
-	printf (s);
+	printf ("%s", s);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
@@ -630,7 +630,7 @@ pgm_print_poll (
 		inet_ntop ( AF_INET, &poll->poll_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_poll );
 		len  -= sizeof( struct pgm_poll );
-		printf (s);
+		printf ("%s", s);
 
 /* back-off interval in microseconds */
 		printf (" bo_ivl %u", poll->poll_bo_ivl);
@@ -655,7 +655,7 @@ pgm_print_poll (
 		inet_ntop ( AF_INET6, &poll6->poll6_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_poll6 );
 		len  -= sizeof( struct pgm_poll6 );
-		printf (s);
+		printf ("%s", s);
 
 /* back-off interval in microseconds */
 		printf (" bo_ivl %u", poll6->poll6_bo_ivl);
@@ -980,7 +980,7 @@ pgm_print_nak (
 		printf ("%s grp ", s);
 
 		inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
-		printf (s);
+		printf ("%s", s);
 
 	case AFI_IP6:
 		if (len < sizeof (struct pgm_nak6)) {
@@ -1000,7 +1000,7 @@ pgm_print_nak (
 		printf ("%s grp ", s);
 
 		inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
-		printf (s);
+		printf ("%s", s);
 
 	default:
 		printf ("unsupported afi");
