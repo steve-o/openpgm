@@ -61,12 +61,21 @@ pgm_parse_raw (
 	)
 {
 /* minimum size should be IP header plus PGM header */
+#ifdef __USE_BSD
+	if (len < (sizeof(struct ip) + sizeof(struct pgm_header))) 
+	{
+		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+			len, (sizeof(struct ip) + sizeof(struct pgm_header)));
+		return -1;
+	}
+#else
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
 	{
 		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
 			len, (sizeof(struct iphdr) + sizeof(struct pgm_header)));
 		return -1;
 	}
+#endif
 
 /* IP packet header: IPv4
  *
@@ -115,11 +124,21 @@ pgm_parse_raw (
  */
 
 /* decode IP header */
+#ifdef __USE_BSD
+	const struct ip* ip = (struct ip*)data;
+	switch (ip->ip_v)
+#else
 	const struct iphdr* ip = (struct iphdr*)data;
-	switch (ip->version) {
+	switch (ip->version)
+#endif
+	{
 	case 4:
 		((struct sockaddr_in*)dst_addr)->sin_family = AF_INET;
+#ifdef __USE_BSD
+		((struct sockaddr_in*)dst_addr)->sin_addr.s_addr = ip->ip_dst.s_addr;
+#else
 		((struct sockaddr_in*)dst_addr)->sin_addr.s_addr = ip->daddr;
+#endif
 		*dst_addr_len = sizeof(struct sockaddr_in);
 		break;
 
@@ -130,22 +149,41 @@ pgm_parse_raw (
 		return -1;
 
 	default:
+#ifdef __USE_BSD
+		printf ("unknown IP version (%i) :/\n", ip->ip_v);
+#else
 		printf ("unknown IP version (%i) :/\n", ip->version);	
+#endif
 		return -1;
 	}
 
+#ifdef __USE_BSD
+	gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+	if (ip_header_length < sizeof(struct ip))
+#else
 	gsize ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct iphdr)) {
+	if (ip_header_length < sizeof(struct iphdr))
+#endif
+	{
 		puts ("bad IP header length :(");
 		return -1;
 	}
+
+#ifdef __USE_BSD
+	gsize packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+#else
+	gsize packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+#endif
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
-	gsize packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+	if (len == packet_length + ip_header_length) {
+		packet_length += ip_header_length;
+	}
+
 	if (len < packet_length) {			/* redundant: often handled in kernel */
 		printf ("truncated IP packet: %i < %i\n", (int)len, (int)packet_length);
 		return -1;
@@ -162,14 +200,22 @@ pgm_parse_raw (
 #if PGM_CHECK_IN_CKSUM
 	int sum = in_cksum(data, packet_length, 0);
 	if (sum != 0) {
+#ifdef __USE_BSD
+		int ip_sum = g_ntohs(ip->ip_sum);
+#else
 		int ip_sum = g_ntohs(ip->check);
+#endif
 		printf ("bad cksum! %i\n", ip_sum);
 		return -2;
 	}
 #endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
+#ifdef __USE_BSD
+	guint offset = g_ntohs(ip->ip_off);
+#else
 	guint offset = g_ntohs(ip->frag_off);
+#endif
 	if ((offset & 0x1fff) != 0) {
 		puts ("fragmented packet :/");
 		return -1;
@@ -269,39 +315,60 @@ pgm_print_packet (
 	)
 {
 /* minimum size should be IP header plus PGM header */
+#ifdef __USE_BSD
+	if (len < (sizeof(struct ip) + sizeof(struct pgm_header))) 
+#else
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
+#endif
 	{
 		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n", len, sizeof(struct pgm_header));
 		return FALSE;
 	}
 
 /* decode IP header */
+#ifdef __USE_BSD
+	const struct ip* ip = (struct ip*)data;
+	if (ip->ip_v != 4) 				/* IP version, 4 or 6 */
+#else
 	const struct iphdr* ip = (struct iphdr*)data;
-	if (ip->version != 4) {				/* IP version, 4 or 6 */
+	if (ip->version != 4) 				/* IP version, 4 or 6 */
+#endif
+	{
 		puts ("not IP4 packet :/");		/* v6 not currently handled */
 		return FALSE;
 	}
 	printf ("IP ");
 
+#ifdef __USE_BSD
+	gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+	if (ip_header_length < sizeof(struct iphdr)) 
+#else
 	gsize ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct iphdr)) {
+	if (ip_header_length < sizeof(struct ip)) 
+#endif
+	{
 		puts ("bad IP header length :(");
 		return FALSE;
 	}
+
+#ifdef __USE_BSD
+	gsize packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+#else
+	gsize packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+#endif
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
-	gsize packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+	if (len == packet_length + ip_header_length) {
+		packet_length += ip_header_length;
+	}
+
 	if (len < packet_length) {				/* redundant: often handled in kernel */
 		puts ("truncated IP packet");
 		return FALSE;
-	}
-
-	if (len == packet_length + ip_header_length) {	/* SYSV */
-		packet_length += ip_header_length;
 	}
 
 /* TCP Segmentation Offload (TSO) might have zero length here */
@@ -310,22 +377,33 @@ pgm_print_packet (
 		return FALSE;
 	}
 
+#ifdef __USE_BSD
+	guint offset = g_ntohs(ip->ip_off);
+#else
 	guint offset = g_ntohs(ip->frag_off);
+#endif
 
 /* 3 bits routing priority, 4 bits type of service: delay, throughput, reliability, cost */
+#ifdef __USE_BSD
+	printf ("(tos 0x%x", (int)ip->ip_tos);
+	switch (ip->ip_tos & 0x3)
+#else
 	printf ("(tos 0x%x", (int)ip->tos);
-	if (ip->tos & 0x3) {
-		switch (ip->tos & 0x3) {
-		case 1: printf (",ECT(1)"); break;
-		case 2: printf (",ECT(0)"); break;
-		case 3: printf (",CE"); break;
-		}
+	switch (ip->tos & 0x3)
+#endif
+	{
+	case 1: printf (",ECT(1)"); break;
+	case 2: printf (",ECT(0)"); break;
+	case 3: printf (",CE"); break;
+	default: break;
 	}
 
 /* time to live */
-	if (ip->ttl >= 1) {
-		printf (", ttl %u", ip->ttl);
-	}
+#ifdef __USE_BSD
+	if (ip->ip_ttl >= 1) printf (", ttl %u", ip->ip_ttl);
+#else
+	if (ip->ttl >= 1) printf (", ttl %u", ip->ttl);
+#endif
 
 /* fragmentation */
 #define IP_RDF	0x8000
@@ -334,24 +412,40 @@ pgm_print_packet (
 #define IP_OFFMASK	0x1fff
 
 	printf (", id %u, offset %u, flags [%s%s]",
+#ifdef __USE_BSD
+		g_ntohs(ip->ip_id),
+#else
 		g_ntohs(ip->id),
+#endif
 		(offset & 0x1fff) * 8,
 		((offset & IP_DF) ? "DF" : ""),
 		((offset & IP_MF) ? "+" : ""));
 	printf (", length %" G_GSIZE_FORMAT, packet_length);
 
 /* IP options */
+#ifdef __USE_BSD
+	if ((ip_header_length - sizeof(struct ip)) > 0) {
+		printf (", options (");
+		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct ip));
+		printf (" )");
+	}
+#else
 	if ((ip_header_length - sizeof(struct iphdr)) > 0) {
 		printf (", options (");
 		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct iphdr));
 		printf (" )");
 	}
+#endif
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
 	int sum = pgm_inet_checksum(data, packet_length, 0);
 	if (sum != 0) {
+#ifdef __USE_BSD
+		int ip_sum = g_ntohs(ip->ip_sum);
+#else
 		int ip_sum = g_ntohs(ip->check);
+#endif
 		printf (", bad cksum! %i", ip_sum);
 	}
 
@@ -388,8 +482,13 @@ pgm_print_packet (
 	}
 
 	printf ("%s.%s > %s.%s: PGM\n",
+#ifdef __USE_BSD
+		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src), pgm_udpport_string(pgm_header->pgm_sport),
+		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_dst), pgm_udpport_string(pgm_header->pgm_dport));
+#else
 		pgm_gethostbyaddr((const struct in_addr*)&ip->saddr), pgm_udpport_string(pgm_header->pgm_sport),
 		pgm_gethostbyaddr((const struct in_addr*)&ip->daddr), pgm_udpport_string(pgm_header->pgm_dport));
+#endif
 
 	printf ("type: %s [%i] (version=%i, reserved=%i)\n"
 		"options: extensions=%s, network-significant=%s, parity packet=%s (variable size=%s)\n"
