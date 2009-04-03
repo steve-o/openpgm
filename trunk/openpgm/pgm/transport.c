@@ -955,7 +955,11 @@ pgm_transport_set_max_tpdu (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+#ifdef __USE_BSD
+	g_return_val_if_fail (max_tpdu >= (sizeof(struct ip) + sizeof(struct pgm_header)), -EINVAL);
+#else
 	g_return_val_if_fail (max_tpdu >= (sizeof(struct iphdr) + sizeof(struct pgm_header)), -EINVAL);
+#endif
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->max_tpdu = max_tpdu;
@@ -1593,7 +1597,11 @@ pgm_transport_bind (
 /* determine IP header size for rate regulation engine & stats */
 	switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
 	case AF_INET:
+#ifdef __USE_BSD
+		transport->iphdr_len = sizeof(struct ip);
+#else
 		transport->iphdr_len = sizeof(struct iphdr);
+#endif
 		break;
 
 	case AF_INET6:
