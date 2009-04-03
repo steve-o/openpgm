@@ -23,7 +23,9 @@
 #define __PGM_TRANSPORT_H__
 
 #include <poll.h>
-#include <sys/epoll.h>
+#ifdef CONFIG_HAVE_EPOLL
+#	include <sys/epoll.h>
+#endif
 
 #include <glib.h>
 
@@ -396,7 +398,9 @@ gssize pgm_transport_recvfrom (pgm_transport_t*, gpointer, gsize, int, pgm_tsi_t
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
+#ifdef CONFIG_HAVE_EPOLL
 int pgm_transport_epoll_ctl (pgm_transport_t*, int, int, int);
+#endif
 
 int pgm_transport_join_group (pgm_transport_t*, struct group_req*, gsize);
 int pgm_transport_leave_group (pgm_transport_t*, struct group_req*, gsize);
