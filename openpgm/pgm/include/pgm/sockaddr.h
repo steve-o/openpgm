@@ -2,7 +2,7 @@
  * 
  * struct sockaddr functions independent of in or in6.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,6 +37,20 @@
 /* glibc 2.3 on debian etch doesn't include this */
 #ifndef IPV6_RECVPKTINFO
 #	define IPV6_RECVPKTINFO		49
+#endif
+
+/* OpenSolaris differences */
+#ifndef MCAST_MSFILTER
+#	define MCAST_MSFILTER		SIOCSMSFILTER
+#endif
+#ifndef SOL_IP
+#	define SOL_IP			IPPROTO_IP
+#endif
+#ifndef SOL_IPV6
+#	define SOL_IPV6			IPPROTO_IPV6
+#endif
+#ifndef MSG_CONFIRM
+#	define MSG_CONFIRM		0
 #endif
 
 
