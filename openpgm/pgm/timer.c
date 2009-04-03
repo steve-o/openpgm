@@ -57,27 +57,33 @@ pgm_time_update_func pgm_time_update_now;
 pgm_time_sleep_func pgm_time_sleep;
 pgm_time_since_epoch_func pgm_time_since_epoch;
 
-static int tsc_us_scaler = 0;
-
 static gboolean time_got_initialized = FALSE;
 static pgm_time_t rel_offset = 0;
 
 static pgm_time_t gettimeofday_update (void);
 static pgm_time_t clock_update (void);
 static pgm_time_t ftime_update (void);
+static int clock_init (void);
+static void clock_nano_sleep (gulong);
+static void nano_sleep (gulong);
+static void select_sleep (gulong);
+
+#ifdef CONFIG_HAVE_RTC
+static int tsc_us_scaler = 0;
+
 static int rtc_init (void);
 static int rtc_destroy (void);
 static pgm_time_t rtc_update (void);
+static void rtc_sleep (gulong);
+#endif
+
+#ifdef CONFIG_HAVE_TSC
 static int tsc_init (void);
 static pgm_time_t tsc_update (void);
-static int clock_init (void);
-
-static void clock_nano_sleep (gulong);
-static void nano_sleep (gulong);
-static void rtc_sleep (gulong);
 static void tsc_sleep (gulong);
-static void select_sleep (gulong);
-#ifdef CONFIG_TIMER_PPOLL
+#endif
+
+#ifdef CONFIG_HAVE_PPOLL
 static void poll_sleep (gulong);
 #endif
 
@@ -91,7 +97,13 @@ pgm_time_init ( void )
 
 /* current time */
 	const char *cfg = getenv ("PGM_TIMER");
-	if (cfg == NULL) cfg = "TSC";
+	if (cfg == NULL) {
+#ifdef CONFIG_HAVE_TSC
+		cfg = "TSC";
+#else
+		cfg = "GTOD";
+#endif
+	}
 
 	pgm_time_since_epoch = pgm_time_conv;
 
@@ -99,12 +111,16 @@ pgm_time_init ( void )
 	case 'C':	pgm_time_update_now = clock_update; break;
 	case 'F':	pgm_time_update_now = ftime_update; break;
 
+#ifdef CONFIG_HAVE_RTC
 	case 'R':	pgm_time_update_now = rtc_update;
 			pgm_time_since_epoch = pgm_time_conv_from_reset;
 			break;
+#endif
+#ifdef CONFIG_HAVE_TSC
 	case 'T':	pgm_time_update_now = tsc_update;
 			pgm_time_since_epoch = pgm_time_conv_from_reset;
 			break;
+#endif
 
 	default:
 	case 'G':	pgm_time_update_now = gettimeofday_update; break;
@@ -117,10 +133,15 @@ pgm_time_init ( void )
 	switch (cfg[0]) {
 	case 'C':	pgm_time_sleep = clock_nano_sleep; break;
 	case 'N':	pgm_time_sleep = nano_sleep; break;
-	case 'R':	pgm_time_sleep = rtc_sleep; break;
-	case 'T':	pgm_time_sleep = tsc_sleep; break;
 	case 'S':	pgm_time_sleep = select_sleep; break;			/* mainly for testing glib loop */
-#ifdef CONFIG_TIMER_PPOLL
+
+#ifdef CONFIG_HAVE_RTC
+	case 'R':	pgm_time_sleep = rtc_sleep; break;
+#endif
+#ifdef CONFIG_HAVE_TSC
+	case 'T':	pgm_time_sleep = tsc_sleep; break;
+#endif
+#ifdef CONFIG_HAVE_PPOLL
 	case 'P':	pgm_time_sleep = poll_sleep; break;
 #endif
 
@@ -129,11 +150,13 @@ pgm_time_init ( void )
 	case 'U':	pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
 	}
 
+#ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 	{
 		rtc_init();
 	}
-
+#endif
+#ifdef CONFIG_HAVE_TSC
 	if (pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
 	{
 /* attempt to parse clock ticks from kernel
@@ -170,6 +193,7 @@ pgm_time_init ( void )
 			tsc_init();
 		}
 	}
+#endif
 
 	if (pgm_time_sleep == clock_nano_sleep)
 	{
@@ -179,7 +203,14 @@ pgm_time_init ( void )
 	pgm_time_update_now();
 
 /* calculate relative time offset */
-	if (pgm_time_update_now == rtc_update || pgm_time_update_now == tsc_update)
+	if (	0
+#ifdef CONFIG_HAVE_RTC
+		|| pgm_time_update_now == rtc_update
+#endif
+#ifdef CONFIG_HAVE_TSC
+		|| pgm_time_update_now == tsc_update
+#endif
+	   )
 	{
 		rel_offset = gettimeofday_update() - pgm_time_update_now();
 	}
@@ -197,10 +228,12 @@ pgm_time_supported (void)
 int
 pgm_time_destroy (void)
 {
+#ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 	{
 		rtc_destroy();
 	}
+#endif
 
 	return 0;
 }
@@ -245,6 +278,7 @@ ftime_update (void)
  * WARNING: time is relative to start of timer.
  */
 
+#ifdef CONFIG_HAVE_RTC
 static int rtc_fd = -1;
 static int rtc_frequency = 8192;
 static pgm_time_t rtc_count = 0;
@@ -326,10 +360,12 @@ rtc_sleep (gulong usec)
 
 	rtc_count += count;
 }
+#endif /* CONFIG_HAVE_RTC */
 
 /* read time stamp counter, count of ticks from processor reset.
- *  */
+ */
 
+#ifdef CONFIG_HAVE_TSC
 static inline pgm_time_t
 rdtsc (void)
 {
@@ -419,6 +455,7 @@ tsc_sleep (gulong usec)
 
 	} while ( now < end );
 }
+#endif /* CONFIG_HAVE_TSC */
 
 static clockid_t g_clock_id;
 
@@ -478,7 +515,7 @@ select_sleep (gulong usec)
 	pselect (0, NULL, NULL, NULL, &ts, NULL);
 }
 
-#ifdef CONFIG_TIMER_PPOLL
+#ifdef CONFIG_HAVE_PPOLL
 static void
 poll_sleep (gulong usec)
 {
