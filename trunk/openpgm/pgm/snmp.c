@@ -69,7 +69,7 @@ log_handler (
 	strncpy (sbuf, string, len);
 	if (len > 0)
 		sbuf[len - 1] = '\0';
-	g_log (G_LOG_DOMAIN, log_level, sbuf);
+	g_log (G_LOG_DOMAIN, log_level, "%s", sbuf);
 	return 1;
 }
 

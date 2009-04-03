@@ -811,7 +811,7 @@ http_time_summary (
 		if (now_time < 14) {
 			return sprintf (sz, "%s (%li day%s ago)", daymonth, now_time, now_time > 1 ? "s" : "");
 		} else {
-			return sprintf (sz, daymonth);
+			return sprintf (sz, "%s", daymonth);
 		}
 	}
 }
