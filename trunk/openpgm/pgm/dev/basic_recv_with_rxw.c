@@ -52,7 +52,7 @@ struct tsi {
 	guint16	source_port;
 };
 
-struct stat {
+struct sessionstat {
 	gulong	count, snap_count;
 	gulong	bytes, snap_bytes;
 	gulong	tsdu;
@@ -89,7 +89,7 @@ struct hoststat {
 
 	gulong	spm_sqn;		/* independent sequence number */
 
-	struct stat	spm,
+	struct sessionstat	spm,
 			poll,
 			polr,
 			odata,
@@ -187,11 +187,19 @@ static gboolean on_io_error (GIOChannel*, GIOCondition, gpointer);
 
 static void send_nak (int, struct in_addr*);
 
+#ifdef CONFIG_LIBSOUP22
 static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
-static int tsi_callback (SoupServerContext*, SoupMessage*, gpointer);
+#else
+static void robots_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void default_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void css_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void index_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+#endif
+
+static int tsi_callback (SoupMessage*, const char*);
 
 static int on_pgm_data (gpointer, guint, gpointer);
 
@@ -333,10 +341,17 @@ on_startup (
                 hostname,
                 soup_server_get_port (g_soup_server));
 
+#ifdef CONFIG_LIBSOUP22
         soup_server_add_handler (g_soup_server, NULL,	NULL, default_callback, NULL, NULL);
         soup_server_add_handler (g_soup_server, "/robots.txt",	NULL, robots_callback, NULL, NULL);
         soup_server_add_handler (g_soup_server, "/main.css",	NULL, css_callback, NULL, NULL);
         soup_server_add_handler (g_soup_server, "/",	NULL, index_callback, NULL, NULL);
+#else
+        soup_server_add_handler (g_soup_server, NULL,           default_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/robots.txt",  robots_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/main.css",    css_callback, NULL, NULL);
+        soup_server_add_handler (g_soup_server, "/",            index_callback, NULL, NULL);
+#endif
 
         soup_server_run_async (g_soup_server);
         g_object_unref (g_soup_server);
@@ -985,6 +1000,7 @@ tsi_equal (
 /* request on web interface
  */
 
+#ifdef CONFIG_LIBSOUP22
 static void
 robots_callback (
                 G_GNUC_UNUSED SoupServerContext*      context,
@@ -995,7 +1011,23 @@ robots_callback (
 	soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
 				WWW_ROBOTS, strlen(WWW_ROBOTS));
 }
+#else
+static void
+robots_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+{
+        soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+                                WWW_ROBOTS, strlen(WWW_ROBOTS));
+}
+#endif
 
+#ifdef CONFIG_LIBSOUP22
 static void
 css_callback (
                 G_GNUC_UNUSED SoupServerContext*      context,
@@ -1006,8 +1038,23 @@ css_callback (
 	soup_message_set_response (msg, "text/css", SOUP_BUFFER_STATIC,
 				WWW_CSS, strlen(WWW_CSS));
 }
+#else
+static void
+css_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+{
+        soup_message_set_response (msg, "text/css", SOUP_MEMORY_STATIC,
+                                WWW_CSS, strlen(WWW_CSS));
+}
+#endif
 
-
+#ifdef CONFIG_LIBSOUP22
 static void
 default_callback (
                 SoupServerContext*      context,
@@ -1015,26 +1062,44 @@ default_callback (
                 gpointer                data
                 )
 {
-        char *path;
-
-        path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
-//        printf ("%s %s HTTP/1.%d\n", msg->method, path,
-//                soup_message_get_http_version (msg));
-
-	int e = -1;
-	if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
-	{
-		e = tsi_callback (context, msg, data);
-	}
-
-	if (e)
-	{
-	        soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
-	                                        WWW_NOTFOUND, strlen(WWW_NOTFOUND));
-	        soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
-	        soup_message_add_header (msg->response_headers, "Connection", "close");
-	}
+        if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
+        {
+                const char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
+                int e = tsi_callback (msg, path);
+                if (e)
+                {
+                        soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
+                                                        WWW_NOTFOUND, strlen(WWW_NOTFOUND));
+                        soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+                        soup_message_add_header (msg->response_headers, "Connection", "close");
+                }
+		g_free (path);
+        }
 }
+#else
+static void
+default_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+{
+        if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
+        {
+                int e = tsi_callback (msg, path);
+                if (e)
+                {
+                        soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+                                                        WWW_NOTFOUND, strlen(WWW_NOTFOUND));
+                        soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+                        soup_message_headers_append (msg->response_headers, "Connection", "close");
+                }
+        }
+}
+#endif
 
 /* transport session identifier TSI index
  */
@@ -1124,12 +1189,24 @@ index_nets_row (
 	return FALSE;
 }
 
+#ifdef CONFIG_LIBSOUP22
 static void
 index_callback (
                 G_GNUC_UNUSED SoupServerContext*      context,
                 SoupMessage*            msg,
                 G_GNUC_UNUSED gpointer                data
                 )
+#else
+static void
+index_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+#endif
 {
 	GString *response;
 
@@ -1175,7 +1252,13 @@ index_callback (
 
 	g_string_append (response, "</p>" WWW_FOOTER);
 	gchar* resp = g_string_free (response, FALSE);
-	soup_message_set_response (msg, "text/html", SOUP_BUFFER_SYSTEM_OWNED, resp, strlen(resp));
+        soup_message_set_response (msg, "text/html",
+#ifdef CONFIG_LIBSOUP22
+                                        SOUP_BUFFER_SYSTEM_OWNED,
+#else
+                                        SOUP_MEMORY_TAKE,
+#endif
+                                        resp, strlen(resp));
 }
 
 /* transport session identifier TSI details
@@ -1184,13 +1267,13 @@ index_callback (
 static char*
 print_stat (
 		const char*	name,
-		struct stat*	stat,
+		struct sessionstat*	sessionstat,
 		float		secs,
 		const char*	el		/* xml element name */
 		)
 {
 	static char buf[1024];
-	float bitrate = ((float)( stat->bytes - stat->snap_bytes ) * 8.0 / secs);
+	float bitrate = ((float)( sessionstat->bytes - sessionstat->snap_bytes ) * 8.0 / secs);
 	const char* bitprefix = print_si (&bitrate);
 	
 	snprintf (buf, sizeof(buf),
@@ -1203,11 +1286,11 @@ print_stat (
 			"<%s>%lu / %3.1f%%</%s>"	/* invalid */
 		"</tr>",
 		el, name, el,
-		el, stat->count, el,
-		el, stat->bytes, el,
-		el, ( stat->count - stat->snap_count ) / secs, el,
+		el, sessionstat->count, el,
+		el, sessionstat->bytes, el,
+		el, ( sessionstat->count - sessionstat->snap_count ) / secs, el,
 		el, bitrate, bitprefix, el,
-		el, stat->invalid, stat->invalid ? (100.0 * stat->invalid) / stat->invalid : 0.0, el
+		el, sessionstat->invalid, sessionstat->invalid ? (100.0 * sessionstat->invalid) / sessionstat->invalid : 0.0, el
 		);
 
 	return buf;
@@ -1215,12 +1298,10 @@ print_stat (
 
 static int
 tsi_callback (
-                G_GNUC_UNUSED SoupServerContext*      context,
                 SoupMessage*            msg,
-                G_GNUC_UNUSED gpointer                data
+		const char*     path
                 )
 {
-        char *path;
 	struct hoststat* hoststat = NULL;
 	struct tsi tsi;
 
@@ -1229,6 +1310,8 @@ tsi_callback (
 	int e = sscanf (path + strlen("/tsi/"), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
 		&tsi.gsi[0], &tsi.gsi[1], &tsi.gsi[2], &tsi.gsi[3], &tsi.gsi[4], &tsi.gsi[5],
 		&tsi.source_port);
+	g_free (path);
+
 	tsi.source_port = g_ntohs (tsi.source_port);
 
 	if (e == 7) {
@@ -1305,7 +1388,13 @@ tsi_callback (
 
 	g_string_append (response, WWW_FOOTER);
 	gchar* resp = g_string_free (response, FALSE);
-	soup_message_set_response (msg, "text/html", SOUP_BUFFER_SYSTEM_OWNED, resp, strlen(resp));
+        soup_message_set_response (msg, "text/html",
+#ifdef CONFIG_LIBSOUP22
+                                        SOUP_BUFFER_SYSTEM_OWNED,
+#else
+                                        SOUP_MEMORY_TAKE,
+#endif
+                                        resp, strlen(resp));
 
 	return 0;
 }

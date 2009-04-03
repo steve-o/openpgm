@@ -21,6 +21,7 @@
 
 
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -30,7 +31,9 @@
 
 #include <libsoup/soup.h>
 #include <libsoup/soup-server.h>
-#include <libsoup/soup-server-message.h>
+#ifdef CONFIG_LIBSOUP22
+#	include <libsoup/soup-server-message.h>
+#endif
 #include <libsoup/soup-address.h>
 
 #include "pgm/http.h"
@@ -59,11 +62,19 @@ static GMutex* http_mutex;
 static gpointer http_thread (gpointer);
 static int http_tsi_response (pgm_tsi_t*, SoupMessage*);
 
+#ifdef CONFIG_LIBSOUP22
 static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void transports_callback (SoupServerContext*, SoupMessage*, gpointer);
+#else
+static void default_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void robots_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void css_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void index_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void transports_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+#endif
 
 static void http_each_receiver (pgm_peer_t*, GString*);
 static int http_receiver_response (pgm_peer_t*, SoupMessage*);
@@ -154,11 +165,19 @@ http_thread (
 			hostname,
 			soup_server_get_port (g_soup_server));
 
+#ifdef CONFIG_LIBSOUP22
 	soup_server_add_handler (g_soup_server, NULL,		NULL, default_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/robots.txt",	NULL, robots_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/base.css",	NULL, css_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/",		NULL, index_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	NULL, transports_callback, NULL, NULL);
+#else
+	soup_server_add_handler (g_soup_server, NULL,		default_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/robots.txt",	robots_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/base.css",	css_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/",		index_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/transports",	transports_callback, NULL, NULL);
+#endif
 
 /* signal parent thread we are ready to run */
 	g_cond_signal (http_cond);
@@ -243,11 +262,18 @@ http_finalize_response (
 
 	gchar* buf = g_string_free (response, FALSE);
 	soup_message_set_status (msg, SOUP_STATUS_OK);
+#ifdef CONFIG_LIBSOUP22
 	soup_server_message_set_encoding (SOUP_SERVER_MESSAGE (msg), SOUP_TRANSFER_CONTENT_LENGTH);
 	soup_message_set_response (msg, "text/html", SOUP_BUFFER_SYSTEM_OWNED,
 					buf, strlen(buf));
+#else
+	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/html", SOUP_MEMORY_TAKE,
+					buf, strlen(buf));
+#endif
 }
-	
+
+#ifdef CONFIG_LIBSOUP22	
 static void
 robots_callback (
 	SoupServerContext*	context,
@@ -265,7 +291,30 @@ robots_callback (
 	soup_message_set_response (msg, "text/plain", SOUP_BUFFER_STATIC,
 					WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
 }
+#else
+static void
+robots_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+{
+	if (0 != g_strcmp0 (msg->method, "GET")) {
+		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+		return;
+	}
 
+	soup_message_set_status (msg, SOUP_STATUS_OK);
+	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+        soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+                                WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
+}
+#endif
+
+#ifdef CONFIG_LIBSOUP22 
 static void
 css_callback (
 	SoupServerContext*	context,
@@ -283,13 +332,47 @@ css_callback (
 	soup_message_set_response (msg, "text/css", SOUP_BUFFER_STATIC,
 					WWW_BASE_CSS, strlen(WWW_BASE_CSS));
 }
+#else
+static void
+css_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+{       
+        if (0 != g_strcmp0 (msg->method, "GET")) {
+                soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+                return;
+        }
 
+        soup_message_set_status (msg, SOUP_STATUS_OK);
+        soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+        soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+                                WWW_BASE_CSS, strlen(WWW_BASE_CSS));
+}
+#endif
+
+#ifdef CONFIG_LIBSOUP22
 static void
 index_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
 	SoupMessage*		msg,
 	G_GNUC_UNUSED gpointer	data
 	)
+#else
+static void
+index_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+#endif
 {
 	GString *response;
 
@@ -341,12 +424,24 @@ index_callback (
 	http_finalize_response (response, msg);
 }
 
+#ifdef CONFIG_LIBSOUP22
 static void
 transports_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
 	SoupMessage*		msg,
 	G_GNUC_UNUSED gpointer	data
 	)
+#else
+static void
+transports_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+#endif
 {
 	GString *response;
 
@@ -424,6 +519,7 @@ transports_callback (
 	http_finalize_response (response, msg);
 }
 
+#ifdef CONFIG_LIBSOUP22
 static void
 default_callback (
 	SoupServerContext*	context,
@@ -438,6 +534,22 @@ default_callback (
 
 /* magical mysterious GSI hunting from path */
 	char *path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
+#else
+static void
+default_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
+        )
+{
+        if (0 != g_strcmp0 (msg->method, "GET")) {
+                soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+                return;
+        }
+#endif
 
 	pgm_tsi_t tsi;
 	int count = sscanf (path, "/%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
@@ -449,7 +561,9 @@ default_callback (
 				(unsigned char*)&tsi.gsi.identifier[5],
 				&tsi.sport);
 	tsi.sport = g_htons (tsi.sport);
+#ifdef CONFIG_LIBSOUP22
 	g_free (path);
+#endif
 	if (count == 7)
 	{
 		int retval = http_tsi_response (&tsi, msg);
@@ -457,9 +571,15 @@ default_callback (
 	}
 
 	soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+#ifdef CONFIG_LIBSOUP22
 	soup_server_message_set_encoding (SOUP_SERVER_MESSAGE (msg), SOUP_TRANSFER_CONTENT_LENGTH);
 	soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
 					WWW_404_HTML, strlen(WWW_404_HTML));
+#else
+	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+					WWW_404_HTML, strlen(WWW_404_HTML));
+#endif
 }
 
 static int

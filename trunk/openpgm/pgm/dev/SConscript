@@ -6,7 +6,7 @@ import os
 Import('env')
 
 e = env.Clone()
-e.Append(LIBS = ['libpgmplus', 'libpgmex']);
+e.Append(LIBS = ['libpgm', 'libpgmex']);
 
 e.Program(['basic_send.c'])
 e.Program(['spm_idle.c'])
