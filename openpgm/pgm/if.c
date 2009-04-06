@@ -112,8 +112,21 @@ pgm_gethostbyname2 (
 #endif
 
 #ifdef CONFIG_HAVE_GETIFADDRS
-#	define pgm_if_getifaddrs(ifap)	( getifaddrs  ((struct ifaddrs**)(ifap)) )
-#	define pgm_if_freeifaddrs(ifap)	( freeifaddrs ((struct ifaddrs*)(ifa))   )
+static inline int
+pgm_if_getifaddrs (
+	struct pgm_ifaddrs**	ifap
+	)
+{
+	return getifaddrs ((struct ifaddrs**)ifap);
+}
+
+static inline void
+pgm_if_freeifaddrs (
+	struct pgm_ifaddrs*	ifa
+	)
+{
+	freeifaddrs ((struct ifaddrs*)ifa);
+}
 #else
 
 static int
