@@ -26,7 +26,7 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'true',
+	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
 			allowed_values=('true', 'false')),
 )
 

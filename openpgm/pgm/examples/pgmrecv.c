@@ -377,7 +377,9 @@ receiver_thread (
 		}
 	} while (!g_quit);
 
+#ifdef CONFIG_HAVE_EPOLL
 	close (efd);
+#endif
 	return NULL;
 }
 
