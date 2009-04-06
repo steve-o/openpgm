@@ -47,6 +47,11 @@
 #include "htdocs/robots.txt.h"
 #include "htdocs/xhtml10_strict.doctype.h"
 
+/* OpenSolaris */
+#ifndef LOGIN_NAME_MAX
+#	define LOGIN_NAME_MAX		256
+#endif
+
 
 /* globals */
 

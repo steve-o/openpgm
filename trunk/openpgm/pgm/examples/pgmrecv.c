@@ -42,9 +42,12 @@
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-#include <pgm/http.h>
-#include <pgm/snmp.h>
-
+#ifdef CONFIG_WITH_HTTP
+#	include <pgm/http.h>
+#endif
+#ifdef CONFIG_WITH_SNMP
+#	include <pgm/snmp.h>
+#endif
 
 /* typedefs */
 
@@ -92,8 +95,12 @@ usage (
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
+#ifdef CONFIG_WITH_HTTP
 	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
+#endif
+#ifdef CONFIG_WITH_SNMP
 	fprintf (stderr, "  -x              : Enable SNMP interface\n");
+#endif
 	exit (1);
 }
 
@@ -104,13 +111,24 @@ main (
 	)
 {
 	g_message ("pgmrecv");
+#ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
+#endif
+#ifdef CONFIG_WITH_SNMP
 	gboolean enable_snmpx = FALSE;
+#endif
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "a:s:n:p:lxth")) != -1)
+	while ((c = getopt (argc, argv, "a:s:n:p:lh"
+#ifdef CONFIG_WITH_HTTP
+					"t"
+#endif
+#ifdef CONFIG_WITH_SNMP
+					"x"
+#endif
+					)) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -119,8 +137,12 @@ main (
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
 
 		case 'l':	g_multicast_loop = TRUE; break;
+#ifdef CONFIG_WITH_HTTP
 		case 't':	enable_http = TRUE; break;
+#endif
+#ifdef CONFIG_WITH_SNMP
 		case 'x':	enable_snmpx = TRUE; break;
+#endif
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -130,10 +152,14 @@ main (
 	log_init();
 	pgm_init();
 
+#ifdef CONFIG_WITH_HTTP
 	if (enable_http)
 		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+#endif
+#ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
 		pgm_snmp_init();
+#endif
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -167,10 +193,14 @@ main (
 		g_transport = NULL;
 	}
 
+#ifdef CONFIG_WITH_HTTP
 	if (enable_http)
 		pgm_http_shutdown();
+#endif
+#ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
 		pgm_snmp_shutdown();
+#endif
 
 	g_message ("finished.");
 	return 0;

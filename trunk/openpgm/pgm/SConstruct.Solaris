@@ -14,6 +14,20 @@ vars.AddVariables (
 			allowed_values=('release', 'debug', 'profile')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_DEV', 'Development code', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_TEST', 'Network test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'true',
+			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
@@ -92,11 +106,13 @@ env = Environment(
 			'-D__need_IOV_MAX',
 			'-D__USE_BSD',
 			'-DCONFIG_HAVE_TSC',
-			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
 	LINKFLAGS = [	'-pipe',
+			'-lresolv',
+			'-lsocket',
+			'-lnsl'
 		    ]
 )
 
@@ -141,7 +157,10 @@ env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
         'CFLAGS'        : [],
-        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
+        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp',
+			    'ssl', 'kstat', 'wrap', 'adm' ],
+	'CPPPATH'	: ['/opt/cws/include'],
+	'LIBPATH'	: ['/opt/csw/lib'],
 };
 env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 
@@ -180,27 +199,24 @@ int main(int argc, char**argv)
 	context.Result(result);
 	return result;
 
-conf = Configure(env, custom_tests = {	'CheckSNMP':	CheckSNMP,
-					'CheckCheck':	CheckCheck,
-					'CheckEventFD': CheckEventFD	});
+tests = {
+	'CheckCheck':	CheckCheck,
+	'CheckEventFD':	CheckEventFD
+}
+if env['WITH_SNMP'] == 'true':
+	tests['CheckSNMP'] = CheckSNMP;
+conf = Configure(env, custom_tests = tests);
 
-if not conf.CheckSNMP():
-	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
-	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
-	lastLIBS = conf.env['LIBS'];
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
-	conf.env['SNMP_FLAGS']['LIBS'].append(conf.env['LIBS']);
-	conf.env.Replace(LIBS = lastLIBS);
-	if not conf.CheckSNMP():
-		print 'Net-SNMP libraries not compatible.';
-		Exit(1);
+if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
 
-if conf.CheckCheck():
+if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
-	conf.env['CHECK'] = 1;
+	conf.env['CHECK'] = 'true';
 else:
 	print 'Disabling Check unit tests.';
-	conf.env['CHECK'] = 0;
+	conf.env['CHECK'] = 'false';
 
 if conf.CheckEventFD():
 	print 'Enabling kernel eventfd notification mechanism.';
@@ -232,15 +248,19 @@ env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
 SConscript(ref_node + 'SConscript.libpgm');
 SConscript(ref_node + 'SConscript.libpgmex');
-SConscript(ref_node + 'SConscript.libpgmhttp');
-SConscript(ref_node + 'SConscript.libpgmsnmp');
-SConscript(ref_node + 'test/SConscript');
-SConscript(ref_node + 'dev/SConscript');
-SConscript(ref_node + 'examples/SConscript');
+if env['WITH_HTTP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmhttp');
+if env['WITH_SNMP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmsnmp');
+if env['WITH_TEST'] == 'true':
+	SConscript(ref_node + 'test/SConscript');
+if env['WITH_DEV'] == 'true':
+	SConscript(ref_node + 'dev/SConscript');
+if env['WITH_EXAMPLES'] == 'true':
+	SConscript(ref_node + 'examples/SConscript');
 
 # unit testing framework optional.
-if env['CHECK'] == 1:
+if env['WITH_CHECK'] and env['CHECK'] == 'true':
  	SConscript(ref_node + 'check/SConscript');
-
 
 # end of file

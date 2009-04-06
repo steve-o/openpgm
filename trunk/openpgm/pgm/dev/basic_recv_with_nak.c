@@ -44,6 +44,11 @@
 #include "pgm/packet.h"
 #include "pgm/checksum.h"
 
+/* OpenSolaris */
+#ifndef MSG_CONFIRM
+#	define MSG_CONFIRM	0
+#endif
+
 
 /* typedefs */
 struct tsi {
@@ -65,7 +70,7 @@ struct sessionstat {
 };
 
 struct netstat {
-	struct in_addr	s_addr;
+	struct in_addr	addr;
 	gulong		corrupt;
 };
 
@@ -142,7 +147,7 @@ struct hoststat {
 
 static int g_port = 7500;
 static const char* g_network = "226.0.0.1";
-static struct ip_mreqn g_mreqn;
+static struct ip_mreq g_mreq;
 
 static int g_http = 4968;
 
@@ -448,14 +453,14 @@ on_startup (
 	printf ("socket bound to %s (%s)\n", inet_ntoa(g_addr), hostname);
 
 /* multicast */
-	memset(&g_mreqn, 0, sizeof(g_mreqn));
-	g_mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("listening on interface %s.\n", inet_ntoa(g_mreqn.imr_address));
-	g_mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("joining multicast group address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
-	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
-	e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
-	e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
+	memset(&g_mreq, 0, sizeof(g_mreq));
+	g_mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("listening on interface %s.\n", inet_ntoa(g_mreq.imr_interface));
+	g_mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	printf ("joining multicast group address %s.\n", inet_ntoa(g_mreq.imr_multiaddr));
+	e = setsockopt(g_recv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreq, sizeof(g_mreq));
+	e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreq, sizeof(g_mreq));
+	e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreq, sizeof(g_mreq));
 	if (e < 0 || e2 < 0 || e3 < 0) {
 		perror("on_startup() failed");
 		close(g_recv_sock);
@@ -608,9 +613,9 @@ on_io_data (
 			struct netstat* netstat = g_hash_table_lookup (g_nets, &addr.sin_addr);
 			if (netstat == NULL) {
 				netstat = g_malloc0(sizeof(struct netstat));
-				netstat->s_addr = addr.sin_addr;
+				netstat->addr = addr.sin_addr;
 				g_mutex_lock (g_nets_mutex);
-				g_hash_table_insert (g_nets, (gpointer)&netstat->s_addr, (gpointer)netstat);
+				g_hash_table_insert (g_nets, (gpointer)&netstat->addr, (gpointer)netstat);
 				g_mutex_unlock (g_nets_mutex);
 			}
 
@@ -980,7 +985,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 /* multicast group nla */
 	nak->nak_grp_nla_afi	= g_htons (AFI_IP);
 	nak->nak_grp_nla.s_addr	= source->s_addr;	/* IPv4 */
-//	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreqn.imr_multiaddr.s_addr;
+//	((struct in_addr*)(nak + 1 + sizeof(struct in_addr) + (2 * sizeof(guint16))))->s_addr = g_mreq.imr_multiaddr.s_addr;
 
 	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
@@ -1236,7 +1241,7 @@ index_nets_row (
 				"<td>%s</td>"
 				"<td>%lu</td>"
 			"</tr>",
-			inet_ntoa (netstat->s_addr),
+			inet_ntoa (netstat->addr),
 			netstat->corrupt
 			);
 
