@@ -873,14 +873,14 @@ css_callback (
 #ifdef CONFIG_LIBSOUP22
 static void
 default_callback (
-	SoupServerContext*      context,
+	G_GNUC_UNUSED SoupServerContext*	context,
 	SoupMessage*            msg,
-	gpointer                data
+	G_GNUC_UNUSED gpointer	data
 	)
 {
+       	const char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
 	if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
 	{
-        	const char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
 		int e = tsi_callback (msg, path);
 		if (e)
 		{
@@ -897,7 +897,7 @@ static void
 default_callback (
 	G_GNUC_UNUSED SoupServer*	server,
 	SoupMessage*	msg,
-	G_GNUC_UNUSED const char*	path,
+	const char*	path,
 	G_GNUC_UNUSED GHashTable* query,
 	G_GNUC_UNUSED SoupClientContext* client,
 	G_GNUC_UNUSED gpointer data
