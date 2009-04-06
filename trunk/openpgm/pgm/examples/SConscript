@@ -17,6 +17,7 @@ e.Append(LIBS = ['libpgmex', 'libpgm']);
 # core preferred examples
 e.Program(['pgmdump.c'])
 e.Program(['pgmsend.c'])
+e.Program(['pgmrecv.c'])
 e.Program(['pgmping.c'])
 
 # sync examples
@@ -26,7 +27,6 @@ e.Program(['pnonblocksyncrecv.c'])
 
 # epoll based examples
 if '-DCONFIG_HAVE_EPOLL' in e['CFLAGS']:
-	e.Program(['pgmrecv.c'])
 	e.Program(['enonblocksyncrecv.c'])
 	e.Program(['enonblocksyncrecvmsg.c'])
 	e.Program(['enonblocksyncrecvmsgv.c'])

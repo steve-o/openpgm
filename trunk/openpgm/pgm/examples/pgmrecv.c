@@ -30,7 +30,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <netinet/in.h>
-#include <sys/epoll.h>
+#ifdef CONFIG_HAVE_EPOLL
+#	include <sys/epoll.h>
+#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -316,6 +318,7 @@ receiver_thread (
 	long iov_max = sysconf( SC_IOV_MAX );
 	pgm_msgv_t msgv[iov_max];
 
+#ifdef CONFIG_HAVE_EPOLL
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
@@ -329,6 +332,11 @@ receiver_thread (
 		g_main_loop_quit(g_loop);
 		return NULL;
 	}
+#else
+	int n_fds = 2;
+	struct pollfd fds[ n_fds ];
+	
+#endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
 		gssize len = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
@@ -338,8 +346,14 @@ receiver_thread (
 		}
 		else if (errno == EAGAIN)	/* len == -1, an error occured */
 		{
+#ifdef CONFIG_HAVE_EPOLL
 			struct epoll_event events[1];	/* wait for maximum 1 event */
 			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
+#else
+			memset (fds, 0, sizeof(fds));
+			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
+			poll (fds, n_fds, 1000 /* ms */);
+#endif /* !CONFIG_HAVE_EPOLL */
 		}
 		else if (errno == ECONNRESET)
 		{
