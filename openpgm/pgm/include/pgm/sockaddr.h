@@ -162,7 +162,7 @@ static inline int pgm_sockaddr_hdrincl (int s, int sa_family, gboolean v)
 static inline int pgm_sockaddr_pktinfo (int s, int sa_family, gboolean v)
 {
     int retval = 0;
-    gint8 optval = v;
+    gint optval = v;
 
     switch (sa_family) {
     case AF_INET:
@@ -207,7 +207,7 @@ static inline int pgm_sockaddr_router_alert (int s, int sa_family, gboolean v)
 static inline int pgm_sockaddr_tos (int s, int sa_family, int tos)
 {
     int retval = 0;
-    gint8 optval = tos;
+    gint optval = tos;
 
     switch (sa_family) {
     case AF_INET:
