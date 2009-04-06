@@ -199,13 +199,13 @@ on_startup (
 	}
 
 /* multicast */
-	struct ip_mreqn mreqn;
-	memset(&mreqn, 0, sizeof(mreqn));
-	mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("listening on interface %s.\n", inet_ntoa(mreqn.imr_address));
-	mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("subscription on multicast address %s.\n", inet_ntoa(mreqn.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn));
+	struct ip_mreq mreq;
+	memset(&mreq, 0, sizeof(mreq));
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
+	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
 		perror("on_startup() failed");
 		close(sock);

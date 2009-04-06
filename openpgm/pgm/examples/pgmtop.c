@@ -69,7 +69,7 @@ struct pgm_stat {
 };
 
 struct pgm_netstat {
-	struct in_addr	s_addr;
+	struct in_addr	addr;
 	gulong		corrupt;
 };
 
@@ -649,13 +649,13 @@ on_startup (
 	}
 
 /* multicast */
-	struct ip_mreqn mreqn;
-	memset(&mreqn, 0, sizeof(mreqn));
-	mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("listening on interface %s.\n", inet_ntoa(mreqn.imr_address));
-	mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("subscription on multicast address %s.\n", inet_ntoa(mreqn.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn));
+	struct ip_mreq mreq;
+	memset(&mreq, 0, sizeof(mreq));
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
+	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
 		printw("on_startup() failed\n");
 		close(sock);
@@ -753,8 +753,8 @@ on_io_data (
 		if (netstat == NULL) {
 			write_status ("new host publishing corrupt data, local nla %s", inet_ntoa(src_addr.sin_addr));
 			netstat = g_malloc0(sizeof(struct pgm_netstat));
-			netstat->s_addr = src_addr.sin_addr;
-			g_hash_table_insert (g_nets, (gpointer)&netstat->s_addr, (gpointer)netstat);
+			netstat->addr = src_addr.sin_addr;
+			g_hash_table_insert (g_nets, (gpointer)&netstat->addr, (gpointer)netstat);
 		}
 
 		netstat->corrupt++;

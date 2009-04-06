@@ -41,8 +41,12 @@
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-#include <pgm/http.h>
-#include <pgm/snmp.h>
+#ifdef CONFIG_WITH_HTTP
+#	include <pgm/http.h>
+#endif
+#ifdef CONFIG_WITH_SNMP
+#	include <pgm/snmp.h>
+#endif
 
 
 /* typedefs */
@@ -159,10 +163,14 @@ main (
 	log_init ();
 	pgm_init ();
 
+#ifdef CONFIG_WITH_HTTP
 	if (enable_http)
 		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+#endif
+#ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
 		pgm_snmp_init();
+#endif
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -198,10 +206,14 @@ main (
 		g_transport = NULL;
 	}
 
+#ifdef CONFIG_WITH_HTTP
 	if (enable_http)
 		pgm_http_shutdown();
+#endif
+#ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
 		pgm_snmp_shutdown();
+#endif
 
 	g_message ("finished.");
 	return 0;
@@ -328,7 +340,7 @@ on_startup (
 	int n_fds = 2;
 	struct pollfd fds[ n_fds ];
 	memset (fds, 0, sizeof(fds));
-	pgm_transport_poll_info (g_transport, fds, &n_fds, EPOLLIN);
+	pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
 	g_io_channel_recv = g_io_channel_unix_new (fds[0].fd);
 	g_io_channel_notify = g_io_channel_unix_new (fds[1].fd);
 	/* guint event = */ g_io_add_watch (g_io_channel_recv, G_IO_IN, on_io_data, NULL);

@@ -32,7 +32,7 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <linux/if.h>
+#include <net/if.h>
 #include <arpa/inet.h>
 
 #include <glib.h>
@@ -42,12 +42,16 @@
 #include "pgm/packet.h"
 #include "pgm/checksum.h"
 
+/* OpenSolaris */
+#ifndef MSG_CONFIRM
+#	define MSG_CONFIRM	0
+#endif
 
 /* globals */
 
 static int g_port = 7500;
 static const char* g_network = "226.0.0.1";
-static struct ip_mreqn g_mreqn;
+static struct ip_mreq g_mreq;
 
 static const char* g_payload = "banana man!";
 
@@ -57,7 +61,11 @@ static const char* g_payload = "banana man!";
  * 1492 is good for ATM.
  */
 static int g_mtu = 1500;
-#define g_tpdu_limit  (g_mtu - sizeof(struct iphdr))
+#ifdef __USE_BSD
+#	define g_tpdu_limit  (g_mtu - sizeof(struct ip))
+#else
+#	define g_tpdu_limit  (g_mtu - sizeof(struct iphdr))
+#endif
 
 /* TSDU limit is more complicated as PGM options reduce the available size
  */
@@ -281,26 +289,30 @@ on_startup (
 	if (e < 0) {
 		perror("Cannot determine interface MTU");
 	} else {
+#ifdef __USE_BSD
+		printf ("interface MTU %i bytes.\n", ifreq.ifr_metric);
+#else
 		printf ("interface MTU %i bytes.\n", ifreq.ifr_mtu);
+#endif
 	}
 
 /* multicast */
-	memset(&g_mreqn, 0, sizeof(g_mreqn));
-	g_mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("sending on interface %s.\n", inet_ntoa(g_mreqn.imr_address));
-	g_mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	if (IN_MULTICAST(g_htonl(g_mreqn.imr_multiaddr.s_addr)))
-		printf ("sending on multicast address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+	memset(&g_mreq, 0, sizeof(g_mreq));
+	g_mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("sending on interface %s.\n", inet_ntoa(g_mreq.imr_interface));
+	g_mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	if (IN_MULTICAST(g_htonl(g_mreq.imr_multiaddr.s_addr)))
+		printf ("sending on multicast address %s.\n", inet_ntoa(g_mreq.imr_multiaddr));
 	else
-		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreq.imr_multiaddr));
 
-	if (IN_MULTICAST(g_htonl(g_mreqn.imr_multiaddr.s_addr)))
+	if (IN_MULTICAST(g_htonl(g_mreq.imr_multiaddr.s_addr)))
 	{
 /* IP_ADD_MEMBERSHIP = subscription
  * IP_MULTICAST_IF = send only
  */
-		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
-//		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
+		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreq, sizeof(g_mreq));
+//		e = setsockopt(g_io_channel_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreq, sizeof(g_mreq));
 		if (e < 0) {
 			perror("on_startup() failed");
 			close(g_io_channel_sock);
@@ -411,7 +423,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 /* IP header handled by sendto() */
 	struct sockaddr_in mc;
 	mc.sin_family		= AF_INET;
-	mc.sin_addr.s_addr	= g_mreqn.imr_multiaddr.s_addr;
+	mc.sin_addr.s_addr	= g_mreq.imr_multiaddr.s_addr;
 	mc.sin_port		= 0;
 
 	printf("TPDU %i bytes to %s.\n", tpdu_length, inet_ntoa(mc.sin_addr));

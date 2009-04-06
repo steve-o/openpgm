@@ -45,7 +45,7 @@
 
 static int g_port = 7500;
 static const char* g_network = "239.192.0.1";
-static struct in_addr g_filter = { 0 };
+static struct in_addr g_filter /* = { 0 } */;
 
 static GIOChannel* g_io_channel = NULL;
 static GIOChannel* g_stdin_channel = NULL;
@@ -76,6 +76,8 @@ main (
 	pgm_signal_install(SIGINT, on_signal);
 	pgm_signal_install(SIGTERM, on_signal);
 	pgm_signal_install(SIGHUP, SIG_IGN);
+
+	g_filter.s_addr = 0;
 
 /* delayed startup */
 	puts ("scheduling startup.");
@@ -211,13 +213,13 @@ on_startup (
 	}
 
 /* multicast */
-	struct ip_mreqn mreqn;
-	memset(&mreqn, 0, sizeof(mreqn));
-	mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("listening on interface %s.\n", inet_ntoa(mreqn.imr_address));
-	mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("subscription on multicast address %s.\n", inet_ntoa(mreqn.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn));
+	struct ip_mreq mreq;
+	memset(&mreq, 0, sizeof(mreq));
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
+	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
 		perror("on_startup() failed");
 		close(sock);
