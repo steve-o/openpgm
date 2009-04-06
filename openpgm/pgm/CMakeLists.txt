@@ -42,7 +42,7 @@ SET(LIBRARY_OUTPUT_PATH  ${CMAKE_BINARY_DIR}/lib)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_ROOT}/Modules ${CMAKE_SOURCE_DIR}/CMake)
 INCLUDE(FindPkgConfig)
 pkg_check_modules (GLIB2 REQUIRED	glib-2.0>=2.10 gthread-2.0)
-pkg_check_modules (LIBSOUP REQUIRED	libsoup-2.2)
+pkg_check_modules (LIBSOUP REQUIRED	libsoup-2.4)
 pkg_check_modules (CHECK 		check)
 
 #-----------------------------------------------------------------------------
@@ -85,6 +85,8 @@ SET(PLATFORM_CFLAGS " 	-pipe
 			-DCONFIG_HAVE_SIGHANDLER_T
 			-DCONFIG_BIND_INADDR_ANY
 			-DCONFIG_GALOIS_MUL_LUT
+			-DCONFIG_WITH_SNMP
+			-DCONFIG_WITH_HTTP
 ")
 STRING(REGEX REPLACE "[\t\n ]+" " " PLATFORM_CFLAGS "${PLATFORM_CFLAGS}")
 SET(PLATFORM_LINKFLAGS	"-pipe")

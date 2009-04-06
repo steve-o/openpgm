@@ -44,6 +44,10 @@
 #include "pgm/txwi.h"
 #include "pgm/checksum.h"
 
+/* OpenSolaris */
+#ifndef MSG_CONFIRM
+#	define MSG_CONFIRM	0
+#endif
 
 /* typedefs */
 struct tsi {
@@ -56,7 +60,7 @@ struct tsi {
 
 static int g_port = 7500;
 static const char* g_network = "226.0.0.1";
-static struct ip_mreqn g_mreqn;
+static struct ip_mreq g_mreq;
 
 static int g_spm_ambient_interval = 10 * 1000;
 static int g_odata_interval = 1 * 1000;
@@ -325,17 +329,17 @@ on_startup (
 	printf ("socket bound to %s (%s)\n", inet_ntoa(g_addr), hostname);
 
 /* multicast */
-	memset(&g_mreqn, 0, sizeof(g_mreqn));
-	g_mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("sending on interface %s.\n", inet_ntoa(g_mreqn.imr_address));
-	g_mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	if (IN_MULTICAST(g_htonl(g_mreqn.imr_multiaddr.s_addr)))
+	memset(&g_mreq, 0, sizeof(g_mreq));
+	g_mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("sending on interface %s.\n", inet_ntoa(g_mreq.imr_interface));
+	g_mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	if (IN_MULTICAST(g_htonl(g_mreq.imr_multiaddr.s_addr)))
 	{
-		printf ("joining multicast group %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+		printf ("joining multicast group %s.\n", inet_ntoa(g_mreq.imr_multiaddr));
 
-		e = setsockopt(g_recv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreqn, sizeof(g_mreqn));
-		e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn)); 
-		e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreqn, sizeof(g_mreqn));
+		e = setsockopt(g_recv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &g_mreq, sizeof(g_mreq));
+		e2 = setsockopt(g_send_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreq, sizeof(g_mreq)); 
+		e3 = setsockopt(g_send_with_router_alert_sock, IPPROTO_IP, IP_MULTICAST_IF, &g_mreq, sizeof(g_mreq));
 		if (e < 0 || e2 < 0 || e3 < 0) {
 			perror("on_startup() failed");
 			close(g_recv_sock);
@@ -376,7 +380,7 @@ on_startup (
 	}
 	else
 	{
-		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreqn.imr_multiaddr));
+		printf ("sending unicast to address %s.\n", inet_ntoa(g_mreq.imr_multiaddr));
 	}
 
 /* add socket to event manager */
@@ -621,7 +625,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 /* IP header handled by sendto() */
 	struct sockaddr_in mc;
 	mc.sin_family		= AF_INET;
-	mc.sin_addr.s_addr	= g_mreqn.imr_multiaddr.s_addr;
+	mc.sin_addr.s_addr	= g_mreq.imr_multiaddr.s_addr;
 	mc.sin_port		= 0;
 
 	printf("TPDU %i bytes.\n", tpdu_length);
@@ -722,7 +726,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 /* IP header handled by sendto() */
         struct sockaddr_in mc;
         mc.sin_family           = AF_INET;
-        mc.sin_addr.s_addr      = g_mreqn.imr_multiaddr.s_addr;
+        mc.sin_addr.s_addr      = g_mreq.imr_multiaddr.s_addr;
         mc.sin_port             = 0;
 
         printf("TPDU %i bytes.\n", tpdu_length);
@@ -810,7 +814,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 /* IP header handled by sendto() */
         struct sockaddr_in mc;
         mc.sin_family           = AF_INET;
-        mc.sin_addr.s_addr      = g_mreqn.imr_multiaddr.s_addr;
+        mc.sin_addr.s_addr      = g_mreq.imr_multiaddr.s_addr;
         mc.sin_port             = 0;
 
         printf("TPDU %i bytes.\n", tpdu_length);

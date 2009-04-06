@@ -1642,6 +1642,7 @@ pgm_transport_bind (
 /* set socket sharing if loopback enabled, needs to be performed pre-bind */
 		if (transport->use_multicast_loop)
 		{
+			g_trace ("INFO","set socket sharing.");
 			gboolean v = TRUE;
 			retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
 			if (retval < 0) {
@@ -1661,6 +1662,7 @@ pgm_transport_bind (
 		}
 
 /* request extra packet information to determine destination address on each packet */
+		g_trace ("INFO","request socket packet-info.");
 		int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group);
 		retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 		if (retval < 0) {
@@ -1674,6 +1676,7 @@ pgm_transport_bind (
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
+			g_trace ("INFO","request IP headers.");
 			retval = pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE);
 			if (retval < 0) {
 				g_static_mutex_unlock (&transport->mutex);
@@ -1683,6 +1686,7 @@ pgm_transport_bind (
 		else
 		{
 			g_assert (AF_INET6 == recv_family);
+			g_trace ("INFO","request socket packet-info.");
 			retval = pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE);
 			if (retval < 0) {
 				g_static_mutex_unlock (&transport->mutex);
@@ -1694,6 +1698,7 @@ pgm_transport_bind (
 /* buffers, set size first then re-read to confirm actual value */
 	if (transport->rcvbuf)
 	{
+		g_trace ("INFO","set receive socket buffer size.");
 		retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (char*)&transport->rcvbuf, sizeof(transport->rcvbuf));
 		if (retval < 0) {
 			g_static_mutex_unlock (&transport->mutex);
@@ -1702,6 +1707,7 @@ pgm_transport_bind (
 	}
 	if (transport->sndbuf)
 	{
+		g_trace ("INFO","set send socket buffer size.");
 		retval = setsockopt(transport->send_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf));
 		if (retval < 0) {
 			g_static_mutex_unlock (&transport->mutex);
@@ -2003,6 +2009,7 @@ pgm_transport_bind (
 /* multicast loopback */
 	if (!transport->use_multicast_loop)
 	{
+		g_trace ("INFO","set multicast loop.");
 		retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->use_multicast_loop);
 		if (retval < 0) {
 			g_static_mutex_unlock (&transport->mutex);
@@ -2021,6 +2028,7 @@ pgm_transport_bind (
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
+	g_trace ("INFO","set multicast hop limit.");
 	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->hops);
 	if (retval < 0) {
 		g_static_mutex_unlock (&transport->mutex);
@@ -2038,6 +2046,7 @@ pgm_transport_bind (
 	}
 
 /* set low packet latency preference for network elements */
+	g_trace ("INFO","set packet TOS.");
 	int tos = IPTOS_LOWDELAY;
 	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
 	if (retval < 0) {

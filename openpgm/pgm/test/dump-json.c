@@ -40,8 +40,13 @@
 #define OPTIONS_TOTAL_LEN(x)	*(guint16*)( ((char*)(x)) + sizeof(guint16) )
 
 
+#ifdef __USE_BSD
+int verify_ip_header (struct ip*, guint);
+void print_ip_header (struct ip*);
+#else
 int verify_ip_header (struct iphdr*, guint);
 void print_ip_header (struct iphdr*);
+#endif
 int verify_pgm_header (struct pgm_header*, guint);
 void print_pgm_header (struct pgm_header*);
 int verify_spm (struct pgm_header*, char*, guint);
@@ -81,15 +86,24 @@ monitor_packet (
 
 	int retval = 0;
 
+#ifdef __USE_BSD
+	struct ip* ip = (struct ip*)data;
+#else
 	struct iphdr* ip = (struct iphdr*)data;
+#endif
 	if (verify_ip_header (ip, len) < 0) {
 		puts ("\t\"valid\": false");
 		retval = -1;
 		goto out;
 	}
 
+#ifdef __USE_BSD
+	struct pgm_header* pgm = (struct pgm_header*)(data + (ip->ip_hl * 4));
+	guint pgm_len = len - (ip->ip_hl * 4);
+#else
 	struct pgm_header* pgm = (struct pgm_header*)(data + (ip->ihl * 4));
 	guint pgm_len = len - (ip->ihl * 4);
+#endif
 	if (verify_pgm_header (pgm, pgm_len) < 0) {
 		puts ("\t\"valid\": false");
 		retval = -1;
@@ -141,12 +155,20 @@ out:
 	
 int
 verify_ip_header (
+#ifdef __USE_BSD
+	struct ip*	ip,
+#else
 	struct iphdr*	ip,
+#endif
 	guint		len
 	)
 {
 /* minimum size should be IP header plus PGM header */
+#ifdef __USE_BSD
+	if (len < (sizeof(struct ip) + sizeof(struct pgm_header))) 
+#else
 	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
+#endif
 	{
 		printf ("\t\"message\": \"IP: packet size too small: %i bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\",\n", len, sizeof(struct pgm_header));
 		return -1;
@@ -176,14 +198,25 @@ verify_ip_header (
  */
 
 /* decode IP header */
+#ifdef __USE_BSD
+	if (ip->ip_v != 4 && ip->ip_v != 6) {		/* IP version, 4 or 6 */
+		printf ("\t\"message\": \"IP: unknown IP version %i.\",\n", ip->ip_v);
+#else
 	if (ip->version != 4 && ip->version != 6) {	/* IP version, 4 or 6 */
 		printf ("\t\"message\": \"IP: unknown IP version %i.\",\n", ip->version);
+#endif
 		return -1;
 	}
 
+#ifdef __USE_BSD
+	guint ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+	if (ip_header_length < sizeof(struct ip)) {
+		printf ("\t\"message\": \"IP: bad IP header length %i, should be at least %" G_GSIZE_FORMAT "lu bytes.\",\n", ip_header_length, sizeof(struct ip));
+#else
 	guint ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
 	if (ip_header_length < sizeof(struct iphdr)) {
 		printf ("\t\"message\": \"IP: bad IP header length %i, should be at least %" G_GSIZE_FORMAT "lu bytes.\",\n", ip_header_length, sizeof(struct iphdr));
+#endif
 		return -1;
 	}
 
@@ -192,7 +225,11 @@ verify_ip_header (
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
+#ifdef __USE_BSD
+	guint packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+#else
 	guint packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+#endif
 	if (len < packet_length) {			/* redundant: often handled in kernel */
 		printf ("\t\"message\": \"IP: truncated IP packet: header reports %i actual length %i bytes.\",\n", (int)len, (int)packet_length);
 		return -1;
@@ -208,18 +245,31 @@ verify_ip_header (
  */
 	int sum = pgm_inet_checksum((char*)ip, ip_header_length, 0);
 	if (sum != 0) {
+#ifdef __USE_BSD
+		int ip_sum = g_ntohs(ip->ip_sum);
+#else
 		int ip_sum = g_ntohs(ip->check);
+#endif
 		printf ("\t\"message\": \"IP: IP header checksum incorrect: 0x%x.\",\n", ip_sum);
 		return -2;
 	}
 
+#ifdef __USE_BSD
+	if (ip->ip_p != IPPROTO_PGM) {
+		printf ("\t\"message\": \"IP: packet IP protocol not PGM: %i.\",\n", ip->ip_p);
+#else
 	if (ip->protocol != IPPROTO_PGM) {
 		printf ("\t\"message\": \"IP: packet IP protocol not PGM: %i.\",\n", ip->protocol);
+#endif
 		return -1;
 	}
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
+#ifdef __USE_BSD
+	int offset = g_ntohs(ip->ip_off);
+#else
 	int offset = g_ntohs(ip->frag_off);
+#endif
 	if ((offset & 0x1fff) != 0) {
 		printf ("\t\"message\": \"IP: fragmented IP packet, ignoring.\",\n");
 		return -1;
@@ -230,22 +280,98 @@ verify_ip_header (
 
 void
 print_ip_header (
+#ifdef __USE_BSD
+	struct ip*	ip
+#else
 	struct iphdr*	ip
+#endif
 	)
 {
 	puts ("\t\"IP\": {");
-	printf ("\t\t\"version\": %i,\n", ip->version);
-	printf ("\t\t\"headerLength\": %i,\n", ip->ihl);
-	printf ("\t\t\"ToS\": %i,\n", ip->tos & 0x3);
-	printf ("\t\t\"length\": %i,\n", g_ntohs(ip->tot_len));
-	printf ("\t\t\"fragmentId\": %i,\n", g_ntohs(ip->id));
-    	printf ("\t\t\"DF\": %s,\n", (g_ntohs(ip->frag_off) & 0x4000) ? "true" : "false");
-    	printf ("\t\t\"MF\": %s,\n", (g_ntohs(ip->frag_off) & 0x2000) ? "true" : "false");
-    	printf ("\t\t\"fragmentOffset\": %i,\n", g_ntohs(ip->frag_off) & 0x1fff);
-	printf ("\t\t\"TTL\": %i,\n", ip->ttl);
-	printf ("\t\t\"protocol\": %i,\n", ip->protocol);
-	printf ("\t\t\"sourceIp\": \"%s\",\n", inet_ntoa(*(struct in_addr*)&ip->saddr));
-	printf ("\t\t\"destinationIp\": \"%s\",\n", inet_ntoa(*(struct in_addr*)&ip->daddr));
+	printf ("\t\t\"version\": %i,\n",
+#ifdef __USE_BSD
+		ip->ip_v
+#else
+		ip->version
+#endif
+		);
+	printf ("\t\t\"headerLength\": %i,\n",
+#ifdef __USE_BSD
+		ip->ip_hl
+#else
+		ip->ihl
+#endif
+		);
+	printf ("\t\t\"ToS\": %i,\n",
+#ifdef __USE_BSD
+		ip->ip_tos & 0x3
+#else
+		ip->tos & 0x3
+#endif
+		);
+	printf ("\t\t\"length\": %i,\n",
+#ifdef __USE_BSD
+		g_ntohs(ip->ip_len)
+#else
+		g_ntohs(ip->tot_len)
+#endif
+		);
+	printf ("\t\t\"fragmentId\": %i,\n",
+#ifdef __USE_BSD
+		g_ntohs(ip->ip_id)
+#else
+		g_ntohs(ip->id)
+#endif
+		);
+    	printf ("\t\t\"DF\": %s,\n",
+#ifdef __USE_BSD
+		(g_ntohs(ip->ip_off) & 0x4000) ? "true" : "false"
+#else
+		(g_ntohs(ip->frag_off) & 0x4000) ? "true" : "false"
+#endif
+		);
+    	printf ("\t\t\"MF\": %s,\n",
+#ifdef __USE_BSD
+		(g_ntohs(ip->ip_off) & 0x2000) ? "true" : "false"
+#else
+		(g_ntohs(ip->frag_off) & 0x2000) ? "true" : "false"
+#endif
+		);
+    	printf ("\t\t\"fragmentOffset\": %i,\n",
+#ifdef __USE_BSD
+		g_ntohs(ip->ip_off) & 0x1fff
+#else
+		g_ntohs(ip->frag_off) & 0x1fff
+#endif
+		);
+	printf ("\t\t\"TTL\": %i,\n",
+#ifdef __USE_BSD
+		ip->ip_ttl
+#else
+		ip->ttl
+#endif
+		);
+	printf ("\t\t\"protocol\": %i,\n",
+#ifdef __USE_BSD
+		ip->ip_p
+#else
+		ip->protocol
+#endif
+		);
+	printf ("\t\t\"sourceIp\": \"%s\",\n",
+#ifdef __USE_BSD
+		inet_ntoa(*(struct in_addr*)&ip->ip_src)
+#else
+		inet_ntoa(*(struct in_addr*)&ip->saddr)
+#endif
+		);
+	printf ("\t\t\"destinationIp\": \"%s\",\n",
+#ifdef __USE_BSD
+		inet_ntoa(*(struct in_addr*)&ip->ip_dst)
+#else
+		inet_ntoa(*(struct in_addr*)&ip->daddr)
+#endif
+		);
 	puts ("\t\t\"IpOptions\": {");
 	puts ("\t\t}");
 	puts ("\t},");

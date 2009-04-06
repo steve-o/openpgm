@@ -20,7 +20,6 @@ e.Program(['dumpif.c'])
 e.Program(['testif.c'])
 e.Program('sw_calc.c')
 e.Program(['basic_rxw.c'])
-e.Program('test_cpu_timers.c')
 e.Program(['test_time.c'])
 e.Program(['block_send.c'])
 e.Program(['test_rs.c'])
@@ -30,14 +29,20 @@ e.Program(['pgmversion.c'])
 e.Program(['test_partial_csum.c'])
 
 # merge SNMP and LIBSOUP libraries into new environment
-me = e.Clone();
-me.MergeFlags(me['SNMP_FLAGS']);
-me.MergeFlags(me['LIBSOUP_FLAGS']);
 
-me.Program(['basic_recv.c'])
-me.Program(['basic_http.c'])
-me.Program(['basic_recv_with_nak.c'])
-me.Program(['basic_recv_with_rxw.c'])
+if e['WITH_SNMP'] == 'true' or e['WITH_HTTP'] == 'true':
+	me = e.Clone();
+	if me['WITH_SNMP'] == 'true':
+		me.MergeFlags(me['SNMP_FLAGS']);
+	if me['WITH_HTTP'] == 'true':
+		me.MergeFlags(me['LIBSOUP_FLAGS']);
+	me.Program(['basic_recv.c'])
+	me.Program(['basic_http.c'])
+	me.Program(['basic_recv_with_nak.c'])
+	me.Program(['basic_recv_with_rxw.c'])
 
+uname_s = os.uname()[0];
+if uname_s == 'Linux':
+	e.Program('test_cpu_timers.c')
 
 # end of file

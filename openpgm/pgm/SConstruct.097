@@ -12,6 +12,13 @@ opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
+	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_DEV', 'Development code', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'true', ('true', 'false'))),
 )
 
 #-----------------------------------------------------------------------------
@@ -180,11 +187,15 @@ int main(int argc, char**argv)
 	context.Result(result);
 	return result;
 
-conf = Configure(env, custom_tests = {	'CheckSNMP':	CheckSNMP,
-					'CheckCheck':	CheckCheck,
-					'CheckEventFD': CheckEventFD	});
+tests = {
+	'CheckCheck':	CheckCheck,
+	'CheckEventFD':	CheckEventFD
+}
+if env['WITH_SNMP'] == 'true':
+	tests['CheckSNMP'] = CheckSNMP;
+conf = Configure(env, custom_tests = tests);
 
-if not conf.CheckSNMP():
+if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
 	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
 	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
 	lastLIBS = conf.env['LIBS'];
@@ -195,12 +206,12 @@ if not conf.CheckSNMP():
 		print 'Net-SNMP libraries not compatible.';
 		Exit(1);
 
-if conf.CheckCheck():
+if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
-	conf.env['CHECK'] = 1;
+	conf.env['CHECK'] = 'true';
 else:
 	print 'Disabling Check unit tests.';
-	conf.env['CHECK'] = 0;
+	conf.env['CHECK'] = 'false';
 
 if conf.CheckEventFD():
 	print 'Enabling kernel eventfd notification mechanism.';
@@ -232,15 +243,19 @@ env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
 SConscript(ref_node + 'SConscript.libpgm');
 SConscript(ref_node + 'SConscript.libpgmex');
-SConscript(ref_node + 'SConscript.libpgmhttp');
-SConscript(ref_node + 'SConscript.libpgmsnmp');
-SConscript(ref_node + 'test/SConscript');
-SConscript(ref_node + 'dev/SConscript');
-SConscript(ref_node + 'examples/SConscript');
+if env['WITH_HTTP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmhttp');
+if env['WITH_SNMP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmsnmp');
+if env['WITH_TEST'] == 'true':
+	SConscript(ref_node + 'test/SConscript');
+if env['WITH_DEV'] == 'true':
+	SConscript(ref_node + 'dev/SConscript');
+if env['WITH_EXAMPLES'] == 'true':
+	SConscript(ref_node + 'examples/SConscript');
 
 # unit testing framework optional.
-if env['CHECK'] == 1:
+if env['WITH_CHECK'] and env['CHECK'] == 'true':
  	SConscript(ref_node + 'check/SConscript');
-
 
 # end of file

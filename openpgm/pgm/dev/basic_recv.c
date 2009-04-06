@@ -28,10 +28,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <netinet/in.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include <glib.h>
 #include <libsoup/soup.h>
@@ -63,7 +65,7 @@ struct sessionstat {
 };
 
 struct netstat {
-	struct in_addr	s_addr;
+	struct in_addr	addr;
 	gulong		corrupt;
 };
 
@@ -396,13 +398,13 @@ on_startup (
 	}
 
 /* multicast */
-	struct ip_mreqn mreqn;
-	memset(&mreqn, 0, sizeof(mreqn));
-	mreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	printf ("listening on interface %s.\n", inet_ntoa(mreqn.imr_address));
-	mreqn.imr_multiaddr.s_addr = inet_addr(g_network);
-	printf ("subscription on multicast address %s.\n", inet_ntoa(mreqn.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn));
+	struct ip_mreq mreq;
+	memset(&mreq, 0, sizeof(mreq));
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
+	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
+	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
 		perror("on_startup() failed");
 		close(sock);
@@ -529,9 +531,9 @@ on_io_data (
 			struct netstat* netstat = g_hash_table_lookup (g_nets, &addr.sin_addr);
 			if (netstat == NULL) {
 				netstat = g_malloc0(sizeof(struct netstat));
-				netstat->s_addr = addr.sin_addr;
+				netstat->addr = addr.sin_addr;
 				g_mutex_lock (g_nets_mutex);
-				g_hash_table_insert (g_nets, (gpointer)&netstat->s_addr, (gpointer)netstat);
+				g_hash_table_insert (g_nets, (gpointer)&netstat->addr, (gpointer)netstat);
 				g_mutex_unlock (g_nets_mutex);
 			}
 
@@ -996,7 +998,7 @@ index_nets_row (
 				"<td>%s</td>"
 				"<td>%lu</td>"
 			"</tr>",
-			inet_ntoa (netstat->s_addr),
+			inet_ntoa (netstat->addr),
 			netstat->corrupt
 			);
 
