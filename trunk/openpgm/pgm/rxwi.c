@@ -556,10 +556,16 @@ pgm_rxw_push_fragment (
 					rp->state = PGM_PKT_WAIT_DATA_STATE;
 				}
 			}
+			else if ( rp->state == PGM_PKT_LOST_DATA_STATE )	/* lucky packet */
+			{
+				r->lost_count--;
+			}
+
+/* a non-committed packet */
+			r->fragment_count++;
 
 			if (apdu_len)	/* a fragment */
 			{
-				r->fragment_count++;
 				memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 			}
 
@@ -703,9 +709,11 @@ pgm_rxw_push_fragment (
 			goto out_flush;
 		}
 
+/* a non-committed packet */
+		r->fragment_count++;
+
 		if (apdu_len)	/* fragment */
 		{
-			r->fragment_count++;
 			memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 		}
 		rp->data		= packet;
@@ -933,6 +941,7 @@ pgm_rxw_readv (
 
 /* move to commit window */
 				cp->state = PGM_PKT_COMMIT_DATA_STATE;
+				r->fragment_count--;
 				r->commit_lead++;
 				r->committed_count++;
 
@@ -1275,10 +1284,11 @@ pgm_rxw_push_nth_repair (
 /* return parity block */
 	pgm_rxw_data_free1 (r, rp);
 
+	r->fragment_count++;
+
 	if (opt_fragment) {
 		memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 		g_assert( g_ntohl (rp->of_apdu_len) > 0 );
-		r->fragment_count++;
 	}
 	rp->data	= data;
 	rp->length	= length;
@@ -1680,7 +1690,7 @@ pgm_rxw_ncf (
 		goto out;
 	}
 
-	g_trace ("ncf extends leads to #%u", sequence_number);
+	g_trace ("ncf extends lead #%u to #%u", r->lead, sequence_number);
 
 /* mark all sequence numbers to ncf # in BACK-OFF_STATE */
 
@@ -1695,6 +1705,8 @@ pgm_rxw_ncf (
 		retval = PGM_RXW_CREATED_PLACEHOLDER;
 		goto out;
 	}
+
+	r->lead++;
 
 	while (r->lead != sequence_number)
 	{
