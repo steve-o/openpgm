@@ -2045,15 +2045,18 @@ pgm_transport_bind (
 		goto out;
 	}
 
-/* set low packet latency preference for network elements */
-	g_trace ("INFO","set packet TOS.");
-	int tos = IPTOS_LOWDELAY;
-	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
+/* set Expedited Forwarding PHB for network elements, no ECN.
+ * 
+ * codepoint 101110 (RFC 3246)
+ */
+	g_trace ("INFO","set packet differentiated services field to expedited forwarding.");
+	int dscp = 0x2e << 2;
+	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
 	if (retval < 0) {
 		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
-	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), tos);
+	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
 	if (retval < 0) {
 		g_static_mutex_unlock (&transport->mutex);
 		goto out;
