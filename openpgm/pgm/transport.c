@@ -2053,14 +2053,16 @@ pgm_transport_bind (
 	int dscp = 0x2e << 2;
 	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
 	if (retval < 0) {
-		g_static_mutex_unlock (&transport->mutex);
-		goto out;
+		g_trace ("INFO","DSCP setting requires CAP_NET_ADMIN or ADMIN capability.");
+		goto no_cap_net_admin;
 	}
 	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
 	if (retval < 0) {
 		g_static_mutex_unlock (&transport->mutex);
 		goto out;
 	}
+
+no_cap_net_admin:
 
 /* any to timer notify channel */
 	transport->notify_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_notify));
