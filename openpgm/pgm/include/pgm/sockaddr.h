@@ -141,7 +141,7 @@ static inline int pgm_sockaddr_cmp (const struct sockaddr *a, const struct socka
 static inline int pgm_sockaddr_hdrincl (int s, int sa_family, gboolean v)
 {
     int retval = 0;
-    gint8 optval = v;
+    gint optval = v;
 
     switch (sa_family) {
     case AF_INET:
