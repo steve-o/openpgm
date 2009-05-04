@@ -1364,8 +1364,8 @@ pgm_if_parse_entity_receive (
 				{
 					g_trace ("Cannot resolve nodename");
 					g_free (gsr);
-					g_free (interface);
-					return -ENODEV;
+					retval = -ENODEV;
+					goto out;
 				}
 
 				g_trace ("Assuming address family %s from node address.",
@@ -1385,8 +1385,8 @@ pgm_if_parse_entity_receive (
 						g_trace ("Address family of interface \"%s\" does not match default node interface", 
 								interface->ir_name);
 						g_free (gsr);
-						g_free (interface);
-						return -ENODEV;
+						retval = -ENODEV;
+						goto out;
 					}
 
 					gsr->gsr_interface = ir.ir_interface;
@@ -1425,15 +1425,13 @@ pgm_if_parse_entity_receive (
 						g_trace ("Multiple interfaces match the name \"%s\", if multiple IPv6 scopes are defined please specify the scope by IP or network address instead of name.", interface->ir_name);
 					}
 					g_free (gsr);
-					g_free (interface);
-					return retval;
+					goto out;
 				}
 				else if (0 > retval)
 				{
 					g_trace ("Address family of interface \"%s\" does not match the detected receive group", interface->ir_name);
 					g_free (gsr);
-					g_free (interface);
-					return retval;
+					goto out;
 				}
 
 				gsr->gsr_interface = ir.ir_interface;
@@ -1468,7 +1466,6 @@ pgm_if_parse_entity_receive (
 		memcpy(&gsr->gsr_source, &gsr->gsr_group, pgm_sockaddr_len(&gsr->gsr_group));
 
 		*recv_list = g_list_append (*recv_list, gsr);
-		g_free (interface);
 		goto out;
 	}
 
@@ -1501,7 +1498,6 @@ pgm_if_parse_entity_receive (
 		if (retval != 0) {
 			g_strfreev (tokens);
 			g_free (gsr);
-			g_free (interface);
 			goto out;
 		}
 
@@ -1524,16 +1520,15 @@ pgm_if_parse_entity_receive (
 						g_trace ("Multiple interfaces match the name \"%s\", if multiple IPv6 scopes are defined please specify the scope by IP or network address instead of name.", interface->ir_name);
 					}
 					g_free (gsr);
-					g_free (interface);
-					return retval;
+					goto out;
 				}
 				else if (0 > retval)
 				{
 					g_trace ("Address family of interface \"%s\" does not match specified receive multicast group",
 							interface->ir_name);
 					g_free (gsr);
-					g_free (interface);
-					return -EINVAL;
+					retval = -EINVAL;
+					goto out;
 				}
 
 				gsr->gsr_interface = ir.ir_interface;
@@ -1550,6 +1545,7 @@ pgm_if_parse_entity_receive (
 	g_strfreev (tokens);
 
 out:
+	g_free (interface);
 	return retval;
 }
 
