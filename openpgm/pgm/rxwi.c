@@ -785,6 +785,7 @@ pgm_rxw_readv (
 			}
 
 /* from now on r->commit_lead ≡ r->trail */
+			g_assert (r->commit_lead == r->trail);
 
 /* check for lost apdu */
 			if ( g_ntohl (cp->of_apdu_len) )
@@ -795,11 +796,7 @@ pgm_rxw_readv (
 				if ( r->trail == apdu_first_sqn )
 				{
 					dropped++;
-					r->lost_count--;
-					RXW_SET_PACKET(r, r->trail, NULL);
-					if (r->trail++ == r->commit_trail)
-						r->commit_trail++;
-					pgm_rxw_pkt_remove1 (r, cp);
+					pgm_rxw_pop_trail (r);
 				}
 
 /* flush others, make sure to check each packet is an apdu packet and not simply a zero match */
@@ -809,16 +806,7 @@ pgm_rxw_readv (
 					if (g_ntohl (cp->of_apdu_len) && g_ntohl (cp->of_apdu_first_sqn) == apdu_first_sqn)
 					{
 						dropped++;
-						if ( cp->state == PGM_PKT_LOST_DATA_STATE ) {
-							r->lost_count--;
-						} else {
-							g_assert (cp->state == PGM_PKT_HAVE_DATA_STATE);
-							r->fragment_count--;
-						}
-						RXW_SET_PACKET(r, r->trail, NULL);
-						if (r->trail++ == r->commit_trail)
-							r->commit_trail++;
-						pgm_rxw_pkt_remove1 (r, cp);
+						pgm_rxw_pop_trail (r);
 					}
 					else
 					{	/* another apdu or tpdu exists */
@@ -831,15 +819,11 @@ pgm_rxw_readv (
 				g_trace ("skipping lost packet @ #%" G_GUINT32_FORMAT, cp->sequence_number);
 
 				dropped++;
-				r->lost_count--;
-				RXW_SET_PACKET(r, r->trail, NULL);
-				if (r->trail++ == r->commit_trail)
-					r->commit_trail++;
-				pgm_rxw_pkt_remove1 (r, cp);
+				pgm_rxw_pop_trail (r);
 /* one tpdu lost */
 			}
 
-			r->commit_lead = r->trail;
+			g_assert (r->commit_lead == r->trail);
 			goto out;
 			continue;
 		
