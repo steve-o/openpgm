@@ -164,6 +164,7 @@ static void _list_iterator (gpointer, gpointer);
 static inline int pgm_rxw_pop_lead (pgm_rxw_t*);
 static inline int pgm_rxw_pop_trail (pgm_rxw_t*);
 static inline int pgm_rxw_pkt_remove1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline int pgm_rxw_pkt_data_free1 (pgm_rxw_t*, gpointer);
 static inline int pgm_rxw_data_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
 static inline int pgm_rxw_pkt_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
 static inline gpointer pgm_rxw_alloc_packet (pgm_rxw_t*);
@@ -389,7 +390,10 @@ pgm_rxw_alloc0_packet (
 
 /* the sequence number is inside the packet as opposed to from internal
  * counters, this means one push on the receive window can actually translate
- * as many: the extra's acting as place holders and NAK containers
+ * as many: the extra's acting as place holders and NAK containers.
+ *
+ * ownership of packet is with receive window, therefore must be added to
+ * receive window or trash stack.
  *
  * returns:
  *	PGM_RXW_CREATED_PLACEHOLDER
@@ -451,6 +455,7 @@ pgm_rxw_push_fragment (
 		if ( !IN_TXW(r, sequence_number) )
 		{
 			g_trace ("#%u: not in transmit window, discarding.", sequence_number);
+			pgm_rxw_pkt_data_free1 (r, packet);
 			retval = PGM_RXW_NOT_IN_TXW;
 			goto out;
 		}
@@ -467,7 +472,7 @@ pgm_rxw_push_fragment (
 	if ( pgm_uint32_lt (sequence_number, r->commit_lead) )
 	{
 		g_trace ("#%u: already committed, discarding.", sequence_number);
-
+		pgm_rxw_pkt_data_free1 (r, packet);
 		retval = PGM_RXW_DUPLICATE;
 		goto out;
 	}
@@ -484,6 +489,7 @@ pgm_rxw_push_fragment (
 			if (rp->length)
 			{
 				g_trace ("#%u: already received, discarding.", sequence_number);
+				pgm_rxw_pkt_data_free1 (r, packet);
 				retval = PGM_RXW_DUPLICATE;
 				goto out;
 			}
@@ -500,6 +506,7 @@ pgm_rxw_push_fragment (
 			{
 				g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
 				pgm_rxw_mark_lost (r, sequence_number);
+				pgm_rxw_pkt_data_free1 (r, packet);
 				retval = PGM_RXW_APDU_LOST;
 				goto out_flush;
 			}
@@ -508,6 +515,7 @@ pgm_rxw_push_fragment (
 			{
 				g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, ignoring packet.",
 					sequence_number, apdu_first_sqn);
+				pgm_rxw_pkt_data_free1 (r, packet);
 				retval = PGM_RXW_MALFORMED_APDU;
 				goto out;
 			}
@@ -537,6 +545,8 @@ pgm_rxw_push_fragment (
 					     pp->state == PGM_PKT_WAIT_DATA_STATE ||
 					     pp->state == PGM_PKT_LOST_DATA_STATE )
 					{
+						g_assert (pp->data == NULL);
+
 /* move parity to this new sequence number */
 						memcpy (&pp->opt_fragment, &rp->opt_fragment, sizeof(struct pgm_opt_fragment));
 						pp->data	= rp->data;
@@ -569,6 +579,7 @@ pgm_rxw_push_fragment (
 				memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 			}
 
+			g_assert (rp->data == NULL);
 			rp->data	= packet;
 			rp->length	= length;
 
@@ -618,6 +629,7 @@ pgm_rxw_push_fragment (
 		     (new_commit_sqns >= pgm_rxw_len (r)) )
                 {
 			pgm_rxw_window_update (r, r->rxw_trail, sequence_number, r->tg_size, r->tg_sqn_shift, nak_rb_expiry);
+			pgm_rxw_pkt_data_free1 (r, packet);
 			goto out;
                 }
 
@@ -682,6 +694,7 @@ pgm_rxw_push_fragment (
 		{
 			g_trace ("#%u: first apdu fragment sequence number: #%u not lowest, ignoring packet.",
 				sequence_number, apdu_first_sqn);
+			pgm_rxw_pkt_data_free1 (r, packet);
 			retval = PGM_RXW_MALFORMED_APDU;
 			goto out;
 		}
@@ -701,6 +714,7 @@ pgm_rxw_push_fragment (
 		   )
 		{
 			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", sequence_number, apdu_first_sqn);
+			pgm_rxw_pkt_data_free1 (r, packet);
 			rp->state = PGM_PKT_LOST_DATA_STATE;
 			r->lost_count++;
 			RXW_SET_PACKET(r, rp->sequence_number, rp);
@@ -1105,15 +1119,25 @@ pgm_rxw_pkt_remove1 (
 }
 
 static inline int
+pgm_rxw_pkt_data_free1 (
+	pgm_rxw_t*		r,
+	gpointer		packet
+	)
+{
+//	g_slice_free1 (rp->length, rp->data);
+	g_static_mutex_lock (r->trash_mutex);
+	g_trash_stack_push (r->trash_data, packet);
+	g_static_mutex_unlock (r->trash_mutex);
+	return PGM_RXW_OK;
+}
+
+static inline int
 pgm_rxw_data_free1 (
 	pgm_rxw_t*		r,
 	pgm_rxw_packet_t*	rp
 	)
 {
-//	g_slice_free1 (rp->length, rp->data);
-	g_static_mutex_lock (r->trash_mutex);
-	g_trash_stack_push (r->trash_data, rp->data);
-	g_static_mutex_unlock (r->trash_mutex);
+	pgm_rxw_pkt_data_free1 (r, rp->data);
 	rp->data = NULL;
 
 	return PGM_RXW_OK;
