@@ -6020,6 +6020,7 @@ retry_send:
 			}
 		}
 
+		transport->is_apdu_eagain = FALSE;
 		return (gssize)data_bytes_sent;
 	}
 
