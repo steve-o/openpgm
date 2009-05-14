@@ -479,7 +479,7 @@ pgm_if_indextosockaddr(
 		struct pgm_ifaddrs *ifap, *ifa;
 		int e = pgm_if_getifaddrs (&ifap);
 		if (e < 0) {
-			g_trace ("INFO", "pgm_if_getifaddrs failed when trying to resolve link scope interfaces");
+			g_trace ("pgm_if_getifaddrs failed when trying to resolve link scope interfaces");
 			return -1;
 		}
 
@@ -1648,6 +1648,19 @@ out:
 				((x) == '/') || \
 				((x) == '.') \
 			)
+/* e.g. fe80::1%eth0.620    vlan tag,
+ *      fe80::1%eth0:0      IP alias
+ *      fe80::1%qe0_0       Solaris link name
+ *
+ * The Linux kernel generally doesn't care too much, but everything else falls apart with
+ * random characters in interface names.  Hyphen is a popular problematic character.
+ */
+#define IS_IP6_WITH_ZONE(x) ( \
+				IS_IP6(x) || \
+				((x) == '%') || \
+				isalpha(x) || \
+				((x) == '_') \
+			    )
 #define IS_NETPARAM(x) ( \
 				((x) == ',') || \
 				((x) == ';') \
@@ -1680,7 +1693,7 @@ pgm_if_parse_network (
 
 	while (p < e)
 	{
-		if (!IS_HOSTNAME(*p) && !IS_IP(*p) && !IS_IP6(*p) && !IS_NETPARAM(*p))
+		if (!IS_HOSTNAME(*p) && !IS_IP(*p) && !IS_IP6_WITH_ZONE(*p) && !IS_NETPARAM(*p))
 		{
 			g_trace ("invalid character 0x%x", *p);
 			retval = -EINVAL;
