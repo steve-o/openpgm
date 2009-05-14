@@ -434,7 +434,7 @@ pgm_init (void)
 	int e = getprotobyname_r("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			g_trace("INFO","Setting PGM protocol number to %i from /etc/protocols.");
+			g_trace("INFO","Setting PGM protocol number to %i from /etc/protocols.", proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
 	}
@@ -4944,7 +4944,7 @@ check_peer_nak_state (
 		{
 			if (((pgm_rxw_t*)peer->rxw)->committed_count)
 			{
-				g_trace ("peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
+				g_trace ("INFO", "peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
 				peer->expiry += transport->peer_expiry;
 				g_static_mutex_unlock (&peer->mutex);
 			}
@@ -5153,7 +5153,7 @@ nak_rpt_state (
 	}
 
 	if (dropped) {
-		g_trace ("dropped %u messages due to ncf cancellation, "
+		g_trace ("INFO", "dropped %u messages due to ncf cancellation, "
 				"rxw_sqns %" G_GUINT32_FORMAT
 				" bo %" G_GUINT32_FORMAT
 				" ncf %" G_GUINT32_FORMAT
@@ -5303,7 +5303,7 @@ nak_rdata_state (
 	}
 
 	if (dropped) {
-		g_trace ("dropped %u messages due to data cancellation.", dropped);
+		g_trace ("INFO", "dropped %u messages due to data cancellation.", dropped);
 	}
 
 /* mark receiver window for flushing on next recv() */
