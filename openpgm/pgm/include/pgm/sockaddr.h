@@ -297,16 +297,21 @@ static inline int pgm_sockaddr_multicast_if (int s, const struct sockaddr* addre
 static inline int pgm_sockaddr_multicast_loop (int s, int sa_family, gboolean v)
 {
     int retval = 0;
-    gint8 optval = v;
 
     switch (sa_family) {
     case AF_INET:
+    {
+    	gint8 optval = v;
 	retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_LOOP, &optval, sizeof(optval));
 	break;
+    }
 
     case AF_INET6:
+    {
+	gint optval = v;
 	retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &optval, sizeof(optval));
 	break;
+    }
 
     default:
 	retval = -EINVAL;
@@ -319,16 +324,21 @@ static inline int pgm_sockaddr_multicast_loop (int s, int sa_family, gboolean v)
 static inline int pgm_sockaddr_multicast_hops (int s, int sa_family, gint hops)
 {
     int retval = 0;
-    gint8 optval = hops;
 
     switch (sa_family) {
     case AF_INET:
+    {
+    	gint8 optval = hops;
 	retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_TTL, &optval, sizeof(optval));
 	break;
+    }
 
     case AF_INET6:
+    {
+    	gint optval = hops;
 	retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &optval, sizeof(optval));
 	break;
+    }
 
     default:
 	retval = -EINVAL;
