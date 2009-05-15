@@ -20,17 +20,18 @@
  */
 
 #include <fcntl.h>
-#include <poll.h>
-#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/timeb.h>
+#ifdef CONFIG_HAVE_POLL
+#	include <poll.h>
+#endif
 #ifdef CONFIG_HAVE_RTC
+#	include <sys/ioctl.h>
 #	include <linux/rtc.h>
 #endif
 
@@ -63,11 +64,18 @@ static gboolean time_got_initialized = FALSE;
 static pgm_time_t rel_offset = 0;
 
 static pgm_time_t gettimeofday_update (void);
+#ifdef CONFIG_HAVE_CLOCK_GETTIME
 static pgm_time_t clock_update (void);
+#endif
 static pgm_time_t ftime_update (void);
+#ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 static int clock_init (void);
 static void clock_nano_sleep (gulong);
+#endif
+#ifdef CONFIG_HAVE_NANOSLEEP
 static void nano_sleep (gulong);
+#endif
+
 static void select_sleep (gulong);
 
 #ifdef CONFIG_HAVE_RTC
@@ -109,9 +117,11 @@ pgm_time_init ( void )
 	pgm_time_since_epoch = pgm_time_conv;
 
 	switch (cfg[0]) {
-	case 'C':	pgm_time_update_now = clock_update; break;
 	case 'F':	pgm_time_update_now = ftime_update; break;
 
+#ifdef CONFIG_HAVE_CLOCK_GETTIME
+	case 'C':	pgm_time_update_now = clock_update; break;
+#endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':	pgm_time_update_now = rtc_update;
 			pgm_time_since_epoch = pgm_time_conv_from_reset;
@@ -129,13 +139,15 @@ pgm_time_init ( void )
 
 /* sleeping */
 	cfg = getenv ("PGM_SLEEP");
-	if (cfg == NULL) cfg = "USLEEP";
+	if (cfg == NULL) cfg = "MSLEEP";
 
 	switch (cfg[0]) {
+#ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	case 'C':	pgm_time_sleep = clock_nano_sleep; break;
+#endif
+#ifdef CONFIG_HAVE_NANOSLEEP
 	case 'N':	pgm_time_sleep = nano_sleep; break;
-	case 'S':	pgm_time_sleep = select_sleep; break;			/* mainly for testing glib loop */
-
+#endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':	pgm_time_sleep = rtc_sleep; break;
 #endif
@@ -146,9 +158,17 @@ pgm_time_init ( void )
 	case 'P':	pgm_time_sleep = poll_sleep; break;
 #endif
 
+	case 'S':	pgm_time_sleep = select_sleep; break;
+
 	default:
+#ifdef CONFIG_HAVE_USLEEP
 	case 'M':
-	case 'U':	pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
+	case 'U':
+			pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
+#else
+	case 'S':
+			pgm_time_sleep = select_sleep; break;
+#endif /* CONFIG_HAVE_USLEEP */
 	}
 
 #ifdef CONFIG_HAVE_RTC
@@ -194,12 +214,14 @@ pgm_time_init ( void )
 			tsc_init();
 		}
 	}
-#endif
+#endif /* CONFIG_HAVE_TSC */
 
+#ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	if (pgm_time_sleep == clock_nano_sleep)
 	{
 		clock_init();
 	}
+#endif
 
 	pgm_time_update_now();
 
@@ -250,6 +272,7 @@ gettimeofday_update (void)
 	return pgm_time_now;
 }
 
+#ifdef CONFIG_HAVE_CLOCK_GETTIME
 static pgm_time_t
 clock_update (void)
 {
@@ -260,6 +283,7 @@ clock_update (void)
 
 	return pgm_time_now;
 }
+#endif /* CONFIG_HAVE_CLOCK_GETTIME */
 
 static pgm_time_t
 ftime_update (void)
@@ -458,6 +482,7 @@ tsc_sleep (gulong usec)
 }
 #endif /* CONFIG_HAVE_TSC */
 
+#ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 static clockid_t g_clock_id;
 
 static int
@@ -497,7 +522,9 @@ clock_nano_sleep (gulong usec)
 	clock_nanosleep (g_clock_id, TIMER_ABSTIME, &ts, NULL);
 #endif
 }
+#endif /* CONFIG_HAVE_CLOCK_NANOSLEEP */
 
+#ifdef CONFIG_HAVE_NANOSLEEP
 static void
 nano_sleep (gulong usec)
 {
@@ -506,6 +533,7 @@ nano_sleep (gulong usec)
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	nanosleep (&ts, NULL);
 }
+#endif /* CONFIG_HAVE_NANOSLEEP */
 
 static void
 select_sleep (gulong usec)

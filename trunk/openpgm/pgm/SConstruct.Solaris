@@ -28,6 +28,8 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
 			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
+			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
@@ -105,7 +107,12 @@ env = Environment(
 			'-DBSD_COMP',
 			'-D__need_IOV_MAX',
 			'-D__USE_BSD',
+			'-DCONFIG_HAVE_CLOCK_GETTIME',
+			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
+			'-DCONFIG_HAVE_NANOSLEEP',
+			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_TSC',
+			'-DCONFIG_HAVE_POLL',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
@@ -152,7 +159,7 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
+env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
@@ -182,7 +189,7 @@ int main(int argc, char**argv)
 
 def CheckCheck(context):
 	context.Message('Checking Check unit test framework...');
-	result = context.TryAction('pkg-config --static --cflags --libs check')[0];
+	result = context.TryAction('pkg-config --cflags --libs check')[0];
 	context.Result(result);
 	return result;
 
