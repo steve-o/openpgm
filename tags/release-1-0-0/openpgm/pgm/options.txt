@@ -1,0 +1,158 @@
+   OPT_LENGTH      0x00 - Option's Length
+
+pgm_opt_header
+pgm_opt_length
+
+first option, always present.
+
+--------------------------------------------------------------------------------
+
+   OPT_FRAGMENT    0x01 - Fragmentation
+
+pgm_opt_header
+pgm_opt_fragment
+
+may be present for odata, rdata.  'MAY' exist for others, although a bit strange.
+
+--------------------------------------------------------------------------------
+
+   OPT_NAK_LIST    0x02 - List of NAK entries
+
+pgm_opt_header
+pgm_opt_nak_list
+
+may be present for naks.
+
+--------------------------------------------------------------------------------
+
+   OPT_JOIN        0x03 - Late Joining
+
+pgm_opt_header
+pgm_opt_join
+
+may be present for odata, rdata, spm.
+
+requires SPM to learn NLA already so not overly useful with odata/rdata, could be
+used with video streaming to last i-frame data sequence number.
+
+--------------------------------------------------------------------------------
+
+   OPT_REDIRECT    0x07 - Redirect
+
+pgm_opt_header
+pgm_opt_redirect
+pgm_opt_redirect6
+
+should be present for polrs from a dlr.
+
+--------------------------------------------------------------------------------
+
+   OPT_SYN         0x0D - Synchronization
+
+pgm_opt_header
+pgm_opt_syn
+
+must only appear with odata or rdata.
+
+--------------------------------------------------------------------------------
+
+   OPT_FIN         0x0E - Session Fin   receivers, conventional
+                          feedbackish
+
+pgm_opt_header
+opt_opt_fin
+
+may be present for odata, rdata, must appear in following spms.
+
+--------------------------------------------------------------------------------
+
+   OPT_RST         0x0F - Session Reset
+
+pgm_opt_header
+pgm_opt_rst
+
+must only appear in spms.  not many 'unrecoverable error conditions' exist though.
+
+--------------------------------------------------------------------------------
+
+   OPT_PARITY
+
+must appear in odata or rdata to indicate pro-active or on-demand parity data,
+nak to request parity repair data, ncf to confirm parity nak.
+
+
+   OPT_VAR_PKTLEN
+
+may be present in odata or data to indicate variable size packets.
+
+
+   OPT_PARITY_PRM  0x08 - Forward Error Correction Parameters
+
+pgm_opt_header
+pgm_opt_parity_prm
+
+appended to spms to inform of pro-active or on-demand parity.
+
+--------------------------------------------------------------------------------
+
+   OPT_PARITY_GRP  0x09 - Forward Error Correction Group Number
+
+pgm_opt_parity_grp
+
+appended to odata and rdata parity packets.
+
+--------------------------------------------------------------------------------
+
+   OPT_CURR_TGSIZE 0x0A - Forward Error Correction Group Size
+
+pgm_opt_curr_tgsize
+
+must appear in last odata or rdata packet of variable transmission group, may
+appear in spms.
+
+--------------------------------------------------------------------------------
+
+   OPT_CR          0x10 - Congestion Report
+
+pgm_opt_header
+pgm_opt_cr
+
+--------------------------------------------------------------------------------
+
+   OPT_CRQST       0x11 - Congestion Report Request
+
+pgm_opt_header
+pgm_opt_crqst
+
+--------------------------------------------------------------------------------
+
+   OPT_NAK_BO_IVL  0x04 - NAK Back-Off Interval
+
+pgm_opt_header
+pgm_opt_nak_bo_ivl
+
+--------------------------------------------------------------------------------
+
+   OPT_NAK_BO_RNG  0x05 - NAK Back-Off Range
+
+pgm_opt_header
+pgm_opt_nak_bo_rng
+
+--------------------------------------------------------------------------------
+
+   OPT_NBR_UNREACH 0x0B - Neighbor Unreachable
+
+pgm_opt_header
+pgm_opt_nbr_unreach
+
+--------------------------------------------------------------------------------
+
+   OPT_PATH_NLA    0x0C - Path NLA
+
+pgm_opt_header
+pgm_opt_path_nla
+pgm_opt6_path_nla
+
+--------------------------------------------------------------------------------
+
+   OPT_INVALID     0x7F - Option invalidated
