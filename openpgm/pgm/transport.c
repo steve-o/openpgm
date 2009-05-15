@@ -2054,6 +2054,7 @@ pgm_transport_bind (
 	retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
 	if (retval < 0) {
 		g_trace ("INFO","DSCP setting requires CAP_NET_ADMIN or ADMIN capability.");
+		retval = 0;
 		goto no_cap_net_admin;
 	}
 	retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
