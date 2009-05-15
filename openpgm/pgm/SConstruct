@@ -28,6 +28,8 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'true',
 			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'true',
+			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
@@ -101,7 +103,12 @@ env = Environment(
 			'-D_REENTRANT',
 			'-D_GNU_SOURCE',
 			'-D__need_IOV_MAX',
+			'-DCONFIG_HAVE_POLL',
 			'-DCONFIG_HAVE_EPOLL',
+			'-DCONFIG_HAVE_CLOCK_GETTIME',
+			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
+			'-DCONFIG_HAVE_NANOSLEEP',
+			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
 			'-DCONFIG_HAVE_IFR_NETMASK',

@@ -19,6 +19,7 @@ opt.AddOptions (
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_PLUS', 'libpgmplus GPL library', 'true', ('true', 'false'))),
 )
 
 #-----------------------------------------------------------------------------
@@ -89,7 +90,12 @@ env = Environment(ENV = os.environ,
 			'-D_REENTRANT',
 			'-D_GNU_SOURCE',
 			'-D__need_IOV_MAX',
+			'-DCONFIG_HAVE_POLL',
 			'-DCONFIG_HAVE_EPOLL',
+			'-DCONFIG_HAVE_CLOCK_GETTIME',
+			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
+			'-DCONFIG_HAVE_NANOSLEEP',
+			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
 			'-DCONFIG_HAVE_GETIFADDRS',
