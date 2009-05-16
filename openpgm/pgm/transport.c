@@ -48,6 +48,7 @@
 
 #include "pgm/transport.h"
 #include "pgm/if.h"
+#include "pgm/ip.h"
 #include "pgm/packet.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
@@ -956,11 +957,7 @@ pgm_transport_set_max_tpdu (
 {
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-#ifdef __USE_BSD
-	g_return_val_if_fail (max_tpdu >= (sizeof(struct ip) + sizeof(struct pgm_header)), -EINVAL);
-#else
-	g_return_val_if_fail (max_tpdu >= (sizeof(struct iphdr) + sizeof(struct pgm_header)), -EINVAL);
-#endif
+	g_return_val_if_fail (max_tpdu >= (sizeof(struct pgm_ip) + sizeof(struct pgm_header)), -EINVAL);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->max_tpdu = max_tpdu;
@@ -1598,22 +1595,18 @@ pgm_transport_bind (
 /* determine IP header size for rate regulation engine & stats */
 	switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
 	case AF_INET:
-#ifdef __USE_BSD
-		transport->iphdr_len = sizeof(struct ip);
-#else
-		transport->iphdr_len = sizeof(struct iphdr);
-#endif
+		transport->iphdr_len = sizeof(struct pgm_ip);
 		break;
 
 	case AF_INET6:
-		transport->iphdr_len = 40;	/* sizeof(struct ipv6hdr) */
+		transport->iphdr_len = sizeof(struct pgm_ip6_hdr);
 		break;
 	}
 	g_trace ("INFO","assuming IP header size of %" G_GSIZE_FORMAT " bytes", transport->iphdr_len);
 
 	if (transport->udp_encap_port)
 	{
-		guint udphdr_len = sizeof( struct udphdr );
+		guint udphdr_len = sizeof( struct pgm_udphdr );
 		g_trace ("INFO","assuming UDP header size of %i bytes", udphdr_len);
 		transport->iphdr_len += udphdr_len;
 	}
@@ -2209,11 +2202,11 @@ new_peer (
 #ifdef TRANSPORT_DEBUG
 	char localnla[INET6_ADDRSTRLEN];
 	char groupnla[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( src_addr ),
+	pgm_inet_ntop (	pgm_sockaddr_family( src_addr ),
 			pgm_sockaddr_addr( src_addr ),
 			localnla,
 			sizeof(localnla) );
-	inet_ntop (	pgm_sockaddr_family( dst_addr ),
+	pgm_inet_ntop (	pgm_sockaddr_family( dst_addr ),
 			pgm_sockaddr_addr( dst_addr ),
 			groupnla,
 			sizeof(groupnla) );
