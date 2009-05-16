@@ -25,7 +25,6 @@
 #include <getopt.h>
 #include <limits.h>
 #include <netdb.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +35,9 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#ifdef CONFIG_HAVE_POLL
+#	include <poll.h>
+#endif
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
@@ -335,13 +337,24 @@ pgm_sendto (
 		!( errno == EAGAIN && flags & MSG_DONTWAIT )	/* would block on non-blocking send */
 	   )
 	{
+#ifdef CONFIG_HAVE_POLL
 /* poll for cleared socket */
 		struct pollfd p = {
 			.fd		= transport->send_sock,
 			.events		= POLLOUT,
 			.revents	= 0
-				  };
+		};
 		int ready = poll (&p, 1, 500 /* ms */);
+#else
+		fd_set writefds;
+		FD_ZERO(&writefds);
+		FD_SET(transport->send_sock, &writefds);
+		struct timeval tv = {
+			.tv_sec  = 0,
+			.tv_usec = 500 /* ms */ * 1000
+		};
+		int ready = select (1, NULL, &writefds, NULL, &tv);
+#endif /* CONFIG_HAVE_POLL */
 		if (ready > 0)
 		{
 			sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
@@ -355,12 +368,12 @@ pgm_sendto (
 		}
 		else if (ready == 0)
 		{
-			g_warning ("sendto %s socket pollout timeout.",
+			g_warning ("sendto %s socket timeout.",
 					 inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
 		}
 		else
 		{
-			g_warning ("poll on blocked sendto %s socket failed: %i %s",
+			g_warning ("blocked sendto %s socket failed: %i %s",
 					inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
 					errno,
 					strerror (errno));
@@ -2764,12 +2777,21 @@ check_for_repeat:
 		if (0 == data_read)
 		{
 			int n_fds = 2;
+#ifdef CONFIG_HAVE_POLL
 			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
 			if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, POLLIN)) {
 				g_trace ("SPM", "poll_info returned errno=%i",errno);
 				return -1;
 			}
+#else
+			fd_set readfds;
+			FD_ZERO(&readfds);
+			if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
+				g_trace ("SPM", "select_info returned errno=%i",errno);
+				return -1;
+			}
+#endif /* CONFIG_HAVE_POLL */
 
 /* flush any waiting notifications */
 			if (transport->is_waiting_read) {
@@ -2781,15 +2803,25 @@ check_for_repeat:
  * first run should trigger waiting pipe event which will flush and loop.
  */
 			g_static_mutex_unlock (&transport->waiting_mutex);
-			int events = poll (fds, n_fds, -1 /* timeout=∞ */);
 
-			if (-1 == events) {
-				g_trace ("SPM","poll returned errno=%i",errno);
-				return events;
+#ifdef CONFIG_HAVE_POLL
+			int ready = poll (fds, n_fds, -1 /* timeout=∞ */);
+#else
+			int ready = select (n_fds, &readfds, NULL, NULL, NULL);
+#endif
+
+			if (-1 == ready) {
+				g_trace ("SPM","block returned errno=%i",errno);
+				return ready;
 			}
 			g_static_mutex_lock (&transport->waiting_mutex);
 
-			if (fds[0].revents) {
+#ifdef CONFIG_HAVE_POLL
+			if (fds[0].revents)
+#else
+			if (FD_ISSET(transport->recv_sock, &readfds))
+#endif
+			{
 				g_trace ("SPM","recv again on empty");
 				goto recv_again;
 			} else {
@@ -2979,6 +3011,7 @@ pgm_transport_select_info (
 	return *n_fds = MAX(fds, *n_fds);
 }
 
+#ifdef CONFIG_HAVE_POLL
 /* add poll parameters for this transports receive socket(s)
  *
  * returns number of pollfd structures filled.
@@ -3030,6 +3063,7 @@ pgm_transport_poll_info (
 
 	return *n_fds = moo;
 }
+#endif /* CONFIG_HAVE_POLL */
 
 /* add epoll parameters for this transports recieve socket(s), events should
  * be set to EPOLLIN to wait for incoming events (data), and EPOLLOUT to wait
