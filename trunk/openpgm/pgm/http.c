@@ -36,6 +36,7 @@
 #endif
 #include <libsoup/soup-address.h>
 
+#include "pgm/ip.h"
 #include "pgm/http.h"
 #include "pgm/transport.h"
 #include "pgm/txwi.h"
@@ -388,15 +389,17 @@ index_callback (
 	getlogin_r (username, sizeof(username));
 
 	char ipaddress[INET6_ADDRSTRLEN];
-	struct addrinfo hints, *res = NULL;
-	memset (&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_flags = AI_ADDRCONFIG;
+	struct addrinfo hints = {
+		.ai_family	= AF_UNSPEC,
+		.ai_socktype	= SOCK_STREAM,
+		.ai_protocol	= IPPROTO_TCP,
+		.ai_flags	= AI_ADDRCONFIG
+	}, *res;
 	getaddrinfo (hostname, NULL, &hints, &res);
-	inet_ntop (	res->ai_family,
-			&((struct sockaddr_in*)res->ai_addr)->sin_addr,
-			ipaddress,
-			sizeof(ipaddress) );
+	getnameinfo (res->ai_addr, pgm_sockaddr_len (res->ai_addr),
+		     ipaddress, sizeof(ipaddress),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 	freeaddrinfo (res);
 
 	int transport_count;
@@ -472,11 +475,10 @@ transports_callback (
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
-			inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_group ),
-					pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
-					group_address,
-					sizeof(group_address) );
-
+			getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len (&transport->send_gsr.gsr_group),
+				     group_address, sizeof(group_address),
+				     NULL, 0,
+				     NI_NUMERICHOST);
 			int dport = g_ntohs (transport->dport);
 
 			char gsi[sizeof("000.000.000.000.000.000")];
@@ -645,16 +647,16 @@ http_tsi_response (
 		g_ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_source ),
-			pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
-			source_address,
-			sizeof(source_address) );
+	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_source, pgm_sockaddr_len (&transport->send_gsr.gsr_source),
+		     source_address, sizeof(source_address),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	char group_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_group ),
-			pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
-			group_address,
-			sizeof(group_address) );
+	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len (&transport->send_gsr.gsr_group),
+		     group_address, sizeof(group_address),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	int dport = g_ntohs (transport->dport);
 	int sport = g_ntohs (transport->tsi.sport);
@@ -663,10 +665,10 @@ http_tsi_response (
 	gint ihb_max = 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &transport->recv_gsr[0].gsr_source ),
-			pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
-			spm_path,
-			sizeof(spm_path) );
+	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_source),
+		     spm_path, sizeof(spm_path),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
 	g_string_append_printf (response,	"<div class=\"heading\">"
@@ -847,24 +849,24 @@ http_each_receiver (
 	)
 {
 	char group_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
-			pgm_sockaddr_addr( &peer->group_nla ),
-			group_address,
-			sizeof(group_address) );
+	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len (&peer->group_nla),
+		     group_address, sizeof(group_address),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
 
 	char source_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &peer->nla ),
-			pgm_sockaddr_addr( &peer->nla ),
-			source_address,
-			sizeof(source_address) );
+	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
+		     source_address, sizeof(source_address),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	char last_hop[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &peer->local_nla ),
-			pgm_sockaddr_addr( &peer->local_nla ),
-			last_hop,
-			sizeof(last_hop) );
+	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len (&peer->local_nla),
+		     last_hop, sizeof(last_hop),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	char gsi[sizeof("000.000.000.000.000.000")];
 	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
@@ -962,24 +964,24 @@ http_receiver_response (
 		g_ntohs (peer->tsi.sport));
 
 	char group_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
-			pgm_sockaddr_addr( &peer->group_nla ),
-			group_address,
-			sizeof(group_address) );
+	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len (&peer->group_nla),
+		     group_address, sizeof(group_address),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
 
 	char source_address[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &peer->nla ),
-			pgm_sockaddr_addr( &peer->nla ),
-			source_address,
-			sizeof(source_address) );
+	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
+		     source_address, sizeof(source_address),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	char last_hop[INET6_ADDRSTRLEN];
-	inet_ntop (	pgm_sockaddr_family( &peer->local_nla ),
-			pgm_sockaddr_addr( &peer->local_nla ),
-			last_hop,
-			sizeof(last_hop) );
+	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len (&peer->local_nla),
+		     last_hop, sizeof(last_hop),
+		     NULL, 0,
+		     NI_NUMERICHOST);
 
 	int sport = g_ntohs (peer->tsi.sport);
 

@@ -1766,7 +1766,7 @@ pgm_transport_bind (
 		break;
 	}
 #else
-	retval = pgm_if_indextosockaddr (transport->recv_gsr[0].gsr_interface, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), &recv_addr);
+	retval = pgm_if_indextosockaddr (transport->recv_gsr[0].gsr_interface, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), pgm_sockaddr_scope_id(&transport->recv_gsr[0].gsr_group), &recv_addr);
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
@@ -1819,7 +1819,7 @@ pgm_transport_bind (
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
 
-	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
+	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), pgm_sockaddr_scope_id(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
