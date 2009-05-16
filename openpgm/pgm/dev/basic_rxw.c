@@ -168,12 +168,12 @@ flush_rxw (
 	g_return_val_if_fail (r != NULL, -1);
 
 	pgm_msgv_t msgv[ IOV_MAX ];
-	struct iovec iov[ IOV_MAX ];
+	struct pgm_iovec iov[ IOV_MAX ];
 
 	int bytes_read = 0;
 	do {
 		pgm_msgv_t* pmsgv = msgv;
-		struct iovec* piov = iov;
+		struct pgm_iovec* piov = iov;
 		bytes_read = pgm_rxw_readv (r, &pmsgv, G_N_ELEMENTS(msgv), &piov, G_N_ELEMENTS(iov));
 	} while (bytes_read > 0);
 

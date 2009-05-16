@@ -251,7 +251,7 @@ on_datav (
 	g_message ("(%i bytes from %s)", len, tsi);
 
 /* protect against non-null terminated strings */
-	struct iovec* msgv_iov = datav->msgv_iov;
+	struct pgm_iovec* msgv_iov = datav->msgv_iov;
 	int i = 0;
 	while (len)
 	{
