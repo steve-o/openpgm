@@ -228,7 +228,7 @@ pgm_rxw_init (
 		g_static_mutex_lock (r->trash_mutex);
 		for (guint32 i = 0; i < preallocate_size; i++)
 		{
-			gpointer data   = g_slice_alloc (r->max_tpdu);
+			gpointer data   = g_slice_alloc (r->max_tpdu + sizeof(gint));
 			gpointer packet = g_slice_alloc (sizeof(pgm_rxw_packet_t));
 			g_trash_stack_push (r->trash_data, data);
 			g_trash_stack_push (r->trash_packet, packet);
@@ -407,8 +407,9 @@ pgm_rxw_alloc0_packet (
 int
 pgm_rxw_push_fragment (
 	pgm_rxw_t*	r,
-	gpointer	packet,
-	gsize		length,
+	gpointer	packet,			/* data = packet + offset */
+	guint16		offset,
+	guint16		length,
 	guint32		sequence_number,
 	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,
@@ -544,14 +545,16 @@ pgm_rxw_push_fragment (
 					     pp->state == PGM_PKT_WAIT_DATA_STATE ||
 					     pp->state == PGM_PKT_LOST_DATA_STATE )
 					{
-						g_assert (pp->data == NULL);
+						g_assert (pp->packet == NULL);
 
 /* move parity to this new sequence number */
 						memcpy (&pp->opt_fragment, &rp->opt_fragment, sizeof(struct pgm_opt_fragment));
-						pp->data	= rp->data;
+						pp->packet	= rp->packet;
+						pp->offset	= rp->offset;
 						pp->length	= rp->length;
 						pp->state	= rp->state;
-						rp->data	= NULL;
+						rp->packet	= NULL;
+						rp->offset	= 0;
 						rp->length	= 0;
 						rp->state	= PGM_PKT_WAIT_DATA_STATE;
 						break;
@@ -578,8 +581,9 @@ pgm_rxw_push_fragment (
 				memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 			}
 
-			g_assert (rp->data == NULL);
-			rp->data	= packet;
+			g_assert (rp->packet == NULL);
+			rp->packet	= packet;
+			rp->offset	= offset;
 			rp->length	= length;
 
 			pgm_rxw_pkt_state_unlink (r, rp);
@@ -729,7 +733,8 @@ pgm_rxw_push_fragment (
 		{
 			memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 		}
-		rp->data		= packet;
+		rp->packet		= packet;
+		rp->offset		= offset;
 		rp->length		= length;
 		rp->state		= PGM_PKT_HAVE_DATA_STATE;
 
@@ -843,7 +848,7 @@ pgm_rxw_readv (
 		
 		case PGM_PKT_HAVE_DATA_STATE:
 			/* not lost */
-			g_assert ( cp->data != NULL && cp->length > 0 );
+			g_assert ( cp->packet != NULL && cp->length > 0 );
 
 /* check for contiguous apdu */
 			if ( g_ntohl (cp->of_apdu_len) )
@@ -890,12 +895,13 @@ pgm_rxw_readv (
 					{
 						ap = RXW_PACKET(r, i);
 
-						(*piov)->iov_base = ap->data;	/* copy */
-						(*piov)->iov_len  = ap->length;
+						(*piov)->iov_base   = ap->packet;	/* copy */
+						(*piov)->iov_offset = ap->offset;
+						(*piov)->iov_len    = ap->length;
 						(*pmsg)->msgv_iovlen++;
 
 						if (is_final) {
-							pgm_rxw_pkt_data_ref (ap->data, ap->length);
+							pgm_rxw_pkt_data_ref (ap->packet, r->max_tpdu);
 						}
 						++(*piov);
 
@@ -936,11 +942,13 @@ pgm_rxw_readv (
 				(*pmsg)->msgv_iovlen     = 1;
 				(*pmsg)->msgv_iov        = *piov;
 
-				(*piov)->iov_base = cp->data;
-				(*piov)->iov_len  = cp->length;
+				(*piov)->iov_base   = cp->packet;
+				(*piov)->iov_offset = cp->offset;
+				(*piov)->iov_len    = cp->length;
 
+g_message ("iov_base %p", (*piov)->iov_base);
 				if (is_final) {
-					pgm_rxw_pkt_data_ref (cp->data, cp->length);
+					pgm_rxw_pkt_data_ref (cp->packet, r->max_tpdu);
 				}
 
 				bytes_read += cp->length;
@@ -1113,10 +1121,15 @@ pgm_rxw_pkt_remove1 (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	g_assert ( rp != NULL );
 
-	if (rp->data)
+	if (rp->packet)
 	{
-		rp->data = NULL;
+		rp->packet = NULL;
+		rp->offset = 0;
+		rp->length = 0;
 	}
+
+	g_assert (rp->offset == 0);
+	g_assert (rp->length == 0);
 
 //	g_slice_free1 (sizeof(pgm_rxw_t), rp);
 	g_static_mutex_lock (r->trash_mutex);
@@ -1132,8 +1145,10 @@ pgm_rxw_data_free1 (
 	pgm_rxw_packet_t*	rp
 	)
 {
-	pgm_rxw_pkt_data_free1 (r, rp->data);
-	rp->data = NULL;
+	pgm_rxw_pkt_data_free1 (r, rp->packet);
+	rp->packet = NULL;
+	rp->offset = 0;
+	rp->length = 0;
 }
 
 static inline void
@@ -1145,7 +1160,7 @@ pgm_rxw_pkt_free1 (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	g_assert ( rp != NULL );
 
-	if (rp->data)
+	if (rp->packet)
 	{
 		pgm_rxw_data_free1 (r, rp);
 	}
@@ -1196,7 +1211,7 @@ pgm_rxw_peek (
 	pgm_rxw_packet_t* rp = RXW_PACKET(r, sequence_number);
 
 	*opt_fragment	= &rp->opt_fragment;
-	*data		= rp->data;
+	*data		= (guint8*)rp->packet + rp->offset;
 	*length		= rp->length;
 	*is_parity	= rp->state == PGM_PKT_HAVE_PARITY_STATE;
 
@@ -1212,7 +1227,8 @@ pgm_rxw_push_nth_parity (
 	guint32		sequence_number,
 	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,			/* in network order */
-	gpointer	data,
+	gpointer	packet,
+	guint16		offset,					/* data = packet + offset */
 	guint16		length,
 	pgm_time_t	nak_rb_expiry
 	)
@@ -1242,7 +1258,8 @@ pgm_rxw_push_nth_parity (
 	if (opt_fragment) {
 		memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 	}
-	rp->data	= data;
+	rp->packet	= packet;
+	rp->offset	= offset;
 	rp->length	= length;
 	rp->state	= PGM_PKT_HAVE_PARITY_STATE;
 
@@ -1260,7 +1277,8 @@ pgm_rxw_push_nth_repair (
 	guint32		sequence_number,
 	guint32		trail,
 	struct pgm_opt_fragment* opt_fragment,			/* in network order */
-	gpointer	data,
+	gpointer	packet,					/* data = packet + offset */
+	guint16		offset,
 	guint16		length,
 	pgm_time_t	nak_rb_expiry
 	)
@@ -1290,7 +1308,8 @@ pgm_rxw_push_nth_repair (
 		memcpy (&rp->opt_fragment, opt_fragment, sizeof(struct pgm_opt_fragment));
 		g_assert( g_ntohl (rp->of_apdu_len) > 0 );
 	}
-	rp->data	= data;
+	rp->packet	= packet;
+	rp->offset	= offset;
 	rp->length	= length;
 	rp->state	= PGM_PKT_HAVE_DATA_STATE;
 
