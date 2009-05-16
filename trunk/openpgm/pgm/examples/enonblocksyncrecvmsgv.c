@@ -265,10 +265,10 @@ on_msgv (
 	guint i = 0;
 	while (len)
 	{
-		struct iovec* msgv_iov = msgv->msgv_iov;
+		struct pgm_iovec* msgv_iov = msgv->msgv_iov;
 
 		guint apdu_len = 0; 
-		struct iovec* p = msgv_iov;
+		struct pgm_iovec* p = msgv_iov;
 		for (guint j = 0; j < msgv->msgv_iovlen; j++) {	/* # elements */
 			apdu_len += p->iov_len;
 			p++;

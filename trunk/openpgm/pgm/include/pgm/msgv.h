@@ -22,14 +22,25 @@
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
+/* struct for scatter/gather I/O */
+struct pgm_iovec {
+#ifndef _WIN32
+	void*		iov_base;	/* pointer to data */
+	size_t		iov_len;	/* length of data */
+#else
+	u_long		iov_len;	/* len */
+	char*		iov_base; 	/* buf */
+#endif /* _WIN32 */
+};
+
 struct pgm_msgv_t {
 #ifdef __PGM_TRANSPORT_H__
 	const pgm_tsi_t*	msgv_tsi;
 #else
-	const void*	msgv_identifier;
+	const void*		msgv_identifier;
 #endif
-	struct iovec*	msgv_iov;	/* scatter/gather array */
-	size_t		msgv_iovlen;	/* # elements in iov */
+	struct pgm_iovec*	msgv_iov;	/* scatter/gather array */
+	size_t			msgv_iovlen;	/* # elements in iov */
 };
 
 typedef struct pgm_msgv_t pgm_msgv_t;

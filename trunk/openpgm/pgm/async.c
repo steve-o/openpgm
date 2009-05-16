@@ -124,7 +124,7 @@ pgm_receiver_thread (
 			event->len  = len;
 
 			gpointer dst = event->data;
-			struct iovec* src = msgv.msgv_iov;
+			struct pgm_iovec* src = msgv.msgv_iov;
 			while (len)
 			{
 				memcpy (dst, src->iov_base, src->iov_len);
