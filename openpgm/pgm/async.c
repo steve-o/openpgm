@@ -127,7 +127,7 @@ pgm_receiver_thread (
 			struct pgm_iovec* src = msgv.msgv_iov;
 			while (len)
 			{
-				memcpy (dst, src->iov_base, src->iov_len);
+				memcpy (dst, (const char*)src->iov_base + src->iov_offset, src->iov_len);
 				dst = (char*)dst + src->iov_len;
 				len -= src->iov_len;
 				src++;
