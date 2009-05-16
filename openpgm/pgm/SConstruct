@@ -163,7 +163,7 @@ env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
-        'CFLAGS'        : [],
+        'CCFLAGS'        : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
 env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
@@ -171,7 +171,7 @@ env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4')
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
 	lastLIBS = context.env['LIBS'];
-	lastCFLAGS= context.env['CFLAGS'];
+	lastCCFLAGS= context.env['CCFLAGS'];
 	context.env.MergeFlags(env['SNMP_FLAGS']);
 	result = context.TryLink("""
 int main(int argc, char**argv)
@@ -180,7 +180,7 @@ int main(int argc, char**argv)
 	return 0;
 }
 """, '.c');
-	context.env.Replace(LIBS = lastLIBS, CFLAGS=lastCFLAGS);
+	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
 	context.Result(not result);
 	return result;
 

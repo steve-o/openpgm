@@ -151,7 +151,7 @@ env.ParseConfig('PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkconfi
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
-        'CFLAGS'        : [],
+        'CCFLAGS'       : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
 env['LIBSOUP_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkgconfig pkg-config --cflags --libs libsoup-2.2 gobject-2.0');
@@ -159,7 +159,7 @@ env['LIBSOUP_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=/usr/evolution28/lib/pkg
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
 	lastLIBS = context.env['LIBS'];
-	lastCFLAGS= context.env['CFLAGS'];
+	lastCCFLAGS= context.env['CCFLAGS'];
 	context.env.MergeFlags(env['SNMP_FLAGS']);
 	result = context.TryLink("""
 int main(int argc, char**argv)
@@ -168,7 +168,7 @@ int main(int argc, char**argv)
 	return 0;
 }
 """, '.c');
-	context.env.Replace(LIBS = lastLIBS, CFLAGS=lastCFLAGS);
+	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
 	context.Result(not result);
 	return result;
 
