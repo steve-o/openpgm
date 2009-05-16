@@ -163,10 +163,9 @@
 static void _list_iterator (gpointer, gpointer);
 static inline int pgm_rxw_pop_lead (pgm_rxw_t*);
 static inline int pgm_rxw_pop_trail (pgm_rxw_t*);
-static inline int pgm_rxw_pkt_remove1 (pgm_rxw_t*, pgm_rxw_packet_t*);
-static inline int pgm_rxw_pkt_data_free1 (pgm_rxw_t*, gpointer);
-static inline int pgm_rxw_data_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
-static inline int pgm_rxw_pkt_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline void pgm_rxw_pkt_remove1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline void pgm_rxw_data_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
+static inline void pgm_rxw_pkt_free1 (pgm_rxw_t*, pgm_rxw_packet_t*);
 static inline gpointer pgm_rxw_alloc_packet (pgm_rxw_t*);
 static inline gpointer pgm_rxw_alloc0_packet (pgm_rxw_t*);
 
@@ -772,7 +771,8 @@ pgm_rxw_readv (
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
 	guint			msg_len,	/* number of items in pmsg */
 	struct iovec**		piov,		/* underlying iov storage */
-	guint			iov_len		/* number of items in piov */
+	guint			iov_len,	/* number of items in piov */
+	gboolean		is_final	/* transfer ownership to application */
 	)
 {
 	ASSERT_RXW_BASE_INVARIANT(r);
@@ -894,6 +894,9 @@ pgm_rxw_readv (
 						(*piov)->iov_len  = ap->length;
 						(*pmsg)->msgv_iovlen++;
 
+						if (is_final) {
+							pgm_rxw_pkt_data_ref (ap->data, ap->length);
+						}
 						++(*piov);
 
 						bytes_read += ap->length;	/* stats */
@@ -928,12 +931,18 @@ pgm_rxw_readv (
 				g_trace ("one packet found @ #%" G_GUINT32_FORMAT ", passing upstream.",
 					cp->sequence_number);
 
-/* pass upstream, including data memory ownership */
+/* pass upstream */
 				(*pmsg)->msgv_identifier = r->identifier;
 				(*pmsg)->msgv_iovlen     = 1;
 				(*pmsg)->msgv_iov        = *piov;
+
 				(*piov)->iov_base = cp->data;
 				(*piov)->iov_len  = cp->length;
+
+				if (is_final) {
+					pgm_rxw_pkt_data_ref (cp->data, cp->length);
+				}
+
 				bytes_read += cp->length;
 				msgs_read++;
 
@@ -1095,7 +1104,7 @@ pgm_rxw_pkt_state_unlink (
  * ownership upstream.
  */
 
-static inline int
+static inline void
 pgm_rxw_pkt_remove1 (
 	pgm_rxw_t*		r,
 	pgm_rxw_packet_t*	rp
@@ -1115,23 +1124,9 @@ pgm_rxw_pkt_remove1 (
 	g_static_mutex_unlock (r->trash_mutex);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return PGM_RXW_OK;
 }
 
-static inline int
-pgm_rxw_pkt_data_free1 (
-	pgm_rxw_t*		r,
-	gpointer		packet
-	)
-{
-//	g_slice_free1 (rp->length, rp->data);
-	g_static_mutex_lock (r->trash_mutex);
-	g_trash_stack_push (r->trash_data, packet);
-	g_static_mutex_unlock (r->trash_mutex);
-	return PGM_RXW_OK;
-}
-
-static inline int
+static inline void
 pgm_rxw_data_free1 (
 	pgm_rxw_t*		r,
 	pgm_rxw_packet_t*	rp
@@ -1139,11 +1134,9 @@ pgm_rxw_data_free1 (
 {
 	pgm_rxw_pkt_data_free1 (r, rp->data);
 	rp->data = NULL;
-
-	return PGM_RXW_OK;
 }
 
-static inline int
+static inline void
 pgm_rxw_pkt_free1 (
 	pgm_rxw_t*		r,
 	pgm_rxw_packet_t*	rp
@@ -1163,7 +1156,6 @@ pgm_rxw_pkt_free1 (
 	g_static_mutex_unlock (r->trash_mutex);
 
 	ASSERT_RXW_BASE_INVARIANT(r);
-	return PGM_RXW_OK;
 }
 
 /* peek contents of of window entry, allow writing of data and parity members

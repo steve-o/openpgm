@@ -39,5 +39,7 @@ PGMEXE(enonblocksyncrecvmsgv)
 PGMEXE(asyncqrecv)
 PGMEXE(blockqrecv)
 
+# zero copy example
+PGMEXE(zerocopyrecv)
 
 # end of file

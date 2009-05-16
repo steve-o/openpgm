@@ -161,7 +161,7 @@ int pgm_rxw_shutdown (pgm_rxw_t*);
 
 int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, gsize, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
 
-gssize pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, guint, struct iovec**, guint);
+gssize pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, guint, struct iovec**, guint, gboolean);
 
 /* from state checking */
 int pgm_rxw_mark_lost (pgm_rxw_t*, guint32);
@@ -205,12 +205,15 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
     if (!g_trash_stack_is_empty(r->trash_data)) {
 	p = g_trash_stack_pop (r->trash_data);
     } else {
-	p = g_slice_alloc (r->max_tpdu);
+	p = g_slice_alloc (r->max_tpdu + sizeof(gint));
     }
     g_static_mutex_unlock (r->trash_mutex);
 
 /* mark non-zeroed */
     ( (guint8*)p )[ r->max_tpdu - 1 ] = PGM_PACKET_DIRTY;
+
+/* add reference counter to tail */
+    *(gint*)( (guint8*)p + r->max_tpdu ) = 1;
 
     return p;
 }
@@ -227,11 +230,26 @@ static inline void pgm_rxw_zero_pad (pgm_rxw_t* r, gpointer data, guint16 offset
     ( (guint8*)data )[ r->max_tpdu - 1 ] = PGM_PACKET_ZERO_PADDED;
 }
 
-static inline void pgm_rxw_data_unref (GTrashStack** trash, GStaticMutex* mutex, gpointer data)
+static inline void pgm_rxw_pkt_data_ref (gpointer data, gsize len)
 {
-    g_static_mutex_lock (mutex);
-    g_trash_stack_push (trash, data);
-    g_static_mutex_unlock (mutex);
+	gint* atomic = (gint*)( (guint*)data + len );
+	g_atomic_int_inc (atomic);
+}
+
+static inline void pgm_rxw_pkt_data_unref (GTrashStack** trash, GStaticMutex* mutex, gpointer data, gsize len)
+{
+	gint* atomic = (gint*)( (guint*)data + len );
+	gboolean is_zero = g_atomic_int_dec_and_test (atomic);
+	if (is_zero) {
+		g_static_mutex_lock (mutex);
+		g_trash_stack_push (trash, data);
+		g_static_mutex_unlock (mutex);
+	}
+}
+
+static inline void pgm_rxw_pkt_data_free1 (pgm_rxw_t* r, gpointer packet)
+{
+        pgm_rxw_pkt_data_unref (r->trash_data, r->trash_mutex, packet, r->max_tpdu);
 }
 
 static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)

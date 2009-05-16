@@ -267,6 +267,18 @@ pgm_packetv_free1 (
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 }
 
+/* decrement reference to receive window data buffer
+ */
+void
+pgm_pkt_data_free1 (
+	pgm_transport_t*	transport,
+	gpointer		packet
+	)
+{
+	g_assert (transport);
+	pgm_rxw_pkt_data_unref (&transport->rx_data, &transport->rx_mutex, packet, transport->max_tpdu - transport->iphdr_len);
+}
+
 /* fast log base 2 of power of 2
  */
 
@@ -564,7 +576,7 @@ pgm_transport_destroy (
 		gpointer* p = NULL;
 		while ( (p = g_trash_stack_pop (&transport->rx_data)) )
 		{
-			g_slice_free1 (transport->max_tpdu - transport->iphdr_len, p);
+			g_slice_free1 (transport->max_tpdu + sizeof(gint) - transport->iphdr_len, p);
 		}
 
 		g_assert (transport->rx_data == NULL);
@@ -2350,7 +2362,7 @@ pgm_transport_recvmsgv (
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov, flags & MSG_FIN);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
@@ -2454,7 +2466,7 @@ recv_again:
 	{
 /* IPv4 PGM includes IP packet header which we can easily parse to grab destination multicast group
  */
-		e = pgm_parse_raw(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+		e = pgm_parse_raw (iov.iov_base, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	}
 	else
 	{
@@ -2498,7 +2510,7 @@ recv_again:
 			dst_addr_len = sizeof(struct sockaddr_in);
 		}
 
-		e = pgm_parse_udp_encap(transport->rx_buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
+		e = pgm_parse_udp_encap (iov.iov_base, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len);
 	}
 
 	if (e < 0)
@@ -2713,7 +2725,7 @@ flush_waiting:
 		while (transport->peers_waiting)
 		{
 			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov);
+			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov, flags & MSG_FIN);
 
 /* clean up completed transmission groups */
 			pgm_rxw_free_committed (waiting_rxw);
@@ -2916,7 +2928,7 @@ pgm_transport_recvfrom (
 {
 	pgm_msgv_t msgv;
 
-	gssize bytes_read = pgm_transport_recvmsg (transport, &msgv, flags);
+	gssize bytes_read = pgm_transport_recvmsg (transport, &msgv, flags & ~MSG_FIN);
 
 /* merge apdu packets together */
 	if (bytes_read > 0)
