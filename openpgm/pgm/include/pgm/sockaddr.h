@@ -80,11 +80,20 @@ G_BEGIN_DECLS
 		(const void*)&((const struct sockaddr_in*)(src))->sin_addr : \
 		(const void*)&((const struct sockaddr_in6*)(src))->sin6_addr )
 
+#define pgm_sockaddr_addr_len(src) \
+	    ( pgm_sockaddr_family(src) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr) )
+
 #define pgm_sockaddr_len(src) \
 	    ( pgm_sockaddr_family(src) == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
 
+#define pgm_sockaddr_scope_id(src) \
+	    ( pgm_sockaddr_family(src) == AF_INET ? 0 : ((const struct sockaddr_in6*)(src))->sin6_scope_id )
+
 #define pgm_sockaddr_ntop(src,dst,cnt) \
-	    ( inet_ntop(pgm_sockaddr_family(src), pgm_sockaddr_addr(src), (dst), (cnt)) )
+	    ( getnameinfo ((const struct sockaddr*)(src), (socklen_t)pgm_sockaddr_len((src)), \
+			     (char*)(dst), (size_t)(cnt), \
+			     NULL, 0, \
+			     NI_NUMERICHOST) )
 
 static inline int pgm_sockaddr_is_addr_multicast (const struct sockaddr* s)
 {
@@ -241,7 +250,7 @@ static inline int pgm_sockaddr_add_membership (int s, const struct group_source_
 	    mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
 
 	    struct sockaddr_in interface;
-	    pgm_if_indextosockaddr (gsr->gsr_interface, AF_INET, (struct sockaddr*)&interface);
+	    pgm_if_indextosockaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&interface);
 	    mreq.imr_interface.s_addr = interface.sin_addr.s_addr;
 
 	    retval = setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
