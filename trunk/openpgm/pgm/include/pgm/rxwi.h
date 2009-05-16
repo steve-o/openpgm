@@ -84,7 +84,8 @@ const char* pgm_rxw_returns_string (pgm_rxw_returns_e);
 typedef int (*pgm_rxw_commitfn_t)(guint32, gpointer, guint, gpointer);
 
 struct pgm_rxw_packet_t {
-	gpointer        data;
+	gpointer        packet;			/* data = packet + offset */
+	guint16		offset;
 	guint16         length;
 	guint32         sequence_number;
 
@@ -159,7 +160,7 @@ typedef struct pgm_rxw_t pgm_rxw_t;
 pgm_rxw_t* pgm_rxw_init (const void*, guint16, guint32, guint32, guint, guint, GTrashStack**, GTrashStack**, GStaticMutex*);
 int pgm_rxw_shutdown (pgm_rxw_t*);
 
-int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, gsize, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
+int pgm_rxw_push_fragment (pgm_rxw_t*, gpointer, guint16, guint16, guint32, guint32, struct pgm_opt_fragment*, pgm_time_t);
 
 gssize pgm_rxw_readv (pgm_rxw_t*, pgm_msgv_t**, guint, struct pgm_iovec**, guint, gboolean);
 
@@ -205,7 +206,7 @@ static inline gpointer pgm_rxw_alloc (pgm_rxw_t* r)
     if (!g_trash_stack_is_empty(r->trash_data)) {
 	p = g_trash_stack_pop (r->trash_data);
     } else {
-	p = g_slice_alloc (r->max_tpdu + sizeof(gint));
+	p = g_slice_alloc (r->max_tpdu + sizeof(gpointer) + sizeof(gint));
     }
     g_static_mutex_unlock (r->trash_mutex);
 
@@ -252,37 +253,37 @@ static inline void pgm_rxw_pkt_data_free1 (pgm_rxw_t* r, gpointer packet)
         pgm_rxw_pkt_data_unref (r->trash_data, r->trash_mutex, packet, r->max_tpdu);
 }
 
-static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push (pgm_rxw_t* r, gpointer packet, guint16 offset, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
-    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, NULL, nak_rb_expiry);
+    return pgm_rxw_push_fragment (r, packet, offset, len, sqn, trail, NULL, nak_rb_expiry);
 }
 
-static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint16 len, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_fragment_copy (pgm_rxw_t* r, gpointer packet_, guint16 offset, guint16 len, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
-    memcpy (packet, packet_, len);
-    return pgm_rxw_push_fragment (r, packet, len, sqn, trail, opt_fragment, nak_rb_expiry);
+    memcpy (packet, (guint8*)packet_ + offset, len);
+    return pgm_rxw_push_fragment (r, packet, 0, len, sqn, trail, opt_fragment, nak_rb_expiry);
 }
 
-static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_copy (pgm_rxw_t* r, gpointer packet_, guint16 offset, guint16 len, guint32 sqn, guint32 trail, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
-    memcpy (packet, packet_, len);
-    return pgm_rxw_push (r, packet, len, sqn, trail, nak_rb_expiry);
+    memcpy (packet, (guint8*)packet_ + offset, len);
+    return pgm_rxw_push (r, packet, 0, len, sqn, trail, nak_rb_expiry);
 }
 
 int pgm_rxw_pkt_state_unlink (pgm_rxw_t*, pgm_rxw_packet_t*);
 
 int pgm_rxw_peek (pgm_rxw_t*, guint32, struct pgm_opt_fragment** ,gpointer*, guint16*, gboolean*);
 
-int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint16, pgm_time_t);
-int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint16, pgm_time_t);
+int pgm_rxw_push_nth_parity (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint16, guint16, pgm_time_t);
+int pgm_rxw_push_nth_repair (pgm_rxw_t*, guint32, guint32, struct pgm_opt_fragment*, gpointer, guint16, guint16, pgm_time_t);
 
-static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, gpointer packet_, guint16 len, pgm_time_t nak_rb_expiry)
+static inline int pgm_rxw_push_nth_parity_copy (pgm_rxw_t* r, guint32 sqn, guint32 trail, struct pgm_opt_fragment* opt_fragment, gpointer packet_, guint16 offset, guint16 len, pgm_time_t nak_rb_expiry)
 {
     gpointer packet = pgm_rxw_alloc (r);
-    memcpy (packet, packet_, len);
-    return pgm_rxw_push_nth_parity (r, sqn, trail, opt_fragment, packet, len, nak_rb_expiry);
+    memcpy (packet, (guint8*)packet_ + offset, len);
+    return pgm_rxw_push_nth_parity (r, sqn, trail, opt_fragment, packet, 0, len, nak_rb_expiry);
 }
 
 int pgm_rxw_release_committed (pgm_rxw_t*);

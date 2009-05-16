@@ -25,11 +25,13 @@
 /* struct for scatter/gather I/O */
 struct pgm_iovec {
 #ifndef _WIN32
-	void*		iov_base;	/* pointer to data */
+	void*		iov_base;
 	size_t		iov_len;	/* length of data */
+	size_t		iov_offset;	/* offset to data from iov_base */
 #else
-	u_long		iov_len;	/* len */
-	char*		iov_base; 	/* buf */
+	u_long		iov_len;
+	char*		iov_base;
+	u_long		iov_offset;
 #endif /* _WIN32 */
 };
 

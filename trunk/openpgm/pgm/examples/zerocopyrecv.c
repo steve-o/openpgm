@@ -254,7 +254,7 @@ on_data (
 
 /* truncate to first fragment to make GLib printing happy */
                 char buf[1024], tsi[PGM_TSISTRLEN];
-                snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
+                snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base + msgv_iov->iov_offset);
                 pgm_print_tsi_r (msgv->msgv_tsi, tsi, sizeof(tsi));
                 if (msgv->msgv_iovlen > 1) {
                         g_message ("\t%u: \"%s\" ... (%u bytes from %s)", ++i, buf, apdu_len, tsi);
