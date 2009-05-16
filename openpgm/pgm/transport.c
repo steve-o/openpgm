@@ -2189,7 +2189,7 @@ no_cap_net_admin:
 
 /* scatter/gather vector for contiguous reading from the window */
 	transport->piov_len = IOV_MAX;
-	transport->piov = g_malloc ( transport->piov_len * sizeof( struct iovec ) );
+	transport->piov = g_malloc ( transport->piov_len * sizeof( struct pgm_iovec ) );
 
 /* receiver trash */
 	g_static_mutex_init (&transport->rx_mutex);
@@ -2338,8 +2338,8 @@ pgm_transport_recvmsgv (
 	guint data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len;
-	struct iovec* piov = transport->piov;
-	const struct iovec* iov_end = piov + transport->piov_len;
+	struct pgm_iovec* piov = transport->piov;
+	const struct pgm_iovec* iov_end = piov + transport->piov_len;
 
 /* lock waiting so extra events are not generated during call */
 	g_static_mutex_lock (&transport->waiting_mutex);
@@ -2934,7 +2934,7 @@ pgm_transport_recvfrom (
 	if (bytes_read > 0)
 	{
 		gssize bytes_copied = 0;
-		struct iovec* p = msgv.msgv_iov;
+		struct pgm_iovec* p = msgv.msgv_iov;
 
 /* copy sender TSI to application buffer */
 		if (from) {
@@ -5626,7 +5626,7 @@ retry_send:
 static gssize
 pgm_transport_send_onev (
 	pgm_transport_t*	transport,
-	const struct iovec*	vector,
+	const struct pgm_iovec*	vector,
 	guint			count,		/* number of items in vector */
 	int			flags
 	)
@@ -5959,7 +5959,7 @@ blocked:
 gssize
 pgm_transport_sendv (
 	pgm_transport_t*	transport,
-	const struct iovec*	vector,
+	const struct pgm_iovec*	vector,
 	guint			count,		/* number of items in vector */
 	int			flags,		/* MSG_DONTWAIT = rate non-blocking,
 						   MSG_WAITALL  = packet blocking   */
@@ -6245,7 +6245,7 @@ blocked:
 gssize
 pgm_transport_send_packetv (
 	pgm_transport_t*	transport,
-	const struct iovec*	vector,		/* packet */
+	const struct pgm_iovec*	vector,		/* packet */
 	guint			count,
 	int			flags,		/* MSG_DONTWAIT = rate non-blocking,
 						   MSG_WAITALL  = packet blocking   */

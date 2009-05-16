@@ -284,7 +284,7 @@ struct pgm_transport_t {
     gpointer		parity_buffer;		    /* for parity odata/rdata generation */
 
     gpointer		rx_buffer;
-    struct iovec*	piov;
+    struct pgm_iovec*	piov;
     guint		piov_len;		    /* # elements in piov */
 
     GTrashStack*	rx_data;		    /* shared between all receivers for this instance */
@@ -386,8 +386,8 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 int pgm_set_nonblocking (int filedes[2]);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
-gssize pgm_transport_sendv (pgm_transport_t*, const struct iovec*, guint, int, gboolean);
-gssize pgm_transport_send_packetv (pgm_transport_t*, const struct iovec*, guint, int, gboolean);
+gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
+gssize pgm_transport_send_packetv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
 
 gpointer pgm_packetv_alloc (pgm_transport_t*, gboolean);
 void pgm_packetv_free1 (pgm_transport_t*, gpointer, gboolean);

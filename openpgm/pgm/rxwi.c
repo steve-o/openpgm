@@ -770,7 +770,7 @@ pgm_rxw_readv (
 	pgm_rxw_t*		r,
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
 	guint			msg_len,	/* number of items in pmsg */
-	struct iovec**		piov,		/* underlying iov storage */
+	struct pgm_iovec**	piov,		/* underlying iov storage */
 	guint			iov_len,	/* number of items in piov */
 	gboolean		is_final	/* transfer ownership to application */
 	)
@@ -783,7 +783,7 @@ pgm_rxw_readv (
 	gssize bytes_read = 0;
 	guint msgs_read = 0;
 	const pgm_msgv_t* msg_end = *pmsg + msg_len;
-	const struct iovec* iov_end = *piov + iov_len;
+	const struct pgm_iovec* iov_end = *piov + iov_len;
 
 	while ( !pgm_rxw_incoming_empty (r) )
 	{
