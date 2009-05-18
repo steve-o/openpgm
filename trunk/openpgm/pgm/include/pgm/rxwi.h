@@ -121,9 +121,9 @@ struct pgm_rxw_t {
 	gboolean	is_waiting;
 	GSList		commit_link;
 
-        GQueue*         backoff_queue;
-        GQueue*         wait_ncf_queue;
-        GQueue*         wait_data_queue;
+        GQueue          backoff_queue;
+        GQueue          wait_ncf_queue;
+        GQueue          wait_data_queue;
 /* window context counters */
 	guint32		lost_count;		/* failed to repair */
 	guint32		fragment_count;		/* incomplete apdu */

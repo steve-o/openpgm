@@ -132,9 +132,9 @@
 /* queue's contain at least one packet */ \
 			if ( !(w)->is_waiting ) \
 			{ \
-				g_assert ( ( (w)->backoff_queue->length + \
-					     (w)->wait_ncf_queue->length + \
-					     (w)->wait_data_queue->length + \
+				g_assert ( ( (w)->backoff_queue.length + \
+					     (w)->wait_ncf_queue.length + \
+					     (w)->wait_data_queue.length + \
 					     (w)->lost_count + \
 					     (w)->fragment_count + \
 					     (w)->parity_count + \
@@ -144,9 +144,9 @@
 		} \
 		else \
 		{ \
-			g_assert ( (w)->backoff_queue->length == 0 ); \
-			g_assert ( (w)->wait_ncf_queue->length == 0 ); \
-			g_assert ( (w)->wait_data_queue->length == 0 ); \
+			g_assert ( (w)->backoff_queue.length == 0 ); \
+			g_assert ( (w)->wait_ncf_queue.length == 0 ); \
+			g_assert ( (w)->wait_data_queue.length == 0 ); \
 			g_assert ( (w)->lost_count == 0 ); \
 			g_assert ( (w)->fragment_count == 0 ); \
 			g_assert ( (w)->parity_count == 0 ); \
@@ -259,11 +259,6 @@ pgm_rxw_init (
 	r->is_rxw_constrained = TRUE;
 	r->is_window_defined = FALSE;
 
-/* empty queue's for nak & ncfs */
-	r->backoff_queue = g_queue_new ();
-	r->wait_ncf_queue = g_queue_new ();
-	r->wait_data_queue = g_queue_new ();
-
 /* statistics */
 #if 0
 	r->min_fill_time = G_MAXINT;
@@ -307,25 +302,6 @@ pgm_rxw_shutdown (
 		g_ptr_array_foreach (r->pdata, _list_iterator, r);
 		g_ptr_array_free (r->pdata, TRUE);
 		r->pdata = NULL;
-	}
-
-/* nak/ncf time lists,
- * important: link items are static to each packet struct
- */
-	if (r->backoff_queue)
-	{
-		g_slice_free (GQueue, r->backoff_queue);
-		r->backoff_queue = NULL;
-	}
-	if (r->wait_ncf_queue)
-	{
-		g_slice_free (GQueue, r->wait_ncf_queue);
-		r->wait_ncf_queue = NULL;
-	}
-	if (r->wait_data_queue)
-	{
-		g_slice_free (GQueue, r->wait_data_queue);
-		r->wait_data_queue = NULL;
 	}
 
 	return PGM_RXW_OK;
@@ -668,9 +644,9 @@ pgm_rxw_push_fragment (
 				RXW_SET_PACKET(r, ph->sequence_number, ph);
 
 /* send nak by sending to end of expiry list */
-				g_queue_push_head_link (r->backoff_queue, &ph->link_);
+				g_queue_push_head_link (&r->backoff_queue, &ph->link_);
 				g_trace ("#%" G_GUINT32_FORMAT ": place holder, backoff_queue %" G_GUINT32_FORMAT "/%u lead %" G_GUINT32_FORMAT,
-					sequence_number, r->backoff_queue->length, pgm_rxw_sqns(r), r->lead);
+					sequence_number, r->backoff_queue.length, pgm_rxw_sqns(r), r->lead);
 
 				if ( pgm_rxw_full(r) )
 				{
@@ -1074,9 +1050,9 @@ pgm_rxw_pkt_state_unlink (
 	GQueue* queue = NULL;
 
 	switch (rp->state) {
-	case PGM_PKT_BACK_OFF_STATE:  queue = r->backoff_queue; break;
-	case PGM_PKT_WAIT_NCF_STATE:  queue = r->wait_ncf_queue; break;
-	case PGM_PKT_WAIT_DATA_STATE: queue = r->wait_data_queue; break;
+	case PGM_PKT_BACK_OFF_STATE:  queue = &r->backoff_queue; break;
+	case PGM_PKT_WAIT_NCF_STATE:  queue = &r->wait_ncf_queue; break;
+	case PGM_PKT_WAIT_DATA_STATE: queue = &r->wait_data_queue; break;
 	case PGM_PKT_HAVE_DATA_STATE:
 	case PGM_PKT_HAVE_PARITY_STATE:
 	case PGM_PKT_COMMIT_DATA_STATE:
@@ -1497,7 +1473,7 @@ pgm_rxw_window_update (
 				g_trace ("adding placeholder #%u", ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
-				g_queue_push_head_link (r->backoff_queue, &ph->link_);
+				g_queue_push_head_link (&r->backoff_queue, &ph->link_);
 				naks++;
 			}
 		}
@@ -1695,7 +1671,7 @@ pgm_rxw_ncf (
 
 		pgm_rxw_pkt_state_unlink (r, rp);
 		rp->state = PGM_PKT_WAIT_DATA_STATE;
-		g_queue_push_head_link (r->wait_data_queue, &rp->link_);
+		g_queue_push_head_link (&r->wait_data_queue, &rp->link_);
 
 		retval = PGM_RXW_CREATED_PLACEHOLDER;
 		goto out;
@@ -1749,7 +1725,7 @@ pgm_rxw_ncf (
 		g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
 
 /* send nak by sending to end of expiry list */
-		g_queue_push_head_link (r->backoff_queue, &ph->link_);
+		g_queue_push_head_link (&r->backoff_queue, &ph->link_);
 
 		r->lead++;
 	}
@@ -1778,7 +1754,7 @@ pgm_rxw_ncf (
 	g_trace ("ncf: adding placeholder #%u", ph->sequence_number);
 
 /* do not send nak, simply add to ncf list */
-	g_queue_push_head_link (r->wait_data_queue, &ph->link_);
+	g_queue_push_head_link (&r->wait_data_queue, &ph->link_);
 
 	r->is_waiting = TRUE;
 

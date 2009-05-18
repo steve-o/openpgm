@@ -98,9 +98,9 @@ GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all t
 GSList* pgm_transport_list = NULL;
 
 /* helpers for pgm_peer_t */
-#define next_nak_rb_expiry(r)       ( ((pgm_rxw_packet_t*)(r)->backoff_queue->tail->data)->nak_rb_expiry )
-#define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue->tail->data)->nak_rpt_expiry )
-#define next_nak_rdata_expiry(r)    ( ((pgm_rxw_packet_t*)(r)->wait_data_queue->tail->data)->nak_rdata_expiry )
+#define next_nak_rb_expiry(r)       ( ((pgm_rxw_packet_t*)(r)->backoff_queue.tail->data)->nak_rb_expiry )
+#define next_nak_rpt_expiry(r)      ( ((pgm_rxw_packet_t*)(r)->wait_ncf_queue.tail->data)->nak_rpt_expiry )
+#define next_nak_rdata_expiry(r)    ( ((pgm_rxw_packet_t*)(r)->wait_data_queue.tail->data)->nak_rdata_expiry )
 
 
 static GSource* pgm_create_timer (pgm_transport_t*);
@@ -4694,7 +4694,7 @@ nak_rb_state (
 	nak_list.len = 0;
 #endif
 
-	g_trace ("INFO", "nak_rb_state(len=%u)", g_list_length(rxw->backoff_queue->tail));
+	g_trace ("INFO", "nak_rb_state(len=%u)", g_list_length(rxw->backoff_queue.tail));
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
  * better to get the notification out a.s.a.p. even though it might be waiting
@@ -4703,7 +4703,7 @@ nak_rb_state (
  * alternative: after each packet check for incoming data and return to the
  * event loop.  bias for shorter loops as retry count increases.
  */
-	list = rxw->backoff_queue->tail;
+	list = rxw->backoff_queue.tail;
 	if (!list) {
 		g_warning ("backoff queue is empty in nak_rb_state.");
 		return;
@@ -4768,7 +4768,7 @@ nak_rb_state (
 					rp->nak_transmit_count++;
 
 					rp->state = PGM_PKT_WAIT_NCF_STATE;
-					g_queue_push_head_link (rxw->wait_ncf_queue, &rp->link_);
+					g_queue_push_head_link (&rxw->wait_ncf_queue, &rp->link_);
 
 #ifdef PGM_ABSOLUTE_EXPIRY
 					rp->nak_rpt_expiry = rp->nak_rb_expiry + transport->nak_rpt_ivl;
@@ -4842,7 +4842,7 @@ nak_rb_state (
 				rp->nak_transmit_count++;
 
 				rp->state = PGM_PKT_WAIT_NCF_STATE;
-				g_queue_push_head_link (rxw->wait_ncf_queue, &rp->link_);
+				g_queue_push_head_link (&rxw->wait_ncf_queue, &rp->link_);
 
 /* we have two options here, calculate the expiry time in the new state relative to the current
  * state execution time, skipping missed expirations due to delay in state processing, or base
@@ -4909,18 +4909,18 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 		}
 	}
 
-	if (rxw->backoff_queue->length == 0)
+	if (rxw->backoff_queue.length == 0)
 	{
-		g_assert ((struct rxw_packet*)rxw->backoff_queue->head == NULL);
-		g_assert ((struct rxw_packet*)rxw->backoff_queue->tail == NULL);
+		g_assert ((struct rxw_packet*)rxw->backoff_queue.head == NULL);
+		g_assert ((struct rxw_packet*)rxw->backoff_queue.tail == NULL);
 	}
 	else
 	{
-		g_assert ((struct rxw_packet*)rxw->backoff_queue->head != NULL);
-		g_assert ((struct rxw_packet*)rxw->backoff_queue->tail != NULL);
+		g_assert ((struct rxw_packet*)rxw->backoff_queue.head != NULL);
+		g_assert ((struct rxw_packet*)rxw->backoff_queue.tail != NULL);
 	}
 
-	if (rxw->backoff_queue->tail)
+	if (rxw->backoff_queue.tail)
 		g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf((float)next_nak_rb_expiry(rxw) - (float)pgm_time_now));
 	else
 		g_trace ("INFO", "backoff queue empty.");
@@ -4958,7 +4958,7 @@ check_peer_nak_state (
 			}
 		}
 
-		if (rxw->backoff_queue->tail)
+		if (rxw->backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rb_expiry(rxw)))
 			{
@@ -4966,7 +4966,7 @@ check_peer_nak_state (
 			}
 		}
 		
-		if (rxw->wait_ncf_queue->tail)
+		if (rxw->wait_ncf_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rpt_expiry(rxw)))
 			{
@@ -4974,7 +4974,7 @@ check_peer_nak_state (
 			}
 		}
 
-		if (rxw->wait_data_queue->tail)
+		if (rxw->wait_data_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rdata_expiry(rxw)))
 			{
@@ -5050,7 +5050,7 @@ min_nak_expiry (
 			}
 		}
 
-		if (rxw->backoff_queue->tail)
+		if (rxw->backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rb_expiry(rxw)))
 			{
@@ -5058,7 +5058,7 @@ min_nak_expiry (
 			}
 		}
 
-		if (rxw->wait_ncf_queue->tail)
+		if (rxw->wait_ncf_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rpt_expiry(rxw)))
 			{
@@ -5066,7 +5066,7 @@ min_nak_expiry (
 			}
 		}
 
-		if (rxw->wait_data_queue->tail)
+		if (rxw->wait_data_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rdata_expiry(rxw)))
 			{
@@ -5093,9 +5093,9 @@ nak_rpt_state (
 {
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
-	GList* list = rxw->wait_ncf_queue->tail;
+	GList* list = rxw->wait_ncf_queue.tail;
 
-	g_trace ("INFO", "nak_rpt_state(len=%u)", g_list_length(rxw->wait_ncf_queue->tail));
+	g_trace ("INFO", "nak_rpt_state(len=%u)", g_list_length(rxw->wait_ncf_queue.tail));
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -5164,7 +5164,7 @@ nak_rpt_state (
 				g_trace("INFO", "retry #%u attempt %u/%u.", rp->sequence_number, rp->ncf_retry_count, transport->nak_ncf_retries);
 				pgm_rxw_pkt_state_unlink (rxw, rp);
 				rp->state = PGM_PKT_BACK_OFF_STATE;
-				g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
+				g_queue_push_head_link (&rxw->backoff_queue, &rp->link_);
 //				rp->nak_rb_expiry = rp->nak_rpt_expiry + nak_rb_ivl(transport);
 				rp->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
 			}
@@ -5180,15 +5180,15 @@ nak_rpt_state (
 		list = next_list_el;
 	}
 
-	if (rxw->wait_ncf_queue->length == 0)
+	if (rxw->wait_ncf_queue.length == 0)
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue->head == NULL);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue->tail == NULL);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.head == NULL);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.tail == NULL);
 	}
 	else
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue->head);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue->tail);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.head);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.tail);
 	}
 
 	if (dropped_invalid) {
@@ -5205,9 +5205,9 @@ nak_rpt_state (
 				" frag %" G_GUINT32_FORMAT,
 				dropped,
 				pgm_rxw_sqns(rxw),
-				rxw->backoff_queue->length,
-				rxw->wait_ncf_queue->length,
-				rxw->wait_data_queue->length,
+				rxw->backoff_queue.length,
+				rxw->wait_ncf_queue.length,
+				rxw->wait_data_queue.length,
 				rxw->lost_count,
 				rxw->fragment_count);
 	}
@@ -5225,7 +5225,7 @@ nak_rpt_state (
 		transport->peers_waiting = &rxw->waiting_link;
 	}
 
-	if (rxw->wait_ncf_queue->tail)
+	if (rxw->wait_ncf_queue.tail)
 	{
 		if (next_nak_rpt_expiry(rxw) > pgm_time_now)
 		{
@@ -5250,9 +5250,9 @@ nak_rdata_state (
 {
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
-	GList* list = rxw->wait_data_queue->tail;
+	GList* list = rxw->wait_data_queue.tail;
 
-	g_trace ("INFO", "nak_rdata_state(len=%u)", g_list_length(rxw->wait_data_queue->tail));
+	g_trace ("INFO", "nak_rdata_state(len=%u)", g_list_length(rxw->wait_data_queue.tail));
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -5317,7 +5317,7 @@ nak_rdata_state (
 /* retry back to back-off state */
 			g_trace("INFO", "retry #%u attempt %u/%u.", rp->sequence_number, rp->data_retry_count, transport->nak_data_retries);
 			rp->state = PGM_PKT_BACK_OFF_STATE;
-			g_queue_push_head_link (rxw->backoff_queue, &rp->link_);
+			g_queue_push_head_link (&rxw->backoff_queue, &rp->link_);
 //			rp->nak_rb_expiry = rp->nak_rdata_expiry + nak_rb_ivl(transport);
 			rp->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
 		}
@@ -5330,15 +5330,15 @@ nak_rdata_state (
 		list = next_list_el;
 	}
 
-	if (rxw->wait_data_queue->length == 0)
+	if (rxw->wait_data_queue.length == 0)
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue->head == NULL);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue->tail == NULL);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.head == NULL);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.tail == NULL);
 	}
 	else
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue->head);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue->tail);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.head);
+		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.tail);
 	}
 
 	if (dropped_invalid) {
@@ -5362,7 +5362,7 @@ nak_rdata_state (
 		transport->peers_waiting = &rxw->waiting_link;
 	}
 
-	if (rxw->wait_data_queue->tail)
+	if (rxw->wait_data_queue.tail)
 		g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf(next_nak_rdata_expiry(rxw) - pgm_time_now));
 	else
 		g_trace ("INFO", "wait data queue empty.");
