@@ -58,7 +58,7 @@ struct pgm_txw_t {
         guint32         lead;
         guint32         trail;
 
-        GQueue*		retransmit_queue;
+        GQueue		retransmit_queue;
 	GStaticMutex	retransmit_mutex;
 
 	guint32		bytes_in_window;

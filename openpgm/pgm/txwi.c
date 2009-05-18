@@ -157,7 +157,6 @@ pgm_txw_init (
 	t->lead = -1;
 	t->trail = t->lead + 1;
 
-	t->retransmit_queue = g_queue_new();
 	g_static_mutex_init (&t->retransmit_mutex);
 
 #ifdef TXW_DEBUG
@@ -217,11 +216,6 @@ pgm_txw_shutdown (
 		g_assert ( t->trash_packet == NULL );
 	}
 
-	if (t->retransmit_queue)
-	{
-		g_queue_free (t->retransmit_queue);
-		t->retransmit_queue = NULL;
-	}
 	g_static_mutex_free (&t->retransmit_mutex);
 
 	return 0;
@@ -366,7 +360,7 @@ pgm_txw_pop (
 	g_static_mutex_lock (&t->retransmit_mutex);
 	if (tp->link_.data)
 	{
-		g_queue_unlink (t->retransmit_queue, &tp->link_);
+		g_queue_unlink (&t->retransmit_queue, &tp->link_);
 		tp->link_.data = NULL;
 	}
 	g_static_mutex_unlock (&t->retransmit_mutex);
@@ -443,7 +437,7 @@ printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 /* new request */
 		tp->pkt_cnt_requested++;
 		tp->link_.data = tp;
-		g_queue_push_head_link (t->retransmit_queue, &tp->link_);
+		g_queue_push_head_link (&t->retransmit_queue, &tp->link_);
 		g_static_mutex_unlock (&t->retransmit_mutex);
 
 	}
@@ -469,7 +463,7 @@ printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 		}
 
 		tp->link_.data = tp;
-		g_queue_push_head_link (t->retransmit_queue, &tp->link_);
+		g_queue_push_head_link (&t->retransmit_queue, &tp->link_);
 		g_static_mutex_unlock (&t->retransmit_mutex);
 
 	}
@@ -498,7 +492,7 @@ pgm_txw_retransmit_try_peek (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	const GList* tail_link = g_queue_peek_tail_link (t->retransmit_queue);
+	const GList* tail_link = g_queue_peek_tail_link (&t->retransmit_queue);
 	if (!tail_link) {
 		g_static_mutex_unlock (&t->retransmit_mutex);
 		return -1;
@@ -550,7 +544,7 @@ pgm_txw_retransmit_try_pop (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	GList* tail_link = g_queue_peek_tail_link (t->retransmit_queue);
+	GList* tail_link = g_queue_peek_tail_link (&t->retransmit_queue);
 	if (!tail_link) {
 		g_static_mutex_unlock (&t->retransmit_mutex);
 		return -1;
@@ -566,7 +560,7 @@ pgm_txw_retransmit_try_pop (
 /* remove if all requested parity packets have been sent */
 		if (--(tp->pkt_cnt_requested) == 0)
 		{
-			g_queue_pop_tail_link (t->retransmit_queue);
+			g_queue_pop_tail_link (&t->retransmit_queue);
 			tail_link->data = NULL;
 		}
 
@@ -584,7 +578,7 @@ pgm_txw_retransmit_try_pop (
 /* selective NAK, therefore pop node */
 		*packet = tp->data;
 		*length	= tp->length;
-		g_queue_pop_tail_link (t->retransmit_queue);
+		g_queue_pop_tail_link (&t->retransmit_queue);
 		tail_link->data = NULL;
 	}
 
@@ -608,7 +602,7 @@ pgm_txw_retransmit_pop (
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
 	g_static_mutex_lock (&t->retransmit_mutex);
-	GList* tail_link = g_queue_peek_tail_link (t->retransmit_queue);
+	GList* tail_link = g_queue_peek_tail_link (&t->retransmit_queue);
 	g_assert (tail_link);
 
 	pgm_txw_packet_t* tp = tail_link->data;
@@ -618,7 +612,7 @@ pgm_txw_retransmit_pop (
 /* remove if all requested parity packets have been sent */
 		if (--(tp->pkt_cnt_requested) == 0)
 		{
-			g_queue_pop_tail_link (t->retransmit_queue);
+			g_queue_pop_tail_link (&t->retransmit_queue);
 			tail_link->data = NULL;
 		}
 
@@ -631,7 +625,7 @@ pgm_txw_retransmit_pop (
 	}
 	else
 	{
-		g_queue_pop_tail_link (t->retransmit_queue);
+		g_queue_pop_tail_link (&t->retransmit_queue);
 		tail_link->data = NULL;
 	}
 

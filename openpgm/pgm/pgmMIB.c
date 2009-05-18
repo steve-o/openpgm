@@ -2347,9 +2347,9 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVEROUTSTANDINGSELECTIVENAKS:
 				{
-				unsigned long outstanding_selective = ((pgm_rxw_t*)peer->rxw)->backoff_queue->length
-									+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue->length
-									+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue->length;
+				unsigned long outstanding_selective = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length
+									+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length
+									+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&outstanding_selective, sizeof(outstanding_selective) );
 				}

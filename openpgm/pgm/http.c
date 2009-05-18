@@ -985,9 +985,9 @@ http_receiver_response (
 
 	int sport = g_ntohs (peer->tsi.sport);
 
-	guint outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue->length 
-				+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue->length
-				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue->length;
+	guint outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length 
+				+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length
+				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
 
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
