@@ -186,6 +186,7 @@ pgm_txw_shutdown (
 	ASSERT_TXW_BASE_INVARIANT(t);
 	ASSERT_TXW_POINTER_INVARIANT(t);
 
+/* pointer array */
 	if (t->pdata)
 	{
 		g_ptr_array_foreach (t->pdata, _list_iterator, t);
@@ -223,6 +224,9 @@ pgm_txw_shutdown (
 		t->retransmit_queue = NULL;
 	}
 	g_static_mutex_free (&t->retransmit_mutex);
+
+/* window */
+	g_slice_free1 (sizeof(pgm_txw_t), t);
 
 	return 0;
 }

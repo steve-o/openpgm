@@ -303,6 +303,7 @@ pgm_rxw_shutdown (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
+/* pointer array */
 	if (r->pdata)
 	{
 		g_ptr_array_foreach (r->pdata, _list_iterator, r);
@@ -328,6 +329,9 @@ pgm_rxw_shutdown (
 		g_slice_free (GQueue, r->wait_data_queue);
 		r->wait_data_queue = NULL;
 	}
+
+/* window */
+	g_slice_free1 (sizeof(pgm_rxw_t), r);
 
 	return PGM_RXW_OK;
 }
