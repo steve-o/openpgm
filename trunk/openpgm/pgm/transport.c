@@ -2186,7 +2186,7 @@ no_cap_net_admin:
 
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = g_slice_alloc (transport->max_tpdu + sizeof(gint));
-	*(gint*)( (guint8*)transport->rx_buffer + transport->max_tpdu + sizeof(gpointer) ) = 1;
+	*(gint*)( (guint8*)transport->rx_buffer + transport->max_tpdu ) = 1;
 
 /* scatter/gather vector for contiguous reading from the window */
 	transport->piov_len = IOV_MAX;

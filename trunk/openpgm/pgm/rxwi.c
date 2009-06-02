@@ -69,11 +69,11 @@
 
 #define RXW_PACKET_OFFSET(w,x)		( (x) % pgm_rxw_len ((w)) ) 
 #define RXW_PACKET(w,x) \
-	( (pgm_rxw_packet_t*)g_ptr_array_index((w)->pdata, RXW_PACKET_OFFSET((w), (x))) )
+	( (pgm_rxw_packet_t*)g_ptr_array_index(&(w)->pdata, RXW_PACKET_OFFSET((w), (x))) )
 #define RXW_SET_PACKET(w,x,v) \
 	do { \
 		register int _o = RXW_PACKET_OFFSET((w), (x)); \
-		g_ptr_array_index((w)->pdata, _o) = (v); \
+		g_ptr_array_index(&(w)->pdata, _o) = (v); \
 	} while (0)
 
 /* is (a) greater than (b) wrt. leading edge of receive window (w) */
@@ -95,7 +95,7 @@
 		g_assert ( (w) != NULL ); \
 \
 /* does the array exist */ \
-		g_assert ( (w)->pdata != NULL && (w)->pdata->len > 0 ); \
+		g_assert ( (w)->pdata.len > 0 ); \
 \
 /* do the trash stacks point somewhere (the transport object) */ \
 		g_assert ( (w)->trash_data != NULL ); \
@@ -115,8 +115,8 @@
 /* all pointers are within window bounds */ \
 		if ( !pgm_rxw_empty( (w) ) ) /* empty: trail = lead + 1, hence wrap around */ \
 		{ \
-			g_assert ( RXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata->len ); \
-			g_assert ( RXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata->len ); \
+			g_assert ( RXW_PACKET_OFFSET( (w), (w)->lead ) < (w)->pdata.len ); \
+			g_assert ( RXW_PACKET_OFFSET( (w), (w)->trail ) < (w)->pdata.len ); \
 		} \
 \
 	}
@@ -216,7 +216,6 @@ pgm_rxw_init (
 
 	pgm_rxw_t* r = g_slice_alloc0 (sizeof(pgm_rxw_t));
 	r->identifier = identifier;
-	r->pdata = g_ptr_array_new ();
 	r->max_tpdu = tpdu_length;
 
 	r->trash_data = trash_data;
@@ -245,7 +244,9 @@ pgm_rxw_init (
 		rxw_sqns = (rxw_secs * rxw_max_rte) / r->max_tpdu;
 	}
 
-	g_ptr_array_set_size (r->pdata, rxw_sqns);
+/* pointer array */
+	r->pdata.alloc = r->pdata.len = rxw_sqns;
+	r->pdata.pdata = g_malloc0 (sizeof(gpointer) * r->pdata.alloc);
 
 /* empty state:
  *
@@ -271,7 +272,7 @@ pgm_rxw_init (
 	guint memory = sizeof(pgm_rxw_t) +
 /* pointer array */
 			sizeof(GPtrArray) + sizeof(guint) +
-			*(guint*)( (char*)r->pdata + sizeof(gpointer) + sizeof(guint) ) +
+			( sizeof(gpointer) * r->pdata.alloc ) +
 /* pre-allocated data & packets */
 			( preallocate_size * (r->max_tpdu + sizeof(pgm_rxw_packet_t)) ) +
 /* state queues */
@@ -297,27 +298,20 @@ pgm_rxw_shutdown (
 	ASSERT_RXW_BASE_INVARIANT(r);
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
-	if (r->pdata)
+/* pointer array */
+	for (guint i = 0; i < r->pdata.len; i++)
 	{
-		g_ptr_array_foreach (r->pdata, _list_iterator, r);
-		g_ptr_array_free (r->pdata, TRUE);
-		r->pdata = NULL;
+		if (r->pdata.pdata[i]) {
+			pgm_rxw_pkt_free1 (r, (pgm_rxw_packet_t*)r->pdata.pdata[i]);
+		}
 	}
+	g_free (r->pdata.pdata);
+	r->pdata.pdata = NULL;
+
+/* window */
+	g_slice_free1 (sizeof(pgm_rxw_t), r);
 
 	return PGM_RXW_OK;
-}
-
-static void
-_list_iterator (
-	gpointer	data,
-	gpointer	user_data
-	)
-{
-	if (data == NULL) return;
-
-	g_assert ( user_data != NULL);
-
-	pgm_rxw_pkt_free1 ((pgm_rxw_t*)user_data, (pgm_rxw_packet_t*)data);
 }
 
 static inline gpointer
@@ -922,7 +916,6 @@ pgm_rxw_readv (
 				(*piov)->iov_offset = cp->offset;
 				(*piov)->iov_len    = cp->length;
 
-g_message ("iov_base %p", (*piov)->iov_base);
 				if (is_final) {
 					pgm_rxw_pkt_data_ref (cp->packet, r->max_tpdu);
 				}

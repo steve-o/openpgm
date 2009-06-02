@@ -110,7 +110,11 @@ struct pgm_rxw_packet_t {
 typedef struct pgm_rxw_packet_t pgm_rxw_packet_t;
 
 struct pgm_rxw_t {
-        GPtrArray*      pdata;
+	struct {				/* GPtrArray */
+		gpointer*	pdata;
+		guint		len;
+		guint		alloc;
+	} pdata;
 	GTrashStack**	trash_data;		/* owned by transport */
 	GTrashStack**	trash_packet;
 	GStaticMutex*	trash_mutex;
@@ -177,7 +181,7 @@ int pgm_rxw_ncf (pgm_rxw_t*, guint32, pgm_time_t, pgm_time_t);
 /* type determined by garray.h */
 static inline guint pgm_rxw_len (pgm_rxw_t* r)
 {
-    return r->pdata->len;
+    return r->pdata.len;
 }
 
 static inline guint32 pgm_rxw_sqns (pgm_rxw_t* r)
@@ -233,13 +237,13 @@ static inline void pgm_rxw_zero_pad (pgm_rxw_t* r, gpointer data, guint16 offset
 
 static inline void pgm_rxw_pkt_data_ref (gpointer data, gsize len)
 {
-	gint* atomic = (gint*)( (guint*)data + len );
+	gint* atomic = (gint*)( (guint8*)data + len );
 	g_atomic_int_inc (atomic);
 }
 
 static inline void pgm_rxw_pkt_data_unref (GTrashStack** trash, GStaticMutex* mutex, gpointer data, gsize len)
 {
-	gint* atomic = (gint*)( (guint*)data + len );
+	gint* atomic = (gint*)( (guint8*)data + len );
 	gboolean is_zero = g_atomic_int_dec_and_test (atomic);
 	if (is_zero) {
 		g_static_mutex_lock (mutex);
