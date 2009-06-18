@@ -346,67 +346,60 @@ on_io_data (
 {
 	pgm_transport_t* transport = data;
 
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (transport->max_tpdu);
         int fd = g_io_channel_unix_get_fd(source);
-	char buffer[transport->max_tpdu];
 	struct sockaddr_storage src_addr;
 	socklen_t src_addr_len = sizeof(src_addr);
-        int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
+        skb->len = recvfrom(fd, skb->head, transport->max_tpdu, MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
 
-        printf ("%i bytes received from %s.\n", len, inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
+        printf ("%i bytes received from %s.\n", skb->len, inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
-        monitor_packet (buffer, len);
+        monitor_packet (skb->data, skb->len);
         fflush (stdout);
 
 /* parse packet to maintain peer database */
-	struct sockaddr_storage dst_addr;
-        socklen_t dst_addr_len = sizeof(dst_addr);
-        struct pgm_header *pgm_header;
-        gpointer packet;
-        gsize packet_len;
 	int e;
 
-	if (transport->udp_encap_port) {
-		if ((e = pgm_parse_udp_encap(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
+	if (transport->udp_encap_port)
+	{
+		if ((e = pgm_parse_udp_encap(skb)) < 0)
                 {
                         goto out;
                 }
-        } else {
-                if ((e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_len)) < 0)
+        }
+	else
+	{
+                if ((e = pgm_parse_raw(skb)) < 0)
                 {
                         goto out;
                 }
         }
 
-/* calculate senders TSI */
-        pgm_tsi_t tsi;
-        memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
-        tsi.sport = pgm_header->pgm_sport;
-
-	if (pgm_is_upstream (pgm_header->pgm_type) || pgm_is_peer (pgm_header->pgm_type))
+	if (pgm_is_upstream (skb->pgm_header->pgm_type) || pgm_is_peer (skb->pgm_header->pgm_type))
 	{
 		goto out;	/* ignore */
 	}
 
 /* downstream = source to receivers */
-	if (!pgm_is_downstream (pgm_header->pgm_type))
+	if (!pgm_is_downstream (skb->pgm_header->pgm_type))
 	{
 		goto out;
 	}
 
 /* pgm packet DPORT contains our transport DPORT */
-        if (pgm_header->pgm_dport != transport->dport) {
+        if (skb->pgm_header->pgm_dport != transport->dport) {
                 goto out;
         }
 
 /* search for TSI peer context or create a new one */
-        pgm_peer_t* sender = g_hash_table_lookup (transport->peers_hashtable, &tsi);
+        pgm_peer_t* sender = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
         if (sender == NULL)
         {
-		printf ("new peer, tsi %s, local nla %s\n", pgm_print_tsi (&tsi), inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
+		printf ("new peer, tsi %s, local nla %s\n", pgm_print_tsi (&skb->tsi), inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
 		pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
 		peer->transport = transport;
-		memcpy (&peer->tsi, &tsi, sizeof(pgm_tsi_t));
+		memcpy (&peer->tsi, &skb->tsi, sizeof(pgm_tsi_t));
 		((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 		memcpy (&peer->local_nla, &src_addr, src_addr_len);
 
@@ -415,9 +408,9 @@ on_io_data (
         }
 
 /* handle SPMs for advertised NLA */
-	if (pgm_header->pgm_type == PGM_SPM)
+	if (skb->pgm_header->pgm_type == PGM_SPM)
 	{
-		char *pgm_data = (char*)(pgm_header + 1);
+		char *pgm_data = (char*)(skb->pgm_header + 1);
 		struct pgm_spm* spm = (struct pgm_spm*)pgm_data;
 		guint32 spm_sqn = g_ntohl (spm->spm_sqn);
 
@@ -483,7 +476,10 @@ fake_pgm_transport_bind (
 
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
-	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
+	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface,
+					 pgm_sockaddr_family(&transport->send_gsr.gsr_group),
+					 pgm_sockaddr_scope_id(&transport->send_gsr.gsr_group),
+					 (struct sockaddr*)&send_addr);
         if (retval < 0) {
                 retval = errno;
 		goto out;
@@ -833,22 +829,24 @@ brokn_send_apdu_unlocked (
                 int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - data_bytes_sent);
                 int tpdu_length = header_length + tsdu_length;
 
-                char *pkt = pgm_txw_alloc(transport->txw);
-                struct pgm_header *header = (struct pgm_header*)pkt;
-                memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
-                header->pgm_sport       = transport->tsi.sport;
-                header->pgm_dport       = transport->dport;
-                header->pgm_type        = PGM_ODATA;
-                header->pgm_options     = PGM_OPT_PRESENT;
-                header->pgm_tsdu_length = g_htons (tsdu_length);
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (tsdu_length);
+		pgm_skb_put (skb, tpdu_length);
+
+                skb->pgm_header = (struct pgm_header*)skb->data;
+                memcpy (skb->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+                skb->pgm_header->pgm_sport       = transport->tsi.sport;
+                skb->pgm_header->pgm_dport       = transport->dport;
+                skb->pgm_header->pgm_type        = PGM_ODATA;
+                skb->pgm_header->pgm_options     = PGM_OPT_PRESENT;
+                skb->pgm_header->pgm_tsdu_length = g_htons (tsdu_length);
 
 /* ODATA */
-                struct pgm_data *odata = (struct pgm_data*)(header + 1);
-                odata->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
-                odata->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
+                skb->pgm_data = (struct pgm_data*)(skb->pgm_header + 1);
+                skb->pgm_data->data_sqn         = g_htonl (pgm_txw_next_lead(transport->txw));
+                skb->pgm_data->data_trail       = g_htonl (pgm_txw_trail(transport->txw));
 
 /* OPT_LENGTH */
-                struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(odata + 1);
+                struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(skb->pgm_data + 1);
                 opt_len->opt_type       = PGM_OPT_LENGTH;
                 opt_len->opt_length     = sizeof(struct pgm_opt_length);
                 opt_len->opt_total_length       = g_htons (     sizeof(struct pgm_opt_length) +
@@ -859,35 +857,35 @@ brokn_send_apdu_unlocked (
                 opt_header->opt_type    = PGM_OPT_FRAGMENT | PGM_OPT_END;
                 opt_header->opt_length  = sizeof(struct pgm_opt_header) +
                                                 sizeof(struct pgm_opt_fragment);
-                struct pgm_opt_fragment* opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
-                opt_fragment->opt_reserved      = 0;
-                opt_fragment->opt_sqn           = g_htonl (opt_sqn);
-                opt_fragment->opt_frag_off      = g_htonl (data_bytes_sent);
-                opt_fragment->opt_frag_len      = g_htonl (count);
+                skb->pgm_opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+                skb->pgm_opt_fragment->opt_reserved      = 0;
+                skb->pgm_opt_fragment->opt_sqn           = g_htonl (opt_sqn);
+                skb->pgm_opt_fragment->opt_frag_off      = g_htonl (data_bytes_sent);
+                skb->pgm_opt_fragment->opt_frag_len      = g_htonl (count);
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
-                header->pgm_checksum    = 0;
+                skb->pgm_header->pgm_checksum    = 0;
 
-                int pgm_header_len      = (char*)(opt_fragment + 1) - (char*)header;
-                guint32 unfolded_header = pgm_csum_partial ((const void*)header, pgm_header_len, 0);
-                guint32 unfolded_odata  = pgm_csum_partial_copy ((const void*)(buf + data_bytes_sent), (void*)(opt_fragment + 1), tsdu_length, 0);
-                header->pgm_checksum    = pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
+                int pgm_header_len      = (char*)(skb->pgm_opt_fragment + 1) - (char*)skb->pgm_header;
+                guint32 unfolded_header = pgm_csum_partial ((const void*)skb->pgm_header, pgm_header_len, 0);
+                guint32 unfolded_odata  = pgm_csum_partial_copy ((const void*)(buf + data_bytes_sent), (void*)(skb->pgm_opt_fragment + 1), tsdu_length, 0);
+                skb->pgm_header->pgm_checksum    = pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
-                pgm_txw_push (transport->txw, pkt, tpdu_length);
+                pgm_txw_push (transport->txw, skb);
 
 /* do not send send packet */
 		if (packets != 1)
                 retval = pgm_sendto (transport,
                                         FALSE,
-                                        header,
+                                        skb->data,
                                         tpdu_length,
                                         MSG_CONFIRM,            /* not expecting a reply */
                                         (struct sockaddr*)&transport->send_gsr.gsr_group,
                                         pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 
 /* save unfolded odata for retransmissions */
-                *(guint32*)(void*)&header->pgm_sport   = unfolded_odata;
+		*(guint32*)&skb->cb = unfolded_odata;
 
                 packets++;
                 bytes_sent += tpdu_length + transport->iphdr_len;

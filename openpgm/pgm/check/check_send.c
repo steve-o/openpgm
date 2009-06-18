@@ -82,29 +82,37 @@ teardown (void)
  */
 START_TEST (test_send_one)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
+	struct pgm_sk_buff_t* skb	= pgm_alloc_skb (g_transport->max_tpdu);
 	gsize		tsdu_length	= _i;
 	int		flags		= 0;
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
 
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_one (g_transport, pkt, tsdu_length, flags));
+/* 'place' payload into socket buffer */
+	pgm_skb_put (skb, tsdu_length);
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_one (g_transport, skb, flags));
+
+/* cleanup */
+	pgm_free_skb (skb);
 }
 END_TEST
 
 START_TEST (test_send_one_fail)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
+	struct pgm_sk_buff_t* skb	= pgm_alloc_skb (g_transport->max_tpdu);
 	gsize		tsdu_length	= g_max_tsdu + 1;
 	int		flags		= 0;
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
 
-	fail_unless (-EINVAL == pgm_transport_send_one (g_transport, pkt, tsdu_length, flags));
+/* 'place' payload into socket buffer */
+	pgm_skb_put (skb, tsdu_length);
+
+	fail_unless (-EINVAL == pgm_transport_send_one (g_transport, skb, flags));
+
+/* cleanup */
+	pgm_free_skb (skb);
 }
 END_TEST
 
@@ -121,7 +129,7 @@ END_TEST
  */
 START_TEST (test_send_one_copy_000)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
 	guint8		buffer[ 1500 ];
 	gsize		tsdu_length	= _i;
@@ -135,7 +143,7 @@ END_TEST
  */
 START_TEST (test_send_one_copy_001)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
 	gpointer	ptr		= NULL;
 	gsize		tsdu_length	= 0;
@@ -147,13 +155,13 @@ END_TEST
 
 START_TEST (test_send_one_copy_fail)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
 	guint8		buffer[ PGM_MAX_TPDU ];
 	gsize		tsdu_length	= g_max_tsdu + 1;
 	int		flags		= 0;
 
-	fail_unless (-EINVAL == pgm_transport_send_one (g_transport, buffer, tsdu_length, flags));
+	fail_unless (-EINVAL == pgm_transport_send_one_copy (g_transport, buffer, tsdu_length, flags));
 }
 END_TEST
 
@@ -170,13 +178,13 @@ END_TEST
  */
 START_TEST (test_send_onev_000)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = _i } };
-	guint		count		= 1;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = _i } };
+	guint			count		= 1;
+	gsize			tsdu_length	= _i;
+	int			flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -186,13 +194,13 @@ END_TEST
  */
 START_TEST (test_send_onev_001)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
-	guint		count		= 1;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
+	guint			count		= 1;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -202,13 +210,13 @@ END_TEST
  */
 START_TEST (test_send_onev_002)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
-	guint		count		= 0;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
+	guint			count		= 0;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -218,12 +226,12 @@ END_TEST
  */
 START_TEST (test_send_onev_003)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	struct iovec*	vector		= NULL;
-	guint		count		= 0;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
+	struct pgm_iovec*	vector		= NULL;
+	guint			count		= 0;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -233,14 +241,14 @@ END_TEST
  */
 START_TEST (test_send_onev_004)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 2 ]	= { { .iov_base = NULL,   .iov_len =  0 },
-					    { .iov_base = buffer, .iov_len = _i } };
-	guint		count		= 2;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 2 ]	= { { .iov_base = NULL,   .iov_len =  0 },
+						    { .iov_base = buffer, .iov_len = _i } };
+	guint			count		= 2;
+	gsize			tsdu_length	= _i;
+	int			flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -250,14 +258,14 @@ END_TEST
  */
 START_TEST (test_send_onev_005)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 2 ]	= { { .iov_base = buffer, .iov_len = _i },
-					    { .iov_base = NULL,   .iov_len =  0 } };
-	guint		count		= 2;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 2 ]	= { { .iov_base = buffer, .iov_len = _i },
+						    { .iov_base = NULL,   .iov_len =  0 } };
+	guint			count		= 2;
+	gsize			tsdu_length	= _i;
+	int			flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -267,18 +275,19 @@ END_TEST
  */
 START_TEST (test_send_onev_006)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ PGM_MAX_TPDU ];
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ PGM_MAX_TPDU ];
+
 	for (int _j = 0; _j < _i; _j++)
 	{
 		vector[_j].iov_base = &buffer[ _j ];
 		vector[_j].iov_len  = 1;
 	}
-	guint		count		= _i;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
+	guint	count		= _i;
+	gsize	tsdu_length	= _i;
+	int	flags		= 0;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -288,12 +297,12 @@ END_TEST
  */
 START_TEST (test_send_onev_fail)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = g_max_tsdu + 1 } };
-	guint		count		= 1;
-	int		flags		= 0;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = g_max_tsdu + 1 } };
+	guint			count		= 1;
+	int			flags		= 0;
 
 	fail_unless (-EINVAL == pgm_transport_send_onev (g_transport, vector, count, flags));
 }
@@ -312,7 +321,7 @@ END_TEST
  */
 START_TEST (test_send_000)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
 	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize		tsdu_length	= _i;
@@ -326,7 +335,7 @@ END_TEST
  */
 START_TEST (test_send_fail)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
 	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize		tsdu_length	= g_max_apdu + 1;
@@ -350,14 +359,14 @@ END_TEST
  */
 START_TEST (test_sendv_000)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = _i } };
-	guint		count		= 1;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = _i } };
+	guint			count		= 1;
+	gsize			tsdu_length	= _i;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -367,14 +376,14 @@ END_TEST
  */
 START_TEST (test_sendv_001)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
-	guint		count		= 1;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
+	guint			count		= 1;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -384,14 +393,14 @@ END_TEST
  */
 START_TEST (test_sendv_002)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
-	guint		count		= 0;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = 0 } };
+	guint			count		= 0;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -401,13 +410,13 @@ END_TEST
  */
 START_TEST (test_sendv_003)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	struct iovec*	vector		= NULL;
-	guint		count		= 0;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	struct pgm_iovec*	vector		= NULL;
+	guint			count		= 0;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -417,15 +426,15 @@ END_TEST
  */
 START_TEST (test_sendv_004)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ 2 ]	= { { .iov_base = NULL,   .iov_len =  0 },
-					    { .iov_base = buffer, .iov_len = _i } };
-	guint		count		= 2;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 2 ]	= { { .iov_base = NULL,   .iov_len =  0 },
+						    { .iov_base = buffer, .iov_len = _i } };
+	guint			count		= 2;
+	gsize			tsdu_length	= _i;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -435,15 +444,15 @@ END_TEST
  */
 START_TEST (test_sendv_005)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ 2 ]	= { { .iov_base = buffer, .iov_len = _i },
-					    { .iov_base = NULL,  .iov_len =  0 } };
-	guint		count		= 2;
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 2 ]	= { { .iov_base = buffer, .iov_len = _i },
+						    { .iov_base = NULL,  .iov_len =  0 } };
+	guint			count		= 2;
+	gsize			tsdu_length	= _i;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -453,10 +462,11 @@ END_TEST
  */
 START_TEST (test_sendv_006)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+
 	for (int _j = 0; _j < _i; _j++)
 	{
 		vector[_j].iov_base = &buffer[ _j ];
@@ -475,16 +485,17 @@ END_TEST
  */
 START_TEST (test_sendv_007)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 	fail_unless ( (PGM_TXW_SQNS % (2 << _i)) == 0 );
 
-	guint8		buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	struct iovec	vector[ PGM_TXW_SQNS ];
-	guint		factor = 2 << _i;
-	int		count = PGM_TXW_SQNS / factor;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ PGM_TXW_SQNS ];
+	guint			factor = 2 << _i;
+	int			count = PGM_TXW_SQNS / factor;
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
+
 	for (int _j = 0; _j < count; _j++)
 	{
 		vector[_j].iov_base = &buffer[ tsdu_length ];
@@ -500,13 +511,13 @@ END_TEST
  */
 START_TEST (test_sendv_fail)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	guint8		buffer[ PGM_MAX_TPDU ];
-	struct iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = g_max_apdu + 1 } };
-	guint		count		= 1;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	guint8			buffer[ PGM_MAX_TPDU ];
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = buffer, .iov_len = g_max_apdu + 1 } };
+	guint			count		= 1;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
 	fail_unless (-EINVAL == pgm_transport_sendv (g_transport, vector, count, flags, is_one_apdu));
 }
@@ -525,128 +536,172 @@ END_TEST
  *                 vector::iov_base must be offset to payload in packets.
  * post-condition: return value equals apdu_length.
  */
-START_TEST (test_send_packetv_000)
+START_TEST (test_send_skbv_000)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+	struct pgm_sk_buff_t* skb		= pgm_alloc_skb (g_transport->max_tpdu);
 
-	gsize		tsdu_length	= _i;
-	int		flags		= 0;
-	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = _i } };
-	guint		count		= 1;
-	gboolean	is_one_apdu	= TRUE;
+/* reserve PGM header */
+	pgm_skb_put (skb, pgm_transport_pkt_offset(TRUE));
 
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+	gsize			tsdu_length	= _i;
+
+/* reserve payload */
+	pgm_skb_put (skb, tsdu_length);
+
+	int			flags		= 0;
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = skb, .iov_len = _i } };
+	guint			count		= 1;
+	gboolean		is_one_apdu	= TRUE;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_skbv (g_transport, vector, count, flags, is_one_apdu));
 }
 END_TEST
 
 /* zero length TSDU in non-zero vector
  */
-START_TEST (test_send_packetv_001)
+START_TEST (test_send_skbv_001)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+	struct pgm_sk_buff_t* skb		= pgm_alloc_skb (g_transport->max_tpdu);
 
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = 0 } };
-	guint		count		= 1;
-	gboolean	is_one_apdu	= TRUE;
+/* reserve PGM header */
+	pgm_skb_put (skb, pgm_transport_pkt_offset(TRUE));
 
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = skb, .iov_len = 0 } };
+	guint			count		= 1;
+	gboolean		is_one_apdu	= TRUE;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_skbv (g_transport, vector, count, flags, is_one_apdu));
+
+/* cleanup */
+	pgm_free_skb (skb);
 }
 END_TEST
 
 /* zero length vector
  */
-START_TEST (test_send_packetv_002)
+START_TEST (test_send_skbv_002)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+	struct pgm_sk_buff_t* skb		= pgm_alloc_skb (g_transport->max_tpdu);
 
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = 0 } };
-	guint		count		= 0;
-	gboolean	is_one_apdu	= TRUE;
+/* reserve PGM header */
+	pgm_skb_put (skb, pgm_transport_pkt_offset(TRUE));
 
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+	gsize			tsdu_length	= 0;
+	int			flags		= 0;
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = skb, .iov_len = 0 } };
+	guint			count		= 0;
+	gboolean		is_one_apdu	= TRUE;
+
+	fail_unless ((gssize)tsdu_length == pgm_transport_send_skbv (g_transport, vector, count, flags, is_one_apdu));
+
+/* cleanup */
+	pgm_free_skb (skb);
 }
 END_TEST
 
 /* multiple packet apdus
  */
-START_TEST (test_send_packetv_003)
+START_TEST (test_send_skbv_003)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	struct iovec	vector[ PGM_TXW_SQNS ];
-	int		count		= _i;
-	gsize		tsdu_length	= 0;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	struct pgm_iovec	vector[ PGM_TXW_SQNS ];
+	int			count		= _i;
+	gsize			apdu_length	= 0;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
 	for (int _j = 0; _j < count; _j++)
 	{
-		vector[_j].iov_base = pgm_packetv_alloc (g_transport, count > 1);
-		vector[_j].iov_len  = pgm_transport_max_tsdu (g_transport, count > 1);
-		tsdu_length	   += pgm_transport_max_tsdu (g_transport, count > 1);
-	}
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_transport->max_tpdu);
+		const gsize tsdu_length = pgm_transport_max_tsdu (g_transport, count > 1);
 
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+		pgm_skb_put (skb, pgm_transport_pkt_offset(count > 1) + tsdu_length);
+
+		vector[_j].iov_base = skb;
+		vector[_j].iov_len  = tsdu_length;
+		apdu_length	   += tsdu_length;
+	}
+
+	fail_unless ((gssize)apdu_length == pgm_transport_send_skbv (g_transport, vector, count, flags, is_one_apdu));
+
+/* cleanup */
+	for (int _j = 0; _j < count; _j++)
+	{
+		pgm_free_skb (vector[_j].iov_base);
+	}
 }
 END_TEST
 
 /* too long on single packet APDU
  */
-START_TEST (test_send_packetv_fail_000)
+START_TEST (test_send_skbv_fail_000)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
-	gpointer	pkt		= pgm_packetv_alloc (g_transport, FALSE);
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+	struct pgm_sk_buff_t* skb		= pgm_alloc_skb (g_transport->max_tpdu);
 
-	int		flags		= 0;
-	struct iovec	vector[ 1 ]	= { { .iov_base = pkt, .iov_len = pgm_transport_max_tsdu (g_transport, FALSE) + 1 } };
-	guint		count		= 1;
-	gboolean	is_one_apdu	= TRUE;
+	pgm_skb_put (skb, pgm_transport_pkt_offset(FALSE));
 
-	fail_unless (-EINVAL == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+	const gsize apdu_length			= pgm_transport_max_tsdu (g_transport, FALSE) + 1;
+
+/* ignore SKB API limit checking */
+	skb->tail = (guint8*)skb->tail + apdu_length;
+	skb->len += apdu_length;
+
+	int			flags		= 0;
+	struct pgm_iovec	vector[ 1 ]	= { { .iov_base = skb, .iov_len = apdu_length } };
+	guint			count		= 1;
+	gboolean		is_one_apdu	= TRUE;
+
+	fail_unless (-EINVAL == pgm_transport_send_skbv (g_transport, vector, count, flags, is_one_apdu));
+
+/* cleanup */
+	pgm_free_skb (skb);
 }
 END_TEST
 
 /* too long on multiple packet APDU
  */
-START_TEST (test_send_packetv_fail_001)
+START_TEST (test_send_skbv_fail_001)
 {
-	fail_unless (g_transport);
+	fail_unless (NULL != g_transport);
 
-	struct iovec 	vector[ 2 ];
-	int		count		= 2;
-	int		flags		= 0;
-	gboolean	is_one_apdu	= TRUE;
+	struct pgm_iovec 	vector[ 2 ];
+	int			count		= 2;
+	int			flags		= 0;
+	gboolean		is_one_apdu	= TRUE;
 
-	fail_unless (g_static_rw_lock_writer_trylock (&g_transport->txw_lock));
 	for (int _j = 0; _j < count; _j++)
 	{
-		vector[_j].iov_base = pgm_packetv_alloc (g_transport, count > 1);
-		vector[_j].iov_len  = pgm_transport_max_tsdu (g_transport, count > 1) + 1;
-	}
-	g_static_rw_lock_writer_unlock (&g_transport->txw_lock);
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_transport->max_tpdu);
+		const gsize tsdu_length = pgm_transport_max_tsdu (g_transport, count > 1) + 1;
 
-	fail_unless (-EINVAL == pgm_transport_send_packetv (g_transport, vector, count, flags, is_one_apdu));
+		pgm_skb_put (skb, pgm_transport_pkt_offset(count > 1));
+
+/* ignore SKB API limit checking */
+		skb->tail = (guint8*)skb->tail + tsdu_length;
+		skb->len += tsdu_length;
+
+		vector[_j].iov_base = skb;
+		vector[_j].iov_len  = tsdu_length;
+	}
+
+	fail_unless (-EINVAL == pgm_transport_send_skbv (g_transport, vector, count, flags, is_one_apdu));
+
+/* cleanup */
+	for (int _j = 0; _j < count; _j++)
+	{
+		pgm_free_skb (vector[_j].iov_base);
+	}
 }
 END_TEST
 
@@ -661,14 +716,14 @@ make_send_suite (void)
 	TCase* tc_send_onev = tcase_create ("send_onev");
 	TCase* tc_send = tcase_create ("send");
 	TCase* tc_sendv = tcase_create ("sendv");
-	TCase* tc_send_packetv = tcase_create ("send_packetv");
+	TCase* tc_send_skbv = tcase_create ("send_skbv");
 
 	tcase_add_checked_fixture (tc_send_one, setup, teardown);
 	tcase_add_checked_fixture (tc_send_one_copy, setup, teardown);
 	tcase_add_checked_fixture (tc_send_onev, setup, teardown);
 	tcase_add_checked_fixture (tc_send, setup, teardown);
 	tcase_add_checked_fixture (tc_sendv, setup, teardown);
-	tcase_add_checked_fixture (tc_send_packetv, setup, teardown);
+	tcase_add_checked_fixture (tc_send_skbv, setup, teardown);
 
 	g_max_tsdu = PGM_MAX_TPDU - 20 - pgm_transport_pkt_offset (FALSE);
 	g_max_apdu = ( PGM_MAX_TPDU - 20 - pgm_transport_pkt_offset (TRUE) ) * PGM_TXW_SQNS;
@@ -729,14 +784,14 @@ make_send_suite (void)
 	tcase_add_test (tc_sendv, test_sendv_fail);
 
 /* zero-copy api */
-	suite_add_tcase (s, tc_send_packetv);
-	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, 0, 4);
-	tcase_add_loop_test (tc_send_packetv, test_send_packetv_000, g_max_tsdu - 4, g_max_tsdu);
-	tcase_add_test (tc_send_packetv, test_send_packetv_001);
-	tcase_add_test (tc_send_packetv, test_send_packetv_002);
-	tcase_add_loop_test (tc_send_packetv, test_send_packetv_003, 0, PGM_TXW_SQNS);
-	tcase_add_test (tc_send_packetv, test_send_packetv_fail_000);
-	tcase_add_test (tc_send_packetv, test_send_packetv_fail_001);
+	suite_add_tcase (s, tc_send_skbv);
+	tcase_add_loop_test (tc_send_skbv, test_send_skbv_000, 0, 4);
+	tcase_add_loop_test (tc_send_skbv, test_send_skbv_000, g_max_tsdu - 4, g_max_tsdu);
+	tcase_add_test (tc_send_skbv, test_send_skbv_001);
+	tcase_add_test (tc_send_skbv, test_send_skbv_002);
+	tcase_add_loop_test (tc_send_skbv, test_send_skbv_003, 0, PGM_TXW_SQNS);
+	tcase_add_test (tc_send_skbv, test_send_skbv_fail_000);
+	tcase_add_test (tc_send_skbv, test_send_skbv_fail_001);
 
 	return s;
 }

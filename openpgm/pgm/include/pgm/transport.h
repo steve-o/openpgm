@@ -31,10 +31,17 @@
 
 #include <glib.h>
 
-
 #ifndef __PGM_GSI_H__
 #   include <pgm/gsi.h>
 #endif
+
+struct pgm_tsi_t {            /* transport session identifier */
+    pgm_gsi_t   gsi;	    /* global session identifier */
+    guint16     sport;	    /* source port: a random number to help detect session re-starts */
+};
+
+typedef struct pgm_tsi_t pgm_tsi_t;
+typedef struct pgm_transport_t pgm_transport_t;
 
 #ifndef __PGM_SOCKADDR_H__
 #   include <pgm/sockaddr.h>
@@ -46,6 +53,10 @@
 
 #ifndef __PGM_NOTIFY_H__
 #   include <pgm/notify.h>
+#endif
+
+#ifndef __PGM_SKBUFF_H__
+#   include <pgm/skbuff.h>
 #endif
 
 
@@ -137,15 +148,6 @@ typedef enum {
 /* marker */
     PGM_PC_RECEIVER_MAX
 } pgm_pc_receiver_e;
-
-typedef struct pgm_transport_t pgm_transport_t;
-
-struct pgm_tsi_t {            /* transport session identifier */
-    pgm_gsi_t   gsi;	    /* global session identifier */
-    guint16     sport;	    /* source port: a random number to help detect session re-starts */
-};
-
-typedef struct pgm_tsi_t pgm_tsi_t;
 
 #ifndef __PGM_MSGV_H__
 #   include <pgm/msgv.h>
@@ -248,9 +250,8 @@ struct pgm_transport_t {
 	guint		    data_pkt_offset;
 	gsize		    data_bytes_offset;
 	guint32		    first_sqn;
-	gpointer	    pkt;
+	struct pgm_sk_buff_t* skb;			/* references external buffer */
 	gsize		    tsdu_length;
-	gsize		    tpdu_length;
 	guint32		    unfolded_odata;
 	gsize		    apdu_length;
 	guint		    vector_index;
@@ -281,15 +282,11 @@ struct pgm_transport_t {
     guint		rs_k;
     guint		rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
     guint		tg_sqn_shift;
-    gpointer		parity_buffer;		    /* for parity odata/rdata generation */
+    struct pgm_sk_buff_t* parity_buffer;	    /* for parity odata/rdata generation */
 
-    gpointer		rx_buffer;
+    struct pgm_sk_buff_t* rx_buffer;
     struct pgm_iovec*	piov;
     guint		piov_len;		    /* # elements in piov */
-
-    GTrashStack*	rx_data;		    /* shared between all receivers for this instance */
-    GTrashStack*	rx_packet;
-    GStaticMutex	rx_mutex;
 
     GStaticRWLock	peers_lock;
     GHashTable*		peers_hashtable;	    /* fast lookup */
@@ -387,11 +384,7 @@ int pgm_set_nonblocking (int filedes[2]);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
 gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
-gssize pgm_transport_send_packetv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
-
-gpointer pgm_packetv_alloc (pgm_transport_t*, gboolean);
-void pgm_packetv_free1 (pgm_transport_t*, gpointer, gboolean);
-void pgm_pkt_data_free1 (pgm_transport_t*, gpointer);
+gssize pgm_transport_send_skbv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);

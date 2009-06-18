@@ -172,9 +172,6 @@ static SoupServer* g_soup_server = NULL;
 static gpointer g_rxw = NULL;			/* receive window */
 static int g_max_tpdu = 1500;
 static int g_rxw_sqns = 10;
-static GTrashStack* g_trash_data = NULL;
-static GTrashStack* g_trash_packet = NULL;
-static GStaticMutex g_trash_mutex = G_STATIC_MUTEX_INIT;
 
 static guint tsi_hash (gconstpointer);
 static gint tsi_equal (gconstpointer, gconstpointer);
@@ -203,7 +200,7 @@ static void css_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, S
 static void index_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 #endif
 
-static int tsi_callback (SoupMessage*, const char*);
+static int tsi_callback (SoupMessage*, char*);
 
 static int on_pgm_data (gpointer, guint, gpointer);
 
@@ -327,7 +324,7 @@ on_startup (
 	puts ("startup.");
 
 	puts ("construct receive window.");
-	g_rxw = pgm_rxw_init (NULL, g_max_tpdu, 0, g_rxw_sqns, 0, 0, &g_trash_data, &g_trash_packet, &g_trash_mutex);
+	g_rxw = pgm_rxw_init (NULL, g_max_tpdu, g_rxw_sqns, 0, 0);
 
         puts ("starting soup server.");
         g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_http,
@@ -596,23 +593,20 @@ on_io_data (
 {
 //	printf ("on_data: ");
 
-	char buffer[4096];
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (4096);
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
 
 	int fd = g_io_channel_unix_get_fd(source);
 	struct sockaddr_in addr;
 	socklen_t addr_len = sizeof(addr);
-	int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+
+	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+	skb->tail = (guint8*)skb->tail + skb->len;
 
 //	printf ("%i bytes received from %s.\n", len, inet_ntoa(addr.sin_addr));
 
-	struct sockaddr_in dst_addr;
-	socklen_t dst_addr_len;
-	struct pgm_header *pgm_header;
-	gpointer packet;
-	gsize packet_length;
-	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_raw (skb);
 
 	switch (e) {
 	case -2:
@@ -652,20 +646,16 @@ on_io_data (
 		g_hosts_mutex = g_mutex_new ();
 	}
 
-	struct tsi tsi;
-	memcpy (tsi.gsi, pgm_header->pgm_gsi, 6 * sizeof(guint8));
-	tsi.source_port = pgm_header->pgm_sport;
+//	printf ("tsi %s\n", print_tsi (&skb->tsi));
 
-//	printf ("tsi %s\n", print_tsi (&tsi));
-
-	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
+	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &skb->tsi);
 	if (hoststat == NULL) {
 
 /* New TSI */
-		printf ("new tsi %s\n", print_tsi (&tsi));
+		printf ("new tsi %s\n", print_tsi (&skb->tsi));
 
 		hoststat = g_malloc0(sizeof(struct hoststat));
-		memcpy (&hoststat->tsi, &tsi, sizeof(struct tsi));
+		memcpy (&hoststat->tsi, &skb->tsi, sizeof(struct tsi));
 
 		hoststat->session_start = tv;
 
@@ -677,11 +667,14 @@ on_io_data (
 /* increment statistics */
 	memcpy (&hoststat->last_addr, &addr.sin_addr, sizeof(addr.sin_addr));
 	hoststat->general.count++;
-	hoststat->general.bytes += len;
+	hoststat->general.bytes += skb->len;
 	hoststat->general.last = tv;
 
+	skb->data       = (guint8*)skb->data + sizeof(struct pgm_header);
+	skb->len       -= sizeof(struct pgm_header);
+
 	gboolean err = FALSE;
-        switch (pgm_header->pgm_type) {
+        switch (skb->pgm_header->pgm_type) {
 
 /* SPM
  *
@@ -691,13 +684,13 @@ on_io_data (
  */
         case PGM_SPM:
 		hoststat->spm.count++;
-		hoststat->spm.bytes += len;
+		hoststat->spm.bytes += skb->len;
 		hoststat->spm.last = tv;
 
 puts ("SPM");
 
-		err = pgm_verify_spm (pgm_header, packet, packet_length);
-		hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
+		err = pgm_verify_spm (skb->pgm_header, skb->data, skb->len);
+		hoststat->nla.s_addr = ((struct pgm_spm*)skb->data)->spm_nla.s_addr;
 
 if (!err && (hoststat->nla.s_addr != 0)) {
 	printf ("senders nla: %s\n", inet_ntoa(hoststat->nla));
@@ -711,15 +704,15 @@ if (!err && (hoststat->nla.s_addr != 0)) {
 			hoststat->spm.last_invalid = tv;
 		} else {
 /* TODO: protect against UINT32 wrap-around */
-			if (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ) <= hoststat->spm_sqn)
+			if (g_ntohl( ((struct pgm_spm*)skb->data)->spm_sqn ) <= hoststat->spm_sqn)
 			{
 				hoststat->general.duplicate++;
 				break;
 			}
 
-			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)packet)->spm_sqn );
-			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)packet)->spm_trail );
-			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)packet)->spm_lead );
+			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)skb->data)->spm_sqn );
+			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)skb->data)->spm_trail );
+			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)skb->data)->spm_lead );
 			hoststat->rxw_trail = hoststat->txw_trail;
 //printf ("SPM: tx window now %lu - %lu\n", 
 //		hoststat->txw_trail, hoststat->txw_lead);
@@ -731,13 +724,13 @@ if (!err && (hoststat->nla.s_addr != 0)) {
 
         case PGM_POLL:
 		hoststat->poll.count++;
-		hoststat->poll.bytes += len;
+		hoststat->poll.bytes += skb->len;
 		hoststat->poll.last = tv;
 		break;
 
         case PGM_POLR:
 		hoststat->polr.count++;
-		hoststat->polr.bytes += len;
+		hoststat->polr.bytes += skb->len;
 		hoststat->polr.last = tv;
 		break;
 
@@ -745,23 +738,18 @@ if (!err && (hoststat->nla.s_addr != 0)) {
  */
         case PGM_ODATA:
 		hoststat->odata.count++;
-		hoststat->odata.bytes += len;
+		hoststat->odata.bytes += skb->len;
 		hoststat->odata.last = tv;
 
-		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
+		((struct pgm_data*)skb->data)->data_sqn = g_ntohl (((struct pgm_data*)skb->data)->data_sqn);
 
-printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
+printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)skb->data)->data_sqn);
 
-		if (!pgm_rxw_push_copy (g_rxw,
-					((struct pgm_data*)packet) + 1, 
-					g_ntohs (pgm_header->pgm_tsdu_length),
-					((struct pgm_data*)packet)->data_sqn,
-					g_ntohl (((struct pgm_data*)packet)->data_trail),
-					pgm_time_update_now()) )
+		if ( !pgm_rxw_push (g_rxw, skb, pgm_time_update_now()) )
 		{
-			printf ("processed packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
+			printf ("processed packet #%u\n", ((struct pgm_data*)skb->data)->data_sqn);
 
-			hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
+			hoststat->odata.tsdu += g_ntohs (skb->pgm_header->pgm_tsdu_length);
 
 /* process nak list and send naks for all with null nak_sent time */
 #if 0
@@ -785,32 +773,32 @@ printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 
         case PGM_RDATA:
 		hoststat->rdata.count++;
-		hoststat->rdata.bytes += len;
+		hoststat->rdata.bytes += skb->len;
 		hoststat->rdata.last = tv;
 
 		break;
 
         case PGM_NAK:
 		hoststat->nak.count++;
-		hoststat->nak.bytes += len;
+		hoststat->nak.bytes += skb->len;
 		hoststat->nak.last = tv;
 		break;
 
         case PGM_NNAK:
 		hoststat->nnak.count++;
-		hoststat->nnak.bytes += len;
+		hoststat->nnak.bytes += skb->len;
 		hoststat->nnak.last = tv;
 		break;
 
         case PGM_NCF:
 		hoststat->ncf.count++;
-		hoststat->ncf.bytes += len;
+		hoststat->ncf.bytes += skb->len;
 		hoststat->ncf.last = tv;
 		break;
 
         case PGM_SPMR:
 		hoststat->spmr.count++;
-		hoststat->spmr.bytes += len;
+		hoststat->spmr.bytes += skb->len;
 		hoststat->spmr.last = tv;
 		break;
 
@@ -834,7 +822,7 @@ printf ("ODATA: processing packet #%u\n", ((struct pgm_data*)packet)->data_sqn);
 	do {
 		pgm_msgv_t* pmsgv = msgv;
 		struct pgm_iovec* piov = iov;
-		bytes_read = pgm_rxw_readv (g_rxw, &pmsgv, G_N_ELEMENTS(msgv), &piov, G_N_ELEMENTS(iov));
+		bytes_read = pgm_rxw_readv (g_rxw, &pmsgv, G_N_ELEMENTS(msgv), &piov, G_N_ELEMENTS(iov), 0);
 	} while (bytes_read > 0);
 
 /* ignore actual data, we don't care */
@@ -1066,7 +1054,7 @@ default_callback (
 	G_GNUC_UNUSED gpointer	data
 	)
 {
-	const char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
+	char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
         if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
         {
                 int e = tsi_callback (msg, path);
@@ -1303,7 +1291,7 @@ print_stat (
 static int
 tsi_callback (
                 SoupMessage*            msg,
-		const char*     path
+		char*     path
                 )
 {
 	struct hoststat* hoststat = NULL;
