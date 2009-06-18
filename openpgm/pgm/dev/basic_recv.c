@@ -2,7 +2,7 @@
  *
  * Listen to PGM packets, note per host details and data loss.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -497,23 +497,20 @@ on_io_data (
 {
 //	printf ("on_data: ");
 
-	char buffer[4096];
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (4096);
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
 
 	int fd = g_io_channel_unix_get_fd(source);
 	struct sockaddr_in addr;
 	socklen_t addr_len = sizeof(addr);
-	int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+
+	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+	skb->tail = (guint8*)skb->tail + skb->len;
 
 //	printf ("%i bytes received from %s.\n", len, inet_ntoa(addr.sin_addr));
 
-	struct sockaddr_in dst_addr;
-	socklen_t dst_addr_len;
-	struct pgm_header *pgm_header;
-	gpointer packet;
-	gsize packet_length;
-	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_raw (skb);
 
 	switch (e) {
 	case -2:
@@ -542,6 +539,7 @@ on_io_data (
 
 	case -1:
 		fflush(stdout);
+		pgm_free_skb (skb);
 		return TRUE;
 
 	default: break;
@@ -553,20 +551,16 @@ on_io_data (
 		g_hosts_mutex = g_mutex_new ();
 	}
 
-	struct tsi tsi;
-	memcpy (tsi.gsi, pgm_header->pgm_gsi, 6 * sizeof(guint8));
-	tsi.source_port = pgm_header->pgm_sport;
+//	printf ("tsi %s\n", print_tsi (&skb->tsi));
 
-//	printf ("tsi %s\n", print_tsi (&tsi));
-
-	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
+	struct hoststat* hoststat = g_hash_table_lookup (g_hosts, &skb->tsi);
 	if (hoststat == NULL) {
 
 /* New TSI */
-		printf ("new tsi %s\n", print_tsi (&tsi));
+		printf ("new tsi %s\n", print_tsi (&skb->tsi));
 
 		hoststat = g_malloc0(sizeof(struct hoststat));
-		memcpy (&hoststat->tsi, &tsi, sizeof(struct tsi));
+		memcpy (&hoststat->tsi, &skb->tsi, sizeof(struct tsi));
 
 		hoststat->session_start = tv;
 
@@ -578,11 +572,14 @@ on_io_data (
 /* increment statistics */
 	memcpy (&hoststat->last_addr, &addr.sin_addr, sizeof(addr.sin_addr));
 	hoststat->general.count++;
-	hoststat->general.bytes += len;
+	hoststat->general.bytes += skb->len;
 	hoststat->general.last = tv;
 
+	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
+	skb->len       -= sizeof(struct pgm_header);
+
 	gboolean err = FALSE;
-        switch (pgm_header->pgm_type) {
+        switch (skb->pgm_header->pgm_type) {
 
 /* SPM
  *
@@ -592,12 +589,12 @@ on_io_data (
  */
         case PGM_SPM:
 		hoststat->spm.count++;
-		hoststat->spm.bytes += len;
+		hoststat->spm.bytes += skb->len;
 		hoststat->spm.last = tv;
 
-		err = pgm_verify_spm (pgm_header, packet, packet_length);
-		g_assert (((struct pgm_spm*)packet)->spm_nla_afi == AFI_IP);
-		hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
+		err = pgm_verify_spm (skb->pgm_header, skb->data, skb->len);
+		g_assert (((struct pgm_spm*)skb->data)->spm_nla_afi == AFI_IP);
+		hoststat->nla.s_addr = ((struct pgm_spm*)skb->data)->spm_nla.s_addr;
 
 		if (err) {
 //puts ("invalid SPM");
@@ -605,15 +602,15 @@ on_io_data (
 			hoststat->spm.last_invalid = tv;
 		} else {
 /* TODO: protect against UINT32 wrap-around */
-			if (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ) <= hoststat->spm_sqn)
+			if (g_ntohl( ((struct pgm_spm*)skb->data)->spm_sqn ) <= hoststat->spm_sqn)
 			{
 				hoststat->general.duplicate++;
 				break;
 			}
 
-			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)packet)->spm_sqn );
-			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)packet)->spm_trail );
-			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)packet)->spm_lead );
+			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)skb->data)->spm_sqn );
+			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)skb->data)->spm_trail );
+			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)skb->data)->spm_lead );
 			hoststat->rxw_trail = hoststat->txw_trail;
 //printf ("SPM: tx window now %lu - %lu\n", 
 //		hoststat->txw_trail, hoststat->txw_lead);
@@ -623,13 +620,13 @@ on_io_data (
 
         case PGM_POLL:
 		hoststat->poll.count++;
-		hoststat->poll.bytes += len;
+		hoststat->poll.bytes += skb->len;
 		hoststat->poll.last = tv;
 		break;
 
         case PGM_POLR:
 		hoststat->polr.count++;
-		hoststat->polr.bytes += len;
+		hoststat->polr.bytes += skb->len;
 		hoststat->polr.last = tv;
 		break;
 
@@ -654,15 +651,15 @@ on_io_data (
 
         case PGM_ODATA:
 		hoststat->odata.count++;
-		hoststat->odata.bytes += len;
+		hoststat->odata.bytes += skb->len;
 		hoststat->odata.last = tv;
 
-		((struct pgm_data*)packet)->data_sqn = g_ntohl (((struct pgm_data*)packet)->data_sqn);
-		((struct pgm_data*)packet)->data_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
-		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		((struct pgm_data*)skb->data)->data_sqn = g_ntohl (((struct pgm_data*)skb->data)->data_sqn);
+		((struct pgm_data*)skb->data)->data_trail = g_ntohl (((struct pgm_data*)skb->data)->data_trail);
+		if ( !IN_TRANSMIT_WINDOW( ((struct pgm_data*)skb->data)->data_sqn ) )
 		{
 			printf ("not in tx window %" G_GUINT32_FORMAT ", %" G_GUINT32_FORMAT " - %" G_GUINT32_FORMAT "\n",
-				((struct pgm_data*)packet)->data_sqn,
+				((struct pgm_data*)skb->data)->data_sqn,
 				hoststat->txw_trail,
 				hoststat->txw_lead);
 			err = TRUE;
@@ -675,71 +672,71 @@ on_io_data (
 		if (hoststat->rxw_learning == 0)
 		{
 puts ("first packet, learning ...");
-			hoststat->rxw_trail_init = ((struct pgm_data*)packet)->data_sqn;
+			hoststat->rxw_trail_init = ((struct pgm_data*)skb->data)->data_sqn;
 			hoststat->rxw_learning++;
 
 /* we need to jump to avoid loss detection
  * TODO: work out better arrangement */
-			hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn - 1;
+			hoststat->rxw_lead = ((struct pgm_data*)skb->data)->data_sqn - 1;
 		}
 /* subsequent packets */
 		else if (hoststat->rxw_learning == 1 &&
-			((struct pgm_data*)packet)->data_trail > hoststat->rxw_trail_init )
+			((struct pgm_data*)skb->data)->data_trail > hoststat->rxw_trail_init )
 		{
 puts ("rx window trail is now past first packet sequence number, stop learning.");
 			hoststat->rxw_learning++;
 		}
 
 /* dupe */
-		if ( IN_RECEIVE_WINDOW( ((struct pgm_data*)packet)->data_sqn ) )
+		if ( IN_RECEIVE_WINDOW( ((struct pgm_data*)skb->data)->data_sqn ) )
 		{
 			hoststat->general.duplicate++;
 			break;
 		}
 
 /* lost packets */
-		if ( !IS_NEXT_SEQUENCE_NUMBER( ((struct pgm_data*)packet)->data_sqn ) )
+		if ( !IS_NEXT_SEQUENCE_NUMBER( ((struct pgm_data*)skb->data)->data_sqn ) )
 		{
 			printf ("lost %i packets.\n",
-				(int)( ((struct pgm_data*)packet)->data_sqn - hoststat->rxw_lead - 1 ));
+				(int)( ((struct pgm_data*)skb->data)->data_sqn - hoststat->rxw_lead - 1 ));
 		}
 
-		hoststat->txw_trail = ((struct pgm_data*)packet)->data_trail;
+		hoststat->txw_trail = ((struct pgm_data*)skb->data)->data_trail;
 		if (hoststat->txw_trail > hoststat->txw_lead)
 			hoststat->txw_lead = hoststat->txw_trail -1;
 		hoststat->rxw_trail = hoststat->txw_trail;
-		hoststat->rxw_lead = ((struct pgm_data*)packet)->data_sqn;
+		hoststat->rxw_lead = ((struct pgm_data*)skb->data)->data_sqn;
 
-		hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
+		hoststat->odata.tsdu += g_ntohs (skb->pgm_header->pgm_tsdu_length);
 		break;
 
         case PGM_RDATA:
 		hoststat->rdata.count++;
-		hoststat->rdata.bytes += len;
+		hoststat->rdata.bytes += skb->len;
 		hoststat->rdata.last = tv;
 		break;
 
         case PGM_NAK:
 		hoststat->nak.count++;
-		hoststat->nak.bytes += len;
+		hoststat->nak.bytes += skb->len;
 		hoststat->nak.last = tv;
 		break;
 
         case PGM_NNAK:
 		hoststat->nnak.count++;
-		hoststat->nnak.bytes += len;
+		hoststat->nnak.bytes += skb->len;
 		hoststat->nnak.last = tv;
 		break;
 
         case PGM_NCF:
 		hoststat->ncf.count++;
-		hoststat->ncf.bytes += len;
+		hoststat->ncf.bytes += skb->len;
 		hoststat->ncf.last = tv;
 		break;
 
         case PGM_SPMR:
 		hoststat->spmr.count++;
-		hoststat->spmr.bytes += len;
+		hoststat->spmr.bytes += skb->len;
 		hoststat->spmr.last = tv;
 		break;
 
@@ -757,7 +754,7 @@ puts ("rx window trail is now past first packet sequence number, stop learning."
 	}
 
 	fflush(stdout);
-
+	pgm_free_skb (skb);
 	return TRUE;
 }
 
@@ -878,7 +875,7 @@ default_callback (
 	G_GNUC_UNUSED gpointer	data
 	)
 {
-       	const char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
+       	char* path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
 	if (g_hosts && strncmp ("/tsi/", path, strlen("/tsi/")) == 0)
 	{
 		int e = tsi_callback (msg, path);

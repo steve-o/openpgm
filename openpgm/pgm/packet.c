@@ -34,6 +34,7 @@
 #include "pgm/ip.h"
 #include "pgm/packet.h"
 #include "pgm/checksum.h"
+#include "pgm/skbuff.h"
 
 
 /* globals */
@@ -52,20 +53,14 @@ static gssize pgm_print_options (gpointer, gsize);
 
 int
 pgm_parse_raw (
-	gpointer		data,			/* packet to parse */
-	gsize			len,
-	struct sockaddr*	dst_addr,
-	socklen_t*		dst_addr_len,
-	struct pgm_header**	header,			/* return PGM header location */
-	gpointer*		packet,			/* and pointer to PGM packet type header */
-	gsize*			packet_len
+	struct pgm_sk_buff_t* skb		/* data will be modified */
 	)
 {
 /* minimum size should be IP header plus PGM header */
-	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
+	if (skb->len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
-			len, (sizeof(struct pgm_ip) + sizeof(struct pgm_header)));
+		printf ("IP packet size too small: %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GUINT16_FORMAT " bytes.\n",
+			skb->len, (guint16)(sizeof(struct pgm_ip) + sizeof(struct pgm_header)));
 		return -1;
 	}
 
@@ -116,20 +111,24 @@ pgm_parse_raw (
  */
 
 /* decode IP header */
-	const struct pgm_ip* ip = (struct pgm_ip*)data;
+	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
 	switch (ip->ip_v)
 	{
-	case 4:
-		((struct sockaddr_in*)dst_addr)->sin_family = AF_INET;
-		((struct sockaddr_in*)dst_addr)->sin_addr.s_addr = ip->ip_dst.s_addr;
-		*dst_addr_len = sizeof(struct sockaddr_in);
+	case 4: {
+		struct sockaddr_in* sin = (struct sockaddr_in*)&skb->dst;
+		sin->sin_family		= AF_INET;
+		sin->sin_addr.s_addr	= ip->ip_dst.s_addr;
 		break;
+	}
 
-	case 6:
-		((struct sockaddr_in6*)dst_addr)->sin6_family = AF_INET6;
+	case 6: {
+		const struct pgm_ip6_hdr* ip6	= (struct pgm_ip6_hdr*)skb->data;
+		struct sockaddr_in6* sin6 	= (struct sockaddr_in6*)&skb->dst;
+		sin6->sin6_family		= AF_INET6;
+		sin6->sin6_addr			= ip6->ip6_dst;
 		g_warning ("IPv6 packet headers are not provided by PF_PACKET capture.");
-		*dst_addr_len = sizeof(struct sockaddr_in6);
 		return -1;
+	}
 
 	default:
 		printf ("unknown IP version (%i) :/\n", ip->ip_v);
@@ -150,18 +149,18 @@ pgm_parse_raw (
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
-	if (len == packet_length + ip_header_length) {
+	if (skb->len == packet_length + ip_header_length) {
 		packet_length += ip_header_length;
 	}
 
-	if (len < packet_length) {			/* redundant: often handled in kernel */
-		printf ("truncated IP packet: %i < %i\n", (int)len, (int)packet_length);
+	if (skb->len < packet_length) {			/* redundant: often handled in kernel */
+		printf ("truncated IP packet: %" G_GUINT16_FORMAT " < %" G_GSIZE_FORMAT "\n", skb->len, packet_length);
 		return -1;
 	}
 
 /* TCP Segmentation Offload (TSO) might have zero length here */
 	if (packet_length < ip_header_length) {
-		printf ("bad length: %i < %i\n", (int)packet_length, (int)ip_header_length);
+		printf ("bad length: %" G_GSIZE_FORMAT " < %" G_GSIZE_FORMAT "\n", packet_length, ip_header_length);
 		return -1;
 	}
 
@@ -199,73 +198,62 @@ pgm_parse_raw (
  * | Type specific data ...
  * +-+-+-+-+-+-+-+-+-+- ...
  */
-	struct pgm_header* pgm_header = (struct pgm_header*)((guint8*)data + ip_header_length);
-	gsize pgm_length = packet_length - ip_header_length;
 
-	return pgm_parse (pgm_header, pgm_length, header, packet, packet_len);
+	skb->pgm_header = (gpointer)( (guint8*)skb->data + ip_header_length );
+
+/* advance DATA pointer to PGM packet */
+	skb->data	= skb->pgm_header;
+	skb->len       -= ip_header_length;
+
+	return pgm_parse (skb);
 }
 
 int
 pgm_parse_udp_encap (
-	gpointer		data,
-	gsize			len,
-	G_GNUC_UNUSED struct sockaddr*	dst_addr,
-	G_GNUC_UNUSED socklen_t*	dst_addr_len,
-	struct pgm_header**	header,
-	gpointer*		packet,
-	gsize*			packet_len
+	struct pgm_sk_buff_t*	skb		/* will be modified */
 	)
 {
-	return pgm_parse ((struct pgm_header*)data, len, header, packet, packet_len);
+	if (skb->len < sizeof(struct pgm_header)) {
+		printf ("UDP packet size too small: %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+			skb->len, sizeof(struct pgm_header));
+		return -1;
+	}
+
+/* DATA payload is PGM packet, no headers */
+	skb->pgm_header = skb->data;
+
+	return pgm_parse (skb);
 }
 
 /* will modify packet contents to calculate and check PGM checksum
  */
 int
 pgm_parse (
-	struct pgm_header*	pgm_header,
-	gsize			pgm_length,
-	struct pgm_header**	header,
-	gpointer*		packet,
-	gsize*			packet_len
+	struct pgm_sk_buff_t*	skb		/* will be modified */
 	)
 {
-	if (pgm_length < sizeof(pgm_header)) {
-		puts ("bad packet size :(");
-		return -1;
-	}
-
 /* pgm_checksum == 0 means no transmitted checksum */
-	if (pgm_header->pgm_checksum)
+	if (skb->pgm_header->pgm_checksum)
 	{
-		int sum = pgm_header->pgm_checksum;
-		pgm_header->pgm_checksum = 0;
-		int pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)pgm_header, pgm_length, 0));
-		pgm_header->pgm_checksum = sum;
+		const int sum = skb->pgm_header->pgm_checksum;
+		skb->pgm_header->pgm_checksum = 0;
+		int pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)skb->pgm_header, skb->len, 0));
+		skb->pgm_header->pgm_checksum = sum;
 		if (pgm_sum != sum) {
 			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", sum, pgm_sum);
 			return -2;
 		}
 	} else {
-		if (pgm_header->pgm_type == PGM_ODATA || pgm_header->pgm_type == PGM_RDATA) {
+		if (skb->pgm_header->pgm_type == PGM_ODATA || skb->pgm_header->pgm_type == PGM_RDATA) {
 			puts ("PGM checksum mandatory for ODATA and RDATA packets :(");
 			return -1;
 		}
 		puts ("No PGM checksum :O");
 	}
 
-/* now decode PGM packet types */
-	gpointer pgm_data = pgm_header + 1;
-	gssize pgm_data_length = (gssize)pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
-
-	if (pgm_data_length < 0) {
-		puts ("bad packet length :(");
-		return -1;
-	}
-
-	*header = pgm_header;
-	*packet = pgm_data;
-	*packet_len = (gsize)pgm_data_length;
+/* copy packets source transport identifier */
+	memcpy (&skb->tsi.gsi, skb->pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
+	skb->tsi.sport = skb->pgm_header->pgm_sport;
 
 	return 0;
 }

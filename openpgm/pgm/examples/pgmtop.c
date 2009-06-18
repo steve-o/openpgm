@@ -723,25 +723,21 @@ static gboolean
 on_io_data (
 	GIOChannel* source,
 	G_GNUC_UNUSED GIOCondition condition,
-	G_GNUC_UNUSED gpointer data
+	G_GNUC_UNUSED gpointer user_data
 	)
 {
 	struct timeval now;
-	char buffer[4096];
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (4096);
+	const struct sockaddr_in* sin = (struct sockaddr_in*)&skb->src;
 	int fd = g_io_channel_unix_get_fd(source);
-	struct sockaddr_in src_addr;
-	socklen_t src_addr_len = sizeof(src_addr);
-	int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
+	socklen_t src_addr_len = sizeof(skb->src);
+
+	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&skb->src, &src_addr_len);
 
 	gettimeofday (&now, NULL);
 	g_packets++;
 
-	struct sockaddr_in dst_addr;
-	socklen_t dst_addr_len;
-	struct pgm_header *pgm_header;
-	gpointer packet;
-	gsize packet_length;
-	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_raw (skb);
 	if (e == -2)
 	{
 /* corrupt packet */
@@ -749,21 +745,23 @@ on_io_data (
 			g_nets = g_hash_table_new (g_int_hash, g_int_equal);
 		}
 
-		struct pgm_netstat* netstat = g_hash_table_lookup (g_nets, &src_addr.sin_addr);
+		struct pgm_netstat* netstat = g_hash_table_lookup (g_nets, &sin->sin_addr);
 		if (netstat == NULL) {
-			write_status ("new host publishing corrupt data, local nla %s", inet_ntoa(src_addr.sin_addr));
+			write_status ("new host publishing corrupt data, local nla %s", inet_ntoa(sin->sin_addr));
 			netstat = g_malloc0(sizeof(struct pgm_netstat));
-			netstat->addr = src_addr.sin_addr;
+			netstat->addr = sin->sin_addr;
 			g_hash_table_insert (g_nets, (gpointer)&netstat->addr, (gpointer)netstat);
 		}
 
 		netstat->corrupt++;
+		pgm_free_skb (skb);
 		return TRUE;
 	}
 
 	if (e == -1)
 	{
 /* general error */
+		pgm_free_skb (skb);
 		return TRUE;
 	}
 
@@ -772,48 +770,49 @@ on_io_data (
 		g_hosts = g_hash_table_new (tsi_hash, tsi_equal);
 	}
 
-	pgm_tsi_t tsi;
-	memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
-	tsi.sport = pgm_header->pgm_sport;
-
-	struct pgm_hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
+	struct pgm_hoststat* hoststat = g_hash_table_lookup (g_hosts, &skb->tsi);
 	if (hoststat == NULL) {
-		write_status ("new tsi %s with local nla %s", pgm_print_tsi (&tsi), inet_ntoa(src_addr.sin_addr));
+		write_status ("new tsi %s with local nla %s", pgm_print_tsi (&skb->tsi), inet_ntoa(sin->sin_addr));
 
 		hoststat = g_malloc0(sizeof(struct pgm_hoststat));
-		memcpy (&hoststat->tsi, &tsi, sizeof(pgm_tsi_t));
+		memcpy (&hoststat->tsi, &skb->tsi, sizeof(pgm_tsi_t));
 		hoststat->session_start = now;
 
 		g_hash_table_insert (g_hosts, (gpointer)&hoststat->tsi, (gpointer)hoststat);
 	}
 
 /* increment statistics */
-	memcpy (&hoststat->last_addr, &src_addr.sin_addr, sizeof(src_addr.sin_addr));
+	memcpy (&hoststat->last_addr, &sin->sin_addr, sizeof(sin->sin_addr));
 	hoststat->general.count++;
-	hoststat->general.bytes += len;
+	hoststat->general.bytes += skb->len;
 	hoststat->general.last = now;
 
+	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
+	skb->len       -= sizeof(struct pgm_header);
+
 	gboolean err = FALSE;
-	switch (pgm_header->pgm_type) {
+	switch (skb->pgm_header->pgm_type) {
 	case PGM_SPM:
 		hoststat->spm.count++;
-		hoststat->spm.bytes += len;
+		hoststat->spm.bytes += skb->len;
 		hoststat->spm.last = now;
 
-		err = pgm_verify_spm (pgm_header, packet, packet_length);
+		err = pgm_verify_spm (skb->pgm_header, skb->data, skb->len);
 		
 		if (err) {
 			hoststat->spm.invalid++;
 			hoststat->spm.last_invalid = now;
 		} else {
-			hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
-			if (pgm_uint32_lte (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ), hoststat->spm_sqn)) {
+			const struct pgm_spm* spm = (struct pgm_spm*)skb->data;
+
+			hoststat->nla.s_addr = spm->spm_nla.s_addr;
+			if (pgm_uint32_lte (g_ntohl( spm->spm_sqn ), hoststat->spm_sqn)) {
 				hoststat->general.duplicate++;
 				break;
 			}
-			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)packet)->spm_sqn );
-			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)packet)->spm_trail );
-			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)packet)->spm_lead );
+			hoststat->spm_sqn = g_ntohl( spm->spm_sqn );
+			hoststat->txw_trail = g_ntohl( spm->spm_trail );
+			hoststat->txw_lead = g_ntohl( spm->spm_lead );
 			hoststat->rxw_trail = hoststat->txw_trail;
 			hoststat->window_defined = TRUE;
 		}
@@ -821,62 +820,64 @@ on_io_data (
 
 	case PGM_ODATA:
 		hoststat->odata.count++;
-		hoststat->odata.bytes += len;
+		hoststat->odata.bytes += skb->len;
 		hoststat->odata.last = now;
 
+		const struct pgm_data* data = (struct pgm_data*)skb->data;
+
 		if (!hoststat->window_defined) {
-			hoststat->rxw_lead = g_ntohl (((struct pgm_data*)packet)->data_sqn) - 1;
+			hoststat->rxw_lead = g_ntohl (data->data_sqn) - 1;
 			hoststat->rxw_trail = hoststat->rxw_trail_init = hoststat->rxw_lead + 1;
 			hoststat->rxw_constrained = TRUE;
 			hoststat->window_defined = TRUE;
 		} else {
-			if (! pgm_uint32_gte( g_ntohl (((struct pgm_data*)packet)->data_sqn) , hoststat->rxw_trail ) )
+			if (! pgm_uint32_gte( g_ntohl (data->data_sqn) , hoststat->rxw_trail ) )
 			{
 				hoststat->odata.invalid++;
 				hoststat->odata.last_invalid = now;
 				break;
 			}
-			hoststat->rxw_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
+			hoststat->rxw_trail = g_ntohl (data->data_trail);
 		}
 
 		if (hoststat->rxw_constrained && hoststat->txw_trail > hoststat->rxw_trail_init) {
 			hoststat->rxw_constrained = FALSE;
 		}
 
-		if ( pgm_uint32_lte ( g_ntohl (((struct pgm_data*)packet)->data_sqn), hoststat->rxw_lead ) ) {
+		if ( pgm_uint32_lte ( g_ntohl (data->data_sqn), hoststat->rxw_lead ) ) {
 			hoststat->general.duplicate++;
 			break;
 		} else {
-			hoststat->rxw_lead = g_ntohl (((struct pgm_data*)packet)->data_sqn);
+			hoststat->rxw_lead = g_ntohl (data->data_sqn);
 
-			hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
+			hoststat->odata.tsdu += g_ntohs (skb->pgm_header->pgm_tsdu_length);
 		}
 		break;
 
 	case PGM_RDATA:
 		hoststat->rdata.count++;
-		hoststat->rdata.bytes += len;
+		hoststat->rdata.bytes += skb->len;
 		hoststat->rdata.last = now;
 		break;
 
 	case PGM_POLL:
 		hoststat->poll.count++;
-		hoststat->poll.bytes += len;
+		hoststat->poll.bytes += skb->len;
 		hoststat->poll.last = now;
 		break;
 
 	case PGM_POLR:
 		hoststat->polr.count++;
-		hoststat->polr.bytes += len;
+		hoststat->polr.bytes += skb->len;
 		hoststat->polr.last = now;
 		break;
 
 	case PGM_NAK:
 		hoststat->nak.count++;
-		hoststat->nak.bytes += len;
+		hoststat->nak.bytes += skb->len;
 		hoststat->nak.last = now;
 
-		err = pgm_verify_nak (pgm_header, packet, packet_length);
+		err = pgm_verify_nak (skb->pgm_header, skb->data, skb->len);
 
 		if (err) {
 			hoststat->nak.invalid++;
@@ -886,22 +887,22 @@ on_io_data (
 
 	case PGM_NNAK:
 		hoststat->nnak.count++;
-		hoststat->nnak.bytes += len;
+		hoststat->nnak.bytes += skb->len;
 		hoststat->nnak.last = now;
 		break;
 
 	case PGM_NCF:
 		hoststat->ncf.count++;
-		hoststat->ncf.bytes += len;
+		hoststat->ncf.bytes += skb->len;
 		hoststat->ncf.last = now;
 		break;
 
 	case PGM_SPMR:
 		hoststat->spmr.count++;
-		hoststat->spmr.bytes += len;
+		hoststat->spmr.bytes += skb->len;
 		hoststat->spmr.last = now;
 
-		err = pgm_verify_spmr (pgm_header, packet, packet_length);
+		err = pgm_verify_spmr (skb->pgm_header, skb->data, skb->len);
 
 		if (err) {
 			hoststat->spmr.invalid++;
@@ -921,6 +922,7 @@ on_io_data (
 		hoststat->general.last_valid = now;
 	}
 
+	pgm_free_skb (skb);
 	return TRUE;
 }
 

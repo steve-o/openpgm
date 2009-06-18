@@ -35,6 +35,7 @@
 
 #include "pgm/backtrace.h"
 #include "pgm/rxwi.h"
+#include "pgm/skbuff.h"
 
 #if 1
 #define g_trace(...)	while (0)
@@ -174,7 +175,7 @@ flush_rxw (
 	do {
 		pgm_msgv_t* pmsgv = msgv;
 		struct pgm_iovec* piov = iov;
-		bytes_read = pgm_rxw_readv (r, &pmsgv, G_N_ELEMENTS(msgv), &piov, G_N_ELEMENTS(iov));
+		bytes_read = pgm_rxw_readv (r, &pmsgv, G_N_ELEMENTS(msgv), &piov, G_N_ELEMENTS(iov), 0);
 	} while (bytes_read > 0);
 
 	return 0;
@@ -187,22 +188,23 @@ backoff_state_foreach (
 {
 	g_return_val_if_fail (r != NULL, -1);
 
-	GList* list = r->backoff_queue->tail;
+	GList* list = r->backoff_queue.tail;
 
 	if (!list) return 0;
 
 	while (list)
 	{
 		GList* next_list_el = list->prev;
-		pgm_rxw_packet_t* rp = (pgm_rxw_packet_t*)list->data;
+		struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)list;
+		pgm_rxw_packet_t* pkt = (pgm_rxw_packet_t*)&skb->cb;
 
-		pgm_rxw_pkt_state_unlink (r, rp);
+		pgm_rxw_pkt_state_unlink (r, skb);
 
 		/* -- pretend to send nak here -- */
 
 /* nak sent, await ncf */
-		rp->state = PGM_PKT_WAIT_NCF_STATE;
-		g_queue_push_head_link (r->wait_ncf_queue, &rp->link_);
+		pkt->state = PGM_PKT_WAIT_NCF_STATE;
+		g_queue_push_head_link (&r->wait_ncf_queue, &skb->link_);
 
 		list = next_list_el;
 	}
@@ -220,42 +222,28 @@ test_basic_rxw (
 	gpointer rxw;
 	int i;
 
-	GTrashStack* trash_data = NULL;
-	GTrashStack* trash_packet = NULL;
-	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
-
-	rxw = pgm_rxw_init (NULL, size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
-//	rxw = pgm_rxw_init (NULL, size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, count, 0, 0);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (size_per_entry);
+		const int header_size = pgm_transport_pkt_offset(FALSE);
+		pgm_skb_reserve (skb, header_size);
+		pgm_skb_put (skb, size_per_entry);
 
-		pgm_rxw_push (rxw, entry, size_per_entry, i, 0, pgm_time_now);
+		skb->sequence = i;
+		pgm_rxw_push (rxw, skb, pgm_time_now);
 		backoff_state_foreach (rxw);
 		flush_rxw (rxw);
 	}
 	gettimeofday(&now, NULL);
 
-        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
-
 	pgm_rxw_shutdown (rxw);
 
-	gpointer* p = NULL;
-	if (trash_data)
-	while ( (p = g_trash_stack_pop (&trash_data)) )
-	{
-		g_slice_free1 (size_per_entry, p);
-	}
-	if (trash_packet)
-	while ( (p = g_trash_stack_pop (&trash_packet)) )
-	{
-		g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
-	}
-
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
 
@@ -269,41 +257,28 @@ test_jump (
 	gpointer rxw;
 	int i, j;
 
-	GTrashStack* trash_data = NULL;
-	GTrashStack* trash_packet = NULL;
-	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
-
-	rxw = pgm_rxw_init (NULL, size_per_entry, 2 * count, 2 * count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, 2 * count, 0, 0);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = j = 0; i < count; i++, j+=2)
 	{
-		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (size_per_entry);
+		const int header_size = pgm_transport_pkt_offset(FALSE);
+		pgm_skb_reserve (skb, header_size);
+		pgm_skb_put (skb, size_per_entry);
 
-		pgm_rxw_push (rxw, entry, size_per_entry, j, 0, pgm_time_now);
+		skb->sequence = j;
+		pgm_rxw_push (rxw, skb, pgm_time_now);
 		backoff_state_foreach (rxw);
 		flush_rxw (rxw);
 	}
 	gettimeofday(&now, NULL);
 
-        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
-
 	pgm_rxw_shutdown (rxw);
 
-	gpointer* p = NULL;
-	if (trash_data)
-	while ( (p = g_trash_stack_pop (&trash_data)) )
-	{
-		g_slice_free1 (size_per_entry, p);
-	}
-	if (trash_packet)
-	while ( (p = g_trash_stack_pop (&trash_packet)) )
-	{
-		g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
-	}
-
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
 
@@ -317,46 +292,30 @@ test_reverse (
 	gpointer rxw;
 	int i, j;
 
-	GTrashStack* trash_data = NULL;
-	GTrashStack* trash_packet = NULL;
-	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
-
-	rxw = pgm_rxw_init (NULL, size_per_entry, count, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
-//	rxw = pgm_rxw_init (NULL, size_per_entry, 0, count, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, count, 0, 0);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0, j = count; i < count; i++)
 	{
-		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (size_per_entry);
+		const int header_size = pgm_transport_pkt_offset(FALSE);
+		pgm_skb_reserve (skb, header_size);
+		pgm_skb_put (skb, size_per_entry);
 
-		if (i > 0)
-			pgm_rxw_push (rxw, entry, size_per_entry, --j, 0, pgm_time_now);
-		else
-			pgm_rxw_push (rxw, entry, size_per_entry, i, 0, pgm_time_now);
+		if (i > 0)	skb->sequence = --j;
+		else		skb->sequence =   i;
 
+		pgm_rxw_push (rxw, skb, pgm_time_now);
 		backoff_state_foreach (rxw);
 		flush_rxw (rxw);
 	}
 	gettimeofday(&now, NULL);
 
-        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
-
 	pgm_rxw_shutdown (rxw);
 
-	gpointer* p = NULL;
-	if (trash_data)
-	while ( (p = g_trash_stack_pop (&trash_data)) )
-	{
-		g_slice_free1 (size_per_entry, p);
-	}
-	if (trash_packet)
-	while ( (p = g_trash_stack_pop (&trash_packet)) )
-	{
-		g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
-	}
-
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
 
@@ -370,44 +329,28 @@ test_fill (
 	gpointer rxw;
 	int i;
 
-	GTrashStack* trash_data = NULL;
-	GTrashStack* trash_packet = NULL;
-	GStaticMutex trash_mutex = G_STATIC_MUTEX_INIT;
-
-	rxw = pgm_rxw_init (NULL, size_per_entry, count+1, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
-//	rxw = pgm_rxw_init (NULL, size_per_entry, 0, count+1, 0, 0, &trash_data, &trash_packet, &trash_mutex);
+	rxw = pgm_rxw_init (NULL, size_per_entry, count+1, 0, 0);
 	g_assert (rxw);
 	pgm_rxw_window_update(rxw, 0 /* trail */, -1 /* lead */, 1, 0, pgm_time_update_now());
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? pgm_rxw_alloc(rxw) : NULL;
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (size_per_entry);
+		const int header_size = pgm_transport_pkt_offset(FALSE);
+		pgm_skb_reserve (skb, header_size);
+		pgm_skb_put (skb, size_per_entry);
 
-		pgm_rxw_push (rxw, entry, size_per_entry, i+1, 0, pgm_time_now);
-
-// immediately send naks
+		skb->sequence = i + 1;
+		pgm_rxw_push (rxw, skb, pgm_time_now);
 		backoff_state_foreach (rxw);
 		flush_rxw (rxw);
 	}
 	gettimeofday(&now, NULL);
 
-        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
-
 	pgm_rxw_shutdown (rxw);
 
-	gpointer* p = NULL;
-	if (trash_data)
-	while ( (p = g_trash_stack_pop (&trash_data)) )
-	{
-		g_slice_free1 (size_per_entry, p);
-	}
-	if (trash_packet)
-	while ( (p = g_trash_stack_pop (&trash_packet)) )
-	{
-		g_slice_free1 (sizeof(pgm_rxw_packet_t), p);
-	}
-
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
 

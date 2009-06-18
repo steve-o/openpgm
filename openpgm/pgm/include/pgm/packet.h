@@ -29,6 +29,10 @@
 
 #include <glib.h>
 
+#ifndef __PGM_SKBUFF_H__
+#	include <pgm/skbuff.h>
+#endif
+
 
 #ifndef IPPROTO_PGM
 #define IPPROTO_PGM 		    113
@@ -368,9 +372,9 @@ struct pgm_opt6_path_nla {
 
 G_BEGIN_DECLS
 
-int pgm_parse (struct pgm_header*, gsize, struct pgm_header**, gpointer*, gsize*);
-int pgm_parse_raw (gpointer, gsize, struct sockaddr*, socklen_t*, struct pgm_header**, gpointer*, gsize*);
-int pgm_parse_udp_encap (gpointer, gsize, struct sockaddr*, socklen_t*, struct pgm_header**, gpointer*, gsize*);
+int pgm_parse (struct pgm_sk_buff_t*);
+int pgm_parse_raw (struct pgm_sk_buff_t*);
+int pgm_parse_udp_encap (struct pgm_sk_buff_t*);
 gboolean pgm_print_packet (gpointer, gsize);
 
 static inline gboolean pgm_is_upstream (guint8 type)
