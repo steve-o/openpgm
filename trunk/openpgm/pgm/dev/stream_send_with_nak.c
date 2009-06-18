@@ -95,7 +95,7 @@ static gchar* print_tsi (gconstpointer);
 
 static void send_spm (void);
 static void send_odata (void);
-static void send_rdata (int, gpointer, int);
+static void send_rdata (int, struct pgm_sk_buff_t*);
 static gboolean on_spm_timer (gpointer);
 static gboolean on_odata_timer (gpointer);
 
@@ -211,7 +211,7 @@ on_startup (
 	puts ("startup.");
 
 	puts ("construct transmit window.");
-	g_txw = pgm_txw_init (g_max_tpdu, 0, g_txw_sqns, 0, 0);
+	g_txw = pgm_txw_init (g_max_tpdu, g_txw_sqns, 0, 0);
 
 /* find PGM protocol id */
 // TODO: fix valgrind errors
@@ -414,43 +414,38 @@ on_io_data (
 {
 	printf ("on_data: ");
 
-	char buffer[4096];
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (4096);
 	static struct timeval tv;
 	gettimeofday(&tv, NULL);
 
 	int fd = g_io_channel_unix_get_fd(source);
 	struct sockaddr_in addr;
 	socklen_t addr_len = sizeof(addr);
-	int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
+	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&addr, &addr_len);
 
-	printf ("%i bytes received from %s.\n", len, inet_ntoa(addr.sin_addr));
+	printf ("%i bytes received from %s.\n", skb->len, inet_ntoa(addr.sin_addr));
 
-	struct sockaddr_in dst_addr;
-	socklen_t dst_addr_len;
-	struct pgm_header *pgm_header;
-	gpointer packet;
-	gsize packet_length;
-	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	int e = pgm_parse_raw (skb);
 
 	switch (e) {
 	case -2:
 	case -1:
 		fflush(stdout);
+		pgm_free_skb (skb);
 		return TRUE;
 
 	default: break;
 	}
 
-	struct tsi tsi;
-	memcpy (tsi.gsi, pgm_header->pgm_gsi, 6 * sizeof(guint8));
-	tsi.source_port = pgm_header->pgm_sport;
+	printf ("tsi %s\n", print_tsi (&skb->tsi));
 
-	printf ("tsi %s\n", print_tsi (&tsi));
+	skb->data       = (guint8*)skb->data + sizeof(struct pgm_header);
+	skb->len       -= sizeof(struct pgm_header);
 
 	gboolean err = FALSE;
-	switch (pgm_header->pgm_type) {
+	switch (skb->pgm_header->pgm_type) {
 	case PGM_NAK:
-		err = on_nak (pgm_header, pgm_header + 1, packet_length - sizeof(pgm_header));
+		err = on_nak (skb->pgm_header, skb->data, skb->len);
 		break;
 
 	default:
@@ -459,6 +454,7 @@ on_io_data (
 		break;
 	}
 
+	pgm_free_skb (skb);
 	fflush(stdout);
 	return TRUE;
 }
@@ -514,14 +510,14 @@ on_nak (
 
 	printf ("src %s for #%i", s, nak->nak_sqn);
 
-	gpointer rdata = NULL;
-	guint16 rlen = 0;
-	if (!pgm_txw_peek (g_txw, nak->nak_sqn, &rdata, &rlen))
+	struct pgm_sk_buff_t* rdata_skb;
+	if (!pgm_txw_peek (g_txw, nak->nak_sqn, &rdata_skb))
 	{
 		puts (", in window");
-
-		send_rdata (nak->nak_sqn, rdata, rlen);
-	} else {
+		send_rdata (nak->nak_sqn, rdata_skb);
+	}
+	else
+	{
 		puts (", sequence number not available.");
 	}
 
@@ -711,7 +707,14 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
         header->pgm_checksum = pgm_csum_fold (pgm_csum_partial(buf, tpdu_length, 0));
 
 /* add to transmit window */
-	pgm_txw_push_copy (g_txw, payload_string, strlen(payload_string) + 1);
+	const int payload_length = strlen(payload_string) + 1;
+
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (1024);
+	const int header_size = pgm_transport_pkt_offset(FALSE);
+	pgm_skb_reserve (skb, header_size);
+	pgm_skb_put (skb, payload_length);
+	memcpy (skb->data, payload_string, payload_length);
+	pgm_txw_push (g_txw, skb);
 
 /* corrupt packet */
 	if (g_corruption && g_random_int_range (0, 100) < g_corruption)
@@ -750,18 +753,17 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 
 static void
 send_rdata (
-	int		sequence_number,
-	gpointer	data,
-	int		len
+	int			sequence_number,
+	struct pgm_sk_buff_t*	skb
 	)
 {
 	puts ("send_rdata.");
 
 	int e;
-	char* payload_string = (char*)data;
+	char* payload_string = (char*)skb->data;
 
 /* construct PGM packet */
-	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + len;
+	int tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + skb->len;
 	gchar *buf = (gchar*)malloc( tpdu_length );
 	if (buf == NULL) {
 		perror ("oh crap.");
@@ -773,7 +775,7 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
 	"payload size %i\n",
 	sizeof(struct pgm_header),
 	sizeof(struct pgm_data),
-	len );
+	skb->len );
 
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_data *rdata = (struct pgm_data*)(header + 1);
@@ -791,13 +793,13 @@ printf ("PGM header size %" G_GSIZE_FORMAT "\n"
         header->pgm_gsi[4]      = 5;
         header->pgm_gsi[5]      = 6;
 
-        header->pgm_tsdu_length = g_htons (len);               /* transport data unit length */
+        header->pgm_tsdu_length = g_htons (skb->len);               /* transport data unit length */
 
 /* RDATA */
         rdata->data_sqn         = g_htonl (sequence_number);
         rdata->data_trail       = g_htonl (pgm_txw_trail(g_txw));
 
-        memcpy (rdata + 1, payload_string, len);
+        memcpy (rdata + 1, payload_string, skb->len);
 
         header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 

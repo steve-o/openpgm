@@ -137,21 +137,23 @@ test_basic_txw (
 	gpointer txw;
 	int i;
 
-	txw = pgm_txw_init (size_per_entry, count, count, 0, 0);
+	txw = pgm_txw_init (size_per_entry, count, 0, 0);
 
 	gettimeofday(&start, NULL);
 	for (i = 0; i < count; i++)
 	{
-		char *entry = size_per_entry ? pgm_txw_alloc(txw) : NULL;
+		struct pgm_sk_buff_t* skb = pgm_alloc_skb (size_per_entry);
+		const int header_size = pgm_transport_pkt_offset(FALSE);
+		pgm_skb_reserve (skb, header_size);
+		pgm_skb_put (skb, size_per_entry);
 
-		pgm_txw_push (txw, entry, size_per_entry);
+		pgm_txw_push (txw, skb);
 	}
 	gettimeofday(&now, NULL);
 
-        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
-
 	pgm_txw_shutdown (txw);
 
+        double secs = (now.tv_sec - start.tv_sec) + ( (now.tv_usec - start.tv_usec) / 1000.0 / 1000.0 );
 	return (secs * 1000.0 * 1000.0) / (double)count;
 }
 

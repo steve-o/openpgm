@@ -19,6 +19,7 @@ opt.AddOptions (
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_PLUS', 'libpgmplus GPL library', 'true', ('true', 'false'))),
 )
 
