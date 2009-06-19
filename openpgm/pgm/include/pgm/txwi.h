@@ -33,6 +33,9 @@ G_BEGIN_DECLS
 
 struct pgm_txw_packet_t {
 	guint32		unfolded_checksum;	/* first 32-bit word must be checksum */
+
+	unsigned	waiting_retransmit:1;	/* in retransmit queue */
+
 #if 0
         struct timeval  expiry;			/* Advance with time */
         struct timeval  last_retransmit;	/* NAK elimination */
