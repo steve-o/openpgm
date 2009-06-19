@@ -62,10 +62,15 @@
 	( (struct pgm_sk_buff_t*)g_ptr_array_index(&(w)->pdata, TXW_SKB_OFFSET((w), (x))) )
 #define TXW_PACKET(w,x) \
 	( (struct pgm_txw_packet_t*)&(TXW_SKB(w,x))->cb )
-#define TXW_SET_SKB(w,x,v) \
+#define TXW_SET_SKB(w,v) \
+	do { \
+		register int _o = TXW_SKB_OFFSET((w), (v)->sequence); \
+		g_ptr_array_index(&(w)->pdata, _o) = (v); \
+	} while (0)
+#define TXW_CLEAR_SKB(w,x) \
 	do { \
 		register int _o = TXW_SKB_OFFSET((w), (x)); \
-		g_ptr_array_index(&(w)->pdata, _o) = (v); \
+		g_ptr_array_index(&(w)->pdata, _o) = NULL; \
 	} while (0)
 
 #ifdef TXW_DEBUG
@@ -222,7 +227,7 @@ pgm_txw_push (
 /* add to window */
 	skb->sequence		= t->lead;
 
-	TXW_SET_SKB(t, skb->sequence, skb);
+	TXW_SET_SKB(t, skb);
 	g_trace ("#%u: adding packet", skb->sequence);
 
 	t->bytes_in_window += skb->len;
@@ -275,13 +280,15 @@ pgm_txw_pop (
 	}
 
 	struct pgm_sk_buff_t* skb	= TXW_SKB(t, t->trail);
+	g_assert (skb);
+	pgm_txw_packet_t* pkt		= (pgm_txw_packet_t*)&skb->cb;
 
 /* packet is waiting for retransmission */
 	g_static_mutex_lock (&t->retransmit_mutex);
-	if (skb->link_.data)
+	if (pkt->waiting_retransmit)
 	{
-		g_queue_unlink (&t->retransmit_queue, &skb->link_);
-		skb->link_.data = NULL;
+		g_queue_unlink (&t->retransmit_queue, (GList*)skb);
+		pkt->waiting_retransmit = 0;
 	}
 	g_static_mutex_unlock (&t->retransmit_mutex);
 
@@ -289,7 +296,7 @@ pgm_txw_pop (
 	t->packets_in_window--;
 
 	pgm_free_skb (skb);
-	TXW_SET_SKB(t, t->trail, NULL);
+	TXW_CLEAR_SKB(t, t->trail);
 
 	t->trail++;
 
@@ -338,10 +345,11 @@ printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 		}
 
 		struct pgm_sk_buff_t* skb	= TXW_SKB(t, nak_tg_sqn);
+		g_assert (skb);
 		pgm_txw_packet_t* pkt		= (pgm_txw_packet_t*)&skb->cb;
 
 		g_static_mutex_lock (&t->retransmit_mutex);
-		if (skb->link_.data)
+		if (pkt->waiting_retransmit)
 		{
 			if (pkt->pkt_cnt_requested >= nak_pkt_cnt)
 			{
@@ -354,11 +362,14 @@ printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 			pkt->pkt_cnt_requested = nak_pkt_cnt;
 			return 0;
 		}
+		else
+		{
+			pkt->waiting_retransmit = 1;
+		}
 
 /* new request */
 		pkt->pkt_cnt_requested++;
-		skb->link_.data = skb;
-		g_queue_push_head_link (&t->retransmit_queue, &skb->link_);
+		g_queue_push_head_link (&t->retransmit_queue, (GList*)skb);
 		g_static_mutex_unlock (&t->retransmit_mutex);
 
 	}
@@ -374,17 +385,18 @@ printf ("nak_tg_sqn %i nak_pkt_cnt %i\n", (int)nak_tg_sqn, (int)nak_pkt_cnt);
 		}
 
 		struct pgm_sk_buff_t* skb	= TXW_SKB(t, sequence_number);
+		g_assert (skb);
+		pgm_txw_packet_t* pkt		= (pgm_txw_packet_t*)&skb->cb;
 
 		g_static_mutex_lock (&t->retransmit_mutex);
-		if (skb->link_.data)
+		if (pkt->waiting_retransmit)
 		{
 			g_static_mutex_unlock (&t->retransmit_mutex);
 			g_trace ("%u already queued for retransmission.", sequence_number);
 			return -1;
 		}
 
-		skb->link_.data = skb;
-		g_queue_push_head_link (&t->retransmit_queue, &skb->link_);
+		g_queue_push_head_link (&t->retransmit_queue, (GList*)skb);
 		g_static_mutex_unlock (&t->retransmit_mutex);
 
 	}
@@ -418,7 +430,7 @@ pgm_txw_retransmit_try_peek (
 		return -1;
 	}
 
-	*skb = tail_link->data;
+	*skb = (struct pgm_sk_buff_t*)tail_link;
 	const pgm_txw_packet_t* pkt = (pgm_txw_packet_t*)&(*skb)->cb;
 	*unfolded_checksum = pkt->unfolded_checksum;
 
@@ -469,9 +481,9 @@ pgm_txw_retransmit_try_pop (
 		return -1;
 	}
 
-	struct pgm_sk_buff_t* skb	= tail_link->data;
+	struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)tail_link;
 	pgm_txw_packet_t* pkt		= (pgm_txw_packet_t*)&skb->cb;
-	*sequence_number = skb->sequence;
+	*sequence_number		= skb->sequence;
 
 	if (pkt->pkt_cnt_requested) {
 		*is_parity	= TRUE;
@@ -481,7 +493,7 @@ pgm_txw_retransmit_try_pop (
 		if (--(pkt->pkt_cnt_requested) == 0)
 		{
 			g_queue_pop_tail_link (&t->retransmit_queue);
-			tail_link->data = NULL;
+			pkt->waiting_retransmit = 0;
 		}
 
 /* wrap around parity generation in unlikely event that more packets requested than are available
@@ -493,13 +505,13 @@ pgm_txw_retransmit_try_pop (
 	}
 	else
 	{
-		*is_parity	= FALSE;
+		*is_parity		= FALSE;
 
 /* selective NAK, therefore pop node */
-		*packet		= skb->data;
-		*length		= skb->len;
+		*packet			= skb->data;
+		*length			= skb->len;
 		g_queue_pop_tail_link (&t->retransmit_queue);
-		tail_link->data = NULL;
+		pkt->waiting_retransmit = 0;
 	}
 
 	g_static_mutex_unlock (&t->retransmit_mutex);
@@ -525,7 +537,7 @@ pgm_txw_retransmit_pop (
 	GList* tail_link = g_queue_peek_tail_link (&t->retransmit_queue);
 	g_assert (tail_link);
 
-	struct pgm_sk_buff_t* skb	= tail_link->data;
+	struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)tail_link;
 	pgm_txw_packet_t* pkt		= (pgm_txw_packet_t*)&skb->cb;
 
 	if (pkt->pkt_cnt_requested)
@@ -534,7 +546,7 @@ pgm_txw_retransmit_pop (
 		if (--(pkt->pkt_cnt_requested) == 0)
 		{
 			g_queue_pop_tail_link (&t->retransmit_queue);
-			tail_link->data = NULL;
+			pkt->waiting_retransmit = 0;
 		}
 
 /* wrap around parity generation in unlikely event that more packets requested than are available
@@ -547,7 +559,7 @@ pgm_txw_retransmit_pop (
 	else
 	{
 		g_queue_pop_tail_link (&t->retransmit_queue);
-		tail_link->data = NULL;
+		pkt->waiting_retransmit = 0;
 	}
 
 	g_static_mutex_unlock (&t->retransmit_mutex);

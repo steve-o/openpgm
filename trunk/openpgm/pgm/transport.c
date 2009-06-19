@@ -2635,7 +2635,8 @@ recv_again:
 		case PGM_ODATA:
 			if (G_LIKELY(on_odata (source, skb))) {
 				skb = transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
-				iov.iov_base = skb->data;
+				iov.iov_base = skb->head;
+				msg.msg_name = &skb->src;
 			}
 			break;
 
@@ -2647,6 +2648,7 @@ recv_again:
 			if (on_rdata (source, skb)) {
 				skb = transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 				iov.iov_base = skb->data;
+				msg.msg_name = &skb->src;
 			}
 			break;
 
@@ -3195,7 +3197,7 @@ on_nak_notify (
 
 /* construct basic PGM header to be completed by send_rdata() */
 			r_skb = transport->parity_buffer;
-			r_skb->data = r_skb->tail= r_skb->head;
+			r_skb->data = r_skb->tail = r_skb->head;
 
 /* space for PGM header */
 			pgm_skb_put (r_skb, sizeof(struct pgm_header));
