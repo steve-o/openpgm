@@ -72,10 +72,15 @@
 	( (struct pgm_sk_buff_t*)g_ptr_array_index(&(w)->pdata, RXW_SKB_OFFSET((w), (x))) )
 #define RXW_PACKET(w,x) \
 	( (struct pgm_rxw_packet_t*)&(RXW_SKB(w,x))->cb )
-#define RXW_SET_SKB(w,x,v) \
+#define RXW_SET_SKB(w,v) \
+	do { \
+		register int _o = RXW_SKB_OFFSET((w), (v)->sequence); \
+		g_ptr_array_index(&(w)->pdata, _o) = (v); \
+	} while (0)
+#define RXW_CLEAR_SKB(w,x) \
 	do { \
 		register int _o = RXW_SKB_OFFSET((w), (x)); \
-		g_ptr_array_index(&(w)->pdata, _o) = (v); \
+		g_ptr_array_index(&(w)->pdata, _o) = NULL; \
 	} while (0)
 
 /* is (a) greater than (b) wrt. leading edge of receive window (w) */
@@ -555,7 +560,7 @@ pgm_rxw_push (
 				pad_pkt->state			= PGM_PKT_BACK_OFF_STATE;
 				pad_pkt->t0			= pgm_time_now;
 
-				RXW_SET_SKB(r, pad_skb->sequence, pad_skb);
+				RXW_SET_SKB(r, pad_skb);
 
 /* send nak by sending to end of expiry list */
 				g_queue_push_head_link (&r->backoff_queue, &pad_skb->link_);
@@ -591,9 +596,8 @@ pgm_rxw_push (
 			goto out;
 		}
 
-		struct pgm_sk_buff_t* rx_skb	= pgm_alloc_skb (r->max_tpdu);
-		pgm_rxw_packet_t* rx_pkt	= (pgm_rxw_packet_t*)&rx_skb->cb;
-		rx_skb->sequence		= r->lead;
+		pgm_rxw_packet_t* pkt	= (pgm_rxw_packet_t*)&skb->cb;
+		skb->sequence		= data_sqn;
 
 /* for fragments check that apdu is valid: dupe code to above */
 		if (    apdu_len && 
@@ -606,33 +610,23 @@ pgm_rxw_push (
 		   )
 		{
 			g_trace ("#%u: first fragment #%u not in receive window, apdu is lost.", data_sqn, apdu_first_sqn);
-			rx_pkt->state = PGM_PKT_LOST_DATA_STATE;
+			pkt->state	= PGM_PKT_LOST_DATA_STATE;
 			r->lost_count++;
-			RXW_SET_SKB(r, rx_skb->sequence, rx_skb);
-			retval = PGM_RXW_APDU_LOST;
-			r->is_waiting = TRUE;
+			RXW_SET_SKB(r, skb);
+			retval		= PGM_RXW_APDU_LOST | PGM_RXW_CONSUMED_SKB;
+			r->is_waiting	= TRUE;
 			goto out_flush;
 		}
 
 /* a non-committed packet */
 		r->fragment_count++;
+		pkt->state = PGM_PKT_HAVE_DATA_STATE;
 
-		memcpy (rx_skb->head, skb->head, (guint8*)skb->tail - (guint8*)skb->head);
-		rx_skb->tstamp			= skb->tstamp;
-		memcpy (&rx_skb->tsi, &skb->tsi, sizeof(pgm_tsi_t));
-		rx_skb->data			= (guint8*)rx_skb->head + ((guint8*)skb->data - (guint8*)skb->head);
-		rx_skb->tail			= (guint8*)rx_skb->data + ((guint8*)skb->tail - (guint8*)skb->data);
-		rx_skb->len			= skb->len;
-		rx_skb->pgm_header		= (gpointer)( (guint8*)rx_skb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head) );
-		rx_skb->pgm_opt_fragment	= skb->pgm_opt_fragment ?
-							(gpointer)( (guint8*)rx_skb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head) ) :
-							skb->pgm_opt_fragment;
-		rx_skb->pgm_data		= (gpointer)( (guint8*)rx_skb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head) );
-		rx_pkt->state			= PGM_PKT_HAVE_DATA_STATE;
+		RXW_SET_SKB(r, skb);
+		retval    |= PGM_RXW_CONSUMED_SKB;
 
-		RXW_SET_SKB(r, rx_skb->sequence, rx_skb);
-		g_trace ("#%" G_GUINT32_FORMAT ": added packet #%" G_GUINT32_FORMAT ", rxw_sqns %" G_GUINT32_FORMAT,
-			data_sqn, rx_skb->sequence, pgm_rxw_sqns(r));
+		g_trace ("#%" G_GUINT32_FORMAT ": added packet, rxw: %" G_GUINT32_FORMAT " sqns",
+			data_sqn, pgm_rxw_sqns(r));
 	}
 
 	r->is_waiting = TRUE;
@@ -1198,7 +1192,7 @@ pgm_rxw_pop_lead (
 
 	pgm_rxw_pkt_state_unlink (r, skb);
 	pgm_free_skb (skb);
-	RXW_SET_SKB(r, r->lead, NULL);
+	RXW_CLEAR_SKB(r, r->lead);
 
 	r->lead--;
 
@@ -1247,7 +1241,7 @@ pgm_rxw_pop_trail (
 
 	pgm_rxw_pkt_state_unlink (r, skb);
 	pgm_free_skb (skb);
-	RXW_SET_SKB(r, r->trail, NULL);
+	RXW_CLEAR_SKB(r, r->trail);
 
 /* advance trailing pointers as necessary */
 	if (r->trail++ == r->commit_trail)
@@ -1336,7 +1330,7 @@ pgm_rxw_window_update (
 				ph_pkt->state			= PGM_PKT_BACK_OFF_STATE;
 				ph_pkt->t0			= pgm_time_now;
 
-				RXW_SET_SKB(r, ph_skb->sequence, ph_skb);
+				RXW_SET_SKB(r, ph_skb);
 				g_trace ("adding placeholder #%u", ph_skb->sequence);
 
 /* send nak by sending to end of expiry list */
@@ -1593,7 +1587,7 @@ pgm_rxw_ncf (
 		ph_pkt->state			= PGM_PKT_BACK_OFF_STATE;
 		ph_pkt->t0			= pgm_time_now;
 
-		RXW_SET_SKB(r, ph_skb->sequence, ph_skb);
+		RXW_SET_SKB(r, ph_skb);
 		g_trace ("ncf: adding placeholder #%u", ph_skb->sequence);
 
 /* send nak by sending to end of expiry list */
@@ -1622,7 +1616,7 @@ pgm_rxw_ncf (
 	ph_pkt->state			= PGM_PKT_WAIT_DATA_STATE;
 	ph_pkt->t0			= pgm_time_now;
 		
-	RXW_SET_SKB(r, ph_skb->sequence, ph_skb);
+	RXW_SET_SKB(r, ph_skb);
 	g_trace ("ncf: adding placeholder #%u", ph_skb->sequence);
 
 /* do not send nak, simply add to ncf list */
