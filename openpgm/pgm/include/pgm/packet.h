@@ -373,7 +373,7 @@ struct pgm_opt6_path_nla {
 G_BEGIN_DECLS
 
 int pgm_parse (struct pgm_sk_buff_t*);
-int pgm_parse_raw (struct pgm_sk_buff_t*);
+int pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const);
 int pgm_parse_udp_encap (struct pgm_sk_buff_t*);
 gboolean pgm_print_packet (gpointer, gsize);
 

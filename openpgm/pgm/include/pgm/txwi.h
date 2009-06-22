@@ -31,7 +31,7 @@
 
 G_BEGIN_DECLS
 
-struct pgm_txw_packet_t {
+struct pgm_txw_state_t {
 	guint32		unfolded_checksum;	/* first 32-bit word must be checksum */
 
 	unsigned	waiting_retransmit:1;	/* in retransmit queue */
@@ -44,76 +44,80 @@ struct pgm_txw_packet_t {
 	guint8		pkt_cnt_sent;		/* # parity packets already sent */
 };
 
-typedef struct pgm_txw_packet_t pgm_txw_packet_t;
+typedef struct pgm_txw_state_t pgm_txw_state_t;
 
 struct pgm_txw_t {
-	struct {				/* GPtrArray */
-		gpointer*	pdata;
-		guint		len;
-		guint		alloc;
-	} pdata;
-
-        guint16         max_tpdu;               /* maximum packet size */
-
         guint32         lead;
         guint32         trail;
 
+/* option: lockless queue */
         GQueue		retransmit_queue;
 	GStaticMutex	retransmit_mutex;
 
-	guint32		bytes_in_window;
-	guint32		packets_in_window;
+	guint32		size;			/* window content size in bytes */
+	guint32		alloc;			/* length of pdata[] */
+	struct pgm_sk_buff_t*	pdata[];
 };
 
 typedef struct pgm_txw_t pgm_txw_t;
 
 
-pgm_txw_t* pgm_txw_init (guint16, guint32, guint, guint);
-int pgm_txw_shutdown (pgm_txw_t*);
+pgm_txw_t* pgm_txw_init (const guint16, const guint32, const guint, const guint);
+int pgm_txw_shutdown (pgm_txw_t* const);
+void pgm_txw_add (pgm_txw_t* const, struct pgm_sk_buff_t* const);
+struct pgm_sk_buff_t* pgm_txw_peek (pgm_txw_t* const, const guint32);
 
-int pgm_txw_push (pgm_txw_t*, struct pgm_sk_buff_t*);
-int pgm_txw_peek (pgm_txw_t*, guint32, struct pgm_sk_buff_t**);
-
-/* return type as defined in garray.h */
-static inline guint pgm_txw_len (pgm_txw_t* t)
+static inline guint32 pgm_txw_max_length (const pgm_txw_t* const window)
 {
-    return t->pdata.len;
+	g_assert (window);
+	return window->alloc;
 }
 
-static inline guint32 pgm_txw_sqns (pgm_txw_t* t)
+static inline guint32 pgm_txw_length (const pgm_txw_t* const window)
 {
-    return ( 1 + t->lead ) - t->trail;
+	g_assert (window);
+	return ( 1 + window->lead ) - window->trail;
 }
 
-static inline gboolean pgm_txw_empty (pgm_txw_t* t)
+static inline guint32 pgm_txw_size (const pgm_txw_t* const window)
 {
-    return pgm_txw_sqns (t) == 0;
+	g_assert (window);
+	return window->size;
 }
 
-static inline gboolean pgm_txw_full (pgm_txw_t* t)
+static inline gboolean pgm_txw_is_empty (const pgm_txw_t* const window)
 {
-    return pgm_txw_len (t) == pgm_txw_sqns (t);
+	g_assert (window);
+	return pgm_txw_length (window) == 0;
 }
 
-static inline guint32 pgm_txw_next_lead (pgm_txw_t* t)
+static inline gboolean pgm_txw_is_full (const pgm_txw_t* const window)
 {
-    return (guint32)(t->lead + 1);
+	g_assert (window);
+	return pgm_txw_length (window) == pgm_txw_max_length (window);
 }
 
-static inline guint32 pgm_txw_lead (pgm_txw_t* t)
+static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
 {
-    return t->lead;
+	g_assert (window);
+	return (guint32)(window->lead + 1);
 }
 
-static inline guint32 pgm_txw_trail (pgm_txw_t* t)
+static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
 {
-    return t->trail;
+	g_assert (window);
+	return window->lead;
 }
 
-int pgm_txw_retransmit_push (pgm_txw_t*, guint32, gboolean, guint);
-int pgm_txw_retransmit_try_peek (pgm_txw_t*, struct pgm_sk_buff_t**, guint32*, gboolean*, guint*);
-int pgm_txw_retransmit_try_pop (pgm_txw_t*, guint32*, gpointer*, guint16*, gboolean*, guint*, guint);
-int pgm_txw_retransmit_pop (pgm_txw_t*, guint);
+static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
+{
+	g_assert (window);
+	return window->trail;
+}
+
+int pgm_txw_retransmit_push (pgm_txw_t* const, const guint32, const gboolean, const guint);
+int pgm_txw_retransmit_try_peek (pgm_txw_t* const, struct pgm_sk_buff_t**, guint32* const, gboolean* const, guint* const);
+void pgm_txw_retransmit_pop (pgm_txw_t* const, const guint);
 
 G_END_DECLS
 
