@@ -32,9 +32,9 @@
 #include <glib.h>
 
 #include "pgm/ip.h"
-#include "pgm/packet.h"
 #include "pgm/checksum.h"
 #include "pgm/skbuff.h"
+#include "pgm/packet.h"
 
 
 /* globals */
@@ -53,7 +53,8 @@ static gssize pgm_print_options (gpointer, gsize);
 
 int
 pgm_parse_raw (
-	struct pgm_sk_buff_t* skb		/* data will be modified */
+	struct pgm_sk_buff_t* const	skb,		/* data will be modified */
+	struct sockaddr* const		dst
 	)
 {
 /* minimum size should be IP header plus PGM header */
@@ -115,7 +116,7 @@ pgm_parse_raw (
 	switch (ip->ip_v)
 	{
 	case 4: {
-		struct sockaddr_in* sin = (struct sockaddr_in*)&skb->dst;
+		struct sockaddr_in* sin = (struct sockaddr_in*)dst;
 		sin->sin_family		= AF_INET;
 		sin->sin_addr.s_addr	= ip->ip_dst.s_addr;
 		break;
@@ -123,7 +124,7 @@ pgm_parse_raw (
 
 	case 6: {
 		const struct pgm_ip6_hdr* ip6	= (struct pgm_ip6_hdr*)skb->data;
-		struct sockaddr_in6* sin6 	= (struct sockaddr_in6*)&skb->dst;
+		struct sockaddr_in6* sin6 	= (struct sockaddr_in6*)dst;
 		sin6->sin6_family		= AF_INET6;
 		sin6->sin6_addr			= ip6->ip6_dst;
 		g_warning ("IPv6 packet headers are not provided by PF_PACKET capture.");

@@ -35,14 +35,15 @@
 //#define RXW_DEBUG
 
 #ifndef RXW_DEBUG
-#define G_DISABLE_ASSERT
+//#define G_DISABLE_ASSERT
 #endif
 
 #include <glib.h>
 
-#include "pgm/rxwi.h"
-#include "pgm/sn.h"
-#include "pgm/timer.h"
+#include <pgm/skbuff.h>
+#include <pgm/rxwi.h>
+#include <pgm/sn.h>
+#include <pgm/timer.h>
 
 #ifndef RXW_DEBUG
 #define g_trace(...)		while (0)
@@ -135,13 +136,31 @@
 					     (w)->parity_count + \
 					     (w)->committed_count + \
 					     (w)->parity_data_count ) > 0 ); \
+				if ( (w)->backoff_queue.length ) { \
+					g_assert ( (w)->backoff_queue.head ); \
+					g_assert ( (w)->backoff_queue.tail ); \
+				} \
+				if ( (w)->wait_ncf_queue.length ) { \
+					g_assert ( (w)->wait_ncf_queue.head ); \
+					g_assert ( (w)->wait_ncf_queue.tail ); \
+				} \
+				if ( (w)->wait_data_queue.length ) { \
+					g_assert ( (w)->wait_data_queue.head ); \
+					g_assert ( (w)->wait_data_queue.tail ); \
+				} \
 			} \
 		} \
 		else \
 		{ \
 			g_assert ( (w)->backoff_queue.length == 0 ); \
+			g_assert ( (w)->backoff_queue.head == NULL ); \
+			g_assert ( (w)->backoff_queue.tail == NULL ); \
 			g_assert ( (w)->wait_ncf_queue.length == 0 ); \
+			g_assert ( (w)->wait_ncf_queue.head == NULL ); \
+			g_assert ( (w)->wait_ncf_queue.tail == NULL ); \
 			g_assert ( (w)->wait_data_queue.length == 0 ); \
+			g_assert ( (w)->wait_data_queue.head == NULL ); \
+			g_assert ( (w)->wait_data_queue.tail == NULL ); \
 			g_assert ( (w)->lost_count == 0 ); \
 			g_assert ( (w)->fragment_count == 0 ); \
 			g_assert ( (w)->parity_count == 0 ); \
@@ -456,7 +475,7 @@ pgm_rxw_push (
 				{
 					rx_pkt->state = PGM_PKT_WAIT_DATA_STATE;
 				}
-				g_queue_push_head_link (&r->wait_data_queue, &rx_skb->link_);
+				g_queue_push_head_link (&r->wait_data_queue, (GList*)rx_skb);
 			}
 			else if ( rx_pkt->state == PGM_PKT_LOST_DATA_STATE )	/* lucky packet */
 			{
@@ -470,23 +489,20 @@ pgm_rxw_push (
 
 /* swap place holder skb with incoming skb
  */
-			memcpy (rx_skb->head, skb->head, (guint8*)skb->tail - (guint8*)skb->head);
-			rx_skb->tstamp			= skb->tstamp;
-			memcpy (&rx_skb->tsi, &skb->tsi, sizeof(pgm_tsi_t));
-			rx_skb->data			= (guint8*)rx_skb->head + ((guint8*)skb->data - (guint8*)skb->head);
-			rx_skb->tail			= (guint8*)rx_skb->data + ((guint8*)skb->tail - (guint8*)skb->data);
-			rx_skb->len			= skb->len;
-			rx_skb->pgm_header		= (gpointer)( (guint8*)rx_skb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head) );
-			rx_skb->pgm_opt_fragment	= skb->pgm_opt_fragment ?
-								(gpointer)( (guint8*)rx_skb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head) ) :
-								skb->pgm_opt_fragment;
-			rx_skb->pgm_data		= (gpointer)( (guint8*)rx_skb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head) );
-
 			pgm_rxw_pkt_state_unlink (r, rx_skb);
-			rx_pkt->state	= PGM_PKT_HAVE_DATA_STATE;
-			retval		= PGM_RXW_FILLED_PLACEHOLDER;
 
-			const guint32 fill_time = pgm_time_now - rx_pkt->t0;
+			skb->sequence		= rx_skb->sequence;
+			pgm_rxw_packet_t* pkt	= (pgm_rxw_packet_t*)&skb->cb;
+			memcpy (pkt, rx_pkt, sizeof(pgm_rxw_packet_t));
+
+			pgm_free_skb (rx_skb);
+			rx_skb = NULL; rx_pkt = NULL;
+
+			pkt->state		= PGM_PKT_HAVE_DATA_STATE;
+			RXW_SET_SKB(r, skb);
+			retval			= PGM_RXW_FILLED_PLACEHOLDER | PGM_RXW_CONSUMED_SKB;
+
+			const guint32 fill_time = skb->tstamp - pkt->t0;
 			if (!r->max_fill_time) {
 				r->max_fill_time = r->min_fill_time = fill_time;
 			}
@@ -498,14 +514,14 @@ pgm_rxw_push (
 					r->min_fill_time = fill_time;
 
 				if (!r->max_nak_transmit_count) {
-					r->max_nak_transmit_count = r->min_nak_transmit_count = rx_pkt->nak_transmit_count;
+					r->max_nak_transmit_count = r->min_nak_transmit_count = pkt->nak_transmit_count;
 				}
 				else
 				{
-					if (rx_pkt->nak_transmit_count > r->max_nak_transmit_count)
-						r->max_nak_transmit_count = rx_pkt->nak_transmit_count;
-					else if (rx_pkt->nak_transmit_count < r->min_nak_transmit_count)
-						r->min_nak_transmit_count = rx_pkt->nak_transmit_count;
+					if (pkt->nak_transmit_count > r->max_nak_transmit_count)
+						r->max_nak_transmit_count = pkt->nak_transmit_count;
+					else if (pkt->nak_transmit_count < r->min_nak_transmit_count)
+						r->min_nak_transmit_count = pkt->nak_transmit_count;
 				}
 			}
 		}
@@ -563,7 +579,7 @@ pgm_rxw_push (
 				RXW_SET_SKB(r, pad_skb);
 
 /* send nak by sending to end of expiry list */
-				g_queue_push_head_link (&r->backoff_queue, &pad_skb->link_);
+				g_queue_push_head_link (&r->backoff_queue, (GList*)pad_skb);
 				g_trace ("#%" G_GUINT32_FORMAT ": place holder, backoff_queue %" G_GUINT32_FORMAT "/%u lead %" G_GUINT32_FORMAT,
 					data_sqn, r->backoff_queue.length, pgm_rxw_sqns(r), r->lead);
 
@@ -679,9 +695,8 @@ pgm_rxw_readv (
 	while ( !pgm_rxw_incoming_empty (r) )
 	{
 		struct pgm_sk_buff_t* commit_skb	= RXW_SKB(r, r->commit_lead);
-		g_assert ( commit_skb != NULL );
+		g_assert ( commit_skb );
 		pgm_rxw_packet_t* commit_pkt		= (pgm_rxw_packet_t*)&commit_skb->cb;
-		g_assert ( commit_pkt != NULL );
 
 		switch (commit_pkt->state) {
 		case PGM_PKT_LOST_DATA_STATE:
@@ -780,7 +795,7 @@ pgm_rxw_readv (
 						g_ntohl (commit_skb->of_apdu_first_sqn), apdu_skb->sequence);
 
 /* pass upstream & cleanup */
-					(*pmsg)->msgv_identifier = r->identifier;
+					(*pmsg)->msgv_tsi	 = r->identifier;
 					(*pmsg)->msgv_iovlen     = 0;
 					(*pmsg)->msgv_iov        = *piov;
 					for (guint32 i = g_ntohl (commit_skb->of_apdu_first_sqn); i < frag; i++)
@@ -831,7 +846,7 @@ pgm_rxw_readv (
 					commit_skb->sequence);
 
 /* pass upstream */
-				(*pmsg)->msgv_identifier = r->identifier;
+				(*pmsg)->msgv_tsi	 = r->identifier;
 				(*pmsg)->msgv_iovlen     = 1;
 				(*pmsg)->msgv_iov        = *piov;
 
@@ -986,7 +1001,7 @@ pgm_rxw_pkt_state_unlink (
 		break;
 
 	default:
-		g_critical ("pkt->state = %i", pkt->state);
+		g_critical ("pkt->state = %s (%i)", pgm_rxw_state_string(pkt->state), pkt->state);
 		g_assert_not_reached();
 		break;
 	}
@@ -996,8 +1011,10 @@ pgm_rxw_pkt_state_unlink (
 #ifdef RXW_DEBUG
 		guint original_length = queue->length;
 #endif
-		g_queue_unlink (queue, &skb->link_);
-		skb->link_.prev = skb->link_.next = NULL;
+		GList* queue_link = (GList*)skb;
+		g_queue_unlink (queue, queue_link);
+		g_assert (queue_link->next == NULL);
+		g_assert (queue_link->prev == NULL);
 #ifdef RXW_DEBUG
 		g_assert (queue->length == original_length - 1);
 #endif
@@ -1089,8 +1106,6 @@ pgm_rxw_push_nth_parity (
 		   parity_pkt->state == PGM_PKT_WAIT_DATA_STATE ||
 		   parity_pkt->state == PGM_PKT_LOST_DATA_STATE );
 
-	pgm_rxw_pkt_state_unlink (r, parity_skb);
-
 	memcpy (parity_skb->head, skb->head, (guint8*)skb->tail - (guint8*)skb->head);
 	parity_skb->data		= (guint8*)parity_skb->head + ((guint8*)skb->data - (guint8*)skb->head);
 	parity_skb->tail		= (guint8*)parity_skb->data + ((guint8*)skb->tail - (guint8*)skb->data);
@@ -1098,6 +1113,8 @@ pgm_rxw_push_nth_parity (
 	parity_skb->pgm_header		= (gpointer)( (guint8*)parity_skb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head) );
 	parity_skb->pgm_opt_fragment	= (gpointer)( (guint8*)parity_skb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head) );
 	parity_skb->pgm_data		= (gpointer)( (guint8*)parity_skb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head) );
+
+	pgm_rxw_pkt_state_unlink (r, parity_skb);
 	parity_pkt->state		= PGM_PKT_HAVE_PARITY_STATE;
 
 	r->parity_count++;
@@ -1334,7 +1351,7 @@ pgm_rxw_window_update (
 				g_trace ("adding placeholder #%u", ph_skb->sequence);
 
 /* send nak by sending to end of expiry list */
-				g_queue_push_head_link (&r->backoff_queue, &ph_skb->link_);
+				g_queue_push_head_link (&r->backoff_queue, (GList*)ph_skb);
 				naks++;
 			}
 		}
@@ -1441,6 +1458,7 @@ pgm_rxw_mark_lost (
 	ASSERT_RXW_POINTER_INVARIANT(r);
 
 	struct pgm_sk_buff_t* skb	= RXW_SKB(r, sequence_number);
+	g_assert (skb);
 	pgm_rxw_packet_t* pkt		= (pgm_rxw_packet_t*)&skb->cb;
 
 /* invalid if we already have data or parity */
@@ -1450,8 +1468,8 @@ pgm_rxw_mark_lost (
 
 /* remove current state */
 	pgm_rxw_pkt_state_unlink (r, skb);
-
 	pkt->state = PGM_PKT_LOST_DATA_STATE;
+
 	r->lost_count++;
 	r->cumulative_losses++;
 	r->is_waiting = TRUE;
@@ -1536,7 +1554,7 @@ pgm_rxw_ncf (
 
 		pgm_rxw_pkt_state_unlink (r, skb);
 		pkt->state = PGM_PKT_WAIT_DATA_STATE;
-		g_queue_push_head_link (&r->wait_data_queue, &skb->link_);
+		g_queue_push_head_link (&r->wait_data_queue, (GList*)skb);
 
 		retval = PGM_RXW_CREATED_PLACEHOLDER;
 		goto out;
@@ -1591,7 +1609,7 @@ pgm_rxw_ncf (
 		g_trace ("ncf: adding placeholder #%u", ph_skb->sequence);
 
 /* send nak by sending to end of expiry list */
-		g_queue_push_head_link (&r->backoff_queue, &ph_skb->link_);
+		g_queue_push_head_link (&r->backoff_queue, (GList*)ph_skb);
 
 		r->lead++;
 	}
@@ -1620,7 +1638,7 @@ pgm_rxw_ncf (
 	g_trace ("ncf: adding placeholder #%u", ph_skb->sequence);
 
 /* do not send nak, simply add to ncf list */
-	g_queue_push_head_link (&r->wait_data_queue, &ph_skb->link_);
+	g_queue_push_head_link (&r->wait_data_queue, (GList*)ph_skb);
 
 	r->is_waiting = TRUE;
 

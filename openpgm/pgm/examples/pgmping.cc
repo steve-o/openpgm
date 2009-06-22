@@ -449,7 +449,7 @@ receiver_thread (
 	gssize len = 0;
 	pgm_time_t loss_tstamp = 0;
 	pgm_tsi_t  loss_tsi;
-	guint32	   loss_count;
+	guint32	   loss_count = 0;
 
 	memset (&loss_tsi, 0, sizeof(loss_tsi));
 
@@ -537,48 +537,52 @@ on_data (
 		struct pgm_sk_buff_t* skb  = (struct pgm_sk_buff_t*)msgv->msgv_iov->iov_base;
 
 /* only parse first fragment of each apdu */
-		ping.ParseFromArray (skb->data, skb->len);
+		if (!ping.ParseFromArray (skb->data, skb->len))
+			goto next_msg;
 //		g_message ("payload: %s", ping.DebugString().c_str());
 
-		pgm_time_t send_time	= ping.time();
-		guint64 seqno		= ping.seqno();
-		guint64 latency		= ping.latency();
+		{
+			pgm_time_t send_time	= ping.time();
+			guint64 seqno		= ping.seqno();
+			guint64 latency		= ping.latency();
 
-		g_in_total += skb->len;
-		g_msg_received++;
+			g_in_total += skb->len;
+			g_msg_received++;
 
 /* handle ping */
-		pgm_time_t elapsed	= skb->tstamp - send_time;
+			pgm_time_t elapsed	= skb->tstamp - send_time;
 
-		if (pgm_time_after(send_time, skb->tstamp)) {
-			g_message ("timer mismatch, send time (%.0f) = now (%.0f) + %.3f ms",
-					send_time, skb->tstamp,
-					pgm_to_msecsf(send_time - skb->tstamp));
-			goto next_msg;
+			if (pgm_time_after(send_time, skb->tstamp)) {
+				g_message ("timer mismatch, send time = now + %.3f ms",
+						pgm_to_msecsf(send_time - skb->tstamp));
+				goto next_msg;
+			}
+			g_latency_current	= pgm_to_secs(elapsed);
+			g_latency_seqno		= seqno;
+			g_latency_total	       += elapsed;
+
+			if (elapsed > g_latency_max) {
+				g_latency_max = elapsed;
+			} else if (elapsed < g_latency_min) {
+				g_latency_min = elapsed;
+			}
+
+			g_latency_running_average += elapsed;
+			g_latency_count++;
 		}
-		g_latency_current	= pgm_to_secs(elapsed);
-		g_latency_seqno		= seqno;
-		g_latency_total	       += elapsed;
-
-		if (elapsed > g_latency_max) {
-			g_latency_max = elapsed;
-		} else if (elapsed < g_latency_min) {
-			g_latency_min = elapsed;
-		}
-
-		g_latency_running_average += elapsed;
-		g_latency_count++;
 
 /* move onto next apdu */
 next_msg:
-		guint apdu_len = 0;
-		struct pgm_iovec* p = msgv_iov;
-		for (guint j = 0; j < msgv->msgv_iovlen; j++) { /* # elements */
-			apdu_len += p->iov_len;
-			p++;
+		{
+			guint apdu_len = 0;
+			struct pgm_iovec* p = msgv_iov;
+			for (guint j = 0; j < msgv->msgv_iovlen; j++) { /* # elements */
+				apdu_len += p->iov_len;
+				p++;
+			}
+			len -= apdu_len;
+			msgv++;
 		}
-		len -= apdu_len;
-		msgv++;
 	}
 
 	return 0;

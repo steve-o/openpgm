@@ -728,16 +728,17 @@ on_io_data (
 {
 	struct timeval now;
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (4096);
-	const struct sockaddr_in* sin = (struct sockaddr_in*)&skb->src;
+	struct sockaddr_storage src, dst;
+	struct sockaddr_in* sin = (struct sockaddr_in*)&src;
+	socklen_t src_addr_len = sizeof(src);
 	int fd = g_io_channel_unix_get_fd(source);
-	socklen_t src_addr_len = sizeof(skb->src);
 
-	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&skb->src, &src_addr_len);
+	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&src, &src_addr_len);
 
 	gettimeofday (&now, NULL);
 	g_packets++;
 
-	int e = pgm_parse_raw (skb);
+	int e = pgm_parse_raw (skb, (struct sockaddr*)&dst);
 	if (e == -2)
 	{
 /* corrupt packet */

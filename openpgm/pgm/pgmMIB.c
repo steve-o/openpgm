@@ -848,7 +848,7 @@ pgmSourcePerformanceTable_handler (
 			case COLUMN_PGMSOURCEBYTESBUFFERED:
 				{
 				pgm_txw_t* txw = (pgm_txw_t*)transport->txw;
-				unsigned long bytes_buffered = transport->can_send_data ? txw->bytes_in_window : 0;
+				unsigned long bytes_buffered = transport->can_send_data ? pgm_txw_size (txw) : 0;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&bytes_buffered, sizeof(bytes_buffered) );
 				}
@@ -857,7 +857,7 @@ pgmSourcePerformanceTable_handler (
 			case COLUMN_PGMSOURCEMSGSBUFFERED:
 				{
 				pgm_txw_t* txw = (pgm_txw_t*)transport->txw;
-				unsigned long msgs_buffered = transport->can_send_data ? txw->packets_in_window : 0;
+				unsigned long msgs_buffered = transport->can_send_data ? pgm_txw_length (txw) : 0;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&msgs_buffered, sizeof(msgs_buffered) );
 				}

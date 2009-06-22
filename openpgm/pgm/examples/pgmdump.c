@@ -37,6 +37,7 @@
 
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/skbuff.h>
 #include <pgm/packet.h>
 
 
