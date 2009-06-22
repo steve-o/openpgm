@@ -819,8 +819,8 @@ http_tsi_response (
 						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						transport->txw ? ((pgm_txw_t*)transport->txw)->bytes_in_window : 0,	/* minus IP & any UDP header */
-						transport->txw ? ((pgm_txw_t*)transport->txw)->packets_in_window : 0,
+						transport->txw ? pgm_txw_size((pgm_txw_t*)transport->txw) : 0,	/* minus IP & any UDP header */
+						transport->txw ? pgm_txw_length((pgm_txw_t*)transport->txw) : 0,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
