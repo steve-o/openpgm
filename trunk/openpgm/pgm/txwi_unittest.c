@@ -163,6 +163,44 @@ START_TEST (test_add_fail_003)
 }
 END_TEST
 
+/* target:
+ *	struct pgm_sk_buff_t*
+ *	pgm_txw_peek (
+ *		pgm_txw_t* const	window,
+ *		const guint32		sequence
+ *		)
+ */
+
+START_TEST (test_peek_pass_001)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	pgm_txw_add (window, skb);
+	fail_unless (skb == pgm_txw_peek (window, window->trail));
+	fail_unless (0 == pgm_txw_shutdown (window));
+}
+END_TEST
+
+/* null window */
+START_TEST (test_peek_fail_001)
+{
+	fail_unless (NULL == pgm_txw_peek (NULL, 0));
+}
+END_TEST
+
+/* empty window */
+START_TEST (test_peek_fail_002)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	fail_unless (NULL == pgm_txw_peek (window, window->trail));
+	fail_unless (0 == pgm_txw_shutdown (window));
+}
+END_TEST
+
+
 static
 Suite*
 make_test_suite (void)
@@ -196,6 +234,9 @@ make_test_suite (void)
 
 	TCase* tc_peek = tcase_create ("peek");
 	suite_add_tcase (s, tc_peek);
+	tcase_add_test (tc_peek, test_peek_pass_001);
+	tcase_add_test (tc_peek, test_peek_fail_001);
+	tcase_add_test (tc_peek, test_peek_fail_002);
 
 	TCase* tc_max_length = tcase_create ("max-length");
 	suite_add_tcase (s, tc_max_length);

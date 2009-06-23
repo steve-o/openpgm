@@ -49,12 +49,28 @@
 #endif
 
 
+/* testing function: is TSI null
+ *
+ * returns TRUE if null, returns FALSE if not null.
+ */
+
+static inline
+gboolean
+pgm_txw_tsi_is_null (
+	pgm_tsi_t* const	tsi
+	)
+{
+	pgm_tsi_t nulltsi;
+	memset (&nulltsi, 0, sizeof(nulltsi));
+	return 0 == memcmp (&nulltsi, tsi, sizeof(nulltsi));
+}
+
 /* returns the pointer at the given index of the window.
  */
 
 static inline
 struct pgm_sk_buff_t*
-pgm_txw_lookup (
+_pgm_txw_peek (
 	const pgm_txw_t* const	window,
 	const guint32		sequence
 	)
@@ -70,6 +86,9 @@ pgm_txw_lookup (
 	{
 		const guint32 index_ = sequence % pgm_txw_max_length (window);
 		skb = window->pdata[index_];
+		g_assert (skb);
+		g_assert (pgm_skb_is_valid (skb));
+		g_assert (pgm_txw_tsi_is_null (&skb->tsi));
 	}
 	else
 		skb = NULL;
@@ -98,21 +117,6 @@ pgm_txw_retransmit_can_peek (
 	return 0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h);
 }
 
-/* testing function: is TSI null
- *
- * returns TRUE if null, returns FALSE if not null.
- */
-
-static inline
-gboolean
-pgm_txw_tsi_is_null (
-	pgm_tsi_t* const	tsi
-	)
-{
-	pgm_tsi_t nulltsi;
-	memset (&nulltsi, 0, sizeof(nulltsi));
-	return 0 == memcmp (&nulltsi, tsi, sizeof(nulltsi));
-}
 
 /* globals */
 
@@ -300,18 +304,8 @@ pgm_txw_peek (
 	const guint32		sequence
 	)
 {
-	struct pgm_sk_buff_t* skb;
-
-	g_return_val_if_fail (window, NULL);
-
 	g_trace ("peek (window:%p sequence:%" G_GUINT32_FORMAT ")", (gpointer)window, sequence);
-
-	skb = pgm_txw_lookup (window, sequence);
-	g_assert (skb);
-	g_assert (pgm_skb_is_valid (skb));
-	g_assert (pgm_txw_tsi_is_null (&skb->tsi));
-	g_assert (skb->len == (guint8*)skb->tail - (guint8*)skb->data);
-	return skb;
+	return _pgm_txw_peek (window, sequence);
 }
 
 /* remove an entry from the trailing edge of the transmit window.
@@ -329,7 +323,7 @@ pgm_txw_pop (
 
 	g_return_val_if_fail (window, -1);
 
-	skb = pgm_txw_lookup (window, window->trail);
+	skb = _pgm_txw_peek (window, window->trail);
 	g_assert (skb);
 	g_assert (pgm_skb_is_valid (skb));
 	g_assert (pgm_txw_tsi_is_null (&skb->tsi));
@@ -422,7 +416,7 @@ pgm_txw_retransmit_push_parity (
 	const guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
 	const guint32 nak_tg_sqn  = sequence &  tg_sqn_mask;	/* left unshifted */
 	const guint32 nak_pkt_cnt = sequence & ~tg_sqn_mask;
-	skb = pgm_txw_lookup (window, nak_tg_sqn);
+	skb = _pgm_txw_peek (window, nak_tg_sqn);
 
 	if (NULL == skb)
 	{
@@ -475,7 +469,7 @@ pgm_txw_retransmit_push_selective (
 
 	g_return_val_if_fail (window, -1);
 
-	skb = pgm_txw_lookup (window, sequence);
+	skb = _pgm_txw_peek (window, sequence);
 	if (NULL == skb)
 	{
 		g_trace ("requested packet #%" G_GUINT32_FORMAT " not in window.", sequence);
