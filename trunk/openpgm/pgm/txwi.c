@@ -137,8 +137,11 @@ pgm_txw_init (
 	pgm_txw_t* window;
 
 	if (sqns) {
+		g_return_val_if_fail (0 == tpdu_size, NULL);
 		g_return_val_if_fail (sqns > 0, NULL);
 		g_return_val_if_fail (!(sqns & PGM_UINT32_SIGN_BIT), NULL);
+		g_return_val_if_fail (0 == secs, NULL);
+		g_return_val_if_fail (0 == max_rte, NULL);
 	} else {
 		g_return_val_if_fail (tpdu_size > 0, NULL);
 		g_return_val_if_fail (secs > 0, NULL);
@@ -155,7 +158,7 @@ pgm_txw_init (
 	{
 		alloc_sqns = sqns;
 	}
-	else if (secs && max_rte)
+	else if (tpdu_size && secs && max_rte)
 	{
 		alloc_sqns = (secs * max_rte) / tpdu_size;
 	}

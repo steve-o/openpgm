@@ -46,7 +46,17 @@ struct pgm_txw_state_t {
 
 typedef struct pgm_txw_state_t pgm_txw_state_t;
 
+/* must be smaller than PGM skbuff control buffer */
+#ifndef G_STATIC_ASSERT
+#	define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
+#	define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
+#	define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
+#endif
+
+G_STATIC_ASSERT(sizeof(struct pgm_txw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
+
 struct pgm_txw_t {
+/* option: lockless atomics */
         guint32         lead;
         guint32         trail;
 

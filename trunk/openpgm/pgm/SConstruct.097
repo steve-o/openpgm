@@ -262,7 +262,7 @@ if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
 
 # unit testing framework optional.
-if env['WITH_CHECK'] and env['CHECK'] == 'true':
- 	SConscript(ref_node + 'check/SConscript');
+#if env['WITH_CHECK'] and env['CHECK'] == 'true':
+# 	SConscript(ref_node + 'check/SConscript');
 
 # end of file
