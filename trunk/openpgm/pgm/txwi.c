@@ -193,7 +193,7 @@ pgm_txw_init (
 	return window;
 }
 
-/* destructor for transmit window
+/* destructor for transmit window.  must not be called more than once for same window.
  *
  * returns 0 if window shutdown correctly, returns -1 on error.
  */
@@ -235,14 +235,18 @@ pgm_txw_shutdown (
 }
 
 /* add skb to transmit window, taking ownership.  window does not grow.
+ * PGM skbuff data/tail pointers must point to the PGM payload, and hence skb->len
+ * is allowed to be zero.
  *
  * side effects:
  *
  * 1) sequence number is set in skb.
  * 2) window is updated with new skb.
  *
- * no return value.  silent failure on invalid parameters.  if window is full then
+ * no return value.  fatal error raised on invalid parameters.  if window is full then
  * an entry is dropped to fulfil the request.
+ *
+ * it is an error to try to free the skb after adding to the window.
  */
 
 void
@@ -251,10 +255,9 @@ pgm_txw_add (
 	struct pgm_sk_buff_t* const	skb		/* cannot be NULL */
 	)
 {
-	g_return_if_fail (window);
-	g_return_if_fail (skb);
-
 /* pre-conditions */
+	g_assert (window);
+	g_assert (skb);
 	g_assert_cmpuint (pgm_txw_max_length (window), >, 0);
 	g_assert (pgm_skb_is_valid (skb));
 	g_assert (((const GList*)skb)->next == NULL);
@@ -282,7 +285,6 @@ pgm_txw_add (
 	window->size += skb->len;
 
 /* post-conditions */
-	g_assert_cmpuint (pgm_txw_size (window), >, 0);
 	g_assert_cmpuint (pgm_txw_length (window), >, 0);
 	g_assert_cmpuint (pgm_txw_length (window), <=, pgm_txw_max_length (window));
 }
