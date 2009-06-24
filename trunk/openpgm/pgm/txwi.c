@@ -267,6 +267,7 @@ pgm_txw_add (
 	g_assert (((const GList*)skb)->next == NULL);
 	g_assert (((const GList*)skb)->prev == NULL);
 	g_assert (pgm_txw_tsi_is_null (&skb->tsi));
+	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint8*)skb->data - (guint8*)skb->head);
 	g_assert (skb->len == (guint8*)skb->tail - (guint8*)skb->data);
 
 	g_trace ("add (window:%p skb:%p)", (gpointer)window, (gpointer)skb);

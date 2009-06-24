@@ -185,7 +185,7 @@ static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
 	g_return_val_if_fail ((const guint8*)skb->end >= (const guint8*)skb->tail, FALSE);
 /* pgm_header */
 	if (skb->pgm_header) {
-		g_return_val_if_fail ((const guint8*)skb->pgm_header >= (const guint8*)skb->data, FALSE);
+		g_return_val_if_fail ((const guint8*)skb->pgm_header >= (const guint8*)skb->head, FALSE);
 		g_return_val_if_fail ((const guint8*)skb->pgm_header + sizeof(struct pgm_header) <= (const guint8*)skb->tail, FALSE);
 		g_return_val_if_fail (skb->pgm_data, FALSE);
 		g_return_val_if_fail ((const guint8*)skb->pgm_data >= (const guint8*)skb->pgm_header + sizeof(struct pgm_header), FALSE);
