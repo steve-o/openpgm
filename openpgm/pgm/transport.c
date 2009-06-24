@@ -3150,7 +3150,6 @@ on_nak_notify (
 	guint32		unfolded_checksum;
 	gboolean	is_parity = FALSE;
 	guint		rs_h = 0;
-	const guint	rs_2t = transport->rs_n - transport->rs_k;
 
 /* parity packets are re-numbered across the transmission group with index h, sharing the space
  * with the original packets.  beyond the transmission group size (k), the PGM option OPT_PARITY_GRP
@@ -3165,6 +3164,8 @@ on_nak_notify (
 	{
 		gboolean is_var_pktlen = FALSE;
 		gboolean has_saved_partial_csum = TRUE;
+
+		rs_h %= transport->rs_n - transport->rs_k;	/* wrap around 2t parity packets */
 
 /* calculate parity packet */
 		if (is_parity)
@@ -3303,8 +3304,8 @@ on_nak_notify (
 
 		send_rdata (transport, r_skb->sequence, r_skb->data, r_skb->len, has_saved_partial_csum, unfolded_checksum);
 
-/* now remove sequence number from retransmit queue, re-enabling NAK requests for this packet */
-		pgm_txw_retransmit_pop (transport->txw, rs_2t);
+/* now remove sequence number from retransmit queue, re-enabling NAK processing for this sequence number */
+		pgm_txw_retransmit_remove (transport->txw);
 	}
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
