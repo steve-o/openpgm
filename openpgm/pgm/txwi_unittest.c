@@ -71,33 +71,37 @@ END_TEST
 /* invalid tpdu size */
 START_TEST (test_init_fail_001)
 {
-	fail_unless (NULL == pgm_txw_init (0, 0, 60, 800000));
+	pgm_txw_init (0, 0, 60, 800000);
+	fail ();
 }
 END_TEST
 
 /* no specified sequence count or time value */
 START_TEST (test_init_fail_002)
 {
-	fail_unless (NULL == pgm_txw_init (0, 0, 0, 800000));
+	pgm_txw_init (0, 0, 0, 800000);
+	fail ();
 }
 END_TEST
 
 /* no specified rate */
 START_TEST (test_init_fail_003)
 {
-	fail_unless (NULL == pgm_txw_init (0, 0, 60, 0));
+	pgm_txw_init (0, 0, 60, 0);
+	fail ();
 }
 END_TEST
 
 /* all invalid */
 START_TEST (test_init_fail_004)
 {
-	fail_unless (NULL == pgm_txw_init (0, 0, 0, 0));
+	pgm_txw_init (0, 0, 0, 0);
+	fail ();
 }
 END_TEST
 
 /* target:
- *	int
+ *	void
  *	pgm_txw_shutdown (
  *		pgm_txw_t* const	window
  *		)
@@ -107,13 +111,14 @@ START_TEST (test_shutdown_pass_001)
 {
 	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
 	fail_if (NULL == window);
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
 START_TEST (test_shutdown_fail_001)
 {
-	fail_unless (-1 == pgm_txw_shutdown (NULL));
+	pgm_txw_shutdown (NULL);
+	fail ();
 }
 END_TEST
 
@@ -133,7 +138,7 @@ START_TEST (test_add_pass_001)
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -185,7 +190,7 @@ START_TEST (test_peek_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (skb == pgm_txw_peek (window, window->trail));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -202,7 +207,7 @@ START_TEST (test_peek_fail_002)
 	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (NULL == pgm_txw_peek (window, window->trail));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -215,7 +220,7 @@ START_TEST (test_max_length_pass_001)
 	pgm_txw_t* window = pgm_txw_init (0, window_length, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (window_length == pgm_txw_max_length (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -237,7 +242,7 @@ START_TEST (test_length_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (1 == pgm_txw_length (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -259,7 +264,7 @@ START_TEST (test_size_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (1000 == pgm_txw_size (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -281,7 +286,7 @@ START_TEST (test_is_empty_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_if (pgm_txw_is_empty (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -303,7 +308,7 @@ START_TEST (test_is_full_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (pgm_txw_is_full (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -325,7 +330,7 @@ START_TEST (test_lead_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (lead + 1 == pgm_txw_lead (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -348,7 +353,7 @@ START_TEST (test_next_lead_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (next_lead == pgm_txw_lead (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
@@ -376,13 +381,183 @@ START_TEST (test_trail_pass_001)
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_if (trail == pgm_txw_trail (window));
-	fail_unless (0 == pgm_txw_shutdown (window));
+	pgm_txw_shutdown (window);
 }
 END_TEST
 
 START_TEST (test_trail_fail_001)
 {
 	pgm_txw_trail (NULL);
+	fail ();
+}
+END_TEST
+
+/* target:
+ *	int
+ *	pgm_txw_retransmit_push (
+ *		pgm_txw_t* const	window,
+ *		const guint32		sequence,
+ *		const gboolean		is_parity,
+ *		const guint		tg_sqn_shift
+ *		)
+ */
+
+START_TEST (test_retransmit_push_pass_001)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+/* empty window invalidates all requests */
+	fail_unless (0 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	pgm_txw_add (window, skb);
+/* first request */
+	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+/* second request eliminated */
+	fail_unless (0 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	pgm_txw_shutdown (window);
+}
+END_TEST
+
+START_TEST (test_retransmit_push_fail_001)
+{
+	pgm_txw_retransmit_push (NULL, 0, FALSE, 0);
+	fail ();
+}
+END_TEST
+
+/* target:
+ *	int
+ *	pgm_txw_retransmit_try_peek (
+ *		pgm_txw_t* const	window,
+ *		struct pgm_sk_buff_t**	skb,
+ *		guint32* const		unfolded_checksum,
+ *		gboolean* const		is_parity,
+ *		guint* const		rs_h
+ *		)
+ */
+
+START_TEST (test_retransmit_try_peek_pass_001)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	pgm_txw_add (window, skb);
+	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	guint32		unfolded_checksum;
+	gboolean	is_parity;
+	guint		rs_h;
+	skb = NULL;
+	fail_unless (0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h));
+	pgm_txw_shutdown (window);
+}
+END_TEST
+
+/* null window */
+START_TEST (test_retransmit_try_peek_fail_001)
+{
+	pgm_txw_t*		window;
+	struct pgm_sk_buff_t*	skb;
+	guint32			unfolded_checksum;
+	gboolean		is_parity;
+	guint			rs_h;
+	pgm_txw_retransmit_try_peek (NULL, &skb, &unfolded_checksum, &is_parity, &rs_h);
+	fail ();
+}
+END_TEST
+
+/* null skb pointer */
+START_TEST (test_retransmit_try_peek_fail_002)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	guint32			unfolded_checksum;
+	gboolean		is_parity;
+	guint			rs_h;
+	pgm_txw_retransmit_try_peek (window, NULL, &unfolded_checksum, &is_parity, &rs_h);
+	fail ();
+}
+END_TEST
+
+/* null unfolded checksum pointer */
+START_TEST (test_retransmit_try_peek_fail_003)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t*	skb;
+	gboolean		is_parity;
+	guint			rs_h;
+	pgm_txw_retransmit_try_peek (window, &skb, NULL, &is_parity, &rs_h);
+	fail ();
+}
+END_TEST
+
+/* null is-parity pointer */
+START_TEST (test_retransmit_try_peek_fail_004)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t*	skb;
+	guint32			unfolded_checksum;
+	guint			rs_h;
+	pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, NULL, &rs_h);
+	fail ();
+}
+END_TEST
+
+/* null h (rs) pointer */
+START_TEST (test_retransmit_try_peek_fail_005)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t*	skb;
+	guint32			unfolded_checksum;
+	gboolean		is_parity;
+	pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, NULL);
+	fail ();
+}
+END_TEST
+
+/* target:
+ *	void
+ *	pgm_txw_retransmit_remove (
+ *		pgm_txw_t* const	window
+ *		)
+ */
+
+START_TEST (test_retransmit_remove_pass_001)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	pgm_txw_add (window, skb);
+	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	guint32		unfolded_checksum;
+	gboolean	is_parity;
+	guint		rs_h;
+	skb = NULL;
+	fail_unless (0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h));
+	pgm_txw_retransmit_remove (window);
+	pgm_txw_shutdown (window);
+}
+END_TEST
+
+/* null window */
+START_TEST (test_retransmit_remove_fail_001)
+{
+	pgm_txw_retransmit_remove (NULL);
+	fail ();
+}
+END_TEST
+
+/* empty retransmit queue */
+START_TEST (test_retransmit_remove_fail_002)
+{
+	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_txw_retransmit_remove (window);
 	fail ();
 }
 END_TEST
@@ -401,15 +576,15 @@ make_test_suite (void)
 	tcase_add_test (tc_init, test_init_pass_002);
 	tcase_add_test (tc_init, test_init_pass_003);
 	tcase_add_test (tc_init, test_init_pass_004);
-	tcase_add_test (tc_init, test_init_fail_001);
-	tcase_add_test (tc_init, test_init_fail_002);
-	tcase_add_test (tc_init, test_init_fail_003);
-	tcase_add_test (tc_init, test_init_fail_004);
+	tcase_add_test_raise_signal (tc_init, test_init_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_init, test_init_fail_002, SIGABRT);
+	tcase_add_test_raise_signal (tc_init, test_init_fail_003, SIGABRT);
+	tcase_add_test_raise_signal (tc_init, test_init_fail_004, SIGABRT);
 
 	TCase* tc_shutdown = tcase_create ("shutdown");
 	suite_add_tcase (s, tc_shutdown);
 	tcase_add_test (tc_shutdown, test_shutdown_pass_001);
-	tcase_add_test (tc_shutdown, test_shutdown_fail_001);
+	tcase_add_test_raise_signal (tc_shutdown, test_shutdown_fail_001, SIGABRT);
 
 	TCase* tc_add = tcase_create ("add");
 	suite_add_tcase (s, tc_add);
@@ -421,6 +596,7 @@ make_test_suite (void)
 	TCase* tc_peek = tcase_create ("peek");
 	suite_add_tcase (s, tc_peek);
 	tcase_add_test (tc_peek, test_peek_pass_001);
+/* logical not fatal errors */
 	tcase_add_test (tc_peek, test_peek_fail_001);
 	tcase_add_test (tc_peek, test_peek_fail_002);
 
@@ -466,12 +642,23 @@ make_test_suite (void)
 
 	TCase* tc_retransmit_push = tcase_create ("retransmit-push");
 	suite_add_tcase (s, tc_retransmit_push);
+	tcase_add_test (tc_retransmit_push, test_retransmit_push_pass_001);
+	tcase_add_test_raise_signal (tc_retransmit_push, test_retransmit_push_fail_001, SIGABRT);
 
 	TCase* tc_retransmit_try_peek = tcase_create ("retransmit-try-peek");
 	suite_add_tcase (s, tc_retransmit_try_peek);
+	tcase_add_test (tc_retransmit_try_peek, test_retransmit_try_peek_pass_001);
+	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_002, SIGABRT);
+	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_003, SIGABRT);
+	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_004, SIGABRT);
+	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_005, SIGABRT);
 
-	TCase* tc_retransmit_pop = tcase_create ("retransmit-pop");
-	suite_add_tcase (s, tc_retransmit_pop);
+	TCase* tc_retransmit_remove = tcase_create ("retransmit-remove");
+	suite_add_tcase (s, tc_retransmit_remove);
+	tcase_add_test (tc_retransmit_remove, test_retransmit_remove_pass_001);
+	tcase_add_test_raise_signal (tc_retransmit_remove, test_retransmit_remove_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_retransmit_remove, test_retransmit_remove_fail_002, SIGABRT);
 
 	return s;
 }

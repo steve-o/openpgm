@@ -73,7 +73,7 @@ typedef struct pgm_txw_t pgm_txw_t;
 
 
 pgm_txw_t* pgm_txw_init (const guint16, const guint32, const guint, const guint);
-int pgm_txw_shutdown (pgm_txw_t* const);
+void pgm_txw_shutdown (pgm_txw_t* const);
 void pgm_txw_add (pgm_txw_t* const, struct pgm_sk_buff_t* const);
 struct pgm_sk_buff_t* pgm_txw_peek (pgm_txw_t* const, const guint32);
 
@@ -127,7 +127,7 @@ static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
 
 int pgm_txw_retransmit_push (pgm_txw_t* const, const guint32, const gboolean, const guint);
 int pgm_txw_retransmit_try_peek (pgm_txw_t* const, struct pgm_sk_buff_t**, guint32* const, gboolean* const, guint* const);
-void pgm_txw_retransmit_pop (pgm_txw_t* const, const guint);
+void pgm_txw_retransmit_remove (pgm_txw_t* const);
 
 G_END_DECLS
 
