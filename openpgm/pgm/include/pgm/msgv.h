@@ -2,7 +2,7 @@
  * 
  * Vector message container
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,22 +27,18 @@ struct pgm_iovec {
 #ifndef _WIN32
 	void*		iov_base;
 	size_t		iov_len;	/* length of data */
-	size_t		iov_offset;	/* offset to data from iov_base */
 #else
 	u_long		iov_len;
 	char*		iov_base;
-	u_long		iov_offset;
 #endif /* _WIN32 */
 };
 
+/* Cisco default: 24 (max 8200), Juniper & H3C default: 16 */
+#define PGM_MAX_FRAGMENTS		16
+
 struct pgm_msgv_t {
-#ifdef __PGM_TRANSPORT_H__
-	const pgm_tsi_t*	msgv_tsi;
-#else
-	const void*		msgv_identifier;
-#endif
-	struct pgm_iovec*	msgv_iov;	/* scatter/gather array */
-	size_t			msgv_iovlen;	/* # elements in iov */
+	size_t			msgv_len;	/* number of bytes in skb */
+	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
 
 typedef struct pgm_msgv_t pgm_msgv_t;

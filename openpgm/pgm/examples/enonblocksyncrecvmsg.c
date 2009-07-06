@@ -141,7 +141,7 @@ main (
 		}
 		else if (errno == ECONNRESET)
 		{
-			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv.msgv_iov->iov_base;
+			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv.msgv_skb;
 			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
 					pgm_sock_err->lost_count,
 					pgm_print_tsi(&pgm_sock_err->tsi));
@@ -241,25 +241,25 @@ on_startup (void)
 
 static int
 on_datav (
-	pgm_msgv_t*	datav,
+	pgm_msgv_t*	datav,			/* one msgv object */
 	guint		len,
 	G_GNUC_UNUSED gpointer user_data
 	)
 {
 	char tsi[PGM_TSISTRLEN];
-	pgm_print_tsi_r (datav->msgv_tsi, tsi, sizeof(tsi));
+	pgm_print_tsi_r (&datav->msgv_skb[0]->tsi, tsi, sizeof(tsi));
 	g_message ("(%i bytes from %s)", len, tsi);
 
 /* protect against non-null terminated strings */
-	struct pgm_iovec* msgv_iov = datav->msgv_iov;
+	struct pgm_sk_buff_t* skb = datav->msgv_skb[0];
 	int i = 0;
 	while (len)
 	{
 		char buf[1024];
-		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base + msgv_iov->iov_offset);
-		g_message ("\t%i: %s (%" G_GSIZE_FORMAT " bytes)", ++i, buf, msgv_iov->iov_len);
-		len -= msgv_iov->iov_len;
-		msgv_iov++;
+		snprintf (buf, sizeof(buf), "%s", (char*)skb->data);
+		g_message ("\t%i: %s (%" G_GUINT16_FORMAT " bytes)", ++i, buf, skb->len);
+		len -= skb->len;
+		skb++;
 	}
 
 	return 0;
