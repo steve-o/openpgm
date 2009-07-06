@@ -1080,7 +1080,7 @@ pgm_rxw_readv (
 	const guint		msg_len		/* number of items in pmsg */
 	)
 {
-	const pgm_msgv_t* msg_end = *pmsg + msg_len;
+	const pgm_msgv_t* msg_end;
 	struct pgm_sk_buff_t* skb;
 	pgm_rxw_state_t* state;
 
@@ -1092,6 +1092,7 @@ pgm_rxw_readv (
 	g_trace ("readv (window:%p pmsg:%p msg-len:%u)",
 		window, pmsg, msg_len);
 
+	msg_end = *pmsg + msg_len;
 	window->pgm_sock_err.lost_count = 0;
 	gssize bytes_read;
 
@@ -1192,7 +1193,7 @@ pgm_rxw_incoming_read (
 	guint			msg_len		/* number of items in pmsg */
 	)
 {
-	const pgm_msgv_t* msg_end = *pmsg + msg_len;
+	const pgm_msgv_t* msg_end;
 	struct pgm_sk_buff_t* skb;
 
 /* pre-conditions */
@@ -1201,6 +1202,7 @@ pgm_rxw_incoming_read (
 	g_assert_cmpuint (msg_len, >, 0);
 	g_assert (!pgm_rxw_incoming_is_empty (window));
 
+	msg_end = *pmsg + msg_len;
 	gssize bytes_read = 0;
 
 	do {
