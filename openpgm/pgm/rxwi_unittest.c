@@ -610,6 +610,31 @@ START_TEST (test_next_lead_fail_001)
 }
 END_TEST
 
+/* target:
+ *	gssize
+ *	pgm_rxw_peek (
+ *		pgm_rxw_t* const	window,
+ *		pgm_msgv_t**		pmsg,
+ *		const guint		msg_len
+ *		)
+ */
+
+START_TEST (test_readv_pass_001)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (0);
+	const pgm_time_t nak_rb_expiry = 1;
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	pgm_msgv_t msgv[1], *pmsg = msgv;
+	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	pgm_rxw_shutdown (window);
+}
+END_TEST
+
 
 static
 Suite*
@@ -687,6 +712,9 @@ make_test_suite (void)
 	tcase_add_test_raise_signal (tc_next_lead, test_next_lead_fail_001, SIGABRT);
 
 	TCase* tc_readv = tcase_create ("readv");
+	suite_add_tcase (s, tc_readv);
+	tcase_add_test (tc_readv, test_readv_pass_001);
+
 	TCase* tc_remove_trail = tcase_create ("remove-trail");
 	TCase* tc_update = tcase_create ("update");
         TCase* tc_confirm = tcase_create ("confirm");

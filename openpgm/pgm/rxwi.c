@@ -1143,11 +1143,7 @@ _pgm_rxw_remove_trail (
 
 /* pre-conditions */
 	g_assert (window);
-	g_assert (pgm_rxw_commit_is_empty (window));
-	g_assert (!pgm_rxw_incoming_is_empty (window));
-
-/* expunge lost transmission group parity-data */
-	g_assert_cmpuint (window->trail, ==, window->commit_lead);
+	g_assert (!pgm_rxw_is_empty (window));
 
 	guint dropped = 0;
 
@@ -1156,7 +1152,8 @@ _pgm_rxw_remove_trail (
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
 	pgm_free_skb (skb);
-	window->commit_lead++;
+	if (window->trail == window->commit_lead)
+		window->commit_lead++;
 	window->trail++;
 	dropped++;
 
@@ -1165,7 +1162,6 @@ _pgm_rxw_remove_trail (
 
 /* post-conditions */
 	g_assert_cmpuint (dropped, >, 0);
-	g_assert (pgm_rxw_commit_is_empty (window));
 
 	return dropped;
 }
@@ -1412,17 +1408,17 @@ pgm_rxw_is_apdu_complete (
 
 	skb = _pgm_rxw_peek (window, first_sequence);
 
-	const gsize apdu_size = g_ntohl (skb->of_apdu_len);
+	const gsize apdu_size = skb->pgm_opt_fragment ? g_ntohl (skb->of_apdu_len) : skb->len;
 	const guint32 tg_sqn = pgm_rxw_tg_sqn (window, first_sequence);
 	guint32 sequence = first_sequence;
 	guint contiguous_tpdus = 0;
 	gsize contiguous_size = 0;
 	gboolean check_parity = FALSE;
 
-	g_assert_cmpuint (apdu_size, >, skb->len);
+	g_assert_cmpuint (apdu_size, >=, skb->len);
 
 /* protocol sanity check: maximum length */
-	if (g_ntohl (skb->of_apdu_len) > pgm_rxw_max_length (window)) {
+	if (apdu_size > PGM_MAX_APDU) {
 		_pgm_rxw_lost (window, first_sequence);
 		return FALSE;
 	}
@@ -1517,7 +1513,7 @@ pgm_rxw_incoming_read_apdu (
 
 /* pre-conditions */
 	g_assert (window);
-	g_assert (skb);
+	g_assert (pmsg);
 	g_assert_cmpuint (msg_len, >, 0);
 
 	skb = _pgm_rxw_peek (window, window->commit_lead);
