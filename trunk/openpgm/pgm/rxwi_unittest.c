@@ -73,12 +73,14 @@ static
 struct pgm_sk_buff_t*
 generate_valid_skb (void)
 {
+	const pgm_tsi_t tsi = { { 200, 202, 203, 204, 205, 206 }, 2000 };
 	const guint16 tsdu_length = 1000;
 	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (1500);
+	memcpy (&skb->tsi, &tsi, sizeof(tsi));
 /* fake but valid transport and timestamp */
 	skb->transport = (pgm_transport_t*)0x1;
-	skb->tstamp = 1;
+	skb->tstamp = pgm_time_now;
 /* header */
 	pgm_skb_reserve (skb, header_length);
 	memset (skb->head, 0, header_length);
@@ -225,7 +227,7 @@ START_TEST (test_add_pass_001)
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	const pgm_time_t nak_rb_expiry = 1;
-	pgm_rxw_add (window, skb, nak_rb_expiry);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	pgm_rxw_shutdown (window);
 }
 END_TEST
@@ -298,7 +300,7 @@ START_TEST (test_peek_pass_001)
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t nak_rb_expiry = 1;
-	pgm_rxw_add (window, skb, nak_rb_expiry);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_unless (skb == pgm_rxw_peek (window, 0));
 	fail_unless (NULL == pgm_rxw_peek (window, 1));
 	fail_unless (NULL == pgm_rxw_peek (window, -1));
@@ -309,7 +311,8 @@ END_TEST
 /* null window */
 START_TEST (test_peek_fail_001)
 {
-	fail_unless (NULL == pgm_rxw_peek (NULL, 0));
+	pgm_rxw_peek (NULL, 0);
+	fail ();
 }
 END_TEST
 
@@ -346,7 +349,7 @@ START_TEST (test_length_pass_001)
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t nak_rb_expiry = 1;
-	pgm_rxw_add (window, skb, nak_rb_expiry);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_unless (1 == pgm_rxw_length (window));
 	pgm_rxw_shutdown (window);
 }
@@ -371,7 +374,7 @@ START_TEST (test_size_pass_001)
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t nak_rb_expiry = 1;
-	pgm_rxw_add (window, skb, nak_rb_expiry);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_unless (1000 == pgm_rxw_size (window));
 	pgm_rxw_shutdown (window);
 }
@@ -396,7 +399,7 @@ START_TEST (test_is_empty_pass_001)
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t nak_rb_expiry = 1;
-	pgm_rxw_add (window, skb, nak_rb_expiry);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_if (pgm_rxw_is_empty (window));
 	pgm_rxw_shutdown (window);
 }
@@ -421,7 +424,7 @@ START_TEST (test_is_full_pass_001)
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t nak_rb_expiry = 1;
-	pgm_rxw_add (window, skb, nak_rb_expiry);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_unless (pgm_rxw_is_full (window));
 	pgm_rxw_shutdown (window);
 }
@@ -468,8 +471,7 @@ make_test_suite (void)
 	TCase* tc_peek = tcase_create ("peek");
 	suite_add_tcase (s, tc_peek);
 	tcase_add_test (tc_peek, test_peek_pass_001);
-/* logical not fatal errors */
-	tcase_add_test (tc_peek, test_peek_fail_001);
+	tcase_add_test_raise_signal (tc_peek, test_peek_fail_001, SIGABRT);
 
 	TCase* tc_max_length = tcase_create ("max-length");
 	suite_add_tcase (s, tc_max_length);

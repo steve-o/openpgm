@@ -166,6 +166,7 @@ void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const guint32);
 const char* pgm_pkt_state_string (pgm_pkt_state_e);
 const char* pgm_rxw_returns_string (pgm_rxw_returns_e);
+void pgm_rxw_dump (const pgm_rxw_t* const);
 
 static inline guint32 pgm_rxw_max_length (const pgm_rxw_t* const window)
 {
