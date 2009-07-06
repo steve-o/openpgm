@@ -341,6 +341,14 @@ pgm_rxw_add (
 
 	skb->sequence = g_ntohl (skb->pgm_data->data_sqn);
 
+/* protocol sanity check: tsdu size */
+	if (skb->len != g_ntohs (skb->pgm_header->pgm_tsdu_length))
+		return PGM_RXW_MALFORMED;
+
+/* protocol sanity check: valid trail pointer wrt. sequence */
+	if (skb->sequence - g_ntohl (skb->pgm_data->data_trail) >= ((UINT32_MAX/2)-1))
+		return PGM_RXW_MALFORMED;
+
 /* verify fragment header for original data, parity packets include a
  * parity fragment header
  */
@@ -396,8 +404,12 @@ pgm_rxw_add (
 	}
 	else
 	{
-		if (pgm_uint32_lt (skb->sequence, window->commit_lead))
-			return PGM_RXW_DUPLICATE;
+		if (pgm_uint32_lt (skb->sequence, window->commit_lead)) {
+			if (pgm_uint32_gte (skb->sequence, window->trail))
+				return PGM_RXW_DUPLICATE;
+			else
+				return PGM_RXW_BOUNDS;
+		}
 
 		if (pgm_uint32_lte (skb->sequence, window->lead))
 			return pgm_rxw_insert (window, skb);
@@ -409,7 +421,8 @@ pgm_rxw_add (
 		}
 
 		pgm_rxw_add_placeholder_range (window, skb->sequence, nak_rb_expiry);
-		return pgm_rxw_append (window, skb);
+		const int status = pgm_rxw_append (window, skb);
+		return PGM_RXW_APPENDED == status ? PGM_RXW_MISSING : status;
 	}
 
 	g_assert_not_reached();
@@ -486,6 +499,14 @@ pgm_rxw_update_trail (
 /* pre-conditions */
 	g_assert (window);
 
+/* advertised trail is less than the current value */
+	if (pgm_uint32_lte (txw_trail, window->rxw_trail))
+		return;
+
+/* protocol sanity check: advertised trail jumps too far ahead */
+	if (txw_trail - window->rxw_trail > ((UINT32_MAX/2)-1))
+		return;
+
 /* retransmissions requests are constrained on startup until the advertised trail advances
  * beyond the first data sequence number.
  */
@@ -496,10 +517,6 @@ pgm_rxw_update_trail (
 		else
 			return;
 	}
-
-/* advertised trail is less than the current value */
-	if (pgm_uint32_lte (txw_trail, window->rxw_trail))
-		return;
 
 	window->rxw_trail = txw_trail;
 
