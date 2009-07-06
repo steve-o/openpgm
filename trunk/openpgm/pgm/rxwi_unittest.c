@@ -210,7 +210,7 @@ START_TEST (test_shutdown_fail_001)
 END_TEST
 
 /* target:
- *	void
+ *	int
  *	pgm_rxw_add (
  *		pgm_rxw_t* const		window,
  *		struct pgm_sk_buff_t* const	skb,
@@ -351,6 +351,12 @@ START_TEST (test_length_pass_001)
 	const pgm_time_t nak_rb_expiry = 1;
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_unless (1 == pgm_rxw_length (window));
+/* #2 */
+	skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (1);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (2 == pgm_rxw_length (window));
 	pgm_rxw_shutdown (window);
 }
 END_TEST
@@ -376,6 +382,12 @@ START_TEST (test_size_pass_001)
 	const pgm_time_t nak_rb_expiry = 1;
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 	fail_unless (1000 == pgm_rxw_size (window));
+/* #2 */
+	skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (1);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (2000 == pgm_rxw_size (window));
 	pgm_rxw_shutdown (window);
 }
 END_TEST
@@ -437,6 +449,57 @@ START_TEST (test_is_full_fail_001)
 }
 END_TEST
 
+/* pgm_rxw_lead
+ */
+START_TEST (test_lead_pass_001)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	guint32 lead = pgm_rxw_lead (window);
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (0);
+	const pgm_time_t nak_rb_expiry = 1;
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (lead + 1 == pgm_rxw_lead (window));
+	pgm_rxw_shutdown (window);
+}
+END_TEST
+
+START_TEST (test_lead_fail_001)
+{
+	pgm_rxw_lead (NULL);
+	fail ();
+}
+END_TEST
+
+/* pgm_rxw_next_lead
+ */
+START_TEST (test_next_lead_pass_001)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	guint32 next_lead = pgm_rxw_next_lead (window);
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (0);
+	const pgm_time_t nak_rb_expiry = 1;
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (next_lead == pgm_rxw_lead (window));
+	pgm_rxw_shutdown (window);
+}
+END_TEST
+
+START_TEST (test_next_lead_fail_001)
+{
+	pgm_rxw_next_lead (NULL);
+	fail ();
+}
+END_TEST
+
+
 static
 Suite*
 make_test_suite (void)
@@ -497,6 +560,16 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_is_full);
 	tcase_add_test (tc_is_full, test_is_full_pass_001);
 	tcase_add_test_raise_signal (tc_is_full, test_is_full_fail_001, SIGABRT);
+
+	TCase* tc_lead = tcase_create ("lead");
+	suite_add_tcase (s, tc_lead);
+	tcase_add_test (tc_lead, test_lead_pass_001);
+	tcase_add_test_raise_signal (tc_lead, test_lead_fail_001, SIGABRT);
+
+	TCase* tc_next_lead = tcase_create ("next-lead");
+	suite_add_tcase (s, tc_next_lead);
+	tcase_add_test (tc_next_lead, test_next_lead_pass_001);
+	tcase_add_test_raise_signal (tc_next_lead, test_next_lead_fail_001, SIGABRT);
 
 	return s;
 }
