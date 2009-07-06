@@ -122,7 +122,7 @@ _pgm_rxw_peek (
 		if (pgm_uint32_lte (sequence, window->commit_lead)) {
 			g_assert (skb);
 			g_assert (pgm_skb_is_valid (skb));
-			g_assert (pgm_tsi_is_null (&skb->tsi));
+			g_assert (!pgm_tsi_is_null (&skb->tsi));
 		}
 	}
 	else
@@ -201,6 +201,7 @@ pgm_rxw_init (
 	pgm_rxw_t* window;
 
 /* pre-conditions */
+	g_assert (tsi);
 	g_assert_cmpuint (tpdu_size, >, 0);
 	if (sqns) {
 		g_assert_cmpuint (sqns, >, 0);
@@ -276,12 +277,7 @@ pgm_rxw_shutdown (
 
 /* contents of window */
 	while (!pgm_rxw_is_empty (window)) {
-#ifndef G_DISABLE_ASSERT
-		int e = _pgm_rxw_remove_trail (window);
-		g_assert (0 == e);
-#else
 		_pgm_rxw_remove_trail (window);
-#endif
 	}
 
 /* window must now be empty */
@@ -400,13 +396,13 @@ pgm_rxw_add (
 	}
 	else
 	{
-		if (pgm_uint32_lte (skb->sequence, window->commit_lead))
+		if (pgm_uint32_lt (skb->sequence, window->commit_lead))
 			return PGM_RXW_DUPLICATE;
 
 		if (pgm_uint32_lte (skb->sequence, window->lead))
 			return pgm_rxw_insert (window, skb);
 
-		if (skb->sequence == window->lead) {
+		if (skb->sequence == pgm_rxw_next_lead (window)) {
 			if (pgm_rxw_is_first_of_tg_sqn (window, skb->sequence))
 				state->is_contiguous = 1;
 			return pgm_rxw_append (window, skb);
@@ -938,6 +934,7 @@ pgm_rxw_insert (
 		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_PARITY_STATE);
 	else
 		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_DATA_STATE);
+	window->size += new_skb->len;
 
 	return PGM_RXW_INSERTED;
 }
@@ -997,7 +994,7 @@ pgm_rxw_append (
 	if (skb->pgm_header->pgm_options & PGM_OPT_PARITY) {
 		g_assert (pgm_rxw_tg_sqn (window, skb->sequence) == pgm_rxw_tg_sqn (window, pgm_rxw_lead (window)));
 	} else {
-		g_assert (skb->sequence == pgm_rxw_lead (window));
+		g_assert (skb->sequence == pgm_rxw_next_lead (window));
 	}
 
 	if (pgm_rxw_is_invalid_var_pktlen (window, skb) ||
@@ -1007,16 +1004,18 @@ pgm_rxw_append (
 	if (pgm_rxw_is_full (window))
 		_pgm_rxw_remove_trail (window);
 
+/* advance leading edge */
+	window->lead++;
+
 /* APDU fragments are already declared lost */
 	if (skb->pgm_opt_fragment &&
 	    pgm_rxw_is_apdu_lost (window, skb))
 	{
-		const guint32 lost_sequence	= skb->sequence;
 		struct pgm_sk_buff_t* lost_skb	= pgm_alloc_skb (window->max_tpdu);
 		lost_skb->tstamp		= pgm_time_now;
-		lost_skb->sequence		= lost_sequence;
+		lost_skb->sequence		= skb->sequence;
 
-/* add skb to window */
+/* add lost-placeholder skb to window */
 		const guint32 index_	= lost_skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_]	= lost_skb;
 
@@ -1027,7 +1026,7 @@ pgm_rxw_append (
 /* add skb to window */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PARITY)
 	{
-		const guint32 index_	= pgm_rxw_lead (window) % pgm_rxw_max_length (window);
+		const guint32 index_	= skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_]	= skb;
 		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_PARITY_STATE);
 	}
@@ -1037,6 +1036,9 @@ pgm_rxw_append (
 		window->pdata[index_]	= skb;
 		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_DATA_STATE);
 	}
+
+/* statistics */
+	window->size += skb->len;
 
 	return PGM_RXW_APPENDED;
 }
@@ -1132,17 +1134,14 @@ _pgm_rxw_remove_trail (
 
 	guint dropped = 0;
 
-	do {
-		skb = _pgm_rxw_peek (window, window->trail);
-		g_assert (skb);
-		if (!pgm_rxw_is_apdu_lost (window, skb))
-			break;
-		_pgm_rxw_unlink (window, skb);
-		pgm_free_skb (skb);
-		window->commit_lead++;
-		window->trail++;
-		dropped++;
-	} while (!pgm_rxw_incoming_is_empty (window));
+	skb = _pgm_rxw_peek (window, window->trail);
+	g_assert (skb);
+	_pgm_rxw_unlink (window, skb);
+	window->size -= skb->len;
+	pgm_free_skb (skb);
+	window->commit_lead++;
+	window->trail++;
+	dropped++;
 
 /* statistics */
 	window->cumulative_losses += dropped;
@@ -1924,6 +1923,103 @@ pgm_rxw_recovery_append (
 	_pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
 
 	return PGM_RXW_APPENDED;
+}
+
+/* dumps window state to stdout
+ */
+
+void
+pgm_rxw_dump (
+	const pgm_rxw_t* const	window
+	)
+{
+	g_message ("window = {"
+		"tsi = {gsi = {identifier = %i.%i.%i.%i.%i.%i}, sport = %" G_GUINT16_FORMAT "}, "
+		"pgm_sock_err = {lost_count = %" G_GUINT32_FORMAT "}, "
+		"waiting_link = {data = %p, next = %p}, "
+		"backoff_queue = {head = %p, tail = %p, length = %u}, "
+		"wait_ncf_queue = {head = %p, tail = %p, length = %u}, "
+		"wait_data_queue = {head = %p, tail = %p, length = %u}, "
+		"lost_count = %" G_GUINT32_FORMAT ", "
+		"fragment_count = %" G_GUINT32_FORMAT ", "
+		"parity_count = %" G_GUINT32_FORMAT ", "
+		"committed_count = %" G_GUINT32_FORMAT ", "
+		"max_tpdu = %" G_GUINT16_FORMAT ", "
+		"tg_size = %" G_GUINT32_FORMAT ", "
+		"tg_sqn_shift = %u, "
+		"lead = %" G_GUINT32_FORMAT ", "
+		"trail = %" G_GUINT32_FORMAT ", "
+		"rxw_trail = %" G_GUINT32_FORMAT ", "
+		"rxw_trail_init = %" G_GUINT32_FORMAT ", "
+		"commit_lead = %" G_GUINT32_FORMAT ", "
+		"is_constrained = %u, "
+		"is_defined = %u, "
+		"is_waiting = %u, "
+		"is_fec_available = %u, "
+		"rs = %p, "
+		"rs_n = %u, "
+		"rs_k = %u, "
+		"min_fill_time = %" G_GUINT32_FORMAT ", "
+		"max_fill_time = %" G_GUINT32_FORMAT ", "
+		"min_nak_transmit_count = %" G_GUINT32_FORMAT ", "
+		"max_nak_transmit_count = %" G_GUINT32_FORMAT ", "
+		"cumulative_losses = %" G_GUINT32_FORMAT ", "
+		"ack_cumulative_losses = %" G_GUINT32_FORMAT ", "
+		"bytes_delivered = %" G_GUINT32_FORMAT ", "
+		"msgs_delivered = %" G_GUINT32_FORMAT ", "
+		"size = %" G_GUINT32_FORMAT ", "
+		"alloc = %" G_GUINT32_FORMAT ", "
+		"pdata = []"
+		"}",
+		window->tsi->gsi.identifier[0], 
+			window->tsi->gsi.identifier[1],
+			window->tsi->gsi.identifier[2],
+			window->tsi->gsi.identifier[3],
+			window->tsi->gsi.identifier[4],
+			window->tsi->gsi.identifier[5],
+			g_ntohs (window->tsi->sport),
+		window->pgm_sock_err.lost_count,
+		window->waiting_link.data,
+			(gpointer)window->waiting_link.next,
+		(gpointer)window->backoff_queue.head,
+			(gpointer)window->backoff_queue.tail,
+			window->backoff_queue.length,
+		(gpointer)window->wait_ncf_queue.head,
+			(gpointer)window->wait_ncf_queue.tail,
+			window->wait_ncf_queue.length,
+		(gpointer)window->wait_data_queue.head,
+			(gpointer)window->wait_data_queue.tail,
+			window->wait_data_queue.length,
+		window->lost_count,
+		window->fragment_count,
+		window->parity_count,
+		window->committed_count,
+		window->max_tpdu,
+		window->tg_size,
+		window->tg_sqn_shift,
+		window->lead,
+		window->trail,
+		window->rxw_trail,
+		window->rxw_trail_init,
+		window->commit_lead,
+		window->is_constrained,
+		window->is_defined,
+		window->is_waiting,
+		window->is_fec_available,
+		window->rs,
+		window->rs_n,
+		window->rs_k,
+		window->min_fill_time,
+		window->max_fill_time,
+		window->min_nak_transmit_count,
+		window->max_nak_transmit_count,
+		window->cumulative_losses,
+		window->ack_cumulative_losses,
+		window->bytes_delivered,
+		window->msgs_delivered,
+		window->size,
+		window->alloc
+	);
 }
 
 /* state string helper
