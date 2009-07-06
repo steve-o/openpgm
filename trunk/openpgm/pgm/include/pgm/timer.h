@@ -58,6 +58,7 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 #define pgm_usecs(t)	((pgm_time_t)( (t) ))
 #define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000 ))
 
+#define PGM_TIME_FORMAT	G_GUINT64_FORMAT
 
 /* micro-seconds */
 extern pgm_time_t pgm_time_now;

@@ -107,16 +107,16 @@ static inline gboolean pgm_txw_is_full (const pgm_txw_t* const window)
 	return pgm_txw_length (window) == pgm_txw_max_length (window);
 }
 
-static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
-{
-	g_assert (window);
-	return (guint32)(window->lead + 1);
-}
-
 static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
 {
 	g_assert (window);
 	return window->lead;
+}
+
+static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
+{
+	g_assert (window);
+	return (guint32)(pgm_txw_lead (window) + 1);
 }
 
 static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
@@ -127,7 +127,7 @@ static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
 
 int pgm_txw_retransmit_push (pgm_txw_t* const, const guint32, const gboolean, const guint);
 int pgm_txw_retransmit_try_peek (pgm_txw_t* const, struct pgm_sk_buff_t**, guint32* const, gboolean* const, guint* const);
-void pgm_txw_retransmit_remove (pgm_txw_t* const);
+void pgm_txw_retransmit_remove_head (pgm_txw_t* const);
 
 G_END_DECLS
 

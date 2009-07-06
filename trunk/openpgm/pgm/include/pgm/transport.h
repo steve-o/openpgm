@@ -283,16 +283,12 @@ struct pgm_transport_t {
     guint		rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
     guint		tg_sqn_shift;
     struct pgm_sk_buff_t* parity_buffer;	    /* for parity odata/rdata generation */
-
     struct pgm_sk_buff_t* rx_buffer;
-    struct pgm_iovec*	piov;
-    guint		piov_len;		    /* # elements in piov */
 
     GStaticRWLock	peers_lock;
     GHashTable*		peers_hashtable;	    /* fast lookup */
     GList*		peers_list;		    /* easy iteration */
     GSList*		peers_waiting;		    /* rxw: have or lost data */
-    GSList*		peers_committed;	    /* rxw: waiting to free */
     GStaticMutex	waiting_mutex;
     pgm_notify_t	waiting_notify;		    /* timer to rx */
     gboolean		is_waiting_read;
@@ -384,7 +380,7 @@ int pgm_set_nonblocking (int filedes[2]);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
 gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
-gssize pgm_transport_send_skbv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
+gssize pgm_transport_send_skbv (pgm_transport_t*, struct pgm_sk_buff_t*, guint, int, gboolean);
 
 /* receiver side */
 gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);

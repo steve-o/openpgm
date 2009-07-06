@@ -357,7 +357,7 @@ receiver_thread (
 		}
 		else if (errno == ECONNRESET)
 		{
-			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_iov->iov_base;
+			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_skb;
 			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
 					pgm_sock_err->lost_count,
 					pgm_print_tsi(&pgm_sock_err->tsi));
@@ -394,30 +394,21 @@ on_msgv (
                         len);
 
         guint i = 0;
-        while (len)
-        {
-                struct pgm_iovec* msgv_iov = msgv->msgv_iov;
-
-		guint apdu_len = 0;
-		struct pgm_iovec* p = msgv_iov;
-		for (guint j = 0; j < msgv->msgv_iovlen; j++) {	/* # elements */
-			apdu_len += p->iov_len;
-			p++;
-		}
+/* for each apdu */
+	do {
+                struct pgm_sk_buff_t* pskb = msgv[i].msgv_skb[0];
 
 /* truncate to first fragment to make GLib printing happy */
 		char buf[1024], tsi[PGM_TSISTRLEN];
-		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base + msgv_iov->iov_offset);
-		pgm_print_tsi_r (msgv->msgv_tsi, tsi, sizeof(tsi));
-		if (msgv->msgv_iovlen > 1) {
-			g_message ("\t%u: \"%s\" ... (%u bytes from %s)", ++i, buf, apdu_len, tsi);
-		} else {
-			g_message ("\t%u: \"%s\" (%u bytes from %s)", ++i, buf, apdu_len, tsi);
-		}
-
-		len -= apdu_len;
-                msgv++;
-        }
+		snprintf (buf, sizeof(buf), "%s", (char*)pskb->data);
+		pgm_print_tsi_r (&pskb->tsi, tsi, sizeof(tsi));
+		if (msgv[i].msgv_len > pskb->len)
+			g_message ("\t%u: \"%s\" ... (%" G_GSIZE_FORMAT " bytes from %s)",
+				   i, buf, msgv[i].msgv_len, tsi);
+		else
+			g_message ("\t%u: \"%s\" (%" G_GSIZE_FORMAT " bytes from %s)",
+				   i, buf, msgv[i].msgv_len, tsi);
+        } while (len -= msgv[i++].msgv_len);
 
 	return 0;
 }

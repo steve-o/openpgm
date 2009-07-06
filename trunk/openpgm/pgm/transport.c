@@ -98,34 +98,34 @@ GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all t
 GSList* pgm_transport_list = NULL;
 
 /* helpers for pgm_peer_t */
-static inline pgm_time_t next_nak_rb_expiry (gpointer r_)
+static inline pgm_time_t next_nak_rb_expiry (gpointer window_)
 {
-	pgm_rxw_t* r = (pgm_rxw_t*)r_;
-	g_assert (r);
-	g_assert (r->backoff_queue.tail);
-	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)r->backoff_queue.tail;
-	pgm_rxw_packet_t* pkt = (pgm_rxw_packet_t*)&skb->cb;
-	return pkt->nak_rb_expiry;
+	pgm_rxw_t* window = (pgm_rxw_t*)window_;
+	g_assert (window);
+	g_assert (window->backoff_queue.tail);
+	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)window->backoff_queue.tail;
+	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
+	return state->nak_rb_expiry;
 }
 
-static inline pgm_time_t next_nak_rpt_expiry (gpointer r_)
+static inline pgm_time_t next_nak_rpt_expiry (gpointer window_)
 {
-	pgm_rxw_t* r = (pgm_rxw_t*)r_;
-	g_assert (r);
-	g_assert (r->wait_ncf_queue.tail);
-	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)r->wait_ncf_queue.tail;
-	pgm_rxw_packet_t* pkt = (pgm_rxw_packet_t*)&skb->cb;
-	return pkt->nak_rpt_expiry;
+	pgm_rxw_t* window = (pgm_rxw_t*)window_;
+	g_assert (window);
+	g_assert (window->wait_ncf_queue.tail);
+	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)window->wait_ncf_queue.tail;
+	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
+	return state->nak_rpt_expiry;
 }
 
-static inline pgm_time_t next_nak_rdata_expiry (gpointer r_)
+static inline pgm_time_t next_nak_rdata_expiry (gpointer window_)
 {
-	pgm_rxw_t* r = (pgm_rxw_t*)r_;
-	g_assert (r);
-	g_assert (r->wait_data_queue.tail);
-	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)r->wait_data_queue.tail;
-	pgm_rxw_packet_t* pkt = (pgm_rxw_packet_t*)&skb->cb;
-	return pkt->nak_rdata_expiry;
+	pgm_rxw_t* window = (pgm_rxw_t*)window_;
+	g_assert (window);
+	g_assert (window->wait_data_queue.tail);
+	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)window->wait_data_queue.tail;
+	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
+	return state->nak_rdata_expiry;
 }
 
 static GSource* pgm_create_timer (pgm_transport_t*);
@@ -174,8 +174,7 @@ static int on_nak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
 static int on_peer_nak (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_ncf (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
-static gboolean on_odata (pgm_peer_t*, struct pgm_sk_buff_t*);
-static gboolean on_rdata (pgm_peer_t*, struct pgm_sk_buff_t*);
+static gboolean on_data (pgm_peer_t*, struct pgm_sk_buff_t*);
 
 static gssize pgm_transport_send_one (pgm_transport_t*, struct pgm_sk_buff_t*, int);
 static gssize pgm_transport_send_one_copy (pgm_transport_t*, gconstpointer, gsize, int);
@@ -628,11 +627,6 @@ pgm_transport_destroy (
 	if (transport->rx_buffer) {
 		pgm_free_skb (transport->rx_buffer);
 		transport->rx_buffer = NULL;
-	}
-
-	if (transport->piov) {
-		g_free (transport->piov);
-		transport->piov = NULL;
 	}
 
 	g_free (transport);
@@ -2154,10 +2148,6 @@ no_cap_net_admin:
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 
-/* scatter/gather vector for contiguous reading from the window */
-	transport->piov_len = IOV_MAX;
-	transport->piov = g_malloc ( transport->piov_len * sizeof( struct pgm_iovec ) );
-
 /* cleanup */
 	transport->is_bound = TRUE;
 	transport->is_open = TRUE;
@@ -2283,10 +2273,8 @@ pgm_transport_recvmsgv (
 	}
 	if (transport->has_lost_data) {
 		pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
-		msg_start[0].msgv_iov = &transport->piov[0];
-		transport->piov[0].iov_base = &lost_rxw->pgm_sock_err;
-		transport->piov[0].iov_offset = 0;
-		transport->piov[0].iov_len = sizeof(pgm_sock_err_t);
+		msg_start[0].msgv_len = sizeof(lost_rxw->pgm_sock_err);
+		msg_start[0].msgv_skb[0] = (gpointer)&lost_rxw->pgm_sock_err;
 		if (transport->will_close_on_failure) {
 			transport->is_open = FALSE;
 		} else {
@@ -2300,72 +2288,47 @@ pgm_transport_recvmsgv (
 	guint data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len;
-	struct pgm_iovec* piov = transport->piov;
-	const struct pgm_iovec* iov_end = piov + transport->piov_len;
 
 /* lock waiting so extra events are not generated during call */
 	g_static_mutex_lock (&transport->waiting_mutex);
 
 /* second, flush any remaining contiguous messages from previous call(s) */
-	if (transport->peers_waiting || transport->peers_committed)
+	while (transport->peers_waiting)
 	{
-		while (transport->peers_committed)
+		pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
+		const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg);
+
+		if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
 		{
-			pgm_rxw_t* committed_rxw = transport->peers_committed->data;
-
-/* move any previous blocks to parity */
-			pgm_rxw_release_committed (committed_rxw);
-
-			transport->peers_committed->data = NULL;
-			transport->peers_committed->next = NULL;
-			transport->peers_committed = transport->peers_committed->next;
+			transport->has_lost_data = TRUE;
+			waiting_rxw->pgm_sock_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
+			waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
 		}
-
-		while (transport->peers_waiting)
+	
+		if (peer_bytes_read >= 0)
 		{
-			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov, flags & MSG_FIN);
+			bytes_read += peer_bytes_read;
+			data_read++;
 
-/* clean up completed transmission groups */
-			pgm_rxw_free_committed (waiting_rxw);
-
-			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
-			{
-				transport->has_lost_data = TRUE;
-				waiting_rxw->pgm_sock_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
-				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
-			}
-	
-			if (peer_bytes_read >= 0)
-			{
-/* add to release list */
-				waiting_rxw->commit_link.data = waiting_rxw;
-				waiting_rxw->commit_link.next = transport->peers_committed;
-				transport->peers_committed = &waiting_rxw->commit_link;
-
-				bytes_read += peer_bytes_read;
-				data_read++;
-
-				if (pgm_rxw_full(waiting_rxw)) 		/* window full */
-				{
-					goto out;
-				}
-	
-				if (pmsg == msg_end || piov == iov_end)	/* commit full */
-				{
-					goto out;
-				}
-			}
-			if (transport->has_lost_data)
+			if (pgm_rxw_is_full (waiting_rxw)) 		/* window full */
 			{
 				goto out;
 			}
+	
+			if (pmsg == msg_end)	/* commit full */
+			{
+				goto out;
+			}
+		}
+		if (transport->has_lost_data)
+		{
+			goto out;
+		}
 
 /* next */
-			transport->peers_waiting->data = NULL;
-			transport->peers_waiting->next = NULL;
-			transport->peers_waiting = transport->peers_waiting->next;
-		}
+		transport->peers_waiting->data = NULL;
+		transport->peers_waiting->next = NULL;
+		transport->peers_waiting = transport->peers_waiting->next;
 	}
 
 /* read the data:
@@ -2640,7 +2603,8 @@ recv_again:
 /* handle PGM packet type */
 		switch (skb->pgm_header->pgm_type) {
 		case PGM_ODATA:
-			if (G_LIKELY(on_odata (source, skb))) {
+		case PGM_RDATA:
+			if (on_data (source, skb)) {
 				skb = transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 				iov.iov_base = skb->head;
 			}
@@ -2648,13 +2612,6 @@ recv_again:
 
 		case PGM_NCF:
 			on_ncf (source, skb->pgm_header, skb->data, skb->len);
-			break;
-
-		case PGM_RDATA:
-			if (on_rdata (source, skb)) {
-				skb = transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
-				iov.iov_base = skb->data;
-			}
 			break;
 
 		case PGM_SPM:
@@ -2682,55 +2639,44 @@ recv_again:
 		goto flush_waiting;	/* :D */
 	}
 
-	if (transport->peers_waiting)
-	{
 flush_waiting:
 /* flush any congtiguous packets generated by the receipt of this packet */
-		while (transport->peers_waiting)
+	while (transport->peers_waiting)
+	{
+		pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
+		const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg);
+
+		if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
 		{
-			pgm_rxw_t* waiting_rxw = transport->peers_waiting->data;
-			const gssize peer_bytes_read = pgm_rxw_readv (waiting_rxw, &pmsg, msg_end - pmsg, &piov, iov_end - piov, flags & MSG_FIN);
+			transport->has_lost_data = TRUE;
+			waiting_rxw->pgm_sock_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
+			waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
+		}
 
-/* clean up completed transmission groups */
-			pgm_rxw_free_committed (waiting_rxw);
+		if (peer_bytes_read >= 0)
+		{
+			bytes_read += peer_bytes_read;
+			data_read++;
 
-			if (waiting_rxw->ack_cumulative_losses != waiting_rxw->cumulative_losses)
-			{
-				transport->has_lost_data = TRUE;
-				waiting_rxw->pgm_sock_err.lost_count = waiting_rxw->cumulative_losses - waiting_rxw->ack_cumulative_losses;
-				waiting_rxw->ack_cumulative_losses = waiting_rxw->cumulative_losses;
-			}
-
-			if (peer_bytes_read >= 0)
-			{
-/* add to release list */
-				waiting_rxw->commit_link.data = waiting_rxw;
-				waiting_rxw->commit_link.next = transport->peers_committed;
-				transport->peers_committed = &waiting_rxw->commit_link;
-
-				bytes_read += peer_bytes_read;
-				data_read++;
-
-				if (pgm_rxw_full(waiting_rxw)) 		/* window full */
-				{
-					goto out;
-				}
-
-				if (pmsg == msg_end || piov == iov_end) /* commit full */
-				{
-					goto out;
-				}
-			}
-			if (transport->has_lost_data)
+			if (pgm_rxw_is_full (waiting_rxw)) 		/* window full */
 			{
 				goto out;
 			}
+
+			if (pmsg == msg_end) /* commit full */
+			{
+				goto out;
+			}
+		}
+		if (transport->has_lost_data)
+		{
+			goto out;
+		}
  
 /* next */
-			transport->peers_waiting->data = NULL;
-			transport->peers_waiting->next = NULL;
-			transport->peers_waiting = transport->peers_waiting->next;
-		}
+		transport->peers_waiting->data = NULL;
+		transport->peers_waiting->next = NULL;
+		transport->peers_waiting = transport->peers_waiting->next;
 	}
 
 check_for_repeat:
@@ -2819,8 +2765,8 @@ out:
 
 		if (transport->has_lost_data) {
 			pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
-			msg_start[0].msgv_iov = &transport->piov[0];
-			transport->piov[0].iov_base = &lost_rxw->pgm_sock_err;
+			msg_start[0].msgv_len = sizeof(lost_rxw->pgm_sock_err);
+			msg_start[0].msgv_skb[0] = (gpointer)&lost_rxw->pgm_sock_err;
 			if (transport->will_close_on_failure) {
 				transport->is_open = FALSE;
 			} else {
@@ -2891,41 +2837,36 @@ pgm_transport_recvfrom (
 	)
 {
 	pgm_msgv_t msgv;
+	gssize bytes_read;
 
-	gssize bytes_read = pgm_transport_recvmsg (transport, &msgv, flags & ~MSG_FIN);
+	bytes_read = pgm_transport_recvmsg (transport, &msgv, flags & ~MSG_FIN);
 
-/* merge apdu packets together */
-	if (bytes_read > 0)
+	if (bytes_read >= 0)
 	{
 		gssize bytes_copied = 0;
-		struct pgm_iovec* p = msgv.msgv_iov;
+		struct pgm_sk_buff_t* skb = msgv.msgv_skb[0];
 
-/* copy sender TSI to application buffer */
-		if (from) {
-			memcpy (from, msgv.msgv_tsi, sizeof(pgm_tsi_t));
-		}
+		if (from)
+			memcpy (from, &skb->tsi, sizeof(pgm_tsi_t));
 
-		do {
-			size_t src_bytes = p->iov_len;
-			g_assert (src_bytes > 0);
-
-			if (bytes_copied + src_bytes > len) {
-				g_error ("APDU truncated as provided buffer too small %" G_GSIZE_FORMAT " > %" G_GSIZE_FORMAT, bytes_read, len);
-				src_bytes = len - bytes_copied;
-				bytes_read = bytes_copied + src_bytes;
+		while (bytes_copied < bytes_read)
+		{
+			gsize copy_len = skb->len;
+			if (bytes_copied + copy_len > len) {
+				g_error ("APDU truncated as provided buffer too small %" G_GSIZE_FORMAT " > %" G_GSIZE_FORMAT,
+					bytes_read, len);
+				copy_len = len - bytes_copied;
+				bytes_read = len;
 			}
 
-			memcpy (data, (const char*)p->iov_base + p->iov_offset, src_bytes);
-
-			data = (char*)data + src_bytes;
-			bytes_copied += src_bytes;
-			p++;
-
-		} while (bytes_copied < bytes_read);
+			memcpy ((guint8*)data + bytes_copied, skb->data, copy_len);
+			bytes_copied += copy_len;
+			skb++;
+		}
 	}
 	else if (errno == ECONNRESET)
 	{
-		memcpy (data, msgv.msgv_iov->iov_base, MIN(sizeof(pgm_sock_err_t), len));
+		memcpy (data, msgv.msgv_skb[0], msgv.msgv_len);
 	}
 
 	return bytes_read;
@@ -3305,7 +3246,7 @@ on_nak_notify (
 		send_rdata (transport, r_skb->sequence, r_skb->data, r_skb->len, has_saved_partial_csum, unfolded_checksum);
 
 /* now remove sequence number from retransmit queue, re-enabling NAK processing for this sequence number */
-		pgm_txw_retransmit_remove (transport->txw);
+		pgm_txw_retransmit_remove_head (transport->txw);
 	}
 	g_static_rw_lock_reader_unlock (&transport->txw_lock);
 
@@ -3389,12 +3330,10 @@ on_spm (
 
 /* update receive window */
 		pgm_time_t nak_rb_expiry = now + nak_rb_ivl(transport);
-		guint naks = pgm_rxw_window_update (sender->rxw,
-							g_ntohl (spm->spm_trail),
-							g_ntohl (spm->spm_lead),
-							transport->rs_k,
-							transport->tg_sqn_shift,
-							nak_rb_expiry);
+		guint naks = pgm_rxw_update (sender->rxw,
+					     g_ntohl (spm->spm_trail),
+					     g_ntohl (spm->spm_lead),
+					     nak_rb_expiry);
 		if (naks && pgm_time_after(transport->next_poll, nak_rb_expiry))
 		{
 			transport->next_poll = nak_rb_expiry;
@@ -3772,7 +3711,10 @@ on_peer_nak (
 
 /* handle as NCF */
 	pgm_time_update_now();
-	pgm_rxw_ncf (peer->rxw, g_ntohl (nak->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
+	pgm_rxw_confirm (peer->rxw,
+			 g_ntohl (nak->nak_sqn),
+			 pgm_time_now + transport->nak_rdata_ivl,
+			 pgm_time_now + nak_rb_ivl(transport));
 
 /* check NAK list */
 	const guint32* nak_list = NULL;
@@ -3815,7 +3757,10 @@ on_peer_nak (
 	g_trace ("INFO", "NAK contains 1+%i sequence numbers.", nak_list_len);
 	while (nak_list_len)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*nak_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
+		pgm_rxw_confirm (peer->rxw,
+				 g_ntohl (*nak_list),
+				 pgm_time_now + transport->nak_rdata_ivl,
+				 pgm_time_now + nak_rb_ivl(transport));
 		nak_list++;
 		nak_list_len--;
 	}
@@ -3901,7 +3846,10 @@ on_ncf (
 	g_static_mutex_lock (&peer->mutex);
 
 	pgm_time_update_now();
-	pgm_rxw_ncf (peer->rxw, g_ntohl (ncf->nak_sqn), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
+	pgm_rxw_confirm (peer->rxw,
+			 g_ntohl (ncf->nak_sqn),
+			 pgm_time_now + transport->nak_rdata_ivl,
+			 pgm_time_now + nak_rb_ivl(transport));
 
 /* check NCF list */
 	const guint32* ncf_list = NULL;
@@ -3944,7 +3892,10 @@ on_ncf (
 	g_trace ("INFO", "NCF contains 1+%i sequence numbers.", ncf_list_len);
 	while (ncf_list_len)
 	{
-		pgm_rxw_ncf (peer->rxw, g_ntohl (*ncf_list), pgm_time_now + transport->nak_rdata_ivl, pgm_time_now + nak_rb_ivl(transport));
+		pgm_rxw_confirm (peer->rxw,
+				 g_ntohl (*ncf_list),
+				 pgm_time_now + transport->nak_rdata_ivl,
+				 pgm_time_now + nak_rb_ivl(transport));
 		ncf_list++;
 		ncf_list_len--;
 	}
@@ -4688,16 +4639,16 @@ nak_rb_state (
 		{
 			GList* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
-			pgm_rxw_packet_t* pkt		= (pgm_rxw_packet_t*)&skb->cb;
+			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
-			if (pgm_time_after_eq(pgm_time_now, pkt->nak_rb_expiry))
+			if (pgm_time_after_eq(pgm_time_now, state->nak_rb_expiry))
 			{
 				if (!is_valid_nla)
 				{
 					dropped_invalid++;
 					g_trace ("INFO", "lost data #%u due to no peer NLA.", skb->sequence);
-					pgm_rxw_mark_lost (rxw, skb->sequence);
+					pgm_rxw_lost (rxw, skb->sequence);
 
 /* mark receiver window for flushing on next recv() */
 					if (!rxw->waiting_link.data)
@@ -4716,23 +4667,21 @@ nak_rb_state (
 				if (	( nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
 					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
 				{
-/* remove from this state */
-					pgm_rxw_pkt_state_unlink (rxw, skb);
-					pkt->state = PGM_PKT_WAIT_NCF_STATE;
-					g_queue_push_head_link (&rxw->wait_ncf_queue, (GList*)skb);
+					pgm_rxw_unlink (rxw, skb);
+					pgm_rxw_state (rxw, skb, PGM_PKT_WAIT_NCF_STATE);
 
 					if (!nak_pkt_cnt++)
 						nak_tg_sqn = tg_sqn;
-					pkt->nak_transmit_count++;
+					state->nak_transmit_count++;
 
 #ifdef PGM_ABSOLUTE_EXPIRY
-					pkt->nak_rpt_expiry = pkt->nak_rb_expiry + transport->nak_rpt_ivl;
-					while (pgm_time_after_eq(pgm_time_now, pkt->nak_rpt_expiry){
-						pkt->nak_rpt_expiry += transport->nak_rpt_ivl;
-						pkt->ncf_retry_count++;
+					state->nak_rpt_expiry = state->nak_rb_expiry + transport->nak_rpt_ivl;
+					while (pgm_time_after_eq(pgm_time_now, state->nak_rpt_expiry){
+						state->nak_rpt_expiry += transport->nak_rpt_ivl;
+						state->ncf_retry_count++;
 					}
 #else
-					pkt->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
+					state->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
 #endif
 				}
 				else
@@ -4762,15 +4711,15 @@ nak_rb_state (
 		{
 			GList* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
-			pgm_rxw_packet_t* pkt		= (pgm_rxw_packet_t*)&skb->cb;
+			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
-			if (pgm_time_after_eq(pgm_time_now, pkt->nak_rb_expiry))
+			if (pgm_time_after_eq(pgm_time_now, state->nak_rb_expiry))
 			{
 				if (!is_valid_nla) {
 					dropped_invalid++;
 					g_trace ("INFO", "lost data #%u due to no peer NLA.", skb->sequence);
-					pgm_rxw_mark_lost (rxw, skb->sequence);
+					pgm_rxw_lost (rxw, skb->sequence);
 
 /* mark receiver window for flushing on next recv() */
 					if (!rxw->waiting_link.data)
@@ -4784,10 +4733,8 @@ nak_rb_state (
 					continue;
 				}
 
-/* remove from this state */
-				pgm_rxw_pkt_state_unlink (rxw, skb);
-				pkt->state = PGM_PKT_WAIT_NCF_STATE;
-				g_queue_push_head_link (&rxw->wait_ncf_queue, (GList*)skb);
+				pgm_rxw_unlink (rxw, skb);
+				pgm_rxw_state (rxw, skb, PGM_PKT_WAIT_NCF_STATE);
 #if PGM_SINGLE_NAK
 				if (transport->can_send_nak)
 					send_nak (transport, peer, skb->sequence);
@@ -4795,22 +4742,22 @@ nak_rb_state (
 #else
 				nak_list.sqn[nak_list.len++] = skb->sequence;
 #endif
-				pkt->nak_transmit_count++;
+				state->nak_transmit_count++;
 
 /* we have two options here, calculate the expiry time in the new state relative to the current
  * state execution time, skipping missed expirations due to delay in state processing, or base
  * from the actual current time.
  */
 #ifdef PGM_ABSOLUTE_EXPIRY
-				pkt->nak_rpt_expiry = pkt->nak_rb_expiry + transport->nak_rpt_ivl;
-				while (pgm_time_after_eq(pgm_time_now, pkt->nak_rpt_expiry){
-					pkt->nak_rpt_expiry += transport->nak_rpt_ivl;
-					pkt->ncf_retry_count++;
+				state->nak_rpt_expiry = state->nak_rb_expiry + transport->nak_rpt_ivl;
+				while (pgm_time_after_eq(pgm_time_now, state->nak_rpt_expiry){
+					state->nak_rpt_expiry += transport->nak_rpt_ivl;
+					state->ncf_retry_count++;
 				}
 #else
-				pkt->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
+				state->nak_rpt_expiry = pgm_time_now + transport->nak_rpt_ivl;
 g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
-		pgm_to_secsf( pkt->nak_rpt_expiry - pgm_time_now ) );
+		pgm_to_secsf( state->nak_rpt_expiry - pgm_time_now ) );
 #endif
 
 #ifndef PGM_SINGLE_NAK
@@ -5064,15 +5011,15 @@ nak_rpt_state (
 	{
 		GList* next_list_el = list->prev;
 		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
-		pgm_rxw_packet_t* pkt		= (pgm_rxw_packet_t*)&skb->cb;
+		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
-		if (pgm_time_after_eq(pgm_time_now, pkt->nak_rpt_expiry))
+		if (pgm_time_after_eq(pgm_time_now, state->nak_rpt_expiry))
 		{
 			if (!is_valid_nla) {
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", skb->sequence);
-				pgm_rxw_mark_lost (rxw, skb->sequence);
+				pgm_rxw_lost (rxw, skb->sequence);
 
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
@@ -5086,13 +5033,13 @@ nak_rpt_state (
 				continue;
 			}
 
-			if (++pkt->ncf_retry_count >= transport->nak_ncf_retries)
+			if (++state->ncf_retry_count >= transport->nak_ncf_retries)
 			{
 /* cancellation */
 				dropped++;
 				g_trace ("INFO", "lost data #%u due to cancellation.", skb->sequence);
 
-				const guint32 fail_time = pgm_time_now - pkt->t0;
+				const guint32 fail_time = pgm_time_now - skb->tstamp;
 				if (!peer->max_fail_time) {
 					peer->max_fail_time = peer->min_fail_time = fail_time;
 				}
@@ -5104,7 +5051,7 @@ nak_rpt_state (
 						peer->min_fail_time = fail_time;
 				}
 
-				pgm_rxw_mark_lost (rxw, skb->sequence);
+				pgm_rxw_lost (rxw, skb->sequence);
 
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
@@ -5119,20 +5066,19 @@ nak_rpt_state (
 			else
 			{
 /* retry */
-//				pkt->nak_rb_expiry = pkt->nak_rpt_expiry + nak_rb_ivl(transport);
-				pkt->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
+//				state->nak_rb_expiry = pkt->nak_rpt_expiry + nak_rb_ivl(transport);
+				state->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
 
-				pgm_rxw_pkt_state_unlink (rxw, skb);
-				pkt->state = PGM_PKT_BACK_OFF_STATE;
-				g_queue_push_head_link (&rxw->backoff_queue, (GList*)skb);
+				pgm_rxw_unlink (rxw, skb);
+				pgm_rxw_state (rxw, skb, PGM_PKT_BACK_OFF_STATE);
 
-				g_trace("INFO", "retry #%u attempt %u/%u.", skb->sequence, pkt->ncf_retry_count, transport->nak_ncf_retries);
+				g_trace("INFO", "retry #%u attempt %u/%u.", skb->sequence, state->ncf_retry_count, transport->nak_ncf_retries);
 			}
 		}
 		else
 		{
 /* packet expires some time later */
-			g_trace("INFO", "#%u retry is delayed %f seconds.", rdata_skb->sequence, pgm_to_secsf(pkt->nak_rpt_expiry - pgm_time_now));
+			g_trace("INFO", "#%u retry is delayed %f seconds.", rdata_skb->sequence, pgm_to_secsf(state->nak_rpt_expiry - pgm_time_now));
 			break;
 		}
 		
@@ -5142,13 +5088,13 @@ nak_rpt_state (
 
 	if (rxw->wait_ncf_queue.length == 0)
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.head == NULL);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.tail == NULL);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_ncf_queue.head == NULL);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_ncf_queue.tail == NULL);
 	}
 	else
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.head != NULL);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_ncf_queue.tail != NULL);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_ncf_queue.head != NULL);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_ncf_queue.tail != NULL);
 	}
 
 	if (dropped_invalid) {
@@ -5225,15 +5171,15 @@ nak_rdata_state (
 		GList* next_list_el = list->prev;
 		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)list;
 		g_assert (rdata_skb);
-		pgm_rxw_packet_t* rdata_pkt	= (pgm_rxw_packet_t*)&rdata_skb->cb;
+		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
 
 /* check this packet for state expiration */
-		if (pgm_time_after_eq(pgm_time_now, rdata_pkt->nak_rdata_expiry))
+		if (pgm_time_after_eq(pgm_time_now, rdata_state->nak_rdata_expiry))
 		{
 			if (!is_valid_nla) {
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", rdata_skb->sequence);
-				pgm_rxw_mark_lost (rxw, rdata_skb->sequence);
+				pgm_rxw_lost (rxw, rdata_skb->sequence);
 
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
@@ -5247,17 +5193,17 @@ nak_rdata_state (
 				continue;
 			}
 
-			if (++rdata_pkt->data_retry_count >= transport->nak_data_retries)
+			if (++rdata_state->data_retry_count >= transport->nak_data_retries)
 			{
 /* cancellation */
 				dropped++;
 				g_trace ("INFO", "lost data #%u due to cancellation.", rdata_skb->sequence);
 
-				const guint32 fail_time = pgm_time_now - rdata_pkt->t0;
+				const guint32 fail_time = pgm_time_now - rdata_skb->tstamp;
 				if (fail_time > peer->max_fail_time)		peer->max_fail_time = fail_time;
 				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
 
-				pgm_rxw_mark_lost (rxw, rdata_skb->sequence);
+				pgm_rxw_lost (rxw, rdata_skb->sequence);
 
 /* mark receiver window for flushing on next recv() */
 				if (!rxw->waiting_link.data)
@@ -5273,16 +5219,14 @@ nak_rdata_state (
 				continue;
 			}
 
-//			rdata_pkt->nak_rb_expiry = rdata_pkt->nak_rdata_expiry + nak_rb_ivl(transport);
-			rdata_pkt->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
+//			rdata_state->nak_rb_expiry = rdata_pkt->nak_rdata_expiry + nak_rb_ivl(transport);
+			rdata_state->nak_rb_expiry = pgm_time_now + nak_rb_ivl(transport);
 
-/* remove from this state */
-			pgm_rxw_pkt_state_unlink (rxw, rdata_skb);
-			rdata_pkt->state = PGM_PKT_BACK_OFF_STATE;
-			g_queue_push_head_link (&rxw->backoff_queue, (GList*)rdata_skb);
+			pgm_rxw_unlink (rxw, rdata_skb);
+			pgm_rxw_state (rxw, rdata_skb, PGM_PKT_BACK_OFF_STATE);
 
 /* retry back to back-off state */
-			g_trace("INFO", "retry #%u attempt %u/%u.", rdata_skb->sequence, rdata_pkt->data_retry_count, transport->nak_data_retries);
+			g_trace("INFO", "retry #%u attempt %u/%u.", rdata_skb->sequence, rdata_state->data_retry_count, transport->nak_data_retries);
 		}
 		else
 		{	/* packet expires some time later */
@@ -5295,13 +5239,13 @@ nak_rdata_state (
 
 	if (rxw->wait_data_queue.length == 0)
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.head == NULL);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.tail == NULL);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_data_queue.head == NULL);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_data_queue.tail == NULL);
 	}
 	else
 	{
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.head);
-		g_assert ((pgm_rxw_packet_t*)rxw->wait_data_queue.tail);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_data_queue.head);
+		g_assert ((pgm_rxw_state_t*)rxw->wait_data_queue.tail);
 	}
 
 	if (dropped_invalid) {
@@ -6219,7 +6163,7 @@ blocked:
 gssize
 pgm_transport_send_skbv (
 	pgm_transport_t*	transport,
-	const struct pgm_iovec*	vector,		/* packet */
+	struct pgm_sk_buff_t*	vector,		/* packet */
 	guint			count,
 	int			flags,		/* MSG_DONTWAIT = rate non-blocking,
 						   MSG_WAITALL  = packet blocking   */
@@ -6241,7 +6185,7 @@ pgm_transport_send_skbv (
 	}
 	g_return_val_if_fail (vector != NULL, -EINVAL);
 	if (count == 1) {
-		return pgm_transport_send_one (transport, (struct pgm_sk_buff_t*)vector->iov_base, flags);
+		return pgm_transport_send_one (transport, vector, flags);
 	}
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
@@ -6261,7 +6205,7 @@ pgm_transport_send_skbv (
 		gsize total_tpdu_length = 0;
 		for (guint i = 0; i < count; i++)
 		{
-			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset (is_one_apdu) + vector[i].iov_len;
+			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset (is_one_apdu) + vector[i].len;
 		}
 
 /* calculation includes one iphdr length already */
@@ -6281,16 +6225,16 @@ pgm_transport_send_skbv (
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->txw);
 		for (guint i = 0; i < count; i++)
 		{
-			g_return_val_if_fail (vector[i].iov_len <= transport->max_tsdu_fragment, -EMSGSIZE);
-			STATE(apdu_length) += vector[i].iov_len;
+			g_return_val_if_fail (vector[i].len <= transport->max_tsdu_fragment, -EMSGSIZE);
+			STATE(apdu_length) += vector[i].len;
 		}
 	}
 
 	for (STATE(vector_index) = 0; STATE(vector_index) < count; STATE(vector_index)++)
 	{
-		STATE(tsdu_length) = vector[STATE(vector_index)].iov_len;
+		STATE(tsdu_length) = vector[STATE(vector_index)].len;
 		
-		STATE(skb) = pgm_skb_get((struct pgm_sk_buff_t*)vector[STATE(vector_index)].iov_base);
+		STATE(skb) = pgm_skb_get(&vector[STATE(vector_index)]);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
 		STATE(skb)->data  = (guint8*)STATE(skb)->data - pgm_transport_pkt_offset(is_one_apdu);
@@ -7020,7 +6964,7 @@ get_opt_fragment (
 	return 0;
 }
 
-/* ODATA packet with any of the following options:
+/* ODATA or RDATA packet with any of the following options:
  *
  * OPT_FRAGMENT - this TPDU part of a larger APDU.
  *
@@ -7030,14 +6974,14 @@ get_opt_fragment (
  */
 
 static gboolean
-on_odata (
+on_data (
 	pgm_peer_t*		sender,
 	struct pgm_sk_buff_t*	skb
 	)
 {
 	g_assert (sender);
 	g_assert (skb);
-	g_trace ("INFO","on_odata");
+	g_trace ("INFO","on_data");
 
 	int retval = 0;
 	guint msg_count = 0;
@@ -7052,54 +6996,43 @@ on_odata (
 	pgm_skb_pull (skb, sizeof(struct pgm_data) + opt_total_length);
 
 	g_static_mutex_lock (&sender->mutex);
-	if (opt_total_length > 0 && get_opt_fragment((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment))
-	{
-		g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
-			g_ntohl (skb->pgm_data->data_sqn),
-			g_ntohl (skb->pgm_data->data_trail),
-			g_ntohl (skb->pgm_opt_fragment->opt_sqn),
-			g_ntohl (skb->pgm_opt_fragment->opt_frag_off),
-			g_ntohl (skb->pgm_opt_fragment->opt_frag_len));
-		retval = pgm_rxw_push (sender->rxw, skb, nak_rb_expiry);
-	}
-	else
-	{
-		skb->pgm_opt_fragment = NULL;
-		retval = pgm_rxw_push (sender->rxw, skb, nak_rb_expiry);
-	}
-	skb = NULL;
+	if (opt_total_length > 0)
+		 get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
 
-	if ( retval & PGM_RXW_NEW_APDU )
-	{
-		msg_count++;
-	}
+	retval = pgm_rxw_add (sender->rxw, skb, nak_rb_expiry);
+
+/* reference is now invalid */
+	skb = NULL;
 
 	g_static_mutex_unlock (&sender->mutex);
 
 	gboolean flush_naks = FALSE;
 
-	switch (retval & PGM_RXW_RETURNS_MASK) {
-	case PGM_RXW_CREATED_PLACEHOLDER:
+	switch (retval) {
+	case PGM_RXW_MISSING:
 		flush_naks = TRUE;
+/* fall through */
+	case PGM_RXW_INSERTED:
+	case PGM_RXW_APPENDED:
+		msg_count++;
 		break;
 
 	case PGM_RXW_DUPLICATE:
 		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS]++;
-		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		break;
+		goto discarded;
 
-	case PGM_RXW_MALFORMED_APDU:
+	case PGM_RXW_MALFORMED:
 		sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA]++;
-
-	case PGM_RXW_NOT_IN_TXW:
-	case PGM_RXW_APDU_LOST:
+/* fall through */
+	case PGM_RXW_BOUNDS:
+discarded:
 		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		break;
+		return FALSE;
 
-	default:
-		break;
+	default: g_assert_not_reached(); break;
 	}
 
+/* valid data */
 	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += tsdu_length;
 	sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]  += msg_count;
 
@@ -7121,270 +7054,7 @@ on_odata (
 		g_static_mutex_unlock (&sender->transport->mutex);
 	}
 
-	return (retval & PGM_RXW_CONSUMED_SKB);
-}
-
-/* identical to on_odata except for statistics
- */
-
-static gboolean
-on_rdata (
-	pgm_peer_t*		sender,
-	struct pgm_sk_buff_t*	skb
-	)
-{
-	g_trace ("INFO","on_rdata");
-
-	int retval = 0;
-	gboolean flush_naks = FALSE;
-	const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl(sender->transport);
-	const guint16 tsdu_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
-
-	skb->pgm_data = skb->data;
-
-/* parity RDATA needs to be decoded */
-	if (skb->pgm_header->pgm_options & PGM_OPT_PARITY)
-	{
-		const guint32 tg_sqn_mask = 0xffffffff << sender->transport->tg_sqn_shift;
-		const guint32 tg_sqn = skb->pgm_data->data_sqn & tg_sqn_mask;
-
-		const gboolean is_var_pktlen = skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN;
-		const gboolean is_op_encoded = skb->pgm_header->pgm_options & PGM_OPT_PRESENT;		/* non-encoded options? */
-
-/* determine payload location */
-		guint8* rdata_bytes = (guint8*)(skb->pgm_data + 1);
-		if ((skb->pgm_header->pgm_options & PGM_OPT_PRESENT) && get_opt_fragment((struct pgm_opt_header*)rdata_bytes, &skb->pgm_opt_fragment))
-		{
-			guint16 opt_total_length = g_ntohs(*(guint16*)( (char*)( skb->pgm_data + 1 ) + sizeof(guint16)));
-			rdata_bytes += opt_total_length;
-		}
-
-/* create list of sequence numbers for each k packet in the FEC block */
-		guint rs_h = 0;
-		const gsize parity_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
-		guint32 target_sqn = tg_sqn - 1;
-		struct pgm_sk_buff_t* src_skbs[ sender->rs_n ];
-		guint8* src_data[ sender->rs_n ];
-		guint8* src_opts[ sender->rs_n ];
-		guint32 offsets[ sender->rs_k ];
-		for (guint32 i = tg_sqn; i != (tg_sqn + sender->rs_k); i++)
-		{
-			struct pgm_opt_fragment* opt_fragment = NULL;
-			gpointer packet = NULL;
-			guint16 length = 0;
-			gboolean is_parity = FALSE;
-			int status = pgm_rxw_peek (sender->rxw, i, &opt_fragment, &packet, &length, &is_parity);
-
-			if (status == PGM_RXW_DUPLICATE) {	/* already committed */
-				goto out;
-			}
-			if (status == PGM_RXW_NOT_IN_TXW) {
-				goto out;
-			}
-
-			if (length == 0 && !is_parity) {	/* nothing */
-
-				if (target_sqn == tg_sqn - 1)
-				{
-/* keep parity packet here */
-					target_sqn			= i;
-					src_skbs[ sender->rs_k + rs_h ] = skb;
-					src_data[ sender->rs_k + rs_h ]	= rdata_bytes;
-					src_opts[ sender->rs_k + rs_h ] = (guint8*)skb->pgm_opt_fragment;
-					offsets[ i - tg_sqn ]		= sender->rs_k + rs_h++;
-
-/* move repair to receive window ownership */
-					skb->pgm_data->data_sqn	= g_htonl (i);
-					pgm_rxw_push_nth_parity (sender->rxw, skb, nak_rb_expiry);
-// TODO:
-//					rx_buffer = pgm_rxw_alloc (sender->rxw);
-				}
-				else
-				{
-/* transmission group incomplete */
-					g_trace ("INFO", "transmission group incomplete, awaiting further repair packets.");
-					goto out;
-				}
-
-			} else if (is_parity) {			/* repair data */
-				src_data[ sender->rs_k + rs_h ] = packet;
-				src_opts[ sender->rs_k + rs_h ] = (guint8*)opt_fragment;
-				offsets[ i - tg_sqn ] = sender->rs_k + rs_h++;
-			} else {				/* original data */
-				src_data[ i - tg_sqn ] = packet;
-				src_opts[ i - tg_sqn ] = (guint8*)opt_fragment;
-				offsets[ i - tg_sqn ] = i - tg_sqn;
-				if (!is_var_pktlen && length != parity_length) {
-					g_warning ("Variable TSDU length without OPT_VAR_PKTLEN.\n");
-					goto out;
-				}
-
-/* zero pad buffer */
-				if (!skb->zero_padded) {
-					memset (skb->tail, 0, parity_length - length);
-					skb->zero_padded = 1;
-				}
-			}
-		}
-
-/* full transmission group, now allocate new packets */
-		for (unsigned i = 0; i < sender->rs_k; i++)
-		{
-			if (offsets[ i ] >= sender->rs_k)
-			{
-				struct pgm_sk_buff_t* null_skb = pgm_alloc_skb (sender->transport->max_tpdu);
-				pgm_skb_put (null_skb, sizeof(struct pgm_header) + sizeof(struct pgm_data));
-
-				null_skb->pgm_header = null_skb->data;
-				null_skb->pgm_data = (gpointer)( null_skb->pgm_header + 1 );
-
-/* prepare DATA */
-				if (is_op_encoded)
-				{
-					const guint16 opt_total_length = sizeof(struct pgm_opt_length) +
-									 sizeof(struct pgm_opt_header) +
-									 sizeof(struct pgm_opt_fragment);
-					pgm_skb_put (null_skb, opt_total_length);
-
-					null_skb->pgm_opt_fragment = (gpointer)( null_skb->pgm_data + 1 );
-					memset (null_skb->pgm_opt_fragment, 0, opt_total_length + parity_length);
-					src_data[ i ] = (guint8*)null_skb->pgm_opt_fragment + opt_total_length;
-				}
-				else
-				{
-					memset (null_skb->pgm_data + 1, 0, parity_length);
-					src_data[ i ] = (gpointer)( null_skb->pgm_data + 1 );
-				}
-
-				src_skbs[ i ] = null_skb;
-			}
-		}
-
-/* decode payload */
-		pgm_rs_decode_parity_appended (sender->rs, (void**)(void*)src_data, offsets, parity_length);
-
-/* decode opt_fragment option */
-		if (is_op_encoded)
-		{
-			pgm_rs_decode_parity_appended (sender->rs, (void**)(void*)src_opts, offsets, sizeof(struct pgm_opt_fragment));
-		}
-
-/* treat decoded packet as selective repair(s) */
-		g_static_mutex_lock (&sender->mutex);
-		gsize repair_length = parity_length;
-		for (unsigned i = 0; i < sender->rs_k; i++)
-		{
-			if (offsets[ i ] >= sender->rs_k)
-			{
-/* extract TSDU length is variable packet option was found on parity packet */
-				if (is_var_pktlen)
-				{
-					repair_length = *(guint16*)( src_data[i] + parity_length - 2 );
-				}
-
-				retval = pgm_rxw_push_nth_repair (sender->rxw, src_skbs[i], nak_rb_expiry);
-
-				switch (retval) {
-				case PGM_RXW_CREATED_PLACEHOLDER:
-				case PGM_RXW_DUPLICATE:
-					g_warning ("repaired packets not matching receive window state.");
-					break;
-
-				case PGM_RXW_MALFORMED_APDU:
-					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA]++;
-
-				case PGM_RXW_NOT_IN_TXW:
-				case PGM_RXW_APDU_LOST:
-					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-					break;
-
-				default:
-					break;
-				}
-
-				sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += repair_length;
-				sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]++;
-			}
-		}
-		g_static_mutex_unlock (&sender->mutex);
-	}
-	else
-	{
-/* selective RDATA */
-
-		guint8* opt_header = (guint8*)(skb->pgm_data + 1);
-		const guint16 opt_total_length = (skb->pgm_header->pgm_options & PGM_OPT_PRESENT) ? g_ntohs(*(guint16*)( opt_header + sizeof(guint16))) : 0;
-
-/* advance data pointer to payload */
-		pgm_skb_pull (skb, sizeof(struct pgm_data) + opt_total_length);
-
-		if (opt_total_length > 0 && get_opt_fragment((gpointer)opt_header, &skb->pgm_opt_fragment))
-		{
-			g_trace ("INFO","push fragment (sqn #%u trail #%u apdu_first_sqn #%u fragment_offset %u apdu_len %u)",
-				 skb->pgm_data->data_sqn,
-				 g_ntohl (skb->pgm_data->data_trail),
-				 g_ntohl (skb->pgm_opt_fragment->opt_sqn),
-				 g_ntohl (skb->pgm_opt_fragment->opt_frag_off),
-				 g_ntohl (skb->pgm_opt_fragment->opt_frag_len));
-			g_static_mutex_lock (&sender->mutex);
-			retval = pgm_rxw_push (sender->rxw, skb, nak_rb_expiry);
-		}
-		else
-		{
-			g_static_mutex_lock (&sender->mutex);
-			skb->pgm_opt_fragment = NULL;
-			retval = pgm_rxw_push (sender->rxw, skb, nak_rb_expiry);
-		}
-		skb = NULL;
-
-		g_static_mutex_unlock (&sender->mutex);
-
-		switch (retval) {
-		case PGM_RXW_CREATED_PLACEHOLDER:
-			flush_naks = TRUE;
-			break;
-
-		case PGM_RXW_DUPLICATE:
-			sender->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS]++;
-			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			break;
-
-		case PGM_RXW_MALFORMED_APDU:
-			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA]++;
-
-		case PGM_RXW_NOT_IN_TXW:
-		case PGM_RXW_APDU_LOST:
-			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			break;
-
-		default:
-			break;
-		}
-
-		sender->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += tsdu_length;
-		sender->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]++;
-	}
-
-	if (flush_naks)
-	{
-/* flush out 1st time nak packets */
-		g_static_mutex_lock (&sender->transport->mutex);
-
-		if (pgm_time_after (sender->transport->next_poll, nak_rb_expiry))
-		{
-			sender->transport->next_poll = nak_rb_expiry;
-			g_trace ("INFO","on_odata: prod timer thread");
-			if (!pgm_notify_send (&sender->transport->timer_notify)) {
-				g_critical ("write to timer pipe failed :(");
-				retval = -EINVAL;
-			}
-		}
-
-		g_static_mutex_unlock (&sender->transport->mutex);
-	}
-
-out:
-	return FALSE;
+	return TRUE;
 }
 
 /* eof */

@@ -44,11 +44,14 @@
 #define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
-/*
- * Udp port for UDP encapsulation
+/* UDP ports for UDP encapsulation
  */
 #define DEFAULT_UDP_ENCAP_UCAST_PORT 3055
 #define DEFAULT_UDP_ENCAP_MCAST_PORT 3056
+
+/* DoS limitation to protocol (MS08-036, KB950762)
+ */
+#define PGM_MAX_APDU	UINT16_MAX
 
 enum pgm_type_e {
     PGM_SPM = 0x00,	/* 8.1: source path message */
