@@ -1,3 +1,24 @@
+/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
+ *
+ * unit tests for transmit window.
+ *
+ * Copyright (c) 2009 Miru Limited.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 
 #include <stdlib.h>
 #include <check.h>
@@ -521,12 +542,12 @@ END_TEST
 
 /* target:
  *	void
- *	pgm_txw_retransmit_remove (
+ *	pgm_txw_retransmit_remove_head (
  *		pgm_txw_t* const	window
  *		)
  */
 
-START_TEST (test_retransmit_remove_pass_001)
+START_TEST (test_retransmit_remove_head_pass_001)
 {
 	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
 	fail_if (NULL == window);
@@ -539,25 +560,25 @@ START_TEST (test_retransmit_remove_pass_001)
 	guint		rs_h;
 	skb = NULL;
 	fail_unless (0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h));
-	pgm_txw_retransmit_remove (window);
+	pgm_txw_retransmit_remove_head (window);
 	pgm_txw_shutdown (window);
 }
 END_TEST
 
 /* null window */
-START_TEST (test_retransmit_remove_fail_001)
+START_TEST (test_retransmit_remove_head_fail_001)
 {
-	pgm_txw_retransmit_remove (NULL);
+	pgm_txw_retransmit_remove_head (NULL);
 	fail ();
 }
 END_TEST
 
 /* empty retransmit queue */
-START_TEST (test_retransmit_remove_fail_002)
+START_TEST (test_retransmit_remove_head_fail_002)
 {
 	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
 	fail_if (NULL == window);
-	pgm_txw_retransmit_remove (window);
+	pgm_txw_retransmit_remove_head (window);
 	fail ();
 }
 END_TEST
@@ -654,11 +675,11 @@ make_test_suite (void)
 	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_004, SIGABRT);
 	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_005, SIGABRT);
 
-	TCase* tc_retransmit_remove = tcase_create ("retransmit-remove");
-	suite_add_tcase (s, tc_retransmit_remove);
-	tcase_add_test (tc_retransmit_remove, test_retransmit_remove_pass_001);
-	tcase_add_test_raise_signal (tc_retransmit_remove, test_retransmit_remove_fail_001, SIGABRT);
-	tcase_add_test_raise_signal (tc_retransmit_remove, test_retransmit_remove_fail_002, SIGABRT);
+	TCase* tc_retransmit_remove_head = tcase_create ("retransmit-remove-head");
+	suite_add_tcase (s, tc_retransmit_remove_head);
+	tcase_add_test (tc_retransmit_remove_head, test_retransmit_remove_head_pass_001);
+	tcase_add_test_raise_signal (tc_retransmit_remove_head, test_retransmit_remove_head_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_retransmit_remove_head, test_retransmit_remove_head_fail_002, SIGABRT);
 
 	return s;
 }

@@ -122,15 +122,14 @@ pgm_receiver_thread (
 			pgm_event_t* event = pgm_event_alloc (async);
 			event->data = len > 0 ? g_malloc (len) : NULL;
 			event->len  = len;
-
 			gpointer dst = event->data;
-			struct pgm_iovec* src = msgv.msgv_iov;
+			guint i = 0;
 			while (len)
 			{
-				memcpy (dst, (const char*)src->iov_base + src->iov_offset, src->iov_len);
-				dst = (char*)dst + src->iov_len;
-				len -= src->iov_len;
-				src++;
+				const struct pgm_sk_buff_t* skb = msgv.msgv_skb[i++];
+				memcpy (dst, skb->data, skb->len);
+				dst = (char*)dst + skb->len;
+				len -= skb->len;
 			}
 
 /* prod pipe on edge */
