@@ -38,6 +38,10 @@ int pgm_transport_set_txw_sqns (pgm_transport_t*, guint);
 int pgm_transport_set_txw_secs (pgm_transport_t*, guint);
 int pgm_transport_set_txw_max_rte (pgm_transport_t*, guint);
 
+gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
+gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
+gssize pgm_transport_send_skbv (pgm_transport_t*, struct pgm_sk_buff_t*, guint, int, gboolean);
+
 int send_spm_unlocked (pgm_transport_t*);
 gboolean on_nak_notify (GIOChannel*, GIOCondition, gpointer);
 int on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, gpointer, gsize);
