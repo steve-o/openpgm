@@ -331,33 +331,14 @@ void pgm_drop_superuser (void);
 int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, guint16, struct group_source_req*, gsize, struct group_source_req*);
 int pgm_transport_bind (pgm_transport_t*);
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
-
 int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
 int pgm_transport_set_multicast_loop (pgm_transport_t*, gboolean);
 int pgm_transport_set_hops (pgm_transport_t*, gint);
-
-int pgm_transport_set_peer_expiry (pgm_transport_t*, guint);
-int pgm_transport_set_spmr_expiry (pgm_transport_t*, guint);
-
-int pgm_transport_set_rxw_preallocate (pgm_transport_t*, guint);
-int pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
-int pgm_transport_set_rxw_secs (pgm_transport_t*, guint);
-int pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
-
 int pgm_transport_set_sndbuf (pgm_transport_t*, int);
 int pgm_transport_set_rcvbuf (pgm_transport_t*, int);
-
-int pgm_transport_set_nak_bo_ivl (pgm_transport_t*, guint);
-int pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
-int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
-int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
-int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
-
 int pgm_transport_set_fec (pgm_transport_t*, guint, gboolean, gboolean, guint, guint);
-
 int pgm_transport_set_send_only (pgm_transport_t*, gboolean);
 int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
-
 int pgm_transport_set_close_on_failure (pgm_transport_t*, gboolean);
 
 gsize pgm_transport_pkt_offset (gboolean);
@@ -368,16 +349,7 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
-
-gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
-gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
-gssize pgm_transport_send_skbv (pgm_transport_t*, struct pgm_sk_buff_t*, guint, int, gboolean);
-
-/* receiver side */
-gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
-gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int);
-gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int);
-gssize pgm_transport_recvfrom (pgm_transport_t*, gpointer, gsize, int, pgm_tsi_t*);
+int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 #ifdef CONFIG_HAVE_POLL

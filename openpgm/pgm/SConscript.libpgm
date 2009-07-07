@@ -15,6 +15,7 @@ src = Split("""
 		rxwi.c
 		transport.c
 		source.c
+		receiver.c
 		pgm.c
 		timer.c
 		net.c
