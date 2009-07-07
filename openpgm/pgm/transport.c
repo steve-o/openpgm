@@ -3331,8 +3331,8 @@ on_spm (
 /* update receive window */
 		pgm_time_t nak_rb_expiry = now + nak_rb_ivl(transport);
 		guint naks = pgm_rxw_update (sender->rxw,
-					     g_ntohl (spm->spm_trail),
 					     g_ntohl (spm->spm_lead),
+					     g_ntohl (spm->spm_trail),
 					     nak_rb_expiry);
 		if (naks && pgm_time_after(transport->next_poll, nak_rb_expiry))
 		{
