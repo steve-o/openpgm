@@ -25,7 +25,7 @@
 #include <check.h>
 
 #include <pgm/transport.h>
-#include <pgm/timer.h>
+#include <pgm/time.h>
 
 
 /* mock global */

@@ -30,7 +30,7 @@
 #include <pgm/signal.h>
 #include <pgm/sn.h>
 #include <pgm/sockaddr.h>
-#include <pgm/timer.h>
+#include <pgm/time.h>
 #include <pgm/transport.h>
 #include <pgm/version.h>
 

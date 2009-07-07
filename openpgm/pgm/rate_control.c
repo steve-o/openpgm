@@ -25,7 +25,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#include "pgm/timer.h"
+#include "pgm/time.h"
 #include "pgm/rate_control.h"
 
 
