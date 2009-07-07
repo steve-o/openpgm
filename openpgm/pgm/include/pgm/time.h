@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_TIMER_H__
-#define __PGM_TIMER_H__
+#ifndef __PGM_TIME_H__
+#define __PGM_TIME_H__
 
 #include <glib.h>
 
@@ -73,5 +73,5 @@ gboolean pgm_time_supported (void);
 
 G_END_DECLS
 
-#endif /* __PGM_TIMER_H__ */
+#endif /* __PGM_TIME_H__ */
 

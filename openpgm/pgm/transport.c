@@ -52,10 +52,12 @@
 #include "pgm/if.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
+#include "pgm/net.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
 #include "pgm/rate_control.h"
 #include "pgm/sn.h"
+#include "pgm/time.h"
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
@@ -76,24 +78,7 @@
 #endif
 
 
-/* internal: Glib event loop GSource of spm & rx state timers */
-struct pgm_timer_t {
-	GSource		source;
-	pgm_time_t	expiration;
-	pgm_transport_t* transport;
-};
-
-typedef struct pgm_timer_t pgm_timer_t;
-
-
-/* callback for pgm timer events */
-typedef int (*pgm_timer_callback)(pgm_transport_t*);
-
-
 /* global locals */
-
-static int ipproto_pgm = IPPROTO_PGM;
-
 GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
 GSList* pgm_transport_list = NULL;
 
@@ -128,23 +113,7 @@ static inline pgm_time_t next_nak_rdata_expiry (gpointer window_)
 	return state->nak_rdata_expiry;
 }
 
-static GSource* pgm_create_timer (pgm_transport_t*);
-static int pgm_add_timer_full (pgm_transport_t*, gint);
-static int pgm_add_timer (pgm_transport_t*);
-
-static gboolean pgm_timer_prepare (GSource*, gint*);
-static gboolean pgm_timer_check (GSource*);
-static gboolean pgm_timer_dispatch (GSource*, GSourceFunc, gpointer);
-
-static GSourceFuncs g_pgm_timer_funcs = {
-	.prepare		= pgm_timer_prepare,
-	.check			= pgm_timer_check,
-	.dispatch		= pgm_timer_dispatch,
-	.finalize		= NULL,
-	.closure_callback	= NULL
-};
-
-static int send_spm_unlocked (pgm_transport_t*);
+int send_spm_unlocked (pgm_transport_t*);
 static inline int send_spm (pgm_transport_t*);
 static int send_spmr (pgm_peer_t*);
 static int send_nak (pgm_peer_t*, guint32);
@@ -156,8 +125,8 @@ static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, 
 static void nak_rb_state (pgm_peer_t*);
 static void nak_rpt_state (pgm_peer_t*);
 static void nak_rdata_state (pgm_peer_t*);
-static void check_peer_nak_state (pgm_transport_t*);
-static pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
+void check_peer_nak_state (pgm_transport_t*);
+pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
 static int send_rdata (pgm_transport_t*, guint32, gpointer, gsize, gboolean, guint32);
 
@@ -286,178 +255,6 @@ nak_rb_ivl (
 	)
 {
 	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
-}
-
-/* locked and rate regulated sendto
- *
- * on success, returns number of bytes sent.  on error, -1 is returned, and
- * errno set appropriately.
- */
-static inline gssize
-pgm_sendto (
-	pgm_transport_t*	transport,
-	gboolean		use_rate_limit,
-	gboolean		use_router_alert,
-	const void*		buf,
-	gsize			len,
-	int			flags,
-	const struct sockaddr*	to,
-	gsize			tolen
-	)
-{
-	g_assert( transport );
-	g_assert( buf );
-	g_assert( len > 0 );
-	g_assert( to );
-	g_assert( tolen > 0 );
-
-	GStaticMutex* mutex = use_router_alert ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
-	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
-
-	if (use_rate_limit)
-	{
-		int check = pgm_rate_check (transport->rate_control, len, flags);
-		if (check < 0 && errno == EAGAIN)
-		{
-			return (gssize)check;
-		}
-	}
-
-	g_static_mutex_lock (mutex);
-
-	ssize_t sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
-	if (	sent < 0 &&
-		errno != ENETUNREACH &&		/* Network is unreachable */
-		errno != EHOSTUNREACH &&	/* No route to host */
-		!( errno == EAGAIN && flags & MSG_DONTWAIT )	/* would block on non-blocking send */
-	   )
-	{
-#ifdef CONFIG_HAVE_POLL
-/* poll for cleared socket */
-		struct pollfd p = {
-			.fd		= transport->send_sock,
-			.events		= POLLOUT,
-			.revents	= 0
-		};
-		int ready = poll (&p, 1, 500 /* ms */);
-#else
-		fd_set writefds;
-		FD_ZERO(&writefds);
-		FD_SET(transport->send_sock, &writefds);
-		struct timeval tv = {
-			.tv_sec  = 0,
-			.tv_usec = 500 /* ms */ * 1000
-		};
-		int ready = select (1, NULL, &writefds, NULL, &tv);
-#endif /* CONFIG_HAVE_POLL */
-		if (ready > 0)
-		{
-			sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
-			if ( sent < 0 )
-			{
-				g_warning ("sendto %s failed: %i/%s",
-						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						errno,
-						strerror (errno));
-			}
-		}
-		else if (ready == 0)
-		{
-			g_warning ("sendto %s socket timeout.",
-					 inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
-		}
-		else
-		{
-			g_warning ("blocked sendto %s socket failed: %i %s",
-					inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-					errno,
-					strerror (errno));
-		}
-	}
-
-	g_static_mutex_unlock (mutex);
-
-	return sent;
-}
-
-/* socket helper, for setting pipe ends non-blocking
- *
- * on success, returns 0.  on error, returns -1, and sets errno appropriately.
- */
-int
-pgm_set_nonblocking (
-	int		filedes[2]
-	)
-{
-	int retval = 0;
-
-/* set write end non-blocking */
-	int fd_flags = fcntl (filedes[1], F_GETFL);
-	if (fd_flags < 0) {
-		retval = fd_flags;
-		goto out;
-	}
-	retval = fcntl (filedes[1], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = fd_flags;
-		goto out;
-	}
-/* set read end non-blocking */
-	fcntl (filedes[0], F_GETFL);
-	if (fd_flags < 0) {
-		retval = fd_flags;
-		goto out;
-	}
-	retval = fcntl (filedes[0], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = fd_flags;
-		goto out;
-	}
-
-out:
-	return retval;
-}		
-
-/* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
- *
- * on success, returns 0.
- */
-int
-pgm_init (void)
-{
-	int retval = 0;
-
-/* ensure threading enabled */
-	if (!g_thread_supported ()) g_thread_init (NULL);
-
-/* ensure timer enabled */
-	if (!pgm_time_supported ()) pgm_time_init();
-
-
-/* find PGM protocol id */
-
-// TODO: fix valgrind errors
-#ifdef CONFIG_HAVE_GETPROTOBYNAME_R
-	char b[1024];
-	struct protoent protobuf, *proto;
-	int e = getprotobyname_r("pgm", &protobuf, b, sizeof(b), &proto);
-	if (e != -1 && proto != NULL) {
-		if (proto->p_proto != ipproto_pgm) {
-			g_trace("INFO","Setting PGM protocol number to %i from /etc/protocols.", proto->p_proto);
-			ipproto_pgm = proto->p_proto;
-		}
-	}
-#else
-	struct protoent *proto = getprotobyname("pgm");
-	if (proto != NULL) {
-		if (proto->p_proto != ipproto_pgm) {
-			g_trace("INFO","Setting PGM protocol number to %i from /etc/protocols.", proto->p_proto);
-			ipproto_pgm = proto->p_proto;
-		}
-	}
-#endif
-
-	return retval;
 }
 
 /* destroy a pgm_transport object and contents, if last transport also destroy
@@ -680,35 +477,6 @@ pgm_peer_unref (
 /* object */
 		g_free (peer);
 	}
-}
-
-/* timer thread execution function.
- *
- * when thread loop is terminated, returns NULL, to be returned by
- * g_thread_join()
- */
-static gpointer
-pgm_timer_thread (
-	gpointer		data
-	)
-{
-	pgm_transport_t* transport = (pgm_transport_t*)data;
-
-	transport->timer_context = g_main_context_new ();
-	g_mutex_lock (transport->thread_mutex);
-	transport->timer_loop = g_main_loop_new (transport->timer_context, FALSE);
-	g_cond_signal (transport->thread_cond);
-	g_mutex_unlock (transport->thread_mutex);
-
-	g_trace ("INFO", "pgm_timer_thread entering event loop.");
-	g_main_loop_run (transport->timer_loop);
-	g_trace ("INFO", "pgm_timer_thread leaving event loop.");
-
-/* cleanup */
-	g_main_loop_unref (transport->timer_loop);
-	g_main_context_unref (transport->timer_context);
-
-	return NULL;
 }
 
 /* create a pgm_transport object.  create sockets that require superuser priviledges, if this is
@@ -2142,7 +1910,7 @@ no_cap_net_admin:
 	}
 
 	g_trace ("INFO","adding dynamic timer");
-	transport->timer_id = pgm_add_timer (transport);
+	transport->timer_id = pgm_timer_add (transport);
 
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
@@ -4032,7 +3800,7 @@ send_spm (
 	return result;
 }
 
-static int
+int
 send_spm_unlocked (
 	pgm_transport_t*	transport
 	)
@@ -4834,7 +4602,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
  * timer execution.
  */
 
-static void
+void
 check_peer_nak_state (
 	pgm_transport_t*	transport
 	)
@@ -4928,7 +4696,7 @@ check_peer_nak_state (
  * on success, returns the earliest of the expiration parameter or next
  * peer expiration time.
  */
-static pgm_time_t
+pgm_time_t
 min_nak_expiry (
 	pgm_time_t		expiration,
 	pgm_transport_t*	transport
@@ -6764,174 +6532,6 @@ pgm_transport_msfilter (
 	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, -EINVAL);
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_MSFILTER, gf_list, len);
 }
-
-static GSource*
-pgm_create_timer (
-	pgm_transport_t*	transport
-	)
-{
-	g_return_val_if_fail (transport != NULL, NULL);
-
-	GSource *source = g_source_new (&g_pgm_timer_funcs, sizeof(pgm_timer_t));
-	pgm_timer_t *timer = (pgm_timer_t*)source;
-
-	timer->transport = transport;
-
-	return source;
-}
-
-/* on success, returns id of GSource 
- */
-static int
-pgm_add_timer_full (
-	pgm_transport_t*	transport,
-	gint			priority
-	)
-{
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-
-	GSource* source = pgm_create_timer (transport);
-
-	if (priority != G_PRIORITY_DEFAULT)
-		g_source_set_priority (source, priority);
-
-	guint id = g_source_attach (source, transport->timer_context);
-	g_source_unref (source);
-
-	return id;
-}
-
-static int
-pgm_add_timer (
-	pgm_transport_t*	transport
-	)
-{
-	return pgm_add_timer_full (transport, G_PRIORITY_HIGH_IDLE);
-}
-
-/* determine which timer fires next: spm (ihb_tmr), nak_rb_ivl, nak_rpt_ivl, or nak_rdata_ivl
- * and check whether its already due.
- */
-
-static gboolean
-pgm_timer_prepare (
-	GSource*		source,
-	gint*			timeout
-	)
-{
-	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
-	pgm_transport_t* transport = pgm_timer->transport;
-	glong msec;
-
-	g_static_mutex_lock (&transport->mutex);
-	pgm_time_t now = pgm_time_update_now();
-	pgm_time_t expiration = now + pgm_secs( 30 );
-
-	if (transport->can_send_data)
-	{
-		expiration = transport->spm_heartbeat_state ? MIN(transport->next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
-		g_trace ("SPM","spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
-	}
-
-/* save the nearest timer */
-	if (transport->can_recv)
-	{
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		expiration = min_nak_expiry (expiration, transport);
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
-	}
-
-	transport->next_poll = pgm_timer->expiration = expiration;
-	g_static_mutex_unlock (&transport->mutex);
-
-/* advance time again to adjust for processing time out of the event loop, this
- * could cause further timers to expire even before checking for new wire data.
- */
-	msec = pgm_to_msecs((gint64)expiration - (gint64)now);
-	if (msec < 0)
-		msec = 0;
-	else
-		msec = MIN (G_MAXINT, (guint)msec);
-
-	*timeout = (gint)msec;
-
-	g_trace ("SPM","expiration in %i msec", (gint)msec);
-
-	return (msec == 0);
-}
-
-static gboolean
-pgm_timer_check (
-	GSource*		source
-	)
-{
-	g_trace ("SPM","pgm_timer_check");
-
-	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
-	const pgm_time_t now = pgm_time_update_now();
-
-	gboolean retval = ( pgm_time_after_eq(now, pgm_timer->expiration) );
-	if (!retval) g_thread_yield();
-	return retval;
-}
-
-/* call all timers, assume that time_now has been updated by either pgm_timer_prepare
- * or pgm_timer_check and no other method calls here.
- */
-
-static gboolean
-pgm_timer_dispatch (
-	GSource*			source,
-	G_GNUC_UNUSED GSourceFunc	callback,
-	G_GNUC_UNUSED gpointer		user_data
-	)
-{
-	g_trace ("SPM","pgm_timer_dispatch");
-
-	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
-	pgm_transport_t* transport = pgm_timer->transport;
-
-/* find which timers have expired and call each */
-	if (transport->can_send_data)
-	{
-		g_static_mutex_lock (&transport->mutex);
-		if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
-		{
-			send_spm_unlocked (transport);
-			transport->spm_heartbeat_state = 0;
-			transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
-		}
-		else if ( transport->spm_heartbeat_state &&
-			 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm) )
-		{
-			send_spm_unlocked (transport);
-		
-			if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
-			{
-				transport->next_heartbeat_spm = pgm_time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-			}
-			else
-			{	/* transition heartbeat to ambient */
-				transport->spm_heartbeat_state = 0;
-			}
-		}
-		g_static_mutex_unlock (&transport->mutex);
-	}
-
-	if (transport->can_recv)
-	{
-		g_static_mutex_lock (&transport->waiting_mutex);
-		g_static_mutex_lock (&transport->mutex);
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		check_peer_nak_state (transport);
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
-		g_static_mutex_unlock (&transport->mutex);
-		g_static_mutex_unlock (&transport->waiting_mutex);
-	}
-
-	return TRUE;
-}
-
 
 /* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
  *

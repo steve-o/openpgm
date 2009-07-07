@@ -29,14 +29,15 @@
 
 #include <glib.h>
 
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
 
-
+/* protocol number assigned by IANA */
 #ifndef IPPROTO_PGM
-#define IPPROTO_PGM 		    113
+#define IPPROTO_PGM 		    	113
 #endif
+
+/* read from /etc/protocols if available */
+extern int ipproto_pgm;
+
 
 /* address family indicator, rfc 1700 (ADDRESS FAMILY NUMBERS) */
 #ifndef AFI_IP
@@ -44,14 +45,16 @@
 #define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
-/* UDP ports for UDP encapsulation
- */
-#define DEFAULT_UDP_ENCAP_UCAST_PORT 3055
-#define DEFAULT_UDP_ENCAP_MCAST_PORT 3056
+/* UDP ports for UDP encapsulation, as per IBM WebSphere MQ */
+#define DEFAULT_UDP_ENCAP_UCAST_PORT	3055
+#define DEFAULT_UDP_ENCAP_MCAST_PORT	3056
 
-/* DoS limitation to protocol (MS08-036, KB950762)
- */
-#define PGM_MAX_APDU	UINT16_MAX
+/* DoS limitation to protocol (MS08-036, KB950762) */
+#define PGM_MAX_APDU			UINT16_MAX
+
+/* Cisco default: 24 (max 8200), Juniper & H3C default: 16 */
+#define PGM_MAX_FRAGMENTS		16
+
 
 enum pgm_type_e {
     PGM_SPM = 0x00,	/* 8.1: source path message */
@@ -372,6 +375,9 @@ struct pgm_opt6_path_nla {
 
 #pragma pack(pop)
 
+#ifndef __PGM_SKBUFF_H__
+#	include <pgm/skbuff.h>
+#endif
 
 G_BEGIN_DECLS
 

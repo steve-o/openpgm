@@ -43,7 +43,7 @@
 #include <pgm/skbuff.h>
 #include <pgm/rxwi.h>
 #include <pgm/sn.h>
-#include <pgm/timer.h>
+#include <pgm/time.h>
 #include <pgm/reed_solomon.h>
 
 #ifndef RXW_DEBUG

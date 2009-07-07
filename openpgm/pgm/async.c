@@ -26,6 +26,7 @@
 
 #include <glib.h>
 
+#include "pgm/net.h"
 #include "pgm/async.h"
 
 

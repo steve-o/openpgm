@@ -24,8 +24,8 @@
 
 #include <glib.h>
 
-#ifndef __PGM_TIMER_H__
-#   include <pgm/timer.h>
+#ifndef __PGM_TIME_H__
+#   include <pgm/time.h>
 #endif
 
 #ifndef __PGM_MSGV_H__
