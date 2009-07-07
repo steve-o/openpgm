@@ -1,6 +1,6 @@
-/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
+/* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * Vector message container
+ * network send wrapper.
  *
  * Copyright (c) 2006-2009 Miru Limited.
  *
@@ -19,31 +19,22 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_MSGV_H__
-#define __PGM_MSGV_H__
+#ifndef __PGM_NET_H__
+#define __PGM_NET_H__
 
-#ifndef __PGM_PACKET_H__
-#	include <pgm/packet.h>
+#include <glib.h>
+
+#ifndef __PGM_TRANSPORT_H__
+#	include <pgm/transport.h>
 #endif
 
 
-/* struct for scatter/gather I/O */
-struct pgm_iovec {
-#ifndef _WIN32
-	void*		iov_base;
-	size_t		iov_len;	/* length of data */
-#else
-	u_long		iov_len;
-	char*		iov_base;
-#endif /* _WIN32 */
-};
+G_BEGIN_DECLS
 
-struct pgm_msgv_t {
-	size_t			msgv_len;	/* number of bytes in skb */
-	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
-};
+gssize pgm_sendto (pgm_transport_t*, gboolean, gboolean, const void*, gsize, int, const struct sockaddr*, gsize);
+int pgm_set_nonblocking (int fd[2]);
 
-typedef struct pgm_msgv_t pgm_msgv_t;
+G_END_DECLS
 
+#endif /* __PGM_NET_H__ */
 
-#endif /* __PGM_MSGV_H__ */

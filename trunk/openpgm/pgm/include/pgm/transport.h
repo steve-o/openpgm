@@ -2,7 +2,7 @@
  * 
  * PGM transport.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -47,8 +47,8 @@ typedef struct pgm_transport_t pgm_transport_t;
 #   include <pgm/sockaddr.h>
 #endif
 
-#ifndef __PGM_TIMER_H__
-#   include <pgm/timer.h>
+#ifndef __PGM_TIME_H__
+#   include <pgm/time.h>
 #endif
 
 #ifndef __PGM_NOTIFY_H__
@@ -375,8 +375,6 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
-
-int pgm_set_nonblocking (int filedes[2]);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
 gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);

@@ -7,13 +7,16 @@ Import('env')
 
 src = Split("""
 		packet.c
-		timer.c
+		time.c
 		if.c
 		gsi.c
 		signal.c
 		txwi.c
 		rxwi.c
 		transport.c
+		pgm.c
+		timer.c
+		net.c
 		rate_control.c
 		async.c
 		checksum.c
