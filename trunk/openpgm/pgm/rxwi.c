@@ -83,7 +83,7 @@ static inline gboolean pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const guint3
 static inline void pgm_rxw_remove_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline int pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline int pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static inline void pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t);
+static inline int pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t);
 static inline void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
 static inline guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
 static inline void _pgm_rxw_lost (pgm_rxw_t* const, const guint32);
@@ -119,7 +119,7 @@ _pgm_rxw_peek (
 		const guint32 index_ = sequence % pgm_rxw_max_length (window);
 		skb = window->pdata[index_];
 /* availability only guaranteed inside commit window */
-		if (pgm_uint32_lte (sequence, window->commit_lead)) {
+		if (pgm_uint32_lt (sequence, window->commit_lead)) {
 			g_assert (skb);
 			g_assert (pgm_skb_is_valid (skb));
 			g_assert (!pgm_tsi_is_null (&skb->tsi));
@@ -323,6 +323,7 @@ pgm_rxw_add (
 	)
 {
 	pgm_rxw_state_t* const state = (pgm_rxw_state_t*)&skb->cb;
+	int status;
 
 /* pre-conditions */
 	g_assert (window);
@@ -374,7 +375,7 @@ pgm_rxw_add (
 
 /* first packet of a session defines the window */
 	if (!window->is_defined)
-		pgm_rxw_define (window, skb->sequence);
+		pgm_rxw_define (window, skb->sequence - 1);	/* previous_lead needed for append to occur */
 	else
 		pgm_rxw_update_trail (window, g_ntohl (skb->pgm_data->data_trail));
 
@@ -399,8 +400,7 @@ pgm_rxw_add (
 		}
 
 		g_assert (first_state);
-		pgm_rxw_add_placeholder_range (window, pgm_rxw_tg_sqn (window, skb->sequence), nak_rb_expiry);
-		return pgm_rxw_append (window, skb);
+		status = pgm_rxw_add_placeholder_range (window, pgm_rxw_tg_sqn (window, skb->sequence), nak_rb_expiry);
 	}
 	else
 	{
@@ -420,12 +420,15 @@ pgm_rxw_add (
 			return pgm_rxw_append (window, skb);
 		}
 
-		pgm_rxw_add_placeholder_range (window, skb->sequence, nak_rb_expiry);
-		const int status = pgm_rxw_append (window, skb);
-		return PGM_RXW_APPENDED == status ? PGM_RXW_MISSING : status;
+		status = pgm_rxw_add_placeholder_range (window, skb->sequence, nak_rb_expiry);
 	}
 
-	g_assert_not_reached();
+	if (PGM_RXW_APPENDED == status) {
+		status = pgm_rxw_append (window, skb);
+		if (PGM_RXW_APPENDED == status)
+			status = PGM_RXW_MISSING;
+	}
+	return status;
 }
 
 /* trail is the next packet to commit upstream, lead is the leading edge
@@ -450,7 +453,7 @@ pgm_rxw_define (
 	g_assert (pgm_rxw_incoming_is_empty (window));
 	g_assert (!window->is_defined);
 
-	window->lead = lead - 1;
+	window->lead = lead;
 	window->commit_lead = window->rxw_trail = window->rxw_trail_init = window->trail = window->lead + 1;
 	window->is_constrained = window->is_defined = TRUE;
 
@@ -470,8 +473,8 @@ pgm_rxw_define (
 guint32
 pgm_rxw_update (
 	pgm_rxw_t* const	window,
-	const guint32		txw_trail,
 	const guint32		txw_lead,
+	const guint32		txw_trail,
 	const pgm_time_t	nak_rb_expiry		/* packet expiration time */
 	)
 {
@@ -479,8 +482,10 @@ pgm_rxw_update (
 	g_assert (window);
 	g_assert_cmpuint (nak_rb_expiry, >, 0);
 
-	if (!window->is_defined)
+	if (!window->is_defined) {
 		pgm_rxw_define (window, txw_lead);
+		return 0;
+	}
 
 	pgm_rxw_update_trail (window, txw_trail);
 	return pgm_rxw_update_lead (window, txw_lead, nak_rb_expiry);
@@ -565,10 +570,13 @@ pgm_rxw_add_placeholder (
 	g_assert (window);
 	g_assert (!pgm_rxw_is_full (window));
 
+/* advance lead */
+	window->lead++;
+
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
 	skb->tstamp		= pgm_time_now;
-	skb->sequence		= ++(window->lead);
+	skb->sequence		= window->lead;
 	state->nak_rb_expiry	= nak_rb_expiry;
 
 	if (!pgm_rxw_is_first_of_tg_sqn (window, skb->sequence))
@@ -596,7 +604,7 @@ pgm_rxw_add_placeholder (
  */
 
 static
-void
+int
 pgm_rxw_add_placeholder_range (
 	pgm_rxw_t* const	window,
 	const guint32		sequence,
@@ -610,16 +618,14 @@ pgm_rxw_add_placeholder_range (
 /* check bounds of commit window */
 	const guint32 new_commit_sqns = ( 1 + sequence ) - window->trail;
         if ( !pgm_rxw_commit_is_empty (window) &&
-	     (new_commit_sqns >= pgm_rxw_length (window)) )
+	     (new_commit_sqns >= pgm_rxw_max_length (window)) )
         {
 		pgm_rxw_update_lead (window, sequence, nak_rb_expiry);
-		return;		/* effectively a slow consumer */
+		return PGM_RXW_BOUNDS;		/* effectively a slow consumer */
         }
 
 	if (pgm_rxw_is_full (window))
-	{
 		_pgm_rxw_remove_trail (window);
-	}
 
 /* if packet is non-contiguous to current leading edge add place holders
  * TODO: can be rather inefficient on packet loss looping through dropped sequence numbers
@@ -628,13 +634,13 @@ pgm_rxw_add_placeholder_range (
 	{
 		pgm_rxw_add_placeholder (window, nak_rb_expiry);
 		if (pgm_rxw_is_full (window))
-		{
 			_pgm_rxw_remove_trail (window);
-		}
 	}
 
 /* post-conditions */
 	g_assert (!pgm_rxw_is_full (window));
+
+	return PGM_RXW_APPENDED;
 }
 
 /* update leading edge of receive window.
