@@ -872,39 +872,6 @@ END_TEST
 
 /* target:
  *	void
- *	pgm_rxw_unlink (
- *		pgm_rxw_t* const	window,
- *		struct pgm_sk_buff_t*	skb
- *		)
- */
-
-START_TEST (test_unlink_pass_001)
-{
-}
-END_TEST
-
-START_TEST (test_unlink_fail_001)
-{
-	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
-	skb->pgm_data->data_sqn = g_htonl (0);
-	pgm_rxw_unlink (NULL, skb);
-	fail ();
-}
-END_TEST
-
-START_TEST (test_unlink_fail_002)
-{
-	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
-	pgm_rxw_unlink (window, NULL);
-	fail ();
-}
-END_TEST
-
-/* target:
- *	void
  *	pgm_rxw_lost (
  *		pgm_rxw_t* const	window,
  *		const guint32		sequence
@@ -913,6 +880,32 @@ END_TEST
 
 START_TEST (test_lost_pass_001)
 {
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	const pgm_time_t nak_rdata_expiry = 1;
+	const pgm_time_t nak_rb_expiry = 1;
+/* #1 at 100 */
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (100);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (1 == pgm_rxw_length (window));
+	fail_unless (1000 == pgm_rxw_size (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (2 == pgm_rxw_length (window));
+	fail_unless (1000 == pgm_rxw_size (window));
+	pgm_rxw_lost (window, 101);
+	fail_unless (2 == pgm_rxw_length (window));
+	fail_unless (1000 == pgm_rxw_size (window));
+/* #2 at 101 */
+	skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (101);
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (2 == pgm_rxw_length (window));
+	fail_unless (2000 == pgm_rxw_size (window));
+	pgm_rxw_shutdown (window);
 }
 END_TEST
 
@@ -973,11 +966,11 @@ END_TEST
 
 static
 Suite*
-make_test_suite (void)
+make_basic_test_suite (void)
 {
 	Suite* s;
 
-	s = suite_create (__FILE__);
+	s = suite_create ("basic transmit window API");
 
 	TCase* tc_init = tcase_create ("init");
 	suite_add_tcase (s, tc_init);
@@ -1065,11 +1058,6 @@ make_test_suite (void)
 	tcase_add_test (tc_confirm, test_confirm_pass_001);
 	tcase_add_test_raise_signal (tc_confirm, test_confirm_fail_001, SIGABRT);
 
-        TCase* tc_unlink = tcase_create ("unlink");
-	suite_add_tcase (s, tc_unlink);
-	tcase_add_test (tc_unlink, test_unlink_pass_001);
-	tcase_add_test_raise_signal (tc_unlink, test_unlink_fail_001, SIGABRT);
-
         TCase* tc_lost = tcase_create ("lost");
 	suite_add_tcase (s, tc_lost);
 	tcase_add_test (tc_lost, test_lost_pass_001);
@@ -1079,6 +1067,39 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_state);
 	tcase_add_test (tc_state, test_state_pass_001);
 	tcase_add_test_raise_signal (tc_state, test_state_fail_001, SIGABRT);
+
+	return s;
+}
+
+static
+Suite*
+make_advanced_test_suite (void)
+{
+	Suite* s;
+
+	s = suite_create ("advanced transmit window API");
+
+	return s;
+}
+
+static
+Suite*
+make_fec_test_suite (void)
+{
+	Suite* s;
+
+	s = suite_create ("FEC transmit window");
+
+	return s;
+}
+
+static
+Suite*
+make_internal_test_suite (void)
+{
+	Suite* s;
+
+	s = suite_create ("internal transmit window API");
 
 	return s;
 }
@@ -1095,7 +1116,10 @@ int
 main (void)
 {
 	SRunner* sr = srunner_create (make_master_suite ());
-	srunner_add_suite (sr, make_test_suite ());
+	srunner_add_suite (sr, make_basic_test_suite ());
+	srunner_add_suite (sr, make_advanced_test_suite ());
+	srunner_add_suite (sr, make_fec_test_suite ());
+	srunner_add_suite (sr, make_internal_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);

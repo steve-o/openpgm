@@ -916,7 +916,6 @@ pgm_rxw_insert (
 	case PGM_PKT_WAIT_NCF_STATE:
 	case PGM_PKT_WAIT_DATA_STATE:
 	case PGM_PKT_LOST_DATA_STATE:
-		_pgm_rxw_unlink (window, skb);
 		break;
 
 	case PGM_PKT_HAVE_PARITY_STATE:
@@ -984,7 +983,6 @@ pgm_rxw_shuffle_parity (
 
 /* replace place holder skb with parity skb */
 	char cb[48];
-	_pgm_rxw_unlink (window, skb);
 	_pgm_rxw_unlink (window, missing);
 	memcpy (cb, skb->cb, sizeof(skb->cb));
 	memcpy (skb->cb, missing->cb, sizeof(skb->cb));
@@ -993,7 +991,6 @@ pgm_rxw_shuffle_parity (
 	window->pdata[index_] = skb;
 	index_ = missing->sequence % pgm_rxw_max_length (window);
 	window->pdata[index_] = missing;
-	_pgm_rxw_state (window, missing, PGM_PKT_HAVE_PARITY_STATE);
 }
 
 /* skb advances the window lead.
@@ -1634,7 +1631,7 @@ pgm_rxw_remove_tg_sqn (
 	}
 }
 
-/* update PGM skbuff to new FSM state
+/* set PGM skbuff to new FSM state.
  */
 
 static inline
@@ -1645,13 +1642,15 @@ _pgm_rxw_state (
 	pgm_pkt_state_e		new_state
 	)
 {
-	pgm_rxw_state_t* state;
+	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
 
 /* pre-conditions */
 	g_assert (window);
 	g_assert (skb);
 
-	state = (pgm_rxw_state_t*)&skb->cb;
+/* remove current state */
+	if (PGM_PKT_ERROR_STATE != state->state)
+		_pgm_rxw_unlink (window, skb);
 
 	switch (new_state) {
 	case PGM_PKT_BACK_OFF_STATE:
@@ -1708,6 +1707,9 @@ pgm_rxw_state (
 		(gpointer)window, (gpointer)skb, pgm_pkt_state_string (new_state));
 	_pgm_rxw_state (window, skb, new_state);
 }
+
+/* remove current state from sequence.
+ */
 
 static inline
 void
@@ -1771,16 +1773,6 @@ unlink_queue:
 	state->state = PGM_PKT_ERROR_STATE;
 	g_assert (((GList*)skb)->next == NULL);
 	g_assert (((GList*)skb)->prev == NULL);
-}
-
-void
-pgm_rxw_unlink (
-	pgm_rxw_t*		window,
-	struct pgm_sk_buff_t*	skb
-	)
-{
-	g_trace ("unlink (window:%p skb:%p)", (gpointer)window, (gpointer)skb);
-	_pgm_rxw_unlink (window, skb);
 }
 
 /* returns the pointer at the given index of the window.
@@ -1907,7 +1899,6 @@ pgm_rxw_recovery_update (
 	switch (state->state) {
 	case PGM_PKT_BACK_OFF_STATE:
 	case PGM_PKT_WAIT_NCF_STATE:
-		_pgm_rxw_unlink (window, skb);
 		pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
 
 /* fall through */

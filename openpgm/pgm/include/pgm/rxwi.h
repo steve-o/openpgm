@@ -49,6 +49,7 @@ G_BEGIN_DECLS
 
 typedef enum
 {
+    PGM_PKT_ERROR_STATE = 0,
     PGM_PKT_BACK_OFF_STATE,	    /* PGM protocol recovery states */
     PGM_PKT_WAIT_NCF_STATE,
     PGM_PKT_WAIT_DATA_STATE,
@@ -58,8 +59,6 @@ typedef enum
     PGM_PKT_HAVE_PARITY_STATE,	    /* contains parity information not original data */
     PGM_PKT_COMMIT_DATA_STATE,	    /* commited data waiting for purging */
     PGM_PKT_LOST_DATA_STATE,	    /* if recovery fails, but packet has not yet been commited */
-
-    PGM_PKT_ERROR_STATE
 } pgm_pkt_state_e;
 
 typedef enum
@@ -160,7 +159,6 @@ gssize pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const guint);
 guint pgm_rxw_remove_trail (pgm_rxw_t* const);
 guint32 pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t);
 int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t);
-void pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
 void pgm_rxw_lost (pgm_rxw_t* const, const guint32);
 void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const guint32);
