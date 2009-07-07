@@ -927,6 +927,17 @@ END_TEST
 
 START_TEST (test_state_pass_001)
 {
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	const pgm_time_t nak_rdata_expiry = 1;
+	const pgm_time_t nak_rb_expiry = 1;
+	fail_unless (0 == pgm_rxw_update (window, 100, 99, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, nak_rdata_expiry, nak_rb_expiry));
+	struct pgm_sk_buff_t* skb = pgm_rxw_peek (window, 101);
+	pgm_rxw_state (window, skb, PGM_PKT_WAIT_NCF_STATE);
+	pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
+	pgm_rxw_shutdown (window);
 }
 END_TEST
 
