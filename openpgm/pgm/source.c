@@ -80,12 +80,12 @@
 
 /* locals */
 static int send_spm (pgm_transport_t*);
-static int pgm_reset_heartbeat_spm (pgm_transport_t*);
-static gssize pgm_transport_send_onev (pgm_transport_t*, const struct pgm_iovec*, guint, int);
+static int reset_heartbeat_spm (pgm_transport_t*);
 static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32, gboolean);
 static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*, gboolean);
-static gssize pgm_transport_send_one (pgm_transport_t*, struct pgm_sk_buff_t*, int);
-static gssize pgm_transport_send_one_copy (pgm_transport_t*, gconstpointer, gsize, int);
+static gssize send_odata (pgm_transport_t*, struct pgm_sk_buff_t*, int);
+static gssize send_odata_copy (pgm_transport_t*, gconstpointer, gsize, int);
+static gssize send_odatav (pgm_transport_t*, const struct pgm_iovec*, guint, int);
 static int send_rdata (pgm_transport_t*, guint32, gpointer, gsize, gboolean, guint32);
 
 
@@ -273,7 +273,7 @@ pgm_schedule_proactive_nak (
  */
 
 gboolean
-on_nak_notify (
+_pgm_on_nak_notify (
 	G_GNUC_UNUSED GIOChannel*	source,
 	G_GNUC_UNUSED GIOCondition	condition,
 	gpointer			data
@@ -461,7 +461,7 @@ on_nak_notify (
  */
 
 int
-on_spmr (
+_pgm_on_spmr (
 	pgm_transport_t*	transport,
 	pgm_peer_t*		peer,
 	struct pgm_header*	header,
@@ -469,7 +469,7 @@ on_spmr (
 	gsize			len
 	)
 {
-	g_trace ("INFO","on_spmr()");
+	g_trace ("INFO","_pgm_on_spmr()");
 
 	int retval;
 
@@ -511,14 +511,14 @@ on_spmr (
  */
 
 int
-on_nak (
+_pgm_on_nak (
 	pgm_transport_t*	transport,
 	struct pgm_header*	header,
 	gpointer		data,
 	gsize			len
 	)
 {
-	g_trace ("INFO","on_nak()");
+	g_trace ("INFO","_pgm_on_nak()");
 
 	const gboolean is_parity = header->pgm_options & PGM_OPT_PARITY;
 
@@ -664,14 +664,14 @@ out:
  */
 
 int
-on_nnak (
+_pgm_on_nnak (
 	pgm_transport_t*	transport,
 	struct pgm_header*	header,
 	gpointer		data,
 	gsize			len
 	)
 {
-	g_trace ("INFO","on_nnak()");
+	g_trace ("INFO","_pgm_on_nnak()");
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED]++;
 
 	int retval;
@@ -763,13 +763,13 @@ send_spm (
 	)
 {
 	g_static_mutex_lock (&transport->mutex);
-	int result = send_spm_unlocked (transport);
+	int result = _pgm_send_spm_unlocked (transport);
 	g_static_mutex_unlock (&transport->mutex);
 	return result;
 }
 
 int
-send_spm_unlocked (
+_pgm_send_spm_unlocked (
 	pgm_transport_t*	transport
 	)
 {
@@ -789,7 +789,7 @@ send_spm_unlocked (
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, transport->spm_len, 0));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				TRUE,				/* rate limited */
 				TRUE,				/* with router alert */
 				header,
@@ -856,7 +856,7 @@ send_ncf (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
 				header,
@@ -964,7 +964,7 @@ send_ncf_list (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
 				header,
@@ -991,7 +991,7 @@ send_ncf_list (
 
 static
 int
-pgm_reset_heartbeat_spm (pgm_transport_t* transport)
+reset_heartbeat_spm (pgm_transport_t* transport)
 {
 	int retval = 0;
 
@@ -1005,7 +1005,7 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
 	{
 		transport->next_poll = transport->next_heartbeat_spm;
-		g_trace ("INFO","pgm_reset_heartbeat_spm: prod timer thread");
+		g_trace ("INFO","reset_heartbeat_spm: prod timer thread");
 		if (!pgm_notify_send (&transport->timer_notify)) {
 			g_critical ("send to timer notify channel failed :(");
 			retval = -EINVAL;
@@ -1035,7 +1035,7 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 
 static
 gssize
-pgm_transport_send_one (
+send_odata (
 	pgm_transport_t*	transport,
 	struct pgm_sk_buff_t*	skb,
 	int			flags
@@ -1087,7 +1087,7 @@ pgm_transport_send_one (
 
 	gssize sent;
 retry_send:
-	sent = pgm_sendto (transport,
+	sent = _pgm_sendto (transport,
 				TRUE,			/* rate limited */
 				FALSE,			/* regular socket */
 				STATE(skb)->data,
@@ -1110,7 +1110,7 @@ retry_send:
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	transport->is_apdu_eagain = FALSE;
-	pgm_reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport);
 
 	if ( sent == (gssize)STATE(skb)->len )
 	{
@@ -1144,7 +1144,7 @@ retry_send:
 
 static
 gssize
-pgm_transport_send_one_copy (
+send_odata_copy (
 	pgm_transport_t*	transport,
 	gconstpointer		tsdu,
 	gsize			tsdu_length,
@@ -1194,7 +1194,7 @@ pgm_transport_send_one_copy (
 
 	gssize sent;
 retry_send:
-	sent = pgm_sendto (transport,
+	sent = _pgm_sendto (transport,
 				TRUE,			/* rate limited */
 				FALSE,			/* regular socket */
 				STATE(skb)->data,
@@ -1217,7 +1217,7 @@ retry_send:
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	transport->is_apdu_eagain = FALSE;
-	pgm_reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport);
 
 	if ( sent == (gssize)STATE(skb)->len )
 	{
@@ -1244,7 +1244,7 @@ retry_send:
 /* send one PGM original data packet, callee owned scatter/gather io vector
  *
  *    ⎢ DATA₀ ⎢
- *    ⎢ DATA₁ ⎢ → pgm_transport_send_onev() →  ⎢ TSDU₀ ⎢ → libc
+ *    ⎢ DATA₁ ⎢ → send_odatav() →  ⎢ TSDU₀ ⎢ → libc
  *    ⎢   ⋮   ⎢
  *
  * on success, returns number of data bytes pushed into the transmit window and
@@ -1254,7 +1254,7 @@ retry_send:
 
 static
 gssize
-pgm_transport_send_onev (
+send_odatav (
 	pgm_transport_t*	transport,
 	const struct pgm_iovec*	vector,
 	guint			count,		/* number of items in vector */
@@ -1266,7 +1266,7 @@ pgm_transport_send_onev (
 		g_return_val_if_fail (vector != NULL, -EINVAL);
 	} else {
 /* pass on zero length call so we don't have to check count on first iteration. */
-		return pgm_transport_send_one_copy (transport, NULL, 0, flags);
+		return send_odata_copy (transport, NULL, 0, flags);
 	}
 	g_return_val_if_fail (transport != NULL, -EINVAL);
 
@@ -1332,7 +1332,7 @@ pgm_transport_send_onev (
 
 	gssize sent;
 retry_send:
-	sent = pgm_sendto (transport,
+	sent = _pgm_sendto (transport,
 				TRUE,			/* rate limited */
 				FALSE,			/* regular socket */
 				STATE(skb)->data,
@@ -1355,7 +1355,7 @@ retry_send:
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	transport->is_apdu_eagain = FALSE;
-	pgm_reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport);
 
 	if ( sent == (gssize)STATE(skb)->len )
 	{
@@ -1405,7 +1405,7 @@ pgm_transport_send (
 
 /* pass on non-fragment calls */
 	if (apdu_length < transport->max_tsdu) {
-		return pgm_transport_send_one_copy (transport, apdu, apdu_length, flags);
+		return send_odata_copy (transport, apdu, apdu_length, flags);
 	}
 	g_return_val_if_fail (apdu != NULL, -EINVAL);
 	g_return_val_if_fail (apdu_length <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
@@ -1501,7 +1501,7 @@ pgm_transport_send (
 
 		gssize sent;
 retry_send:
-		sent = pgm_sendto (transport,
+		sent = _pgm_sendto (transport,
 					!STATE(is_rate_limited),	/* rate limit on blocking */
 					FALSE,				/* regular socket */
 					STATE(skb)->data,
@@ -1547,7 +1547,7 @@ retry_send:
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	transport->is_apdu_eagain = FALSE;
-	pgm_reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport);
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -1558,7 +1558,7 @@ retry_send:
 blocked:
 	if (bytes_sent)
 	{
-		pgm_reset_heartbeat_spm (transport);
+		reset_heartbeat_spm (transport);
 
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -1609,7 +1609,7 @@ pgm_transport_sendv (
 
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0) {
-		return pgm_transport_send_one_copy (transport, NULL, count, flags);
+		return send_odata_copy (transport, NULL, count, flags);
 	}
 	g_return_val_if_fail (vector != NULL, -EINVAL);
 
@@ -1623,7 +1623,7 @@ pgm_transport_sendv (
 	if (transport->is_apdu_eagain) {
 		if (is_one_apdu) {
 			if (STATE(apdu_length) < transport->max_tsdu) {
-				return pgm_transport_send_onev (transport, vector, count, flags);
+				return send_odatav (transport, vector, count, flags);
 			} else {
 				goto retry_one_apdu_send;
 			}
@@ -1647,7 +1647,7 @@ pgm_transport_sendv (
 
 /* pass on non-fragment calls */
 	if (is_one_apdu && STATE(apdu_length) < transport->max_tsdu) {
-		return pgm_transport_send_onev (transport, vector, count, flags);
+		return send_odatav (transport, vector, count, flags);
 	}
 	g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
 
@@ -1798,7 +1798,7 @@ retry_send:
 
 		gssize sent;
 retry_one_apdu_send:
-		sent = pgm_sendto (transport,
+		sent = _pgm_sendto (transport,
 					!STATE(is_rate_limited),	/* rate limited on blocking */
 					FALSE,				/* regular socket */
 					STATE(skb)->data,
@@ -1844,7 +1844,7 @@ retry_one_apdu_send:
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	transport->is_apdu_eagain = FALSE;
-	pgm_reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport);
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -1855,7 +1855,7 @@ retry_one_apdu_send:
 blocked:
 	if (bytes_sent)
 	{
-		pgm_reset_heartbeat_spm (transport);
+		reset_heartbeat_spm (transport);
 
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -1876,6 +1876,7 @@ blocked:
  * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
  * if the packet sizes would exceed the current rate limit.
  */
+
 gssize
 pgm_transport_send_skbv (
 	pgm_transport_t*	transport,
@@ -1897,11 +1898,11 @@ pgm_transport_send_skbv (
 
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0) {
-		return pgm_transport_send_one_copy (transport, NULL, count, flags);
+		return send_odata_copy (transport, NULL, count, flags);
 	}
 	g_return_val_if_fail (vector != NULL, -EINVAL);
 	if (count == 1) {
-		return pgm_transport_send_one (transport, vector, flags);
+		return send_odata (transport, vector, flags);
 	}
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
@@ -2009,7 +2010,7 @@ pgm_transport_send_skbv (
 		pgm_txw_add (transport->txw, STATE(skb));
 		gssize sent;
 retry_send:
-		sent = pgm_sendto (transport,
+		sent = _pgm_sendto (transport,
 					!STATE(is_rate_limited),	/* rate limited on blocking */
 					FALSE,				/* regular socket */
 					STATE(skb)->data,
@@ -2061,7 +2062,7 @@ retry_send:
 	g_static_rw_lock_writer_unlock (&transport->txw_lock);
 
 	transport->is_apdu_eagain = FALSE;
-	pgm_reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport);
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -2072,7 +2073,7 @@ retry_send:
 blocked:
 	if (bytes_sent)
 	{
-		pgm_reset_heartbeat_spm (transport);
+		reset_heartbeat_spm (transport);
 
 		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -2130,7 +2131,7 @@ send_rdata (
 	}
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				TRUE,			/* rate limited */
 				TRUE,			/* with router alert */
 				header,

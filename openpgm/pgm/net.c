@@ -45,7 +45,7 @@
  */
 
 gssize
-pgm_sendto (
+_pgm_sendto (
 	pgm_transport_t*	transport,
 	gboolean		use_rate_limit,
 	gboolean		use_router_alert,
@@ -137,7 +137,7 @@ pgm_sendto (
  */
 
 int
-pgm_set_nonblocking (
+_pgm_set_nonblocking (
 	int		filedes[2]
 	)
 {
