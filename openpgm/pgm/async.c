@@ -196,7 +196,7 @@ pgm_async_create (
 		goto err_destroy;
 	}
 
-	e = pgm_set_nonblocking (async->commit_pipe);
+	e = _pgm_set_nonblocking (async->commit_pipe);
 	if (e) {
 		pgm_errno = errno;
 		goto err_destroy;

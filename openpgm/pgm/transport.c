@@ -273,7 +273,7 @@ pgm_transport_destroy (
 
 		do {
 			GList* next = transport->peers_list->next;
-			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
+			_pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
 
 			transport->peers_list = next;
 		} while (transport->peers_list);
@@ -1295,7 +1295,7 @@ no_cap_net_admin:
 	if (transport->can_send_data)
 	{
 		transport->rdata_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->rdata_notify));
-		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_nak_notify, transport, NULL);
+		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, _pgm_on_nak_notify, transport, NULL);
 
 /* create recyclable SPM packet */
 		switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
@@ -1360,9 +1360,9 @@ no_cap_net_admin:
 		}
 
 /* announce new transport by sending out SPMs */
-		send_spm_unlocked (transport);
-		send_spm_unlocked (transport);
-		send_spm_unlocked (transport);
+		_pgm_send_spm_unlocked (transport);
+		_pgm_send_spm_unlocked (transport);
+		_pgm_send_spm_unlocked (transport);
 
 /* parity buffer for odata/rdata transmission */
 		if (transport->use_proactive_parity || transport->use_ondemand_parity)
@@ -1917,7 +1917,7 @@ pgm_transport_msfilter (
  */
 
 int
-get_opt_fragment (
+_pgm_get_opt_fragment (
 	struct pgm_opt_header*		opt_header,
 	struct pgm_opt_fragment**	opt_fragment
 	)

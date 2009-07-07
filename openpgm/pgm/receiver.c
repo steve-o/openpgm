@@ -86,8 +86,6 @@ static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*);
 static void nak_rb_state (pgm_peer_t*);
 static void nak_rpt_state (pgm_peer_t*);
 static void nak_rdata_state (pgm_peer_t*);
-void check_peer_nak_state (pgm_transport_t*);
-pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static int on_spm (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_peer_nak (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
@@ -158,7 +156,7 @@ pgm_peer_ref (
  */
 
 void
-pgm_peer_unref (
+_pgm_peer_unref (
 	pgm_peer_t*	peer
 	)
 {
@@ -821,7 +819,7 @@ recv_again:
 			if (source) {
 				on_peer_nak (source, skb->pgm_header, skb->data, skb->len);
 			} else if (!pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst)) {
-				on_nak (transport, skb->pgm_header, skb->data, skb->len);
+				_pgm_on_nak (transport, skb->pgm_header, skb->data, skb->len);
 				goto check_for_repeat;
 			} else {
 /* ignore multicast NAKs as the source */
@@ -830,8 +828,8 @@ recv_again:
 			}
 			break;
 
-		case PGM_NNAK:	on_nnak (transport, skb->pgm_header, skb->data, skb->len); break;
-		case PGM_SPMR:	on_spmr (transport, source, skb->pgm_header, skb->data, skb->len); break;
+		case PGM_NNAK:	_pgm_on_nnak (transport, skb->pgm_header, skb->data, skb->len); break;
+		case PGM_SPMR:	_pgm_on_spmr (transport, source, skb->pgm_header, skb->data, skb->len); break;
 		case PGM_POLR:
 		default:
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -1632,7 +1630,7 @@ send_spmr (
 /* send multicast SPMR TTL 1 */
 	g_trace ("INFO", "send multicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr ));
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), 1);
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				FALSE,			/* regular socket */
 				header,
@@ -1644,7 +1642,7 @@ send_spmr (
 /* send unicast SPMR with regular TTL */
 	g_trace ("INFO", "send unicast SPMR to %s", inet_ntoa( ((struct sockaddr_in*)&peer->local_nla)->sin_addr ));
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
-	sent += pgm_sendto (transport,
+	sent += _pgm_sendto (transport,
 				FALSE,
 				FALSE,
 				header,
@@ -1722,7 +1720,7 @@ send_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
 				header,
@@ -1796,7 +1794,7 @@ send_parity_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				TRUE,			/* with router alert */
 				header,
@@ -1911,7 +1909,7 @@ send_nak_list (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
+	gssize sent = _pgm_sendto (transport,
 				FALSE,			/* not rate limited */
 				FALSE,			/* regular socket */
 				header,
@@ -2187,7 +2185,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
  */
 
 void
-check_peer_nak_state (
+_pgm_check_peer_nak_state (
 	pgm_transport_t*	transport
 	)
 {
@@ -2253,7 +2251,7 @@ check_peer_nak_state (
 				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
 				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->link_);
 				g_static_mutex_unlock (&peer->mutex);
-				pgm_peer_unref (peer);
+				_pgm_peer_unref (peer);
 			}
 		}
 		else
@@ -2280,8 +2278,9 @@ check_peer_nak_state (
  * on success, returns the earliest of the expiration parameter or next
  * peer expiration time.
  */
+
 pgm_time_t
-min_nak_expiry (
+_pgm_min_nak_expiry (
 	pgm_time_t		expiration,
 	pgm_transport_t*	transport
 	)
@@ -2659,7 +2658,7 @@ on_data (
 
 	g_static_mutex_lock (&sender->mutex);
 	if (opt_total_length > 0)
-		 get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
+		 _pgm_get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
 
 	retval = pgm_rxw_add (sender->rxw, skb, nak_rb_expiry);
 

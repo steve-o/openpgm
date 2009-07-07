@@ -22,6 +22,8 @@
 #include <glib.h>
 
 #include "pgm/transport.h"
+#include "pgm/source.h"
+#include "pgm/receiver.h"
 #include "pgm/timer.h"
 
 #define TIMER_DEBUG
@@ -31,12 +33,6 @@
 #else
 #	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
-
-
-/* externals */
-extern pgm_time_t min_nak_expiry (pgm_time_t, pgm_transport_t*);
-extern int send_spm_unlocked (pgm_transport_t*);
-extern void check_peer_nak_state (pgm_transport_t*);
 
 
 /* internal: Glib event loop GSource of spm & rx state timers */
@@ -165,7 +161,7 @@ pgm_timer_prepare (
 	if (transport->can_recv)
 	{
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		expiration = min_nak_expiry (expiration, transport);
+		expiration = _pgm_min_nak_expiry (expiration, transport);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
@@ -227,14 +223,14 @@ pgm_timer_dispatch (
 		g_static_mutex_lock (&transport->mutex);
 		if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
 		{
-			send_spm_unlocked (transport);
+			_pgm_send_spm_unlocked (transport);
 			transport->spm_heartbeat_state = 0;
 			transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
 		}
 		else if ( transport->spm_heartbeat_state &&
 			 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm) )
 		{
-			send_spm_unlocked (transport);
+			_pgm_send_spm_unlocked (transport);
 		
 			if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
 			{
@@ -253,7 +249,7 @@ pgm_timer_dispatch (
 		g_static_mutex_lock (&transport->waiting_mutex);
 		g_static_mutex_lock (&transport->mutex);
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		check_peer_nak_state (transport);
+		_pgm_check_peer_nak_state (transport);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		g_static_mutex_unlock (&transport->mutex);
 		g_static_mutex_unlock (&transport->waiting_mutex);

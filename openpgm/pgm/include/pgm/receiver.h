@@ -48,7 +48,9 @@ gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int);
 gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int);
 gssize pgm_transport_recvfrom (pgm_transport_t*, gpointer, gsize, int, pgm_tsi_t*);
 
-void pgm_peer_unref (pgm_peer_t*);
+void _pgm_peer_unref (pgm_peer_t*);
+void _pgm_check_peer_nak_state (pgm_transport_t*);
+pgm_time_t _pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*);
 
 G_END_DECLS
 
