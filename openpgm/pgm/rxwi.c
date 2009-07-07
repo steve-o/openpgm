@@ -32,7 +32,7 @@
 #include <sys/time.h>
 #include <sys/uio.h>
 
-//#define RXW_DEBUG
+#define RXW_DEBUG
 
 #ifndef RXW_DEBUG
 #	define G_DISABLE_ASSERT
@@ -334,7 +334,7 @@ pgm_rxw_add (
 	g_assert (((const GList*)skb)->next == NULL);
 	g_assert (((const GList*)skb)->prev == NULL);
 	g_assert (!pgm_tsi_is_null (&skb->tsi));
-	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint8*)skb->data - (guint8*)skb->head);
+	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint)((guint8*)skb->data - (guint8*)skb->head));
 	g_assert (skb->len == (guint8*)skb->tail - (guint8*)skb->data);
 
 	g_trace ("add (window:%p skb:%p, nak_rb_expiry:%" PGM_TIME_FORMAT ")",
@@ -385,13 +385,16 @@ pgm_rxw_add (
 		if (pgm_uint32_lt (pgm_rxw_tg_sqn (window, skb->sequence), pgm_rxw_tg_sqn (window, window->commit_lead)))
 			return PGM_RXW_DUPLICATE;
 
-		if (pgm_uint32_lt (pgm_rxw_tg_sqn (window, skb->sequence), pgm_rxw_tg_sqn (window, window->lead)))
+		if (pgm_uint32_lt (pgm_rxw_tg_sqn (window, skb->sequence), pgm_rxw_tg_sqn (window, window->lead))) {
+			window->has_event = 1;
 			return pgm_rxw_insert (window, skb);
+		}
 
 		const struct pgm_sk_buff_t* const first_skb = _pgm_rxw_peek (window, pgm_rxw_tg_sqn (window, skb->sequence));
 		const pgm_rxw_state_t* const first_state = (pgm_rxw_state_t*)&first_skb->cb;
 
 		if (pgm_rxw_tg_sqn (window, skb->sequence) == pgm_rxw_tg_sqn (window, window->lead)) {
+			window->has_event = 1;
 			if (NULL == first_state || first_state->is_contiguous) {
 				state->is_contiguous = 1;
 				return pgm_rxw_append (window, skb);
@@ -411,10 +414,13 @@ pgm_rxw_add (
 				return PGM_RXW_BOUNDS;
 		}
 
-		if (pgm_uint32_lte (skb->sequence, window->lead))
+		if (pgm_uint32_lte (skb->sequence, window->lead)) {
+			window->has_event = 1;
 			return pgm_rxw_insert (window, skb);
+		}
 
 		if (skb->sequence == pgm_rxw_next_lead (window)) {
+			window->has_event = 1;
 			if (pgm_rxw_is_first_of_tg_sqn (window, skb->sequence))
 				state->is_contiguous = 1;
 			return pgm_rxw_append (window, skb);
@@ -1093,7 +1099,7 @@ pgm_rxw_readv (
 	g_assert_cmpuint (msg_len, >, 0);
 
 	g_trace ("readv (window:%p pmsg:%p msg-len:%u)",
-		window, pmsg, msg_len);
+		(gpointer)window, (gpointer)pmsg, msg_len);
 
 	msg_end = *pmsg + msg_len;
 	window->pgm_sock_err.lost_count = 0;
@@ -1683,7 +1689,7 @@ _pgm_rxw_state (
 	case PGM_PKT_LOST_DATA_STATE:
 		window->lost_count++;
 		window->cumulative_losses++;
-		window->is_waiting = TRUE;
+		window->has_event = 1;
 		g_assert_cmpuint (window->lost_count, <=, pgm_rxw_length (window));
 		break;
 
@@ -1984,7 +1990,7 @@ pgm_rxw_dump (
 		"commit_lead = %" G_GUINT32_FORMAT ", "
 		"is_constrained = %u, "
 		"is_defined = %u, "
-		"is_waiting = %u, "
+		"has_event = %u, "
 		"is_fec_available = %u, "
 		"rs = %p, "
 		"rs_n = %u, "
@@ -2034,7 +2040,7 @@ pgm_rxw_dump (
 		window->commit_lead,
 		window->is_constrained,
 		window->is_defined,
-		window->is_waiting,
+		window->has_event,
 		window->is_fec_available,
 		window->rs,
 		window->rs_n,

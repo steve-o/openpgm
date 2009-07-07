@@ -61,7 +61,7 @@
 #include "pgm/reed_solomon.h"
 #include "pgm/err.h"
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -1604,10 +1604,9 @@ pgm_transport_bind (
 	if (transport->can_send_data)
 	{
 		g_trace ("INFO","construct transmit window.");
-		transport->txw = pgm_txw_init (transport->max_tpdu,
-					       transport->txw_sqns,
-					       transport->txw_secs,
-					       transport->txw_max_rte);
+		transport->txw = transport->txw_sqns ?
+					pgm_txw_init (0, transport->txw_sqns, 0, 0) :
+					pgm_txw_init (transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte);
 	}
 
 /* create peer list */
@@ -2631,7 +2630,9 @@ recv_again:
 	} /* downstream message */
 
 /* check whether source has waiting data */
-	if (source && ((pgm_rxw_t*)source->rxw)->is_waiting && !((pgm_rxw_t*)source->rxw)->waiting_link.data)
+	if (source &&
+	    pgm_rxw_epoll ((pgm_rxw_t*)source->rxw) &&
+	    !((pgm_rxw_t*)source->rxw)->waiting_link.data)
 	{
 		((pgm_rxw_t*)source->rxw)->waiting_link.data = source->rxw;
 		((pgm_rxw_t*)source->rxw)->waiting_link.next = transport->peers_waiting;
@@ -4820,7 +4821,8 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 	if (rxw->backoff_queue.tail)
 	{
-		g_trace ("INFO", "next expiry set in %f seconds.", pgm_to_secsf((float)next_nak_rb_expiry(rxw) - (float)pgm_time_now));
+		g_trace ("INFO", "next expiry set in %f seconds.",
+			pgm_to_secsf(next_nak_rb_expiry(rxw) - pgm_time_now));
 	}
 	else
 	{
@@ -5075,7 +5077,8 @@ nak_rpt_state (
 		else
 		{
 /* packet expires some time later */
-			g_trace("INFO", "#%u retry is delayed %f seconds.", rdata_skb->sequence, pgm_to_secsf(state->nak_rpt_expiry - pgm_time_now));
+			g_trace("INFO", "#%u retry is delayed %f seconds.",
+				skb->sequence, pgm_to_secsf(state->nak_rpt_expiry - pgm_time_now));
 			break;
 		}
 		
@@ -5107,7 +5110,7 @@ nak_rpt_state (
 				" lost %" G_GUINT32_FORMAT
 				" frag %" G_GUINT32_FORMAT,
 				dropped,
-				pgm_rxw_sqns(rxw),
+				pgm_rxw_length(rxw),
 				rxw->backoff_queue.length,
 				rxw->wait_ncf_queue.length,
 				rxw->wait_data_queue.length,
