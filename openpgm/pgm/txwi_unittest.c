@@ -218,7 +218,8 @@ END_TEST
 /* null window */
 START_TEST (test_peek_fail_001)
 {
-	fail_unless (NULL == pgm_txw_peek (NULL, 0));
+	pgm_txw_peek (NULL, 0);
+	fail ();
 }
 END_TEST
 
@@ -617,8 +618,8 @@ make_test_suite (void)
 	TCase* tc_peek = tcase_create ("peek");
 	suite_add_tcase (s, tc_peek);
 	tcase_add_test (tc_peek, test_peek_pass_001);
+	tcase_add_test_raise_signal (tc_peek, test_peek_fail_001, SIGABRT);
 /* logical not fatal errors */
-	tcase_add_test (tc_peek, test_peek_fail_001);
 	tcase_add_test (tc_peek, test_peek_fail_002);
 
 	TCase* tc_max_length = tcase_create ("max-length");
