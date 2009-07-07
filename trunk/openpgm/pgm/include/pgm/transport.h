@@ -335,16 +335,9 @@ int pgm_transport_destroy (pgm_transport_t*, gboolean);
 int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
 int pgm_transport_set_multicast_loop (pgm_transport_t*, gboolean);
 int pgm_transport_set_hops (pgm_transport_t*, gint);
-int pgm_transport_set_ambient_spm (pgm_transport_t*, guint);
-int pgm_transport_set_heartbeat_spm (pgm_transport_t*, const guint*, int);
 
 int pgm_transport_set_peer_expiry (pgm_transport_t*, guint);
 int pgm_transport_set_spmr_expiry (pgm_transport_t*, guint);
-
-int pgm_transport_set_txw_preallocate (pgm_transport_t*, guint);
-int pgm_transport_set_txw_sqns (pgm_transport_t*, guint);
-int pgm_transport_set_txw_secs (pgm_transport_t*, guint);
-int pgm_transport_set_txw_max_rte (pgm_transport_t*, guint);
 
 int pgm_transport_set_rxw_preallocate (pgm_transport_t*, guint);
 int pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
