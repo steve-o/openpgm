@@ -835,6 +835,31 @@ END_TEST
 
 START_TEST (test_confirm_pass_001)
 {
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	const pgm_time_t nak_rdata_expiry = 1;
+	const pgm_time_t nak_rb_expiry = 1;
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 0, nak_rdata_expiry, nak_rb_expiry));
+/* #1 at 100 */
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (100);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (1 == pgm_rxw_length (window));
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 99, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (PGM_RXW_DUPLICATE == pgm_rxw_confirm (window, 100, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (2 == pgm_rxw_length (window));
+	fail_unless (PGM_RXW_UPDATED == pgm_rxw_confirm (window, 101, nak_rdata_expiry, nak_rb_expiry));
+/* #2 at 101 */
+	skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (101);
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	pgm_msgv_t msgv[2], *pmsg = msgv;
+	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	pgm_rxw_shutdown (window);
 }
 END_TEST
 
