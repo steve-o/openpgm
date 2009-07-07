@@ -1838,7 +1838,11 @@ pgm_rxw_lost (
 /* received a uni/multicast ncf, search for a matching nak & tag or extend window if
  * beyond lead
  *
- * returns.
+ * returns:
+ * PGM_RXW_BOUNDS - sequence is outside of window, or window is undefined.
+ * PGM_RXW_UPDATED - receiver state updated, waiting for data.
+ * PGM_RXW_DUPLICATE - data already exists at sequence.
+ * PGM_RXW_APPENDED - lead is extended with state set waiting for data.
  */
 
 int
@@ -1857,11 +1861,15 @@ pgm_rxw_confirm (
 
 /* NCFs do not define the transmit window */
 	if (!window->is_defined)
-		return 0;
+		return PGM_RXW_BOUNDS;
 
 /* sequence already committed */
-	if (pgm_uint32_lte (sequence, window->commit_lead))
-		return 0;
+	if (pgm_uint32_lt (sequence, window->commit_lead)) {
+		if (pgm_uint32_gte (sequence, window->trail))
+			return PGM_RXW_DUPLICATE;
+		else
+			return PGM_RXW_BOUNDS;
+	}
 
 	if (pgm_uint32_lte (sequence, window->lead))
 		return pgm_rxw_recovery_update (window, sequence, nak_rdata_expiry);
@@ -1875,6 +1883,10 @@ pgm_rxw_confirm (
 }
 
 /* update an incoming sequence with state transition to WAIT-DATA.
+ *
+ * returns:
+ * PGM_RXW_UPDATED - receiver state updated, waiting for data.
+ * PGM_RXW_DUPLICATE - data already exists at sequence.
  */
 
 static inline
@@ -1916,6 +1928,9 @@ pgm_rxw_recovery_update (
 }
 
 /* append an skb to the incoming window with WAIT-DATA state.
+ *
+ * returns:
+ * PGM_RXW_APPENDED - lead is extended with state set waiting for data.
  */
 
 static inline
@@ -1932,6 +1947,9 @@ pgm_rxw_recovery_append (
 
 	if (pgm_rxw_is_full (window))
 		_pgm_rxw_remove_trail (window);
+
+/* advance leading edge */
+	window->lead++;
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
