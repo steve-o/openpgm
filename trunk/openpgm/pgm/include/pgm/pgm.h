@@ -32,6 +32,8 @@
 #include <pgm/sockaddr.h>
 #include <pgm/time.h>
 #include <pgm/transport.h>
+#include <pgm/source.h>
+#include <pgm/receiver.h>
 #include <pgm/version.h>
 
 #endif /* __PGM_H__ */
