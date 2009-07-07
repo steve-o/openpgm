@@ -31,8 +31,8 @@
 
 G_BEGIN_DECLS
 
-gssize pgm_sendto (pgm_transport_t*, gboolean, gboolean, const void*, gsize, int, const struct sockaddr*, gsize);
-int pgm_set_nonblocking (int fd[2]);
+gssize _pgm_sendto (pgm_transport_t*, gboolean, gboolean, const void*, gsize, int, const struct sockaddr*, gsize);
+int _pgm_set_nonblocking (int fd[2]);
 
 G_END_DECLS
 

@@ -349,7 +349,7 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
-int get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
+int _pgm_get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 #ifdef CONFIG_HAVE_POLL
