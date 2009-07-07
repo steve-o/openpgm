@@ -974,6 +974,64 @@ START_TEST (test_state_fail_003)
 }
 END_TEST
 
+/* pgm_rxw_epoll
+ */
+
+START_TEST (test_epoll_pass_001)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_init (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+/* empty */
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+	struct pgm_sk_buff_t* skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (0);
+	const pgm_time_t nak_rdata_expiry = 1;
+	const pgm_time_t nak_rb_expiry = 1;
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
+/* 1 sequence */
+	fail_unless (TRUE == pgm_rxw_epoll (window));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+/* jump */
+	skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (2);
+	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+/* loss */
+	pgm_rxw_lost (window, 1);
+	fail_unless (TRUE == pgm_rxw_epoll (window));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+/* insert */
+	skb = generate_valid_skb ();
+	fail_if (NULL == skb);
+	skb->pgm_data->data_sqn = g_htonl (1);
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, nak_rb_expiry));
+	fail_unless (TRUE == pgm_rxw_epoll (window));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+/* confirm */
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 3, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+/* partial read */
+	pgm_msgv_t msgv[2], *pmsg = msgv;
+	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+/* finish read */
+	pmsg = msgv;
+	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (FALSE == pgm_rxw_epoll (window));
+	pgm_rxw_shutdown (window);
+}
+END_TEST
+
+START_TEST (test_epoll_fail_001)
+{
+	pgm_rxw_epoll (NULL);
+	fail ();
+}
+END_TEST
+
 
 static
 Suite*

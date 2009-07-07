@@ -126,7 +126,7 @@ struct pgm_rxw_t {
 	guint32		commit_lead;
         unsigned        is_constrained:1;
         unsigned        is_defined:1;
-	unsigned	is_waiting:1;
+	unsigned	has_event:1;		/* edge triggered */
 	unsigned	is_fec_available:1;
 
 	gpointer	rs;
@@ -205,6 +205,15 @@ static inline guint32 pgm_rxw_lead (const pgm_rxw_t* const window)
 static inline guint32 pgm_rxw_next_lead (const pgm_rxw_t* const window)
 {
 	return (guint32)(pgm_rxw_lead (window) + 1);
+}
+
+static inline gboolean pgm_rxw_epoll (pgm_rxw_t* const window)
+{
+	if (window->has_event) {
+		window->has_event = 0;
+		return TRUE;
+	}
+	return FALSE;
 }
 
 G_END_DECLS
