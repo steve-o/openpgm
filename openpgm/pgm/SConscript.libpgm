@@ -14,6 +14,7 @@ src = Split("""
 		txwi.c
 		rxwi.c
 		transport.c
+		source.c
 		pgm.c
 		timer.c
 		net.c
