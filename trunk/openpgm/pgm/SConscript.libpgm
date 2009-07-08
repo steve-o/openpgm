@@ -53,6 +53,7 @@ if env['WITH_CHECK'] == 'true':
 	te.ParseConfig ('pkg-config --static --cflags --libs check');
 	te.Program ('txwi_unittest.c');
 	te.Program ('rxwi_unittest.c');
+	te.Program ('pgm_unittest.c');
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
