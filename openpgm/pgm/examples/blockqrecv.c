@@ -110,7 +110,7 @@ main (
 
 /* asynchronous receiver thread */
 	pgm_async_t* async = NULL;
-	int e = pgm_async_create (&async, g_transport, 0);
+	int e = pgm_async_create (&async, g_transport);
 	g_assert (e == 0);
 
 /* dispatch loop */

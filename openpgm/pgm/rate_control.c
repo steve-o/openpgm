@@ -44,7 +44,7 @@ typedef struct rate_t rate_t;
 
 
 int
-pgm_rate_create (
+_pgm_rate_create (
 	gpointer*	bucket_,
 	guint		rate_per_sec,		/* 0 = disable */
 	guint		iphdr_len
@@ -64,7 +64,7 @@ pgm_rate_create (
 #define BUCKET	((rate_t*)bucket)
 
 int
-pgm_rate_destroy (
+_pgm_rate_destroy (
 	gpointer	bucket
 	)
 {
@@ -80,7 +80,7 @@ pgm_rate_destroy (
  */
 
 int
-pgm_rate_check (
+_pgm_rate_check (
 	gpointer	bucket,
 	guint		data_size,
 	int		flags		/* MSG_DONTWAIT = non-blocking */
