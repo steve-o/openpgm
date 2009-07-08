@@ -143,8 +143,8 @@ struct pgm_rxw_t {
 	guint32		bytes_delivered;
 	guint32		msgs_delivered;
 
-	guint		size;
-	guint		alloc;
+	gsize		size;			/* in bytes */
+	guint		alloc;			/* in pkts */
 	struct pgm_sk_buff_t*	pdata[];
 };
 
@@ -177,7 +177,7 @@ static inline guint32 pgm_rxw_length (const pgm_rxw_t* const window)
 	return ( 1 + window->lead ) - window->trail;
 }
 
-static inline guint pgm_rxw_size (const pgm_rxw_t* const window)
+static inline gsize pgm_rxw_size (const pgm_rxw_t* const window)
 {
 	g_assert (window);
 	return window->size;

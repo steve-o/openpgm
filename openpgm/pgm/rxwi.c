@@ -2003,7 +2003,7 @@ pgm_rxw_dump (
 		"ack_cumulative_losses = %" G_GUINT32_FORMAT ", "
 		"bytes_delivered = %" G_GUINT32_FORMAT ", "
 		"msgs_delivered = %" G_GUINT32_FORMAT ", "
-		"size = %" G_GUINT32_FORMAT ", "
+		"size = %" G_GSIZE_FORMAT ", "
 		"alloc = %" G_GUINT32_FORMAT ", "
 		"pdata = []"
 		"}",
