@@ -31,11 +31,10 @@
 
 G_BEGIN_DECLS
 
-GSource* pgm_timer_create (pgm_transport_t*);
-int pgm_timer_add_full (pgm_transport_t*, gint);
-int pgm_timer_add (pgm_transport_t*);
-
-gpointer pgm_timer_thread (gpointer);
+GSource* pgm_timer_create (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_timer_add_full (pgm_transport_t*, gint) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_timer_add (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
+gpointer pgm_timer_thread (gpointer) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

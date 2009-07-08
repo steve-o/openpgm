@@ -29,8 +29,8 @@ G_BEGIN_DECLS
 
 #define PGM_HTTP_DEFAULT_SERVER_PORT	4968
 
-int pgm_http_init (guint16);
-int pgm_http_shutdown (void);
+int pgm_http_init (guint16) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_http_shutdown (void) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

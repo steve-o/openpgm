@@ -31,7 +31,6 @@
 
 G_BEGIN_DECLS
 
-int pgm_transport_set_rxw_preallocate (pgm_transport_t*, guint);
 int pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
 int pgm_transport_set_rxw_secs (pgm_transport_t*, guint);
 int pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
@@ -43,14 +42,14 @@ int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
-gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int);
-gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int);
-gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int);
-gssize pgm_transport_recvfrom (pgm_transport_t*, gpointer, gsize, int, pgm_tsi_t*);
+gssize pgm_transport_recvmsg (pgm_transport_t*, pgm_msgv_t*, int) G_GNUC_WARN_UNUSED_RESULT;
+gssize pgm_transport_recvmsgv (pgm_transport_t*, pgm_msgv_t*, gsize, int) G_GNUC_WARN_UNUSED_RESULT;
+gssize pgm_transport_recv (pgm_transport_t*, gpointer, gsize, int) G_GNUC_WARN_UNUSED_RESULT;
+gssize pgm_transport_recvfrom (pgm_transport_t*, gpointer, gsize, int, pgm_tsi_t*) G_GNUC_WARN_UNUSED_RESULT;
 
-void _pgm_peer_unref (pgm_peer_t*);
-void _pgm_check_peer_nak_state (pgm_transport_t*);
-pgm_time_t _pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*);
+G_GNUC_INTERNAL void _pgm_peer_unref (pgm_peer_t*);
+G_GNUC_INTERNAL void _pgm_check_peer_nak_state (pgm_transport_t*);
+G_GNUC_INTERNAL pgm_time_t _pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

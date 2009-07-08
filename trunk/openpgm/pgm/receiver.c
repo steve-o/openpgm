@@ -86,6 +86,7 @@ static int send_nak_list (pgm_peer_t*, pgm_sqn_list_t*);
 static void nak_rb_state (pgm_peer_t*);
 static void nak_rpt_state (pgm_peer_t*);
 static void nak_rdata_state (pgm_peer_t*);
+static pgm_peer_t* new_peer (pgm_transport_t*, pgm_tsi_t*, struct sockaddr*, gsize, struct sockaddr*, gsize) G_GNUC_PURE;
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
 static int on_spm (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
 static int on_peer_nak (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
@@ -175,7 +176,7 @@ _pgm_peer_unref (
 
 /* reed solomon state */
 		if (peer->rs) {
-			pgm_rs_destroy (peer->rs);
+			_pgm_rs_destroy (peer->rs);
 			peer->rs = NULL;
 		}
 
@@ -231,30 +232,6 @@ pgm_transport_set_spmr_expiry (
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->spmr_expiry = spmr_expiry;
-	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
-}
-
-/* 0 < rxw_preallocate <= rxw_sqns 
- *
- * can only be enforced at bind.
- *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
- */
-
-int
-pgm_transport_set_rxw_preallocate (
-	pgm_transport_t*	transport,
-	guint			sqns
-	)
-{
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (sqns > 0, -EINVAL);
-
-	g_static_mutex_lock (&transport->mutex);
-	transport->rxw_preallocate = sqns;
 	g_static_mutex_unlock (&transport->mutex);
 
 	return 0;
@@ -1297,11 +1274,11 @@ on_spm (
 					sender->tg_sqn_shift = pgm_power2_log2 (sender->rs_k);
 					if (sender->rs) {
 						g_trace ("INFO", "Destroying existing Reed-Solomon state for peer.");
-						pgm_rs_destroy (sender->rs);
+						_pgm_rs_destroy (sender->rs);
 					}
 					g_trace ("INFO", "Enabling Reed-Solomon forward error correction for peer, RS(%i,%i)",
 						sender->rs_n, sender->rs_k);
-					pgm_rs_create (&sender->rs, sender->rs_n, sender->rs_k);
+					_pgm_rs_create (&sender->rs, sender->rs_n, sender->rs_k);
 				}
 				break;
 			}

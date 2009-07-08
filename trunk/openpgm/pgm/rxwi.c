@@ -1341,14 +1341,14 @@ pgm_rxw_reconstruct (
 	}
 
 /* reconstruct payload */
-	pgm_rs_decode_parity_appended (window->rs,
+	_pgm_rs_decode_parity_appended (window->rs,
 				       (void**)(void*)tg_data,
 				       offsets,
 				       parity_length);
 
 /* reconstruct opt_fragment option */
 	if (is_op_encoded)
-		pgm_rs_decode_parity_appended (window->rs,
+		_pgm_rs_decode_parity_appended (window->rs,
 					       (void**)(void*)tg_opts,
 					       offsets,
 					       sizeof(struct pgm_opt_fragment));

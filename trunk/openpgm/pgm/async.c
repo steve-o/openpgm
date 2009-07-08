@@ -69,43 +69,38 @@ static GSourceFuncs g_pgm_watch_funcs = {
 };
 
 
-static inline gpointer
+static inline gpointer pgm_event_alloc (pgm_async_t*) G_GNUC_MALLOC;
+
+
+static inline
+gpointer
 pgm_event_alloc (
 	pgm_async_t*	async
 	)
 {
 	g_return_val_if_fail (async != NULL, NULL);
 
-	gpointer p;
-	g_static_mutex_lock (&async->trash_mutex);
-	if (async->trash_event) {
-		p = g_trash_stack_pop (&async->trash_event);
-	} else {
-		p = g_slice_alloc (sizeof(pgm_event_t));
-	}
-	g_static_mutex_unlock (&async->trash_mutex);
-	return p;
+	return g_slice_alloc (sizeof(pgm_event_t));
 }
 
 /* release event memory for custom async queue dispatch handlers
  */
 
-static int
+static inline
+void
 pgm_event_unref (
         pgm_async_t*	async,
         pgm_event_t*	event
         )
 {
-        g_static_mutex_lock (&async->trash_mutex);
-        g_trash_stack_push (&async->trash_event, event);
-        g_static_mutex_unlock (&async->trash_mutex);
-        return TRUE;
+	g_slice_free1 (sizeof(pgm_event_t), event);
 }
 
 /* internal receiver thread, sits in a loop processing incoming packets
  */
 
-static gpointer
+static
+gpointer
 pgm_receiver_thread (
 	gpointer	data
 	)
@@ -162,11 +157,11 @@ pgm_receiver_thread (
  * on success, 0 is returned.  on error, -1 is returned, and errno set appropriately.
  * on invalid parameters, -EINVAL is returned.
  */
+
 int
 pgm_async_create (
 	pgm_async_t**		async_,
-	pgm_transport_t*	transport,
-	guint			preallocate
+	pgm_transport_t*	transport
 	)
 {
 	g_return_val_if_fail (async_ != NULL, -EINVAL);
@@ -177,14 +172,6 @@ pgm_async_create (
 
 	async = g_malloc0 (sizeof(pgm_async_t));
 	async->transport = transport;
-	async->event_preallocate = preallocate;
-	g_trace ("INFO","preallocate event queue.");
-	for (guint32 i = 0; i < async->event_preallocate; i++)
-	{
-		gpointer event = g_slice_alloc (sizeof(pgm_event_t));
-		g_trash_stack_push (&async->trash_event, event);
-	}
-	g_static_mutex_init (&async->trash_mutex);
 
 	g_trace ("INFO","create asynchronous commit queue.");
 	async->commit_queue = g_async_queue_new();
@@ -237,16 +224,6 @@ err_destroy:
 		async->commit_pipe[1] = 0;
 	}
 
-	if (async->trash_event) {
-		gpointer* p = NULL;
-		while ( (p = g_trash_stack_pop (&async->trash_event)) )
-		{
-			g_slice_free1 (sizeof(pgm_event_t), p);
-		}
-		g_assert (async->trash_event == NULL);
-	}
-	g_static_mutex_free (&async->trash_mutex);
-
 	g_free (async);
 	async = NULL;
 
@@ -258,6 +235,7 @@ err_destroy:
  *
  * on success, 0 is returned.  if async is invalid, -EINVAL is returned.
  */
+
 int
 pgm_async_destroy (
 	pgm_async_t*		async
@@ -282,15 +260,6 @@ pgm_async_destroy (
                 close (async->commit_pipe[1]);
                 async->commit_pipe[1] = 0;
         }
-        if (async->trash_event) {
-                gpointer *p = NULL;
-                while ( (p = g_trash_stack_pop (&async->trash_event)) )
-                {
-                        g_slice_free1 (sizeof(pgm_event_t), p);
-                }
-                g_assert (async->trash_event == NULL);
-        }
-	g_static_mutex_free (&async->trash_mutex);
 
 	g_free (async);
 	return 0;
@@ -361,7 +330,8 @@ pgm_async_add_watch (
  * called before event loop poll()
  */
 
-static gboolean
+static
+gboolean
 pgm_src_prepare (
         GSource*                source,
         gint*                   timeout
@@ -380,13 +350,12 @@ pgm_src_prepare (
  * return TRUE if ready to dispatch.
  */
 
-static gboolean
+static
+gboolean
 pgm_src_check (
         GSource*                source
         )
 {
-//      g_trace ("INFO","pgm_src_check");
-
         pgm_watch_t* watch = (pgm_watch_t*)source;
 
         return ( g_async_queue_length(watch->async->commit_queue) > 0 );

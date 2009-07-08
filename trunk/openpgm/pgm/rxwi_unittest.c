@@ -49,7 +49,7 @@ mock_pgm_print_tsi (
 
 static
 int
-mock_pgm_rs_decode_parity_appended (
+mock__pgm_rs_decode_parity_appended (
 	gpointer		rs,
 	void**			block,
 	guint*			offsets,
@@ -61,7 +61,7 @@ mock_pgm_rs_decode_parity_appended (
 
 #define pgm_time_now	mock_pgm_time_now
 #define pgm_print_tsi	mock_pgm_print_tsi
-#define pgm_rs_decode_parity_appended	mock_pgm_rs_decode_parity_appended
+#define _pgm_rs_decode_parity_appended	mock__pgm_rs_decode_parity_appended
 
 #define RXW_DEBUG
 #include "rxwi.c"

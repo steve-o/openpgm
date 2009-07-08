@@ -287,7 +287,7 @@ pgm_transport_destroy (
 
 	if (transport->rate_control) {
 		g_trace ("INFO","destroying rate control.");
-		pgm_rate_destroy (transport->rate_control);
+		_pgm_rate_destroy (transport->rate_control);
 		transport->rate_control = NULL;
 	}
 	if (transport->recv_sock) {
@@ -345,7 +345,7 @@ pgm_transport_destroy (
 		transport->parity_buffer = NULL;
 	}
 	if (transport->rs) {
-		pgm_rs_destroy (transport->rs);
+		_pgm_rs_destroy (transport->rs);
 		transport->rs = NULL;
 	}
 
@@ -1352,7 +1352,7 @@ no_cap_net_admin:
 			g_trace ("INFO","Setting rate regulation to %i bytes per second.",
 					transport->txw_max_rte);
 	
-			retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
+			retval = _pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
 			if (retval < 0) {
 				g_static_mutex_unlock (&transport->mutex);
 				goto out;
@@ -1370,7 +1370,7 @@ no_cap_net_admin:
 			g_trace ("INFO","Enabling Reed-Solomon forward error correction, RS(%i,%i).",
 					transport->rs_n, transport->rs_k);
 			transport->parity_buffer = pgm_alloc_skb (transport->max_tpdu);
-			pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
+			_pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
 		}
 
 		transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
