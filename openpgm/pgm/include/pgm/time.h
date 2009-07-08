@@ -43,10 +43,10 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 #define pgm_time_after_eq(a,b)  ( (a) >= (b) )
 #define pgm_time_before_eq(a,b) ( pgm_time_after_eq((b),(a)) )
 
-#define pgm_to_secs(t)	( (t) / 1000000UL )
-#define pgm_to_msecs(t)	( (t) / 1000 )
+#define pgm_to_secs(t)	((pgm_time_t)( (t) / 1000000UL ))
+#define pgm_to_msecs(t)	((pgm_time_t)( (t) / 1000UL ))
 #define pgm_to_usecs(t)	( (t) )
-#define pgm_to_nsecs(t)	( (t) * 1000 )
+#define pgm_to_nsecs(t)	((pgm_time_t)( (t) * 1000UL ))
 
 #define pgm_to_secsf(t)	 ( (double)(t) / 1000000.0 )
 #define pgm_to_msecsf(t) ( (double)(t) / 1000.0 )
@@ -54,9 +54,9 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 #define pgm_to_nsecsf(t) ( (double)(t) * 1000.0 )
 
 #define pgm_secs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000000UL ))
-#define pgm_msecs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000 ))
+#define pgm_msecs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000UL ))
 #define pgm_usecs(t)	((pgm_time_t)( (t) ))
-#define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000 ))
+#define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000UL ))
 
 #define PGM_TIME_FORMAT	G_GUINT64_FORMAT
 
@@ -67,9 +67,9 @@ extern pgm_time_update_func pgm_time_update_now;
 extern pgm_time_sleep_func pgm_time_sleep;
 extern pgm_time_since_epoch_func pgm_time_since_epoch;
 
-G_GNUC_INTERNAL int pgm_time_init (void) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int pgm_time_destroy (void) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int _pgm_time_init (void) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean _pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int _pgm_time_shutdown (void);
 
 G_END_DECLS
 

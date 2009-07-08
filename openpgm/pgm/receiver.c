@@ -171,7 +171,7 @@ _pgm_peer_unref (
 		g_static_mutex_free (&peer->mutex);
 
 /* receive window */
-		pgm_rxw_shutdown (peer->rxw);
+		pgm_rxw_destroy (peer->rxw);
 		peer->rxw = NULL;
 
 /* reed solomon state */
@@ -459,7 +459,7 @@ new_peer (
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
 
 /* lock on rx window */
-	peer->rxw = pgm_rxw_init (
+	peer->rxw = pgm_rxw_create (
 				&peer->tsi,
 				transport->max_tpdu,
 				transport->rxw_sqns,

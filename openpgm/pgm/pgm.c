@@ -28,9 +28,9 @@
 
 
 #ifndef PGM_DEBUG
-#	define g_trace(m,...)		while (0)
+#	define g_trace(...)		while (0)
 #else
-#	define g_trace(m,...)		g_debug(__VA_ARGS__)
+#	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
 
@@ -38,24 +38,28 @@
 int ipproto_pgm = IPPROTO_PGM;
 
 
+/* locals */
+static gboolean pgm_got_initialized = FALSE;
+
+
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  *
- * on success, returns 0.
+ * returns 0 on success, returns -1 if an error occurred, implying some form of
+ * system re-configuration is required to resolve before trying again.
  */
-
+// TODO: could wrap initialization with g_once_init_enter/leave.
+// TODO: fix valgrind errors in getprotobyname/_r
 int
 pgm_init (void)
 {
+	g_return_val_if_fail (pgm_got_initialized == FALSE, -1);
+	g_return_val_if_fail (_pgm_time_supported() == FALSE, -1);
+
 /* ensure threading enabled */
 	if (!g_thread_supported ())
 		g_thread_init (NULL);
 
-/* ensure timing enabled */
-	if (!pgm_time_supported ())
-		pgm_time_init();
-
-/* find PGM protocol id */
-// TODO: fix valgrind errors
+/* find PGM protocol id overriding default value */
 #ifdef CONFIG_HAVE_GETPROTOBYNAME_R
 	char b[1024];
 	struct protoent protobuf, *proto;
@@ -78,6 +82,35 @@ pgm_init (void)
 	}
 #endif
 
+/* ensure timing enabled */
+	if (-1 == _pgm_time_init ())
+		return -1;
+
+	pgm_got_initialized = TRUE;
+	return 0;
+}
+
+/* returns TRUE if PGM engine has been initialized
+ */
+
+gboolean
+pgm_supported (void)
+{
+	return ( pgm_got_initialized == TRUE );
+}
+
+/* returns 0 on success, returns -1 if an error occurred.
+ */
+
+int
+pgm_shutdown (void)
+{
+	g_return_val_if_fail (pgm_supported() == TRUE, -1);
+	g_return_val_if_fail (_pgm_time_supported() == TRUE, -1);
+	if (-1 == _pgm_time_shutdown ())
+		return -1;
+
+	pgm_got_initialized = FALSE;
 	return 0;
 }
 

@@ -661,8 +661,8 @@ http_tsi_response (
 	int dport = g_ntohs (transport->dport);
 	int sport = g_ntohs (transport->tsi.sport);
 
-	gint ihb_min = 0;			/* need to bind first */
-	gint ihb_max = 0;
+	pgm_time_t ihb_min = 0;			/* need to bind first */
+	pgm_time_t ihb_max = 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_source),
@@ -742,25 +742,25 @@ http_tsi_response (
 	g_string_append_printf (response,	"<tr>"
 							"<td colspan=\"2\"><div class=\"break\"></div></td>"
 						"</tr><tr>"
-							"<th>Ttl</th><td>%i</td>"
+							"<th>Ttl</th><td>%u</td>"
 						"</tr><tr>"
 							"<th>Adv Mode</th><td>data(1)</td>"
 						"</tr><tr>"
 							"<th>Late join</th><td>disable(2)</td>"
 						"</tr><tr>"
-							"<th>TXW_MAX_RTE</th><td>%i</td>"
+							"<th>TXW_MAX_RTE</th><td>%u</td>"
 						"</tr><tr>"
-							"<th>TXW_SECS</th><td>%i</td>"
+							"<th>TXW_SECS</th><td>%u</td>"
 						"</tr><tr>"
 							"<th>TXW_ADV_SECS</th><td>0</td>"
 						"</tr><tr>"
-							"<th>Ambient SPM interval</th><td>%i ms</td>"
+							"<th>Ambient SPM interval</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
-							"<th>IHB_MIN</th><td>%i ms</td>"
+							"<th>IHB_MIN</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
-							"<th>IHB_MAX</th><td>%i ms</td>"
+							"<th>IHB_MAX</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
-							"<th>NAK_BO_IVL</th><td>%i ms</td>"
+							"<th>NAK_BO_IVL</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
 							"<th>FEC</th><td>disabled(1)</td>"
 						"</tr><tr>"
@@ -782,39 +782,39 @@ http_tsi_response (
 	g_string_append_printf (response,	"<h2>Performance information</h2>"
 						"<table>"
 						"<tr>"
-							"<th>Data bytes sent</th><td>%i</td>"
+							"<th>Data bytes sent</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Data packets sent</th><td>%i</td>"
+							"<th>Data packets sent</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes buffered</th><td>%i</td>"
+							"<th>Bytes buffered</th><td>%u</td>"
 						"</tr><tr>"
-							"<th>Packets buffered</th><td>%i</td>"
+							"<th>Packets buffered</th><td>%u</td>"
 						"</tr><tr>"
-							"<th>Bytes sent</th><td>%i</td>"
+							"<th>Bytes sent</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Raw NAKs received</th><td>%i</td>"
+							"<th>Raw NAKs received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Checksum errors</th><td>%i</td>"
+							"<th>Checksum errors</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NAKs</th><td>%i</td>"
+							"<th>Malformed NAKs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets discarded</th><td>%i</td>"
+							"<th>Packets discarded</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes retransmitted</th><td>%i</td>"
+							"<th>Bytes retransmitted</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets retransmitted</th><td>%i</td>"
+							"<th>Packets retransmitted</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs received</th><td>%i</td>"
+							"<th>NAKs received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs ignored</th><td>%i</td>"
+							"<th>NAKs ignored</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Transmission rate</th><td>%i bps</td>"
+							"<th>Transmission rate</th><td>%" G_GUINT32_FORMAT " bps</td>"
 						"</tr><tr>"
-							"<th>NNAK packets received</th><td>%i</td>"
+							"<th>NNAK packets received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NNAKs received</th><td>%i</td>"
+							"<th>NNAKs received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NNAKs</th><td>%i</td>"
+							"<th>Malformed NNAKs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr>"
 						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
@@ -884,17 +884,15 @@ http_each_receiver (
 							"<td>%i</td>"
 							"<td>%s</td>"
 							"<td>%s</td>"
-							"<td><a href=\"/%s.%hu\">%s</a></td>"
-							"<td><a href=\"/%s.%hu\">%hu</a></td>"
+							"<td><a href=\"/%s.%i\">%s</a></td>"
+							"<td><a href=\"/%s.%i\">%i</a></td>"
 						"</tr>",
 				group_address,
 				dport,
 				source_address,
 				last_hop,
-				gsi, sport,
-				gsi,
-				gsi, sport,
-				sport
+				gsi, sport, gsi,
+				gsi, sport, sport
 			);
 }
 
@@ -921,14 +919,17 @@ http_time_summary (
 		strftime (hourmin, sizeof(hourmin), "%H:%M", &activity_tm);
 
 		if (now_time < 60) {
-			return sprintf (sz, "%s (%li second%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
+			return sprintf (sz, "%s (%li second%s ago)",
+					hourmin, now_time, now_time > 1 ? "s" : "");
 		}
 		now_time /= 60;
 		if (now_time < 60) {
-			return sprintf (sz, "%s (%li minute%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
+			return sprintf (sz, "%s (%li minute%s ago)",
+					hourmin, now_time, now_time > 1 ? "s" : "");
 		}
 		now_time /= 60;
-		return sprintf (sz, "%s (%li hour%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
+		return sprintf (sz, "%s (%li hour%s ago)",
+				hourmin, now_time, now_time > 1 ? "s" : "");
 	}
 	else
 	{
@@ -936,7 +937,8 @@ http_time_summary (
 		strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
 		now_time /= 24;
 		if (now_time < 14) {
-			return sprintf (sz, "%s (%li day%s ago)", daymonth, now_time, now_time > 1 ? "s" : "");
+			return sprintf (sz, "%s (%li day%s ago)",
+					daymonth, now_time, now_time > 1 ? "s" : "");
 		} else {
 			return sprintf (sz, "%s", daymonth);
 		}
@@ -985,9 +987,9 @@ http_receiver_response (
 
 	int sport = g_ntohs (peer->tsi.sport);
 
-	guint outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length 
-				+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length
-				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
+	guint32 outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length +
+				   ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length +
+				   ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
 
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
@@ -1033,21 +1035,21 @@ http_receiver_response (
 	g_string_append_printf (response,	"<tr>"
 							"<td colspan=\"2\"><div class=\"break\"></div></td>"
 						"</tr><tr>"
-							"<th>NAK_BO_IVL</th><td>%i ms</td>"
+							"<th>NAK_BO_IVL</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
-							"<th>NAK_RPT_IVL</th><td>%i ms</td>"
+							"<th>NAK_RPT_IVL</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
-							"<th>NAK_NCF_RETRIES</th><td>%i</td>"
+							"<th>NAK_NCF_RETRIES</th><td>%u</td>"
 						"</tr><tr>"
-							"<th>NAK_RDATA_IVL</th><td>%i ms</td>"
+							"<th>NAK_RDATA_IVL</th><td>%" PGM_TIME_FORMAT " ms</td>"
 						"</tr><tr>"
-							"<th>NAK_DATA_RETRIES</th><td>%i</td>"
+							"<th>NAK_DATA_RETRIES</th><td>%u</td>"
 						"</tr><tr>"
 							"<th>Send NAKs</th><td>enabled(1)</td>"
 						"</tr><tr>"
 							"<th>Late join</th><td>disabled(2)</td>"
 						"</tr><tr>"
-							"<th>NAK TTL</th><td>%i</td>"
+							"<th>NAK TTL</th><td>%u</td>"
 						"</tr><tr>"
 							"<th>Delivery order</th><td>ordered(2)</td>"
 						"</tr><tr>"
@@ -1065,77 +1067,77 @@ http_receiver_response (
 	g_string_append_printf (response,	"<h2>Performance information</h2>"
 						"<table>"
 						"<tr>"
-							"<th>Data bytes received</th><td>%i</td>"
+							"<th>Data bytes received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Data packets received</th><td>%i</td>"
+							"<th>Data packets received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK failures</th><td>%i</td>"
+							"<th>NAK failures</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes received</th><td>%i</td>"
+							"<th>Bytes received</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Checksum errors</th><td>%i</td>"
+							"<th>Checksum errors</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed SPMs</th><td>%i</td>"
+							"<th>Malformed SPMs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed ODATA</th><td>%i</td>"
+							"<th>Malformed ODATA</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed RDATA</th><td>%i</td>"
+							"<th>Malformed RDATA</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NCFs</th><td>%i</td>"
+							"<th>Malformed NCFs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets discarded</th><td>%i</td>"
+							"<th>Packets discarded</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Losses</th><td>%i</td>"	/* detected missed packets */
+							"<th>Losses</th><td>%" G_GUINT32_FORMAT "</td>"	/* detected missed packets */
 						"</tr><tr>"
-							"<th>Bytes delivered to app</th><td>%i</td>"
+							"<th>Bytes delivered to app</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets delivered to app</th><td>%i</td>"
+							"<th>Packets delivered to app</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Duplicate SPMs</th><td>%i</td>"
+							"<th>Duplicate SPMs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Duplicate ODATA/RDATA</th><td>%i</td>"
+							"<th>Duplicate ODATA/RDATA</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK packets sent</th><td>%i</td>"
+							"<th>NAK packets sent</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs sent</th><td>%i</td>"
+							"<th>NAKs sent</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs retransmitted</th><td>%i</td>"
+							"<th>NAKs retransmitted</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed</th><td>%i</td>"
+							"<th>NAKs failed</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to RXW advance</th><td>%i</td>"
+							"<th>NAKs failed due to RXW advance</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to NCF retries</th><td>%i</td>"
+							"<th>NAKs failed due to NCF retries</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to DATA retries</th><td>%i</td>"
+							"<th>NAKs failed due to DATA retries</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK failures delivered to app</th><td>%i</td>"
+							"<th>NAK failures delivered to app</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs suppressed</th><td>%i</td>"
+							"<th>NAKs suppressed</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NAKs</th><td>%i</td>"
+							"<th>Malformed NAKs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Outstanding NAKs</th><td>%i</td>"
+							"<th>Outstanding NAKs</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
 							"<th>Last activity</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>NAK repair min time</th><td>%i μs</td>"
+							"<th>NAK repair min time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair mean time</th><td>%i μs</td>"
+							"<th>NAK repair mean time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair max time</th><td>%i μs</td>"
+							"<th>NAK repair max time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail min time</th><td>%i μs</td>"
+							"<th>NAK fail min time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail mean time</th><td>%i μs</td>"
+							"<th>NAK fail mean time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail max time</th><td>%i μs</td>"
+							"<th>NAK fail max time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
 						"</tr><tr>"
-							"<th>NAK min retransmit count</th><td>%i</td>"
+							"<th>NAK min retransmit count</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK mean retransmit count</th><td>%i</td>"
+							"<th>NAK mean retransmit count</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK max retransmit count</th><td>%i</td>"
+							"<th>NAK max retransmit count</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr>"
 						"</table>",
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED],

@@ -190,7 +190,7 @@ pgm_rxw_incoming_is_empty (
  */
 
 pgm_rxw_t*
-pgm_rxw_init (
+pgm_rxw_create (
 	const pgm_tsi_t*	tsi,
 	const guint16		tpdu_size,
 	const guint32		sqns,		/* transmit window size in sequence numbers */
@@ -213,7 +213,7 @@ pgm_rxw_init (
 		g_assert_cmpuint (max_rte, >, 0);
 	}
 
-	g_trace ("init (tsi:%s max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u).\n",
+	g_trace ("create (tsi:%s max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u).\n",
 		pgm_print_tsi (tsi), tpdu_size, sqns, secs, max_rte);
 
 /* calculate receive window parameters */
@@ -265,7 +265,7 @@ pgm_rxw_init (
  */
 
 void
-pgm_rxw_shutdown (
+pgm_rxw_destroy (
 	pgm_rxw_t* const	window
 	)
 {
@@ -273,7 +273,7 @@ pgm_rxw_shutdown (
 	g_assert (window);
 	g_assert_cmpuint (window->alloc, >, 0);
 
-	g_trace ("shutdown (window:%p)", (gpointer)window);
+	g_trace ("destroy (window:%p)", (gpointer)window);
 
 /* contents of window */
 	while (!pgm_rxw_is_empty (window)) {
@@ -476,7 +476,7 @@ pgm_rxw_define (
  * returns count of placeholders added into window, used to start sending naks.
  */
 
-guint32
+guint
 pgm_rxw_update (
 	pgm_rxw_t* const	window,
 	const guint32		txw_lead,
@@ -655,7 +655,7 @@ pgm_rxw_add_placeholder_range (
  */
 
 static
-guint32
+guint
 pgm_rxw_update_lead (
 	pgm_rxw_t* const	window,
 	const guint32		txw_lead,
@@ -682,7 +682,7 @@ pgm_rxw_update_lead (
 	else
 		lead = txw_lead;
 
-	guint32 lost = 0;
+	guint lost = 0;
 
 	while (window->lead != lead)
 	{
@@ -932,7 +932,7 @@ pgm_rxw_insert (
 	}
 
 /* statistics */
-	const guint32 fill_time = skb->tstamp - new_skb->tstamp;
+	const pgm_time_t fill_time = skb->tstamp - new_skb->tstamp;
 	if (!window->max_fill_time) {
 		window->max_fill_time = window->min_fill_time = fill_time;
 	}
