@@ -28,11 +28,11 @@ G_BEGIN_DECLS
 #define PGM_RS_DEFAULT_N	255
 
 
-G_GNUC_INTERNAL int _pgm_rs_create (gpointer*, guint, guint) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_rs_destroy (gpointer) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_rs_encode (gpointer, const void**, guint, void*, gsize) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_rs_decode_parity_inline (gpointer, void**, guint*, gsize) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_rs_decode_parity_appended (gpointer, void**, guint*, gsize) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL void _pgm_rs_create (gpointer*, guint, guint);
+G_GNUC_INTERNAL void _pgm_rs_destroy (gpointer);
+G_GNUC_INTERNAL void _pgm_rs_encode (gpointer, const void**, guint, void*, gsize);
+G_GNUC_INTERNAL void _pgm_rs_decode_parity_inline (gpointer, void**, guint*, gsize);
+G_GNUC_INTERNAL void _pgm_rs_decode_parity_appended (gpointer, void**, guint*, gsize);
 
 G_END_DECLS
 

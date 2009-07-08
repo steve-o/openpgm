@@ -80,7 +80,7 @@ static void select_sleep (gulong);
 
 #ifdef CONFIG_HAVE_RTC
 static int rtc_init (void);
-static int rtc_destroy (void);
+static int rtc_shutdown (void);
 static pgm_time_t rtc_update (void);
 static void rtc_sleep (gulong);
 #endif
@@ -99,10 +99,17 @@ static void poll_sleep (gulong);
 static void pgm_time_conv (pgm_time_t*, time_t*);
 static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
 
+
+/* initialize time system.
+ *
+ * returns 0 on success, returns -1 on error such as being unable to open
+ * the RTC device, an unstable TSC, or system already initialized.
+ */
+
 int
-pgm_time_init ( void )
+_pgm_time_init (void)
 {
-	g_return_val_if_fail (time_got_initialized == FALSE, -1);
+	g_return_val_if_fail (FALSE == time_got_initialized, -1);
 
 /* current time */
 	const char *cfg = getenv ("PGM_TIMER");
@@ -243,21 +250,23 @@ pgm_time_init ( void )
 }
 
 gboolean
-pgm_time_supported (void)
+_pgm_time_supported (void)
 {
 	return ( time_got_initialized == TRUE );
 }
 
+/* returns 0 if shutdown succeeded, returns -1 on error.
+ */
+
 int
-pgm_time_destroy (void)
+_pgm_time_shutdown (void)
 {
+	g_return_val_if_fail (TRUE == time_got_initialized, -1);
+
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
-	{
-		rtc_destroy();
-	}
+		return rtc_shutdown ();
 #endif
-
 	return 0;
 }
 
@@ -315,31 +324,31 @@ rtc_init (void)
 
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
 	if (rtc_fd < 0) {
-		g_critical ("Cannot open /dev/rtc for reading.");
-		g_assert_not_reached();
+		g_error ("Cannot open /dev/rtc for reading.");
+		return -1;
 	}
-
 	if ( ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency) < 0 ) {
-		g_critical ("Cannot set RTC frequency to %i Hz.", rtc_frequency);
-		g_assert_not_reached();
+		g_error ("Cannot set RTC frequency to %i Hz.", rtc_frequency);
+		return -1;
 	}
-
 	if ( ioctl (rtc_fd, RTC_PIE_ON, 0) < 0 ) {
-		g_critical ("Cannot enable periodic interrupt (PIE) on RTC.");
-		g_assert_not_reached();
+		g_error ("Cannot enable periodic interrupt (PIE) on RTC.");
+		return -1;
 	}
-
 	return 0;
 }
 
-static int
-rtc_destroy (void)
+/* returns 0 on success even if RTC device cannot be closed or had an IO error,
+ * returns -1 if the RTC file descriptor is not set.
+ */
+
+static
+int
+rtc_shutdown (void)
 {
 	g_return_val_if_fail (rtc_fd, -1);
-
-	close (rtc_fd);
+	g_warn_if_fail (0 == close (rtc_fd));
 	rtc_fd = -1;
-
 	return 0;
 }
 
@@ -428,12 +437,9 @@ tsc_init (void)
 			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP.");
 
 /* force both to stable clocks even though one might be OK */
-		pgm_time_destroy();
-
 		pgm_time_update_now = gettimeofday_update;
 		pgm_time_sleep = (pgm_time_sleep_func)usleep;
-
-		return 0;
+		return -1;
 	}
 
 /* TODO: this math needs to be scaled to reduce rounding errors */
@@ -451,7 +457,6 @@ tsc_init (void)
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server.",
 		   tsc_us_scaler);
-
 	return 0;
 }
 

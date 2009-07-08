@@ -43,11 +43,11 @@ typedef struct rs_t rs_t;
 
 /* globals */
 
-int _pgm_rs_create (rs_t**, guint, guint);
-int _pgm_rs_destroy (rs_t*);
-int _pgm_rs_encode (rs_t*, const gf8_t**, guint, gf8_t*, gsize);
-int _pgm_rs_decode_parity_inline (rs_t*, gf8_t**, guint*, gsize);
-int _pgm_rs_decode_parity_appended (rs_t*, gf8_t**, guint*, gsize);
+void _pgm_rs_create (rs_t**, guint, guint);
+void _pgm_rs_destroy (rs_t*);
+void _pgm_rs_encode (rs_t*, const gf8_t**, guint, gf8_t*, gsize);
+void _pgm_rs_decode_parity_inline (rs_t*, gf8_t**, guint*, gsize);
+void _pgm_rs_decode_parity_appended (rs_t*, gf8_t**, guint*, gsize);
 
 
 /* Vector GF(2⁸) plus-equals multiplication.
@@ -55,7 +55,8 @@ int _pgm_rs_decode_parity_appended (rs_t*, gf8_t**, guint*, gsize);
  * d[] += b • s[]
  */
 
-static void
+static
+void
 gf_vec_addmul (
 	gf8_t*			d,
 	const gf8_t		b,
@@ -122,7 +123,8 @@ gf_vec_addmul (
  *        r=1
  */
 
-static void
+static
+void
 matmul (
 	const gf8_t*		a,	/* m-by-n */
 	const gf8_t*		b,	/* n-by-p */
@@ -157,7 +159,8 @@ matmul (
 #define SWAP(a, b)	do { gf8_t _t = (b); (b) = (a); (a) = _t; } while (0)
 #endif
 
-static void
+static
+void
 matinv (
 	gf8_t*			M,		/* is n-by-n */
 	const guint		n
@@ -279,7 +282,8 @@ found:
  * As only the second column is actually unique so optimise from that.
  */
 
-static void
+static
+void
 matinv_vandermonde (
 	gf8_t*			V,		/* is n-by-n */
 	const guint		n
@@ -355,14 +359,14 @@ matinv_vandermonde (
  * e = s × GM
  */
 
-int
+void
 _pgm_rs_create (
 	rs_t**			rs_,
 	guint			n,
 	guint			k
 	)
 {
-	g_return_val_if_fail (rs_ != NULL, -EINVAL);
+	g_assert (rs_);
 
 	rs_t* rs = g_malloc0 (sizeof(rs_t));
 
@@ -422,16 +426,14 @@ _pgm_rs_create (
 	}
 
 	*rs_	= rs;
-
-	return 0;
 }
 
-int
+void
 _pgm_rs_destroy (
 	rs_t*		rs
 	)
 {
-	g_return_val_if_fail (rs != NULL, -EINVAL);
+	g_assert (rs);
 
 	if (rs->RM) {
 		g_free (rs->RM);
@@ -444,14 +446,13 @@ _pgm_rs_destroy (
 	}
 
 	g_free (rs);
-
-	return 0;
 }
 
 /* create a parity packet from a vector of original data packets and
  * FEC block packet offset.
  */
-int
+
+void
 _pgm_rs_encode (
 	rs_t*		rs,
 	const gf8_t*	src[],		/* length rs_t::k */
@@ -468,14 +469,13 @@ _pgm_rs_encode (
 		gf8_t c = rs->GM[ (offset * rs->k) + i ];
 		gf_vec_addmul (dst, c, src[i], len);
 	}
-
-	return 0;
 }
 
 /* original data block of packets with missing packet entries replaced
  * with on-demand parity packets.
  */
-int
+
+void
 _pgm_rs_decode_parity_inline (
 	rs_t*		rs,
 	gf8_t*		block[],	/* length rs_t::k */
@@ -524,15 +524,13 @@ _pgm_rs_decode_parity_inline (
 		memcpy (block[ j ], repairs[ j ], len * sizeof(gf8_t));
 		g_slice_free1 (len, repairs[ j ]);
 	}
-
-	return 0;
 }
 
 /* entire FEC block of original data and parity packets.
  *
  * erased packet buffers must be zeroed.
  */
-int
+void
 _pgm_rs_decode_parity_appended (
 	rs_t*		rs,
 	gf8_t*		block[],	/* length rs_t::n, the FEC block */
@@ -574,8 +572,6 @@ _pgm_rs_decode_parity_appended (
 			gf_vec_addmul (erasure, c, src, len);
 		}
 	}
-
-	return 0;
 }
 
 /* eof */

@@ -271,7 +271,7 @@ struct pgm_transport_t {
 
     GRand*		rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
     guint		nak_data_retries, nak_ncf_retries;
-    guint		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
+    pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
     pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
     gpointer		rs;
@@ -319,6 +319,8 @@ extern GSList* pgm_transport_list;
 G_BEGIN_DECLS
 
 int pgm_init (void);
+gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_shutdown (void);
 
 gchar* pgm_print_tsi (const pgm_tsi_t*) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);

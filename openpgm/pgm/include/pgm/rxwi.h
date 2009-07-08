@@ -133,31 +133,30 @@ struct pgm_rxw_t {
 	guint		rs_n;
 	guint		rs_k;
 
-	guint32		min_fill_time;
+/* counters all guint32 */
+	guint32		min_fill_time;		/* restricted from pgm_time_t */
 	guint32		max_fill_time;
 	guint32		min_nak_transmit_count;
 	guint32		max_nak_transmit_count;
-
-/* runtime context counters */
 	guint32		cumulative_losses;
 	guint32		ack_cumulative_losses;
 	guint32		bytes_delivered;
 	guint32		msgs_delivered;
 
-	guint32		size;
-	guint32		alloc;
+	guint		size;
+	guint		alloc;
 	struct pgm_sk_buff_t*	pdata[];
 };
 
 typedef struct pgm_rxw_t pgm_rxw_t;
 
 
-G_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_init (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL void pgm_rxw_shutdown (pgm_rxw_t* const);
+G_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t* const);
 G_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gssize pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_rxw_remove_trail (pgm_rxw_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL guint32 pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const guint32);
 G_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
@@ -166,7 +165,7 @@ G_GNUC_INTERNAL const char* pgm_pkt_state_string (pgm_pkt_state_e) G_GNUC_WARN_U
 G_GNUC_INTERNAL const char* pgm_rxw_returns_string (pgm_rxw_returns_e) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t* const);
 
-static inline guint32 pgm_rxw_max_length (const pgm_rxw_t* const window)
+static inline guint pgm_rxw_max_length (const pgm_rxw_t* const window)
 {
 	g_assert (window);
 	return window->alloc;
@@ -178,7 +177,7 @@ static inline guint32 pgm_rxw_length (const pgm_rxw_t* const window)
 	return ( 1 + window->lead ) - window->trail;
 }
 
-static inline guint32 pgm_rxw_size (const pgm_rxw_t* const window)
+static inline guint pgm_rxw_size (const pgm_rxw_t* const window)
 {
 	g_assert (window);
 	return window->size;
