@@ -27,8 +27,8 @@
 
 G_BEGIN_DECLS
 
-int pgm_snmp_init (void);
-int pgm_snmp_shutdown (void);
+int pgm_snmp_init (void) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_snmp_shutdown (void) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

@@ -456,9 +456,9 @@ static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla)
     return retval;
 }
 
-const char* pgm_type_string (guint8);
-const char* pgm_udpport_string (int);
-const char* pgm_gethostbyaddr (const struct in_addr*);
+const char* pgm_type_string (guint8) G_GNUC_WARN_UNUSED_RESULT;
+const char* pgm_udpport_string (int) G_GNUC_WARN_UNUSED_RESULT;
+const char* pgm_gethostbyaddr (const struct in_addr*) G_GNUC_WARN_UNUSED_RESULT;
 void pgm_ipopt_print (gconstpointer, gsize);
 
 G_END_DECLS

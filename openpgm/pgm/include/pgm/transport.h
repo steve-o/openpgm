@@ -235,8 +235,8 @@ struct pgm_transport_t {
     gsize		iphdr_len;
     gboolean		use_multicast_loop;    /* and reuseaddr for UDP encapsulation */
     guint		hops;
-    guint		txw_preallocate, txw_sqns, txw_secs, txw_max_rte;
-    guint		rxw_preallocate, rxw_sqns, rxw_secs, rxw_max_rte;
+    guint		txw_sqns, txw_secs, txw_max_rte;
+    guint		rxw_sqns, rxw_secs, rxw_max_rte;
     int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
     GStaticRWLock	txw_lock;
@@ -320,16 +320,16 @@ G_BEGIN_DECLS
 
 int pgm_init (void);
 
-gchar* pgm_print_tsi (const pgm_tsi_t*);
+gchar* pgm_print_tsi (const pgm_tsi_t*) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);
-guint pgm_tsi_hash (gconstpointer);
-gboolean pgm_tsi_equal (gconstpointer, gconstpointer);
-guint pgm_power2_log2 (guint);
+guint pgm_tsi_hash (gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
+gboolean pgm_tsi_equal (gconstpointer, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL guint pgm_power2_log2 (guint) G_GNUC_WARN_UNUSED_RESULT;
 
 void pgm_drop_superuser (void);
 
-int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, guint16, struct group_source_req*, gsize, struct group_source_req*);
-int pgm_transport_bind (pgm_transport_t*);
+int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, guint16, struct group_source_req*, gsize, struct group_source_req*) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_transport_bind (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
 int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
 int pgm_transport_set_multicast_loop (pgm_transport_t*, gboolean);
@@ -341,7 +341,7 @@ int pgm_transport_set_send_only (pgm_transport_t*, gboolean);
 int pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
 int pgm_transport_set_close_on_failure (pgm_transport_t*, gboolean);
 
-gsize pgm_transport_pkt_offset (gboolean);
+gsize pgm_transport_pkt_offset (gboolean) G_GNUC_WARN_UNUSED_RESULT;
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
 {
     gsize max_tsdu = can_fragment ? transport->max_tsdu_fragment : transport->max_tsdu;
@@ -349,7 +349,7 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
-int _pgm_get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
+G_GNUC_INTERNAL int _pgm_get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
 
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 #ifdef CONFIG_HAVE_POLL

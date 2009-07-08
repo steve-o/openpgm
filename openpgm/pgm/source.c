@@ -145,30 +145,6 @@ pgm_transport_set_heartbeat_spm (
 	return 0;
 }
 
-/* 0 < txw_preallocate <= txw_sqns 
- *
- * can only be enforced at bind.
- *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
- */
-
-int
-pgm_transport_set_txw_preallocate (
-	pgm_transport_t*	transport,
-	guint			sqns
-	)
-{
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (sqns > 0, -EINVAL);
-
-	g_static_mutex_lock (&transport->mutex);
-	transport->txw_preallocate = sqns;
-	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
-}
-
 /* 0 < txw_sqns < one less than half sequence space
  *
  * on success, returns 0.  on invalid setting, returns -EINVAL.
@@ -433,13 +409,13 @@ _pgm_on_nak_notify (
  *
  *   "warning: dereferencing type-punned pointer will break strict-aliasing rules"
  */
-				pgm_rs_encode (transport->rs, (const void**)(void*)opt_src, transport->rs_k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
+				_pgm_rs_encode (transport->rs, (const void**)(void*)opt_src, transport->rs_k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
 
 				data_bytes = opt_fragment + 1;
 			}
 
 /* encode payload */
-			pgm_rs_encode (transport->rs, (const void**)(void*)src, transport->rs_k + rs_h, data_bytes, parity_length);
+			_pgm_rs_encode (transport->rs, (const void**)(void*)src, transport->rs_k + rs_h, data_bytes, parity_length);
 			has_saved_partial_csum = FALSE;
 		}
 
@@ -1435,7 +1411,7 @@ pgm_transport_send (
 		} while (offset_ < apdu_length);
 
 /* calculation includes one iphdr length already */
-		int result = pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
+		int result = _pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
 		if (result == -1) {
 			return (gssize)result;
 		}
@@ -1665,7 +1641,7 @@ pgm_transport_sendv (
 		} while (offset_ < STATE(apdu_length));
 
 /* calculation includes one iphdr length already */
-                int result = pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
+                int result = _pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
                 if (result == -1) {
 			return (gssize)result;
                 }
@@ -1926,7 +1902,7 @@ pgm_transport_send_skbv (
 		}
 
 /* calculation includes one iphdr length already */
-		int result = pgm_rate_check (transport->rate_control, total_tpdu_length - transport->iphdr_len, flags);
+		int result = _pgm_rate_check (transport->rate_control, total_tpdu_length - transport->iphdr_len, flags);
 		if (result == -1) {
 			return (gssize)result;
 		}

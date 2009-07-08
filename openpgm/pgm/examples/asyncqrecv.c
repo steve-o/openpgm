@@ -195,7 +195,7 @@ on_startup (void)
 
 /* asynchronous receiver thread */
 	pgm_async_t* async = NULL;
-	pgm_async_create (&async, g_transport, 0);
+	pgm_async_create (&async, g_transport);
 	pgm_async_add_watch (async, on_data, NULL);
 
 	g_message ("startup complete.");

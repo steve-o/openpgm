@@ -67,7 +67,7 @@ _pgm_sendto (
 
 	if (use_rate_limit)
 	{
-		int check = pgm_rate_check (transport->rate_control, len, flags);
+		int check = _pgm_rate_check (transport->rate_control, len, flags);
 		if (check < 0 && errno == EAGAIN)
 		{
 			return (gssize)check;

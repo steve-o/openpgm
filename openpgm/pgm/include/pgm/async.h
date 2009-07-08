@@ -38,15 +38,9 @@ struct pgm_event_t {
 
 struct pgm_async_t {
     pgm_transport_t*	transport;
-
     GThread*		thread;
     GAsyncQueue*	commit_queue;
     int			commit_pipe[2];
-
-    guint		event_preallocate;
-    GTrashStack*	trash_event;	    /* sizeof(struct pgm_event) */
-    GStaticMutex	trash_mutex;
-
     gboolean		quit;
 };
 
@@ -55,8 +49,12 @@ typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
 
 G_BEGIN_DECLS
 
-int pgm_async_create (pgm_async_t**, pgm_transport_t*, guint);
+int pgm_async_create (pgm_async_t**, pgm_transport_t*);
 int pgm_async_destroy (pgm_async_t*);
+gssize pgm_async_recv (pgm_async_t* async, gpointer, gsize, int);
+GSource* pgm_async_create_watch (pgm_async_t*) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_async_add_watch_full (pgm_async_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
+int pgm_async_add_watch (pgm_async_t*, pgm_eventfn_t, gpointer);
 
 static inline int pgm_async_get_fd (pgm_async_t* async)
 {
@@ -64,12 +62,6 @@ static inline int pgm_async_get_fd (pgm_async_t* async)
     return async->commit_pipe[0];
 }
 
-gssize pgm_async_recv (pgm_async_t* async, gpointer, gsize, int);
-
-GSource* pgm_async_create_watch (pgm_async_t*);
-int pgm_async_add_watch_full (pgm_async_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
-int pgm_async_add_watch (pgm_async_t*, pgm_eventfn_t, gpointer);
-
 G_END_DECLS
 
-#endif /* __PGM_SIGNAL_H__ */
+#endif /* __PGM_ASYNC_H__ */

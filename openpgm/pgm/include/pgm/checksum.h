@@ -28,10 +28,8 @@
 G_BEGIN_DECLS
 
 guint16 pgm_inet_checksum (const void*, guint, int);
-
 guint16 pgm_csum_fold (guint32);
 guint32 pgm_csum_block_add (guint32, guint32, guint);
-
 guint32 pgm_compat_csum_partial (const void*, guint, guint32);
 guint32 pgm_compat_csum_partial_copy (const void*, void*, guint, guint32);
 

@@ -33,7 +33,6 @@ G_BEGIN_DECLS
 
 int pgm_transport_set_ambient_spm (pgm_transport_t*, guint);
 int pgm_transport_set_heartbeat_spm (pgm_transport_t*, const guint*, int);
-int pgm_transport_set_txw_preallocate (pgm_transport_t*, guint);
 int pgm_transport_set_txw_sqns (pgm_transport_t*, guint);
 int pgm_transport_set_txw_secs (pgm_transport_t*, guint);
 int pgm_transport_set_txw_max_rte (pgm_transport_t*, guint);
@@ -42,11 +41,11 @@ gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
 gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
 gssize pgm_transport_send_skbv (pgm_transport_t*, struct pgm_sk_buff_t*, guint, int, gboolean);
 
-int _pgm_send_spm_unlocked (pgm_transport_t*);
-gboolean _pgm_on_nak_notify (GIOChannel*, GIOCondition, gpointer);
-int _pgm_on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, gpointer, gsize);
-int _pgm_on_nak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
-int _pgm_on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize);
+G_GNUC_INTERNAL int _pgm_send_spm_unlocked (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean _pgm_on_nak_notify (GIOChannel*, GIOCondition, gpointer) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int _pgm_on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, gpointer, gsize) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int _pgm_on_nak (pgm_transport_t*, struct pgm_header*, gpointer, gsize) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int _pgm_on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 
