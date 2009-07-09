@@ -31,15 +31,16 @@
 #include <netinet/in.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "pgm/gsi.h"
 
-//#define IF_DEBUG
+//#define GSI_DEBUG
 
-#ifndef IF_DEBUG
-#define g_trace(...)		while (0)
+#ifndef GSI_DEBUG
+#	define g_trace(...)		while (0)
 #else
-#define g_trace(...)		g_debug(__VA_ARGS__)
+#	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
 
@@ -70,10 +71,15 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 #endif
 
 
+static PGMGSIError pgm_gsi_error_from_errno (gint);
+static PGMGSIError pgm_gsi_error_from_eai_errno (gint);
+
+
 /* Initialize structure containing state of computation.
    (RFC 1321, 3.3: Step 3)  */
 
-static void
+static
+void
 md5_init_ctx (
 	struct md5_ctx*	ctx
 	)
@@ -98,7 +104,8 @@ md5_init_ctx (
 /* Process LEN bytes of BUFFER, accumulating context into CTX.
    It is assumed that LEN % 64 == 0.  */
 
-static void
+static
+void
 md5_process_block (
 	const void*	buffer,
 	size_t		len,
@@ -258,7 +265,8 @@ md5_process_block (
 	ctx->D = D;
 }
 
-static void
+static
+void
 md5_process_bytes (
 	const void*	buffer,
 	size_t		len,
@@ -314,7 +322,8 @@ md5_process_bytes (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
-static void *
+static
+void*
 md5_read_ctx (
 	const struct md5_ctx	*ctx,
 	void*			resbuf
@@ -334,7 +343,8 @@ md5_read_ctx (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
-static void *
+static
+void*
 md5_finish_ctx (
 	struct md5_ctx*	ctx,
 	void*		resbuf
@@ -366,23 +376,29 @@ md5_finish_ctx (
 /* create a global session ID as recommended by the PGM draft specification using
  * low order 48 bits of md5 of the hostname.
  *
- * could easily be swapped for an OpenSSL accelerated varient.
+ * returns TRUE on success, returns FALSE on error and sets error appropriately,
  */
 
-int
-pgm_create_md5_gsi (
-	pgm_gsi_t*	gsi
+gboolean
+pgm_gsi_create_from_hostname (
+	pgm_gsi_t*	gsi,
+	GError**	error
 	)
 {
-	g_return_val_if_fail (gsi != NULL, -EINVAL);
-
-	int retval = 0;
 	struct md5_ctx ctx;
 	char hostname[NI_MAXHOST];
 	char resblock[16];
 
-	if ((retval = gethostname (hostname, sizeof(hostname))) != 0) {
-		goto out;
+	g_return_val_if_fail (NULL != gsi, FALSE);
+
+	int retval = gethostname (hostname, sizeof(hostname));
+	if (0 != retval) {
+		g_set_error (error,
+			     PGM_GSI_ERROR,
+			     pgm_gsi_error_from_errno (errno),
+			     _("Resolving hostname: %s"),
+			     g_strerror (errno));
+		return FALSE;
 	}
 
 	md5_init_ctx (&ctx);
@@ -390,77 +406,94 @@ pgm_create_md5_gsi (
 	md5_finish_ctx (&ctx, resblock);
 
 	memcpy (gsi, resblock + 10, 6);
-
-out:
-	return retval;
+	return TRUE;
 }
 
 /* create a global session ID based on the IP address.
  *
  * GLib random API will need warming up before g_random_int_range returns
  * numbers that actually vary.
+ *
+ * returns TRUE on succcess, returns FALSE on error and sets error.
  */
 
-int
-pgm_create_ipv4_gsi (
-	pgm_gsi_t*	gsi
+gboolean
+pgm_gsi_create_from_addr (
+	pgm_gsi_t*	gsi,
+	GError**	error
 	)
 {
-	g_return_val_if_fail (gsi != NULL, -EINVAL);
-	int retval = 0;
 	char hostname[NI_MAXHOST];
 	struct addrinfo hints, *res = NULL;
 
-	if ((retval = gethostname (hostname, sizeof(hostname))) != 0) {
-		goto out;
-	}
+	g_return_val_if_fail (NULL != gsi, FALSE);
 
+	int retval = gethostname (hostname, sizeof(hostname));
+	if (0 != retval) {
+		g_set_error (error,
+			     PGM_GSI_ERROR,
+			     pgm_gsi_error_from_errno (errno),
+			     _("Resolving hostname: %s"),
+			     g_strerror (errno));
+		return FALSE;
+	}
 	memset (&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_flags = AI_ADDRCONFIG;
-	if ((retval = getaddrinfo (hostname, NULL, &hints, &res)) != 0) {
-		goto out;
+	retval = getaddrinfo (hostname, NULL, &hints, &res);
+	if (0 != retval) {
+		g_set_error (error,
+			     PGM_GSI_ERROR,
+			     pgm_gsi_error_from_eai_errno (retval),
+			     _("Resolving hostname address: %s"),
+			     gai_strerror (retval));
+		return FALSE;
 	}
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
 	freeaddrinfo (res);
 	guint16 random = g_random_int_range (0, UINT16_MAX);
-	memcpy (gsi + sizeof(struct in_addr), &random, sizeof(random));
-
-out:
-	return retval;
+	memcpy ((guint8*)gsi + sizeof(struct in_addr), &random, sizeof(random));
+	return TRUE;
 }
 
-/* re-entrant form of pgm_print_gsi()
+/* re-entrant form of pgm_gsi_print()
+ *
+ * returns number of bytes written to buffer on success, returns -1 on
+ * invalid parameters.
  */
+
 int
-pgm_print_gsi_r (
-	const pgm_gsi_t*	gsi_,
+pgm_gsi_print_r (
+	const pgm_gsi_t*	gsi,
 	char*			buf,
 	gsize			bufsize
 	)
 {
-	g_return_val_if_fail (gsi_ != NULL, -EINVAL);
-	g_return_val_if_fail (buf != NULL, -EINVAL);
+	const guint8* src = (const guint8*)gsi;
 
-	const guint8* gsi = (const guint8*)gsi_;
-	snprintf(buf, bufsize, "%i.%i.%i.%i.%i.%i",
-		gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5]);
-	return 0;
+	g_return_val_if_fail (NULL != gsi, -1);
+	g_return_val_if_fail (NULL != buf, -1);
+	g_return_val_if_fail (bufsize > 0, -1);
+
+	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i",
+			src[0], src[1], src[2], src[3], src[4], src[5]);
 }
 
 /* transform GSI to ASCII string form.
  *
  * on success, returns pointer to ASCII string.  on error, returns NULL.
  */
+
 gchar*
-pgm_print_gsi (
+pgm_gsi_print (
 	const pgm_gsi_t*	gsi
 	)
 {
-	g_return_val_if_fail (gsi != NULL, NULL);
-
 	static char buf[PGM_GSISTRLEN];
-	pgm_print_gsi_r (gsi, buf, sizeof(buf));
+
+	g_return_val_if_fail (NULL != gsi, NULL);
+
+	pgm_gsi_print_r (gsi, buf, sizeof(buf));
 	return buf;
 }
 
@@ -473,8 +506,131 @@ pgm_gsi_equal (
         gconstpointer   v2
         )
 {
+/* pre-conditions */
+	g_assert (v);
+	g_assert (v2);
+
         return memcmp (v, v2, 6 * sizeof(guint8)) == 0;
 }
 
+GQuark
+pgm_gsi_error_quark (void)
+{
+	return g_quark_from_static_string ("pgm-gsi-error-quark");
+}
+
+static
+PGMGSIError
+pgm_gsi_error_from_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_GSI_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EINVAL
+	case EINVAL:
+		return PGM_GSI_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef EPERM
+	case EPERM:
+		return PGM_GSI_ERROR_PERM;
+		break;
+#endif
+
+	default :
+		return PGM_GSI_ERROR_FAILED;
+		break;
+	}
+}
+
+/* errno must be preserved before calling to catch correct error
+ * status with EAI_SYSTEM.
+ */
+
+static
+PGMGSIError
+pgm_gsi_error_from_eai_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EAI_ADDRFAMILY
+	case EAI_ADDRFAMILY:
+		return PGM_GSI_ERROR_ADDRFAMILY;
+		break;
+#endif
+
+#ifdef EAI_AGAIN
+	case EAI_AGAIN:
+		return PGM_GSI_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef EAI_BADFLAGS
+	case EAI_BADFLAGS:
+		return PGM_GSI_ERROR_BADFLAGS;
+		break;
+#endif
+
+#ifdef EAI_FAIL
+	case EAI_FAIL:
+		return PGM_GSI_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef EAI_FAMILY
+	case EAI_FAMILY:
+		return PGM_GSI_ERROR_FAMILY;
+		break;
+#endif
+
+#ifdef EAI_MEMORY
+	case EAI_MEMORY:
+		return PGM_GSI_ERROR_MEMORY;
+		break;
+#endif
+
+#ifdef EAI_NODATA
+	case EAI_NODATA:
+		return PGM_GSI_ERROR_NODATA;
+		break;
+#endif
+
+#ifdef EAI_NONAME
+	case EAI_NONAME:
+		return PGM_GSI_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef EAI_SERVICE
+	case EAI_SERVICE:
+		return PGM_GSI_ERROR_SERVICE;
+		break;
+#endif
+
+#ifdef EAI_SOCKTYPE
+	case EAI_SOCKTYPE:
+		return PGM_GSI_ERROR_SOCKTYPE;
+		break;
+#endif
+
+#ifdef EAI_SYSTEM
+	case EAI_SYSTEM:
+		return pgm_gsi_error_from_errno (errno);
+		break;
+#endif
+
+	default :
+		return PGM_GSI_ERROR_FAILED;
+		break;
+	}
+}
 
 /* eof */
