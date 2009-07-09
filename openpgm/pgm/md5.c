@@ -59,7 +59,7 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
    (RFC 1321, 3.3: Step 3)  */
 
 void
-md5_init_ctx (
+_md5_init_ctx (
 	struct md5_ctx*	ctx
 	)
 {
@@ -245,7 +245,7 @@ md5_process_block (
 }
 
 void
-md5_process_bytes (
+_md5_process_bytes (
 	const void*	buffer,
 	size_t		len,
 	struct md5_ctx*	ctx
@@ -322,7 +322,7 @@ md5_read_ctx (
    aligned for a 32 bits value.  */
 
 void*
-md5_finish_ctx (
+_md5_finish_ctx (
 	struct md5_ctx*	ctx,
 	void*		resbuf
 	)

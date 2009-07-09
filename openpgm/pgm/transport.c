@@ -52,6 +52,8 @@
 #include "pgm/source.h"
 #include "pgm/receiver.h"
 #include "pgm/if.h"
+#include "pgm/getnodeaddr.h"
+#include "pgm/indextoaddr.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
 #include "pgm/net.h"
@@ -984,11 +986,11 @@ pgm_transport_bind (
 		break;
 	}
 #else
-	retval = pgm_if_indextosockaddr (transport->recv_gsr[0].gsr_interface, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), pgm_sockaddr_scope_id(&transport->recv_gsr[0].gsr_group), &recv_addr);
+	retval = _pgm_if_indextoaddr (transport->recv_gsr[0].gsr_interface, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), pgm_sockaddr_scope_id(&transport->recv_gsr[0].gsr_group), &recv_addr);
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
-		g_trace ("INFO","pgm_if_indextosockaddr failed on recv_gsr[0] interface %i, family %s, %s",
+		g_trace ("INFO","_pgm_if_indextoaddr failed on recv_gsr[0] interface %i, family %s, %s",
 				transport->recv_gsr[0].gsr_interface,
 				AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET" :
 					( AF_INET6 == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET6" :
@@ -1037,11 +1039,11 @@ pgm_transport_bind (
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
 
-	retval = pgm_if_indextosockaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), pgm_sockaddr_scope_id(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
+	retval = _pgm_if_indextoaddr (transport->send_gsr.gsr_interface, pgm_sockaddr_family(&transport->send_gsr.gsr_group), pgm_sockaddr_scope_id(&transport->send_gsr.gsr_group), (struct sockaddr*)&send_addr);
 	if (retval < 0) {
 #ifdef TRANSPORT_DEBUG
 		int errno_ = errno;
-		g_trace ("INFO","pgm_if_indextosockaddr failed on send_gsr interface %i, family %s, %s",
+		g_trace ("INFO","_pgm_if_indextoaddr failed on send_gsr interface %i, family %s, %s",
 				transport->send_gsr.gsr_interface,
 				AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET" :
 					( AF_INET6 == pgm_sockaddr_family(&transport->send_gsr.gsr_group) ? "AF_INET6" :
@@ -1081,7 +1083,7 @@ pgm_transport_bind (
 	case AF_INET:
 		if (((struct sockaddr_in*)&send_addr)->sin_addr.s_addr == INADDR_ANY)
 		{
-			retval = pgm_if_getnodeaddr(AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr));
+			retval = _pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr));
 			if (retval < 0) {
 				g_static_mutex_unlock (&transport->mutex);
 				goto out;
@@ -1092,7 +1094,7 @@ pgm_transport_bind (
 	case AF_INET6:
 		if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0)
 		{
-			retval = pgm_if_getnodeaddr(AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr));
+			retval = _pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr));
 			if (retval < 0) {
 				g_static_mutex_unlock (&transport->mutex);
 				goto out;
