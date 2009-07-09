@@ -107,7 +107,10 @@ main (
 	signal(SIGTERM, on_signal);
 	signal(SIGHUP, SIG_IGN);
 
-	on_startup();
+	if (!on_startup()) {
+		g_error ("startup failed");
+		exit(1);
+	}
 
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
@@ -179,14 +182,18 @@ on_startup (void)
 	g_message ("create transport.");
 
 	pgm_gsi_t gsi;
-	int e = pgm_create_md5_gsi (&gsi);
-	g_assert (e == 0);
+	GError* err = NULL;
+	if (!pgm_gsi_create_from_hostname (&gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
+		return FALSE;
+	}
 
 	struct group_source_req recv_gsr, send_gsr;
 	char network[1024];
 	sprintf (network, ";%s", g_network);
 	gsize recv_len = 1;
-	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
+	int e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);
 	g_assert (recv_len == 1);
 

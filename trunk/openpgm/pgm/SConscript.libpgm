@@ -28,6 +28,7 @@ src = Split("""
 
 e = env.Clone();
 e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
+e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 # Galois tables
 e.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
@@ -54,6 +55,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('txwi_unittest.c');
 	te.Program ('rxwi_unittest.c');
 	te.Program ('pgm_unittest.c');
+	te.Program ('gsi_unittest.c');
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
@@ -61,6 +63,7 @@ if env['WITH_CHECK'] == 'true':
 if env['WITH_PLUS'] == 'true':
 	pe = env.Clone();
 	pe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
+	pe.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 # add new suffix so objects don't interfere with LGPL license library
 	pe['SHOBJSUFFIX'] = '.plus' + pe['SHOBJSUFFIX'];
