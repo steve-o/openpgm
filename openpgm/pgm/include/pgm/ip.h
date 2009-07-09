@@ -48,9 +48,12 @@
 #ifndef __PGM_IP_H__
 #define __PGM_IP_H__
 
+#include <errno.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #include <glib.h>
 
