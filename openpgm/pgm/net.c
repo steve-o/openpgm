@@ -138,36 +138,30 @@ _pgm_sendto (
 
 int
 _pgm_set_nonblocking (
-	int		filedes[2]
+	int		fd[2]
 	)
 {
-	int retval = 0;
+	int flags;
+
+/* pre-conditions */
+	g_assert (fd);
+	g_assert (fd[0]);
+	g_assert (fd[1]);
 
 /* set write end non-blocking */
-	int fd_flags = fcntl (filedes[1], F_GETFL);
-	if (fd_flags < 0) {
-		retval = fd_flags;
-		goto out;
-	}
-	retval = fcntl (filedes[1], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = fd_flags;
-		goto out;
-	}
+	flags = fcntl (fd[1], F_GETFL);
+	if (flags < 0)
+		return -1;
+	if (fcntl (fd[1], F_SETFL, flags | O_NONBLOCK) < 0)
+		return -1;
 /* set read end non-blocking */
-	fcntl (filedes[0], F_GETFL);
-	if (fd_flags < 0) {
-		retval = fd_flags;
-		goto out;
-	}
-	retval = fcntl (filedes[0], F_SETFL, fd_flags | O_NONBLOCK);
-	if (retval < 0) {
-		retval = fd_flags;
-		goto out;
-	}
+	flags = fcntl (fd[0], F_GETFL);
+	if (flags < 0)
+		return -1;
+	if (fcntl (fd[0], F_SETFL, flags | O_NONBLOCK) < 0)
+		return -1;
 
-out:
-	return retval;
+	return 0;
 }		
 
 /* eof */

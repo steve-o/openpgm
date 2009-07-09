@@ -30,7 +30,27 @@
 
 
 #define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
+#define PGM_GSI_ERROR		pgm_gsi_error_quark ()
 
+typedef enum
+{
+	/* Derived from errno */
+	PGM_GSI_ERROR_FAULT,		/* gethostname returned EFAULT */
+	PGM_GSI_ERROR_INVAL,
+	PGM_GSI_ERROR_PERM,
+	PGM_GSI_ERROR_ADDRFAMILY,	/* getaddrinfo return EAI_ADDRFAMILY */
+	PGM_GSI_ERROR_AGAIN,
+	PGM_GSI_ERROR_BADFLAGS,
+	PGM_GSI_ERROR_FAIL,
+	PGM_GSI_ERROR_FAMILY,
+	PGM_GSI_ERROR_MEMORY,
+	PGM_GSI_ERROR_NODATA,
+	PGM_GSI_ERROR_NONAME,
+	PGM_GSI_ERROR_SERVICE,
+	PGM_GSI_ERROR_SOCKTYPE,
+	PGM_GSI_ERROR_SYSTEM,
+	PGM_GSI_ERROR_FAILED
+} PGMGSIError;
 
 typedef struct pgm_gsi_t pgm_gsi_t;
 
@@ -40,11 +60,11 @@ struct pgm_gsi_t {
 
 G_BEGIN_DECLS
 
-int pgm_create_md5_gsi (pgm_gsi_t*);
-int pgm_create_ipv4_gsi (pgm_gsi_t*);
-
-int pgm_print_gsi_r (const pgm_gsi_t*, char*, gsize);
-gchar* pgm_print_gsi (const pgm_gsi_t*);
+GQuark pgm_gsi_error_quark (void);
+gboolean pgm_gsi_create_from_hostname (pgm_gsi_t*, GError**);
+gboolean pgm_gsi_create_from_addr (pgm_gsi_t*, GError**);
+int pgm_gsi_print_r (const pgm_gsi_t*, char*, gsize);
+gchar* pgm_gsi_print (const pgm_gsi_t*);
 gint pgm_gsi_equal (gconstpointer, gconstpointer);
 
 
