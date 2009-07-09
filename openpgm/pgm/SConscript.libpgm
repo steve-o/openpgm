@@ -9,6 +9,7 @@ src = Split("""
 		packet.c
 		time.c
 		if.c
+		getifaddrs.c
 		gsi.c
 		signal.c
 		txwi.c
