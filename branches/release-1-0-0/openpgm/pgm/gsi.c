@@ -34,9 +34,9 @@
 
 #include "pgm/gsi.h"
 
-//#define IF_DEBUG
+//#define GSI_DEBUG
 
-#ifndef IF_DEBUG
+#ifndef GSI_DEBUG
 #define g_trace(...)		while (0)
 #else
 #define g_trace(...)		g_debug(__VA_ARGS__)
@@ -424,7 +424,7 @@ pgm_create_ipv4_gsi (
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
 	freeaddrinfo (res);
 	guint16 random = g_random_int_range (0, UINT16_MAX);
-	memcpy (gsi + sizeof(struct in_addr), &random, sizeof(random));
+	memcpy ((guint8*)gsi + sizeof(struct in_addr), &random, sizeof(random));
 
 out:
 	return retval;
