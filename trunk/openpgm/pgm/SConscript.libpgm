@@ -10,6 +10,9 @@ src = Split("""
 		time.c
 		if.c
 		getifaddrs.c
+		getnodeaddr.c
+		indextoaddr.c
+		inet_network.c
 		md5.c
 		gsi.c
 		signal.c

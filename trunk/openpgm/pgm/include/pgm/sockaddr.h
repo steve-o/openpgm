@@ -33,6 +33,10 @@
 #	include <pgm/if.h>
 #endif
 
+#ifndef __PGM_INDEXTOADDR_H__
+#	include <pgm/indextoaddr.h>
+#endif
+
 
 /* glibc 2.3 on debian etch doesn't include this */
 #ifndef IPV6_RECVPKTINFO
@@ -250,7 +254,7 @@ static inline int pgm_sockaddr_add_membership (int s, const struct group_source_
 	    mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
 
 	    struct sockaddr_in interface;
-	    pgm_if_indextosockaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&interface);
+	    _pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&interface);
 	    mreq.imr_interface.s_addr = interface.sin_addr.s_addr;
 
 	    retval = setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
