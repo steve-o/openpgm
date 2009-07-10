@@ -379,7 +379,7 @@ pgm_if_parse_interface (
 			.ai_family	= ai_family,
 			.ai_socktype	= SOCK_STREAM,		/* not really, SOCK_RAW */
 			.ai_protocol	= IPPROTO_TCP,		/* not really, IPPROTO_PGM */
-			.ai_flags	= AI_ADDRCONFIG | AI_CANONNAME,		/* AI_V4MAPPED is unhelpful */
+			.ai_flags	= AI_ADDRCONFIG,	/* AI_V4MAPPED is unhelpful */
 		}, *res;
 
 		e = getaddrinfo (s, NULL, &hints, &res);
@@ -632,21 +632,10 @@ pgm_if_parse_multicast (
 		hints.ai_family = ai_family;
 /*		hints.ai_protocol = IPPROTO_PGM; */
 /*		hints.ai.socktype = SOCK_RAW; */
-		hints.ai_flags  = AI_ADDRCONFIG | AI_CANONNAME; /* AI_V4MAPPED is probably stupid here */
+		hints.ai_flags  = AI_ADDRCONFIG; /* AI_V4MAPPED is probably stupid here */
 		int err = getaddrinfo (s, NULL, &hints, &res);
 
 		if (!err) {
-#ifdef IF_DEBUG
-			char s2[INET6_ADDRSTRLEN];
-			g_trace ("DNS hostname: (A) %s address %s",
-				res->ai_canonname,
-				pgm_inet_ntop (res->ai_family, 
-						res->ai_family == AF_INET ?
-							(const void*)&((struct sockaddr_in*)(res->ai_addr))->sin_addr :
-							(const void*)&((struct sockaddr_in6*)(res->ai_addr))->sin6_addr,
-						s2, sizeof(s2)) );
-#endif
-
 			if (res->ai_family == AF_INET)
 			{
 				addr->sa_family = AF_INET;
@@ -852,7 +841,7 @@ pgm_if_parse_entity_receive (
 					.ai_family	= AF_UNSPEC,
 					.ai_socktype	= SOCK_STREAM,		/* not really */
 					.ai_protocol	= IPPROTO_TCP,		/* not really */
-					.ai_flags	= AI_ADDRCONFIG | AI_CANONNAME
+					.ai_flags	= AI_ADDRCONFIG
 				}, *res;
 				gethostname (hostname, sizeof(hostname));
 				retval = getaddrinfo (hostname, NULL, &hints, &res);

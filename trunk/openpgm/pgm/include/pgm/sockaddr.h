@@ -23,8 +23,11 @@
 #define __PGM_SOCKADDR_H__
 
 #include <errno.h>
+#include <netdb.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include <glib.h>
 
@@ -98,6 +101,17 @@ G_BEGIN_DECLS
 			     (char*)(dst), (size_t)(cnt), \
 			     NULL, 0, \
 			     NI_NUMERICHOST) )
+
+static inline int pgm_sockaddr_pton (const char* src, gpointer dst)
+{
+	struct addrinfo *res;
+	if (0 == getaddrinfo (src, NULL, NULL, &res)) {
+		memcpy (dst, res->ai_addr, res->ai_addrlen);
+		freeaddrinfo (res);
+		return 1;
+	}
+	return 0;
+}
 
 static inline int pgm_sockaddr_is_addr_multicast (const struct sockaddr* s)
 {
