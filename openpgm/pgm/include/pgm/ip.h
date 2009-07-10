@@ -159,7 +159,7 @@ static inline int pgm_inet_pton (int af, const char* src, void* dst)
 		.ai_socktype	= SOCK_STREAM,		/* not really */
 		.ai_protocol	= IPPROTO_TCP,		/* not really */
 		.ai_flags	= AI_NUMERICHOST
-	}, *result;
+	}, *result = NULL;
 
 	int e = getaddrinfo (src, NULL, &hints, &result);
 	if (0 != e) {
@@ -174,6 +174,10 @@ static inline int pgm_inet_pton (int af, const char* src, void* dst)
 
 	case AF_INET6:
 		g_assert (sizeof(struct sockaddr_in6) == pgm_sockaddr_len (result->ai_addr));
+		break;
+
+	default:
+		g_assert_not_reached();
 		break;
 	}
 
