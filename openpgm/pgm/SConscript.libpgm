@@ -60,7 +60,8 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('txwi_unittest.c');
 	te.Program ('rxwi_unittest.c');
 	te.Program ('pgm_unittest.c');
-	te.Program ('gsi_unittest.c');
+	te.Program (['gsi_unittest.c', e.Object('md5.c')]);
+	te.Program (['if_unittest.c', e.Object('inet_network.c')]);
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
