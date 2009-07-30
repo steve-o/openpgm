@@ -46,8 +46,8 @@ struct pgm_ifaddrs
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL int pgm_if_getifaddrs (struct pgm_ifaddrs**);
-G_GNUC_INTERNAL void pgm_if_freeifaddrs (struct pgm_ifaddrs*);
+G_GNUC_INTERNAL int pgm_getifaddrs (struct pgm_ifaddrs**);
+G_GNUC_INTERNAL void pgm_freeifaddrs (struct pgm_ifaddrs*);
 
 G_END_DECLS
 

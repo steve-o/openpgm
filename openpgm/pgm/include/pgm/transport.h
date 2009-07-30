@@ -43,6 +43,10 @@ struct pgm_tsi_t {            /* transport session identifier */
 typedef struct pgm_tsi_t pgm_tsi_t;
 typedef struct pgm_transport_t pgm_transport_t;
 
+#ifndef __PGM_IF_H__
+#   include <pgm/if.h>
+#endif
+
 #ifndef __PGM_SOCKADDR_H__
 #   include <pgm/sockaddr.h>
 #endif
@@ -62,6 +66,7 @@ typedef struct pgm_transport_t pgm_transport_t;
 
 /* maximum length of TSI as a string */
 #define PGM_TSISTRLEN		(sizeof("000.000.000.000.000.000.00000"))
+#define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
 
 
 /* Performance Counters */
@@ -153,6 +158,31 @@ typedef enum {
 #   include <pgm/msgv.h>
 #endif
 
+typedef enum
+{
+	/* Derived from errno */
+	PGM_TRANSPORT_ERROR_INVAL,
+	PGM_TRANSPORT_ERROR_MFILE,
+	PGM_TRANSPORT_ERROR_NFILE,
+	PGM_TRANSPORT_ERROR_NODEV,
+	PGM_TRANSPORT_ERROR_NOMEM,
+	PGM_TRANSPORT_ERROR_FAULT,
+	PGM_TRANSPORT_ERROR_PERM,
+	PGM_TRANSPORT_ERROR_NOPROTOOPT,
+	/* Derived from eai_errno */
+	PGM_TRANSPORT_ERROR_ADDRFAMILY,
+	PGM_TRANSPORT_ERROR_AGAIN,
+	PGM_TRANSPORT_ERROR_BADFLAGS,
+	PGM_TRANSPORT_ERROR_FAIL,
+	PGM_TRANSPORT_ERROR_FAMILY,
+	PGM_TRANSPORT_ERROR_MEMORY,
+	PGM_TRANSPORT_ERROR_NODATA,
+	PGM_TRANSPORT_ERROR_NONAME,
+	PGM_TRANSPORT_ERROR_SERVICE,
+	PGM_TRANSPORT_ERROR_SOCKTYPE,
+	PGM_TRANSPORT_ERROR_FAILED
+} PGMTransportError;
+
 struct pgm_sqn_list_t {
     guint	    len;
     guint32         sqn[63];	/* list of sequence numbers */
@@ -198,8 +228,8 @@ typedef struct pgm_peer_t pgm_peer_t;
 struct pgm_transport_t {
     pgm_tsi_t           tsi;
     guint16		dport;
-
-    guint16		udp_encap_port;
+    guint16		udp_encap_ucast_port;
+    guint16		udp_encap_mcast_port;
 
     GStaticMutex	mutex;
     GThread		*timer_thread;
@@ -327,11 +357,13 @@ int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);
 guint pgm_tsi_hash (gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_tsi_equal (gconstpointer, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_power2_log2 (guint) G_GNUC_WARN_UNUSED_RESULT;
-
 void pgm_drop_superuser (void);
 
-int pgm_transport_create (pgm_transport_t**, pgm_gsi_t*, guint16, guint16, struct group_source_req*, gsize, struct group_source_req*) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_transport_bind (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
+GQuark pgm_transport_error_quark (void);
+PGMTransportError pgm_transport_error_from_errno (gint);
+PGMTransportError pgm_transport_error_from_eai_errno (gint);
+gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
+gboolean pgm_transport_bind (pgm_transport_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_transport_destroy (pgm_transport_t*, gboolean);
 int pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
 int pgm_transport_set_multicast_loop (pgm_transport_t*, gboolean);
