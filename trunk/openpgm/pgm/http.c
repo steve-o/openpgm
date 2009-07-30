@@ -149,7 +149,7 @@ pgm_http_init (
 			     PGM_HTTP_ERROR,
 			     pgm_http_error_from_errno (errno),
 			     _("Retrieving user name: %s"),
-			     strerror (errno));
+			     g_strerror (errno));
 		return FALSE;
 	}
 	g_pid = getpid();
@@ -165,6 +165,8 @@ pgm_http_init (
 						G_THREAD_PRIORITY_LOW,	/* lowest */
 						error);
 	if (!thread) {
+		g_prefix_error (error,
+				_("Creating HTTP thread: "));
 		g_cond_free  (g_thread_cond);
 		g_mutex_free (g_thread_mutex);
 		return FALSE;
@@ -198,7 +200,7 @@ pgm_http_shutdown (void)
 	g_return_val_if_fail (NULL != g_soup_server, FALSE);
 	soup_server_quit (g_soup_server);
 	g_thread_join (g_thread);
-	g_thread = g_soup_server = NULL;
+	g_thread = NULL; g_soup_server = NULL;
 	return TRUE;
 }
 
