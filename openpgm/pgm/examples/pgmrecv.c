@@ -112,13 +112,15 @@ main (
 	char*		argv[]
 	)
 {
-	g_message ("pgmrecv");
+	GError* err = NULL;
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
 #endif
 #ifdef CONFIG_WITH_SNMP
 	gboolean enable_snmpx = FALSE;
 #endif
+
+	g_message ("pgmrecv");
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -155,8 +157,14 @@ main (
 	pgm_init();
 
 #ifdef CONFIG_WITH_HTTP
-	if (enable_http)
-		pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT);
+	if (enable_http) {
+		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
+			g_error ("Unable to start HTTP interface: %s", err->message);
+			g_error_free (err);
+			pgm_shutdown ();
+			return EXIT_FAILURE;
+		}
+	}
 #endif
 #ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
@@ -205,7 +213,8 @@ main (
 #endif
 
 	g_message ("finished.");
-	return 0;
+	pgm_shutdown ();
+	return EXIT_SUCCESS;
 }
 
 static void
