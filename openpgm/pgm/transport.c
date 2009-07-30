@@ -604,8 +604,9 @@ pgm_transport_destroy (
 		transport->rand_ = NULL;
 	}
 
-	pgm_notify_destroy (&transport->rdata_notify);
 	pgm_notify_destroy (&transport->timer_notify);
+	pgm_notify_destroy (&transport->timer_shutdown);
+	pgm_notify_destroy (&transport->rdata_notify);
 	pgm_notify_destroy (&transport->waiting_notify);
 
 	g_static_rw_lock_free (&transport->peers_lock);

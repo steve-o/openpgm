@@ -427,17 +427,16 @@ pgm_if_print_all (void)
 		}
 
 		char s[INET6_ADDRSTRLEN];
-		inet_ntop (ifa->ifa_addr->sa_family,
-				ifa->ifa_addr->sa_family == AF_INET ?
-					(struct sockaddr*)&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr :
-					(struct sockaddr*)&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr,
-				s,
-				sizeof(s));
-		g_message ("#%d name %-15.15s IPv%i %-46.46s status %s loop %s b/c %s m/c %s",
+		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
+			     s, sizeof(s),
+			     NULL, 0,
+			     NI_NUMERICHOST);
+		g_message ("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s",
 			i,
 			b,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
 			s,
+			pgm_sockaddr_scope_id(ifa->ifa_addr),
 			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
 			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
 			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
