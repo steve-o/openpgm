@@ -448,6 +448,7 @@ pgm_transport_create (
 
 /* copy network parameters */
 	memcpy (&new_transport->send_gsr, &tinfo->ti_send_addrs[0], sizeof(struct group_source_req));
+	((struct sockaddr_in*)&new_transport->send_gsr.gsr_group)->sin_port = g_htons (new_transport->udp_encap_mcast_port);
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
 		memcpy (&new_transport->recv_gsr[i], &tinfo->ti_recv_addrs[i], sizeof(struct group_source_req));
@@ -785,7 +786,7 @@ pgm_transport_bind (
 	g_return_val_if_fail (NULL != transport, FALSE);
 	g_return_val_if_fail (!transport->is_bound, FALSE);
 
-	g_trace ("bind (transport:%p error:%p)",
+	g_trace ("INFO", "bind (transport:%p error:%p)",
 		 (gpointer)transport, (gpointer)error);
 
 	g_static_mutex_lock (&transport->mutex);

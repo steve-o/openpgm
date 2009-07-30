@@ -48,6 +48,8 @@
 
 static int g_port = 7500;
 static const char* g_network = "";
+static const char* g_source = "";
+static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -69,8 +71,10 @@ usage (
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
+	fprintf (stderr, "  -a <ip address> : Source unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	exit (1);
 }
 
@@ -85,12 +89,14 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
+	while ((c = getopt (argc, argv, "a:s:n:p:lh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
+		case 'a':	g_source = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
+		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -152,7 +158,7 @@ on_startup (void)
 
 /* parse network parameter into transport address structure */
 	char network[1024];
-	sprintf (network, ";%s", g_network);
+	sprintf (network, "%s", g_network);
 	struct pgm_transport_info_t* res = NULL;
 	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
 		g_error ("parsing network parameter: %s", err->message);
@@ -168,6 +174,11 @@ on_startup (void)
 		g_main_loop_quit (g_loop);
 		return FALSE;
 	}
+/* source-specific multicast (SSM) */
+	if (g_source[0]) {
+		((struct sockaddr_in*)&res->ti_recv_addrs[0].gsr_source)->sin_addr.s_addr = inet_addr(g_source);
+	}
+/* UDP encapsulation */
 	if (g_udp_encap_port) {
 		res->ti_udp_encap_ucast_port = g_udp_encap_port;
 		res->ti_udp_encap_mcast_port = g_udp_encap_port;
@@ -185,6 +196,7 @@ on_startup (void)
 	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
+	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
 	pgm_transport_set_hops (g_transport, 16);
 	pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
 	pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
