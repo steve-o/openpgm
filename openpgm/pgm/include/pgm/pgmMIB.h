@@ -11,7 +11,7 @@
 G_BEGIN_DECLS
 
 /* function declarations */
-int pgm_mib_init (void);
+gboolean pgm_mib_init (GError**);
 
 int send_pgmStart_trap(void);
 int send_pgmStop_trap(void);

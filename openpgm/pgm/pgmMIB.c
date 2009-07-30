@@ -7,6 +7,10 @@
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
+#include <glib.h>
+#include <glib/gi18n-lib.h>
+
+#include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"
 #include "pgm/pgmMIB_columns.h"
 #include "pgm/pgmMIB_enums.h"
@@ -69,49 +73,55 @@ static Netsnmp_Next_Data_Point pgmReceiverPerformanceTable_get_next_data_point;
 static Netsnmp_Free_Loop_Context pgmReceiverPerformanceTable_free_loop_context;
 
 
-int
-pgm_mib_init (void)
+gboolean
+pgm_mib_init (
+	GError**	error
+	)
 {
-	int retval = 0;
-
-	retval = initialize_table_pgmSourceTable();
-	if (retval != MIB_REGISTERED_OK) {
-		g_error ("pgmSourceTable registration failed.");
-		goto out;
+	if (MIB_REGISTERED_OK != initialize_table_pgmSourceTable()) {
+		g_set_error (error,
+			     PGM_SNMP_ERROR,
+			     PGM_SNMP_ERROR_FAILED,
+			     _("pgmSourceTable registration: see SNMP log for further details."));
+		return FALSE;
+	}
+	if (MIB_REGISTERED_OK != initialize_table_pgmSourceConfigTable()) {
+		g_set_error (error,
+			     PGM_SNMP_ERROR,
+			     PGM_SNMP_ERROR_FAILED,
+			     _("pgmSourceConfigTable registration: see SNMP log for further details."));
+		return FALSE;
+	}
+	if (MIB_REGISTERED_OK != initialize_table_pgmSourcePerformanceTable()) {
+		g_set_error (error,
+			     PGM_SNMP_ERROR,
+			     PGM_SNMP_ERROR_FAILED,
+			     _("pgmSourcePerformanceTable registration: see SNMP log for further details."));
+		return FALSE;
+	}
+	if (MIB_REGISTERED_OK != initialize_table_pgmReceiverTable()) {
+		g_set_error (error,
+			     PGM_SNMP_ERROR,
+			     PGM_SNMP_ERROR_FAILED,
+			     _("pgmReceiverTable registration: see SNMP log for further details."));
+		return FALSE;
+	}
+	if (MIB_REGISTERED_OK != initialize_table_pgmReceiverConfigTable()) {
+		g_set_error (error,
+			     PGM_SNMP_ERROR,
+			     PGM_SNMP_ERROR_FAILED,
+			     _("pgmReceiverConfigTable registration: see SNMP log for further details."));
+		return FALSE;
+	}
+	if (MIB_REGISTERED_OK != initialize_table_pgmReceiverPerformanceTable()) {
+		g_set_error (error,
+			     PGM_SNMP_ERROR,
+			     PGM_SNMP_ERROR_FAILED,
+			     _("pgmReceiverPerformanceTable registration: see SNMP log for further details."));
+		return FALSE;
 	}
 
-	retval = initialize_table_pgmSourceConfigTable();
-	if (retval != MIB_REGISTERED_OK) {
-		g_error ("pgmSourceConfigTable registration failed.");
-		goto out;
-	}
-
-	retval = initialize_table_pgmSourcePerformanceTable();
-	if (retval != MIB_REGISTERED_OK) {
-		g_error ("pgmSourcePerformanceTable registration failed.");
-		goto out;
-	}
-
-	retval = initialize_table_pgmReceiverTable();
-	if (retval != MIB_REGISTERED_OK) {
-		g_error ("pgmReceiverTable registration failed.");
-		goto out;
-	}
-
-	retval = initialize_table_pgmReceiverConfigTable();
-	if (retval != MIB_REGISTERED_OK) {
-		g_error ("pgmReceiverTable registration failed.");
-		goto out;
-	}
-
-	retval = initialize_table_pgmReceiverPerformanceTable();
-	if (retval != MIB_REGISTERED_OK) {
-		g_error ("pgmReceiverTable registration failed.");
-		goto out;
-	}
-
-out:
-	return retval;
+	return TRUE;
 }
 
 /*
