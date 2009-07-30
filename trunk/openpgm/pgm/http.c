@@ -28,6 +28,7 @@
 #include <sys/types.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include <libsoup/soup.h>
 #include <libsoup/soup-server.h>
@@ -58,12 +59,15 @@
 
 /* local globals */
 
-static guint16 g_server_port;
-
-static GThread* thread;
-static SoupServer* g_soup_server = NULL;
-static GCond* http_cond;
-static GMutex* http_mutex;
+static SoupServer*	g_soup_server = NULL;
+static GThread*		g_thread;
+static GCond*		g_thread_cond;
+static GMutex*		g_thread_mutex;
+static GError*		g_error;
+static char		g_hostname[NI_MAXHOST + 1];
+static char		g_address[INET6_ADDRSTRLEN];
+static char		g_username[LOGIN_NAME_MAX + 1];
+static int		g_pid;
 
 static gpointer http_thread (gpointer);
 static int http_tsi_response (pgm_tsi_t*, SoupMessage*);
@@ -85,90 +89,147 @@ static void transports_callback (SoupServer*, SoupMessage*, const char*, GHashTa
 static void http_each_receiver (pgm_peer_t*, GString*);
 static int http_receiver_response (pgm_peer_t*, SoupMessage*);
 
+static PGMHTTPError pgm_http_error_from_errno (gint);
+static PGMHTTPError pgm_http_error_from_eai_errno (gint);
 
-int
+
+gboolean
 pgm_http_init (
-	guint16		server_port
+	guint16			http_port,
+	GError**		error
 	)
 {
-	int retval = 0;
-	GError* err;
-	GThread* tmp_thread;
+	g_return_val_if_fail (NULL == g_soup_server, FALSE);
 
 	g_type_init ();
 
 /* ensure threading enabled */
 	if (!g_thread_supported ()) g_thread_init (NULL);
 
-	http_mutex = g_mutex_new();
-	http_cond = g_cond_new();
+/* resolve (relatively) constant host details */
+	if (0 != gethostname (g_hostname, sizeof(g_hostname))) {
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_errno (errno),
+			     _("Resolving hostname: %s"),
+			     g_strerror (errno));
+		return FALSE;
+	}
+	struct addrinfo hints = {
+		.ai_family	= AF_UNSPEC,
+		.ai_socktype	= SOCK_STREAM,
+		.ai_protocol	= IPPROTO_TCP,
+		.ai_flags	= AI_ADDRCONFIG
+	}, *res = NULL;
+	int e = getaddrinfo (g_hostname, NULL, &hints, &res);
+	if (0 != e) {
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_eai_errno (e),
+			     _("Resolving hostname address: %s"),
+			     gai_strerror (e));
+		return FALSE;
+	}
+	e = getnameinfo (res->ai_addr, pgm_sockaddr_len (res->ai_addr),
+		         g_address, sizeof(g_address),
+			 NULL, 0,
+			 NI_NUMERICHOST);
+	if (0 != e) {
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_eai_errno (e),
+			     _("Resolving numeric hostname: %s"),
+			     gai_strerror (e));
+		return FALSE;
+	}
+	freeaddrinfo (res);
+	e = getlogin_r (g_username, sizeof(g_username));
+	if (0 != e) {
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_errno (errno),
+			     _("Retrieving user name: %s"),
+			     strerror (errno));
+		return FALSE;
+	}
+	g_pid = getpid();
 
-	g_server_port = server_port;
+	g_thread_mutex	= g_mutex_new();
+	g_thread_cond	= g_cond_new();
 
-	tmp_thread = g_thread_create_full (http_thread,
-					NULL,
-					0,		/* stack size */
-					TRUE,		/* joinable */
-					TRUE,		/* native thread */
-					G_THREAD_PRIORITY_LOW,	/* lowest */
-					&err);
-	if (!tmp_thread) {
-		g_error ("thread failed: %i %s", err->code, err->message);
-		goto err_destroy;
+	GThread* thread = g_thread_create_full (http_thread,
+						(gpointer)&http_port,
+						0,		/* stack size */
+						TRUE,		/* joinable */
+						TRUE,		/* native thread */
+						G_THREAD_PRIORITY_LOW,	/* lowest */
+						error);
+	if (!thread) {
+		g_cond_free  (g_thread_cond);
+		g_mutex_free (g_thread_mutex);
+		return FALSE;
 	}
 
-	thread = tmp_thread;
+	g_thread = thread;
 
 /* spin lock around condition waiting for thread startup */
-	g_mutex_lock (http_mutex);
+	g_mutex_lock (g_thread_mutex);
 	while (!g_soup_server)
-		g_cond_wait (http_cond, http_mutex);
-	g_mutex_unlock (http_mutex);
+		g_cond_wait (g_thread_cond, g_thread_mutex);
+	g_mutex_unlock (g_thread_mutex);
 
-	g_mutex_free (http_mutex);
-	http_mutex = NULL;
-	g_cond_free (http_cond);
-	http_cond = NULL;
+/* catch failure */
+	if (NULL == g_soup_server) {
+		g_propagate_error (error, g_error);
+		g_cond_free  (g_thread_cond);
+		g_mutex_free (g_thread_mutex);
+		return FALSE;
+	}
 
-	return retval;
-
-err_destroy:
-	return 0;
+/* cleanup */
+	g_cond_free  (g_thread_cond);
+	g_mutex_free (g_thread_mutex);
+	return TRUE;
 }
 
-int
+gboolean
 pgm_http_shutdown (void)
 {
-	if (g_soup_server) {
-		g_object_unref (g_soup_server);
-		g_soup_server = NULL;
-	}
-
-	return 0;
+	g_return_val_if_fail (NULL != g_soup_server, FALSE);
+	soup_server_quit (g_soup_server);
+	g_thread_join (g_thread);
+	g_thread = g_soup_server = NULL;
+	return TRUE;
 }
 
-static gpointer
+static
+gpointer
 http_thread (
-	G_GNUC_UNUSED gpointer data
+	gpointer		data
 	)
 {
-	GMainContext* context = g_main_context_new ();
+	g_assert (NULL != data);
 
-	g_message ("starting soup server.");
-	g_mutex_lock (http_mutex);
-	g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_server_port,
-					SOUP_SERVER_ASYNC_CONTEXT, context,
-					NULL);
+	const guint16 http_port = *(guint16*)data;
+	GMainContext* context = g_main_context_new ();
+	g_mutex_lock (g_thread_mutex);
+	g_soup_server = soup_server_new (SOUP_SERVER_PORT, http_port,
+					 SOUP_SERVER_ASYNC_CONTEXT, context,
+					 NULL);
 	if (!g_soup_server) {
-		g_warning ("soup server failed startup: %s", strerror (errno));
-		goto out;
+		g_set_error (&g_error,
+			     PGM_HTTP_ERROR,
+			     PGM_HTTP_ERROR_FAILED,
+			     _("Creating new Soup Server: %s"),
+			     g_strerror (errno));
+		g_main_context_unref (context);
+		g_cond_signal  (g_thread_cond);
+		g_mutex_unlock (g_thread_mutex);
+		return NULL;
 	}
 
-	char hostname[NI_MAXHOST + 1];
-	gethostname (hostname, sizeof(hostname));
-
 	g_message ("web interface: http://%s:%i",
-			hostname,
+			g_hostname,
 			soup_server_get_port (g_soup_server));
 
 #ifdef CONFIG_LIBSOUP22
@@ -186,13 +247,12 @@ http_thread (
 #endif
 
 /* signal parent thread we are ready to run */
-	g_cond_signal (http_cond);
-	g_mutex_unlock (http_mutex);
-
+	g_cond_signal  (g_thread_cond);
+	g_mutex_unlock (g_thread_mutex);
+/* main loop */
 	soup_server_run (g_soup_server);
+/* cleanup */
 	g_object_unref (g_soup_server);
-
-out:
 	g_main_context_unref (context);
 	return NULL;
 }
@@ -205,18 +265,19 @@ typedef enum {
 	HTTP_TAB_TRANSPORTS
 } http_tab_e;
 
-static GString*
+static
+GString*
 http_create_response (
 	const gchar*		subtitle,
 	http_tab_e		tab
 	)
 {
-	char hostname[NI_MAXHOST + 1];
-	gethostname (hostname, sizeof(hostname));
+	g_assert (NULL != subtitle);
+	g_assert (tab == HTTP_TAB_GENERAL_INFORMATION || tab == HTTP_TAB_TRANSPORTS);
 
 /* surprising deficiency of GLib is no support of display locale time */
 	char buf[100];
-	time_t nowdate = time(NULL);
+	const time_t nowdate = time(NULL);
 	struct tm now;
 	localtime_r (&nowdate, &now);
 	gsize ret = strftime (buf, sizeof(buf), "%c", &now);
@@ -240,20 +301,20 @@ http_create_response (
 						"<div id=\"tabline\"></div>"
 					"</div>"
 					"<div id=\"content\">",
-				hostname,
+				g_hostname,
 				subtitle,
-				hostname,
+				g_hostname,
 				pgm_major_version, pgm_minor_version, pgm_micro_version,
 				timestamp,
 				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
 				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom");
 
 	g_free (timestamp);
-
 	return response;
 }
 
-static void
+static
+void
 http_finalize_response (
 	GString*		response,
 	SoupMessage*		msg
@@ -280,7 +341,8 @@ http_finalize_response (
 }
 
 #ifdef CONFIG_LIBSOUP22	
-static void
+static
+void
 robots_callback (
 	SoupServerContext*	context,
 	SoupMessage*		msg,
@@ -298,14 +360,15 @@ robots_callback (
 					WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
 }
 #else
-static void
+static
+void
 robots_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    msg,
+        SoupMessage*    		msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED GHashTable* 	query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer data
+        G_GNUC_UNUSED gpointer 		data
         )
 {
 	if (0 != g_strcmp0 (msg->method, "GET")) {
@@ -342,11 +405,11 @@ css_callback (
 static void
 css_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    msg,
+        SoupMessage*    		msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED GHashTable* 	query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer data
+        G_GNUC_UNUSED gpointer 		data
         )
 {       
         if (0 != g_strcmp0 (msg->method, "GET")) {
@@ -365,51 +428,26 @@ css_callback (
 static void
 index_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
-	SoupMessage*		msg,
-	G_GNUC_UNUSED gpointer	data
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
 	)
 #else
 static void
 index_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    msg,
+        SoupMessage*    		msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED GHashTable* 	query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer data
+        G_GNUC_UNUSED gpointer 		data
         )
 #endif
 {
-	GString *response;
-
-	char hostname[NI_MAXHOST + 1];
-	gethostname (hostname, sizeof(hostname));
-
-	char username[LOGIN_NAME_MAX + 1];
-	getlogin_r (username, sizeof(username));
-
-	char ipaddress[INET6_ADDRSTRLEN];
-	struct addrinfo hints = {
-		.ai_family	= AF_UNSPEC,
-		.ai_socktype	= SOCK_STREAM,
-		.ai_protocol	= IPPROTO_TCP,
-		.ai_flags	= AI_ADDRCONFIG
-	}, *res;
-	getaddrinfo (hostname, NULL, &hints, &res);
-	getnameinfo (res->ai_addr, pgm_sockaddr_len (res->ai_addr),
-		     ipaddress, sizeof(ipaddress),
-		     NULL, 0,
-		     NI_NUMERICHOST);
-	freeaddrinfo (res);
-
-	int transport_count;
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
-	transport_count = g_slist_length (pgm_transport_list);
+	const int transport_count = g_slist_length (pgm_transport_list);
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 
-	int pid = getpid();
-
-	response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
+	GString* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
 	g_string_append_printf (response,	"<table>"
 						"<tr>"
 							"<th>host name:</th><td>%s</td>"
@@ -423,11 +461,11 @@ index_callback (
 							"<th>process ID:</th><td>%i</td>"
 						"</tr>"
 						"</table>",
-				hostname,
-				username,
-				ipaddress,
+				g_hostname,
+				g_username,
+				g_address,
 				transport_count,
-				pid);
+				g_pid);
 
 	http_finalize_response (response, msg);
 }
@@ -436,24 +474,22 @@ index_callback (
 static void
 transports_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
-	SoupMessage*		msg,
-	G_GNUC_UNUSED gpointer	data
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
 	)
 #else
 static void
 transports_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    msg,
+        SoupMessage*    		msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED GHashTable* 	query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer data
+        G_GNUC_UNUSED gpointer 		data
         )
 #endif
 {
-	GString *response;
-
-	response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
+	GString* response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
 	g_string_append (response,	"<div class=\"bubbly\">"
 					"<table cellspacing=\"0\">"
 					"<tr>"
@@ -479,8 +515,6 @@ transports_callback (
 				     group_address, sizeof(group_address),
 				     NULL, 0,
 				     NI_NUMERICHOST);
-			int dport = g_ntohs (transport->dport);
-
 			char gsi[sizeof("000.000.000.000.000.000")];
 			snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
 				transport->tsi.gsi.identifier[0],
@@ -489,10 +523,8 @@ transports_callback (
 				transport->tsi.gsi.identifier[3],
 				transport->tsi.gsi.identifier[4],
 				transport->tsi.gsi.identifier[5]);
-
-			int sport = g_ntohs (transport->tsi.sport);
-
-	
+			const int sport = g_ntohs (transport->tsi.sport);
+			const int dport = g_ntohs (transport->dport);
 			g_string_append_printf (response,	"<tr>"
 									"<td>%s</td>"
 									"<td>%i</td>"
@@ -505,16 +537,13 @@ transports_callback (
 						gsi,
 						gsi, sport,
 						sport);
-
 			list = next;
 		}
-
 		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 	}
 	else
 	{
 /* no transports */
-
 		g_string_append (response,		"<tr>"
 							"<td colspan=\"6\"><div class=\"empty\">This transport has no peers.</div></td>"
 							"</tr>"
@@ -545,11 +574,11 @@ default_callback (
 static void
 default_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    msg,
+        SoupMessage*    		msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED GHashTable* 	query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer data
+        G_GNUC_UNUSED gpointer 		data
         )
 {
         if (0 != g_strcmp0 (msg->method, "GET")) {
@@ -591,8 +620,8 @@ default_callback (
 
 static int
 http_tsi_response (
-	pgm_tsi_t*	tsi,
-	SoupMessage*	msg
+	pgm_tsi_t*		tsi,
+	SoupMessage*		msg
 	)
 {
 /* first verify this is a valid TSI */
@@ -658,8 +687,8 @@ http_tsi_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	int dport = g_ntohs (transport->dport);
-	int sport = g_ntohs (transport->tsi.sport);
+	const int dport = g_ntohs (transport->dport);
+	const int sport = g_ntohs (transport->tsi.sport);
 
 	pgm_time_t ihb_min = 0;			/* need to bind first */
 	pgm_time_t ihb_max = 0;
@@ -844,8 +873,8 @@ http_tsi_response (
 
 static void
 http_each_receiver (
-	pgm_peer_t*	peer,
-	GString*	response
+	pgm_peer_t*		peer,
+	GString*		response
 	)
 {
 	char group_address[INET6_ADDRSTRLEN];
@@ -853,8 +882,6 @@ http_each_receiver (
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
-
-	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
 
 	char source_address[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
@@ -877,8 +904,8 @@ http_each_receiver (
 			peer->tsi.gsi.identifier[4],
 			peer->tsi.gsi.identifier[5]);
 
-	int sport = g_ntohs (peer->tsi.sport);
-
+	const int sport = g_ntohs (peer->tsi.sport);
+	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
 	g_string_append_printf (response,	"<tr>"
 							"<td>%s</td>"
 							"<td>%i</td>"
@@ -898,8 +925,8 @@ http_each_receiver (
 
 static int
 http_time_summary (
-	const time_t* activity_time,
-	char* sz
+	const time_t* 		activity_time,
+	char* 			sz
 	)
 {
 	time_t now_time = time(NULL);
@@ -947,8 +974,8 @@ http_time_summary (
 
 static int
 http_receiver_response (
-	pgm_peer_t*	peer,
-	SoupMessage*	msg
+	pgm_peer_t*		peer,
+	SoupMessage*		msg
 	)
 {
 	char gsi[sizeof("000.000.000.000.000.000")];
@@ -971,8 +998,6 @@ http_receiver_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
-
 	char source_address[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
 		     source_address, sizeof(source_address),
@@ -985,11 +1010,11 @@ http_receiver_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	int sport = g_ntohs (peer->tsi.sport);
-
-	guint32 outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length +
-				   ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length +
-				   ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
+	const int sport = g_ntohs (peer->tsi.sport);
+	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
+	const guint32 outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length +
+					 ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length +
+					 ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
 
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
@@ -999,7 +1024,6 @@ http_receiver_response (
 
 	gsize bytes_written;
 	gchar* last_activity = g_locale_to_utf8 (buf, strlen(buf), NULL, &bytes_written, NULL);
-
 
 	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
 	g_string_append_printf (response,	"<div class=\"heading\">"
@@ -1176,13 +1200,159 @@ http_receiver_response (
 						((pgm_rxw_t*)peer->rxw)->min_nak_transmit_count,
 						peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN],
 						((pgm_rxw_t*)peer->rxw)->max_nak_transmit_count);
-
 	http_finalize_response (response, msg);
-
-	g_free( last_activity );
-
+	g_free (last_activity);
 	return 0;
 }
 
+GQuark
+pgm_http_error_quark (void)
+{
+	return g_quark_from_static_string ("pgm-http-error-quark");
+}
+
+static
+PGMHTTPError
+pgm_http_error_from_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_HTTP_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EINVAL
+	case EINVAL:
+		return PGM_HTTP_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef EPERM
+	case EPERM:
+		return PGM_HTTP_ERROR_PERM;
+		break;
+#endif
+
+#ifdef EMFILE
+	case EMFILE:
+		return PGM_HTTP_ERROR_MFILE;
+		break;
+#endif
+
+#ifdef ENFILE
+	case ENFILE:
+		return PGM_HTTP_ERROR_NFILE;
+		break;
+#endif
+
+#ifdef ENXIO
+	case ENXIO:
+		return PGM_HTTP_ERROR_NXIO;
+		break;
+#endif
+
+#ifdef ERANGE
+	case ERANGE:
+		return PGM_HTTP_ERROR_RANGE;
+		break;
+#endif
+
+#ifdef ENOENT
+	case ENOENT:
+		return PGM_HTTP_ERROR_NOENT;
+		break;
+#endif
+
+	default :
+		return PGM_HTTP_ERROR_FAILED;
+		break;
+	}
+}
+
+/* errno must be preserved before calling to catch correct error
+ * status with EAI_SYSTEM.
+ */
+
+static
+PGMHTTPError
+pgm_http_error_from_eai_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EAI_ADDRFAMILY
+	case EAI_ADDRFAMILY:
+		return PGM_HTTP_ERROR_ADDRFAMILY;
+		break;
+#endif
+
+#ifdef EAI_AGAIN
+	case EAI_AGAIN:
+		return PGM_HTTP_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef EAI_BADFLAGS
+	case EAI_BADFLAGS:
+		return PGM_HTTP_ERROR_BADFLAGS;
+		break;
+#endif
+
+#ifdef EAI_FAIL
+	case EAI_FAIL:
+		return PGM_HTTP_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef EAI_FAMILY
+	case EAI_FAMILY:
+		return PGM_HTTP_ERROR_FAMILY;
+		break;
+#endif
+
+#ifdef EAI_MEMORY
+	case EAI_MEMORY:
+		return PGM_HTTP_ERROR_MEMORY;
+		break;
+#endif
+
+#ifdef EAI_NODATA
+	case EAI_NODATA:
+		return PGM_HTTP_ERROR_NODATA;
+		break;
+#endif
+
+#ifdef EAI_NONAME
+	case EAI_NONAME:
+		return PGM_HTTP_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef EAI_SERVICE
+	case EAI_SERVICE:
+		return PGM_HTTP_ERROR_SERVICE;
+		break;
+#endif
+
+#ifdef EAI_SOCKTYPE
+	case EAI_SOCKTYPE:
+		return PGM_HTTP_ERROR_SOCKTYPE;
+		break;
+#endif
+
+#ifdef EAI_SYSTEM
+	case EAI_SYSTEM:
+		return pgm_http_error_from_errno (errno);
+		break;
+#endif
+
+	default :
+		return PGM_HTTP_ERROR_FAILED;
+		break;
+	}
+}
 
 /* eof */
