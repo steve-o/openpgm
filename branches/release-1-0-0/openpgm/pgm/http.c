@@ -113,6 +113,8 @@ pgm_http_init (
 					&err);
 	if (!tmp_thread) {
 		g_error ("thread failed: %i %s", err->code, err->message);
+		g_mutex_free (http_mutex);
+		g_cond_free (http_cond);
 		goto err_destroy;
 	}
 
@@ -139,8 +141,9 @@ int
 pgm_http_shutdown (void)
 {
 	if (g_soup_server) {
-		g_object_unref (g_soup_server);
-		g_soup_server = NULL;
+		soup_server_quit (g_soup_server);
+		g_thread_join (thread);
+		thread = NULL; g_soup_server = NULL;
 	}
 
 	return 0;
