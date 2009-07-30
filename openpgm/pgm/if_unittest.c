@@ -212,12 +212,14 @@ mock_setup_net (void)
 	APPEND_HOST (	"127.0.0.1",		"localhost");
 	APPEND_HOST2(	"10.6.28.33",		"kiku.hk.miru.hk",	"kiku");
 	APPEND_HOST2(	"2002:dce8:d28e::33",	"ip6-kiku",		"kiku");
+	APPEND_HOST2(	"172.12.90.1",		"mi-hee.ko.miru.hk",	"mi-hee");
 	APPEND_HOST2(	"::1",			"ip6-localhost",	"ip6-loopback");
 	APPEND_HOST (	"239.192.0.1",		"PGM.MCAST.NET");
 	APPEND_HOST (	"ff08::1",		"IP6-PGM.MCAST.NET");
 
 	APPEND_NETWORK(	"loopback",	"127.0.0.0");
 	APPEND_NETWORK(	"private",	"10.6.28.0");
+	APPEND_NETWORK(	"private2",	"172.16.90.0");
 	APPEND_NETWORK( "pgm-private",	"239.192.0.1");
 #ifdef CONFIG_HAVE_IP6_NETWORKS
 	APPEND_NETWORK(	"ip6-private",	"2002:dce8:d28e:0:0:0");
@@ -1152,6 +1154,82 @@ START_TEST (test_parse_transport_fail_007)
 }
 END_TEST
 
+/* invalid interface
+ */
+START_TEST (test_parse_transport_fail_008)
+{
+	const char* s = "qe0;";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
+	if (!retval) {
+		g_message ("pgm_if_get_transport_info: %s", err ? err->message : "(null)");
+	}
+	fail_unless (FALSE == retval);
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* non-existing interface IP address
+ */
+START_TEST (test_parse_transport_fail_009)
+{
+	const char* s = "172.16.90.1;";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
+	if (!retval) {
+		g_message ("pgm_if_get_transport_info: %s", err ? err->message : "(null)");
+	}
+	fail_unless (FALSE == retval);
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* non-existing network name address
+ */
+START_TEST (test_parse_transport_fail_010)
+{
+	const char* s = "private2;";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
+	if (!retval) {
+		g_message ("pgm_if_get_transport_info: %s", err ? err->message : "(null)");
+	}
+	fail_unless (FALSE == retval);
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* non-existing host name interface
+ */
+START_TEST (test_parse_transport_fail_011)
+{
+	const char* s = "mi-hee.ko.miru.hk;";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
+	if (!retval) {
+		g_message ("pgm_if_get_transport_info: %s", err ? err->message : "(null)");
+	}
+	fail_unless (FALSE == retval);
+	fail_unless (NULL == res);
+}
+END_TEST
+
 /* target:
  *	pgm_if_print_all (void)
  */
@@ -1192,6 +1270,10 @@ make_test_suite (void)
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_005);
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_006);
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_007);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_008);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_009);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_010);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_011);
 
 /* IP version 4, ai_family = AF_INET */
 	TCase* tc_parse_transport_ip4 = tcase_create ("parse_transport/af_inet");
