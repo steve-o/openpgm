@@ -198,7 +198,7 @@ on_startup (void)
 
 /* parse network parameter into transport address structure */
 	char network[1024];
-	sprintf (network, ";%s", g_network);
+	sprintf (network, "%s", g_network);
 	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
 		g_error ("parsing network parameter: %s", err->message);
 		g_error_free (err);

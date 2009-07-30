@@ -191,7 +191,7 @@ on_startup (void)
 
 	struct group_source_req recv_gsr, send_gsr;
 	char network[1024];
-	sprintf (network, ";%s", g_network);
+	sprintf (network, "%s", g_network);
 	gsize recv_len = 1;
 	int e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
 	g_assert (e == 0);

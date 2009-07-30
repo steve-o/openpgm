@@ -2,7 +2,7 @@
  *
  * Asynchronous queue for receiving packets in a separate managed thread.
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -81,7 +81,6 @@ pgm_event_alloc (
 	)
 {
 	g_return_val_if_fail (async != NULL, NULL);
-
 	return g_slice_alloc (sizeof(pgm_event_t));
 }
 
@@ -107,6 +106,8 @@ pgm_receiver_thread (
 	gpointer	data
 	)
 {
+	g_assert (NULL != data);
+
 	pgm_async_t* async = (pgm_async_t*)data;
 	g_async_queue_ref (async->commit_queue);
 
@@ -136,9 +137,8 @@ pgm_receiver_thread (
 			g_async_queue_push_unlocked (async->commit_queue, event);
 			if (g_async_queue_length_unlocked (async->commit_queue) == 1)
 			{
-				const char one = '1';
-				if (1 != write (async->commit_pipe[1], &one, sizeof(one))) {
-					g_critical ("write to pipe failed :(");
+				if (!pgm_notify_send (&async->commit_notify)) {
+					g_critical ("notification failed :(");
 				}
 			}
 			g_async_queue_unlock (async->commit_queue);
@@ -177,26 +177,16 @@ pgm_async_create (
 
 	new_async = g_malloc0 (sizeof(pgm_async_t));
 	new_async->transport = transport;
+	if (0 != pgm_notify_init (&new_async->commit_notify)) {
+		g_set_error (error,
+			     PGM_ASYNC_ERROR,
+			     pgm_async_error_from_errno (errno),
+			     _("Creating async notification channel: %s"),
+			     g_strerror (errno));
+		g_free (new_async);
+		return FALSE;
+	}
 	new_async->commit_queue = g_async_queue_new();
-
-	if (0 != pipe (new_async->commit_pipe)) {
-		g_set_error (error,
-			     PGM_ASYNC_ERROR,
-			     pgm_async_error_from_errno (errno),
-			     _("pipe() failed: %s"),
-			     g_strerror (errno));
-		goto err_destroy;
-	}
-
-	if (0 != _pgm_set_nonblocking (new_async->commit_pipe)) {
-		g_set_error (error,
-			     PGM_ASYNC_ERROR,
-			     pgm_async_error_from_errno (errno),
-			     _("Setting non-blocking pipe file descriptors: %s"),
-			     g_strerror (errno));
-		goto err_destroy;
-	}
-
 /* setup new thread */
 	new_async->thread = g_thread_create_full (pgm_receiver_thread,
 						  new_async,
@@ -205,28 +195,16 @@ pgm_async_create (
 						  TRUE,
 						  G_THREAD_PRIORITY_HIGH,
 						  error);
-	if (NULL == new_async->thread)
-		goto err_destroy;
+	if (NULL == new_async->thread) {
+		g_async_queue_unref (new_async->commit_queue);
+		pgm_notify_destroy (&new_async->commit_notify);
+		g_free (new_async);
+		return FALSE;
+	}
 
 /* return new object */
 	*async = new_async;
 	return TRUE;
-
-err_destroy:
-	if (new_async->commit_queue) {
-		g_async_queue_unref (new_async->commit_queue);
-		new_async->commit_queue = NULL;
-	}
-	if (new_async->commit_pipe[0]) {
-		close (new_async->commit_pipe[0]);
-		new_async->commit_pipe[0] = 0;
-	}
-	if (new_async->commit_pipe[1]) {
-		close (new_async->commit_pipe[1]);
-		new_async->commit_pipe[1] = 0;
-	}
-	g_free (new_async);
-	return FALSE;
 }
 
 /* tell async thread to stop, wait for it to stop, then cleanup.
@@ -245,20 +223,11 @@ pgm_async_destroy (
 		async->quit = TRUE;
 		g_thread_join (async->thread);
 	}
-
 	if (async->commit_queue) {
 		g_async_queue_unref (async->commit_queue);
 		async->commit_queue = NULL;
 	}
-	if (async->commit_pipe[0]) {
-                close (async->commit_pipe[0]);
-                async->commit_pipe[0] = 0;
-        }
-        if (async->commit_pipe[1]) {
-                close (async->commit_pipe[1]);
-                async->commit_pipe[1] = 0;
-        }
-
+	pgm_notify_destroy (&async->commit_notify);
 	g_free (async);
 	return 0;
 }
@@ -276,7 +245,7 @@ pgm_async_create_watch (
         pgm_watch_t *watch = (pgm_watch_t*)source;
 
         watch->async = async;
-        watch->pollfd.fd = async->commit_pipe[0];
+        watch->pollfd.fd = pgm_async_get_fd (async);
         watch->pollfd.events = G_IO_IN;
 
         g_source_add_poll (source, &watch->pollfd);
@@ -371,13 +340,12 @@ pgm_src_dispatch (
 {
         g_trace ("pgm_src_dispatch");
 
-        pgm_eventfn_t function = (pgm_eventfn_t)callback;
+        const pgm_eventfn_t function = (pgm_eventfn_t)callback;
         pgm_watch_t* watch = (pgm_watch_t*)source;
         pgm_async_t* async = watch->async;
 
 /* empty pipe */
-        char buf;
-        while (1 == read (async->commit_pipe[0], &buf, sizeof(buf)));
+	pgm_notify_read (&async->commit_notify);
 
 /* purge only one message from the asynchronous queue */
 	pgm_event_t* event = g_async_queue_try_pop (async->commit_queue);
