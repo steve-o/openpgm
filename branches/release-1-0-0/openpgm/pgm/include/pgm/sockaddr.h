@@ -83,6 +83,9 @@ G_BEGIN_DECLS
 #define pgm_sockaddr_len(src) \
 	    ( pgm_sockaddr_family(src) == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) )
 
+#define pgm_sockaddr_scope_id(src) \
+	    ( pgm_sockaddr_family(src) == AF_INET ? 0 : ((const struct sockaddr_in6*)(src))->sin6_scope_id )
+
 #define pgm_sockaddr_ntop(src,dst,cnt) \
 	    ( inet_ntop(pgm_sockaddr_family(src), pgm_sockaddr_addr(src), (dst), (cnt)) )
 
