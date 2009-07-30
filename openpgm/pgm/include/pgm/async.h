@@ -2,7 +2,7 @@
  * 
  * Asynchronous receive thread helper
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,11 @@
 #include <glib.h>
 
 #ifndef __PGM_TRANSPORT_H__
-#   include <pgm/transport.h>
+#	include <pgm/transport.h>
+#endif
+
+#ifndef __PGM_NOTIFY_H__
+#	include <pgm/notify.h>
 #endif
 
 
@@ -44,16 +48,16 @@ typedef struct pgm_event_t pgm_event_t;
 typedef struct pgm_async_t pgm_async_t;
 
 struct pgm_event_t {
-    gpointer		data;
-    guint		len;
+	gpointer		data;
+	guint			len;
 };
 
 struct pgm_async_t {
-    pgm_transport_t*	transport;
-    GThread*		thread;
-    GAsyncQueue*	commit_queue;
-    int			commit_pipe[2];
-    gboolean		quit;
+	pgm_transport_t*	transport;
+	GThread*		thread;
+	GAsyncQueue*		commit_queue;
+	pgm_notify_t		commit_notify;
+	gboolean		quit;
 };
 
 typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
@@ -71,8 +75,8 @@ GQuark pgm_async_error_quark (void);
 
 static inline int pgm_async_get_fd (pgm_async_t* async)
 {
-    g_return_val_if_fail (async != NULL, -EINVAL);
-    return async->commit_pipe[0];
+	g_return_val_if_fail (async != NULL, -EINVAL);
+	return pgm_notify_get_fd (&async->commit_notify);
 }
 
 G_END_DECLS
