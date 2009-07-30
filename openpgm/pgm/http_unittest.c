@@ -81,7 +81,7 @@ mock_pgm_time_since_epoch (
 
 START_TEST (test_init_pass_001)
 {
-	GError** err = NULL;
+	GError* err = NULL;
 	fail_unless (TRUE == pgm_http_init (8080, &err));
 	fail_unless (NULL == err);
 }
@@ -90,7 +90,7 @@ END_TEST
 /* duplicate servers */
 START_TEST (test_init_fail_001)
 {
-	GError** err = NULL;
+	GError* err = NULL;
 	fail_unless (TRUE == pgm_http_init (8080, &err));
 	fail_unless (FALSE == pgm_http_init (8080, &err));
 }
@@ -103,7 +103,7 @@ END_TEST
 
 START_TEST (test_shutdown_pass_001)
 {
-	GError** err = NULL;
+	GError* err = NULL;
 	fail_unless (TRUE == pgm_http_init (8080, &err));
 	fail_unless (NULL == err);
 	fail_unless (TRUE == pgm_http_shutdown ());
@@ -114,7 +114,7 @@ END_TEST
  */
 START_TEST (test_shutdown_pass_002)
 {
-	GError** err = NULL;
+	GError* err = NULL;
 	fail_unless (TRUE == pgm_http_init (8080, &err));
 	fail_unless (NULL == err);
 	fail_unless (TRUE == pgm_http_shutdown ());

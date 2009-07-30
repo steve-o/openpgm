@@ -167,8 +167,18 @@ main (
 	}
 #endif
 #ifdef CONFIG_WITH_SNMP
-	if (enable_snmpx)
-		pgm_snmp_init();
+	if (enable_snmpx) {
+		if (!pgm_snmp_init (&err)) {
+			g_error ("Unable to start SNMP interface: %s", err->message);
+			g_error_free (err);
+#ifdef CONFIG_WITH_HTTP
+			if (enable_http)
+				pgm_http_shutdown ();
+#endif
+			pgm_shutdown ();
+			return EXIT_FAILURE;
+		}
+	}
 #endif
 
 	g_loop = g_main_loop_new (NULL, FALSE);

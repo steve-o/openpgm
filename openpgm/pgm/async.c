@@ -184,7 +184,7 @@ pgm_async_create (
 			     PGM_ASYNC_ERROR,
 			     pgm_async_error_from_errno (errno),
 			     _("pipe() failed: %s"),
-			     strerror (errno));
+			     g_strerror (errno));
 		goto err_destroy;
 	}
 
@@ -193,7 +193,7 @@ pgm_async_create (
 			     PGM_ASYNC_ERROR,
 			     pgm_async_error_from_errno (errno),
 			     _("Setting non-blocking pipe file descriptors: %s"),
-			     strerror (errno));
+			     g_strerror (errno));
 		goto err_destroy;
 	}
 

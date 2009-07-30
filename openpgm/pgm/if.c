@@ -450,7 +450,7 @@ g_message ("oooooooo ******************");
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
-			     strerror (errno));
+			     g_strerror (errno));
 		return FALSE;
 	}
 
