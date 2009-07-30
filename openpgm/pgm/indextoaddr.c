@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
@@ -45,14 +46,19 @@
  * the big problem is that multiple IPv6 addresses can be bound to one link - called scopes.
  * we can just pick the first scope and let IP routing handle the rest.
  */
-int
+
+gboolean
 _pgm_if_indextoaddr (
-	unsigned int		ifindex,
-	int			iffamily,
-	unsigned		ifscope,
-	struct sockaddr*	ifsa
+	const unsigned int	ifindex,
+	const int		iffamily,
+	const unsigned		ifscope,
+	struct sockaddr*	ifsa,
+	GError**		error
         )
 {
+/* pre-conditions */
+	g_assert (NULL != ifsa);
+
 	if (0 == ifindex)		/* any interface or address */
 	{
 		ifsa->sa_family = iffamily;
@@ -64,39 +70,48 @@ _pgm_if_indextoaddr (
 		case AF_INET6:
 			((struct sockaddr_in6*)ifsa)->sin6_addr = in6addr_any;
 			break;
+
+		default:
+			g_assert_not_reached();
+			break;
 		}
-		return 0;
+		return TRUE;
 	}
-	else
+
+	struct ifaddrs *ifap, *ifa;
+	if (0 != getifaddrs (&ifap)) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_errno (errno),
+			     _("Enumerating network interfaces: %s"),
+			     g_strerror (errno));
+		return FALSE;
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		struct ifaddrs *ifap, *ifa;
-		int e = getifaddrs (&ifap);
-		if (e < 0) {
-			g_trace ("getifaddrs failed when trying to resolve link scope interfaces");
-			return -1;
-		}
+		if (ifa->ifa_addr->sa_family != iffamily)
+			continue;
 
-		for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+		const unsigned i = if_nametoindex(ifa->ifa_name);
+		g_assert (0 != i);
+		if (i == ifindex)
 		{
-			if ( ifa->ifa_addr->sa_family != iffamily )
+			if (ifscope && ifscope != pgm_sockaddr_scope_id (ifa->ifa_addr))
 				continue;
-
-			unsigned i = if_nametoindex(ifa->ifa_name);
-			if (i == ifindex)
-			{
-				if (ifscope && ifscope != pgm_sockaddr_scope_id(ifa->ifa_addr)) {
-					continue;
-				}
-				memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
-				freeifaddrs (ifap);
-				return 0;
-			}
+			memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
+			freeifaddrs (ifap);
+			return TRUE;
 		}
-
-		freeifaddrs (ifap);
 	}
 
-	return -1;
+	g_set_error (error,
+		     PGM_IF_ERROR,
+		     PGM_IF_ERROR_NODEV,
+		     _("No matching network interface index: %i"),
+		     ifindex);
+	freeifaddrs (ifap);
+	return FALSE;
 }
 
 /* eof */

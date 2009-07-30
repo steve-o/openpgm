@@ -24,10 +24,14 @@
 
 #include <glib.h>
 
+#ifndef __PGM_IF_H__
+#	include <pgm/if.h>
+#endif
+
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL int _pgm_if_getnodeaddr (int, struct sockaddr*, socklen_t);
+G_GNUC_INTERNAL gboolean _pgm_if_getnodeaddr (int, struct sockaddr*, socklen_t, GError**);
 
 G_END_DECLS
 

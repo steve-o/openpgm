@@ -27,8 +27,8 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL int _pgm_if_inet_network (const char*, struct in_addr*);
-G_GNUC_INTERNAL int _pgm_if_inet6_network (const char*, struct in6_addr*);
+G_GNUC_INTERNAL int _pgm_inet_network (const char*, struct in_addr*);
+G_GNUC_INTERNAL int _pgm_inet6_network (const char*, struct in6_addr*);
 
 G_END_DECLS
 

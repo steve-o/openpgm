@@ -2,6 +2,8 @@
  *
  * unit tests for network interface declaration parsing.
  *
+ * CAUTION: Assumes host is IPv4 by default for AF_UNSPEC
+ *
  * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
@@ -31,6 +33,7 @@
 #include <glib.h>
 #include <check.h>
 
+#include "pgm/if.h"
 #include "pgm/ip.h"
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
@@ -59,12 +62,29 @@ struct mock_interface_t {
 };
 
 static GList *mock_hosts = NULL, *mock_networks = NULL, *mock_interfaces = NULL;
-static char* mock_kiku = "kiku";
-static char* mock_localhost = "localhost";
-static char* mock_invalid = "invalid.invalid";		/* RFC 2606 */
-static char* mock_toolong = "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
-static char* mock_hostname = NULL;
 
+#define MOCK_HOSTNAME		"kiku"
+#define MOCK_HOSTNAME6		"ip6-kiku"		/* ping6 doesn't work on fe80:: */
+#define MOCK_NETWORK		"private"		/* /etc/networks */
+#define MOCK_NETWORK6		"ip6-private"
+#define MOCK_PGM_NETWORK	"pgm-private"
+#define MOCK_PGM_NETWORK6	"pgm-ip6-private"
+#define MOCK_INTERFACE		"eth0"
+#define MOCK_INTERFACE_INDEX	2
+#define MOCK_ADDRESS		"10.6.28.33"
+#define MOCK_GROUP		((in_addr_t) 0xefc00001) /* 239.192.0.1 */
+#define MOCK_GROUP6_INIT	{ { { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }	/* ff08::1 */
+static const struct in6_addr mock_group6_addr = MOCK_GROUP6_INIT;
+#define MOCK_ADDRESS6		"2002:dce8:d28e::33"
+#define MOCK_ADDRESS6_INIT	{ { { 0x20,2,0xdc,0xe8,0xd2,0x8e,0,0,0,0,0,0,0,0,0,0x33 } } }
+static const struct in6_addr mock_address6_addr = MOCK_ADDRESS6_INIT;
+
+static int mock_family =	0;
+static char* mock_kiku =	MOCK_HOSTNAME;
+static char* mock_localhost =	"localhost";
+static char* mock_invalid =	"invalid.invalid";		/* RFC 2606 */
+static char* mock_toolong =	"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
+static char* mock_hostname =	NULL;
 
 
 static
@@ -185,12 +205,12 @@ create_interface (
 		} while (0)
 static
 void
-mock_setup (void)
+mock_setup_net (void)
 {
 	mock_hostname = mock_kiku;
 
 	APPEND_HOST (	"127.0.0.1",		"localhost");
-	APPEND_HOST2(	"10.6.28.33",		"kiki.hk.miru.hk",	"kiku");
+	APPEND_HOST2(	"10.6.28.33",		"kiku.hk.miru.hk",	"kiku");
 	APPEND_HOST2(	"2002:dce8:d28e::33",	"ip6-kiku",		"kiku");
 	APPEND_HOST2(	"::1",			"ip6-localhost",	"ip6-loopback");
 	APPEND_HOST (	"239.192.0.1",		"PGM.MCAST.NET");
@@ -198,23 +218,25 @@ mock_setup (void)
 
 	APPEND_NETWORK(	"loopback",	"127.0.0.0");
 	APPEND_NETWORK(	"private",	"10.6.28.0");
+	APPEND_NETWORK( "pgm-private",	"239.192.0.1");
 #ifdef CONFIG_HAVE_IP6_NETWORKS
 	APPEND_NETWORK(	"ip6-private",	"2002:dce8:d28e:0:0:0");
+	APPEND_NETWORK( "ip6-pgm-private","ff08::1");
 #endif
 
 	APPEND_INTERFACE(	1,	"lo",	"up,loop");
 	APPEND_INTERFACE(	2,	"eth0",	"up,broadcast,multicast");
 	APPEND_INTERFACE(	3,	"eth1",	"down,broadcast,multicast");
 	APPEND_INTERFACE(	1,	"lo",	"up,loop,ip=127.0.0.1,netmask=255.0.0.0");
-	APPEND_INTERFACE(	2,	"eth0",	"up,broadcast,multicast,ip=10.6.28.31,netmask=255.255.255.0");
+	APPEND_INTERFACE(	2,	"eth0",	"up,broadcast,multicast,ip=10.6.28.33,netmask=255.255.255.0");
 	APPEND_INTERFACE(	1,	"lo",	"up,loop,ip=::1,netmask=ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff,scope=0");
-	APPEND_INTERFACE(	2,	"eth0",	"up,broadcast,multicast,ip=2002:dce8:d28e::31,netmask=ffff:ffff:ffff:ffff::0,scope=0");
+	APPEND_INTERFACE(	2,	"eth0",	"up,broadcast,multicast,ip=2002:dce8:d28e::33,netmask=ffff:ffff:ffff:ffff::0,scope=0");
 	APPEND_INTERFACE(	2,	"eth0",	"up,broadcast,multicast,ip=fe80::214:5eff:febd:6dda,netmask=ffff:ffff:ffff:ffff::0,scope=2");
 }
 
 static
 void
-mock_teardown (void)
+mock_teardown_net (void)
 {
 	GList* list;
 
@@ -395,7 +417,7 @@ mock_getnameinfo (
 		pgm_inet_ntop (sa_family, &((const struct sockaddr_in6*)sa)->sin6_addr, host, hostlen);
 		if (scope) {
 			char buffer[1+IF_NAMESIZE];
-			strcat (host, ":");
+			strcat (host, "%");
 			strcat (host, mock_if_indextoname (scope, buffer));
 		}
 	}
@@ -414,6 +436,7 @@ mock_getaddrinfo (
 	const int ai_flags  = hints ? hints->ai_flags  : (AI_V4MAPPED | AI_ADDRCONFIG);
 	const int ai_family = hints ? hints->ai_family : AF_UNSPEC;
 	GList* list;
+	struct sockaddr_storage addr;
 
 	if (NULL == node && NULL == service)
 		return EAI_NONAME;
@@ -422,9 +445,11 @@ mock_getaddrinfo (
 	g_assert (NULL != node);
 	g_assert (NULL == service);
 	g_assert (!(ai_flags & AI_CANONNAME));
-	g_assert (!(ai_flags & AI_NUMERICHOST));
 	g_assert (!(ai_flags & AI_NUMERICSERV));
 	g_assert (!(ai_flags & AI_V4MAPPED));
+
+	g_message ("mock_getaddrinfo (node:\"%s\" service:%s hints:%p res:%p)",
+		node, service, (gpointer)hints, (gpointer)res);
 
 	gboolean has_ip4_config;
 	gboolean has_ip6_config;
@@ -447,11 +472,17 @@ mock_getaddrinfo (
 		has_ip4_config = has_ip6_config = TRUE;
 	}
 
+	if (ai_flags & AI_NUMERICHOST) {
+		pgm_sockaddr_pton (node, &addr);
+	}
 	list = mock_hosts;
 	while (list) {
 		struct mock_host_t* host = list->data;
 		const int host_family = ((struct sockaddr*)&host->address)->sa_family;
-		if (strcmp (host->canonical_hostname, node) == 0 &&
+		if (((strcmp (host->canonical_hostname, node) == 0) ||
+		     (ai_flags & AI_NUMERICHOST &&
+		      0 == pgm_sockaddr_cmp ((struct sockaddr*)&addr, (struct sockaddr*)&host->address)))
+		     &&
 		    (host_family == ai_family || AF_UNSPEC == ai_family) &&
 		    ((AF_INET == host_family && has_ip4_config) || (AF_INET6 == host_family && has_ip6_config)))
 		{
@@ -527,6 +558,59 @@ mock_getnetbyname (
 	return NULL;
 }
 
+static
+gboolean
+mock__pgm_if_getnodeaddr (
+	const int		family,
+	struct sockaddr*	addr,
+	const socklen_t		cnt,
+	GError**		error
+	)
+{
+	switch (family) {
+	case AF_UNSPEC:
+	case AF_INET:
+		((struct sockaddr*)addr)->sa_family = AF_INET;
+		((struct sockaddr_in*)addr)->sin_addr.s_addr = inet_addr(MOCK_ADDRESS);
+		break;
+	case AF_INET6:
+		((struct sockaddr*)addr)->sa_family = AF_INET6;
+		((struct sockaddr_in6*)addr)->sin6_addr = mock_address6_addr;
+		break;
+	default:
+		g_assert_not_reached();
+	}
+	return TRUE;
+}
+
+/* following tests will use AF_UNSPEC address family */
+
+static
+void
+mock_setup_unspec (void)
+{
+	mock_family = AF_UNSPEC;
+}
+
+/* following tests will use AF_INET address family */
+
+static
+void
+mock_setup_ip4 (void)
+{
+	mock_family = AF_INET;
+}
+
+/* following tests will use AF_INET6 address family */
+
+static
+void
+mock_setup_ip6 (void)
+{
+	mock_family = AF_INET6;
+}
+
+
 #define getifaddrs	mock_getifaddrs
 #define freeifaddrs	mock_freeifaddrs
 #define if_nametoindex	mock_if_nametoindex
@@ -536,10 +620,93 @@ mock_getnetbyname (
 #define freeaddrinfo	mock_freeaddrinfo
 #define gethostname	mock_gethostname
 #define getnetbyname	mock_getnetbyname
+#define _pgm_if_getnodeaddr	mock__pgm_if_getnodeaddr
 
 #define IF_DEBUG
 #include "if.c"
 
+
+/* return 0 if gsr multicast group does not match the default PGM group for
+ * the address family, return -1 on no match.
+ */
+
+static
+gboolean
+match_default_group (
+	const int			ai_family,
+	const struct group_source_req*	gsr
+	)
+{
+	const struct sockaddr_in sa_default = {
+		.sin_family = AF_INET,
+		.sin_addr.s_addr = g_htonl (MOCK_GROUP)
+	};
+	const struct sockaddr_in6 sa6_default = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = MOCK_GROUP6_INIT
+	};
+	gboolean is_match = FALSE;
+
+	switch (ai_family) {
+	case AF_UNSPEC:
+	case AF_INET:
+		is_match = (0 == pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (const struct sockaddr*)&sa_default));
+		if (!is_match) {
+			char addr1[INET6_ADDRSTRLEN], addr2[INET6_ADDRSTRLEN];
+			pgm_sockaddr_ntop (&gsr->gsr_group, addr1, sizeof(addr1));
+			pgm_sockaddr_ntop (&sa_default, addr2, sizeof(addr2));
+			g_message ("FALSE == cmp(\"%s\", default-group \"%s\")", addr1, addr2);
+		}
+		break;
+	case AF_INET6:
+		is_match = (0 == pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (const struct sockaddr*)&sa6_default));
+		if (!is_match) {
+			char addr1[INET6_ADDRSTRLEN], addr2[INET6_ADDRSTRLEN];
+			pgm_sockaddr_ntop (&gsr->gsr_group, addr1, sizeof(addr1));
+			pgm_sockaddr_ntop (&sa6_default, addr2, sizeof(addr2));
+			g_message ("FALSE == cmp(\"%s\", default-group \"%s\")", addr1, addr2);
+		}
+	default:
+		break;
+	}
+	return is_match;
+}
+
+/* return 0 if gsr source inteface does not match the INADDR_ANY reserved
+ * address, return -1 on no match.
+ */
+
+static
+int
+match_default_source (
+	const int			ai_family,
+	const struct group_source_req*	gsr
+	)
+{
+	if (0 != gsr->gsr_interface)
+		return FALSE;
+
+/* ASM: source == group */
+	return (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_group, (const struct sockaddr*)&gsr->gsr_source));
+}
+
+/* return 0 if gsr source interface does not match the hosts default interface,
+ * return -1 on mismatch
+ */
+
+static
+int
+match_default_interface (
+	const int			ai_family,
+	const struct group_source_req*	gsr
+	)
+{
+	if (MOCK_INTERFACE_INDEX != gsr->gsr_interface)
+		return FALSE;
+
+/* ASM: source == group */
+	return (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_group, (const struct sockaddr*)&gsr->gsr_source));
+}
 
 /* target:
  *	int
@@ -552,8 +719,436 @@ mock_getnetbyname (
  *	)
  */
 
+struct test_case_t {
+	const char* ip4;
+	const char* ip6;
+};
+
+#define IP4_AND_IP6(x)	x, x
+
+static const struct test_case_t cases_001[] = {
+	{ 	IP4_AND_IP6("")	},
+	{ 	IP4_AND_IP6(";")	},
+	{ 	IP4_AND_IP6(";;")	},
+	{ "239.192.0.1",			"ff08::1"				},
+	{ ";239.192.0.1",			";ff08::1"				},
+	{ ";239.192.0.1;239.192.0.1",		";ff08::1;ff08::1"			},
+	{ "PGM.MCAST.NET",			"IP6-PGM.MCAST.NET"			},
+	{ ";PGM.MCAST.NET",			";IP6-PGM.MCAST.NET"			},
+	{ ";PGM.MCAST.NET;PGM.MCAST.NET",	";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ ";239.192.0.1;PGM.MCAST.NET",		";ff08::1;IP6-PGM.MCAST.NET"		},
+	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;ff08::1"		},
+	{ "pgm-private",			/* ‡ */ "pgm-ip6-private"			},
+	{ ";pgm-private",			/* ‡ */ ";pgm-ip6-private"			},
+	{ ";pgm-private;pgm-private",		/* ‡ */ ";pgm-ip6-private;pgm-ip6-private" 	},
+	{ ";PGM.MCAST.NET;pgm-private",		/* ‡ */ ";IP6-PGM.MCAST.NET;pgm-ip6-private" 	},
+	{ ";pgm-private;PGM.MCAST.NET",		/* ‡ */ ";pgm-ip6-private;IP6-PGM.MCAST.NET" 	},
+	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";ff08::1;pgm-ip6-private" 		},
+	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;ff08::1" 		},
+};
+
 START_TEST (test_parse_transport_pass_001)
 {
+	fail_unless (mock_family == AF_UNSPEC || mock_family == AF_INET || mock_family == AF_INET6);
+
+	const char* s = (mock_family == AF_INET6) ? cases_001[_i].ip6 : cases_001[_i].ip4;
+	struct pgm_transport_info_t hints = {
+		.ti_family	= mock_family
+	}, *res = NULL;
+	GError* err = NULL;
+
+	g_message ("%i: test_parse_transport_001(%s, \"%s\")",
+		   _i, (mock_family == AF_INET6) ? "AF_INET6" : ( (mock_family == AF_INET) ? "AF_INET" : "AF_UNSPEC" ), s);
+
+/* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
+ *   pgm_if_parse_transport will fail.
+ */
+#ifndef CONFIG_HAVE_IP6_NETWORKS
+	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
+	{
+		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
+		return;
+	}
+#endif
+
+	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
+	if (!retval) {
+		g_message ("pgm_if_get_transport_info: %s", err ? err->message : "(null)");
+	}
+	fail_unless (TRUE == retval);
+	fail_if     (NULL == res);
+	fail_unless (NULL == err);
+
+	fail_unless (1 == res->ti_recv_addrs_len);
+	fail_unless (match_default_group (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (match_default_source (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (1 == res->ti_send_addrs_len);
+	fail_unless (match_default_group (mock_family, &res->ti_send_addrs[0]));
+	fail_unless (match_default_source (mock_family, &res->ti_send_addrs[0]));
+}
+END_TEST
+
+/* interface name
+ *
+ * pre-condition: interface defined to match running host
+ * 		  ipv4 and ipv6 hostnames are different, otherwise "<hostname>" tests might go unexpected.
+ */
+
+static const struct test_case_t cases_002[] = {
+	{ MOCK_INTERFACE,				/* † */ MOCK_INTERFACE		},
+	{ MOCK_INTERFACE ";",				/* † */ MOCK_INTERFACE ";"		},
+	{ MOCK_INTERFACE ";;",				/* † */ MOCK_INTERFACE ";;"	},
+	{ MOCK_INTERFACE ";239.192.0.1",		/* † */ MOCK_INTERFACE ";ff08::1"			},
+	{ MOCK_INTERFACE ";239.192.0.1;239.192.0.1",	/* † */ MOCK_INTERFACE ";ff08::1;ff08::1"		},
+	{ MOCK_INTERFACE ";PGM.MCAST.NET",		/* † */ MOCK_INTERFACE ";IP6-PGM.MCAST.NET"	},
+	{ MOCK_INTERFACE ";PGM.MCAST.NET;PGM.MCAST.NET",/* † */ MOCK_INTERFACE ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ MOCK_INTERFACE ";239.192.0.1;PGM.MCAST.NET",	/* † */ MOCK_INTERFACE ";ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_INTERFACE ";pgm-private",		/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private" },
+	{ MOCK_INTERFACE ";pgm-private;pgm-private",	/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private;pgm-ip6-private" },
+	{ MOCK_ADDRESS,					MOCK_ADDRESS6			},
+	{ MOCK_ADDRESS ";",				MOCK_ADDRESS6 ";"		},
+	{ MOCK_ADDRESS ";;",				MOCK_ADDRESS6 ";;"		},
+	{ MOCK_ADDRESS ";239.192.0.1",			MOCK_ADDRESS6 ";ff08::1"			},
+	{ MOCK_ADDRESS ";239.192.0.1;239.192.0.1",	MOCK_ADDRESS6 ";ff08::1;ff08::1"		},
+	{ MOCK_ADDRESS ";PGM.MCAST.NET",		MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS ";PGM.MCAST.NET;PGM.MCAST.NET",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS ";239.192.0.1;PGM.MCAST.NET",	MOCK_ADDRESS6 ";ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_ADDRESS ";pgm-private",			MOCK_ADDRESS6 ";pgm-ip6-private" },
+	{ MOCK_ADDRESS ";pgm-private;pgm-private",	MOCK_ADDRESS6 ";pgm-ip6-private;pgm-ip6-private" },
+	{ MOCK_NETWORK,					/* ‡ */ MOCK_NETWORK6			},
+	{ MOCK_NETWORK ";",				/* ‡ */ MOCK_NETWORK6 ";"		},
+	{ MOCK_NETWORK ";;",				/* ‡ */ MOCK_NETWORK6 ";;"		},
+	{ MOCK_NETWORK ";239.192.0.1",			/* ‡ */ MOCK_NETWORK6 ";ff08::1"			},
+	{ MOCK_NETWORK ";239.192.0.1;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";ff08::1;ff08::1"		},
+	{ MOCK_NETWORK ";PGM.MCAST.NET",		/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET"	},
+	{ MOCK_NETWORK ";PGM.MCAST.NET;PGM.MCAST.NET",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ MOCK_NETWORK ";239.192.0.1;PGM.MCAST.NET",	/* ‡ */ MOCK_NETWORK6 ";ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_NETWORK ";PGM.MCAST.NET;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_NETWORK ";pgm-private",			/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private" },
+	{ MOCK_NETWORK ";pgm-private;pgm-private",	/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private;pgm-ip6-private" },
+	{ MOCK_HOSTNAME,				MOCK_HOSTNAME6			},
+	{ MOCK_HOSTNAME ";",				MOCK_HOSTNAME6 ";"		},
+	{ MOCK_HOSTNAME ";;",				MOCK_HOSTNAME6 ";;"		},
+	{ MOCK_HOSTNAME ";239.192.0.1",			MOCK_HOSTNAME6 ";ff08::1"		},
+	{ MOCK_HOSTNAME ";239.192.0.1;239.192.0.1",	MOCK_HOSTNAME6 ";ff08::1;ff08::1"	},
+	{ MOCK_HOSTNAME ";PGM.MCAST.NET",		MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET" },
+	{ MOCK_HOSTNAME ";PGM.MCAST.NET;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET" },
+	{ MOCK_HOSTNAME ";239.192.0.1;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";ff08::1;IP6-PGM.MCAST.NET" },
+	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;ff08::1" },
+	{ MOCK_HOSTNAME ";pgm-private",			MOCK_HOSTNAME6 ";pgm-ip6-private" },
+	{ MOCK_HOSTNAME ";pgm-private;pgm-private",	MOCK_HOSTNAME6 ";pgm-ip6-private;pgm-ip6-private" },
+};
+
+START_TEST (test_parse_transport_pass_002)
+{
+	fail_unless (mock_family == AF_UNSPEC || mock_family == AF_INET || mock_family == AF_INET6);
+
+	const char* s = (mock_family == AF_INET6) ? cases_002[_i].ip6 : cases_002[_i].ip4;
+	struct pgm_transport_info_t hints = {
+		.ti_family	= mock_family
+	}, *res = NULL;
+	GError* err = NULL;
+
+	g_message ("%i: test_parse_transport_002(%s, \"%s\")",
+		   _i, (mock_family == AF_INET6) ? "AF_INET6" : ( (mock_family == AF_INET) ? "AF_INET" : "AF_UNSPEC" ), s);
+
+/* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
+ *   pgm_if_parse_transport will fail.
+ */
+#ifndef CONFIG_HAVE_IP6_NETWORKS
+	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
+	{
+		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
+		return;
+	}
+#endif
+
+/* † Multiple scoped IPv6 interfaces match a simple interface name network parameter and so
+ *   pgm-if_parse_transport will fail finding multiple matching interfaces
+ */
+	if (AF_INET6 == mock_family && 0 == strncmp (s, MOCK_INTERFACE, strlen (MOCK_INTERFACE)))
+	{
+		g_message ("IPv6 exception, multiple scoped addresses on one interface");
+		fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+		fail_unless (NULL == res);
+		fail_if     (NULL == err);
+		fail_unless (PGM_IF_ERROR_NOTUNIQ == err->code);
+		return;
+	}
+
+	fail_unless (TRUE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (1 == res->ti_recv_addrs_len);
+	fail_unless (match_default_group     (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (match_default_interface (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (1 == res->ti_send_addrs_len);
+	fail_unless (match_default_group     (mock_family, &res->ti_send_addrs[0]));
+	fail_unless (match_default_interface (mock_family, &res->ti_send_addrs[0]));
+}
+END_TEST
+
+/* network to node address in bits, 8-32
+ *
+ * e.g. 127.0.0.1/16
+ */
+
+static const struct test_case_t cases_003[] = {
+	{ MOCK_ADDRESS "/24",				MOCK_ADDRESS6 "/64"				},
+	{ MOCK_ADDRESS "/24;",				MOCK_ADDRESS6 "/64;"				},
+	{ MOCK_ADDRESS "/24;;",				MOCK_ADDRESS6 "/64;;"				},
+	{ MOCK_ADDRESS "/24;239.192.0.1",		MOCK_ADDRESS6 "/64;ff08::1"			},
+	{ MOCK_ADDRESS "/24;239.192.0.1;239.192.0.1",	MOCK_ADDRESS6 "/64;ff08::1;ff08::1"		},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS "/24;239.192.0.1;PGM.MCAST.NET",	MOCK_ADDRESS6 "/64;ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS "/24;pgm-private",		/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private"			},
+	{ MOCK_ADDRESS "/24;pgm-private;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;pgm-ip6-private"	},
+	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ff08::1;pgm-ip6-private"		},
+	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;ff08::1"		},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;pgm-ip6-private"	},
+	{ MOCK_ADDRESS "/24;pgm-private;PGM.MCAST.NET",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;IP6-PGM.MCAST.NET"	},
+};
+
+START_TEST (test_parse_transport_pass_003)
+{
+	fail_unless (mock_family == AF_UNSPEC || mock_family == AF_INET || mock_family == AF_INET6);
+
+	const char* s = (mock_family == AF_INET6) ? cases_003[_i].ip6 : cases_003[_i].ip4;
+	struct pgm_transport_info_t hints = {
+		.ti_family	= mock_family
+	}, *res = NULL;
+	GError* err = NULL;
+
+	g_message ("%i: test_parse_transport_003(%s, \"%s\")",
+		   _i, (mock_family == AF_INET6) ? "AF_INET6" : ( (mock_family == AF_INET) ? "AF_INET" : "AF_UNSPEC" ), s);
+
+/* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
+ *   pgm_if_parse_transport will fail.
+ */
+#ifndef CONFIG_HAVE_IP6_NETWORKS
+	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
+	{
+		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
+		return;
+	}
+#endif
+
+	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
+	if (!retval) {
+		g_message ("pgm_if_get_transport_info: %s", err ? err->message : "(null)");
+	}
+	fail_unless (TRUE == retval);
+	fail_unless (1 == res->ti_recv_addrs_len);
+	fail_unless (match_default_group     (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (match_default_interface (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (1 == res->ti_send_addrs_len);
+	fail_unless (match_default_group     (mock_family, &res->ti_send_addrs[0]));
+	fail_unless (match_default_interface (mock_family, &res->ti_send_addrs[0]));
+}
+END_TEST
+
+/* asymmetric groups
+ */
+
+START_TEST (test_parse_transport_pass_004)
+{
+	fail_unless (mock_family == AF_UNSPEC || mock_family == AF_INET || mock_family == AF_INET6);
+
+	const char* s = (mock_family == AF_INET6) ? ";ff08::1;ff08::2"
+				       /* AF_INET */: ";239.192.56.1;239.192.56.2";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= mock_family
+	}, *res = NULL;
+	GError* err = NULL;
+	struct sockaddr_storage addr;
+
+	fail_unless (TRUE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (1 == res->ti_recv_addrs_len);
+	fail_unless (1 == res->ti_send_addrs_len);
+	if (mock_family == AF_INET6)
+	{
+		inet_pton (AF_INET6, "ff08::1", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		((struct sockaddr*)&addr)->sa_family = mock_family;
+		((struct sockaddr_in6*)&addr)->sin6_port = 0;
+		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
+		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_recv_addrs[0].gsr_group, (struct sockaddr*)&addr));
+		inet_pton (AF_INET6, "ff08::2", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		((struct sockaddr*)&addr)->sa_family = mock_family;
+		((struct sockaddr_in6*)&addr)->sin6_port = 0;
+		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
+		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_send_addrs[0].gsr_group, (struct sockaddr*)&addr));
+	} else {
+		inet_pton (AF_INET, "239.192.56.1", &((struct sockaddr_in*)&addr)->sin_addr);
+		((struct sockaddr*)&addr)->sa_family = AF_INET;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_recv_addrs[0].gsr_group, (struct sockaddr*)&addr));
+		inet_pton (AF_INET, "239.192.56.2", &((struct sockaddr_in*)&addr)->sin_addr);
+		((struct sockaddr*)&addr)->sa_family = AF_INET;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_send_addrs[0].gsr_group, (struct sockaddr*)&addr));
+	}
+	fail_unless (match_default_source (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (match_default_source (mock_family, &res->ti_send_addrs[0]));
+}
+END_TEST
+
+/* multiple receive groups and asymmetric sending
+ */
+
+START_TEST (test_parse_transport_pass_005)
+{
+	fail_unless (mock_family == AF_UNSPEC || mock_family == AF_INET || mock_family == AF_INET6);
+
+	const char* s = (mock_family == AF_INET6) ? ";ff08::1,ff08::2;ff08::3"
+				       /* AF_INET */: ";239.192.56.1,239.192.56.2;239.192.56.3";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= mock_family
+	}, *res = NULL;
+	GError* err = NULL;
+	struct sockaddr_storage addr;
+
+	fail_unless (TRUE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (2 == res->ti_recv_addrs_len);
+	fail_unless (1 == res->ti_send_addrs_len);
+	if (mock_family == AF_INET6)
+	{
+		inet_pton (AF_INET6, "ff08::1", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		((struct sockaddr*)&addr)->sa_family = mock_family;
+		((struct sockaddr_in6*)&addr)->sin6_port = 0;
+		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
+		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_recv_addrs[0].gsr_group, (struct sockaddr*)&addr));
+		inet_pton (AF_INET6, "ff08::2", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		((struct sockaddr*)&addr)->sa_family = mock_family;
+		((struct sockaddr_in6*)&addr)->sin6_port = 0;
+		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
+		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_recv_addrs[1].gsr_group, (struct sockaddr*)&addr));
+		inet_pton (AF_INET6, "ff08::3", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		((struct sockaddr*)&addr)->sa_family = mock_family;
+		((struct sockaddr_in6*)&addr)->sin6_port = 0;
+		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
+		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_send_addrs[0].gsr_group, (struct sockaddr*)&addr));
+	} else {
+		inet_pton (AF_INET, "239.192.56.1", &((struct sockaddr_in*)&addr)->sin_addr);
+		((struct sockaddr*)&addr)->sa_family = AF_INET;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_recv_addrs[0].gsr_group, (struct sockaddr*)&addr));
+		inet_pton (AF_INET, "239.192.56.2", &((struct sockaddr_in*)&addr)->sin_addr);
+		((struct sockaddr*)&addr)->sa_family = AF_INET;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_recv_addrs[1].gsr_group, (struct sockaddr*)&addr));
+		inet_pton (AF_INET, "239.192.56.3", &((struct sockaddr_in*)&addr)->sin_addr);
+		((struct sockaddr*)&addr)->sa_family = AF_INET;
+		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ti_send_addrs[0].gsr_group, (struct sockaddr*)&addr));
+	}
+	fail_unless (match_default_source (mock_family, &res->ti_recv_addrs[0]));
+	fail_unless (match_default_source (mock_family, &res->ti_send_addrs[0]));
+}
+END_TEST
+
+
+/* too many interfaces
+ */
+START_TEST (test_parse_transport_fail_001)
+{
+	const char* s = "eth0,lo;;;";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* invalid characters, or simply just bogus
+ */
+START_TEST (test_parse_transport_fail_002)
+{
+        const char* s = "!@#$%^&*()";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* too many groups
+ */
+START_TEST (test_parse_transport_fail_003)
+{
+        const char* s = ";239.192.0.1,239.192.0.2,239.192.0.3,239.192.0.4,239.192.0.5,239.192.0.6,239.192.0.7,239.192.0.8,239.192.0.9,239.192.0.10,239.192.0.11,239.192.0.12,239.192.0.13,239.192.0.14,239.192.0.15,239.192.0.16,239.192.0.17,239.192.0.18,239.192.0.19,239.192.0.20;239.192.0.21";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* too many receiver groups in asymmetric pairing
+ */
+START_TEST (test_parse_transport_fail_004)
+{
+        const char* s = ";239.192.0.1,239.192.0.2,239.192.0.3,239.192.0.4,239.192.0.5,239.192.0.6,239.192.0.7,239.192.0.8,239.192.0.9,239.192.0.10,239.192.0.11,239.192.0.12,239.192.0.13,239.192.0.14,239.192.0.15,239.192.0.16,239.192.0.17,239.192.0.18,239.192.0.19,239.192.0.20,239.192.0.21;239.192.0.22";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* null string
+ */
+START_TEST (test_parse_transport_fail_005)
+{
+        const char* s = NULL;
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_UNSPEC
+	}, *res = NULL;
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* invalid address family
+ */
+START_TEST (test_parse_transport_fail_006)
+{
+        const char* s = ";";
+	struct pgm_transport_info_t hints = {
+		.ti_family	= AF_IPX
+	}, *res = NULL;
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err));
+	fail_unless (NULL == res);
+}
+END_TEST
+
+/* invalid transport info pointer
+ */
+START_TEST (test_parse_transport_fail_007)
+{
+        const char* s = ";";
+	GError* err = NULL;
+
+	fail_unless (FALSE == pgm_if_get_transport_info (s, NULL, NULL, &err));
 }
 END_TEST
 
@@ -576,13 +1171,52 @@ make_test_suite (void)
 
 	s = suite_create (__FILE__);
 
-	TCase* tc_parse_transport = tcase_create ("parse-transport");
-	tcase_add_checked_fixture (tc_parse_transport, mock_setup, mock_teardown);
-	suite_add_tcase (s, tc_parse_transport);
-	tcase_add_test (tc_parse_transport, test_parse_transport_pass_001);
+/* three variations of all parse-transport tests, one for each valid
+ * address family value: AF_UNSPEC, AF_INET, AF_INET6. 
+ */
+
+/* unspecified address family, ai_family == AF_UNSPEC */
+	TCase* tc_parse_transport_unspec = tcase_create ("parse_transport/unspec");
+	suite_add_tcase (s, tc_parse_transport_unspec);
+	tcase_add_checked_fixture (tc_parse_transport_unspec, mock_setup_net, mock_teardown_net);
+	tcase_add_checked_fixture (tc_parse_transport_unspec, mock_setup_unspec, NULL);
+	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_001, 0, G_N_ELEMENTS(cases_001));
+	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_002, 0, G_N_ELEMENTS(cases_002));
+	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_003, 0, G_N_ELEMENTS(cases_003));
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_pass_004);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_pass_005);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_001);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_002);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_003);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_004);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_005);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_006);
+	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_007);
+
+/* IP version 4, ai_family = AF_INET */
+	TCase* tc_parse_transport_ip4 = tcase_create ("parse_transport/af_inet");
+	suite_add_tcase (s, tc_parse_transport_ip4);
+	tcase_add_checked_fixture (tc_parse_transport_ip4, mock_setup_net, mock_teardown_net);
+	tcase_add_checked_fixture (tc_parse_transport_ip4, mock_setup_ip4, NULL);
+	tcase_add_loop_test (tc_parse_transport_ip4, test_parse_transport_pass_001, 0, G_N_ELEMENTS(cases_001));
+	tcase_add_loop_test (tc_parse_transport_ip4, test_parse_transport_pass_002, 0, G_N_ELEMENTS(cases_002));
+	tcase_add_loop_test (tc_parse_transport_ip4, test_parse_transport_pass_003, 0, G_N_ELEMENTS(cases_003));
+	tcase_add_test (tc_parse_transport_ip4, test_parse_transport_pass_004);
+	tcase_add_test (tc_parse_transport_ip4, test_parse_transport_pass_005);
+
+/* IP version 6, ai_family = AF_INET6 */
+	TCase* tc_parse_transport_ip6 = tcase_create ("parse_transport/af_inet6");
+	suite_add_tcase (s, tc_parse_transport_ip6);
+	tcase_add_checked_fixture (tc_parse_transport_ip6, mock_setup_net, mock_teardown_net);
+	tcase_add_checked_fixture (tc_parse_transport_ip6, mock_setup_ip6, NULL);
+	tcase_add_loop_test (tc_parse_transport_ip6, test_parse_transport_pass_001, 0, G_N_ELEMENTS(cases_001));
+	tcase_add_loop_test (tc_parse_transport_ip6, test_parse_transport_pass_002, 0, G_N_ELEMENTS(cases_002));
+	tcase_add_loop_test (tc_parse_transport_ip6, test_parse_transport_pass_003, 0, G_N_ELEMENTS(cases_003));
+	tcase_add_test (tc_parse_transport_ip6, test_parse_transport_pass_004);
+	tcase_add_test (tc_parse_transport_ip6, test_parse_transport_pass_005);
 
 	TCase* tc_print_all = tcase_create ("print-all");
-	tcase_add_checked_fixture (tc_print_all, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_print_all, mock_setup_net, mock_teardown_net);
 	suite_add_tcase (s, tc_print_all);
 	tcase_add_test (tc_print_all, test_print_all_pass_001);
 

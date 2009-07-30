@@ -27,7 +27,7 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL int _pgm_if_indextoaddr (unsigned int, int, unsigned, struct sockaddr*);
+G_GNUC_INTERNAL gboolean _pgm_if_indextoaddr (unsigned int, int, unsigned, struct sockaddr*, GError**);
 
 G_END_DECLS
 
