@@ -46,7 +46,7 @@
  */
 
 int
-_pgm_if_inet_network (
+_pgm_inet_network (
 	const char* s,
 	struct in_addr* in
 	)
@@ -137,7 +137,7 @@ _pgm_if_inet_network (
  */
 
 int
-_pgm_if_inet6_network (
+_pgm_inet6_network (
 	const char* s,		/* NULL terminated */
 	struct in6_addr* in6
 	)

@@ -453,10 +453,11 @@ new_peer (
 	g_static_mutex_init (&peer->mutex);
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
-	((struct sockaddr_in*)&peer->nla)->sin_port = transport->udp_encap_port;
-	((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 	memcpy (&peer->group_nla, dst_addr, dst_addr_len);
 	memcpy (&peer->local_nla, src_addr, src_addr_len);
+/* port at same location for sin/sin6 */
+	((struct sockaddr_in*)&peer->local_nla)->sin_port = g_htons (transport->udp_encap_ucast_port);
+	((struct sockaddr_in*)&peer->nla)->sin_port = g_htons (transport->udp_encap_ucast_port);
 
 /* lock on rx window */
 	peer->rxw = pgm_rxw_create (
@@ -639,7 +640,7 @@ recv_again:
 	skb->len	= len;
 	skb->tail	= (guint8*)skb->data + len;
 
-	if (!transport->udp_encap_port &&
+	if (!transport->udp_encap_ucast_port &&
 	    AF_INET == pgm_sockaddr_family(&src))
 	{
 /* IPv4 PGM includes IP packet header which we can easily parse to grab destination multicast group

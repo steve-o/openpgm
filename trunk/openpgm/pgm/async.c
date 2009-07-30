@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "pgm/receiver.h"
 #include "pgm/net.h"
@@ -34,10 +35,10 @@
 //#define ASYNC_DEBUG
 
 #ifndef ASYNC_DEBUG
-#       define g_trace(m,...)           while (0)
+#       define g_trace(...)           while (0)
 #else
 #include <ctype.h>
-#       define g_trace(m,...)           g_debug(__VA_ARGS__)
+#       define g_trace(...)           g_debug(__VA_ARGS__)
 #endif
 
 
@@ -70,6 +71,7 @@ static GSourceFuncs g_pgm_watch_funcs = {
 
 
 static inline gpointer pgm_event_alloc (pgm_async_t*) G_GNUC_MALLOC;
+static PGMAsyncError pgm_async_error_from_errno (gint);
 
 
 static inline
@@ -89,7 +91,7 @@ pgm_event_alloc (
 static inline
 void
 pgm_event_unref (
-        pgm_async_t*	async,
+        G_GNUC_UNUSED pgm_async_t*	async,
         pgm_event_t*	event
         )
 {
@@ -158,77 +160,73 @@ pgm_receiver_thread (
  * on invalid parameters, -EINVAL is returned.
  */
 
-int
+gboolean
 pgm_async_create (
-	pgm_async_t**		async_,
-	pgm_transport_t*	transport
+	pgm_async_t**		async,
+	pgm_transport_t*	transport,
+	GError**		error
 	)
 {
-	g_return_val_if_fail (async_ != NULL, -EINVAL);
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	pgm_async_t* new_async;
 
-	int pgm_errno = 0;
-	pgm_async_t* async;
+	g_return_val_if_fail (NULL != async, FALSE);
+	g_return_val_if_fail (NULL != transport, FALSE);
 
-	async = g_malloc0 (sizeof(pgm_async_t));
-	async->transport = transport;
+	g_trace ("create (async:%p transport:%p error:%p)",
+		 (gpointer)async, (gpointer)transport, (gpointer)error);
 
-	g_trace ("INFO","create asynchronous commit queue.");
-	async->commit_queue = g_async_queue_new();
+	new_async = g_malloc0 (sizeof(pgm_async_t));
+	new_async->transport = transport;
+	new_async->commit_queue = g_async_queue_new();
 
-	g_trace ("INFO","create commit pipe.");
-	int e = pipe (async->commit_pipe);
-	if (e < 0) {
-		pgm_errno = errno;
+	if (0 != pipe (new_async->commit_pipe)) {
+		g_set_error (error,
+			     PGM_ASYNC_ERROR,
+			     pgm_async_error_from_errno (errno),
+			     _("pipe() failed: %s"),
+			     strerror (errno));
 		goto err_destroy;
 	}
 
-	e = _pgm_set_nonblocking (async->commit_pipe);
-	if (e) {
-		pgm_errno = errno;
+	if (0 != _pgm_set_nonblocking (new_async->commit_pipe)) {
+		g_set_error (error,
+			     PGM_ASYNC_ERROR,
+			     pgm_async_error_from_errno (errno),
+			     _("Setting non-blocking pipe file descriptors: %s"),
+			     strerror (errno));
 		goto err_destroy;
 	}
 
 /* setup new thread */
-	GError* err;
-	async->thread = g_thread_create_full (pgm_receiver_thread,
-						async,
-						0,
-						TRUE,
-						TRUE,
-						G_THREAD_PRIORITY_HIGH,
-						&err);
-	if (!async->thread) {
-		pgm_errno = errno;
-		g_error ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
+	new_async->thread = g_thread_create_full (pgm_receiver_thread,
+						  new_async,
+						  0,
+						  TRUE,
+						  TRUE,
+						  G_THREAD_PRIORITY_HIGH,
+						  error);
+	if (NULL == new_async->thread)
 		goto err_destroy;
-	}
 
 /* return new object */
-	*async_ = async;
-
-	return 0;
+	*async = new_async;
+	return TRUE;
 
 err_destroy:
-	if (async->commit_queue) {
-		g_async_queue_unref (async->commit_queue);
-		async->commit_queue = NULL;
+	if (new_async->commit_queue) {
+		g_async_queue_unref (new_async->commit_queue);
+		new_async->commit_queue = NULL;
 	}
-
-	if (async->commit_pipe[0]) {
-		close (async->commit_pipe[0]);
-		async->commit_pipe[0] = 0;
+	if (new_async->commit_pipe[0]) {
+		close (new_async->commit_pipe[0]);
+		new_async->commit_pipe[0] = 0;
 	}
-	if (async->commit_pipe[1]) {
-		close (async->commit_pipe[1]);
-		async->commit_pipe[1] = 0;
+	if (new_async->commit_pipe[1]) {
+		close (new_async->commit_pipe[1]);
+		new_async->commit_pipe[1] = 0;
 	}
-
-	g_free (async);
-	async = NULL;
-
-	errno = pgm_errno;
-	return -1;
+	g_free (new_async);
+	return FALSE;
 }
 
 /* tell async thread to stop, wait for it to stop, then cleanup.
@@ -371,7 +369,7 @@ pgm_src_dispatch (
         gpointer                user_data
         )
 {
-        g_trace ("INFO","pgm_src_dispatch");
+        g_trace ("pgm_src_dispatch");
 
         pgm_eventfn_t function = (pgm_eventfn_t)callback;
         pgm_watch_t* watch = (pgm_watch_t*)source;
@@ -445,6 +443,43 @@ pgm_async_recv (
 	pgm_event_unref (async, event);
 
 	return (gssize)bytes_read;	
+}
+
+GQuark
+pgm_async_error_quark (void)
+{
+        return g_quark_from_static_string ("pgm-async-error-quark");
+}
+
+static
+PGMAsyncError
+pgm_async_error_from_errno (
+        gint            err_no
+        )
+{
+        switch (err_no) {
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_ASYNC_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EMFILE
+	case EMFILE:
+		return PGM_ASYNC_ERROR_MFILE;
+		break;
+#endif
+
+#ifdef ENFILE
+	case ENFILE:
+		return PGM_ASYNC_ERROR_NFILE;
+		break;
+#endif
+
+	default :
+                return PGM_ASYNC_ERROR_FAILED;
+                break;
+        }
 }
 
 /* eof */

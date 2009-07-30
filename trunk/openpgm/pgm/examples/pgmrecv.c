@@ -156,7 +156,7 @@ main (
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http)
-		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+		pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT);
 #endif
 #ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
@@ -223,36 +223,48 @@ on_startup (
 	G_GNUC_UNUSED gpointer data
 	)
 {
+	struct pgm_transport_info_t* res = NULL;
+	GError* err = NULL;
+
 	g_message ("startup.");
 	g_message ("create transport.");
 
-	pgm_gsi_t gsi;
-	GError* err = NULL;
-	if (!pgm_gsi_create_from_hostname (&gsi, &err)) {
-		g_error ("creating GSI: %s", err->message);
+/* parse network parameter into transport address structure */
+	char network[1024];
+	sprintf (network, ";%s", g_network);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
+		g_error ("parsing network parameter: %s", err->message);
 		g_error_free (err);
-		g_main_loop_quit (g_loop);
+		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
-
-	struct group_source_req recv_gsr, send_gsr;
-	gsize recv_len = 1;
-	int e = pgm_if_parse_transport (g_network, AF_UNSPEC, &recv_gsr, &recv_len, &send_gsr);
-	g_assert (e == 0);
-	g_assert (recv_len == 1);
-
+/* create global session identifier */
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+/* source-specific multicast (SSM) */
 	if (g_source[0]) {
-		((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_addr.s_addr = inet_addr(g_source);
+		((struct sockaddr_in*)&res->ti_recv_addrs[0].gsr_source)->sin_addr.s_addr = inet_addr(g_source);
 	}
-
+/* UDP encapsulation */
 	if (g_udp_encap_port) {
-		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		res->ti_udp_encap_ucast_port = g_udp_encap_port;
+		res->ti_udp_encap_mcast_port = g_udp_encap_port;
 	}
+	if (!pgm_transport_create (&g_transport, res, &err)) {
+		g_error ("creating transport: %s", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+	pgm_if_free_transport_info (res);
 
-	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
-	g_assert (e == 0);
-
+/* set PGM parameters */
 	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
@@ -266,29 +278,29 @@ on_startup (
 	pgm_transport_set_nak_data_retries (g_transport, 50);
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
-	e = pgm_transport_bind (g_transport);
-	if (e < 0) {
-		if      (e == -1)
-			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
-		else if (e == -2)
-			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
-		else
-			g_critical ("pgm_transport_bind failed e %i", e);
+/* assign transport to specified address */
+	if (!pgm_transport_bind (g_transport, &err)) {
+		g_error ("binding transport: %s", err->message);
+		g_error_free (err);
+		pgm_transport_destroy (g_transport, FALSE);
+		g_transport = NULL;
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
-	g_assert (e == 0);
 
 /* create receiver thread */
 	g_thread = g_thread_create_full (receiver_thread,
-					g_transport,
-					0,
-					TRUE,
-					TRUE,
-					G_THREAD_PRIORITY_HIGH,
-					&err);
+					 g_transport,
+					 0,
+					 TRUE,
+					 TRUE,
+					 G_THREAD_PRIORITY_HIGH,
+					 &err);
 	if (!g_thread) {
-		g_critical ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
+		g_error ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
+		g_error_free (err);
+		pgm_transport_destroy (g_transport, FALSE);
+		g_transport = NULL;
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}

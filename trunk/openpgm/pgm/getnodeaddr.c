@@ -27,7 +27,9 @@
 #include <sys/socket.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
+#include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
 
@@ -42,118 +44,131 @@
 
 /* return node primary address on multi-address family interfaces.
  *
- * returns > 0 on success, or -1 on error and sets errno appropriately,
- * 			   or -2 on NS lookup error and sets h_errno appropriately.
+ * returns TRUE on success, returns FALSE on failure.
  */
 
-int
+gboolean
 _pgm_if_getnodeaddr (
-	int			af,	/* requested address family, AF_INET, or AF_INET6 */
+	const int		family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
 	struct sockaddr*	addr,
-	socklen_t		cnt	/* size of address pointed to by addr */
+	const socklen_t		cnt,	/* size of address pointed to by addr */
+	GError**		error
 	)
 {
-	g_return_val_if_fail (af == AF_INET || af == AF_INET6, -EINVAL);
-	g_return_val_if_fail (NULL != addr, -EINVAL);
+	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	g_assert (NULL != addr);
+	if (AF_INET == family || AF_UNSPEC == family)
+		g_assert (cnt >= sizeof(struct sockaddr_in));
+	else
+		g_assert (cnt >= sizeof(struct sockaddr_in6));
 
 	char hostname[NI_MAXHOST + 1];
 	struct hostent* he;
 
-	gethostname (hostname, sizeof(hostname));
-
-	if (AF_INET == af)
-	{
-		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), -EINVAL);
-
-		((struct sockaddr_in*)addr)->sin_family = af;
-
-		he = gethostbyname (hostname);
-		if (NULL == he) {
-			g_trace ("gethostbyname failed on local hostname: %s", hstrerror (h_errno));
-			return -2;
-		}
-		((struct sockaddr_in*)addr)->sin_addr.s_addr = ((struct in_addr*)(he->h_addr_list[0]))->s_addr;
-		cnt = sizeof(struct sockaddr_in);
+	if (0 != gethostname (hostname, sizeof(hostname))) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_errno (errno),
+			     _("Resolving hostname: %s"),
+			     g_strerror (errno));
+		return FALSE;
 	}
-	else
-	{
-		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), -EINVAL);
 
-		((struct sockaddr_in6*)addr)->sin6_family = af;
+	addr->sa_family = family;
+	struct addrinfo hints = {
+		.ai_family	= family,
+		.ai_socktype	= SOCK_STREAM,		/* not really */
+		.ai_protocol	= IPPROTO_TCP,		/* not really */
+		.ai_flags	= AI_ADDRCONFIG,
+	}, *res;
 
-		struct addrinfo hints = {
-			.ai_family	= af,
-			.ai_socktype	= SOCK_STREAM,		/* not really */
-			.ai_protocol	= IPPROTO_TCP,		/* not really */
-			.ai_flags	= 0,
-		}, *res;
+	int e = getaddrinfo (hostname, NULL, &hints, &res);
+	if (0 == e) {
+		const gsize addrlen = res->ai_addrlen;
+		memcpy (addr, res->ai_addr, addrlen);
+		freeaddrinfo (res);
+		return addrlen;
+	} else if (EAI_NONAME != e) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_eai_errno (e),
+			     _("Resolving hostname address: %s"),
+			     gai_strerror (e));
+		return FALSE;
+	} else if (AF_UNSPEC == family) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     PGM_IF_ERROR_NONAME,
+			     _("Resolving hostname address family."));
+		return FALSE;
+	}
 
-		int e = getaddrinfo (hostname, NULL, &hints, &res);
-		if (0 == e)
-		{
-			const struct sockaddr_in6* res_sin6 = (const struct sockaddr_in6*)res->ai_addr;
-			((struct sockaddr_in6*)addr)->sin6_addr     = res_sin6->sin6_addr;
-			((struct sockaddr_in6*)addr)->sin6_scope_id = res_sin6->sin6_scope_id;
-			freeaddrinfo (res);
-		}
-		else
-		{
-/* try link scope via IPv4 nodename */
-			he = gethostbyname (hostname);
-			if (NULL == he)
-			{
-				g_trace ("gethostbyname2 and gethostbyname failed on local hostname: %s", hstrerror (h_errno));
-				return -2;
-			}
+/* Common case a dual stack host has incorrect IPv6 configuration, i.e.
+ * hostname is only IPv4 and despite one or more IPv6 addresses.  Workaround
+ * for this case is to resolve the IPv4 hostname, find the matching interface
+ * and from that interface find an active IPv6 address taking global scope as
+ * preference over link scoped addresses.
+ */
+	he = gethostbyname (hostname);
+	if (NULL == he) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_h_errno (h_errno),
+			     _("Resolving IPv4 hostname address: %s"),
+			     hstrerror (h_errno));
+		return FALSE;
+	}
 
-			struct ifaddrs *ifap, *ifa, *ifa6;
-			e = getifaddrs (&ifap);
-			if (e < 0) {
-				g_trace ("getifaddrs failed when trying to resolve link scope interfaces");
-				return -1;
-			}
+	struct ifaddrs *ifap, *ifa, *ifa6;
+	e = getifaddrs (&ifap);
+	if (e < 0) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_errno (errno),
+			     _("Enumerating network interfaces: %s"),
+			     g_strerror (errno));
+		return FALSE;
+	}
 
 /* hunt for IPv4 interface */
-			for (ifa = ifap; ifa; ifa = ifa->ifa_next)
-			{
-				if (AF_INET != ifa->ifa_addr->sa_family) {
-					continue;
-				}
-				if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == ((struct in_addr*)(he->h_addr_list[0]))->s_addr)
-				{
-					goto ipv4_found;
-				}
-			}
-			g_trace ("node IPv4 interface not found!");
-			freeifaddrs (ifap);
-			errno = ENONET;
-			return -1;
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+	{
+		if (AF_INET != ifa->ifa_addr->sa_family)
+			continue;
+		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == ((struct in_addr*)(he->h_addr_list[0]))->s_addr)
+		{
+			goto ipv4_found;
+		}
+	}
+	freeifaddrs (ifap);
+	g_set_error (error,
+		     PGM_IF_ERROR,
+		     PGM_IF_ERROR_NONET,
+		     _("Discovering primary IPv4 network interface."));
+	return FALSE;
 ipv4_found:
 
 /* hunt for IPv6 interface */
-			for (ifa6 = ifap; ifa6; ifa6 = ifa6->ifa_next)
-			{
-				if (AF_INET6 != ifa6->ifa_addr->sa_family) {
-					continue;
-				}
-				if (0 == strcmp(ifa->ifa_name, ifa6->ifa_name))
-				{
-					goto ipv6_found;
-				}
-			}
-			g_trace ("node IPv6 interface not found!");
-			freeifaddrs (ifap);
-			errno = ENONET;
-			return -1;
-ipv6_found:
-			((struct sockaddr_in6*)addr)->sin6_addr = ((struct sockaddr_in6 *)ifa6->ifa_addr)->sin6_addr;
-			freeifaddrs (ifap);
+	for (ifa6 = ifap; ifa6; ifa6 = ifa6->ifa_next)
+	{
+		if (AF_INET6 != ifa6->ifa_addr->sa_family)
+			continue;
+		if (0 == strcmp (ifa->ifa_name, ifa6->ifa_name))
+		{
+			goto ipv6_found;
 		}
-
-		cnt = sizeof(struct sockaddr_in6);
 	}
+	freeifaddrs (ifap);
+	g_set_error (error,
+		     PGM_IF_ERROR,
+		     PGM_IF_ERROR_NONET,
+		     _("Discovering primary IPv6 network interface."));
+	return FALSE;
+ipv6_found:
 
-	return cnt;
+	memcpy (addr, ifa6->ifa_addr, pgm_sockaddr_len (ifa6->ifa_addr));
+	freeifaddrs (ifap);
+	return TRUE;
 }
 
 /* eof */
