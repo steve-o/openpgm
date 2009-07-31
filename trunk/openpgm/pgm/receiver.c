@@ -2219,13 +2219,13 @@ _pgm_check_peer_nak_state (
 		{
 			if (((pgm_rxw_t*)peer->rxw)->committed_count)
 			{
-				g_trace ("INFO", "peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
+				g_trace ("INFO", "peer expiration postponed due to committed data, tsi %s", pgm_tsi_print (&peer->tsi));
 				peer->expiry += transport->peer_expiry;
 				g_static_mutex_unlock (&peer->mutex);
 			}
 			else
 			{
-				g_warning ("peer expired, tsi %s", pgm_print_tsi (&peer->tsi));
+				g_warning ("peer expired, tsi %s", pgm_tsi_print (&peer->tsi));
 				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
 				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->link_);
 				g_static_mutex_unlock (&peer->mutex);
