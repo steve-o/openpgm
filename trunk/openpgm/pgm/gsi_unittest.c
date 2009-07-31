@@ -193,7 +193,9 @@ END_TEST
 /* target:
  *	int
  *	pgm_gsi_print_r (
- *		const pgm_gsi_t*	gsi
+ *		const pgm_gsi_t*	gsi,
+ *		char*			buf,
+ *		gsize			bufsize
  *	)
  */
 
