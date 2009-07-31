@@ -49,11 +49,13 @@ pgm_tsi_print_r (
 	gsize			bufsize
 	)
 {
-	g_return_val_if_fail (tsi != NULL, -1);
-	g_return_val_if_fail (buf != NULL, -1);
+	g_return_val_if_fail (NULL != tsi, -1);
+	g_return_val_if_fail (NULL != buf, -1);
+	g_return_val_if_fail (bufsize > 0, -1);
 
 	const guint8* gsi = (const guint8*)tsi;
 	const guint16 source_port = tsi->sport;
+
 	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i.%i",
 			 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
 }
@@ -84,7 +86,9 @@ pgm_tsi_hash (
 	gconstpointer v
         )
 {
-	g_assert (v != NULL);
+/* pre-conditions */
+	g_assert (NULL != v);
+
 	const pgm_tsi_t* tsi = v;
 	char buf[PGM_TSISTRLEN];
 	const int valid = pgm_tsi_print_r (tsi, buf, sizeof(buf));
@@ -102,6 +106,10 @@ pgm_tsi_equal (
 	gconstpointer   v2
         )
 {
+/* pre-conditions */
+	g_assert (v);
+	g_assert (v2);
+
 	return memcmp (v, v2, sizeof(struct pgm_tsi_t)) == 0;
 }
 
