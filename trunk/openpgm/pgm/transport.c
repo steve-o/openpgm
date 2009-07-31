@@ -196,17 +196,16 @@ pgm_power2_log2 (
  * If application calls a function on the transport after destroy() it is a
  * programmer error: segv likely to occur on unlock.
  *
- * on success, returns 0.  if transport is invalid, or previously destroyed,
- * returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_destroy (
 	pgm_transport_t*	transport,
 	gboolean		flush
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
 
 	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
 	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
@@ -361,7 +360,7 @@ pgm_transport_destroy (
 	g_free (transport);
 
 	g_trace ("INFO","finished.");
-	return 0;
+	return TRUE;
 }
 
 /* create a pgm_transport object.  create sockets that require superuser priviledges, if this is
@@ -479,8 +478,8 @@ pgm_transport_create (
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Creating receive socket: %s"),
 			     g_strerror (save_errno));
-		if (EPERM == save_errno && 0 != getuid ()) {
-			g_warning ("PGM protocol requires this program to run as superuser.");
+		if (EPERM == save_errno) {
+			g_warning ("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'");
 		}
 		goto err_destroy;
 	}
@@ -589,87 +588,84 @@ pgm_drop_superuser (void)
  * IPv4:   68 <= tpdu < 65536		(RFC 2765)
  * IPv6: 1280 <= tpdu < 65536		(RFC 2460)
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_max_tpdu (
 	pgm_transport_t*	transport,
 	guint16			max_tpdu
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (max_tpdu >= (sizeof(struct pgm_ip) + sizeof(struct pgm_header)), -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (max_tpdu >= (sizeof(struct pgm_ip) + sizeof(struct pgm_header)), FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->max_tpdu = max_tpdu;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* TRUE = enable multicast loopback and for UDP encapsulation SO_REUSEADDR,
  * FALSE = default, to disable.
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_multicast_loop (
 	pgm_transport_t*	transport,
 	gboolean		use_multicast_loop
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->use_multicast_loop = use_multicast_loop;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < hops < 256, hops == -1 use kernel default (ignored).
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_hops (
 	pgm_transport_t*	transport,
 	gint			hops
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (hops > 0, -EINVAL);
-	g_return_val_if_fail (hops < 256, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (hops > 0, FALSE);
+	g_return_val_if_fail (hops < 256, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->hops = hops;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < wmem < wmem_max (user)
  *
  * operating system and sysctl dependent maximum, minimum on Linux 256 (doubled).
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_sndbuf (
 	pgm_transport_t*	transport,
 	int			size		/* not gsize/gssize as we propogate to setsockopt() */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (size > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (size > 0, FALSE);
 
 	int wmem_max;
 	FILE *fp = fopen ("/proc/sys/net/core/wmem_max", "r");
@@ -684,26 +680,25 @@ pgm_transport_set_sndbuf (
 	g_static_mutex_lock (&transport->mutex);
 	transport->sndbuf = size;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < rmem < rmem_max (user)
  *
  * minimum on Linux is 2048 (doubled).
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_rcvbuf (
 	pgm_transport_t*	transport,
 	int			size		/* not gsize/gssize */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (size > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (size > 0, FALSE);
 
 	int rmem_max;
 	FILE *fp = fopen ("/proc/sys/net/core/rmem_max", "r");
@@ -718,8 +713,7 @@ pgm_transport_set_rcvbuf (
 	g_static_mutex_lock (&transport->mutex);
 	transport->rcvbuf = size;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* context aware g_io helpers
@@ -1695,10 +1689,10 @@ on_timer_shutdown (
  *
  * when h > k parity packets can be lost.
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE, on failure returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_fec (
 	pgm_transport_t*	transport,
 	guint			proactive_h,		/* 0 == no pro-active parity */
@@ -1708,21 +1702,21 @@ pgm_transport_set_fec (
 	guint			default_k
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail ((default_k & (default_k -1)) == 0, -EINVAL);
-	g_return_val_if_fail (default_k >= 2 && default_k <= 128, -EINVAL);
-	g_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail ((default_k & (default_k -1)) == 0, FALSE);
+	g_return_val_if_fail (default_k >= 2 && default_k <= 128, FALSE);
+	g_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, FALSE);
 
 	guint default_h = default_n - default_k;
 
-	g_return_val_if_fail (proactive_h <= default_h, -EINVAL);
+	g_return_val_if_fail (proactive_h <= default_h, FALSE);
 
 /* check validity of parameters */
 	if ( default_k > 223 &&
 		( (default_h * 223.0) / default_k ) < 1.0 )
 	{
 		g_error ("k/h ratio too low to generate parity data.");
-		return -EINVAL;
+		return FALSE;
 	}
 
 	g_static_mutex_lock (&transport->mutex);
@@ -1735,63 +1729,65 @@ pgm_transport_set_fec (
 	transport->tg_sqn_shift		= pgm_power2_log2 (transport->rs_k);
 
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* declare transport only for sending, discard any incoming SPM, ODATA,
  * RDATA, etc, packets.
+ *
+ * on success, returns TRUE, on failure returns FALSE.
  */
-int
+gboolean
 pgm_transport_set_send_only (
 	pgm_transport_t*	transport,
 	gboolean		send_only
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->can_recv	= !send_only;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* declare transport only for receiving, no transmit window will be created
  * and no SPM broadcasts sent.
+ *
+ * on success, returns TRUE, on failure returns FALSE.
  */
-int
+gboolean
 pgm_transport_set_recv_only (
 	pgm_transport_t*	transport,
 	gboolean		is_passive	/* don't send any request or responses */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->can_send_data	= FALSE;
 	transport->can_send_nak		= !is_passive;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* on unrecoverable data loss shutdown transport from further transmission or
  * receiving.
+ *
+ * on success, returns TRUE, on failure returns FALSE.
  */
-int
+gboolean
 pgm_transport_set_close_on_failure (
 	pgm_transport_t*	transport,
 	gboolean		close_on_failure
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->will_close_on_failure = close_on_failure;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 
