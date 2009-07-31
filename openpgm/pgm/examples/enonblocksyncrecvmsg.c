@@ -147,7 +147,7 @@ main (
 			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv.msgv_skb;
 			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
 					pgm_sock_err->lost_count,
-					pgm_print_tsi(&pgm_sock_err->tsi));
+					pgm_tsi_print(&pgm_sock_err->tsi));
 			continue;
 		}
 		else if (errno == ENOTCONN)
@@ -258,7 +258,7 @@ on_datav (
 	)
 {
 	char tsi[PGM_TSISTRLEN];
-	pgm_print_tsi_r (&datav->msgv_skb[0]->tsi, tsi, sizeof(tsi));
+	pgm_tsi_print_r (&datav->msgv_skb[0]->tsi, tsi, sizeof(tsi));
 	g_message ("(%i bytes from %s)", len, tsi);
 
 /* protect against non-null terminated strings */

@@ -44,6 +44,7 @@
 #include <pgm/rxwi.h>
 #include <pgm/sn.h>
 #include <pgm/time.h>
+#include <pgm/tsi.h>
 #include <pgm/reed_solomon.h>
 
 #ifndef RXW_DEBUG
@@ -214,7 +215,7 @@ pgm_rxw_create (
 	}
 
 	g_trace ("create (tsi:%s max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u).\n",
-		pgm_print_tsi (tsi), tpdu_size, sqns, secs, max_rte);
+		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte);
 
 /* calculate receive window parameters */
 	guint32 alloc_sqns;
