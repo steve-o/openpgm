@@ -25,6 +25,7 @@
 #include <pgm/async.h>
 #include <pgm/err.h>
 #include <pgm/gsi.h>
+#include <pgm/tsi.h>
 #include <pgm/if.h>
 #include <pgm/msgv.h>
 #include <pgm/signal.h>

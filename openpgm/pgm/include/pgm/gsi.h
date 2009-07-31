@@ -2,7 +2,7 @@
  * 
  * global session ID helper functions
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

@@ -136,7 +136,7 @@ main (
 			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)buffer;
                         g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
 					pgm_sock_err->lost_count,
-					pgm_print_tsi(&pgm_sock_err->tsi));
+					pgm_tsi_print(&pgm_sock_err->tsi));
 			continue;
 		}
 		else if (errno == ENOTCONN)
@@ -246,7 +246,7 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
-	pgm_print_tsi_r (from, tsi, sizeof(tsi));
+	pgm_tsi_print_r (from, tsi, sizeof(tsi));
 
 	g_message ("\"%s\" (%i bytes from %s)",
 			buf,

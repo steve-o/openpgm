@@ -395,7 +395,7 @@ receiver_thread (
 			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_skb;
 			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
 					pgm_sock_err->lost_count,
-					pgm_print_tsi(&pgm_sock_err->tsi));
+					pgm_tsi_print(&pgm_sock_err->tsi));
 			continue;
 		} 
 		else if (errno == ENOTCONN)		/* socket(s) closed */
@@ -436,7 +436,7 @@ on_msgv (
 /* truncate to first fragment to make GLib printing happy */
 		char buf[1024], tsi[PGM_TSISTRLEN];
 		snprintf (buf, sizeof(buf), "%s", (char*)pskb->data);
-		pgm_print_tsi_r (&pskb->tsi, tsi, sizeof(tsi));
+		pgm_tsi_print_r (&pskb->tsi, tsi, sizeof(tsi));
 		if (msgv[i].msgv_len > pskb->len)
 			g_message ("\t%u: \"%s\" ... (%" G_GSIZE_FORMAT " bytes from %s)",
 				   i, buf, msgv[i].msgv_len, tsi);

@@ -385,7 +385,7 @@ tsi_row (
 			( (g_now.tv_usec - g_last_snap.tv_usec) / 1000.0 / 1000.0 );
 
 /* TSI */
-	char* tsi_string = pgm_print_tsi (&hoststat->tsi);
+	char* tsi_string = pgm_tsi_print (&hoststat->tsi);
 	mvwaddstr (g_peer->window, *row,  1, tsi_string);
 
 /* Packets */
@@ -707,7 +707,7 @@ tsi_hash (
         gconstpointer v
         )
 {
-	return g_str_hash(pgm_print_tsi(v));
+	return g_str_hash(pgm_tsi_print(v));
 }
 
 static gint
@@ -773,7 +773,7 @@ on_io_data (
 
 	struct pgm_hoststat* hoststat = g_hash_table_lookup (g_hosts, &skb->tsi);
 	if (hoststat == NULL) {
-		write_status ("new tsi %s with local nla %s", pgm_print_tsi (&skb->tsi), inet_ntoa(sin->sin_addr));
+		write_status ("new tsi %s with local nla %s", pgm_tsi_print (&skb->tsi), inet_ntoa(sin->sin_addr));
 
 		hoststat = g_malloc0(sizeof(struct pgm_hoststat));
 		memcpy (&hoststat->tsi, &skb->tsi, sizeof(pgm_tsi_t));

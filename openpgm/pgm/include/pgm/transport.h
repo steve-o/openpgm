@@ -35,12 +35,10 @@
 #   include <pgm/gsi.h>
 #endif
 
-struct pgm_tsi_t {            /* transport session identifier */
-    pgm_gsi_t   gsi;	    /* global session identifier */
-    guint16     sport;	    /* source port: a random number to help detect session re-starts */
-};
+#ifndef __PGM_TSI_H__
+#   include <pgm/tsi.h>
+#endif
 
-typedef struct pgm_tsi_t pgm_tsi_t;
 typedef struct pgm_transport_t pgm_transport_t;
 
 #ifndef __PGM_IF_H__
@@ -64,8 +62,6 @@ typedef struct pgm_transport_t pgm_transport_t;
 #endif
 
 
-/* maximum length of TSI as a string */
-#define PGM_TSISTRLEN		(sizeof("000.000.000.000.000.000.00000"))
 #define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
 
 
@@ -352,10 +348,6 @@ int pgm_init (void);
 gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_shutdown (void);
 
-gchar* pgm_print_tsi (const pgm_tsi_t*) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);
-guint pgm_tsi_hash (gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_tsi_equal (gconstpointer, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_power2_log2 (guint) G_GNUC_WARN_UNUSED_RESULT;
 void pgm_drop_superuser (void);
 
