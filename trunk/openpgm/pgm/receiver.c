@@ -53,6 +53,7 @@
 #include "pgm/if.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
+#include "pgm/math.h"
 #include "pgm/net.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
@@ -88,10 +89,10 @@ static void nak_rpt_state (pgm_peer_t*);
 static void nak_rdata_state (pgm_peer_t*);
 static pgm_peer_t* new_peer (pgm_transport_t*, pgm_tsi_t*, struct sockaddr*, gsize, struct sockaddr*, gsize) G_GNUC_PURE;
 static inline pgm_peer_t* pgm_peer_ref (pgm_peer_t*);
-static int on_spm (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
-static int on_peer_nak (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
-static int on_ncf (pgm_peer_t*, struct pgm_header*, gpointer, gsize);
-static gboolean on_data (pgm_peer_t*, struct pgm_sk_buff_t*);
+static gboolean on_spm (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const);
+static gboolean on_peer_nak (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const);
+static gboolean on_ncf (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const);
+static gboolean on_data (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const);
 
 
 /* helpers for pgm_peer_t */
@@ -183,6 +184,40 @@ _pgm_peer_unref (
 /* object */
 		g_free (peer);
 	}
+}
+
+/* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
+ *
+ * returns TRUE if opt_fragment is found, otherwise FALSE is returned.
+ */
+
+static
+gboolean
+get_opt_fragment (
+	struct pgm_opt_header*		opt_header,
+	struct pgm_opt_fragment**	opt_fragment
+	)
+{
+/* pre-conditions */
+	g_assert (NULL != opt_header);
+	g_assert (NULL != opt_fragment);
+	g_assert (opt_header->opt_type   == PGM_OPT_LENGTH);
+	g_assert (opt_header->opt_length == sizeof(struct pgm_opt_length));
+
+/* always at least two options, first is always opt_length */
+	do {
+		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
+
+		if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_FRAGMENT)
+		{
+			*opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+			return TRUE;
+		}
+
+	} while (!(opt_header->opt_type & PGM_OPT_END));
+
+	*opt_fragment = NULL;
+	return FALSE;
 }
 
 /* set interval timer & expiration timeout for peer expiration, very lax checking.
@@ -631,7 +666,8 @@ recv_again:
 		bytes_received += len;
 	}
 
-	int e;
+	gboolean is_valid = FALSE;
+	GError* err = NULL;
 
 /* successfully read packet */
 	skb->transport	= transport;
@@ -645,7 +681,7 @@ recv_again:
 	{
 /* IPv4 PGM includes IP packet header which we can easily parse to grab destination multicast group
  */
-		e = pgm_parse_raw (skb, (struct sockaddr*)&dst);
+		is_valid = pgm_parse_raw (skb, (struct sockaddr*)&dst, &err);
 	}
 	else
 	{
@@ -689,20 +725,19 @@ recv_again:
 			sin->sin_addr.s_addr		= INADDR_ANY;
 		}
 
-		e = pgm_parse_udp_encap (skb);
+		is_valid = pgm_parse_udp_encap (skb, &err);
 	}
 
-	if (e < 0)
+	if (!is_valid)
 	{
 /* TODO: difference between PGM_PC_SOURCE_CKSUM_ERRORS & PGM_PC_RECEIVER_CKSUM_ERRORS */
-		if (e == -2)
+		if (err && PGM_PACKET_ERROR_CKSUM == err->code)
 			transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 		goto check_for_repeat;
 	}
 
 	pgm_peer_t* source = NULL;
-
 	if (pgm_is_upstream (skb->pgm_header->pgm_type) || pgm_is_peer (skb->pgm_header->pgm_type))
 	{
 
@@ -795,9 +830,11 @@ recv_again:
 		switch (skb->pgm_header->pgm_type) {
 		case PGM_NAK:
 			if (source) {
-				on_peer_nak (source, skb->pgm_header, skb->data, skb->len);
+				if (!on_peer_nak (transport, source, skb))
+					source->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 			} else if (!pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst)) {
-				_pgm_on_nak (transport, skb->pgm_header, skb->data, skb->len);
+				if (!_pgm_on_nak (transport, skb))
+					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 				goto check_for_repeat;
 			} else {
 /* ignore multicast NAKs as the source */
@@ -806,8 +843,14 @@ recv_again:
 			}
 			break;
 
-		case PGM_NNAK:	_pgm_on_nnak (transport, skb->pgm_header, skb->data, skb->len); break;
-		case PGM_SPMR:	_pgm_on_spmr (transport, source, skb->pgm_header, skb->data, skb->len); break;
+		case PGM_NNAK:
+			if (!_pgm_on_nnak (transport, skb))
+				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			break;
+		case PGM_SPMR:
+			if (!_pgm_on_spmr (transport, source, skb))
+				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			break;
 		case PGM_POLR:
 		default:
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -860,18 +903,20 @@ recv_again:
 		switch (skb->pgm_header->pgm_type) {
 		case PGM_ODATA:
 		case PGM_RDATA:
-			if (on_data (source, skb)) {
+			if (on_data (transport, source, skb)) {
 				skb = transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 				iov.iov_base = skb->head;
 			}
 			break;
 
 		case PGM_NCF:
-			on_ncf (source, skb->pgm_header, skb->data, skb->len);
+			if (!on_ncf (transport, source, skb))
+				source->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 			break;
 
 		case PGM_SPM:
-			on_spm (source, skb->pgm_header, skb->data, skb->len);
+			if (!on_spm (transport, source, skb))
+				source->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 
 /* update group NLA if appropriate */
 			if (pgm_sockaddr_is_addr_multicast ((struct sockaddr*)&dst)) {
@@ -880,7 +925,7 @@ recv_again:
 			break;
 
 		default:
-			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+			transport->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
 
@@ -1144,32 +1189,27 @@ pgm_transport_recv (
 /* SPM indicate start of a session, continued presence of a session, or flushing final packets
  * of a session.
  *
- * returns -EINVAL on invalid packet or duplicate SPM sequence number.
+ * returns TRUE on valid packet, FALSE on invalid packet or duplicate SPM sequence number.
  */
 
-static int
+static
+gboolean
 on_spm (
+	pgm_transport_t* const	transport,
 	pgm_peer_t*		sender,
-	struct pgm_header*	header,
-	gpointer		data,		/* data will be changed to host order on demand */
-	gsize			len
+	struct pgm_sk_buff_t*	skb
 	)
 {
-	int retval;
-
-	if ((retval = pgm_verify_spm (header, data, len)) != 0)
+	if (!pgm_verify_spm (skb))
 	{
 		sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
-		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
+		return FALSE;
 	}
 
-	struct pgm_transport_t* transport = sender->transport;
-	struct pgm_spm* spm = (struct pgm_spm*)data;
-	struct pgm_spm6* spm6 = (struct pgm_spm6*)data;
+	struct pgm_spm*  spm  = (struct pgm_spm*) skb->data;
+	struct pgm_spm6* spm6 = (struct pgm_spm6*)skb->data;
 	const pgm_time_t now = pgm_time_update_now ();
-
-	spm->spm_sqn = g_ntohl (spm->spm_sqn);
+	const guint32 spm_sqn = g_ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
 	g_static_mutex_lock (&transport->mutex);
@@ -1181,22 +1221,19 @@ on_spm (
 		pgm_nla_to_sockaddr (&spm->spm_nla_afi, (struct sockaddr*)&sender->nla);
 
 /* save sequence number */
-		sender->spm_sqn = spm->spm_sqn;
+		sender->spm_sqn = spm_sqn;
 
 /* update receive window */
-		pgm_time_t nak_rb_expiry = now + nak_rb_ivl(transport);
-		guint naks = pgm_rxw_update (sender->rxw,
-					     g_ntohl (spm->spm_lead),
-					     g_ntohl (spm->spm_trail),
-					     nak_rb_expiry);
-		if (naks && pgm_time_after(transport->next_poll, nak_rb_expiry))
+		const pgm_time_t nak_rb_expiry = now + nak_rb_ivl (transport);
+		const guint naks = pgm_rxw_update (sender->rxw,
+						     g_ntohl (spm->spm_lead),
+						     g_ntohl (spm->spm_trail),
+						     nak_rb_expiry);
+		if (naks && pgm_time_after (transport->next_poll, nak_rb_expiry))
 		{
 			transport->next_poll = nak_rb_expiry;
 			g_trace ("INFO","on_spm: prod timer thread");
-			if (!pgm_notify_send (&transport->timer_notify)) {
-				g_critical ("send to timer notify channel failed :(");
-				retval = -EINVAL;
-			}
+			pgm_notify_send (&transport->timer_notify);
 		}
 
 /* mark receiver window for flushing on next recv() */
@@ -1207,7 +1244,6 @@ on_spm (
 			transport->has_lost_data = TRUE;
 			sender_rxw->pgm_sock_err.lost_count = sender_rxw->cumulative_losses - sender_rxw->ack_cumulative_losses;
 			sender_rxw->ack_cumulative_losses = sender_rxw->cumulative_losses;
-
 			sender_rxw->waiting_link.data = sender_rxw;
 			sender_rxw->waiting_link.next = transport->peers_waiting;
 			transport->peers_waiting = &sender_rxw->waiting_link;
@@ -1216,58 +1252,57 @@ on_spm (
 	else
 	{	/* does not advance SPM sequence number */
 		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS]++;
-		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		retval = -EINVAL;
+		g_static_mutex_unlock (&sender->mutex);
+		g_static_mutex_unlock (&transport->mutex);
+		return FALSE;
 	}
 
 /* check whether peer can generate parity packets */
-	if (header->pgm_options & PGM_OPT_PRESENT)
+	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
 		struct pgm_opt_length* opt_len = (spm->spm_nla_afi == AFI_IP6) ?
 							(struct pgm_opt_length*)(spm6 + 1) :
-							(struct pgm_opt_length*)(spm + 1);
+							(struct pgm_opt_length*)(spm  + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
-			retval = -EINVAL;
 			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
-			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out;
+			g_static_mutex_unlock (&sender->mutex);
+			g_static_mutex_unlock (&transport->mutex);
+			return FALSE;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
-			retval = -EINVAL;
 			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
-			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out;
+			g_static_mutex_unlock (&sender->mutex);
+			g_static_mutex_unlock (&transport->mutex);
+			return FALSE;
 		}
 /* TODO: check for > 16 options & past packet end */
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
-
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_PARITY_PRM)
 			{
 				struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
-
 				if ((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0)
 				{
-					retval = -EINVAL;
 					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
-					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-					goto out;
+					g_static_mutex_unlock (&sender->mutex);
+					g_static_mutex_unlock (&transport->mutex);
+					return FALSE;
 				}
 
-				guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
+				const guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
 				if (parity_prm_tgs < 2 || parity_prm_tgs > 128)
 				{
-					retval = -EINVAL;
 					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
-					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-					goto out;
+					g_static_mutex_unlock (&sender->mutex);
+					g_static_mutex_unlock (&transport->mutex);
+					return FALSE;
 				}
 			
 				sender->use_proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
-				sender->use_ondemand_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
+				sender->use_ondemand_parity  = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
 				if (sender->rs_k != parity_prm_tgs)
 				{
 					sender->rs_n = PGM_RS_DEFAULT_N;
@@ -1291,69 +1326,59 @@ on_spm (
 	sender->spmr_expiry = 0;
 	g_static_mutex_unlock (&sender->mutex);
 	g_static_mutex_unlock (&transport->mutex);
-
-out:
-	return retval;
+	return TRUE;
 }
 
 /* Multicast peer-to-peer NAK handling, pretty much the same as a NCF but different direction
  *
- * if NAK is valid, returns 0.  on error, -EINVAL is returned.
+ * if NAK is valid, returns TRUE.  on error, FALSE is returned.
  */
 
-static int
+static
+gboolean
 on_peer_nak (
-	pgm_peer_t*		peer,
-	struct pgm_header*	header,
-	gpointer		data,
-	gsize			len
+	pgm_transport_t* const		transport,
+	pgm_peer_t* const		peer,
+	struct pgm_sk_buff_t* const	skb
 	)
 {
-	g_trace ("INFO","on_peer_nak()");
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != peer);
+	g_assert (NULL != skb);
 
-	int retval;
-	pgm_transport_t* transport = peer->transport;
+	g_trace ("INFO","on_peer_nak (transport:%p peer:%p skb:%p)",
+		(gpointer)transport, (gpointer)peer, (gpointer)skb);
 
-	if ((retval = pgm_verify_nak (header, data, len)) != 0)
+	if (!pgm_verify_nak (skb))
 	{
 		g_trace ("INFO", "Invalid NAK, ignoring.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS]++;
-		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
+		return FALSE;
 	}
 
-	const struct pgm_nak* nak = (struct pgm_nak*)data;
-	const struct pgm_nak6* nak6 = (struct pgm_nak6*)data;
+	const struct pgm_nak*  nak  = (struct pgm_nak*) skb->data;
+	const struct pgm_nak6* nak6 = (struct pgm_nak6*)skb->data;
 		
 /* NAK_SRC_NLA must not contain our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
-
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0) {
-		retval = -EINVAL;
-		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
-	}
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0)
+		return FALSE;
 
 /* NAK_GRP_NLA contains one of our transport receive multicast groups: the sources send multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi,
-				(struct sockaddr*)&nak_grp_nla);
-
+	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 	gboolean found = FALSE;
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0)
-		{
 			found = TRUE;
-		}
 	}
 
 	if (!found) {
 		g_trace ("INFO", "NAK not destined for this multicast group.");
-		retval = -EINVAL;
-		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
+		return FALSE;
 	}
 
 	g_static_mutex_lock (&transport->mutex);
@@ -1369,7 +1394,7 @@ on_peer_nak (
 /* check NAK list */
 	const guint32* nak_list = NULL;
 	guint nak_list_len = 0;
-	if (header->pgm_options & PGM_OPT_PRESENT)
+	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
 		const struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
 							(const struct pgm_opt_length*)(nak6 + 1) :
@@ -1377,24 +1402,19 @@ on_peer_nak (
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			g_trace ("INFO", "First PGM Option in NAK incorrect, ignoring.");
-			retval = -EINVAL;
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
-			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out_unlock;
+			return FALSE;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
 			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
-			retval = -EINVAL;
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
-			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out_unlock;
+			return FALSE;
 		}
 /* TODO: check for > 16 options & past packet end */
 		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
-
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				nak_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
@@ -1423,50 +1443,48 @@ on_peer_nak (
 		transport->has_lost_data = TRUE;
 		peer_rxw->pgm_sock_err.lost_count = peer_rxw->cumulative_losses - peer_rxw->ack_cumulative_losses;
 		peer_rxw->ack_cumulative_losses = peer_rxw->cumulative_losses;
-
 		peer_rxw->waiting_link.data = peer_rxw;
 		peer_rxw->waiting_link.next = transport->peers_waiting;
 		transport->peers_waiting = &peer_rxw->waiting_link;
 	}
 
-out_unlock:
 	g_static_mutex_unlock (&peer->mutex);
 	g_static_mutex_unlock (&transport->mutex);
-
-out:
-	return retval;
+	return TRUE;
 }
 
 /* NCF confirming receipt of a NAK from this transport or another on the LAN segment.
  *
  * Packet contents will match exactly the sent NAK, although not really that helpful.
  *
- * if NCF is valid, returns 0.  on error, -EINVAL is returned.
+ * if NCF is valid, returns TRUE.  on error, FALSE is returned.
  */
 
-static int
+static
+gboolean
 on_ncf (
-	pgm_peer_t*		peer,
-	struct pgm_header*	header,
-	gpointer		data,
-	gsize			len
+	pgm_transport_t* const		transport,
+	pgm_peer_t* const		peer,
+	struct pgm_sk_buff_t* const	skb
 	)
 {
-	g_trace ("INFO","on_ncf()");
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != peer);
+	g_assert (NULL != skb);
 
-	int retval;
-	pgm_transport_t* transport = peer->transport;
+	g_trace ("INFO","on_ncf (transport:%p peer:%p skb:%p)",
+		(gpointer)transport, (gpointer)peer, (gpointer)skb);
 
-	if ((retval = pgm_verify_ncf (header, data, len)) != 0)
+	if (!pgm_verify_ncf (skb))
 	{
 		g_trace ("INFO", "Invalid NCF, ignoring.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
-		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
+		return FALSE;
 	}
 
-	const struct pgm_nak* ncf = (struct pgm_nak*)data;
-	const struct pgm_nak6* ncf6 = (struct pgm_nak6*)data;
+	const struct pgm_nak*  ncf  = (struct pgm_nak*) skb->data;
+	const struct pgm_nak6* ncf6 = (struct pgm_nak6*)skb->data;
 		
 /* NCF_SRC_NLA may contain our transport unicast NLA, we don't really care */
 	struct sockaddr_storage ncf_src_nla;
@@ -1482,14 +1500,11 @@ on_ncf (
 
 /* NCF_GRP_NLA contains our transport multicast group */ 
 	struct sockaddr_storage ncf_grp_nla;
-	pgm_nla_to_sockaddr ((ncf->nak_src_nla_afi == AFI_IP6) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi,
-				(struct sockaddr*)&ncf_grp_nla);
-
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0) {
+	pgm_nla_to_sockaddr ((ncf->nak_src_nla_afi == AFI_IP6) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
+	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0)
+	{
 		g_trace ("INFO", "NCF not destined for this multicast group.");
-		retval = -EINVAL;
-		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
+		return FALSE;
 	}
 
 	g_static_mutex_lock (&transport->mutex);
@@ -1504,32 +1519,27 @@ on_ncf (
 /* check NCF list */
 	const guint32* ncf_list = NULL;
 	guint ncf_list_len = 0;
-	if (header->pgm_options & PGM_OPT_PRESENT)
+	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
 		const struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
 							(const struct pgm_opt_length*)(ncf6 + 1) :
-							(const struct pgm_opt_length*)(ncf + 1);
+							(const struct pgm_opt_length*)(ncf  + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
 			g_trace ("INFO", "First PGM Option in NCF incorrect, ignoring.");
-			retval = -EINVAL;
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
-			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out_unlock;
+			return FALSE;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
 			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
-			retval = -EINVAL;
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
-			peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out_unlock;
+			return FALSE;
 		}
 /* TODO: check for > 16 options & past packet end */
 		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
-
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				ncf_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
@@ -1558,18 +1568,14 @@ on_ncf (
 		transport->has_lost_data = TRUE;
 		peer_rxw->pgm_sock_err.lost_count = peer_rxw->cumulative_losses - peer_rxw->ack_cumulative_losses;
 		peer_rxw->ack_cumulative_losses = peer_rxw->cumulative_losses;
-
 		peer_rxw->waiting_link.data = peer_rxw;
 		peer_rxw->waiting_link.next = transport->peers_waiting;
 		transport->peers_waiting = &peer_rxw->waiting_link;
 	}
 
-out_unlock:
 	g_static_mutex_unlock (&peer->mutex);
 	g_static_mutex_unlock (&transport->mutex);
-
-out:
-	return retval;
+	return TRUE;
 }
 
 /* send SPM-request to a new peer, this packet type has no contents
@@ -2004,7 +2010,7 @@ nak_rb_state (
 
 #ifdef PGM_ABSOLUTE_EXPIRY
 					state->nak_rpt_expiry = state->nak_rb_expiry + transport->nak_rpt_ivl;
-					while (pgm_time_after_eq(pgm_time_now, state->nak_rpt_expiry){
+					while (pgm_time_after_eq(pgm_time_now, state->nak_rpt_expiry)) {
 						state->nak_rpt_expiry += transport->nak_rpt_ivl;
 						state->ncf_retry_count++;
 					}
@@ -2612,19 +2618,24 @@ nak_rdata_state (
  * returns TRUE is skb has been replaced, FALSE is remains unchanged and can be recycled.
  */
 
-static gboolean
+static
+gboolean
 on_data (
-	pgm_peer_t*		sender,
-	struct pgm_sk_buff_t*	skb
+	pgm_transport_t* const		transport,
+	pgm_peer_t* const		sender,
+	struct pgm_sk_buff_t* const	skb
 	)
 {
-	g_assert (sender);
-	g_assert (skb);
-	g_trace ("INFO","on_data");
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != sender);
+	g_assert (NULL != skb);
 
-	int retval = 0;
+	g_trace ("INFO","on_data (transport:%p sender:%p skb:%p)",
+		(gpointer)transport, (gpointer)sender, (gpointer)skb);
+
 	guint msg_count = 0;
-	const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl(sender->transport);
+	const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl (transport);
 	const guint16 tsdu_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
 
 	skb->pgm_data = skb->data;
@@ -2636,18 +2647,16 @@ on_data (
 
 	g_static_mutex_lock (&sender->mutex);
 	if (opt_total_length > 0)
-		 _pgm_get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
+		 get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
 
-	retval = pgm_rxw_add (sender->rxw, skb, nak_rb_expiry);
+	const int add_status = pgm_rxw_add (sender->rxw, skb, nak_rb_expiry);
 
-/* reference is now invalid */
-	skb = NULL;
-
+/* skb reference is now invalid */
 	g_static_mutex_unlock (&sender->mutex);
 
 	gboolean flush_naks = FALSE;
 
-	switch (retval) {
+	switch (add_status) {
 	case PGM_RXW_MISSING:
 		flush_naks = TRUE;
 /* fall through */
@@ -2665,7 +2674,6 @@ on_data (
 /* fall through */
 	case PGM_RXW_BOUNDS:
 discarded:
-		sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		return FALSE;
 
 	default: g_assert_not_reached(); break;
@@ -2678,21 +2686,17 @@ discarded:
 	if (flush_naks)
 	{
 /* flush out 1st time nak packets */
-		g_static_mutex_lock (&sender->transport->mutex);
+		g_static_mutex_lock (&transport->mutex);
 
-		if (pgm_time_after (sender->transport->next_poll, nak_rb_expiry))
+		if (pgm_time_after (transport->next_poll, nak_rb_expiry))
 		{
-			sender->transport->next_poll = nak_rb_expiry;
+			transport->next_poll = nak_rb_expiry;
 			g_trace ("INFO","on_odata: prod timer thread");
-			if (!pgm_notify_send (&sender->transport->timer_notify)) {
-				g_critical ("send to timer notify channel failed :(");
-				retval = -EINVAL;
-			}
+			pgm_notify_send (&transport->timer_notify);
 		}
 
-		g_static_mutex_unlock (&sender->transport->mutex);
+		g_static_mutex_unlock (&transport->mutex);
 	}
-
 	return TRUE;
 }
 

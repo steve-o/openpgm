@@ -43,9 +43,9 @@ gssize pgm_transport_send_skbv (pgm_transport_t*, struct pgm_sk_buff_t*, guint, 
 
 G_GNUC_INTERNAL int _pgm_send_spm_unlocked (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gboolean _pgm_on_nak_notify (GIOChannel*, GIOCondition, gpointer) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_on_spmr (pgm_transport_t*, pgm_peer_t*, struct pgm_header*, gpointer, gsize) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_on_nak (pgm_transport_t*, struct pgm_header*, gpointer, gsize) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int _pgm_on_nnak (pgm_transport_t*, struct pgm_header*, gpointer, gsize) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean _pgm_on_spmr (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean _pgm_on_nak (pgm_transport_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean _pgm_on_nnak (pgm_transport_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

@@ -57,6 +57,7 @@
 #include "pgm/indextoaddr.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
+#include "pgm/math.h"
 #include "pgm/net.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
@@ -104,22 +105,6 @@ pgm_transport_pkt_offset (
 	                      + sizeof(struct pgm_opt_header)
 			      + sizeof(struct pgm_opt_fragment) )
 			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
-}
-
-/* fast log base 2 of power of 2
- */
-
-guint
-pgm_power2_log2 (
-	guint		v
-	)
-{
-	static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
-	unsigned int r = (v & b[0]) != 0;
-	for (int i = 4; i > 0; i--) {
-		r |= ((v & b[i]) != 0) << i;
-	}
-	return r;
 }
 
 /* destroy a pgm_transport object and contents, if last transport also destroy
@@ -1928,36 +1913,6 @@ pgm_transport_msfilter (
 	g_return_val_if_fail (len > 0, -EINVAL);
 	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, -EINVAL);
 	return setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_MSFILTER, gf_list, len);
-}
-
-/* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
- *
- * returns 1 if opt_fragment is found, otherwise 0 is returned.
- */
-
-int
-_pgm_get_opt_fragment (
-	struct pgm_opt_header*		opt_header,
-	struct pgm_opt_fragment**	opt_fragment
-	)
-{
-	g_assert (opt_header->opt_type   == PGM_OPT_LENGTH);
-	g_assert (opt_header->opt_length == sizeof(struct pgm_opt_length));
-
-/* always at least two options, first is always opt_length */
-	do {
-		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
-
-		if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_FRAGMENT)
-		{
-			*opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
-			return 1;
-		}
-
-	} while (!(opt_header->opt_type & PGM_OPT_END));
-
-	*opt_fragment = NULL;
-	return 0;
 }
 
 GQuark

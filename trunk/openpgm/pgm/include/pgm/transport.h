@@ -348,7 +348,6 @@ int pgm_init (void);
 gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_shutdown (void);
 
-G_GNUC_INTERNAL guint pgm_power2_log2 (guint) G_GNUC_WARN_UNUSED_RESULT;
 void pgm_drop_superuser (void);
 
 GQuark pgm_transport_error_quark (void);
@@ -375,8 +374,6 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
-G_GNUC_INTERNAL int _pgm_get_opt_fragment (struct pgm_opt_header*, struct pgm_opt_fragment**);
-
 int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
 #ifdef CONFIG_HAVE_POLL
 int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
