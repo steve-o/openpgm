@@ -738,8 +738,9 @@ on_io_data (
 	gettimeofday (&now, NULL);
 	g_packets++;
 
-	int e = pgm_parse_raw (skb, (struct sockaddr*)&dst);
-	if (e == -2)
+	GError* err = NULL;
+	gboolean is_valid = pgm_parse_raw (skb, (struct sockaddr*)&dst, &err);
+	if (!is_valid && err && PGM_PACKET_ERROR_CKSUM == err->code)
 	{
 /* corrupt packet */
 		if (!g_nets) {
@@ -758,8 +759,7 @@ on_io_data (
 		pgm_free_skb (skb);
 		return TRUE;
 	}
-
-	if (e == -1)
+	else if (!is_valid)
 	{
 /* general error */
 		pgm_free_skb (skb);
@@ -791,16 +791,16 @@ on_io_data (
 	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
 	skb->len       -= sizeof(struct pgm_header);
 
-	gboolean err = FALSE;
+/* repurpose is_valid for PGM subtype */
+	is_valid = FALSE;
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_SPM:
 		hoststat->spm.count++;
 		hoststat->spm.bytes += skb->len;
 		hoststat->spm.last = now;
 
-		err = pgm_verify_spm (skb->pgm_header, skb->data, skb->len);
-		
-		if (err) {
+		is_valid = pgm_verify_spm (skb);
+		if (!is_valid) {
 			hoststat->spm.invalid++;
 			hoststat->spm.last_invalid = now;
 		} else {
@@ -878,9 +878,8 @@ on_io_data (
 		hoststat->nak.bytes += skb->len;
 		hoststat->nak.last = now;
 
-		err = pgm_verify_nak (skb->pgm_header, skb->data, skb->len);
-
-		if (err) {
+		is_valid = pgm_verify_nak (skb);
+		if (!is_valid) {
 			hoststat->nak.invalid++;
 			hoststat->nak.last_invalid = now;
 		}
@@ -903,20 +902,18 @@ on_io_data (
 		hoststat->spmr.bytes += skb->len;
 		hoststat->spmr.last = now;
 
-		err = pgm_verify_spmr (skb->pgm_header, skb->data, skb->len);
-
-		if (err) {
+		is_valid = pgm_verify_spmr (skb);
+		if (!is_valid) {
 			hoststat->spmr.invalid++;
 			hoststat->spmr.last_invalid = now;
 		}
 		break;
 
 	default:
-		err = TRUE;
 		break;
 	}
 
-	if (err) {
+	if (!is_valid) {
 		hoststat->general.invalid++;
 		hoststat->general.last_invalid = now;
 	} else {
