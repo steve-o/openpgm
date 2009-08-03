@@ -29,6 +29,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <glib.h>
+
 #include "pgm/md5.h"
 
 //#define MD5_DEBUG
@@ -60,9 +62,12 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 
 void
 _md5_init_ctx (
-	struct md5_ctx*	ctx
+	struct md5_ctx*		ctx
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != ctx);
+
 	ctx->A = 0x67452301;
 	ctx->B = 0xefcdab89;
 	ctx->C = 0x98badcfe;
@@ -86,14 +91,19 @@ _md5_init_ctx (
 static
 void
 md5_process_block (
-	const void*	buffer,
-	size_t		len,
-	struct md5_ctx*	ctx
+	struct md5_ctx*		ctx,
+	gconstpointer		buffer,
+	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != buffer);
+	g_assert (len > 0);
+	g_assert (NULL != ctx);
+
 	guint32 correct_words[16];
 	const guint32 *words = buffer;
-	size_t nwords = len / sizeof (guint32);
+	const gsize nwords = len / sizeof (guint32);
 	const guint32 *endp = words + nwords;
 	guint32 A = ctx->A;
 	guint32 B = ctx->B;
@@ -246,11 +256,17 @@ md5_process_block (
 
 void
 _md5_process_bytes (
-	const void*	buffer,
-	size_t		len,
-	struct md5_ctx*	ctx
+	struct md5_ctx*		ctx,
+	gconstpointer		buffer,
+	gsize			len
 	)
 {
+/* pre-conditions */
+	if (len > 0) {
+		g_assert (NULL != buffer);
+	}
+	g_assert (NULL != ctx);
+
 	if (len >= 64)
 	{
 #if !_STRING_ARCH_unaligned
@@ -264,14 +280,14 @@ _md5_process_bytes (
 		if (UNALIGNED_P (buffer))
 			while (len > 64)
 			{
-				md5_process_block (memcpy (ctx->buffer, buffer, 64), 64, ctx);
+				md5_process_block (ctx, memcpy (ctx->buffer, buffer, 64), 64);
 				buffer = (const char *) buffer + 64;
 				len -= 64;
 			}
 		else
 #endif
 		{
-			md5_process_block (buffer, len & ~63, ctx);
+			md5_process_block (ctx, buffer, len & ~63);
 			buffer = (const char *) buffer + (len & ~63);
 			len &= 63;
 		}
@@ -286,7 +302,7 @@ _md5_process_bytes (
 		left_over += len;
 		if (left_over >= 64)
 		{
-			md5_process_block (ctx->buffer, 64, ctx);
+			md5_process_block (ctx, ctx->buffer, 64);
 			left_over -= 64;
 			memcpy (ctx->buffer, &ctx->buffer[64], left_over);
 		}
@@ -301,12 +317,16 @@ _md5_process_bytes (
    aligned for a 32 bits value.  */
 
 static
-void*
+gpointer
 md5_read_ctx (
 	const struct md5_ctx	*ctx,
-	void*			resbuf
+	gpointer		resbuf
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != ctx);
+	g_assert (NULL != resbuf);
+
 	((guint32*)resbuf)[0] = SWAP (ctx->A);
 	((guint32*)resbuf)[1] = SWAP (ctx->B);
 	((guint32*)resbuf)[2] = SWAP (ctx->C);
@@ -321,15 +341,19 @@ md5_read_ctx (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
-void*
+gpointer
 _md5_finish_ctx (
-	struct md5_ctx*	ctx,
-	void*		resbuf
+	struct md5_ctx*		ctx,
+	gpointer		resbuf
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != ctx);
+	g_assert (NULL != resbuf);
+
 /* Take yet unprocessed bytes into account.  */
-	guint32 bytes = ctx->buflen;
-	size_t pad;
+	const guint32 bytes = ctx->buflen;
+	gsize pad;
 
 /* Now count remaining bytes.  */
 	ctx->total[0] += bytes;
@@ -345,7 +369,7 @@ _md5_finish_ctx (
 								(ctx->total[0] >> 29));
 
 /* Process last bytes.  */
-	md5_process_block (ctx->buffer, bytes + pad + 8, ctx);
+	md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
 
 	return md5_read_ctx (ctx, resbuf);
 }
