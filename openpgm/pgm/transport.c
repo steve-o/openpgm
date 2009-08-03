@@ -3444,14 +3444,14 @@ on_spm (
 			retval = -EINVAL;
 			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out;
+			goto out_unlock;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
 			retval = -EINVAL;
 			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 			sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-			goto out;
+			goto out_unlock;
 		}
 /* TODO: check for > 16 options & past packet end */
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)opt_len;
@@ -3467,7 +3467,7 @@ on_spm (
 					retval = -EINVAL;
 					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-					goto out;
+					goto out_unlock;
 				}
 
 				guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
@@ -3476,7 +3476,7 @@ on_spm (
 					retval = -EINVAL;
 					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 					sender->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-					goto out;
+					goto out_unlock;
 				}
 			
 				sender->use_proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
@@ -3502,6 +3502,7 @@ on_spm (
 /* either way bump expiration timer */
 	sender->expiry = now + transport->peer_expiry;
 	sender->spmr_expiry = 0;
+out_unlock:
 	g_static_mutex_unlock (&sender->mutex);
 	g_static_mutex_unlock (&transport->mutex);
 
