@@ -55,7 +55,7 @@ struct _pgm_ifaddrs
  */
 
 int
-pgm_if_getifaddrs (
+pgm_getifaddrs (
 	struct pgm_ifaddrs**	ifap
 	)
 {
@@ -188,7 +188,7 @@ pgm_if_getifaddrs (
 }
 
 void
-pgm_if_freeifaddrs (
+pgm_freeifaddrs (
 	struct pgm_ifaddrs*	ifa
 	)
 {

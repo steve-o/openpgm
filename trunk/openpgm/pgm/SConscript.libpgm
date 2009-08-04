@@ -68,6 +68,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['source_unittest.c']);
 	te.Program (['receiver_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c')]);
 	te.Program ('md5_unittest.c');
+	te.Program ('getifaddrs_unittest.c');
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
