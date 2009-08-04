@@ -42,6 +42,11 @@
 #endif
 
 
+/* globals */
+
+static const char* pgm_family_string (const int);
+
+
 /* return node primary address on multi-address family interfaces.
  *
  * returns TRUE on success, returns FALSE on failure.
@@ -55,12 +60,15 @@ _pgm_if_getnodeaddr (
 	GError**		error
 	)
 {
-	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	g_assert (NULL != addr);
+	g_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
+	g_return_val_if_fail (NULL != addr, FALSE);
 	if (AF_INET == family || AF_UNSPEC == family)
-		g_assert (cnt >= sizeof(struct sockaddr_in));
+		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), FALSE);
 	else
-		g_assert (cnt >= sizeof(struct sockaddr_in6));
+		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
+
+	g_trace ("_pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
+		pgm_family_string (family), (gpointer)addr, cnt, (gpointer)error);
 
 	char hostname[NI_MAXHOST + 1];
 	struct hostent* he;
@@ -87,7 +95,7 @@ _pgm_if_getnodeaddr (
 		const gsize addrlen = res->ai_addrlen;
 		memcpy (addr, res->ai_addr, addrlen);
 		freeaddrinfo (res);
-		return addrlen;
+		return TRUE;
 	} else if (EAI_NONAME != e) {
 		g_set_error (error,
 			     PGM_IF_ERROR,
@@ -169,6 +177,24 @@ ipv6_found:
 	memcpy (addr, ifa6->ifa_addr, pgm_sockaddr_len (ifa6->ifa_addr));
 	freeifaddrs (ifap);
 	return TRUE;
+}
+
+static
+const char*
+pgm_family_string (
+	const int	family
+	)
+{
+	const char* c;
+
+	switch (family) {
+	case AF_UNSPEC:		c = "AF_UNSPEC"; break;
+	case AF_INET:		c = "AF_INET"; break;
+	case AF_INET6:		c = "AF_INET6"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
 }
 
 /* eof */
