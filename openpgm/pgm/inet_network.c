@@ -41,19 +41,26 @@
 #endif
 
 
-/* 127		=> 127.0.0.0
+/* Converts a numbers-and-dots notation string into a network number.
+ * Note parameters and return value differs from inet_network().
+ *
+ * 127		=> 127.0.0.0
  * 127.1/8	=> 127.0.0.0
+ *
+ * returns 0 on success, returns -1 on invalid address.
  */
 
 int
 _pgm_inet_network (
-	const char* s,
-	struct in_addr* in
+	const char*		s,
+	struct in_addr*		in
 	)
 {
-	g_return_val_if_fail (s != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != s,  -1);
+	g_return_val_if_fail (NULL != in, -1);
 
-	g_trace ("if_inet_network (\"%s\")", s);
+	g_trace ("_pgm_inet_network (s:\"%s\" in:%p)",
+		 s, (gpointer)in);
 	in->s_addr = INADDR_ANY;
 
 	const char *p = s;
@@ -131,20 +138,26 @@ _pgm_inet_network (
 	return 0;
 }
 
-/* ::1/128	=> 0:0:0:0:0:0:0:1
+/* Converts a numbers-and-dots notation string into an IPv6 network number.
+ *
+ * ::1/128	=> 0:0:0:0:0:0:0:1
  * ::1          => 0:0:0:0:0:0:0:1
  * ::1.2.3.4	=> 0:0:0:0:1.2.3.4
+ *
+ * returns 0 on success, returns -1 on invalid address.
  */
 
 int
 _pgm_inet6_network (
-	const char* s,		/* NULL terminated */
-	struct in6_addr* in6
+	const char*		s,		/* NULL terminated */
+	struct in6_addr*	in6
 	)
 {
-	g_return_val_if_fail (s != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != s,   -1);
+	g_return_val_if_fail (NULL != in6, -1);
 
-	g_trace ("if_inet6_network (\"%s\")", s);
+	g_trace ("_pgm_inet6_network (s:\"%s\" in6:%p)",
+		 s, (gpointer)in6);
 
 /* inet_pton cannot parse IPv6 addresses with subnet declarations, so
  * chop them off.
