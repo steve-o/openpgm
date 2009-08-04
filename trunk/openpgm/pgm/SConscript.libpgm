@@ -74,6 +74,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['indextoaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
 	te.Program ('net_unittest.c');
 	te.Program ('timer_unittest.c');
+	te.Program ('time_unittest.c');
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
