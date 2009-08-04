@@ -102,14 +102,14 @@ static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
 
 /* initialize time system.
  *
- * returns 0 on success, returns -1 on error such as being unable to open
+ * returns TRUE on success, returns FALSE on error such as being unable to open
  * the RTC device, an unstable TSC, or system already initialized.
  */
 
-int
+gboolean
 _pgm_time_init (void)
 {
-	g_return_val_if_fail (FALSE == time_got_initialized, -1);
+	g_return_val_if_fail (FALSE == time_got_initialized, FALSE);
 
 /* current time */
 	const char *cfg = getenv ("PGM_TIMER");
@@ -246,7 +246,7 @@ _pgm_time_init (void)
 	}
 
 	time_got_initialized = TRUE;
-	return 0;
+	return TRUE;
 }
 
 gboolean
@@ -255,19 +255,21 @@ _pgm_time_supported (void)
 	return ( time_got_initialized == TRUE );
 }
 
-/* returns 0 if shutdown succeeded, returns -1 on error.
+/* returns TRUE if shutdown succeeded, returns FALSE on error.
  */
 
-int
+gboolean
 _pgm_time_shutdown (void)
 {
-	g_return_val_if_fail (TRUE == time_got_initialized, -1);
+	g_return_val_if_fail (TRUE == time_got_initialized, FALSE);
 
+	gboolean success = TRUE;
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
-		return rtc_shutdown ();
+		success = rtc_shutdown ();
 #endif
-	return 0;
+	time_got_initialized = !success;
+	return TRUE;
 }
 
 static pgm_time_t
@@ -343,13 +345,13 @@ rtc_init (void)
  */
 
 static
-int
+gboolean
 rtc_shutdown (void)
 {
-	g_return_val_if_fail (rtc_fd, -1);
+	g_return_val_if_fail (rtc_fd, FALSE);
 	g_warn_if_fail (0 == close (rtc_fd));
 	rtc_fd = -1;
-	return 0;
+	return FALSE;
 }
 
 static pgm_time_t
