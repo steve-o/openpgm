@@ -46,10 +46,8 @@ ifflags_string (
 	static char s[1024];
 
 	s[0] = '\0';
-#ifdef IFF_UP
 	if (flags & IFF_UP)
 		strcat (s, "IFF_UP");
-#endif
 #define IFF(flag) \
 	do { \
 		if (flags & flag) { \
