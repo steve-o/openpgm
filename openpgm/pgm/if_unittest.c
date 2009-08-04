@@ -482,6 +482,7 @@ mock_getaddrinfo (
 		struct mock_host_t* host = list->data;
 		const int host_family = ((struct sockaddr*)&host->address)->sa_family;
 		if (((strcmp (host->canonical_hostname, node) == 0) ||
+		     (host->alias && strcmp (host->alias, node) == 0) || 
 		     (ai_flags & AI_NUMERICHOST &&
 		      0 == pgm_sockaddr_cmp ((struct sockaddr*)&addr, (struct sockaddr*)&host->address)))
 		     &&
@@ -517,12 +518,18 @@ mock_gethostname (
 	size_t			len
 	)
 {
-	if (NULL == name)
-		return EFAULT;
-	if (len < 0)
-		return EINVAL;
-	if (len < (1 + strlen (mock_hostname)))
-		return ENAMETOOLONG;
+	if (NULL == name) {
+		errno = EFAULT;
+		return -1;
+	}
+	if (len < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (len < (1 + strlen (mock_hostname))) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
 /* force an error */
 	if (mock_hostname == mock_toolong) {
 		errno = ENAMETOOLONG;

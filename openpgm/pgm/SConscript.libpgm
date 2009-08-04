@@ -70,6 +70,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('md5_unittest.c');
 	te.Program ('getifaddrs_unittest.c');
 	te.Program ('inet_network_unittest.c');
+	te.Program (['getnodeaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c')]);
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
