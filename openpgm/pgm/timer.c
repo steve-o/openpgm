@@ -56,6 +56,8 @@ static GSourceFuncs g_pgm_timer_funcs = {
 	.closure_callback	= NULL
 };
 
+static const char* gpriority_string (int);
+
 
 /* timer thread execution function.
  *
@@ -70,6 +72,11 @@ pgm_timer_thread (
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
 
+/* pre-conditions */
+	g_assert (NULL != transport);
+
+	g_trace ("pgm_timer_thread (data:%p)", data);
+
 	transport->timer_context = g_main_context_new ();
 	g_mutex_lock (transport->thread_mutex);
 	transport->timer_loop = g_main_loop_new (transport->timer_context, FALSE);
@@ -83,26 +90,32 @@ pgm_timer_thread (
 /* cleanup */
 	g_main_loop_unref (transport->timer_loop);
 	g_main_context_unref (transport->timer_context);
-
 	return NULL;
 }
+
+/* create new GSource for PGM timer thread events
+ *
+ * returns GSource on success, returns NULL on failure.
+ */
 
 GSource*
 pgm_timer_create (
 	pgm_transport_t*	transport
 	)
 {
-	g_return_val_if_fail (transport != NULL, NULL);
+	g_return_val_if_fail (NULL != transport, NULL);
+
+	g_trace ("pgm_timer_create (transport:%p)", (gpointer)transport);
 
 	GSource *source = g_source_new (&g_pgm_timer_funcs, sizeof(pgm_timer_t));
 	pgm_timer_t *timer = (pgm_timer_t*)source;
-
 	timer->transport = transport;
-
 	return source;
 }
 
-/* on success, returns id of GSource 
+/* add a GSource to the timer thread GLib context.
+ *
+ * on success, returns id of GSource (> 0), on failure returns 0
  */
 
 int
@@ -111,18 +124,23 @@ pgm_timer_add_full (
 	gint			priority
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != transport, -1);
+
+	g_trace ("pgm_timer_add_full (transport:%p priority:%s)",
+		(gpointer)transport, gpriority_string (priority));
 
 	GSource* source = pgm_timer_create (transport);
-
 	if (priority != G_PRIORITY_DEFAULT)
 		g_source_set_priority (source, priority);
-
-	guint id = g_source_attach (source, transport->timer_context);
+	const guint id = g_source_attach (source, transport->timer_context);
 	g_source_unref (source);
-
 	return id;
 }
+
+/* add a GSource to the timer thread GLib context with high idle priority.
+ *
+ * on success, returns id of GSource (> 0), on failure returns 0.
+ */
 
 int
 pgm_timer_add (
@@ -154,7 +172,6 @@ pgm_timer_prepare (
 	if (transport->can_send_data)
 	{
 		expiration = transport->spm_heartbeat_state ? MIN(transport->next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
-		g_trace ("spm %" G_GINT64_FORMAT " usec", (gint64)expiration - (gint64)now);
 	}
 
 /* save the nearest timer */
@@ -176,11 +193,8 @@ pgm_timer_prepare (
 		msec = 0;
 	else
 		msec = MIN (G_MAXINT, (guint)msec);
-
 	*timeout = (gint)msec;
-
-	g_trace ("expiration in %i msec", (gint)msec);
-
+	g_trace ("%dms", (gint)msec);
 	return (msec == 0);
 }
 
@@ -190,8 +204,6 @@ pgm_timer_check (
 	GSource*		source
 	)
 {
-	g_trace ("pgm_timer_check");
-
 	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
 	const pgm_time_t now = pgm_time_update_now();
 
@@ -207,12 +219,16 @@ pgm_timer_check (
 static
 gboolean
 pgm_timer_dispatch (
-	GSource*			source,
-	G_GNUC_UNUSED GSourceFunc	callback,
-	G_GNUC_UNUSED gpointer		user_data
+	GSource*		source,
+	GSourceFunc		callback,
+	gpointer		user_data
 	)
 {
-	g_trace ("pgm_timer_dispatch");
+/* pre-conditions */
+	g_assert (NULL != source);
+
+	g_trace ("pgm_timer_dispatch (source: %p callback:%p user-data:%p)",
+		(gpointer)source, (gpointer)callback, (gpointer)user_data);
 
 	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
 	pgm_transport_t* transport = pgm_timer->transport;
@@ -256,6 +272,26 @@ pgm_timer_dispatch (
 	}
 
 	return TRUE;
+}
+
+static
+const char*
+gpriority_string (
+	int		priority
+	)
+{
+	const char* c;
+
+	switch (priority) {
+	case G_PRIORITY_HIGH:		c = "G_PRIORITY_HIGH"; break;
+	case G_PRIORITY_DEFAULT:	c = "G_PRIORITY_DEFAULT"; break;
+	case G_PRIORITY_HIGH_IDLE:	c = "G_PRIORITY_HIGH_IDLE"; break;
+	case G_PRIORITY_DEFAULT_IDLE:	c = "G_PRIORITY_DEFAULT_IDLE"; break;
+	case G_PRIORITY_LOW:		c = "G_PRIORITY_LOW"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
 }
 
 /* eof */
