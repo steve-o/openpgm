@@ -56,8 +56,7 @@ _pgm_if_indextoaddr (
 	GError**		error
         )
 {
-/* pre-conditions */
-	g_assert (NULL != ifsa);
+	g_return_val_if_fail (NULL != ifsa, FALSE);
 
 	if (0 == ifindex)		/* any interface or address */
 	{
@@ -72,7 +71,7 @@ _pgm_if_indextoaddr (
 			break;
 
 		default:
-			g_assert_not_reached();
+			g_return_val_if_reached (FALSE);
 			break;
 		}
 		return TRUE;

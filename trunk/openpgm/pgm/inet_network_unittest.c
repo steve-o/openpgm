@@ -72,7 +72,7 @@ END_TEST
 START_TEST (test_inet6_network_pass_001)
 {
 	const char* network = "::1/128";
-	char snetwork[INET_ADDRSTRLEN];
+	char snetwork[INET6_ADDRSTRLEN];
 	struct in6_addr addr;
 	fail_unless (0 == _pgm_inet6_network (network, &addr));
 	g_message ("Resolved \"%s\" to \"%s\"",
