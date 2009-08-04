@@ -27,8 +27,8 @@
 #ifdef CONFIG_HAVE_GETIFADDRS
 #	include <ifaddrs.h>
 #else
-#	define getifaddrs	pgm_if_getifaddrs
-#	define freeifaddrs	pgm_if_freeifaddrs
+#	define getifaddrs	pgm_getifaddrs
+#	define freeifaddrs	pgm_freeifaddrs
 #	define ifaddrs		pgm_ifaddrs
 #endif
 
