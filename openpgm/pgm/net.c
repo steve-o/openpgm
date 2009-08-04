@@ -24,6 +24,7 @@
 #endif
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "pgm/transport.h"
 #include "pgm/rate_control.h"
@@ -67,10 +68,10 @@ _pgm_sendto (
 
 	if (use_rate_limit)
 	{
-		int check = _pgm_rate_check (transport->rate_control, len, flags);
+		const int check = _pgm_rate_check (transport->rate_control, len, flags);
 		if (check < 0 && errno == EAGAIN)
 		{
-			return (gssize)check;
+			return (const gssize)check;
 		}
 	}
 
@@ -90,7 +91,7 @@ _pgm_sendto (
 			.events		= POLLOUT,
 			.revents	= 0
 		};
-		int ready = poll (&p, 1, 500 /* ms */);
+		const int ready = poll (&p, 1, 500 /* ms */);
 #else
 		fd_set writefds;
 		FD_ZERO(&writefds);
@@ -99,35 +100,31 @@ _pgm_sendto (
 			.tv_sec  = 0,
 			.tv_usec = 500 /* ms */ * 1000
 		};
-		int ready = select (1, NULL, &writefds, NULL, &tv);
+		const int ready = select (1, NULL, &writefds, NULL, &tv);
 #endif /* CONFIG_HAVE_POLL */
 		if (ready > 0)
 		{
 			sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
 			if ( sent < 0 )
 			{
-				g_warning ("sendto %s failed: %i/%s",
+				g_warning (_("sendto %s failed: %s"),
 						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						errno,
 						g_strerror (errno));
 			}
 		}
 		else if (ready == 0)
 		{
-			g_warning ("sendto %s socket timeout.",
+			g_warning (_("sendto %s failed: socket timeout."),
 					 inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
 		}
 		else
 		{
-			g_warning ("blocked sendto %s socket failed: %i %s",
-					inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-					errno,
+			g_warning (_("blocked socket failed: %s"),
 					g_strerror (errno));
 		}
 	}
 
 	g_static_mutex_unlock (mutex);
-
 	return sent;
 }
 
