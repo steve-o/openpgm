@@ -143,7 +143,7 @@ static
 pgm_time_t
 mock_pgm_time_update_now (void)
 {
-	return 0x1;
+	return mock_pgm_time_now;
 }
 
 /** receiver module */
