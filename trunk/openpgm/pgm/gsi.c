@@ -76,7 +76,7 @@ pgm_gsi_create_from_hostname (
 	}
 
 	_md5_init_ctx (&ctx);
-	_md5_process_bytes (hostname, strlen(hostname), &ctx);
+	_md5_process_bytes (&ctx, hostname, strlen(hostname));
 	_md5_finish_ctx (&ctx, resblock);
 
 	memcpy (gsi, resblock + 10, 6);
