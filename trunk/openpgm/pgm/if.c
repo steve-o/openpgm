@@ -43,7 +43,7 @@
 #include "pgm/getnodeaddr.h"
 #include "pgm/inet_network.h"
 
-#define IF_DEBUG
+//#define IF_DEBUG
 
 #ifndef IF_DEBUG
 #define g_trace(...)		while (0)
