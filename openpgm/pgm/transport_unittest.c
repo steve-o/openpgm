@@ -151,23 +151,21 @@ mock_pgm_txw_shutdown (
 
 /** rate control module */
 static
-int
+void
 mock__pgm_rate_create (
 	gpointer*		bucket_,
 	guint			rate_per_sec,
 	guint			iphdr_len
 	)
 {
-	return 0;
 }
 
 static
-int
+void
 mock__pgm_rate_destroy (
 	gpointer		bucket
 	)
 {
-	return 0;
 }
 
 /** reed solomon module */
@@ -175,8 +173,8 @@ static
 void
 mock__pgm_rs_create (
 	gpointer*		rs_,
-	guint			n,
-	guint			k
+	const guint		n,
+	const guint		k
 	)
 {
 }

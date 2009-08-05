@@ -117,16 +117,16 @@ flags_string (
 /* mock functions for external references */
 
 static
-int
+gboolean
 mock__pgm_rate_check (
 	gpointer		bucket,
-	guint			data_size,
-	int			flags		/* MSG_DONTWAIT = non-blocking */
+	const guint		data_size,
+	const int		flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
 	g_debug ("mock__pgm_rate_check (bucket:%p data-size:%u flags:%s)",
 		bucket, data_size, flags_string (flags));
-	return 0;
+	return TRUE;
 }
 
 static
