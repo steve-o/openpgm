@@ -41,16 +41,11 @@ typedef enum
 	PGM_ASYNC_ERROR_FAULT,
 	PGM_ASYNC_ERROR_MFILE,
 	PGM_ASYNC_ERROR_NFILE,
-	PGM_ASYNC_ERROR_FAILED
+	PGM_ASYNC_ERROR_OVERFLOW,
+	PGM_ASYNC_ERROR_FAILED,
 } PGMAsyncError;
 
-typedef struct pgm_event_t pgm_event_t;
 typedef struct pgm_async_t pgm_async_t;
-
-struct pgm_event_t {
-	gpointer		data;
-	guint			len;
-};
 
 struct pgm_async_t {
 	pgm_transport_t*	transport;
@@ -67,7 +62,7 @@ G_BEGIN_DECLS
 
 int pgm_async_create (pgm_async_t**, pgm_transport_t*, GError**);
 int pgm_async_destroy (pgm_async_t*);
-gssize pgm_async_recv (pgm_async_t* async, gpointer, gsize, int);
+GIOStatus pgm_async_recv (pgm_async_t* async, gpointer, gsize, gsize*, int, GError**);
 GSource* pgm_async_create_watch (pgm_async_t*) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_async_add_watch_full (pgm_async_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
 int pgm_async_add_watch (pgm_async_t*, pgm_eventfn_t, gpointer);
