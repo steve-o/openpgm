@@ -76,6 +76,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('timer_unittest.c');
 	te.Program ('time_unittest.c');
 	te.Program ('signal_unittest.c');
+	te.Program (['reed_solomon_unittest.c', e.Object('galois_tables.c')]);
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
