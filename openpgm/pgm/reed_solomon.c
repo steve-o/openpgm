@@ -7,7 +7,7 @@
  * draft-ietf-rmt-bb-fec-rs-05.txt
  * + rfc5052
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -43,11 +43,11 @@ typedef struct rs_t rs_t;
 
 /* globals */
 
-void _pgm_rs_create (rs_t**, guint, guint);
+void _pgm_rs_create (rs_t**, const guint, const guint);
 void _pgm_rs_destroy (rs_t*);
-void _pgm_rs_encode (rs_t*, const gf8_t**, guint, gf8_t*, gsize);
-void _pgm_rs_decode_parity_inline (rs_t*, gf8_t**, guint*, gsize);
-void _pgm_rs_decode_parity_appended (rs_t*, gf8_t**, guint*, gsize);
+void _pgm_rs_encode (rs_t*, const gf8_t**, const guint, gf8_t*, const gsize);
+void _pgm_rs_decode_parity_inline (rs_t*, gf8_t**, const guint*, const gsize);
+void _pgm_rs_decode_parity_appended (rs_t*, gf8_t**, const guint*, const gsize);
 
 
 /* Vector GF(2⁸) plus-equals multiplication.
@@ -362,11 +362,13 @@ matinv_vandermonde (
 void
 _pgm_rs_create (
 	rs_t**			rs_,
-	guint			n,
-	guint			k
+	const guint		n,
+	const guint		k
 	)
 {
-	g_assert (rs_);
+	g_assert (NULL != rs_);
+	g_assert (n > 0);
+	g_assert (k > 0);
 
 	rs_t* rs = g_malloc0 (sizeof(rs_t));
 
@@ -430,10 +432,10 @@ _pgm_rs_create (
 
 void
 _pgm_rs_destroy (
-	rs_t*		rs
+	rs_t*			rs
 	)
 {
-	g_assert (rs);
+	g_assert (NULL != rs);
 
 	if (rs->RM) {
 		g_free (rs->RM);
@@ -454,14 +456,18 @@ _pgm_rs_destroy (
 
 void
 _pgm_rs_encode (
-	rs_t*		rs,
-	const gf8_t*	src[],		/* length rs_t::k */
-	guint		offset,
-	gf8_t*		dst,
-	gsize		len
+	rs_t*			rs,
+	const gf8_t*		src[],		/* length rs_t::k */
+	const guint		offset,
+	gf8_t*			dst,
+	const gsize		len
 	)
 {
+	g_assert (NULL != rs);
+	g_assert (NULL != src);
 	g_assert (offset >= rs->k && offset < rs->n);	/* parity packet */
+	g_assert (NULL != dst);
+	g_assert (len > 0);
 
 	memset (dst, 0, len);
 	for (guint i = 0; i < rs->k; i++)
@@ -477,12 +483,17 @@ _pgm_rs_encode (
 
 void
 _pgm_rs_decode_parity_inline (
-	rs_t*		rs,
-	gf8_t*		block[],	/* length rs_t::k */
-	guint		offsets[],	/* offsets within FEC block, 0 < offset < n */
-	gsize		len		/* packet length */
+	rs_t*			rs,
+	gf8_t*			block[],	/* length rs_t::k */
+	const guint		offsets[],	/* offsets within FEC block, 0 < offset < n */
+	const gsize		len		/* packet length */
 	)
 {
+	g_assert (NULL != rs);
+	g_assert (NULL != block);
+	g_assert (NULL != offsets);
+	g_assert (len > 0);
+
 /* create new recovery matrix from generator
  */
 	for (guint i = 0; i < rs->k; i++)
@@ -532,12 +543,17 @@ _pgm_rs_decode_parity_inline (
  */
 void
 _pgm_rs_decode_parity_appended (
-	rs_t*		rs,
-	gf8_t*		block[],	/* length rs_t::n, the FEC block */
-	guint		offsets[],	/* ordered index of packets */
-	gsize		len		/* packet length */
+	rs_t*			rs,
+	gf8_t*			block[],	/* length rs_t::n, the FEC block */
+	const guint		offsets[],	/* ordered index of packets */
+	const gsize		len		/* packet length */
 	)
 {
+	g_assert (NULL != rs);
+	g_assert (NULL != block);
+	g_assert (NULL != offsets);
+	g_assert (len > 0);
+
 /* create new recovery matrix from generator
  */
 	for (guint i = 0; i < rs->k; i++)
