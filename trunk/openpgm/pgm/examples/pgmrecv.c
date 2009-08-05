@@ -78,7 +78,7 @@ static GThread* g_thread = NULL;
 static GMainLoop* g_loop = NULL;
 static gboolean g_quit = FALSE;
 
-static void on_signal (int);
+static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
@@ -184,10 +184,10 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* setup signal handlers */
-	signal(SIGSEGV, on_sigsegv);
-	pgm_signal_install(SIGINT, on_signal);
-	pgm_signal_install(SIGTERM, on_signal);
-	pgm_signal_install(SIGHUP, SIG_IGN);
+	signal (SIGSEGV, on_sigsegv);
+	signal (SIGHUP,  SIG_IGN);
+	pgm_signal_install (SIGINT,  on_signal, g_loop);
+	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -227,17 +227,21 @@ main (
 	return EXIT_SUCCESS;
 }
 
-static void
+static
+void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int		signum,
+	gpointer	user_data
 	)
 {
-	g_message ("on_signal");
-
-	g_main_loop_quit(g_loop);
+	GMainLoop* loop = (GMainLoop*)user_data;
+	g_message ("on_signal (signum:%d user_data:%p)",
+		   signum, user_data);
+	g_main_loop_quit (loop);
 }
 
-static gboolean
+static
+gboolean
 on_startup (
 	G_GNUC_UNUSED gpointer data
 	)

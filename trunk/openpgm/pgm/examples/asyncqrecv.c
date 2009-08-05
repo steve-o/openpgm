@@ -58,13 +58,15 @@ static int g_sqns = 100;
 static pgm_transport_t* g_transport = NULL;
 static GMainLoop* g_loop = NULL;
 
-static void on_signal (int);
+static void on_signal (int, gpointer);
 static gboolean on_startup (void);
 
 static int on_data (gpointer, guint, gpointer);
 
 
-G_GNUC_NORETURN static void
+G_GNUC_NORETURN
+static
+void
 usage (
 	const char*	bin
 	)
@@ -109,10 +111,10 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* setup signal handlers */
-	signal(SIGSEGV, on_sigsegv);
-	pgm_signal_install(SIGINT, on_signal);
-	pgm_signal_install(SIGTERM, on_signal);
-	pgm_signal_install(SIGHUP, SIG_IGN);
+	signal (SIGSEGV, on_sigsegv);
+	signal (SIGHUP,  SIG_IGN);
+	pgm_signal_install (SIGINT,  on_signal, g_loop);
+	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -139,16 +141,21 @@ main (
 	return 0;
 }
 
-static void
+static
+void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int		signum,
+	gpointer	user_data
 	)
 {
-	g_message ("on_signal");
-	g_main_loop_quit (g_loop);
+	GMainLoop* loop = (GMainLoop*)user_data;
+	g_message ("on_signal (signum:%d user_data:%p)",
+		   signum, user_data);
+	g_main_loop_quit (loop);
 }
 
-static gboolean
+static
+gboolean
 on_startup (void)
 {
 	GError* err = NULL;
@@ -231,7 +238,8 @@ on_startup (void)
 	return FALSE;
 }
 
-static int
+static
+int
 on_data (
 	gpointer	data,
 	guint		len,

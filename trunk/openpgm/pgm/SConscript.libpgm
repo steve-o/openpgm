@@ -75,6 +75,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('net_unittest.c');
 	te.Program ('timer_unittest.c');
 	te.Program ('time_unittest.c');
+	te.Program ('signal_unittest.c');
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version

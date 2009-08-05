@@ -152,7 +152,7 @@ static void resize_status (struct ncurses_window*, int, int);
 static void write_status (const gchar*, ...) G_GNUC_PRINTF (1, 2);
 static void write_statusv (const gchar*, va_list);
 
-static void on_signal (int);
+static void on_signal (int, gpointer);
 static void on_winch (int);
 static gboolean on_startup (gpointer);
 static gboolean on_snap (gpointer);
@@ -166,7 +166,7 @@ static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 int
 main (
 	G_GNUC_UNUSED int	argc,
-	G_GNUC_UNUSED char   *argv[]
+	G_GNUC_UNUSED char     *argv[]
 	)
 {
 	puts ("pgmtop");
@@ -174,17 +174,17 @@ main (
 	log_init ();
 	pgm_init ();
 
+	g_loop = g_main_loop_new (NULL, FALSE);
+
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	pgm_signal_install (SIGINT, on_signal);
-	pgm_signal_install (SIGTERM, on_signal);
-	pgm_signal_install (SIGHUP, SIG_IGN);
-
-	g_loop = g_main_loop_new (NULL, FALSE);
+	signal (SIGHUP,  SIG_IGN);
+	pgm_signal_install (SIGINT,  on_signal, g_loop);
+	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
 	puts ("scheduling startup.n");
-	g_timeout_add(0, (GSourceFunc)on_startup, NULL);
+	g_timeout_add(0, (GSourceFunc)on_startup, g_loop);
 
 /* dispatch loop */
 	puts ("entering main event loop ...");
@@ -194,7 +194,7 @@ main (
 	puts ("event loop terminated, cleaning up.");
 
 /* cleanup */
-	g_main_loop_unref(g_loop);
+	g_main_loop_unref (g_loop);
 	g_loop = NULL;
 	if (g_io_channel) {
 		puts ("closing socket.");
@@ -539,14 +539,16 @@ write_statusv (
 	g_status_list = g_list_append (g_status_list, g_memdup (buffer, strlen(buffer)+1));
 }
 
-static void
+static
+void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int			signum,
+	gpointer		user_data
 	)
 {
+	GMainLoop* loop = (GMainLoop*)user_data;
 	puts ("on_signal");
-
-	g_main_loop_quit(g_loop);
+	g_main_loop_quit (loop);
 }
 
 /* terminal resize signal
@@ -562,9 +564,10 @@ on_winch (
 
 static gboolean
 on_startup (
-	G_GNUC_UNUSED gpointer data
+	gpointer		user_data
 	)
 {
+	GMainLoop* loop = (GMainLoop*)user_data;
 	int e;
 
 	puts ("startup.");
@@ -575,15 +578,15 @@ on_startup (
 #if HAVE_GETPROTOBYNAME_R
 	char b[1024];
 	struct protoent protobuf, *proto;
-	e = getprotobyname_r("pgm", &protobuf, b, sizeof(b), &proto);
+	e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			printf("Setting PGM protocol number to %i from /etc/protocols.\n", proto->p_proto);
+			print f("Setting PGM protocol number to %i from /etc/protocols.\n", proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
 	}
 #else
-	struct protoent *proto = getprotobyname("pgm");
+	struct protoent *proto = getprotobyname ("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
 			printf("Setting PGM protocol number to %i from /etc/protocols.\n", proto->p_proto);
@@ -594,72 +597,72 @@ on_startup (
 
 /* open socket for snooping */
 	puts ("opening raw socket.");
-	int sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	int sock = socket (PF_INET, SOCK_RAW, ipproto_pgm);
 	if (sock < 0) {
 		int _e = errno;
-		puts("on_startup() failed");
+		puts ("on_startup() failed");
 
 		if (_e == EPERM && 0 != getuid()) {
 			puts ("PGM protocol requires this program to run as superuser.");
 		}
-		g_main_loop_quit(g_loop);
+		g_main_loop_quit (loop);
 		return FALSE;
 	}
 
 /* drop out of setuid 0 */
-	if (0 == getuid()) {
+	if (0 == getuid ()) {
 		puts ("dropping superuser privileges.");
-		setuid((gid_t)65534);
-		setgid((uid_t)65534);
+		setuid ((gid_t)65534);
+		setgid ((uid_t)65534);
 	}
 
 	char _t = 1;
-	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
+	e = setsockopt (sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
 	if (e < 0) {
-		printw("on_startup() failed\n");
-		close(sock);
-		g_main_loop_quit(g_loop);
+		printw ("on_startup() failed\n");
+		close (sock);
+		g_main_loop_quit (loop);
 		return FALSE;
 	}
 
 /* buffers */
 	int buffer_size = 0;
 	socklen_t len = 0;
-	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
+	e = getsockopt (sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("receive buffer set at %i bytes.\n", buffer_size);
 	}
-	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	e = getsockopt (sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("send buffer set at %i bytes.\n", buffer_size);
 	}
 
 /* bind */
 	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
+	memset (&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	e = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+	e = bind (sock, (struct sockaddr*)&addr, sizeof(addr));
 	if (e < 0) {
-		printw("on_startup() failed\n");
-		close(sock);
-		g_main_loop_quit(g_loop);
+		printw ("on_startup() failed\n");
+		close (sock);
+		g_main_loop_quit (loop);
 		return FALSE;
 	}
 
 /* multicast */
 	struct ip_mreq mreq;
-	memset(&mreq, 0, sizeof(mreq));
+	memset (&mreq, 0, sizeof(mreq));
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
 	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
 	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+	e = setsockopt (sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
-		printw("on_startup() failed\n");
-		close(sock);
-		g_main_loop_quit(g_loop);
+		printw ("on_startup() failed\n");
+		close (sock);
+		g_main_loop_quit (loop);
 		return FALSE;
 	}
 
@@ -688,7 +691,6 @@ on_startup (
 	puts ("READY");
 
 	init_ncurses();
-
 	return FALSE;
 }
 
