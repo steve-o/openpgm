@@ -137,13 +137,14 @@ mock__pgm_rs_encode (
 }
 
 static
-int
+gboolean
 mock__pgm_rate_check (
 	gpointer			bucket,
-	guint				data_size,
-	int				flags
+	const guint			data_size,
+	const int			flags
 	)
 {
+	return TRUE;
 }
 
 static
