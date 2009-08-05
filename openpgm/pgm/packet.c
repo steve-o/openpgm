@@ -49,6 +49,7 @@
 
 /* globals */
 
+static gboolean pgm_parse (struct pgm_sk_buff_t* const, GError**);
 static gboolean pgm_print_spm (struct pgm_header*, gpointer, gsize);
 static gboolean pgm_print_poll (struct pgm_header*, gpointer, gsize);
 static gboolean pgm_print_polr (struct pgm_header*, gpointer, gsize);
@@ -76,6 +77,10 @@ pgm_parse_raw (
 	GError**			error
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != skb);
+	g_assert (NULL != dst);
+
 /* minimum size should be IPv4 header plus PGM header, check IP version later */
 	if (skb->len < PGM_MIN_SIZE)
 	{
@@ -246,6 +251,8 @@ pgm_parse_udp_encap (
 	GError**		error
 	)
 {
+	g_assert (NULL != skb);
+
 	if (skb->len < sizeof(struct pgm_header)) {
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
@@ -262,12 +269,16 @@ pgm_parse_udp_encap (
 
 /* will modify packet contents to calculate and check PGM checksum
  */
+static
 gboolean
 pgm_parse (
 	struct pgm_sk_buff_t* const	skb,		/* will be modified to calculate checksum */
 	GError**			error
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != skb);
+
 /* pgm_checksum == 0 means no transmitted checksum */
 	if (skb->pgm_header->pgm_checksum)
 	{
@@ -309,6 +320,10 @@ pgm_print_packet (
 	gsize		len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
 	{
@@ -429,8 +444,9 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	printf ("%s.%s > %s.%s: PGM\n",
-		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src), pgm_udpport_string(pgm_header->pgm_sport),
+	printf ("%s.%s > ",
+		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src), pgm_udpport_string(pgm_header->pgm_sport));
+	printf ("%s.%s: PGM\n",
 		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_dst), pgm_udpport_string(pgm_header->pgm_dport));
 
 	printf ("type: %s [%i] (version=%i, reserved=%i)\n"
@@ -552,6 +568,11 @@ pgm_print_spm (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("SPM: ");
 
 	if (len < PGM_MIN_SPM_SIZE) {
@@ -641,6 +662,11 @@ pgm_print_poll (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("POLL: ");
 
 	if (len < PGM_MIN_POLL_SIZE) {
@@ -742,6 +768,11 @@ pgm_print_polr (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("POLR: ");
 
 	if (len < sizeof(struct pgm_polr)) {
@@ -791,6 +822,11 @@ pgm_print_odata (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("ODATA: ");
 
 	if (len < sizeof(struct pgm_data)) {
@@ -843,6 +879,11 @@ pgm_print_rdata (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("RDATA: ");
 
 	if (len < sizeof(struct pgm_data)) {
@@ -919,7 +960,7 @@ pgm_verify_nak (
 /* pre-conditions */
 	g_assert (NULL != skb);
 
-	g_trace ("pgm_verify_nak (skb:%p)", (gpointer)skb);
+	g_trace ("pgm_verify_nak (skb:%p)", (gconstpointer)skb);
 
 /* truncated packet */
 	if (skb->len < PGM_MIN_NAK_SIZE)
@@ -977,6 +1018,11 @@ pgm_print_nak (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("NAK: ");
 
 	if (len < PGM_MIN_NAK_SIZE) {
@@ -1055,6 +1101,9 @@ pgm_verify_nnak (
 	const struct pgm_sk_buff_t* const	skb
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != skb);
+
 	return pgm_verify_nak (skb);
 }
 
@@ -1065,6 +1114,11 @@ pgm_print_nnak (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("N-NAK: ");
 
 	if (len < sizeof(struct pgm_nak)) {
@@ -1085,6 +1139,9 @@ pgm_verify_ncf (
 	const struct pgm_sk_buff_t* const	skb
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != skb);
+
 	return pgm_verify_nak (skb);
 }
 
@@ -1095,6 +1152,11 @@ pgm_print_ncf (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("NCF: ");
 
 	if (len < sizeof(struct pgm_nak)) {
@@ -1121,6 +1183,9 @@ pgm_verify_spmr (
 	G_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != skb);
+
 	return TRUE;
 }
 
@@ -1131,6 +1196,11 @@ pgm_print_spmr (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != header);
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf ("SPMR: ");
 
 /* option extensions */
@@ -1155,6 +1225,10 @@ pgm_print_options (
 	gsize			len
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != data);
+	g_assert (len > 0);
+
 	printf (" OPTIONS:");
 
 	if (len < sizeof(struct pgm_opt_length)) {
@@ -1319,6 +1393,9 @@ pgm_ipopt_print (
 	gsize			length
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != ipopt);
+
 	const char* op = ipopt;
 
 	while (length)

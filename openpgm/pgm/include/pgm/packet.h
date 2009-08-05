@@ -394,7 +394,6 @@ typedef enum
 G_BEGIN_DECLS
 
 GQuark pgm_packet_error_quark (void);
-gboolean pgm_parse (struct pgm_sk_buff_t* const, GError**);
 gboolean pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, GError**);
 gboolean pgm_parse_udp_encap (struct pgm_sk_buff_t* const, GError**);
 gboolean pgm_print_packet (gpointer, gsize);
