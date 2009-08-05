@@ -30,6 +30,7 @@ if env['WITH_CHECK'] == 'true':
 	te['CCFLAGS'] = newCCFLAGS;
 	te.ParseConfig ('pkg-config --static --cflags --libs check');
 	te.Program ('snmp_unittest.c');
+	te.Program (['pgmMIB_unittest.c', e.Object('snmp.c')]);
 
 
 # end of file

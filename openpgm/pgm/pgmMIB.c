@@ -19,6 +19,15 @@
 #include "pgm/transport.h"
 
 
+//#define PGMMIB_DEBUG
+
+#ifndef PGMMIB_DEBUG
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
+
+
 struct pgm_snmp_context_t {
 	GSList*		list;
 	GList*		node;
@@ -78,6 +87,9 @@ pgm_mib_init (
 	GError**	error
 	)
 {
+	g_trace ("pgm_mib_init (error:%p)",
+		(gpointer)error);
+
 	if (MIB_REGISTERED_OK != initialize_table_pgmSourceTable()) {
 		g_set_error (error,
 			     PGM_SNMP_ERROR,
@@ -133,9 +145,12 @@ pgm_mib_init (
  * 	SNMPERR_GENERR
  */
 
-static int
-initialize_table_pgmSourceTable(void)
+static
+int
+initialize_table_pgmSourceTable (void)
 {
+	g_trace ("initialize_table_pgmSourceTable ()");
+
 	static oid pgmSourceTable_oid[] = {1,3,6,1,3,112,1,2,100,2};
 	netsnmp_table_registration_info* table_info = NULL;
 	netsnmp_iterator_info* iinfo = NULL;
@@ -190,7 +205,8 @@ error:
  * returns answer or NULL
  */
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmSourceTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
@@ -198,6 +214,14 @@ pgmSourceTable_get_first_data_point(
 	netsnmp_iterator_info*	mydata			/* iinfo on init() */
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != my_loop_context);
+	g_assert (NULL != my_data_context);
+	g_assert (NULL != put_index_data);
+
+	g_trace ("pgmSourceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+		(gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -214,14 +238,23 @@ pgmSourceTable_get_first_data_point(
 	return pgmSourceTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
 }
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmSourceTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != my_loop_context);
+	g_assert (NULL != my_data_context);
+	g_assert (NULL != put_index_data);
+
+	g_trace ("pgmSourceTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+		(gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
@@ -254,27 +287,44 @@ pgmSourceTable_get_next_data_point(
 	return put_index_data;
 }
 
-static void
+static
+void
 pgmSourceTable_free_loop_context (
 	void*			my_loop_context,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != my_loop_context);
+
+	g_trace ("pgmSourceTable_free_loop_context (my_loop_context:%p mydata:%p)",
+		(gpointer)my_loop_context, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
-	g_free(context);
+	g_free (context);
 	my_loop_context = NULL;
 
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
-static int
+static
+int
 pgmSourceTable_handler (
-	G_GNUC_UNUSED netsnmp_mib_handler* handler,
-	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != handler);
+	g_assert (NULL != reginfo);
+	g_assert (NULL != reqinfo);
+	g_assert (NULL != requests);
+
+	g_trace ("pgmSourceTable_handler (handler:%p reginfo:%p reqinfo:%p requests:%p)",
+		(gpointer)handler, (gpointer)reginfo, (gpointer)reqinfo, (gpointer)requests);
+	
 	switch (reqinfo->mode)
 	{
 
@@ -356,9 +406,12 @@ pgmSourceTable_handler (
  *
  */
 
-static int
+static
+int
 initialize_table_pgmSourceConfigTable(void)
 {
+	g_trace ("initialize_table_pgmSourceConfigTable ()");
+
 	static oid pgmSourceConfigTable_oid[] = {1,3,6,1,3,112,1,2,100,3};
 	netsnmp_table_registration_info* table_info = NULL;
 	netsnmp_iterator_info* iinfo = NULL;
@@ -413,7 +466,8 @@ error:
  * returns answer or NULL
  */
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmSourceConfigTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
@@ -421,6 +475,14 @@ pgmSourceConfigTable_get_first_data_point(
 	netsnmp_iterator_info*	mydata			/* iinfo on init() */
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmSourceConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -437,14 +499,23 @@ pgmSourceConfigTable_get_first_data_point(
 	return pgmSourceConfigTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
 }
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmSourceConfigTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmSourceConfigTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
@@ -477,12 +548,19 @@ pgmSourceConfigTable_get_next_data_point(
 	return put_index_data;
 }
 
-static void
+static
+void
 pgmSourceConfigTable_free_loop_context (
 	void*			my_loop_context,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+
+        g_trace ("pgmSourceConfigTable_free_loop_context (my_loop_context:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 	g_free(context);
 	my_loop_context = NULL;
@@ -490,14 +568,24 @@ pgmSourceConfigTable_free_loop_context (
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
-static int
+static
+int
 pgmSourceConfigTable_handler (
-	G_GNUC_UNUSED netsnmp_mib_handler* handler,
-	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != handler);
+        g_assert (NULL != reginfo);
+        g_assert (NULL != reqinfo);
+        g_assert (NULL != requests);
+
+        g_trace ("pgmSourceConfigTable_handler (handler:%p reginfo:%p reqinfo:%p requests:%p)",
+                (gpointer)handler, (gpointer)reginfo, (gpointer)reqinfo, (gpointer)requests);
+
 	switch (reqinfo->mode)
 	{
 
@@ -672,9 +760,12 @@ pgmSourceConfigTable_handler (
  * pgmSourcePerformanceTable
  */
 
-static int
-initialize_table_pgmSourcePerformanceTable(void)
+static
+int
+initialize_table_pgmSourcePerformanceTable (void)
 {
+	g_trace ("initialize_table_pgmSourcePerformanceTable ()");
+
 	static oid pgmSourcePerformanceTable_oid[] = {1,3,6,1,3,112,1,2,100,4};
 	netsnmp_table_registration_info* table_info = NULL;
 	netsnmp_iterator_info* iinfo = NULL;
@@ -729,7 +820,8 @@ error:
  * returns answer or NULL
  */
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmSourcePerformanceTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
@@ -737,6 +829,14 @@ pgmSourcePerformanceTable_get_first_data_point(
 	netsnmp_iterator_info*	mydata			/* iinfo on init() */
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmSourcePerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -753,14 +853,23 @@ pgmSourcePerformanceTable_get_first_data_point(
 	return pgmSourcePerformanceTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
 }
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmSourcePerformanceTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmSourcePerformanceTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
@@ -793,12 +902,19 @@ pgmSourcePerformanceTable_get_next_data_point(
 	return put_index_data;
 }
 
-static void
+static
+void
 pgmSourcePerformanceTable_free_loop_context (
 	void*			my_loop_context,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+
+        g_trace ("pgmPerformanceSourceTable_free_loop_context (my_loop_context:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)mydata);
+ 
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 	g_free(context);
 	my_loop_context = NULL;
@@ -806,14 +922,24 @@ pgmSourcePerformanceTable_free_loop_context (
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
-static int
+static
+int
 pgmSourcePerformanceTable_handler (
-	G_GNUC_UNUSED netsnmp_mib_handler* handler,
-	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != handler);
+        g_assert (NULL != reginfo);
+        g_assert (NULL != reqinfo);
+        g_assert (NULL != requests);
+
+        g_trace ("pgmSourcePerformanceTable_handler (handler:%p reginfo:%p reqinfo:%p requests:%p)",
+                (gpointer)handler, (gpointer)reginfo, (gpointer)reqinfo, (gpointer)requests);
+
 	switch (reqinfo->mode)
 	{
 
@@ -1166,9 +1292,12 @@ pgmSourcePerformanceTable_handler (
  * pgmReceiverTable
  */
 
-static int
+static
+int
 initialize_table_pgmReceiverTable(void)
 {
+	g_trace ("initialize_table_pgmReceiverTable ()");
+
 	static oid pgmReceiverTable_oid[] = {1,3,6,1,3,112,1,3,100,2};
 	netsnmp_table_registration_info* table_info = NULL;
 	netsnmp_iterator_info* iinfo = NULL;
@@ -1224,7 +1353,8 @@ error:
  * returns answer or NULL
  */
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmReceiverTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
@@ -1232,6 +1362,14 @@ pgmReceiverTable_get_first_data_point(
 	netsnmp_iterator_info*	mydata			/* iinfo on init() */
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmReceiverTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -1270,14 +1408,23 @@ pgmReceiverTable_get_first_data_point(
 	return pgmReceiverTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
 }
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmReceiverTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmReceiverTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
@@ -1341,12 +1488,19 @@ pgmReceiverTable_get_next_data_point(
 	return put_index_data;
 }
 
-static void
+static
+void
 pgmReceiverTable_free_loop_context (
 	void*			my_loop_context,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+
+        g_trace ("pgmReceiverTable_free_loop_context (my_loop_context:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 
 /* check for intra-peer state */
@@ -1361,14 +1515,24 @@ pgmReceiverTable_free_loop_context (
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
-static int
+static
+int
 pgmReceiverTable_handler (
-	G_GNUC_UNUSED netsnmp_mib_handler* handler,
-	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != handler);
+        g_assert (NULL != reginfo);
+        g_assert (NULL != reqinfo);
+        g_assert (NULL != requests);
+
+        g_trace ("pgmReceiverTable_handler (handler:%p reginfo:%p reqinfo:%p requests:%p)",
+                (gpointer)handler, (gpointer)reginfo, (gpointer)reqinfo, (gpointer)requests);
+
 	switch (reqinfo->mode)
 	{
 
@@ -1464,9 +1628,12 @@ pgmReceiverTable_handler (
  *
  */
 
-static int
+static
+int
 initialize_table_pgmReceiverConfigTable(void)
 {
+	g_trace ("initialize_table_pgmReceiverConfigTable ()");
+
 	static oid pgmReceiverConfigTable_oid[] = {1,3,6,1,3,112,1,3,100,3};
 	netsnmp_table_registration_info* table_info = NULL;
 	netsnmp_iterator_info* iinfo = NULL;
@@ -1522,7 +1689,8 @@ error:
  * returns answer or NULL
  */
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmReceiverConfigTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
@@ -1530,6 +1698,14 @@ pgmReceiverConfigTable_get_first_data_point(
 	netsnmp_iterator_info*	mydata			/* iinfo on init() */
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmReceiverConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -1566,14 +1742,23 @@ pgmReceiverConfigTable_get_first_data_point(
 	return pgmReceiverConfigTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
 }
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmReceiverConfigTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmReceiverConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
@@ -1637,12 +1822,19 @@ pgmReceiverConfigTable_get_next_data_point(
 	return put_index_data;
 }
 
-static void
+static
+void
 pgmReceiverConfigTable_free_loop_context (
 	void*			my_loop_context,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+
+        g_trace ("pgmReceiverConfigTable_free_loop_context (my_loop_context:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 
 /* check for intra-peer state */
@@ -1657,14 +1849,24 @@ pgmReceiverConfigTable_free_loop_context (
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
-static int
+static
+int
 pgmReceiverConfigTable_handler (
-	G_GNUC_UNUSED netsnmp_mib_handler* handler,
-	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != handler);
+        g_assert (NULL != reginfo);
+        g_assert (NULL != reqinfo);
+        g_assert (NULL != requests);
+
+        g_trace ("pgmReceiverConfigTable_handler (handler:%p reginfo:%p reqinfo:%p requests:%p)",
+                (gpointer)handler, (gpointer)reginfo, (gpointer)reqinfo, (gpointer)requests);
+
 	switch (reqinfo->mode)
 	{
 
@@ -1811,9 +2013,12 @@ pgmReceiverConfigTable_handler (
  * pgmReceiverPerformanceTable
  */
 
-static int
+static
+int
 initialize_table_pgmReceiverPerformanceTable(void)
 {
+	g_trace ("initialize_table_pgmReceiverPerformanceTable ()");
+
 	static oid pgmReceiverPerformanceTable_oid[] = {1,3,6,1,3,112,1,3,100,4};
 	netsnmp_table_registration_info* table_info = NULL;
 	netsnmp_iterator_info* iinfo = NULL;
@@ -1869,7 +2074,8 @@ error:
  * returns answer or NULL
  */
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmReceiverPerformanceTable_get_first_data_point(
 	void**			my_loop_context,	/* valid through one query of multiple "data points" */
 	void**			my_data_context,	/* answer blob which is passed to handler() */
@@ -1877,6 +2083,14 @@ pgmReceiverPerformanceTable_get_first_data_point(
 	netsnmp_iterator_info*	mydata			/* iinfo on init() */
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmReceiverPerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
@@ -1913,14 +2127,23 @@ pgmReceiverPerformanceTable_get_first_data_point(
 	return pgmReceiverPerformanceTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
 }
 
-static netsnmp_variable_list*
+static
+netsnmp_variable_list*
 pgmReceiverPerformanceTable_get_next_data_point(
 	void**			my_loop_context,
 	void**			my_data_context,
 	netsnmp_variable_list*	put_index_data,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+        g_assert (NULL != my_data_context);
+        g_assert (NULL != put_index_data);
+
+        g_trace ("pgmReceiverPerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
@@ -1983,12 +2206,19 @@ pgmReceiverPerformanceTable_get_next_data_point(
 	return put_index_data;
 }
 
-static void
+static
+void
 pgmReceiverPerformanceTable_free_loop_context (
 	void*			my_loop_context,
-	G_GNUC_UNUSED netsnmp_iterator_info* mydata
+	netsnmp_iterator_info*	mydata
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != my_loop_context);
+
+        g_trace ("pgmReceiverPerformanceTable_free_loop_context (my_loop_context:%p mydata:%p)",
+                (gpointer)my_loop_context, (gpointer)mydata);
+
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
 
 /* check for intra-peer state */
@@ -2003,14 +2233,24 @@ pgmReceiverPerformanceTable_free_loop_context (
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
-static int
+static
+int
 pgmReceiverPerformanceTable_handler (
-	G_GNUC_UNUSED netsnmp_mib_handler* handler,
-	G_GNUC_UNUSED netsnmp_handler_registration* reginfo,
+	netsnmp_mib_handler*		handler,
+	netsnmp_handler_registration*	reginfo,
 	netsnmp_agent_request_info*	reqinfo,
 	netsnmp_request_info*		requests
 	)
 {
+/* pre-conditions */
+        g_assert (NULL != handler);
+        g_assert (NULL != reginfo);
+        g_assert (NULL != reqinfo);
+        g_assert (NULL != requests);
+
+        g_trace ("pgmReceiverPerformanceTable_handler (handler:%p reginfo:%p reqinfo:%p requests:%p)",
+                (gpointer)handler, (gpointer)reginfo, (gpointer)reqinfo, (gpointer)requests);
+
 	switch (reqinfo->mode)
 	{
 
@@ -2503,401 +2743,405 @@ pgmReceiverPerformanceTable_handler (
  */
 
 int
-send_pgmStart_trap( void )
+send_pgmStart_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmStart_oid[] = { 1,3,6,1,3,112,2,0,1 };
+	g_trace ("send_pgmStart_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmStart_oid, sizeof(pgmStart_oid));
-    
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmStart_oid[] = { 1,3,6,1,3,112,2,0,1 };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmStart_oid, sizeof(pgmStart_oid));
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmStop_trap( void )
+send_pgmStop_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmStop_oid[] = { 1,3,6,1,3,112,2,0,2 };
+	g_trace ("send_pgmStop_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmStop_oid, sizeof(pgmStop_oid));
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmStop_oid[] = { 1,3,6,1,3,112,2,0,2 };
+
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmStop_oid, sizeof(pgmStop_oid));
     
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmNewSourceTrap_trap( void )
+send_pgmNewSourceTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmNewSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,3 };
-    oid pgmSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,6, /* insert index here */ };
-    oid pgmSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,7, /* insert index here */ };
+	g_trace ("send_pgmNewSourceTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmNewSourceTrap_oid, sizeof(pgmNewSourceTrap_oid));
-    
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmSourceSourceGsi_oid, OID_LENGTH(pgmSourceSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmSourceSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmSourceSourcePortNumber_oid, OID_LENGTH(pgmSourceSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmSourceSourcePortNumber */
-        NULL, 0);
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmNewSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,3 };
+	oid pgmSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,6, /* insert index here */ };
+	oid pgmSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,7, /* insert index here */ };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmNewSourceTrap_oid, sizeof(pgmNewSourceTrap_oid));
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmSourceSourceGsi_oid, OID_LENGTH(pgmSourceSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmSourceSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmSourceSourcePortNumber_oid, OID_LENGTH(pgmSourceSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmSourceSourcePortNumber */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmClosedSourceTrap_trap( void )
+send_pgmClosedSourceTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmClosedSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,4 };
-    oid pgmSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,6, /* insert index here */ };
-    oid pgmSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,7, /* insert index here */ };
+	g_trace ("send_pgmClosedSourceTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmClosedSourceTrap_oid, sizeof(pgmClosedSourceTrap_oid));
-    
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmSourceSourceGsi_oid, OID_LENGTH(pgmSourceSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmSourceSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmSourceSourcePortNumber_oid, OID_LENGTH(pgmSourceSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmSourceSourcePortNumber */
-        NULL, 0);
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmClosedSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,4 };
+	oid pgmSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,6, /* insert index here */ };
+	oid pgmSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,2,100,2,1,7, /* insert index here */ };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmClosedSourceTrap_oid, sizeof(pgmClosedSourceTrap_oid));
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmSourceSourceGsi_oid, OID_LENGTH(pgmSourceSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmSourceSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmSourceSourcePortNumber_oid, OID_LENGTH(pgmSourceSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmSourceSourcePortNumber */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmNewReceiverTrap_trap( void )
+send_pgmNewReceiverTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmNewReceiverTrap_oid[] = { 1,3,6,1,3,112,2,0,5 };
-    oid pgmReceiverSourceGsi_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,8, /* insert index here */ };
-    oid pgmReceiverSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,9, /* insert index here */ };
-    oid pgmReceiverUniqueInstance_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,10, /* insert index here */ };
+	g_trace ("send_pgmNewReceiverTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmNewReceiverTrap_oid, sizeof(pgmNewReceiverTrap_oid));
-    
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverSourceGsi_oid, OID_LENGTH(pgmReceiverSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmReceiverSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverSourcePortNumber_oid, OID_LENGTH(pgmReceiverSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverSourcePortNumber */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverUniqueInstance_oid, OID_LENGTH(pgmReceiverUniqueInstance_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverUniqueInstance */
-        NULL, 0);
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmNewReceiverTrap_oid[] = { 1,3,6,1,3,112,2,0,5 };
+	oid pgmReceiverSourceGsi_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,8, /* insert index here */ };
+	oid pgmReceiverSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,9, /* insert index here */ };
+	oid pgmReceiverUniqueInstance_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,10, /* insert index here */ };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmNewReceiverTrap_oid, sizeof(pgmNewReceiverTrap_oid));
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverSourceGsi_oid, OID_LENGTH(pgmReceiverSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmReceiverSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverSourcePortNumber_oid, OID_LENGTH(pgmReceiverSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverSourcePortNumber */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverUniqueInstance_oid, OID_LENGTH(pgmReceiverUniqueInstance_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverUniqueInstance */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmClosedReceiverTrap_trap( void )
+send_pgmClosedReceiverTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmClosedReceiverTrap_oid[] = { 1,3,6,1,3,112,2,0,6 };
-    oid pgmReceiverSourceGsi_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,8, /* insert index here */ };
-    oid pgmReceiverSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,9, /* insert index here */ };
-    oid pgmReceiverUniqueInstance_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,10, /* insert index here */ };
+	g_trace ("send_pgmClosedReceiverTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmClosedReceiverTrap_oid, sizeof(pgmClosedReceiverTrap_oid));
-    
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverSourceGsi_oid, OID_LENGTH(pgmReceiverSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmReceiverSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverSourcePortNumber_oid, OID_LENGTH(pgmReceiverSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverSourcePortNumber */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverUniqueInstance_oid, OID_LENGTH(pgmReceiverUniqueInstance_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverUniqueInstance */
-        NULL, 0);
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmClosedReceiverTrap_oid[] = { 1,3,6,1,3,112,2,0,6 };
+	oid pgmReceiverSourceGsi_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,8, /* insert index here */ };
+	oid pgmReceiverSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,9, /* insert index here */ };
+	oid pgmReceiverUniqueInstance_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,10, /* insert index here */ };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmClosedReceiverTrap_oid, sizeof(pgmClosedReceiverTrap_oid));
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverSourceGsi_oid, OID_LENGTH(pgmReceiverSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmReceiverSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverSourcePortNumber_oid, OID_LENGTH(pgmReceiverSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverSourcePortNumber */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverUniqueInstance_oid, OID_LENGTH(pgmReceiverUniqueInstance_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverUniqueInstance */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmNakFailuresTrap_trap( void )
+send_pgmNakFailuresTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmNakFailuresTrap_oid[] = { 1,3,6,1,3,112,2,0,7 };
-    oid pgmReceiverSourceGsi_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,8, /* insert index here */ };
-    oid pgmReceiverSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,9, /* insert index here */ };
-    oid pgmReceiverUniqueInstance_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,10, /* insert index here */ };
-    oid pgmReceiverNakFailureThresholdTimer_oid[] = { 1,3,6,1,3,112,1,3,100,3,1,14, /* insert index here */ };
-    oid pgmReceiverNakFailureThreshold_oid[] = { 1,3,6,1,3,112,1,3,100,3,1,15, /* insert index here */ };
-    oid pgmReceiverNakFailuresLastInterval_oid[] = { 1,3,6,1,3,112,1,3,100,4,1,56, /* insert index here */ };
-    oid pgmReceiverLastIntervalNakFailures_oid[] = { 1,3,6,1,3,112,1,3,100,4,1,57, /* insert index here */ };
+	g_trace ("send_pgmNakFailuresTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmNakFailuresTrap_oid, sizeof(pgmNakFailuresTrap_oid));
-    
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverSourceGsi_oid, OID_LENGTH(pgmReceiverSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmReceiverSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverSourcePortNumber_oid, OID_LENGTH(pgmReceiverSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverSourcePortNumber */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverUniqueInstance_oid, OID_LENGTH(pgmReceiverUniqueInstance_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverUniqueInstance */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverNakFailureThresholdTimer_oid, OID_LENGTH(pgmReceiverNakFailureThresholdTimer_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverNakFailureThresholdTimer */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverNakFailureThreshold_oid, OID_LENGTH(pgmReceiverNakFailureThreshold_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmReceiverNakFailureThreshold */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverNakFailuresLastInterval_oid, OID_LENGTH(pgmReceiverNakFailuresLastInterval_oid),
-        ASN_COUNTER,
-        /* Set an appropriate value for pgmReceiverNakFailuresLastInterval */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmReceiverLastIntervalNakFailures_oid, OID_LENGTH(pgmReceiverLastIntervalNakFailures_oid),
-        ASN_COUNTER,
-        /* Set an appropriate value for pgmReceiverLastIntervalNakFailures */
-        NULL, 0);
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmNakFailuresTrap_oid[] = { 1,3,6,1,3,112,2,0,7 };
+	oid pgmReceiverSourceGsi_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,8, /* insert index here */ };
+	oid pgmReceiverSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,9, /* insert index here */ };
+	oid pgmReceiverUniqueInstance_oid[] = { 1,3,6,1,3,112,1,3,100,2,1,10, /* insert index here */ };
+	oid pgmReceiverNakFailureThresholdTimer_oid[] = { 1,3,6,1,3,112,1,3,100,3,1,14, /* insert index here */ };
+	oid pgmReceiverNakFailureThreshold_oid[] = { 1,3,6,1,3,112,1,3,100,3,1,15, /* insert index here */ };
+	oid pgmReceiverNakFailuresLastInterval_oid[] = { 1,3,6,1,3,112,1,3,100,4,1,56, /* insert index here */ };
+	oid pgmReceiverLastIntervalNakFailures_oid[] = { 1,3,6,1,3,112,1,3,100,4,1,57, /* insert index here */ };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmNakFailuresTrap_oid, sizeof(pgmNakFailuresTrap_oid));
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverSourceGsi_oid, OID_LENGTH(pgmReceiverSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmReceiverSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverSourcePortNumber_oid, OID_LENGTH(pgmReceiverSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverSourcePortNumber */
+        NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverUniqueInstance_oid, OID_LENGTH(pgmReceiverUniqueInstance_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverUniqueInstance */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverNakFailureThresholdTimer_oid, OID_LENGTH(pgmReceiverNakFailureThresholdTimer_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverNakFailureThresholdTimer */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverNakFailureThreshold_oid, OID_LENGTH(pgmReceiverNakFailureThreshold_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmReceiverNakFailureThreshold */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverNakFailuresLastInterval_oid, OID_LENGTH(pgmReceiverNakFailuresLastInterval_oid),
+				   ASN_COUNTER,
+/* Set an appropriate value for pgmReceiverNakFailuresLastInterval */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmReceiverLastIntervalNakFailures_oid, OID_LENGTH(pgmReceiverLastIntervalNakFailures_oid),
+				   ASN_COUNTER,
+/* Set an appropriate value for pgmReceiverLastIntervalNakFailures */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmNewDlrSourceTrap_trap( void )
+send_pgmNewDlrSourceTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmNewDlrSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,8 };
-    oid pgmDlrSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,4, /* insert index here */ };
-    oid pgmDlrSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,5, /* insert index here */ };
+	g_trace ("send_pgmNewDlrSourceTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmNewDlrSourceTrap_oid, sizeof(pgmNewDlrSourceTrap_oid));
-    
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmDlrSourceSourceGsi_oid, OID_LENGTH(pgmDlrSourceSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmDlrSourceSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmDlrSourceSourcePortNumber_oid, OID_LENGTH(pgmDlrSourceSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmDlrSourceSourcePortNumber */
-        NULL, 0);
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmNewDlrSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,8 };
+	oid pgmDlrSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,4, /* insert index here */ };
+	oid pgmDlrSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,5, /* insert index here */ };
 
-    /*
-     * Add any extra (optional) objects here
-     */
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmNewDlrSourceTrap_oid, sizeof(pgmNewDlrSourceTrap_oid));
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmDlrSourceSourceGsi_oid, OID_LENGTH(pgmDlrSourceSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmDlrSourceSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmDlrSourceSourcePortNumber_oid, OID_LENGTH(pgmDlrSourceSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmDlrSourceSourcePortNumber */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
 int
-send_pgmClosedDlrSourceTrap_trap( void )
+send_pgmClosedDlrSourceTrap_trap (void)
 {
-    netsnmp_variable_list  *var_list = NULL;
-    oid pgmClosedDlrSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,9 };
-    oid pgmDlrSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,4, /* insert index here */ };
-    oid pgmDlrSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,5, /* insert index here */ };
+	g_trace ("send_pgmClosedDlrSourceTrap_trap ()");
 
-    /*
-     * Set the snmpTrapOid.0 value
-     */
-    snmp_varlist_add_variable(&var_list,
-        snmptrap_oid, OID_LENGTH(snmptrap_oid),
-        ASN_OBJECT_ID,
-        (const u_char*)pgmClosedDlrSourceTrap_oid, sizeof(pgmClosedDlrSourceTrap_oid));
+	netsnmp_variable_list  *var_list = NULL;
+	oid pgmClosedDlrSourceTrap_oid[] = { 1,3,6,1,3,112,2,0,9 };
+	oid pgmDlrSourceSourceGsi_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,4, /* insert index here */ };
+	oid pgmDlrSourceSourcePortNumber_oid[] = { 1,3,6,1,3,112,1,4,100,2,1,5, /* insert index here */ };
+
+/*
+ * Set the snmpTrapOid.0 value
+ */
+	snmp_varlist_add_variable (&var_list,
+				   snmptrap_oid, OID_LENGTH(snmptrap_oid),
+				   ASN_OBJECT_ID,
+				   (const u_char*)pgmClosedDlrSourceTrap_oid, sizeof(pgmClosedDlrSourceTrap_oid));
     
-    /*
-     * Add any objects from the trap definition
-     */
-    snmp_varlist_add_variable(&var_list,
-        pgmDlrSourceSourceGsi_oid, OID_LENGTH(pgmDlrSourceSourceGsi_oid),
-        ASN_OCTET_STR,
-        /* Set an appropriate value for pgmDlrSourceSourceGsi */
-        NULL, 0);
-    snmp_varlist_add_variable(&var_list,
-        pgmDlrSourceSourcePortNumber_oid, OID_LENGTH(pgmDlrSourceSourcePortNumber_oid),
-        ASN_UNSIGNED,
-        /* Set an appropriate value for pgmDlrSourceSourcePortNumber */
-        NULL, 0);
+/*
+ * Add any objects from the trap definition
+ */
+	snmp_varlist_add_variable (&var_list,
+				   pgmDlrSourceSourceGsi_oid, OID_LENGTH(pgmDlrSourceSourceGsi_oid),
+				   ASN_OCTET_STR,
+/* Set an appropriate value for pgmDlrSourceSourceGsi */
+				   NULL, 0);
+	snmp_varlist_add_variable (&var_list,
+				   pgmDlrSourceSourcePortNumber_oid, OID_LENGTH(pgmDlrSourceSourcePortNumber_oid),
+				   ASN_UNSIGNED,
+/* Set an appropriate value for pgmDlrSourceSourcePortNumber */
+				   NULL, 0);
+/*
+ * Add any extra (optional) objects here
+ */
 
-    /*
-     * Add any extra (optional) objects here
-     */
-
-    /*
-     * Send the trap to the list of configured destinations
-     *  and clean up
-     */
-    send_v2trap( var_list );
-    snmp_free_varbind( var_list );
-
-    return SNMP_ERR_NOERROR;
+/*
+ * Send the trap to the list of configured destinations
+ *  and clean up
+ */
+	send_v2trap (var_list);
+	snmp_free_varbind (var_list);
+	return SNMP_ERR_NOERROR;
 }
+
+/* eof */
