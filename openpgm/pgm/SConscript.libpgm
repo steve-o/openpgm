@@ -78,6 +78,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('signal_unittest.c');
 	te.Program (['reed_solomon_unittest.c', e.Object('galois_tables.c')]);
 	te.Program ('rate_control_unittest.c');
+	te.Program ('checksum_unittest.c');
 	te.Program (['packet_unittest.c', e.Object('checksum.c')]);
 
 #-----------------------------------------------------------------------------
