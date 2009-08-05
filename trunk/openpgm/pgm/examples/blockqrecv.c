@@ -124,10 +124,12 @@ main (
 	g_message ("entering PGM message loop ... ");
 	do {
 		char buffer[4096];
-		gssize len = pgm_async_recv (async, buffer, sizeof(buffer), 0 /* blocking */);
-		if (len >= 0)
-		{
+		gsize len;
+		if (G_IO_STATUS_NORMAL == pgm_async_recv (async, buffer, sizeof(buffer), &len, 0 /* blocking */, &err))
 			on_data (buffer, len, NULL);
+		else if (err) {
+			g_error ("recv: %s", err->message);
+			g_error_free (err);
 		}
 	} while (!g_quit);
 
