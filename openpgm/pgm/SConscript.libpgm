@@ -80,6 +80,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('rate_control_unittest.c');
 	te.Program ('checksum_unittest.c');
 	te.Program (['packet_unittest.c', e.Object('checksum.c')]);
+	te.Program ('async_unittest.c');
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version

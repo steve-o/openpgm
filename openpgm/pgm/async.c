@@ -47,6 +47,14 @@
 
 /* global locals */
 
+typedef struct pgm_event_t pgm_event_t;
+
+struct pgm_event_t {
+	gpointer		data;
+	guint			len;
+};
+
+
 /* external: Glib event loop GSource of pgm contiguous data */
 struct pgm_watch_t {
 	GSource		source;
@@ -118,7 +126,7 @@ pgm_receiver_thread (
 		int len = pgm_transport_recvmsg (async->transport, &msgv, 0 /* blocking */);
 		if (len >= 0)
 		{
-/* append to queue */
+/* queue a copy to receiver */
 			pgm_event_t* event = pgm_event_alloc (async);
 			event->data = len > 0 ? g_malloc (len) : NULL;
 			event->len  = len;
@@ -212,12 +220,12 @@ pgm_async_create (
  * on success, 0 is returned.  if async is invalid, -EINVAL is returned.
  */
 
-int
+gboolean
 pgm_async_destroy (
 	pgm_async_t*		async
 	)
 {
-	g_return_val_if_fail (async != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != async, FALSE);
 
 	if (async->thread) {
 		async->quit = TRUE;
@@ -229,7 +237,7 @@ pgm_async_destroy (
 	}
 	pgm_notify_destroy (&async->commit_notify);
 	g_free (async);
-	return 0;
+	return TRUE;
 }
 
 /* queue to GSource and GMainLoop */
@@ -364,21 +372,23 @@ pgm_src_dispatch (
 
 /* synchronous reading from the queue.
  *
- * on success, returns number of bytes read.  on error, -1 is returned, and errno set
- * appropriately.  on invalid parameters, -EINVAL is returned.
+ * returns GIOStatus with success, error, again, or eof.
  */
 
-gssize
+GIOStatus
 pgm_async_recv (
 	pgm_async_t*		async,
 	gpointer		data,
 	gsize			len,
-	int			flags		/* MSG_DONTWAIT for non-blocking */
+	gsize*			bytes_read,
+	int			flags,		/* MSG_DONTWAIT for non-blocking */
+	GError**		error
 	)
 {
-        g_return_val_if_fail (async != NULL, -EINVAL);
+        g_return_val_if_fail (NULL != async, G_IO_STATUS_ERROR);
 	if (len)
-	        g_return_val_if_fail (len > 0 && data != NULL, -EINVAL);
+	        g_return_val_if_fail (NULL != data, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != bytes_read, G_IO_STATUS_ERROR);
 
 	pgm_event_t* event;
 
@@ -388,8 +398,7 @@ pgm_async_recv (
 		if (g_async_queue_length_unlocked (async->commit_queue) == 0)
 		{
 			g_async_queue_unlock (async->commit_queue);
-			errno = EAGAIN;
-			return -1;
+			return G_IO_STATUS_AGAIN;
 		}
 
 		event = g_async_queue_pop_unlocked (async->commit_queue);
@@ -401,16 +410,24 @@ pgm_async_recv (
 	}
 
 /* pass data back to callee */
-	gsize bytes_read = event->len;
-	if (bytes_read > len) bytes_read = len;
+	if (event->len > len) {
+		*bytes_read = len;
+		memcpy (data, event->data, *bytes_read);
+		g_set_error (error,
+			     PGM_ASYNC_ERROR,
+			     PGM_ASYNC_ERROR_OVERFLOW,
+			     _("Message too large to be stored in buffer."));
+		pgm_event_unref (async, event);
+		return G_IO_STATUS_ERROR;
+	}
 
-	memcpy (data, event->data, bytes_read);
+	*bytes_read = event->len;
+	memcpy (data, event->data, *bytes_read);
 
 /* cleanup */
 	if (event->len) g_free (event->data);
 	pgm_event_unref (async, event);
-
-	return (gssize)bytes_read;	
+	return G_IO_STATUS_NORMAL;
 }
 
 GQuark
