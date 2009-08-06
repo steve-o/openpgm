@@ -12,6 +12,7 @@ opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
+	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
 	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_DEV', 'Development code', 'false', ('true', 'false'))),
@@ -119,6 +120,13 @@ if env['BRANCH'] == 'profile':
 	env.Append(LINKFLAGS = '-fprofile-arcs')
 elif env['BRANCH'] == 'seed':
 	env.Append(CCFLAGS = '-fbranch-probabilities')
+
+# Coverage analysis
+if env['COVERAGE'] == 'full':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(CCFLAGS = '-ftest-coverage')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-lgcov')
 
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
