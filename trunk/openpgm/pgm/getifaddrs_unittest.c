@@ -127,8 +127,8 @@ ifflags_string (
 START_TEST (test_getifaddrs_pass_001)
 {
 	char saddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
-	struct ifaddrs *ifap = NULL, *ifa;
-	fail_unless (0 == getifaddrs (&ifap));
+	struct pgm_ifaddrs *ifap = NULL, *ifa;
+	fail_unless (0 == pgm_getifaddrs (&ifap));
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
 		fail_unless (NULL != ifa);
@@ -170,7 +170,7 @@ END_TEST
 
 START_TEST (test_getifaddrs_fail_001)
 {
-	fail_unless (-1 == getifaddrs (NULL));
+	fail_unless (-1 == pgm_getifaddrs (NULL));
 	g_message ("errno:%d", errno);
 }
 END_TEST
@@ -184,16 +184,16 @@ END_TEST
 
 START_TEST (test_freeifaddrs_pass_001)
 {
-	struct ifaddrs* ifap = NULL;
-	fail_unless (0 == getifaddrs (&ifap));
-	freeifaddrs (ifap);
+	struct pgm_ifaddrs* ifap = NULL;
+	fail_unless (0 == pgm_getifaddrs (&ifap));
+	pgm_freeifaddrs (ifap);
 }
 END_TEST
 
 /* silent failure */
 START_TEST (test_freeifaddrs_pass_002)
 {
-	freeifaddrs (NULL);
+	pgm_freeifaddrs (NULL);
 }
 END_TEST
 
