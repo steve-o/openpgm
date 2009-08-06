@@ -22,6 +22,63 @@
 
 #include <stdlib.h>
 #include <check.h>
+#include <glib.h>
+
+#include <pgm/reed_solomon.h>
+
+
+/* mock global */
+
+/** reed-solomon module */
+static
+void
+mock__pgm_rs_create (
+	rs_t*			rs_,
+	guint			n,
+	guint			k
+	)
+{
+}
+
+static
+void
+mock__pgm_rs_destroy (
+	rs_t*			rs
+	)
+{
+}
+
+static
+void
+mock__pgm_rs_encode(
+	rs_t*			rs,
+	const gpointer		src[],
+	const guint		offset,
+	gpointer		dst,
+	const gsize		len
+        )
+{
+}
+
+/** checksum module */
+static
+guint32
+mock_pgm_compat_csum_partial (
+	const void*		addr,
+	guint			len,
+	guint32			csum
+	)
+{
+	return 0x0;
+}
+
+
+/* mock functions for external references */
+
+#define _pgm_rs_create			mock__pgm_rs_create
+#define _pgm_rs_destroy			mock__pgm_rs_destroy
+#define _pgm_rs_encode			mock__pgm_rs_encode
+#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
 
 #define TXW_DEBUG
 #include "txwi.c"
@@ -53,70 +110,82 @@ generate_valid_skb (void)
 
 /* target:
  *	pgm_txw_t*
- *	pgm_txw_init (
+ *	pgm_txw_create (
+ *		const pgm_tsi_t* const	tsi,
  *		const guint16		tpdu_size,
  *		const guint32		sqns,
  *		const guint		secs,
- *		const guint		max_rte
+ *		const guint		max_rte,
+ *		const gboolean		use_fec,
+ *		const guint		rs_n,
+ *		const guint		rs_k
  *		)
  */
 
 /* vanilla sequence count window */
-START_TEST (test_init_pass_001)
+START_TEST (test_create_pass_001)
 {
-	fail_if (NULL == pgm_txw_init (0, 100, 0, 0));
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	fail_if (NULL == pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0));
 }
 END_TEST
 
 /* vanilla time based window */
-START_TEST (test_init_pass_002)
+START_TEST (test_create_pass_002)
 {
-	fail_if (NULL == pgm_txw_init (1500, 0, 60, 800000));
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	fail_if (NULL == pgm_txw_create (&tsi, 1500, 0, 60, 800000, FALSE, 0, 0));
 }
 END_TEST
 
 /* jumbo frame */
-START_TEST (test_init_pass_003)
+START_TEST (test_create_pass_003)
 {
-	fail_if (NULL == pgm_txw_init (9000, 0, 60, 800000));
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	fail_if (NULL == pgm_txw_create (&tsi, 9000, 0, 60, 800000, FALSE, 0, 0));
 }
 END_TEST
 
 /* max frame */
-START_TEST (test_init_pass_004)
+START_TEST (test_create_pass_004)
 {
-	fail_if (NULL == pgm_txw_init (UINT16_MAX, 0, 60, 800000));
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	fail_if (NULL == pgm_txw_create (&tsi, UINT16_MAX, 0, 60, 800000, FALSE, 0, 0));
 }
 END_TEST
 
 /* invalid tpdu size */
-START_TEST (test_init_fail_001)
+START_TEST (test_create_fail_001)
 {
-	pgm_txw_init (0, 0, 60, 800000);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_create (&tsi, 0, 0, 60, 800000, FALSE, 0, 0);
 	fail ();
 }
 END_TEST
 
 /* no specified sequence count or time value */
-START_TEST (test_init_fail_002)
+START_TEST (test_create_fail_002)
 {
-	pgm_txw_init (0, 0, 0, 800000);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_create (&tsi, 0, 0, 0, 800000, FALSE, 0, 0);
 	fail ();
 }
 END_TEST
 
 /* no specified rate */
-START_TEST (test_init_fail_003)
+START_TEST (test_create_fail_003)
 {
-	pgm_txw_init (0, 0, 60, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_create (&tsi, 0, 0, 60, 0, FALSE, 0, 0);
 	fail ();
 }
 END_TEST
 
 /* all invalid */
-START_TEST (test_init_fail_004)
+START_TEST (test_create_fail_004)
 {
-	pgm_txw_init (0, 0, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_create (NULL, 0, 0, 0, 0, FALSE, 0, 0);
 	fail ();
 }
 END_TEST
@@ -130,7 +199,8 @@ END_TEST
 
 START_TEST (test_shutdown_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	pgm_txw_shutdown (window);
 }
@@ -154,7 +224,8 @@ END_TEST
 
 START_TEST (test_add_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
@@ -166,7 +237,8 @@ END_TEST
 /* null skb */
 START_TEST (test_add_fail_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	pgm_txw_add (window, NULL);
 	fail ();
@@ -186,7 +258,8 @@ END_TEST
 /* null skb content */
 START_TEST (test_add_fail_003)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	char buffer[1500];
 	memset (buffer, 0, sizeof(buffer));
@@ -205,7 +278,8 @@ END_TEST
 
 START_TEST (test_peek_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
@@ -226,7 +300,8 @@ END_TEST
 /* empty window */
 START_TEST (test_peek_fail_002)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (NULL == pgm_txw_peek (window, window->trail));
 	pgm_txw_shutdown (window);
@@ -239,7 +314,8 @@ END_TEST
 START_TEST (test_max_length_pass_001)
 {
 	const guint window_length = 100;
-	pgm_txw_t* window = pgm_txw_init (0, window_length, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, window_length, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (window_length == pgm_txw_max_length (window));
 	pgm_txw_shutdown (window);
@@ -257,7 +333,8 @@ END_TEST
  */
 START_TEST (test_length_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (0 == pgm_txw_length (window));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -279,7 +356,8 @@ END_TEST
  */
 START_TEST (test_size_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (0 == pgm_txw_size (window));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -301,7 +379,8 @@ END_TEST
  */
 START_TEST (test_is_empty_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_unless (pgm_txw_is_empty (window));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -323,7 +402,8 @@ END_TEST
  */
 START_TEST (test_is_full_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 1, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_if (pgm_txw_is_full (window));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -345,7 +425,8 @@ END_TEST
  */
 START_TEST (test_lead_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	guint32 lead = pgm_txw_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -368,7 +449,8 @@ END_TEST
 START_TEST (test_next_lead_pass_001)
 {
 	const guint window_length = 100;
-	pgm_txw_t* window = pgm_txw_init (0, window_length, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, window_length, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	guint32 next_lead = pgm_txw_next_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -390,7 +472,8 @@ END_TEST
  */
 START_TEST (test_trail_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 1, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 1, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 /* does not advance with adding skb */
 	guint32 trail = pgm_txw_trail (window);
@@ -426,7 +509,8 @@ END_TEST
 
 START_TEST (test_retransmit_push_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 /* empty window invalidates all requests */
 	fail_unless (0 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
@@ -461,17 +545,14 @@ END_TEST
 
 START_TEST (test_retransmit_try_peek_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
-	guint32		unfolded_checksum;
-	gboolean	is_parity;
-	guint		rs_h;
-	skb = NULL;
-	fail_unless (0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h));
+	fail_unless (NULL != pgm_txw_retransmit_try_peek (window));
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -479,12 +560,7 @@ END_TEST
 /* null window */
 START_TEST (test_retransmit_try_peek_fail_001)
 {
-	pgm_txw_t*		window;
-	struct pgm_sk_buff_t*	skb;
-	guint32			unfolded_checksum;
-	gboolean		is_parity;
-	guint			rs_h;
-	pgm_txw_retransmit_try_peek (NULL, &skb, &unfolded_checksum, &is_parity, &rs_h);
+	pgm_txw_retransmit_try_peek (NULL);
 	fail ();
 }
 END_TEST
@@ -492,12 +568,10 @@ END_TEST
 /* null skb pointer */
 START_TEST (test_retransmit_try_peek_fail_002)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
-	guint32			unfolded_checksum;
-	gboolean		is_parity;
-	guint			rs_h;
-	pgm_txw_retransmit_try_peek (window, NULL, &unfolded_checksum, &is_parity, &rs_h);
+	pgm_txw_retransmit_try_peek (window);
 	fail ();
 }
 END_TEST
@@ -505,12 +579,10 @@ END_TEST
 /* null unfolded checksum pointer */
 START_TEST (test_retransmit_try_peek_fail_003)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
-	struct pgm_sk_buff_t*	skb;
-	gboolean		is_parity;
-	guint			rs_h;
-	pgm_txw_retransmit_try_peek (window, &skb, NULL, &is_parity, &rs_h);
+	pgm_txw_retransmit_try_peek (window);
 	fail ();
 }
 END_TEST
@@ -518,12 +590,10 @@ END_TEST
 /* null is-parity pointer */
 START_TEST (test_retransmit_try_peek_fail_004)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
-	struct pgm_sk_buff_t*	skb;
-	guint32			unfolded_checksum;
-	guint			rs_h;
-	pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, NULL, &rs_h);
+	pgm_txw_retransmit_try_peek (window);
 	fail ();
 }
 END_TEST
@@ -531,12 +601,10 @@ END_TEST
 /* null h (rs) pointer */
 START_TEST (test_retransmit_try_peek_fail_005)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
-	struct pgm_sk_buff_t*	skb;
-	guint32			unfolded_checksum;
-	gboolean		is_parity;
-	pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, NULL);
+	pgm_txw_retransmit_try_peek (window);
 	fail ();
 }
 END_TEST
@@ -550,17 +618,14 @@ END_TEST
 
 START_TEST (test_retransmit_remove_head_pass_001)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
-	guint32		unfolded_checksum;
-	gboolean	is_parity;
-	guint		rs_h;
-	skb = NULL;
-	fail_unless (0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h));
+	fail_unless (NULL != pgm_txw_retransmit_try_peek (window));
 	pgm_txw_retransmit_remove_head (window);
 	pgm_txw_shutdown (window);
 }
@@ -577,7 +642,8 @@ END_TEST
 /* empty retransmit queue */
 START_TEST (test_retransmit_remove_head_fail_002)
 {
-	pgm_txw_t* window = pgm_txw_init (0, 100, 0, 0);
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	pgm_txw_retransmit_remove_head (window);
 	fail ();
@@ -592,16 +658,16 @@ make_test_suite (void)
 
 	s = suite_create (__FILE__);
 
-	TCase* tc_init = tcase_create ("init");
-	suite_add_tcase (s, tc_init);
-	tcase_add_test (tc_init, test_init_pass_001);
-	tcase_add_test (tc_init, test_init_pass_002);
-	tcase_add_test (tc_init, test_init_pass_003);
-	tcase_add_test (tc_init, test_init_pass_004);
-	tcase_add_test_raise_signal (tc_init, test_init_fail_001, SIGABRT);
-	tcase_add_test_raise_signal (tc_init, test_init_fail_002, SIGABRT);
-	tcase_add_test_raise_signal (tc_init, test_init_fail_003, SIGABRT);
-	tcase_add_test_raise_signal (tc_init, test_init_fail_004, SIGABRT);
+	TCase* tc_create = tcase_create ("create");
+	suite_add_tcase (s, tc_create);
+	tcase_add_test (tc_create, test_create_pass_001);
+	tcase_add_test (tc_create, test_create_pass_002);
+	tcase_add_test (tc_create, test_create_pass_003);
+	tcase_add_test (tc_create, test_create_pass_004);
+	tcase_add_test_raise_signal (tc_create, test_create_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_create, test_create_fail_002, SIGABRT);
+	tcase_add_test_raise_signal (tc_create, test_create_fail_003, SIGABRT);
+	tcase_add_test_raise_signal (tc_create, test_create_fail_004, SIGABRT);
 
 	TCase* tc_shutdown = tcase_create ("shutdown");
 	suite_add_tcase (s, tc_shutdown);

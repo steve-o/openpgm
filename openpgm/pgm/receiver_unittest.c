@@ -28,6 +28,7 @@
 #include <pgm/receiver.h>
 #include <pgm/rxwi.h>
 #include <pgm/skbuff.h>
+#include <pgm/reed_solomon.h>
 
 
 /* mock state */
@@ -265,7 +266,7 @@ mock__pgm_on_spmr (
 static
 void
 mock__pgm_rs_create (
-	gpointer*		rs_,
+	rs_t*			rs_,
 	guint			n,
 	guint			k
 	)
@@ -275,7 +276,7 @@ mock__pgm_rs_create (
 static
 void
 mock__pgm_rs_destroy (
-	gpointer		rs
+	rs_t*			rs
 	)
 {
 }

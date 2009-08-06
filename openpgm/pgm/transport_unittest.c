@@ -129,11 +129,15 @@ mock_pgm_timer_add (
 /** transmit window module */
 static
 pgm_txw_t*
-mock_pgm_txw_init (
+mock_pgm_txw_create (
+	const pgm_tsi_t* const	tsi,
 	const guint16		tpdu_size,
 	const guint32		sqns,
 	const guint		secs,
-	const guint		max_rte
+	const guint		max_rte,
+	const gboolean		use_fec,
+	const guint		rs_n,
+	const guint		rs_k
 	)
 {
 	pgm_txw_t* window = g_malloc0 (sizeof(pgm_txw_t));
@@ -204,7 +208,7 @@ mock_pgm_time_update_now (void)
 #define _pgm_send_spm_unlocked	mock__pgm_send_spm_unlocked
 #define pgm_timer_thread	mock_pgm_timer_thread
 #define pgm_timer_add		mock_pgm_timer_add
-#define pgm_txw_init		mock_pgm_txw_init
+#define pgm_txw_create		mock_pgm_txw_create
 #define pgm_txw_shutdown	mock_pgm_txw_shutdown
 #define _pgm_rate_create	mock__pgm_rate_create
 #define _pgm_rate_destroy	mock__pgm_rate_destroy

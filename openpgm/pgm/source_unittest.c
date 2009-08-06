@@ -28,6 +28,8 @@
 #include <pgm/source.h>
 #include <pgm/txwi.h>
 #include <pgm/skbuff.h>
+#include <pgm/ip.h>
+#include <pgm/transport.h>
 
 
 /* mock state */
@@ -48,8 +50,8 @@
 #define PGM_NAK_DATA_RETRIES	5
 #define PGM_NAK_NCF_RETRIES	2
 
-static pgm_transport_t* g_transport = NULL;
 
+static gsize mock_pgm_transport_pkt_offset (const gboolean can_fragment);
 
 static
 void
@@ -59,17 +61,58 @@ mock_setup (void)
 }
 
 static
-void
-mock_teardown (void)
-{
-}
-
-static
 struct pgm_transport_t*
 generate_transport (void)
 {
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
 	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
+	((struct sockaddr*)&transport->send_gsr.gsr_group)->sa_family = AF_INET;
+	((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
+	transport->dport = g_htons(7500);
+	transport->txw = g_malloc0 (sizeof(pgm_txw_t));
+	transport->max_tpdu = PGM_MAX_TPDU;
+	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (FALSE);
+	transport->iphdr_len = sizeof(struct pgm_ip);
+	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
+	transport->spm_heartbeat_interval[0] = pgm_secs(1);
+	pgm_notify_init (&transport->rdata_notify);
+	transport->is_open = TRUE;
 	return transport;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_skb (void)
+{
+	const char source[] = "i am not a string";
+	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_reserve (skb, header_length);
+	pgm_skb_put (skb, sizeof(source));
+	memcpy (skb->data, source, sizeof(source));
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_odata (void)
+{
+	const char source[] = "i am not a string";
+	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_reserve (skb, header_length);
+	memset (skb->head, 0, header_length);
+	skb->pgm_header = (struct pgm_header*)skb->head;
+	skb->pgm_data   = (struct pgm_data*)(skb->pgm_header + 1);
+	skb->pgm_header->pgm_type = PGM_ODATA;
+	skb->pgm_header->pgm_tsdu_length = g_htons (sizeof(source));
+	memcpy (skb->data, source, sizeof(source));
+	pgm_skb_put (skb, sizeof(source));
+/* reverse pull */
+	skb->len += (guint8*)skb->data - (guint8*)skb->head;
+	skb->data = skb->head;
+	return skb;
 }
 
 static
@@ -79,6 +122,8 @@ mock_pgm_txw_add (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
+	g_debug ("mock_pgm_txw_add (window:%p skb:%p)",
+		(gpointer)window, (gpointer)skb);
 }
 
 static
@@ -88,6 +133,8 @@ mock_pgm_txw_peek (
 	const guint32			sequence
 	)
 {
+	g_debug ("mock_pgm_txw_peek (window:%p sequence:%" G_GUINT32_FORMAT ")",
+		(gpointer)window, sequence);
 	return NULL;
 }
 
@@ -100,20 +147,23 @@ mock_pgm_txw_retransmit_push (
 	const guint			tg_sqn_shift
 	)
 {
+	g_debug ("mock_pgm_txw_retransmit_push (window:%p sequence:%" G_GUINT32_FORMAT " is-parity:%s tg-sqn-shift:%d)",
+		(gpointer)window,
+		sequence,
+		is_parity ? "YES" : "NO",
+		tg_sqn_shift);
 	return TRUE;
 }
 
 static
-gboolean
+struct pgm_sk_buff_t*
 mock_pgm_txw_retransmit_try_peek (
-	pgm_txw_t* const		window,
-	struct pgm_sk_buff_t** 		skb,
-	guint32* const			unfolded_checksum,
-	gboolean* const			is_parity,
-	guint* const			rs_h
+	pgm_txw_t* const		window
 	)
 {
-	return FALSE;
+	g_debug ("mock_pgm_txw_retransmit_try_peek (window:%p)",
+		(gpointer)window);
+	return generate_odata (); 
 }
 
 static
@@ -122,6 +172,8 @@ mock_pgm_txw_retransmit_remove_head (
 	pgm_txw_t* const		window
 	)
 {
+	g_debug ("mock_pgm_txw_retransmit_remove_head (window:%p)",
+		(gpointer)window);
 }
 
 static
@@ -134,6 +186,8 @@ mock__pgm_rs_encode (
 	gsize				len
 	)
 {
+	g_debug ("mock__pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%" G_GSIZE_FORMAT ")",
+		rs, src, offset, dst, len);
 }
 
 static
@@ -144,6 +198,8 @@ mock__pgm_rate_check (
 	const int			flags
 	)
 {
+	g_debug ("mock__pgm_rate_check (bucket:%p data-size:%u flags:%d)",
+		bucket, data_size, flags);
 	return TRUE;
 }
 
@@ -230,6 +286,17 @@ mock__pgm_sendto (
 	gsize				tolen
 	)
 {
+	char saddr[INET6_ADDRSTRLEN];
+	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
+	g_debug ("mock__pgm_sendto (transport:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d flags:%d to:%s tolen:%d)",
+		(gpointer)transport,
+		use_rate_limit ? "YES" : "NO",
+		use_router_alert ? "YES" : "NO",
+		buf,
+		len,
+		flags,
+		saddr,
+		tolen);
 	return len;
 }
 
@@ -294,12 +361,10 @@ mock_pgm_transport_pkt_offset (
 
 START_TEST (test_send_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
+	pgm_transport_t* transport = generate_transport ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
-	fail_unless ((gssize)apdu_length == pgm_transport_send (g_transport, buffer, apdu_length, 0));
+	fail_unless ((gssize)apdu_length == pgm_transport_send (transport, buffer, apdu_length, 0));
 }
 END_TEST
 
@@ -307,7 +372,7 @@ START_TEST (test_send_fail_001)
 {
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
-	fail_unless (-1 == pgm_transport_send (NULL, buffer, apdu_length, 0));
+	fail_unless (-EINVAL == pgm_transport_send (NULL, buffer, apdu_length, 0));
 }
 END_TEST
 
@@ -324,13 +389,11 @@ END_TEST
 
 START_TEST (test_sendv_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
+	pgm_transport_t* transport = generate_transport ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize tsdu_length = 100;
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
-	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (g_transport, vector, 1, 0, TRUE));
+	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (transport, vector, 1, 0, TRUE));
 }
 END_TEST
 
@@ -339,7 +402,7 @@ START_TEST (test_sendv_fail_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize tsdu_length = 100;
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
-	fail_unless (-1 == pgm_transport_sendv (NULL, vector, 1, 0, TRUE));
+	fail_unless (-EINVAL == pgm_transport_sendv (NULL, vector, 1, 0, TRUE));
 }
 END_TEST
 
@@ -347,33 +410,28 @@ END_TEST
  *	gssize
  *	pgm_transport_send_skbv (
  *		pgm_transport_t*	transport,
- *		struct pgm_sk_buff_t*,
- *		guint,
- *		int,
- *		gboolean
+ *		struct pgm_sk_buff_t*	vector,
+ *		guint			count,
+ *		int			flags,
+ *		gboolean		is_one_apdu
  *		)
  */
 
 START_TEST (test_send_skbv_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_transport->max_tpdu);
-/* reserve PGM header */
-	pgm_skb_put (skb, pgm_transport_pkt_offset (TRUE));
-	const gsize tsdu_length = 100;
-	fail_unless ((gssize)tsdu_length == pgm_transport_send_skbv (g_transport, skb, 1, 0, TRUE));
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb = generate_skb ();
+	fail_unless ((gssize)skb->len == pgm_transport_send_skbv (transport, skb, 1, 0, TRUE));
 }
 END_TEST
 
 START_TEST (test_send_skbv_fail_001)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_transport->max_tpdu);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 /* reserve PGM header */
 	pgm_skb_put (skb, pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
-	fail_unless (-1 == pgm_transport_send_skbv (NULL, skb, 1, 0, TRUE));
+	fail_unless (-EINVAL == pgm_transport_send_skbv (NULL, skb, 1, 0, TRUE));
 }
 END_TEST
 
@@ -386,7 +444,8 @@ END_TEST
 
 START_TEST (test_send_spm_unlocked_pass_001)
 {
-	fail ();
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == _pgm_send_spm_unlocked (transport));
 }
 END_TEST
 
@@ -408,12 +467,15 @@ END_TEST
 
 START_TEST (test_on_nak_notify_pass_001)
 {
-	fail ();
+	GIOChannel* source = g_malloc0 (sizeof(GIOChannel));
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == _pgm_on_nak_notify (source, G_IO_IN, transport));
 }
 END_TEST
 	
 START_TEST (test_on_nak_notify_fail_001)
 {
+	_pgm_on_nak_notify (NULL, 0, NULL);
 	fail ();
 }
 END_TEST
@@ -429,6 +491,7 @@ END_TEST
 
 START_TEST (test_on_spmr_pass_001)
 {
+	pgm_transport_t* transport = generate_transport ();
 	fail ();
 }
 END_TEST
@@ -450,6 +513,7 @@ END_TEST
 
 START_TEST (test_on_nak_pass_001)
 {
+	pgm_transport_t* transport = generate_transport ();
 	fail ();
 }
 END_TEST
@@ -471,6 +535,7 @@ END_TEST
 
 START_TEST (test_on_nnak_pass_001)
 {
+	pgm_transport_t* transport = generate_transport ();
 	fail ();
 }
 END_TEST
@@ -599,83 +664,87 @@ make_test_suite (void)
 
 	s = suite_create (__FILE__);
 
+#if 0
 	TCase* tc_send = tcase_create ("send");
 	suite_add_tcase (s, tc_send);
-	tcase_add_checked_fixture (tc_send, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_send, mock_setup, NULL);
 	tcase_add_test (tc_send, test_send_pass_001);
 	tcase_add_test (tc_send, test_send_fail_001);
 
 	TCase* tc_sendv = tcase_create ("sendv");
 	suite_add_tcase (s, tc_sendv);
-	tcase_add_checked_fixture (tc_sendv, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_sendv, mock_setup, NULL);
 	tcase_add_test (tc_sendv, test_sendv_pass_001);
 	tcase_add_test (tc_sendv, test_sendv_fail_001);
 
 	TCase* tc_send_skbv = tcase_create ("send-skbv");
 	suite_add_tcase (s, tc_send_skbv);
-	tcase_add_checked_fixture (tc_send_skbv, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_send_skbv, mock_setup, NULL);
 	tcase_add_test (tc_send_skbv, test_send_skbv_pass_001);
 	tcase_add_test (tc_send_skbv, test_send_skbv_fail_001);
 
 	TCase* tc_send_spm_unlocked = tcase_create ("send-spm-unlocked");
 	suite_add_tcase (s, tc_send_spm_unlocked);
-	tcase_add_checked_fixture (tc_send_spm_unlocked, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_send_spm_unlocked, mock_setup, NULL);
 	tcase_add_test (tc_send_spm_unlocked, test_send_spm_unlocked_pass_001);
-	tcase_add_test (tc_send_spm_unlocked, test_send_spm_unlocked_fail_001);
+	tcase_add_test_raise_signal (tc_send_spm_unlocked, test_send_spm_unlocked_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_on_nak_notify = tcase_create ("on-nak-notify");
 	suite_add_tcase (s, tc_on_nak_notify);
-	tcase_add_checked_fixture (tc_on_nak_notify, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_on_nak_notify, mock_setup, NULL);
 	tcase_add_test (tc_on_nak_notify, test_on_nak_notify_pass_001);
-	tcase_add_test (tc_on_nak_notify, test_on_nak_notify_fail_001);
+//	tcase_add_test_raise_signal (tc_on_nak_notify, test_on_nak_notify_fail_001, SIGABRT);
 
+#if 0
 	TCase* tc_on_spmr = tcase_create ("on-spmr");
 	suite_add_tcase (s, tc_on_spmr);
-	tcase_add_checked_fixture (tc_on_spmr, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_on_spmr, mock_setup, NULL);
 	tcase_add_test (tc_on_spmr, test_on_spmr_pass_001);
 	tcase_add_test (tc_on_spmr, test_on_spmr_fail_001);
 
 	TCase* tc_on_nak = tcase_create ("on-nak");
 	suite_add_tcase (s, tc_on_nak);
-	tcase_add_checked_fixture (tc_on_nak, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_on_nak, mock_setup, NULL);
 	tcase_add_test (tc_on_nak, test_on_nak_pass_001);
 	tcase_add_test (tc_on_nak, test_on_nak_fail_001);
 
 	TCase* tc_on_nnak = tcase_create ("on-nnak");
 	suite_add_tcase (s, tc_on_nnak);
-	tcase_add_checked_fixture (tc_on_nnak, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_on_nnak, mock_setup, NULL);
 	tcase_add_test (tc_on_nnak, test_on_nnak_pass_001);
 	tcase_add_test (tc_on_nnak, test_on_nnak_fail_001);
 
 	TCase* tc_set_ambient_spm = tcase_create ("set-ambient-spm");
 	suite_add_tcase (s, tc_set_ambient_spm);
-	tcase_add_checked_fixture (tc_set_ambient_spm, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_ambient_spm, mock_setup, NULL);
 	tcase_add_test (tc_set_ambient_spm, test_set_ambient_spm_pass_001);
 	tcase_add_test (tc_set_ambient_spm, test_set_ambient_spm_fail_001);
 
 	TCase* tc_set_heartbeat_spm = tcase_create ("set-heartbeat-spm");
 	suite_add_tcase (s, tc_set_heartbeat_spm);
-	tcase_add_checked_fixture (tc_set_heartbeat_spm, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_heartbeat_spm, mock_setup, NULL);
 	tcase_add_test (tc_set_heartbeat_spm, test_set_heartbeat_spm_pass_001);
 	tcase_add_test (tc_set_heartbeat_spm, test_set_heartbeat_spm_fail_001);
 
 	TCase* tc_set_txw_sqns = tcase_create ("set-txw-sqns");
 	suite_add_tcase (s, tc_set_txw_sqns);
-	tcase_add_checked_fixture (tc_set_txw_sqns, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_txw_sqns, mock_setup, NULL);
 	tcase_add_test (tc_set_txw_sqns, test_set_txw_sqns_pass_001);
 	tcase_add_test (tc_set_txw_sqns, test_set_txw_sqns_fail_001);
 
 	TCase* tc_set_txw_secs = tcase_create ("set-txw-secs");
 	suite_add_tcase (s, tc_set_txw_secs);
-	tcase_add_checked_fixture (tc_set_txw_secs, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_txw_secs, mock_setup, NULL);
 	tcase_add_test (tc_set_txw_secs, test_set_txw_secs_pass_001);
 	tcase_add_test (tc_set_txw_secs, test_set_txw_secs_fail_001);
 
 	TCase* tc_set_txw_max_rte = tcase_create ("set-txw-max-rte");
 	suite_add_tcase (s, tc_set_txw_max_rte);
-	tcase_add_checked_fixture (tc_set_txw_max_rte, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_txw_max_rte, mock_setup, NULL);
 	tcase_add_test (tc_set_txw_max_rte, test_set_txw_max_rte_pass_001);
 	tcase_add_test (tc_set_txw_max_rte, test_set_txw_max_rte_fail_001);
+#endif
 	return s;
 }
 
