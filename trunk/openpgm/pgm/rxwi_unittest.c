@@ -26,6 +26,7 @@
 
 #include <pgm/transport.h>
 #include <pgm/time.h>
+#include <pgm/reed_solomon.h>
 
 
 /* mock global */
@@ -34,23 +35,10 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 
 /* mock functions for external references */
 
-gchar*
-mock_pgm_print_tsi (
-	const pgm_tsi_t*	tsi
-	)
-{
-	const guint8* gsi = (const guint8*)tsi;
-	g_return_val_if_fail (tsi != NULL, NULL);
-	static char buf[PGM_TSISTRLEN];
-	snprintf (buf, sizeof(buf), "%i.%i.%i.%i.%i.%i.%i",
-		  gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (tsi->sport));
-	return buf;
-}
-
 static
 void
 mock__pgm_rs_decode_parity_appended (
-	gpointer		rs,
+	rs_t*			rs,
 	void**			block,
 	guint*			offsets,
 	gsize			len
@@ -60,7 +48,6 @@ mock__pgm_rs_decode_parity_appended (
 }
 
 #define pgm_time_now	mock_pgm_time_now
-#define pgm_print_tsi	mock_pgm_print_tsi
 #define _pgm_rs_decode_parity_appended	mock__pgm_rs_decode_parity_appended
 
 #define RXW_DEBUG

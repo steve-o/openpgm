@@ -289,9 +289,6 @@ struct pgm_transport_t {
     guint		spm_ambient_interval;	    /* microseconds */
     guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
     guint		spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
-    gchar*		spm_packet;
-    gsize		spm_len;
-
     guint		peer_expiry;		    /* from absence of SPMs */
     guint		spmr_expiry;		    /* waiting for peer SPMRs */
 
@@ -300,7 +297,6 @@ struct pgm_transport_t {
     pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
     pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
-    gpointer		rs;
     gboolean		use_proactive_parity;
     gboolean		use_ondemand_parity;
     gboolean		use_varpkt_len;
@@ -308,7 +304,6 @@ struct pgm_transport_t {
     guint		rs_k;
     guint		rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
     guint		tg_sqn_shift;
-    struct pgm_sk_buff_t* parity_buffer;	    /* for parity odata/rdata generation */
     struct pgm_sk_buff_t* rx_buffer;
 
     GStaticRWLock	peers_lock;

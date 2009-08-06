@@ -41,6 +41,11 @@
 
 #include "pgm/txwi.h"
 #include "pgm/sn.h"
+#include "pgm/reed_solomon.h"
+#include "pgm/math.h"
+#include "pgm/checksum.h"
+#include "pgm/tsi.h"
+
 
 #ifndef TXW_DEBUG
 #define g_trace(...)		while (0)
@@ -112,14 +117,8 @@ pgm_txw_retransmit_can_peek (
 	pgm_txw_t* const	window
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	guint32 unfolded_checksum;
-	gboolean is_parity;
-	guint rs_h;
-
 	g_return_val_if_fail (window, FALSE);
-
-	return 0 == pgm_txw_retransmit_try_peek (window, &skb, &unfolded_checksum, &is_parity, &rs_h);
+	return NULL != pgm_txw_retransmit_try_peek (window);
 }
 
 
@@ -136,16 +135,21 @@ static int pgm_txw_retransmit_push_selective (pgm_txw_t* const, const guint32);
  */
 
 pgm_txw_t*
-pgm_txw_init (
+pgm_txw_create (
+	const pgm_tsi_t* const	tsi,
 	const guint16		tpdu_size,
 	const guint32		sqns,		/* transmit window size in sequence numbers */
 	const guint		secs,		/* size in seconds */
-	const guint		max_rte		/* max bandwidth */
+	const guint		max_rte,	/* max bandwidth */
+	const gboolean		use_fec,
+	const guint		rs_n,
+	const guint		rs_k
 	)
 {
 	pgm_txw_t* window;
 
 /* pre-conditions */
+	g_assert (NULL != tsi);
 	if (sqns) {
 		g_assert_cmpuint (tpdu_size, ==, 0);
 		g_assert_cmpuint (sqns, >, 0);
@@ -157,9 +161,16 @@ pgm_txw_init (
 		g_assert_cmpuint (secs, >, 0);
 		g_assert_cmpuint (max_rte, >, 0);
 	}
+	if (use_fec) {
+		g_assert_cmpuint (rs_n, >, 0);
+		g_assert_cmpuint (rs_k, >, 0);
+	}
 
-	g_trace ("init (max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u).\n",
-		tpdu_size, sqns, secs, max_rte);
+	g_trace ("create (tsi:%s max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u use-fec:%s rs(n):%u rs(k):%u).\n",
+		pgm_tsi_print (tsi),
+		tpdu_size, sqns, secs, max_rte,
+		use_fec ? "YES" : "NO",
+		rs_n, rs_k);
 
 /* calculate transmit window parameters */
 	guint32 alloc_sqns;
@@ -178,6 +189,7 @@ pgm_txw_init (
 	}
 
 	window = g_slice_alloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
+	window->tsi = tsi;
 
 /* empty state for transmission group boundaries to align.
  *
@@ -185,6 +197,14 @@ pgm_txw_init (
  */
 	window->lead = -1;
 	window->trail = window->lead + 1;
+
+/* reed-solomon forward error correction */
+	if (use_fec) {
+		window->parity_buffer = pgm_alloc_skb (tpdu_size);
+		window->tg_sqn_shift = pgm_power2_log2 (rs_k);
+		_pgm_rs_create (&window->rs, rs_n, rs_k);
+		window->is_fec_enabled = 1;
+	}
 
 /* lock on queue */
 	g_static_mutex_init (&window->retransmit_mutex);
@@ -230,6 +250,12 @@ pgm_txw_shutdown (
 
 /* retransmit queue must be empty */
 	g_assert (!pgm_txw_retransmit_can_peek (window));
+
+/* free reed-solomon state */
+	if (window->is_fec_enabled) {
+		pgm_free_skb (window->parity_buffer);
+		_pgm_rs_destroy (&window->rs);
+	}
 
 /* free lock on queue */
 	g_static_mutex_free (&window->retransmit_mutex);
@@ -503,57 +529,176 @@ pgm_txw_retransmit_push_selective (
 
 /* try to peek a request from the retransmit queue
  *
- * return 0 if request peeked, return -1 if queue is empty.
+ * return pointer of first skb in queue, or return NULL if the queue is empty.
  */
 
-int
+struct pgm_sk_buff_t*
 pgm_txw_retransmit_try_peek (
-	pgm_txw_t* const		window,
-	struct pgm_sk_buff_t** 		skb,
-	guint32* const			unfolded_checksum,
-	gboolean* const			is_parity,
-	guint* const			rs_h			/* parity packet offset */
+	pgm_txw_t* const		window
 	)
 {
-	GList* tail_link;
-	const pgm_txw_state_t* state;
-
 /* pre-conditions */
 	g_assert (window);
-	g_assert (skb);
-	g_assert (unfolded_checksum);
-	g_assert (is_parity);
-	g_assert (rs_h);
 
-	g_trace ("retransmit_try_peek (window:%p skb:%p unfolded_checksum:%p is_parity:%p rs_h:%p)",
-		(gpointer)window, (gpointer)skb, (gpointer)unfolded_checksum, (gpointer)is_parity, (gpointer)rs_h);
+	g_trace ("retransmit_try_peek (window:%p)", (gpointer)window);
 
 /* no lock required to detect presence of a request */
-	tail_link = g_queue_peek_tail_link (&window->retransmit_queue);
-	if (NULL == tail_link) {
-		return -1;
-	}
+	GList* tail_link = g_queue_peek_tail_link (&window->retransmit_queue);
+	if (NULL == tail_link)
+		return NULL;
 
-	*skb = (struct pgm_sk_buff_t*)tail_link;
-	g_assert (pgm_skb_is_valid (*skb));
-	state = (pgm_txw_state_t*)&(*skb)->cb;
-	*unfolded_checksum = state->unfolded_checksum;
+	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)tail_link;
+	g_assert (pgm_skb_is_valid (skb));
+	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
 
 /* must lock before reading to catch parity updates */
 	g_static_mutex_lock (&window->retransmit_mutex);
 	if (!state->waiting_retransmit)
 	{
-		g_assert (((const GList*)*skb)->next == NULL);
-		g_assert (((const GList*)*skb)->prev == NULL);
+		g_assert (((const GList*)skb)->next == NULL);
+		g_assert (((const GList*)skb)->prev == NULL);
 	}
-	if (state->pkt_cnt_requested) {
-		*is_parity	= TRUE;
-		*rs_h		= state->pkt_cnt_sent;
-	} else {
-		*is_parity	= FALSE;
+	if (!state->pkt_cnt_requested) {
+		g_static_mutex_unlock (&window->retransmit_mutex);
+		return skb;
 	}
+
+/* generate parity packet to satisify request */	
+	const guint rs_h = state->pkt_cnt_sent % (window->rs.n - window->rs.k);
+	const guint32 tg_sqn_mask = 0xffffffff << window->tg_sqn_shift;
+	const guint32 tg_sqn = skb->sequence & tg_sqn_mask;
+	gboolean is_var_pktlen = FALSE;
+	gboolean is_op_encoded = FALSE;
+	guint16 parity_length = 0;
+	const guint8* src[ window->rs.k ];
+	for (unsigned i = 0; i < window->rs.k; i++)
+	{
+		const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
+		const guint16 odata_tsdu_length = g_ntohs (odata_skb->pgm_header->pgm_tsdu_length);
+		if (!parity_length)
+		{
+			parity_length = odata_tsdu_length;
+		}
+		else if (odata_tsdu_length != parity_length)
+		{
+			is_var_pktlen = TRUE;
+			if (odata_tsdu_length > parity_length)
+				parity_length = odata_tsdu_length;
+		}
+
+		src[i] = odata_skb->data;
+		if (odata_skb->pgm_header->pgm_options & PGM_OPT_PRESENT) {
+			is_op_encoded = TRUE;
+		}
+	}
+
+/* construct basic PGM header to be completed by send_rdata() */
+	skb = window->parity_buffer;
+	skb->data = skb->tail = skb->head = skb + 1;
+
+/* space for PGM header */
+	pgm_skb_put (skb, sizeof(struct pgm_header));
+
+	skb->pgm_header		= skb->data;
+	skb->pgm_data		= (gpointer)( skb->pgm_header + 1 );
+	memcpy (skb->pgm_header->pgm_gsi, &window->tsi->gsi, sizeof(pgm_gsi_t));
+	skb->pgm_header->pgm_options = PGM_OPT_PARITY;
+
+/* append actual TSDU length if variable length packets, zero pad as necessary.
+ */
+	if (is_var_pktlen)
+	{
+		skb->pgm_header->pgm_options |= PGM_OPT_VAR_PKTLEN;
+
+		for (unsigned i = 0; i < window->rs.k; i++)
+		{
+			struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
+			const guint16 odata_tsdu_length = g_ntohs (odata_skb->pgm_header->pgm_tsdu_length);
+
+			g_assert (odata_tsdu_length == odata_skb->len);
+			g_assert (parity_length >= odata_tsdu_length);
+
+			if (!odata_skb->zero_padded) {
+				memset (odata_skb->tail, 0, parity_length - odata_tsdu_length);
+				*(guint16*)((guint8*)odata_skb->data + parity_length) = odata_tsdu_length;
+				odata_skb->zero_padded = 1;
+			}
+		}
+		parity_length += 2;
+	}
+
+	skb->pgm_header->pgm_tsdu_length = g_htons (parity_length);
+
+/* space for DATA */
+	pgm_skb_put (skb, sizeof(struct pgm_data) + parity_length);
+
+	skb->pgm_data->data_sqn	= g_htonl ( tg_sqn | rs_h );
+
+	gpointer data_bytes = skb->pgm_data + 1;
+
+/* encode every option separately, currently only one applies: opt_fragment
+ */
+	if (is_op_encoded)
+	{
+		skb->pgm_header->pgm_options |= PGM_OPT_PRESENT;
+
+		struct pgm_opt_fragment null_opt_fragment;
+		guint8* opt_src[ window->rs.k ];
+		memset (&null_opt_fragment, 0, sizeof(null_opt_fragment));
+		*(guint8*)&null_opt_fragment |= PGM_OP_ENCODED_NULL;
+		for (unsigned i = 0; i < window->rs.k; i++)
+		{
+			const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
+
+			if (odata_skb->pgm_opt_fragment)
+			{
+				g_assert (odata_skb->pgm_header->pgm_options & PGM_OPT_PRESENT);
+/* skip three bytes of header */
+				opt_src[i] = (guint8*)odata_skb->pgm_opt_fragment + sizeof (struct pgm_opt_header);
+			}
+			else
+			{
+				opt_src[i] = (guint8*)&null_opt_fragment;
+			}
+		}
+
+/* add options to this rdata packet */
+		const guint16 opt_total_length = sizeof(struct pgm_opt_length) +
+						 sizeof(struct pgm_opt_header) +
+						 sizeof(struct pgm_opt_fragment);
+
+/* add space for PGM options */
+		pgm_skb_put (skb, opt_total_length);
+
+		struct pgm_opt_length* opt_len		= data_bytes;
+		opt_len->opt_type			= PGM_OPT_LENGTH;
+		opt_len->opt_length			= sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length		= g_htons ( opt_total_length );
+		struct pgm_opt_header* opt_header 	= (struct pgm_opt_header*)(opt_len + 1);
+		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
+		opt_header->opt_length			= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+		opt_header->opt_reserved 		= PGM_OP_ENCODED;
+		struct pgm_opt_fragment* opt_fragment	= (struct pgm_opt_fragment*)(opt_header + 1);
+
+/* The cast below is the correct way to handle the problem. 
+ * The (void *) cast is to avoid a GCC warning like: 
+ *
+ *   "warning: dereferencing type-punned pointer will break strict-aliasing rules"
+ */
+		_pgm_rs_encode (&window->rs, (void**)(void*)opt_src, window->rs.k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
+
+		data_bytes = opt_fragment + 1;
+	}
+
+/* encode payload */
+	_pgm_rs_encode (&window->rs, (void**)(void*)src, window->rs.k + rs_h, data_bytes, parity_length);
+
+/* calculate partial checksum */
+	const guint tsdu_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
+	state->unfolded_checksum = pgm_csum_partial ((guint8*)skb->tail - tsdu_length, tsdu_length, 0);
+
 	g_static_mutex_unlock (&window->retransmit_mutex);
-	return 0;
+	return skb;
 }
 
 /* remove head entry from retransmit queue, will fail on assertion if queue is empty.

@@ -28,6 +28,10 @@
 #	include <pgm/skbuff.h>
 #endif
 
+#ifndef __PGM_REED_SOLOMON_H__
+#	include <pgm/reed_solomon.h>
+#endif
+
 
 G_BEGIN_DECLS
 
@@ -56,28 +60,35 @@ typedef struct pgm_txw_state_t pgm_txw_state_t;
 G_STATIC_ASSERT(sizeof(struct pgm_txw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
 
 struct pgm_txw_t {
+	const pgm_tsi_t*	tsi;
+
 /* option: lockless atomics */
-        guint32         lead;
-        guint32         trail;
+        guint32			lead;
+        guint32			trail;
 
 /* option: lockless queue */
-        GQueue		retransmit_queue;
-	GStaticMutex	retransmit_mutex;
+        GQueue			retransmit_queue;
+	GStaticMutex		retransmit_mutex;
 
-	guint32		size;			/* window content size in bytes */
-	guint32		alloc;			/* length of pdata[] */
+	rs_t			rs;
+	guint			tg_sqn_shift;
+	struct pgm_sk_buff_t*	parity_buffer;
+	unsigned		is_fec_enabled:1;
+
+	guint32			size;			/* window content size in bytes */
+	guint32			alloc;			/* length of pdata[] */
 	struct pgm_sk_buff_t*	pdata[];
 };
 
 typedef struct pgm_txw_t pgm_txw_t;
 
 
-G_GNUC_INTERNAL pgm_txw_t* pgm_txw_init (const guint16, const guint32, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL pgm_txw_t* pgm_txw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint, const gboolean, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_txw_shutdown (pgm_txw_t* const);
 G_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t* const, struct pgm_sk_buff_t* const);
 G_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_peek (pgm_txw_t* const, const guint32) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL int pgm_txw_retransmit_push (pgm_txw_t* const, const guint32, const gboolean, const guint) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL int pgm_txw_retransmit_try_peek (pgm_txw_t* const, struct pgm_sk_buff_t**, guint32* const, gboolean* const, guint* const) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_retransmit_try_peek (pgm_txw_t* const) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_txw_retransmit_remove_head (pgm_txw_t* const);
 
 static inline guint32 pgm_txw_max_length (const pgm_txw_t* const window)
@@ -126,6 +137,18 @@ static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
 {
 	g_assert (window);
 	return window->trail;
+}
+
+static inline guint32 pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t* skb)
+{
+	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
+	return state->unfolded_checksum;
+}
+
+static inline void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t* skb, const guint32 csum)
+{
+	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
+	state->unfolded_checksum = csum;
 }
 
 G_END_DECLS
