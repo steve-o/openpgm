@@ -57,7 +57,6 @@
 #include "pgm/indextoaddr.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
-#include "pgm/math.h"
 #include "pgm/net.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
@@ -256,20 +255,6 @@ pgm_transport_destroy (
 
 	g_static_mutex_unlock (&transport->mutex);
 	g_static_mutex_free (&transport->mutex);
-
-	if (transport->spm_packet) {
-		g_slice_free1 (transport->spm_len, transport->spm_packet);
-		transport->spm_packet = NULL;
-	}
-
-	if (transport->parity_buffer) {
-		pgm_free_skb (transport->parity_buffer);
-		transport->parity_buffer = NULL;
-	}
-	if (transport->rs) {
-		_pgm_rs_destroy (transport->rs);
-		transport->rs = NULL;
-	}
 
 	if (transport->rx_buffer) {
 		pgm_free_skb (transport->rx_buffer);
@@ -767,8 +752,8 @@ pgm_transport_bind (
 	if (transport->can_send_data) {
 		g_trace ("INFO","construct transmit window.");
 		transport->txw = transport->txw_sqns ?
-					pgm_txw_init (0, transport->txw_sqns, 0, 0) :
-					pgm_txw_init (transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte);
+					pgm_txw_create (&transport->tsi, 0, transport->txw_sqns, 0, 0, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k) :
+					pgm_txw_create (&transport->tsi, transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k);
 		g_assert (transport->txw);
 	}
 
@@ -1302,55 +1287,6 @@ no_cap_net_admin:
 		transport->rdata_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->rdata_notify));
 		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, _pgm_on_nak_notify, transport, NULL);
 
-/* create recyclable SPM packet */
-		switch (pgm_sockaddr_family(&transport->send_gsr.gsr_group)) {
-		case AF_INET:
-			transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm);
-			break;
-
-		case AF_INET6:
-			transport->spm_len = sizeof(struct pgm_header) + sizeof(struct pgm_spm6);
-			break;
-		}
-
-		if (transport->use_proactive_parity || transport->use_ondemand_parity)
-		{
-			transport->spm_len += sizeof(struct pgm_opt_length) +
-					      sizeof(struct pgm_opt_header) +
-					      sizeof(struct pgm_opt_parity_prm);
-		}
-
-		transport->spm_packet = g_slice_alloc0 (transport->spm_len);
-
-		struct pgm_header* header = (struct pgm_header*)transport->spm_packet;
-		struct pgm_spm* spm = (struct pgm_spm*)( header + 1 );
-		memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
-		header->pgm_sport	= transport->tsi.sport;
-		header->pgm_dport	= transport->dport;
-		header->pgm_type	= PGM_SPM;
-
-		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_addr, (char*)&spm->spm_nla_afi);
-
-/* OPT_PARITY_PRM */
-		if (transport->use_proactive_parity || transport->use_ondemand_parity)
-		{
-			header->pgm_options     = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
-
-			struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
-			opt_len->opt_type	= PGM_OPT_LENGTH;
-			opt_len->opt_length	= sizeof(struct pgm_opt_length);
-			opt_len->opt_total_length = g_htons (	sizeof(struct pgm_opt_length) +
-								sizeof(struct pgm_opt_header) +
-								sizeof(struct pgm_opt_parity_prm) );
-			struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
-			opt_header->opt_type	= PGM_OPT_PARITY_PRM | PGM_OPT_END;
-			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
-			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
-			opt_parity_prm->opt_reserved = (transport->use_proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
-						       (transport->use_ondemand_parity ? PGM_PARITY_PRM_OND : 0);
-			opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
-		}
-
 /* setup rate control */
 		if (transport->txw_max_rte)
 		{
@@ -1365,16 +1301,6 @@ no_cap_net_admin:
 		_pgm_send_spm_unlocked (transport);
 		_pgm_send_spm_unlocked (transport);
 		_pgm_send_spm_unlocked (transport);
-
-/* parity buffer for odata/rdata transmission */
-		if (transport->use_proactive_parity || transport->use_ondemand_parity)
-		{
-			g_trace ("INFO","Enabling Reed-Solomon forward error correction, RS(%i,%i).",
-					transport->rs_n, transport->rs_k);
-			transport->parity_buffer = pgm_alloc_skb (transport->max_tpdu);
-			_pgm_rs_create (&transport->rs, transport->rs_n, transport->rs_k);
-			g_assert (NULL != transport->rs);
-		}
 
 		transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
 	}
@@ -1645,7 +1571,6 @@ pgm_transport_set_fec (
 	transport->rs_n			= default_n;
 	transport->rs_k			= default_k;
 	transport->rs_proactive_h	= proactive_h;
-	transport->tg_sqn_shift		= pgm_power2_log2 (transport->rs_k);
 
 	g_static_mutex_unlock (&transport->mutex);
 	return TRUE;
