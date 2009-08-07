@@ -50,6 +50,9 @@
 #define PGM_NAK_DATA_RETRIES	5
 #define PGM_NAK_NCF_RETRIES	2
 
+static gboolean mock_is_valid_spmr = TRUE;
+static gboolean mock_is_valid_nak = TRUE;
+static gboolean mock_is_valid_nnak = TRUE;
 
 static gsize mock_pgm_transport_pkt_offset (const gboolean can_fragment);
 
@@ -67,6 +70,8 @@ generate_transport (void)
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
 	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
 	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
+	((struct sockaddr*)&transport->send_addr)->sa_family = AF_INET;
+	((struct sockaddr_in*)&transport->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
 	((struct sockaddr*)&transport->send_gsr.gsr_group)->sa_family = AF_INET;
 	((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
 	transport->dport = g_htons(7500);
@@ -112,6 +117,124 @@ generate_odata (void)
 /* reverse pull */
 	skb->len += (guint8*)skb->data - (guint8*)skb->head;
 	skb->data = skb->head;
+	return skb;
+}
+
+static
+pgm_peer_t*
+generate_peer (void)
+{
+	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
+	return peer;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_spmr (void)
+{
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	const guint16 header_length = sizeof(struct pgm_header);
+	pgm_skb_reserve (skb, header_length);
+	memset (skb->head, 0, header_length);
+	skb->pgm_header = (struct pgm_header*)skb->head;
+	skb->pgm_header->pgm_type = PGM_SPMR;
+	pgm_skb_put (skb, header_length);
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_single_nak (void)
+{
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	pgm_skb_reserve (skb, sizeof(struct pgm_header));
+	memset (skb->head, 0, header_length);
+	skb->pgm_header = (struct pgm_header*)skb->head;
+	skb->pgm_header->pgm_type = PGM_NAK;
+	struct pgm_nak* nak = (struct pgm_nak*)(skb->pgm_header + 1);
+	struct sockaddr_in nla = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr("127.0.0.2")
+	};
+	pgm_sockaddr_to_nla ((struct sockaddr*)&nla, (char*)&nak->nak_src_nla_afi);
+	struct sockaddr_in group = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr("239.192.0.1")
+	};
+	pgm_sockaddr_to_nla ((struct sockaddr*)&group, (char*)&nak->nak_grp_nla_afi);
+	pgm_skb_put (skb, header_length);
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_single_nnak (void)
+{
+	struct pgm_sk_buff_t* skb = generate_single_nak ();
+	skb->pgm_header->pgm_type = PGM_NNAK;
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_parity_nak (void)
+{
+	struct pgm_sk_buff_t* skb = generate_single_nak ();
+	skb->pgm_header->pgm_options = PGM_OPT_PARITY;
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_nak_list (void)
+{
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak) +
+				      sizeof(struct pgm_opt_length) +
+				      sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
+				      ( 62 * sizeof(guint32) );
+	pgm_skb_reserve (skb, sizeof(struct pgm_header));
+	memset (skb->head, 0, header_length);
+	skb->pgm_header = (struct pgm_header*)skb->head;
+	skb->pgm_header->pgm_type = PGM_NAK;
+	skb->pgm_header->pgm_options = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
+	struct pgm_nak *nak = (struct pgm_nak*)(skb->pgm_header + 1);
+	struct sockaddr_in nla = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr("127.0.0.2")
+	};
+	pgm_sockaddr_to_nla ((struct sockaddr*)&nla, (char*)&nak->nak_src_nla_afi);
+	struct sockaddr_in group = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr("239.192.0.1")
+	};
+	pgm_sockaddr_to_nla ((struct sockaddr*)&group, (char*)&nak->nak_grp_nla_afi);
+	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(nak + 1);
+	opt_len->opt_type = PGM_OPT_LENGTH;
+	opt_len->opt_length = sizeof(struct pgm_opt_length);
+	opt_len->opt_total_length = g_htons (   sizeof(struct pgm_opt_length) +
+						sizeof(struct pgm_opt_header) +
+						sizeof(struct pgm_opt_nak_list) +
+						( 62 * sizeof(guint32) ) );
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+	opt_header->opt_type = PGM_OPT_NAK_LIST | PGM_OPT_END;
+	opt_header->opt_length = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
+				 ( 62 * sizeof(guint32) );
+	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
+	for (unsigned i = 1; i < 63; i++) {
+		opt_nak_list->opt_sqn[i-1] = g_htonl (i);
+	}
+	pgm_skb_put (skb, header_length);
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_parity_nak_list (void)
+{
+	struct pgm_sk_buff_t* skb = generate_nak_list ();
+	skb->pgm_header->pgm_options = PGM_OPT_PARITY | PGM_OPT_PRESENT | PGM_OPT_NETWORK;
 	return skb;
 }
 
@@ -209,7 +332,7 @@ mock_pgm_verify_spmr (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
-	return TRUE;
+	return mock_is_valid_spmr;
 }
 
 static
@@ -218,7 +341,7 @@ mock_pgm_verify_nak (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
-	return TRUE;
+	return mock_is_valid_nak;
 }
 
 static
@@ -227,7 +350,7 @@ mock_pgm_verify_nnak (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
-	return TRUE;
+	return mock_is_valid_nnak;
 }
 
 static
@@ -489,14 +612,40 @@ END_TEST
  *	)
  */
 
+/* peer spmr */
 START_TEST (test_on_spmr_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail ();
+	pgm_peer_t* peer = generate_peer ();
+	struct pgm_sk_buff_t* skb = generate_spmr ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_spmr (transport, peer, skb));
 }
 END_TEST
 
+/* source spmr */
+START_TEST (test_on_spmr_pass_002)
+{
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb = generate_spmr ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_spmr (transport, NULL, skb));
+}
+END_TEST
+
+/* invalid spmr */
 START_TEST (test_on_spmr_fail_001)
+{
+	pgm_transport_t* transport = generate_transport ();
+	pgm_peer_t* peer = generate_peer ();
+	struct pgm_sk_buff_t* skb = generate_spmr ();
+	skb->transport = transport;
+	mock_is_valid_spmr = FALSE;
+	fail_unless (FALSE == _pgm_on_spmr (transport, peer, skb));
+}
+END_TEST
+
+START_TEST (test_on_spmr_fail_002)
 {
 	_pgm_on_spmr (NULL, NULL, NULL);
 	fail ();
@@ -511,14 +660,59 @@ END_TEST
  *	)
  */
 
+/* single nak */
 START_TEST (test_on_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail ();
+	struct pgm_sk_buff_t* skb = generate_single_nak ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+}
+END_TEST
+
+/* nak list */
+START_TEST (test_on_nak_pass_002)
+{
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb = generate_nak_list ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+}
+END_TEST
+
+/* single parity nak */
+START_TEST (test_on_nak_pass_003)
+{
+	pgm_transport_t* transport = generate_transport ();
+	transport->use_ondemand_parity = TRUE;
+	struct pgm_sk_buff_t* skb = generate_parity_nak ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+}
+END_TEST
+
+/* parity nak list */
+START_TEST (test_on_nak_pass_004)
+{
+	pgm_transport_t* transport = generate_transport ();
+	transport->use_ondemand_parity = TRUE;
+	struct pgm_sk_buff_t* skb = generate_parity_nak_list ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_nak (transport, skb));
 }
 END_TEST
 
 START_TEST (test_on_nak_fail_001)
+{
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb = generate_single_nak ();
+	skb->transport = transport;
+	mock_is_valid_nak = FALSE;
+	fail_unless (FALSE == _pgm_on_nak (transport, skb));
+}
+END_TEST
+
+START_TEST (test_on_nak_fail_002)
 {
 	_pgm_on_nak (NULL, NULL);
 	fail ();
@@ -526,7 +720,7 @@ START_TEST (test_on_nak_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	_pgm_on_nnak (
  *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	skb
@@ -536,11 +730,23 @@ END_TEST
 START_TEST (test_on_nnak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail ();
+	struct pgm_sk_buff_t* skb = generate_single_nnak ();
+	skb->transport = transport;
+	fail_unless (TRUE == _pgm_on_nnak (transport, skb));
 }
 END_TEST
 
 START_TEST (test_on_nnak_fail_001)
+{
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb = generate_single_nnak ();
+	skb->transport = transport;
+	mock_is_valid_nnak = FALSE;
+	fail_unless (FALSE == _pgm_on_nnak (transport, skb));
+}
+END_TEST
+
+START_TEST (test_on_nnak_fail_002)
 {
 	_pgm_on_nnak (NULL, NULL);
 	fail ();
@@ -664,7 +870,6 @@ make_test_suite (void)
 
 	s = suite_create (__FILE__);
 
-#if 0
 	TCase* tc_send = tcase_create ("send");
 	suite_add_tcase (s, tc_send);
 	tcase_add_checked_fixture (tc_send, mock_setup, NULL);
@@ -688,32 +893,37 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_send_spm_unlocked, mock_setup, NULL);
 	tcase_add_test (tc_send_spm_unlocked, test_send_spm_unlocked_pass_001);
 	tcase_add_test_raise_signal (tc_send_spm_unlocked, test_send_spm_unlocked_fail_001, SIGABRT);
-#endif
 
 	TCase* tc_on_nak_notify = tcase_create ("on-nak-notify");
 	suite_add_tcase (s, tc_on_nak_notify);
 	tcase_add_checked_fixture (tc_on_nak_notify, mock_setup, NULL);
 	tcase_add_test (tc_on_nak_notify, test_on_nak_notify_pass_001);
-//	tcase_add_test_raise_signal (tc_on_nak_notify, test_on_nak_notify_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_on_nak_notify, test_on_nak_notify_fail_001, SIGABRT);
 
-#if 0
 	TCase* tc_on_spmr = tcase_create ("on-spmr");
 	suite_add_tcase (s, tc_on_spmr);
 	tcase_add_checked_fixture (tc_on_spmr, mock_setup, NULL);
 	tcase_add_test (tc_on_spmr, test_on_spmr_pass_001);
+	tcase_add_test (tc_on_spmr, test_on_spmr_pass_002);
 	tcase_add_test (tc_on_spmr, test_on_spmr_fail_001);
+	tcase_add_test_raise_signal (tc_on_spmr, test_on_spmr_fail_002, SIGABRT);
 
 	TCase* tc_on_nak = tcase_create ("on-nak");
 	suite_add_tcase (s, tc_on_nak);
 	tcase_add_checked_fixture (tc_on_nak, mock_setup, NULL);
 	tcase_add_test (tc_on_nak, test_on_nak_pass_001);
+	tcase_add_test (tc_on_nak, test_on_nak_pass_002);
+	tcase_add_test (tc_on_nak, test_on_nak_pass_003);
+	tcase_add_test (tc_on_nak, test_on_nak_pass_004);
 	tcase_add_test (tc_on_nak, test_on_nak_fail_001);
+	tcase_add_test_raise_signal (tc_on_nak, test_on_nak_fail_002, SIGABRT);
 
 	TCase* tc_on_nnak = tcase_create ("on-nnak");
 	suite_add_tcase (s, tc_on_nnak);
 	tcase_add_checked_fixture (tc_on_nnak, mock_setup, NULL);
 	tcase_add_test (tc_on_nnak, test_on_nnak_pass_001);
 	tcase_add_test (tc_on_nnak, test_on_nnak_fail_001);
+	tcase_add_test_raise_signal (tc_on_nnak, test_on_nnak_fail_002, SIGABRT);
 
 	TCase* tc_set_ambient_spm = tcase_create ("set-ambient-spm");
 	suite_add_tcase (s, tc_set_ambient_spm);
@@ -744,7 +954,6 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_set_txw_max_rte, mock_setup, NULL);
 	tcase_add_test (tc_set_txw_max_rte, test_set_txw_max_rte_pass_001);
 	tcase_add_test (tc_set_txw_max_rte, test_set_txw_max_rte_fail_001);
-#endif
 	return s;
 }
 

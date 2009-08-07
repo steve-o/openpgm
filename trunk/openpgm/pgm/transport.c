@@ -497,8 +497,8 @@ pgm_drop_superuser (void)
 
 gboolean
 pgm_transport_set_max_tpdu (
-	pgm_transport_t*	transport,
-	guint16			max_tpdu
+	pgm_transport_t* const	transport,
+	const guint16		max_tpdu
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -519,8 +519,8 @@ pgm_transport_set_max_tpdu (
 
 gboolean
 pgm_transport_set_multicast_loop (
-	pgm_transport_t*	transport,
-	gboolean		use_multicast_loop
+	pgm_transport_t* const	transport,
+	const gboolean		use_multicast_loop
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -539,8 +539,8 @@ pgm_transport_set_multicast_loop (
 
 gboolean
 pgm_transport_set_hops (
-	pgm_transport_t*	transport,
-	gint			hops
+	pgm_transport_t* const	transport,
+	const gint		hops
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -563,8 +563,8 @@ pgm_transport_set_hops (
 
 gboolean
 pgm_transport_set_sndbuf (
-	pgm_transport_t*	transport,
-	int			size		/* not gsize/gssize as we propogate to setsockopt() */
+	pgm_transport_t* const	transport,
+	const int		size		/* not gsize/gssize as we propogate to setsockopt() */
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -596,8 +596,8 @@ pgm_transport_set_sndbuf (
 
 gboolean
 pgm_transport_set_rcvbuf (
-	pgm_transport_t*	transport,
-	int			size		/* not gsize/gssize */
+	pgm_transport_t* const	transport,
+	const int		size		/* not gsize/gssize */
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -1539,12 +1539,12 @@ on_timer_shutdown (
 
 gboolean
 pgm_transport_set_fec (
-	pgm_transport_t*	transport,
-	guint			proactive_h,		/* 0 == no pro-active parity */
-	gboolean		use_ondemand_parity,
-	gboolean		use_varpkt_len,
-	guint			default_n,
-	guint			default_k
+	pgm_transport_t* const	transport,
+	const guint		proactive_h,		/* 0 == no pro-active parity */
+	const gboolean		use_ondemand_parity,
+	const gboolean		use_varpkt_len,
+	const guint		default_n,
+	const guint		default_k
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -1583,8 +1583,8 @@ pgm_transport_set_fec (
  */
 gboolean
 pgm_transport_set_send_only (
-	pgm_transport_t*	transport,
-	gboolean		send_only
+	pgm_transport_t* const	transport,
+	const gboolean		send_only
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -1602,8 +1602,8 @@ pgm_transport_set_send_only (
  */
 gboolean
 pgm_transport_set_recv_only (
-	pgm_transport_t*	transport,
-	gboolean		is_passive	/* don't send any request or responses */
+	pgm_transport_t* const	transport,
+	const gboolean		is_passive	/* don't send any request or responses */
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -1622,8 +1622,8 @@ pgm_transport_set_recv_only (
  */
 gboolean
 pgm_transport_set_close_on_failure (
-	pgm_transport_t*	transport,
-	gboolean		close_on_failure
+	pgm_transport_t* const	transport,
+	const gboolean		close_on_failure
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
