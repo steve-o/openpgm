@@ -81,8 +81,8 @@
 /* locals */
 static int send_spm (pgm_transport_t*);
 static int reset_heartbeat_spm (pgm_transport_t*);
-static int send_ncf (pgm_transport_t*, struct sockaddr*, struct sockaddr*, guint32, gboolean);
-static int send_ncf_list (pgm_transport_t*, struct sockaddr*, struct sockaddr*, pgm_sqn_list_t*, gboolean);
+static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
+static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
 static gssize send_odata (pgm_transport_t*, struct pgm_sk_buff_t*, int);
 static gssize send_odata_copy (pgm_transport_t*, gconstpointer, gsize, int);
 static gssize send_odatav (pgm_transport_t*, const struct pgm_iovec*, guint, int);
@@ -122,45 +122,44 @@ reset_spmr_timer (
  * and future high-resolution timers allow nanosecond resolution.  Current ethernet technology
  * is limited to microseconds at best so we'll sit there for a bit.
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_ambient_spm (
-	pgm_transport_t*	transport,
-	guint			spm_ambient_interval	/* in microseconds */
+	pgm_transport_t* const	transport,
+	const guint		spm_ambient_interval	/* in microseconds */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (spm_ambient_interval > 0, -EINVAL);
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (spm_ambient_interval > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->spm_ambient_interval = spm_ambient_interval;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* an array of intervals appropriately tuned till ambient period is reached.
  *
  * array is zero leaded for ambient state, and zero terminated for easy detection.
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_heartbeat_spm (
-	pgm_transport_t*	transport,
-	const guint*		spm_heartbeat_interval,
-	int			len
+	pgm_transport_t* const	transport,
+	const guint* const	spm_heartbeat_interval,
+	const int		len
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (len > 0, -EINVAL);
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (len > 0, FALSE);
 	for (int i = 0; i < len; i++) {
-		g_return_val_if_fail (spm_heartbeat_interval[i] > 0, -EINVAL);
+		g_return_val_if_fail (spm_heartbeat_interval[i] > 0, FALSE);
 	}
 
 	g_static_mutex_lock (&transport->mutex);
@@ -170,55 +169,52 @@ pgm_transport_set_heartbeat_spm (
 	memcpy (&transport->spm_heartbeat_interval[1], spm_heartbeat_interval, sizeof(guint) * len);
 	transport->spm_heartbeat_interval[0] = transport->spm_heartbeat_interval[len] = 0;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < txw_sqns < one less than half sequence space
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_txw_sqns (
-	pgm_transport_t*	transport,
-	guint			sqns
+	pgm_transport_t* const	transport,
+	const guint		sqns
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), -EINVAL);
-	g_return_val_if_fail (sqns > 0, -EINVAL);
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
+	g_return_val_if_fail (sqns > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->txw_sqns = sqns;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < secs < ( txw_sqns / txw_max_rte )
  *
  * can only be enforced upon bind.
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_txw_secs (
-	pgm_transport_t*	transport,
-	guint			secs
+	pgm_transport_t* const	transport,
+	const guint		secs
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (secs > 0, -EINVAL);
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (secs > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->txw_secs = secs;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < txw_max_rte < interface capacity
@@ -229,24 +225,23 @@ pgm_transport_set_txw_secs (
  *
  * no practical way to determine upper limit and enforce.
  *
- * on success, returns 0.  on invalid setting, returns -EINVAL.
+ * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
 
-int
+gboolean
 pgm_transport_set_txw_max_rte (
-	pgm_transport_t*	transport,
-	guint			max_rte
+	pgm_transport_t* const	transport,
+	const guint		max_rte
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (max_rte > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (max_rte > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->txw_max_rte = max_rte;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* prototype of function to send pro-active parity NAKs.
@@ -339,8 +334,10 @@ _pgm_on_spmr (
 	g_trace ("INFO","_pgm_on_spmr (transport:%p peer:%p skb:%p)",
 		(gpointer)transport, (gpointer)peer, (gpointer)skb);
 
-	if (!pgm_verify_spmr (skb))
+	if (!pgm_verify_spmr (skb)) {
+		g_trace ("DEBUG","Malformed SPMR rejected.");
 		return FALSE;
+	}
 
 	if (peer_is_source (peer))
 		send_spm (transport);
@@ -380,6 +377,7 @@ _pgm_on_nak (
 	if (is_parity) {
 		transport->cumulative_stats[PGM_PC_SOURCE_PARITY_NAKS_RECEIVED]++;
 		if (!transport->use_ondemand_parity) {
+			g_trace ("DEBUG","Parity NAK rejected as on-demand parity is not enabled.");
 			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
@@ -387,6 +385,7 @@ _pgm_on_nak (
 		transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED]++;
 
 	if (!pgm_verify_nak (skb)) {
+		g_trace ("DEBUG","Malformed NAK rejected.");
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -399,6 +398,9 @@ _pgm_on_nak (
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) != 0)
 	{
+		char saddr[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop ((struct sockaddr*)&nak_src_nla, saddr, sizeof(saddr));
+		g_trace ("DEBUG","NAK rejected for unmatched NLA: %s", saddr);
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -408,6 +410,9 @@ _pgm_on_nak (
 	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0)
 	{
+		char sgroup[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop ((struct sockaddr*)&nak_src_nla, sgroup, sizeof(sgroup));
+		g_trace ("DEBUG","NAK rejected as targeted for different multicast group: %s", sgroup);
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -428,10 +433,12 @@ _pgm_on_nak (
 							(const struct pgm_opt_length*)(nak6 + 1) :
 							(const struct pgm_opt_length*)(nak  + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH) {
+			g_trace ("DEBUG","Malformed NAK rejected.");
 			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length)) {
+			g_trace ("DEBUG","Malformed NAK rejected.");
 			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
@@ -448,20 +455,11 @@ _pgm_on_nak (
 	}
 
 /* nak list numbers */
-#ifdef TRANSPORT_DEBUG
-	if (nak_list)
-	{
-		char nak_sz[1024] = "";
-		const guint32 *nakp = nak_list, *nake = nak_list + nak_list_len;
-		while (nakp < nake) {
-			char tmp[1024];
-			sprintf (tmp, "%" G_GUINT32_FORMAT " ", g_ntohl(*nakp));
-			strcat (nak_sz, tmp);
-			nakp++;
-		}
-	g_trace ("INFO", "nak list %s", nak_sz);
+	if (nak_list_len > 63) {
+		g_trace ("DEBUG","Malformed NAK rejected on too long sequence list.");
+		return FALSE;
 	}
-#endif
+		
 	for (unsigned i = 0; i < nak_list_len; i++)
 	{
 		sqn_list.sqn[sqn_list.len++] = g_ntohl (*nak_list);
@@ -471,11 +469,10 @@ _pgm_on_nak (
 /* send NAK confirm packet immediately, then defer to timer thread for a.s.a.p
  * delivery of the actual RDATA packets.
  */
-	if (nak_list_len) {
+	if (nak_list_len)
 		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, &sqn_list, is_parity);
-	} else {
+	else
 		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list.sqn[0], is_parity);
-	}
 
 /* queue retransmit requests */
 	for (unsigned i = 0; i < sqn_list.len; i++) {
@@ -483,7 +480,6 @@ _pgm_on_nak (
 		if (cnt > 0)
 			pgm_notify_send (&transport->rdata_notify);
 	}
-
 	return TRUE;
 }
 
@@ -581,6 +577,8 @@ send_spm (
 /* pre-conditions */
 	g_assert (NULL != transport);
 
+	g_trace ("SPM","send_spm (transport:%p", (gpointer)transport);
+
 	g_static_mutex_lock (&transport->mutex);
 	gboolean status = _pgm_send_spm_unlocked (transport);
 	g_static_mutex_unlock (&transport->mutex);
@@ -676,31 +674,45 @@ _pgm_send_spm_unlocked (
 
 /* send a NAK confirm (NCF) message with provided sequence number list.
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned.  on error, FALSE is returned.
  */
 
 static
-int
+gboolean
 send_ncf (
-	pgm_transport_t*	transport,
-	struct sockaddr*	nak_src_nla,
-	struct sockaddr*	nak_grp_nla,
-	guint32			sequence_number,
-	gboolean		is_parity		/* send parity NCF */
+	pgm_transport_t* const		transport,
+	const struct sockaddr* const	nak_src_nla,
+	const struct sockaddr* const	nak_grp_nla,
+	const guint32			sequence,
+	const gboolean			is_parity		/* send parity NCF */
 	)
 {
-	g_trace ("INFO", "send_ncf()");
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != nak_src_nla);
+	g_assert (NULL != nak_grp_nla);
+	g_assert (pgm_sockaddr_family(nak_src_nla) == pgm_sockaddr_family(nak_grp_nla));
 
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
-	if (pgm_sockaddr_family(nak_src_nla) == AF_INET6) {
-		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
-	}
+#ifdef SOURCE_DEBUG
+	char saddr[INET6_ADDRSTRLEN], gaddr[INET6_ADDRSTRLEN];
+	pgm_sockaddr_ntop (nak_src_nla, saddr, sizeof(saddr));
+	pgm_sockaddr_ntop (nak_grp_nla, gaddr, sizeof(gaddr));
+	g_trace ("INFO", "send_ncf (transport:%p nak-src-nla:%s nak-grp-nla:%s sequence:%" G_GUINT32_FORMAT" is-parity:%s)",
+		(gpointer)transport,
+		saddr,
+		gaddr,
+		sequence,
+		is_parity ? "TRUE": "FALSE"
+		);
+#endif
+
+	gsize tpdu_length = sizeof(struct pgm_header);
+	tpdu_length += (AF_INET == pgm_sockaddr_family(nak_src_nla)) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
 	guint8 buf[ tpdu_length ];
 
-	struct pgm_header *header = (struct pgm_header*)buf;
-	struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
-	struct pgm_nak6 *ncf6 = (struct pgm_nak6*)(header + 1);
+	struct pgm_header* header = (struct pgm_header*)buf;
+	struct pgm_nak*  ncf  = (struct pgm_nak*) (header + 1);
+	struct pgm_nak6* ncf6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	
 	header->pgm_sport	= transport->tsi.sport;
@@ -710,7 +722,7 @@ send_ncf (
         header->pgm_tsdu_length = 0;
 
 /* NCF */
-	ncf->nak_sqn		= g_htonl (sequence_number);
+	ncf->nak_sqn		= g_htonl (sequence);
 
 /* source nla */
 	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
@@ -723,23 +735,21 @@ send_ncf (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = _pgm_sendto (transport,
-				FALSE,			/* not rate limited */
-				TRUE,			/* with router alert */
-				header,
-				tpdu_length,
-				MSG_CONFIRM,		/* not expecting a reply */
-				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	const gssize sent = _pgm_sendto (transport,
+					 FALSE,			/* not rate limited */
+					 TRUE,			/* with router alert */
+					 header,
+					 tpdu_length,
+					 MSG_CONFIRM,		/* not expecting a reply */
+					 (struct sockaddr*)&transport->send_gsr.gsr_group,
+					 pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 
-	if ( sent != (gssize)tpdu_length )
-	{
-		return -1;
+	if ( sent != (gssize)tpdu_length ) {
+		return FALSE;
 	}
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
-
-	return 0;
+	return TRUE;
 }
 
 /* A NCF packet with a OPT_NAK_LIST option extension
@@ -749,31 +759,53 @@ send_ncf (
  */
 
 static
-int
+gboolean
 send_ncf_list (
-	pgm_transport_t*	transport,
-	struct sockaddr*	nak_src_nla,
-	struct sockaddr*	nak_grp_nla,
-	pgm_sqn_list_t*		sqn_list,
-	gboolean		is_parity		/* send parity NCF */
+	pgm_transport_t* const 		transport,
+	const struct sockaddr* const	nak_src_nla,
+	const struct sockaddr* const	nak_grp_nla,
+	pgm_sqn_list_t* const		sqn_list,		/* will change to network-order */
+	const gboolean			is_parity		/* send parity NCF */
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != nak_src_nla);
+	g_assert (NULL != nak_grp_nla);
 	g_assert (sqn_list->len > 1);
 	g_assert (sqn_list->len <= 63);
 	g_assert (pgm_sockaddr_family(nak_src_nla) == pgm_sockaddr_family(nak_grp_nla));
 
-	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak)
-			+ sizeof(struct pgm_opt_length)		/* includes header */
-			+ sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-			+ ( (sqn_list->len-1) * sizeof(guint32) );
-	if (pgm_sockaddr_family(nak_src_nla) == AFI_IP6) {
-		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
+#ifdef SOURCE_DEBUG
+	char saddr[INET6_ADDRSTRLEN], gaddr[INET6_ADDRSTRLEN];
+	char list[1024];
+	pgm_sockaddr_ntop (nak_src_nla, saddr, sizeof(saddr));
+	pgm_sockaddr_ntop (nak_grp_nla, gaddr, sizeof(gaddr));
+	sprintf (list, "%" G_GUINT32_FORMAT, sqn_list->sqn[0]);
+	for (unsigned i = 1; i < sqn_list->len; i++) {
+		char sequence[2 + strlen("4294967295")];
+		sprintf (sequence, " %" G_GUINT32_FORMAT, sqn_list->sqn[i]);
+		strcat (list, sequence);
 	}
+	g_trace ("INFO", "send_ncf_list (transport:%p nak-src-nla:%s nak-grp-nla:%s sqn-list:[%s] is-parity:%s)",
+		(gpointer)transport,
+		saddr,
+		gaddr,
+		list,
+		is_parity ? "TRUE": "FALSE"
+		);
+#endif
+
+	gsize tpdu_length = sizeof(struct pgm_header) +
+			    sizeof(struct pgm_opt_length) +		/* includes header */
+			    sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
+			    ( (sqn_list->len-1) * sizeof(guint32) );
+	tpdu_length += (AF_INET == pgm_sockaddr_family(nak_src_nla)) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
 	guint8 buf[ tpdu_length ];
 
-	struct pgm_header *header = (struct pgm_header*)buf;
-	struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
-	struct pgm_nak6 *ncf6 = (struct pgm_nak6*)(header + 1);
+	struct pgm_header* header = (struct pgm_header*)buf;
+	struct pgm_nak*  ncf  = (struct pgm_nak*) (header + 1);
+	struct pgm_nak6* ncf6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	header->pgm_sport	= transport->tsi.sport;
@@ -805,28 +837,15 @@ send_ncf_list (
 						( (sqn_list->len-1) * sizeof(guint32) ) );
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
-	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
-				+ ( (sqn_list->len-1) * sizeof(guint32) );
+	opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+				  sizeof(struct pgm_opt_nak_list) +
+				  ( (sqn_list->len-1) * sizeof(guint32) );
 	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;
-
-#ifdef TRANSPORT_DEBUG
-	char nak1[1024];
-	sprintf (nak1, "send_ncf_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
-#endif
+/* to network-order */
 	for (unsigned i = 1; i < sqn_list->len; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
-
-#ifdef TRANSPORT_DEBUG
-		char nak2[1024];
-		sprintf (nak2, "%" G_GUINT32_FORMAT " ", sqn_list->sqn[i]);
-		strcat (nak1, nak2);
-#endif
 	}
-
-#ifdef TRANSPORT_DEBUG
-	g_trace ("INFO", "%s]%i )", nak1, sqn_list->len);
-#endif
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -841,13 +860,10 @@ send_ncf_list (
 				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 
 	if ( sent != (gssize)tpdu_length )
-	{
-		return -1;
-	}
+		return FALSE;
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
-
-	return 0;
+	return TRUE;
 }
 
 /* cancel any pending heartbeat SPM and schedule a new one

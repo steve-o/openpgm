@@ -31,11 +31,11 @@
 
 G_BEGIN_DECLS
 
-int pgm_transport_set_ambient_spm (pgm_transport_t*, guint);
-int pgm_transport_set_heartbeat_spm (pgm_transport_t*, const guint*, int);
-int pgm_transport_set_txw_sqns (pgm_transport_t*, guint);
-int pgm_transport_set_txw_secs (pgm_transport_t*, guint);
-int pgm_transport_set_txw_max_rte (pgm_transport_t*, guint);
+gboolean pgm_transport_set_ambient_spm (pgm_transport_t* const, const guint);
+gboolean pgm_transport_set_heartbeat_spm (pgm_transport_t* const, const guint*, const int);
+gboolean pgm_transport_set_txw_sqns (pgm_transport_t* const, const guint);
+gboolean pgm_transport_set_txw_secs (pgm_transport_t* const, const guint);
+gboolean pgm_transport_set_txw_max_rte (pgm_transport_t* const, const guint);
 
 gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
 gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
