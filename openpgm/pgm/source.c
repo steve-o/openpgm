@@ -1290,7 +1290,7 @@ pgm_transport_send (
 	if (apdu_length < transport->max_tsdu) {
 		return send_odata_copy (transport, apdu, apdu_length, flags);
 	}
-	g_return_val_if_fail (apdu != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != apdu, -EINVAL);
 	g_return_val_if_fail (apdu_length <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
@@ -1482,7 +1482,9 @@ pgm_transport_sendv (
                                                    false = vector::iov_base = apdu */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != transport, -EINVAL);
+	g_return_val_if_fail (NULL != vector, -EINVAL);
+	g_return_val_if_fail (count > 0, -EINVAL);
 
 /* reject on closed transport */
 	if (!transport->is_open) {
@@ -1520,19 +1522,24 @@ pgm_transport_sendv (
 	for (unsigned i = 0; i < count; i++)
 	{
 #ifdef TRANSPORT_DEBUG
-		if (vector[i].iov_len)
-		{
+		if (vector[i].iov_len) {
 			g_assert( vector[i].iov_base );
 		}
 #endif
+		if (!is_one_apdu) {
+			g_return_val_if_fail (vector[i].iov_len <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
+		}
 		STATE(apdu_length) += vector[i].iov_len;
 	}
 
 /* pass on non-fragment calls */
-	if (is_one_apdu && STATE(apdu_length) < transport->max_tsdu) {
-		return send_odatav (transport, vector, count, flags);
+	if (is_one_apdu) {
+		if (STATE(apdu_length) < transport->max_tsdu) {
+			return send_odatav (transport, vector, count, flags);
+		} else {
+			g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
+		}
 	}
-	g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
 
 /* if non-blocking calculate total wire size and check rate limit */
 	STATE(is_rate_limited) = FALSE;
@@ -1548,7 +1555,7 @@ pgm_transport_sendv (
 		} while (offset_ < STATE(apdu_length));
 
 /* calculation includes one iphdr length already */
-                int result = _pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
+                const int result = _pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
                 if (result == -1) {
 			return (gssize)result;
                 }
@@ -1763,7 +1770,7 @@ blocked:
 gssize
 pgm_transport_send_skbv (
 	pgm_transport_t*	transport,
-	struct pgm_sk_buff_t*	vector,		/* packet */
+	struct pgm_sk_buff_t**	vector,		/* array of skb pointers vs. array of skbs */
 	guint			count,
 	int			flags,		/* MSG_DONTWAIT = rate non-blocking,
 						   MSG_WAITALL  = packet blocking   */
@@ -1771,7 +1778,9 @@ pgm_transport_send_skbv (
                                                   false: vector::iov_base = apdu */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != transport, -EINVAL);
+	g_return_val_if_fail (NULL != vector, -EINVAL);
+	g_return_val_if_fail (count > 0, -EINVAL);
 
 /* reject on closed transport */
 	if (!transport->is_open) {
@@ -1785,7 +1794,7 @@ pgm_transport_send_skbv (
 	}
 	g_return_val_if_fail (vector != NULL, -EINVAL);
 	if (count == 1) {
-		return send_odata (transport, vector, flags);
+		return send_odata (transport, vector[0], flags);
 	}
 
 	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
@@ -1805,7 +1814,7 @@ pgm_transport_send_skbv (
 		gsize total_tpdu_length = 0;
 		for (guint i = 0; i < count; i++)
 		{
-			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset (is_one_apdu) + vector[i].len;
+			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset (is_one_apdu) + vector[i]->len;
 		}
 
 /* calculation includes one iphdr length already */
@@ -1825,16 +1834,16 @@ pgm_transport_send_skbv (
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->txw);
 		for (guint i = 0; i < count; i++)
 		{
-			g_return_val_if_fail (vector[i].len <= transport->max_tsdu_fragment, -EMSGSIZE);
-			STATE(apdu_length) += vector[i].len;
+			g_return_val_if_fail (vector[i]->len <= transport->max_tsdu_fragment, -EMSGSIZE);
+			STATE(apdu_length) += vector[i]->len;
 		}
 	}
 
 	for (STATE(vector_index) = 0; STATE(vector_index) < count; STATE(vector_index)++)
 	{
-		STATE(tsdu_length) = vector[STATE(vector_index)].len;
+		STATE(tsdu_length) = vector[STATE(vector_index)]->len;
 		
-		STATE(skb) = pgm_skb_get(&vector[STATE(vector_index)]);
+		STATE(skb) = pgm_skb_get(vector[STATE(vector_index)]);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
 		STATE(skb)->data  = (guint8*)STATE(skb)->data - pgm_transport_pkt_offset(is_one_apdu);
