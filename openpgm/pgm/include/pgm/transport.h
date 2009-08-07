@@ -351,15 +351,15 @@ PGMTransportError pgm_transport_error_from_eai_errno (gint);
 gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_bind (pgm_transport_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_destroy (pgm_transport_t*, gboolean);
-gboolean pgm_transport_set_max_tpdu (pgm_transport_t*, guint16);
-gboolean pgm_transport_set_multicast_loop (pgm_transport_t*, gboolean);
-gboolean pgm_transport_set_hops (pgm_transport_t*, gint);
-gboolean pgm_transport_set_sndbuf (pgm_transport_t*, int);
-gboolean pgm_transport_set_rcvbuf (pgm_transport_t*, int);
-gboolean pgm_transport_set_fec (pgm_transport_t*, guint, gboolean, gboolean, guint, guint);
-gboolean pgm_transport_set_send_only (pgm_transport_t*, gboolean);
-gboolean pgm_transport_set_recv_only (pgm_transport_t*, gboolean);
-gboolean pgm_transport_set_close_on_failure (pgm_transport_t*, gboolean);
+gboolean pgm_transport_set_max_tpdu (pgm_transport_t* const, const guint16);
+gboolean pgm_transport_set_multicast_loop (pgm_transport_t* const, const gboolean);
+gboolean pgm_transport_set_hops (pgm_transport_t* const, const gint);
+gboolean pgm_transport_set_sndbuf (pgm_transport_t* const, const int);
+gboolean pgm_transport_set_rcvbuf (pgm_transport_t* const, const int);
+gboolean pgm_transport_set_fec (pgm_transport_t* const, const guint, const gboolean, const gboolean, const guint, const guint);
+gboolean pgm_transport_set_send_only (pgm_transport_t* const, const gboolean);
+gboolean pgm_transport_set_recv_only (pgm_transport_t* const, const gboolean);
+gboolean pgm_transport_set_close_on_failure (pgm_transport_t* const, const gboolean);
 
 gsize pgm_transport_pkt_offset (gboolean) G_GNUC_WARN_UNUSED_RESULT;
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
