@@ -74,10 +74,12 @@ generate_transport (void)
 	((struct sockaddr_in*)&transport->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
 	((struct sockaddr*)&transport->send_gsr.gsr_group)->sa_family = AF_INET;
 	((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
-	transport->dport = g_htons(7500);
+	transport->dport = g_htons(PGM_PORT);
 	transport->txw = g_malloc0 (sizeof(pgm_txw_t));
+	transport->txw_sqns = PGM_TXW_SQNS;
 	transport->max_tpdu = PGM_MAX_TPDU;
 	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (FALSE);
+	transport->max_tsdu_fragment = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (TRUE);
 	transport->iphdr_len = sizeof(struct pgm_ip);
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	transport->spm_heartbeat_interval[0] = pgm_secs(1);
@@ -485,8 +487,18 @@ mock_pgm_transport_pkt_offset (
 START_TEST (test_send_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
+	guint8 buffer[ apdu_length ];
+	fail_unless ((gssize)apdu_length == pgm_transport_send (transport, buffer, apdu_length, 0));
+}
+END_TEST
+
+/* large apdu */
+START_TEST (test_send_pass_002)
+{
+	pgm_transport_t* transport = generate_transport ();
+	const gsize apdu_length = 16000;
+	guint8 buffer[ apdu_length ];
 	fail_unless ((gssize)apdu_length == pgm_transport_send (transport, buffer, apdu_length, 0));
 }
 END_TEST
@@ -513,10 +525,50 @@ END_TEST
 START_TEST (test_sendv_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	const gsize tsdu_length = 100;
-	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
-	fail_unless ((gssize)tsdu_length == pgm_transport_sendv (transport, vector, 1, 0, TRUE));
+	const gsize apdu_length = 100;
+	guint8 buffer[ apdu_length ];
+	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
+	fail_unless ((gssize)apdu_length == pgm_transport_sendv (transport, vector, 1, 0, TRUE));
+}
+END_TEST
+
+/* large apdu */
+START_TEST (test_sendv_pass_002)
+{
+	pgm_transport_t* transport = generate_transport ();
+	const gsize apdu_length = 16000;
+	guint8 buffer[ apdu_length ];
+	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
+	fail_unless ((gssize)apdu_length == pgm_transport_sendv (transport, vector, 1, 0, TRUE));
+}
+END_TEST
+
+/* multipart apdu */
+START_TEST (test_sendv_pass_003)
+{
+	pgm_transport_t* transport = generate_transport ();
+	const gsize apdu_length = 16000;
+	guint8 buffer[ apdu_length ];
+	struct pgm_iovec vector[ 16 ];
+	for (unsigned i = 0; i < G_N_ELEMENTS(vector); i++) {
+		vector[i].iov_base = &buffer[ (i * apdu_length) / G_N_ELEMENTS(vector) ];
+		vector[i].iov_len  = apdu_length / G_N_ELEMENTS(vector);
+	}
+	fail_unless ((gssize)apdu_length == pgm_transport_sendv (transport, vector, G_N_ELEMENTS(vector), 0, TRUE));
+}
+END_TEST
+
+/* multiple apdus */
+START_TEST (test_sendv_pass_004)
+{
+	pgm_transport_t* transport = generate_transport ();
+	const gsize apdu_length = 16000;
+	struct pgm_iovec vector[ 16 ];
+	for (unsigned i = 0; i < G_N_ELEMENTS(vector); i++) {
+		vector[i].iov_base = g_malloc0 (apdu_length);
+		vector[i].iov_len  = apdu_length;
+	}
+	fail_unless ((gssize)(apdu_length * G_N_ELEMENTS(vector)) == pgm_transport_sendv (transport, vector, G_N_ELEMENTS(vector), 0, FALSE));
 }
 END_TEST
 
@@ -533,7 +585,7 @@ END_TEST
  *	gssize
  *	pgm_transport_send_skbv (
  *		pgm_transport_t*	transport,
- *		struct pgm_sk_buff_t*	vector,
+ *		struct pgm_sk_buff_t*	vector[],
  *		guint			count,
  *		int			flags,
  *		gboolean		is_one_apdu
@@ -544,7 +596,31 @@ START_TEST (test_send_skbv_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
 	struct pgm_sk_buff_t* skb = generate_skb ();
-	fail_unless ((gssize)skb->len == pgm_transport_send_skbv (transport, skb, 1, 0, TRUE));
+	fail_unless ((gssize)skb->len == pgm_transport_send_skbv (transport, &skb, 1, 0, TRUE));
+}
+END_TEST
+
+/* multipart apdu */
+START_TEST (test_send_skbv_pass_002)
+{
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb[16];
+	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++) {
+		skb[i] = generate_skb ();
+	}
+	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == pgm_transport_send_skbv (transport, skb, G_N_ELEMENTS(skb), 0, TRUE));
+}
+END_TEST
+
+/* multiple apdus */
+START_TEST (test_send_skbv_pass_003)
+{
+	pgm_transport_t* transport = generate_transport ();
+	struct pgm_sk_buff_t* skb[16];
+	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++) {
+		skb[i] = generate_skb ();
+	}
+	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == pgm_transport_send_skbv (transport, skb, G_N_ELEMENTS(skb), 0, FALSE));
 }
 END_TEST
 
@@ -874,18 +950,23 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_send);
 	tcase_add_checked_fixture (tc_send, mock_setup, NULL);
 	tcase_add_test (tc_send, test_send_pass_001);
+	tcase_add_test (tc_send, test_send_pass_002);
 	tcase_add_test (tc_send, test_send_fail_001);
 
 	TCase* tc_sendv = tcase_create ("sendv");
 	suite_add_tcase (s, tc_sendv);
 	tcase_add_checked_fixture (tc_sendv, mock_setup, NULL);
 	tcase_add_test (tc_sendv, test_sendv_pass_001);
+	tcase_add_test (tc_sendv, test_sendv_pass_002);
+	tcase_add_test (tc_sendv, test_sendv_pass_003);
+	tcase_add_test (tc_sendv, test_sendv_pass_004);
 	tcase_add_test (tc_sendv, test_sendv_fail_001);
 
 	TCase* tc_send_skbv = tcase_create ("send-skbv");
 	suite_add_tcase (s, tc_send_skbv);
 	tcase_add_checked_fixture (tc_send_skbv, mock_setup, NULL);
 	tcase_add_test (tc_send_skbv, test_send_skbv_pass_001);
+	tcase_add_test (tc_send_skbv, test_send_skbv_pass_002);
 	tcase_add_test (tc_send_skbv, test_send_skbv_fail_001);
 
 	TCase* tc_send_spm_unlocked = tcase_create ("send-spm-unlocked");
