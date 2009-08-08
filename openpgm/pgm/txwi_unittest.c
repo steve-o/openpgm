@@ -403,7 +403,7 @@ END_TEST
 START_TEST (test_is_full_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
+	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 1, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 	fail_if (pgm_txw_is_full (window));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -533,13 +533,9 @@ START_TEST (test_retransmit_push_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	struct pgm_sk_buff_t*
  *	pgm_txw_retransmit_try_peek (
- *		pgm_txw_t* const	window,
- *		struct pgm_sk_buff_t**	skb,
- *		guint32* const		unfolded_checksum,
- *		gboolean* const		is_parity,
- *		guint* const		rs_h
+ *		pgm_txw_t* const	window
  *		)
  */
 
@@ -561,50 +557,6 @@ END_TEST
 START_TEST (test_retransmit_try_peek_fail_001)
 {
 	pgm_txw_retransmit_try_peek (NULL);
-	fail ();
-}
-END_TEST
-
-/* null skb pointer */
-START_TEST (test_retransmit_try_peek_fail_002)
-{
-	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	pgm_txw_retransmit_try_peek (window);
-	fail ();
-}
-END_TEST
-
-/* null unfolded checksum pointer */
-START_TEST (test_retransmit_try_peek_fail_003)
-{
-	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	pgm_txw_retransmit_try_peek (window);
-	fail ();
-}
-END_TEST
-
-/* null is-parity pointer */
-START_TEST (test_retransmit_try_peek_fail_004)
-{
-	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	pgm_txw_retransmit_try_peek (window);
-	fail ();
-}
-END_TEST
-
-/* null h (rs) pointer */
-START_TEST (test_retransmit_try_peek_fail_005)
-{
-	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	pgm_txw_retransmit_try_peek (window);
 	fail ();
 }
 END_TEST
@@ -707,7 +659,6 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_is_empty);
 	tcase_add_test (tc_is_empty, test_is_empty_pass_001);
 	tcase_add_test_raise_signal (tc_is_empty, test_is_empty_fail_001, SIGABRT);
-
 	TCase* tc_is_full = tcase_create ("is-full");
 	suite_add_tcase (s, tc_is_full);
 	tcase_add_test (tc_is_full, test_is_full_pass_001);
@@ -737,10 +688,6 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_retransmit_try_peek);
 	tcase_add_test (tc_retransmit_try_peek, test_retransmit_try_peek_pass_001);
 	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_001, SIGABRT);
-	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_002, SIGABRT);
-	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_003, SIGABRT);
-	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_004, SIGABRT);
-	tcase_add_test_raise_signal (tc_retransmit_try_peek, test_retransmit_try_peek_fail_005, SIGABRT);
 
 	TCase* tc_retransmit_remove_head = tcase_create ("retransmit-remove-head");
 	suite_add_tcase (s, tc_retransmit_remove_head);
