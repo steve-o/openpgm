@@ -44,6 +44,10 @@
 #	include <pgm/skbuff.h>
 #endif
 
+#ifndef	__PGM_REED_SOLOMON_H__
+#	include <pgm/reed_solomon.h>
+#endif
+
 
 G_BEGIN_DECLS
 
@@ -118,9 +122,6 @@ struct pgm_rxw_t {
 	guint32		committed_count;	/* but still in window */
 
         guint16         max_tpdu;               /* maximum packet size */
-	guint32		tg_size;		/* transmission group size for parity recovery */
-	guint		tg_sqn_shift;
-
         guint32         lead, trail;
         guint32         rxw_trail, rxw_trail_init;
 	guint32		commit_lead;
@@ -128,10 +129,9 @@ struct pgm_rxw_t {
         unsigned        is_defined:1;
 	unsigned	has_event:1;		/* edge triggered */
 	unsigned	is_fec_available:1;
-
-	gpointer	rs;
-	guint		rs_n;
-	guint		rs_k;
+	rs_t		rs;
+	guint32		tg_size;		/* transmission group size for parity recovery */
+	guint		tg_sqn_shift;
 
 /* counters all guint32 */
 	guint32		min_fill_time;		/* restricted from pgm_time_t */
@@ -157,6 +157,7 @@ G_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, 
 G_GNUC_INTERNAL gssize pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_rxw_remove_trail (pgm_rxw_t* const) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const guint);
 G_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const guint32);
 G_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
