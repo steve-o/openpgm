@@ -45,6 +45,7 @@
 #include <pgm/sn.h>
 #include <pgm/time.h>
 #include <pgm/tsi.h>
+#include <pgm/math.h>
 #include <pgm/reed_solomon.h>
 
 #ifndef RXW_DEBUG
@@ -489,6 +490,9 @@ pgm_rxw_update (
 	g_assert (window);
 	g_assert_cmpuint (nak_rb_expiry, >, 0);
 
+	g_trace ("pgm_rxw_update (window:%p txw-lead:%" G_GUINT32_FORMAT " txw-trail:%" G_GUINT32_FORMAT " nak-rb-expiry:%" PGM_TIME_FORMAT ")",
+		(gpointer)window, txw_lead, txw_trail, nak_rb_expiry);
+
 	if (!window->is_defined) {
 		pgm_rxw_define (window, txw_lead);
 		return 0;
@@ -559,6 +563,31 @@ pgm_rxw_update_trail (
 
 /* post-conditions */
 	g_assert (!pgm_rxw_is_full (window));
+}
+
+/* update FEC parameters
+ */
+
+void
+pgm_rxw_update_fec (
+	pgm_rxw_t* const	window,
+	const guint		rs_k
+	)
+{
+/* pre-conditions */
+	g_assert (window);
+
+	g_trace ("pgm_rxw_update_fec (window:%p rs(k):%u)",
+		(gpointer)window, rs_k);
+
+	if (window->is_fec_available) {
+		if (rs_k == window->rs.k) return;
+		_pgm_rs_destroy (&window->rs);
+	} else
+		window->is_fec_available = 1;
+	_pgm_rs_create (&window->rs, PGM_RS_DEFAULT_N, rs_k);
+	window->tg_sqn_shift = pgm_power2_log2 (rs_k);
+	window->tg_size = window->rs.k;
 }
 
 /* add one placeholder to leading edge due to detected lost packet.
@@ -1271,7 +1300,8 @@ pgm_rxw_reconstruct (
 	pgm_rxw_state_t* state;
 
 /* pre-conditions */
-	g_assert (window);
+	g_assert (NULL != window);
+	g_assert (1 == window->is_fec_available);
 	g_assert_cmpuint (pgm_rxw_pkt_sqn (window, tg_sqn), ==, 0);
 
 	skb = _pgm_rxw_peek (window, tg_sqn);
@@ -1280,13 +1310,13 @@ pgm_rxw_reconstruct (
 	const gboolean is_var_pktlen = skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN;
 	const gboolean is_op_encoded = skb->pgm_header->pgm_options & PGM_OPT_PRESENT;
 	const gsize parity_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
-	struct pgm_sk_buff_t* tg_skbs[ window->rs_n ];
-	guint8* tg_data[ window->rs_n ];
-	guint8* tg_opts[ window->rs_n ];
-	guint32 offsets[ window->rs_k ];
+	struct pgm_sk_buff_t* tg_skbs[ window->rs.n ];
+	guint8* tg_data[ window->rs.n ];
+	guint8* tg_opts[ window->rs.n ];
+	guint32 offsets[ window->rs.k ];
 	guint rs_h = 0;
 
-	for (guint32 i = tg_sqn, j = 0; i != (tg_sqn + window->rs_k); i++, j++)
+	for (guint32 i = tg_sqn, j = 0; i != (tg_sqn + window->rs.k); i++, j++)
 	{
 		skb = _pgm_rxw_peek (window, i);
 		g_assert (skb);
@@ -1300,10 +1330,10 @@ pgm_rxw_reconstruct (
 			break;
 
 		case PGM_PKT_HAVE_PARITY_STATE:
-			tg_skbs[ window->rs_k + rs_h ] = skb;
-			tg_data[ window->rs_k + rs_h ] = skb->data;
-			tg_opts[ window->rs_k + rs_h ] = (gpointer)skb->pgm_opt_fragment;
-			offsets[ j ] = window->rs_k + rs_h;
+			tg_skbs[ window->rs.k + rs_h ] = skb;
+			tg_data[ window->rs.k + rs_h ] = skb->data;
+			tg_opts[ window->rs.k + rs_h ] = (gpointer)skb->pgm_opt_fragment;
+			offsets[ j ] = window->rs.k + rs_h;
 			++rs_h;
 /* fall through and alloc new skb for reconstructed data */
 		case PGM_PKT_BACK_OFF_STATE:
@@ -1342,22 +1372,22 @@ pgm_rxw_reconstruct (
 	}
 
 /* reconstruct payload */
-	_pgm_rs_decode_parity_appended (window->rs,
+	_pgm_rs_decode_parity_appended (&window->rs,
 				       (void**)(void*)tg_data,
 				       offsets,
 				       parity_length);
 
 /* reconstruct opt_fragment option */
 	if (is_op_encoded)
-		_pgm_rs_decode_parity_appended (window->rs,
+		_pgm_rs_decode_parity_appended (&window->rs,
 					       (void**)(void*)tg_opts,
 					       offsets,
 					       sizeof(struct pgm_opt_fragment));
 
 /* swap parity skbs with reconstructed skbs */
-	for (guint32 i = 0; i < window->rs_k; i++)
+	for (guint32 i = 0; i < window->rs.k; i++)
 	{
-		if (offsets[i] < window->rs_k)
+		if (offsets[i] < window->rs.k)
 			continue;
 
 		struct pgm_sk_buff_t* repair_skb = tg_skbs[i];
@@ -1368,9 +1398,9 @@ pgm_rxw_reconstruct (
 			if (pktlen > parity_length) {
 				g_warning ("Invalid encoded variable packet length in reconstructed packet, dropping entire transmission group.");
 				pgm_free_skb (repair_skb);
-				for (guint32 j = i; j < window->rs_k; j++)
+				for (guint32 j = i; j < window->rs.k; j++)
 				{
-					if (offsets[j] < window->rs_k)
+					if (offsets[j] < window->rs.k)
 						continue;
 					pgm_rxw_lost (window, tg_skbs[offsets[j]]->sequence);
 				}
@@ -1993,9 +2023,6 @@ pgm_rxw_dump (
 		"is_defined = %u, "
 		"has_event = %u, "
 		"is_fec_available = %u, "
-		"rs = %p, "
-		"rs_n = %u, "
-		"rs_k = %u, "
 		"min_fill_time = %" G_GUINT32_FORMAT ", "
 		"max_fill_time = %" G_GUINT32_FORMAT ", "
 		"min_nak_transmit_count = %" G_GUINT32_FORMAT ", "
@@ -2043,9 +2070,6 @@ pgm_rxw_dump (
 		window->is_defined,
 		window->has_event,
 		window->is_fec_available,
-		window->rs,
-		window->rs_n,
-		window->rs_k,
 		window->min_fill_time,
 		window->max_fill_time,
 		window->min_nak_transmit_count,

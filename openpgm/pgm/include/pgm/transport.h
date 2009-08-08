@@ -180,155 +180,152 @@ typedef enum
 } PGMTransportError;
 
 struct pgm_sqn_list_t {
-    guint	    len;
-    guint32         sqn[63];	/* list of sequence numbers */
+	guint			len;
+	guint32			sqn[63];	/* list of sequence numbers */
 };
 
 typedef struct pgm_sqn_list_t pgm_sqn_list_t;
 
 struct pgm_peer_t {
-    gint		ref_count;		    /* atomic integer */
+	gint			ref_count;		    /* atomic integer */
 
-    pgm_tsi_t           tsi;
-    struct sockaddr_storage	group_nla;
-    struct sockaddr_storage	nla, local_nla;	    /* nla = advertised, local_nla = from packet */
-    struct sockaddr_storage	redirect_nla;	    /* from dlr */
-    pgm_time_t		spmr_expiry;
+	pgm_tsi_t		tsi;
+	struct sockaddr_storage	group_nla;
+	struct sockaddr_storage	nla, local_nla;	    /* nla = advertised, local_nla = from packet */
+	struct sockaddr_storage	redirect_nla;	    /* from dlr */
+	pgm_time_t		spmr_expiry;
 
-    GStaticMutex	mutex;
+	GStaticMutex		mutex;
 
-    gpointer            rxw;		/* pgm_rxw_t */
-    pgm_transport_t*    transport;
-    GList		link_;
+	gpointer            	rxw;		/* pgm_rxw_t */
+	pgm_transport_t*    	transport;
+	GList			link_;
 
-    gpointer		rs;
-    gboolean		use_proactive_parity;	    /* indicating availability from this source */
-    gboolean		use_ondemand_parity;
-    guint		rs_n;
-    guint		rs_k;
-    guint32		tg_sqn_shift;		    /* log2 (rs_k) */
+	unsigned		is_fec_enabled:1;
+	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
+	unsigned		has_ondemand_parity:1;
 
-    guint32		spm_sqn;
-    pgm_time_t		expiry;
+	guint32			spm_sqn;
+	pgm_time_t		expiry;
 
-    pgm_time_t		last_packet;
-    guint32		cumulative_stats[PGM_PC_RECEIVER_MAX];
-    guint32		snap_stats[PGM_PC_RECEIVER_MAX];
+	pgm_time_t		last_packet;
+	guint32			cumulative_stats[PGM_PC_RECEIVER_MAX];
+	guint32			snap_stats[PGM_PC_RECEIVER_MAX];
 
-    guint32		min_fail_time;
-    guint32		max_fail_time;
+	guint32			min_fail_time;
+	guint32			max_fail_time;
 };
 
 typedef struct pgm_peer_t pgm_peer_t;
 
 struct pgm_transport_t {
-    pgm_tsi_t           tsi;
-    guint16		dport;
-    guint16		udp_encap_ucast_port;
-    guint16		udp_encap_mcast_port;
+	pgm_tsi_t           	tsi;
+	guint16			dport;
+	guint16			udp_encap_ucast_port;
+	guint16			udp_encap_mcast_port;
 
-    GStaticMutex	mutex;
-    GThread		*timer_thread;
-    GMainLoop		*timer_loop;
-    GMainContext	*timer_context;
-    guint               timer_id;
-    gboolean		is_bound;
-    gboolean		is_open;
-    gboolean            has_lost_data;
-    gboolean		will_close_on_failure;
+	GStaticMutex		mutex;
+	GThread*		timer_thread;
+	GMainLoop*		timer_loop;
+	GMainContext*		timer_context;
+	guint               	timer_id;
+	gboolean		is_bound;
+	gboolean		is_open;
+	gboolean            	has_lost_data;
+	gboolean		will_close_on_failure;
 
-    gboolean		can_send_data;			/* and SPMs */
-    gboolean		can_send_nak;
-    gboolean		can_recv;
-    gboolean		is_edge_triggered_recv;
+	gboolean		can_send_data;			/* and SPMs */
+	gboolean		can_send_nak;
+	gboolean		can_recv;
+	gboolean		is_edge_triggered_recv;
 
-    GCond		*thread_cond;
-    GMutex		*thread_mutex;
+	GCond*			thread_cond;
+	GMutex*			thread_mutex;
 
-    struct group_source_req send_gsr;			/* multicast */
-    struct sockaddr_storage send_addr;			/* unicast nla */
-    GStaticMutex	send_mutex;
-    int			send_sock;
-    GStaticMutex	send_with_router_alert_mutex;
-    int			send_with_router_alert_sock;
-    struct group_source_req recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
-    guint		recv_gsr_len;
-    int			recv_sock;
+	struct group_source_req send_gsr;			/* multicast */
+	struct sockaddr_storage send_addr;			/* unicast nla */
+	GStaticMutex		send_mutex;
+	int			send_sock;
+	GStaticMutex		send_with_router_alert_mutex;
+	int			send_with_router_alert_sock;
+	struct group_source_req recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
+	guint			recv_gsr_len;
+	int			recv_sock;
 
-    guint16		max_tpdu;
-    guint16		max_tsdu;		    /* excluding optional varpkt_len word */
-    guint16		max_tsdu_fragment;
-    gsize		iphdr_len;
-    gboolean		use_multicast_loop;    /* and reuseaddr for UDP encapsulation */
-    guint		hops;
-    guint		txw_sqns, txw_secs, txw_max_rte;
-    guint		rxw_sqns, rxw_secs, rxw_max_rte;
-    int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
+	guint16			max_tpdu;
+	guint16			max_tsdu;		    /* excluding optional varpkt_len word */
+	guint16			max_tsdu_fragment;
+	gsize			iphdr_len;
+	gboolean		use_multicast_loop;    	    /* and reuseaddr for UDP encapsulation */
+	guint			hops;
+	guint			txw_sqns, txw_secs, txw_max_rte;
+	guint			rxw_sqns, rxw_secs, rxw_max_rte;
+	int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
-    GStaticRWLock	txw_lock;
-    gpointer            txw;		   	    /* pgm_txw_t */
-    gpointer		rate_control;		    /* rate_t */
+	GStaticRWLock		txw_lock;
+	gpointer       	     	txw;		   	    /* pgm_txw_t */
+	gpointer		rate_control;		    /* rate_t */
 
-    gboolean		is_apdu_eagain;		    /* writer-lock on txw_lock exists
-						       as send would block */
+	gboolean		is_apdu_eagain;		    /* writer-lock on txw_lock exists
+							       as send would block */
 
-    struct {
-	guint		    data_pkt_offset;
-	gsize		    data_bytes_offset;
-	guint32		    first_sqn;
-	struct pgm_sk_buff_t* skb;			/* references external buffer */
-	gsize		    tsdu_length;
-	guint32		    unfolded_odata;
-	gsize		    apdu_length;
-	guint		    vector_index;
-	gsize		    vector_offset;
-	gboolean	    is_rate_limited;
-    } pkt_dontwait_state;
+	struct {
+		guint		    data_pkt_offset;
+		gsize		    data_bytes_offset;
+		guint32		    first_sqn;
+		struct pgm_sk_buff_t* skb;			/* references external buffer */
+		gsize		    tsdu_length;
+		guint32		    unfolded_odata;
+		gsize		    apdu_length;
+		guint		    vector_index;
+		gsize		    vector_offset;
+		gboolean	    is_rate_limited;
+	} pkt_dontwait_state;
 
-    guint32		spm_sqn;
-    guint		spm_ambient_interval;	    /* microseconds */
-    guint*		spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
-    guint		spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
-    guint		peer_expiry;		    /* from absence of SPMs */
-    guint		spmr_expiry;		    /* waiting for peer SPMRs */
+	guint32			spm_sqn;
+	guint			spm_ambient_interval;	    /* microseconds */
+	guint*			spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
+	guint			spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
+	guint			peer_expiry;		    /* from absence of SPMs */
+	guint			spmr_expiry;		    /* waiting for peer SPMRs */
 
-    GRand*		rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
-    guint		nak_data_retries, nak_ncf_retries;
-    pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
-    pgm_time_t		next_heartbeat_spm, next_ambient_spm;
+	GRand*			rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
+	guint			nak_data_retries, nak_ncf_retries;
+	pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
+	pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
-    gboolean		use_proactive_parity;
-    gboolean		use_ondemand_parity;
-    gboolean		use_varpkt_len;
-    guint		rs_n;
-    guint		rs_k;
-    guint		rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
-    guint		tg_sqn_shift;
-    struct pgm_sk_buff_t* rx_buffer;
+	gboolean		use_proactive_parity;
+	gboolean		use_ondemand_parity;
+	gboolean		use_varpkt_len;
+	guint			rs_n;
+	guint			rs_k;
+	guint			rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
+	guint			tg_sqn_shift;
+	struct pgm_sk_buff_t* 	rx_buffer;
 
-    GStaticRWLock	peers_lock;
-    GHashTable*		peers_hashtable;	    /* fast lookup */
-    GList*		peers_list;		    /* easy iteration */
-    GSList*		peers_waiting;		    /* rxw: have or lost data */
-    GStaticMutex	waiting_mutex;
-    pgm_notify_t	waiting_notify;		    /* timer to rx */
-    gboolean		is_waiting_read;
+	GStaticRWLock		peers_lock;
+	GHashTable*		peers_hashtable;	    /* fast lookup */
+	GList*			peers_list;		    /* easy iteration */
+	GSList*			peers_waiting;		    /* rxw: have or lost data */
+	GStaticMutex		waiting_mutex;
+	pgm_notify_t		waiting_notify;		    /* timer to rx */
+	gboolean		is_waiting_read;
 
-    pgm_notify_t	rdata_notify;		    /* rx to timer */
-    GIOChannel*		rdata_channel;
-    guint		rdata_id;
+	pgm_notify_t		rdata_notify;		    /* rx to timer */
+	GIOChannel*		rdata_channel;
+	guint			rdata_id;
 
-    pgm_time_t		next_poll;
-    pgm_notify_t	timer_notify;		    /* any to timer */
-    GIOChannel*		notify_channel;
-    guint               notify_id;
-    pgm_notify_t	timer_shutdown;
-    GIOChannel*		shutdown_channel;
-    guint               shutdown_id;
+	pgm_time_t		next_poll;
+	pgm_notify_t		timer_notify;		    /* any to timer */
+	GIOChannel*		notify_channel;
+	guint          	     	notify_id;
+	pgm_notify_t		timer_shutdown;
+	GIOChannel*		shutdown_channel;
+	guint               	shutdown_id;
 
-    guint32		cumulative_stats[PGM_PC_SOURCE_MAX];
-    guint32		snap_stats[PGM_PC_SOURCE_MAX];
-    pgm_time_t		snap_time;
+	guint32			cumulative_stats[PGM_PC_SOURCE_MAX];
+	guint32			snap_stats[PGM_PC_SOURCE_MAX];
+	pgm_time_t		snap_time;
 };
 
 

@@ -82,6 +82,15 @@ generate_apdu (
 {
 }
 
+static
+pgm_peer_t*
+generate_peer (void)
+{
+	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
+	g_atomic_int_inc (&peer->ref_count);
+	return peer;
+}
+
 /** receive window module */
 static
 pgm_rxw_t*
@@ -126,6 +135,15 @@ mock_pgm_rxw_update (
 	)
 {
 	return 0;
+}
+
+static
+void
+mock_pgm_rxw_update_fec (
+	pgm_rxw_t* const	window,
+	const guint		rs_k
+	)
+{
 }
 
 static
@@ -262,25 +280,6 @@ mock__pgm_on_spmr (
 	return TRUE;
 }
 
-/** reed-solomon module */
-static
-void
-mock__pgm_rs_create (
-	rs_t*			rs_,
-	guint			n,
-	guint			k
-	)
-{
-}
-
-static
-void
-mock__pgm_rs_destroy (
-	rs_t*			rs
-	)
-{
-}
-
 /** net module */
 static
 gssize
@@ -336,6 +335,7 @@ mock_pgm_time_update_now (void)
 #define pgm_rxw_destroy		mock_pgm_rxw_destroy
 #define pgm_rxw_add		mock_pgm_rxw_add
 #define pgm_rxw_update		mock_pgm_rxw_update
+#define pgm_rxw_update_fec	mock_pgm_rxw_update_fec
 #define pgm_rxw_readv		mock_pgm_rxw_readv
 #define pgm_rxw_state		mock_pgm_rxw_state
 #define pgm_rxw_lost		mock_pgm_rxw_lost
@@ -349,8 +349,6 @@ mock_pgm_time_update_now (void)
 #define _pgm_on_nak		mock__pgm_on_nak
 #define _pgm_on_nnak		mock__pgm_on_nnak
 #define _pgm_on_spmr		mock__pgm_on_spmr
-#define _pgm_rs_create		mock__pgm_rs_create
-#define _pgm_rs_destroy		mock__pgm_rs_destroy
 #define _pgm_sendto		mock__pgm_sendto
 #define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
 #define pgm_csum_fold		mock_pgm_csum_fold
@@ -499,7 +497,8 @@ END_TEST
 
 START_TEST (test_peer_unref_pass_001)
 {
-	fail ();
+	pgm_peer_t* peer = generate_peer();
+	_pgm_peer_unref (peer);
 }
 END_TEST
 
