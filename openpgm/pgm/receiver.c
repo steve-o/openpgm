@@ -175,12 +175,6 @@ _pgm_peer_unref (
 		pgm_rxw_destroy (peer->rxw);
 		peer->rxw = NULL;
 
-/* reed solomon state */
-		if (peer->rs) {
-			_pgm_rs_destroy (peer->rs);
-			peer->rs = NULL;
-		}
-
 /* object */
 		g_free (peer);
 	}
@@ -1301,22 +1295,12 @@ on_spm (
 					return FALSE;
 				}
 			
-				sender->use_proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
-				sender->use_ondemand_parity  = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
-				if (sender->rs_k != parity_prm_tgs)
-				{
-					sender->rs_n = PGM_RS_DEFAULT_N;
-					sender->rs_k = parity_prm_tgs;
-					sender->tg_sqn_shift = pgm_power2_log2 (sender->rs_k);
-					if (sender->rs) {
-						g_trace ("INFO", "Destroying existing Reed-Solomon state for peer.");
-						_pgm_rs_destroy (sender->rs);
-					}
-					g_trace ("INFO", "Enabling Reed-Solomon forward error correction for peer, RS(%i,%i)",
-						sender->rs_n, sender->rs_k);
-					_pgm_rs_create (&sender->rs, sender->rs_n, sender->rs_k);
+				sender->has_proactive_parity = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_PRO;
+				sender->has_ondemand_parity  = opt_parity_prm->opt_reserved & PGM_PARITY_PRM_OND;
+				if (sender->has_proactive_parity || sender->has_ondemand_parity) {
+					sender->is_fec_enabled = 1;
+					pgm_rxw_update_fec (sender->rxw, parity_prm_tgs);
 				}
-				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
@@ -1958,9 +1942,9 @@ nak_rb_state (
 /* TODO: process BOTH selective and parity NAKs? */
 
 /* calculate current transmission group for parity enabled peers */
-	if (peer->use_ondemand_parity)
+	if (peer->has_ondemand_parity)
 	{
-		const guint32 tg_sqn_mask = 0xffffffff << peer->tg_sqn_shift;
+		const guint32 tg_sqn_mask = 0xffffffff << ((pgm_rxw_t*)peer->rxw)->tg_sqn_shift;
 
 /* NAKs only generated previous to current transmission group */
 		const guint32 current_tg_sqn = ((pgm_rxw_t*)peer->rxw)->lead & tg_sqn_mask;

@@ -35,6 +35,25 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 
 /* mock functions for external references */
 
+/** reed-solomon module */
+static
+void
+mock__pgm_rs_create (
+	rs_t*			rs_,
+	guint			n,
+	guint			k
+	)
+{
+}
+
+static
+void
+mock__pgm_rs_destroy (
+	rs_t*			rs
+	)
+{
+}
+
 static
 void
 mock__pgm_rs_decode_parity_appended (
@@ -47,7 +66,9 @@ mock__pgm_rs_decode_parity_appended (
 // null
 }
 
-#define pgm_time_now	mock_pgm_time_now
+#define pgm_time_now			mock_pgm_time_now
+#define _pgm_rs_create			mock__pgm_rs_create
+#define _pgm_rs_destroy			mock__pgm_rs_destroy
 #define _pgm_rs_decode_parity_appended	mock__pgm_rs_decode_parity_appended
 
 #define RXW_DEBUG
