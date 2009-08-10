@@ -436,18 +436,22 @@ on_msgv (
 /* for each apdu */
 	do {
                 struct pgm_sk_buff_t* pskb = msgv[i].msgv_skb[0];
-
+		gsize apdu_len = 0;
+		for (unsigned j = 0; j < msgv[i].msgv_len; j++)
+			apdu_len += msgv[i].msgv_skb[j]->len;
 /* truncate to first fragment to make GLib printing happy */
 		char buf[1024], tsi[PGM_TSISTRLEN];
 		snprintf (buf, sizeof(buf), "%s", (char*)pskb->data);
 		pgm_tsi_print_r (&pskb->tsi, tsi, sizeof(tsi));
-		if (msgv[i].msgv_len > pskb->len)
+		if (msgv[i].msgv_len > 1)
 			g_message ("\t%u: \"%s\" ... (%" G_GSIZE_FORMAT " bytes from %s)",
-				   i, buf, msgv[i].msgv_len, tsi);
+				   i, buf, apdu_len, tsi);
 		else
 			g_message ("\t%u: \"%s\" (%" G_GSIZE_FORMAT " bytes from %s)",
-				   i, buf, msgv[i].msgv_len, tsi);
-        } while (len -= msgv[i++].msgv_len);
+				   i, buf, apdu_len, tsi);
+		i++;
+		len -= apdu_len;
+        } while (len);
 
 	return 0;
 }

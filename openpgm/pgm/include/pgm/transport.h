@@ -235,8 +235,8 @@ struct pgm_transport_t {
 	gboolean		will_close_on_failure;
 
 	gboolean		can_send_data;			/* and SPMs */
-	gboolean		can_send_nak;
-	gboolean		can_recv;
+	gboolean		can_send_nak;			/* muted receiver */
+	gboolean		can_recv_data;			/* send-only */
 	gboolean		is_edge_triggered_recv;
 
 	GCond*			thread_cond;

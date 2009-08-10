@@ -27,8 +27,10 @@
 
 #include <pgm/receiver.h>
 #include <pgm/rxwi.h>
+#include <pgm/ip.h>
 #include <pgm/skbuff.h>
 #include <pgm/reed_solomon.h>
+#include <pgm/checksum.h>
 
 
 /* mock state */
@@ -49,8 +51,13 @@
 #define PGM_NAK_DATA_RETRIES	5
 #define PGM_NAK_NCF_RETRIES	2
 
-static pgm_transport_t* g_transport = NULL;
+struct mock_recvmsg_t {
+	struct msghdr*		mr_msg;
+	ssize_t			mr_retval;
+	int			mr_errno;
+};
 
+GList* mock_recvmsg_list = NULL;
 
 static
 void
@@ -60,132 +67,143 @@ mock_setup (void)
 }
 
 static
-void
-mock_teardown (void)
-{
-}
-
-static
 struct pgm_transport_t*
 generate_transport (void)
 {
 	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	transport->is_open = TRUE;
+	transport->is_bound = TRUE;
+	transport->rx_buffer = pgm_alloc_skb (PGM_MAX_TPDU);
+	transport->max_tpdu = PGM_MAX_TPDU;
+	transport->rxw_sqns = PGM_RXW_SQNS;
+	transport->dport = g_htons(PGM_PORT);
+	transport->can_send_data = TRUE;
+	transport->can_send_nak = TRUE;
+	transport->can_recv_data = TRUE;
+	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	transport->rand_ = g_rand_new();
+	transport->nak_bo_ivl = 100*1000;
+	pgm_notify_init (&transport->waiting_notify);
 	return transport;
 }
 
 static
 void
 generate_apdu (
-	const pgm_tsi_t*	sender,
-	const gsize		len
+	const char*		source,
+	const guint		source_len,
+	const guint32		sequence,
+	gpointer*		packet,
+	gsize*			len
 	)
 {
+	struct pgm_sk_buff_t* skb;
+	GError* err = NULL;
+
+	skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	skb->data		= skb->head;
+	skb->len		= sizeof(struct pgm_ip) + sizeof(struct pgm_header) + sizeof(struct pgm_data) + source_len;
+	skb->tail		= (guint8*)skb->data + skb->len;
+
+/* add IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_hl		= sizeof(struct pgm_ip) / 4;
+	iphdr->ip_v		= 4;
+	iphdr->ip_tos		= 0;
+	iphdr->ip_len		= g_htons (skb->len);
+	iphdr->ip_id		= 0;
+	iphdr->ip_off		= 0;
+	iphdr->ip_ttl		= 16;
+	iphdr->ip_p		= IPPROTO_PGM;
+	iphdr->ip_sum		= 0;
+	iphdr->ip_src.s_addr	= inet_addr ("127.0.0.1");
+	iphdr->ip_dst.s_addr	= inet_addr ("127.0.0.2");
+
+/* add PGM header */
+	struct pgm_header* pgmhdr = (gpointer)(iphdr + 1);
+	pgmhdr->pgm_sport	= g_htons ((guint16)1000);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_PORT);
+	pgmhdr->pgm_type	= PGM_ODATA;
+	pgmhdr->pgm_options	= 0;
+	pgmhdr->pgm_gsi[0]	= 1;
+	pgmhdr->pgm_gsi[1]	= 2;
+	pgmhdr->pgm_gsi[2]	= 3;
+	pgmhdr->pgm_gsi[3]	= 4;
+	pgmhdr->pgm_gsi[4]	= 5;
+	pgmhdr->pgm_gsi[5]	= 6;
+	pgmhdr->pgm_tsdu_length = g_htons (source_len);
+
+/* add ODATA header */
+	struct pgm_data* datahdr = (gpointer)(pgmhdr + 1);
+	datahdr->data_sqn	= g_htonl (sequence);
+	datahdr->data_trail	= g_htonl ((guint32)-1);
+
+/* add payload */
+	gpointer data = (gpointer)(datahdr + 1);
+	memcpy (data, source, source_len);
+
+/* finally PGM checksum */
+	pgmhdr->pgm_checksum 	= 0;
+	pgmhdr->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (pgmhdr, sizeof(struct pgm_header) + sizeof(struct pgm_data) + source_len, 0));
+
+/* and IP checksum */
+	iphdr->ip_sum		= pgm_inet_checksum (skb->head, skb->len, 0);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_msghdr (
+	const gpointer		packet,
+	const gsize		packet_len
+	)
+{
+	struct sockaddr_in addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr("127.0.0.3")
+	};
+	struct iovec iov = {
+		.iov_base		= packet,
+		.iov_len		= packet_len
+	};
+	struct cmsghdr* packet_cmsg = g_malloc0 (sizeof(struct cmsghdr) + sizeof(struct in_pktinfo));
+	packet_cmsg->cmsg_len   = sizeof(struct cmsghdr) + sizeof(struct in_pktinfo);
+	packet_cmsg->cmsg_level = IPPROTO_IP;
+	packet_cmsg->cmsg_type  = IP_PKTINFO;
+	struct in_pktinfo packet_info = {
+		.ipi_ifindex		= 2,
+		.ipi_spec_dst		= inet_addr("127.0.0.2"),
+		.ipi_addr		= inet_addr("127.0.0.1")
+	};
+	memcpy ((char*)(packet_cmsg + 1), &packet_info, sizeof(struct in_pktinfo));
+	struct msghdr packet_msg = {
+		.msg_name		= g_memdup (&addr, sizeof(addr)),
+		.msg_namelen		= sizeof(addr),
+		.msg_iov		= g_memdup (&iov, sizeof(iov)),
+		.msg_iovlen		= 1,
+		.msg_control		= &packet_cmsg,
+		.msg_controllen		= sizeof(struct cmsghdr) + sizeof(struct in_pktinfo),
+		.msg_flags		= 0
+	};
+
+	struct mock_recvmsg_t* mr = g_malloc (sizeof(struct mock_recvmsg_t));
+	mr->mr_msg	= g_memdup (&packet_msg, sizeof(packet_msg));
+	mr->mr_errno	= 0;
+	mr->mr_retval	= packet_len;
+	mock_recvmsg_list = g_list_append (mock_recvmsg_list, mr);
 }
 
 static
 pgm_peer_t*
 generate_peer (void)
 {
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
+	peer->rxw = pgm_rxw_create (&tsi, PGM_MAX_TPDU, 0, 60, 10*1000);
 	g_atomic_int_inc (&peer->ref_count);
 	return peer;
-}
-
-/** receive window module */
-static
-pgm_rxw_t*
-mock_pgm_rxw_create (
-	const pgm_tsi_t*	tsi,
-	const guint16		tpdu_size,
-	const guint32		sqns,
-	const guint		secs,
-	const guint		max_rte
-	)
-{
-	pgm_rxw_t* rxw = g_malloc0 (sizeof(pgm_rxw_t));
-	return rxw;
-}
-
-static
-void
-mock_pgm_rxw_destroy (
-	pgm_rxw_t* const	window
-	)
-{
-}
-
-static
-int
-mock_pgm_rxw_add (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb,
-	const pgm_time_t		nak_rb_expiry
-	)
-{
-	return PGM_RXW_APPENDED;
-}
-
-static
-guint
-mock_pgm_rxw_update (
-	pgm_rxw_t* const	window,
-	const guint32		txw_lead,
-	const guint32		txw_trail,
-	const pgm_time_t	nak_rb_expiry
-	)
-{
-	return 0;
-}
-
-static
-void
-mock_pgm_rxw_update_fec (
-	pgm_rxw_t* const	window,
-	const guint		rs_k
-	)
-{
-}
-
-static
-gssize
-mock_pgm_rxw_readv (
-	pgm_rxw_t* const	window,
-	pgm_msgv_t**		pmsg,
-	const guint		msg_len
-	)
-{
-	return 100;
-}
-
-static
-void
-mock_pgm_rxw_state (
-	pgm_rxw_t* const	window,
-	struct pgm_sk_buff_t*	skb,
-	pgm_pkt_state_e		new_state
-	)
-{
-}
-
-static
-void
-mock_pgm_rxw_lost (
-	pgm_rxw_t* const	window,
-	const guint32		sequence
-	)
-{
-}
-
-static
-int
-mock_pgm_rxw_confirm (
-	pgm_rxw_t* const	window,
-	const guint32		sequence,
-	const pgm_time_t	nak_rdata_expiry,
-	const pgm_time_t	nak_rb_expiry
-	)
-{
-	return PGM_RXW_DUPLICATE;
 }
 
 /** packet module */
@@ -197,6 +215,16 @@ mock_pgm_parse_raw (
 	GError**			error
 	)
 {
+	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
+	struct sockaddr_in* sin = (struct sockaddr_in*)dst;
+	sin->sin_family         = AF_INET;
+	sin->sin_addr.s_addr    = ip->ip_dst.s_addr;
+	const gsize ip_header_length = ip->ip_hl * 4;
+	skb->pgm_header = (gpointer)( (guint8*)skb->data + ip_header_length );
+	skb->data       = skb->pgm_header;
+	skb->len       -= ip_header_length;
+	memcpy (&skb->tsi.gsi, skb->pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
+	skb->tsi.sport = skb->pgm_header->pgm_sport;
 	return TRUE;
 }
 
@@ -207,6 +235,9 @@ mock_pgm_parse_udp_encap (
 	GError**			error
 	)
 {
+	skb->pgm_header = skb->data;
+	memcpy (&skb->tsi.gsi, skb->pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
+	skb->tsi.sport = skb->pgm_header->pgm_sport;
 	return TRUE;
 }
 
@@ -297,27 +328,6 @@ mock__pgm_sendto (
 	return len;
 }
 
-/** checksum module */
-static
-guint32
-mock_pgm_compat_csum_partial (
-	const void*			addr,
-	guint				len,
-	guint32				csum
-	)
-{
-	return 0x0;
-}
-
-static
-guint16
-mock_pgm_csum_fold (
-	guint32				csum
-	)
-{
-	return 0x0;
-}
-
 /** time module */
 static pgm_time_t mock_pgm_time_now = 0x1;
 
@@ -328,18 +338,49 @@ mock_pgm_time_update_now (void)
 	return mock_pgm_time_now;
 }
 
+/** libc */
+static
+ssize_t
+mock_recvmsg (
+	int			s,
+	struct msghdr*		msg,
+	int			flags
+	)
+{
+	g_assert (NULL != msg);
+	g_assert (NULL != mock_recvmsg_list);
+
+	g_debug ("mock_recvmsg (s:%d msg:%p flags:%d)",
+		s, (gpointer)msg, flags);
+
+	struct mock_recvmsg_t* mr = mock_recvmsg_list->data;
+	struct msghdr* mock_msg	= mr->mr_msg;
+	ssize_t mock_retval	= mr->mr_retval;
+	int mock_errno		= mr->mr_errno;
+	mock_recvmsg_list = g_list_delete_link (mock_recvmsg_list, mock_recvmsg_list);
+	if (mock_msg) {
+		g_assert_cmpuint (mock_msg->msg_namelen, <=, msg->msg_namelen);
+		g_assert_cmpuint (mock_msg->msg_iovlen, <=, msg->msg_iovlen);
+		g_assert_cmpuint (mock_msg->msg_controllen, <=, msg->msg_controllen);
+		if (mock_msg->msg_namelen)
+			memcpy (msg->msg_name, mock_msg->msg_name, mock_msg->msg_namelen);
+		if (mock_msg->msg_iovlen) {
+			for (unsigned i = 0; i < mock_msg->msg_iovlen; i++) {
+				g_assert (mock_msg->msg_iov[i].iov_len <= msg->msg_iov[i].iov_len);
+				memcpy (msg->msg_iov[i].iov_base, mock_msg->msg_iov[i].iov_base, mock_msg->msg_iov[i].iov_len);
+			}
+		}
+		if (mock_msg->msg_controllen)
+			memcpy (msg->msg_control, mock_msg->msg_control, mock_msg->msg_controllen);
+		msg->msg_flags = mock_msg->msg_flags;
+	}
+	errno = mock_errno;
+	return mock_retval;
+}
+
 
 /* mock functions for external references */
 
-#define pgm_rxw_create		mock_pgm_rxw_create
-#define pgm_rxw_destroy		mock_pgm_rxw_destroy
-#define pgm_rxw_add		mock_pgm_rxw_add
-#define pgm_rxw_update		mock_pgm_rxw_update
-#define pgm_rxw_update_fec	mock_pgm_rxw_update_fec
-#define pgm_rxw_readv		mock_pgm_rxw_readv
-#define pgm_rxw_state		mock_pgm_rxw_state
-#define pgm_rxw_lost		mock_pgm_rxw_lost
-#define pgm_rxw_confirm		mock_pgm_rxw_confirm
 #define pgm_parse_raw		mock_pgm_parse_raw
 #define pgm_parse_udp_encap	mock_pgm_parse_udp_encap
 #define pgm_verify_spm		mock_pgm_verify_spm
@@ -350,13 +391,15 @@ mock_pgm_time_update_now (void)
 #define _pgm_on_nnak		mock__pgm_on_nnak
 #define _pgm_on_spmr		mock__pgm_on_spmr
 #define _pgm_sendto		mock__pgm_sendto
-#define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
-#define pgm_csum_fold		mock_pgm_csum_fold
 #define pgm_time_now		mock_pgm_time_now
 #define pgm_time_update_now	mock_pgm_time_update_now
+#define recvmsg			mock_recvmsg
 
 #define RECEIVER_DEBUG
 #include "receiver.c"
+#undef g_trace
+
+#include "rxwi.c"
 
 
 /* target:
@@ -371,14 +414,60 @@ mock_pgm_time_update_now (void)
 
 START_TEST (test_recv_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
+	const char* source[] = {
+		"i am not a string",
+		"i am not an iguana",
+		"i am not a peach"
+	};
+	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	const pgm_tsi_t sender = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	const gsize apdu_length = 100;
-	generate_apdu (&sender, apdu_length);
-	fail_unless ((gssize)apdu_length == pgm_transport_recv (g_transport, buffer, sizeof(buffer), 0));
+	gpointer packet; gsize packet_len;
+	generate_apdu (source[0], 1+strlen(source[0]), 0, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	generate_apdu (source[2], 1+strlen(source[2]), 2, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	generate_apdu (source[1], 1+strlen(source[1]), 1, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	fail_unless ((gssize)(1+strlen(source[0])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	g_message ("buffer:\"%s\"", buffer);
+	fail_unless ((gssize)(1+strlen(source[1])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	g_message ("buffer:\"%s\"", buffer);
+	fail_unless ((gssize)(1+strlen(source[2])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	g_message ("buffer:\"%s\"", buffer);
+}
+END_TEST
+
+/* force external cycle per packet */
+START_TEST (test_recv_pass_002)
+{
+	const char* source[] = {
+		"i am not a string",
+		"i am not an iguana",
+		"i am not a peach"
+	};
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_apdu (source[0], 1+strlen(source[0]), 0, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	fail_unless ((gssize)(1+strlen(source[0])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	g_message ("buffer:\"%s\"", buffer);
+	generate_apdu (source[2], 1+strlen(source[2]), 2, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+/* block */
+	struct mock_recvmsg_t* mr = g_malloc (sizeof(struct mock_recvmsg_t));
+	mr->mr_msg	= NULL;
+	mr->mr_errno	= EAGAIN;
+	mr->mr_retval	= -1;
+	mock_recvmsg_list = g_list_append (mock_recvmsg_list, mr);
+	fail_unless ((gssize)-1 == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	fail_unless (EAGAIN == errno);
+	generate_apdu (source[1], 1+strlen(source[1]), 1, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	fail_unless ((gssize)(1+strlen(source[1])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	g_message ("buffer:\"%s\"", buffer);
+	fail_unless ((gssize)(1+strlen(source[2])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
+	g_message ("buffer:\"%s\"", buffer);
 }
 END_TEST
 
@@ -402,16 +491,17 @@ END_TEST
 
 START_TEST (test_recvfrom_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
+	const char source[] = "i am not a string";
+	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	pgm_tsi_t tsi;
-	const pgm_tsi_t sender = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	const gsize apdu_length = 100;
-	generate_apdu (&sender, apdu_length);
-	fail_unless ((gssize)apdu_length == pgm_transport_recvfrom (g_transport, buffer, sizeof(buffer), 0, &tsi));
-	fail_unless (TRUE == pgm_tsi_equal (&tsi, &sender));
+	const pgm_tsi_t ref = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_tsi_t from;
+	gpointer packet; gsize packet_len;
+	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	fail_unless ((gssize)sizeof(source) == pgm_transport_recvfrom (transport, buffer, sizeof(buffer), 0, &from));
+	fail_unless (TRUE == pgm_tsi_equal (&from, &ref));
+	g_message ("buffer:\"%s\" from:%s", buffer, pgm_tsi_print(&from));
 }
 END_TEST
 
@@ -434,17 +524,16 @@ END_TEST
 
 START_TEST (test_recvmsg_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
+	const char source[] = "i am not a string";
+	pgm_transport_t* transport = generate_transport();
 	pgm_msgv_t msgv;
-	pgm_tsi_t tsi;
-	const pgm_tsi_t sender = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	const gsize apdu_length = 100;
-	generate_apdu (&sender, apdu_length);
-	fail_unless ((gssize)apdu_length == pgm_transport_recvmsg (g_transport, &msgv, 0));
-	fail_unless (msgv.msgv_len > 0);
-	fail_unless (apdu_length == msgv.msgv_skb[0]->len);
+	const pgm_tsi_t ref = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	gpointer packet; gsize packet_len;
+	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	fail_unless ((gssize)sizeof(source) == pgm_transport_recvmsg (transport, &msgv, 0));
+	fail_unless (1 == msgv.msgv_len);
+	fail_unless (sizeof(source) == msgv.msgv_skb[0]->len);
 }
 END_TEST
 
@@ -467,17 +556,15 @@ END_TEST
 
 START_TEST (test_recvmsgv_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
+	const char source[] = "i am not a string";
+	pgm_transport_t* transport = generate_transport();
 	pgm_msgv_t msgv[1];
-	pgm_tsi_t tsi;
-	const pgm_tsi_t sender = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	const gsize apdu_length = 100;
-	generate_apdu (&sender, apdu_length);
-	fail_unless ((gssize)apdu_length == pgm_transport_recvmsgv (g_transport, msgv, G_N_ELEMENTS(msgv), 0));
-	fail_unless (msgv[0].msgv_len > 0);
-	fail_unless (apdu_length == msgv[0].msgv_skb[0]->len);
+	gpointer packet; gsize packet_len;
+	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	fail_unless ((gssize)sizeof(source) == pgm_transport_recvmsgv (transport, msgv, G_N_ELEMENTS(msgv), 0));
+	fail_unless (1 == msgv[0].msgv_len);
+	fail_unless (sizeof(source) == msgv[0].msgv_skb[0]->len);
 }
 END_TEST
 
@@ -495,12 +582,22 @@ END_TEST
  *		)
  */
 
+/* last ref */
 START_TEST (test_peer_unref_pass_001)
 {
 	pgm_peer_t* peer = generate_peer();
 	_pgm_peer_unref (peer);
 }
 END_TEST
+
+/* non-last ref */
+START_TEST (test_peer_unref_pass_002)
+{
+	pgm_peer_t* peer = pgm_peer_ref (generate_peer());
+	_pgm_peer_unref (peer);
+}
+END_TEST
+
 
 START_TEST (test_peer_unref_fail_001)
 {
@@ -518,10 +615,8 @@ END_TEST
 
 START_TEST (test_check_peer_nak_state_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
-	fail ();
+	pgm_transport_t* transport = generate_transport();
+	_pgm_check_peer_nak_state (transport);
 }
 END_TEST
 
@@ -542,16 +637,15 @@ END_TEST
 
 START_TEST (test_min_nak_expiry_pass_001)
 {
-/* pre-condition on setup */
-	fail_unless (NULL != g_transport);
-
-	fail ();
+	pgm_transport_t* transport = generate_transport();
+	const pgm_time_t expiration = pgm_secs(1);
+	pgm_time_t next_expiration = _pgm_min_nak_expiry (expiration, transport);
 }
 END_TEST
 
 START_TEST (test_min_nak_expiry_fail_001)
 {
-	const pgm_time_t expiration = 0;
+	const pgm_time_t expiration = pgm_secs(1);
 	_pgm_min_nak_expiry (expiration, NULL);
 	fail ();
 }
@@ -568,6 +662,7 @@ END_TEST
 START_TEST (test_set_rxw_sqns_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_rxw_sqns (transport, 100));
 }
 END_TEST
@@ -589,6 +684,7 @@ END_TEST
 START_TEST (test_set_rxw_secs_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_rxw_secs (transport, 10));
 }
 END_TEST
@@ -610,6 +706,7 @@ END_TEST
 START_TEST (test_set_rxw_max_rte_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_rxw_max_rte (transport, 100*1000));
 }
 END_TEST
@@ -631,7 +728,9 @@ END_TEST
 START_TEST (test_set_peer_expiry_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_peer_expiry (transport, 100*1000));
+	transport->is_bound = FALSE;
+	transport->spm_ambient_interval = pgm_secs(30);
+	fail_unless (TRUE == pgm_transport_set_peer_expiry (transport, pgm_secs(100)));
 }
 END_TEST
 
@@ -652,7 +751,9 @@ END_TEST
 START_TEST (test_set_spmr_expiry_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_spmr_expiry (transport, 100*1000));
+	transport->is_bound = FALSE;
+	transport->spm_ambient_interval = pgm_secs(30);
+	fail_unless (TRUE == pgm_transport_set_spmr_expiry (transport, pgm_secs(10)));
 }
 END_TEST
 
@@ -673,6 +774,7 @@ END_TEST
 START_TEST (test_set_nak_bo_ivl_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_nak_bo_ivl (transport, 100*1000));
 }
 END_TEST
@@ -694,6 +796,7 @@ END_TEST
 START_TEST (test_set_nak_rpt_ivl_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_nak_rpt_ivl (transport, 100*1000));
 }
 END_TEST
@@ -715,6 +818,7 @@ END_TEST
 START_TEST (test_set_nak_rdata_ivl_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_nak_rdata_ivl (transport, 100*1000));
 }
 END_TEST
@@ -736,6 +840,7 @@ END_TEST
 START_TEST (test_set_nak_data_retries_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_nak_data_retries (transport, 100));
 }
 END_TEST
@@ -757,6 +862,7 @@ END_TEST
 START_TEST (test_set_nak_ncf_retries_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = FALSE;
 	fail_unless (TRUE == pgm_transport_set_nak_ncf_retries (transport, 100));
 }
 END_TEST
@@ -778,103 +884,104 @@ make_test_suite (void)
 
 	TCase* tc_recv = tcase_create ("recv");
 	suite_add_tcase (s, tc_recv);
-	tcase_add_checked_fixture (tc_recv, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_recv, mock_setup, NULL);
 	tcase_add_test (tc_recv, test_recv_pass_001);
+	tcase_add_test (tc_recv, test_recv_pass_002);
 	tcase_add_test (tc_recv, test_recv_fail_001);
 
 	TCase* tc_recvfrom = tcase_create ("recvfrom");
 	suite_add_tcase (s, tc_recvfrom);
-	tcase_add_checked_fixture (tc_recvfrom, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_recvfrom, mock_setup, NULL);
 	tcase_add_test (tc_recvfrom, test_recvfrom_pass_001);
 	tcase_add_test (tc_recvfrom, test_recvfrom_fail_001);
 
 	TCase* tc_recvmsg = tcase_create ("recvmsg");
 	suite_add_tcase (s, tc_recvmsg);
-	tcase_add_checked_fixture (tc_recvmsg, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_recvmsg, mock_setup, NULL);
 	tcase_add_test (tc_recvmsg, test_recvmsg_pass_001);
 	tcase_add_test (tc_recvmsg, test_recvmsg_fail_001);
 
 	TCase* tc_recvmsgv = tcase_create ("recvmsgv");
 	suite_add_tcase (s, tc_recvmsgv);
-	tcase_add_checked_fixture (tc_recvmsgv, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_recvmsgv, mock_setup, NULL);
 	tcase_add_test (tc_recvmsgv, test_recvmsgv_pass_001);
 	tcase_add_test (tc_recvmsgv, test_recvmsgv_fail_001);
 
 	TCase* tc_peer_unref = tcase_create ("peer_unref");
 	suite_add_tcase (s, tc_peer_unref);
-	tcase_add_checked_fixture (tc_peer_unref, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_peer_unref, mock_setup, NULL);
 	tcase_add_test (tc_peer_unref, test_peer_unref_pass_001);
-	tcase_add_test (tc_peer_unref, test_peer_unref_fail_001);
+	tcase_add_test_raise_signal (tc_peer_unref, test_peer_unref_fail_001, SIGABRT);
 
 	TCase* tc_check_peer_nak_state = tcase_create ("check-peer-nak-state");
 	suite_add_tcase (s, tc_check_peer_nak_state);
-	tcase_add_checked_fixture (tc_check_peer_nak_state, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_check_peer_nak_state, mock_setup, NULL);
 	tcase_add_test (tc_check_peer_nak_state, test_check_peer_nak_state_pass_001);
-	tcase_add_test (tc_check_peer_nak_state, test_check_peer_nak_state_fail_001);
+	tcase_add_test_raise_signal (tc_check_peer_nak_state, test_check_peer_nak_state_fail_001, SIGABRT);
 
 	TCase* tc_min_nak_expiry = tcase_create ("min-nak-expiry");
 	suite_add_tcase (s, tc_min_nak_expiry);
-	tcase_add_checked_fixture (tc_min_nak_expiry, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_min_nak_expiry, mock_setup, NULL);
 	tcase_add_test (tc_min_nak_expiry, test_min_nak_expiry_pass_001);
-	tcase_add_test (tc_min_nak_expiry, test_min_nak_expiry_fail_001);
+	tcase_add_test_raise_signal (tc_min_nak_expiry, test_min_nak_expiry_fail_001, SIGABRT);
 
 	TCase* tc_set_rxw_sqns = tcase_create ("set-rxw_sqns");
 	suite_add_tcase (s, tc_set_rxw_sqns);
-	tcase_add_checked_fixture (tc_set_rxw_sqns, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_rxw_sqns, mock_setup, NULL);
 	tcase_add_test (tc_set_rxw_sqns, test_set_rxw_sqns_pass_001);
 	tcase_add_test (tc_set_rxw_sqns, test_set_rxw_sqns_fail_001);
 
 	TCase* tc_set_rxw_secs = tcase_create ("set-rxw-secs");
 	suite_add_tcase (s, tc_set_rxw_secs);
-	tcase_add_checked_fixture (tc_set_rxw_secs, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_rxw_secs, mock_setup, NULL);
 	tcase_add_test (tc_set_rxw_secs, test_set_rxw_secs_pass_001);
 	tcase_add_test (tc_set_rxw_secs, test_set_rxw_secs_fail_001);
 
 	TCase* tc_set_rxw_max_rte = tcase_create ("set-rxw-max-rte");
 	suite_add_tcase (s, tc_set_rxw_max_rte);
-	tcase_add_checked_fixture (tc_set_rxw_max_rte, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_rxw_max_rte, mock_setup, NULL);
 	tcase_add_test (tc_set_rxw_max_rte, test_set_rxw_max_rte_pass_001);
 	tcase_add_test (tc_set_rxw_max_rte, test_set_rxw_max_rte_fail_001);
 
 	TCase* tc_set_peer_expiry = tcase_create ("set-peer-expiry");
 	suite_add_tcase (s, tc_set_peer_expiry);
-	tcase_add_checked_fixture (tc_set_peer_expiry, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_peer_expiry, mock_setup, NULL);
 	tcase_add_test (tc_set_peer_expiry, test_set_peer_expiry_pass_001);
 	tcase_add_test (tc_set_peer_expiry, test_set_peer_expiry_fail_001);
 
 	TCase* tc_set_spmr_expiry = tcase_create ("set-spmr-expiry");
 	suite_add_tcase (s, tc_set_spmr_expiry);
-	tcase_add_checked_fixture (tc_set_spmr_expiry, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_spmr_expiry, mock_setup, NULL);
 	tcase_add_test (tc_set_spmr_expiry, test_set_spmr_expiry_pass_001);
 	tcase_add_test (tc_set_spmr_expiry, test_set_spmr_expiry_fail_001);
 
 	TCase* tc_set_nak_bo_ivl = tcase_create ("set-nak-bo-ivl");
 	suite_add_tcase (s, tc_set_nak_bo_ivl);
-	tcase_add_checked_fixture (tc_set_nak_bo_ivl, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_nak_bo_ivl, mock_setup, NULL);
 	tcase_add_test (tc_set_nak_bo_ivl, test_set_nak_bo_ivl_pass_001);
 	tcase_add_test (tc_set_nak_bo_ivl, test_set_nak_bo_ivl_fail_001);
 
 	TCase* tc_set_nak_rpt_ivl = tcase_create ("set-nak-rpt-ivl");
 	suite_add_tcase (s, tc_set_nak_rpt_ivl);
-	tcase_add_checked_fixture (tc_set_nak_rpt_ivl, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_nak_rpt_ivl, mock_setup, NULL);
 	tcase_add_test (tc_set_nak_rpt_ivl, test_set_nak_rpt_ivl_pass_001);
 	tcase_add_test (tc_set_nak_rpt_ivl, test_set_nak_rpt_ivl_fail_001);
 
 	TCase* tc_set_nak_rdata_ivl = tcase_create ("set-nak-rdata-ivl");
 	suite_add_tcase (s, tc_set_nak_rdata_ivl);
-	tcase_add_checked_fixture (tc_set_nak_rdata_ivl, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_nak_rdata_ivl, mock_setup, NULL);
 	tcase_add_test (tc_set_nak_rdata_ivl, test_set_nak_rdata_ivl_pass_001);
 	tcase_add_test (tc_set_nak_rdata_ivl, test_set_nak_rdata_ivl_fail_001);
 
 	TCase* tc_set_nak_data_retries = tcase_create ("set-nak-data-retries");
 	suite_add_tcase (s, tc_set_nak_data_retries);
-	tcase_add_checked_fixture (tc_set_nak_data_retries, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_nak_data_retries, mock_setup, NULL);
 	tcase_add_test (tc_set_nak_data_retries, test_set_nak_data_retries_pass_001);
 	tcase_add_test (tc_set_nak_data_retries, test_set_nak_data_retries_fail_001);
 
 	TCase* tc_set_nak_ncf_retries = tcase_create ("set-nak-ncf-retries");
 	suite_add_tcase (s, tc_set_nak_ncf_retries);
-	tcase_add_checked_fixture (tc_set_nak_ncf_retries, mock_setup, mock_teardown);
+	tcase_add_checked_fixture (tc_set_nak_ncf_retries, mock_setup, NULL);
 	tcase_add_test (tc_set_nak_ncf_retries, test_set_nak_ncf_retries_pass_001);
 	tcase_add_test (tc_set_nak_ncf_retries, test_set_nak_ncf_retries_fail_001);
 	return s;

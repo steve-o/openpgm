@@ -1116,7 +1116,7 @@ gssize
 pgm_rxw_readv (
 	pgm_rxw_t* const	window,
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
-	const guint		msg_len		/* number of items in pmsg */
+	const guint		pmsglen		/* number of items in pmsg */
 	)
 {
 	const pgm_msgv_t* msg_end;
@@ -1126,12 +1126,12 @@ pgm_rxw_readv (
 /* pre-conditions */
 	g_assert (window);
 	g_assert (pmsg);
-	g_assert_cmpuint (msg_len, >, 0);
+	g_assert_cmpuint (pmsglen, >, 0);
 
-	g_trace ("readv (window:%p pmsg:%p msg-len:%u)",
-		(gpointer)window, (gpointer)pmsg, msg_len);
+	g_trace ("readv (window:%p pmsg:%p pmsglen:%u)",
+		(gpointer)window, (gpointer)pmsg, pmsglen);
 
-	msg_end = *pmsg + msg_len;
+	msg_end = *pmsg + pmsglen;
 	window->pgm_sock_err.lost_count = 0;
 	gssize bytes_read;
 
@@ -1229,7 +1229,7 @@ gssize
 pgm_rxw_incoming_read (
 	pgm_rxw_t* const	window,
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
-	guint			msg_len		/* number of items in pmsg */
+	guint			pmsglen		/* number of items in pmsg */
 	)
 {
 	const pgm_msgv_t* msg_end;
@@ -1238,10 +1238,10 @@ pgm_rxw_incoming_read (
 /* pre-conditions */
 	g_assert (window);
 	g_assert (pmsg);
-	g_assert_cmpuint (msg_len, >, 0);
+	g_assert_cmpuint (pmsglen, >, 0);
 	g_assert (!pgm_rxw_incoming_is_empty (window));
 
-	msg_end = *pmsg + msg_len;
+	msg_end = *pmsg + pmsglen;
 	gssize bytes_read = 0;
 
 	do {
@@ -1446,7 +1446,9 @@ pgm_rxw_is_apdu_complete (
 /* pre-conditions */
 	g_assert (window);
 	g_assert (skb);
-	g_assert_cmpuint (max_len, >, 0);
+
+/* message array full */
+	if (0 == max_len) return FALSE;
 
 	skb = _pgm_rxw_peek (window, first_sequence);
 
@@ -1548,7 +1550,7 @@ gssize
 pgm_rxw_incoming_read_apdu (
 	pgm_rxw_t* const	window,
 	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
-	guint			msg_len		/* number of items in pmsg */
+	guint			pmsglen		/* number of items in pmsg */
 	)
 {
 	struct pgm_sk_buff_t *skb, **pskb;
@@ -1556,16 +1558,18 @@ pgm_rxw_incoming_read_apdu (
 /* pre-conditions */
 	g_assert (window);
 	g_assert (pmsg);
-	g_assert_cmpuint (msg_len, >, 0);
+	g_assert_cmpuint (pmsglen, >, 0);
 
 	skb = _pgm_rxw_peek (window, window->commit_lead);
 	gsize contiguous_len = 0;
 	const gsize apdu_len = skb->pgm_opt_fragment ? g_ntohl (skb->of_apdu_len) : skb->len;
 	g_assert_cmpuint (apdu_len, >=, skb->len);
 	pskb = (*pmsg)->msgv_skb;
+	(*pmsg)->msgv_len = 0;
 	do {
 		_pgm_rxw_state (window, skb, PGM_PKT_COMMIT_DATA_STATE);
 		*pskb++ = skb;
+		(*pmsg)->msgv_len++;
 		contiguous_len += skb->len;
 		if (pgm_rxw_is_last_of_tg_sqn (window, window->commit_lead))
 			pgm_rxw_remove_tg_sqn (window, pgm_rxw_tg_sqn (window, window->commit_lead));
@@ -1575,7 +1579,6 @@ pgm_rxw_incoming_read_apdu (
 		skb = _pgm_rxw_peek (window, window->commit_lead);
 	} while (apdu_len > contiguous_len);
 
-	(*pmsg)->msgv_len = contiguous_len;
 	(*pmsg)++;
 
 /* post-conditions */
