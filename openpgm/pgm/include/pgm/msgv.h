@@ -39,7 +39,7 @@ struct pgm_iovec {
 };
 
 struct pgm_msgv_t {
-	size_t			msgv_len;	/* number of bytes in skb */
+	size_t			msgv_len;	/* number of elements in skb */
 	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
 

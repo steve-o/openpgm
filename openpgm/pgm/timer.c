@@ -175,7 +175,7 @@ pgm_timer_prepare (
 	}
 
 /* save the nearest timer */
-	if (transport->can_recv)
+	if (transport->can_recv_data)
 	{
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
 		expiration = _pgm_min_nak_expiry (expiration, transport);
@@ -260,7 +260,7 @@ pgm_timer_dispatch (
 		g_static_mutex_unlock (&transport->mutex);
 	}
 
-	if (transport->can_recv)
+	if (transport->can_recv_data)
 	{
 		g_static_mutex_lock (&transport->waiting_mutex);
 		g_static_mutex_lock (&transport->mutex);
