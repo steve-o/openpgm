@@ -43,6 +43,17 @@ struct pgm_notify_t {
 
 typedef struct pgm_notify_t pgm_notify_t;
 
+static inline gboolean pgm_notify_is_valid (pgm_notify_t* notify)
+{
+	if (NULL == notify) return FALSE;
+#ifdef CONFIG_HAVE_EVENTFD
+	if (0 == notify->eventfd) return FALSE;
+#else
+	if (0 == notify->pipefd[0] || 0 == notify->pipefd[1]) return FALSE;
+#endif /* CONFIG_HAVE_EVENTFD */
+	return TRUE;
+}
+
 static inline int pgm_notify_init (pgm_notify_t* notify)
 {
 	g_assert (notify);

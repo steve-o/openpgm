@@ -315,7 +315,7 @@ pgm_transport_create (
 	new_transport = g_malloc0 (sizeof(pgm_transport_t));
 	new_transport->can_send_data = TRUE;
 	new_transport->can_send_nak  = TRUE;
-	new_transport->can_recv	     = TRUE;
+	new_transport->can_recv_data = TRUE;
 
 /* regular send lock */
 	g_static_mutex_init (&new_transport->send_mutex);
@@ -723,7 +723,7 @@ pgm_transport_bind (
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
 	}
-	if (transport->can_recv) {
+	if (transport->can_recv_data) {
 		if (0 != pgm_notify_init (&transport->waiting_notify)) {
 			const int save_errno = errno;
 			g_set_error (error,
@@ -758,7 +758,7 @@ pgm_transport_bind (
 	}
 
 /* create peer list */
-	if (transport->can_recv) {
+	if (transport->can_recv_data) {
 		transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 		g_assert (transport->peers_hashtable);
 	}
@@ -1306,7 +1306,7 @@ no_cap_net_admin:
 	}
 	else
 	{
-		g_assert (transport->can_recv);
+		g_assert (transport->can_recv_data);
 		transport->next_poll = pgm_time_update_now() + pgm_secs( 30 );
 	}
 
@@ -1354,7 +1354,7 @@ pgm_transport_select_info (
 		FD_SET(transport->recv_sock, readfds);
 		fds = transport->recv_sock + 1;
 
-		if (transport->can_recv) {
+		if (transport->can_recv_data) {
 			int waiting_fd = pgm_notify_get_fd (&transport->waiting_notify);
 			FD_SET(waiting_fd, readfds);
 			fds = MAX(fds, waiting_fd + 1);
@@ -1403,7 +1403,7 @@ pgm_transport_poll_info (
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
-		if (transport->can_recv)
+		if (transport->can_recv_data)
 		{
 			g_assert ( (1 + moo) <= *n_fds );
 			fds[moo].fd = pgm_notify_get_fd (&transport->waiting_notify);
@@ -1463,7 +1463,7 @@ pgm_transport_epoll_ctl (
 			goto out;
 		}
 
-		if (transport->can_recv)
+		if (transport->can_recv_data)
 		{
 			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->waiting_notify), &event);
 			if (retval) {
@@ -1590,7 +1590,7 @@ pgm_transport_set_send_only (
 	g_return_val_if_fail (transport != NULL, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->can_recv	= !send_only;
+	transport->can_recv_data	= !send_only;
 	g_static_mutex_unlock (&transport->mutex);
 	return TRUE;
 }

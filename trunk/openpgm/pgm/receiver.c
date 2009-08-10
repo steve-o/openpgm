@@ -133,6 +133,11 @@ nak_rb_ivl (
 	pgm_transport_t* transport
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != transport->rand_);
+	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
+
 	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
 }
 
@@ -147,10 +152,10 @@ pgm_peer_ref (
 	pgm_peer_t*	peer
 	)
 {
-	g_return_val_if_fail (peer != NULL, NULL);
+/* pre-conditions */
+	g_assert (NULL != peer);
 
 	g_atomic_int_inc (&peer->ref_count);
-
 	return peer;
 }
 
@@ -162,10 +167,10 @@ _pgm_peer_unref (
 	pgm_peer_t*	peer
 	)
 {
-	g_return_if_fail (peer != NULL);
+/* pre-conditions */
+	g_assert (NULL != peer);
 
-	gboolean is_zero = g_atomic_int_dec_and_test (&peer->ref_count);
-
+	const gboolean is_zero = g_atomic_int_dec_and_test (&peer->ref_count);
 	if (G_UNLIKELY (is_zero))
 	{
 /* peer lock */
@@ -198,6 +203,9 @@ get_opt_fragment (
 	g_assert (opt_header->opt_type   == PGM_OPT_LENGTH);
 	g_assert (opt_header->opt_length == sizeof(struct pgm_opt_length));
 
+	g_trace ("INFO","get_opt_fragment (opt-header:%p opt-fragment:%p)",
+		(gpointer)opt_header, (gpointer)opt_fragment);
+
 /* always at least two options, first is always opt_length */
 	do {
 		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
@@ -221,22 +229,21 @@ get_opt_fragment (
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
 
-int
+gboolean
 pgm_transport_set_peer_expiry (
-	pgm_transport_t*	transport,
-	guint			peer_expiry	/* in microseconds */
+	pgm_transport_t* const	transport,
+	const guint		peer_expiry	/* in microseconds */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (peer_expiry > 0, -EINVAL);
-	g_return_val_if_fail (peer_expiry >= 2 * transport->spm_ambient_interval, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (peer_expiry > 0, FALSE);
+	g_return_val_if_fail (peer_expiry >= 2 * transport->spm_ambient_interval, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->peer_expiry = peer_expiry;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* set maximum back off range for listening for multicast SPMR
@@ -246,24 +253,23 @@ pgm_transport_set_peer_expiry (
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
 
-int
+gboolean
 pgm_transport_set_spmr_expiry (
-	pgm_transport_t*	transport,
-	guint			spmr_expiry	/* in microseconds */
+	pgm_transport_t* const	transport,
+	const guint		spmr_expiry	/* in microseconds */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (spmr_expiry > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (spmr_expiry > 0, FALSE);
 	if (transport->can_send_data) {
-		g_return_val_if_fail (transport->spm_ambient_interval > spmr_expiry, -EINVAL);
+		g_return_val_if_fail (transport->spm_ambient_interval > spmr_expiry, FALSE);
 	}
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->spmr_expiry = spmr_expiry;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < rxw_sqns < one less than half sequence space
@@ -271,22 +277,21 @@ pgm_transport_set_spmr_expiry (
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
 
-int
+gboolean
 pgm_transport_set_rxw_sqns (
-	pgm_transport_t*	transport,
-	guint			sqns
+	pgm_transport_t* const	transport,
+	const guint		sqns
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), -EINVAL);
-	g_return_val_if_fail (sqns > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
+	g_return_val_if_fail (sqns > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->rxw_sqns = sqns;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < secs < ( rxw_sqns / rxw_max_rte )
@@ -296,21 +301,20 @@ pgm_transport_set_rxw_sqns (
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
 
-int
+gboolean
 pgm_transport_set_rxw_secs (
-	pgm_transport_t*	transport,
-	guint			secs
+	pgm_transport_t* const	transport,
+	const guint		secs
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (secs > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (secs > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->rxw_secs = secs;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* 0 < rxw_max_rte < interface capacity
@@ -324,21 +328,20 @@ pgm_transport_set_rxw_secs (
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
 
-int
+gboolean
 pgm_transport_set_rxw_max_rte (
-	pgm_transport_t*	transport,
-	guint			max_rte
+	pgm_transport_t* const	transport,
+	const guint		max_rte
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
-	g_return_val_if_fail (max_rte > 0, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
+	g_return_val_if_fail (max_rte > 0, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->rxw_max_rte = max_rte;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* Actual NAK back-off, NAK_RB_IVL, is random time interval 1 < NAK_BO_IVL,
@@ -347,100 +350,99 @@ pgm_transport_set_rxw_max_rte (
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
 
-int
+gboolean
 pgm_transport_set_nak_bo_ivl (
-	pgm_transport_t*	transport,
-	guint			usec		/* microseconds */
+	pgm_transport_t* const	transport,
+	const guint		usec		/* microseconds */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->nak_bo_ivl = usec;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* Set NAK_RPT_IVL, the repeat interval before re-sending a NAK.
  *
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
-int
+
+gboolean
 pgm_transport_set_nak_rpt_ivl (
-	pgm_transport_t*	transport,
-	guint			usec		/* microseconds */
+	pgm_transport_t* const	transport,
+	const guint		usec		/* microseconds */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->nak_rpt_ivl = usec;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* Set NAK_RDATA_IVL, the interval waiting for data.
  *
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
-int
+
+gboolean
 pgm_transport_set_nak_rdata_ivl (
-	pgm_transport_t*	transport,
-	guint			usec		/* microseconds */
+	pgm_transport_t* const	transport,
+	const guint		usec		/* microseconds */
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->nak_rdata_ivl = usec;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* statistics are limited to guint8, i.e. 255 retries
  *
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
-int
+
+gboolean
 pgm_transport_set_nak_data_retries (
-	pgm_transport_t*	transport,
-	guint			cnt
+	pgm_transport_t* const	transport,
+	const guint		cnt
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->nak_data_retries = cnt;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* statistics are limited to guint8, i.e. 255 retries
  *
  * on success, returns 0.  on invalid setting, returns -EINVAL.
  */
-int
+
+gboolean
 pgm_transport_set_nak_ncf_retries (
-	pgm_transport_t*	transport,
-	guint			cnt
+	pgm_transport_t* const	transport,
+	const guint		cnt
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (!transport->is_bound, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->nak_ncf_retries = cnt;
 	g_static_mutex_unlock (&transport->mutex);
-
-	return 0;
+	return TRUE;
 }
 
 /* a peer in the context of the transport is another party on the network sending PGM
@@ -450,7 +452,8 @@ pgm_transport_set_nak_ncf_retries (
  * on success, returns new peer object.
  */
 
-static pgm_peer_t*
+static
+pgm_peer_t*
 new_peer (
 	pgm_transport_t*	transport,
 	pgm_tsi_t*		tsi,
@@ -462,18 +465,19 @@ new_peer (
 {
 	pgm_peer_t* peer;
 
-#ifdef TRANSPORT_DEBUG
-	char localnla[INET6_ADDRSTRLEN];
-	char groupnla[INET6_ADDRSTRLEN];
-	pgm_inet_ntop (	pgm_sockaddr_family( src_addr ),
-			pgm_sockaddr_addr( src_addr ),
-			localnla,
-			sizeof(localnla) );
-	pgm_inet_ntop (	pgm_sockaddr_family( dst_addr ),
-			pgm_sockaddr_addr( dst_addr ),
-			groupnla,
-			sizeof(groupnla) );
-	g_trace ("INFO","new peer, tsi %s, group nla %s, local nla %s", pgm_print_tsi (tsi), groupnla, localnla);
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != src_addr);
+	g_assert (src_addr_len > 0);
+	g_assert (NULL != dst_addr);
+	g_assert (dst_addr_len > 0);
+
+#ifdef RECEIVER_DEBUG
+	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
+	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
+	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
+	g_trace ("INFO","new_peer (transport:%p tsi:%s src-addr:%s src-addr-len:%" G_GSIZE_FORMAT " dst-addr:%s dst-addr-len:%" G_GSIZE_FORMAT ")",
+		(gpointer)transport, pgm_tsi_print (tsi), saddr, src_addr_len, daddr, dst_addr_len);
 #endif
 
 	peer = g_malloc0 (sizeof(pgm_peer_t));
@@ -548,23 +552,36 @@ pgm_transport_recvmsgv (
 	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
-	g_trace ("INFO", "pgm_transport_recvmsgv");
-	g_assert( msg_len > 0 );
-
-/* reject on closed transport */
-	if (!transport->is_open) {
+	g_return_val_if_fail (NULL != transport, -1);
+	if (msg_len) g_return_val_if_fail (NULL != msg_start, -1);
+	if (!transport->is_bound || !transport->is_open) {
+		g_trace ("INFO", transport->is_bound ? "recvmsgv failed as transport is not open." :
+						       "recvmsgv failed as transport is not bound.");
 		errno = ENOTCONN;
 		return -1;
 	}
+
+/* pre-conditions */
+	g_assert (NULL != transport->rx_buffer);
+	g_assert (transport->max_tpdu > 0);
+	g_assert (NULL != transport->peers_hashtable);
+	g_assert (NULL != transport->rand_);
+	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
+	g_assert (pgm_notify_is_valid (&transport->waiting_notify));
+
+	g_trace ("INFO", "pgm_transport_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT" flags:%d)",
+		(gpointer)transport, (gpointer)msg_start, msg_len, flags);
+
 	if (transport->has_lost_data) {
 		pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
-		msg_start[0].msgv_len = sizeof(lost_rxw->pgm_sock_err);
+		msg_start[0].msgv_len = 1;
 		msg_start[0].msgv_skb[0] = (gpointer)&lost_rxw->pgm_sock_err;
 		if (transport->will_close_on_failure) {
 			transport->is_open = FALSE;
 		} else {
 			transport->has_lost_data = !transport->has_lost_data;
 		}
+		g_trace ("INFO", "recvmsgv failed as transport reset on data loss.");
 		errno = ECONNRESET;
 		return -1;
 	}
@@ -686,7 +703,6 @@ recv_again:
 
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
 		{
-			g_trace ("INFO", "cmsg: level=%d type=%d", cmsg->cmsg_level, cmsg->cmsg_type);
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
@@ -713,7 +729,6 @@ recv_again:
 /* set any empty address if no headers found */
 		if (!found_dstaddr)
 		{
-			g_trace("INFO","no destination address found in header");
 			struct sockaddr_in* sin		= (struct sockaddr_in*)&dst;
 			sin->sin_family			= AF_INET;
 			sin->sin_addr.s_addr		= INADDR_ANY;
@@ -725,6 +740,7 @@ recv_again:
 	if (!is_valid)
 	{
 /* TODO: difference between PGM_PC_SOURCE_CKSUM_ERRORS & PGM_PC_RECEIVER_CKSUM_ERRORS */
+		g_trace("INFO","Discarded invalid packet.");
 		if (err && PGM_PACKET_ERROR_CKSUM == err->code)
 			transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
@@ -743,9 +759,8 @@ recv_again:
 
 		if (skb->pgm_header->pgm_sport != transport->dport)
 		{
-
 /* its upstream/peer-to-peer for another session */
-
+			g_trace("INFO","Discarded packet on data-destination port mismatch.");
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -760,11 +775,11 @@ recv_again:
 			{
 
 /* we are the source, propagate null as the source */
-
 				source = NULL;
 
 				if (!transport->can_send_data)
 				{
+					g_trace("INFO","Discarded packet for silenced source.");
 					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 					goto check_for_repeat;
 				}
@@ -773,8 +788,9 @@ recv_again:
 			{
 /* we are not the source */
 
-				if (!transport->can_recv)
+				if (!transport->can_recv_data)
 				{
+					g_trace("INFO","Discarded packet for mute receiver.");
 					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 					goto check_for_repeat;
 				}
@@ -785,9 +801,8 @@ recv_again:
 				g_static_rw_lock_reader_unlock (&transport->peers_lock);
 				if (source == NULL)
 				{
-
 /* this source is unknown, we don't care about messages about it */
-
+					g_trace("INFO","Discarded packet about unknown source.");
 					transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 					goto check_for_repeat;
 				}
@@ -800,20 +815,19 @@ recv_again:
 		{
 
 /* unicast upstream message, note that dport & sport are reversed */
-
 			source = NULL;
 
 			if (!transport->can_send_data)
 			{
+				g_trace("INFO","Discarded packet for mute source.");
 				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 				goto check_for_repeat;
 			}
 		}
 		else
 		{
-
 /* it is a mystery! */
-
+			g_trace("INFO","Discarded unknown PGM packet.");
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -832,6 +846,7 @@ recv_again:
 				goto check_for_repeat;
 			} else {
 /* ignore multicast NAKs as the source */
+				g_trace("INFO","Discarded multicast NAK as source.");
 				transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 				goto check_for_repeat;
 			}
@@ -847,6 +862,7 @@ recv_again:
 			break;
 		case PGM_POLR:
 		default:
+			g_trace("INFO","Discarded unsupported PGM type packet.");
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -858,6 +874,7 @@ recv_again:
 
 		if (!pgm_is_downstream (skb->pgm_header->pgm_type))
 		{
+			g_trace("INFO","Discarded unknown PGM packet.");
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -865,12 +882,14 @@ recv_again:
 /* pgm packet DPORT contains our transport DPORT */
 		if (skb->pgm_header->pgm_dport != transport->dport)
 		{
+			g_trace("INFO","Discarded packet on data-destination port mismatch.");
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
 
-		if (!transport->can_recv)
+		if (!transport->can_recv_data)
 		{
+			g_trace("INFO","Discarded packet for mute receiver.");
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -919,6 +938,7 @@ recv_again:
 			break;
 
 		default:
+			g_trace("INFO","Discarded unsupported PGM type packet.");
 			transport->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 			goto check_for_repeat;
 		}
@@ -930,6 +950,7 @@ recv_again:
 	    pgm_rxw_epoll ((pgm_rxw_t*)source->rxw) &&
 	    !((pgm_rxw_t*)source->rxw)->waiting_link.data)
 	{
+		g_trace("INFO","waiting data.");
 		((pgm_rxw_t*)source->rxw)->waiting_link.data = source->rxw;
 		((pgm_rxw_t*)source->rxw)->waiting_link.next = transport->peers_waiting;
 		transport->peers_waiting = &((pgm_rxw_t*)source->rxw)->waiting_link;
@@ -1062,7 +1083,7 @@ out:
 
 		if (transport->has_lost_data) {
 			pgm_rxw_t* lost_rxw = transport->peers_waiting->data;
-			msg_start[0].msgv_len = sizeof(lost_rxw->pgm_sock_err);
+			msg_start[0].msgv_len = 1;
 			msg_start[0].msgv_skb[0] = (gpointer)&lost_rxw->pgm_sock_err;
 			if (transport->will_close_on_failure) {
 				transport->is_open = FALSE;
@@ -1113,6 +1134,12 @@ pgm_transport_recvmsg (
 	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
+	g_return_val_if_fail (NULL != transport, -1);
+	g_return_val_if_fail (NULL != msgv, -1);
+
+	g_trace ("INFO", "pgm_transport_recvmsg (transport:%p msgv:%p flags:%d)",
+		(gpointer)transport, (gpointer)msgv, flags);
+
 	return pgm_transport_recvmsgv (transport, msgv, 1, flags);
 }
 
@@ -1130,11 +1157,17 @@ pgm_transport_recvfrom (
 	gpointer		data,
 	gsize			len,
 	int			flags,		/* MSG_DONTWAIT for non-blocking */
-	pgm_tsi_t*		from
+	pgm_tsi_t*		from		/* maybe NULL */
 	)
 {
 	pgm_msgv_t msgv;
 	gssize bytes_read;
+
+	g_return_val_if_fail (NULL != transport, -1);
+	if (len) g_return_val_if_fail (NULL != data, -1);
+
+	g_trace ("INFO", "pgm_transport_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d from:%p)",
+		(gpointer)transport, data, len, flags, (gpointer)from);
 
 	bytes_read = pgm_transport_recvmsg (transport, &msgv, flags & ~MSG_FIN);
 
@@ -1143,8 +1176,10 @@ pgm_transport_recvfrom (
 		gssize bytes_copied = 0;
 		struct pgm_sk_buff_t* skb = msgv.msgv_skb[0];
 
-		if (from)
-			memcpy (from, &skb->tsi, sizeof(pgm_tsi_t));
+		if (from) {
+			memcpy (&from->gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
+			from->sport = g_ntohs (skb->tsi.sport);
+		}
 
 		while (bytes_copied < bytes_read)
 		{
@@ -1163,7 +1198,7 @@ pgm_transport_recvfrom (
 	}
 	else if (errno == ECONNRESET)
 	{
-		memcpy (data, msgv.msgv_skb[0], msgv.msgv_len);
+		memcpy (data, msgv.msgv_skb[0], sizeof(struct pgm_sock_err_t));
 	}
 
 	return bytes_read;
@@ -1177,6 +1212,12 @@ pgm_transport_recv (
 	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
+	g_return_val_if_fail (NULL != transport, -1);
+	if (len) g_return_val_if_fail (NULL != data, -1);
+
+	g_trace ("INFO", "pgm_transport_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d)",
+		(gpointer)transport, data, len, flags);
+
 	return pgm_transport_recvfrom (transport, data, len, flags, NULL);
 }
 
@@ -1194,8 +1235,16 @@ on_spm (
 	struct pgm_sk_buff_t*	skb
 	)
 {
-	if (!pgm_verify_spm (skb))
-	{
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != sender);
+	g_assert (NULL != skb);
+
+	g_trace("INFO","on_spm (transport:%p sender:%p skb:%p)",
+		(gpointer)transport, (gpointer)sender, (gpointer)skb);
+
+	if (!pgm_verify_spm (skb)) {
+		g_trace("INFO","Discarded invalid SPM.");
 		sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 		return FALSE;
 	}
@@ -1226,7 +1275,6 @@ on_spm (
 		if (naks && pgm_time_after (transport->next_poll, nak_rb_expiry))
 		{
 			transport->next_poll = nak_rb_expiry;
-			g_trace ("INFO","on_spm: prod timer thread");
 			pgm_notify_send (&transport->timer_notify);
 		}
 
@@ -1245,6 +1293,7 @@ on_spm (
 	}
 	else
 	{	/* does not advance SPM sequence number */
+		g_trace ("INFO","Discarded duplicate SPM.");
 		sender->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS]++;
 		g_static_mutex_unlock (&sender->mutex);
 		g_static_mutex_unlock (&transport->mutex);
@@ -1259,6 +1308,7 @@ on_spm (
 							(struct pgm_opt_length*)(spm  + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
+			g_trace ("INFO","Discarded malformed SPM.");
 			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 			g_static_mutex_unlock (&sender->mutex);
 			g_static_mutex_unlock (&transport->mutex);
@@ -1266,6 +1316,7 @@ on_spm (
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
+			g_trace ("INFO","Discarded malformed SPM.");
 			sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 			g_static_mutex_unlock (&sender->mutex);
 			g_static_mutex_unlock (&transport->mutex);
@@ -1280,6 +1331,7 @@ on_spm (
 				struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
 				if ((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0)
 				{
+					g_trace ("INFO","Discarded malformed SPM.");
 					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 					g_static_mutex_unlock (&sender->mutex);
 					g_static_mutex_unlock (&transport->mutex);
@@ -1289,6 +1341,7 @@ on_spm (
 				const guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
 				if (parity_prm_tgs < 2 || parity_prm_tgs > 128)
 				{
+					g_trace ("INFO","Discarded malformed SPM.");
 					sender->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 					g_static_mutex_unlock (&sender->mutex);
 					g_static_mutex_unlock (&transport->mutex);
@@ -1336,7 +1389,7 @@ on_peer_nak (
 
 	if (!pgm_verify_nak (skb))
 	{
-		g_trace ("INFO", "Invalid NAK, ignoring.");
+		g_trace ("INFO","Discarded invalid multicast NAK.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS]++;
 		return FALSE;
 	}
@@ -1348,7 +1401,10 @@ on_peer_nak (
 	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0)
+	{
+		g_trace ("INFO","Discarded multicast NAK on NLA mismatch.");
 		return FALSE;
+	}
 
 /* NAK_GRP_NLA contains one of our transport receive multicast groups: the sources send multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
@@ -1357,11 +1413,13 @@ on_peer_nak (
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0)
+		{
 			found = TRUE;
+		}
 	}
 
 	if (!found) {
-		g_trace ("INFO", "NAK not destined for this multicast group.");
+		g_trace ("INFO","Discarded multicast NAK on multicast group mismatch.");
 		return FALSE;
 	}
 
@@ -1385,13 +1443,13 @@ on_peer_nak (
 							(const struct pgm_opt_length*)(nak + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
-			g_trace ("INFO", "First PGM Option in NAK incorrect, ignoring.");
+			g_trace ("INFO","Discarded malformed multicast NAK.");
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
-			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
+			g_trace ("INFO","Discarded malformed multicast NAK.");
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
@@ -1408,9 +1466,7 @@ on_peer_nak (
 		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
 
-	g_trace ("INFO", "NAK contains 1+%i sequence numbers.", nak_list_len);
-	while (nak_list_len)
-	{
+	while (nak_list_len) {
 		pgm_rxw_confirm (peer->rxw,
 				 g_ntohl (*nak_list),
 				 pgm_time_now + transport->nak_rdata_ivl,
@@ -1462,7 +1518,7 @@ on_ncf (
 
 	if (!pgm_verify_ncf (skb))
 	{
-		g_trace ("INFO", "Invalid NCF, ignoring.");
+		g_trace ("INFO", "Discarded invalid NCF.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 		return FALSE;
 	}
@@ -1476,9 +1532,9 @@ on_ncf (
 
 #if 0
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_addr) != 0) {
-		retval = -EINVAL;
+		g_trace ("INFO", "Discarded NCF on NLA mismatch.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-		goto out;
+		return FALSE;
 	}
 #endif
 
@@ -1487,7 +1543,7 @@ on_ncf (
 	pgm_nla_to_sockaddr ((ncf->nak_src_nla_afi == AFI_IP6) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
 	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0)
 	{
-		g_trace ("INFO", "NCF not destined for this multicast group.");
+		g_trace ("INFO", "Discarded NCF on multicast group mismatch.");
 		return FALSE;
 	}
 
@@ -1510,13 +1566,13 @@ on_ncf (
 							(const struct pgm_opt_length*)(ncf  + 1);
 		if (opt_len->opt_type != PGM_OPT_LENGTH)
 		{
-			g_trace ("INFO", "First PGM Option in NCF incorrect, ignoring.");
+			g_trace ("INFO","Discarded malformed NCF.");
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
 		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
 		{
-			g_trace ("INFO", "PGM Length Option has incorrect length, ignoring.");
+			g_trace ("INFO","Discarded malformed NCF.");
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
@@ -1568,12 +1624,16 @@ on_ncf (
  * appropriately.
  */
 
-static int
+static
+int
 send_spmr (
 	pgm_peer_t*	peer
 	)
 {
-	g_trace ("INFO","send_spmr");
+/* pre-conditions */
+	g_assert (NULL != peer);
+
+	g_trace ("INFO","send_spmr (peer:%p)", (gpointer)peer);
 
 	pgm_transport_t* transport = peer->transport;
 
@@ -1627,7 +1687,6 @@ send_spmr (
 	}
 
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length * 2;
-
 	return 0;
 }
 
@@ -1636,17 +1695,18 @@ send_spmr (
  * on success, 0 is returned.  on error, -1 is returned, and errno set
  * appropriately.
  */
-static int
+static
+int
 send_nak (
 	pgm_peer_t*		peer,
-	guint32			sequence_number
+	guint32			sequence
 	)
 {
-#ifdef TRANSPORT_DEBUG
-	char s[INET6_ADDRSTRLEN];
-	pgm_sockaddr_ntop(&peer->nla, s, sizeof(s));
-	g_trace ("INFO", "send_nak(%" G_GUINT32_FORMAT ") -> %s:%hu", sequence_number, s, g_ntohs(((struct sockaddr_in*)&peer->nla)->sin_port));
-#endif
+/* pre-conditions */
+	g_assert (NULL != peer);
+
+	g_trace ("INFO", "send_nak (peer:%p sequence:%" G_GUINT32_FORMAT ")",
+		(gpointer)peer, sequence);
 
 	pgm_transport_t* transport = peer->transport;
 
@@ -1673,7 +1733,7 @@ send_nak (
         header->pgm_tsdu_length = 0;
 
 /* NAK */
-	nak->nak_sqn		= g_htonl (sequence_number);
+	nak->nak_sqn		= g_htonl (sequence);
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
@@ -1704,7 +1764,6 @@ send_nak (
 
 	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
 	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT]++;
-
 	return 0;
 }
 
@@ -1713,14 +1772,19 @@ send_nak (
  * on success, 0 is returned.  on error, -1 is returned, and errno set
  * appropriately.
  */
-static int
+static
+int
 send_parity_nak (
 	pgm_peer_t*		peer,
 	guint32			nak_tg_sqn,	/* transmission group (shifted) */
 	guint32			nak_pkt_cnt	/* count of parity packets to request */
 	)
 {
-	g_trace ("INFO", "send_parity_nak(%u, %u)", nak_tg_sqn, nak_pkt_cnt);
+/* pre-conditions */
+	g_assert (NULL != peer);
+
+	g_trace ("INFO", "send_parity_nak (peer:%p nak-tg-sqn:%" G_GUINT32_FORMAT " nak-pkt-cnt:%" G_GUINT32_FORMAT ")",
+		(gpointer)peer, nak_tg_sqn, nak_pkt_cnt);
 
 	pgm_transport_t* transport = peer->transport;
 
@@ -1778,7 +1842,6 @@ send_parity_nak (
 
 	peer->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT]++;
 	peer->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAKS_SENT]++;
-
 	return 0;
 }
 
@@ -1788,15 +1851,21 @@ send_parity_nak (
  * appropriately.
  */
 
-#ifndef PGM_SINGLE_NAK
-static int
+static
+int
 send_nak_list (
 	pgm_peer_t*	peer,
 	pgm_sqn_list_t*	sqn_list
 	)
 {
-	g_assert (sqn_list->len > 1);
-	g_assert (sqn_list->len <= 63);
+/* pre-conditions */
+	g_assert (NULL != peer);
+	g_assert (NULL != sqn_list);
+	g_assert_cmpuint (sqn_list->len, >, 1);
+	g_assert_cmpuint (sqn_list->len, <=, 63);
+
+	g_trace("INFO","send_nak_list (peer:%p sqn-list:%p)",
+		(gpointer)peer, (gpointer)sqn_list);
 
 	pgm_transport_t* transport = peer->transport;
 
@@ -1854,25 +1923,9 @@ send_nak_list (
 	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;
 
-#ifdef TRANSPORT_DEBUG
-	char s[INET6_ADDRSTRLEN];
-	pgm_sockaddr_ntop(&peer->nla, s, sizeof(s));
-	char nak1[1024];
-	sprintf (nak1, "send_nak_list( %" G_GUINT32_FORMAT " + [", sqn_list->sqn[0]);
-#endif
 	for (unsigned i = 1; i < sqn_list->len; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
-
-#ifdef TRANSPORT_DEBUG
-		char nak2[1024];
-		sprintf (nak2, "%" G_GUINT32_FORMAT " ", sqn_list->sqn[i]);
-		strcat (nak1, nak2);
-#endif
 	}
-
-#ifdef TRANSPORT_DEBUG
-	g_trace ("INFO", "%s]%i ) -> %s:%hu", nak1, sqn_list->len, s, g_ntohs(((struct sockaddr_in*)&peer->nla)->sin_port));
-#endif
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -1893,10 +1946,8 @@ send_nak_list (
 
 	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
 	peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT] += 1 + sqn_list->len;
-
 	return 0;
 }
-#endif /* !PGM_SINGLE_NAK */
 
 /* check all receiver windows for packets in BACK-OFF_STATE, on expiration send a NAK.
  * update transport::next_nak_rb_timestamp for next expiration time.
@@ -1904,19 +1955,21 @@ send_nak_list (
  * peer object is locked before entry.
  */
 
-static void
+static
+void
 nak_rb_state (
 	pgm_peer_t*		peer
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != peer);
+
+	g_trace ("INFO", "nak_rb_state (peer:%p)", (gpointer)peer);
+
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
 	GList* list;
-#ifndef PGM_SINGLE_NAK
 	pgm_sqn_list_t nak_list = { .len = 0 };
-#endif
-
-	g_trace ("INFO", "nak_rb_state(len=%u)", g_list_length(rxw->backoff_queue.tail));
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
  * better to get the notification out a.s.a.p. even though it might be waiting
@@ -2157,9 +2210,13 @@ _pgm_check_peer_nak_state (
 	pgm_transport_t*	transport
 	)
 {
-	if (!transport->peers_list) {
+/* pre-conditions */
+	g_assert (NULL != transport);
+
+	g_trace ("INFO","_pgm_check_peer_nak_state (transport:%p)", (gpointer)transport);
+
+	if (!transport->peers_list)
 		return;
-	}
 
 	GList* list = transport->peers_list;
 	do {
@@ -2183,25 +2240,19 @@ _pgm_check_peer_nak_state (
 		if (rxw->backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rb_expiry(rxw)))
-			{
 				nak_rb_state (peer);
-			}
 		}
 		
 		if (rxw->wait_ncf_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rpt_expiry(rxw)))
-			{
 				nak_rpt_state (peer);
-			}
 		}
 
 		if (rxw->wait_data_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rdata_expiry(rxw)))
-			{
 				nak_rdata_state (peer);
-			}
 		}
 
 /* expired, remove from hash table and linked list */
@@ -2253,9 +2304,14 @@ _pgm_min_nak_expiry (
 	pgm_transport_t*	transport
 	)
 {
-	if (!transport->peers_list) {
-		goto out;
-	}
+/* pre-conditions */
+	g_assert (NULL != transport);
+
+	g_trace ("INFO","_pgm_min_nak_expiry (expiration:%" PGM_TIME_FORMAT " transport:%p)",
+		expiration, (gpointer)transport);
+
+	if (!transport->peers_list)
+		return expiration;
 
 	GList* list = transport->peers_list;
 	do {
@@ -2268,33 +2324,25 @@ _pgm_min_nak_expiry (
 		if (peer->spmr_expiry)
 		{
 			if (pgm_time_after_eq (expiration, peer->spmr_expiry))
-			{
 				expiration = peer->spmr_expiry;
-			}
 		}
 
 		if (rxw->backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rb_expiry(rxw)))
-			{
 				expiration = next_nak_rb_expiry(rxw);
-			}
 		}
 
 		if (rxw->wait_ncf_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rpt_expiry(rxw)))
-			{
 				expiration = next_nak_rpt_expiry(rxw);
-			}
 		}
 
 		if (rxw->wait_data_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rdata_expiry(rxw)))
-			{
 				expiration = next_nak_rdata_expiry(rxw);
-			}
 		}
 	
 		g_static_mutex_unlock (&peer->mutex);
@@ -2302,23 +2350,27 @@ _pgm_min_nak_expiry (
 		list = next;
 	} while (list);
 
-out:
 	return expiration;
 }
 
 /* check WAIT_NCF_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_NCF_RETRIES
  * cancel the sequence number.
  */
-static void
+static
+void
 nak_rpt_state (
 	pgm_peer_t*		peer
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != peer);
+
+	g_trace ("INFO","nak_rpt_state (peer:%p)",
+		(gpointer)peer);
+
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
 	GList* list = rxw->wait_ncf_queue.tail;
-
-	g_trace ("INFO", "nak_rpt_state(len=%u)", g_list_length(rxw->wait_ncf_queue.tail));
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -2468,16 +2520,21 @@ nak_rpt_state (
 /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
  * canel the sequence number.
  */
-static void
+static
+void
 nak_rdata_state (
 	pgm_peer_t*		peer
 	)
 {
+/* pre-conditions */
+	g_assert (NULL != peer);
+
+	g_trace ("INFO","nak_rdata_state (peer:%p)",
+		(gpointer)peer);
+
 	pgm_rxw_t* rxw = (pgm_rxw_t*)peer->rxw;
 	pgm_transport_t* transport = peer->transport;
 	GList* list = rxw->wait_data_queue.tail;
-
-	g_trace ("INFO", "nak_rdata_state(len=%u)", g_list_length(rxw->wait_data_queue.tail));
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
