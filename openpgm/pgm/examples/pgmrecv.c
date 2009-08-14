@@ -378,13 +378,17 @@ receiver_thread (
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
-		gssize len = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT /* non-blocking */);
-		if (len >= 0)
-		{
+		gsize len;
+		GError* err = NULL;
+		const GIOStatus status = pgm_recvmsgv (transport,
+						       msgv,
+						       iov_max,
+						       MSG_DONTWAIT, /* non-blocking */
+						       &len,
+						       &err);
+		if (G_IO_STATUS_NORMAL == status)
 			on_msgv (msgv, len, NULL);
-		}
-		else if (errno == EAGAIN)	/* len == -1, an error occured */
-		{
+		else if (G_IO_STATUS_AGAIN == status) {
 #ifdef CONFIG_HAVE_EPOLL
 			struct epoll_event events[1];	/* wait for maximum 1 event */
 			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
@@ -393,26 +397,13 @@ receiver_thread (
 			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
 			poll (fds, n_fds, 1000 /* ms */);
 #endif /* !CONFIG_HAVE_EPOLL */
-		}
-		else if (errno == ECONNRESET)
-		{
-			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_skb;
-			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
-					pgm_sock_err->lost_count,
-					pgm_tsi_print(&pgm_sock_err->tsi));
-			continue;
-		} 
-		else if (errno == ENOTCONN)		/* socket(s) closed */
-		{
-			g_error ("pgm socket closed.");
-			g_main_loop_quit(g_loop);
-			break;
-		}
-		else
-		{
-			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
-			g_main_loop_quit(g_loop);
-			break;
+		} else {
+			if (err) {
+				g_warning (err->message);
+				g_error_free (err);
+			}
+			if (G_IO_STATUS_ERROR == status)
+				break;
 		}
 	} while (!g_quit);
 

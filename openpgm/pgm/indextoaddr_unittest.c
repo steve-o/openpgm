@@ -199,7 +199,7 @@ mock_freeifaddrs (
 
 /* target:
  *	gboolean
- *	_pgm_if_indextoaddr (
+ *	pgm_if_indextoaddr (
  *		const unsigned int	ifindex,
  *		const int		iffamily,
  *		const unsigned		ifscope,
@@ -214,11 +214,11 @@ START_TEST (test_indextoaddr_pass_001)
 	struct sockaddr_storage addr;
 	GError* err = NULL;
 	const unsigned int ifindex = 2;
-	fail_unless (TRUE == _pgm_if_indextoaddr (ifindex, AF_INET, 0, (struct sockaddr*)&addr, &err));
+	fail_unless (TRUE == pgm_if_indextoaddr (ifindex, AF_INET, 0, (struct sockaddr*)&addr, &err));
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("index:%d -> %s",
 		  ifindex, saddr);
-	fail_unless (TRUE == _pgm_if_indextoaddr (ifindex, AF_INET6, 0, (struct sockaddr*)&addr, &err));
+	fail_unless (TRUE == pgm_if_indextoaddr (ifindex, AF_INET6, 0, (struct sockaddr*)&addr, &err));
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("index:%d -> %s",
 		  ifindex, saddr);
@@ -228,7 +228,7 @@ END_TEST
 START_TEST (test_indextoaddr_fail_001)
 {
 	GError* err = NULL;
-	fail_unless (FALSE == _pgm_if_indextoaddr (0, 0, 0, NULL, &err));
+	fail_unless (FALSE == pgm_if_indextoaddr (0, 0, 0, NULL, &err));
 }
 END_TEST
 

@@ -38,7 +38,7 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 /** reed-solomon module */
 static
 void
-mock__pgm_rs_create (
+mock_pgm_rs_create (
 	rs_t*			rs_,
 	guint			n,
 	guint			k
@@ -48,7 +48,7 @@ mock__pgm_rs_create (
 
 static
 void
-mock__pgm_rs_destroy (
+mock_pgm_rs_destroy (
 	rs_t*			rs
 	)
 {
@@ -56,7 +56,7 @@ mock__pgm_rs_destroy (
 
 static
 void
-mock__pgm_rs_decode_parity_appended (
+mock_pgm_rs_decode_parity_appended (
 	rs_t*			rs,
 	void**			block,
 	guint*			offsets,
@@ -67,9 +67,9 @@ mock__pgm_rs_decode_parity_appended (
 }
 
 #define pgm_time_now			mock_pgm_time_now
-#define _pgm_rs_create			mock__pgm_rs_create
-#define _pgm_rs_destroy			mock__pgm_rs_destroy
-#define _pgm_rs_decode_parity_appended	mock__pgm_rs_decode_parity_appended
+#define pgm_rs_create			mock_pgm_rs_create
+#define pgm_rs_destroy			mock_pgm_rs_destroy
+#define pgm_rs_decode_parity_appended	mock_pgm_rs_decode_parity_appended
 
 #define RXW_DEBUG
 #include "rxwi.c"
@@ -982,16 +982,16 @@ START_TEST (test_state_fail_003)
 }
 END_TEST
 
-/* pgm_rxw_epoll
+/* pgm_peer_has_pending
  */
 
-START_TEST (test_epoll_pass_001)
+START_TEST (test_has_pending_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window);
 /* empty */
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (0 == window->has_event);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (0);
@@ -999,44 +999,37 @@ START_TEST (test_epoll_pass_001)
 	const pgm_time_t nak_rb_expiry = 1;
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, nak_rb_expiry));
 /* 1 sequence */
-	fail_unless (TRUE == pgm_rxw_epoll (window));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (1 == window->has_event);
+	window->has_event = 0;
 /* jump */
 	skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (2);
 	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, nak_rb_expiry));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (0 == window->has_event);
 /* loss */
 	pgm_rxw_lost (window, 1);
-	fail_unless (TRUE == pgm_rxw_epoll (window));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (1 == window->has_event);
+	window->has_event = 0;
 /* insert */
 	skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	skb->pgm_data->data_sqn = g_htonl (1);
 	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, nak_rb_expiry));
-	fail_unless (TRUE == pgm_rxw_epoll (window));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (1 == window->has_event);
+	window->has_event = 0;
 /* confirm */
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 3, nak_rdata_expiry, nak_rb_expiry));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (0 == window->has_event);
 /* partial read */
 	pgm_msgv_t msgv[2], *pmsg = msgv;
 	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (0 == window->has_event);
 /* finish read */
 	pmsg = msgv;
 	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-	fail_unless (FALSE == pgm_rxw_epoll (window));
+	fail_unless (0 == window->has_event);
 	pgm_rxw_destroy (window);
-}
-END_TEST
-
-START_TEST (test_epoll_fail_001)
-{
-	pgm_rxw_epoll (NULL);
-	fail ();
 }
 END_TEST
 

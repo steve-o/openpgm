@@ -32,7 +32,7 @@
 /** reed-solomon module */
 static
 void
-mock__pgm_rs_create (
+mock_pgm_rs_create (
 	rs_t*			rs_,
 	guint			n,
 	guint			k
@@ -42,7 +42,7 @@ mock__pgm_rs_create (
 
 static
 void
-mock__pgm_rs_destroy (
+mock_pgm_rs_destroy (
 	rs_t*			rs
 	)
 {
@@ -50,9 +50,9 @@ mock__pgm_rs_destroy (
 
 static
 void
-mock__pgm_rs_encode(
+mock_pgm_rs_encode(
 	rs_t*			rs,
-	const gpointer		src[],
+	const void**		src,
 	const guint		offset,
 	gpointer		dst,
 	const gsize		len
@@ -75,9 +75,9 @@ mock_pgm_compat_csum_partial (
 
 /* mock functions for external references */
 
-#define _pgm_rs_create			mock__pgm_rs_create
-#define _pgm_rs_destroy			mock__pgm_rs_destroy
-#define _pgm_rs_encode			mock__pgm_rs_encode
+#define pgm_rs_create			mock_pgm_rs_create
+#define pgm_rs_destroy			mock_pgm_rs_destroy
+#define pgm_rs_encode			mock_pgm_rs_encode
 #define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
 
 #define TXW_DEBUG

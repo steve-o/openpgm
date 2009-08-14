@@ -75,7 +75,7 @@ generate_transport (void)
 	((struct sockaddr*)&transport->send_gsr.gsr_group)->sa_family = AF_INET;
 	((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
 	transport->dport = g_htons(PGM_PORT);
-	transport->txw = g_malloc0 (sizeof(pgm_txw_t));
+	transport->window = g_malloc0 (sizeof(pgm_txw_t));
 	transport->txw_sqns = PGM_TXW_SQNS;
 	transport->max_tpdu = PGM_MAX_TPDU;
 	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (FALSE);
@@ -84,7 +84,6 @@ generate_transport (void)
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	transport->spm_heartbeat_interval[0] = pgm_secs(1);
 	pgm_notify_init (&transport->rdata_notify);
-	transport->is_open = TRUE;
 	return transport;
 }
 
@@ -303,7 +302,7 @@ mock_pgm_txw_retransmit_remove_head (
 
 static
 void
-mock__pgm_rs_encode (
+mock_pgm_rs_encode (
 	gpointer			rs,
 	const void**			src,
 	guint				offset,
@@ -311,19 +310,19 @@ mock__pgm_rs_encode (
 	gsize				len
 	)
 {
-	g_debug ("mock__pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%" G_GSIZE_FORMAT ")",
+	g_debug ("mock_pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%" G_GSIZE_FORMAT ")",
 		rs, src, offset, dst, len);
 }
 
 static
 gboolean
-mock__pgm_rate_check (
+mock_pgm_rate_check (
 	gpointer			bucket,
 	const guint			data_size,
 	const int			flags
 	)
 {
-	g_debug ("mock__pgm_rate_check (bucket:%p data-size:%u flags:%d)",
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u flags:%d)",
 		bucket, data_size, flags);
 	return TRUE;
 }
@@ -400,7 +399,7 @@ mock_pgm_csum_fold (
 
 static
 gssize
-mock__pgm_sendto (
+mock_pgm_sendto (
 	pgm_transport_t*		transport,
 	gboolean			use_rate_limit,
 	gboolean			use_router_alert,
@@ -413,7 +412,7 @@ mock__pgm_sendto (
 {
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	g_debug ("mock__pgm_sendto (transport:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d flags:%d to:%s tolen:%d)",
+	g_debug ("mock_pgm_sendto (transport:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d flags:%d to:%s tolen:%d)",
 		(gpointer)transport,
 		use_rate_limit ? "YES" : "NO",
 		use_router_alert ? "YES" : "NO",
@@ -456,8 +455,8 @@ mock_pgm_transport_pkt_offset (
 #define pgm_txw_retransmit_push		mock_pgm_txw_retransmit_push
 #define pgm_txw_retransmit_try_peek	mock_pgm_txw_retransmit_try_peek
 #define pgm_txw_retransmit_remove_head	mock_pgm_txw_retransmit_remove_head
-#define _pgm_rs_encode			mock__pgm_rs_encode
-#define _pgm_rate_check			mock__pgm_rate_check
+#define pgm_rs_encode			mock_pgm_rs_encode
+#define pgm_rate_check			mock_pgm_rate_check
 #define pgm_verify_spmr			mock_pgm_verify_spmr
 #define pgm_verify_nak			mock_pgm_verify_nak
 #define pgm_verify_nnak			mock_pgm_verify_nnak
@@ -465,7 +464,7 @@ mock_pgm_transport_pkt_offset (
 #define pgm_compat_csum_partial_copy	mock_pgm_compat_csum_partial_copy
 #define pgm_csum_block_add		mock_pgm_csum_block_add
 #define pgm_csum_fold			mock_pgm_csum_fold
-#define _pgm_sendto			mock__pgm_sendto
+#define pgm_sendto			mock_pgm_sendto
 #define pgm_time_update_now		mock_pgm_time_update_now
 #define pgm_transport_pkt_offset	mock_pgm_transport_pkt_offset
 
@@ -636,7 +635,7 @@ END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_send_spm_unlocked (
+ *	pgm_send_spm_unlocked (
  *		pgm_transport_t*	transport
  *		)
  */
@@ -644,20 +643,20 @@ END_TEST
 START_TEST (test_send_spm_unlocked_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == _pgm_send_spm_unlocked (transport));
+	fail_unless (TRUE == pgm_send_spm_unlocked (transport));
 }
 END_TEST
 
 START_TEST (test_send_spm_unlocked_fail_001)
 {
-	_pgm_send_spm_unlocked (NULL);
+	pgm_send_spm_unlocked (NULL);
 	fail ();
 }
 END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_on_nak_notify (
+ *	pgm_on_nak_notify (
  *		GIOChannel*		source,
  *		GIOCondition		condition,
  *		gpointer		data
@@ -668,20 +667,20 @@ START_TEST (test_on_nak_notify_pass_001)
 {
 	GIOChannel* source = g_malloc0 (sizeof(GIOChannel));
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == _pgm_on_nak_notify (source, G_IO_IN, transport));
+	fail_unless (TRUE == pgm_on_nak_notify (source, G_IO_IN, transport));
 }
 END_TEST
 	
 START_TEST (test_on_nak_notify_fail_001)
 {
-	_pgm_on_nak_notify (NULL, 0, NULL);
+	pgm_on_nak_notify (NULL, 0, NULL);
 	fail ();
 }
 END_TEST
 	
 /* target:
  *	gboolean
- *	_pgm_on_spmr (
+ *	pgm_on_spmr (
  *		pgm_transport_t*	transport,
  *		pgm_peer_t*		peer,
  *		struct pgm_sk_buff_t*	skb
@@ -695,7 +694,7 @@ START_TEST (test_on_spmr_pass_001)
 	pgm_peer_t* peer = generate_peer ();
 	struct pgm_sk_buff_t* skb = generate_spmr ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_spmr (transport, peer, skb));
+	fail_unless (TRUE == pgm_on_spmr (transport, peer, skb));
 }
 END_TEST
 
@@ -705,7 +704,7 @@ START_TEST (test_on_spmr_pass_002)
 	pgm_transport_t* transport = generate_transport ();
 	struct pgm_sk_buff_t* skb = generate_spmr ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_spmr (transport, NULL, skb));
+	fail_unless (TRUE == pgm_on_spmr (transport, NULL, skb));
 }
 END_TEST
 
@@ -717,20 +716,20 @@ START_TEST (test_on_spmr_fail_001)
 	struct pgm_sk_buff_t* skb = generate_spmr ();
 	skb->transport = transport;
 	mock_is_valid_spmr = FALSE;
-	fail_unless (FALSE == _pgm_on_spmr (transport, peer, skb));
+	fail_unless (FALSE == pgm_on_spmr (transport, peer, skb));
 }
 END_TEST
 
 START_TEST (test_on_spmr_fail_002)
 {
-	_pgm_on_spmr (NULL, NULL, NULL);
+	pgm_on_spmr (NULL, NULL, NULL);
 	fail ();
 }
 END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_on_nak (
+ *	pgm_on_nak (
  *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	skb
  *	)
@@ -742,7 +741,7 @@ START_TEST (test_on_nak_pass_001)
 	pgm_transport_t* transport = generate_transport ();
 	struct pgm_sk_buff_t* skb = generate_single_nak ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb));
 }
 END_TEST
 
@@ -752,7 +751,7 @@ START_TEST (test_on_nak_pass_002)
 	pgm_transport_t* transport = generate_transport ();
 	struct pgm_sk_buff_t* skb = generate_nak_list ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb));
 }
 END_TEST
 
@@ -763,7 +762,7 @@ START_TEST (test_on_nak_pass_003)
 	transport->use_ondemand_parity = TRUE;
 	struct pgm_sk_buff_t* skb = generate_parity_nak ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb));
 }
 END_TEST
 
@@ -774,7 +773,7 @@ START_TEST (test_on_nak_pass_004)
 	transport->use_ondemand_parity = TRUE;
 	struct pgm_sk_buff_t* skb = generate_parity_nak_list ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb));
 }
 END_TEST
 
@@ -784,20 +783,20 @@ START_TEST (test_on_nak_fail_001)
 	struct pgm_sk_buff_t* skb = generate_single_nak ();
 	skb->transport = transport;
 	mock_is_valid_nak = FALSE;
-	fail_unless (FALSE == _pgm_on_nak (transport, skb));
+	fail_unless (FALSE == pgm_on_nak (transport, skb));
 }
 END_TEST
 
 START_TEST (test_on_nak_fail_002)
 {
-	_pgm_on_nak (NULL, NULL);
+	pgm_on_nak (NULL, NULL);
 	fail ();
 }
 END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_on_nnak (
+ *	pgm_on_nnak (
  *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	skb
  *	)
@@ -808,7 +807,7 @@ START_TEST (test_on_nnak_pass_001)
 	pgm_transport_t* transport = generate_transport ();
 	struct pgm_sk_buff_t* skb = generate_single_nnak ();
 	skb->transport = transport;
-	fail_unless (TRUE == _pgm_on_nnak (transport, skb));
+	fail_unless (TRUE == pgm_on_nnak (transport, skb));
 }
 END_TEST
 
@@ -818,13 +817,13 @@ START_TEST (test_on_nnak_fail_001)
 	struct pgm_sk_buff_t* skb = generate_single_nnak ();
 	skb->transport = transport;
 	mock_is_valid_nnak = FALSE;
-	fail_unless (FALSE == _pgm_on_nnak (transport, skb));
+	fail_unless (FALSE == pgm_on_nnak (transport, skb));
 }
 END_TEST
 
 START_TEST (test_on_nnak_fail_002)
 {
-	_pgm_on_nnak (NULL, NULL);
+	pgm_on_nnak (NULL, NULL);
 	fail ();
 }
 END_TEST

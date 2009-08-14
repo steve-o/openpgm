@@ -41,9 +41,9 @@ typedef struct rate_t rate_t;
 
 /* globals */
 
-G_GNUC_INTERNAL void _pgm_rate_create (rate_t**, const guint, const guint);
-G_GNUC_INTERNAL void _pgm_rate_destroy (rate_t*);
-G_GNUC_INTERNAL gboolean _pgm_rate_check (rate_t*, const guint, const int);
+G_GNUC_INTERNAL void pgm_rate_create (rate_t**, const guint, const guint);
+G_GNUC_INTERNAL void pgm_rate_destroy (rate_t*);
+G_GNUC_INTERNAL gboolean pgm_rate_check (rate_t*, const guint, const int);
 
 
 /* create machinery for rate regulation.
@@ -51,7 +51,7 @@ G_GNUC_INTERNAL gboolean _pgm_rate_check (rate_t*, const guint, const int);
  */
 
 void
-_pgm_rate_create (
+pgm_rate_create (
 	rate_t**		bucket_,
 	const guint		rate_per_sec,		/* 0 = disable */
 	const guint		iphdr_len
@@ -69,7 +69,7 @@ _pgm_rate_create (
 }
 
 void
-_pgm_rate_destroy (
+pgm_rate_destroy (
 	rate_t*			bucket
 	)
 {
@@ -87,7 +87,7 @@ _pgm_rate_destroy (
  */
 
 gboolean
-_pgm_rate_check (
+pgm_rate_check (
 	rate_t*			bucket,
 	const guint		data_size,
 	const int		flags		/* MSG_DONTWAIT = non-blocking */

@@ -22,6 +22,7 @@ src = Split("""
 		transport.c
 		source.c
 		receiver.c
+		recv.c
 		pgm.c
 		timer.c
 		net.c
@@ -66,7 +67,8 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['if_unittest.c', e.Object('inet_network.c')]);
 	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c')]);
 	te.Program (['source_unittest.c']);
-	te.Program (['receiver_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c'), e.Object('checksum.c'), e.Object('reed_solomon.c'), e.Object('galois_tables.c')]);
+	te.Program (['receiver_unittest.c', e.Object('tsi.c')]);
+	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c')]);
 	te.Program ('md5_unittest.c');
 	te.Program ('getifaddrs_unittest.c');
 	te.Program ('inet_network_unittest.c');

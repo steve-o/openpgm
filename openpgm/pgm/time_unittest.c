@@ -38,41 +38,41 @@
 
 /* target:
  *	gboolean
- *	_pgm_time_init (void)
+ *	pgm_time_init (void)
  */
 
 START_TEST (test_init_pass_001)
 {
-	fail_unless (TRUE == _pgm_time_init ());
-	fail_unless (FALSE == _pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (FALSE == pgm_time_init ());
 }
 END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_time_shutdown (void)
+ *	pgm_time_shutdown (void)
  */
 
 START_TEST (test_shutdown_pass_001)
 {
-	fail_unless (TRUE == _pgm_time_init ());
-	fail_unless (TRUE == _pgm_time_shutdown ());
-	fail_unless (FALSE == _pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_shutdown ());
+	fail_unless (FALSE == pgm_time_shutdown ());
 }
 END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_time_supported (void)
+ *	pgm_time_supported (void)
  */
 
 START_TEST (test_supported_pass_001)
 {
-	fail_unless (FALSE == _pgm_time_supported ());
-	fail_unless (TRUE == _pgm_time_init ());
-	fail_unless (TRUE == _pgm_time_supported ());
-	fail_unless (TRUE == _pgm_time_shutdown ());
-	fail_unless (FALSE == _pgm_time_supported ());
+	fail_unless (FALSE == pgm_time_supported ());
+	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_supported ());
+	fail_unless (TRUE == pgm_time_shutdown ());
+	fail_unless (FALSE == pgm_time_supported ());
 }
 END_TEST
 
@@ -83,7 +83,7 @@ END_TEST
 
 START_TEST (test_update_now_pass_001)
 {
-	fail_unless (TRUE == _pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init ());
 	pgm_time_t start_time = pgm_time_update_now ();
 	g_message ("start-time: %" PGM_TIME_FORMAT, start_time);
 	pgm_time_t check_time;
@@ -95,7 +95,7 @@ START_TEST (test_update_now_pass_001)
 /* must be monotonic */
 		fail_unless (check_time >= start_time);
 	}
-	fail_unless (TRUE == _pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_shutdown ());
 }
 END_TEST
 
@@ -109,7 +109,7 @@ END_TEST
 START_TEST (test_sleep_pass_001)
 {
 	const pgm_time_t sleep_time = 100 * 1000;
-	fail_unless (TRUE == _pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init ());
 	pgm_time_t start_time = pgm_time_update_now ();
 	g_message ("start-time: %" PGM_TIME_FORMAT, start_time);
 	pgm_time_t check_time;
@@ -125,7 +125,7 @@ START_TEST (test_sleep_pass_001)
 		fail_unless (percent_diff <= 10.0);
 		start_time = check_time;
 	}
-	fail_unless (TRUE == _pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_shutdown ());
 }
 END_TEST
 
@@ -142,7 +142,7 @@ START_TEST (test_since_epoch_pass_001)
 	char stime[1024];
 	time_t t;
 	struct tm* tmp;
-	fail_unless (TRUE == _pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init ());
 	pgm_time_t pgm_now = pgm_time_update_now ();
 	pgm_time_since_epoch (&pgm_now, &t);
 	tmp = localtime (&t);
@@ -150,7 +150,7 @@ START_TEST (test_since_epoch_pass_001)
 	fail_unless (0 != strftime (stime, sizeof(stime), "%X", tmp));
 	g_message ("pgm-time:%" PGM_TIME_FORMAT " = %s",
 		   pgm_now, stime);
-	fail_unless (TRUE == _pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_shutdown ());
 }
 END_TEST
 

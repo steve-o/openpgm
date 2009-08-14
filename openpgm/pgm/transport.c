@@ -129,13 +129,13 @@ pgm_transport_destroy (
 	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
 	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 
-	transport->is_open = FALSE;
+	transport->is_destroyed = TRUE;
 
 /* rollback any pkt_dontwait APDU */
 	if (transport->is_apdu_eagain)
 	{
-		((pgm_txw_t*)transport->txw)->lead = transport->pkt_dontwait_state.first_sqn - 1;
-		g_static_rw_lock_writer_unlock (&transport->txw_lock);
+		((pgm_txw_t*)transport->window)->lead = transport->pkt_dontwait_state.first_sqn - 1;
+		g_static_rw_lock_writer_unlock (&transport->window_lock);
 		transport->is_apdu_eagain = FALSE;
 	}
 
@@ -193,21 +193,21 @@ pgm_transport_destroy (
 
 		do {
 			GList* next = transport->peers_list->next;
-			_pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
+			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
 
 			transport->peers_list = next;
 		} while (transport->peers_list);
 	}
 
-	if (transport->txw) {
+	if (transport->window) {
 		g_trace ("INFO","destroying transmit window.");
-		pgm_txw_shutdown (transport->txw);
-		transport->txw = NULL;
+		pgm_txw_shutdown (transport->window);
+		transport->window = NULL;
 	}
 
 	if (transport->rate_control) {
 		g_trace ("INFO","destroying rate control.");
-		_pgm_rate_destroy (transport->rate_control);
+		pgm_rate_destroy (transport->rate_control);
 		transport->rate_control = NULL;
 	}
 	if (transport->recv_sock) {
@@ -240,11 +240,11 @@ pgm_transport_destroy (
 	pgm_notify_destroy (&transport->timer_notify);
 	pgm_notify_destroy (&transport->timer_shutdown);
 	pgm_notify_destroy (&transport->rdata_notify);
-	pgm_notify_destroy (&transport->waiting_notify);
+	pgm_notify_destroy (&transport->pending_notify);
 
 	g_static_rw_lock_free (&transport->peers_lock);
 
-	g_static_rw_lock_free (&transport->txw_lock);
+	g_static_rw_lock_free (&transport->window_lock);
 
 	if (transport->is_bound) {
 		g_static_mutex_unlock (&transport->send_mutex);
@@ -327,7 +327,7 @@ pgm_transport_create (
 	g_static_mutex_init (&new_transport->mutex);
 
 /* transmit window read/write lock */
-	g_static_rw_lock_init (&new_transport->txw_lock);
+	g_static_rw_lock_init (&new_transport->window_lock);
 
 /* peer hash map & list lock */
 	g_static_rw_lock_init (&new_transport->peers_lock);
@@ -376,12 +376,12 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		int save_errno = errno;
+		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     pgm_transport_error_from_errno (errno),
 			     _("Creating receive socket: %s"),
-			     g_strerror (save_errno));
+			     g_strerror (errno));
 		if (EPERM == save_errno) {
 			g_warning ("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'");
 		}
@@ -392,12 +392,11 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     pgm_transport_error_from_errno (errno),
 			     _("Creating send socket: %s"),
-			     g_strerror (save_errno));
+			     g_strerror (errno));
 		goto err_destroy;
 	}
 
@@ -405,12 +404,11 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     pgm_transport_error_from_errno (errno),
 			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
-			     g_strerror (save_errno));
+			     g_strerror (errno));
 		goto err_destroy;
 	}
 
@@ -693,44 +691,40 @@ pgm_transport_bind (
 
 	if (transport->can_send_data) {
 		if (0 != pgm_notify_init (&transport->rdata_notify)) {
-			const int save_errno = errno;
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
+				     pgm_transport_error_from_errno (errno),
 				     _("Creating RX to NAK processor notification channel: %s"),
-				     g_strerror (save_errno));
+				     g_strerror (errno));
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
 	}
 	if (0 != pgm_notify_init (&transport->timer_notify)) {
-		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     pgm_transport_error_from_errno (errno),
 			     _("Creating timer notification channel: %s"),
-			     g_strerror (save_errno));
+			     g_strerror (errno));
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
 	}
 	if (0 != pgm_notify_init (&transport->timer_shutdown)) {
-		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     pgm_transport_error_from_errno (errno),
 			     _("Creating timer shutdown notification channel: %s"),
-			     g_strerror (save_errno));
+			     g_strerror (errno));
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
 	}
 	if (transport->can_recv_data) {
-		if (0 != pgm_notify_init (&transport->waiting_notify)) {
-			const int save_errno = errno;
+		if (0 != pgm_notify_init (&transport->pending_notify)) {
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
+				     pgm_transport_error_from_errno (errno),
 				     _("Creating waiting peer notification channel: %s"),
-				     g_strerror (save_errno));
+				     g_strerror (errno));
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
@@ -751,10 +745,10 @@ pgm_transport_bind (
 
 	if (transport->can_send_data) {
 		g_trace ("INFO","construct transmit window.");
-		transport->txw = transport->txw_sqns ?
+		transport->window = transport->txw_sqns ?
 					pgm_txw_create (&transport->tsi, 0, transport->txw_sqns, 0, 0, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k) :
 					pgm_txw_create (&transport->tsi, transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k);
-		g_assert (transport->txw);
+		g_assert (transport->window);
 	}
 
 /* create peer list */
@@ -765,56 +759,30 @@ pgm_transport_bind (
 
 	if (transport->udp_encap_ucast_port)
 	{
-/* set socket sharing if loopback enabled, needs to be performed pre-bind */
-		if (transport->use_multicast_loop)
+		g_trace ("INFO","set socket sharing.");
+		gboolean v = TRUE;
+		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)) ||
+		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)) ||
+		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)))
 		{
-			g_trace ("INFO","set socket sharing.");
-			gboolean v = TRUE;
-			if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)))
-			{
-				const int save_errno = errno;
-				g_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
-					     _("Enabling reuse of receive socket local address: %s"),
-					     g_strerror (save_errno));
-				g_static_mutex_unlock (&transport->mutex);
-				return FALSE;
-			}
-			if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)))
-			{
-				const int save_errno = errno;
-				g_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
-					     _("Enabling reuse of send socket local address: %s"),
-					     g_strerror (save_errno));
-				g_static_mutex_unlock (&transport->mutex);
-				return FALSE;
-			}
-			if (0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v)))
-			{
-				const int save_errno = errno;
-				g_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
-					     _("Enabling reuse of IP Router Alert (RFC 2113) send socket local address: %s"),
-					     g_strerror (save_errno));
-				g_static_mutex_unlock (&transport->mutex);
-				return FALSE;
-			}
+			g_set_error (error,
+				     PGM_TRANSPORT_ERROR,
+				     pgm_transport_error_from_errno (errno),
+				     _("Enabling reuse of socket local address: %s"),
+				     g_strerror (errno));
+			g_static_mutex_unlock (&transport->mutex);
+			return FALSE;
 		}
 
 /* request extra packet information to determine destination address on each packet */
 		g_trace ("INFO","request socket packet-info.");
 		const int recv_family = pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group);
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE)) {
-			const int save_errno = errno;
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
+				     pgm_transport_error_from_errno (errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
-				     g_strerror (save_errno));
+				     g_strerror (errno));
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
@@ -827,12 +795,11 @@ pgm_transport_bind (
 /* include IP header only for incoming data, only works for IPv4 */
 			g_trace ("INFO","request IP headers.");
 			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE)) {
-				const int save_errno = errno;
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
+					     pgm_transport_error_from_errno (errno),
 					     _("Enabling IP header in front of user data: %s"),
-					     g_strerror (save_errno));
+					     g_strerror (errno));
 				g_static_mutex_unlock (&transport->mutex);
 				return FALSE;
 			}
@@ -842,12 +809,11 @@ pgm_transport_bind (
 			g_assert (AF_INET6 == recv_family);
 			g_trace ("INFO","request socket packet-info.");
 			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE)) {
-				const int save_errno = errno;
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
+					     pgm_transport_error_from_errno (errno),
 					     _("Enabling receipt of control message per incoming datagram: %s"),
-					     g_strerror (save_errno));
+					     g_strerror (errno));
 				g_static_mutex_unlock (&transport->mutex);
 				return FALSE;
 			}
@@ -860,12 +826,11 @@ pgm_transport_bind (
 		g_trace ("INFO","set receive socket buffer size.");
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (char*)&transport->rcvbuf, sizeof(transport->rcvbuf)))
 		{
-			const int save_errno = errno;
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
+				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket receive buffer in bytes: %s"),
-				     g_strerror (save_errno));
+				     g_strerror (errno));
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
@@ -873,25 +838,14 @@ pgm_transport_bind (
 	if (transport->sndbuf)
 	{
 		g_trace ("INFO","set send socket buffer size.");
-		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf)))
+		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
+		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf)))
 		{
-			const int save_errno = errno;
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
+				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket send buffer in bytes: %s"),
-				     g_strerror (save_errno));
-			g_static_mutex_unlock (&transport->mutex);
-			return FALSE;
-		}
-		if (0 != setsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (char*)&transport->sndbuf, sizeof(transport->sndbuf)))
-		{
-			const int save_errno = errno;
-			g_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
-				     _("Setting maximum socket IP Router Alert (RFC 2113) send buffer in bytes: %s"),
-				     g_strerror (save_errno));
+				     g_strerror (errno));
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
@@ -936,14 +890,16 @@ pgm_transport_bind (
 	if (0 != bind (transport->recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len (&recv_addr)))
 	{
 		int save_errno = errno;
-		char addr[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&recv_addr, addr, sizeof(addr));
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
-			     _("Binding receive socket to address %s: %s"),
-			     addr,
-			     g_strerror (save_errno));
+		if (error) {
+			char addr[INET6_ADDRSTRLEN];
+			pgm_sockaddr_ntop (&recv_addr, addr, sizeof(addr));
+			g_set_error (error,
+				     PGM_TRANSPORT_ERROR,
+				     pgm_transport_error_from_errno (save_errno),
+				     _("Binding receive socket to address %s: %s"),
+				     addr,
+				     g_strerror (save_errno));
+		}
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
 	}
@@ -960,7 +916,7 @@ pgm_transport_bind (
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
 
-	if (!_pgm_if_indextoaddr (transport->send_gsr.gsr_interface,
+	if (!pgm_if_indextoaddr (transport->send_gsr.gsr_interface,
 				  pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 				  pgm_sockaddr_scope_id (&transport->send_gsr.gsr_group),
 				  (struct sockaddr*)&send_addr,
@@ -996,14 +952,14 @@ pgm_transport_bind (
 	if (AF_INET == pgm_sockaddr_family (&send_addr))
 	{
 		if ((INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr) &&
-		    !_pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
+		    !pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
 		{
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
 	}
 	else if ((memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0) &&
-		 !_pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
+		 !pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
 	{
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
@@ -1022,14 +978,16 @@ pgm_transport_bind (
 			pgm_sockaddr_len(&send_with_router_alert_addr)))
 	{
 		int save_errno = errno;
-		char addr[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&send_with_router_alert_addr, addr, sizeof(addr));
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
-			     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
-			     addr,
-			     g_strerror (save_errno));
+		if (error) {
+			char addr[INET6_ADDRSTRLEN];
+			pgm_sockaddr_ntop (&send_with_router_alert_addr, addr, sizeof(addr));
+			g_set_error (error,
+				     PGM_TRANSPORT_ERROR,
+				     pgm_transport_error_from_errno (save_errno),
+				     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
+				     addr,
+				     g_strerror (save_errno));
+		}
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
 	}
@@ -1154,91 +1112,44 @@ pgm_transport_bind (
 #endif
 
 /* multicast loopback */
-	if (!transport->use_multicast_loop)
+	g_trace ("INFO","set multicast loopback.");
+	if (0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
+					      pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group),
+					      FALSE) ||
+	    0 != pgm_sockaddr_multicast_loop (transport->send_sock,
+					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->use_multicast_loop) ||
+	    0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
+					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->use_multicast_loop))
 	{
-		g_trace ("INFO","set multicast loop.");
-		if (0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
-						      pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group),
-						      transport->use_multicast_loop))
-		{
-			const int save_errno = errno;
-			g_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
-				     _("Setting sent multicast packets to be looped back to local sockets: %s"),
-				     g_strerror (save_errno));
-			g_static_mutex_unlock (&transport->mutex);
-			return FALSE;
-		}
-		if (0 != pgm_sockaddr_multicast_loop (transport->send_sock,
-						      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
-						      transport->use_multicast_loop))
-		{
-			const int save_errno = errno;
-			g_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
-				     _("Setting sent multicast packets to be looped back to local sockets: %s"),
-				     g_strerror (save_errno));
-			g_static_mutex_unlock (&transport->mutex);
-			return FALSE;
-		}
-		if (0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
-						      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
-						      transport->use_multicast_loop))
-		{
-			const int save_errno = errno;
-			g_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
-				     _("Setting sent multicast packets to be looped back to local sockets: %s"),
-				     g_strerror (save_errno));
-			g_static_mutex_unlock (&transport->mutex);
-			return FALSE;
-		}
+		g_set_error (error,
+			     PGM_TRANSPORT_ERROR,
+			     pgm_transport_error_from_errno (errno),
+			     _("Setting multicast loopback: %s"),
+			     g_strerror (errno));
+		g_static_mutex_unlock (&transport->mutex);
+		return FALSE;
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 	g_trace ("INFO","set multicast hop limit.");
 	if (0 != pgm_sockaddr_multicast_hops (transport->recv_sock,
 					      pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group),
-					      transport->hops))
-	{
-		const int save_errno = errno;
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
-			     _("Setting multicast hop limit to %i: %s"),
-			     transport->hops,
-			     g_strerror (save_errno));
-		g_static_mutex_unlock (&transport->mutex);
-		return FALSE;
-	}
-	if (0 != pgm_sockaddr_multicast_hops (transport->send_sock,
+					      transport->hops) ||
+	    0 != pgm_sockaddr_multicast_hops (transport->send_sock,
+					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->hops) ||
+	    0 != pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock,
 					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 					      transport->hops))
 	{
-		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast hop limit to %i: %s"),
 			     transport->hops,
-			     g_strerror (save_errno));
-		g_static_mutex_unlock (&transport->mutex);
-		return FALSE;
-	}
-	if (0 != pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock,
-					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
-					      transport->hops))
-	{
-		const int save_errno = errno;
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
-			     _("Setting multicast hop limit to %i: %s"),
-			     transport->hops,
-			     g_strerror (save_errno));
+			     g_strerror (errno));
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
 	}
@@ -1251,24 +1162,13 @@ pgm_transport_bind (
 	int dscp = 0x2e << 2;
 	if (0 != pgm_sockaddr_tos (transport->send_sock,
 				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+				   dscp) ||
+	    0 != pgm_sockaddr_tos (transport->send_with_router_alert_sock,
+				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 				   dscp))
 	{
 		g_warning ("DSCP setting requires CAP_NET_ADMIN or ADMIN capability.");
 		goto no_cap_net_admin;
-	}
-/* call should not fail on router-alert socket after succeeding on normal socket */
-	if (0 != pgm_sockaddr_tos (transport->send_with_router_alert_sock,
-				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
-				   dscp))
-	{
-		const int save_errno = errno;
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
-			     _("Setting packet Type-Of-Service (TOS) field: %s"),
-			     g_strerror (save_errno));
-		g_static_mutex_unlock (&transport->mutex);
-		return FALSE;
 	}
 
 no_cap_net_admin:
@@ -1285,7 +1185,7 @@ no_cap_net_admin:
 	if (transport->can_send_data)
 	{
 		transport->rdata_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->rdata_notify));
-		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, _pgm_on_nak_notify, transport, NULL);
+		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, pgm_on_nak_notify, transport, NULL);
 
 /* setup rate control */
 		if (transport->txw_max_rte)
@@ -1293,14 +1193,23 @@ no_cap_net_admin:
 			g_trace ("INFO","Setting rate regulation to %i bytes per second.",
 					transport->txw_max_rte);
 	
-			_pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
+			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
 			g_assert (NULL != transport->rate_control);
 		}
 
 /* announce new transport by sending out SPMs */
-		_pgm_send_spm_unlocked (transport);
-		_pgm_send_spm_unlocked (transport);
-		_pgm_send_spm_unlocked (transport);
+		if (!pgm_send_spm_unlocked (transport) ||
+		    !pgm_send_spm_unlocked (transport) ||
+		    !pgm_send_spm_unlocked (transport))
+		{
+			g_set_error (error,
+				     PGM_TRANSPORT_ERROR,
+				     pgm_transport_error_from_errno (errno),
+				     _("Sending SPM broadcast: %s"),
+				     g_strerror (errno));
+			g_static_mutex_unlock (&transport->mutex);
+			return FALSE;
+		}
 
 		transport->next_poll = transport->next_ambient_spm = pgm_time_update_now() + transport->spm_ambient_interval;
 	}
@@ -1318,7 +1227,6 @@ no_cap_net_admin:
 
 /* cleanup */
 	transport->is_bound = TRUE;
-	transport->is_open = TRUE;
 	g_static_mutex_unlock (&transport->send_mutex);
 	g_static_mutex_unlock (&transport->mutex);
 
@@ -1342,7 +1250,7 @@ pgm_transport_select_info (
 	g_assert (transport);
 	g_assert (n_fds);
 
-	if (!transport->is_open) {
+	if (transport->is_destroyed) {
 		errno = EBADF;
 		return -1;
 	}
@@ -1355,7 +1263,7 @@ pgm_transport_select_info (
 		fds = transport->recv_sock + 1;
 
 		if (transport->can_recv_data) {
-			int waiting_fd = pgm_notify_get_fd (&transport->waiting_notify);
+			int waiting_fd = pgm_notify_get_fd (&transport->pending_notify);
 			FD_SET(waiting_fd, readfds);
 			fds = MAX(fds, waiting_fd + 1);
 		}
@@ -1389,7 +1297,7 @@ pgm_transport_poll_info (
 	g_assert (fds);
 	g_assert (n_fds);
 
-	if (!transport->is_open) {
+	if (transport->is_destroyed) {
 		errno = EBADF;
 		return -1;
 	}
@@ -1406,7 +1314,7 @@ pgm_transport_poll_info (
 		if (transport->can_recv_data)
 		{
 			g_assert ( (1 + moo) <= *n_fds );
-			fds[moo].fd = pgm_notify_get_fd (&transport->waiting_notify);
+			fds[moo].fd = pgm_notify_get_fd (&transport->pending_notify);
 			fds[moo].events = POLLIN;
 			moo++;
 		}
@@ -1445,7 +1353,7 @@ pgm_transport_epoll_ctl (
 		errno = EINVAL;
 		return -1;
 	}
-	else if (!transport->is_open)
+	else if (transport->is_destroyed)
 	{
 		errno = EBADF;
 		return -1;
@@ -1465,7 +1373,7 @@ pgm_transport_epoll_ctl (
 
 		if (transport->can_recv_data)
 		{
-			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->waiting_notify), &event);
+			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->pending_notify), &event);
 			if (retval) {
 				goto out;
 			}
@@ -1615,21 +1523,21 @@ pgm_transport_set_recv_only (
 	return TRUE;
 }
 
-/* on unrecoverable data loss shutdown transport from further transmission or
+/* on unrecoverable data loss stop transport from further transmission and
  * receiving.
  *
  * on success, returns TRUE, on failure returns FALSE.
  */
 gboolean
-pgm_transport_set_close_on_failure (
+pgm_transport_set_abort_on_reset (
 	pgm_transport_t* const	transport,
-	const gboolean		close_on_failure
+	const gboolean		abort_on_reset
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 
 	g_static_mutex_lock (&transport->mutex);
-	transport->will_close_on_failure = close_on_failure;
+	transport->is_abort_on_reset = abort_on_reset;
 	g_static_mutex_unlock (&transport->mutex);
 	return TRUE;
 }

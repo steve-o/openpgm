@@ -51,7 +51,7 @@ mock_pgm_time_update_now (void)
 
 /* target:
  *	void
- *	_pgm_rate_create (
+ *	pgm_rate_create (
  *		rate_t**		bucket_,
  *		const guint		rate_per_sec,
  *		const guint		iphdr_len
@@ -61,20 +61,20 @@ mock_pgm_time_update_now (void)
 START_TEST (test_create_pass_001)
 {
 	rate_t* rate = NULL;
-	_pgm_rate_create (&rate, 100*1000, 10);
+	pgm_rate_create (&rate, 100*1000, 10);
 }
 END_TEST
 
 START_TEST (test_create_fail_001)
 {
-	_pgm_rate_create (NULL, 0, 0);
+	pgm_rate_create (NULL, 0, 0);
 	fail ();
 }
 END_TEST
 
 /* target:
  *	void
- *	_pgm_rate_destroy (
+ *	pgm_rate_destroy (
  *		rate_t*			bucket
  *	)
  */
@@ -82,21 +82,21 @@ END_TEST
 START_TEST (test_destroy_pass_001)
 {
 	rate_t* rate = NULL;
-	_pgm_rate_create (&rate, 100*1000, 10);
-	_pgm_rate_destroy (rate);
+	pgm_rate_create (&rate, 100*1000, 10);
+	pgm_rate_destroy (rate);
 }
 END_TEST
 
 START_TEST (test_destroy_fail_001)
 {
-	_pgm_rate_destroy (NULL);
+	pgm_rate_destroy (NULL);
 	fail ();
 }
 END_TEST
 
 /* target:
  *	gboolean
- *	_pgm_rate_check (
+ *	pgm_rate_check (
  *		rate_t*			bucket,
  *		const guint		data_size,
  *		const int		flags
@@ -106,18 +106,18 @@ END_TEST
 START_TEST (test_check_pass_001)
 {
 	rate_t* rate = NULL;
-	_pgm_rate_create (&rate, 2*1010*1000, 10);
+	pgm_rate_create (&rate, 2*1010*1000, 10);
 	mock_pgm_time_now += pgm_secs(2);
-	fail_unless (TRUE == _pgm_rate_check (rate, 1000, MSG_DONTWAIT));
-	fail_unless (TRUE == _pgm_rate_check (rate, 1000, MSG_DONTWAIT));
-	fail_unless (FALSE == _pgm_rate_check (rate, 1000, MSG_DONTWAIT));
-	_pgm_rate_destroy (rate);
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, MSG_DONTWAIT));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, MSG_DONTWAIT));
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, MSG_DONTWAIT));
+	pgm_rate_destroy (rate);
 }
 END_TEST
 
 START_TEST (test_check_fail_001)
 {
-	_pgm_rate_check (NULL, 1000, 0);
+	pgm_rate_check (NULL, 1000, 0);
 	fail ();
 }
 END_TEST

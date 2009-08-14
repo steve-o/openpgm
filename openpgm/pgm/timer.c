@@ -178,7 +178,7 @@ pgm_timer_prepare (
 	if (transport->can_recv_data)
 	{
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		expiration = _pgm_min_nak_expiry (expiration, transport);
+		expiration = pgm_min_nak_expiry (expiration, transport);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
@@ -228,7 +228,7 @@ pgm_timer_dispatch (
 	g_assert (NULL != source);
 
 	g_trace ("pgm_timer_dispatch (source: %p callback:%p user-data:%p)",
-		(gpointer)source, (gpointer)callback, (gpointer)user_data);
+		(gpointer)source, (gpointer)callback, user_data);
 
 	pgm_timer_t* pgm_timer = (pgm_timer_t*)source;
 	pgm_transport_t* transport = pgm_timer->transport;
@@ -239,14 +239,16 @@ pgm_timer_dispatch (
 		g_static_mutex_lock (&transport->mutex);
 		if ( pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm) )
 		{
-			_pgm_send_spm_unlocked (transport);
+			if (!pgm_send_spm_unlocked (transport))
+				g_warning ("Sending SPM broadcast failed.");
 			transport->spm_heartbeat_state = 0;
 			transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
 		}
 		else if ( transport->spm_heartbeat_state &&
 			 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm) )
 		{
-			_pgm_send_spm_unlocked (transport);
+			if (!pgm_send_spm_unlocked (transport))
+				g_warning ("Sending SPM broadcast failed.");
 		
 			if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
 			{
@@ -262,13 +264,13 @@ pgm_timer_dispatch (
 
 	if (transport->can_recv_data)
 	{
-		g_static_mutex_lock (&transport->waiting_mutex);
+		g_static_mutex_lock (&transport->pending_mutex);
 		g_static_mutex_lock (&transport->mutex);
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		_pgm_check_peer_nak_state (transport);
+		pgm_check_peer_nak_state (transport);
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		g_static_mutex_unlock (&transport->mutex);
-		g_static_mutex_unlock (&transport->waiting_mutex);
+		g_static_mutex_unlock (&transport->pending_mutex);
 	}
 
 	return TRUE;

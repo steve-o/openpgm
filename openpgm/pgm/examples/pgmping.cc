@@ -451,11 +451,10 @@ receiver_thread (
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
 	pgm_msgv_t msgv[20];
-	gssize len = 0;
-	pgm_time_t loss_tstamp = 0;
-	pgm_tsi_t  loss_tsi;
-	guint32	   loss_count = 0;
-
+	pgm_time_t lost_tstamp = 0;
+	pgm_tsi_t  lost_tsi;
+	guint32	   lost_count = 0;
+t
 	memset (&loss_tsi, 0, sizeof(loss_tsi));
 
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
@@ -473,52 +472,43 @@ receiver_thread (
 	}
 
 	do {
-		len = pgm_transport_recvmsgv (g_transport, msgv, G_N_ELEMENTS(msgv), MSG_DONTWAIT /* non-blocking */);
-
-		if (loss_count) {
-			pgm_time_t elapsed = pgm_time_update_now() - loss_tstamp;
+		gsize len;
+		GError* err = NULL;
+		const GIOStatus status = pgm_recvmsgv (g_transport,
+						       msgv,
+						       G_N_ELEMENTS(msgv),
+						       MSG_DONTWAIT | MSG_ERRQUEUE, /* non-blocking */
+						       &len,
+						       &err);
+		if (lost_count) {
+			pgm_time_t elapsed = pgm_time_update_now() - lost_tstamp;
 			if (elapsed >= pgm_secs(1)) {
 				g_warning ("pgm data lost %" G_GUINT32_FORMAT " packets detected from %s",
-						loss_count, pgm_print_tsi (&loss_tsi));
-				loss_count = 0;
+						lost_count, pgm_print_tsi (&lost_tsi));
+				lost_count = 0;
 			}
 		}
 
-		if (len >= 0)
-		{
+		if (G_IO_STATUS_NORMAL == status)
 			on_data (msgv, len, NULL);
-		}
-		else if (errno == EAGAIN)		/* len == -1, an error occured */
-		{
+		else if (G_IO_STATUS_AGAIN == status) {
 			struct epoll_event events[1];	/* wait for maximum 1 event */
 			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
-		}
-		else if (errno == ECONNRESET)
-		{
-			const pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_iov->iov_base;
-
-			if (!loss_count) loss_tstamp = pgm_time_update_now();
-
-			if (pgm_tsi_equal (&pgm_sock_err->tsi, &loss_tsi))
-			{
-				loss_count += pgm_sock_err->lost_count;
+		} else if (G_IO_STATUS_EOF == status) {
+			struct pgm_sk_buff_t* skb = msgv[0]->msgv_skb[0];
+			lost_tstamp = skb->tstamp;
+			if (pgm_tsi_equal (&skb->tsi, &lost_tsi))
+				lost_count += skb->sequence;
+			else {
+				lost_count = skb->sequence;
+				memcpy (&lost_tsi, &skb->tsi);
 			}
-			else
-			{
-				loss_count = pgm_sock_err->lost_count;
-				memcpy (&loss_tsi, &pgm_sock_err->tsi, sizeof(pgm_tsi_t));
+			pgm_free_skb (skb);
+		} else {
+			if (err) {
+				g_warning (err->message);
+				g_error_free (err);
 			}
-		}
-		else if (errno == ENOTCONN)		/* socket(s) closed */
-		{
-			g_error ("pgm socket closed.");
-			g_main_loop_quit(g_loop);
-			break;
-		}
-		else
-		{
-			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
-			g_main_loop_quit(g_loop);
 			break;
 		}
 	} while (!g_quit);

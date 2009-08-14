@@ -165,6 +165,7 @@ typedef enum
 	PGM_TRANSPORT_ERROR_FAULT,
 	PGM_TRANSPORT_ERROR_PERM,
 	PGM_TRANSPORT_ERROR_NOPROTOOPT,
+	PGM_TRANSPORT_ERROR_CONNRESET,
 	/* Derived from eai_errno */
 	PGM_TRANSPORT_ERROR_ADDRFAMILY,
 	PGM_TRANSPORT_ERROR_AGAIN,
@@ -191,15 +192,16 @@ struct pgm_peer_t {
 
 	pgm_tsi_t		tsi;
 	struct sockaddr_storage	group_nla;
-	struct sockaddr_storage	nla, local_nla;	    /* nla = advertised, local_nla = from packet */
-	struct sockaddr_storage	redirect_nla;	    /* from dlr */
+	struct sockaddr_storage	nla, local_nla;		/* nla = advertised, local_nla = from packet */
+	struct sockaddr_storage	redirect_nla;		/* from dlr */
 	pgm_time_t		spmr_expiry;
 
 	GStaticMutex		mutex;
 
-	gpointer            	rxw;		/* pgm_rxw_t */
+	gpointer            	window;			/* pgm_rxw_t */
 	pgm_transport_t*    	transport;
-	GList			link_;
+	GList			peers_link;
+	GSList			pending_link;
 
 	unsigned		is_fec_enabled:1;
 	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
@@ -209,6 +211,8 @@ struct pgm_peer_t {
 	pgm_time_t		expiry;
 
 	pgm_time_t		last_packet;
+	guint32			lost_count;
+	guint32			last_cumulative_losses;
 	guint32			cumulative_stats[PGM_PC_RECEIVER_MAX];
 	guint32			snap_stats[PGM_PC_RECEIVER_MAX];
 
@@ -230,9 +234,9 @@ struct pgm_transport_t {
 	GMainContext*		timer_context;
 	guint               	timer_id;
 	gboolean		is_bound;
-	gboolean		is_open;
-	gboolean            	has_lost_data;
-	gboolean		will_close_on_failure;
+	gboolean		is_destroyed;
+	gboolean            	is_reset;
+	gboolean		is_abort_on_reset;
 
 	gboolean		can_send_data;			/* and SPMs */
 	gboolean		can_send_nak;			/* muted receiver */
@@ -262,8 +266,8 @@ struct pgm_transport_t {
 	guint			rxw_sqns, rxw_secs, rxw_max_rte;
 	int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
-	GStaticRWLock		txw_lock;
-	gpointer       	     	txw;		   	    /* pgm_txw_t */
+	GStaticRWLock		window_lock;
+	gpointer       	     	window;		   	    /* pgm_txw_t */
 	gpointer		rate_control;		    /* rate_t */
 
 	gboolean		is_apdu_eagain;		    /* writer-lock on txw_lock exists
@@ -306,10 +310,10 @@ struct pgm_transport_t {
 	GStaticRWLock		peers_lock;
 	GHashTable*		peers_hashtable;	    /* fast lookup */
 	GList*			peers_list;		    /* easy iteration */
-	GSList*			peers_waiting;		    /* rxw: have or lost data */
-	GStaticMutex		waiting_mutex;
-	pgm_notify_t		waiting_notify;		    /* timer to rx */
-	gboolean		is_waiting_read;
+	GSList*			peers_pending;		    /* rxw: have or lost data */
+	GStaticMutex		pending_mutex;
+	pgm_notify_t		pending_notify;		    /* timer to rx */
+	gboolean		is_pending_read;
 
 	pgm_notify_t		rdata_notify;		    /* rx to timer */
 	GIOChannel*		rdata_channel;
@@ -356,7 +360,7 @@ gboolean pgm_transport_set_rcvbuf (pgm_transport_t* const, const int);
 gboolean pgm_transport_set_fec (pgm_transport_t* const, const guint, const gboolean, const gboolean, const guint, const guint);
 gboolean pgm_transport_set_send_only (pgm_transport_t* const, const gboolean);
 gboolean pgm_transport_set_recv_only (pgm_transport_t* const, const gboolean);
-gboolean pgm_transport_set_close_on_failure (pgm_transport_t* const, const gboolean);
+gboolean pgm_transport_set_abort_on_reset (pgm_transport_t* const, const gboolean);
 
 gsize pgm_transport_pkt_offset (gboolean) G_GNUC_WARN_UNUSED_RESULT;
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)

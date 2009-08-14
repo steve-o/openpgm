@@ -51,7 +51,7 @@
  */
 
 int
-_pgm_inet_network (
+pgm_inet_network (
 	const char*		s,
 	struct in_addr*		in
 	)
@@ -59,7 +59,7 @@ _pgm_inet_network (
 	g_return_val_if_fail (NULL != s,  -1);
 	g_return_val_if_fail (NULL != in, -1);
 
-	g_trace ("_pgm_inet_network (s:\"%s\" in:%p)",
+	g_trace ("pgm_inet_network (s:\"%s\" in:%p)",
 		 s, (gpointer)in);
 	in->s_addr = INADDR_ANY;
 
@@ -148,7 +148,7 @@ _pgm_inet_network (
  */
 
 int
-_pgm_inet6_network (
+pgm_inet6_network (
 	const char*		s,		/* NULL terminated */
 	struct in6_addr*	in6
 	)
@@ -156,7 +156,7 @@ _pgm_inet6_network (
 	g_return_val_if_fail (NULL != s,   -1);
 	g_return_val_if_fail (NULL != in6, -1);
 
-	g_trace ("_pgm_inet6_network (s:\"%s\" in6:%p)",
+	g_trace ("pgm_inet6_network (s:\"%s\" in6:%p)",
 		 s, (gpointer)in6);
 
 /* inet_pton cannot parse IPv6 addresses with subnet declarations, so

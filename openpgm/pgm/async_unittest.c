@@ -65,24 +65,25 @@ generate_msgv (void)
 static gpointer mock_msgv = NULL;
 
 static
-gssize
-mock_pgm_transport_recvmsg (
-	pgm_transport_t*	transport,
-	pgm_msgv_t*		msgv,
-	int			flags
+GIOStatus
+mock_pgm_recvmsg (
+	pgm_transport_t* const	transport,
+	pgm_msgv_t* const	msgv,
+	const int		flags,
+	gsize*			bytes_read,
+	GError**		error
 	)
 {
 	pgm_msgv_t* _msgv = g_atomic_pointer_get (&mock_msgv);
-	if (NULL == _msgv) {
-		errno = EAGAIN;
-		return -1;
-	}
+	if (NULL == _msgv)
+		return G_IO_STATUS_AGAIN;
 	memcpy (msgv, _msgv, sizeof(pgm_msgv_t));
 	g_atomic_pointer_set (&mock_msgv, NULL);
-	return _msgv->msgv_len;
+	*bytes_read = _msgv->msgv_len;
+	return G_IO_STATUS_NORMAL;
 }
 
-#define pgm_transport_recvmsg	mock_pgm_transport_recvmsg
+#define pgm_recvmsg	mock_pgm_recvmsg
 
 #define ASYNC_DEBUG
 #include "async.c"
