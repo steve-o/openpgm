@@ -79,14 +79,14 @@
 
 
 /* locals */
-static int send_spm (pgm_transport_t*);
-static int reset_heartbeat_spm (pgm_transport_t*);
+static int send_spm (pgm_transport_t* const);
+static int reset_heartbeat_spm (pgm_transport_t* const);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
-static gssize send_odata (pgm_transport_t*, struct pgm_sk_buff_t*, int);
-static gssize send_odata_copy (pgm_transport_t*, gconstpointer, gsize, int);
-static gssize send_odatav (pgm_transport_t*, const struct pgm_iovec*, guint, int);
-static gboolean send_rdata (pgm_transport_t*, struct pgm_sk_buff_t*);
+static GIOStatus send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, const int, gsize*);
+static GIOStatus send_odata_copy (pgm_transport_t* const, gconstpointer, const gsize, const int, gsize*);
+static GIOStatus send_odatav (pgm_transport_t* const, const struct pgm_iovec* const, const guint, const int, gsize*);
+static gboolean send_rdata (pgm_transport_t* const, struct pgm_sk_buff_t* const);
 
 
 static inline
@@ -897,18 +897,22 @@ reset_heartbeat_spm (pgm_transport_t* transport)
  */
 
 static
-gssize
+GIOStatus
 send_odata (
-	pgm_transport_t*	transport,
-	struct pgm_sk_buff_t*	skb,
-	int			flags
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb,
+	const int			flags,
+	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (skb != NULL, -EINVAL);
-	g_return_val_if_fail (skb->len <= transport->max_tsdu, -EMSGSIZE);
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (NULL != skb);
+	g_assert (skb->len <= transport->max_tsdu);
+	g_assert (0 == (flags & ~MSG_DONTWAIT));
 
-	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+	g_trace ("INFO","send_odata (transport:%p skb:%p flags:%d bytes-written:%p)",
+		(gpointer)transport, (gpointer)skb, flags, (gpointer)bytes_written);
 
 	const guint16 tsdu_length = skb->len;
 
@@ -954,14 +958,12 @@ retry_send:
 			   FALSE,			/* regular socket */
 			   STATE(skb)->data,
 			   STATE(skb)->len,
-			   (flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
-					flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
-					flags,
+			   flags,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
 		transport->is_apdu_eagain = TRUE;
-		return -1;
+		return G_IO_STATUS_AGAIN;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -989,7 +991,9 @@ retry_send:
 
 /* remove applications reference to skbuff */
 	pgm_free_skb (STATE(skb));
-	return (gssize)tsdu_length;
+	if (bytes_written)
+		*bytes_written = tsdu_length;
+	return G_IO_STATUS_NORMAL;
 }
 
 /* send one PGM original data packet, callee owned memory.
@@ -1000,21 +1004,23 @@ retry_send:
  */
 
 static
-gssize
+GIOStatus
 send_odata_copy (
-	pgm_transport_t*	transport,
-	gconstpointer		tsdu,
-	gsize			tsdu_length,
-	int			flags
+	pgm_transport_t* const		transport,
+	gconstpointer			tsdu,
+	const gsize			tsdu_length,
+	const int			flags,
+	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	if (tsdu_length) {
-		g_return_val_if_fail (tsdu != NULL, -EINVAL);
-		g_return_val_if_fail (tsdu_length <= transport->max_tsdu, -EMSGSIZE);
-	}
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (tsdu_length <= transport->max_tsdu);
+	if (tsdu_length) g_assert (NULL != tsdu);
+	g_assert (0 == (flags & ~MSG_DONTWAIT));
 
-	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+	g_trace ("INFO","send_odata_copy (transport:%p tsdu:%p tsdu_length:%" G_GSIZE_FORMAT " flags:%d bytes-written:%p)",
+		(gpointer)transport, tsdu, tsdu_length, flags, (gpointer)bytes_written);
 
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain)
@@ -1055,14 +1061,12 @@ retry_send:
 			   FALSE,			/* regular socket */
 			   STATE(skb)->data,
 			   STATE(skb)->len,
-			   (flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
-					flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
-					flags,
+			   flags,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
 		transport->is_apdu_eagain = TRUE;
-		return -1;
+		return G_IO_STATUS_AGAIN;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1089,7 +1093,9 @@ retry_send:
 	}
 
 /* return data payload length sent */
-	return (gssize)tsdu_length;
+	if (bytes_written)
+		*bytes_written = tsdu_length;
+	return G_IO_STATUS_NORMAL;
 }
 
 /* send one PGM original data packet, callee owned scatter/gather io vector
@@ -1104,24 +1110,26 @@ retry_send:
  */
 
 static
-gssize
+GIOStatus
 send_odatav (
-	pgm_transport_t*	transport,
-	const struct pgm_iovec*	vector,
-	guint			count,		/* number of items in vector */
-	int			flags
+	pgm_transport_t* const		transport,
+	const struct pgm_iovec* const	vector,
+	const guint			count,		/* number of items in vector */
+	const int			flags,
+	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	if (count) {
-		g_return_val_if_fail (vector != NULL, -EINVAL);
-	} else {
-/* pass on zero length call so we don't have to check count on first iteration. */
-		return send_odata_copy (transport, NULL, 0, flags);
-	}
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+/* pre-conditions */
+	g_assert (NULL != transport);
+	g_assert (count <= PGM_MAX_FRAGMENTS);
+	if (count) g_assert (NULL != vector);
+	g_assert (0 == (flags & ~MSG_DONTWAIT));
 
-	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+	g_trace ("INFO","send_odatav (transport:%p vector:%p count:%u flags:%d bytes-written:%p)",
+		(gpointer)transport, (gconstpointer)vector, count, flags, (gpointer)bytes_written);
+
+	if (0 == count)
+		return send_odata_copy (transport, NULL, 0, flags, bytes_written);
 
 /* continue if blocked on send */
 	if (transport->is_apdu_eagain)
@@ -1137,7 +1145,7 @@ send_odatav (
 #endif
 		STATE(tsdu_length) += vector[i].iov_len;
 	}
-	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, -EMSGSIZE);
+	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, G_IO_STATUS_ERROR);
 
 	g_static_rw_lock_writer_lock (&transport->window_lock);
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
@@ -1185,14 +1193,12 @@ retry_send:
 			   FALSE,			/* regular socket */
 			   STATE(skb)->data,
 			   STATE(skb)->len,
-			   (flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
-					flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
-					flags,
+			   flags,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
 		transport->is_apdu_eagain = TRUE;
-		return -1;
+		return G_IO_STATUS_AGAIN;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1219,7 +1225,9 @@ retry_send:
 	}
 
 /* return data payload length sent */
-	return (gssize)STATE(tsdu_length);
+	if (bytes_written)
+		*bytes_written = STATE(tsdu_length);
+	return G_IO_STATUS_NORMAL;
 }
 
 /* send PGM original data, callee owned memory.  if larger than maximum TPDU
@@ -1229,30 +1237,28 @@ retry_send:
  * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
  * if the packet sizes would exceed the current rate limit.
  */
-gssize
-pgm_transport_send (
-	pgm_transport_t*	transport,
-	gconstpointer		apdu,
-	gsize			apdu_length,
-	int			flags		/* MSG_DONTWAIT = rate non-blocking,
-						   MSG_WAITALL  = packet blocking   */
+
+GIOStatus
+pgm_send (
+	pgm_transport_t* const		transport,
+	gconstpointer			apdu,
+	const gsize			apdu_length,
+	const int			flags,
+	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (transport != NULL, -EINVAL);
+	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (apdu_length <= transport->max_apdu, G_IO_STATUS_ERROR);
+	if (apdu_length) g_return_val_if_fail (NULL != apdu, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (0 == (flags & ~(MSG_DONTWAIT | MSG_WAITALL)), G_IO_STATUS_ERROR);
 
-/* reject on closed transport */
-	if (transport->is_destroyed) {
-		errno = ECONNRESET;
-		return -1;
-	}
+	g_trace ("INFO","pgm_send (transport:%p apdu:%p apdu-length:%" G_GSIZE_FORMAT" flags:%d bytes-written:%p)",
+		(gpointer)transport, apdu, apdu_length, flags, (gpointer)bytes_written);
 
 /* pass on non-fragment calls */
 	if (apdu_length < transport->max_tsdu)
-		return send_odata_copy (transport, apdu, apdu_length, flags);
-	g_return_val_if_fail (NULL != apdu, -EINVAL);
-	g_return_val_if_fail (apdu_length <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
-
-	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+		return send_odata_copy (transport, apdu, apdu_length, flags & MSG_DONTWAIT, bytes_written);
 
 	gsize bytes_sent	= 0;		/* counted at IP layer */
 	guint packets_sent	= 0;		/* IP packets */
@@ -1278,7 +1284,7 @@ pgm_transport_send (
 /* calculation includes one iphdr length already */
 		const int result = pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
 		if (result == -1)
-			return (gssize)result;
+			return G_IO_STATUS_AGAIN;
 
 		STATE(is_rate_limited) = TRUE;
 	}
@@ -1346,9 +1352,7 @@ retry_send:
 				   FALSE,				/* regular socket */
 				   STATE(skb)->data,
 				   STATE(skb)->len,
-				   (flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
-						flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
-						flags,
+				   flags & MSG_DONTWAIT,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 		if (sent < 0 && errno == EAGAIN) {
@@ -1387,7 +1391,9 @@ retry_send:
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
-	return (gssize)apdu_length;
+	if (bytes_written)
+		*bytes_written = apdu_length;
+	return G_IO_STATUS_NORMAL;
 
 blocked:
 	if (bytes_sent) {
@@ -1396,8 +1402,7 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	errno = EAGAIN;
-	return -1;
+	return G_IO_STATUS_AGAIN;
 }
 
 /* send PGM original data, callee owned scatter/gather IO vector.  if larger than maximum TPDU
@@ -1406,46 +1411,47 @@ blocked:
  * is_one_apdu = true:
  *
  *    ⎢ DATA₀ ⎢
- *    ⎢ DATA₁ ⎢ → pgm_transport_sendv() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → libc
+ *    ⎢ DATA₁ ⎢ → pgm_sendv() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → libc
  *    ⎢   ⋮   ⎢
  *
  * is_one_apdu = false:
  *
- *    ⎢ APDU₀ ⎢                            ⎢ ⋯ TSDU₁,₀ TSDU₀,₀ ⎢
- *    ⎢ APDU₁ ⎢ → pgm_transport_sendv() →  ⎢ ⋯ TSDU₁,₁ TSDU₀,₁ ⎢ → libc
- *    ⎢   ⋮   ⎢                            ⎢     ⋮       ⋮     ⎢
+ *    ⎢ APDU₀ ⎢                  ⎢ ⋯ TSDU₁,₀ TSDU₀,₀ ⎢
+ *    ⎢ APDU₁ ⎢ → pgm_sendv() →  ⎢ ⋯ TSDU₁,₁ TSDU₀,₁ ⎢ → libc
+ *    ⎢   ⋮   ⎢                  ⎢     ⋮       ⋮     ⎢
  *
  * on success, returns number of data bytes pushed into the transmit window and
  * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
  * if the packet sizes would exceed the current rate limit.
  */
-gssize
-pgm_transport_sendv (
-	pgm_transport_t*	transport,
-	const struct pgm_iovec*	vector,
-	guint			count,		/* number of items in vector */
-	int			flags,		/* MSG_DONTWAIT = rate non-blocking,
-						   MSG_WAITALL  = packet blocking   */
-	gboolean		is_one_apdu	/* true  = vector = apdu,
-                                                   false = vector::iov_base = apdu */
+
+GIOStatus
+pgm_sendv (
+	pgm_transport_t* const		transport,
+	const struct pgm_iovec* const	vector,
+	const guint			count,		/* number of items in vector */
+	const int			flags,
+	const gboolean			is_one_apdu,	/* true  = vector = apdu, false = vector::iov_base = apdu */
+        gsize*                     	bytes_written
 	)
 {
-	g_return_val_if_fail (NULL != transport, -EINVAL);
-	g_return_val_if_fail (NULL != vector, -EINVAL);
-	g_return_val_if_fail (count > 0, -EINVAL);
+	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, G_IO_STATUS_ERROR);
+	if (count) g_return_val_if_fail (NULL != vector, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (0 == (flags & ~(MSG_DONTWAIT | MSG_WAITALL)), G_IO_STATUS_ERROR);
 
-/* reject on closed transport */
-	if (transport->is_destroyed) {
-		errno = ECONNRESET;
-		return -1;
-	}
+	g_trace ("INFO","pgm_sendv (transport:%p vector:%p count:%u flags:%d is-one-apdu:%s bytes-written:%p)",
+		(gpointer)transport,
+		(gconstpointer)vector,
+		count,
+		flags,
+		is_one_apdu ? "TRUE" : "FALSE",
+		(gpointer)bytes_written);
 
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0)
-		return send_odata_copy (transport, NULL, count, flags);
-	g_return_val_if_fail (vector != NULL, -EINVAL);
-
-	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+		return send_odata_copy (transport, NULL, count, flags & ~MSG_WAITALL, bytes_written);
 
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
@@ -1454,11 +1460,10 @@ pgm_transport_sendv (
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain) {
 		if (is_one_apdu) {
-			if (STATE(apdu_length) < transport->max_tsdu) {
-				return send_odatav (transport, vector, count, flags);
-			} else {
+			if (STATE(apdu_length) < transport->max_tsdu)
+				return send_odatav (transport, vector, count, flags & ~MSG_WAITALL, bytes_written);
+			else
 				goto retry_one_apdu_send;
-			}
 		} else {
 			goto retry_send;
 		}
@@ -1474,7 +1479,7 @@ pgm_transport_sendv (
 		}
 #endif
 		if (!is_one_apdu) {
-			g_return_val_if_fail (vector[i].iov_len <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
+			g_return_val_if_fail (vector[i].iov_len <= transport->max_apdu, G_IO_STATUS_ERROR);
 		}
 		STATE(apdu_length) += vector[i].iov_len;
 	}
@@ -1482,9 +1487,9 @@ pgm_transport_sendv (
 /* pass on non-fragment calls */
 	if (is_one_apdu) {
 		if (STATE(apdu_length) < transport->max_tsdu) {
-			return send_odatav (transport, vector, count, flags);
+			return send_odatav (transport, vector, count, flags & ~MSG_WAITALL, bytes_written);
 		} else {
-			g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
+			g_return_val_if_fail (STATE(apdu_length) <= transport->max_apdu, G_IO_STATUS_ERROR);
 		}
 	}
 
@@ -1504,7 +1509,7 @@ pgm_transport_sendv (
 /* calculation includes one iphdr length already */
                 const int result = pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, flags);
                 if (result == -1)
-			return (gssize)result;
+			return G_IO_STATUS_AGAIN;
 		STATE(is_rate_limited) = TRUE;
         }
 
@@ -1513,20 +1518,26 @@ pgm_transport_sendv (
 	{
 		for (STATE(data_pkt_offset) = 0; STATE(data_pkt_offset) < count; STATE(data_pkt_offset)++)
 		{
-			gssize sent;
+			gsize wrote_bytes;
+			GIOStatus status;
 retry_send:
-			sent = pgm_transport_send (transport, vector[STATE(data_pkt_offset)].iov_base, vector[STATE(data_pkt_offset)].iov_len, flags);
-			if (sent < 0 && errno == EAGAIN) {
+			status = pgm_send (transport,
+					   vector[STATE(data_pkt_offset)].iov_base,
+					   vector[STATE(data_pkt_offset)].iov_len,
+					   flags & ~MSG_WAITALL,
+					   &wrote_bytes);
+			if (G_IO_STATUS_AGAIN == status) {
 				transport->is_apdu_eagain = TRUE;
-				return -1;
-			}
-
-			if (sent == (gssize)vector[STATE(data_pkt_offset)].iov_len)
-				data_bytes_sent += vector[STATE(data_pkt_offset)].iov_len;
+				return status;
+			} else if (G_IO_STATUS_NORMAL != status)
+				return status;
+			data_bytes_sent += wrote_bytes;
 		}
 
 		transport->is_apdu_eagain = FALSE;
-		return (gssize)data_bytes_sent;
+		if (bytes_written)
+			*bytes_written = data_bytes_sent;
+		return G_IO_STATUS_NORMAL;
 	}
 
 	STATE(data_bytes_offset)	= 0;
@@ -1631,9 +1642,7 @@ retry_one_apdu_send:
 				   FALSE,				/* regular socket */
 				   STATE(skb)->data,
 				   STATE(skb)->len,
-				   (flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
-						flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
-						flags,
+				   flags & ~MSG_WAITALL,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 		if (sent < 0 && errno == EAGAIN) {
@@ -1672,7 +1681,9 @@ retry_one_apdu_send:
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
-	return (gssize)STATE(apdu_length);
+	if (bytes_written)
+		*bytes_written = STATE(apdu_length);
+	return G_IO_STATUS_NORMAL;
 
 blocked:
 	if (bytes_sent) {
@@ -1681,14 +1692,13 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	errno = EAGAIN;
-	return -1;
+	return G_IO_STATUS_AGAIN;
 }
 
 /* send PGM original data, transmit window owned scatter/gather IO vector.
  *
  *    ⎢ TSDU₀ ⎢
- *    ⎢ TSDU₁ ⎢ → pgm_transport_send_packetv() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → libc
+ *    ⎢ TSDU₁ ⎢ → pgm_send_skbv() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → libc
  *    ⎢   ⋮   ⎢
  *
  * on success, returns number of data bytes pushed into the transmit window and
@@ -1696,35 +1706,35 @@ blocked:
  * if the packet sizes would exceed the current rate limit.
  */
 
-gssize
-pgm_transport_send_skbv (
-	pgm_transport_t*	transport,
-	struct pgm_sk_buff_t**	vector,		/* array of skb pointers vs. array of skbs */
-	guint			count,
-	int			flags,		/* MSG_DONTWAIT = rate non-blocking,
-						   MSG_WAITALL  = packet blocking   */
-	gboolean		is_one_apdu	/* true: vector = apdu,
-                                                  false: vector::iov_base = apdu */
+GIOStatus
+pgm_send_skbv (
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t** const	vector,		/* array of skb pointers vs. array of skbs */
+	const guint			count,
+	const int			flags,
+	const gboolean			is_one_apdu,	/* true: vector = apdu, false: vector::iov_base = apdu */
+	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (NULL != transport, -EINVAL);
-	g_return_val_if_fail (NULL != vector, -EINVAL);
-	g_return_val_if_fail (count > 0, -EINVAL);
+	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, G_IO_STATUS_ERROR);
+	if (count) g_return_val_if_fail (NULL != vector, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (0 == (flags & ~(MSG_DONTWAIT | MSG_WAITALL)), G_IO_STATUS_ERROR);
 
-/* reject on closed transport */
-	if (transport->is_destroyed) {
-		errno = ECONNRESET;
-		return -1;
-	}
+	g_trace ("INFO","pgm_send_skbv (transport:%p vector:%p count:%u flags:%d is-one-apdu:%s bytes-written:%p)",
+		(gpointer)transport,
+		(gpointer)vector,
+		count,
+		flags,
+		is_one_apdu ? "TRUE" : "FALSE",
+		(gpointer)bytes_written);
 
 /* pass on zero length as cannot count vector lengths */
-	if (count == 0)
-		return send_odata_copy (transport, NULL, count, flags);
-	g_return_val_if_fail (vector != NULL, -EINVAL);
-	if (count == 1)
-		return send_odata (transport, vector[0], flags);
-
-	g_assert( !(flags & MSG_WAITALL && !(flags & MSG_DONTWAIT)) );
+	if (0 == count)
+		return send_odata_copy (transport, NULL, count, flags & ~MSG_WAITALL, bytes_written);
+	if (1 == count)
+		return send_odata (transport, vector[0], flags & ~MSG_WAITALL, bytes_written);
 
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
@@ -1744,8 +1754,7 @@ pgm_transport_send_skbv (
 /* calculation includes one iphdr length already */
 		const int result = pgm_rate_check (transport->rate_control, total_tpdu_length - transport->iphdr_len, flags);
 		if (result == -1)
-			return (gssize)result;
-
+			return G_IO_STATUS_AGAIN;
 		STATE(is_rate_limited) = TRUE;
 	}
 
@@ -1756,9 +1765,10 @@ pgm_transport_send_skbv (
 		STATE(apdu_length)	= 0;
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->window);
 		for (guint i = 0; i < count; i++) {
-			g_return_val_if_fail (vector[i]->len <= transport->max_tsdu_fragment, -EMSGSIZE);
+			g_return_val_if_fail (vector[i]->len <= transport->max_tsdu_fragment, G_IO_STATUS_ERROR);
 			STATE(apdu_length) += vector[i]->len;
 		}
+		g_return_val_if_fail (STATE(apdu_length) <= transport->max_apdu, G_IO_STATUS_ERROR);
 	}
 
 	for (STATE(vector_index) = 0; STATE(vector_index) < count; STATE(vector_index)++)
@@ -1829,9 +1839,7 @@ retry_send:
 				    FALSE,				/* regular socket */
 				    STATE(skb)->data,
 				    STATE(skb)->len,
-				    (flags & MSG_DONTWAIT && flags & MSG_WAITALL) ?
-						flags & ~(MSG_DONTWAIT | MSG_WAITALL) :
-						flags,
+				    flags & ~MSG_WAITALL,
 				    (struct sockaddr*)&transport->send_gsr.gsr_group,
 				    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 		if (sent < 0 && errno == EAGAIN) {
@@ -1876,7 +1884,9 @@ retry_send:
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
-	return (gssize)data_bytes_sent;
+	if (bytes_written)
+		*bytes_written = data_bytes_sent;
+	return G_IO_STATUS_NORMAL;
 
 blocked:
 	if (bytes_sent) {
@@ -1885,8 +1895,7 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	errno = EAGAIN;
-	return -1;
+	return G_IO_STATUS_AGAIN;
 }
 
 /* cleanup resuming send state helper 

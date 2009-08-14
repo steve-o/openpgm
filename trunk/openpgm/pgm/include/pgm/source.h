@@ -37,9 +37,9 @@ gboolean pgm_transport_set_txw_sqns (pgm_transport_t* const, const guint);
 gboolean pgm_transport_set_txw_secs (pgm_transport_t* const, const guint);
 gboolean pgm_transport_set_txw_max_rte (pgm_transport_t* const, const guint);
 
-gssize pgm_transport_send (pgm_transport_t*, gconstpointer, gsize, int);
-gssize pgm_transport_sendv (pgm_transport_t*, const struct pgm_iovec*, guint, int, gboolean);
-gssize pgm_transport_send_skbv (pgm_transport_t*, struct pgm_sk_buff_t**, guint, int, gboolean);
+GIOStatus pgm_send (pgm_transport_t* const, gconstpointer, const gsize, const int, gsize*);
+GIOStatus pgm_sendv (pgm_transport_t* const, const struct pgm_iovec* const, const guint, const int, const gboolean, gsize*);
+GIOStatus pgm_send_skbv (pgm_transport_t* const, struct pgm_sk_buff_t**, const guint, const int, const gboolean, gsize*);
 
 G_GNUC_INTERNAL int pgm_send_spm_unlocked (pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gboolean pgm_on_nak_notify (GIOChannel*, GIOCondition, gpointer) G_GNUC_WARN_UNUSED_RESULT;
