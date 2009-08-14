@@ -807,7 +807,7 @@ pgm_recvfrom (
 	if (G_IO_STATUS_NORMAL != status)
 		return status;
 
-	gssize bytes_copied = 0;
+	gsize bytes_copied = 0;
 	struct pgm_sk_buff_t* skb = msgv.msgv_skb[0];
 
 	if (from) {

@@ -256,6 +256,7 @@ struct pgm_transport_t {
 	guint			recv_gsr_len;
 	int			recv_sock;
 
+	guint16			max_apdu;
 	guint16			max_tpdu;
 	guint16			max_tsdu;		    /* excluding optional varpkt_len word */
 	guint16			max_tsdu_fragment;
