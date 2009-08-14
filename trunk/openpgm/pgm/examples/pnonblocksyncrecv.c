@@ -115,38 +115,33 @@ main (
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
-		pgm_tsi_t from;
 		char buffer[4096];
-		gssize len = pgm_transport_recvfrom (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */, &from);
-		if (len >= 0)
-		{
+		gsize len;
+		pgm_tsi_t from;
+		GError* err = NULL;
+		const GIOStatus status = pgm_recvfrom (g_transport,
+						       buffer,
+						       sizeof(buffer),
+						       MSG_DONTWAIT, /* non-blocking */
+						       &len,
+						       &from,
+						       &err);
+		if (G_IO_STATUS_NORMAL == status)
 			on_data (buffer, len, &from);
-		}
-		else if (errno == EAGAIN)
-		{
+		else if (G_IO_STATUS_AGAIN == status) {
 /* poll for next event */
 			int n_fds = 2;
 			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
 			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
 			poll (fds, n_fds, 1000 /* ms */);
-		}
-		else if (errno == ECONNRESET)
-		{
-			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)buffer;
-                        g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
-					pgm_sock_err->lost_count,
-					pgm_tsi_print(&pgm_sock_err->tsi));
-			continue;
-		}
-		else if (errno == ENOTCONN)
-		{
-			g_error ("pgm socket closed.");
-		}
-		else
-		{
-			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
-			break;
+		} else {
+			if (err) {
+				g_warning (err->message);
+				g_error_free (err);
+			}
+			if (G_IO_STATUS_ERROR == status)
+				break;
 		}
 	} while (!g_quit);
 

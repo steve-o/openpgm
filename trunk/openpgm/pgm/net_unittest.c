@@ -118,13 +118,13 @@ flags_string (
 
 static
 gboolean
-mock__pgm_rate_check (
+mock_pgm_rate_check (
 	gpointer		bucket,
 	const guint		data_size,
 	const int		flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
-	g_debug ("mock__pgm_rate_check (bucket:%p data-size:%u flags:%s)",
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u flags:%s)",
 		bucket, data_size, flags_string (flags));
 	return TRUE;
 }
@@ -201,7 +201,7 @@ mock_fcntl (
 	g_assert_not_reached();
 }
 
-#define _pgm_rate_check		mock__pgm_rate_check
+#define pgm_rate_check		mock_pgm_rate_check
 #define sendto			mock_sendto
 #define poll			mock_poll
 #define select			mock_select
@@ -233,7 +233,7 @@ START_TEST (test_sendto_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = _pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
 }
 END_TEST
 
@@ -244,7 +244,7 @@ START_TEST (test_sendto_fail_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = _pgm_sendto (NULL, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (NULL, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -257,7 +257,7 @@ START_TEST (test_sendto_fail_002)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = _pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -270,7 +270,7 @@ START_TEST (test_sendto_fail_003)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = _pgm_sendto (transport, FALSE, FALSE, buf, 0, 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, 0, 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -283,7 +283,7 @@ START_TEST (test_sendto_fail_004)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = _pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, NULL, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, NULL, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -296,14 +296,14 @@ START_TEST (test_sendto_fail_005)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = _pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, 0);
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, 0);
 	fail ();
 }
 END_TEST
 
 /* target:
  * 	int
- * 	_pgm_set_nonblocking (
+ * 	pgm_set_nonblocking (
  * 		int			filedes[2]
  * 	)
  */
@@ -311,13 +311,13 @@ END_TEST
 START_TEST (test_set_nonblocking_pass_001)
 {
 	int fd = fileno (stdout);
-	int retval = _pgm_set_nonblocking (&fd);
+	int retval = pgm_set_nonblocking (&fd);
 }
 END_TEST
 
 START_TEST (test_set_nonblocking_fail_001)
 {
-	int retval = _pgm_set_nonblocking (NULL);
+	int retval = pgm_set_nonblocking (NULL);
 	fail ();
 }
 END_TEST

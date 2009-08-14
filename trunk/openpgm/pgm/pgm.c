@@ -53,7 +53,7 @@ int
 pgm_init (void)
 {
 	g_return_val_if_fail (pgm_got_initialized == FALSE, -1);
-	g_return_val_if_fail (_pgm_time_supported() == FALSE, -1);
+	g_return_val_if_fail (pgm_time_supported() == FALSE, -1);
 
 /* ensure threading enabled */
 	if (!g_thread_supported ())
@@ -83,7 +83,7 @@ pgm_init (void)
 #endif
 
 /* ensure timing enabled */
-	if (-1 == _pgm_time_init ())
+	if (-1 == pgm_time_init ())
 		return -1;
 
 	pgm_got_initialized = TRUE;
@@ -106,8 +106,8 @@ int
 pgm_shutdown (void)
 {
 	g_return_val_if_fail (pgm_supported() == TRUE, -1);
-	g_return_val_if_fail (_pgm_time_supported() == TRUE, -1);
-	if (-1 == _pgm_time_shutdown ())
+	g_return_val_if_fail (pgm_time_supported() == TRUE, -1);
+	if (-1 == pgm_time_shutdown ())
 		return -1;
 
 	pgm_got_initialized = FALSE;

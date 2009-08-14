@@ -110,8 +110,6 @@ struct pgm_rxw_t {
 	const pgm_tsi_t*	tsi;
 	pgm_sock_err_t	pgm_sock_err;
 
-	GSList		waiting_link;
-
         GQueue          backoff_queue;
         GQueue          wait_ncf_queue;
         GQueue          wait_data_queue;
@@ -139,7 +137,6 @@ struct pgm_rxw_t {
 	guint32		min_nak_transmit_count;
 	guint32		max_nak_transmit_count;
 	guint32		cumulative_losses;
-	guint32		ack_cumulative_losses;
 	guint32		bytes_delivered;
 	guint32		msgs_delivered;
 
@@ -205,15 +202,6 @@ static inline guint32 pgm_rxw_lead (const pgm_rxw_t* const window)
 static inline guint32 pgm_rxw_next_lead (const pgm_rxw_t* const window)
 {
 	return (guint32)(pgm_rxw_lead (window) + 1);
-}
-
-static inline gboolean pgm_rxw_epoll (pgm_rxw_t* const window)
-{
-	if (window->has_event) {
-		window->has_event = 0;
-		return TRUE;
-	}
-	return FALSE;
 }
 
 G_END_DECLS

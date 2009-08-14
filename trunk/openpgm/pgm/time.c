@@ -107,7 +107,7 @@ static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
  */
 
 gboolean
-_pgm_time_init (void)
+pgm_time_init (void)
 {
 	g_return_val_if_fail (FALSE == time_got_initialized, FALSE);
 
@@ -250,7 +250,7 @@ _pgm_time_init (void)
 }
 
 gboolean
-_pgm_time_supported (void)
+pgm_time_supported (void)
 {
 	return ( time_got_initialized == TRUE );
 }
@@ -259,7 +259,7 @@ _pgm_time_supported (void)
  */
 
 gboolean
-_pgm_time_shutdown (void)
+pgm_time_shutdown (void)
 {
 	g_return_val_if_fail (TRUE == time_got_initialized, FALSE);
 

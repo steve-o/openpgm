@@ -250,7 +250,7 @@ parse_interface (
 		 pgm_family_string (family), ifname, (gpointer)ir, (gpointer)error);
 
 /* network address: in_addr in network order */
-	if (AF_INET6 != family && 0 == _pgm_inet_network (ifname, &in_addr))
+	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
 		if (IN_MULTICAST(g_ntohl(in_addr.s_addr))) {
 			g_set_error (error,
@@ -265,7 +265,7 @@ parse_interface (
 		((struct sockaddr_in*)&addr)->sin_addr.s_addr = in_addr.s_addr;
 		check_addr = TRUE;
 	}
-	if (AF_INET  != family && 0 == _pgm_inet6_network (ifname, &in6_addr))
+	if (AF_INET  != family && 0 == pgm_inet6_network (ifname, &in6_addr))
 	{
 		if (IN6_IS_ADDR_MULTICAST(&in6_addr)) {
 			g_set_error (error,
@@ -857,7 +857,7 @@ parse_receive_entity (
 			if (AF_UNSPEC == ((struct sockaddr*)&primary_interface->ir_addr)->sa_family)
 			{
 				struct sockaddr_storage addr;
-				if (!_pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
+				if (!pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
 				{
 					g_prefix_error (error,
 							_("Node primary address family cannot be determined: "));

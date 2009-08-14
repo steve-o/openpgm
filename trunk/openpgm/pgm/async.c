@@ -27,7 +27,7 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 
-#include "pgm/receiver.h"
+#include "pgm/recv.h"
 #include "pgm/net.h"
 #include "pgm/async.h"
 
@@ -121,37 +121,33 @@ pgm_receiver_thread (
 
 /* incoming message buffer */
 	pgm_msgv_t msgv;
+	gsize bytes_read;
 
 	do {
-		int len = pgm_transport_recvmsg (async->transport, &msgv, 0 /* blocking */);
-		if (len >= 0)
+/* blocking read */
+		const GIOStatus status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
+		if (G_IO_STATUS_NORMAL == status)
 		{
 /* queue a copy to receiver */
 			pgm_event_t* event = pgm_event_alloc (async);
-			event->data = len > 0 ? g_malloc (len) : NULL;
-			event->len  = len;
+			event->data = bytes_read > 0 ? g_malloc (bytes_read) : NULL;
+			event->len  = bytes_read;
 			gpointer dst = event->data;
 			guint i = 0;
-			while (len)
-			{
+			while (bytes_read) {
 				const struct pgm_sk_buff_t* skb = msgv.msgv_skb[i++];
 				memcpy (dst, skb->data, skb->len);
 				dst = (char*)dst + skb->len;
-				len -= skb->len;
+				bytes_read -= skb->len;
 			}
-
 /* prod pipe on edge */
 			g_async_queue_lock (async->commit_queue);
 			g_async_queue_push_unlocked (async->commit_queue, event);
 			if (g_async_queue_length_unlocked (async->commit_queue) == 1)
-			{
-				if (!pgm_notify_send (&async->commit_notify)) {
-					g_critical ("notification failed :(");
-				}
-			}
+				pgm_notify_send (&async->commit_notify);
 			g_async_queue_unlock (async->commit_queue);
 		}
-		else if (ECONNRESET == errno && async->transport->will_close_on_failure)
+		else if (G_IO_STATUS_EOF == status && async->transport->is_abort_on_reset)
 		{
 			break;
 		}

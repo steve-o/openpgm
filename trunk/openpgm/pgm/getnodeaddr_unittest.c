@@ -445,7 +445,7 @@ mock_gethostname (
 
 /* target:
  *	gboolean
- *	_pgm_if_getnodeaddr (
+ *	pgm_if_getnodeaddr (
  *		const int		family,
  *		struct sockaddr*	addr,
  *		const socklen_t		cnt,
@@ -458,7 +458,7 @@ START_TEST (test_getnodeaddr_pass_001)
 	struct sockaddr_storage addr;
 	char saddr[INET6_ADDRSTRLEN];
 	GError* err = NULL;
-	gboolean success = _pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
+	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
 		g_error ("Resolving node address with AF_UNSPEC: %s", err->message);
 	}
@@ -466,11 +466,11 @@ START_TEST (test_getnodeaddr_pass_001)
 	fail_unless (NULL == err);
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_UNSPEC:%s", saddr);
-	fail_unless (TRUE == _pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err));
+	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err));
 	fail_unless (NULL == err);
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_INET:%s", saddr);
-	fail_unless (TRUE == _pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err));
+	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err));
 	fail_unless (NULL == err);
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_INET6:%s", saddr);
@@ -480,7 +480,7 @@ END_TEST
 START_TEST (test_getnodeaddr_fail_001)
 {
 	GError* err = NULL;
-	fail_unless (FALSE == _pgm_if_getnodeaddr (AF_UNSPEC, NULL, 0, &err));
+	fail_unless (FALSE == pgm_if_getnodeaddr (AF_UNSPEC, NULL, 0, &err));
 }
 END_TEST
 

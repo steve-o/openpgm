@@ -43,11 +43,11 @@ typedef struct rs_t rs_t;
 
 /* globals */
 
-void _pgm_rs_create (rs_t**, const guint, const guint);
-void _pgm_rs_destroy (rs_t*);
-void _pgm_rs_encode (rs_t*, const gf8_t**, const guint, gf8_t*, const gsize);
-void _pgm_rs_decode_parity_inline (rs_t*, gf8_t**, const guint*, const gsize);
-void _pgm_rs_decode_parity_appended (rs_t*, gf8_t**, const guint*, const gsize);
+void pgm_rs_create (rs_t**, const guint, const guint);
+void pgm_rs_destroy (rs_t*);
+void pgm_rs_encode (rs_t*, const gf8_t**, const guint, gf8_t*, const gsize);
+void pgm_rs_decode_parity_inline (rs_t*, gf8_t**, const guint*, const gsize);
+void pgm_rs_decode_parity_appended (rs_t*, gf8_t**, const guint*, const gsize);
 
 
 /* Vector GF(2⁸) plus-equals multiplication.
@@ -360,7 +360,7 @@ matinv_vandermonde (
  */
 
 void
-_pgm_rs_create (
+pgm_rs_create (
 	rs_t**			rs_,
 	const guint		n,
 	const guint		k
@@ -431,7 +431,7 @@ _pgm_rs_create (
 }
 
 void
-_pgm_rs_destroy (
+pgm_rs_destroy (
 	rs_t*			rs
 	)
 {
@@ -455,7 +455,7 @@ _pgm_rs_destroy (
  */
 
 void
-_pgm_rs_encode (
+pgm_rs_encode (
 	rs_t*			rs,
 	const gf8_t*		src[],		/* length rs_t::k */
 	const guint		offset,
@@ -482,7 +482,7 @@ _pgm_rs_encode (
  */
 
 void
-_pgm_rs_decode_parity_inline (
+pgm_rs_decode_parity_inline (
 	rs_t*			rs,
 	gf8_t*			block[],	/* length rs_t::k */
 	const guint		offsets[],	/* offsets within FEC block, 0 < offset < n */
@@ -542,7 +542,7 @@ _pgm_rs_decode_parity_inline (
  * erased packet buffers must be zeroed.
  */
 void
-_pgm_rs_decode_parity_appended (
+pgm_rs_decode_parity_appended (
 	rs_t*			rs,
 	gf8_t*			block[],	/* length rs_t::n, the FEC block */
 	const guint		offsets[],	/* ordered index of packets */

@@ -262,7 +262,7 @@ static inline int pgm_sockaddr_add_membership (int s, const struct group_source_
 	    mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
 
 	    struct sockaddr_in interface;
-	    if (!_pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&interface, NULL))
+	    if (!pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&interface, NULL))
 		return retval;
 		
 	    mreq.imr_interface.s_addr = interface.sin_addr.s_addr;

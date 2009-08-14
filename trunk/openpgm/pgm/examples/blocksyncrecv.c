@@ -113,28 +113,24 @@ main (
 	do {
 		pgm_tsi_t from;
 		char buffer[4096];
-		gssize len = pgm_transport_recvfrom (g_transport, buffer, sizeof(buffer), 0 /* blocking */, &from);
-		if (len >= 0)
-		{
+		gsize len;
+		GError* err = NULL;
+		const GIOStatus status = pgm_recvfrom (g_transport,
+						       buffer,
+						       sizeof(buffer),
+						       0,		/* blocking */
+						       &len,
+						       &from,
+						       &err);
+		if (G_IO_STATUS_NORMAL == status)
 			on_data (buffer, len, &from);
-		}
-		else if (errno == ENOTCONN)
-		{
-			g_error ("pgm socket closed.");
-			break;
-		}
-		else if (errno == ECONNRESET)
-		{
-			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)buffer;
-			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
-					pgm_sock_err->lost_count,
-					pgm_tsi_print(&pgm_sock_err->tsi));
-			continue;
-		}
-		else
-		{
-			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
-			break;
+		else {
+			if (err) {
+				g_warning (err->message);
+				g_error_free (err);
+			}
+			if (G_IO_STATUS_ERROR == status)
+				break;
 		}
 	} while (!g_quit);
 
@@ -143,11 +139,9 @@ main (
 /* cleanup */
 	if (g_transport) {
 		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
-
 	g_message ("finished.");
 	return 0;
 }

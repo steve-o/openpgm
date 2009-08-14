@@ -39,7 +39,7 @@
 
 /* target:
  *	int
- *	_pgm_inet_network (
+ *	pgm_inet_network (
  *		const char*		s,
  *		struct in_addr*		in
  *	)
@@ -49,7 +49,7 @@ START_TEST (test_inet_network_pass_001)
 {
 	const char* network = "127.0.0.1/8";
 	struct in_addr addr;
-	fail_unless (0 == _pgm_inet_network (network, &addr));
+	fail_unless (0 == pgm_inet_network (network, &addr));
 	g_message ("Resolved \"%s\" to \"%s\"",
 		   network, inet_ntoa (addr));
 }
@@ -57,13 +57,13 @@ END_TEST
 
 START_TEST (test_inet_network_fail_001)
 {
-	fail_unless (-1 == _pgm_inet_network (NULL, NULL));
+	fail_unless (-1 == pgm_inet_network (NULL, NULL));
 }
 END_TEST
 
 /* target:
  *	int
- *	_pgm_inet6_network (
+ *	pgm_inet6_network (
  *		const char*		s,
  *		struct in6_addr*	in6
  *	)
@@ -74,7 +74,7 @@ START_TEST (test_inet6_network_pass_001)
 	const char* network = "::1/128";
 	char snetwork[INET6_ADDRSTRLEN];
 	struct in6_addr addr;
-	fail_unless (0 == _pgm_inet6_network (network, &addr));
+	fail_unless (0 == pgm_inet6_network (network, &addr));
 	g_message ("Resolved \"%s\" to \"%s\"",
 		   network, pgm_inet_ntop (AF_INET6, &addr, snetwork, sizeof(snetwork)));
 }
@@ -82,7 +82,7 @@ END_TEST
 
 START_TEST (test_inet6_network_fail_001)
 {
-	fail_unless (-1 == _pgm_inet6_network (NULL, NULL));
+	fail_unless (-1 == pgm_inet6_network (NULL, NULL));
 }
 END_TEST
 

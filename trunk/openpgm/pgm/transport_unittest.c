@@ -71,7 +71,7 @@ generate_asm_tinfo (void)
 /** receiver module */
 static
 void
-mock__pgm_peer_unref (
+mock_pgm_peer_unref (
 	pgm_peer_t*		peer
 	)
 {
@@ -80,7 +80,7 @@ mock__pgm_peer_unref (
 /** source module */
 static
 gboolean
-mock__pgm_on_nak_notify (
+mock_pgm_on_nak_notify (
 	GIOChannel*		source,
 	GIOCondition		condition,
 	gpointer		data
@@ -91,7 +91,7 @@ mock__pgm_on_nak_notify (
 
 static
 int
-mock__pgm_send_spm_unlocked (
+mock_pgm_send_spm_unlocked (
 	pgm_transport_t*	transport
 	)
 {
@@ -156,7 +156,7 @@ mock_pgm_txw_shutdown (
 /** rate control module */
 static
 void
-mock__pgm_rate_create (
+mock_pgm_rate_create (
 	gpointer*		bucket_,
 	guint			rate_per_sec,
 	guint			iphdr_len
@@ -166,7 +166,7 @@ mock__pgm_rate_create (
 
 static
 void
-mock__pgm_rate_destroy (
+mock_pgm_rate_destroy (
 	gpointer		bucket
 	)
 {
@@ -175,7 +175,7 @@ mock__pgm_rate_destroy (
 /** reed solomon module */
 static
 void
-mock__pgm_rs_create (
+mock_pgm_rs_create (
 	gpointer*		rs_,
 	const guint		n,
 	const guint		k
@@ -185,7 +185,7 @@ mock__pgm_rs_create (
 
 static
 void
-mock__pgm_rs_destroy (
+mock_pgm_rs_destroy (
 	gpointer		rs
 	)
 {
@@ -203,17 +203,17 @@ mock_pgm_time_update_now (void)
 /* mock functions for external references */
 
 #define ipproto_pgm		mock_ipproto_pgm
-#define _pgm_peer_unref		mock__pgm_peer_unref
-#define _pgm_on_nak_notify	mock__pgm_on_nak_notify
-#define _pgm_send_spm_unlocked	mock__pgm_send_spm_unlocked
+#define pgm_peer_unref		mock_pgm_peer_unref
+#define pgm_on_nak_notify	mock_pgm_on_nak_notify
+#define pgm_send_spm_unlocked	mock_pgm_send_spm_unlocked
 #define pgm_timer_thread	mock_pgm_timer_thread
 #define pgm_timer_add		mock_pgm_timer_add
 #define pgm_txw_create		mock_pgm_txw_create
 #define pgm_txw_shutdown	mock_pgm_txw_shutdown
-#define _pgm_rate_create	mock__pgm_rate_create
-#define _pgm_rate_destroy	mock__pgm_rate_destroy
-#define _pgm_rs_create		mock__pgm_rs_create
-#define _pgm_rs_destroy		mock__pgm_rs_destroy
+#define pgm_rate_create		mock_pgm_rate_create
+#define pgm_rate_destroy	mock_pgm_rate_destroy
+#define pgm_rs_create		mock_pgm_rs_create
+#define pgm_rs_destroy		mock_pgm_rs_destroy
 #define pgm_time_update_now	mock_pgm_time_update_now
 
 #define TRANSPORT_DEBUG
@@ -309,7 +309,7 @@ START_TEST (test_destroy_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_max_tpdu (
  *		pgm_transport_t*	transport,
  *		guint16			max_tpdu
@@ -345,7 +345,7 @@ START_TEST (test_set_max_tpdu_fail_002)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_multicast_loop (
  *		pgm_transport_t*	transport,
  *		gboolean		use_multicast_loop
@@ -370,7 +370,7 @@ START_TEST (test_set_multicast_loop_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_hops (
  *		pgm_transport_t*	transport,
  *		gint			hops
@@ -395,7 +395,7 @@ START_TEST (test_set_hops_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_sndbuf (
  *		pgm_transport_t*	transport,
  *		int			size
@@ -420,7 +420,7 @@ START_TEST (test_set_sndbuf_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_rcvbuf (
  *		pgm_transport_t*	transport,
  *		int			size
@@ -445,7 +445,7 @@ START_TEST (test_set_rcvbuf_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_fec (
  *		pgm_transport_t*	transport,
  *		guint			proactive_h,
@@ -477,7 +477,7 @@ END_TEST
  */
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_send_only (
  *		pgm_transport_t*	transport,
  *		gboolean		send_only
@@ -502,7 +502,7 @@ START_TEST (test_set_send_only_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_transport_set_recv_only (
  *		pgm_transport_t*	transport,
  *		gboolean		is_passive
@@ -527,27 +527,27 @@ START_TEST (test_set_recv_only_fail_001)
 END_TEST
 
 /* target:
- *	int
- *	pgm_transport_set_close_on_failure (
+ *	gboolean
+ *	pgm_transport_set_abort_on_reset (
  *		pgm_transport_t*	transport,
- *		gboolean		close_on_failure
+ *		gboolean		abort_on_reset
  *	)
  */
 
-START_TEST (test_set_close_on_failure_pass_001)
+START_TEST (test_set_abort_on_reset_pass_001)
 {
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
 	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_close_on_failure (transport, TRUE));
+	fail_unless (TRUE == pgm_transport_set_abort_on_reset (transport, TRUE));
 }
 END_TEST
 
-START_TEST (test_set_close_on_failure_fail_001)
+START_TEST (test_set_abort_on_reset_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_close_on_failure (NULL, TRUE));
+	fail_unless (FALSE == pgm_transport_set_abort_on_reset (NULL, TRUE));
 }
 END_TEST
 
@@ -651,11 +651,11 @@ make_test_suite (void)
 	tcase_add_test (tc_set_recv_only, test_set_recv_only_pass_001);
 	tcase_add_test (tc_set_recv_only, test_set_recv_only_fail_001);
 
-	TCase* tc_set_close_on_failure = tcase_create ("set-close-on-failure");
-	suite_add_tcase (s, tc_set_close_on_failure);
-	tcase_add_checked_fixture (tc_set_close_on_failure, mock_setup, mock_teardown);
-	tcase_add_test (tc_set_close_on_failure, test_set_close_on_failure_pass_001);
-	tcase_add_test (tc_set_close_on_failure, test_set_close_on_failure_fail_001);
+	TCase* tc_set_abort_on_reset = tcase_create ("set-abort-on-reset");
+	suite_add_tcase (s, tc_set_abort_on_reset);
+	tcase_add_checked_fixture (tc_set_abort_on_reset, mock_setup, mock_teardown);
+	tcase_add_test (tc_set_abort_on_reset, test_set_abort_on_reset_pass_001);
+	tcase_add_test (tc_set_abort_on_reset, test_set_abort_on_reset_fail_001);
 	return s;
 }
 

@@ -202,7 +202,7 @@ pgm_txw_create (
 	if (use_fec) {
 		window->parity_buffer = pgm_alloc_skb (tpdu_size);
 		window->tg_sqn_shift = pgm_power2_log2 (rs_k);
-		_pgm_rs_create (&window->rs, rs_n, rs_k);
+		pgm_rs_create (&window->rs, rs_n, rs_k);
 		window->is_fec_enabled = 1;
 	}
 
@@ -254,7 +254,7 @@ pgm_txw_shutdown (
 /* free reed-solomon state */
 	if (window->is_fec_enabled) {
 		pgm_free_skb (window->parity_buffer);
-		_pgm_rs_destroy (&window->rs);
+		pgm_rs_destroy (&window->rs);
 	}
 
 /* free lock on queue */
@@ -685,13 +685,13 @@ pgm_txw_retransmit_try_peek (
  *
  *   "warning: dereferencing type-punned pointer will break strict-aliasing rules"
  */
-		_pgm_rs_encode (&window->rs, (void**)(void*)opt_src, window->rs.k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
+		pgm_rs_encode (&window->rs, (const void**)opt_src, window->rs.k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
 
 		data_bytes = opt_fragment + 1;
 	}
 
 /* encode payload */
-	_pgm_rs_encode (&window->rs, (void**)(void*)src, window->rs.k + rs_h, data_bytes, parity_length);
+	pgm_rs_encode (&window->rs, (const void**)src, window->rs.k + rs_h, data_bytes, parity_length);
 
 /* calculate partial checksum */
 	const guint tsdu_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
