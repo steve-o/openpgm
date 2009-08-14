@@ -569,7 +569,7 @@ mock_getnetbyname (
 
 static
 gboolean
-mock__pgm_if_getnodeaddr (
+mock_pgm_if_getnodeaddr (
 	const int		family,
 	struct sockaddr*	addr,
 	const socklen_t		cnt,
@@ -629,7 +629,7 @@ mock_setup_ip6 (void)
 #define freeaddrinfo	mock_freeaddrinfo
 #define gethostname	mock_gethostname
 #define getnetbyname	mock_getnetbyname
-#define _pgm_if_getnodeaddr	mock__pgm_if_getnodeaddr
+#define pgm_if_getnodeaddr	mock_pgm_if_getnodeaddr
 
 #define IF_DEBUG
 #include "if.c"

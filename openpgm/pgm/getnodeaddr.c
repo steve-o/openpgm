@@ -53,7 +53,7 @@ static const char* pgm_family_string (const int);
  */
 
 gboolean
-_pgm_if_getnodeaddr (
+pgm_if_getnodeaddr (
 	const int		family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
 	struct sockaddr*	addr,
 	const socklen_t		cnt,	/* size of address pointed to by addr */
@@ -67,7 +67,7 @@ _pgm_if_getnodeaddr (
 	else
 		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
 
-	g_trace ("_pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
+	g_trace ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
 		pgm_family_string (family), (gpointer)addr, cnt, (gpointer)error);
 
 	char hostname[NI_MAXHOST + 1];

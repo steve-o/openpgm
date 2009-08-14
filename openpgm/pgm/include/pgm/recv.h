@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * network send wrapper.
+ * Transport receive API.
  *
  * Copyright (c) 2006-2009 Miru Limited.
  *
@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_NET_H__
-#define __PGM_NET_H__
+#ifndef __PGM_RECV_H__
+#define __PGM_RECV_H__
 
 #include <glib.h>
 
@@ -29,12 +29,29 @@
 #endif
 
 
+#define PGM_RECV_ERROR		pgm_recv_error_quark ()
+
+typedef enum
+{
+	/* Derived from errno */
+	PGM_RECV_ERROR_BADF,
+	PGM_RECV_ERROR_FAULT,
+	PGM_RECV_ERROR_INTR,
+	PGM_RECV_ERROR_INVAL,
+	PGM_RECV_ERROR_NOMEM,
+	PGM_RECV_ERROR_CONNRESET,
+	PGM_RECV_ERROR_FAILED
+} PGMRecvError;
+
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL gssize pgm_sendto (pgm_transport_t*, gboolean, gboolean, const void*, gsize, int, const struct sockaddr*, gsize);
-G_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
+GQuark pgm_recv_error_quark (void);
+GIOStatus pgm_recvmsg (pgm_transport_t* const, pgm_msgv_t* const, const int, gsize*, GError**) G_GNUC_WARN_UNUSED_RESULT;
+GIOStatus pgm_recvmsgv (pgm_transport_t* const, pgm_msgv_t* const, const gsize, const int, gsize*, GError**) G_GNUC_WARN_UNUSED_RESULT;
+GIOStatus pgm_recv (pgm_transport_t* const, gpointer, const gsize, const int, gsize* const, GError**) G_GNUC_WARN_UNUSED_RESULT;
+GIOStatus pgm_recvfrom (pgm_transport_t* const, gpointer, const gsize, const int, gsize*, pgm_tsi_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 
-#endif /* __PGM_NET_H__ */
+#endif /* __PGM_RECV_H__ */
 

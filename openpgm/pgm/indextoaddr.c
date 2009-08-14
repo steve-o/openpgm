@@ -48,7 +48,7 @@
  */
 
 gboolean
-_pgm_if_indextoaddr (
+pgm_if_indextoaddr (
 	const unsigned int	ifindex,
 	const int		iffamily,
 	const unsigned		ifscope,

@@ -850,8 +850,8 @@ http_tsi_response (
 						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						transport->txw ? pgm_txw_size((pgm_txw_t*)transport->txw) : 0,	/* minus IP & any UDP header */
-						transport->txw ? pgm_txw_length((pgm_txw_t*)transport->txw) : 0,
+						transport->window ? pgm_txw_size((pgm_txw_t*)transport->window) : 0,	/* minus IP & any UDP header */
+						transport->window ? pgm_txw_length((pgm_txw_t*)transport->window) : 0,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
@@ -1014,9 +1014,9 @@ http_receiver_response (
 
 	const int sport = g_ntohs (peer->tsi.sport);
 	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
-	const guint32 outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length +
-					 ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length +
-					 ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
+	const guint32 outstanding_naks = ((pgm_rxw_t*)peer->window)->backoff_queue.length +
+					 ((pgm_rxw_t*)peer->window)->wait_ncf_queue.length +
+					 ((pgm_rxw_t*)peer->window)->wait_data_queue.length;
 
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
@@ -1176,9 +1176,9 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED],
-						((pgm_rxw_t*)peer->rxw)->cumulative_losses,
-						((pgm_rxw_t*)peer->rxw)->bytes_delivered,
-						((pgm_rxw_t*)peer->rxw)->msgs_delivered,
+						((pgm_rxw_t*)peer->window)->cumulative_losses,
+						((pgm_rxw_t*)peer->window)->bytes_delivered,
+						((pgm_rxw_t*)peer->window)->msgs_delivered,
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT],
@@ -1193,15 +1193,15 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS],
 						outstanding_naks,
 						last_activity,
-						((pgm_rxw_t*)peer->rxw)->min_fill_time,
+						((pgm_rxw_t*)peer->window)->min_fill_time,
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN],
-						((pgm_rxw_t*)peer->rxw)->max_fill_time,
+						((pgm_rxw_t*)peer->window)->max_fill_time,
 						peer->min_fail_time,
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN],
 						peer->max_fail_time,
-						((pgm_rxw_t*)peer->rxw)->min_nak_transmit_count,
+						((pgm_rxw_t*)peer->window)->min_nak_transmit_count,
 						peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN],
-						((pgm_rxw_t*)peer->rxw)->max_nak_transmit_count);
+						((pgm_rxw_t*)peer->window)->max_nak_transmit_count);
 	http_finalize_response (response, msg);
 	g_free (last_activity);
 	return 0;

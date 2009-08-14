@@ -46,7 +46,7 @@
  */
 
 gssize
-_pgm_sendto (
+pgm_sendto (
 	pgm_transport_t*	transport,
 	gboolean		use_rate_limit,
 	gboolean		use_router_alert,
@@ -68,7 +68,7 @@ _pgm_sendto (
 
 	if (use_rate_limit)
 	{
-		const int check = _pgm_rate_check (transport->rate_control, len, flags);
+		const int check = pgm_rate_check (transport->rate_control, len, flags);
 		if (check < 0 && errno == EAGAIN)
 		{
 			return (const gssize)check;
@@ -134,7 +134,7 @@ _pgm_sendto (
  */
 
 int
-_pgm_set_nonblocking (
+pgm_set_nonblocking (
 	int		fd[2]
 	)
 {

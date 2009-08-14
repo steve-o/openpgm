@@ -49,7 +49,7 @@ mock_teardown (void)
 /* mock functions for external references */
 
 int
-mock__pgm_time_init (void)
+mock_pgm_time_init (void)
 {
 	if (mock_time_init)
 		return -1;
@@ -58,13 +58,13 @@ mock__pgm_time_init (void)
 }
 
 gboolean
-mock__pgm_time_supported (void)
+mock_pgm_time_supported (void)
 {
 	return mock_time_init;
 }
 
 int
-mock__pgm_time_shutdown (void)
+mock_pgm_time_shutdown (void)
 {
 	if (!mock_time_init)
 		return -1;
@@ -73,9 +73,9 @@ mock__pgm_time_shutdown (void)
 }
 
 
-#define _pgm_time_init		mock__pgm_time_init
-#define _pgm_time_supported	mock__pgm_time_supported
-#define _pgm_time_shutdown	mock__pgm_time_shutdown
+#define pgm_time_init		mock_pgm_time_init
+#define pgm_time_supported	mock_pgm_time_supported
+#define pgm_time_shutdown	mock_pgm_time_shutdown
 
 #define PGM_DEBUG
 #include "pgm.c"
@@ -105,7 +105,7 @@ END_TEST
 /* timing module already init */
 START_TEST (test_init_pass_003)
 {
-	fail_unless (0 == _pgm_time_init ());
+	fail_unless (0 == pgm_time_init ());
 	fail_unless (-1 == pgm_init ());
 }
 END_TEST

@@ -218,6 +218,7 @@ pgmSourceTable_get_first_data_point(
 	g_assert (NULL != my_loop_context);
 	g_assert (NULL != my_data_context);
 	g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
 	g_trace ("pgmSourceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
 		(gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -251,6 +252,7 @@ pgmSourceTable_get_next_data_point(
 	g_assert (NULL != my_loop_context);
 	g_assert (NULL != my_data_context);
 	g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
 	g_trace ("pgmSourceTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
 		(gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -296,6 +298,7 @@ pgmSourceTable_free_loop_context (
 {
 /* pre-conditions */
 	g_assert (NULL != my_loop_context);
+	g_assert (NULL != mydata);
 
 	g_trace ("pgmSourceTable_free_loop_context (my_loop_context:%p mydata:%p)",
 		(gpointer)my_loop_context, (gpointer)mydata);
@@ -479,6 +482,7 @@ pgmSourceConfigTable_get_first_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmSourceConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -512,6 +516,7 @@ pgmSourceConfigTable_get_next_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmSourceConfigTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -557,6 +562,7 @@ pgmSourceConfigTable_free_loop_context (
 {
 /* pre-conditions */
         g_assert (NULL != my_loop_context);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmSourceConfigTable_free_loop_context (my_loop_context:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)mydata);
@@ -833,6 +839,7 @@ pgmSourcePerformanceTable_get_first_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmSourcePerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -866,6 +873,7 @@ pgmSourcePerformanceTable_get_next_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmSourcePerformanceTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -911,6 +919,7 @@ pgmSourcePerformanceTable_free_loop_context (
 {
 /* pre-conditions */
         g_assert (NULL != my_loop_context);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmPerformanceSourceTable_free_loop_context (my_loop_context:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)mydata);
@@ -983,8 +992,8 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEBYTESBUFFERED:
 				{
-				pgm_txw_t* txw = (pgm_txw_t*)transport->txw;
-				unsigned long bytes_buffered = transport->can_send_data ? pgm_txw_size (txw) : 0;
+				pgm_txw_t* window = (pgm_txw_t*)transport->window;
+				unsigned long bytes_buffered = transport->can_send_data ? pgm_txw_size (window) : 0;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&bytes_buffered, sizeof(bytes_buffered) );
 				}
@@ -992,8 +1001,8 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEMSGSBUFFERED:
 				{
-				pgm_txw_t* txw = (pgm_txw_t*)transport->txw;
-				unsigned long msgs_buffered = transport->can_send_data ? pgm_txw_length (txw) : 0;
+				pgm_txw_t* window = (pgm_txw_t*)transport->window;
+				unsigned long msgs_buffered = transport->can_send_data ? pgm_txw_length (window) : 0;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&msgs_buffered, sizeof(msgs_buffered) );
 				}
@@ -1366,6 +1375,7 @@ pgmReceiverTable_get_first_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -1421,6 +1431,7 @@ pgmReceiverTable_get_next_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverTable_get_next_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -1497,6 +1508,7 @@ pgmReceiverTable_free_loop_context (
 {
 /* pre-conditions */
         g_assert (NULL != my_loop_context);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverTable_free_loop_context (my_loop_context:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)mydata);
@@ -1702,6 +1714,7 @@ pgmReceiverConfigTable_get_first_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -1755,6 +1768,7 @@ pgmReceiverConfigTable_get_next_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -1831,6 +1845,7 @@ pgmReceiverConfigTable_free_loop_context (
 {
 /* pre-conditions */
         g_assert (NULL != my_loop_context);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverConfigTable_free_loop_context (my_loop_context:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)mydata);
@@ -2087,6 +2102,7 @@ pgmReceiverPerformanceTable_get_first_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverPerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -2140,6 +2156,7 @@ pgmReceiverPerformanceTable_get_next_data_point(
         g_assert (NULL != my_loop_context);
         g_assert (NULL != my_data_context);
         g_assert (NULL != put_index_data);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverPerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
@@ -2215,6 +2232,7 @@ pgmReceiverPerformanceTable_free_loop_context (
 {
 /* pre-conditions */
         g_assert (NULL != my_loop_context);
+	g_assert (NULL != mydata);
 
         g_trace ("pgmReceiverPerformanceTable_free_loop_context (my_loop_context:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)mydata);
@@ -2387,7 +2405,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERLOSSES:
 				{
-				unsigned long losses = ((pgm_rxw_t*)peer->rxw)->cumulative_losses;
+				unsigned long losses = ((pgm_rxw_t*)peer->window)->cumulative_losses;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&losses, sizeof(losses) );
 				}
@@ -2395,7 +2413,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERBYTESDELIVEREDTOAPP:
 				{
-				unsigned long bytes_delivered = ((pgm_rxw_t*)peer->rxw)->bytes_delivered;
+				unsigned long bytes_delivered = ((pgm_rxw_t*)peer->window)->bytes_delivered;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&bytes_delivered, sizeof(bytes_delivered) );
 				}
@@ -2403,7 +2421,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERMSGSDELIVEREDTOAPP:
 				{
-				unsigned long msgs_delivered = ((pgm_rxw_t*)peer->rxw)->msgs_delivered;
+				unsigned long msgs_delivered = ((pgm_rxw_t*)peer->window)->msgs_delivered;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&msgs_delivered, sizeof(msgs_delivered) );
 				}
@@ -2597,9 +2615,9 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVEROUTSTANDINGSELECTIVENAKS:
 				{
-				unsigned long outstanding_selective = ((pgm_rxw_t*)peer->rxw)->backoff_queue.length
-									+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue.length
-									+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue.length;
+				unsigned long outstanding_selective = ((pgm_rxw_t*)peer->window)->backoff_queue.length
+									+ ((pgm_rxw_t*)peer->window)->wait_ncf_queue.length
+									+ ((pgm_rxw_t*)peer->window)->wait_data_queue.length;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&outstanding_selective, sizeof(outstanding_selective) );
 				}
@@ -2616,7 +2634,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKSVCTIMEMIN:
 				{
-				unsigned long min_repair_time = ((pgm_rxw_t*)peer->rxw)->min_fill_time;
+				unsigned long min_repair_time = ((pgm_rxw_t*)peer->window)->min_fill_time;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&min_repair_time, sizeof(min_repair_time) );
 				}
@@ -2632,7 +2650,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKSVCTIMEMAX:
 				{
-				unsigned long max_repair_time = ((pgm_rxw_t*)peer->rxw)->max_fill_time;
+				unsigned long max_repair_time = ((pgm_rxw_t*)peer->window)->max_fill_time;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&max_repair_time, sizeof(max_repair_time) );
 				}
@@ -2664,7 +2682,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKTRANSMITMIN:
 				{
-				unsigned long min_transmit_count = ((pgm_rxw_t*)peer->rxw)->min_nak_transmit_count;
+				unsigned long min_transmit_count = ((pgm_rxw_t*)peer->window)->min_nak_transmit_count;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&min_transmit_count, sizeof(min_transmit_count) );
 				}
@@ -2680,7 +2698,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERNAKTRANSMITMAX:
 				{
-				unsigned long max_transmit_count = ((pgm_rxw_t*)peer->rxw)->max_nak_transmit_count;
+				unsigned long max_transmit_count = ((pgm_rxw_t*)peer->window)->max_nak_transmit_count;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&max_transmit_count, sizeof(max_transmit_count) );
 				}
@@ -2697,7 +2715,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERRXWTRAIL:
 				{
-				unsigned long rxw_trail = ((pgm_rxw_t*)peer->rxw)->rxw_trail;
+				unsigned long rxw_trail = ((pgm_rxw_t*)peer->window)->rxw_trail;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&rxw_trail, sizeof(rxw_trail) );
 				}
@@ -2705,7 +2723,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERRXWLEAD:
 				{
-				unsigned long rxw_lead = ((pgm_rxw_t*)peer->rxw)->lead;
+				unsigned long rxw_lead = ((pgm_rxw_t*)peer->window)->lead;
 				snmp_set_var_typed_value(	var, ASN_COUNTER, /* ASN_COUNTER32 */
 								(u_char*)&rxw_lead, sizeof(rxw_lead) );
 				}

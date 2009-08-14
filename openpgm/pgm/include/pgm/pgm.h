@@ -35,6 +35,7 @@
 #include <pgm/transport.h>
 #include <pgm/source.h>
 #include <pgm/receiver.h>
+#include <pgm/recv.h>
 #include <pgm/version.h>
 
 #endif /* __PGM_H__ */

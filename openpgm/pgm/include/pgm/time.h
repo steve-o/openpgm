@@ -67,9 +67,9 @@ extern pgm_time_update_func pgm_time_update_now;
 extern pgm_time_sleep_func pgm_time_sleep;
 extern pgm_time_since_epoch_func pgm_time_since_epoch;
 
-G_GNUC_INTERNAL gboolean _pgm_time_init (void) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean _pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean _pgm_time_shutdown (void);
+G_GNUC_INTERNAL gboolean pgm_time_init (void) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean pgm_time_shutdown (void);
 
 G_END_DECLS
 
