@@ -121,13 +121,11 @@ main (
 
 	if (!create_transport ())
 	{
-		while (optind < argc)
-		{
-			gssize e = pgm_transport_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0);
-		        if (e < 0) {
+		while (optind < argc) {
+			const GIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0, NULL);
+		        if (G_IO_STATUS_NORMAL != status) {
 				g_warning ("pgm_transport_send failed.");
 		        }
-
 			optind++;
 		}
 	}
