@@ -36,7 +36,13 @@
 /* mock state */
 
 #define PGM_NETWORK		""
-#define PGM_PORT		7500
+#define PGM_DPORT		7500
+#define PGM_SPORT		1000
+#define PGM_SRC_ADDR		"127.0.0.1"
+#define PGM_END_ADDR		"127.0.0.2"
+#define PGM_GROUP_ADDR		"239.192.0.1"
+#define PGM_PEER_ADDR		"127.0.0.6"
+#define PGM_DLR_ADDR		"127.0.0.9"
 #define PGM_MAX_TPDU		1500
 #define PGM_TXW_SQNS		32
 #define PGM_RXW_SQNS		32
@@ -75,12 +81,14 @@ static
 struct pgm_transport_t*
 generate_transport (void)
 {
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(PGM_SPORT) };
 	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
 	transport->is_bound = TRUE;
 	transport->rx_buffer = pgm_alloc_skb (PGM_MAX_TPDU);
 	transport->max_tpdu = PGM_MAX_TPDU;
 	transport->rxw_sqns = PGM_RXW_SQNS;
-	transport->dport = g_htons(PGM_PORT);
+	transport->dport = g_htons(PGM_DPORT);
 	transport->can_send_data = TRUE;
 	transport->can_send_nak = TRUE;
 	transport->can_recv_data = TRUE;
@@ -92,21 +100,14 @@ generate_transport (void)
 }
 
 static
-void
-generate_apdu (
-	const char*		source,
-	const guint		source_len,
-	const guint32		sequence,
-	gpointer*		packet,
-	gsize*			len
-	)
+struct pgm_sk_buff_t*
+generate_packet (void)
 {
 	struct pgm_sk_buff_t* skb;
-	GError* err = NULL;
 
 	skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	skb->data		= skb->head;
-	skb->len		= sizeof(struct pgm_ip) + sizeof(struct pgm_header) + sizeof(struct pgm_data) + source_len;
+	skb->len		= sizeof(struct pgm_ip) + sizeof(struct pgm_header);
 	skb->tail		= (guint8*)skb->data + skb->len;
 
 /* add IP header */
@@ -114,20 +115,18 @@ generate_apdu (
 	iphdr->ip_hl		= sizeof(struct pgm_ip) / 4;
 	iphdr->ip_v		= 4;
 	iphdr->ip_tos		= 0;
-	iphdr->ip_len		= g_htons (skb->len);
 	iphdr->ip_id		= 0;
 	iphdr->ip_off		= 0;
 	iphdr->ip_ttl		= 16;
 	iphdr->ip_p		= IPPROTO_PGM;
 	iphdr->ip_sum		= 0;
-	iphdr->ip_src.s_addr	= inet_addr ("127.0.0.1");
-	iphdr->ip_dst.s_addr	= inet_addr ("127.0.0.2");
+	iphdr->ip_src.s_addr	= inet_addr (PGM_SRC_ADDR);
+	iphdr->ip_dst.s_addr	= inet_addr (PGM_GROUP_ADDR);
 
 /* add PGM header */
 	struct pgm_header* pgmhdr = (gpointer)(iphdr + 1);
-	pgmhdr->pgm_sport	= g_htons ((guint16)1000);
-	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_PORT);
-	pgmhdr->pgm_type	= PGM_ODATA;
+	pgmhdr->pgm_sport	= g_htons ((guint16)PGM_SPORT);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_DPORT);
 	pgmhdr->pgm_options	= 0;
 	pgmhdr->pgm_gsi[0]	= 1;
 	pgmhdr->pgm_gsi[1]	= 2;
@@ -135,22 +134,265 @@ generate_apdu (
 	pgmhdr->pgm_gsi[3]	= 4;
 	pgmhdr->pgm_gsi[4]	= 5;
 	pgmhdr->pgm_gsi[5]	= 6;
-	pgmhdr->pgm_tsdu_length = g_htons (source_len);
+	pgmhdr->pgm_tsdu_length = 0;
+	pgmhdr->pgm_checksum 	= 0;
+
+	skb->pgm_header = pgmhdr;
+	return skb;
+}
+
+static
+void
+generate_odata (
+	const char*		source,
+	const guint		source_len,
+	const guint32		data_sqn,
+	const guint32		data_trail,
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+	pgm_skb_put (skb, sizeof(struct pgm_data) + source_len);
 
 /* add ODATA header */
-	struct pgm_data* datahdr = (gpointer)(pgmhdr + 1);
-	datahdr->data_sqn	= g_htonl (sequence);
-	datahdr->data_trail	= g_htonl ((guint32)-1);
+	struct pgm_data* datahdr = (gpointer)(skb->pgm_header + 1);
+	datahdr->data_sqn	= g_htonl (data_sqn);
+	datahdr->data_trail	= g_htonl (data_trail);
 
 /* add payload */
 	gpointer data = (gpointer)(datahdr + 1);
 	memcpy (data, source, source_len);
 
-/* finally PGM checksum */
-	pgmhdr->pgm_checksum 	= 0;
+/* finalize PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_type	= PGM_ODATA;
+	pgmhdr->pgm_tsdu_length = g_htons (source_len);
 
-/* and IP checksum */
-	iphdr->ip_sum		= 0;
+/* finalize IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_spm (
+	const guint32		spm_sqn,
+	const guint32		spm_trail,
+	const guint32		spm_lead,
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+	pgm_skb_put (skb, sizeof(struct pgm_spm));
+
+/* add SPM header */
+	struct pgm_spm* spm = (gpointer)(skb->pgm_header + 1);
+	spm->spm_sqn	= g_htonl (spm_sqn);
+	spm->spm_trail	= g_htonl (spm_trail);
+	spm->spm_lead	= g_htonl (spm_lead);
+
+/* finalize PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_type	= PGM_SPM;
+
+/* finalize IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_nak (
+	const guint32		nak_sqn,
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+	pgm_skb_put (skb, sizeof(struct pgm_spm));
+
+/* update IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_src.s_addr	= inet_addr (PGM_END_ADDR);
+	iphdr->ip_dst.s_addr	= inet_addr (PGM_SRC_ADDR);
+
+/* update PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_sport	= g_htons ((guint16)PGM_DPORT);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_SPORT);
+
+/* add NAK header */
+	struct pgm_nak* nak = (gpointer)(skb->pgm_header + 1);
+	nak->nak_sqn	= g_htonl (nak_sqn);
+
+/* finalize PGM header */
+	pgmhdr->pgm_type	= PGM_NAK;
+
+/* finalize IP header */
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_peer_nak (
+	const guint32		nak_sqn,
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+	pgm_skb_put (skb, sizeof(struct pgm_spm));
+
+/* update IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_src.s_addr	= inet_addr (PGM_PEER_ADDR);
+	iphdr->ip_dst.s_addr	= inet_addr (PGM_GROUP_ADDR);
+
+/* update PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_sport	= g_htons ((guint16)PGM_DPORT);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_SPORT);
+
+/* add NAK header */
+	struct pgm_nak* nak = (gpointer)(skb->pgm_header + 1);
+	nak->nak_sqn	= g_htonl (nak_sqn);
+
+/* finalize PGM header */
+	pgmhdr->pgm_type	= PGM_NAK;
+
+/* finalize IP header */
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_nnak (
+	const guint32		nak_sqn,
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+	pgm_skb_put (skb, sizeof(struct pgm_nak));
+
+/* update IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_src.s_addr	= inet_addr (PGM_DLR_ADDR);
+	iphdr->ip_dst.s_addr	= inet_addr (PGM_SRC_ADDR);
+
+/* update PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_sport	= g_htons ((guint16)PGM_DPORT);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_SPORT);
+
+/* add NNAK header */
+	struct pgm_nak* nak = (gpointer)(skb->pgm_header + 1);
+	nak->nak_sqn	= g_htonl (nak_sqn);
+
+/* finalize PGM header */
+	pgmhdr->pgm_type	= PGM_NNAK;
+
+/* finalize IP header */
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_ncf (
+	const guint32		nak_sqn,
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+	pgm_skb_put (skb, sizeof(struct pgm_nak));
+
+/* add NAK header */
+	struct pgm_nak* nak = (gpointer)(skb->pgm_header + 1);
+	nak->nak_sqn	= g_htonl (nak_sqn);
+
+/* finalize PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_type	= PGM_NCF;
+
+/* finalize IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_spmr (
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+
+/* update IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_src.s_addr	= inet_addr (PGM_END_ADDR);
+	iphdr->ip_dst.s_addr	= inet_addr (PGM_SRC_ADDR);
+
+/* update PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_sport	= g_htons ((guint16)PGM_DPORT);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_SPORT);
+
+/* finalize PGM header */
+	pgmhdr->pgm_type	= PGM_SPMR;
+
+/* finalize IP header */
+	iphdr->ip_len		= g_htons (skb->len);
+
+	*packet = skb->head;
+	*len    = skb->len;
+}
+
+static
+void
+generate_peer_spmr (
+	gpointer*		packet,
+	gsize*			len
+	)
+{
+	struct pgm_sk_buff_t* skb = generate_packet ();
+
+/* update IP header */
+	struct pgm_ip* iphdr = skb->data;
+	iphdr->ip_src.s_addr	= inet_addr (PGM_PEER_ADDR);
+	iphdr->ip_dst.s_addr	= inet_addr (PGM_GROUP_ADDR);
+
+/* update PGM header */
+	struct pgm_header* pgmhdr = skb->pgm_header;
+	pgmhdr->pgm_sport	= g_htons ((guint16)PGM_DPORT);
+	pgmhdr->pgm_dport	= g_htons ((guint16)PGM_SPORT);
+
+/* finalize PGM header */
+	pgmhdr->pgm_type	= PGM_SPMR;
+
+/* finalize IP header */
+	iphdr->ip_len		= g_htons (skb->len);
 
 	*packet = skb->head;
 	*len    = skb->len;
@@ -163,9 +405,10 @@ generate_msghdr (
 	const gsize		packet_len
 	)
 {
+	struct pgm_ip* iphdr = packet;
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
-		.sin_addr.s_addr	= inet_addr("127.0.0.3")
+		.sin_addr.s_addr	= iphdr->ip_src.s_addr
 	};
 	struct iovec iov = {
 		.iov_base		= packet,
@@ -177,12 +420,12 @@ generate_msghdr (
 	packet_cmsg->cmsg_type  = IP_PKTINFO;
 	struct in_pktinfo packet_info = {
 		.ipi_ifindex		= 2,
-		.ipi_spec_dst		= inet_addr("127.0.0.2"),
-		.ipi_addr		= inet_addr("127.0.0.1")
+		.ipi_spec_dst		= iphdr->ip_src.s_addr,		/* local address */
+		.ipi_addr		= iphdr->ip_dst.s_addr		/* destination address */
 	};
 	memcpy ((char*)(packet_cmsg + 1), &packet_info, sizeof(struct in_pktinfo));
 	struct msghdr packet_msg = {
-		.msg_name		= g_memdup (&addr, sizeof(addr)),
+		.msg_name		= g_memdup (&addr, sizeof(addr)),	/* source address */
 		.msg_namelen		= sizeof(addr),
 		.msg_iov		= g_memdup (&iov, sizeof(iov)),
 		.msg_iovlen		= 1,
@@ -613,7 +856,7 @@ START_TEST (test_recv_data_pass_001)
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
-	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
+	generate_odata (source, sizeof(source), 0 /* sqn */, -1 /* trail */, &packet, &packet_len);
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
@@ -624,11 +867,116 @@ START_TEST (test_recv_data_pass_001)
 END_TEST
 
 /* recv -> on_spm */
+START_TEST (test_recv_spm_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_spm (200 /* spm-sqn */, -1 /* trail */, 0 /* lead */, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_SPM == mock_pgm_type);
+}
+END_TEST
+
 /* recv -> on_nak */
+START_TEST (test_recv_nak_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_nak (0 /* sqn */, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_NAK == mock_pgm_type);
+}
+END_TEST
+
 /* recv -> on_peer_nak */
+START_TEST (test_recv_peer_nak_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_peer_nak (0 /* sqn */, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_NAK == mock_pgm_type);
+}
+END_TEST
+
 /* recv -> on_nnak */
+START_TEST (test_recv_nnak_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_nnak (0 /* sqn */, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_NNAK == mock_pgm_type);
+}
+END_TEST
+
 /* recv -> on_ncf */
+START_TEST (test_recv_ncf_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_ncf (0 /* sqn */, &packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_NCF == mock_pgm_type);
+}
+END_TEST
+
 /* recv -> on_spmr */
+START_TEST (test_recv_spmr_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_spmr (&packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_SPMR == mock_pgm_type);
+}
+END_TEST
+
+/* recv -> on (peer) spmr */
+START_TEST (test_recv_peer_spmr_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gpointer packet; gsize packet_len;
+	generate_peer_spmr (&packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_SPMR == mock_pgm_type);
+}
+END_TEST
 
 /* recv -> invalid packet */
 
@@ -822,6 +1170,41 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_recv_data);
 	tcase_add_checked_fixture (tc_recv_data, mock_setup, NULL);
 	tcase_add_test (tc_recv_data, test_recv_data_pass_001);
+
+	TCase* tc_recv_spm = tcase_create ("recv-spm");
+	suite_add_tcase (s, tc_recv_spm);
+	tcase_add_checked_fixture (tc_recv_spm, mock_setup, NULL);
+	tcase_add_test (tc_recv_spm, test_recv_spm_pass_001);
+
+	TCase* tc_recv_nak = tcase_create ("recv-nak");
+	suite_add_tcase (s, tc_recv_nak);
+	tcase_add_checked_fixture (tc_recv_nak, mock_setup, NULL);
+	tcase_add_test (tc_recv_nak, test_recv_nak_pass_001);
+
+	TCase* tc_recv_peer_nak = tcase_create ("recv-peer-nak");
+	suite_add_tcase (s, tc_recv_peer_nak);
+	tcase_add_checked_fixture (tc_recv_peer_nak, mock_setup, NULL);
+	tcase_add_test (tc_recv_peer_nak, test_recv_peer_nak_pass_001);
+
+	TCase* tc_recv_nnak = tcase_create ("recv-nnak");
+	suite_add_tcase (s, tc_recv_nnak);
+	tcase_add_checked_fixture (tc_recv_nnak, mock_setup, NULL);
+	tcase_add_test (tc_recv_nnak, test_recv_nnak_pass_001);
+
+	TCase* tc_recv_ncf = tcase_create ("recv-ncf");
+	suite_add_tcase (s, tc_recv_ncf);
+	tcase_add_checked_fixture (tc_recv_ncf, mock_setup, NULL);
+	tcase_add_test (tc_recv_ncf, test_recv_ncf_pass_001);
+
+	TCase* tc_recv_spmr = tcase_create ("recv-spmr");
+	suite_add_tcase (s, tc_recv_spmr);
+	tcase_add_checked_fixture (tc_recv_spmr, mock_setup, NULL);
+	tcase_add_test (tc_recv_spmr, test_recv_spmr_pass_001);
+
+	TCase* tc_recv_peer_spmr = tcase_create ("recv-peer-spmr");
+	suite_add_tcase (s, tc_recv_peer_spmr);
+	tcase_add_checked_fixture (tc_recv_peer_spmr, mock_setup, NULL);
+	tcase_add_test (tc_recv_peer_spmr, test_recv_peer_spmr_pass_001);
 
 #if 0
 	TCase* tc_recv = tcase_create ("recv");

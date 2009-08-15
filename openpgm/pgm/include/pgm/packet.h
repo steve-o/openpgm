@@ -400,7 +400,10 @@ gboolean pgm_print_packet (gpointer, gsize);
 
 static inline gboolean pgm_is_upstream (guint8 type)
 {
-    return (type == PGM_NAK || type == PGM_SPMR || type == PGM_POLR);
+    return (type == PGM_NAK ||
+	    type == PGM_NNAK ||
+	    type == PGM_SPMR ||
+	    type == PGM_POLR);
 }
 
 static inline gboolean pgm_is_peer (guint8 type)
@@ -410,7 +413,11 @@ static inline gboolean pgm_is_peer (guint8 type)
 
 static inline gboolean pgm_is_downstream (guint8 type)
 {
-    return (type == PGM_SPM || type == PGM_ODATA || type == PGM_RDATA || type == PGM_POLL || type == PGM_NCF);
+    return (type == PGM_SPM   ||
+	    type == PGM_ODATA ||
+	    type == PGM_RDATA ||
+	    type == PGM_POLL  ||
+	    type == PGM_NCF);
 }
 
 gboolean pgm_verify_spm (const struct pgm_sk_buff_t* const);
