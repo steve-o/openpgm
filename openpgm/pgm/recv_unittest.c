@@ -65,6 +65,10 @@ struct mock_recvmsg_t {
 
 GList* mock_recvmsg_list = NULL;
 static int mock_pgm_type = -1;
+static gboolean mock_reset_on_spmr = FALSE;
+static gboolean mock_data_on_spmr = FALSE;
+static pgm_peer_t* mock_peer = NULL;
+GList* mock_data_list = NULL;
 
 static pgm_rxw_t* mock_pgm_rxw_create (const pgm_tsi_t*, const guint16, const guint32, const guint, const guint);
 static pgm_time_t mock_pgm_time_update_now (void);
@@ -594,6 +598,25 @@ mock_pgm_flush_peers_pending (
 	guint* const                    data_read
 	)
 {
+	if (mock_data_list) {
+		gsize len = 0;
+		guint count = 0;
+		while (mock_data_list && *pmsg != msg_end) {
+			pgm_msgv_t* mock_msgv = mock_data_list->data;
+			(*pmsg)->msgv_len = mock_msgv->msgv_len;
+			for (unsigned i = 0; i < mock_msgv->msgv_len; i++) {
+				(*pmsg)->msgv_skb[i] = mock_msgv->msgv_skb[i];
+				len += mock_msgv->msgv_skb[i]->len;
+			}
+			count++;
+			(*pmsg)++;
+			mock_data_list = g_list_delete_link (mock_data_list, mock_data_list);
+		}
+		*bytes_read = len;
+		*data_read = count;
+		if (*pmsg == msg_end)
+			return -ENOBUFS;
+	}
 	return 0;
 }
 
@@ -613,6 +636,12 @@ mock_pgm_peer_set_pending (
 	pgm_peer_t* const               peer
 	)
 {
+	g_assert (NULL != transport);
+	g_assert (NULL != peer);
+	if (peer->pending_link.data) return;
+	peer->pending_link.data = peer;
+	peer->pending_link.next = transport->peers_pending;
+	transport->peers_pending = &peer->pending_link;
 }
 
 static
@@ -709,6 +738,13 @@ mock_pgm_on_spmr (
 	g_debug ("mock_pgm_on_spmr (transport:%p peer:%p skb:%p)",
 		(gpointer)transport, (gpointer)peer, (gpointer)skb);
 	mock_pgm_type = PGM_SPMR;
+	if (mock_reset_on_spmr) {
+		transport->is_reset = TRUE;
+		mock_pgm_peer_set_pending (transport, mock_peer);
+	}
+	if (mock_data_on_spmr) {
+		mock_pgm_peer_set_pending (transport, mock_peer);
+	}
 	return TRUE;
 }
 
@@ -839,7 +875,7 @@ mock_recvmsg (
 
 /* target:
  *	GIOStatus
- *	pgm_transport_recv (
+ *	pgm_recv (
  *		pgm_transport_t*	transport,
  *		gpointer		data,
  *		gsize			len,
@@ -850,7 +886,7 @@ mock_recvmsg (
  */
 
 /* recv -> on_data */
-START_TEST (test_recv_data_pass_001)
+START_TEST (test_data_pass_001)
 {
 	const char source[] = "i am not a string";
 	pgm_transport_t* transport = generate_transport();
@@ -867,7 +903,7 @@ START_TEST (test_recv_data_pass_001)
 END_TEST
 
 /* recv -> on_spm */
-START_TEST (test_recv_spm_pass_001)
+START_TEST (test_spm_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -883,7 +919,7 @@ START_TEST (test_recv_spm_pass_001)
 END_TEST
 
 /* recv -> on_nak */
-START_TEST (test_recv_nak_pass_001)
+START_TEST (test_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -899,7 +935,7 @@ START_TEST (test_recv_nak_pass_001)
 END_TEST
 
 /* recv -> on_peer_nak */
-START_TEST (test_recv_peer_nak_pass_001)
+START_TEST (test_peer_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -915,7 +951,7 @@ START_TEST (test_recv_peer_nak_pass_001)
 END_TEST
 
 /* recv -> on_nnak */
-START_TEST (test_recv_nnak_pass_001)
+START_TEST (test_nnak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -931,7 +967,7 @@ START_TEST (test_recv_nnak_pass_001)
 END_TEST
 
 /* recv -> on_ncf */
-START_TEST (test_recv_ncf_pass_001)
+START_TEST (test_ncf_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -947,7 +983,7 @@ START_TEST (test_recv_ncf_pass_001)
 END_TEST
 
 /* recv -> on_spmr */
-START_TEST (test_recv_spmr_pass_001)
+START_TEST (test_spmr_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -963,7 +999,7 @@ START_TEST (test_recv_spmr_pass_001)
 END_TEST
 
 /* recv -> on (peer) spmr */
-START_TEST (test_recv_peer_spmr_pass_001)
+START_TEST (test_peer_spmr_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -978,48 +1014,205 @@ START_TEST (test_recv_peer_spmr_pass_001)
 }
 END_TEST
 
-/* recv -> invalid packet */
-
 /* recv -> lost data */
-/* recv -> lost data and close transport */
-/* recv -> data & loss */
-/* recv -> data & loss & close transport */
-
-/* new waiting peer -> return data */
-/* waiting from data -> return data */
-/* zero length data waiting */
-/* more than vector length data waiting */
-
-/* edge triggered waiting */
-
-#if 0
-START_TEST (test_recv_pass_001)
+START_TEST (test_lost_pass_001)
 {
-	const char* source[] = {
-		"i am not a string",
-		"i am not an iguana",
-		"i am not a peach"
-	};
 	pgm_transport_t* transport = generate_transport();
+	transport->is_reset = TRUE;
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_pgm_peer_set_pending (transport, peer);
+	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	gpointer packet; gsize packet_len;
-	generate_apdu (source[0], 1+strlen(source[0]), 0, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	generate_apdu (source[2], 1+strlen(source[2]), 2, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	generate_apdu (source[1], 1+strlen(source[1]), 1, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	fail_unless ((gssize)(1+strlen(source[0])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	g_message ("buffer:\"%s\"", buffer);
-	fail_unless ((gssize)(1+strlen(source[1])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	g_message ("buffer:\"%s\"", buffer);
-	fail_unless ((gssize)(1+strlen(source[2])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	g_message ("buffer:\"%s\"", buffer);
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	if (err) {
+		g_message (err->message);
+		g_error_free (err);
+		err = NULL;
+	}
+	push_block_event ();
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
-/* force external cycle per packet */
-START_TEST (test_recv_pass_002)
+/* recv -> lost data and abort transport */
+START_TEST (test_abort_on_lost_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	transport->is_reset = TRUE;
+	transport->is_abort_on_reset = TRUE;
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_pgm_peer_set_pending (transport, peer);
+	push_block_event ();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	if (err) {
+		g_message (err->message);
+		g_error_free (err);
+		err = NULL;
+	}
+	push_block_event ();
+	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+}
+END_TEST
+
+/* recv -> (spmr) & loss */
+START_TEST (test_then_lost_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	mock_reset_on_spmr = TRUE;
+	gpointer packet; gsize packet_len;
+	generate_spmr (&packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	push_block_event ();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	if (err) {
+		g_message (err->message);
+		g_error_free (err);
+		err = NULL;
+	}
+	push_block_event ();
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+}
+END_TEST
+
+/* recv -> data & loss & abort transport */
+START_TEST (test_then_abort_on_lost_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	mock_reset_on_spmr = TRUE;
+	transport->is_abort_on_reset = TRUE;
+	gpointer packet; gsize packet_len;
+	generate_spmr (&packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	push_block_event ();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	if (err) {
+		g_message (err->message);
+		g_error_free (err);
+		err = NULL;
+	}
+	push_block_event ();
+	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+}
+END_TEST
+
+/* new waiting peer -> return data */
+START_TEST (test_on_data_pass_001)
+{
+	const char source[] = "i am not a string";
+	pgm_transport_t* transport = generate_transport();
+	mock_data_on_spmr = TRUE;
+	gpointer packet; gsize packet_len;
+	generate_spmr (&packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_put (skb, sizeof(source));
+	memcpy (skb->data, source, sizeof(source));
+	pgm_msgv_t* msgv = g_malloc0 (sizeof(pgm_msgv_t));
+	msgv->msgv_len = 1;
+	msgv->msgv_skb[0] = skb;
+	mock_data_list = g_list_append (mock_data_list, msgv);
+	push_block_event ();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (NULL == err);
+	fail_unless ((gsize)sizeof(source) == bytes_read);
+	push_block_event ();
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+}
+END_TEST
+
+/* zero length data waiting */
+START_TEST (test_on_zero_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	mock_data_on_spmr = TRUE;
+	gpointer packet; gsize packet_len;
+	generate_spmr (&packet, &packet_len);
+	generate_msghdr (packet, packet_len);
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_msgv_t* msgv = g_malloc0 (sizeof(pgm_msgv_t));
+	msgv->msgv_len = 1;
+	msgv->msgv_skb[0] = skb;
+	mock_data_list = g_list_append (mock_data_list, msgv);
+	push_block_event ();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (NULL == err);
+	fail_unless ((gsize)0 == bytes_read);
+	push_block_event ();
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+}
+END_TEST
+
+/* more than vector length data waiting */
+START_TEST (test_on_many_data_pass_001)
 {
 	const char* source[] = {
 		"i am not a string",
@@ -1027,135 +1220,129 @@ START_TEST (test_recv_pass_002)
 		"i am not a peach"
 	};
 	pgm_transport_t* transport = generate_transport();
-	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	mock_data_on_spmr = TRUE;
 	gpointer packet; gsize packet_len;
-	generate_apdu (source[0], 1+strlen(source[0]), 0, &packet, &packet_len);
+	generate_spmr (&packet, &packet_len);
 	generate_msghdr (packet, packet_len);
-	fail_unless ((gssize)(1+strlen(source[0])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	g_message ("buffer:\"%s\"", buffer);
-	generate_apdu (source[2], 1+strlen(source[2]), 2, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-/* block */
-	struct mock_recvmsg_t* mr = g_malloc (sizeof(struct mock_recvmsg_t));
-	mr->mr_msg	= NULL;
-	mr->mr_errno	= EAGAIN;
-	mr->mr_retval	= -1;
-	mock_recvmsg_list = g_list_append (mock_recvmsg_list, mr);
-	fail_unless ((gssize)-1 == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	fail_unless (EAGAIN == errno);
-	generate_apdu (source[1], 1+strlen(source[1]), 1, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	fail_unless ((gssize)(1+strlen(source[1])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	g_message ("buffer:\"%s\"", buffer);
-	fail_unless ((gssize)(1+strlen(source[2])) == pgm_transport_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT));
-	g_message ("buffer:\"%s\"", buffer);
+	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
+	struct sockaddr_in grp_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_GROUP_ADDR)
+	}, peer_addr = {
+		.sin_family		= AF_INET,
+		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
+	};
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	struct pgm_sk_buff_t* skb;
+	pgm_msgv_t* msgv;
+/* #1 */
+	msgv = g_malloc0 (sizeof(pgm_msgv_t));
+	skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_put (skb, strlen(source[0]) + 1);
+	memcpy (skb->data, source[0], strlen(source[0]));
+	msgv->msgv_len = 1;
+	msgv->msgv_skb[0] = skb;
+	mock_data_list = g_list_append (mock_data_list, msgv);
+/* #2 */
+	msgv = g_malloc0 (sizeof(pgm_msgv_t));
+	skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_put (skb, strlen(source[1]) + 1);
+	memcpy (skb->data, source[1], strlen(source[1]));
+	msgv->msgv_len = 1;
+	msgv->msgv_skb[0] = skb;
+	mock_data_list = g_list_append (mock_data_list, msgv);
+/* #3 */
+	msgv = g_malloc0 (sizeof(pgm_msgv_t));
+	skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_put (skb, strlen(source[2]) + 1);
+	memcpy (skb->data, source[2], strlen(source[2]));
+	msgv->msgv_len = 1;
+	msgv->msgv_skb[0] = skb;
+	mock_data_list = g_list_append (mock_data_list, msgv);
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (NULL == err);
+	fail_unless ((gsize)(strlen(source[0]) + 1) == bytes_read);
+	g_message ("#1 = \"%s\"", buffer);
+	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (NULL == err);
+	fail_unless ((gsize)(strlen(source[1]) + 1) == bytes_read);
+	g_message ("#2 = \"%s\"", buffer);
+	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (NULL == err);
+	fail_unless ((gsize)(strlen(source[2]) + 1) == bytes_read);
+	g_message ("#3 = \"%s\"", buffer);
+	push_block_event ();
+	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
 START_TEST (test_recv_fail_001)
 {
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	fail_unless (-1 == pgm_transport_recv (NULL, buffer, sizeof(buffer), 0));
+	fail_unless (G_IO_STATUS_ERROR == pgm_recv (NULL, buffer, sizeof(buffer), 0, NULL, NULL));
 }
 END_TEST
 
 /* target:
- *	gssize
- *	pgm_transport_recvfrom (
+ *	GIOStatus
+ *	pgm_recvfrom (
  *		pgm_transport_t*	transport,
  *		gpointer		data,
  *		gsize			len,
  *		int			flags,
- *		pgm_tsi_t*		from
+ *		gsize*			bytes_read,
+ *		pgm_tsi_t*		from,
+ *		GError**		error
  *		)
  */
-
-START_TEST (test_recvfrom_pass_001)
-{
-	const char source[] = "i am not a string";
-	pgm_transport_t* transport = generate_transport();
-	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	const pgm_tsi_t ref = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_tsi_t from;
-	gpointer packet; gsize packet_len;
-	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	fail_unless ((gssize)sizeof(source) == pgm_transport_recvfrom (transport, buffer, sizeof(buffer), 0, &from));
-	fail_unless (TRUE == pgm_tsi_equal (&from, &ref));
-	g_message ("buffer:\"%s\" from:%s", buffer, pgm_tsi_print(&from));
-}
-END_TEST
 
 START_TEST (test_recvfrom_fail_001)
 {
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	pgm_tsi_t tsi;
-	fail_unless (-1 == pgm_transport_recvfrom (NULL, buffer, sizeof(buffer), 0, &tsi));
+	fail_unless (G_IO_STATUS_ERROR == pgm_recvfrom (NULL, buffer, sizeof(buffer), 0, NULL, &tsi, NULL));
 }
 END_TEST
 
 /* target:
- *	gssize
- *	pgm_transport_recvmsg (
+ *	GIOStatus
+ *	pgm_recvmsg (
  *		pgm_transport_t*	transport,
  *		pgm_msgv_t*		msgv,
- *		int			flags
+ *		int			flags,
+ *		gsize*			bytes_read,
+ *		GError**		error
  *		)
  */
-
-START_TEST (test_recvmsg_pass_001)
-{
-	const char source[] = "i am not a string";
-	pgm_transport_t* transport = generate_transport();
-	pgm_msgv_t msgv;
-	const pgm_tsi_t ref = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	gpointer packet; gsize packet_len;
-	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	fail_unless ((gssize)sizeof(source) == pgm_transport_recvmsg (transport, &msgv, 0));
-	fail_unless (1 == msgv.msgv_len);
-	fail_unless (sizeof(source) == msgv.msgv_skb[0]->len);
-}
-END_TEST
 
 START_TEST (test_recvmsg_fail_001)
 {
 	pgm_msgv_t msgv;
-	fail_unless (-1 == pgm_transport_recvmsg (NULL, &msgv, 0));
+	fail_unless (G_IO_STATUS_ERROR == pgm_recvmsg (NULL, &msgv, 0, NULL, NULL));
 }
 END_TEST
 
 /* target:
- *	gssize
- *	pgm_transport_recvmsgv (
+ *	GIOStatus
+ *	pgm_recvmsgv (
  *		pgm_transport_t*	transport,
  *		pgm_msgv_t*		msgv,
  *		guint			msgv_length,
- *		int			flags
+ *		int			flags,
+ *		gsize*			bytes_read,
+ *		GError**		error
  *		)
  */
-
-START_TEST (test_recvmsgv_pass_001)
-{
-	const char source[] = "i am not a string";
-	pgm_transport_t* transport = generate_transport();
-	pgm_msgv_t msgv[1];
-	gpointer packet; gsize packet_len;
-	generate_apdu (source, sizeof(source), 0, &packet, &packet_len);
-	generate_msghdr (packet, packet_len);
-	fail_unless ((gssize)sizeof(source) == pgm_transport_recvmsgv (transport, msgv, G_N_ELEMENTS(msgv), 0));
-	fail_unless (1 == msgv[0].msgv_len);
-	fail_unless (sizeof(source) == msgv[0].msgv_skb[0]->len);
-}
-END_TEST
 
 START_TEST (test_recvmsgv_fail_001)
 {
 	pgm_msgv_t msgv[1];
-	fail_unless (-1 == pgm_transport_recvmsgv (NULL, msgv, G_N_ELEMENTS(msgv), 0));
+	fail_unless (G_IO_STATUS_ERROR == pgm_recvmsgv (NULL, msgv, G_N_ELEMENTS(msgv), 0, NULL, NULL));
 }
 END_TEST
-#endif
 
 
 static
@@ -1166,52 +1353,84 @@ make_test_suite (void)
 
 	s = suite_create (__FILE__);
 
-	TCase* tc_recv_data = tcase_create ("recv-data");
-	suite_add_tcase (s, tc_recv_data);
-	tcase_add_checked_fixture (tc_recv_data, mock_setup, NULL);
-	tcase_add_test (tc_recv_data, test_recv_data_pass_001);
+	TCase* tc_data = tcase_create ("data");
+	suite_add_tcase (s, tc_data);
+	tcase_add_checked_fixture (tc_data, mock_setup, NULL);
+	tcase_add_test (tc_data, test_data_pass_001);
 
-	TCase* tc_recv_spm = tcase_create ("recv-spm");
-	suite_add_tcase (s, tc_recv_spm);
-	tcase_add_checked_fixture (tc_recv_spm, mock_setup, NULL);
-	tcase_add_test (tc_recv_spm, test_recv_spm_pass_001);
+	TCase* tc_spm = tcase_create ("spm");
+	suite_add_tcase (s, tc_spm);
+	tcase_add_checked_fixture (tc_spm, mock_setup, NULL);
+	tcase_add_test (tc_spm, test_spm_pass_001);
 
-	TCase* tc_recv_nak = tcase_create ("recv-nak");
-	suite_add_tcase (s, tc_recv_nak);
-	tcase_add_checked_fixture (tc_recv_nak, mock_setup, NULL);
-	tcase_add_test (tc_recv_nak, test_recv_nak_pass_001);
+	TCase* tc_nak = tcase_create ("nak");
+	suite_add_tcase (s, tc_nak);
+	tcase_add_checked_fixture (tc_nak, mock_setup, NULL);
+	tcase_add_test (tc_nak, test_nak_pass_001);
 
-	TCase* tc_recv_peer_nak = tcase_create ("recv-peer-nak");
-	suite_add_tcase (s, tc_recv_peer_nak);
-	tcase_add_checked_fixture (tc_recv_peer_nak, mock_setup, NULL);
-	tcase_add_test (tc_recv_peer_nak, test_recv_peer_nak_pass_001);
+	TCase* tc_peer_nak = tcase_create ("peer-nak");
+	suite_add_tcase (s, tc_peer_nak);
+	tcase_add_checked_fixture (tc_peer_nak, mock_setup, NULL);
+	tcase_add_test (tc_peer_nak, test_peer_nak_pass_001);
 
-	TCase* tc_recv_nnak = tcase_create ("recv-nnak");
-	suite_add_tcase (s, tc_recv_nnak);
-	tcase_add_checked_fixture (tc_recv_nnak, mock_setup, NULL);
-	tcase_add_test (tc_recv_nnak, test_recv_nnak_pass_001);
+	TCase* tc_nnak = tcase_create ("nnak");
+	suite_add_tcase (s, tc_nnak);
+	tcase_add_checked_fixture (tc_nnak, mock_setup, NULL);
+	tcase_add_test (tc_nnak, test_nnak_pass_001);
 
-	TCase* tc_recv_ncf = tcase_create ("recv-ncf");
-	suite_add_tcase (s, tc_recv_ncf);
-	tcase_add_checked_fixture (tc_recv_ncf, mock_setup, NULL);
-	tcase_add_test (tc_recv_ncf, test_recv_ncf_pass_001);
+	TCase* tc_ncf = tcase_create ("ncf");
+	suite_add_tcase (s, tc_ncf);
+	tcase_add_checked_fixture (tc_ncf, mock_setup, NULL);
+	tcase_add_test (tc_ncf, test_ncf_pass_001);
 
-	TCase* tc_recv_spmr = tcase_create ("recv-spmr");
-	suite_add_tcase (s, tc_recv_spmr);
-	tcase_add_checked_fixture (tc_recv_spmr, mock_setup, NULL);
-	tcase_add_test (tc_recv_spmr, test_recv_spmr_pass_001);
+	TCase* tc_spmr = tcase_create ("spmr");
+	suite_add_tcase (s, tc_spmr);
+	tcase_add_checked_fixture (tc_spmr, mock_setup, NULL);
+	tcase_add_test (tc_spmr, test_spmr_pass_001);
 
-	TCase* tc_recv_peer_spmr = tcase_create ("recv-peer-spmr");
-	suite_add_tcase (s, tc_recv_peer_spmr);
-	tcase_add_checked_fixture (tc_recv_peer_spmr, mock_setup, NULL);
-	tcase_add_test (tc_recv_peer_spmr, test_recv_peer_spmr_pass_001);
+	TCase* tc_peer_spmr = tcase_create ("peer-spmr");
+	suite_add_tcase (s, tc_peer_spmr);
+	tcase_add_checked_fixture (tc_peer_spmr, mock_setup, NULL);
+	tcase_add_test (tc_peer_spmr, test_peer_spmr_pass_001);
 
-#if 0
+	TCase* tc_lost = tcase_create ("lost");
+	suite_add_tcase (s, tc_lost);
+	tcase_add_checked_fixture (tc_lost, mock_setup, NULL);
+	tcase_add_test (tc_lost, test_lost_pass_001);
+
+	TCase* tc_abort_on_lost = tcase_create ("abort-on-lost");
+	suite_add_tcase (s, tc_abort_on_lost);
+	tcase_add_checked_fixture (tc_abort_on_lost, mock_setup, NULL);
+	tcase_add_test (tc_abort_on_lost, test_abort_on_lost_pass_001);
+
+	TCase* tc_then_lost = tcase_create ("then-lost");
+	suite_add_tcase (s, tc_then_lost);
+	tcase_add_checked_fixture (tc_then_lost, mock_setup, NULL);
+	tcase_add_test (tc_then_lost, test_then_lost_pass_001);
+
+	TCase* tc_then_abort_on_lost = tcase_create ("then-abort-on-lost");
+	suite_add_tcase (s, tc_then_abort_on_lost);
+	tcase_add_checked_fixture (tc_then_abort_on_lost, mock_setup, NULL);
+	tcase_add_test (tc_then_abort_on_lost, test_then_abort_on_lost_pass_001);
+
+	TCase* tc_on_data = tcase_create ("on-data");
+	suite_add_tcase (s, tc_on_data);
+	tcase_add_checked_fixture (tc_on_data, mock_setup, NULL);
+	tcase_add_test (tc_on_data, test_on_data_pass_001);
+
+	TCase* tc_on_zero = tcase_create ("on-zero");
+	suite_add_tcase (s, tc_on_zero);
+	tcase_add_checked_fixture (tc_on_zero, mock_setup, NULL);
+	tcase_add_test (tc_on_zero, test_on_zero_pass_001);
+
+	TCase* tc_on_many_data = tcase_create ("on-many-data");
+	suite_add_tcase (s, tc_on_many_data);
+	tcase_add_checked_fixture (tc_on_many_data, mock_setup, NULL);
+	tcase_add_test (tc_on_many_data, test_on_many_data_pass_001);
+
 	TCase* tc_recv = tcase_create ("recv");
 	suite_add_tcase (s, tc_recv);
 	tcase_add_checked_fixture (tc_recv, mock_setup, NULL);
-	tcase_add_test (tc_recv, test_recv_pass_001);
-	tcase_add_test (tc_recv, test_recv_pass_002);
 	tcase_add_test (tc_recv, test_recv_fail_001);
 
 	TCase* tc_recvfrom = tcase_create ("recvfrom");
@@ -1222,15 +1441,12 @@ make_test_suite (void)
 	TCase* tc_recvmsg = tcase_create ("recvmsg");
 	suite_add_tcase (s, tc_recvmsg);
 	tcase_add_checked_fixture (tc_recvmsg, mock_setup, NULL);
-	tcase_add_test (tc_recvmsg, test_recvmsg_pass_001);
 	tcase_add_test (tc_recvmsg, test_recvmsg_fail_001);
 
 	TCase* tc_recvmsgv = tcase_create ("recvmsgv");
 	suite_add_tcase (s, tc_recvmsgv);
 	tcase_add_checked_fixture (tc_recvmsgv, mock_setup, NULL);
-	tcase_add_test (tc_recvmsgv, test_recvmsgv_pass_001);
 	tcase_add_test (tc_recvmsgv, test_recvmsgv_fail_001);
-#endif
 	return s;
 }
 
