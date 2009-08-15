@@ -16,6 +16,7 @@ gcov -fno ref/debug pgmMIB_unittest.c
 gcov -fno ref/debug pgm_unittest.c
 gcov -fno ref/debug rate_control_unittest.c
 gcov -fno ref/debug receiver_unittest.c
+gcov -fno ref/debug recv_unittest.c
 gcov -fno ref/debug reed_solomon_unittest.c
 gcov -fno ref/debug rxwi_unittest.c
 gcov -fno ref/debug signal_unittest.c
