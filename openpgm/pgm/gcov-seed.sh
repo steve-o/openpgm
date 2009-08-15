@@ -16,6 +16,7 @@
 ./ref/debug/pgm_unittest
 ./ref/debug/rate_control_unittest
 ./ref/debug/receiver_unittest
+./ref/debug/recv_unittest
 ./ref/debug/reed_solomon_unittest
 ./ref/debug/rxwi_unittest
 ./ref/debug/signal_unittest
