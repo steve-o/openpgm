@@ -23,9 +23,13 @@
 #define __PGM_PACKET_H__
 
 #include <errno.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
+#ifdef G_OS_UNIX
+#	include <netinet/in.h>
+#	include <sys/socket.h>
+#	include <sys/types.h>
+#else
+#	include <ws2tcpip.h>
+#endif
 
 #include <glib.h>
 

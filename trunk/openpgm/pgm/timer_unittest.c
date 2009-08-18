@@ -159,12 +159,13 @@ mock_pgm_min_nak_expiry (
 }
 
 static
-void
+gboolean
 mock_pgm_check_peer_nak_state (
 	pgm_transport_t*	transport
 	)
 {
 	g_assert (NULL != transport);
+	return TRUE;
 }
 
 /** source module */

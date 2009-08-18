@@ -660,11 +660,12 @@ mock_pgm_on_data (
 }
 
 static
-void
+gboolean
 mock_pgm_on_deferred_nak (
 	pgm_transport_t* const		transport
 	)
 {
+	return TRUE;
 }
 
 static
@@ -827,11 +828,12 @@ mock_pgm_timer_expiration (
 }
 
 static
-void
+gboolean
 mock_pgm_timer_dispatch (
 	pgm_transport_t* const		transport
 	)
 {
+	return TRUE;
 }
 
 /** time module */

@@ -31,10 +31,10 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL gboolean pgm_timer_prepare (pgm_transport_t*);
-G_GNUC_INTERNAL gboolean pgm_timer_check (pgm_transport_t*);
-G_GNUC_INTERNAL long pgm_timer_expiration (pgm_transport_t*);
-G_GNUC_INTERNAL void pgm_timer_dispatch (pgm_transport_t*);
+G_GNUC_INTERNAL gboolean pgm_timer_prepare (pgm_transport_t* const);
+G_GNUC_INTERNAL gboolean pgm_timer_check (pgm_transport_t* const);
+G_GNUC_INTERNAL long pgm_timer_expiration (pgm_transport_t* const);
+G_GNUC_INTERNAL gboolean pgm_timer_dispatch (pgm_transport_t* const);
 
 G_END_DECLS
 

@@ -238,6 +238,7 @@ struct pgm_transport_t {
 	gboolean		can_send_nak;			/* muted receiver */
 	gboolean		can_recv_data;			/* send-only */
 	gboolean		is_edge_triggered_recv;
+	gboolean		is_nonblocking;
 
 	GCond*			thread_cond;
 	GMutex*			thread_mutex;
@@ -347,6 +348,7 @@ gboolean pgm_transport_set_fec (pgm_transport_t* const, const guint, const gbool
 gboolean pgm_transport_set_send_only (pgm_transport_t* const, const gboolean);
 gboolean pgm_transport_set_recv_only (pgm_transport_t* const, const gboolean);
 gboolean pgm_transport_set_abort_on_reset (pgm_transport_t* const, const gboolean);
+gboolean pgm_transport_set_nonblocking (pgm_transport_t* const, const gboolean);
 
 gsize pgm_transport_pkt_offset (gboolean) G_GNUC_WARN_UNUSED_RESULT;
 static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
