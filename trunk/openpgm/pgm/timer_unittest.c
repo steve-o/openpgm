@@ -39,6 +39,7 @@ pgm_transport_t*
 generate_transport (void)
 {
 	pgm_transport_t* transport = g_malloc0 (sizeof(pgm_transport_t));
+	pgm_notify_init (&transport->timer_notify);
 	return transport;
 }
 
@@ -200,88 +201,88 @@ mock_pgm_send_spm_unlocked (
 
 
 /* target:
- *	GSource*
- *	pgm_timer_create (
+ *	gboolean
+ *	pgm_timer_prepare (
  *		pgm_transport_t*	transport
  *	)
  */
 
-START_TEST (test_create_pass_001)
+START_TEST (test_prepare_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	GSource* source = pgm_timer_create (transport);
-	fail_unless (NULL != source);
+	transport->can_send_data = TRUE;
+	transport->next_ambient_spm = mock_pgm_time_now + pgm_secs(10);
+	fail_unless (FALSE == pgm_timer_prepare (transport));
 }
 END_TEST
 
-START_TEST (test_create_fail_001)
+START_TEST (test_prepare_fail_001)
 {
-	GSource* source = pgm_timer_create (NULL);
-	fail_unless (NULL == source);
+	gboolean expired = pgm_timer_prepare (NULL);
+	fail();
 }
 END_TEST
 
 /* target:
- *	int
- *	pgm_timer_add_full (
+ *	gboolean
+ *	pgm_timer_check (
  *		pgm_transport_t*	transport
  *	)
  */
 
-START_TEST (test_add_full_pass_001)
+START_TEST (test_check_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	int source_id = pgm_timer_add_full (transport, G_PRIORITY_DEFAULT);
-	fail_unless (source_id > 0);
+	fail_unless (TRUE == pgm_timer_check (transport));
 }
 END_TEST
 
-START_TEST (test_add_full_fail_001)
+START_TEST (test_check_fail_001)
 {
-	int source_id = pgm_timer_add_full (NULL, G_PRIORITY_DEFAULT);
-	fail_unless (source_id <= 0);
+	gboolean expired = pgm_timer_check (NULL);
+	fail();
 }
 END_TEST
 
 /* target:
- *	int
- *	pgm_timer_add (
+ *	long
+ *	pgm_timer_expiration (
  *		pgm_transport_t*	transport
  *	)
  */
 
-START_TEST (test_add_pass_001)
+START_TEST (test_expiration_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	int source_id = pgm_timer_add (transport);
-	fail_unless (source_id > 0);
+	transport->next_poll = mock_pgm_time_now + pgm_secs(300);
+	fail_unless (pgm_secs(300) == pgm_timer_expiration (transport));
 }
 END_TEST
 
-START_TEST (test_add_fail_001)
+START_TEST (test_expiration_fail_001)
 {
-	int source_id = pgm_timer_add (NULL);
-	fail_unless (source_id <= 0);
+	long expiration = pgm_timer_expiration (NULL);
+	fail();
 }
 END_TEST
 
 /* target:
- *	gpointer
- *	pgm_timer_thread (
- *		gpointer	data	// pgm_transport_t
+ *	void
+ *	pgm_timer_dispatch (
+ *		pgm_transport_t*	transport
  *	)
  */
 
-START_TEST (test_thread_pass_001)
+START_TEST (test_dispatch_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (NULL == pgm_timer_thread ((gpointer)transport));
+	pgm_timer_dispatch (transport);
 }
 END_TEST
 
-START_TEST (test_thread_fail_001)
+START_TEST (test_dispatch_fail_001)
 {
-	gpointer retval = pgm_timer_thread (NULL);
+	pgm_timer_dispatch (NULL);
 	fail ();
 }
 END_TEST
@@ -295,25 +296,25 @@ make_test_suite (void)
 
 	s = suite_create (__FILE__);
 
-	TCase* tc_create = tcase_create ("create");
-	suite_add_tcase (s, tc_create);
-	tcase_add_test (tc_create, test_create_pass_001);
-	tcase_add_test (tc_create, test_create_fail_001);
+	TCase* tc_prepare = tcase_create ("prepare");
+	suite_add_tcase (s, tc_prepare);
+	tcase_add_test (tc_prepare, test_prepare_pass_001);
+	tcase_add_test_raise_signal (tc_prepare, test_prepare_fail_001, SIGABRT);
 
-	TCase* tc_add_full = tcase_create ("add-full");
-	suite_add_tcase (s, tc_add_full);
-	tcase_add_test (tc_add_full, test_add_full_pass_001);
-	tcase_add_test (tc_add_full, test_add_full_fail_001);
+	TCase* tc_check = tcase_create ("check");
+	suite_add_tcase (s, tc_check);
+	tcase_add_test (tc_check, test_check_pass_001);
+	tcase_add_test_raise_signal (tc_check, test_check_fail_001, SIGABRT);
 
-	TCase* tc_add = tcase_create ("add");
-	suite_add_tcase (s, tc_add);
-	tcase_add_test (tc_add, test_add_pass_001);
-	tcase_add_test (tc_add, test_add_fail_001);
+	TCase* tc_expiration = tcase_create ("expiration");
+	suite_add_tcase (s, tc_expiration);
+	tcase_add_test (tc_expiration, test_expiration_pass_001);
+	tcase_add_test_raise_signal (tc_expiration, test_expiration_fail_001, SIGABRT);
 
-	TCase* tc_thread = tcase_create ("thread");
-	suite_add_tcase (s, tc_thread);
-	tcase_add_test (tc_thread, test_thread_pass_001);
-	tcase_add_test_raise_signal (tc_thread, test_thread_fail_001, SIGABRT);
+	TCase* tc_dispatch = tcase_create ("dispatch");
+	suite_add_tcase (s, tc_dispatch);
+	tcase_add_test (tc_dispatch, test_dispatch_pass_001);
+	tcase_add_test_raise_signal (tc_dispatch, test_dispatch_fail_001, SIGABRT);
 	return s;
 }
 

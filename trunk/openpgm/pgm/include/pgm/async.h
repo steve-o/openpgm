@@ -52,7 +52,8 @@ struct pgm_async_t {
 	GThread*		thread;
 	GAsyncQueue*		commit_queue;
 	pgm_notify_t		commit_notify;
-	gboolean		quit;
+	pgm_notify_t		destroy_notify;
+	gboolean		is_destroyed;
 };
 
 typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);

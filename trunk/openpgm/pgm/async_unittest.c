@@ -42,6 +42,7 @@ pgm_transport_t*
 generate_transport (void)
 {
 	pgm_transport_t* transport = g_malloc0 (sizeof(pgm_transport_t));
+	pgm_notify_init (&transport->pending_notify);
 	return transport;
 }
 
@@ -83,7 +84,43 @@ mock_pgm_recvmsg (
 	return G_IO_STATUS_NORMAL;
 }
 
-#define pgm_recvmsg	mock_pgm_recvmsg
+#ifdef CONFIG_HAVE_POLL
+static
+int
+mock_pgm_transport_poll_info (
+	pgm_transport_t* const	transport,
+	struct pollfd* const	fds,
+	int* const		n_fds,
+	const int		events
+	)
+{
+	int moo = 0;
+	fds[moo].fd = pgm_notify_get_fd (&transport->pending_notify);
+	fds[moo].events = POLLIN;
+	moo++;
+	return *n_fds = moo;
+}
+#else
+static
+int
+mock_pgm_transport_select_info (
+	pgm_transport_t* const	transport,
+	fd_set*			readfds,
+	fd_set*			writefds,
+	int* const		n_fds,
+	)
+{
+	int fds = 0;
+	int waiting_fd = pgm_notify_get_fd (&transport->pending_notify);
+	fds = waiting_fd + 1;
+	return *n_fds = MAX(fds, *n_fds);
+}
+#endif
+
+
+#define pgm_recvmsg			mock_pgm_recvmsg
+#define pgm_transport_poll_info		mock_pgm_transport_poll_info
+#define pgm_transport_select_info	mock_pgm_transport_select_info
 
 #define ASYNC_DEBUG
 #include "async.c"
@@ -165,6 +202,7 @@ START_TEST (test_recv_pass_001)
 	fail_unless (TRUE == pgm_async_create (&async, transport, &err));
 	struct pgm_msgv_t* msgv = generate_msgv ();
 	g_atomic_pointer_set (&mock_msgv, msgv);
+	pgm_notify_send (&transport->pending_notify);
 	char buffer[1024];
 	gsize bytes_read = 0;
 	fail_unless (G_IO_STATUS_NORMAL == pgm_async_recv (async, &buffer, sizeof(buffer), &bytes_read, 0, &err));

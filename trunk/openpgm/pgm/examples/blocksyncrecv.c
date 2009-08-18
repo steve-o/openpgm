@@ -152,7 +152,6 @@ on_signal (
 	)
 {
 	g_message ("on_signal");
-
 	g_quit = TRUE;
 }
 
