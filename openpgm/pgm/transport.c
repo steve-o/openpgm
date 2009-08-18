@@ -88,11 +88,6 @@ GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all t
 GSList* pgm_transport_list = NULL;
 
 
-static gboolean on_timer_notify (GIOChannel*, GIOCondition, gpointer);
-static gboolean on_timer_shutdown (GIOChannel*, GIOCondition, gpointer);
-static gboolean g_source_remove_context (GMainContext*, guint);
-
-
 gsize
 pgm_transport_pkt_offset (
 	gboolean		can_fragment
@@ -137,39 +132,6 @@ pgm_transport_destroy (
 		((pgm_txw_t*)transport->window)->lead = transport->pkt_dontwait_state.first_sqn - 1;
 		g_static_rw_lock_writer_unlock (&transport->window_lock);
 		transport->is_apdu_eagain = FALSE;
-	}
-
-/* cleanup rdata-transmit channel in timer thread */
-	if (transport->rdata_id > 0) {
-		g_source_remove_context (transport->timer_context, transport->rdata_id);
-	}
-	if (transport->rdata_channel) {
-		g_io_channel_unref (transport->rdata_channel);
-	}
-
-/* terminate & join internal thread */
-	if (transport->notify_id > 0) {
-		g_source_remove_context (transport->timer_context, transport->notify_id);
-	}
-	if (transport->notify_channel) {
-		g_io_channel_unref (transport->notify_channel);
-	}
-
-	if (transport->timer_id > 0) {
-		g_source_remove_context (transport->timer_context, transport->timer_id);
-	}
-
-#ifndef PGM_SINGLE_THREAD
-	if (transport->timer_thread) {
-		pgm_notify_send (&transport->timer_shutdown);
-		g_thread_join (transport->timer_thread);
-		transport->timer_thread = NULL;
-	}
-#endif /* !PGM_SINGLE_THREAD */
-
-/* cleanup shutdown comms */
-	if (transport->shutdown_channel) {
-		g_io_channel_unref (transport->shutdown_channel);
 	}
 
 	g_static_mutex_lock (&transport->mutex);
@@ -238,12 +200,10 @@ pgm_transport_destroy (
 	}
 
 	pgm_notify_destroy (&transport->timer_notify);
-	pgm_notify_destroy (&transport->timer_shutdown);
 	pgm_notify_destroy (&transport->rdata_notify);
 	pgm_notify_destroy (&transport->pending_notify);
 
 	g_static_rw_lock_free (&transport->peers_lock);
-
 	g_static_rw_lock_free (&transport->window_lock);
 
 	if (transport->is_bound) {
@@ -411,34 +371,6 @@ pgm_transport_create (
 			     g_strerror (errno));
 		goto err_destroy;
 	}
-
-/* create timer thread */
-	GThread* thread;
-
-/* set up condition for thread context & loop being ready */
-	new_transport->thread_mutex = g_mutex_new ();
-	new_transport->thread_cond = g_cond_new ();
-
-	thread = g_thread_create_full (pgm_timer_thread,
-					new_transport,
-					0,
-					TRUE,
-					TRUE,
-					G_THREAD_PRIORITY_HIGH,
-					error);
-	if (NULL == thread)
-		goto err_destroy;
-
-	new_transport->timer_thread = thread;
-	g_mutex_lock (new_transport->thread_mutex);
-	while (!new_transport->timer_loop)
-		g_cond_wait (new_transport->thread_cond, new_transport->thread_mutex);
-	g_mutex_unlock (new_transport->thread_mutex);
-
-	g_mutex_free (new_transport->thread_mutex);
-	new_transport->thread_mutex = NULL;
-	g_cond_free (new_transport->thread_cond);
-	new_transport->thread_cond = NULL;
 
 	*transport = new_transport;
 
@@ -618,55 +550,6 @@ pgm_transport_set_rcvbuf (
 	return TRUE;
 }
 
-/* context aware g_io helpers
- *
- * on success, returns id of GSource.
- */
-static guint
-g_io_add_watch_context_full (
-	GIOChannel*		channel,
-	GMainContext*		context,
-	gint			priority,
-	GIOCondition		condition,
-	GIOFunc			function,
-	gpointer		user_data,
-	GDestroyNotify		notify
-	)
-{
-	GSource *source;
-	guint id;
-  
-	g_return_val_if_fail (channel != NULL, 0);
-
-	source = g_io_create_watch (channel, condition);
-
-	if (priority != G_PRIORITY_DEFAULT)
-		g_source_set_priority (source, priority);
-	g_source_set_callback (source, (GSourceFunc)function, user_data, notify);
-
-	id = g_source_attach (source, context);
-	g_source_unref (source);
-
-	return id;
-}
-
-static gboolean
-g_source_remove_context (
-	GMainContext*		context,
-	guint			tag
-	)
-{
-	GSource* source;
-
-	g_return_val_if_fail (tag > 0, FALSE);
-
-	source = g_main_context_find_source_by_id (context, tag);
-	if (source)
-		g_source_destroy (source);
-
-	return source != NULL;
-}
-
 /* bind the sockets to the link layer to start receiving data.
  *
  * returns 0 on success, or -1 on error and sets errno appropriately,
@@ -705,15 +588,6 @@ pgm_transport_bind (
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating timer notification channel: %s"),
-			     g_strerror (errno));
-		g_static_mutex_unlock (&transport->mutex);
-		return FALSE;
-	}
-	if (0 != pgm_notify_init (&transport->timer_shutdown)) {
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
-			     _("Creating timer shutdown notification channel: %s"),
 			     g_strerror (errno));
 		g_static_mutex_unlock (&transport->mutex);
 		return FALSE;
@@ -1174,20 +1048,9 @@ pgm_transport_bind (
 
 no_cap_net_admin:
 
-/* any to timer notify channel */
-	transport->notify_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_notify));
-	transport->notify_id = g_io_add_watch_context_full (transport->notify_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_notify, transport, NULL);
-
-/* timer shutdown channel */
-	transport->shutdown_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->timer_shutdown));
-	transport->shutdown_id = g_io_add_watch_context_full (transport->shutdown_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, on_timer_shutdown, transport, NULL);
-
 /* rx to nak processor notify channel */
 	if (transport->can_send_data)
 	{
-		transport->rdata_channel = g_io_channel_unix_new (pgm_notify_get_fd (&transport->rdata_notify));
-		transport->rdata_id = g_io_add_watch_context_full (transport->rdata_channel, transport->timer_context, G_PRIORITY_HIGH, G_IO_IN, pgm_on_nak_notify, transport, NULL);
-
 /* setup rate control */
 		if (transport->txw_max_rte)
 		{
@@ -1220,9 +1083,6 @@ no_cap_net_admin:
 		transport->next_poll = pgm_time_update_now() + pgm_secs( 30 );
 	}
 
-	g_trace ("INFO","adding dynamic timer");
-	transport->timer_id = pgm_timer_add (transport);
-
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 
@@ -1230,6 +1090,9 @@ no_cap_net_admin:
 	transport->is_bound = TRUE;
 	g_static_mutex_unlock (&transport->send_mutex);
 	g_static_mutex_unlock (&transport->mutex);
+
+	g_trace ("INFO","preparing dynamic timer");
+	pgm_timer_prepare (transport);
 
 	g_trace ("INFO","transport successfully created.");
 	return TRUE;
@@ -1242,10 +1105,10 @@ no_cap_net_admin:
 
 int
 pgm_transport_select_info (
-	pgm_transport_t*	transport,
-	fd_set*			readfds,
-	fd_set*			writefds,
-	int*			n_fds		/* in: max fds, out: max (in:fds, transport:fds) */
+	pgm_transport_t* const	transport,
+	fd_set* const		readfds,
+	fd_set* const		writefds,
+	int* const		n_fds		/* in: max fds, out: max (in:fds, transport:fds) */
 	)
 {
 	g_assert (transport);
@@ -1288,10 +1151,10 @@ pgm_transport_select_info (
 
 int
 pgm_transport_poll_info (
-	pgm_transport_t*	transport,
-	struct pollfd*		fds,
-	int*			n_fds,		/* in: #fds, out: used #fds */
-	int			events		/* POLLIN, POLLOUT */
+	pgm_transport_t* const	transport,
+	struct pollfd* const	fds,
+	int* const		n_fds,		/* in: #fds, out: used #fds */
+	const int		events		/* POLLIN, POLLOUT */
 	)
 {
 	g_assert (transport);
@@ -1343,10 +1206,10 @@ pgm_transport_poll_info (
 #ifdef CONFIG_HAVE_EPOLL
 int
 pgm_transport_epoll_ctl (
-	pgm_transport_t*	transport,
-	int			epfd,
-	int			op,		/* EPOLL_CTL_ADD, ... */
-	int			events		/* EPOLLIN, EPOLLOUT */
+	pgm_transport_t* const	transport,
+	const int		epfd,
+	const int		op,		/* EPOLL_CTL_ADD, ... */
+	const int		events		/* EPOLLIN, EPOLLOUT */
 	)
 {
 	if (op != EPOLL_CTL_ADD)	/* only addition currently supported */
@@ -1396,38 +1259,6 @@ out:
 }
 #endif
 
-/* prod to wakeup timer thread
- *
- * returns TRUE to keep monitoring the event source.
- */
-
-static gboolean
-on_timer_notify (
-	G_GNUC_UNUSED GIOChannel*	source,
-	G_GNUC_UNUSED GIOCondition	condition,
-	gpointer			data
-	)
-{
-	pgm_transport_t* transport = data;
-
-/* empty notify channel */
-	pgm_notify_clear (&transport->timer_notify);
-
-	return TRUE;
-}
-
-static gboolean
-on_timer_shutdown (
-	G_GNUC_UNUSED GIOChannel*	source,
-	G_GNUC_UNUSED GIOCondition	condition,
-	gpointer			data
-	)
-{
-	pgm_transport_t* transport = data;
-	g_main_loop_quit (transport->timer_loop);
-	return FALSE;
-}
-	
 /* Enable FEC for this transport, specifically Reed Solmon encoding RS(n,k), common
  * setting is RS(255, 223).
  *

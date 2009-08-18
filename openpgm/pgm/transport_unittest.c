@@ -100,30 +100,38 @@ mock_pgm_send_spm_unlocked (
 
 /** timer module */
 static
-gpointer
-mock_pgm_timer_thread (
-	gpointer		data
+gboolean
+mock_pgm_timer_prepare (
+	pgm_transport_t* const		transport
 	)
 {
-	pgm_transport_t* transport = (pgm_transport_t*)data;
-	transport->timer_context = g_main_context_new ();
-	g_mutex_lock (transport->thread_mutex);
-	transport->timer_loop = g_main_loop_new (transport->timer_context, FALSE);
-	g_cond_signal (transport->thread_cond);
-	g_mutex_unlock (transport->thread_mutex);
-	g_main_loop_run (transport->timer_loop);
-	g_main_loop_unref (transport->timer_loop);
-	g_main_context_unref (transport->timer_context);
-	return NULL;
+	return FALSE;
 }
 
 static
-int
-mock_pgm_timer_add (
-	pgm_transport_t*	transport
+gboolean
+mock_pgm_timer_check (
+	pgm_transport_t* const		transport
 	)
 {
-	return 1;	/* GSource id */
+	return FALSE;
+}
+
+static
+long
+mock_pgm_timer_expiration (
+	pgm_transport_t* const		transport
+	)
+{
+	return 100L;
+}
+
+static
+void
+mock_pgm_timer_dispatch (
+	pgm_transport_t* const		transport
+	)
+{
 }
 
 /** transmit window module */
@@ -206,8 +214,10 @@ mock_pgm_time_update_now (void)
 #define pgm_peer_unref		mock_pgm_peer_unref
 #define pgm_on_nak_notify	mock_pgm_on_nak_notify
 #define pgm_send_spm_unlocked	mock_pgm_send_spm_unlocked
-#define pgm_timer_thread	mock_pgm_timer_thread
-#define pgm_timer_add		mock_pgm_timer_add
+#define pgm_timer_prepare	mock_pgm_timer_prepare
+#define pgm_timer_check		mock_pgm_timer_check
+#define pgm_timer_expiration	mock_pgm_timer_expiration
+#define pgm_timer_dispatch	mock_pgm_timer_dispatch
 #define pgm_txw_create		mock_pgm_txw_create
 #define pgm_txw_shutdown	mock_pgm_txw_shutdown
 #define pgm_rate_create		mock_pgm_rate_create

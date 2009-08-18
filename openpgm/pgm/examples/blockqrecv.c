@@ -127,9 +127,12 @@ main (
 		gsize len;
 		if (G_IO_STATUS_NORMAL == pgm_async_recv (async, buffer, sizeof(buffer), &len, 0 /* blocking */, &err))
 			on_data (buffer, len, NULL);
-		else if (err) {
-			g_error ("recv: %s", err->message);
-			g_error_free (err);
+		else {
+			if (err) {
+				g_error ("recv: %s", err->message);
+				g_error_free (err);
+			}
+			break;
 		}
 	} while (!g_quit);
 
@@ -140,7 +143,6 @@ main (
 
 	if (g_transport) {
 		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
@@ -155,7 +157,6 @@ on_signal (
 	)
 {
 	g_message ("on_signal");
-
 	g_quit = TRUE;
 }
 
@@ -218,7 +219,7 @@ on_startup (void)
 	}
 
 	g_message ("startup complete.");
-	return FALSE;
+	return TRUE;
 }
 
 static int

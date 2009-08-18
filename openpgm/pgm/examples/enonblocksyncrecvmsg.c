@@ -239,7 +239,7 @@ on_startup (void)
 	}
 
 	g_message ("startup complete.");
-	return FALSE;
+	return TRUE;
 }
 
 static int
