@@ -123,13 +123,15 @@ recvskb (
 	};
 
 	ssize_t len = recvmsg (transport->recv_sock, &msg, flags);
-	if (len) {
-		skb->transport	= transport;
-		skb->tstamp	= pgm_time_update_now();
-		skb->data	= skb->head;
-		skb->len	= len;
-		skb->tail	= (guint8*)skb->data + len;
-	}
+	if (len <= 0)
+		return len;
+
+	skb->transport	= transport;
+	skb->tstamp	= pgm_time_update_now();
+	skb->data	= skb->head;
+	skb->len	= len;
+	skb->tail	= (guint8*)skb->data + len;
+
 	if (transport->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (&src_addr))
 	{
