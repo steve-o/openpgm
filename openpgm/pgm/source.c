@@ -265,10 +265,10 @@ pgm_schedule_proactive_nak (
  * window to see if the packet exists and forward on, maintaining a lock until the queue is
  * empty.
  *
- * returns TRUE to keep monitoring the event source.
+ * returns TRUE on success, returns FALSE if operation would block.
  */
 
-void
+gboolean
 pgm_on_deferred_nak (
 	pgm_transport_t* const	transport
 	)
@@ -291,12 +291,16 @@ pgm_on_deferred_nak (
 	g_static_rw_lock_reader_lock (&transport->window_lock);
 	struct pgm_sk_buff_t* skb = pgm_txw_retransmit_try_peek (transport->window);
 	if (skb) {
-		send_rdata (transport, skb);
+		if (!send_rdata (transport, skb)) {
+			g_static_rw_lock_reader_unlock (&transport->window_lock);
+			return FALSE;
+		}
 
 /* now remove sequence number from retransmit queue, re-enabling NAK processing for this sequence number */
 		pgm_txw_retransmit_remove_head (transport->window);
 	}
 	g_static_rw_lock_reader_unlock (&transport->window_lock);
+	return TRUE;
 }
 
 /* SPMR indicates if multicast to cancel own SPMR, or unicast to send SPM.
@@ -563,7 +567,7 @@ send_spm (
 	g_trace ("SPM","send_spm (transport:%p", (gpointer)transport);
 
 	g_static_mutex_lock (&transport->mutex);
-	gboolean status = pgm_send_spm_unlocked (transport);
+	const gboolean status = pgm_send_spm_unlocked (transport);
 	g_static_mutex_unlock (&transport->mutex);
 	return status;
 }
@@ -600,7 +604,7 @@ pgm_send_spm_unlocked (
 	header->pgm_tsdu_length = 0;
 
 /* SPM */
-	spm->spm_sqn		= g_htonl (transport->spm_sqn++);
+	spm->spm_sqn		= g_htonl (transport->spm_sqn);
 	g_static_rw_lock_reader_lock (&transport->window_lock);
 	spm->spm_trail		= g_htonl (pgm_txw_trail(transport->window));
 	spm->spm_lead		= g_htonl (pgm_txw_lead(transport->window));
@@ -635,16 +639,18 @@ pgm_send_spm_unlocked (
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
-				TRUE,				/* rate limited */
-				TRUE,				/* with router alert */
-				header,
-				tpdu_length,
-				MSG_CONFIRM,			/* not expecting a reply */
-				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	const gssize sent = pgm_sendto (transport,
+					TRUE,				/* rate limited */
+					TRUE,				/* with router alert */
+					header,
+					tpdu_length,
+					MSG_CONFIRM,			/* not expecting a reply */
+					(struct sockaddr*)&transport->send_gsr.gsr_group,
+					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if ( sent != (gssize)tpdu_length )
 		return FALSE;
+/* advance SPM sequence only on successful transmission */
+	transport->spm_sqn++;
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
 	return TRUE;
 }

@@ -127,11 +127,12 @@ mock_pgm_timer_expiration (
 }
 
 static
-void
+gboolean
 mock_pgm_timer_dispatch (
 	pgm_transport_t* const		transport
 	)
 {
+	return TRUE;
 }
 
 /** transmit window module */

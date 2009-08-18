@@ -485,6 +485,7 @@ wait_for_event (
 
 	do {
 		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
+/* tight loop on blocked send */
 			pgm_on_deferred_nak (transport);
 
 #ifdef CONFIG_HAVE_POLL
@@ -607,7 +608,10 @@ pgm_recvmsgv (
 
 /* timer status */
 	if (pgm_timer_check (transport)) {
-		pgm_timer_dispatch (transport);
+		if (!pgm_timer_dispatch (transport)) {
+			g_static_mutex_unlock (&transport->pending_mutex);
+			return G_IO_STATUS_AGAIN;
+		}
 		pgm_timer_prepare (transport);
 	}
 
@@ -701,7 +705,8 @@ check_for_repeat:
 			if (EAGAIN == wait_status)
 				goto recv_again;
 			else if (EINTR == wait_status) {
-				pgm_timer_dispatch (transport);
+				if (!pgm_timer_dispatch (transport))
+					goto check_for_repeat;
 				goto flush_pending;
 			} else if (EFAULT == wait_status) {
 				g_set_error (error,

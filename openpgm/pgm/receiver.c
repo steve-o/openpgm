@@ -84,7 +84,7 @@ static int send_spmr (pgm_transport_t* const, pgm_peer_t* const);
 static int send_nak (pgm_transport_t* const, pgm_peer_t* const, const guint32);
 static int send_parity_nak (pgm_transport_t* const, pgm_peer_t* const, const guint, const guint);
 static int send_nak_list (pgm_transport_t* const, pgm_peer_t* const, const pgm_sqn_list_t* const);
-static void nak_rb_state (pgm_peer_t*);
+static gboolean nak_rb_state (pgm_peer_t*);
 static void nak_rpt_state (pgm_peer_t*);
 static void nak_rdata_state (pgm_peer_t*);
 static inline pgm_peer_t* _pgm_peer_ref (pgm_peer_t*);
@@ -1035,12 +1035,12 @@ pgm_on_ncf (
 
 /* send SPM-request to a new peer, this packet type has no contents
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned, if operation would block FALSE is
+ * returned.
  */
 
 static
-int
+gboolean
 send_spmr (
 	pgm_transport_t* const	transport,
 	pgm_peer_t* const	source
@@ -1076,6 +1076,8 @@ send_spmr (
 				  MSG_CONFIRM,		/* not expecting a reply */
 				  (struct sockaddr*)&transport->send_gsr.gsr_group,
 				  pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	if (-1 == sent && EAGAIN == errno)
+		return FALSE;
 
 /* send unicast SPMR with regular TTL */
 	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
@@ -1087,14 +1089,12 @@ send_spmr (
 			    MSG_CONFIRM,		/* not expecting a reply */
 			    (struct sockaddr*)&source->local_nla,
 			    pgm_sockaddr_len(&source->local_nla));
+	if ( sent != (gssize)(tpdu_length * 2) ) 
+		return FALSE;
 
 	source->spmr_expiry = 0;
-
-	if ( sent != (gssize)(tpdu_length * 2) ) 
-		return -1;
-
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length * 2;
-	return 0;
+	return TRUE;
 }
 
 /* send selective NAK for one sequence number.
@@ -1342,10 +1342,12 @@ send_nak_list (
  * update transport::next_nak_rb_timestamp for next expiration time.
  *
  * peer object is locked before entry.
+ *
+ * returns TRUE on success, returns FALSE if operation would block.
  */
 
 static
-void
+gboolean
 nak_rb_state (
 	pgm_peer_t*		peer
 	)
@@ -1371,7 +1373,7 @@ nak_rb_state (
 	if (!list) {
 		g_assert (window->backoff_queue.head == NULL);
 		g_warning ("backoff queue is empty in nak_rb_state.");
-		return;
+		return TRUE;
 	} else {
 		g_assert (window->backoff_queue.head != NULL);
 	}
@@ -1449,8 +1451,8 @@ nak_rb_state (
 			list = next_list_el;
 		}
 
-		if (nak_pkt_cnt)
-			send_parity_nak (transport, peer, nak_tg_sqn, nak_pkt_cnt);
+		if (nak_pkt_cnt && !send_parity_nak (transport, peer, nak_tg_sqn, nak_pkt_cnt))
+			return FALSE;
 	}
 	else
 	{
@@ -1497,8 +1499,8 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 #endif
 
 				if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
-					if (transport->can_send_nak)
-						send_nak_list (transport, peer, &nak_list);
+					if (transport->can_send_nak && !send_nak_list (transport, peer, &nak_list))
+						return FALSE;
 					pgm_time_update_now();
 					nak_list.len = 0;
 				}
@@ -1513,12 +1515,10 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 		if (transport->can_send_nak && nak_list.len)
 		{
-			if (nak_list.len > 1) {
-				send_nak_list (transport, peer, &nak_list);
-			} else {
-				g_assert (nak_list.len == 1);
-				send_nak (transport, peer, nak_list.sqn[0]);
-			}
+			if (nak_list.len > 1 && !send_nak_list (transport, peer, &nak_list))
+				return FALSE;
+			else if (!send_nak (transport, peer, nak_list.sqn[0]))
+				return FALSE;
 		}
 
 	}
@@ -1558,13 +1558,16 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 	{
 		g_trace ("INFO", "backoff queue empty.");
 	}
+	return TRUE;
 }
 
 /* check this peer for NAK state timers, uses the tail of each queue for the nearest
  * timer execution.
+ *
+ * returns TRUE on complete sweep, returns FALSE if operation would block.
  */
 
-void
+gboolean
 pgm_check_peer_nak_state (
 	pgm_transport_t*	transport
 	)
@@ -1575,7 +1578,7 @@ pgm_check_peer_nak_state (
 	g_trace ("INFO","pgm_check_peer_nak_state (transport:%p)", (gpointer)transport);
 
 	if (!transport->peers_list)
-		return;
+		return TRUE;
 
 	GList* list = transport->peers_list;
 	do {
@@ -1589,9 +1592,12 @@ pgm_check_peer_nak_state (
 		{
 			if (pgm_time_after_eq (pgm_time_now, peer->spmr_expiry))
 			{
-				if (transport->can_send_nak)
-					send_spmr (transport, peer);
-				else
+				if (transport->can_send_nak) {
+					if (!send_spmr (transport, peer)) {
+						g_static_mutex_unlock (&peer->mutex);
+						return FALSE;
+					}
+				} else
 					peer->spmr_expiry = 0;
 			}
 		}
@@ -1599,7 +1605,10 @@ pgm_check_peer_nak_state (
 		if (window->backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (pgm_time_now, next_nak_rb_expiry(window)))
-				nak_rb_state (peer);
+				if (!nak_rb_state (peer)) {
+					g_static_mutex_unlock (&peer->mutex);
+					return FALSE;
+				}
 		}
 		
 		if (window->wait_ncf_queue.tail)
@@ -1647,6 +1656,7 @@ pgm_check_peer_nak_state (
 		pgm_notify_send (&transport->pending_notify);
 		transport->is_pending_read = TRUE;
 	}
+	return TRUE;
 }
 
 /* find the next state expiration time among the transports peers.
