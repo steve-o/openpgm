@@ -471,71 +471,72 @@ on_pgm (
 static
 int
 wait_for_event (
-	pgm_transport_t* const	transport,
-	const long		timeout		/* microseconds (μs) */
+	pgm_transport_t* const	transport
 	)
 {
 	int n_fds = 2;
 
 /* pre-conditions */
 	g_assert (NULL != transport);
-	g_assert (0 != timeout);
 
-	g_trace ("wait_for_event (transport:%p timeout:%ld)", (gpointer)transport, timeout);
+	g_trace ("wait_for_event (transport:%p)", (gpointer)transport);
+
+	do {
+		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
+			pgm_on_deferred_nak (transport);
 
 #ifdef CONFIG_HAVE_POLL
-	struct pollfd fds[ n_fds ];
-	memset (fds, 0, sizeof(fds));
-	if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, POLLIN)) {
-		g_trace ("poll_info returned errno=%i",errno);
-		return EFAULT;
-	}
+		struct pollfd fds[ n_fds ];
+		memset (fds, 0, sizeof(fds));
+		if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, POLLIN)) {
+			g_trace ("poll_info returned errno=%i",errno);
+			return EFAULT;
+		}
 #else
-	fd_set readfds;
-	FD_ZERO(&readfds);
-	if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
-		g_trace ("select_info returned errno=%i",errno);
-		return EFAULT;
-	}
+		fd_set readfds;
+		FD_ZERO(&readfds);
+		if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
+			g_trace ("select_info returned errno=%i",errno);
+			return EFAULT;
+		}
 #endif /* CONFIG_HAVE_POLL */
 
 /* flush any waiting notifications */
-	if (transport->is_pending_read) {
-		pgm_notify_clear (&transport->pending_notify);
-		transport->is_pending_read = FALSE;
-	}
+		if (transport->is_pending_read) {
+			pgm_notify_clear (&transport->pending_notify);
+			transport->is_pending_read = FALSE;
+		}
 
-/* spin the locks to allow other thread to set waiting state,
- * first run should trigger waiting pipe event which will flush and loop.
- */
-	g_static_mutex_unlock (&transport->pending_mutex);
+		long timeout;
+		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
+			timeout = 0;
+		else
+			timeout = pgm_timer_expiration (transport);
+		
+#ifdef CONFIG_HAVE_POLL
+		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
+#else
+		struct timeval tv_timeout = {
+			.tv_sec		= timeout > 1000000UL ? timeout / 1000000UL : 0,
+			.tv_usec	= timeout > 1000000UL ? timeout % 1000000UL : timeout
+		};
+		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
+#endif
+		if (-1 == ready) {
+			g_trace ("block returned errno=%i",errno);
+			return EFAULT;
+		}
 
 #ifdef CONFIG_HAVE_POLL
-	const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
+		if (ready > 0 && fds[0].revents)
 #else
-	struct timeval tv_timeout = {
-		.tv_sec		= timeout > 1000000UL ? timeout / 1000000UL : 0,
-		.tv_usec	= timeout > 1000000UL ? timeout % 1000000UL : timeout
-	};
-	const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
+		if (ready > 0 && FD_ISSET(transport->recv_sock, &readfds))
 #endif
-
-	if (-1 == ready) {
-		g_trace ("block returned errno=%i",errno);
-		return EFAULT;
-	}
-	g_static_mutex_lock (&transport->pending_mutex);
-
-#ifdef CONFIG_HAVE_POLL
-	if (ready > 0 && fds[0].revents)
-#else
-	if (ready > 0 && FD_ISSET(transport->recv_sock, &readfds))
-#endif
-	{
-		g_trace ("recv again on empty");
-		return EAGAIN;
-	}
-
+		{
+			g_trace ("recv again on empty");
+			return EAGAIN;
+		}
+	} while (pgm_timer_check (transport));
 	g_trace ("state generated event");
 	return EINTR;
 }
@@ -607,6 +608,10 @@ pgm_recvmsgv (
 		pgm_timer_dispatch (transport);
 		pgm_timer_prepare (transport);
 	}
+
+/* NAK status */
+	if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
+		pgm_on_deferred_nak (transport);
 
 	gsize bytes_read = 0;
 	guint data_read = 0;
@@ -690,7 +695,7 @@ check_for_repeat:
 /* repeat if blocking and empty, i.e. received non data packet.
  */
 		if (0 == data_read) {
-			const int wait_status = wait_for_event (transport, pgm_timer_expiration (transport));
+			const int wait_status = wait_for_event (transport);
 			if (EAGAIN == wait_status)
 				goto recv_again;
 			else if (EINTR == wait_status) {

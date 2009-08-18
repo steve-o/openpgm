@@ -254,14 +254,11 @@ pgm_schedule_proactive_nak (
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
-	if (pgm_txw_retransmit_push (transport->window,
-				     nak_tg_sqn | transport->rs_proactive_h,
-				     TRUE /* is_parity */,
-				     transport->tg_sqn_shift))
-	{
-		pgm_notify_send (&transport->rdata_notify);
-	}
-	return TRUE;
+	gboolean status = pgm_txw_retransmit_push (transport->window,
+						   nak_tg_sqn | transport->rs_proactive_h,
+						   TRUE /* is_parity */,
+						   transport->tg_sqn_shift);
+	return status;
 }
 
 /* a deferred request for RDATA, now processing in the timer thread, we check the transmit
@@ -271,22 +268,13 @@ pgm_schedule_proactive_nak (
  * returns TRUE to keep monitoring the event source.
  */
 
-gboolean
-pgm_on_nak_notify (
-	GIOChannel*		source,
-	GIOCondition		condition,
-	gpointer		data
+void
+pgm_on_deferred_nak (
+	pgm_transport_t* const	transport
 	)
 {
 /* pre-conditions */
-	g_assert (NULL    != source);
-	g_assert (G_IO_IN == condition);
-	g_assert (NULL    != data);
-
-	pgm_transport_t* transport = data;
-
-/* remove one event from notify channel */
-	pgm_notify_read (&transport->rdata_notify);
+	g_assert (NULL != transport);
 
 /* We can flush queue and block all odata, or process one set, or process each
  * sequence number individually.
@@ -309,7 +297,6 @@ pgm_on_nak_notify (
 		pgm_txw_retransmit_remove_head (transport->window);
 	}
 	g_static_rw_lock_reader_unlock (&transport->window_lock);
-	return TRUE;
 }
 
 /* SPMR indicates if multicast to cancel own SPMR, or unicast to send SPM.
@@ -474,11 +461,8 @@ pgm_on_nak (
 		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list.sqn[0], is_parity);
 
 /* queue retransmit requests */
-	for (unsigned i = 0; i < sqn_list.len; i++) {
-		const int cnt = pgm_txw_retransmit_push (transport->window, sqn_list.sqn[i], is_parity, transport->tg_sqn_shift);
-		if (cnt > 0)
-			pgm_notify_send (&transport->rdata_notify);
-	}
+	for (unsigned i = 0; i < sqn_list.len; i++)
+		pgm_txw_retransmit_push (transport->window, sqn_list.sqn[i], is_parity, transport->tg_sqn_shift);
 	return TRUE;
 }
 
@@ -864,10 +848,8 @@ reset_heartbeat_spm (pgm_transport_t* transport)
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 
 /* prod recv thread if sleeping */
-	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm )) {
+	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
 		transport->next_poll = transport->next_heartbeat_spm;
-		pgm_notify_send (&transport->timer_notify);
-	}
 	g_static_mutex_unlock (&transport->mutex);
 }
 

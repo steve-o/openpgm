@@ -199,8 +199,6 @@ pgm_transport_destroy (
 		transport->rand_ = NULL;
 	}
 
-	pgm_notify_destroy (&transport->timer_notify);
-	pgm_notify_destroy (&transport->rdata_notify);
 	pgm_notify_destroy (&transport->pending_notify);
 
 	g_static_rw_lock_free (&transport->peers_lock);
@@ -572,26 +570,6 @@ pgm_transport_bind (
 	transport->rand_ = g_rand_new();
 	g_assert (transport->rand_);
 
-	if (transport->can_send_data) {
-		if (0 != pgm_notify_init (&transport->rdata_notify)) {
-			g_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
-				     _("Creating RX to NAK processor notification channel: %s"),
-				     g_strerror (errno));
-			g_static_mutex_unlock (&transport->mutex);
-			return FALSE;
-		}
-	}
-	if (0 != pgm_notify_init (&transport->timer_notify)) {
-		g_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
-			     _("Creating timer notification channel: %s"),
-			     g_strerror (errno));
-		g_static_mutex_unlock (&transport->mutex);
-		return FALSE;
-	}
 	if (transport->can_recv_data) {
 		if (0 != pgm_notify_init (&transport->pending_notify)) {
 			g_set_error (error,

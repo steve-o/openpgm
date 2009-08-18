@@ -660,6 +660,14 @@ mock_pgm_on_data (
 }
 
 static
+void
+mock_pgm_on_deferred_nak (
+	pgm_transport_t* const		transport
+	)
+{
+}
+
+static
 gboolean
 mock_pgm_on_nak (
 	pgm_transport_t* const		transport,
@@ -895,6 +903,7 @@ mock_recvmsg (
 #define pgm_on_data		mock_pgm_on_data
 #define pgm_on_spm		mock_pgm_on_spm
 #define pgm_on_nak		mock_pgm_on_nak
+#define pgm_on_deferred_nak	mock_pgm_on_deferred_nak
 #define pgm_on_peer_nak		mock_pgm_on_peer_nak
 #define pgm_on_nnak		mock_pgm_on_nnak
 #define pgm_on_ncf		mock_pgm_on_ncf
