@@ -81,7 +81,7 @@ pgm_sendto (
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
 		errno != EHOSTUNREACH &&	/* No route to host */
-		!( errno == EAGAIN && flags & MSG_DONTWAIT )	/* would block on non-blocking send */
+		errno != EAGAIN 		/* would block on non-blocking send */
 	   )
 	{
 #ifdef CONFIG_HAVE_POLL
@@ -145,19 +145,8 @@ pgm_set_nonblocking (
 	g_assert (fd[0]);
 	g_assert (fd[1]);
 
-/* set write end non-blocking */
-	flags = fcntl (fd[1], F_GETFL);
-	if (flags < 0)
-		return -1;
-	if (fcntl (fd[1], F_SETFL, flags | O_NONBLOCK) < 0)
-		return -1;
-/* set read end non-blocking */
-	flags = fcntl (fd[0], F_GETFL);
-	if (flags < 0)
-		return -1;
-	if (fcntl (fd[0], F_SETFL, flags | O_NONBLOCK) < 0)
-		return -1;
-
+	pgm_sockaddr_nonblocking (fd[0], TRUE);
+	pgm_sockaddr_nonblocking (fd[1], TRUE);
 	return 0;
 }		
 

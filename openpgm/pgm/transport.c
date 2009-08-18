@@ -1061,6 +1061,13 @@ no_cap_net_admin:
 		transport->next_poll = pgm_time_update_now() + pgm_secs( 30 );
 	}
 
+/* non-blocking sockets */
+	pgm_sockaddr_nonblocking (transport->recv_sock, transport->is_nonblocking);
+	if (transport->can_send_data) {
+		pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
+		pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
+	}
+
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 
@@ -1348,6 +1355,22 @@ pgm_transport_set_abort_on_reset (
 
 	g_static_mutex_lock (&transport->mutex);
 	transport->is_abort_on_reset = abort_on_reset;
+	g_static_mutex_unlock (&transport->mutex);
+	return TRUE;
+}
+
+/* default non-blocking operation on send and receive sockets.
+ */
+gboolean
+pgm_transport_set_nonblocking (
+	pgm_transport_t* const	transport,
+	const gboolean		nonblocking
+	)
+{
+	g_return_val_if_fail (transport != NULL, FALSE);
+
+	g_static_mutex_lock (&transport->mutex);
+	transport->is_nonblocking = nonblocking;
 	g_static_mutex_unlock (&transport->mutex);
 	return TRUE;
 }

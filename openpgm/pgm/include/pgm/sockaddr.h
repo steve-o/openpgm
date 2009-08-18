@@ -23,11 +23,18 @@
 #define __PGM_SOCKADDR_H__
 
 #include <errno.h>
-#include <netdb.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+
+#ifdef G_OS_UNIX
+#	include <fcntl.h>
+#	include <netdb.h>
+#	include <string.h>
+#	include <unistd.h>
+#	include <netinet/in.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
+#endif
 
 #include <glib.h>
 
@@ -60,11 +67,11 @@
 #ifndef MSG_CONFIRM
 #	define MSG_CONFIRM		0
 #endif
-#ifndef IP_ROUTER_ALERT
+#if !defined(IP_ROUTER_ALERT) && !defined(G_OS_WIN32)
 #	include <netinet/ip.h>
 #	define IP_ROUTER_ALERT		IPOPT_RTRALERT
 #endif
-#ifndef IPV6_ROUTER_ALERT
+#if !defined(IPV6_ROUTER_ALERT) && !defined(G_OS_WIN32)
 #	include <netinet/ip6.h>
 #	define IPV6_ROUTER_ALERT	IP6OPT_ROUTER_ALERT
 #endif
@@ -115,171 +122,177 @@ static inline int pgm_sockaddr_pton (const char* src, gpointer dst)
 
 static inline int pgm_sockaddr_is_addr_multicast (const struct sockaddr* s)
 {
-    int retval = -1;
+	int retval = -1;
 
-    switch (s->sa_family) {
-    case AF_INET:
-	retval = IN_MULTICAST(g_ntohl( ((const struct sockaddr_in*)s)->sin_addr.s_addr ));
-	break;
+	switch (s->sa_family) {
+	case AF_INET:
+		retval = IN_MULTICAST(g_ntohl( ((const struct sockaddr_in*)s)->sin_addr.s_addr ));
+		break;
 
-    case AF_INET6:
-	retval = IN6_IS_ADDR_MULTICAST( &((const struct sockaddr_in6*)s)->sin6_addr );
-	break;
+	case AF_INET6:
+		retval = IN6_IS_ADDR_MULTICAST( &((const struct sockaddr_in6*)s)->sin6_addr );
+		break;
 
-    default: break;
-    }
-
-    return retval;
+	default: break;
+	}
+	return retval;
 }
 
 static inline int pgm_sockaddr_cmp (const struct sockaddr *a, const struct sockaddr *b)
 {
-    int retval = 0;
+	int retval = 0;
 
-    if (a->sa_family != b->sa_family)
-    {
-	retval = a->sa_family < b->sa_family ? -1 : 1;
-    }
-    else
-    {
-	switch (a->sa_family) {
+	if (a->sa_family != b->sa_family)
+		retval = a->sa_family < b->sa_family ? -1 : 1;
+	else {
+		switch (a->sa_family) {
+		case AF_INET:
+			if (((const struct sockaddr_in*)a)->sin_addr.s_addr != ((const struct sockaddr_in*)b)->sin_addr.s_addr)
+			{
+				retval = ((const struct sockaddr_in*)a)->sin_addr.s_addr < ((const struct sockaddr_in*)b)->sin_addr.s_addr ? -1 : 1;
+			}
+			break;
+
+		case AF_INET6:
+			retval = memcmp (&((const struct sockaddr_in6*)a)->sin6_addr, &((const struct sockaddr_in6*)b)->sin6_addr, sizeof(struct in6_addr));
+			if (0 == retval &&
+			    ((const struct sockaddr_in6*)a)->sin6_scope_id != ((const struct sockaddr_in6*)b)->sin6_scope_id)
+			{
+				retval = ((const struct sockaddr_in6*)a)->sin6_scope_id < ((const struct sockaddr_in6*)b)->sin6_scope_id ? -1 : 1;
+			}
+			break;
+
+		default: break;
+		}
+	}
+	return retval;
+}
+
+static inline int pgm_sockaddr_hdrincl (const int s, const int sa_family, const gboolean v)
+{
+	int retval = -1;
+	const gint optval = v;
+
+	switch (sa_family) {
 	case AF_INET:
-	    if (((const struct sockaddr_in*)a)->sin_addr.s_addr != ((const struct sockaddr_in*)b)->sin_addr.s_addr)
-	    {
-		retval = ((const struct sockaddr_in*)a)->sin_addr.s_addr < ((const struct sockaddr_in*)b)->sin_addr.s_addr ? -1 : 1;
-	    }
-	    break;
+		retval = setsockopt (s, IPPROTO_IP, IP_HDRINCL, (const char*)&optval, sizeof(optval));
+		break;
 
-	case AF_INET6:
-	    retval = memcmp (&((const struct sockaddr_in6*)a)->sin6_addr, &((const struct sockaddr_in6*)b)->sin6_addr, sizeof(struct in6_addr));
-	    if (0 == retval &&
-                ((const struct sockaddr_in6*)a)->sin6_scope_id != ((const struct sockaddr_in6*)b)->sin6_scope_id)
-	    {
-		retval = ((const struct sockaddr_in6*)a)->sin6_scope_id < ((const struct sockaddr_in6*)b)->sin6_scope_id ? -1 : 1;
-	    }
-	    break;
+	case AF_INET6:  /* method does not exist */
+		retval = 0;
+		break;
 
 	default: break;
 	}
-    }
-
-    return retval;
+	return retval;
 }
 
-static inline int pgm_sockaddr_hdrincl (int s, int sa_family, gboolean v)
+static inline int pgm_sockaddr_pktinfo (const int s, const int sa_family, const gboolean v)
 {
-    int retval = -1;
-    gint optval = v;
+	int retval = -1;
+	const gint optval = v;
 
-    switch (sa_family) {
-    case AF_INET:
-	retval = setsockopt (s, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(optval));
-	break;
+	switch (sa_family) {
+	case AF_INET:
+		retval = setsockopt (s, IPPROTO_IP, IP_PKTINFO, (const char*)&optval, sizeof(optval));
+		break;
 
-    case AF_INET6:  /* method does not exist */
-	retval = 0;
-	break;
+	case AF_INET6:
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const char*)&optval, sizeof(optval));
+		break;
 
-    default: break;
-    }
-
-    return retval;
-}
-
-static inline int pgm_sockaddr_pktinfo (int s, int sa_family, gboolean v)
-{
-    int retval = -1;
-    gint optval = v;
-
-    switch (sa_family) {
-    case AF_INET:
-	retval = setsockopt (s, IPPROTO_IP, IP_PKTINFO, &optval, sizeof(optval));
-	break;
-
-    case AF_INET6:
-	retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &optval, sizeof(optval));
-	break;
-
-    default: break;
-    }
-
-    return retval;
+	default: break;
+	}
+	return retval;
 }
 
 
-static inline int pgm_sockaddr_router_alert (int s, int sa_family, gboolean v)
+static inline int pgm_sockaddr_router_alert (const int s, const int sa_family, const gboolean v)
 {
-    int retval = -1;
-    gint8 optval = v;
+	int retval = -1;
+#ifdef IP_ROUTER_ALERT
+	const gint8 optval = v;
 
-    switch (sa_family) {
-    case AF_INET:
-	retval = setsockopt (s, IPPROTO_IP, IP_ROUTER_ALERT, &optval, sizeof(optval));
-	break;
+	switch (sa_family) {
+	case AF_INET:
+		retval = setsockopt (s, IPPROTO_IP, IP_ROUTER_ALERT, (const char*)&optval, sizeof(optval));
+		break;
 
-    case AF_INET6:
-	retval = setsockopt (s, IPPROTO_IPV6, IPV6_ROUTER_ALERT, &optval, sizeof(optval));
-	break;
+	case AF_INET6:
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_ROUTER_ALERT, (const char*)&optval, sizeof(optval));
+		break;
 
-    default: break;
-    }
+	default: break;
+	}
+#else
+	const guint32 optval = v ? g_htonl(0x94040000) : 0;
 
-    return retval;
+	switch (sa_family) {
+	case AF_INET:
+		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&optval, sizeof(optval));
+		break;
+
+	default: break;
+	}
+#endif
+	return retval;
 }
 
-static inline int pgm_sockaddr_tos (int s, int sa_family, int tos)
+static inline int pgm_sockaddr_tos (const int s, const int sa_family, const int tos)
 {
-    int retval = -1;
-    gint optval = tos;
+	int retval = -1;
+	const gint optval = tos;
 
-    switch (sa_family) {
-    case AF_INET:
-	retval = setsockopt (s, IPPROTO_IP, IP_TOS, &optval, sizeof(optval));
-	break;
+	switch (sa_family) {
+	case AF_INET:
+		retval = setsockopt (s, IPPROTO_IP, IP_TOS, (const char*)&optval, sizeof(optval));
+		break;
 
-    case AF_INET6:  /* TRAFFIC_CLASS not implemented */
-	break;
+	case AF_INET6:  /* TRAFFIC_CLASS not implemented */
+		break;
 
-    default: break;
-    }
-
-    return retval;
+	default: break;
+	}
+	return retval;
 }
 
 /* nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
  */
-static inline int pgm_sockaddr_add_membership (int s, const struct group_source_req* gsr)
+static inline int pgm_sockaddr_add_membership (const int s, const struct group_source_req* gsr)
 {
 	int retval = -1;
 
 	switch (pgm_sockaddr_family(&gsr->gsr_group)) {
-	case AF_INET:
-	{
+	case AF_INET: {
+#ifdef IP_ADD_SOURCE_MEMBERSHIP
+		struct ip_mreq_source mreqs;
+		memset (&mreqs, 0, sizeof(mreqs));
+		mreqs.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
+		mreqs.imr_sourceaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
+		struct sockaddr_in ifaddr;
+		pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL);
+		mreqs.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		retval = setsockopt (s, IPPROTO_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
+#else
 /* Linux: ip_mreqn preferred, ip_mreq supported for compat */
-	    struct ip_mreq mreq;
-	    memset (&mreq, 0, sizeof(mreq));
-
-	    mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
-
-	    struct sockaddr_in interface;
-	    if (!pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&interface, NULL))
-		return retval;
-		
-	    mreq.imr_interface.s_addr = interface.sin_addr.s_addr;
-
-	    retval = setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+		struct ip_mreq mreq;
+		memset (&mreq, 0, sizeof(mreq));
+		mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
+		struct sockaddr_in ifaddr;
+		if (!pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
+			return retval;
+		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		retval = setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+#endif
 	}
 	break;
 
-	case AF_INET6:
-	{
+	case AF_INET6: {
 		struct ipv6_mreq mreq6;
 		memset (&mreq6, 0, sizeof(mreq6));
-
 		mreq6.ipv6mr_multiaddr = ((const struct sockaddr_in6*)&gsr->gsr_group)->sin6_addr;
 		mreq6.ipv6mr_interface = gsr->gsr_interface;
-
-		retval = setsockopt (s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq6, sizeof(mreq6));
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_JOIN_GROUP, (const char*)&mreq6, sizeof(mreq6));
 	}
 	break;
 
@@ -294,73 +307,76 @@ static inline int pgm_sockaddr_multicast_if (int s, const struct sockaddr* addre
 	int retval = -1;
 
 	switch (pgm_sockaddr_family(address)) {
-	case AF_INET:
-	{
-		const struct in_addr interface = ((const struct sockaddr_in*)address)->sin_addr;
-		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, &interface, sizeof(interface));
+	case AF_INET: {
+		const struct in_addr ifaddr = ((const struct sockaddr_in*)address)->sin_addr;
+		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&ifaddr, sizeof(ifaddr));
 	}
 	break;
 
 	case AF_INET6:
-	{
-		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex, sizeof(ifindex));
-	}
-	break;
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, (const char*)&ifindex, sizeof(ifindex));
+		break;
 
 	default: break;
 	}
-
 	return retval;
 }
 
-static inline int pgm_sockaddr_multicast_loop (int s, int sa_family, gboolean v)
+static inline int pgm_sockaddr_multicast_loop (const int s, const int sa_family, const gboolean v)
 {
-    int retval = -1;
+	int retval = -1;
 
-    switch (sa_family) {
-    case AF_INET:
-    {
-    	gint8 optval = v;
-	retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_LOOP, &optval, sizeof(optval));
-	break;
-    }
+	switch (sa_family) {
+	case AF_INET: {
+		const gint8 optval = v;
+		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
+		break;
+	}
 
-    case AF_INET6:
-    {
-	gint optval = v;
-	retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &optval, sizeof(optval));
-	break;
-    }
+	case AF_INET6: {
+		const gint optval = v;
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
+		break;
+	}
 
-    default: break;
-    }
-
-    return retval;
+	default: break;
+	}
+	return retval;
 }
 
-static inline int pgm_sockaddr_multicast_hops (int s, int sa_family, gint hops)
+static inline int pgm_sockaddr_multicast_hops (const int s, const int sa_family, const gint hops)
 {
-    int retval = -1;
+	int retval = -1;
 
-    switch (sa_family) {
-    case AF_INET:
-    {
-    	gint8 optval = hops;
-	retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_TTL, &optval, sizeof(optval));
-	break;
-    }
+	switch (sa_family) {
+	case AF_INET: {
+		const gint8 optval = hops;
+		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_TTL, (const char*)&optval, sizeof(optval));
+		break;
+	}
 
-    case AF_INET6:
-    {
-    	gint optval = hops;
-	retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &optval, sizeof(optval));
-	break;
-    }
+	case AF_INET6: {
+		const gint optval = hops;
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char*)&optval, sizeof(optval));
+		break;
+	}
 
-    default: break;
-    }
+	default: break;
+	}
+	return retval;
+}
 
-    return retval;
+static inline void pgm_sockaddr_nonblocking (const int s, const gboolean v)
+{
+#ifdef G_OS_UNIX
+	int flags = fcntl (s, F_GETFL);
+	if (v) flags &= ~O_NONBLOCK;
+	else flags |= O_NONBLOCK;
+	fcntl (s, F_SETFL, flags);
+#else
+	u_long mode = v;
+	ioctlsocket (s, FIONBIO, &mode);
+#endif
 }
 
 G_END_DECLS

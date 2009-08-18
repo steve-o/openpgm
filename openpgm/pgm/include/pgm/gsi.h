@@ -22,9 +22,11 @@
 #ifndef __PGM_GSI_H__
 #define __PGM_GSI_H__
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
+#ifdef G_OS_UNIX
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <arpa/inet.h>
+#endif
 
 #include <glib.h>
 

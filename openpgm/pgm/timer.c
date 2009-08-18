@@ -111,9 +111,11 @@ pgm_timer_expiration (
 
 /* call all timers, assume that time_now has been updated by either pgm_timer_prepare
  * or pgm_timer_check and no other method calls here.
+ * 
+ * returns TRUE on success, returns FALSE on blocked operation.
  */
 
-void
+gboolean
 pgm_timer_dispatch (
 	pgm_transport_t* const	transport
 	)
@@ -129,17 +131,20 @@ pgm_timer_dispatch (
 		g_static_mutex_lock (&transport->mutex);
 		if (pgm_time_after_eq (pgm_time_now, transport->next_ambient_spm))
 		{
-			if (!pgm_send_spm_unlocked (transport))
-				g_warning ("Sending SPM broadcast failed.");
+			if (!pgm_send_spm_unlocked (transport)) {
+				g_static_mutex_unlock (&transport->mutex);
+				return FALSE;
+			}
 			transport->spm_heartbeat_state = 0;
 			transport->next_ambient_spm = pgm_time_now + transport->spm_ambient_interval;
 		}
 		else if (transport->spm_heartbeat_state &&
 			 pgm_time_after_eq (pgm_time_now, transport->next_heartbeat_spm))
 		{
-			if (!pgm_send_spm_unlocked (transport))
-				g_warning ("Sending SPM broadcast failed.");
-		
+			if (!pgm_send_spm_unlocked (transport)) {
+				g_static_mutex_unlock (&transport->mutex);
+				return FALSE;
+			}
 			if (transport->spm_heartbeat_interval[transport->spm_heartbeat_state])
 				transport->next_heartbeat_spm = pgm_time_now + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 			else	/* transition heartbeat to ambient */
@@ -151,10 +156,15 @@ pgm_timer_dispatch (
 	if (transport->can_recv_data) {
 		g_static_mutex_lock (&transport->mutex);
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		pgm_check_peer_nak_state (transport);
+		if (!pgm_check_peer_nak_state (transport)) {
+			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			g_static_mutex_unlock (&transport->mutex);
+			return FALSE;
+		}
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		g_static_mutex_unlock (&transport->mutex);
 	}
+	return TRUE;
 }
 
 /* eof */
