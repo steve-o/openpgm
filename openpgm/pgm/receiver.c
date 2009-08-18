@@ -511,14 +511,7 @@ pgm_new_peer (
 /* prod timer thread if sleeping */
 	g_static_mutex_lock (&transport->mutex);
 	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
-	{
 		transport->next_poll = peer->spmr_expiry;
-		g_trace ("INFO","new_peer: prod timer thread");
-		if (!pgm_notify_send (&transport->timer_notify)) {
-			g_critical ("notify to timer channel failed :(");
-			/* retval = -EINVAL; */
-		}
-	}
 	g_static_mutex_unlock (&transport->mutex);
 	return peer;
 }
@@ -548,7 +541,7 @@ pgm_flush_peers_pending (
 	g_assert (NULL != bytes_read);
 	g_assert (NULL != data_read);
 
-	g_trace ("pgm_flush_peers_pending (transport:%p pmsg:%p msg-end:%p bytes-read:%p data-read:%p)",
+	g_trace ("INFO","pgm_flush_peers_pending (transport:%p pmsg:%p msg-end:%p bytes-read:%p data-read:%p)",
 		(gpointer)transport, (gpointer)pmsg, (gconstpointer)msg_end, (gpointer)bytes_read, (gpointer)data_read);
 
 	while (transport->peers_pending)
@@ -698,10 +691,7 @@ pgm_on_spm (
 						   g_ntohl (spm->spm_trail),
 						   nak_rb_expiry);
 		if (naks && pgm_time_after (transport->next_poll, nak_rb_expiry))
-		{
 			transport->next_poll = nak_rb_expiry;
-			pgm_notify_send (&transport->timer_notify);
-		}
 
 /* mark receiver window for flushing on next recv() */
 		pgm_rxw_t* window = (pgm_rxw_t*)source->window;
@@ -2051,18 +2041,11 @@ discarded:
 	source->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += tsdu_length;
 	source->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]  += msg_count;
 
-	if (flush_naks)
-	{
+	if (flush_naks) {
 /* flush out 1st time nak packets */
 		g_static_mutex_lock (&transport->mutex);
-
 		if (pgm_time_after (transport->next_poll, nak_rb_expiry))
-		{
 			transport->next_poll = nak_rb_expiry;
-			g_trace ("INFO","pgm_on_odata: prod timer thread");
-			pgm_notify_send (&transport->timer_notify);
-		}
-
 		g_static_mutex_unlock (&transport->mutex);
 	}
 	return TRUE;

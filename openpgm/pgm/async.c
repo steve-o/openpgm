@@ -30,9 +30,10 @@
 #include "pgm/recv.h"
 #include "pgm/net.h"
 #include "pgm/async.h"
+#include "pgm/transport.h"
 
 
-//#define ASYNC_DEBUG
+#define ASYNC_DEBUG
 
 #ifndef ASYNC_DEBUG
 #       define g_trace(...)           while (0)
@@ -125,7 +126,7 @@ pgm_receiver_thread (
 
 	do {
 /* blocking read */
-		const GIOStatus status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
+		const GIOStatus status = pgm_recvmsg (async->transport, &msgv, MSG_DONTWAIT, &bytes_read, NULL);
 		if (G_IO_STATUS_NORMAL == status)
 		{
 /* queue a copy to receiver */
@@ -147,11 +148,46 @@ pgm_receiver_thread (
 				pgm_notify_send (&async->commit_notify);
 			g_async_queue_unlock (async->commit_queue);
 		}
-		else if (G_IO_STATUS_EOF == status && async->transport->is_abort_on_reset)
+		else if (G_IO_STATUS_AGAIN == status)
 		{
-			break;
+#ifdef CONFIG_HAVE_POLL
+			int n_fds = 2;
+			struct pollfd fds[1+n_fds];
+			memset (fds, 0, sizeof(fds));
+			fds[0].fd = pgm_notify_get_fd (&async->destroy_notify);
+			fds[0].events = POLLIN;
+			if (-1 == pgm_transport_poll_info (async->transport, &fds[1], &n_fds, POLLIN)) {
+				g_trace ("poll_info returned errno=%i",errno);
+				break;
+			}
+			const int ready = poll (fds, 1+n_fds, -1);
+#else
+			fd_set readfds;
+			int fd = pgm_notify_get_fd (&async->destroy_notify), n_fds = 1 + fd;
+			FD_ZERO(&readfds);
+			FD_SET(fd, &readfds);
+			if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
+				g_trace ("select_info returned errno=%i",errno);
+				break;
+			}
+			const int ready = select (n_fds, &readfds, NULL, NULL, NULL);
+#endif
+			if (-1 == ready) {
+				g_trace ("block returned errno=%i",errno);
+				break;
+			}
+#ifdef CONFIG_HAVE_POLL
+			if (ready > 0 && fds[0].revents)
+#else
+			if (ready > 0 && FD_ISSET(fd, &readfds))
+#endif
+				break;
 		}
-	} while (!async->quit);
+		else if (G_IO_STATUS_ERROR == status)
+			break;
+		else if (G_IO_STATUS_EOF == status && async->transport->is_abort_on_reset)
+			break;
+	} while (!async->is_destroyed);
 
 /* cleanup */
 	g_async_queue_unref (async->commit_queue);
@@ -181,11 +217,13 @@ pgm_async_create (
 
 	new_async = g_malloc0 (sizeof(pgm_async_t));
 	new_async->transport = transport;
-	if (0 != pgm_notify_init (&new_async->commit_notify)) {
+	if (0 != pgm_notify_init (&new_async->commit_notify) ||
+	    0 != pgm_notify_init (&new_async->destroy_notify))
+	{
 		g_set_error (error,
 			     PGM_ASYNC_ERROR,
 			     pgm_async_error_from_errno (errno),
-			     _("Creating async notification channel: %s"),
+			     _("Creating async notification channels: %s"),
 			     g_strerror (errno));
 		g_free (new_async);
 		return FALSE;
@@ -222,15 +260,17 @@ pgm_async_destroy (
 	)
 {
 	g_return_val_if_fail (NULL != async, FALSE);
+	g_return_val_if_fail (!async->is_destroyed, FALSE);
 
-	if (async->thread) {
-		async->quit = TRUE;
+	async->is_destroyed = TRUE;
+	pgm_notify_send (&async->destroy_notify);
+	if (async->thread)
 		g_thread_join (async->thread);
-	}
 	if (async->commit_queue) {
 		g_async_queue_unref (async->commit_queue);
 		async->commit_queue = NULL;
 	}
+	pgm_notify_destroy (&async->destroy_notify);
 	pgm_notify_destroy (&async->commit_notify);
 	g_free (async);
 	return TRUE;
@@ -342,7 +382,8 @@ pgm_src_dispatch (
         gpointer                user_data
         )
 {
-        g_trace ("pgm_src_dispatch");
+        g_trace ("pgm_src_dispatch (source:%p callback:() user-data:%p)",
+		(gpointer)source, user_data);
 
         const pgm_eventfn_t function = (pgm_eventfn_t)callback;
         pgm_watch_t* watch = (pgm_watch_t*)source;
@@ -382,28 +423,46 @@ pgm_async_recv (
 	)
 {
         g_return_val_if_fail (NULL != async, G_IO_STATUS_ERROR);
-	if (len)
-	        g_return_val_if_fail (NULL != data, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (NULL != bytes_read, G_IO_STATUS_ERROR);
+	if (len) g_return_val_if_fail (NULL != data, G_IO_STATUS_ERROR);
+
+	g_trace ("pgm_async_recv (async:%p data:%p len:%" G_GSIZE_FORMAT" bytes-read:%p flags:%d error:%p)",
+		(gpointer)async, data, len, (gpointer)bytes_read, flags, (gpointer)error);
 
 	pgm_event_t* event;
-
-	if (flags & MSG_DONTWAIT)
+	g_async_queue_lock (async->commit_queue);
+	if (g_async_queue_length_unlocked (async->commit_queue) == 0)
 	{
-		g_async_queue_lock (async->commit_queue);
-		if (g_async_queue_length_unlocked (async->commit_queue) == 0)
-		{
-			g_async_queue_unlock (async->commit_queue);
-			return G_IO_STATUS_AGAIN;
-		}
-
-		event = g_async_queue_pop_unlocked (async->commit_queue);
 		g_async_queue_unlock (async->commit_queue);
+		if (flags & MSG_DONTWAIT)
+			return G_IO_STATUS_AGAIN;
+#ifdef CONFIG_HAVE_POLL
+		struct pollfd fds[1];
+		int ready;
+		do {
+			memset (fds, 0, sizeof(fds));
+			fds[0].fd = pgm_notify_get_fd (&async->commit_notify);
+			fds[0].events = POLLIN;
+			ready = poll (fds, G_N_ELEMENTS(fds), -1);
+			if (-1 == ready || async->is_destroyed)	/* errno = EINTR */
+				return G_IO_STATUS_ERROR;
+		} while (ready <= 0);
+#else
+		fd_set readfds;
+		int n_fds, ready, fd = pgm_notify_get_fd (&async->commit_notify);
+		do {
+			FD_ZERO(&readfds);
+			FD_SET(fd, &readfds);
+			n_fds = fd + 1;
+			ready = select (n_fds, &readfds, NULL, NULL, NULL);
+			if (-1 == ready || async->is_destroyed)	/* errno = EINTR */
+				return G_IO_STATUS_ERROR;
+		} while (ready <= 0);
+#endif
+		pgm_notify_read (&async->commit_notify);
+		g_async_queue_lock (async->commit_queue);
 	}
-	else
-	{
-		event = g_async_queue_pop (async->commit_queue);
-	}
+	event = g_async_queue_pop_unlocked (async->commit_queue);
+	g_async_queue_unlock (async->commit_queue);
 
 /* pass data back to callee */
 	if (event->len > len) {
@@ -417,8 +476,9 @@ pgm_async_recv (
 		return G_IO_STATUS_ERROR;
 	}
 
-	*bytes_read = event->len;
-	memcpy (data, event->data, *bytes_read);
+	if (bytes_read)
+		*bytes_read = event->len;
+	memcpy (data, event->data, event->len);
 
 /* cleanup */
 	if (event->len) g_free (event->data);

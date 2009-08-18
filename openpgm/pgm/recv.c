@@ -190,7 +190,7 @@ on_upstream (
 	g_assert (NULL != skb);
 	g_assert_cmpuint (skb->pgm_header->pgm_dport, ==, transport->tsi.sport);
 
-	g_trace ("recvskb (transport:%p skb:%p)",
+	g_trace ("on_upstream (transport:%p skb:%p)",
 		(gpointer)transport, (gpointer)skb);
 
 	if (!transport->can_send_data) {
@@ -471,15 +471,17 @@ on_pgm (
 static
 int
 wait_for_event (
-	pgm_transport_t* const	transport
+	pgm_transport_t* const	transport,
+	const long		timeout		/* microseconds (μs) */
 	)
 {
 	int n_fds = 2;
 
 /* pre-conditions */
 	g_assert (NULL != transport);
+	g_assert (0 != timeout);
 
-	g_trace ("wait_for_event (transport:%p)", (gpointer)transport);
+	g_trace ("wait_for_event (transport:%p timeout:%ld)", (gpointer)transport, timeout);
 
 #ifdef CONFIG_HAVE_POLL
 	struct pollfd fds[ n_fds ];
@@ -509,9 +511,13 @@ wait_for_event (
 	g_static_mutex_unlock (&transport->pending_mutex);
 
 #ifdef CONFIG_HAVE_POLL
-	const int ready = poll (fds, n_fds, -1 /* timeout=∞ */);
+	const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
 #else
-	const int ready = select (n_fds, &readfds, NULL, NULL, NULL);
+	struct timeval tv_timeout = {
+		.tv_sec		= timeout > 1000000UL ? timeout / 1000000UL : 0,
+		.tv_usec	= timeout > 1000000UL ? timeout % 1000000UL : timeout
+	};
+	const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif
 
 	if (-1 == ready) {
@@ -521,9 +527,9 @@ wait_for_event (
 	g_static_mutex_lock (&transport->pending_mutex);
 
 #ifdef CONFIG_HAVE_POLL
-	if (fds[0].revents)
+	if (ready > 0 && fds[0].revents)
 #else
-	if (FD_ISSET(transport->recv_sock, &readfds))
+	if (ready > 0 && FD_ISSET(transport->recv_sock, &readfds))
 #endif
 	{
 		g_trace ("recv again on empty");
@@ -593,13 +599,19 @@ pgm_recvmsgv (
 		return G_IO_STATUS_EOF;
 	}
 
+/* lock waiting so extra events are not generated during call */
+	g_static_mutex_lock (&transport->pending_mutex);
+
+/* timer status */
+	if (pgm_timer_check (transport)) {
+		pgm_timer_dispatch (transport);
+		pgm_timer_prepare (transport);
+	}
+
 	gsize bytes_read = 0;
 	guint data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len;
-
-/* lock waiting so extra events are not generated during call */
-	g_static_mutex_lock (&transport->pending_mutex);
 
 /* second, flush any remaining contiguous messages from previous call(s) */
 	if (transport->peers_pending) {
@@ -678,12 +690,13 @@ check_for_repeat:
 /* repeat if blocking and empty, i.e. received non data packet.
  */
 		if (0 == data_read) {
-			const int wait_status = wait_for_event (transport);
+			const int wait_status = wait_for_event (transport, pgm_timer_expiration (transport));
 			if (EAGAIN == wait_status)
 				goto recv_again;
-			else if (EINTR == wait_status)
+			else if (EINTR == wait_status) {
+				pgm_timer_dispatch (transport);
 				goto flush_pending;
-			else if (EFAULT == wait_status) {
+			} else if (EFAULT == wait_status) {
 				g_set_error (error,
 					     PGM_RECV_ERROR,
 					     pgm_recv_error_from_errno (errno),

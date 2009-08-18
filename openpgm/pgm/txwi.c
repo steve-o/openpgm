@@ -397,7 +397,7 @@ pgm_txw_remove_tail (
  * added to queue.
  */
 
-int
+gboolean
 pgm_txw_retransmit_push (
 	pgm_txw_t* const	window,
 	const guint32		sequence,
@@ -414,7 +414,7 @@ pgm_txw_retransmit_push (
 
 /* early elimination */
 	if (pgm_txw_is_empty (window))
-		return 0;
+		return FALSE;
 
 	if (is_parity)
 	{
@@ -426,7 +426,7 @@ pgm_txw_retransmit_push (
 	}
 }
 
-int
+gboolean
 pgm_txw_retransmit_push_parity (
 	pgm_txw_t* const	window,
 	const guint32		sequence,
@@ -445,10 +445,9 @@ pgm_txw_retransmit_push_parity (
 	const guint32 nak_pkt_cnt = sequence & ~tg_sqn_mask;
 	skb = _pgm_txw_peek (window, nak_tg_sqn);
 
-	if (NULL == skb)
-	{
+	if (NULL == skb) {
 		g_trace ("transmission group lead #%" G_GUINT32_FORMAT " not in window.", nak_tg_sqn);
-		return 0;
+		return FALSE;
 	}
 
 	g_assert (pgm_skb_is_valid (skb));
@@ -461,13 +460,12 @@ pgm_txw_retransmit_push_parity (
 	{
 		g_assert (((const GList*)skb)->next);
 		g_assert (((const GList*)skb)->prev);
-		if (state->pkt_cnt_requested < nak_pkt_cnt)
-		{
+		if (state->pkt_cnt_requested < nak_pkt_cnt) {
 /* more parity packets requested than currently scheduled, simply bump up the count */
 			state->pkt_cnt_requested = nak_pkt_cnt;
 		}
 		g_static_mutex_unlock (&window->retransmit_mutex);
-		return 0;
+		return FALSE;
 	}
 	else
 	{
@@ -481,10 +479,10 @@ pgm_txw_retransmit_push_parity (
 	g_assert (!g_queue_is_empty (&window->retransmit_queue));
 	state->waiting_retransmit = 1;
 	g_static_mutex_unlock (&window->retransmit_mutex);
-	return 1;
+	return TRUE;
 }
 
-int
+gboolean
 pgm_txw_retransmit_push_selective (
 	pgm_txw_t* const	window,
 	const guint32		sequence
@@ -497,10 +495,9 @@ pgm_txw_retransmit_push_selective (
 	g_assert (window);
 
 	skb = _pgm_txw_peek (window, sequence);
-	if (NULL == skb)
-	{
+	if (NULL == skb) {
 		g_trace ("requested packet #%" G_GUINT32_FORMAT " not in window.", sequence);
-		return 0;
+		return FALSE;
 	}
 
 	g_assert (pgm_skb_is_valid (skb));
@@ -509,11 +506,10 @@ pgm_txw_retransmit_push_selective (
 
 /* check if request can be eliminated */
 	g_static_mutex_lock (&window->retransmit_mutex);
-	if (state->waiting_retransmit)
-	{
+	if (state->waiting_retransmit) {
 		g_assert (!g_queue_is_empty (&window->retransmit_queue));
 		g_static_mutex_unlock (&window->retransmit_mutex);
-		return 0;
+		return FALSE;
 	}
 
 	g_assert (((const GList*)skb)->next == NULL);
@@ -524,7 +520,7 @@ pgm_txw_retransmit_push_selective (
 	g_assert (!g_queue_is_empty (&window->retransmit_queue));
 	state->waiting_retransmit = 1;
 	g_static_mutex_unlock (&window->retransmit_mutex);
-	return 1;
+	return TRUE;
 }
 
 /* try to peek a request from the retransmit queue

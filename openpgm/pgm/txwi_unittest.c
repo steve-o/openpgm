@@ -498,7 +498,7 @@ START_TEST (test_trail_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	gboolean
  *	pgm_txw_retransmit_push (
  *		pgm_txw_t* const	window,
  *		const guint32		sequence,
@@ -513,14 +513,14 @@ START_TEST (test_retransmit_push_pass_001)
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
 	fail_if (NULL == window);
 /* empty window invalidates all requests */
-	fail_unless (0 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	fail_unless (FALSE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb);
 	pgm_txw_add (window, skb);
 /* first request */
-	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	fail_unless (TRUE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
 /* second request eliminated */
-	fail_unless (0 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	fail_unless (FALSE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
 	pgm_txw_shutdown (window);
 }
 END_TEST

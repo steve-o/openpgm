@@ -229,10 +229,6 @@ struct pgm_transport_t {
 	guint16			udp_encap_mcast_port;
 
 	GStaticMutex		mutex;
-	GThread*		timer_thread;
-	GMainLoop*		timer_loop;
-	GMainContext*		timer_context;
-	guint               	timer_id;
 	gboolean		is_bound;
 	gboolean		is_destroyed;
 	gboolean            	is_reset;
@@ -315,18 +311,9 @@ struct pgm_transport_t {
 	GStaticMutex		pending_mutex;
 	pgm_notify_t		pending_notify;		    /* timer to rx */
 	gboolean		is_pending_read;
-
 	pgm_notify_t		rdata_notify;		    /* rx to timer */
-	GIOChannel*		rdata_channel;
-	guint			rdata_id;
-
-	pgm_time_t		next_poll;
 	pgm_notify_t		timer_notify;		    /* any to timer */
-	GIOChannel*		notify_channel;
-	guint          	     	notify_id;
-	pgm_notify_t		timer_shutdown;
-	GIOChannel*		shutdown_channel;
-	guint               	shutdown_id;
+	pgm_time_t		next_poll;
 
 	guint32			cumulative_stats[PGM_PC_SOURCE_MAX];
 	guint32			snap_stats[PGM_PC_SOURCE_MAX];
@@ -371,12 +358,12 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
-int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
+int pgm_transport_select_info (pgm_transport_t* const, fd_set* const, fd_set* const, int* const);
 #ifdef CONFIG_HAVE_POLL
-int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
+int pgm_transport_poll_info (pgm_transport_t* const, struct pollfd* const, int* const, const int);
 #endif
 #ifdef CONFIG_HAVE_EPOLL
-int pgm_transport_epoll_ctl (pgm_transport_t*, int, int, int);
+int pgm_transport_epoll_ctl (pgm_transport_t* const, const int, const int, const int);
 #endif
 
 int pgm_transport_join_group (pgm_transport_t*, struct group_req*, gsize);

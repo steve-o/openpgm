@@ -80,7 +80,7 @@
 
 /* locals */
 static int send_spm (pgm_transport_t* const);
-static int reset_heartbeat_spm (pgm_transport_t* const);
+static void reset_heartbeat_spm (pgm_transport_t* const);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
 static GIOStatus send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, const int, gsize*);
@@ -246,23 +246,22 @@ pgm_transport_set_txw_max_rte (
 
 /* prototype of function to send pro-active parity NAKs.
  */
-static int
+static
+gboolean
 pgm_schedule_proactive_nak (
 	pgm_transport_t*	transport,
 	guint32			nak_tg_sqn	/* transmission group (shifted) */
 	)
 {
-	int retval = 0;
-
-	pgm_txw_retransmit_push (transport->window,
-				 nak_tg_sqn | transport->rs_proactive_h,
-				 TRUE /* is_parity */,
-				 transport->tg_sqn_shift);
-	if (!pgm_notify_send (&transport->rdata_notify)) {
-		g_critical ("send to rdata notify channel failed :(");
-		retval = -EINVAL;
+	g_return_val_if_fail (NULL != transport, FALSE);
+	if (pgm_txw_retransmit_push (transport->window,
+				     nak_tg_sqn | transport->rs_proactive_h,
+				     TRUE /* is_parity */,
+				     transport->tg_sqn_shift))
+	{
+		pgm_notify_send (&transport->rdata_notify);
 	}
-	return retval;
+	return TRUE;
 }
 
 /* a deferred request for RDATA, now processing in the timer thread, we check the transmit
@@ -855,29 +854,21 @@ send_ncf_list (
  */
 
 static
-int
+void
 reset_heartbeat_spm (pgm_transport_t* transport)
 {
-	int retval = 0;
-
 	g_static_mutex_lock (&transport->mutex);
 
 /* re-set spm timer */
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 
-/* prod timer thread if sleeping */
-	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
-	{
+/* prod recv thread if sleeping */
+	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm )) {
 		transport->next_poll = transport->next_heartbeat_spm;
-		g_trace ("INFO","reset_heartbeat_spm: prod timer thread");
-		if (!pgm_notify_send (&transport->timer_notify)) {
-			g_critical ("send to timer notify channel failed :(");
-			retval = -EINVAL;
-		}
+		pgm_notify_send (&transport->timer_notify);
 	}
 	g_static_mutex_unlock (&transport->mutex);
-	return retval;
 }
 
 /* state helper for resuming sends

@@ -119,7 +119,7 @@ main (
 	signal (SIGSEGV, on_sigsegv);
 	signal (SIGHUP, SIG_IGN);
 
-	if (!create_transport ())
+	if (create_transport ())
 	{
 		while (optind < argc) {
 			const GIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0, NULL);
@@ -195,8 +195,7 @@ create_transport (void)
 		g_transport = NULL;
 		return FALSE;
 	}
-
-	return FALSE;
+	return TRUE;
 }
 
 /* eof */

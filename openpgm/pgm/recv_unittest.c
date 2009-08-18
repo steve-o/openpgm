@@ -790,6 +790,42 @@ mock_pgm_sendto (
 	return len;
 }
 
+/** timer module */
+static
+gboolean
+mock_pgm_timer_prepare (
+	pgm_transport_t* const		transport
+	)
+{
+	return FALSE;
+}
+
+static
+gboolean
+mock_pgm_timer_check (
+	pgm_transport_t* const		transport
+	)
+{
+	return FALSE;
+}
+
+static
+long
+mock_pgm_timer_expiration (
+	pgm_transport_t* const		transport
+	)
+{
+	return 100L;
+}
+
+static
+void
+mock_pgm_timer_dispatch (
+	pgm_transport_t* const		transport
+	)
+{
+}
+
 /** time module */
 static pgm_time_t mock_pgm_time_now = 0x1;
 
@@ -864,6 +900,10 @@ mock_recvmsg (
 #define pgm_on_ncf		mock_pgm_on_ncf
 #define pgm_on_spmr		mock_pgm_on_spmr
 #define pgm_sendto		mock_pgm_sendto
+#define pgm_timer_prepare	mock_pgm_timer_prepare
+#define pgm_timer_check		mock_pgm_timer_check
+#define pgm_timer_expiration	mock_pgm_timer_expiration
+#define pgm_timer_dispatch	mock_pgm_timer_dispatch
 #define pgm_time_now		mock_pgm_time_now
 #define pgm_time_update_now	mock_pgm_time_update_now
 #define recvmsg			mock_recvmsg
