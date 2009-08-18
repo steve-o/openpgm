@@ -195,7 +195,7 @@ mock_fcntl (
 		va_start (args, cmd);
 		arg = va_arg (args, long);
 		va_end (args);
-		g_debug ("mock_fcntl (fd:%d cmd:F_SETFL arg:%d)", fd, arg);
+		g_debug ("mock_fcntl (fd:%d cmd:F_SETFL arg:%ld)", fd, arg);
 		return arg;
 	}
 	g_assert_not_reached();

@@ -14,6 +14,8 @@ vars.AddVariables (
 			allowed_values=('release', 'debug', 'profile')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('COVERAGE', 'test coverage', 'none',
+			allowed_values=('none', 'full')),
 	EnumVariable ('WITH_HTTP', 'HTTP administration', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_SNMP', 'SNMP administration', 'true',
@@ -27,6 +29,8 @@ vars.AddVariables (
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'true',
 			allowed_values=('true', 'false')),
@@ -128,6 +132,13 @@ if env['BRANCH'] == 'profile':
 	env.Append(LINKFLAGS = '-fprofile-arcs')
 elif env['BRANCH'] == 'seed':
 	env.Append(CCFLAGS = '-fbranch-probabilities')
+
+# Coverage analysis
+if env['COVERAGE'] == 'full':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(CCFLAGS = '-ftest-coverage')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-lgcov')
 
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
@@ -268,9 +279,5 @@ if env['WITH_DEV'] == 'true':
 	SConscript(ref_node + 'dev/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
-
-# unit testing framework optional.
-if env['WITH_CHECK'] and env['CHECK'] == 'true':
- 	SConscript(ref_node + 'check/SConscript');
 
 # end of file
