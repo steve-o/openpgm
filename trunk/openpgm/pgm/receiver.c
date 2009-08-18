@@ -80,10 +80,10 @@
 #endif
 
 
-static int send_spmr (pgm_transport_t* const, pgm_peer_t* const);
-static int send_nak (pgm_transport_t* const, pgm_peer_t* const, const guint32);
-static int send_parity_nak (pgm_transport_t* const, pgm_peer_t* const, const guint, const guint);
-static int send_nak_list (pgm_transport_t* const, pgm_peer_t* const, const pgm_sqn_list_t* const);
+static gboolean send_spmr (pgm_transport_t* const, pgm_peer_t* const);
+static gboolean send_nak (pgm_transport_t* const, pgm_peer_t* const, const guint32);
+static gboolean send_parity_nak (pgm_transport_t* const, pgm_peer_t* const, const guint, const guint);
+static gboolean send_nak_list (pgm_transport_t* const, pgm_peer_t* const, const pgm_sqn_list_t* const);
 static gboolean nak_rb_state (pgm_peer_t*);
 static void nak_rpt_state (pgm_peer_t*);
 static void nak_rdata_state (pgm_peer_t*);
@@ -1089,7 +1089,7 @@ send_spmr (
 			    MSG_CONFIRM,		/* not expecting a reply */
 			    (struct sockaddr*)&source->local_nla,
 			    pgm_sockaddr_len(&source->local_nla));
-	if ( sent != (gssize)(tpdu_length * 2) ) 
+	if (-1 == sent && EAGAIN == errno)
 		return FALSE;
 
 	source->spmr_expiry = 0;
@@ -1099,11 +1099,10 @@ send_spmr (
 
 /* send selective NAK for one sequence number.
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned, returns FALSE if would block on operation.
  */
 static
-int
+gboolean
 send_nak (
 	pgm_transport_t* const	transport,
 	pgm_peer_t* const	source,
@@ -1156,21 +1155,20 @@ send_nak (
 				  MSG_CONFIRM,		/* not expecting a reply */
 				  (struct sockaddr*)&source->nla,
 				  pgm_sockaddr_len(&source->nla));
-	if ( sent != (gssize)tpdu_length )
-		return -1;
+	if (-1 == sent && EAGAIN == errno)
+		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT]++;
-	return 0;
+	return TRUE;
 }
 
 /* Send a parity NAK requesting on-demand parity packet generation.
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned, returns FALSE if operation would block.
  */
 static
-int
+gboolean
 send_parity_nak (
 	pgm_transport_t* const	transport,
 	pgm_peer_t* const	source,
@@ -1217,20 +1215,20 @@ send_parity_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
-				  FALSE,		/* not rate limited */
-				  TRUE,			/* with router alert */
-				  header,
-				  tpdu_length,
-				  MSG_CONFIRM,		/* not expecting a reply */
-				  (struct sockaddr*)&source->nla,
-				  pgm_sockaddr_len(&source->nla));
-	if ( sent != (gssize)tpdu_length )
-		return -1;
+	const gssize sent = pgm_sendto (transport,
+					FALSE,		/* not rate limited */
+					TRUE,			/* with router alert */
+					header,
+					tpdu_length,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&source->nla,
+					pgm_sockaddr_len(&source->nla));
+	if (-1 == sent && EAGAIN == errno)
+		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT]++;
 	source->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAKS_SENT]++;
-	return 0;
+	return TRUE;
 }
 
 /* A NAK packet with a OPT_NAK_LIST option extension
@@ -1240,7 +1238,7 @@ send_parity_nak (
  */
 
 static
-int
+gboolean
 send_nak_list (
 	pgm_transport_t* const		transport,
 	pgm_peer_t* const		source,
@@ -1331,11 +1329,11 @@ send_nak_list (
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
 	if ( sent != (gssize)tpdu_length )
-		return -1;
+		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT] += 1 + sqn_list->len;
-	return 0;
+	return TRUE;
 }
 
 /* check all receiver windows for packets in BACK-OFF_STATE, on expiration send a NAK.

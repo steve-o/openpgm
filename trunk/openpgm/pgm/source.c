@@ -647,7 +647,7 @@ pgm_send_spm_unlocked (
 					MSG_CONFIRM,			/* not expecting a reply */
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if ( sent != (gssize)tpdu_length )
+	if (-1 == sent && EAGAIN == errno)
 		return FALSE;
 /* advance SPM sequence only on successful transmission */
 	transport->spm_sqn++;
@@ -657,7 +657,7 @@ pgm_send_spm_unlocked (
 
 /* send a NAK confirm (NCF) message with provided sequence number list.
  *
- * on success, TRUE is returned.  on error, FALSE is returned.
+ * on success, TRUE is returned, returns FALSE if operation would block.
  */
 
 static
@@ -716,14 +716,14 @@ send_ncf (
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	const gssize sent = pgm_sendto (transport,
-					 FALSE,			/* not rate limited */
-					 TRUE,			/* with router alert */
-					 header,
-					 tpdu_length,
-					 MSG_CONFIRM,		/* not expecting a reply */
-					 (struct sockaddr*)&transport->send_gsr.gsr_group,
-					 pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if ( sent != (gssize)tpdu_length )
+					FALSE,			/* not rate limited */
+					TRUE,			/* with router alert */
+					header,
+					tpdu_length,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_gsr.gsr_group,
+					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	if (-1 == sent && EAGAIN == errno)
 		return FALSE;
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
 	return TRUE;
@@ -823,15 +823,15 @@ send_ncf_list (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	gssize sent = pgm_sendto (transport,
-				  FALSE,			/* not rate limited */
-				  TRUE,			/* with router alert */
-				  header,
-				  tpdu_length,
-				  MSG_CONFIRM,		/* not expecting a reply */
-				  (struct sockaddr*)&transport->send_gsr.gsr_group,
-				  pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if ( sent != (gssize)tpdu_length )
+	const gssize sent = pgm_sendto (transport,
+					FALSE,			/* not rate limited */
+					TRUE,			/* with router alert */
+					header,
+					tpdu_length,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_gsr.gsr_group,
+					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	if (-1 == sent && EAGAIN == errno)
 		return FALSE;
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
 	return TRUE;
@@ -1910,16 +1910,19 @@ send_rdata (
 	guint32 unfolded_odata		= pgm_txw_get_unfolded_checksum (skb);
 	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
-	gssize sent = pgm_sendto (transport,
-				   TRUE,			/* rate limited */
-				   TRUE,			/* with router alert */
-				   header,
-				   skb->len,
-				   MSG_CONFIRM,		/* not expecting a reply */
-				   (struct sockaddr*)&transport->send_gsr.gsr_group,
-				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	const gssize sent = pgm_sendto (transport,
+					TRUE,			/* rate limited */
+					TRUE,			/* with router alert */
+					header,
+					skb->len,
+					MSG_CONFIRM,		/* not expecting a reply */
+					(struct sockaddr*)&transport->send_gsr.gsr_group,
+					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 /* re-save unfolded payload for further retransmissions */
 	pgm_txw_set_unfolded_checksum (skb, unfolded_odata);
+
+	if (-1 == sent && EAGAIN == errno)
+		return FALSE;
 
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */
@@ -1928,8 +1931,6 @@ send_rdata (
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	g_static_mutex_unlock (&transport->mutex);
 
-	if ( sent != (gssize)skb->len )
-		return FALSE;
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += skb->len + transport->iphdr_len;
