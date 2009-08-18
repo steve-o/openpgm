@@ -84,7 +84,6 @@ generate_transport (void)
 	transport->iphdr_len = sizeof(struct pgm_ip);
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	transport->spm_heartbeat_interval[0] = pgm_secs(1);
-	pgm_notify_init (&transport->rdata_notify);
 	return transport;
 }
 
@@ -677,25 +676,22 @@ START_TEST (test_send_spm_unlocked_fail_001)
 END_TEST
 
 /* target:
- *	gboolean
- *	pgm_on_nak_notify (
- *		GIOChannel*		source,
- *		GIOCondition		condition,
- *		gpointer		data
+ *	void
+ *	pgm_on_deferred_nak (
+ *		pgm_transport_t*	transport
  *		)
  */
 
-START_TEST (test_on_nak_notify_pass_001)
+START_TEST (test_on_deferred_nak_pass_001)
 {
-	GIOChannel* source = g_malloc0 (sizeof(GIOChannel));
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_on_nak_notify (source, G_IO_IN, transport));
+	pgm_on_deferred_nak (transport);
 }
 END_TEST
 	
-START_TEST (test_on_nak_notify_fail_001)
+START_TEST (test_on_deferred_nak_fail_001)
 {
-	pgm_on_nak_notify (NULL, 0, NULL);
+	pgm_on_deferred_nak (NULL);
 	fail ();
 }
 END_TEST
@@ -996,11 +992,11 @@ make_test_suite (void)
 	tcase_add_test (tc_send_spm_unlocked, test_send_spm_unlocked_pass_001);
 	tcase_add_test_raise_signal (tc_send_spm_unlocked, test_send_spm_unlocked_fail_001, SIGABRT);
 
-	TCase* tc_on_nak_notify = tcase_create ("on-nak-notify");
-	suite_add_tcase (s, tc_on_nak_notify);
-	tcase_add_checked_fixture (tc_on_nak_notify, mock_setup, NULL);
-	tcase_add_test (tc_on_nak_notify, test_on_nak_notify_pass_001);
-	tcase_add_test_raise_signal (tc_on_nak_notify, test_on_nak_notify_fail_001, SIGABRT);
+	TCase* tc_on_deferred_nak = tcase_create ("on-deferred-nak");
+	suite_add_tcase (s, tc_on_deferred_nak);
+	tcase_add_checked_fixture (tc_on_deferred_nak, mock_setup, NULL);
+	tcase_add_test (tc_on_deferred_nak, test_on_deferred_nak_pass_001);
+	tcase_add_test_raise_signal (tc_on_deferred_nak, test_on_deferred_nak_fail_001, SIGABRT);
 
 	TCase* tc_on_spmr = tcase_create ("on-spmr");
 	suite_add_tcase (s, tc_on_spmr);

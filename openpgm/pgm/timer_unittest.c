@@ -39,7 +39,6 @@ pgm_transport_t*
 generate_transport (void)
 {
 	pgm_transport_t* transport = g_malloc0 (sizeof(pgm_transport_t));
-	pgm_notify_init (&transport->timer_notify);
 	return transport;
 }
 

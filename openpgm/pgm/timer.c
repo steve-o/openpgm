@@ -155,9 +155,6 @@ pgm_timer_dispatch (
 		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 		g_static_mutex_unlock (&transport->mutex);
 	}
-
-/* consume any notification */
-	pgm_notify_clear (&transport->timer_notify);
 }
 
 /* eof */

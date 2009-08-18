@@ -151,6 +151,12 @@ static inline void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t* skb, con
 	state->unfolded_checksum = csum;
 }
 
+static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
+{
+	g_assert (window);
+	return g_queue_is_empty (&window->retransmit_queue);
+}
+
 G_END_DECLS
 
 #endif /* __PGM_TXW_H__ */

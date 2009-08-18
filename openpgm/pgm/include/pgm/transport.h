@@ -311,8 +311,6 @@ struct pgm_transport_t {
 	GStaticMutex		pending_mutex;
 	pgm_notify_t		pending_notify;		    /* timer to rx */
 	gboolean		is_pending_read;
-	pgm_notify_t		rdata_notify;		    /* rx to timer */
-	pgm_notify_t		timer_notify;		    /* any to timer */
 	pgm_time_t		next_poll;
 
 	guint32			cumulative_stats[PGM_PC_SOURCE_MAX];
