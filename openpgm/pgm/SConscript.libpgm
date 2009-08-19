@@ -33,6 +33,7 @@ src = Split("""
 		checksum.c
 		reed_solomon.c
 		galois_tables.c
+		wsastrerror.c
 """)
 
 e = env.Clone();
