@@ -84,6 +84,9 @@
 #		define g_trace(m,...)		do { if (strcmp((m),"SPM")) { g_debug(__VA_ARGS__); } } while (0)
 #	endif
 #endif
+#ifndef g_assert_cmpuint
+#	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
+#endif
 
 #ifndef ENOBUFS
 #	define ENOBUFS		WSAENOBUFS

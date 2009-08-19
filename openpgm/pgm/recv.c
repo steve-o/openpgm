@@ -82,6 +82,9 @@
 #else
 #	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
+#ifndef g_assert_cmpuint
+#	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
+#endif
 
 
 #ifdef G_OS_WIN32
