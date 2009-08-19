@@ -22,20 +22,23 @@
 
 #include <errno.h>
 #include <getopt.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <netinet/in.h>
+#	include <sys/socket.h>
+#	include <arpa/inet.h>
+#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -112,7 +115,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
+#ifdef SIGHUP
 	signal (SIGHUP,  SIG_IGN);
+#endif
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
@@ -123,20 +128,16 @@ main (
 /* dispatch loop */
 	g_message ("entering main event loop ... ");
 	g_main_loop_run (g_loop);
-
 	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
 	g_main_loop_unref(g_loop);
 	g_loop = NULL;
-
 	if (g_transport) {
 		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
-
 	g_message ("finished.");
 	return 0;
 }
@@ -159,7 +160,6 @@ gboolean
 on_startup (void)
 {
 	GError* err = NULL;
-
 	g_message ("startup.");
 	g_message ("create transport.");
 
@@ -252,11 +252,9 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
-
 	g_message ("\"%s\" (%i bytes)",
 			buf,
 			len);
-
 	return 0;
 }
 

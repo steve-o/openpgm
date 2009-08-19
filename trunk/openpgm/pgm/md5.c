@@ -24,14 +24,19 @@
  */
 
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
 #include <glib.h>
 
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#endif
+
 #include "pgm/md5.h"
+
 
 //#define MD5_DEBUG
 

@@ -49,16 +49,25 @@
 #define __PGM_IP_H__
 
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <glib.h>
 
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
+#endif
+
 #ifndef __PGM_SOCKADDR_H__
 #	include "pgm/sockaddr.h"
+#endif
+
+#ifdef G_OS_WIN32
+#	define EAFNOSUPPORT		WSAEAFNOSUPPORT
 #endif
 
 

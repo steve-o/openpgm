@@ -79,14 +79,14 @@ static GSourceFuncs g_pgm_watch_funcs = {
 };
 
 
-static inline gpointer pgm_event_alloc (pgm_async_t*) G_GNUC_MALLOC;
-static PGMAsyncError pgm_async_error_from_errno (gint);
+static inline gpointer pgm_event_alloc (pgm_async_t* const) G_GNUC_MALLOC;
+static PGMAsyncError pgm_async_error_from_errno (const gint);
 
 
 static inline
 gpointer
 pgm_event_alloc (
-	pgm_async_t*	async
+	pgm_async_t* const	async
 	)
 {
 	g_return_val_if_fail (async != NULL, NULL);
@@ -99,10 +99,12 @@ pgm_event_alloc (
 static inline
 void
 pgm_event_unref (
-        G_GNUC_UNUSED pgm_async_t*	async,
-        pgm_event_t*	event
+        pgm_async_t* const	async,
+        pgm_event_t* const	event
         )
 {
+	g_return_if_fail (async != NULL);
+	g_return_if_fail (event != NULL);
 	g_slice_free1 (sizeof(pgm_event_t), event);
 }
 
@@ -126,7 +128,7 @@ pgm_receiver_thread (
 
 	do {
 /* blocking read */
-		const GIOStatus status = pgm_recvmsg (async->transport, &msgv, MSG_DONTWAIT, &bytes_read, NULL);
+		const GIOStatus status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
 		if (G_IO_STATUS_NORMAL == status)
 		{
 /* queue a copy to receiver */
@@ -166,7 +168,7 @@ pgm_receiver_thread (
 			int fd = pgm_notify_get_fd (&async->destroy_notify), n_fds = 1 + fd;
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
-			if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
+			if (-1 == pgm_transport_select_info (async->transport, &readfds, NULL, &n_fds)) {
 				g_trace ("select_info returned errno=%i",errno);
 				break;
 			}
@@ -203,7 +205,7 @@ pgm_receiver_thread (
 gboolean
 pgm_async_create (
 	pgm_async_t**		async,
-	pgm_transport_t*	transport,
+	pgm_transport_t* const	transport,
 	GError**		error
 	)
 {
@@ -256,7 +258,7 @@ pgm_async_create (
 
 gboolean
 pgm_async_destroy (
-	pgm_async_t*		async
+	pgm_async_t* const	async
 	)
 {
 	g_return_val_if_fail (NULL != async, FALSE);
@@ -414,11 +416,11 @@ pgm_src_dispatch (
 
 GIOStatus
 pgm_async_recv (
-	pgm_async_t*		async,
+	pgm_async_t* const	async,
 	gpointer		data,
-	gsize			len,
-	gsize*			bytes_read,
-	int			flags,		/* MSG_DONTWAIT for non-blocking */
+	const gsize		len,
+	gsize* const		bytes_read,
+	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	GError**		error
 	)
 {
@@ -433,7 +435,7 @@ pgm_async_recv (
 	if (g_async_queue_length_unlocked (async->commit_queue) == 0)
 	{
 		g_async_queue_unlock (async->commit_queue);
-		if (flags & MSG_DONTWAIT)
+		if (flags & MSG_DONTWAIT || async->is_nonblocking)
 			return G_IO_STATUS_AGAIN;
 #ifdef CONFIG_HAVE_POLL
 		struct pollfd fds[1];
@@ -486,6 +488,17 @@ pgm_async_recv (
 	return G_IO_STATUS_NORMAL;
 }
 
+gboolean
+pgm_async_set_nonblocking (
+	pgm_async_t* const	async,
+	const gboolean		nonblocking
+	)
+{
+        g_return_val_if_fail (NULL != async, FALSE);
+	async->is_nonblocking = nonblocking;
+	return TRUE;
+}
+
 GQuark
 pgm_async_error_quark (void)
 {
@@ -495,8 +508,8 @@ pgm_async_error_quark (void)
 static
 PGMAsyncError
 pgm_async_error_from_errno (
-        gint            err_no
-        )
+	const gint		err_no
+	)
 {
         switch (err_no) {
 #ifdef EFAULT

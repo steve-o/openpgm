@@ -19,11 +19,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <glib.h>
 
 #include <errno.h>
-#include <glib.h>
 #include <sys/types.h>
-#include <sys/socket.h>
+
+#ifdef G_OS_UNIX
+#	include <sys/socket.h>
+#endif
 
 #include "pgm/time.h"
 
@@ -90,7 +93,7 @@ gboolean
 pgm_rate_check (
 	rate_t*			bucket,
 	const guint		data_size,
-	const int		flags		/* MSG_DONTWAIT = non-blocking */
+	const gboolean		is_nonblocking
 	)
 {
 /* pre-conditions */
@@ -110,9 +113,7 @@ pgm_rate_check (
 	bucket->last_rate_check = pgm_time_now;
 
 	const gint new_rate_limit = bucket->rate_limit - ( bucket->iphdr_len + data_size );
-	if (flags & MSG_DONTWAIT &&
-		new_rate_limit < 0)
-	{
+	if (is_nonblocking && new_rate_limit < 0) {
 		g_static_mutex_unlock (&bucket->mutex);
 		return FALSE;
 	}

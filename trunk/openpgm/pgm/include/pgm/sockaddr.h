@@ -24,6 +24,8 @@
 
 #include <errno.h>
 
+#include <glib.h>
+
 #ifdef G_OS_UNIX
 #	include <fcntl.h>
 #	include <netdb.h>
@@ -35,8 +37,6 @@
 #else
 #	include <ws2tcpip.h>
 #endif
-
-#include <glib.h>
 
 
 #ifndef __PGM_IF_H__
@@ -66,6 +66,15 @@
 #endif
 #ifndef MSG_CONFIRM
 #	define MSG_CONFIRM		0
+#endif
+#ifndef MSG_DONTWAIT
+#	define MSG_DONTWAIT		0
+#endif
+#ifndef MSG_FIN
+#	define MSG_FIN			0x200
+#endif
+#ifndef MSG_ERRQUEUE
+#	define MSG_ERRQUEUE		0x2000
 #endif
 #if !defined(IP_ROUTER_ALERT) && !defined(G_OS_WIN32)
 #	include <netinet/ip.h>

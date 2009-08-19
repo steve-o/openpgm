@@ -21,16 +21,22 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <ipexport.h>
+#endif
 
 #include "pgm/ip.h"
 #include "pgm/checksum.h"
@@ -48,6 +54,20 @@
 
 
 /* globals */
+
+#ifndef IPOPT_NOP
+#	define IPOPT_NOP	IP_OPT_NOP
+#endif
+#ifndef IPOPT_EOL
+#	define IPOPT_EOL	IP_OPT_EOL
+#endif
+#ifndef IPOPT_RR
+#	define IPOPT_RR		IP_OPT_RR
+#endif
+#ifndef IPOPT_TS
+#	define IPOPT_TS		IP_OPT_TS
+#endif
+
 
 static gboolean pgm_parse (struct pgm_sk_buff_t* const, GError**);
 static gboolean pgm_print_spm (struct pgm_header*, gpointer, gsize);

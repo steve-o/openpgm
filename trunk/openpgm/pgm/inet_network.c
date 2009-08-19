@@ -20,17 +20,24 @@
  */
 
 #include <ctype.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-
 #include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
+#	include <iphlpapi.h>
+#endif
 
 #include "pgm/inet_network.h"
 #include "pgm/ip.h"
+
 
 //#define INET_NETWORK_DEBUG
 

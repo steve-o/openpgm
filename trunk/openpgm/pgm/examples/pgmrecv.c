@@ -22,24 +22,27 @@
 
 #include <errno.h>
 #include <getopt.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <netinet/in.h>
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
-#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/uio.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <arpa/inet.h>
+#	include <netinet/in.h>
+#	include <sys/socket.h>
+#	include <sys/uio.h>
+#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -51,18 +54,8 @@
 #	include <pgm/snmp.h>
 #endif
 
-/* typedefs */
 
 /* globals */
-
-#ifndef SC_IOV_MAX
-#ifdef _SC_IOV_MAX
-#	define SC_IOV_MAX	_SC_IOV_MAX
-#else
-#	SC_IOV_MAX and _SC_IOV_MAX undefined too, please fix.
-#endif
-#endif
-
 
 static int g_port = 7500;
 static const char* g_network = "";
@@ -112,7 +105,9 @@ main (
 	char*		argv[]
 	)
 {
+#if defined(CONFIG_WITH_HTTP) || defined(CONFIG_WITH_SNMP)
 	GError* err = NULL;
+#endif
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
 #endif
@@ -185,7 +180,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
+#ifdef SIGHUP
 	signal (SIGHUP,  SIG_IGN);
+#endif
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
@@ -354,8 +351,7 @@ receiver_thread (
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
-	long iov_max = sysconf( SC_IOV_MAX );
-	pgm_msgv_t msgv[iov_max];
+	pgm_msgv_t msgv[ 20 ];
 
 #ifdef CONFIG_HAVE_EPOLL
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
@@ -371,10 +367,12 @@ receiver_thread (
 		g_main_loop_quit(g_loop);
 		return NULL;
 	}
-#else
+#elif defined(CONFIG_HAVE_POLL)
 	int n_fds = 2;
 	struct pollfd fds[ n_fds ];
-	
+#else
+	int n_fds = 2;
+	fd_set readfds;
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
@@ -382,7 +380,7 @@ receiver_thread (
 		GError* err = NULL;
 		const GIOStatus status = pgm_recvmsgv (transport,
 						       msgv,
-						       iov_max,
+						       G_N_ELEMENTS(msgv),
 						       MSG_DONTWAIT, /* non-blocking */
 						       &len,
 						       &err);
@@ -392,10 +390,14 @@ receiver_thread (
 #ifdef CONFIG_HAVE_EPOLL
 			struct epoll_event events[1];	/* wait for maximum 1 event */
 			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
-#else
+#elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
 			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
 			poll (fds, n_fds, 1000 /* ms */);
+#else
+			FD_ZERO(&readfds);
+			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
+			select (n_fds, &readfds, NULL, NULL, NULL);
 #endif /* !CONFIG_HAVE_EPOLL */
 		} else {
 			if (err) {

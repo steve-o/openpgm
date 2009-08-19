@@ -23,6 +23,9 @@
 #define __PGM_PACKET_H__
 
 #include <errno.h>
+
+#include <glib.h>
+
 #ifdef G_OS_UNIX
 #	include <netinet/in.h>
 #	include <sys/socket.h>
@@ -30,8 +33,6 @@
 #else
 #	include <ws2tcpip.h>
 #endif
-
-#include <glib.h>
 
 
 /* protocol number assigned by IANA */

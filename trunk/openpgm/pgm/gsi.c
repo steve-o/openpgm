@@ -20,17 +20,24 @@
  */
 
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
-#include <netinet/in.h>
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <netinet/in.h>
+#else
+#	include <ws2tcpip.h>
+#endif
+
 #include "pgm/md5.h"
 #include "pgm/gsi.h"
+
 
 //#define GSI_DEBUG
 

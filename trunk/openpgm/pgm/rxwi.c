@@ -19,7 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include <errno.h>
 #include <getopt.h>
 #include <signal.h>
@@ -30,15 +29,12 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <sys/uio.h>
-
-#define RXW_DEBUG
-
-#ifndef RXW_DEBUG
-#	define G_DISABLE_ASSERT
-#endif
 
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <sys/uio.h>
+#endif
 
 #include <pgm/skbuff.h>
 #include <pgm/rxwi.h>
@@ -47,6 +43,13 @@
 #include <pgm/tsi.h>
 #include <pgm/math.h>
 #include <pgm/reed_solomon.h>
+
+
+#define RXW_DEBUG
+
+#ifndef RXW_DEBUG
+#	define G_DISABLE_ASSERT
+#endif
 
 #ifndef RXW_DEBUG
 #define g_trace(...)		while (0)
