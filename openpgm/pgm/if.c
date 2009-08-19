@@ -28,6 +28,7 @@
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
+#include "pgm/glib-compat.h"
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
