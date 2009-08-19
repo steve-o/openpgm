@@ -444,7 +444,7 @@ parse_interface (
 			memcpy (&addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
 			freeaddrinfo (res);
 			check_addr = TRUE;
-		} else if (EAI_NONAME != eai) {
+		} else if (EAI_NONAME != eai && EAI_NODATA != eai) {
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     pgm_if_error_from_eai_errno (eai),
