@@ -36,6 +36,7 @@
 #endif
 
 #include <glib.h>
+#include "pgm/glib-compat.h"
 
 #ifdef G_OS_WIN32
 #	define WIN32_LEAN_AND_MEAN

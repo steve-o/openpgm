@@ -34,6 +34,7 @@ src = Split("""
 		reed_solomon.c
 		galois_tables.c
 		wsastrerror.c
+		glib-compat.c
 """)
 
 e = env.Clone();
