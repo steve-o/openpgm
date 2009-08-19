@@ -650,11 +650,21 @@ pgm_transport_bind (
 		g_trace ("INFO","request socket packet-info.");
 		const int recv_family = pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group);
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE)) {
+#ifdef G_OS_UNIX
+			int save_errno = errno;
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
+				     pgm_transport_error_from_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
-				     g_strerror (errno));
+				     g_strerror (save_errno));
+#else
+			int save_errno = WSAGetLastError();
+			g_set_error (error,
+				     PGM_TRANSPORT_ERROR,
+				     pgm_transport_error_from_wsa_errno (save_errno),
+				     _("Enabling receipt of ancillary information per incoming packet: %s"),
+				     pgm_wsastrerror (save_errno));
+#endif
 			g_static_mutex_unlock (&transport->mutex);
 			return FALSE;
 		}
@@ -800,7 +810,7 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	else
 	{
-		g_trace ("INFO","binding send socket to interface index %" G_GUINT32_FORMAT, transport->send_gsr.gsr_interface);
+		g_trace ("INFO","binding send socket to interface index %u", (unsigned)transport->send_gsr.gsr_interface);
 	}
 #endif
 
@@ -926,11 +936,11 @@ pgm_transport_bind (
 			pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
 			pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
 			if (optname == MCAST_JOIN_GROUP)
-				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %" G_GUINT32_FORMAT " group %s",
-					i, p->gsr_interface, s1);
+				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
+					i, (unsigned)p->gsr_interface, s1);
 			else
-				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %" G_GUINT32_FORMAT " group %s source %s",
-					i, p->gsr_interface, s1, s2);
+				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %u group %s source %s",
+					i, (unsigned)p->gsr_interface, s1, s2);
 		}
 #endif
 	}
@@ -955,8 +965,8 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
-		g_trace ("INFO","pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %" G_GUINT32_FORMAT,
-					s, transport->send_gsr.gsr_interface);
+		g_trace ("INFO","pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %u",
+					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
 #endif
 	if (0 != pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock,
@@ -978,8 +988,8 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
-		g_trace ("INFO","pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %" G_GUINT32_FORMAT,
-					s, transport->send_gsr.gsr_interface);
+		g_trace ("INFO","pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %u",
+					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
 #endif
 
@@ -1426,7 +1436,7 @@ pgm_transport_join_group (
 			char s[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&gr->gr_group, s, sizeof(s));
 			if (transport->recv_gsr[i].gsr_interface) {
-				g_trace("INFO", "transport has already joined group %s on interface %" G_GUINT32_FORMAT, s, gr->gr_interface);
+				g_trace("INFO", "transport has already joined group %s on interface %u", s, gr->gr_interface);
 			} else {
 				g_trace("INFO", "transport has already joined group %s on all interfaces.", s);
 			}
@@ -1537,9 +1547,11 @@ pgm_transport_join_source_group (
 				pgm_sockaddr_ntop (&gsr->gsr_group, s1, sizeof(s1));
 				pgm_sockaddr_ntop (&gsr->gsr_source, s2, sizeof(s2));
 				if (transport->recv_gsr[i].gsr_interface) {
-					g_trace("INFO", "transport has already joined group %s from source %s on interface %" G_GUINT32_FORMAT, s1, s2, gsr->gsr_interface);
+					g_trace("INFO", "transport has already joined group %s from source %s on interface %u",
+						s1, s2, (unsigned)gsr->gsr_interface);
 				} else {
-					g_trace("INFO", "transport has already joined group %s from source %s on all interfaces", s1, s2);
+					g_trace("INFO", "transport has already joined group %s from source %s on all interfaces",
+						s1, s2);
 				}
 #endif
 				return -EINVAL;
@@ -1735,6 +1747,44 @@ pgm_transport_error_from_eai_errno (
 #ifdef EAI_SYSTEM
 	case EAI_SYSTEM:
 		return pgm_if_error_from_errno (errno);
+		break;
+#endif
+
+	default :
+		return PGM_TRANSPORT_ERROR_FAILED;
+		break;
+	}
+}
+
+PGMTransportError
+pgm_transport_error_from_wsa_errno (
+	gint		err_no
+        )
+{
+	switch (err_no) {
+#ifdef WSAEINVAL
+	case WSAEINVAL:
+		return PGM_TRANSPORT_ERROR_INVAL;
+		break;
+#endif
+#ifdef WSAEMFILE
+	case WSAEMFILE:
+		return PGM_TRANSPORT_ERROR_MFILE;
+		break;
+#endif
+#ifdef WSA_NOT_ENOUGH_MEMORY
+	case WSA_NOT_ENOUGH_MEMORY:
+		return PGM_TRANSPORT_ERROR_NOMEM;
+		break;
+#endif
+#ifdef WSAENOPROTOOPT
+	case WSAENOPROTOOPT:
+		return PGM_TRANSPORT_ERROR_NOPROTOOPT;
+		break;
+#endif
+#ifdef WSAECONNRESET
+	case WSAECONNRESET:
+		return PGM_TRANSPORT_ERROR_CONNRESET;
 		break;
 #endif
 
