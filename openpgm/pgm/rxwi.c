@@ -49,6 +49,10 @@
 
 #ifndef RXW_DEBUG
 #	define G_DISABLE_ASSERT
+#	ifdef g_assert_cmpuint
+#		undef g_assert_cmpuint
+#	endif
+#	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
 #endif
 
 #ifndef RXW_DEBUG
