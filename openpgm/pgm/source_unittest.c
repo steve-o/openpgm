@@ -405,20 +405,18 @@ mock_pgm_sendto (
 	gboolean			use_router_alert,
 	const void*			buf,
 	gsize				len,
-	int				flags,
 	const struct sockaddr*		to,
 	gsize				tolen
 	)
 {
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	g_debug ("mock_pgm_sendto (transport:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d flags:%d to:%s tolen:%d)",
+	g_debug ("mock_pgm_sendto (transport:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d to:%s tolen:%d)",
 		(gpointer)transport,
 		use_rate_limit ? "YES" : "NO",
 		use_router_alert ? "YES" : "NO",
 		buf,
 		len,
-		flags,
 		saddr,
 		tolen);
 	return len;
@@ -479,7 +477,7 @@ mock_pgm_transport_pkt_offset (
  *		pgm_transport_t*	transport,
  *		gconstpointer		apdu,
  *		gsize			apdu_length,
- *		int			flags
+ *		gsize*			bytes_written
  *		)
  */
 
@@ -489,7 +487,7 @@ START_TEST (test_send_pass_001)
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, 0, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -501,7 +499,7 @@ START_TEST (test_send_pass_002)
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, 0, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -511,7 +509,7 @@ START_TEST (test_send_fail_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, 0, &bytes_written));
+	fail_unless (G_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, &bytes_written));
 }
 END_TEST
 
@@ -521,8 +519,8 @@ END_TEST
  *		pgm_transport_t*	transport,
  *		const struct pgmiovec*	vector,
  *		guint			count,
- *		int			flags,
- *		gboolean		is_one_apdu
+ *		gboolean		is_one_apdu,
+ *		gsize*			bytes_written
  *		)
  */
 
@@ -533,7 +531,7 @@ START_TEST (test_sendv_pass_001)
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -546,7 +544,7 @@ START_TEST (test_sendv_pass_002)
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -563,7 +561,7 @@ START_TEST (test_sendv_pass_003)
 		vector[i].iov_len  = apdu_length / G_N_ELEMENTS(vector);
 	}
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -579,7 +577,7 @@ START_TEST (test_sendv_pass_004)
 		vector[i].iov_len  = apdu_length;
 	}
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), 0, FALSE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written));
 	fail_unless ((gssize)(apdu_length * G_N_ELEMENTS(vector)) == bytes_written);
 }
 END_TEST
@@ -590,7 +588,7 @@ START_TEST (test_sendv_fail_001)
 	const gsize tsdu_length = 100;
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_ERROR == pgm_sendv (NULL, vector, 1, 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_ERROR == pgm_sendv (NULL, vector, 1, TRUE, &bytes_written));
 }
 END_TEST
 
@@ -600,8 +598,8 @@ END_TEST
  *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	vector[],
  *		guint			count,
- *		int			flags,
- *		gboolean		is_one_apdu
+ *		gboolean		is_one_apdu,
+ *		gsize*			bytes_written
  *		)
  */
 
@@ -611,7 +609,7 @@ START_TEST (test_send_skbv_pass_001)
 	struct pgm_sk_buff_t* skb = generate_skb ();
 	gsize apdu_length = (gsize)skb->len;
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, TRUE, &bytes_written));
 	fail_unless (apdu_length == bytes_written);
 }
 END_TEST
@@ -625,7 +623,7 @@ START_TEST (test_send_skbv_pass_002)
 		skb[i] = generate_skb ();
 	gsize apdu_length = (gsize)skb[0]->len * G_N_ELEMENTS(skb);
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written));
 	fail_unless (apdu_length == bytes_written);
 }
 END_TEST
@@ -638,7 +636,7 @@ START_TEST (test_send_skbv_pass_003)
 	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++)
 		skb[i] = generate_skb ();
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), 0, FALSE, &bytes_written));
+	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written));
 	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == bytes_written);
 }
 END_TEST
@@ -650,7 +648,7 @@ START_TEST (test_send_skbv_fail_001)
 	pgm_skb_put (skb, pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, 0, TRUE, &bytes_written));
+	fail_unless (G_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written));
 }
 END_TEST
 

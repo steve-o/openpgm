@@ -22,20 +22,23 @@
 
 #include <errno.h>
 #include <getopt.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <arpa/inet.h>
+#	include <netinet/in.h>
+#	include <sys/socket.h>
+#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -117,12 +120,14 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
+#ifdef SIGHUP
 	signal (SIGHUP, SIG_IGN);
+#endif
 
 	if (create_transport ())
 	{
 		while (optind < argc) {
-			const GIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0, NULL);
+			const GIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
 		        if (G_IO_STATUS_NORMAL != status) {
 				g_warning ("pgm_transport_send failed.");
 		        }

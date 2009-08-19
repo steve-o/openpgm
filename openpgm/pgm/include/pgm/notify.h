@@ -22,13 +22,14 @@
 #ifndef __PGM_NOTIFY_H__
 #define __PGM_NOTIFY_H__
 
-#ifdef CONFIG_HAVE_EVENTFD
-#	include <sys/eventfd.h>
-#endif
 #include <unistd.h>
 #include <fcntl.h>
 
 #include <glib.h>
+
+#ifdef CONFIG_HAVE_EVENTFD
+#	include <sys/eventfd.h>
+#endif
 
 
 G_BEGIN_DECLS

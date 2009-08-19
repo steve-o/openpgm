@@ -791,7 +791,6 @@ mock_pgm_sendto (
 	gboolean			use_router_alert,
 	const void*			buf,
 	gsize				len,
-	int				flags,
 	const struct sockaddr*		to,
 	gsize				tolen
 	)

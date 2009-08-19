@@ -20,17 +20,21 @@
  */
 
 #include <string.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 
+#ifdef G_OS_UNIX
+#	include <net/if.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <sys/socket.h>
+#endif
+
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
+#include "pgm/nametoindex.h"
 #include "pgm/indextoaddr.h"
 
 //#define INDEXTOADDR_DEBUG

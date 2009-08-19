@@ -23,29 +23,35 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
+#include <sys/types.h>
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <net/if.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <netinet/udp.h>
+#	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#endif
 
 #include "pgm/transport.h"
 #include "pgm/source.h"
@@ -77,6 +83,13 @@
 #	else
 #		define g_trace(m,...)		do { if (strcmp((m),"SPM")) { g_debug(__VA_ARGS__); } } while (0)
 #	endif
+#endif
+
+#ifndef ENOBUFS
+#	define ENOBUFS		WSAENOBUFS
+#endif
+#ifndef ECONNRESET
+#	define ECONNRESET	WSAECONNRESET
 #endif
 
 
@@ -1073,7 +1086,6 @@ send_spmr (
 				  FALSE,			/* regular socket */
 				  header,
 				  tpdu_length,
-				  MSG_CONFIRM,		/* not expecting a reply */
 				  (struct sockaddr*)&transport->send_gsr.gsr_group,
 				  pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (-1 == sent && EAGAIN == errno)
@@ -1086,7 +1098,6 @@ send_spmr (
 			    FALSE,
 			    header,
 			    tpdu_length,
-			    MSG_CONFIRM,		/* not expecting a reply */
 			    (struct sockaddr*)&source->local_nla,
 			    pgm_sockaddr_len(&source->local_nla));
 	if (-1 == sent && EAGAIN == errno)
@@ -1148,11 +1159,10 @@ send_nak (
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	gssize sent = pgm_sendto (transport,
-				  FALSE,			/* not rate limited */
+				  FALSE,		/* not rate limited */
 				  TRUE,			/* with router alert */
 				  header,
 				  tpdu_length,
-				  MSG_CONFIRM,		/* not expecting a reply */
 				  (struct sockaddr*)&source->nla,
 				  pgm_sockaddr_len(&source->nla));
 	if (-1 == sent && EAGAIN == errno)
@@ -1217,10 +1227,9 @@ send_parity_nak (
 
 	const gssize sent = pgm_sendto (transport,
 					FALSE,		/* not rate limited */
-					TRUE,			/* with router alert */
+					TRUE,		/* with router alert */
 					header,
 					tpdu_length,
-					MSG_CONFIRM,		/* not expecting a reply */
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
 	if (-1 == sent && EAGAIN == errno)
@@ -1325,7 +1334,6 @@ send_nak_list (
 					FALSE,			/* regular socket */
 					header,
 					tpdu_length,
-					MSG_CONFIRM,		/* not expecting a reply */
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
 	if ( sent != (gssize)tpdu_length )

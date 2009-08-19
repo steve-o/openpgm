@@ -24,12 +24,24 @@
 
 #include <glib.h>
 
+#ifdef G_OS_UNIX
+#	include <net/if.h>
+#endif
+
 #ifdef CONFIG_HAVE_GETIFADDRS
 #	include <ifaddrs.h>
 #else
 #	define getifaddrs	pgm_getifaddrs
 #	define freeifaddrs	pgm_freeifaddrs
 #	define ifaddrs		pgm_ifaddrs
+#endif
+
+#ifndef IF_NAMESIZE
+#	ifdef IFNAMSIZ
+#		define IF_NAMESIZE	IFNAMSIZ
+#	else
+#		define IF_NAMESIZE	16
+#	endif
 #endif
 
 struct pgm_ifaddrs

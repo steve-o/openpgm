@@ -26,6 +26,10 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 
+#ifdef G_OS_WIN32
+#	include <ws2tcpip.h>
+#endif
+
 #include "pgm/transport.h"
 #include "pgm/rate_control.h"
 #include "pgm/net.h"
@@ -36,6 +40,14 @@
 #	define g_trace(m,...)		while (0)
 #else
 #	define g_trace(m,...)		g_debug(__VA_ARGS__)
+#endif
+
+
+#ifndef ENETUNREACH
+#	define ENETUNREACH	WSAENETUNREACH
+#endif
+#ifndef EHOSTUNREACH
+#	define EHOSTUNREACH	WSAEHOSTUNREACH
 #endif
 
 
@@ -52,7 +64,6 @@ pgm_sendto (
 	gboolean		use_router_alert,
 	const void*		buf,
 	gsize			len,
-	int			flags,
 	const struct sockaddr*	to,
 	gsize			tolen
 	)
@@ -68,7 +79,7 @@ pgm_sendto (
 
 	if (use_rate_limit)
 	{
-		const int check = pgm_rate_check (transport->rate_control, len, flags);
+		const int check = pgm_rate_check (transport->rate_control, len, transport->is_nonblocking);
 		if (check < 0 && errno == EAGAIN)
 		{
 			return (const gssize)check;
@@ -77,7 +88,7 @@ pgm_sendto (
 
 	g_static_mutex_lock (mutex);
 
-	ssize_t sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
+	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
 		errno != EHOSTUNREACH &&	/* No route to host */
@@ -104,7 +115,7 @@ pgm_sendto (
 #endif /* CONFIG_HAVE_POLL */
 		if (ready > 0)
 		{
-			sent = sendto (sock, buf, len, flags, to, (socklen_t)tolen);
+			sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
 			if ( sent < 0 )
 			{
 				g_warning (_("sendto %s failed: %s"),

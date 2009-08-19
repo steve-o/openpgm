@@ -23,22 +23,25 @@
 #include <errno.h>
 #include <getopt.h>
 #include <limits.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <netinet/in.h>
 #include <sys/epoll.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/uio.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <arpa/inet.h>
+#	include <netinet/in.h>
+#	include <sys/socket.h>
+#	include <sys/uio.h>
+#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -115,7 +118,9 @@ main (
 	signal(SIGSEGV, on_sigsegv);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
+#ifdef SIGHUP
 	signal(SIGHUP, SIG_IGN);
+#endif
 
 	if (!on_startup()) {
 		g_error ("startup failed");

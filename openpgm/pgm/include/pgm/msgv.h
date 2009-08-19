@@ -22,6 +22,8 @@
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
+#include <glib.h>
+
 #ifndef __PGM_PACKET_H__
 #	include <pgm/packet.h>
 #endif

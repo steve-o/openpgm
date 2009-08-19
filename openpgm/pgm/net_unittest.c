@@ -219,7 +219,6 @@ mock_fcntl (
  *		gboolean		use_router_alert,
  *		const void*		buf,
  *		gsize			len,
- *		int			flags,
  *		const struct sockaddr*	to,
  *		gsize			tolen
  *	)
@@ -233,7 +232,7 @@ START_TEST (test_sendto_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 }
 END_TEST
 
@@ -244,7 +243,7 @@ START_TEST (test_sendto_fail_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (NULL, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (NULL, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -257,7 +256,7 @@ START_TEST (test_sendto_fail_002)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -270,7 +269,7 @@ START_TEST (test_sendto_fail_003)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, 0, 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -283,7 +282,7 @@ START_TEST (test_sendto_fail_004)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, NULL, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
 	fail ();
 }
 END_TEST
@@ -296,7 +295,7 @@ START_TEST (test_sendto_fail_005)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), 0, (struct sockaddr*)&addr, 0);
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
 	fail ();
 }
 END_TEST

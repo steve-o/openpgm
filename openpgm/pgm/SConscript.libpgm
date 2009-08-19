@@ -12,6 +12,8 @@ src = Split("""
 		getifaddrs.c
 		getnodeaddr.c
 		indextoaddr.c
+		indextoname.c
+		nametoindex.c
 		inet_network.c
 		md5.c
 		gsi.c

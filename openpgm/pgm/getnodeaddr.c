@@ -20,14 +20,17 @@
  */
 
 #include <errno.h>
-#include <netdb.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <sys/socket.h>
+#endif
 
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
@@ -122,8 +125,13 @@ pgm_if_getnodeaddr (
 		g_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_h_errno (h_errno),
+#ifdef G_OS_UNIX
 			     _("Resolving IPv4 hostname address: %s"),
 			     hstrerror (h_errno));
+#else
+			     _("Resolving IPv4 hostname address: %d"),
+			     WSAGetLastError());
+#endif
 		return FALSE;
 	}
 

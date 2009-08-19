@@ -270,6 +270,7 @@ struct pgm_transport_t {
 
 	gboolean		is_apdu_eagain;		    /* writer-lock on txw_lock exists
 							       as send would block */
+	gboolean		is_spm_eagain;		    /* writer-lock in receiver */
 
 	struct {
 		guint		    data_pkt_offset;
