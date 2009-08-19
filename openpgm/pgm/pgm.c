@@ -19,9 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <netdb.h>
-
 #include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#endif
 
 #include "pgm/packet.h"
 #include "pgm/time.h"

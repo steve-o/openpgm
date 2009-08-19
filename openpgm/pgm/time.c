@@ -37,6 +37,12 @@
 
 #include <glib.h>
 
+#ifdef G_OS_WIN32
+#	define WIN32_LEAN_AND_MEAN
+#	include "windows.h"
+#	include "winsock2.h"
+#endif
+
 #include "pgm/time.h"
 
 
@@ -74,6 +80,9 @@ static void clock_nano_sleep (gulong);
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
 static void nano_sleep (gulong);
+#endif
+#ifdef G_OS_WIN32
+static void msleep (gulong);
 #endif
 
 static void select_sleep (gulong);
@@ -165,16 +174,18 @@ pgm_time_init (void)
 	case 'P':	pgm_time_sleep = poll_sleep; break;
 #endif
 
-	case 'S':	pgm_time_sleep = select_sleep; break;
-
 	default:
 #ifdef CONFIG_HAVE_USLEEP
 	case 'M':
 	case 'U':
 			pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
+
+	case 'S':	pgm_time_sleep = select_sleep; break;
+#elif defined(G_OS_WIN32)
+	case 'M':	pgm_time_sleep = msleep; break;
+	case 'S':	pgm_time_sleep = select_sleep; break;
 #else
-	case 'S':
-			pgm_time_sleep = select_sleep; break;
+	case 'S':	pgm_time_sleep = select_sleep; break;
 #endif /* CONFIG_HAVE_USLEEP */
 	}
 
@@ -272,7 +283,8 @@ pgm_time_shutdown (void)
 	return TRUE;
 }
 
-static pgm_time_t
+static
+pgm_time_t
 gettimeofday_update (void)
 {
 	static struct timeval now;
@@ -284,7 +296,8 @@ gettimeofday_update (void)
 }
 
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
-static pgm_time_t
+static
+pgm_time_t
 clock_update (void)
 {
 	static struct timespec now;
@@ -296,7 +309,8 @@ clock_update (void)
 }
 #endif /* CONFIG_HAVE_CLOCK_GETTIME */
 
-static pgm_time_t
+static
+pgm_time_t
 ftime_update (void)
 {
 	static struct timeb now;
@@ -319,7 +333,8 @@ static int rtc_fd = -1;
 static int rtc_frequency = 8192;
 static pgm_time_t rtc_count = 0;
 
-static int
+static
+int
 rtc_init (void)
 {
 	g_return_val_if_fail (rtc_fd == -1, -1);
@@ -354,7 +369,8 @@ rtc_shutdown (void)
 	return FALSE;
 }
 
-static pgm_time_t
+static
+pgm_time_t
 rtc_update (void)
 {
 	unsigned long data;
@@ -371,7 +387,8 @@ rtc_update (void)
 /* use a select to check if we have to clear the current interrupt count
  */
 
-static void
+static
+void
 rtc_sleep (gulong usec)
 {
 	unsigned long data;
@@ -402,7 +419,8 @@ rtc_sleep (gulong usec)
  */
 
 #ifdef CONFIG_HAVE_TSC
-static inline pgm_time_t
+static inline
+pgm_time_t
 rdtsc (void)
 {
 	guint32 lo, hi;
@@ -419,7 +437,8 @@ rdtsc (void)
  * WARNING: time is relative to start of timer.
  */
 
-static int
+static
+int
 tsc_init (void)
 {
 	pgm_time_t start, stop;
@@ -462,7 +481,8 @@ tsc_init (void)
 	return 0;
 }
 
-static pgm_time_t
+static
+pgm_time_t
 tsc_update (void)
 {
 	pgm_time_t count = rdtsc();
@@ -472,7 +492,8 @@ tsc_update (void)
 	return pgm_time_now;
 }	
 
-static void
+static
+void
 tsc_sleep (gulong usec)
 {
 	pgm_time_t start, now, end;
@@ -492,7 +513,8 @@ tsc_sleep (gulong usec)
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 static clockid_t g_clock_id;
 
-static int
+static
+int
 clock_init (void)
 {
 	g_clock_id = CLOCK_REALTIME;
@@ -514,7 +536,8 @@ clock_init (void)
 	return 0;
 }
 
-static void
+static
+void
 clock_nano_sleep (gulong usec)
 {
 	struct timespec ts;
@@ -532,7 +555,8 @@ clock_nano_sleep (gulong usec)
 #endif /* CONFIG_HAVE_CLOCK_NANOSLEEP */
 
 #ifdef CONFIG_HAVE_NANOSLEEP
-static void
+static
+void
 nano_sleep (gulong usec)
 {
 	struct timespec ts;
@@ -542,17 +566,35 @@ nano_sleep (gulong usec)
 }
 #endif /* CONFIG_HAVE_NANOSLEEP */
 
-static void
+#ifdef G_OS_WIN32
+static
+void
+msleep (gulong usec)
+{
+	Sleep (usecs_to_msecs(usec));
+}
+#endif
+
+static
+void
 select_sleep (gulong usec)
 {
+#ifdef CONFIG_HAVE_PSELECT
 	struct timespec ts;
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	pselect (0, NULL, NULL, NULL, &ts, NULL);
+#else
+	struct timeval tv;
+	tv.tv_sec	= usec / 1000000UL;
+	tv.tv_usec	= usec % 1000000UL;
+	select (0, NULL, NULL, NULL, &tv);
+#endif
 }
 
 #ifdef CONFIG_HAVE_PPOLL
-static void
+static
+void
 poll_sleep (gulong usec)
 {
 	struct timespec ts;
@@ -564,7 +606,8 @@ poll_sleep (gulong usec)
 
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
  */
-static void
+static
+void
 pgm_time_conv (
 	pgm_time_t*	pgm_time_t_time,
 	time_t*		time_t_time
@@ -575,7 +618,8 @@ pgm_time_conv (
 
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the core started.
  */
-static void
+static
+void
 pgm_time_conv_from_reset (
 	pgm_time_t*	pgm_time_t_time,
 	time_t*		time_t_time

@@ -27,6 +27,7 @@
 
 #include <glib.h>
 
+#include "pgm/sockaddr.h"
 #include "pgm/signal.h"
 
 
@@ -65,22 +66,15 @@ pgm_signal_install (
 
 	if (NULL == g_signal_io)
 	{
+#ifdef G_OS_UNIX
 		if (pipe (g_signal_pipe))
-			return FALSE;
-/* write-end */
-		int fd_flags = fcntl (g_signal_pipe[1], F_GETFL);
-		if (fd_flags < 0)
-			return FALSE;
-		if (fcntl (g_signal_pipe[1], F_SETFL, fd_flags | O_NONBLOCK))
+#else
+		if (_pipe (g_signal_pipe, 4096, _O_BINARY | _O_NOINHERIT))
+#endif
 			return FALSE;
 
-/* read-end */
-		fd_flags = fcntl (g_signal_pipe[0], F_GETFL);
-		if (fd_flags < 0)
-			return FALSE;
-		if (fcntl (g_signal_pipe[0], F_SETFL, fd_flags | O_NONBLOCK))
-			return FALSE;
-
+		pgm_sockaddr_nonblocking (g_signal_pipe[0], TRUE);
+		pgm_sockaddr_nonblocking (g_signal_pipe[1], TRUE);
 /* add to evm */
 		g_signal_io = g_io_channel_unix_new (g_signal_pipe[0]);
 		g_io_add_watch (g_signal_io, G_IO_IN, on_io_signal, user_data);
@@ -102,7 +96,11 @@ on_signal (
 	g_trace ("on_signal (signum:%d)", signum);
 	if (write (g_signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
+#ifdef G_OS_UNIX
 		g_critical ("Unix signal %s (%i) lost", strsignal(signum), signum);
+#else
+		g_critical ("Unix signal (%i) lost", signum);
+#endif
 	}
 }
 

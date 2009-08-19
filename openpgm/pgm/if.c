@@ -21,20 +21,23 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <net/if.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <net/if.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <sys/ioctl.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#endif
 
 #include "pgm/if.h"
 #include "pgm/ip.h"
@@ -42,6 +45,9 @@
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
 #include "pgm/inet_network.h"
+#include "pgm/indextoname.h"
+#include "pgm/nametoindex.h"
+
 
 //#define IF_DEBUG
 
@@ -64,7 +70,11 @@ struct interface_req {
 
 /* globals */
 
-#define IF_DEFAULT_GROUP	((in_addr_t) 0xefc00001) /* 239.192.0.1 */
+#ifdef G_OS_UNIX
+#	define IF_DEFAULT_GROUP	((in_addr_t)0xefc00001) /* 239.192.0.1 */
+#else
+#	define IF_DEFAULT_GROUP	((u_long)0xefc00001)
+#endif
 
 /* ff08::1 */
 #define IF6_DEFAULT_INIT { { { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
@@ -134,7 +144,7 @@ pgm_if_print_all (void)
 			     s, sizeof(s),
 			     NULL, 0,
 			     NI_NUMERICHOST);
-		g_message ("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s",
+		g_message ("#%d name %-15.15s IPv%i %-46.46s scope %" G_GUINT32_FORMAT " status %s loop %s b/c %s m/c %s",
 			i,
 			b,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
@@ -329,6 +339,7 @@ parse_interface (
 		}
 	}
 
+#ifdef G_OS_UNIX
 /* network name into network address, can be expensive with NSS network lookup */
 	if (!(check_inet_network || check_inet6_network))
 	{
@@ -346,9 +357,7 @@ parse_interface (
 				}
 /* ne->n_net in network order */
 				in_addr.s_addr = ne->n_net;
-g_message ("moooooooo ******************");
 				if (IN_MULTICAST(g_ntohl(in_addr.s_addr))) {
-g_message ("oooooooo ******************");
 					g_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_XDEV,
@@ -397,6 +406,7 @@ g_message ("oooooooo ******************");
 			}
 		}
 	}
+#endif /* G_OS_UNIX */
 
 /* hostname lookup with potential DNS delay or error */
 	if (!check_addr)
@@ -606,6 +616,7 @@ parse_group (
 		return TRUE;
 	}
 
+#ifdef G_OS_UNIX
 /* NSS network */
 	const struct netent* ne = getnetbyname (group);
 	if (ne) {
@@ -672,6 +683,7 @@ parse_group (
 			return FALSE;
 		}
 	}
+#endif /* G_OS_UNIX */
 
 /* lookup group through name service */
 	struct addrinfo hints = {

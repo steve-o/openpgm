@@ -23,30 +23,38 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
+#include <sys/types.h>
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
 
 #include <glib.h>
 #include <glib/gi18n-lib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <net/if.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <netinet/udp.h>
+#	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <arpa/inet.h>
+#else
+#	define WIN32_LEAN_AND_MEAN
+#	include <windows.h>
+#	include <winsock2.h>
+#	include <mswsock.h>
+#endif
 
 #include "pgm/transport.h"
 #include "pgm/source.h"
@@ -75,6 +83,19 @@
 #	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
+
+#ifdef G_OS_WIN32
+#	ifndef WSAID_WSARECVMSG
+/* http://cvs.winehq.org/cvsweb/wine/include/mswsock.h */
+#		define WSAID_WSARECVMSG {0xf689d7c8,0x6f1f,0x436b,{0x8a,0x53,0xe5,0x4f,0xe3,0x51,0xc3,0x22}}
+#	endif
+#	define cmsghdr wsacmsghdr
+#	define CMSG_FIRSTHDR(msg)	WSA_CMSG_FIRSTHDR(msg)
+#	define CMSG_NXTHDR(msg, cmsg)	WSA_CMSG_NXTHDR(msg, cmsg)
+#	define CMSG_DATA(cmsg)		WSA_CMSG_DATA(cmsg)
+#	define CMSG_SPACE(len)		WSA_CMSG_SPACE(len)
+#	define CMSG_LEN(len)		WSA_CMSG_LEN(len)
+#endif
 
 static PGMRecvError pgm_recv_error_from_errno (gint);
 
@@ -107,11 +128,12 @@ recvskb (
 	g_trace ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
 		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
 
-	struct iovec iov = {
+	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
 		.iov_len	= transport->max_tpdu
 	};
 	size_t aux[1024 / sizeof(size_t)];
+#ifdef G_OS_UNIX
 	struct msghdr msg = {
 		.msg_name	= src_addr,
 		.msg_namelen	= src_addrlen,
@@ -125,6 +147,35 @@ recvskb (
 	ssize_t len = recvmsg (transport->recv_sock, &msg, flags);
 	if (len <= 0)
 		return len;
+#else /* !G_OS_UNIX */
+	WSAMSG msg = {
+		.name		= (LPSOCKADDR)&src_addr,
+		.namelen	= src_addrlen,
+		.lpBuffers	= (LPWSABUF)&iov,
+		.dwBufferCount	= 1,
+		.dwFlags	= 0
+	};
+	msg.Control.buf		= aux;
+	msg.Control.len		= sizeof(aux);
+
+	static int (*WSARecvMsg_)() = NULL;
+	if (!WSARecvMsg_) {
+		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
+		DWORD cbBytesReturned;
+		if (SOCKET_ERROR == WSAIoctl (transport->recv_sock,
+					      SIO_GET_EXTENSION_FUNCTION_POINTER,
+				 	      &WSARecvMsg_GUID, sizeof(WSARecvMsg_GUID),
+		 			      &WSARecvMsg_, sizeof(WSARecvMsg_),
+		 			      &cbBytesReturned,
+					      NULL,
+					      NULL))
+			return -1;
+	}
+
+	DWORD len;
+	if (SOCKET_ERROR == WSARecvMsg_ (transport->recv_sock, &msg, &len, NULL, NULL))
+		return -1;
+#endif /* !G_OS_UNIX */
 
 	skb->transport	= transport;
 	skb->tstamp	= pgm_time_update_now();
@@ -642,7 +693,7 @@ recv_again:
 
 	len = recvskb (transport,
 		       transport->rx_buffer,		/* PGM skbuff */
-		       MSG_DONTWAIT,
+		       0,
 		       (struct sockaddr*)&src,
 		       sizeof(src),
 		       (struct sockaddr*)&dst,

@@ -54,6 +54,7 @@ struct pgm_async_t {
 	pgm_notify_t		commit_notify;
 	pgm_notify_t		destroy_notify;
 	gboolean		is_destroyed;
+	gboolean		is_nonblocking;
 };
 
 typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
@@ -61,10 +62,11 @@ typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
 
 G_BEGIN_DECLS
 
-int pgm_async_create (pgm_async_t**, pgm_transport_t*, GError**);
-int pgm_async_destroy (pgm_async_t*);
-GIOStatus pgm_async_recv (pgm_async_t* async, gpointer, gsize, gsize*, int, GError**);
-GSource* pgm_async_create_watch (pgm_async_t*) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_async_create (pgm_async_t**, pgm_transport_t* const, GError**);
+int pgm_async_destroy (pgm_async_t* const);
+GIOStatus pgm_async_recv (pgm_async_t* const, gpointer, const gsize, gsize* const, const int, GError**);
+gboolean pgm_async_set_nonblocking (pgm_async_t* const, const gboolean);
+GSource* pgm_async_create_watch (pgm_async_t* const) G_GNUC_WARN_UNUSED_RESULT;
 int pgm_async_add_watch_full (pgm_async_t*, gint, pgm_eventfn_t, gpointer, GDestroyNotify);
 int pgm_async_add_watch (pgm_async_t*, pgm_eventfn_t, gpointer);
 GQuark pgm_async_error_quark (void);
