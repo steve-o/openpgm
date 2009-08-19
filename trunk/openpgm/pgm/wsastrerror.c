@@ -21,12 +21,12 @@
 #include <glib/gi18n-lib.h>
 
 #ifdef G_OS_WIN32
-#include <winerror.h>
+#include <ws2tcpip.h>
 
 
 /* locals */
 
-G_CONST_RETURN gchar*
+gchar*
 pgm_wsastrerror (
 	gint		err_no
 	)
@@ -317,6 +317,7 @@ pgm_wsastrerror (
 #ifdef WSA_QOS_RESERVED_PETYPE
 	case WSA_QOS_RESERVED_PETYPE: return _("Reserved policy QOS element type.");
 #endif
+	default: return _("Unknown.");
 	}
 }
 

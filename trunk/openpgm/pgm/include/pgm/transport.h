@@ -338,7 +338,7 @@ GQuark pgm_transport_error_quark (void);
 PGMTransportError pgm_transport_error_from_errno (gint);
 PGMTransportError pgm_transport_error_from_eai_errno (gint);
 PGMTransportError pgm_transport_error_from_wsa_errno (gint);
-const gchar* pgm_wsastrerror (gint);
+gchar* pgm_wsastrerror (gint);
 gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_bind (pgm_transport_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_destroy (pgm_transport_t*, gboolean);

@@ -1436,7 +1436,7 @@ pgm_transport_join_group (
 			char s[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop (&gr->gr_group, s, sizeof(s));
 			if (transport->recv_gsr[i].gsr_interface) {
-				g_trace("INFO", "transport has already joined group %s on interface %u", s, gr->gr_interface);
+				g_trace("INFO", "transport has already joined group %s on interface %u", s, (unsigned)gr->gr_interface);
 			} else {
 				g_trace("INFO", "transport has already joined group %s on all interfaces.", s);
 			}
