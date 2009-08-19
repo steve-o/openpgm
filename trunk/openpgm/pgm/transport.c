@@ -351,6 +351,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
+#ifdef G_OS_UNIX
 		const int save_errno = errno;
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
@@ -360,6 +361,14 @@ pgm_transport_create (
 		if (EPERM == save_errno) {
 			g_warning ("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'");
 		}
+#else
+		const int save_errno = WSAGetLastError();
+		g_set_error (error,
+			     PGM_TRANSPORT_ERROR,
+			     pgm_transport_error_from_wsa_errno (save_errno),
+			     _("Creating receive socket: %s"),
+			     pgm_wsastrerror (save_errno));
+#endif
 		goto err_destroy;
 	}
 
