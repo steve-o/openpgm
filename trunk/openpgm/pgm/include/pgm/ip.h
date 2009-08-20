@@ -94,6 +94,18 @@ struct pgm_ip
 };
 
 /* RFC 2460 */
+#ifdef ip6_vfc
+#	undef ip6_vfc
+#endif
+#ifdef ip6_plen
+#	undef ip6_len
+#endif
+#ifdef ip6_nxt
+#	undef ip6_nxt
+#endif
+#ifdef ip6_hops
+#	undef ip6_hops
+#endif
 struct pgm_ip6_hdr
 {
 	guint32		ip6_vfc;		/* version:4, traffic class:8, flow label:20 */
