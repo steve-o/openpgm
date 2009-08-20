@@ -98,7 +98,7 @@ struct pgm_ip
 #	undef ip6_vfc
 #endif
 #ifdef ip6_plen
-#	undef ip6_len
+#	undef ip6_plen
 #endif
 #ifdef ip6_nxt
 #	undef ip6_nxt
