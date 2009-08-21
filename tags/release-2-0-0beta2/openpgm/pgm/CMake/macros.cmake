@@ -1,0 +1,31 @@
+
+MACRO(OPENPGMLIB
+	name
+	sources
+	includes
+	cflags)
+
+	FILE(GLOB_RECURSE INC_ALL *.h)
+	INCLUDE_DIRECTORIES(${includes})
+	ADD_LIBRARY(${name} STATIC ${INC_ALL} ${sources})
+	ADD_LIBRARY("${name}-pic" STATIC ${INC_ALL} ${sources})
+	STRING(REGEX REPLACE "\\\\"" "\\\\\\\\\\\\"" cflags "${cflags}")
+	SET_TARGET_PROPERTIES("${name}" PROPERTIES COMPILE_FLAGS "${cflags} ${CMAKE_SHARED_LIBRARY_C_FLAGS}")
+	SET_TARGET_PROPERTIES("${name}-pic" PROPERTIES COMPILE_FLAGS "${cflags} ${CMAKE_SHARED_LIBRARY_C_FLAGS}")
+
+# define cmake source group
+	SOURCE_GROUP(Files FILES CMakeLists.txt)
+	SET(ALL_FILES ${sources} ${INC_ALL})
+	FOREACH(SRC ${ALL_FILES})
+		STRING(REGEX REPLACE ${CMAKE_CURRENT_SOURCE_DIR} "Files" REL_DIR "${SRC}")
+		STRING(REGEX REPLACE "[\\\\/][^\\\\/]*$" "" REL_DIR "${REL_DIR}")
+		STRING(REGEX REPLACE "^[\\\\/]" "" REL_DIR "${REL_DIR}")
+		IF(REL_DIR)
+			SOURCE_GROUP(${REL_DIR} FILES ${SRC})
+		ELSE(REL_DIR)
+			SOURCE_GROUP(Files FILES ${SRC})
+		ENDIF(REL_DIR)
+	ENDFOREACH(SRC)
+
+	MESSAGE(STATUS "Configuring library ${name}")
+ENDMACRO(OPENPGMLIB)
