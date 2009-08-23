@@ -20,8 +20,6 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_SNMP', 'SNMP administration', 'true',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_DEV', 'Development code', 'false',
-			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_TEST', 'Network test system', 'false',
@@ -277,8 +275,6 @@ if env['WITH_SNMP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmsnmp');
 if env['WITH_TEST'] == 'true':
 	SConscript(ref_node + 'test/SConscript');
-if env['WITH_DEV'] == 'true':
-	SConscript(ref_node + 'dev/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
 
