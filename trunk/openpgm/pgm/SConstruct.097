@@ -15,7 +15,6 @@ opt.AddOptions (
 	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
 	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
-	(EnumOption ('WITH_DEV', 'Development code', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
@@ -265,8 +264,6 @@ if env['WITH_SNMP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmsnmp');
 if env['WITH_TEST'] == 'true':
 	SConscript(ref_node + 'test/SConscript');
-if env['WITH_DEV'] == 'true':
-	SConscript(ref_node + 'dev/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
 
