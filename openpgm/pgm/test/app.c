@@ -42,6 +42,8 @@
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/transport.h>
+#include <pgm/source.h>
+#include <pgm/receiver.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
 #include <pgm/timer.h>
@@ -52,15 +54,14 @@
 /* typedefs */
 
 struct idle_source {
-	GSource		source;
-	guint64		expiration;
+	GSource			source;
+	guint64			expiration;
 };
 
 struct app_session {
-	char*		name;
-	pgm_gsi_t	gsi;
-	pgm_transport_t* transport;
-	pgm_async_t*	async;
+	char*			name;
+	pgm_transport_t*	transport;
+	pgm_async_t*		async;
 };
 
 /* globals */
@@ -78,7 +79,7 @@ static GMainLoop* g_loop = NULL;
 static GIOChannel* g_stdin_channel = NULL;
 
 
-static void on_signal (int);
+static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
@@ -88,7 +89,8 @@ static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
 
-G_GNUC_NORETURN static void
+G_GNUC_NORETURN static
+void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
@@ -126,9 +128,9 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	pgm_signal_install (SIGINT, on_signal);
-	pgm_signal_install (SIGTERM, on_signal);
-	pgm_signal_install (SIGHUP, SIG_IGN);
+	signal (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGINT, on_signal, g_loop);
+	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -161,7 +163,8 @@ main (
 	return 0;
 }
 
-static void
+static
+void
 destroy_session (
                 gpointer        key,		/* session name */
                 gpointer        value,		/* transport_session object */
@@ -185,17 +188,20 @@ destroy_session (
 	g_free (sess);
 }
 
-static void
+static
+void
 on_signal (
-	G_GNUC_UNUSED int	signum
+	int		signum,
+	gpointer	user_data
 	)
 {
-	g_message ("on_signal");
-
-	g_main_loop_quit(g_loop);
+	GMainLoop* loop = (GMainLoop*)user_data;
+	g_message ("on_signal (signum:%d user-data:%p)", signum, user_data);
+	g_main_loop_quit (loop);
 }
 
-static gboolean
+static
+gboolean
 on_startup (
 	G_GNUC_UNUSED gpointer data
 	)
@@ -219,7 +225,8 @@ on_startup (
 	return FALSE;
 }
 
-static int
+static
+int
 on_data (
 	gpointer	data,
 	G_GNUC_UNUSED guint		len,
@@ -228,15 +235,20 @@ on_data (
 {
 	printf ("DATA: %s\n", (char*)data);
 	fflush (stdout);
-
 	return 0;
 }
 
-static void
+static
+void
 session_create (
 	char*		name
 	)
 {
+	struct pgm_transport_info_t hints = {
+		.ti_family = AF_INET
+	}, *res = NULL;
+	GError* err = NULL;
+
 /* check for duplicate */
 	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess != NULL) {
@@ -247,24 +259,30 @@ session_create (
 /* create new and fill in bits */
 	sess = g_malloc0(sizeof(struct app_session));
 	sess->name = g_memdup (name, strlen(name)+1);
-	int e = pgm_create_md5_gsi (&sess->gsi);
-	if (e != 0) {
-		puts ("FAILED: pgm_create_md5_gsi()");
+
+	if (!pgm_if_get_transport_info (g_network, &hints, &res, &err)) {
+		printf ("FAILED: pgm_if_get_transport_info(): %s\n", err->message);
+		g_error_free (err);
 		goto err_free;
 	}
 
-/* temp fixed addresses */
-	struct group_source_req recv_gsr, send_gsr;
-	gsize recv_len = 1;
-	e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
-	g_assert (e == 0);
-	g_assert (recv_len == 1);
-
-	e = pgm_transport_create (&sess->transport, &sess->gsi, 0, g_port, &recv_gsr, recv_len, &send_gsr);
-	if (e != 0) {
-		puts ("FAILED: pgm_transport_create()");
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
 		goto err_free;
 	}
+
+	res->ti_sport = g_port;
+	res->ti_dport = 0;
+	if (!pgm_transport_create (&sess->transport, res, &err)) {
+		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		goto err_free;
+	}
+
+	pgm_if_free_transport_info (res);
 
 /* success */
 	g_hash_table_insert (g_sessions, sess->name, sess);
@@ -278,7 +296,8 @@ err_free:
 	g_free(sess);
 }
 
-static void
+static
+void
 session_set_nak_bo_ivl (
 	char*		name,
 	guint		nak_bo_ivl		/* milliseconds */
@@ -291,11 +310,14 @@ session_set_nak_bo_ivl (
 		return;
 	}
 
-	pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(nak_bo_ivl));
-	puts ("READY");
+	if (!pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(nak_bo_ivl)))
+		puts ("FAILED: pgm_transport_set_nak_bo_ivl");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_set_nak_rpt_ivl (
 	char*		name,
 	guint		nak_rpt_ivl		/* milliseconds */
@@ -308,11 +330,14 @@ session_set_nak_rpt_ivl (
 		return;
 	}
 
-	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_msecs(nak_rpt_ivl));
-	puts ("READY");
+	if (!pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_msecs(nak_rpt_ivl)))
+		puts ("FAILED: pgm_transport_set_nak_rpt_ivl");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_set_nak_rdata_ivl (
 	char*		name,
 	guint		nak_rdata_ivl		/* milliseconds */
@@ -325,11 +350,14 @@ session_set_nak_rdata_ivl (
 		return;
 	}
 
-	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_msecs(nak_rdata_ivl));
-	puts ("READY");
+	if (!pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_msecs(nak_rdata_ivl)))
+		puts ("FAILED: pgm_transport_set_nak_rdata_ivl");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_set_nak_ncf_retries (
 	char*		name,
 	guint		nak_ncf_retries
@@ -342,11 +370,14 @@ session_set_nak_ncf_retries (
 		return;
 	}
 
-	pgm_transport_set_nak_ncf_retries (sess->transport, nak_ncf_retries);
-	puts ("READY");
+	if (!pgm_transport_set_nak_ncf_retries (sess->transport, nak_ncf_retries))
+		puts ("FAILED pgm_transport_set_nak_ncf_retries");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_set_nak_data_retries (
 	char*		name,
 	guint		nak_data_retries
@@ -359,11 +390,14 @@ session_set_nak_data_retries (
 		return;
 	}
 
-	pgm_transport_set_nak_data_retries (sess->transport, nak_data_retries);
-	puts ("READY");
+	if (!pgm_transport_set_nak_data_retries (sess->transport, nak_data_retries))
+		puts ("FAILED: pgm_transport_set_nak_data_retries");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_set_txw_max_rte (
 	char*		name,
 	guint		txw_max_rte
@@ -376,11 +410,14 @@ session_set_txw_max_rte (
 		return;
 	}
 
-	pgm_transport_set_txw_max_rte (sess->transport, txw_max_rte);
-	puts ("READY");
+	if (!pgm_transport_set_txw_max_rte (sess->transport, txw_max_rte))
+		puts ("FAILED:pgm_transport_set_txw_max_rte");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_set_fec (
 	char*		name,
 	guint		default_n,
@@ -394,15 +431,21 @@ session_set_fec (
 		return;
 	}
 
-	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k);
-	puts ("READY");
+	if (!pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k))
+		puts ("FAILED: pgm_transport_set_fec");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_bind (
 	char*		name
 	)
 {
+	const guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+	GError* err = NULL;
+
 /* check that session exists */
 	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
@@ -410,36 +453,42 @@ session_bind (
 		return;
 	}
 
-	pgm_transport_set_max_tpdu (sess->transport, g_max_tpdu);
-	pgm_transport_set_txw_sqns (sess->transport, g_sqns);
-	pgm_transport_set_rxw_sqns (sess->transport, g_sqns);
-	pgm_transport_set_hops (sess->transport, 16);
-	pgm_transport_set_ambient_spm (sess->transport, pgm_secs(30));
-	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
-	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
-	pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300));
-	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
-	if (!sess->transport->nak_bo_ivl)
-		pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(50));
-	if (!sess->transport->nak_rpt_ivl)
-		pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
-	if (!sess->transport->nak_rdata_ivl)
-		pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2));
-	if (!sess->transport->nak_data_retries)
-		pgm_transport_set_nak_data_retries (sess->transport, 50);
-	if (!sess->transport->nak_ncf_retries)
-		pgm_transport_set_nak_ncf_retries (sess->transport, 50);
+	if (!pgm_transport_set_max_tpdu (sess->transport, g_max_tpdu))
+		puts ("FAILED: pgm_transport_set_max_tpdu");
+	if (!pgm_transport_set_txw_sqns (sess->transport, g_sqns))
+		puts ("FAILED: pgm_transport_set_txw_sqns");
+	if (!pgm_transport_set_rxw_sqns (sess->transport, g_sqns))
+		puts ("FAILED: pgm_transport_set_rxw_sqns");
+	if (!pgm_transport_set_hops (sess->transport, 16))
+		puts ("FAILED: pgm_transport_set_hops");
+	if (!pgm_transport_set_ambient_spm (sess->transport, pgm_secs(30)))
+		puts ("FAILED: pgm_transport_set_ambient_spm");
+	if (!pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat)))
+		puts ("FAILED: pgm_transport_set_heartbeat_spm");
+	if (!pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300)))
+		puts ("FAILED: pgm_transport_set_peer_expiry");
+	if (!pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250)))
+		puts ("FAILED: pgm_transport_set_spmr_expiry");
+	if (!sess->transport->nak_bo_ivl && !pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(50)))
+		puts ("FAILED: pgm_transport_set_nak_bo_ivl");
+	if (!sess->transport->nak_rpt_ivl && !pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2)))
+		puts ("FAILED: pgm_transport_set_nak_rpt_ivl");
+	if (!sess->transport->nak_rdata_ivl && !pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2)))
+		puts ("FAILED: pgm_transport_set_nak_rdata_ivl");
+	if (!sess->transport->nak_data_retries && !pgm_transport_set_nak_data_retries (sess->transport, 50))
+		puts ("FAILED: pgm_transport_set_nak_data_retries");
+	if (!sess->transport->nak_ncf_retries && !pgm_transport_set_nak_ncf_retries (sess->transport, 50))
+		puts ("FAILED: pgm_transport_set_nak_ncf_retries");
 
-	int e = pgm_transport_bind (sess->transport);
-	if (e != 0) {
-		puts ("FAILED: pgm_transport_bind()");
-		return;
-	}
-
-	puts ("READY");
+	if (!pgm_transport_bind (sess->transport, &err)) {
+		printf ("FAILED: pgm_transport_bind(): %s\n", err->message);
+		g_error_free (err);
+	} else 
+		puts ("READY");
 }
 
-static void
+static
+void
 session_send (
 	char*		name,
 	char*		string
@@ -453,19 +502,20 @@ session_send (
 	}
 
 /* send message */
-        gssize e = pgm_transport_send (sess->transport, string, strlen(string) + 1, 0);
-        if (e < 0) {
+	if (G_IO_STATUS_NORMAL != pgm_send (sess->transport, string, strlen(string) + 1, NULL))
 		puts ("FAILED: pgm_transport_send()");
-        }
-
-	puts ("READY");
+	else
+		puts ("READY");
 }
 
-static void
+static
+void
 session_listen (
 	char*		name
 	)
 {
+	GError* err = NULL;
+
 /* check that session exists */
 	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
@@ -474,13 +524,17 @@ session_listen (
 	}
 
 /* listen */
-	pgm_async_create (&sess->async, sess->transport, 0);
-	pgm_async_add_watch (sess->async, on_data, NULL);
-
+	if (!pgm_async_create (&sess->async, sess->transport, &err)) {
+		printf ("FAILED: pgm_async_create(): %s", err->message);
+		g_error_free (err);
+		return;
+	}
+	pgm_async_add_watch (sess->async, on_data, sess);
 	puts ("READY");
 }
 
-static void
+static
+void
 session_destroy (
 	char*		name
 	)
@@ -513,7 +567,8 @@ session_destroy (
 /* process input commands from stdin/fd 
  */
 
-static gboolean
+static
+gboolean
 on_stdin_data (
 	GIOChannel* source,
 	G_GNUC_UNUSED GIOCondition condition,
@@ -772,7 +827,8 @@ out:
 /* idle log notification
  */
 
-static gboolean
+static
+gboolean
 on_mark (
 	G_GNUC_UNUSED gpointer data
 	)
