@@ -52,7 +52,7 @@ static GIOChannel* g_stdin_channel = NULL;
 static GMainLoop* g_loop = NULL;
 
 
-static void on_signal (int);
+static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
@@ -72,10 +72,10 @@ main (
 	log_init ();
 
 /* setup signal handlers */
-	signal(SIGSEGV, on_sigsegv);
-	pgm_signal_install(SIGINT, on_signal);
-	pgm_signal_install(SIGTERM, on_signal);
-	pgm_signal_install(SIGHUP, SIG_IGN);
+	signal (SIGSEGV, on_sigsegv);
+	signal (SIGHUP, SIG_IGN);
+	pgm_signal_install (SIGINT, on_signal, g_loop);
+	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 	g_filter.s_addr = 0;
 
@@ -115,12 +115,13 @@ main (
 
 static void
 on_signal (
-	G_GNUC_UNUSED int	signum
+	int		signum,
+	gpointer	user_data
 	)
 {
-	puts ("on_signal");
-
-	g_main_loop_quit(g_loop);
+	GMainLoop* loop = (GMainLoop*)user_data;
+	g_message ("on_signal (signum:%d user-data:%p)", signum, user_data);
+	g_main_loop_quit (loop);
 }
 
 static gboolean
