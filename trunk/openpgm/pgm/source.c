@@ -1241,7 +1241,8 @@ pgm_send (
 
 /* if non-blocking calculate total wire size and check rate limit */
 	STATE(is_rate_limited) = FALSE;
-	if (transport->is_nonblocking)
+	if (transport->is_nonblocking &&
+	    transport->rate_control)
 	{
 		const gsize header_length = pgm_transport_pkt_offset (TRUE);
 		gsize tpdu_length = 0;
@@ -1253,10 +1254,12 @@ pgm_send (
 		} while (offset_ < apdu_length);
 
 /* calculation includes one iphdr length already */
-		const int result = pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, transport->is_nonblocking);
-		if (result == -1)
+		if (!pgm_rate_check (transport->rate_control,
+				     tpdu_length - transport->iphdr_len,
+				     transport->is_nonblocking))
+		{
 			return G_IO_STATUS_AGAIN;
-
+		}
 		STATE(is_rate_limited) = TRUE;
 	}
 
@@ -1462,7 +1465,8 @@ pgm_sendv (
 
 /* if non-blocking calculate total wire size and check rate limit */
 	STATE(is_rate_limited) = FALSE;
-	if (transport->is_nonblocking)
+	if (transport->is_nonblocking &&
+	    transport->rate_control)
         {
 		const gsize header_length = pgm_transport_pkt_offset (TRUE);
                 gsize tpdu_length = 0;
@@ -1474,9 +1478,12 @@ pgm_sendv (
 		} while (offset_ < STATE(apdu_length));
 
 /* calculation includes one iphdr length already */
-                const int result = pgm_rate_check (transport->rate_control, tpdu_length - transport->iphdr_len, transport->is_nonblocking);
-                if (result == -1)
+                if (!pgm_rate_check (transport->rate_control,
+				     tpdu_length - transport->iphdr_len,
+				     transport->is_nonblocking))
+		{
 			return G_IO_STATUS_AGAIN;
+		}
 		STATE(is_rate_limited) = TRUE;
         }
 
@@ -1707,16 +1714,20 @@ pgm_send_skbv (
 		goto retry_send;
 
 	STATE(is_rate_limited) = FALSE;
-	if (transport->is_nonblocking)
+	if (transport->is_nonblocking &&
+	    transport->rate_control)
 	{
 		gsize total_tpdu_length = 0;
 		for (guint i = 0; i < count; i++)
 			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset (is_one_apdu) + vector[i]->len;
 
 /* calculation includes one iphdr length already */
-		const int result = pgm_rate_check (transport->rate_control, total_tpdu_length - transport->iphdr_len, transport->is_nonblocking);
-		if (result == -1)
+		if (!pgm_rate_check (transport->rate_control,
+				     total_tpdu_length - transport->iphdr_len,
+				     transport->is_nonblocking))
+		{
 			return G_IO_STATUS_AGAIN;
+		}
 		STATE(is_rate_limited) = TRUE;
 	}
 

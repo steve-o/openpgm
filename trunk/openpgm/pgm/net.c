@@ -77,13 +77,12 @@ pgm_sendto (
 	GStaticMutex* mutex = use_router_alert ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
 	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
-	if (use_rate_limit)
+	if (use_rate_limit &&
+	    transport->rate_control && 
+	    !pgm_rate_check (transport->rate_control, len, transport->is_nonblocking))
 	{
-		const int check = pgm_rate_check (transport->rate_control, len, transport->is_nonblocking);
-		if (check < 0 && errno == EAGAIN)
-		{
-			return (const gssize)check;
-		}
+		errno = EAGAIN;
+		return (const gssize)-1;
 	}
 
 	g_static_mutex_lock (mutex);
