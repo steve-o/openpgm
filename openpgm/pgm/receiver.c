@@ -574,8 +574,8 @@ pgm_flush_peers_pending (
 	
 		if (peer_bytes >= 0)
 		{
-			*bytes_read += peer_bytes;
-			(*data_read)++;
+			(*bytes_read) += peer_bytes;
+			(*data_read)  ++;
 			if (*pmsg == msg_end) {			/* commit full */
 				retval = -ENOBUFS;
 				break;

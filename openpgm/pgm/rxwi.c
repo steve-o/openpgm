@@ -45,7 +45,7 @@
 #include <pgm/reed_solomon.h>
 
 
-//#define RXW_DEBUG
+#define RXW_DEBUG
 
 #ifndef RXW_DEBUG
 #	define G_DISABLE_ASSERT
@@ -99,8 +99,8 @@ static inline void _pgm_rxw_lost (pgm_rxw_t* const, const guint32);
 static inline void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline gssize _pgm_rxw_incoming_read (pgm_rxw_t* const, pgm_msgv_t**, guint);
-static inline gboolean _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const guint32, const guint);
-static inline gssize _pgm_rxw_incoming_read_apdu (pgm_rxw_t* const, pgm_msgv_t**, guint);
+static inline gboolean _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const guint32);
+static inline gssize _pgm_rxw_incoming_read_apdu (pgm_rxw_t* const, pgm_msgv_t**);
 static inline int _pgm_rxw_recovery_update (pgm_rxw_t* const, const guint32, const pgm_time_t);
 static inline int _pgm_rxw_recovery_append (pgm_rxw_t* const, const pgm_time_t);
 
@@ -1129,6 +1129,7 @@ pgm_rxw_readv (
 	const pgm_msgv_t* msg_end;
 	struct pgm_sk_buff_t* skb;
 	pgm_rxw_state_t* state;
+	gssize bytes_read;
 
 /* pre-conditions */
 	g_assert (window);
@@ -1139,8 +1140,6 @@ pgm_rxw_readv (
 		(gpointer)window, (gpointer)pmsg, pmsglen);
 
 	msg_end = *pmsg + pmsglen;
-	window->pgm_sock_err.lost_count = 0;
-	gssize bytes_read;
 
 	if (_pgm_rxw_incoming_is_empty (window))
 		return -1;
@@ -1155,13 +1154,14 @@ pgm_rxw_readv (
 		break;
 
 	case PGM_PKT_LOST_DATA_STATE:
-		window->pgm_sock_err.lost_count += _pgm_rxw_remove_trail (window);
+		window->lost_count += _pgm_rxw_remove_trail (window);
 /* fall through */
 	case PGM_PKT_BACK_OFF_STATE:
 	case PGM_PKT_WAIT_NCF_STATE:
 	case PGM_PKT_WAIT_DATA_STATE:
 	case PGM_PKT_HAVE_PARITY_STATE:
-		return -1;
+		bytes_read = -1;
+		break;
 
 	case PGM_PKT_COMMIT_DATA_STATE:
 	case PGM_PKT_ERROR_STATE:
@@ -1248,8 +1248,12 @@ _pgm_rxw_incoming_read (
 	g_assert_cmpuint (pmsglen, >, 0);
 	g_assert (!_pgm_rxw_incoming_is_empty (window));
 
+	g_trace ("_pgm_rxw_incoming_read (window:%p pmsg:%p pmsglen:%u)",
+		 (gpointer)window, (gpointer)pmsg, pmsglen);
+
 	msg_end = *pmsg + pmsglen;
 	gssize bytes_read = 0;
+	guint data_read = 0;
 
 	do {
 		skb = _pgm_rxw_peek (window, window->commit_lead);
@@ -1257,15 +1261,15 @@ _pgm_rxw_incoming_read (
 		if (_pgm_rxw_is_apdu_complete (window,
 					      skb->pgm_opt_fragment ?
 							g_ntohl (skb->of_apdu_first_sqn) :
-							skb->sequence,
-					      msg_end - *pmsg))
+							skb->sequence))
 		{
-			bytes_read += _pgm_rxw_incoming_read_apdu (window, pmsg, msg_end - *pmsg);
+			bytes_read += _pgm_rxw_incoming_read_apdu (window, pmsg);
+			data_read  ++;
 		}
 		else break;
 	} while (!_pgm_rxw_incoming_is_empty (window));
 
-	return bytes_read;
+	return data_read > 0 ? bytes_read : -1;
 }
 
 /* returns TRUE if transmission group is lost.
@@ -1436,6 +1440,8 @@ _pgm_rxw_reconstruct (
  * packets with single fragment fragment headers must be normalised as regular
  * packets before calling.
  *
+ * APDUs exceeding PGM_MAX_FRAGMENTS or PGM_MAX_APDU length will be discarded.
+ *
  * returns FALSE if APDU is incomplete or longer than max_len sequences.
  */
 
@@ -1443,8 +1449,7 @@ static inline
 gboolean
 _pgm_rxw_is_apdu_complete (
 	pgm_rxw_t* const	window,
-	const guint32		first_sequence,
-	const guint		max_len			/* of TPDUs */
+	const guint32		first_sequence
 	)
 {
 	struct pgm_sk_buff_t* skb;
@@ -1453,8 +1458,8 @@ _pgm_rxw_is_apdu_complete (
 /* pre-conditions */
 	g_assert (window);
 
-/* message array full */
-	if (0 == max_len) return FALSE;
+	g_trace ("_pgm_rxw_is_apdu_complete (window:%p first-sequence:%" G_GUINT32_FORMAT ")",
+		(gpointer)window, first_sequence);
 
 	skb = _pgm_rxw_peek (window, first_sequence);
 	g_assert (skb);
@@ -1501,7 +1506,7 @@ _pgm_rxw_is_apdu_complete (
 /* have sufficient been received for reconstruction */
 			if (contiguous_tpdus >= window->tg_size) {
 				_pgm_rxw_reconstruct (window, tg_sqn);
-				return _pgm_rxw_is_apdu_complete (window, first_sequence, max_len);
+				return _pgm_rxw_is_apdu_complete (window, first_sequence);
 			}
 		}
 		else
@@ -1529,9 +1534,6 @@ _pgm_rxw_is_apdu_complete (
 				return FALSE;
 			}
 
-			if (contiguous_tpdus > max_len)
-				return FALSE;
-
 			contiguous_size += skb->len;
 			if (apdu_size == contiguous_size)
 				return TRUE;
@@ -1556,26 +1558,27 @@ static inline
 gssize
 _pgm_rxw_incoming_read_apdu (
 	pgm_rxw_t* const	window,
-	pgm_msgv_t**		pmsg,		/* message array, updated as messages appended */
-	guint			pmsglen		/* number of items in pmsg */
+	pgm_msgv_t**		pmsg		/* message array, updated as messages appended */
 	)
 {
-	struct pgm_sk_buff_t *skb, **pskb;
+	struct pgm_sk_buff_t *skb;
 
 /* pre-conditions */
 	g_assert (window);
 	g_assert (pmsg);
-	g_assert_cmpuint (pmsglen, >, 0);
+
+	g_trace ("_pgm_rxw_incoming_read_apdu (window:%p pmsg:%p)",
+		(gpointer)window, (gpointer)pmsg);
 
 	skb = _pgm_rxw_peek (window, window->commit_lead);
 	gsize contiguous_len = 0;
 	const gsize apdu_len = skb->pgm_opt_fragment ? g_ntohl (skb->of_apdu_len) : skb->len;
+	guint i = 0;
 	g_assert_cmpuint (apdu_len, >=, skb->len);
-	pskb = (*pmsg)->msgv_skb;
 	(*pmsg)->msgv_len = 0;
 	do {
 		_pgm_rxw_state (window, skb, PGM_PKT_COMMIT_DATA_STATE);
-		*pskb++ = skb;
+		(*pmsg)->msgv_skb[i++] = skb;
 		(*pmsg)->msgv_len++;
 		contiguous_len += skb->len;
 		if (_pgm_rxw_is_last_of_tg_sqn (window, window->commit_lead))
