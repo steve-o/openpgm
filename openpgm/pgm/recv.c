@@ -824,7 +824,8 @@ out:
 	}
 
 	g_static_mutex_unlock (&transport->pending_mutex);
-	if (_bytes_read)
+g_message ("read %d bytes", (int)bytes_read);
+	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
 	return G_IO_STATUS_NORMAL;
 }

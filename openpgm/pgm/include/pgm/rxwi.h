@@ -108,7 +108,6 @@ G_STATIC_ASSERT(sizeof(struct pgm_rxw_state_t) <= sizeof(((struct pgm_sk_buff_t*
 
 struct pgm_rxw_t {
 	const pgm_tsi_t*	tsi;
-	pgm_sock_err_t	pgm_sock_err;
 
         GQueue          backoff_queue;
         GQueue          wait_ncf_queue;
