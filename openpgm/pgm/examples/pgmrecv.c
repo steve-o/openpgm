@@ -433,8 +433,10 @@ on_msgv (
 		for (unsigned j = 0; j < msgv[i].msgv_len; j++)
 			apdu_len += msgv[i].msgv_skb[j]->len;
 /* truncate to first fragment to make GLib printing happy */
-		char buf[1024], tsi[PGM_TSISTRLEN];
-		snprintf (buf, sizeof(buf), "%s", (char*)pskb->data);
+		char buf[2000], tsi[PGM_TSISTRLEN];
+		const gsize buflen = MIN(sizeof(buf) - 1, pskb->len);
+		strncpy (buf, (char*)pskb->data, buflen);
+		buf[buflen] = '\0';
 		pgm_tsi_print_r (&pskb->tsi, tsi, sizeof(tsi));
 		if (msgv[i].msgv_len > 1)
 			g_message ("\t%u: \"%s\" ... (%" G_GSIZE_FORMAT " bytes from %s)",
