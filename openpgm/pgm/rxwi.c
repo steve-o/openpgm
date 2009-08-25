@@ -1452,12 +1452,12 @@ _pgm_rxw_is_apdu_complete (
 
 /* pre-conditions */
 	g_assert (window);
-	g_assert (skb);
 
 /* message array full */
 	if (0 == max_len) return FALSE;
 
 	skb = _pgm_rxw_peek (window, first_sequence);
+	g_assert (skb);
 
 	const gsize apdu_size = skb->pgm_opt_fragment ? g_ntohl (skb->of_apdu_len) : skb->len;
 	const guint32 tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);

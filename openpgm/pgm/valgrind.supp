@@ -66,6 +66,24 @@
    fun:g_log
 }
 
+{
+   miru-glib-hack-6
+   Memcheck:Leak
+   fun:malloc
+   fun:g_malloc
+   fun:g_log_set_handler
+}
+
+{
+   miru-glib-hack-7
+   Memcheck:Leak
+   fun:calloc
+   fun:g_malloc0
+   fun:g_thread_self
+   fun:g_thread_init_glib
+}
+
+
 
 ## Annoying libc errors
 
