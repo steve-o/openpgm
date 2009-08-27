@@ -39,9 +39,6 @@ pgm_inet_checksum (
 	int		csum
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != addr);
-
 	guint nleft = len;
 	const guint16 *w = (const guint16*)addr;
 	guint answer;
@@ -70,9 +67,6 @@ pgm_compat_csum_partial (
 	guint32		csum
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != addr);
-
 	const guint16 *w = (const guint16*)addr;
 	guint32 sum = csum;
 	guint16 odd_byte;
@@ -104,10 +98,6 @@ pgm_compat_csum_partial_copy (
 	guint32		csum
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != src);
-	g_assert (NULL != dst);
-
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);
 }

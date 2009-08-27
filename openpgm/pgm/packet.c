@@ -21,55 +21,22 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <sys/socket.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#	include <arpa/inet.h>
-#else
-#	include <ws2tcpip.h>
-#	include <ipexport.h>
-#endif
-
-#include "pgm/ip.h"
-#include "pgm/checksum.h"
-#include "pgm/skbuff.h"
 #include "pgm/packet.h"
-
-
-//#define PACKET_DEBUG
-
-#ifdef PACKET_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
+#include "pgm/checksum.h"
 
 
 /* globals */
 
-#ifndef IPOPT_NOP
-#	define IPOPT_NOP	IP_OPT_NOP
-#endif
-#ifndef IPOPT_EOL
-#	define IPOPT_EOL	IP_OPT_EOL
-#endif
-#ifndef IPOPT_RR
-#	define IPOPT_RR		IP_OPT_RR
-#endif
-#ifndef IPOPT_TS
-#	define IPOPT_TS		IP_OPT_TS
-#endif
-
-
-static gboolean pgm_parse (struct pgm_sk_buff_t* const, GError**);
 static gboolean pgm_print_spm (struct pgm_header*, gpointer, gsize);
 static gboolean pgm_print_poll (struct pgm_header*, gpointer, gsize);
 static gboolean pgm_print_polr (struct pgm_header*, gpointer, gsize);
@@ -82,35 +49,33 @@ static gboolean pgm_print_spmr (struct pgm_header*, gpointer, gsize);
 static gssize pgm_print_options (gpointer, gsize);
 
 
-/* Parse a raw-IP packet for IP and PGM header and any payload.
- */
-
-#define PGM_MIN_SIZE	( \
-				sizeof(struct pgm_ip) + 	/* IPv4 header */ \
-				sizeof(struct pgm_header) 	/* PGM header */ \
-			)
-
-gboolean
+int
 pgm_parse_raw (
-	struct pgm_sk_buff_t* const	skb,		/* data will be modified */
-	struct sockaddr* const		dst,
-	GError**			error
+	gpointer		data,			/* packet to parse */
+	gsize			len,
+	struct sockaddr*	dst_addr,
+	socklen_t*		dst_addr_len,
+	struct pgm_header**	header,			/* return PGM header location */
+	gpointer*		packet,			/* and pointer to PGM packet type header */
+	gsize*			packet_len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
-	g_assert (NULL != dst);
-
-/* minimum size should be IPv4 header plus PGM header, check IP version later */
-	if (skb->len < PGM_MIN_SIZE)
+/* minimum size should be IP header plus PGM header */
+#ifdef __USE_BSD
+	if (len < (sizeof(struct ip) + sizeof(struct pgm_header))) 
 	{
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
-			     _("IP packet too small at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GUINT16_FORMAT " bytes."),
-			     skb->len, (guint16)PGM_MIN_SIZE);
-		return FALSE;
+		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+			len, (sizeof(struct ip) + sizeof(struct pgm_header)));
+		return -1;
 	}
+#else
+	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
+	{
+		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+			len, (sizeof(struct iphdr) + sizeof(struct pgm_header)));
+		return -1;
+	}
+#endif
 
 /* IP packet header: IPv4
  *
@@ -159,85 +124,101 @@ pgm_parse_raw (
  */
 
 /* decode IP header */
-	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
-	switch (ip->ip_v) {
-	case 4: {
-		struct sockaddr_in* sin = (struct sockaddr_in*)dst;
-		sin->sin_family		= AF_INET;
-		sin->sin_addr.s_addr	= ip->ip_dst.s_addr;
+#ifdef __USE_BSD
+	const struct ip* ip = (struct ip*)data;
+	switch (ip->ip_v)
+#else
+	const struct iphdr* ip = (struct iphdr*)data;
+	switch (ip->version)
+#endif
+	{
+	case 4:
+		((struct sockaddr_in*)dst_addr)->sin_family = AF_INET;
+#ifdef __USE_BSD
+		((struct sockaddr_in*)dst_addr)->sin_addr.s_addr = ip->ip_dst.s_addr;
+#else
+		((struct sockaddr_in*)dst_addr)->sin_addr.s_addr = ip->daddr;
+#endif
+		*dst_addr_len = sizeof(struct sockaddr_in);
 		break;
-	}
 
 	case 6:
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_AFNOSUPPORT,
-			     _("IPv6 is not supported for raw IP header parsing."));
-		return FALSE;
+		((struct sockaddr_in6*)dst_addr)->sin6_family = AF_INET6;
+		g_warning ("IPv6 packet headers are not provided by PF_PACKET capture.");
+		*dst_addr_len = sizeof(struct sockaddr_in6);
+		return -1;
 
 	default:
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_AFNOSUPPORT,
-			     _("IP header reports an invalid version %d."),
-			     ip->ip_v);
-		return FALSE;
+#ifdef __USE_BSD
+		printf ("unknown IP version (%i) :/\n", ip->ip_v);
+#else
+		printf ("unknown IP version (%i) :/\n", ip->version);	
+#endif
+		return -1;
 	}
 
-	const gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct pgm_ip))
+#ifdef __USE_BSD
+	gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+	if (ip_header_length < sizeof(struct ip))
+#else
+	gsize ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
+	if (ip_header_length < sizeof(struct iphdr))
+#endif
 	{
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
-			     _("IP header reports an invalid header length %" G_GSIZE_FORMAT " bytes."),
-			     ip_header_length);
-		return FALSE;
+		puts ("bad IP header length :(");
+		return -1;
 	}
 
+#ifdef __USE_BSD
 	gsize packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+#else
+	gsize packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+#endif
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
-	if (skb->len == packet_length + ip_header_length) {
+	if (len == packet_length + ip_header_length) {
 		packet_length += ip_header_length;
 	}
 
-	if (skb->len < packet_length) {			/* redundant: often handled in kernel */
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
-			     _("IP packet received at %" G_GUINT16_FORMAT " bytes whilst IP header reports %" G_GSIZE_FORMAT " bytes."),
-			     skb->len, packet_length);
-		return FALSE;
+	if (len < packet_length) {			/* redundant: often handled in kernel */
+		printf ("truncated IP packet: %i < %i\n", (int)len, (int)packet_length);
+		return -1;
+	}
+
+/* TCP Segmentation Offload (TSO) might have zero length here */
+	if (packet_length < ip_header_length) {
+		printf ("bad length: %i < %i\n", (int)packet_length, (int)ip_header_length);
+		return -1;
 	}
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
 #if PGM_CHECK_IN_CKSUM
-	const int sum = in_cksum (data, packet_length, 0);
-	if (0 != sum) {
-		const int ip_sum = g_ntohs (ip->ip_sum);
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_CKSUM,
-			     _("IP packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
-			     ip_sum, sum);
-		return FALSE;
+	int sum = in_cksum(data, packet_length, 0);
+	if (sum != 0) {
+#ifdef __USE_BSD
+		int ip_sum = g_ntohs(ip->ip_sum);
+#else
+		int ip_sum = g_ntohs(ip->check);
+#endif
+		printf ("bad cksum! %i\n", ip_sum);
+		return -2;
 	}
 #endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
-	const guint offset = g_ntohs (ip->ip_off);
+#ifdef __USE_BSD
+	guint offset = g_ntohs(ip->ip_off);
+#else
+	guint offset = g_ntohs(ip->frag_off);
+#endif
 	if ((offset & 0x1fff) != 0) {
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_PROTO,
-			     _("IP header reports packet fragmentation."));
-		return FALSE;
+		puts ("fragmented packet :/");
+		return -1;
 	}
 
 /* PGM payload, header looks as follows:
@@ -256,82 +237,75 @@ pgm_parse_raw (
  * | Type specific data ...
  * +-+-+-+-+-+-+-+-+-+- ...
  */
+	struct pgm_header* pgm_header = (struct pgm_header*)((guint8*)data + ip_header_length);
+	gsize pgm_length = packet_length - ip_header_length;
 
-	skb->pgm_header = (gpointer)( (guint8*)skb->data + ip_header_length );
-
-/* advance DATA pointer to PGM packet */
-	skb->data	= skb->pgm_header;
-	skb->len       -= ip_header_length;
-	return pgm_parse (skb, error);
+	return pgm_parse (pgm_header, pgm_length, header, packet, packet_len);
 }
 
-gboolean
+int
 pgm_parse_udp_encap (
-	struct pgm_sk_buff_t*	skb,		/* will be modified */
-	GError**		error
+	gpointer		data,
+	gsize			len,
+	G_GNUC_UNUSED struct sockaddr*	dst_addr,
+	G_GNUC_UNUSED socklen_t*	dst_addr_len,
+	struct pgm_header**	header,
+	gpointer*		packet,
+	gsize*			packet_len
 	)
 {
-	g_assert (NULL != skb);
-
-	if (skb->len < sizeof(struct pgm_header)) {
-		g_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
-			     _("UDP payload too small for PGM packet at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes."),
-			     skb->len, sizeof(struct pgm_header));
-		return FALSE;
-	}
-
-/* DATA payload is PGM packet, no headers */
-	skb->pgm_header = skb->data;
-	return pgm_parse (skb, error);
+	return pgm_parse ((struct pgm_header*)data, len, header, packet, packet_len);
 }
 
 /* will modify packet contents to calculate and check PGM checksum
  */
-static
-gboolean
+int
 pgm_parse (
-	struct pgm_sk_buff_t* const	skb,		/* will be modified to calculate checksum */
-	GError**			error
+	struct pgm_header*	pgm_header,
+	gsize			pgm_length,
+	struct pgm_header**	header,
+	gpointer*		packet,
+	gsize*			packet_len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
-
-/* pgm_checksum == 0 means no transmitted checksum */
-	if (skb->pgm_header->pgm_checksum)
-	{
-		const int sum = skb->pgm_header->pgm_checksum;
-		skb->pgm_header->pgm_checksum = 0;
-		const int pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
-		skb->pgm_header->pgm_checksum = sum;
-		if (pgm_sum != sum) {
-			g_set_error (error,
-				     PGM_PACKET_ERROR,
-				     PGM_PACKET_ERROR_CKSUM,
-			     	     _("PGM packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
-			     	     pgm_sum, sum);
-			return FALSE;
-		}
-	} else {
-		if (PGM_ODATA == skb->pgm_header->pgm_type ||
-		    PGM_RDATA == skb->pgm_header->pgm_type)
-		{
-			g_set_error (error,
-				     PGM_PACKET_ERROR,
-				     PGM_PACKET_ERROR_PROTO,
-			     	     _("PGM checksum missing whilst mandatory for %cDATA packets."),
-				     PGM_ODATA == skb->pgm_header->pgm_type ? 'O' : 'R');
-			return FALSE;
-		}
-		g_trace ("No PGM checksum :O");
+	if (pgm_length < sizeof(pgm_header)) {
+		puts ("bad packet size :(");
+		return -1;
 	}
 
-/* copy packets source transport identifier */
-	memcpy (&skb->tsi.gsi, skb->pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
-	skb->tsi.sport = skb->pgm_header->pgm_sport;
-	return TRUE;
+/* pgm_checksum == 0 means no transmitted checksum */
+	if (pgm_header->pgm_checksum)
+	{
+		int sum = pgm_header->pgm_checksum;
+		pgm_header->pgm_checksum = 0;
+		int pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)pgm_header, pgm_length, 0));
+		pgm_header->pgm_checksum = sum;
+		if (pgm_sum != sum) {
+			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", sum, pgm_sum);
+			return -2;
+		}
+	} else {
+		if (pgm_header->pgm_type == PGM_ODATA || pgm_header->pgm_type == PGM_RDATA) {
+			puts ("PGM checksum mandatory for ODATA and RDATA packets :(");
+			return -1;
+		}
+		puts ("No PGM checksum :O");
+	}
+
+/* now decode PGM packet types */
+	gpointer pgm_data = pgm_header + 1;
+	gssize pgm_data_length = (gssize)pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
+
+	if (pgm_data_length < 0) {
+		puts ("bad packet length :(");
+		return -1;
+	}
+
+	*header = pgm_header;
+	*packet = pgm_data;
+	*packet_len = (gsize)pgm_data_length;
+
+	return 0;
 }
 
 gboolean
@@ -340,34 +314,48 @@ pgm_print_packet (
 	gsize		len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 /* minimum size should be IP header plus PGM header */
-	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
+#ifdef __USE_BSD
+	if (len < (sizeof(struct ip) + sizeof(struct pgm_header))) 
+#else
+	if (len < (sizeof(struct iphdr) + sizeof(struct pgm_header))) 
+#endif
 	{
 		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n", len, sizeof(struct pgm_header));
 		return FALSE;
 	}
 
 /* decode IP header */
-	const struct pgm_ip* ip = (struct pgm_ip*)data;
+#ifdef __USE_BSD
+	const struct ip* ip = (struct ip*)data;
 	if (ip->ip_v != 4) 				/* IP version, 4 or 6 */
+#else
+	const struct iphdr* ip = (struct iphdr*)data;
+	if (ip->version != 4) 				/* IP version, 4 or 6 */
+#endif
 	{
 		puts ("not IP4 packet :/");		/* v6 not currently handled */
 		return FALSE;
 	}
 	printf ("IP ");
 
+#ifdef __USE_BSD
 	gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct pgm_ip)) 
+	if (ip_header_length < sizeof(struct ip)) 
+#else
+	gsize ip_header_length = ip->ihl * 4;		/* IP header length in 32bit octets */
+	if (ip_header_length < sizeof(struct iphdr)) 
+#endif
 	{
 		puts ("bad IP header length :(");
 		return FALSE;
 	}
 
+#ifdef __USE_BSD
 	gsize packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+#else
+	gsize packet_length = g_ntohs(ip->tot_len);	/* total packet length */
+#endif
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
@@ -389,11 +377,20 @@ pgm_print_packet (
 		return FALSE;
 	}
 
+#ifdef __USE_BSD
 	guint offset = g_ntohs(ip->ip_off);
+#else
+	guint offset = g_ntohs(ip->frag_off);
+#endif
 
 /* 3 bits routing priority, 4 bits type of service: delay, throughput, reliability, cost */
+#ifdef __USE_BSD
 	printf ("(tos 0x%x", (int)ip->ip_tos);
 	switch (ip->ip_tos & 0x3)
+#else
+	printf ("(tos 0x%x", (int)ip->tos);
+	switch (ip->tos & 0x3)
+#endif
 	{
 	case 1: printf (",ECT(1)"); break;
 	case 2: printf (",ECT(0)"); break;
@@ -402,7 +399,11 @@ pgm_print_packet (
 	}
 
 /* time to live */
+#ifdef __USE_BSD
 	if (ip->ip_ttl >= 1) printf (", ttl %u", ip->ip_ttl);
+#else
+	if (ip->ttl >= 1) printf (", ttl %u", ip->ttl);
+#endif
 
 /* fragmentation */
 #define IP_RDF	0x8000
@@ -411,24 +412,40 @@ pgm_print_packet (
 #define IP_OFFMASK	0x1fff
 
 	printf (", id %u, offset %u, flags [%s%s]",
+#ifdef __USE_BSD
 		g_ntohs(ip->ip_id),
+#else
+		g_ntohs(ip->id),
+#endif
 		(offset & 0x1fff) * 8,
 		((offset & IP_DF) ? "DF" : ""),
 		((offset & IP_MF) ? "+" : ""));
 	printf (", length %" G_GSIZE_FORMAT, packet_length);
 
 /* IP options */
-	if ((ip_header_length - sizeof(struct pgm_ip)) > 0) {
+#ifdef __USE_BSD
+	if ((ip_header_length - sizeof(struct ip)) > 0) {
 		printf (", options (");
-		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct pgm_ip));
+		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct ip));
 		printf (" )");
 	}
+#else
+	if ((ip_header_length - sizeof(struct iphdr)) > 0) {
+		printf (", options (");
+		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct iphdr));
+		printf (" )");
+	}
+#endif
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
 	int sum = pgm_inet_checksum(data, packet_length, 0);
 	if (sum != 0) {
+#ifdef __USE_BSD
 		int ip_sum = g_ntohs(ip->ip_sum);
+#else
+		int ip_sum = g_ntohs(ip->check);
+#endif
 		printf (", bad cksum! %i", ip_sum);
 	}
 
@@ -464,10 +481,14 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	printf ("%s.%s > ",
-		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src), pgm_udpport_string(pgm_header->pgm_sport));
-	printf ("%s.%s: PGM\n",
+	printf ("%s.%s > %s.%s: PGM\n",
+#ifdef __USE_BSD
+		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src), pgm_udpport_string(pgm_header->pgm_sport),
 		pgm_gethostbyaddr((const struct in_addr*)&ip->ip_dst), pgm_udpport_string(pgm_header->pgm_dport));
+#else
+		pgm_gethostbyaddr((const struct in_addr*)&ip->saddr), pgm_udpport_string(pgm_header->pgm_sport),
+		pgm_gethostbyaddr((const struct in_addr*)&ip->daddr), pgm_udpport_string(pgm_header->pgm_dport));
+#endif
 
 	printf ("type: %s [%i] (version=%i, reserved=%i)\n"
 		"options: extensions=%s, network-significant=%s, parity packet=%s (variable size=%s)\n"
@@ -554,31 +575,39 @@ pgm_print_packet (
 
 #define PGM_MIN_SPM_SIZE	( sizeof(struct pgm_spm) )
 
-gboolean
+int
 pgm_verify_spm (
-	const struct pgm_sk_buff_t* const	skb
+	G_GNUC_UNUSED struct pgm_header* header,
+	gpointer		data,
+	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
+	int retval = 0;
 
-	const struct pgm_spm* spm = (const struct pgm_spm*)skb->data;
-	switch (g_ntohs (spm->spm_nla_afi)) {
 /* truncated packet */
+	if (len < PGM_MIN_SPM_SIZE) {
+		retval = -EINVAL;
+		goto out;
+	}
+
+	struct pgm_spm* spm = (struct pgm_spm*)data;
+
+	switch (g_ntohs(spm->spm_nla_afi)) {
 	case AFI_IP6:
-		if (skb->len < sizeof(struct pgm_spm6))
-			return FALSE;
-		break;
+		if (len < sizeof(struct pgm_spm6)) {
+			retval = -EINVAL;
+		}
+
 	case AFI_IP:
-		if (skb->len < sizeof(struct pgm_spm))
-			return FALSE;
 		break;
 
 	default:
-		return FALSE;
+		retval = -EINVAL;
+		break;
 	}
 
-	return TRUE;
+out:
+	return retval;
 }
 
 static gboolean
@@ -588,11 +617,6 @@ pgm_print_spm (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("SPM: ");
 
 	if (len < PGM_MIN_SPM_SIZE) {
@@ -614,7 +638,7 @@ pgm_print_spm (
 	char s[INET6_ADDRSTRLEN];
 	switch (spm->spm_nla_afi) {
 	case AFI_IP:
-		pgm_inet_ntop ( AF_INET, &spm->spm_nla, s, sizeof (s) );
+		inet_ntop ( AF_INET, &spm->spm_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_spm );
 		len  -= sizeof( struct pgm_spm );
 		break;
@@ -625,7 +649,7 @@ pgm_print_spm (
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET6, &spm6->spm6_nla, s, sizeof (s) );
+		inet_ntop ( AF_INET6, &spm6->spm6_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_spm6 );
 		len  -= sizeof( struct pgm_spm6 );
 		break;
@@ -682,11 +706,6 @@ pgm_print_poll (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("POLL: ");
 
 	if (len < PGM_MIN_POLL_SIZE) {
@@ -707,7 +726,7 @@ pgm_print_poll (
 	char s[INET6_ADDRSTRLEN];
 	switch (poll4->poll_nla_afi) {
 	case AFI_IP:
-		pgm_inet_ntop ( AF_INET, &poll4->poll_nla, s, sizeof (s) );
+		inet_ntop ( AF_INET, &poll4->poll_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_poll );
 		len  -= sizeof( struct pgm_poll );
 		printf ("%s", s);
@@ -732,7 +751,7 @@ pgm_print_poll (
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET6, &poll6->poll6_nla, s, sizeof (s) );
+		inet_ntop ( AF_INET6, &poll6->poll6_nla, s, sizeof (s) );
 		data  = (guint8*)data + sizeof( struct pgm_poll6 );
 		len  -= sizeof( struct pgm_poll6 );
 		printf ("%s", s);
@@ -788,11 +807,6 @@ pgm_print_polr (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("POLR: ");
 
 	if (len < sizeof(struct pgm_polr)) {
@@ -842,11 +856,6 @@ pgm_print_odata (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("ODATA: ");
 
 	if (len < sizeof(struct pgm_data)) {
@@ -899,11 +908,6 @@ pgm_print_rdata (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("RDATA: ");
 
 	if (len < sizeof(struct pgm_data)) {
@@ -972,22 +976,23 @@ pgm_print_rdata (
 
 #define PGM_MIN_NAK_SIZE	( sizeof(struct pgm_nak) )
 
-gboolean
+int
 pgm_verify_nak (
-	const struct pgm_sk_buff_t* const	skb
+	G_GNUC_UNUSED struct pgm_header* header,
+	gpointer		data,
+	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
-
-	g_trace ("pgm_verify_nak (skb:%p)", (gconstpointer)skb);
+	int retval = 0;
 
 /* truncated packet */
-	if (skb->len < PGM_MIN_NAK_SIZE)
-		return FALSE;
+	if (len < PGM_MIN_NAK_SIZE) {
+		retval = -EINVAL;
+		goto out;
+	}
 
-	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
-	const int nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
+	struct pgm_nak* nak = (struct pgm_nak*)data;
+	int nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
 	int nak_grp_nla_afi = -1;
 
 /* check source NLA: unicast address of the ODATA sender */
@@ -997,11 +1002,12 @@ pgm_verify_nak (
 		break;
 
 	case AFI_IP6:
-		nak_grp_nla_afi = g_ntohs (((const struct pgm_nak6*)nak)->nak6_grp_nla_afi);
+		nak_grp_nla_afi = g_ntohs (((struct pgm_nak6*)nak)->nak6_grp_nla_afi);
 		break;
 
 	default:
-		return FALSE;
+		retval = -EINVAL;
+		goto out;
 	}
 
 /* check multicast group NLA */
@@ -1010,14 +1016,16 @@ pgm_verify_nak (
 		switch (nak_src_nla_afi) {
 /* IPv4 + IPv6 NLA */
 		case AFI_IP:
-			if (skb->len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ))
-				return FALSE;
+			if (len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )) {
+				retval = -EINVAL;
+			}
 			break;
 
 /* IPv6 + IPv6 NLA */
 		case AFI_IP6:
-			if (skb->len < sizeof(struct pgm_nak6))
-				return FALSE;
+			if (len < sizeof(struct pgm_nak6)) {
+				retval = -EINVAL;
+			}
 			break;
 		}
 
@@ -1025,10 +1033,12 @@ pgm_verify_nak (
 		break;
 
 	default:
-		return FALSE;
+		retval = -EINVAL;
+		break;
 	}
 
-	return TRUE;
+out:
+	return retval;
 }
 
 static gboolean
@@ -1038,11 +1048,6 @@ pgm_print_nak (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("NAK: ");
 
 	if (len < PGM_MIN_NAK_SIZE) {
@@ -1068,12 +1073,12 @@ pgm_print_nak (
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
+		inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
 		data  = (guint8*)data + sizeof( struct pgm_nak );
 		len  -= sizeof( struct pgm_nak );
 		printf ("%s grp ", s);
 
-		pgm_inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
+		inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
 		printf ("%s", s);
 
 	case AFI_IP6:
@@ -1088,12 +1093,12 @@ pgm_print_nak (
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
+		inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
 		data  = (guint8*)data + sizeof( struct pgm_nak6 );
 		len  -= sizeof( struct pgm_nak6 );
 		printf ("%s grp ", s);
 
-		pgm_inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
+		inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
 		printf ("%s", s);
 
 	default:
@@ -1116,15 +1121,14 @@ pgm_print_nak (
 /* 8.3.  N-NAK
  */
 
-gboolean
+int
 pgm_verify_nnak (
-	const struct pgm_sk_buff_t* const	skb
+	struct pgm_header*	header,
+	gpointer		data,
+	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
-
-	return pgm_verify_nak (skb);
+	return pgm_verify_nak (header, data, len);
 }
 
 static gboolean
@@ -1134,11 +1138,6 @@ pgm_print_nnak (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("N-NAK: ");
 
 	if (len < sizeof(struct pgm_nak)) {
@@ -1154,15 +1153,14 @@ pgm_print_nnak (
 /* 8.3.  NCF
  */
 
-gboolean
+int
 pgm_verify_ncf (
-	const struct pgm_sk_buff_t* const	skb
+	struct pgm_header*	header,
+	gpointer		data,
+	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
-
-	return pgm_verify_nak (skb);
+	return pgm_verify_nak (header, data, len);
 }
 
 gboolean
@@ -1172,11 +1170,6 @@ pgm_print_ncf (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("NCF: ");
 
 	if (len < sizeof(struct pgm_nak)) {
@@ -1198,15 +1191,16 @@ pgm_print_ncf (
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
  */
 
-gboolean
+int
 pgm_verify_spmr (
-	G_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
+	G_GNUC_UNUSED struct pgm_header*	header,
+	G_GNUC_UNUSED gpointer			data,
+	G_GNUC_UNUSED gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != skb);
+	int retval = 0;
 
-	return TRUE;
+	return retval;
 }
 
 static gboolean
@@ -1216,11 +1210,6 @@ pgm_print_spmr (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf ("SPMR: ");
 
 /* option extensions */
@@ -1245,10 +1234,6 @@ pgm_print_options (
 	gsize			len
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != data);
-	g_assert (len > 0);
-
 	printf (" OPTIONS:");
 
 	if (len < sizeof(struct pgm_opt_length)) {
@@ -1395,7 +1380,7 @@ pgm_gethostbyaddr (
 		return host_string;
 	}
 
-	struct hostent* he = gethostbyaddr((const char*)ap, sizeof(struct in_addr), AF_INET);
+	struct hostent* he = gethostbyaddr(ap, sizeof(struct in_addr), AF_INET);
 	if (he == NULL) {
 		struct in_addr in;
 		memcpy (&in, ap, sizeof(in));
@@ -1413,9 +1398,6 @@ pgm_ipopt_print (
 	gsize			length
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != ipopt);
-
 	const char* op = ipopt;
 
 	while (length)
@@ -1443,12 +1425,6 @@ pgm_ipopt_print (
 		op += len;
 		length -= len;
 	}
-}
-
-GQuark
-pgm_packet_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-packet-error-quark");
 }
 
 /* eof */

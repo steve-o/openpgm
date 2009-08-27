@@ -23,26 +23,16 @@
 #define __PGM_PACKET_H__
 
 #include <errno.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #include <glib.h>
 
-#ifdef G_OS_UNIX
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#	include <sys/types.h>
-#else
-#	include <ws2tcpip.h>
-#endif
 
-
-/* protocol number assigned by IANA */
 #ifndef IPPROTO_PGM
-#define IPPROTO_PGM 		    	113
+#define IPPROTO_PGM 		    113
 #endif
-
-/* read from /etc/protocols if available */
-extern int ipproto_pgm;
-
 
 /* address family indicator, rfc 1700 (ADDRESS FAMILY NUMBERS) */
 #ifndef AFI_IP
@@ -50,16 +40,11 @@ extern int ipproto_pgm;
 #define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
-/* UDP ports for UDP encapsulation, as per IBM WebSphere MQ */
-#define DEFAULT_UDP_ENCAP_UCAST_PORT	3055
-#define DEFAULT_UDP_ENCAP_MCAST_PORT	3056
-
-/* DoS limitation to protocol (MS08-036, KB950762) */
-#define PGM_MAX_APDU			UINT16_MAX
-
-/* Cisco default: 24 (max 8200), Juniper & H3C default: 16 */
-#define PGM_MAX_FRAGMENTS		16
-
+/*
+ * Udp port for UDP encapsulation
+ */
+#define DEFAULT_UDP_ENCAP_UCAST_PORT 3055
+#define DEFAULT_UDP_ENCAP_MCAST_PORT 3056
 
 enum pgm_type_e {
     PGM_SPM = 0x00,	/* 8.1: source path message */
@@ -378,37 +363,19 @@ struct pgm_opt6_path_nla {
     struct in6_addr opt6_path_nla;	/* path nla */
 };
 
-#define PGM_PACKET_ERROR	pgm_packet_error_quark ()
-
-typedef enum
-{
-	PGM_PACKET_ERROR_BOUNDS,
-	PGM_PACKET_ERROR_AFNOSUPPORT,
-	PGM_PACKET_ERROR_CKSUM,
-	PGM_PACKET_ERROR_PROTO,
-	PGM_PACKET_ERROR_FAILED
-} PGMPacketError;
-
-
 #pragma pack(pop)
 
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
 
 G_BEGIN_DECLS
 
-GQuark pgm_packet_error_quark (void);
-gboolean pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, GError**);
-gboolean pgm_parse_udp_encap (struct pgm_sk_buff_t* const, GError**);
+int pgm_parse (struct pgm_header*, gsize, struct pgm_header**, gpointer*, gsize*);
+int pgm_parse_raw (gpointer, gsize, struct sockaddr*, socklen_t*, struct pgm_header**, gpointer*, gsize*);
+int pgm_parse_udp_encap (gpointer, gsize, struct sockaddr*, socklen_t*, struct pgm_header**, gpointer*, gsize*);
 gboolean pgm_print_packet (gpointer, gsize);
 
 static inline gboolean pgm_is_upstream (guint8 type)
 {
-    return (type == PGM_NAK ||
-	    type == PGM_NNAK ||
-	    type == PGM_SPMR ||
-	    type == PGM_POLR);
+    return (type == PGM_NAK || type == PGM_SPMR || type == PGM_POLR);
 }
 
 static inline gboolean pgm_is_peer (guint8 type)
@@ -418,18 +385,14 @@ static inline gboolean pgm_is_peer (guint8 type)
 
 static inline gboolean pgm_is_downstream (guint8 type)
 {
-    return (type == PGM_SPM   ||
-	    type == PGM_ODATA ||
-	    type == PGM_RDATA ||
-	    type == PGM_POLL  ||
-	    type == PGM_NCF);
+    return (type == PGM_SPM || type == PGM_ODATA || type == PGM_RDATA || type == PGM_POLL || type == PGM_NCF);
 }
 
-gboolean pgm_verify_spm (const struct pgm_sk_buff_t* const);
-gboolean pgm_verify_spmr (const struct pgm_sk_buff_t* const);
-gboolean pgm_verify_nak (const struct pgm_sk_buff_t* const);
-gboolean pgm_verify_nnak (const struct pgm_sk_buff_t* const);
-gboolean pgm_verify_ncf (const struct pgm_sk_buff_t* const);
+int pgm_verify_spm (struct pgm_header*, gpointer, gsize);
+int pgm_verify_spmr (struct pgm_header*, gpointer, gsize);
+int pgm_verify_nak (struct pgm_header*, gpointer, gsize);
+int pgm_verify_nnak (struct pgm_header*, gpointer, gsize);
+int pgm_verify_ncf (struct pgm_header*, gpointer, gsize);
 
 static inline int pgm_nla_to_sockaddr (gconstpointer nla, struct sockaddr* sa)
 {
@@ -480,9 +443,9 @@ static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla)
     return retval;
 }
 
-const char* pgm_type_string (guint8) G_GNUC_WARN_UNUSED_RESULT;
-const char* pgm_udpport_string (int) G_GNUC_WARN_UNUSED_RESULT;
-const char* pgm_gethostbyaddr (const struct in_addr*) G_GNUC_WARN_UNUSED_RESULT;
+const char* pgm_type_string (guint8);
+const char* pgm_udpport_string (int);
+const char* pgm_gethostbyaddr (const struct in_addr*);
 void pgm_ipopt_print (gconstpointer, gsize);
 
 G_END_DECLS

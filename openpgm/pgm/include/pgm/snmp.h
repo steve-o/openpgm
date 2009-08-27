@@ -2,7 +2,7 @@
  * 
  * SNMP
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,19 +24,11 @@
 
 #include <glib.h>
 
-#define PGM_SNMP_ERROR		pgm_snmp_error_quark ()
-
-typedef enum
-{
-	/* Derived from errno */
-	PGM_SNMP_ERROR_FAILED
-} PGMSNMPError;
 
 G_BEGIN_DECLS
 
-gboolean pgm_snmp_init (GError**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_snmp_shutdown (void);
-GQuark pgm_snmp_error_quark (void);
+int pgm_snmp_init (void);
+int pgm_snmp_shutdown (void);
 
 G_END_DECLS
 
