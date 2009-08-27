@@ -1,0 +1,44 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+e = env.Clone()
+if e['WITH_SNMP'] == 'true':
+	e.Append(CFLAGS = ['-DCONFIG_WITH_SNMP']);
+	e.Append(LIBS = ['libpgmsnmp']);
+	e.MergeFlags(e['SNMP_FLAGS']);
+if e['WITH_HTTP'] == 'true':
+	e.Append(CFLAGS = ['-DCONFIG_WITH_HTTP']);
+	e.Append(LIBS = ['libpgmhttp']);
+	e.MergeFlags(e['LIBSOUP_FLAGS']);
+e.Append(LIBS = ['libpgmex', 'libpgm']);
+
+# core preferred examples
+e.Program(['pgmdump.c'])
+e.Program(['pgmsend.c'])
+e.Program(['pgmrecv.c'])
+e.Program(['pgmping.c'])
+
+# sync examples
+e.Program(['blocksyncrecv.c'])
+e.Program(['snonblocksyncrecv.c'])
+e.Program(['pnonblocksyncrecv.c'])
+
+# epoll based examples
+if '-DCONFIG_HAVE_EPOLL' in e['CFLAGS']:
+	e.Program(['enonblocksyncrecv.c'])
+	e.Program(['enonblocksyncrecvmsg.c'])
+	e.Program(['enonblocksyncrecvmsgv.c'])
+
+# async examples
+e.Program(['asyncqrecv.c'])
+e.Program(['blockqrecv.c'])
+
+# ncurses examples
+if e['WITH_NCURSES'] == 'true':
+	ne = e.Clone()
+	ne.Append(LIBS = ['panel', 'ncurses']);
+	ne.Program(['pgmtop.c'])
+
+# end of file
