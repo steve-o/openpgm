@@ -19,19 +19,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
-
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#else
-#	include <ws2tcpip.h>
-#endif
+#include <netdb.h>
 
 #include "pgm/log.h"
 
@@ -62,12 +56,16 @@ log_init ( void )
 	int dir = loc->tm_year - gmt->tm_year;
 	if (!dir) dir = loc->tm_yday - gmt->tm_yday;
 	g_timezone += dir * 24 * 60 * 60;
+
 //	printf ("timezone offset %u seconds.\n", g_timezone);
+
 	gethostname (g_hostname, sizeof(g_hostname));
+
 	g_log_set_handler ("Pgm",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler ("Pgm-Http",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler ("Pgm-Snmp",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler (NULL,		G_LOG_LEVEL_MASK, log_handler, NULL);
+
 	return 0;
 }
 
@@ -81,7 +79,6 @@ log_handler (
 	G_GNUC_UNUSED gpointer		unused_data
 	)
 {
-#ifdef G_OS_UNIX
 	struct iovec iov[7];
 	struct iovec* v = iov;
 	time_t now;
@@ -95,6 +92,7 @@ log_handler (
 	v->iov_base = g_hostname;
 	v->iov_len = strlen(g_hostname);
 	v++;
+
 	if (log_domain) {
 		v->iov_base = " ";
 		v->iov_len = 1;
@@ -103,6 +101,7 @@ log_handler (
 		v->iov_len = strlen(log_domain);
 		v++;
 	}
+
 	v->iov_base = ": ";
 	v->iov_len = 2;
 	v++;
@@ -112,23 +111,8 @@ log_handler (
 	v->iov_base = "\n";
 	v->iov_len = 1;
 	v++;
+
 	writev (STDOUT_FILENO, iov, v - iov);
-#else
-	time_t now;
-	time (&now);
-	const struct tm* time_ptr = localtime(&now);
-	char s[1024];
-	strftime(s, sizeof(s), TIME_FORMAT, time_ptr);
-	write (STDOUT_FILENO, s, strlen(s));
-	write (STDOUT_FILENO, g_hostname, strlen(g_hostname));
-	if (log_domain) {
-		write (STDOUT_FILENO, " ", 1);
-		write (STDOUT_FILENO, log_domain, strlen(log_domain));
-	}
-	write (STDOUT_FILENO, ": ", 2);
-	write (STDOUT_FILENO, message, strlen(message));
-	write (STDOUT_FILENO, "\n", 1);
-#endif
 }
 
 /* eof */

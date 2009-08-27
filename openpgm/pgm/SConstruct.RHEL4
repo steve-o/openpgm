@@ -12,15 +12,13 @@ opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
-	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
 	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_DEV', 'Development code', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
-	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_PLUS', 'libpgmplus GPL library', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'true', ('true', 'false'))),
 )
 
 #-----------------------------------------------------------------------------
@@ -91,18 +89,13 @@ env = Environment(ENV = os.environ,
 			'-D_REENTRANT',
 			'-D_GNU_SOURCE',
 			'-D__need_IOV_MAX',
-			'-DCONFIG_HAVE_PSELECT',
-			'-DCONFIG_HAVE_POLL',
 			'-DCONFIG_HAVE_EPOLL',
-			'-DCONFIG_HAVE_CLOCK_GETTIME',
-			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
-			'-DCONFIG_HAVE_NANOSLEEP',
-			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
 			'-DCONFIG_HAVE_GETIFADDRS',
 			'-DCONFIG_HAVE_GETHOSTBYNAME2',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
+			'-DCONFIG_HAVE_SIGHANDLER_T',
 			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
@@ -118,13 +111,6 @@ if env['BRANCH'] == 'profile':
 	env.Append(LINKFLAGS = '-fprofile-arcs')
 elif env['BRANCH'] == 'seed':
 	env.Append(CCFLAGS = '-fbranch-probabilities')
-
-# Coverage analysis
-if env['COVERAGE'] == 'full':
-	env.Append(CCFLAGS = '-fprofile-arcs')
-	env.Append(CCFLAGS = '-ftest-coverage')
-	env.Append(LINKFLAGS = '-fprofile-arcs')
-	env.Append(LINKFLAGS = '-lgcov')
 
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
@@ -159,7 +145,7 @@ env.ParseConfig('PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkconfi
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
-        'CCFLAGS'       : [],
+        'CFLAGS'        : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
 env['LIBSOUP_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkgconfig pkg-config --cflags --libs libsoup-2.2 gobject-2.0');
@@ -167,7 +153,7 @@ env['LIBSOUP_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=/usr/evolution28/lib/pkg
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
 	lastLIBS = context.env['LIBS'];
-	lastCCFLAGS= context.env['CCFLAGS'];
+	lastCFLAGS= context.env['CFLAGS'];
 	context.env.MergeFlags(env['SNMP_FLAGS']);
 	result = context.TryLink("""
 int main(int argc, char**argv)
@@ -176,7 +162,7 @@ int main(int argc, char**argv)
 	return 0;
 }
 """, '.c');
-	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
+	context.env.Replace(LIBS = lastLIBS, CFLAGS=lastCFLAGS);
 	context.Result(not result);
 	return result;
 
@@ -261,7 +247,13 @@ if env['WITH_SNMP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmsnmp');
 if env['WITH_TEST'] == 'true':
 	SConscript(ref_node + 'test/SConscript');
+if env['WITH_DEV'] == 'true':
+	SConscript(ref_node + 'dev/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
+
+# unit testing framework optional.
+if env['WITH_CHECK'] and env['CHECK'] == 'true':
+ 	SConscript(ref_node + 'check/SConscript');
 
 # end of file

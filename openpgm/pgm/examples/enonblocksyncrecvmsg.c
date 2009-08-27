@@ -22,24 +22,21 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -108,14 +105,9 @@ main (
 	signal(SIGSEGV, on_sigsegv);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
-#ifdef SIGHUP
 	signal(SIGHUP, SIG_IGN);
-#endif
 
-	if (!on_startup()) {
-		g_error ("startup failed");
-		exit(1);
-	}
+	on_startup();
 
 /* epoll file descriptor */
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
@@ -136,26 +128,34 @@ main (
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
-		gsize len;
-		GError* err = NULL;
-		const GIOStatus status = pgm_recvmsg (g_transport,
-						      &msgv,
-						      MSG_DONTWAIT /* non-blocking */,
-						      &len,
-						      &err);
-		if (G_IO_STATUS_NORMAL == status)
+		gssize len = pgm_transport_recvmsg (g_transport, &msgv, MSG_DONTWAIT /* non-blocking */);
+		if (len >= 0)
+		{
 			on_datav (&msgv, len, NULL);
-		else if (G_IO_STATUS_AGAIN == status) {
+		}
+		else if (errno == EAGAIN)
+		{
 /* poll for next event */
 			struct epoll_event events[1];	/* wait for maximum 1 event */
 			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
-		} else {
-			if (err) {
-				g_warning (err->message);
-				g_error_free (err);
-			}
-			if (G_IO_STATUS_ERROR == status)
-				break;
+		}
+		else if (errno == ECONNRESET)
+		{
+			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv.msgv_iov->iov_base;
+			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
+					pgm_sock_err->lost_count,
+					pgm_print_tsi(&pgm_sock_err->tsi));
+			continue;
+		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
+			break;
+		}
+		else
+		{
+			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
+			break;
 		}
 	} while (!g_quit);
 
@@ -188,40 +188,29 @@ on_signal (
 static gboolean
 on_startup (void)
 {
-	struct pgm_transport_info_t* res = NULL;
-	GError* err = NULL;
-
 	g_message ("startup.");
 	g_message ("create transport.");
 
-/* parse network parameter into transport address structure */
-	char network[1024];
-	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
-		g_error ("parsing network parameter: %s", err->message);
-		g_error_free (err);
-		return FALSE;
-	}
-/* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
-		g_error ("creating GSI: %s", err->message);
-		g_error_free (err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	if (g_udp_encap_port) {
-		res->ti_udp_encap_ucast_port = g_udp_encap_port;
-		res->ti_udp_encap_mcast_port = g_udp_encap_port;
-	}
-	if (!pgm_transport_create (&g_transport, res, &err)) {
-		g_error ("creating transport: %s", err->message);
-		g_error_free (err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	pgm_if_free_transport_info (res);
+	pgm_gsi_t gsi;
+	int e = pgm_create_md5_gsi (&gsi);
+	g_assert (e == 0);
 
-/* set PGM parameters */
+	struct group_source_req recv_gsr, send_gsr;
+	char network[1024];
+	sprintf (network, ";%s", g_network);
+	gsize recv_len = 1;
+	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
+	g_assert (e == 0);
+	g_assert (recv_len == 1);
+
+	if (g_udp_encap_port) {
+		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+	}
+
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
+	g_assert (e == 0);
+
 	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
@@ -234,40 +223,43 @@ on_startup (void)
 	pgm_transport_set_nak_data_retries (g_transport, 50);
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
-/* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &err)) {
-		g_error ("binding transport: %s", err->message);
-		g_error_free (err);
-		pgm_transport_destroy (g_transport, FALSE);
-		g_transport = NULL;
-		return FALSE;
+	e = pgm_transport_bind (g_transport);
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		G_BREAKPOINT();
 	}
+	g_assert (e == 0);
 
 	g_message ("startup complete.");
-	return TRUE;
+	return FALSE;
 }
 
 static int
 on_datav (
-	pgm_msgv_t*	datav,			/* one msgv object */
+	pgm_msgv_t*	datav,
 	guint		len,
 	G_GNUC_UNUSED gpointer user_data
 	)
 {
 	char tsi[PGM_TSISTRLEN];
-	pgm_tsi_print_r (&datav->msgv_skb[0]->tsi, tsi, sizeof(tsi));
+	pgm_print_tsi_r (datav->msgv_tsi, tsi, sizeof(tsi));
 	g_message ("(%i bytes from %s)", len, tsi);
 
 /* protect against non-null terminated strings */
-	struct pgm_sk_buff_t* skb = datav->msgv_skb[0];
+	struct iovec* msgv_iov = datav->msgv_iov;
 	int i = 0;
 	while (len)
 	{
 		char buf[1024];
-		snprintf (buf, sizeof(buf), "%s", (char*)skb->data);
-		g_message ("\t%i: %s (%" G_GUINT16_FORMAT " bytes)", ++i, buf, skb->len);
-		len -= skb->len;
-		skb++;
+		snprintf (buf, sizeof(buf), "%s", (char*)msgv_iov->iov_base);
+		g_message ("\t%i: %s (%" G_GSIZE_FORMAT " bytes)", ++i, buf, msgv_iov->iov_len);
+		len -= msgv_iov->iov_len;
+		msgv_iov++;
 	}
 
 	return 0;

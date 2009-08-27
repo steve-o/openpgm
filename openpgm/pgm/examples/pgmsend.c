@@ -22,23 +22,20 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -120,17 +117,17 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-#ifdef SIGHUP
 	signal (SIGHUP, SIG_IGN);
-#endif
 
-	if (create_transport ())
+	if (!create_transport ())
 	{
-		while (optind < argc) {
-			const GIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
-		        if (G_IO_STATUS_NORMAL != status) {
+		while (optind < argc)
+		{
+			gssize e = pgm_transport_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0);
+		        if (e < 0) {
 				g_warning ("pgm_transport_send failed.");
 		        }
+
 			optind++;
 		}
 	}
@@ -147,37 +144,25 @@ main (
 static gboolean
 create_transport (void)
 {
-	struct pgm_transport_info_t* res = NULL;
-	GError* err = NULL;
+	pgm_gsi_t gsi;
 
-/* parse network parameter into transport address structure */
-	char network[1024];
-	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
-		g_error ("parsing network parameter: %s", err->message);
-		g_error_free (err);
-		return FALSE;
-	}
-/* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
-		g_error ("creating GSI: %s", err->message);
-		g_error_free (err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
+	int e = pgm_create_md5_gsi (&gsi);
+	g_assert (e == 0);
+
+	struct group_source_req recv_gsr, send_gsr;
+	gsize recv_len = 1;
+	e = pgm_if_parse_transport (g_network, AF_UNSPEC, &recv_gsr, &recv_len, &send_gsr);
+	g_assert (e == 0);
+	g_assert (recv_len == 1);
+
 	if (g_udp_encap_port) {
-		res->ti_udp_encap_ucast_port = g_udp_encap_port;
-		res->ti_udp_encap_mcast_port = g_udp_encap_port;
+		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
 	}
-	if (!pgm_transport_create (&g_transport, res, &err)) {
-		g_error ("creating transport: %s", err->message);
-		g_error_free (err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	pgm_if_free_transport_info (res);
 
-/* set PGM parameters */
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
+	g_assert (e == 0);
+
 	pgm_transport_set_send_only (g_transport, TRUE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
@@ -188,19 +173,24 @@ create_transport (void)
 	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
 ), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+
 	if (g_fec) {
 		pgm_transport_set_fec (g_transport, 0, TRUE, TRUE, g_n, g_k);
 	}
 
-/* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &err)) {
-		g_error ("binding transport: %s", err->message);
-		g_error_free (err);
-		pgm_transport_destroy (g_transport, FALSE);
-		g_transport = NULL;
-		return FALSE;
+	e = pgm_transport_bind (g_transport);
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		return TRUE;
 	}
-	return TRUE;
+	g_assert (e == 0);
+
+	return FALSE;
 }
 
 /* eof */
