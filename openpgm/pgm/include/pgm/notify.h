@@ -22,14 +22,13 @@
 #ifndef __PGM_NOTIFY_H__
 #define __PGM_NOTIFY_H__
 
+#ifdef CONFIG_HAVE_EVENTFD
+#	include <sys/eventfd.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 
 #include <glib.h>
-
-#ifdef CONFIG_HAVE_EVENTFD
-#	include <sys/eventfd.h>
-#endif
 
 
 G_BEGIN_DECLS
@@ -44,52 +43,38 @@ struct pgm_notify_t {
 
 typedef struct pgm_notify_t pgm_notify_t;
 
-
-static inline gboolean pgm_notify_is_valid (pgm_notify_t* notify)
-{
-	if (NULL == notify) return FALSE;
-#ifdef CONFIG_HAVE_EVENTFD
-	if (0 == notify->eventfd) return FALSE;
-#else
-	if (0 == notify->pipefd[0] || 0 == notify->pipefd[1]) return FALSE;
-#endif /* CONFIG_HAVE_EVENTFD */
-	return TRUE;
-}
-
 static inline int pgm_notify_init (pgm_notify_t* notify)
 {
 	g_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
 	int retval = eventfd (0, 0);
-	if (-1 == retval)
+	if (-1 == retval) {
 		return retval;
+	}
 	notify->eventfd = retval;
-	const int fd_flags = fcntl (notify->eventfd, F_GETFL);
-	if (-1 != fd_flags)
+	int fd_flags = fcntl (notify->eventfd, F_GETFL);
+	if (fd_flags != -1) {
 		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
+	}
 	return 0;
-#elif defined(G_OS_UNIX)
+#else
 	int retval = pipe (notify->pipefd);
 	g_assert (0 == retval);
+
 /* set non-blocking */
 /* write-end */
 	int fd_flags = fcntl (notify->pipefd[1], F_GETFL);
-	if (fd_flags != -1)
+	if (fd_flags != -1) {
 		retval = fcntl (notify->pipefd[1], F_SETFL, fd_flags | O_NONBLOCK);
+	}
 	g_assert (notify->pipefd[1]);
 /* read-end */
 	fd_flags = fcntl (notify->pipefd[0], F_GETFL);
-	if (fd_flags != -1)
+	if (fd_flags != -1) {
 		retval = fcntl (notify->pipefd[0], F_SETFL, fd_flags | O_NONBLOCK);
+	}
 	g_assert (notify->pipefd[0]);
-	return retval;
-#else
-	int retval = _pipe (notify->pipefd, 4096, _O_BINARY | _O_NOINHERIT);
-	g_assert (0 == retval);
-	u_long optval = 1;
-	ioctlsocket (notify->pipefd[1], FIONBIO, &optval);
-	ioctlsocket (notify->pipefd[0], FIONBIO, &optval);
 	return retval;
 #endif
 }
