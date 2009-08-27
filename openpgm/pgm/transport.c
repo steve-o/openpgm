@@ -970,7 +970,7 @@ pgm_transport_set_max_tpdu (
 	return 0;
 }
 
-/* TRUE = enable multicast loopback and for UDP encapsulation SO_REUSEADDR,
+/* TRUE = enable multicast loopback,
  * FALSE = default, to disable.
  *
  * on success, returns 0.  on invalid setting, returns -EINVAL.
@@ -1641,25 +1641,14 @@ pgm_transport_bind (
 	if (transport->udp_encap_port)
 	{
 /* set socket sharing if loopback enabled, needs to be performed pre-bind */
-		if (transport->use_multicast_loop)
+		g_trace ("INFO","set socket sharing.");
+		gboolean v = TRUE;
+		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
-			g_trace ("INFO","set socket sharing.");
-			gboolean v = TRUE;
-			retval = setsockopt(transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
-			if (retval < 0) {
-				g_static_mutex_unlock (&transport->mutex);
-				goto out;
-			}
-			retval = setsockopt(transport->send_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
-			if (retval < 0) {
-				g_static_mutex_unlock (&transport->mutex);
-				goto out;
-			}
-			retval = setsockopt(transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
-			if (retval < 0) {
-				g_static_mutex_unlock (&transport->mutex);
-				goto out;
-			}
+			g_static_mutex_unlock (&transport->mutex);
+			goto out;
 		}
 
 /* request extra packet information to determine destination address on each packet */
