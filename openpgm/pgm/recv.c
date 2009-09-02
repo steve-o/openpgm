@@ -131,6 +131,9 @@ recvskb (
 	g_trace ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
 		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
 
+	if (G_UNLIKELY(transport->is_destroyed))
+		return 0;
+
 	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
 		.iov_len	= transport->max_tpdu
@@ -140,7 +143,7 @@ recvskb (
 	struct msghdr msg = {
 		.msg_name	= src_addr,
 		.msg_namelen	= src_addrlen,
-		.msg_iov	= &iov,
+		.msg_iov	= (gpointer)&iov,
 		.msg_iovlen	= 1,
 		.msg_control	= aux,
 		.msg_controllen = sizeof(aux),
@@ -521,7 +524,7 @@ on_pgm (
 
 /* block on receiving socket whilst holding transport::waiting-mutex
  * returns EAGAIN for waiting data, returns EINTR for waiting timer event,
- * returns EFAULT for libc error.
+ * returns ENOENT on closed transport, and returns EFAULT for libc error.
  */
 
 static
@@ -538,6 +541,9 @@ wait_for_event (
 	g_trace ("wait_for_event (transport:%p)", (gpointer)transport);
 
 	do {
+		if (G_UNLIKELY(transport->is_destroyed))
+			return ENOENT;
+
 		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
 /* tight loop on blocked send */
 			pgm_on_deferred_nak (transport);
@@ -609,7 +615,7 @@ wait_for_event (
  * on success, returns bytes read, on error returns -1.
  */
 
-GIOStatus
+PGMIOStatus
 pgm_recvmsgv (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msg_start,
@@ -621,10 +627,24 @@ pgm_recvmsgv (
 {
 	pgm_peer_t* peer;
 
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	if (msg_len) g_return_val_if_fail (NULL != msg_start, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (transport->is_bound, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
+	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
+		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
+
+/* parameters */
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (msg_len) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
+
+/* shutdown */
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+
+/* state */
+	if (!transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	}
 
 /* pre-conditions */
 	g_assert (NULL != transport->rx_buffer);
@@ -634,8 +654,8 @@ pgm_recvmsgv (
 	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
 	g_assert (pgm_notify_is_valid (&transport->pending_notify));
 
-	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
-		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
+/* receiver */
+	g_static_mutex_lock (&transport->receiver_mutex);
 
 	if (transport->is_reset) {
 		g_assert (NULL != transport->peers_pending);
@@ -654,24 +674,27 @@ pgm_recvmsgv (
 		}
 		if (!transport->is_abort_on_reset)
 			transport->is_reset = !transport->is_reset;
-		return G_IO_STATUS_EOF;
+		g_static_mutex_unlock (&transport->receiver_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return PGM_IO_STATUS_RESET;
 	}
 
-/* lock waiting so extra events are not generated during call */
-	g_static_mutex_lock (&transport->pending_mutex);
-
 /* timer status */
-	if (pgm_timer_check (transport)) {
-		if (!pgm_timer_dispatch (transport)) {
-			g_static_mutex_unlock (&transport->pending_mutex);
-			return G_IO_STATUS_AGAIN;
-		}
-		pgm_timer_prepare (transport);
+	if (pgm_timer_check (transport) &&
+	    !pgm_timer_dispatch (transport))
+	{
+		g_static_mutex_unlock (&transport->receiver_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return PGM_IO_STATUS_AGAIN;
 	}
 
 /* NAK status */
-	if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
-		pgm_on_deferred_nak (transport);
+	if (transport->can_send_data) {
+		if (!pgm_txw_retransmit_is_empty (transport->window))
+			pgm_on_deferred_nak (transport);
+		else
+			pgm_notify_clear (&transport->rdata_notify);
+	}
 
 	gsize bytes_read = 0;
 	guint data_read = 0;
@@ -756,19 +779,28 @@ check_for_repeat:
  */
 		if (0 == data_read) {
 			const int wait_status = wait_for_event (transport);
-			if (EAGAIN == wait_status)
+			switch (wait_status) {
+			case EAGAIN:
 				goto recv_again;
-			else if (EINTR == wait_status) {
+			case EINTR:
 				if (!pgm_timer_dispatch (transport))
 					goto check_for_repeat;
 				goto flush_pending;
-			} else if (EFAULT == wait_status) {
+			case ENOENT:
+				g_static_mutex_unlock (&transport->receiver_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
+				return PGM_IO_STATUS_FIN;
+			case EFAULT:
 				g_set_error (error,
 					     PGM_RECV_ERROR,
 					     pgm_recv_error_from_errno (errno),
 					     _("Waiting for event: %s"),
 					     g_strerror (errno));
-				return G_IO_STATUS_ERROR;
+				g_static_mutex_unlock (&transport->receiver_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
+				return PGM_IO_STATUS_ERROR;
+			default:
+				g_assert_not_reached();
 			}
 		}
 	}
@@ -781,7 +813,6 @@ out:
 			pgm_notify_clear (&transport->pending_notify);
 			transport->is_pending_read = FALSE;
 		}
-		g_static_mutex_unlock (&transport->pending_mutex);
 /* report data loss */
 		if (transport->is_reset) {
 			g_assert (NULL != transport->peers_pending);
@@ -800,10 +831,14 @@ out:
 			}
 			if (!transport->is_abort_on_reset)
 				transport->is_reset = !transport->is_reset;
-			return G_IO_STATUS_EOF;
+			g_static_mutex_unlock (&transport->receiver_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			return PGM_IO_STATUS_RESET;
 		}
 /* return reset on zero bytes instead of waiting for next call */
-		return G_IO_STATUS_AGAIN;
+		g_static_mutex_unlock (&transport->receiver_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return PGM_IO_STATUS_AGAIN;
 	}
 
 	if (transport->peers_pending)
@@ -823,11 +858,12 @@ out:
 		}
 	}
 
-	g_static_mutex_unlock (&transport->pending_mutex);
 g_message ("read %d bytes", (int)bytes_read);
 	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
-	return G_IO_STATUS_NORMAL;
+	g_static_mutex_unlock (&transport->receiver_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_NORMAL;
 }
 
 /* read one contiguous apdu and return as a IO scatter/gather array.  msgv is owned by
@@ -837,7 +873,7 @@ g_message ("read %d bytes", (int)bytes_read);
  * errno is set appropriately.
  */
 
-GIOStatus
+PGMIOStatus
 pgm_recvmsg (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msgv,
@@ -846,8 +882,8 @@ pgm_recvmsg (
 	GError**		error
 	)
 {
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (NULL != msgv, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != msgv, PGM_IO_STATUS_ERROR);
 
 	g_trace ("pgm_recvmsg (transport:%p msgv:%p flags:%d bytes_read:%p error:%p)",
 		(gpointer)transport, (gpointer)msgv, flags, (gpointer)bytes_read, (gpointer)error);
@@ -863,7 +899,7 @@ pgm_recvmsg (
  * errno is set appropriately.
  */
 
-GIOStatus
+PGMIOStatus
 pgm_recvfrom (
 	pgm_transport_t* const	transport,
 	gpointer		data,
@@ -877,14 +913,14 @@ pgm_recvfrom (
 	pgm_msgv_t msgv;
 	gsize bytes_read;
 
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	if (len) g_return_val_if_fail (NULL != data, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (len) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
 	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
-	const GIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_FIN | MSG_ERRQUEUE), &bytes_read, error);
-	if (G_IO_STATUS_NORMAL != status)
+	const PGMIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_FIN | MSG_ERRQUEUE), &bytes_read, error);
+	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
 	gsize bytes_copied = 0;
@@ -909,10 +945,10 @@ pgm_recvfrom (
 	}
 	if (_bytes_read)
 		*_bytes_read = bytes_copied;
-	return G_IO_STATUS_NORMAL;
+	return PGM_IO_STATUS_NORMAL;
 }
 
-GIOStatus
+PGMIOStatus
 pgm_recv (
 	pgm_transport_t* const	transport,
 	gpointer		data,
@@ -922,8 +958,8 @@ pgm_recv (
 	GError**		error
 	)
 {
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	if (len) g_return_val_if_fail (NULL != data, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (len) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
 	g_trace ("pgm_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)bytes_read, (gpointer)error);

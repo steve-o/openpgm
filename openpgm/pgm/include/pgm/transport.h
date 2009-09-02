@@ -65,6 +65,18 @@ typedef struct pgm_transport_t pgm_transport_t;
 #define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
 
 
+/* IO status */
+
+typedef enum {
+	PGM_IO_STATUS_ERROR,		/* an error occurred */
+	PGM_IO_STATUS_NORMAL,		/* success */
+	PGM_IO_STATUS_RESET,		/* session reset */
+	PGM_IO_STATUS_FIN,		/* session finished */
+	PGM_IO_STATUS_AGAIN,		/* resource temporarily unavailable */
+	PGM_IO_STATUS_AGAIN2		/* would block on send-in-receive */
+} PGMIOStatus;
+
+
 /* Performance Counters */
 
 typedef enum {
@@ -196,8 +208,6 @@ struct pgm_peer_t {
 	struct sockaddr_storage	redirect_nla;		/* from dlr */
 	pgm_time_t		spmr_expiry;
 
-	GStaticMutex		mutex;
-
 	gpointer            	window;			/* pgm_rxw_t */
 	pgm_transport_t*    	transport;
 	GList			peers_link;
@@ -228,7 +238,13 @@ struct pgm_transport_t {
 	guint16			udp_encap_ucast_port;
 	guint16			udp_encap_mcast_port;
 
-	GStaticMutex		mutex;
+	GStaticRWLock		lock;				/* running / destroyed */
+	GStaticMutex		receiver_mutex;			/* receiver API */
+	GStaticMutex		source_mutex;			/* source API */
+	GStaticMutex		txw_mutex;			/* transmit window */
+	GStaticMutex		send_mutex;			/* non-router alert socket */
+	GStaticMutex		timer_mutex;			/* next timer expiration */
+
 	gboolean		is_bound;
 	gboolean		is_destroyed;
 	gboolean            	is_reset;
@@ -240,14 +256,9 @@ struct pgm_transport_t {
 	gboolean		is_edge_triggered_recv;
 	gboolean		is_nonblocking;
 
-	GCond*			thread_cond;
-	GMutex*			thread_mutex;
-
 	struct group_source_req send_gsr;			/* multicast */
 	struct sockaddr_storage send_addr;			/* unicast nla */
-	GStaticMutex		send_mutex;
 	int			send_sock;
-	GStaticMutex		send_with_router_alert_mutex;
 	int			send_with_router_alert_sock;
 	struct group_source_req recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
 	guint			recv_gsr_len;
@@ -264,11 +275,12 @@ struct pgm_transport_t {
 	guint			rxw_sqns, rxw_secs, rxw_max_rte;
 	int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
-	GStaticRWLock		window_lock;
 	gpointer       	     	window;		   	    /* pgm_txw_t */
 	gpointer		rate_control;		    /* rate_t */
 
-	gboolean		is_apdu_eagain;		    /* writer-lock on txw_lock exists
+	pgm_notify_t		rdata_notify;
+
+	gboolean		is_apdu_eagain;		    /* writer-lock on window_lock exists
 							       as send would block */
 	gboolean		is_spm_eagain;		    /* writer-lock in receiver */
 
@@ -289,6 +301,7 @@ struct pgm_transport_t {
 	guint			spm_ambient_interval;	    /* microseconds */
 	guint*			spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
 	guint			spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
+	guint			spm_heartbeat_len;
 	guint			peer_expiry;		    /* from absence of SPMs */
 	guint			spmr_expiry;		    /* waiting for peer SPMRs */
 
@@ -310,7 +323,6 @@ struct pgm_transport_t {
 	GHashTable*		peers_hashtable;	    /* fast lookup */
 	GList*			peers_list;		    /* easy iteration */
 	GSList*			peers_pending;		    /* rxw: have or lost data */
-	GStaticMutex		pending_mutex;
 	pgm_notify_t		pending_notify;		    /* timer to rx */
 	gboolean		is_pending_read;
 	pgm_time_t		next_poll;

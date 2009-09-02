@@ -74,7 +74,6 @@ pgm_sendto (
 	g_assert( to );
 	g_assert( tolen > 0 );
 
-	GStaticMutex* mutex = use_router_alert ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
 	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
 	if (use_rate_limit &&
@@ -85,7 +84,8 @@ pgm_sendto (
 		return (const gssize)-1;
 	}
 
-	g_static_mutex_lock (mutex);
+	if (!use_router_alert)
+		g_static_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
 	if (	sent < 0 &&
@@ -134,7 +134,8 @@ pgm_sendto (
 		}
 	}
 
-	g_static_mutex_unlock (mutex);
+	if (!use_router_alert)
+		g_static_mutex_unlock (&transport->send_mutex);
 	return sent;
 }
 
@@ -148,8 +149,6 @@ pgm_set_nonblocking (
 	int		fd[2]
 	)
 {
-	int flags;
-
 /* pre-conditions */
 	g_assert (fd);
 	g_assert (fd[0]);
