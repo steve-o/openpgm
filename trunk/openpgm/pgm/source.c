@@ -89,9 +89,9 @@ static gboolean send_spm (pgm_transport_t* const);
 static void reset_heartbeat_spm (pgm_transport_t* const);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
-static GIOStatus send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, gsize*);
-static GIOStatus send_odata_copy (pgm_transport_t* const, gconstpointer, const gsize, gsize*);
-static GIOStatus send_odatav (pgm_transport_t* const, const struct pgm_iovec* const, const guint, gsize*);
+static PGMIOStatus send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, gsize*);
+static PGMIOStatus send_odata_copy (pgm_transport_t* const, gconstpointer, const gsize, gsize*);
+static PGMIOStatus send_odatav (pgm_transport_t* const, const struct pgm_iovec* const, const guint, gsize*);
 static gboolean send_rdata (pgm_transport_t* const, struct pgm_sk_buff_t* const);
 
 
@@ -119,9 +119,7 @@ reset_spmr_timer (
 	pgm_peer_t* const	peer
 	)
 {
-	g_static_mutex_lock (&peer->mutex);
 	peer->spmr_expiry = 0;
-	g_static_mutex_unlock (&peer->mutex);
 }
 
 /* Linux 2.6 limited to millisecond resolution with conventional timers, however RDTSC
@@ -138,12 +136,17 @@ pgm_transport_set_ambient_spm (
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (!transport->is_bound, FALSE);
 	g_return_val_if_fail (spm_ambient_interval > 0, FALSE);
-
-	g_static_mutex_lock (&transport->mutex);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return FALSE;
+	}
 	transport->spm_ambient_interval = spm_ambient_interval;
-	g_static_mutex_unlock (&transport->mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -158,23 +161,28 @@ gboolean
 pgm_transport_set_heartbeat_spm (
 	pgm_transport_t* const	transport,
 	const guint* const	spm_heartbeat_interval,
-	const int		len
+	const guint		len
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (!transport->is_bound, FALSE);
 	g_return_val_if_fail (len > 0, FALSE);
-	for (int i = 0; i < len; i++) {
+	for (unsigned i = 0; i < len; i++)
 		g_return_val_if_fail (spm_heartbeat_interval[i] > 0, FALSE);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return FALSE;
 	}
-
-	g_static_mutex_lock (&transport->mutex);
 	if (transport->spm_heartbeat_interval)
 		g_free (transport->spm_heartbeat_interval);
-	transport->spm_heartbeat_interval = g_malloc (sizeof(guint) * (len+2));
+	transport->spm_heartbeat_interval = g_malloc (sizeof(guint) * (len+1));
 	memcpy (&transport->spm_heartbeat_interval[1], spm_heartbeat_interval, sizeof(guint) * len);
-	transport->spm_heartbeat_interval[0] = transport->spm_heartbeat_interval[len] = 0;
-	g_static_mutex_unlock (&transport->mutex);
+	transport->spm_heartbeat_interval[0] = 0;
+	transport->spm_heartbeat_len = len;
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -190,13 +198,18 @@ pgm_transport_set_txw_sqns (
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (!transport->is_bound, FALSE);
 	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
 	g_return_val_if_fail (sqns > 0, FALSE);
-
-	g_static_mutex_lock (&transport->mutex);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return FALSE;
+	}
 	transport->txw_sqns = sqns;
-	g_static_mutex_unlock (&transport->mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -214,12 +227,17 @@ pgm_transport_set_txw_secs (
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (!transport->is_bound, FALSE);
 	g_return_val_if_fail (secs > 0, FALSE);
-
-	g_static_mutex_lock (&transport->mutex);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return FALSE;
+	}
 	transport->txw_secs = secs;
-	g_static_mutex_unlock (&transport->mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -241,12 +259,17 @@ pgm_transport_set_txw_max_rte (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (!transport->is_bound, FALSE);
 	g_return_val_if_fail (max_rte > 0, FALSE);
-
-	g_static_mutex_lock (&transport->mutex);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return FALSE;
+	}
 	transport->txw_max_rte = max_rte;
-	g_static_mutex_unlock (&transport->mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -294,18 +317,21 @@ pgm_on_deferred_nak (
 /* peek from the retransmit queue so we can eliminate duplicate NAKs up until the repair packet
  * has been retransmitted.
  */
-	g_static_rw_lock_reader_lock (&transport->window_lock);
+	g_static_mutex_lock (&transport->txw_mutex);
 	struct pgm_sk_buff_t* skb = pgm_txw_retransmit_try_peek (transport->window);
 	if (skb) {
+		skb = pgm_skb_get (skb);
+		g_static_mutex_unlock (&transport->txw_mutex);
 		if (!send_rdata (transport, skb)) {
-			g_static_rw_lock_reader_unlock (&transport->window_lock);
+			pgm_free_skb (skb);
+			pgm_notify_send (&transport->rdata_notify);
 			return FALSE;
 		}
-
+		pgm_free_skb (skb);
 /* now remove sequence number from retransmit queue, re-enabling NAK processing for this sequence number */
 		pgm_txw_retransmit_remove_head (transport->window);
-	}
-	g_static_rw_lock_reader_unlock (&transport->window_lock);
+	} else
+		g_static_mutex_unlock (&transport->txw_mutex);
 	return TRUE;
 }
 
@@ -336,7 +362,7 @@ pgm_on_spmr (
 	}
 
 	if (peer_is_source (peer))
-		send_spm (transport);
+		pgm_send_spm (transport, 0);
 	else {
 		g_trace ("INFO", "suppressing SPMR due to peer multicast SPMR.");
 		reset_spmr_timer (peer);
@@ -463,7 +489,8 @@ pgm_on_nak (
 	}
 
 /* send NAK confirm packet immediately, then defer to timer thread for a.s.a.p
- * delivery of the actual RDATA packets.
+ * delivery of the actual RDATA packets.  blocking send for NCF is ignored as RDATA
+ * broadcast will be sent later.
  */
 	if (nak_list_len)
 		send_ncf_list (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, &sqn_list, is_parity);
@@ -557,37 +584,21 @@ pgm_on_nnak (
  *
  * heartbeat: ihb_tmr decaying between ihb_min and ihb_max 2x after last packet
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned, if operation would block, FALSE is returned.
  */
 
-static
 gboolean
-send_spm (
-	pgm_transport_t*	transport
-	)
-{
-/* pre-conditions */
-	g_assert (NULL != transport);
-
-	g_trace ("SPM","send_spm (transport:%p", (gpointer)transport);
-
-	g_static_mutex_lock (&transport->mutex);
-	const gboolean status = pgm_send_spm_unlocked (transport);
-	g_static_mutex_unlock (&transport->mutex);
-	return status;
-}
-
-gboolean
-pgm_send_spm_unlocked (
-	pgm_transport_t*	transport
+pgm_send_spm (
+	pgm_transport_t* const	transport,
+	const int		flags
 	)
 {
 /* pre-conditions */
 	g_assert (NULL != transport);
 	g_assert (NULL != transport->window);
 
-	g_trace ("SPM","pgm_send_spm_unlocked (transport:%p", (gpointer)transport);
+	g_trace ("SPM","pgm_send_spm (transport:%p flags:%d)",
+		(gpointer)transport, flags);
 
 	gsize tpdu_length = sizeof(struct pgm_header);
 	if (AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group))
@@ -611,34 +622,64 @@ pgm_send_spm_unlocked (
 
 /* SPM */
 	spm->spm_sqn		= g_htonl (transport->spm_sqn);
-	g_static_rw_lock_reader_lock (&transport->window_lock);
-	spm->spm_trail		= g_htonl (pgm_txw_trail(transport->window));
-	spm->spm_lead		= g_htonl (pgm_txw_lead(transport->window));
-	g_static_rw_lock_reader_unlock (&transport->window_lock);
+	spm->spm_trail		= g_htonl (pgm_txw_trail_atomic (transport->window));
+	spm->spm_lead		= g_htonl (pgm_txw_lead_atomic (transport->window));
 /* our nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_addr, (char*)&spm->spm_nla_afi);
 
-/* OPT_PARITY_PRM */
-	if (transport->use_proactive_parity || transport->use_ondemand_parity)
+/* PGM options */
+	if (transport->use_proactive_parity ||
+	    transport->use_ondemand_parity ||
+	    PGM_OPT_FIN == flags)
 	{
-		header->pgm_options     = PGM_OPT_PRESENT | PGM_OPT_NETWORK;
+		gpointer data;
 		struct pgm_opt_length* opt_len;
+		struct pgm_opt_header* opt_header;
+		gsize opt_total_length;
+
 		if (AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group))
-			opt_len = (struct pgm_opt_length*)(spm + 1);
+			data = (struct pgm_opt_length*)(spm + 1);
 		else
-			opt_len = (struct pgm_opt_length*)(spm6 + 1);
-		opt_len->opt_type       = PGM_OPT_LENGTH;
-		opt_len->opt_length     = sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length = g_htons ( sizeof(struct pgm_opt_length) +
-					              sizeof(struct pgm_opt_header) +
-					              sizeof(struct pgm_opt_parity_prm) );
-		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
-		opt_header->opt_type    = PGM_OPT_PARITY_PRM | PGM_OPT_END;
-		opt_header->opt_length  = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
-		struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
-		opt_parity_prm->opt_reserved = (transport->use_proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
-					       (transport->use_ondemand_parity ? PGM_PARITY_PRM_OND : 0);
-		opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
+			data = (struct pgm_opt_length*)(spm6 + 1);
+		header->pgm_options |= PGM_OPT_PRESENT;
+		opt_len			= data;
+		opt_len->opt_type	= PGM_OPT_LENGTH;
+		opt_len->opt_length	= sizeof(struct pgm_opt_length);
+		opt_total_length	= sizeof(struct pgm_opt_length);
+		data = opt_len + 1;
+
+/* OPT_PARITY_PRM */
+		if (transport->use_proactive_parity ||
+		    transport->use_ondemand_parity)
+		{
+			header->pgm_options |= PGM_OPT_NETWORK;
+			opt_total_length += sizeof(struct pgm_opt_header) +
+					    sizeof(struct pgm_opt_parity_prm);
+			opt_header		= (struct pgm_opt_header*)data;
+			opt_header->opt_type	= PGM_OPT_PARITY_PRM;
+			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
+			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
+			opt_parity_prm->opt_reserved = (transport->use_proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
+						       (transport->use_ondemand_parity ? PGM_PARITY_PRM_OND : 0);
+			opt_parity_prm->parity_prm_tgs = g_htonl (transport->rs_k);
+			data = opt_parity_prm + 1;
+		}
+
+/* OPT_FIN */
+		if (PGM_OPT_FIN == flags)
+		{
+			opt_total_length += sizeof(struct pgm_opt_header) +
+					    sizeof(struct pgm_opt_fin);
+			opt_header		= (struct pgm_opt_header*)data;
+			opt_header->opt_type	= PGM_OPT_FIN;
+			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fin);
+			struct pgm_opt_fin* opt_fin = (struct pgm_opt_fin*)(opt_header + 1);
+			opt_fin->opt_reserved = 0;
+			data = opt_fin + 1;
+		}
+
+		opt_header->opt_type |= PGM_OPT_END;
+		opt_len->opt_total_length = g_htons (opt_total_length);
 	}
 
 /* checksum optional for SPMs */
@@ -656,7 +697,7 @@ pgm_send_spm_unlocked (
 		return FALSE;
 /* advance SPM sequence only on successful transmission */
 	transport->spm_sqn++;
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
 
@@ -729,7 +770,7 @@ send_ncf (
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (-1 == sent && EAGAIN == errno)
 		return FALSE;
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
 
@@ -836,30 +877,23 @@ send_ncf_list (
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (-1 == sent && EAGAIN == errno)
 		return FALSE;
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
 
 /* cancel any pending heartbeat SPM and schedule a new one
- *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
  */
 
 static
 void
 reset_heartbeat_spm (pgm_transport_t* transport)
 {
-	g_static_mutex_lock (&transport->mutex);
-
-/* re-set spm timer */
+	g_static_mutex_lock (&transport->timer_mutex);
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-
-/* prod recv thread if sleeping */
 	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
 		transport->next_poll = transport->next_heartbeat_spm;
-	g_static_mutex_unlock (&transport->mutex);
+	g_static_mutex_unlock (&transport->timer_mutex);
 }
 
 /* state helper for resuming sends
@@ -879,7 +913,7 @@ reset_heartbeat_spm (pgm_transport_t* transport)
  */
 
 static
-GIOStatus
+PGMIOStatus
 send_odata (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb,
@@ -916,8 +950,6 @@ send_odata (
         STATE(skb)->pgm_header->pgm_options     = 0;
         STATE(skb)->pgm_header->pgm_tsdu_length = g_htons (tsdu_length);
 
-	g_static_rw_lock_writer_lock (&transport->window_lock);
-
 /* ODATA */
         STATE(skb)->pgm_data->data_sqn		= g_htonl (pgm_txw_next_lead(transport->window));
         STATE(skb)->pgm_data->data_trail	= g_htonl (pgm_txw_trail(transport->window));
@@ -929,7 +961,9 @@ send_odata (
         STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
+	g_static_mutex_lock (&transport->txw_mutex);
 	pgm_txw_add (transport->window, STATE(skb));
+	g_static_mutex_unlock (&transport->txw_mutex);
 
 	gssize sent;
 retry_send:
@@ -942,14 +976,11 @@ retry_send:
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
 		transport->is_apdu_eagain = TRUE;
-		return G_IO_STATUS_AGAIN;
+		return PGM_IO_STATUS_AGAIN;
 	}
 
 /* save unfolded odata for retransmissions */
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
-
-/* release window lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->window_lock);
 
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
@@ -957,7 +988,7 @@ retry_send:
 	if ( sent == (gssize)STATE(skb)->len ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]	   += STATE(skb)->len + transport->iphdr_len;
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], STATE(skb)->len + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -972,7 +1003,7 @@ retry_send:
 	pgm_free_skb (STATE(skb));
 	if (bytes_written)
 		*bytes_written = tsdu_length;
-	return G_IO_STATUS_NORMAL;
+	return PGM_IO_STATUS_NORMAL;
 }
 
 /* send one PGM original data packet, callee owned memory.
@@ -983,7 +1014,7 @@ retry_send:
  */
 
 static
-GIOStatus
+PGMIOStatus
 send_odata_copy (
 	pgm_transport_t* const		transport,
 	gconstpointer			tsdu,
@@ -1003,7 +1034,6 @@ send_odata_copy (
 	if (transport->is_apdu_eagain)
 		goto retry_send;
 
-	g_static_rw_lock_writer_lock (&transport->window_lock);
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
@@ -1029,7 +1059,9 @@ send_odata_copy (
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
+	g_static_mutex_lock (&transport->txw_mutex);
 	pgm_txw_add (transport->window, STATE(skb));
+	g_static_mutex_unlock (&transport->txw_mutex);
 
 	gssize sent;
 retry_send:
@@ -1042,14 +1074,11 @@ retry_send:
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
 		transport->is_apdu_eagain = TRUE;
-		return G_IO_STATUS_AGAIN;
+		return PGM_IO_STATUS_AGAIN;
 	}
 
 /* save unfolded odata for retransmissions */
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
-
-/* release txw lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->window_lock);
 
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
@@ -1057,7 +1086,7 @@ retry_send:
 	if ( sent == (gssize)STATE(skb)->len ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]	   += STATE(skb)->len + transport->iphdr_len;
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], STATE(skb)->len + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1071,7 +1100,7 @@ retry_send:
 /* return data payload length sent */
 	if (bytes_written)
 		*bytes_written = tsdu_length;
-	return G_IO_STATUS_NORMAL;
+	return PGM_IO_STATUS_NORMAL;
 }
 
 /* send one PGM original data packet, callee owned scatter/gather io vector
@@ -1086,7 +1115,7 @@ retry_send:
  */
 
 static
-GIOStatus
+PGMIOStatus
 send_odatav (
 	pgm_transport_t* const		transport,
 	const struct pgm_iovec* const	vector,
@@ -1119,9 +1148,8 @@ send_odatav (
 #endif
 		STATE(tsdu_length) += vector[i].iov_len;
 	}
-	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, G_IO_STATUS_ERROR);
+	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, PGM_IO_STATUS_ERROR);
 
-	g_static_rw_lock_writer_lock (&transport->window_lock);
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
@@ -1158,7 +1186,9 @@ send_odatav (
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
+	g_static_mutex_lock (&transport->txw_mutex);
 	pgm_txw_add (transport->window, STATE(skb));
+	g_static_mutex_unlock (&transport->txw_mutex);
 
 	gssize sent;
 retry_send:
@@ -1171,14 +1201,11 @@ retry_send:
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
 		transport->is_apdu_eagain = TRUE;
-		return G_IO_STATUS_AGAIN;
+		return PGM_IO_STATUS_AGAIN;
 	}
 
 /* save unfolded odata for retransmissions */
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
-
-/* release txw lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->window_lock);
 
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
@@ -1186,7 +1213,7 @@ retry_send:
 	if ( sent == (gssize)STATE(skb)->len ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]	   += STATE(skb)->len + transport->iphdr_len;
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], STATE(skb)->len + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1200,7 +1227,7 @@ retry_send:
 /* return data payload length sent */
 	if (bytes_written)
 		*bytes_written = STATE(tsdu_length);
-	return G_IO_STATUS_NORMAL;
+	return PGM_IO_STATUS_NORMAL;
 }
 
 /* send PGM original data, callee owned memory.  if larger than maximum TPDU
@@ -1211,7 +1238,7 @@ retry_send:
  * if the packet sizes would exceed the current rate limit.
  */
 
-GIOStatus
+PGMIOStatus
 pgm_send (
 	pgm_transport_t* const		transport,
 	gconstpointer			apdu,
@@ -1219,21 +1246,42 @@ pgm_send (
 	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (apdu_length <= transport->max_apdu, G_IO_STATUS_ERROR);
-	if (apdu_length) g_return_val_if_fail (NULL != apdu, G_IO_STATUS_ERROR);
+	gsize bytes_sent	= 0;		/* counted at IP layer */
+	guint packets_sent	= 0;		/* IP packets */
+	gsize data_bytes_sent	= 0;
 
 	g_trace ("INFO","pgm_send (transport:%p apdu:%p apdu-length:%" G_GSIZE_FORMAT" bytes-written:%p)",
 		(gpointer)transport, apdu, apdu_length, (gpointer)bytes_written);
 
+/* parameters */
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (apdu_length) g_return_val_if_fail (NULL != apdu, PGM_IO_STATUS_ERROR);
+
+/* shutdown */
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+
+/* state */
+	if (!transport->is_bound ||
+	    transport->is_destroyed ||
+	    apdu_length > transport->max_tpdu)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	}
+
+/* source */
+	g_static_mutex_lock (&transport->source_mutex);
+
 /* pass on non-fragment calls */
 	if (apdu_length < transport->max_tsdu)
-		return send_odata_copy (transport, apdu, apdu_length, bytes_written);
-
-	gsize bytes_sent	= 0;		/* counted at IP layer */
-	guint packets_sent	= 0;		/* IP packets */
-	gsize data_bytes_sent	= 0;
+	{
+		PGMIOStatus status;
+		status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
+		g_static_mutex_unlock (&transport->source_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return status;
+	}
 
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain)
@@ -1258,15 +1306,15 @@ pgm_send (
 				     tpdu_length - transport->iphdr_len,
 				     transport->is_nonblocking))
 		{
-			return G_IO_STATUS_AGAIN;
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			return PGM_IO_STATUS_AGAIN;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
 
-	STATE(data_bytes_offset) = 0;
-
-	g_static_rw_lock_writer_lock (&transport->window_lock);
-	STATE(first_sqn)	= pgm_txw_next_lead(transport->window);
+	STATE(data_bytes_offset)	= 0;
+	STATE(first_sqn)		= pgm_txw_next_lead(transport->window);
 
 	do {
 /* retrieve packet storage from transmit window */
@@ -1317,7 +1365,9 @@ pgm_send (
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
+		g_static_mutex_lock (&transport->txw_mutex);
 		pgm_txw_add (transport->window, STATE(skb));
+		g_static_mutex_unlock (&transport->txw_mutex);
 
 		gssize sent;
 retry_send:
@@ -1355,27 +1405,28 @@ retry_send:
 	} while ( STATE(data_bytes_offset)  < apdu_length);
 	g_assert( STATE(data_bytes_offset) == apdu_length );
 
-/* release txw lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->window_lock);
-
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
 
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
 		*bytes_written = apdu_length;
-	return G_IO_STATUS_NORMAL;
+	g_static_mutex_unlock (&transport->source_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_NORMAL;
 
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (transport);
-		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	return G_IO_STATUS_AGAIN;
+	g_static_mutex_unlock (&transport->source_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_AGAIN;
 }
 
 /* send PGM original data, callee owned scatter/gather IO vector.  if larger than maximum TPDU
@@ -1398,7 +1449,7 @@ blocked:
  * if the packet sizes would exceed the current rate limit.
  */
 
-GIOStatus
+PGMIOStatus
 pgm_sendv (
 	pgm_transport_t* const		transport,
 	const struct pgm_iovec* const	vector,
@@ -1407,11 +1458,6 @@ pgm_sendv (
         gsize*                     	bytes_written
 	)
 {
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, G_IO_STATUS_ERROR);
-	if (count) g_return_val_if_fail (NULL != vector, G_IO_STATUS_ERROR);
-
 	g_trace ("INFO","pgm_sendv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
 		(gpointer)transport,
 		(gconstpointer)vector,
@@ -1419,9 +1465,29 @@ pgm_sendv (
 		is_one_apdu ? "TRUE" : "FALSE",
 		(gpointer)bytes_written);
 
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
+	if (count) g_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	if (!transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	}
+
+	g_static_mutex_lock (&transport->source_mutex);
+
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0)
-		return send_odata_copy (transport, NULL, count, bytes_written);
+	{
+		PGMIOStatus status;
+		status = send_odata_copy (transport, NULL, count, bytes_written);
+		g_static_mutex_unlock (&transport->source_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return status;
+	}
 
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
@@ -1431,7 +1497,13 @@ pgm_sendv (
 	if (transport->is_apdu_eagain) {
 		if (is_one_apdu) {
 			if (STATE(apdu_length) < transport->max_tsdu)
-				return send_odatav (transport, vector, count, bytes_written);
+			{
+				PGMIOStatus status;
+				status = send_odatav (transport, vector, count, bytes_written);
+				g_static_mutex_unlock (&transport->source_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
+				return status;
+			}
 			else
 				goto retry_one_apdu_send;
 		} else {
@@ -1448,8 +1520,12 @@ pgm_sendv (
 			g_assert( vector[i].iov_base );
 		}
 #endif
-		if (!is_one_apdu) {
-			g_return_val_if_fail (vector[i].iov_len <= transport->max_apdu, G_IO_STATUS_ERROR);
+		if (!is_one_apdu &&
+		    vector[i].iov_len > transport->max_apdu)
+		{
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 		}
 		STATE(apdu_length) += vector[i].iov_len;
 	}
@@ -1457,9 +1533,15 @@ pgm_sendv (
 /* pass on non-fragment calls */
 	if (is_one_apdu) {
 		if (STATE(apdu_length) < transport->max_tsdu) {
-			return send_odatav (transport, vector, count, bytes_written);
-		} else {
-			g_return_val_if_fail (STATE(apdu_length) <= transport->max_apdu, G_IO_STATUS_ERROR);
+			PGMIOStatus status;
+			status = send_odatav (transport, vector, count, bytes_written);
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			return status;
+		} else if (STATE(apdu_length) > transport->max_apdu) {
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 		}
 	}
 
@@ -1482,6 +1564,8 @@ pgm_sendv (
 				     tpdu_length - transport->iphdr_len,
 				     transport->is_nonblocking))
 		{
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
 			return G_IO_STATUS_AGAIN;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1499,25 +1583,36 @@ retry_send:
 					   vector[STATE(data_pkt_offset)].iov_base,
 					   vector[STATE(data_pkt_offset)].iov_len,
 					   &wrote_bytes);
-			if (G_IO_STATUS_AGAIN == status) {
+			switch (status) {
+			case G_IO_STATUS_NORMAL:
+				break;
+			case G_IO_STATUS_AGAIN:
 				transport->is_apdu_eagain = TRUE;
-				return status;
-			} else if (G_IO_STATUS_NORMAL != status)
-				return status;
+				g_static_mutex_unlock (&transport->source_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
+				return PGM_IO_STATUS_AGAIN;
+			case G_IO_STATUS_ERROR:
+				g_static_mutex_unlock (&transport->source_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
+				return PGM_IO_STATUS_ERROR;
+			default:
+				g_assert_not_reached();
+			}
 			data_bytes_sent += wrote_bytes;
 		}
 
 		transport->is_apdu_eagain = FALSE;
 		if (bytes_written)
 			*bytes_written = data_bytes_sent;
-		return G_IO_STATUS_NORMAL;
+		g_static_mutex_unlock (&transport->source_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return PGM_IO_STATUS_NORMAL;
 	}
 
 	STATE(data_bytes_offset)	= 0;
 	STATE(vector_index)		= 0;
 	STATE(vector_offset)		= 0;
 
-	g_static_rw_lock_writer_lock (&transport->window_lock);
 	STATE(first_sqn)		= pgm_txw_next_lead(transport->window);
 
 	do {
@@ -1606,7 +1701,9 @@ retry_send:
 		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
+		g_static_mutex_lock (&transport->txw_mutex);
 		pgm_txw_add (transport->window, STATE(skb));
+		g_static_mutex_unlock (&transport->txw_mutex);
 
 		gssize sent;
 retry_one_apdu_send:
@@ -1644,27 +1741,28 @@ retry_one_apdu_send:
 	} while ( STATE(data_bytes_offset)  < STATE(apdu_length) );
 	g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 
-/* release txw lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->window_lock);
-
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
 
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
 		*bytes_written = STATE(apdu_length);
-	return G_IO_STATUS_NORMAL;
+	g_static_mutex_unlock (&transport->source_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_NORMAL;
 
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (transport);
-		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	return G_IO_STATUS_AGAIN;
+	g_static_mutex_unlock (&transport->source_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_AGAIN;
 }
 
 /* send PGM original data, transmit window owned scatter/gather IO vector.
@@ -1678,7 +1776,7 @@ blocked:
  * if the packet sizes would exceed the current rate limit.
  */
 
-GIOStatus
+PGMIOStatus
 pgm_send_skbv (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t** const	vector,		/* array of skb pointers vs. array of skbs */
@@ -1687,11 +1785,6 @@ pgm_send_skbv (
 	gsize*				bytes_written
 	)
 {
-	g_return_val_if_fail (NULL != transport, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (!transport->is_destroyed, G_IO_STATUS_ERROR);
-	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, G_IO_STATUS_ERROR);
-	if (count) g_return_val_if_fail (NULL != vector, G_IO_STATUS_ERROR);
-
 	g_trace ("INFO","pgm_send_skbv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
 		(gpointer)transport,
 		(gpointer)vector,
@@ -1699,11 +1792,37 @@ pgm_send_skbv (
 		is_one_apdu ? "TRUE" : "FALSE",
 		(gpointer)bytes_written);
 
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
+	if (count) g_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	if (!transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	}
+
+	g_static_mutex_lock (&transport->source_mutex);
+
 /* pass on zero length as cannot count vector lengths */
 	if (0 == count)
-		return send_odata_copy (transport, NULL, count, bytes_written);
+	{
+		PGMIOStatus status;
+		status = send_odata_copy (transport, NULL, count, bytes_written);
+		g_static_mutex_unlock (&transport->source_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return status;
+	}
 	if (1 == count)
-		return send_odata (transport, vector[0], bytes_written);
+	{
+		PGMIOStatus status;
+		status = send_odata (transport, vector[0], bytes_written);
+		g_static_mutex_unlock (&transport->source_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return status;
+	}
 
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
@@ -1726,22 +1845,31 @@ pgm_send_skbv (
 				     total_tpdu_length - transport->iphdr_len,
 				     transport->is_nonblocking))
 		{
-			return G_IO_STATUS_AGAIN;
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			return PGM_IO_STATUS_AGAIN;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
-
-	g_static_rw_lock_writer_lock (&transport->window_lock);
 
 	if (is_one_apdu)
 	{
 		STATE(apdu_length)	= 0;
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->window);
-		for (guint i = 0; i < count; i++) {
-			g_return_val_if_fail (vector[i]->len <= transport->max_tsdu_fragment, G_IO_STATUS_ERROR);
+		for (guint i = 0; i < count; i++)
+		{
+			if (vector[i]->len > transport->max_tsdu_fragment) {
+				g_static_mutex_unlock (&transport->source_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
+				return PGM_IO_STATUS_ERROR;
+			}
 			STATE(apdu_length) += vector[i]->len;
 		}
-		g_return_val_if_fail (STATE(apdu_length) <= transport->max_apdu, G_IO_STATUS_ERROR);
+		if (STATE(apdu_length) > transport->max_apdu) {
+			g_static_mutex_unlock (&transport->source_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
+			return PGM_IO_STATUS_ERROR;
+		}
 	}
 
 	for (STATE(vector_index) = 0; STATE(vector_index) < count; STATE(vector_index)++)
@@ -1804,7 +1932,9 @@ pgm_send_skbv (
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window */
+		g_static_mutex_lock (&transport->txw_mutex);
 		pgm_txw_add (transport->window, STATE(skb));
+		g_static_mutex_unlock (&transport->txw_mutex);
 		gssize sent;
 retry_send:
 		sent = pgm_sendto (transport,
@@ -1847,27 +1977,28 @@ retry_send:
 	}
 #endif
 
-/* release txw lock here in order to allow spms to lock mutex */
-	g_static_rw_lock_writer_unlock (&transport->window_lock);
-
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
 
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
 		*bytes_written = data_bytes_sent;
-	return G_IO_STATUS_NORMAL;
+	g_static_mutex_unlock (&transport->source_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_NORMAL;
 
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (transport);
-		transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT]      += bytes_sent;
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	return G_IO_STATUS_AGAIN;
+	g_static_mutex_unlock (&transport->source_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
+	return PGM_IO_STATUS_AGAIN;
 }
 
 /* cleanup resuming send state helper 
@@ -1918,14 +2049,14 @@ send_rdata (
 
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */
-	g_static_mutex_lock (&transport->mutex);
+	g_static_mutex_lock (&transport->timer_mutex);
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-	g_static_mutex_unlock (&transport->mutex);
+	g_static_mutex_unlock (&transport->timer_mutex);
 
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
-	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += skb->len + transport->iphdr_len;
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], skb->len + transport->iphdr_len);
 	return TRUE;
 }
 
