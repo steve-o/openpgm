@@ -47,7 +47,7 @@ G_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
 G_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t* const, pgm_msgv_t**, const pgm_msgv_t* const, gsize* const, guint* const);
 G_GNUC_INTERNAL gboolean pgm_peer_has_pending (pgm_peer_t* const) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t* const, pgm_peer_t* const);
-G_GNUC_INTERNAL gboolean pgm_check_peer_nak_state (pgm_transport_t* const);
+G_GNUC_INTERNAL gboolean pgm_check_peer_nak_state (pgm_transport_t* const, const pgm_time_t);
 G_GNUC_INTERNAL void pgm_set_reset_error (pgm_transport_t* const, pgm_peer_t* const, pgm_msgv_t* const);
 G_GNUC_INTERNAL pgm_time_t pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gboolean pgm_on_peer_nak (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;

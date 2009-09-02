@@ -210,9 +210,6 @@ pgm_txw_create (
 		window->is_fec_enabled = 1;
 	}
 
-/* lock on queue */
-	g_static_mutex_init (&window->retransmit_mutex);
-
 /* pointer array */
 	window->alloc = alloc_sqns;
 
@@ -261,9 +258,6 @@ pgm_txw_shutdown (
 		pgm_rs_destroy (&window->rs);
 	}
 
-/* free lock on queue */
-	g_static_mutex_free (&window->retransmit_mutex);
-
 /* window */
 	g_slice_free1 (sizeof(pgm_txw_t) + ( window->alloc * sizeof(struct pgm_sk_buff_t*) ), window);
 }
@@ -308,7 +302,7 @@ pgm_txw_add (
 	}
 
 /* generate new sequence number */
-	skb->sequence = ++(window->lead);
+	pgm_atomic_int32_inc (&window->lead);
 
 /* add skb to window */
 	const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
@@ -362,14 +356,10 @@ pgm_txw_remove_tail (
 
 	state = (pgm_txw_state_t*)&skb->cb;
 
-/* must lock before checking whether part of the retransmit queue */
-	g_static_mutex_lock (&window->retransmit_mutex);
-	if (state->waiting_retransmit)
-	{
+	if (state->waiting_retransmit) {
 		g_queue_unlink (&window->retransmit_queue, (GList*)skb);
 		state->waiting_retransmit = 0;
 	}
-	g_static_mutex_unlock (&window->retransmit_mutex);
 
 /* statistics */
 	window->size -= skb->len;
@@ -382,7 +372,7 @@ pgm_txw_remove_tail (
 	pgm_free_skb (skb);
 
 /* advance trailing pointer */
-	window->trail++;
+	pgm_atomic_int32_inc (&window->trail);
 
 /* post-conditions */
 	g_assert (!pgm_txw_is_full (window));
@@ -459,7 +449,6 @@ pgm_txw_retransmit_push_parity (
 	state = (pgm_txw_state_t*)&skb->cb;
 
 /* check if request can be eliminated */
-	g_static_mutex_lock (&window->retransmit_mutex);
 	if (state->waiting_retransmit)
 	{
 		g_assert (((const GList*)skb)->next);
@@ -468,7 +457,6 @@ pgm_txw_retransmit_push_parity (
 /* more parity packets requested than currently scheduled, simply bump up the count */
 			state->pkt_cnt_requested = nak_pkt_cnt;
 		}
-		g_static_mutex_unlock (&window->retransmit_mutex);
 		return FALSE;
 	}
 	else
@@ -482,7 +470,6 @@ pgm_txw_retransmit_push_parity (
 	g_queue_push_head_link (&window->retransmit_queue, (GList*)skb);
 	g_assert (!g_queue_is_empty (&window->retransmit_queue));
 	state->waiting_retransmit = 1;
-	g_static_mutex_unlock (&window->retransmit_mutex);
 	return TRUE;
 }
 
@@ -509,10 +496,8 @@ pgm_txw_retransmit_push_selective (
 	state = (pgm_txw_state_t*)&skb->cb;
 
 /* check if request can be eliminated */
-	g_static_mutex_lock (&window->retransmit_mutex);
 	if (state->waiting_retransmit) {
 		g_assert (!g_queue_is_empty (&window->retransmit_queue));
-		g_static_mutex_unlock (&window->retransmit_mutex);
 		return FALSE;
 	}
 
@@ -523,7 +508,6 @@ pgm_txw_retransmit_push_selective (
 	g_queue_push_head_link (&window->retransmit_queue, (GList*)skb);
 	g_assert (!g_queue_is_empty (&window->retransmit_queue));
 	state->waiting_retransmit = 1;
-	g_static_mutex_unlock (&window->retransmit_mutex);
 	return TRUE;
 }
 
@@ -551,15 +535,11 @@ pgm_txw_retransmit_try_peek (
 	g_assert (pgm_skb_is_valid (skb));
 	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
 
-/* must lock before reading to catch parity updates */
-	g_static_mutex_lock (&window->retransmit_mutex);
-	if (!state->waiting_retransmit)
-	{
+	if (!state->waiting_retransmit) {
 		g_assert (((const GList*)skb)->next == NULL);
 		g_assert (((const GList*)skb)->prev == NULL);
 	}
 	if (!state->pkt_cnt_requested) {
-		g_static_mutex_unlock (&window->retransmit_mutex);
 		return skb;
 	}
 
@@ -696,8 +676,6 @@ pgm_txw_retransmit_try_peek (
 /* calculate partial checksum */
 	const guint tsdu_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
 	state->unfolded_checksum = pgm_csum_partial ((guint8*)skb->tail - tsdu_length, tsdu_length, 0);
-
-	g_static_mutex_unlock (&window->retransmit_mutex);
 	return skb;
 }
 
@@ -724,7 +702,6 @@ pgm_txw_retransmit_remove_head (
 /* link must be valid for pop */
 	g_assert (tail_link);
 
-	g_static_mutex_lock (&window->retransmit_mutex);
 	skb = (struct pgm_sk_buff_t*)tail_link;
 	g_assert (pgm_skb_is_valid (skb));
 	g_assert (pgm_tsi_is_null (&skb->tsi));
@@ -749,8 +726,6 @@ pgm_txw_retransmit_remove_head (
 		g_queue_pop_tail_link (&window->retransmit_queue);
 		state->waiting_retransmit = 0;
 	}
-
-	g_static_mutex_unlock (&window->retransmit_mutex);
 }
 
 /* eof */
