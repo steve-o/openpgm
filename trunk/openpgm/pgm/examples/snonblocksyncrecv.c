@@ -188,10 +188,10 @@ main (
 
 static void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int		signum
 	)
 {
-	g_message ("on_signal");
+	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 	const char one = '1';
 	write (g_quit_pipe[1], &one, sizeof(one));
