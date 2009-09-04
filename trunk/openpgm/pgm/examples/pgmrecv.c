@@ -227,8 +227,9 @@ main (
 		pgm_snmp_shutdown();
 #endif
 
-	g_message ("finished.");
+	g_message ("PGM engine shutdown.");
 	pgm_shutdown ();
+	g_message ("finished.");
 	return EXIT_SUCCESS;
 }
 
@@ -425,7 +426,7 @@ receiver_thread (
 			fds[0].events = POLLIN;
 			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
-#else
+#else /* HAVE_SELECT */
 			FD_ZERO(&readfds);
 			FD_SET(g_quit_pipe[0], &readfds);
 			n_fds = g_quit_pipe[0] + 1;

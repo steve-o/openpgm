@@ -68,7 +68,7 @@ pgm_init (void)
 	int e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			g_trace ("Setting PGM protocol number to %i from /etc/protocols.",
+			g_trace ("setting PGM protocol number to %i from /etc/protocols.",
 				proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
@@ -77,7 +77,7 @@ pgm_init (void)
 	struct protoent *proto = getprotobyname ("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			g_trace ("Setting PGM protocol number to %i from /etc/protocols.",
+			g_trace ("setting PGM protocol number to %i from /etc/protocols.",
 				proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
