@@ -605,10 +605,19 @@ pgm_send_spm (
 		tpdu_length += sizeof(struct pgm_spm);
 	else
 		tpdu_length += sizeof(struct pgm_spm6);
-	if (transport->use_proactive_parity || transport->use_ondemand_parity)
-		tpdu_length += sizeof(struct pgm_opt_length) +
-			       sizeof(struct pgm_opt_header) +
-			       sizeof(struct pgm_opt_parity_prm);
+	if (transport->use_proactive_parity ||
+	    transport->use_ondemand_parity ||
+	    PGM_OPT_FIN == flags)
+	{
+		tpdu_length += sizeof(struct pgm_opt_length);
+		if (transport->use_proactive_parity ||
+		    transport->use_ondemand_parity)
+			tpdu_length += sizeof(struct pgm_opt_header) +
+				       sizeof(struct pgm_opt_parity_prm);
+		if (PGM_OPT_FIN == flags)
+			tpdu_length += sizeof(struct pgm_opt_header) +
+				       sizeof(struct pgm_opt_fin);
+	}
 	guint8 buf[ tpdu_length ];
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
@@ -929,6 +938,7 @@ send_odata (
 		(gpointer)transport, (gpointer)skb, (gpointer)bytes_written);
 
 	const guint16 tsdu_length = skb->len;
+	const guint16 tpdu_length = tsdu_length + pgm_transport_pkt_offset(FALSE);
 
 /* continue if send would block */
 	if (transport->is_apdu_eagain)
@@ -938,10 +948,8 @@ send_odata (
 	STATE(skb) = pgm_skb_get(skb);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	STATE(skb)->data  = (guint8*)STATE(skb)->data - pgm_transport_pkt_offset(FALSE);
-	STATE(skb)->len  += pgm_transport_pkt_offset(FALSE);
 
-	STATE(skb)->pgm_header = (struct pgm_header*)STATE(skb)->data;
+	STATE(skb)->pgm_header = (struct pgm_header*)STATE(skb)->head;
 	STATE(skb)->pgm_data   = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
 	memcpy (STATE(skb)->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
@@ -960,7 +968,7 @@ send_odata (
 	STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)(STATE(skb)->pgm_data + 1), tsdu_length, 0);
         STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
-/* add to transmit window */
+/* add to transmit window, skb::data set to payload */
 	g_static_mutex_lock (&transport->txw_mutex);
 	pgm_txw_add (transport->window, STATE(skb));
 	g_static_mutex_unlock (&transport->txw_mutex);
@@ -970,8 +978,8 @@ retry_send:
 	sent = pgm_sendto (transport,
 			   TRUE,			/* rate limited */
 			   FALSE,			/* regular socket */
-			   STATE(skb)->data,
-			   STATE(skb)->len,
+			   STATE(skb)->head,
+			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
@@ -985,10 +993,10 @@ retry_send:
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
 
-	if ( sent == (gssize)STATE(skb)->len ) {
+	if ( sent == tpdu_length ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], STATE(skb)->len + transport->iphdr_len);
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1030,6 +1038,8 @@ send_odata_copy (
 	g_trace ("INFO","send_odata_copy (transport:%p tsdu:%p tsdu_length:%" G_GSIZE_FORMAT " bytes-written:%p)",
 		(gpointer)transport, tsdu, tsdu_length, (gpointer)bytes_written);
 
+	const guint16 tpdu_length = tsdu_length + pgm_transport_pkt_offset(FALSE);
+
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain)
 		goto retry_send;
@@ -1037,9 +1047,10 @@ send_odata_copy (
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_put (STATE(skb), pgm_transport_pkt_offset (FALSE) + tsdu_length);
+	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
+	pgm_skb_put (STATE(skb), tsdu_length);
 
-	STATE(skb)->pgm_header	= (struct pgm_header*)STATE(skb)->data;
+	STATE(skb)->pgm_header	= (struct pgm_header*)STATE(skb)->head;
 	STATE(skb)->pgm_data	= (struct pgm_data*)(STATE(skb)->pgm_header + 1);
 	memcpy (STATE(skb)->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 	STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
@@ -1058,7 +1069,7 @@ send_odata_copy (
 	STATE(unfolded_odata)			= pgm_csum_partial_copy (tsdu, (guint8*)(STATE(skb)->pgm_data + 1), tsdu_length, 0);
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
-/* add to transmit window */
+/* add to transmit window, skb::data set to payload */
 	g_static_mutex_lock (&transport->txw_mutex);
 	pgm_txw_add (transport->window, STATE(skb));
 	g_static_mutex_unlock (&transport->txw_mutex);
@@ -1068,8 +1079,8 @@ retry_send:
 	sent = pgm_sendto (transport,
 			   TRUE,			/* rate limited */
 			   FALSE,			/* regular socket */
-			   STATE(skb)->data,
-			   STATE(skb)->len,
+			   STATE(skb)->head,
+			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
@@ -1083,10 +1094,10 @@ retry_send:
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport);
 
-	if ( sent == (gssize)STATE(skb)->len ) {
+	if ( sent == tpdu_length ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], STATE(skb)->len + transport->iphdr_len);
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1153,7 +1164,8 @@ send_odatav (
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_put (STATE(skb), pgm_transport_pkt_offset (FALSE) + STATE(tsdu_length));
+	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
+	pgm_skb_put (STATE(skb), STATE(tsdu_length));
 
 	STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
 	STATE(skb)->pgm_data    = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
@@ -1185,18 +1197,19 @@ send_odatav (
 
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
-/* add to transmit window */
+/* add to transmit window, skb::data set to payload */
 	g_static_mutex_lock (&transport->txw_mutex);
 	pgm_txw_add (transport->window, STATE(skb));
 	g_static_mutex_unlock (&transport->txw_mutex);
 
-	gssize sent;
+	gssize tpdu_length, sent;
 retry_send:
+	tpdu_length = (guint8*)STATE(skb)->tail - (guint8*)STATE(skb)->head;
 	sent = pgm_sendto (transport,
 			   TRUE,			/* rate limited */
 			   FALSE,			/* regular socket */
-			   STATE(skb)->data,
-			   STATE(skb)->len,
+			   STATE(skb)->head,
+			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 	if (sent < 0 && errno == EAGAIN) {
@@ -1213,7 +1226,7 @@ retry_send:
 	if ( sent == (gssize)STATE(skb)->len ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], STATE(skb)->len + transport->iphdr_len);
+		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1324,9 +1337,10 @@ pgm_send (
 		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
-		pgm_skb_put (STATE(skb), header_length +  STATE(tsdu_length));
+		pgm_skb_reserve (STATE(skb), header_length);
+		pgm_skb_put (STATE(skb), STATE(tsdu_length));
 
-		STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
+		STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->head;
 		STATE(skb)->pgm_data    = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
 		memcpy (STATE(skb)->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
@@ -1364,18 +1378,19 @@ pgm_send (
 		STATE(unfolded_odata)			= pgm_csum_partial_copy ((const guint8*)apdu + STATE(data_bytes_offset), STATE(skb)->pgm_opt_fragment + 1, STATE(tsdu_length), 0);
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
-/* add to transmit window */
+/* add to transmit window, skb::data set to payload */
 		g_static_mutex_lock (&transport->txw_mutex);
 		pgm_txw_add (transport->window, STATE(skb));
 		g_static_mutex_unlock (&transport->txw_mutex);
 
-		gssize sent;
+		gssize tpdu_length, sent;
 retry_send:
+		tpdu_length = (guint8*)STATE(skb)->tail - (guint8*)STATE(skb)->head;
 		sent = pgm_sendto (transport,
 				   !STATE(is_rate_limited),	/* rate limit on blocking */
 				   FALSE,				/* regular socket */
-				   STATE(skb)->data,
-				   STATE(skb)->len,
+				   STATE(skb)->head,
+				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 		if (sent < 0 && errno == EAGAIN) {
@@ -1386,8 +1401,8 @@ retry_send:
 /* save unfolded odata for retransmissions */
 		pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
 
-		if ( sent == (gssize)STATE(skb)->len ) {
-			bytes_sent += STATE(skb)->len + transport->iphdr_len;	/* as counted at IP layer */
+		if ( sent == tpdu_length ) {
+			bytes_sent += tpdu_length + transport->iphdr_len;	/* as counted at IP layer */
 			packets_sent++;							/* IP packets */
 			data_bytes_sent += STATE(tsdu_length);
 		}
@@ -1622,9 +1637,10 @@ retry_send:
 		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
-		pgm_skb_put (STATE(skb), header_length + STATE(tsdu_length));
+		pgm_skb_reserve (STATE(skb), header_length);
+		pgm_skb_put (STATE(skb), STATE(tsdu_length));
 
-		STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
+		STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->head;
 		STATE(skb)->pgm_data    = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
 		memcpy (STATE(skb)->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
@@ -1700,18 +1716,19 @@ retry_send:
 
 		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
-/* add to transmit window */
+/* add to transmit window, skb::data set to payload */
 		g_static_mutex_lock (&transport->txw_mutex);
 		pgm_txw_add (transport->window, STATE(skb));
 		g_static_mutex_unlock (&transport->txw_mutex);
 
-		gssize sent;
+		gssize tpdu_length, sent;
 retry_one_apdu_send:
+		tpdu_length = (guint8*)STATE(skb)->tail - (guint8*)STATE(skb)->head;
 		sent = pgm_sendto (transport,
 				   !STATE(is_rate_limited),	/* rate limited on blocking */
 				   FALSE,				/* regular socket */
-				   STATE(skb)->data,
-				   STATE(skb)->len,
+				   STATE(skb)->head,
+				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 		if (sent < 0 && errno == EAGAIN) {
@@ -1722,8 +1739,8 @@ retry_one_apdu_send:
 /* save unfolded odata for retransmissions */
 		pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
 
-		if ( sent == (gssize)STATE(skb)->len ) {
-			bytes_sent += STATE(skb)->len + transport->iphdr_len;	/* as counted at IP layer */
+		if ( sent == tpdu_length ) {
+			bytes_sent += tpdu_length + transport->iphdr_len;	/* as counted at IP layer */
 			packets_sent++;							/* IP packets */
 			data_bytes_sent += STATE(tsdu_length);
 		}
@@ -1879,10 +1896,8 @@ pgm_send_skbv (
 		STATE(skb) = pgm_skb_get(vector[STATE(vector_index)]);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
-		STATE(skb)->data  = (guint8*)STATE(skb)->data - pgm_transport_pkt_offset(is_one_apdu);
-		STATE(skb)->len  += pgm_transport_pkt_offset(is_one_apdu);
 
-		STATE(skb)->pgm_header = (struct pgm_header*)STATE(skb)->data;
+		STATE(skb)->pgm_header = (struct pgm_header*)STATE(skb)->head;
 		STATE(skb)->pgm_data   = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
 		memcpy (STATE(skb)->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 		STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
@@ -1931,17 +1946,18 @@ pgm_send_skbv (
 		STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)(STATE(skb)->pgm_opt_fragment + 1), STATE(tsdu_length), 0);
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
-/* add to transmit window */
+/* add to transmit window, skb::data set to payload */
 		g_static_mutex_lock (&transport->txw_mutex);
 		pgm_txw_add (transport->window, STATE(skb));
 		g_static_mutex_unlock (&transport->txw_mutex);
-		gssize sent;
+		gssize tpdu_length, sent;
 retry_send:
+		tpdu_length = (guint8*)STATE(skb)->tail - (guint8*)STATE(skb)->head;
 		sent = pgm_sendto (transport,
 				   !STATE(is_rate_limited),	/* rate limited on blocking */
 				    FALSE,				/* regular socket */
-				    STATE(skb)->data,
-				    STATE(skb)->len,
+				    STATE(skb)->head,
+				    tpdu_length,
 				    (struct sockaddr*)&transport->send_gsr.gsr_group,
 				    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 		if (sent < 0 && errno == EAGAIN) {
@@ -1952,8 +1968,8 @@ retry_send:
 /* save unfolded odata for retransmissions */
 		pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
 
-		if (sent == (gssize)STATE(skb)->len) {
-			bytes_sent += STATE(skb)->len + transport->iphdr_len;	/* as counted at IP layer */
+		if (sent == tpdu_length) {
+			bytes_sent += tpdu_length + transport->iphdr_len;	/* as counted at IP layer */
 			packets_sent++;							/* IP packets */
 			data_bytes_sent += STATE(tsdu_length);
 		}
@@ -2021,6 +2037,8 @@ send_rdata (
 	g_assert (NULL != transport);
 	g_assert (NULL != skb);
 
+	const gssize tpdu_length = (guint8*)skb->tail - (guint8*)skb->head;
+
 /* update previous odata/rdata contents */
 	struct pgm_header* header	= skb->pgm_header;
 	struct pgm_data* rdata		= skb->pgm_data;
@@ -2029,7 +2047,7 @@ send_rdata (
         rdata->data_trail		= g_htonl (pgm_txw_trail(transport->window));
 
         header->pgm_checksum		= 0;
-	const gsize pgm_header_len	= skb->len - g_ntohs(header->pgm_tsdu_length);
+	const gsize pgm_header_len	= tpdu_length - g_ntohs(header->pgm_tsdu_length);
 	guint32 unfolded_header		= pgm_csum_partial (header, pgm_header_len, 0);
 	guint32 unfolded_odata		= pgm_txw_get_unfolded_checksum (skb);
 	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
@@ -2038,7 +2056,7 @@ send_rdata (
 					TRUE,			/* rate limited */
 					TRUE,			/* with router alert */
 					header,
-					skb->len,
+					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
 /* re-save unfolded payload for further retransmissions */
@@ -2056,7 +2074,7 @@ send_rdata (
 
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
-	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], skb->len + transport->iphdr_len);
+	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	return TRUE;
 }
 

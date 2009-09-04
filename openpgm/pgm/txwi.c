@@ -31,7 +31,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-//#define TXW_DEBUG
+#define TXW_DEBUG
 
 #ifndef TXW_DEBUG
 #	define G_DISABLE_ASSERT
@@ -291,7 +291,7 @@ pgm_txw_add (
 	g_assert (((const GList*)skb)->next == NULL);
 	g_assert (((const GList*)skb)->prev == NULL);
 	g_assert (pgm_tsi_is_null (&skb->tsi));
-	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint8*)skb->data - (guint8*)skb->head);
+	g_assert ((sizeof(struct pgm_header) + sizeof(struct pgm_data)) <= ((guint8*)skb->data - (guint8*)skb->head));
 
 	g_trace ("add (window:%p skb:%p)", (gpointer)window, (gpointer)skb);
 
@@ -303,6 +303,7 @@ pgm_txw_add (
 
 /* generate new sequence number */
 	pgm_atomic_int32_inc (&window->lead);
+	skb->sequence = window->lead;
 
 /* add skb to window */
 	const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
@@ -345,6 +346,8 @@ pgm_txw_remove_tail (
 	struct pgm_sk_buff_t* skb;
 	pgm_txw_state_t* state;
 
+	g_trace ("pgm_txw_remove_tail (window:%p)", (gpointer)window);
+
 /* pre-conditions */
 	g_assert (window);
 	g_assert (!pgm_txw_is_empty (window));
@@ -355,7 +358,6 @@ pgm_txw_remove_tail (
 	g_assert (pgm_tsi_is_null (&skb->tsi));
 
 	state = (pgm_txw_state_t*)&skb->cb;
-
 	if (state->waiting_retransmit) {
 		g_queue_unlink (&window->retransmit_queue, (GList*)skb);
 		state->waiting_retransmit = 0;

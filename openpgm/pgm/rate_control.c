@@ -135,4 +135,21 @@ pgm_rate_check (
 	return TRUE;
 }
 
+pgm_time_t
+pgm_rate_remaining (
+	rate_t*			bucket
+	)
+{
+	pgm_time_t sleep_amount;
+
+/* pre-conditions */
+	g_assert (NULL != bucket);
+	g_static_mutex_lock (&bucket->mutex);
+	const pgm_time_t now = pgm_time_update_now();
+	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
+	sleep_amount = (double)bucket->rate_per_sec * (double)pgm_to_secs((double)time_since_last_rate_check);
+	g_static_mutex_unlock (&bucket->mutex);
+	return sleep_amount;
+}
+
 /* eof */

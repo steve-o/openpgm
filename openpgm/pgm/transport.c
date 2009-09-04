@@ -141,7 +141,7 @@ pgm_transport_destroy (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (transport->is_destroyed, FALSE);
+	g_return_val_if_fail (!transport->is_destroyed, FALSE);
 	g_trace ("INFO","pgm_transport_destroy (transport:%p flush:%s)",
 		(gpointer)transport,
 		flush ? "TRUE":"FALSE");
@@ -156,7 +156,10 @@ pgm_transport_destroy (
 	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 
 /* flush source side by sending heartbeat SPMs */
-	if (flush) {
+	if (transport->can_send_data &&
+	    transport->is_bound && 
+	    flush)
+	{
 		g_trace ("INFO","flushing PGM source with session finish option broadcast SPMs.");
 		if (!pgm_send_spm (transport, PGM_OPT_FIN) ||
 		    !pgm_send_spm (transport, PGM_OPT_FIN) ||
@@ -616,7 +619,7 @@ pgm_transport_bind (
 	g_return_val_if_fail (NULL != transport, FALSE);
 	if (!g_static_rw_lock_writer_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
-	if (!transport->is_bound ||
+	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		g_static_rw_lock_writer_unlock (&transport->lock);
@@ -1131,11 +1134,11 @@ no_cap_net_admin:
 	}
 
 /* non-blocking sockets */
+	g_trace ("INFO","set %s sockets",
+		transport->is_nonblocking ? "non-blocking" : "blocking");
 	pgm_sockaddr_nonblocking (transport->recv_sock, transport->is_nonblocking);
-	if (transport->can_send_data) {
-		pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
-		pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
-	}
+	pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
+	pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
 
 /* allocate first incoming packet buffer */
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
@@ -1147,6 +1150,24 @@ no_cap_net_admin:
 	transport->is_bound = TRUE;
 	g_static_rw_lock_writer_unlock (&transport->lock);
 	g_trace ("INFO","transport successfully created.");
+	return TRUE;
+}
+
+/* returns timeout for blocking sends, PGM_IO_STATUS_AGAIN2 on recv()
+ * or PGM_IO_STATUS_AGAIN on send().
+ */
+
+gboolean
+pgm_transport_get_rate_remaining (
+	pgm_transport_t* const	transport,
+	struct timeval*		tv
+	)
+{
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (NULL != tv, FALSE);
+	const pgm_time_t pgm_time = pgm_rate_remaining (&transport->rate_control);
+	tv->tv_sec  = pgm_time / 1000000UL;
+	tv->tv_usec = pgm_time % 1000000UL;
 	return TRUE;
 }
 
@@ -1180,12 +1201,12 @@ pgm_transport_select_info (
 		FD_SET(transport->recv_sock, readfds);
 		fds = transport->recv_sock + 1;
 		if (transport->can_send_data) {
-			int rdata_fd = pgm_notify_get_fd (&transport->rdata_notify);
+			const int rdata_fd = pgm_notify_get_fd (&transport->rdata_notify);
 			FD_SET(rdata_fd, readfds);
 			fds = MAX(fds, rdata_fd + 1);
 		}
 		if (transport->can_recv_data) {
-			int pending_fd = pgm_notify_get_fd (&transport->pending_notify);
+			const int pending_fd = pgm_notify_get_fd (&transport->pending_notify);
 			FD_SET(pending_fd, readfds);
 			fds = MAX(fds, pending_fd + 1);
 		}
@@ -1371,7 +1392,7 @@ pgm_transport_set_fec (
 
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
-	if (!transport->is_bound ||
+	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
@@ -1403,7 +1424,7 @@ pgm_transport_set_send_only (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
-	if (!transport->is_bound ||
+	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
@@ -1428,7 +1449,7 @@ pgm_transport_set_recv_only (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
-	if (!transport->is_bound ||
+	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
@@ -1454,7 +1475,7 @@ pgm_transport_set_abort_on_reset (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
-	if (!transport->is_bound ||
+	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
@@ -1476,7 +1497,7 @@ pgm_transport_set_nonblocking (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
-	if (!transport->is_bound ||
+	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);

@@ -379,7 +379,7 @@ static inline void pgm_sockaddr_nonblocking (const int s, const gboolean v)
 {
 #ifdef G_OS_UNIX
 	int flags = fcntl (s, F_GETFL);
-	if (v) flags &= ~O_NONBLOCK;
+	if (!v) flags &= ~O_NONBLOCK;
 	else flags |= O_NONBLOCK;
 	fcntl (s, F_SETFL, flags);
 #else
