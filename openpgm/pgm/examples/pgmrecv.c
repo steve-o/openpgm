@@ -363,6 +363,8 @@ receiver_thread (
 	pgm_msgv_t msgv[ 20 ];
 
 #ifdef CONFIG_HAVE_EPOLL
+	struct epoll_event events[1];	/* wait for maximum 1 event */
+	int timeout;
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
@@ -386,6 +388,7 @@ receiver_thread (
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
+	int timeout;
 	int n_fds = 2;
 	struct pollfd fds[ 1 + n_fds ];
 #else
@@ -394,6 +397,7 @@ receiver_thread (
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
+		struct timeval tv;
 		gsize len;
 		GError* err = NULL;
 		const PGMIOStatus status = pgm_recvmsgv (transport,
@@ -402,36 +406,20 @@ receiver_thread (
 						       0,
 						       &len,
 						       &err);
-		if (PGM_IO_STATUS_NORMAL == status)
+		switch (status) {
+		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);
-		else if (PGM_IO_STATUS_AGAIN == status) {
-#ifdef CONFIG_HAVE_EPOLL
-			struct epoll_event events[1];	/* wait for maximum 1 event */
-			epoll_wait (efd, events, G_N_ELEMENTS(events), -1 /* ms */);
-#elif defined(CONFIG_HAVE_POLL)
-			memset (fds, 0, sizeof(fds));
-			fds[0].fd = g_quit_pipe[0];
-			fds[0].events = POLLIN;
-			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
-			poll (fds, 1 + n_fds, -1 /* ms */);
-#else
-			FD_ZERO(&readfds);
-			FD_SET(g_quit_pipe[0], &readfds);
-			n_fds = g_quit_pipe[0] + 1;
-			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
-			select (n_fds, &readfds, NULL, NULL, NULL);
-#endif /* !CONFIG_HAVE_EPOLL */
-		} else if (PGM_IO_STATUS_AGAIN2 == status) {
-			struct timeval tv;
+			break;
+		case PGM_IO_STATUS_AGAIN2:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 			g_message ("wait on fd or timeout %u:%u",
 				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
+		case PGM_IO_STATUS_AGAIN:
 #ifdef CONFIG_HAVE_EPOLL
-			const int timeout = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-			struct epoll_event events[1];	/* wait for maximum 1 event */
+			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
-			const int timeout = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
@@ -442,11 +430,13 @@ receiver_thread (
 			FD_SET(g_quit_pipe[0], &readfds);
 			n_fds = g_quit_pipe[0] + 1;
 			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
-			select (n_fds, &readfds, NULL, NULL, &tv);
+			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_AGAIN2 == status ? &tv : NULL);
 #endif /* !CONFIG_HAVE_EPOLL */
-		} else {
+			break;
+
+		default:
 			if (err) {
-				g_warning (err->message);
+				g_warning ("%s", err->message);
 				g_error_free (err);
 			}
 			if (PGM_IO_STATUS_ERROR == status)
