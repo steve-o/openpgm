@@ -125,11 +125,13 @@ pgm_receiver_thread (
 /* incoming message buffer */
 	pgm_msgv_t msgv;
 	gsize bytes_read;
+	struct timeval tv;
 
 	do {
 /* blocking read */
-		const GIOStatus status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
-		if (G_IO_STATUS_NORMAL == status)
+		const PGMIOStatus status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
+		switch (status) {
+		case PGM_IO_STATUS_NORMAL:
 		{
 /* queue a copy to receiver */
 			pgm_event_t* event = pgm_event_alloc (async);
@@ -149,10 +151,18 @@ pgm_receiver_thread (
 			if (g_async_queue_length_unlocked (async->commit_queue) == 1)
 				pgm_notify_send (&async->commit_notify);
 			g_async_queue_unlock (async->commit_queue);
+			break;
 		}
-		else if (G_IO_STATUS_AGAIN == status)
+
+		case PGM_IO_STATUS_AGAIN2:
+		{
+			pgm_transport_get_rate_remaining (async->transport, &tv);
+		}
+/* fall through */
+		case PGM_IO_STATUS_AGAIN:
 		{
 #ifdef CONFIG_HAVE_POLL
+			const int timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
 			int n_fds = 2;
 			struct pollfd fds[1+n_fds];
 			memset (fds, 0, sizeof(fds));
@@ -160,38 +170,51 @@ pgm_receiver_thread (
 			fds[0].events = POLLIN;
 			if (-1 == pgm_transport_poll_info (async->transport, &fds[1], &n_fds, POLLIN)) {
 				g_trace ("poll_info returned errno=%i",errno);
-				break;
+				goto cleanup;
 			}
-			const int ready = poll (fds, 1+n_fds, -1);
-#else
+			const int ready = poll (fds, 1 + n_fds, timeout);
+#else /* HAVE_SELECT */
 			fd_set readfds;
 			int fd = pgm_notify_get_fd (&async->destroy_notify), n_fds = 1 + fd;
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
 			if (-1 == pgm_transport_select_info (async->transport, &readfds, NULL, &n_fds)) {
 				g_trace ("select_info returned errno=%i",errno);
-				break;
+				goto cleanup;
 			}
-			const int ready = select (n_fds, &readfds, NULL, NULL, NULL);
+			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_AGAIN2 == status ? &tv : NULL);
 #endif
 			if (-1 == ready) {
 				g_trace ("block returned errno=%i",errno);
-				break;
+				goto cleanup;
 			}
 #ifdef CONFIG_HAVE_POLL
 			if (ready > 0 && fds[0].revents)
 #else
 			if (ready > 0 && FD_ISSET(fd, &readfds))
 #endif
-				break;
+				goto cleanup;
+			break;
 		}
-		else if (G_IO_STATUS_ERROR == status)
+
+		case PGM_IO_STATUS_ERROR:
+			goto cleanup;
+
+		case PGM_IO_STATUS_RESET:
+			if (async->transport->is_abort_on_reset)
+				goto cleanup;
 			break;
-		else if (G_IO_STATUS_EOF == status && async->transport->is_abort_on_reset)
+
+/* TODO: report to user */
+		case PGM_IO_STATUS_FIN:
 			break;
+
+		default:
+			g_assert_not_reached();
+		}
 	} while (!async->is_destroyed);
 
-/* cleanup */
+cleanup:
 	g_async_queue_unref (async->commit_queue);
 	return NULL;
 }
