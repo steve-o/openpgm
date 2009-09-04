@@ -1104,7 +1104,7 @@ no_cap_net_admin:
 /* setup rate control */
 		if (transport->txw_max_rte)
 		{
-			g_trace ("INFO","Setting rate regulation to %i bytes per second.",
+			g_trace ("INFO","setting rate regulation to %i bytes per second.",
 					transport->txw_max_rte);
 	
 			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);

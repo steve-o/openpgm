@@ -70,7 +70,7 @@
 #include "pgm/err.h"
 
 #define SOURCE_DEBUG
-//#define SPM_DEBUG
+#define SPM_DEBUG
 
 #ifndef SOURCE_DEBUG
 #	define g_trace(m,...)		while (0)
