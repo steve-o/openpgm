@@ -127,8 +127,8 @@ main (
 	if (create_transport ())
 	{
 		while (optind < argc) {
-			const GIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
-		        if (G_IO_STATUS_NORMAL != status) {
+			const PGMIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
+		        if (PGM_IO_STATUS_NORMAL != status) {
 				g_warning ("pgm_transport_send failed.");
 		        }
 			optind++;

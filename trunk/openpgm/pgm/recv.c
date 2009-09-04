@@ -150,7 +150,9 @@ recvskb (
 		.msg_flags	= 0
 	};
 
+g_trace ("recvmsg: enter");
 	ssize_t len = recvmsg (transport->recv_sock, &msg, flags);
+g_trace ("recvmsg: leave");
 	if (len <= 0)
 		return len;
 #else /* !G_OS_UNIX */
@@ -626,6 +628,7 @@ pgm_recvmsgv (
 	)
 {
 	pgm_peer_t* peer;
+	PGMIOStatus status = PGM_IO_STATUS_NORMAL;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
@@ -683,15 +686,19 @@ pgm_recvmsgv (
 	if (pgm_timer_check (transport) &&
 	    !pgm_timer_dispatch (transport))
 	{
-		g_static_mutex_unlock (&transport->receiver_mutex);
-		g_static_rw_lock_reader_unlock (&transport->lock);
-		return PGM_IO_STATUS_AGAIN;
+/* block on send-in-recv */
+		status = PGM_IO_STATUS_AGAIN2;
 	}
 
 /* NAK status */
-	if (transport->can_send_data) {
+	if (PGM_IO_STATUS_NORMAL == status &&
+	    transport->can_send_data)
+	{
 		if (!pgm_txw_retransmit_is_empty (transport->window))
-			pgm_on_deferred_nak (transport);
+		{
+			if (!pgm_on_deferred_nak (transport))
+				status = PGM_IO_STATUS_AGAIN2;
+		}
 		else
 			pgm_notify_clear (&transport->rdata_notify);
 	}
@@ -701,7 +708,7 @@ pgm_recvmsgv (
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len;
 
-/* second, flush any remaining contiguous messages from previous call(s) */
+	/* second, flush any remaining contiguous messages from previous call(s) */
 	if (transport->peers_pending) {
 		if (0 != pgm_flush_peers_pending (transport, &pmsg, msg_end, &bytes_read, &data_read))
 			goto out;
@@ -766,7 +773,8 @@ flush_pending:
 
 check_for_repeat:
 /* repeat if non-blocking and not full */
-	if (flags & MSG_DONTWAIT)
+	if (transport->is_nonblocking ||
+	    flags & MSG_DONTWAIT)
 	{
 		if (len > 0 && pmsg < msg_end) {
 			g_trace ("recv again on not-full");
@@ -838,6 +846,10 @@ out:
 /* return reset on zero bytes instead of waiting for next call */
 		g_static_mutex_unlock (&transport->receiver_mutex);
 		g_static_rw_lock_reader_unlock (&transport->lock);
+		if (PGM_IO_STATUS_AGAIN2 == status) {
+			pgm_notify_send (&transport->pending_notify);
+			return status;
+		}
 		return PGM_IO_STATUS_AGAIN;
 	}
 
