@@ -52,6 +52,7 @@
 
 static int g_port = 7500;
 static const char* g_network = "";
+static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
@@ -75,6 +76,7 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	exit (1);
 }
 
@@ -89,12 +91,13 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:lh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
+		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -106,10 +109,10 @@ main (
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
-	signal(SIGINT, on_signal);
+	signal(SIGINT,  on_signal);
 	signal(SIGTERM, on_signal);
 #ifdef SIGHUP
-	signal(SIGHUP, SIG_IGN);
+	signal(SIGHUP,  SIG_IGN);
 #endif
 
 	if (!on_startup()) {
@@ -132,29 +135,40 @@ main (
 
 /* incoming message buffer */
 	pgm_msgv_t msgv;
+	struct epoll_event events[1];	/* wait for maximum 1 event */
 
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
+		struct timeval tv;
+		int timeout;
 		gsize len;
 		GError* err = NULL;
-		const GIOStatus status = pgm_recvmsg (g_transport,
-						      &msgv,
-						      MSG_DONTWAIT /* non-blocking */,
-						      &len,
-						      &err);
-		if (G_IO_STATUS_NORMAL == status)
+		const PGMIOStatus status = pgm_recvmsg (g_transport,
+						        &msgv,
+						        0,
+						        &len,
+						        &err);
+		switch (status) {
+		case PGM_IO_STATUS_NORMAL:
 			on_datav (&msgv, len, NULL);
-		else if (G_IO_STATUS_AGAIN == status) {
+			break;
+
+		case PGM_IO_STATUS_AGAIN2:
+			pgm_transport_get_rate_remaining (g_transport, &tv);
+/* fall through */
+		case PGM_IO_STATUS_AGAIN:
 /* poll for next event */
-			struct epoll_event events[1];	/* wait for maximum 1 event */
-			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
-		} else {
+			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
+			break;
+
+		default:
 			if (err) {
-				g_warning (err->message);
+				g_warning ("%s", err->message);
 				g_error_free (err);
 			}
-			if (G_IO_STATUS_ERROR == status)
+			if (PGM_IO_STATUS_ERROR == status)
 				break;
 		}
 	} while (!g_quit);
@@ -163,25 +177,24 @@ main (
 
 /* cleanup */
 	close (efd);
-
 	if (g_transport) {
 		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
 
+	g_message ("PGM engine shutdown.");
+	pgm_shutdown ();
 	g_message ("finished.");
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int		signum
 	)
 {
-	g_message ("on_signal");
-
+	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 }
 
@@ -222,6 +235,7 @@ on_startup (void)
 	pgm_if_free_transport_info (res);
 
 /* set PGM parameters */
+	pgm_transport_set_nonblocking (g_transport, TRUE);
 	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);

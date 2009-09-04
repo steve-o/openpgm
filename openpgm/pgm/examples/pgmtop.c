@@ -210,8 +210,10 @@ main (
 		g_stdin_channel = NULL;
 	}
 
+	puts ("PGM engine shutdown.");
+	pgm_shutdown ();
 	puts ("finished.");
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static struct ncurses_window*

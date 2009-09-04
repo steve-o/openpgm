@@ -160,22 +160,22 @@ main (
 /* cleanup */
 	if (g_transport) {
 		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
 
+	g_message ("PGM engine shutdown.");
+	pgm_shutdown ();
 	g_message ("finished.");
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int		signum
 	)
 {
-	g_message ("on_signal");
-
+	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 }
 

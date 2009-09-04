@@ -151,13 +151,14 @@ main (
 
 /* cleanup */
 	pgm_async_destroy (async);
-
 	if (g_transport) {
 		g_message ("destroying transport.");
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
 
+	g_message ("PGM engine shutdown.");
+	pgm_shutdown ();
 	g_message ("finished.");
 	return EXIT_SUCCESS;
 }
