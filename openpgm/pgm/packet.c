@@ -347,7 +347,8 @@ pgm_print_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n", len, sizeof(struct pgm_header));
+		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+			len, sizeof(struct pgm_ip) + sizeof(struct pgm_header));
 		return FALSE;
 	}
 
@@ -1267,7 +1268,10 @@ pgm_print_options (
 
 	printf (" total len %" G_GUINT16_FORMAT " ", opt_len->opt_total_length);
 
-	if (opt_len->opt_total_length < (sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header)) || opt_len->opt_total_length > len) {
+	if (opt_len->opt_total_length < (sizeof(struct pgm_opt_length) +
+					 sizeof(struct pgm_opt_header))   ||
+	    opt_len->opt_total_length > len)
+	{
 		puts ("bad total length");
 		return -1;
 	}

@@ -373,6 +373,7 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
+gboolean pgm_transport_get_rate_remaining (pgm_transport_t* const, struct timeval* const);
 int pgm_transport_select_info (pgm_transport_t* const, fd_set* const, fd_set* const, int* const);
 #ifdef CONFIG_HAVE_POLL
 int pgm_transport_poll_info (pgm_transport_t* const, struct pollfd* const, int* const, const int);

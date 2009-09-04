@@ -69,7 +69,8 @@ static int g_sqns = 100;
 static pgm_transport_t* g_transport = NULL;
 static GThread* g_thread = NULL;
 static GMainLoop* g_loop = NULL;
-static gboolean g_quit = FALSE;
+static gboolean g_quit;
+static int g_quit_pipe[2];
 
 static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
@@ -178,6 +179,9 @@ main (
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
+	g_quit = FALSE;
+	pipe (g_quit_pipe);
+
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
 #ifdef SIGHUP
@@ -198,7 +202,11 @@ main (
 
 /* cleanup */
 	g_quit = TRUE;
+	const char one = '1';
+	write (g_quit_pipe[1], &one, sizeof(one));
 	g_thread_join (g_thread);
+	close (g_quit_pipe[0]);
+	close (g_quit_pipe[1]);
 
 	g_main_loop_unref(g_loop);
 	g_loop = NULL;
@@ -285,6 +293,7 @@ on_startup (
 	pgm_if_free_transport_info (res);
 
 /* set PGM parameters */
+	pgm_transport_set_nonblocking (g_transport, TRUE);
 	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
@@ -361,50 +370,86 @@ receiver_thread (
 		return NULL;
 	}
 
-	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN);
-	if (retval < 0) {
+	if (pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN) < 0)
+	{
 		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit(g_loop);
+		return NULL;
+	}
+	struct epoll_event event = {
+		.events = EPOLLIN
+	};
+	if (epoll_ctl (efd, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0)
+	{
+		g_error ("epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
 		g_main_loop_quit(g_loop);
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
 	int n_fds = 2;
-	struct pollfd fds[ n_fds ];
+	struct pollfd fds[ 1 + n_fds ];
 #else
-	int n_fds = 2;
+	int n_fds;
 	fd_set readfds;
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
 		gsize len;
 		GError* err = NULL;
-		const GIOStatus status = pgm_recvmsgv (transport,
+		const PGMIOStatus status = pgm_recvmsgv (transport,
 						       msgv,
 						       G_N_ELEMENTS(msgv),
-						       MSG_DONTWAIT, /* non-blocking */
+						       0,
 						       &len,
 						       &err);
-		if (G_IO_STATUS_NORMAL == status)
+		if (PGM_IO_STATUS_NORMAL == status)
 			on_msgv (msgv, len, NULL);
-		else if (G_IO_STATUS_AGAIN == status) {
+		else if (PGM_IO_STATUS_AGAIN == status) {
 #ifdef CONFIG_HAVE_EPOLL
 			struct epoll_event events[1];	/* wait for maximum 1 event */
-			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
+			epoll_wait (efd, events, G_N_ELEMENTS(events), -1 /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
-			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
-			poll (fds, n_fds, 1000 /* ms */);
+			fds[0].fd = g_quit_pipe[0];
+			fds[0].events = POLLIN;
+			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
+			poll (fds, 1 + n_fds, -1 /* ms */);
 #else
 			FD_ZERO(&readfds);
+			FD_SET(g_quit_pipe[0], &readfds);
+			n_fds = g_quit_pipe[0] + 1;
 			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
 			select (n_fds, &readfds, NULL, NULL, NULL);
+#endif /* !CONFIG_HAVE_EPOLL */
+		} else if (PGM_IO_STATUS_AGAIN2 == status) {
+			struct timeval tv;
+			pgm_transport_get_rate_remaining (g_transport, &tv);
+			g_message ("wait on fd or timeout %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
+#ifdef CONFIG_HAVE_EPOLL
+			const int timeout = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+			struct epoll_event events[1];	/* wait for maximum 1 event */
+			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
+#elif defined(CONFIG_HAVE_POLL)
+			const int timeout = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+			memset (fds, 0, sizeof(fds));
+			fds[0].fd = g_quit_pipe[0];
+			fds[0].events = POLLIN;
+			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
+			poll (fds, 1 + n_fds, timeout /* ms */);
+#else
+			FD_ZERO(&readfds);
+			FD_SET(g_quit_pipe[0], &readfds);
+			n_fds = g_quit_pipe[0] + 1;
+			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
+			select (n_fds, &readfds, NULL, NULL, &tv);
 #endif /* !CONFIG_HAVE_EPOLL */
 		} else {
 			if (err) {
 				g_warning (err->message);
 				g_error_free (err);
 			}
-			if (G_IO_STATUS_ERROR == status)
+			if (PGM_IO_STATUS_ERROR == status)
 				break;
 		}
 	} while (!g_quit);
