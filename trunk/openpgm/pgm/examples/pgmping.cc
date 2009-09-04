@@ -248,8 +248,10 @@ main (
 
 	google::protobuf::ShutdownProtobufLibrary();
 
+	g_message ("PGM engine shutdown.");
+	pgm_shutdown ();
 	g_message ("finished.");
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static void
