@@ -66,7 +66,7 @@ generate_msgv (void)
 static gpointer mock_msgv = NULL;
 
 static
-GIOStatus
+PGMIOStatus
 mock_pgm_recvmsg (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msgv,
@@ -77,11 +77,21 @@ mock_pgm_recvmsg (
 {
 	pgm_msgv_t* _msgv = g_atomic_pointer_get (&mock_msgv);
 	if (NULL == _msgv)
-		return G_IO_STATUS_AGAIN;
+		return PGM_IO_STATUS_AGAIN;
 	memcpy (msgv, _msgv, sizeof(pgm_msgv_t));
 	g_atomic_pointer_set (&mock_msgv, NULL);
 	*bytes_read = _msgv->msgv_len;
-	return G_IO_STATUS_NORMAL;
+	return PGM_IO_STATUS_NORMAL;
+}
+
+static
+gboolean
+mock_pgm_transport_get_rate_remaining (
+	pgm_transport_t* const	transport,
+	struct timeval*		tv
+	)
+{
+	return FALSE;
 }
 
 #ifdef CONFIG_HAVE_POLL
@@ -119,6 +129,7 @@ mock_pgm_transport_select_info (
 
 
 #define pgm_recvmsg			mock_pgm_recvmsg
+#define pgm_transport_get_rate_remaining	mock_pgm_transport_get_rate_remaining
 #define pgm_transport_poll_info		mock_pgm_transport_poll_info
 #define pgm_transport_select_info	mock_pgm_transport_select_info
 
@@ -205,7 +216,7 @@ START_TEST (test_recv_pass_001)
 	pgm_notify_send (&transport->pending_notify);
 	char buffer[1024];
 	gsize bytes_read = 0;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_async_recv (async, &buffer, sizeof(buffer), &bytes_read, 0, &err));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_async_recv (async, &buffer, sizeof(buffer), &bytes_read, 0, &err));
 	fail_unless (TRUE == pgm_async_destroy (async));
 	g_message ("recv returned \"%s\"", buffer);
 }
@@ -213,7 +224,7 @@ END_TEST
 
 START_TEST (test_recv_fail_001)
 {
-	fail_unless (G_IO_STATUS_ERROR == pgm_async_recv (NULL, NULL, 0, NULL, 0, NULL));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_async_recv (NULL, NULL, 0, NULL, 0, NULL));
 }
 END_TEST
 

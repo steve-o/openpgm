@@ -91,8 +91,9 @@ mock_pgm_on_nak_notify (
 
 static
 int
-mock_pgm_send_spm_unlocked (
-	pgm_transport_t*	transport
+mock_pgm_send_spm (
+	pgm_transport_t*	transport,
+	int			flags
 	)
 {
 	return 0;
@@ -181,6 +182,16 @@ mock_pgm_rate_destroy (
 {
 }
 
+static
+pgm_time_t
+mock_pgm_rate_remaining (
+	gpointer		bucket,
+	gsize			packetlen
+	)
+{
+	return 0;
+}
+
 /** reed solomon module */
 static
 void
@@ -214,7 +225,7 @@ mock_pgm_time_update_now (void)
 #define ipproto_pgm		mock_ipproto_pgm
 #define pgm_peer_unref		mock_pgm_peer_unref
 #define pgm_on_nak_notify	mock_pgm_on_nak_notify
-#define pgm_send_spm_unlocked	mock_pgm_send_spm_unlocked
+#define pgm_send_spm		mock_pgm_send_spm
 #define pgm_timer_prepare	mock_pgm_timer_prepare
 #define pgm_timer_check		mock_pgm_timer_check
 #define pgm_timer_expiration	mock_pgm_timer_expiration
@@ -223,6 +234,7 @@ mock_pgm_time_update_now (void)
 #define pgm_txw_shutdown	mock_pgm_txw_shutdown
 #define pgm_rate_create		mock_pgm_rate_create
 #define pgm_rate_destroy	mock_pgm_rate_destroy
+#define pgm_rate_remaining	mock_pgm_rate_remaining
 #define pgm_rs_create		mock_pgm_rs_create
 #define pgm_rs_destroy		mock_pgm_rs_destroy
 #define pgm_time_update_now	mock_pgm_time_update_now
