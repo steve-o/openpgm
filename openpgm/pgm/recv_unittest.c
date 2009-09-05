@@ -566,7 +566,6 @@ mock_pgm_new_peer (
 					    transport->rxw_sqns,
 					    transport->rxw_secs,
 					    transport->rxw_max_rte);
-	memcpy (&((pgm_rxw_t*)peer->window)->pgm_sock_err.tsi, &peer->tsi, sizeof(pgm_tsi_t));
 	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
 	gpointer entry = mock__pgm_peer_ref(peer);
 	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);

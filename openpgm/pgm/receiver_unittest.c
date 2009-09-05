@@ -356,13 +356,13 @@ START_TEST (test_check_peer_nak_state_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
 	transport->is_bound = TRUE;
-	pgm_check_peer_nak_state (transport);
+	pgm_check_peer_nak_state (transport, mock_pgm_time_now);
 }
 END_TEST
 
 START_TEST (test_check_peer_nak_state_fail_001)
 {
-	pgm_check_peer_nak_state (NULL);
+	pgm_check_peer_nak_state (NULL, mock_pgm_time_now);
 	fail ();
 }
 END_TEST
