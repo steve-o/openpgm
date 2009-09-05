@@ -161,7 +161,8 @@ mock_pgm_min_nak_expiry (
 static
 gboolean
 mock_pgm_check_peer_nak_state (
-	pgm_transport_t*	transport
+	pgm_transport_t*	transport,
+	pgm_time_t		now
 	)
 {
 	g_assert (NULL != transport);
@@ -171,8 +172,9 @@ mock_pgm_check_peer_nak_state (
 /** source module */
 static
 int
-mock_pgm_send_spm_unlocked (
-	pgm_transport_t*	transport
+mock_pgm_send_spm (
+	pgm_transport_t*	transport,
+	int			flags
 	)
 {
 	g_assert (NULL != transport);
@@ -193,7 +195,7 @@ mock_pgm_send_spm_unlocked (
 #define pgm_time_update_now		mock_pgm_time_update_now
 #define pgm_min_nak_expiry		mock_pgm_min_nak_expiry
 #define pgm_check_peer_nak_state	mock_pgm_check_peer_nak_state
-#define pgm_send_spm_unlocked		mock_pgm_send_spm_unlocked
+#define pgm_send_spm			mock_pgm_send_spm
 
 
 #define TIMER_DEBUG

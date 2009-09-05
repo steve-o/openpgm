@@ -654,21 +654,22 @@ END_TEST
 
 /* target:
  *	gboolean
- *	pgm_send_spm_unlocked (
- *		pgm_transport_t*	transport
+ *	pgm_send_spm (
+ *		pgm_transport_t*	transport,
+ *		int			flags
  *		)
  */
 
-START_TEST (test_send_spm_unlocked_pass_001)
+START_TEST (test_send_spm_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_send_spm_unlocked (transport));
+	fail_unless (TRUE == pgm_send_spm (transport, 0));
 }
 END_TEST
 
-START_TEST (test_send_spm_unlocked_fail_001)
+START_TEST (test_send_spm_fail_001)
 {
-	pgm_send_spm_unlocked (NULL);
+	pgm_send_spm (NULL, 0);
 	fail ();
 }
 END_TEST
@@ -984,11 +985,11 @@ make_test_suite (void)
 	tcase_add_test (tc_send_skbv, test_send_skbv_pass_002);
 	tcase_add_test (tc_send_skbv, test_send_skbv_fail_001);
 
-	TCase* tc_send_spm_unlocked = tcase_create ("send-spm-unlocked");
-	suite_add_tcase (s, tc_send_spm_unlocked);
-	tcase_add_checked_fixture (tc_send_spm_unlocked, mock_setup, NULL);
-	tcase_add_test (tc_send_spm_unlocked, test_send_spm_unlocked_pass_001);
-	tcase_add_test_raise_signal (tc_send_spm_unlocked, test_send_spm_unlocked_fail_001, SIGABRT);
+	TCase* tc_send_spm = tcase_create ("send-spm");
+	suite_add_tcase (s, tc_send_spm);
+	tcase_add_checked_fixture (tc_send_spm, mock_setup, NULL);
+	tcase_add_test (tc_send_spm, test_send_spm_pass_001);
+	tcase_add_test_raise_signal (tc_send_spm, test_send_spm_fail_001, SIGABRT);
 
 	TCase* tc_on_deferred_nak = tcase_create ("on-deferred-nak");
 	suite_add_tcase (s, tc_on_deferred_nak);
