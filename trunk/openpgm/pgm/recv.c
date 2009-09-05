@@ -533,7 +533,7 @@ wait_for_event (
 	pgm_transport_t* const	transport
 	)
 {
-	int n_fds = 2;
+	int n_fds = 3;
 
 /* pre-conditions */
 	g_assert (NULL != transport);

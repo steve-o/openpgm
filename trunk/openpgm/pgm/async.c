@@ -163,7 +163,7 @@ pgm_receiver_thread (
 		{
 #ifdef CONFIG_HAVE_POLL
 			const int timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
-			int n_fds = 2;
+			int n_fds = 3;
 			struct pollfd fds[1+n_fds];
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = pgm_notify_get_fd (&async->destroy_notify);
