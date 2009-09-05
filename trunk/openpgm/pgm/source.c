@@ -69,8 +69,8 @@
 #include "pgm/reed_solomon.h"
 #include "pgm/err.h"
 
-#define SOURCE_DEBUG
-#define SPM_DEBUG
+//#define SOURCE_DEBUG
+//#define SPM_DEBUG
 
 #ifndef SOURCE_DEBUG
 #	define g_trace(m,...)		while (0)
@@ -696,14 +696,16 @@ pgm_send_spm (
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 	const gssize sent = pgm_sendto (transport,
-					TRUE,				/* rate limited */
+					flags != PGM_OPT_SYN,		/* rate limited */
 					TRUE,				/* with router alert */
 					header,
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+		transport->blocklen = tpdu_length;
 		return FALSE;
+	}
 /* advance SPM sequence only on successful transmission */
 	transport->spm_sqn++;
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
@@ -777,7 +779,7 @@ send_ncf (
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
 		return FALSE;
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
@@ -884,7 +886,7 @@ send_ncf_list (
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
 		return FALSE;
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
@@ -982,9 +984,10 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && errno == EAGAIN) {
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 		transport->is_apdu_eagain = TRUE;
-		return PGM_IO_STATUS_AGAIN;
+		transport->blocklen = tpdu_length;
+		return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1083,9 +1086,10 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && errno == EAGAIN) {
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 		transport->is_apdu_eagain = TRUE;
-		return PGM_IO_STATUS_AGAIN;
+		transport->blocklen = tpdu_length;
+		return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1212,9 +1216,10 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && errno == EAGAIN) {
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 		transport->is_apdu_eagain = TRUE;
-		return PGM_IO_STATUS_AGAIN;
+		transport->blocklen = tpdu_length;
+		return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1319,9 +1324,10 @@ pgm_send (
 				     tpdu_length - transport->iphdr_len,
 				     transport->is_nonblocking))
 		{
+			transport->blocklen = tpdu_length;
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
-			return PGM_IO_STATUS_AGAIN;
+			return PGM_IO_STATUS_AGAIN2;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
@@ -1393,8 +1399,9 @@ retry_send:
 				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && errno == EAGAIN) {
+		if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 			transport->is_apdu_eagain = TRUE;
+			transport->blocklen = tpdu_length;
 			goto blocked;
 		}
 
@@ -1441,7 +1448,7 @@ blocked:
 	}
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
-	return PGM_IO_STATUS_AGAIN;
+	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
 }
 
 /* send PGM original data, callee owned scatter/gather IO vector.  if larger than maximum TPDU
@@ -1579,9 +1586,10 @@ pgm_sendv (
 				     tpdu_length - transport->iphdr_len,
 				     transport->is_nonblocking))
 		{
+			transport->blocklen = tpdu_length;
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
-			return G_IO_STATUS_AGAIN;
+			return PGM_IO_STATUS_AGAIN2;
 		}
 		STATE(is_rate_limited) = TRUE;
         }
@@ -1592,24 +1600,25 @@ pgm_sendv (
 		for (STATE(data_pkt_offset) = 0; STATE(data_pkt_offset) < count; STATE(data_pkt_offset)++)
 		{
 			gsize wrote_bytes;
-			GIOStatus status;
+			PGMIOStatus status;
 retry_send:
 			status = pgm_send (transport,
 					   vector[STATE(data_pkt_offset)].iov_base,
 					   vector[STATE(data_pkt_offset)].iov_len,
 					   &wrote_bytes);
 			switch (status) {
-			case G_IO_STATUS_NORMAL:
+			case PGM_IO_STATUS_NORMAL:
 				break;
-			case G_IO_STATUS_AGAIN:
+			case PGM_IO_STATUS_AGAIN:
+			case PGM_IO_STATUS_AGAIN2:
 				transport->is_apdu_eagain = TRUE;
 				g_static_mutex_unlock (&transport->source_mutex);
 				g_static_rw_lock_reader_unlock (&transport->lock);
-				return PGM_IO_STATUS_AGAIN;
-			case G_IO_STATUS_ERROR:
+				return status;
+			case PGM_IO_STATUS_ERROR:
 				g_static_mutex_unlock (&transport->source_mutex);
 				g_static_rw_lock_reader_unlock (&transport->lock);
-				return PGM_IO_STATUS_ERROR;
+				return status;
 			default:
 				g_assert_not_reached();
 			}
@@ -1731,8 +1740,9 @@ retry_one_apdu_send:
 				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && errno == EAGAIN) {
+		if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 			transport->is_apdu_eagain = TRUE;
+			transport->blocklen = tpdu_length;
 			goto blocked;
 		}
 
@@ -1779,7 +1789,7 @@ blocked:
 	}
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
-	return PGM_IO_STATUS_AGAIN;
+	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
 }
 
 /* send PGM original data, transmit window owned scatter/gather IO vector.
@@ -1862,9 +1872,10 @@ pgm_send_skbv (
 				     total_tpdu_length - transport->iphdr_len,
 				     transport->is_nonblocking))
 		{
+			transport->blocklen = total_tpdu_length;
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
-			return PGM_IO_STATUS_AGAIN;
+			return PGM_IO_STATUS_AGAIN2;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
@@ -1960,8 +1971,9 @@ retry_send:
 				    tpdu_length,
 				    (struct sockaddr*)&transport->send_gsr.gsr_group,
 				    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && errno == EAGAIN) {
+		if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 			transport->is_apdu_eagain = TRUE;
+			transport->blocklen = tpdu_length;
 			goto blocked;
 		}
 
@@ -2014,7 +2026,7 @@ blocked:
 	}
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
-	return PGM_IO_STATUS_AGAIN;
+	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
 }
 
 /* cleanup resuming send state helper 
@@ -2062,8 +2074,10 @@ send_rdata (
 /* re-save unfolded payload for further retransmissions */
 	pgm_txw_set_unfolded_checksum (skb, unfolded_odata);
 
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && EAGAIN == errno) {
+		transport->blocklen = tpdu_length;
 		return FALSE;
+	}
 
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */

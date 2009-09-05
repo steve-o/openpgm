@@ -161,9 +161,9 @@ static inline struct pgm_sk_buff_t* pgm_skb_copy (const struct pgm_sk_buff_t* co
 	newskb->end  = (guint8*)newskb->head + ((guint8*)skb->end - (guint8*)skb->head);
 	newskb->data = (guint8*)newskb->head + ((guint8*)skb->data - (guint8*)skb->head);
 	newskb->tail = (guint8*)newskb->head + ((guint8*)skb->tail - (guint8*)skb->head);
-	newskb->pgm_header = skb->pgm_header ? (gpointer)((guint8*)newskb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head)) : skb->pgm_header;
-	newskb->pgm_opt_fragment = skb->pgm_opt_fragment ? (gpointer)((guint8*)newskb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head)) : skb->pgm_opt_fragment;
-	newskb->pgm_data = skb->pgm_data ? (gpointer)((guint8*)newskb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head)) : skb->pgm_data;
+	newskb->pgm_header = skb->pgm_header ? (struct pgm_header*)((guint8*)newskb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head)) : skb->pgm_header;
+	newskb->pgm_opt_fragment = skb->pgm_opt_fragment ? (struct pgm_opt_fragment*)((guint8*)newskb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head)) : skb->pgm_opt_fragment;
+	newskb->pgm_data = skb->pgm_data ? (struct pgm_data*)((guint8*)newskb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head)) : skb->pgm_data;
 	memcpy (newskb->head, skb->head, (guint8*)skb->end - (guint8*)skb->head);
 	return newskb;
 }

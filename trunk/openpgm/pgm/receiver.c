@@ -71,7 +71,7 @@
 #include "pgm/reed_solomon.h"
 #include "pgm/err.h"
 
-#define RECEIVER_DEBUG
+//#define RECEIVER_DEBUG
 //#define SPM_DEBUG
 
 #ifndef RECEIVER_DEBUG
@@ -1112,7 +1112,7 @@ send_spmr (
 				  tpdu_length,
 				  (struct sockaddr*)&transport->send_gsr.gsr_group,
 				  pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
 		return FALSE;
 
 /* send unicast SPMR with regular TTL */
@@ -1124,7 +1124,7 @@ send_spmr (
 			   tpdu_length,
 			   (struct sockaddr*)&source->local_nla,
 			   pgm_sockaddr_len(&source->local_nla));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && EAGAIN == errno)
 		return FALSE;
 
 	source->spmr_expiry = 0;
@@ -1189,7 +1189,7 @@ send_nak (
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
@@ -1256,7 +1256,7 @@ send_parity_nak (
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
-	if (-1 == sent && EAGAIN == errno)
+	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT]++;

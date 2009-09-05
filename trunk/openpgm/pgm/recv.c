@@ -75,7 +75,7 @@
 #include "pgm/reed_solomon.h"
 #include "pgm/err.h"
 
-#define RECV_DEBUG
+//#define RECV_DEBUG
 
 #ifndef RECV_DEBUG
 #	define g_trace(...)		while (0)
@@ -150,9 +150,7 @@ recvskb (
 		.msg_flags	= 0
 	};
 
-g_trace ("recvmsg: enter");
 	ssize_t len = recvmsg (transport->recv_sock, &msg, flags);
-g_trace ("recvmsg: leave");
 	if (len <= 0)
 		return len;
 #else /* !G_OS_UNIX */
@@ -652,10 +650,12 @@ pgm_recvmsgv (
 /* pre-conditions */
 	g_assert (NULL != transport->rx_buffer);
 	g_assert (transport->max_tpdu > 0);
-	g_assert (NULL != transport->peers_hashtable);
-	g_assert (NULL != transport->rand_);
-	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
-	g_assert (pgm_notify_is_valid (&transport->pending_notify));
+	if (transport->can_recv_data) {
+		g_assert (NULL != transport->peers_hashtable);
+		g_assert (NULL != transport->rand_);
+		g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
+		g_assert (pgm_notify_is_valid (&transport->pending_notify));
+	}
 
 /* receiver */
 	g_static_mutex_lock (&transport->receiver_mutex);

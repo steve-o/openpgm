@@ -78,7 +78,7 @@
 #include "pgm/err.h"
 
 
-#define TRANSPORT_DEBUG
+//#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -632,6 +632,17 @@ pgm_transport_bind (
 	transport->rand_ = g_rand_new();
 	g_assert (transport->rand_);
 
+	if (transport->can_send_data) {
+		if (0 != pgm_notify_init (&transport->rdata_notify)) {
+			g_set_error (error,
+				     PGM_TRANSPORT_ERROR,
+				     pgm_transport_error_from_errno (errno),
+				     _("Creating RDATA notification channel: %s"),
+				     g_strerror (errno));
+			g_static_rw_lock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+	}
 	if (transport->can_recv_data) {
 		if (0 != pgm_notify_init (&transport->pending_notify)) {
 			g_set_error (error,
@@ -1112,9 +1123,9 @@ no_cap_net_admin:
 		}
 
 /* announce new transport by sending out SPMs */
-		if (!pgm_send_spm (transport, 0) ||
-		    !pgm_send_spm (transport, 0) ||
-		    !pgm_send_spm (transport, 0))
+		if (!pgm_send_spm (transport, PGM_OPT_SYN) ||
+		    !pgm_send_spm (transport, PGM_OPT_SYN) ||
+		    !pgm_send_spm (transport, PGM_OPT_SYN))
 		{
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
@@ -1165,7 +1176,7 @@ pgm_transport_get_rate_remaining (
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
 	g_return_val_if_fail (NULL != tv, FALSE);
-	const pgm_time_t pgm_time = pgm_rate_remaining (&transport->rate_control);
+	const pgm_time_t pgm_time = pgm_rate_remaining (transport->rate_control, transport->blocklen);
 	tv->tv_sec  = pgm_time / 1000000UL;
 	tv->tv_usec = pgm_time % 1000000UL;
 	return TRUE;
@@ -1297,7 +1308,7 @@ pgm_transport_epoll_ctl (
 	const int		events		/* EPOLLIN, EPOLLOUT */
 	)
 {
-	if (op != EPOLL_CTL_ADD)	/* only addition currently supported */
+	if (!(op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD))
 	{
 		errno = EINVAL;
 		return -1;
@@ -1313,7 +1324,7 @@ pgm_transport_epoll_ctl (
 
 	if (events & EPOLLIN)
 	{
-		event.events = events & (EPOLLIN | EPOLLET);
+		event.events = events & (EPOLLIN | EPOLLET | EPOLLONESHOT);
 		event.data.ptr = transport;
 		retval = epoll_ctl (epfd, op, transport->recv_sock, &event);
 		if (retval)
@@ -1336,7 +1347,7 @@ pgm_transport_epoll_ctl (
 
 	if (transport->can_send_data && events & EPOLLOUT)
 	{
-		event.events = events & (EPOLLOUT | EPOLLET);
+		event.events = events & (EPOLLOUT | EPOLLET | EPOLLONESHOT);
 		event.data.ptr = transport;
 		retval = epoll_ctl (epfd, op, transport->send_sock, &event);
 	}
