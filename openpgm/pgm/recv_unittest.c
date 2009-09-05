@@ -26,6 +26,7 @@
 #include <check.h>
 
 #include <pgm/recv.h>
+#include <pgm/txwi.h>
 #include <pgm/rxwi.h>
 #include <pgm/ip.h>
 #include <pgm/skbuff.h>
@@ -87,6 +88,7 @@ generate_transport (void)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(PGM_SPORT) };
 	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	transport->window = g_malloc0 (sizeof(pgm_txw_t));
 	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
 	transport->is_bound = TRUE;
 	transport->rx_buffer = pgm_alloc_skb (PGM_MAX_TPDU);
@@ -100,6 +102,7 @@ generate_transport (void)
 	transport->rand_ = g_rand_new();
 	transport->nak_bo_ivl = 100*1000;
 	pgm_notify_init (&transport->pending_notify);
+	pgm_notify_init (&transport->rdata_notify);
 	return transport;
 }
 
