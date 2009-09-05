@@ -740,12 +740,11 @@ static inline
 gssize
 pgm_sendto (pgm_transport_t* transport, gboolean rl, gboolean ra, const void* buf, gsize len, const struct sockaddr* to, socklen_t tolen)
 {
-        GStaticMutex* mutex = ra ? &transport->send_with_router_alert_mutex : &transport->send_mutex;
         int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
 
-        g_static_mutex_lock (mutex);
+        g_static_mutex_lock (&transport->send_mutex);
         ssize_t sent = sendto (sock, buf, len, 0, to, tolen);
-        g_static_mutex_unlock (mutex);
+        g_static_mutex_unlock (&transport->send_mutex);
         return sent > 0 ? (gssize)len : (gssize)sent;
 }
 
@@ -755,7 +754,7 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 {
         int retval = 0;
 
-        g_static_mutex_lock (&transport->mutex);
+        g_static_mutex_lock (&transport->timer_mutex);
 
 /* re-set spm timer */
         transport->spm_heartbeat_state = 1;
@@ -765,13 +764,13 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
         if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
                 transport->next_poll = transport->next_heartbeat_spm;
 
-        g_static_mutex_unlock (&transport->mutex);
+        g_static_mutex_unlock (&transport->timer_mutex);
 
         return retval;
 }
 
 static inline
-GIOStatus
+PGMIOStatus
 brokn_send_apdu_unlocked (
         pgm_transport_t*        transport,
         const gchar*            buf,
@@ -784,7 +783,7 @@ brokn_send_apdu_unlocked (
         guint bytes_sent = 0;
         guint data_bytes_sent = 0;
 
-        g_static_rw_lock_writer_lock (&transport->window_lock);
+        g_static_mutex_lock (&transport->source_mutex);
 
         do {
 /* retrieve packet storage from transmit window */
@@ -837,7 +836,9 @@ brokn_send_apdu_unlocked (
                 skb->pgm_header->pgm_checksum    = pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
+		g_static_mutex_lock (&transport->txw_mutex);
                 pgm_txw_add (transport->window, skb);
+		g_static_mutex_unlock (&transport->txw_mutex);
 
 /* do not send send packet */
 		if (packets != 1)
@@ -862,13 +863,13 @@ brokn_send_apdu_unlocked (
 		*bytes_written = data_bytes_sent;
 
 /* release txw lock here in order to allow spms to lock mutex */
-        g_static_rw_lock_writer_unlock (&transport->window_lock);
+        g_static_mutex_unlock (&transport->source_mutex);
         pgm_reset_heartbeat_spm (transport);
-        return G_IO_STATUS_NORMAL;
+        return PGM_IO_STATUS_NORMAL;
 }
 
 static
-GIOStatus
+PGMIOStatus
 brokn_send (
         pgm_transport_t*        transport,      
         const gchar*            data,
@@ -880,7 +881,7 @@ brokn_send (
                                                sizeof(struct pgm_data) ) ) )
         {
 		puts ("FAILED: cannot send brokn single TPDU length APDU");
-		return G_IO_STATUS_ERROR;
+		return PGM_IO_STATUS_ERROR;
         }
 
         return brokn_send_apdu_unlocked (transport, data, len, bytes_written);
@@ -902,14 +903,14 @@ session_send (
 	}
 
 /* send message */
-        GIOStatus status;
+        PGMIOStatus status;
 	if (is_brokn) {
 		status = brokn_send (sess->transport, string, strlen(string) + 1, NULL);
 	} else {
 		status = pgm_send (sess->transport, string, strlen(string) + 1, NULL);
 	}
-        if (G_IO_STATUS_NORMAL != status)
-		puts ("FAILED: pgm_transport_send()");
+        if (PGM_IO_STATUS_NORMAL != status)
+		puts ("FAILED: pgm_send()");
 	puts ("READY");
 }
 
@@ -1200,14 +1201,12 @@ net_send_spm (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	puts ("READY");
 }
@@ -1385,14 +1384,12 @@ net_send_ncf (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
         retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	puts ("READY");
 }
@@ -1486,14 +1483,12 @@ net_send_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	g_static_mutex_lock (&transport->send_with_router_alert_mutex);
         retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
                                 (struct sockaddr*)&peer_nla,
                                 pgm_sockaddr_len(&peer_nla));
-	g_static_mutex_unlock (&transport->send_with_router_alert_mutex);
 
 	puts ("READY");
 }
