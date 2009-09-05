@@ -923,7 +923,7 @@ mock_recvmsg (
 
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_recv (
  *		pgm_transport_t*	transport,
  *		gpointer		data,
@@ -946,7 +946,7 @@ START_TEST (test_data_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_ODATA == mock_pgm_type);
 }
 END_TEST
@@ -962,7 +962,7 @@ START_TEST (test_spm_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_SPM == mock_pgm_type);
 }
 END_TEST
@@ -978,7 +978,7 @@ START_TEST (test_nak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NAK == mock_pgm_type);
 }
 END_TEST
@@ -994,7 +994,7 @@ START_TEST (test_peer_nak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NAK == mock_pgm_type);
 }
 END_TEST
@@ -1010,7 +1010,7 @@ START_TEST (test_nnak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NNAK == mock_pgm_type);
 }
 END_TEST
@@ -1026,7 +1026,7 @@ START_TEST (test_ncf_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NCF == mock_pgm_type);
 }
 END_TEST
@@ -1042,7 +1042,7 @@ START_TEST (test_spmr_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_SPMR == mock_pgm_type);
 }
 END_TEST
@@ -1058,7 +1058,7 @@ START_TEST (test_peer_spmr_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_SPMR == mock_pgm_type);
 }
 END_TEST
@@ -1082,14 +1082,14 @@ START_TEST (test_lost_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	if (err) {
 		g_message (err->message);
 		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1113,14 +1113,14 @@ START_TEST (test_abort_on_lost_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	if (err) {
 		g_message (err->message);
 		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1145,14 +1145,14 @@ START_TEST (test_then_lost_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	if (err) {
 		g_message (err->message);
 		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1178,14 +1178,14 @@ START_TEST (test_then_abort_on_lost_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	if (err) {
 		g_message (err->message);
 		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (G_IO_STATUS_EOF == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1218,11 +1218,11 @@ START_TEST (test_on_data_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (NULL == err);
 	fail_unless ((gsize)sizeof(source) == bytes_read);
 	push_block_event ();
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1252,11 +1252,11 @@ START_TEST (test_on_zero_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (NULL == err);
 	fail_unless ((gsize)0 == bytes_read);
 	push_block_event ();
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1311,32 +1311,32 @@ START_TEST (test_on_many_data_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (NULL == err);
 	fail_unless ((gsize)(strlen(source[0]) + 1) == bytes_read);
 	g_message ("#1 = \"%s\"", buffer);
-	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (NULL == err);
 	fail_unless ((gsize)(strlen(source[1]) + 1) == bytes_read);
 	g_message ("#2 = \"%s\"", buffer);
-	fail_unless (G_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (NULL == err);
 	fail_unless ((gsize)(strlen(source[2]) + 1) == bytes_read);
 	g_message ("#3 = \"%s\"", buffer);
 	push_block_event ();
-	fail_unless (G_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_AGAIN == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
 START_TEST (test_recv_fail_001)
 {
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
-	fail_unless (G_IO_STATUS_ERROR == pgm_recv (NULL, buffer, sizeof(buffer), 0, NULL, NULL));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_recv (NULL, buffer, sizeof(buffer), 0, NULL, NULL));
 }
 END_TEST
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_recvfrom (
  *		pgm_transport_t*	transport,
  *		gpointer		data,
@@ -1352,12 +1352,12 @@ START_TEST (test_recvfrom_fail_001)
 {
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	pgm_tsi_t tsi;
-	fail_unless (G_IO_STATUS_ERROR == pgm_recvfrom (NULL, buffer, sizeof(buffer), 0, NULL, &tsi, NULL));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_recvfrom (NULL, buffer, sizeof(buffer), 0, NULL, &tsi, NULL));
 }
 END_TEST
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_recvmsg (
  *		pgm_transport_t*	transport,
  *		pgm_msgv_t*		msgv,
@@ -1370,12 +1370,12 @@ END_TEST
 START_TEST (test_recvmsg_fail_001)
 {
 	pgm_msgv_t msgv;
-	fail_unless (G_IO_STATUS_ERROR == pgm_recvmsg (NULL, &msgv, 0, NULL, NULL));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_recvmsg (NULL, &msgv, 0, NULL, NULL));
 }
 END_TEST
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_recvmsgv (
  *		pgm_transport_t*	transport,
  *		pgm_msgv_t*		msgv,
@@ -1389,7 +1389,7 @@ END_TEST
 START_TEST (test_recvmsgv_fail_001)
 {
 	pgm_msgv_t msgv[1];
-	fail_unless (G_IO_STATUS_ERROR == pgm_recvmsgv (NULL, msgv, G_N_ELEMENTS(msgv), 0, NULL, NULL));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_recvmsgv (NULL, msgv, G_N_ELEMENTS(msgv), 0, NULL, NULL));
 }
 END_TEST
 

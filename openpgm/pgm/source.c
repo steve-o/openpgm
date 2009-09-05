@@ -1257,7 +1257,7 @@ retry_send:
  */
 
 PGMIOStatus
-pgm_send (
+send_apdu (
 	pgm_transport_t* const		transport,
 	gconstpointer			apdu,
 	const gsize			apdu_length,
@@ -1268,38 +1268,8 @@ pgm_send (
 	guint packets_sent	= 0;		/* IP packets */
 	gsize data_bytes_sent	= 0;
 
-	g_trace ("INFO","pgm_send (transport:%p apdu:%p apdu-length:%" G_GSIZE_FORMAT" bytes-written:%p)",
-		(gpointer)transport, apdu, apdu_length, (gpointer)bytes_written);
-
-/* parameters */
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (apdu_length) g_return_val_if_fail (NULL != apdu, PGM_IO_STATUS_ERROR);
-
-/* shutdown */
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
-
-/* state */
-	if (!transport->is_bound ||
-	    transport->is_destroyed ||
-	    apdu_length > transport->max_tpdu)
-	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
-	}
-
-/* source */
-	g_static_mutex_lock (&transport->source_mutex);
-
-/* pass on non-fragment calls */
-	if (apdu_length < transport->max_tsdu)
-	{
-		PGMIOStatus status;
-		status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
-		g_static_mutex_unlock (&transport->source_mutex);
-		g_static_rw_lock_reader_unlock (&transport->lock);
-		return status;
-	}
+	g_assert (NULL != transport);
+	g_assert (NULL != apdu);
 
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain)
@@ -1325,8 +1295,6 @@ pgm_send (
 				     transport->is_nonblocking))
 		{
 			transport->blocklen = tpdu_length;
-			g_static_mutex_unlock (&transport->source_mutex);
-			g_static_rw_lock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_AGAIN2;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1435,8 +1403,6 @@ retry_send:
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
 		*bytes_written = apdu_length;
-	g_static_mutex_unlock (&transport->source_mutex);
-	g_static_rw_lock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 
 blocked:
@@ -1446,9 +1412,54 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
+	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+}
+
+PGMIOStatus
+pgm_send (
+	pgm_transport_t* const		transport,
+	gconstpointer			apdu,
+	const gsize			apdu_length,
+	gsize*				bytes_written
+	)
+{
+	g_trace ("INFO","pgm_send (transport:%p apdu:%p apdu-length:%" G_GSIZE_FORMAT" bytes-written:%p)",
+		(gpointer)transport, apdu, apdu_length, (gpointer)bytes_written);
+
+/* parameters */
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (apdu_length) g_return_val_if_fail (NULL != apdu, PGM_IO_STATUS_ERROR);
+
+/* shutdown */
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+
+/* state */
+	if (!transport->is_bound ||
+	    transport->is_destroyed ||
+	    apdu_length > transport->max_apdu)
+	{
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	}
+
+/* source */
+	g_static_mutex_lock (&transport->source_mutex);
+
+/* pass on non-fragment calls */
+	if (apdu_length < transport->max_tsdu)
+	{
+		PGMIOStatus status;
+		status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
+		g_static_mutex_unlock (&transport->source_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		return status;
+	}
+
+	const PGMIOStatus status = send_apdu (transport, apdu, apdu_length, bytes_written);
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
-	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+	return status;
 }
 
 /* send PGM original data, callee owned scatter/gather IO vector.  if larger than maximum TPDU
@@ -1602,10 +1613,10 @@ pgm_sendv (
 			gsize wrote_bytes;
 			PGMIOStatus status;
 retry_send:
-			status = pgm_send (transport,
-					   vector[STATE(data_pkt_offset)].iov_base,
-					   vector[STATE(data_pkt_offset)].iov_len,
-					   &wrote_bytes);
+			status = send_apdu (transport,
+					    vector[STATE(data_pkt_offset)].iov_base,
+					    vector[STATE(data_pkt_offset)].iov_len,
+					    &wrote_bytes);
 			switch (status) {
 			case PGM_IO_STATUS_NORMAL:
 				break;

@@ -84,6 +84,8 @@ generate_transport (void)
 	transport->iphdr_len = sizeof(struct pgm_ip);
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	transport->spm_heartbeat_interval[0] = pgm_secs(1);
+	transport->is_bound = FALSE;
+	transport->is_destroyed = FALSE;
 	return transport;
 }
 
@@ -472,7 +474,7 @@ mock_pgm_transport_pkt_offset (
 
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_send (
  *		pgm_transport_t*	transport,
  *		gconstpointer		apdu,
@@ -484,10 +486,11 @@ mock_pgm_transport_pkt_offset (
 START_TEST (test_send_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -496,10 +499,11 @@ END_TEST
 START_TEST (test_send_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -509,12 +513,12 @@ START_TEST (test_send_fail_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, &bytes_written));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, &bytes_written));
 }
 END_TEST
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_sendv (
  *		pgm_transport_t*	transport,
  *		const struct pgmiovec*	vector,
@@ -527,11 +531,12 @@ END_TEST
 START_TEST (test_sendv_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -540,11 +545,12 @@ END_TEST
 START_TEST (test_sendv_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -553,6 +559,7 @@ END_TEST
 START_TEST (test_sendv_pass_003)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[ 16 ];
@@ -561,7 +568,7 @@ START_TEST (test_sendv_pass_003)
 		vector[i].iov_len  = apdu_length / G_N_ELEMENTS(vector);
 	}
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written));
 	fail_unless ((gssize)apdu_length == bytes_written);
 }
 END_TEST
@@ -570,6 +577,7 @@ END_TEST
 START_TEST (test_sendv_pass_004)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	struct pgm_iovec vector[ 16 ];
 	for (unsigned i = 0; i < G_N_ELEMENTS(vector); i++) {
@@ -577,7 +585,7 @@ START_TEST (test_sendv_pass_004)
 		vector[i].iov_len  = apdu_length;
 	}
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written));
 	fail_unless ((gssize)(apdu_length * G_N_ELEMENTS(vector)) == bytes_written);
 }
 END_TEST
@@ -588,12 +596,12 @@ START_TEST (test_sendv_fail_001)
 	const gsize tsdu_length = 100;
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_ERROR == pgm_sendv (NULL, vector, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_sendv (NULL, vector, 1, TRUE, &bytes_written));
 }
 END_TEST
 
 /* target:
- *	GIOStatus
+ *	PGMIOStatus
  *	pgm_send_skbv (
  *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	vector[],
@@ -606,10 +614,11 @@ END_TEST
 START_TEST (test_send_skbv_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb = generate_skb ();
 	gsize apdu_length = (gsize)skb->len;
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, TRUE, &bytes_written));
 	fail_unless (apdu_length == bytes_written);
 }
 END_TEST
@@ -618,12 +627,13 @@ END_TEST
 START_TEST (test_send_skbv_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
 	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++)
 		skb[i] = generate_skb ();
 	gsize apdu_length = (gsize)skb[0]->len * G_N_ELEMENTS(skb);
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written));
 	fail_unless (apdu_length == bytes_written);
 }
 END_TEST
@@ -632,11 +642,12 @@ END_TEST
 START_TEST (test_send_skbv_pass_003)
 {
 	pgm_transport_t* transport = generate_transport ();
+	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
 	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++)
 		skb[i] = generate_skb ();
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written));
 	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == bytes_written);
 }
 END_TEST
@@ -648,7 +659,7 @@ START_TEST (test_send_skbv_fail_001)
 	pgm_skb_put (skb, pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
-	fail_unless (G_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written));
 }
 END_TEST
 
