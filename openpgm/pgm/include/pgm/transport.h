@@ -73,7 +73,7 @@ typedef enum {
 	PGM_IO_STATUS_RESET,		/* session reset */
 	PGM_IO_STATUS_FIN,		/* session finished */
 	PGM_IO_STATUS_AGAIN,		/* resource temporarily unavailable */
-	PGM_IO_STATUS_AGAIN2		/* would block on send-in-receive */
+	PGM_IO_STATUS_AGAIN2		/* would-block on rate limit, check timer */
 } PGMIOStatus;
 
 
@@ -280,6 +280,7 @@ struct pgm_transport_t {
 
 	pgm_notify_t		rdata_notify;
 
+	gsize			blocklen;		    /* length of buffer blocked */
 	gboolean		is_apdu_eagain;		    /* writer-lock on window_lock exists
 							       as send would block */
 	gboolean		is_spm_eagain;		    /* writer-lock in receiver */

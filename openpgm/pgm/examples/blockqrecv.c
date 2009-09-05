@@ -129,7 +129,7 @@ main (
 	}
 
 /* blocking async API */
-	pgm_async_set_nonblocking (&async, FALSE);
+	pgm_async_set_nonblocking (async, FALSE);
 
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
