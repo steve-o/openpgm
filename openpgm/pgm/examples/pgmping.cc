@@ -100,15 +100,16 @@ static guint64 g_in_total = 0;
 static GMainLoop* g_loop = NULL;
 static GThread* g_sender_thread = NULL;
 static GThread* g_receiver_thread = NULL;
-static gboolean g_quit = FALSE;
+static gboolean g_quit;
+static int g_quit_pipe[2];
 
-static void on_signal (int);
+static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_shutdown (gpointer);
 static gboolean on_mark (gpointer);
 
 static void send_odata (void);
-static int on_data (pgm_msgv_t*, guint, gpointer);
+static int on_msgv (pgm_msgv_t*, guint, gpointer);
 
 static gpointer sender_thread (gpointer);
 static gpointer receiver_thread (gpointer);
@@ -139,16 +140,17 @@ main (
 	char   *argv[]
 	)
 {
-	g_message ("pgmping");
+	GError* err = NULL;
 	gboolean enable_http = FALSE;
 	gboolean enable_snmpx = FALSE;
-
 	int timeout = 0;
 
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 	setenv("PGM_TIMER", "GTOD", 1);
 	setenv("PGM_SLEEP", "USLEEP", 1);
+
+	g_message ("pgmping");
 
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
@@ -180,7 +182,7 @@ main (
 	}
 
 	if (g_fec && ( !g_k || !g_n )) {
-		puts ("Invalid Reed-Solomon parameters.");
+		g_error ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
 
@@ -188,31 +190,50 @@ main (
 	pgm_init ();
 
 #ifdef CONFIG_WITH_HTTP
-	if (enable_http)
-		pgm_http_init(PGM_HTTP_DEFAULT_SERVER_PORT);
+	if (enable_http) {
+		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
+			g_error ("Unable to start HTTP interface: %s", err->message);
+			g_error_free (err);
+			pgm_shutdown ();
+			return EXIT_FAILURE;
+		}
+	}
 #endif
 #ifdef CONFIG_WITH_SNMP
-	if (enable_snmpx)
-		pgm_snmp_init();
+	if (enable_snmpx) {
+		if (!pgm_snmp_init (&err)) {
+			g_error ("Unable to start SNMP interface: %s", err->message);
+			g_error_free (err);
+#ifdef CONFIG_WITH_HTTP
+			if (enable_http)
+				pgm_http_shutdown ();
+#endif
+			pgm_shutdown ();
+			return EXIT_FAILURE;
+		}
+	}
 #endif
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
+	g_quit = FALSE;
+	pipe (g_quit_pipe);
+
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	pgm_signal_install (SIGINT, on_signal);
-	pgm_signal_install (SIGTERM, on_signal);
-#ifndef _WIN32
-	pgm_signal_install (SIGHUP, SIG_IGN);
+#ifdef G_OS_WIN32
+	signal (SIGHUP,  SIG_IGN);
 #endif
+	pgm_signal_install (SIGINT,  on_signal, g_loop);
+	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
 	g_message ("scheduling startup.");
-	g_timeout_add (0, (GSourceFunc)on_startup, NULL);
+	g_timeout_add (0, (GSourceFunc)on_startup, g_loop);
 
 	if (timeout) {
 		g_message ("scheduling shutdown.");
-		g_timeout_add (timeout, (GSourceFunc)on_shutdown, NULL);
+		g_timeout_add (timeout, (GSourceFunc)on_shutdown, g_loop);
 	}
 
 /* dispatch loop */
@@ -222,17 +243,17 @@ main (
 	g_message ("event loop terminated, cleaning up.");
 
 /* cleanup */
-	g_main_loop_unref(g_loop);
-	g_loop = NULL;
-
 	g_quit = TRUE;
+	const char one = '1';
+	write (g_quit_pipe[1], &one, sizeof(one));
 	if (g_send_mode)
 		g_thread_join (g_sender_thread);
 	g_thread_join (g_receiver_thread);
+	g_main_loop_unref (g_loop);
+	g_loop = NULL;
 
 	if (g_transport) {
 		g_message ("destroying transport.");
-
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
@@ -254,57 +275,82 @@ main (
 	return EXIT_SUCCESS;
 }
 
-static void
+static
+void
 on_signal (
-	G_GNUC_UNUSED int signum
+	int		signum,
+	gpointer	user_data
 	)
 {
-	g_message ("on_signal");
-
-	g_main_loop_quit(g_loop);
+	GMainLoop* loop = (GMainLoop*)user_data;
+	g_message ("on_signal (signum:%d user-data:%p)",
+		   signum, user_data);
+	g_main_loop_quit (loop);
 }
 
-static gboolean
+static
+gboolean
 on_shutdown (
-	G_GNUC_UNUSED gpointer data
+	gpointer	user_data
 	)
 {
-	g_message ("shutdown");
-	g_main_loop_quit(g_loop);
+	GMainLoop* loop = (GMainLoop*)user_data;
+	g_message ("on_shutdown (user-data:%p)", user_data);
+	g_main_loop_quit (loop);
 	return FALSE;
 }
 
-static gboolean
+static
+gboolean
 on_startup (
-	G_GNUC_UNUSED gpointer data
+	gpointer	user_data
 	)
 {
+	GMainLoop* loop = (GMainLoop*)user_data;
+	struct pgm_transport_info_t* res = NULL;
+	GError* err = NULL;
+
 	g_message ("startup.");
 	g_message ("create transport.");
 
-	pgm_gsi_t gsi;
-	GError* err = NULL;
-	if (!pgm_gsi_create_from_hostname (&gsi, &err)) {
-		g_error ("creating GSI: %s", err->message);
+/* parse network parameter into transport address structure */
+	char network[1024];
+	sprintf (network, "%s", g_network);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
+		g_error ("parsing network parameter: %s", err->message);
 		g_error_free (err);
-		g_main_loop_quit (g_loop);
+		g_main_loop_quit (loop);
 		return FALSE;
 	}
-
-	struct group_source_req recv_gsr, send_gsr;
-	gsize recv_len = 1;
-	int e = pgm_if_parse_transport (g_network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
-	g_assert (e == 0);
-	g_assert (recv_len == 1);
-
-	if (g_udp_encap_port) {
-		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
-		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+/* create global session identifier */
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		g_main_loop_quit (loop);
+		return FALSE;
 	}
+/* UDP encapsulation */
+	if (g_udp_encap_port) {
+		res->ti_udp_encap_ucast_port = g_udp_encap_port;
+		res->ti_udp_encap_mcast_port = g_udp_encap_port;
+	}
+	if (!pgm_transport_create (&g_transport, res, &err)) {
+		g_error ("creating transport: %s", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		g_main_loop_quit (loop);
+		return FALSE;
+	}
+	pgm_if_free_transport_info (res);
 
-	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
-	g_assert (e == 0);
-
+/* set PGM parameters */
+	pgm_transport_set_nonblocking (g_transport, TRUE);
+	if (g_send_mode) {
+		pgm_transport_set_send_only (g_transport, TRUE);
+	} else {
+		pgm_transport_set_recv_only (g_transport, TRUE);
+	}
 	pgm_transport_set_sndbuf (g_transport, 1024 * 1024);
 	pgm_transport_set_rcvbuf (g_transport, 1024 * 1024);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
@@ -324,37 +370,25 @@ on_startup (
 	pgm_transport_set_nak_data_retries (g_transport, 50);
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
-	if (g_fec) {
+	if (g_fec)
 		pgm_transport_set_fec (g_transport, 0, TRUE, TRUE, g_n, g_k);
-	}
 
-	e = pgm_transport_bind (g_transport);
-	if (e < 0) {
-#ifndef _WIN32
-		if      (e == -1)
-			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
-		else if (e == -2)
-			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
-#else
-		if	(e == -1) {
-			DWORD dwError = WSAGetLastError();
-			g_critical ("pgm_transport_bind failed error %ld", dwError);
-		}
-#endif /* _WIN32 */
-		else
-			g_critical ("pgm_transport_bind failed e %i", e);
-		g_main_loop_quit(g_loop);
+/* assign transport to specified address */
+	if (!pgm_transport_bind (g_transport, &err)) {
+		g_error ("binding transport: %s", err->message);
+		g_error_free (err);
+		pgm_transport_destroy (g_transport, FALSE);
+		g_transport = NULL;
+		g_main_loop_quit (loop);
 		return FALSE;
 	}
-	g_assert (e == 0);
 
 /* period timer to indicate some form of life */
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
-	g_timeout_add(2 * 1000, (GSourceFunc)on_mark, NULL);
+	g_timeout_add (2 * 1000, (GSourceFunc)on_mark, NULL);
 
 	if (g_send_mode)
 	{
-		GError* err;
 		g_sender_thread = g_thread_create_full (sender_thread,
 							g_transport,
 							0,
@@ -364,13 +398,12 @@ on_startup (
 							&err);
 		if (!g_sender_thread) {
 			g_critical ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
-			g_main_loop_quit(g_loop);
+			g_main_loop_quit (loop);
 			return FALSE;
 		}
 	}
 
 	{
-		GError* err;
 		g_receiver_thread = g_thread_create_full (receiver_thread,
 							g_transport,
 							0,
@@ -380,7 +413,7 @@ on_startup (
 							&err);
 		if (!g_receiver_thread) {
 			g_critical ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
-			g_main_loop_quit(g_loop);
+			g_main_loop_quit (loop);
 			return FALSE;
 		}
 	}
@@ -389,17 +422,20 @@ on_startup (
 	return FALSE;
 }
 
-static gpointer
+static
+gpointer
 sender_thread (
-	gpointer	data
+	gpointer	user_data
 	)
 {
-	pgm_transport_t* transport = (pgm_transport_t*)data;
+	pgm_transport_t* transport = (pgm_transport_t*)user_data;
 	example::Ping ping;
 	string subject("PING.PGM.TEST.");
 	char hostname[NI_MAXHOST + 1];
 	char payload[1000];
 	gpointer buffer = NULL;
+	struct epoll_event events[1];
+	guint64 latency, now, last = pgm_time_update_now();
 
 	gethostname (hostname, sizeof(hostname));
 	subject.append(hostname);
@@ -409,14 +445,39 @@ sender_thread (
 	ping.mutable_market_data_header()->set_rec_type (example::MarketDataHeader::PING);
 	ping.mutable_market_data_header()->set_rec_status (example::MarketDataHeader::STATUS_OK);
 
+	int efd_again = epoll_create (IP_MAX_MEMBERSHIPS);
+	if (efd_again < 0) {
+		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit (g_loop);
+		return NULL;
+	}
+	if (pgm_transport_epoll_ctl (g_transport, efd_again, EPOLL_CTL_ADD, EPOLLOUT | EPOLLONESHOT) < 0) {
+		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit (g_loop);
+		return NULL;
+	}
+	struct epoll_event event;
+	event.events = EPOLLIN;
+	event.data.fd = g_quit_pipe[0];
+	if (epoll_ctl (efd_again, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0) {
+		g_error ("epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit (g_loop);
+		return NULL;
+	}
+
 	do {
-		guint64 latency;
 		if (g_msg_sent && g_latency_seqno + 1 == g_msg_sent)
 			latency = g_latency_current;
 		else
 			latency = g_odata_interval;
 
-		guint64 now = pgm_time_update_now();
+/* wait on packet rate limit */
+		now = pgm_time_update_now();
+		while ((now - last) < g_odata_interval) {
+			pgm_time_sleep (g_odata_interval - (now - last));
+			now = pgm_time_update_now();
+		}
+		last = now;
 		ping.set_time (now);
 		ping.set_seqno (g_msg_sent);
 		ping.set_latency (latency);
@@ -429,86 +490,150 @@ sender_thread (
 		pgm_skb_put (skb, apdu_size);
 		ping.SerializeToArray (skb->data, skb->len);
 
-		struct pgm_iovec vector[1];
-		vector[0].iov_base = skb;
-		vector[0].iov_len  = skb->len;
-
-		gssize e = pgm_transport_send_skbv (g_transport, vector, G_N_ELEMENTS(vector), 0, FALSE);
-	        if (e < 0) {
-			g_warning ("pgm_transport_send failed: %i/%s.", errno, strerror(errno));
-	                return NULL;
-	        }
-
-		g_out_total += e;
+		struct timeval tv;
+		int timeout;
+		gsize bytes_written;
+		PGMIOStatus status;
+again:
+g_message ("send %" G_GUINT64_FORMAT, g_msg_sent);
+		status = pgm_send_skbv (g_transport, &skb, 1, TRUE, &bytes_written);
+		switch (status) {
+		case PGM_IO_STATUS_AGAIN2:
+		{
+			pgm_transport_get_rate_remaining (g_transport, &tv);
+g_message ("2/remaining %u:%u", (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
+			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+g_message ("%" PGM_TIME_FORMAT " :timeout %d", pgm_time_update_now(), timeout);
+			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
+g_message ("%" PGM_TIME_FORMAT " :ready %d", pgm_time_update_now(), ready);
+if (ready) {
+	g_message ("bitmask %" G_GUINT32_FORMAT, events[0].events);
+	if (events[0].data.fd == g_quit_pipe[0])
+		g_message ("event on quit");
+	else if (events[0].data.ptr == g_transport)
+		g_message ("event on out");
+} else g_message ("event on timer");
+			if (G_UNLIKELY(g_quit))
+				break;
+			goto again;
+		}
+		case PGM_IO_STATUS_AGAIN:
+		{
+			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
+g_message ("%" PGM_TIME_FORMAT " :ready %d", pgm_time_update_now(), ready);
+if (ready) {
+	g_message ("bitmask %" G_GUINT32_FORMAT, events[0].events);
+	if (events[0].data.fd == g_quit_pipe[0])
+		g_message ("event on quit");
+	else if (events[0].data.ptr == g_transport)
+		g_message ("event on out");
+}
+			if (G_UNLIKELY(g_quit))
+				break;
+			if (ready > 0 &&
+			    pgm_transport_epoll_ctl (g_transport, efd_again, EPOLL_CTL_MOD, EPOLLOUT | EPOLLONESHOT) < 0)
+			{
+				g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+				g_main_loop_quit (g_loop);
+				return NULL;
+			}
+			goto again;
+		}
+		case PGM_IO_STATUS_NORMAL:
+			break;
+		default:
+			g_warning ("pgm_send_skbv failed");
+			g_main_loop_quit (g_loop);
+			return NULL;
+		}
+		g_out_total += bytes_written;
 		g_msg_sent++;
 	} while (!g_quit);
 
 	return NULL;
 }
 
-static gpointer
+static
+gpointer
 receiver_thread (
 	gpointer	data
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
 	pgm_msgv_t msgv[20];
+	struct epoll_event events[20];
 	pgm_time_t lost_tstamp = 0;
 	pgm_tsi_t  lost_tsi;
 	guint32	   lost_count = 0;
-t
-	memset (&loss_tsi, 0, sizeof(loss_tsi));
+
+	memset (&lost_tsi, 0, sizeof(lost_tsi));
 
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
- 		g_main_loop_quit(g_loop);
+		g_main_loop_quit (g_loop);
 		return NULL;
 	}
-
-	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN);
-	if (retval < 0) {
+	if (pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN) < 0) {
 		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
-		g_main_loop_quit(g_loop);
+		g_main_loop_quit (g_loop);
+		return NULL;
+	}
+	struct epoll_event event;
+	event.events = EPOLLIN;
+	if (epoll_ctl (efd, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0) {
+		g_error ("epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit (g_loop);
 		return NULL;
 	}
 
 	do {
+		struct timeval tv;
+		int timeout;
 		gsize len;
 		GError* err = NULL;
-		const GIOStatus status = pgm_recvmsgv (g_transport,
-						       msgv,
-						       G_N_ELEMENTS(msgv),
-						       MSG_DONTWAIT | MSG_ERRQUEUE, /* non-blocking */
-						       &len,
-						       &err);
+		const PGMIOStatus status = pgm_recvmsgv (g_transport,
+						         msgv,
+						         G_N_ELEMENTS(msgv),
+						         MSG_ERRQUEUE,
+						         &len,
+						         &err);
 		if (lost_count) {
 			pgm_time_t elapsed = pgm_time_update_now() - lost_tstamp;
 			if (elapsed >= pgm_secs(1)) {
 				g_warning ("pgm data lost %" G_GUINT32_FORMAT " packets detected from %s",
-						lost_count, pgm_print_tsi (&lost_tsi));
+						lost_count, pgm_tsi_print (&lost_tsi));
 				lost_count = 0;
 			}
 		}
 
-		if (G_IO_STATUS_NORMAL == status)
-			on_data (msgv, len, NULL);
-		else if (G_IO_STATUS_AGAIN == status) {
-			struct epoll_event events[1];	/* wait for maximum 1 event */
-			epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
-		} else if (G_IO_STATUS_EOF == status) {
-			struct pgm_sk_buff_t* skb = msgv[0]->msgv_skb[0];
+		switch (status) {
+		case PGM_IO_STATUS_NORMAL:
+			on_msgv (msgv, len, NULL);
+			break;
+		case PGM_IO_STATUS_AGAIN2:
+			pgm_transport_get_rate_remaining (g_transport, &tv);
+/* fall through */
+		case PGM_IO_STATUS_AGAIN:
+			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
+			break;
+		case PGM_IO_STATUS_RESET:
+		{
+			struct pgm_sk_buff_t* skb = msgv[0].msgv_skb[0];
 			lost_tstamp = skb->tstamp;
 			if (pgm_tsi_equal (&skb->tsi, &lost_tsi))
 				lost_count += skb->sequence;
 			else {
 				lost_count = skb->sequence;
-				memcpy (&lost_tsi, &skb->tsi);
+				memcpy (&lost_tsi, &skb->tsi, sizeof(pgm_tsi_t));
 			}
 			pgm_free_skb (skb);
-		} else {
+			break;
+		}
+		default:
 			if (err) {
-				g_warning (err->message);
+				g_warning ("%s", err->message);
 				g_error_free (err);
 			}
 			break;
@@ -519,39 +644,43 @@ t
 	return NULL;
 }
 
-static int
-on_data (
-	pgm_msgv_t*	msgv,
+static
+int
+on_msgv (
+	pgm_msgv_t*	msgv,		/* an array of msgvs */
 	guint		len,
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	example::Ping ping;
+	guint i = 0;
 
 	while (len)
 	{
-		struct pgm_iovec* msgv_iov = msgv->msgv_iov;
-		struct pgm_sk_buff_t* skb  = (struct pgm_sk_buff_t*)msgv->msgv_iov->iov_base;
+		const struct pgm_sk_buff_t* pskb = msgv[i].msgv_skb[0];
+		gsize apdu_len = 0;
+		for (unsigned j = 0; j < msgv[i].msgv_len; j++)
+			apdu_len += msgv[i].msgv_skb[j]->len;
 
 /* only parse first fragment of each apdu */
-		if (!ping.ParseFromArray (skb->data, skb->len))
+		if (!ping.ParseFromArray (pskb->data, pskb->len))
 			goto next_msg;
 //		g_message ("payload: %s", ping.DebugString().c_str());
 
 		{
-			pgm_time_t send_time	= ping.time();
-			guint64 seqno		= ping.seqno();
-			guint64 latency		= ping.latency();
+			const pgm_time_t send_time	= ping.time();
+			const guint64 seqno		= ping.seqno();
+			const guint64 latency		= ping.latency();
 
-			g_in_total += skb->len;
+			g_in_total += pskb->len;
 			g_msg_received++;
 
 /* handle ping */
-			pgm_time_t elapsed	= skb->tstamp - send_time;
+			const pgm_time_t elapsed = pskb->tstamp - send_time;
 
-			if (pgm_time_after(send_time, skb->tstamp)) {
+			if (pgm_time_after(send_time, pskb->tstamp)) {
 				g_message ("timer mismatch, send time = now + %.3f ms",
-						pgm_to_msecsf(send_time - skb->tstamp));
+					   pgm_to_msecsf(send_time - pskb->tstamp));
 				goto next_msg;
 			}
 			g_latency_current	= pgm_to_secs(elapsed);
@@ -570,16 +699,8 @@ on_data (
 
 /* move onto next apdu */
 next_msg:
-		{
-			guint apdu_len = 0;
-			struct pgm_iovec* p = msgv_iov;
-			for (guint j = 0; j < msgv->msgv_iovlen; j++) { /* # elements */
-				apdu_len += p->iov_len;
-				p++;
-			}
-			len -= apdu_len;
-			msgv++;
-		}
+		i++;
+		len -= apdu_len;
 	}
 
 	return 0;
@@ -588,13 +709,15 @@ next_msg:
 /* idle log notification
  */
 
-static gboolean
+static
+gboolean
 on_mark (
 	G_GNUC_UNUSED gpointer data
 	)
 {
-	double interval = pgm_to_secsf(pgm_time_update_now() - g_interval_start);
-	g_interval_start = pgm_time_now;
+	const pgm_time_t now = pgm_time_update_now ();
+	double interval = pgm_to_secsf(now - g_interval_start);
+	g_interval_start = now;
 
 /* receiving a ping */
 	if (g_latency_count)

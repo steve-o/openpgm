@@ -30,7 +30,7 @@ G_BEGIN_DECLS
 G_GNUC_INTERNAL void pgm_rate_create (gpointer*, const guint, const guint);
 G_GNUC_INTERNAL void pgm_rate_destroy (gpointer);
 G_GNUC_INTERNAL gboolean pgm_rate_check (gpointer, const guint, const gboolean);
-G_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (gpointer);
+G_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (gpointer, const gsize);
 
 G_END_DECLS
 

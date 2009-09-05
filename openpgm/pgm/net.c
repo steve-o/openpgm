@@ -80,7 +80,7 @@ pgm_sendto (
 	    transport->rate_control && 
 	    !pgm_rate_check (transport->rate_control, len, transport->is_nonblocking))
 	{
-		errno = EAGAIN;
+		errno = ETIME;
 		return (const gssize)-1;
 	}
 

@@ -45,7 +45,7 @@
 #include <pgm/reed_solomon.h>
 
 
-#define RXW_DEBUG
+//#define RXW_DEBUG
 
 #ifndef RXW_DEBUG
 #	define G_DISABLE_ASSERT

@@ -26,7 +26,7 @@
 #include "pgm/receiver.h"
 #include "pgm/timer.h"
 
-#define TIMER_DEBUG
+//#define TIMER_DEBUG
 
 #ifndef TIMER_DEBUG
 #	define g_trace(...)		while (0)
