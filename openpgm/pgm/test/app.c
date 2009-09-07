@@ -526,7 +526,7 @@ again:
 		poll (fds, n_fds, timeout /* ms */);
 		goto again;
 	default:
-		puts ("FAILED: pgm_transport_send()");
+		puts ("FAILED: pgm_send()");
 		break;
 	}
 }

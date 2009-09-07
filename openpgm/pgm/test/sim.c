@@ -135,8 +135,8 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal (SIGHUP, SIG_IGN);
-	pgm_signal_install (SIGINT, on_signal, g_loop);
+	signal (SIGHUP,  SIG_IGN);
+	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
@@ -689,6 +689,8 @@ session_bind (
 		return;
 	}
 
+	pgm_transport_set_nonblocking (sess->transport, TRUE);
+	pgm_sockaddr_nonblocking (sess->transport->send_sock, FALSE);
 	pgm_transport_set_max_tpdu (sess->transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (sess->transport, g_sqns);
 	pgm_transport_set_rxw_sqns (sess->transport, g_sqns);
@@ -741,7 +743,6 @@ gssize
 pgm_sendto (pgm_transport_t* transport, gboolean rl, gboolean ra, const void* buf, gsize len, const struct sockaddr* to, socklen_t tolen)
 {
         int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
-
         g_static_mutex_lock (&transport->send_mutex);
         ssize_t sent = sendto (sock, buf, len, 0, to, tolen);
         g_static_mutex_unlock (&transport->send_mutex);
@@ -904,14 +905,33 @@ session_send (
 
 /* send message */
         PGMIOStatus status;
-	if (is_brokn) {
-		status = brokn_send (sess->transport, string, strlen(string) + 1, NULL);
-	} else {
-		status = pgm_send (sess->transport, string, strlen(string) + 1, NULL);
-	}
-        if (PGM_IO_STATUS_NORMAL != status)
+	gsize stringlen = strlen(string) + 1;
+	int n_fds = 1;
+	struct pollfd fds[ n_fds ];
+	struct timeval tv;
+	int timeout;
+again:
+	if (is_brokn)
+		status = brokn_send (sess->transport, string, stringlen, NULL);
+	else
+		status = pgm_send (sess->transport, string, stringlen, NULL);
+	switch (status) {
+	case PGM_IO_STATUS_NORMAL:
+		puts ("READY");
+		break;
+	case PGM_IO_STATUS_AGAIN2:
+		pgm_transport_get_rate_remaining (sess->transport, &tv);
+/* fall through */
+	case PGM_IO_STATUS_AGAIN:
+		timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+		memset (fds, 0, sizeof(fds));
+		pgm_transport_poll_info (sess->transport, fds, &n_fds, POLLOUT);
+		poll (fds, n_fds, timeout /* ms */);
+		goto again;
+	default:
 		puts ("FAILED: pgm_send()");
-	puts ("READY");
+		break;
+	}
 }
 
 static
@@ -1207,7 +1227,6 @@ net_send_spm (
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-
 	puts ("READY");
 }
 
