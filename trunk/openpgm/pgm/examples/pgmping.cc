@@ -495,24 +495,13 @@ sender_thread (
 		gsize bytes_written;
 		PGMIOStatus status;
 again:
-g_message ("send %" G_GUINT64_FORMAT, g_msg_sent);
 		status = pgm_send_skbv (g_transport, &skb, 1, TRUE, &bytes_written);
 		switch (status) {
 		case PGM_IO_STATUS_AGAIN2:
 		{
 			pgm_transport_get_rate_remaining (g_transport, &tv);
-g_message ("2/remaining %u:%u", (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
-g_message ("%" PGM_TIME_FORMAT " :timeout %d", pgm_time_update_now(), timeout);
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
-g_message ("%" PGM_TIME_FORMAT " :ready %d", pgm_time_update_now(), ready);
-if (ready) {
-	g_message ("bitmask %" G_GUINT32_FORMAT, events[0].events);
-	if (events[0].data.fd == g_quit_pipe[0])
-		g_message ("event on quit");
-	else if (events[0].data.ptr == g_transport)
-		g_message ("event on out");
-} else g_message ("event on timer");
 			if (G_UNLIKELY(g_quit))
 				break;
 			goto again;
@@ -520,14 +509,6 @@ if (ready) {
 		case PGM_IO_STATUS_AGAIN:
 		{
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
-g_message ("%" PGM_TIME_FORMAT " :ready %d", pgm_time_update_now(), ready);
-if (ready) {
-	g_message ("bitmask %" G_GUINT32_FORMAT, events[0].events);
-	if (events[0].data.fd == g_quit_pipe[0])
-		g_message ("event on quit");
-	else if (events[0].data.ptr == g_transport)
-		g_message ("event on out");
-}
 			if (G_UNLIKELY(g_quit))
 				break;
 			if (ready > 0 &&

@@ -33,7 +33,7 @@
 #include "pgm/transport.h"
 
 
-#define ASYNC_DEBUG
+//#define ASYNC_DEBUG
 
 #ifndef ASYNC_DEBUG
 #       define g_trace(...)           while (0)

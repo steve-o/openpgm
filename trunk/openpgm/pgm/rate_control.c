@@ -110,7 +110,6 @@ pgm_rate_check (
 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
 	bucket->rate_limit += (double)bucket->rate_per_sec * pgm_to_secsf((double)time_since_last_rate_check);
-g_message ("add bucket %d", (int)((double)bucket->rate_per_sec * pgm_to_secsf((double)time_since_last_rate_check)));
 /* per milli-second */
 	if (bucket->rate_limit > (bucket->rate_per_sec / 1000)) 
 		bucket->rate_limit = bucket->rate_per_sec / 1000;
@@ -119,10 +118,8 @@ g_message ("add bucket %d", (int)((double)bucket->rate_per_sec * pgm_to_secsf((d
 	const gint new_rate_limit = bucket->rate_limit - ( bucket->iphdr_len + data_size );
 	if (is_nonblocking && new_rate_limit < 0) {
 		g_static_mutex_unlock (&bucket->mutex);
-g_message ("should block/bucket limit: %d max %d", bucket->rate_limit, bucket->rate_per_sec / 1000);
 		return FALSE;
 	}
-g_message ("from bucket %d", bucket->iphdr_len + data_size );
 
 	bucket->rate_limit = new_rate_limit;
 	if (bucket->rate_limit < 0) {
@@ -136,7 +133,6 @@ g_message ("from bucket %d", bucket->iphdr_len + data_size );
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
 	} 
-g_message ("bucket limit: %d max %d", bucket->rate_limit, bucket->rate_per_sec / 1000);
 	g_static_mutex_unlock (&bucket->mutex);
 	return TRUE;
 }
@@ -159,7 +155,6 @@ pgm_rate_remaining (
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 	const gint bucket_bytes = bucket->rate_limit + ((double)bucket->rate_per_sec * (double)pgm_to_secs((double)time_since_last_rate_check)) - packetlen;
-g_message ("bucket limit: %d bytes: %d", bucket->rate_limit, bucket_bytes);
 	g_static_mutex_unlock (&bucket->mutex);
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
 }
