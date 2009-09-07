@@ -78,7 +78,7 @@
 #include "pgm/err.h"
 
 
-//#define TRANSPORT_DEBUG
+#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
 #ifndef TRANSPORT_DEBUG
@@ -141,12 +141,26 @@ pgm_transport_destroy (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
+	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+		g_return_val_if_reached (FALSE);
 	g_return_val_if_fail (!transport->is_destroyed, FALSE);
 	g_trace ("INFO","pgm_transport_destroy (transport:%p flush:%s)",
 		(gpointer)transport,
 		flush ? "TRUE":"FALSE");
 /* flag existing calls */
 	transport->is_destroyed = TRUE;
+/* cancel running blocking operations */
+	if (transport->recv_sock) {
+		g_trace ("INFO","closing receive socket.");
+		close(transport->recv_sock);
+//		transport->recv_sock = -1;
+	}
+	if (transport->send_sock) {
+		g_trace ("INFO","closing send socket.");
+		close(transport->send_sock);
+//		transport->send_sock = -1;
+	}
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	g_trace ("INFO","blocking on destroy lock ...");
 	g_static_rw_lock_writer_lock (&transport->lock);
 
@@ -193,16 +207,6 @@ pgm_transport_destroy (
 		g_trace ("INFO","destroying rate control.");
 		pgm_rate_destroy (transport->rate_control);
 		transport->rate_control = NULL;
-	}
-	if (transport->recv_sock) {
-		g_trace ("INFO","closing receive socket.");
-		close(transport->recv_sock);
-		transport->recv_sock = 0;
-	}
-	if (transport->send_sock) {
-		g_trace ("INFO","closing send socket.");
-		close(transport->send_sock);
-		transport->send_sock = 0;
 	}
 	if (transport->send_with_router_alert_sock) {
 		g_trace ("INFO","closing send with router alert socket.");

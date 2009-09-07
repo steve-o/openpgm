@@ -626,7 +626,7 @@ pgm_recvmsgv (
 	)
 {
 	pgm_peer_t* peer;
-	PGMIOStatus status = PGM_IO_STATUS_NORMAL;
+	PGMIOStatus status = PGM_IO_STATUS_AGAIN;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
@@ -689,10 +689,8 @@ pgm_recvmsgv (
 /* block on send-in-recv */
 		status = PGM_IO_STATUS_AGAIN2;
 	}
-
 /* NAK status */
-	if (PGM_IO_STATUS_NORMAL == status &&
-	    transport->can_send_data)
+	else if (transport->can_send_data)
 	{
 		if (!pgm_txw_retransmit_is_empty (transport->window))
 		{
@@ -712,6 +710,7 @@ pgm_recvmsgv (
 	if (transport->peers_pending) {
 		if (0 != pgm_flush_peers_pending (transport, &pmsg, msg_end, &bytes_read, &data_read))
 			goto out;
+/* returns on: reset or full buffer */
 	}
 
 /* read the data:
@@ -732,11 +731,30 @@ recv_again:
 		       (struct sockaddr*)&dst,
 		       sizeof(dst));
 	if (len < 0)
-		goto check_for_repeat;
-	else if (0 == len)
+	{
+		const int save_errno = errno;
+		if (EAGAIN == save_errno) {
+			goto check_for_repeat;
+		}
+		status = PGM_IO_STATUS_ERROR;
+		g_set_error (error,
+			     PGM_RECV_ERROR,
+			     pgm_recv_error_from_errno (save_errno),
+			     PGM_RECV_ERROR_CONNRESET,
+			     _("Transport socket error: %s"),
+			     g_strerror (save_errno));
 		goto out;
+	}
+	else if (0 == len)
+	{
+/* cannot return NORMAL/0 as that is valid payload with SKB */
+		status = PGM_IO_STATUS_EOF;
+		goto out;
+	}
 	else
+	{
 		bytes_received += len;
+	}
 
 	GError* err = NULL;
 	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == pgm_sockaddr_family (&src)) ?
@@ -797,7 +815,7 @@ check_for_repeat:
 			case ENOENT:
 				g_static_mutex_unlock (&transport->receiver_mutex);
 				g_static_rw_lock_reader_unlock (&transport->lock);
-				return PGM_IO_STATUS_FIN;
+				return PGM_IO_STATUS_EOF;
 			case EFAULT:
 				g_set_error (error,
 					     PGM_RECV_ERROR,
@@ -843,14 +861,14 @@ out:
 			g_static_rw_lock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RESET;
 		}
-/* return reset on zero bytes instead of waiting for next call */
 		g_static_mutex_unlock (&transport->receiver_mutex);
 		g_static_rw_lock_reader_unlock (&transport->lock);
-		if (PGM_IO_STATUS_AGAIN2 == status) {
+		if (PGM_IO_STATUS_AGAIN  == status ||
+		    PGM_IO_STATUS_AGAIN2 == status)
+		{
 			pgm_notify_send (&transport->pending_notify);
-			return status;
 		}
-		return PGM_IO_STATUS_AGAIN;
+		return status;
 	}
 
 	if (transport->peers_pending)

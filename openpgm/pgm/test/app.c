@@ -128,8 +128,8 @@ main (
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal (SIGHUP, SIG_IGN);
-	pgm_signal_install (SIGINT, on_signal, g_loop);
+	signal (SIGHUP,  SIG_IGN);
+	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
@@ -453,6 +453,8 @@ session_bind (
 		return;
 	}
 
+	if (!pgm_transport_set_nonblocking (sess->transport, TRUE))
+		puts ("FAILED: pgm_transport_set_nonblocking");
 	if (!pgm_transport_set_max_tpdu (sess->transport, g_max_tpdu))
 		puts ("FAILED: pgm_transport_set_max_tpdu");
 	if (!pgm_transport_set_txw_sqns (sess->transport, g_sqns))
@@ -502,10 +504,31 @@ session_send (
 	}
 
 /* send message */
-	if (G_IO_STATUS_NORMAL != pgm_send (sess->transport, string, strlen(string) + 1, NULL))
-		puts ("FAILED: pgm_transport_send()");
-	else
+	PGMIOStatus status;
+	gsize stringlen = strlen(string) + 1;
+	int n_fds = 1;
+	struct pollfd fds[ n_fds ];
+	struct timeval tv;
+	int timeout;
+again:
+	status = pgm_send (sess->transport, string, stringlen, NULL);
+	switch (status) {
+	case PGM_IO_STATUS_NORMAL:
 		puts ("READY");
+		break;
+	case PGM_IO_STATUS_AGAIN2:
+		pgm_transport_get_rate_remaining (sess->transport, &tv);
+/* fall through */
+	case PGM_IO_STATUS_AGAIN:
+		timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+		memset (fds, 0, sizeof(fds));
+		pgm_transport_poll_info (sess->transport, fds, &n_fds, POLLOUT);
+		poll (fds, n_fds, timeout /* ms */);
+		goto again;
+	default:
+		puts ("FAILED: pgm_transport_send()");
+		break;
+	}
 }
 
 static
