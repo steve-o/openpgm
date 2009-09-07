@@ -562,14 +562,14 @@ _pgm_rxw_update_trail (
 
 /* remove all buffers between commit lead and advertised rxw_trail */
 	for (guint32 sequence = window->commit_lead;
-	     pgm_uint32_gt (window->rxw_trail, sequence);
+	     pgm_uint32_gt (window->rxw_trail, sequence) && pgm_uint32_gte (window->lead, sequence);
 	     sequence++)
 	{
 		_pgm_rxw_lost (window, sequence);
 	}
 
-/* post-conditions */
-	g_assert (!pgm_rxw_is_full (window));
+/* post-conditions: only after flush */
+//	g_assert (!pgm_rxw_is_full (window));
 }
 
 /* update FEC parameters

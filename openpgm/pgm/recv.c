@@ -740,7 +740,6 @@ recv_again:
 		g_set_error (error,
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_errno (save_errno),
-			     PGM_RECV_ERROR_CONNRESET,
 			     _("Transport socket error: %s"),
 			     g_strerror (save_errno));
 		goto out;
@@ -863,8 +862,9 @@ out:
 		}
 		g_static_mutex_unlock (&transport->receiver_mutex);
 		g_static_rw_lock_reader_unlock (&transport->lock);
-		if (PGM_IO_STATUS_AGAIN  == status ||
-		    PGM_IO_STATUS_AGAIN2 == status)
+		if (transport->can_recv_data &&
+		    ( PGM_IO_STATUS_AGAIN  == status ||
+		      PGM_IO_STATUS_AGAIN2 == status) )
 		{
 			pgm_notify_send (&transport->pending_notify);
 		}
@@ -888,7 +888,6 @@ out:
 		}
 	}
 
-g_message ("read %d bytes", (int)bytes_read);
 	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
 	g_static_mutex_unlock (&transport->receiver_mutex);
