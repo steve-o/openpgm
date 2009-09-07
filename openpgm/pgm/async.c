@@ -198,6 +198,7 @@ pgm_receiver_thread (
 		}
 
 		case PGM_IO_STATUS_ERROR:
+		case PGM_IO_STATUS_EOF:
 			goto cleanup;
 
 		case PGM_IO_STATUS_RESET:
