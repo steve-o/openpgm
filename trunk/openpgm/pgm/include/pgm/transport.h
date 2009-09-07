@@ -72,6 +72,7 @@ typedef enum {
 	PGM_IO_STATUS_NORMAL,		/* success */
 	PGM_IO_STATUS_RESET,		/* session reset */
 	PGM_IO_STATUS_FIN,		/* session finished */
+	PGM_IO_STATUS_EOF,		/* transport closed */
 	PGM_IO_STATUS_AGAIN,		/* resource temporarily unavailable */
 	PGM_IO_STATUS_AGAIN2		/* would-block on rate limit, check timer */
 } PGMIOStatus;
