@@ -93,7 +93,8 @@ pgm_if_indextoaddr (
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		if (ifa->ifa_addr->sa_family != iffamily)
+		if (NULL == ifa->ifa_addr ||
+		    ifa->ifa_addr->sa_family != iffamily)
 			continue;
 
 		const unsigned i = if_nametoindex(ifa->ifa_name);

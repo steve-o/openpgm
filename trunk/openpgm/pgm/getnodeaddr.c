@@ -149,7 +149,8 @@ pgm_if_getnodeaddr (
 /* hunt for IPv4 interface */
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		if (AF_INET != ifa->ifa_addr->sa_family)
+		if (NULL == ifa->ifa_addr ||
+		    AF_INET != ifa->ifa_addr->sa_family)
 			continue;
 		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == ((struct in_addr*)(he->h_addr_list[0]))->s_addr)
 		{

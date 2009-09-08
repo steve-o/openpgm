@@ -125,8 +125,9 @@ pgm_if_print_all (void)
 		if_indextoname(i, rname);
 		sprintf (b, "%s (%s)", ifa->ifa_name, rname);
 
-		if ( ifa->ifa_addr->sa_family != AF_INET && 
-			ifa->ifa_addr->sa_family != AF_INET6)
+		if (NULL == ifa->ifa_addr ||
+		     (ifa->ifa_addr->sa_family != AF_INET && 
+		      ifa->ifa_addr->sa_family != AF_INET6) )
 		{
 			g_message ("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s",
 				i,
@@ -467,6 +468,9 @@ parse_interface (
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
+		if (NULL == ifa->ifa_addr)
+			continue;
+
 		switch (ifa->ifa_addr->sa_family) {
 /* ignore raw entries on Linux */
 #ifdef CONFIG_HAVE_GETIFADDRS
