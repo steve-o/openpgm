@@ -67,8 +67,8 @@ static int g_port = 7500;
 static const char* g_network = "";
 static int g_udp_encap_port = 0;
 
-static int g_odata_rate = 10 * 1000;				/* 10 per second */
-static int g_odata_interval = (1000 * 1000) / g_odata_rate;	/* 100 ms */
+static int g_odata_rate = 0;
+static int g_odata_interval = 0;
 static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_max_rte = 16*1000*1000;
