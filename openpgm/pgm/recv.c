@@ -949,7 +949,7 @@ pgm_recvfrom (
 	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
-	const PGMIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_FIN | MSG_ERRQUEUE), &bytes_read, error);
+	const PGMIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
