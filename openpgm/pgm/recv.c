@@ -78,6 +78,7 @@
 //#define RECV_DEBUG
 
 #ifndef RECV_DEBUG
+#	define G_DISABLE_ASSERT
 #	define g_trace(...)		while (0)
 #else
 #	define g_trace(...)		g_debug(__VA_ARGS__)

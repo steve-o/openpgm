@@ -137,7 +137,7 @@ debug = env.Clone(BUILD = 'debug')
 debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
 
 profile = env.Clone(BUILD = 'profile')
-profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
+profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
 thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')

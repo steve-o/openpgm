@@ -36,6 +36,16 @@ G_GNUC_INTERNAL gboolean pgm_timer_check (pgm_transport_t* const);
 G_GNUC_INTERNAL long pgm_timer_expiration (pgm_transport_t* const);
 G_GNUC_INTERNAL gboolean pgm_timer_dispatch (pgm_transport_t* const);
 
+static inline void pgm_timer_lock (pgm_transport_t* const transport)
+{
+	if (transport->can_send_data) g_static_mutex_lock (&transport->timer_mutex);
+}
+
+static inline void pgm_timer_unlock (pgm_transport_t* const transport)
+{
+	if (transport->can_send_data) g_static_mutex_unlock (&transport->timer_mutex);
+}
+
 G_END_DECLS
 
 #endif /* __PGM_TIMER_H__ */

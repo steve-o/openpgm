@@ -29,6 +29,7 @@
 //#define TIMER_DEBUG
 
 #ifndef TIMER_DEBUG
+#	define G_DISABLE_ASSERT
 #	define g_trace(...)		while (0)
 #else
 #	define g_trace(...)		g_debug(__VA_ARGS__)
@@ -85,9 +86,9 @@ pgm_timer_check (
 /* pre-conditions */
 	g_assert (NULL != transport);
 
-	g_static_mutex_lock (&transport->timer_mutex);
+	pgm_timer_lock (transport);
 	expired = pgm_time_after_eq (now, transport->next_poll);
-	g_static_mutex_unlock (&transport->timer_mutex);
+	pgm_timer_unlock (transport);
 	return expired;
 }
 
@@ -105,9 +106,9 @@ pgm_timer_expiration (
 /* pre-conditions */
 	g_assert (NULL != transport);
 
-	g_static_mutex_lock (&transport->timer_mutex);
+	pgm_timer_lock (transport);
 	expiration = (long)pgm_to_usecs (transport->next_poll - now);
-	g_static_mutex_unlock (&transport->timer_mutex);
+	pgm_timer_unlock (transport);
 	return expiration;
 }
 
@@ -140,11 +141,11 @@ pgm_timer_dispatch (
 
 	if (transport->can_send_data)
 	{
-		g_static_mutex_lock (&transport->timer_mutex);
+		pgm_timer_lock (transport);
 		guint spm_heartbeat_state = transport->spm_heartbeat_state;
 		pgm_time_t next_heartbeat_spm = transport->next_heartbeat_spm;
 		pgm_time_t next_spm = spm_heartbeat_state ? next_heartbeat_spm : transport->next_ambient_spm;
-		g_static_mutex_unlock (&transport->timer_mutex);
+		pgm_timer_unlock (transport);
 
 		if (pgm_time_after_eq (now, next_spm))
 		{
@@ -171,9 +172,9 @@ pgm_timer_dispatch (
 	else
 		next_expiration = next_expiration > 0 ? MIN(next_expiration, now + transport->peer_expiry) : now + transport->peer_expiry;
 
-	g_static_mutex_lock (&transport->timer_mutex);
+	pgm_timer_lock (transport);
 	transport->next_poll = next_expiration;
-	g_static_mutex_unlock (&transport->timer_mutex);
+	pgm_timer_unlock (transport);
 	return TRUE;
 }
 
