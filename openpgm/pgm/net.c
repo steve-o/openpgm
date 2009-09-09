@@ -84,7 +84,7 @@ pgm_sendto (
 		return (const gssize)-1;
 	}
 
-	if (!use_router_alert)
+	if (!use_router_alert && transport->can_send_data)
 		g_static_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
@@ -134,7 +134,7 @@ pgm_sendto (
 		}
 	}
 
-	if (!use_router_alert)
+	if (!use_router_alert && transport->can_send_data)
 		g_static_mutex_unlock (&transport->send_mutex);
 	return sent;
 }

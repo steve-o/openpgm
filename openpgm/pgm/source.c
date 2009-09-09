@@ -73,6 +73,7 @@
 //#define SPM_DEBUG
 
 #ifndef SOURCE_DEBUG
+#	define G_DISABLE_ASSERT
 #	define g_trace(m,...)		while (0)
 #else
 #	include <ctype.h>
@@ -899,12 +900,12 @@ static
 void
 reset_heartbeat_spm (pgm_transport_t* transport)
 {
-	g_static_mutex_lock (&transport->timer_mutex);
+	pgm_timer_lock (transport);
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
 		transport->next_poll = transport->next_heartbeat_spm;
-	g_static_mutex_unlock (&transport->timer_mutex);
+	pgm_timer_unlock (transport);
 }
 
 /* state helper for resuming sends
@@ -2092,10 +2093,10 @@ send_rdata (
 
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */
-	g_static_mutex_lock (&transport->timer_mutex);
+	pgm_timer_lock (transport);
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-	g_static_mutex_unlock (&transport->timer_mutex);
+	pgm_timer_unlock (transport);
 
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */

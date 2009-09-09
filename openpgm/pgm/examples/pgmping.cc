@@ -347,28 +347,28 @@ on_startup (
 /* set PGM parameters */
 	pgm_transport_set_nonblocking (g_transport, TRUE);
 	if (g_send_mode) {
+		const guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+
 		pgm_transport_set_send_only (g_transport, TRUE);
+		pgm_transport_set_txw_sqns (g_transport, g_sqns * 4);
+		pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
+		pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
+		pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	} else {
 		pgm_transport_set_recv_only (g_transport, TRUE);
+		pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
+		pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
+		pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));
+		pgm_transport_set_nak_rpt_ivl (g_transport, pgm_secs(2));
+		pgm_transport_set_nak_rdata_ivl (g_transport, pgm_secs(2));
+		pgm_transport_set_nak_data_retries (g_transport, 50);
+		pgm_transport_set_nak_ncf_retries (g_transport, 50);
 	}
 	pgm_transport_set_sndbuf (g_transport, 1024 * 1024);
 	pgm_transport_set_rcvbuf (g_transport, 1024 * 1024);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
-	pgm_transport_set_txw_sqns (g_transport, g_sqns);
-	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
-	pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
-	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
-), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
-	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
-	pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
-	pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
-	pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));
-	pgm_transport_set_nak_rpt_ivl (g_transport, pgm_secs(2));
-	pgm_transport_set_nak_rdata_ivl (g_transport, pgm_secs(2));
-	pgm_transport_set_nak_data_retries (g_transport, 50);
-	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 	if (g_fec)
 		pgm_transport_set_fec (g_transport, 0, TRUE, TRUE, g_n, g_k);
@@ -409,7 +409,7 @@ on_startup (
 							0,
 							TRUE,
 							TRUE,
-							G_THREAD_PRIORITY_NORMAL,
+							G_THREAD_PRIORITY_HIGH,
 							&err);
 		if (!g_receiver_thread) {
 			g_critical ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
@@ -501,6 +501,7 @@ again:
 		{
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+			if (timeout < 2) timeout = 0;
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
 			if (G_UNLIKELY(g_quit))
 				break;
@@ -597,6 +598,7 @@ receiver_thread (
 /* fall through */
 		case PGM_IO_STATUS_AGAIN:
 			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+			if (timeout > 0 && timeout < 2) timeout = 0;
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 			break;
 		case PGM_IO_STATUS_RESET:

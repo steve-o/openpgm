@@ -1192,25 +1192,18 @@ _pgm_rxw_remove_trail (
 	g_assert (window);
 	g_assert (!pgm_rxw_is_empty (window));
 
-	guint dropped = 0;
-
 	skb = _pgm_rxw_peek (window, window->trail);
 	g_assert (skb);
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
 	pgm_free_skb (skb);
-	if (window->trail == window->commit_lead)
+	if (window->trail++ == window->commit_lead) {
+/* data-loss */
 		window->commit_lead++;
-	window->trail++;
-	dropped++;
-
-/* statistics */
-	window->cumulative_losses += dropped;
-
-/* post-conditions */
-	g_assert_cmpuint (dropped, >, 0);
-
-	return dropped;
+		window->cumulative_losses++;
+		return 1;
+	}
+	return 0;
 }
 
 guint
@@ -1662,6 +1655,9 @@ _pgm_rxw_is_last_of_tg_sqn (
 
 	return _pgm_rxw_pkt_sqn (window, sequence) == window->tg_size - 1;
 }
+
+/* remove matching transmission group at trail of window
+ */
 
 static inline
 void
