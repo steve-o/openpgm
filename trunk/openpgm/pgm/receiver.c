@@ -75,6 +75,7 @@
 //#define SPM_DEBUG
 
 #ifndef RECEIVER_DEBUG
+#	define G_DISABLE_ASSERT
 #	define g_trace(m,...)		while (0)
 #else
 #include <ctype.h>
@@ -571,10 +572,10 @@ pgm_new_peer (
 	transport->peers_list = &peer->peers_link;
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
 
-	g_static_mutex_lock (&transport->timer_mutex);
+	pgm_timer_lock (transport);
 	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
 		transport->next_poll = peer->spmr_expiry;
-	g_static_mutex_unlock (&transport->timer_mutex);
+	pgm_timer_unlock (transport);
 	return peer;
 }
 
@@ -615,7 +616,7 @@ pgm_flush_peers_pending (
 		{
 			transport->is_reset = TRUE;
 			peer->lost_count = ((pgm_rxw_t*)peer->window)->cumulative_losses - peer->last_cumulative_losses;
-			peer->last_cumulative_losses =((pgm_rxw_t*) peer->window)->cumulative_losses;
+			peer->last_cumulative_losses = ((pgm_rxw_t*)peer->window)->cumulative_losses;
 		}
 	
 		if (peer_bytes >= 0)
@@ -750,10 +751,10 @@ pgm_on_spm (
 						   g_ntohl (spm->spm_trail),
 						   nak_rb_expiry);
 		if (naks) {
-			g_static_mutex_lock (&transport->timer_mutex);
+			pgm_timer_lock (transport);
 			if (pgm_time_after (transport->next_poll, nak_rb_expiry))
 				transport->next_poll = nak_rb_expiry;
-			g_static_mutex_unlock (&transport->timer_mutex);
+			pgm_timer_unlock (transport);
 		}
 
 /* mark receiver window for flushing on next recv() */
@@ -2071,10 +2072,10 @@ discarded:
 
 	if (flush_naks) {
 /* flush out 1st time nak packets */
-		g_static_mutex_lock (&transport->timer_mutex);
+		pgm_timer_lock (transport);
 		if (pgm_time_after (transport->next_poll, nak_rb_expiry))
 			transport->next_poll = nak_rb_expiry;
-		g_static_mutex_unlock (&transport->timer_mutex);
+		pgm_timer_unlock (transport);
 	}
 	return TRUE;
 }
