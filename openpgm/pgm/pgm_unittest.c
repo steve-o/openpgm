@@ -25,11 +25,13 @@
 #include <glib.h>
 #include <check.h>
 
+#include "pgm/transport.h"
+
 
 /* mock state */
 
 static gboolean mock_time_init;
-
+static GSList* mock_pgm_transport_list = NULL;
 
 static
 void
@@ -72,10 +74,21 @@ mock_pgm_time_shutdown (void)
 	return 0;
 }
 
+gboolean
+mock_pgm_transport_destroy (
+        pgm_transport_t*        transport,
+        gboolean                flush
+        )
+{
+	return TRUE;
+}
+
 
 #define pgm_time_init		mock_pgm_time_init
 #define pgm_time_supported	mock_pgm_time_supported
 #define pgm_time_shutdown	mock_pgm_time_shutdown
+#define pgm_transport_destroy	mock_pgm_transport_destroy
+#define pgm_transport_list	mock_pgm_transport_list
 
 #define PGM_DEBUG
 #include "pgm.c"
