@@ -66,12 +66,9 @@ pgm_gsi_create_from_hostname (
 	GError**	error
 	)
 {
-	struct md5_ctx ctx;
-	char hostname[NI_MAXHOST];
-	char resblock[16];
-
 	g_return_val_if_fail (NULL != gsi, FALSE);
 
+	char hostname[NI_MAXHOST];
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
 		g_set_error (error,
@@ -82,11 +79,20 @@ pgm_gsi_create_from_hostname (
 		return FALSE;
 	}
 
+#ifdef CONFIG_HAVE_GLIB_CHECKSUM
+	GChecksum* checksum = g_checksum_new (G_CHECKSUM_MD5);
+	g_return_val_if_fail (NULL != checksum, FALSE);
+	g_checksum_update (checksum, hostname, strlen(hostname));
+	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
+	g_checksum_free (checksum);
+#else
+	struct md5_ctx ctx;
+	char resblock[16];
 	_md5_init_ctx (&ctx);
 	_md5_process_bytes (&ctx, hostname, strlen(hostname));
 	_md5_finish_ctx (&ctx, resblock);
-
 	memcpy (gsi, resblock + 10, 6);
+#endif
 	return TRUE;
 }
 
