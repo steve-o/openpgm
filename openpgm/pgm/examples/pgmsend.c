@@ -140,8 +140,8 @@ main (
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
-
-	return 0;
+	pgm_shutdown ();
+	return EXIT_SUCCESS;
 }
 
 static gboolean

@@ -27,6 +27,7 @@
 
 #include "pgm/packet.h"
 #include "pgm/time.h"
+#include "pgm/transport.h"
 
 
 #ifndef PGM_DEBUG
@@ -109,6 +110,12 @@ pgm_shutdown (void)
 {
 	g_return_val_if_fail (pgm_supported() == TRUE, -1);
 	g_return_val_if_fail (pgm_time_supported() == TRUE, -1);
+
+/* destroy all open transports */
+	while (pgm_transport_list) {
+		pgm_transport_destroy (pgm_transport_list->data, FALSE);
+	}
+
 	if (-1 == pgm_time_shutdown ())
 		return -1;
 
