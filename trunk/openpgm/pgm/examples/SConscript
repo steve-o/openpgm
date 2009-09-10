@@ -26,7 +26,6 @@ e.Program(['blocksyncrecv.c'])
 e.Program(['snonblocksyncrecv.c'])
 if '-DCONFIG_HAVE_POLL' in e['CCFLAGS']:
 	e.Program(['pnonblocksyncrecv.c'])
-#	e.Program(['zerocopyrecv.c'])
 
 # epoll based examples
 if '-DCONFIG_HAVE_EPOLL' in e['CCFLAGS']:
