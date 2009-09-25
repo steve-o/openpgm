@@ -31,16 +31,16 @@
 
 G_BEGIN_DECLS
 
-int pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
-int pgm_transport_set_rxw_secs (pgm_transport_t*, guint);
-int pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
-int pgm_transport_set_peer_expiry (pgm_transport_t*, guint);
-int pgm_transport_set_spmr_expiry (pgm_transport_t*, guint);
-int pgm_transport_set_nak_bo_ivl (pgm_transport_t*, guint);
-int pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
-int pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
-int pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
-int pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
+gboolean pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
+gboolean pgm_transport_set_rxw_secs (pgm_transport_t*, guint);
+gboolean pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
+gboolean pgm_transport_set_peer_expiry (pgm_transport_t*, guint);
+gboolean pgm_transport_set_spmr_expiry (pgm_transport_t*, guint);
+gboolean pgm_transport_set_nak_bo_ivl (pgm_transport_t*, guint);
+gboolean pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
+gboolean pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
+gboolean pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
+gboolean pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
 G_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t* const, const pgm_tsi_t* const, const struct sockaddr* const, const gsize, const struct sockaddr* const, const gsize);
 G_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
