@@ -54,6 +54,10 @@ extern int ipproto_pgm;
 #define DEFAULT_UDP_ENCAP_UCAST_PORT	3055
 #define DEFAULT_UDP_ENCAP_MCAST_PORT	3056
 
+/* PGM default ports */
+#define DEFAULT_DATA_DESTINATION_PORT	7500
+#define DEFAULT_DATA_SOURCE_PORT	0	/* random */
+
 /* DoS limitation to protocol (MS08-036, KB950762) */
 #define PGM_MAX_APDU			UINT16_MAX
 

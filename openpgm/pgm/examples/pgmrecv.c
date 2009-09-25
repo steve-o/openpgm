@@ -57,7 +57,7 @@
 
 /* globals */
 
-static int g_port = 7500;
+static int g_port = 0;
 static const char* g_network = "";
 static const char* g_source = "";
 static gboolean g_multicast_loop = FALSE;
@@ -284,6 +284,8 @@ on_startup (
 		res->ti_udp_encap_ucast_port = g_udp_encap_port;
 		res->ti_udp_encap_mcast_port = g_udp_encap_port;
 	}
+	if (g_port)
+		res->ti_dport = g_port;
 	if (!pgm_transport_create (&g_transport, res, &err)) {
 		g_error ("creating transport: %s", err->message);
 		g_error_free (err);
