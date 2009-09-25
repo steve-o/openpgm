@@ -48,6 +48,7 @@
 #include "pgm/inet_network.h"
 #include "pgm/indextoname.h"
 #include "pgm/nametoindex.h"
+#include "pgm/packet.h"
 
 
 //#define IF_DEBUG
@@ -1453,6 +1454,8 @@ pgm_if_get_transport_info (
 	ti->ti_recv_addrs = (gpointer)((guint8*)ti + sizeof(struct pgm_transport_info_t));
 	ti->ti_send_addrs_len = send_list_len;
 	ti->ti_send_addrs = (gpointer)((guint8*)ti->ti_recv_addrs + recv_list_len * sizeof(struct group_source_req));
+	ti->ti_dport = DEFAULT_DATA_DESTINATION_PORT;
+	ti->ti_sport = DEFAULT_DATA_SOURCE_PORT;
 			
 	gsize i = 0;
 	while (recv_list) {
