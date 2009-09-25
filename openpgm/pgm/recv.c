@@ -589,14 +589,7 @@ wait_for_event (
 		if (-1 == ready) {
 			g_trace ("block returned errno=%i",errno);
 			return EFAULT;
-		}
-
-#ifdef CONFIG_HAVE_POLL
-		if (ready > 0 && fds[0].revents)
-#else
-		if (ready > 0 && FD_ISSET(transport->recv_sock, &readfds))
-#endif
-		{
+		} else if (ready > 0) {
 			g_trace ("recv again on empty");
 			return EAGAIN;
 		}
