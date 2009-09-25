@@ -857,10 +857,10 @@ out:
 		g_static_mutex_unlock (&transport->receiver_mutex);
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		if (transport->can_recv_data &&
-		    ( PGM_IO_STATUS_AGAIN  == status ||
-		      PGM_IO_STATUS_AGAIN2 == status) )
+		    ( PGM_IO_STATUS_AGAIN2  == status) )
 		{
 			pgm_notify_send (&transport->pending_notify);
+			transport->is_pending_read = TRUE;
 		}
 		return status;
 	}

@@ -857,7 +857,7 @@ pgm_transport_bind (
 #endif /* CONFIG_BIND_INADDR_ANY */
 
 	memcpy (&recv_addr2, &recv_addr, pgm_sockaddr_len (&recv_addr));
-	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_mcast_port;
+	((struct sockaddr_in*)&recv_addr)->sin_port = g_htons (transport->udp_encap_mcast_port);
 	if (0 != bind (transport->recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len (&recv_addr)))
 	{
 		int save_errno = errno;
@@ -884,7 +884,7 @@ pgm_transport_bind (
 #endif
 
 	if (-1 != transport->recv_sock2) {
-		((struct sockaddr_in*)&recv_addr2)->sin_port = transport->udp_encap_ucast_port;
+		((struct sockaddr_in*)&recv_addr2)->sin_port = g_htons (transport->udp_encap_ucast_port);
 		if (0 != bind (transport->recv_sock2, (struct sockaddr*)&recv_addr2, pgm_sockaddr_len (&recv_addr2)))
 		{
 			int save_errno = errno;
