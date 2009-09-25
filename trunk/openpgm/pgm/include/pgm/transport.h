@@ -264,6 +264,7 @@ struct pgm_transport_t {
 	struct group_source_req recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
 	guint			recv_gsr_len;
 	int			recv_sock;
+	int			recv_sock2;
 
 	guint16			max_apdu;
 	guint16			max_tpdu;
@@ -301,7 +302,7 @@ struct pgm_transport_t {
 
 	guint32			spm_sqn;
 	guint			spm_ambient_interval;	    /* microseconds */
-	guint*			spm_heartbeat_interval;	    /* zero terminated, zero lead-pad */
+	guint*			spm_heartbeat_interval;     /* zero terminated, zero lead-pad */
 	guint			spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
 	guint			spm_heartbeat_len;
 	guint			peer_expiry;		    /* from absence of SPMs */

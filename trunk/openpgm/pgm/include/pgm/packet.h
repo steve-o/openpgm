@@ -405,20 +405,20 @@ gboolean pgm_print_packet (gpointer, gsize);
 
 static inline gboolean pgm_is_upstream (guint8 type)
 {
-    return (type == PGM_NAK ||
-	    type == PGM_NNAK ||
-	    type == PGM_SPMR ||
-	    type == PGM_POLR);
+    return (type == PGM_NAK ||		/* unicast */
+	    type == PGM_NNAK ||		/* unicast */
+	    type == PGM_SPMR ||		/* multicast + unicast */
+	    type == PGM_POLR);		/* unicast */
 }
 
 static inline gboolean pgm_is_peer (guint8 type)
 {
-    return (type == PGM_SPMR);
+    return (type == PGM_SPMR);		/* multicast */
 }
 
 static inline gboolean pgm_is_downstream (guint8 type)
 {
-    return (type == PGM_SPM   ||
+    return (type == PGM_SPM   ||	/* all multicast */
 	    type == PGM_ODATA ||
 	    type == PGM_RDATA ||
 	    type == PGM_POLL  ||

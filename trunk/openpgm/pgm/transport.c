@@ -150,15 +150,20 @@ pgm_transport_destroy (
 /* flag existing calls */
 	transport->is_destroyed = TRUE;
 /* cancel running blocking operations */
-	if (transport->recv_sock) {
+	if (-1 != transport->recv_sock) {
 		g_trace ("INFO","closing receive socket.");
-		close(transport->recv_sock);
-//		transport->recv_sock = -1;
+		close (transport->recv_sock);
+		transport->recv_sock = -1;
 	}
-	if (transport->send_sock) {
+	if (-1 != transport->recv_sock2) {
+		g_trace ("INFO","closing receive socket2.");
+		close (transport->recv_sock2);
+		transport->recv_sock2 = -1;
+	}
+	if (-1 != transport->send_sock) {
 		g_trace ("INFO","closing send socket.");
-		close(transport->send_sock);
-//		transport->send_sock = -1;
+		close (transport->send_sock);
+		transport->send_sock = -1;
 	}
 	g_static_rw_lock_reader_unlock (&transport->lock);
 	g_trace ("INFO","blocking on destroy lock ...");
@@ -330,8 +335,6 @@ pgm_transport_create (
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
 		memcpy (&new_transport->recv_gsr[i], &tinfo->ti_recv_addrs[i], sizeof(struct group_source_req));
-/* port at same location for sin/sin6 */
-		((struct sockaddr_in*)&new_transport->recv_gsr[i].gsr_group)->sin_port = g_htons (new_transport->udp_encap_mcast_port);
 	}
 	new_transport->recv_gsr_len = tinfo->ti_recv_addrs_len;
 
@@ -372,6 +375,16 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
+	new_transport->recv_sock2 = -1;
+	if (new_transport->udp_encap_ucast_port != new_transport->udp_encap_mcast_port)
+	{
+		g_set_error (error,
+			     PGM_TRANSPORT_ERROR,
+			     PGM_TRANSPORT_ERROR_INVAL,
+			     _("Creating receive socket2: unsupported feature."));
+		goto err_destroy;
+	}
+
 	if ((new_transport->send_sock = socket (pgm_sockaddr_family (&new_transport->send_gsr.gsr_group),
 						socket_type,
 						protocol)) < 0)
@@ -404,19 +417,22 @@ pgm_transport_create (
 	return TRUE;
 
 err_destroy:
-	if (new_transport->recv_sock) {
-		close(new_transport->recv_sock);
-		new_transport->recv_sock = 0;
+	if (-1 != new_transport->recv_sock) {
+		close (new_transport->recv_sock);
+		new_transport->recv_sock = -1;
 	}
-	if (new_transport->send_sock) {
-		close(new_transport->send_sock);
-		new_transport->send_sock = 0;
+	if (-1 != new_transport->recv_sock2) {
+		close (new_transport->recv_sock2);
+		new_transport->recv_sock2 = -1;
 	}
-	if (new_transport->send_with_router_alert_sock) {
-		close(new_transport->send_with_router_alert_sock);
-		new_transport->send_with_router_alert_sock = 0;
+	if (-1 != new_transport->send_sock) {
+		close (new_transport->send_sock);
+		new_transport->send_sock = -1;
 	}
-
+	if (-1 != new_transport->send_with_router_alert_sock) {
+		close (new_transport->send_with_router_alert_sock);
+		new_transport->send_with_router_alert_sock = -1;
+	}
 	g_free (new_transport);
 	return FALSE;
 }
@@ -671,7 +687,9 @@ pgm_transport_bind (
 
 	transport->max_tsdu = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (FALSE);
 	transport->max_tsdu_fragment = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (TRUE);
-	transport->max_apdu = MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) * transport->max_tsdu_fragment;
+	transport->max_apdu = (transport->txw_sqns ? 
+				MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) :
+				PGM_MAX_FRAGMENTS) * transport->max_tsdu_fragment;
 
 	if (transport->can_send_data) {
 		g_trace ("INFO","construct transmit window.");
@@ -692,6 +710,8 @@ pgm_transport_bind (
 		g_trace ("INFO","set socket sharing.");
 		gboolean v = TRUE;
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+		     (-1 != transport->recv_sock2 &&
+		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) ||
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
@@ -707,7 +727,10 @@ pgm_transport_bind (
 /* request extra packet information to determine destination address on each packet */
 		g_trace ("INFO","request socket packet-info.");
 		const int recv_family = pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group);
-		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE)) {
+		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE) ||
+		     (-1 != transport->recv_sock2 &&
+		       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
+		{
 #ifdef G_OS_UNIX
 			int save_errno = errno;
 			g_set_error (error,
@@ -734,7 +757,10 @@ pgm_transport_bind (
 		{
 /* include IP header only for incoming data, only works for IPv4 */
 			g_trace ("INFO","request IP headers.");
-			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE)) {
+			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE) ||
+			     (-1 != transport->recv_sock2 &&
+			       0 != pgm_sockaddr_hdrincl (transport->recv_sock2, recv_family, TRUE)))
+			{
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
@@ -748,7 +774,10 @@ pgm_transport_bind (
 		{
 			g_assert (AF_INET6 == recv_family);
 			g_trace ("INFO","request socket packet-info.");
-			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE)) {
+			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE) ||
+			     (-1 != transport->recv_sock2 &&
+			       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
+			{
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
@@ -764,7 +793,9 @@ pgm_transport_bind (
 	if (transport->rcvbuf)
 	{
 		g_trace ("INFO","set receive socket buffer size.");
-		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)))
+		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)) ||
+		     (-1 != transport->recv_sock2 &&
+		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf))))
 		{
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
@@ -798,7 +829,7 @@ pgm_transport_bind (
  */
 /* TODO: different ports requires a new bound socket */
 
-	struct sockaddr_storage recv_addr;
+	struct sockaddr_storage recv_addr, recv_addr2;
 	memset (&recv_addr, 0, sizeof(recv_addr));
 
 #ifdef CONFIG_BIND_INADDR_ANY
@@ -825,8 +856,8 @@ pgm_transport_bind (
 
 #endif /* CONFIG_BIND_INADDR_ANY */
 
-	((struct sockaddr_in*)&recv_addr)->sin_port = ((struct sockaddr_in*)&transport->recv_gsr[0].gsr_group)->sin_port;
-
+	memcpy (&recv_addr2, &recv_addr, pgm_sockaddr_len (&recv_addr));
+	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_mcast_port;
 	if (0 != bind (transport->recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len (&recv_addr)))
 	{
 		int save_errno = errno;
@@ -851,6 +882,26 @@ pgm_transport_bind (
 		g_trace ("INFO","bind succeeded on recv_gsr[0] interface %s", s);
 	}
 #endif
+
+	if (-1 != transport->recv_sock2) {
+		((struct sockaddr_in*)&recv_addr2)->sin_port = transport->udp_encap_ucast_port;
+		if (0 != bind (transport->recv_sock2, (struct sockaddr*)&recv_addr2, pgm_sockaddr_len (&recv_addr2)))
+		{
+			int save_errno = errno;
+			if (error) {
+				char addr[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop (&recv_addr2, addr, sizeof(addr));
+				g_set_error (error,
+					     PGM_TRANSPORT_ERROR,
+					     pgm_transport_error_from_errno (save_errno),
+					     _("Binding receive socket2 to address %s: %s"),
+					     addr,
+					     g_strerror (save_errno));
+			}
+			g_static_rw_lock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+	}
 
 /* keep a copy of the original address source to re-use for router alert bind */
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
@@ -1053,10 +1104,7 @@ pgm_transport_bind (
 
 /* multicast loopback */
 	g_trace ("INFO","set multicast loopback.");
-	if (0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
-					      pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group),
-					      FALSE) ||
-	    0 != pgm_sockaddr_multicast_loop (transport->send_sock,
+	if (0 != pgm_sockaddr_multicast_loop (transport->send_sock,
 					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 					      transport->use_multicast_loop) ||
 	    0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
@@ -1074,10 +1122,7 @@ pgm_transport_bind (
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 	g_trace ("INFO","set multicast hop limit.");
-	if (0 != pgm_sockaddr_multicast_hops (transport->recv_sock,
-					      pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group),
-					      transport->hops) ||
-	    0 != pgm_sockaddr_multicast_hops (transport->send_sock,
+	if (0 != pgm_sockaddr_multicast_hops (transport->send_sock,
 					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 					      transport->hops) ||
 	    0 != pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock,
@@ -1152,6 +1197,8 @@ no_cap_net_admin:
 	g_trace ("INFO","set %s sockets",
 		transport->is_nonblocking ? "non-blocking" : "blocking");
 	pgm_sockaddr_nonblocking (transport->recv_sock, transport->is_nonblocking);
+	if (-1 != transport->recv_sock2)
+		pgm_sockaddr_nonblocking (transport->recv_sock2, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
 
@@ -1215,6 +1262,10 @@ pgm_transport_select_info (
 	{
 		FD_SET(transport->recv_sock, readfds);
 		fds = transport->recv_sock + 1;
+		if (-1 != transport->recv_sock2) {
+			FD_SET(transport->recv_sock2, readfds);
+			fds = MAX(fds, transport->recv_sock2 + 1);
+		}
 		if (transport->can_send_data) {
 			const int rdata_fd = pgm_notify_get_fd (&transport->rdata_notify);
 			FD_SET(rdata_fd, readfds);
@@ -1270,6 +1321,12 @@ pgm_transport_poll_info (
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
+		if (-1 != transport->recv_sock2) {
+			g_assert ( (1 + moo) <= *n_fds );
+			fds[moo].fd = transport->recv_sock2;
+			fds[moo].events = POLLIN;
+			moo++;
+		}
 		if (transport->can_send_data) {
 			g_assert ( (1 + moo) <= *n_fds );
 			fds[moo].fd = pgm_notify_get_fd (&transport->rdata_notify);
@@ -1334,6 +1391,11 @@ pgm_transport_epoll_ctl (
 		if (retval)
 			goto out;
 
+		if (-1 != transport->recv_sock2) {
+			retval = epoll_ctl (epfd, op, transport->recv_sock2, &event);
+			if (retval)
+				goto out;
+		}
 		if (transport->can_send_data) {
 			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->rdata_notify), &event);
 			if (retval)
@@ -1470,7 +1532,7 @@ pgm_transport_set_recv_only (
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
-	transport->can_send_data	= FALSE;
+	transport->can_send_data	= !is_passive;
 	transport->can_send_nak		= !is_passive;
 	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
