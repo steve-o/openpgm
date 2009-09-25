@@ -297,7 +297,7 @@ on_startup (
 
 /* set PGM parameters */
 	pgm_transport_set_nonblocking (g_transport, TRUE);
-	pgm_transport_set_recv_only (g_transport, FALSE);
+	pgm_transport_set_recv_only (g_transport, TRUE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
@@ -381,9 +381,9 @@ receiver_thread (
 		g_main_loop_quit(g_loop);
 		return NULL;
 	}
-	struct epoll_event event = {
-		.events = EPOLLIN
-	};
+	struct epoll_event event;
+	event.events = EPOLLIN;
+	event.data.fd = g_quit_pipe[0];
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0)
 	{
 		g_error ("epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
