@@ -364,7 +364,7 @@ gboolean pgm_transport_set_sndbuf (pgm_transport_t* const, const int);
 gboolean pgm_transport_set_rcvbuf (pgm_transport_t* const, const int);
 gboolean pgm_transport_set_fec (pgm_transport_t* const, const guint, const gboolean, const gboolean, const guint, const guint);
 gboolean pgm_transport_set_send_only (pgm_transport_t* const, const gboolean);
-gboolean pgm_transport_set_recv_only (pgm_transport_t* const, const gboolean);
+gboolean pgm_transport_set_recv_only (pgm_transport_t* const, const gboolean, const gboolean);
 gboolean pgm_transport_set_abort_on_reset (pgm_transport_t* const, const gboolean);
 gboolean pgm_transport_set_nonblocking (pgm_transport_t* const, const gboolean);
 
