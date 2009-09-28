@@ -528,6 +528,7 @@ END_TEST
  *	gboolean
  *	pgm_transport_set_recv_only (
  *		pgm_transport_t*	transport,
+ *		gboolean		recv_only,
  *		gboolean		is_passive
  *	)
  */
@@ -539,13 +540,13 @@ START_TEST (test_set_recv_only_pass_001)
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
 	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_recv_only (transport, TRUE));
+	fail_unless (TRUE == pgm_transport_set_recv_only (transport, TRUE, FALSE));
 }
 END_TEST
 
 START_TEST (test_set_recv_only_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_recv_only (NULL, TRUE));
+	fail_unless (FALSE == pgm_transport_set_recv_only (NULL, TRUE, FALSE));
 }
 END_TEST
 

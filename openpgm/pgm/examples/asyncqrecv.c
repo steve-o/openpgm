@@ -206,7 +206,7 @@ on_startup (void)
 
 /* set PGM parameters */
 	pgm_transport_set_nonblocking (g_transport, TRUE);
-	pgm_transport_set_recv_only (g_transport, FALSE);
+	pgm_transport_set_recv_only (g_transport, TRUE, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
