@@ -3,7 +3,7 @@
  * PGM transport: manage incoming & outgoing sockets with ambient SPMs, 
  * transmit & receive windows.
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -5737,7 +5737,7 @@ pgm_transport_send (
 	}
 
 /* pass on non-fragment calls */
-	if (apdu_length < transport->max_tsdu) {
+	if (apdu_length <= transport->max_tsdu) {
 		return pgm_transport_send_one_copy (transport, apdu, apdu_length, flags);
 	}
 	g_return_val_if_fail (apdu != NULL, -EINVAL);
@@ -5953,7 +5953,7 @@ pgm_transport_sendv (
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain) {
 		if (is_one_apdu) {
-			if (STATE(apdu_length) < transport->max_tsdu) {
+			if (STATE(apdu_length) <= transport->max_tsdu) {
 				return pgm_transport_send_onev (transport, vector, count, flags);
 			} else {
 				goto retry_one_apdu_send;
@@ -5977,7 +5977,7 @@ pgm_transport_sendv (
 	}
 
 /* pass on non-fragment calls */
-	if (is_one_apdu && STATE(apdu_length) < transport->max_tsdu) {
+	if (is_one_apdu && STATE(apdu_length) <= transport->max_tsdu) {
 		return pgm_transport_send_onev (transport, vector, count, flags);
 	}
 	g_return_val_if_fail (STATE(apdu_length) <= (transport->txw_sqns * pgm_transport_max_tsdu (transport, TRUE)), -EMSGSIZE);
