@@ -1448,7 +1448,7 @@ pgm_send (
 	g_static_mutex_lock (&transport->source_mutex);
 
 /* pass on non-fragment calls */
-	if (apdu_length < transport->max_tsdu)
+	if (apdu_length <= transport->max_tsdu)
 	{
 		PGMIOStatus status;
 		status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
@@ -1530,7 +1530,7 @@ pgm_sendv (
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain) {
 		if (is_one_apdu) {
-			if (STATE(apdu_length) < transport->max_tsdu)
+			if (STATE(apdu_length) <= transport->max_tsdu)
 			{
 				PGMIOStatus status;
 				status = send_odatav (transport, vector, count, bytes_written);
@@ -1566,7 +1566,7 @@ pgm_sendv (
 
 /* pass on non-fragment calls */
 	if (is_one_apdu) {
-		if (STATE(apdu_length) < transport->max_tsdu) {
+		if (STATE(apdu_length) <= transport->max_tsdu) {
 			PGMIOStatus status;
 			status = send_odatav (transport, vector, count, bytes_written);
 			g_static_mutex_unlock (&transport->source_mutex);
