@@ -1520,6 +1520,7 @@ pgm_transport_set_send_only (
 gboolean
 pgm_transport_set_recv_only (
 	pgm_transport_t* const	transport,
+	const gboolean		recv_only,
 	const gboolean		is_passive	/* don't send any request or responses */
 	)
 {
@@ -1532,7 +1533,7 @@ pgm_transport_set_recv_only (
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
-	transport->can_send_data	= !is_passive;
+	transport->can_send_data	= !recv_only;
 	transport->can_send_nak		= !is_passive;
 	g_static_rw_lock_reader_unlock (&transport->lock);
 	return TRUE;
