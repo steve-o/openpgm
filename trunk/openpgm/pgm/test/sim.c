@@ -630,8 +630,8 @@ session_create (
 		goto err_free;
 	}
 
-	res->ti_sport = g_port;
-	res->ti_dport = 0;
+	res->ti_dport = g_port;
+	res->ti_sport = 0;
 	if (is_fake) {
 		sess->is_transport_fake = TRUE;
 		status = fake_pgm_transport_create (&sess->transport, res, &err);
