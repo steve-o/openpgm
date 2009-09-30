@@ -107,7 +107,7 @@ pgm_timer_expiration (
 	g_assert (NULL != transport);
 
 	pgm_timer_lock (transport);
-	expiration = (long)pgm_to_usecs (transport->next_poll - now);
+	expiration = pgm_time_after (transport->next_poll, now) ? (long)pgm_to_usecs (transport->next_poll - now) : 0;
 	pgm_timer_unlock (transport);
 	return expiration;
 }
@@ -136,7 +136,8 @@ pgm_timer_dispatch (
 	{
 		if (!pgm_check_peer_nak_state (transport, now))
 			return FALSE;
-		next_expiration = pgm_min_nak_expiry (next_expiration, transport);
+		next_expiration = pgm_min_nak_expiry (now + transport->peer_expiry, transport);
+g_warning ("min-nak returned %i", (int)(next_expiration - now));
 	}
 
 	if (transport->can_send_data)
@@ -169,8 +170,6 @@ pgm_timer_dispatch (
 			next_expiration = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
 		}
 	}
-	else
-		next_expiration = next_expiration > 0 ? MIN(next_expiration, now + transport->peer_expiry) : now + transport->peer_expiry;
 
 	pgm_timer_lock (transport);
 	transport->next_poll = next_expiration;

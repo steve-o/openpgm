@@ -1215,6 +1215,23 @@ no_cap_net_admin:
 	return TRUE;
 }
 
+/* returns timeout for pending timer.
+ */
+
+gboolean
+pgm_transport_get_timer_pending (
+	pgm_transport_t* const	transport,
+	struct timeval*		tv
+	)
+{
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (NULL != tv, FALSE);
+	const long usecs = pgm_timer_expiration (transport);
+	tv->tv_sec  = usecs / 1000000UL;
+	tv->tv_usec = usecs % 1000000UL;
+	return TRUE;
+}
+
 /* returns timeout for blocking sends, PGM_IO_STATUS_AGAIN2 on recv()
  * or PGM_IO_STATUS_AGAIN on send().
  */
