@@ -565,7 +565,29 @@ _pgm_rxw_update_trail (
 	     pgm_uint32_gt (window->rxw_trail, sequence) && pgm_uint32_gte (window->lead, sequence);
 	     sequence++)
 	{
-		_pgm_rxw_lost (window, sequence);
+		struct pgm_sk_buff_t* skb;
+		pgm_rxw_state_t* state;
+
+		skb = _pgm_rxw_peek (window, sequence);
+		g_assert (skb);
+		state = (pgm_rxw_state_t*)&skb->cb;
+
+		switch (state->state) {
+		case PGM_PKT_HAVE_DATA_STATE:
+		case PGM_PKT_HAVE_PARITY_STATE:
+			window->size -= skb->len;
+			skb->data = skb->tail = skb->head;
+			skb->len = 0;
+			_pgm_rxw_state (window, skb, PGM_PKT_LOST_DATA_STATE);
+			break;
+
+		case PGM_PKT_LOST_DATA_STATE:
+			break;
+
+		default:
+			_pgm_rxw_lost (window, sequence);
+			break;
+		}
 	}
 
 /* post-conditions: only after flush */
@@ -1855,6 +1877,7 @@ _pgm_rxw_lost (
 	g_assert (skb);
 
 	state = (pgm_rxw_state_t*)&skb->cb;
+
 	g_assert( state->state == PGM_PKT_BACK_OFF_STATE ||
 		  state->state == PGM_PKT_WAIT_NCF_STATE ||
 		  state->state == PGM_PKT_WAIT_DATA_STATE  );
