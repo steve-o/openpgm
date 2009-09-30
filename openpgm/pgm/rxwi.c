@@ -575,14 +575,11 @@ _pgm_rxw_update_trail (
 		switch (state->state) {
 		case PGM_PKT_HAVE_DATA_STATE:
 		case PGM_PKT_HAVE_PARITY_STATE:
-			window->size -= skb->len;
-			skb->data = skb->tail = skb->head;
-			skb->len = 0;
-			_pgm_rxw_state (window, skb, PGM_PKT_LOST_DATA_STATE);
-			break;
-
 		case PGM_PKT_LOST_DATA_STATE:
 			break;
+
+		case PGM_PKT_ERROR_STATE:
+			g_assert_not_reached();
 
 		default:
 			_pgm_rxw_lost (window, sequence);

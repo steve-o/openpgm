@@ -620,7 +620,7 @@ pgm_recvmsgv (
 	)
 {
 	pgm_peer_t* peer;
-	PGMIOStatus status = PGM_IO_STATUS_AGAIN;
+	PGMIOStatus status = PGM_IO_STATUS_WOULD_BLOCK;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
@@ -681,7 +681,7 @@ pgm_recvmsgv (
 	    !pgm_timer_dispatch (transport))
 	{
 /* block on send-in-recv */
-		status = PGM_IO_STATUS_AGAIN2;
+		status = PGM_IO_STATUS_RATE_LIMITED;
 	}
 /* NAK status */
 	else if (transport->can_send_data)
@@ -689,7 +689,7 @@ pgm_recvmsgv (
 		if (!pgm_txw_retransmit_is_empty (transport->window))
 		{
 			if (!pgm_on_deferred_nak (transport))
-				status = PGM_IO_STATUS_AGAIN2;
+				status = PGM_IO_STATUS_RATE_LIMITED;
 		}
 		else
 			pgm_notify_clear (&transport->rdata_notify);
@@ -856,11 +856,11 @@ out:
 		}
 		g_static_mutex_unlock (&transport->receiver_mutex);
 		g_static_rw_lock_reader_unlock (&transport->lock);
-		if (transport->can_recv_data &&
-		    ( PGM_IO_STATUS_AGAIN2  == status) )
+		if (PGM_IO_STATUS_WOULD_BLOCK == status &&
+		    ( transport->can_send_data ||
+		      ( transport->can_recv_data && NULL != transport->peers_list )))
 		{
-			pgm_notify_send (&transport->pending_notify);
-			transport->is_pending_read = TRUE;
+			status = PGM_IO_STATUS_TIMER_PENDING;
 		}
 		return status;
 	}

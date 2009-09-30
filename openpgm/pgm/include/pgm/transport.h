@@ -73,8 +73,9 @@ typedef enum {
 	PGM_IO_STATUS_RESET,		/* session reset */
 	PGM_IO_STATUS_FIN,		/* session finished */
 	PGM_IO_STATUS_EOF,		/* transport closed */
-	PGM_IO_STATUS_AGAIN,		/* resource temporarily unavailable */
-	PGM_IO_STATUS_AGAIN2		/* would-block on rate limit, check timer */
+	PGM_IO_STATUS_WOULD_BLOCK,	/* resource temporarily unavailable */
+	PGM_IO_STATUS_RATE_LIMITED,	/* would-block on rate limit, check timer */
+	PGM_IO_STATUS_TIMER_PENDING	/* would-block with pending timer */
 } PGMIOStatus;
 
 
@@ -376,6 +377,7 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
+gboolean pgm_transport_get_timer_pending (pgm_transport_t* const, struct timeval* const);
 gboolean pgm_transport_get_rate_remaining (pgm_transport_t* const, struct timeval* const);
 int pgm_transport_select_info (pgm_transport_t* const, fd_set* const, fd_set* const, int* const);
 #ifdef CONFIG_HAVE_POLL

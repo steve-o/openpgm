@@ -154,15 +154,22 @@ pgm_receiver_thread (
 			break;
 		}
 
-		case PGM_IO_STATUS_AGAIN2:
+		case PGM_IO_STATUS_TIMER_PENDING:
+		{
+			pgm_transport_get_timer_pending (async->transport, &tv);
+			goto block;
+		}
+
+		case PGM_IO_STATUS_RATE_LIMITED:
 		{
 			pgm_transport_get_rate_remaining (async->transport, &tv);
 		}
 /* fall through */
-		case PGM_IO_STATUS_AGAIN:
+		case PGM_IO_STATUS_WOULD_BLOCK:
+block:
 		{
 #ifdef CONFIG_HAVE_POLL
-			const int timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+			const int timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			int n_fds = 3;
 			struct pollfd fds[1+n_fds];
 			memset (fds, 0, sizeof(fds));
@@ -182,7 +189,7 @@ pgm_receiver_thread (
 				g_trace ("select_info returned errno=%i",errno);
 				goto cleanup;
 			}
-			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_AGAIN2 == status ? &tv : NULL);
+			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
 #endif
 			if (-1 == ready) {
 				g_trace ("block returned errno=%i",errno);

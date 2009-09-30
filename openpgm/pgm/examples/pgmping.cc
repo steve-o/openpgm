@@ -499,7 +499,7 @@ sender_thread (
 again:
 		status = pgm_send_skbv (g_transport, &skb, 1, TRUE, &bytes_written);
 		switch (status) {
-		case PGM_IO_STATUS_AGAIN2:
+		case PGM_IO_STATUS_RATE_LIMITED:
 		{
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
@@ -509,7 +509,7 @@ again:
 				break;
 			goto again;
 		}
-		case PGM_IO_STATUS_AGAIN:
+		case PGM_IO_STATUS_WOULD_BLOCK:
 		{
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
 			if (G_UNLIKELY(g_quit))
@@ -595,11 +595,15 @@ receiver_thread (
 		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);
 			break;
-		case PGM_IO_STATUS_AGAIN2:
+		case PGM_IO_STATUS_TIMER_PENDING:
+			pgm_transport_get_timer_pending (g_transport, &tv);
+			goto block;
+		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 /* fall through */
-		case PGM_IO_STATUS_AGAIN:
-			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+		case PGM_IO_STATUS_WOULD_BLOCK:
+block:
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			if (timeout > 0 && timeout < 2) timeout = 0;
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 			break;

@@ -156,12 +156,16 @@ main (
 			on_data (buffer, len, &from);
 			break;
 
-		case PGM_IO_STATUS_AGAIN2:
+		case PGM_IO_STATUS_TIMER_PENDING:
+			pgm_transport_get_timer_pending (g_transport, &tv);
+			goto block;
+		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 /* fall through */
-		case PGM_IO_STATUS_AGAIN:
+		case PGM_IO_STATUS_WOULD_BLOCK:
 /* poll for next event */
-			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+block:
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 			break;
 
