@@ -144,17 +144,23 @@ main (
 		case PGM_IO_STATUS_NORMAL:
 			on_data (buffer, len, &from);
 			break;
-		case PGM_IO_STATUS_AGAIN2:
-			pgm_transport_get_rate_remaining (g_transport, &tv);
-			g_message ("wait on fd or timeout %u:%u",
+		case PGM_IO_STATUS_TIMER_PENDING:
+			pgm_transport_get_timer_pending (g_transport, &tv);
+			g_message ("wait on fd or pending timer %u:%u",
 				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
-		case PGM_IO_STATUS_AGAIN:
+			goto block;
+		case PGM_IO_STATUS_RATE_LIMITED:
+			pgm_transport_get_rate_remaining (g_transport, &tv);
+			g_message ("wait on fd or rate limit timeout %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
+		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
+block:
 			fds = g_quit_pipe[0] + 1;
 			FD_ZERO(&readfds);
 			FD_SET(g_quit_pipe[0], &readfds);
 			pgm_transport_select_info (g_transport, &readfds, NULL, &fds);
-			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_AGAIN2 == status ? &tv : NULL);
+			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 			break;
 
 		default:

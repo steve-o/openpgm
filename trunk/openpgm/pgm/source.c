@@ -988,7 +988,7 @@ retry_send:
 	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
-		return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1090,7 +1090,7 @@ retry_send:
 	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
-		return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1220,7 +1220,7 @@ retry_send:
 	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
-		return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1296,7 +1296,7 @@ send_apdu (
 				     transport->is_nonblocking))
 		{
 			transport->blocklen = tpdu_length;
-			return PGM_IO_STATUS_AGAIN2;
+			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
@@ -1413,7 +1413,7 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 
 PGMIOStatus
@@ -1601,7 +1601,7 @@ pgm_sendv (
 			transport->blocklen = tpdu_length;
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
-			return PGM_IO_STATUS_AGAIN2;
+			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
         }
@@ -1621,8 +1621,8 @@ retry_send:
 			switch (status) {
 			case PGM_IO_STATUS_NORMAL:
 				break;
-			case PGM_IO_STATUS_AGAIN:
-			case PGM_IO_STATUS_AGAIN2:
+			case PGM_IO_STATUS_WOULD_BLOCK:
+			case PGM_IO_STATUS_RATE_LIMITED:
 				transport->is_apdu_eagain = TRUE;
 				g_static_mutex_unlock (&transport->source_mutex);
 				g_static_rw_lock_reader_unlock (&transport->lock);
@@ -1801,7 +1801,7 @@ blocked:
 	}
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
-	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 
 /* send PGM original data, transmit window owned scatter/gather IO vector.
@@ -1887,7 +1887,7 @@ pgm_send_skbv (
 			transport->blocklen = total_tpdu_length;
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
-			return PGM_IO_STATUS_AGAIN2;
+			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
@@ -2038,7 +2038,7 @@ blocked:
 	}
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
-	return EAGAIN == errno ? PGM_IO_STATUS_AGAIN : PGM_IO_STATUS_AGAIN2;
+	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 
 /* cleanup resuming send state helper 

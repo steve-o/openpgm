@@ -77,7 +77,7 @@ mock_pgm_recvmsg (
 {
 	pgm_msgv_t* _msgv = g_atomic_pointer_get (&mock_msgv);
 	if (NULL == _msgv)
-		return PGM_IO_STATUS_AGAIN;
+		return PGM_IO_STATUS_WOULD_BLOCK;
 	memcpy (msgv, _msgv, sizeof(pgm_msgv_t));
 	g_atomic_pointer_set (&mock_msgv, NULL);
 	*bytes_read = _msgv->msgv_len;

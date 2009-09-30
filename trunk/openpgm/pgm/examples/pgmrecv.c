@@ -413,16 +413,22 @@ receiver_thread (
 		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);
 			break;
-		case PGM_IO_STATUS_AGAIN2:
-			pgm_transport_get_rate_remaining (g_transport, &tv);
-			g_message ("wait on fd or timeout %u:%u",
+		case PGM_IO_STATUS_TIMER_PENDING:
+			pgm_transport_get_timer_pending (g_transport, &tv);
+			g_message ("wait on fd or pending timer %u:%u",
 				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
-		case PGM_IO_STATUS_AGAIN:
+			goto block;
+		case PGM_IO_STATUS_RATE_LIMITED:
+			pgm_transport_get_rate_remaining (g_transport, &tv);
+			g_message ("wait on fd or rate limit timeout %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
+		case PGM_IO_STATUS_WOULD_BLOCK:
+block:
 #ifdef CONFIG_HAVE_EPOLL
-			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
-			timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
@@ -433,7 +439,7 @@ receiver_thread (
 			FD_SET(g_quit_pipe[0], &readfds);
 			n_fds = g_quit_pipe[0] + 1;
 			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
-			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_AGAIN2 == status ? &tv : NULL);
+			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
 #endif /* !CONFIG_HAVE_EPOLL */
 			break;
 

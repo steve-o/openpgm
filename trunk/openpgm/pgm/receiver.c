@@ -1005,12 +1005,22 @@ pgm_on_ncf (
 		return FALSE;
 	}
 
+	const pgm_time_t ncf_rdata_ivl = skb->tstamp + transport->nak_rdata_ivl;
+	const pgm_time_t ncf_rb_ivl    = skb->tstamp + nak_rb_ivl(transport);
 	int status = pgm_rxw_confirm (source->window,
 				      g_ntohl (ncf->nak_sqn),
-				      skb->tstamp + transport->nak_rdata_ivl,
-				      skb->tstamp + nak_rb_ivl(transport));
+				      ncf_rdata_ivl,
+				      ncf_rb_ivl);
 	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
+	{
+		pgm_time_t ncf_ivl = (PGM_RXW_APPENDED == status) ? ncf_rb_ivl : ncf_rdata_ivl;
+		pgm_timer_lock (transport);
+		if (pgm_time_after (transport->next_poll, ncf_ivl)) {
+			transport->next_poll = ncf_ivl;
+		}
+		pgm_timer_unlock (transport);
 		source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
+	}
 
 /* check NCF list */
 	const guint32* ncf_list = NULL;
@@ -1050,8 +1060,8 @@ pgm_on_ncf (
 	{
 		status = pgm_rxw_confirm (source->window,
 					  g_ntohl (*ncf_list),
-					  skb->tstamp + transport->nak_rdata_ivl,
-					  skb->tstamp + nak_rb_ivl(transport));
+					  ncf_rdata_ivl,
+					  ncf_rb_ivl);
 		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
 			source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
 		ncf_list++;
@@ -1470,6 +1480,10 @@ nak_rb_state (
 #else
 					state->nak_rpt_expiry = now + transport->nak_rpt_ivl;
 #endif
+					pgm_timer_lock (transport);
+					if (pgm_time_after (transport->next_poll, state->nak_rpt_expiry))
+						transport->next_poll = state->nak_rpt_expiry;
+					pgm_timer_unlock (transport);
 				}
 				else
 				{	/* different transmission group */
@@ -1530,6 +1544,10 @@ nak_rb_state (
 g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 		pgm_to_secsf( state->nak_rpt_expiry - now ) );
 #endif
+				pgm_timer_lock (transport);
+				if (pgm_time_after (transport->next_poll, state->nak_rpt_expiry))
+					transport->next_poll = state->nak_rpt_expiry;
+				pgm_timer_unlock (transport);
 
 				if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
 					if (transport->can_send_nak && !send_nak_list (transport, peer, &nak_list))
@@ -1691,7 +1709,7 @@ pgm_check_peer_nak_state (
 
 pgm_time_t
 pgm_min_nak_expiry (
-	pgm_time_t		expiration,
+	pgm_time_t		expiration,		/* absolute time */
 	pgm_transport_t*	transport
 	)
 {
@@ -1950,7 +1968,6 @@ nak_rdata_state (
 
 //			rdata_state->nak_rb_expiry = rdata_pkt->nak_rdata_expiry + nak_rb_ivl(transport);
 			rdata_state->nak_rb_expiry = now + nak_rb_ivl(transport);
-
 			pgm_rxw_state (window, rdata_skb, PGM_PKT_BACK_OFF_STATE);
 
 /* retry back to back-off state */

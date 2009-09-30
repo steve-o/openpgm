@@ -919,11 +919,15 @@ again:
 	case PGM_IO_STATUS_NORMAL:
 		puts ("READY");
 		break;
-	case PGM_IO_STATUS_AGAIN2:
+	case PGM_IO_STATUS_TIMER_PENDING:
+		pgm_transport_get_timer_pending (sess->transport, &tv);
+		goto block;
+	case PGM_IO_STATUS_RATE_LIMITED:
 		pgm_transport_get_rate_remaining (sess->transport, &tv);
 /* fall through */
-	case PGM_IO_STATUS_AGAIN:
-		timeout = PGM_IO_STATUS_AGAIN2 == status ? ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)) : -1;
+	case PGM_IO_STATUS_WOULD_BLOCK:
+block:
+		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		memset (fds, 0, sizeof(fds));
 		pgm_transport_poll_info (sess->transport, fds, &n_fds, POLLOUT);
 		poll (fds, n_fds, timeout /* ms */);
