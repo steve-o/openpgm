@@ -46,7 +46,7 @@
 
 //#define PACKET_DEBUG
 
-#ifdef PACKET_DEBUG
+#ifndef PACKET_DEBUG
 #	define g_trace(...)		while (0)
 #else
 #	define g_trace(...)		g_debug(__VA_ARGS__)
