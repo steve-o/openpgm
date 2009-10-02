@@ -108,7 +108,11 @@ main (
 	pgm_init ();
 
 	g_quit = FALSE;
+#ifdef G_OS_UNIX
 	pipe (g_quit_pipe);
+#else
+	_pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
+#endif
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
