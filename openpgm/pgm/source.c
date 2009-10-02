@@ -84,6 +84,10 @@
 #	endif
 #endif
 
+#ifndef ENOBUFS
+#	define ENOBUFS	WSAENOBUFS
+#endif
+
 
 /* locals */
 static gboolean send_spm (pgm_transport_t* const);
@@ -703,7 +707,7 @@ pgm_send_spm (
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->blocklen = tpdu_length;
 		return FALSE;
 	}
@@ -780,7 +784,7 @@ send_ncf (
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
@@ -887,7 +891,7 @@ send_ncf_list (
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
 					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
@@ -985,7 +989,7 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
 		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
@@ -1087,7 +1091,7 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
 		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
@@ -1217,7 +1221,7 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
 			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
 		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
@@ -1368,7 +1372,7 @@ retry_send:
 				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 			transport->is_apdu_eagain = TRUE;
 			transport->blocklen = tpdu_length;
 			goto blocked;
@@ -1752,7 +1756,7 @@ retry_one_apdu_send:
 				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
 				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 			transport->is_apdu_eagain = TRUE;
 			transport->blocklen = tpdu_length;
 			goto blocked;
@@ -1983,7 +1987,7 @@ retry_send:
 				    tpdu_length,
 				    (struct sockaddr*)&transport->send_gsr.gsr_group,
 				    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ETIME == errno)) {
+		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 			transport->is_apdu_eagain = TRUE;
 			transport->blocklen = tpdu_length;
 			goto blocked;
