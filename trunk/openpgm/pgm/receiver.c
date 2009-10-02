@@ -95,6 +95,9 @@
 #ifndef ECONNRESET
 #	define ECONNRESET	WSAECONNRESET
 #endif
+#ifndef ENOBUFS
+#	define ENOBUFS		WSAENOBUFS
+#endif
 
 
 static gboolean send_spmr (pgm_transport_t* const, pgm_peer_t* const);
@@ -1123,7 +1126,7 @@ send_spmr (
 				  tpdu_length,
 				  (struct sockaddr*)&transport->send_gsr.gsr_group,
 				  pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
 /* send unicast SPMR with regular TTL */
@@ -1200,7 +1203,7 @@ send_nak (
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
@@ -1267,7 +1270,7 @@ send_parity_nak (
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len(&source->nla));
-	if (sent < 0 && (EAGAIN == errno || ETIME == errno))
+	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT]++;
