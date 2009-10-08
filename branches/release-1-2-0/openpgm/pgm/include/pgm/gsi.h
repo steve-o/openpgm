@@ -42,6 +42,8 @@ G_BEGIN_DECLS
 
 int pgm_create_md5_gsi (pgm_gsi_t*);
 int pgm_create_ipv4_gsi (pgm_gsi_t*);
+int pgm_create_data_gsi (pgm_gsi_t*, const unsigned char*, gsize);
+int pgm_create_str_gsi (pgm_gsi_t*, const char*, gssize);
 
 int pgm_print_gsi_r (const pgm_gsi_t*, char*, gsize);
 gchar* pgm_print_gsi (const pgm_gsi_t*);

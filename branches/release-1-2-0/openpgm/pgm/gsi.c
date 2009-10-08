@@ -363,6 +363,47 @@ md5_finish_ctx (
 	return md5_read_ctx (ctx, resbuf);
 }
 
+/* create a GSI based on md5 of a user provided data block.
+ */
+
+int
+pgm_create_data_gsi (
+	pgm_gsi_t*		gsi,
+	const unsigned char*	data,
+	gsize			length
+	)
+{
+	g_return_val_if_fail (gsi != NULL, -EINVAL);
+	g_return_val_if_fail (data != NULL, -EINVAL);
+	g_return_val_if_fail (length > 1, -EINVAL);
+
+	struct md5_ctx ctx;
+	char resblock[16];
+
+	md5_init_ctx (&ctx);
+	md5_process_bytes (data, length, &ctx);
+	md5_finish_ctx (&ctx, resblock);
+
+	memcpy (gsi, resblock + 10, 6);
+	return 0;
+}
+
+int
+pgm_create_str_gsi (
+	pgm_gsi_t*	gsi,
+	const char*	str,
+	gssize		length
+	)
+{
+	g_return_val_if_fail (gsi != NULL, -EINVAL);
+	g_return_val_if_fail (str != NULL, -EINVAL);
+
+	if (length < 0)
+		length = strlen(str);
+
+	return pgm_create_data_gsi (gsi, (const unsigned char*)str, length);
+}
+
 /* create a global session ID as recommended by the PGM draft specification using
  * low order 48 bits of md5 of the hostname.
  *
@@ -376,23 +417,13 @@ pgm_create_md5_gsi (
 {
 	g_return_val_if_fail (gsi != NULL, -EINVAL);
 
-	int retval = 0;
-	struct md5_ctx ctx;
 	char hostname[NI_MAXHOST];
-	char resblock[16];
+	int retval = gethostname (hostname, sizeof(hostname));
 
-	if ((retval = gethostname (hostname, sizeof(hostname))) != 0) {
-		goto out;
-	}
+	if (0 != retval)
+		return retval;
 
-	md5_init_ctx (&ctx);
-	md5_process_bytes (hostname, strlen(hostname), &ctx);
-	md5_finish_ctx (&ctx, resblock);
-
-	memcpy (gsi, resblock + 10, 6);
-
-out:
-	return retval;
+	return pgm_create_str_gsi (gsi, hostname, -1);
 }
 
 /* create a global session ID based on the IP address.
