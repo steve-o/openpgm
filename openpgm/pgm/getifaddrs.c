@@ -286,8 +286,7 @@ pgm_getifaddrs (
 		else
 			memcpy (ift->_ifa.ifa_netmask, iix[i].iiNetmask.lpSockaddr, iix[i].iiNetmask.iSockaddrLength);
 
-		++ift;
-		if (ift < &ifa[iilen]) {
+		if (ift < &ifa[iilen - 1]) {
 			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
 			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
@@ -336,7 +335,7 @@ pgm_getifaddrs (
 	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
 
 	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
-	if (ERROR_BUFFER_OVERFLOW) {
+	if (ERROR_BUFFER_OVERFLOW != dwRet) {
 		perror("GetAdaptersAddresses");
 		return -1;
 	}
@@ -368,6 +367,7 @@ pgm_getifaddrs (
 			{
 				if (0 == pgm_sockaddr_cmp (unicast->Address.lpSockaddr, ifi->ifa_addr))
 				{
+					g_assert (IF_NAMESIZE > strlen(adapter->AdapterName));
 					strncpy (ifi->ifa_name, adapter->AdapterName, IF_NAMESIZE);
 					ifi->ifa_name[IF_NAMESIZE - 1] = 0;
 					resolved++;
