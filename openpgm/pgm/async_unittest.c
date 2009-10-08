@@ -94,6 +94,17 @@ mock_pgm_transport_get_rate_remaining (
 	return FALSE;
 }
 
+static
+gboolean
+mock_pgm_transport_get_timer_pending (
+        pgm_transport_t* const  transport,
+        struct timeval*         tv
+        )
+{
+	return FALSE;
+}
+
+
 #ifdef CONFIG_HAVE_POLL
 static
 int
@@ -130,6 +141,7 @@ mock_pgm_transport_select_info (
 
 #define pgm_recvmsg			mock_pgm_recvmsg
 #define pgm_transport_get_rate_remaining	mock_pgm_transport_get_rate_remaining
+#define pgm_transport_get_timer_pending	mock_pgm_transport_get_timer_pending
 #define pgm_transport_poll_info		mock_pgm_transport_poll_info
 #define pgm_transport_select_info	mock_pgm_transport_select_info
 
