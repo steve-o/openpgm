@@ -54,6 +54,55 @@ static PGMGSIError pgm_gsi_error_from_errno (gint);
 static PGMGSIError pgm_gsi_error_from_eai_errno (gint);
 
 
+/* create a GSI based on md5 of a user provided data block.
+ *
+ * returns TRUE on success, returns FALSE on error and sets error appropriately,
+ */
+
+gboolean
+pgm_gsi_create_from_data (
+	pgm_gsi_t*	gsi,
+	const guchar*	data,
+	const gsize	length
+	)
+{
+	g_return_val_if_fail (NULL != gsi, FALSE);
+	g_return_val_if_fail (NULL != data, FALSE);
+	g_return_val_if_fail (length > 1, FALSE);
+
+#ifdef CONFIG_HAVE_GLIB_CHECKSUM
+	GChecksum* checksum = g_checksum_new (G_CHECKSUM_MD5);
+	g_return_val_if_fail (NULL != checksum, FALSE);
+	g_checksum_update (checksum, data, length);
+	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
+	g_checksum_free (checksum);
+#else
+	struct md5_ctx ctx;
+	char resblock[16];
+	_md5_init_ctx (&ctx);
+	_md5_process_bytes (&ctx, data, length);
+	_md5_finish_ctx (&ctx, resblock);
+	memcpy (gsi, resblock + 10, 6);
+#endif
+	return TRUE;
+}
+
+gboolean
+pgm_gsi_create_from_string (
+	pgm_gsi_t*	gsi,
+	const gchar*	str,
+	gssize		length
+	)
+{
+	g_return_val_if_fail (NULL != gsi, FALSE);
+	g_return_val_if_fail (NULL != str, FALSE);
+
+	if (length < 0)
+		length = strlen (str);
+
+	return pgm_gsi_create_from_data (gsi, (const guchar*)str, length);
+}
+
 /* create a global session ID as recommended by the PGM draft specification using
  * low order 48 bits of md5 of the hostname.
  *
@@ -79,21 +128,7 @@ pgm_gsi_create_from_hostname (
 		return FALSE;
 	}
 
-#ifdef CONFIG_HAVE_GLIB_CHECKSUM
-	GChecksum* checksum = g_checksum_new (G_CHECKSUM_MD5);
-	g_return_val_if_fail (NULL != checksum, FALSE);
-	g_checksum_update (checksum, hostname, strlen(hostname));
-	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
-	g_checksum_free (checksum);
-#else
-	struct md5_ctx ctx;
-	char resblock[16];
-	_md5_init_ctx (&ctx);
-	_md5_process_bytes (&ctx, hostname, strlen(hostname));
-	_md5_finish_ctx (&ctx, resblock);
-	memcpy (gsi, resblock + 10, 6);
-#endif
-	return TRUE;
+	return pgm_gsi_create_from_string (gsi, hostname, -1);
 }
 
 /* create a global session ID based on the IP address.

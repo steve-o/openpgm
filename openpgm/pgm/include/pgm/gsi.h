@@ -65,6 +65,8 @@ G_BEGIN_DECLS
 GQuark pgm_gsi_error_quark (void);
 gboolean pgm_gsi_create_from_hostname (pgm_gsi_t*, GError**);
 gboolean pgm_gsi_create_from_addr (pgm_gsi_t*, GError**);
+gboolean pgm_gsi_create_from_data (pgm_gsi_t*, const guchar*, const gsize);
+gboolean pgm_gsi_create_from_string (pgm_gsi_t*, const gchar*, gssize);
 int pgm_gsi_print_r (const pgm_gsi_t*, char*, gsize);
 gchar* pgm_gsi_print (const pgm_gsi_t*);
 gint pgm_gsi_equal (gconstpointer, gconstpointer);
