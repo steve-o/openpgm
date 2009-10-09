@@ -39,16 +39,60 @@
 
 
 #ifdef G_OS_WIN32
+
+/* Retrieve interface index for a specified adapter name.
+ *
+ * On Windows is IPv4 specific, IPv6 indexes are separate (IP_ADAPTER_ADDRESSES::Ipv6IfIndex)
+ *
+ * On error returns zero, no errors are defined.
+ */
+
 int
 pgm_if_nametoindex (
 	const char*		ifname
         )
 {
-	g_return_val_if_fail (NULL != ifname, NULL);
+	g_return_val_if_fail (NULL != ifname, 0);
 
 	ULONG ifIndex;
-	const DWORD dwRetval = GetAdapterIndex ((LPWSTR)ifname, &ifIndex);
-	return dwRetval == NO_ERROR ? ifIndex : 0;
+	DWORD dwSize, dwRet;
+	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
+
+	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
+	if (NO_ERROR == dwRet)
+		return ifIndex;
+
+/* fallback to finding index via iterating adapter list */
+	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
+	if (ERROR_BUFFER_OVERFLOW != dwRet) {
+		perror("GetAdaptersAddresses");
+		return 0;
+	}
+	pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)malloc (dwSize);
+	if (NULL == pAdapterAddresses) {
+		perror("malloc");
+		return 0;
+	}
+	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
+	if (ERROR_SUCCESS != dwRet) {
+		perror("GetAdaptersAddresses(2)");
+		free(pAdapterAddresses);
+		return 0;
+	}
+
+	for (adapter = pAdapterAddresses;
+		adapter;
+		adapter = adapter->Next)
+	{
+		if (0 == strcmp (ifname, adapter->AdapterName)) {
+			ifIndex = adapter->IfIndex;
+			free (pAdapterAddresses);
+			return ifIndex;
+		}
+	}
+
+	free (pAdapterAddresses);
+	return 0;
 }
 #endif /* G_OS_WIN32 */
 
