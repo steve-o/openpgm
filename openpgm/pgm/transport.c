@@ -998,16 +998,19 @@ pgm_transport_bind (
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
 		const struct group_source_req* p = &transport->recv_gsr[i];
-		const int recv_level = ( (AF_INET == pgm_sockaddr_family((&p->gsr_group))) ? SOL_IP : SOL_IPV6 );
-		const int optname = (pgm_sockaddr_cmp ((const struct sockaddr*)&p->gsr_group, (const struct sockaddr*)&p->gsr_source) == 0)
-				? MCAST_JOIN_GROUP : MCAST_JOIN_SOURCE_GROUP;
-		const socklen_t plen = MCAST_JOIN_GROUP == optname ? sizeof(struct group_req) : sizeof(struct group_source_req);
-		if (0 != setsockopt (transport->recv_sock, recv_level, optname, (const char*)p, plen))
+
+/* ASM */
+		if (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&p->gsr_group, (const struct sockaddr*)&p->gsr_source))
 		{
-			const int save_errno = errno;
-			char group_addr[INET_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&p->gsr_group, group_addr, sizeof(group_addr));
-			if (MCAST_JOIN_GROUP == optname) {
+			if (0 != pgm_sockaddr_join_group (transport->recv_sock,
+							  pgm_sockaddr_family (&p->gsr_group),
+							  (const struct group_req*)p,
+							  sizeof(struct group_req)))
+			{
+				const int save_errno = errno;
+				char group_addr[INET_ADDRSTRLEN];
+				char ifname[IF_NAMESIZE];
+				pgm_sockaddr_ntop (&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
 					g_set_error (error,
 						     PGM_TRANSPORT_ERROR,
@@ -1015,8 +1018,7 @@ pgm_transport_bind (
 						     _("Joining multicast group %s: %s"),
 						     group_addr,
 						     g_strerror (save_errno));
-				else {
-					char ifname[IF_NAMESIZE];
+				else
 					g_set_error (error,
 						     PGM_TRANSPORT_ERROR,
 						     pgm_transport_error_from_errno (save_errno),
@@ -1024,10 +1026,31 @@ pgm_transport_bind (
 						     group_addr,
 						     if_indextoname (p->gsr_interface, ifname),
 						     g_strerror (save_errno));
-				}
-			} else {
+				g_static_rw_lock_writer_unlock (&transport->lock);
+				return FALSE;
+			}
+#ifdef TRANSPORT_DEBUG
+			else
+			{
+				char s1[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
+				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
+					i, (unsigned)p->gsr_interface, s1);
+			}
+#endif /* TRANSPORT_DEBUG */
+		}
+		else /* source != group, i.e. SSM */
+		{
+			if (0 != pgm_sockaddr_join_source_group (transport->recv_sock,
+								 pgm_sockaddr_family (&p->gsr_group),
+								 p,
+								 sizeof(struct group_source_req)))
+			{
+				const int save_errno = errno;
 				char source_addr[INET_ADDRSTRLEN];
+				char group_addr[INET_ADDRSTRLEN];
 				pgm_sockaddr_ntop (&p->gsr_source, source_addr, sizeof(source_addr));
+				pgm_sockaddr_ntop (&p->gsr_group, group_addr, sizeof(group_addr));
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
@@ -1035,23 +1058,20 @@ pgm_transport_bind (
 					     group_addr,
 					     source_addr,
 					     g_strerror (save_errno));
+				g_static_rw_lock_writer_unlock (&transport->lock);
+				return FALSE;
 			}
-			g_static_rw_lock_writer_unlock (&transport->lock);
-			return FALSE;
-		}
 #ifdef TRANSPORT_DEBUG
-		{
-			char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
-			pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
-			if (optname == MCAST_JOIN_GROUP)
-				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
-					i, (unsigned)p->gsr_interface, s1);
 			else
+			{
+				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
 				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %u group %s source %s",
 					i, (unsigned)p->gsr_interface, s1, s2);
+			}
+#endif /* TRANSPORT_DEBUG */
 		}
-#endif
 	}
 
 /* send group (singular) */

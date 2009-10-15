@@ -267,48 +267,63 @@ static inline int pgm_sockaddr_tos (const int s, const int sa_family, const int 
 
 /* nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
  */
-static inline int pgm_sockaddr_add_membership (const int s, const struct group_source_req* gsr)
+static inline int pgm_sockaddr_join_group (const int s, const int sa_family, const struct group_req* gr, const socklen_t length)
 {
-	int retval = -1;
+#ifdef CONFIG_HAVE_MCAST_JOIN
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	return setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, length);
+#else
+	struct ip_mreq mreq;
+	struct ipv6_mreq mreq6;
+	struct sockaddr_in ifaddr;
 
-	switch (pgm_sockaddr_family(&gsr->gsr_group)) {
-	case AF_INET: {
-#ifdef IP_ADD_SOURCE_MEMBERSHIP
-		struct ip_mreq_source mreqs;
+	switch (sa_family) {
+	case AF_INET:
+		memset (&mreq, 0, sizeof(mreq));
+		mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gr->gr_group)->sin_addr.s_addr;
+		if (!pgm_if_indextoaddr (gr->gr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
+			return -1;
+		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		return setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+
+	case AF_INET6:
+		memset (&mreq6, 0, sizeof(mreq6));
+		mreq6.ipv6mr_multiaddr = ((const struct sockaddr_in6*)&gr->gr_group)->sin6_addr;
+		mreq6.ipv6mr_interface = gr->gr_interface;
+		return setsockopt (s, SOL_IPV6, IPV6_ADD_MEMBERSHIP, (const char*)&mreq6, sizeof(mreq6));
+
+	default: g_assert_not_reached();
+	}
+#endif /* CONFIG_HAVE_MCAST_JOIN */
+}
+
+/* silently revert to ASM if SSM not supported */
+static inline int pgm_sockaddr_join_source_group (const int s, const int sa_family, const struct group_source_req* gsr, const socklen_t length)
+{
+#ifdef CONFIG_HAVE_MCAST_JOIN
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	return setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, gsr, length);
+#elif defined(IP_ADD_SOURCE_MEMBERSHIP)
+	struct ip_mreq_source mreqs;
+	struct sockaddr_in ifaddr;
+
+	switch (sa_family) {
+	case AF_INET:
 		memset (&mreqs, 0, sizeof(mreqs));
 		mreqs.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
 		mreqs.imr_sourceaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
-		struct sockaddr_in ifaddr;
 		pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL);
 		mreqs.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
-		retval = setsockopt (s, IPPROTO_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
+		return setsockopt (s, SOL_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
+
+	case AF_INET6:
+		return pgm_sockaddr_join_group (s, sa_family, (struct group_req*)gsr, sizeof(struct group_req));
+
+	default: g_assert_not_reached();
+	}
 #else
-/* Linux: ip_mreqn preferred, ip_mreq supported for compat */
-		struct ip_mreq mreq;
-		memset (&mreq, 0, sizeof(mreq));
-		mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
-		struct sockaddr_in ifaddr;
-		if (!pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
-			return retval;
-		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
-		retval = setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
-#endif
-	}
-	break;
-
-	case AF_INET6: {
-		struct ipv6_mreq mreq6;
-		memset (&mreq6, 0, sizeof(mreq6));
-		mreq6.ipv6mr_multiaddr = ((const struct sockaddr_in6*)&gsr->gsr_group)->sin6_addr;
-		mreq6.ipv6mr_interface = gsr->gsr_interface;
-		retval = setsockopt (s, IPPROTO_IPV6, IPV6_JOIN_GROUP, (const char*)&mreq6, sizeof(mreq6));
-	}
-	break;
-
-	default: break;
-	}
-
-	return retval;
+	return pgm_sockaddr_join_group (s, sa_family, (struct group_req*)gsr, sizeof(struct group_req));	
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 }
 
 static inline int pgm_sockaddr_multicast_if (int s, const struct sockaddr* address, int ifindex)
