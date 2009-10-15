@@ -1,0 +1,53 @@
+#summary OpenPGM 2 : C Reference : Monitoring and Administration
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
+= Introduction =
+The OpenPGM suite provides two optional monitoring and administration interfaces, one a traditional SNMP agent that works with the popular [http://net-snmp.sourceforge.net/ Net-SNMP] daemon, the other a more convenient web-based HTTP or HTTPS interface.
+
+
+= Topics in Alphabetical Order =
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>[OpenPGM2CReferencepgmsnmpinit pgm_snmp_init()]</tt></td>
+<td>Start the SNMP sub-agent.</td>
+</tr><tr>
+<td><tt>[OpenPGM2CReferencepgmsnmpshutdown pgm_snmp_shutdown()]</tt></td>
+<td>Terminates and destroys a running SNMP sub-agent.</td>
+</tr><tr>
+<td><tt>[OpenPGM2CReferencepgmhttpinit pgm_http_init()]</tt></td>
+<td>Start the HTTP or HTTPS interface.</td>
+</tr><tr>
+<td><tt>[OpenPGM2CReferencepgmhttpshutdown pgm_http_shutdown()]</tt></td>
+<td>Terminates and destroys a running HTTP/HTTPS interface.</td>
+</tr>
+</table>
+
+
+= Example HTTP Screenshots =
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_general_information.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_general_information.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>General Information</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_transports.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_transports.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>Transports</td>
+</tr>
+</table>
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_receive_transport.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_receive_transport.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>Receive Transports</td>
+</tr>
+</table>
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_send_transport.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_send_transport.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>One Send Transport</td>
+</tr>
+</table>
