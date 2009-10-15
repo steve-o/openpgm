@@ -32,22 +32,24 @@ The OpenPGM suite provides two optional monitoring and administration interfaces
 
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
-<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_general_information.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_general_information.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>General Information</td>
+<td><a href="http://miru.hk/wiki/PGMHTTP_-_general_information.png"><img src="http://miru.hk/wiki/320px-PGMHTTP_-_general_information.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>General Information</td>
 </tr>
 </table>
 
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
-<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_transports.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_transports.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>Transports</td>
+<td><a href="http://miru.hk/wiki/PGMHTTP_-_transports.png"><img src="http://miru.hk/wiki/320px-PGMHTTP_-_transports.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Transports</td>
 </tr>
 </table>
+
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
-<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_receive_transport.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_receive_transport.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>Receive Transports</td>
+<td><a href="http://miru.hk/wiki/PGMHTTP_-_receive_transport.png"><img src="http://miru.hk/wiki/320px-PGMHTTP_-_receive_transport.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Receive Transports</td>
 </tr>
 </table>
+
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
-<td><a href="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_send_transport.png"><img src="http://openpgm.googlecode.com/svn/wiki/images/PGMHTTP_-_send_transport.png" width="320"/><br/><img align="right" src="http://openpgm.googlecode.com/svn/wiki/images/magnify-clip.png"/></a>One Send Transport</td>
+<td><a href="http://miru.hk/wiki/PGMHTTP_-_send_transport.png"><img src="http://miru.hk/wiki/320px-PGMHTTP_-_send_transport.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>One Send Transport</td>
 </tr>
 </table>
