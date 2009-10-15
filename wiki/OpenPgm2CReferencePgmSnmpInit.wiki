@@ -73,9 +73,9 @@ On success, TRUE is returned.  On error, FALSE is returned.  If <tt>err</tt> is 
 }}}
 
 === See Also ===
-  * <tt>[OpenPGM2CReferencepgmsnmpshutdown pgm_snmp_shutdown()]</tt><br>
-  * <tt>[OpenPGM2CReferencepgmhttpinit pgm_http_init()]</tt><br>
-  * <tt>[OpenPGM2CReferencepgminit pgm_init()]</tt><br>
+  * <tt>[OpenPGM2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
+  * <tt>[OpenPGM2CReferencePgmHttpInit pgm_http_init()]</tt><br>
+  * <tt>[OpenPGM2CReferencePgmInit pgm_init()]</tt><br>
   * [OpenPGM2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
   * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].<br>
   * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].
