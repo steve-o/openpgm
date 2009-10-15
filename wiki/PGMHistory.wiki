@@ -1,0 +1,212 @@
+#summary History of the PGM protocol.
+#labels Phase-Support
+
+= History =
+
+== 1998 January == 
+  * _Pretty Good Multicast_, original draft <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-00 draft-speakman-pgm-spec-00.txt]>
+  * Draft 1 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-01 draft-speakman-pgm-spec-01.txt]>
+
+<pre>
+      Deleted reference to proprietary trademark.
+</pre>
+
+== 1998 August ==
+  * Draft 2 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-02 draft-speakman-pgm-spec-02.txt]>
+
+<pre>
+      This revision benefited from general discussions in the forum of
+      the Reliable Multicast IRTF as well as from individual discussion
+      with Dan Leshchiner concerning source addressing and NAK elimina-
+      tion, with Chetan Rai concerning outgoing packet ordering and
+      local retransmission, and with Jim Gemmell, Luigi Rizzo, and
+      Lorenzo Vicisano concerning FEC.
+ 
+      Clarified that RDATA from DLRs and NCFs from network elements MUST
+      bear the ODATA source's network-header source address.
+ 
+      Added NAK elimination timer and corresponding procedures to net-
+      work elements.
+ 
+      Added procedures and packet formats to incorporate FEC.
+ 
+      Changed all the packet type encodings to anticipate versioning and
+      extension.
+ 
+      Added work-in-progress items for RDATA delay at the source and
+      minimum NAK back-off at receivers.
+ 
+      Added work-in-progress items for SPMRs.
+</pre>
+
+== 1999 June ==
+  * Draft 3 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-03 draft-speakman-pgm-spec-03.txt]>
+
+<pre>
+      The polling and implosion control procedures in this document were
+      developed jointly with Jim Gemmell.  The work on SPMRs arose from
+      discussions with Dan Leshchiner.
+ 
+      Removed range NAKs for re-working.
+ 
+      Generalized and simplified methods for advancing transmit window.
+ 
+      Removed increment sequence number from SPM packets.
+ 
+      Removed Appendix B's information for congestion avoidance.
+ 
+      Removed "local retransmission" in favor of full DLR functionality.
+ 
+      Added generic polling capability within a single PGM hop.
+ 
+      Added procedures to adjust NAK_BO_IVL dynamically and to address
+      potential NAK implosion problems.
+ 
+      Added SPMR procedures and packet formats.
+</pre>
+
+== 1999 August ==
+  * Cisco release IOS 12.0(5)T with Router-Assist <[http://www.cisco.com/en/US/docs/ios/12_0t/12_0t5/feature/guide/pgmscale.html PGM Router Assist]>
+  * Luigi Rizzo releases a PGM Host implementation for FreeBSD <[http://info.iet.unipi.it/~luigi/pgm.html PGM Host]>
+
+== 1999 October ==
+  * Whitebarn release WRMF-PGM, a Reliable Multicast Protocol framework and Cisco PGM implementation.
+
+== 2000 April ==
+  * Draft 4 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-04 draft-speakman-pgm-spec-04.txt]>
+
+<pre>
+      Introduced NAK lists.
+ 
+      Revised DLR procedures to include off-tree DLRs.
+ 
+      Revised description of NAK procedures.
+ 
+      Changed TPDU length in packet formats to TSDU length.
+ 
+      Swap of SQN and TRAIL fields in ODATA/RDATA header formats.
+ 
+      Removed RSN TSN Appendix (formerly Appendix C).
+ 
+      Added FIN/SYN/RST support
+ 
+      Defined SPM NLA = 0 to mean that no path information is present.
+ 
+      Defined SPM_TRAIL/LEAD values when no windowing information is
+      present.
+ 
+      Rationalized the option number space. Note to implementors: this
+      is a significant change, so make sure your options have the right
+      numbers in the right order.
+ 
+      Moved the bulk of the Transmit Window information to Appendix F.
+ 
+      OPT_VAR_SIZE became OPT_VAR_PKTLEN, a more descriptive and useful
+      name.
+</pre>
+
+  * Cisco release IOS 12.1(1)T with PGM Host support (''defunct'') <[http://www.cisco.com/en/US/docs/ios/12_1t/12_1t1/feature/guide/dtpgmhst.html PGM Host]>
+
+== 2000 August ==
+  * TIBCO announced it has delivered open source code <[http://www.prnewswire.com/cgi-bin/stories.pl?ACCT=104&STORY=/www/story/12-04-2000/0001378267&EDATE= PGM Open Source Program]>
+
+== 2000 November ==
+  * Draft 5 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-05 draft-speakman-pgm-spec-05.txt]>
+
+<pre>
+      Added the specification allowing the combined use of fragmentation
+      and FEC.
+ 
+      Changed the text in the FEC appendix to disallow receivers to send
+      selective NAKs when parity is available (in the "SHOULD NOT"
+      form).
+ 
+      Changed the text that deals with prioritization of packet
+      transmission at the source.
+ 
+      Lower-case "must", "should" .. etc changed to upper-case where
+      needed.
+ 
+      Added an "Intellectual Property" disclaimer.
+ 
+      Fixed the packet format of OPT_FRAGMENT.
+ 
+      Fixed some typos and minor inconsistencies.
+</pre>
+
+  * Initial draft of full MIB for the PGM protocol <[http://www.potaroo.net/ietf/old-ids/draft-petrova-nwg-pgmmib-00.txt draft-petrova-nwg-pgmmib-00]>
+
+== 2001 February ==
+  * Draft 6 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-06 draft-speakman-pgm-spec-06.txt]>
+
+<pre>
+      To accommodate very small transmit windows, relaxed the require-
+      ment that SPMs be sent at least at the rate at which the transmit
+      window is advanced.
+ 
+      Deleted the recommendation that a source SHOULD transmit RDATA at
+      priority over concurrent ODATA.
+ 
+      Changed the use of multicast NAKs from a recommendation to an
+      option.
+ 
+      Revised the text throughout to prohibit selective NAKs in FEC ses-
+      sion except for the leading partial transmission block.
+ 
+      To accommodate shortening a transmission group after the transmis-
+      sion of the last data packet, relaxed the requirement that
+      OPT_CURR_TGSIZE be appended to the last data packet in a shortened
+      group.
+ 
+      Revised the procedures for handling fragments in an FEC session.
+ 
+      Added rounds and their application to the polling procedures.
+ 
+      Removed the option of setting SPM_PATH to zero.
+</pre>
+
+  * Initial draft of PGMCC, a single rate multicast congestion control scheme <[http://www.tools.ietf.org/html/draft-ietf-rmt-bb-pgmcc-00 draft-ietf-rmt-bb-pgmcc-00]>
+
+== 2001 July ==
+  * Talarian contribute PGM inspection to Ethereal (Wireshark) <[http://ethereal.netmirror.org/lists/ethereal-cvs/200107/msg00093.html packet-pgm]>
+
+== 2001 September ==
+  * Draft 7 <[http://www.tools.ietf.org/html/draft-speakman-pgm-spec-07 draft-speakman-pgm-spec-07.txt]>
+
+== 2001 October ==
+  * Microsoft releases Windows XP with PGM implemented in optional install of MSMQ 3.
+  * Nortel Networks releases the 3.2 Passport 8600 Routing Switch with Router Assist <[http://www25.nortelnetworks.com/library/tpubs/html/passport/313196A/Chapter744.html#31843 Router Assist]>
+
+== 2001 December ==
+  * RFC 3208 (Experimental)
+
+== 2002 May ==
+  * TIBCO release Rendezvous 7.0 with PGM network protocol support.
+  * Draft 2 of PGMMIB, full MIB for the PGM protocol <[http://www.icir.org/fenner/mibs/extracted/PGM-MIB-petrova-01.txt draft-petrova-pgmmib-01.txt]>
+
+== 2002 June ==
+  * Draft 1 of PGMCC, a single rate multicast congestion control scheme <[http://www.tools.ietf.org/html/draft-ietf-rmt-bb-pgmcc-01 draft-ietf-rmt-bb-pgmcc-01]>
+
+== 2003 April ==
+  * Microsoft releases Windows Server 2003 with PGM implemented through Windows Sockets.
+
+== 2003 June ==
+  * Draft 2 of PGMCC, a single rate multicast congestion control scheme <[http://www.tools.ietf.org/html/draft-ietf-rmt-bb-pgmcc-02 draft-ietf-rmt-bb-pgmcc-02]>
+
+== 2004 January ==
+  * Juniper release JUNOS 7.2 with Router-Assist <[http://www.m40.net/techpubs/software/junos/junos62/swconfig62-multicast/html/pgm-overview.html PGM Router Assist]>
+
+== 2004 July ==
+  * Draft 3 of PGMCC, a single rate multicast congestion control scheme <[http://www.tools.ietf.org/html/draft-ietf-rmt-bb-pgmcc-03 draft-ietf-rmt-bb-pgmcc-03]>
+
+== 2005 May ==
+  * Juniper Networks contributes PGM packet dumping to <tt>tcpdump</tt>.
+
+== 2005 October ==
+  * IBM release WebSphere Message Broker V6 with PGM/IP, and PGM UDP implementations <[http://www.ibm.com/developerworks/websphere/library/techarticles/0510_dunn/0510_dunn.html Publish/subscribe]>
+
+== 2006 August ==
+  * Start of OpenPGM project.
+
+== 2009 May ==
+  * General availability of OpenPGM version 1.0.
