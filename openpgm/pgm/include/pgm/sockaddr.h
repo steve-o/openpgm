@@ -317,7 +317,7 @@ static inline int pgm_sockaddr_join_source_group (const int s, const int sa_fami
 		return setsockopt (s, SOL_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
 
 	case AF_INET6:
-		return pgm_sockaddr_join_group (s, sa_family, (struct group_req*)gsr, sizeof(struct group_req));
+		return pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr, sizeof(struct group_req));
 
 	default: g_assert_not_reached();
 	}
