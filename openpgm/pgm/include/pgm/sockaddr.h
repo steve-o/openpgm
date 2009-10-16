@@ -267,11 +267,11 @@ static inline int pgm_sockaddr_tos (const int s, const int sa_family, const int 
 
 /* nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
  */
-static inline int pgm_sockaddr_join_group (const int s, const int sa_family, const struct group_req* gr, const socklen_t length)
+static inline int pgm_sockaddr_join_group (const int s, const int sa_family, const struct group_req* gr)
 {
 #ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	return setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, length);
+	return setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, sizeof(struct group_req));
 #else
 	struct ip_mreq mreq;
 	struct ipv6_mreq mreq6;
@@ -298,11 +298,11 @@ static inline int pgm_sockaddr_join_group (const int s, const int sa_family, con
 }
 
 /* silently revert to ASM if SSM not supported */
-static inline int pgm_sockaddr_join_source_group (const int s, const int sa_family, const struct group_source_req* gsr, const socklen_t length)
+static inline int pgm_sockaddr_join_source_group (const int s, const int sa_family, const struct group_source_req* gsr)
 {
 #ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	return setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, gsr, length);
+	return setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
 #elif defined(IP_ADD_SOURCE_MEMBERSHIP)
 	struct ip_mreq_source mreqs;
 	struct sockaddr_in ifaddr;
@@ -317,12 +317,12 @@ static inline int pgm_sockaddr_join_source_group (const int s, const int sa_fami
 		return setsockopt (s, SOL_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
 
 	case AF_INET6:
-		return pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr, sizeof(struct group_req));
+		return pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);
 
 	default: g_assert_not_reached();
 	}
 #else
-	return pgm_sockaddr_join_group (s, sa_family, (struct group_req*)gsr, sizeof(struct group_req));	
+	return pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);	
 #endif /* CONFIG_HAVE_MCAST_JOIN */
 }
 

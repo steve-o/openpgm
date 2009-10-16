@@ -1004,8 +1004,7 @@ pgm_transport_bind (
 		{
 			if (0 != pgm_sockaddr_join_group (transport->recv_sock,
 							  pgm_sockaddr_family (&p->gsr_group),
-							  (const struct group_req*)p,
-							  sizeof(struct group_req)))
+							  (const struct group_req*)p))
 			{
 				const int save_errno = errno;
 				char group_addr[INET_ADDRSTRLEN];
@@ -1043,8 +1042,7 @@ pgm_transport_bind (
 		{
 			if (0 != pgm_sockaddr_join_source_group (transport->recv_sock,
 								 pgm_sockaddr_family (&p->gsr_group),
-								 p,
-								 sizeof(struct group_source_req)))
+								 p))
 			{
 				const int save_errno = errno;
 				char source_addr[INET_ADDRSTRLEN];
