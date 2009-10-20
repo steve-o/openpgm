@@ -70,16 +70,18 @@
 #	define EAFNOSUPPORT		WSAEAFNOSUPPORT
 #endif
 
+/* 1-byte alignment */
+#pragma pack(push, 1)
 
 /* RFC 791 */
 struct pgm_ip
 {
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-	unsigned char	ip_hl:4;		/* header length */
-	unsigned char	ip_v:4;			/* version */
+	unsigned	ip_hl:4;		/* header length */
+	unsigned	ip_v:4;			/* version */
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-	unsigned char	ip_v:4;			/* version */
-	unsigned char	ip_hl:4;		/* header length */
+	unsigned	ip_v:4;			/* version */
+	unsigned	ip_hl:4;		/* header length */
 #else
 #	error unknown ENDIAN type
 #endif
@@ -123,6 +125,8 @@ struct pgm_udphdr
 	guint16		uh_ulen;		/* udp length */
 	guint16		uh_sum;			/* udp checksum */
 };
+
+#pragma pack(pop)
 
 G_BEGIN_DECLS
 
