@@ -77,11 +77,11 @@
 struct pgm_ip
 {
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-	unsigned	ip_hl:4;		/* header length */
-	unsigned	ip_v:4;			/* version */
+	unsigned int	ip_hl:4;		/* header length */
+	unsigned int	ip_v:4;			/* version */
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
-	unsigned	ip_v:4;			/* version */
-	unsigned	ip_hl:4;		/* header length */
+	unsigned int	ip_v:4;			/* version */
+	unsigned int	ip_hl:4;		/* header length */
 #else
 #	error unknown ENDIAN type
 #endif
