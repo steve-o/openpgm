@@ -102,6 +102,7 @@
 #endif
 
 static PGMRecvError pgm_recv_error_from_errno (gint);
+static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
 
 
 /* read a packet into a PGM skbuff
@@ -726,6 +727,7 @@ recv_again:
 		       sizeof(dst));
 	if (len < 0)
 	{
+#ifdef G_OS_UNIX
 		const int save_errno = errno;
 		if (EAGAIN == save_errno) {
 			goto check_for_repeat;
@@ -736,6 +738,18 @@ recv_again:
 			     pgm_recv_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
 			     g_strerror (save_errno));
+#else
+		const int save_wsa_errno = WSAGetLastError ();
+		if (WSAEWOULDBLOCK == save_wsa_errno) {
+			goto check_for_repeat;
+		}
+		status = PGM_IO_STATUS_ERROR;
+		g_set_error (error,
+			     PGM_RECV_ERROR,
+			     pgm_recv_error_from_wsa_errno (save_wsa_errno),
+			     _("Transport socket error: %s"),
+			     g_strerror (save_wsa_errno));
+#endif /* !G_OS_UNIX */
 		goto out;
 	}
 	else if (0 == len)
@@ -1039,5 +1053,43 @@ pgm_recv_error_from_errno (
 	}
 }
 
+static
+PGMRecvError
+pgm_recv_error_from_wsa_errno (
+	gint		err_no
+        )
+{
+	switch (err_no) {
+#ifdef WSAEINVAL
+	case WSAEINVAL:
+		return PGM_RECV_ERROR_INVAL;
+		break;
+#endif
+#ifdef WSAEMFILE
+	case WSAEMFILE:
+		return PGM_RECV_ERROR_MFILE;
+		break;
+#endif
+#ifdef WSA_NOT_ENOUGH_MEMORY
+	case WSA_NOT_ENOUGH_MEMORY:
+		return PGM_RECV_ERROR_NOMEM;
+		break;
+#endif
+#ifdef WSAENOPROTOOPT
+	case WSAENOPROTOOPT:
+		return PGM_RECV_ERROR_NOPROTOOPT;
+		break;
+#endif
+#ifdef WSAECONNRESET
+	case WSAECONNRESET:
+		return PGM_RECV_ERROR_CONNRESET;
+		break;
+#endif
+
+	default :
+		return PGM_RECV_ERROR_FAILED;
+		break;
+	}
+}
 
 /* eof */
