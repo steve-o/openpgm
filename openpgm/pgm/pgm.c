@@ -23,6 +23,8 @@
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
+#else
+#       include <ws2tcpip.h>
 #endif
 
 #include "pgm/packet.h"
@@ -43,6 +45,9 @@ int ipproto_pgm = IPPROTO_PGM;
 
 /* locals */
 static gboolean pgm_got_initialized = FALSE;
+#ifdef G_OS_WIN32
+static gboolean pgm_wsa_got_initialized = FALSE;
+#endif
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -61,6 +66,21 @@ pgm_init (void)
 /* ensure threading enabled */
 	if (!g_thread_supported ())
 		g_thread_init (NULL);
+
+#ifdef G_OS_WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	if (WSAStartup (wVersionRequested, &wsaData) != 0)
+		return -1;
+
+	pgm_wsa_got_initialized = TRUE;
+
+	if (LOBYTE (wsaData.wVersion) != 2 || HIBYTE (wsaData.wVersion) != 2)
+	{
+		WSACleanup ();
+		return -1;
+	}
+#endif /* G_OS_WIN32 */
 
 /* find PGM protocol id overriding default value */
 #ifdef CONFIG_HAVE_GETPROTOBYNAME_R
@@ -118,6 +138,10 @@ pgm_shutdown (void)
 
 	if (-1 == pgm_time_shutdown ())
 		return -1;
+
+#ifdef G_OS_WIN32
+	WSACleanup ();
+#endif
 
 	pgm_got_initialized = FALSE;
 	return 0;
