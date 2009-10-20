@@ -74,6 +74,8 @@
 #pragma pack(push, 1)
 
 /* RFC 791 */
+
+/* nb: first four bytes are forced bitfields for win32 "feature" */
 struct pgm_ip
 {
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
@@ -85,8 +87,8 @@ struct pgm_ip
 #else
 #	error unknown ENDIAN type
 #endif
-	guint8		ip_tos;			/* type of service */
-	guint16		ip_len;			/* total length */
+	unsigned int	ip_tos:8;		/* type of service */
+	unsigned int	ip_len:16;		/* total length */
 	guint16		ip_id;			/* identification */
 	guint16		ip_off;			/* fragment offset field */
 	guint8		ip_ttl;			/* time to live */
