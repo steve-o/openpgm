@@ -97,6 +97,15 @@ struct pgm_ip
 	struct in_addr	ip_src, ip_dst;		/* source and dest address */
 };
 
+
+#ifndef G_STATIC_ASSERT
+#       define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
+#       define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
+#       define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
+#endif
+
+G_STATIC_ASSERT(sizeof(struct pgm_ip) == 20);
+
 /* RFC 2460 */
 #ifdef ip6_vfc
 #	undef ip6_vfc
@@ -119,6 +128,8 @@ struct pgm_ip6_hdr
 	struct in6_addr	ip6_src, ip6_dst;	/* source and dest address */
 };
 
+G_STATIC_ASSERT(sizeof(struct pgm_ip6_hdr) == 40);
+
 /* RFC 768 */
 struct pgm_udphdr
 {
@@ -127,6 +138,8 @@ struct pgm_udphdr
 	guint16		uh_ulen;		/* udp length */
 	guint16		uh_sum;			/* udp checksum */
 };
+
+G_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
 #pragma pack(pop)
 
