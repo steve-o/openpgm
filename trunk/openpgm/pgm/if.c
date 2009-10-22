@@ -119,7 +119,7 @@ pgm_if_print_all (void)
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		int i = if_nametoindex(ifa->ifa_name);
+		int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
 		char rname[IF_NAMESIZE * 2 + 3];
 		char b[IF_NAMESIZE * 2 + 3];
 
@@ -490,7 +490,7 @@ parse_interface (
 			continue;
 		}
 
-		const unsigned ifindex = if_nametoindex (ifa->ifa_name);
+		const unsigned ifindex = pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
 		g_assert (0 != ifindex);
 
 /* check numeric host */

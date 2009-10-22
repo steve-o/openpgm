@@ -320,7 +320,8 @@ mock_freeifaddrs (
 
 static
 unsigned int
-mock_if_nametoindex (
+mock_pgm_if_nametoindex (
+	const int		iffamily,
 	const char*		ifname
 	)
 {
@@ -622,7 +623,7 @@ mock_setup_ip6 (void)
 
 #define getifaddrs	mock_getifaddrs
 #define freeifaddrs	mock_freeifaddrs
-#define if_nametoindex	mock_if_nametoindex
+#define pgm_if_nametoindex	mock_pgm_if_nametoindex
 #define if_indextoname	mock_if_indextoname
 #define getnameinfo	mock_getnameinfo
 #define getaddrinfo	mock_getaddrinfo

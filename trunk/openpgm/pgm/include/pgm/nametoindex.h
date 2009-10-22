@@ -25,16 +25,24 @@
 #include <glib.h>
 
 
-#ifdef G_OS_WIN32
-
-#define if_nametoindex	pgm_if_nametoindex
-
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL int pgm_if_nametoindex (const char*);
+#ifdef G_OS_UNIX
+
+#include <net/if.h>
+
+static inline int pgm_if_nametoindex (G_GNUC_UNUSED const int iffamily, const char* ifname)
+{
+	return if_nametoindex (ifname);
+}
+
+#else
+
+G_GNUC_INTERNAL int pgm_if_nametoindex (const int, const char*);
+
+#endif /* !G_OS_UNIX */
 
 G_END_DECLS
 
-#endif
 
 #endif /* __PGM_NAMETOINDEX_H__ */
