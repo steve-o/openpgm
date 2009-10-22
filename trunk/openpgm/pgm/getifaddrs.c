@@ -72,7 +72,7 @@ pgm_getifaddrs (
 
 	int sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (sock6 < 0) {
-		close (sock6);
+		close (sock);
 		return -1;
 	}
 
@@ -204,7 +204,7 @@ pgm_getifaddrs (
 	}
 
 	if (WSAIoctl (	sock6,
-			SIO_GET_INTERFACE_LIST,		/* control code */
+			SIO_ADDRESS_LIST_QUERY,		/* control code */
 			NULL, 0,			/* input buffer: pointer, size in bytes */
 			buf6, sizeof(buf6),		/* output buffer: pointer, size in bytes */
 			&bytesReturned6,		/* actual number of bytes output */
@@ -216,9 +216,10 @@ pgm_getifaddrs (
 	}
 
 /* guess return structure from size */
-	unsigned iilen, iilen6;
-	INTERFACE_INFO *ii, *ii6;
-	INTERFACE_INFO_EX *iix, *iix6;
+	unsigned iilen, salist6len;
+	INTERFACE_INFO *ii;
+	INTERFACE_INFO_EX *iix;
+	SOCKET_ADDRESS_LIST *salist6;
 
 /* IPv4 */
 	if (0 == bytesReturned % sizeof(INTERFACE_INFO))
@@ -236,23 +237,20 @@ pgm_getifaddrs (
 	}
 
 /* IPv6 */
-	if (0 == bytesReturned6 % sizeof(INTERFACE_INFO))
+	if (bytesReturned6 > 0)
 	{
-		iilen6 = bytesReturned6 / sizeof(INTERFACE_INFO);
-		ii6    = (INTERFACE_INFO*)buf;
-		iix6   = NULL;
+		salist6 = (SOCKET_ADDRESS_LIST*)buf6;
+		salist6len = salist6->iAddressCount;
 	}
 	else
 	{
-		g_assert (0 == bytesReturned6 / sizeof(INTERFACE_INFO_EX));
-		iilen6 = bytesReturned6 / sizeof(INTERFACE_INFO_EX);
-		ii6    = NULL;
-		iix6   = (INTERFACE_INFO_EX*)buf;
+		salist6 = NULL;
+		salist6len = 0;
 	}
 
 
 /* alloc a contiguous block for entire list */
-	unsigned n = iilen + iilen6;
+	unsigned n = iilen + salist6len;
 	struct _pgm_ifaddrs* ifa = malloc (n * sizeof(struct _pgm_ifaddrs));
 	memset (ifa, 0, n * sizeof(struct _pgm_ifaddrs));
 
@@ -286,48 +284,33 @@ pgm_getifaddrs (
 		else
 			memcpy (ift->_ifa.ifa_netmask, iix[i].iiNetmask.lpSockaddr, iix[i].iiNetmask.iSockaddrLength);
 
-		if (ift < &ifa[iilen - 1]) {
+		if (ift < &ifa[n - 1]) {
 			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
 			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 	}
 
 /* repeat for IPv6 */
-	for (unsigned i = 0; i < iilen6; i++)
+	for (unsigned i = 0; i < salist6len; i++)
 	{
-		if (ift != ifa) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
-			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
-		}
-
-		if (iix6)
-			g_assert (sizeof(struct sockaddr_in6) == iix6[i].iiAddress.iSockaddrLength);
+		g_assert (sizeof(struct sockaddr_in6) == salist6->Address[i].iSockaddrLength);
 /* address */
 		ift->_ifa.ifa_addr = &ift->_addr;
-		if (ii6) {
-			memcpy (ift->_ifa.ifa_addr, &ii6[i].iiAddress.AddressIn6, sizeof(struct sockaddr_in6_old));
-			((struct sockaddr_in6*)ift->_ifa.ifa_addr)->sin6_scope_id = 0;
-		} else
-			memcpy (ift->_ifa.ifa_addr, iix6[i].iiAddress.lpSockaddr, iix6[i].iiAddress.iSockaddrLength);
+		memcpy (ift->_ifa.ifa_addr, salist6[i].Address, sizeof(struct sockaddr_in6));
 
 /* flags */
-		if (ii6)
-			ift->_ifa.ifa_flags = ii6[i].iiFlags;
-		else
-			ift->_ifa.ifa_flags = iix6[i].iiFlags;
+		ift->_ifa.ifa_flags = IFF_UP;
 
 /* name */
 		ift->_ifa.ifa_name = ift->_name;
 
 /* netmask */
 		ift->_ifa.ifa_netmask = &ift->_netmask;
-		if (ii6) {
-			memcpy (ift->_ifa.ifa_netmask, &ii6[i].iiNetmask.AddressIn6, sizeof(struct sockaddr_in6_old));
-			((struct sockaddr_in6*)ift->_ifa.ifa_netmask)->sin6_scope_id = 0;
-		} else
-			memcpy (ift->_ifa.ifa_netmask, iix6[i].iiNetmask.lpSockaddr, iix6[i].iiNetmask.iSockaddrLength);
 
-		++ift;
+		if (ift < &ifa[n - 1]) {
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+		}
 	}
 
 /* populate the names via win32 api */
