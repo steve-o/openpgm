@@ -207,7 +207,11 @@ static inline int pgm_sockaddr_pktinfo (const int s, const int sa_family, const 
 		break;
 
 	case AF_INET6:
+#ifdef G_OS_UNIX
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const char*)&optval, sizeof(optval));
+#else
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_PKTINFO, (const char*)&optval, sizeof(optval));
+#endif
 		break;
 
 	default: break;
