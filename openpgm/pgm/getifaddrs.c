@@ -304,8 +304,10 @@ pgm_getifaddrs (
 /* name */
 		ift->_ifa.ifa_name = ift->_name;
 
-/* netmask */
+/* netmask: default to full address mask */
 		ift->_ifa.ifa_netmask = &ift->_netmask;
+		ift->_netmask.ss_family = AF_INET6;
+		memset (&((struct sockaddr_in6*)&ift->_netmask)->sin6_addr, 0xff, sizeof (struct in6_addr));
 
 		if (ift < &ifa[n - 1]) {
 			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
