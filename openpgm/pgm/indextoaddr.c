@@ -97,7 +97,7 @@ pgm_if_indextoaddr (
 		    ifa->ifa_addr->sa_family != iffamily)
 			continue;
 
-		const unsigned i = if_nametoindex(ifa->ifa_name);
+		const unsigned i = pgm_if_nametoindex (iffamily, ifa->ifa_name);
 		g_assert (0 != i);
 		if (i == ifindex)
 		{
