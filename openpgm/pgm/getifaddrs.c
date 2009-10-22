@@ -296,7 +296,7 @@ pgm_getifaddrs (
 		g_assert (sizeof(struct sockaddr_in6) == salist6->Address[i].iSockaddrLength);
 /* address */
 		ift->_ifa.ifa_addr = &ift->_addr;
-		memcpy (ift->_ifa.ifa_addr, salist6[i].Address, sizeof(struct sockaddr_in6));
+		memcpy (ift->_ifa.ifa_addr, salist6->Address[i].lpSockaddr, sizeof(struct sockaddr_in6));
 
 /* flags */
 		ift->_ifa.ifa_flags = IFF_UP;
