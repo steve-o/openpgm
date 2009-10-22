@@ -49,6 +49,7 @@
 
 int
 pgm_if_nametoindex (
+	const int		iffamily,
 	const char*		ifname
         )
 {
@@ -85,7 +86,7 @@ pgm_if_nametoindex (
 		adapter = adapter->Next)
 	{
 		if (0 == strcmp (ifname, adapter->AdapterName)) {
-			ifIndex = adapter->IfIndex;
+			ifIndex = AF_INET6 == iffamily ? adapter->Ipv6IfIndex : adapter->IfIndex;
 			free (pAdapterAddresses);
 			return ifIndex;
 		}
