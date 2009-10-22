@@ -157,7 +157,7 @@ recvskb (
 		return len;
 #else /* !G_OS_UNIX */
 	WSAMSG msg = {
-		.name		= (LPSOCKADDR)&src_addr,
+		.name		= (LPSOCKADDR)src_addr,
 		.namelen	= src_addrlen,
 		.lpBuffers	= (LPWSABUF)&iov,
 		.dwBufferCount	= 1,
@@ -192,7 +192,7 @@ recvskb (
 	skb->tail	= (guint8*)skb->data + len;
 
 	if (transport->udp_encap_ucast_port ||
-	    AF_INET6 == pgm_sockaddr_family (&src_addr))
+	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
 		struct cmsghdr* cmsg;
 		gpointer pktinfo = NULL;
