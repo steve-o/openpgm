@@ -24,6 +24,7 @@
 #include <unistd.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <net/if.h>
@@ -65,6 +66,7 @@ pgm_getifaddrs (
 	struct pgm_ifaddrs**	ifap
 	)
 {
+#ifdef G_OS_UNIX
 	int sock = socket (AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
 		return -1;
@@ -76,7 +78,6 @@ pgm_getifaddrs (
 		return -1;
 	}
 
-#ifdef G_OS_UNIX
 /* get count of interfaces */
 	char buf[1024], buf6[1024];
 	struct ifconf ifc, ifc6;
@@ -186,140 +187,16 @@ pgm_getifaddrs (
 		++ifr;
 	}
 #endif
+
+	close (sock);
+	close (sock6);
+
 #else /* !G_OS_UNIX */
-/* get count of interfaces */
-	char buf[1024], buf6[1024];
-	DWORD bytesReturned, bytesReturned6;
 
-	if (WSAIoctl (	sock,
-			SIO_GET_INTERFACE_LIST,		/* control code */
-			NULL, 0,			/* input buffer: pointer, size in bytes */
-			buf, sizeof(buf),		/* output buffer: pointer, size in bytes */
-			&bytesReturned,			/* actual number of bytes output */
-			NULL, NULL) < 0)
-	{
-		close (sock);
-		close (sock6);
-		return -1;
-	}
-
-	if (WSAIoctl (	sock6,
-			SIO_ADDRESS_LIST_QUERY,		/* control code */
-			NULL, 0,			/* input buffer: pointer, size in bytes */
-			buf6, sizeof(buf6),		/* output buffer: pointer, size in bytes */
-			&bytesReturned6,		/* actual number of bytes output */
-			NULL, NULL) < 0)
-	{
-		close (sock);
-		close (sock6);
-		return -1;
-	}
-
-/* guess return structure from size */
-	unsigned iilen, salist6len;
-	INTERFACE_INFO *ii;
-	INTERFACE_INFO_EX *iix;
-	SOCKET_ADDRESS_LIST *salist6;
-
-/* IPv4 */
-	if (0 == bytesReturned % sizeof(INTERFACE_INFO))
-	{
-		iilen = bytesReturned / sizeof(INTERFACE_INFO);
-		ii    = (INTERFACE_INFO*)buf;
-		iix   = NULL;
-	}
-	else
-	{
-		g_assert (0 == bytesReturned / sizeof(INTERFACE_INFO_EX));
-		iilen  = bytesReturned / sizeof(INTERFACE_INFO_EX);
-		ii     = NULL;
-		iix    = (INTERFACE_INFO_EX*)buf;
-	}
-
-/* IPv6 */
-	if (bytesReturned6 > 0)
-	{
-		salist6 = (SOCKET_ADDRESS_LIST*)buf6;
-		salist6len = salist6->iAddressCount;
-	}
-	else
-	{
-		salist6 = NULL;
-		salist6len = 0;
-	}
-
-
-/* alloc a contiguous block for entire list */
-	unsigned n = iilen + salist6len;
-	struct _pgm_ifaddrs* ifa = malloc (n * sizeof(struct _pgm_ifaddrs));
-	memset (ifa, 0, n * sizeof(struct _pgm_ifaddrs));
-
-/* foreach interface */
-	struct _pgm_ifaddrs* ift = ifa;
-
-	for (unsigned i = 0; i < iilen; i++)
-	{
-		if (iix)
-			g_assert (sizeof(struct sockaddr_in) == iix[i].iiAddress.iSockaddrLength);
-/* address */
-		ift->_ifa.ifa_addr = &ift->_addr;
-		if (ii)
-			memcpy (ift->_ifa.ifa_addr, &ii[i].iiAddress.AddressIn, sizeof(struct sockaddr_in));
-		else
-			memcpy (ift->_ifa.ifa_addr, iix[i].iiAddress.lpSockaddr, iix[i].iiAddress.iSockaddrLength);
-
-/* flags */
-		if (ii)
-			ift->_ifa.ifa_flags = ii[i].iiFlags;
-		else
-			ift->_ifa.ifa_flags = iix[i].iiFlags;
-
-/* name */
-		ift->_ifa.ifa_name = ift->_name;
-
-/* netmask */
-		ift->_ifa.ifa_netmask = &ift->_netmask;
-		if (ii)
-			memcpy (ift->_ifa.ifa_netmask, &ii[i].iiNetmask.AddressIn, sizeof(struct sockaddr_in));
-		else
-			memcpy (ift->_ifa.ifa_netmask, iix[i].iiNetmask.lpSockaddr, iix[i].iiNetmask.iSockaddrLength);
-
-		if (ift < &ifa[n - 1]) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
-			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
-		}
-	}
-
-/* repeat for IPv6 */
-	for (unsigned i = 0; i < salist6len; i++)
-	{
-		g_assert (sizeof(struct sockaddr_in6) == salist6->Address[i].iSockaddrLength);
-/* address */
-		ift->_ifa.ifa_addr = &ift->_addr;
-		memcpy (ift->_ifa.ifa_addr, salist6->Address[i].lpSockaddr, sizeof(struct sockaddr_in6));
-
-/* flags */
-		ift->_ifa.ifa_flags = IFF_UP;
-
-/* name */
-		ift->_ifa.ifa_name = ift->_name;
-
-/* netmask: default to full address mask */
-		ift->_ifa.ifa_netmask = &ift->_netmask;
-		ift->_netmask.ss_family = AF_INET6;
-		memset (&((struct sockaddr_in6*)&ift->_netmask)->sin6_addr, 0xff, sizeof (struct in6_addr));
-
-		if (ift < &ifa[n - 1]) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
-			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
-		}
-	}
-
-/* populate the names via win32 api */
 	DWORD dwSize, dwRet;
 	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
 
-	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
+	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
 	if (ERROR_BUFFER_OVERFLOW != dwRet) {
 		perror("GetAdaptersAddresses");
 		return -1;
@@ -329,14 +206,15 @@ pgm_getifaddrs (
 		perror("malloc");
 		return -1;
 	}
-	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
+	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
 	if (ERROR_SUCCESS != dwRet) {
 		perror("GetAdaptersAddresses(2)");
 		free(pAdapterAddresses);
 		return -1;
 	}
 
-	unsigned resolved = 0;
+/* count valid adapters */
+	int n = 0;
 	for (adapter = pAdapterAddresses;
 		 adapter;
 		 adapter = adapter->Next)
@@ -345,31 +223,107 @@ pgm_getifaddrs (
 			 unicast;
 			 unicast = unicast->Next)
 		{
-			struct pgm_ifaddrs* ifi;
-			for (ifi = (struct pgm_ifaddrs*)ifa;
-				ifi;
-				ifi = ifi->ifa_next)
+/* ensure IP adapter */
+			if (AF_INET != unicast->Address.lpSockaddr->sa_family &&
+			    AF_INET6 != unicast->Address.lpSockaddr->sa_family)
 			{
-				if (0 == pgm_sockaddr_cmp (unicast->Address.lpSockaddr, ifi->ifa_addr))
-				{
-					g_assert (IF_NAMESIZE > strlen(adapter->AdapterName));
-					strncpy (ifi->ifa_name, adapter->AdapterName, IF_NAMESIZE);
-					ifi->ifa_name[IF_NAMESIZE - 1] = 0;
-					resolved++;
+				continue;
+			}
+
+			++n;
+		}
+	}
+
+/* contiguous block for adapter list */
+	struct _pgm_ifaddrs* ifa = malloc (n * sizeof(struct _pgm_ifaddrs));
+	memset (ifa, 0, n * sizeof(struct _pgm_ifaddrs));
+	struct _pgm_ifaddrs* ift = ifa;
+
+/* now populate list */
+	for (adapter = pAdapterAddresses;
+		 adapter;
+		 adapter = adapter->Next)
+	{
+		int unicastIndex = 0;
+		for (IP_ADAPTER_UNICAST_ADDRESS *unicast = adapter->FirstUnicastAddress;
+			 unicast;
+			 unicast = unicast->Next, ++unicastIndex)
+		{
+/* ensure IP adapter */
+			if (AF_INET != unicast->Address.lpSockaddr->sa_family &&
+			    AF_INET6 != unicast->Address.lpSockaddr->sa_family)
+			{
+				continue;
+			}
+
+/* address */
+			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			memcpy (ift->_ifa.ifa_addr, unicast->Address.lpSockaddr, unicast->Address.iSockaddrLength);
+
+/* name */
+			ift->_ifa.ifa_name = ift->_name;
+			strncpy (ift->_ifa.ifa_name, adapter->AdapterName, IF_NAMESIZE);
+			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
+
+/* flags */
+			ift->_ifa.ifa_flags = 0;
+			if (IfOperStatusUp == adapter->OperStatus)
+				ift->_ifa.ifa_flags |= IFF_UP;
+			if (IF_TYPE_SOFTWARE_LOOPBACK == adapter->IfType)
+				ift->_ifa.ifa_flags |= IFF_LOOPBACK;
+			if (!(adapter->Flags & IP_ADAPTER_NO_MULTICAST))
+				ift->_ifa.ifa_flags |= IFF_MULTICAST;
+
+/* netmask */
+			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+
+/* pre-Vista must hunt for matching prefix in linked list, otherwise use OnLinkPrefixLength */
+			int prefixIndex = 0;
+			ULONG prefixLength = 0;
+			for (IP_ADAPTER_PREFIX *prefix = adapter->FirstPrefix;
+				prefix;
+				prefix = prefix->Next, ++prefixIndex)
+			{
+				if (prefixIndex == unicastIndex) {
+					prefixLength = prefix->PrefixLength;
 					break;
 				}
 			}
+
+/* map prefix to netmask */
+			ift->_ifa.ifa_netmask->sa_family = unicast->Address.lpSockaddr->sa_family;
+			switch (unicast->Address.lpSockaddr->sa_family) {
+			case AF_INET:
+				if (0 == prefixLength) {
+					g_warning (_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
+					prefixLength = 32;
+				}
+				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = g_htonl( 0xffffffffU << ( 32 - prefixLength ) );
+				break;
+
+			case AF_INET6:
+				if (0 == prefixLength) {
+					g_warning (_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
+					prefixLength = 128;
+				}
+				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
+				{
+					((struct sockaddr_in6*)ift->_ifa.ifa_netmask)->sin6_addr.s6_addr[ j ] = i >= 8 ? 0xff : (ULONG)(( 0xffU << ( 8 - i ) ) & 0xffU );
+				}
+				break;
+			}
+
+/* next */
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 	}
 
 	free (pAdapterAddresses);
-/* are all adapter names successfully resolved? */
-	g_assert (resolved == n);
+
 #endif /* !G_OS_UNIX */
 
 	*ifap = (struct pgm_ifaddrs*)ifa;
-	close (sock);
-	close (sock6);
 	return 0;
 }
 

@@ -31,7 +31,7 @@
 
 /* struct for scatter/gather I/O */
 struct pgm_iovec {
-#ifndef G_OS_WIN32
+#ifdef G_OS_UNIX
 	void*		iov_base;
 	size_t		iov_len;	/* length of data */
 #else
