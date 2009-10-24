@@ -308,7 +308,8 @@ parse_interface (
 		}, *res;
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
 		if (0 == eai) {
-			if (AF_INET == res->ai_family && IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+			if (AF_INET == res->ai_family &&
+			    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
 				g_set_error (error,
 					     PGM_IF_ERROR,
@@ -318,7 +319,8 @@ parse_interface (
 				freeaddrinfo (res);
 				return FALSE;
 			}
-			else if (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
+			else if (AF_INET6 == res->ai_family &&
+				 IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 			{
 				g_set_error (error,
 					     PGM_IF_ERROR,
@@ -423,7 +425,8 @@ parse_interface (
 
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
 		if (0 == eai) {
-			if (AF_INET == res->ai_family && IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+			if (AF_INET == res->ai_family &&
+			    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
 				g_set_error (error,
 					     PGM_IF_ERROR,
@@ -433,7 +436,8 @@ parse_interface (
 				freeaddrinfo (res);
 				return FALSE;
 			}
-			else if (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
+			else if (AF_INET6 == res->ai_family &&
+				 IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 			{
 				g_set_error (error,
 					     PGM_IF_ERROR,
@@ -505,7 +509,8 @@ parse_interface (
 		}
 
 /* check network address */
-		if (check_inet_network)
+		if (check_inet_network &&
+		    AF_INET == ifa->ifa_addr->sa_family)
 		{
 			const struct in_addr netaddr = ((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
 			const struct in_addr netmask = ((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr;
@@ -517,7 +522,8 @@ parse_interface (
 				return TRUE;
 			}
 		}
-		if (check_inet6_network)
+		if (check_inet6_network &&
+		    AF_INET6 == ifa->ifa_addr->sa_family)
 		{
 			const struct in6_addr netaddr = ((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
