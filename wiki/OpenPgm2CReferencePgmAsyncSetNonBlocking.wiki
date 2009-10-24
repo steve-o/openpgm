@@ -7,7 +7,7 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_async_set_nonblocking* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]* const    async,
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*` const    async,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]      nonblocking
 );
 </pre>

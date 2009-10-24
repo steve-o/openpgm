@@ -7,7 +7,7 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_async_get_fd* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]*    async
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*`    async
 );
 </pre>
 

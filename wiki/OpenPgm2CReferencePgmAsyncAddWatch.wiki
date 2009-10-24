@@ -7,13 +7,13 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_async_add_watch* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]*    async,
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*`    async,
 	[OpenPgm2CReferencePgmEventFnT pgm_eventfn_t]      fcuntion,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      user_data
 );
 
 int *pgm_async_add_watch_full* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]*    async,
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*`    async,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]      priority,
 	[OpenPgm2CReferencePgmEventFnT pgm_eventfn_t]      fcuntion,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      user_data,

@@ -1,0 +1,54 @@
+#summary OpenPGM 2 : C Reference : pgm_gsi_equal()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint] *pgm_gsi_equal* (
+	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi1,
+	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi2
+);
+</pre>
+
+=== Purpose ===
+Compare two GSI values.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>gsi1</tt></td>
+<td>Globally unique session identifier (GSI).</td>
+<td>A pointer to the GSI provided by the application that the function will fill.</td>
+</tr><tr>
+<td><tt>gsi2</tt></td>
+<td>Globally unique session identifier (GSI).</td>
+<td>A pointer to the GSI provided by the application that the function will fill.</td>
+</tr>
+</table>
+
+=== Return Value ===
+The <tt>pgm_gsi_equal()</tt> function returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if both values are equal and [h
+ttp://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] otherwise.
+
+=== Example ===
+
+{{{
+ pgm_gsi_t gsi1, gsi2 = { .identifier = { 170, 29, 65, 155, 237, 36 } };
+ pgm_create_md5_gsi(&gsi1);
+ if (pgm_gsi_equal(&gsi1, &gsi2)) {
+   g_message ("GSI matches host ayaka");
+ }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmGsiT pgm_gsi_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt><br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

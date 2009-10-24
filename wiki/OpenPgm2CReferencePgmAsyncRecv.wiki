@@ -7,12 +7,12 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus] *pgm_async_recv* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]* const    async,
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*` const    async,
 	const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]     buf,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      len,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]* const      bytes_read,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*` const      bytes_read,
 	int      flags,
-        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]**     error
+        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
 );
 </pre>
 

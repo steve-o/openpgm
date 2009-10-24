@@ -7,7 +7,7 @@ _Function_
 #include <pgm/snmp.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_snmp_init* (
-        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]**     error
+        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
 );
 </pre>
 

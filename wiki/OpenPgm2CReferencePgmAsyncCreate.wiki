@@ -7,9 +7,9 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_async_create* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]**    async,
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t] const*    transport,
-        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]**     error
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*``*`    async,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t] const`*`    transport,
+        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
 );
 </pre>
 
