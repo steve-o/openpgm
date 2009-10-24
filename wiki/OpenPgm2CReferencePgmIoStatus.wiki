@@ -1,0 +1,25 @@
+#summary OpenPGM 2 : C Reference : PGMIOStatus
+#labels Phase-Implementation
+
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+enum PGMIOStatus {
+	PGM_IO_STATUS_ERROR,     /* an error occurred */
+	PGM_IO_STATUS_NORMAL,    /* success */
+	PGM_IO_STATUS_RESET,     /* session reset */
+	PGM_IO_STATUS_FIN,       /* session finished */
+	PGM_IO_STATUS_AGAIN,     /* resource temporarily unavailable */
+	PGM_IO_STATUS_AGAIN2,    /* would-block on rate limit, check timer */
+};
+</pre>
+
+=== Purpose ===
+Return status for PGM IO functions.
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmRecv pgm_recv()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmSend pgm_send()]</tt><br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

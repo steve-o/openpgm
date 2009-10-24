@@ -54,8 +54,11 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm2CReferencePgmIoStatus PGMIOStatus]</tt></td>
 <td>Return status for PGM IO functions.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencePgmMsgvT pgm_msgv_t]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmIoVec pgm_iovec]</tt></td>
 <td>A scatter/gather message vector.</td>
+</tr><tr>
+<td><tt>[OpenPgm2CReferencePgmMsgvT pgm_msgv_t]</tt></td>
+<td>A scatter/gather message vector^2^.</td>
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt></td>
 <td>A transport object represents a delivery mechanism for messages.</td>
