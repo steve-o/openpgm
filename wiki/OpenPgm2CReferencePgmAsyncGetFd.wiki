@@ -1,0 +1,36 @@
+#summary OpenPGM 2 : C Reference : pgm_async_get_fd()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_async_get_fd* (
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]*    async
+);
+</pre>
+
+=== Purpose ===
+Retrieve file descriptor for event signalling.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>async</tt></td>
+<td>The asynchronous receiver object.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success the file descriptor is returned.  If <tt>async</tt> is invalid, <tt>-EINVAL</tt> is returned.
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmAsyncT pgm_async_t]</tt><br>
+  * [OpenPgm2CReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.

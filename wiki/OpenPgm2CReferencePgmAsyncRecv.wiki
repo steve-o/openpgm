@@ -1,0 +1,71 @@
+#summary OpenPGM 2 : C Reference : pgm_async_recv()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus] *pgm_async_recv* (
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]* const    async,
+	const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]     buf,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      len,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]* const      bytes_read,
+	int      flags,
+        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]**     error
+);
+</pre>
+
+=== Purpose ===
+Receive an Application Protocol Domain Unit (APDU) from an asynchronous queue.
+
+=== Remarks ===
+<tt>pgm_async_recv()</tt> fills the provided buffer location with up to <tt>len</tt> contiguous APDU bytes  therefore the buffer should be large enough to store the largest APDU expected.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>async</tt></td>
+<td>The asynchronous receiver object.</td>
+</tr><tr>
+td><tt>buf</tt></td>
+<td>Data buffer to fill.</td>
+</tr><tr>
+<td><tt>len</tt></td>
+<td>Length of <tt>buf</tt> in bytes.</td>
+</tr><tr>
+<td><tt>bytes_read</tt></td>
+<td>Number of bytes read into <tt>buf</tt>.</td>
+</tr><tr>
+<td><tt>flags</tt></td>
+<td>Bitwise OR of zero or more flags: <tt>MSG_DONTWAIT</tt> enabling non-blocking operation on Unix platforms.</td>
+</tr><tr>
+<td><tt>error</tt></td>
+<td>a return location for a [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError], or [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#NULL--CAPS NULL].</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, [http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus G_IO_STATUS_NORMAL] is returned.  On error, [http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus G_IO_STATUS_ERROR] is returned, and if set, <tt>error</tt> may be set appropriately.  If receiver is marked non-blocking and the receive operation would block, [http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus G_IO_STATUS_AGAIN] is returned.
+
+=== Example ===
+Receive an APDU up to 4096 bytes in length.
+
+{{{
+ gchar buf[4096];
+ gsize bytes_read 
+ if (G_IO_STATUS_NORMAL == pgm_async_recv (async, buf, sizeof(buf), &bytes_read, 0, NULL)) {
+   g_message ("Received %d bytes: \"%s\"", bytes_read, buf);
+ }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmAsyncT pgm_async_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmRecv pgm_recv()]</tt><br>
+  * [OpenPgm2CReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.<br>
+  * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].

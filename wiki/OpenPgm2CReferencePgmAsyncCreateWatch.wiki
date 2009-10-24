@@ -1,0 +1,54 @@
+#summary OpenPGM 2 : C Reference : pgm_async_create_watch()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource]* *pgm_async_create_watch* (
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]*    async
+);
+</pre>
+
+=== Purpose ===
+Create a transport event listener.
+
+=== Remarks ===
+Creates a [http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource] that is dispatched when an incoming message is ready to be processed.  The [http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource] should be added to the !GLib main loop with <tt>[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#g-source-attach g_source_attach()]</tt>.  <tt>[OpenPgm2CReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt> can be used to create and attach the listener to the current main loop with one call.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>async</tt></td>
+<td>The asynchronous receiver object.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, the newly-created [http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource].  If <tt>async</tt> is invalid, <tt>NULL</tt> is returned.
+
+=== Example ===
+
+{{{
+ pgm_async_t* async;
+ pgm_async_create (&async, transport, 0);
+ GSource* source = pgm_async_create_watch (async);
+ g_source_set_priority (source, G_PRIORITY_HIGH);
+ g_source_attach (source, NULL);
+ g_source_unref (source);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmAsyncT pgm_async_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmAsyncCreate pgm_async_create()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmAsyncAddWatch pgm_async_add_watch_full()]</tt><br>
+  * [OpenPgm2CReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.

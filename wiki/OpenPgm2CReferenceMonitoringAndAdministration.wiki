@@ -13,16 +13,16 @@ The OpenPGM suite provides two optional monitoring and administration interfaces
 <th>Description</th>
 </tr>
 <tr>
-<td><tt>[OpenPgm2CReferencepgmsnmpinit pgm_snmp_init()]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]</tt></td>
 <td>Start the SNMP sub-agent.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencepgmsnmpshutdown pgm_snmp_shutdown()]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt></td>
 <td>Terminates and destroys a running SNMP sub-agent.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencepgmhttpinit pgm_http_init()]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]</tt></td>
 <td>Start the HTTP or HTTPS interface.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencepgmhttpshutdown pgm_http_shutdown()]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmHttpShutdown pgm_http_shutdown()]</tt></td>
 <td>Terminates and destroys a running HTTP/HTTPS interface.</td>
 </tr>
 </table>
