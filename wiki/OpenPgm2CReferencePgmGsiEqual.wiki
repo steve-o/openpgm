@@ -25,11 +25,9 @@ Compare two GSI values.
 <tr>
 <td><tt>gsi1</tt></td>
 <td>Globally unique session identifier (GSI).</td>
-<td>A pointer to the GSI provided by the application that the function will fill.</td>
 </tr><tr>
 <td><tt>gsi2</tt></td>
 <td>Globally unique session identifier (GSI).</td>
-<td>A pointer to the GSI provided by the application that the function will fill.</td>
 </tr>
 </table>
 

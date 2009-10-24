@@ -7,6 +7,7 @@ _Type_
 #include <pgm/pgm.h>
 
 typedef struct pgm_gsi_t *pgm_gsi_t*;
+
 struct pgm_gsi_t {
 	char identifier[6];
 };

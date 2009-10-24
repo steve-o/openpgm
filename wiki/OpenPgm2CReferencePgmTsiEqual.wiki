@@ -1,0 +1,40 @@
+#summary OpenPGM 2 : C Reference : pgm_tsi_equal()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint] *pgm_tsi_equal* (
+	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi1,
+	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi2
+);
+</pre>
+
+=== Purpose ===
+Compare two TSI values.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>tsi1</tt></td>
+<td>Globally unique transport session identifier (.GSI).</td>
+</tr><tr>
+<td><tt>.gsi2</tt></td>
+<td>Globally unique transport session identifier (TSI).</td>
+</tr>
+</table>
+
+=== Return Value ===
+The <tt>pgm_tsi_equal()</tt> function returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if both values are equal and [h
+ttp://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] otherwise.
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
