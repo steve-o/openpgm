@@ -214,7 +214,7 @@ pgm_getifaddrs (
 	}
 
 /* count valid adapters */
-	int n = 0;
+	int n = 0, k = 0;
 	for (adapter = pAdapterAddresses;
 		 adapter;
 		 adapter = adapter->Next)
@@ -314,8 +314,10 @@ pgm_getifaddrs (
 			}
 
 /* next */
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
-			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+			if (k++ < (n - 1)) {
+				ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+				ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+			}
 		}
 	}
 
