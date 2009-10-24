@@ -59,7 +59,7 @@ Example <tt>snmpd.conf</tt>:
 
 
 === Return Value ===
-On success, TRUE is returned.  On error, FALSE is returned.  If <tt>err</tt> is provided it may be set detailing any threading or issue connecting to the SNMP agent or daemon.  SNMP errors will be reported to its log system.
+On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] is returned.  On error, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] is returned.  If <tt>err</tt> is provided it may be set detailing any threading or issue connecting to the SNMP agent or daemon.  SNMP errors will be reported to its log system.
 
 === Example ===
 
@@ -73,9 +73,9 @@ On success, TRUE is returned.  On error, FALSE is returned.  If <tt>err</tt> is 
 }}}
 
 === See Also ===
-  * <tt>[OpenPGM2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
-  * <tt>[OpenPGM2CReferencePgmHttpInit pgm_http_init()]</tt><br>
-  * <tt>[OpenPGM2CReferencePgmInit pgm_init()]</tt><br>
-  * [OpenPGM2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
+  * <tt>[OpenPgm2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
+  * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
   * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].<br>
   * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].

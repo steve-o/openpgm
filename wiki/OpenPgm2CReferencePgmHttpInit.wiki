@@ -1,0 +1,55 @@
+#summary OpenPGM 2 : C Reference : pgm_http_init()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/http.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_http_init* (
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      server_port,
+        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]**     error
+);
+</pre>
+
+=== Purpose ===
+Create and start a HTTP administration interface.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>server_port</tt></td>
+<td>HTTP port to listen on.</td>
+</tr><tr>
+<td><tt>error</tt></td>
+<td>a return location for a [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError], or [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#NULL--CAPS NULL].</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] is returned.  On error, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] is returned.  If <tt>err</tt> is provided it may be set detailing the fault.
+
+=== Example ===
+
+{{{
+ GError* err = NULL;
+ if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
+   g_error ("Unable to start HTTP interface: %s", err->message);
+   g_error_free (err);
+   return EXIT_FAILURE;
+ }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmHttpShutdown pgm_http_shutdown()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
+  * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
+  * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].<br>
+  * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].

@@ -1,0 +1,23 @@
+#summary OpenPGM 2 : C Reference : pgm_snmp_shutdown()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/snmp.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_snmp_shutdown* (void);
+</pre>
+
+=== Purpose ===
+Stop and destroy a running SNMP agent or master agent.
+
+=== Return Value ===
+On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] is returned.  On error, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] is returned.
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmHttpShutdown pgm_http_shutdown()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
+  * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].
