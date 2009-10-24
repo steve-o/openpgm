@@ -40,7 +40,7 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm2CReferencePgmTsiPrint pgm_tsi_print()]</tt></td>
 <td>Display a TSI in human friendly form.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTsiPrintR pgm_tsi_print_r()]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmTsiPrint pgm_tsi_print_r()]</tt></td>
 <td>Display a TSI in human friendly form, re-entrant version.</td>
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTsiEqual pgm_tsi_equal()]</tt></td>

@@ -1,0 +1,67 @@
+#summary OpenPGM 2 : C Reference : pgm_transport_block_source()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_block_source* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	struct group_source_req`*`     gsr,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     len
+);
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_unblock_source* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	struct group_source_req`*`     gsr,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     len
+);
+</pre>
+
+=== Purpose ===
+The <tt>pgm_transport_block_source</tt> function turns off a given source.
+
+The <tt>pgm_transport_unblock_source</tt> function re-allows a blocked source.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>gsr</tt></td>
+<td>Multicast group and source specification with optional interface.</td>
+</tr><tr>
+<td><tt>len</tt></td>
+<td>Length of <tt>gr</tt> in bytes.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] is returned.  On error, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] is returned.
+
+=== Example ===
+Blocks source 192.168.9.1, group 239.192.0.2 on default interface to transport.
+
+{{{
+ struct group_source_req gsr;
+ memset (&gsr, 0, sizeof(gsr));
+ ((struct sockaddr*)&gsr)->gsr_group.sa_family = AF_INET;
+ ((struct sockaddr_in*)&gsr)->gsr_group.sin_addr.s_addr = inet_addr("239.192.0.2");
+ ((struct sockaddr*)&gsr)->gsr_source.sa_family = AF_INET;
+ ((struct sockaddr_in*)&gsr)->gsr_source.sin_addr.s_addr = inet_addr("192.168.9.1");
+ pgm_transport_block_source (transport, &gsr, sizeof(gsr));
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportJoinGroup pgm_transport_join_group()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportJoinSourceGroup pgm_transport_join_source_group()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportMsFilter pgm_transport_msfilter()]</tt><br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
