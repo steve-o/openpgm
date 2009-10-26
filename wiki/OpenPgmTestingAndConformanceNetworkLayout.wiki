@@ -1,0 +1,23 @@
+This section describes the network layout necessary to perform PGM protocol compliance of a PGM network stack.
+
+== Basic Testing ==
+Basic covers the principal operations of sending, receiving, error detection, requesting packet retransmission (NAKs), and  transmission of repair data. 
+
+[[Image:OpenPGM testing layout.png]]
+
+The network layout described covers four hosts:
+
+; Application : Runs the PGM network stack to test.  This is implemented as a thin agnostic layer above the API allowing control and feedback to the tester.
+; Simulator : A host which can send and receive PGM packets in order to illicit a response from the application under test.
+; Monitor : An independent network monitor to verify what is actually sent on the network.
+; Tester : The central control point which co-ordinates the start and operation of the Application, Simulator, and Monitor  systems.
+
+
+The diagram suggests the tester as a human operator but it is possible to run as an automated <tt>expect</tt> style script to simplify repeated test validations.  An example flow for NAK testing is as follows:
+
+[[Image:Flow part1.png|thumb|left|320px|1: Create transports in both Application and Simulator]]
+[[Image:Flow part2.png|thumb|left|320px|2: Send messages from Application]]
+{{clr}}
+[[Image:Flow part3.png|thumb|left|320px|3: Send NAK from Simulator]]
+[[Image:Flow part4.png|thumb|left|320px|4: Wait for RDATA data re-transmission from Application]]
+

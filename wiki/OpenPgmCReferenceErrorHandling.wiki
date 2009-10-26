@@ -1,0 +1,45 @@
+﻿=== Logging ===
+OpenPGM modules log messages through [http://library.gnome.org/devel/glib/stable/glib-Message-Logging.html GLog], providing versatile support for logging messages with different levels of importance.   The following log domains have been defined for the components of OpenPGM.
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Log Domain</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>Pgm</tt></td>
+<td>PGM transport.</td>
+</tr><tr>
+<td><tt>Pgm-Http</tt></td>
+<td>HTTP/HTTPS administrative and monitoring interface.</td>
+</tr><tr>
+<td><tt>Pgm-Snmp</tt></td>
+<td>SNMP administrative and monitoring interface.</td>
+</tr>
+</table>
+
+
+Log messages can be redirected using [http://library.gnome.org/devel/glib/stable/glib-Message-Logging.html#g-log-set-handler g_log_set_handler], one call is required for each domain.
+
+=== Example ===
+
+ static void
+ log_handler (
+        const gchar*      log_domain,
+        GLogLevelFlags    log_level,
+        const gchar*      message,
+        gpointer          unused_data
+        )
+ {
+     if (log_domain)
+         printf ("%s: %s\n", log_domain, message);
+     else
+         puts (message);
+ }
+ 
+ ...
+ 
+ g_log_set_handler ("Pgm",      G_LOG_LEVEL_MASK, log_handler, NULL);
+ g_log_set_handler ("Pgm-Http", G_LOG_LEVEL_MASK, log_handler, NULL);
+ g_log_set_handler ("Pgm-Snmp", G_LOG_LEVEL_MASK, log_handler, NULL);
+

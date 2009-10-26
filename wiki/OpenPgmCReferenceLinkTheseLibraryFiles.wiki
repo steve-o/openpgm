@@ -1,0 +1,27 @@
+﻿OpenPGM C programs must link the appropriate library files.
+
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Linker Flag</th>
+<th>Description</th>
+</tr>
+<tr>
+<td colspan="2"><h3>Communications and Events</h3></td>
+</tr><tr>
+<td><tt>`pkg-config --static --cflags --libs glib-2.0 gthread-2.0`</tt></td>
+<td>Include this for the GLib API.</td>
+</tr><tr>
+<td><tt>-lpgm</tt></td>
+<td>All OpenPGM programs must use this link flag.</td>
+</tr><tr>
+<td colspan="2"><h3>Monitoring and Administration</h3></td>
+</tr><tr>
+<td>Change the GLib line to<br><tt>`pkg-config --static --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.2` -lpgmhttp </tt></td>
+<td>Include this for the HTTP/HTTPS interface.</td>
+</tr><tr>
+<td><tt>-lpgmsnmp -lnetsnmpagent -lnetsnmpmibs -lnetsnmphelpers -lnetsnmp</tt></td>
+<td>Include this for a Net-SNMP based sub-agent.</td>
+</tr>
+</table>
+

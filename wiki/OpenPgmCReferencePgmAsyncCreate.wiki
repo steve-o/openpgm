@@ -1,0 +1,51 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_async_create''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]**     async,</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>int                        preallocate</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Create an asynchronous event handler.
+
+=== Remarks ===
+APDUs are stored in an asynchronous queue using event objects, the <tt>preallocate</tt> parameter is used to set the initial number of these objects to keep in the trash stack.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>async</tt></td>
+<td>The asynchronous receiver object.</td>
+</tr><tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>preallocate</tt></td>
+<td>Number of event objects.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, 0 is returned.  On invalid arguments, a critical message is logged and <tt>-EINVAL</tt> is returned.  On error, -1 is returned, and <tt>errno</tt> is set appropriately.
+
+=== Errors ===
+;EAGAIN: The system lacked the necessary resources to create another thread, or the system-imposed limit on the total number of threads in a process <tt>PTHREAD_THREADS_MAX</tt> would be exceeded.
+;EMFILE: Too many file descriptors are in use by the process.
+;ENFILE: The system limit on the total number of open files has been reached.
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_async_destroy()|pgm_async_destroy()]]</tt>
+

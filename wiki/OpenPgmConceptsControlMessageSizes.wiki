@@ -1,0 +1,2 @@
+Although the ability to exchange data buffers larger than individual UDP packets allow is a feature of OpenPGM, it is best  not to make messages too large.  Large messages increase the demands on the send and receive buffers and hence detrimental to overall system performance.  Testing is necessary to determine the most efficient size for your network.
+

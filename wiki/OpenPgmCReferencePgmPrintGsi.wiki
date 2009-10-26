@@ -1,0 +1,72 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>#define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))</tt>
+
+<tt>gchar* '''pgm_print_gsi''' (</tt><br>
+: <tt>const [[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*     gsi</tt><br>
+: <tt>);</tt>
+
+<tt>int '''pgm_print_gsi_r''' (</tt><br>
+: <tt>const [[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*     gsi,</tt>
+: <tt>char* buf,</tt>
+: <tt>size_t bufsize</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Display a GSI in human friendly form.
+
+=== Remarks ===
+<tt>'''pgm_print_gsi_r'''</tt> returns the same identifier in the array <tt>buf</tt> of size <tt>bufsize</tt>.
+
+<tt>bufsize</tt> should be at least <tt>PGM_GSISTRLEN</tt> in length.
+
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>gsi</tt></td>
+<td>Globally unique session identifier (GSI).</td>
+</tr><tr>
+<td><tt>buf</tt></td>
+<td>Buffer to store GSI.</td>
+</tr><tr>
+<td><tt>bufsize</tt></td>
+<td>Length of buffer <tt>buf</tt>.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, <tt>'''pgm_print_gsi'''</tt> returns a pointer to the GSI, and <tt>NULL</tt> on failure.  <tt>'''pgm_print_gsi_r'''</tt> returns 0 when successful, and <tt>-EINVAL</tt> on failure.
+
+=== Example ===
+Display MD5 and IPv4 versions of GSI for the host.
+
+ pgm_gsi_t gsi;
+ pgm_create_md5_gsi(&gsi);
+ printf ("MD5 GSI: %s\n", '''pgm_print_gsi''' (&gsi));
+ pgm_create_ipv4_gsi(&gsi);
+ printf ("IPv4 GSI: %s\n", '''pgm_print_gsi''' (&gsi));
+
+Display MD5 GSI using re-entrant version <tt>'''pgm_print_gsi_r'''</tt>.
+
+ pgm_gsi_t gsi;
+ char buf[PGM_GSISTRLEN];
+ '''pgm_create_md5_gsi''' (&gsi);
+ pgm_print_gsi_r (&gsi, buf, sizeof(buf));
+ printf ("MD5 GSI: %s\n", buf);
+
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt>
+

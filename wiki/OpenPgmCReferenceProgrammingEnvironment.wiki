@@ -1,0 +1,18 @@
+﻿When developing or deploying OpenPGM programs, remember these steps.
+
+=== Code ===
+* Include the appropriate OpenPGM C header files; see [[OpenPGM C Reference/Include these Header Files|Include these Header Files]].
+* Configure the PGM protocol; see [[OpenPGM C Reference/Set these Parameters|Set these Parameters]].
+
+
+=== Compile ===
+* Compile programs with a C compiler supporting ISO C99 plus GNU extensions.
+
+
+=== Link ===
+* Link with the appropriate OpenPGM C library files; see [[OpenPGM C Reference/Link these Library Files|Link these Library Files]].
+
+
+=== Run ===
+* Run with the appropriate system capabilities; see [[OpenPGM C Reference/Run with these Capabilities|Run with these Capabilities]].
+

@@ -1,0 +1,59 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] '''pgm_transport_max_tsdu''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_tranport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]*              can_fragment</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Get maximum TSDU, or packet payload size with or without fragmentation.
+
+=== Remarks ===
+The underlying transport handles packets sized to the maximum transmission protocol data unit (TPDU), when an application provides a larger APDU it will fragment the message into many packets which the receivers will reconstruct and present as a single data unit.  The maximum size available per packet for application payload varies depending whether it is part of a larger APDU.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>PGM Transport.</td>
+</tr><tr>
+<td><tt>can_fragment</tt></td>
+<td>Fragmented or non-fragmented packet.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+Returns the maximum TSDU size, or number of bytes available per packet as application payload.
+
+=== Example ===
+Send one zero-copy packet sized APDU.
+
+ const int max_tpdu = 1500;
+ struct pgm_sk_buff_t vector[1];
+ vector[0] = pgm_alloc_skb (max_tpdu);
+ pgm_send_skbv (transport, vector, 1, TRUE, NULL);
+
+Send a 10 KB zero-copy sized APDU.
+
+ const int max_tpdu = 1500;
+ gsize apdu_size = 10 * 1024;
+ gsize tsdu_size = '''pgm_transport_max_tsdu''' (transport, TRUE);
+ guint packets = apdu_size / tsdu_size;
+ struct pgm_sk_buff_t vector[packets];
+ for (guint i = 0; i < packets; i++)
+   vector[i] = pgm_alloc_skb (max_tpdu);
+ pgm_send_skbv (transport, vector, packets, TRUE, NULL);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_alloc_skb()|pgm_alloc_skb()]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_send_skbv()|pgm_send_skbv()]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.

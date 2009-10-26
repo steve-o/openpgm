@@ -1,0 +1,16 @@
+﻿''Type''
+__NOTOC__
+=== Declaration ===
+<tt>typedef struct pgm_tsi_t '''pgm_tsi_t''';</tt><br>
+<tt>struct pgm_tsi_t {</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]] gsi;</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16] sport;</tt><br>
+<tt>};</tt>
+
+=== Purpose ===
+A transport session identifier (TSI).
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_print_tsi()|pgm_print_tsi()]]</tt>
+

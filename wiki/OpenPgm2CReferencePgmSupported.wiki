@@ -1,0 +1,15 @@
+''Function''
+
+=== Declaration ===
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_supported'''(void);</tt>
+
+=== Purpose ===
+Check whether PGM engine initiated.
+
+=== Return Value ===
+Returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if PGM engine is initialized, returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] if it is not.
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_init()|pgm_init()]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_shutdown()|pgm_shutdown()]]</tt>
+

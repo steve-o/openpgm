@@ -1,0 +1,9 @@
+[[Image:NCF - ignore.png]]
+
+* Reception of NCF will be ignored unless a sequence number matches one in the receive window.
+
+
+[[Image:NCF - preempted.png]]
+
+* For sequence numbers in the receive window that are waiting data, reception of an NCF will pre-empt sending of a NAK.
+

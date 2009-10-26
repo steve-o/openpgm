@@ -1,0 +1,434 @@
+Test numbers as per the referring section in the PGM draft with alphabetical suffix for multiple matching tests.
+
+=== 3.6.2.1.a. Sending ODATA packet ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/odata.pl odata.pl]</tt>
+
+; Overview : Send one data packet from the application and confirm delivery on the network.
+
+; Pseudo code :
+ app: create transport
+ app: send "ringo" 
+ mon: wait for ODATA: "ringo"
+
+
+=== 5.1.1.a. ODATA sequencing ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/odata_number.pl odata_number.pl]</tt>
+
+; Overview : Send 1,000 data packets and verify sending order is same as received order.
+
+; Pseudo code :
+ app: create transport
+ for (''i'' = 1..1000) {
+   app: send ''i''
+   mon: wait for ODATA: ''i''
+ }
+
+
+=== 5.1.1.b. Maximum Cumulative Transmit Rate ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/odata_rate.pl odata_rate.pl]</tt>
+
+; Overview : Set a low TXW_MAX_RTE (1KBps), send 50 data packets and verify received data rate.
+
+; Pseudo code :
+ app: set TXW_MAX_RTE
+ app: create transport
+ for (1..50) {
+   app: send "ringo"
+   mon: wait for ODATA
+   ''bytes'' += ODATA packet size
+ }
+ ''rate'' = ''bytes'' / elapsed time
+
+
+=== 5.1.4.a. Ambient SPMs ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spm.pl spm.pl]</tt>
+
+; Overview : Create a transport and wait for SPM announcement on the network.
+
+; Pseudo code :
+ app: create transport
+ mon: wait for SPM
+
+
+=== 5.1.4.b. Ambient SPMs interleaved with ODATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/ambient_spm.pl ambient_spm.pl]</tt>
+
+; Overview : Send a stream of data packets with interval less than the minimum SPM heartbeat interval, look for an ambient SPM broadcast.
+
+; Remarks : Highly dependent on PGM parameters, data packets need to be published with greater frequency than the minimum SPM heartbeat interval.  Current configuration is publishing every 50ms which should support heartbeat intervals at 100ms and above.
+
+; Pseudo code :
+ app: create transport
+ fork --------------------------------> /* child process */
+ mon: wait for odata                    for (;;) {
+ mon: wait for spm                        app: send "ringo"
+                                        }
+
+
+=== 5.1.5.a. Heartbeat SPMs ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/heartbeat_spm.pl heartbeat_spm.pl]</tt>
+
+; Overview : Look for SPMs shortly following an ODATA packet.
+
+; Remarks : Highly dependent on PGM parameters, currently looking for four consecutive heartbeat SPMs less than 1000ms apart.
+
+; Pseudo code :
+ app: create transport
+ app: send "ringo"
+ mon: wait for ODATA
+ for (1..4) { 
+   mon: wait for SPM
+ }
+
+
+=== 5.2.a. Negative Acknowledgment Confirmation ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/ncf.pl ncf.pl]</tt>
+
+; Overview : Send a sequence of data packets from the application, then request re-transmission of one of the packets and wait for a matching NCF packet.
+
+; Pseudo code :
+ sim: create transport
+ app: create transport
+ app: send "ringo"              /* sequence number: #1 */
+ app: send "ichigo"                              /* #2 */
+ app: send "momo"                                /* #3 */
+ mon: wait for ODATA: #1, "ringo"
+ mon: wait for ODATA: #2, "ichigo"
+ mon: wait for ODATA: #3, "momo"
+ sim: send NAK for #2                 /* ichigo */
+ mon: wait for NCF: #2
+
+
+=== 5.3.a. Repairs ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/nak.pl nak.pl]</tt>
+
+; Overview : Send a sequence of data packets from the application, then request re-transmission of one of the packets and wait for a matching RDATA packet.
+
+; Pseudo code :
+ sim: create transport
+ app: create transport
+ app: send "ringo"              /* sequence number: #1 */
+ app: send "ichigo"                              /* #2 */
+ app: send "momo"                                /* #3 */
+ mon: wait for ODATA: #1, "ringo"
+ mon: wait for ODATA: #2, "ichigo"
+ mon: wait for ODATA: #3, "momo"
+ sim: send NAK for #2                 /* ichigo */
+ mon: wait for RDATA: #2, "ichigo"
+
+
+=== 6.1.a. Data Reception by ODATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/odata_reception.pl odata_reception.pl]</tt>
+
+; Overview : Initiate a PGM session with an ODATA and verify with following ODATA.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish ODATA sqn 90,000
+ app: wait for data
+ sim: verify no NAKs are generated from app
+ sim: publish ODATA sqn 90,001
+ app: wait for data
+
+
+=== 6.1.b. Data Reception by RDATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/rdata_reception.pl rdata_reception.pl]</tt>
+
+; Overview : Initiate a PGM session with a RDATA packet and verify with following ODATA.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish RDATA sqn 90,000
+ app: wait for data
+ sim: verify no NAKs are generated from app
+ sim: publish ODATA sqn 90,001
+ app: wait for data
+
+
+=== 6.1.c. Data Reception by SPM ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spm_reception.pl spm_reception.pl]</tt>
+
+; Overview : Initiate a PGM session with a SPM and verify with matching ODATA.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish SPM txw_trail 90,000
+ sim: verify no NAKs are generated from app
+ sim: publish ODATA sqn 90,001
+ app: wait for data
+
+
+=== 6.1.d. Fragmented APDU ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/apdu.pl apdu.pl]</tt>
+
+; Overview : Send a fragmented APDU and confirm reconstruction at the receiver side.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create transport
+ sim: publish 5KiB ODATA message
+ app: wait for data
+
+
+=== 6.2.a. Out-of-sequence SPMs must be discarded ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spm_jump.pl spm_jump.pl]</tt>
+
+; Overview : Create a PGM session with an initial SPM, follow with an out-of-sequence SPM and verify no NAKs are generated.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish SPM txw_lead 90,000 SPM sqn 3200
+ sim: publish SPM txw_lead 90,005 SPM sqn 20
+ sim: verify no NAKs are generated from app
+
+
+=== 6.3.a. NAK generation induced by ODATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/odata_jump.pl odata_jump.pl]</tt>
+
+; Overview : Create a PGM session with an initial ODATA packet, follow with an ODATA with a jumped sequence number.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish ODATA sqn 90,001
+ sim: publish ODATA sqn 90,003
+ sim: wait for NAK
+
+
+=== 6.3.b. NAK generation induced by RDATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/rdata_jump.pl rdata_jump.pl]</tt>
+
+; Overview : Create a PGM session with an initial ODATA packet, follow with an RDATA with a jumped sequence number.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish ODATA sqn 90,001
+ sim: publish RDATA sqn 90,003
+ sim: wait for NAK
+
+
+=== 6.3.c. NAK generation induced by SPM ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spm_jump2.pl spm_jump2.pl]</tt>
+
+; Overview : Create a PGM session with an initial SPM, follow with an in-sequence SPM that indicates the transmit window has advanced.
+
+; Pseudo code :
+ app: create transport
+ app: listen on transport
+ sim: create fake transport
+ sim: publish SPM txw_lead 90,000 SPM sqn 3200
+ sim: publish SPM txw_lead 90,001 SPM sqn 3201
+ sim: wait for NAK
+
+
+=== 6.3.d. NAK suppression by NCF ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/ncf_suppression.pl ncf_suppression.pl]</tt>
+
+; Overview : Send out-of-sequence ODATA packets to induce a NAK, but follow with a NCF to suppress sending.
+
+; Pseudo code :
+ app: create transport
+ sim: create fake transport
+ sim: sent SPM                        /* set NLA in app */
+ sim: send "ringo"
+ app: wait for data
+ sim: send "ichigo" with sequence number jump 
+ sim: send NCF
+ sim: fail if NAK received
+
+
+=== 6.3.f. Completion by ODATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/odata_completion.pl odata_completion.pl]</tt>
+
+; Overview : Send out-of-sequence ODATA packets to induce a NAK, but follow with a ODATA to complete sequence.
+
+; Pseudo code :
+ app: create transport
+ app: send "nashi"
+ mon: wait for ODATA and save TSI
+ sim: create fake transport
+ sim: sent SPM                        /* set NLA in app */
+ sim: send "ringo"
+ app: wait for data
+ sim: send "ichigo" with sequence number jump 
+ sim: send ODATA "momo"
+ app: wait for data: "momo"
+ app: wait for data: "ichigo"
+
+
+=== 6.3.g. Completion by RDATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/rdata_completion.pl rdata_completion.pl]</tt>
+
+; Overview : Send out-of-sequence ODATA packets to induce a NAK, but follow with a RDATA to complete sequence.
+
+; Pseudo code :
+ app: create transport
+ sim: create fake transport
+ sim: sent SPM                        /* set NLA in app */
+ sim: send "ringo"
+ app: wait for data
+ sim: send "ichigo" with sequence number jump 
+ sim: send RDATA "momo"
+ app: wait for data: "momo"
+ app: wait for data: "ichigo"
+
+
+=== 6.3.h. NAK cancellation by NCF ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/ncf_cancellation.pl ncf_cancellation.pl]</tt>
+
+; Overview : Send out-of-sequence ODATA packets to induce a NAK, wait until NAK is cancelled by NCF retry count.
+
+; Pseudo code :
+ app: create transport
+ sim: create fake transport
+ sim: sent SPM                        /* set NLA in app */
+ sim: send "ringo"
+ app: wait for data
+ sim: send "ichigo" with sequence number jump 
+ fork --------------------------------> /* child process */
+ app: wait for data                     for (;;) {
+                                          sim: wait for NAK
+                                        }
+
+
+=== 6.3.i. NAK cancellation by DATA ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/nak_cancellation.pl nak_cancellation.pl]</tt>
+
+; Overview : Send out-of-sequence ODATA packets to induce a NAK, wait until NAK is cancelled by DATA retry count.
+
+; Pseudo code :
+ app: create transport
+ sim: create fake transport
+ sim: sent SPM                        /* set NLA in app */
+ sim: send "ringo"
+ app: wait for data
+ sim: send "ichigo" with sequence number jump 
+ fork --------------------------------> /* child process */
+ app: wait for data                     for (;;) {
+                                          sim: wait for NAK
+                                          sim: send NCF
+                                        }
+
+
+== 9.3. NAK List Option - OPT_NAK_LIST ==
+
+; Description : The NAK List Option allows transmission of more than sequence number with a single NAK packet.
+
+
+=== 9.3.a. Sending RDATA in response to valid NAK List ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/nak_list.pl nak_list.pl]</tt>
+
+; Overview : Send a sequence of data packets from the application, then request re-transmission of a list of packets and wait for a matching sequence of RDATA packets.
+
+; Pseudo code :
+ sim: create fake transport
+ app: create transport
+ app: send "ringo"              /* sequence number: #1 */
+ app: send "ichigo"                              /* #2 */
+ app: send "momo"                                /* #3 */
+ mon: wait for ODATA: #1, "ringo"
+ mon: wait for ODATA: #2, "ichigo"
+ mon: wait for ODATA: #3, "momo"
+ sim: send NAK list for #1, #2, #3               /* all packets */
+ mon: wait for RDATA: #1, "ringo"
+ mon: wait for RDATA: #2, "ichigo"
+ mon: wait for RDATA: #3, "momo"
+
+
+=== 9.3.b. Sending NCF in response to valid NAK List ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/ncf_list.pl ncf_list.pl]</tt>
+
+; Overview : Send a sequence of data packets from the application, then request re-transmission of a list of packets and wait for a matching NCF list packet.
+
+; Pseudo code :
+ sim: create fake transport
+ app: create transport
+ app: send "ringo"              /* sequence number: #1 */
+ app: send "ichigo"                              /* #2 */
+ app: send "momo"                                /* #3 */
+ mon: wait for ODATA: #1, "ringo"
+ mon: wait for ODATA: #2, "ichigo"
+ mon: wait for ODATA: #3, "momo"
+ sim: send NAK list for #1, #2, #3               /* all packets */
+ mon: wait for NCF list: #1, #2, #3
+
+
+== 13. Appendix C - SPM Requests ==
+
+; Description : SPM Requests (SPMRs) MAY be used to solicit an SPM from a source in a non-implosive way.
+
+
+=== 13.3.1.a SPM Request on DATA opened session ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spmr_from_odata.pl spmr_from_odata.pl]</tt>
+
+; Overview : Send a ODATA packet to lead a new session, wait for SPM Request from test application.
+
+; Pseudo code :
+ sim: create fake transport
+ app: create transport
+ sim: send "ringo"
+ mon: wait for SPMR
+
+
+=== 13.3.1.b SPM broadcast on SPM Request ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spmr.pl spmr.pl]</tt>
+
+; Overview : Send a SPM Request and wait for a matching SPM broadcast.
+
+; Pseudo code :
+ sim: create fake transport
+ app: create transport
+ sim: send SPMR
+ mon: wait for SPM
+
+
+=== 13.3.1.c SPMR suppression by SPMR ===
+
+; Test : <tt>[https://forgesvn1.novell.com/viewsvn/openpgm/trunk/openpgm/pgm/test/spmr_suppression.pl spmr_suppression.pl]</tt>
+
+; Overview : Induce a SPM Request by ODATA lead new session, suppress SPMR generation by sending a multicast peer SPMR.
+
+; Pseudo code :
+ sim: create fake transport
+ app: create transport
+ sim: send "ringo"
+ sim: send SPMR
+ mon: fail on SPMR
+

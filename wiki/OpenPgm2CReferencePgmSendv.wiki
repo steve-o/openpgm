@@ -41,7 +41,7 @@ Calling with non-blocking transport set will return with <tt>PGM_IO_STATUS_AGAIN
 <td>Elements in <tt>vector</tt>.</td>
 </tr><tr>
 <td><tt>is_one_apdu</tt></td>
-<td><tt>vector</tt> is one APDU if set <tt>TRUE</tt>, <tt>vector::iov_base</tt> is one APDU if set <tt>FALSE</tt>.
+<td><tt>vector</tt> is one APDU if set <tt>TRUE</tt>, <tt>vector::iov_base</tt> is one APDU if set <tt>FALSE</tt>.</td>
 </tr><tr>
 <td><tt>bytes_written</tt></td>
 <td>Pointer to store count of bytes written into <tt>buf</tt>.</td>

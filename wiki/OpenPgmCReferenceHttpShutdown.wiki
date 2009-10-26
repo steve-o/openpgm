@@ -1,0 +1,17 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/http.h></tt>
+
+<tt>int '''pgm_http_shutdown''' (void);</tt>
+
+=== Purpose ===
+Stop and destroy a running HTTP interface.
+
+=== Return Value ===
+On success, 0 is returned.
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_http_init()|pgm_http_init()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_snmp_shutdown()|pgm_snmp_shutdown()]]</tt>
+

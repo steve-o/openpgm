@@ -1,0 +1,63 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_transport_epoll_ctl''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>int epfd,</tt><br>
+: <tt>int op,</tt><br>
+: <tt>int events</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set parameters suitable for using with <tt>epoll_wait()</tt>.
+
+=== Remarks ===
+An Edge Triggered event signals the transition to a rising edge (0 to 1).  In simple terms, the start of a series of incoming events.  Data should be read until <tt>EAGAIN</tt> is returned before the next Edge Triggered event will occur.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>epfd</tt></td>
+<td>epoll file descriptor.</td>
+</tr><tr>
+<td><tt>op</tt></td>
+<td>Operation, must be <tt>EPOLL_CTL_ADD</tt>.</td>
+</tr><tr>
+<td><tt>events</tt></td>
+<td>A bit set composed using the following available event types:
+;<tt>EPOLLIN</tt>: The transport is available for <tt>recv()</tt> operations.
+;<tt>EPOLLOUT</tt>: The transport is available for <tt>send()</tt> operations.
+;<tt>EPOLLET</tt>: Sets the Edge Triggered behaviour for the transport.  The default behaviour is Level Triggered.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns 0.  On error, returns -1 and <tt>errno</tt> is set appropriately.
+
+=== Errors ===
+;EBADF:<tt>epfd</tt> is not a valid file descriptor or the transport is closed.
+;EEXIST:<tt>op</tt> was <tt>EPOLL_CTL_ADD</tt>, and a transport file descriptor is already in <tt>epfd</tt>.
+;EINVAL:<tt>epfd</tt> is not an <tt>epoll</tt> file descriptor, or the requested operation <tt>op</tt> is not supported by this interface.
+;ENOMEM:There was insufficient memory to handle the requested <tt>op</tt> control operation.
+
+=== Example ===
+Wait for one incoming Edge Triggered event on the transport.
+
+ int epfd = epoll_create (IP_MAX_MEMBERSHIPS);
+ int retval = '''pgm_transport_epoll_ctl''' (transport, epfd, EPOLL_CTL_ADD, EPOLLIN | EPOLLET);
+ struct epoll_event events[1];
+ epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt>
+

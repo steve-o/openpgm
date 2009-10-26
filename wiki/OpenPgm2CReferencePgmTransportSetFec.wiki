@@ -1,0 +1,58 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_fec''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                      use_proactive_parity,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                      use_ondemand_parity,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                      use_varpkt_len,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                      default_n,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                      default_k</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set and enable Forward Error Correction parameters.
+
+=== Remarks ===
+To send parity encoded APDUs you will most likely require variable length packets and so must set the <tt>use_varpkt_len</tt> parameter to <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>use_proactive_parity</tt></td>
+<td>Enable proactive parity generation.</td>
+</tr><tr>
+<td><tt>use_ondemand_parity</tt></td>
+<td>Enable on-demand (reactive) parity generation.</td>
+</tr><tr>
+<td><tt>use_varpkt_len</tt></td>
+<td>Packet sizes will vary within a transmission block.</td>
+</tr><tr>
+<td><tt>default_n</tt></td>
+<td>Transmission group size.</td>
+</tr><tr>
+<td><tt>default_k</tt></td>
+<td>Transmission block size.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+
+ '''pgm_transport_set_fec''' (transport, FALSE, TRUE, TRUE, 255, 4);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.

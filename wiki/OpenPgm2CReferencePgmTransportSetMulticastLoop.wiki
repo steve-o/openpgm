@@ -1,0 +1,42 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_multicast_loop''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                   use_multicast_loop</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set multicast loop and socket address sharing.
+
+=== Remarks ===
+PGM is a bi-direction communication protocol using the back channel for NAKs, by default multicast loop is therefore disabled to remove unwanted data.  The side effect of disabling multicast loop is that two applications on the same host cannot communicate with each other using PGM.  For production purposes it would be better to use a regular IPC method and it is not recommended, but for development of PGM applications multicast loop allows the convenience of development on one host.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>use_multicast_loop</tt></td>
+<td>Enable multicast loop and socket address sharing.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+
+ '''pgm_transport_set_multicast_loop''' (transport, TRUE);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.

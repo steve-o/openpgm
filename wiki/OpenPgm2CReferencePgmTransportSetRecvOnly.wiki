@@ -1,0 +1,48 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_recv_only''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                      recv_only,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                      is_passive</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set transport to receive-only mode, data packets will not be published.
+
+=== Remarks ===
+A passive receiver will not publish any packets to the network or send to the sender's NLA.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>recv_only</tt></td>
+<td>Receive data only.</td>
+</tr><tr>
+<td><tt>is_passive</tt></td>
+<td>Passive receiver.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+
+ '''pgm_transport_set_recv_only''' (transport, TRUE, FALSE);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+

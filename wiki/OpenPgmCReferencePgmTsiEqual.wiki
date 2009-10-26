@@ -1,0 +1,36 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>gchar* '''pgm_tsi_equal''' (</tt><br>
+: <tt>const [[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*     tsi1,</tt><br>
+: <tt>const [[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*     tsi2,</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Compare two TSI values.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>tsi1</tt></td>
+<td>Globally unique transport session identifier (TSI).</td>
+</tr><tr>
+<td><tt>tsi2</tt></td>
+<td>Globally unique transport session identifier (TSI).</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+The <tt>pgm_tsi_equal()</tt> function returns TRUE if both values are equal and FALSE otherwise. .
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt>
+

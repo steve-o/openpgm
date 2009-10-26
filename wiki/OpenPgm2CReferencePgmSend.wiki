@@ -71,4 +71,4 @@ Basic non-blocking send.
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgm2CReferencePgmSendv pgm_sendv()]</tt><br>
-  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.<br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

@@ -1,0 +1,33 @@
+﻿The OpenPGM suite provides two optional monitoring and administration interfaces, one a traditional SNMP agent that works with the popular [http://net-snmp.sourceforge.net/ Net-SNMP] daemon, the other a more convenient web-based HTTP or HTTPS interface.
+
+
+'''Topics in Alphabetical Order'''
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>[[OpenPGM C Reference/pgm_snmp_init()|pgm_snmp_init()]]</tt></td>
+<td>Start the SNMP sub-agent.</td>
+</tr><tr>
+<td><tt>[[OpenPGM C Reference/pgm_snmp_shutdown()|pgm_snmp_shutdown()]]</tt></td>
+<td>Terminates and destroys a running SNMP sub-agent.</td>
+</tr><tr>
+<td><tt>[[OpenPGM C Reference/pgm_http_init()|pgm_http_init()]]</tt></td>
+<td>Start the HTTP or HTTPS interface.</td>
+</tr><tr>
+<td><tt>[[OpenPGM C Reference/pgm_http_shutdown()|pgm_http_shutdown()]]</tt></td>
+<td>Terminates and destroys a running HTTP/HTTPS interface.</td>
+</tr>
+</table>
+
+
+'''Example HTTP Screenshots'''
+
+[[Image:PGMHTTP_-_general_information.png|none|thumb|320px|General Information]]
+[[Image:PGMHTTP_-_transports.png|none|thumb|320px|Transports]]
+[[Image:PGMHTTP_-_receive_transport.png|none|thumb|320px|Receive Transports]]
+[[Image:PGMHTTP_-_send_transport.png|none|thumb|320px|One Send Transport]]
+

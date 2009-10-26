@@ -1,0 +1,15 @@
+[[Image:SPMR - ignore.png]]
+
+* Invalid SPM-Requests will be ignored.
+* SPM-Requests with non-matching data-destination port will be ignored.
+
+
+[[Image:SPMR - response.png]]
+
+* Receipt of a valid SPM-Request will cause a SPM packet to be broadcast.
+
+
+[[Image:SPMR - limit.png]]
+
+* Receipt of multiple SPM-Requests within a short time period will be ignored.
+

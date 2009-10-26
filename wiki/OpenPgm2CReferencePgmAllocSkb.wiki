@@ -1,0 +1,50 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>struct [[2/OpenPGM_C_Reference/pgm_sk_buff_t|pgm_sk_buff_t]]* '''pgm_alloc_skb''' (</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                        size</tt><br>
+: <tt>);</tt>
+
+<tt>struct [[2/OpenPGM_C_Reference/pgm_sk_buff_t|pgm_sk_buff_t]]* '''pgm_skb_get''' (</tt><br>
+: <tt>struct [[2/OpenPGM_C_Reference/pgm_sk_buff_t|pgm_sk_buff_t]] *skb</tt><br>
+: <tt>);</tt>
+
+<tt>void '''pgm_free_skb''' (</tt><br>
+: <tt>struct [[2/OpenPGM_C_Reference/pgm_sk_buff_t|pgm_sk_buff_t]] *skb</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+<tt>pgm_alloc_skb()</tt> creates a PGM socket buffer.
+
+<tt>pgm_skb_get()</tt> increments the reference count of a PGM socket buffer.
+
+<tt>pgm_free_skb()</tt> decrements the reference count a PGM socket buffer and if zero frees the underlying memory.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>size</tt></td>
+<td>Size of the data segment.</td>
+</tr>
+</table>
+
+
+=== Example ===
+Create a skbuff with enough space for a regular Ethernet sized packet, create a reference and free the original.
+
+ struct pgm_sk_buff_t *skb, *ref;
+ skb = pgm_alloc_skb (1500);
+ ref = pgm_skb_get (skb);
+ pgm_free_skb (skb);
+
+=== See Also ===
+<tt>struct [[2/OpenPGM C Reference/pgm_sk_buff_t|pgm_sk_buff_t]]</tt><br>
+[[2/OpenPGM C Reference/PGM SKBs|PGM SKBs]] in OpenPGM C Reference.
+

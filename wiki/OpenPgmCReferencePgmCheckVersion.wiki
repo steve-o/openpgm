@@ -1,0 +1,43 @@
+﻿''Function''
+
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+
+<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_major_version''';</tt><br>
+<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_minor_version''';</tt><br>
+<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_micro_version''';</tt>
+
+<strike><tt>const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]* '''pgm_check_version''' (</tt></strike><br>
+: <tt><strike>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] required_major,</strike></tt><br>
+: <tt><strike>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] required_minor,</strike></tt><br>
+: <tt><strike>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] required_micro</strike></tt><br>
+: <tt><strike>);</strike></tt>
+
+
+=== Purpose ===
+OpenPGM version information.
+
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>required_major</tt></td>
+<td>The required major version.</td>
+</tr><tr>
+<td><tt>required_minor</tt></td>
+<td>The required minor version.</td>
+</tr><tr>
+<td><tt>required_micro</tt></td>
+<td>The required micro version.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>NULL</tt>, on error returns a string describing the mismatch.
+

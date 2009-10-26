@@ -1,0 +1,45 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_txw_sqns''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     sqns</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set send window size in sequence numbers.
+
+=== Remarks ===
+Microsoft PGM sets its transmt window size in bytes, a default size of 10 MB which is roughly 7,000 sequence numbers when using 1,500 MTU sized IPv4 packets.  Microsoft PGM stores its window contents on disk to enable large window sizes, OpenPGM only stores in memory.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>sqns</tt></td>
+<td>Size of window in sequence numbers.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+Create a reliability window sufficient to store 400,000 packets.
+
+ '''pgm_transport_set_txw_sqns''' (transport, 400*1000);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_transport_set_rxw_sqns()|pgm_transport_set_rxw_sqns()]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+

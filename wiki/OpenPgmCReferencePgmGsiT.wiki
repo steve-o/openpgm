@@ -1,0 +1,16 @@
+﻿''Type''
+__NOTOC__
+=== Declaration ===
+<tt>typedef struct pgm_gsi_t '''pgm_gsi_t''';</tt><br>
+<tt>struct pgm_gsi_t {</tt><br>
+: <tt>char   identifier[6];</tt><br>
+<tt>};</tt>
+
+=== Purpose ===
+A globally unique source identifier (GSI).
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt>
+

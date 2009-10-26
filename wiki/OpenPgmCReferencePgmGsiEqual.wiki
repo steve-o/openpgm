@@ -1,0 +1,46 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>gchar* '''pgm_gsi_equal''' (</tt><br>
+: <tt>const [[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*     gsi1,</tt><br>
+: <tt>const [[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*     gsi2,</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Compare two GSI values.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>gsi1</tt></td>
+<td>Globally unique session identifier (GSI).</td>
+</tr><tr>
+<td><tt>gsi2</tt></td>
+<td>Globally unique session identifier (GSI).</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+The <tt>pgm_gsi_equal()</tt> function returns TRUE if both values are equal and FALSE otherwise. .
+
+=== Example ===
+
+ pgm_gsi_t gsi1, gsi2 = { .identifier = { 170, 29, 65, 155, 237, 36 } };
+ pgm_create_md5_gsi(&gsi1);
+ if (pgm_gsi_equal(&gsi1, &gsi2)) {
+   g_message ("GSI matches host ayaka");
+ }
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt>
+

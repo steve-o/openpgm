@@ -1,0 +1,49 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_transport_set_nak_bo_ivl''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     usec</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set NAK transmit back-off interval.
+
+=== Remarks ===
+Before transmitting a NAK, a receiver must wait some interval NAK_RB_IVL chosen randomly over some time period NAK_BO_IVL.  During this period, receipt of a matching NAK or a matching NCF will suspend NAK generation.  NAK_RB_IVL is counted down from the time a missing data packet is detected.  During NAK_RB_IVL a NAK is said to be pending.
+
+The NAK back-off interval is a procedure intended to prevent NAK implosion and to limit its extent in the case of the loss of all or part of the suppressing multicast distribution tree.
+
+SmartPGM uses a default of 500ms, Microsoft PGM uses a default of 600ms.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>usec</tt></td>
+<td>Interval in microseconds.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
+
+=== Example ===
+Set NAK_BO_IVL to 50ms, same as TIBCO Rendezvous.
+
+ '''pgm_transport_set_nak_bo_ivl''' (transport, 50*1000);
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_set_nak_rpt_ivl()|pgm_transport_set_nak_rpt_ivl()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_set_nak_rdata_ivl()|pgm_transport_set_nak_rdata_ivl()]]</tt>
+

@@ -1,0 +1,17 @@
+[[Image:SPM - ignore.png]]
+
+* Reception of invalid SPM will be ignored.
+* Reception of SPM with non-matching data-destination port will be ignored.
+* Reception of SPMs with SPM sequence number older or equal to previous sequence number will be ignored.
+
+
+[[Image:SPM - session.png]]
+
+* Reception of SPMs for new TSIs indicate a new PGM session.
+* Reception of SPMs for known TSIs update the stored NLA to send NAKs.
+
+
+[[Image:SPM - lost.png]]
+
+* Reception of SPM updates the status of the Tx Window indicating lost leading packets causing NAK generation.
+

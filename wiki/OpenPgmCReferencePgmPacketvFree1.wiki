@@ -1,0 +1,40 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_packetv_free1''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                       tsdu,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                       can_fragment</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Return an unused packet allocated from the transmit window via <tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt>.
+
+=== Remarks ===
+The same <tt>can_fragment</tt> parameter value must be used as when the pointer was retrieved from the transmit window.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>tsdu</tt></td>
+<td>Packet buffer pointer.</td>
+</tr><tr>
+<td><tt>can_fragment</tt></td>
+<td>Whether this packet will be part of a multi-packet APDU.</td>
+</tr>
+</table>
+
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt>
+

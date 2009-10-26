@@ -1,0 +1,7 @@
+You can use the OpenPGM libraries with any popular software development methodology. Add these steps to the development process:
+
+* Identify information producers and consumers during the analysis phase. Consider whether the information flow is best characterized as request/reply or as publish/subscribe (or both). Use this analysis to guide architectural design.<br>For example, if your program behaves as a request/reply application, you can divide it into client and server components. If your program behaves as a publish/subscribe application, you can divide it into sending components and listening components. In some cases programs communicate in both modes—request/reply and publish/subscribe.
+* Identify the kinds of information that components exchange, the events that generate the information, and the information that triggers other events. Use this analysis to establish subject naming conventions and to design the content of data messages.
+* Write your OpenPGM programs using the OpenPGM API calls as appropriate.
+* Compile with the appropriate OpenPGM header files. Link your program code with the OpenPGM library. Link additional libraries for extended functionality. For details, see the Programmer’s Checklist section in the C Reference documentation.
+

@@ -1,0 +1,33 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_async_destroy''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]*     async</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Destroy an asynchronous event handler.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>async</tt></td>
+<td>The asynchronous receiver object.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, 0 is returned.  If <tt>async</tt> is invalid, <tt>-EINVAL</tt> is returned.
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt>
+

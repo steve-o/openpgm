@@ -1,0 +1,47 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/snmp.h></tt>
+
+<tt>int '''pgm_snmp_init''' (void);</tt>
+
+=== Purpose ===
+Create and start a SNMP agent or master agent.
+
+=== Remarks ===
+The included PGM MIB <tt>PGM-MIB-petrova-01.txt</tt> should be installed in the NET-SNMP MIB directory, and the <tt>snmpd</tt> started and configured appropriately before calling this function.
+
+Example <tt>snmpd.conf</tt>:
+ com2sec readonly  default         public
+ 
+ group MyROSystem v1        paranoid
+ group MyROSystem v2c       paranoid
+ group MyROSystem usm       paranoid
+ group MyROGroup v1         readonly
+ group MyROGroup v2c        readonly
+ group MyROGroup usm        readonly
+ group MyRWGroup v1         readwrite
+ group MyRWGroup v2c        readwrite
+ group MyRWGroup usm        readwrite
+ 
+ view all    included  .1                               80
+ view system included  .iso.org.dod.internet.mgmt.mib-2.system
+ 
+ access MyROSystem ""     any       noauth    exact  system none   none
+ access MyROGroup ""      any       noauth    exact  all    none   none
+ access MyRWGroup ""      any       noauth    exact  all    all    none
+ 
+ syslocation Unknown (configure /etc/snmp/snmpd.local.conf)
+ syscontact Root <root@localhost> (configure /etc/snmp/snmpd.local.conf)
+ 
+ master  agentx
+
+=== Return Value ===
+On success, 0 is returned.  On error, 1 is returned, and a SNMP log entry created.
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_snmp_shutdown()|pgm_snmp_shutdown()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_http_init()|pgm_http_init()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_init()|pgm_init()]]</tt><br>
+[http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].
+

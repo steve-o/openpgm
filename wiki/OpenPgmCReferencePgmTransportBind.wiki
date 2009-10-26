@@ -1,0 +1,49 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_transport_bind''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Bind a transport to the specified network devices.
+
+=== Remarks ===
+Assigns local addresses to the PGM transport sockets which will initiate delivery of reconstructed messages to the asynchronous queue and its associated dispatcher threads.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns 0.  If <tt>transport</tt> is invalid or already bound, returns <tt>-EINVAL</tt>.  On error, returns -1 and sets <tt>errno</tt> appropriately, or if the local interface cannot be resolved, -2 is returned <tt>h_errno</tt> set appropriately.
+
+=== Errors ===
+The variable <tt>errno</tt> can have the following values:
+;EACCES:The address is protected, and the user is not the superuser.
+;EADDRINUSE:The given address is already in use.
+;EADDRNOTAVAIL:Unknown multicast group address passed.
+;EMFILE:Too many file descriptors are in use by the process.
+;ENFILE:The system limit on the total number of open files has been reached.
+The variable <tt>h_errno</tt> can have the following values:
+;HOST_NOT_FOUND:The specified host is unknown.
+;NO_ADDRESS or NO_DATA:The requested name is valid but does not have an IP address.
+;NO_RECOVERY:A non-recoverable name server error occurred.
+;TRY_AGAIN:A temporary error occurred on an authoritative name server.  Try again later.
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt>
+

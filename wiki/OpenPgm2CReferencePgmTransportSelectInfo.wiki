@@ -1,0 +1,60 @@
+#summary OpenPGM 2 : C Reference : pgm_transport_select_info()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_select_info* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	fd_set`*`     readfds,
+	fd_set`*`     writefds,
+	int`*`     nfds
+);
+</pre>
+
+=== Purpose ===
+Set parameters suitable for feeding into <tt>select()</tt>.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>readfds</tt></td>
+<td>File descriptors to be watched for reading.</td>
+</tr><tr>
+<td><tt>writefds</tt></td>
+<td>File descriptors to be watched for writing.</td>
+</tr><tr>
+<td><tt>nfds</tt></td>
+<td>Highest-numbered file descriptor plus 1.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, returns the highest-numbered file descriptor plus 1.  If the transport is closed, returns -1 and sets <tt>errno</tt> to <tt>EBADF</tt>.
+
+=== Example ===
+Monitor the PGM transport for incoming events.
+
+{{{
+ int nfds = 0;
+ fd_set readfds;
+ FD_ZERO(&readfds);
+ pgm_transport_select_info (transport, &readfds, NULL, &nfds);
+ nfds = select (nfds, &readfds, NULL, NULL, NULL);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportPollInfo pgm_transport_poll_info()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportEpollCtl pgm_transport_epoll_ctl()]</tt><br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

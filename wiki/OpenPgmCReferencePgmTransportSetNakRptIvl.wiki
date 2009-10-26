@@ -1,0 +1,51 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_transport_set_nak_rpt_ivl''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     usec</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set timeout before repeating NAK.
+
+=== Remarks ===
+NAKs are repeated at a rate governed by NAK_RPT_IVL up to NAK_NCF_RETRIES times while waiting for a matching NCF.
+
+SmartPGM uses a default of 500ms, but can auto-tune from 20-2000ms depending on network conditions.  Microsoft PGM defaults to 1000ms.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>usec</tt></td>
+<td>AInterval in microseconds.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
+
+=== Example ===
+Set NAK_RPT_IVL to 200ms.
+
+ '''pgm_transport_set_nak_rpt_ivl''' (transport, 200*1000);
+
+Set NAK_RPT_IVL to 2 seconds, matching TIBCO Rendezvous over PGM.
+
+ '''pgm_transport_set_nak_rpt_ivl''' (transport, 2*1000*1000);
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_set_nak_rb_ivl()|pgm_transport_set_nak_rb_ivl()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_set_nak_rdata_ivl()|pgm_transport_set_nak_rdata_ivl()]]</tt>
+

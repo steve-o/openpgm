@@ -1,0 +1,21 @@
+﻿''Type''
+__NOTOC__
+=== Declaration ===
+<tt>typedef struct pgm_msgv_t '''pgm_msgv_t''';</tt><br>
+<tt>struct pgm_msgv_t {</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*      msgv_tsi;       /* TSI */</tt><br>
+: <tt>struct iovec*   msgv_iov;       /* scatter/gather array */</tt><br>
+: <tt>size_t          msgv_iovlen;    /* # elements in iov */</tt><br>
+<tt>};</tt>
+
+=== Purpose ===
+A scatter/gather message vector.
+
+=== Remarks ===
+Received messages from a transport can be a populated scatter/gather vector.  APDU arrays are owned by the transport object, and the TPDU buffers are owned by the receive window and both will be recycled on the next call.
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recvmsg()]]</tt><br>
+<tt>[[OpenPGM C Reference/pgm_transport_recvmsgv()|pgm_transport_recvmsgv()]]</tt>
+

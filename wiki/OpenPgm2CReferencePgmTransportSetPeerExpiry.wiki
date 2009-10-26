@@ -1,0 +1,51 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_peer_expiry''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     peer_expiry</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set timeout for removing a dead peer.
+
+=== Remarks ===
+The absence of regular Source Path Messages (SPMs) indicates the failure of a network element or the PGM source.
+
+TIBCO Rendezvous handles session timeouts based on <tt>HOST.STATUS</tt> broadcasts, independent of whether TRDP or PGM is used as the underlying network transport.  The host timeout interval is 300 seconds.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>peer_expiry</tt></td>
+<td>Timeout in microseconds.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+Set expiration timeout to five times the ambient SPM interval, in effect allowing up to five lost broadcasts.
+
+ '''pgm_transport_set_peer_expiry''' (transport, 5*8192*1000);
+
+Set expiration interval to 300 seconds.
+
+ '''pgm_transport_set_peer_expiry''' (transport, 300*1000*1000);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_transport_set_ambient_spm()|pgm_transport_set_ambient_spm()]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+

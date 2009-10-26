@@ -1,0 +1,14 @@
+''Function''
+
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+
+<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_major_version''';</tt><br>
+<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_minor_version''';</tt><br>
+<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_micro_version''';</tt>
+
+
+=== Purpose ===
+OpenPGM version information.
+

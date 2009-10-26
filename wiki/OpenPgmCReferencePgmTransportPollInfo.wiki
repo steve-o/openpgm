@@ -1,0 +1,58 @@
+﻿''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>int '''pgm_transport_poll_info''' (</tt><br>
+: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>struct pollfd* fds,</tt>
+: <tt>int* n_fds</tt>,<br>
+: <tt>int events</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set parameters suitable for feeding into <tt>poll()</tt>.
+
+=== Remarks ===
+An assertion will be raised if insufficient file descriptors are provided.  1 file descriptor is required for basic <tt>POLLIN</tt> events, another is required if the transport has a receive channel (default configuration, or calling <tt>[[OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt> with <tt>FALSE</tt>).  1 file descriptor is required for basic <tt>POLLOUT</tt> events.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>fds</tt></td>
+<td>Array to store poll file descriptors.</td>
+</tr><tr>
+<td><tt>n_fds</tt></td>
+<td>Length of <tt>fds</tt> array, and file descriptors used.</td>
+</tr><tr>
+<td><tt>events</tt></td>
+<td>A bit set composed using the following available event types:
+;<tt>POLLIN</tt>: The transport is available for <tt>recv()</tt> operations.
+;<tt>POLLOUT</tt>: The transport is available for <tt>send()</tt> operations.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns the number of <tt>pollfd</tt> event structures filled.  If the transport is closed, returns -1 and sets <tt>errno</tt> to <tt>EBADF</tt>. 
+
+=== Example ===
+Poll the PGM transport for incoming events.
+
+ int nfds = IP_MAX_MEMBERSHIPS;
+ struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
+ memset (fds, 0, sizeof(fds));
+ '''pgm_transport_poll_info''' (transport, &fds, &nfds, POLLIN);
+ poll (fds, nfds, 1000 /* ms */);
+
+=== See Also ===
+<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt>,<br>
+<tt>[[OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt>
+

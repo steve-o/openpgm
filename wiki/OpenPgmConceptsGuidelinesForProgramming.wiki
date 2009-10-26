@@ -1,0 +1,8 @@
+This section describes techniques and guidelines to help you create programs that use OpenPGM to the fullest advantage.
+
+* [OpenPgmConceptsControlMessageSizes Control Message Sizes]
+* [OpenPgmConceptsAvoidFloodingTheNetwork Avoid Flooding the Network]
+* [OpenPgmConceptsBewareOfNetworkBoundaries Beware of Network Boundaries]
+* [OpenPgmConceptsMakeTransportParametersFlexible Make Transport Parameters Flexible]
+* [OpenPgmConceptsVerifyEachInboundMessage Verify Each Inbound Message]
+

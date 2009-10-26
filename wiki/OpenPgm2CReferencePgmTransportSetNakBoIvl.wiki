@@ -1,0 +1,50 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_nak_bo_ivl''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     usec</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set NAK transmit back-off interval.
+
+=== Remarks ===
+Before transmitting a NAK, a receiver must wait some interval <tt>NAK_RB_IVL</tt> chosen randomly over some time period <tt>NAK_BO_IVL</tt>.  During this period, receipt of a matching NAK or a matching NCF will suspend NAK generation.  <tt>NAK_RB_IVL</tt> is counted down from the time a missing data packet is detected.  During <tt>NAK_RB_IVL</tt> a NAK is said to be pending.
+
+The NAK back-off interval is a procedure intended to prevent NAK implosion and to limit its extent in the case of the loss of all or part of the suppressing multicast distribution tree.
+
+SmartPGM uses a default of 500ms, Microsoft PGM uses a default of 600ms.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>usec</tt></td>
+<td>Interval in microseconds.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+Set <tt>NAK_BO_IVL</tt> to 50ms, same as TIBCO Rendezvous.
+
+ '''pgm_transport_set_nak_bo_ivl''' (transport, 50*1000);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_transport_set_nak_rpt_ivl()|pgm_transport_set_nak_rpt_ivl()]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_transport_set_nak_rdata_ivl()|pgm_transport_set_nak_rdata_ivl()]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+

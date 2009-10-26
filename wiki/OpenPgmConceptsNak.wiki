@@ -1,0 +1,14 @@
+[[Image:NAK - ignore.png]]
+
+* Reception of invalid NAKs will be ignored.
+
+
+[[Image:NAK - confirm.png]]
+
+* Reception of valid NAKs will be responded with matching NCF, even if the sequence numbers are not in the transmit window.
+
+
+[[Image:NAK - repair.png]]
+
+* Reception of NAK with sequence numbers in the transmit window will be confirmed with a matching NCF and then later RDATA packets for each requested sequence number (ARQ).
+

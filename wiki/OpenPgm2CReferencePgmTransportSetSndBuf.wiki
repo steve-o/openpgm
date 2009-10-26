@@ -1,0 +1,44 @@
+''Function''
+__NOTOC__
+=== Declaration ===
+<tt>#include <pgm/pgm.h></tt>
+
+<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_sndbuf''' (</tt><br>
+: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
+: <tt>int                       size</tt><br>
+: <tt>);</tt>
+
+=== Purpose ===
+Set send buffer size.
+
+=== Remarks ===
+Changes the send socket buffer sizes from the system default (<tt>/proc/sys/net/core/wmem_default</tt>) up to a maximum (<tt>/proc/sys/net/core/wmem_max</tt>).
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>size</tt></td>
+<td>Size of socket buffer in bytes.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
+
+=== Example ===
+
+ '''pgm_transport_set_sndbuf''' (transport, 131071);
+
+=== See Also ===
+<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
+<tt>[[2/OpenPGM C Reference/pgm_transport_set_rcvbuf()|pgm_transport_set_rcvbuf()]]</tt><br>
+[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+
