@@ -1,13 +1,17 @@
-''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM 2 : C Reference : pgm_transport_set_heartbeat_spm()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_heartbeat_spm''' (</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]*                    spm_heartbeat_interval,</tt><br>
-: <tt>int                       len</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_heartbeat_spm* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]`*`     spm_heartbeat_interval,
+	int      len
+	);
+</pre>
 
 === Purpose ===
 Set intervals of data flushing SPM packets.
@@ -46,20 +50,24 @@ On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standar
 === Example ===
 After the last data packet publish a SPM packet in increments of 1ms, 1ms, 2ms, 4ms, 8ms, 16ms, 32ms, 64ms, 128ms, 250ms, 512ms, 1s, 2s, 4s, and finally 8s, matching the ambient SPM interval.
 
+{{{
  guint spm_heartbeat[] = { 1*1000, 1*1000, 2*1000, 4*1000, 8*1000, 16*1000, 
                            32*1000, 64*1000, 128*1000, 256*1000, 512*1000,
                            1024*1000, 2048*1000, 4096*1000, 8192*1000 };
- '''pgm_transport_set_heartbeat_spm''' (transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+ pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
  pgm_transport_set_ambient_spm (transport, 8192*1000);
+}}}
 
 For interoperability with a TIBCO Rendezvous daemon the following intervals can be used.
 
+{{{
  guint spm_heartbeat[] = { 100*1000, 100*1000, 100*1000, 100*1000, 1300*1000,
                            7*1000*1000, 16*1000*1000, 25*1000*1000, 30*1000*1000 };
- '''pgm_transport_set_heartbeat_spm''' (transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+ pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
  pgm_transport_set_ambient_spm (transport, 30*1000*1000);
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_transport_set_ambient_spm()|pgm_transport_set_ambient_spm()]]</tt><br>
-[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt><br>
+  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.

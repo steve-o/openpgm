@@ -1,7 +1,12 @@
-__NOTOC__
+#summary OpenPGM 2 : C Reference : PGM Socket Buffers (PGM SKBs)
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
+=== Introduction ===
 PGM socket buffer API.
 
-'''Topics in Alphabetical Order'''
+
+=== Topics in Alphabetical Order ===
 
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>

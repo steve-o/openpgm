@@ -1,5 +1,5 @@
 #summary Whitepapers and research documents on the PGM protocol.
-#labels Phase-Design
+#labels Featured,Phase-Design
 
   * RFC 3208 - PGM Reliable Transport Protocol Specification
 http://www.ietf.org/rfc/rfc3208.txt

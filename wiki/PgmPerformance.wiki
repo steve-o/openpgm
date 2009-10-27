@@ -1,5 +1,5 @@
 #summary Math on the efficiency of the PGM protocol.
-#labels Phase-Design
+#labels Featured,Phase-Design
 
 = PGM Protocol Efficiency =
 

@@ -1,0 +1,23 @@
+#summary OpenPGM 2 : C Reference : pgm_shutdown()
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_shutdown* (void);
+</pre>
+
+=== Purpose ===
+Shutdown OpenPGM internal machinery.
+
+=== Return Value ===
+On success, returns 0.  On failure, returns -1.
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
+  * [OpenPgm2CReferenceEnvironment Environment] in OpenPGM C Reference.
+

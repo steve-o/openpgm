@@ -1,7 +1,6 @@
 #summary OpenPGM 2 : C Reference : Error Handling
 #labels Phase-Implementation
 #sidebar TOC2CReference
-
 === Introduction ===
 Warnings and errors in OpenPGM maybe raised via log messages or return status values.
 

@@ -1,12 +1,16 @@
-''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM 2 : C Reference : pgm_transport_set_nak_ncf_retries()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_nak_ncf_retries''' (</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     retries</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_nak_ncf_retries* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      cnt
+	);
+</pre>
 
 === Purpose ===
 Set retries for DATA after NCF.
@@ -26,7 +30,7 @@ SmartPGM uses a value of 50 retries but can auto-tune the setting to 10-100 depe
 <td><tt>transport</tt></td>
 <td>The PGM transport object.</td>
 </tr><tr>
-<td><tt>retries</tt></td>
+<td><tt>cnt</tt></td>
 <td>Maximum number of retries.</td>
 </tr>
 </table>
@@ -36,11 +40,12 @@ SmartPGM uses a value of 50 retries but can auto-tune the setting to 10-100 depe
 On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
 
 === Example ===
-
- '''pgm_transport_set_nak_ncf_retries''' (transport, 2);
+{{{
+ pgm_transport_set_nak_ncf_retries (transport, 2);
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_transport_set_nak_data_retries()|pgm_transport_set_nak_data_retries()]]</tt><br>
-[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportSetNakDataRetries pgm_transport_set_nak_data_retries()]</tt><br>
+  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.
 

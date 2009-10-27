@@ -1,5 +1,5 @@
 #summary History of the PGM protocol.
-#labels Phase-Support
+#labels Featured,Phase-Support
 
 = History =
 

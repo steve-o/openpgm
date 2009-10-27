@@ -1,7 +1,14 @@
-''Function''
+#summary OpenPGM 2 : C Reference : pgm_init()
+#labels Phase-Implementation
+#sidebar TOC2CReference
 
+_Function_
 === Declaration ===
-<tt>int '''pgm_init'''(void);</tt>
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_init* (void);
+</pre>
 
 === Purpose ===
 Create and start OpenPGM internal machinery.
@@ -9,20 +16,22 @@ Create and start OpenPGM internal machinery.
 === Remarks ===
 This call creates the internal machinery that OpenPGM requires for its operation:
 
-* Threading support.
-* Timer support.
-* PGM protocol number.
+  * Threading support.
+  * Timer support.
+  * PGM protocol number.
  
 Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports are unusable.
 
 <tt>pgm_init()</tt> might only be called once. On the second call it will abort with an error. If you want to make sure that the thread system is initialized, you can do this:
 
+{{{
  if (!pgm_supported ()) pgm_init ();
+}}}
 
 === Return Value ===
 On success, returns 0.  On failure, returns -1.
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_supported()|pgm_supported()]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_shutdown()|pgm_shutdown()]]</tt>
-
+  * <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * [OpenPgm2CReferenceEnvironment Environment] in OpenPGM C Reference.

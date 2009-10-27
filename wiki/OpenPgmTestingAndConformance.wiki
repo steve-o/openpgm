@@ -1,12 +1,15 @@
-''1.0.0''
+#summary Testing and Conformance to PGM Protocol
+#labels Featured,Phase-Design,Phase-QA
 
-''May 2009''
+*1.0.0*
+
+*May 2009*
 
 
 == Contents ==
-# [OpenPgmTestingAndConformanceBehaviour OpenPGM Behaviour]
-# [OpenPgmTestingAndConformanceNetworkLayout Network Layout]
-# [OpenPgmTestingAndConformanceSystems Systems]
-# [OpenPgmTestingAndConformanceTests Tests]
-# [OpenPgmTestingAndConformanceIPv6 IPv6 Compatibility]
+  # [OpenPgmTestingAndConformanceBehaviour OpenPGM Behaviour]
+  # [OpenPgmTestingAndConformanceNetworkLayout Network Layout]
+  # [OpenPgmTestingAndConformanceSystems Systems]
+  # [OpenPgmTestingAndConformanceTests Tests]
+  # [OpenPgmTestingAndConformanceIPv6 IPv6 Compatibility]
 

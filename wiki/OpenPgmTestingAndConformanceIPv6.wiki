@@ -1,37 +1,40 @@
+#summary IPv6 Conformance
+#labels Phase-Design,Phase-QA
+
 == Known Issues ==
-* [http://en.wikipedia.org/wiki/IPv6#Link-local_addresses_and_zone_indices Zone Indices] are not completely supported in interface parsing.
+  * [http://en.wikipedia.org/wiki/IPv6#Link-local_addresses_and_zone_indices Zone Indices] are not completely supported in interface parsing.
 
 If you bridge an IPv6 interface on two different networks, i.e. using VLAN tagging, both interfaces will keep the same IPv6 link-local address, e.g.
-
+<pre>
  eth0      Link encap:Ethernet  HWaddr 00:30:1b:b7:a2:09  
            inet6 addr: fe80::230:1bff:feb7:a209/64 Scope:Link
  
  eth0.615  Link encap:Ethernet  HWaddr 00:30:1b:b7:a2:09  
            inet6 addr: fe80::230:1bff:feb7:a209/64 Scope:Link
-
+</pre>
 Zone indices would allow the user to specify the adapter by index on Windows platforms, e.g.
-
+<pre>
  $ pgmsend -n "fe80::230:1bff:feb7:a209%2" moo
  $ pgmsend -n "fe80::230:1bff:feb7:a209%3" baa
-
+</pre>
 Or the interface name on Unix platforms, e.g.
-
+<pre>
  $ pgmsend -n "fe80::230:1bff:feb7:a209%eth0" moo
  $ pgmsend -n "fe80::230:1bff:feb7:a209%eth0.615" baa
-
+</pre>
 The interface index can be seen running <tt>dumpif</tt>
-
+<pre>
  Pgm-Message: #1 name lo (lo)         IPv6 ::1
  Pgm-Message: #2 name eth0 (eth0)     IPv6 fe80::230:1bff:feb7:a209
  Pgm-Message: #3 name eth0.615 (eth0. IPv6 fe80::230:1bff:feb7:a209
-
+</pre>
 OpenPGM provides the ability to specify the interface as part of the network parameter but not the scope, similarly a multicast address must be specified if a dual protocol stack is enabled.
-
+<pre>
  $ pgmsend -n "eth0" moo
  $ pgmsend -n "eth0.615" baa
-
+</pre>
 or
-
+<pre>
  $ pgmsend -n "eth0;ff08::1" moo
  $ pgmsend -n "eth0.615;ff08::1" baa
-
+</pre>

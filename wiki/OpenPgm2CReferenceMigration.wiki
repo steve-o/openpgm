@@ -1,160 +1,162 @@
+#summary OpenPGM 2 : C Reference : Migration
+#labels Phase-Implementation
+#sidebar TOC2CReference
 == Environment ==
 === Summary ===
-* Add call to <tt>[[2/OpenPGM C Reference/pgm_shutdown()|pgm_shutdown()]]</tt> on application shutdown.
-
+  * Add call to <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt> on application shutdown.
 
 === Details ===
-Version 2.0 introduces a <tt>[[2/OpenPGM C Reference/pgm_shutdown()|pgm_shutdown()]]</tt> function to free resources used by the PGM engine together with <tt>[[2/OpenPGM C Reference/pgm_supported()|pgm_supported()]]</tt>, a method to detect previously initialized PGM engine allowing multiple subsystems to use PGM, for example within a library and inside an application core.
+Version 2.0 introduces a <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt> function to free resources used by the PGM engine together with <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt>, a method to detect previously initialized PGM engine allowing multiple subsystems to use PGM, for example within a library and inside an application core.
 
 
 == Interface and GSI ==
 === Summary ===
-* Replace interface parsing calls to <tt>[[OpenPGM C Reference/pgm_if_parse_transport()|pgm_if_parse_transport()]]</tt> with <tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_get_transport_info()]]</tt>.
-* Parameters <tt>recv_gsr</tt>, <tt>recv_len</tt>, and <tt>send_gsr</tt> need to be replaced with an object of structure <tt>[[2/OpenPGM C Reference/pgm_transport_info_t|pgm_transport_info_t]]</tt>.
-* Replace GSI creation calls to <tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt> and <tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt> with <tt>[[2/OpenPGM C Reference/pgm_gsi_create_from_addr()|pgm_gsi_create_from_addr()]]</tt> and <tt>[[2/OpenPGM C Reference/pgm_gsi_create_from_hostname()|pgm_gsi_create_from_hostname()]]</tt> respectively.
+  * Replace interface parsing calls to <tt>[[OpenPgmCReferencePgmIfParseTransport pgm_if_parse_transport()]</tt> with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>.
+  * Parameters <tt>recv_gsr</tt>, <tt>recv_len</tt>, and <tt>send_gsr</tt> need to be replaced with an object of structure <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt>.
+  * Replace GSI creation calls to <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt> and <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt> with <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt> and <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt> respectively.
 
 
 === Details ===
-Version 2.0 simplifies the parameters for creating a PGM transport by combining all the network details into one structure, <tt>[[2/OpenPGM C Reference/pgm_transport_info_t|pgm_transport_info_t]]</tt>.  The structure can be manually populated or filled with a helper function <tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_get_transport_info()]]</tt>.
+Version 2.0 simplifies the parameters for creating a PGM transport by combining all the network details into one structure, <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt>.  The structure can be manually populated or filled with a helper function <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>.
 
-GSI creation functions <tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt> and <tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt> and been replaced with variants including extra error reporting and normalized names, <tt>[[2/OpenPGM C Reference/pgm_gsi_create_from_addr()|pgm_gsi_create_from_addr()]]</tt> and <tt>[[2/OpenPGM C Reference/pgm_gsi_create_from_hostname()|pgm_gsi_create_from_hostname()]]</tt> respectively.  These new functions populate contents of the <tt>[[2/OpenPGM C Reference/pgm_transport_info_t|pgm_transport_info_t]]</tt> structure and if used, should be called after <tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_get_transport_info()]]</tt>.
+GSI creation functions <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]]</tt> and <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt> and been replaced with variants including extra error reporting and normalized names, <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt> and <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt> respectively.  These new functions populate contents of the <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt> structure and if used, should be called after <tt>[OpenPgm2CReferencePgmIfGetTransportIinfo pgm_if_get_transport_info()]</tt>.
 
-Transport info structures created with <tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_get_transport_info()]]</tt> should be freed with <tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_free_transport_info()]]</tt>.  The transport info object can be released without needing to destroy any associated PGM transport.
+Transport info structures created with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt> should be freed with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]</tt>.  The transport info object can be released without needing to destroy any associated PGM transport.
 
 Improved error reporting means that detailed error messages are available on invalid network parameters.  Using the additional error results is optional.
 
 
-''Example version 1.0 code using UDP encapsulation and hostname based GSI.''
-
+*Example version 1.0 code using UDP encapsulation and hostname based GSI.*
+{{{
  pgm_gsi_t gsi;
  struct group_source_req recv_gsr, send_gsr;
  gsize recv_len;
  int e;
  
- e = '''pgm_create_md5_gsi''' (&gsi);
+ e = pgm_create_md5_gsi (&gsi);
  g_assert (e == 0);
  recv_len = 1;
- e = '''pgm_if_parse_transport''' (''network'', AF_UNSPEC, &recv_gsr, &recv_len, &send_gsr);
+ e = pgm_if_parse_transport (network, AF_UNSPEC, &recv_gsr, &recv_len, &send_gsr);
  g_assert (e == 0);
  g_assert (recv_len == 1);
  /* populate UDP encapsulation port */
- ((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (''udp_encap_port'');
- ((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (''udp_encap_port'');
+ ((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (udp_encap_port);
+ ((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (udp_encap_port);
+}}}
 
-
-''Example updated for version 2 with basic error handling''
-
+*Example updated for version 2 with basic error handling.*
+{{{
  struct pgm_transport_info_t* res = NULL;
  gboolean e;
  
- e = '''pgm_if_get_transport_info''' (''network'', NULL, &res, NULL);
+ e = pgm_if_get_transport_info (network, NULL, &res, NULL);
  g_assert (TRUE == e);
- e = '''pgm_gsi_create_from_hostname''' (&res->ti_gsi, NULL);
+ e = pgm_gsi_create_from_hostname (&res->ti_gsi, NULL);
  g_assert (TRUE == e);
  /* populate UDP encapsulation port */
- res->ti_udp_encap_ucast_port = ''udp_encap_port'';
- res->ti_udp_encap_mcast_port = ''udp_encap_port'';
+ res->ti_udp_encap_ucast_port = udp_encap_port;
+ res->ti_udp_encap_mcast_port = udp_encap_port;
+}}}
 
-
-''Example updated for version 2 with detailed error reporting''
-
+*Example updated for version 2 with detailed error reporting.*
+{{{
  struct pgm_transport_info_t* res = NULL;
  GError* err = NULL;
  
- if (!'''pgm_if_get_transport_info''' (''network'', NULL, &res, &err)) {
+ if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
    g_error ("parsing network parameter: %s", err->message);
    g_error_free (err);
    return EXIT_FAILURE;
  }
- if (!'''pgm_gsi_create_from_hostname''' (&res->ti_gsi, NULL))) {
+ if (!pgm_gsi_create_from_hostname (&res->ti_gsi, NULL))) {
    g_error ("creating GSI: %s", err->message);
    g_error_free (err);
-   '''pgm_if_free_transport_info''' (res);
+   pgm_if_free_transport_info (res);
    return EXIT_FAILURE;
  }
  /* populate UDP encapsulation port */
- res->ti_udp_encap_ucast_port = ''udp_encap_port'';
- res->ti_udp_encap_mcast_port = ''udp_encap_port'';
-
+ res->ti_udp_encap_ucast_port = udp_encap_port;
+ res->ti_udp_encap_mcast_port = udp_encap_port;
+}}}
 
 == Transport ==
 === Summary ===
-* Update transport create and bind functions with <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters.
-* Update pgm_transport_recv calls with shortened form, <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters, and <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return values.
-* Update transport parameter setters to check for [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] return values instead of int based ones.
-* Non-blocking flag <tt>MSG_DONTWAIT</tt> needs to be replaced with transport wide <tt>[http://developer.novell.com/wiki/index.php?title=2/OpenPGM_C_Reference/pgm_transport_set_nonblocking pgm_transport_set_nonblocking]</tt> for support on Windows platforms.
-* Remove setters for transmit or receive window pre-allocation sizes.
+  * Update transport create and bind functions with <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters.
+  * Update pgm_transport_recv calls with shortened form, <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters, and <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return values.
+  * Update transport parameter setters to check for [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] return values instead of int based ones.
+  * Non-blocking flag <tt>MSG_DONTWAIT</tt> needs to be replaced with transport wide <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> for support on Windows platforms.
+  * Remove setters for transmit or receive window pre-allocation sizes.
 
 
 === Details ===
 Version 2.0 introduces more detailed error reporting on network operations so every transport API, send-side excepting includes an optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> return value.
 
 
-''Example version 1.0 code.''
-
+*Example version 1.0 code.*
+{{{
  char buffer[4096];
  gsize bytes_read, bytes_sent;
  pgm_transport_t *transport;
  int e;
  
- e = '''pgm_transport_create''' (&transport, ''&gsi'', ''dport'', ''sport'', ''&recv_gsr'', ''recv_len'', ''&send_gsr'');
+ e = pgm_transport_create (&transport, &gsi, dport, sport, &recv_gsr, recv_len, &send_gsr);
  g_assert (e == 0);
- '''pgm_transport_set_max_tpdu''' (transport, ''max_tpdu'');
- '''pgm_transport_set_txw_sqns''' (transport, ''sqns'');
- '''pgm_transport_set_txw_max_rte''' (transport, ''max_rte'');
- '''pgm_transport_set_multicast_loop''' (transport, ''multicast_loop'');
- '''pgm_transport_set_hops''' (transport, ''hops'');
- '''pgm_transport_set_ambient_spm''' (transport, ''spm_ambient'');
- '''pgm_transport_set_heartbeat_spm''' (transport, ''spm_heartbeat'', G_N_ELEMENTS(''spm_heartbeat''));
- e = '''pgm_transport_bind''' (transport);
+ pgm_transport_set_max_tpdu (transport, max_tpdu);
+ pgm_transport_set_txw_sqns (transport, sqns);
+ pgm_transport_set_txw_max_rte (transport, max_rte);
+ pgm_transport_set_multicast_loop (transport, multicast_loop);
+ pgm_transport_set_hops (transport, hops);
+ pgm_transport_set_ambient_spm (transport, spm_ambient);
+ pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+ e = pgm_transport_bind (transport);
  g_assert (e == 0);
- bytes_read = '''pgm_transport_recv''' (transport, buffer, sizeof(buffer), 0);
+ bytes_read = pgm_transport_recv (transport, buffer, sizeof(buffer), 0);
  if (bytes_read >= 0)
    g_message ("recv: %s", buffer);
- bytes_sent = '''pgm_transport_send''' (transport, buffer, bytes_read, 0);
+ bytes_sent = pgm_transport_send (transport, buffer, bytes_read, 0);
  if (bytes_sent >= 0)
    g_message ("sent: %d bytes", bytes_sent);
 
-''Updated code for version 2.0.''
-
+*Updated code for version 2.0.*
+{{{
  pgm_transport_t *transport;
  char buffer[4096];
  gsize bytes_read, bytes_sent;
  PGMIOStatus status;
  GError* err = NULL;
  
- if (!'''pgm_transport_create''' (&transport, ''tinfo'', &err)) {
+ if (!pgm_transport_create (&transport, tinfo, &err)) {
    g_error ("creating transport: %s", err->message);
    g_error_free (err);
    pgm_if_free_transport_info (tinfo);
    return EXIT_FAILURE;
  }
  pgm_if_free_transport_info (tinfo);
- '''pgm_transport_set_max_tpdu''' (transport, ''max_tpdu'');
- '''pgm_transport_set_txw_sqns''' (transport, ''sqns'');
- '''pgm_transport_set_txw_max_rte''' (transport, ''max_rte'');
- '''pgm_transport_set_multicast_loop''' (transport, ''multicast_loop'');
- '''pgm_transport_set_hops''' (transport, ''hops'');
- '''pgm_transport_set_ambient_spm''' (transport, ''spm_ambient'');
- '''pgm_transport_set_heartbeat_spm''' (transport, ''spm_heartbeat'', G_N_ELEMENTS(''spm_heartbeat''));
- if (!'''pgm_transport_bind''' (transport, &err)) {
+ pgm_transport_set_max_tpdu (transport, max_tpdu);
+ pgm_transport_set_txw_sqns (transport, sqns);
+ pgm_transport_set_txw_max_rte (transport, max_rte);
+ pgm_transport_set_multicast_loop (transport, multicast_loop);
+ pgm_transport_set_hops (transport, hops);
+ pgm_transport_set_ambient_spm (transport, spm_ambient);
+ pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+ if (!pgm_transport_bind (transport, &err)) {
    g_error ("binding transport: %s", err->message);
    g_error_free (err);
    pgm_transport_destroy (transport, FALSE);
    return EXIT_FAILURE;
  }
- status = '''pgm_recv''' (transport, buffer, sizeof(buffer), 0, &bytes_read, &err);
+ status = pgm_recv (transport, buffer, sizeof(buffer), 0, &bytes_read, &err);
  if (PGM_IO_STATUS_NORMAL == status)
    g_message ("recv: %s", buffer);
- status = '''pgm_transport_send''' (transport, buffer, bytes_read, &bytes_sent);
+ status = pgm_transport_send (transport, buffer, bytes_read, &bytes_sent);
  if (PGM_IO_STATUS_NORMAL == status)
    g_message ("sent: %d bytes", bytes_sent);
-
+}}}
 
 == Asynchronous Receivers ==
 === Summary ===
-* Update calls to <tt>[[2/OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
-* Update calls to <tt>[[2/OpenPGM C Reference/pgm_async_recv()|pgm_async_recv()]]</tt> with <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return value and optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2CReferencePgmAsyncCreate pgm_async_create()]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2CReferencePgmAsyncRecv pgm_async_recv()]]</tt> with <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return value and optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
 
 
 === Details ===
@@ -163,17 +165,17 @@ Version 2.0 introduces more detailed error reporting on network and threading op
 
 == Zero Copy ==
 === Summary ===
-* Update <tt>packetv</tt> structures with <tt>struct [[2/OpenPGM C Reference/pgm_sk_buff_t|pgm_sk_buff_t]]</tt>.
-* Replace <tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt> and <tt>[[OpenPGM C Reference/pgm_packetv_free1()|pgm_packetv_free1()]]</tt> with <tt>[[2/OpenPGM C Reference/pgm_alloc_skb()|pgm_alloc_skb()]]</tt> and <tt>[[2/OpenPGM C Reference/pgm_alloc_skb()|pgm_free_skb()]]</tt>.
-* Replace <tt>[[OpenPGM C Reference/pgm_transport_send_packetv()|pgm_transport_send_packetv()]]</tt> with <tt>[[2/OpenPGM C Reference/pgm_send_skbv()|pgm_send_skbv()]]</tt>.
-* Zero-copy receive processing needs to be updated to handle PGM skbuffs instead of data pointers.
+  * Update <tt>packetv</tt> structures with <tt>struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]</tt>.
+  * Replace <tt>[OpenPgmCReferencePgmPacketvAlloc pgm_packetv_alloc()]</tt> and <tt>[OpenPgmCReferencePgmPacketvFree1 pgm_packetv_free1()]</tt> with <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt> and <tt>[OpenPgm2CReferencePgmAllocSkb pgm_free_skb()]</tt>.
+  * Replace <tt>[OpenPgmCReferencePgmTransportSendPacketv pgm_transport_send_packetv()]]</tt> with <tt>[OpenPgm2CReferencePgmSendSkbv pgm_send_skbv()]</tt>.
+  * Zero-copy receive processing needs to be updated to handle PGM skbuffs instead of data pointers.
 
 
 === Details ===
 Send and receive zero-copy handling has been consolidating into to using new PGM variants of Linux SKBs.  Memory is managed system wide by the GLib slab allocator instead of per transport.
 
-''Example send for version 1.0''
-
+*Example send for version 1.0.*
+{{{
  const char src[] = "i am not a string";
  gpointer data;
  gsize bytes_sent;
@@ -184,9 +186,9 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
  vector[0].iov_base = data;
  vector[0].iov_len = sizeof(src);
  bytes_sent = pgm_transport_send_packetv (transport, vector, G_N_ELEMENTS(vector), 0, TRUE);
-
-''Updated example for version 2.0''
-
+}}}
+*Updated example for version 2.0.*
+{{{
  const char src[] = "i am not a string";
  gsize bytes_sent;
  struct pgm_sk_buff_t* skb;
@@ -196,9 +198,9 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
  vector[0].iov_base = skb;
  vector[0].iov_len = skb->len;
  pgm_send_skbv (transport, vector, G_N_ELEMENTS(vector), &bytes_sent, TRUE);
-
-''Example zero-copy send for version 1.0''
-
+}}}
+*Example zero-copy send for version 1.0.*
+{{{
  pgm_msgv_t msgv[10], *pmsgv = msgv;
  gsize len;
  
@@ -209,9 +211,9 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
               pgm_tsi_print (pmsgv->msgv_tsi));
    pmsgv++;
  }
-
-''Update zero-copy send example for version 2.0''
-
+}}}
+*Update zero-copy send example for version 2.0.*
+{{{
  pgm_msgv_t msgv[10], *pmsgv = msgv;
  gsize len = 0;
  
@@ -222,20 +224,20 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
               pgm_tsi_print (pmsgv->msgv_skb[0]->len));
    pmsgv++;
  }
-
+}}}
 
 == Monitoring and Administration ==
 === Summary ===
-* Update calls to <tt>[[2/OpenPGM C Reference/pgm_http_init()|pgm_http_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
-* Update calls to <tt>[[2/OpenPGM C Reference/pgm_snmp_init()|pgm_snmp_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2C ReferencePgmHttpInit pgm_http_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2C ReferencePgmSnmpInit pgm_snmp_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
 
 
 === Details ===
 Version 2.0 introduces more detailed error reporting on network operations so async creation and recv calls include optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> return values.
 
 
-''Version 1.0 code example''
-
+*Version 1.0 code example.*
+{{{
  if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
    g_error ("Unable to start HTTP interface.");
    pgm_shutdown ();
@@ -247,9 +249,9 @@ Version 2.0 introduces more detailed error reporting on network operations so as
     pgm_shutdown ();
     return EXIT_FAILURE;
   }
-
-''Updated example for version 2.0.''
-
+}}}
+*Updated example for version 2.0.*
+{{{
  GError *err = NULL;
  if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
    g_error ("Unable to start HTTP interface: %s", err->message);
@@ -264,4 +266,4 @@ Version 2.0 introduces more detailed error reporting on network operations so as
     pgm_shutdown ();
     return EXIT_FAILURE;
   }
-
+}}}

@@ -1,12 +1,16 @@
-''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM 2 : C Reference : pgm_transport_set_nak_data_retries()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_nak_data_retries''' (</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     cnt</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_nak_data_retries* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      cnt
+	);
+</pre>
 
 === Purpose ===
 Set retries for DATA packets after NAK.
@@ -38,14 +42,18 @@ On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standar
 === Example ===
 Set <tt>NAK_DATA_RETRIES</tt> to 5.
 
- '''pgm_transport_set_nak_data_retries''' (transport, 5);
+{{{
+ pgm_transport_set_nak_data_retries (transport, 5);
+}}}
 
 SmartPGM since release 4.0.1 uses a value of 50 retries.
 
- '''pgm_transport_set_nak_data_retries''' (transport, 50);
+{{{
+ pgm_transport_set_nak_data_retries (transport, 50);
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_transport_set_nak_ncf_retries()|pgm_transport_set_nak_ncf_retries()]]</tt><br>
-[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportSetNakNcfRetries pgm_transport_set_nak_ncf_retries()]</tt><br>
+  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.
 

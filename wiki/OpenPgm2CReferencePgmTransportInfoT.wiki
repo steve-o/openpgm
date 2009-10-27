@@ -1,27 +1,33 @@
-''Type''
-__NOTOC__
+#summary OpenPGM 2 : C Reference : struct pgm_transport_info_t
+#labels Phase-Implementation
+
+_Type_
 === Declaration ===
-<tt>typedef struct pgm_transport_info_t '''pgm_transport_info_t''';</tt><br>
-<tt>struct pgm_transport_info_t {</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]] ti_gsi;</tt><br>
-: <tt>int ti_flags;</tt><br>
-: <tt>int ti_family;</tt><br>
-: <tt>int ti_udp_encap_ucast_port;</tt><br>
-: <tt>int ti_udp_encap_mcast_port;</tt><br>
-: <tt>int ti_sport;</tt><br>
-: <tt>int ti_dport;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] ti_recv_addrs_len;</tt><br>
-: <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]* ti_recv_addrs;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] ti_send_addrs_len;</tt><br>
-: <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]* ti_send_addrs;</tt><br>
-<tt>};</tt>
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_transport_info_t *pgm_transport_info_t*;
+
+struct pgm_transport_info_t {
+	[OpenPgm2CReferencePgmGsiT pgm_gsi_t]      ti_gsi;
+	int      ti_flags;
+	int      ti_family;
+	int      ti_udp_encap_ucast_port;
+	int      ti_udp_encap_mcast_port;
+	int      ti_sport;
+	int      ti_dport;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      ti_recv_addrs_len;
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_recv_addrs;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      ti_send_addrs_len;
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_send_addrs;
+	};
+</pre>
 
 === Purpose ===
 A transport object represents network definition of a transport.
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_get_transport_info()]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_if_get_transport_info()|pgm_if_free_transport_info()]]</tt><br>
-[[2/OpenPGM C Reference/Interface|Interface]] in OpenPGM C Reference.<br>
-[[OpenPGM Concepts/Transport|Transport]] in OpenPGM Concepts.
-
+  * <tt>[OpenPgm2CReferencePgmGsiT pgm_gsi_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]</tt><br>
+  * [OpenPgm2CReferenceInterface Interface] in OpenPGM C Reference.

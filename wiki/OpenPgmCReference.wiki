@@ -1,13 +1,16 @@
-﻿''OpenPGM versions 1.0.12 through 1.2.14''
+#summary C Reference for OpenPGM version 1
+#labels Featured,Phase-Design
 
-''September 2009''
+*OpenPGM versions 1.0.12 through 1.2.14*
+
+*September 2009*
 
 
 == Contents ==
-# [[OpenPGM C Reference/Programmer’s Checklist|Programmer’s Checklist]]
-# [[OpenPGM C Reference/Environment|Environment]]
-# [[OpenPGM C Reference/Events|Events]]
-# [[OpenPGM C Reference/Transport|Transport]]
-# [[OpenPGM C Reference/Error Handling|Error Handling]]
-# [[OpenPGM C Reference/Monitoring and Administration|Monitoring and Administration]]
+  # [OpenPgmCReferenceProgrammersChecklist Programmer’s Checklist]
+  # [OpenPgmCReferenceEnvironment Environment]
+  # [OpenPgmCReferenceEvents Events]
+  # [OpenPgmCReferenceTransport Transport]
+  # [OpenPgmCReferenceErrorHandling Error Handling]
+  # [OpenPgmCReferenceMonitoringAndAdministration Monitoring and Administration]
 

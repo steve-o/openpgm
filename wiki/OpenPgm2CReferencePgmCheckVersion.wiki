@@ -1,14 +1,21 @@
-''Function''
+#summary OpenPGM 2 : C Reference : pgm_check_version()
+#labels Phase-Implementation
+#sidebar TOC2CReference
 
+_Function_
 === Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+<pre>
+#include <pgm/pgm.h>
 
-
-<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_major_version''';</tt><br>
-<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_minor_version''';</tt><br>
-<tt>extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] '''pgm_micro_version''';</tt>
-
+extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_major_version*;
+extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_minor_version*;
+extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_micro_version*;
+</pre>
 
 === Purpose ===
 OpenPGM version information.
 
+
+=== See Also ===
+  * <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt><br>
+  * [OpenPgm2CReferenceEnvironment Environment] in OpenPGM C Reference.

@@ -1,12 +1,12 @@
 #summary C Reference for OpenPGM version 2.
-#labels Phase-Implementation
+#labels Featured,Phase-Implementation
 
 *OpenPGM version 2.0.14*
 
 *October 2009*
 
 
-== Contents ==
+=== Contents ===
   # [OpenPgm2CReferenceProgrammersChecklist Programmer’s Checklist]
   # [OpenPgm2CReferenceMigration Migration from version 1.0]
   # [OpenPgm2CReferenceEnvironment Environment]

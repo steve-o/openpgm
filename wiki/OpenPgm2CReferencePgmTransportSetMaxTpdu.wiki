@@ -1,12 +1,16 @@
-''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM 2 : C Reference : pgm_transport_set_max_tpdu()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_max_tpdu''' (</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                   max_tpdu</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_max_tpdu* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      max_tpdu
+	);
+</pre>
 
 === Purpose ===
 Set maximum transport data unit size.
@@ -68,10 +72,10 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 </table>
 
 
-; &dagger; : For APDUs greater than one TPDU in length, the per packet overhead is increased.
-; &Dagger; : Not implemented.
-; &sect; : When Forward-Error Correction is enabled.
-
+<dl><dt>&dagger;</dt><dd>For APDUs greater than one TPDU in length, the per packet overhead is increased.
+</dd><dt>&Dagger;</dt><dd>Not implemented.
+</dd><dt>&sect;</dt><dd>When Forward-Error Correction is enabled.
+</dd></dl>
 
 === Parameters ===
 <table border="1" cellpadding="5" cellspacing="0">
@@ -93,12 +97,13 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
 
 === Example ===
-
- '''pgm_transport_set_max_tpdu''' (transport, 1500);
+{{{
+ pgm_transport_set_max_tpdu (transport, 1500);
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.<br>
-[http://en.wikipedia.org/wiki/802.2 IEEE 802.2] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Jumbo_frame Jumbo frame] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Maximum_transmission_unit Maximum transmission unit] in Wikipedia.
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.<br>
+  * [http://en.wikipedia.org/wiki/802.2 IEEE 802.2] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Jumbo_frame Jumbo frame] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Maximum_transmission_unit Maximum transmission unit] in Wikipedia.

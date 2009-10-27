@@ -1,5 +1,5 @@
 #summary Important points of note about OpenPGM.
-#labels Phase-Design
+#labels Featured,Phase-Design
 
 = Introduction =
 

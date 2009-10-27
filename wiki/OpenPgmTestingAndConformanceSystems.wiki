@@ -1,3 +1,6 @@
+#summary Test systems
+#labels Phase-QA
+
 == Application ==
 ; Purpose : Runs the PGM network stack to test. This is implemented as a thin agnostic layer above the API allowing control and feedback to the tester. 
 ; Syntax :

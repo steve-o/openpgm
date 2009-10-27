@@ -1,12 +1,16 @@
-''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM 2 : C Reference : pgm_transport_set_abort_on_reset()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_transport_set_close_on_failure''' (</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                   close_on_failure</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_abort_on_reset* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]      abort_on_reset
+	);
+</pre>
 
 === Purpose ===
 Close transport after detecting unrecoverable data loss.
@@ -31,9 +35,10 @@ Close transport after detecting unrecoverable data loss.
 On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt>.  On invalid parameter, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt>.
 
 === Example ===
-
- '''pgm_transport_set_close_on_failure''' (transport, TRUE);
+{{{
+ pgm_transport_set_abort_on_reset (transport, TRUE);
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.

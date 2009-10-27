@@ -1,7 +1,13 @@
-''Function''
+#summary OpenPGM 2 : C Reference : pgm_supported()
+#labels Phase-Implementation
 
+_Function_
 === Declaration ===
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_supported'''(void);</tt>
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_supported*(void);
+</pre>
 
 === Purpose ===
 Check whether PGM engine initiated.
@@ -10,6 +16,6 @@ Check whether PGM engine initiated.
 Returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if PGM engine is initialized, returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] if it is not.
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_init()|pgm_init()]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_shutdown()|pgm_shutdown()]]</tt>
-
+  * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * [OpenPgm2CReferenceEnvironment Environment] in OpenPGM C Reference.

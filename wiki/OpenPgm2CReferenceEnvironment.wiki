@@ -1,6 +1,10 @@
+#summary OpenPGM 2 : C Reference : Environment
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Introduction ===
 This section describes the functions relating to the global dependencies of OpenPGM.
 
-'''Topics in Alphabetical Order'''
+=== Topics in Alphabetical Order ===
 
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>

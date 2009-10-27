@@ -1,34 +1,41 @@
-''Type''
+#summary OpenPGM 2 : C Reference : struct pgm_sk_buff_t
+#labels Phase-Implementation
+#sidebar TOC2CReference
 
+_Type_
 === Declaration ===
-<tt>struct pgm_sk_buff_t {</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Doubly-Linked-Lists.html#GList GList] link_;</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]] *transport;</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_time_t|pgm_time_t]] tstamp;</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]] tsi;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint32 guint32] sequence;</tt><br>
-: <tt>char cb[48];</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16] len;</tt><br>
-: <tt>unsigned zero_padded:1;</tt><br>
-: <tt>struct [[2/OpenPGM C Reference/pgm_header|pgm_header]] *pgm_header;</tt><br>
-: <tt>struct [[2/OpenPGM C Reference/pgm_opt_fragment|pgm_opt_fragment]] *pgm_opt_fragment;</tt><br>
-: <tt>struct [[2/OpenPGM C Reference/pgm_data|pgm_data]] *pgm_data;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] head;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] data;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] tail;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] end;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] truesize;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint] users;</tt><br>
-<tt>};</tt>
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_sk_buff_t {</tt><br>
+	[http://library.gnome.org/devel/glib/stable/glib-Doubly-Linked-Lists.html#GList GList]      link_;
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport;
+	[OpenPgm2CReferencePgmTimeT pgm_time_t]      tstamp;
+	[OpenPgm2CReferencePgmTsiT pgm_tsi_t]      tsi;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint32 guint32]      sequence;
+	char      cb[48];
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      len;
+	unsigned      zero_padded:1;
+	struct [OpenPgm2CReferencePgmHeader pgm_header]`*`     pgm_header;
+	struct [OpenPgm2CReferencePgmOptFragment pgm_opt_fragment]`*`     pgm_opt_fragment;
+	struct [OpenPgm2CReferencePgmData pgm_data]`*`     pgm_data;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      head;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      data;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      tail;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      end;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      truesize;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]      users;
+	};
+</pre>
 
 === Purpose ===
 Object representing a PGM socket buffer.
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_time_t|pgm_time_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_alloc_skb()|pgm_alloc_skb()]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_alloc_skb()|pgm_free_skb()]]</tt><br>
-[[2/OpenPGM C Reference/PGM SKBs|PGM SKBs]] in OpenPGM C Reference.
+  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTimeT pgm_time_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_free_skb()]</tt><br>
+  * [OpenPgm2CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.
 

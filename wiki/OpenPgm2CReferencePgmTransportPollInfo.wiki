@@ -39,8 +39,8 @@ An assertion will be raised if insufficient file descriptors are provided.  1 fi
 </tr><tr>
 <td><tt>events</tt></td>
 <td>A bit set composed using the following available event types:
-;<tt>POLLIN</tt>: The transport is available for <tt>recv()</tt> operations.
-;<tt>POLLOUT</tt>: The transport is available for <tt>send()</tt> operations.</td>
+<dl><dt><tt>POLLIN</tt></dt><dd>The transport is available for <tt>recv()</tt> operations.
+</dd><dt><tt>POLLOUT</tt></dt><dd>The transport is available for <tt>send()</tt> operations.</dd></dl></td>
 </tr>
 </table>
 

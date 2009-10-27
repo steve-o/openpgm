@@ -1,27 +1,31 @@
-''Function''
-__NOTOC__
+#summary OpenPGM 2 : C Reference : pgm_if_get_transport_info()
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
+_Function_
 === Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+<pre>
+#include <pgm/pgm.h>
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] '''pgm_if_get_transport_info''' (</tt><br>
-: <tt>const char*        network,</tt><br>
-: <tt>struct [[2/OpenPGM_C_Reference/pgm_transport_info_t|pgm_transport_info_t]] const       *hints,</tt><br>
-: <tt>struct [[2/OpenPGM_C_Reference/pgm_transport_info_t|pgm_transport_info_t]]       **res,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]**             error</tt><br>
-: <tt>);</tt>
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_if_get_transport_info* (
+	const char`*`     network,
+	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t] const`*`     hints,
+	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*``*`    res,
+	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`    error
+	);
 
-<tt>void '''pgm_if_free_transport_info''' (</tt><br>
-: <tt>struct [[2/OpenPGM_C_Reference/pgm_transport_info_t|pgm_transport_info_t]]       *res</tt><br>
-: <tt>);</tt>
-
+void *pgm_if_free_transport_info* (
+	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*`     res
+	);
+</pre>
 
 === Purpose ===
 Decompose a string network specification.
 
 === Remarks ===
-The TIBCO Rendezvous network parameter provides a convenient compact representation of the complicated data structures needed to specify sending and receiving interfaces and multicast addresses.  This function provides conversion between the network string and the parameters of <tt>[[2/OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt>.
+The TIBCO Rendezvous network parameter provides a convenient compact representation of the complicated data structures needed to specify sending and receiving interfaces and multicast addresses.  This function provides conversion between the network string and the parameters of <tt>[OpenPgm2CReferencePgmTransportCreate pgm_transport_create()]</tt>.
 
-The returned <tt>[[2/OpenPGM_C_Reference/pgm_transport_info_t|pgm_transport_info_t]]</tt> must be freed with <tt>pgm_if_free_transport_info()</tt>.
+The returned <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt> must be freed with <tt>pgm_if_free_transport_info()</tt>.
 
 === Parameters ===
 
@@ -51,19 +55,19 @@ On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.htm
 
 === Example ===
 Basic example using default hints.
-
+{{{
  char* network = "eth0;226.0.0.1";
  struct pgm_transport_info_t* res = NULL;
  
- if (!'''pgm_if_get_transport_info''' (network, NULL, &res, &err)) {
+ if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
    g_error ("parsing network parameter: %s", err->message);
    g_error_free (err);
    return EXIT_FAILURE;
  }
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_transport_info_t|pgm_transport_info_t]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt><br>
-[[2/OpenPGM C Reference/Interface|Interface]] in OpenPGM C Reference.<br>
-[[OpenPGM_Concepts/Transport|Transport]] in OpenPGM Concepts.
+  * <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * [OpenPgm2CReferenceInterface Interface] in OpenPGM C Reference.
 

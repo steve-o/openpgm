@@ -1,7 +1,6 @@
 #summary OpenPGM 2 : C Reference : Asynchronous Receiver
 #labels Phase-Implementation
 #sidebar TOC2CReference
-
 === Introduction ===
 An asynchronous receiver is a transport that queues incoming messages for latter processing.
 

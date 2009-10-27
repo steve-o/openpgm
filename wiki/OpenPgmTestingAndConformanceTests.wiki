@@ -1,3 +1,6 @@
+#summary Tests
+#labels Phase-QA
+
 Test numbers as per the referring section in the PGM draft with alphabetical suffix for multiple matching tests.
 
 === 3.6.2.1.a. Sending ODATA packet ===

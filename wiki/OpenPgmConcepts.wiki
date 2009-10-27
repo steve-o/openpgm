@@ -1,5 +1,7 @@
+#summary Concepts for OpenPGM
 #labels Featured,Phase-Design
-*1.0.0rc6*
+
+*OpenPGM Version 1.0.0rc6*
 
 *March 2009*
 
