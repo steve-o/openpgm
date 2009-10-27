@@ -1,9 +1,16 @@
+#summary OpenPGM Concepts : Listener Event Semantics
+#labels Phase-Design
+#sidebar TOC2CReference
+
 The arrival of an inbound message is an important event for most OpenPGM programs. To receive messages, programs create listener events, define callback functions to process the inbound messages, and dispatch events in a loop.
 
 Each time the callback function runs, it receives an inbound message as an argument. The callback function must process the message in an appropriate application-specific fashion.
 
-
-[[Image:OpenPGM listener events.png]]
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><img src="http://miru.hk/wiki/OpenPGM_listener_events.png"/></td>
+</tr>
+</table>
 
 
 OpenPGM still processes incoming messages as the listener callback is being executed.  If the incoming rate is faster than the callback handler can handle the message queue will increase until the system is exhausted.

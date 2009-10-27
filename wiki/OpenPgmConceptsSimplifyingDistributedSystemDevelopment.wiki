@@ -1,3 +1,6 @@
+#summary OpenPGM Concepts : Simplifying Distributed System Development
+#labels Phase-Design
+
 OpenPGM eases distributed system development in these ways:
 
 === Decoupling and Data Independence ===

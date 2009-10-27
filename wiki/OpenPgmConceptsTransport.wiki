@@ -1,12 +1,17 @@
+#summary OpenPGM Concepts : Transport
+#labels Phase-Design
+#sidebar TOC2CReference
+
+=== Introduction ===
 The software mechanism for sending and delivering messages is called a transport. A transport defines the delivery scope—that is, the set of possible destinations for the messages it sends.
 
 
 === Network Transport Parameters ===
 Transport creation calls accept three parameters that govern the behaviour of the transport: data-destination port, receive network, and send network.  In simple networking environments one multicast group is sufficient for sending and receiving, however other environments may require further configuration.
 
-* Several independent distributed applications run on the same network, and you must isolate them from one another (data-destination port).
-* A program runs on a computer with more than one network interface, and you must select a specific network for outbound multicast communications (network parameters).
-* Computers on the network use asymmetric multicast addressing to achieve even higher efficiency, and you must specify which multicast groups to join (network parameters).
+  * Several independent distributed applications run on the same network, and you must isolate them from one another (data-destination port).
+  * A program runs on a computer with more than one network interface, and you must select a specific network for outbound multicast communications (network parameters).
+  * Computers on the network use asymmetric multicast addressing to achieve even higher efficiency, and you must specify which multicast groups to join (network parameters).
 
 
 === Data-Destination Port Parameter ===
@@ -30,14 +35,15 @@ The default network is the administratively scoped multicast address 239.192.0.1
 
 ==== Constructing the Network Parameter ====
 The TIBCO Rendezvous network parameter consists of up to three parts, separated by semicolons—network, multicast groups, send address—as in these examples:
-
+<pre>
  lan0                                 network only
  lan0;224.1.1.1                       one multicast group
  lan0;224.1.1.1,224.1.1.5;224.1.1.6   two multicast groups, send address
+</pre>
 
 ===== Part One—Interface =====
 Part one identifies the network interface, which you can specify a list of interfaces in several ways:
-
+<pre>
  Interface name            When an application specifies an interface name, the transport creation
                            function searches the interface table for the specified interface name. 
                            For example, eth0.
@@ -55,13 +61,13 @@ Part one identifies the network interface, which you can specify a list of inter
                            For example: "link-local"
  
  Default                   The default interface as per multicast routing tables.
+</pre>
 
 Notes:
-
-* When using Source-Specific Multicast (SSM) through a router IPv4 addresses must be in the range 232/8, IPv6 must be FF3''x''::/96.  On a simple switched environment any multicast address ''may'' work.
-* Linux does not support IPv6 NSS network names and any query will return <tt>INADDR_BROADCAST</tt>.
-* Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP or network address should be specified instead.
-* A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast this address for repairs in effect disabling PGM reliability.  Ensure that the hostname resolves to an Ethernet link or specify the Ethernet network as the first entity.
+  * When using Source-Specific Multicast (SSM) through a router IPv4 addresses must be in the range 232/8, IPv6 must be FF3*x*::/96.  On a simple switched environment any multicast address *may* work.
+  * Linux does not support IPv6 NSS network names and any query will return <tt>INADDR_BROADCAST</tt>.
+  * Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP or network address should be specified instead.
+  * A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast this address for repairs in effect disabling PGM reliability.  Ensure that the hostname resolves to an Ethernet link or specify the Ethernet network as the first entity.
 
 
 ===== Part Two—Receive Groups =====
@@ -79,10 +85,10 @@ If you join one or more multicast groups in part two, but do not specify a send 
 === PGM Sessions ===
 When configuring multiple PGM sessions one needs to select appropriate multicast group addresses and PGM ports.  The data-destination port (dport) and multicast group needs to be the same for every host to join one particular session, the data-source port (sport) needs to be only unique on per GSI, i.e. to the host.  For example the following parameters are all unique,
 
-* Session 1: network ";239.192.0.1", sport 0, dport 7500
-* Session 2: network ";239.192.0.2", sport 0, dport 7500
-* Session 3: network ";239.192.0.2", sport 0, dport 7501
-* Session 4: network ";239.192.0.2", sport 0, dport 7502
+  * Session 1: network ";239.192.0.1", sport 0, dport 7500
+  * Session 2: network ";239.192.0.2", sport 0, dport 7500
+  * Session 3: network ";239.192.0.2", sport 0, dport 7501
+  * Session 4: network ";239.192.0.2", sport 0, dport 7502
 
 Note that multicast filtering on the network occurs at the multicast group address level, port level filtering occurs at the operating system level.
 
@@ -90,19 +96,22 @@ Note that multicast filtering on the network occurs at the multicast group addre
 === UDP Encapsulation ===
 When using UDP encapsulation many different ports have to be specified and this can get confusing, there is one set of ports for the UDP layer in addition to the set of ports for PGM.
 
-
-[[Image:Udp encapsulated ports.png]]
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><img src="http://miru.hk/wiki/Udp_encapsulated_ports.png"/></td>
+</tr>
+</table>
 
 
 If implementing a system with multiple PGM channels it might be easier to consider fixing the same PGM parameters and altering the UDP parameters for each session, for example:
 
-* Session 1: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
-* Session 2: network ";239.192.0.2", sport 0, dport 7500, udp-port 3056.
+  * Session 1: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
+  * Session 2: network ";239.192.0.2", sport 0, dport 7500, udp-port 3056.
 
 With a small number of transports one should choose a unique multicast group address and UDP-port for each.  Multicast filtering occurs at the address level such that all packets for any port will be passed to the operating system which then performs the port filtering.  All benefit of network filtering be lost if only using multiple ports on the same multicast group address.
 
 Multiple applications on one host need to enable multicast loop for port sharing, example settings:
 
-* Application A: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
-* Application B: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
+  * Application A: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
+  * Application B: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
 

@@ -1,9 +1,13 @@
+#summary Software Overview
+#labels Phase-Design
+
+=== Introduction ===
 This section introduces OpenPGM.
 
 === Topics ===
-* [OpenPgmConceptsIntroductionToOpenPgm Introduction to OpenPGM]
-* [OpenPgmConceptsBenefitsOfProgrammingWithOpenPgm Benefits of Programming with OpenPGM]
-* [OpenPgmConceptsSimplifyingDistributedSystemDevelopment Simplifying Distributed System Development]
-* [OpenPgmConceptsDevelopingDistributedSystems Developing Distributed Systems]
-* [OpenPgmConceptsProgrammingExamples Programming Examples]
+  * [OpenPgmConceptsIntroductionToOpenPgm Introduction to OpenPGM]
+  * [OpenPgmConceptsBenefitsOfProgrammingWithOpenPgm Benefits of Programming with OpenPGM]
+  * [OpenPgmConceptsSimplifyingDistributedSystemDevelopment Simplifying Distributed System Development]
+  * [OpenPgmConceptsDevelopingDistributedSystems Developing Distributed Systems]
+  * [OpenPgmConceptsProgrammingExamples Programming Examples]
 

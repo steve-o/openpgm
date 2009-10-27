@@ -1,2 +1,6 @@
+#summary OpenPGM Concepts : Verify Each Inbound Message
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
 Programs must verify each inbound message field to assure integrity and robustness.
 
