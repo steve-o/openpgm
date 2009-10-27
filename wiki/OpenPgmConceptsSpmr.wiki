@@ -1,15 +1,19 @@
-[[Image:SPMR - ignore.png]]
+#summary OpenPGM Concepts : SPMR
+#labels Phase-Design
+#sidebar TOC2CReference
 
-* Invalid SPM-Requests will be ignored.
-* SPM-Requests with non-matching data-destination port will be ignored.
+<img src="http://miru.hk/wiki/SPMR_-_ignore.png"/>
+
+  * Invalid SPM-Requests will be ignored.
+  * SPM-Requests with non-matching data-destination port will be ignored.
 
 
-[[Image:SPMR - response.png]]
+<img src="http://miru.hk/wiki/SPMR_-_response.png"/>]
 
-* Receipt of a valid SPM-Request will cause a SPM packet to be broadcast.
+  * Receipt of a valid SPM-Request will cause a SPM packet to be broadcast.
 
 
-[[Image:SPMR - limit.png]]
+<img src="http://miru.hk/wiki/SPMR_-_limit.png"/>]
 
-* Receipt of multiple SPM-Requests within a short time period will be ignored.
+  * Receipt of multiple SPM-Requests within a short time period will be ignored.
 

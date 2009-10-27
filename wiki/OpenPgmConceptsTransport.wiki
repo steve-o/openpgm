@@ -64,7 +64,7 @@ Part one identifies the network interface, which you can specify a list of inter
 </pre>
 
 Notes:
-  * When using Source-Specific Multicast (SSM) through a router IPv4 addresses must be in the range 232/8, IPv6 must be FF3*x*::/96.  On a simple switched environment any multicast address *may* work.
+  * When using Source-Specific Multicast (SSM) through a router IPv4 addresses must be in the range 232/8, IPv6 must be FF3 _x_::/96.  On a simple switched environment any multicast address *may* work.
   * Linux does not support IPv6 NSS network names and any query will return <tt>INADDR_BROADCAST</tt>.
   * Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP or network address should be specified instead.
   * A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast this address for repairs in effect disabling PGM reliability.  Ensure that the hostname resolves to an Ethernet link or specify the Ethernet network as the first entity.

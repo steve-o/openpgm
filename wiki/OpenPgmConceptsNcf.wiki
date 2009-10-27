@@ -1,9 +1,13 @@
-[[Image:NCF - ignore.png]]
+#summary OpenPGM Concepts : NCF
+#labels Phase-Design
+#sidebar TOC2CReference
 
-* Reception of NCF will be ignored unless a sequence number matches one in the receive window.
+<img src="http://miru.hk/wiki/NCF_-_ignore.png"/>
+
+  * Reception of NCF will be ignored unless a sequence number matches one in the receive window.
 
 
-[[Image:NCF - preempted.png]]
+<img src="http://miru.hk/wiki/NCF_-_preempted.png"/>
 
-* For sequence numbers in the receive window that are waiting data, reception of an NCF will pre-empt sending of a NAK.
+  * For sequence numbers in the receive window that are waiting data, reception of an NCF will pre-empt sending of a NAK.
 

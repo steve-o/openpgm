@@ -1,5 +1,8 @@
-''Setting''
+#summary OpenPGM Concepts : TXW_MAX_RTE
+#labels Phase-Design
+#sidebar TOC2CReference
 
+_Setting_
 === Syntax ===
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
@@ -26,8 +29,8 @@ There is no rate limiting in TIBCO Rendezvous, in Smart PGM default <tt>TXW_MAX_
 The following packet types are unaffected: POLL, POLR, NAK, NNAK, NCF, and SPMR.
 
 === See Also ===
-<tt>[[OpenPGM Concepts/RXW_MAX_RTE|RXW_MAX_RTE]]</tt><br>
-<tt>[[OpenPGM Concepts/TXW_SECS|TXW_SECS]]</tt><br>
-<tt>[[OpenPGM Concepts/TXW_SQNS|TXW_SQNS]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_txw_max_rte()|pgm_transport_set_txw_max_rte()]]</tt> in ''OpenPGM C Reference''.
+  * <tt>[OpenPgmConceptsRxwMaxRte RXW_MAX_RTE]]</tt><br>
+  * <tt>[OpenPgmConceptsTxwSecs TXW_SECS]]</tt><br>
+  * <tt>[OpenPgmConceptsTxwSqns TXW_SQNS]]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]]</tt> in OpenPGM C Reference.
 
