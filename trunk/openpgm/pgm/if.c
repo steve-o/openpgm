@@ -209,7 +209,7 @@ is_in_net6 (
 #endif
 
 	for (unsigned i = 0; i < 16; i++)
-		if (addr->s6_addr[i] != (netaddr->s6_addr[i] & netmask->s6_addr[i]))
+		if (netmask->s6_addr[i] && addr->s6_addr[i] != (netaddr->s6_addr[i] & netmask->s6_addr[i]))
 			return FALSE;
 	return TRUE;
 }
