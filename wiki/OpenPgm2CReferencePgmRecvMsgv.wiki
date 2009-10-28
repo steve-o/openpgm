@@ -7,12 +7,12 @@ _Function_
 #include <pgm/pgm.h>
 
 [OpenPgm2CReferencePgmIoStatus PGMIOStatus] *pgm_recvmsgv* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`      transport,
 	[OpenPgm2CReferencePgmMsgvT pgm_msgv_t]`*` const     msgv,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     count,
-	int      flags,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*`     bytes_read,
-	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                 count,
+	int                   flags,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*`                bytes_read,
+	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`              error
 );
 </pre>
 
