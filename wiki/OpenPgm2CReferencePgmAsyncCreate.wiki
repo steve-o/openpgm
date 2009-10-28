@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_async_create()
+﻿#summary OpenPGM 2 : C Reference : pgm_async_create()
 #labels Phase-Implementation
 
 _Function_
@@ -7,10 +7,10 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_async_create* (
-	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*``*`    async,
+	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*``*`             async,
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t] const`*`    transport,
-        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
-);
+	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`                  error
+	);
 </pre>
 
 === Purpose ===

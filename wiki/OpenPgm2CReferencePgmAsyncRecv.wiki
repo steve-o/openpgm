@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_async_recv()
+﻿#summary OpenPGM 2 : C Reference : pgm_async_recv()
 #labels Phase-Implementation
 
 _Function_
@@ -8,11 +8,11 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus] *pgm_async_recv* (
 	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*` const    async,
-	const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]     buf,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      len,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*` const      bytes_read,
-	int      flags,
-        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
+	const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]        buf,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                 len,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*` const          bytes_read,
+	int                   flags,
+	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`              error
 );
 </pre>
 
@@ -33,7 +33,7 @@ Receive an Application Protocol Domain Unit (APDU) from an asynchronous queue.
 <td><tt>async</tt></td>
 <td>The asynchronous receiver object.</td>
 </tr><tr>
-td><tt>buf</tt></td>
+<td><tt>buf</tt></td>
 <td>Data buffer to fill.</td>
 </tr><tr>
 <td><tt>len</tt></td>
