@@ -4,35 +4,19 @@
 
 Millisecond level timers are handled by the platforms LIBC library, high resolution timers for intervals less than a millisecond require direct polling of the core and its associated internal clock.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/OpenPGM_stack.png"/></td>
-</tr>
-</table>
+<img src="http://miru.hk/wiki/OpenPGM_stack.png"/>
 
 Timer events are generated at repeating intervals, there is a overhead between the actual interval time and the callback time which can vary with the number of timers being processed.  A typical timer event timeline looks as follows.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/OpenPGM_timer_events.png"/></td>
-</tr>
+<img src="http://miru.hk/wiki/OpenPGM_timer_events.png"/>
 
 Using the GLib API note that the interval is calculated after the timer callback, so the actual timeline would be this.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/OpenPGM_GLib_timer_events.png"/></td>
-</tr>
-</table>
-
+<img src="http://miru.hk/wiki/OpenPGM_GLib_timer_events.png"/>
 
 The high resolution timing by OpenPGM is a best attempt at the first by using the latter with actual execution time offsets and microsecond accuracy.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/OpenPGM_HR_timer_events.png"/></td>
-</tr>
-</table>
+<img src="http://miru.hk/wiki/OpenPGM_HR_timer_events.png"/>
 
 After the callback the second interval if elapsed would cause another callback, for performance reasons if multiple timer intervals have elapsed during the callback only one event is generated.
 

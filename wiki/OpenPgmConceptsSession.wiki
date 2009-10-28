@@ -9,14 +9,11 @@ The state of a transport is bounded by PGM sessions between a sender and one or 
 === Session Start ===
 The presence of a PGM sender is noted when the first packet with a new TSI is received.  This may be a Source-Path Message (SPM) simply defining the distribution tree or a data packet indicating late joining.
 
+
 ==== SPM Distribution Tree ====
 A PGM distribution tree is defined by the flow of Source Path Messages (SPMs) from a source through network elements to subscribers.  PGM network elements use the SPM information to address returning unicast NAKs directly to the next upstream PGM network toward the source, and thereby insure that NAKs return from a receiver to a source on the reverse of the distribution path for any TSI.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/SPM_distribution_tree.png"/></td>
-</tr>
-</table>
+<img src="http://miru.hk/wiki/SPM_distribution_tree.png"/>
 
 A receiving application joining a PGM multicast address will see the existence of a PGM session by its regular SPM broadcast.  If the sender has already transmitted data packets it is considered late joining.
 
@@ -24,11 +21,7 @@ A receiving application joining a PGM multicast address will see the existence o
 ==== Late Joining ====
 A new receiving application joining a PGM session already in flow is called late joining.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/Late_joining.png"/></td>
-</tr>
-</table>
+<img src="http://miru.hk/wiki/Late_joining.png"/>
 
 The PGM specification defines that the receive window is bound by the first sequence number received.  So in the example RXW_TRAIL_INIT is set to 3, that means the receiver is not permitted to request packets with an earlier sequence number.  This can be overridden with the OPT_JOIN - Late Joining option.
 
@@ -47,12 +40,7 @@ The active list of sessions is maintained as state information of a PGM receiver
 ==== OPT_FIN ====
 Dependent upon the application domain an OPT_FIN indicates that a source has finished its session.  For example this could indicate the end of a video broadcast.
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/SYN_and_FIN.png"/></td>
-</tr>
-</table>
-
+<img src="http://miru.hk/wiki/SYN_and_FIN.png"/>
 
 In order to ensure delivery of session termination the sending transport continues to broadcast SPMs with the OPT_FIN option until the transport is terminated.
 

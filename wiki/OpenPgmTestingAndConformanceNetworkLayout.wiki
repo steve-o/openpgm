@@ -6,11 +6,7 @@ This section describes the network layout necessary to perform PGM protocol comp
 == Basic Testing ==
 Basic covers the principal operations of sending, receiving, error detection, requesting packet retransmission (NAKs), and  transmission of repair data. 
 
-<table border="1" cellpadding="5" cellspacing="0">
-<tr>
-<td><img src="http://miru.hk/wiki/OpenPGM_testing_layout.png"/></td>
-</tr>
-</table>
+<img src="http://miru.hk/wiki/OpenPGM_testing_layout.png"/>
 
 The network layout described covers four hosts:
 

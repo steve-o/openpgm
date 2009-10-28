@@ -2,27 +2,32 @@
 #labels Phase-QA
 
 == Application ==
-; Purpose : Runs the PGM network stack to test. This is implemented as a thin agnostic layer above the API allowing control and feedback to the tester. 
-; Syntax :
- app [-n ''network'']
-     [-s ''service'']
-
-; Remarks : Control is provided by standard input with feedback to standard output, the available commands follow in alphabetical order.  After an input command is processed and is ready to accept another command the output "READY" is displayed.
-
+<dl><dt>Purpose</dt><dd>Runs the PGM network stack to test. This is implemented as a thin agnostic layer above the API allowing control and feedback to the tester. 
+</dd><dt>Syntax</dt><dd>
+<pre>
+ app `[`-n _network_`]` 
+     `[`-s _service_`]`
+</pre>
+</dd><dt>Remarks</dt><dd>Control is provided by standard input with feedback to standard output, the available commands follow in alphabetical order.  After an input command is processed and is ready to accept another command the output "<tt>READY</tt>" is displayed.
+</dd></dl>
 
 === bind ===
-; Syntax :
- bind ''session_name''
-; Purpose : Bind a transport to the network.
-; Remarks : The transport must be previously created with the <tt>create</tt> command.
+<dl><dt>Syntax</dt><dd>
+<pre>
+ bind _session_name_ 
+</pre>
+<dl><dt>Purpose</dt><dd>Bind a transport to the network.
+</dd><dt>Remarks</dt><dd>The transport must be previously created with the <tt>create</tt> command.
 
-Example output for binding a session called ''transport1'':
- create transport1
- created new session "transport1"
+Example output for binding a session called _transport1_:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''bind''' transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -33,17 +38,21 @@ Example output for binding a session called ''transport1'':
 <td>The transport identifier.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === create ===
-; Syntax :
- create ''session_name''
-; Purpose : Create a new transport.
-; Remarks : Example output for creating a new transport session called ''transport1'':
- '''create''' transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ create _session_name_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Create a new transport.
+</dd><dt>Remarks</dt><dd>Example output for creating a new transport session called _transport1_:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -54,19 +63,23 @@ Example output for binding a session called ''transport1'':
 <td>The transport identifier.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === destroy ===
-; Syntax :
- destroy ''session_name''
-; Purpose : Destroy a transport.
-; Remarks : Example output for destroying a session called ''transport1'':
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ destroy _session_name_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Destroy a transport.
+</dd><dt>Remarks</dt><dd>Example output for destroying a session called _transport1_:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''destroy''' transport1
+ *destroy _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -77,21 +90,25 @@ Example output for binding a session called ''transport1'':
 <td>The transport identifier.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === listen ===
-; Syntax :
- listen ''session_name''
-; Purpose : Listen to data packets on a transport.
-; Remarks : Example output for listening to a session called ''transport1'':
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ listen _session_name_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Listen to data packets on a transport.
+</dd><dt>Remarks</dt><dd>Example output for listening to a session called _transport1_:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- bind transport1
+ *bind _transport1_* 
  READY
- '''listen''' transport1
+ *listen _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -102,35 +119,43 @@ Example output for binding a session called ''transport1'':
 <td>The transport identifier.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === quit ===
-; Syntax :
+<dl><dt>Syntax</dt><dd>
+<pre>
  quit
-; Purpose : Terminates the application and destroy all active transports.  Call to finish a test early, usually upon failure, or at test completion upon success.
-; Remarks : Example output with no active transport sessions:
- '''quit'''
- ** Message: event loop terminated, cleaning up.
- ** Message: destroying sessions.
+</pre>
+</dd><dt>Purpose</dt><dd>Terminates the application and destroy all active transports.  Call to finish a test early, usually upon failure, or at test completion upon success.
+</dd><dt>Remarks</dt><dd>Example output with no active transport sessions:
+ *quit* 
+ `*``*` Message: event loop terminated, cleaning up.
+ `*``*` Message: destroying sessions.
  unbinding stdin.
- ** Message: finished.
-
+ `*``*` Message: finished.
+</pre>
+</dd></dl>
 
 === send ===
-; Syntax :
- send ''session_name'' ''string''
- send ''session_name'' ''string'' x ''repeat_count''
-; Purpose : Send a simple message on the specified bound transport.
-; Remarks : The transport must be bound with <tt>bind</tt> command before messages can be sent.  The format restrictions on the ''string'' are to simplify output parsing.
+<dl><dt>Syntax</dt><dd>
+<pre>
+ send _session_name_ _string_ 
+ send _session_name_ _string_ x _repeat_count_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Send a simple message on the specified bound transport.
+</dd><dt>Remarks</dt><dd>The transport must be bound with <tt>bind</tt> command before messages can be sent.  The format restrictions on the _string_ are to simplify output parsing.
 
-Example output for sending the string "''hello''" on the transport session ''transport1'':
- '''send''' transport1 hello
+Example output for sending the string "_hello_" on the transport session _transport1_:
+<pre>
+ *send _transport1 hello_* 
  READY
-
+</pre>
 To send a large message, or APDU fragmented across multiple packets use the second format:
- '''send''' transport1 goodbye x 1000
+<pre>
+ *send _transport1 goodbye_ x _1000_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -147,21 +172,25 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Repetitions of <tt>string</tt> to include in the message payload.</td>
 <td></tr>
 </table>
-
+</dd></dl>
 
 === set NAK_BO_IVL ===
-; Syntax :
- set ''session_name'' NAK_BO_IVL ''interval''
-; Purpose : Sets NAK_BO_IVL, the maximum value of NAK_RB_IVL, the back-off interval to wait whilst watching for matching NCFs or NAKs, before publishing a NAK.
-; Remarks : Example output:
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ NAK_BO_IVL _interval_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Sets <tt>NAK_BO_IVL</tt>, the maximum value of <tt>NAK_RB_IVL</tt>, the back-off interval to wait whilst watching for matching NCFs or NAKs, before publishing a NAK.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''set''' transport1 '''NAK_BO_IVL''' 50
+ *set _transport1_ NAK_BO_IVL _50_* 
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -175,21 +204,25 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Interval in milliseconds.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === set NAK_RPT_IVL ===
-; Syntax :
- set ''session_name'' NAK_RPT_IVL ''interval''
-; Purpose : Set NAK_RPT_IVL, the interval after sending or receiving a NAK and waiting for a matching NCF.
-; Remarks : Example output:
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ NAK_RPT_IVL _interval_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Set <tt>NAK_RPT_IVL</tt>, the interval after sending or receiving a NAK and waiting for a matching NCF.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''set''' transport1 '''NAK_RPT_IVL''' 2000
+ *set _transport1_ NAK_RPT_IVL _2000_* 
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -203,21 +236,24 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Interval in milliseconds.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === set NAK_RDATA_IVL ===
-; Syntax :
- set ''session_name'' NAK_RDATA_IVL ''rate''
-; Purpose : Set NAK_RDATA_IVL, the interval between receiving a NCF and waiting for a matching RDATA.
-; Remarks : Example output:
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ NAK_RDATA_IVL _rate_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Set <tt>NAK_RDATA_IVL</tt>, the interval between receiving a NCF and waiting for a matching RDATA.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''set''' transport1 '''NAK_RDATA_IVL''' 2000
+ *set _transport1_ NAK_RDATA_IVL _2000_* 
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -231,21 +267,25 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Interval in milliseconds.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === set NAK_NCF_RETRIES ===
-; Syntax :
- set ''session_name'' NAK_NCF_RETRIES ''retries''
-; Purpose : Set NAK_NCF_RETRIES, the maximum number of times to wait for a NCF before cancelling NAK generation.
-; Remarks : Example output:
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ NAK_NCF_RETRIES _retries_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Set <tt>NAK_NCF_RETRIES</tt>, the maximum number of times to wait for a NCF before cancelling NAK generation.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''set''' transport1 '''NAK_NCF_RETRIES''' 50
+ *set _transport1_ NAK_NCF_RETRIES _50_* 
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -259,21 +299,25 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Number of retries.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === set NAK_DATA_RETRIES ===
-; Syntax :
- set ''session_name'' NAK_DATA_RETRIES ''retries''
-; Purpose : Set NAK_DATA_RETRIES, the maximum number of times to wait for repair data before cancelling NAK generation.
-; Remarks : Example output:
- create transport1
- created new session "transport1"
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ NAK_DATA_RETRIES _retries_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Set <tt>NAK_DATA_RETRIES</tt>, the maximum number of times to wait for repair data before cancelling NAK generation.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *create _transport1_* 
+ created new session "_transport1_"
  READY
- '''set''' transport1 '''NAK_DATA_RETRIES''' 1000
+ *set _transport1_ NAK_DATA_RETRIES _1000_* 
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -287,21 +331,25 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Number of retries.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === set TXW_MAX_RTE ===
-; Syntax :
- set ''session_name'' TXW_MAX_RTE ''rate''
-; Purpose : Set sender maximum cumulative transmission rate.
-; Remarks : Example output for setting a rate of 1KBps:
- create transport1
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ TXW_MAX_RTE _rate_
+</pre>
+</dd><dt>Purpose</dt><dd>Set sender maximum cumulative transmission rate.
+</dd><dt>Remarks</dt><dd>Example output for setting a rate of 1KBps:
+<pre>
+ *create _transport1_* 
  created new session "transport1"
  READY
- '''set''' transport1 '''TXW_MAX_RTE''' 1000
+ *set _transport1_ TXW_MAX_RTE _1000_* 
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -315,21 +363,25 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Transmission rate in bytes per second.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === set FEC ===
-; Syntax :
- set ''session_name'' FEC RS(''n'', ''k'')
-; Purpose : Enable Reed-Solomon FEC engine and set RS code.
-; Remarks : Example output for using a RS(255,64) code:
- create transport1
+<dl><dt>Syntax</dt><dd>
+<pre>
+ set _session_name_ FEC RS(_n_, _k_)
+</pre>
+</dd><dt>Purpose</dt><dd>Enable Reed-Solomon FEC engine and set RS code.
+</dd><dt>Remarks</dt><dd>Example output for using a RS(255,64) code:
+<pre>
+ *create _transport1_* 
  created new session "transport1"
  READY
- '''set''' transport1 '''FEC''' '''RS('''255''', '''64''')
+ *set _transport1_ FEC RS(_255_, _64_)
  READY
- bind transport1
+ *bind _transport1_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -346,50 +398,60 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 <td>Transmission Group length.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 == Simulator ==
-; Purpose : A host which can send and receive PGM packets in order to illicit a response from the application under test. 
-; Syntax :
- sim [-n ''network'']
-     [-s ''service'']
-; Remarks : Control is provided by standard input with feedback to standard output, the available commands follow in alphabetical order.  After an input command is processed and is ready to accept another command the output "READY" is displayed.
-
+<dl><dt>Purpose</dt><dd>A host which can send and receive PGM packets in order to illicit a response from the application under test. 
+</dd><dt>Syntax</dt><dd>
+<pre>
+ sim `[`-n _network_`]` 
+     `[`-s _service_`]` 
+</pre>
+</dd><dt>Remarks</dt><dd>Control is provided by standard input with feedback to standard output, the available commands follow in alphabetical order.  After an input command is processed and is ready to accept another command the output "<tt>READY</tt>" is displayed.
+</dd></dl>
 
 === bind ===
-See <tt>[[#bind|Application/bind]]</tt>.
+See <tt>[#bind Application/bind]</tt>.
 
 
 === set FEC ===
-See <tt>[[#set FEC|Application/set FEC]]</tt>.
+See <tt>[#setFec Application/set FEC]</tt>.
 
 
 === create ===
-; Syntax :
- create [ ''fake'' ] ''session_name''
-; Purpose : Create a new transport.
-; Remarks : A fake transport is necessary framework for sending PGM protocol packets in an absolute controlled manner.  SPMs will not be automatically published, and NAKs will be not be generated on detected data loss.
+<dl><dt>Syntax</dt><dd>
+<pre>
+ create `[` _fake_ `]` _session_name_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Create a new transport.
+</dd><dt>Remarks</dt><dd>A fake transport is necessary framework for sending PGM protocol packets in an absolute controlled manner.  SPMs will not be automatically published, and NAKs will be not be generated on detected data loss.
 
 Example output for creating a fake session:
- '''create fake''' transport1
+<pre>
+ *create fake* transport1
  READY
+</pre>
 
-See <tt>[[#create|Application/create]]</tt>.
-
+See <tt>[#create Application/create]</tt>.
+</dd></dl>
 
 === destroy ===
-See <tt>[[#destroy|Application/destroy]]</tt>.
+See <tt>[#destroy Application/destroy]</tt>.
 
 
 === net send data ===
-; Syntax :
- net send odata ''session_name'' ''sequence_number'' ''txw_trail'' ''string''
- net send rdata ''session_name'' ''sequence_number'' ''txw_trail'' ''string''
-; Purpose : Send an ODATA or RDATA packet with specified sequence number and TXW_TRAIL.
-; Remarks : Example output:
- '''net send odata''' transport1 401 400 ringo
+<dl><dt>Syntax</dt><dd>
+<pre>
+ net send odata _session_name_ _sequence_number_ _txw_trail_ _string_ 
+ net send rdata _session_name_ _sequence_number_ _txw_trail_ _string_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Send an ODATA or RDATA packet with specified sequence number and TXW_TRAIL.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *net send odata _transport1 401 400 ringo_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -409,17 +471,21 @@ See <tt>[[#destroy|Application/destroy]]</tt>.
 <td>An alphanumeric string to send, must not contain any spaces.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === net send parity data ===
-; Syntax :
- net send parity odata ''session_name'' ''sequence_number'' ''txw_trail'' ''strings''
- net send parity rdata ''session_name'' ''sequence_number'' ''txw_trail'' ''strings''
-; Purpose : Send a parity ODATA (pro-active) or RDATA (on-demand) packet with specified sequence number and TXW_TRAIL.
-; Remarks : Example output:
- '''net send parity rdata''' transport1 401 400 ringo ichigo momo budo
+<dl><dt>Syntax</dt><dd>
+<pre>
+ net send parity odata _session_name_ _sequence_number_ _txw_trail_ _strings_ 
+ net send parity rdata _session_name_ _sequence_number_ _txw_trail_ _strings_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Send a parity ODATA (pro-active) or RDATA (on-demand) packet with specified sequence number and TXW_TRAIL.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *net send parity rdata _transport1 401 400 ringo ichigo momo budo_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -439,19 +505,25 @@ See <tt>[[#destroy|Application/destroy]]</tt>.
 <td>A list of alphanumeric strings representing the original data block, must not contain any spaces.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === net send nak ===
-; Syntax :
- net send nak ''session_name'' ''TSI'' ''sequence_number'' [ ,''sequence_number'' ]...
-; Purpose : Send a NAK to a specified Transport Session Identifier (TSI).
-; Remarks : Example output for sending a NAK for sequence number #1 on the transport session ''transport1'' to the sender with session identifier "''4.232.81.47.21.115.34649''":
- '''net send nak''' transport1 4.232.81.47.21.115.34649 1
+<dl><dt>Syntax</dt><dd>
+<pre>
+ net send nak _session_name_ _TSI_ _sequence_number_ [ ,_sequence_number_ ]...
+</pre>
+</dd><dt>Purpose</dt><dd>Send a NAK to a specified Transport Session Identifier (TSI).
+</dd><dt>Remarks</dt><dd>Example output for sending a NAK for sequence number #1 on the transport session _transport1_ to the sender with session identifier "_4.232.81.47.21.115.34649_":
+<pre>
+ *net send nak _transport1 4.232.81.47.21.115.34649 1_* 
  READY
+</pre>
 Example sending a list of NAKs for sequence numbers 2,3,4:
- '''net send nak''' transport1 4.232.81.47.21.115.34649 2,3,4
+<pre>
+ *net send nak _transport1 4.232.81.47.21.115.34649 2,3,4_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -468,16 +540,20 @@ Example sending a list of NAKs for sequence numbers 2,3,4:
 <td>Packet sequence number to request re-transmission of.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === net send spm ===
-; Syntax :
- net send spm ''session_name'' ''sequence_number'' ''txw_trail'' ''txw_lead''
-; Purpose : Send a SPM with specified sequence numbers and transmit window parameters.
-; Remarks : Example output:
- '''net send spm''' transport1 60 801 800
+<dl><dt>Syntax</dt><dd>
+<pre>
+ net send spm _session_name_ _sequence_number_ _txw_trail_ _txw_lead_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Send a SPM with specified sequence numbers and transmit window parameters.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *net send spm _transport1 60 801 800_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -497,16 +573,20 @@ Example sending a list of NAKs for sequence numbers 2,3,4:
 <td>TXW_LEAD: the leading edge of the transmit window.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === net send parity spm ===
-; Syntax :
- net send spm ''session_name'' ''sequence_number'' ''txw_trail'' ''txw_lead'' pro-active on-demand ''k'
-; Purpose : Send a parity SPM with specified sequence numbers, transmit window parameters, and which FEC services to advertise.
-; Remarks : Example output:
- '''net send spm''' transport1 60 801 800 on-demand 64
+<dl><dt>Syntax</dt><dd>
+<pre>
+ net send spm _session_name_ _sequence_number_ _txw_trail_ _txw_lead_ pro-active on-demand _k'
+</pre>
+</dd><dt>Purpose</dt><dd>Send a parity SPM with specified sequence numbers, transmit window parameters, and which FEC services to advertise.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *net send spm _transport1 60 801 800_ on-demand _64_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -526,16 +606,20 @@ Example sending a list of NAKs for sequence numbers 2,3,4:
 <td>TXW_LEAD: the leading edge of the transmit window.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === net send spmr ===
-; Syntax :
- net send spmr ''session_name'' ''TSI''
-; Purpose : Send a SPMR to local multicast segment and unicast to the specified TSI.
-; Remarks : Example output:
- '''net send spmr''' transport1 4.232.81.47.21.115.34649
+<dl><dt>Syntax</dt><dd>
+<pre>
+ net send spmr _session_name_ _TSI_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Send a SPMR to local multicast segment and unicast to the specified TSI.
+</dd><dt>Remarks</dt><dd>Example output:
+<pre>
+ *net send spmr _transport1 4.232.81.47.21.115.34649_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -549,32 +633,35 @@ Example sending a list of NAKs for sequence numbers 2,3,4:
 <td>Transport Session Identifier.</td>
 </tr>
 </table>
-
+</dd></dl>
 
 === quit ===
-See <tt>[[#quit|Application/quit]]</tt>.
-
+See <tt>[#quit Application/quit]</tt>.
 
 === send ===
-See <tt>[[#send|Application/send]]</tt>.
-
-
+See <tt>[#send Application/send]</tt>.
 
 == Monitor ==
-; Purpose : An independent network monitor to verify what is actually sent on the network.
-; Syntax :
+<dl><dt>Purpose</dt><dd>An independent network monitor to verify what is actually sent on the network.
+</dd><dt>Syntax</dt><dd>
+<pre>
  monitor
-; Remarks : Control is provided by standard input with feedback to standard output, the available commands follow in alphabetical order.  After an input command is processed and is ready to accept another command the output "READY" is displayed.
-
+</pre>
+</dd><dt>Remarks</dt><dd>Control is provided by standard input with feedback to standard output, the available commands follow in alphabetical order.  After an input command is processed and is ready to accept another command the output "<tt>READY</tt>" is displayed.
+</dd></dl>
 
 === filter ===
-; Syntax :
- filter ''IPv4_address''
-; Purpose : Filter out packets that do not matched the provided IP address.
-; Remarks : Example output to filter for only packets from the host ''10.6.28.31'':
- '''filter''' 10.6.28.31
+<dl><dt>Syntax</dt><dd>
+<pre>
+ filter _IPv4_address_ 
+</pre>
+</dd><dt>Purpose</dt><dd>Filter out packets that do not matched the provided IP address.
+</dd><dt>Remarks</dt><dd>Example output to filter for only packets from the host _10.6.28.31_:
+<pre>
+ *filter _10.6.28.31_* 
  READY
-; Parameters :
+</pre>
+</dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Parameter</th>
@@ -585,9 +672,8 @@ See <tt>[[#send|Application/send]]</tt>.
 <td>A dotted quad IPv4 address.</td>
 </tr>
 </table>
-
-
+</dd></dl>
 
 === quit ===
-See <tt>[[#quit|Application/quit]]</tt>.
+See <tt>[#quit Application/quit]</tt>.
 
