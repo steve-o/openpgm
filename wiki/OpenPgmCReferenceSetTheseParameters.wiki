@@ -1,4 +1,7 @@
-﻿OpenPGM does not default with a set of PGM parameters as it is necessary to customize to your messaging platform requirements. OpenPGM applications need to include calls to the following functions before binding a transport with a call to <tt>[[OpenPGM C Reference/pgm_transport_bind()|pgm_transport_bind()]]</tt>
+﻿#summary OpenPGM C Reference : Set these Parameters
+#labels Phase-Implementation
+
+OpenPGM does not default with a set of PGM parameters as it is necessary to customize to your messaging platform requirements. OpenPGM applications need to include calls to the following functions before binding a transport with a call to <tt>[OpenPgmCReferencePgmTransportBind pgm_transport_bind()]</tt>
 
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -9,73 +12,73 @@
 <tr>
 <td colspan="2"><h3>Sending</h3></td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_max_tpdu()|pgm_transport_set_max_tpdu()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_txw_sqns()|pgm_transport_set_txw_sqns()]]</tt>, or<br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_txw_max_rte()|pgm_transport_set_txw_max_rte()]]</tt> and <tt>[[OpenPGM C Reference/pgm_transport_set_txw_secs()|pgm_transport_set_txw_secs()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
+<tt>[OpenPgmCReferencePgmTransportSetTxwMaxTte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size, optionally enabling rate regulation engine.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rxw_sqns()|pgm_transport_set_rxw_sqns()]]</tt>, or<br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_rxw_max_rte()|pgm_transport_set_rxw_max_rte()]]</tt> and <tt>[[OpenPGM C Reference/pgm_transport_set_rxw_secs()|pgm_transport_set_rxw_secs()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
+<tt>[OpenPgmCReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
 <td>Set receive window size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_hops()|pgm_transport_set_hops()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_ambient_spm()|pgm_transport_set_ambient_spm()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
 <td>Set interval of background SPM packets.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_heartbeat_spm()|pgm_transport_set_heartbeat_spm()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHeartbeat_spm pgm_transport_set_heartbeat_spm()]</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_peer_expiry()|pgm_transport_set_peer_expiry()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
 <td>Set timeout for removing a dead peer.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_spmr_expiry()|pgm_transport_set_spmr_expiry()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>
 <td>Set expiration time of SPM Requests.</td>
 </tr><tr>
 <td colspan="2"><h3>Receiving</h3></td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_max_tpdu()|pgm_transport_set_max_tpdu()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_txw_sqns()|pgm_transport_set_txw_sqns()]]</tt>, or<br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_txw_max_rte()|pgm_transport_set_txw_max_rte()]]</tt> and <tt>[[OpenPGM C Reference/pgm_transport_set_txw_secs()|pgm_transport_set_txw_secs()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
+<tt>[OpenPgmCReferencePgmTransportSetTxwMaxTte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rxw_sqns()|pgm_transport_set_rxw_sqns()]]</tt>, or<br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_rxw_max_rte()|pgm_transport_set_rxw_max_rte()]]</tt> and <tt>[[OpenPGM C Reference/pgm_transport_set_rxw_secs()|pgm_transport_set_rxw_secs()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
+<tt>[OpenPgmCReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
 <td>Set receive window size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_hops()|pgm_transport_set_hops()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_ambient_spm()|pgm_transport_set_ambient_spm()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
 <td>Set interval of background SPM packets.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_heartbeat_spm()|pgm_transport_set_heartbeat_spm()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_peer_expiry()|pgm_transport_set_peer_expiry()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
 <td>Set timeout for removing a dead peer.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_spmr_expiry()|pgm_transport_set_spmr_expiry()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>
 <td>Set expiration time of SPM Requests.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_bo_ivl()|pgm_transport_set_nak_bo_ivl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakBoIvl pgm_transport_set_nak_bo_ivl()]</tt></td>
 <td>Set NAK transmit back-off interval.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_rpt_ivl()|pgm_transport_set_nak_rpt_ivl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakRptIvl pgm_transport_set_nak_rpt_ivl()]</tt></td>
 <td>Set timeout before repeating NAK.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_rdata_ivl()|pgm_transport_set_nak_rdata_ivl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakRdataIvl pgm_transport_set_nak_rdata_ivl()]</tt></td>
 <td>Set timeout for receiving RDATA.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_data_retries()|pgm_transport_set_nak_data_retries()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakDataRetries pgm_transport_set_nak_data_retries()]</tt></td>
 <td>Set retries for DATA packets after NAK.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_ncf_retries()|pgm_transport_set_nak_ncf_retries()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakNcfRetries pgm_transport_set_nak_ncf_retries()]</tt></td>
 <td>Set retries for DATA after NCF.</td>
 </tr>
 </table>

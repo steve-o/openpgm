@@ -1,4 +1,7 @@
-﻿OpenPGM C programs must link the appropriate library files.
+﻿#summary OpenPGM C Reference : Link these Library Files
+#labels Phase-Implementation
+
+OpenPGM C programs must link the appropriate library files.
 
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -9,7 +12,7 @@
 <tr>
 <td colspan="2"><h3>Communications and Events</h3></td>
 </tr><tr>
-<td><tt>`pkg-config --static --cflags --libs glib-2.0 gthread-2.0`</tt></td>
+<td><tt>```pkg-config --static --cflags --libs glib-2.0 gthread-2.0`````</tt></td>
 <td>Include this for the GLib API.</td>
 </tr><tr>
 <td><tt>-lpgm</tt></td>
@@ -17,7 +20,7 @@
 </tr><tr>
 <td colspan="2"><h3>Monitoring and Administration</h3></td>
 </tr><tr>
-<td>Change the GLib line to<br><tt>`pkg-config --static --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.2` -lpgmhttp </tt></td>
+<td>Change the GLib line to<br/><tt>```pkg-config --static --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.2``` -lpgmhttp </tt></td>
 <td>Include this for the HTTP/HTTPS interface.</td>
 </tr><tr>
 <td><tt>-lpgmsnmp -lnetsnmpagent -lnetsnmpmibs -lnetsnmphelpers -lnetsnmp</tt></td>

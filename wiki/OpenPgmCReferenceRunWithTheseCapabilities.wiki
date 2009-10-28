@@ -1,6 +1,8 @@
-﻿OpenPGM C programs require system capabilities from this list in order to function.
+﻿#summary OpenPGM C Reference : Run With These Capabilities
+#labels Phase-Implementation
 
-__NOTOC__
+OpenPGM C programs require system capabilities from this list in order to function.
+
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>System Capability</th>
@@ -15,14 +17,14 @@ __NOTOC__
 <td><tt>CAP_SYS_NICE</tt></td>
 <td>To set real time thread scheduling and high thread priority for processing incoming messages and high resolution timing.</td>
 </tr><tr>
-<td colspan="2"><h3>Real-time Clock*</h3></td>
+<td colspan="2"><h3>Real-time Clock`*`</h3></td>
 </tr><tr>
 <td>access to <tt>/dev/rtc</tt></td>
 <td>For TSC calibration with the hardware real-time clock access to the <tt>rtc</tt> device can be enabled by adding the user to the real-time Unix group, on Ubuntu this is called <tt>audio</tt>.</td>
 </tr>
 </table>
 
-'''* Clock selection''' is specified by two system environment variables <tt>PGM_TIMER</tt> governing how to get the current time, and <tt>PGM_SLEEP</tt> governing how to wait for an interval of time.
+*`*` Clock selection* is specified by two system environment variables <tt>PGM_TIMER</tt> governing how to get the current time, and <tt>PGM_SLEEP</tt> governing how to wait for an interval of time.
 
 
 === Clock Selection ===
@@ -57,7 +59,7 @@ On Linux TSC is calibrated using the details provided by the kernel in <tt>/proc
 <td><tt>TSC</tt></td>
 <td>Call RDTSC and normalize with a RTC calibrated count of core ticks.</td>
 </tr><tr>
-<td><tt>GETTIMEOFDAY</tt>*</td>
+<td><tt>GETTIMEOFDAY</tt>`*`</td>
 <td>Use <tt>gettimeofday (tv, NULL)</tt>, see <tt>GETTIMEOFDAY(2)</tt> for further details.</td>
 </tr><tr>
 <td colspan="2"><h3>PGM_SLEEP</h3></td>
@@ -74,10 +76,10 @@ On Linux TSC is calibrated using the details provided by the kernel in <tt>/proc
 <td><tt>TSC</tt></td>
 <td>Repeatedly call <tt>RDTSC</tt> interleaving with [http://library.gnome.org/devel/glib/stable/glib-Threads.html#g-thread-yield g_thread_yield()] to allow other threads to execute.</td>
 </tr><tr>
-<td><tt>USLEEP</tt>* or <tt>MICROSLEEP</tt></td>
+<td><tt>USLEEP</tt>`*` or <tt>MICROSLEEP</tt></td>
 <td>Use <tt>usleep (usec)</tt>, see <tt>USLEEP(3)</tt> for further details.</td>
 </tr>
 </table>
 
-* Default settings.
+`*` Default settings.
 

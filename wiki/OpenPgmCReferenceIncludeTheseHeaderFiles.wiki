@@ -1,4 +1,7 @@
-﻿OpenPGM C programs must include the appropriate header files from this list.
+﻿#summary OpenPGM C Reference : Include these Header Files
+#labels Phase-Implementation
+
+OpenPGM C programs must include the appropriate header files from this list.
 
 
 <table border="1" cellpadding="5" cellspacing="0">

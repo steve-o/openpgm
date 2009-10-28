@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : Build Library
+﻿#summary OpenPGM 2 : C Reference : Build Library
 #labels Phase-Implementation
 #sidebar TOC2CReference
 === Introduction ===
@@ -38,7 +38,7 @@ First install all the C compiler dependencies and Subversion.  Install the libra
 </pre>
 Download and build stable release of SCons.
 <pre>
- $ wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz
+ $ wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz 
  $ tar zxf scons-1.2.0.tar.gz
  $ cd scons-1.2.0
  $ sudo python setup.py install
@@ -73,12 +73,12 @@ Download and unpack the Win32 library dependencies, primarily GLib Binaries & De
  $ cd win
  $ wget http://ftp.gnome.org/pub/gnome/binaries/win32/glib/2.20/glib_2.20.4-1_win32.zip \
         http://ftp.gnome.org/pub/gnome/binaries/win32/glib/2.20/glib-dev_2.20.4-1_win32.zip \
-        http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/proxy-libintl-dev_20080918_win32.zip
+        http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/proxy-libintl-dev_20080918_win32.zip 
  $ for i in *.zip; do unzip $i; done
 </pre>
 Update the <tt>pkgconfig</tt> configuration for where the root directory is located.
 <pre>
- $ for i in lib/pkgconfig/*.pc; do sed -i "s#prefix=c:/.*#prefix=`pwd`#" $i; done
+ $ for i in lib/pkgconfig/`*`.pc; do sed -i "s#prefix=c:/.`*`#prefix=`pwd`#" $i; done
 </pre>
 Patch the mingw32 installation with updated Win32 headers.
 <pre>
@@ -173,9 +173,9 @@ Install dependencies to build a Debian package.
 </pre>
 Pull in the 1.0.0 SCons source from Lenny.
 <pre>
- $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.dsc
- $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0.orig.tar.gz
- $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.diff.gz
+ $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.dsc 
+ $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0.orig.tar.gz 
+ $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.diff.gz 
  $ dpkg-source -x scons_1.0.0-1.dsc
  $ cd scons-1.0.0/
  $ sudo apt-get build-dep scons
@@ -219,10 +219,10 @@ Don't, for the following reasons.
 ==== Rebuilding yum packages ====
 Setup user packaging as per [http://wiki.centos.org/TipsAndTricks/YumAndRPM YumAndRPM] in the CentOS wiki.  Download the source package from Red Hat or CentOS, then rebuild the package, installing any additional build dependencies as necessary.
 <pre>
- $ wget http://mirror.centos.org/centos/4/os/SRPMS/libsoup-2.2.1-4.src.rpm
+ $ wget http://mirror.centos.org/centos/4/os/SRPMS/libsoup-2.2.1-4.src.rpm 
  $ sudo yum install gnutls-devel
- $ rpmbuild --rebuild libsoup-*.src.rpm 
- $ sudo rpm -i redat/RPMS/libsoup-devel-*.rpm
+ $ rpmbuild --rebuild libsoup-`*`.src.rpm 
+ $ sudo rpm -i redat/RPMS/libsoup-devel-`*`.rpm
 </pre>
 
 ==== Building ====
@@ -303,7 +303,7 @@ Two hosts are required for full PGM protocol testing, one to send the other to r
 On the receiving host run the OpenPGM receiver.
 <pre>
  kiku$ sudo ./ref/debug/examples/pgmrecv 
- ** Message: pgmrecv
+ `*``*` Message: pgmrecv
  2008-05-27 18:02:53 kiku: scheduling startup.
  2008-05-27 18:02:53 kiku: entering main event loop ... 
  2008-05-27 18:02:53 kiku: startup.
@@ -331,7 +331,7 @@ Without explicit network parameter passing OpenPGM will assume the default adapt
 For multicast loopback testing using only one host requires use of a low-resolution timing mechanism as the <tt>/dev/rtc</tt> real-time clock device cannot be shared.  The example <tt>pgmrecv</tt> and <tt>pgmsend</tt> applications have convenience parameters to automagically enable this configuration.  For this demonstration we will also use UDP encapsulation of the PGM protocol so as not to require any extra system privileges.  On one terminal start a receiver.
 <pre>
  aiko$ ./ref/debug/examples/pgmrecv -lp 3065
- ** Message: pgmrecv
+ `*``*` Message: pgmrecv
  2008-11-19 17:59:05 aiko: setting low resolution timers for multicast loopback.
  2008-11-19 17:59:05 aiko: scheduling startup.
  2008-11-19 17:59:05 aiko: entering main event loop ... 
