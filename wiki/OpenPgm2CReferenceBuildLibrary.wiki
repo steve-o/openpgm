@@ -31,7 +31,7 @@ By default SCons is configured to build the debug tree in <tt>./ref/debug</tt> t
  $ scons BUILD=release WITH_NCURSES=false
 </pre>
 
-=== Building in OpenSolaris 2008.11 or 2009.06 under SCons ===
+=== Building in !OpenSolaris 2008.11 or 2009.06 under SCons ===
 First install all the C compiler dependencies and Subversion.  Install the library dependencies, primarily GLib.
 <pre>
  SUNWsvn SUNWgcc SUNWgnome-common-devel SUNWgnome-base-libs SUNWlibsoup (IPSnetsnmp)
@@ -74,7 +74,7 @@ Download and unpack the Win32 library dependencies, primarily GLib Binaries & De
  $ wget http://ftp.gnome.org/pub/gnome/binaries/win32/glib/2.20/glib_2.20.4-1_win32.zip \
         http://ftp.gnome.org/pub/gnome/binaries/win32/glib/2.20/glib-dev_2.20.4-1_win32.zip \
         http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/proxy-libintl-dev_20080918_win32.zip 
- $ for i in *.zip; do unzip $i; done
+ $ for i in `*`.zip; do unzip $i; done
 </pre>
 Update the <tt>pkgconfig</tt> configuration for where the root directory is located.
 <pre>
@@ -321,7 +321,7 @@ Then on the receiver you should see the test messages.
  2008-05-27 18:03:25 kiku: (4 bytes)
  2008-05-27 18:03:25 kiku: 	1: "baa" (4 bytes)
 </pre>
-Without explicit network parameter passing OpenPGM will assume the default adapter and either IPv4 or IPv6 addressing.  If your operating system defaults to DHCP it is possible that the nodename of the host resolves to localhost and not a real adapter, it is then necessary to explicitly set the adapter name.  Similarly you might have problems with IPv6 auto-configuration and multiple scopes per adapter.  So on a default OpenSolaris install you might wish to try the following:
+Without explicit network parameter passing OpenPGM will assume the default adapter and either IPv4 or IPv6 addressing.  If your operating system defaults to DHCP it is possible that the nodename of the host resolves to localhost and not a real adapter, it is then necessary to explicitly set the adapter name.  Similarly you might have problems with IPv6 auto-configuration and multiple scopes per adapter.  So on a default !OpenSolaris install you might wish to try the following:
 <pre>
  opensolaris$ sudo ./ref/debug/examples/pgmsend -n "pcn0;239.192.0.1" ichigo milk 
 </pre>

@@ -6,7 +6,7 @@ This section presents important general information for programmers using OpenPG
 
 === Topics ===
   * [OpenPgm2CReferenceBuildLibrary Build Library]
-  * [OpenPgmCReferenceProgrammingEnvironment Programming Environment]
+  * [OpenPgm2CReferenceProgrammingEnvironment Programming Environment]
   * [OpenPgmCReferenceIncludeTheseHeaderFiles Include these Header Files]
   * [OpenPgm2CReferenceSetTheseParameters Set these Parameters]
   * [OpenPgmCReferenceLinkTheseLibraryFiles Link these Library Files]

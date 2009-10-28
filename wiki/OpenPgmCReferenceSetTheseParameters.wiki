@@ -16,7 +16,7 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgmCReferencePgmTransportSetTxwMaxTte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
+<tt>[OpenPgmCReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size, optionally enabling rate regulation engine.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
@@ -29,7 +29,7 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 <td><tt>[OpenPgmCReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
 <td>Set interval of background SPM packets.</td>
 </tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetHeartbeat_spm pgm_transport_set_heartbeat_spm()]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
@@ -44,7 +44,7 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgmCReferencePgmTransportSetTxwMaxTte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
+<tt>[OpenPgmCReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
