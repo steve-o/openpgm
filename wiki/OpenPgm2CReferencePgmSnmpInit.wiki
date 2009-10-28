@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_snmp_init()
+﻿#summary OpenPGM 2 : C Reference : pgm_snmp_init()
 #labels Phase-Implementation
 
 _Function_
@@ -8,7 +8,7 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_snmp_init* (
         [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
-);
+	);
 </pre>
 
 === Purpose ===
