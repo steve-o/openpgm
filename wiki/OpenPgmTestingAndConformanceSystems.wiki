@@ -16,7 +16,7 @@
 <pre>
  bind _session_name_ 
 </pre>
-<dl><dt>Purpose</dt><dd>Bind a transport to the network.
+</dd><dt>Purpose</dt><dd>Bind a transport to the network.
 </dd><dt>Remarks</dt><dd>The transport must be previously created with the <tt>create</tt> command.
 
 Example output for binding a session called _transport1_:
@@ -128,6 +128,7 @@ Example output for binding a session called _transport1_:
 </pre>
 </dd><dt>Purpose</dt><dd>Terminates the application and destroy all active transports.  Call to finish a test early, usually upon failure, or at test completion upon success.
 </dd><dt>Remarks</dt><dd>Example output with no active transport sessions:
+<pre>
  *quit* 
  `*``*` Message: event loop terminated, cleaning up.
  `*``*` Message: destroying sessions.
@@ -170,7 +171,7 @@ To send a large message, or APDU fragmented across multiple packets use the seco
 </tr><tr>
 <td><tt>repeat_count</tt></td>
 <td>Repetitions of <tt>string</tt> to include in the message payload.</td>
-<td></tr>
+</tr>
 </table>
 </dd></dl>
 
@@ -253,6 +254,7 @@ To send a large message, or APDU fragmented across multiple packets use the seco
  READY
  *bind _transport1_* 
  READY
+</pre>
 </dd><dt>Parameters</dt><dd>
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
@@ -676,4 +678,3 @@ See <tt>[#send Application/send]</tt>.
 
 === quit ===
 See <tt>[#quit Application/quit]</tt>.
-
