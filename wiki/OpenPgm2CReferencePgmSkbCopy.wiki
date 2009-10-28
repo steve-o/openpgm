@@ -8,7 +8,7 @@ _Function_
 #include <pgm/pgm.h>
 
 struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*` *pgm_skb_copy* (
-	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t] *skb
+	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb
 	);
 </pre>
 

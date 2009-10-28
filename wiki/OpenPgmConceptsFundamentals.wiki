@@ -88,5 +88,5 @@ When Reed-Solomon forward error correction (FEC) is enabled the concept of trans
 
 <img src="http://miru.hk/wiki/PGM_transmission_group.png"/>
 
-A transmission group is a series of *k* packets as defined by the Reed-Solomon code RS(*n*, *k*).  Packet recovery mechanisms are delayed until the end of a transmission group is reached or discovered.  If pro-active parity is enabled parity packets are broadcast after the original data packets, if on-demand parity is enabled parity packets are sent instead of re-transmitting original data.
+A transmission group is a series of _k_ packets as defined by the Reed-Solomon code RS(_n_, _k_).  Packet recovery mechanisms are delayed until the end of a transmission group is reached or discovered.  If pro-active parity is enabled parity packets are broadcast after the original data packets, if on-demand parity is enabled parity packets are sent instead of re-transmitting original data.
 

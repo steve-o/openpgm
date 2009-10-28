@@ -8,12 +8,12 @@ _Function_
 #include <pgm/pgm.h>
 
 struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*` *pgm_alloc_skb* (
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      size
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                   size
 	);
 
 struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*` *pgm_skb_get* (
 	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb
-	);</tt>
+	);
 
 void *pgm_free_skb* (
 	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb
@@ -44,9 +44,9 @@ void *pgm_free_skb* (
 === Example ===
 Create a skbuff with enough space for a regular Ethernet sized packet, create a reference and free the original.
 {{{
- struct pgm_sk_buff_t *skb, *ref;
+ struct pgm_sk_buff_t *skb, *ref_skb;
  skb = pgm_alloc_skb (1500);
- ref = pgm_skb_get (skb);
+ ref_skb = pgm_skb_get (skb);
  pgm_free_skb (skb);
 }}}
 

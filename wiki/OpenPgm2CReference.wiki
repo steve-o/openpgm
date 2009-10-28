@@ -13,6 +13,7 @@
   # [OpenPgm2CReferenceEvents Events]
   # [OpenPgm2CReferencePgmSkbs PGM Socket Buffers (SKBs)]
   # [OpenPgm2CReferenceInterface Interface]
+  # [OpenPgm2CReferenceTiming Timing]
   # [OpenPgm2CReferenceTransport Transport]
   # [OpenPgm2CReferenceAsynchronousReceiver Asynchronous Receiver]
   # [OpenPgm2CReferenceErrorHandling Error Handling]

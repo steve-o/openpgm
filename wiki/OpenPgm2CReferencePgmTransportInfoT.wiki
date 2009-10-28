@@ -9,16 +9,16 @@ _Type_
 typedef struct pgm_transport_info_t *pgm_transport_info_t*;
 
 struct pgm_transport_info_t {
-	[OpenPgm2CReferencePgmGsiT pgm_gsi_t]      ti_gsi;
-	int      ti_flags;
-	int      ti_family;
-	int      ti_udp_encap_ucast_port;
-	int      ti_udp_encap_mcast_port;
-	int      ti_sport;
-	int      ti_dport;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      ti_recv_addrs_len;
+	[OpenPgm2CReferencePgmGsiT pgm_gsi_t]                    ti_gsi;
+	int                          ti_flags;
+	int                          ti_family;
+	int                          ti_udp_encap_ucast_port;
+	int                          ti_udp_encap_mcast_port;
+	int                          ti_sport;
+	int                          ti_dport;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        ti_recv_addrs_len;
 	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_recv_addrs;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]      ti_send_addrs_len;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        ti_send_addrs_len;
 	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_send_addrs;
 	};
 </pre>

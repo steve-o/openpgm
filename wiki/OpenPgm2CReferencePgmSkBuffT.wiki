@@ -7,24 +7,24 @@ _Type_
 <pre>
 #include <pgm/pgm.h>
 
-struct pgm_sk_buff_t {</tt><br>
-	[http://library.gnome.org/devel/glib/stable/glib-Doubly-Linked-Lists.html#GList GList]      link_;
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport;
-	[OpenPgm2CReferencePgmTimeT pgm_time_t]      tstamp;
-	[OpenPgm2CReferencePgmTsiT pgm_tsi_t]      tsi;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint32 guint32]      sequence;
-	char      cb[48];
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      len;
-	unsigned      zero_padded:1;
-	struct [OpenPgm2CReferencePgmHeader pgm_header]`*`     pgm_header;
+struct pgm_sk_buff_t {
+	[http://library.gnome.org/devel/glib/stable/glib-Doubly-Linked-Lists.html#GList GList]                        link_;
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`             transport;
+	[OpenPgm2CReferencePgmTimeT pgm_time_t]                   tstamp;
+	[OpenPgm2CReferencePgmTsiT pgm_tsi_t]                    tsi;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint32 guint32]                      sequence;
+	char                         cb[48];
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                      len;
+	unsigned                     zero_padded:1;
+	struct [OpenPgm2CReferencePgmHeader pgm_header]`*`           pgm_header;
 	struct [OpenPgm2CReferencePgmOptFragment pgm_opt_fragment]`*`     pgm_opt_fragment;
-	struct [OpenPgm2CReferencePgmData pgm_data]`*`     pgm_data;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      head;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      data;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      tail;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]      end;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      truesize;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]      users;
+	struct [OpenPgm2CReferencePgmData pgm_data]`*`             pgm_data;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                     head;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                     data;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                     tail;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                     end;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                        truesize;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]                         users;
 	};
 </pre>
 

@@ -1,0 +1,21 @@
+#summary OpenPGM 2 : C Reference : Timing
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Introduction ===
+Functionality for high resolution timing, sleeping, and delays.
+
+=== Topics in Alphabetical Order ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td colspan="2"><h3>Timing API</h3></td>
+</tr><tr>
+<td><tt>[OpenPgm2CReferencePgmTimeT pgm_time_t]</tt></td>
+<td>Time value data type.</td>
+</tr>
+</table>
+

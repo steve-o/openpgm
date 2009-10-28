@@ -8,14 +8,14 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_if_get_transport_info* (
-	const char`*`     network,
+	const char`*`                            network,
 	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t] const`*`     hints,
-	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*``*`    res,
-	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`    error
+	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*``*`          res,
+	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`                               error
 	);
 
 void *pgm_if_free_transport_info* (
-	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*`     res
+	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*`           res
 	);
 </pre>
 

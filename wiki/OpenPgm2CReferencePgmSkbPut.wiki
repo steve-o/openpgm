@@ -9,17 +9,17 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] *pgm_skb_put* (
 	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      size
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                   size
 	);
 
 void *pgm_skb_reserve* (
 	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      size
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                   size
 	);
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] *pgm_skb_pull* (
 	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      size
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                   size
 	);
 </pre>
 
