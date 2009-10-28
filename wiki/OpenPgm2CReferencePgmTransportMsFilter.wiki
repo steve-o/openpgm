@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_msfilter()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_msfilter()
 #labels Phase-Implementation
 
 _Function_
@@ -7,9 +7,9 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_msfilter* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`         transport,
 	struct group_filter`*`     gf_list,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     len
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                    len
 );
 </pre>
 
@@ -59,4 +59,4 @@ Exclude sources 192.168.9.2/3 from group 239.192.0.2.
   * <tt>[OpenPgm2CReferencePgmTransportBlockSource pgm_transport_block_source()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportJoinGroup pgm_transport_join_group()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportJoinSourceGroup pgm_transport_join_source_group()]</tt><br>
-   [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

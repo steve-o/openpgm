@@ -1,12 +1,16 @@
-''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_max_tsdu()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] '''pgm_transport_max_tsdu''' (</tt><br>
-: <tt>[[2/OpenPGM C Reference/pgm_transport_t|pgm_tranport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]*              can_fragment</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] *pgm_transport_max_tsdu* (
+	[OpenPgm2CReferencePgmTransportT pgm_tranport_t]*     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]*           can_fragment
+	);
+</pre>
 
 === Purpose ===
 Get maximum TSDU, or packet payload size with or without fragmentation.
@@ -37,23 +41,27 @@ Returns the maximum TSDU size, or number of bytes available per packet as applic
 === Example ===
 Send one zero-copy packet sized APDU.
 
+{{{
  const int max_tpdu = 1500;
  struct pgm_sk_buff_t vector[1];
  vector[0] = pgm_alloc_skb (max_tpdu);
  pgm_send_skbv (transport, vector, 1, TRUE, NULL);
+}}}
 
 Send a 10 KB zero-copy sized APDU.
 
+{{{
  const int max_tpdu = 1500;
  gsize apdu_size = 10 * 1024;
- gsize tsdu_size = '''pgm_transport_max_tsdu''' (transport, TRUE);
+ gsize tsdu_size = pgm_transport_max_tsdu (transport, TRUE);
  guint packets = apdu_size / tsdu_size;
  struct pgm_sk_buff_t vector[packets];
  for (guint i = 0; i < packets; i++)
    vector[i] = pgm_alloc_skb (max_tpdu);
  pgm_send_skbv (transport, vector, packets, TRUE, NULL);
+}}}
 
 === See Also ===
-<tt>[[2/OpenPGM C Reference/pgm_alloc_skb()|pgm_alloc_skb()]]</tt><br>
-<tt>[[2/OpenPGM C Reference/pgm_send_skbv()|pgm_send_skbv()]]</tt><br>
-[[2/OpenPGM C Reference/Transport|Transport]] in OpenPGM C Reference.
+  * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmSendSkbv pgm_send_skbv()]</tt><br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

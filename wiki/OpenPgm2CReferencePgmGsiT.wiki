@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_gsi_t
+﻿#summary OpenPGM 2 : C Reference : pgm_gsi_t
 #labels Phase-Implementation
 
 _Type_
@@ -9,7 +9,7 @@ _Type_
 typedef struct pgm_gsi_t *pgm_gsi_t*;
 
 struct pgm_gsi_t {
-	char identifier[6];
+	char identifier`[`6`]`;
 };
 </pre>
 

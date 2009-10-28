@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_tsi_t
+﻿#summary OpenPGM 2 : C Reference : pgm_tsi_t
 #labels Phase-Implementation
 
 _Type_
@@ -10,8 +10,8 @@ typedef struct pgm_tsi_t *pgm_tsi_t*;
 
 struct pgm_tsi_t {
 	[OpenPgm2CReferencePgmGsiT pgm_gsi_t]     gsi;
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]     sport;
-};
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]       sport;
+	};
 </pre>
 
 === Purpose ===

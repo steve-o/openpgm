@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_gsi_print()
+﻿#summary OpenPGM 2 : C Reference : pgm_gsi_print()
 #labels Phase-Implementation
 
 _Function_
@@ -10,13 +10,13 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_gsi_print* (
 	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi
-);
+	);
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_gsi_print_r* (
 	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi,
-	char`*`     buf,
-	size_t     bufsize
-);
+	char`*`               buf,
+	size_t              bufsize
+	);
 </pre>
 
 === Purpose ===

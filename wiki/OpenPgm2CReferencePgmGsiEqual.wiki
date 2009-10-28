@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_gsi_equal()
+﻿#summary OpenPGM 2 : C Reference : pgm_gsi_equal()
 #labels Phase-Implementation
 
 _Function_
@@ -9,7 +9,7 @@ _Function_
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint] *pgm_gsi_equal* (
 	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi1,
 	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi2
-);
+	);
 </pre>
 
 === Purpose ===

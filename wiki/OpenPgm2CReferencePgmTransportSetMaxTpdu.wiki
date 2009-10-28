@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_set_max_tpdu()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_set_max_tpdu()
 #labels Phase-Implementation
 
 _Function_
@@ -8,7 +8,7 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_max_tpdu* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]      max_tpdu
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]              max_tpdu
 	);
 </pre>
 
@@ -46,35 +46,35 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 <td>Option extension length.</td>
 </tr><tr>
 <td>-16 bytes</td>
-<td>Fragmentation Option. &dagger;</td>
+<td>Fragmentation Option. †</td>
 </tr><tr>
 <td>-8 bytes</td>
-<td>Late Joining Option. &Dagger;</td>
+<td>Late Joining Option. ‡</td>
 </tr><tr>
 <td>-4 bytes</td>
-<td>Synchronisation Option (first packet and its repairs). &Dagger;</td>
+<td>Synchronisation Option (first packet and its repairs). ‡</td>
 </tr><tr>
 <td>-4 bytes</td>
-<td>Session Finish Option (last packet and its repairs). &Dagger;</td>
+<td>Session Finish Option (last packet and its repairs). ‡</td>
 </tr><tr>
 <td>-8 bytes</td>
-<td>Parity Group Number Option. &sect;</td>
+<td>Parity Group Number Option. §</td>
 </tr><tr>
 <td>-8 bytes</td>
-<td>Actual Transmission Group Size Option. &sect; &Dagger;</td>
+<td>Actual Transmission Group Size Option. §‡</td>
 </tr><tr>
 <td>-2 bytes</td>
-<td>Variable TSDU length encoding for parity packets &dagger;</td>
+<td>Variable TSDU length encoding for parity packets †</td>
 </tr><tr>
-<td>'''-102 bytes'''</td>
-<td>'''Worst case overhead.'''</td>
+<td>*-102 bytes*</td>
+<td>*Worst case overhead.*</td>
 </tr>
 </table>
 
 
-<dl><dt>&dagger;</dt><dd>For APDUs greater than one TPDU in length, the per packet overhead is increased.
-</dd><dt>&Dagger;</dt><dd>Not implemented.
-</dd><dt>&sect;</dt><dd>When Forward-Error Correction is enabled.
+<dl><dt>†</dt><dd>For APDUs greater than one TPDU in length, the per packet overhead is increased.
+</dd><dt>‡</dt><dd>Not implemented.
+</dd><dt>§</dt><dd>When Forward-Error Correction is enabled.
 </dd></dl>
 
 === Parameters ===
@@ -103,7 +103,7 @@ On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standar
 
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
-  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.<br>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.<br>
   * [http://en.wikipedia.org/wiki/802.2 IEEE 802.2] in Wikipedia.<br>
   * [http://en.wikipedia.org/wiki/Jumbo_frame Jumbo frame] in Wikipedia.<br>
   * [http://en.wikipedia.org/wiki/Maximum_transmission_unit Maximum transmission unit] in Wikipedia.

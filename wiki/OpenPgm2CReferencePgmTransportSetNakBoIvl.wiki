@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_set_nak_bo_ivl()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_set_nak_bo_ivl()
 #labels Phase-Implementation
 
 _Function_
@@ -8,7 +8,7 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_nak_bo_ivl* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      usec
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                usec
 	);
 </pre>
 
@@ -52,5 +52,5 @@ Set <tt>NAK_BO_IVL</tt> to 50ms, same as TIBCO Rendezvous.
   * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportSetNakRdataIvl pgm_transport_set_nak_rdata_ivl()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportSetNakRptIvl pgm_transport_set_nak_rpt_ivl()]</tt><br>
-  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
 

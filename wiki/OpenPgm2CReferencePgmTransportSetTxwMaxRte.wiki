@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_set_txw_max_rte()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_set_txw_max_rte()
 #labels Phase-Implementation
 
 _Function_
@@ -8,12 +8,12 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_txw_max_rte* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      max_rte
-	);</tt>
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                max_rte
+	);
 </pre>
 
 === Purpose ===
-Set the size of the send window size by data rate in bytes per second (<tt>[[OpenPGM Concepts/TXW_MAX_RTE|TXW_MAX_RTE]]</tt>).
+Set the size of the send window size by data rate in bytes per second (<tt>[OpenPgmConceptsTxwMaxRte TXW_MAX_RTE]</tt>).
 
 === Remarks ===
 The transmit window size can be set by count of sequence numbers using <tt>[OpenPgm2CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or by maximum transmit rate (<tt>pgm_transport_set_txw_max_rte()</tt>) and a time interval (<tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt>).
@@ -56,5 +56,5 @@ Create a 10 second reliability window with maximum data rate of 400,000 bytes pe
   * <tt>[OpenPgm2CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt><br>
-  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
 

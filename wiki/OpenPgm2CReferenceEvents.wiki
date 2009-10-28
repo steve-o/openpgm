@@ -1,6 +1,9 @@
-<div style="background-color: #ccff99; -moz-border-radius: 4px; padding: 10px; width: 250px; float:right">
-'''NAK and NCF processing''' requires that one thread is always processing incoming events.  With a synchronous strategy this should be one dedicated application thread reading messages and copying or processing into an internal queue, with asynchronous event handling a managed thread can be created with <tt>[OpenPgm2CReferencePgmAsyncCreate pgm_async_create()]</tt>.
-</div>
+﻿#summary OpenPGM 2 : C Reference : Events
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
+NAK and NCF processing requires that one thread is always processing incoming events.  With a synchronous strategy this should be one dedicated application thread reading messages and copying or processing into an internal queue, with asynchronous event handling a managed thread can be created with <tt>[OpenPgm2CReferencePgmAsyncCreate pgm_async_create()]</tt>.
+
 Event driven programs idle in an event loop dispatching events as they are raised.  OpenPGM application developers can choose whether to follow an event driven model or regular imperative styles.
 
 Events can come from any number of different types of sources such as file descriptors (plain files, pipes or sockets) and timeouts.  With OpenPGM events can be driven from the underlying network transport, timing state engine, or at a higher level from an asynchronous data queue.
@@ -34,11 +37,11 @@ When relying on the underlying network transport for event generation the develo
 </tr><tr>
 <td>GLib Event Source</td>
 <td><tt>[OpenPgm2CReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt></td>
-</tr><tr>
+</tr>
 </table>
 
 
-Note that the special APIs for synchronous events as multiple file descriptors need to be monitored for correct operation, see the section [[OpenPGM Concepts/Events#Data Triggers|Data Triggers]] in ''OpenPGM Concepts'' for further details.
+Note that the special APIs for synchronous events as multiple file descriptors need to be monitored for correct operation, see the section [OpenPgmConceptsEvents Data Triggers] in _OpenPGM Concepts_ for further details.
 
 
 == Asynchronous Threading == 

@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : Transport
+﻿#summary OpenPGM 2 : C Reference : Transport
 #labels Phase-Implementation
 #sidebar TOC2CReference
 
@@ -168,7 +168,7 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm2CReferencePgmTransportSetSendOnly pgm_transport_set_send_only()]</tt></td>
 <td>Set transport to send-only mode, data packets will not be read.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetSndbuf pgm_transport_set_sndbuf()]</tt></td>
+<td><tt>[OpenPgm2CReferencePgmTransportSetSndBuf pgm_transport_set_sndbuf()]</tt></td>
 <td>Set send buffer size.</td>
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>

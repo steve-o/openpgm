@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_send()
+﻿#summary OpenPGM 2 : C Reference : pgm_send()
 #labels Phase-Implementation
 
 _Function_
@@ -8,9 +8,9 @@ _Function_
 
 [OpenPgm2CReferencePgmIoStatus PGMIOStatus] *pgm_send* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const    transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gconstpointer gconstpointer]     buf,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     count,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*`     bytes_written
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gconstpointer gconstpointer]             buf,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                     count,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*`                    bytes_written
 );
 </pre>
 

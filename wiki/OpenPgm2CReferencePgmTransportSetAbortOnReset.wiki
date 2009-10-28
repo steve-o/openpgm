@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_set_abort_on_reset()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_set_abort_on_reset()
 #labels Phase-Implementation
 
 _Function_
@@ -8,7 +8,7 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_abort_on_reset* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]      abort_on_reset
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]             abort_on_reset
 	);
 </pre>
 
@@ -41,4 +41,4 @@ On success, returns <tt>[http://library.gnome.org/devel/glib/stable/glib-Standar
 
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
-  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

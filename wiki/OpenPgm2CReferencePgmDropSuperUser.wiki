@@ -1,11 +1,11 @@
-#summary OpenPGM 2 : C Reference : pgm_drop_superuser()
+﻿#summary OpenPGM 2 : C Reference : pgm_drop_superuser()
 #labels Phase-Implementation
 #sidebar TOC2CReference
 
 _Function_
 === Declaration ===
 <pre>
-#include <pgm/pgm.h><
+#include <pgm/pgm.h>
 
 void *pgm_drop_superuser* (void);
 </pre>

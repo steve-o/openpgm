@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_set_spmr_expiry()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_set_spmr_expiry()
 #labels Phase-Implementation
 
 _Function_
@@ -8,7 +8,7 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_spmr_expiry* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      spmr_expiry
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                spmr_expiry
 	);
 </pre>
 
@@ -51,5 +51,5 @@ Set SPMR expiration period to 250ms.
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt><br>
-  * [OpenPgm2CReferencePgmTransport Transport] in OpenPGM C Reference.
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
 

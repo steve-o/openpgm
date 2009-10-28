@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_sendv()
+﻿#summary OpenPGM 2 : C Reference : pgm_sendv()
 #labels Phase-Implementation
 
 _Function_
@@ -7,11 +7,11 @@ _Function_
 #include <pgm/pgm.h>
 
 [OpenPgm2CReferencePgmIoStatus PGMIOStatus] *pgm_sendv* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const      transport,
 	const struct [OpenPgm2CReferencePgmIoVec pgm_iovec]`*`     vector,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]     count,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]     is_one_apdu,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*`     bytes_written
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                       count,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                    is_one_apdu,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]`*`                      bytes_written
 );
 </pre>
 

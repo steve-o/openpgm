@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_create()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_create()
 #labels Phase-Implementation
 
 _Function_
@@ -7,10 +7,10 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_create* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const           transport,
 	struct [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]`*`     tinfo,
-	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
-);
+	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`                         error
+	);
 </pre>
 
 === Purpose ===
@@ -23,11 +23,11 @@ A PGM data-source port is a unique inbox per GSI different from the data-destina
 
 Both <tt>pgm_transport_info_t::ti_recv_addrs</tt> and <tt>pgm_transport_info_t::ti_send_addrs</tt> are populated as per RFC 3678.  <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt> provides a convenient method of defining the network parameters with a TIBCO Rendezvous network parameter compatible string.  By default an any-source multicast configuration is enabled, set <tt>group_source_req::gsr_source</tt> to the IP address of a sending computer for source-specific multicast (SSM).  Set <tt>pgm_transport_info_t::ti_udp_encap_ucast_port</tt> and <tt>pgm_transport_info_t::ti_encap_mcast_port</tt> entities to specify the ports to use for UDP encapsulation.
 
-SSM destination addresses must be in the ranges 232/8 for IPv4 or FF3''x''::/96 for IPv6.
+SSM destination addresses must be in the ranges 232/8 for IPv4 or FF3 _x_::/96 for IPv6.
 
-Try to avoid 224.0.0.x addresses as many of these [http://en.wikipedia.org/wiki/Multicast_address multicast addresses] are used by network infrastructure equipment and have special purposes.  The recommendation on private networks is to used the administratively scoped range 239/8 (239.192/16 for local-scope) as per RFC 2365 and RFC 3171.  Public Internet usage of multicast should be careful of conflicts with [http://www.iana.org/assignments/multicast-addresses IANA assigned multicast addresses] and should consider 233/8 [http://en.wikipedia.org/wiki/GLOP GLOP addressing] as per RFC 3180.
+Try to avoid 224.0.0._x_ addresses as many of these [http://en.wikipedia.org/wiki/Multicast_address multicast addresses] are used by network infrastructure equipment and have special purposes.  The recommendation on private networks is to used the administratively scoped range 239/8 (239.192/16 for local-scope) as per RFC 2365 and RFC 3171.  Public Internet usage of multicast should be careful of conflicts with [http://www.iana.org/assignments/multicast-addresses IANA assigned multicast addresses] and should consider 233/8 [http://en.wikipedia.org/wiki/GLOP GLOP addressing] as per RFC 3180.
 
-IP Multicasting uses Layer 2 MAC addressing to transmit a packet to a group of hosts on a LAN segment.  The Layer 3 address (224.0.0.0 to 239.255.255.255) are mapped to Layer 2 addresses (0x0100.5E''xx''.''xxxx'').  Because all 28 bits of the Layer 3 IP multicast address information cannot be mapped into the available 23 bits of MAC address space, five bits of address information are lost in the mapping process.  This means that each IP multicast MAC address can represent 32 IP multicast addresses.
+IP Multicasting uses Layer 2 MAC addressing to transmit a packet to a group of hosts on a LAN segment.  The Layer 3 address (224.0.0.0 to 239.255.255.255) are mapped to Layer 2 addresses (0x0100.5E _xx_._xxxx_).  Because all 28 bits of the Layer 3 IP multicast address information cannot be mapped into the available 23 bits of MAC address space, five bits of address information are lost in the mapping process.  This means that each IP multicast MAC address can represent 32 IP multicast addresses.
 
 IGMP Snooping normally is used by Layer 2 switches to constrain multicast traffic only to those ports that have hosts attached and that have signalled their desire to join the multicast group by sending IGMP Membership Reports.  IGMP Snooping is disabled for the special 224.0.0.1 - <tt>ALL-HOSTS</tt> group, 224.0.0.2 - <tt>ALL-ROUTERS</tt> group, 224.0.0.5 - <tt>ALL-OSPF-ROUTERS</tt> group, etc.  This means any IP multicast group matching 224-239.0.0/24 and 224-239.128.0/24 will also cause Layer 2 flooding and should be avoided.
 
@@ -46,8 +46,7 @@ IGMP Snooping normally is used by Layer 2 switches to constrain multicast traffi
 <td>Transport information object.</td>
 </tr><tr>
 <td><tt>error</tt></td>
-<td>a return location for a [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError], or [http://library.gnome
-.org/devel/glib/stable/glib-Standard-Macros.html#NULL--CAPS NULL].</td>
+<td>a return location for a [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError], or [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#NULL--CAPS NULL].</td>
 </tr>
 </table>
 

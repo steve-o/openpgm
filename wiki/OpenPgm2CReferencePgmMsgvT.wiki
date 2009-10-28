@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_msgv_t
+﻿#summary OpenPGM 2 : C Reference : pgm_msgv_t
 #labels Phase-Implementation
 
 _Type_
@@ -11,8 +11,8 @@ _Type_
 typedef struct pgm_msgv_t pgm_msgv_t;
 
 struct pgm_msgv_t {
-	size_t msgv_len;                                       /`*` number of elements in msgv_skb `*`/
-	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*` msgv_skb[PGM_MAX_FRAGMENTS];     /`*` PGM socket buffer array `*`/
+	size_t                msgv_len;                        /`*` number of elements in msgv_skb `*`/
+	struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]`*` msgv_skb`[`PGM_MAX_FRAGMENTS`]`;     /`*` PGM socket buffer array `*`/
 };
 </pre>
 

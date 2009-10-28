@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_join_source_group()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_join_source_group()
 #labels Phase-Implementation
 
 _Function_
@@ -7,15 +7,15 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_join_source_group* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`            transport,
 	struct group_source_req`*`     gsr,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     len
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        len
 );
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_leave_source_group* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`            transport,
 	struct group_source_req`*`     gsr,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]     len
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        len
 );
 </pre>
 

@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_transport_poll_info()
+﻿#summary OpenPGM 2 : C Reference : pgm_transport_poll_info()
 #labels Phase-Implementation
 
 _Function_
@@ -8,10 +8,10 @@ _Function_
 
 int *pgm_transport_poll_info* (
 	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*` const    transport,
-	struct pollfd`*`     fds,
-	int`*`     nfds,
-	int      events
-);
+	struct pollfd`*`            fds,
+	int`*`                      nfds,
+	int                       events
+	);
 </pre>
 
 === Purpose ===

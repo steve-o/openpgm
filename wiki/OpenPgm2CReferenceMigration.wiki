@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : Migration
+﻿#summary OpenPGM 2 : C Reference : Migration
 #labels Phase-Implementation
 #sidebar TOC2CReference
 == Environment ==
@@ -11,7 +11,7 @@ Version 2.0 introduces a <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt>
 
 == Interface and GSI ==
 === Summary ===
-  * Replace interface parsing calls to <tt>[[OpenPgmCReferencePgmIfParseTransport pgm_if_parse_transport()]</tt> with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>.
+  * Replace interface parsing calls to <tt>[OpenPgmCReferencePgmIfParseTransport pgm_if_parse_transport()]</tt> with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>.
   * Parameters <tt>recv_gsr</tt>, <tt>recv_len</tt>, and <tt>send_gsr</tt> need to be replaced with an object of structure <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt>.
   * Replace GSI creation calls to <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt> and <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt> with <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt> and <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt> respectively.
 
@@ -19,7 +19,7 @@ Version 2.0 introduces a <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt>
 === Details ===
 Version 2.0 simplifies the parameters for creating a PGM transport by combining all the network details into one structure, <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt>.  The structure can be manually populated or filled with a helper function <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>.
 
-GSI creation functions <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]]</tt> and <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt> and been replaced with variants including extra error reporting and normalized names, <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt> and <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt> respectively.  These new functions populate contents of the <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt> structure and if used, should be called after <tt>[OpenPgm2CReferencePgmIfGetTransportIinfo pgm_if_get_transport_info()]</tt>.
+GSI creation functions <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]]</tt> and <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt> and been replaced with variants including extra error reporting and normalized names, <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt> and <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt> respectively.  These new functions populate contents of the <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt> structure and if used, should be called after <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>.
 
 Transport info structures created with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt> should be freed with <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]</tt>.  The transport info object can be released without needing to destroy any associated PGM transport.
 
@@ -116,6 +116,7 @@ Version 2.0 introduces more detailed error reporting on network operations so ev
  bytes_sent = pgm_transport_send (transport, buffer, bytes_read, 0);
  if (bytes_sent >= 0)
    g_message ("sent: %d bytes", bytes_sent);
+}}}
 
 *Updated code for version 2.0.*
 {{{
