@@ -16,7 +16,7 @@ _Function_
 Get remaining time slice of the send rate limit engine.
 
 === Remarks ===
-A transport set as non-blocking with <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> will return <tt>PGM_IO_STATUS_RATE_LIMITED</tt> on calls to <tt>[OpenPgmCReferencePgmRecv pgm_transport_recv()]</tt> and <tt>[OpenPgm2CReferencePgmSend pgm_send()]</tt> that would block due to the rate limit engine.
+A transport set as non-blocking with <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> will return <tt>PGM_IO_STATUS_RATE_LIMITED</tt> on calls to <tt>[OpenPgm2CReferencePgmRecv pgm_recv()]</tt> and <tt>[OpenPgm2CReferencePgmSend pgm_send()]</tt> that would block due to the rate limit engine.
 
 === Parameters ===
 

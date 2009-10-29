@@ -16,7 +16,7 @@ _Function_
 Get time before next timer event.
 
 === Remarks ===
-A transport set as non-blocking with <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> will return <tt>PGM_IO_STATUS_TIMER_PENDING</tt> on calls to <tt>[OpenPgmCReferencePgmRecv pgm_transport_recv()]</tt> that have a pending timing event.
+A transport set as non-blocking with <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> will return <tt>PGM_IO_STATUS_TIMER_PENDING</tt> on calls to <tt>[OpenPgm2CReferencePgmRecv pgm_recv()]</tt> that have a pending timing event.
 
 === Parameters ===
 

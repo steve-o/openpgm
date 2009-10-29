@@ -76,8 +76,8 @@ It is valid to send and receive zero length PGM packets.
 </tr><tr>
 <td><tt>flags</tt></td>
 <td>
-;<tt>MSG_DONTWAIT</tt>: Enables non-blocking operation on Unix, no action on Windows.
-;<tt>MSG_ERR_QUEUE</tt>: Returns an error SKB on session reset.</td>
+<dl><dt><tt>MSG_DONTWAIT</tt></dt><dd>Enables non-blocking operation on Unix, no action on Windows.
+</dd><dt><tt>MSG_ERR_QUEUE</tt></dt><dd>Returns an error SKB on session reset.</dd></dl></td>
 </tr><tr>
 <td><tt>bytes_read</tt></td>
 <td>Pointer to store count of bytes read into <tt>buf</tt>.</td>
