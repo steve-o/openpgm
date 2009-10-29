@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_set_hops()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_hops''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]                      hops</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_set_hops* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]                 hops
+	);
+</pre>
 
 === Purpose ===
 Set maximum number of network hops to cross.
@@ -36,10 +40,11 @@ Several Cisco routers have a bug causing excessive CPU usage when publishing mul
 On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
-
- '''pgm_transport_set_hops''' (transport, 16);
+{{{
+ pgm_transport_set_hops (transport, 16);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-[http://en.wikipedia.org/wiki/Time_to_live Time to live] in Wikipedia.
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.<br>
+  * [http://en.wikipedia.org/wiki/Time_to_live Time to live] in Wikipedia.

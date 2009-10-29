@@ -1,16 +1,21 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM : C Reference : pgm_packetv_free1()
+#labels Phase-Implementation
+#sidebar TOCCReference
 
-<tt>int '''pgm_packetv_free1''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                       tsdu,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                       can_fragment</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_packetv_free1* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                       tsdu,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                       can_fragment
+	);
+</pre>
 
 === Purpose ===
-Return an unused packet allocated from the transmit window via <tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt>.
+Return an unused packet allocated from the transmit window via <tt>[OpenPgmCReferencePgmPacketvAlloc pgm_packetv_alloc()]</tt>.
 
 === Remarks ===
 The same <tt>can_fragment</tt> parameter value must be used as when the pointer was retrieved from the transmit window.
@@ -36,5 +41,6 @@ The same <tt>can_fragment</tt> parameter value must be used as when the pointer 
 
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmPacketvAlloc pgm_packetv_alloc()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

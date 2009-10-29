@@ -1,21 +1,26 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM : C Reference : pgm_if_parse_transport()
+#labels Phase-Implementation
+#sidebar TOCCReference
 
-<tt>int '''pgm_if_parse_transport''' (</tt><br>
-: <tt>const char*        network,</tt><br>
-: <tt>int                ai_family,</tt><br>
-: <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]*  recv_gsr,</tt><br>
-: <tt>gsize*             recv_len,</tt><br>
-: <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]*  send_gsr</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_if_parse_transport* (
+	const char`*`                  network,
+	int                          ai_family,
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     recv_gsr,
+	gsize`*`                       recv_len,
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     send_gsr
+	);
+</pre>
 
 === Purpose ===
 Decompose a string network specification.
 
 === Remarks ===
-The TIBCO Rendezvous network parameter provides a convenient compact representation of the complicated data structures needed to specify sending and receiving interfaces and multicast addresses.  This function provides conversion between the network string and the parameters of <tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt>.
+The TIBCO Rendezvous network parameter provides a convenient compact representation of the complicated data structures needed to specify sending and receiving interfaces and multicast addresses.  This function provides conversion between the network string and the parameters of <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt>.
 
 Both <tt>recv_gsr</tt> and <tt>send_gsr</tt> are populated as per RFC 3678, <tt>gsr_interface</tt> is the index of the link layer interface, <tt>gsr_group</tt> is the multicast address.  By design, <tt>gsr_source</tt> is a copy of <tt>gsr_group</tt>, this indicates any-source multicast (ASM).
 
@@ -49,17 +54,16 @@ Both <tt>recv_gsr</tt> and <tt>send_gsr</tt> are populated as per RFC 3678, <tt>
 On success, 0 is returned.  On invalid arguments, <tt>-EINVAL</tt> is returned.  If more multicast groups are found than the <tt>recv_len</tt> parameter, <tt>-ENOMEM</tt> is returned.
 
 === Example ===
-
+{{{
  char* network = "eth0;226.0.0.1";
  struct group_source_req recv_gsr, send_gsr;
  gsize recv_len = 1;
  
- '''pgm_if_parse_transport''' (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
+ pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt><br>
-[[OpenPGM_Concepts/Transport|Transport]] in OpenPGM Concepts<br>
-<tt>[http://www.ietf.org/rfc/rfc3678.txt group_source_req]</tt> in RFC 3678<br>
-[http://en.wikipedia.org/wiki/Any-source_multicast Any-source multicast (ASM)] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Source-specific_multicast Source-source multicast (SSM)] in Wikipedia.
-
+  * <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * <tt>[http://www.ietf.org/rfc/rfc3678.txt group_source_req]</tt> in RFC 3678<br>
+  * [http://en.wikipedia.org/wiki/Any-source_multicast Any-source multicast (ASM)] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Source-specific_multicast Source-source multicast (SSM)] in Wikipedia.

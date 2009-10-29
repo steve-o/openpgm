@@ -20,7 +20,7 @@ Ambient SPMs are driven by a count-down timer that expires regularly.  The trans
 
 If a subscriber joins a high speed publishing feed, at a publishing rate such that no heartbeat SPM packets are generated, the subscriber will have to wait for the next ambient SPM before it can request repair via NAKs.  Note that SPM Requests (SPMRs) may be used to solicit an SPM without having to wait for the next scheduled delivery.
 
-Cisco routers have a ''feature'' that will halt multicast forwarding unless a packet is generated every 120 seconds.  TIBCO Rendezvous avoids this in TRDP mode by periodically sending out a <tt>HOST.STATUS</tt> messages.  In PGM it is integrated as part of the protocol to create and maintain the distribution tree.
+Cisco routers have a _feature_ that will halt multicast forwarding unless a packet is generated every 120 seconds.  TIBCO Rendezvous avoids this in TRDP mode by periodically sending out a <tt>HOST.STATUS</tt> messages.  In PGM it is integrated as part of the protocol to create and maintain the distribution tree.
 
 TIBCO Rendezvous daemons using PGM have an ambient SPM broadcast interval of 30 seconds.  Microsoft PGM sends ambient SPMs every 3 seconds.
 

@@ -24,9 +24,9 @@ Compare two TSI values.
 </tr>
 <tr>
 <td><tt>tsi1</tt></td>
-<td>Globally unique transport session identifier (.GSI).</td>
+<td>Globally unique transport session identifier (TSI).</td>
 </tr><tr>
-<td><tt>.gsi2</tt></td>
+<td><tt>tsi2</tt></td>
 <td>Globally unique transport session identifier (TSI).</td>
 </tr>
 </table>

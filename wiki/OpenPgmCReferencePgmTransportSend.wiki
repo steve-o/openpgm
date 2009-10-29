@@ -1,14 +1,17 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_send()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] '''pgm_transport_send''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_tranport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gconstpointer gconstpointer]*              buf,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                     count,</tt>
-: <tt>int flags</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] *pgm_transport_send* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gconstpointer gconstpointer]             buf,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                     count
+);
+</pre>
 
 === Purpose ===
 Send an Application Protocol Data Unit (APDU) to the network.
@@ -18,7 +21,7 @@ The underlying transport handles packets sized to the maximum transmission proto
 
 Two methods of non-blocking operation are available, blocking at the underlying transmission data unit, or blocking at the application data unit.  Specify <tt>MSG_DONTWAIT</tt> to block at the underlying transmission data unit, or specify <tt>MSG_DONTWAIT | MSG_WAITALL</tt> to block at the application data unit.
 
-A would be blocked operation might have sent one or more transmission data units.  The context is saved internally but subsequent call should be either <tt>pgm_transport_send()</tt> with the exact same parameters, or <tt>[[OpenPGM C Reference/pgm_transport_destroy()|pgm_transport_destroy()]]</tt>.  Put another way: in a multi-threaded application a locking mechanism should be implemented to prevent another thread trying to send a different application data unit.
+A would be blocked operation might have sent one or more transmission data units.  The context is saved internally but subsequent call should be either <tt>pgm_transport_send()</tt> with the exact same parameters, or <tt>[OpenPgmCReferencePgmTransportDestroy pgm_transport_destroy()]</tt>.  Put another way: in a multi-threaded application a locking mechanism should be implemented to prevent another thread trying to send a different application data unit.
 
 === Parameters ===
 
@@ -39,8 +42,8 @@ A would be blocked operation might have sent one or more transmission data units
 </tr><tr>
 <td><tt>flags</tt></td>
 <td>Bitwise OR of zero or more of the following flags:
-;<tt>MSG_DONTWAIT</tt>: Enables non-blocking operation; if sending a packet would block, <tt>EAGAIN</tt> is returned.
-;<tt>MSG_WAITALL</tt>: Requests that the operation block until the full send can be satisified.</td>
+<dl><dt><tt>MSG_DONTWAIT</tt></dt><dd>Enables non-blocking operation; if sending a packet would block, <tt>EAGAIN</tt> is returned.
+</dd><dt><tt>MSG_WAITALL</tt></dt><dd>Requests that the operation block until the full send can be satisified.</dd></dl></td>
 </tr>
 </table>
 
@@ -49,39 +52,44 @@ A would be blocked operation might have sent one or more transmission data units
 On success, returns the number of data bytes sent (not transport bytes).  On error, -1 is returned and <tt>errno</tt> set appropriately.
 
 === Errors ===
-;<tt>EAGAIN</tt>:The socket is marked non-blocking and the requested operation would block.
-;<tt>EMSGSIZE</tt>:The size of the message to be sent is too large.
-;<tt>ENOBUFS</tt>:The  output queue for a network interface was full.  This generally indicates that the interface has stopped sending, but may be caused by transient congestion.  (Normally, this does not occur in Linux. Packets are just silently dropped when a device queue overflows.)
-;<tt>ENOMEM</tt>:No memory available.
-;<tt>ECONNRESET</tt>:Transport was reset due to unrecoverable data loss with close-on-failure enabled with <tt>[[OpenPGM C Reference/pgm_transport_set_close_on_failure()|pgm_transport_set_close_on_failure()]].</tt>.
+<dl><dt><tt>EAGAIN</tt></dt><dd>The socket is marked non-blocking and the requested operation would block.
+</dd><dt><tt>EMSGSIZE</tt></dt><dd>The size of the message to be sent is too large.
+</dd><dt><tt>ENOBUFS</tt></dt><dd>The  output queue for a network interface was full.  This generally indicates that the interface has stopped sending, but may be caused by transient congestion.  (Normally, this does not occur in Linux. Packets are just silently dropped when a device queue overflows.)
+</dd><dt><tt>ENOMEM</tt></dt><dd>No memory available.
+</dd><dt><tt>ECONNRESET</tt></dt><dd>Transport was reset due to unrecoverable data loss with close-on-failure enabled with <tt>[OpenPgmCReferencePgmTransportSetCloseOnFailure pgm_transport_set_close_on_failure()].</tt>.
+</dd></dl>
 
 === Example ===
 Send the traditional Hello world.
 
+{{{
  gchar* s = "hello world!";
- '''pgm_transport_send''' (transport, s, strlen(s) + 1, 0);
+ pgm_transport_send (transport, s, strlen(s) + 1, 0);
+}}}
 
 Basic packet level non-blocking send.
 
+{{{
  gchar* s = "hello world!";
  size_t len = strlen (s) + 1;
  gssize sent;
  do {
-   sent = '''pgm_transport_send''' (transport, s, len, MSG_DONTWAIT);
+   sent = pgm_transport_send (transport, s, len, MSG_DONTWAIT);
  } while (sent == -1 && errno == EAGAIN);
+}}}
 
 Application level non-blocking send.
 
+{{{
  gchar* s = "hello world!";
  size_t len = strlen (s) + 1;
  gssize sent;
  do {
-   sent = '''pgm_transport_send''' (transport, s, len, MSG_DONTWAIT | MSG_WAITALL);
+   sent = pgm_transport_send (transport, s, len, MSG_DONTWAIT | MSG_WAITALL);
  } while (sent == -1 && errno == EAGAIN);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport|pgm_transport]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_sendv()|pgm_transport_sendv()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_close_on_failure()|pgm_transport_set_close_on_failure()]].</tt><br>
-[[OpenPGM Concepts/Transport|Transport]] in OpenPGM Concepts
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSendv pgm_transport_sendv()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

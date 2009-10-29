@@ -1,16 +1,23 @@
-﻿''Type''
-__NOTOC__
+﻿#summary OpenPGM : C Reference : pgm_gsi_t
+#labels Phase-Implementation
+
+_Type_
 === Declaration ===
-<tt>typedef struct pgm_gsi_t '''pgm_gsi_t''';</tt><br>
-<tt>struct pgm_gsi_t {</tt><br>
-: <tt>char   identifier[6];</tt><br>
-<tt>};</tt>
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_gsi_t *pgm_gsi_t*;
+
+struct pgm_gsi_t {
+	char identifier`[`6`]`;
+};
+</pre>
 
 === Purpose ===
 A globally unique source identifier (GSI).
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt>
-
+  * <tt>[OpenPgm2CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt><br>
+  * <tt>[OpenPgm2CReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

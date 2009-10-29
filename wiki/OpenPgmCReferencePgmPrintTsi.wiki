@@ -1,19 +1,23 @@
-﻿''Function''
-__NOTOC__
+﻿#summary OpenPGM : C Reference : pgm_print_tsi()
+#labels Phase-Implementation
+
+_Function_
 === Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+<pre>
+#include <pgm/pgm.h>
 
-<tt>#define PGM_TSISTRLEN           (sizeof("000.000.000.000.000.000.00000"))</tt>
+#define PGM_TSISTRLEN (sizeof("000.000.000.000.000.000.00000"))
 
-<tt>gchar* '''pgm_print_tsi''' (</tt><br>
-: <tt>const [[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*     tsi</tt><br>
-: <tt>);</tt>
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_tsi_print* (
+	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi
+	);
 
-<tt>int '''pgm_print_tsi_r''' (</tt><br>
-: <tt>const [[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*     tsi,</tt>
-: <tt>char* buf,</tt>
-: <tt>size_t bufsize</tt><br>
-: <tt>);</tt>
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_tsi_print_r* (
+	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi,
+	char`*`               buf,
+	size_t              bufsize
+	);
+</pre>
 
 === Purpose ===
 Display a TSI in human friendly form.
@@ -21,7 +25,7 @@ Display a TSI in human friendly form.
 === Remarks ===
 The globally unique transport session identifier (TSI) is composed of the concatenation of a globally unique source identifier (GSI) and a source-assigned data-source port.
 
-<tt>'''pgm_print_tsi_r'''</tt> returns the same identifier in the array <tt>buf</tt> of size <tt>bufsize</tt>.
+<tt>pgm_print_tsi_r</tt> returns the same identifier in the array <tt>buf</tt> of size <tt>bufsize</tt>.
 
 <tt>bufsize</tt> should be at least <tt>PGM_TSISTRLEN</tt> in length.
 
@@ -47,22 +51,23 @@ The globally unique transport session identifier (TSI) is composed of the concat
 
 
 === Return Value ===
-On success, <tt>'''pgm_print_tsi'''</tt> returns a pointer to the TSI, and <tt>NULL</tt> on failure.  <tt>'''pgm_print_tsi_r'''</tt> returns 0 when successful, and <tt>-EINVAL</tt> on failure.
+On success, <tt>pgm_print_tsi</tt> returns a pointer to the TSI, and <tt>NULL</tt> on failure.  <tt>pgm_print_tsi_r</tt> returns 0 when successful, and <tt>-EINVAL</tt> on failure.
 
 === Example ===
 Display TSI in non-re-entrant form.
 
- printf ("TSI: %s\n", '''pgm_print_tsi''' (&transport->tsi));
+{{{
+ printf ("TSI: %s\n", pgm_print_tsi (&transport->tsi));
+}}}
 
 Display TSI in re-entrant form.
 
+{{{
  char buf[PGM_TSISTRLEN];
- '''pgm_print_tsi_r''' (&transport->tsi, buf, sizeof(buf));
+ pgm_print_tsi_r (&transport->tsi, buf, sizeof(buf));
  printf ("TSI: %s\n", buf);
-
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

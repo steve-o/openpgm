@@ -1,11 +1,15 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_async_get_fd()
+#labels Phase-Implementation
 
-<tt>int '''pgm_async_get_fd''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]**     async</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_async_get_fd* (
+	[OpenPgmCReferencePgmAsyncT pgm_async_t]`*`    async
+	);
+</pre>
 
 === Purpose ===
 Retrieve file descriptor for event signalling.
@@ -27,10 +31,10 @@ Retrieve file descriptor for event signalling.
 On success the file descriptor is returned.  If <tt>async</tt> is invalid, <tt>-EINVAL</tt> is returned.
 
 === Example ===
-
+{{{
  int fd = pgm_async_get_fd (async);
-
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt><br>
+  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.

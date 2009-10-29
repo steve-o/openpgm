@@ -1,14 +1,18 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿﻿#summary OpenPGM : C Reference : pgm_transport_epoll_ctl()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_epoll_ctl''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>int epfd,</tt><br>
-: <tt>int op,</tt><br>
-: <tt>int events</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_epoll_ctl* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	int                       epfd,
+	int                       op,
+	int                       events
+	);
+</pre>
 
 === Purpose ===
 Set parameters suitable for using with <tt>epoll_wait()</tt>.
@@ -34,9 +38,9 @@ An Edge Triggered event signals the transition to a rising edge (0 to 1).  In si
 </tr><tr>
 <td><tt>events</tt></td>
 <td>A bit set composed using the following available event types:
-;<tt>EPOLLIN</tt>: The transport is available for <tt>recv()</tt> operations.
-;<tt>EPOLLOUT</tt>: The transport is available for <tt>send()</tt> operations.
-;<tt>EPOLLET</tt>: Sets the Edge Triggered behaviour for the transport.  The default behaviour is Level Triggered.</td>
+<dl><dt><tt>EPOLLIN</tt></dt><dd>The transport is available for <tt>recv()</tt> operations.
+</dd><dt><tt>EPOLLOUT</tt></dt><dd>The transport is available for <tt>send()</tt> operations.
+</dd><dt><tt>EPOLLET</tt></dt><dd>Sets the Edge Triggered behaviour for the transport.  The default behaviour is Level Triggered.</dd></dl></td>
 </tr>
 </table>
 
@@ -45,19 +49,24 @@ An Edge Triggered event signals the transition to a rising edge (0 to 1).  In si
 On success, returns 0.  On error, returns -1 and <tt>errno</tt> is set appropriately.
 
 === Errors ===
-;EBADF:<tt>epfd</tt> is not a valid file descriptor or the transport is closed.
-;EEXIST:<tt>op</tt> was <tt>EPOLL_CTL_ADD</tt>, and a transport file descriptor is already in <tt>epfd</tt>.
-;EINVAL:<tt>epfd</tt> is not an <tt>epoll</tt> file descriptor, or the requested operation <tt>op</tt> is not supported by this interface.
-;ENOMEM:There was insufficient memory to handle the requested <tt>op</tt> control operation.
+<dl><dt><tt>EBADF</tt></dt><dd><tt>epfd</tt> is not a valid file descriptor or the transport is closed.
+</dd><dt><tt>EEXIST</tt></dt><dd><tt>op</tt> was <tt>EPOLL_CTL_ADD</tt>, and a transport file descriptor is already in <tt>epfd</tt>.
+</dd><dt><tt>EINVAL</tt></dt><dd><tt>epfd</tt> is not an <tt>epoll</tt> file descriptor, or the requested operation <tt>op</tt> is not supported by this interface.
+</dd><dt><tt>ENOMEM</tt></dt><dd>There was insufficient memory to handle the requested <tt>op</tt> control operation.
+</dd></dl>
 
 === Example ===
 Wait for one incoming Edge Triggered event on the transport.
 
+{{{
  int epfd = epoll_create (IP_MAX_MEMBERSHIPS);
- int retval = '''pgm_transport_epoll_ctl''' (transport, epfd, EPOLL_CTL_ADD, EPOLLIN | EPOLLET);
+ int retval = pgm_transport_epoll_ctl (transport, epfd, EPOLL_CTL_ADD, EPOLLIN | EPOLLET);
  struct epoll_event events[1];
  epoll_wait (efd, events, G_N_ELEMENTS(events), 1000 /* ms */);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportPollInfo pgm_transport_poll_info()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

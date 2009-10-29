@@ -1,380 +1,382 @@
+﻿#summary OpenPGM : C Reference : Build Library
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Introduction ===
 ﻿There are currently no official releases or pre-built packages in any distributions.  The OpenPGM library must be built from source taken from the projects subversion repository.
-
 
 == Building in openSUSE 11.1 ==
 First install the C compiler dependencies and the SCons build tool.
-
+<pre>
  $ sudo zypper install gcc scons
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.
-
+<pre>
  $ sudo zypper install libsoup-devel net-snmp-devel
-
+</pre>
 To download the source code Subversion is needed to contact the repository.
-
+<pre>
  $ sudo zypper install subversion
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build without the ncurses examples as <tt>libpanel</tt> is not included.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ scons WITH_NCURSES=false
-
+</pre>
 By default SCons is configured to build the debug tree in <tt>./ref/debug</tt> to build the release version in <tt>./ref/release</tt>.
-
+<pre>
  $ scons BUILD=release WITH_NCURSES=false
-
+</pre>
 
 == Building in OpenSolaris 2008.11 under SCons ==
 First install all the C compiler dependencies and Subversion.  Install the library dependencies, primarily GLib.
-
+<pre>
  SUNWsvn SUNWgcc SUNWgnome-common-devel SUNWgnome-base-libs SUNWlibsoup (IPSnetsnmp)
-
+</pre>
 Download and build stable release of SCons.
-
- $ wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz
+<pre>
+ $ wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz 
  $ tar zxf scons-1.2.0.tar.gz
  $ cd scons-1.2.0
  $ sudo python setup.py install
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ scons -f SConstruct.Solaris
-
+</pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
-
+<pre>
  $ scons -f SConstruct.Solaris
-
+</pre>
 To build the release version in <tt>./ref/release</tt> use the following:
-
+<pre>
  $ scons -f SConstruct.Solaris BUILD=release
-
+</pre>
 
 == Building in Ubuntu 9.04 under SCons ==
 First install all the C compiler dependencies, SCons, and Subversion.
-
+<pre>
  $ sudo apt-get install build-essential scons subversion
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note that the repository contains multiple versions of libsoup with incompatible API.
-
+<pre>
  $ sudo apt-get install libglib2.0-dev libsoup2.4-dev libncurses5-dev libsnmp-dev
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ scons
-
+</pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
-
+<pre>
  $ scons
-
+</pre>
 To build the release version in <tt>./ref/release</tt> use the following:
-
+<pre>
  $ scons BUILD=release
-
+</pre>
 
 == Building in Ubuntu 8.04 or 8.10 under SCons ==
 First install all the C compiler dependencies, SCons, and Subversion.
-
+<pre>
  $ sudo apt-get install build-essential scons subversion
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note that the repository contains multiple versions of libsoup with incompatible API.
-
+<pre>
  $ sudo apt-get install libglib2.0-dev libsoup2.2-dev libncurses5-dev libsnmp-dev
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ scons
-
+</pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
-
+<pre>
  $ scons -f SConstruct.097
-
+</pre>
 To build the release version in <tt>./ref/release</tt> use the following:
-
+<pre>
  $ scons -f SConstruct.097 BUILD=release
-
+</pre>
 
 == Building in Ubuntu 8.04 or 8.10 under CMake ==
 First install all the C compiler dependencies, CMake, and Subversion.
-
+<pre>
  $ sudo apt-get install build-essential cmake subversion
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note that the repository contains multiple versions of libsoup with incompatible API, libsoup-2.4 is not supported.
-
+<pre>
  $ sudo apt-get install libglib2.0-dev libsoup2.2-dev libncurses5-dev libsnmp-dev
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ mkdir build
  $ cd build
-
+</pre>
 By default CMake is configured to build a debug tree in the current directory:
-
+<pre>
  $ cmake ..
  $ make
-
+</pre>
 To build a release version in <tt>./build/release</tt> use the following:
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ mkdir -p build/release
  $ cd build/release
  $ cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ../..
  $ make
-
+</pre>
 
 == Building in Debian 4.0 under SCons ==
 Requires new installation of SCons as repository only contains version 0.96 which does not support <tt>autoconf</tt>.
 
 First install all the C compiler dependencies and Subversion.
-
+<pre>
  $ sudo apt-get install build-essential subversion
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note that the repository contains multiple versions of libsoup with incompatible API.
-
+<pre>
  $ sudo apt-get install libglib2.0-dev libsoup2.4-dev libncurses5-dev libsnmp-dev
-
+</pre>
 Install dependencies to build a Debian package.
-
+<pre>
  # sudo apt-get install fakeroot dpkg-dev
-
+</pre>
 Pull in the 1.0.0 SCons source from Lenny.
-
- $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.dsc
- $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0.orig.tar.gz
- $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.diff.gz
+<pre>
+ $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.dsc 
+ $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0.orig.tar.gz 
+ $ wget http://ftp.de.debian.org/debian/pool/main/s/scons/scons_1.0.0-1.diff.gz 
  $ dpkg-source -x scons_1.0.0-1.dsc
  $ cd scons-1.0.0/
  $ sudo apt-get build-dep scons
  $ dpkg-buildpackage -rfakeroot -b
-
+</pre>
 Install the new package.
-
+<pre>
  $ sudo dpkg -i ../scons_1.0.0-1_all.deb
  $ cd ..
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
- $ scons
-
+ $ scons -f SConstruct.Debian4
+</pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
-
- $ scons
-
+<pre>
+ $ scons -f SConstruct.Debian4
+</pre>
 To build the release version in <tt>./ref/release</tt> use the following:
-
- $ scons BUILD=release
-
+<pre>
+ $ scons -f SConstruct.Debian4 BUILD=release
+</pre>
 
 == Building in Debian 4.0 under CMake ==
 First install all the C compiler dependencies, CMake, and Subversion.
-
+<pre>
  $ sudo apt-get install build-essential cmake subversion
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note that the repository contains multiple versions of libsoup with incompatible API, libsoup-2.4 is not supported.
-
+<pre>
  $ sudo apt-get install libglib2.0-dev libsoup2.2-dev libncurses5-dev libsnmp-dev
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Locate the <tt>FindPkgConfig</tt> module missing from the Etch patch revision.
-
+<pre>
  $ wget http://ftp.de.debian.org/debian/pool/main/c/cmake/cmake_2.6.0.orig.tar.gz
  $ tar xzOf cmake_2.6.0.orig.tar.gz cmake-2.6.0/Modules/FindPkgConfig.cmake > CMake/FindPkgConfig.cmake
-
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ mkdir build
  $ cd build
-
+</pre>
 By default CMake is configured to build a debug tree in the current directory:
-
+<pre>
  $ cmake ..
  $ make
-
+</pre>
 To build a release version in <tt>./build/release</tt> use the following:
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ mkdir -p build/release
  $ cd build/release
  $ cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ../..
  $ make
-
+</pre>
 
 == Building in RHEL or CentOS 4.x ==
 Don't, for the following reasons.
 
 === Issues ===
-# <tt>pkg-config</tt> does not support <tt>--static</tt> to provide static library parameters for GLib and other packages.
-# <tt>libsoup-devel-2.2.1-4.i386.rpm</tt> is broken.
-# Old <tt>gcc</tt> does not support new warnings, <tt>-Wunsafe-loop-optimizations</tt>.
-# GLib 2.10 is required for the [http://library.gnome.org/devel/glib/stable/glib-Memory-Slices.html SLAB allocator], the default packaged version is 2.4.  A special 2.12 build is available as a dependency for Evolution, <tt>evolution28-glib2-devel.i386</tt>.
-# <tt>libsoup</tt> 2.2.1 does not support asynchronous callbacks, however the <tt>evolution28-libsoup-devel.i386</tt> does.
-# <tt>evolution28-libsoup-devel.i386</tt> has an extra hidden dependency on <tt>gobject</tt>.
+  # <tt>pkg-config</tt> does not support <tt>--static</tt> to provide static library parameters for GLib and other packages.
+  # <tt>libsoup-devel-2.2.1-4.i386.rpm</tt> is broken.
+  # Old <tt>gcc</tt> does not support new warnings, <tt>-Wunsafe-loop-optimizations</tt>.
+  # GLib 2.10 is required for the [http://library.gnome.org/devel/glib/stable/glib-Memory-Slices.html SLAB allocator], the default packaged version is 2.4.  A special 2.12 build is available as a dependency for Evolution, <tt>evolution28-glib2-devel.i386</tt>.
+  # <tt>libsoup</tt> 2.2.1 does not support asynchronous callbacks, however the <tt>evolution28-libsoup-devel.i386</tt> does.
+  # <tt>evolution28-libsoup-devel.i386</tt> has an extra hidden dependency on <tt>gobject</tt>.
 
 
 === Rebuilding yum packages ===
 Setup user packaging as per [http://wiki.centos.org/TipsAndTricks/YumAndRPM YumAndRPM] in the CentOS wiki.  Download the source package from Red Hat or CentOS, then rebuild the package, installing any additional build dependencies as necessary.
-
- $ wget http://mirror.centos.org/centos/4/os/SRPMS/libsoup-2.2.1-4.src.rpm
+<pre>
+ $ wget http://mirror.centos.org/centos/4/os/SRPMS/libsoup-2.2.1-4.src.rpm 
  $ sudo yum install gnutls-devel
- $ rpmbuild --rebuild libsoup-*.src.rpm 
- $ sudo rpm -i redat/RPMS/libsoup-devel-*.rpm
-
+ $ rpmbuild --rebuild libsoup-`*`.src.rpm 
+ $ sudo rpm -i redat/RPMS/libsoup-devel-`*`.rpm
+</pre>
 
 === Building ===
 First install the C compiler dependencies.
-
+<pre>
  $ sudo yum install gcc
-
+</pre>
 Install SCons by downloading the [http://scons.org/download.php 0.97 stable package].
-
+<pre>
  $ sudo rpm -i scons-0.97-1.noarch.rpm
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note we are install the Evolution 2.8 versions of the GLib suite, not the default packages.
-
+<pre>
  $ sudo yum install evolution28-glib2-devel evolution28-libsoup-devel ncurses-devel net-snmp-devel
-
+</pre>
 Red Hat net-snmp libraries are a bit chunky and need some extras:
-
+<pre>
  $ sudo yum install lm_sensors-devel
-
+</pre>
 To download the source code Subversion is needed to contact the repository.
-
+<pre>
  $ sudo yum install subversion
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 For the default debug build use the following and look in <tt>./ref/debug</tt>:
-
+<pre>
  $ scons -f SConstruct.RHEL4
-
+</pre>
 
 === Testing ===
 The lack of static library support in <tt>pkg-config</tt> requires extra steps for testing, Red Hat <tt>sudo</tt> by default blocks <tt>LD_LIBRARY_PATH</tt> exports.
-
+<pre>
  $ sudo bash
  $ LD_LIBRARY_PATH=/usr/evolution28/lib ./pgmrecv
-
+</pre>
 
 == Building in RHEL or CentOS 5.1-5.3 ==
 First install the C compiler dependencies.
-
+<pre>
  $ sudo yum install gcc
-
+</pre>
 Install SCons by downloading the [http://scons.org/download.php 0.97 stable package].
-
+<pre>
  $ sudo rpm -i scons-0.97-1.noarch.rpm
-
+</pre>
 Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.
-
+<pre>
  $ sudo yum install glib2-devel libsoup-devel ncurses-devel net-snmp-devel
-
+</pre>
 Red Hat net-snmp libraries are a bit chunky and need some extras:
-
+<pre>
  $ sudo yum install lm_sensors-devel
-
+</pre>
 To download the source code Subversion is needed to contact the repository.
-
+<pre>
  $ sudo yum install subversion
-
-Checkout the repository as per the [[Openpgm_Subversion|Subversion guide]].
-
- $ svn checkout https://forgesvn1.novell.com/svn/openpgm/tags/release-1-0-0
-
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/tags/release-1-0-0
+</pre>
 Build.
-
+<pre>
  $ cd trunk/openpgm/pgm
  $ scons -f SConstruct.097
-
+</pre>
 By default SCons is configured to build the debug tree in <tt>./ref/debug</tt> to build the release version in <tt>./ref/release</tt>.
-
+<pre>
  $ scons -f SConstruct.097 BUILD=release
-
+</pre>
 
 == PGM Testing ==
 Two hosts are required for full PGM protocol testing, one to send the other to receive.  In this example <tt>ayaka</tt> is the sending host and <tt>kiku</tt> is receiving.
 
 On the receiving host run the OpenPGM receiver.
-
+<pre>
  kiku$ sudo ./ref/debug/examples/pgmrecv 
- ** Message: pgmrecv
+ `*``*` Message: pgmrecv
  2008-05-27 18:02:53 kiku: scheduling startup.
  2008-05-27 18:02:53 kiku: entering main event loop ... 
  2008-05-27 18:02:53 kiku: startup.
  2008-05-27 18:02:53 kiku: create transport.
  2008-05-27 18:02:53 kiku: startup complete.
-
+</pre>
 On the sending host run the OpenPGM publisher.
-
+<pre>
  ayaka$ sudo ./ref/debug/examples/pgmsend mooooo baa
-
+</pre>
 Then on the receiver you should see the test messages.
-
+<pre>
  2008-05-27 18:03:25 kiku: (7 bytes)
  2008-05-27 18:03:25 kiku: 	1: "mooooo" (7 bytes)
  2008-05-27 18:03:25 kiku: (4 bytes)
  2008-05-27 18:03:25 kiku: 	1: "baa" (4 bytes)
-
-Without explicit network parameter passing OpenPGM will assume the default adapter and either IPv4 or IPv6 addressing.  If your operating system defaults to DHCP it is possible that the nodename of the host resolves to localhost and not a real adapter, it is then necessary to explicitly set the adapter name.  Similarly you might have problems with IPv6 auto-configuration and multiple scopes per adapter.  So on a default OpenSolaris install you might wish to try the following:
-
- opensolaris$ sudo ./ref/debug/examples pgmsend -n "pcn0;239.192.0.1" ichigo milk 
-
+</pre>
+Without explicit network parameter passing OpenPGM will assume the default adapter and either IPv4 or IPv6 addressing.  If your operating system defaults to DHCP it is possible that the nodename of the host resolves to localhost and not a real adapter, it is then necessary to explicitly set the adapter name.  Similarly you might have problems with IPv6 auto-configuration and multiple scopes per adapter.  So on a default !OpenSolaris install you might wish to try the following:
+<pre>
+ opensolaris$ sudo ./ref/debug/examples/pgmsend -n "pcn0;239.192.0.1" ichigo milk 
+</pre>
 
 == PGM Testing on Multicast Loopback ==
-
 For multicast loopback testing using only one host requires use of a low-resolution timing mechanism as the <tt>/dev/rtc</tt> real-time clock device cannot be shared.  The example <tt>pgmrecv</tt> and <tt>pgmsend</tt> applications have convenience parameters to automagically enable this configuration.  For this demonstration we will also use UDP encapsulation of the PGM protocol so as not to require any extra system privileges.  On one terminal start a receiver.
-
+<pre>
  aiko$ ./ref/debug/examples/pgmrecv -lp 3065
- ** Message: pgmrecv
+ `*``*` Message: pgmrecv
  2008-11-19 17:59:05 aiko: setting low resolution timers for multicast loopback.
  2008-11-19 17:59:05 aiko: scheduling startup.
  2008-11-19 17:59:05 aiko: entering main event loop ... 
  2008-11-19 17:59:05 aiko: startup.
  2008-11-19 17:59:05 aiko: create transport.
  2008-11-19 17:59:05 aiko: startup complete.
-
+</pre>
 In another terminal send some test messages:
-
+<pre>
  $ ./ref/debug/examples/pgmsend -lp 3065 mooo baa
  2008-11-19 17:59:18 aiko: setting low resolution timers for multicast loopback.
-
+</pre>
 In the receiving terminal you should see the correct receipt of two messages.
-
+<pre>
  2008-11-19 17:59:18 aiko: (5 bytes)
  2008-11-19 17:59:18 aiko: 	1: "mooo" (5 bytes)
  2008-11-19 17:59:18 aiko: (4 bytes)
  2008-11-19 17:59:18 aiko: 	1: "baa" (4 bytes)
-
+</pre>

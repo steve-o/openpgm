@@ -1,18 +1,23 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM : C Reference : pgm_packetv_alloc()
+#labels Phase-Implementation
+#sidebar TOCCReference
 
-<tt>int '''pgm_packetv_alloc''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                       can_fragment</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer] *pgm_packetv_alloc* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                       can_fragment
+	);
+</pre>
 
 === Purpose ===
 Allocate a packet from the transmit window, offset to the payload.
 
 === Remarks ===
-The memory buffer is owned by the transmit window and so must be returned to the window with content via [[OpenPGM C Reference/pgm_transport_send()|pgm_transport_send()]] calls or unused with [[OpenPGM C Reference/pgm_packetv_free1()|pgm_packetv_free1()]].
+The memory buffer is owned by the transmit window and so must be returned to the window with content via [OpenPgmCReferencePgmTransportSendPacketv pgm_transport_send_packetv()] calls or unused with [OpenPgmCReferencePgmPacketvFree1 pgm_packetv_free1()].
 
 === Parameters ===
 
@@ -35,6 +40,7 @@ The memory buffer is owned by the transmit window and so must be returned to the
 On success, a pointer to the allocated buffer is returned.
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_packetv_free1()|pgm_packetv_free1()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_send_packetv()|pgm_transport_send_packetv()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmPacketvFree1 pgm_packetv_free1()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSendPacketv pgm_transport_send_packetv()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

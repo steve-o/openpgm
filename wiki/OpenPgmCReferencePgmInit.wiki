@@ -1,7 +1,14 @@
-﻿''Function''
+#summary OpenPGM : C Reference : pgm_init()
+#labels Phase-Implementation
+#sidebar TOCCReference
 
+_Function_
 === Declaration ===
-<tt>int '''pgm_init'''(void);</tt>
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_init* (void);
+</pre>
 
 === Purpose ===
 Create and start OpenPGM internal machinery.
@@ -9,12 +16,14 @@ Create and start OpenPGM internal machinery.
 === Remarks ===
 This call creates the internal machinery that OpenPGM requires for its operation:
 
-* Threading support.
-* Timer support.
-* PGM protocol number.
+  * Threading support.
+  * Timer support.
+  * PGM protocol number.
  
 Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports are unusable.
 
 === Return Value ===
 On success, returns 0.
 
+=== See Also ===
+  * [OpenPgmCReferenceEnvironment Environment] in OpenPGM C Reference.

@@ -27,7 +27,6 @@ OpenPGM modules log messages through [http://library.gnome.org/devel/glib/stable
 Log messages can be redirected using [http://library.gnome.org/devel/glib/stable/glib-Message-Logging.html#g-log-set-handler g_log_set_handler], one call is required for each domain
 
 === Example ===
-
 {{{
  static void
  log_handler (

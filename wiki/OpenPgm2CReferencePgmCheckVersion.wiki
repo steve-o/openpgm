@@ -15,7 +15,6 @@ extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#g
 === Purpose ===
 OpenPGM version information.
 
-
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt><br>
   * [OpenPgm2CReferenceEnvironment Environment] in OpenPGM C Reference.

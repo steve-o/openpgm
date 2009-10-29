@@ -1,10 +1,13 @@
-﻿This section presents important general information for programmers using OpenPGM.
+﻿#summary OpenPGM C Reference : Programmer's Checklist
+#labels Phase-Implementation
+
+=== Introduction ===
+This section presents important general information for programmers using OpenPGM.
 
 === Topics ===
-* [[OpenPGM C Reference/Build Library|Build Library]]
-* [[OpenPGM C Reference/Programming Environment|Programming Environment]]
-* [[OpenPGM C Reference/Include these Header Files|Include these Header Files]]
-* [[OpenPGM C Reference/Set these Parameters|Set these Parameters]]
-* [[OpenPGM C Reference/Link these Library Files|Link these Library Files]]
-* [[OpenPGM C Reference/Run with these Capabilities|Run with these Capabilities]]
-
+  * [OpenPgmCReferenceBuildLibrary Build Library]
+  * [OpenPgmCReferenceProgrammingEnvironment Programming Environment]
+  * [OpenPgmCReferenceIncludeTheseHeaderFiles Include these Header Files]
+  * [OpenPgmCReferenceSetTheseParameters Set these Parameters]
+  * [OpenPgmCReferenceLinkTheseLibraryFiles Link these Library Files]
+  * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]

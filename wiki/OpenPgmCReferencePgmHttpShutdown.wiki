@@ -1,0 +1,22 @@
+#summary OpenPGM : C Reference : pgm_http_shutdown()
+#labels Phase-Implementation
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/http.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_http_shutdown* (void);
+</pre>
+
+=== Purpose ===
+Stop and destroy a running HTTP interface.
+
+=== Return Value ===
+On success, 0 is returned.
+
+=== See Also ===
+  * <tt>[OpenPgmCReferencePgmHttpInit pgm_http_init()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * [OpenPgmCReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.

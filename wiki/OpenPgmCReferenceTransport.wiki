@@ -1,8 +1,11 @@
-﻿__NOTOC__
+﻿#summary OpenPGM : C Reference : Transport
+#labels Phase-Implementation
+#sidebar TOC2CReference
+
+=== Introduction ===
 Transports manage network connections and send outbound messages.
 
-'''Topics in Alphabetical Order'''
-
+=== Topics in Alphabetical Order ===
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
 <th>Function or Type</th>
@@ -11,223 +14,229 @@ Transports manage network connections and send outbound messages.
 <tr>
 <td colspan="2"><h3>Asynchronous receiver API</h3></td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt></td>
 <td>Object representing a transport asynchronous receiver.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt></td>
 <td>Create an asynchronous event handler.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_destroy()|pgm_async_destroy()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt></td>
 <td>Destroy an asynchronous event handler.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_get_fd()|pgm_async_get_fd()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncGetFd pgm_async_get_fd()]</tt></td>
 <td>Retrieve file descriptor for event signalling.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_add_watch()|pgm_async_add_watch()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt></td>
 <td>Add a transport event listener.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_add_watch()|pgm_async_add_watch_full()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch_full()]</tt></td>
 <td>Add a transport event listener, and run a completion function when all of the destroyed event’s callback functions are complete.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_create_watch()|pgm_async_create_watch()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncCreateWatch pgm_async_create_watch()]</tt></td>
 <td>Create a transport event listener.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_async_recv()|pgm_async_recv()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncRecv pgm_async_recv()]</tt></td>
 <td>Synchronous receiving from an asynchronous queue.</td>
 </tr><tr>
 <td colspan="2"><h3>GSI API</h3></td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmGsiT pgm_gsi_t]</tt></td>
 <td>Object representing a GSI.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt></td>
 <td>Create a GSI based on IPv4 host address.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt></td>
 <td>Create a GSI based on MD5 of system host name.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_print_gsi()|pgm_print_gsi()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmCreateStrGsi pgm_create_str_gsi()]</tt></td>
+<td>Create a GSI based on MD5 of provided string.</td>
+</tr><tr>
+<td><tt>[OpenPgmCReferencePgmCreateDataGsi pgm_create_data_gsi()]</tt></td>
+<td>Create a GSI based on MD5 of provided data buffer.</td>
+</tr><tr>
+<td><tt>[OpenPgmCReferencePgmPrintGsi pgm_print_gsi()]</tt></td>
 <td>Display a GSI in human friendly form.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_gsi_equal()|pgm_gsi_equal()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmGsiEqual pgm_gsi_equal()]</tt></td>
 <td>Compare two GSI values.</td>
 </tr><tr>
 <td colspan="2"><h3>Interface API</h3></td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_if_parse_transport()|pgm_if_parse_transport()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmIfParseTransport pgm_if_parse_transport()]</tt></td>
 <td>Decompose a string network specification.</td>
 </tr><tr>
 <td colspan="2"><h3>Transport API</h3></td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTsiT pgm_tsi_t]</tt></td>
 <td>Object representing a TSI.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_print_tsi()|pgm_print_tsi()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmPrintTsi pgm_print_tsi()]</tt></td>
 <td>Display a TSI in human friendly form.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_tsi_equal()|pgm_tsi_equal()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTsiEqual pgm_tsi_equal(]]</tt></td>
 <td>Compare two TSI values.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_msgv_t|pgm_msgv_t]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmMsgvT pgm_msgv_t]</tt></td>
 <td>A scatter/gather message vector.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_sock_err_t|pgm_sock_err_t]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmSockErrT pgm_sock_err_t]</tt></td>
 <td>A structure detailing unrecoverable data loss.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt></td>
 <td>A transport object represents a delivery mechanism for messages.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_bind()|pgm_transport_bind()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportBind pgm_transport_bind()]</tt></td>
 <td>Bind a transport to the specified network devices.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt></td>
 <td>Create a network transport.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_destroy()|pgm_transport_destroy()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportDestroy pgm_transport_destroy()]</tt></td>
 <td>Destroy a transport.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportRecv pgm_transport_recv()]</tt></td>
 <td>Receive a message from the transport.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recvfrom()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportRecv pgm_transport_recvfrom()]</tt></td>
 <td>Receive a message from the transport saving source TSI.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recvmsg()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportRecv pgm_transport_recvmsg()]</tt></td>
 <td>Receive a message from the transport with scatter/gather vector buffers.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_recvmsgv()|pgm_transport_recvmsgv()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportRecvMsgv pgm_transport_recvmsgv()]</tt></td>
 <td>Receive a message vector from the transport with scatter/gather vector buffers.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_select_info()|pgm_transport_select_info()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt></td>
 <td>Set parameters suitable for feeding into <tt>select()</tt>.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_poll_info()|pgm_transport_poll_info()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportPollInfo pgm_transport_poll_info()]</tt></td>
 <td>Set parameters suitable for feeding into <tt>poll()</tt>.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_epoll_ctl()|pgm_transport_epoll_ctl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportEpollCtl pgm_transport_epoll_ctl()]</tt></td>
 <td>Fill <tt>epoll_event</tt> parameters in preparation for <tt>epoll_wait()</tt>.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_ambient_spm()|pgm_transport_set_ambient_spm()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
 <td>Set interval of background SPM packets.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_heartbeat_spm()|pgm_transport_set_heartbeat_spm()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_close_on_failure()|pgm_transport_set_close_on_failure()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetCloseOnFailure pgm_transport_set_close_on_failure()]</tt></td>
 <td>Close transport after detecting unrecoverable data loss.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_fec()|pgm_transport_set_fec()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetFec pgm_transport_set_fec()]</tt></td>
 <td>Set and enable Forward Error Correction parameters.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_hops()|pgm_transport_set_hops()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_max_tpdu()|pgm_transport_set_max_tpdu()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_multicast_loop()|pgm_transport_set_multicast_loop()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetMulticastLoop pgm_transport_set_multicast_loop()]</tt></td>
 <td>Set multicast loop and socket address sharing.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_data_retries()|pgm_transport_set_nak_data_retries()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakDataRetries pgm_transport_set_nak_data_retries()]</tt></td>
 <td>Set retries for DATA packets after NAK.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_ncf_retries()|pgm_transport_set_nak_ncf_retries()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakNcfRetries pgm_transport_set_nak_ncf_retries()]</tt></td>
 <td>Set retries for DATA after NCF.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_bo_ivl()|pgm_transport_set_nak_bo_ivl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakBoIvl pgm_transport_set_nak_bo_ivl()]</tt></td>
 <td>Set NAK transmit back-off interval.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_rdata_ivl()|pgm_transport_set_nak_rdata_ivl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakRdataIvl pgm_transport_set_nak_rdata_ivl()]</tt></td>
 <td>Set timeout for receiving RDATA.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_nak_rpt_ivl()|pgm_transport_set_nak_rpt_ivl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetNakRptIvl pgm_transport_set_nak_rpt_ivl()]</tt></td>
 <td>Set timeout before repeating NAK.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_peer_expiry()|pgm_transport_set_peer_expiry()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
 <td>Set timeout for removing a dead peer.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rcvbuf()|pgm_transport_set_rcvbuf()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRcvBuf　pgm_transport_set_rcvbuf()]</tt></td>
 <td>Set receive buffer size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rxw_max_rte()|pgm_transport_set_rxw_max_rte()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt></td>
 <td>Set receive window size by data rate.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rxw_preallocate()|pgm_transport_set_rxw_preallocate()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRxwPreallocate pgm_transport_set_rxw_preallocate()]</tt></td>
 <td>Preallocate memory for receive window.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rxw_secs()|pgm_transport_set_rxw_secs()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
 <td>Set receive window size in seconds.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_rxw_sqns()|pgm_transport_set_rxw_sqns()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt></td>
 <td>Set receive window size in sequence numbers.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_recv_only()|pgm_transport_set_recv_only()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRecvOnly pgm_transport_set_recv_only()]</tt></td>
 <td>Set transport to receive-only mode, data packets will not be published.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetSendOnly pgm_transport_set_send_only()]</tt></td>
 <td>Set transport to send-only mode, data packets will not be read.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_sndbuf()|pgm_transport_set_sndbuf()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetSndBuf pgm_transport_set_sndbuf()]</tt></td>
 <td>Set send buffer size.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_spmr_expiry()|pgm_transport_set_spmr_expiry()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>
 <td>Set expiration time of SPM Requests.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_txw_max_rte()|pgm_transport_set_txw_max_rte()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt></td>
 <td>Set send window size by data rate.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_txw_preallocate()|pgm_transport_set_txw_preallocate()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetTxwPreallocate pgm_transport_set_txw_preallocate()]</tt></td>
 <td>Preallocate memory for transmit window.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_txw_secs()|pgm_transport_set_txw_secs()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size in seconds.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_set_txw_sqns()|pgm_transport_set_txw_sqns()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt></td>
 <td>Set send window size in sequence numbers.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_join_group()|pgm_transport_join_group()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportJoinGroup pgm_transport_join_group()]</tt></td>
 <td>Join a multicast group (ASM).</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_leave_group()|pgm_transport_leave_group()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportJoinGroup pgm_transport_leave_group()]</tt></td>
 <td>Leave a multicast group (ASM).</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_block_source()|pgm_transport_block_source()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportBlockSource pgm_transport_block_source()]</tt></td>
 <td>Block packets from a specific source IP address (ASM).</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_unblock_source()|pgm_transport_unblock_source()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportBlockSource pgm_transport_unblock_source()]</tt></td>
 <td>Re-allow packets from a specific source IP address (ASM).</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_join_source_group()|pgm_transport_join_source_group()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportJoinSourceGroup pgm_transport_join_source_group()]</tt></td>
 <td>Join a multicast group sent by a specific source IP address (SSM).</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_leave_source_group()|pgm_transport_leave_source_group()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportJoinSourceGroup pgm_transport_leave_source_group()]</tt></td>
 <td>Leave a multicast group sent by a specific source IP address (SSM).</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_msfilter()|pgm_transport_msfilter()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportMsFilter pgm_transport_msfilter()]</tt></td>
 <td>Block or re-allow packets from a list of source IP addresses.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_send()|pgm_transport_send()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSend pgm_transport_send()]</tt></td>
 <td>Send a message.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_sendv()|pgm_transport_sendv()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSendv pgm_transport_sendv()]</tt></td>
 <td>Send a vector of messages.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_send_packetv()|pgm_transport_send_packetv()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSendPacketv pgm_transport_send_packetv()]</tt></td>
 <td>Zero-copy send a vector of application buffers.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_transport_max_tsdu()|pgm_transport_max_tsdu()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportMaxTsdu pgm_transport_max_tsdu()]</tt></td>
 <td>Get maximum TSDU, or packet payload size with or without fragmentation.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmPacketvAlloc pgm_packetv_alloc()]</tt></td>
 <td>Allocate memory from the transmit window.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_packetv_free1()|pgm_packetv_free1()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmPacketvFree1 pgm_packetv_free1()]</tt></td>
 <td>Return unused memory to the transmit window.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_drop_superuser()|pgm_drop_superuser()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmDropSuperUser pgm_drop_superuser()]</tt></td>
 <td>Drop superuser privileges needed to create PGM protocol sockets.</td>
 </tr><tr>
-<td><s><tt>[[OpenPGM C Reference/pgm_sock_mreq|pgm_sock_mreq]]</tt></s></td>
+<td><s><tt>pgm_sock_mreq</tt></s></td>
 <td>A socket object representing an interface and multicast group.</td>
 </tr>
 </table>

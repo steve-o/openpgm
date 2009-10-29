@@ -1,13 +1,19 @@
-﻿''Type''
+#summary OpenPGM : C Reference : pgm_async_t
+#labels Phase-Implementation
 
+_Type_
 === Declaration ===
-<tt>typedef struct pgm_async_t '''pgm_async_t''';</tt>
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_async_t *pgm_async_t*;
+</pre>
 
 === Purpose ===
 Object representing a transport asynchronous receiver.
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_async_destroy()|pgm_async_destroy()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_async_recv()|pgm_async_recv()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncRecv pgm_async_recv()]</tt><br>
+  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.

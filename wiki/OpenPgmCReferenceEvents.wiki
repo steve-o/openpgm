@@ -1,6 +1,9 @@
-﻿<div style="background-color: #ccff99; -moz-border-radius: 4px; padding: 10px; width: 250px; float:right">
-'''NAK and NCF processing''' requires that one thread is always processing incoming events.  With a synchronous strategy this should be one dedicated application thread reading messages and copying or processing into an internal queue, with asynchronous event handling a managed thread can be created with <tt>[[OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt>.
-</div>
+#summary OpenPGM : C Reference : Events
+#labels Phase-Implementation
+#sidebar TOCCReference
+
+NAK and NCF processing requires that one thread is always processing incoming events.  With a synchronous strategy this should be one dedicated application thread reading messages and copying or processing into an internal queue, with asynchronous event handling a managed thread can be created with <tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt>.
+
 Event driven programs idle in an event loop dispatching events as they are raised.  OpenPGM application developers can choose whether to follow an event driven model or regular imperative styles.
 
 Events can come from any number of different types of sources such as file descriptors (plain files, pipes or sockets) and timeouts.  With OpenPGM events can be driven from the underlying network transport, timing state engine, or at a higher level from an asynchronous data queue.
@@ -16,29 +19,29 @@ When relying on the underlying network transport for event generation the develo
 <tr>
 <td rowspan="3">Synchronous</td>
 <td><tt>select()</tt></td>
-<td><tt>[[OpenPGM C Reference/pgm_transport_select_info()|pgm_transport_select_info()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt></td>
 </tr><tr>
 <td><tt>poll()</tt></td>
-<td><tt>[[OpenPGM C Reference/pgm_transport_poll_info()|pgm_transport_poll_info()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportPollInfo pgm_transport_poll_info()]</tt></td>
 </tr><tr>
 <td><tt>epoll()</tt></td>
-<td><tt>[[OpenPGM C Reference/pgm_transport_epoll_ctl()|pgm_transport_epoll_ctl()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportEpollCtl pgm_transport_epoll_ctl()]</tt></td>
 </tr><tr>
 <td rowspan="4">Asynchronous</td>
 <td><tt>select()</tt></td>
-<td rowspan="3"><tt>[[OpenPGM C Reference/pgm_async_get_fd()|pgm_async_get_fd()]]</tt></td>
+<td rowspan="3"><tt>[OpenPgmCReferencePgmAsyncGetFd pgm_async_get_fd()]</tt></td>
 </tr><tr>
 <td><tt>poll()</tt></td>
 </tr><tr>
 <td><tt>epoll()</tt></td>
 </tr><tr>
 <td>GLib Event Source</td>
-<td><tt>[[OpenPGM C Reference/pgm_async_add_watch()|pgm_async_add_watch()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt></td>
 </tr><tr>
 </table>
 
 
-Note that the special APIs for synchronous events as multiple file descriptors need to be monitored for correct operation, see the section [[OpenPGM Concepts/Events#Data Triggers|Data Triggers]] in ''OpenPGM Concepts'' for further details.
+Note that the special APIs for synchronous events as multiple file descriptors need to be monitored for correct operation, see the section [OpenPgmConceptsEvents Data Triggers] in _OpenPGM Concepts_ for further details.
 
 
 == Asynchronous Threading == 

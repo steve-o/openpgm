@@ -36,7 +36,6 @@ The <tt>pgm_gsi_equal()</tt> function returns [http://library.gnome.org/devel/gl
 ttp://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] otherwise.
 
 === Example ===
-
 {{{
  pgm_gsi_t gsi1, gsi2 = { .identifier = { 170, 29, 65, 155, 237, 36 } };
  pgm_create_md5_gsi(&gsi1);

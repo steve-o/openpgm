@@ -19,5 +19,4 @@ On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.htm
   * <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt><br>
-  * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
-  * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].
+  * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.

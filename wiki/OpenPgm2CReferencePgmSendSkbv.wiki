@@ -95,6 +95,5 @@ Send with non-blocking APDU with basic event detection.
   * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmSend pgm_send()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmSendv pgm_sendv()]</tt><br>
-  * <tt>[OpenPgm2CReferencePgmSendSkbv pgm_send_skbv()]</tt><br>
   * [OpenPgm2CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.<br>
   * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

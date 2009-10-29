@@ -6,7 +6,7 @@ _Function_
 <pre>
 #include <pgm/pgm.h>
 
-[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource]* *pgm_async_create_watch* (
+[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource]`*` *pgm_async_create_watch* (
 	[OpenPgm2CReferencePgmAsyncT pgm_async_t]`*`    async
 	);
 </pre>
@@ -35,7 +35,6 @@ Creates a [http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.h
 On success, the newly-created [http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource].  If <tt>async</tt> is invalid, <tt>NULL</tt> is returned.
 
 === Example ===
-
 {{{
  pgm_async_t* async;
  pgm_async_create (&async, transport, 0);

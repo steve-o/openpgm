@@ -1,14 +1,18 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_recvmsgv()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] '''pgm_transport_recvmsgv''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_tranport_t]]*     transport,</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_msgv_t|pgm_msgv_t]]*     msgv,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] count,</tt>
-: <tt>int flags</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] *pgm_transport_recvmsgv* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`      transport,
+	[OpenPgmCReferencePgmMsgvT pgm_msgv_t]`*` const     msgv,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                 count,
+	int                   flags
+);
+</pre>
 
 === Purpose ===
 Receive a vector of Application Protocol Domain Unit's (APDUs) from the transport.
@@ -20,7 +24,7 @@ The PGM protocol is bi-directional, even send-only applications need to process 
 
 Memory is returned to the receive window on the next call or transport destruction.
 
-Unrecoverable data loss will cause the function to immediately return with <tt>errno</tt> set to <tt>ECONNRESET</tt>.  If <tt>[[OpenPGM C Reference/pgm_transport_set_close_on_failure()|pgm_transport_set_close_on_failure()]]</tt> is called with <tt>FALSE</tt> (the default mode) processing can continue with subsequent calls to <tt>pgm_transport_recvmsgv()</tt>, if <tt>TRUE</tt> then the transport will be closed and subsequent calls will return <tt>ENOTCONN</tt>.
+Unrecoverable data loss will cause the function to immediately return with <tt>errno</tt> set to <tt>ECONNRESET</tt>.  If <tt>[OpenPgmCReferencePgmTransportSetCloseOnFailure pgm_transport_set_close_on_failure()]</tt> is called with <tt>FALSE</tt> (the default mode) processing can continue with subsequent calls to <tt>pgm_transport_recvmsgv()</tt>, if <tt>TRUE</tt> then the transport will be closed and subsequent calls will return <tt>ENOTCONN</tt>.
 
 It is valid to send and receive zero length PGM packets.
 
@@ -51,32 +55,37 @@ It is valid to send and receive zero length PGM packets.
 On success, returns the number of data bytes read, or -1 if an error occurred and <tt>errno</tt> appropriately set.
 
 === Errors ===
-;EAGAIN:The socket is marked non-blocking and the receive operation would block.
-;ECONNRESET:Unrecoverable data loss was detected.
-;EINTR:The receive was interrupted by delivery of a signal before any data were available.
-;ENOMEM:Unable to allocate memory for internal tables.
-;ENOTCONN:The transport is closed.
+<dl><dt><tt>EAGAIN</tt></dt><dd>The socket is marked non-blocking and the receive operation would block.
+</dd><dt><tt>ECONNRESET</tt></dt><dd>Unrecoverable data loss was detected.
+</dd><dt><tt>EINTR</tt></dt><dd>The receive was interrupted by delivery of a signal before any data were available.
+</dd><dt><tt>ENOMEM</tt></dt><dd>Unable to allocate memory for internal tables.
+</dd><dt><tt>ENOTCONN</tt></dt><dd>The transport is closed.
+</dd></dl>
 
 === Example ===
 Read a maximum size vector from a transport.
 
+{{{
  gsize iov_max = sysconf( SC_IOV_MAX );
  pgm_msgv_t msgv[iov_max];
- gssize bytes_read = '''pgm_transport_recvmsgv''' (transport, msgv, iov_max, MSG_DONTWAIT);
+ gssize bytes_read = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT);
+}}}
 
 Display error details on unrecoverable error. 
 
+{{{
  pgm_msgv_t msgv[10];
- gssize bytes_read = '''pgm_transport_recvmsgv''' (transport, msgv, iov_max, MSG_DONTWAIT);
+ gssize bytes_read = pgm_transport_recvmsgv (transport, msgv, iov_max, MSG_DONTWAIT);
  if (-1 == len && ECONNRESET == errno) {
   pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)msgv[0].msgv_iov->iov_base;
   g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
              pgm_sock_err->lost_count,
              pgm_print_tsi(&pgm_sock_err->tsi));
  }
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport|pgm_transport]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt><br>
-[[OpenPGM Concepts/Transport|Transport]] in OpenPGM Concepts
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportRecv pgm_transport_recv()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

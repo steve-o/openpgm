@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_set_recv_only()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_recv_only''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                      is_passive</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_set_recv_only* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]             is_passive
+	);
+</pre>
 
 === Purpose ===
 Set transport to receive-only mode, data packets will not be published.
@@ -34,10 +38,12 @@ A passive receiver will not publish any packets to the network or send to the se
 On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
-
- '''pgm_transport_set_recv_only''' (transport, FALSE);
+{{{
+ pgm_transport_set_recv_only (transport, FALSE);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt>
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSetSendOnly pgm_transport_set_send_only()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.
 

@@ -1,11 +1,15 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_bind()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_bind''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_bind* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const    transport
+	);
+</pre>
 
 === Purpose ===
 Bind a transport to the specified network devices.
@@ -32,18 +36,20 @@ On success, returns 0.  If <tt>transport</tt> is invalid or already bound, retur
 
 === Errors ===
 The variable <tt>errno</tt> can have the following values:
-;EACCES:The address is protected, and the user is not the superuser.
-;EADDRINUSE:The given address is already in use.
-;EADDRNOTAVAIL:Unknown multicast group address passed.
-;EMFILE:Too many file descriptors are in use by the process.
-;ENFILE:The system limit on the total number of open files has been reached.
+
+<dl><dt><tt>EACCES</tt><dt><dd>The address is protected, and the user is not the superuser.
+</dd><dt><tt>EADDRINUSE</tt><dt><dd>The given address is already in use.
+</dd><dt><tt>EADDRNOTAVAIL</tt><dt><dd>Unknown multicast group address passed.
+</dd><dt><tt>EMFILE</tt><dt><dd>Too many file descriptors are in use by the process.
+</dd><dt><tt>ENFILE</tt><dt><dd>The system limit on the total number of open files has been reached.
 The variable <tt>h_errno</tt> can have the following values:
-;HOST_NOT_FOUND:The specified host is unknown.
-;NO_ADDRESS or NO_DATA:The requested name is valid but does not have an IP address.
-;NO_RECOVERY:A non-recoverable name server error occurred.
-;TRY_AGAIN:A temporary error occurred on an authoritative name server.  Try again later.
+</dd><dt><tt>HOST_NOT_FOUND</tt><dt><dd>The specified host is unknown.
+</dd><dt><tt>NO_ADDRESS</tt> or <tt>NO_DATA</tt><dt><dd>The requested name is valid but does not have an IP address.
+</dd><dt><tt>NO_RECOVERY</tt><dt><dd>A non-recoverable name server error occurred.
+</dd><dt><tt>TRY_AGAIN</tt><dt><dd>A temporary error occurred on an authoritative name server.  Try again later.
+</dd></dl>
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

@@ -58,7 +58,6 @@ Event management is handled by the GLib general-purpose utility library, <tt>pgm
 On success, the ID (greater than 0) of the event source.  On invalid arguments, <tt>-EINVAL</tt> is returned.
 
 === Example ===
-
 {{{
  int
  on_data (

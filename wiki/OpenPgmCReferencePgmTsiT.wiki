@@ -1,16 +1,25 @@
-﻿''Type''
-__NOTOC__
+﻿#summary OpenPGM : C Reference : pgm_tsi_t
+#labels Phase-Implementation
+
+_Type_
 === Declaration ===
-<tt>typedef struct pgm_tsi_t '''pgm_tsi_t''';</tt><br>
-<tt>struct pgm_tsi_t {</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]] gsi;</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16] sport;</tt><br>
-<tt>};</tt>
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_tsi_t *pgm_tsi_t*;
+
+struct pgm_tsi_t {
+	[OpenPgmCReferencePgmGsiT pgm_gsi_t]     gsi;
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]       sport;
+	};
+</pre>
 
 === Purpose ===
 A transport session identifier (TSI).
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_print_tsi()|pgm_print_tsi()]]</tt>
+  * <tt>[OpenPgmCReferencePgmGsiT pgm_gsi_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmPrintTsi pgm_print_tsi()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmPrintTsi pgm_print_tsi_r()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.
 

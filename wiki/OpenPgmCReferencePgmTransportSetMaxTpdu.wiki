@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_set_max_tpdu()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_max_tpdu''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                   max_tpdu</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_set_max_tpdu* (
+	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]              max_tpdu
+	);
+</pre>
 
 === Purpose ===
 Set maximum transport data unit size.
@@ -42,36 +46,35 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 <td>Option extension length.</td>
 </tr><tr>
 <td>-16 bytes</td>
-<td>Fragmentation Option. &dagger;</td>
+<td>Fragmentation Option. †</td>
 </tr><tr>
 <td>-8 bytes</td>
-<td>Late Joining Option. &Dagger;</td>
+<td>Late Joining Option. ‡</td>
 </tr><tr>
 <td>-4 bytes</td>
-<td>Synchronisation Option (first packet and its repairs). &Dagger;</td>
+<td>Synchronisation Option (first packet and its repairs). ‡</td>
 </tr><tr>
 <td>-4 bytes</td>
-<td>Session Finish Option (last packet and its repairs). &Dagger;</td>
+<td>Session Finish Option (last packet and its repairs). ‡</td>
 </tr><tr>
 <td>-8 bytes</td>
-<td>Parity Group Number Option. &sect;</td>
+<td>Parity Group Number Option. §</td>
 </tr><tr>
 <td>-8 bytes</td>
-<td>Actual Transmission Group Size Option. &sect; &Dagger;</td>
+<td>Actual Transmission Group Size Option. §‡</td>
 </tr><tr>
 <td>-2 bytes</td>
-<td>Variable TSDU length encoding for parity packets &dagger;</td>
+<td>Variable TSDU length encoding for parity packets †</td>
 </tr><tr>
-<td>'''-102 bytes'''</td>
-<td>'''Worst case overhead.'''</td>
+<td>*-102 bytes*</td>
+<td>*Worst case overhead.*</td>
 </tr>
 </table>
 
-
-; &dagger; : For APDUs greater than one TPDU in length, the per packet overhead is increased.
-; &Dagger; : Not implemented.
-; &sect; : When Forward-Error Correction is enabled.
-
+<dl><dt>†</dt><dd>For APDUs greater than one TPDU in length, the per packet overhead is increased.
+</dd><dt>‡</dt><dd>Not implemented.
+</dd><dt>§</dt><dd>When Forward-Error Correction is enabled.
+</dd></dl>
 
 === Parameters ===
 <table border="1" cellpadding="5" cellspacing="0">
@@ -93,12 +96,13 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
-
- '''pgm_transport_set_max_tpdu''' (transport, 1500);
+{{{
+ pgm_transport_set_max_tpdu (transport, 1500);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-[http://en.wikipedia.org/wiki/802.2 IEEE 802.2] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Jumbo_frame Jumbo frame] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Maximum_transmission_unit Maximum transmission unit] in Wikipedia.
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.<br>
+  * [http://en.wikipedia.org/wiki/802.2 IEEE 802.2] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Jumbo_frame Jumbo frame] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Maximum_transmission_unit Maximum transmission unit] in Wikipedia.

@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_set_rcvbuf()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_rcvbuf''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>int                       size</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_set_rcvbuf* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	int                  size
+	);
+</pre>
 
 === Purpose ===
 Set receive buffer size.
@@ -34,10 +38,11 @@ Changes the receiver socket buffer sizes from the system default (<tt>/proc/sys/
 On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
-
- '''pgm_transport_set_rcvbuf''' (transport, 131071);
+{{{
+ pgm_transport_set_rcvbuf (transport, 131071);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_sndbuf()|pgm_transport_set_sndbuf()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSetSndBuf pgm_transport_set_sndbuf()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

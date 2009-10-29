@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_set_txw_sqns()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_txw_sqns''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                     sqns</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_set_txw_sqns* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                sqns
+	);
+</pre>
 
 === Purpose ===
 Set send window size in sequence numbers.
@@ -36,9 +40,11 @@ On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 === Example ===
 Create a reliability window sufficient to store 400,000 packets.
 
- '''pgm_transport_set_txw_sqns''' (transport, 400*1000);
+{{{
+ pgm_transport_set_txw_sqns (transport, 400*1000);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_rxw_sqns()|pgm_transport_set_rxw_sqns()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

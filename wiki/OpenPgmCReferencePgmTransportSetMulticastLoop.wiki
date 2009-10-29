@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_set_multicast_loop()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_multicast_loop''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                   use_multicast_loop</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_set_multicast_loop* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]             use_multicast_loop
+	);
+</pre>
 
 === Purpose ===
 Set multicast loop and socket address sharing.
@@ -36,9 +40,10 @@ PGM is a bi-direction communication protocol using the back channel for NAKs, by
 On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
-
- '''pgm_transport_set_multicast_loop''' (transport, TRUE);
+{{{
+ pgm_transport_set_multicast_loop (transport, TRUE);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

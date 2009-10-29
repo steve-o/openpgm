@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_gsi_equal()
+#labels Phase-Implementation
 
-<tt>gchar* '''pgm_gsi_equal''' (</tt><br>
-: <tt>const [[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*     gsi1,</tt><br>
-: <tt>const [[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*     gsi2,</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint] *pgm_gsi_equal* (
+	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi1,
+	const [OpenPgm2CReferencePgmGsiT pgm_gsi_t]`*`    gsi2
+	);
+</pre>
 
 === Purpose ===
 Compare two GSI values.
@@ -32,15 +36,15 @@ Compare two GSI values.
 The <tt>pgm_gsi_equal()</tt> function returns TRUE if both values are equal and FALSE otherwise. .
 
 === Example ===
-
+{{{
  pgm_gsi_t gsi1, gsi2 = { .identifier = { 170, 29, 65, 155, 237, 36 } };
  pgm_create_md5_gsi(&gsi1);
  if (pgm_gsi_equal(&gsi1, &gsi2)) {
    g_message ("GSI matches host ayaka");
- }
+ }}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_create_ipv4_gsi()|pgm_create_ipv4_gsi()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_create_md5_gsi()|pgm_create_md5_gsi()]]</tt>
-
+  * <tt>[OpenPgm2CReferencePgmGsiT pgm_gsi_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt>
+  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.

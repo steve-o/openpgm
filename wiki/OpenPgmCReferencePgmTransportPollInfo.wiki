@@ -1,20 +1,24 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_poll_info()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_poll_info''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>struct pollfd* fds,</tt>
-: <tt>int* n_fds</tt>,<br>
-: <tt>int events</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_poll_info* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	struct pollfd`*`            fds,
+	int`*`                      nfds,
+	int                       events
+	);
+</pre>
 
 === Purpose ===
 Set parameters suitable for feeding into <tt>poll()</tt>.
 
 === Remarks ===
-An assertion will be raised if insufficient file descriptors are provided.  1 file descriptor is required for basic <tt>POLLIN</tt> events, another is required if the transport has a receive channel (default configuration, or calling <tt>[[OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt> with <tt>FALSE</tt>).  1 file descriptor is required for basic <tt>POLLOUT</tt> events.
+An assertion will be raised if insufficient file descriptors are provided.  1 file descriptor is required for basic <tt>POLLIN</tt> events, another is required if the transport has a receive channel (default configuration, or calling <tt>[OpenPgmCReferencePgmTransportSetSendOnly pgm_transport_set_send_only()]</tt> with <tt>FALSE</tt>).  1 file descriptor is required for basic <tt>POLLOUT</tt> events.
 
 === Parameters ===
 <table border="1" cellpadding="5" cellspacing="0">
@@ -34,8 +38,8 @@ An assertion will be raised if insufficient file descriptors are provided.  1 fi
 </tr><tr>
 <td><tt>events</tt></td>
 <td>A bit set composed using the following available event types:
-;<tt>POLLIN</tt>: The transport is available for <tt>recv()</tt> operations.
-;<tt>POLLOUT</tt>: The transport is available for <tt>send()</tt> operations.</td>
+<dl><dt><tt>POLLIN</tt></dt><dd>The transport is available for <tt>recv()</tt> operations.
+</dd><dt><tt>POLLOUT</tt></dt><dd>The transport is available for <tt>send()</tt> operations.</dd></dl></td>
 </tr>
 </table>
 
@@ -46,13 +50,16 @@ On success, returns the number of <tt>pollfd</tt> event structures filled.  If t
 === Example ===
 Poll the PGM transport for incoming events.
 
+{{{
  int nfds = IP_MAX_MEMBERSHIPS;
  struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
  memset (fds, 0, sizeof(fds));
- '''pgm_transport_poll_info''' (transport, &fds, &nfds, POLLIN);
+ pgm_transport_poll_info (transport, &fds, &nfds, POLLIN);
  poll (fds, nfds, 1000 /* ms */);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt>,<br>
-<tt>[[OpenPGM C Reference/pgm_transport_set_send_only()|pgm_transport_set_send_only()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportEpollCtl pgm_transport_epoll_ctl()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

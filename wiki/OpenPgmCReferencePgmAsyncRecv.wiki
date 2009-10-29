@@ -1,14 +1,18 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_async_recv()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] '''pgm_async_recv''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]*     async,</tt><br>
-: <tt>const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]              buf,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] len,</tt>
-: <tt>int flags</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] *pgm_async_recv* (
+	[OpenPgmCReferencePgmAsyncT pgm_async_t]`*` const    async,
+	const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]        buf,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                 len,
+	int                   flags
+);
+</pre>
 
 === Purpose ===
 Receive an Application Protocol Domain Unit (APDU) from an asynchronous queue.
@@ -43,16 +47,19 @@ Receive an Application Protocol Domain Unit (APDU) from an asynchronous queue.
 On success, the number of bytes read from the queue is returned (zero indicates an empty message).  On invalid arguments, <tt>-EINVAL</tt> is returned.  On error, -1 is returned, and <tt>errno</tt> is set appropriately.
 
 === Errors ===
-;EAGAIN: The socket is marked non-blocking and the operation would block.
+<dl><dt><tt>EAGAIN</tt></dt><dd>The socket is marked non-blocking and the operation would block.
+</dd></dl>
 
 === Example ===
 Receive an APDU up to 4096 bytes in length.
 
+{{{
  gchar buf[4096];
- int bytes_read = '''pgm_async_recv''' (async, buf, sizeof(buf), 0);
-
+ int bytes_read = pgm_async_recv (async, buf, sizeof(buf), 0);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt>
+  * <tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmRecv pgm_recv()]</tt><br>
+  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
 

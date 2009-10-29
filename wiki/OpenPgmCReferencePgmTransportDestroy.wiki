@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_destroy()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_destroy''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>gboolean              flush</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_destroy* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                  flush
+	);
+</pre>
 
 === Purpose ===
 Destroy a transport.
@@ -29,6 +33,7 @@ Destroy a transport.
 On success, returns 0.  If <tt>transport</tt> invalid, returns <tt>-EINVAL</tt>.
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportBind pgm_transport_bind()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

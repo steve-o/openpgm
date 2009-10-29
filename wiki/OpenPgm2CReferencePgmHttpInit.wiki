@@ -6,6 +6,8 @@ _Function_
 <pre>
 #include <pgm/http.h>
 
+#define PGM_HTTP_DEFAULT_SERVER_PORT    4968
+
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_http_init* (
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]        server_port,
 	[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
@@ -51,5 +53,4 @@ On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.htm
   * <tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
   * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
-  * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].<br>
-  * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].
+  * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].

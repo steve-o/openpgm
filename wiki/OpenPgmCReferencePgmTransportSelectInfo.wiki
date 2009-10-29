@@ -1,14 +1,18 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_select_info()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_select_info''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>fd_set* readfds,</tt>
-: <tt>fd_set* writefds,</tt>
-: <tt>int* nfds</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_select_info* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	fd_set`*`                   readfds,
+	fd_set`*`                   writefds,
+	int`*`                      nfds
+	);
+</pre>
 
 === Purpose ===
 Set parameters suitable for feeding into <tt>select()</tt>.
@@ -41,12 +45,16 @@ On success, returns the highest-numbered file descriptor plus 1.  If the transpo
 === Example ===
 Monitor the PGM transport for incoming events.
 
+{{{
  int nfds = 0;
  fd_set readfds;
  FD_ZERO(&readfds);
- '''pgm_transport_select_info''' (transport, &readfds, NULL, &nfds);
+ pgm_transport_select_info (transport, &readfds, NULL, &nfds);
  nfds = select (nfds, &readfds, NULL, NULL, NULL);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_recv()|pgm_transport_recv()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportPollInfo pgm_transport_poll_info()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportEpollCtl pgm_transport_epoll_ctl()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

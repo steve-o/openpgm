@@ -1,7 +1,7 @@
 #summary C Reference for OpenPGM version 1
 #labels Featured,Phase-Design
 
-*OpenPGM versions 1.0.12 through 1.2.14*
+*OpenPGM versions 1.0.12 through 1.2.16*
 
 *September 2009*
 

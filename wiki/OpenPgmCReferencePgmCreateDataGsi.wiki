@@ -1,4 +1,4 @@
-﻿#summary OpenPGM : C Reference : pgm_create_md5_gsi()
+﻿#summary OpenPGM : C Reference : pgm_create_data_gsi()
 #labels Phase-Implementation
 
 _Function_
@@ -6,18 +6,15 @@ _Function_
 <pre>
 #include <pgm/pgm.h>
 
-int *pgm_create_md5_gsi* (
-	[OpenPgmCReferencePgmGsiT pgm_gsi_t]`*`    gsi
+int *pgm_create_data_gsi* (
+	[OpenPgmCReferencePgmGsiT pgm_gsi_t]`*`    gsi,
+	const unsigned char`*`   buf,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                length,
 	);
 </pre>
 
 === Purpose ===
-Create a GSI based on MD5 of system host name.
-
-=== Remarks ===
-A globally unique source identifier (GSI) is required for PGM to track the sending state of peers.  This function generates a GSI as suggested by the PGM draft specification using a MD5 hash of the system host name.
-
-The GSI is specified when creating a new PGM transport with <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt>.
+Create a GSI based on MD5 of provided data buffer.
 
 === Parameters ===
 
@@ -29,6 +26,12 @@ The GSI is specified when creating a new PGM transport with <tt>[OpenPgmCReferen
 <tr>
 <td><tt>gsi</tt></td>
 <td>A pointer to the GSI provided by the application that the function will fill.</td>
+</tr><td>
+<td><tt>buf</tt></td>
+<td>Data buffer.</td>
+</tr><td>
+<td><tt>length</tt></td>
+<td>Length of <tt>buf</tt>.</td>
 </tr>
 </table>
 
@@ -39,7 +42,8 @@ On success, 0 is returned.  If <tt>gsi</tt> is an invalid address, <tt>-EINVAL</
 === Example ===
 {{{
  pgm_gsi_t gsi;
- pgm_create_md5_gsi (&gsi);
+ unsigned char buf[] = { 0x1, 0x2, 0x3, 0x4 };
+ pgm_create_data_gsi (&gsi, buf, sizeof(buf));
 }}}
 
 === See Also ===

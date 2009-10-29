@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM : C Reference : pgm_transport_set_close_on_failure()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_set_close_on_failure''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                   close_on_failure</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_transport_set_close_on_failure* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]             close_on_failure
+	);
+</pre>
 
 === Purpose ===
 Close transport after detecting unrecoverable data loss.
@@ -31,9 +35,11 @@ Close transport after detecting unrecoverable data loss.
 On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
-
- '''pgm_transport_set_close_on_failure''' (transport, TRUE);
+{{{
+ pgm_transport_set_close_on_failure''' (transport, TRUE);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt>
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.
 

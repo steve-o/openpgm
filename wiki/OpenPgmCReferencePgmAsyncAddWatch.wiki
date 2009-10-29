@@ -1,21 +1,26 @@
-﻿''Function''
-__NOTOC__
+﻿#summary OpenPGM : C Reference : pgm_async_add_watch()
+#labels Phase-Implementation
+#sidebar TOCCReference
+
+_Function_
 === Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+<pre>
+#include <pgm/pgm.h>
 
-<tt>int '''pgm_async_add_watch''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]*     async,</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_eventfn_t|pgm_eventfn_t]]                  function,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                  user_data</tt><br>
-: <tt>);</tt>
+int *pgm_async_add_watch* (
+	[OpenPgmCReferencePgmAsyncT pgm_async_t]`*`       async,
+	[OpenPgmCReferencePgmEventFnT pgm_eventfn_t]      function,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]           user_data
+	);
 
-<tt>int '''pgm_async_add_watch_full''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]*     async,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]                      priority,</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_eventfn_t|pgm_eventfn_t]]                  function,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                  user_data,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Datasets.html#GDestroyNotify GDestroyNotify]            notify</tt><br>
-: <tt>);</tt>
+int *pgm_async_add_watch_full* (
+	[OpenPgmCReferencePgmAsyncT pgm_async_t]`*`       async,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint]               priority,
+	[OpenPgmCReferencePgmEventFnT pgm_eventfn_t]      function,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]           user_data,
+	[http://library.gnome.org/devel/glib/stable/glib-Datasets.html#GDestroyNotify GDestroyNotify]     notify
+	);
+</pre>
 
 === Purpose ===
 Add a transport event listener.
@@ -53,7 +58,7 @@ Event management is handled by the GLib general-purpose utility library, <tt>pgm
 On success, the ID (greater than 0) of the event source.  On invalid arguments, <tt>-EINVAL</tt> is returned.
 
 === Example ===
-
+{{{
  int
  on_data (
      gpointer data,
@@ -68,10 +73,13 @@ On success, the ID (greater than 0) of the event source.  On invalid arguments, 
  
  pgm_async_t* async;
  pgm_async_create (&async, transport, 0);
- '''pgm_async_add_watch''' (async, on_data, NULL);
+ pgm_async_add_watch (async, on_data, NULL);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_eventfn_t|pgm_eventfn_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmEventFnT pgm_eventfn_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
+  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.

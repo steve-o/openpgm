@@ -1,6 +1,10 @@
-﻿This section describes the functions relating to the global dependencies of OpenPGM.
+#summary OpenPGM : C Reference : Environment
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Introduction ===
+This section describes the functions relating to the global dependencies of OpenPGM.
 
-'''Topics in Alphabetical Order'''
+=== Topics in Alphabetical Order ===
 
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
@@ -8,19 +12,19 @@
 <th>Description</th>
 </tr>
 <tr>
-<td><tt>[[OpenPGM C Reference/pgm_init()|pgm_init()]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmInit pgm_init(]]</tt></td>
 <td>Start the PGM environment.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_check_version()|pgm_major_version]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmCheckVersion pgm_major_versio]]</tt></td>
 <td>Major version number of OpenPGM.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_check_version()|pgm_minor_version]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmCheckVersion pgm_minor_version]</tt></td>
 <td>Minor version number of OpenPGM.</td>
 </tr><tr>
-<td><tt>[[OpenPGM C Reference/pgm_check_version()|pgm_micro_version]]</tt></td>
+<td><tt>[OpenPgmCReferencePgmCheckVersion pgm_micro_version]</tt></td>
 <td>Micro version number of OpenPGM.</td>
 </tr><tr>
-<td><s><tt>[[OpenPGM C Reference/pgm_check_version()|pgm_check_version()]]</tt></s></td>
+<td><s><tt>[OpenPgmCReferencePgmCheckVersion pgm_check_version()]</tt></s></td>
 <td>Check version compatibility.</td>
 </tr>
 </table>

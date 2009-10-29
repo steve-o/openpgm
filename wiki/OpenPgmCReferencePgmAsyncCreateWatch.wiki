@@ -1,17 +1,21 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_async_create_watch()
+#labels Phase-Implementation
 
-<tt>GSource* '''pgm_async_create_watch''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]*     async</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#GSource GSource]`*` *pgm_async_create_watch* (
+	[OpenPgmCReferencePgmAsyncT pgm_async_t]`*`    async
+	);
+</pre>
 
 === Purpose ===
 Create a transport event listener.
 
 === Remarks ===
-Creates a GSource that is dispatched when an incoming message is ready to be processed.  The GSource should be added to the GLib main loop with <tt>[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#g-source-attach g_source_attach()]</tt>.  <tt>[[OpenPGM C Reference/pgm_async_add_watch()|pgm_async_add_watch()]]</tt> can be used to create and attach the listener to the current main loop with one call.
+Creates a GSource that is dispatched when an incoming message is ready to be processed.  The GSource should be added to the GLib main loop with <tt>[http://library.gnome.org/devel/glib/stable/glib-The-Main-Event-Loop.html#g-source-attach g_source_attach()]</tt>.  <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt> can be used to create and attach the listener to the current main loop with one call.
 
 === Parameters ===
 
@@ -31,16 +35,19 @@ Creates a GSource that is dispatched when an incoming message is ready to be pro
 On success, the newly-created GSource.  If <tt>async</tt> is invalid, <tt>NULL</tt> is returned.
 
 === Example ===
-
+{{{
  pgm_async_t* async;
  pgm_async_create (&async, transport, 0);
- GSource* source = '''pgm_async_create_watch''' (async);
+ GSource* source = pgm_async_create_watch (async);
  g_source_set_priority (source, G_PRIORITY_HIGH);
  g_source_attach (source, NULL);
  g_source_unref (source);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_async_t|pgm_async_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_async_create()|pgm_async_create()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_async_add_watch()|pgm_async_add_watch()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch_full()]</tt><br>
+  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.

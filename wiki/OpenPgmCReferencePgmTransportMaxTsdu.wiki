@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_max_tsdu()
+#labels Phase-Implementation
 
-<tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] '''pgm_transport_max_tsdu''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_tranport_t]]*     transport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]*              can_fragment</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize] *pgm_transport_max_tsdu* (
+	[OpenPgmCReferencePgmTransportT pgm_tranport_t]*     transport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]*           can_fragment
+	);
+</pre>
 
 === Purpose ===
 Get maximum TSDU, or packet payload size with or without fragmentation.
@@ -37,16 +41,19 @@ Returns the maximum TSDU size, or number of bytes available per packet as applic
 === Example ===
 Send one zero-copy packet sized APDU.
 
+{{{
  struct iovec vector = {
      .iov_base = pgm_packetv_alloc (transport, FALSE),
-     .iov_len  = '''pgm_transport_max_tsdu''' (transport, FALSE)
+     .iov_len  = pgm_transport_max_tsdu (transport, FALSE)
  }
  pgm_transport_send_packetv (transport, vector, 1, 0, TRUE);
+}}}
 
 Send a 10 KB zero-copy sized APDU.
 
+{{{
  gsize apdu_size = 10 * 1024;
- gsize tsdu_size = '''pgm_transport_max_tsdu''' (transport, TRUE);
+ gsize tsdu_size = pgm_transport_max_tsdu (transport, TRUE);
  guint packets = apdu_size / tsdu_size;
  struct iovec vector[packets];
  for (guint i = 0; i < packets; i++) {
@@ -54,8 +61,9 @@ Send a 10 KB zero-copy sized APDU.
    vector[i].iov_len  = (i == (packets - 1)) ? (apdu_size % tsdu_size) : tsdu_size;
  }
  pgm_transport_send_packetv (transport, vector, packets, 0, TRUE);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_send_packetv()|pgm_transport_send_packetv()]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmPacketvAlloc pgm_packetv_alloc()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSendPacketv pgm_transport_send_packetv()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

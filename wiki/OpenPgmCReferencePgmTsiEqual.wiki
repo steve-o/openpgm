@@ -1,12 +1,16 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_tsi_equal()
+#labels Phase-Implementation
 
-<tt>gchar* '''pgm_tsi_equal''' (</tt><br>
-: <tt>const [[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*     tsi1,</tt><br>
-: <tt>const [[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]*     tsi2,</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gint gint] *pgm_tsi_equal* (
+	const [OpenPgmCReferencePgmTsiT pgm_tsi_t]`*`    tsi1,
+	const [OpenPgmCReferencePgmTsiT pgm_tsi_t]`*`    tsi2
+	);
+</pre>
 
 === Purpose ===
 Compare two TSI values.
@@ -27,10 +31,9 @@ Compare two TSI values.
 </tr>
 </table>
 
-
 === Return Value ===
-The <tt>pgm_tsi_equal()</tt> function returns TRUE if both values are equal and FALSE otherwise. .
+The <tt>pgm_tsi_equal()</tt> function returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if both values are equal and [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] otherwise.
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_tsi_t|pgm_tsi_t]]</tt>
-
+  * <tt>[OpenPgmCReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

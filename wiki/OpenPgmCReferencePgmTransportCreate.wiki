@@ -1,33 +1,37 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+﻿#summary OpenPGM : C Reference : pgm_transport_create()
+#labels Phase-Implementation
 
-<tt>int '''pgm_transport_create''' (</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]**     transport,</tt><br>
-: <tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]*                    gsi,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                    sport,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                    dport,</tt><br>
-: <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]*          recv_gsr,</tt><br>
-: <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        recv_len,</tt><br>
-: <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]*          send_gsr</tt><br>
-: <tt>);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_create* (
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const           transport,
+	[OpenPgmCReferencePgmTGsiT pgm_gsi_t]`*`                       gsi,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                          sport,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                          dport,
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`             recv_gsr,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        recv_len,
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`             send_gsr
+	);
+</pre>
 
 === Purpose ===
 Create a network transport.
 
 === Remarks ===
-A custom network protocol requires super-user privileges to open the necessary raw sockets.  An application can call <tt>pgm_transport_create()</tt> to create unbound raw sockets, drop the privileges to maintain security, and finally bind with <tt>[[OpenPGM C Reference/pgm_transport_bind()|pgm_transport_bind()]]</tt> to start processing incoming packets.
+A custom network protocol requires super-user privileges to open the necessary raw sockets.  An application can call <tt>pgm_transport_create()</tt> to create unbound raw sockets, drop the privileges to maintain security, and finally bind with <tt>[OpenPgmCReferencePgmTransportBind pgm_transport_bind()]</tt> to start processing incoming packets.
 
 A PGM data-source port is a unique inbox per GSI different from the data-destination port.  When an application restarts it should use a new data-source port to distinguish its sequence number usage from previous instances.  Special applications such as file carousels may wish to re-join previous sessions if sequence numbers are mapped to file contents.  Specifying a value of 0 for a PGM data-source port will randomly generate a unique value.  Administrators running multiple PGM applications on the same host using multicast loop should pay attention to the possibility that serious communication problems will occur if applications pick the same data-source port.
 
-Both <tt>recv_gsr</tt> and <tt>send_gsr</tt> are populated as per RFC 3678.  <tt>[[OpenPGM C Reference/pgm_if_parse_transport()|pgm_if_parse_transport()]]</tt> provides a convenient method of defining the network parameters with a TIBCO Rendezvous network parameter compatible string.  By default an any-source multicast configuration is enabled, set <tt>gsr_source</tt> to the IP address of a sending computer for source-specific multicast (SSM).  Set <tt>sin_port</tt> of <tt>send_gsr</tt> and all <tt>recv_gsr</tt> entities to specify the port to use for UDP encapsulation.
+Both <tt>recv_gsr</tt> and <tt>send_gsr</tt> are populated as per RFC 3678.  <tt>[OpenPgmCReferencePgmIfParseTransport pgm_if_parse_transport()]</tt> provides a convenient method of defining the network parameters with a TIBCO Rendezvous network parameter compatible string.  By default an any-source multicast configuration is enabled, set <tt>gsr_source</tt> to the IP address of a sending computer for source-specific multicast (SSM).  Set <tt>sin_port</tt> of <tt>send_gsr</tt> and all <tt>recv_gsr</tt> entities to specify the port to use for UDP encapsulation.
 
-SSM destination addresses must be in the ranges 232/8 for IPv4 or FF3''x''::/96 for IPv6.
+SSM destination addresses must be in the ranges 232/8 for IPv4 or FF3 _x_::/96 for IPv6.
 
 Try to avoid 224.0.0.x addresses as many of these [http://en.wikipedia.org/wiki/Multicast_address multicast addresses] are used by network infrastructure equipment and have special purposes.  The recommendation on private networks is to used the administratively scoped range 239/8 (239.192/16 for local-scope) as per RFC 2365 and RFC 3171.  Public Internet usage of multicast should be careful of conflicts with [http://www.iana.org/assignments/multicast-addresses IANA assigned multicast addresses] and should consider 233/8 [http://en.wikipedia.org/wiki/GLOP GLOP addressing] as per RFC 3180.
 
-IP Multicasting uses Layer 2 MAC addressing to transmit a packet to a group of hosts on a LAN segment.  The Layer 3 address (224.0.0.0 to 239.255.255.255) are mapped to Layer 2 addresses (0x0100.5E''xx''.''xxxx'').  Because all 28 bits of the Layer 3 IP multicast address information cannot be mapped into the available 23 bits of MAC address space, five bits of address information are lost in the mapping process.  This means that each IP multicast MAC address can represent 32 IP multicast addresses.
+IP Multicasting uses Layer 2 MAC addressing to transmit a packet to a group of hosts on a LAN segment.  The Layer 3 address (224.0.0.0 to 239.255.255.255) are mapped to Layer 2 addresses (0x0100.5E _xx_._xxxx_).  Because all 28 bits of the Layer 3 IP multicast address information cannot be mapped into the available 23 bits of MAC address space, five bits of address information are lost in the mapping process.  This means that each IP multicast MAC address can represent 32 IP multicast addresses.
 
 IGMP Snooping normally is used by Layer 2 switches to constrain multicast traffic only to those ports that have hosts attached and that have signalled their desire to join the multicast group by sending IGMP Membership Reports.  IGMP Snooping is disabled for the special 224.0.0.1 - <tt>ALL-HOSTS</tt> group, 224.0.0.2 - <tt>ALL-ROUTERS</tt> group, 224.0.0.5 - <tt>ALL-OSPF-ROUTERS</tt> group, etc.  This means any IP multicast group matching 224-239.0.0/24 and 224-239.128.0/24 will also cause Layer 2 flooding and should be avoided.
 
@@ -67,20 +71,22 @@ IGMP Snooping normally is used by Layer 2 switches to constrain multicast traffi
 On success, returns 0.  On invalid arguments, returns <tt>-EINVAL</tt>.  On error, returns -1 and sets <tt>errno</tt> appropriately.
 
 === Errors ===
-;EAGAIN:The system lacked the necessary resources to create another thread, or the system-imposed limit on the total number of threads in a process <tt>PTHREAD_THREADS_MAX</tt> would be exceeded.
-;EACCES:Permission to create a socket of the specified type is denied.
-;EAFNOSUPPORT:The implementation does not support the specified address family.
-;EINVAL:Unknown protocol, or protocol family not available.
-;EMFILE:Too many file descriptors are in use by the process.
-;ENFILE:The system limit on the total number of open files has been reached.
-;ENETDOWN:Interface is not up.
-;ENOBUFS or ENOMEM:Insufficient memory is  available.   The  socket  cannot  be  created  until  sufficient resources are freed.
-;EPERM:User has insufficient privileges to carry out this operation.
-;EPROTONOSUPPORT:The protocol type or the specified protocol is not supported within this domain.
+<dl><dt><tt>EAGAIN</tt></dt><dd>The system lacked the necessary resources to create another thread, or the system-imposed limit on the total number of threads in a process <tt>PTHREAD_THREADS_MAX</tt> would be exceeded.
+</dd><dt><tt>EACCES</tt></dt><dd>Permission to create a socket of the specified type is denied.
+</dd><dt><tt>EAFNOSUPPORT</tt></dt><dd>The implementation does not support the specified address family.
+</dd><dt><tt>EINVAL</tt></dt><dd>Unknown protocol, or protocol family not available.
+</dd><dt><tt>EMFILE</tt></dt><dd>Too many file descriptors are in use by the process.
+</dd><dt><tt>ENFILE</tt></dt><dd>The system limit on the total number of open files has been reached.
+</dd><dt><tt>ENETDOWN</tt></dt><dd>Interface is not up.
+</dd><dt><tt>ENOBUFS</tt> or <tt>ENOMEM</tt></dt><dd>Insufficient memory is  available.   The  socket  cannot  be  created  until  sufficient resources are freed.
+</dd><dt><tt>EPERM</tt></dt><dd>User has insufficient privileges to carry out this operation.
+</dd><dt><tt>EPROTONOSUPPORT</tt></dt><dd>The protocol type or the specified protocol is not supported within this domain.
+</dd></dl>
 
 === Example ===
 Regular PGM protocol example using the <tt>eth0</tt> interface (popular Linux adapter name), the multicast address 239.192.0.1, and the data-destination port 7500.
 
+{{{
  pgm_gsi_t gsi;
  guint16 dport = 7500;
  char* network = "eth0;239.192.0.1";
@@ -90,10 +96,12 @@ Regular PGM protocol example using the <tt>eth0</tt> interface (popular Linux ad
  
  pgm_create_md5_gsi (&gsi);
  pgm_if_parse_transport (network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
- '''pgm_transport_create''' (&transport, &gsi, 0, dport, &recv_gsr, gsr_len, &send_gsr);
+ pgm_transport_create (&transport, &gsi, 0, dport, &recv_gsr, gsr_len, &send_gsr);
+}}}
 
 A UDP encapsulated example using UDP port 3055.
 
+{{{
  pgm_gsi_t gsi;
  guint16 dport = 7500;
  guint16 udp_encap_port = 3055
@@ -106,10 +114,12 @@ A UDP encapsulated example using UDP port 3055.
  pgm_if_parse_transport (network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
  ((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (udp_encap_port);
  ((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (udp_encap_port);
- '''pgm_transport_create''' (&transport, &gsi, 0, dport, &recv_gsr, gsr_len, &send_gsr);
+ pgm_transport_create (&transport, &gsi, 0, dport, &recv_gsr, gsr_len, &send_gsr);
+}}}
 
 A source-specific multicast session, subscribing to group 232.0.1.1 from host 172.16.0.1.
 
+{{{
  pgm_gsi_t gsi;
  guint16 dport = 7500;
  char* network = ";232.0.1.1";
@@ -121,10 +131,12 @@ A source-specific multicast session, subscribing to group 232.0.1.1 from host 17
  pgm_create_md5_gsi (&gsi);
  pgm_if_parse_transport (network, AF_INET, &recv_gsr, &send_gsr, &gsr_len);
  ((struct sockaddr_in*)&recv_gsr.gsr_source)->sin_addr.s_addr = inet_addr(source);
- '''pgm_transport_create''' (&transport, &gsi, 0, dport, &recv_gsr, gsr_len, &send_gsr);
+ pgm_transport_create (&transport, &gsi, 0, dport, &recv_gsr, gsr_len, &send_gsr);
+}}}
 
 Manually populate the GSR receive and send entities with ASM group 239.192.0.2.
 
+{{{
  pgm_gsi_t gsi;
  guint16 dport = 7500;
  char* network = ";232.0.1.1";
@@ -137,20 +149,19 @@ Manually populate the GSR receive and send entities with ASM group 239.192.0.2.
  ((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_addr.s_addr = inet_addr(network);
  memcpy (&recv_gsr.gsr_source, &recv_gsr.gsr_group, sizeof(recv_gsr.gsr_group));
  memcpy (&send_gsr, &recv_gsr, sizeof(recv_gsr));
- '''pgm_transport_create''' (&transport, &gsi, 0, dport, &recv_gsr, 1, &send_gsr);
-
+ pgm_transport_create (&transport, &gsi, 0, dport, &recv_gsr, 1, &send_gsr);
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_gsi_t|pgm_gsi_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_t|pgm_transport_t]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_if_parse_transport()|pgm_if_parse_transport()]]</tt><br>
-<tt>[[OpenPGM C Reference/pgm_transport_bind()|pgm_transport_bind()]]</tt><br>
-<tt>[http://www.ietf.org/rfc/rfc3678.txt group_source_req]</tt> in RFC 3678<br>
-[http://www.iana.org/assignments/multicast-addresses Assigned multicast addresses] at [http://en.wikipedia.org/wiki/Internet_Assigned_Numbers_Authority IANA].<br>
-[http://www.cisco.com/en/US/tech/tk828/technologies_white_paper09186a00802d4643.shtml Guidelines for Enterprise IP Multicast Address Allocation] at Cisco.<br>
-[http://en.wikipedia.org/wiki/Multicast_address Multicast address] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Any-source_multicast Any-source multicast (ASM)] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Source-specific_multicast Source-source multicast (SSM)] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Internet_Group_Management_Protocol Internet Group Management Protocol (IGMP)] in Wikipedia.<br>
-[http://en.wikipedia.org/wiki/Multicast_Listener_Discovery Multicast Listener Discovery (MLD)] in Wikipedia.
-
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmIfParseTransport pgm_if_parse_transport()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportBind pgm_transport_bind()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.<br>
+  * <tt>struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]</tt> in RFC 3678.<br>
+  * [http://www.iana.org/assignments/multicast-addresses Assigned multicast addresses] at [http://en.wikipedia.org/wiki/Internet_Assigned_Numbers_Authority IANA].<br>
+  * [http://www.cisco.com/en/US/tech/tk828/technologies_white_paper09186a00802d4643.shtml Guidelines for Enterprise IP Multicast Address Allocation] at Cisco.<br>
+  * [http://en.wikipedia.org/wiki/Multicast_address Multicast address] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Any-source_multicast Any-source multicast (ASM)] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Source-specific_multicast Source-source multicast (SSM)] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Internet_Group_Management_Protocol Internet Group Management Protocol (IGMP)] in Wikipedia.<br>
+  * [http://en.wikipedia.org/wiki/Multicast_Listener_Discovery Multicast Listener Discovery (MLD)] in Wikipedia.

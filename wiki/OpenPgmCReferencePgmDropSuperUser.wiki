@@ -1,16 +1,20 @@
-﻿''Function''
-__NOTOC__
-=== Declaration ===
-<tt>#include <pgm/pgm.h></tt>
+#summary OpenPGM : C Reference : pgm_drop_superuser()
+#labels Phase-Implementation
+#sidebar TOCCReference
 
-<tt>void '''pgm_drop_superuser''' (void);</tt>
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+void *pgm_drop_superuser* (void);
+</pre>
 
 === Purpose ===
 Drop superuser privileges needed to create PGM protocol sockets.
 
-
 === Example ===
-
+{{{
  pgm_gsi_t gsi;
  gsize recv_len = 1;
  struct group_source_req recv_gsr, send_gsr;
@@ -18,8 +22,10 @@ Drop superuser privileges needed to create PGM protocol sockets.
  pgm_create_md5_gsi (&gsi);
  pgm_if_parse_transport (";239.192.0.1", AF_UNSPEC, &recv_gsr, &recv_len, &send_gsr);
  pgm_transport_create (&transport, &gsi, 0, dport, &recv_gsr, recv_len, &send_gsr);
- '''pgm_drop_superuser''' ();
+ pgm_drop_superuser ();
+}}}
 
 === See Also ===
-<tt>[[OpenPGM C Reference/pgm_transport_create()|pgm_transport_create()]]</tt>
+  * <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * [OpenPgmCReferenceEnvironment Environment] in OpenPGM C Reference.
 
