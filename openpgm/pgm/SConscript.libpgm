@@ -7,39 +7,22 @@ Import('env')
 
 src = Split("""
 		packet.c
-		time.c
+		timer.c
 		if.c
-		getifaddrs.c
-		getnodeaddr.c
-		indextoaddr.c
-		indextoname.c
-		nametoindex.c
-		inet_network.c
-		md5.c
 		gsi.c
-		tsi.c
 		signal.c
 		txwi.c
 		rxwi.c
 		transport.c
-		source.c
-		receiver.c
-		recv.c
-		pgm.c
-		timer.c
-		net.c
 		rate_control.c
 		async.c
 		checksum.c
 		reed_solomon.c
 		galois_tables.c
-		wsastrerror.c
-		glib-compat.c
 """)
 
 e = env.Clone();
 e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
-e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 # Galois tables
 e.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
@@ -52,65 +35,27 @@ src += ['version.c'];
 e.StaticLibrary('libpgm', src);
 e.StaticSharedLibrary('libpgm-pic', src);
 
-#-----------------------------------------------------------------------------
-# unit testing
-
-if env['WITH_CHECK'] == 'true':
-	te = e.Clone();
-	newCCFLAGS = [];
-	for flag in te['CCFLAGS']:
-		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
-			newCCFLAGS.append(flag);
-	te['CCFLAGS'] = newCCFLAGS;
-	te.ParseConfig ('pkg-config --static --cflags --libs check');
-	te.Program (['txwi_unittest.c', e.Object('tsi.c')]);
-	te.Program (['rxwi_unittest.c', e.Object('tsi.c')]);
-	te.Program ('pgm_unittest.c');
-	te.Program (['gsi_unittest.c', e.Object('md5.c')]);
-	te.Program ('tsi_unittest.c');
-	te.Program (['if_unittest.c', e.Object('inet_network.c')]);
-	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c')]);
-	te.Program (['source_unittest.c']);
-	te.Program (['receiver_unittest.c', e.Object('tsi.c')]);
-	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c')]);
-	te.Program ('md5_unittest.c');
-	te.Program ('getifaddrs_unittest.c');
-	te.Program ('inet_network_unittest.c');
-	te.Program (['getnodeaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c')]);
-	te.Program (['indextoaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
-	te.Program ('net_unittest.c');
-	te.Program ('timer_unittest.c');
-	te.Program ('time_unittest.c');
-	te.Program ('signal_unittest.c');
-	te.Program (['reed_solomon_unittest.c', e.Object('galois_tables.c')]);
-	te.Program ('rate_control_unittest.c');
-	te.Program ('checksum_unittest.c');
-	te.Program (['packet_unittest.c', e.Object('checksum.c')]);
-	te.Program ('async_unittest.c');
-	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
 
-if env['WITH_PLUS'] == 'true':
-	pe = env.Clone();
-	pe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
-	pe.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
+pe = env.Clone();
+pe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 
 # add new suffix so objects don't interfere with LGPL license library
-	pe['SHOBJSUFFIX'] = '.plus' + pe['SHOBJSUFFIX'];
-	pe['OBJSUFFIX']   = '.plus' + pe['OBJSUFFIX'];
+pe['SHOBJSUFFIX'] = '.plus' + pe['SHOBJSUFFIX'];
+pe['OBJSUFFIX']   = '.plus' + pe['OBJSUFFIX'];
 
-	uname_s = os.uname()[0];
-	if uname_s == 'Linux':
-		uname_m = os.uname()[4];
-		if uname_m == 'x86_64':
-			pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
-			src += ['csum-copy64.S', 'csum-partial64.c'];
-		else:
-			pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
-			src += ['checksum32.S'];
-		pe.StaticLibrary('libpgmplus', src);
-		pe.StaticSharedLibrary('libpgmplus-pic', src);
+uname_s = os.uname()[0];
+if uname_s == 'Linux':
+	uname_m = os.uname()[4];
+	if uname_m == 'x86_64':
+		pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+		src += ['csum-copy64.S', 'csum-partial64.c'];
+	else:
+		pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+		src += ['checksum32.S'];
+	pe.StaticLibrary('libpgmplus', src);
+	pe.StaticSharedLibrary('libpgmplus-pic', src);
 
 # end of file

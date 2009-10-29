@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * PGM timer thread.
+ * high resolution timers.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,27 +24,51 @@
 
 #include <glib.h>
 
-#ifndef __PGM_TRANSPORT_H__
-#	include <pgm/transport.h>
+#ifndef __PGM_SN_H
+#   include <pgm/sn.h>
 #endif
 
 
+typedef guint64 pgm_time_t;
+
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL gboolean pgm_timer_prepare (pgm_transport_t* const);
-G_GNUC_INTERNAL gboolean pgm_timer_check (pgm_transport_t* const);
-G_GNUC_INTERNAL long pgm_timer_expiration (pgm_transport_t* const);
-G_GNUC_INTERNAL gboolean pgm_timer_dispatch (pgm_transport_t* const);
+typedef pgm_time_t (*pgm_time_update_func)(void);
+typedef void (*pgm_time_sleep_func)(gulong);
+typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 
-static inline void pgm_timer_lock (pgm_transport_t* const transport)
-{
-	if (transport->can_send_data) g_static_mutex_lock (&transport->timer_mutex);
-}
+#define pgm_time_after(a,b)	( (a) > (b) )
+#define pgm_time_before(a,b)    ( pgm_time_after((b),(a)) )
 
-static inline void pgm_timer_unlock (pgm_transport_t* const transport)
-{
-	if (transport->can_send_data) g_static_mutex_unlock (&transport->timer_mutex);
-}
+#define pgm_time_after_eq(a,b)  ( (a) >= (b) )
+#define pgm_time_before_eq(a,b) ( pgm_time_after_eq((b),(a)) )
+
+#define pgm_to_secs(t)	( (t) / 1000000UL )
+#define pgm_to_msecs(t)	( (t) / 1000 )
+#define pgm_to_usecs(t)	( (t) )
+#define pgm_to_nsecs(t)	( (t) * 1000 )
+
+#define pgm_to_secsf(t)	 ( (double)(t) / 1000000.0 )
+#define pgm_to_msecsf(t) ( (double)(t) / 1000.0 )
+#define pgm_to_usecsf(t) ( (double)(t) )
+#define pgm_to_nsecsf(t) ( (double)(t) * 1000.0 )
+
+#define pgm_secs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000000UL ))
+#define pgm_msecs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000 ))
+#define pgm_usecs(t)	((pgm_time_t)( (t) ))
+#define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000 ))
+
+
+/* micro-seconds */
+extern pgm_time_t pgm_time_now;
+
+extern pgm_time_update_func pgm_time_update_now;
+extern pgm_time_sleep_func pgm_time_sleep;
+extern pgm_time_since_epoch_func pgm_time_since_epoch;
+
+int pgm_time_init (void);
+int pgm_time_destroy (void);
+gboolean pgm_time_supported (void);
 
 G_END_DECLS
 

@@ -24,25 +24,18 @@
 
 #include <glib.h>
 
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
-
-#ifndef __PGM_REED_SOLOMON_H__
-#	include <pgm/reed_solomon.h>
-#endif
-
-#ifndef __PGM_ATOMIC_H__
-#	include <pgm/atomic.h>
+#ifndef __PGM_ZERO_H
+#   include <pgm/zero.h>
 #endif
 
 
 G_BEGIN_DECLS
 
-struct pgm_txw_state_t {
-	guint32		unfolded_checksum;	/* first 32-bit word must be checksum */
+struct pgm_txw_packet_t {
+        gpointer        data;
 
-	unsigned	waiting_retransmit:1;	/* in retransmit queue */
+        guint16         length;
+        guint32         sequence_number;
 
 #if 0
         struct timeval  expiry;			/* Advance with time */
@@ -50,126 +43,115 @@ struct pgm_txw_state_t {
 #endif
 	guint8		pkt_cnt_requested;	/* # parity packets to send */
 	guint8		pkt_cnt_sent;		/* # parity packets already sent */
+	GList		link_;			/* retransmission queue node */
 };
 
-typedef struct pgm_txw_state_t pgm_txw_state_t;
-
-/* must be smaller than PGM skbuff control buffer */
-#ifndef G_STATIC_ASSERT
-#	define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
-#	define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
-#	define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
-#endif
-
-G_STATIC_ASSERT(sizeof(struct pgm_txw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
+typedef struct pgm_txw_packet_t pgm_txw_packet_t;
 
 struct pgm_txw_t {
-	const pgm_tsi_t*	tsi;
+        GPtrArray*      pdata;
+        GTrashStack*    trash_packet;           /* sizeof(txw_packet) */
+        GTrashStack*    trash_data;             /* max_tpdu */
 
-/* option: lockless atomics */
-        guint32			lead;
-        guint32			trail;
+        guint16         max_tpdu;               /* maximum packet size */
 
-        GQueue			retransmit_queue;
+        guint32         lead;
+        guint32         trail;
 
-	rs_t			rs;
-	guint			tg_sqn_shift;
-	struct pgm_sk_buff_t*	parity_buffer;
-	unsigned		is_fec_enabled:1;
+        GQueue*		retransmit_queue;
+	GStaticMutex	retransmit_mutex;
 
-	guint32			size;			/* window content size in bytes */
-	guint32			alloc;			/* length of pdata[] */
-	struct pgm_sk_buff_t*	pdata[];
+	guint32		bytes_in_window;
+	guint32		packets_in_window;
 };
 
 typedef struct pgm_txw_t pgm_txw_t;
 
 
-G_GNUC_INTERNAL pgm_txw_t* pgm_txw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint, const gboolean, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL void pgm_txw_shutdown (pgm_txw_t* const);
-G_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t* const, struct pgm_sk_buff_t* const);
-G_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_peek (pgm_txw_t* const, const guint32) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_txw_retransmit_push (pgm_txw_t* const, const guint32, const gboolean, const guint) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_retransmit_try_peek (pgm_txw_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL void pgm_txw_retransmit_remove_head (pgm_txw_t* const);
+pgm_txw_t* pgm_txw_init (guint16, guint32, guint32, guint, guint);
+int pgm_txw_shutdown (pgm_txw_t*);
 
-static inline guint32 pgm_txw_max_length (const pgm_txw_t* const window)
+int pgm_txw_push (pgm_txw_t*, gpointer, guint16);
+int pgm_txw_peek (pgm_txw_t*, guint32, gpointer*, guint16*);
+
+/* return type as defined in garray.h */
+static inline guint pgm_txw_len (pgm_txw_t* t)
 {
-	g_assert (window);
-	return window->alloc;
+    return t->pdata->len;
 }
 
-static inline guint32 pgm_txw_length (const pgm_txw_t* const window)
+static inline guint32 pgm_txw_sqns (pgm_txw_t* t)
 {
-	g_assert (window);
-	return ( 1 + window->lead ) - window->trail;
+    return ( 1 + t->lead ) - t->trail;
 }
 
-static inline guint32 pgm_txw_size (const pgm_txw_t* const window)
+static inline gboolean pgm_txw_empty (pgm_txw_t* t)
 {
-	g_assert (window);
-	return window->size;
+    return pgm_txw_sqns (t) == 0;
 }
 
-static inline gboolean pgm_txw_is_empty (const pgm_txw_t* const window)
+static inline gboolean pgm_txw_full (pgm_txw_t* t)
 {
-	g_assert (window);
-	return pgm_txw_length (window) == 0;
+    return pgm_txw_len (t) == pgm_txw_sqns (t);
 }
 
-static inline gboolean pgm_txw_is_full (const pgm_txw_t* const window)
+#ifndef g_trash_stack_is_empty
+#       define g_trash_stack_is_empty(stack_p)     (NULL == *(GTrashStack**)(stack_p))
+#endif
+
+static inline gpointer pgm_txw_alloc (pgm_txw_t* t)
 {
-	g_assert (window);
-	return pgm_txw_length (window) == pgm_txw_max_length (window);
+    gpointer p;
+    if (!g_trash_stack_is_empty(&t->trash_data)) {
+	p = g_trash_stack_pop (&t->trash_data);
+    } else {
+	p = g_slice_alloc (t->max_tpdu);
+    }
+
+/* mark non-zeroed */
+    ( (guint8*)p )[ t->max_tpdu - 1 ] = PGM_PACKET_DIRTY;
+
+    return p;
 }
 
-static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
+static inline void pgm_txw_zero_pad (pgm_txw_t* t, gpointer data, guint16 offset, guint16 len)
 {
-	g_assert (window);
-	return window->lead;
+    g_assert ( offset <= len );
+    if ( offset == len ||
+	 PGM_PACKET_ZERO_PADDED == ( (guint8*)data )[ t->max_tpdu - 1 ] )
+    {
+	return;
+    }
+    memset ( (gchar*)data + offset, 0, len - offset );
+    ( (guint8*)data )[ t->max_tpdu - 1 ] = PGM_PACKET_ZERO_PADDED;
 }
 
-static inline guint32 pgm_txw_lead_atomic (const pgm_txw_t* const window)
+static inline guint32 pgm_txw_next_lead (pgm_txw_t* t)
 {
-	g_assert (window);
-	return pgm_atomic_int32_get (&window->lead);
+    return (guint32)(t->lead + 1);
 }
 
-static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
+static inline guint32 pgm_txw_lead (pgm_txw_t* t)
 {
-	g_assert (window);
-	return (guint32)(pgm_txw_lead (window) + 1);
+    return t->lead;
 }
 
-static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
+static inline guint32 pgm_txw_trail (pgm_txw_t* t)
 {
-	g_assert (window);
-	return window->trail;
+    return t->trail;
 }
 
-static inline guint32 pgm_txw_trail_atomic (const pgm_txw_t* const window)
+static inline int pgm_txw_push_copy (pgm_txw_t* t, gpointer packet_, guint16 len)
 {
-	g_assert (window);
-	return pgm_atomic_int32_get (&window->trail);
+    gpointer packet = pgm_txw_alloc (t);
+    memcpy (packet, packet_, len);
+    return pgm_txw_push (t, packet, len);
 }
 
-static inline guint32 pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t* skb)
-{
-	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
-	return state->unfolded_checksum;
-}
-
-static inline void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t* skb, const guint32 csum)
-{
-	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
-	state->unfolded_checksum = csum;
-}
-
-static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
-{
-	g_assert (window);
-	return g_queue_is_empty (&window->retransmit_queue);
-}
+int pgm_txw_retransmit_push (pgm_txw_t*, guint32, gboolean, guint);
+int pgm_txw_retransmit_try_peek (pgm_txw_t*, guint32*, gpointer*, guint16*, gboolean*, guint*);
+int pgm_txw_retransmit_try_pop (pgm_txw_t*, guint32*, gpointer*, guint16*, gboolean*, guint*, guint);
+int pgm_txw_retransmit_pop (pgm_txw_t*, guint);
 
 G_END_DECLS
 

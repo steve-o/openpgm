@@ -23,26 +23,27 @@
 
 #include <glib.h>
 
-
-struct rs_t {
-	guint		n, k;		/* RS(n, k) */
-	gpointer	GM;
-	gpointer	RM;
-};
-
-typedef struct rs_t rs_t;
-
-
 G_BEGIN_DECLS
 
 #define PGM_RS_DEFAULT_N	255
 
 
-G_GNUC_INTERNAL void pgm_rs_create (rs_t*, guint, guint);
-G_GNUC_INTERNAL void pgm_rs_destroy (rs_t*);
-G_GNUC_INTERNAL void pgm_rs_encode (rs_t*, const void**, guint, void*, gsize);
-G_GNUC_INTERNAL void pgm_rs_decode_parity_inline (rs_t*, void**, guint*, gsize);
-G_GNUC_INTERNAL void pgm_rs_decode_parity_appended (rs_t*, void**, guint*, gsize);
+int pgm_rs_create (gpointer*, guint, guint);
+int pgm_rs_destroy (gpointer);
+
+int pgm_rs_encode (gpointer, const void**, guint, void*, gsize);
+int pgm_rs_decode_parity_inline (gpointer, void**, guint*, gsize);
+int pgm_rs_decode_parity_appended (gpointer, void**, guint*, gsize);
+
+#if 0
+int pgm_rs_bch_create (gpointer*, int, int);
+int pgm_rs_bch_destroy (gpointer);
+
+int pgm_rs_bch_encode (gpointer, const void**, void**, int);
+int pgm_rs_bch_decode_parity_inline (gpointer, void*, int*, int);
+int pgm_rs_bch_decode_parity_appended (gpointer, void*, int*, int);
+#endif
+
 
 G_END_DECLS
 

@@ -2,7 +2,7 @@
  *
  * Asynchronous queue for receiving packets in a separate managed thread.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,21 +25,17 @@
 #include <unistd.h>
 
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
-#include "pgm/recv.h"
-#include "pgm/net.h"
 #include "pgm/async.h"
-#include "pgm/transport.h"
 
 
 //#define ASYNC_DEBUG
 
 #ifndef ASYNC_DEBUG
-#       define g_trace(...)           while (0)
+#       define g_trace(m,...)           while (0)
 #else
 #include <ctype.h>
-#       define g_trace(...)           g_debug(__VA_ARGS__)
+#       define g_trace(m,...)           g_debug(__VA_ARGS__)
 #endif
 
 
@@ -47,14 +43,6 @@
 
 
 /* global locals */
-
-typedef struct pgm_event_t pgm_event_t;
-
-struct pgm_event_t {
-	gpointer		data;
-	guint			len;
-};
-
 
 /* external: Glib event loop GSource of pgm contiguous data */
 struct pgm_watch_t {
@@ -79,150 +67,91 @@ static GSourceFuncs g_pgm_watch_funcs = {
 };
 
 
-static inline gpointer pgm_event_alloc (pgm_async_t* const) G_GNUC_MALLOC;
-static PGMAsyncError pgm_async_error_from_errno (const gint);
-
-
-static inline
-gpointer
+static inline gpointer
 pgm_event_alloc (
-	pgm_async_t* const	async
+	pgm_async_t*	async
 	)
 {
 	g_return_val_if_fail (async != NULL, NULL);
-	return g_slice_alloc (sizeof(pgm_event_t));
+
+	gpointer p;
+	g_static_mutex_lock (&async->trash_mutex);
+	if (async->trash_event) {
+		p = g_trash_stack_pop (&async->trash_event);
+	} else {
+		p = g_slice_alloc (sizeof(pgm_event_t));
+	}
+	g_static_mutex_unlock (&async->trash_mutex);
+	return p;
 }
 
 /* release event memory for custom async queue dispatch handlers
  */
 
-static inline
-void
+static int
 pgm_event_unref (
-        pgm_async_t* const	async,
-        pgm_event_t* const	event
+        pgm_async_t*	async,
+        pgm_event_t*	event
         )
 {
-	g_return_if_fail (async != NULL);
-	g_return_if_fail (event != NULL);
-	g_slice_free1 (sizeof(pgm_event_t), event);
+        g_static_mutex_lock (&async->trash_mutex);
+        g_trash_stack_push (&async->trash_event, event);
+        g_static_mutex_unlock (&async->trash_mutex);
+        return TRUE;
 }
 
 /* internal receiver thread, sits in a loop processing incoming packets
  */
 
-static
-gpointer
+static gpointer
 pgm_receiver_thread (
 	gpointer	data
 	)
 {
-	g_assert (NULL != data);
-
 	pgm_async_t* async = (pgm_async_t*)data;
 	g_async_queue_ref (async->commit_queue);
 
 /* incoming message buffer */
 	pgm_msgv_t msgv;
-	gsize bytes_read;
-	struct timeval tv;
 
 	do {
-/* blocking read */
-		const PGMIOStatus status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
-		switch (status) {
-		case PGM_IO_STATUS_NORMAL:
+		int len = pgm_transport_recvmsg (async->transport, &msgv, 0 /* blocking */);
+		if (len >= 0)
 		{
-/* queue a copy to receiver */
+/* append to queue */
 			pgm_event_t* event = pgm_event_alloc (async);
-			event->data = bytes_read > 0 ? g_malloc (bytes_read) : NULL;
-			event->len  = bytes_read;
+			event->data = len > 0 ? g_malloc (len) : NULL;
+			event->len  = len;
+
 			gpointer dst = event->data;
-			guint i = 0;
-			while (bytes_read) {
-				const struct pgm_sk_buff_t* skb = msgv.msgv_skb[i++];
-				memcpy (dst, skb->data, skb->len);
-				dst = (char*)dst + skb->len;
-				bytes_read -= skb->len;
+			struct iovec* src = msgv.msgv_iov;
+			while (len)
+			{
+				memcpy (dst, src->iov_base, src->iov_len);
+				dst = (char*)dst + src->iov_len;
+				len -= src->iov_len;
+				src++;
 			}
+
 /* prod pipe on edge */
 			g_async_queue_lock (async->commit_queue);
 			g_async_queue_push_unlocked (async->commit_queue, event);
 			if (g_async_queue_length_unlocked (async->commit_queue) == 1)
-				pgm_notify_send (&async->commit_notify);
+			{
+				const char one = '1';
+				if (1 != write (async->commit_pipe[1], &one, sizeof(one))) {
+					g_critical ("write to pipe failed :(");
+				}
+			}
 			g_async_queue_unlock (async->commit_queue);
-			break;
 		}
-
-		case PGM_IO_STATUS_TIMER_PENDING:
+		else if (ECONNRESET == errno && async->transport->will_close_on_failure)
 		{
-			pgm_transport_get_timer_pending (async->transport, &tv);
-			goto block;
-		}
-
-		case PGM_IO_STATUS_RATE_LIMITED:
-		{
-			pgm_transport_get_rate_remaining (async->transport, &tv);
-		}
-/* fall through */
-		case PGM_IO_STATUS_WOULD_BLOCK:
-block:
-		{
-#ifdef CONFIG_HAVE_POLL
-			const int timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			int n_fds = 3;
-			struct pollfd fds[1+n_fds];
-			memset (fds, 0, sizeof(fds));
-			fds[0].fd = pgm_notify_get_fd (&async->destroy_notify);
-			fds[0].events = POLLIN;
-			if (-1 == pgm_transport_poll_info (async->transport, &fds[1], &n_fds, POLLIN)) {
-				g_trace ("poll_info returned errno=%i",errno);
-				goto cleanup;
-			}
-			const int ready = poll (fds, 1 + n_fds, timeout);
-#else /* HAVE_SELECT */
-			fd_set readfds;
-			int fd = pgm_notify_get_fd (&async->destroy_notify), n_fds = 1 + fd;
-			FD_ZERO(&readfds);
-			FD_SET(fd, &readfds);
-			if (-1 == pgm_transport_select_info (async->transport, &readfds, NULL, &n_fds)) {
-				g_trace ("select_info returned errno=%i",errno);
-				goto cleanup;
-			}
-			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
-#endif
-			if (-1 == ready) {
-				g_trace ("block returned errno=%i",errno);
-				goto cleanup;
-			}
-#ifdef CONFIG_HAVE_POLL
-			if (ready > 0 && fds[0].revents)
-#else
-			if (ready > 0 && FD_ISSET(fd, &readfds))
-#endif
-				goto cleanup;
 			break;
 		}
+	} while (!async->quit);
 
-		case PGM_IO_STATUS_ERROR:
-		case PGM_IO_STATUS_EOF:
-			goto cleanup;
-
-		case PGM_IO_STATUS_RESET:
-			if (async->transport->is_abort_on_reset)
-				goto cleanup;
-			break;
-
-/* TODO: report to user */
-		case PGM_IO_STATUS_FIN:
-			break;
-
-		default:
-			g_assert_not_reached();
-		}
-	} while (!async->is_destroyed);
-
-cleanup:
+/* cleanup */
 	g_async_queue_unref (async->commit_queue);
 	return NULL;
 }
@@ -232,81 +161,138 @@ cleanup:
  * on success, 0 is returned.  on error, -1 is returned, and errno set appropriately.
  * on invalid parameters, -EINVAL is returned.
  */
-
-gboolean
+int
 pgm_async_create (
-	pgm_async_t**		async,
-	pgm_transport_t* const	transport,
-	GError**		error
+	pgm_async_t**		async_,
+	pgm_transport_t*	transport,
+	guint			preallocate
 	)
 {
-	pgm_async_t* new_async;
+	g_return_val_if_fail (async_ != NULL, -EINVAL);
+	g_return_val_if_fail (transport != NULL, -EINVAL);
 
-	g_return_val_if_fail (NULL != async, FALSE);
-	g_return_val_if_fail (NULL != transport, FALSE);
+	int pgm_errno = 0;
+	pgm_async_t* async;
 
-	g_trace ("create (async:%p transport:%p error:%p)",
-		 (gpointer)async, (gpointer)transport, (gpointer)error);
-
-	new_async = g_malloc0 (sizeof(pgm_async_t));
-	new_async->transport = transport;
-	if (0 != pgm_notify_init (&new_async->commit_notify) ||
-	    0 != pgm_notify_init (&new_async->destroy_notify))
+	async = g_malloc0 (sizeof(pgm_async_t));
+	async->transport = transport;
+	async->event_preallocate = preallocate;
+	g_trace ("INFO","preallocate event queue.");
+	for (guint32 i = 0; i < async->event_preallocate; i++)
 	{
-		g_set_error (error,
-			     PGM_ASYNC_ERROR,
-			     pgm_async_error_from_errno (errno),
-			     _("Creating async notification channels: %s"),
-			     g_strerror (errno));
-		g_free (new_async);
-		return FALSE;
+		gpointer event = g_slice_alloc (sizeof(pgm_event_t));
+		g_trash_stack_push (&async->trash_event, event);
 	}
-	new_async->commit_queue = g_async_queue_new();
+	g_static_mutex_init (&async->trash_mutex);
+
+	g_trace ("INFO","create asynchronous commit queue.");
+	async->commit_queue = g_async_queue_new();
+
+	g_trace ("INFO","create commit pipe.");
+	int e = pipe (async->commit_pipe);
+	if (e < 0) {
+		pgm_errno = errno;
+		goto err_destroy;
+	}
+
+	e = pgm_set_nonblocking (async->commit_pipe);
+	if (e) {
+		pgm_errno = errno;
+		goto err_destroy;
+	}
+
 /* setup new thread */
-	new_async->thread = g_thread_create_full (pgm_receiver_thread,
-						  new_async,
-						  0,
-						  TRUE,
-						  TRUE,
-						  G_THREAD_PRIORITY_HIGH,
-						  error);
-	if (NULL == new_async->thread) {
-		g_async_queue_unref (new_async->commit_queue);
-		pgm_notify_destroy (&new_async->commit_notify);
-		g_free (new_async);
-		return FALSE;
+	GError* err;
+	async->thread = g_thread_create_full (pgm_receiver_thread,
+						async,
+						0,
+						TRUE,
+						TRUE,
+						G_THREAD_PRIORITY_HIGH,
+						&err);
+	if (!async->thread) {
+		pgm_errno = errno;
+		g_error ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
+		goto err_destroy;
 	}
 
 /* return new object */
-	*async = new_async;
-	return TRUE;
+	*async_ = async;
+
+	return 0;
+
+err_destroy:
+	if (async->commit_queue) {
+		g_async_queue_unref (async->commit_queue);
+		async->commit_queue = NULL;
+	}
+
+	if (async->commit_pipe[0]) {
+		close (async->commit_pipe[0]);
+		async->commit_pipe[0] = 0;
+	}
+	if (async->commit_pipe[1]) {
+		close (async->commit_pipe[1]);
+		async->commit_pipe[1] = 0;
+	}
+
+	if (async->trash_event) {
+		gpointer* p = NULL;
+		while ( (p = g_trash_stack_pop (&async->trash_event)) )
+		{
+			g_slice_free1 (sizeof(pgm_event_t), p);
+		}
+		g_assert (async->trash_event == NULL);
+	}
+	g_static_mutex_free (&async->trash_mutex);
+
+	g_free (async);
+	async = NULL;
+
+	errno = pgm_errno;
+	return -1;
 }
 
 /* tell async thread to stop, wait for it to stop, then cleanup.
  *
  * on success, 0 is returned.  if async is invalid, -EINVAL is returned.
  */
-
-gboolean
+int
 pgm_async_destroy (
-	pgm_async_t* const	async
+	pgm_async_t*		async
 	)
 {
-	g_return_val_if_fail (NULL != async, FALSE);
-	g_return_val_if_fail (!async->is_destroyed, FALSE);
+	g_return_val_if_fail (async != NULL, -EINVAL);
 
-	async->is_destroyed = TRUE;
-	pgm_notify_send (&async->destroy_notify);
-	if (async->thread)
+	if (async->thread) {
+		async->quit = TRUE;
 		g_thread_join (async->thread);
+	}
+
 	if (async->commit_queue) {
 		g_async_queue_unref (async->commit_queue);
 		async->commit_queue = NULL;
 	}
-	pgm_notify_destroy (&async->destroy_notify);
-	pgm_notify_destroy (&async->commit_notify);
+	if (async->commit_pipe[0]) {
+                close (async->commit_pipe[0]);
+                async->commit_pipe[0] = 0;
+        }
+        if (async->commit_pipe[1]) {
+                close (async->commit_pipe[1]);
+                async->commit_pipe[1] = 0;
+        }
+        if (async->trash_event) {
+                gpointer *p = NULL;
+                while ( (p = g_trash_stack_pop (&async->trash_event)) )
+                {
+                        g_slice_free1 (sizeof(pgm_event_t), p);
+                }
+                g_assert (async->trash_event == NULL);
+        }
+	g_static_mutex_free (&async->trash_mutex);
+
 	g_free (async);
-	return TRUE;
+	return 0;
 }
 
 /* queue to GSource and GMainLoop */
@@ -322,7 +308,7 @@ pgm_async_create_watch (
         pgm_watch_t *watch = (pgm_watch_t*)source;
 
         watch->async = async;
-        watch->pollfd.fd = pgm_async_get_fd (async);
+        watch->pollfd.fd = async->commit_pipe[0];
         watch->pollfd.events = G_IO_IN;
 
         g_source_add_poll (source, &watch->pollfd);
@@ -374,8 +360,7 @@ pgm_async_add_watch (
  * called before event loop poll()
  */
 
-static
-gboolean
+static gboolean
 pgm_src_prepare (
         GSource*                source,
         gint*                   timeout
@@ -394,12 +379,13 @@ pgm_src_prepare (
  * return TRUE if ready to dispatch.
  */
 
-static
-gboolean
+static gboolean
 pgm_src_check (
         GSource*                source
         )
 {
+//      g_trace ("INFO","pgm_src_check");
+
         pgm_watch_t* watch = (pgm_watch_t*)source;
 
         return ( g_async_queue_length(watch->async->commit_queue) > 0 );
@@ -415,15 +401,15 @@ pgm_src_dispatch (
         gpointer                user_data
         )
 {
-        g_trace ("pgm_src_dispatch (source:%p callback:() user-data:%p)",
-		(gpointer)source, user_data);
+        g_trace ("INFO","pgm_src_dispatch");
 
-        const pgm_eventfn_t function = (pgm_eventfn_t)callback;
+        pgm_eventfn_t function = (pgm_eventfn_t)callback;
         pgm_watch_t* watch = (pgm_watch_t*)source;
         pgm_async_t* async = watch->async;
 
 /* empty pipe */
-	pgm_notify_read (&async->commit_notify);
+        char buf;
+        while (1 == read (async->commit_pipe[0], &buf, sizeof(buf)));
 
 /* purge only one message from the asynchronous queue */
 	pgm_event_t* event = g_async_queue_try_pop (async->commit_queue);
@@ -442,129 +428,53 @@ pgm_src_dispatch (
 
 /* synchronous reading from the queue.
  *
- * returns GIOStatus with success, error, again, or eof.
+ * on success, returns number of bytes read.  on error, -1 is returned, and errno set
+ * appropriately.  on invalid parameters, -EINVAL is returned.
  */
 
-GIOStatus
+gssize
 pgm_async_recv (
-	pgm_async_t* const	async,
+	pgm_async_t*		async,
 	gpointer		data,
-	const gsize		len,
-	gsize* const		bytes_read,
-	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	GError**		error
+	gsize			len,
+	int			flags		/* MSG_DONTWAIT for non-blocking */
 	)
 {
-        g_return_val_if_fail (NULL != async, G_IO_STATUS_ERROR);
-	if (len) g_return_val_if_fail (NULL != data, G_IO_STATUS_ERROR);
-
-	g_trace ("pgm_async_recv (async:%p data:%p len:%" G_GSIZE_FORMAT" bytes-read:%p flags:%d error:%p)",
-		(gpointer)async, data, len, (gpointer)bytes_read, flags, (gpointer)error);
+        g_return_val_if_fail (async != NULL, -EINVAL);
+	if (len)
+	        g_return_val_if_fail (len > 0 && data != NULL, -EINVAL);
 
 	pgm_event_t* event;
-	g_async_queue_lock (async->commit_queue);
-	if (g_async_queue_length_unlocked (async->commit_queue) == 0)
+
+	if (flags & MSG_DONTWAIT)
 	{
-		g_async_queue_unlock (async->commit_queue);
-		if (flags & MSG_DONTWAIT || async->is_nonblocking)
-			return G_IO_STATUS_AGAIN;
-#ifdef CONFIG_HAVE_POLL
-		struct pollfd fds[1];
-		int ready;
-		do {
-			memset (fds, 0, sizeof(fds));
-			fds[0].fd = pgm_notify_get_fd (&async->commit_notify);
-			fds[0].events = POLLIN;
-			ready = poll (fds, G_N_ELEMENTS(fds), -1);
-			if (-1 == ready || async->is_destroyed)	/* errno = EINTR */
-				return G_IO_STATUS_ERROR;
-		} while (ready <= 0);
-#else
-		fd_set readfds;
-		int n_fds, ready, fd = pgm_notify_get_fd (&async->commit_notify);
-		do {
-			FD_ZERO(&readfds);
-			FD_SET(fd, &readfds);
-			n_fds = fd + 1;
-			ready = select (n_fds, &readfds, NULL, NULL, NULL);
-			if (-1 == ready || async->is_destroyed)	/* errno = EINTR */
-				return G_IO_STATUS_ERROR;
-		} while (ready <= 0);
-#endif
-		pgm_notify_read (&async->commit_notify);
 		g_async_queue_lock (async->commit_queue);
+		if (g_async_queue_length_unlocked (async->commit_queue) == 0)
+		{
+			g_async_queue_unlock (async->commit_queue);
+			errno = EAGAIN;
+			return -1;
+		}
+
+		event = g_async_queue_pop_unlocked (async->commit_queue);
+		g_async_queue_unlock (async->commit_queue);
 	}
-	event = g_async_queue_pop_unlocked (async->commit_queue);
-	g_async_queue_unlock (async->commit_queue);
+	else
+	{
+		event = g_async_queue_pop (async->commit_queue);
+	}
 
 /* pass data back to callee */
-	if (event->len > len) {
-		*bytes_read = len;
-		memcpy (data, event->data, *bytes_read);
-		g_set_error (error,
-			     PGM_ASYNC_ERROR,
-			     PGM_ASYNC_ERROR_OVERFLOW,
-			     _("Message too large to be stored in buffer."));
-		pgm_event_unref (async, event);
-		return G_IO_STATUS_ERROR;
-	}
+	gsize bytes_read = event->len;
+	if (bytes_read > len) bytes_read = len;
 
-	if (bytes_read)
-		*bytes_read = event->len;
-	memcpy (data, event->data, event->len);
+	memcpy (data, event->data, bytes_read);
 
 /* cleanup */
 	if (event->len) g_free (event->data);
 	pgm_event_unref (async, event);
-	return G_IO_STATUS_NORMAL;
-}
 
-gboolean
-pgm_async_set_nonblocking (
-	pgm_async_t* const	async,
-	const gboolean		nonblocking
-	)
-{
-        g_return_val_if_fail (NULL != async, FALSE);
-	async->is_nonblocking = nonblocking;
-	return TRUE;
-}
-
-GQuark
-pgm_async_error_quark (void)
-{
-        return g_quark_from_static_string ("pgm-async-error-quark");
-}
-
-static
-PGMAsyncError
-pgm_async_error_from_errno (
-	const gint		err_no
-	)
-{
-        switch (err_no) {
-#ifdef EFAULT
-	case EFAULT:
-		return PGM_ASYNC_ERROR_FAULT;
-		break;
-#endif
-
-#ifdef EMFILE
-	case EMFILE:
-		return PGM_ASYNC_ERROR_MFILE;
-		break;
-#endif
-
-#ifdef ENFILE
-	case ENFILE:
-		return PGM_ASYNC_ERROR_NFILE;
-		break;
-#endif
-
-	default :
-                return PGM_ASYNC_ERROR_FAILED;
-                break;
-        }
+	return (gssize)bytes_read;	
 }
 
 /* eof */
