@@ -75,7 +75,7 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 </dd><dt>Pseudo code</dt><dd>
 <pre>
  app: create transport
- fork --------------------------------> /* child process */
+ fork --------------------------------> /`*` child process `*`/
  mon: wait for odata                    for (;;) {
  mon: wait for spm                        app: send "ringo"
                                         }
@@ -111,13 +111,13 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  sim: create transport
  app: create transport
- app: send "ringo"              /* sequence number: #1 */
- app: send "ichigo"                              /* #2 */
- app: send "momo"                                /* #3 */
+ app: send "ringo"              /`*` sequence number: #1 `*`/
+ app: send "ichigo"                              /`*` #2 `*`/
+ app: send "momo"                                /`*` #3 `*`/
  mon: wait for ODATA: #1, "ringo"
  mon: wait for ODATA: #2, "ichigo"
  mon: wait for ODATA: #3, "momo"
- sim: send NAK for #2                 /* ichigo */
+ sim: send NAK for #2                 /`*` ichigo `*`/
  mon: wait for NCF: #2
 </pre>
 </dd></dl>
@@ -132,13 +132,13 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  sim: create transport
  app: create transport
- app: send "ringo"              /* sequence number: #1 */
- app: send "ichigo"                              /* #2 */
- app: send "momo"                                /* #3 */
+ app: send "ringo"              /`*` sequence number: #1 `*`/
+ app: send "ichigo"                              /`*` #2 `*`/
+ app: send "momo"                                /`*` #3 `*`/
  mon: wait for ODATA: #1, "ringo"
  mon: wait for ODATA: #2, "ichigo"
  mon: wait for ODATA: #3, "momo"
- sim: send NAK for #2                 /* ichigo */
+ sim: send NAK for #2                 /`*` ichigo `*`/
  mon: wait for RDATA: #2, "ichigo"
 </pre>
 </dd></dl>
@@ -293,7 +293,7 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  app: create transport
  sim: create fake transport
- sim: sent SPM                        /* set NLA in app */
+ sim: sent SPM                        /`*` set NLA in app `*`/
  sim: send "ringo"
  app: wait for data
  sim: send "ichigo" with sequence number jump 
@@ -314,7 +314,7 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
  app: send "nashi"
  mon: wait for ODATA and save TSI
  sim: create fake transport
- sim: sent SPM                        /* set NLA in app */
+ sim: sent SPM                        /`*` set NLA in app `*`/
  sim: send "ringo"
  app: wait for data
  sim: send "ichigo" with sequence number jump 
@@ -334,7 +334,7 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  app: create transport
  sim: create fake transport
- sim: sent SPM                        /* set NLA in app */
+ sim: sent SPM                        /`*` set NLA in app `*`/
  sim: send "ringo"
  app: wait for data
  sim: send "ichigo" with sequence number jump 
@@ -354,11 +354,11 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  app: create transport
  sim: create fake transport
- sim: sent SPM                        /* set NLA in app */
+ sim: sent SPM                        /`*` set NLA in app `*`/
  sim: send "ringo"
  app: wait for data
  sim: send "ichigo" with sequence number jump 
- fork --------------------------------> /* child process */
+ fork --------------------------------> /`*` child process `*`/
  app: wait for data                     for (;;) {
                                           sim: wait for NAK
                                         }
@@ -375,11 +375,11 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  app: create transport
  sim: create fake transport
- sim: sent SPM                        /* set NLA in app */
+ sim: sent SPM                        /`*` set NLA in app `*`/
  sim: send "ringo"
  app: wait for data
  sim: send "ichigo" with sequence number jump 
- fork --------------------------------> /* child process */
+ fork --------------------------------> /`*` child process `*`/
  app: wait for data                     for (;;) {
                                           sim: wait for NAK
                                           sim: send NCF
@@ -402,13 +402,13 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  sim: create fake transport
  app: create transport
- app: send "ringo"              /* sequence number: #1 */
- app: send "ichigo"                              /* #2 */
- app: send "momo"                                /* #3 */
+ app: send "ringo"              /`*` sequence number: #1 `*`/
+ app: send "ichigo"                              /`*` #2 `*`/
+ app: send "momo"                                /`*` #3 `*`/
  mon: wait for ODATA: #1, "ringo"
  mon: wait for ODATA: #2, "ichigo"
  mon: wait for ODATA: #3, "momo"
- sim: send NAK list for #1, #2, #3               /* all packets */
+ sim: send NAK list for #1, #2, #3               /`*` all packets `*`/
  mon: wait for RDATA: #1, "ringo"
  mon: wait for RDATA: #2, "ichigo"
  mon: wait for RDATA: #3, "momo"
@@ -425,13 +425,13 @@ Test numbers as per the referring section in the PGM draft with alphabetical suf
 <pre>
  sim: create fake transport
  app: create transport
- app: send "ringo"              /* sequence number: #1 */
- app: send "ichigo"                              /* #2 */
- app: send "momo"                                /* #3 */
+ app: send "ringo"              /`*` sequence number: #1 `*`/
+ app: send "ichigo"                              /`*` #2 `*`/
+ app: send "momo"                                /`*` #3 `*`/
  mon: wait for ODATA: #1, "ringo"
  mon: wait for ODATA: #2, "ichigo"
  mon: wait for ODATA: #3, "momo"
- sim: send NAK list for #1, #2, #3               /* all packets */
+ sim: send NAK list for #1, #2, #3               /`*` all packets `*`/
  mon: wait for NCF list: #1, #2, #3
 </pre>
 </dd></dl>

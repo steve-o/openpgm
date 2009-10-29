@@ -23,6 +23,12 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt></td>
 <td>Create a GSI based on MD5 of system host name.</td>
 </tr><tr>
+<td><tt>[OpenPgm2CReferencePgmGsiCreateFromString pgm_gsi_create_from_string()]</tt></td>
+<td>Create a GSI based on MD5 of a text string.</td>
+</tr><tr>
+<td><tt>[OpenPgm2CReferencePgmGsiCreateFromData pgm_gsi_create_from_data()]</tt></td>
+<td>Create a GSI based on MD5 of a data buffer.</td>
+</tr><tr>
 <td><tt>[OpenPgm2CReferencePgmGsiPrint pgm_gsi_print()]</tt></td>
 <td>Display a GSI in human friendly form.</td>
 </tr><tr>
