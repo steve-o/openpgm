@@ -8,12 +8,12 @@ _Function_
 
 int *pgm_transport_create* (
 	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const           transport,
-	[OpenPgmCReferencePgmTGsiT pgm_gsi_t]`*`                       gsi,
+	[OpenPgmCReferencePgmGsiT pgm_gsi_t]`*`                       gsi,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                          sport,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint16 guint16]                          dport,
-	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`             recv_gsr,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                        recv_len,
-	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`             send_gsr
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`         recv_gsr,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                            recv_len,
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`         send_gsr
 	);
 </pre>
 

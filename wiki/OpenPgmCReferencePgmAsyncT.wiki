@@ -16,4 +16,4 @@ Object representing a transport asynchronous receiver.
   * <tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncRecv pgm_async_recv()]</tt><br>
-  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

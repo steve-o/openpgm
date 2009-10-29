@@ -4,7 +4,7 @@
 === Introduction ===
 Warnings and errors in OpenPGM maybe raised via log messages or return status values.
 
-﻿=== Logging ===
+=== Logging ===
 OpenPGM modules log messages through [http://library.gnome.org/devel/glib/stable/glib-Message-Logging.html GLog], providing versatile support for logging messages with different levels of importance.   The following log domains have been defined for the components of OpenPGM.
 
 <table border="1" cellpadding="5" cellspacing="0">

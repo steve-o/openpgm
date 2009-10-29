@@ -1,0 +1,18 @@
+#summary OpenPGM : C Reference : pgm_eventfn_t
+#labels Phase-Implementation
+
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+typedef int (`*`*pgm_eventfn_t*)(gpointer buf, guint len, gpointer user_data);
+</pre>
+
+=== Purpose ===
+Callback function pointer for asynchronous events.
+
+=== See Also ===
+  * <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_add_watch()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_add_watch_full()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

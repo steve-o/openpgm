@@ -9,7 +9,7 @@ _Function_
 int *pgm_create_str_gsi* (
 	[OpenPgmCReferencePgmGsiT pgm_gsi_t]`*`    gsi,
 	const char`*`   str,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize]               length,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize]        length,
 	);
 </pre>
 
@@ -29,7 +29,7 @@ Create a GSI based on MD5 of provided string.
 </tr><td>
 <td><tt>str</tt></td>
 <td>Text string.</td>
-</tr><td>
+</tr><tr>
 <td><tt>length</tt></td>
 <td>Length of <tt>str</tt>, or 0 for NULL terminated string.</td>
 </tr>
@@ -42,7 +42,7 @@ On success, 0 is returned.  If <tt>gsi</tt> is an invalid address, <tt>-EINVAL</
 === Example ===
 {{{
  pgm_gsi_t gsi;
- pgm_create_str_gsi (&gsi, "101 Acacia Avenue", 0);
+ pgm_create_str_gsi (&gsi, "29 Acacia Road", 0);
 }}}
 
 === See Also ===

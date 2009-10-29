@@ -47,7 +47,7 @@ On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 Continually broadcast a SPM packet every 8 seconds.
 
 {{{
- *pgm_transport_set_ambient_spm* (transport, 8192*1000);
+ pgm_transport_set_ambient_spm (transport, 8192*1000);
 }}}
 
 === See Also ===

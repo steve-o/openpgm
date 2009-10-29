@@ -23,6 +23,6 @@ Received messages from a transport can be a populated scatter/gather vector.  AP
 
 === See Also ===
   * <tt>[OpenPgmCReferencePgmTsiT pgm_tsi_t]</tt><br>
-  * <tt>[OpenPgmCReferencePgmRecv pgm_recvmsg()]</tt><br>
-  * <tt>[OpenPgmCReferencePgmRecvMsgv pgm_recvmsgv()]</tt><br>
-  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
+  * <tt>[OpenPgmCReferencePgmTransportRecv pgm_transport_recvmsg()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportRecvMsgv pgm_transport_recvmsgv()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

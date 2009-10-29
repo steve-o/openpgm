@@ -53,4 +53,4 @@ On success, 0 is returned.  On invalid arguments, a critical message is logged a
   * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
   * <tt>[OpenPgmCReferencePgmTransportCreate pgm_transport_create()]</tt><br>
-  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

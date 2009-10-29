@@ -31,7 +31,7 @@ By default SCons is configured to build the debug tree in <tt>./ref/debug</tt> t
  $ scons BUILD=release WITH_NCURSES=false
 </pre>
 
-== Building in OpenSolaris 2008.11 under SCons ==
+== Building in !OpenSolaris 2008.11 under SCons ==
 First install all the C compiler dependencies and Subversion.  Install the library dependencies, primarily GLib.
 <pre>
  SUNWsvn SUNWgcc SUNWgnome-common-devel SUNWgnome-base-libs SUNWlibsoup (IPSnetsnmp)
@@ -144,7 +144,7 @@ To build a release version in <tt>./build/release</tt> use the following:
  $ cd trunk/openpgm/pgm
  $ mkdir -p build/release
  $ cd build/release
- $ cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ../..
+ $ cmake -DCMAKE_BUILD_TYPE=!RelWithDebInfo ../..
  $ make
 </pre>
 
@@ -211,7 +211,7 @@ Checkout the repository as per the [http://code.google.com/p/openpgm/source/chec
 </pre>
 Locate the <tt>FindPkgConfig</tt> module missing from the Etch patch revision.
 <pre>
- $ wget http://ftp.de.debian.org/debian/pool/main/c/cmake/cmake_2.6.0.orig.tar.gz
+ $ wget http://ftp.de.debian.org/debian/pool/main/c/cmake/cmake_2.6.0.orig.tar.gz 
  $ tar xzOf cmake_2.6.0.orig.tar.gz cmake-2.6.0/Modules/FindPkgConfig.cmake > CMake/FindPkgConfig.cmake
 </pre>
 Build.

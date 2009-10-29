@@ -82,4 +82,4 @@ On success, the ID (greater than 0) of the event source.  On invalid arguments, 
   * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
-  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

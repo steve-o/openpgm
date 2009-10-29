@@ -7,9 +7,9 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_create_data_gsi* (
-	[OpenPgmCReferencePgmGsiT pgm_gsi_t]`*`    gsi,
+	[OpenPgmCReferencePgmGsiT pgm_gsi_t]`*`             gsi,
 	const unsigned char`*`   buf,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                length,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gsize gsize]                  length,
 	);
 </pre>
 
@@ -29,7 +29,7 @@ Create a GSI based on MD5 of provided data buffer.
 </tr><td>
 <td><tt>buf</tt></td>
 <td>Data buffer.</td>
-</tr><td>
+</tr><tr>
 <td><tt>length</tt></td>
 <td>Length of <tt>buf</tt>.</td>
 </tr>

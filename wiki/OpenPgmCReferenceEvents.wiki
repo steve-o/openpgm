@@ -37,7 +37,7 @@ When relying on the underlying network transport for event generation the develo
 </tr><tr>
 <td>GLib Event Source</td>
 <td><tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt></td>
-</tr><tr>
+</tr>
 </table>
 
 

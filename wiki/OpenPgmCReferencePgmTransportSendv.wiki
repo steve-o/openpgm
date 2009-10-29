@@ -8,7 +8,7 @@ _Function_
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] *pgm_transport_sendv* (
 	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const      transport,
-	const struct [OpenPgmCReferencePgmIoVec pgm_iovec]`*`     vector,
+	const struct iovec`*`         vector,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                       count,
 	int                         flags,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                    is_one_apdu,
@@ -48,7 +48,7 @@ When calling with <tt>MSG_DONTWAIT|MSG_WAIT_ALL</tt> flags you can call with dif
 </dd><dt><tt>MSG_DONTWAIT|MSG_WAITALL</tt></dt><dd>Enables APDU non-blocking operation; if sending all packets within the APDU would block due to rate limiting, <tt>EAGAIN</tt> is returned.</dd></dl></td>
 </tr><tr>
 <td><tt>is_one_apdu</tt></td>
-<td><tt>vector</tt> is one APDU if set <tt>TRUE</tt>, <tt>vector::iov_base</tt> is one APDU if set <tt>FALSE</tt>.
+<td><tt>vector</tt> is one APDU if set <tt>TRUE</tt>, <tt>vector::iov_base</tt> is one APDU if set <tt>FALSE</tt>.</td>
 </tr>
 </table>
 

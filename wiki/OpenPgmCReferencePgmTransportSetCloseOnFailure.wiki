@@ -36,7 +36,7 @@ On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 
 === Example ===
 {{{
- pgm_transport_set_close_on_failure''' (transport, TRUE);
+ pgm_transport_set_close_on_failure (transport, TRUE);
 }}}
 
 === See Also ===

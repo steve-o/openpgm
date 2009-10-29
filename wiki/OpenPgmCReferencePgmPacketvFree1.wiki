@@ -9,8 +9,8 @@ _Function_
 
 int *pgm_packetv_free1* (
 	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]                       tsdu,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                       can_fragment
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gpointer gpointer]             tsdu,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]             can_fragment
 	);
 </pre>
 

@@ -7,11 +7,11 @@ _Function_
 #include <pgm/pgm.h>
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gssize gssize] *pgm_transport_send_packetv* (
-	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const           transport,
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*` const       transport,
 	const struct iovec`*`          vector,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                            count,
-	int                              flags,
-	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                         is_one_apdu
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                        count,
+	int                          flags,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]                     is_one_apdu
 	);
 </pre>
 
@@ -19,7 +19,7 @@ _Function_
 Send a vector of transmit window buffers as one Application Protocol Data Unit (APDU), or a vector of APDUs to the network.
 
 === Remarks ===
-Network delivery of APDUs can be interspersed with ambient SPM and RDATA packets as necessary.  Vector element pointers must be retrieved from the transmit window via <tt>[[OpenPGM C Reference/pgm_packetv_alloc()|pgm_packetv_alloc()]].</tt>
+Network delivery of APDUs can be interspersed with ambient SPM and RDATA packets as necessary.  Vector element pointers must be retrieved from the transmit window via <tt>[OpenPgmCReferencePgmPacketvAlloc pgm_packetv_alloc()].</tt>
 
 When calling with <tt>MSG_DONTWAIT|MSG_WAIT_ALL</tt> flags you can call with different parameters if <tt>EAGAIN</tt> is returned as non-blocking only occurs at the behest of the defined rate limit.  Individual packets with the APDU are sent blocking mode to ensure delivery of the entire APDU.  It is assumed that sufficient networking testing be deployed such that the application defined rate limit would remove or minimise the chance of blocking to occur at the socket level - it is currently impossible to check whether the underlying network stack could accept all the packets within the provided APDU.
 
@@ -46,7 +46,7 @@ When calling with <tt>MSG_DONTWAIT|MSG_WAIT_ALL</tt> flags you can call with dif
 </dd><dt><tt>MSG_DONTWAIT|MSG_WAITALL</tt></dt><dd>Enables APDU non-blocking operation; if sending all packets within the APDU would block due to rate limiting, <tt>EAGAIN</tt> is returned.</dd></dl></td>
 </tr><tr>
 <td><tt>is_one_apdu</tt></td>
-<td><tt>vector</tt> is one APDU if set <tt>TRUE</tt>, <tt>vector::iov_base</tt> is one APDU if set <tt>FALSE</tt>.
+<td><tt>vector</tt> is one APDU if set <tt>TRUE</tt>, <tt>vector::iov_base</tt> is one APDU if set <tt>FALSE</tt>.</td>
 </tr>
 </table>
 

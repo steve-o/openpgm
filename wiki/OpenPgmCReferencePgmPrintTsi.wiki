@@ -9,11 +9,11 @@ _Function_
 #define PGM_TSISTRLEN (sizeof("000.000.000.000.000.000.00000"))
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_tsi_print* (
-	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi
+	const [OpenPgmCReferencePgmTsiT pgm_tsi_t]`*`    tsi
 	);
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_tsi_print_r* (
-	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi,
+	const [OpenPgmCReferencePgmTsiT pgm_tsi_t]`*`    tsi,
 	char`*`               buf,
 	size_t              bufsize
 	);

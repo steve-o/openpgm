@@ -12,7 +12,7 @@ OpenPGM C programs must link the appropriate library files.
 <tr>
 <td colspan="2"><h3>Communications and Events</h3></td>
 </tr><tr>
-<td><tt>```pkg-config --static --cflags --libs glib-2.0 gthread-2.0`````</tt></td>
+<td><tt>```pkg-config --static --cflags --libs glib-2.0 gthread-2.0```</tt></td>
 <td>Include this for the GLib API.</td>
 </tr><tr>
 <td><tt>-lpgm</tt></td>

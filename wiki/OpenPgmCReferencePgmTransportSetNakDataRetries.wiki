@@ -7,7 +7,7 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_transport_set_nak_data_retries* (
-	[OpenPgm2CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	[OpenPgmCReferencePgmTransportT pgm_transport_t]`*`     transport,
 	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]                cnt
 	);
 </pre>

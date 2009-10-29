@@ -17,6 +17,9 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt></td>
 <td>Object representing a transport asynchronous receiver.</td>
 </tr><tr>
+<td><tt>[OpenPgmCReferencePgmEventFnT pgm_eventfn_t]</tt></td>
+<td>Callback function pointer for asynchronous events.</td>
+</tr><tr>
 <td><tt>[OpenPgmCReferencePgmAsyncCreate pgm_async_create()]</tt></td>
 <td>Create an asynchronous event handler.</td>
 </tr><tr>
@@ -155,7 +158,7 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
 <td>Set timeout for removing a dead peer.</td>
 </tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetRcvBuf　pgm_transport_set_rcvbuf()]</tt></td>
+<td><tt>[OpenPgmCReferencePgmTransportSetRcvBuf pgm_transport_set_rcvbuf()]</tt></td>
 <td>Set receive buffer size.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt></td>

@@ -24,6 +24,7 @@ Retrieve file descriptor for event signalling.
 <tr>
 <td><tt>async</tt></td>
 <td>Asynchronous receiver object.</td>
+</tr>
 </table>
 
 
@@ -37,4 +38,4 @@ On success the file descriptor is returned.  If <tt>async</tt> is invalid, <tt>-
 
 === See Also ===
   * <tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt><br>
-  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

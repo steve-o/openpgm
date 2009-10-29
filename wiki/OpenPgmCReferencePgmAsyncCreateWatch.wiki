@@ -50,4 +50,4 @@ On success, the newly-created GSource.  If <tt>async</tt> is invalid, <tt>NULL</
   * <tt>[OpenPgmCReferencePgmAsyncDestroy pgm_async_destroy()]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt><br>
   * <tt>[OpenPgmCReferencePgmAsyncAddWatch pgm_async_add_watch_full()]</tt><br>
-  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

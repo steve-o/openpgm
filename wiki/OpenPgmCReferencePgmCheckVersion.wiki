@@ -10,13 +10,14 @@ _Function_
 extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_major_version*;
 extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_minor_version*;
 extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_micro_version*;
-
-<strike>const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_check_version*' (</strike>
-	<strike>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      required_major,</strike>
-	<strike>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      required_minor,</strike>
-	<strike>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      required_micro</strike>
-	<strike>);</strike></tt>
 </pre>
+
+<strike><pre>
+const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_check_version*' (
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      required_major,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      required_minor,
+	[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint]      required_micro
+	);</pre></strike>
 
 === Purpose ===
 OpenPGM version information.

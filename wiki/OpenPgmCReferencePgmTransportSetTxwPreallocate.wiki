@@ -44,6 +44,6 @@ On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 }}}
 
 === See Also ===
-  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgmCReferencePgmTransportSetRxwPreallocate pgm_transport_set_rxw_preallocate()]</tt>
 

@@ -17,7 +17,7 @@ struct pgm_gsi_t {
 A globally unique source identifier (GSI).
 
 === See Also ===
-  * <tt>[OpenPgm2CReferencePgmTsiT pgm_tsi_t]</tt><br>
-  * <tt>[OpenPgm2CReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt><br>
-  * <tt>[OpenPgm2CReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt>
-  * [OpenPgm2CReferenceTransport Transport] in OpenPGM C Reference.
+  * <tt>[OpenPgmCReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmCreateIPv4Gsi pgm_create_ipv4_gsi()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmCreateMD5Gsi pgm_create_md5_gsi()]</tt>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

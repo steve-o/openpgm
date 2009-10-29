@@ -44,6 +44,6 @@ On success, returns 0.  On invalid parameter, returns <tt>-EINVAL</tt>.
 }}}
 
 === See Also ===
-  * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
-  * <tt>[OpenPgm2CReferencePgmTransportSetTxwPreallocate pgm_transport_set_txw_preallocate()]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgmCReferencePgmTransportSetTxwPreallocate pgm_transport_set_txw_preallocate()]</tt><br>
   * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.

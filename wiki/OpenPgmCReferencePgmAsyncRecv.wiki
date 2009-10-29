@@ -60,6 +60,6 @@ Receive an APDU up to 4096 bytes in length.
 
 === See Also ===
   * <tt>[OpenPgmCReferencePgmAsyncT pgm_async_t]</tt><br>
-  * <tt>[OpenPgmCReferencePgmRecv pgm_recv()]</tt><br>
-  * [OpenPgmCReferenceAsynchronousReceiver Asynchronous Receiver] in OpenPGM C Reference.
+  * <tt>[OpenPgmCReferencePgmTransportRecv pgm_transport_recv()]</tt><br>
+  * [OpenPgmCReferenceTransport Transport] in OpenPGM C Reference.
 
