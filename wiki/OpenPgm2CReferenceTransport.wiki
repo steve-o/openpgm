@@ -102,6 +102,9 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm2CReferencePgmTransportGetRateRemaining pgm_transport_get_rate_remaining()]</tt></td>
 <td>Get remaining time slice of the send rate limit engine.</td>
 </tr><tr>
+<td><tt>[OpenPgm2CReferencePgmTransportGetTimerPending pgm_transport_get_timer_pending()]</tt></td>
+<td>Get time before next timer event.</td>
+</tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt></td>
 <td>Set parameters suitable for feeding into <tt>select()</tt>.</td>
 </tr><tr>

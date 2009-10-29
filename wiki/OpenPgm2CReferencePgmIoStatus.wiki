@@ -7,12 +7,14 @@ _Type_
 #include <pgm/pgm.h>
 
 enum PGMIOStatus {
-	PGM_IO_STATUS_ERROR,     /`*` an error occurred `*`/
-	PGM_IO_STATUS_NORMAL,    /`*` success `*`/
-	PGM_IO_STATUS_RESET,     /`*` session reset `*`/
-	PGM_IO_STATUS_FIN,       /`*` session finished `*`/
-	PGM_IO_STATUS_AGAIN,     /`*` resource temporarily unavailable `*`/
-	PGM_IO_STATUS_AGAIN2,    /`*` would-block on rate limit, check timer `*`/
+	PGM_IO_STATUS_ERROR,           /`*` an error occurred `*`/
+	PGM_IO_STATUS_NORMAL,          /`*` success `*`/
+	PGM_IO_STATUS_RESET,           /`*` session reset `*`/
+	PGM_IO_STATUS_FIN,             /`*` session finished `*`/
+	PGM_IO_STATUS_EOF,             /`*` transport closed `*`/
+	PGM_IO_STATUS_WOULD_BLOCK,     /`*` resource temporarily unavailable `*`/
+	PGM_IO_STATUS_RATE_LIMITED,    /`*` would-block on rate limit, check timer `*`/
+	PGM_IO_STATUS_TIMER_PENDING,   /`*` would-block with pending timer `*`/
 };
 </pre>
 

@@ -26,7 +26,7 @@ The PGM protocol is bi-directional, even send-only applications need to process 
 
 Memory is returned to the receive window on the next call or transport destruction.
 
-Unrecoverable data loss will cause the function to immediately return with <tt>PGM_IO_STATUS_RESET</tt>, setting flags to <tt>MSG_ERR_QUEUE</tt> will return a populated <tt>msgv</tt> with an error skbuff detailing the error.  If <tt>[OpenPgm2CReferencePgmTransportSetAbortOnReset pgm_transport_set_abort_on_reset()]</tt> is called with <tt>FALSE</tt> (the default mode) processing can continue with subsequent calls to <tt>pgm_recv()</tt>, if <tt>TRUE</tt> then the transport will return <tt>PGM_IO_STATUS_ERROR</tt> until destroyed.
+Unrecoverable data loss will cause the function to immediately return with <tt>PGM_IO_STATUS_RESET</tt>, setting flags to <tt>MSG_ERR_QUEUE</tt> will return a populated <tt>msgv</tt> with an error skbuff detailing the error.  If <tt>[OpenPgm2CReferencePgmTransportSetAbortOnReset pgm_transport_set_abort_on_reset()]</tt> is called with <tt>FALSE</tt> (the default mode) processing can continue with subsequent calls to <tt>pgm_recv()</tt>, if <tt>TRUE</tt> then the transport will return <tt>PGM_IO_STATUS_RESET</tt> until destroyed.
 
 It is valid to send and receive zero length PGM packets.
 
@@ -62,7 +62,7 @@ It is valid to send and receive zero length PGM packets.
 </table>
 
 === Return Value ===
-On success, returns <tt>PGM_IO_STATUS_NORMAL</tt>, on error returns <tt>PGM_IO_STATUS_ERROR</tt>, on reset due to unrecoverable data loss, returns <tt>PGM_IO_STATUS_RESET</tt>.  If the transport is marked non-blocking then <tt>PGM_IO_STATUS_AGAIN</tt> is returned if the operation would block, if the block would be caused by the rate limiting engine then <tt>PGM_IO_STATUS_AGAIN2</tt> is returned instead.
+On success, returns <tt>PGM_IO_STATUS_NORMAL</tt>, on error returns <tt>PGM_IO_STATUS_ERROR</tt>, on reset due to unrecoverable data loss, returns <tt>PGM_IO_STATUS_RESET</tt>.  If the transport is marked non-blocking then <tt>PGM_IO_STATUS_WOULD_BLOCK</tt> is returned if the operation would block, if the block would be caused by the rate limiting engine then <tt>PGM_IO_STATUS_RATE_LIMITED</tt> is returned instead.  If no data is available but a pending timer is running <tt>PGM_IO_STATUS_TIMER_PENDING</tt> is returned.
 
 === Example ===
 Read a maximum size vector from a transport.
@@ -103,6 +103,7 @@ Take ownership of a PGM SKB by incrementing the reference count with <tt>[OpenPg
 }}}
 
 === See Also ===
+  * <tt>[OpenPgm2CReferencePgmIoStatus PGMIOStatus]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt><br>
   * <tt>[OpenPgm2CReferencePgmRecv pgm_recv()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmTransportCreate pgm_transport_create()]</tt><br>

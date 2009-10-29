@@ -26,7 +26,7 @@ Create a GSI based on MD5 of provided data buffer.
 <tr>
 <td><tt>gsi</tt></td>
 <td>A pointer to the GSI provided by the application that the function will fill.</td>
-</tr><td>
+</tr><tr>
 <td><tt>buf</tt></td>
 <td>Data buffer.</td>
 </tr><tr>
