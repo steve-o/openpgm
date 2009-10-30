@@ -70,9 +70,14 @@ static pgm_transport_t* g_transport = NULL;
 static GThread* g_thread = NULL;
 static GMainLoop* g_loop = NULL;
 static gboolean g_quit;
+#ifdef G_OS_UNIX
 static int g_quit_pipe[2];
-
 static void on_signal (int, gpointer);
+#else
+static HANDLE g_quit_event;
+static BOOL on_console_ctrl (DWORD);
+#endif
+
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
@@ -183,7 +188,8 @@ main (
 #ifdef G_OS_UNIX
 	pipe (g_quit_pipe);
 #else
-	_pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
+	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif
 
 /* setup signal handlers */
@@ -191,8 +197,10 @@ main (
 #ifdef SIGHUP
 	signal (SIGHUP,  SIG_IGN);
 #endif
+#ifdef G_OS_UNIX
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#endif
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -206,11 +214,17 @@ main (
 
 /* cleanup */
 	g_quit = TRUE;
+#ifdef G_OS_UNIX
 	const char one = '1';
 	write (g_quit_pipe[1], &one, sizeof(one));
 	g_thread_join (g_thread);
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
+#else
+	SetEvent (g_quit_event);
+	g_thread_join (g_thread);
+	CloseHandle (g_quit_event);
+#endif
 
 	g_main_loop_unref(g_loop);
 	g_loop = NULL;
@@ -237,6 +251,7 @@ main (
 	return EXIT_SUCCESS;
 }
 
+#ifdef G_OS_UNIX
 static
 void
 on_signal (
@@ -249,6 +264,18 @@ on_signal (
 		   signum, user_data);
 	g_main_loop_quit (loop);
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	g_main_loop_quit (g_loop);
+	return TRUE;
+}
+#endif
 
 static
 gboolean
@@ -398,9 +425,23 @@ receiver_thread (
 	int timeout;
 	int n_fds = 2;
 	struct pollfd fds[ 1 + n_fds ];
-#else
+#elif defined(G_OS_UNIX) /* HAVE_SELECT */
 	int n_fds;
 	fd_set readfds;
+#else /* G_OS_WIN32 */
+	int n_handles = 3;
+	HANDLE waitHandles[ n_handles ];
+	DWORD timeout, dwEvents;
+	WSAEVENT recvEvent, pendingEvent;
+
+	recvEvent = WSACreateEvent ();
+	WSAEventSelect (g_transport->recv_sock, recvEvent, FD_READ);
+	pendingEvent = WSACreateEvent ();
+	WSAEventSelect (pgm_notify_get_fd (&g_transport->pending_notify), pendingEvent, FD_READ);
+
+	waitHandles[0] = g_quit_event;
+	waitHandles[1] = recvEvent;
+	waitHandles[2] = pendingEvent;
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
@@ -438,12 +479,20 @@ block:
 			fds[0].events = POLLIN;
 			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
-#else /* HAVE_SELECT */
+#elif defined(G_OS_UNIX) /* HAVE_SELECT */
 			FD_ZERO(&readfds);
 			FD_SET(g_quit_pipe[0], &readfds);
 			n_fds = g_quit_pipe[0] + 1;
 			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
 			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
+#else /* G_OS_WIN32 */
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, timeout));
+			switch (dwEvents) {
+			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			default: break;
+			}
 #endif /* !CONFIG_HAVE_EPOLL */
 			break;
 
@@ -459,6 +508,9 @@ block:
 
 #ifdef CONFIG_HAVE_EPOLL
 	close (efd);
+#elif defined(G_OS_WIN32)
+	WSACloseEvent (recvEvent);
+	WSACloseEvent (pendingEvent);
 #endif
 	return NULL;
 }
