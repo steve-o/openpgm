@@ -185,12 +185,6 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 	g_quit = FALSE;
-#ifdef G_OS_UNIX
-	pipe (g_quit_pipe);
-#else
-	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
-	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
-#endif
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
@@ -198,8 +192,12 @@ main (
 	signal (SIGHUP,  SIG_IGN);
 #endif
 #ifdef G_OS_UNIX
+	pipe (g_quit_pipe);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#else
+	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif
 
 /* delayed startup */
@@ -275,7 +273,7 @@ on_console_ctrl (
 	g_main_loop_quit (g_loop);
 	return TRUE;
 }
-#endif
+#endif /* !G_OS_UNIX */
 
 static
 gboolean
@@ -435,9 +433,9 @@ receiver_thread (
 	WSAEVENT recvEvent, pendingEvent;
 
 	recvEvent = WSACreateEvent ();
-	WSAEventSelect (g_transport->recv_sock, recvEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_recv_fd (g_transport), recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_notify_get_fd (&g_transport->pending_notify), pendingEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_pending_fd (g_transport), pendingEvent, FD_READ);
 
 	waitHandles[0] = g_quit_event;
 	waitHandles[1] = recvEvent;

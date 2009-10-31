@@ -101,9 +101,14 @@ static GMainLoop* g_loop = NULL;
 static GThread* g_sender_thread = NULL;
 static GThread* g_receiver_thread = NULL;
 static gboolean g_quit;
+#ifdef G_OS_UNIX
 static int g_quit_pipe[2];
-
 static void on_signal (int, gpointer);
+#else
+static HANDLE g_quit_event;
+static BOOL on_console_ctrl (DWORD);
+#endif
+
 static gboolean on_startup (gpointer);
 static gboolean on_shutdown (gpointer);
 static gboolean on_mark (gpointer);
@@ -217,19 +222,20 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 	g_quit = FALSE;
-#ifdef G_OS_UNIX
-	pipe (g_quit_pipe);
-#else
-	_pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
-#endif
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-#ifdef G_OS_WIN32
+#ifdef SIGHUP
 	signal (SIGHUP,  SIG_IGN);
 #endif
+#ifdef G_OS_UNIX
+	pipe (g_quit_pipe);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#else
+	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+#endif /* !G_OS_UNIX */
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -248,11 +254,20 @@ main (
 
 /* cleanup */
 	g_quit = TRUE;
+#ifdef G_OS_UNIX
 	const char one = '1';
 	write (g_quit_pipe[1], &one, sizeof(one));
 	if (g_send_mode)
 		g_thread_join (g_sender_thread);
 	g_thread_join (g_receiver_thread);
+	close (g_quit_pipe[0]);
+	close (g_quit_pipe[1]);
+#else
+	SetEvent (g_quit_event);
+	g_thread_join (g_thread);
+	CloseHandle (g_quit_event);
+#endif
+
 	g_main_loop_unref (g_loop);
 	g_loop = NULL;
 
@@ -279,6 +294,7 @@ main (
 	return EXIT_SUCCESS;
 }
 
+#ifdef G_OS_UNIX
 static
 void
 on_signal (
@@ -291,6 +307,18 @@ on_signal (
 		   signum, user_data);
 	g_main_loop_quit (loop);
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	g_main_loop_quit (g_loop);
+	return TRUE;
+}
+#endif /* !G_OS_UNIX */
 
 static
 gboolean

@@ -59,9 +59,15 @@ static int g_sqns = 100;
 
 static pgm_transport_t* g_transport = NULL;
 static gboolean g_quit;
-static int g_quit_pipe[2];
 
+#ifdef G_OS_UNIX
+static int g_quit_pipe[2];
 static void on_signal (int);
+#else
+static HANDLE g_quit_event;
+static BOOL on_console_ctrl (DWORD);
+#endif
+
 static gboolean on_startup (void);
 
 static int on_data (gpointer, guint, pgm_tsi_t*);
@@ -108,19 +114,20 @@ main (
 	pgm_init ();
 
 	g_quit = FALSE;
-#ifdef G_OS_UNIX
-	pipe (g_quit_pipe);
-#else
-	_pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
-#endif
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
-	signal(SIGINT,  on_signal);
-	signal(SIGTERM, on_signal);
 #ifdef SIGHUP
 	signal(SIGHUP,  SIG_IGN);
 #endif
+#ifdef G_OS_UNIX
+	pipe (g_quit_pipe);
+	signal(SIGINT,  on_signal);
+	signal(SIGTERM, on_signal);
+#else
+	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+#endif /* !G_OS_UNIX */
 
 	if (!on_startup()) {
 		g_error ("startup failed");
@@ -128,10 +135,26 @@ main (
 	}
 
 /* dispatch loop */
+#ifdef G_OS_UNIX
+	int fds;
+	fd_set readfds;
+#else
+	int n_handles = 3;
+	HANDLE waitHandles[ n_handles ];
+	DWORD dwTimeout, dwEvents;
+	WSAEVENT recvEvent, pendingEvent;
+
+	recvEvent = WSACreateEvent ();
+	WSAEventSelect (pgm_transport_get_recv_fd (g_transport), recvEvent, FD_READ);
+	pendingEvent = WSACreateEvent ();
+	WSAEventSelect (pgm_transport_get_pending_fd (g_transport), pendingEvent, FD_READ);
+
+	waitHandles[0] = g_quit_event;
+	waitHandles[1] = recvEvent;
+	waitHandles[2] = pendingEvent;
+#endif /* !G_OS_UNIX */
 	g_message ("entering PGM message loop ... ");
 	do {
-		int fds;
-		fd_set readfds;
 		struct timeval tv;
 		char buffer[4096];
 		gsize len;
@@ -160,11 +183,21 @@ main (
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
+#ifdef G_OS_UNIX
 			fds = g_quit_pipe[0] + 1;
 			FD_ZERO(&readfds);
 			FD_SET(g_quit_pipe[0], &readfds);
 			pgm_transport_select_info (g_transport, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
+#else
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout));
+			switch (dwEvents) {
+			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			default: break;
+			}
+#endif /* !G_OS_UNIX */
 			break;
 
 		default:
@@ -180,8 +213,14 @@ block:
 	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
+#ifdef G_OS_UNIX
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
+#else
+	WSACloseEvent (recvEvent);
+	WSACloseEvent (pendingEvent);
+	CloseHandle (g_quit_event);
+#endif /* !G_OS_UNIX */
 
 	if (g_transport) {
 		g_message ("destroying transport.");
@@ -196,7 +235,9 @@ block:
 	return EXIT_SUCCESS;
 }
 
-static void
+#ifdef G_OS_UNIX
+static
+void
 on_signal (
 	int		signum
 	)
@@ -206,8 +247,21 @@ on_signal (
 	const char one = '1';
 	write (g_quit_pipe[1], &one, sizeof(one));
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	SetEvent (g_quit_event);
+	return TRUE;
+}
+#endif /* !G_OS_UNIX */
 
-static gboolean
+static
+gboolean
 on_startup (void)
 {
 	struct pgm_transport_info_t* res = NULL;
@@ -272,7 +326,8 @@ on_startup (void)
 	return TRUE;
 }
 
-static int
+static
+int
 on_data (
 	gpointer	data,
 	guint		len,
