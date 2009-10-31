@@ -60,7 +60,12 @@ static int g_sqns = 100;
 static pgm_transport_t* g_transport = NULL;
 static gboolean g_quit = FALSE;
 
+#ifdef G_OS_UNIX
 static void on_signal (int);
+#else
+static BOOL on_console_ctrl (DWORD);
+#endif
+
 static gboolean on_startup (void);
 
 static int on_data (gpointer, guint, pgm_tsi_t*);
@@ -108,10 +113,14 @@ main (
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
+#ifdef SIGHUP
+	signal(SIGHUP,  SIG_IGN);
+#endif
+#ifdef G_OS_UNIX
 	signal(SIGINT,  on_signal);
 	signal(SIGTERM, on_signal);
-#ifdef G_OS_UNIX
-	signal(SIGHUP,  SIG_IGN);
+#else
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif
 
 	on_startup();
@@ -157,6 +166,7 @@ main (
 	return EXIT_SUCCESS;
 }
 
+#ifdef G_OS_UNIX
 static void
 on_signal (
 	int		signum
@@ -165,6 +175,18 @@ on_signal (
 	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	g_main_loop_quit (g_loop);
+	return TRUE;
+}
+#endif /* !G_OS_UNIX */
 
 static gboolean
 on_startup (void)

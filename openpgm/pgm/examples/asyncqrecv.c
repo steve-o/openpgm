@@ -61,7 +61,12 @@ static int g_sqns = 100;
 static pgm_transport_t* g_transport = NULL;
 static GMainLoop* g_loop = NULL;
 
+#ifdef G_OS_UNIX
 static void on_signal (int, gpointer);
+#else
+static BOOL on_console_ctrl (DWORD);
+#endif
+
 static gboolean on_startup (void);
 
 static int on_data (gpointer, guint, gpointer);
@@ -118,8 +123,12 @@ main (
 #ifdef SIGHUP
 	signal (SIGHUP,  SIG_IGN);
 #endif
+#ifdef G_OS_UNIX
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#else
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+#endif /* !G_OS_UNIX */
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -145,6 +154,7 @@ main (
 	return EXIT_SUCCESS;
 }
 
+#ifdef G_OS_UNIX
 static
 void
 on_signal (
@@ -157,6 +167,18 @@ on_signal (
 		   signum, user_data);
 	g_main_loop_quit (loop);
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	g_main_loop_quit (g_loop);
+	return TRUE;
+}
+#endif /* !G_OS_UNIX */
 
 static
 gboolean
