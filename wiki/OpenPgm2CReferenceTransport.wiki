@@ -105,6 +105,18 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm2CReferencePgmTransportGetTimerPending pgm_transport_get_timer_pending()]</tt></td>
 <td>Get time before next timer event.</td>
 </tr><tr>
+<td><tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_recv_fd()]</tt></td>
+<td>Get receive event notification file descriptor.</td>
+</tr><tr>
+<td><tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_pending_fd()]</tt></td>
+<td>Get pending data event notification file descriptor.</td>
+</tr><tr>
+<td><tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_repair_fd()]</tt></td>
+<td>Get repair event notification file descriptor.</td>
+</tr><tr>
+<td><tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_send_fd()]</tt></td>
+<td>Get send event notification file descriptor.</td>
+</tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt></td>
 <td>Set parameters suitable for feeding into <tt>select()</tt>.</td>
 </tr><tr>
