@@ -377,6 +377,24 @@ static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean
 	max_tsdu -= sizeof (guint16);
     return max_tsdu;
 }
+
+static inline int pgm_transport_get_recv_fd (pgm_transport_t* transport)
+{
+	return transport->recv_sock;
+}
+static inline int pgm_transport_get_pending_fd (pgm_transport_t* transport)
+{
+	return pgm_notify_get_fd (&transport->pending_notify);
+}
+static inline int pgm_transport_get_repair_fd (pgm_transport_t* transport)
+{
+	return pgm_notify_get_fd (&transport->rdata_notify);
+}
+static inline int pgm_transport_get_send_fd (pgm_transport_t* transport)
+{
+	return transport->send_sock;
+}
+
 gboolean pgm_transport_get_timer_pending (pgm_transport_t* const, struct timeval* const);
 gboolean pgm_transport_get_rate_remaining (pgm_transport_t* const, struct timeval* const);
 int pgm_transport_select_info (pgm_transport_t* const, fd_set* const, fd_set* const, int* const);

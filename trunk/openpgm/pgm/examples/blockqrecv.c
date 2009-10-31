@@ -60,7 +60,12 @@ static int g_sqns = 100;
 static pgm_transport_t* g_transport = NULL;
 static gboolean g_quit = FALSE;
 
+#ifdef G_OS_UNIX
 static void on_signal (int);
+#else
+static BOOL on_console_ctrl (DWORD);
+#endif
+
 static gboolean on_startup (void);
 
 static int on_data (gpointer, guint, gpointer);
@@ -108,10 +113,14 @@ main (
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
+#ifdef SIGHUP
+	signal(SIGHUP,  SIG_IGN);
+#endif
+#ifdef G_OS_UNIX
 	signal(SIGINT,  on_signal);
 	signal(SIGTERM, on_signal);
-#ifdef G_OS_UNIX
-	signal(SIGHUP,  SIG_IGN);
+#else
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif
 
 	if (!on_startup()) {
@@ -163,7 +172,9 @@ main (
 	return EXIT_SUCCESS;
 }
 
-static void
+#ifdef G_OS_UNIX
+static
+void
 on_signal (
 	int		signum
 	)
@@ -171,8 +182,21 @@ on_signal (
 	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	g_main_loop_quit (g_loop);
+	return TRUE;
+}
+#endif /* !G_OS_UNIX */
 
-static gboolean
+static
+gboolean
 on_startup (void)
 {
 	struct pgm_transport_info_t* res = NULL;
@@ -237,7 +261,8 @@ on_startup (void)
 	return TRUE;
 }
 
-static int
+static
+int
 on_data (
 	gpointer	data,
 	guint		len,
