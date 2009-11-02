@@ -174,7 +174,7 @@ on_console_ctrl (
 	DWORD		dwCtrlType
 	)
 {
-	g_message ("on_console_ctrl (dwCtrlType:%" G_GUINT32_FORMAT ")", dwCtrlType);
+	g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
 	g_main_loop_quit (g_loop);
 	return TRUE;
 }
