@@ -19,8 +19,8 @@ In order to accelerate the development of OpenPGM and provide a proven cross pla
 OpenPGM does not provide PGM default parameters, this is necessary to introduce that the parameters need tuning to the destination environment.  With very high speed messaging, which means from 100,000 to millions of packets-per-second (pps), it is not practical to have a reliability buffer many seconds in length.  Conversely low data rate messaging, such as system monitoring, it is superfluous trying to ensure microsecond latencies. 
 
 
-= "Advance with Data" only =
-The transmit window only advances with data.  This means the entire window size of memory is permanently in use.  With an "Advance with Time" scheme in quiet period the window will be flushed out freeing memory for the application.
+= "Advance with Time" only =
+The transmit window advances with time but with a fixed window size, i.e. <tt>TXW_BYTES</tt> bytes of data.  "Advanced with Data" as per the specification means new transmissions are halted until no NAKs have been seen for </tt>TXW_ADV_IVL</tt> seconds.
 
 
 = No Adaptive NAK Implosion =
@@ -33,7 +33,7 @@ OpenPGM does include rate regulation using a leaky bucket scheme.
 
 
 = No RDMA Support =
-New technologies like 10 GigE and InfiniBand provide user-space transports through the RDMA protocol.  This alleviates the biggest performance problem of system call overhead.
+New technologies like 10 GigE and !InfiniBand provide user-space transports through the RDMA protocol.  This alleviates the biggest performance problem of system call overhead.
 
 Alternatives to RDMA are more invasive to the operating environment such as multi-packet variants of <tt>sendmsg()</tt> and <tt>recvmsg()</tt>, and simply moving the core PGM logic inside kernel space as part of the core networking set.  Both still need context switches and do not scale well on the faster networking fabrics.
 

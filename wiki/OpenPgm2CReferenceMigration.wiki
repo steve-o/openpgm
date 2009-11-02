@@ -82,8 +82,8 @@ Improved error reporting means that detailed error messages are available on inv
 == Transport ==
 === Summary ===
   * Update transport create and bind functions with <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters.
-  * Update pgm_transport_recv calls with shortened form, <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters, and <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return values.
-  * Update transport parameter setters to check for [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] return values instead of int based ones.
+  * <tt>Update pgm_transport_recv</tt> calls with shortened name version, <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters, and <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return values.
+  * Update transport parameter setters to check for [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] return values instead of <tt>int</tt> based ones.
   * Non-blocking flag <tt>MSG_DONTWAIT</tt> needs to be replaced with transport wide <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> for support on Windows platforms.
   * Remove setters for transmit or receive window pre-allocation sizes.
 
@@ -175,7 +175,7 @@ Version 2.0 introduces more detailed error reporting on network and threading op
 === Details ===
 Send and receive zero-copy handling has been consolidating into to using new PGM variants of Linux SKBs.  Memory is managed system wide by the GLib slab allocator instead of per transport.
 
-*Example send for version 1.0.*
+*Example zero-copy send for version 1.0.*
 {{{
  const char src[] = "i am not a string";
  gpointer data;
@@ -188,7 +188,7 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
  vector[0].iov_len = sizeof(src);
  bytes_sent = pgm_transport_send_packetv (transport, vector, G_N_ELEMENTS(vector), 0, TRUE);
 }}}
-*Updated example for version 2.0.*
+*Updated zero-copy send example for version 2.0.*
 {{{
  const char src[] = "i am not a string";
  gsize bytes_sent;
@@ -196,11 +196,9 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
  
  skb = pgm_alloc_skb (1500);
  memcpy (pgm_skb_put (skb, sizeof(src)), src, sizeof(src));
- vector[0].iov_base = skb;
- vector[0].iov_len = skb->len;
- pgm_send_skbv (transport, vector, G_N_ELEMENTS(vector), &bytes_sent, TRUE);
+ pgm_send_skbv (transport, &skb, 1, &bytes_sent, TRUE);
 }}}
-*Example zero-copy send for version 1.0.*
+*Example zero-copy receive for version 1.0.*
 {{{
  pgm_msgv_t msgv[10], *pmsgv = msgv;
  gsize len;
@@ -213,7 +211,7 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
    pmsgv++;
  }
 }}}
-*Update zero-copy send example for version 2.0.*
+*Update zero-copy receive example for version 2.0.*
 {{{
  pgm_msgv_t msgv[10], *pmsgv = msgv;
  gsize len = 0;
@@ -222,19 +220,19 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
  while (len) {
    g_message ("recv: %s from %d",
               pmsgv->msgv_skb[0]->data,
-              pgm_tsi_print (pmsgv->msgv_skb[0]->len));
+              pgm_tsi_print (pmsgv->msgv_skb[0]->tsi));
    pmsgv++;
  }
 }}}
 
 == Monitoring and Administration ==
 === Summary ===
-  * Update calls to <tt>[OpenPgm2C ReferencePgmHttpInit pgm_http_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
-  * Update calls to <tt>[OpenPgm2C ReferencePgmSnmpInit pgm_snmp_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
 
 
 === Details ===
-Version 2.0 introduces more detailed error reporting on network operations so async creation and recv calls include optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> return values.
+Version 2.0 introduces more detailed error reporting on network operations so asynchronous creation and receive calls include optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> return values.
 
 
 *Version 1.0 code example.*
