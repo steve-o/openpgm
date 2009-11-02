@@ -1,4 +1,4 @@
-#summary Whitepapers and research documents on the PGM protocol.
+﻿#summary Whitepapers and research documents on the PGM protocol.
 #labels Featured,Phase-Design
 
   * RFC 3208 - PGM Reliable Transport Protocol Specification
@@ -162,3 +162,13 @@ http://pages.cs.wisc.edu/~suman/pubs/cs-tr-4252.ps.gz
 http://www.isoc.org/isoc/conferences/ndss/2000/proceedings/028.pdf
 
 http://www.isoc.org/isoc/conferences/ndss/2000/proceedings/slides/04.ppt
+
+  * Recovery Performance of PGM with Redundancy Estimation for Proactive FEC
+http://www.cs.purdue.edu/research/technical_reports/2003/TR%2003-019.pdf
+
+  * PGM-based reliable multicast data dissemination in satellite IP networks
+http://ala.isti.cnr.it/atti/ISWCS05/iwssc05/pdf/FS3-3.pdf
+
+  * DyRAM : a Reliable Multicast Protocol
+http://lara.inist.fr/bitstream/2332/822/1/LIP-RR2003-05.pdf
+
