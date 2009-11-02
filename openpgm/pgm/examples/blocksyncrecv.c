@@ -182,8 +182,8 @@ on_console_ctrl (
 	DWORD		dwCtrlType
 	)
 {
-	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
-	g_main_loop_quit (g_loop);
+	g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
+	g_quit = TRUE;
 	return TRUE;
 }
 #endif /* !G_OS_UNIX */

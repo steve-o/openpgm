@@ -269,7 +269,7 @@ on_console_ctrl (
 	DWORD		dwCtrlType
 	)
 {
-	g_message ("on_console_ctrl (dwCtrlType:%I32d)", dwCtrlType);
+	g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
 	g_main_loop_quit (g_loop);
 	return TRUE;
 }
@@ -485,7 +485,7 @@ block:
 			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
 #else /* G_OS_WIN32 */
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, timeout));
+			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, timeout);
 			switch (dwEvents) {
 			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
 			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
