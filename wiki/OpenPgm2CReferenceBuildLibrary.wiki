@@ -61,7 +61,7 @@ To build the release version in <tt>./ref/release</tt> use the following:
  $ scons -f SConstruct.Solaris BUILD=release
 </pre>
 
-=== Cross-compiling in Ubuntu 9.04 for Win32 under SCons and MinGW ===
+=== Cross-compiling in Ubuntu 9.04 or 9.10 for Win32 under SCons and MinGW ===
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>
  $ sudo apt-get install build-essential scons subversion mingw32
@@ -82,7 +82,7 @@ Update the <tt>pkgconfig</tt> configuration for where the root directory is loca
 </pre>
 Patch the mingw32 installation with updated Win32 headers.
 <pre>
- $ sudo patch -d /usr/i586-mingw32msvc/include < mingw32_4.2.1.dfsg-1ubuntu1_openpgm1.diff
+ $ sudo patch -d /usr/i586-mingw32msvc/include < mingw32-runtime_3.13-1openpgm1.diff
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
@@ -102,7 +102,7 @@ To build the release version in <tt>./ref/release</tt> use the following:
  $ scons -f SConstruct.mingw BUILD=release
 </pre>
 
-=== Building in Ubuntu 9.04 under SCons ===
+=== Building in Ubuntu 9.04 or 9.10 under SCons ===
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>
  $ sudo apt-get install build-essential scons subversion
