@@ -137,7 +137,6 @@ pgm_timer_dispatch (
 		if (!pgm_check_peer_nak_state (transport, now))
 			return FALSE;
 		next_expiration = pgm_min_nak_expiry (now + transport->peer_expiry, transport);
-g_warning ("min-nak returned %i", (int)(next_expiration - now));
 	}
 
 	if (transport->can_send_data)
