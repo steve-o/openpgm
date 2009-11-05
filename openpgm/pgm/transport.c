@@ -1185,7 +1185,7 @@ no_cap_net_admin:
 			g_trace ("INFO","setting rate regulation to %i bytes per second.",
 					transport->txw_max_rte);
 	
-			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
+			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len, transport->max_tpdu);
 			g_assert (NULL != transport->rate_control);
 		}
 
