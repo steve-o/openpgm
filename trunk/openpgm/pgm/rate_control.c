@@ -37,6 +37,11 @@ struct rate_t {
 
 	gint		rate_limit;		/* signed for math */
 	pgm_time_t	last_rate_check;
+	gboolean	use_seconds_resolution;
+	enum {
+		RESOLUTION_SECOND,
+		RESOLUTION_MILLISECOND
+	}		rate_resolution;
 	GStaticMutex	mutex;
 };
 
@@ -44,7 +49,7 @@ typedef struct rate_t rate_t;
 
 /* globals */
 
-G_GNUC_INTERNAL void pgm_rate_create (rate_t**, const guint, const guint);
+G_GNUC_INTERNAL void pgm_rate_create (rate_t**, const guint, const guint, const guint);
 G_GNUC_INTERNAL void pgm_rate_destroy (rate_t*);
 G_GNUC_INTERNAL gboolean pgm_rate_check (rate_t*, const guint, const int);
 G_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (rate_t*, const gsize);
@@ -58,18 +63,26 @@ void
 pgm_rate_create (
 	rate_t**		bucket_,
 	const guint		rate_per_sec,		/* 0 = disable */
-	const guint		iphdr_len
+	const guint		iphdr_len,
+	const guint		max_tpdu
 	)
 {
 /* pre-conditions */
 	g_assert (NULL != bucket_);
+	g_assert (rate_per_sec >= max_tpdu);
 
 	rate_t* bucket = g_malloc0 (sizeof(rate_t));
 	bucket->rate_per_sec	= (gint)rate_per_sec;
 	bucket->iphdr_len	= iphdr_len;
 	bucket->last_rate_check	= pgm_time_update_now ();
 /* pre-fill bucket */
-	bucket->rate_limit	= bucket->rate_per_sec / 1000;
+	if ((rate_per_sec / 1000) >= max_tpdu) {
+		bucket->rate_resolution = RESOLUTION_MILLISECOND;
+		bucket->rate_limit = bucket->rate_per_sec / 1000;
+	} else {
+		bucket->rate_resolution = RESOLUTION_SECOND;
+		bucket->rate_limit = bucket->rate_per_sec;
+	}
 	g_static_mutex_init (&bucket->mutex);
 	*bucket_ = bucket;
 }
@@ -111,9 +124,15 @@ pgm_rate_check (
 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
 	bucket->rate_limit += (double)bucket->rate_per_sec * pgm_to_secsf((double)time_since_last_rate_check);
+	if (RESOLUTION_SECOND == bucket->rate_resolution) {
+/* per second */
+		if (bucket->rate_limit > bucket->rate_per_sec)
+			bucket->rate_limit = bucket->rate_per_sec;
+	} else {
 /* per milli-second */
-	if (bucket->rate_limit > (bucket->rate_per_sec / 1000)) 
-		bucket->rate_limit = bucket->rate_per_sec / 1000;
+		if (bucket->rate_limit > (bucket->rate_per_sec / 1000)) 
+			bucket->rate_limit = bucket->rate_per_sec / 1000;
+	}
 	bucket->last_rate_check = now;
 
 	const gint new_rate_limit = bucket->rate_limit - ( bucket->iphdr_len + data_size );
