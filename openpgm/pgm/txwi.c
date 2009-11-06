@@ -381,10 +381,16 @@ pgm_txw_remove_tail (
 	const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
 	window->pdata[index_] = NULL;
 #endif
-	if (pgm_chunk_is_last_skb (&window->allocator, window->last_chunk, skb)) {
-		pgm_chunk* temp_chunk = window->last_chunk->next;
-		pgm_chunk_free (window->last_chunk);
-		window->last_chunk = temp_chunk;
+	if (g_atomic_int_dec_and_test (&skb->users))
+	{
+		if (pgm_chunk_is_last_skb (&window->allocator, window->last_chunk, skb))
+		{
+			pgm_chunk* temp_chunk = window->last_chunk->next;
+			pgm_chunk_free (window->last_chunk);
+			window->last_chunk = temp_chunk;
+		}
+	} else {
+		g_warning ("Transmit window PGM SKB still owned by application.");
 	}
 
 /* advance trailing pointer */
