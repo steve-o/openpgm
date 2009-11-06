@@ -519,7 +519,7 @@ sender_thread (
 
 		const int header_size = pgm_transport_pkt_offset(FALSE);
 		const int apdu_size = ping.ByteSize();
-		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_max_tpdu);
+		struct pgm_sk_buff_t* skb = pgm_chunk_alloc_skb (pgm_get_send_allocator(g_transport), g_max_tpdu);
 		pgm_skb_reserve (skb, header_size);
 		pgm_skb_put (skb, apdu_size);
 		ping.SerializeToArray (skb->data, skb->len);

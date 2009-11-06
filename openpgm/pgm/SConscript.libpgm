@@ -6,6 +6,7 @@ import os;
 Import('env')
 
 src = Split("""
+		chunk.c
 		packet.c
 		time.c
 		if.c
