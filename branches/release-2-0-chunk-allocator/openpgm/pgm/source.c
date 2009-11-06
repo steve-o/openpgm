@@ -1052,7 +1052,7 @@ send_odata_copy (
 	if (transport->is_apdu_eagain)
 		goto retry_send;
 
-	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+	STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport), transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
 	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
@@ -1170,7 +1170,7 @@ send_odatav (
 	}
 	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, PGM_IO_STATUS_ERROR);
 
-	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+	STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport), transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
 	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
@@ -1313,7 +1313,7 @@ send_apdu (
 		gsize header_length = pgm_transport_pkt_offset (TRUE);
 		STATE(tsdu_length) = MIN( pgm_transport_max_tsdu (transport, TRUE), apdu_length - STATE(data_bytes_offset) );
 
-		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+		STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport), transport->max_tpdu);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
 		pgm_skb_reserve (STATE(skb), header_length);
@@ -1659,7 +1659,7 @@ retry_send:
 /* retrieve packet storage from transmit window */
 		gsize header_length = pgm_transport_pkt_offset (TRUE);
 		STATE(tsdu_length) = MIN( pgm_transport_max_tsdu (transport, TRUE), STATE(apdu_length) - STATE(data_bytes_offset) );
-		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+		STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport), transport->max_tpdu);
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
 		pgm_skb_reserve (STATE(skb), header_length);
