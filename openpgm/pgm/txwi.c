@@ -195,7 +195,9 @@ pgm_txw_create (
 	window->tsi = tsi;
 
 /* chunk allocator */
-	pgm_allocator_create (&window->allocator, tpdu_size, 4 * tpdu_size);
+	pgm_allocator_create (&window->allocator,
+			      sizeof(struct pgm_sk_buff_t) + tpdu_size,		/* atom size */
+			      4 * (sizeof(struct pgm_sk_buff_t) + tpdu_size));	/* chunk size */
 
 /* empty state for transmission group boundaries to align.
  *

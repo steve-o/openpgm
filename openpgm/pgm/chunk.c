@@ -99,17 +99,16 @@ pgm_chunk_is_last_atom (
 
 struct pgm_sk_buff_t*
 pgm_chunk_alloc_skb (
-	pgm_allocator*		allocator,
-	guint16			size
+	pgm_allocator*		allocator
 	)
 {
 	struct pgm_sk_buff_t* skb = pgm_atom_alloc (allocator);
 	memset (skb, 0, sizeof(struct pgm_sk_buff_t));
-	skb->truesize = size + sizeof(struct pgm_sk_buff_t);
+	skb->truesize = allocator->atom_size;
 	g_atomic_int_set (&skb->users, 1);
 	skb->head = skb + 1;
 	skb->data = skb->tail = skb->head;
-	skb->end  = (guint8*)skb->data + size;
+	skb->end  = (guint8*)skb->data + (skb->truesize - sizeof(struct pgm_sk_buff_t));
 	return skb;
 }
 
