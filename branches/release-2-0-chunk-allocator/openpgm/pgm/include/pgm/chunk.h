@@ -50,7 +50,7 @@ struct pgm_allocator
 
 G_BEGIN_DECLS
 
-struct pgm_sk_buff_t* pgm_chunk_alloc_skb (pgm_allocator*, guint16);
+struct pgm_sk_buff_t* pgm_chunk_alloc_skb (pgm_allocator*);
 gboolean pgm_chunk_is_last_skb (pgm_allocator*, pgm_chunk*, struct pgm_sk_buff_t*);
 
 static inline pgm_chunk* pgm_chunk_get_current_chunk (pgm_allocator* allocator) {
