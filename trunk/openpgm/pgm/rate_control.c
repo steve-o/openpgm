@@ -37,7 +37,6 @@ struct rate_t {
 
 	gint		rate_limit;		/* signed for math */
 	pgm_time_t	last_rate_check;
-	gboolean	use_seconds_resolution;
 	enum {
 		RESOLUTION_SECOND,
 		RESOLUTION_MILLISECOND
