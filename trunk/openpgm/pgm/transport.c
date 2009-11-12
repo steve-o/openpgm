@@ -1162,7 +1162,7 @@ pgm_transport_bind (
  * codepoint 101110 (RFC 3246)
  */
 	g_trace ("INFO","set packet differentiated services field to expedited forwarding.");
-	int dscp = 0x2e << 2;
+	const int dscp = 0x2e << 2;
 	if (0 != pgm_sockaddr_tos (transport->send_sock,
 				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 				   dscp) ||
