@@ -102,7 +102,9 @@
 #endif
 
 static PGMRecvError pgm_recv_error_from_errno (gint);
+#ifdef G_OS_WIN32
 static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
+#endif
 
 
 /* read a packet into a PGM skbuff
@@ -511,7 +513,6 @@ on_pgm (
 		if (pgm_is_upstream (skb->pgm_header->pgm_type) ||
 		    pgm_is_peer (skb->pgm_header->pgm_type))
 		{
-			*source = NULL;
 			return on_upstream (transport, skb);
 		}
 	}
@@ -620,7 +621,6 @@ pgm_recvmsgv (
 	GError**		error
 	)
 {
-	pgm_peer_t* peer;
 	PGMIOStatus status = PGM_IO_STATUS_WOULD_BLOCK;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
@@ -658,7 +658,7 @@ pgm_recvmsgv (
 	if (transport->is_reset) {
 		g_assert (NULL != transport->peers_pending);
 		g_assert (NULL != transport->peers_pending->data);
-		peer = transport->peers_pending->data;
+		pgm_peer_t* peer = transport->peers_pending->data;
 		if (flags & MSG_ERRQUEUE)
 			pgm_set_reset_error (transport, peer, msg_start);
 		else if (error) {
@@ -779,7 +779,7 @@ recv_again:
 		goto recv_again;
 	}
 
-	pgm_peer_t* source;
+	pgm_peer_t* source = NULL;
 	if (!on_pgm (transport, transport->rx_buffer, (struct sockaddr*)&src, (struct sockaddr*)&dst, &source))
 		goto recv_again;
 
@@ -850,7 +850,7 @@ out:
 		if (transport->is_reset) {
 			g_assert (NULL != transport->peers_pending);
 			g_assert (NULL != transport->peers_pending->data);
-			peer = transport->peers_pending->data;
+			pgm_peer_t* peer = transport->peers_pending->data;
 			if (flags & MSG_ERRQUEUE)
 				pgm_set_reset_error (transport, peer, msg_start);
 			else if (error) {
@@ -948,7 +948,7 @@ pgm_recvfrom (
 	)
 {
 	pgm_msgv_t msgv;
-	gsize bytes_read;
+	gsize bytes_read = 0;
 
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
 	if (len) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
@@ -1053,6 +1053,7 @@ pgm_recv_error_from_errno (
 	}
 }
 
+#ifdef G_OS_WIN32
 static
 PGMRecvError
 pgm_recv_error_from_wsa_errno (
@@ -1091,5 +1092,6 @@ pgm_recv_error_from_wsa_errno (
 		break;
 	}
 }
+#endif /* G_OS_WIN32 */
 
 /* eof */
