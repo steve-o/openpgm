@@ -66,6 +66,11 @@ First install all the C compiler dependencies, SCons, and Subversion.
 <pre>
  $ sudo apt-get install build-essential scons subversion mingw32
 </pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/trunk
+ $ cd trunk/openpgm/pgm
+</pre>
 Download and unpack the Win32 library dependencies, primarily GLib Binaries & Dev, and proxy-libintl Binaries.  Extract into a subdirectory called <tt>win/</tt>.
 
   * http://www.gtk.org/download-windows.html
@@ -78,19 +83,15 @@ Download and unpack the Win32 library dependencies, primarily GLib Binaries & De
 </pre>
 Update the <tt>pkgconfig</tt> configuration for where the root directory is located.
 <pre>
- $ for i in lib/pkgconfig/`*`.pc; do sed -i "s#prefix=c:/.`*`#prefix=`pwd`#" $i; done
+ $ for i in lib/pkgconfig/`*`.pc; do sed -i "s#prefix=c:/.`*`#prefix=``pwd``#" $i; done
 </pre>
 Patch the mingw32 installation with updated Win32 headers.
 <pre>
  $ sudo patch -d /usr/i586-mingw32msvc/include < mingw32-runtime_3.13-1openpgm1.diff
 </pre>
-Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
-<pre>
- $ svn checkout http://openpgm.googlecode.com/svn/trunk
-</pre>
 Build.
 <pre>
- $ cd trunk/openpgm/pgm
+ $ cd ..
  $ scons -f SConstruct.mingw
 </pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
