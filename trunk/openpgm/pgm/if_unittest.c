@@ -318,8 +318,9 @@ mock_freeifaddrs (
 	free (ifa);
 }
 
+#ifndef G_OS_UNIX
 static
-unsigned int
+int
 mock_pgm_if_nametoindex (
 	const int		iffamily,
 	const char*		ifname
@@ -334,6 +335,7 @@ mock_pgm_if_nametoindex (
 	}
 	return 0;
 }
+#endif
 
 static
 char*

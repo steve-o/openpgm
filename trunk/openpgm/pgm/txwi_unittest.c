@@ -26,6 +26,9 @@
 
 #include <pgm/reed_solomon.h>
 
+#define pgm_histogram_add	mock_pgm_histogram_add
+#include <pgm/histogram.h>
+
 
 /* mock global */
 
@@ -72,6 +75,21 @@ mock_pgm_compat_csum_partial (
 	return 0x0;
 }
 
+void
+mock_pgm_histogram_init (
+	pgm_histogram_t*	histogram
+	)
+{
+}
+
+void
+mock_pgm_histogram_add (
+	pgm_histogram_t*	histogram,
+	int			value
+	)
+{
+}
+
 
 /* mock functions for external references */
 
@@ -79,6 +97,7 @@ mock_pgm_compat_csum_partial (
 #define pgm_rs_destroy			mock_pgm_rs_destroy
 #define pgm_rs_encode			mock_pgm_rs_encode
 #define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
+#define pgm_histogram_init	mock_pgm_histogram_init
 
 #define TXW_DEBUG
 #include "txwi.c"
