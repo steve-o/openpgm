@@ -2102,6 +2102,7 @@ send_rdata (
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	pgm_timer_unlock (transport);
 
+	pgm_txw_inc_retransmit_count (skb);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);

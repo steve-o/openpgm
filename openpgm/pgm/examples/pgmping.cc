@@ -389,7 +389,7 @@ on_startup (
 		pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
 		pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
 	} else {
-		pgm_transport_set_recv_only (g_transport, TRUE);
+		pgm_transport_set_recv_only (g_transport, TRUE, FALSE);
 		pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
 		pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
 		pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));

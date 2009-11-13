@@ -49,6 +49,7 @@
 #include "pgm/math.h"
 #include "pgm/checksum.h"
 #include "pgm/tsi.h"
+#include "pgm/histogram.h"
 
 
 #ifndef TXW_DEBUG
@@ -365,6 +366,12 @@ pgm_txw_remove_tail (
 
 /* statistics */
 	window->size -= skb->len;
+	if (state->retransmit_count > 0) {
+		PGM_HISTOGRAM_COUNTS("Tx.RetransmitCount", state->retransmit_count);
+	}
+	if (state->nak_elimination_count > 0) {
+		PGM_HISTOGRAM_COUNTS("Tx.NakEliminationCount", state->nak_elimination_count);
+	}
 
 /* remove reference to skb */
 #ifdef PGM_TXW_CLEAR_UNUSED_ENTRIES
@@ -389,7 +396,7 @@ pgm_txw_remove_tail (
  * transmisison group.  Parity NAKs are ignored if the packet count is
  * less than or equal to the count already queued for retransmission.
  *
- * returns 0 if request was eliminated, returns 1 if request was
+ * returns FALSE if request was eliminated, returns TRUE if request was
  * added to queue.
  */
 
@@ -459,6 +466,7 @@ pgm_txw_retransmit_push_parity (
 /* more parity packets requested than currently scheduled, simply bump up the count */
 			state->pkt_cnt_requested = nak_pkt_cnt;
 		}
+		state->nak_elimination_count++;
 		return FALSE;
 	}
 	else
@@ -500,6 +508,7 @@ pgm_txw_retransmit_push_selective (
 /* check if request can be eliminated */
 	if (state->waiting_retransmit) {
 		g_assert (!g_queue_is_empty (&window->retransmit_queue));
+		state->nak_elimination_count++;
 		return FALSE;
 	}
 

@@ -43,6 +43,8 @@ struct pgm_txw_state_t {
 	guint32		unfolded_checksum;	/* first 32-bit word must be checksum */
 
 	unsigned	waiting_retransmit:1;	/* in retransmit queue */
+	unsigned	retransmit_count:15;
+	unsigned	nak_elimination_count:16;
 
 #if 0
         struct timeval  expiry;			/* Advance with time */
@@ -163,6 +165,12 @@ static inline void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t* skb, con
 {
 	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
 	state->unfolded_checksum = csum;
+}
+
+static inline void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t* skb)
+{
+	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
+	state->retransmit_count++;
 }
 
 static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
