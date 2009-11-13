@@ -35,6 +35,7 @@ src = Split("""
 		galois_tables.c
 		wsastrerror.c
 		glib-compat.c
+		histogram.c
 """)
 
 e = env.Clone();

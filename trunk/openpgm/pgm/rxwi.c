@@ -43,6 +43,7 @@
 #include <pgm/tsi.h>
 #include <pgm/math.h>
 #include <pgm/reed_solomon.h>
+#include <pgm/histogram.h>
 
 
 //#define RXW_DEBUG
@@ -989,6 +990,10 @@ _pgm_rxw_insert (
 
 /* statistics */
 	const pgm_time_t fill_time = skb->tstamp - new_skb->tstamp;
+	PGM_HISTOGRAM_TIMES("Rx.RepairTime", fill_time);
+	PGM_HISTOGRAM_COUNTS("Rx.NakTransmits", state->nak_transmit_count);
+	PGM_HISTOGRAM_COUNTS("Rx.NcfRetries", state->ncf_retry_count);
+	PGM_HISTOGRAM_COUNTS("Rx.DataRetries", state->data_retry_count);
 	if (!window->max_fill_time) {
 		window->max_fill_time = window->min_fill_time = fill_time;
 	}
