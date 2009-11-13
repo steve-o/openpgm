@@ -124,6 +124,7 @@ env = Environment(
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
 	LINKFLAGS = [	'-pipe',
+			'-lm'
 		    ]
 )
 

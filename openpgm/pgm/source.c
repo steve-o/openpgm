@@ -90,7 +90,6 @@
 
 
 /* locals */
-static gboolean send_spm (pgm_transport_t* const);
 static void reset_heartbeat_spm (pgm_transport_t* const);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);

@@ -169,7 +169,8 @@ void
 mock_pgm_rate_create (
 	gpointer*		bucket_,
 	guint			rate_per_sec,
-	guint			iphdr_len
+	guint			iphdr_len,
+	guint			max_tpdu
 	)
 {
 }
