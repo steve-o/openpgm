@@ -545,9 +545,6 @@ pgm_transport_set_sndbuf (
 	const int		size		/* not gsize/gssize as we propogate to setsockopt() */
 	)
 {
-	int wmem_max;
-	FILE* fp;
-
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (size > 0, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
@@ -559,6 +556,9 @@ pgm_transport_set_sndbuf (
 		return FALSE;
 	}
 #ifdef G_OS_UNIX
+	int wmem_max;
+	FILE* fp;
+
 	fp = fopen ("/proc/sys/net/core/wmem_max", "r");
 	if (fp) {
 		fscanf (fp, "%d", &wmem_max);
@@ -591,9 +591,6 @@ pgm_transport_set_rcvbuf (
 	const int		size		/* not gsize/gssize */
 	)
 {
-	int rmem_max;
-	FILE* fp;
-
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (size > 0, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
@@ -605,6 +602,9 @@ pgm_transport_set_rcvbuf (
 		return FALSE;
 	}
 #ifdef G_OS_UNIX
+	int rmem_max;
+	FILE* fp;
+
 	fp = fopen ("/proc/sys/net/core/rmem_max", "r");
 	if (fp) {
 		fscanf (fp, "%d", &rmem_max);

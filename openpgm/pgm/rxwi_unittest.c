@@ -28,6 +28,9 @@
 #include <pgm/time.h>
 #include <pgm/reed_solomon.h>
 
+#define pgm_histogram_add	mock_pgm_histogram_add
+#include <pgm/histogram.h>
+
 
 /* mock global */
 
@@ -66,10 +69,27 @@ mock_pgm_rs_decode_parity_appended (
 // null
 }
 
+void
+mock_pgm_histogram_init (
+	pgm_histogram_t*	histogram
+	)
+{
+}
+
+void
+mock_pgm_histogram_add (
+	pgm_histogram_t*	histogram,
+	int			value
+	)
+{
+}
+
+
 #define pgm_time_now			mock_pgm_time_now
 #define pgm_rs_create			mock_pgm_rs_create
 #define pgm_rs_destroy			mock_pgm_rs_destroy
 #define pgm_rs_decode_parity_appended	mock_pgm_rs_decode_parity_appended
+#define pgm_histogram_init		mock_pgm_histogram_init
 
 #define RXW_DEBUG
 #include "rxwi.c"
