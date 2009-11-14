@@ -13,6 +13,7 @@ opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
 	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
+	(EnumOption ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
@@ -112,6 +113,7 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
 	LINKFLAGS = [	'-pipe',
+			'-lm'
 		    ]
 )
 opt.Update (env)
@@ -160,6 +162,10 @@ Import('env')
 
 # vanilla environment
 env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+
+# instrumentation
+if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
+	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
