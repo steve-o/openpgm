@@ -14,6 +14,8 @@ vars.AddVariables (
 			allowed_values=('release', 'debug', 'profile')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
+			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
@@ -120,7 +122,8 @@ env = Environment(
 	LINKFLAGS = [	'-pipe',
 			'-lresolv',
 			'-lsocket',
-			'-lnsl'
+			'-lnsl',
+			'-lm'
 		    ]
 )
 
@@ -161,6 +164,10 @@ Import('env')
 
 # vanilla environment
 env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+
+# instrumentation
+if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
+	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 

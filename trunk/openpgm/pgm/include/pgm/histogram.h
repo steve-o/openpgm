@@ -72,6 +72,8 @@ typedef struct pgm_histogram_t pgm_histogram_t;
 			.is_registered		= FALSE \
 		}
 
+#ifdef CONFIG_HISTOGRAMS
+
 #define PGM_HISTOGRAM_TIMES(name, sample) do { \
 		PGM_HISTOGRAM_DEFINE(name, pgm_msecs(1), pgm_secs(10), 50); \
 		if (!counter.is_registered) { \
@@ -91,6 +93,13 @@ typedef struct pgm_histogram_t pgm_histogram_t;
 		} \
 		pgm_histogram_add (&counter, (sample)); \
 	} while (0)
+
+#else /* !CONFIG_HISTOGRAMS */
+
+#define PGM_HISTOGRAM_TIMES(name, sample)
+#define PGM_HISTOGRAM_COUNTS(name, sample)
+
+#endif /* !CONFIG_HISTOGRAMS */
 
 
 extern GSList* pgm_histograms;

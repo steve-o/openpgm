@@ -248,16 +248,20 @@ http_thread (
 	soup_server_add_handler (g_soup_server, "/",		NULL, index_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/interfaces",	NULL, interfaces_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	NULL, transports_callback, NULL, NULL);
+#ifdef CONFIG_HISTOGRAMS
 	soup_server_add_handler (g_soup_server, "/histograms",	NULL, histograms_callback, NULL, NULL);
-#else
+#endif /* CONFIG_HISTOGRAMS */
+#else /* !CONFIG_LIBSOUP22 */
 	soup_server_add_handler (g_soup_server, NULL,		default_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/robots.txt",	robots_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/base.css",	css_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/",		index_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/interfaces",	interfaces_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	transports_callback, NULL, NULL);
+#ifdef CONFIG_HISTOGRAMS
 	soup_server_add_handler (g_soup_server, "/histograms",	histograms_callback, NULL, NULL);
-#endif
+#endif /* CONFIG_HISTOGRAMS */
+#endif /* !CONFIG_LIBSOUP22 */
 
 /* signal parent thread we are ready to run */
 	g_cond_signal  (g_thread_cond);
@@ -317,7 +321,9 @@ http_create_response (
 						"<a href=\"/\"><span class=\"tab\" id=\"tab%s\">General Information</span></a>"
 						"<a href=\"/interfaces\"><span class=\"tab\" id=\"tab%s\">Interfaces</span></a>"
 						"<a href=\"/transports\"><span class=\"tab\" id=\"tab%s\">Transports</span></a>"
+#ifdef CONFIG_HISTOGRAMS
 						"<a href=\"/histograms\"><span class=\"tab\" id=\"tab%s\">Histograms</span></a>"
+#endif
 						"<div id=\"tabline\"></div>"
 					"</div>"
 					"<div id=\"content\">",
@@ -328,8 +334,11 @@ http_create_response (
 				timestamp,
 				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
 				tab == HTTP_TAB_INTERFACES ? "top" : "bottom",
-				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom",
-				tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom");
+				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom"
+#ifdef CONFIG_HISTOGRAMS
+				,tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom"
+#endif
+	);
 
 	g_free (timestamp);
 	return response;
