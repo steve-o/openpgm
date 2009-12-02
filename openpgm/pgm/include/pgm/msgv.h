@@ -40,12 +40,32 @@ struct pgm_iovec {
 #endif /* G_OS_WIN32 */
 };
 
+/* skb vector */
 struct pgm_msgv_t {
-	size_t			msgv_len;	/* number of elements in skb */
+	size_t			msgv_len;	/* number of fragments in msgv_skb */
 	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
 
 typedef struct pgm_msgv_t pgm_msgv_t;
 
+#ifdef CONFIG_HAVE_RECVMMSG
+struct mmsghdr {
+	struct msghdr		msg_hdr;
+	unsigned		msg_len;
+};
+
+/* dependencies on recvmmsg */
+struct _pgm_mmsg_t {
+/* pgm socket buffer */
+	struct pgm_sk_buff_t*	mmsg_skb;
+/* scatter/gather vector */
+	struct pgm_iovec	mmsg_iov;
+/* ancillary data */
+	size_t			mmsg_aux[ 1024 / sizeof(size_t) ];
+/* source address */
+	struct sockaddr_storage	mmsg_name;
+	socklen_t		mmsg_namelen;
+};
+#endif /* CONFIG_HAVE_RECVMMSG */
 
 #endif /* __PGM_MSGV_H__ */
