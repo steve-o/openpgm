@@ -897,7 +897,14 @@ flush_pending:
 		if (0 != pgm_flush_peers_pending (transport, &pmsg, msg_end, &bytes_read, &data_read))
 		{
 /* recv vector is now full */
+#ifdef CONFIG_HAVE_RECVMMSG
+/* flush mmsg buffer, will drop data packets as recv vector is full */
+			if ((1 + transport->rx_index) == transport->rx_len)
+				goto out;
+			goto recv_again;
+#else
 			goto out;
+#endif
 		}
 	}
 
@@ -906,10 +913,19 @@ check_for_repeat:
 	if (transport->is_nonblocking ||
 	    flags & MSG_DONTWAIT)
 	{
+#ifdef CONFIG_HAVE_RECVMMSG
+		if (len > 0 &&
+		    ( (1 + transport->rx_index) == transport->rx_len || pmsg < msg_end ))
+		{
+			g_trace ("recv again on flush or not-full");
+			goto recv_again;
+		}
+#else /* !CONFIG_HAVE_RECVMMSG */
 		if (len > 0 && pmsg < msg_end) {
 			g_trace ("recv again on not-full");
 			goto recv_again;		/* \:D/ */
 		}
+#endif /* !CONFIG_HAVE_RECVMMSG */
 	}
 	else
 	{
