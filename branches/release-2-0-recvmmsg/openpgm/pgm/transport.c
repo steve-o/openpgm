@@ -228,11 +228,21 @@ pgm_transport_destroy (
 		g_rand_free (transport->rand_);
 		transport->rand_ = NULL;
 	}
+#ifdef CONFIG_HAVE_RECVMMSG
+	if (transport->rx_mmsg[0].mmsg_skb) {
+		g_trace ("INFO","freeing receive buffer.");
+		for (int i = 0; i < PGM_RECVMMSG_LEN; i++) {
+			pgm_free_skb (transport->rx_mmsg[i].mmsg_skb);
+			transport->rx_mmsg[i].mmsg_skb = NULL;
+		}
+	}
+#else /* !CONFIG_HAVE_RECVMMSG */
 	if (transport->rx_buffer) {
 		g_trace ("INFO","freeing receive buffer.");
 		pgm_free_skb (transport->rx_buffer);
 		transport->rx_buffer = NULL;
 	}
+#endif /* !CONFIG_HAVE_RECVMMSG */
 	g_trace ("INFO","destroying notification channel.");
 	pgm_notify_destroy (&transport->pending_notify);
 	g_trace ("INFO","freeing transport locks.");
@@ -1220,8 +1230,14 @@ no_cap_net_admin:
 	pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
 
-/* allocate first incoming packet buffer */
+/* allocate first incoming packet buffers */
+#ifdef CONFIG_HAVE_RECVMMSG
+	for (int i = 0; i < PGM_RECVMMSG_LEN; i++)
+		transport->rx_mmsg[i].mmsg_skb = pgm_alloc_skb (transport->max_tpdu);
+	transport->rx_buffer = transport->rx_mmsg[0].mmsg_skb;
+#else /* !CONFIG_HAVE_RECVMMSG */
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
+#endif /* !CONFIG_HAVE_RECVMMSG */
 
 /* cleanup */
 	g_trace ("INFO","preparing dynamic timer");
