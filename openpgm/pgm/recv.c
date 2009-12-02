@@ -107,9 +107,9 @@ static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
 #endif
 
 #ifdef CONFIG_HAVE_RECVMMSG
-static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags)
+static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
 {
-	return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags);
+	return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
 }
 #endif /* CONFIG_HAVE_RECVMMSG */
 
@@ -213,7 +213,7 @@ recvskb (
 		transport->rx_index = 0;
 		transport->rx_buffer = transport->rx_mmsg[0].mmsg_skb;
 
-		transport->rx_len = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags);
+		transport->rx_len = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags, NULL);
 		if (transport->rx_len <= 0)
 			return transport->rx_len;
 
