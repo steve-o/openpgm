@@ -107,6 +107,7 @@ static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
 #endif
 
 #ifdef CONFIG_HAVE_RECVMMSG
+#include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
 static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
 {
 	return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
