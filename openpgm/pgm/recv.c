@@ -145,8 +145,10 @@ recvskb (
 
 #ifdef CONFIG_HAVE_RECVMMSG
 /* flush remaining messages */
-	if (++(transport->rx_index) < transport->rx_len)
+	if ((1 + transport->rx_index) < transport->rx_len)
 	{
+		transport->rx_index++;
+
 		const struct _pgm_mmsg_t* mmsg    = &transport->rx_mmsg[ transport->rx_index ];
 		struct mmsghdr*     mmsghdr = &transport->rx_mmsghdr[ transport->rx_index ];
 
@@ -221,8 +223,10 @@ recvskb (
 		transport->rx_buffer = transport->rx_mmsg[0].mmsg_skb;
 
 		const int mmsglen = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags, NULL);
-		if (mmsglen <= 0)
+		if (mmsglen <= 0) {
+			transport->rx_len = 0;
 			return mmsglen;
+		}
 
 		transport->rx_len = mmsglen;
 
