@@ -150,6 +150,9 @@ recvskb (
 		const struct _pgm_mmsg_t* mmsg    = &transport->rx_mmsg[ transport->rx_index ];
 		struct mmsghdr*     mmsghdr = &transport->rx_mmsghdr[ transport->rx_index ];
 
+		g_assert (NULL != mmsg);
+		g_assert (NULL != mmsghdr);
+
 /* pgm socket buffer */
 		transport->rx_buffer = mmsg->mmsg_skb;
 /* source address */
@@ -201,6 +204,9 @@ recvskb (
 		for (unsigned i = 0; i < PGM_RECVMMSG_LEN; i++) {
 			struct _pgm_mmsg_t* mmsg     = &transport->rx_mmsg[i];
 			struct msghdr*      msg_hdr  = &transport->rx_mmsghdr[i].msg_hdr;
+			g_assert (NULL != mmsg);
+			g_assert (NULL != mmsg->mmsg_skb);
+			g_assert (NULL != msg_hdr);
 			mmsg->mmsg_iov.iov_base	= mmsg->mmsg_skb->head;
 			mmsg->mmsg_iov.iov_len 	= transport->max_tpdu;
 			msg_hdr->msg_name	= &mmsg->mmsg_name;
@@ -214,13 +220,16 @@ recvskb (
 		transport->rx_index = 0;
 		transport->rx_buffer = transport->rx_mmsg[0].mmsg_skb;
 
-		transport->rx_len = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags, NULL);
-		if (transport->rx_len <= 0)
-			return transport->rx_len;
+		const int mmsglen = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags, NULL);
+		if (mmsglen <= 0)
+			return mmsglen;
+
+		transport->rx_len = mmsglen;
 
 		const pgm_time_t now = pgm_time_update_now();
 		for (unsigned i = 0; i < transport->rx_len; i++) {
 			struct pgm_sk_buff_t* skb = transport->rx_mmsg[i].mmsg_skb;
+			g_assert (NULL != skb);
 			skb->transport	= transport;
 			skb->tstamp	= now;
 			skb->data	= skb->head;
