@@ -23,7 +23,6 @@
 #define __PGM_H__
 
 #include <pgm/async.h>
-#include <pgm/err.h>
 #include <pgm/gsi.h>
 #include <pgm/tsi.h>
 #include <pgm/if.h>
