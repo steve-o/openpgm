@@ -73,7 +73,6 @@
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
-#include "pgm/err.h"
 
 //#define RECV_DEBUG
 

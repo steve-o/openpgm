@@ -36,10 +36,6 @@
 #   include <pgm/packet.h>
 #endif
 
-#ifndef __PGM_ERR_H__
-#   include <pgm/err.h>
-#endif
-
 #ifndef __PGM_SKBUFF_H__
 #	include <pgm/skbuff.h>
 #endif
