@@ -107,11 +107,26 @@ static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
 #endif
 
 #ifdef CONFIG_HAVE_RECVMMSG
-#include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
+#	ifdef CONFIG_COMPAT_RECVMMSG
+static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
+{
+	int ret = -1;
+	for (int i = 0; i < vlen; i++) {
+		const int tmp = recvmsg (fd, &mmsg[i].msg_hdr, flags);
+		if (tmp < 0)
+			break;
+		mmsg[i].msg_len = tmp;
+		ret++;
+	}
+	return ret;
+}
+#	else
+#		include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
 static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
 {
 	return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
 }
+#	endif /* CONFIG_COMPAT_RECVMMSG */
 #endif /* CONFIG_HAVE_RECVMMSG */
 
 /* read a packet into a PGM skbuff
