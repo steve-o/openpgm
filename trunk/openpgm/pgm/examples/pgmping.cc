@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,6 +96,7 @@ static pgm_time_t g_latency_current = 0;
 static guint64 g_latency_seqno = 0;
 static guint64 g_last_seqno = 0;
 static pgm_time_t g_latency_total = 0;
+static pgm_time_t g_latency_square_total = 0;
 static guint64 g_latency_count = 0;
 static pgm_time_t g_latency_max = 0;
 static pgm_time_t g_latency_min = -1;
@@ -749,6 +751,7 @@ again:
 			g_latency_current	= pgm_to_secs(elapsed);
 			g_latency_seqno		= seqno;
 			g_latency_total	       += elapsed;
+			g_latency_total	       += elapsed * elapsed;
 
 			if (elapsed > g_latency_max) {
 				g_latency_max = elapsed;
@@ -785,30 +788,35 @@ on_mark (
 /* receiving a ping */
 	if (g_latency_count)
 	{
-		pgm_time_t average = g_latency_total / g_latency_count;
+		const double average = pgm_to_msecsf(g_latency_total / g_latency_count);
+		const double variance = pgm_to_msecsf(g_latency_square_total) / g_latency_count
+					- average * average;
+		const double standard_deviation = sqrt (variance);
 
 		if (g_latency_count < 10)
 		{
 			g_message ("seqno=%" G_GUINT64_FORMAT " time=%.03f ms",
 					g_latency_seqno,
-					pgm_to_msecsf(average));
+					average);
 		}
 		else
 		{
 			double seq_rate = (g_latency_seqno - g_last_seqno) / interval;
 			double out_rate = g_out_total * 8.0 / 1000000.0 / interval;
 			double  in_rate = g_in_total  * 8.0 / 1000000.0 / interval;
-			g_message ("s=%.01f avg=%.03f min=%.03f max=%.03f ms o=%.2f i=%.2f mbit",
+			g_message ("s=%.01f avg=%.03f min=%.03f max=%.03f stddev=%0.3f ms o=%.2f i=%.2f mbit",
 					seq_rate,
-					pgm_to_msecsf(average),
+					average,
 					pgm_to_msecsf(g_latency_min),
 					pgm_to_msecsf(g_latency_max),
+					standard_deviation,
 					out_rate,
 					in_rate);
 		}
 
 /* reset interval counters */
 		g_latency_total		= 0;
+		g_latency_square_total	= 0;
 		g_latency_count		= 0;
 		g_last_seqno		= g_latency_seqno;
 		g_latency_min		= -1;
