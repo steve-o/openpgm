@@ -46,13 +46,17 @@ pgm_atom_alloc (
 	)
 {
 	g_return_val_if_fail (allocator != NULL, NULL);
-  
+
+	g_trace ("pgm_atom_alloc ()");
+
 	if ((!allocator->current) ||
 	    ((allocator->current->index + allocator->atom_size) > allocator->chunk_size))
 	{
-		allocator->current = g_malloc (sizeof (pgm_chunk) + allocator->chunk_size);
-		allocator->current->next = allocator->chunks;
-		allocator->chunks = allocator->current;
+		if (allocator->current)
+			allocator->current = allocator->current->next = g_malloc (sizeof (pgm_chunk) + allocator->chunk_size);
+		else
+			allocator->chunks = allocator->current = g_malloc (sizeof (pgm_chunk) + allocator->chunk_size);
+		allocator->current->next = NULL;
 		allocator->current->index = 0;
 	}
   
@@ -79,11 +83,12 @@ static
 gboolean
 pgm_chunk_is_last_atom (
 	pgm_allocator*		allocator,
-	pgm_chunk*		chunk,
 	pgm_atom		atom
 	)
 {
-	const gulong data_index = (gchar*)atom - (gchar*)chunk->data;
+	g_assert (NULL != allocator->chunks);
+	const gulong data_index = allocator->atom_size + (gchar*)atom - (gchar*)allocator->chunks->data;
+	g_assert (data_index <= allocator->chunk_size);
 	return (data_index + allocator->atom_size) > allocator->chunk_size;
 }
 
@@ -115,11 +120,24 @@ pgm_chunk_alloc_skb (
 gboolean
 pgm_chunk_is_last_skb (
 	pgm_allocator*		allocator,
-	pgm_chunk*		chunk,
 	struct pgm_sk_buff_t*	skb
 	)
 {
-	return pgm_chunk_is_last_atom (allocator, chunk, (pgm_atom)skb);
+	return pgm_chunk_is_last_atom (allocator, (pgm_atom)skb);
+}
+
+/* frees the last chunk in the allocator */
+void
+pgm_chunk_free (
+	pgm_allocator*		allocator
+	)
+{
+	g_assert (NULL != allocator->chunks);
+	g_trace ("pgm_chunk_free ()");
+
+	pgm_chunk* next_chunk = allocator->chunks->next;
+	g_free (allocator->chunks);
+	allocator->chunks = next_chunk;
 }
 
 /* create a new allocator object which manages it's own buffer.
@@ -138,6 +156,8 @@ pgm_allocator_create (
 	g_return_val_if_fail (atom_size > 0, FALSE);
 	g_return_val_if_fail (chunk_size >= atom_size, FALSE);
 
+	g_trace ("pgm_allocator_create ()");
+
 	allocator->current = NULL;
 	allocator->chunks = NULL;
 	allocator->atom_size = (atom_size + (G_MEM_ALIGN - 1)) & ~(G_MEM_ALIGN - 1);
@@ -154,6 +174,8 @@ pgm_allocator_destroy (
 	)
 {
 	g_return_if_fail (allocator != NULL);
+
+	g_trace("pgm_allocator_destroy ()");
 
 	pgm_chunk* chunks = allocator->chunks;
 	while (chunks) {
