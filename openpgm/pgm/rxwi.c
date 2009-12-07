@@ -83,21 +83,21 @@ _pgm_tsi_is_null (
 	return 0 == memcmp (&nulltsi, tsi, sizeof(nulltsi));
 }
 
-static inline void _pgm_rxw_define (pgm_rxw_t* const, const guint32);
-static inline void _pgm_rxw_update_trail (pgm_rxw_t* const, const guint32);
+static void _pgm_rxw_define (pgm_rxw_t* const, const guint32);
+static void _pgm_rxw_update_trail (pgm_rxw_t* const, const guint32);
 static inline guint32 _pgm_rxw_update_lead (pgm_rxw_t* const, const guint32, const pgm_time_t);
 static inline guint32 _pgm_rxw_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline guint32 _pgm_rxw_pkt_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline void _pgm_rxw_remove_tg_sqn (pgm_rxw_t* const, const guint32);
-static inline int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static inline int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static inline int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t);
+static int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
+static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
+static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t);
 static inline void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
-static inline guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
+static guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
 static inline void _pgm_rxw_lost (pgm_rxw_t* const, const guint32);
-static inline void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
+static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline gssize _pgm_rxw_incoming_read (pgm_rxw_t* const, pgm_msgv_t**, guint);
 static inline gboolean _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const guint32);
@@ -109,15 +109,13 @@ static inline int _pgm_rxw_recovery_append (pgm_rxw_t* const, const pgm_time_t);
 /* returns the pointer at the given index of the window.
  */
 
-static inline
+static
 struct pgm_sk_buff_t*
 _pgm_rxw_peek (
 	const pgm_rxw_t* const	window,
 	const guint32		sequence
 	)
 {
-	struct pgm_sk_buff_t* skb;
-
 /* pre-conditions */
 	g_assert (window);
 
@@ -127,18 +125,17 @@ _pgm_rxw_peek (
 	if (pgm_uint32_gte (sequence, window->trail) && pgm_uint32_lte (sequence, window->lead))
 	{
 		const guint32 index_ = sequence % pgm_rxw_max_length (window);
-		skb = window->pdata[index_];
+		struct pgm_sk_buff_t* skb = window->pdata[index_];
 /* availability only guaranteed inside commit window */
 		if (pgm_uint32_lt (sequence, window->commit_lead)) {
 			g_assert (skb);
 			g_assert (pgm_skb_is_valid (skb));
 			g_assert (!_pgm_tsi_is_null (&skb->tsi));
 		}
+		return skb;
 	}
-	else
-		skb = NULL;
 
-	return skb;
+	return NULL;
 }
 
 /* sections of the receive window:
@@ -455,7 +452,7 @@ pgm_rxw_add (
 /* define window by parameters of first data packet.
  */
 
-static inline
+static
 void
 _pgm_rxw_define (
 	pgm_rxw_t* const	window,
@@ -513,7 +510,7 @@ pgm_rxw_update (
 /* update trailing edge of receive window
  */
 
-static inline
+static
 void
 _pgm_rxw_update_trail (
 	pgm_rxw_t* const	window,
@@ -929,7 +926,7 @@ _pgm_rxw_is_invalid_payload_op (
  * PGM_RXW_BOUNDS - packet out of window.
  */
 
-static inline
+static
 int
 _pgm_rxw_insert (
 	pgm_rxw_t* const		window,
@@ -1068,7 +1065,7 @@ _pgm_rxw_shuffle_parity (
  * PGM_RXW_BOUNDS - packet out of window.
  */
 
-static inline
+static
 int
 _pgm_rxw_append (
 	pgm_rxw_t* const		window,
@@ -1204,7 +1201,7 @@ pgm_rxw_readv (
  * returns number of sequences purged.
  */
 
-static inline
+static
 guint
 _pgm_rxw_remove_trail (
 	pgm_rxw_t* const	window
@@ -1317,7 +1314,7 @@ _pgm_rxw_is_tg_sqn_lost (
 /* reconstruct missing sequences in a transmission group using embedded parity data.
  */
 
-static inline
+static
 void
 _pgm_rxw_reconstruct (
 	pgm_rxw_t* const	window,
@@ -1704,7 +1701,7 @@ _pgm_rxw_remove_tg_sqn (
 /* set PGM skbuff to new FSM state.
  */
 
-static inline
+static
 void
 _pgm_rxw_state (
 	pgm_rxw_t* const		window,

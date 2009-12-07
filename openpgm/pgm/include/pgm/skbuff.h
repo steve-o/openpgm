@@ -179,6 +179,10 @@ static inline void pgm_skb_zero_pad (struct pgm_sk_buff_t* const skb, const guin
 
 /* PGM skbuff for data, in-state skbuffs will return FALSE.
  */
+#ifndef SKB_DEBUG
+static inline gboolean pgm_skb_is_valid (G_GNUC_UNUSED const struct pgm_sk_buff_t* const skb)
+{
+#else
 static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
 {
 	g_return_val_if_fail (skb, FALSE);
@@ -230,6 +234,7 @@ static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
 	g_return_val_if_fail (skb->truesize == (guint)((const guint8*)skb->end - (const guint8*)skb), FALSE);
 /* users */
 	g_return_val_if_fail (g_atomic_int_get (&skb->users) > 0, FALSE);
+#endif
 	return TRUE;
 }
 
