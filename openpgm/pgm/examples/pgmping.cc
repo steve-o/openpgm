@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,11 +95,12 @@ static pgm_time_t g_interval_start = 0;
 static pgm_time_t g_latency_current = 0;
 static guint64 g_latency_seqno = 0;
 static guint64 g_last_seqno = 0;
-static pgm_time_t g_latency_total = 0;
+static double g_latency_total = 0.0;
+static double g_latency_square_total = 0.0;
 static guint64 g_latency_count = 0;
-static pgm_time_t g_latency_max = 0;
-static pgm_time_t g_latency_min = -1;
-static pgm_time_t g_latency_running_average = 0;
+static double g_latency_max = 0.0;
+static double g_latency_min = INFINITY;
+static double g_latency_running_average = 0.0;
 static guint64 g_out_total = 0;
 static guint64 g_in_total = 0;
 
@@ -705,10 +707,9 @@ on_msgv (
 
 		if (PGMPING_MODE_REFLECTOR == g_mode)
 		{
-			struct pgm_sk_buff_t* send_skb = pgm_skb_get (msgv[i].msgv_skb[0]);
 			PGMIOStatus status;
 again:
-			status = pgm_send_skbv (g_transport, &send_skb, 1, TRUE, NULL);
+			status = pgm_send (g_transport, pskb->data, pskb->len, NULL);
 			switch (status) {
 			case PGM_IO_STATUS_RATE_LIMITED:
 			case PGM_IO_STATUS_WOULD_BLOCK:
@@ -739,22 +740,22 @@ again:
 			g_msg_received++;
 
 /* handle ping */
-			const pgm_time_t elapsed = pskb->tstamp - send_time;
+			const double elapsed = pgm_to_usecsf (pskb->tstamp - send_time);
 
-			if (pgm_time_after(send_time, pskb->tstamp)) {
+			if (pgm_time_after(send_time, pskb->tstamp)){
 				g_message ("timer mismatch, send time = now + %.3f ms",
 					   pgm_to_msecsf(send_time - pskb->tstamp));
 				goto next_msg;
 			}
-			g_latency_current	= pgm_to_secs(elapsed);
+			g_latency_current	= pgm_to_secs(pskb->tstamp - send_time);
 			g_latency_seqno		= seqno;
 			g_latency_total	       += elapsed;
+			g_latency_square_total += elapsed * elapsed;
 
-			if (elapsed > g_latency_max) {
+			if (elapsed > g_latency_max)
 				g_latency_max = elapsed;
-			} else if (elapsed < g_latency_min) {
+			if (elapsed < g_latency_min)
 				g_latency_min = elapsed;
-			}
 
 			g_latency_running_average += elapsed;
 			g_latency_count++;
@@ -779,40 +780,46 @@ on_mark (
 	)
 {
 	const pgm_time_t now = pgm_time_update_now ();
-	double interval = pgm_to_secsf(now - g_interval_start);
+	const double interval = pgm_to_secsf(now - g_interval_start);
 	g_interval_start = now;
 
 /* receiving a ping */
 	if (g_latency_count)
 	{
-		pgm_time_t average = g_latency_total / g_latency_count;
+		const double average = g_latency_total / g_latency_count;
+		const double variance = g_latency_square_total / g_latency_count
+					- average * average;
+		const double standard_deviation = sqrt (variance);
 
 		if (g_latency_count < 10)
 		{
-			g_message ("seqno=%" G_GUINT64_FORMAT " time=%.03f ms",
-					g_latency_seqno,
-					pgm_to_msecsf(average));
+			if (average < 1000.0)
+				g_message ("seqno=%" G_GUINT64_FORMAT " time=%.01f us",
+						g_latency_seqno, average);
+			else
+				g_message ("seqno=%" G_GUINT64_FORMAT " time=%.01f ms",
+						g_latency_seqno, average / 1000);
 		}
 		else
 		{
 			double seq_rate = (g_latency_seqno - g_last_seqno) / interval;
 			double out_rate = g_out_total * 8.0 / 1000000.0 / interval;
 			double  in_rate = g_in_total  * 8.0 / 1000000.0 / interval;
-			g_message ("s=%.01f avg=%.03f min=%.03f max=%.03f ms o=%.2f i=%.2f mbit",
-					seq_rate,
-					pgm_to_msecsf(average),
-					pgm_to_msecsf(g_latency_min),
-					pgm_to_msecsf(g_latency_max),
-					out_rate,
-					in_rate);
+			if (g_latency_min < 1000.0)
+				g_message ("s=%.01f avg=%.01f min=%.01f max=%.01f stddev=%0.1f us o=%.2f i=%.2f mbit",
+					seq_rate, average, g_latency_min, g_latency_max, standard_deviation, out_rate, in_rate);
+			else
+				g_message ("s=%.01f avg=%.01f min=%.01f max=%.01f stddev=%0.1f ms o=%.2f i=%.2f mbit",
+					seq_rate, average / 1000, g_latency_min / 1000, g_latency_max / 1000, standard_deviation / 1000, out_rate, in_rate);
 		}
 
 /* reset interval counters */
-		g_latency_total		= 0;
+		g_latency_total		= 0.0;
+		g_latency_square_total	= 0.0;
 		g_latency_count		= 0;
 		g_last_seqno		= g_latency_seqno;
-		g_latency_min		= -1;
-		g_latency_max		= 0;
+		g_latency_min		= INFINITY;
+		g_latency_max		= 0.0;
 		g_out_total		= 0;
 		g_in_total		= 0;
 	}

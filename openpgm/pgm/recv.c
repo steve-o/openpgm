@@ -118,7 +118,7 @@ static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigne
 		mmsg[i].msg_len = tmp;
 		ret++;
 	}
-	return ret;
+	return ret < 0 ? ret : (1 + ret);
 }
 #	else
 #		include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
@@ -166,8 +166,8 @@ recvskb (
 
 		const struct _pgm_mmsg_t* mmsg    = &transport->rx_mmsg[ transport->rx_index ];
 		struct mmsghdr*     mmsghdr = &transport->rx_mmsghdr[ transport->rx_index ];
-
 		g_assert (NULL != mmsg);
+		g_assert (NULL != mmsg->mmsg_skb);
 		g_assert (NULL != mmsghdr);
 
 /* pgm socket buffer */
@@ -235,7 +235,7 @@ recvskb (
 			msg_hdr->msg_flags	= 0;
 		}
 		transport->rx_index = 0;
-		transport->rx_buffer = transport->rx_mmsg[0].mmsg_skb;
+		transport->rx_buffer = transport->rx_mmsg[ transport->rx_index ].mmsg_skb;
 
 		const int mmsglen = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags, NULL);
 		if (mmsglen <= 0) {
@@ -245,6 +245,7 @@ recvskb (
 
 		transport->rx_len = mmsglen;
 
+/* tag all filled PGM SKBs */
 		const pgm_time_t now = pgm_time_update_now();
 		for (unsigned i = 0; i < transport->rx_len; i++) {
 			struct pgm_sk_buff_t* skb = transport->rx_mmsg[i].mmsg_skb;
@@ -253,9 +254,56 @@ recvskb (
 			skb->tstamp	= now;
 			skb->data	= skb->head;
 			skb->len	= transport->rx_mmsghdr[i].msg_len;
-			skb->tail	= (guint8*)skb->data + skb->len;
+			skb->tail	= (guint8*)skb->head + skb->len;
+			transport->rx_mmsg[i].mmsg_namelen = transport->rx_mmsghdr[i].msg_hdr.msg_namelen;
 		}
 
+		const struct _pgm_mmsg_t* mmsg    = &transport->rx_mmsg[ transport->rx_index ];
+		struct mmsghdr*     mmsghdr = &transport->rx_mmsghdr[ transport->rx_index ];
+		g_assert (NULL != mmsg);
+		g_assert (NULL != mmsg->mmsg_skb);
+		g_assert (NULL != mmsghdr);
+
+/* source address */
+		memcpy (src_addr, &mmsg->mmsg_name, mmsg->mmsg_namelen);
+/* destination address */
+		if (transport->udp_encap_ucast_port ||
+		    AF_INET6 == pgm_sockaddr_family (src_addr))
+		{
+			struct cmsghdr* cmsg;
+			gpointer pktinfo = NULL;
+			for (cmsg = CMSG_FIRSTHDR(&mmsghdr->msg_hdr);
+			     cmsg != NULL;
+			     cmsg = CMSG_NXTHDR(&mmsghdr->msg_hdr, cmsg))
+			{
+				if (IPPROTO_IP == cmsg->cmsg_level && 
+				    IP_PKTINFO == cmsg->cmsg_type)
+				{
+					pktinfo				= CMSG_DATA(cmsg);
+					const struct in_pktinfo* in	= pktinfo;
+					struct sockaddr_in* sin		= (struct sockaddr_in*)dst_addr;
+					sin->sin_family			= AF_INET;
+					sin->sin_addr.s_addr		= in->ipi_addr.s_addr;
+					break;
+				}
+
+				if (IPPROTO_IPV6 == cmsg->cmsg_level && 
+				    IPV6_PKTINFO == cmsg->cmsg_type)
+				{
+					pktinfo				= CMSG_DATA(cmsg);
+					const struct in6_pktinfo* in6	= pktinfo;
+					struct sockaddr_in6* sin6	= (struct sockaddr_in6*)dst_addr;
+					sin6->sin6_family		= AF_INET6;
+					sin6->sin6_addr			= in6->ipi6_addr;
+					sin6->sin6_scope_id		= in6->ipi6_ifindex;
+/* does not set flow id */
+					break;
+				}
+			}
+/* discard on invalid address */
+			if (NULL == pktinfo)
+				return -1;
+		}
 		return transport->rx_buffer->len;
 	}
 
