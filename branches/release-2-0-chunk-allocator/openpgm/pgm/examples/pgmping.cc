@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,7 +79,12 @@ static gboolean g_fec = FALSE;
 static int g_k = 64;
 static int g_n = 255;
 
-static gboolean g_send_mode = TRUE;
+static enum {
+	PGMPING_MODE_SOURCE,
+	PGMPING_MODE_RECEIVER,
+	PGMPING_MODE_INITIATOR,
+	PGMPING_MODE_REFLECTOR
+} g_mode = PGMPING_MODE_INITIATOR;
 
 static pgm_transport_t* g_transport = NULL;
 
@@ -89,11 +95,12 @@ static pgm_time_t g_interval_start = 0;
 static pgm_time_t g_latency_current = 0;
 static guint64 g_latency_seqno = 0;
 static guint64 g_last_seqno = 0;
-static pgm_time_t g_latency_total = 0;
+static double g_latency_total = 0.0;
+static double g_latency_square_total = 0.0;
 static guint64 g_latency_count = 0;
-static pgm_time_t g_latency_max = 0;
-static pgm_time_t g_latency_min = -1;
-static pgm_time_t g_latency_running_average = 0;
+static double g_latency_max = 0.0;
+static double g_latency_min = INFINITY;
+static double g_latency_running_average = 0.0;
 static guint64 g_out_total = 0;
 static guint64 g_in_total = 0;
 
@@ -129,7 +136,9 @@ usage (const char* bin)
         fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -d <seconds>    : Terminate transport after duration.\n");
 	fprintf (stderr, "  -m <frequency>  : Number of message to send per second\n");
-	fprintf (stderr, "  -l              : Listen mode (default send mode)\n");
+	fprintf (stderr, "  -o              : Send-only mode (default send & receive mode)\n");
+	fprintf (stderr, "  -l              : Listen-only mode\n");
+	fprintf (stderr, "  -e              : Relect mode\n");
         fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
         fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
         fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
@@ -160,7 +169,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:m:ld:r:e:k:g:txh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:old:r:fek:g:txh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -179,7 +188,9 @@ main (
 				g_odata_interval = (1000 * 1000) / g_odata_rate; break;
 		case 'd':	timeout = 1000 * atoi (optarg); break;
 
-		case 'l':	g_send_mode = FALSE; break;
+		case 'o':	g_mode = PGMPING_MODE_SOURCE; break;
+		case 'l':	g_mode = PGMPING_MODE_RECEIVER; break;
+		case 'e':	g_mode = PGMPING_MODE_REFLECTOR; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -257,14 +268,16 @@ main (
 #ifdef G_OS_UNIX
 	const char one = '1';
 	write (g_quit_pipe[1], &one, sizeof(one));
-	if (g_send_mode)
+	if (PGMPING_MODE_SOURCE == g_mode || PGMPING_MODE_INITIATOR == g_mode)
 		g_thread_join (g_sender_thread);
 	g_thread_join (g_receiver_thread);
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
 #else
 	SetEvent (g_quit_event);
-	g_thread_join (g_thread);
+	if (PGMPING_MODE_SOURCE == g_mode || PGMPING_MODE_INITIATOR == g_mode)
+		g_thread_join (g_sender_thread);
+	g_thread_join (g_receiver_thread);
 	CloseHandle (g_quit_event);
 #endif
 
@@ -380,16 +393,25 @@ on_startup (
 
 /* set PGM parameters */
 	pgm_transport_set_nonblocking (g_transport, TRUE);
-	if (g_send_mode) {
+	if (PGMPING_MODE_SOURCE == g_mode ||
+	    PGMPING_MODE_INITIATOR == g_mode ||
+	    PGMPING_MODE_REFLECTOR == g_mode)
+	{
 		const guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 
-		pgm_transport_set_send_only (g_transport, TRUE);
+		if (PGMPING_MODE_SOURCE == g_mode)
+			pgm_transport_set_send_only (g_transport, TRUE);
 		pgm_transport_set_txw_sqns (g_transport, g_sqns * 4);
 		pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
 		pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
 		pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
-	} else {
-		pgm_transport_set_recv_only (g_transport, TRUE);
+	}
+	if (PGMPING_MODE_RECEIVER == g_mode ||
+	    PGMPING_MODE_INITIATOR == g_mode ||
+	    PGMPING_MODE_REFLECTOR == g_mode)
+	{
+		if (PGMPING_MODE_RECEIVER == g_mode)
+			pgm_transport_set_recv_only (g_transport, TRUE, FALSE);
 		pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
 		pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
 		pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));
@@ -421,7 +443,7 @@ on_startup (
 // TODO: Gnome 2.14: replace with g_timeout_add_seconds()
 	g_timeout_add (2 * 1000, (GSourceFunc)on_mark, NULL);
 
-	if (g_send_mode)
+	if (PGMPING_MODE_SOURCE == g_mode || PGMPING_MODE_INITIATOR == g_mode)
 	{
 		g_sender_thread = g_thread_create_full (sender_thread,
 							g_transport,
@@ -519,7 +541,7 @@ sender_thread (
 
 		const int header_size = pgm_transport_pkt_offset(FALSE);
 		const int apdu_size = ping.ByteSize();
-		struct pgm_sk_buff_t* skb = pgm_chunk_alloc_skb (pgm_get_send_allocator(g_transport));
+		struct pgm_sk_buff_t* skb = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
 		pgm_skb_reserve (skb, header_size);
 		pgm_skb_put (skb, apdu_size);
 		ping.SerializeToArray (skb->data, skb->len);
@@ -683,6 +705,27 @@ on_msgv (
 		for (unsigned j = 0; j < msgv[i].msgv_len; j++)
 			apdu_len += msgv[i].msgv_skb[j]->len;
 
+		if (PGMPING_MODE_REFLECTOR == g_mode)
+		{
+			PGMIOStatus status;
+again:
+			status = pgm_send (g_transport, pskb->data, pskb->len, NULL);
+			switch (status) {
+			case PGM_IO_STATUS_RATE_LIMITED:
+			case PGM_IO_STATUS_WOULD_BLOCK:
+				goto again;
+
+			case PGM_IO_STATUS_NORMAL:
+				break;
+
+			default:
+				g_warning ("pgm_send_skbv failed");
+				g_main_loop_quit (g_loop);
+				return 0;
+			}
+			goto next_msg;
+		}
+
 /* only parse first fragment of each apdu */
 		if (!ping.ParseFromArray (pskb->data, pskb->len))
 			goto next_msg;
@@ -697,22 +740,22 @@ on_msgv (
 			g_msg_received++;
 
 /* handle ping */
-			const pgm_time_t elapsed = pskb->tstamp - send_time;
+			const double elapsed = pgm_to_usecsf (pskb->tstamp - send_time);
 
-			if (pgm_time_after(send_time, pskb->tstamp)) {
+			if (pgm_time_after(send_time, pskb->tstamp)){
 				g_message ("timer mismatch, send time = now + %.3f ms",
 					   pgm_to_msecsf(send_time - pskb->tstamp));
 				goto next_msg;
 			}
-			g_latency_current	= pgm_to_secs(elapsed);
+			g_latency_current	= pgm_to_secs(pskb->tstamp - send_time);
 			g_latency_seqno		= seqno;
 			g_latency_total	       += elapsed;
+			g_latency_square_total += elapsed * elapsed;
 
-			if (elapsed > g_latency_max) {
+			if (elapsed > g_latency_max)
 				g_latency_max = elapsed;
-			} else if (elapsed < g_latency_min) {
+			if (elapsed < g_latency_min)
 				g_latency_min = elapsed;
-			}
 
 			g_latency_running_average += elapsed;
 			g_latency_count++;
@@ -737,40 +780,46 @@ on_mark (
 	)
 {
 	const pgm_time_t now = pgm_time_update_now ();
-	double interval = pgm_to_secsf(now - g_interval_start);
+	const double interval = pgm_to_secsf(now - g_interval_start);
 	g_interval_start = now;
 
 /* receiving a ping */
 	if (g_latency_count)
 	{
-		pgm_time_t average = g_latency_total / g_latency_count;
+		const double average = g_latency_total / g_latency_count;
+		const double variance = g_latency_square_total / g_latency_count
+					- average * average;
+		const double standard_deviation = sqrt (variance);
 
 		if (g_latency_count < 10)
 		{
-			g_message ("seqno=%" G_GUINT64_FORMAT " time=%.03f ms",
-					g_latency_seqno,
-					pgm_to_msecsf(average));
+			if (average < 1000.0)
+				g_message ("seqno=%" G_GUINT64_FORMAT " time=%.01f us",
+						g_latency_seqno, average);
+			else
+				g_message ("seqno=%" G_GUINT64_FORMAT " time=%.01f ms",
+						g_latency_seqno, average / 1000);
 		}
 		else
 		{
 			double seq_rate = (g_latency_seqno - g_last_seqno) / interval;
 			double out_rate = g_out_total * 8.0 / 1000000.0 / interval;
 			double  in_rate = g_in_total  * 8.0 / 1000000.0 / interval;
-			g_message ("s=%.01f avg=%.03f min=%.03f max=%.03f ms o=%.2f i=%.2f mbit",
-					seq_rate,
-					pgm_to_msecsf(average),
-					pgm_to_msecsf(g_latency_min),
-					pgm_to_msecsf(g_latency_max),
-					out_rate,
-					in_rate);
+			if (g_latency_min < 1000.0)
+				g_message ("s=%.01f avg=%.01f min=%.01f max=%.01f stddev=%0.1f us o=%.2f i=%.2f mbit",
+					seq_rate, average, g_latency_min, g_latency_max, standard_deviation, out_rate, in_rate);
+			else
+				g_message ("s=%.01f avg=%.01f min=%.01f max=%.01f stddev=%0.1f ms o=%.2f i=%.2f mbit",
+					seq_rate, average / 1000, g_latency_min / 1000, g_latency_max / 1000, standard_deviation / 1000, out_rate, in_rate);
 		}
 
 /* reset interval counters */
-		g_latency_total		= 0;
+		g_latency_total		= 0.0;
+		g_latency_square_total	= 0.0;
 		g_latency_count		= 0;
 		g_last_seqno		= g_latency_seqno;
-		g_latency_min		= -1;
-		g_latency_max		= 0;
+		g_latency_min		= INFINITY;
+		g_latency_max		= 0.0;
 		g_out_total		= 0;
 		g_in_total		= 0;
 	}

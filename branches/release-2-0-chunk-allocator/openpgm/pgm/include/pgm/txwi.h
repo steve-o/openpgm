@@ -75,7 +75,6 @@ struct pgm_txw_t {
         guint32			trail;
 
 	pgm_allocator		allocator;
-	pgm_chunk*		last_chunk;
         GQueue			retransmit_queue;
 
 	rs_t			rs;

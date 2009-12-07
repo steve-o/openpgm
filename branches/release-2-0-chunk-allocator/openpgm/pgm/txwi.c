@@ -195,9 +195,10 @@ pgm_txw_create (
 	window->tsi = tsi;
 
 /* chunk allocator */
-	pgm_allocator_create (&window->allocator,
-			      sizeof(struct pgm_sk_buff_t) + tpdu_size,		/* atom size */
-			      4 * (sizeof(struct pgm_sk_buff_t) + tpdu_size));	/* chunk size */
+	const guint atom_size = sizeof(struct pgm_sk_buff_t) + tpdu_size;
+	const guint aligned_atom_size = (atom_size + (G_MEM_ALIGN - 1)) & ~(G_MEM_ALIGN - 1);
+	const gulong chunk_size = 4 * aligned_atom_size;
+	pgm_allocator_create (&window->allocator, atom_size, chunk_size);
 
 /* empty state for transmission group boundaries to align.
  *
@@ -301,10 +302,6 @@ pgm_txw_add (
 
 	g_trace ("add (window:%p skb:%p)", (gpointer)window, (gpointer)skb);
 
-/* track end of chunk */
-	if (NULL == window->last_chunk)
-		window->last_chunk = pgm_chunk_get_current_chunk (&window->allocator);
-
 	if (pgm_txw_is_full (window))
 	{
 /* transmit window advancement scheme dependent action here */
@@ -383,12 +380,8 @@ pgm_txw_remove_tail (
 #endif
 	if (g_atomic_int_dec_and_test (&skb->users))
 	{
-		if (pgm_chunk_is_last_skb (&window->allocator, window->last_chunk, skb))
-		{
-			pgm_chunk* temp_chunk = window->last_chunk->next;
-			pgm_chunk_free (window->last_chunk);
-			window->last_chunk = temp_chunk;
-		}
+		if (pgm_chunk_is_last_skb (&window->allocator, skb))
+			pgm_chunk_free (&window->allocator);
 	} else {
 		g_warning ("Transmit window PGM SKB still owned by application.");
 	}
