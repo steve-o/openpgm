@@ -160,7 +160,7 @@ nak_rb_ivl (
 /* mark sequence as recovery failed.
  */
 
-static inline
+static
 void
 cancel_skb (
 	pgm_transport_t*	transport,

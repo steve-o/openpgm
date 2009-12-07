@@ -129,7 +129,7 @@ pgm_txw_retransmit_can_peek (
 
 /* globals */
 
-static inline void pgm_txw_remove_tail (pgm_txw_t* const);
+static void pgm_txw_remove_tail (pgm_txw_t* const);
 static int pgm_txw_retransmit_push_parity (pgm_txw_t* const, const guint32, const guint);
 static int pgm_txw_retransmit_push_selective (pgm_txw_t* const, const guint32);
 
@@ -338,7 +338,7 @@ pgm_txw_peek (
  * returns 0 if entry successfully removed, returns -1 on error.
  */
 
-static inline
+static
 void
 pgm_txw_remove_tail (
 	pgm_txw_t* const	window
@@ -676,13 +676,13 @@ pgm_txw_retransmit_try_peek (
  *
  *   "warning: dereferencing type-punned pointer will break strict-aliasing rules"
  */
-		pgm_rs_encode (&window->rs, (const void**)opt_src, window->rs.k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
+		pgm_rs_encode (&window->rs, (const void**)(void*)opt_src, window->rs.k + rs_h, opt_fragment + sizeof(struct pgm_opt_header), sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
 
 		data_bytes = opt_fragment + 1;
 	}
 
 /* encode payload */
-	pgm_rs_encode (&window->rs, (const void**)src, window->rs.k + rs_h, data_bytes, parity_length);
+	pgm_rs_encode (&window->rs, (const void**)(void*)src, window->rs.k + rs_h, data_bytes, parity_length);
 
 /* calculate partial checksum */
 	const guint tsdu_length = g_ntohs (skb->pgm_header->pgm_tsdu_length);
