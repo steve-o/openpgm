@@ -28,6 +28,8 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'true',
 			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
+			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
