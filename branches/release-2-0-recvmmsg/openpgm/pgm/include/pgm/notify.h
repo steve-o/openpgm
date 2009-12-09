@@ -126,6 +126,11 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 	notify->s[0] = accept (listener, NULL, NULL);
 	g_assert (notify->s[0] != INVALID_SOCKET);
 
+// Set read-end to non-blocking mode
+	unsigned long one = 1;
+	rc = ioctlsocket (notify->s[0], FIONBIO, &one);
+	g_assert (rc != SOCKET_ERROR);
+
 // We don't need the listening socket anymore. Close it.
 	rc = closesocket (listener);
 	g_assert (rc != SOCKET_ERROR);

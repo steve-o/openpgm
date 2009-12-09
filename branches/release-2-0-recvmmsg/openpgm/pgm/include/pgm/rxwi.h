@@ -36,10 +36,6 @@
 #   include <pgm/packet.h>
 #endif
 
-#ifndef __PGM_ERR_H__
-#   include <pgm/err.h>
-#endif
-
 #ifndef __PGM_SKBUFF_H__
 #	include <pgm/skbuff.h>
 #endif
@@ -149,12 +145,12 @@ typedef struct pgm_rxw_t pgm_rxw_t;
 
 G_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t* const);
-G_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gssize pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_rxw_remove_trail (pgm_rxw_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const guint);
-G_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const guint32);
 G_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 G_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const guint32) G_GNUC_WARN_UNUSED_RESULT;

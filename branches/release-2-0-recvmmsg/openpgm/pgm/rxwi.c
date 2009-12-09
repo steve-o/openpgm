@@ -83,41 +83,39 @@ _pgm_tsi_is_null (
 	return 0 == memcmp (&nulltsi, tsi, sizeof(nulltsi));
 }
 
-static inline void _pgm_rxw_define (pgm_rxw_t* const, const guint32);
-static inline void _pgm_rxw_update_trail (pgm_rxw_t* const, const guint32);
-static inline guint32 _pgm_rxw_update_lead (pgm_rxw_t* const, const guint32, const pgm_time_t);
+static void _pgm_rxw_define (pgm_rxw_t* const, const guint32);
+static void _pgm_rxw_update_trail (pgm_rxw_t* const, const guint32);
+static inline guint32 _pgm_rxw_update_lead (pgm_rxw_t* const, const guint32, const pgm_time_t, const pgm_time_t);
 static inline guint32 _pgm_rxw_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline guint32 _pgm_rxw_pkt_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline void _pgm_rxw_remove_tg_sqn (pgm_rxw_t* const, const guint32);
-static inline int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static inline int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static inline int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t);
+static int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
+static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t);
+static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t, const pgm_time_t);
 static inline void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
-static inline guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
+static guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
 static inline void _pgm_rxw_lost (pgm_rxw_t* const, const guint32);
-static inline void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
+static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline gssize _pgm_rxw_incoming_read (pgm_rxw_t* const, pgm_msgv_t**, guint);
 static inline gboolean _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const guint32);
 static inline gssize _pgm_rxw_incoming_read_apdu (pgm_rxw_t* const, pgm_msgv_t**);
 static inline int _pgm_rxw_recovery_update (pgm_rxw_t* const, const guint32, const pgm_time_t);
-static inline int _pgm_rxw_recovery_append (pgm_rxw_t* const, const pgm_time_t);
+static inline int _pgm_rxw_recovery_append (pgm_rxw_t* const, const pgm_time_t, const pgm_time_t);
 
 
 /* returns the pointer at the given index of the window.
  */
 
-static inline
+static
 struct pgm_sk_buff_t*
 _pgm_rxw_peek (
 	const pgm_rxw_t* const	window,
 	const guint32		sequence
 	)
 {
-	struct pgm_sk_buff_t* skb;
-
 /* pre-conditions */
 	g_assert (window);
 
@@ -127,18 +125,17 @@ _pgm_rxw_peek (
 	if (pgm_uint32_gte (sequence, window->trail) && pgm_uint32_lte (sequence, window->lead))
 	{
 		const guint32 index_ = sequence % pgm_rxw_max_length (window);
-		skb = window->pdata[index_];
+		struct pgm_sk_buff_t* skb = window->pdata[index_];
 /* availability only guaranteed inside commit window */
 		if (pgm_uint32_lt (sequence, window->commit_lead)) {
 			g_assert (skb);
 			g_assert (pgm_skb_is_valid (skb));
 			g_assert (!_pgm_tsi_is_null (&skb->tsi));
 		}
+		return skb;
 	}
-	else
-		skb = NULL;
 
-	return skb;
+	return NULL;
 }
 
 /* sections of the receive window:
@@ -329,6 +326,7 @@ int
 pgm_rxw_add (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
+	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry	/* calculated expiry time for this skb */
 	)
 {
@@ -407,13 +405,13 @@ pgm_rxw_add (
 			window->has_event = 1;
 			if (NULL == first_state || first_state->is_contiguous) {
 				state->is_contiguous = 1;
-				return _pgm_rxw_append (window, skb);
+				return _pgm_rxw_append (window, skb, now);
 			} else
 				return _pgm_rxw_insert (window, skb);
 		}
 
 		g_assert (first_state);
-		status = _pgm_rxw_add_placeholder_range (window, _pgm_rxw_tg_sqn (window, skb->sequence), nak_rb_expiry);
+		status = _pgm_rxw_add_placeholder_range (window, _pgm_rxw_tg_sqn (window, skb->sequence), now, nak_rb_expiry);
 	}
 	else
 	{
@@ -433,14 +431,14 @@ pgm_rxw_add (
 			window->has_event = 1;
 			if (_pgm_rxw_is_first_of_tg_sqn (window, skb->sequence))
 				state->is_contiguous = 1;
-			return _pgm_rxw_append (window, skb);
+			return _pgm_rxw_append (window, skb, now);
 		}
 
-		status = _pgm_rxw_add_placeholder_range (window, skb->sequence, nak_rb_expiry);
+		status = _pgm_rxw_add_placeholder_range (window, skb->sequence, now, nak_rb_expiry);
 	}
 
 	if (PGM_RXW_APPENDED == status) {
-		status = _pgm_rxw_append (window, skb);
+		status = _pgm_rxw_append (window, skb, now);
 		if (PGM_RXW_APPENDED == status)
 			status = PGM_RXW_MISSING;
 	}
@@ -455,7 +453,7 @@ pgm_rxw_add (
 /* define window by parameters of first data packet.
  */
 
-static inline
+static
 void
 _pgm_rxw_define (
 	pgm_rxw_t* const	window,
@@ -491,6 +489,7 @@ pgm_rxw_update (
 	pgm_rxw_t* const	window,
 	const guint32		txw_lead,
 	const guint32		txw_trail,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rb_expiry		/* packet expiration time */
 	)
 {
@@ -507,13 +506,13 @@ pgm_rxw_update (
 	}
 
 	_pgm_rxw_update_trail (window, txw_trail);
-	return _pgm_rxw_update_lead (window, txw_lead, nak_rb_expiry);
+	return _pgm_rxw_update_lead (window, txw_lead, now, nak_rb_expiry);
 }
 
 /* update trailing edge of receive window
  */
 
-static inline
+static
 void
 _pgm_rxw_update_trail (
 	pgm_rxw_t* const	window,
@@ -624,6 +623,7 @@ static
 void
 _pgm_rxw_add_placeholder (
 	pgm_rxw_t* const	window,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rb_expiry
 	)
 {
@@ -638,7 +638,7 @@ _pgm_rxw_add_placeholder (
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
-	skb->tstamp		= pgm_time_now;
+	skb->tstamp		= now;
 	skb->sequence		= window->lead;
 	state->nak_rb_expiry	= nak_rb_expiry;
 
@@ -671,6 +671,7 @@ int
 _pgm_rxw_add_placeholder_range (
 	pgm_rxw_t* const	window,
 	const guint32		sequence,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rb_expiry
 	)
 {
@@ -683,7 +684,7 @@ _pgm_rxw_add_placeholder_range (
         if ( !_pgm_rxw_commit_is_empty (window) &&
 	     (new_commit_sqns >= pgm_rxw_max_length (window)) )
         {
-		_pgm_rxw_update_lead (window, sequence, nak_rb_expiry);
+		_pgm_rxw_update_lead (window, sequence, now, nak_rb_expiry);
 		return PGM_RXW_BOUNDS;		/* effectively a slow consumer */
         }
 
@@ -695,7 +696,7 @@ _pgm_rxw_add_placeholder_range (
  */
 	while (pgm_rxw_next_lead (window) != sequence)
 	{
-		_pgm_rxw_add_placeholder (window, nak_rb_expiry);
+		_pgm_rxw_add_placeholder (window, now, nak_rb_expiry);
 		if (pgm_rxw_is_full (window))
 			_pgm_rxw_remove_trail (window);
 	}
@@ -716,6 +717,7 @@ guint
 _pgm_rxw_update_lead (
 	pgm_rxw_t* const	window,
 	const guint32		txw_lead,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rb_expiry
 	)
 {
@@ -748,7 +750,7 @@ _pgm_rxw_update_lead (
 		{
 			_pgm_rxw_remove_trail (window);
 		}
-		_pgm_rxw_add_placeholder (window, nak_rb_expiry);
+		_pgm_rxw_add_placeholder (window, now, nak_rb_expiry);
 		lost++;
 	}
 
@@ -929,7 +931,7 @@ _pgm_rxw_is_invalid_payload_op (
  * PGM_RXW_BOUNDS - packet out of window.
  */
 
-static inline
+static
 int
 _pgm_rxw_insert (
 	pgm_rxw_t* const		window,
@@ -1016,6 +1018,8 @@ _pgm_rxw_insert (
 
 /* replace place holder skb with incoming skb */
 	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
+	((pgm_rxw_state_t*)new_skb->cb)->state = PGM_PKT_ERROR_STATE;
+	_pgm_rxw_unlink (window, skb);
 	pgm_free_skb (skb);
 	const guint32 index_ = new_skb->sequence % pgm_rxw_max_length (window);
 	window->pdata[index_] = new_skb;
@@ -1068,11 +1072,12 @@ _pgm_rxw_shuffle_parity (
  * PGM_RXW_BOUNDS - packet out of window.
  */
 
-static inline
+static
 int
 _pgm_rxw_append (
 	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb
+	struct pgm_sk_buff_t* const	skb,
+	const pgm_time_t		now
 	)
 {
 /* pre-conditions */
@@ -1099,7 +1104,7 @@ _pgm_rxw_append (
 	    _pgm_rxw_is_apdu_lost (window, skb))
 	{
 		struct pgm_sk_buff_t* lost_skb	= pgm_alloc_skb (window->max_tpdu);
-		lost_skb->tstamp		= pgm_time_now;
+		lost_skb->tstamp		= now;
 		lost_skb->sequence		= skb->sequence;
 
 /* add lost-placeholder skb to window */
@@ -1204,7 +1209,7 @@ pgm_rxw_readv (
  * returns number of sequences purged.
  */
 
-static inline
+static
 guint
 _pgm_rxw_remove_trail (
 	pgm_rxw_t* const	window
@@ -1317,7 +1322,7 @@ _pgm_rxw_is_tg_sqn_lost (
 /* reconstruct missing sequences in a transmission group using embedded parity data.
  */
 
-static inline
+static
 void
 _pgm_rxw_reconstruct (
 	pgm_rxw_t* const	window,
@@ -1704,7 +1709,7 @@ _pgm_rxw_remove_tg_sqn (
 /* set PGM skbuff to new FSM state.
  */
 
-static inline
+static
 void
 _pgm_rxw_state (
 	pgm_rxw_t* const		window,
@@ -1912,6 +1917,7 @@ int
 pgm_rxw_confirm (
 	pgm_rxw_t* const	window,
 	const guint32		sequence,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rdata_expiry,		/* pre-calculated expiry times */
 	const pgm_time_t	nak_rb_expiry
 	)
@@ -1938,10 +1944,10 @@ pgm_rxw_confirm (
 		return _pgm_rxw_recovery_update (window, sequence, nak_rdata_expiry);
 
 	if (sequence == window->lead) 
-		return _pgm_rxw_recovery_append (window, nak_rdata_expiry);
+		return _pgm_rxw_recovery_append (window, now, nak_rdata_expiry);
 	else {
-		_pgm_rxw_add_placeholder_range (window, sequence, nak_rb_expiry);
-		return _pgm_rxw_recovery_append (window, nak_rdata_expiry);
+		_pgm_rxw_add_placeholder_range (window, sequence, now, nak_rb_expiry);
+		return _pgm_rxw_recovery_append (window, now, nak_rdata_expiry);
 	}
 }
 
@@ -1999,6 +2005,7 @@ static inline
 int
 _pgm_rxw_recovery_append (
 	pgm_rxw_t* const	window,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rdata_expiry		/* pre-calculated expiry times */
 	)
 {
@@ -2015,7 +2022,7 @@ _pgm_rxw_recovery_append (
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
-	skb->tstamp		= pgm_time_now;
+	skb->tstamp		= now;
 	skb->sequence		= window->lead;
 	state->nak_rdata_expiry	= nak_rdata_expiry;
 

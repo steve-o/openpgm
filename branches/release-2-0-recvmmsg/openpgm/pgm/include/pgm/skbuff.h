@@ -22,6 +22,7 @@
 #ifndef __PGM_SKBUFF_H__
 #define __PGM_SKBUFF_H__
 
+#include <stdlib.h>
 #include <glib.h>
 
 struct pgm_sk_buff_t;
@@ -83,7 +84,11 @@ static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint16 size)
 	struct pgm_sk_buff_t* skb;
 
 	skb = (struct pgm_sk_buff_t*)g_slice_alloc (size + sizeof(struct pgm_sk_buff_t));
+#ifdef CONFIG_GC_FRIENDLY
+	memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
+#else
 	memset (skb, 0, sizeof(struct pgm_sk_buff_t));
+#endif
 	skb->truesize = size + sizeof(struct pgm_sk_buff_t);
 	g_atomic_int_set (&skb->users, 1);
 	skb->head = skb + 1;
@@ -179,6 +184,10 @@ static inline void pgm_skb_zero_pad (struct pgm_sk_buff_t* const skb, const guin
 
 /* PGM skbuff for data, in-state skbuffs will return FALSE.
  */
+#ifndef SKB_DEBUG
+static inline gboolean pgm_skb_is_valid (G_GNUC_UNUSED const struct pgm_sk_buff_t* const skb)
+{
+#else
 static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
 {
 	g_return_val_if_fail (skb, FALSE);
@@ -230,6 +239,7 @@ static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
 	g_return_val_if_fail (skb->truesize == (guint)((const guint8*)skb->end - (const guint8*)skb), FALSE);
 /* users */
 	g_return_val_if_fail (g_atomic_int_get (&skb->users) > 0, FALSE);
+#endif
 	return TRUE;
 }
 

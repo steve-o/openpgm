@@ -69,7 +69,6 @@
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
-#include "pgm/err.h"
 #include "pgm/histogram.h"
 
 
@@ -161,7 +160,7 @@ nak_rb_ivl (
 /* mark sequence as recovery failed.
  */
 
-static inline
+static
 void
 cancel_skb (
 	pgm_transport_t*	transport,
@@ -783,6 +782,7 @@ pgm_on_spm (
 		const guint naks = pgm_rxw_update (source->window,
 						   g_ntohl (spm->spm_lead),
 						   g_ntohl (spm->spm_trail),
+						   skb->tstamp,
 						   nak_rb_expiry);
 		if (naks) {
 			pgm_timer_lock (transport);
@@ -928,6 +928,7 @@ pgm_on_peer_nak (
 /* handle as NCF */
 	int status = pgm_rxw_confirm (peer->window,
 				      g_ntohl (nak->nak_sqn),
+				      skb->tstamp,
 				      skb->tstamp + transport->nak_rdata_ivl,
 				      skb->tstamp + nak_rb_ivl(transport));
 	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -969,6 +970,7 @@ pgm_on_peer_nak (
 	while (nak_list_len) {
 		status = pgm_rxw_confirm (peer->window,
 					  g_ntohl (*nak_list),
+					  skb->tstamp,
 					  skb->tstamp + transport->nak_rdata_ivl,
 					  skb->tstamp + nak_rb_ivl(transport));
 		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -1047,6 +1049,7 @@ pgm_on_ncf (
 	const pgm_time_t ncf_rb_ivl    = skb->tstamp + nak_rb_ivl(transport);
 	int status = pgm_rxw_confirm (source->window,
 				      g_ntohl (ncf->nak_sqn),
+				      skb->tstamp,
 				      ncf_rdata_ivl,
 				      ncf_rb_ivl);
 	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -1098,6 +1101,7 @@ pgm_on_ncf (
 	{
 		status = pgm_rxw_confirm (source->window,
 					  g_ntohl (*ncf_list),
+					  skb->tstamp,
 					  ncf_rdata_ivl,
 					  ncf_rb_ivl);
 		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -1355,7 +1359,9 @@ send_nak_list (
 	if (AFI_IP6 == pgm_sockaddr_family(&source->nla))
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
-	memset (buf, 0, sizeof(buf));
+#ifdef CONFIG_GC_FRIENDLY
+	memset (buf, 0, tpdu_length);
+#endif
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
 	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
@@ -2069,7 +2075,7 @@ pgm_on_data (
 	if (opt_total_length > 0)
 		 get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
 
-	const int add_status = pgm_rxw_add (source->window, skb, nak_rb_expiry);
+	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
 
 /* skb reference is now invalid */
 	gboolean flush_naks = FALSE;
