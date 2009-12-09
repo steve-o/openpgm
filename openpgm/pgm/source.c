@@ -67,7 +67,6 @@
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
-#include "pgm/err.h"
 
 //#define SOURCE_DEBUG
 //#define SPM_DEBUG
@@ -90,7 +89,6 @@
 
 
 /* locals */
-static gboolean send_spm (pgm_transport_t* const);
 static void reset_heartbeat_spm (pgm_transport_t* const);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
@@ -624,6 +622,9 @@ pgm_send_spm (
 				       sizeof(struct pgm_opt_fin);
 	}
 	guint8 buf[ tpdu_length ];
+#ifdef CONFIG_GC_FRIENDLY
+	memset (buf, 0, tpdu_length);
+#endif
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
 	struct pgm_spm6 *spm6 = (struct pgm_spm6*)(header + 1);
@@ -2102,6 +2103,7 @@ send_rdata (
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 	pgm_timer_unlock (transport);
 
+	pgm_txw_inc_retransmit_count (skb);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
 	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);

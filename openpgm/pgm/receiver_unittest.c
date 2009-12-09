@@ -28,6 +28,9 @@
 #include <pgm/receiver.h>
 #include <pgm/rxwi.h>
 
+#define pgm_histogram_add	mock_pgm_histogram_add
+#include <pgm/histogram.h>
+
 
 /* mock state */
 
@@ -199,6 +202,7 @@ int
 mock_pgm_rxw_confirm (
 	pgm_rxw_t* const	window,
 	const guint32		sequence,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rdata_expiry,
 	const pgm_time_t	nak_rb_expiry
 	)
@@ -231,6 +235,7 @@ mock_pgm_rxw_update (
 	pgm_rxw_t* const		window,
 	const guint32			txw_lead,
 	const guint32			txw_trail,
+	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry
 	)
 {
@@ -251,6 +256,7 @@ int
 mock_pgm_rxw_add (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
+	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry
 	)
 {
@@ -289,6 +295,20 @@ mock_pgm_compat_csum_partial (
 	return 0x0;
 }
 
+void
+mock_pgm_histogram_init (
+	pgm_histogram_t*	histogram
+	)
+{
+}
+
+void
+mock_pgm_histogram_add (
+	pgm_histogram_t*	histogram,
+	int			value
+	)
+{
+}
 
 /* mock functions for external references */
 
@@ -309,6 +329,7 @@ mock_pgm_compat_csum_partial (
 #define pgm_rxw_readv		mock_pgm_rxw_readv
 #define pgm_csum_fold		mock_pgm_csum_fold
 #define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
+#define pgm_histogram_init	mock_pgm_histogram_init
 
 #define RECEIVER_DEBUG
 #include "receiver.c"

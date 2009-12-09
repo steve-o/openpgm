@@ -213,6 +213,7 @@ struct pgm_peer_t {
 	struct sockaddr_storage	nla, local_nla;		/* nla = advertised, local_nla = from packet */
 	struct sockaddr_storage	redirect_nla;		/* from dlr */
 	pgm_time_t		spmr_expiry;
+	pgm_time_t		spmr_tstamp;
 
 	gpointer            	window;			/* pgm_rxw_t */
 	pgm_transport_t*    	transport;

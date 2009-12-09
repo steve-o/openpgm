@@ -188,7 +188,7 @@ is_in_net (
 	return TRUE;
 }
 
-static inline
+static
 gboolean
 is_in_net6 (
 	const struct in6_addr*	addr,
@@ -592,7 +592,7 @@ parse_interface (
  * ff05::1:3 DHCP
  */
 
-static inline
+static
 gboolean
 parse_group (
 	const int		family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
@@ -1046,7 +1046,7 @@ parse_receive_entity (
 	return TRUE;
 }
 
-static inline
+static
 gboolean
 parse_send_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
