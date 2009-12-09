@@ -69,7 +69,8 @@
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
-#include "pgm/err.h"
+#include "pgm/histogram.h"
+
 
 //#define RECEIVER_DEBUG
 //#define SPM_DEBUG
@@ -154,6 +155,35 @@ nak_rb_ivl (
 	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
 
 	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
+}
+
+/* mark sequence as recovery failed.
+ */
+
+static
+void
+cancel_skb (
+	pgm_transport_t*	transport,
+	pgm_peer_t*		peer,
+	struct pgm_sk_buff_t*	skb,
+	pgm_time_t		now
+	)
+{
+	g_trace ("INFO", "lost data #%u due to cancellation.", skb->sequence);
+
+	const guint32 fail_time = now - skb->tstamp;
+	if (!peer->max_fail_time)
+		peer->max_fail_time = peer->min_fail_time = fail_time;
+	else if (fail_time > peer->max_fail_time)
+		peer->max_fail_time = fail_time;
+	else if (fail_time < peer->min_fail_time)
+		peer->min_fail_time = fail_time;
+
+	pgm_rxw_lost (peer->window, skb->sequence);
+	PGM_HISTOGRAM_TIMES("Rx.FailTime", fail_time);
+
+/* mark receiver window for flushing on next recv() */
+	pgm_peer_set_pending (transport, peer);
 }
 
 /* increase reference count for peer object
@@ -752,6 +782,7 @@ pgm_on_spm (
 		const guint naks = pgm_rxw_update (source->window,
 						   g_ntohl (spm->spm_lead),
 						   g_ntohl (spm->spm_trail),
+						   skb->tstamp,
 						   nak_rb_expiry);
 		if (naks) {
 			pgm_timer_lock (transport);
@@ -831,6 +862,10 @@ pgm_on_spm (
 /* either way bump expiration timer */
 	source->expiry = skb->tstamp + transport->peer_expiry;
 	source->spmr_expiry = 0;
+	if (source->spmr_tstamp > 0) {
+		PGM_HISTOGRAM_TIMES("Rx.SpmRequestResponseTime", skb->tstamp - source->spmr_tstamp);
+		source->spmr_tstamp = 0;
+	}
 	return TRUE;
 }
 
@@ -893,6 +928,7 @@ pgm_on_peer_nak (
 /* handle as NCF */
 	int status = pgm_rxw_confirm (peer->window,
 				      g_ntohl (nak->nak_sqn),
+				      skb->tstamp,
 				      skb->tstamp + transport->nak_rdata_ivl,
 				      skb->tstamp + nak_rb_ivl(transport));
 	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -934,6 +970,7 @@ pgm_on_peer_nak (
 	while (nak_list_len) {
 		status = pgm_rxw_confirm (peer->window,
 					  g_ntohl (*nak_list),
+					  skb->tstamp,
 					  skb->tstamp + transport->nak_rdata_ivl,
 					  skb->tstamp + nak_rb_ivl(transport));
 		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -1012,6 +1049,7 @@ pgm_on_ncf (
 	const pgm_time_t ncf_rb_ivl    = skb->tstamp + nak_rb_ivl(transport);
 	int status = pgm_rxw_confirm (source->window,
 				      g_ntohl (ncf->nak_sqn),
+				      skb->tstamp,
 				      ncf_rdata_ivl,
 				      ncf_rb_ivl);
 	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -1063,6 +1101,7 @@ pgm_on_ncf (
 	{
 		status = pgm_rxw_confirm (source->window,
 					  g_ntohl (*ncf_list),
+					  skb->tstamp,
 					  ncf_rdata_ivl,
 					  ncf_rb_ivl);
 		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
@@ -1320,7 +1359,9 @@ send_nak_list (
 	if (AFI_IP6 == pgm_sockaddr_family(&source->nla))
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
-	memset (buf, 0, sizeof(buf));
+#ifdef CONFIG_GC_FRIENDLY
+	memset (buf, 0, tpdu_length);
+#endif
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
 	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);
@@ -1649,6 +1690,7 @@ pgm_check_peer_nak_state (
 					if (!send_spmr (transport, peer)) {
 						return FALSE;
 					}
+					peer->spmr_tstamp = now;
 				} else
 					peer->spmr_expiry = 0;
 			}
@@ -1808,25 +1850,8 @@ nak_rpt_state (
 
 			if (++state->ncf_retry_count >= transport->nak_ncf_retries)
 			{
-/* cancellation */
 				dropped++;
-				g_trace ("INFO", "lost data #%u due to cancellation.", skb->sequence);
-
-				const guint32 fail_time = now - skb->tstamp;
-				if (!peer->max_fail_time) {
-					peer->max_fail_time = peer->min_fail_time = fail_time;
-				}
-				else
-				{
-					if (fail_time > peer->max_fail_time)
-						peer->max_fail_time = fail_time;
-					else if (fail_time < peer->min_fail_time)
-						peer->min_fail_time = fail_time;
-				}
-
-				pgm_rxw_lost (window, skb->sequence);
-/* mark receiver window for flushing on next recv() */
-				pgm_peer_set_pending (transport, peer);
+				cancel_skb (transport, peer, skb, now);
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED]++;
 			}
 			else
@@ -1954,16 +1979,8 @@ nak_rdata_state (
 
 			if (++rdata_state->data_retry_count >= transport->nak_data_retries)
 			{
-/* cancellation */
 				dropped++;
-				g_trace ("INFO", "lost data #%u due to cancellation.", rdata_skb->sequence);
-
-				const guint32 fail_time = now - rdata_skb->tstamp;
-				if (fail_time > peer->max_fail_time)		peer->max_fail_time = fail_time;
-				else if (fail_time < peer->min_fail_time)	peer->min_fail_time = fail_time;
-				pgm_rxw_lost (window, rdata_skb->sequence);
-/* mark receiver window for flushing on next recv() */
-				pgm_peer_set_pending (transport, peer);
+				cancel_skb (transport, peer, rdata_skb, now);
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED]++;
 				list = next_list_el;
 				continue;
@@ -2058,7 +2075,7 @@ pgm_on_data (
 	if (opt_total_length > 0)
 		 get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
 
-	const int add_status = pgm_rxw_add (source->window, skb, nak_rb_expiry);
+	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
 
 /* skb reference is now invalid */
 	gboolean flush_naks = FALSE;
@@ -2087,6 +2104,7 @@ discarded:
 	}
 
 /* valid data */
+	PGM_HISTOGRAM_COUNTS("Rx.DataBytesReceived", tsdu_length);
 	source->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += tsdu_length;
 	source->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]  += msg_count;
 

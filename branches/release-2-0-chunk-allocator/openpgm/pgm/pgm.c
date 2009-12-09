@@ -45,9 +45,6 @@ int ipproto_pgm = IPPROTO_PGM;
 
 /* locals */
 static gboolean pgm_got_initialized = FALSE;
-#ifdef G_OS_WIN32
-static gboolean pgm_wsa_got_initialized = FALSE;
-#endif
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -72,8 +69,6 @@ pgm_init (void)
 	WSADATA wsaData;
 	if (WSAStartup (wVersionRequested, &wsaData) != 0)
 		return -1;
-
-	pgm_wsa_got_initialized = TRUE;
 
 	if (LOBYTE (wsaData.wVersion) != 2 || HIBYTE (wsaData.wVersion) != 2)
 	{

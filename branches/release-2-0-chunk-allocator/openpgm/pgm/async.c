@@ -124,7 +124,7 @@ pgm_receiver_thread (
 
 /* incoming message buffer */
 	pgm_msgv_t msgv;
-	gsize bytes_read;
+	gsize bytes_read = 0;
 	struct timeval tv;
 
 	do {
@@ -461,7 +461,7 @@ pgm_async_recv (
 	g_trace ("pgm_async_recv (async:%p data:%p len:%" G_GSIZE_FORMAT" bytes-read:%p flags:%d error:%p)",
 		(gpointer)async, data, len, (gpointer)bytes_read, flags, (gpointer)error);
 
-	pgm_event_t* event;
+	pgm_event_t* event = NULL;
 	g_async_queue_lock (async->commit_queue);
 	if (g_async_queue_length_unlocked (async->commit_queue) == 0)
 	{

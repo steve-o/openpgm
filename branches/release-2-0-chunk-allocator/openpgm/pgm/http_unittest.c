@@ -56,6 +56,15 @@ mock_pgm_time_since_epoch (
 	*time_t_time = pgm_to_secs (*pgm_time_t_time + 0);
 }
 
+static
+void
+mock_pgm_histogram_write_html_graph_all
+	(
+	GString*	string
+	)
+{
+}
+
 
 /* mock functions for external references */
 
@@ -66,6 +75,7 @@ mock_pgm_time_since_epoch (
 #define pgm_transport_list	mock_pgm_transport_list
 #define pgm_tsi_equal		mock_pgm_tsi_equal
 #define pgm_time_since_epoch	mock_pgm_time_since_epoch
+#define pgm_histogram_write_html_graph_all	mock_pgm_histogram_write_html_graph_all
 
 #define HTTP_DEBUG
 #include "http.c"

@@ -43,6 +43,9 @@
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
 #include "pgm/version.h"
+#include "pgm/histogram.h"
+#include "pgm/getifaddrs.h"
+#include "pgm/nametoindex.h"
 
 #include "htdocs/404.html.h"
 #include "htdocs/base.css.h"
@@ -77,13 +80,17 @@ static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void interfaces_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void transports_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void histograms_callback (SoupServerContext*, SoupMessage*, gpointer);
 #else
 static void default_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void robots_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void css_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void index_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void interfaces_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void transports_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void histograms_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 #endif
 
 static void http_each_receiver (pgm_peer_t*, GString*);
@@ -239,14 +246,22 @@ http_thread (
 	soup_server_add_handler (g_soup_server, "/robots.txt",	NULL, robots_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/base.css",	NULL, css_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/",		NULL, index_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/interfaces",	NULL, interfaces_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	NULL, transports_callback, NULL, NULL);
-#else
+#ifdef CONFIG_HISTOGRAMS
+	soup_server_add_handler (g_soup_server, "/histograms",	NULL, histograms_callback, NULL, NULL);
+#endif /* CONFIG_HISTOGRAMS */
+#else /* !CONFIG_LIBSOUP22 */
 	soup_server_add_handler (g_soup_server, NULL,		default_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/robots.txt",	robots_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/base.css",	css_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/",		index_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/interfaces",	interfaces_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	transports_callback, NULL, NULL);
-#endif
+#ifdef CONFIG_HISTOGRAMS
+	soup_server_add_handler (g_soup_server, "/histograms",	histograms_callback, NULL, NULL);
+#endif /* CONFIG_HISTOGRAMS */
+#endif /* !CONFIG_LIBSOUP22 */
 
 /* signal parent thread we are ready to run */
 	g_cond_signal  (g_thread_cond);
@@ -264,7 +279,9 @@ http_thread (
 
 typedef enum {
 	HTTP_TAB_GENERAL_INFORMATION,
-	HTTP_TAB_TRANSPORTS
+	HTTP_TAB_INTERFACES,
+	HTTP_TAB_TRANSPORTS,
+	HTTP_TAB_HISTOGRAMS
 } http_tab_e;
 
 static
@@ -275,7 +292,10 @@ http_create_response (
 	)
 {
 	g_assert (NULL != subtitle);
-	g_assert (tab == HTTP_TAB_GENERAL_INFORMATION || tab == HTTP_TAB_TRANSPORTS);
+	g_assert (tab == HTTP_TAB_GENERAL_INFORMATION ||
+		  tab == HTTP_TAB_INTERFACES ||
+		  tab == HTTP_TAB_TRANSPORTS ||
+		  tab == HTTP_TAB_HISTOGRAMS);
 
 /* surprising deficiency of GLib is no support of display locale time */
 	char buf[100];
@@ -299,7 +319,11 @@ http_create_response (
 					"</div>"
 					"<div id=\"navigation\">"
 						"<a href=\"/\"><span class=\"tab\" id=\"tab%s\">General Information</span></a>"
+						"<a href=\"/interfaces\"><span class=\"tab\" id=\"tab%s\">Interfaces</span></a>"
 						"<a href=\"/transports\"><span class=\"tab\" id=\"tab%s\">Transports</span></a>"
+#ifdef CONFIG_HISTOGRAMS
+						"<a href=\"/histograms\"><span class=\"tab\" id=\"tab%s\">Histograms</span></a>"
+#endif
 						"<div id=\"tabline\"></div>"
 					"</div>"
 					"<div id=\"content\">",
@@ -309,7 +333,12 @@ http_create_response (
 				pgm_major_version, pgm_minor_version, pgm_micro_version,
 				timestamp,
 				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
-				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom");
+				tab == HTTP_TAB_INTERFACES ? "top" : "bottom",
+				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom"
+#ifdef CONFIG_HISTOGRAMS
+				,tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom"
+#endif
+	);
 
 	g_free (timestamp);
 	return response;
@@ -474,6 +503,83 @@ index_callback (
 
 #ifdef CONFIG_LIBSOUP22
 static void
+interfaces_callback (
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
+	)
+#else
+static void
+interfaces_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
+        )
+#endif
+{
+	GString* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
+	g_string_append (response, "<PRE>");
+	struct ifaddrs *ifap, *ifa;
+	int e = getifaddrs (&ifap);
+	if (e < 0) {
+		g_string_append_printf (response, "getifaddrs(): %s", g_strerror (errno));
+		http_finalize_response (response, msg);
+		return;
+	}
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+	{
+		int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
+		char rname[IF_NAMESIZE * 2 + 3];
+		char b[IF_NAMESIZE * 2 + 3];
+
+		if_indextoname(i, rname);
+		sprintf (b, "%s (%s)", ifa->ifa_name, rname);
+
+		 if (NULL == ifa->ifa_addr ||
+		      (ifa->ifa_addr->sa_family != AF_INET &&
+		       ifa->ifa_addr->sa_family != AF_INET6) )
+		{
+			g_string_append_printf (response,
+				"#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s<BR/>",
+				i,
+				b,
+				"",
+				ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
+				ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
+				ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
+				ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
+			);
+			continue;
+		}
+
+		char s[INET6_ADDRSTRLEN];
+		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
+			     s, sizeof(s),
+			     NULL, 0,
+			     NI_NUMERICHOST);
+		g_string_append_printf (response,
+			"#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s<BR/>",
+			i,
+			b,
+			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
+			s,
+			(unsigned)pgm_sockaddr_scope_id(ifa->ifa_addr),
+			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
+			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
+			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
+			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
+		);
+	}
+	freeifaddrs (ifap);
+	g_string_append (response, "</PRE>");
+	http_finalize_response (response, msg);
+}
+
+#ifdef CONFIG_LIBSOUP22
+static void
 transports_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
 	SoupMessage*			msg,
@@ -554,6 +660,30 @@ transports_callback (
 
 	g_string_append (response,		"</table>"
 						"</div>");
+	http_finalize_response (response, msg);
+}
+
+#ifdef CONFIG_LIBSOUP22
+static void
+histograms_callback (
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
+	)
+#else
+static void
+histograms_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
+        )
+#endif
+{
+	GString* response = http_create_response ("Histograms", HTTP_TAB_HISTOGRAMS);
+	pgm_histogram_write_html_graph_all (response);
 	http_finalize_response (response, msg);
 }
 
@@ -1149,15 +1279,15 @@ http_receiver_response (
 						"</tr><tr>"
 							"<th>NAK repair min time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair mean time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
+							"<th>NAK repair mean time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair max time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
+							"<th>NAK repair max time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail min time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
+							"<th>NAK fail min time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail mean time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
+							"<th>NAK fail mean time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail max time</th><td>%" G_GUINT32_FORMAT "i μs</td>"
+							"<th>NAK fail max time</th><td>%" G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
 							"<th>NAK min retransmit count</th><td>%" G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
