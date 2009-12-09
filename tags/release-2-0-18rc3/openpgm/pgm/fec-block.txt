@@ -1,0 +1,66 @@
+from rfc5052
+------------
+
+
+step one:
+
+   Input:
+
+   B  -- Maximum Source Block Length, i.e., the maximum number of source
+         symbols per source block
+
+   L  -- Transfer Length in octets
+
+   E  -- Encoding Symbol Length in octets
+
+   Output:
+
+   T  -- the number of source symbols in the object.
+
+   N  -- the number of source blocks into which the object shall be
+         partitioned.
+
+   Algorithm:
+
+   1.  The number of source symbols in the transport object is computed
+       as T = ceil[L/E].
+
+   2.  The transport object shall be partitioned into N = ceil[T/B]
+       source blocks.
+
+
+B = maximum TPDU - IP header ( - UDP header ) - PGM header
+L = APDU length (pgm_transport_send length parameter).
+E = 1 (fixed).
+
+T = ceil( L / E ) = ceil( L / 1 ) = L
+N = ceil( T / B ) = ceil( L / B )
+
+step two:
+
+   Input:
+
+   T  -- the number of source symbols in the object.
+
+   N  -- the number of source blocks into which the object is
+      partitioned.
+
+   Output:
+
+   I  -- the number of larger source blocks.
+
+   A_large  -- the length of each of the larger source blocks in
+      symbols.
+
+   A_small  -- the length of each of the smaller source blocks in
+      symbols.
+
+   Algorithm:
+
+   1.  A_large = ceil[T/N]
+
+   2.  A_small = floor[T/N]
+
+   3.  I = T - A_small * N
+
+
