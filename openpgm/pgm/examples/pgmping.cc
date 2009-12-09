@@ -374,6 +374,7 @@ on_startup (
 	}
 
 /* set PGM parameters */
+	pgm_transport_set_multicast_loop (g_transport, FALSE);
 	if (PGMPING_MODE_SOURCE == g_mode ||
 	    PGMPING_MODE_INITIATOR == g_mode ||
 	    PGMPING_MODE_REFLECTOR == g_mode)
@@ -475,15 +476,17 @@ sender_thread (
 	char payload[1000];
 	gpointer buffer = NULL;
 	struct epoll_event events[1];
-	guint64 latency, now, last = pgm_time_update_now();
+	guint64 latency, now, last;
 
 	gethostname (hostname, sizeof(hostname));
 	subject.append(hostname);
+	memset (payload, 0, sizeof(payload));
 
 	ping.mutable_subscription_header()->set_subject (subject);
 	ping.mutable_market_data_header()->set_msg_type (example::MarketDataHeader::MSG_VERIFY);
 	ping.mutable_market_data_header()->set_rec_type (example::MarketDataHeader::PING);
 	ping.mutable_market_data_header()->set_rec_status (example::MarketDataHeader::STATUS_OK);
+	ping.set_time (last);
 
 	int efd_again = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd_again < 0) {
@@ -497,6 +500,7 @@ sender_thread (
 		return NULL;
 	}
 	struct epoll_event event;
+	memset (&event, 0, sizeof(event));
 	event.events = EPOLLIN;
 	event.data.fd = g_quit_pipe[0];
 	if (epoll_ctl (efd_again, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0) {
@@ -505,20 +509,13 @@ sender_thread (
 		return NULL;
 	}
 
+	last = now = pgm_time_update_now();
 	do {
 		if (g_msg_sent && g_latency_seqno + 1 == g_msg_sent)
 			latency = g_latency_current;
 		else
 			latency = g_odata_interval;
 
-/* wait on packet rate limit */
-		now = pgm_time_update_now();
-		while ((now - last) < g_odata_interval) {
-			pgm_time_sleep (g_odata_interval - (now - last));
-			now = pgm_time_update_now();
-		}
-		last = now;
-		ping.set_time (now);
 		ping.set_seqno (g_msg_sent);
 		ping.set_latency (latency);
 		ping.set_payload (payload, sizeof(payload));
@@ -528,6 +525,14 @@ sender_thread (
 		struct iovec vector[1];
 		vector[0].iov_base = data;
 		vector[0].iov_len  = apdu_size;
+
+/* wait on packet rate limit */
+		if ((last + g_odata_interval) > now) {
+			pgm_time_sleep (g_odata_interval - (now - last));
+			now = pgm_time_update_now ();
+		}
+		last += g_odata_interval;
+		ping.set_time (now);
 		ping.SerializeToArray (data, pgm_transport_max_tsdu (transport, FALSE));
 
 		struct timeval tv;
@@ -553,7 +558,7 @@ receiver_thread (
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
 	pgm_msgv_t msgv[20];
-	struct epoll_event events[20];
+	struct epoll_event events[1];
 	pgm_time_t lost_tstamp = 0;
 	pgm_tsi_t  lost_tsi;
 	guint32	   lost_count = 0;
@@ -572,6 +577,7 @@ receiver_thread (
 		return NULL;
 	}
 	struct epoll_event event;
+	memset (&event, 0, sizeof(event));
 	event.events = EPOLLIN;
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0) {
 		g_error ("epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
@@ -630,6 +636,7 @@ on_msgv (
 	)
 {
 	const pgm_time_t tstamp = pgm_time_update_now();
+	static pgm_time_t last_time = tstamp;
 	example::Ping ping;
 	guint i = 0;
 
@@ -665,15 +672,24 @@ on_msgv (
 			g_msg_received++;
 
 /* handle ping */
-			const double elapsed = pgm_to_usecsf (tstamp - send_time);
-
-			if (pgm_time_after(send_time, tstamp)){
-				g_message ("timer mismatch, send time = now + %.3f ms",
-					   pgm_to_msecsf(send_time - tstamp));
+const pgm_time_t now = pgm_time_update_now();
+			if (send_time > now)
+				g_warning ("send time %" G_GUINT64_FORMAT " newer than now %" G_GUINT64_FORMAT,
+					   send_time, now);
+			if (tstamp > now)
+				g_warning ("recv time %" G_GUINT64_FORMAT " newer than now %" G_GUINT64_FORMAT,
+					   tstamp, now);
+			if (send_time > tstamp){
+				g_message ("timer mismatch, send time = recv time + %.3f ms (last time + %.3f ms)",
+					   pgm_to_msecsf(send_time - tstamp),
+					   pgm_to_msecsf(last_time - send_time));
 				goto next_msg;
 			}
+
 			g_latency_current	= pgm_to_secs(tstamp - send_time);
 			g_latency_seqno		= seqno;
+
+			const double elapsed	= pgm_to_usecsf (tstamp - send_time);
 			g_latency_total	       += elapsed;
 			g_latency_square_total += elapsed * elapsed;
 
@@ -684,6 +700,7 @@ on_msgv (
 
 			g_latency_running_average += elapsed;
 			g_latency_count++;
+			last_time = tstamp;
 		}
 
 /* move onto next apdu */

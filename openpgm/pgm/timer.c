@@ -242,34 +242,37 @@ pgm_time_destroy (void)
 static pgm_time_t
 gettimeofday_update (void)
 {
-	static struct timeval now;
-	
-	gettimeofday (&now, NULL);
-	pgm_time_now = secs_to_usecs(now.tv_sec) + now.tv_usec;
-
-	return pgm_time_now;
+	struct timeval gettimeofday_now;
+	gettimeofday (&gettimeofday_now, NULL);
+	const pgm_time_t now = secs_to_usecs(gettimeofday_now.tv_sec) + gettimeofday_now.tv_usec;
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
 }
 
 static pgm_time_t
 clock_update (void)
 {
-	static struct timespec now;
-
-	clock_gettime (CLOCK_MONOTONIC, &now);
-	pgm_time_now = secs_to_usecs(now.tv_sec) + nsecs_to_usecs(now.tv_nsec);
-
-	return pgm_time_now;
+	struct timespec clock_now;
+	clock_gettime (CLOCK_MONOTONIC, &clock_now);
+	const pgm_time_t now = secs_to_usecs(clock_now.tv_sec) + nsecs_to_usecs(clock_now.tv_nsec);
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
 }
 
 static pgm_time_t
 ftime_update (void)
 {
-	static struct timeb now;
-
-	ftime (&now);
-	pgm_time_now = secs_to_usecs(now.time) + msecs_to_usecs(now.millitm);
-
-	return pgm_time_now;
+	struct timeb ftime_now;
+	ftime (&ftime_now);
+	const pgm_time_t now = secs_to_usecs(ftime_now.time) + msecs_to_usecs(ftime_now.millitm);
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
 }
 
 /* Old PC/AT-Compatible driver:  /dev/rtc
@@ -323,14 +326,10 @@ static pgm_time_t
 rtc_update (void)
 {
 	unsigned long data;
-
 /* returned value contains interrupt type and count of interrupts since last read */
 	read (rtc_fd, &data, sizeof(data));
-
 	rtc_count += data >> 8;
-	pgm_time_now = rtc_count * 1000000UL / rtc_frequency;
-
-	return pgm_time_now;
+	return pgm_time_now = rtc_count * 1000000UL / rtc_frequency;
 }
 
 /* use a select to check if we have to clear the current interrupt count
@@ -354,9 +353,7 @@ rtc_sleep (gulong usec)
 	pgm_time_t count = 0;
 	do {
 		read (rtc_fd, &data, sizeof(data));
-
 		count += data >> 8;
-
 	} while ( (count * 1000000UL) < rtc_frequency * usec );
 
 	rtc_count += count;
@@ -434,11 +431,12 @@ tsc_init (void)
 static pgm_time_t
 tsc_update (void)
 {
-	pgm_time_t count = rdtsc();
-
-	pgm_time_now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
-
-	return pgm_time_now;
+	const pgm_time_t count = rdtsc();
+	const pgm_time_t now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
 }	
 
 static void
@@ -449,12 +447,11 @@ tsc_sleep (gulong usec)
 	start = rdtsc();
 	end = start + ( tsc_us_scaler > 0 ? (usec * tsc_us_scaler) : (usec / tsc_us_scaler) );
 
-	do {
+	for (;;) {
 		now = rdtsc();
-
 		if (now < end) g_thread_yield();
-
-	} while ( now < end );
+		else break;
+	}
 }
 #endif /* CONFIG_HAVE_TSC */
 
