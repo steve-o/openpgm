@@ -83,17 +83,24 @@ END_TEST
 
 START_TEST (test_update_now_pass_001)
 {
+	pgm_time_t tstamps[11];
 	fail_unless (TRUE == pgm_time_init ());
-	pgm_time_t start_time = pgm_time_update_now ();
-	g_message ("start-time: %" PGM_TIME_FORMAT, start_time);
-	pgm_time_t check_time;
+	const pgm_time_t start_time = pgm_time_update_now ();
 	for (unsigned i = 1; i <= 10; i++)
 	{
-		check_time = pgm_time_update_now ();
-		g_message ("check-point-%u: %" PGM_TIME_FORMAT " (%+" PGM_TIME_FORMAT ")",
-			   i, check_time, check_time - start_time);
+		tstamps[i] = pgm_time_update_now();
+	}
+	g_message ("start-time:     %" PGM_TIME_FORMAT, start_time);
+	for (unsigned i = 1; i <= 10; i++)
+	{
+		const pgm_time_t check_time = tstamps[i];
+		const pgm_time_t elapsed_time = check_time - start_time;
+
 /* must be monotonic */
-		fail_unless (check_time >= start_time);
+		fail_unless (G_LIKELY(check_time >= start_time));
+
+		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" PGM_TIME_FORMAT "us)",
+			   i, check_time, pgm_to_usecs(elapsed_time));
 	}
 	fail_unless (TRUE == pgm_time_shutdown ());
 }
@@ -108,21 +115,28 @@ END_TEST
 
 START_TEST (test_sleep_pass_001)
 {
-	const pgm_time_t sleep_time = 100 * 1000;
+	pgm_time_t tstamps[11];
+	const pgm_time_t sleep_time = 100 * 1000;	/* 100ms */
 	fail_unless (TRUE == pgm_time_init ());
 	pgm_time_t start_time = pgm_time_update_now ();
-	g_message ("start-time: %" PGM_TIME_FORMAT, start_time);
-	pgm_time_t check_time;
 	for (unsigned i = 1; i <= 10; i++)
 	{
-		pgm_time_sleep (sleep_time);
-		check_time = pgm_time_update_now ();
-		pgm_time_t diff_time = check_time - start_time - sleep_time;
-		float percent_diff = ( 100.0 * fabs (pgm_to_usecsf (diff_time)) ) / sleep_time;
-		g_message ("check-point-%u: %" PGM_TIME_FORMAT " (%+" PGM_TIME_FORMAT " / %+3.3f%%)",
-			   i, check_time, diff_time, percent_diff);
+		tstamps[i] = pgm_time_sleep (sleep_time);
+	}
+	g_message ("start-time:     %" PGM_TIME_FORMAT, start_time);
+	for (unsigned i = 1; i <= 10; i++)
+	{
+		const pgm_time_t check_time = tstamps[i];
+
 		fail_unless (check_time >= start_time);
-		fail_unless (percent_diff <= 10.0);
+		const pgm_time_t elapsed_time = check_time - start_time;
+
+/* should be close to zero */
+		const gint64 diff_time = elapsed_time - sleep_time;
+		const float percent_diff = ( 100.0 * pgm_to_usecsf (diff_time) ) / sleep_time;
+		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" PGM_TIME_FORMAT "us %+3.1f%%)",
+			   i, check_time, pgm_to_usecs(elapsed_time), percent_diff);
+
 		start_time = check_time;
 	}
 	fail_unless (TRUE == pgm_time_shutdown ());
@@ -200,6 +214,9 @@ make_master_suite (void)
 int
 main (void)
 {
+	setenv ("PGM_TIMER", "GTOD", 1);
+	setenv ("PGM_SLEEP", "USLEEP", 1);
+
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);

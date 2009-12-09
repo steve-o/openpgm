@@ -202,6 +202,7 @@ int
 mock_pgm_rxw_confirm (
 	pgm_rxw_t* const	window,
 	const guint32		sequence,
+	const pgm_time_t	now,
 	const pgm_time_t	nak_rdata_expiry,
 	const pgm_time_t	nak_rb_expiry
 	)
@@ -234,6 +235,7 @@ mock_pgm_rxw_update (
 	pgm_rxw_t* const		window,
 	const guint32			txw_lead,
 	const guint32			txw_trail,
+	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry
 	)
 {
@@ -254,6 +256,7 @@ int
 mock_pgm_rxw_add (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
+	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry
 	)
 {

@@ -73,7 +73,6 @@
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
-#include "pgm/err.h"
 
 //#define RECV_DEBUG
 
@@ -121,7 +120,8 @@ static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigne
 	return ret < 0 ? ret : (1 + ret);
 }
 #	else
-#		include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
+//#		include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
+#		include "/home/ubuntu/linux-2.6.24/include/asm-x86/unistd.h"
 static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
 {
 	return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
