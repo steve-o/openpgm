@@ -22,23 +22,21 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <netdb.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#endif
 
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
@@ -49,25 +47,17 @@
 
 /* globals */
 
-static int g_port = 0;
+static int g_port = 7500;
 static const char* g_network = "";
-static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
 static int g_sqns = 100;
 
 static pgm_transport_t* g_transport = NULL;
-static gboolean g_quit;
+static gboolean g_quit = FALSE;
 
-#ifdef G_OS_UNIX
-static int g_quit_pipe[2];
 static void on_signal (int);
-#else
-static HANDLE g_quit_event;
-static BOOL on_console_ctrl (DWORD);
-#endif
-
 static gboolean on_startup (void);
 
 static int on_data (gpointer, guint, pgm_tsi_t*);
@@ -82,7 +72,6 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	exit (1);
 }
 
@@ -97,13 +86,12 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:lh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
-		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
@@ -113,115 +101,56 @@ main (
 	log_init ();
 	pgm_init ();
 
-	g_quit = FALSE;
-
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
-#ifdef SIGHUP
-	signal(SIGHUP,  SIG_IGN);
-#endif
-#ifdef G_OS_UNIX
-	pipe (g_quit_pipe);
-	signal(SIGINT,  on_signal);
+	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
-#else
-	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
-	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
-#endif /* !G_OS_UNIX */
+	signal(SIGHUP, SIG_IGN);
 
-	if (!on_startup()) {
-		g_error ("startup failed");
-		exit(1);
-	}
+	on_startup();
 
 /* dispatch loop */
-#ifdef G_OS_UNIX
-	int fds;
-	fd_set readfds;
-#else
-	int n_handles = 3;
-	HANDLE waitHandles[ n_handles ];
-	DWORD dwTimeout, dwEvents;
-	WSAEVENT recvEvent, pendingEvent;
-
-	recvEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_recv_fd (g_transport), recvEvent, FD_READ);
-	pendingEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_pending_fd (g_transport), pendingEvent, FD_READ);
-
-	waitHandles[0] = g_quit_event;
-	waitHandles[1] = recvEvent;
-	waitHandles[2] = pendingEvent;
-#endif /* !G_OS_UNIX */
 	g_message ("entering PGM message loop ... ");
 	do {
-		struct timeval tv;
-		char buffer[4096];
-		gsize len;
 		pgm_tsi_t from;
-		GError* err = NULL;
-		const PGMIOStatus status = pgm_recvfrom (g_transport,
-						         buffer,
-						         sizeof(buffer),
-						         0,
-						         &len,
-						         &from,
-						         &err);
-		switch (status) {
-		case PGM_IO_STATUS_NORMAL:
+		char buffer[4096];
+		gssize len = pgm_transport_recvfrom (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */, &from);
+		if (len >= 0)
+		{
 			on_data (buffer, len, &from);
-			break;
-		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_transport_get_timer_pending (g_transport, &tv);
-			g_message ("wait on fd or pending timer %u:%u",
-				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
-			goto block;
-		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_transport_get_rate_remaining (g_transport, &tv);
-			g_message ("wait on fd or rate limit timeout %u:%u",
-				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
-		case PGM_IO_STATUS_WOULD_BLOCK:
+		}
+		else if (errno == EAGAIN)
+		{
 /* select for next event */
-block:
-#ifdef G_OS_UNIX
-			fds = g_quit_pipe[0] + 1;
+			int fds = 0, block = 0;
+			fd_set readfds;
+			struct timeval timeout = {0, 100 * 1000000UL};
 			FD_ZERO(&readfds);
-			FD_SET(g_quit_pipe[0], &readfds);
 			pgm_transport_select_info (g_transport, &readfds, NULL, &fds);
-			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
-#else
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
-			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
-			default: break;
-			}
-#endif /* !G_OS_UNIX */
+			fds = select (fds, &readfds, NULL, NULL, block ? NULL : &timeout);
+		}
+		else if (errno == ECONNRESET)
+		{
+			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)buffer;
+			g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
+					pgm_sock_err->lost_count,
+					pgm_print_tsi(&pgm_sock_err->tsi));
+			continue;
+		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
+		}
+		else
+		{
+			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
 			break;
-
-		default:
-			if (err) {
-				g_warning ("%s", err->message);
-				g_error_free (err);
-			}
-			if (PGM_IO_STATUS_ERROR == status)
-				break;
 		}
 	} while (!g_quit);
 
 	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
-#ifdef G_OS_UNIX
-	close (g_quit_pipe[0]);
-	close (g_quit_pipe[1]);
-#else
-	WSACloseEvent (recvEvent);
-	WSACloseEvent (pendingEvent);
-	CloseHandle (g_quit_event);
-#endif /* !G_OS_UNIX */
-
 	if (g_transport) {
 		g_message ("destroying transport.");
 
@@ -229,79 +158,47 @@ block:
 		g_transport = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown ();
 	g_message ("finished.");
-	return EXIT_SUCCESS;
+	return 0;
 }
 
-#ifdef G_OS_UNIX
-static
-void
+static void
 on_signal (
-	int		signum
+	G_GNUC_UNUSED int signum
 	)
 {
-	g_message ("on_signal (signum:%d)", signum);
-	g_quit = TRUE;
-	const char one = '1';
-	write (g_quit_pipe[1], &one, sizeof(one));
-}
-#else
-static
-BOOL
-on_console_ctrl (
-	DWORD		dwCtrlType
-	)
-{
-	g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
-	SetEvent (g_quit_event);
-	return TRUE;
-}
-#endif /* !G_OS_UNIX */
+	g_message ("on_signal");
 
-static
-gboolean
+	g_quit = TRUE;
+}
+
+static gboolean
 on_startup (void)
 {
-	struct pgm_transport_info_t* res = NULL;
-	GError* err = NULL;
-
 	g_message ("startup.");
 	g_message ("create transport.");
 
-/* parse network parameter into transport address structure */
-	char network[1024];
-	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
-		g_error ("parsing network parameter: %s", err->message);
-		g_error_free (err);
-		return FALSE;
-	}
-/* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
-		g_error ("creating GSI: %s", err->message);
-		g_error_free (err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	if (g_udp_encap_port) {
-		res->ti_udp_encap_ucast_port = g_udp_encap_port;
-		res->ti_udp_encap_mcast_port = g_udp_encap_port;
-	}
-	if (g_port)
-		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &err)) {
-		g_error ("creating transport: %s", err->message);
-		g_error_free (err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	pgm_if_free_transport_info (res);
+	pgm_gsi_t gsi;
+	int e = pgm_create_md5_gsi (&gsi);
+	g_assert (e == 0);
 
-/* set PGM parameters */
-	pgm_transport_set_nonblocking (g_transport, TRUE);
-	pgm_transport_set_recv_only (g_transport, TRUE, FALSE);
+	struct group_source_req recv_gsr, send_gsr;
+	char network[1024];
+	sprintf (network, ";%s", g_network);
+	gsize recv_len = 1;
+	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
+	g_assert (e == 0);
+	g_assert (recv_len == 1);
+
+	if (g_udp_encap_port) {
+		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+	}
+
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
+	g_assert (e == 0);
+
+	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
@@ -313,21 +210,23 @@ on_startup (void)
 	pgm_transport_set_nak_data_retries (g_transport, 50);
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
-/* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &err)) {
-		g_error ("binding transport: %s", err->message);
-		g_error_free (err);
-		pgm_transport_destroy (g_transport, FALSE);
-		g_transport = NULL;
-		return FALSE;
+	e = pgm_transport_bind (g_transport);
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		G_BREAKPOINT();
 	}
+	g_assert (e == 0);
 
 	g_message ("startup complete.");
-	return TRUE;
+	return FALSE;
 }
 
-static
-int
+static int
 on_data (
 	gpointer	data,
 	guint		len,
@@ -337,7 +236,7 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
-	pgm_tsi_print_r (from, tsi, sizeof(tsi));
+	pgm_print_tsi_r (from, tsi, sizeof(tsi));
 
 	g_message ("\"%s\" (%i bytes from %s)",
 			buf,

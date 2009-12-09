@@ -21,26 +21,22 @@
 
 
 #include <errno.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
 
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#endif
-
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-#include <pgm/skbuff.h>
 #include <pgm/packet.h>
 
 
@@ -73,9 +69,7 @@ main (
 	signal(SIGSEGV, on_sigsegv);
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
-#ifdef SIGHUP
 	signal(SIGHUP, SIG_IGN);
-#endif
 
 /* delayed startup */
 	puts ("scheduling startup.");
@@ -101,10 +95,8 @@ main (
 		g_io_channel = NULL;
 	}
 
-	puts ("PGM engine shutdown.");
-	pgm_shutdown ();
 	puts ("finished.");
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static void
@@ -117,8 +109,7 @@ on_signal (
 	g_main_loop_quit(g_loop);
 }
 
-static
-gboolean
+static gboolean
 on_startup (
 	G_GNUC_UNUSED gpointer data
 	)
@@ -155,24 +146,22 @@ on_startup (
 	puts ("opening raw socket.");
 	int sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
 	if (sock < 0) {
+		int _e = errno;
 		perror("on_startup() failed");
-#ifdef G_OS_UNIX
-		if (EPERM == errno && 0 != getuid()) {
+
+		if (_e == EPERM && 0 != getuid()) {
 			puts ("PGM protocol requires this program to run as superuser.");
 		}
-#endif
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
-#ifdef G_OS_UNIX
 /* drop out of setuid 0 */
 	if (0 == getuid()) {
 		puts ("dropping superuser privileges.");
 		setuid((gid_t)65534);
 		setgid((uid_t)65534);
 	}
-#endif
 
 	char _t = 1;
 	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
@@ -186,11 +175,11 @@ on_startup (
 /* buffers */
 	int buffer_size = 0;
 	socklen_t len = 0;
-	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char*)&buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("receive buffer set at %i bytes.\n", buffer_size);
 	}
-	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char*)&buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("send buffer set at %i bytes.\n", buffer_size);
 	}
@@ -216,7 +205,7 @@ on_startup (
 	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
 	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
 	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
 		perror("on_startup() failed");
 		close(sock);

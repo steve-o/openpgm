@@ -14,11 +14,11 @@ vars.AddVariables (
 			allowed_values=('release', 'debug', 'profile')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
-	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
-			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_DEV', 'Development code', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
 			allowed_values=('true', 'false')),
@@ -27,10 +27,6 @@ vars.AddVariables (
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
-			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
-			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
 			allowed_values=('true', 'false')),
 )
 
@@ -109,21 +105,14 @@ env = Environment(
 			'-DBSD_COMP',
 			'-D__need_IOV_MAX',
 			'-D__USE_BSD',
-			'-DCONFIG_HAVE_CLOCK_GETTIME',
-			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
-			'-DCONFIG_HAVE_NANOSLEEP',
-			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_TSC',
-			'-DCONFIG_HAVE_POLL',
-			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
 	LINKFLAGS = [	'-pipe',
 			'-lresolv',
 			'-lsocket',
-			'-lnsl',
-			'-lm'
+			'-lnsl'
 		    ]
 )
 
@@ -163,15 +152,11 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
-
-# instrumentation
-if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
+env.ParseConfig('pkg-config --static --cflags --libs glib-2.0 gthread-2.0');
 
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
-        'CCFLAGS'       : [],
+        'CFLAGS'        : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp',
 			    'ssl', 'kstat', 'wrap', 'adm' ],
 	'CPPPATH'	: ['/opt/cws/include'],
@@ -182,7 +167,7 @@ env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4')
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
 	lastLIBS = context.env['LIBS'];
-	lastCCFLAGS= context.env['CCFLAGS'];
+	lastCFLAGS= context.env['CFLAGS'];
 	context.env.MergeFlags(env['SNMP_FLAGS']);
 	result = context.TryLink("""
 int main(int argc, char**argv)
@@ -191,13 +176,13 @@ int main(int argc, char**argv)
 	return 0;
 }
 """, '.c');
-	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
+	context.env.Replace(LIBS = lastLIBS, CFLAGS=lastCFLAGS);
 	context.Result(not result);
 	return result;
 
 def CheckCheck(context):
 	context.Message('Checking Check unit test framework...');
-	result = context.TryAction('pkg-config --cflags --libs check')[0];
+	result = context.TryAction('pkg-config --static --cflags --libs check')[0];
 	context.Result(result);
 	return result;
 
@@ -269,6 +254,8 @@ if env['WITH_SNMP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmsnmp');
 if env['WITH_TEST'] == 'true':
 	SConscript(ref_node + 'test/SConscript');
+if env['WITH_DEV'] == 'true':
+	SConscript(ref_node + 'dev/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
 

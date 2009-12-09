@@ -9,6 +9,14 @@ endif(COMMAND cmake_policy)
 
 project(OpenPGM)
 
+# Build options.
+option(LIBPGM_WITH_HTTP			"HTTP administration" OFF)
+option(LIBPGM_WITH_SNMP			"SNMP administration" OFF)
+option(LIBPGM_WITH_CHECK		"Check test system" OFF)
+option(LIBPGM_WITH_TEST			"Network test system" OFF)
+option(LIBPGM_WITH_DEV			"Development code" OFF)
+option(LIBPGM_WITH_EXAMPLES		"Examples" OFF)
+
 #-----------------------------------------------------------------------------
 # force off-tree build
 
@@ -42,8 +50,12 @@ SET(LIBRARY_OUTPUT_PATH  ${CMAKE_BINARY_DIR}/lib)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_ROOT}/Modules ${CMAKE_SOURCE_DIR}/CMake)
 INCLUDE(FindPkgConfig)
 pkg_check_modules (GLIB2 REQUIRED	glib-2.0>=2.10 gthread-2.0)
-pkg_check_modules (LIBSOUP REQUIRED	libsoup-2.4)
-pkg_check_modules (CHECK 		check)
+IF(LIBPGM_WITH_HTTP)
+	pkg_check_modules (LIBSOUP REQUIRED	libsoup-2.4)
+ENDIF(LIBPGM_WITH_HTTP)
+IF(LIBPGM_WITH_CHECK)
+	pkg_check_modules (CHECK 		check)
+ENDIF(LIBPGM_WITH_CHECK)
 
 #-----------------------------------------------------------------------------
 # Platform specifics
@@ -82,21 +94,27 @@ SET(PLATFORM_CFLAGS " 	-pipe
 			-DCONFIG_HAVE_GETIFADDRS
 			-DCONFIG_HAVE_GETHOSTBYNAME2
 			-DCONFIG_HAVE_GETPROTOBYNAME_R
+			-DCONFIG_HAVE_SIGHANDLER_T
 			-DCONFIG_BIND_INADDR_ANY
 			-DCONFIG_GALOIS_MUL_LUT
 			-DCONFIG_WITH_SNMP
 			-DCONFIG_WITH_HTTP
 ")
+IF(LIBPGM_WITH_HTTP)
+	SET(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -DCONFIG_WITH_HTTP")
+ENDIF(LIBPGM_WITH_HTTP)
+IF(LIBPGM_WITH_SNMP)
+	SET(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -DCONFIG_WITH_SNMP")
+	SET(SNMP_CFLAGS, "")
+	SET(SNMP_LIBRARIES
+		netsnmpagent
+		netsnmpmibs
+		netsnmphelpers
+		netsnmp
+	)
+ENDIF(LIBPGM_WITH_SNMP)
 STRING(REGEX REPLACE "[\t\n ]+" " " PLATFORM_CFLAGS "${PLATFORM_CFLAGS}")
 SET(PLATFORM_LINKFLAGS	"-pipe")
-
-SET(SNMP_CFLAGS, "")
-SET(SNMP_LIBRARIES
-	netsnmpagent
-	netsnmpmibs
-	netsnmphelpers
-	netsnmp
-)
 
 # fix CMake bug detecting arch
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES "unknown")
@@ -118,22 +136,35 @@ INCLUDE(CMake/macros.cmake)
 # libraries
 INCLUDE(libpgm.cmake)
 INCLUDE(libpgmplus.cmake)
-INCLUDE(libpgmhttp.cmake)
-INCLUDE(libpgmsnmp.cmake)
+IF(LIBPGM_WITH_HTTP)
+	INCLUDE(libpgmhttp.cmake)
+ENDIF(LIBPGM_WITH_HTTP)
+IF(LIBPGM_WITH_SNMP)
+	INCLUDE(libpgmsnmp.cmake)
+ENDIF(LIBPGM_WITH_SNMP)
+
+IF(LIBPGM_WITH_CHECK OR LIBPGM_WITH_EXAMPLES)
+	INCLUDE(libpgmex.cmake)
+ENDIF(LIBPGM_WITH_CHECK OR LIBPGM_WITH_EXAMPLES)
 
 # unit tests
-IF(CHECK_FOUND)
+IF(LIBPGM_WITH_CHECK)
 	ADD_SUBDIRECTORY(check)
-ENDIF(CHECK_FOUND)
+ENDIF(LIBPGM_WITH_CHECK)
 
 # network tests
-ADD_SUBDIRECTORY(test)
+IF(LIBPGM_WITH_TEST)
+	ADD_SUBDIRECTORY(test)
+ENDIF(LIBPGM_WITH_TEST)
 
 # development code
-ADD_SUBDIRECTORY(dev)
+IF(LIBPGM_WITH_DEV)
+	ADD_SUBDIRECTORY(dev)
+ENDIF(LIBPGM_WITH_DEV)
 
 # examples
-INCLUDE(libpgmex.cmake)
-ADD_SUBDIRECTORY(examples)
+IF(LIBPGM_WITH_EXAMPLES)
+	ADD_SUBDIRECTORY(examples)
+ENDIF(LIBPGM_WITH_EXAMPLES)
 
 # end of file
