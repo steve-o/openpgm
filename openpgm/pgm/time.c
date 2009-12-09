@@ -62,7 +62,6 @@
 #define nsecs_to_msecs(t)	( (t) / 1000000UL )
 #define nsecs_to_usecs(t)	( (t) / 1000 )
 
-pgm_time_t pgm_time_now = 0;
 pgm_time_update_func pgm_time_update_now;
 pgm_time_sleep_func pgm_time_sleep;
 pgm_time_since_epoch_func pgm_time_since_epoch;
@@ -77,38 +76,77 @@ static pgm_time_t clock_update (void);
 static pgm_time_t ftime_update (void);
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 static int clock_init (void);
-static void clock_nano_sleep (gulong);
+static pgm_time_t clock_nano_sleep (gulong);
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
-static void nano_sleep (gulong);
+static pgm_time_t nano_sleep (gulong);
 #endif
 #ifdef G_OS_WIN32
-static void msleep (gulong);
+static pgm_time_t msleep (gulong);
+#endif
+#ifdef CONFIG_HAVE_USLEEP
+static pgm_time_t usleep_sleep (gulong);
 #endif
 
-static void select_sleep (gulong);
+static pgm_time_t select_sleep (gulong);
 
 #ifdef CONFIG_HAVE_RTC
 static int rtc_init (void);
 static int rtc_shutdown (void);
 static pgm_time_t rtc_update (void);
-static void rtc_sleep (gulong);
+static pgm_time_t rtc_sleep (gulong);
 #endif
 
 #ifdef CONFIG_HAVE_TSC
-static int tsc_us_scaler = 0;
+#define TSC_NS_SCALE	10 /* 2^10, carefully chosen */
+#define TSC_US_SCALE	20
+static guint32 tsc_mhz = 0;
+static guint32 tsc_ns_mul = 0;
+static guint32 tsc_us_mul = 0;
 static int tsc_init (void);
 static pgm_time_t tsc_update (void);
-static void tsc_sleep (gulong);
+static pgm_time_t tsc_sleep (gulong);
 #endif
 
 #ifdef CONFIG_HAVE_PPOLL
-static void poll_sleep (gulong);
+static pgm_time_t poll_sleep (gulong);
 #endif
 
 static void pgm_time_conv (pgm_time_t*, time_t*);
 static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
 
+/* TSC helper functions */
+#ifdef CONFIG_HAVE_TSC
+static inline
+void
+set_tsc_mul (
+	const guint32		khz
+	)
+{
+	tsc_ns_mul = (1000000 << TSC_NS_SCALE) / khz;
+	tsc_us_mul = (1000 << TSC_US_SCALE) / khz;
+}
+
+/* convert from clocks (64 bits) to nanoseconds (64 bits)
+ */
+static
+guint64
+tsc_to_ns (
+	const guint64		tsc
+	)
+{
+	return (tsc * tsc_ns_mul) >> TSC_NS_SCALE;
+}
+
+static
+guint64
+tsc_to_us (
+	const guint64		tsc
+	)
+{
+	return (tsc * tsc_us_mul) >> TSC_US_SCALE;
+}
+#endif /* CONFIG_HAVE_TSC */
 
 /* initialize time system.
  *
@@ -179,7 +217,7 @@ pgm_time_init (void)
 #ifdef CONFIG_HAVE_USLEEP
 	case 'M':
 	case 'U':
-			pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
+			pgm_time_sleep = usleep_sleep; break;
 
 	case 'S':	pgm_time_sleep = select_sleep; break;
 #elif defined(G_OS_WIN32)
@@ -211,7 +249,7 @@ pgm_time_init (void)
 				if (strstr (buffer, "cpu MHz"))
 				{
 					char *p = strchr (buffer, ':');
-					if (p) tsc_us_scaler = atoi (p + 1);
+					if (p) tsc_mhz = atoi (p + 1);
 					break;
 				}
 			}
@@ -222,16 +260,14 @@ pgm_time_init (void)
  *
  * Value can be used to override kernel tick rate as well as internal calibration
  */
-		const char *scaler = getenv ("RDTSC_FREQUENCY");
-		if (scaler) {
-			tsc_us_scaler = atoi (scaler);
-		}
+		const char *env_mhz = getenv ("RDTSC_FREQUENCY");
+		if (env_mhz)
+			tsc_mhz = atoi (env_mhz);
 
 /* calibrate */
-		if (0 >= tsc_us_scaler)
-		{
+		if (0 >= tsc_mhz)
 			tsc_init();
-		}
+		set_tsc_mul (tsc_mhz * 1000);
 	}
 #endif /* CONFIG_HAVE_TSC */
 
@@ -288,12 +324,14 @@ static
 pgm_time_t
 gettimeofday_update (void)
 {
-	static struct timeval now;
-	
-	gettimeofday (&now, NULL);
-	pgm_time_now = secs_to_usecs(now.tv_sec) + now.tv_usec;
-
-	return pgm_time_now;
+	struct timeval gettimeofday_now;
+	static pgm_time_t last = 0;
+	gettimeofday (&gettimeofday_now, NULL);
+	const pgm_time_t now = secs_to_usecs (gettimeofday_now.tv_sec) + gettimeofday_now.tv_usec;
+	if (G_UNLIKELY(now < last))
+		return last;
+	else
+		return last = now;
 }
 
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
@@ -301,12 +339,14 @@ static
 pgm_time_t
 clock_update (void)
 {
-	static struct timespec now;
-
-	clock_gettime (CLOCK_MONOTONIC, &now);
-	pgm_time_now = secs_to_usecs(now.tv_sec) + nsecs_to_usecs(now.tv_nsec);
-
-	return pgm_time_now;
+	struct timespec clock_now;
+	static pgm_time_t last = 0;
+	clock_gettime (CLOCK_MONOTONIC, &clock_now);
+	const pgm_time_t now = secs_to_usecs (clock_now.tv_sec) + nsecs_to_usecs (clock_now.tv_nsec);
+	if (G_UNLIKELY(now < last))
+		return last;
+	else
+		return last = now;
 }
 #endif /* CONFIG_HAVE_CLOCK_GETTIME */
 
@@ -314,12 +354,14 @@ static
 pgm_time_t
 ftime_update (void)
 {
-	static struct timeb now;
-
-	ftime (&now);
-	pgm_time_now = secs_to_usecs(now.time) + msecs_to_usecs(now.millitm);
-
-	return pgm_time_now;
+	struct timeb ftime_now;
+	static pgm_time_t last = 0;
+	ftime (&ftime_now);
+	const pgm_time_t now = secs_to_usecs (ftime_now.time) + msecs_to_usecs (ftime_now.millitm);
+	if (G_UNLIKELY(now < last))
+		return last;
+	else
+		return last = now;
 }
 
 /* Old PC/AT-Compatible driver:  /dev/rtc
@@ -375,21 +417,17 @@ pgm_time_t
 rtc_update (void)
 {
 	unsigned long data;
-
 /* returned value contains interrupt type and count of interrupts since last read */
 	read (rtc_fd, &data, sizeof(data));
-
 	rtc_count += data >> 8;
-	pgm_time_now = rtc_count * 1000000UL / rtc_frequency;
-
-	return pgm_time_now;
+	return rtc_count * 1000000UL / rtc_frequency;
 }
 
 /* use a select to check if we have to clear the current interrupt count
  */
 
 static
-void
+pgm_time_t
 rtc_sleep (gulong usec)
 {
 	unsigned long data;
@@ -398,7 +436,7 @@ rtc_sleep (gulong usec)
 	fd_set readfds;
 	FD_ZERO(&readfds);
 	FD_SET(rtc_fd, &readfds);
-	int retval = select (rtc_fd + 1, &readfds, NULL, NULL, &zero_tv);
+	const int retval = select (rtc_fd + 1, &readfds, NULL, NULL, &zero_tv);
 	if (retval) {
 		read (rtc_fd, &data, sizeof(data));
 		rtc_count += data >> 8;
@@ -407,12 +445,14 @@ rtc_sleep (gulong usec)
 	pgm_time_t count = 0;
 	do {
 		read (rtc_fd, &data, sizeof(data));
-
 		count += data >> 8;
-
 	} while ( (count * 1000000UL) < rtc_frequency * usec );
 
 	rtc_count += count;
+	if (pgm_time_update_now == rtc_update)
+		return rtc_count * 1000000UL / rtc_frequency;
+	else
+		return pgm_time_update_now();
 }
 #endif /* CONFIG_HAVE_RTC */
 
@@ -443,7 +483,7 @@ int
 tsc_init (void)
 {
 	pgm_time_t start, stop;
-	gulong calibration_usec = 4000 * 1000;
+	const gulong calibration_usec = 4000 * 1000;
 
 	g_message ("Running a benchmark to measure system clock frequency...");
 
@@ -465,20 +505,20 @@ tsc_init (void)
 	}
 
 /* TODO: this math needs to be scaled to reduce rounding errors */
-	pgm_time_t tsc_diff = stop - start;
+	const pgm_time_t tsc_diff = stop - start;
 	if (tsc_diff > calibration_usec) {
 /* cpu > 1 Ghz */
-		tsc_us_scaler = tsc_diff / calibration_usec;
+		tsc_mhz = tsc_diff / calibration_usec;
 	} else {
 /* cpu < 1 Ghz */
-		tsc_us_scaler = -( calibration_usec / tsc_diff );
+		tsc_mhz = -( calibration_usec / tsc_diff );
 	}
 
 	g_warning ("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %i on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server.",
-		   tsc_us_scaler);
+		   tsc_mhz);
 	return 0;
 }
 
@@ -486,28 +526,32 @@ static
 pgm_time_t
 tsc_update (void)
 {
-	pgm_time_t count = rdtsc();
-
-	pgm_time_now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
-
-	return pgm_time_now;
+	static pgm_time_t last = 0;
+	const pgm_time_t now = tsc_to_us (rdtsc());
+	if (G_UNLIKELY(now < last))
+		return last;
+	else
+		return last = now;
 }	
 
 static
-void
+pgm_time_t
 tsc_sleep (gulong usec)
 {
-	pgm_time_t start, now, end;
+	guint64 now;
+	const guint64 start = tsc_to_us (rdtsc());
+	const guint64 end   = start + usec;
 
-	start = rdtsc();
-	end = start + ( tsc_us_scaler > 0 ? (usec * tsc_us_scaler) : (usec / tsc_us_scaler) );
-
-	do {
-		now = rdtsc();
-
+	for (;;) {
+		now = tsc_to_us (rdtsc());
 		if (now < end) g_thread_yield();
+		else break;
+	}
 
-	} while ( now < end );
+	if (pgm_time_update_now == tsc_update)
+		return now;
+	else
+		return pgm_time_update_now();
 }
 #endif /* CONFIG_HAVE_TSC */
 
@@ -538,7 +582,7 @@ clock_init (void)
 }
 
 static
-void
+pgm_time_t
 clock_nano_sleep (gulong usec)
 {
 	struct timespec ts;
@@ -547,37 +591,50 @@ clock_nano_sleep (gulong usec)
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	clock_nanosleep (g_clock_id, 0, &ts, NULL);
 #else
-	usec += pgm_time_now;
+	usec += pgm_time_update_now ();
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	clock_nanosleep (g_clock_id, TIMER_ABSTIME, &ts, NULL);
 #endif
+	return pgm_time_update_now ();
 }
 #endif /* CONFIG_HAVE_CLOCK_NANOSLEEP */
 
 #ifdef CONFIG_HAVE_NANOSLEEP
 static
-void
+pgm_time_t
 nano_sleep (gulong usec)
 {
 	struct timespec ts;
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	nanosleep (&ts, NULL);
+	return pgm_time_update_now ();
 }
 #endif /* CONFIG_HAVE_NANOSLEEP */
 
 #ifdef G_OS_WIN32
 static
-void
+pgm_time_t
 msleep (gulong usec)
 {
 	Sleep (usecs_to_msecs(usec));
+	return pgm_time_update_now ();
 }
 #endif
 
+#ifdef CONFIG_HAVE_USLEEP
 static
-void
+pgm_time_t
+usleep_sleep (gulong usec)
+{
+	usleep (usec);
+	return pgm_time_update_now ();
+}
+#endif /* CONFIG_HAVE_USLEEP */
+
+static
+pgm_time_t
 select_sleep (gulong usec)
 {
 #ifdef CONFIG_HAVE_PSELECT
@@ -591,17 +648,19 @@ select_sleep (gulong usec)
 	tv.tv_usec	= usec % 1000000UL;
 	select (0, NULL, NULL, NULL, &tv);
 #endif
+	return pgm_time_update_now ();
 }
 
 #ifdef CONFIG_HAVE_PPOLL
 static
-void
+pgm_time_t
 poll_sleep (gulong usec)
 {
 	struct timespec ts;
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
 	ppoll (NULL, 0, &ts, NULL);
+	return pgm_time_update_now();
 }
 #endif
 

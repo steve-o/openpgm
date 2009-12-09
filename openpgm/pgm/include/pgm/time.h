@@ -34,7 +34,7 @@ typedef guint64 pgm_time_t;
 G_BEGIN_DECLS
 
 typedef pgm_time_t (*pgm_time_update_func)(void);
-typedef void (*pgm_time_sleep_func)(gulong);
+typedef pgm_time_t (*pgm_time_sleep_func)(gulong);
 typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 
 #define pgm_time_after(a,b)	( (a) > (b) )
@@ -59,9 +59,6 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 #define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000UL ))
 
 #define PGM_TIME_FORMAT	G_GUINT64_FORMAT
-
-/* micro-seconds */
-extern pgm_time_t pgm_time_now;
 
 extern pgm_time_update_func pgm_time_update_now;
 extern pgm_time_sleep_func pgm_time_sleep;

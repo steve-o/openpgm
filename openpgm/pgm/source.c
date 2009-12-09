@@ -622,6 +622,9 @@ pgm_send_spm (
 				       sizeof(struct pgm_opt_fin);
 	}
 	guint8 buf[ tpdu_length ];
+#ifdef CONFIG_GC_FRIENDLY
+	memset (buf, 0, tpdu_length);
+#endif
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
 	struct pgm_spm6 *spm6 = (struct pgm_spm6*)(header + 1);
