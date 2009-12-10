@@ -374,10 +374,10 @@ pgm_txw_remove_tail (
 	}
 
 /* remove reference to skb */
-#ifdef PGM_TXW_CLEAR_UNUSED_ENTRIES
-	const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
-	window->pdata[index_] = NULL;
-#endif
+	if (G_UNLIKELY(g_mem_gc_friendly)) {
+		const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
+		window->pdata[index_] = NULL;
+	}
 	pgm_free_skb (skb);
 
 /* advance trailing pointer */

@@ -84,11 +84,10 @@ static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint16 size)
 	struct pgm_sk_buff_t* skb;
 
 	skb = (struct pgm_sk_buff_t*)g_slice_alloc (size + sizeof(struct pgm_sk_buff_t));
-#ifdef CONFIG_GC_FRIENDLY
-	memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
-#else
-	memset (skb, 0, sizeof(struct pgm_sk_buff_t));
-#endif
+	if (G_UNLIKELY(g_mem_gc_friendly))
+		memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
+	else
+		memset (skb, 0, sizeof(struct pgm_sk_buff_t));
 	skb->truesize = size + sizeof(struct pgm_sk_buff_t);
 	g_atomic_int_set (&skb->users, 1);
 	skb->head = skb + 1;
