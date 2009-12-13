@@ -172,3 +172,7 @@ http://ala.isti.cnr.it/atti/ISWCS05/iwssc05/pdf/FS3-3.pdf
   * DyRAM : a Reliable Multicast Protocol
 http://lara.inist.fr/bitstream/2332/822/1/LIP-RR2003-05.pdf
 
+  * An Enhancement of Multicast Congestion Control over Hybrid Wired/Wireless Networks
+http://web.archive.org/web/20060812013021/http://www.ntu.edu.sg/home5/ZHOU0022/papers/YLiu04.pdf
+
+_Proposes an enhanced congestion control scheme called EPGMCC (Enhanced PGMCC)._
