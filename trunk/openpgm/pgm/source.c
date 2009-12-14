@@ -1937,8 +1937,6 @@ pgm_send_skbv (
 		STATE(skb)->pgm_data->data_sqn		= g_htonl (pgm_txw_next_lead(transport->window));
 		STATE(skb)->pgm_data->data_trail	= g_htonl (pgm_txw_trail(transport->window));
 
-		gpointer dst = NULL;
-
 		if (is_one_apdu)
 		{
 /* OPT_LENGTH */
@@ -1959,18 +1957,18 @@ pgm_send_skbv (
 			STATE(skb)->pgm_opt_fragment->opt_frag_off	= g_htonl (STATE(data_bytes_offset));
 			STATE(skb)->pgm_opt_fragment->opt_frag_len	= g_htonl (STATE(apdu_length));
 
-			dst = STATE(skb)->pgm_opt_fragment + 1;
+			g_assert (STATE(skb)->data == (STATE(skb)->pgm_opt_fragment + 1));
 		}
 		else
 		{
-			dst = STATE(skb)->pgm_data + 1;
+			g_assert (STATE(skb)->data == (STATE(skb)->pgm_data + 1));
 		}
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
 		STATE(skb)->pgm_header->pgm_checksum	= 0;
-		const gsize pgm_header_len		= (guint8*)dst - (guint8*)STATE(skb)->pgm_header;
+		const gsize pgm_header_len		= (guint8*)STATE(skb)->data - (guint8*)STATE(skb)->pgm_header;
 		const guint32 unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-		STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)(STATE(skb)->pgm_opt_fragment + 1), STATE(tsdu_length), 0);
+		STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)STATE(skb)->data, STATE(tsdu_length), 0);
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
