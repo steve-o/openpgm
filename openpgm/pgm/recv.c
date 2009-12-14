@@ -105,6 +105,29 @@ static PGMRecvError pgm_recv_error_from_errno (gint);
 static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
 #endif
 
+#ifdef CONFIG_HAVE_RECVMMSG
+#	ifdef CONFIG_COMPAT_RECVMMSG
+static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
+{
+	int ret = -1;
+	for (int i = 0; i < vlen; i++) {
+		const int tmp = recvmsg (fd, &mmsg[i].msg_hdr, flags);
+		if (tmp < 0)
+			break;
+		mmsg[i].msg_len = tmp;
+		ret++;
+	}
+	return ret < 0 ? ret : (1 + ret);
+}
+#	else
+//#		include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
+#		include "/home/ubuntu/linux-2.6.24/include/asm-x86/unistd.h"
+static inline int recvmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
+{
+	return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
+}
+#	endif /* CONFIG_COMPAT_RECVMMSG */
+#endif /* CONFIG_HAVE_RECVMMSG */
 
 /* read a packet into a PGM skbuff
  * on success returns packet length, on closed socket returns 0,
@@ -115,7 +138,6 @@ static
 ssize_t
 recvskb (
 	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
 	const int			flags,
 	struct sockaddr* const		src_addr,
 	const gsize			src_addrlen,
@@ -125,18 +147,168 @@ recvskb (
 {
 /* pre-conditions */
 	g_assert (NULL != transport);
-	g_assert (NULL != skb);
 	g_assert (NULL != src_addr);
 	g_assert (src_addrlen > 0);
 	g_assert (NULL != dst_addr);
 	g_assert (dst_addrlen > 0);
 
-	g_trace ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
-		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
+	g_trace ("recvskb (transport:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
+		(gpointer)transport, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
 
 	if (G_UNLIKELY(transport->is_destroyed))
 		return 0;
 
+#ifdef CONFIG_HAVE_RECVMMSG
+/* flush remaining messages */
+	if ((1 + transport->rx_index) < transport->rx_len)
+	{
+		transport->rx_index++;
+
+		const struct _pgm_mmsg_t* mmsg    = &transport->rx_mmsg[ transport->rx_index ];
+		struct mmsghdr*     mmsghdr = &transport->rx_mmsghdr[ transport->rx_index ];
+		g_assert (NULL != mmsg);
+		g_assert (NULL != mmsg->mmsg_skb);
+		g_assert (NULL != mmsghdr);
+
+/* pgm socket buffer */
+		transport->rx_buffer = mmsg->mmsg_skb;
+/* source address */
+		memcpy (src_addr, &mmsg->mmsg_name, mmsg->mmsg_namelen);
+/* destination address */
+		if (transport->udp_encap_ucast_port ||
+		    AF_INET6 == pgm_sockaddr_family (src_addr))
+		{
+			struct cmsghdr* cmsg;
+			gpointer pktinfo = NULL;
+			for (cmsg = CMSG_FIRSTHDR(&mmsghdr->msg_hdr);
+			     cmsg != NULL;
+			     cmsg = CMSG_NXTHDR(&mmsghdr->msg_hdr, cmsg))
+			{
+				if (IPPROTO_IP == cmsg->cmsg_level && 
+				    IP_PKTINFO == cmsg->cmsg_type)
+				{
+					pktinfo				= CMSG_DATA(cmsg);
+					const struct in_pktinfo* in	= pktinfo;
+					struct sockaddr_in* sin		= (struct sockaddr_in*)dst_addr;
+					sin->sin_family			= AF_INET;
+					sin->sin_addr.s_addr		= in->ipi_addr.s_addr;
+					break;
+				}
+
+				if (IPPROTO_IPV6 == cmsg->cmsg_level && 
+				    IPV6_PKTINFO == cmsg->cmsg_type)
+				{
+					pktinfo				= CMSG_DATA(cmsg);
+					const struct in6_pktinfo* in6	= pktinfo;
+					struct sockaddr_in6* sin6	= (struct sockaddr_in6*)dst_addr;
+					sin6->sin6_family		= AF_INET6;
+					sin6->sin6_addr			= in6->ipi6_addr;
+					sin6->sin6_scope_id		= in6->ipi6_ifindex;
+/* does not set flow id */
+					break;
+				}
+			}
+/* discard on invalid address */
+			if (NULL == pktinfo)
+				return -1;
+		}
+/* return length of packet */
+		return transport->rx_buffer->len;
+	}
+	else
+	{
+/* read from kernel */
+		for (unsigned i = 0; i < PGM_RECVMMSG_LEN; i++) {
+			struct _pgm_mmsg_t* mmsg     = &transport->rx_mmsg[i];
+			struct msghdr*      msg_hdr  = &transport->rx_mmsghdr[i].msg_hdr;
+			g_assert (NULL != mmsg);
+			g_assert (NULL != mmsg->mmsg_skb);
+			g_assert (NULL != msg_hdr);
+			mmsg->mmsg_iov.iov_base	= mmsg->mmsg_skb->head;
+			mmsg->mmsg_iov.iov_len 	= transport->max_tpdu;
+			msg_hdr->msg_name	= &mmsg->mmsg_name;
+			msg_hdr->msg_namelen	= sizeof(struct sockaddr_storage);
+			msg_hdr->msg_iov	= (gpointer)&mmsg->mmsg_iov;
+			msg_hdr->msg_iovlen  	= 1;
+			msg_hdr->msg_control	= mmsg->mmsg_aux;
+			msg_hdr->msg_controllen	= sizeof(mmsg->mmsg_aux);
+			msg_hdr->msg_flags	= 0;
+		}
+		transport->rx_index = 0;
+		transport->rx_buffer = transport->rx_mmsg[ transport->rx_index ].mmsg_skb;
+
+		const int mmsglen = recvmmsg (transport->recv_sock, transport->rx_mmsghdr, PGM_RECVMMSG_LEN, flags, NULL);
+		if (mmsglen <= 0) {
+			transport->rx_len = 0;
+			return mmsglen;
+		}
+
+		transport->rx_len = mmsglen;
+
+/* tag all filled PGM SKBs */
+		const pgm_time_t now = pgm_time_update_now();
+		for (unsigned i = 0; i < transport->rx_len; i++) {
+			struct pgm_sk_buff_t* skb = transport->rx_mmsg[i].mmsg_skb;
+			g_assert (NULL != skb);
+			skb->transport	= transport;
+			skb->tstamp	= now;
+			skb->data	= skb->head;
+			skb->len	= transport->rx_mmsghdr[i].msg_len;
+			skb->tail	= (guint8*)skb->head + skb->len;
+			transport->rx_mmsg[i].mmsg_namelen = transport->rx_mmsghdr[i].msg_hdr.msg_namelen;
+		}
+
+		const struct _pgm_mmsg_t* mmsg    = &transport->rx_mmsg[ transport->rx_index ];
+		struct mmsghdr*     mmsghdr = &transport->rx_mmsghdr[ transport->rx_index ];
+		g_assert (NULL != mmsg);
+		g_assert (NULL != mmsg->mmsg_skb);
+		g_assert (NULL != mmsghdr);
+
+/* source address */
+		memcpy (src_addr, &mmsg->mmsg_name, mmsg->mmsg_namelen);
+/* destination address */
+		if (transport->udp_encap_ucast_port ||
+		    AF_INET6 == pgm_sockaddr_family (src_addr))
+		{
+			struct cmsghdr* cmsg;
+			gpointer pktinfo = NULL;
+			for (cmsg = CMSG_FIRSTHDR(&mmsghdr->msg_hdr);
+			     cmsg != NULL;
+			     cmsg = CMSG_NXTHDR(&mmsghdr->msg_hdr, cmsg))
+			{
+				if (IPPROTO_IP == cmsg->cmsg_level && 
+				    IP_PKTINFO == cmsg->cmsg_type)
+				{
+					pktinfo				= CMSG_DATA(cmsg);
+					const struct in_pktinfo* in	= pktinfo;
+					struct sockaddr_in* sin		= (struct sockaddr_in*)dst_addr;
+					sin->sin_family			= AF_INET;
+					sin->sin_addr.s_addr		= in->ipi_addr.s_addr;
+					break;
+				}
+
+				if (IPPROTO_IPV6 == cmsg->cmsg_level && 
+				    IPV6_PKTINFO == cmsg->cmsg_type)
+				{
+					pktinfo				= CMSG_DATA(cmsg);
+					const struct in6_pktinfo* in6	= pktinfo;
+					struct sockaddr_in6* sin6	= (struct sockaddr_in6*)dst_addr;
+					sin6->sin6_family		= AF_INET6;
+					sin6->sin6_addr			= in6->ipi6_addr;
+					sin6->sin6_scope_id		= in6->ipi6_ifindex;
+/* does not set flow id */
+					break;
+				}
+			}
+/* discard on invalid address */
+			if (NULL == pktinfo)
+				return -1;
+		}
+		return transport->rx_buffer->len;
+	}
+
+#else /* !CONFIG_HAVE_RECVMMSG */
+	struct pgm_sk_buff_t* skb = transport->rx_buffer;
 	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
 		.iov_len	= transport->max_tpdu
@@ -192,6 +364,9 @@ recvskb (
 	skb->len	= len;
 	skb->tail	= (guint8*)skb->data + len;
 
+/* the destination multicast address can be read from the IPv4 header for PGM packets,
+ * so only continue for UDP encapsulation or IPv6 which don't provide headers
+ */
 	if (transport->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
@@ -230,6 +405,7 @@ recvskb (
 			return -1;
 	}
 	return len;
+#endif /* !CONFIG_HAVE_RECVMMSG */
 }
 
 /* upstream = receiver to source, peer-to-peer = receive to receiver
@@ -445,7 +621,11 @@ g_trace ("source:%p", (gpointer)*source);
 	case PGM_RDATA:
 		if (!pgm_on_data (transport, *source, skb))
 			goto out_discarded;
+#ifdef CONFIG_HAVE_RECVMMSG
+		transport->rx_mmsg[ transport->rx_index ].mmsg_skb = pgm_alloc_skb (transport->max_tpdu);
+#else
 		transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
+#endif
 		break;
 
 	case PGM_NCF:
@@ -718,7 +898,6 @@ pgm_recvmsgv (
 recv_again:
 
 	len = recvskb (transport,
-		       transport->rx_buffer,		/* PGM skbuff */
 		       0,
 		       (struct sockaddr*)&src,
 		       sizeof(src),
@@ -795,7 +974,14 @@ flush_pending:
 		if (0 != pgm_flush_peers_pending (transport, &pmsg, msg_end, &bytes_read, &data_read))
 		{
 /* recv vector is now full */
+#ifdef CONFIG_HAVE_RECVMMSG
+/* flush mmsg buffer, will drop data packets as recv vector is full */
+			if ((1 + transport->rx_index) == transport->rx_len)
+				goto out;
+			goto recv_again;
+#else
 			goto out;
+#endif
 		}
 	}
 
@@ -804,10 +990,19 @@ check_for_repeat:
 	if (transport->is_nonblocking ||
 	    flags & MSG_DONTWAIT)
 	{
+#ifdef CONFIG_HAVE_RECVMMSG
+		if (len > 0 &&
+		    ( (1 + transport->rx_index) == transport->rx_len || pmsg < msg_end ))
+		{
+			g_trace ("recv again on flush or not-full");
+			goto recv_again;
+		}
+#else /* !CONFIG_HAVE_RECVMMSG */
 		if (len > 0 && pmsg < msg_end) {
 			g_trace ("recv again on not-full");
 			goto recv_again;		/* \:D/ */
 		}
+#endif /* !CONFIG_HAVE_RECVMMSG */
 	}
 	else
 	{

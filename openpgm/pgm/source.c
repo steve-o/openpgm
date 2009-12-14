@@ -83,6 +83,13 @@
 #	endif
 #endif
 
+#ifndef UIO_FASTIOV
+#	define UIO_FASTIOV	8
+#endif
+#ifndef UIO_MAXIOV
+#	define UIO_MAXIOV	1024
+#endif
+
 #ifndef ENOBUFS
 #	define ENOBUFS	WSAENOBUFS
 #endif
@@ -1871,10 +1878,20 @@ pgm_send_skbv (
 	gsize bytes_sent	= 0;
 	guint packets_sent	= 0;
 	gsize data_bytes_sent	= 0;
+	struct pgm_iovec iovstack[UIO_FASTIOV], *iov = iovstack;
+
+	if (count >= UIO_MAXIOV)
+		iov = g_malloc (count * sizeof(struct pgm_iovec));
 
 /* continue if blocked mid-apdu */
-	if (transport->is_apdu_eagain)
+	if (transport->is_apdu_eagain) {
+		for (unsigned i = STATE(vector_index); i < count; i++) {
+			const struct pgm_sk_buff_t* skb	= vector[STATE(vector_index)];
+			iov[STATE(vector_index)].iov_base	= skb->head;
+			iov[STATE(vector_index)].iov_len	= (guint8*)skb->tail - (guint8*)skb->head;
+		}
 		goto retry_send;
+	}
 
 	STATE(is_rate_limited) = FALSE;
 	if (transport->is_nonblocking &&
@@ -1892,58 +1909,65 @@ pgm_send_skbv (
 			transport->blocklen = total_tpdu_length;
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
+			if (count >= UIO_MAXIOV)
+				g_free (iov);
 			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
 	}
 
+	gsize apdu_length;
+	guint32 first_sqn;
 	if (is_one_apdu)
 	{
-		STATE(apdu_length)	= 0;
-		STATE(first_sqn)	= pgm_txw_next_lead(transport->window);
+		apdu_length	= 0;
+		first_sqn	= pgm_txw_next_lead(transport->window);
 		for (guint i = 0; i < count; i++)
 		{
 			if (vector[i]->len > transport->max_tsdu_fragment) {
 				g_static_mutex_unlock (&transport->source_mutex);
 				g_static_rw_lock_reader_unlock (&transport->lock);
+				if (count >= UIO_MAXIOV)
+					g_free (iov);
 				return PGM_IO_STATUS_ERROR;
 			}
-			STATE(apdu_length) += vector[i]->len;
+			apdu_length += vector[i]->len;
 		}
-		if (STATE(apdu_length) > transport->max_apdu) {
+		if (apdu_length > transport->max_apdu) {
 			g_static_mutex_unlock (&transport->source_mutex);
 			g_static_rw_lock_reader_unlock (&transport->lock);
+			if (count >= UIO_MAXIOV)
+				g_free (iov);
 			return PGM_IO_STATUS_ERROR;
 		}
 	}
 
-	for (STATE(vector_index) = 0; STATE(vector_index) < count; STATE(vector_index)++)
+	const guint32 next_lead = pgm_txw_next_lead(transport->window);
+	gsize data_bytes_offset = 0;
+	for (guint vector_index = 0; vector_index < count; vector_index++)
 	{
-		STATE(tsdu_length) = vector[STATE(vector_index)]->len;
-		
-		STATE(skb) = pgm_skb_get(vector[STATE(vector_index)]);
-		STATE(skb)->transport = transport;
-		STATE(skb)->tstamp = pgm_time_update_now();
+		const gsize tsdu_length = vector[vector_index]->len;
+		struct pgm_sk_buff_t* skb = pgm_skb_get(vector[vector_index]);
+		skb->transport = transport;
+		skb->tstamp = pgm_time_update_now();
 
-		STATE(skb)->pgm_header = (struct pgm_header*)STATE(skb)->head;
-		STATE(skb)->pgm_data   = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
-		memcpy (STATE(skb)->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
-		STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
-		STATE(skb)->pgm_header->pgm_dport	= transport->dport;
-		STATE(skb)->pgm_header->pgm_type	= PGM_ODATA;
-		STATE(skb)->pgm_header->pgm_options	= is_one_apdu ? PGM_OPT_PRESENT : 0;
-		STATE(skb)->pgm_header->pgm_tsdu_length = g_htons (STATE(tsdu_length));
+		skb->pgm_header = (struct pgm_header*)skb->head;
+		skb->pgm_data   = (struct pgm_data*)(skb->pgm_header + 1);
+		memcpy (skb->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+		skb->pgm_header->pgm_sport	= transport->tsi.sport;
+		skb->pgm_header->pgm_dport	= transport->dport;
+		skb->pgm_header->pgm_type	= PGM_ODATA;
+		skb->pgm_header->pgm_options	= is_one_apdu ? PGM_OPT_PRESENT : 0;
+		skb->pgm_header->pgm_tsdu_length = g_htons (tsdu_length);
 
 /* ODATA */
-		STATE(skb)->pgm_data->data_sqn		= g_htonl (pgm_txw_next_lead(transport->window));
-		STATE(skb)->pgm_data->data_trail	= g_htonl (pgm_txw_trail(transport->window));
-
-		gpointer dst = NULL;
+		skb->pgm_data->data_sqn		= g_htonl (next_lead + vector_index);
+		skb->pgm_data->data_trail	= g_htonl (pgm_txw_trail(transport->window));
 
 		if (is_one_apdu)
 		{
 /* OPT_LENGTH */
-			struct pgm_opt_length* opt_len		= (struct pgm_opt_length*)(STATE(skb)->pgm_data + 1);
+			struct pgm_opt_length* opt_len		= (struct pgm_opt_length*)(skb->pgm_data + 1);
 			opt_len->opt_type			= PGM_OPT_LENGTH;
 			opt_len->opt_length			= sizeof(struct pgm_opt_length);
 			opt_len->opt_total_length		= g_htons (	sizeof(struct pgm_opt_length) +
@@ -1954,95 +1978,89 @@ pgm_send_skbv (
 			opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
 			opt_header->opt_length			= sizeof(struct pgm_opt_header) +
 								  sizeof(struct pgm_opt_fragment);
-			STATE(skb)->pgm_opt_fragment			= (struct pgm_opt_fragment*)(opt_header + 1);
-			STATE(skb)->pgm_opt_fragment->opt_reserved	= 0;
-			STATE(skb)->pgm_opt_fragment->opt_sqn		= g_htonl (STATE(first_sqn));
-			STATE(skb)->pgm_opt_fragment->opt_frag_off	= g_htonl (STATE(data_bytes_offset));
-			STATE(skb)->pgm_opt_fragment->opt_frag_len	= g_htonl (STATE(apdu_length));
-
-			dst = STATE(skb)->pgm_opt_fragment + 1;
-		}
-		else
-		{
-			dst = STATE(skb)->pgm_data + 1;
+			skb->pgm_opt_fragment			= (struct pgm_opt_fragment*)(opt_header + 1);
+			skb->pgm_opt_fragment->opt_reserved	= 0;
+			skb->pgm_opt_fragment->opt_sqn		= g_htonl (first_sqn);
+			skb->pgm_opt_fragment->opt_frag_off	= g_htonl (data_bytes_offset);
+			skb->pgm_opt_fragment->opt_frag_len	= g_htonl (apdu_length);
 		}
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
-		STATE(skb)->pgm_header->pgm_checksum	= 0;
-		const gsize pgm_header_len		= (guint8*)dst - (guint8*)STATE(skb)->pgm_header;
-		const guint32 unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-		STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)(STATE(skb)->pgm_opt_fragment + 1), STATE(tsdu_length), 0);
-		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+		skb->pgm_header->pgm_checksum	= 0;
+		const gsize pgm_header_len	= (guint8*)skb->data - (guint8*)skb->pgm_header;
+		const guint32 unfolded_header	= pgm_csum_partial (skb->pgm_header, pgm_header_len, 0);
+		const guint32 unfolded_odata	= pgm_csum_partial ((guint8*)skb->data, tsdu_length, 0);
+		skb->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 		g_static_mutex_lock (&transport->txw_mutex);
-		pgm_txw_add (transport->window, STATE(skb));
+		pgm_txw_preload (transport->window, skb);
 		g_static_mutex_unlock (&transport->txw_mutex);
-		gssize tpdu_length, sent;
-retry_send:
-		tpdu_length = (guint8*)STATE(skb)->tail - (guint8*)STATE(skb)->head;
-		sent = pgm_sendto (transport,
-				   !STATE(is_rate_limited),	/* rate limited on blocking */
-				    FALSE,				/* regular socket */
-				    STATE(skb)->head,
-				    tpdu_length,
-				    (struct sockaddr*)&transport->send_gsr.gsr_group,
-				    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-			transport->is_apdu_eagain = TRUE;
-			transport->blocklen = tpdu_length;
-			goto blocked;
-		}
+
+		iov[vector_index].iov_base	= skb->head;
+		iov[vector_index].iov_len	= (guint8*)skb->tail - (guint8*)skb->head;
 
 /* save unfolded odata for retransmissions */
-		pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
+		pgm_txw_set_unfolded_checksum (skb, unfolded_odata);
 
-		if (sent == tpdu_length) {
-			bytes_sent += tpdu_length + transport->iphdr_len;	/* as counted at IP layer */
-			packets_sent++;							/* IP packets */
-			data_bytes_sent += STATE(tsdu_length);
-		}
-
-		pgm_free_skb (STATE(skb));
-		STATE(data_bytes_offset) += STATE(tsdu_length);
-
-/* check for end of transmission group */
-		if (transport->use_proactive_parity) {
-			const guint32 odata_sqn = g_ntohl (STATE(skb)->pgm_data->data_sqn);
-			guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
-			if (!((odata_sqn + 1) & ~tg_sqn_mask))
-				pgm_schedule_proactive_nak (transport, odata_sqn & tg_sqn_mask);
-		}
-
+		data_bytes_offset += tsdu_length;
 	}
-#ifdef TRANSPORT_DEBUG
-	if (is_one_apdu)
+
+	g_static_mutex_lock (&transport->txw_mutex);
+	pgm_txw_preload_commit (transport->window, count);
+	g_static_mutex_unlock (&transport->txw_mutex);
+
+/* count success sends */
+	STATE(vector_index) = 0;
+
+	int datagrams;
+
+retry_send:
+	datagrams = pgm_sendtov (transport,
+			        !STATE(is_rate_limited),	/* rate limited on blocking */
+			         FALSE,				/* regular socket */
+			         &iov[STATE(vector_index)],
+			         count - STATE(vector_index),
+			         (struct sockaddr*)&transport->send_gsr.gsr_group,
+			         pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+	if (datagrams > 0) {
+		for (unsigned i = 0; i < datagrams; i++) {
+			struct pgm_sk_buff_t* skb = vector[STATE(vector_index)];
+			const gsize tpdu_length = (guint8*)skb->tail - (guint8*)skb->head;
+			bytes_sent += tpdu_length + transport->iphdr_len;
+			packets_sent++;
+			data_bytes_sent += vector[STATE(vector_index)]->len;
+			pgm_free_skb (skb);
+			STATE(vector_index)++;
+		}
+		if (bytes_sent) {
+			reset_heartbeat_spm (transport);
+			pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+			transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+			transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
+			if (bytes_written)
+				*bytes_written = data_bytes_sent;
+		}
+	}
+	if ((datagrams > 0 && datagrams < count) ||
+	    (datagrams < 0 && (EAGAIN == errno || ENOBUFS == errno)))
 	{
-		g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
+		goto blocked;
 	}
-#endif
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
-
-	pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
-	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
-	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
-	if (bytes_written)
-		*bytes_written = data_bytes_sent;
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
+	if (count >= UIO_MAXIOV)
+		g_free (iov);
 	return PGM_IO_STATUS_NORMAL;
 
 blocked:
-	if (bytes_sent) {
-		reset_heartbeat_spm (transport);
-		pgm_atomic_int32_add (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
-		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
-		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
-	}
+	transport->is_apdu_eagain = TRUE;
 	g_static_mutex_unlock (&transport->source_mutex);
 	g_static_rw_lock_reader_unlock (&transport->lock);
+	if (count >= UIO_MAXIOV)
+		g_free (iov);
 	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 

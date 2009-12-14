@@ -53,6 +53,13 @@
 #	define ENOBUFS		WSAENOBUFS
 #endif
 
+#ifndef UIO_FASTIOV
+#	define UIO_FASTIOV	8
+#endif
+#ifndef UIO_MAXIOV
+#	define UIO_MAXIOV	1024
+#endif
+
 
 /* locked and rate regulated sendto
  *
@@ -77,7 +84,7 @@ pgm_sendto (
 	g_assert( to );
 	g_assert( tolen > 0 );
 
-	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
+	const int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
 	if (use_rate_limit &&
 	    transport->rate_control && 
@@ -140,6 +147,138 @@ pgm_sendto (
 	if (!use_router_alert && transport->can_send_data)
 		g_static_mutex_unlock (&transport->send_mutex);
 	return sent;
+}
+
+#define CONFIG_COMPAT_SENDMMSG
+#ifdef CONFIG_COMPAT_SENDMMSG
+static inline int sendmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
+{
+	int ret = -1;
+	for (int i = 0; i < vlen; i++) {
+		const int tmp = sendmsg (fd, &mmsg[i].msg_hdr, flags);
+		if (tmp < 0)
+			break;
+		mmsg[i].msg_len = tmp;
+		ret++;
+	}
+	return ret < 0 ? ret : (1 + ret);
+}
+#else
+//#		include "/home/ubuntu/linux-2.6/arch/x86/include/asm/unistd.h"
+#	include "/home/ubuntu/linux-2.6.24/include/asm-x86/unistd.h"
+static inline int sendmmsg (int fd, struct mmsghdr* mmsg, unsigned vlen, unsigned flags, struct timespec* timeout)
+{
+	return syscall(__NR_sendmmsg, fd, mmsg, vlen, flags, timeout);
+}
+#endif /* CONFIG_COMPAT_SENDMMSG */
+
+gssize
+pgm_sendtov (
+	pgm_transport_t*	transport,
+	gboolean		use_rate_limit,
+	gboolean		use_router_alert,
+	const struct pgm_iovec*	iov,
+	guint			vlen,
+	const struct sockaddr*	to,
+	gsize			tolen
+	)
+{
+	g_assert( transport );
+	g_assert( iov );
+	g_assert( vlen > 0 );
+	g_assert( vlen <= UIO_MAXIOV );
+	g_assert( to );
+	g_assert( tolen > 0 );
+
+	const int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
+
+	if (use_rate_limit &&
+	    transport->rate_control)
+	{
+		guint len = 0;
+		for (unsigned i = 0; i < vlen; i++)
+			len += iov[i].iov_len;
+		if (!pgm_rate_check (transport->rate_control, len, transport->is_nonblocking))
+		{
+			errno = ENOBUFS;
+			return (const gssize)-1;
+		}
+	}
+
+	struct mmsghdr mmsgstack[UIO_FASTIOV], *mmsg = mmsgstack;
+	if (vlen > UIO_FASTIOV)
+		mmsg = g_malloc (vlen * sizeof(struct mmsghdr));
+	for (unsigned i = 0; i < vlen; i++) {
+		mmsg[i].msg_hdr.msg_name	= to;
+		mmsg[i].msg_hdr.msg_namelen	= tolen;
+		mmsg[i].msg_hdr.msg_iov		= &iov[i];
+		mmsg[i].msg_hdr.msg_iovlen	= 1;
+		mmsg[i].msg_hdr.msg_control	= NULL;
+		mmsg[i].msg_hdr.msg_controllen	= 0;
+		mmsg[i].msg_hdr.msg_flags	= 0;
+		mmsg[i].msg_len			= iov[i].iov_len;
+	}
+
+	if (!use_router_alert && transport->can_send_data)
+		g_static_mutex_lock (&transport->send_mutex);
+
+	int datagrams = sendmmsg (sock, mmsg, vlen, 0, NULL);
+	if ((	datagrams < 0 &&
+		errno != ENETUNREACH &&		/* Network is unreachable */
+		errno != EHOSTUNREACH &&	/* No route to host */
+		errno != EAGAIN 		/* would block on non-blocking send */
+	    ) |
+	    (   datagrams < vlen
+	    ))
+	{
+#ifdef CONFIG_HAVE_POLL
+/* poll for cleared socket */
+		struct pollfd p = {
+			.fd		= transport->send_sock,
+			.events		= POLLOUT,
+			.revents	= 0
+		};
+		const int ready = poll (&p, 1, 500 /* ms */);
+#else
+		fd_set writefds;
+		FD_ZERO(&writefds);
+		FD_SET(transport->send_sock, &writefds);
+		struct timeval tv = {
+			.tv_sec  = 0,
+			.tv_usec = 500 /* ms */ * 1000
+		};
+		const int ready = select (1, NULL, &writefds, NULL, &tv);
+#endif /* CONFIG_HAVE_POLL */
+		if (ready > 0)
+		{
+			if (datagrams > 0)
+				datagrams += sendmmsg (sock, mmsg + datagrams, vlen - datagrams, 0, NULL);
+			else
+				datagrams = sendmmsg (sock, mmsg, vlen, 0, NULL);
+			if ( datagrams < 0 )
+			{
+				g_warning (_("sendto %s failed: %s"),
+						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
+						g_strerror (errno));
+			}
+		}
+		else if (ready == 0)
+		{
+			g_warning (_("sendto %s failed: socket timeout."),
+					 inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
+		}
+		else
+		{
+			g_warning (_("blocked socket failed: %s"),
+					g_strerror (errno));
+		}
+	}
+
+	if (!use_router_alert && transport->can_send_data)
+		g_static_mutex_unlock (&transport->send_mutex);
+	if (vlen > UIO_FASTIOV)
+		g_free (mmsg);
+	return datagrams;
 }
 
 /* socket helper, for setting pipe ends non-blocking

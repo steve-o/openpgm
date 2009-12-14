@@ -325,6 +325,68 @@ pgm_txw_add (
 	g_assert_cmpuint (pgm_txw_length (window), <=, pgm_txw_max_length (window));
 }
 
+/* preload the transmit window with new PGM SKBs, i.e. add without
+ * advancing the lead.
+ */
+
+void
+pgm_txw_preload (
+	pgm_txw_t* const		window,
+	struct pgm_sk_buff_t* const	skb		/* cannot be NULL */
+	)
+{
+/* pre-conditions */
+	g_assert (window);
+	g_assert (skb);
+	g_assert_cmpuint (pgm_txw_max_length (window), >, 0);
+	g_assert (pgm_skb_is_valid (skb));
+	g_assert (((const GList*)skb)->next == NULL);
+	g_assert (((const GList*)skb)->prev == NULL);
+	g_assert (pgm_tsi_is_null (&skb->tsi));
+	g_assert ((sizeof(struct pgm_header) + sizeof(struct pgm_data)) <= ((guint8*)skb->data - (guint8*)skb->head));
+
+	g_trace ("add (window:%p skb:%p)", (gpointer)window, (gpointer)skb);
+
+	if (pgm_txw_is_full (window))
+	{
+/* transmit window advancement scheme dependent action here */
+		pgm_txw_remove_tail (window);
+	}
+
+/* generate new sequence number, no need for atomics as value kept in sender thread till commit */
+	window->preload_count++;
+	skb->sequence = window->lead + window->preload_count;
+
+/* add skb to window */
+	const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
+	window->pdata[index_] = skb;
+
+/* statistics */
+	window->size += skb->len;
+
+/* post-conditions */
+	g_assert_cmpuint (window->preload_count + pgm_txw_length (window), >, 0);
+	g_assert_cmpuint (window->preload_count + pgm_txw_length (window), <=, pgm_txw_max_length (window));
+}
+
+/* advance window for real */
+
+void
+pgm_txw_preload_commit (
+	pgm_txw_t* const		window,
+	const guint			commit_count
+	)
+{
+	g_assert (commit_count <= window->preload_count);
+
+	pgm_atomic_int32_add (&window->lead, commit_count);
+	window->preload_count -= commit_count;
+
+/* post-conditions */
+	g_assert_cmpuint (window->preload_count + pgm_txw_length (window), >, 0);
+	g_assert_cmpuint (window->preload_count + pgm_txw_length (window), <=, pgm_txw_max_length (window));
+}
+
 /* peek an entry from the window for retransmission.
  *
  * returns pointer to skbuff on success, returns NULL on invalid parameters.

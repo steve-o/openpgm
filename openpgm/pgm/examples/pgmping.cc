@@ -527,35 +527,36 @@ sender_thread (
 
 	last = now = pgm_time_update_now();
 	do {
+		struct pgm_sk_buff_t* vector[8];
 		if (g_msg_sent && g_latency_seqno + 1 == g_msg_sent)
 			latency = g_latency_current;
 		else
 			latency = g_odata_interval;
-
-		ping.set_seqno (g_msg_sent);
 		ping.set_latency (latency);
-		ping.set_payload (payload, sizeof(payload));
-
-		const int header_size = pgm_transport_pkt_offset(FALSE);
-		const int apdu_size = ping.ByteSize();
-		struct pgm_sk_buff_t* skb = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
-		pgm_skb_reserve (skb, header_size);
-		pgm_skb_put (skb, apdu_size);
-
 /* wait on packet rate limit */
-		if ((last + g_odata_interval) > now) {
-			now = pgm_time_sleep (g_odata_interval - (now - last));
+		if ((last + (8 * g_odata_interval)) > now) {
+			now = pgm_time_sleep ((8 * g_odata_interval) - (now - last));
 		}
-		last += g_odata_interval;
+		last += 8 * g_odata_interval;
 		ping.set_time (now);
-		ping.SerializeToArray (skb->data, skb->len);
+		for (unsigned i = 0; i < 8; i++)
+		{
+			ping.set_seqno (g_msg_sent + i);
+			ping.set_payload (payload, sizeof(payload));
+			const int header_size = pgm_transport_pkt_offset(FALSE);
+			const int apdu_size = ping.ByteSize();
+			vector[i] = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
+			pgm_skb_reserve (vector[i], header_size);
+			pgm_skb_put (vector[i], apdu_size);
+			ping.SerializeToArray (vector[i]->data, vector[i]->len);
+		}
 
 		struct timeval tv;
 		int timeout;
 		gsize bytes_written;
 		PGMIOStatus status;
 again:
-		status = pgm_send_skbv (g_transport, &skb, 1, TRUE, &bytes_written);
+		status = pgm_send_skbv (g_transport, vector, 8, FALSE, &bytes_written);
 		switch (status) {
 		case PGM_IO_STATUS_RATE_LIMITED:
 		{
@@ -589,7 +590,7 @@ again:
 			return NULL;
 		}
 		g_out_total += bytes_written;
-		g_msg_sent++;
+		g_msg_sent += 8;
 	} while (!g_quit);
 
 	return NULL;
