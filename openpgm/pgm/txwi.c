@@ -155,14 +155,13 @@ pgm_txw_create (
 
 /* pre-conditions */
 	g_assert (NULL != tsi);
+	g_assert_cmpuint (tpdu_size, >, 0);
 	if (sqns) {
-		g_assert_cmpuint (tpdu_size, ==, 0);
 		g_assert_cmpuint (sqns, >, 0);
 		g_assert_cmpuint (sqns & PGM_UINT32_SIGN_BIT, ==, 0);
 		g_assert_cmpuint (secs, ==, 0);
 		g_assert_cmpuint (max_rte, ==, 0);
 	} else {
-		g_assert_cmpuint (tpdu_size, >, 0);
 		g_assert_cmpuint (secs, >, 0);
 		g_assert_cmpuint (max_rte, >, 0);
 	}
@@ -195,6 +194,12 @@ pgm_txw_create (
 
 	window = g_slice_alloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 	window->tsi = tsi;
+
+/* chunk allocator */
+	const guint atom_size = sizeof(struct pgm_sk_buff_t) + tpdu_size;
+	const guint aligned_atom_size = (atom_size + (G_MEM_ALIGN - 1)) & ~(G_MEM_ALIGN - 1);
+	const gulong chunk_size = 4 * aligned_atom_size;
+	pgm_allocator_create (&window->allocator, atom_size, chunk_size);
 
 /* empty state for transmission group boundaries to align.
  *
@@ -243,6 +248,8 @@ pgm_txw_shutdown (
 	while (!pgm_txw_is_empty (window)) {
 		pgm_txw_remove_tail (window);
 	}
+
+	pgm_allocator_destroy (&window->allocator);
 
 /* window must now be empty */
 	g_assert_cmpuint (pgm_txw_length (window), ==, 0);
@@ -374,11 +381,17 @@ pgm_txw_remove_tail (
 	}
 
 /* remove reference to skb */
-	if (G_UNLIKELY(g_mem_gc_friendly)) {
-		const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
-		window->pdata[index_] = NULL;
+#ifdef PGM_TXW_CLEAR_UNUSED_ENTRIES
+	const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
+	window->pdata[index_] = NULL;
+#endif
+	if (g_atomic_int_dec_and_test (&skb->users))
+	{
+		if (pgm_chunk_is_last_skb (&window->allocator, skb))
+			pgm_chunk_free (&window->allocator);
+	} else {
+		g_warning ("Transmit window PGM SKB still owned by application.");
 	}
-	pgm_free_skb (skb);
 
 /* advance trailing pointer */
 	pgm_atomic_int32_inc (&window->trail);

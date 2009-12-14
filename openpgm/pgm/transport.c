@@ -693,7 +693,7 @@ pgm_transport_bind (
 	if (transport->can_send_data) {
 		g_trace ("INFO","construct transmit window.");
 		transport->window = transport->txw_sqns ?
-					pgm_txw_create (&transport->tsi, 0, transport->txw_sqns, 0, 0, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k) :
+					pgm_txw_create (&transport->tsi, transport->max_tpdu, transport->txw_sqns, 0, 0, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k) :
 					pgm_txw_create (&transport->tsi, transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k);
 		g_assert (transport->window);
 	}
@@ -1265,6 +1265,15 @@ pgm_transport_get_rate_remaining (
 	tv->tv_sec  = pgm_time / 1000000UL;
 	tv->tv_usec = pgm_time % 1000000UL;
 	return TRUE;
+}
+
+pgm_allocator*
+pgm_transport_get_send_allocator (
+	pgm_transport_t*	transport
+	)
+{
+	g_return_val_if_fail (NULL != transport, NULL);
+	return pgm_txw_get_allocator (transport->window);
 }
 
 /* add select parameters for the transports receive socket(s)

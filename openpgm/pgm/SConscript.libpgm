@@ -6,6 +6,8 @@ import os;
 Import('env')
 
 src = Split("""
+		chunk.c
+		histogram.c
 		packet.c
 		time.c
 		if.c
@@ -35,7 +37,6 @@ src = Split("""
 		galois_tables.c
 		wsastrerror.c
 		glib-compat.c
-		histogram.c
 """)
 
 e = env.Clone();

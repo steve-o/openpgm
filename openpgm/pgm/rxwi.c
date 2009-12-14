@@ -1225,11 +1225,6 @@ _pgm_rxw_remove_trail (
 	g_assert (skb);
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
-/* remove reference to skb */
-	if (G_UNLIKELY(g_mem_gc_friendly)) {
-		const guint32 index_ = skb->sequence % pgm_rxw_max_length (window);
-		window->pdata[index_] = NULL;
-	}
 	pgm_free_skb (skb);
 	if (window->trail++ == window->commit_lead) {
 /* data-loss */
