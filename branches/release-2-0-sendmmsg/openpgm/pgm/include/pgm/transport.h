@@ -326,6 +326,12 @@ struct pgm_transport_t {
 	guint			rs_k;
 	guint			rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
 	guint			tg_sqn_shift;
+#ifdef CONFIG_HAVE_RECVMMSG
+#define PGM_RECVMMSG_LEN	32
+	struct mmsghdr		rx_mmsghdr[ PGM_RECVMMSG_LEN ];
+	struct _pgm_mmsg_t	rx_mmsg[ PGM_RECVMMSG_LEN ];
+	unsigned		rx_index, rx_len;
+#endif /* !CONFIG_HAVE_RECVMMSG */
 	struct pgm_sk_buff_t* 	rx_buffer;
 
 	GStaticRWLock		peers_lock;

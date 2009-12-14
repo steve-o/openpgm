@@ -32,6 +32,7 @@
 G_BEGIN_DECLS
 
 G_GNUC_INTERNAL gssize pgm_sendto (pgm_transport_t*, gboolean, gboolean, const void*, gsize, const struct sockaddr*, gsize);
+G_GNUC_INTERNAL gssize pgm_sendtov (pgm_transport_t*, gboolean, gboolean, const struct pgm_iovec*, guint, const struct sockaddr*, gsize);
 G_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
 
 G_END_DECLS

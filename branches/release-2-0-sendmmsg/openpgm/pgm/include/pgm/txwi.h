@@ -75,6 +75,7 @@ struct pgm_txw_t {
 /* option: lockless atomics */
         guint32			lead;
         guint32			trail;
+	guint			preload_count;
 
 	pgm_allocator		allocator;
         GQueue			retransmit_queue;
@@ -94,6 +95,8 @@ typedef struct pgm_txw_t pgm_txw_t;
 
 G_GNUC_INTERNAL pgm_txw_t* pgm_txw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint, const gboolean, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_txw_shutdown (pgm_txw_t* const);
+G_GNUC_INTERNAL void pgm_txw_preload (pgm_txw_t* const, struct pgm_sk_buff_t* const);
+G_GNUC_INTERNAL void pgm_txw_preload_commit (pgm_txw_t* const, const guint);
 G_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t* const, struct pgm_sk_buff_t* const);
 G_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_peek (pgm_txw_t* const, const guint32) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gboolean pgm_txw_retransmit_push (pgm_txw_t* const, const guint32, const gboolean, const guint) G_GNUC_WARN_UNUSED_RESULT;
@@ -127,7 +130,7 @@ static inline gboolean pgm_txw_is_empty (const pgm_txw_t* const window)
 static inline gboolean pgm_txw_is_full (const pgm_txw_t* const window)
 {
 	g_assert (window);
-	return pgm_txw_length (window) == pgm_txw_max_length (window);
+	return (pgm_txw_length (window) + window->preload_count) == pgm_txw_max_length (window);
 }
 
 static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
