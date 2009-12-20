@@ -115,7 +115,6 @@ static
 ssize_t
 recvskb (
 	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
 	const int			flags,
 	struct sockaddr* const		src_addr,
 	const gsize			src_addrlen,
@@ -125,18 +124,18 @@ recvskb (
 {
 /* pre-conditions */
 	g_assert (NULL != transport);
-	g_assert (NULL != skb);
 	g_assert (NULL != src_addr);
 	g_assert (src_addrlen > 0);
 	g_assert (NULL != dst_addr);
 	g_assert (dst_addrlen > 0);
 
-	g_trace ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
-		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
+	g_trace ("recvskb (transport:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
+		(gpointer)transport, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
 
 	if (G_UNLIKELY(transport->is_destroyed))
 		return 0;
 
+	struct pgm_sk_buff_t* skb = transport->rx_buffer;
 	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
 		.iov_len	= transport->max_tpdu
@@ -445,7 +444,8 @@ g_trace ("source:%p", (gpointer)*source);
 	case PGM_RDATA:
 		if (!pgm_on_data (transport, *source, skb))
 			goto out_discarded;
-		transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
+		transport->rx_buffer->len = 0;
+		transport->rx_buffer->tail = transport->rx_buffer->data;
 		break;
 
 	case PGM_NCF:
@@ -718,7 +718,6 @@ pgm_recvmsgv (
 recv_again:
 
 	len = recvskb (transport,
-		       transport->rx_buffer,		/* PGM skbuff */
 		       0,
 		       (struct sockaddr*)&src,
 		       sizeof(src),

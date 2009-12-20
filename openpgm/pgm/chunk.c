@@ -136,6 +136,10 @@ pgm_chunk_free (
 	g_trace ("pgm_chunk_free ()");
 
 	pgm_chunk* next_chunk = allocator->chunks->next;
+	if (NULL == next_chunk) {
+		g_assert (allocator->chunks == allocator->current);
+		allocator->current = NULL;
+	}
 	g_free (allocator->chunks);
 	allocator->chunks = next_chunk;
 }
