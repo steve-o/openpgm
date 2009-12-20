@@ -36,6 +36,10 @@
 #	include <pgm/atomic.h>
 #endif
 
+#ifndef __PGM_CHUNK_H__
+#	include <pgm/chunk.h>
+#endif
+
 
 G_BEGIN_DECLS
 
@@ -72,6 +76,7 @@ struct pgm_txw_t {
         guint32			lead;
         guint32			trail;
 
+	pgm_allocator		allocator;
         GQueue			retransmit_queue;
 
 	rs_t			rs;
@@ -177,6 +182,11 @@ static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
 {
 	g_assert (window);
 	return g_queue_is_empty (&window->retransmit_queue);
+}
+
+static inline pgm_allocator* pgm_txw_get_allocator (pgm_txw_t* window)
+{
+	return &window->allocator;
 }
 
 G_END_DECLS

@@ -622,8 +622,9 @@ pgm_send_spm (
 				       sizeof(struct pgm_opt_fin);
 	}
 	guint8 buf[ tpdu_length ];
-	if (G_UNLIKELY(g_mem_gc_friendly))
-		memset (buf, 0, tpdu_length);
+#ifdef CONFIG_GC_FRIENDLY
+	memset (buf, 0, tpdu_length);
+#endif
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
 	struct pgm_spm6 *spm6 = (struct pgm_spm6*)(header + 1);
@@ -1052,7 +1053,7 @@ send_odata_copy (
 	if (transport->is_apdu_eagain)
 		goto retry_send;
 
-	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+	STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
 	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
@@ -1170,7 +1171,7 @@ send_odatav (
 	}
 	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, PGM_IO_STATUS_ERROR);
 
-	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+	STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
 	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
@@ -1313,7 +1314,7 @@ send_apdu (
 		gsize header_length = pgm_transport_pkt_offset (TRUE);
 		STATE(tsdu_length) = MIN( pgm_transport_max_tsdu (transport, TRUE), apdu_length - STATE(data_bytes_offset) );
 
-		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+		STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
 		pgm_skb_reserve (STATE(skb), header_length);
@@ -1659,7 +1660,7 @@ retry_send:
 /* retrieve packet storage from transmit window */
 		gsize header_length = pgm_transport_pkt_offset (TRUE);
 		STATE(tsdu_length) = MIN( pgm_transport_max_tsdu (transport, TRUE), STATE(apdu_length) - STATE(data_bytes_offset) );
-		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
+		STATE(skb) = pgm_chunk_alloc_skb (pgm_transport_get_send_allocator (transport));
 		STATE(skb)->transport = transport;
 		STATE(skb)->tstamp = pgm_time_update_now();
 		pgm_skb_reserve (STATE(skb), header_length);
@@ -1937,6 +1938,8 @@ pgm_send_skbv (
 		STATE(skb)->pgm_data->data_sqn		= g_htonl (pgm_txw_next_lead(transport->window));
 		STATE(skb)->pgm_data->data_trail	= g_htonl (pgm_txw_trail(transport->window));
 
+		gpointer dst = NULL;
+
 		if (is_one_apdu)
 		{
 /* OPT_LENGTH */
@@ -1957,18 +1960,18 @@ pgm_send_skbv (
 			STATE(skb)->pgm_opt_fragment->opt_frag_off	= g_htonl (STATE(data_bytes_offset));
 			STATE(skb)->pgm_opt_fragment->opt_frag_len	= g_htonl (STATE(apdu_length));
 
-			g_assert (STATE(skb)->data == (STATE(skb)->pgm_opt_fragment + 1));
+			dst = STATE(skb)->pgm_opt_fragment + 1;
 		}
 		else
 		{
-			g_assert (STATE(skb)->data == (STATE(skb)->pgm_data + 1));
+			dst = STATE(skb)->pgm_data + 1;
 		}
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
 		STATE(skb)->pgm_header->pgm_checksum	= 0;
-		const gsize pgm_header_len		= (guint8*)STATE(skb)->data - (guint8*)STATE(skb)->pgm_header;
+		const gsize pgm_header_len		= (guint8*)dst - (guint8*)STATE(skb)->pgm_header;
 		const guint32 unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-		STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)STATE(skb)->data, STATE(tsdu_length), 0);
+		STATE(unfolded_odata)			= pgm_csum_partial ((guint8*)(STATE(skb)->pgm_opt_fragment + 1), STATE(tsdu_length), 0);
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */

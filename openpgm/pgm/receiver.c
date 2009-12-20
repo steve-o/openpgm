@@ -1359,8 +1359,9 @@ send_nak_list (
 	if (AFI_IP6 == pgm_sockaddr_family(&source->nla))
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
-	if (G_UNLIKELY(g_mem_gc_friendly))
-		memset (buf, 0, tpdu_length);
+#ifdef CONFIG_GC_FRIENDLY
+	memset (buf, 0, tpdu_length);
+#endif
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
 	struct pgm_nak6 *nak6 = (struct pgm_nak6*)(header + 1);

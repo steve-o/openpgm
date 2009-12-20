@@ -61,6 +61,10 @@ typedef struct pgm_transport_t pgm_transport_t;
 #   include <pgm/skbuff.h>
 #endif
 
+#ifndef __PGM_CHUNK_H__
+#	include <pgm/chunk.h>
+#endif
+
 
 #define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
 
@@ -396,6 +400,7 @@ static inline int pgm_transport_get_send_fd (pgm_transport_t* transport)
 	return transport->send_sock;
 }
 
+pgm_allocator* pgm_transport_get_send_allocator (pgm_transport_t*);
 gboolean pgm_transport_get_timer_pending (pgm_transport_t* const, struct timeval* const);
 gboolean pgm_transport_get_rate_remaining (pgm_transport_t* const, struct timeval* const);
 int pgm_transport_select_info (pgm_transport_t* const, fd_set* const, fd_set* const, int* const);

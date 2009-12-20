@@ -1,17 +1,6 @@
-#!/usr/bin/python
-
-import os
-import sys
-import time
-
-build_date = time.strftime ("%Y-%m-%d")
-build_time = time.strftime ("%H:%M:%S")
-build_rev = os.popen('svnversion -n .').read();
-
-print """
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
- * OpenPGM version.
+ * PGM error structure ala MSG_ERRQUEUE
  *
  * Copyright (c) 2006-2009 Miru Limited.
  *
@@ -30,23 +19,23 @@ print """
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
+#ifndef __PGM_ERR_H__
+#define __PGM_ERR_H__
 
-#include "pgm/version.h"
+#pragma pack(push, 1)
+
+struct pgm_sock_err_t {
+#ifdef __PGM_TRANSPORT_H__
+	pgm_tsi_t	tsi;
+#else
+	char		identifier[8];		/* TSI */
+#endif
+	guint32		lost_count;
+};
+
+typedef struct pgm_sock_err_t pgm_sock_err_t;
+
+#pragma pack(pop)
 
 
-/* globals */
-
-const guint pgm_major_version = 2;
-const guint pgm_minor_version = 0;
-const guint pgm_micro_version = 15;
-const char* pgm_build_date = "%s";
-const char* pgm_build_time = "%s";
-const char* pgm_build_platform = "%s";
-const char* pgm_build_revision = "%s";
-
-
-/* eof */
-"""%(build_date, build_time, sys.platform, build_rev)
-
-# end of file
+#endif /* __PGM_ERR_H__ */
