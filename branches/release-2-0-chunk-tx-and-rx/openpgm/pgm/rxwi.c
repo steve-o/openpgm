@@ -244,6 +244,12 @@ pgm_rxw_create (
 	window->tsi		= tsi;
 	window->max_tpdu	= tpdu_size;
 
+/* chunk allocator */
+	const guint atom_size = sizeof(struct pgm_sk_buff_t) + tpdu_size;
+	const guint aligned_atom_size = (atom_size + (G_MEM_ALIGN - 1)) & ~(G_MEM_ALIGN - 1);
+	const gulong chunk_size = 4 * aligned_atom_size;
+	pgm_allocator_create (&window->allocator, atom_size, chunk_size);
+
 /* empty state:
  *
  * trail = 0, lead = -1
@@ -636,7 +642,7 @@ _pgm_rxw_add_placeholder (
 /* advance lead */
 	window->lead++;
 
-	skb			= pgm_alloc_skb (window->max_tpdu);
+	skb			= pgm_chunk_alloc_skb (&window->allocator);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
 	skb->tstamp		= now;
 	skb->sequence		= window->lead;
@@ -1017,17 +1023,15 @@ _pgm_rxw_insert (
 	}
 
 /* replace place holder skb with incoming skb */
-	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
-	((pgm_rxw_state_t*)new_skb->cb)->state = PGM_PKT_ERROR_STATE;
-	_pgm_rxw_unlink (window, skb);
-	pgm_free_skb (skb);
-	const guint32 index_ = new_skb->sequence % pgm_rxw_max_length (window);
-	window->pdata[index_] = new_skb;
+	memcpy (skb->data, new_skb->data, new_skb->len);
+	skb->len = new_skb->len;
+	skb->tail = (guint8*)skb->data + skb->len;
+
 	if (new_skb->pgm_header->pgm_options & PGM_OPT_PARITY)
-		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_PARITY_STATE);
+		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_PARITY_STATE);
 	else
-		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_DATA_STATE);
-	window->size += new_skb->len;
+		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_DATA_STATE);
+	window->size += skb->len;
 
 	return PGM_RXW_INSERTED;
 }
@@ -1103,7 +1107,7 @@ _pgm_rxw_append (
 	if (skb->pgm_opt_fragment &&
 	    _pgm_rxw_is_apdu_lost (window, skb))
 	{
-		struct pgm_sk_buff_t* lost_skb	= pgm_alloc_skb (window->max_tpdu);
+		struct pgm_sk_buff_t* lost_skb	= pgm_chunk_alloc_skb (&window->allocator);
 		lost_skb->tstamp		= now;
 		lost_skb->sequence		= skb->sequence;
 
@@ -1115,22 +1119,36 @@ _pgm_rxw_append (
 		return PGM_RXW_BOUNDS;
 	}
 
+	struct pgm_sk_buff_t* new_skb	= pgm_chunk_alloc_skb (&window->allocator);
+	memcpy (new_skb, skb, G_STRUCT_OFFSET(struct pgm_sk_buff_t, pgm_header));
+	new_skb->zero_padded = 0;
+	new_skb->truesize = skb->truesize;
+	g_atomic_int_set (&new_skb->users, 1);
+	new_skb->head = new_skb + 1;
+	new_skb->end  = (guint8*)new_skb->head + ((guint8*)skb->end - (guint8*)skb->head);
+	new_skb->data = (guint8*)new_skb->head + ((guint8*)skb->data - (guint8*)skb->head);
+	new_skb->tail = (guint8*)new_skb->head + ((guint8*)skb->tail - (guint8*)skb->head);
+	new_skb->pgm_header = skb->pgm_header ? (struct pgm_header*)((guint8*)new_skb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head)) : skb->pgm_header;
+	new_skb->pgm_opt_fragment = skb->pgm_opt_fragment ? (struct pgm_opt_fragment*)((guint8*)new_skb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head)) : skb->pgm_opt_fragment;
+	new_skb->pgm_data = skb->pgm_data ? (struct pgm_data*)((guint8*)new_skb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head)) : skb->pgm_data;
+	memcpy (new_skb->head, skb->head, (guint8*)skb->end - (guint8*)skb->head);
+
 /* add skb to window */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PARITY)
 	{
-		const guint32 index_	= skb->sequence % pgm_rxw_max_length (window);
-		window->pdata[index_]	= skb;
-		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_PARITY_STATE);
+		const guint32 index_	= new_skb->sequence % pgm_rxw_max_length (window);
+		window->pdata[index_]	= new_skb;
+		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_PARITY_STATE);
 	}
 	else
 	{
-		const guint32 index_	= skb->sequence % pgm_rxw_max_length (window);
-		window->pdata[index_]	= skb;
-		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_DATA_STATE);
+		const guint32 index_	= new_skb->sequence % pgm_rxw_max_length (window);
+		window->pdata[index_]	= new_skb;
+		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_DATA_STATE);
 	}
 
 /* statistics */
-	window->size += skb->len;
+	window->size += new_skb->len;
 
 	return PGM_RXW_APPENDED;
 }
@@ -1225,7 +1243,8 @@ _pgm_rxw_remove_trail (
 	g_assert (skb);
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
-	pgm_free_skb (skb);
+	if (pgm_chunk_is_last_skb (&window->allocator, skb))
+		pgm_chunk_free (&window->allocator);
 	if (window->trail++ == window->commit_lead) {
 /* data-loss */
 		window->commit_lead++;
@@ -1373,7 +1392,7 @@ _pgm_rxw_reconstruct (
 		case PGM_PKT_WAIT_NCF_STATE:
 		case PGM_PKT_WAIT_DATA_STATE:
 		case PGM_PKT_LOST_DATA_STATE:
-			skb = pgm_alloc_skb (window->max_tpdu);
+			skb = pgm_chunk_alloc_skb (&window->allocator);
 			pgm_skb_reserve (skb, sizeof(struct pgm_header) + sizeof(struct pgm_data));
 			skb->pgm_header = skb->head;
 			skb->pgm_data = (gpointer)( skb->pgm_header + 1 );
@@ -2020,7 +2039,7 @@ _pgm_rxw_recovery_append (
 /* advance leading edge */
 	window->lead++;
 
-	skb			= pgm_alloc_skb (window->max_tpdu);
+	skb			= pgm_chunk_alloc_skb (&window->allocator);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
 	skb->tstamp		= now;
 	skb->sequence		= window->lead;

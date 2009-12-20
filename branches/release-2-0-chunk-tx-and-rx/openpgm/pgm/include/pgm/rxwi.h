@@ -44,6 +44,10 @@
 #	include <pgm/reed_solomon.h>
 #endif
 
+#ifndef __PGM_CHUNK_H__
+#	include <pgm/chunk.h>
+#endif
+
 
 G_BEGIN_DECLS
 
@@ -135,6 +139,7 @@ struct pgm_rxw_t {
 	guint32		bytes_delivered;
 	guint32		msgs_delivered;
 
+	pgm_allocator	allocator;
 	gsize		size;			/* in bytes */
 	guint		alloc;			/* in pkts */
 	struct pgm_sk_buff_t*	pdata[];
