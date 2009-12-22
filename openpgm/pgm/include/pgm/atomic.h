@@ -53,7 +53,7 @@ static inline void pgm_atomic_int32_set (volatile gint32* atomic, const gint32 n
 #	define pgm_atomic_int32_set(atomic, newval) 	((void) (*(atomic) = (newval)))
 #endif /* G_ATOMIC_OP_MEMORY_BARRIER_NEEDED */
 
-#define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((atomic), 1))
+#define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
 
 G_END_DECLS
 
