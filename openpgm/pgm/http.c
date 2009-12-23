@@ -833,8 +833,8 @@ http_tsi_response (
 	const int dport = g_ntohs (transport->dport);
 	const int sport = g_ntohs (transport->tsi.sport);
 
-	pgm_time_t ihb_min = 0;			/* need to bind first */
-	pgm_time_t ihb_max = 0;
+	pgm_time_t ihb_min = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ 1 ] : 0;
+	pgm_time_t ihb_max = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ transport->spm_heartbeat_len - 1 ] : 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_source),
