@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <locale.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,6 +121,8 @@ main (
 #ifdef CONFIG_WITH_SNMP
 	gboolean enable_snmpx = FALSE;
 #endif
+
+	setlocale (LC_ALL, "");
 
 	g_message ("pgmrecv");
 

@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <locale.h>
 #include <math.h>
 #include <signal.h>
 #include <stdio.h>
@@ -73,7 +74,7 @@ static int g_odata_interval = 0;
 static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_max_rte = 16*1000*1000;
-static int g_sqns = 200;
+static int g_sqns = 2000;
 
 static gboolean g_fec = FALSE;
 static int g_k = 64;
@@ -161,8 +162,9 @@ main (
 
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-	setenv("PGM_TIMER", "GTOD", 1);
-	setenv("PGM_SLEEP", "USLEEP", 1);
+	setlocale (LC_ALL, "");
+	setenv ("PGM_TIMER", "GTOD", 1);
+	setenv ("PGM_SLEEP", "USLEEP", 1);
 
 	g_message ("pgmping");
 
