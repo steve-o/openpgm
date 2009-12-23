@@ -74,7 +74,7 @@ static int g_odata_interval = 0;
 static guint32 g_payload = 0;
 static int g_max_tpdu = 1500;
 static int g_max_rte = 16*1000*1000;
-static int g_sqns = 2000;
+static int g_sqns = 200;
 
 static gboolean g_fec = FALSE;
 static int g_k = 64;
