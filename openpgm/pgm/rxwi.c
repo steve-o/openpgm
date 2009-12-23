@@ -1296,6 +1296,8 @@ _pgm_rxw_incoming_read (
 		else break;
 	} while (!_pgm_rxw_incoming_is_empty (window));
 
+	window->bytes_delivered += bytes_read;
+	window->msgs_delivered  += data_read;
 	return data_read > 0 ? bytes_read : -1;
 }
 
