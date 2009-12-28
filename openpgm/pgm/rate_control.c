@@ -30,12 +30,16 @@
 
 
 struct rate_t {
-	gint rate_per_sec;
-	guint iphdr_len;
+	gint		rate_per_sec;
+	guint		iphdr_len;
 
-	gint rate_limit;		/* signed for math */
-	pgm_time_t last_rate_check;
-	GStaticMutex mutex;
+	gint		rate_limit;		/* signed for math */
+	pgm_time_t	last_rate_check;
+	enum {
+		RESOLUTION_SECOND,
+		RESOLUTION_MILLISECOND
+	}	rate_resolution;
+	GStaticMutex	mutex;
 };
 
 typedef struct rate_t rate_t;
@@ -47,14 +51,25 @@ int
 pgm_rate_create (
 	gpointer*	bucket_,
 	guint		rate_per_sec,		/* 0 = disable */
-	guint		iphdr_len
+	guint		iphdr_len,
+	guint		max_tpdu
 	)
 {
 	g_return_val_if_fail (bucket_ != NULL, -EINVAL);
+	g_return_val_if_fail (rate_per_sec >= max_tpdu, -EINVAL);
 
 	rate_t* bucket = g_malloc0 (sizeof(rate_t));
-	bucket->rate_per_sec = (gint)rate_per_sec;
-	bucket->iphdr_len = iphdr_len;
+	bucket->rate_per_sec	= (gint)rate_per_sec;
+	bucket->iphdr_len	= iphdr_len;
+	bucket->last_rate_check = pgm_time_update_now ();
+/* pre-fill bucket */
+	if ((rate_per_sec / 1000) >= max_tpdu) {
+		bucket->rate_resolution = RESOLUTION_MILLISECOND;
+		bucket->rate_limit = bucket->rate_per_sec / 1000;
+	} else {
+		bucket->rate_resolution = RESOLUTION_SECOND;
+		bucket->rate_limit	= bucket->rate_per_sec;
+	}
 	g_static_mutex_init (&bucket->mutex);
 	*bucket_ = bucket;
 
@@ -89,15 +104,21 @@ pgm_rate_check (
 	if (!bucket || !(BUCKET->rate_per_sec > 0)) return 0;
 
 	g_static_mutex_lock (&BUCKET->mutex);
-	pgm_time_t time_since_last_rate_check = pgm_time_update_now() - BUCKET->last_rate_check;
+	pgm_time_t now = pgm_time_update_now();
+	pgm_time_t time_since_last_rate_check = now - BUCKET->last_rate_check;
 
-	BUCKET->rate_limit += (double)BUCKET->rate_per_sec * (double)pgm_to_secs((double)time_since_last_rate_check);
+	gint new_rate_limit = BUCKET->rate_limit + pgm_to_secsf ((double)BUCKET->rate_per_sec * (double)time_since_last_rate_check);
+	if (RESOLUTION_SECOND == BUCKET->rate_resolution) {
+/* per second */
+		if (new_rate_limit > BUCKET->rate_per_sec)
+			new_rate_limit = BUCKET->rate_per_sec;
+	} else {
 /* per milli-second */
-	if (BUCKET->rate_limit > (BUCKET->rate_per_sec / 1000)) 
-		BUCKET->rate_limit = BUCKET->rate_per_sec / 1000;
-	BUCKET->last_rate_check = pgm_time_now;
+		if (new_rate_limit > (BUCKET->rate_per_sec / 1000)) 
+			new_rate_limit = BUCKET->rate_per_sec / 1000;
+	}
 
-	gint new_rate_limit = BUCKET->rate_limit - ( BUCKET->iphdr_len + data_size );
+	new_rate_limit -= BUCKET->iphdr_len + data_size;
 	if (flags & MSG_DONTWAIT &&
 		new_rate_limit < 0)
 	{
@@ -107,12 +128,14 @@ pgm_rate_check (
 	}
 
 	BUCKET->rate_limit = new_rate_limit;
+	BUCKET->last_rate_check = pgm_time_now;
 	if (BUCKET->rate_limit < 0) {
 		gint sleep_amount;
 		do {
 			g_thread_yield();
-			time_since_last_rate_check = pgm_time_update_now() - BUCKET->last_rate_check;
-			sleep_amount = (double)BUCKET->rate_per_sec * (double)pgm_to_secs((double)time_since_last_rate_check);
+			now = pgm_time_update_now();
+			time_since_last_rate_check = now - BUCKET->last_rate_check;
+			sleep_amount = pgm_to_secsf ((double)BUCKET->rate_per_sec * (double)time_since_last_rate_check);
 		} while (sleep_amount + BUCKET->rate_limit < 0);
 		BUCKET->rate_limit += sleep_amount;
 		BUCKET->last_rate_check = pgm_time_now;
