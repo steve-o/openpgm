@@ -2124,7 +2124,7 @@ no_cap_net_admin:
 			g_trace ("INFO","Setting rate regulation to %i bytes per second.",
 					transport->txw_max_rte);
 	
-			retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len);
+			retval = pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len, transport->max_tpdu);
 			if (retval < 0) {
 				g_static_mutex_unlock (&transport->mutex);
 				goto out;
