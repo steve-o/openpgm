@@ -233,7 +233,7 @@ http_create_response (
 					"<body>"
 					"<div id=\"header\">"
 						"<span id=\"hostname\">%s</span>"
-						" | <span id=\"banner\"><a href=\"http://developer.novell.com/wiki/index.php/OpenPGM\">OpenPGM</a> %u.%u.%u</span>"
+						" | <span id=\"banner\"><a href=\"http://openpgm.googlecode.com/\">OpenPGM</a> %u.%u.%u</span>"
 						" | <span id=\"timestamp\">%s</span>"
 					"</div>"
 					"<div id=\"navigation\">"
