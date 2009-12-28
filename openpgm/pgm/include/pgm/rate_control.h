@@ -2,7 +2,7 @@
  * 
  * Rate regulation.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,10 +27,9 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL void pgm_rate_create (gpointer*, const guint, const guint, const guint);
-G_GNUC_INTERNAL void pgm_rate_destroy (gpointer);
-G_GNUC_INTERNAL gboolean pgm_rate_check (gpointer, const guint, const gboolean);
-G_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (gpointer, const gsize);
+int pgm_rate_create (gpointer*, guint, guint, guint);
+int pgm_rate_destroy (gpointer);
+int pgm_rate_check (gpointer, guint, int);
 
 G_END_DECLS
 

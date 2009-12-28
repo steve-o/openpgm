@@ -28,7 +28,6 @@
 #include <sys/types.h>
 
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #include <libsoup/soup.h>
 #include <libsoup/soup-server.h>
@@ -37,15 +36,11 @@
 #endif
 #include <libsoup/soup-address.h>
 
-#include "pgm/ip.h"
 #include "pgm/http.h"
 #include "pgm/transport.h"
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
 #include "pgm/version.h"
-#include "pgm/histogram.h"
-#include "pgm/getifaddrs.h"
-#include "pgm/nametoindex.h"
 
 #include "htdocs/404.html.h"
 #include "htdocs/base.css.h"
@@ -57,26 +52,17 @@
 #	define LOGIN_NAME_MAX		256
 #endif
 
-#ifdef CONFIG_HAVE_SPRINTF_GROUPING
-#	define GROUP_FORMAT			"'"
-#else
-#	define GROUP_FORMAT			""
-#endif
-
 
 /* globals */
 
 /* local globals */
 
-static SoupServer*	g_soup_server = NULL;
-static GThread*		g_thread;
-static GCond*		g_thread_cond;
-static GMutex*		g_thread_mutex;
-static GError*		g_error;
-static char		g_hostname[NI_MAXHOST + 1];
-static char		g_address[INET6_ADDRSTRLEN];
-static char		g_username[LOGIN_NAME_MAX + 1];
-static int		g_pid;
+static guint16 g_server_port;
+
+static GThread* thread;
+static SoupServer* g_soup_server = NULL;
+static GCond* http_cond;
+static GMutex* http_mutex;
 
 static gpointer http_thread (gpointer);
 static int http_tsi_response (pgm_tsi_t*, SoupMessage*);
@@ -86,165 +72,105 @@ static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
-static void interfaces_callback (SoupServerContext*, SoupMessage*, gpointer);
 static void transports_callback (SoupServerContext*, SoupMessage*, gpointer);
-static void histograms_callback (SoupServerContext*, SoupMessage*, gpointer);
 #else
 static void default_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void robots_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void css_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void index_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
-static void interfaces_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 static void transports_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
-static void histograms_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 #endif
 
 static void http_each_receiver (pgm_peer_t*, GString*);
 static int http_receiver_response (pgm_peer_t*, SoupMessage*);
 
-static PGMHTTPError pgm_http_error_from_errno (gint);
-static PGMHTTPError pgm_http_error_from_eai_errno (gint);
 
-
-gboolean
+int
 pgm_http_init (
-	guint16			http_port,
-	GError**		error
+	guint16		server_port
 	)
 {
-	g_return_val_if_fail (NULL == g_soup_server, FALSE);
+	int retval = 0;
+	GError* err;
+	GThread* tmp_thread;
 
 	g_type_init ();
 
 /* ensure threading enabled */
 	if (!g_thread_supported ()) g_thread_init (NULL);
 
-/* resolve (relatively) constant host details */
-	if (0 != gethostname (g_hostname, sizeof(g_hostname))) {
-		g_set_error (error,
-			     PGM_HTTP_ERROR,
-			     pgm_http_error_from_errno (errno),
-			     _("Resolving hostname: %s"),
-			     g_strerror (errno));
-		return FALSE;
-	}
-	struct addrinfo hints = {
-		.ai_family	= AF_UNSPEC,
-		.ai_socktype	= SOCK_STREAM,
-		.ai_protocol	= IPPROTO_TCP,
-		.ai_flags	= AI_ADDRCONFIG
-	}, *res = NULL;
-	int e = getaddrinfo (g_hostname, NULL, &hints, &res);
-	if (0 != e) {
-		g_set_error (error,
-			     PGM_HTTP_ERROR,
-			     pgm_http_error_from_eai_errno (e),
-			     _("Resolving hostname address: %s"),
-			     gai_strerror (e));
-		return FALSE;
-	}
-	e = getnameinfo (res->ai_addr, pgm_sockaddr_len (res->ai_addr),
-		         g_address, sizeof(g_address),
-			 NULL, 0,
-			 NI_NUMERICHOST);
-	if (0 != e) {
-		g_set_error (error,
-			     PGM_HTTP_ERROR,
-			     pgm_http_error_from_eai_errno (e),
-			     _("Resolving numeric hostname: %s"),
-			     gai_strerror (e));
-		return FALSE;
-	}
-	freeaddrinfo (res);
-	e = getlogin_r (g_username, sizeof(g_username));
-	if (0 != e) {
-		g_set_error (error,
-			     PGM_HTTP_ERROR,
-			     pgm_http_error_from_errno (errno),
-			     _("Retrieving user name: %s"),
-			     g_strerror (errno));
-		return FALSE;
-	}
-	g_pid = getpid();
+	http_mutex = g_mutex_new();
+	http_cond = g_cond_new();
 
-	g_thread_mutex	= g_mutex_new();
-	g_thread_cond	= g_cond_new();
+	g_server_port = server_port;
 
-	GThread* thread = g_thread_create_full (http_thread,
-						(gpointer)&http_port,
-						0,		/* stack size */
-						TRUE,		/* joinable */
-						TRUE,		/* native thread */
-						G_THREAD_PRIORITY_LOW,	/* lowest */
-						error);
-	if (!thread) {
-		g_prefix_error (error,
-				_("Creating HTTP thread: "));
-		g_cond_free  (g_thread_cond);
-		g_mutex_free (g_thread_mutex);
-		return FALSE;
+	tmp_thread = g_thread_create_full (http_thread,
+					NULL,
+					0,		/* stack size */
+					TRUE,		/* joinable */
+					TRUE,		/* native thread */
+					G_THREAD_PRIORITY_LOW,	/* lowest */
+					&err);
+	if (!tmp_thread) {
+		g_error ("thread failed: %i %s", err->code, err->message);
+		g_mutex_free (http_mutex);
+		g_cond_free (http_cond);
+		goto err_destroy;
 	}
 
-	g_thread = thread;
+	thread = tmp_thread;
 
 /* spin lock around condition waiting for thread startup */
-	g_mutex_lock (g_thread_mutex);
+	g_mutex_lock (http_mutex);
 	while (!g_soup_server)
-		g_cond_wait (g_thread_cond, g_thread_mutex);
-	g_mutex_unlock (g_thread_mutex);
+		g_cond_wait (http_cond, http_mutex);
+	g_mutex_unlock (http_mutex);
 
-/* catch failure */
-	if (NULL == g_soup_server) {
-		g_propagate_error (error, g_error);
-		g_cond_free  (g_thread_cond);
-		g_mutex_free (g_thread_mutex);
-		return FALSE;
-	}
+	g_mutex_free (http_mutex);
+	http_mutex = NULL;
+	g_cond_free (http_cond);
+	http_cond = NULL;
 
-/* cleanup */
-	g_cond_free  (g_thread_cond);
-	g_mutex_free (g_thread_mutex);
-	return TRUE;
+	return retval;
+
+err_destroy:
+	return 0;
 }
 
-gboolean
+int
 pgm_http_shutdown (void)
 {
-	g_return_val_if_fail (NULL != g_soup_server, FALSE);
-	soup_server_quit (g_soup_server);
-	g_thread_join (g_thread);
-	g_thread = NULL; g_soup_server = NULL;
-	return TRUE;
-}
-
-static
-gpointer
-http_thread (
-	gpointer		data
-	)
-{
-	g_assert (NULL != data);
-
-	const guint16 http_port = *(guint16*)data;
-	GMainContext* context = g_main_context_new ();
-	g_mutex_lock (g_thread_mutex);
-	g_soup_server = soup_server_new (SOUP_SERVER_PORT, http_port,
-					 SOUP_SERVER_ASYNC_CONTEXT, context,
-					 NULL);
-	if (!g_soup_server) {
-		g_set_error (&g_error,
-			     PGM_HTTP_ERROR,
-			     PGM_HTTP_ERROR_FAILED,
-			     _("Creating new Soup Server: %s"),
-			     g_strerror (errno));
-		g_main_context_unref (context);
-		g_cond_signal  (g_thread_cond);
-		g_mutex_unlock (g_thread_mutex);
-		return NULL;
+	if (g_soup_server) {
+		soup_server_quit (g_soup_server);
+		g_thread_join (thread);
+		thread = NULL; g_soup_server = NULL;
 	}
 
+	return 0;
+}
+
+static gpointer
+http_thread (
+	G_GNUC_UNUSED gpointer data
+	)
+{
+	GMainContext* context = g_main_context_new ();
+
+	g_message ("starting soup server.");
+	g_mutex_lock (http_mutex);
+	g_soup_server = soup_server_new (SOUP_SERVER_PORT, g_server_port,
+					SOUP_SERVER_ASYNC_CONTEXT, context,
+					NULL);
+	if (!g_soup_server) {
+		g_warning ("soup server failed startup: %s", strerror (errno));
+		goto out;
+	}
+
+	char hostname[NI_MAXHOST + 1];
+	gethostname (hostname, sizeof(hostname));
+
 	g_message ("web interface: http://%s:%i",
-			g_hostname,
+			hostname,
 			soup_server_get_port (g_soup_server));
 
 #ifdef CONFIG_LIBSOUP22
@@ -252,30 +178,23 @@ http_thread (
 	soup_server_add_handler (g_soup_server, "/robots.txt",	NULL, robots_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/base.css",	NULL, css_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/",		NULL, index_callback, NULL, NULL);
-	soup_server_add_handler (g_soup_server, "/interfaces",	NULL, interfaces_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	NULL, transports_callback, NULL, NULL);
-#ifdef CONFIG_HISTOGRAMS
-	soup_server_add_handler (g_soup_server, "/histograms",	NULL, histograms_callback, NULL, NULL);
-#endif /* CONFIG_HISTOGRAMS */
-#else /* !CONFIG_LIBSOUP22 */
+#else
 	soup_server_add_handler (g_soup_server, NULL,		default_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/robots.txt",	robots_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/base.css",	css_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/",		index_callback, NULL, NULL);
-	soup_server_add_handler (g_soup_server, "/interfaces",	interfaces_callback, NULL, NULL);
 	soup_server_add_handler (g_soup_server, "/transports",	transports_callback, NULL, NULL);
-#ifdef CONFIG_HISTOGRAMS
-	soup_server_add_handler (g_soup_server, "/histograms",	histograms_callback, NULL, NULL);
-#endif /* CONFIG_HISTOGRAMS */
-#endif /* !CONFIG_LIBSOUP22 */
+#endif
 
 /* signal parent thread we are ready to run */
-	g_cond_signal  (g_thread_cond);
-	g_mutex_unlock (g_thread_mutex);
-/* main loop */
+	g_cond_signal (http_cond);
+	g_mutex_unlock (http_mutex);
+
 	soup_server_run (g_soup_server);
-/* cleanup */
 	g_object_unref (g_soup_server);
+
+out:
 	g_main_context_unref (context);
 	return NULL;
 }
@@ -285,27 +204,21 @@ http_thread (
 
 typedef enum {
 	HTTP_TAB_GENERAL_INFORMATION,
-	HTTP_TAB_INTERFACES,
-	HTTP_TAB_TRANSPORTS,
-	HTTP_TAB_HISTOGRAMS
+	HTTP_TAB_TRANSPORTS
 } http_tab_e;
 
-static
-GString*
+static GString*
 http_create_response (
 	const gchar*		subtitle,
 	http_tab_e		tab
 	)
 {
-	g_assert (NULL != subtitle);
-	g_assert (tab == HTTP_TAB_GENERAL_INFORMATION ||
-		  tab == HTTP_TAB_INTERFACES ||
-		  tab == HTTP_TAB_TRANSPORTS ||
-		  tab == HTTP_TAB_HISTOGRAMS);
+	char hostname[NI_MAXHOST + 1];
+	gethostname (hostname, sizeof(hostname));
 
 /* surprising deficiency of GLib is no support of display locale time */
 	char buf[100];
-	const time_t nowdate = time(NULL);
+	time_t nowdate = time(NULL);
 	struct tm now;
 	localtime_r (&nowdate, &now);
 	gsize ret = strftime (buf, sizeof(buf), "%c", &now);
@@ -313,45 +226,36 @@ http_create_response (
 	gchar* timestamp = g_locale_to_utf8 (buf, ret, NULL, &bytes_written, NULL);
 
 	GString* response = g_string_new (WWW_XHTML10_STRICT_DOCTYPE);
-	g_string_append_printf (response, "\n<head>"
+	g_string_append_printf (response, "<head>"
 						"<title>%s - %s</title>"
 						"<link rel=\"stylesheet\" href=\"/base.css\" type=\"text/css\" charset=\"utf-8\" />"
-					"</head>\n"
+					"</head>"
 					"<body>"
 					"<div id=\"header\">"
 						"<span id=\"hostname\">%s</span>"
-						" | <span id=\"banner\"><a href=\"http://code.google.com/p/openpgm/\">OpenPGM</a> %u.%u.%u</span>"
+						" | <span id=\"banner\"><a href=\"http://developer.novell.com/wiki/index.php/OpenPGM\">OpenPGM</a> %u.%u.%u</span>"
 						" | <span id=\"timestamp\">%s</span>"
 					"</div>"
 					"<div id=\"navigation\">"
 						"<a href=\"/\"><span class=\"tab\" id=\"tab%s\">General Information</span></a>"
-						"<a href=\"/interfaces\"><span class=\"tab\" id=\"tab%s\">Interfaces</span></a>"
 						"<a href=\"/transports\"><span class=\"tab\" id=\"tab%s\">Transports</span></a>"
-#ifdef CONFIG_HISTOGRAMS
-						"<a href=\"/histograms\"><span class=\"tab\" id=\"tab%s\">Histograms</span></a>"
-#endif
 						"<div id=\"tabline\"></div>"
 					"</div>"
 					"<div id=\"content\">",
-				g_hostname,
+				hostname,
 				subtitle,
-				g_hostname,
+				hostname,
 				pgm_major_version, pgm_minor_version, pgm_micro_version,
 				timestamp,
 				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
-				tab == HTTP_TAB_INTERFACES ? "top" : "bottom",
-				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom"
-#ifdef CONFIG_HISTOGRAMS
-				,tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom"
-#endif
-	);
+				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom");
 
 	g_free (timestamp);
+
 	return response;
 }
 
-static
-void
+static void
 http_finalize_response (
 	GString*		response,
 	SoupMessage*		msg
@@ -361,7 +265,7 @@ http_finalize_response (
 					"<div id=\"footer\">"
 						"&copy;2009 Miru"
 					"</div>"
-					"</body>\n"
+					"</body>"
 					"</html>");
 
 	gchar* buf = g_string_free (response, FALSE);
@@ -378,8 +282,7 @@ http_finalize_response (
 }
 
 #ifdef CONFIG_LIBSOUP22	
-static
-void
+static void
 robots_callback (
 	SoupServerContext*	context,
 	SoupMessage*		msg,
@@ -397,15 +300,14 @@ robots_callback (
 					WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
 }
 #else
-static
-void
+static void
 robots_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    		msg,
+        SoupMessage*    msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED GHashTable* query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer 		data
+        G_GNUC_UNUSED gpointer data
         )
 {
 	if (0 != g_strcmp0 (msg->method, "GET")) {
@@ -415,7 +317,7 @@ robots_callback (
 
 	soup_message_set_status (msg, SOUP_STATUS_OK);
 	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
-        soup_message_set_response (msg, "text/plain", SOUP_MEMORY_STATIC,
+        soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
                                 WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
 }
 #endif
@@ -442,11 +344,11 @@ css_callback (
 static void
 css_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    		msg,
+        SoupMessage*    msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED GHashTable* query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer 		data
+        G_GNUC_UNUSED gpointer data
         )
 {       
         if (0 != g_strcmp0 (msg->method, "GET")) {
@@ -456,7 +358,7 @@ css_callback (
 
         soup_message_set_status (msg, SOUP_STATUS_OK);
         soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
-        soup_message_set_response (msg, "text/css", SOUP_MEMORY_STATIC,
+        soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
                                 WWW_BASE_CSS, strlen(WWW_BASE_CSS));
 }
 #endif
@@ -465,31 +367,49 @@ css_callback (
 static void
 index_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
-	SoupMessage*			msg,
-	G_GNUC_UNUSED gpointer		data
+	SoupMessage*		msg,
+	G_GNUC_UNUSED gpointer	data
 	)
-{
 #else
 static void
 index_callback (
-        SoupServer*		server,
-        SoupMessage*    	msg,
-        const char*       	path,
-        GHashTable* 		query,
-        SoupClientContext*	client,
-        gpointer 		data
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer data
         )
-{
-	if (strlen (path) > 1) {
-		default_callback (server, msg, path, query, client, data);
-		return;
-	}
 #endif
+{
+	GString *response;
+
+	char hostname[NI_MAXHOST + 1];
+	gethostname (hostname, sizeof(hostname));
+
+	char username[LOGIN_NAME_MAX + 1];
+	getlogin_r (username, sizeof(username));
+
+	char ipaddress[INET6_ADDRSTRLEN];
+	struct addrinfo hints, *res = NULL;
+	memset (&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_flags = AI_ADDRCONFIG;
+	getaddrinfo (hostname, NULL, &hints, &res);
+	inet_ntop (	res->ai_family,
+			&((struct sockaddr_in*)res->ai_addr)->sin_addr,
+			ipaddress,
+			sizeof(ipaddress) );
+	freeaddrinfo (res);
+
+	int transport_count;
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
-	const int transport_count = g_slist_length (pgm_transport_list);
+	transport_count = g_slist_length (pgm_transport_list);
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 
-	GString* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
+	int pid = getpid();
+
+	response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
 	g_string_append_printf (response,	"<table>"
 						"<tr>"
 							"<th>host name:</th><td>%s</td>"
@@ -502,90 +422,13 @@ index_callback (
 						"</tr><tr>"
 							"<th>process ID:</th><td>%i</td>"
 						"</tr>"
-						"</table>\n",
-				g_hostname,
-				g_username,
-				g_address,
+						"</table>",
+				hostname,
+				username,
+				ipaddress,
 				transport_count,
-				g_pid);
+				pid);
 
-	http_finalize_response (response, msg);
-}
-
-#ifdef CONFIG_LIBSOUP22
-static void
-interfaces_callback (
-	G_GNUC_UNUSED SoupServerContext* context,
-	SoupMessage*			msg,
-	G_GNUC_UNUSED gpointer		data
-	)
-#else
-static void
-interfaces_callback (
-        G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    		msg,
-        G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* 	query,
-        G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer 		data
-        )
-#endif
-{
-	GString* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
-	g_string_append (response, "<PRE>");
-	struct ifaddrs *ifap, *ifa;
-	int e = getifaddrs (&ifap);
-	if (e < 0) {
-		g_string_append_printf (response, "getifaddrs(): %s", g_strerror (errno));
-		http_finalize_response (response, msg);
-		return;
-	}
-	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
-	{
-		int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
-		char rname[IF_NAMESIZE * 2 + 3];
-		char b[IF_NAMESIZE * 2 + 3];
-
-		if_indextoname(i, rname);
-		sprintf (b, "%s (%s)", ifa->ifa_name, rname);
-
-		 if (NULL == ifa->ifa_addr ||
-		      (ifa->ifa_addr->sa_family != AF_INET &&
-		       ifa->ifa_addr->sa_family != AF_INET6) )
-		{
-			g_string_append_printf (response,
-				"#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s<BR/>\n",
-				i,
-				b,
-				"",
-				ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
-				ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
-				ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
-				ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
-			);
-			continue;
-		}
-
-		char s[INET6_ADDRSTRLEN];
-		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
-			     s, sizeof(s),
-			     NULL, 0,
-			     NI_NUMERICHOST);
-		g_string_append_printf (response,
-			"#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s<BR/>\n",
-			i,
-			b,
-			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
-			s,
-			(unsigned)pgm_sockaddr_scope_id(ifa->ifa_addr),
-			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
-			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
-			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
-			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
-		);
-	}
-	freeifaddrs (ifap);
-	g_string_append (response, "</PRE>\n");
 	http_finalize_response (response, msg);
 }
 
@@ -593,24 +436,26 @@ interfaces_callback (
 static void
 transports_callback (
 	G_GNUC_UNUSED SoupServerContext* context,
-	SoupMessage*			msg,
-	G_GNUC_UNUSED gpointer		data
+	SoupMessage*		msg,
+	G_GNUC_UNUSED gpointer	data
 	)
 #else
 static void
 transports_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    		msg,
+        SoupMessage*    msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED GHashTable* query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer 		data
+        G_GNUC_UNUSED gpointer data
         )
 #endif
 {
-	GString* response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
+	GString *response;
+
+	response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
 	g_string_append (response,	"<div class=\"bubbly\">"
-					"\n<table cellspacing=\"0\">"
+					"<table cellspacing=\"0\">"
 					"<tr>"
 						"<th>Group address</th>"
 						"<th>Dest port</th>"
@@ -630,10 +475,13 @@ transports_callback (
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
-			getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len (&transport->send_gsr.gsr_group),
-				     group_address, sizeof(group_address),
-				     NULL, 0,
-				     NI_NUMERICHOST);
+			inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_group ),
+					pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
+					group_address,
+					sizeof(group_address) );
+
+			int dport = g_ntohs (transport->dport);
+
 			char gsi[sizeof("000.000.000.000.000.000")];
 			snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
 				transport->tsi.gsi.identifier[0],
@@ -642,8 +490,10 @@ transports_callback (
 				transport->tsi.gsi.identifier[3],
 				transport->tsi.gsi.identifier[4],
 				transport->tsi.gsi.identifier[5]);
-			const int sport = g_ntohs (transport->tsi.sport);
-			const int dport = g_ntohs (transport->dport);
+
+			int sport = g_ntohs (transport->tsi.sport);
+
+	
 			g_string_append_printf (response,	"<tr>"
 									"<td>%s</td>"
 									"<td>%i</td>"
@@ -656,45 +506,24 @@ transports_callback (
 						gsi,
 						gsi, sport,
 						sport);
+
 			list = next;
 		}
+
 		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 	}
 	else
 	{
 /* no transports */
+
 		g_string_append (response,		"<tr>"
 							"<td colspan=\"6\"><div class=\"empty\">This transport has no peers.</div></td>"
 							"</tr>"
 				);
 	}
 
-	g_string_append (response,		"</table>\n"
+	g_string_append (response,		"</table>"
 						"</div>");
-	http_finalize_response (response, msg);
-}
-
-#ifdef CONFIG_LIBSOUP22
-static void
-histograms_callback (
-	G_GNUC_UNUSED SoupServerContext* context,
-	SoupMessage*			msg,
-	G_GNUC_UNUSED gpointer		data
-	)
-#else
-static void
-histograms_callback (
-        G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    		msg,
-        G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* 	query,
-        G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer 		data
-        )
-#endif
-{
-	GString* response = http_create_response ("Histograms", HTTP_TAB_HISTOGRAMS);
-	pgm_histogram_write_html_graph_all (response);
 	http_finalize_response (response, msg);
 }
 
@@ -717,11 +546,11 @@ default_callback (
 static void
 default_callback (
         G_GNUC_UNUSED SoupServer*       server,
-        SoupMessage*    		msg,
+        SoupMessage*    msg,
         G_GNUC_UNUSED const char*       path,
-        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED GHashTable* query,
         G_GNUC_UNUSED SoupClientContext* client,
-        G_GNUC_UNUSED gpointer 		data
+        G_GNUC_UNUSED gpointer data
         )
 {
         if (0 != g_strcmp0 (msg->method, "GET")) {
@@ -731,7 +560,7 @@ default_callback (
 #endif
 
 	pgm_tsi_t tsi;
-	const int count = sscanf (path, "/%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
+	int count = sscanf (path, "/%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
 				(unsigned char*)&tsi.gsi.identifier[0],
 				(unsigned char*)&tsi.gsi.identifier[1],
 				(unsigned char*)&tsi.gsi.identifier[2],
@@ -763,8 +592,8 @@ default_callback (
 
 static int
 http_tsi_response (
-	pgm_tsi_t*		tsi,
-	SoupMessage*		msg
+	pgm_tsi_t*	tsi,
+	SoupMessage*	msg
 	)
 {
 /* first verify this is a valid TSI */
@@ -819,28 +648,28 @@ http_tsi_response (
 		g_ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_source, pgm_sockaddr_len (&transport->send_gsr.gsr_source),
-		     source_address, sizeof(source_address),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_source ),
+			pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
+			source_address,
+			sizeof(source_address) );
 
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len (&transport->send_gsr.gsr_group),
-		     group_address, sizeof(group_address),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &transport->send_gsr.gsr_group ),
+			pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
+			group_address,
+			sizeof(group_address) );
 
-	const int dport = g_ntohs (transport->dport);
-	const int sport = g_ntohs (transport->tsi.sport);
+	int dport = g_ntohs (transport->dport);
+	int sport = g_ntohs (transport->tsi.sport);
 
-	pgm_time_t ihb_min = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ 1 ] : 0;
-	pgm_time_t ihb_max = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ transport->spm_heartbeat_len - 1 ] : 0;
+	gint ihb_min = 0;			/* need to bind first */
+	gint ihb_max = 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_source),
-		     spm_path, sizeof(spm_path),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &transport->recv_gsr[0].gsr_source ),
+			pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
+			spm_path,
+			sizeof(spm_path) );
 
 	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
 	g_string_append_printf (response,	"<div class=\"heading\">"
@@ -852,7 +681,7 @@ http_tsi_response (
 /* peers */
 
 	g_string_append (response,		"<div class=\"bubbly\">"
-						"\n<table cellspacing=\"0\">"
+						"<table cellspacing=\"0\">"
 						"<tr>"
 							"<th>Group address</th>"
 							"<th>Dest port</th>"
@@ -885,13 +714,13 @@ http_tsi_response (
 
 	}
 
-	g_string_append (response,		"</table>\n"
+	g_string_append (response,		"</table>"
 						"</div>");
 
 /* source and configuration information */
 
 	g_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
-						"\n<table>"
+						"<table>"
 						"<tr>"
 							"<th>Source address</th><td>%s</td>"
 						"</tr><tr>"
@@ -914,31 +743,31 @@ http_tsi_response (
 	g_string_append_printf (response,	"<tr>"
 							"<td colspan=\"2\"><div class=\"break\"></div></td>"
 						"</tr><tr>"
-							"<th>Ttl</th><td>%u</td>"
+							"<th>Ttl</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Adv Mode</th><td>data(1)</td>"
 						"</tr><tr>"
 							"<th>Late join</th><td>disable(2)</td>"
 						"</tr><tr>"
-							"<th>TXW_MAX_RTE</th><td>%" GROUP_FORMAT "u</td>"
+							"<th>TXW_MAX_RTE</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>TXW_SECS</th><td>%" GROUP_FORMAT "u</td>"
+							"<th>TXW_SECS</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>TXW_ADV_SECS</th><td>0</td>"
 						"</tr><tr>"
-							"<th>Ambient SPM interval</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>Ambient SPM interval</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<th>IHB_MIN</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>IHB_MIN</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<th>IHB_MAX</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>IHB_MAX</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<th>NAK_BO_IVL</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>NAK_BO_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
 							"<th>FEC</th><td>disabled(1)</td>"
 						"</tr><tr>"
 							"<th>Source Path Address</th><td>%s</td>"
 						"</tr>"
-						"</table>\n"
+						"</table>"
 						"</div>",
 				transport->hops,
 				transport->txw_max_rte,
@@ -951,48 +780,48 @@ http_tsi_response (
 
 /* performance information */
 
-	g_string_append_printf (response,	"\n<h2>Performance information</h2>"
-						"\n<table>"
+	g_string_append_printf (response,	"<h2>Performance information</h2>"
+						"<table>"
 						"<tr>"
-							"<th>Data bytes sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Data bytes sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Data packets sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Data packets sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Bytes buffered</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Bytes buffered</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Packets buffered</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Packets buffered</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Bytes sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Bytes sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Raw NAKs received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Raw NAKs received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Checksum errors</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Checksum errors</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed NAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed NAKs</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Packets discarded</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Packets discarded</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Bytes retransmitted</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Bytes retransmitted</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Packets retransmitted</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Packets retransmitted</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs ignored</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs ignored</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Transmission rate</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " bps</td>"
+							"<th>Transmission rate</th><td>%i bps</td>"
 						"</tr><tr>"
-							"<th>NNAK packets received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NNAK packets received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NNAKs received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NNAKs received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed NNAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed NNAKs</th><td>%i</td>"
 						"</tr>"
-						"</table>\n",
+						"</table>",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						transport->window ? pgm_txw_size((pgm_txw_t*)transport->window) : 0,	/* minus IP & any UDP header */
-						transport->window ? pgm_txw_length((pgm_txw_t*)transport->window) : 0,
+						transport->txw ? ((pgm_txw_t*)transport->txw)->bytes_in_window : 0,	/* minus IP & any UDP header */
+						transport->txw ? ((pgm_txw_t*)transport->txw)->packets_in_window : 0,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
@@ -1016,27 +845,29 @@ http_tsi_response (
 
 static void
 http_each_receiver (
-	pgm_peer_t*		peer,
-	GString*		response
+	pgm_peer_t*	peer,
+	GString*	response
 	)
 {
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len (&peer->group_nla),
-		     group_address, sizeof(group_address),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
+			pgm_sockaddr_addr( &peer->group_nla ),
+			group_address,
+			sizeof(group_address) );
+
+	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
-		     source_address, sizeof(source_address),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &peer->nla ),
+			pgm_sockaddr_addr( &peer->nla ),
+			source_address,
+			sizeof(source_address) );
 
 	char last_hop[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len (&peer->local_nla),
-		     last_hop, sizeof(last_hop),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &peer->local_nla ),
+			pgm_sockaddr_addr( &peer->local_nla ),
+			last_hop,
+			sizeof(last_hop) );
 
 	char gsi[sizeof("000.000.000.000.000.000")];
 	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
@@ -1047,29 +878,31 @@ http_each_receiver (
 			peer->tsi.gsi.identifier[4],
 			peer->tsi.gsi.identifier[5]);
 
-	const int sport = g_ntohs (peer->tsi.sport);
-	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
+	int sport = g_ntohs (peer->tsi.sport);
+
 	g_string_append_printf (response,	"<tr>"
 							"<td>%s</td>"
 							"<td>%i</td>"
 							"<td>%s</td>"
 							"<td>%s</td>"
-							"<td><a href=\"/%s.%i\">%s</a></td>"
-							"<td><a href=\"/%s.%i\">%i</a></td>"
+							"<td><a href=\"/%s.%hu\">%s</a></td>"
+							"<td><a href=\"/%s.%hu\">%hu</a></td>"
 						"</tr>",
 				group_address,
 				dport,
 				source_address,
 				last_hop,
-				gsi, sport, gsi,
-				gsi, sport, sport
+				gsi, sport,
+				gsi,
+				gsi, sport,
+				sport
 			);
 }
 
 static int
 http_time_summary (
-	const time_t* 		activity_time,
-	char* 			sz
+	const time_t* activity_time,
+	char* sz
 	)
 {
 	time_t now_time = time(NULL);
@@ -1089,17 +922,14 @@ http_time_summary (
 		strftime (hourmin, sizeof(hourmin), "%H:%M", &activity_tm);
 
 		if (now_time < 60) {
-			return sprintf (sz, "%s (%li second%s ago)",
-					hourmin, now_time, now_time > 1 ? "s" : "");
+			return sprintf (sz, "%s (%li second%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
 		}
 		now_time /= 60;
 		if (now_time < 60) {
-			return sprintf (sz, "%s (%li minute%s ago)",
-					hourmin, now_time, now_time > 1 ? "s" : "");
+			return sprintf (sz, "%s (%li minute%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
 		}
 		now_time /= 60;
-		return sprintf (sz, "%s (%li hour%s ago)",
-				hourmin, now_time, now_time > 1 ? "s" : "");
+		return sprintf (sz, "%s (%li hour%s ago)", hourmin, now_time, now_time > 1 ? "s" : "");
 	}
 	else
 	{
@@ -1107,8 +937,7 @@ http_time_summary (
 		strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
 		now_time /= 24;
 		if (now_time < 14) {
-			return sprintf (sz, "%s (%li day%s ago)",
-					daymonth, now_time, now_time > 1 ? "s" : "");
+			return sprintf (sz, "%s (%li day%s ago)", daymonth, now_time, now_time > 1 ? "s" : "");
 		} else {
 			return sprintf (sz, "%s", daymonth);
 		}
@@ -1117,8 +946,8 @@ http_time_summary (
 
 static int
 http_receiver_response (
-	pgm_peer_t*		peer,
-	SoupMessage*		msg
+	pgm_peer_t*	peer,
+	SoupMessage*	msg
 	)
 {
 	char gsi[sizeof("000.000.000.000.000.000")];
@@ -1136,28 +965,30 @@ http_receiver_response (
 		g_ntohs (peer->tsi.sport));
 
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len (&peer->group_nla),
-		     group_address, sizeof(group_address),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &peer->group_nla ),
+			pgm_sockaddr_addr( &peer->group_nla ),
+			group_address,
+			sizeof(group_address) );
+
+	int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
-		     source_address, sizeof(source_address),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &peer->nla ),
+			pgm_sockaddr_addr( &peer->nla ),
+			source_address,
+			sizeof(source_address) );
 
 	char last_hop[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len (&peer->local_nla),
-		     last_hop, sizeof(last_hop),
-		     NULL, 0,
-		     NI_NUMERICHOST);
+	inet_ntop (	pgm_sockaddr_family( &peer->local_nla ),
+			pgm_sockaddr_addr( &peer->local_nla ),
+			last_hop,
+			sizeof(last_hop) );
 
-	const int sport = g_ntohs (peer->tsi.sport);
-	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
-	const guint32 outstanding_naks = ((pgm_rxw_t*)peer->window)->backoff_queue.length +
-					 ((pgm_rxw_t*)peer->window)->wait_ncf_queue.length +
-					 ((pgm_rxw_t*)peer->window)->wait_data_queue.length;
+	int sport = g_ntohs (peer->tsi.sport);
+
+	guint outstanding_naks = ((pgm_rxw_t*)peer->rxw)->backoff_queue->length 
+				+ ((pgm_rxw_t*)peer->rxw)->wait_ncf_queue->length
+				+ ((pgm_rxw_t*)peer->rxw)->wait_data_queue->length;
 
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
@@ -1167,6 +998,7 @@ http_receiver_response (
 
 	gsize bytes_written;
 	gchar* last_activity = g_locale_to_utf8 (buf, strlen(buf), NULL, &bytes_written, NULL);
+
 
 	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
 	g_string_append_printf (response,	"<div class=\"heading\">"
@@ -1178,7 +1010,7 @@ http_receiver_response (
 
 /* peer information */
 	g_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
-						"\n<table>"
+						"<table>"
 						"<tr>"
 							"<th>Group address</th><td>%s</td>"
 						"</tr><tr>"
@@ -1202,27 +1034,27 @@ http_receiver_response (
 	g_string_append_printf (response,	"<tr>"
 							"<td colspan=\"2\"><div class=\"break\"></div></td>"
 						"</tr><tr>"
-							"<th>NAK_BO_IVL</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>NAK_BO_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<th>NAK_RPT_IVL</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>NAK_RPT_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<th>NAK_NCF_RETRIES</th><td>%" GROUP_FORMAT "u</td>"
+							"<th>NAK_NCF_RETRIES</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAK_RDATA_IVL</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
+							"<th>NAK_RDATA_IVL</th><td>%i ms</td>"
 						"</tr><tr>"
-							"<th>NAK_DATA_RETRIES</th><td>%" GROUP_FORMAT "u</td>"
+							"<th>NAK_DATA_RETRIES</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Send NAKs</th><td>enabled(1)</td>"
 						"</tr><tr>"
 							"<th>Late join</th><td>disabled(2)</td>"
 						"</tr><tr>"
-							"<th>NAK TTL</th><td>%u</td>"
+							"<th>NAK TTL</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Delivery order</th><td>ordered(2)</td>"
 						"</tr><tr>"
 							"<th>Multicast NAKs</th><td>disabled(2)</td>"
 						"</tr>"
-						"</table>\n"
+						"</table>"
 						"</div>",
 						pgm_to_msecs(peer->transport->nak_bo_ivl),
 						pgm_to_msecs(peer->transport->nak_rpt_ivl),
@@ -1231,82 +1063,82 @@ http_receiver_response (
 						peer->transport->nak_data_retries,
 						peer->transport->hops);
 
-	g_string_append_printf (response,	"\n<h2>Performance information</h2>"
-						"\n<table>"
+	g_string_append_printf (response,	"<h2>Performance information</h2>"
+						"<table>"
 						"<tr>"
-							"<th>Data bytes received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Data bytes received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Data packets received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Data packets received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAK failures</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAK failures</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Bytes received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Bytes received</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Checksum errors</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Checksum errors</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed SPMs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed SPMs</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed ODATA</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed ODATA</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed RDATA</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed RDATA</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed NCFs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed NCFs</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Packets discarded</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Packets discarded</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Losses</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"	/* detected missed packets */
+							"<th>Losses</th><td>%i</td>"	/* detected missed packets */
 						"</tr><tr>"
-							"<th>Bytes delivered to app</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Bytes delivered to app</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Packets delivered to app</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Packets delivered to app</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Duplicate SPMs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Duplicate SPMs</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Duplicate ODATA/RDATA</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Duplicate ODATA/RDATA</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAK packets sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAK packets sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs sent</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs retransmitted</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs retransmitted</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs failed</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs failed</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to RXW advance</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs failed due to RXW advance</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to NCF retries</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs failed due to NCF retries</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to DATA retries</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs failed due to DATA retries</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAK failures delivered to app</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAK failures delivered to app</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAKs suppressed</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAKs suppressed</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Malformed NAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Malformed NAKs</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>Outstanding NAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>Outstanding NAKs</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Last activity</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>NAK repair min time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
+							"<th>NAK repair min time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair mean time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
+							"<th>NAK repair mean time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair max time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
+							"<th>NAK repair max time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail min time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
+							"<th>NAK fail min time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail mean time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
+							"<th>NAK fail mean time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail max time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
+							"<th>NAK fail max time</th><td>%i μs</td>"
 						"</tr><tr>"
-							"<th>NAK min retransmit count</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAK min retransmit count</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAK mean retransmit count</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAK mean retransmit count</th><td>%i</td>"
 						"</tr><tr>"
-							"<th>NAK max retransmit count</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
+							"<th>NAK max retransmit count</th><td>%i</td>"
 						"</tr>"
-						"</table>\n",
+						"</table>",
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED],
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED],
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES],
@@ -1317,9 +1149,9 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED],
-						((pgm_rxw_t*)peer->window)->cumulative_losses,
-						((pgm_rxw_t*)peer->window)->bytes_delivered,
-						((pgm_rxw_t*)peer->window)->msgs_delivered,
+						((pgm_rxw_t*)peer->rxw)->cumulative_losses,
+						((pgm_rxw_t*)peer->rxw)->bytes_delivered,
+						((pgm_rxw_t*)peer->rxw)->msgs_delivered,
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT],
@@ -1334,168 +1166,22 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS],
 						outstanding_naks,
 						last_activity,
-						((pgm_rxw_t*)peer->window)->min_fill_time,
+						((pgm_rxw_t*)peer->rxw)->min_fill_time,
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN],
-						((pgm_rxw_t*)peer->window)->max_fill_time,
+						((pgm_rxw_t*)peer->rxw)->max_fill_time,
 						peer->min_fail_time,
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN],
 						peer->max_fail_time,
-						((pgm_rxw_t*)peer->window)->min_nak_transmit_count,
+						((pgm_rxw_t*)peer->rxw)->min_nak_transmit_count,
 						peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN],
-						((pgm_rxw_t*)peer->window)->max_nak_transmit_count);
+						((pgm_rxw_t*)peer->rxw)->max_nak_transmit_count);
+
 	http_finalize_response (response, msg);
-	g_free (last_activity);
+
+	g_free( last_activity );
+
 	return 0;
 }
 
-GQuark
-pgm_http_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-http-error-quark");
-}
-
-static
-PGMHTTPError
-pgm_http_error_from_errno (
-	gint		err_no
-	)
-{
-	switch (err_no) {
-#ifdef EFAULT
-	case EFAULT:
-		return PGM_HTTP_ERROR_FAULT;
-		break;
-#endif
-
-#ifdef EINVAL
-	case EINVAL:
-		return PGM_HTTP_ERROR_INVAL;
-		break;
-#endif
-
-#ifdef EPERM
-	case EPERM:
-		return PGM_HTTP_ERROR_PERM;
-		break;
-#endif
-
-#ifdef EMFILE
-	case EMFILE:
-		return PGM_HTTP_ERROR_MFILE;
-		break;
-#endif
-
-#ifdef ENFILE
-	case ENFILE:
-		return PGM_HTTP_ERROR_NFILE;
-		break;
-#endif
-
-#ifdef ENXIO
-	case ENXIO:
-		return PGM_HTTP_ERROR_NXIO;
-		break;
-#endif
-
-#ifdef ERANGE
-	case ERANGE:
-		return PGM_HTTP_ERROR_RANGE;
-		break;
-#endif
-
-#ifdef ENOENT
-	case ENOENT:
-		return PGM_HTTP_ERROR_NOENT;
-		break;
-#endif
-
-	default :
-		return PGM_HTTP_ERROR_FAILED;
-		break;
-	}
-}
-
-/* errno must be preserved before calling to catch correct error
- * status with EAI_SYSTEM.
- */
-
-static
-PGMHTTPError
-pgm_http_error_from_eai_errno (
-	gint		err_no
-	)
-{
-	switch (err_no) {
-#ifdef EAI_ADDRFAMILY
-	case EAI_ADDRFAMILY:
-		return PGM_HTTP_ERROR_ADDRFAMILY;
-		break;
-#endif
-
-#ifdef EAI_AGAIN
-	case EAI_AGAIN:
-		return PGM_HTTP_ERROR_AGAIN;
-		break;
-#endif
-
-#ifdef EAI_BADFLAGS
-	case EAI_BADFLAGS:
-		return PGM_HTTP_ERROR_BADFLAGS;
-		break;
-#endif
-
-#ifdef EAI_FAIL
-	case EAI_FAIL:
-		return PGM_HTTP_ERROR_FAIL;
-		break;
-#endif
-
-#ifdef EAI_FAMILY
-	case EAI_FAMILY:
-		return PGM_HTTP_ERROR_FAMILY;
-		break;
-#endif
-
-#ifdef EAI_MEMORY
-	case EAI_MEMORY:
-		return PGM_HTTP_ERROR_MEMORY;
-		break;
-#endif
-
-#ifdef EAI_NODATA
-	case EAI_NODATA:
-		return PGM_HTTP_ERROR_NODATA;
-		break;
-#endif
-
-#ifdef EAI_NONAME
-	case EAI_NONAME:
-		return PGM_HTTP_ERROR_NONAME;
-		break;
-#endif
-
-#ifdef EAI_SERVICE
-	case EAI_SERVICE:
-		return PGM_HTTP_ERROR_SERVICE;
-		break;
-#endif
-
-#ifdef EAI_SOCKTYPE
-	case EAI_SOCKTYPE:
-		return PGM_HTTP_ERROR_SOCKTYPE;
-		break;
-#endif
-
-#ifdef EAI_SYSTEM
-	case EAI_SYSTEM:
-		return pgm_http_error_from_errno (errno);
-		break;
-#endif
-
-	default :
-		return PGM_HTTP_ERROR_FAILED;
-		break;
-	}
-}
 
 /* eof */

@@ -22,7 +22,6 @@ ENDMACRO(PGMEXE)
 PGMEXE(pgmdump)
 PGMEXE(pgmsend)
 PGMEXE(pgmrecv)
-PGMEXE(pgmping)
 
 PGMEXE(pgmtop)
 TARGET_LINK_LIBRARIES(pgmtop ncurses panel)
@@ -39,7 +38,5 @@ PGMEXE(enonblocksyncrecvmsgv)
 PGMEXE(asyncqrecv)
 PGMEXE(blockqrecv)
 
-# zero copy example
-PGMEXE(zerocopyrecv)
 
 # end of file
