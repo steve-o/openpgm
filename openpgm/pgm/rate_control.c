@@ -33,14 +33,11 @@
 
 struct rate_t {
 	gint		rate_per_sec;
+	gint		rate_per_msec;
 	guint		iphdr_len;
 
 	gint		rate_limit;		/* signed for math */
 	pgm_time_t	last_rate_check;
-	enum {
-		RESOLUTION_SECOND,
-		RESOLUTION_MILLISECOND
-	}		rate_resolution;
 	GStaticMutex	mutex;
 };
 
@@ -75,12 +72,11 @@ pgm_rate_create (
 	bucket->iphdr_len	= iphdr_len;
 	bucket->last_rate_check	= pgm_time_update_now ();
 /* pre-fill bucket */
-	if ((rate_per_sec / 1000) >= max_tpdu) {
-		bucket->rate_resolution = RESOLUTION_MILLISECOND;
-		bucket->rate_limit = bucket->rate_per_sec / 1000;
+	if ((bucket->rate_per_sec / 1000) >= max_tpdu) {
+		bucket->rate_per_msec	= bucket->rate_per_sec / 1000;
+		bucket->rate_limit	= bucket->rate_per_msec;
 	} else {
-		bucket->rate_resolution = RESOLUTION_SECOND;
-		bucket->rate_limit = bucket->rate_per_sec;
+		bucket->rate_limit	= bucket->rate_per_sec;
 	}
 	g_static_mutex_init (&bucket->mutex);
 	*bucket_ = bucket;
@@ -111,6 +107,8 @@ pgm_rate_check (
 	const gboolean		is_nonblocking
 	)
 {
+	gint new_rate_limit;
+
 /* pre-conditions */
 	g_assert (NULL != bucket);
 	g_assert (data_size > 0);
@@ -122,15 +120,25 @@ pgm_rate_check (
 	pgm_time_t now = pgm_time_update_now();
 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
-	gint new_rate_limit = bucket->rate_limit + pgm_to_secsf ((double)bucket->rate_per_sec * (double)time_since_last_rate_check);
-	if (RESOLUTION_SECOND == bucket->rate_resolution) {
-/* per second */
-		if (new_rate_limit > bucket->rate_per_sec)
+	if (bucket->rate_per_msec)
+	{
+		if (time_since_last_rate_check > pgm_msecs(1)) 
+			new_rate_limit = bucket->rate_per_msec;
+		else {
+			new_rate_limit = bucket->rate_limit + ((bucket->rate_per_msec * time_since_last_rate_check) / 1000UL);
+			if (new_rate_limit > bucket->rate_per_msec)
+				new_rate_limit = bucket->rate_per_msec;
+		}
+	}
+	else
+	{
+		if (time_since_last_rate_check > pgm_secs(1)) 
 			new_rate_limit = bucket->rate_per_sec;
-	} else {
-/* per milli-second */
-		if (new_rate_limit > (bucket->rate_per_sec / 1000)) 
-			new_rate_limit = bucket->rate_per_sec / 1000;
+		else {
+			new_rate_limit = bucket->rate_limit + ((bucket->rate_per_sec * time_since_last_rate_check) / 1000000UL);
+			if (new_rate_limit > bucket->rate_per_sec)
+				new_rate_limit = bucket->rate_per_sec;
+		}
 	}
 
 	new_rate_limit -= ( bucket->iphdr_len + data_size );
@@ -147,7 +155,7 @@ pgm_rate_check (
 			g_thread_yield();
 			now = pgm_time_update_now();
 			time_since_last_rate_check = now - bucket->last_rate_check;
-			sleep_amount = pgm_to_secsf ((double)bucket->rate_per_sec * (double)time_since_last_rate_check);
+			sleep_amount = pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check);
 		} while (sleep_amount + bucket->rate_limit < 0);
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
@@ -173,7 +181,7 @@ pgm_rate_remaining (
 	g_static_mutex_lock (&bucket->mutex);
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
-	const gint bucket_bytes = bucket->rate_limit + pgm_to_secsf ((double)bucket->rate_per_sec * (double)time_since_last_rate_check) - packetlen;
+	const gint bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - packetlen;
 	g_static_mutex_unlock (&bucket->mutex);
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
 }
