@@ -3,7 +3,7 @@
  * PGM transport: manage incoming & outgoing sockets with ambient SPMs, 
  * transmit & receive windows.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -249,17 +249,18 @@ pgm_transport_destroy (
 	return TRUE;
 }
 
-/* create a pgm_transport object.  create sockets that require superuser priviledges, if this is
- * the first instance also create a real-time priority receiving thread.  if interface ports
- * are specified then UDP encapsulation will be used instead of raw protocol.
+/* Create a pgm_transport object.  Create sockets that require superuser
+ * priviledges.  If interface ports are specified then UDP encapsulation will
+ * be used instead of raw protocol.
  *
- * if send == recv only two sockets need to be created iff ip headers are not required (IPv6).
+ * If send == recv only two sockets need to be created iff ip headers are not
+ * required (IPv6).
  *
- * all receiver addresses must be the same family.
+ * All receiver addresses must be the same family.
  * interface and multiaddr must be the same family.
  * family cannot be AF_UNSPEC!
  *
- * returns 0 on success, or -1 on error and sets errno appropriately.
+ * returns TRUE on success, or FALSE on error and sets error appropriately.
  */
 
 #if ( AF_INET != PF_INET ) || ( AF_INET6 != PF_INET6 )
@@ -625,8 +626,7 @@ pgm_transport_set_rcvbuf (
 
 /* bind the sockets to the link layer to start receiving data.
  *
- * returns 0 on success, or -1 on error and sets errno appropriately,
- *			 or -2 on NS lookup error and sets h_errno appropriately.
+ * returns TRUE on success, or FALSE on error and sets error appropriately,
  */
 
 gboolean

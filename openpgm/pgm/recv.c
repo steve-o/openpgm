@@ -2,7 +2,7 @@
  *
  * Transport recv API.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -607,7 +607,13 @@ wait_for_event (
  *
  * can be called due to event from incoming socket(s) or timer induced data loss.
  *
- * on success, returns bytes read, on error returns -1.
+ * On success, returns PGM_IO_STATUS_NORMAL and saves the count of bytes read
+ * into _bytes_read.  With non-blocking sockets a block returns
+ * PGM_IO_STATUS_WOULD_BLOCK.  When rate limited sending repair data, returns
+ * PGM_IO_STATUS_RATE_LIMITED and caller should wait.  During recovery state,
+ * returns PGM_IO_STATUS_TIMER_PENDING and caller should also wait.  On
+ * unrecoverable dataloss, returns PGM_IO_STATUS_CONN_RESET.  If connection is
+ * closed, returns PGM_IO_STATUS_EOF.  On error, returns PGM_IO_STATUS_ERROR.
  */
 
 PGMIOStatus
@@ -909,8 +915,7 @@ out:
 /* read one contiguous apdu and return as a IO scatter/gather array.  msgv is owned by
  * the caller, tpdu contents are owned by the receive window.
  *
- * on success, returns the number of bytes read.  on error, -1 is returned, and
- * errno is set appropriately.
+ * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
 PGMIOStatus
@@ -935,8 +940,7 @@ pgm_recvmsg (
  * location.  the caller must provide an adequately sized buffer to store the largest
  * expected apdu or else it will be truncated.
  *
- * on success, returns the number of bytes read.  on error, -1 is returned, and
- * errno is set appropriately.
+ * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
 PGMIOStatus
@@ -987,6 +991,11 @@ pgm_recvfrom (
 		*_bytes_read = bytes_copied;
 	return PGM_IO_STATUS_NORMAL;
 }
+
+/* Basic recv operation, copying data from window to application.
+ *
+ * on success, returns PGM_IO_STATUS_NORMAL.
+ */
 
 PGMIOStatus
 pgm_recv (
