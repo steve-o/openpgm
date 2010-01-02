@@ -2,7 +2,7 @@
  *
  * network interface handling.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -232,8 +232,7 @@ is_in_net6 (
  * We could use if_nametoindex() but we might as well check that the interface is
  * actually UP and capable of multicast traffic.
  *
- * returns 0 on success, -EINVAL on invalid input, -ENODEV on interface not found,
- * -EXDEV if multicast address instead of interface found.
+ * returns TRUE on success, FALSE on error and sets error appropriately.
  */
 
 static
@@ -590,6 +589,8 @@ parse_interface (
  * ff0x::fb multicast DNS
  * ff0x::108 NIS
  * ff05::1:3 DHCP
+ *
+ * returns TRUE on success, FALSE on error and sets error appropriately.
  */
 
 static
@@ -742,11 +743,8 @@ parse_group (
  * 	      "qe0,qe1,qe2"
  * 	      "qe0,qe2,qe2"	=> valid even though duplicate interface name
  *
- * returns 0 on success with device_list containing double linked list of devices as
- * sockaddr/idx pairs.  returns -ERANGE, device multicast group address family with be
- * AF_UNSPEC when multiple matching adapters have been discovered.  returns -EINVAL on
- * invalid input, -ENODEV if a device could not be found, and -EXDEV if a multicast group
- * is resolved instead of a node address.
+ * returns TRUE on success with device_list containing double linked list of devices as
+ * sockaddr/idx pairs.  returns FALSE on error, including multiple matching adapters.
  *
  * memory ownership of linked list is passed to caller and must be freed with g_free
  * and the g_list_free* api.
@@ -835,6 +833,8 @@ parse_interface_entity (
  * 	"239.192.0.100,239.192.0.101"
  *
  * unspecified address family interfaces are forced to AF_INET or AF_INET6.
+ *
+ * returns TRUE on success, returns FALSE on error and sets error appropriately.
  */
 
 static
@@ -1125,11 +1125,6 @@ parse_send_entity (
 /* parse network parameter
  *
  * interface list; receive multicast group list; send multicast group
- *
- * TODO: reply with linked list of devices & groups.
- * TODO: split receive/send interfaces, ensure matching interface to multicast group.
- *
- * TODO: create function to determine whether this host is default IPv4 or IPv6 and use that instead of IPv4.
  */
 
 #define IS_HOSTNAME(x) ( 				/* RFC 952 */ \
@@ -1422,7 +1417,7 @@ free_lists:
 /* create group_source_req as used by pgm_transport_create which specify port, address & interface.
  * gsr_source is copied from gsr_group for ASM, caller needs to populate gsr_source for SSM.
  *
- * returns 0 on success, returns -EINVAL on invalid input, returns -ENOMEM when out of memory.
+ * returns TRUE on success, returns FALSE on error and sets error appropriately.
  */
 
 gboolean

@@ -2,7 +2,7 @@
  *
  * high resolution timers.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -398,8 +398,8 @@ rtc_init (void)
 	return 0;
 }
 
-/* returns 0 on success even if RTC device cannot be closed or had an IO error,
- * returns -1 if the RTC file descriptor is not set.
+/* returns TRUE on success even if RTC device cannot be closed or had an IO error,
+ * returns FALSE if the RTC file descriptor is not set.
  */
 
 static

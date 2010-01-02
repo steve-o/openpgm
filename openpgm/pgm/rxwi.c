@@ -224,21 +224,8 @@ pgm_rxw_create (
 		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte);
 
 /* calculate receive window parameters */
-	guint32 alloc_sqns;
-
-	if (sqns)
-	{
-		alloc_sqns = sqns;
-	}
-	else if (secs && max_rte)
-	{
-		alloc_sqns = (secs * max_rte) / tpdu_size;
-	}
-	else
-	{
-		g_assert_not_reached();
-	}
-
+	g_assert (sqns || (secs && max_rte));
+	const guint32 alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
 	window = g_slice_alloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 
 	window->tsi		= tsi;

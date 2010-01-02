@@ -2,7 +2,7 @@
  *
  * PGM source transport.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -662,6 +662,8 @@ pgm_send_spm (
 		opt_total_length	= sizeof(struct pgm_opt_length);
 		data = opt_len + 1;
 
+		opt_header		= (struct pgm_opt_header*)data;
+
 /* OPT_PARITY_PRM */
 		if (transport->use_proactive_parity ||
 		    transport->use_ondemand_parity)
@@ -669,7 +671,6 @@ pgm_send_spm (
 			header->pgm_options |= PGM_OPT_NETWORK;
 			opt_total_length += sizeof(struct pgm_opt_header) +
 					    sizeof(struct pgm_opt_parity_prm);
-			opt_header		= (struct pgm_opt_header*)data;
 			opt_header->opt_type	= PGM_OPT_PARITY_PRM;
 			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_parity_prm);
 			struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
@@ -684,7 +685,6 @@ pgm_send_spm (
 		{
 			opt_total_length += sizeof(struct pgm_opt_header) +
 					    sizeof(struct pgm_opt_fin);
-			opt_header		= (struct pgm_opt_header*)data;
 			opt_header->opt_type	= PGM_OPT_FIN;
 			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fin);
 			struct pgm_opt_fin* opt_fin = (struct pgm_opt_fin*)(opt_header + 1);
@@ -792,8 +792,7 @@ send_ncf (
 
 /* A NCF packet with a OPT_NAK_LIST option extension
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned.  on error, FALSE is returned.
  */
 
 static
@@ -918,10 +917,11 @@ reset_heartbeat_spm (pgm_transport_t* transport)
 
 /* send one PGM data packet, transmit window owned memory.
  *
- * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
- * if the packet sizes would exceed the current rate limit. on invalid arguments,
- * -EINVAL is returned.
+ * On success, returns PGM_IO_STATUS_NORMAL and the number of data bytes pushed
+ * into the transmit window and attempted to send to the socket layer is saved 
+ * into bytes_written.  On non-blocking sockets, PGM_IO_STATUS_WOULD_BLOCK is 
+ * returned if the send would block.  PGM_IO_STATUS_RATE_LIMITED is returned if
+ * the packet sizes would exceed the current rate limit.
  *
  * ! always returns successful if data is pushed into the transmit window, even if
  * sendto() double fails ¡  we don't want the application to try again as that is the
@@ -1024,9 +1024,9 @@ retry_send:
 
 /* send one PGM original data packet, callee owned memory.
  *
- * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
- * if the packet sizes would exceed the current rate limit.
+ * on success, returns PGM_IO_STATUS_NORMAL, on block for non-blocking sockets
+ * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
+ * packet size exceeds the current rate limit.
  */
 
 static
@@ -1129,9 +1129,9 @@ retry_send:
  *    ⎢ DATA₁ ⎢ → send_odatav() →  ⎢ TSDU₀ ⎢ → libc
  *    ⎢   ⋮   ⎢
  *
- * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
- * if the packet sizes would exceed the current rate limit.
+ * on success, returns PGM_IO_STATUS_NORMAL, on block for non-blocking sockets
+ * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
+ * packet size exceeds the current rate limit.
  */
 
 static
@@ -1256,11 +1256,12 @@ retry_send:
 /* send PGM original data, callee owned memory.  if larger than maximum TPDU
  * size will be fragmented.
  *
- * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
- * if the packet sizes would exceed the current rate limit.
+ * on success, returns PGM_IO_STATUS_NORMAL, on block for non-blocking sockets
+ * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
+ * packet size exceeds the current rate limit.
  */
 
+static
 PGMIOStatus
 send_apdu (
 	pgm_transport_t* const		transport,
@@ -1420,6 +1421,12 @@ blocked:
 	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 
+/* Send one APDU, whether it fits within one TPDU or more.
+ *
+ * on success, returns PGM_IO_STATUS_NORMAL, on block for non-blocking sockets
+ * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
+ * packet size exceeds the current rate limit.
+ */
 PGMIOStatus
 pgm_send (
 	pgm_transport_t* const		transport,
@@ -1482,9 +1489,9 @@ pgm_send (
  *    ⎢ APDU₁ ⎢ → pgm_sendv() →  ⎢ ⋯ TSDU₁,₁ TSDU₀,₁ ⎢ → libc
  *    ⎢   ⋮   ⎢                  ⎢     ⋮       ⋮     ⎢
  *
- * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
- * if the packet sizes would exceed the current rate limit.
+ * on success, returns PGM_IO_STATUS_NORMAL, on block for non-blocking sockets
+ * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
+ * packet size exceeds the current rate limit.
  */
 
 PGMIOStatus
@@ -1814,9 +1821,9 @@ blocked:
  *    ⎢ TSDU₁ ⎢ → pgm_send_skbv() →  ⎢ ⋯ TSDU₁ TSDU₀ ⎢ → libc
  *    ⎢   ⋮   ⎢
  *
- * on success, returns number of data bytes pushed into the transmit window and
- * attempted to send to the socket layer.  on non-blocking sockets, -1 is returned
- * if the packet sizes would exceed the current rate limit.
+ * on success, returns PGM_IO_STATUS_NORMAL, on block for non-blocking sockets
+ * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
+ * packet size exceeds the current rate limit.
  */
 
 PGMIOStatus
