@@ -732,7 +732,7 @@ session_bind (
 	else
 	{
 		pgm_async_create (&sess->async, sess->transport, 0);
-		pgm_async_add_watch (sess->async, on_data, NULL);
+		pgm_async_add_watch (sess->async, on_data, sess);
 	}
 
 	puts ("READY");

@@ -643,7 +643,7 @@ pgm_flush_peers_pending (
 	while (transport->peers_pending)
 	{
 		pgm_peer_t* peer = transport->peers_pending->data;
-		const gssize peer_bytes = pgm_rxw_readv (peer->window, pmsg, msg_end - *pmsg);
+		const gssize peer_bytes = pgm_rxw_readv (peer->window, pmsg, msg_end - *pmsg + 1);
 
 		if (peer->last_cumulative_losses != ((pgm_rxw_t*)peer->window)->cumulative_losses)
 		{
@@ -656,7 +656,7 @@ pgm_flush_peers_pending (
 		{
 			(*bytes_read) += peer_bytes;
 			(*data_read)  ++;
-			if (*pmsg == msg_end) {			/* commit full */
+			if (*pmsg > msg_end) {			/* commit full */
 				retval = -ENOBUFS;
 				break;
 			}

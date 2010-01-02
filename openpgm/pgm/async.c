@@ -141,6 +141,9 @@ pgm_receiver_thread (
 			guint i = 0;
 			while (bytes_read) {
 				const struct pgm_sk_buff_t* skb = msgv.msgv_skb[i++];
+				g_assert (NULL != skb);
+				g_assert (skb->len > 0);
+				g_assert (skb->len <= bytes_read);
 				memcpy (dst, skb->data, skb->len);
 				dst = (char*)dst + skb->len;
 				bytes_read -= skb->len;
