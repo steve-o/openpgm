@@ -603,7 +603,7 @@ mock_pgm_flush_peers_pending (
 	if (mock_data_list) {
 		gsize len = 0;
 		guint count = 0;
-		while (mock_data_list && *pmsg != msg_end) {
+		while (mock_data_list && *pmsg <= msg_end) {
 			pgm_msgv_t* mock_msgv = mock_data_list->data;
 			(*pmsg)->msgv_len = mock_msgv->msgv_len;
 			for (unsigned i = 0; i < mock_msgv->msgv_len; i++) {
@@ -616,7 +616,7 @@ mock_pgm_flush_peers_pending (
 		}
 		*bytes_read = len;
 		*data_read = count;
-		if (*pmsg == msg_end)
+		if (*pmsg > msg_end)
 			return -ENOBUFS;
 	}
 	return 0;
