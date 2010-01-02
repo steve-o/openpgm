@@ -1305,11 +1305,9 @@ pgm_transport_select_info (
 			FD_SET(rdata_fd, readfds);
 			fds = MAX(fds, rdata_fd + 1);
 		}
-		if (transport->can_recv_data) {
-			const int pending_fd = pgm_notify_get_fd (&transport->pending_notify);
-			FD_SET(pending_fd, readfds);
-			fds = MAX(fds, pending_fd + 1);
-		}
+		const int pending_fd = pgm_notify_get_fd (&transport->pending_notify);
+		FD_SET(pending_fd, readfds);
+		fds = MAX(fds, pending_fd + 1);
 	}
 
 	if (transport->can_send_data && writefds)
@@ -1367,12 +1365,10 @@ pgm_transport_poll_info (
 			fds[moo].events = POLLIN;
 			moo++;
 		}
-		if (transport->can_recv_data) {
-			g_assert ( (1 + moo) <= *n_fds );
-			fds[moo].fd = pgm_notify_get_fd (&transport->pending_notify);
-			fds[moo].events = POLLIN;
-			moo++;
-		}
+		g_assert ( (1 + moo) <= *n_fds );
+		fds[moo].fd = pgm_notify_get_fd (&transport->pending_notify);
+		fds[moo].events = POLLIN;
+		moo++;
 	}
 
 /* ODATA only published on regular socket, no need to poll router-alert sock */
@@ -1424,7 +1420,6 @@ pgm_transport_epoll_ctl (
 		retval = epoll_ctl (epfd, op, transport->recv_sock, &event);
 		if (retval)
 			goto out;
-
 		if (-1 != transport->recv_sock2) {
 			retval = epoll_ctl (epfd, op, transport->recv_sock2, &event);
 			if (retval)
@@ -1435,11 +1430,9 @@ pgm_transport_epoll_ctl (
 			if (retval)
 				goto out;
 		}
-		if (transport->can_recv_data) {
-			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->pending_notify), &event);
-			if (retval)
-				goto out;
-		}
+		retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->pending_notify), &event);
+		if (retval)
+			goto out;
 
 		if (events & EPOLLET)
 			transport->is_edge_triggered_recv = TRUE;

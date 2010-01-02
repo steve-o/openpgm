@@ -89,7 +89,7 @@
 
 
 /* locals */
-static void reset_heartbeat_spm (pgm_transport_t* const);
+static void reset_heartbeat_spm (pgm_transport_t* const, const pgm_time_t);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
 static PGMIOStatus send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, gsize*);
@@ -901,16 +901,24 @@ send_ncf_list (
 
 static
 void
-reset_heartbeat_spm (pgm_transport_t* transport)
+reset_heartbeat_spm (
+	pgm_transport_t*	transport,
+	const pgm_time_t	now
+	)
 {
-	pgm_timer_lock (transport);
-	transport->spm_heartbeat_state = 1;
-	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm )) {
+	g_static_mutex_lock (&transport->timer_mutex);
+	const pgm_time_t next_poll = transport->next_poll;
+	const pgm_time_t spm_heartbeat_interval = transport->spm_heartbeat_interval[ transport->spm_heartbeat_state = 1 ];
+	transport->next_heartbeat_spm = now + spm_heartbeat_interval;
+	if (pgm_time_after( next_poll, transport->next_heartbeat_spm ))
+	{
 		transport->next_poll = transport->next_heartbeat_spm;
-		pgm_notify_send (&transport->pending_notify);
+		if (!transport->is_pending_read) {
+			pgm_notify_send (&transport->pending_notify);
+			transport->is_pending_read = TRUE;
+		}
 	}
-	pgm_timer_unlock (transport);
+	g_static_mutex_unlock (&transport->timer_mutex);
 }
 
 /* state helper for resuming sends
@@ -1001,7 +1009,7 @@ retry_send:
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
 	if ( sent == tpdu_length ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
@@ -1103,7 +1111,7 @@ retry_send:
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
 	if ( sent == tpdu_length ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
@@ -1233,7 +1241,7 @@ retry_send:
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
 	if ( sent == (gssize)STATE(skb)->len ) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
@@ -1404,7 +1412,7 @@ retry_send:
 	g_assert( STATE(data_bytes_offset) == apdu_length );
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
 	pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -1415,7 +1423,7 @@ retry_send:
 
 blocked:
 	if (bytes_sent) {
-		reset_heartbeat_spm (transport);
+		reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 		pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
@@ -1794,7 +1802,7 @@ retry_one_apdu_send:
 	g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
 	pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -1807,7 +1815,7 @@ retry_one_apdu_send:
 
 blocked:
 	if (bytes_sent) {
-		reset_heartbeat_spm (transport);
+		reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 		pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
@@ -2029,7 +2037,7 @@ retry_send:
 #endif
 
 	transport->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (transport);
+	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
 	pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
@@ -2042,7 +2050,7 @@ retry_send:
 
 blocked:
 	if (bytes_sent) {
-		reset_heartbeat_spm (transport);
+		reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 		pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
@@ -2104,10 +2112,10 @@ send_rdata (
 
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */
-	pgm_timer_lock (transport);
+	g_static_mutex_lock (&transport->timer_mutex);
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-	pgm_timer_unlock (transport);
+	g_static_mutex_unlock (&transport->timer_mutex);
 
 	pgm_txw_inc_retransmit_count (skb);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += g_ntohs(header->pgm_tsdu_length);

@@ -64,6 +64,8 @@ pgm_histogram_add (
 	int			value
 	)
 {
+	if (value > INT_MAX)
+		value = INT_MAX - 1;
 	if (value < 0)
 		value = 0;
 	const gsize i = bucket_index (histogram, value);
@@ -137,6 +139,8 @@ pgm_histogram_init (
 	if (histogram->declared_min <= 0)
 		histogram->declared_min = 1;
 	g_assert (histogram->declared_min > 0);
+	histogram->declared_max = INT_MAX - 1;
+	g_assert (histogram->declared_min <= histogram->declared_max);
 	g_assert (1 < histogram->bucket_count);
 	set_bucket_range (histogram, histogram->bucket_count, INT_MAX);
 	initialize_bucket_range (histogram);
