@@ -552,12 +552,12 @@ mock_pgm_new_peer (
 	const struct sockaddr* const	src_addr,
 	const gsize			src_addr_len,
 	const struct sockaddr* const	dst_addr,
-	const gsize			dst_addr_len
+	const gsize			dst_addr_len,
+	const pgm_time_t		now
 	)
 {
 	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
-	peer->last_packet = mock_pgm_time_update_now();
-	peer->expiry = peer->last_packet + transport->peer_expiry;
+	peer->expiry = now + transport->peer_expiry;
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
 	memcpy (&peer->group_nla, dst_addr, dst_addr_len);
@@ -569,7 +569,7 @@ mock_pgm_new_peer (
 					    transport->rxw_sqns,
 					    transport->rxw_secs,
 					    transport->rxw_max_rte);
-	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
+	peer->spmr_expiry = now + transport->spmr_expiry;
 	gpointer entry = mock__pgm_peer_ref(peer);
 	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
 	peer->peers_link.next = transport->peers_list;
@@ -1093,7 +1093,7 @@ START_TEST (test_lost_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	mock_pgm_peer_set_pending (transport, peer);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -1124,7 +1124,7 @@ START_TEST (test_abort_on_lost_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	mock_pgm_peer_set_pending (transport, peer);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -1157,7 +1157,7 @@ START_TEST (test_then_lost_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
@@ -1190,7 +1190,7 @@ START_TEST (test_then_abort_on_lost_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
@@ -1223,7 +1223,7 @@ START_TEST (test_on_data_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
@@ -1259,7 +1259,7 @@ START_TEST (test_on_zero_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_msgv_t* msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	msgv->msgv_len = 1;
@@ -1298,7 +1298,7 @@ START_TEST (test_on_many_data_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
-	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr));
+	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	struct pgm_sk_buff_t* skb;
 	pgm_msgv_t* msgv;
 /* #1 */
