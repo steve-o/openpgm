@@ -935,7 +935,21 @@ mock_recvmsg (
  *		gsize*			bytes_read,
  *		GError**		error
  *		)
+ *
+ * Most tests default to PGM_IO_STATUS_TIMER_PENDING, PGM_IO_STATUS_WOULD_BLOCK is not expected due
+ * to peer state engine and SPM broadcasts.
  */
+
+START_TEST (test_block_pass_001)
+{
+	pgm_transport_t* transport = generate_transport();
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
+	push_block_event ();
+	gsize bytes_read;
+	GError* err = NULL;
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+}
+END_TEST
 
 /* recv -> on_data */
 START_TEST (test_data_pass_001)
@@ -949,7 +963,7 @@ START_TEST (test_data_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_ODATA == mock_pgm_type);
 }
 END_TEST
@@ -965,7 +979,7 @@ START_TEST (test_spm_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_SPM == mock_pgm_type);
 }
 END_TEST
@@ -981,7 +995,7 @@ START_TEST (test_nak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NAK == mock_pgm_type);
 }
 END_TEST
@@ -997,7 +1011,7 @@ START_TEST (test_peer_nak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NAK == mock_pgm_type);
 }
 END_TEST
@@ -1013,7 +1027,7 @@ START_TEST (test_nnak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NNAK == mock_pgm_type);
 }
 END_TEST
@@ -1029,7 +1043,7 @@ START_TEST (test_ncf_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_NCF == mock_pgm_type);
 }
 END_TEST
@@ -1045,7 +1059,7 @@ START_TEST (test_spmr_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_SPMR == mock_pgm_type);
 }
 END_TEST
@@ -1061,7 +1075,7 @@ START_TEST (test_peer_spmr_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	GError* err = NULL;
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 	fail_unless (PGM_SPMR == mock_pgm_type);
 }
 END_TEST
@@ -1092,7 +1106,7 @@ START_TEST (test_lost_pass_001)
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1155,7 +1169,7 @@ START_TEST (test_then_lost_pass_001)
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1225,7 +1239,7 @@ START_TEST (test_on_data_pass_001)
 	fail_unless (NULL == err);
 	fail_unless ((gsize)sizeof(source) == bytes_read);
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1259,7 +1273,7 @@ START_TEST (test_on_zero_pass_001)
 	fail_unless (NULL == err);
 	fail_unless ((gsize)0 == bytes_read);
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1327,7 +1341,7 @@ START_TEST (test_on_many_data_pass_001)
 	fail_unless ((gsize)(strlen(source[2]) + 1) == bytes_read);
 	g_message ("#3 = \"%s\"", buffer);
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_WOULD_BLOCK == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err));
 }
 END_TEST
 
@@ -1404,6 +1418,11 @@ make_test_suite (void)
 	Suite* s;
 
 	s = suite_create (__FILE__);
+
+	TCase* tc_block = tcase_create ("block");
+	suite_add_tcase (s, tc_block);
+	tcase_add_checked_fixture (tc_block, mock_setup, NULL);
+	tcase_add_test (tc_block, test_block_pass_001);
 
 	TCase* tc_data = tcase_create ("data");
 	suite_add_tcase (s, tc_data);
@@ -1499,6 +1518,7 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_recvmsgv);
 	tcase_add_checked_fixture (tc_recvmsgv, mock_setup, NULL);
 	tcase_add_test (tc_recvmsgv, test_recvmsgv_fail_001);
+
 	return s;
 }
 

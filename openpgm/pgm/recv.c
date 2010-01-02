@@ -810,7 +810,7 @@ check_for_repeat:
 	if (transport->is_nonblocking ||
 	    flags & MSG_DONTWAIT)
 	{
-		if (len > 0 && pmsg < msg_end) {
+		if (len > 0 && (pmsg + 1) < msg_end) {
 			g_trace ("recv again on not-full");
 			goto recv_again;		/* \:D/ */
 		}
