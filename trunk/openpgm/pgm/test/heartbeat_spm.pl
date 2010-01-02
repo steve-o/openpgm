@@ -28,6 +28,7 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("listen ao");
 
 print "app: publish test data.\n";
 $app->say ("send ao ringo");
@@ -36,10 +37,10 @@ print "mon: wait for odata ...\n";
 $mon->wait_for_odata;
 my $t0 = [gettimeofday];
 
-for (1..4)	# look for four consecutive heartbeat SPMs less than 1000ms apart
+for (1..4)	# look for four consecutive heartbeat SPMs less than 5000ms apart
 {
 	print "mon: wait for spm ...\n";
-	$mon->wait_for_spm ({ 'timeout' => 1 });
+	$mon->wait_for_spm ({ 'timeout' => 5 });
 	my $tn = [gettimeofday];
 	my $elapsed = tv_interval ( $t0, $tn );
 	$t0 = $tn;
