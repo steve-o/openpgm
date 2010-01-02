@@ -1155,7 +1155,7 @@ pgm_rxw_readv (
 	g_trace ("readv (window:%p pmsg:%p pmsglen:%u)",
 		(gpointer)window, (gpointer)pmsg, pmsglen);
 
-	msg_end = *pmsg + pmsglen;
+	msg_end = *pmsg + pmsglen - 1;
 
 	if (_pgm_rxw_incoming_is_empty (window))
 		return -1;
@@ -1166,7 +1166,7 @@ pgm_rxw_readv (
 	state = (pgm_rxw_state_t*)&skb->cb;
 	switch (state->state) {
 	case PGM_PKT_HAVE_DATA_STATE:
-		bytes_read = _pgm_rxw_incoming_read (window, pmsg, msg_end - *pmsg);
+		bytes_read = _pgm_rxw_incoming_read (window, pmsg, msg_end - *pmsg + 1);
 		break;
 
 	case PGM_PKT_LOST_DATA_STATE:
@@ -1265,7 +1265,7 @@ _pgm_rxw_incoming_read (
 	g_trace ("_pgm_rxw_incoming_read (window:%p pmsg:%p pmsglen:%u)",
 		 (gpointer)window, (gpointer)pmsg, pmsglen);
 
-	msg_end = *pmsg + pmsglen;
+	msg_end = *pmsg + pmsglen - 1;
 	gssize bytes_read = 0;
 	guint data_read = 0;
 
@@ -1281,7 +1281,7 @@ _pgm_rxw_incoming_read (
 			data_read  ++;
 		}
 		else break;
-	} while (!_pgm_rxw_incoming_is_empty (window));
+	} while (*pmsg <= msg_end && !_pgm_rxw_incoming_is_empty (window));
 
 	window->bytes_delivered += bytes_read;
 	window->msgs_delivered  += data_read;
