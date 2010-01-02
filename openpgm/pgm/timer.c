@@ -26,7 +26,7 @@
 #include "pgm/receiver.h"
 #include "pgm/timer.h"
 
-//#define TIMER_DEBUG
+#define TIMER_DEBUG
 
 #ifndef TIMER_DEBUG
 #	define G_DISABLE_ASSERT
@@ -141,38 +141,62 @@ pgm_timer_dispatch (
 
 	if (transport->can_send_data)
 	{
-		pgm_timer_lock (transport);
-		guint spm_heartbeat_state = transport->spm_heartbeat_state;
-		pgm_time_t next_heartbeat_spm = transport->next_heartbeat_spm;
-		pgm_time_t next_spm = spm_heartbeat_state ? next_heartbeat_spm : transport->next_ambient_spm;
-		pgm_timer_unlock (transport);
+		g_static_mutex_lock (&transport->timer_mutex);
+		const guint spm_heartbeat_state = transport->spm_heartbeat_state;
+		const pgm_time_t next_heartbeat_spm = transport->next_heartbeat_spm;
+		g_static_mutex_unlock (&transport->timer_mutex);
 
-		if (pgm_time_after_eq (now, next_spm))
+/* no lock needed on ambient */
+		const pgm_time_t next_ambient_spm = transport->next_ambient_spm;
+		pgm_time_t next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, next_ambient_spm) : next_ambient_spm;
+
+		if (pgm_time_after_eq (now, next_spm)
+		    && !pgm_send_spm (transport, 0))
+			return FALSE;
+
+/* ambient timing not so important so base next event off current time */
+		if (pgm_time_after_eq (now, next_ambient_spm))
 		{
-			if (!pgm_send_spm (transport, 0))
-				return FALSE;
-
-			if (spm_heartbeat_state)
-			{
-				do {
-					next_spm += transport->spm_heartbeat_interval[spm_heartbeat_state++];
-					if (spm_heartbeat_state == transport->spm_heartbeat_len) {
-						spm_heartbeat_state = 0;
-						next_spm = now + transport->spm_ambient_interval;
-						break;
-					}
-				} while (pgm_time_after_eq (now, next_spm));
-			}
-			else
-				next_spm = now + transport->spm_ambient_interval;
-			
-			next_expiration = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
+			transport->next_ambient_spm = now + transport->spm_ambient_interval;
+			next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, transport->next_ambient_spm) : transport->next_ambient_spm;
 		}
-	}
 
-	pgm_timer_lock (transport);
-	transport->next_poll = next_expiration;
-	pgm_timer_unlock (transport);
+/* heartbeat timing is often high resolution so base times to last event */
+		if (spm_heartbeat_state && pgm_time_after_eq (now, next_heartbeat_spm))
+		{
+			guint new_heartbeat_state    = spm_heartbeat_state;
+			pgm_time_t new_heartbeat_spm = next_heartbeat_spm;
+			do {
+				new_heartbeat_spm += transport->spm_heartbeat_interval[new_heartbeat_state++];
+				if (new_heartbeat_state == transport->spm_heartbeat_len) {
+					new_heartbeat_state = 0;
+					new_heartbeat_spm   = now + transport->spm_ambient_interval;
+					break;
+				}
+			} while (pgm_time_after_eq (now, new_heartbeat_spm));
+/* check for reset heartbeat */
+			g_static_mutex_lock (&transport->timer_mutex);
+			if (next_heartbeat_spm == transport->next_heartbeat_spm) {
+				transport->spm_heartbeat_state = new_heartbeat_state;
+				transport->next_heartbeat_spm  = new_heartbeat_spm;
+				next_spm = MIN(transport->next_ambient_spm, new_heartbeat_spm);
+			} else
+				next_spm = MIN(transport->next_ambient_spm, transport->next_heartbeat_spm);
+			transport->next_poll = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
+			g_static_mutex_unlock (&transport->timer_mutex);
+			return TRUE;
+		}
+
+		next_expiration = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
+
+/* check for reset */
+		g_static_mutex_lock (&transport->timer_mutex);
+		transport->next_poll = transport->next_poll > now ? MIN(transport->next_poll, next_expiration) : next_expiration;
+		g_static_mutex_unlock (&transport->timer_mutex);
+	}
+	else
+		transport->next_poll = next_expiration;
+
 	return TRUE;
 }
 
