@@ -768,7 +768,7 @@ pgm_on_spm (
 	const guint32 spm_sqn = g_ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
-	if ( pgm_uint32_gte (spm->spm_sqn, source->spm_sqn) ||
+	if ( pgm_uint32_gte (spm_sqn, source->spm_sqn) ||
 	     ((struct sockaddr*)&source->nla)->sa_family == 0 )
 	{
 /* copy NLA for replies */
