@@ -273,8 +273,8 @@ session_create (
 		goto err_free;
 	}
 
-	res->ti_sport = g_port;
-	res->ti_dport = 0;
+	res->ti_dport = g_port;
+	res->ti_sport = 0;
 	if (!pgm_transport_create (&sess->transport, res, &err)) {
 		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
 		g_error_free (err);

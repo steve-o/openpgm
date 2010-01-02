@@ -704,7 +704,7 @@ pgm_recvmsgv (
 	gsize bytes_read = 0;
 	guint data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
-	const pgm_msgv_t* msg_end = msg_start + msg_len;
+	const pgm_msgv_t* msg_end = msg_start + msg_len - 1;
 
 	/* second, flush any remaining contiguous messages from previous call(s) */
 	if (transport->peers_pending) {
@@ -810,7 +810,7 @@ check_for_repeat:
 	if (transport->is_nonblocking ||
 	    flags & MSG_DONTWAIT)
 	{
-		if (len > 0 && (pmsg + 1) < msg_end) {
+		if (len > 0 && pmsg <= msg_end) {
 			g_trace ("recv again on not-full");
 			goto recv_again;		/* \:D/ */
 		}
