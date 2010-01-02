@@ -94,9 +94,20 @@ struct pgm_sk_buff_t*
 generate_skb (void)
 {
 	const char source[] = "i am not a string";
-	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
-	pgm_skb_reserve (skb, header_length);
+	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset (FALSE));
+	pgm_skb_put (skb, sizeof(source));
+	memcpy (skb->data, source, sizeof(source));
+	return skb;
+}
+
+static
+struct pgm_sk_buff_t*
+generate_fragment_skb (void)
+{
+	const char source[] = "i am not a string";
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset (TRUE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -630,7 +641,7 @@ START_TEST (test_send_skbv_pass_002)
 	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
 	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++)
-		skb[i] = generate_skb ();
+		skb[i] = generate_fragment_skb ();
 	gsize apdu_length = (gsize)skb[0]->len * G_N_ELEMENTS(skb);
 	gsize bytes_written;
 	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written));
@@ -656,7 +667,7 @@ START_TEST (test_send_skbv_fail_001)
 {
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 /* reserve PGM header */
-	pgm_skb_put (skb, pgm_transport_pkt_offset (TRUE));
+	pgm_skb_put (skb, mock_pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
 	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written));
