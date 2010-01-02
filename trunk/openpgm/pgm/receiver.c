@@ -553,7 +553,8 @@ pgm_new_peer (
 	const struct sockaddr* const	src_addr,
 	const gsize			src_addrlen,
 	const struct sockaddr* const	dst_addr,
-	const gsize			dst_addrlen
+	const gsize			dst_addrlen,
+	const pgm_time_t		now
 	)
 {
 	pgm_peer_t* peer;
@@ -574,7 +575,7 @@ pgm_new_peer (
 #endif
 
 	peer = g_malloc0 (sizeof(pgm_peer_t));
-	peer->expiry = peer->last_packet + transport->peer_expiry;
+	peer->expiry = now + transport->peer_expiry;
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
 	memcpy (&peer->group_nla, dst_addr, dst_addrlen);
@@ -589,7 +590,7 @@ pgm_new_peer (
 					transport->rxw_sqns,
 					transport->rxw_secs,
 					transport->rxw_max_rte);
-	peer->spmr_expiry = peer->last_packet + transport->spmr_expiry;
+	peer->spmr_expiry = now + transport->spmr_expiry;
 
 /* add peer to hash table and linked list */
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
@@ -1180,7 +1181,6 @@ send_spmr (
 	if (sent < 0 && EAGAIN == errno)
 		return FALSE;
 
-	source->spmr_expiry = 0;
 	transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length * 2;
 	return TRUE;
 }
@@ -1689,8 +1689,8 @@ pgm_check_peer_nak_state (
 						return FALSE;
 					}
 					peer->spmr_tstamp = now;
-				} else
-					peer->spmr_expiry = 0;
+				}
+				peer->spmr_expiry = 0;
 			}
 		}
 

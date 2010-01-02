@@ -341,12 +341,16 @@ on_peer (
 	}
 
 /* check to see the source this peer-to-peer message is about is in our peer list */
+	pgm_tsi_t upstream_tsi;
+	memcpy (&upstream_tsi.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
+	upstream_tsi.sport = skb->pgm_header->pgm_dport;
+
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	*source = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
+	*source = g_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
 	g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	if (NULL == *source) {
 /* this source is unknown, we don't care about messages about it */
-		g_trace ("Discarded packet about new source.");
+		g_trace ("Discarded peer packet about new source.");
 		goto out_discarded;
 	}
 
@@ -429,9 +433,9 @@ on_downstream (
 		*source = pgm_new_peer (transport,
 				       &skb->tsi,
 				       (struct sockaddr*)src_addr, pgm_sockaddr_len(src_addr),
-				       (struct sockaddr*)dst_addr, pgm_sockaddr_len(dst_addr));
+				       (struct sockaddr*)dst_addr, pgm_sockaddr_len(dst_addr),
+					skb->tstamp);
 	}
-g_trace ("source:%p", (gpointer)*source);
 
 	(*source)->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += skb->len;
 	(*source)->last_packet = skb->tstamp;
