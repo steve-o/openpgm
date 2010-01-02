@@ -1253,12 +1253,14 @@ net_send_spmr (
 /* check that the peer exists */
 	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	struct sockaddr_storage peer_nla;
+	pgm_gsi_t* peer_gsi;
 	guint16 peer_sport;
 
 	if (peer == NULL) {
 /* ourself */
 		if (pgm_tsi_equal (tsi, &transport->tsi))
 		{
+			peer_gsi   = &transport->tsi.gsi;
 			peer_sport = transport->tsi.sport;
 		}
 		else
@@ -1270,6 +1272,7 @@ net_send_spmr (
 	else
 	{
 		memcpy (&peer_nla, &peer->local_nla, sizeof(struct sockaddr_storage));
+		peer_gsi   = &peer->tsi.gsi;
 		peer_sport = peer->tsi.sport;
 	}
 
@@ -1279,7 +1282,7 @@ net_send_spmr (
 	gchar buf[ tpdu_length ];
 
         struct pgm_header *header = (struct pgm_header*)buf;
-	memcpy (header->pgm_gsi, &peer->tsi.gsi, sizeof(pgm_gsi_t));
+	memcpy (header->pgm_gsi, peer_gsi, sizeof(pgm_gsi_t));
 	header->pgm_sport       = transport->dport;
 	header->pgm_dport       = peer_sport;
 	header->pgm_type        = PGM_SPMR;
