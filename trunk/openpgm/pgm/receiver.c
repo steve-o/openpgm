@@ -2,7 +2,7 @@
  *
  * PGM receiver transport.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1319,8 +1319,7 @@ send_parity_nak (
 
 /* A NAK packet with a OPT_NAK_LIST option extension
  *
- * on success, 0 is returned.  on error, -1 is returned, and errno set
- * appropriately.
+ * on success, TRUE is returned.  on error, FALSE is returned.
  */
 
 static

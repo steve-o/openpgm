@@ -2,7 +2,7 @@
  *
  * A basic transmit window: pointer array implementation.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -178,21 +178,8 @@ pgm_txw_create (
 		rs_n, rs_k);
 
 /* calculate transmit window parameters */
-	guint32 alloc_sqns;
-
-	if (sqns)
-	{
-		alloc_sqns = sqns;
-	}
-	else if (tpdu_size && secs && max_rte)
-	{
-		alloc_sqns = (secs * max_rte) / tpdu_size;
-	}
-	else
-	{
-		g_assert_not_reached();
-	}
-
+	g_assert (sqns || (tpdu_size && secs && max_rte));
+	const guint32 alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
 	window = g_slice_alloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 	window->tsi = tsi;
 
@@ -334,8 +321,6 @@ pgm_txw_peek (
 }
 
 /* remove an entry from the trailing edge of the transmit window.
- *
- * returns 0 if entry successfully removed, returns -1 on error.
  */
 
 static
