@@ -906,8 +906,10 @@ reset_heartbeat_spm (pgm_transport_t* transport)
 	pgm_timer_lock (transport);
 	transport->spm_heartbeat_state = 1;
 	transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
-	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
+	if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm )) {
 		transport->next_poll = transport->next_heartbeat_spm;
+		pgm_notify_send (&transport->pending_notify);
+	}
 	pgm_timer_unlock (transport);
 }
 
