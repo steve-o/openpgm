@@ -662,16 +662,14 @@ pgm_transport_bind (
 			return FALSE;
 		}
 	}
-	if (transport->can_recv_data) {
-		if (0 != pgm_notify_init (&transport->pending_notify)) {
-			g_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
-				     _("Creating waiting peer notification channel: %s"),
-				     g_strerror (errno));
-			g_static_rw_lock_writer_unlock (&transport->lock);
-			return FALSE;
-		}
+	if (0 != pgm_notify_init (&transport->pending_notify)) {
+		g_set_error (error,
+			     PGM_TRANSPORT_ERROR,
+			     pgm_transport_error_from_errno (errno),
+			     _("Creating waiting peer notification channel: %s"),
+			     g_strerror (errno));
+		g_static_rw_lock_writer_unlock (&transport->lock);
+		return FALSE;
 	}
 
 /* determine IP header size for rate regulation engine & stats */
