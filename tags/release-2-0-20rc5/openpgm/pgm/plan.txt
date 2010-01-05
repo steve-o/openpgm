@@ -1,0 +1,238 @@
+pgmdump
+-------
+
+View all packets like tcpdump, but updated to full spec and allow dump of payload.
+
+
+pgmtop
+------
+
+Dump realtime packet statistics in a ncurses display, mix of top/htop/netop.
+
+
+basic_send
+----------
+
+Send an ODATA packet and terminate.
+
+Accept string payload and network parameters on command line.
+
+Send to multicast or send to unicast AFI.
+
+IPv4/6.
+
+Define optional session start, late join tags.
+
+
+spm_idle
+--------
+
+Idle in an event loop sending out SPM packets.
+
+
+stream_send
+-----------
+
+Send a constant stream of ODATA and SPM packets.
+
+
+basic_http
+----------
+
+Simple embedded web server
+
+
+basic_recv
+----------
+
+Listen to packets indicating data loss, view details through web interface.
+
+
+basic_container
+---------------
+
+Test performance of glib containers for fast allocating for a dynamic transmit window.
+
+
+basic_txw
+---------
+
+Test performance of a basic transmit window implementation.
+
+
+nak_txw
+-------
+
+Test performance of random access to packets inside the window.
+
+
+stream_send_with_nak
+--------------------
+
+Respond to NAK's with RDATA.
+
+
+basic_recv_with_nak
+-------------------
+
+Listen to packets and send NAK's to rebuild data.
+
+
+dumpif
+------
+
+Display all IP based interfaces and basic details.
+
+
+testif
+------
+
+Test various combinations of network specification.
+
+
+sw_calc
+-------
+
+Basic calculation tests of wrap-around sliding windows and a leading edge.
+
+
+basic_recv_with_rxw
+-------------------
+
+Listen to packets buffered with a receive window.
+
+
+test_cpu_timers
+---------------
+
+Calculate drift between processors, cores, and hyper-threads.
+
+
+pgmsend
+--------
+
+basic_send updated to use transmit window.
+
+
+pgmrecv
+--------
+
+basic_recv_with_rxw without web interface, primary displays messages from pgmsend.
+
+
+syncrecv
+--------
+
+pgmrecv implemented outside GLib with a synchronous coding paradigm.
+
+
+pgmping
+-------
+
+Dual mode: one to send fixed messages like pgmsend and listen for response, two to listen for
+messages and reply.
+
+
+block_send
+----------
+
+Send APDUs over ODATA.
+
+
+(pgmrecv can receive APDUs)
+
+test_rs
+-------
+
+Test 8-bit symbol Reed Solomon encoding and decoding with errors & erasures.
+
+test_fec
+--------
+
+Test fec creation and recovery.
+
+
+send_with_fec
+--------------------
+
+Send APDUs over ODATA with FEC.
+
+
+
+Scenarios to reproduce
+**********************
+
+- Packet loss in stream causing NAK generation.
+- Link saturation in sending causing API feedback.
+- Link peak stable speed.
+- Maxium NAK generation to determine NCF/RDATA throughput.
+- Corrupt packets with invalid IP checksum (? generate IP HDR in sender)
+- Corrupt packets with invalid PGM checksum.
+- Invalid packet values.
+- NAK to NCF latency.
+- NAK to RDATA latency.
+- Publish bandwidth: total, per packet type, payload, per recipient (?)
+- Subscribe bandwidth: total, per packet type, payload, per publisher (?)
+- Restarting a session with similar or dissimilar sequence numbering.
+
+Outstanding questions
+*********************
+
+- Is it faster to use chunks containing multiple packets instead of one MTU
+  per packet.  Does aligning with system page size matter?
+- Can g_timers be dropped easily for gettimeofday and avoid floating point math?  Possible
+  to pass timer upstream with contiguous data for easy access.
+- Can time evaluation be dropped to at most once per main loop event?
+- Does code work 32 bit and is it optimal?
+- Should trash stacks be monitored and controlled externally?  For example, clearing
+  up after bursts or administrative control.
+- Should trash stacks have a upper limit to then free to the slice allocator?
+- Should lost packets be managed as ranges or individual sequence numbers, how
+  does each method affect performance?
+
+* The initial draft of PGM included OPT_RANGE option for NAKs to specify a range of lost
+  packets, this was replaced in the final draft with NAK lists.  Some research hints that
+  ranges are suitable:
+
+  http://www.isoc.org/inet2001/CD_proceedings/T54/T54.htm
+  http://tools.ietf.org/html/draft-speakman-pgm-spec-01
+
+- Are place holders necessary?  Can state timeouts be managed without a per sequence number
+  object?  For example by the next data object, or an extra object for an ncf extended window:
+  note that nak packet generation should easily dwarfs time spent unless advantage is taken
+  of the additional 62 naks in a opt_nak_list.  Caution has to be taken with the cost of 
+  splitting a range when a packet is inserted in the middle, although idealy it should
+  be sequential from the trailing edge.
+- Is it better to have send sockets per transport, or shared, bound to each interface?
+- Cost of sharing state helper lists between receive windows?  On culling a peer the lists
+  have to be purged.  Saves iterating the hash list of receivers.
+- Encapsulated UDP lists two ports, 3305 for broadcast, 3306 for unicast, how is this 
+  supposed to map to regular PGM, and why the split?
+
+Basic TODO list
+***************
+
+- Ensure standardised error handling and status reporting.
+- Implement mechanism for data-loss feedback.
+- OPT_SYN & OPT_FIN on sending side.
+- Shared trash stacks between multiple receive windows (contexts).
+- Shared trash stacks between transmit and receive windows.
+- FEC: compatibility with SmartPGM FEC, MS FEC?
+- NAK backoff learning.
+- Full conformance testing. (nak backoffs remaining)
+- Unit testing.
+- System testing with valgrind.
+- Performance testing with oprofile.
+- Basic DLR.
+- Implement PGM sender (only) support thread?
+- eventfd instead of pipes for recent Linux kernels.
+
+Optionals
+*********
+
+- Some form of broadcast statistics for passive monitoring.
+- (fix) BCH Reed-Solomon codec as possibly faster alternative, albeit incompatible with Microsoft.
+- Recommendations as per the RMT working group of the IETF for AL-FEC codecs: Raptor codes, LDPC-
+  staircase and LDPC-triangle codes.
+- XDR based messaging format as example of binary encoded messaging.
+
