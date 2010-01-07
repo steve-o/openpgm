@@ -638,6 +638,7 @@ pgm_send_spm (
 	spm->spm_sqn		= g_htonl (transport->spm_sqn);
 	spm->spm_trail		= g_htonl (pgm_txw_trail_atomic (transport->window));
 	spm->spm_lead		= g_htonl (pgm_txw_lead_atomic (transport->window));
+	spm->spm_reserved	= 0;
 /* our nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_addr, (char*)&spm->spm_nla_afi);
 
