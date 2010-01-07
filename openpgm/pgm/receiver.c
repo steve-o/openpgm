@@ -1222,6 +1222,7 @@ send_nak (
 
 /* NAK */
 	nak->nak_sqn		= g_htonl (sequence);
+	nak->nak_reserved	= 0;
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
@@ -1229,9 +1230,14 @@ send_nak (
 /* group nla: we match the NAK NLA to the same as advertised by the source, we might
  * be listening to multiple multicast groups
  */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (nak->nak_src_nla_afi == AFI_IP6) ?
-								(char*)&nak6->nak6_grp_nla_afi :
-								(char*)&nak->nak_grp_nla_afi );
+	if (nak->nak_src_nla_afi == AFI_IP6) {
+		pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (char*)&nak6->nak6_grp_nla_afi);
+		nak6->nak6_reserved2 = 0;
+	} else {
+		pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (char*)&nak->nak_grp_nla_afi);
+		nak->nak_reserved2 = 0;
+	}
+
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
