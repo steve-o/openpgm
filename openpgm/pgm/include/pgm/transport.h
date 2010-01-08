@@ -224,6 +224,7 @@ struct pgm_peer_t {
 	pgm_time_t		expiry;
 
 	pgm_time_t		last_packet;
+	guint			last_commit;
 	guint32			lost_count;
 	guint32			last_cumulative_losses;
 	guint32			cumulative_stats[PGM_PC_RECEIVER_MAX];
@@ -284,6 +285,7 @@ struct pgm_transport_t {
 
 	pgm_notify_t		rdata_notify;
 
+	guint			last_commit;
 	gsize			blocklen;		    /* length of buffer blocked */
 	gboolean		is_apdu_eagain;		    /* writer-lock on window_lock exists
 							       as send would block */
