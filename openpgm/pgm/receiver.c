@@ -644,7 +644,7 @@ pgm_flush_peers_pending (
 	while (transport->peers_pending)
 	{
 		pgm_peer_t* peer = transport->peers_pending->data;
-		if (peer->last_commit && peer->last_commit < transport->commit_index)
+		if (peer->last_commit && peer->last_commit < transport->last_commit)
 			pgm_rxw_remove_commit (peer->window);
 		const gssize peer_bytes = pgm_rxw_readv (peer->window, pmsg, msg_end - *pmsg + 1);
 
@@ -659,7 +659,7 @@ pgm_flush_peers_pending (
 		{
 			(*bytes_read) += peer_bytes;
 			(*data_read)  ++;
-			peer->last_commit = transport->commit_index;
+			peer->last_commit = transport->last_commit;
 			if (*pmsg > msg_end) {			/* commit full */
 				retval = -ENOBUFS;
 				break;

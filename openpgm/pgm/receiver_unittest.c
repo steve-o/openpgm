@@ -264,6 +264,14 @@ mock_pgm_rxw_add (
 }
 
 static
+void
+mock_pgm_rxw_remove_commit (
+	pgm_rxw_t* const		window
+	)
+{
+}
+
+static
 gssize
 mock_pgm_rxw_readv (
 	pgm_rxw_t* const		window,
@@ -326,6 +334,7 @@ mock_pgm_histogram_add (
 #define pgm_rxw_lost		mock_pgm_rxw_lost
 #define pgm_rxw_state		mock_pgm_rxw_state
 #define pgm_rxw_add		mock_pgm_rxw_add
+#define pgm_rxw_remove_commit	mock_pgm_rxw_remove_commit
 #define pgm_rxw_readv		mock_pgm_rxw_readv
 #define pgm_csum_fold		mock_pgm_csum_fold
 #define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
