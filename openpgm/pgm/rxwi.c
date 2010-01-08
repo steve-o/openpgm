@@ -90,7 +90,7 @@ static inline guint32 _pgm_rxw_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline guint32 _pgm_rxw_pkt_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const guint32);
-static inline void _pgm_rxw_remove_tg_sqn (pgm_rxw_t* const, const guint32);
+static inline void _pgm_rxw_unref_tg_sqn (pgm_rxw_t* const, const guint32);
 static int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t);
 static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t, const pgm_time_t);
@@ -241,6 +241,9 @@ pgm_rxw_create (
 
 /* limit retransmit requests on late session joining */
 	window->is_constrained = TRUE;
+
+/* minimum value of RS::k = 1 */
+	window->tg_size = 1;
 
 /* pointer array */
 	window->alloc = alloc_sqns;
@@ -589,6 +592,7 @@ pgm_rxw_update_fec (
 {
 /* pre-conditions */
 	g_assert (window);
+	g_assert_cmpuint (rs_k, >, 1);
 
 	g_trace ("pgm_rxw_update_fec (window:%p rs(k):%u)",
 		(gpointer)window, rs_k);
@@ -1122,6 +1126,27 @@ _pgm_rxw_append (
 	return PGM_RXW_APPENDED;
 }
 
+/* remove references to all commit packets not in the same transmission group
+ * as the commit-lead
+ */
+
+void
+pgm_rxw_remove_commit (
+	pgm_rxw_t* const	window
+	)
+{
+/* pre-conditions */
+	g_assert (window);
+
+	const guint32 tg_sqn_of_commit_lead = _pgm_rxw_tg_sqn (window, window->commit_lead);
+
+	while (!_pgm_rxw_commit_is_empty (window) &&
+	       tg_sqn_of_commit_lead != _pgm_rxw_tg_sqn (window, window->trail))
+	{
+		_pgm_rxw_remove_trail (window);
+	}
+}
+
 /* flush packets but instead of calling on_data append the contiguous data packets
  * to the provided scatter/gather vector.
  *
@@ -1597,8 +1622,6 @@ _pgm_rxw_incoming_read_apdu (
 		(*pmsg)->msgv_skb[i++] = skb;
 		(*pmsg)->msgv_len++;
 		contiguous_len += skb->len;
-		if (_pgm_rxw_is_last_of_tg_sqn (window, window->commit_lead))
-			_pgm_rxw_remove_tg_sqn (window, _pgm_rxw_tg_sqn (window, window->commit_lead));
 		window->commit_lead++;
 		if (apdu_len == contiguous_len)
 			break;
@@ -1677,27 +1700,6 @@ _pgm_rxw_is_last_of_tg_sqn (
 	g_assert (window);
 
 	return _pgm_rxw_pkt_sqn (window, sequence) == window->tg_size - 1;
-}
-
-/* remove matching transmission group at trail of window
- */
-
-static inline
-void
-_pgm_rxw_remove_tg_sqn (
-	pgm_rxw_t* const	window,
-	const guint32		tg_sqn		/* transmission group sequence */
-	)
-{
-/* pre-conditions */
-	g_assert (window);
-	g_assert_cmpuint (_pgm_rxw_pkt_sqn (window, tg_sqn), ==, 0);
-
-	while (!_pgm_rxw_commit_is_empty (window) &&
-		_pgm_rxw_tg_sqn (window, window->trail) == tg_sqn)
-	{
-		_pgm_rxw_remove_trail (window);
-	}
 }
 
 /* set PGM skbuff to new FSM state.

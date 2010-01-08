@@ -186,11 +186,12 @@ recvskb (
 		return -1;
 #endif /* !G_OS_UNIX */
 
-	skb->transport	= transport;
-	skb->tstamp	= pgm_time_update_now();
-	skb->data	= skb->head;
-	skb->len	= len;
-	skb->tail	= (guint8*)skb->data + len;
+	skb->transport		= transport;
+	skb->tstamp		= pgm_time_update_now();
+	skb->data		= skb->head;
+	skb->len		= len;
+	skb->zero_padded	= 0;
+	skb->tail		= (guint8*)skb->data + len;
 
 	if (transport->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
@@ -709,6 +710,9 @@ pgm_recvmsgv (
 	guint data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len - 1;
+
+	if (0 == ++(transport->last_commit))
+		++(transport->last_commit);
 
 	/* second, flush any remaining contiguous messages from previous call(s) */
 	if (transport->peers_pending) {
