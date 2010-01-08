@@ -90,7 +90,6 @@ static inline guint32 _pgm_rxw_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline guint32 _pgm_rxw_pkt_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t* const, const guint32);
 static inline gboolean _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const guint32);
-static inline void _pgm_rxw_unref_tg_sqn (pgm_rxw_t* const, const guint32);
 static int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t);
 static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t, const pgm_time_t);
