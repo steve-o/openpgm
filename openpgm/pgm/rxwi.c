@@ -340,11 +340,11 @@ pgm_rxw_add (
 	skb->sequence = g_ntohl (skb->pgm_data->data_sqn);
 
 /* protocol sanity check: tsdu size */
-	if (skb->len != g_ntohs (skb->pgm_header->pgm_tsdu_length))
+	if (G_UNLIKELY(skb->len != g_ntohs (skb->pgm_header->pgm_tsdu_length)))
 		return PGM_RXW_MALFORMED;
 
 /* protocol sanity check: valid trail pointer wrt. sequence */
-	if (skb->sequence - g_ntohl (skb->pgm_data->data_trail) >= ((UINT32_MAX/2)-1))
+	if (G_UNLIKELY(skb->sequence - g_ntohl (skb->pgm_data->data_trail) >= ((UINT32_MAX/2)-1)))
 		return PGM_RXW_MALFORMED;
 
 /* verify fragment header for original data, parity packets include a
@@ -354,24 +354,24 @@ pgm_rxw_add (
 	    skb->pgm_opt_fragment)
 	{
 /* protocol sanity check: single fragment APDU */
-		if (g_ntohl (skb->of_apdu_len) == skb->len)
+		if (G_UNLIKELY(g_ntohl (skb->of_apdu_len) == skb->len))
 			skb->pgm_opt_fragment = NULL;
 
 /* protocol sanity check: minimum APDU length */
-		if (g_ntohl (skb->of_apdu_len) < skb->len)
+		if (G_UNLIKELY(g_ntohl (skb->of_apdu_len) < skb->len))
 			return PGM_RXW_MALFORMED;
 
 /* protocol sanity check: sequential ordering */
-		if (pgm_uint32_gt (g_ntohl (skb->of_apdu_first_sqn), skb->sequence))
+		if (G_UNLIKELY(pgm_uint32_gt (g_ntohl (skb->of_apdu_first_sqn), skb->sequence)))
 			return PGM_RXW_MALFORMED;
 
 /* protocol sanity check: maximum APDU length */
-		if (g_ntohl (skb->of_apdu_len) > PGM_MAX_APDU)
+		if (G_UNLIKELY(g_ntohl (skb->of_apdu_len) > PGM_MAX_APDU))
 			return PGM_RXW_MALFORMED;
 	}
 
 /* first packet of a session defines the window */
-	if (!window->is_defined)
+	if (G_UNLIKELY(!window->is_defined))
 		_pgm_rxw_define (window, skb->sequence - 1);	/* previous_lead needed for append to occur */
 	else
 		_pgm_rxw_update_trail (window, g_ntohl (skb->pgm_data->data_trail));
@@ -489,7 +489,7 @@ pgm_rxw_update (
 	g_trace ("pgm_rxw_update (window:%p txw-lead:%" G_GUINT32_FORMAT " txw-trail:%" G_GUINT32_FORMAT " nak-rb-expiry:%" PGM_TIME_FORMAT ")",
 		(gpointer)window, txw_lead, txw_trail, nak_rb_expiry);
 
-	if (!window->is_defined) {
+	if (G_UNLIKELY(!window->is_defined)) {
 		_pgm_rxw_define (window, txw_lead);
 		return 0;
 	}
@@ -512,17 +512,17 @@ _pgm_rxw_update_trail (
 	g_assert (window);
 
 /* advertised trail is less than the current value */
-	if (pgm_uint32_lte (txw_trail, window->rxw_trail))
+	if (G_UNLIKELY(pgm_uint32_lte (txw_trail, window->rxw_trail)))
 		return;
 
 /* protocol sanity check: advertised trail jumps too far ahead */
-	if (txw_trail - window->rxw_trail > ((UINT32_MAX/2)-1))
+	if (G_UNLIKELY(txw_trail - window->rxw_trail > ((UINT32_MAX/2)-1)))
 		return;
 
 /* retransmissions requests are constrained on startup until the advertised trail advances
  * beyond the first data sequence number.
  */
-	if (window->is_constrained)
+	if (G_UNLIKELY(window->is_constrained))
 	{
 		if (pgm_uint32_gt (txw_trail, window->rxw_trail_init))
 			window->is_constrained = FALSE;
@@ -533,7 +533,7 @@ _pgm_rxw_update_trail (
 	window->rxw_trail = txw_trail;
 
 /* new value doesn't affect window */
-	if (pgm_uint32_lte (window->rxw_trail, window->trail))
+	if (G_UNLIKELY(pgm_uint32_lte (window->rxw_trail, window->trail)))
 		return;
 
 /* jump remaining sequence numbers if window is empty */
@@ -715,7 +715,7 @@ _pgm_rxw_update_lead (
 	g_assert (window);
 
 /* advertised lead is less than the current value */
-	if (pgm_uint32_lte (txw_lead, window->lead))
+	if (G_UNLIKELY(pgm_uint32_lte (txw_lead, window->lead)))
 		return 0;
 
 	guint32 lead;
@@ -936,8 +936,8 @@ _pgm_rxw_insert (
 	g_assert (new_skb);
 	g_assert (!_pgm_rxw_incoming_is_empty (window));
 
-	if (_pgm_rxw_is_invalid_var_pktlen (window, new_skb) ||
-	    _pgm_rxw_is_invalid_payload_op (window, new_skb))
+	if (G_UNLIKELY(_pgm_rxw_is_invalid_var_pktlen (window, new_skb) ||
+	    _pgm_rxw_is_invalid_payload_op (window, new_skb)))
 		return PGM_RXW_MALFORMED;
 
 	if (new_skb->pgm_header->pgm_options & PGM_OPT_PARITY)
@@ -1079,8 +1079,8 @@ _pgm_rxw_append (
 		g_assert (skb->sequence == pgm_rxw_next_lead (window));
 	}
 
-	if (_pgm_rxw_is_invalid_var_pktlen (window, skb) ||
-	    _pgm_rxw_is_invalid_payload_op (window, skb))
+	if (G_UNLIKELY(_pgm_rxw_is_invalid_var_pktlen (window, skb) ||
+	    _pgm_rxw_is_invalid_payload_op (window, skb)))
 		return PGM_RXW_MALFORMED;
 
 	if (pgm_rxw_is_full (window))
@@ -1514,7 +1514,7 @@ _pgm_rxw_is_apdu_complete (
 	g_assert_cmpuint (apdu_size, >=, skb->len);
 
 /* protocol sanity check: maximum length */
-	if (apdu_size > PGM_MAX_APDU) {
+	if (G_UNLIKELY(apdu_size > PGM_MAX_APDU)) {
 		_pgm_rxw_lost (window, first_sequence);
 		return FALSE;
 	}
@@ -1557,19 +1557,19 @@ _pgm_rxw_is_apdu_complete (
 				return TRUE;
 
 /* protocol sanity check: matching first sequence reference */
-			if (g_ntohl (skb->of_apdu_first_sqn) != first_sequence) {
+			if (G_UNLIKELY(g_ntohl (skb->of_apdu_first_sqn) != first_sequence)) {
 				_pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 
 /* protocol sanity check: matching apdu length */
-			if (g_ntohl (skb->of_apdu_len) != apdu_size) {
+			if (G_UNLIKELY(g_ntohl (skb->of_apdu_len) != apdu_size)) {
 				_pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 
 /* protocol sanity check: maximum number of fragments per apdu */
-			if (++contiguous_tpdus > PGM_MAX_FRAGMENTS) {
+			if (G_UNLIKELY(++contiguous_tpdus > PGM_MAX_FRAGMENTS)) {
 				_pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
@@ -1577,7 +1577,7 @@ _pgm_rxw_is_apdu_complete (
 			contiguous_size += skb->len;
 			if (apdu_size == contiguous_size)
 				return TRUE;
-			if (apdu_size < contiguous_size) {
+			else if (G_UNLIKELY(apdu_size < contiguous_size)) {
 				_pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
@@ -1924,7 +1924,7 @@ pgm_rxw_confirm (
 		(gpointer)window, sequence, nak_rdata_expiry, nak_rb_expiry);
 
 /* NCFs do not define the transmit window */
-	if (!window->is_defined)
+	if (G_UNLIKELY(!window->is_defined))
 		return PGM_RXW_BOUNDS;
 
 /* sequence already committed */

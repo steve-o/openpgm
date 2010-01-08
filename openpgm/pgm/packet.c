@@ -102,7 +102,7 @@ pgm_parse_raw (
 	g_assert (NULL != dst);
 
 /* minimum size should be IPv4 header plus PGM header, check IP version later */
-	if (skb->len < PGM_MIN_SIZE)
+	if (G_UNLIKELY(skb->len < PGM_MIN_SIZE))
 	{
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
@@ -185,7 +185,7 @@ pgm_parse_raw (
 	}
 
 	const gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct pgm_ip))
+	if (G_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
 	{
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
@@ -206,7 +206,7 @@ pgm_parse_raw (
 		packet_length += ip_header_length;
 	}
 
-	if (skb->len < packet_length) {			/* redundant: often handled in kernel */
+	if (G_UNLIKELY(skb->len < packet_length)) {	/* redundant: often handled in kernel */
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_BOUNDS,
@@ -219,7 +219,7 @@ pgm_parse_raw (
  */
 #if PGM_CHECK_IN_CKSUM
 	const int sum = in_cksum (data, packet_length, 0);
-	if (0 != sum) {
+	if (G_UNLIKELY(0 != sum)) {
 		const int ip_sum = g_ntohs (ip->ip_sum);
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
@@ -232,7 +232,7 @@ pgm_parse_raw (
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
 	const guint offset = g_ntohs (ip->ip_off);
-	if ((offset & 0x1fff) != 0) {
+	if (G_UNLIKELY((offset & 0x1fff) != 0)) {
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_PROTO,
@@ -273,7 +273,7 @@ pgm_parse_udp_encap (
 {
 	g_assert (NULL != skb);
 
-	if (skb->len < sizeof(struct pgm_header)) {
+	if (G_UNLIKELY(skb->len < sizeof(struct pgm_header))) {
 		g_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_BOUNDS,
@@ -306,7 +306,7 @@ pgm_parse (
 		skb->pgm_header->pgm_checksum = 0;
 		const int pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
 		skb->pgm_header->pgm_checksum = sum;
-		if (pgm_sum != sum) {
+		if (G_UNLIKELY(pgm_sum != sum)) {
 			g_set_error (error,
 				     PGM_PACKET_ERROR,
 				     PGM_PACKET_ERROR_CKSUM,
@@ -563,11 +563,11 @@ pgm_verify_spm (
 	switch (g_ntohs (spm->spm_nla_afi)) {
 /* truncated packet */
 	case AFI_IP6:
-		if (skb->len < sizeof(struct pgm_spm6))
+		if (G_UNLIKELY(skb->len < sizeof(struct pgm_spm6)))
 			return FALSE;
 		break;
 	case AFI_IP:
-		if (skb->len < sizeof(struct pgm_spm))
+		if (G_UNLIKELY(skb->len < sizeof(struct pgm_spm)))
 			return FALSE;
 		break;
 
@@ -982,7 +982,7 @@ pgm_verify_nak (
 	g_trace ("pgm_verify_nak (skb:%p)", (gconstpointer)skb);
 
 /* truncated packet */
-	if (skb->len < PGM_MIN_NAK_SIZE)
+	if (G_UNLIKELY(skb->len < PGM_MIN_NAK_SIZE))
 		return FALSE;
 
 	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
@@ -1009,13 +1009,13 @@ pgm_verify_nak (
 		switch (nak_src_nla_afi) {
 /* IPv4 + IPv6 NLA */
 		case AFI_IP:
-			if (skb->len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) ))
+			if (G_UNLIKELY(skb->len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )))
 				return FALSE;
 			break;
 
 /* IPv6 + IPv6 NLA */
 		case AFI_IP6:
-			if (skb->len < sizeof(struct pgm_nak6))
+			if (G_UNLIKELY(skb->len < sizeof(struct pgm_nak6)))
 				return FALSE;
 			break;
 		}
