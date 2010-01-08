@@ -146,6 +146,7 @@ typedef struct pgm_rxw_t pgm_rxw_t;
 G_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t* const);
 G_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t* const);
 G_GNUC_INTERNAL gssize pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const guint) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_rxw_remove_trail (pgm_rxw_t* const) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
