@@ -168,7 +168,7 @@ recvskb (
 	msg.Control.len		= sizeof(aux);
 
 	static int (*WSARecvMsg_)() = NULL;
-	if (!WSARecvMsg_) {
+	if (G_UNLIKELY(!WSARecvMsg_)) {
 		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
 		DWORD cbBytesReturned;
 		if (SOCKET_ERROR == WSAIoctl (transport->recv_sock,
@@ -227,7 +227,7 @@ recvskb (
 			}
 		}
 /* discard on invalid address */
-		if (NULL == pktinfo)
+		if (G_UNLIKELY(NULL == pktinfo))
 			return -1;
 	}
 	return len;
@@ -280,17 +280,17 @@ on_upstream (
 
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_NAK:
-		if (!pgm_on_nak (transport, skb))
+		if (G_UNLIKELY(!pgm_on_nak (transport, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_NNAK:
-		if (!pgm_on_nnak (transport, skb))
+		if (G_UNLIKELY(!pgm_on_nnak (transport, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_SPMR:
-		if (!pgm_on_spmr (transport, NULL, skb))
+		if (G_UNLIKELY(!pgm_on_spmr (transport, NULL, skb)))
 			goto out_discarded;
 		break;
 
@@ -349,7 +349,7 @@ on_peer (
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
 	*source = g_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
 	g_static_rw_lock_reader_unlock (&transport->peers_lock);
-	if (NULL == *source) {
+	if (G_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
 		g_trace ("Discarded peer packet about new source.");
 		goto out_discarded;
@@ -361,12 +361,12 @@ on_peer (
 
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_NAK:
-		if (!pgm_on_peer_nak (transport, *source, skb))
+		if (G_UNLIKELY(!pgm_on_peer_nak (transport, *source, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_SPMR:
-		if (!pgm_on_spmr (transport, *source, skb))
+		if (G_UNLIKELY(!pgm_on_spmr (transport, *source, skb)))
 			goto out_discarded;
 		break;
 
@@ -430,7 +430,7 @@ on_downstream (
 	g_static_rw_lock_reader_lock (&transport->peers_lock);
 	*source = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
 	g_static_rw_lock_reader_unlock (&transport->peers_lock);
-	if (NULL == *source) {
+	if (G_UNLIKELY(NULL == *source)) {
 		*source = pgm_new_peer (transport,
 				       &skb->tsi,
 				       (struct sockaddr*)src_addr, pgm_sockaddr_len(src_addr),
@@ -448,22 +448,22 @@ on_downstream (
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_ODATA:
 	case PGM_RDATA:
-		if (!pgm_on_data (transport, *source, skb))
+		if (G_UNLIKELY(!pgm_on_data (transport, *source, skb)))
 			goto out_discarded;
 		transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 		break;
 
 	case PGM_NCF:
-		if (!pgm_on_ncf (transport, *source, skb))
+		if (G_UNLIKELY(!pgm_on_ncf (transport, *source, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_SPM:
-		if (!pgm_on_spm (transport, *source, skb))
+		if (G_UNLIKELY(!pgm_on_spm (transport, *source, skb)))
 			goto out_discarded;
 
 /* update group NLA if appropriate */
-		if (pgm_sockaddr_is_addr_multicast ((struct sockaddr*)dst_addr))
+		if (G_LIKELY(pgm_sockaddr_is_addr_multicast ((struct sockaddr*)dst_addr)))
 			memcpy (&(*source)->group_nla, dst_addr, pgm_sockaddr_len(dst_addr));
 		break;
 
@@ -638,15 +638,15 @@ pgm_recvmsgv (
 
 /* parameters */
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (msg_len) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(msg_len)) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (G_UNLIKELY(!g_static_rw_lock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
-	if (!transport->is_bound ||
-	    transport->is_destroyed)
+	if (G_UNLIKELY(!transport->is_bound ||
+	    transport->is_destroyed))
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
@@ -665,7 +665,7 @@ pgm_recvmsgv (
 /* receiver */
 	g_static_mutex_lock (&transport->receiver_mutex);
 
-	if (transport->is_reset) {
+	if (G_UNLIKELY(transport->is_reset)) {
 		g_assert (NULL != transport->peers_pending);
 		g_assert (NULL != transport->peers_pending->data);
 		pgm_peer_t* peer = transport->peers_pending->data;
@@ -711,7 +711,7 @@ pgm_recvmsgv (
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len - 1;
 
-	if (0 == ++(transport->last_commit))
+	if (G_UNLIKELY(0 == ++(transport->last_commit)))
 		++(transport->last_commit);
 
 	/* second, flush any remaining contiguous messages from previous call(s) */
@@ -780,7 +780,7 @@ recv_again:
 	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == pgm_sockaddr_family (&src)) ?
 					pgm_parse_udp_encap (transport->rx_buffer, &err) :
 					pgm_parse_raw (transport->rx_buffer, (struct sockaddr*)&dst, &err);
-	if (!is_valid)
+	if (G_UNLIKELY(!is_valid))
 	{
 /* inherently cannot determine PGM_PC_RECEIVER_CKSUM_ERRORS unless only one receiver */
 		g_trace ("Discarded invalid packet.");
@@ -864,7 +864,7 @@ out:
 			transport->is_pending_read = FALSE;
 		}
 /* report data loss */
-		if (transport->is_reset) {
+		if (G_UNLIKELY(transport->is_reset)) {
 			g_assert (NULL != transport->peers_pending);
 			g_assert (NULL != transport->peers_pending->data);
 			pgm_peer_t* peer = transport->peers_pending->data;
@@ -966,7 +966,7 @@ pgm_recvfrom (
 	gsize bytes_read = 0;
 
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (len) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(len)) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
 	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
@@ -1016,7 +1016,7 @@ pgm_recv (
 	)
 {
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (len) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(len)) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
 	g_trace ("pgm_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)bytes_read, (gpointer)error);
