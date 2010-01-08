@@ -666,7 +666,7 @@ pgm_flush_peers_pending (
 			}
 		} else
 			peer->last_commit = 0;
-		if (transport->is_reset) {
+		if (G_UNLIKELY(transport->is_reset)) {
 			retval = -ECONNRESET;
 			break;
 		}
@@ -762,7 +762,7 @@ pgm_on_spm (
 	g_trace("INFO","pgm_on_spm (transport:%p source:%p skb:%p)",
 		(gpointer)transport, (gpointer)source, (gpointer)skb);
 
-	if (!pgm_verify_spm (skb)) {
+	if (G_UNLIKELY(!pgm_verify_spm (skb))) {
 		g_trace("INFO","Discarded invalid SPM.");
 		source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 		return FALSE;
@@ -773,8 +773,8 @@ pgm_on_spm (
 	const guint32 spm_sqn = g_ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
-	if ( pgm_uint32_gte (spm_sqn, source->spm_sqn) ||
-	     ((struct sockaddr*)&source->nla)->sa_family == 0 )
+	if (G_LIKELY(pgm_uint32_gte (spm_sqn, source->spm_sqn) ||
+	     ((struct sockaddr*)&source->nla)->sa_family == 0))
 	{
 /* copy NLA for replies */
 		pgm_nla_to_sockaddr (&spm->spm_nla_afi, (struct sockaddr*)&source->nla);
@@ -820,13 +820,13 @@ pgm_on_spm (
 		struct pgm_opt_length* opt_len = (spm->spm_nla_afi == AFI_IP6) ?
 							(struct pgm_opt_length*)(spm6 + 1) :
 							(struct pgm_opt_length*)(spm  + 1);
-		if (opt_len->opt_type != PGM_OPT_LENGTH)
+		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			g_trace ("INFO","Discarded malformed SPM.");
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 			return FALSE;
 		}
-		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
+		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
 		{
 			g_trace ("INFO","Discarded malformed SPM.");
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
@@ -839,7 +839,7 @@ pgm_on_spm (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_PARITY_PRM)
 			{
 				struct pgm_opt_parity_prm* opt_parity_prm = (struct pgm_opt_parity_prm*)(opt_header + 1);
-				if ((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0)
+				if (G_UNLIKELY((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0))
 				{
 					g_trace ("INFO","Discarded malformed SPM.");
 					source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
@@ -847,7 +847,7 @@ pgm_on_spm (
 				}
 
 				const guint32 parity_prm_tgs = g_ntohl (opt_parity_prm->parity_prm_tgs);
-				if (parity_prm_tgs < 2 || parity_prm_tgs > 128)
+				if (G_UNLIKELY(parity_prm_tgs < 2 || parity_prm_tgs > 128))
 				{
 					g_trace ("INFO","Discarded malformed SPM.");
 					source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
@@ -894,7 +894,7 @@ pgm_on_peer_nak (
 	g_trace ("INFO","pgm_on_peer_nak (transport:%p peer:%p skb:%p)",
 		(gpointer)transport, (gpointer)peer, (gpointer)skb);
 
-	if (!pgm_verify_nak (skb))
+	if (G_UNLIKELY(!pgm_verify_nak (skb)))
 	{
 		g_trace ("INFO","Discarded invalid multicast NAK.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS]++;
@@ -907,7 +907,7 @@ pgm_on_peer_nak (
 /* NAK_SRC_NLA must not contain our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0)
+	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0))
 	{
 		g_trace ("INFO","Discarded multicast NAK on NLA mismatch.");
 		return FALSE;
@@ -925,7 +925,7 @@ pgm_on_peer_nak (
 		}
 	}
 
-	if (!found) {
+	if (G_UNLIKELY(!found)) {
 		g_trace ("INFO","Discarded multicast NAK on multicast group mismatch.");
 		return FALSE;
 	}
@@ -947,13 +947,13 @@ pgm_on_peer_nak (
 		const struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
 							(const struct pgm_opt_length*)(nak6 + 1) :
 							(const struct pgm_opt_length*)(nak + 1);
-		if (opt_len->opt_type != PGM_OPT_LENGTH)
+		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			g_trace ("INFO","Discarded malformed multicast NAK.");
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
-		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
+		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
 		{
 			g_trace ("INFO","Discarded malformed multicast NAK.");
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
@@ -1019,7 +1019,7 @@ pgm_on_ncf (
 	g_trace ("INFO","pgm_on_ncf (transport:%p source:%p skb:%p)",
 		(gpointer)transport, (gpointer)source, (gpointer)skb);
 
-	if (!pgm_verify_ncf (skb))
+	if (G_UNLIKELY(!pgm_verify_ncf (skb)))
 	{
 		g_trace ("INFO", "Discarded invalid NCF.");
 		source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
@@ -1034,7 +1034,7 @@ pgm_on_ncf (
 	pgm_nla_to_sockaddr (&ncf->nak_src_nla_afi, (struct sockaddr*)&ncf_src_nla);
 
 #if 0
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_addr) != 0) {
+	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_addr) != 0)) {
 		g_trace ("INFO", "Discarded NCF on NLA mismatch.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		return FALSE;
@@ -1044,7 +1044,7 @@ pgm_on_ncf (
 /* NCF_GRP_NLA contains our transport multicast group */ 
 	struct sockaddr_storage ncf_grp_nla;
 	pgm_nla_to_sockaddr ((ncf->nak_src_nla_afi == AFI_IP6) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
-	if (pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0)
+	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0))
 	{
 		g_trace ("INFO", "Discarded NCF on multicast group mismatch.");
 		return FALSE;
@@ -1076,13 +1076,13 @@ pgm_on_ncf (
 		const struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
 							(const struct pgm_opt_length*)(ncf6 + 1) :
 							(const struct pgm_opt_length*)(ncf  + 1);
-		if (opt_len->opt_type != PGM_OPT_LENGTH)
+		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			g_trace ("INFO","Discarded malformed NCF.");
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
-		if (opt_len->opt_length != sizeof(struct pgm_opt_length))
+		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
 		{
 			g_trace ("INFO","Discarded malformed NCF.");
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
@@ -1502,7 +1502,7 @@ nak_rb_state (
 /* check this packet for state expiration */
 			if (pgm_time_after_eq(now, state->nak_rb_expiry))
 			{
-				if (!is_valid_nla) {
+				if (G_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
 					g_trace ("INFO", "lost data #%u due to no peer NLA.", skb->sequence);
 					pgm_rxw_lost (window, skb->sequence);
@@ -1567,7 +1567,7 @@ nak_rb_state (
 /* check this packet for state expiration */
 			if (pgm_time_after_eq(now, state->nak_rb_expiry))
 			{
-				if (!is_valid_nla) {
+				if (G_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
 					g_trace ("INFO", "lost data #%u due to no peer NLA.", skb->sequence);
 					pgm_rxw_lost (window, skb->sequence);
@@ -1625,7 +1625,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 	}
 
-	if (dropped_invalid)
+	if (G_UNLIKELY(dropped_invalid))
 	{
 		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
 
@@ -1846,7 +1846,7 @@ nak_rpt_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq(now, state->nak_rpt_expiry))
 		{
-			if (!is_valid_nla) {
+			if (G_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", skb->sequence);
 				pgm_rxw_lost (window, skb->sequence);
@@ -1893,11 +1893,11 @@ nak_rpt_state (
 		g_assert ((pgm_rxw_state_t*)window->wait_ncf_queue.tail != NULL);
 	}
 
-	if (dropped_invalid) {
+	if (G_UNLIKELY(dropped_invalid)) {
 		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
 	}
 
-	if (dropped) {
+	if (G_UNLIKELY(dropped)) {
 		g_trace ("INFO", "dropped %u messages due to ncf cancellation, "
 				"rxw_sqns %" G_GUINT32_FORMAT
 				" bo %" G_GUINT32_FORMAT
@@ -1915,8 +1915,8 @@ nak_rpt_state (
 	}
 
 /* mark receiver window for flushing on next recv() */
-	if (window->cumulative_losses != peer->last_cumulative_losses &&
-	    !peer->pending_link.data)
+	if (G_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
+	    !peer->pending_link.data))
 	{
 		transport->is_reset = TRUE;
 		peer->lost_count = window->cumulative_losses - peer->last_cumulative_losses;
@@ -1975,7 +1975,7 @@ nak_rdata_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq(now, rdata_state->nak_rdata_expiry))
 		{
-			if (!is_valid_nla) {
+			if (G_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
 				g_trace ("INFO", "lost data #%u due to no peer NLA.", rdata_skb->sequence);
 				pgm_rxw_lost (window, rdata_skb->sequence);
@@ -2021,17 +2021,17 @@ nak_rdata_state (
 		g_assert ((pgm_rxw_state_t*)window->wait_data_queue.tail);
 	}
 
-	if (dropped_invalid) {
+	if (G_UNLIKELY(dropped_invalid)) {
 		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
 	}
 
-	if (dropped) {
+	if (G_UNLIKELY(dropped)) {
 		g_trace ("INFO", "dropped %u messages due to data cancellation.", dropped);
 	}
 
 /* mark receiver window for flushing on next recv() */
-	if (window->cumulative_losses != peer->last_cumulative_losses &&
-	    !peer->pending_link.data)
+	if (G_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
+	    !peer->pending_link.data))
 	{
 		transport->is_reset = TRUE;
 		peer->lost_count = window->cumulative_losses - peer->last_cumulative_losses;
