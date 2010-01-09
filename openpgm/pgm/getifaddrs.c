@@ -191,24 +191,112 @@ pgm_getifaddrs (
 	close (sock);
 	close (sock6);
 
-#else /* !G_OS_UNIX */
+#elif defined(CONFIG_TARGET_WINE) /* !G_OS_UNIX */
 
-	DWORD dwSize, dwRet;
+	DWORD dwRet;
+	ULONG ulOutBufLen = sizeof (IP_ADAPTER_INFO);
+	PIP_ADAPTER_INFO pAdapterInfo;
+	PIP_ADAPTER_INFO pAdapter = NULL;
+
+	pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof (IP_ADAPTER_INFO));
+	if (NULL == pAdapterInfo) {
+		g_error("malloc");
+		return -1;
+	}
+	dwRet = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen);
+	if (ERROR_BUFFER_OVERFLOW == dwRet) {
+		free(pAdapterInfo);
+		pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
+		if (NULL == pAdapterInfo) {
+			g_error("malloc");
+			return -1;
+		}
+	}
+	dwRet = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen);
+	if (NO_ERROR != dwRet) {
+		g_error("GetAdaptersInfo(2) did not return NO_ERROR");
+		free(pAdapterInfo);
+		return -1;
+	}
+
+/* count valid adapters */
+	int n = 0, k = 0;
+	for (pAdapter = pAdapterInfo;
+		 pAdapter;
+		 pAdapter = pAdapter->Next)
+	{
+		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
+			 pIPAddr;
+			 pIPAddr = pIPAddr->Next)
+		{
+/* skip null adapters */
+			if (strlen (pIPAddr->IpAddress.String) == 0)
+				continue;
+			++n;
+		}
+	}
+
+/* contiguous block for adapter list */
+	struct _pgm_ifaddrs* ifa = malloc (n * sizeof(struct _pgm_ifaddrs));
+	memset (ifa, 0, n * sizeof(struct _pgm_ifaddrs));
+	struct _pgm_ifaddrs* ift = ifa;
+
+/* now populate list */
+	for (pAdapter = pAdapterInfo;
+		 pAdapter;
+		 pAdapter = pAdapter->Next)
+	{
+		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
+			 pIPAddr;
+			 pIPAddr = pIPAddr->Next)
+		{
+/* skip null adapters */
+			if (strlen (pIPAddr->IpAddress.String) == 0)
+				continue;
+/* address */
+			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			g_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
+
+/* name */
+			ift->_ifa.ifa_name = ift->_name;
+			strncpy (ift->_ifa.ifa_name, pAdapter->AdapterName, IF_NAMESIZE);
+			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
+
+/* flags */
+			ift->_ifa.ifa_flags = 0;
+
+/* netmask */
+			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			g_assert (pgm_sockaddr_pton (pIPAddr->IpMask.String, ift->_ifa.ifa_netmask));
+
+/* next */
+			if (k++ < (n - 1)) {
+				ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+				ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+			}
+		}
+	}
+
+	free(pAdapterInfo);
+
+#else /* !CONFIG_TARGET_WINE */
+
+	DWORD dwSize = 0, dwRet;
 	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
 
 	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
 	if (ERROR_BUFFER_OVERFLOW != dwRet) {
-		perror("GetAdaptersAddresses");
+		g_error("GetAdaptersAddresses did not return ERROR_BUFFER_OVERFLOW");
 		return -1;
 	}
 	pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)malloc (dwSize);
 	if (NULL == pAdapterAddresses) {
-		perror("malloc");
+		g_error("malloc");
 		return -1;
 	}
 	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
 	if (ERROR_SUCCESS != dwRet) {
-		perror("GetAdaptersAddresses(2)");
+		g_error("GetAdaptersAddresses(2) did not return ERROR_SUCCESS");
 		free(pAdapterAddresses);
 		return -1;
 	}
