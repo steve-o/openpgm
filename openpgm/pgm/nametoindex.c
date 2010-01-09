@@ -29,6 +29,7 @@
 #include "pgm/nametoindex.h"
 
 
+
 //#define NAMETOINDEX_DEBUG
 
 #ifndef NAMETOINDEX_DEBUG
@@ -55,6 +56,50 @@ pgm_if_nametoindex (
 {
 	g_return_val_if_fail (NULL != ifname, 0);
 
+#ifdef CONFIG_TARGET_WINE
+	g_assert (AF_INET6 != iffamily);
+
+	ULONG ifIndex = 0;
+	DWORD dwSize, dwRet;
+	MIB_IFTABLE *pIfTable;
+	MIB_IFROW *pIfRow;
+
+	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
+	if (NO_ERROR == dwRet)
+		return ifIndex;
+
+	pIfTable = (MIB_IFTABLE *) malloc(sizeof (MIB_IFTABLE));
+	if (NULL == pIfTable) {
+		perror("malloc");
+		return 0;
+	}
+	dwSize = sizeof (MIB_IFTABLE);
+	dwRet = GetIfTable(pIfTable, &dwSize, FALSE);
+	if (ERROR_INSUFFICIENT_BUFFER == dwRet) {
+		free(pIfTable);
+		pIfTable = (MIB_IFTABLE *) malloc(dwSize);
+		if (NULL == pIfTable) {
+			perror("malloc");
+			return 0;
+		}
+	}
+	dwRet = GetIfTable(pIfTable, &dwSize, FALSE);
+	if (NO_ERROR != dwRet) {
+		perror("GetIfTable did not return NO_ERROR");
+		return 0;
+	}
+	for (int i = 0; i < (int) pIfTable->dwNumEntries; i++)
+	{
+		pIfRow = (MIB_IFROW *) & pIfTable->table[i];
+		if (0 == strncmp (ifname, pIfRow->bDescr, pIfRow->dwDescrLen)) {
+			ifIndex = pIfRow->dwIndex;
+			free(pIfTable);
+			return ifIndex;
+		}
+	}
+	free(pIfTable);
+
+#else /* !CONFIG_TARGET_WINE */
 	ULONG ifIndex;
 	DWORD dwSize, dwRet;
 	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
@@ -93,6 +138,7 @@ pgm_if_nametoindex (
 	}
 
 	free (pAdapterAddresses);
+#endif
 	return 0;
 }
 #endif /* G_OS_WIN32 */
