@@ -284,6 +284,9 @@ pgm_transport_create (
 	else if (tinfo->ti_udp_encap_mcast_port)
 		g_return_val_if_fail (tinfo->ti_udp_encap_ucast_port, FALSE);
 	g_return_val_if_fail (tinfo->ti_recv_addrs_len > 0, FALSE);
+#ifdef CONFIG_TARGET_WINE
+	g_return_val_if_fail (tinfo->ti_recv_addrs_len == 1, FALSE);
+#endif
 	g_return_val_if_fail (tinfo->ti_recv_addrs_len <= IP_MAX_MEMBERSHIPS, FALSE);
 	g_return_val_if_fail (NULL != tinfo->ti_recv_addrs, FALSE);
 	g_return_val_if_fail (1 == tinfo->ti_send_addrs_len, FALSE);
@@ -722,6 +725,7 @@ pgm_transport_bind (
 		}
 
 /* request extra packet information to determine destination address on each packet */
+#ifndef CONFIG_TARGET_WINE
 		g_trace ("INFO","request socket packet-info.");
 		const int recv_family = pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group);
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE) ||
@@ -746,6 +750,7 @@ pgm_transport_bind (
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
+#endif
 	}
 	else
 	{
@@ -1136,6 +1141,7 @@ pgm_transport_bind (
 	}
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
+#ifndef CONFIG_TARGET_WINE
 	g_trace ("INFO","set multicast hop limit.");
 	if (0 != pgm_sockaddr_multicast_hops (transport->send_sock,
 					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
@@ -1153,6 +1159,7 @@ pgm_transport_bind (
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
+#endif
 
 /* set Expedited Forwarding PHB for network elements, no ECN.
  * 

@@ -137,12 +137,18 @@ recvskb (
 	if (G_UNLIKELY(transport->is_destroyed))
 		return 0;
 
+#ifdef CONFIG_TARGET_WINE
+	int fromlen = src_addrlen;
+	const int len = recvfrom (transport->recv_sock, skb->head, transport->max_tpdu, 0, src_addr, &fromlen);
+	if (len <= 0)
+		return len;
+#else
 	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
 		.iov_len	= transport->max_tpdu
 	};
 	size_t aux[1024 / sizeof(size_t)];
-#ifdef G_OS_UNIX
+#	ifdef G_OS_UNIX
 	struct msghdr msg = {
 		.msg_name	= src_addr,
 		.msg_namelen	= src_addrlen,
@@ -156,7 +162,7 @@ recvskb (
 	ssize_t len = recvmsg (transport->recv_sock, &msg, flags);
 	if (len <= 0)
 		return len;
-#else /* !G_OS_UNIX */
+#	else /* !G_OS_UNIX */
 	WSAMSG msg = {
 		.name		= (LPSOCKADDR)src_addr,
 		.namelen	= src_addrlen,
@@ -184,7 +190,8 @@ recvskb (
 	DWORD len;
 	if (SOCKET_ERROR == WSARecvMsg_ (transport->recv_sock, &msg, &len, NULL, NULL))
 		return -1;
-#endif /* !G_OS_UNIX */
+#	endif /* !G_OS_UNIX */
+#endif /* !CONFIG_TARGET_WINE */
 
 	skb->transport		= transport;
 	skb->tstamp		= pgm_time_update_now();
@@ -193,6 +200,10 @@ recvskb (
 	skb->zero_padded	= 0;
 	skb->tail		= (guint8*)skb->data + len;
 
+#ifdef CONFIG_TARGET_WINE
+	g_assert (pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group) <= dst_addrlen);
+	memcpy (dst_addr, &transport->recv_gsr[0].gsr_group, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group));
+#else
 	if (transport->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
@@ -230,6 +241,7 @@ recvskb (
 		if (G_UNLIKELY(NULL == pktinfo))
 			return -1;
 	}
+#endif
 	return len;
 }
 
