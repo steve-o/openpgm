@@ -130,7 +130,7 @@ pgm_if_print_all (void)
 		     (ifa->ifa_addr->sa_family != AF_INET && 
 		      ifa->ifa_addr->sa_family != AF_INET6) )
 		{
-			g_message ("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s",
+			g_message (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
 				i,
 				b,
 				"",
@@ -147,7 +147,7 @@ pgm_if_print_all (void)
 			     s, sizeof(s),
 			     NULL, 0,
 			     NI_NUMERICHOST);
-		g_message ("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s",
+		g_message (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
 			i,
 			b,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
