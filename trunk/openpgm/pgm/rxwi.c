@@ -31,6 +31,7 @@
 #include <sys/time.h>
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <sys/uio.h>
@@ -1447,7 +1448,7 @@ _pgm_rxw_reconstruct (
 		{
 			const guint16 pktlen = *(guint16*)( (guint8*)repair_skb->tail - sizeof(guint16));
 			if (pktlen > parity_length) {
-				g_warning ("Invalid encoded variable packet length in reconstructed packet, dropping entire transmission group.");
+				g_warning (_("Invalid encoded variable packet length in reconstructed packet, dropping entire transmission group."));
 				pgm_free_skb (repair_skb);
 				for (guint32 j = i; j < window->rs.k; j++)
 				{

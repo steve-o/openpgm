@@ -39,6 +39,7 @@
 #endif
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -1467,7 +1468,7 @@ nak_rb_state (
 	list = window->backoff_queue.tail;
 	if (!list) {
 		g_assert (window->backoff_queue.head == NULL);
-		g_warning ("backoff queue is empty in nak_rb_state.");
+		g_warning (_("backoff queue is empty in nak_rb_state."));
 		return TRUE;
 	} else {
 		g_assert (window->backoff_queue.head != NULL);
@@ -1627,7 +1628,7 @@ g_trace("INFO", "rp->nak_rpt_expiry in %f seconds.",
 
 	if (G_UNLIKELY(dropped_invalid))
 	{
-		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
+		g_warning (_("dropped %u messages due to invalid NLA."), dropped_invalid);
 
 /* mark receiver window for flushing on next recv() */
 		if (window->cumulative_losses != peer->last_cumulative_losses &&
@@ -1734,7 +1735,7 @@ pgm_check_peer_nak_state (
 			}
 			else
 			{
-				g_warning ("peer expired, tsi %s", pgm_tsi_print (&peer->tsi));
+				g_warning (_("peer expired, tsi %s"), pgm_tsi_print (&peer->tsi));
 				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
 				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->peers_link);
 				pgm_peer_unref (peer);
@@ -1894,7 +1895,7 @@ nak_rpt_state (
 	}
 
 	if (G_UNLIKELY(dropped_invalid)) {
-		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
+		g_warning (_("dropped %u messages due to invalid NLA."), dropped_invalid);
 	}
 
 	if (G_UNLIKELY(dropped)) {
@@ -2022,7 +2023,7 @@ nak_rdata_state (
 	}
 
 	if (G_UNLIKELY(dropped_invalid)) {
-		g_warning ("dropped %u messages due to invalid NLA.", dropped_invalid);
+		g_warning (_("dropped %u messages due to invalid NLA."), dropped_invalid);
 	}
 
 	if (G_UNLIKELY(dropped)) {

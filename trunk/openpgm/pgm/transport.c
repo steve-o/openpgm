@@ -365,7 +365,7 @@ pgm_transport_create (
 			     _("Creating receive socket: %s"),
 			     g_strerror (errno));
 		if (EPERM == save_errno) {
-			g_warning ("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'");
+			g_warning (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
 		}
 #else
 		const int save_errno = WSAGetLastError();
@@ -571,7 +571,7 @@ pgm_transport_set_sndbuf (
 			return FALSE;
 		}
 	} else {
-		g_warning ("cannot open /proc/sys/net/core/wmem_max");
+		g_warning (_("cannot open /proc/sys/net/core/wmem_max"));
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -617,7 +617,7 @@ pgm_transport_set_rcvbuf (
 			return FALSE;
 		}
 	} else {
-		g_warning ("cannot open /proc/sys/net/core/rmem_max");
+		g_warning (_("cannot open /proc/sys/net/core/rmem_max"));
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1174,7 +1174,7 @@ pgm_transport_bind (
 				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
 				   dscp))
 	{
-		g_warning ("DSCP setting requires CAP_NET_ADMIN or ADMIN capability.");
+		g_warning (_("DSCP setting requires CAP_NET_ADMIN or ADMIN capability."));
 		goto no_cap_net_admin;
 	}
 

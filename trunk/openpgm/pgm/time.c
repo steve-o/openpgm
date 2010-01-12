@@ -36,6 +36,7 @@
 #endif
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 #include "pgm/glib-compat.h"
 
 #ifdef G_OS_WIN32
@@ -485,7 +486,7 @@ tsc_init (void)
 	pgm_time_t start, stop;
 	const gulong calibration_usec = 4000 * 1000;
 
-	g_message ("Running a benchmark to measure system clock frequency...");
+	g_message (_("Running a benchmark to measure system clock frequency..."));
 
 	start = rdtsc();
 	pgm_time_sleep (calibration_usec);
@@ -493,10 +494,10 @@ tsc_init (void)
 
 	if (stop < start)
 	{
-		g_warning ("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
+		g_warning (_("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
 			   "non-monotonic time response rendering the TSC unsuitable for high resolution "
 			   "timing.  To prevent the start delay from this benchmark and use a stable clock "
-			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP.");
+			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP."));
 
 /* force both to stable clocks even though one might be OK */
 		pgm_time_update_now = gettimeofday_update;
@@ -514,10 +515,10 @@ tsc_init (void)
 		tsc_mhz = -( calibration_usec / tsc_diff );
 	}
 
-	g_warning ("Finished RDTSC test. To prevent the startup delay from this benchmark, "
+	g_warning (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %i on this "
 		   "system. This value is dependent upon the CPU clock speed and "
-		   "architecture and should be determined separately for each server.",
+		   "architecture and should be determined separately for each server."),
 		   tsc_mhz);
 	return 0;
 }
