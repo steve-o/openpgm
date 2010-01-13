@@ -353,17 +353,29 @@ pgmSourceTable_handler (
 
 			switch (table_info->colnum)
 			{
-			case COLUMN_PGMSOURCESOURCEADDRESS:
+			case COLUMN_PGMSOURCESOURCEADDRESS: {
+				struct sockaddr_in s4;
+				if (AF_INET == transport->send_gsr.gsr_source.ss_family)
+					memcpy (&s4, &transport->send_gsr.gsr_source, sizeof(s4));
+				else
+					memset (&s4, 0, sizeof(s4));
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(const u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_source ),
-								pgm_sockaddr_len( &transport->send_gsr.gsr_source ));
+								(const u_char*)&s4.sin_addr.s_addr,
+								sizeof(struct in_addr) );
 				break;
+			}
 
-			case COLUMN_PGMSOURCEGROUPADDRESS:
+			case COLUMN_PGMSOURCEGROUPADDRESS: {
+				struct sockaddr_in s4;
+				if (AF_INET == transport->send_gsr.gsr_group.ss_family)
+					memcpy (&s4, &transport->send_gsr.gsr_group, sizeof(s4));
+				else
+					memset (&s4, 0, sizeof(s4));
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(const u_char*)pgm_sockaddr_addr( &transport->send_gsr.gsr_group ),
-								pgm_sockaddr_len( &transport->send_gsr.gsr_group ));
+								(const u_char*)&s4.sin_addr.s_addr,
+								sizeof(struct in_addr) );
 				break;
+			}
 
 			case COLUMN_PGMSOURCEDESTPORT:
 				{
@@ -739,11 +751,17 @@ pgmSourceConfigTable_handler (
 				}
 				break;
 
-			case COLUMN_PGMSOURCESPMPATHADDRESS:
+			case COLUMN_PGMSOURCESPMPATHADDRESS: {
+				struct sockaddr_in s4;
+				if (AF_INET == transport->recv_gsr[0].gsr_source.ss_family)
+					memcpy (&s4, &transport->recv_gsr[0].gsr_source, sizeof(s4));
+				else
+					memset (&s4, 0, sizeof(s4));
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(const u_char*)pgm_sockaddr_addr( &transport->recv_gsr[0].gsr_source ),
-								pgm_sockaddr_len( &transport->recv_gsr[0].gsr_source ));
+								(const u_char*)&s4.sin_addr.s_addr,
+								sizeof(struct in_addr) );
 				break;
+			}
 
 			default:
 				snmp_log (LOG_ERR, "pgmSourceConfigTable_handler: unknown column.\n");
@@ -1570,11 +1588,17 @@ pgmReceiverTable_handler (
 
 			switch (table_info->colnum)
 			{
-			case COLUMN_PGMRECEIVERGROUPADDRESS:
+			case COLUMN_PGMRECEIVERGROUPADDRESS: {
+				struct sockaddr_in s4;
+				if (AF_INET == peer->group_nla.ss_family)
+					memcpy (&s4, &peer->group_nla, sizeof(s4));
+				else
+					memset (&s4, 0, sizeof(s4));
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(const u_char*)pgm_sockaddr_addr( &peer->group_nla ),
-								pgm_sockaddr_len( &peer->group_nla ));
+								(const u_char*)&s4.sin_addr.s_addr,
+								sizeof(struct in_addr) );
 				break;
+			}
 
 /* by definition same as transport */
 			case COLUMN_PGMRECEIVERDESTPORT:
@@ -1585,17 +1609,29 @@ pgmReceiverTable_handler (
 				}
 				break;
 
-			case COLUMN_PGMRECEIVERSOURCEADDRESS:
+			case COLUMN_PGMRECEIVERSOURCEADDRESS: {
+				struct sockaddr_in s4;
+				if (AF_INET == peer->nla.ss_family)
+					memcpy (&s4, &peer->nla, sizeof(s4));
+				else
+					memset (&s4, 0, sizeof(s4));
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(const u_char*)pgm_sockaddr_addr( &peer->nla ),
-								pgm_sockaddr_len( &peer->nla ));
+								(const u_char*)&s4.sin_addr.s_addr,
+								sizeof(struct in_addr) );
 				break;
+			}
 
-			case COLUMN_PGMRECEIVERLASTHOP:
+			case COLUMN_PGMRECEIVERLASTHOP: {
+				struct sockaddr_in s4;
+				if (AF_INET == peer->local_nla.ss_family)
+					memcpy (&s4, &peer->local_nla, sizeof(s4));
+				else
+					memset (&s4, 0, sizeof(s4));
 				snmp_set_var_typed_value(	var, ASN_IPADDRESS,
-								(const u_char*)pgm_sockaddr_addr( &peer->local_nla ),
-								pgm_sockaddr_len( &peer->local_nla ));
+								(const u_char*)&s4.sin_addr.s_addr,
+								sizeof(struct in_addr) );
 				break;
+			}
 
 			case COLUMN_PGMRECEIVERSOURCEGSI:
 /* copy index[0] */

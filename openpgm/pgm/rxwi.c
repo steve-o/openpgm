@@ -94,9 +94,8 @@ static inline gboolean _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const guint
 static int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t);
 static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t, const pgm_time_t);
-static inline void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
+static void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
 static guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
-static inline void _pgm_rxw_lost (pgm_rxw_t* const, const guint32);
 static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline gssize _pgm_rxw_incoming_read (pgm_rxw_t* const, pgm_msgv_t**, guint);
@@ -572,7 +571,7 @@ _pgm_rxw_update_trail (
 			g_assert_not_reached();
 
 		default:
-			_pgm_rxw_lost (window, sequence);
+			pgm_rxw_lost (window, sequence);
 			break;
 		}
 	}
@@ -962,7 +961,7 @@ _pgm_rxw_insert (
 	if (new_skb->pgm_opt_fragment &&
 	    _pgm_rxw_is_apdu_lost (window, new_skb))
 	{
-		_pgm_rxw_lost (window, skb->sequence);
+		pgm_rxw_lost (window, skb->sequence);
 		return PGM_RXW_BOUNDS;
 	}
 
@@ -1009,7 +1008,8 @@ _pgm_rxw_insert (
 
 /* replace place holder skb with incoming skb */
 	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
-	((pgm_rxw_state_t*)new_skb->cb)->state = PGM_PKT_ERROR_STATE;
+	pgm_rxw_state_t* rxw_state = (gpointer)new_skb->cb;
+	rxw_state->state = PGM_PKT_ERROR_STATE;
 	_pgm_rxw_unlink (window, skb);
 	pgm_free_skb (skb);
 	const guint32 index_ = new_skb->sequence % pgm_rxw_max_length (window);
@@ -1516,7 +1516,7 @@ _pgm_rxw_is_apdu_complete (
 
 /* protocol sanity check: maximum length */
 	if (G_UNLIKELY(apdu_size > PGM_MAX_APDU)) {
-		_pgm_rxw_lost (window, first_sequence);
+		pgm_rxw_lost (window, first_sequence);
 		return FALSE;
 	}
 
@@ -1559,19 +1559,19 @@ _pgm_rxw_is_apdu_complete (
 
 /* protocol sanity check: matching first sequence reference */
 			if (G_UNLIKELY(g_ntohl (skb->of_apdu_first_sqn) != first_sequence)) {
-				_pgm_rxw_lost (window, first_sequence);
+				pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 
 /* protocol sanity check: matching apdu length */
 			if (G_UNLIKELY(g_ntohl (skb->of_apdu_len) != apdu_size)) {
-				_pgm_rxw_lost (window, first_sequence);
+				pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 
 /* protocol sanity check: maximum number of fragments per apdu */
 			if (G_UNLIKELY(++contiguous_tpdus > PGM_MAX_FRAGMENTS)) {
-				_pgm_rxw_lost (window, first_sequence);
+				pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 
@@ -1579,7 +1579,7 @@ _pgm_rxw_is_apdu_complete (
 			if (apdu_size == contiguous_size)
 				return TRUE;
 			else if (G_UNLIKELY(apdu_size < contiguous_size)) {
-				_pgm_rxw_lost (window, first_sequence);
+				pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 		}
@@ -1782,7 +1782,7 @@ pgm_rxw_state (
 /* remove current state from sequence.
  */
 
-static inline
+static
 void
 _pgm_rxw_unlink (
 	pgm_rxw_t* const		window,
@@ -1862,9 +1862,8 @@ pgm_rxw_peek (
 /* mark an existing sequence lost due to failed recovery.
  */
 
-static inline
 void
-_pgm_rxw_lost (
+pgm_rxw_lost (
 	pgm_rxw_t* const	window,
 	const guint32		sequence
 	)
@@ -1876,6 +1875,9 @@ _pgm_rxw_lost (
 	g_assert (window);
 	g_assert (!pgm_rxw_is_empty (window));
 
+	g_trace ("lost (window:%p sequence:%" G_GUINT32_FORMAT ")",
+		 (gpointer)window, sequence);
+
 	skb = _pgm_rxw_peek (window, sequence);
 	g_assert (skb);
 
@@ -1886,17 +1888,6 @@ _pgm_rxw_lost (
 		  state->state == PGM_PKT_WAIT_DATA_STATE  );
 
 	_pgm_rxw_state (window, skb, PGM_PKT_LOST_DATA_STATE);
-}
-
-void
-pgm_rxw_lost (
-	pgm_rxw_t* const	window,
-	const guint32		sequence
-	)
-{
-	g_trace ("lost (window:%p sequence:%" G_GUINT32_FORMAT ")",
-		 (gpointer)window, sequence);
-	_pgm_rxw_lost (window, sequence);
 }
 
 /* received a uni/multicast ncf, search for a matching nak & tag or extend window if

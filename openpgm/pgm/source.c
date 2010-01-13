@@ -604,7 +604,7 @@ pgm_send_spm (
 		(gpointer)transport, flags);
 
 	gsize tpdu_length = sizeof(struct pgm_header);
-	if (AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group))
+	if (AF_INET == transport->send_gsr.gsr_group.ss_family)
 		tpdu_length += sizeof(struct pgm_spm);
 	else
 		tpdu_length += sizeof(struct pgm_spm6);
@@ -652,7 +652,7 @@ pgm_send_spm (
 		struct pgm_opt_header* opt_header;
 		gsize opt_total_length;
 
-		if (AF_INET == pgm_sockaddr_family(&transport->send_gsr.gsr_group))
+		if (AF_INET == transport->send_gsr.gsr_group.ss_family)
 			data = (struct pgm_opt_length*)(spm + 1);
 		else
 			data = (struct pgm_opt_length*)(spm6 + 1);
@@ -707,7 +707,7 @@ pgm_send_spm (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
-					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+					pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->blocklen = tpdu_length;
 		return FALSE;
@@ -737,7 +737,7 @@ send_ncf (
 	g_assert (NULL != transport);
 	g_assert (NULL != nak_src_nla);
 	g_assert (NULL != nak_grp_nla);
-	g_assert (pgm_sockaddr_family(nak_src_nla) == pgm_sockaddr_family(nak_grp_nla));
+	g_assert (nak_src_nla->sa_family == nak_grp_nla->sa_family);
 
 #ifdef SOURCE_DEBUG
 	char saddr[INET6_ADDRSTRLEN], gaddr[INET6_ADDRSTRLEN];
@@ -753,7 +753,7 @@ send_ncf (
 #endif
 
 	gsize tpdu_length = sizeof(struct pgm_header);
-	tpdu_length += (AF_INET == pgm_sockaddr_family(nak_src_nla)) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
+	tpdu_length += (AF_INET == nak_src_nla->sa_family) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
 	guint8 buf[ tpdu_length ];
 	struct pgm_header* header = (struct pgm_header*)buf;
 	struct pgm_nak*  ncf  = (struct pgm_nak*) (header + 1);
@@ -784,7 +784,7 @@ send_ncf (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
-					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+					pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 	pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
@@ -812,7 +812,7 @@ send_ncf_list (
 	g_assert (NULL != nak_grp_nla);
 	g_assert (sqn_list->len > 1);
 	g_assert (sqn_list->len <= 63);
-	g_assert (pgm_sockaddr_family(nak_src_nla) == pgm_sockaddr_family(nak_grp_nla));
+	g_assert (nak_src_nla->sa_family == nak_grp_nla->sa_family);
 
 #ifdef SOURCE_DEBUG
 	char saddr[INET6_ADDRSTRLEN], gaddr[INET6_ADDRSTRLEN];
@@ -838,7 +838,7 @@ send_ncf_list (
 			    sizeof(struct pgm_opt_length) +		/* includes header */
 			    sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
 			    ( (sqn_list->len-1) * sizeof(guint32) );
-	tpdu_length += (AF_INET == pgm_sockaddr_family(nak_src_nla)) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
+	tpdu_length += (AF_INET == nak_src_nla->sa_family) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
 	guint8 buf[ tpdu_length ];
 	struct pgm_header* header = (struct pgm_header*)buf;
 	struct pgm_nak*  ncf  = (struct pgm_nak*) (header + 1);
@@ -890,7 +890,7 @@ send_ncf_list (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
-					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+					pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 	pgm_atomic_int32_add ((volatile gint32*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
@@ -999,7 +999,7 @@ retry_send:
 			   STATE(skb)->head,
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
-			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+			   pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
@@ -1101,7 +1101,7 @@ retry_send:
 			   STATE(skb)->head,
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
-			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+			   pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
@@ -1231,7 +1231,7 @@ retry_send:
 			   STATE(skb)->head,
 			   tpdu_length,
 			   (struct sockaddr*)&transport->send_gsr.gsr_group,
-			   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+			   pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		transport->is_apdu_eagain = TRUE;
 		transport->blocklen = tpdu_length;
@@ -1383,7 +1383,7 @@ retry_send:
 				   STATE(skb)->head,
 				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
-				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				   pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 			transport->is_apdu_eagain = TRUE;
 			transport->blocklen = tpdu_length;
@@ -1773,7 +1773,7 @@ retry_one_apdu_send:
 				   STATE(skb)->head,
 				   tpdu_length,
 				   (struct sockaddr*)&transport->send_gsr.gsr_group,
-				   pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				   pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 			transport->is_apdu_eagain = TRUE;
 			transport->blocklen = tpdu_length;
@@ -2002,7 +2002,7 @@ retry_send:
 				    STATE(skb)->head,
 				    tpdu_length,
 				    (struct sockaddr*)&transport->send_gsr.gsr_group,
-				    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				    pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 			transport->is_apdu_eagain = TRUE;
 			transport->blocklen = tpdu_length;
@@ -2102,7 +2102,7 @@ send_rdata (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&transport->send_gsr.gsr_group,
-					pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+					pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 /* re-save unfolded payload for further retransmissions */
 	pgm_txw_set_unfolded_checksum (skb, unfolded_odata);
 

@@ -435,55 +435,6 @@ gboolean pgm_verify_nak (const struct pgm_sk_buff_t* const);
 gboolean pgm_verify_nnak (const struct pgm_sk_buff_t* const);
 gboolean pgm_verify_ncf (const struct pgm_sk_buff_t* const);
 
-static inline int pgm_nla_to_sockaddr (gconstpointer nla, struct sockaddr* sa)
-{
-    int retval = 0;
-
-    sa->sa_family = g_ntohs (*(const guint16*)nla);
-    switch (sa->sa_family) {
-    case AFI_IP:
-	sa->sa_family = AF_INET;
-	((struct sockaddr_in*)sa)->sin_addr.s_addr = ((const struct in_addr*)((const guint8*)nla + sizeof(guint32)))->s_addr;
-	break;
-
-    case AFI_IP6:
-	sa->sa_family = AF_INET6;
-	memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (const struct in6_addr*)((const guint8*)nla + sizeof(guint32)), sizeof(struct in6_addr));
-	break;
-
-    default:
-	retval = -EINVAL;
-	break;
-    }
-
-    return retval;
-}
-
-static inline int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla)
-{
-    int retval = 0;
-
-    *(guint16*)nla = sa->sa_family;
-    *(guint16*)((guint8*)nla + sizeof(guint16)) = 0;	/* reserved 16bit space */
-    switch (sa->sa_family) {
-    case AF_INET:
-	*(guint16*)nla = g_htons (AFI_IP);
-	((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr = ((const struct sockaddr_in*)sa)->sin_addr.s_addr;
-	break;
-
-    case AF_INET6:
-	*(guint16*)nla = g_htons (AFI_IP6);
-	memcpy ((struct in6_addr*)((guint8*)nla + sizeof(guint32)), &((const struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
-	break;
-
-    default:
-	retval = -EINVAL;
-	break;
-    }
-
-    return retval;
-}
-
 const char* pgm_type_string (guint8) G_GNUC_WARN_UNUSED_RESULT;
 const char* pgm_udpport_string (int) G_GNUC_WARN_UNUSED_RESULT;
 const char* pgm_gethostbyaddr (const struct in_addr*) G_GNUC_WARN_UNUSED_RESULT;

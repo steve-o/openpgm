@@ -86,7 +86,6 @@
 #	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
 #endif
 
-
 #ifdef G_OS_WIN32
 #	ifndef WSAID_WSARECVMSG
 /* http://cvs.winehq.org/cvsweb/wine/include/mswsock.h */
@@ -218,9 +217,11 @@ recvskb (
 			{
 				pktinfo				= CMSG_DATA(cmsg);
 				const struct in_pktinfo* in	= pktinfo;
-				struct sockaddr_in* sin		= (struct sockaddr_in*)dst_addr;
-				sin->sin_family			= AF_INET;
-				sin->sin_addr.s_addr		= in->ipi_addr.s_addr;
+				struct sockaddr_in s4;
+				memset (&s4, 0, sizeof(s4));
+				s4.sin_family			= AF_INET;
+				s4.sin_addr.s_addr		= in->ipi_addr.s_addr;
+				memcpy (dst_addr, &s4, sizeof(s4));
 				break;
 			}
 
@@ -229,10 +230,12 @@ recvskb (
 			{
 				pktinfo				= CMSG_DATA(cmsg);
 				const struct in6_pktinfo* in6	= pktinfo;
-				struct sockaddr_in6* sin6	= (struct sockaddr_in6*)dst_addr;
-				sin6->sin6_family		= AF_INET6;
-				sin6->sin6_addr			= in6->ipi6_addr;
-				sin6->sin6_scope_id		= in6->ipi6_ifindex;
+				struct sockaddr_in6 s6;
+				memset (&s6, 0, sizeof(s6));
+				s6.sin6_family			= AF_INET6;
+				s6.sin6_addr			= in6->ipi6_addr;
+				s6.sin6_scope_id		= in6->ipi6_ifindex;
+				memcpy (dst_addr, &s6, sizeof(s6));
 /* does not set flow id */
 				break;
 			}
@@ -789,7 +792,7 @@ recv_again:
 	}
 
 	GError* err = NULL;
-	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == pgm_sockaddr_family (&src)) ?
+	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
 					pgm_parse_udp_encap (transport->rx_buffer, &err) :
 					pgm_parse_raw (transport->rx_buffer, (struct sockaddr*)&dst, &err);
 	if (G_UNLIKELY(!is_valid))
