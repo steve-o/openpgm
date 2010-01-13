@@ -1163,26 +1163,26 @@ send_spmr (
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
 /* send multicast SPMR TTL 1 */
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), 1);
+	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, 1);
 	gssize sent = pgm_sendto (transport,
 				  FALSE,			/* not rate limited */
 				  FALSE,			/* regular socket */
 				  header,
 				  tpdu_length,
 				  (struct sockaddr*)&transport->send_gsr.gsr_group,
-				  pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				  pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
 /* send unicast SPMR with regular TTL */
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
+	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
 	sent = pgm_sendto (transport,
 			   FALSE,
 			   FALSE,
 			   header,
 			   tpdu_length,
 			   (struct sockaddr*)&source->local_nla,
-			   pgm_sockaddr_len(&source->local_nla));
+			   pgm_sockaddr_len((struct sockaddr*)&source->local_nla));
 	if (sent < 0 && EAGAIN == errno)
 		return FALSE;
 
@@ -1210,7 +1210,7 @@ send_nak (
 		(gpointer)transport, (gpointer)source, sequence);
 
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
-	if (AF_INET6 == pgm_sockaddr_family(&source->nla))
+	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
 	struct pgm_header *header = (struct pgm_header*)buf;
@@ -1252,7 +1252,7 @@ send_nak (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
-					pgm_sockaddr_len(&source->nla));
+					pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
@@ -1283,7 +1283,7 @@ send_parity_nak (
 		(gpointer)transport, (gpointer)source, nak_tg_sqn, nak_pkt_cnt);
 
 	gsize tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
-	if (AF_INET6 == pgm_sockaddr_family(&source->nla))
+	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
 	struct pgm_header *header = (struct pgm_header*)buf;
@@ -1319,7 +1319,7 @@ send_parity_nak (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
-					pgm_sockaddr_len(&source->nla));
+					pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
@@ -1366,7 +1366,7 @@ send_nak_list (
 			    sizeof(struct pgm_opt_header) +
 			    sizeof(struct pgm_opt_nak_list) +
 			    ( (sqn_list->len-1) * sizeof(guint32) );
-	if (AFI_IP6 == pgm_sockaddr_family(&source->nla))
+	if (AFI_IP6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
 	if (G_UNLIKELY(g_mem_gc_friendly))
@@ -1423,7 +1423,7 @@ send_nak_list (
 					header,
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
-					pgm_sockaddr_len(&source->nla));
+					pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if ( sent != (gssize)tpdu_length )
 		return FALSE;
 
@@ -1477,7 +1477,7 @@ nak_rb_state (
 	guint dropped_invalid = 0;
 
 /* have not learned this peers NLA */
-	const gboolean is_valid_nla = 0 != pgm_sockaddr_family(&peer->nla);
+	const gboolean is_valid_nla = 0 != peer->nla.ss_family;
 
 /* TODO: process BOTH selective and parity NAKs? */
 
@@ -1836,7 +1836,7 @@ nak_rpt_state (
 	guint dropped = 0;
 
 /* have not learned this peers NLA */
-	const gboolean is_valid_nla = 0 != pgm_sockaddr_family(&peer->nla);
+	const gboolean is_valid_nla = 0 != peer->nla.ss_family;
 
 	while (list)
 	{
@@ -1964,7 +1964,7 @@ nak_rdata_state (
 	guint dropped = 0;
 
 /* have not learned this peers NLA */
-	const gboolean is_valid_nla = 0 != pgm_sockaddr_family(&peer->nla);
+	const gboolean is_valid_nla = 0 != peer->nla.ss_family;
 
 	while (list)
 	{

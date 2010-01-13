@@ -293,10 +293,10 @@ pgm_transport_create (
 	g_return_val_if_fail (NULL != tinfo->ti_send_addrs, FALSE);
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
-		g_return_val_if_fail (pgm_sockaddr_family (&tinfo->ti_recv_addrs[i].gsr_group) == pgm_sockaddr_family (&tinfo->ti_recv_addrs[0].gsr_group), -FALSE);
-		g_return_val_if_fail (pgm_sockaddr_family (&tinfo->ti_recv_addrs[i].gsr_group) == pgm_sockaddr_family (&tinfo->ti_recv_addrs[i].gsr_source), -FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, -FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, -FALSE);
 	}
-	g_return_val_if_fail (pgm_sockaddr_family (&tinfo->ti_send_addrs[0].gsr_group) == pgm_sockaddr_family (&tinfo->ti_send_addrs[0].gsr_source), -FALSE);
+	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
 	new_transport = g_malloc0 (sizeof(pgm_transport_t));
 	new_transport->can_send_data = TRUE;
@@ -353,7 +353,7 @@ pgm_transport_create (
 		protocol = ipproto_pgm;
 	}
 
-	if ((new_transport->recv_sock = socket (pgm_sockaddr_family (&new_transport->recv_gsr[0].gsr_group),
+	if ((new_transport->recv_sock = socket (new_transport->recv_gsr[0].gsr_group.ss_family,
 						socket_type,
 						protocol)) < 0)
 	{
@@ -388,7 +388,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if ((new_transport->send_sock = socket (pgm_sockaddr_family (&new_transport->send_gsr.gsr_group),
+	if ((new_transport->send_sock = socket (new_transport->send_gsr.gsr_group.ss_family,
 						socket_type,
 						protocol)) < 0)
 	{
@@ -400,7 +400,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if ((new_transport->send_with_router_alert_sock = socket (pgm_sockaddr_family (&new_transport->send_gsr.gsr_group),
+	if ((new_transport->send_with_router_alert_sock = socket (new_transport->send_gsr.gsr_group.ss_family,
 						socket_type,
 						protocol)) < 0)
 	{
@@ -564,7 +564,8 @@ pgm_transport_set_sndbuf (
 
 	fp = fopen ("/proc/sys/net/core/wmem_max", "r");
 	if (fp) {
-		fscanf (fp, "%d", &wmem_max);
+		const int matches = fscanf (fp, "%d", &wmem_max);
+		g_assert (1 == matches);
 		fclose (fp);
 		if (size > wmem_max) {
 			g_static_rw_lock_reader_unlock (&transport->lock);
@@ -610,7 +611,8 @@ pgm_transport_set_rcvbuf (
 
 	fp = fopen ("/proc/sys/net/core/rmem_max", "r");
 	if (fp) {
-		fscanf (fp, "%d", &rmem_max);
+		const int matches = fscanf (fp, "%d", &rmem_max);
+		g_assert (1 == matches);
 		fclose (fp);
 		if (size > rmem_max) {
 			g_static_rw_lock_reader_unlock (&transport->lock);
@@ -676,7 +678,7 @@ pgm_transport_bind (
 	}
 
 /* determine IP header size for rate regulation engine & stats */
-	transport->iphdr_len = (AF_INET == pgm_sockaddr_family (&transport->send_gsr.gsr_group)) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
+	transport->iphdr_len = (AF_INET == transport->send_gsr.gsr_group.ss_family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
 	g_trace ("INFO","assuming IP header size of %" G_GSIZE_FORMAT " bytes", transport->iphdr_len);
 
 	if (transport->udp_encap_ucast_port) {
@@ -727,7 +729,7 @@ pgm_transport_bind (
 /* request extra packet information to determine destination address on each packet */
 #ifndef CONFIG_TARGET_WINE
 		g_trace ("INFO","request socket packet-info.");
-		const int recv_family = pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group);
+		const int recv_family = transport->recv_gsr[0].gsr_group.ss_family;
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE) ||
 		     (-1 != transport->recv_sock2 &&
 		       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
@@ -754,7 +756,7 @@ pgm_transport_bind (
 	}
 	else
 	{
-		const int recv_family = pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group);
+		const int recv_family = transport->recv_gsr[0].gsr_group.ss_family;
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
@@ -831,24 +833,31 @@ pgm_transport_bind (
  */
 /* TODO: different ports requires a new bound socket */
 
-	struct sockaddr_storage recv_addr, recv_addr2;
-	memset (&recv_addr, 0, sizeof(recv_addr));
+	union {
+		struct sockaddr		sa;
+		struct sockaddr_in	s4;
+		struct sockaddr_in6	s6;
+		struct sockaddr_storage	ss;
+	} recv_addr, recv_addr2, send_addr, send_with_router_alert_addr;
 
 #ifdef CONFIG_BIND_INADDR_ANY
-
 /* force default interface for bind-only, source address is still valid for multicast membership.
  * effectively same as running getaddrinfo(hints = {ai_flags = AI_PASSIVE})
  */
-	((struct sockaddr*)&recv_addr)->sa_family = pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group);
-	if (AF_INET == pgm_sockaddr_family(&recv_addr))
-		((struct sockaddr_in*)&recv_addr)->sin_addr.s_addr = INADDR_ANY;
-	else
-		((struct sockaddr_in6*)&recv_addr)->sin6_addr = in6addr_any;
+	if (AF_INET == transport->recv_gsr[0].gsr_group.ss_family) {
+		memset (&recv_addr.s4, 0, sizeof(struct sockaddr_in));
+		recv_addr.s4.sin_family = AF_INET;
+		recv_addr.s4.sin_addr.s_addr = INADDR_ANY;
+	} else {
+		memset (&recv_addr.s6, 0, sizeof(struct sockaddr_in6));
+		recv_addr.s6.sin6_family = AF_INET;
+		recv_addr.s6.sin6_addr = in6addr_any;
+	}
 #else
 	if (!_pgm_indextoaddr (transport->recv_gsr[0].gsr_interface,
-			       pgm_sockaddr_family (&transport->recv_gsr[0].gsr_group),
-			       pgm_sockaddr_scope_id (&transport->recv_gsr[0].gsr_group),
-			       &recv_addr,
+			       transport->recv_gsr[0].gsr_group.ss_family,
+			       pgm_sockaddr_scope_id ((struct sockaddr*)&transport->recv_gsr[0].gsr_group),
+			       &recv_addr.sa,
 			       error))
 	{
 		g_static_rw_lock_writer_unlock (&transport->lock);
@@ -858,14 +867,14 @@ pgm_transport_bind (
 
 #endif /* CONFIG_BIND_INADDR_ANY */
 
-	memcpy (&recv_addr2, &recv_addr, pgm_sockaddr_len (&recv_addr));
+	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
 	((struct sockaddr_in*)&recv_addr)->sin_port = g_htons (transport->udp_encap_mcast_port);
-	if (0 != bind (transport->recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len (&recv_addr)))
+	if (0 != bind (transport->recv_sock, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa)))
 	{
 		int save_errno = errno;
 		if (error) {
 			char addr[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&recv_addr, addr, sizeof(addr));
+			pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
@@ -880,19 +889,19 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&recv_addr, s, sizeof(s));
+		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, s, sizeof(s));
 		g_trace ("INFO","bind succeeded on recv_gsr[0] interface %s", s);
 	}
 #endif
 
 	if (-1 != transport->recv_sock2) {
 		((struct sockaddr_in*)&recv_addr2)->sin_port = g_htons (transport->udp_encap_ucast_port);
-		if (0 != bind (transport->recv_sock2, (struct sockaddr*)&recv_addr2, pgm_sockaddr_len (&recv_addr2)))
+		if (0 != bind (transport->recv_sock2, (struct sockaddr*)&recv_addr2, pgm_sockaddr_len ((struct sockaddr*)&recv_addr2)))
 		{
 			int save_errno = errno;
 			if (error) {
 				char addr[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop (&recv_addr2, addr, sizeof(addr));
+				pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr2, addr, sizeof(addr));
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
@@ -906,12 +915,11 @@ pgm_transport_bind (
 	}
 
 /* keep a copy of the original address source to re-use for router alert bind */
-	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
 
 	if (!pgm_if_indextoaddr (transport->send_gsr.gsr_interface,
-				  pgm_sockaddr_family (&transport->send_gsr.gsr_group),
-				  pgm_sockaddr_scope_id (&transport->send_gsr.gsr_group),
+				  transport->send_gsr.gsr_group.ss_family,
+				  pgm_sockaddr_scope_id ((struct sockaddr*)&transport->send_gsr.gsr_group),
 				  (struct sockaddr*)&send_addr,
 				  error))
 	{
@@ -925,12 +933,12 @@ pgm_transport_bind (
 	}
 #endif
 
-	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len (&send_addr));
-	if (0 != bind (transport->send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len (&send_addr)))
+	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
+	if (0 != bind (transport->send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
 	{
 		int save_errno = errno;
 		char addr[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&send_addr, addr, sizeof(addr));
+		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
@@ -942,7 +950,7 @@ pgm_transport_bind (
 	}
 
 /* resolve bound address if 0.0.0.0 */
-	if (AF_INET == pgm_sockaddr_family (&send_addr))
+	if (AF_INET == send_addr.ss.ss_family)
 	{
 		if ((INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr) &&
 		    !pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
@@ -961,19 +969,19 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&send_addr, s, sizeof(s));
+		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, s, sizeof(s));
 		g_trace ("INFO","bind succeeded on send_gsr interface %s", s);
 	}
 #endif
 
 	if (0 != bind (transport->send_with_router_alert_sock,
 			(struct sockaddr*)&send_with_router_alert_addr,
-			pgm_sockaddr_len(&send_with_router_alert_addr)))
+			pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr)))
 	{
 		int save_errno = errno;
 		if (error) {
 			char addr[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&send_with_router_alert_addr, addr, sizeof(addr));
+			pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
 			g_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
@@ -988,13 +996,13 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&send_with_router_alert_addr, s, sizeof(s));
+		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, s, sizeof(s));
 		g_trace ("INFO","bind (router alert) succeeded on send_gsr interface %s", s);
 	}
 #endif
 
 /* save send side address for broadcasting as source nla */
-	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len (&send_addr));
+	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
 
 /* receiving groups (multiple) */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
@@ -1005,13 +1013,13 @@ pgm_transport_bind (
 		if (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&p->gsr_group, (const struct sockaddr*)&p->gsr_source))
 		{
 			if (0 != pgm_sockaddr_join_group (transport->recv_sock,
-							  pgm_sockaddr_family (&p->gsr_group),
+							  p->gsr_group.ss_family,
 							  (const struct group_req*)p))
 			{
 				const int save_errno = errno;
 				char group_addr[INET_ADDRSTRLEN];
 				char ifname[IF_NAMESIZE];
-				pgm_sockaddr_ntop (&p->gsr_group, group_addr, sizeof(group_addr));
+				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
 					g_set_error (error,
 						     PGM_TRANSPORT_ERROR,
@@ -1034,7 +1042,7 @@ pgm_transport_bind (
 			else
 			{
 				char s1[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
 				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
 					i, (unsigned)p->gsr_interface, s1);
 			}
@@ -1043,14 +1051,14 @@ pgm_transport_bind (
 		else /* source != group, i.e. SSM */
 		{
 			if (0 != pgm_sockaddr_join_source_group (transport->recv_sock,
-								 pgm_sockaddr_family (&p->gsr_group),
+								 p->gsr_group.ss_family,
 								 p))
 			{
 				const int save_errno = errno;
 				char source_addr[INET_ADDRSTRLEN];
 				char group_addr[INET_ADDRSTRLEN];
-				pgm_sockaddr_ntop (&p->gsr_source, source_addr, sizeof(source_addr));
-				pgm_sockaddr_ntop (&p->gsr_group, group_addr, sizeof(group_addr));
+				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
+				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
@@ -1065,8 +1073,8 @@ pgm_transport_bind (
 			else
 			{
 				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop (&p->gsr_group, s1, sizeof(s1));
-				pgm_sockaddr_ntop (&p->gsr_source, s2, sizeof(s2));
+				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, s2, sizeof(s2));
 				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %u group %s source %s",
 					i, (unsigned)p->gsr_interface, s1, s2);
 			}
@@ -1093,7 +1101,7 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
+		pgm_sockaddr_ntop ((struct sockaddr*)&transport->send_addr, s, sizeof(s));
 		g_trace ("INFO","pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %u",
 					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
@@ -1116,7 +1124,7 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	{
 		char s[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop (&transport->send_addr, s, sizeof(s));
+		pgm_sockaddr_ntop ((struct sockaddr*)&transport->send_addr, s, sizeof(s));
 		g_trace ("INFO","pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %u",
 					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
@@ -1125,10 +1133,10 @@ pgm_transport_bind (
 /* multicast loopback */
 	g_trace ("INFO","set multicast loopback.");
 	if (0 != pgm_sockaddr_multicast_loop (transport->send_sock,
-					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->send_gsr.gsr_group.ss_family,
 					      transport->use_multicast_loop) ||
 	    0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
-					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->send_gsr.gsr_group.ss_family,
 					      transport->use_multicast_loop))
 	{
 		g_set_error (error,
@@ -1144,10 +1152,10 @@ pgm_transport_bind (
 #ifndef CONFIG_TARGET_WINE
 	g_trace ("INFO","set multicast hop limit.");
 	if (0 != pgm_sockaddr_multicast_hops (transport->send_sock,
-					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops) ||
 	    0 != pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock,
-					      pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops))
 	{
 		g_set_error (error,
@@ -1168,10 +1176,10 @@ pgm_transport_bind (
 	g_trace ("INFO","set packet differentiated services field to expedited forwarding.");
 	const int dscp = 0x2e << 2;
 	if (0 != pgm_sockaddr_tos (transport->send_sock,
-				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+				   transport->send_gsr.gsr_group.ss_family,
 				   dscp) ||
 	    0 != pgm_sockaddr_tos (transport->send_with_router_alert_sock,
-				   pgm_sockaddr_family (&transport->send_gsr.gsr_group),
+				   transport->send_gsr.gsr_group.ss_family,
 				   dscp))
 	{
 		g_warning (_("DSCP setting requires CAP_NET_ADMIN or ADMIN capability."));
@@ -1619,8 +1627,8 @@ pgm_transport_set_nonblocking (
 }
 
 
-#define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
-#define TRANSPORT_TO_LEVEL(t)	SOCKADDR_TO_LEVEL( &(t)->recv_gsr[0].gsr_group )
+#define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((struct sockaddr*)(sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
+#define TRANSPORT_TO_LEVEL(t)	( (AF_INET == (t)->recv_gsr[0].gsr_group.ss_family) ? IPPROTO_IP : IPPROTO_IPV6 )
 
 
 /* for any-source applications (ASM), join a new group
@@ -1672,8 +1680,8 @@ pgm_transport_join_group (
 	}
 
 	transport->recv_gsr[transport->recv_gsr_len].gsr_interface = 0;
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len(&gr->gr_group));
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len(&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len((struct sockaddr*)&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len((struct sockaddr*)&gr->gr_group));
 	transport->recv_gsr_len++;
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, (const char*)gr, len);
 	g_static_rw_lock_reader_unlock (&transport->lock);
