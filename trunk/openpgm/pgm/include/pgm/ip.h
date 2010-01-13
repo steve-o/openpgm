@@ -62,13 +62,6 @@
 #	include <ws2tcpip.h>
 #endif
 
-#ifndef __PGM_SOCKADDR_H__
-#	include "pgm/sockaddr.h"
-#endif
-
-#ifdef G_OS_WIN32
-#	define EAFNOSUPPORT		WSAEAFNOSUPPORT
-#endif
 
 /* 1-byte alignment */
 #pragma pack(push, 1)
@@ -142,90 +135,5 @@ struct pgm_udphdr
 G_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
 #pragma pack(pop)
-
-G_BEGIN_DECLS
-
-
-/* Note that are sockaddr structure is not passed these functions inherently
- * cannot support IPv6 Zone Indices and hence are rather limited for the
- * link-local scope.
- */
-static inline const char* pgm_inet_ntop (int af, const void* src, char* dst, socklen_t size)
-{
-	g_assert (AF_INET == af || AF_INET6 == af);
-	g_assert (NULL != src);
-	g_assert (NULL != dst);
-	g_assert (size > 0);
-
-	switch (af) {
-	case AF_INET:
-	{
-		struct sockaddr_in sin;
-		memset (&sin, 0, sizeof(sin));
-		sin.sin_family = AF_INET;
-		sin.sin_addr   = *(const struct in_addr*)src;
-		getnameinfo ((struct sockaddr*)&sin, sizeof(sin),
-			     dst, size,
-			     NULL, 0,
-			     NI_NUMERICHOST);
-		return dst;
-	}
-	case AF_INET6:
-	{
-		struct sockaddr_in6 sin6;
-		memset (&sin6, 0, sizeof(sin6));
-		sin6.sin6_family = AF_INET6;
-		sin6.sin6_addr   = *(const struct in6_addr*)src;
-		getnameinfo ((struct sockaddr*)&sin6, sizeof(sin6),
-			     dst, size,
-			     NULL, 0,
-			     NI_NUMERICHOST);
-		return dst;
-	}
-	}
-
-	errno = EAFNOSUPPORT;
-	return NULL;
-}
-
-static inline int pgm_inet_pton (int af, const char* src, void* dst)
-{
-	g_assert (AF_INET == af || AF_INET6 == af);
-	g_assert (NULL != src);
-	g_assert (NULL != dst);
-
-	struct addrinfo hints = {
-		.ai_family	= af,
-		.ai_socktype	= SOCK_STREAM,		/* not really */
-		.ai_protocol	= IPPROTO_TCP,		/* not really */
-		.ai_flags	= AI_NUMERICHOST
-	}, *result = NULL;
-
-	int e = getaddrinfo (src, NULL, &hints, &result);
-	if (0 != e) {
-		return 0;	/* error */
-	}
-
-	g_assert (NULL != result->ai_addr);
-	switch (pgm_sockaddr_family (result->ai_addr)) {
-	case AF_INET:
-		g_assert (sizeof(struct sockaddr_in) == pgm_sockaddr_len (result->ai_addr));
-		break;
-
-	case AF_INET6:
-		g_assert (sizeof(struct sockaddr_in6) == pgm_sockaddr_len (result->ai_addr));
-		break;
-
-	default:
-		g_assert_not_reached();
-		break;
-	}
-
-	memcpy (dst, pgm_sockaddr_addr (result->ai_addr), pgm_sockaddr_addr_len (result->ai_addr));
-	freeaddrinfo (result);
-	return 1;	/* success */
-}
-
-G_END_DECLS
 
 #endif /* __PGM_IP_H__ */

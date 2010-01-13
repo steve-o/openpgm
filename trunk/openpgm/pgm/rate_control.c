@@ -72,7 +72,7 @@ pgm_rate_create (
 	bucket->iphdr_len	= iphdr_len;
 	bucket->last_rate_check	= pgm_time_update_now ();
 /* pre-fill bucket */
-	if ((bucket->rate_per_sec / 1000) >= max_tpdu) {
+	if ((rate_per_sec / 1000) >= max_tpdu) {
 		bucket->rate_per_msec	= bucket->rate_per_sec / 1000;
 		bucket->rate_limit	= bucket->rate_per_msec;
 	} else {
@@ -170,8 +170,6 @@ pgm_rate_remaining (
 	const gsize		packetlen
 	)
 {
-	pgm_time_t remaining;
-
 /* pre-conditions */
 	g_assert (NULL != bucket);
 

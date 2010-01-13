@@ -143,7 +143,7 @@ pgm_http_init (
 			     gai_strerror (e));
 		return FALSE;
 	}
-	e = getnameinfo (res->ai_addr, pgm_sockaddr_len (res->ai_addr),
+	e = getnameinfo (res->ai_addr, res->ai_addrlen,
 		         g_address, sizeof(g_address),
 			 NULL, 0,
 			 NI_NUMERICHOST);
@@ -630,7 +630,7 @@ transports_callback (
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
-			getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len (&transport->send_gsr.gsr_group),
+			getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_group),
 				     group_address, sizeof(group_address),
 				     NULL, 0,
 				     NI_NUMERICHOST);
@@ -819,13 +819,13 @@ http_tsi_response (
 		g_ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_source, pgm_sockaddr_len (&transport->send_gsr.gsr_source),
+	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_source, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_source),
 		     source_address, sizeof(source_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len (&transport->send_gsr.gsr_group),
+	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_group),
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
@@ -837,7 +837,7 @@ http_tsi_response (
 	pgm_time_t ihb_max = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ transport->spm_heartbeat_len - 1 ] : 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_source),
+	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len ((struct sockaddr*)&transport->recv_gsr[0].gsr_source),
 		     spm_path, sizeof(spm_path),
 		     NULL, 0,
 		     NI_NUMERICHOST);
@@ -1021,19 +1021,19 @@ http_each_receiver (
 	)
 {
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len (&peer->group_nla),
+	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->group_nla),
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
+	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len ((struct sockaddr*)&peer->nla),
 		     source_address, sizeof(source_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char last_hop[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len (&peer->local_nla),
+	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->local_nla),
 		     last_hop, sizeof(last_hop),
 		     NULL, 0,
 		     NI_NUMERICHOST);
@@ -1136,19 +1136,19 @@ http_receiver_response (
 		g_ntohs (peer->tsi.sport));
 
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len (&peer->group_nla),
+	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->group_nla),
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len (&peer->nla),
+	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len ((struct sockaddr*)&peer->nla),
 		     source_address, sizeof(source_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char last_hop[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len (&peer->local_nla),
+	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->local_nla),
 		     last_hop, sizeof(last_hop),
 		     NULL, 0,
 		     NI_NUMERICHOST);
