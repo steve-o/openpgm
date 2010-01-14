@@ -421,24 +421,38 @@ pgm_sockaddr_join_group (
 	int retval = -1;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
- * parameter."
+ * parameter."  Presumably with source field zeroed out.
  * Solaris:ip6(7P) "Takes a struct group_req as the parameter."
+ * Different type for each family, however group_req is protocol-independent.
  *
- * RFC3678: Argument type struct group_source_req
+ * RFC3678: Argument type struct group_req
  */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, sizeof(struct group_req));
 #else
 	switch (sa_family) {
 	case AF_INET: {
-/* Solaris:ip(7P) Just mentions "Join a multicast group."  Manpage muddles up
- * ASM and SSM, mentioning struct ip_mreq for IP_ADD_SOURCE_MEMBERSHIP.
+/* Solaris:ip(7P) Just mentions "Join a multicast group."
+ * No further details provided.
  *
  * Linux:ip(7) "Argument is an ip_mreqn structure.  For compatibility, the old
  * ip_mreq structure (present since Linux 1.2) is still supported."
  *
  * FreeBSD,OS X:IP(4) provided by example "struct ip_mreq mreq;"
+ *
+ * RFC3678: Argument type struct ip_mreq
  */
+#ifdef CONFIG_HAVE_IP_MREQN
+		struct ip_mreqn mreqn;
+		struct sockaddr_in ifaddr;
+		memset (&mnreq, 0, sizeof(mreqn));
+		mreqn.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gr->gr_group)->sin_addr.s_addr;
+		if (!pgm_if_indextoaddr (gr->gr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
+			return -1;
+		mreqn.imr_address.s_addr = ifaddr.sin_addr.s_addr;
+		mreqn.imr_ifindex = gr->gr_interface;
+		retval = setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreqn, sizeof(mreqn));
+#else
 		struct ip_mreq mreq;
 		struct sockaddr_in ifaddr;
 		memset (&mreq, 0, sizeof(mreq));
@@ -447,6 +461,7 @@ pgm_sockaddr_join_group (
 			return -1;
 		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
 		retval = setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+#endif /* !CONFIG_HAVE_IP_MREQN */
 		break;
 	}
 
@@ -481,7 +496,11 @@ pgm_sockaddr_join_source_group (
 {
 	int retval = -1;
 #ifdef CONFIG_HAVE_MCAST_JOIN
-/* Solaris:ip6(7P) "Takes a struct group_source_req as the parameter."
+/* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
+ * parameter."
+ * Solaris:ip6(7P) "Takes a struct group_source_req as the parameter."
+ * Different type for each family, however group_source_req is protocol-
+ * independent.
  *
  * RFC3678: Argument type struct group_source_req
  */
@@ -490,12 +509,14 @@ pgm_sockaddr_join_source_group (
 #elif defined(IP_ADD_SOURCE_MEMBERSHIP)
 	switch (sa_family) {
 	case AF_INET: {
-/* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
- * parameter."
+/* Solaris:ip(7P) "The following options take a struct ip_mreq as the
+ * parameter."  Incorrect literature wrt RFC.
  *
  * Linux:ip(7) absent.
  *
  * OS X:IP(4) absent.
+ *
+ * RFC3678: Argument type struct ip_mreq_source
  */
 		struct ip_mreq_source mreqs;
 		struct sockaddr_in ifaddr;
@@ -509,6 +530,8 @@ pgm_sockaddr_join_source_group (
 	}
 
 	case AF_INET6:
+/* No IPv6 API implemented, MCAST_JOIN_SOURCE_GROUP should be available instead.
+ */
 		retval = pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);
 		break;
 
