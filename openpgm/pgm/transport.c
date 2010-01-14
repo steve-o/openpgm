@@ -1137,6 +1137,10 @@ pgm_transport_bind (
 					      transport->use_multicast_loop) ||
 	    0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
 					      transport->send_gsr.gsr_group.ss_family,
+					      transport->use_multicast_loop) ||
+/* Windows */
+	    0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
+					      transport->recv_gsr[0].gsr_group.ss_family,
 					      transport->use_multicast_loop))
 	{
 		g_set_error (error,
