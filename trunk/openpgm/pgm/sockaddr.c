@@ -253,16 +253,26 @@ pgm_sockaddr_hdrincl (
 	)
 {
 	int retval = -1;
-#ifdef G_OS_UNIX
-	const gint optval = v;
-#else
-	const DWORD optval = v;
-#endif
 
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET: {
+#ifdef G_OS_UNIX
+/* Solaris:ip(7P)  Mentioned but not detailed.
+ *
+ * Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
+ * true.  If enabled, the user supplies an IP header in front of the user
+ * data."  Mentions only send-side, nothing about receive-side.
+ * Linux:raw(7) "For receiving the IP header is always included in the packet."
+ *
+ * FreeBSD,OS X:IP(4) provided by example "int hincl = 1;"
+ */
+		const gint optval = v;
+#else
+		const DWORD optval = v;
+#endif
 		retval = setsockopt (s, IPPROTO_IP, IP_HDRINCL, (const char*)&optval, sizeof(optval));
 		break;
+	}
 
 	case AF_INET6:  /* method only exists on Win32, just ignore */
 		retval = 0;
@@ -282,6 +292,19 @@ pgm_sockaddr_pktinfo (
 {
 	int retval = -1;
 #ifdef G_OS_UNIX
+/* Solaris:ip(7P) "The following options take in_pktinfo_t as the parameter"
+ * Completely different, although ip6(7P) is a little better, "The following
+ * options are boolean switches controlling the reception of ancillary data"
+ *
+ * Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
+ * true.  The argument is a flag that tells the socket whether the IP_PKTINFO
+ * message should be passed or not."
+ * Linux:ipv6(7) Not listed, however IPV6_PKTINFO is with "Argument is a pointer
+ * to a boolean value in an integer."
+ *
+ * Absent from FreeBSD & OS X, suggested replacement IP_RECVDSTADDR.
+ * OS X:IP6(4) "IPV6_PKTINFO int *"
+ */
 	const gint optval = v;
 #else
 	const DWORD optval = v;
@@ -315,6 +338,10 @@ pgm_sockaddr_router_alert (
 {
 	int retval = -1;
 #ifdef IP_ROUTER_ALERT
+/* Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
+ * true.  Expects an integer flag."
+ * Linux:ipv6(7) "Argument is a pointer to an integer."
+ */
 	const gint8 optval = v;
 
 	switch (sa_family) {
@@ -333,6 +360,8 @@ pgm_sockaddr_router_alert (
 
 	switch (sa_family) {
 	case AF_INET:
+/* Linux:ip(7) "The maximum option size for IPv4 is 40 bytes."
+ */
 		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&optval, sizeof(optval));
 		break;
 
@@ -342,11 +371,6 @@ pgm_sockaddr_router_alert (
 	return retval;
 }
 
-/* IP_TOS only works on Win32 with system override:
- * http://support.microsoft.com/kb/248611
- * TODO: Implement GQoS (IPv4 only), qWAVE QOS is Vista+ only
- */
-
 int
 pgm_sockaddr_tos (
 	const int	s,
@@ -355,12 +379,27 @@ pgm_sockaddr_tos (
 	)
 {
 	int retval = -1;
-	const gint optval = tos;
 
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET: {
+#ifdef G_OS_UNIX
+/* Solaris:ip(7P) "This option takes an integer argument as its input value."
+ *
+ * Linux:ip(7) "TOS is a byte."
+ *
+ * FreeBSD,OS X:IP(4) provided by example "int tos = IPTOS_LOWDELAY;"
+ */
+		const gint optval = tos;
+#else
+/* IP_TOS only works on Win32 with system override:
+ * http://support.microsoft.com/kb/248611
+ * TODO: Implement GQoS (IPv4 only), qWAVE QOS is Vista+ only
+ */
+		const DWORD optval = tos;
+#endif
 		retval = setsockopt (s, IPPROTO_IP, IP_TOS, (const char*)&optval, sizeof(optval));
 		break;
+	}
 
 	case AF_INET6:  /* TRAFFIC_CLASS not implemented */
 		break;
@@ -379,32 +418,54 @@ pgm_sockaddr_join_group (
 	const struct group_req*	gr
 	)
 {
+	int retval = -1;
 #ifdef CONFIG_HAVE_MCAST_JOIN
+/* Solaris:ip6(7P) "Takes a struct group_req as the parameter."
+ *
+ * RFC3678: Argument type struct group_source_req
+ */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	return setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, sizeof(struct group_req));
+	retval = setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, sizeof(struct group_req));
 #else
-	struct ip_mreq mreq;
-	struct ipv6_mreq mreq6;
-	struct sockaddr_in ifaddr;
-
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET: {
+/* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
+ * parameter."  Manpage would appear to be wrong.
+ *
+ * Linux:ip(7) "Argument is an ip_mreqn structure."
+ *
+ * FreeBSD,OS X:IP(4) provided by example "struct ip_mreq mreq;"
+ */
+		struct ip_mreq mreq;
+		struct sockaddr_in ifaddr;
 		memset (&mreq, 0, sizeof(mreq));
 		mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gr->gr_group)->sin_addr.s_addr;
 		if (!pgm_if_indextoaddr (gr->gr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
 			return -1;
 		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
-		return setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+		retval = setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+		break;
+	}
 
-	case AF_INET6:
+	case AF_INET6: {
+/* Solaris:ip6(7P) "Takes a struct ipv6_mreq as the parameter;"
+ *
+ * Linux:ipv6(7) "Argument is  a  pointer to a struct ipv6_mreq structure."
+ *
+ * OS X:IP6(4) "IPV6_JOIN_GROUP struct ipv6_mreq *"
+ */
+		struct ipv6_mreq mreq6;
 		memset (&mreq6, 0, sizeof(mreq6));
 		mreq6.ipv6mr_multiaddr = ((const struct sockaddr_in6*)&gr->gr_group)->sin6_addr;
 		mreq6.ipv6mr_interface = gr->gr_interface;
-		return setsockopt (s, SOL_IPV6, IPV6_ADD_MEMBERSHIP, (const char*)&mreq6, sizeof(mreq6));
+		retval = setsockopt (s, SOL_IPV6, IPV6_ADD_MEMBERSHIP, (const char*)&mreq6, sizeof(mreq6));
+		break;
+	}
 
-	default: g_assert_not_reached();
+	default: break;
 	}
 #endif /* CONFIG_HAVE_MCAST_JOIN */
+	return retval;
 }
 
 /* silently revert to ASM if SSM not supported */
@@ -415,30 +476,45 @@ pgm_sockaddr_join_source_group (
 	const struct group_source_req*	gsr
 	)
 {
+	int retval = -1;
 #ifdef CONFIG_HAVE_MCAST_JOIN
+/* Solaris:ip6(7P) "Takes a struct group_source_req as the parameter."
+ *
+ * RFC3678: Argument type struct group_source_req
+ */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	return setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
+	retval = setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
 #elif defined(IP_ADD_SOURCE_MEMBERSHIP)
-	struct ip_mreq_source mreqs;
-	struct sockaddr_in ifaddr;
-
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET: {
+/* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
+ * parameter."
+ *
+ * Linux:ip(7) absent.
+ *
+ * OS X:IP(4) absent.
+ */
+		struct ip_mreq_source mreqs;
+		struct sockaddr_in ifaddr;
 		memset (&mreqs, 0, sizeof(mreqs));
 		mreqs.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
 		mreqs.imr_sourceaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
 		pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL);
 		mreqs.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
-		return setsockopt (s, SOL_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
+		retval = setsockopt (s, SOL_IP, IP_ADD_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
+		break;
+	}
 
 	case AF_INET6:
-		return pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);
+		retval = pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);
+		break;
 
-	default: g_assert_not_reached();
+	default: break;
 	}
 #else
-	return pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);	
+	retval = pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);	
 #endif /* CONFIG_HAVE_MCAST_JOIN */
+	return retval;
 }
 
 int
@@ -449,23 +525,40 @@ pgm_sockaddr_multicast_if (
 	)
 {
 	int retval = -1;
-#ifdef G_OS_UNIX
-	const gint optval = ifindex;
-#else
-	const DWORD optval = ifindex;
-#endif
 
 	switch (address->sa_family) {
 	case AF_INET: {
+/* Solaris:ip(7P) "This option takes a struct in_addr as an argument, and it
+ * selects that interface for outgoing IP multicast packets."
+ *
+ * Linux:ip(7) "Argument is an ip_mreqn or ip_mreq structure similar to
+ * IP_ADD_MEMBERSHIP."
+ *
+ * OS X:IP(4) provided by example "struct in_addr addr;"
+ */
 		struct sockaddr_in s4;
 		memcpy (&s4, address, sizeof(s4));
 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&s4.sin_addr.s_addr, sizeof(struct in_addr));
 		break;
 	}
 
-	case AF_INET6:
+	case AF_INET6: {
+#ifdef G_OS_UNIX
+/* Solaris:ip6(7P) "This option takes an integer as an argument; the integer is the
+ * interface index of the selected interface."
+ *
+ * Linux:ipv6(7) "The argument is a pointer to an interface index (see 
+ * netdevice(7)) in an integer."
+ *
+ * OS X:IP6(4) "IPV6_MULTICAST_IF u_int *"
+ */
+		const gint optval = ifindex;
+#else
+		const DWORD optval = ifindex;
+#endif
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, (const char*)&optval, sizeof(optval));
 		break;
+	}
 
 	default: break;
 	}
@@ -484,6 +577,14 @@ pgm_sockaddr_multicast_loop (
 	switch (sa_family) {
 	case AF_INET: {
 #ifdef G_OS_UNIX
+/* Solaris:ip(7P) "Setting the unsigned character argument to 0 causes the
+ * opposite behavior, meaning that when multiple zones are present, the
+ * datagrams are delivered to all zones except the sending zone."
+ *
+ * Linux:ip(7) "Sets or reads a boolean integer argument"
+ *
+ * OS X:IP(4) provided by example "u_char loop;"
+ */
 		const gint8 optval = v;
 #else
 		const DWORD optval = v;
@@ -494,7 +595,13 @@ pgm_sockaddr_multicast_loop (
 
 	case AF_INET6: {
 #ifdef G_OS_UNIX
-		const gint optval = v;
+/* Solaris:ip(7P) "Setting the unsigned character argument to 0 will cause the opposite behavior."
+ *
+ * Linux:ipv6(7) "Argument is a pointer to boolean."
+ *
+ * OS X:IP6(7) "IPV6_MULTICAST_LOOP u_int *"
+ */
+		const gint8 optval = v;
 #else
 		const DWORD optval = v;
 #endif
@@ -506,6 +613,9 @@ pgm_sockaddr_multicast_loop (
 	}
 	return retval;
 }
+
+/* Only multicast hops, unicast hop-limit is not changed
+ */
 
 int
 pgm_sockaddr_multicast_hops (
@@ -519,6 +629,13 @@ pgm_sockaddr_multicast_hops (
 	switch (sa_family) {
 	case AF_INET: {
 #ifdef G_OS_UNIX
+/* Solaris:ip(7P) "This option takes an unsigned character as an argument."
+ *
+ * Linux:ip(7) "Argument is an integer."
+ *
+ * OS X:IP(4) provided by example for SOCK_DGRAM with IP_TTL: "int ttl = 60;",
+ * or for SOCK_RAW & SOCK_DGRAM with IP_MULTICAST_TTL: "u_char ttl;"
+ */
 		const gint8 optval = hops;
 #else
 		const DWORD optval = hops;
@@ -529,6 +646,12 @@ pgm_sockaddr_multicast_hops (
 
 	case AF_INET6: {
 #ifdef G_OS_UNIX
+/* Solaris:ip6(7P) "This option takes an integer as an argument."
+ *
+ * Linux:ipv6(7) "Argument is a pointer to an integer."
+ *
+ * OS X:IP6(7) "IPV6_MULTICAST_HOPS int *"
+ */
 		const gint optval = hops;
 #else
 		const DWORD optval = hops;
