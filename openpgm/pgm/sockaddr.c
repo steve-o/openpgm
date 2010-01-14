@@ -420,7 +420,9 @@ pgm_sockaddr_join_group (
 {
 	int retval = -1;
 #ifdef CONFIG_HAVE_MCAST_JOIN
-/* Solaris:ip6(7P) "Takes a struct group_req as the parameter."
+/* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
+ * parameter."
+ * Solaris:ip6(7P) "Takes a struct group_req as the parameter."
  *
  * RFC3678: Argument type struct group_source_req
  */
@@ -429,10 +431,11 @@ pgm_sockaddr_join_group (
 #else
 	switch (sa_family) {
 	case AF_INET: {
-/* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
- * parameter."  Manpage would appear to be wrong.
+/* Solaris:ip(7P) Just mentions "Join a multicast group."  Manpage muddles up
+ * ASM and SSM, mentioning struct ip_mreq for IP_ADD_SOURCE_MEMBERSHIP.
  *
- * Linux:ip(7) "Argument is an ip_mreqn structure."
+ * Linux:ip(7) "Argument is an ip_mreqn structure.  For compatibility, the old
+ * ip_mreq structure (present since Linux 1.2) is still supported."
  *
  * FreeBSD,OS X:IP(4) provided by example "struct ip_mreq mreq;"
  */
@@ -450,7 +453,7 @@ pgm_sockaddr_join_group (
 	case AF_INET6: {
 /* Solaris:ip6(7P) "Takes a struct ipv6_mreq as the parameter;"
  *
- * Linux:ipv6(7) "Argument is  a  pointer to a struct ipv6_mreq structure."
+ * Linux:ipv6(7) "Argument is a pointer to a struct ipv6_mreq structure."
  *
  * OS X:IP6(4) "IPV6_JOIN_GROUP struct ipv6_mreq *"
  */
