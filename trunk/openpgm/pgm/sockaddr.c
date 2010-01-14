@@ -253,14 +253,18 @@ pgm_sockaddr_hdrincl (
 	)
 {
 	int retval = -1;
+#ifdef G_OS_UNIX
 	const gint optval = v;
+#else
+	const DWORD optval = v;
+#endif
 
 	switch (sa_family) {
 	case AF_INET:
 		retval = setsockopt (s, IPPROTO_IP, IP_HDRINCL, (const char*)&optval, sizeof(optval));
 		break;
 
-	case AF_INET6:  /* method does not exist */
+	case AF_INET6:  /* method only exists on Win32, just ignore */
 		retval = 0;
 		break;
 
@@ -277,7 +281,11 @@ pgm_sockaddr_pktinfo (
 	)
 {
 	int retval = -1;
+#ifdef G_OS_UNIX
 	const gint optval = v;
+#else
+	const DWORD optval = v;
+#endif
 
 	switch (sa_family) {
 	case AF_INET:
@@ -333,6 +341,11 @@ pgm_sockaddr_router_alert (
 #endif
 	return retval;
 }
+
+/* IP_TOS only works on Win32 with system override:
+ * http://support.microsoft.com/kb/248611
+ * TODO: Implement GQoS (IPv4 only), qWAVE QOS is Vista+ only
+ */
 
 int
 pgm_sockaddr_tos (
@@ -436,6 +449,11 @@ pgm_sockaddr_multicast_if (
 	)
 {
 	int retval = -1;
+#ifdef G_OS_UNIX
+	const gint optval = ifindex;
+#else
+	const DWORD optval = ifindex;
+#endif
 
 	switch (address->sa_family) {
 	case AF_INET: {
@@ -446,7 +464,7 @@ pgm_sockaddr_multicast_if (
 	}
 
 	case AF_INET6:
-		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, (const char*)&ifindex, sizeof(ifindex));
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, (const char*)&optval, sizeof(optval));
 		break;
 
 	default: break;
@@ -465,13 +483,21 @@ pgm_sockaddr_multicast_loop (
 
 	switch (sa_family) {
 	case AF_INET: {
+#ifdef G_OS_UNIX
 		const gint8 optval = v;
+#else
+		const DWORD optval = v;
+#endif
 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
 		break;
 	}
 
 	case AF_INET6: {
+#ifdef G_OS_UNIX
 		const gint optval = v;
+#else
+		const DWORD optval = v;
+#endif
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
 		break;
 	}
@@ -492,13 +518,21 @@ pgm_sockaddr_multicast_hops (
 
 	switch (sa_family) {
 	case AF_INET: {
+#ifdef G_OS_UNIX
 		const gint8 optval = hops;
+#else
+		const DWORD optval = hops;
+#endif
 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_TTL, (const char*)&optval, sizeof(optval));
 		break;
 	}
 
 	case AF_INET6: {
+#ifdef G_OS_UNIX
 		const gint optval = hops;
+#else
+		const DWORD optval = hops;
+#endif
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char*)&optval, sizeof(optval));
 		break;
 	}
