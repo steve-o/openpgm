@@ -482,6 +482,13 @@ on_downstream (
 			memcpy (&(*source)->group_nla, dst_addr, pgm_sockaddr_len(dst_addr));
 		break;
 
+#ifdef CONFIG_PGM_POLLING
+	case PGM_POLL:
+		if (G_UNLIKELY(!pgm_on_poll (transport, *source, skb)))
+			goto out_discarded;
+		break;
+#endif
+
 	default:
 		g_trace ("Discarded unsupported PGM type packet.");
 		goto out_discarded;
