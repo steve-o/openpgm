@@ -317,6 +317,8 @@ struct pgm_poll {
     guint32	poll_sqn;		/* poll sequence number */
     guint16	poll_round;		/* poll round */
     guint16	poll_s_type;		/* poll sub-type */
+#define PGM_POLL_GENERAL	0x0	/* general poll  */
+#define PGM_POLL_DLR		0x1	/* DLR poll */
     guint16	poll_nla_afi;		/* nla afi */
     guint16	poll_reserved;		/* reserved */
     struct in_addr poll_nla;		/* path nla */
@@ -434,6 +436,8 @@ gboolean pgm_verify_spmr (const struct pgm_sk_buff_t* const);
 gboolean pgm_verify_nak (const struct pgm_sk_buff_t* const);
 gboolean pgm_verify_nnak (const struct pgm_sk_buff_t* const);
 gboolean pgm_verify_ncf (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_poll (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_polr (const struct pgm_sk_buff_t* const);
 
 const char* pgm_type_string (guint8) G_GNUC_WARN_UNUSED_RESULT;
 const char* pgm_udpport_string (int) G_GNUC_WARN_UNUSED_RESULT;

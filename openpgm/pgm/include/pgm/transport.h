@@ -207,7 +207,9 @@ struct pgm_peer_t {
 	pgm_tsi_t		tsi;
 	struct sockaddr_storage	group_nla;
 	struct sockaddr_storage	nla, local_nla;		/* nla = advertised, local_nla = from packet */
+	struct sockaddr_storage poll_nla;		/* from parent to direct poll-response */
 	struct sockaddr_storage	redirect_nla;		/* from dlr */
+	pgm_time_t		polr_expiry;
 	pgm_time_t		spmr_expiry;
 	pgm_time_t		spmr_tstamp;
 
@@ -223,6 +225,8 @@ struct pgm_peer_t {
 	guint32			spm_sqn;
 	pgm_time_t		expiry;
 
+	guint32			last_poll_sqn;
+	guint16			last_poll_round;
 	pgm_time_t		last_packet;
 	guint			last_commit;
 	guint32			lost_count;
@@ -241,6 +245,7 @@ struct pgm_transport_t {
 	guint16			dport;
 	guint16			udp_encap_ucast_port;
 	guint16			udp_encap_mcast_port;
+	guint32			rand_node_id;			/* node identifier */
 
 	GStaticRWLock		lock;				/* running / destroyed */
 	GStaticMutex		receiver_mutex;			/* receiver API */
