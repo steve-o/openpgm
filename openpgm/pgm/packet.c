@@ -674,6 +674,33 @@ pgm_print_spm (
 
 #define PGM_MIN_POLL_SIZE	( sizeof(struct pgm_poll) )
 
+gboolean
+pgm_verify_poll (
+	const struct pgm_sk_buff_t* const	skb
+	)
+{
+/* pre-conditions */
+	g_assert (NULL != skb);
+
+	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
+	switch (g_ntohs (poll4->poll_nla_afi)) {
+/* truncated packet */
+	case AFI_IP6:
+		if (G_UNLIKELY(skb->len < sizeof(struct pgm_poll6)))
+			return FALSE;
+		break;
+	case AFI_IP:
+		if (G_UNLIKELY(skb->len < sizeof(struct pgm_poll)))
+			return FALSE;
+		break;
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 static
 gboolean
 pgm_print_poll (
@@ -782,6 +809,20 @@ pgm_print_poll (
  * | Option Extensions when present ...                            |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ... -+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
+
+gboolean
+pgm_verify_polr (
+	const struct pgm_sk_buff_t* const	skb
+	)
+{
+/* pre-conditions */
+	g_assert (NULL != skb);
+
+/* truncated packet */
+	if (G_UNLIKELY(skb->len < sizeof(struct pgm_polr)))
+		return FALSE;
+	return TRUE;
+}
 
 static
 gboolean

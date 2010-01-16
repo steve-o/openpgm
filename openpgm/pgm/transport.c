@@ -656,6 +656,11 @@ pgm_transport_bind (
 	transport->rand_ = g_rand_new();
 	g_assert (transport->rand_);
 
+/* PGM Children support of POLLs requires 32-bit random node identifier RAND_NODE_ID */
+	if (transport->can_recv_data) {
+		transport->rand_node_id = g_rand_int (transport->rand_);
+	}
+
 	if (transport->can_send_data) {
 		if (0 != pgm_notify_init (&transport->rdata_notify)) {
 			g_set_error (error,
@@ -1132,16 +1137,18 @@ pgm_transport_bind (
 
 /* multicast loopback */
 	g_trace ("INFO","set multicast loopback.");
+#ifdef G_OS_UNIX
 	if (0 != pgm_sockaddr_multicast_loop (transport->send_sock,
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->use_multicast_loop) ||
 	    0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
 					      transport->send_gsr.gsr_group.ss_family,
-					      transport->use_multicast_loop) ||
-/* Windows */
-	    0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
+					      transport->use_multicast_loop))
+#else /* G_OS_WIN32 */
+	if (0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
 					      transport->recv_gsr[0].gsr_group.ss_family,
 					      transport->use_multicast_loop))
+#endif /* G_OS_WIN32 */
 	{
 		g_set_error (error,
 			     PGM_TRANSPORT_ERROR,

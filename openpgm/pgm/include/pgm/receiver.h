@@ -54,6 +54,7 @@ G_GNUC_INTERNAL gboolean pgm_on_peer_nak (pgm_transport_t* const, pgm_peer_t* co
 G_GNUC_INTERNAL gboolean pgm_on_data (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gboolean pgm_on_ncf (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 G_GNUC_INTERNAL gboolean pgm_on_spm (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+G_GNUC_INTERNAL gboolean pgm_on_poll (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 
