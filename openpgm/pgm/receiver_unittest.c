@@ -173,6 +173,15 @@ mock_pgm_verify_ncf (
 	return TRUE;
 }
 
+static
+gboolean
+mock_pgm_verify_poll (
+	const struct pgm_sk_buff_t* const       skb
+	)
+{
+	return TRUE;
+}
+
 /* receive window module */
 static
 pgm_rxw_t*
@@ -323,6 +332,7 @@ mock_pgm_histogram_add (
 #define pgm_verify_spm		mock_pgm_verify_spm
 #define pgm_verify_nak		mock_pgm_verify_nak
 #define pgm_verify_ncf		mock_pgm_verify_ncf
+#define pgm_verify_poll		mock_pgm_verify_poll
 #define pgm_sendto		mock_pgm_sendto
 #define pgm_time_now		mock_pgm_time_now
 #define pgm_time_update_now	mock_pgm_time_update_now

@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,9 @@
 #ifdef CONFIG_HAVE_RTC
 #	include <sys/ioctl.h>
 #	include <linux/rtc.h>
+#endif
+#ifdef CONFIG_HAVE_HPET
+#	include <sys/mman.h>
 #endif
 
 #include <glib.h>
@@ -62,6 +66,7 @@
 #define usecs_to_nsecs(t)	( (pgm_time_t)(t) * 1000 )
 #define nsecs_to_msecs(t)	( (t) / 1000000UL )
 #define nsecs_to_usecs(t)	( (t) / 1000 )
+#define fsecs_to_usecs(t)	( (t) / 1000000000UL )
 
 pgm_time_update_func pgm_time_update_now;
 pgm_time_sleep_func pgm_time_sleep;
@@ -93,7 +98,7 @@ static pgm_time_t select_sleep (gulong);
 
 #ifdef CONFIG_HAVE_RTC
 static int rtc_init (void);
-static int rtc_shutdown (void);
+static gboolean rtc_shutdown (void);
 static pgm_time_t rtc_update (void);
 static pgm_time_t rtc_sleep (gulong);
 #endif
@@ -107,6 +112,12 @@ static guint32 tsc_us_mul = 0;
 static int tsc_init (void);
 static pgm_time_t tsc_update (void);
 static pgm_time_t tsc_sleep (gulong);
+#endif
+
+#ifdef CONFIG_HAVE_HPET
+static int hpet_init (void);
+static gboolean hpet_shutdown (void);
+static pgm_time_t hpet_update (void);
 #endif
 
 #ifdef CONFIG_HAVE_PPOLL
@@ -185,6 +196,11 @@ pgm_time_init (void)
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':	pgm_time_update_now = tsc_update;
+			pgm_time_since_epoch = pgm_time_conv_from_reset;
+			break;
+#endif
+#ifdef CONFIG_HAVE_HPET
+	case 'H':	pgm_time_update_now = hpet_update;
 			pgm_time_since_epoch = pgm_time_conv_from_reset;
 			break;
 #endif
@@ -272,6 +288,13 @@ pgm_time_init (void)
 	}
 #endif /* CONFIG_HAVE_TSC */
 
+#ifdef CONFIG_HAVE_HPET
+	if (pgm_time_update_now == hpet_update)
+	{
+		hpet_init();
+	}
+#endif
+
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	if (pgm_time_sleep == clock_nano_sleep)
 	{
@@ -316,6 +339,10 @@ pgm_time_shutdown (void)
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 		success = rtc_shutdown ();
+#endif
+#ifdef CONFIG_HAVE_HPET
+	if (pgm_time_update_now == hpet_update)
+		success = hpet_shutdown ();
 #endif
 	time_got_initialized = !success;
 	return TRUE;
@@ -410,7 +437,7 @@ rtc_shutdown (void)
 	g_return_val_if_fail (rtc_fd, FALSE);
 	g_warn_if_fail (0 == close (rtc_fd));
 	rtc_fd = -1;
-	return FALSE;
+	return TRUE;
 }
 
 static
@@ -555,6 +582,78 @@ tsc_sleep (gulong usec)
 		return pgm_time_update_now();
 }
 #endif /* CONFIG_HAVE_TSC */
+
+#ifdef CONFIG_HAVE_HPET
+#define HPET_MMAP_SIZE			1024
+#define HPET_CAPS			0x000
+#define HPET_PERIOD			0x004
+#define HPET_COUNTER			0x0f0
+#define HPET_CAPS_COUNTER_64BIT		(1 << 13)
+#if defined(__x86_64__)
+typedef guint64 hpet_counter_t;
+#else
+typedef guint32 hpet_counter_t;
+#endif
+static int hpet_fd = -1;
+static unsigned char *hpet_ptr;
+static guint64 hpet_period;
+static guint64 hpet_offset = 0;
+static guint64 hpet_wrap;
+static hpet_counter_t hpet_last = 0;
+
+static
+int
+hpet_init (void)
+{
+	g_return_val_if_fail (hpet_fd == -1, -1);
+
+	hpet_fd = open("/dev/hpet", O_RDONLY);
+	if (hpet_fd < 0) {
+		g_error ("Cannot open /dev/hpet for reading.");
+		return -1;
+	}
+
+	hpet_ptr = (unsigned char*)mmap(NULL, HPET_MMAP_SIZE, PROT_READ, MAP_SHARED, hpet_fd, 0);
+	if (MAP_FAILED == hpet_ptr) {
+		g_error ("Error mapping HPET: %s", g_strerror(errno));
+		close (hpet_fd);
+		hpet_fd = -1;
+		return -1;
+	}
+
+/* HPET period is in femto-seconds */
+	hpet_period = *((guint32*)(hpet_ptr + HPET_PERIOD));
+#if defined(__x86_64__)
+	const guint32 hpet_caps = *((guint32*)(hpet_ptr + HPET_CAPS));
+	hpet_wrap = hpet_caps & HPET_CAPS_COUNTER_64BIT ? 0 : (1ULL << 32);
+#else
+	hpet_wrap = 1ULL << 32;
+#endif
+
+	return 0;
+}
+
+static
+gboolean
+hpet_shutdown (void)
+{
+	g_return_val_if_fail (hpet_fd, FALSE);
+	g_warn_if_fail (0 == close (hpet_fd));
+	hpet_fd = -1;
+	return TRUE;
+}
+
+static
+pgm_time_t
+hpet_update (void)
+{
+	const hpet_counter_t hpet_count = *((hpet_counter_t*)(hpet_ptr + HPET_COUNTER));
+	if (G_UNLIKELY(hpet_count < hpet_last))
+		hpet_offset += hpet_wrap;
+	hpet_last = hpet_count;
+	return fsecs_to_usecs((hpet_offset + hpet_count) * hpet_period);
+}
+#endif /* CONFIG_HAVE_HPET */
 
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 static clockid_t g_clock_id;

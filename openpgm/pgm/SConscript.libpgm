@@ -70,26 +70,26 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('pgm_unittest.c');
 	te.Program (['gsi_unittest.c', e.Object('md5.c')]);
 	te.Program ('tsi_unittest.c');
-	te.Program (['if_unittest.c', e.Object('inet_network.c')]);
-	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c')]);
-	te.Program (['source_unittest.c']);
-	te.Program (['receiver_unittest.c', e.Object('tsi.c')]);
-	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c')]);
+	te.Program (['if_unittest.c', e.Object('inet_network.c'), e.Object('sockaddr.c')]);
+	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('sockaddr.c')]);
+	te.Program (['source_unittest.c', e.Object('sockaddr.c')]);
+	te.Program (['receiver_unittest.c', e.Object('tsi.c'), e.Object('sockaddr.c')]);
+	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c'), e.Object('sockaddr.c')]);
 	te.Program ('md5_unittest.c');
-	te.Program ('getifaddrs_unittest.c');
-	te.Program ('inet_network_unittest.c');
-	te.Program (['getnodeaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c')]);
-	te.Program (['indextoaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
-	te.Program ('net_unittest.c');
+	te.Program (['getifaddrs_unittest.c', e.Object('sockaddr.c')]);
+	te.Program (['inet_network_unittest.c', e.Object('sockaddr.c')]);
+	te.Program (['getnodeaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('sockaddr.c')]);
+	te.Program (['indextoaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c')]);
+	te.Program (['net_unittest.c', e.Object('sockaddr.c')]);
 	te.Program ('timer_unittest.c');
 	te.Program ('time_unittest.c');
-	te.Program ('signal_unittest.c');
+	te.Program (['signal_unittest.c', e.Object('sockaddr.c')]);
 	te.Program (['reed_solomon_unittest.c', e.Object('galois_tables.c')]);
 	te.Program ('rate_control_unittest.c');
 	te.Program ('checksum_unittest.c');
-	te.Program (['packet_unittest.c', e.Object('checksum.c')]);
+	te.Program (['packet_unittest.c', e.Object('checksum.c'), e.Object('sockaddr.c')]);
 	te.Program ('async_unittest.c');
-	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
+	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c')]);
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
