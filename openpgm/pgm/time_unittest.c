@@ -214,7 +214,8 @@ make_master_suite (void)
 int
 main (void)
 {
-	setenv ("PGM_TIMER", "GTOD", 1);
+//	setenv ("PGM_TIMER", "GTOD", 1);
+	setenv ("PGM_TIMER", "HPET", 1);
 	setenv ("PGM_SLEEP", "USLEEP", 1);
 
 	SRunner* sr = srunner_create (make_master_suite ());
