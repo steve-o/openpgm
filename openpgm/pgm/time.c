@@ -220,29 +220,44 @@ pgm_time_init (void)
 	pgm_time_since_epoch = pgm_time_conv;
 
 	switch (cfg[0]) {
-	case 'F':	pgm_time_update_now = ftime_update; break;
+	case 'F':
+		g_debug ("Using ftime() timer.");
+		pgm_time_update_now = ftime_update;
+		break;
 
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
-	case 'C':	pgm_time_update_now = clock_update; break;
+	case 'C':
+		g_debug ("Using clock_gettime() timer.");
+		pgm_time_update_now = clock_update;
+		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
-	case 'R':	pgm_time_update_now = rtc_update;
-			pgm_time_since_epoch = pgm_time_conv_from_reset;
-			break;
+	case 'R':
+		g_debug ("Using /dev/rtc timer.");
+		pgm_time_update_now = rtc_update;
+		pgm_time_since_epoch = pgm_time_conv_from_reset;
+		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
-	case 'T':	pgm_time_update_now = tsc_update;
-			pgm_time_since_epoch = pgm_time_conv_from_reset;
-			break;
+	case 'T':
+		g_debug ("Using TSC timer.");
+		pgm_time_update_now = tsc_update;
+		pgm_time_since_epoch = pgm_time_conv_from_reset;
+		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
-	case 'H':	pgm_time_update_now = hpet_update;
-			pgm_time_since_epoch = pgm_time_conv_from_reset;
-			break;
+	case 'H':
+		g_debug ("Using HPET timer.");
+		pgm_time_update_now = hpet_update;
+		pgm_time_since_epoch = pgm_time_conv_from_reset;
+		break;
 #endif
 
 	default:
-	case 'G':	pgm_time_update_now = gettimeofday_update; break;
+	case 'G':
+		g_debug ("Using gettimeofday() timer.");
+		pgm_time_update_now = gettimeofday_update;
+		break;
 	}
 
 /* sleeping */
@@ -251,37 +266,59 @@ pgm_time_init (void)
 
 	switch (cfg[0]) {
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
-	case 'C':	pgm_time_sleep = clock_nano_sleep; break;
+	case 'C':
+		g_debug ("Using clock_nanosleep() sleep.");
+		pgm_time_sleep = clock_nano_sleep;
+		break;
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
-	case 'N':	pgm_time_sleep = nano_sleep; break;
+	case 'N':
+		g_debug ("Using nanosleep() sleep.");
+		pgm_time_sleep = nano_sleep;
+		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
-	case 'R':	pgm_time_sleep = rtc_sleep; break;
+	case 'R':
+		g_debug ("Using /dev/rtc sleep.");
+		pgm_time_sleep = rtc_sleep;
+		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
-	case 'T':	pgm_time_sleep = tsc_sleep; break;
+	case 'T':
+		g_debug ("Using TSC sleep.");
+		pgm_time_sleep = tsc_sleep;
+		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
-	case 'H':	pgm_time_sleep = hpet_sleep; break;
+	case 'H':
+		g_debug ("Using HPET sleep.");
+		pgm_time_sleep = hpet_sleep;
+		break;
 #endif
 #ifdef CONFIG_HAVE_PPOLL
-	case 'P':	pgm_time_sleep = poll_sleep; break;
+	case 'P':
+		g_debug ("Using ppoll() sleep.");
+		pgm_time_sleep = poll_sleep;
+		break;
 #endif
 
 	default:
 #ifdef CONFIG_HAVE_USLEEP
 	case 'M':
 	case 'U':
-			pgm_time_sleep = usleep_sleep; break;
-
-	case 'S':	pgm_time_sleep = select_sleep; break;
+		g_debug ("Using usleep() sleep.");
+		pgm_time_sleep = usleep_sleep;
+		break;
 #elif defined(G_OS_WIN32)
-	case 'M':	pgm_time_sleep = msleep; break;
-	case 'S':	pgm_time_sleep = select_sleep; break;
-#else
-	case 'S':	pgm_time_sleep = select_sleep; break;
+	case 'M':
+		g_debug ("Using msleep() sleep.");
+		pgm_time_sleep = msleep;
+		break;
 #endif /* CONFIG_HAVE_USLEEP */
+	case 'S':
+		g_debug ("Using select() sleep.");
+		pgm_time_sleep = select_sleep;
+		break;
 	}
 
 #ifdef CONFIG_HAVE_RTC
@@ -293,6 +330,7 @@ pgm_time_init (void)
 #ifdef CONFIG_HAVE_TSC
 	if (pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
 	{
+#ifdef G_OS_UNIX
 /* attempt to parse clock ticks from kernel
  */
 		FILE* fp = fopen ("/proc/cpuinfo", "r");
@@ -311,6 +349,13 @@ pgm_time_init (void)
 			}
 			fclose (fp);
 		}
+#else
+		guint64 frequency;
+		if (QueryPerformanceFrequency ((LARGE_INTEGER*)&frequency))
+		{
+			tsc_mhz = frequency / 1000;
+		}
+#endif /* !G_OS_UNIX */
 
 /* e.g. export RDTSC_FREQUENCY=3200.000000
  *
@@ -531,12 +576,18 @@ static inline
 pgm_time_t
 rdtsc (void)
 {
+#ifdef G_OS_UNIX
 	guint32 lo, hi;
 
 /* We cannot use "=A", since this would use %rax on x86_64 */
 	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
 
 	return (pgm_time_t)hi << 32 | lo;
+#else
+	guint64 counter;
+	QueryPerformanceCounter ((LARGE_INTEGER*)&counter);
+	return (pgm_time_t)counter;
+#endif
 }
 
 /* determine ratio of ticks to nano-seconds, use /dev/rtc for high accuracy
