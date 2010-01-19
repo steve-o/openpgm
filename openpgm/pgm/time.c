@@ -66,6 +66,7 @@
 #define usecs_to_nsecs(t)	( (pgm_time_t)(t) * 1000 )
 #define nsecs_to_msecs(t)	( (t) / 1000000UL )
 #define nsecs_to_usecs(t)	( (t) / 1000 )
+#define fsecs_to_nsecs(t)	( (t) / 1000000UL )
 #define fsecs_to_usecs(t)	( (t) / 1000000000UL )
 
 pgm_time_update_func pgm_time_update_now;
@@ -115,9 +116,14 @@ static pgm_time_t tsc_sleep (gulong);
 #endif
 
 #ifdef CONFIG_HAVE_HPET
+#define HPET_NS_SCALE	22
+#define HPET_US_SCALE	34
+static guint32 hpet_ns_mul = 0;
+static guint32 hpet_us_mul = 0;
 static int hpet_init (void);
 static gboolean hpet_shutdown (void);
 static pgm_time_t hpet_update (void);
+static pgm_time_t hpet_sleep (gulong);
 #endif
 
 #ifdef CONFIG_HAVE_PPOLL
@@ -129,7 +135,7 @@ static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
 
 /* TSC helper functions */
 #ifdef CONFIG_HAVE_TSC
-static inline
+static
 void
 set_tsc_mul (
 	const guint32		khz
@@ -159,6 +165,36 @@ tsc_to_us (
 	return (tsc * tsc_us_mul) >> TSC_US_SCALE;
 }
 #endif /* CONFIG_HAVE_TSC */
+
+#ifdef CONFIG_HAVE_HPET
+static
+void
+set_hpet_mul (
+	const guint32		hpet_period
+	)
+{
+	hpet_ns_mul = fsecs_to_nsecs((guint64)hpet_period << HPET_NS_SCALE);
+	hpet_us_mul = fsecs_to_usecs((guint64)hpet_period << HPET_US_SCALE);
+}
+
+static
+guint64
+hpet_to_ns (
+	const guint64	hpet
+	)
+{
+	return (hpet * hpet_ns_mul) >> HPET_NS_SCALE;
+}
+
+static
+guint64
+hpet_to_us (
+	const guint64		hpet
+	)
+{
+	return (hpet * hpet_us_mul) >> HPET_US_SCALE;
+}
+#endif /* CONFIG_HAVE_HPET */
 
 /* initialize time system.
  *
@@ -226,6 +262,9 @@ pgm_time_init (void)
 #ifdef CONFIG_HAVE_TSC
 	case 'T':	pgm_time_sleep = tsc_sleep; break;
 #endif
+#ifdef CONFIG_HAVE_HPET
+	case 'H':	pgm_time_sleep = hpet_sleep; break;
+#endif
 #ifdef CONFIG_HAVE_PPOLL
 	case 'P':	pgm_time_sleep = poll_sleep; break;
 #endif
@@ -289,7 +328,7 @@ pgm_time_init (void)
 #endif /* CONFIG_HAVE_TSC */
 
 #ifdef CONFIG_HAVE_HPET
-	if (pgm_time_update_now == hpet_update)
+	if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
 	{
 		hpet_init();
 	}
@@ -341,7 +380,7 @@ pgm_time_shutdown (void)
 		success = rtc_shutdown ();
 #endif
 #ifdef CONFIG_HAVE_HPET
-	if (pgm_time_update_now == hpet_update)
+	if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
 		success = hpet_shutdown ();
 #endif
 	time_got_initialized = !success;
@@ -584,11 +623,11 @@ tsc_sleep (gulong usec)
 #endif /* CONFIG_HAVE_TSC */
 
 #ifdef CONFIG_HAVE_HPET
-#define HPET_MMAP_SIZE			1024
-#define HPET_CAPS			0x000
-#define HPET_PERIOD			0x004
-#define HPET_COUNTER			0x0f0
-#define HPET_CAPS_COUNTER_64BIT		(1 << 13)
+#define HPET_MMAP_SIZE			0x400
+#define HPET_GENERAL_CAPS_REGISTER	0x00
+#define HPET_COUNTER_CLK_PERIOD		0x004
+#define HPET_MAIN_COUNTER_REGISTER	0x0f0
+#define HPET_COUNT_SIZE_CAP		(1 << 13)
 #if defined(__x86_64__)
 typedef guint64 hpet_counter_t;
 #else
@@ -596,7 +635,6 @@ typedef guint32 hpet_counter_t;
 #endif
 static int hpet_fd = -1;
 static unsigned char *hpet_ptr;
-static guint64 hpet_period;
 static guint64 hpet_offset = 0;
 static guint64 hpet_wrap;
 static hpet_counter_t hpet_last = 0;
@@ -621,11 +659,14 @@ hpet_init (void)
 		return -1;
 	}
 
-/* HPET period is in femto-seconds */
-	hpet_period = *((guint32*)(hpet_ptr + HPET_PERIOD));
+/* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
+ * the value must be <= 0x05f5e100 or 100ns.
+ */
+	const guint32 hpet_period = *((guint32*)(hpet_ptr + HPET_COUNTER_CLK_PERIOD));
+	set_hpet_mul (hpet_period);
 #if defined(__x86_64__)
-	const guint32 hpet_caps = *((guint32*)(hpet_ptr + HPET_CAPS));
-	hpet_wrap = hpet_caps & HPET_CAPS_COUNTER_64BIT ? 0 : (1ULL << 32);
+	const guint32 hpet_caps = *((guint32*)(hpet_ptr + HPET_GENERAL_CAPS_REGISTER));
+	hpet_wrap = hpet_caps & HPET_COUNT_SIZE_CAP ? 0 : (1ULL << 32);
 #else
 	hpet_wrap = 1ULL << 32;
 #endif
@@ -647,11 +688,32 @@ static
 pgm_time_t
 hpet_update (void)
 {
-	const hpet_counter_t hpet_count = *((hpet_counter_t*)(hpet_ptr + HPET_COUNTER));
+	const hpet_counter_t hpet_count = *((hpet_counter_t*)(hpet_ptr + HPET_MAIN_COUNTER_REGISTER));
+/* 32-bit HPET counters wrap after ~4 minutes */
 	if (G_UNLIKELY(hpet_count < hpet_last))
 		hpet_offset += hpet_wrap;
 	hpet_last = hpet_count;
-	return fsecs_to_usecs((hpet_offset + hpet_count) * hpet_period);
+	return hpet_to_us (hpet_offset + hpet_count);
+}
+
+static
+pgm_time_t
+hpet_sleep (gulong usec)
+{
+	guint64 now;
+	const guint64 start = hpet_update();
+	const guint64 end   = start + usec;
+
+	for (;;) {
+		now = hpet_update();
+		if (now < end) g_thread_yield();
+		else break;
+	}
+
+	if (pgm_time_update_now == hpet_update)
+		return now;
+	else
+		return pgm_time_update_now();
 }
 #endif /* CONFIG_HAVE_HPET */
 
