@@ -299,8 +299,18 @@ mock_gethostbyname (
 			aliases[1] = NULL;
 			he.h_aliases	= aliases;
 			he.h_addrtype	= host_family;
-			he.h_length	= pgm_sockaddr_addr_len (&host->address);
-			addr_list[0] = (char*)pgm_sockaddr_addr (&host->address);
+			switch (host->address.ss_family){
+			case AF_INET:
+				he.h_length	= sizeof (struct in_addr);
+				addr_list[0]	= (char*)&host->address + G_STRUCT_OFFSET(struct sockaddr_in, sin_addr);
+				break;
+			case AF_INET6:
+				he.h_length	= sizeof (struct in6_addr);
+				addr_list[0]	= (char*)&host->address + G_STRUCT_OFFSET(struct sockaddr_in6, sin6_addr);
+				break;
+			default:
+				g_assert_not_reached();
+			}
 			addr_list[1] = NULL;
 			he.h_addr_list	= addr_list;
 			return &he;

@@ -40,13 +40,17 @@ for htdoc in htdocs:
 
 if env['WITH_CHECK'] == 'true':
 	te = e.Clone();
+# add new suffix so we can re-use libpgm objects
+ 	te['SHOBJSUFFIX'] = '.http' + te['SHOBJSUFFIX'];
+	te['OBJSUFFIX']   = '.http' + te['OBJSUFFIX'];
+
 	newCCFLAGS = [];
 	for flag in te['CCFLAGS']:
 		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
 	te.ParseConfig ('pkg-config --static --cflags --libs check');
-	te.Program ('http_unittest.c');
+	te.Program (['http_unittest.c', te.Object('sockaddr.c')]);
 
 
 # end of file
