@@ -208,7 +208,7 @@ struct pgm_opt_fragment {
  */
 struct pgm_opt_nak_list {
     guint8	opt_reserved;		/* reserved */
-#ifdef __USE_ISOC99
+#if (__STDC_VERSION__ >= 199901L)
     guint32	opt_sqn[];		/* requested sequence number [62] */
 #else
     guint32	opt_sqn[0];

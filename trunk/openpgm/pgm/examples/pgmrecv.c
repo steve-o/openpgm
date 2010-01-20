@@ -28,11 +28,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
-#include <sys/time.h>
 #include <sys/types.h>
 
 #include <glib.h>
@@ -41,8 +39,10 @@
 #	include <netdb.h>
 #	include <arpa/inet.h>
 #	include <netinet/in.h>
+#	include <unistd.h>
 #	include <sys/socket.h>
 #	include <sys/uio.h>
+#	include <sys/time.h>
 #endif
 
 #include <pgm/pgm.h>
@@ -431,7 +431,11 @@ receiver_thread (
 	fd_set readfds;
 #else /* G_OS_WIN32 */
 	int n_handles = 3;
+#  if (__STDC_VERSION__ >= 199901L)
 	HANDLE waitHandles[ n_handles ];
+#  else
+	HANDLE* waitHandles = (HANDLE*)g_malloc (n_handles * sizeof(HANDLE));;
+#  endif
 	DWORD timeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
 
@@ -512,6 +516,9 @@ block:
 #elif defined(G_OS_WIN32)
 	WSACloseEvent (recvEvent);
 	WSACloseEvent (pendingEvent);
+#  if (__STDC_VERSION__ < 199901L)
+	g_free (waitHandles);
+#  endif
 #endif
 	return NULL;
 }
