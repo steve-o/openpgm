@@ -70,6 +70,7 @@ static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint16 len)
 {
 	g_error ("skput:over: %d put:%d",
 		    skb->len, len);
+	g_assert_not_reached();
 }
 
 static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint16 len) G_GNUC_NORETURN;
@@ -77,6 +78,7 @@ static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint16 len)
 {
 	g_error ("skput:under: %d put:%d",
 		    skb->len, len);
+	g_assert_not_reached();
 }
 
 static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint16 size)
