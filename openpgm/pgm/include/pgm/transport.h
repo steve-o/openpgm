@@ -62,6 +62,11 @@ typedef struct pgm_transport_t pgm_transport_t;
 #endif
 
 
+#ifndef IP_MAX_MEMBERSHIPS
+#	define IP_MAX_MEMBERSHIPS	20
+#endif
+
+
 #define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
 
 

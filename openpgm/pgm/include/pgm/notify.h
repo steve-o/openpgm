@@ -22,8 +22,10 @@
 #ifndef __PGM_NOTIFY_H__
 #define __PGM_NOTIFY_H__
 
-#include <unistd.h>
 #include <fcntl.h>
+#ifdef G_OS_UNIX
+#	include <unistd.h>
+#endif
 
 #include <glib.h>
 
