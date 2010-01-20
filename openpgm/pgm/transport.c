@@ -151,17 +151,29 @@ pgm_transport_destroy (
 /* cancel running blocking operations */
 	if (-1 != transport->recv_sock) {
 		g_trace ("INFO","closing receive socket.");
+#ifdef G_OS_UNIX
 		close (transport->recv_sock);
+#else
+		closesocket (transport->recv_sock);
+#endif
 		transport->recv_sock = -1;
 	}
 	if (-1 != transport->recv_sock2) {
 		g_trace ("INFO","closing receive socket2.");
+#ifdef G_OS_UNIX
 		close (transport->recv_sock2);
+#else
+		closesocket (transport->recv_sock2);
+#endif
 		transport->recv_sock2 = -1;
 	}
 	if (-1 != transport->send_sock) {
 		g_trace ("INFO","closing send socket.");
+#ifdef G_OS_UNIX
 		close (transport->send_sock);
+#else
+		closesocket (transport->send_sock);
+#endif
 		transport->send_sock = -1;
 	}
 	g_static_rw_lock_reader_unlock (&transport->lock);
@@ -214,7 +226,11 @@ pgm_transport_destroy (
 	}
 	if (transport->send_with_router_alert_sock) {
 		g_trace ("INFO","closing send with router alert socket.");
-		close(transport->send_with_router_alert_sock);
+#ifdef G_OS_UNIX
+		close (transport->send_with_router_alert_sock);
+#else
+		closesocket (transport->send_with_router_alert_sock);
+#endif
 		transport->send_with_router_alert_sock = 0;
 	}
 	if (transport->spm_heartbeat_interval) {
@@ -421,19 +437,35 @@ pgm_transport_create (
 
 err_destroy:
 	if (-1 != new_transport->recv_sock) {
+#ifdef G_OS_UNIX
 		close (new_transport->recv_sock);
+#else
+		closesocket (new_transport->recv_sock);
+#endif
 		new_transport->recv_sock = -1;
 	}
 	if (-1 != new_transport->recv_sock2) {
+#ifdef G_OS_UNIX
 		close (new_transport->recv_sock2);
+#else
+		closesocket (new_transport->recv_sock2);
+#endif
 		new_transport->recv_sock2 = -1;
 	}
 	if (-1 != new_transport->send_sock) {
+#ifdef G_OS_UNIX
 		close (new_transport->send_sock);
+#else
+		closesocket (new_transport->send_sock);
+#endif
 		new_transport->send_sock = -1;
 	}
 	if (-1 != new_transport->send_with_router_alert_sock) {
+#ifdef G_OS_UNIX
 		close (new_transport->send_with_router_alert_sock);
+#else
+		closesocket (new_transport->send_with_router_alert_sock);
+#endif
 		new_transport->send_with_router_alert_sock = -1;
 	}
 	g_free (new_transport);
