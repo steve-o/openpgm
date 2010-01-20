@@ -116,7 +116,9 @@ env = Environment(
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
-	LINKFLAGS = [	'-pipe'
+	LINKFLAGS = [	'-pipe',
+			'-lmno-cygwin',
+			'-lmsvcr90'
 		    ],
 	LIBS = [ 'iphlpapi.lib', 'ws2_32.lib' ]
 )
