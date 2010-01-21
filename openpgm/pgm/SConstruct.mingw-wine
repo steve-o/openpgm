@@ -113,6 +113,7 @@ env = Environment(
 			'-D_WIN32_WINNT=0x0501',
 			'-DCONFIG_HAVE_IFR_NETMASK',
 			'-DCONFIG_HAVE_TSC',
+			'-DCONFIG_HAVE_DSO_VISIBILITY',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 			'-DCONFIG_TARGET_WINE'
@@ -246,6 +247,12 @@ if conf.CheckEventFD():
 	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
 
 env = conf.Finish();
+
+# DSO visibility flags
+if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
+	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
+else:
+	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
 
 # add builder to create PIC static libraries for including in shared libraries
 action_list = [ Action("$ARCOM", "$ARCOMSTR") ];

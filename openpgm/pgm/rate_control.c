@@ -45,10 +45,10 @@ typedef struct rate_t rate_t;
 
 /* globals */
 
-G_GNUC_INTERNAL void pgm_rate_create (rate_t**, const guint, const guint, const guint);
-G_GNUC_INTERNAL void pgm_rate_destroy (rate_t*);
-G_GNUC_INTERNAL gboolean pgm_rate_check (rate_t*, const guint, const int);
-G_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (rate_t*, const gsize);
+PGM_GNUC_INTERNAL void pgm_rate_create (rate_t**, const guint, const guint, const guint);
+PGM_GNUC_INTERNAL void pgm_rate_destroy (rate_t*);
+PGM_GNUC_INTERNAL gboolean pgm_rate_check (rate_t*, const guint, const int);
+PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (rate_t*, const gsize);
 
 
 /* create machinery for rate regulation.

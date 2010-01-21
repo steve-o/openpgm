@@ -42,19 +42,19 @@ gboolean pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
 gboolean pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
 gboolean pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
 
-G_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t* const, const pgm_tsi_t* const, const struct sockaddr* const, const gsize, const struct sockaddr* const, const gsize, const pgm_time_t);
-G_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
-G_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t* const, pgm_msgv_t**, const pgm_msgv_t* const, gsize* const, guint* const);
-G_GNUC_INTERNAL gboolean pgm_peer_has_pending (pgm_peer_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t* const, pgm_peer_t* const);
-G_GNUC_INTERNAL gboolean pgm_check_peer_nak_state (pgm_transport_t* const, const pgm_time_t);
-G_GNUC_INTERNAL void pgm_set_reset_error (pgm_transport_t* const, pgm_peer_t* const, pgm_msgv_t* const);
-G_GNUC_INTERNAL pgm_time_t pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_on_peer_nak (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_on_data (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_on_ncf (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_on_spm (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
-G_GNUC_INTERNAL gboolean pgm_on_poll (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t* const, const pgm_tsi_t* const, const struct sockaddr* const, const gsize, const struct sockaddr* const, const gsize, const pgm_time_t);
+PGM_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
+PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t* const, pgm_msgv_t**, const pgm_msgv_t* const, gsize* const, guint* const);
+PGM_GNUC_INTERNAL gboolean pgm_peer_has_pending (pgm_peer_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t* const, pgm_peer_t* const);
+PGM_GNUC_INTERNAL gboolean pgm_check_peer_nak_state (pgm_transport_t* const, const pgm_time_t);
+PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_transport_t* const, pgm_peer_t* const, pgm_msgv_t* const);
+PGM_GNUC_INTERNAL pgm_time_t pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_peer_nak (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_data (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_ncf (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_spm (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_poll (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

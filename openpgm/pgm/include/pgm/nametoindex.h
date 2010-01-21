@@ -38,7 +38,7 @@ static inline int pgm_if_nametoindex (G_GNUC_UNUSED const int iffamily, const ch
 
 #else
 
-G_GNUC_INTERNAL int pgm_if_nametoindex (const int, const char*);
+PGM_GNUC_INTERNAL int pgm_if_nametoindex (const int, const char*);
 
 #endif /* !G_OS_UNIX */
 
