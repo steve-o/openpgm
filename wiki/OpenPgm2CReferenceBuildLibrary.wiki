@@ -103,6 +103,66 @@ To build the release version in <tt>./ref/release</tt> use the following:
  $ scons -f SConstruct.mingw BUILD=release
 </pre>
 
+=== Cross-compiling in Ubuntu 8.04 for Win64 under SCons and MinGW-w64 ===
+First install all the C compiler dependencies, SCons, and Subversion.
+<pre>
+ $ sudo apt-get install build-essential scons subversion
+</pre>
+Download and unpack [http://sourceforge.net/projects/mingw-w64/files/ MinGW-w64].
+<pre>
+ $ wget http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Release%20for%20GCC%204.4.1/mingw-w64-bin_x86-64-linux_4.4.1-1a.tar.bz2/download 
+ $ sudo mkdir /opt/mingw 
+ $ sudo tar xjf -C /opt/mingw mingw-w64-`*`
+</pre>
+Setup an environment for MinGW.
+<pre>
+ $ cat - | sudo tee mingwvars.sh
+#!/bin/sh
+if [ -z "${PATH}" ]
+then
+    PATH="/opt/mingw/bin"; export PATH
+else
+    PATH="/opt/mingw/bin:${PATH}"; export PATH
+fi
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/trunk 
+ $ cd trunk/openpgm/pgm
+</pre>
+Download and unpack the Win64 library dependencies, primarily GLib Binaries & Dev, and proxy-libintl Binaries.  Extract into a subdirectory called <tt>win/</tt>.
+
+  * http://ftp.gnome.org/pub/GNOME/binaries/win64/
+<pre>
+ $ cd win64
+ $ wget http://ftp.gnome.org/pub/GNOME/binaries/win64/glib/2.20/glib_2.20.1-1_win64.zip  \
+        http://ftp.gnome.org/pub/GNOME/binaries/win64/glib/2.20/glib-dev_2.20.1-1_win64.zip  \
+        http://ftp.gnome.org/pub/GNOME/binaries/win64/dependencies/proxy-libintl-dev_20080918_win64.zip 
+ $ for i in `*`.zip; do unzip $i; done
+</pre>
+Update the <tt>pkgconfig</tt> configuration for where the root directory is located.
+<pre>
+ $ for i in lib/pkgconfig/`*`.pc; do sed -i "s#prefix=c:/.`*`#prefix=``pwd``#" $i; done
+</pre>
+Patch the mingw-w64 installation with updated Windows headers.
+<pre>
+ $ sudo patch -d /opt/mingw/x86_64-w64-mingw32/include < mingw-w64-bin_x86-64-linux_4.4.1-1openpgm1.diff
+</pre>
+Build.
+<pre>
+ $ cd .. 
+ $ source /opt/mingw/mingwvars.sh 
+ $ scons -f SConstruct.097.mingw64
+</pre>
+By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
+<pre>
+ $ scons -f SConstruct.097.mingw64
+</pre>
+To build the release version in <tt>./ref/release</tt> use the following:
+<pre>
+ $ scons -f SConstruct.097.mingw64 BUILD=release
+</pre>
+
 === Building in Ubuntu 9.04 or 9.10 under SCons ===
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>
