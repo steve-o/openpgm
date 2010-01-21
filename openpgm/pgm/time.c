@@ -496,15 +496,15 @@ rtc_init (void)
 
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
 	if (rtc_fd < 0) {
-		g_error ("Cannot open /dev/rtc for reading.");
+		g_error (_("Cannot open /dev/rtc for reading."));
 		return -1;
 	}
 	if ( ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency) < 0 ) {
-		g_error ("Cannot set RTC frequency to %i Hz.", rtc_frequency);
+		g_error (_("Cannot set RTC frequency to %i Hz."), rtc_frequency);
 		return -1;
 	}
 	if ( ioctl (rtc_fd, RTC_PIE_ON, 0) < 0 ) {
-		g_error ("Cannot enable periodic interrupt (PIE) on RTC.");
+		g_error (_("Cannot enable periodic interrupt (PIE) on RTC."));
 		return -1;
 	}
 	return 0;
@@ -698,13 +698,13 @@ hpet_init (void)
 
 	hpet_fd = open("/dev/hpet", O_RDONLY);
 	if (hpet_fd < 0) {
-		g_error ("Cannot open /dev/hpet for reading.");
+		g_error (_("Cannot open /dev/hpet for reading."));
 		return -1;
 	}
 
 	hpet_ptr = (unsigned char*)mmap(NULL, HPET_MMAP_SIZE, PROT_READ, MAP_SHARED, hpet_fd, 0);
 	if (MAP_FAILED == hpet_ptr) {
-		g_error ("Error mapping HPET: %s", g_strerror(errno));
+		g_error (_("Error mapping HPET: %s"), g_strerror(errno));
 		close (hpet_fd);
 		hpet_fd = -1;
 		return -1;

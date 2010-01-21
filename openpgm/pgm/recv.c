@@ -183,7 +183,10 @@ recvskb (
 		 			      &cbBytesReturned,
 					      NULL,
 					      NULL))
+		{
+			g_error (_("WSARecvMsg function not found."));
 			return -1;
+		}
 	}
 
 	DWORD len;
@@ -1012,7 +1015,7 @@ pgm_recvfrom (
 	while (bytes_copied < bytes_read) {
 		gsize copy_len = skb->len;
 		if (bytes_copied + copy_len > len) {
-			g_error ("APDU truncated, original length %" G_GSIZE_FORMAT " bytes.",
+			g_error (_("APDU truncated, original length %" G_GSIZE_FORMAT " bytes."),
 				bytes_read);
 			copy_len = len - bytes_copied;
 			bytes_read = len;

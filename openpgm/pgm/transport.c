@@ -1546,7 +1546,7 @@ pgm_transport_set_fec (
 	if ( default_k > 223 &&
 		( (default_h * 223.0) / default_k ) < 1.0 )
 	{
-		g_error ("k/h ratio too low to generate parity data.");
+		g_error (_("k/h ratio too low to generate parity data."));
 		return FALSE;
 	}
 
