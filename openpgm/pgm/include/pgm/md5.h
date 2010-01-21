@@ -44,9 +44,9 @@ struct md5_ctx
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL void _md5_init_ctx (struct md5_ctx*);
-G_GNUC_INTERNAL void _md5_process_bytes (struct md5_ctx*, gconstpointer, gsize);
-G_GNUC_INTERNAL gpointer _md5_finish_ctx (struct md5_ctx*, gpointer);
+PGM_GNUC_INTERNAL void _md5_init_ctx (struct md5_ctx*);
+PGM_GNUC_INTERNAL void _md5_process_bytes (struct md5_ctx*, gconstpointer, gsize);
+PGM_GNUC_INTERNAL gpointer _md5_finish_ctx (struct md5_ctx*, gpointer);
 
 G_END_DECLS
 
