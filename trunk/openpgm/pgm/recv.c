@@ -206,7 +206,11 @@ recvskb (
 	if (transport->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
+#ifdef CONFIG_HAVE_WSACMSGHDR
+		WSACMSGHDR* cmsg;
+#else
 		struct cmsghdr* cmsg;
+#endif
 		gpointer pktinfo = NULL;
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg != NULL;

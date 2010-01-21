@@ -325,7 +325,7 @@ pgm_gsi_error_from_eai_errno (
 		break;
 #endif
 
-#ifdef EAI_NONAME
+#if defined(EAI_NONAME) && EAI_NONAME != EAI_NODATA
 	case EAI_NONAME:
 		return PGM_GSI_ERROR_NONAME;
 		break;

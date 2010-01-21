@@ -1307,7 +1307,7 @@ pgm_print_options (
 
 	const struct pgm_opt_length* opt_len = (const struct pgm_opt_length*)data;
 	if (opt_len->opt_length != sizeof(struct pgm_opt_length)) {
-		printf (" bad opt_length length %hhu\n", opt_len->opt_length);
+		printf (" bad opt_length length %u\n", (unsigned)opt_len->opt_length);
 		return -1;
 	}
 
@@ -1483,7 +1483,7 @@ pgm_ipopt_print (
 		case IPOPT_SATID:	printf(" satid"); break;
 		case IPOPT_SSRR:	printf(" ssrr"); break;	/* 1 route */
 #endif
-		default:		printf(" %hhx{%hhd}", *op, len); break;
+		default:		printf(" %x{%d}", (int)*op, (int)len); break;
 		}
 
 		if (!len) {
