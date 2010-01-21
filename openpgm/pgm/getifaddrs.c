@@ -200,7 +200,7 @@ pgm_getifaddrs (
 
 	pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof (IP_ADAPTER_INFO));
 	if (NULL == pAdapterInfo) {
-		g_error("malloc");
+		g_error(_("malloc failed for pAdapterInfo."));
 		return -1;
 	}
 	dwRet = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen);
@@ -208,13 +208,13 @@ pgm_getifaddrs (
 		free(pAdapterInfo);
 		pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
 		if (NULL == pAdapterInfo) {
-			g_error("malloc");
+			g_error(_("malloc failed for pAdapterInfo on provided buffer size of %ul bytes."), ulOutBufLen);
 			return -1;
 		}
 	}
 	dwRet = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen);
 	if (NO_ERROR != dwRet) {
-		g_error("GetAdaptersInfo(2) did not return NO_ERROR");
+		g_error(_("GetAdaptersInfo(2) did not return NO_ERROR."));
 		free(pAdapterInfo);
 		return -1;
 	}
@@ -286,17 +286,17 @@ pgm_getifaddrs (
 
 	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
 	if (ERROR_BUFFER_OVERFLOW != dwRet) {
-		g_error("GetAdaptersAddresses did not return ERROR_BUFFER_OVERFLOW");
+		g_error(_("GetAdaptersAddresses did not return ERROR_BUFFER_OVERFLOW."));
 		return -1;
 	}
 	pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)malloc (dwSize);
 	if (NULL == pAdapterAddresses) {
-		g_error("malloc");
+		g_error(_("malloc failed for pAdapterAddresses on provided buffer size of %u bytes."), (unsigned)dwSize);
 		return -1;
 	}
 	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
 	if (ERROR_SUCCESS != dwRet) {
-		g_error("GetAdaptersAddresses(2) did not return ERROR_SUCCESS");
+		g_error(_("GetAdaptersAddresses(2) did not return ERROR_SUCCESS."));
 		free(pAdapterAddresses);
 		return -1;
 	}
