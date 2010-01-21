@@ -39,7 +39,7 @@ print """
 
 const guint pgm_major_version = 2;
 const guint pgm_minor_version = 0;
-const guint pgm_micro_version = 20;
+const guint pgm_micro_version = 21;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";
 const char* pgm_build_platform = "%s";

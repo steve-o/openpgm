@@ -31,7 +31,7 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL char* pgm_if_indextoname (unsigned int, char*);
+PGM_GNUC_INTERNAL char* pgm_if_indextoname (unsigned int, char*);
 
 G_END_DECLS
 
