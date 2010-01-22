@@ -68,6 +68,7 @@ typedef struct pgm_transport_t pgm_transport_t;
 
 
 #define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
+#define PGM_ENGINE_ERROR	pgm_engine_error_quark ()
 
 
 /* IO status */
@@ -198,6 +199,17 @@ typedef enum
 	PGM_TRANSPORT_ERROR_SOCKTYPE,
 	PGM_TRANSPORT_ERROR_FAILED
 } PGMTransportError;
+
+typedef enum
+{
+	/* Derived from WSA */
+	PGM_ENGINE_ERROR_SYSNOTAREADY,
+	PGM_ENGINE_ERROR_VERNOTSUPPORTED,
+	PGM_ENGINE_ERROR_INPROGRESS,
+	PGM_ENGINE_ERROR_PROCLIM,
+	PGM_ENGINE_ERROR_FAULT,
+	PGM_ENGINE_ERROR_FAILED
+} PGMEngineError;
 
 struct pgm_sqn_list_t {
 	guint			len;
@@ -357,13 +369,14 @@ extern GSList* pgm_transport_list;
 
 G_BEGIN_DECLS
 
-int pgm_init (void);
+gboolean pgm_init (GError**);
 gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_shutdown (void);
+gboolean pgm_shutdown (void);
 
 void pgm_drop_superuser (void);
 
 GQuark pgm_transport_error_quark (void);
+GQuark pgm_engine_error_quark (void);
 PGMTransportError pgm_transport_error_from_errno (gint);
 PGMTransportError pgm_transport_error_from_eai_errno (gint);
 PGMTransportError pgm_transport_error_from_wsa_errno (gint);

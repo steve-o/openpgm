@@ -103,6 +103,7 @@ usage (
 #ifdef CONFIG_WITH_SNMP
 	fprintf (stderr, "  -x              : Enable SNMP interface\n");
 #endif
+	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (1);
 }
 
@@ -112,9 +113,7 @@ main (
 	char*		argv[]
 	)
 {
-#if defined(CONFIG_WITH_HTTP) || defined(CONFIG_WITH_SNMP)
 	GError* err = NULL;
-#endif
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
 #endif
@@ -126,10 +125,17 @@ main (
 
 	g_message ("pgmrecv");
 
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
+
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "a:s:n:p:lh"
+	while ((c = getopt (argc, argv, "a:s:n:p:lih"
 #ifdef CONFIG_WITH_HTTP
 					"t"
 #endif
@@ -152,13 +158,15 @@ main (
 		case 'x':	enable_snmpx = TRUE; break;
 #endif
 
+		case 'i':
+			pgm_if_print_all ();
+			return EXIT_SUCCESS;
+
 		case 'h':
-		case '?': usage (binary_name);
+		case '?':
+			usage (binary_name);
 		}
 	}
-
-	log_init();
-	pgm_init();
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {

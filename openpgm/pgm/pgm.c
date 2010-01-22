@@ -20,6 +20,7 @@
  */
 
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -46,19 +47,30 @@ int ipproto_pgm = IPPROTO_PGM;
 /* locals */
 static gboolean pgm_got_initialized = FALSE;
 
+#ifdef G_OS_WIN32
+static PGMEngineError pgm_engine_error_from_wsa_errno (gint);
+#endif
+
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  *
- * returns 0 on success, returns -1 if an error occurred, implying some form of
+ * returns TRUE on success, returns FALSE if an error occurred, implying some form of
  * system re-configuration is required to resolve before trying again.
  */
 // TODO: could wrap initialization with g_once_init_enter/leave.
 // TODO: fix valgrind errors in getprotobyname/_r
-int
-pgm_init (void)
+gboolean
+pgm_init (
+	GError**	error
+	)
 {
-	g_return_val_if_fail (pgm_got_initialized == FALSE, -1);
-	g_return_val_if_fail (pgm_time_supported() == FALSE, -1);
+	if (TRUE == pgm_got_initialized) {
+		g_set_error (error,
+			     PGM_ENGINE_ERROR,
+			     PGM_ENGINE_ERROR_FAILED,
+			     _("Engine already initalized."));
+		return FALSE;
+	}
 
 /* ensure threading enabled */
 	if (!g_thread_supported ())
@@ -68,12 +80,24 @@ pgm_init (void)
 	WORD wVersionRequested = MAKEWORD (2, 2);
 	WSADATA wsaData;
 	if (WSAStartup (wVersionRequested, &wsaData) != 0)
-		return -1;
+	{
+		const int save_errno = WSAGetLastError ();
+		g_set_error (error,
+			     PGM_ENGINE_ERROR,
+			     pgm_engine_error_from_wsa_errno (save_errno),
+			     _("WSAStartup failure: %s"),
+			     pgm_wsastrerror (save_errno));
+		return FALSE;
+	}
 
 	if (LOBYTE (wsaData.wVersion) != 2 || HIBYTE (wsaData.wVersion) != 2)
 	{
 		WSACleanup ();
-		return -1;
+		g_set_error (error,
+			     PGM_ENGINE_ERROR,
+			     PGM_ENGINE_ERROR_FAILED,
+			     _("WSAStartup failed to provide requested version 2.2."));
+		return FALSE;
 	}
 #endif /* G_OS_WIN32 */
 
@@ -101,11 +125,16 @@ pgm_init (void)
 #endif
 
 /* ensure timing enabled */
-	if (-1 == pgm_time_init ())
-		return -1;
+	GError* sub_error = NULL;
+	if (!pgm_time_supported () &&
+	    !pgm_time_init (&sub_error))
+	{
+		g_propagate_error (error, sub_error);
+		return FALSE;
+	}
 
 	pgm_got_initialized = TRUE;
-	return 0;
+	return TRUE;
 }
 
 /* returns TRUE if PGM engine has been initialized
@@ -117,29 +146,72 @@ pgm_supported (void)
 	return ( pgm_got_initialized == TRUE );
 }
 
-/* returns 0 on success, returns -1 if an error occurred.
+/* returns TRUE on success, returns FALSE if an error occurred.
  */
 
-int
+gboolean
 pgm_shutdown (void)
 {
-	g_return_val_if_fail (pgm_supported() == TRUE, -1);
-	g_return_val_if_fail (pgm_time_supported() == TRUE, -1);
+	g_return_val_if_fail (pgm_supported() == TRUE, FALSE);
 
 /* destroy all open transports */
 	while (pgm_transport_list) {
 		pgm_transport_destroy (pgm_transport_list->data, FALSE);
 	}
 
-	if (-1 == pgm_time_shutdown ())
-		return -1;
+	if (pgm_time_supported ())
+		pgm_time_shutdown ();
 
 #ifdef G_OS_WIN32
 	WSACleanup ();
 #endif
 
 	pgm_got_initialized = FALSE;
-	return 0;
+	return TRUE;
+}
+
+GQuark
+pgm_engine_error_quark (void)
+{
+	return g_quark_from_static_string ("pgm-engine-error-quark");
+}
+
+PGMEngineError
+pgm_engine_error_from_wsa_errno (
+	gint            err_no
+	)
+{
+	switch (err_no) {
+#ifdef WSASYSNOTAREADY
+	case WSASYSNOTAREADY:
+		return PGM_ENGINE_ERROR_SYSNOTAREADY;
+		break;
+#endif
+#ifdef WSAVERNOTSUPPORTED
+	case WSAVERNOTSUPPORTED:
+		return PGM_ENGINE_ERROR_VERNOTSUPPORTED;
+		break;
+#endif
+#ifdef WSAEINPROGRESS
+	case WSAEINPROGRESS:
+		return PGM_ENGINE_ERROR_INPROGRESS;
+		break;
+#endif
+#ifdef WSAEPROCLIM
+	case WSAEPROCLIM:
+		return PGM_ENGINE_ERROR_PROCLIM;
+		break;
+#endif
+#ifdef WSAEFAULT
+	case WSAEFAULT:
+		return PGM_ENGINE_ERROR_FAULT;
+		break;
+#endif
+
+	default :
+		return PGM_TRANSPORT_ERROR_FAILED;
+		break;
+	}
 }
 
 /* eof */

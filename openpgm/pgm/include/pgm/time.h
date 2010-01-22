@@ -28,6 +28,12 @@
 #   include <pgm/sn.h>
 #endif
 
+#define PGM_TIME_ERROR		pgm_time_error_quark ()
+
+typedef enum
+{
+        PGM_TIME_ERROR_FAILED
+} PGMTimeError;
 
 typedef guint64 pgm_time_t;
 
@@ -64,7 +70,9 @@ extern pgm_time_update_func pgm_time_update_now;
 extern pgm_time_sleep_func pgm_time_sleep;
 extern pgm_time_since_epoch_func pgm_time_since_epoch;
 
-PGM_GNUC_INTERNAL gboolean pgm_time_init (void) G_GNUC_WARN_UNUSED_RESULT;
+GQuark pgm_time_error_quark (void);
+
+PGM_GNUC_INTERNAL gboolean pgm_time_init (GError**) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL gboolean pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL gboolean pgm_time_shutdown (void);
 
