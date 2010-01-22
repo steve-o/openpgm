@@ -39,6 +39,8 @@
 #ifndef IF_NAMESIZE
 #	ifdef IFNAMSIZ
 #		define IF_NAMESIZE	IFNAMSIZ
+#	elif defined(G_OS_WIN32)
+#		define IF_NAMESIZE	40
 #	else
 #		define IF_NAMESIZE	16
 #	endif

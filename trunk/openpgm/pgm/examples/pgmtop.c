@@ -169,10 +169,16 @@ main (
 	G_GNUC_UNUSED char     *argv[]
 	)
 {
+	GError* err = NULL;
+
 	puts ("pgmtop");
 
 	log_init ();
-	pgm_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 

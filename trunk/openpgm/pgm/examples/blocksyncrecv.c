@@ -90,6 +90,8 @@ main (
 	char*		argv[]
 	)
 {
+	GError* err = NULL;
+
 	g_message ("blocksyncrecv");
 
 /* parse program arguments */
@@ -109,7 +111,11 @@ main (
 	}
 
 	log_init ();
-	pgm_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
