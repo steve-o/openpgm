@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <locale.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,6 +80,7 @@ usage (const char* bin)
 	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
 	fprintf (stderr, "  -g <n>\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
+	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (1);
 }
 
@@ -88,10 +90,21 @@ main (
 	char   *argv[]
 	)
 {
+	GError* err = NULL;
+
+	setlocale (LC_ALL, "");
+
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
+
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -105,8 +118,13 @@ main (
 
 		case 'l':	g_multicast_loop = TRUE; break;
 
+		case 'i':
+			pgm_if_print_all ();
+			return EXIT_SUCCESS;
+
 		case 'h':
-		case '?': usage (binary_name);
+		case '?':
+			usage (binary_name);
 		}
 	}
 
@@ -114,9 +132,6 @@ main (
 		puts ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
-
-	log_init ();
-	pgm_init ();
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);

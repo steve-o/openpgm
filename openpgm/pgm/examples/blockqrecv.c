@@ -90,6 +90,8 @@ main (
 	char*		argv[]
 	)
 {
+	GError* err = NULL;
+
 	g_message ("syncrecv");
 
 /* parse program arguments */
@@ -109,7 +111,11 @@ main (
 	}
 
 	log_init ();
-	pgm_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
@@ -130,7 +136,6 @@ main (
 
 /* asynchronous receiver thread */
 	pgm_async_t* async = NULL;
-	GError* err = NULL;
 	if (!pgm_async_create (&async, g_transport, &err)) {
 		g_error_free (err);
 		pgm_transport_destroy (g_transport, FALSE);
