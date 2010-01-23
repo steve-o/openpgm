@@ -19,12 +19,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <glib.h>
 
 #ifdef G_OS_UNIX
 #	include <execinfo.h>
-#	include <stdio.h>
-#	include <stdlib.h>
 #	include <sys/types.h>
 #	include <unistd.h>
 #endif
