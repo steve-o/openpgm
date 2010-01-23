@@ -7,7 +7,7 @@ _Function_
 <pre>
 #include <pgm/pgm.h>
 
-int *pgm_init* (void);
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_init* ([http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error);
 </pre>
 
 === Purpose ===
@@ -25,11 +25,36 @@ Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports 
 <tt>pgm_init()</tt> might only be called once. On the second call it will abort with an error. If you want to make sure that the thread system is initialized, you can do this:
 
 {{{
- if (!pgm_supported ()) pgm_init ();
+ if (!pgm_supported ()) pgm_init (NULL);
 }}}
 
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>err</tt></td>
+<td>a return location for a [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError], or [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#NULL--CAPS NULL].</td>
+</tr>
+</table>
+
+
 === Return Value ===
-On success, returns 0.  On failure, returns -1.
+On success, returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE].  On failure, returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE].  If <tt>err</tt> is provided it may be set detailing any Winsock or timing device initialization issue.
+
+
+=== Example ===
+{{{
+ GError *err = NULL;
+ if (!pgm_init (&err)) {
+   g_warning ("PGM Engine initialization error %s", err->message);
+   g_error_free (err);
+   return EXIT_FAILURE;
+ }
+}}}
 
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt><br>
