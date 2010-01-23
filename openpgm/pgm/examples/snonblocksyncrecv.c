@@ -165,7 +165,6 @@ main (
 		char buffer[4096];
 		gsize len;
 		pgm_tsi_t from;
-		GError* err = NULL;
 		const PGMIOStatus status = pgm_recvfrom (g_transport,
 						         buffer,
 						         sizeof(buffer),
