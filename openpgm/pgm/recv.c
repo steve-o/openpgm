@@ -169,7 +169,7 @@ recvskb (
 		.dwBufferCount	= 1,
 		.dwFlags	= 0
 	};
-	msg.Control.buf		= aux;
+	msg.Control.buf		= (gpointer)aux;
 	msg.Control.len		= sizeof(aux);
 
 	static int (*WSARecvMsg_)() = NULL;
