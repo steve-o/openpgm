@@ -38,13 +38,13 @@
 
 /* target:
  *	gboolean
- *	pgm_time_init (void)
+ *	pgm_time_init (GError** error)
  */
 
 START_TEST (test_init_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init ());
-	fail_unless (FALSE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init (NULL));
+	fail_unless (FALSE == pgm_time_init (NULL));
 }
 END_TEST
 
@@ -55,7 +55,7 @@ END_TEST
 
 START_TEST (test_shutdown_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init (NULL));
 	fail_unless (TRUE == pgm_time_shutdown ());
 	fail_unless (FALSE == pgm_time_shutdown ());
 }
@@ -69,7 +69,7 @@ END_TEST
 START_TEST (test_supported_pass_001)
 {
 	fail_unless (FALSE == pgm_time_supported ());
-	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init (NULL));
 	fail_unless (TRUE == pgm_time_supported ());
 	fail_unless (TRUE == pgm_time_shutdown ());
 	fail_unless (FALSE == pgm_time_supported ());
@@ -84,7 +84,7 @@ END_TEST
 START_TEST (test_update_now_pass_001)
 {
 	pgm_time_t tstamps[11];
-	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init (NULL));
 	const pgm_time_t start_time = pgm_time_update_now ();
 	for (unsigned i = 1; i <= 10; i++)
 	{
@@ -94,12 +94,12 @@ START_TEST (test_update_now_pass_001)
 	for (unsigned i = 1; i <= 10; i++)
 	{
 		const pgm_time_t check_time = tstamps[i];
-		const pgm_time_t elapsed_time = check_time - start_time;
+		const gint64 elapsed_time = check_time - start_time;
 
 /* must be monotonic */
 		fail_unless (G_LIKELY(check_time >= start_time));
 
-		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" PGM_TIME_FORMAT "us)",
+		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" G_GINT64_FORMAT "us)",
 			   i, check_time, pgm_to_usecs(elapsed_time));
 	}
 	fail_unless (TRUE == pgm_time_shutdown ());
@@ -117,7 +117,7 @@ START_TEST (test_sleep_pass_001)
 {
 	pgm_time_t tstamps[11];
 	const pgm_time_t sleep_time = 100 * 1000;	/* 100ms */
-	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init (NULL));
 	pgm_time_t start_time = pgm_time_update_now ();
 	for (unsigned i = 1; i <= 10; i++)
 	{
@@ -129,12 +129,12 @@ START_TEST (test_sleep_pass_001)
 		const pgm_time_t check_time = tstamps[i];
 
 		fail_unless (check_time >= start_time);
-		const pgm_time_t elapsed_time = check_time - start_time;
+		const gint64 elapsed_time = check_time - start_time;
 
 /* should be close to zero */
 		const gint64 diff_time = elapsed_time - sleep_time;
 		const float percent_diff = ( 100.0 * pgm_to_usecsf (diff_time) ) / sleep_time;
-		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" PGM_TIME_FORMAT "us %+3.1f%%)",
+		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" G_GINT64_FORMAT "us %+3.1f%%)",
 			   i, check_time, pgm_to_usecs(elapsed_time), percent_diff);
 
 		start_time = check_time;
@@ -156,7 +156,7 @@ START_TEST (test_since_epoch_pass_001)
 	char stime[1024];
 	time_t t;
 	struct tm* tmp;
-	fail_unless (TRUE == pgm_time_init ());
+	fail_unless (TRUE == pgm_time_init (NULL));
 	pgm_time_t pgm_now = pgm_time_update_now ();
 	pgm_time_since_epoch (&pgm_now, &t);
 	tmp = localtime (&t);

@@ -52,6 +52,7 @@
 #include <pgm/timer.h>
 #include <pgm/checksum.h>
 #include <pgm/reed_solomon.h>
+#include <pgm/indextoaddr.h>
 #include <pgm/getnodeaddr.h>
 #include <pgm/txwi.h>
 #include <pgm/async.h>
@@ -112,6 +113,8 @@ main (
 	char   *argv[]
 	)
 {
+	GError* err = NULL;
+
 	g_message ("sim");
 
 /* parse program arguments */
@@ -129,7 +132,11 @@ main (
 	}
 
 	log_init ();
-	pgm_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
@@ -248,10 +255,10 @@ fake_pgm_transport_create (
 	g_return_val_if_fail (NULL != tinfo->ti_send_addrs, FALSE);
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
-		g_return_val_if_fail (pgm_sockaddr_family (&tinfo->ti_recv_addrs[i].gsr_group) == pgm_sockaddr_family (&tinfo->ti_recv_addrs[0].gsr_group), -FALSE);
-		g_return_val_if_fail (pgm_sockaddr_family (&tinfo->ti_recv_addrs[i].gsr_group) == pgm_sockaddr_family (&tinfo->ti_recv_addrs[i].gsr_source), -FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, -FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, -FALSE);
 	}
-	g_return_val_if_fail (pgm_sockaddr_family (&tinfo->ti_send_addrs[0].gsr_group) == pgm_sockaddr_family (&tinfo->ti_send_addrs[0].gsr_source), -FALSE);
+	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
 /* create transport object */
 	new_transport = g_malloc0 (sizeof(pgm_transport_t));
@@ -296,7 +303,7 @@ fake_pgm_transport_create (
                 protocol = IPPROTO_PGM;
         }
 
-	if ((new_transport->recv_sock = socket (pgm_sockaddr_family (&new_transport->recv_gsr[0].gsr_group),
+	if ((new_transport->recv_sock = socket (new_transport->recv_gsr[0].gsr_group.ss_family,
                                                 socket_type,
                                                 protocol)) < 0)
         {
@@ -306,14 +313,14 @@ fake_pgm_transport_create (
                 goto err_destroy;
         }
 
-        if ((new_transport->send_sock = socket (pgm_sockaddr_family(&new_transport->send_gsr.gsr_group),
+        if ((new_transport->send_sock = socket (new_transport->send_gsr.gsr_group.ss_family,
                                                 socket_type,
                                                 protocol)) < 0)
         {
                 goto err_destroy;
         }
 
-        if ((new_transport->send_with_router_alert_sock = socket (pgm_sockaddr_family (&new_transport->send_gsr.gsr_group),
+        if ((new_transport->send_with_router_alert_sock = socket (new_transport->send_gsr.gsr_group.ss_family,
                                                 		  socket_type,
                                                 		  protocol)) < 0)
         {
@@ -465,7 +472,7 @@ fake_pgm_transport_bind (
 
 	int retval = bind (transport->recv_sock,
 			   (struct sockaddr*)&recv_addr,
-			   pgm_sockaddr_len(&recv_addr));
+			   pgm_sockaddr_len((struct sockaddr*)&recv_addr));
         if (retval < 0) {
                 goto out;
         }
@@ -473,17 +480,17 @@ fake_pgm_transport_bind (
 	struct sockaddr_storage send_addr, send_with_router_alert_addr;
 	memset (&send_addr, 0, sizeof(send_addr));
 	if (!pgm_if_indextoaddr (transport->send_gsr.gsr_interface,
-				 pgm_sockaddr_family(&transport->send_gsr.gsr_group),
-				 pgm_sockaddr_scope_id(&transport->send_gsr.gsr_group),
+				 transport->send_gsr.gsr_group.ss_family,
+				 pgm_sockaddr_scope_id((struct sockaddr*)&transport->send_gsr.gsr_group),
 				 (struct sockaddr*)&send_addr,
 				 NULL))
 	{
 		goto out;
         }
-	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len(&send_addr));
+	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len((struct sockaddr*)&send_addr));
 	retval = bind (transport->send_sock,
 		       (struct sockaddr*)&send_addr,
-		       pgm_sockaddr_len(&send_addr));
+		       pgm_sockaddr_len((struct sockaddr*)&send_addr));
         if (retval < 0)
 		goto out;
 
@@ -496,11 +503,11 @@ fake_pgm_transport_bind (
 
 	retval = bind (transport->send_with_router_alert_sock,
 			(struct sockaddr*)&send_with_router_alert_addr,
-			pgm_sockaddr_len(&send_with_router_alert_addr));
+			pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr));
         if (retval < 0)
 		goto out;
 
-	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len(&send_addr));
+	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len((struct sockaddr*)&send_addr));
 
 /* receiving groups (multiple) */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
@@ -524,24 +531,24 @@ fake_pgm_transport_bind (
 		goto out;
 
 /* multicast loopback */
-	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), FALSE);
+	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, transport->recv_gsr[0].gsr_group.ss_family, FALSE);
         if (retval < 0)
                 goto out;
-        retval = pgm_sockaddr_multicast_loop (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), FALSE);
+        retval = pgm_sockaddr_multicast_loop (transport->send_sock, transport->send_gsr.gsr_group.ss_family, FALSE);
         if (retval < 0)
                 goto out;
-        retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), FALSE);
+        retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, transport->send_gsr.gsr_group.ss_family, FALSE);
         if (retval < 0)
                 goto out;
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
-	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, pgm_sockaddr_family(&transport->recv_gsr[0].gsr_group), transport->hops);
+	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, transport->recv_gsr[0].gsr_group.ss_family, transport->hops);
         if (retval < 0)
                 goto out;
-        retval = pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
+        retval = pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
         if (retval < 0)
                 goto out;
-        retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
+        retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
         if (retval < 0)
                 goto out;
 
@@ -550,10 +557,10 @@ fake_pgm_transport_bind (
  * codepoint 101110 (RFC 3246)
  */
         int dscp = 0x2e << 2;
-        retval = pgm_sockaddr_tos (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
+        retval = pgm_sockaddr_tos (transport->send_sock, transport->send_gsr.gsr_group.ss_family, dscp);
         if (retval < 0)
                 goto out;
-        retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), dscp);
+        retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, transport->send_gsr.gsr_group.ss_family, dscp);
         if (retval < 0)
                 goto out;
 
@@ -849,7 +856,7 @@ brokn_send_apdu_unlocked (
                                     skb->data,
                                     tpdu_length,
                                     (struct sockaddr*)&transport->send_gsr.gsr_group,
-                                    pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+                                    pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 
 /* save unfolded odata for retransmissions */
 		*(guint32*)&skb->cb = unfolded_odata;
@@ -1038,7 +1045,7 @@ net_send_data (
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	g_static_mutex_unlock (&transport->send_mutex);
 
 	puts ("READY");
@@ -1149,7 +1156,7 @@ net_send_parity (
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	g_static_mutex_unlock (&transport->send_mutex);
 
 	g_strfreev (src);
@@ -1230,7 +1237,7 @@ net_send_spm (
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	puts ("READY");
 }
 
@@ -1293,15 +1300,15 @@ net_send_spmr (
 
 	g_static_mutex_lock (&transport->send_mutex);
 /* TTL 1 */
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), 1);
+	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, 1);
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 /* default TTL */
-	pgm_sockaddr_multicast_hops (transport->send_sock, pgm_sockaddr_family(&transport->send_gsr.gsr_group), transport->hops);
+	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
 
 	if (!pgm_tsi_equal (tsi, &transport->tsi))
 	{
@@ -1310,7 +1317,7 @@ net_send_spmr (
 	                                tpdu_length,
 	                                MSG_CONFIRM,            /* not expecting a reply */
 					(struct sockaddr*)&peer_nla,
-					pgm_sockaddr_len(&peer_nla));
+					pgm_sockaddr_len((struct sockaddr*)&peer_nla));
 	}
 
 	g_static_mutex_unlock (&transport->send_mutex);
@@ -1415,7 +1422,7 @@ net_send_ncf (
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
-				pgm_sockaddr_len(&transport->send_gsr.gsr_group));
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 
 	puts ("READY");
 }
@@ -1514,7 +1521,7 @@ net_send_nak (
                                 tpdu_length,
                                 MSG_CONFIRM,            /* not expecting a reply */
                                 (struct sockaddr*)&peer_nla,
-                                pgm_sockaddr_len(&peer_nla));
+                                pgm_sockaddr_len((struct sockaddr*)&peer_nla));
 
 	puts ("READY");
 }
