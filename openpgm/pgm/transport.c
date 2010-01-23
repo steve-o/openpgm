@@ -1710,7 +1710,7 @@ pgm_transport_join_group (
 		{
 #ifdef TRANSPORT_DEBUG
 			char s[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&gr->gr_group, s, sizeof(s));
+			pgm_sockaddr_ntop ((struct sockaddr*)&gr->gr_group, s, sizeof(s));
 			if (transport->recv_gsr[i].gsr_interface) {
 				g_trace("INFO", "transport has already joined group %s on interface %u", s, (unsigned)gr->gr_interface);
 			} else {
@@ -1873,8 +1873,8 @@ pgm_transport_join_source_group (
 			{
 #ifdef TRANSPORT_DEBUG
 				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop (&gsr->gsr_group, s1, sizeof(s1));
-				pgm_sockaddr_ntop (&gsr->gsr_source, s2, sizeof(s2));
+				pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_source, s2, sizeof(s2));
 				if (transport->recv_gsr[i].gsr_interface) {
 					g_trace("INFO", "transport has already joined group %s from source %s on interface %u",
 						s1, s2, (unsigned)gsr->gsr_interface);
