@@ -172,7 +172,7 @@ recvskb (
 	msg.Control.buf		= (gpointer)aux;
 	msg.Control.len		= sizeof(aux);
 
-	static int (*WSARecvMsg_)() = NULL;
+	LPFN_WSARECVMSG WSARecvMsg_ = NULL;
 	if (G_UNLIKELY(!WSARecvMsg_)) {
 		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
 		DWORD cbBytesReturned;
@@ -223,6 +223,11 @@ recvskb (
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
 				pktinfo				= CMSG_DATA(cmsg);
+/* discard on invalid address */
+				if (G_UNLIKELY(NULL == pktinfo)) {
+					g_trace ("in_pktinfo is NULL");
+					return -1;
+				}
 				const struct in_pktinfo* in	= pktinfo;
 				struct sockaddr_in s4;
 				memset (&s4, 0, sizeof(s4));
@@ -236,6 +241,11 @@ recvskb (
 			    IPV6_PKTINFO == cmsg->cmsg_type)
 			{
 				pktinfo				= CMSG_DATA(cmsg);
+/* discard on invalid address */
+				if (G_UNLIKELY(NULL == pktinfo)) {
+					g_trace ("in6_pktinfo is NULL");
+					return -1;
+				}
 				const struct in6_pktinfo* in6	= pktinfo;
 				struct sockaddr_in6 s6;
 				memset (&s6, 0, sizeof(s6));
@@ -247,9 +257,6 @@ recvskb (
 				break;
 			}
 		}
-/* discard on invalid address */
-		if (G_UNLIKELY(NULL == pktinfo))
-			return -1;
 	}
 #endif
 	return len;
