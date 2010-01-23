@@ -7,17 +7,16 @@ _Function_
 <pre>
 #include <pgm/pgm.h>
 
-int *pgm_shutdown* (void);
+[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_shutdown* (void);
 </pre>
 
 === Purpose ===
 Shutdown OpenPGM internal machinery.
 
 === Return Value ===
-On success, returns 0.  On failure, returns -1.
+On success, returns TRUE.  On failure, returns FALSE.
 
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt><br>
   * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
   * [OpenPgm2CReferenceEnvironment Environment] in OpenPGM C Reference.
-
