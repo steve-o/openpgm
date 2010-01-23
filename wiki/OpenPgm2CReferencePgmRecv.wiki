@@ -116,7 +116,7 @@ Receive a scatter/gather vector APDU message.
  pgm_msgv_t msgv;
  gsize bytes_read;
  pgm_recvmsg (transport, &msgv, 0, &bytes_read, NULL);
- printf ("received %i bytes: ", bytes_read);
+ printf ("received %d bytes: ", bytes_read);
  struct iovec* msgv_iov = msgv.msgv_iov;
  while (bytes_read > 0) {
    printf ((char*)msgv_iov->iov_base);
@@ -133,7 +133,7 @@ Display error details on unrecoverable error.
  gsize bytes_read;
  GError *err = NULL;
  if (PGM_IO_STATUS_RESET == pgm_recv (transport, buf, sizeof(buf), &bytes_read, &err)) {
-   g_warning ("recv error" %s", err->message);
+   g_warning ("recv error %s", err->message);
    g_error_free (err);
    return EXIT_FAILURE;
  }
