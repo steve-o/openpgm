@@ -36,7 +36,7 @@
 #endif
 
 #include "pgm/inet_network.h"
-#include "pgm/ip.h"
+#include "pgm/sockaddr.h"
 
 
 //#define INET_NETWORK_DEBUG
