@@ -1693,7 +1693,7 @@ pgm_transport_join_group (
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
-	    transport->recv_gsr_len > IP_MAX_MEMBERSHIPS)
+	    transport->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
@@ -1855,7 +1855,7 @@ pgm_transport_join_source_group (
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
-	    transport->recv_gsr_len > IP_MAX_MEMBERSHIPS)
+	    transport->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
 	{
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
