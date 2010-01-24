@@ -1144,8 +1144,8 @@ pgm_print_nak (
 	}
 
 	default:
-		printf ("unsupported afi");
-		break;
+		puts ("unsupported afi");
+		return FALSE;
 	}
 
 
