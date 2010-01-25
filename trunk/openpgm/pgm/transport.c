@@ -887,7 +887,7 @@ pgm_transport_bind (
 		recv_addr.s4.sin_addr.s_addr = INADDR_ANY;
 	} else {
 		memset (&recv_addr.s6, 0, sizeof(struct sockaddr_in6));
-		recv_addr.s6.sin6_family = AF_INET;
+		recv_addr.s6.sin6_family = AF_INET6;
 		recv_addr.s6.sin6_addr = in6addr_any;
 	}
 #else
@@ -1054,7 +1054,7 @@ pgm_transport_bind (
 							  (const struct group_req*)p))
 			{
 				const int save_errno = errno;
-				char group_addr[INET_ADDRSTRLEN];
+				char group_addr[INET6_ADDRSTRLEN];
 				char ifname[IF_NAMESIZE];
 				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
@@ -1092,8 +1092,8 @@ pgm_transport_bind (
 								 p))
 			{
 				const int save_errno = errno;
-				char source_addr[INET_ADDRSTRLEN];
-				char group_addr[INET_ADDRSTRLEN];
+				char source_addr[INET6_ADDRSTRLEN];
+				char group_addr[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
 				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				g_set_error (error,
