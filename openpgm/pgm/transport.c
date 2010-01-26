@@ -746,6 +746,8 @@ pgm_transport_bind (
 
 	if (transport->udp_encap_ucast_port)
 	{
+/* Stevens: "SO_REUSEADDR has datatype int."
+ */
 		g_trace ("INFO","set socket sharing.");
 		gboolean v = TRUE;
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
@@ -833,6 +835,8 @@ pgm_transport_bind (
 /* buffers, set size first then re-read to confirm actual value */
 	if (transport->rcvbuf)
 	{
+/* Stevens: "SO_RCVBUF has datatype int."
+ */
 		g_trace ("INFO","set receive socket buffer size.");
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)) ||
 		     (-1 != transport->recv_sock2 &&
@@ -849,6 +853,8 @@ pgm_transport_bind (
 	}
 	if (transport->sndbuf)
 	{
+/* Stevens: "SO_SNDBUF has datatype int."
+ */
 		g_trace ("INFO","set send socket buffer size.");
 		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)))
