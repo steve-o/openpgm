@@ -820,7 +820,7 @@ pgm_on_spm (
 /* check whether peer can generate parity packets */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		struct pgm_opt_length* opt_len = (spm->spm_nla_afi == AFI_IP6) ?
+		struct pgm_opt_length* opt_len = (AF_INET6 == source->nla.ss_family) ?
 							(struct pgm_opt_length*)(spm6 + 1) :
 							(struct pgm_opt_length*)(spm  + 1);
 		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
@@ -918,7 +918,7 @@ pgm_on_peer_nak (
 
 /* NAK_GRP_NLA contains one of our transport receive multicast groups: the sources send multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+	pgm_nla_to_sockaddr ((AF_INET6 == nak_src_nla.ss_family) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 	gboolean found = FALSE;
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
@@ -947,7 +947,7 @@ pgm_on_peer_nak (
 	guint nak_list_len = 0;
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
+		const struct pgm_opt_length* opt_len = (AF_INET6 == nak_src_nla.ss_family) ?
 							(const struct pgm_opt_length*)(nak6 + 1) :
 							(const struct pgm_opt_length*)(nak + 1);
 		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
@@ -1046,7 +1046,7 @@ pgm_on_ncf (
 
 /* NCF_GRP_NLA contains our transport multicast group */ 
 	struct sockaddr_storage ncf_grp_nla;
-	pgm_nla_to_sockaddr ((ncf->nak_src_nla_afi == AFI_IP6) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
+	pgm_nla_to_sockaddr ((AF_INET6 == ncf_src_nla.ss_family) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
 	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0))
 	{
 		g_trace ("INFO", "Discarded NCF on multicast group mismatch.");
@@ -1076,7 +1076,7 @@ pgm_on_ncf (
 	guint ncf_list_len = 0;
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
+		const struct pgm_opt_length* opt_len = (AF_INET6 == ncf_src_nla.ss_family) ?
 							(const struct pgm_opt_length*)(ncf6 + 1) :
 							(const struct pgm_opt_length*)(ncf  + 1);
 		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
@@ -1229,7 +1229,6 @@ send_nak (
 
 /* NAK */
 	nak->nak_sqn		= g_htonl (sequence);
-	nak->nak_reserved	= 0;
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
@@ -1237,13 +1236,7 @@ send_nak (
 /* group nla: we match the NAK NLA to the same as advertised by the source, we might
  * be listening to multiple multicast groups
  */
-	if (nak->nak_src_nla_afi == AFI_IP6) {
-		pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (char*)&nak6->nak6_grp_nla_afi);
-		nak6->nak6_reserved2 = 0;
-	} else {
-		pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (char*)&nak->nak_grp_nla_afi);
-		nak->nak_reserved2 = 0;
-	}
+	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (AF_INET6 == source->nla.ss_family) ? (char*)&nak6->nak6_grp_nla_afi : (char*)&nak->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
@@ -1309,7 +1302,7 @@ send_parity_nak (
 /* group nla: we match the NAK NLA to the same as advertised by the source, we might
  * be listening to multiple multicast groups
  */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (nak->nak_src_nla_afi == AFI_IP6) ?
+	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (AF_INET6 == source->nla.ss_family) ?
 									(char*)&nak6->nak6_grp_nla_afi :
 									(char*)&nak->nak_grp_nla_afi );
         header->pgm_checksum    = 0;
@@ -1368,7 +1361,7 @@ send_nak_list (
 			    sizeof(struct pgm_opt_header) +
 			    sizeof(struct pgm_opt_nak_list) +
 			    ( (sqn_list->len-1) * sizeof(guint32) );
-	if (AFI_IP6 == source->nla.ss_family)
+	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
 	if (G_UNLIKELY(g_mem_gc_friendly))
@@ -1392,12 +1385,12 @@ send_nak_list (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (nak->nak_src_nla_afi == AFI_IP6) ? 
+	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla, (AF_INET6 == source->nla.ss_family) ? 
 								(char*)&nak6->nak6_grp_nla_afi :
 								(char*)&nak->nak_grp_nla_afi );
 
 /* OPT_NAK_LIST */
-	struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ? 
+	struct pgm_opt_length* opt_len = (AF_INET6 == source->nla.ss_family) ? 
 						(struct pgm_opt_length*)(nak6 + 1) :
 						(struct pgm_opt_length*)(nak + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
@@ -2156,8 +2149,8 @@ pgm_on_poll (
 
 	struct pgm_poll*  poll4 = (struct pgm_poll*) skb->data;
 	struct pgm_poll6* poll6 = (struct pgm_poll6*)skb->data;
-	const guint32 poll_rand = (AFI_IP6 == poll4->poll_nla_afi) ? *(guint32*)poll6->poll6_rand : *(guint32*)poll4->poll_rand;
-	const guint32 poll_mask = (AFI_IP6 == poll4->poll_nla_afi) ? g_ntohl (poll6->poll6_mask) : g_ntohl (poll4->poll_mask);
+	const guint32 poll_rand = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? *(guint32*)poll6->poll6_rand : *(guint32*)poll4->poll_rand;
+	const guint32 poll_mask = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? g_ntohl (poll6->poll6_mask) : g_ntohl (poll4->poll_mask);
 
 /* Check for probability match */
 	if (poll_mask &&
@@ -2218,7 +2211,7 @@ on_general_poll (
 /* TODO: cancel any pending poll-response */
 
 /* defer response based on provided back-off interval */
-	const guint32 poll_bo_ivl = (AFI_IP6 == poll4->poll_nla_afi) ? g_ntohl (poll6->poll6_bo_ivl) : g_ntohl (poll4->poll_bo_ivl);
+	const guint32 poll_bo_ivl = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? g_ntohl (poll6->poll6_bo_ivl) : g_ntohl (poll4->poll_bo_ivl);
 	source->polr_expiry = skb->tstamp + g_rand_int_range (transport->rand_, 0, poll_bo_ivl);
 	pgm_nla_to_sockaddr (&poll4->poll_nla_afi, (struct sockaddr*)&source->poll_nla);
 /* TODO: schedule poll-response */
