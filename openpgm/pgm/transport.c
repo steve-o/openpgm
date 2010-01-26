@@ -1958,10 +1958,10 @@ pgm_transport_msfilter (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, -EINVAL);
-	g_return_val_if_fail (gf_list != NULL, -EINVAL);
-	g_return_val_if_fail (len > 0, -EINVAL);
-	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, -EINVAL);
+	g_return_val_if_fail (transport != NULL, FALSE);
+	g_return_val_if_fail (gf_list != NULL, FALSE);
+	g_return_val_if_fail (len > 0, FALSE);
+	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, FALSE);
 	if (!g_static_rw_lock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
@@ -1970,8 +1970,15 @@ pgm_transport_msfilter (
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
-	
+
+#ifdef MCAST_MSFILTER	
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_MSFILTER, (const char*)gf_list, len);
+#elif defined(SIOCSMSFILTER)
+	status = ioctl (transport->recv_sock, SIOCSMSFILTER, (const char*)gf_list);
+#else
+/* operation unsupported */
+	status = -1;
+#endif
 	g_static_rw_lock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
