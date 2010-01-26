@@ -432,7 +432,7 @@ pgm_on_nak (
 
 /* NAK_GRP_NLA containers our transport multicast group */ 
 	struct sockaddr_storage nak_grp_nla;
-	pgm_nla_to_sockaddr ((nak->nak_src_nla_afi == AFI_IP6) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+	pgm_nla_to_sockaddr ((AF_INET6 == nak_src_nla.ss_family) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
 	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0))
 	{
 		char sgroup[INET6_ADDRSTRLEN];
@@ -454,7 +454,7 @@ pgm_on_nak (
 	guint nak_list_len = 0;
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (nak->nak_src_nla_afi == AFI_IP6) ?
+		const struct pgm_opt_length* opt_len = (AF_INET6 == nak_src_nla.ss_family) ?
 							(const struct pgm_opt_length*)(nak6 + 1) :
 							(const struct pgm_opt_length*)(nak  + 1);
 		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH)) {
@@ -546,7 +546,7 @@ pgm_on_nnak (
 
 /* NAK_GRP_NLA containers our transport multicast group */ 
 	struct sockaddr_storage nnak_grp_nla;
-	pgm_nla_to_sockaddr ((nnak->nak_src_nla_afi == AFI_IP6) ? &nnak6->nak6_grp_nla_afi : &nnak->nak_grp_nla_afi, (struct sockaddr*)&nnak_grp_nla);
+	pgm_nla_to_sockaddr ((AF_INET6 == nnak_src_nla.ss_family) ? &nnak6->nak6_grp_nla_afi : &nnak->nak_grp_nla_afi, (struct sockaddr*)&nnak_grp_nla);
 	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nnak_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0))
 	{
 		transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]++;
@@ -557,7 +557,7 @@ pgm_on_nnak (
 	guint nnak_list_len = 0;
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (nnak->nak_src_nla_afi == AFI_IP6) ?
+		const struct pgm_opt_length* opt_len = (AF_INET6 == nnak_src_nla.ss_family) ?
 							(const struct pgm_opt_length*)(nnak6 + 1) :
 							(const struct pgm_opt_length*)(nnak + 1);
 		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH)) {
@@ -772,7 +772,7 @@ send_ncf (
 	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla (nak_grp_nla, (ncf->nak_src_nla_afi == AFI_IP6) ?
+	pgm_sockaddr_to_nla (nak_grp_nla, (AF_INET6 == nak_src_nla->sa_family) ?
 						(char*)&ncf6->nak6_grp_nla_afi :
 						(char*)&ncf->nak_grp_nla_afi );
         header->pgm_checksum    = 0;
@@ -856,12 +856,12 @@ send_ncf_list (
 	pgm_sockaddr_to_nla (nak_src_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-	pgm_sockaddr_to_nla (nak_grp_nla, (ncf->nak_src_nla_afi == AFI_IP6) ? 
+	pgm_sockaddr_to_nla (nak_grp_nla, (AF_INET6 == nak_src_nla->sa_family) ? 
 						(char*)&ncf6->nak6_grp_nla_afi :
 						(char*)&ncf->nak_grp_nla_afi );
 
 /* OPT_NAK_LIST */
-	struct pgm_opt_length* opt_len = (ncf->nak_src_nla_afi == AFI_IP6) ?
+	struct pgm_opt_length* opt_len = (AF_INET6 == nak_src_nla->sa_family) ?
 						(struct pgm_opt_length*)(ncf6 + 1) :
 						(struct pgm_opt_length*)(ncf + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
