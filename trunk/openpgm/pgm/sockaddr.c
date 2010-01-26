@@ -245,6 +245,9 @@ pgm_sockaddr_cmp (
 	return retval;
 }
 
+/* IP header included with data.
+ */
+
 int
 pgm_sockaddr_hdrincl (
 	const int	s,
@@ -265,8 +268,10 @@ pgm_sockaddr_hdrincl (
  * Linux:raw(7) "For receiving the IP header is always included in the packet."
  *
  * FreeBSD,OS X:IP(4) provided by example "int hincl = 1;"
+ *
+ * Stevens: "IP_HDRINCL has datatype int."
  */
-		const gint optval = v;
+		const int optval = v;
 #else
 		const DWORD optval = v;
 #endif
@@ -282,6 +287,9 @@ pgm_sockaddr_hdrincl (
 	}
 	return retval;
 }
+
+/* Return destination IP address.
+ */
 
 int
 pgm_sockaddr_pktinfo (
@@ -304,8 +312,10 @@ pgm_sockaddr_pktinfo (
  *
  * Absent from FreeBSD & OS X, suggested replacement IP_RECVDSTADDR.
  * OS X:IP6(4) "IPV6_PKTINFO int *"
+ *
+ * Stevens: "IP_RECVDSTADDR has datatype int."
  */
-	const gint optval = v;
+	const int optval = v;
 #else
 	const DWORD optval = v;
 #endif
@@ -342,7 +352,7 @@ pgm_sockaddr_router_alert (
  * true.  Expects an integer flag."
  * Linux:ipv6(7) "Argument is a pointer to an integer."
  */
-	const gint8 optval = v;
+	const unsigned char optval = v;
 
 	switch (sa_family) {
 	case AF_INET:
@@ -371,6 +381,9 @@ pgm_sockaddr_router_alert (
 	return retval;
 }
 
+/* Type-of-service and precedence.
+ */
+
 int
 pgm_sockaddr_tos (
 	const int	s,
@@ -388,8 +401,10 @@ pgm_sockaddr_tos (
  * Linux:ip(7) "TOS is a byte."
  *
  * FreeBSD,OS X:IP(4) provided by example "int tos = IPTOS_LOWDELAY;"
+ *
+ * Stevens: "IP_TOS has datatype int."
  */
-		const gint optval = tos;
+		const int optval = tos;
 #else
 /* IP_TOS only works on Win32 with system override:
  * http://support.microsoft.com/kb/248611
@@ -409,7 +424,9 @@ pgm_sockaddr_tos (
 	return retval;
 }
 
-/* nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
+/* Join multicast group.
+ * 
+ * nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
  */
 int
 pgm_sockaddr_join_group (
@@ -425,6 +442,8 @@ pgm_sockaddr_join_group (
  * Solaris:ip6(7P) "Takes a struct group_req as the parameter."
  * Different type for each family, however group_req is protocol-independent.
  *
+ * Stevens: "MCAST_JOIN_GROUP has datatype group_req{}."
+ *
  * RFC3678: Argument type struct group_req
  */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
@@ -439,6 +458,8 @@ pgm_sockaddr_join_group (
  * ip_mreq structure (present since Linux 1.2) is still supported."
  *
  * FreeBSD,OS X:IP(4) provided by example "struct ip_mreq mreq;"
+ *
+ * Stevens: "IP_ADD_MEMBERSHIP has datatype ip_mreq{}."
  *
  * RFC3678: Argument type struct ip_mreq
  */
@@ -471,6 +492,8 @@ pgm_sockaddr_join_group (
  * Linux:ipv6(7) "Argument is a pointer to a struct ipv6_mreq structure."
  *
  * OS X:IP6(4) "IPV6_JOIN_GROUP struct ipv6_mreq *"
+ *
+ * Stevens: "IPV6_JOIN_GROUP has datatype ipv6_mreq{}."
  */
 		struct ipv6_mreq mreq6;
 		memset (&mreq6, 0, sizeof(mreq6));
@@ -486,7 +509,11 @@ pgm_sockaddr_join_group (
 	return retval;
 }
 
-/* silently revert to ASM if SSM not supported */
+/* Join source-specific multicast.
+ *
+ * nb: Silently revert to ASM if SSM not supported
+ */
+
 int
 pgm_sockaddr_join_source_group (
 	const int			s,
@@ -502,6 +529,8 @@ pgm_sockaddr_join_source_group (
  * Different type for each family, however group_source_req is protocol-
  * independent.
  *
+ * Stevens: "MCAST_JOIN_SOURCE_GROUP has datatype group_source_req{}."
+ *
  * RFC3678: Argument type struct group_source_req
  */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
@@ -515,6 +544,8 @@ pgm_sockaddr_join_source_group (
  * Linux:ip(7) absent.
  *
  * OS X:IP(4) absent.
+ *
+ * Stevens: "IP_ADD_SOURCE_MEMBERSHIP has datatype ip_mreq_source{}."
  *
  * RFC3678: Argument type struct ip_mreq_source
  */
@@ -543,6 +574,9 @@ pgm_sockaddr_join_source_group (
 	return retval;
 }
 
+/* Specify outgoing interface.
+ */
+
 int
 pgm_sockaddr_multicast_if (
 	int			s,
@@ -561,6 +595,8 @@ pgm_sockaddr_multicast_if (
  * IP_ADD_MEMBERSHIP."
  *
  * OS X:IP(4) provided by example "struct in_addr addr;"
+ *
+ * Stevens: "IP_MULTICAST_IF has datatype struct in_addr{}."
  */
 		struct sockaddr_in s4;
 		memcpy (&s4, address, sizeof(s4));
@@ -570,15 +606,17 @@ pgm_sockaddr_multicast_if (
 
 	case AF_INET6: {
 #ifdef G_OS_UNIX
-/* Solaris:ip6(7P) "This option takes an integer as an argument; the integer is the
- * interface index of the selected interface."
+/* Solaris:ip6(7P) "This option takes an integer as an argument; the integer
+ * is the interface index of the selected interface."
  *
  * Linux:ipv6(7) "The argument is a pointer to an interface index (see 
  * netdevice(7)) in an integer."
  *
  * OS X:IP6(4) "IPV6_MULTICAST_IF u_int *"
+ *
+ * Stevens: "IPV6_MULTICAST_IF has datatype u_int."
  */
-		const gint optval = ifindex;
+		const unsigned int optval = ifindex;
 #else
 		const DWORD optval = ifindex;
 #endif
@@ -590,6 +628,9 @@ pgm_sockaddr_multicast_if (
 	}
 	return retval;
 }
+
+/* Specify loopback.
+ */
 
 int
 pgm_sockaddr_multicast_loop (
@@ -610,8 +651,10 @@ pgm_sockaddr_multicast_loop (
  * Linux:ip(7) "Sets or reads a boolean integer argument"
  *
  * OS X:IP(4) provided by example "u_char loop;"
+ *
+ * Stevens: "IP_MULTICAST_LOOP has datatype u_char."
  */
-		const gint8 optval = v;
+		const unsigned char optval = v;
 #else
 		const DWORD optval = v;
 #endif
@@ -626,8 +669,10 @@ pgm_sockaddr_multicast_loop (
  * Linux:ipv6(7) "Argument is a pointer to boolean."
  *
  * OS X:IP6(7) "IPV6_MULTICAST_LOOP u_int *"
+ *
+ * Stevens: "IPV6_MULTICAST_LOOP has datatype u_int."
  */
-		const gint8 optval = v;
+		const unsigned int optval = v;
 #else
 		const DWORD optval = v;
 #endif
@@ -640,7 +685,9 @@ pgm_sockaddr_multicast_loop (
 	return retval;
 }
 
-/* Only multicast hops, unicast hop-limit is not changed
+/* Specify TTL or outgoing hop limit.
+ *
+ * nb: Only multicast hops, unicast hop-limit is not changed
  */
 
 int
@@ -661,8 +708,10 @@ pgm_sockaddr_multicast_hops (
  *
  * OS X:IP(4) provided by example for SOCK_DGRAM with IP_TTL: "int ttl = 60;",
  * or for SOCK_RAW & SOCK_DGRAM with IP_MULTICAST_TTL: "u_char ttl;"
+ *
+ * Stevens: "IP_MULTICAST_TTL has datatype u_char."
  */
-		const gint8 optval = hops;
+		const unsigned char optval = hops;
 #else
 		const DWORD optval = hops;
 #endif
@@ -677,8 +726,10 @@ pgm_sockaddr_multicast_hops (
  * Linux:ipv6(7) "Argument is a pointer to an integer."
  *
  * OS X:IP6(7) "IPV6_MULTICAST_HOPS int *"
+ *
+ * Stevens: "IPV6_MULTICAST_HOPS has datatype int."
  */
-		const gint optval = hops;
+		const int optval = hops;
 #else
 		const DWORD optval = hops;
 #endif
