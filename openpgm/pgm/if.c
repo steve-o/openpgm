@@ -238,7 +238,7 @@ is_in_net6 (
 static
 gboolean
 parse_interface (
-	const int		family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
+	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		ifname,			/* NULL terminated */
 	struct interface_req*	ir,			/* location to write interface details to */
 	GError**		error
@@ -247,7 +247,7 @@ parse_interface (
 	gboolean check_inet_network = FALSE, check_inet6_network = FALSE;
 	gboolean check_addr = FALSE;
 	gboolean check_ifname = FALSE;
-	char ifname_[1024];
+	char literal[1024];
 	struct in_addr in_addr;
 	struct in6_addr in6_addr;
 	struct ifaddrs *ifap, *ifa;
@@ -262,14 +262,18 @@ parse_interface (
 	g_trace ("parse_interface (family:%s ifname:\"%s\" ir:%p error:%p)",
 		 pgm_family_string (family), ifname, (gpointer)ir, (gpointer)error);
 
-/* strip any square brackets */
-	if ('[' == ifname[0])
+/* strip any square brackets for IPv6 early evaluation */
+	if (AF_INET != family &&
+	    '[' == ifname[0])
 	{
 		const int ifnamelen = strlen(ifname);
 		if (']' == ifname[ ifnamelen - 1 ]) {
-			strncpy (ifname_, ifname + 1, ifnamelen - 2);
-			ifname_[ ifnamelen - 2 ] = 0;
-			ifname = ifname_;
+			strncpy (literal, ifname + 1, ifnamelen - 2);
+			literal[ ifnamelen - 2 ] = 0;
+			family = AF_INET6;		/* force IPv6 evaluation */
+			check_inet6_network = TRUE;	/* may be a network IP or CIDR block */
+			check_addr = TRUE;		/* cannot be not a name */
+			ifname = literal;
 		}
 	}
 
@@ -619,8 +623,6 @@ parse_group (
 	GError**		error
 	)
 {
-	char group_[1024];
-
 /* pre-conditions */
 	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
 	g_assert (NULL != group);
@@ -629,14 +631,24 @@ parse_group (
 	g_trace ("parse_group (family:%s group:\"%s\" addr:%p error:%p)",
 		 pgm_family_string (family), group, (gpointer)addr, (gpointer)error);
 
-/* strip any square brackets */
-	if ('[' == group[0])
+/* strip any square brackets for early IPv6 literal evaluation */
+	if (AF_INET != family &&
+	    '[' == group[0])
 	{
 		const int grouplen = strlen(group);
 		if (']' == group[ grouplen - 1 ]) {
-			strncpy (group_, group + 1, grouplen - 2);
-			group_[ grouplen - 2 ] = 0;
-			group = group_;
+			char literal[1024];
+			strncpy (literal, group + 1, grouplen - 2);
+			literal[ grouplen - 2 ] = 0;
+			if (pgm_inet_pton (AF_INET6, literal, &((struct sockaddr_in6*)addr)->sin6_addr) &&
+			    IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)addr)->sin6_addr))
+			{
+				addr->sa_family = AF_INET6;
+				((struct sockaddr_in6*)addr)->sin6_port = 0;
+				((struct sockaddr_in6*)addr)->sin6_flowinfo = 0;
+				((struct sockaddr_in6*)addr)->sin6_scope_id = 0;
+				return TRUE;
+			}
 		}
 	}
 
