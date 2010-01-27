@@ -19,7 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -220,6 +219,7 @@ is_in_net6 (
  *       1.2.3.4
  *       1.2
  *       abcd::
+ *       [abcd::]
  *       <hostname>
  *       <nss network name>
  *
@@ -247,6 +247,7 @@ parse_interface (
 	gboolean check_inet_network = FALSE, check_inet6_network = FALSE;
 	gboolean check_addr = FALSE;
 	gboolean check_ifname = FALSE;
+	char ifname_[1024];
 	struct in_addr in_addr;
 	struct in6_addr in6_addr;
 	struct ifaddrs *ifap, *ifa;
@@ -260,6 +261,17 @@ parse_interface (
 
 	g_trace ("parse_interface (family:%s ifname:\"%s\" ir:%p error:%p)",
 		 pgm_family_string (family), ifname, (gpointer)ir, (gpointer)error);
+
+/* strip any square brackets */
+	if ('[' == ifname[0])
+	{
+		const int ifnamelen = strlen(ifname);
+		if (']' == ifname[ ifnamelen - 1 ]) {
+			strncpy (ifname_, ifname + 1, ifnamelen - 2);
+			ifname_[ ifnamelen - 2 ] = 0;
+			ifname = ifname_;
+		}
+	}
 
 /* network address: in_addr in network order */
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
@@ -607,6 +619,8 @@ parse_group (
 	GError**		error
 	)
 {
+	char group_[1024];
+
 /* pre-conditions */
 	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
 	g_assert (NULL != group);
@@ -614,6 +628,17 @@ parse_group (
 
 	g_trace ("parse_group (family:%s group:\"%s\" addr:%p error:%p)",
 		 pgm_family_string (family), group, (gpointer)addr, (gpointer)error);
+
+/* strip any square brackets */
+	if ('[' == group[0])
+	{
+		const int grouplen = strlen(group);
+		if (']' == group[ grouplen - 1 ]) {
+			strncpy (group_, group + 1, grouplen - 2);
+			group_[ grouplen - 2 ] = 0;
+			group = group_;
+		}
+	}
 
 /* IPv4 address */
 	if (AF_INET6 != family &&
@@ -1124,20 +1149,22 @@ parse_send_entity (
  */
 
 #define IS_HOSTNAME(x) ( 				/* RFC 952 */ \
-				isalnum(x) || \
+				g_ascii_isalnum(x) || \
 				((x) == '-') || \
 				((x) == '.') \
 			)
 #define IS_IP(x) ( \
-				isdigit(x) || \
+				g_ascii_isdigit(x) || \
 				((x) == '.') || \
 				((x) == '/') \
 			)
 #define IS_IP6(x) ( \
-				isxdigit(x) || \
+				g_ascii_isxdigit(x) || \
 				((x) == ':') || \
 				((x) == '/') || \
-				((x) == '.') \
+				((x) == '.') || \
+				((x) == '[') || \
+				((x) == ']') \
 			)
 /* e.g. fe80::1%eth0.620    vlan tag,
  *      fe80::1%eth0:0      IP alias
@@ -1149,7 +1176,7 @@ parse_send_entity (
 #define IS_IP6_WITH_ZONE(x) ( \
 				IS_IP6(x) || \
 				((x) == '%') || \
-				isalpha(x) || \
+				g_ascii_isalpha(x) || \
 				((x) == '_') \
 			    )
 #define IS_NETPARAM(x) ( \
