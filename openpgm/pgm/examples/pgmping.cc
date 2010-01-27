@@ -205,7 +205,11 @@ main (
 	}
 
 	log_init ();
-	pgm_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {
