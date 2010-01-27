@@ -72,24 +72,168 @@ pgm_getifaddrs (
 		return -1;
 	}
 
+#	ifdef SIOCGLIFCONF
+
+/* process IPv6 interfaces */
 	int sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (sock6 < 0) {
 		close (sock);
 		return -1;
 	}
 
-/* get count of interfaces */
-	char buf[1024], buf6[1024];
-	struct ifconf ifc, ifc6;
-
-	ifc.ifc_buf = buf;
-	ifc.ifc_len = sizeof(buf);
-	if (ioctl (sock, SIOCGIFCONF, &ifc) < 0) {
+/* process all interfaces with family-agnostic ioctl, unfortunately it still
+ * must be called on each family socket despite what if_tcp(7P) says.
+ */
+	char buf[1024],  buf6[1024];
+	struct lifconf lifc, lifc6;
+	lifc.lifc_family = AF_INET;
+	lifc.lifc_flags  = 0;
+	lifc.lifc_buf    = buf;
+	lifc.lifc_len    = sizeof(buf);
+	if (ioctl (sock, SIOCGLIFCONF, &lifc) < 0) {
 		close (sock);
 		close (sock6);
 		return -1;
 	}
 
+	struct lifnum lifn;
+	lifn.lifn_family = AF_INET;
+	lifn.lifn_flags  = 0;
+	if (ioctl (sock, SIOCGLIFNUM, &lifn) < 0) {
+		close (sock);
+		close (sock6);
+		return -1;
+	}
+	int if_count = lifn.lifn_count;
+
+/* repeat everything for IPv6 */
+	lifc6.lifc_family = AF_INET6;
+	lifc6.lifc_flags  = 0;
+	lifc6.lifc_buf    = buf6;
+	lifc6.lifc_len    = sizeof(buf);
+	if (ioctl (sock6, SIOCGLIFCONF, &lifc6) < 0) {
+		close (sock);
+		close (sock6);
+		return -1;
+	}
+
+	lifn.lifn_family = AF_INET6;
+	lifn.lifn_flags  = 0;
+	if (ioctl (sock6, SIOCGLIFNUM, &lifn) < 0) {
+		close (sock);
+		close (sock6);
+		return -1;
+	}
+	if_count += lifn.lifn_count;
+
+/* alloc a contiguous block for entire list */
+	struct _pgm_ifaddrs* ifa = malloc (if_count * sizeof(struct _pgm_ifaddrs));
+	struct _pgm_ifaddrs* ift = ifa;
+	memset (ifa, 0, if_count * sizeof(struct _pgm_ifaddrs));
+	struct lifreq* lifr      = lifc.lifc_req;
+	struct lifreq* lifr_end  = (struct lifreq *)&lifc.lifc_buf[lifc.lifc_len];
+
+	g_assert (IF_NAMESIZE >= sizeof(lifr->lifr_name));
+
+	while (lifr < lifr_end)
+	{
+/* address */
+		if (ioctl (sock, SIOCGLIFADDR, lifr) != -1) {
+			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
+		}
+
+/* name */
+		ift->_ifa.ifa_name = ift->_name;
+		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
+		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
+
+/* flags */
+		if (ioctl (sock, SIOCGLIFFLAGS, lifr) != -1) {
+			ift->_ifa.ifa_flags = lifr->lifr_flags;
+		}
+
+/* netmask */
+		if (ioctl (sock, SIOCGLIFNETMASK, lifr) != -1) {
+			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+#		ifdef CONFIG_HAVE_IFR_NETMASK
+			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_netmask, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_netmask));
+#		else
+			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
+#		endif
+		}
+
+		++lifr;
+		if (lifr < lifr_end) {
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+		}
+	}
+
+/* repeat everything for IPv6 */
+	lifr  = lifc6.lifc_req;
+	lifr_end = (struct lifreq *)&lifc6.lifc_buf[lifc6.lifc_len];
+
+	while (lifr < lifr_end)
+	{
+		if (ift != ifa) {
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
+		}
+
+/* address */
+		if (ioctl (sock6, SIOCGLIFADDR, lifr) != -1) {
+			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
+		}
+
+/* name */
+		ift->_ifa.ifa_name = ift->_name;
+		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
+		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
+
+/* flags */
+		if (ioctl (sock6, SIOCGLIFFLAGS, lifr) != -1) {
+			ift->_ifa.ifa_flags = lifr->lifr_flags;
+		}
+
+/* netmask */
+		if (ioctl (sock6, SIOCGLIFNETMASK, lifr) != -1) {
+			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+#		ifdef CONFIG_HAVE_IFR_NETMASK
+			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_netmask, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_netmask));
+#		else
+			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
+#		endif
+		}
+
+		++lifr;
+	}
+
+#	else /* !SIOCGLIFCONF */
+
+/* process IPv4 interfaces */
+	char buf[1024];
+	struct ifconf ifc;
+	ifc.ifc_buf = buf;
+	ifc.ifc_len = sizeof(buf);
+	if (ioctl (sock, SIOCGIFCONF, &ifc) < 0) {
+		close (sock);
+		return -1;
+	}
+	int if_count = ifc.ifc_len / sizeof(struct ifreq);
+
+#		ifdef CONFIG_HAVE_IPV6_SIOCGIFADDR
+
+/* process IPv6 interfaces */
+	int sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
+	if (sock6 < 0) {
+		close (sock);
+		return -1;
+	}
+
+	char buf6[1024];
+	struct ifconf ifc6;
 	ifc6.ifc_buf = buf6;
 	ifc6.ifc_len = sizeof(buf6);
 	if (ioctl (sock6, SIOCGIFCONF, &ifc6) < 0) {
@@ -97,20 +241,20 @@ pgm_getifaddrs (
 		close (sock6);
 		return -1;
 	}
+	if_count += ifc6.ifc_len / sizeof(struct ifreq);
+
+#		endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
 
 /* alloc a contiguous block for entire list */
-	int n = (ifc.ifc_len + ifc6.ifc_len) / sizeof(struct ifreq);
-	struct _pgm_ifaddrs* ifa = malloc (n * sizeof(struct _pgm_ifaddrs));
-	memset (ifa, 0, n * sizeof(struct _pgm_ifaddrs));
-
-/* foreach interface */
-	struct ifreq *ifr  = ifc.ifc_req;
-	struct ifreq *lifr = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
+	struct _pgm_ifaddrs* ifa = malloc (if_count * sizeof(struct _pgm_ifaddrs));
 	struct _pgm_ifaddrs* ift = ifa;
+	memset (ifa, 0, if_count * sizeof(struct _pgm_ifaddrs));
+	struct ifreq *ifr  = ifc.ifc_req;
+	struct ifreq *ifr_end = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
 
 	g_assert (IF_NAMESIZE >= sizeof(ifr->ifr_name));
 
-	while (ifr < lifr)
+	while (ifr < ifr_end)
 	{
 /* address */
 		if (ioctl (sock, SIOCGIFADDR, ifr) != -1) {
@@ -131,26 +275,27 @@ pgm_getifaddrs (
 /* netmask */
 		if (ioctl (sock, SIOCGIFNETMASK, ifr) != -1) {
 			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
-#ifdef CONFIG_HAVE_IFR_NETMASK
+#	ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
-#else
+#	else
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
-#endif
+#	endif
 		}
 
 		++ifr;
-		if (ifr < lifr) {
+		if (ifr < ifr_end) {
 			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
 			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 	}
 
-#ifdef CONFIG_HAVE_IPV6_SIOCGIFADDR
-/* repeat for IPv6 */
-	ifr  = ifc6.ifc_req;
-	lifr = (struct ifreq *)&ifc6.ifc_buf[ifc6.ifc_len];
+#		ifdef CONFIG_HAVE_IPV6_SIOCGIFADDR
 
-	while (ifr < lifr)
+/* repeat everything for IPv6 */
+	ifr  = ifc6.ifc_req;
+	ifr_end = (struct ifreq *)&ifc6.ifc_buf[ifc6.ifc_len];
+
+	while (ifr < ifr_end)
 	{
 		if (ift != ifa) {
 			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
@@ -159,7 +304,7 @@ pgm_getifaddrs (
 
 /* address, note this does not work on Linux as struct ifreq is too small for an IPv6 address */
 		if (ioctl (sock6, SIOCGIFADDR, ifr) != -1) {
-			ift->_ifa.ifa_addr = &ift->_addr;
+			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 		}
 
@@ -175,21 +320,23 @@ pgm_getifaddrs (
 
 /* netmask */
 		if (ioctl (sock6, SIOCGIFNETMASK, ifr) != -1) {
-#ifdef CONFIG_HAVE_IFR_NETMASK
-			ift->_ifa.ifa_netmask = &ift->_netmask;
+			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+#		ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
-#else
-			ift->_ifa.ifa_netmask = &ift->_addr;
+#		else
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
-#endif
+#		endif
 		}
 
 		++ifr;
 	}
-#endif
+
+	close (sock6);
+
+#		endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
+#	endif /* !SIOCGLIFCONF */
 
 	close (sock);
-	close (sock6);
 
 #elif defined(CONFIG_TARGET_WINE) /* !G_OS_UNIX */
 
