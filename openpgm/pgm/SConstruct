@@ -32,7 +32,7 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'true',
+	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
 			allowed_values=('true', 'false')),
 )
 
