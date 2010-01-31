@@ -869,10 +869,16 @@ pgm_transport_bind (
 		}
 	}
 
-/* bind udp unicast sockets to interfaces, note multicast on a bound interface is
- * fruity on some platforms so callee should specify any interface.
+/* Bind UDP sockets to interfaces, note multicast on a bound interface is
+ * fruity on some platforms.  Roughly,  binding to INADDR_ANY provides all
+ * data, binding to the multicast group provides only multicast traffic,
+ * and binding to the interface address provides only unicast traffic.
  *
- * after binding default interfaces (0.0.0.0) are resolved
+ * Multicast routing, IGMP & MLD require a link local address, for IPv4
+ * this is provided through MULTICAST_IF and IPv6 through bind, and these
+ * may be overridden by per packet scopes.
+ *
+ * After binding, default interfaces (0.0.0.0) are resolved.
  */
 /* TODO: different ports requires a new bound socket */
 
