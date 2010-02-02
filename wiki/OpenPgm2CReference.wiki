@@ -1,9 +1,9 @@
 #summary C Reference for OpenPGM version 2.
 #labels Featured,Phase-Implementation
 
-*OpenPGM version 2.0.16*
+*OpenPGM version 2.0.22*
 
-*October 2009*
+*February 2010*
 
 
 === Contents ===
