@@ -55,10 +55,7 @@
 #	include <ws2tcpip.h>
 #endif
 
-#include "pgm/transport.h"
-#include "pgm/source.h"
-#include "pgm/receiver.h"
-#include "pgm/if.h"
+#include "pgm/pgm.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
 #include "pgm/indextoaddr.h"
@@ -68,10 +65,10 @@
 #include "pgm/packet.h"
 #include "pgm/net.h"
 #include "pgm/txwi.h"
+#include "pgm/sourcep.h"
 #include "pgm/rxwi.h"
+#include "pgm/receiverp.h"
 #include "pgm/rate_control.h"
-#include "pgm/sn.h"
-#include "pgm/time.h"
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"

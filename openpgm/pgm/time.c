@@ -50,6 +50,7 @@
 #endif
 
 #include "pgm/time.h"
+#include "pgm/timep.h"
 
 
 /* globals */

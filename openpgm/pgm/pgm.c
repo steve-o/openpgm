@@ -28,9 +28,9 @@
 #       include <ws2tcpip.h>
 #endif
 
+#include "pgm/pgm.h"
 #include "pgm/packet.h"
-#include "pgm/time.h"
-#include "pgm/transport.h"
+#include "pgm/timep.h"
 
 
 #ifndef PGM_DEBUG
