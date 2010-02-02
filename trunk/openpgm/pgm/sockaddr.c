@@ -141,7 +141,7 @@ pgm_sockaddr_scope_id (
 	)
 {
 	gsize sa_scope_id;
-	if (AF_INET == sa->sa_family) {
+	if (AF_INET6 == sa->sa_family) {
 		struct sockaddr_in6 s6;
 		memcpy (&s6, sa, sizeof(s6));
 		sa_scope_id = s6.sin6_scope_id;
