@@ -2,7 +2,7 @@
  * 
  * high resolution timers.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,10 +23,6 @@
 #define __PGM_TIME_H__
 
 #include <glib.h>
-
-#ifndef __PGM_SN_H
-#   include <pgm/sn.h>
-#endif
 
 #define PGM_TIME_ERROR		pgm_time_error_quark ()
 
@@ -71,10 +67,6 @@ extern pgm_time_sleep_func pgm_time_sleep;
 extern pgm_time_since_epoch_func pgm_time_since_epoch;
 
 GQuark pgm_time_error_quark (void);
-
-PGM_GNUC_INTERNAL gboolean pgm_time_init (GError**) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL gboolean pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL gboolean pgm_time_shutdown (void);
 
 G_END_DECLS
 

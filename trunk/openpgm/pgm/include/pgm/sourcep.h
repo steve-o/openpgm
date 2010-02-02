@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * PGM receiver transport.
+ * PGM source transport.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *
@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_RECEIVER_H__
-#define __PGM_RECEIVER_H__
+#ifndef __PGM_SOURCEP_H__
+#define __PGM_SOURCEP_H__
 
 #include <glib.h>
 
@@ -31,18 +31,13 @@
 
 G_BEGIN_DECLS
 
-gboolean pgm_transport_set_rxw_sqns (pgm_transport_t*, guint);
-gboolean pgm_transport_set_rxw_secs (pgm_transport_t*, guint);
-gboolean pgm_transport_set_rxw_max_rte (pgm_transport_t*, guint);
-gboolean pgm_transport_set_peer_expiry (pgm_transport_t*, guint);
-gboolean pgm_transport_set_spmr_expiry (pgm_transport_t*, guint);
-gboolean pgm_transport_set_nak_bo_ivl (pgm_transport_t*, guint);
-gboolean pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, guint);
-gboolean pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, guint);
-gboolean pgm_transport_set_nak_data_retries (pgm_transport_t*, guint);
-gboolean pgm_transport_set_nak_ncf_retries (pgm_transport_t*, guint);
+PGM_GNUC_INTERNAL gboolean pgm_send_spm (pgm_transport_t*, int) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_deferred_nak (pgm_transport_t* const);
+PGM_GNUC_INTERNAL gboolean pgm_on_spmr (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_nak (pgm_transport_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_on_nnak (pgm_transport_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 
-#endif /* __PGM_RECEIVER_H__ */
+#endif /* __PGM_SOURCEP_H__ */
 
