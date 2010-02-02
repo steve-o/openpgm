@@ -54,10 +54,8 @@
 #	include <ws2tcpip.h>
 #endif
 
-#include "pgm/transport.h"
-#include "pgm/source.h"
-#include "pgm/receiver.h"
-#include "pgm/if.h"
+#include "pgm/pgm.h"
+#include "pgm/receiverp.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
 #include "pgm/math.h"
@@ -65,8 +63,6 @@
 #include "pgm/txwi.h"
 #include "pgm/rxwi.h"
 #include "pgm/rate_control.h"
-#include "pgm/sn.h"
-#include "pgm/time.h"
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
 #include "pgm/reed_solomon.h"
@@ -2149,7 +2145,8 @@ pgm_on_poll (
 
 	struct pgm_poll*  poll4 = (struct pgm_poll*) skb->data;
 	struct pgm_poll6* poll6 = (struct pgm_poll6*)skb->data;
-	const guint32 poll_rand = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? *(guint32*)poll6->poll6_rand : *(guint32*)poll4->poll_rand;
+	guint32 poll_rand;
+	memcpy (&poll_rand, (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? poll6->poll6_rand : poll4->poll_rand, sizeof(poll_rand));
 	const guint32 poll_mask = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? g_ntohl (poll6->poll6_mask) : g_ntohl (poll4->poll_mask);
 
 /* Check for probability match */

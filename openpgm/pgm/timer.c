@@ -21,10 +21,11 @@
 
 #include <glib.h>
 
-#include "pgm/transport.h"
-#include "pgm/source.h"
-#include "pgm/receiver.h"
+#include "pgm/pgm.h"
+#include "pgm/receiverp.h"
+#include "pgm/sourcep.h"
 #include "pgm/timer.h"
+
 
 //#define TIMER_DEBUG
 

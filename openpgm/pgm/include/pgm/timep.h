@@ -1,19 +1,8 @@
-#!/usr/bin/python
-
-import os
-import sys
-import time
-
-build_date = time.strftime ("%Y-%m-%d")
-build_time = time.strftime ("%H:%M:%S")
-build_rev = os.popen('svnversion -n .').read();
-
-print """
-/* vim:ts=8:sts=8:sw=4:noai:noexpandtab
+/* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * OpenPGM version.
+ * high resolution timers.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -30,23 +19,19 @@ print """
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef __PGM_TIMEP_H__
+#define __PGM_TIMEP_H__
+
 #include <glib.h>
 
-#include "pgm/version.h"
 
+G_BEGIN_DECLS
 
-/* globals */
+PGM_GNUC_INTERNAL gboolean pgm_time_init (GError**) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL gboolean pgm_time_shutdown (void);
 
-const guint pgm_major_version = 2;
-const guint pgm_minor_version = 0;
-const guint pgm_micro_version = 23;
-const char* pgm_build_date = "%s";
-const char* pgm_build_time = "%s";
-const char* pgm_build_platform = "%s";
-const char* pgm_build_revision = "%s";
+G_END_DECLS
 
+#endif /* __PGM_TIMEP_H__ */
 
-/* eof */
-"""%(build_date, build_time, sys.platform, build_rev)
-
-# end of file

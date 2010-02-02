@@ -2,7 +2,7 @@
  * 
  * PGM source transport.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,12 +40,6 @@ gboolean pgm_transport_set_txw_max_rte (pgm_transport_t* const, const guint);
 PGMIOStatus pgm_send (pgm_transport_t* const, gconstpointer, const gsize, gsize*);
 PGMIOStatus pgm_sendv (pgm_transport_t* const, const struct pgm_iovec* const, const guint, const gboolean, gsize*);
 PGMIOStatus pgm_send_skbv (pgm_transport_t* const, struct pgm_sk_buff_t**, const guint, const gboolean, gsize*);
-
-PGM_GNUC_INTERNAL gboolean pgm_send_spm (pgm_transport_t*, int) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL gboolean pgm_on_deferred_nak (pgm_transport_t* const);
-PGM_GNUC_INTERNAL gboolean pgm_on_spmr (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL gboolean pgm_on_nak (pgm_transport_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL gboolean pgm_on_nnak (pgm_transport_t* const, struct pgm_sk_buff_t* const) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 
