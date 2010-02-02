@@ -12,19 +12,24 @@ OpenPGM C programs must link the appropriate library files.
 <tr>
 <td colspan="2"><h3>Communications and Events</h3></td>
 </tr><tr>
-<td><tt>```pkg-config --static --cflags --libs glib-2.0 gthread-2.0```</tt></td>
+<td><tt>```pkg-config --cflags --libs glib-2.0 gthread-2.0```</tt></td>
 <td>Include this for the GLib API.</td>
 </tr><tr>
 <td><tt>-lpgm</tt></td>
 <td>All OpenPGM programs must use this link flag.</td>
 </tr><tr>
+<td><tt>libgcc.a libmingwex.a</tt></td>
+<td>GCC compiler dependencies for MSVC from MinGW cross-compile, must appear first in link line.</td>
+</tr><tr>
 <td colspan="2"><h3>Monitoring and Administration</h3></td>
 </tr><tr>
-<td>Change the GLib line to<br/><tt>```pkg-config --static --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.2``` -lpgmhttp </tt></td>
+<td>Change the GLib line to<br/><tt>```pkg-config --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.2``` -lpgmhttp </tt><br/> or libsoup version 2.4 as appropriate,<br/><tt>```pkg-config --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.4``` -lpgmhttp </tt></td>
 <td>Include this for the HTTP/HTTPS interface.</td>
 </tr><tr>
 <td><tt>-lpgmsnmp -lnetsnmpagent -lnetsnmpmibs -lnetsnmphelpers -lnetsnmp</tt></td>
 <td>Include this for a Net-SNMP based sub-agent.</td>
+</tr><tr>
+<td><tt>-lm</tt></td>
+<td>Required for support of histogram math enabled via <tt>-DCONFIG_HISTOGRAMS</tt>.</td>
 </tr>
 </table>
-
