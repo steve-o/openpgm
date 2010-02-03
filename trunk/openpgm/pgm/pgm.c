@@ -47,10 +47,6 @@ int ipproto_pgm = IPPROTO_PGM;
 /* locals */
 static gboolean pgm_got_initialized = FALSE;
 
-#ifdef G_OS_WIN32
-static PGMEngineError pgm_engine_error_from_wsa_errno (gint);
-#endif
-
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  *
