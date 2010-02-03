@@ -3,11 +3,34 @@
 #sidebar TOC2CReference
 == Environment ==
 === Summary ===
+  * Add [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError] parameter to <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt>.
   * Add call to <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt> on application shutdown.
 
 === Details ===
 Version 2.0 introduces a <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt> function to free resources used by the PGM engine together with <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt>, a method to detect previously initialized PGM engine allowing multiple subsystems to use PGM, for example within a library and inside an application core.
 
+Additional error reporting on version 2 adds [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError] return values to all major functions, this extra information can be ignored by passing a NULL value.
+
+*Version 1.0 code example.*
+{{{
+ pgm_init();
+}}}
+*Updated example for version 2.0.*
+{{{
+ GError *err = NULL;
+ if (!pgm_init (&err)) {
+   g_error ("Unable to initialize PGM engine: %s", err->message);
+   g_error_free (err);
+   return EXIT_FAILURE;
+  }
+}}}
+*Ignoring new error reporting.*
+{{{
+ if (!pgm_init (NULL)) {
+   g_error ("Unable to initialize PGM engine");
+   return EXIT_FAILURE;
+  }
+}}}
 
 == Interface and GSI ==
 === Summary ===
@@ -64,12 +87,12 @@ Improved error reporting means that detailed error messages are available on inv
  GError* err = NULL;
  
  if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
-   g_error ("parsing network parameter: %s", err->message);
+   g_error ("Parsing network parameter: %s", err->message);
    g_error_free (err);
    return EXIT_FAILURE;
  }
- if (!pgm_gsi_create_from_hostname (&res->ti_gsi, NULL))) {
-   g_error ("creating GSI: %s", err->message);
+ if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err))) {
+   g_error ("Creating GSI: %s", err->message);
    g_error_free (err);
    pgm_if_free_transport_info (res);
    return EXIT_FAILURE;
@@ -237,12 +260,12 @@ Version 2.0 introduces more detailed error reporting on network operations so as
 
 *Version 1.0 code example.*
 {{{
- if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
+ if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT)) {
    g_error ("Unable to start HTTP interface.");
    pgm_shutdown ();
    return EXIT_FAILURE;
   }
-  if (!pgm_snmp_init (&err)) {
+  if (!pgm_snmp_init ()) {
     g_error ("Unable to start SNMP interface.");
     pgm_http_shutdown ();
     pgm_shutdown ();
