@@ -665,8 +665,8 @@ match_default_group (
 		is_match = (0 == pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (const struct sockaddr*)&sa_default));
 		if (!is_match) {
 			char addr1[INET6_ADDRSTRLEN], addr2[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&gsr->gsr_group, addr1, sizeof(addr1));
-			pgm_sockaddr_ntop (&sa_default, addr2, sizeof(addr2));
+			pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, addr1, sizeof(addr1));
+			pgm_sockaddr_ntop ((struct sockaddr*)&sa_default, addr2, sizeof(addr2));
 			g_message ("FALSE == cmp(\"%s\", default-group \"%s\")", addr1, addr2);
 		}
 		break;
@@ -674,8 +674,8 @@ match_default_group (
 		is_match = (0 == pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (const struct sockaddr*)&sa6_default));
 		if (!is_match) {
 			char addr1[INET6_ADDRSTRLEN], addr2[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop (&gsr->gsr_group, addr1, sizeof(addr1));
-			pgm_sockaddr_ntop (&sa6_default, addr2, sizeof(addr2));
+			pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, addr1, sizeof(addr1));
+			pgm_sockaddr_ntop ((struct sockaddr*)&sa6_default, addr2, sizeof(addr2));
 			g_message ("FALSE == cmp(\"%s\", default-group \"%s\")", addr1, addr2);
 		}
 	default:
@@ -743,20 +743,27 @@ static const struct test_case_t cases_001[] = {
 	{ 	IP4_AND_IP6(";")	},
 	{ 	IP4_AND_IP6(";;")	},
 	{ "239.192.0.1",			"ff08::1"				},
+	{ "239.192.0.1",			"[ff08::1]"				},
 	{ ";239.192.0.1",			";ff08::1"				},
+	{ ";239.192.0.1",			";[ff08::1]"				},
 	{ ";239.192.0.1;239.192.0.1",		";ff08::1;ff08::1"			},
+	{ ";239.192.0.1;239.192.0.1",		";[ff08::1];[ff08::1]"			},
 	{ "PGM.MCAST.NET",			"IP6-PGM.MCAST.NET"			},
 	{ ";PGM.MCAST.NET",			";IP6-PGM.MCAST.NET"			},
 	{ ";PGM.MCAST.NET;PGM.MCAST.NET",	";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
 	{ ";239.192.0.1;PGM.MCAST.NET",		";ff08::1;IP6-PGM.MCAST.NET"		},
+	{ ";239.192.0.1;PGM.MCAST.NET",		";[ff08::1];IP6-PGM.MCAST.NET"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;ff08::1"		},
+	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;[ff08::1]"		},
 	{ "pgm-private",			/* ‡ */ "pgm-ip6-private"			},
 	{ ";pgm-private",			/* ‡ */ ";pgm-ip6-private"			},
 	{ ";pgm-private;pgm-private",		/* ‡ */ ";pgm-ip6-private;pgm-ip6-private" 	},
 	{ ";PGM.MCAST.NET;pgm-private",		/* ‡ */ ";IP6-PGM.MCAST.NET;pgm-ip6-private" 	},
 	{ ";pgm-private;PGM.MCAST.NET",		/* ‡ */ ";pgm-ip6-private;IP6-PGM.MCAST.NET" 	},
 	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";ff08::1;pgm-ip6-private" 		},
+	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";[ff08::1];pgm-ip6-private" 		},
 	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;ff08::1" 		},
+	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;[ff08::1]" 		},
 };
 
 START_TEST (test_parse_transport_pass_001)
@@ -811,44 +818,67 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_INTERFACE ";",				/* † */ MOCK_INTERFACE ";"		},
 	{ MOCK_INTERFACE ";;",				/* † */ MOCK_INTERFACE ";;"	},
 	{ MOCK_INTERFACE ";239.192.0.1",		/* † */ MOCK_INTERFACE ";ff08::1"			},
+	{ MOCK_INTERFACE ";239.192.0.1",		/* † */ MOCK_INTERFACE ";[ff08::1]"			},
 	{ MOCK_INTERFACE ";239.192.0.1;239.192.0.1",	/* † */ MOCK_INTERFACE ";ff08::1;ff08::1"		},
+	{ MOCK_INTERFACE ";239.192.0.1;239.192.0.1",	/* † */ MOCK_INTERFACE ";[ff08::1];[ff08::1]"		},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET",		/* † */ MOCK_INTERFACE ";IP6-PGM.MCAST.NET"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;PGM.MCAST.NET",/* † */ MOCK_INTERFACE ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
 	{ MOCK_INTERFACE ";239.192.0.1;PGM.MCAST.NET",	/* † */ MOCK_INTERFACE ";ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_INTERFACE ";239.192.0.1;PGM.MCAST.NET",	/* † */ MOCK_INTERFACE ";[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_INTERFACE ";pgm-private",		/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private" },
 	{ MOCK_INTERFACE ";pgm-private;pgm-private",	/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private;pgm-ip6-private" },
 	{ MOCK_ADDRESS,					MOCK_ADDRESS6			},
+	{ MOCK_ADDRESS,					"[" MOCK_ADDRESS6 "]"		},
 	{ MOCK_ADDRESS ";",				MOCK_ADDRESS6 ";"		},
+	{ MOCK_ADDRESS ";",				"[" MOCK_ADDRESS6 "];"		},
 	{ MOCK_ADDRESS ";;",				MOCK_ADDRESS6 ";;"		},
+	{ MOCK_ADDRESS ";;",				"[" MOCK_ADDRESS6 "];;"		},
 	{ MOCK_ADDRESS ";239.192.0.1",			MOCK_ADDRESS6 ";ff08::1"			},
+	{ MOCK_ADDRESS ";239.192.0.1",			"[" MOCK_ADDRESS6 "];[ff08::1]"			},
 	{ MOCK_ADDRESS ";239.192.0.1;239.192.0.1",	MOCK_ADDRESS6 ";ff08::1;ff08::1"		},
+	{ MOCK_ADDRESS ";239.192.0.1;239.192.0.1",	"[" MOCK_ADDRESS6 "];[ff08::1];[ff08::1]"		},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET",		MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS ";PGM.MCAST.NET",		"[" MOCK_ADDRESS6 "];IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;PGM.MCAST.NET",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS ";PGM.MCAST.NET;PGM.MCAST.NET",	"[" MOCK_ADDRESS6 "];IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS ";239.192.0.1;PGM.MCAST.NET",	MOCK_ADDRESS6 ";ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS ";239.192.0.1;PGM.MCAST.NET",	"[" MOCK_ADDRESS6 "];[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	"[" MOCK_ADDRESS6 "];IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_ADDRESS ";pgm-private",			MOCK_ADDRESS6 ";pgm-ip6-private" },
+	{ MOCK_ADDRESS ";pgm-private",			"[" MOCK_ADDRESS6 "];pgm-ip6-private" },
 	{ MOCK_ADDRESS ";pgm-private;pgm-private",	MOCK_ADDRESS6 ";pgm-ip6-private;pgm-ip6-private" },
+	{ MOCK_ADDRESS ";pgm-private;pgm-private",	"[" MOCK_ADDRESS6 "];pgm-ip6-private;pgm-ip6-private" },
 	{ MOCK_NETWORK,					/* ‡ */ MOCK_NETWORK6			},
 	{ MOCK_NETWORK ";",				/* ‡ */ MOCK_NETWORK6 ";"		},
 	{ MOCK_NETWORK ";;",				/* ‡ */ MOCK_NETWORK6 ";;"		},
 	{ MOCK_NETWORK ";239.192.0.1",			/* ‡ */ MOCK_NETWORK6 ";ff08::1"			},
+	{ MOCK_NETWORK ";239.192.0.1",			/* ‡ */ MOCK_NETWORK6 ";[ff08::1]"			},
 	{ MOCK_NETWORK ";239.192.0.1;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";ff08::1;ff08::1"		},
+	{ MOCK_NETWORK ";239.192.0.1;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";[ff08::1];[ff08::1]"		},
 	{ MOCK_NETWORK ";PGM.MCAST.NET",		/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET"	},
 	{ MOCK_NETWORK ";PGM.MCAST.NET;PGM.MCAST.NET",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
 	{ MOCK_NETWORK ";239.192.0.1;PGM.MCAST.NET",	/* ‡ */ MOCK_NETWORK6 ";ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_NETWORK ";239.192.0.1;PGM.MCAST.NET",	/* ‡ */ MOCK_NETWORK6 ";[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_NETWORK ";PGM.MCAST.NET;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_NETWORK ";PGM.MCAST.NET;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_NETWORK ";pgm-private",			/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private" },
 	{ MOCK_NETWORK ";pgm-private;pgm-private",	/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private;pgm-ip6-private" },
 	{ MOCK_HOSTNAME,				MOCK_HOSTNAME6			},
 	{ MOCK_HOSTNAME ";",				MOCK_HOSTNAME6 ";"		},
 	{ MOCK_HOSTNAME ";;",				MOCK_HOSTNAME6 ";;"		},
 	{ MOCK_HOSTNAME ";239.192.0.1",			MOCK_HOSTNAME6 ";ff08::1"		},
+	{ MOCK_HOSTNAME ";239.192.0.1",			MOCK_HOSTNAME6 ";[ff08::1]"		},
 	{ MOCK_HOSTNAME ";239.192.0.1;239.192.0.1",	MOCK_HOSTNAME6 ";ff08::1;ff08::1"	},
+	{ MOCK_HOSTNAME ";239.192.0.1;239.192.0.1",	MOCK_HOSTNAME6 ";[ff08::1];[ff08::1]"	},
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET",		MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET" },
 	{ MOCK_HOSTNAME ";239.192.0.1;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";ff08::1;IP6-PGM.MCAST.NET" },
+	{ MOCK_HOSTNAME ";239.192.0.1;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";[ff08::1];IP6-PGM.MCAST.NET" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;ff08::1" },
+	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;[ff08::1]" },
 	{ MOCK_HOSTNAME ";pgm-private",			MOCK_HOSTNAME6 ";pgm-ip6-private" },
 	{ MOCK_HOSTNAME ";pgm-private;pgm-private",	MOCK_HOSTNAME6 ";pgm-ip6-private;pgm-ip6-private" },
 };
@@ -910,17 +940,23 @@ static const struct test_case_t cases_003[] = {
 	{ MOCK_ADDRESS "/24;",				MOCK_ADDRESS6 "/64;"				},
 	{ MOCK_ADDRESS "/24;;",				MOCK_ADDRESS6 "/64;;"				},
 	{ MOCK_ADDRESS "/24;239.192.0.1",		MOCK_ADDRESS6 "/64;ff08::1"			},
+	{ MOCK_ADDRESS "/24;239.192.0.1",		MOCK_ADDRESS6 "/64;[ff08::1]"			},
 	{ MOCK_ADDRESS "/24;239.192.0.1;239.192.0.1",	MOCK_ADDRESS6 "/64;ff08::1;ff08::1"		},
+	{ MOCK_ADDRESS "/24;239.192.0.1;239.192.0.1",	MOCK_ADDRESS6 "/64;[ff08::1];[ff08::1]"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS "/24;239.192.0.1;PGM.MCAST.NET",	MOCK_ADDRESS6 "/64;ff08::1;IP6-PGM.MCAST.NET"	},
+	{ MOCK_ADDRESS "/24;239.192.0.1;PGM.MCAST.NET",	MOCK_ADDRESS6 "/64;[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;ff08::1"	},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS "/24;pgm-private",		/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private"			},
 	{ MOCK_ADDRESS "/24;pgm-private;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;pgm-ip6-private"	},
 	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ff08::1;pgm-ip6-private"		},
+	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;[ff08::1];pgm-ip6-private"		},
 	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;ff08::1"		},
+	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;[ff08::1]"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;pgm-ip6-private"	},
 	{ MOCK_ADDRESS "/24;pgm-private;PGM.MCAST.NET",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;IP6-PGM.MCAST.NET"	},
 };
