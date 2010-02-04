@@ -169,10 +169,15 @@ pgm_sockaddr_pton (
 	gpointer		dst
 	)
 {
-	struct addrinfo *res;
-	if (0 == getaddrinfo (src, NULL, NULL, &res)) {
-		memcpy (dst, res->ai_addr, res->ai_addrlen);
-		freeaddrinfo (res);
+	struct addrinfo hints = {
+		.ai_family	= AF_UNSPEC,
+		.ai_socktype	= SOCK_STREAM,		/* not really */
+		.ai_protocol	= IPPROTO_TCP,		/* not really */
+		.ai_flags	= AI_NUMERICHOST
+	}, *result = NULL;
+	if (0 == getaddrinfo (src, NULL, &hints, &result)) {
+		memcpy (dst, result->ai_addr, result->ai_addrlen);
+		freeaddrinfo (result);
 		return 1;
 	}
 	return 0;
