@@ -981,7 +981,7 @@ _pgm_rxw_insert (
 	}
 
 /* statistics */
-	const pgm_time_t fill_time = skb->tstamp - new_skb->tstamp;
+	const pgm_time_t fill_time = new_skb->tstamp - skb->tstamp;
 	PGM_HISTOGRAM_TIMES("Rx.RepairTime", fill_time);
 	PGM_HISTOGRAM_COUNTS("Rx.NakTransmits", state->nak_transmit_count);
 	PGM_HISTOGRAM_COUNTS("Rx.NcfRetries", state->ncf_retry_count);
