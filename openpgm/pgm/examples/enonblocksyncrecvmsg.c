@@ -149,7 +149,6 @@ main (
 		struct timeval tv;
 		int timeout;
 		gsize len;
-		GError* err = NULL;
 		const PGMIOStatus status = pgm_recvmsg (g_transport,
 						        &msgv,
 						        0,
@@ -177,6 +176,7 @@ block:
 			if (err) {
 				g_warning ("%s", err->message);
 				g_error_free (err);
+				err = NULL;
 			}
 			if (PGM_IO_STATUS_ERROR == status)
 				break;
