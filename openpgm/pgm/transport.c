@@ -723,9 +723,8 @@ pgm_transport_bind (
 
 	transport->max_tsdu = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (FALSE);
 	transport->max_tsdu_fragment = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (TRUE);
-	transport->max_apdu = (transport->txw_sqns ? 
-				MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) :
-				PGM_MAX_FRAGMENTS) * transport->max_tsdu_fragment;
+	const guint max_fragments = transport->txw_sqns ? MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) : PGM_MAX_FRAGMENTS;
+	transport->max_apdu = MIN(PGM_MAX_APDU, max_fragments * transport->max_tsdu_fragment);
 
 	if (transport->can_send_data) {
 		g_trace ("INFO","construct transmit window.");

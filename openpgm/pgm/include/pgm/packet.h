@@ -59,10 +59,14 @@ extern int ipproto_pgm;
 #define DEFAULT_DATA_SOURCE_PORT	0	/* random */
 
 /* DoS limitation to protocol (MS08-036, KB950762) */
-#define PGM_MAX_APDU			UINT16_MAX
+#ifndef PGM_MAX_APDU
+#	define PGM_MAX_APDU			UINT16_MAX
+#endif
 
 /* Cisco default: 24 (max 8200), Juniper & H3C default: 16 */
-#define PGM_MAX_FRAGMENTS		16
+#ifndef PGM_MAX_FRAGMENTS
+#	define PGM_MAX_FRAGMENTS		16
+#endif
 
 
 enum pgm_type_e {
