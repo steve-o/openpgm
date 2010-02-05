@@ -689,6 +689,7 @@ block:
 			if (err) {
 				g_warning ("%s", err->message);
 				g_error_free (err);
+				err = NULL;
 			}
 			break;
 		}

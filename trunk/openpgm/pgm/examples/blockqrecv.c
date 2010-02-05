@@ -156,6 +156,7 @@ main (
 			if (err) {
 				g_error ("recv: %s", err->message);
 				g_error_free (err);
+				err = NULL;
 			}
 			break;
 		}

@@ -149,7 +149,6 @@ main (
 		pgm_tsi_t from;
 		char buffer[4096];
 		gsize len;
-		GError* err = NULL;
 		const PGMIOStatus status = pgm_recvfrom (g_transport,
 						         buffer,
 						         sizeof(buffer),
@@ -179,6 +178,7 @@ block:
 			if (err) {
 				g_warning ("%s", err->message);
 				g_error_free (err);
+				err = NULL;
 			}
 			if (PGM_IO_STATUS_ERROR == status)
 				break;
