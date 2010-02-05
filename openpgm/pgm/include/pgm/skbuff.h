@@ -47,7 +47,7 @@ struct pgm_sk_buff_t {
 
 	char			cb[48];		/* control buffer */
 
-	guint16			len;		/* actual data */
+	guint			len;		/* actual data */
 	unsigned		zero_padded:1;
 
 	struct pgm_header*	pgm_header;
@@ -65,23 +65,23 @@ struct pgm_sk_buff_t {
 	gint			users;		/* atomic */
 };
 
-static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint16 len) G_GNUC_NORETURN;
-static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint16 len)
+static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
+static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len)
 {
 	g_error ("skput:over: %d put:%d",
 		    skb->len, len);
 	g_assert_not_reached();
 }
 
-static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint16 len) G_GNUC_NORETURN;
-static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint16 len)
+static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
+static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint len)
 {
 	g_error ("skput:under: %d put:%d",
 		    skb->len, len);
 	g_assert_not_reached();
 }
 
-static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint16 size)
+static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
 {
 	struct pgm_sk_buff_t* skb;
 
@@ -113,7 +113,7 @@ static inline void pgm_free_skb (struct pgm_sk_buff_t* skb)
 }
 
 /* add data */
-static inline gpointer pgm_skb_put (struct pgm_sk_buff_t* skb, guint16 len)
+static inline gpointer pgm_skb_put (struct pgm_sk_buff_t* skb, guint len)
 {
 	gpointer tmp = skb->tail;
 	skb->tail = (guint8*)skb->tail + len;
@@ -123,14 +123,14 @@ static inline gpointer pgm_skb_put (struct pgm_sk_buff_t* skb, guint16 len)
 	return tmp;
 }
 
-static inline gpointer __pgm_skb_pull (struct pgm_sk_buff_t *skb, guint16 len)
+static inline gpointer __pgm_skb_pull (struct pgm_sk_buff_t *skb, guint len)
 {
 	skb->len -= len;
 	return skb->data = (guint8*)skb->data + len;
 }
 
 /* remove data from start of buffer */
-static inline gpointer pgm_skb_pull (struct pgm_sk_buff_t* skb, guint16 len)
+static inline gpointer pgm_skb_pull (struct pgm_sk_buff_t* skb, guint len)
 {
 	return G_UNLIKELY(len > skb->len) ? NULL : __pgm_skb_pull (skb, len);
 }
@@ -146,7 +146,7 @@ static inline gint pgm_skb_tailroom (const struct pgm_sk_buff_t* skb)
 }
 
 /* reserve space to add data */
-static inline void pgm_skb_reserve (struct pgm_sk_buff_t* skb, guint16 len)
+static inline void pgm_skb_reserve (struct pgm_sk_buff_t* skb, guint len)
 {
 	skb->data = (guint8*)skb->data + len;
 	skb->tail = (guint8*)skb->tail + len;
@@ -175,12 +175,14 @@ static inline struct pgm_sk_buff_t* pgm_skb_copy (const struct pgm_sk_buff_t* co
 	return newskb;
 }
 
-static inline void pgm_skb_zero_pad (struct pgm_sk_buff_t* const skb, const guint16 len)
+static inline void pgm_skb_zero_pad (struct pgm_sk_buff_t* const skb, const guint len)
 {
 	if (skb->zero_padded)
 		return;
 
-	memset (skb->tail, 0, MIN(pgm_skb_tailroom(skb), len));
+	const guint tailroom = MIN((guint)pgm_skb_tailroom (skb), len);
+	if (tailroom > 0)
+		memset (skb->tail, 0, tailroom);
 	skb->zero_padded = 1;
 }
 
