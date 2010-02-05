@@ -332,7 +332,7 @@ pgm_rxw_add (
 	g_assert (((const GList*)skb)->prev == NULL);
 	g_assert (!_pgm_tsi_is_null (&skb->tsi));
 	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint)((guint8*)skb->data - (guint8*)skb->head));
-	g_assert (skb->len == (guint8*)skb->tail - (guint8*)skb->data);
+	g_assert ((gint)skb->len == (guint8*)skb->tail - (guint8*)skb->data);
 
 	g_trace ("add (window:%p skb:%p, nak_rb_expiry:%" PGM_TIME_FORMAT ")",
 		(gpointer)window, (gpointer)skb, nak_rb_expiry);
@@ -1195,7 +1195,7 @@ pgm_rxw_readv (
 		break;
 
 	case PGM_PKT_LOST_DATA_STATE:
-		window->lost_count += _pgm_rxw_remove_trail (window);
+		_pgm_rxw_remove_trail (window);
 /* fall through */
 	case PGM_PKT_BACK_OFF_STATE:
 	case PGM_PKT_WAIT_NCF_STATE:
@@ -1503,7 +1503,9 @@ _pgm_rxw_is_apdu_complete (
 		(gpointer)window, first_sequence);
 
 	skb = _pgm_rxw_peek (window, first_sequence);
-	g_assert (skb);
+	if (G_UNLIKELY(NULL == skb)) {
+		return FALSE;
+	}
 
 	const gsize apdu_size = skb->pgm_opt_fragment ? g_ntohl (skb->of_apdu_len) : skb->len;
 	const guint32 tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);
@@ -1883,9 +1885,15 @@ pgm_rxw_lost (
 
 	state = (pgm_rxw_state_t*)&skb->cb;
 
-	g_assert( state->state == PGM_PKT_BACK_OFF_STATE ||
-		  state->state == PGM_PKT_WAIT_NCF_STATE ||
-		  state->state == PGM_PKT_WAIT_DATA_STATE  );
+	if (G_UNLIKELY(!(state->state == PGM_PKT_BACK_OFF_STATE  ||
+	                 state->state == PGM_PKT_WAIT_NCF_STATE  ||
+	                 state->state == PGM_PKT_WAIT_DATA_STATE ||
+			 state->state == PGM_PKT_HAVE_DATA_STATE ||	/* fragments */
+			 state->state == PGM_PKT_HAVE_PARITY_STATE)))
+	{
+		g_error (_("Unexpected state %s(%u)"), pgm_pkt_state_string (state->state), state->state);
+		g_assert_not_reached();
+	}
 
 	_pgm_rxw_state (window, skb, PGM_PKT_LOST_DATA_STATE);
 }
