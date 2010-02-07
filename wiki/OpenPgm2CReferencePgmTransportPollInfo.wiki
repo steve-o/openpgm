@@ -4,6 +4,7 @@
 _Function_
 === Declaration ===
 <pre>
+#define CONFIG_HAVE_POLL
 #include <pgm/pgm.h>
 
 int *pgm_transport_poll_info* (
