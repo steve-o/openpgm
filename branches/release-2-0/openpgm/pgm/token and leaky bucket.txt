@@ -1,0 +1,12 @@
+leaky bucket:
+
+	if (BUCKET->rate_limit > BUCKET->rate_per_sec) 
+		BUCKET->rate_limit = BUCKET->rate_per_sec;
+
+
+token bucket:
+
+	guint bucket_limit;
+
+	if (BUCKET->rate_limit > BUCKET->bucket_limit)
+		BUCKET->rate_limit = BUCKET->bucket_limit;

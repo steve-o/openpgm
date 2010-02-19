@@ -1,0 +1,52 @@
+  previous request		following request		return
+  -----------------		-----------------		-----------
+  MCAST_JOIN_GROUP		MCAST_JOIN_GROUP		EADDRINUSE
+  MCAST_JOIN_GROUP		MCAST_LEAVE_GROUP		0
+  MCAST_JOIN_GROUP		MCAST_JOIN_SOURCE_GROUP		EINVAL
+  MCAST_JOIN_GROUP		MCAST_LEAVE_SOURCE_GROUP	EINVAL
+  MCAST_JOIN_GROUP		MCAST_BLOCK_SOURCE		0
+  MCAST_JOIN_SOURCE_GROUP	MCAST_JOIN_GROUP		EADDRINUSE
+  MCAST_JOIN_SOURCE_GROUP	MCAST_LEAVE_GROUP		0
+  MCAST_JOIN_SOURCE_GROUP	MCAST_JOIN_SOURCE_GROUP		(*1)
+  MCAST_JOIN_SOURCE_GROUP	MCAST_LEAVE_SOURCE_GROUP	(*2)
+  MCAST_JOIN_SOURCE_GROUP	MCAST_BLOCK_SOURCE		EINVAL
+  MCAST_JOIN_SOURCE_GROUP	MCAST_UNBLOCK_SOURCE		EINVAL
+  MCAST_BLOCK_SOURCE		MCAST_JOIN_GROUP		EADDRINUSE
+  MCAST_BLOCK_SOURCE		MCAST_LEAVE_GROUP		0
+  MCAST_BLOCK_SOURCE		MCAST_JOIN_SOURCE_GROUP		EINVAL
+  MCAST_BLOCK_SOURCE		MCAST_LEAVE_SOURCE_GROUP	EINVAL
+  MCAST_BLOCK_SOURCE		MCAST_BLOCK_SOURCE		(*1)
+  MCAST_BLOCK_SOURCE		MCAST_UNBLOCK_SOURCE		(*2)
+
+(*1) EADDRNOTAVAIL if source address is same of filtered one. Otherwise 0.
+(*2) EADDRNOTAVAIL if source address is not same of filtered one. Otherwise 0.
+
+
+http://planete.inria.fr/Hitoshi.Asaeda/mldv2/README.txt
+
+
+The following steps apply for any-source applications:
+
+    Use MCAST_JOIN_GROUP to join a group.
+    Use MCAST_BLOCK_SOURCE to turn off a given source, if required.
+    Use MCAST_UNBLOCK_SOURCE to re-allow a blocked source, if required.
+    Use MCAST_LEAVE_GROUP to leave the group.
+
+The following steps apply for controlled-source applications:
+
+    Use MCAST_JOIN_SOURCE_GROUP to join each group/source pair.
+    Use MCAST_LEAVE_SOURCE_GROUP to leave each group/source, or use MCAST_LEAVE_GROUP to leave all sources, if the same group address is used by all sources.
+
+The following steps apply for any-source applications:
+
+    Use IP_ADD_MEMBERSHIP to join a group (IPV6_ADD_MEMBERSHIP for IPv6).
+    Use IP_BLOCK_SOURCE to turn off a given source, if required.
+    Use IP_UNBLOCK_SOURCE to re-allow a blocked source, if required.
+    Use IP_DROP_MEMBERSHIP to leave the group (IPV6_DROP_MEMBERSHIP for IPv6).
+
+The following steps apply for controlled-source applications:
+
+    Use IP_ADD_SOURCE_MEMBERSHIP to join each group/source pair.
+    Use IP_DROP_SOURCE_MEMBERSHIP to leave each group/source, or use IP_DROP_MEMBERSHIP to leave all sources, if the same group address is used by all sources. 
+
+http://msdn.microsoft.com/en-us/library/ms738558(VS.85).aspx
