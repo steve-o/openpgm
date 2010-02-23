@@ -53,6 +53,15 @@
 #include "pgm/timep.h"
 
 
+//#define TIME_DEBUG
+
+#ifndef TIME_DEBUG
+#	define g_trace(m,...)		while (0)
+#else
+#	define g_trace(m,...)		g_debug(__VA_ARGS__)
+#endif
+
+
 /* globals */
 
 #define msecs_to_secs(t)	( (t) / 1000 )
@@ -224,33 +233,33 @@ pgm_time_init (
 
 	switch (cfg[0]) {
 	case 'F':
-		g_debug ("Using ftime() timer.");
+		g_trace ("Using ftime() timer.");
 		pgm_time_update_now = ftime_update;
 		break;
 
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
 	case 'C':
-		g_debug ("Using clock_gettime() timer.");
+		g_trace ("Using clock_gettime() timer.");
 		pgm_time_update_now = clock_update;
 		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':
-		g_debug ("Using /dev/rtc timer.");
+		g_trace ("Using /dev/rtc timer.");
 		pgm_time_update_now = rtc_update;
 		pgm_time_since_epoch = pgm_time_conv_from_reset;
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':
-		g_debug ("Using TSC timer.");
+		g_trace ("Using TSC timer.");
 		pgm_time_update_now = tsc_update;
 		pgm_time_since_epoch = pgm_time_conv_from_reset;
 		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
 	case 'H':
-		g_debug ("Using HPET timer.");
+		g_trace ("Using HPET timer.");
 		pgm_time_update_now = hpet_update;
 		pgm_time_since_epoch = pgm_time_conv_from_reset;
 		break;
@@ -258,7 +267,7 @@ pgm_time_init (
 
 	default:
 	case 'G':
-		g_debug ("Using gettimeofday() timer.");
+		g_trace ("Using gettimeofday() timer.");
 		pgm_time_update_now = gettimeofday_update;
 		break;
 	}
@@ -270,37 +279,37 @@ pgm_time_init (
 	switch (cfg[0]) {
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	case 'C':
-		g_debug ("Using clock_nanosleep() sleep.");
+		g_trace ("Using clock_nanosleep() sleep.");
 		pgm_time_sleep = clock_nano_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
 	case 'N':
-		g_debug ("Using nanosleep() sleep.");
+		g_trace ("Using nanosleep() sleep.");
 		pgm_time_sleep = nano_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':
-		g_debug ("Using /dev/rtc sleep.");
+		g_trace ("Using /dev/rtc sleep.");
 		pgm_time_sleep = rtc_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':
-		g_debug ("Using TSC sleep.");
+		g_trace ("Using TSC sleep.");
 		pgm_time_sleep = tsc_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
 	case 'H':
-		g_debug ("Using HPET sleep.");
+		g_trace ("Using HPET sleep.");
 		pgm_time_sleep = hpet_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_PPOLL
 	case 'P':
-		g_debug ("Using ppoll() sleep.");
+		g_trace ("Using ppoll() sleep.");
 		pgm_time_sleep = poll_sleep;
 		break;
 #endif
@@ -309,17 +318,17 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_USLEEP
 	case 'M':
 	case 'U':
-		g_debug ("Using usleep() sleep.");
+		g_trace ("Using usleep() sleep.");
 		pgm_time_sleep = usleep_sleep;
 		break;
 #elif defined(G_OS_WIN32)
 	case 'M':
-		g_debug ("Using msleep() sleep.");
+		g_trace ("Using msleep() sleep.");
 		pgm_time_sleep = msleep;
 		break;
 #endif /* CONFIG_HAVE_USLEEP */
 	case 'S':
-		g_debug ("Using select() sleep.");
+		g_trace ("Using select() sleep.");
 		pgm_time_sleep = select_sleep;
 		break;
 	}
