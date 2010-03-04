@@ -670,10 +670,7 @@ pgm_flush_peers_pending (
 			break;
 		}
 /* clear this reference and move to next */
-		transport->peers_pending->data = NULL;
-		GSList* next_peer = transport->peers_pending->next;
-		transport->peers_pending->next = NULL;
-		transport->peers_pending = next_peer;
+		transport->peers_pending = pgm_slist_remove_first (transport->peers_pending);
 	}
 
 	return retval;
@@ -712,8 +709,7 @@ pgm_peer_set_pending (
 
 	if (peer->pending_link.data) return;
 	peer->pending_link.data = peer;
-	peer->pending_link.next = transport->peers_pending;
-	transport->peers_pending = &peer->pending_link;
+	transport->peers_pending = pgm_slist_prepend_link (transport->peers_pending, &peer->pending_link);
 }
 
 /* Create a new error SKB detailing data loss.

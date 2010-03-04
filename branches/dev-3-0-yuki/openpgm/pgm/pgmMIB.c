@@ -11,6 +11,7 @@
 #include <glib/gi18n-lib.h>
 
 #include "pgm/malloc.h"
+#include "pgm/slist.h"
 #include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"
 #include "pgm/pgmMIB_columns.h"
@@ -30,7 +31,7 @@
 
 
 struct pgm_snmp_context_t {
-	GSList*		list;
+	PGMSList*	list;
 	GList*		node;
 	gint		index;		/* table index */
 	unsigned long	instance;	/* unique number per node */

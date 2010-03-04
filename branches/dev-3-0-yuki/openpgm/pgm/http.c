@@ -37,6 +37,7 @@
 #endif
 #include <libsoup/soup-address.h>
 
+#include "pgm/slist.h"
 #include "pgm/ip.h"
 #include "pgm/http.h"
 #include "pgm/transport.h"
@@ -486,7 +487,7 @@ index_callback (
 	}
 #endif
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
-	const int transport_count = g_slist_length (pgm_transport_list);
+	const int transport_count = pgm_slist_length (pgm_transport_list);
 	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 
 	GString* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
@@ -623,10 +624,10 @@ transports_callback (
 	{
 		g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
-		GSList* list = pgm_transport_list;
+		PGMSList* list = pgm_transport_list;
 		while (list)
 		{
-			GSList* next = list->next;
+			PGMSList* next = list->next;
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
@@ -771,11 +772,11 @@ http_tsi_response (
 	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	pgm_transport_t* transport = NULL;
-	GSList* list = pgm_transport_list;
+	PGMSList* list = pgm_transport_list;
 	while (list)
 	{
 		pgm_transport_t* list_transport = (pgm_transport_t*)list->data;
-		GSList* next = list->next;
+		PGMSList* next = list->next;
 
 /* check source */
 		if (pgm_tsi_equal (tsi, &list_transport->tsi))
