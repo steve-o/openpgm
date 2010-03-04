@@ -689,7 +689,6 @@ pgm_recvmsgv (
 	g_assert (transport->max_tpdu > 0);
 	if (transport->can_recv_data) {
 		g_assert (NULL != transport->peers_hashtable);
-		g_assert (NULL != transport->rand_);
 		g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
 		g_assert (pgm_notify_is_valid (&transport->pending_notify));
 	}

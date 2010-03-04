@@ -37,6 +37,7 @@
 
 #include "pgm/md5.h"
 #include "pgm/gsi.h"
+#include "pgm/rand.h"
 
 
 //#define GSI_DEBUG
@@ -133,9 +134,6 @@ pgm_gsi_create_from_hostname (
 
 /* create a global session ID based on the IP address.
  *
- * GLib random API will need warming up before g_random_int_range returns
- * numbers that actually vary.
- *
  * returns TRUE on succcess, returns FALSE on error and sets error.
  */
 
@@ -173,7 +171,7 @@ pgm_gsi_create_from_addr (
 	}
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
 	freeaddrinfo (res);
-	guint16 random = g_random_int_range (0, UINT16_MAX);
+	guint16 random = pgm_random_int_range (0, UINT16_MAX);
 	memcpy ((guint8*)gsi + sizeof(struct in_addr), &random, sizeof(random));
 	return TRUE;
 }

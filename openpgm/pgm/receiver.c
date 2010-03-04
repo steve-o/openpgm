@@ -150,10 +150,9 @@ nak_rb_ivl (
 {
 /* pre-conditions */
 	g_assert (NULL != transport);
-	g_assert (NULL != transport->rand_);
 	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
 
-	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
+	return pgm_rand_int_range (&transport->rand_, 1 /* us */, transport->nak_bo_ivl);
 }
 
 /* mark sequence as recovery failed.
@@ -2209,7 +2208,7 @@ on_general_poll (
 
 /* defer response based on provided back-off interval */
 	const guint32 poll_bo_ivl = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? g_ntohl (poll6->poll6_bo_ivl) : g_ntohl (poll4->poll_bo_ivl);
-	source->polr_expiry = skb->tstamp + g_rand_int_range (transport->rand_, 0, poll_bo_ivl);
+	source->polr_expiry = skb->tstamp + pgm_rand_int_range (&transport->rand_, 0, poll_bo_ivl);
 	pgm_nla_to_sockaddr (&poll4->poll_nla_afi, (struct sockaddr*)&source->poll_nla);
 /* TODO: schedule poll-response */
 

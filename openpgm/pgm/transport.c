@@ -235,11 +235,6 @@ pgm_transport_destroy (
 		g_free (transport->spm_heartbeat_interval);
 		transport->spm_heartbeat_interval = NULL;
 	}
-	if (transport->rand_) {
-		g_trace ("INFO","freeing randomization data.");
-		g_rand_free (transport->rand_);
-		transport->rand_ = NULL;
-	}
 	if (transport->rx_buffer) {
 		g_trace ("INFO","freeing receive buffer.");
 		pgm_free_skb (transport->rx_buffer);
@@ -337,7 +332,7 @@ pgm_transport_create (
 		new_transport->tsi.sport = g_htons (tinfo->ti_sport);
 	} else {
 		do {
-			new_transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
+			new_transport->tsi.sport = g_htons (pgm_random_int_range (0, UINT16_MAX));
 		} while (new_transport->tsi.sport == new_transport->dport);
 	}
 
@@ -682,12 +677,11 @@ pgm_transport_bind (
 	g_trace ("INFO", "bind (transport:%p error:%p)",
 		 (gpointer)transport, (gpointer)error);
 
-	transport->rand_ = g_rand_new();
-	g_assert (transport->rand_);
+	pgm_rand_new (&transport->rand_);
 
 /* PGM Children support of POLLs requires 32-bit random node identifier RAND_NODE_ID */
 	if (transport->can_recv_data) {
-		transport->rand_node_id = g_rand_int (transport->rand_);
+		transport->rand_node_id = pgm_rand_int (&transport->rand_);
 	}
 
 	if (transport->can_send_data) {
