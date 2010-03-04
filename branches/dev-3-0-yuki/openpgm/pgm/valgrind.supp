@@ -1,0 +1,147 @@
+##----------------------------------------------------------------------##
+## Suppressions to run OpenPGM
+
+{
+   miru-glib-hack-1
+   Memcheck:Leak
+   fun:memalign
+   fun:posix_memalign
+   obj:/usr/lib/libglib-2.0.so*
+   fun:g_slice_alloc
+}
+
+{
+   miru-glib-hack-2
+   Memcheck:Leak
+   fun:calloc
+   fun:g_malloc0
+   obj:/usr/lib/libglib-2.0.so*
+   fun:g_slice_alloc
+}
+
+{
+   miru-glib-hack-2b
+   Memcheck:Leak
+   fun:malloc
+   fun:g_malloc
+   obj:/usr/lib/libglib-2.0.so*
+   fun:g_slice_alloc
+}
+
+{
+   miru-glib-hack-3
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:g_realloc
+   obj:/usr/lib/libglib-2.0.so*
+   fun:g_ptr_array_add
+   fun:g_main_context_check
+   obj:/usr/lib/libglib-2.0.so*
+   fun:g_main_loop_run
+}
+
+{
+   miru-glib-hack-4
+   Memcheck:Leak
+   fun:realloc
+   fun:g_realloc
+   obj:/usr/lib/libglib-2.0.so*
+   fun:g_array_set_size
+   fun:g_static_private_set
+   fun:g_get_language_names
+}
+
+{
+   miru-glib-hack-5
+   Memcheck:Leak
+   fun:malloc
+   fun:g_malloc
+   fun:g_slice_alloc
+   fun:g_array_sized_new
+   fun:g_static_private_set
+   fun:g_get_charset
+   fun:g_log_default_handler
+   fun:g_logv
+   fun:g_log
+}
+
+{
+   miru-glib-hack-6
+   Memcheck:Leak
+   fun:malloc
+   fun:g_malloc
+   fun:g_log_set_handler
+}
+
+{
+   miru-glib-hack-7
+   Memcheck:Leak
+   fun:calloc
+   fun:g_malloc0
+   fun:g_thread_self
+   fun:g_thread_init_glib
+}
+
+
+
+## Annoying libc errors
+
+{
+   miru-libc-hack-1
+   Memcheck:Addr8
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/libc-2.*.so
+   obj:/lib/ld-2.*.so
+   fun:__libc_dlopen_mode
+   fun:__nss_lookup_function
+   obj:/lib/libc-2.*.so
+   fun:getprotobyname_r
+}
+
+{
+   miru-libc-hack-1b
+   Memcheck:Addr8
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/libc-2.*.so
+   obj:/lib/ld-2.*.so
+   fun:__libc_dlopen_mode
+   fun:__nss_lookup_function
+   obj:/lib/libc-2.*.so
+   fun:getprotobyname_r
+}
+
+{
+   miru-libc-hack-2
+   Memcheck:Cond
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/libc-2.*.so
+   obj:/lib/ld-2.*.so
+   fun:__libc_dlsym
+   fun:__nss_lookup_function
+   obj:/lib/libc-2.*.so
+   fun:getaddrinfo
+}
+
+{
+   miru-libc-hack-3
+   Memcheck:Addr8
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/ld-2.*.so
+   obj:/lib/libc-2.*.so
+   obj:/lib/ld-2.*.so
+   fun:__libc_dlsym
+   fun:__nss_lookup_function
+   obj:/lib/libc-2.*.so
+   fun:getaddrinfo
+}
