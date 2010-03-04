@@ -17,6 +17,7 @@ src = Split("""
 		nametoindex.c
 		inet_network.c
 		md5.c
+		rand.c
 		gsi.c
 		tsi.c
 		signal.c

@@ -53,6 +53,10 @@ typedef struct pgm_transport_t pgm_transport_t;
 #   include <pgm/time.h>
 #endif
 
+#ifndef __PGM_RAND_H__
+#   include <pgm/rand.h>
+#endif
+
 #ifndef __PGM_NOTIFY_H__
 #   include <pgm/notify.h>
 #endif
@@ -334,7 +338,7 @@ struct pgm_transport_t {
 	guint			peer_expiry;		    /* from absence of SPMs */
 	guint			spmr_expiry;		    /* waiting for peer SPMRs */
 
-	GRand*			rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
+	PGMRand			rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
 	guint			nak_data_retries, nak_ncf_retries;
 	pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
 	pgm_time_t		next_heartbeat_spm, next_ambient_spm;
