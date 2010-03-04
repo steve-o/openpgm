@@ -25,6 +25,7 @@
 
 #include "pgm/malloc.h"
 #include "pgm/string.h"
+#include "pgm/slist.h"
 
 
 //#define STRING_DEBUG
@@ -35,6 +36,9 @@
 #define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
+
+/* Return copy of string, must be freed with pgm_free().
+ */
 
 gchar*
 pgm_strdup (
@@ -54,6 +58,79 @@ pgm_strdup (
 		new_str = NULL;
 
 	return new_str;
+}
+
+/* Split a string with delimiter, result must be freed with pgm_strfreev().
+ */
+
+gchar**
+pgm_strsplit (
+	const gchar*	string,
+	const gchar*	delimiter,
+	gint		max_tokens
+	)
+{
+	PGMSList *string_list = NULL, *slist;
+	gchar **str_array, *s;
+	guint n = 0;
+	const gchar *remainder;
+
+	g_return_val_if_fail (string != NULL, NULL);
+	g_return_val_if_fail (delimiter != NULL, NULL);
+	g_return_val_if_fail (delimiter[0] != '\0', NULL);
+
+	if (max_tokens < 1)
+		max_tokens = G_MAXINT;
+
+	remainder = string;
+	s = strstr (remainder, delimiter);
+	if (s)
+	{
+		const gsize delimiter_len = strlen (delimiter);   
+
+		while (--max_tokens && s)
+		{
+			const gsize len = s - remainder;
+			gchar *new_string = g_new (gchar, len + 1);
+			strncpy (new_string, remainder, len);
+			new_string[len] = 0;
+			string_list = pgm_slist_prepend (string_list, new_string);
+			n++;
+			remainder = s + delimiter_len;
+			s = strstr (remainder, delimiter);
+		}
+	}
+	if (*string)
+	{
+		n++;
+		string_list = pgm_slist_prepend (string_list, g_strdup (remainder));
+	}
+
+	str_array = pgm_new (gchar*, n + 1);
+	str_array[n--] = NULL;
+	for (slist = string_list; slist; slist = slist->next)
+		str_array[n--] = slist->data;
+
+	pgm_slist_free (string_list);
+
+	return str_array;
+}
+
+/* Free a NULL-terminated array of strings, such as created by pgm_strsplit
+ */
+
+void
+pgm_strfreev (
+	gchar**		str_array
+	)
+{
+	if (G_LIKELY (str_array))
+	{
+		for (int i = 0; str_array[i] != NULL; i++)
+			pgm_free (str_array[i]);
+
+		pgm_free (str_array);
+	}
 }
 
 /* eof */

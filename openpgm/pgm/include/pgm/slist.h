@@ -37,9 +37,11 @@ typedef struct PGMSList PGMSList;
 G_BEGIN_DECLS
 
 PGMSList* pgm_slist_append (PGMSList*, gpointer) G_GNUC_WARN_UNUSED_RESULT;
+PGMSList* pgm_slist_prepend (PGMSList*, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
 PGMSList* pgm_slist_prepend_link (PGMSList*, PGMSList*) G_GNUC_WARN_UNUSED_RESULT;
 PGMSList* pgm_slist_remove (PGMSList*, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
 PGMSList* pgm_slist_remove_first (PGMSList*) G_GNUC_WARN_UNUSED_RESULT;
+void pgm_slist_free (PGMSList*);
 PGMSList* pgm_slist_last (PGMSList*);
 guint pgm_slist_length (PGMSList*);
 

@@ -28,6 +28,8 @@
 G_BEGIN_DECLS
 
 gchar* pgm_strdup (const gchar*) G_GNUC_MALLOC;
+gchar** pgm_strsplit (const gchar*, const gchar*, gint) G_GNUC_MALLOC;
+void pgm_strfreev (gchar**);
 
 
 G_END_DECLS
