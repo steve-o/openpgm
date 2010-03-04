@@ -125,7 +125,7 @@ pgm_gsi_create_from_hostname (
 			     PGM_GSI_ERROR,
 			     pgm_gsi_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 
@@ -154,7 +154,7 @@ pgm_gsi_create_from_addr (
 			     PGM_GSI_ERROR,
 			     pgm_gsi_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 	memset (&hints, 0, sizeof(hints));

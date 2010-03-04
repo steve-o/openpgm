@@ -122,7 +122,7 @@ pgm_sendto (
 			{
 				g_warning (_("sendto %s failed: %s"),
 						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						g_strerror (errno));
+						strerror (errno));
 			}
 		}
 		else if (ready == 0)
@@ -133,7 +133,7 @@ pgm_sendto (
 		else
 		{
 			g_warning (_("blocked socket failed: %s"),
-					g_strerror (errno));
+					strerror (errno));
 		}
 	}
 

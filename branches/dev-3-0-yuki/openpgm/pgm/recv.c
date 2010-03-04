@@ -781,7 +781,7 @@ recv_again:
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
-			     g_strerror (save_errno));
+			     strerror (save_errno));
 #else
 		const int save_wsa_errno = WSAGetLastError ();
 		if (WSAEWOULDBLOCK == save_wsa_errno) {
@@ -792,7 +792,7 @@ recv_again:
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_wsa_errno (save_wsa_errno),
 			     _("Transport socket error: %s"),
-			     g_strerror (save_wsa_errno));
+			     strerror (save_wsa_errno));
 #endif /* !G_OS_UNIX */
 		goto out;
 	}
@@ -876,7 +876,7 @@ check_for_repeat:
 					     PGM_RECV_ERROR,
 					     pgm_recv_error_from_errno (errno),
 					     _("Waiting for event: %s"),
-					     g_strerror (errno));
+					     strerror (errno));
 				g_static_mutex_unlock (&transport->receiver_mutex);
 				g_static_rw_lock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;

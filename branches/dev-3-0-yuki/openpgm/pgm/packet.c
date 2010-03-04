@@ -38,6 +38,7 @@
 #	include <ipexport.h>
 #endif
 
+#include "pgm/string.h"
 #include "pgm/ip.h"
 #include "pgm/checksum.h"
 #include "pgm/skbuff.h"
@@ -1422,9 +1423,9 @@ pgm_udpport_string (
 	if (se == NULL) {
 		char buf[sizeof("00000")];
 		snprintf(buf, sizeof(buf), "%i", g_ntohs(port));
-		service_string = g_strdup(buf);
+		service_string = pgm_strdup(buf);
 	} else {
-		service_string = g_strdup(se->s_name);
+		service_string = pgm_strdup(se->s_name);
 	}
 	g_hash_table_insert (services, &port, service_string);
 	return service_string;
@@ -1450,9 +1451,9 @@ pgm_gethostbyaddr (
 	if (he == NULL) {
 		struct in_addr in;
 		memcpy (&in, ap, sizeof(in));
-		host_string = g_strdup(inet_ntoa(in));
+		host_string = pgm_strdup(inet_ntoa(in));
 	} else {
-		host_string = g_strdup(he->h_name);
+		host_string = pgm_strdup(he->h_name);
 	}
 	g_hash_table_insert (hosts, ap, host_string);
 	return host_string;

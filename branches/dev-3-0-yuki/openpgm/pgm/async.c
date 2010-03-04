@@ -261,7 +261,7 @@ pgm_async_create (
 			     PGM_ASYNC_ERROR,
 			     pgm_async_error_from_errno (errno),
 			     _("Creating async notification channels: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		pgm_free (new_async);
 		return FALSE;
 	}
