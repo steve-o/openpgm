@@ -32,7 +32,7 @@
 
 struct pgm_snmp_context_t {
 	PGMSList*	list;
-	GList*		node;
+	PGMList*	node;
 	gint		index;		/* table index */
 	unsigned long	instance;	/* unique number per node */
 };

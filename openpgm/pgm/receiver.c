@@ -55,6 +55,7 @@
 #endif
 
 #include "pgm/malloc.h"
+#include "pgm/list.h"
 #include "pgm/pgm.h"
 #include "pgm/receiverp.h"
 #include "pgm/ip.h"
@@ -595,14 +596,8 @@ pgm_new_peer (
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
 	gpointer entry = _pgm_peer_ref(peer);
 	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
-/* there is no g_list_prepend_link(): */
-	peer->peers_link.next = transport->peers_list;
 	peer->peers_link.data = peer;
-/* update next entries previous link */
-	if (transport->peers_list)
-		transport->peers_list->prev = &peer->peers_link;
-/* update head */
-	transport->peers_list = &peer->peers_link;
+	transport->peers_list = pgm_list_prepend_link (transport->peers_list, &peer->peers_link);
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
 
 	pgm_timer_lock (transport);
@@ -1442,7 +1437,7 @@ nak_rb_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	GList* list;
+	PGMList* list;
 	pgm_sqn_list_t nak_list = { .len = 0 };
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
@@ -1483,7 +1478,7 @@ nak_rb_state (
 
 		while (list)
 		{
-			GList* next_list_el = list->prev;
+			PGMList* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1548,7 +1543,7 @@ nak_rb_state (
 
 		while (list)
 		{
-			GList* next_list_el = list->prev;
+			PGMList* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1672,9 +1667,9 @@ pgm_check_peer_nak_state (
 	if (!transport->peers_list)
 		return TRUE;
 
-	GList* list = transport->peers_list;
+	PGMList* list = transport->peers_list;
 	do {
-		GList* next = list->next;
+		PGMList* next = list->next;
 		pgm_peer_t* peer = list->data;
 		pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 
@@ -1724,7 +1719,7 @@ pgm_check_peer_nak_state (
 			{
 				g_warning (_("peer expired, tsi %s"), pgm_tsi_print (&peer->tsi));
 				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
-				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->peers_link);
+				transport->peers_list = pgm_list_remove_link (transport->peers_list, &peer->peers_link);
 				pgm_peer_unref (peer);
 			}
 		}
@@ -1763,9 +1758,9 @@ pgm_min_nak_expiry (
 	if (!transport->peers_list)
 		return expiration;
 
-	GList* list = transport->peers_list;
+	PGMList* list = transport->peers_list;
 	do {
-		GList* next = list->next;
+		PGMList* next = list->next;
 		pgm_peer_t* peer = (pgm_peer_t*)list->data;
 		pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	
@@ -1817,7 +1812,7 @@ nak_rpt_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	GList* list = window->wait_ncf_queue.tail;
+	PGMList* list = window->wait_ncf_queue.tail;
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -1827,7 +1822,7 @@ nak_rpt_state (
 
 	while (list)
 	{
-		GList* next_list_el = list->prev;
+		PGMList* next_list_el = list->prev;
 		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1945,7 +1940,7 @@ nak_rdata_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	GList* list = window->wait_data_queue.tail;
+	PGMList* list = window->wait_data_queue.tail;
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -1955,7 +1950,7 @@ nak_rdata_state (
 
 	while (list)
 	{
-		GList* next_list_el = list->prev;
+		PGMList* next_list_el = list->prev;
 		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)list;
 		g_assert (rdata_skb);
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
