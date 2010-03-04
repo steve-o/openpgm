@@ -904,7 +904,7 @@ parse_receive_entity (
 		(gpointer)error);
 
 	struct group_source_req* recv_gsr;
-	struct interface_req* primary_interface = (struct interface_req*)g_memdup ((*interface_list)->data, sizeof(struct interface_req));
+	struct interface_req* primary_interface = (struct interface_req*)pgm_memdup ((*interface_list)->data, sizeof(struct interface_req));
 
 /* the empty entity */
 	if (NULL == entity)
@@ -1113,7 +1113,7 @@ parse_send_entity (
 
 	if (entity == NULL)
 	{
-		send_gsr = g_memdup ((*recv_list)->data, sizeof(struct group_source_req));
+		send_gsr = pgm_memdup ((*recv_list)->data, sizeof(struct group_source_req));
 		*send_list = g_list_append (*send_list, send_gsr);
 		return TRUE;
 	}
