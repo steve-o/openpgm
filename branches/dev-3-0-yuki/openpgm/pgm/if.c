@@ -40,6 +40,7 @@
 #endif
 
 #include "pgm/malloc.h"
+#include "pgm/string.h"
 #include "pgm/if.h"
 #include "pgm/ip.h"
 #include "pgm/sockaddr.h"
@@ -827,7 +828,7 @@ parse_interface_entity (
 	}
 
 /* check interface name length limit */
-	gchar** tokens = g_strsplit (entity, ",", 10);
+	gchar** tokens = pgm_strsplit (entity, ",", 10);
 	int j = 0;
 	while (tokens && tokens[j])
 	{
@@ -846,7 +847,7 @@ parse_interface_entity (
 			{
 				g_propagate_error (error, sub_error);
 				pgm_free (ir);
-				g_strfreev (tokens);
+				pgm_strfreev (tokens);
 				while (source_list) {
 					pgm_free (source_list->data);
 					source_list = g_list_delete_link (source_list, source_list);
@@ -859,7 +860,7 @@ parse_interface_entity (
 		++j;
 	}
 
-	g_strfreev (tokens);
+	pgm_strfreev (tokens);
 	*interface_list = source_list;
 	return TRUE;
 }
@@ -1017,7 +1018,7 @@ parse_receive_entity (
  */
 
 	int j = 0;	
-	gchar** tokens = g_strsplit (entity, ",", 10);
+	gchar** tokens = pgm_strsplit (entity, ",", 10);
 	while (tokens && tokens[j])
 	{
 /* default receive object */
@@ -1044,7 +1045,7 @@ parse_receive_entity (
 					_("Unresolvable receive entity \"%s\": "),
 					tokens[j]);
 			pgm_free (recv_gsr);
-			g_strfreev (tokens);
+			pgm_strfreev (tokens);
 			pgm_free (primary_interface);
 			return FALSE;
 		}
@@ -1076,7 +1077,7 @@ parse_receive_entity (
 		++j;
 	}
 
-	g_strfreev (tokens);
+	pgm_strfreev (tokens);
 	pgm_free (primary_interface);
 	return TRUE;
 }

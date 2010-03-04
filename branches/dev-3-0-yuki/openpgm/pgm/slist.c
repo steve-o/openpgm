@@ -58,6 +58,21 @@ pgm_slist_append (
 }
 
 PGMSList*
+pgm_slist_prepend (
+	PGMSList*	list,
+	gconstpointer	data
+	)
+{
+	PGMSList *new_list;
+
+	new_list = pgm_new (PGMSList, 1);
+	new_list->data = data;
+	new_list->next = list;
+
+	return new_list;
+}
+
+PGMSList*
 pgm_slist_prepend_link (
 	PGMSList*	list,
 	PGMSList*	link_
@@ -113,6 +128,19 @@ pgm_slist_remove_first (
 	}
 	else
 		return NULL;
+}
+
+void
+pgm_slist_free (
+	PGMSList*	list
+	)
+{
+	while (list)
+	{
+		PGMSList* current = list;
+		list = list->next;
+		pgm_free (list);
+	}
 }
 
 PGMSList*
