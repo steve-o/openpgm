@@ -66,6 +66,25 @@ pgm_malloc0 (
 	return NULL;
 }
 
+gpointer
+pgm_memdup (
+	gconstpointer	mem,
+	guint		n_bytes
+	)
+{
+	gpointer new_mem;
+
+	if (G_LIKELY (mem))
+	{
+		new_mem = pgm_malloc (n_bytes);
+		memcpy (new_mem, mem, n_bytes);
+	}
+	else
+		new_mem = NULL;
+
+	return new_mem;
+}
+
 void
 pgm_free (
 	gpointer	mem

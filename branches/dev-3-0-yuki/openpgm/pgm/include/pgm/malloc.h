@@ -29,6 +29,7 @@ G_BEGIN_DECLS
 
 gpointer pgm_malloc (gulong) G_GNUC_MALLOC;
 gpointer pgm_malloc0 (gulong) G_GNUC_MALLOC;
+gpointer pgm_memdup (gconstpointer, guint) G_GNUC_MALLOC;
 void pgm_free (gpointer);
 
 /* Convenience memory allocators
