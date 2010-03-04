@@ -35,6 +35,10 @@ struct pgm_sk_buff_t;
 #	include <pgm/packet.h>
 #endif
 
+#ifndef __PGM_MALLOC_H__
+#	include <pgm/malloc.h>
+#endif
+
 
 struct pgm_sk_buff_t {
 	GList			link_;
@@ -85,7 +89,7 @@ static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
 {
 	struct pgm_sk_buff_t* skb;
 
-	skb = (struct pgm_sk_buff_t*)g_slice_alloc (size + sizeof(struct pgm_sk_buff_t));
+	skb = (struct pgm_sk_buff_t*)pgm_malloc (size + sizeof(struct pgm_sk_buff_t));
 	if (G_UNLIKELY(g_mem_gc_friendly)) {
 		memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
 		skb->zero_padded = 1;
@@ -109,7 +113,7 @@ static inline struct pgm_sk_buff_t* pgm_skb_get (struct pgm_sk_buff_t* skb)
 static inline void pgm_free_skb (struct pgm_sk_buff_t* skb)
 {
 	if (g_atomic_int_dec_and_test (&skb->users))
-		g_slice_free1 (skb->truesize, skb);
+		pgm_free (skb);
 }
 
 /* add data */
@@ -159,7 +163,7 @@ static inline void pgm_skb_reserve (struct pgm_sk_buff_t* skb, guint len)
 static inline struct pgm_sk_buff_t* pgm_skb_copy (const struct pgm_sk_buff_t* const skb)
 {
 	struct pgm_sk_buff_t* newskb;
-	newskb = (struct pgm_sk_buff_t*)g_slice_alloc (skb->truesize);
+	newskb = (struct pgm_sk_buff_t*)pgm_malloc (skb->truesize);
 	memcpy (newskb, skb, G_STRUCT_OFFSET(struct pgm_sk_buff_t, pgm_header));
 	newskb->zero_padded = 0;
 	newskb->truesize = skb->truesize;

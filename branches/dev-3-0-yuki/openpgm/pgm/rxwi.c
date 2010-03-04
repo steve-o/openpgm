@@ -37,14 +37,15 @@
 #	include <sys/uio.h>
 #endif
 
-#include <pgm/skbuff.h>
-#include <pgm/rxwi.h>
-#include <pgm/sn.h>
-#include <pgm/time.h>
-#include <pgm/tsi.h>
-#include <pgm/math.h>
-#include <pgm/reed_solomon.h>
-#include <pgm/histogram.h>
+#include "pgm/malloc.h"
+#include "pgm/skbuff.h"
+#include "pgm/rxwi.h"
+#include "pgm/sn.h"
+#include "pgm/time.h"
+#include "pgm/tsi.h"
+#include "pgm/math.h"
+#include "pgm/reed_solomon.h"
+#include "pgm/histogram.h"
 
 
 //#define RXW_DEBUG
@@ -225,7 +226,7 @@ pgm_rxw_create (
 /* calculate receive window parameters */
 	g_assert (sqns || (secs && max_rte));
 	const guint32 alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
-	window = g_slice_alloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
+	window = pgm_malloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 
 	window->tsi		= tsi;
 	window->max_tpdu	= tpdu_size;
@@ -283,7 +284,7 @@ pgm_rxw_destroy (
 	g_assert (!pgm_rxw_is_full (window));
 
 /* window */
-	g_slice_free1 (sizeof(pgm_rxw_t) + ( window->alloc * sizeof(struct pgm_sk_buff_t*) ), window);
+	pgm_free (window);
 }
 
 /* add skb to receive window.  window has fixed size and will not grow.

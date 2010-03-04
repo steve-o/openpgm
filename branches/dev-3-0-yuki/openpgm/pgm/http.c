@@ -346,7 +346,7 @@ http_create_response (
 #endif
 	);
 
-	g_free (timestamp);
+	pgm_free (timestamp);
 	return response;
 }
 
