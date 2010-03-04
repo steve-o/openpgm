@@ -201,7 +201,7 @@ pgm_transport_destroy (
 
 	if (transport->peers_hashtable) {
 		g_trace ("INFO","destroying peer lookup table.");
-		g_hash_table_destroy (transport->peers_hashtable);
+		pgm_hash_table_destroy (transport->peers_hashtable);
 		transport->peers_hashtable = NULL;
 	}
 	if (transport->peers_list) {
@@ -733,7 +733,7 @@ pgm_transport_bind (
 
 /* create peer list */
 	if (transport->can_recv_data) {
-		transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+		transport->peers_hashtable = pgm_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 		g_assert (transport->peers_hashtable);
 	}
 

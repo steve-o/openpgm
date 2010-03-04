@@ -595,7 +595,7 @@ pgm_new_peer (
 /* add peer to hash table and linked list */
 	g_static_rw_lock_writer_lock (&transport->peers_lock);
 	gpointer entry = _pgm_peer_ref(peer);
-	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
+	pgm_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
 	peer->peers_link.data = peer;
 	transport->peers_list = pgm_list_prepend_link (transport->peers_list, &peer->peers_link);
 	g_static_rw_lock_writer_unlock (&transport->peers_lock);
@@ -1718,7 +1718,7 @@ pgm_check_peer_nak_state (
 			else
 			{
 				g_warning (_("peer expired, tsi %s"), pgm_tsi_print (&peer->tsi));
-				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
+				pgm_hash_table_remove (transport->peers_hashtable, &peer->tsi);
 				transport->peers_list = pgm_list_remove_link (transport->peers_list, &peer->peers_link);
 				pgm_peer_unref (peer);
 			}

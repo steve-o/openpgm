@@ -49,6 +49,10 @@ typedef struct pgm_transport_t pgm_transport_t;
 #   include <pgm/slist.h>
 #endif
 
+#ifndef __PGM_HASHTABLE_H__
+#   include <pgm/hashtable.h>
+#endif
+
 #ifndef __PGM_IF_H__
 #   include <pgm/if.h>
 #endif
@@ -361,7 +365,7 @@ struct pgm_transport_t {
 	struct pgm_sk_buff_t* 	rx_buffer;
 
 	GStaticRWLock		peers_lock;
-	GHashTable*		peers_hashtable;	    /* fast lookup */
+	PGMHashTable*		peers_hashtable;	    /* fast lookup */
 	PGMList*		peers_list;		    /* easy iteration */
 	PGMSList*		peers_pending;		    /* rxw: have or lost data */
 	pgm_notify_t		pending_notify;		    /* timer to rx */

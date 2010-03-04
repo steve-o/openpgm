@@ -11,6 +11,8 @@ src = Split("""
 		list.c
 		slist.c
 		queue.c
+		hashtable.c
+		math.c
 		packet.c
 		sockaddr.c
 		time.c

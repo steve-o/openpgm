@@ -792,7 +792,7 @@ parse_group (
  * sockaddr/idx pairs.  returns FALSE on error, including multiple matching adapters.
  *
  * memory ownership of linked list is passed to caller and must be freed with pgm_free
- * and the g_list_free* api.
+ * and the pgm_list_free* api.
  */
 
 static
@@ -824,7 +824,7 @@ parse_interface_entity (
 	{
 		ir = pgm_new0 (struct interface_req, 1);
 		ir->ir_addr.ss_family = family;
-		*interface_list = g_list_append (*interface_list, ir);
+		*interface_list = pgm_list_append (*interface_list, ir);
 		return TRUE;
 	}
 
@@ -851,13 +851,13 @@ parse_interface_entity (
 				pgm_strfreev (tokens);
 				while (source_list) {
 					pgm_free (source_list->data);
-					source_list = g_list_delete_link (source_list, source_list);
+					source_list = pgm_list_delete_link (source_list, source_list);
 				}
 				return FALSE;
 			}
 		}
 
-		source_list = g_list_append (source_list, ir);
+		source_list = pgm_list_append (source_list, ir);
 		++j;
 	}
 
@@ -1010,7 +1010,7 @@ parse_receive_entity (
 
 /* ASM: source = group */
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
-		*recv_list = g_list_append (*recv_list, recv_gsr);
+		*recv_list = pgm_list_append (*recv_list, recv_gsr);
 		pgm_free (primary_interface);
 		return TRUE;
 	}
@@ -1074,7 +1074,7 @@ parse_receive_entity (
 
 /* ASM: source = group */
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
-		*recv_list = g_list_append (*recv_list, recv_gsr);
+		*recv_list = pgm_list_append (*recv_list, recv_gsr);
 		++j;
 	}
 
@@ -1116,7 +1116,7 @@ parse_send_entity (
 	if (entity == NULL)
 	{
 		send_gsr = pgm_memdup ((*recv_list)->data, sizeof(struct group_source_req));
-		*send_list = g_list_append (*send_list, send_gsr);
+		*send_list = pgm_list_append (*send_list, send_gsr);
 		return TRUE;
 	}
 
@@ -1154,7 +1154,7 @@ parse_send_entity (
 
 /* ASM: source = group */
 	memcpy (&send_gsr->gsr_source, &send_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&send_gsr->gsr_group));
-	*send_list = g_list_append (*send_list, send_gsr);
+	*send_list = pgm_list_append (*send_list, send_gsr);
 	return TRUE;
 }
 
@@ -1302,7 +1302,7 @@ network_parse (
 					}
 					g_clear_error (&sub_error);
 /* FIXME: too many interfaces */
-					if (g_list_length (source_list) > 1) {
+					if (pgm_list_length (source_list) > 1) {
 						g_set_error (error,
 				   			     PGM_IF_ERROR,
 							     PGM_IF_ERROR_INVAL,
@@ -1314,7 +1314,7 @@ network_parse (
 				g_clear_error (&sub_error);
 				while (source_list) {
 					pgm_free (source_list->data);
-					source_list = g_list_delete_link (source_list, source_list);
+					source_list = pgm_list_delete_link (source_list, source_list);
 				}
 				if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
 				    !(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
@@ -1363,7 +1363,7 @@ network_parse (
 				g_clear_error (&sub_error);
 
 /* FIXME: too many interfaces */
-				if (g_list_length (source_list) > 1) {
+				if (pgm_list_length (source_list) > 1) {
 					g_set_error (error,
 			   			     PGM_IF_ERROR,
 						     PGM_IF_ERROR_INVAL,
@@ -1375,7 +1375,7 @@ network_parse (
 			g_clear_error (&sub_error);
 			while (source_list) {
 				pgm_free (source_list->data);
-				source_list = g_list_delete_link (source_list, source_list);
+				source_list = pgm_list_delete_link (source_list, source_list);
 			}
 			if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
 			    !(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
@@ -1425,13 +1425,13 @@ network_parse (
 		}
 	}
 
-	if (g_list_length (source_list) > 1)
+	if (pgm_list_length (source_list) > 1)
 		goto free_lists;
 
 /* cleanup source interface list */
 	while (source_list) {
 		pgm_free (source_list->data);
-		source_list = g_list_delete_link (source_list, source_list);
+		source_list = pgm_list_delete_link (source_list, source_list);
 	}
 
 	return TRUE;
@@ -1439,15 +1439,15 @@ network_parse (
 free_lists:
 	while (source_list) {
 		pgm_free (source_list->data);
-		source_list = g_list_delete_link (source_list, source_list);
+		source_list = pgm_list_delete_link (source_list, source_list);
 	}
 	while (*recv_list) {
 		pgm_free ((*recv_list)->data);
-		*recv_list = g_list_delete_link (*recv_list, *recv_list);
+		*recv_list = pgm_list_delete_link (*recv_list, *recv_list);
 	}
 	while (*send_list) {
 		pgm_free ((*send_list)->data);
-		*send_list = g_list_delete_link (*send_list, *send_list);
+		*send_list = pgm_list_delete_link (*send_list, *send_list);
 	}
 	return FALSE;
 }
@@ -1485,8 +1485,8 @@ pgm_if_get_transport_info (
 
 	if (!network_parse (network, family, &recv_list, &send_list, error))
 		return FALSE;
-	const int recv_list_len = g_list_length (recv_list);
-	const int send_list_len = g_list_length (send_list);
+	const int recv_list_len = pgm_list_length (recv_list);
+	const int send_list_len = pgm_list_length (send_list);
 	ti = pgm_malloc0 (sizeof(struct pgm_transport_info_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
 	ti->ti_recv_addrs_len = recv_list_len;
@@ -1500,13 +1500,13 @@ pgm_if_get_transport_info (
 	while (recv_list) {
 		memcpy (&ti->ti_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
 		pgm_free (recv_list->data);
-		recv_list = g_list_delete_link (recv_list, recv_list);
+		recv_list = pgm_list_delete_link (recv_list, recv_list);
 	}
 	i = 0;
 	while (send_list) {
 		memcpy (&ti->ti_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
 		pgm_free (send_list->data);
-		send_list = g_list_delete_link (send_list, send_list);
+		send_list = pgm_list_delete_link (send_list, send_list);
 	}
 	*res = ti;
 	return TRUE;

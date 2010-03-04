@@ -787,7 +787,7 @@ http_tsi_response (
 
 /* check receivers */
 		g_static_rw_lock_reader_lock (&list_transport->peers_lock);
-		pgm_peer_t* receiver = g_hash_table_lookup (list_transport->peers_hashtable, tsi);
+		pgm_peer_t* receiver = pgm_hash_table_lookup (list_transport->peers_hashtable, tsi);
 		if (receiver) {
 			int retval = http_receiver_response (receiver, msg);
 			g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
