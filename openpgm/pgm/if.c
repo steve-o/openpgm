@@ -39,6 +39,7 @@
 #	include <arpa/inet.h>
 #endif
 
+#include "pgm/malloc.h"
 #include "pgm/if.h"
 #include "pgm/ip.h"
 #include "pgm/sockaddr.h"
@@ -788,7 +789,7 @@ parse_group (
  * returns TRUE on success with device_list containing double linked list of devices as
  * sockaddr/idx pairs.  returns FALSE on error, including multiple matching adapters.
  *
- * memory ownership of linked list is passed to caller and must be freed with g_free
+ * memory ownership of linked list is passed to caller and must be freed with pgm_free
  * and the g_list_free* api.
  */
 
@@ -819,7 +820,7 @@ parse_interface_entity (
 /* the empty entity, returns in_addr_any for both receive and send interfaces */
 	if (NULL == entity)
 	{
-		ir = g_new0 (struct interface_req, 1);
+		ir = pgm_new0 (struct interface_req, 1);
 		ir->ir_addr.ss_family = family;
 		*interface_list = g_list_append (*interface_list, ir);
 		return TRUE;
@@ -831,7 +832,7 @@ parse_interface_entity (
 	while (tokens && tokens[j])
 	{
 		GError* sub_error = NULL;
-		ir = g_new (struct interface_req, 1);
+		ir = pgm_new (struct interface_req, 1);
 		if (!parse_interface (family, tokens[j], ir, &sub_error))
 		{
 /* mark multiple interfaces for later decision based on group families */
@@ -844,10 +845,10 @@ parse_interface_entity (
 			else
 			{
 				g_propagate_error (error, sub_error);
-				g_free (ir);
+				pgm_free (ir);
 				g_strfreev (tokens);
 				while (source_list) {
-					g_free (source_list->data);
+					pgm_free (source_list->data);
 					source_list = g_list_delete_link (source_list, source_list);
 				}
 				return FALSE;
@@ -909,7 +910,7 @@ parse_receive_entity (
 	if (NULL == entity)
 	{
 /* default receive object */
-		recv_gsr = g_new0 (struct group_source_req, 1);
+		recv_gsr = pgm_new0 (struct group_source_req, 1);
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
 
@@ -927,8 +928,8 @@ parse_receive_entity (
 				{
 					g_prefix_error (error,
 							_("Node primary address family cannot be determined: "));
-					g_free (recv_gsr);
-					g_free (primary_interface);
+					pgm_free (recv_gsr);
+					pgm_free (primary_interface);
 					return FALSE;
 				}
 				recv_gsr->gsr_group.ss_family = addr.ss_family;
@@ -943,8 +944,8 @@ parse_receive_entity (
 						g_prefix_error (error,
 								_("Unique address cannot be determined for interface \"%s\": "),
 								primary_interface->ir_name);
-						g_free (recv_gsr);
-						g_free (primary_interface);
+						pgm_free (recv_gsr);
+						pgm_free (primary_interface);
 						return FALSE;
 					}
 
@@ -978,8 +979,8 @@ parse_receive_entity (
 					g_prefix_error (error,
 							_("Unique address cannot be determined for interface \"%s\": "),
 							primary_interface->ir_name);
-					g_free (recv_gsr);
-					g_free (primary_interface);
+					pgm_free (recv_gsr);
+					pgm_free (primary_interface);
 					return FALSE;
 				}
 
@@ -1008,7 +1009,7 @@ parse_receive_entity (
 /* ASM: source = group */
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
 		*recv_list = g_list_append (*recv_list, recv_gsr);
-		g_free (primary_interface);
+		pgm_free (primary_interface);
 		return TRUE;
 	}
 
@@ -1020,7 +1021,7 @@ parse_receive_entity (
 	while (tokens && tokens[j])
 	{
 /* default receive object */
-		recv_gsr = g_new0 (struct group_source_req, 1);
+		recv_gsr = pgm_new0 (struct group_source_req, 1);
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
 
@@ -1042,9 +1043,9 @@ parse_receive_entity (
 			g_prefix_error (error,
 					_("Unresolvable receive entity \"%s\": "),
 					tokens[j]);
-			g_free (recv_gsr);
+			pgm_free (recv_gsr);
 			g_strfreev (tokens);
-			g_free (primary_interface);
+			pgm_free (primary_interface);
 			return FALSE;
 		}
 
@@ -1059,8 +1060,8 @@ parse_receive_entity (
 					g_prefix_error (error,
 							_("Unique address cannot be determined for interface \"%s\": "),
 							primary_interface->ir_name);
-					g_free (recv_gsr);
-					g_free (primary_interface);
+					pgm_free (recv_gsr);
+					pgm_free (primary_interface);
 					return FALSE;
 				}
 
@@ -1076,7 +1077,7 @@ parse_receive_entity (
 	}
 
 	g_strfreev (tokens);
-	g_free (primary_interface);
+	pgm_free (primary_interface);
 	return TRUE;
 }
 
@@ -1118,14 +1119,14 @@ parse_send_entity (
 	}
 
 /* default send object */
-	send_gsr = g_new0 (struct group_source_req, 1);
+	send_gsr = pgm_new0 (struct group_source_req, 1);
 	send_gsr->gsr_interface = primary_interface->ir_interface;
 	if (!parse_group (family, entity, (struct sockaddr*)&send_gsr->gsr_group, error))
 	{
 		g_prefix_error (error,
 				_("Unresolvable send entity \"%s\": "),
 				entity);
-		g_free (send_gsr);
+		pgm_free (send_gsr);
 		return FALSE;
 	}
 
@@ -1140,7 +1141,7 @@ parse_send_entity (
 				g_prefix_error (error,
 						_("Unique address cannot be determined for interface \"%s\": "),
 						primary_interface->ir_name);
-				g_free (send_gsr);
+				pgm_free (send_gsr);
 				return FALSE;
 			}
 
@@ -1310,7 +1311,7 @@ network_parse (
 				}
 				g_clear_error (&sub_error);
 				while (source_list) {
-					g_free (source_list->data);
+					pgm_free (source_list->data);
 					source_list = g_list_delete_link (source_list, source_list);
 				}
 				if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
@@ -1371,7 +1372,7 @@ network_parse (
 			}
 			g_clear_error (&sub_error);
 			while (source_list) {
-				g_free (source_list->data);
+				pgm_free (source_list->data);
 				source_list = g_list_delete_link (source_list, source_list);
 			}
 			if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
@@ -1427,7 +1428,7 @@ network_parse (
 
 /* cleanup source interface list */
 	while (source_list) {
-		g_free (source_list->data);
+		pgm_free (source_list->data);
 		source_list = g_list_delete_link (source_list, source_list);
 	}
 
@@ -1435,15 +1436,15 @@ network_parse (
 
 free_lists:
 	while (source_list) {
-		g_free (source_list->data);
+		pgm_free (source_list->data);
 		source_list = g_list_delete_link (source_list, source_list);
 	}
 	while (*recv_list) {
-		g_free ((*recv_list)->data);
+		pgm_free ((*recv_list)->data);
 		*recv_list = g_list_delete_link (*recv_list, *recv_list);
 	}
 	while (*send_list) {
-		g_free ((*send_list)->data);
+		pgm_free ((*send_list)->data);
 		*send_list = g_list_delete_link (*send_list, *send_list);
 	}
 	return FALSE;
@@ -1484,7 +1485,7 @@ pgm_if_get_transport_info (
 		return FALSE;
 	const int recv_list_len = g_list_length (recv_list);
 	const int send_list_len = g_list_length (send_list);
-	ti = g_malloc0 (sizeof(struct pgm_transport_info_t) + 
+	ti = pgm_malloc0 (sizeof(struct pgm_transport_info_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
 	ti->ti_recv_addrs_len = recv_list_len;
 	ti->ti_recv_addrs = (gpointer)((guint8*)ti + sizeof(struct pgm_transport_info_t));
@@ -1496,13 +1497,13 @@ pgm_if_get_transport_info (
 	gsize i = 0;
 	while (recv_list) {
 		memcpy (&ti->ti_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
-		g_free (recv_list->data);
+		pgm_free (recv_list->data);
 		recv_list = g_list_delete_link (recv_list, recv_list);
 	}
 	i = 0;
 	while (send_list) {
 		memcpy (&ti->ti_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
-		g_free (send_list->data);
+		pgm_free (send_list->data);
 		send_list = g_list_delete_link (send_list, send_list);
 	}
 	*res = ti;
@@ -1514,7 +1515,7 @@ pgm_if_free_transport_info (
 	struct pgm_transport_info_t*	res
 	)
 {
-	g_free (res);
+	pgm_free (res);
 }
 
 GQuark

@@ -53,6 +53,7 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/malloc.h"
 #include "pgm/pgm.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
@@ -177,8 +178,8 @@ pgm_transport_set_heartbeat_spm (
 		return FALSE;
 	}
 	if (transport->spm_heartbeat_interval)
-		g_free (transport->spm_heartbeat_interval);
-	transport->spm_heartbeat_interval = g_malloc (sizeof(guint) * (len+1));
+		pgm_free (transport->spm_heartbeat_interval);
+	transport->spm_heartbeat_interval = pgm_malloc (sizeof(guint) * (len+1));
 	memcpy (&transport->spm_heartbeat_interval[1], spm_heartbeat_interval, sizeof(guint) * len);
 	transport->spm_heartbeat_interval[0] = 0;
 	transport->spm_heartbeat_len = len;

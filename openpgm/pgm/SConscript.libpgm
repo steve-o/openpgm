@@ -6,6 +6,7 @@ import os;
 Import('env')
 
 src = Split("""
+		malloc.c
 		packet.c
 		sockaddr.c
 		time.c

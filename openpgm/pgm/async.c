@@ -27,6 +27,7 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 
+#include "pgm/malloc.h"
 #include "pgm/recv.h"
 #include "pgm/net.h"
 #include "pgm/async.h"
@@ -90,7 +91,7 @@ pgm_event_alloc (
 	)
 {
 	g_return_val_if_fail (async != NULL, NULL);
-	return g_slice_alloc (sizeof(pgm_event_t));
+	return pgm_malloc (sizeof(pgm_event_t));
 }
 
 /* release event memory for custom async queue dispatch handlers
@@ -105,7 +106,7 @@ pgm_event_unref (
 {
 	g_return_if_fail (async != NULL);
 	g_return_if_fail (event != NULL);
-	g_slice_free1 (sizeof(pgm_event_t), event);
+	pgm_free (event);
 }
 
 /* internal receiver thread, sits in a loop processing incoming packets
@@ -135,7 +136,7 @@ pgm_receiver_thread (
 		{
 /* queue a copy to receiver */
 			pgm_event_t* event = pgm_event_alloc (async);
-			event->data = bytes_read > 0 ? g_malloc (bytes_read) : NULL;
+			event->data = bytes_read > 0 ? pgm_malloc (bytes_read) : NULL;
 			event->len  = bytes_read;
 			gpointer dst = event->data;
 			guint i = 0;
@@ -251,7 +252,7 @@ pgm_async_create (
 	g_trace ("create (async:%p transport:%p error:%p)",
 		 (gpointer)async, (gpointer)transport, (gpointer)error);
 
-	new_async = g_malloc0 (sizeof(pgm_async_t));
+	new_async = pgm_malloc0 (sizeof(pgm_async_t));
 	new_async->transport = transport;
 	if (0 != pgm_notify_init (&new_async->commit_notify) ||
 	    0 != pgm_notify_init (&new_async->destroy_notify))
@@ -261,7 +262,7 @@ pgm_async_create (
 			     pgm_async_error_from_errno (errno),
 			     _("Creating async notification channels: %s"),
 			     g_strerror (errno));
-		g_free (new_async);
+		pgm_free (new_async);
 		return FALSE;
 	}
 	new_async->commit_queue = g_async_queue_new();
@@ -276,7 +277,7 @@ pgm_async_create (
 	if (NULL == new_async->thread) {
 		g_async_queue_unref (new_async->commit_queue);
 		pgm_notify_destroy (&new_async->commit_notify);
-		g_free (new_async);
+		pgm_free (new_async);
 		return FALSE;
 	}
 
@@ -308,7 +309,7 @@ pgm_async_destroy (
 	}
 	pgm_notify_destroy (&async->destroy_notify);
 	pgm_notify_destroy (&async->commit_notify);
-	g_free (async);
+	pgm_free (async);
 	return TRUE;
 }
 
@@ -436,7 +437,7 @@ pgm_src_dispatch (
 		(*function) (event->data, event->len, user_data);
 
 /* return memory to receive window */
-		if (event->len) g_free (event->data);
+		if (event->len) pgm_free (event->data);
 		pgm_event_unref (async, event);
         }
 
@@ -517,7 +518,7 @@ pgm_async_recv (
 	memcpy (data, event->data, event->len);
 
 /* cleanup */
-	if (event->len) g_free (event->data);
+	if (event->len) pgm_free (event->data);
 	pgm_event_unref (async, event);
 	return G_IO_STATUS_NORMAL;
 }

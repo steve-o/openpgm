@@ -43,6 +43,7 @@
 
 #include <glib.h>
 
+#include "pgm/malloc.h"
 #include "pgm/txwi.h"
 #include "pgm/sn.h"
 #include "pgm/reed_solomon.h"
@@ -180,7 +181,7 @@ pgm_txw_create (
 /* calculate transmit window parameters */
 	g_assert (sqns || (tpdu_size && secs && max_rte));
 	const guint32 alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
-	window = g_slice_alloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
+	window = pgm_malloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 	window->tsi = tsi;
 
 /* empty state for transmission group boundaries to align.
@@ -247,7 +248,7 @@ pgm_txw_shutdown (
 	}
 
 /* window */
-	g_slice_free1 (sizeof(pgm_txw_t) + ( window->alloc * sizeof(struct pgm_sk_buff_t*) ), window);
+	pgm_free (window);
 }
 
 /* add skb to transmit window, taking ownership.  window does not grow.

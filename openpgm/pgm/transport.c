@@ -55,6 +55,7 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/malloc.h"
 #include "pgm/pgm.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
@@ -232,7 +233,7 @@ pgm_transport_destroy (
 	}
 	if (transport->spm_heartbeat_interval) {
 		g_trace ("INFO","freeing SPM heartbeat interval data.");
-		g_free (transport->spm_heartbeat_interval);
+		pgm_free (transport->spm_heartbeat_interval);
 		transport->spm_heartbeat_interval = NULL;
 	}
 	if (transport->rx_buffer) {
@@ -252,7 +253,7 @@ pgm_transport_destroy (
 	g_static_rw_lock_writer_unlock (&transport->lock);
 	g_static_rw_lock_free (&transport->lock);
 	g_trace ("INFO","freeing transport data.");
-	g_free (transport);
+	pgm_free (transport);
 	g_trace ("INFO","finished.");
 	return TRUE;
 }
@@ -306,7 +307,7 @@ pgm_transport_create (
 	}
 	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
-	new_transport = g_malloc0 (sizeof(pgm_transport_t));
+	new_transport = pgm_malloc0 (sizeof(pgm_transport_t));
 	new_transport->can_send_data = TRUE;
 	new_transport->can_send_nak  = TRUE;
 	new_transport->can_recv_data = TRUE;
@@ -460,7 +461,7 @@ err_destroy:
 #endif
 		new_transport->send_with_router_alert_sock = -1;
 	}
-	g_free (new_transport);
+	pgm_free (new_transport);
 	return FALSE;
 }
 

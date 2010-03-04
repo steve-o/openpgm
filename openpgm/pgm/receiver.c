@@ -54,6 +54,7 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/malloc.h"
 #include "pgm/pgm.h"
 #include "pgm/receiverp.h"
 #include "pgm/ip.h"
@@ -221,7 +222,7 @@ pgm_peer_unref (
 		peer->window = NULL;
 
 /* object */
-		g_free (peer);
+		pgm_free (peer);
 	}
 }
 
@@ -572,7 +573,7 @@ pgm_new_peer (
 		(gpointer)transport, pgm_tsi_print (tsi), saddr, src_addrlen, daddr, dst_addrlen);
 #endif
 
-	peer = g_malloc0 (sizeof(pgm_peer_t));
+	peer = pgm_malloc0 (sizeof(pgm_peer_t));
 	peer->expiry = now + transport->peer_expiry;
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));

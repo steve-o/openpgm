@@ -28,6 +28,7 @@
 #	include <sys/socket.h>
 #endif
 
+#include "pgm/malloc.h"
 #include "pgm/time.h"
 
 
@@ -67,7 +68,7 @@ pgm_rate_create (
 	g_assert (NULL != bucket_);
 	g_assert (rate_per_sec >= max_tpdu);
 
-	rate_t* bucket = g_malloc0 (sizeof(rate_t));
+	rate_t* bucket = pgm_malloc0 (sizeof(rate_t));
 	bucket->rate_per_sec	= (gint)rate_per_sec;
 	bucket->iphdr_len	= iphdr_len;
 	bucket->last_rate_check	= pgm_time_update_now ();
@@ -91,7 +92,7 @@ pgm_rate_destroy (
 	g_assert (NULL != bucket);
 
 	g_static_mutex_free (&bucket->mutex);
-	g_free (bucket);
+	pgm_free (bucket);
 }
 
 /* check bit bucket whether an operation can proceed or should wait.
