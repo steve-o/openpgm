@@ -56,6 +56,7 @@
 #endif
 
 #include "pgm/malloc.h"
+#include "pgm/slist.h"
 #include "pgm/pgm.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
@@ -99,7 +100,7 @@
 
 /* global locals */
 GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
-GSList* pgm_transport_list = NULL;
+PGMSList* pgm_transport_list = NULL;
 
 
 gsize
@@ -180,7 +181,7 @@ pgm_transport_destroy (
 
 	g_trace ("INFO","removing transport from inventory.");
 	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
-	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
+	pgm_transport_list = pgm_slist_remove (pgm_transport_list, transport);
 	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 
 /* flush source side by sending heartbeat SPMs */
@@ -424,7 +425,7 @@ pgm_transport_create (
 	*transport = new_transport;
 
 	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
-	pgm_transport_list = g_slist_append (pgm_transport_list, *transport);
+	pgm_transport_list = pgm_slist_append (pgm_transport_list, *transport);
 	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
 	return TRUE;
 
