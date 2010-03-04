@@ -488,7 +488,7 @@ parse_interface (
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 

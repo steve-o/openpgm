@@ -772,7 +772,7 @@ hpet_init (
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("Error mapping HPET: %s"),
-			     g_strerror(errno));
+			     strerror(errno));
 		close (hpet_fd);
 		hpet_fd = -1;
 		return FALSE;

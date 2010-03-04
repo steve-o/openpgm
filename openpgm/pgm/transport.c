@@ -372,7 +372,7 @@ pgm_transport_create (
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating receive socket: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		if (EPERM == save_errno) {
 			g_warning (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
 		}
@@ -405,7 +405,7 @@ pgm_transport_create (
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating send socket: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		goto err_destroy;
 	}
 
@@ -417,7 +417,7 @@ pgm_transport_create (
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		goto err_destroy;
 	}
 
@@ -691,7 +691,7 @@ pgm_transport_bind (
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Creating RDATA notification channel: %s"),
-				     g_strerror (errno));
+				     strerror (errno));
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -701,7 +701,7 @@ pgm_transport_bind (
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating waiting peer notification channel: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -751,7 +751,7 @@ pgm_transport_bind (
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Enabling reuse of socket local address: %s"),
-				     g_strerror (errno));
+				     strerror (errno));
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -770,7 +770,7 @@ pgm_transport_bind (
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
-				     g_strerror (save_errno));
+				     strerror (save_errno));
 #else
 			int save_errno = WSAGetLastError();
 			g_set_error (error,
@@ -799,7 +799,7 @@ pgm_transport_bind (
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
 					     _("Enabling IP header in front of user data: %s"),
-					     g_strerror (errno));
+					     strerror (errno));
 				g_static_rw_lock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -816,7 +816,7 @@ pgm_transport_bind (
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
 					     _("Enabling receipt of control message per incoming datagram: %s"),
-					     g_strerror (errno));
+					     strerror (errno));
 				g_static_rw_lock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -837,7 +837,7 @@ pgm_transport_bind (
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket receive buffer in bytes: %s"),
-				     g_strerror (errno));
+				     strerror (errno));
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -854,7 +854,7 @@ pgm_transport_bind (
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket send buffer in bytes: %s"),
-				     g_strerror (errno));
+				     strerror (errno));
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -920,7 +920,7 @@ pgm_transport_bind (
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Binding receive socket to address %s: %s"),
 				     addr,
-				     g_strerror (save_errno));
+				     strerror (save_errno));
 		}
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -947,7 +947,7 @@ pgm_transport_bind (
 					     pgm_transport_error_from_errno (save_errno),
 					     _("Binding receive socket2 to address %s: %s"),
 					     addr,
-					     g_strerror (save_errno));
+					     strerror (save_errno));
 			}
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
@@ -984,7 +984,7 @@ pgm_transport_bind (
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Binding send socket to address %s: %s"),
 			     addr,
-			     g_strerror (save_errno));
+			     strerror (save_errno));
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1027,7 +1027,7 @@ pgm_transport_bind (
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
 				     addr,
-				     g_strerror (save_errno));
+				     strerror (save_errno));
 		}
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1066,7 +1066,7 @@ pgm_transport_bind (
 						     pgm_transport_error_from_errno (save_errno),
 						     _("Joining multicast group %s: %s"),
 						     group_addr,
-						     g_strerror (save_errno));
+						     strerror (save_errno));
 				else
 					g_set_error (error,
 						     PGM_TRANSPORT_ERROR,
@@ -1074,7 +1074,7 @@ pgm_transport_bind (
 						     _("Joining multicast group %s on interface %s: %s"),
 						     group_addr,
 						     if_indextoname (p->gsr_interface, ifname),
-						     g_strerror (save_errno));
+						     strerror (save_errno));
 				g_static_rw_lock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -1105,7 +1105,7 @@ pgm_transport_bind (
 					     _("Joining multicast group %s from source %s: %s"),
 					     group_addr,
 					     source_addr,
-					     g_strerror (save_errno));
+					     strerror (save_errno));
 				g_static_rw_lock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -1134,7 +1134,7 @@ pgm_transport_bind (
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Setting device %s for multicast send socket: %s"),
 			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
-			     g_strerror (save_errno));
+			     strerror (save_errno));
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1157,7 +1157,7 @@ pgm_transport_bind (
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Setting device %s for multicast IP Router Alert (RFC 2113) send socket: %s"),
 			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
-			     g_strerror (save_errno));
+			     strerror (save_errno));
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1189,7 +1189,7 @@ pgm_transport_bind (
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast loopback: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1209,7 +1209,7 @@ pgm_transport_bind (
 			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast hop limit to %i: %s"),
 			     transport->hops,
-			     g_strerror (errno));
+			     strerror (errno));
 		g_static_rw_lock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1256,7 +1256,7 @@ no_cap_net_admin:
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Sending SPM broadcast: %s"),
-				     g_strerror (errno));
+				     strerror (errno));
 			g_static_rw_lock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
