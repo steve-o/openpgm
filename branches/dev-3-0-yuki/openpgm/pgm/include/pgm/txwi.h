@@ -24,6 +24,10 @@
 
 #include <glib.h>
 
+#ifndef __PGM_QUEUE_H__
+#	include <pgm/queue.h>
+#endif
+
 #ifndef __PGM_SKBUFF_H__
 #	include <pgm/skbuff.h>
 #endif
@@ -72,7 +76,7 @@ struct pgm_txw_t {
         guint32			lead;
         guint32			trail;
 
-        GQueue			retransmit_queue;
+        PGMQueue		retransmit_queue;
 
 	rs_t			rs;
 	guint			tg_sqn_shift;
@@ -176,7 +180,7 @@ static inline void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t* skb)
 static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
 {
 	g_assert (window);
-	return g_queue_is_empty (&window->retransmit_queue);
+	return pgm_queue_is_empty (&window->retransmit_queue);
 }
 
 G_END_DECLS

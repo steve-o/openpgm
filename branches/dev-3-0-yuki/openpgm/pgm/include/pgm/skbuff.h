@@ -39,9 +39,13 @@ struct pgm_sk_buff_t;
 #	include <pgm/malloc.h>
 #endif
 
+#ifndef __PGM_LIST_H__
+#	include <pgm/list.h>
+#endif
+
 
 struct pgm_sk_buff_t {
-	GList			link_;
+	PGMList			link_;
 
 	pgm_transport_t*	transport;
 	pgm_time_t		tstamp;

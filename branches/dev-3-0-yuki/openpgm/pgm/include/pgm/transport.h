@@ -41,6 +41,10 @@
 
 typedef struct pgm_transport_t pgm_transport_t;
 
+#ifndef __PGM_LIST_H__
+#   include <pgm/list.h>
+#endif
+
 #ifndef __PGM_SLIST_H__
 #   include <pgm/slist.h>
 #endif
@@ -240,7 +244,7 @@ struct pgm_peer_t {
 
 	gpointer            	window;			/* pgm_rxw_t */
 	pgm_transport_t*    	transport;
-	GList			peers_link;
+	PGMList			peers_link;
 	PGMSList		pending_link;
 
 	unsigned		is_fec_enabled:1;
@@ -358,7 +362,7 @@ struct pgm_transport_t {
 
 	GStaticRWLock		peers_lock;
 	GHashTable*		peers_hashtable;	    /* fast lookup */
-	GList*			peers_list;		    /* easy iteration */
+	PGMList*		peers_list;		    /* easy iteration */
 	PGMSList*		peers_pending;		    /* rxw: have or lost data */
 	pgm_notify_t		pending_notify;		    /* timer to rx */
 	gboolean		is_pending_read;

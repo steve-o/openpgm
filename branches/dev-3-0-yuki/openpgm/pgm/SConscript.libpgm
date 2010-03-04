@@ -8,7 +8,9 @@ Import('env')
 src = Split("""
 		malloc.c
 		string.c
+		list.c
 		slist.c
+		queue.c
 		packet.c
 		sockaddr.c
 		time.c

@@ -56,6 +56,7 @@
 #endif
 
 #include "pgm/malloc.h"
+#include "pgm/list.h"
 #include "pgm/slist.h"
 #include "pgm/pgm.h"
 #include "pgm/getifaddrs.h"
@@ -206,7 +207,7 @@ pgm_transport_destroy (
 	if (transport->peers_list) {
 		g_trace ("INFO","destroying peer list.");
 		do {
-			GList* next = transport->peers_list->next;
+			PGMList* next = transport->peers_list->next;
 			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
 
 			transport->peers_list = next;

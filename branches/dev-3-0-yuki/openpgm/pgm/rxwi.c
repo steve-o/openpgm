@@ -38,6 +38,8 @@
 #endif
 
 #include "pgm/malloc.h"
+#include "pgm/list.h"
+#include "pgm/queue.h"
 #include "pgm/skbuff.h"
 #include "pgm/rxwi.h"
 #include "pgm/sn.h"
@@ -329,8 +331,8 @@ pgm_rxw_add (
 	g_assert_cmpuint (nak_rb_expiry, >, 0);
 	g_assert_cmpuint (pgm_rxw_max_length (window), >, 0);
 	g_assert (pgm_skb_is_valid (skb));
-	g_assert (((const GList*)skb)->next == NULL);
-	g_assert (((const GList*)skb)->prev == NULL);
+	g_assert (((const PGMList*)skb)->next == NULL);
+	g_assert (((const PGMList*)skb)->prev == NULL);
 	g_assert (!_pgm_tsi_is_null (&skb->tsi));
 	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint)((guint8*)skb->data - (guint8*)skb->head));
 	g_assert ((gint)skb->len == (guint8*)skb->tail - (guint8*)skb->data);
@@ -1730,15 +1732,15 @@ _pgm_rxw_state (
 
 	switch (new_state) {
 	case PGM_PKT_BACK_OFF_STATE:
-		g_queue_push_head_link (&window->backoff_queue, (GList*)skb);
+		pgm_queue_push_head_link (&window->backoff_queue, (PGMList*)skb);
 		break;
 
 	case PGM_PKT_WAIT_NCF_STATE:
-		g_queue_push_head_link (&window->wait_ncf_queue, (GList*)skb);
+		pgm_queue_push_head_link (&window->wait_ncf_queue, (PGMList*)skb);
 		break;
 
 	case PGM_PKT_WAIT_DATA_STATE:
-		g_queue_push_head_link (&window->wait_data_queue, (GList*)skb);
+		pgm_queue_push_head_link (&window->wait_data_queue, (PGMList*)skb);
 		break;
 
 	case PGM_PKT_HAVE_DATA_STATE:
@@ -1794,7 +1796,7 @@ _pgm_rxw_unlink (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
-	GQueue* queue;
+	PGMQueue* queue;
 
 /* pre-conditions */
 	g_assert (NULL != window);
@@ -1804,20 +1806,20 @@ _pgm_rxw_unlink (
 
 	switch (state->state) {
 	case PGM_PKT_BACK_OFF_STATE:
-		g_assert (!g_queue_is_empty (&window->backoff_queue));
+		g_assert (!pgm_queue_is_empty (&window->backoff_queue));
 		queue = &window->backoff_queue;
 		goto unlink_queue;
 
 	case PGM_PKT_WAIT_NCF_STATE:
-		g_assert (!g_queue_is_empty (&window->wait_ncf_queue));
+		g_assert (!pgm_queue_is_empty (&window->wait_ncf_queue));
 		queue = &window->wait_ncf_queue;
 		goto unlink_queue;
 
 	case PGM_PKT_WAIT_DATA_STATE:
-		g_assert (!g_queue_is_empty (&window->wait_data_queue));
+		g_assert (!pgm_queue_is_empty (&window->wait_data_queue));
 		queue = &window->wait_data_queue;
 unlink_queue:
-		g_queue_unlink (queue, (GList*)skb);
+		pgm_queue_unlink (queue, (PGMList*)skb);
 		break;
 
 	case PGM_PKT_HAVE_DATA_STATE:
@@ -1847,8 +1849,8 @@ unlink_queue:
 	}
 
 	state->state = PGM_PKT_ERROR_STATE;
-	g_assert (((GList*)skb)->next == NULL);
-	g_assert (((GList*)skb)->prev == NULL);
+	g_assert (((PGMList*)skb)->next == NULL);
+	g_assert (((PGMList*)skb)->prev == NULL);
 }
 
 /* returns the pointer at the given index of the window.
