@@ -1408,13 +1408,13 @@ pgm_udpport_string (
 	int		port
 	)
 {
-	static GHashTable *services = NULL;
+	static PGMHashTable *services = NULL;
 
 	if (!services) {
-		services = g_hash_table_new (g_int_hash, g_int_equal);
+		services = pgm_hash_table_new (g_int_hash, g_int_equal);
 	}
 
-	gpointer service_string = g_hash_table_lookup (services, &port);
+	gpointer service_string = pgm_hash_table_lookup (services, &port);
 	if (service_string != NULL) {
 		return service_string;
 	}
@@ -1427,7 +1427,7 @@ pgm_udpport_string (
 	} else {
 		service_string = pgm_strdup(se->s_name);
 	}
-	g_hash_table_insert (services, &port, service_string);
+	pgm_hash_table_insert (services, &port, service_string);
 	return service_string;
 }
 
@@ -1436,13 +1436,13 @@ pgm_gethostbyaddr (
 	const struct in_addr*	ap
 	)
 {
-	static GHashTable *hosts = NULL;
+	static PGMHashTable *hosts = NULL;
 
 	if (!hosts) {
-		hosts = g_hash_table_new (g_str_hash, g_str_equal);
+		hosts = pgm_hash_table_new (g_str_hash, g_str_equal);
 	}
 
-	gpointer host_string = g_hash_table_lookup (hosts, ap);
+	gpointer host_string = pgm_hash_table_lookup (hosts, ap);
 	if (host_string != NULL) {
 		return host_string;
 	}
@@ -1455,7 +1455,7 @@ pgm_gethostbyaddr (
 	} else {
 		host_string = pgm_strdup(he->h_name);
 	}
-	g_hash_table_insert (hosts, ap, host_string);
+	pgm_hash_table_insert (hosts, ap, host_string);
 	return host_string;
 }
 
