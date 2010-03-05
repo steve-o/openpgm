@@ -800,12 +800,12 @@ gboolean
 parse_interface_entity (
 	int			family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,	/* NULL terminated */
-	PGMList**		interface_list,	/* <struct interface_req*> */
+	pgm_list_t**		interface_list,	/* <struct interface_req*> */
 	GError**		error
 	)
 {
 	struct interface_req* ir;
-	PGMList* source_list = NULL;
+	pgm_list_t* source_list = NULL;
 
 /* pre-conditions */
 	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
@@ -887,8 +887,8 @@ gboolean
 parse_receive_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,		/* NULL terminated */
-	PGMList**		interface_list,	/* <struct interface_req*> */
-	PGMList**		recv_list,	/* <struct group_source_req*> */
+	pgm_list_t**		interface_list,	/* <struct interface_req*> */
+	pgm_list_t**		recv_list,	/* <struct group_source_req*> */
 	GError**		error
 	)
 {
@@ -1088,9 +1088,9 @@ gboolean
 parse_send_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,		/* null = empty entity */
-	PGMList**		interface_list,	/* <struct interface_req*> */
-	PGMList**		recv_list,	/* <struct group_source_req*> */
-	PGMList**		send_list,	/* <struct group_source_req*> */
+	pgm_list_t**		interface_list,	/* <struct interface_req*> */
+	pgm_list_t**		recv_list,	/* <struct group_source_req*> */
+	pgm_list_t**		send_list,	/* <struct group_source_req*> */
 	GError**		error
 	)
 {
@@ -1220,8 +1220,8 @@ gboolean
 network_parse (
 	const char*		network,		/* NULL terminated */
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
-	PGMList**		recv_list,		/* <struct group_source_req*> */
-	PGMList**		send_list,		/* <struct group_source_req*> */
+	pgm_list_t**		recv_list,		/* <struct group_source_req*> */
+	pgm_list_t**		send_list,		/* <struct group_source_req*> */
 	GError**		error
 	)
 {
@@ -1230,7 +1230,7 @@ network_parse (
 	const char *e = p + strlen(network);
 	enum { ENTITY_INTERFACE, ENTITY_RECEIVE, ENTITY_SEND, ENTITY_ERROR } ec = ENTITY_INTERFACE;
 	const char *b = p;		/* begin of entity */
-	PGMList* source_list = NULL;
+	pgm_list_t* source_list = NULL;
 	GError* sub_error = NULL;
 
 /* pre-conditions */
@@ -1468,8 +1468,8 @@ pgm_if_get_transport_info (
 {
 	struct pgm_transport_info_t* ti;
 	int family = hints ? hints->ti_family : AF_UNSPEC;
-	PGMList* recv_list = NULL;	/* <struct group_source_req*> */
-	PGMList* send_list = NULL;	/* <struct group_source_req*> */
+	pgm_list_t* recv_list = NULL;	/* <struct group_source_req*> */
+	pgm_list_t* send_list = NULL;	/* <struct group_source_req*> */
 
 	g_return_val_if_fail (NULL != network, FALSE);
 	g_return_val_if_fail (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family, FALSE);

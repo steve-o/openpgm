@@ -48,7 +48,7 @@ pgm_queue_is_empty (
 void
 pgm_queue_push_head_link (
 	pgm_queue_t*	queue,
-	PGMList*	link
+	pgm_list_t*	link
 	)
 {
 	g_return_if_fail (queue != NULL);
@@ -65,7 +65,7 @@ pgm_queue_push_head_link (
 	queue->length++;
 }
 
-PGMList*
+pgm_list_t*
 pgm_queue_pop_tail_link (
 	pgm_queue_t*	queue
 	)
@@ -74,7 +74,7 @@ pgm_queue_pop_tail_link (
 
 	if (queue->tail)
 	{
-		PGMList *node = queue->tail;
+		pgm_list_t *node = queue->tail;
 
 		queue->tail = node->prev;
 		if (queue->tail)
@@ -92,7 +92,7 @@ pgm_queue_pop_tail_link (
 	return NULL;
 }
 
-PGMList*
+pgm_list_t*
 pgm_queue_peek_tail_link (
 	pgm_queue_t*	queue
 	)
@@ -105,7 +105,7 @@ pgm_queue_peek_tail_link (
 void
 pgm_queue_unlink (
 	pgm_queue_t*	queue,
-	PGMList*	link_
+	pgm_list_t*	link_
 	)
 {
 	g_return_if_fail (queue != NULL);

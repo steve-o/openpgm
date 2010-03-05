@@ -31,8 +31,8 @@
 
 struct pgm_queue_t
 {
-	PGMList*	head;
-	PGMList*	tail;
+	pgm_list_t*	head;
+	pgm_list_t*	tail;
 	guint		length;
 };
 
@@ -42,10 +42,10 @@ typedef struct pgm_queue_t pgm_queue_t;
 G_BEGIN_DECLS
 
 gboolean pgm_queue_is_empty (pgm_queue_t*);
-void pgm_queue_push_head_link (pgm_queue_t*, PGMList*);
-PGMList* pgm_queue_pop_tail_link (pgm_queue_t*);
-PGMList* pgm_queue_peek_tail_link (pgm_queue_t*);
-void pgm_queue_unlink (pgm_queue_t*, PGMList*);
+void pgm_queue_push_head_link (pgm_queue_t*, pgm_list_t*);
+pgm_list_t* pgm_queue_pop_tail_link (pgm_queue_t*);
+pgm_list_t* pgm_queue_peek_tail_link (pgm_queue_t*);
+void pgm_queue_unlink (pgm_queue_t*, pgm_list_t*);
 
 
 G_END_DECLS

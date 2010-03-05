@@ -49,7 +49,7 @@ struct pgm_sk_buff_t;
 
 
 struct pgm_sk_buff_t {
-	PGMList			link_;
+	pgm_list_t		link_;
 
 	pgm_transport_t*	transport;
 	pgm_time_t		tstamp;

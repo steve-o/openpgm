@@ -34,16 +34,16 @@
 #endif
 
 
-PGMList*
+pgm_list_t*
 pgm_list_append (
-	PGMList*	list,
+	pgm_list_t*	list,
 	gpointer	data
 	)
 {
-	PGMList* new_list;
-	PGMList* last;
+	pgm_list_t* new_list;
+	pgm_list_t* last;
 
-	new_list = pgm_new (PGMList, 1);
+	new_list = pgm_new (pgm_list_t, 1);
 	new_list->data = data;
 	new_list->next = NULL;
 
@@ -61,15 +61,15 @@ pgm_list_append (
 	}
 }
 
-PGMList*
+pgm_list_t*
 pgm_list_prepend_link (
-	PGMList*	list,
-	PGMList*	link_
+	pgm_list_t*	list,
+	pgm_list_t*	link_
 	)
 {
 	g_return_val_if_fail (NULL != link_, list);
 
-	PGMList* new_list = link_;
+	pgm_list_t* new_list = link_;
 
 	new_list->next = list;
 	new_list->prev = NULL;
@@ -81,10 +81,10 @@ pgm_list_prepend_link (
 }
 
 static inline
-PGMList* 
+pgm_list_t* 
 _pgm_list_remove_link (
-	PGMList*	list,
-	PGMList*	link_
+	pgm_list_t*	list,
+	pgm_list_t*	link_
 	)
 {
 	if (G_LIKELY (link_))
@@ -102,30 +102,30 @@ _pgm_list_remove_link (
 	return list;
 }
 
-PGMList*
+pgm_list_t*
 pgm_list_remove_link (
-	PGMList*	list,
-	PGMList*	link_
+	pgm_list_t*	list,
+	pgm_list_t*	link_
 	)
 {
 	return _pgm_list_remove_link (list, link_);
 }
 
-PGMList*
+pgm_list_t*
 pgm_list_delete_link (
-	PGMList*	list,
-	PGMList*	link_
+	pgm_list_t*	list,
+	pgm_list_t*	link_
 	)
 {
-	PGMList* new_list = _pgm_list_remove_link (list, link_);
+	pgm_list_t* new_list = _pgm_list_remove_link (list, link_);
 	pgm_free (link_);
 
 	return new_list;
 }
 
-PGMList*
+pgm_list_t*
 pgm_list_last (
-	PGMList*	list
+	pgm_list_t*	list
 	)
 {
 	if (G_LIKELY (list)) {
@@ -137,7 +137,7 @@ pgm_list_last (
 
 guint
 pgm_list_length (
-	PGMList*	list
+	pgm_list_t*	list
 	)
 {
 	guint length = 0;

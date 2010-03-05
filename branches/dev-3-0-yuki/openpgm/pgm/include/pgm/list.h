@@ -25,24 +25,24 @@
 #include <glib.h>
 
 
-struct PGMList
+struct pgm_list_t
 {
 	gpointer 		data;
-	struct PGMList*		next;
-	struct PGMList*		prev;
+	struct pgm_list_t*		next;
+	struct pgm_list_t*		prev;
 };
 
-typedef struct PGMList PGMList;
+typedef struct pgm_list_t pgm_list_t;
 
 
 G_BEGIN_DECLS
 
-PGMList* pgm_list_append (PGMList*, gpointer) G_GNUC_WARN_UNUSED_RESULT;
-PGMList* pgm_list_prepend_link (PGMList*, PGMList*) G_GNUC_WARN_UNUSED_RESULT;
-PGMList* pgm_list_remove_link (PGMList*, PGMList*) G_GNUC_WARN_UNUSED_RESULT;
-PGMList* pgm_list_delete_link (PGMList*, PGMList*) G_GNUC_WARN_UNUSED_RESULT;
-PGMList* pgm_list_last (PGMList*);
-guint pgm_list_length (PGMList*);
+pgm_list_t* pgm_list_append (pgm_list_t*, gpointer) G_GNUC_WARN_UNUSED_RESULT;
+pgm_list_t* pgm_list_prepend_link (pgm_list_t*, pgm_list_t*) G_GNUC_WARN_UNUSED_RESULT;
+pgm_list_t* pgm_list_remove_link (pgm_list_t*, pgm_list_t*) G_GNUC_WARN_UNUSED_RESULT;
+pgm_list_t* pgm_list_delete_link (pgm_list_t*, pgm_list_t*) G_GNUC_WARN_UNUSED_RESULT;
+pgm_list_t* pgm_list_last (pgm_list_t*);
+guint pgm_list_length (pgm_list_t*);
 
 
 G_END_DECLS
