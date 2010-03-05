@@ -38,12 +38,12 @@
 #endif
 
 
-static PGMRand g_rand = { .seed = 0 };
+static pgm_rand_t g_rand = { .seed = 0 };
 static GStaticMutex g_rand_mutex = G_STATIC_MUTEX_INIT;
 
 void
 pgm_rand_new (
-	PGMRand*	rand_
+	pgm_rand_t*	rand_
 	)
 {
 /* pre-conditions */
@@ -75,7 +75,7 @@ pgm_rand_new (
 
 guint32
 pgm_rand_int (
-	PGMRand*	rand_
+	pgm_rand_t*	rand_
 	)
 {
 /* pre-conditions */
@@ -87,7 +87,7 @@ pgm_rand_int (
 
 gint32
 pgm_rand_int_range (
-	PGMRand*	rand_,
+	pgm_rand_t*	rand_,
 	gint32		begin,
 	gint32		end
 	)

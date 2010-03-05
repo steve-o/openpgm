@@ -350,7 +350,7 @@ struct pgm_transport_t {
 	guint			peer_expiry;		    /* from absence of SPMs */
 	guint			spmr_expiry;		    /* waiting for peer SPMRs */
 
-	PGMRand			rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
+	pgm_rand_t		rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
 	guint			nak_data_retries, nak_ncf_retries;
 	pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
 	pgm_time_t		next_heartbeat_spm, next_ambient_spm;
