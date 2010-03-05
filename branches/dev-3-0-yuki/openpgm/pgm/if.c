@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1165,17 +1166,17 @@ parse_send_entity (
  */
 
 #define IS_HOSTNAME(x) ( 				/* RFC 952 */ \
-				g_ascii_isalnum(x) || \
+				isalnum(x) || \
 				((x) == '-') || \
 				((x) == '.') \
 			)
 #define IS_IP(x) ( \
-				g_ascii_isdigit(x) || \
+				isdigit(x) || \
 				((x) == '.') || \
 				((x) == '/') \
 			)
 #define IS_IP6(x) ( \
-				g_ascii_isxdigit(x) || \
+				isxdigit(x) || \
 				((x) == ':') || \
 				((x) == '/') || \
 				((x) == '.') || \
@@ -1192,7 +1193,7 @@ parse_send_entity (
 #define IS_IP6_WITH_ZONE(x) ( \
 				IS_IP6(x) || \
 				((x) == '%') || \
-				g_ascii_isalpha(x) || \
+				isalpha(x) || \
 				((x) == '_') \
 			    )
 #define IS_NETPARAM(x) ( \
