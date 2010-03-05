@@ -33,25 +33,11 @@ G_BEGIN_DECLS
 
 G_STATIC_ASSERT(sizeof(gint) == sizeof(gint32));
 
-static inline void pgm_atomic_int32_add (volatile gint32* atomic, const gint32 val)
-{
-	g_atomic_int_add (atomic, val);
-}
+gint pgm_atomic_int_exchange_and_add (volatile gint*, const gint);
 
-static inline gint32 pgm_atomic_int32_get (volatile gint32* atomic)
-{
-	return g_atomic_int_get (atomic);
-}
-
-static inline void pgm_atomic_int32_set (volatile gint32* atomic, const gint32 newval)
-{
-	g_atomic_int_set (atomic, newval);
-}
-
-#ifndef G_ATOMIC_OP_MEMORY_BARRIER_NEEDED
-#	define pgm_atomic_int32_get(atomic) 		(*(atomic))
-#	define pgm_atomic_int32_set(atomic, newval) 	((void) (*(atomic) = (newval)))
-#endif /* G_ATOMIC_OP_MEMORY_BARRIER_NEEDED */
+void pgm_atomic_int32_add (volatile gint32*, const gint32);
+gint32 pgm_atomic_int32_get (const volatile gint32*);
+void pgm_atomic_int32_set (volatile gint32*, const gint32);
 
 #define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
 
