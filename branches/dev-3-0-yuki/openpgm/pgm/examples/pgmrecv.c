@@ -123,9 +123,11 @@ main (
 
 	setlocale (LC_ALL, "");
 
+	log_init ();
 	g_message ("pgmrecv");
 
-	log_init ();
+	g_thread_init (NULL);
+
 	if (!pgm_init (&err)) {
 		g_error ("Unable to start PGM engine: %s", err->message);
 		g_error_free (err);

@@ -26,6 +26,7 @@
 #include <glib.h>
 
 #include "pgm/time.h"
+#include "pgm/thread.h"
 #include "pgm/rand.h"
 
 
@@ -39,7 +40,19 @@
 
 
 static pgm_rand_t g_rand = { .seed = 0 };
-static GStaticMutex g_rand_mutex = G_STATIC_MUTEX_INIT;
+static pgm_mutex_t g_rand_mutex;
+
+void
+pgm_rand_init (void)
+{
+	pgm_mutex_init (&g_rand_mutex);
+}
+
+void
+pgm_rand_shutdown (void)
+{
+	pgm_mutex_free (&g_rand_mutex);
+}
 
 void
 pgm_rand_new (
@@ -102,11 +115,11 @@ guint32
 pgm_random_int (void)
 {
 	guint32 rand_value;
-	g_static_mutex_lock (&g_rand_mutex);
+	pgm_mutex_lock (&g_rand_mutex);
 	if (!g_rand.seed)
 		pgm_rand_new (&g_rand);
 	rand_value = pgm_rand_int (&g_rand);
-	g_static_mutex_unlock (&g_rand_mutex);
+	pgm_mutex_unlock (&g_rand_mutex);
 	return rand_value;
 }
 

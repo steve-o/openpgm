@@ -79,7 +79,7 @@ pgm_rate_create (
 	} else {
 		bucket->rate_limit	= bucket->rate_per_sec;
 	}
-	g_static_mutex_init (&bucket->mutex);
+	pgm_mutex_init (&bucket->mutex);
 	*bucket_ = bucket;
 }
 
@@ -91,7 +91,7 @@ pgm_rate_destroy (
 /* pre-conditions */
 	g_assert (NULL != bucket);
 
-	g_static_mutex_free (&bucket->mutex);
+	pgm_mutex_free (&bucket->mutex);
 	pgm_free (bucket);
 }
 
@@ -117,7 +117,7 @@ pgm_rate_check (
 	if (0 == bucket->rate_per_sec)
 		return TRUE;
 
-	g_static_mutex_lock (&bucket->mutex);
+	pgm_mutex_lock (&bucket->mutex);
 	pgm_time_t now = pgm_time_update_now();
 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
@@ -144,7 +144,7 @@ pgm_rate_check (
 
 	new_rate_limit -= ( bucket->iphdr_len + data_size );
 	if (is_nonblocking && new_rate_limit < 0) {
-		g_static_mutex_unlock (&bucket->mutex);
+		pgm_mutex_unlock (&bucket->mutex);
 		return FALSE;
 	}
 
@@ -161,7 +161,7 @@ pgm_rate_check (
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
 	} 
-	g_static_mutex_unlock (&bucket->mutex);
+	pgm_mutex_unlock (&bucket->mutex);
 	return TRUE;
 }
 
@@ -177,11 +177,11 @@ pgm_rate_remaining (
 	if (0 == bucket->rate_per_sec)
 		return 0;
 
-	g_static_mutex_lock (&bucket->mutex);
+	pgm_mutex_lock (&bucket->mutex);
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 	const gint bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - packetlen;
-	g_static_mutex_unlock (&bucket->mutex);
+	pgm_mutex_unlock (&bucket->mutex);
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
 }
 

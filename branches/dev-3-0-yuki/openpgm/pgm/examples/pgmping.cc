@@ -166,7 +166,16 @@ main (
 	setenv ("PGM_TIMER", "GTOD", 1);
 	setenv ("PGM_SLEEP", "USLEEP", 1);
 
+	log_init ();
 	g_message ("pgmping");
+
+	g_thread_init (NULL);
+
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
@@ -202,13 +211,6 @@ main (
 	if (g_fec && ( !g_k || !g_n )) {
 		g_error ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
-	}
-
-	log_init ();
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", err->message);
-		g_error_free (err);
-		return EXIT_FAILURE;
 	}
 
 #ifdef CONFIG_WITH_HTTP

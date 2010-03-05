@@ -53,6 +53,10 @@ typedef struct pgm_transport_t pgm_transport_t;
 #   include <pgm/hashtable.h>
 #endif
 
+#ifndef __PGM_THREAD_H__
+#   include <pgm/thread.h>
+#endif
+
 #ifndef __PGM_IF_H__
 #   include <pgm/if.h>
 #endif
@@ -280,12 +284,12 @@ struct pgm_transport_t {
 	guint16			udp_encap_mcast_port;
 	guint32			rand_node_id;			/* node identifier */
 
-	GStaticRWLock		lock;				/* running / destroyed */
-	GStaticMutex		receiver_mutex;			/* receiver API */
-	GStaticMutex		source_mutex;			/* source API */
-	GStaticMutex		txw_mutex;			/* transmit window */
-	GStaticMutex		send_mutex;			/* non-router alert socket */
-	GStaticMutex		timer_mutex;			/* next timer expiration */
+	pgm_rw_lock_t		lock;				/* running / destroyed */
+	pgm_mutex_t		receiver_mutex;			/* receiver API */
+	pgm_mutex_t		source_mutex;			/* source API */
+	pgm_mutex_t		txw_mutex;			/* transmit window */
+	pgm_mutex_t		send_mutex;			/* non-router alert socket */
+	pgm_mutex_t		timer_mutex;			/* next timer expiration */
 
 	gboolean		is_bound;
 	gboolean		is_destroyed;
@@ -364,7 +368,7 @@ struct pgm_transport_t {
 	guint			tg_sqn_shift;
 	struct pgm_sk_buff_t* 	rx_buffer;
 
-	GStaticRWLock		peers_lock;
+	pgm_rw_lock_t		peers_lock;
 	pgm_hashtable_t*	peers_hashtable;	    /* fast lookup */
 	pgm_list_t*		peers_list;		    /* easy iteration */
 	pgm_slist_t*		peers_pending;		    /* rxw: have or lost data */
@@ -379,7 +383,7 @@ struct pgm_transport_t {
 
 
 /* global variables */
-extern GStaticRWLock pgm_transport_list_lock;
+extern pgm_rw_lock_t pgm_transport_list_lock;
 extern pgm_slist_t* pgm_transport_list;
 
 

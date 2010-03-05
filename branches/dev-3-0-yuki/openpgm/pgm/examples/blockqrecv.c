@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <locale.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,7 +93,18 @@ main (
 {
 	GError* err = NULL;
 
+	setlocale (LC_ALL, "");
+
+	log_init ();
 	g_message ("syncrecv");
+
+	g_thread_init (NULL);
+
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -108,13 +120,6 @@ main (
 		case 'h':
 		case '?': usage (binary_name);
 		}
-	}
-
-	log_init ();
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", err->message);
-		g_error_free (err);
-		return EXIT_FAILURE;
 	}
 
 /* setup signal handlers */

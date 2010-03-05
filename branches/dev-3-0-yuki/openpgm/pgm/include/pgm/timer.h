@@ -38,12 +38,12 @@ PGM_GNUC_INTERNAL gboolean pgm_timer_dispatch (pgm_transport_t* const);
 
 static inline void pgm_timer_lock (pgm_transport_t* const transport)
 {
-	if (transport->can_send_data) g_static_mutex_lock (&transport->timer_mutex);
+	if (transport->can_send_data) pgm_mutex_lock (&transport->timer_mutex);
 }
 
 static inline void pgm_timer_unlock (pgm_transport_t* const transport)
 {
-	if (transport->can_send_data) g_static_mutex_unlock (&transport->timer_mutex);
+	if (transport->can_send_data) pgm_mutex_unlock (&transport->timer_mutex);
 }
 
 G_END_DECLS

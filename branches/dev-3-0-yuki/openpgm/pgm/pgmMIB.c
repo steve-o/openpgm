@@ -225,10 +225,10 @@ pgmSourceTable_get_first_data_point(
 	g_trace ("pgmSourceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
 		(gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -309,7 +309,7 @@ pgmSourceTable_free_loop_context (
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -501,10 +501,10 @@ pgmSourceConfigTable_get_first_data_point(
         g_trace ("pgmSourceConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -585,7 +585,7 @@ pgmSourceConfigTable_free_loop_context (
 	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -864,10 +864,10 @@ pgmSourcePerformanceTable_get_first_data_point(
         g_trace ("pgmSourcePerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -948,7 +948,7 @@ pgmSourcePerformanceTable_free_loop_context (
 	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -1400,10 +1400,10 @@ pgmReceiverTable_get_first_data_point(
         g_trace ("pgmReceiverTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1415,20 +1415,20 @@ pgmReceiverTable_get_first_data_point(
 	{
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rw_lock_reader_lock (&transport->peers_lock);
 		context->node = transport->peers_list;
 		if (context->node) {
 /* maintain this transport's peers lock */
 			break;
 		}
 
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (context->node == NULL) {
 		pgm_free( context );
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1504,10 +1504,10 @@ pgmReceiverTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			pgm_rw_lock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
 			transport = context->list->data;
-			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			pgm_rw_lock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 			if (context->node) {
 /* keep lock */
@@ -1538,13 +1538,13 @@ pgmReceiverTable_free_loop_context (
 /* check for intra-peer state */
 	if (context->list) {
 		pgm_transport_t* transport = context->list->data;
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
 	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -1757,10 +1757,10 @@ pgmReceiverConfigTable_get_first_data_point(
         g_trace ("pgmReceiverConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1772,18 +1772,18 @@ pgmReceiverConfigTable_get_first_data_point(
 	{
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rw_lock_reader_lock (&transport->peers_lock);
 		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (context->node == NULL) {
 		pgm_free( context );
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1859,10 +1859,10 @@ pgmReceiverConfigTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			pgm_rw_lock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
 			transport = context->list->data;
-			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			pgm_rw_lock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 			if (context->node) {
 /* keep lock */
@@ -1893,13 +1893,13 @@ pgmReceiverConfigTable_free_loop_context (
 /* check for intra-peer state */
 	if (context->list) {
 		pgm_transport_t* transport = context->list->data;
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
 	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -2145,10 +2145,10 @@ pgmReceiverPerformanceTable_get_first_data_point(
         g_trace ("pgmReceiverPerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -2160,18 +2160,18 @@ pgmReceiverPerformanceTable_get_first_data_point(
 	{
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rw_lock_reader_lock (&transport->peers_lock);
 		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (context->node == NULL) {
 		pgm_free( context );
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -2247,10 +2247,10 @@ pgmReceiverPerformanceTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			pgm_rw_lock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
 			transport = context->list->data;
-			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			pgm_rw_lock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 
 			if (context->node)
@@ -2280,13 +2280,13 @@ pgmReceiverPerformanceTable_free_loop_context (
 /* check for intra-peer state */
 	if (context->list) {
 		pgm_transport_t* transport = context->list->data;
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 
 	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
