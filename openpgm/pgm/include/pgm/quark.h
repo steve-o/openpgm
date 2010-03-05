@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable string manipulation functions.
+ * portable string and integer associations.
  *
  * Copyright (c) 2010 Miru Limited.
  *
@@ -19,26 +19,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_STRING_H__
-#define __PGM_STRING_H__
-
-#include <stdarg.h>
+#ifndef __PGM_QUARK_H__
+#define __PGM_QUARK_H__
 
 #include <glib.h>
 
 
 G_BEGIN_DECLS
 
-
-gchar* pgm_strdup (const gchar*) G_GNUC_MALLOC;
-gsize pgm_printf_string_upper_bound (const gchar*, va_list);
-gint pgm_vasprintf (gchar**, gchar const*, va_list args);
-gchar* pgm_strdup_vprintf (const gchar*, va_list) G_GNUC_MALLOC;
-gchar* pgm_strconcat (const gchar *, ...) G_GNUC_MALLOC G_GNUC_NULL_TERMINATED;
-gchar** pgm_strsplit (const gchar*, const gchar*, gint) G_GNUC_MALLOC;
-void pgm_strfreev (gchar**);
+typedef guint32 pgm_quark_t;
 
 
 G_END_DECLS
 
-#endif /* __PGM_STRING_H__ */
+#endif /* __PGM_QUARK_H__ */

@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <glib.h>
@@ -58,6 +60,112 @@ pgm_strdup (
 		new_str = NULL;
 
 	return new_str;
+}
+
+/* Calculates the maximum space needed to store the output of the sprintf() function.
+ */
+
+gsize
+pgm_printf_string_upper_bound (
+	const gchar*	format,
+	va_list		args
+	)
+{
+	gchar c;
+	return vsnprintf (&c, 1, format, args) + 1;
+}
+
+gint
+pgm_vasprintf (
+	gchar**		string,
+	gchar const*	format,
+	va_list		args
+	)
+{
+	g_return_val_if_fail (string != NULL, -1);
+#ifdef CONFIG_HAVE_VASPRINTF
+	const gint len = vasprintf (string, format, args);
+	if (len < 0)
+		*string = NULL;
+#else
+	va_list args2;
+	G_VA_COPY (args2, args);
+	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
+	const gint len = vsprintf (*string, format, args);
+	va_end (args2);
+#endif
+	return len;
+}
+
+gchar*
+pgm_strdup_vprintf (
+	const gchar*	format,
+	va_list		args
+	)
+{
+	gchar *string = NULL;
+	pgm_vasprintf (&string, format, args);
+	return string;
+}
+
+static
+gchar*
+pgm_stpcpy (
+	gchar*		dest,
+	const gchar*	src
+	)
+{
+	g_return_val_if_fail (dest != NULL, NULL);
+	g_return_val_if_fail (src != NULL, NULL);
+#ifdef CONFIG_HAVE_STPCPY
+	return stpcpy (dest, src);
+#else
+	gchar *d = dest;
+	const gchar *s = src;
+	do {
+		*d++ = *s;
+	} while (*s++ != '\0');
+	return d - 1;
+#endif
+}
+
+gchar*
+pgm_strconcat (
+	const gchar*	string1,
+	...
+	)
+{
+	gsize	l;     
+	va_list args;
+	gchar*	s;
+	gchar*	concat;
+	gchar*	ptr;
+
+	if (!string1)
+		return NULL;
+
+	l = 1 + strlen (string1);
+	va_start (args, string1);
+	s = va_arg (args, gchar*);
+	while (s) {
+		l += strlen (s);
+		s = va_arg (args, gchar*);
+	}
+	va_end (args);
+
+	concat = pgm_malloc (l);
+	ptr = concat;
+
+	ptr = pgm_stpcpy (ptr, string1);
+	va_start (args, string1);
+	s = va_arg (args, gchar*);
+	while (s) {
+		ptr = pgm_stpcpy (ptr, s);
+		s = va_arg (args, gchar*);
+	}
+	va_end (args);
+
+	return concat;
 }
 
 /* Split a string with delimiter, result must be freed with pgm_strfreev().
