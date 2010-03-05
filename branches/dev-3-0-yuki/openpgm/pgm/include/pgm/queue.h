@@ -29,23 +29,23 @@
 #endif
 
 
-struct PGMQueue
+struct pgm_queue_t
 {
 	PGMList*	head;
 	PGMList*	tail;
 	guint		length;
 };
 
-typedef struct PGMQueue PGMQueue;
+typedef struct pgm_queue_t pgm_queue_t;
 
 
 G_BEGIN_DECLS
 
-gboolean pgm_queue_is_empty (PGMQueue*);
-void pgm_queue_push_head_link (PGMQueue*, PGMList*);
-PGMList* pgm_queue_pop_tail_link (PGMQueue*);
-PGMList* pgm_queue_peek_tail_link (PGMQueue*);
-void pgm_queue_unlink (PGMQueue*, PGMList*);
+gboolean pgm_queue_is_empty (pgm_queue_t*);
+void pgm_queue_push_head_link (pgm_queue_t*, PGMList*);
+PGMList* pgm_queue_pop_tail_link (pgm_queue_t*);
+PGMList* pgm_queue_peek_tail_link (pgm_queue_t*);
+void pgm_queue_unlink (pgm_queue_t*, PGMList*);
 
 
 G_END_DECLS

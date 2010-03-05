@@ -76,7 +76,7 @@ struct pgm_txw_t {
         volatile guint32	lead;
         volatile guint32	trail;
 
-        PGMQueue		retransmit_queue;
+        pgm_queue_t		retransmit_queue;
 
 	rs_t			rs;
 	guint			tg_sqn_shift;

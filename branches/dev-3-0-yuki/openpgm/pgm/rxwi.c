@@ -1796,7 +1796,7 @@ _pgm_rxw_unlink (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
-	PGMQueue* queue;
+	pgm_queue_t* queue;
 
 /* pre-conditions */
 	g_assert (NULL != window);
