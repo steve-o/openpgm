@@ -24,7 +24,7 @@
 #include <glib.h>
 
 #include "pgm/atomic.h"
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/hashtable.h"
 #include "pgm/math.h"
 

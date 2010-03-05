@@ -23,7 +23,7 @@
 
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/string.h"
 #include "pgm/slist.h"
 

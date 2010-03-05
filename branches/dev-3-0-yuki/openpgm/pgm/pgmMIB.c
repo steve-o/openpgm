@@ -11,7 +11,7 @@
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/slist.h"
 #include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"

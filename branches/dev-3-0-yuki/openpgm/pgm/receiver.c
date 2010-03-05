@@ -55,7 +55,7 @@
 #	include <ws2tcpip.h>
 #endif
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/pgm.h"
 #include "pgm/receiverp.h"
@@ -1352,7 +1352,7 @@ send_nak_list (
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
-	if (G_UNLIKELY(g_mem_gc_friendly))
+	if (G_UNLIKELY(pgm_mem_gc_friendly))
 		memset (buf, 0, tpdu_length);
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);

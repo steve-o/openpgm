@@ -41,7 +41,7 @@
 #	include <arpa/inet.h>
 #endif
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/string.h"
 #include "pgm/if.h"

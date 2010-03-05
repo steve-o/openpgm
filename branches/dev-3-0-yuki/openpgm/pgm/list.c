@@ -21,7 +21,7 @@
 
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/list.h"
 
 

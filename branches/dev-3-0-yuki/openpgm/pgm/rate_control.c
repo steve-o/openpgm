@@ -28,8 +28,9 @@
 #	include <sys/socket.h>
 #endif
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/time.h"
+#include "pgm/thread.h"
 
 
 struct rate_t {
@@ -39,7 +40,7 @@ struct rate_t {
 
 	gint		rate_limit;		/* signed for math */
 	pgm_time_t	last_rate_check;
-	GStaticMutex	mutex;
+	pgm_mutex_t	mutex;
 };
 
 typedef struct rate_t rate_t;

@@ -38,7 +38,7 @@
 #	include <sys/uio.h>
 #endif
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/queue.h"
 #include "pgm/skbuff.h"
@@ -1244,7 +1244,7 @@ _pgm_rxw_remove_trail (
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
 /* remove reference to skb */
-	if (G_UNLIKELY(g_mem_gc_friendly)) {
+	if (G_UNLIKELY(pgm_mem_gc_friendly)) {
 		const guint32 index_ = skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_] = NULL;
 	}

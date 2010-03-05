@@ -73,6 +73,7 @@ pgm_init (
 
 /* ensure threading enabled */
 	pgm_thread_init ();
+	pgm_mem_init ();
 	pgm_rand_init ();
 
 #ifdef G_OS_WIN32
@@ -169,6 +170,7 @@ pgm_shutdown (void)
 #endif
 
 	pgm_rand_shutdown ();
+	pgm_mem_shutdown ();
 	pgm_thread_shutdown ();
 
 	pgm_got_initialized = FALSE;

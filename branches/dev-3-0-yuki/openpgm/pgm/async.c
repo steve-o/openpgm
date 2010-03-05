@@ -28,7 +28,7 @@
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/recv.h"
 #include "pgm/net.h"
 #include "pgm/async.h"

@@ -23,16 +23,35 @@
 
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 
-//#define ALLOC_DEBUG
+//#define MEM_DEBUG
 
-#ifndef ALLOC_DEBUG
+#ifndef MEM_DEBUG
 #define g_trace(...)		while (0)
 #else
 #define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
+
+gboolean pgm_mem_gc_friendly = FALSE;
+
+void
+pgm_mem_init (void)
+{
+	const GDebugKey keys[] = {
+		{ "gc-friendly", 1 },
+	};
+	const char *val = getenv ("PGM_DEBUG");
+	gint flags = !val ? 0 : g_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
+	if (flags & 1)
+		g_mem_gc_friendly = TRUE;
+}
+
+void
+pgm_mem_shutdown (void)
+{
+}
 
 gpointer
 pgm_malloc (
