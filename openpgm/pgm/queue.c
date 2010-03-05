@@ -37,7 +37,7 @@
 
 gboolean
 pgm_queue_is_empty (
-	PGMQueue*	queue
+	pgm_queue_t*	queue
 	)
 {
 	g_return_val_if_fail (queue != NULL, TRUE);
@@ -47,7 +47,7 @@ pgm_queue_is_empty (
 
 void
 pgm_queue_push_head_link (
-	PGMQueue*	queue,
+	pgm_queue_t*	queue,
 	PGMList*	link
 	)
 {
@@ -67,7 +67,7 @@ pgm_queue_push_head_link (
 
 PGMList*
 pgm_queue_pop_tail_link (
-	PGMQueue*	queue
+	pgm_queue_t*	queue
 	)
 {
 	g_return_val_if_fail (queue != NULL, NULL);
@@ -94,7 +94,7 @@ pgm_queue_pop_tail_link (
 
 PGMList*
 pgm_queue_peek_tail_link (
-	PGMQueue*	queue
+	pgm_queue_t*	queue
 	)
 {
 	g_return_val_if_fail (queue != NULL, NULL);
@@ -104,7 +104,7 @@ pgm_queue_peek_tail_link (
 
 void
 pgm_queue_unlink (
-	PGMQueue*	queue,
+	pgm_queue_t*	queue,
 	PGMList*	link_
 	)
 {
