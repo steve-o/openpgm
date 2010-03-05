@@ -27,8 +27,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #include <libsoup/soup.h>
 #include <libsoup/soup-server.h>
