@@ -24,8 +24,9 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>

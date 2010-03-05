@@ -39,8 +39,9 @@
 #	include <sys/epoll.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -100,7 +101,7 @@
 
 
 /* global locals */
-pgm_rw_lock_t pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
+pgm_rw_lock_t pgm_transport_list_lock;		/* list of all transports for admin interfaces */
 pgm_slist_t* pgm_transport_list = NULL;
 
 
@@ -1061,7 +1062,7 @@ pgm_transport_bind (
 				const int save_errno = errno;
 				char group_addr[INET6_ADDRSTRLEN];
 				char ifname[IF_NAMESIZE];
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
 					g_set_error (error,
 						     PGM_TRANSPORT_ERROR,
@@ -1099,8 +1100,8 @@ pgm_transport_bind (
 				const int save_errno = errno;
 				char source_addr[INET6_ADDRSTRLEN];
 				char group_addr[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				g_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),

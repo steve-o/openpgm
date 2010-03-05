@@ -39,8 +39,9 @@
 #	include <sys/mman.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 #include "pgm/glib-compat.h"
 
 #ifdef G_OS_WIN32
