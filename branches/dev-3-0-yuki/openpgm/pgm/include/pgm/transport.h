@@ -365,7 +365,7 @@ struct pgm_transport_t {
 	struct pgm_sk_buff_t* 	rx_buffer;
 
 	GStaticRWLock		peers_lock;
-	PGMHashTable*		peers_hashtable;	    /* fast lookup */
+	pgm_hashtable_t*	peers_hashtable;	    /* fast lookup */
 	PGMList*		peers_list;		    /* easy iteration */
 	PGMSList*		peers_pending;		    /* rxw: have or lost data */
 	pgm_notify_t		pending_notify;		    /* timer to rx */
