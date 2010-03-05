@@ -25,14 +25,6 @@
 
 G_BEGIN_DECLS
 
-#ifndef G_STATIC_ASSERT
-#	define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
-#	define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
-#	define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
-#endif
-
-G_STATIC_ASSERT(sizeof(gint) == sizeof(gint32));
-
 gint32 pgm_atomic_int32_exchange_and_add (volatile gint32*, const gint32);
 
 void pgm_atomic_int32_add (volatile gint32*, const gint32);
