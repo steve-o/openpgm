@@ -25,7 +25,7 @@
 #include <glib.h>
 
 
-typedef struct PGMHashTable PGMHashTable;
+typedef struct pgm_hashtable_t pgm_hashtable_t;
 
 typedef guint (*PGMHashFunc) (gconstpointer);
 typedef gboolean (*PGMEqualFunc) (gconstpointer, gconstpointer);
@@ -33,14 +33,14 @@ typedef gboolean (*PGMEqualFunc) (gconstpointer, gconstpointer);
 
 G_BEGIN_DECLS
 
-PGMHashTable* pgm_hash_table_new (PGMHashFunc, PGMEqualFunc);
-void pgm_hash_table_destroy (PGMHashTable*);
-void pgm_hash_table_insert (PGMHashTable*, gconstpointer, gpointer);
-gboolean pgm_hash_table_remove (PGMHashTable*, gconstpointer);
-void pgm_hash_table_remove_all (PGMHashTable*);
-gpointer pgm_hash_table_lookup (PGMHashTable*, gconstpointer);
+pgm_hashtable_t* pgm_hash_table_new (PGMHashFunc, PGMEqualFunc);
+void pgm_hash_table_destroy (pgm_hashtable_t*);
+void pgm_hash_table_insert (pgm_hashtable_t*, gconstpointer, gpointer);
+gboolean pgm_hash_table_remove (pgm_hashtable_t*, gconstpointer);
+void pgm_hash_table_remove_all (pgm_hashtable_t*);
+gpointer pgm_hash_table_lookup (pgm_hashtable_t*, gconstpointer);
 
-void pgm_hash_table_unref (PGMHashTable*);
+void pgm_hash_table_unref (pgm_hashtable_t*);
 
 /* Hash Functions
  */

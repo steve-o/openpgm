@@ -1408,7 +1408,7 @@ pgm_udpport_string (
 	int		port
 	)
 {
-	static PGMHashTable *services = NULL;
+	static pgm_hashtable_t *services = NULL;
 
 	if (!services) {
 		services = pgm_hash_table_new (g_int_hash, g_int_equal);
@@ -1436,7 +1436,7 @@ pgm_gethostbyaddr (
 	const struct in_addr*	ap
 	)
 {
-	static PGMHashTable *hosts = NULL;
+	static pgm_hashtable_t *hosts = NULL;
 
 	if (!hosts) {
 		hosts = pgm_hash_table_new (g_str_hash, g_str_equal);
