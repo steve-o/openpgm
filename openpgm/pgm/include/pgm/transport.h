@@ -248,8 +248,8 @@ struct pgm_peer_t {
 
 	gpointer            	window;			/* pgm_rxw_t */
 	pgm_transport_t*    	transport;
-	PGMList			peers_link;
-	PGMSList		pending_link;
+	pgm_list_t		peers_link;
+	pgm_slist_t		pending_link;
 
 	unsigned		is_fec_enabled:1;
 	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
@@ -366,8 +366,8 @@ struct pgm_transport_t {
 
 	GStaticRWLock		peers_lock;
 	pgm_hashtable_t*	peers_hashtable;	    /* fast lookup */
-	PGMList*		peers_list;		    /* easy iteration */
-	PGMSList*		peers_pending;		    /* rxw: have or lost data */
+	pgm_list_t*		peers_list;		    /* easy iteration */
+	pgm_slist_t*		peers_pending;		    /* rxw: have or lost data */
 	pgm_notify_t		pending_notify;		    /* timer to rx */
 	gboolean		is_pending_read;
 	pgm_time_t		next_poll;
@@ -380,7 +380,7 @@ struct pgm_transport_t {
 
 /* global variables */
 extern GStaticRWLock pgm_transport_list_lock;
-extern PGMSList* pgm_transport_list;
+extern pgm_slist_t* pgm_transport_list;
 
 
 G_BEGIN_DECLS

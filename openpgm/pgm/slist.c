@@ -34,16 +34,16 @@
 #endif
 
 
-PGMSList*
+pgm_slist_t*
 pgm_slist_append (
-	PGMSList*	list,
+	pgm_slist_t*	list,
 	gpointer	data
 	)
 {
-	PGMSList* new_list;
-	PGMSList* last;
+	pgm_slist_t* new_list;
+	pgm_slist_t* last;
 
-	new_list = pgm_new (PGMSList, 1);
+	new_list = pgm_new (pgm_slist_t, 1);
 	new_list->data = data;
 	new_list->next = NULL;
 
@@ -57,28 +57,28 @@ pgm_slist_append (
 		return new_list;
 }
 
-PGMSList*
+pgm_slist_t*
 pgm_slist_prepend (
-	PGMSList*	list,
+	pgm_slist_t*	list,
 	gconstpointer	data
 	)
 {
-	PGMSList *new_list;
+	pgm_slist_t *new_list;
 
-	new_list = pgm_new (PGMSList, 1);
+	new_list = pgm_new (pgm_slist_t, 1);
 	new_list->data = data;
 	new_list->next = list;
 
 	return new_list;
 }
 
-PGMSList*
+pgm_slist_t*
 pgm_slist_prepend_link (
-	PGMSList*	list,
-	PGMSList*	link_
+	pgm_slist_t*	list,
+	pgm_slist_t*	link_
 	)
 {
-	PGMSList *new_list;
+	pgm_slist_t *new_list;
 
 	new_list = link_;
 	new_list->next = list;
@@ -86,13 +86,13 @@ pgm_slist_prepend_link (
 	return new_list;
 }
 
-PGMSList*
+pgm_slist_t*
 pgm_slist_remove (
-	PGMSList*	list,
+	pgm_slist_t*	list,
 	gconstpointer	data
 	)
 {
-	PGMSList *tmp = list, *prev = NULL;
+	pgm_slist_t *tmp = list, *prev = NULL;
 
 	while (tmp)
 	{
@@ -112,12 +112,12 @@ pgm_slist_remove (
 	return list;
 }
 
-PGMSList* 
+pgm_slist_t* 
 pgm_slist_remove_first (
-	PGMSList*	list
+	pgm_slist_t*	list
 	)
 {
-	PGMSList *tmp;
+	pgm_slist_t *tmp;
 
 	if (G_LIKELY (list))
 	{
@@ -132,20 +132,20 @@ pgm_slist_remove_first (
 
 void
 pgm_slist_free (
-	PGMSList*	list
+	pgm_slist_t*	list
 	)
 {
 	while (list)
 	{
-		PGMSList* current = list;
+		pgm_slist_t* current = list;
 		list = list->next;
 		pgm_free (list);
 	}
 }
 
-PGMSList*
+pgm_slist_t*
 pgm_slist_last (
-	PGMSList*	list
+	pgm_slist_t*	list
 	)
 {
 	if (G_LIKELY (list))
@@ -159,7 +159,7 @@ pgm_slist_last (
 
 guint
 pgm_slist_length (
-	PGMSList*	list
+	pgm_slist_t*	list
 	)
 {
 	guint length = 0;

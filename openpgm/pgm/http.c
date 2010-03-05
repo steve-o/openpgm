@@ -867,9 +867,9 @@ http_tsi_response (
 	if (transport->peers_list)
 	{
 		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		PGMList* peers_list = transport->peers_list;
+		pgm_list_t* peers_list = transport->peers_list;
 		while (peers_list) {
-			PGMList* next = peers_list->next;
+			pgm_list_t* next = peers_list->next;
 			http_each_receiver (peers_list->data, response);
 			peers_list = next;
 		}

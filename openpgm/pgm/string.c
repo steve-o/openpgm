@@ -70,7 +70,7 @@ pgm_strsplit (
 	gint		max_tokens
 	)
 {
-	PGMSList *string_list = NULL, *slist;
+	pgm_slist_t *string_list = NULL, *slist;
 	gchar **str_array, *s;
 	guint n = 0;
 	const gchar *remainder;

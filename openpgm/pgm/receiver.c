@@ -1437,7 +1437,7 @@ nak_rb_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	PGMList* list;
+	pgm_list_t* list;
 	pgm_sqn_list_t nak_list = { .len = 0 };
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
@@ -1478,7 +1478,7 @@ nak_rb_state (
 
 		while (list)
 		{
-			PGMList* next_list_el = list->prev;
+			pgm_list_t* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1543,7 +1543,7 @@ nak_rb_state (
 
 		while (list)
 		{
-			PGMList* next_list_el = list->prev;
+			pgm_list_t* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1667,9 +1667,9 @@ pgm_check_peer_nak_state (
 	if (!transport->peers_list)
 		return TRUE;
 
-	PGMList* list = transport->peers_list;
+	pgm_list_t* list = transport->peers_list;
 	do {
-		PGMList* next = list->next;
+		pgm_list_t* next = list->next;
 		pgm_peer_t* peer = list->data;
 		pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 
@@ -1758,9 +1758,9 @@ pgm_min_nak_expiry (
 	if (!transport->peers_list)
 		return expiration;
 
-	PGMList* list = transport->peers_list;
+	pgm_list_t* list = transport->peers_list;
 	do {
-		PGMList* next = list->next;
+		pgm_list_t* next = list->next;
 		pgm_peer_t* peer = (pgm_peer_t*)list->data;
 		pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	
@@ -1812,7 +1812,7 @@ nak_rpt_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	PGMList* list = window->wait_ncf_queue.tail;
+	pgm_list_t* list = window->wait_ncf_queue.tail;
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -1822,7 +1822,7 @@ nak_rpt_state (
 
 	while (list)
 	{
-		PGMList* next_list_el = list->prev;
+		pgm_list_t* next_list_el = list->prev;
 		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1940,7 +1940,7 @@ nak_rdata_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	PGMList* list = window->wait_data_queue.tail;
+	pgm_list_t* list = window->wait_data_queue.tail;
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -1950,7 +1950,7 @@ nak_rdata_state (
 
 	while (list)
 	{
-		PGMList* next_list_el = list->prev;
+		pgm_list_t* next_list_el = list->prev;
 		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)list;
 		g_assert (rdata_skb);
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;

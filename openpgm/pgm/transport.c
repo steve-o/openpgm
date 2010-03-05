@@ -101,7 +101,7 @@
 
 /* global locals */
 GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
-PGMSList* pgm_transport_list = NULL;
+pgm_slist_t* pgm_transport_list = NULL;
 
 
 gsize
@@ -207,7 +207,7 @@ pgm_transport_destroy (
 	if (transport->peers_list) {
 		g_trace ("INFO","destroying peer list.");
 		do {
-			PGMList* next = transport->peers_list->next;
+			pgm_list_t* next = transport->peers_list->next;
 			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
 
 			transport->peers_list = next;
