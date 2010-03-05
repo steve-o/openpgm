@@ -486,9 +486,9 @@ index_callback (
 		return;
 	}
 #endif
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 	const int transport_count = pgm_slist_length (pgm_transport_list);
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 
 	GString* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
 	g_string_append_printf (response,	"<table>"
@@ -622,7 +622,7 @@ transports_callback (
 
 	if (pgm_transport_list)
 	{
-		g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 		PGMSList* list = pgm_transport_list;
 		while (list)
@@ -659,7 +659,7 @@ transports_callback (
 						sport);
 			list = next;
 		}
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 	}
 	else
 	{
@@ -769,7 +769,7 @@ http_tsi_response (
 	)
 {
 /* first verify this is a valid TSI */
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	pgm_transport_t* transport = NULL;
 	PGMSList* list = pgm_transport_list;
@@ -786,21 +786,21 @@ http_tsi_response (
 		}
 
 /* check receivers */
-		g_static_rw_lock_reader_lock (&list_transport->peers_lock);
+		pgm_rw_lock_reader_lock (&list_transport->peers_lock);
 		pgm_peer_t* receiver = pgm_hash_table_lookup (list_transport->peers_hashtable, tsi);
 		if (receiver) {
 			int retval = http_receiver_response (receiver, msg);
-			g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
-			g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+			pgm_rw_lock_reader_unlock (&list_transport->peers_lock);
+			pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 			return retval;
 		}
-		g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&list_transport->peers_lock);
 
 		list = next;
 	}
 
 	if (!transport) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return -1;
 	}
 
@@ -866,14 +866,14 @@ http_tsi_response (
 
 	if (transport->peers_list)
 	{
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rw_lock_reader_lock (&transport->peers_lock);
 		pgm_list_t* peers_list = transport->peers_list;
 		while (peers_list) {
 			pgm_list_t* next = peers_list->next;
 			http_each_receiver (peers_list->data, response);
 			peers_list = next;
 		}
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 	else
 	{
@@ -1008,7 +1008,7 @@ http_tsi_response (
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]);
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rw_lock_reader_unlock (&pgm_transport_list_lock);
 
 	http_finalize_response (response, msg);
 

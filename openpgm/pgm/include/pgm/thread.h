@@ -23,7 +23,7 @@
 #include <glib.h>
 
 
-struct PGMMutex {
+struct pgm_mutex_t {
 #ifdef G_OS_UNIX
 	pthread_mutex_t		pthread_mutex;
 #else
@@ -31,9 +31,9 @@ struct PGMMutex {
 #endif /* !G_OS_UNIX */
 };
 
-typedef struct PGMMutex PGMMutex;
+typedef struct pgm_mutex_t pgm_mutex_t;
 
-struct PGMCond {
+struct pgm_cond_t {
 #ifdef G_OS_UNIX
 	pthread_cond_t		pthread_cond;
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -44,15 +44,15 @@ struct PGMCond {
 #endif /* !G_OS_UNIX */
 };
 
-typedef struct PGMCond PGMCond;
+typedef struct pgm_cond_t pgm_cond_t;
 
-struct PGMRWLock {
+struct pgm_rw_lock_t {
 #ifdef CONFIG_HAVE_WIN_SRW_LOCK
 	SRWLOCK		win32_lock;
 #else
-	PGMMutex	mutex;
-	PGMCond		read_cond;
-	PGMCond		write_cond;
+	pgm_mutex_t	mutex;
+	pgm_cond_t	read_cond;
+	pgm_cond_t	write_cond;
 	guint		read_counter;
 	gboolean	have_writer;
 	guint		want_to_read;
@@ -60,30 +60,33 @@ struct PGMRWLock {
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 };
 
-typedef struct PGMRWLock PGMRWLock;
+typedef struct pgm_rw_lock_t pgm_rw_lock_t;
 
 G_BEGIN_DECLS
 
-void pgm_mutex_init (PGMMutex*);
-void pgm_mutex_lock (PGMMutex*);
-gboolean pgm_mutex_trylock (PGMMutex*);
-void pgm_mutex_unlock (PGMMutex*);
-void pgm_mutex_free (PGMMutex*);
+void pgm_mutex_init (pgm_mutex_t*);
+void pgm_mutex_lock (pgm_mutex_t*);
+gboolean pgm_mutex_trylock (pgm_mutex_t*);
+void pgm_mutex_unlock (pgm_mutex_t*);
+void pgm_mutex_free (pgm_mutex_t*);
 
-void pgm_cond_init (PGMCond*);
-void pgm_cond_signal (PGMCond*);
-void pgm_cond_broadcast (PGMCond*);
-void pgm_cond_wait (PGMCond*, PGMMutex*);
-void pgm_cond_free (PGMCond*);
+void pgm_cond_init (pgm_cond_t*);
+void pgm_cond_signal (pgm_cond_t*);
+void pgm_cond_broadcast (pgm_cond_t*);
+void pgm_cond_wait (pgm_cond_t*, pgm_mutex_t*);
+void pgm_cond_free (pgm_cond_t*);
 
-void pgm_rw_lock_init (PGMRWLock*);
-void pgm_rw_lock_reader_lock (PGMRWLock*);
-gboolean pgm_rw_lock_reader_trylock (PGMRWLock*);
-void pgm_rw_lock_reader_unlock(PGMRWLock*);
-void pgm_rw_lock_writer_lock (PGMRWLock*);
-gboolean pgm_rw_lock_writer_trylock (PGMRWLock*);
-void pgm_rw_lock_writer_unlock (PGMRWLock*);
-void pgm_rw_lock_free (PGMRWLock*);
+void pgm_rw_lock_init (pgm_rw_lock_t*);
+void pgm_rw_lock_reader_lock (pgm_rw_lock_t*);
+gboolean pgm_rw_lock_reader_trylock (pgm_rw_lock_t*);
+void pgm_rw_lock_reader_unlock(pgm_rw_lock_t*);
+void pgm_rw_lock_writer_lock (pgm_rw_lock_t*);
+gboolean pgm_rw_lock_writer_trylock (pgm_rw_lock_t*);
+void pgm_rw_lock_writer_unlock (pgm_rw_lock_t*);
+void pgm_rw_lock_free (pgm_rw_lock_t*);
+
+void pgm_thread_init (void);
+void pgm_thread_shutdown (void);
 
 G_END_DECLS
 

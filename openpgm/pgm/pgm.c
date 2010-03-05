@@ -31,6 +31,8 @@
 #include "pgm/pgm.h"
 #include "pgm/packet.h"
 #include "pgm/timep.h"
+#include "pgm/thread.h"
+#include "pgm/rand.h"
 
 
 #ifndef PGM_DEBUG
@@ -69,8 +71,8 @@ pgm_init (
 	}
 
 /* ensure threading enabled */
-	if (!g_thread_supported ())
-		g_thread_init (NULL);
+	pgm_thread_init ();
+	pgm_rand_init ();
 
 #ifdef G_OS_WIN32
 	WORD wVersionRequested = MAKEWORD (2, 2);
@@ -161,6 +163,9 @@ pgm_shutdown (void)
 #ifdef G_OS_WIN32
 	WSACleanup ();
 #endif
+
+	pgm_rand_shutdown ();
+	pgm_thread_shutdown ();
 
 	pgm_got_initialized = FALSE;
 	return TRUE;

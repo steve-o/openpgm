@@ -371,9 +371,9 @@ on_peer (
 	memcpy (&upstream_tsi.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
 	upstream_tsi.sport = skb->pgm_header->pgm_dport;
 
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
+	pgm_rw_lock_reader_lock (&transport->peers_lock);
 	*source = pgm_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
 		g_trace ("Discarded peer packet about new source.");
@@ -452,9 +452,9 @@ on_downstream (
 	}
 
 /* search for TSI peer context or create a new one */
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
+	pgm_rw_lock_reader_lock (&transport->peers_lock);
 	*source = pgm_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	pgm_rw_lock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 		*source = pgm_new_peer (transport,
 				       &skb->tsi,
@@ -673,14 +673,14 @@ pgm_recvmsgv (
 	if (G_LIKELY(msg_len)) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
-	if (G_UNLIKELY(!g_static_rw_lock_reader_trylock (&transport->lock)))
+	if (G_UNLIKELY(!pgm_rw_lock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rw_lock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
@@ -694,7 +694,7 @@ pgm_recvmsgv (
 	}
 
 /* receiver */
-	g_static_mutex_lock (&transport->receiver_mutex);
+	pgm_mutex_lock (&transport->receiver_mutex);
 
 	if (G_UNLIKELY(transport->is_reset)) {
 		g_assert (NULL != transport->peers_pending);
@@ -713,8 +713,8 @@ pgm_recvmsgv (
 		}
 		if (!transport->is_abort_on_reset)
 			transport->is_reset = !transport->is_reset;
-		g_static_mutex_unlock (&transport->receiver_mutex);
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_mutex_unlock (&transport->receiver_mutex);
+		pgm_rw_lock_reader_unlock (&transport->lock);
 		return PGM_IO_STATUS_RESET;
 	}
 
@@ -868,8 +868,8 @@ check_for_repeat:
 					goto check_for_repeat;
 				goto flush_pending;
 			case ENOENT:
-				g_static_mutex_unlock (&transport->receiver_mutex);
-				g_static_rw_lock_reader_unlock (&transport->lock);
+				pgm_mutex_unlock (&transport->receiver_mutex);
+				pgm_rw_lock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT:
 				g_set_error (error,
@@ -877,8 +877,8 @@ check_for_repeat:
 					     pgm_recv_error_from_errno (errno),
 					     _("Waiting for event: %s"),
 					     strerror (errno));
-				g_static_mutex_unlock (&transport->receiver_mutex);
-				g_static_rw_lock_reader_unlock (&transport->lock);
+				pgm_mutex_unlock (&transport->receiver_mutex);
+				pgm_rw_lock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			default:
 				g_assert_not_reached();
@@ -912,12 +912,12 @@ out:
 			}
 			if (!transport->is_abort_on_reset)
 				transport->is_reset = !transport->is_reset;
-			g_static_mutex_unlock (&transport->receiver_mutex);
-			g_static_rw_lock_reader_unlock (&transport->lock);
+			pgm_mutex_unlock (&transport->receiver_mutex);
+			pgm_rw_lock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RESET;
 		}
-		g_static_mutex_unlock (&transport->receiver_mutex);
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_mutex_unlock (&transport->receiver_mutex);
+		pgm_rw_lock_reader_unlock (&transport->lock);
 		if (PGM_IO_STATUS_WOULD_BLOCK == status &&
 		    ( transport->can_send_data ||
 		      ( transport->can_recv_data && NULL != transport->peers_list )))
@@ -946,8 +946,8 @@ out:
 
 	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
-	g_static_mutex_unlock (&transport->receiver_mutex);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_mutex_unlock (&transport->receiver_mutex);
+	pgm_rw_lock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 }
 

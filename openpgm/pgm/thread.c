@@ -67,8 +67,24 @@ static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 
 
 void
+pgm_thread_init (void)
+{
+#if defined(G_OS_WIN) && !defined(CONFIG_HAVE_WIN_COND)
+	win32_check_err (TLS_OUT_OF_INDEXES != (g_cond_event_tls = TlsAlloc ()));
+#endif
+}
+
+void
+pgm_thread_shutdown (void)
+{
+#if defined(G_OS_WIN) && !defined(CONFIG_HAVE_WIN_COND)
+	TlsFree (g_cond_event_tls);
+#endif
+}
+
+void
 pgm_mutex_init (
-	PGMMutex*	mutex
+	pgm_mutex_t*	mutex
 	)
 {
 	g_assert (NULL != mutex);
@@ -81,7 +97,7 @@ pgm_mutex_init (
 
 void
 pgm_mutex_lock (
-	PGMMutex*	mutex
+	pgm_mutex_t*	mutex
 	)
 {
 	g_assert (NULL != mutex);
@@ -94,7 +110,7 @@ pgm_mutex_lock (
 
 gboolean
 pgm_mutex_trylock (
-	PGMMutex*	mutex
+	pgm_mutex_t*	mutex
 	)
 {
 	g_assert (NULL != mutex);
@@ -111,7 +127,7 @@ pgm_mutex_trylock (
 
 void
 pgm_mutex_unlock (
-	PGMMutex*	mutex
+	pgm_mutex_t*	mutex
 	)
 {
 	g_assert (NULL != mutex);
@@ -124,7 +140,7 @@ pgm_mutex_unlock (
 
 void
 pgm_mutex_free (
-	PGMMutex*	mutex
+	pgm_mutex_t*	mutex
 	)
 {
 	g_assert (NULL != mutex);
@@ -137,7 +153,7 @@ pgm_mutex_free (
 
 void
 pgm_cond_init (
-	PGMCond*	cond
+	pgm_cond_t*	cond
 	)
 {
 	g_assert (NULL != cond);
@@ -146,9 +162,6 @@ pgm_cond_init (
 #elif defined(CONFIG_HAVE_WIN_COND)
 	InitializeConditionVariable (&cond->win32_cond);
 #else
-	if (TLS_OUT_OF_INDEXES == g_cond_event_tls) {
-		win32_check_err (TLS_OUT_OF_INDEXES != (g_cond_event_tls = TlsAlloc ()));
-	}
 	cond->array = g_ptr_array_new ();
 	InitializeCriticalSection (&cond->win32_mutex);
 #endif /* !G_OS_UNIX */
@@ -156,7 +169,7 @@ pgm_cond_init (
 
 void
 pgm_cond_signal (
-	PGMCond*	cond
+	pgm_cond_t*	cond
 	)
 {
 	g_assert (NULL != cond);
@@ -176,7 +189,7 @@ pgm_cond_signal (
 
 void
 pgm_cond_broadcast (
-	PGMCond*	cond
+	pgm_cond_t*	cond
 	)
 {
 	g_assert (NULL != cond);
@@ -195,8 +208,8 @@ pgm_cond_broadcast (
 
 void
 pgm_cond_wait (
-	PGMCond*	cond,
-	PGMMutex*	mutex
+	pgm_cond_t*	cond,
+	pgm_mutex_t*	mutex
 	)
 {
 	g_assert (NULL != cond);
@@ -236,7 +249,7 @@ pgm_cond_wait (
 
 void
 pgm_cond_free (
-	PGMCond*	cond
+	pgm_cond_t*	cond
 	)
 {
 	g_assert (NULL != cond);
@@ -252,7 +265,7 @@ pgm_cond_free (
 
 void
 pgm_rw_lock_init (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -272,8 +285,8 @@ pgm_rw_lock_init (
 static inline
 void
 pgm_rw_lock_wait (
-	PGMCond*	cond,
-	PGMMutex*	mutex
+	pgm_cond_t*	cond,
+	pgm_mutex_t*	mutex
 	)
 {
 	pgm_cond_wait (cond, mutex);
@@ -282,7 +295,7 @@ pgm_rw_lock_wait (
 static inline
 void
 pgm_rw_lock_signal (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	if (rw_lock->want_to_write)
@@ -293,7 +306,7 @@ pgm_rw_lock_signal (
 
 void
 pgm_rw_lock_reader_lock (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -312,7 +325,7 @@ pgm_rw_lock_reader_lock (
 
 gboolean
 pgm_rw_lock_reader_trylock (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -333,7 +346,7 @@ pgm_rw_lock_reader_trylock (
 
 void
 pgm_rw_lock_reader_unlock(
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -350,7 +363,7 @@ pgm_rw_lock_reader_unlock(
 
 void
 pgm_rw_lock_writer_lock (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -369,7 +382,7 @@ pgm_rw_lock_writer_lock (
 
 gboolean
 pgm_rw_lock_writer_trylock (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -391,7 +404,7 @@ pgm_rw_lock_writer_trylock (
 
 void
 pgm_rw_lock_writer_unlock (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);
@@ -407,7 +420,7 @@ pgm_rw_lock_writer_unlock (
 
 void
 pgm_rw_lock_free (
-	PGMRWLock*	rw_lock
+	pgm_rw_lock_t*	rw_lock
 	)
 {
 	g_assert (NULL != rw_lock);

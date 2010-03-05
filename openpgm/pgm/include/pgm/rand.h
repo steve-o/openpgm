@@ -39,6 +39,9 @@ gint32 pgm_rand_int_range (pgm_rand_t*, gint32, gint32);
 guint32 pgm_random_int (void);
 gint32 pgm_random_int_range (gint32, gint32);
 
+void pgm_rand_init (void);
+void pgm_rand_shutdown (void);
+
 G_END_DECLS
 
 #endif /* __PGM_RAND_H__ */
