@@ -235,7 +235,7 @@ struct pgm_sqn_list_t {
 typedef struct pgm_sqn_list_t pgm_sqn_list_t;
 
 struct pgm_peer_t {
-	gint			ref_count;		    /* atomic integer */
+	gint32			ref_count;		    /* atomic integer */
 
 	pgm_tsi_t		tsi;
 	struct sockaddr_storage	group_nla;

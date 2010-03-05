@@ -35,14 +35,14 @@
 static GStaticMutex g_atomic_mutex = G_STATIC_MUTEX_INIT;
 
 
-gint
-g_atomic_int_exchange_and_add (
-	volatile gint*		atomic,
-	const gint		val
+gint32
+pgm_atomic_int32_exchange_and_add (
+	volatile gint32*	atomic,
+	const gint32		val
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	gint result;
+	gint32 result;
 	__asm__ __volatile__ ("lock; xaddl %0,%1"
 			      : "=r" (result), "=m" (*atomic) 
 			      : "0" (val), "m" (*atomic));
@@ -62,7 +62,7 @@ g_atomic_int_exchange_and_add (
 			     : "memory", "cc");
 	return result;
 #elif defined( __GNUC__ ) && defined( __ppc__ )
-	gint result;
+	gint32 result;
 	__asm__ __volatile__ ("1:  lwarx   %0,0,%2\n"
 			      "    add     %0,%1,%0\n"
 			      "    stwcx.  %0,0,%2\n"
@@ -80,7 +80,7 @@ g_atomic_int_exchange_and_add (
 			      : "cc", "memory");
 	return result;
 #elif defined( __GNUC__ ) && defined( __ppc64__ )
-	gint result;
+	gint32 result;
 	__asm__ __volatile__ (
 #ifdef CONFIG_HAVE_PPC_SMP
 			      "    eieio\n"
@@ -98,7 +98,7 @@ g_atomic_int_exchange_and_add (
 	return result;
 #elif defined( __GNUC__ ) && defined( __arm__ )
 	unsigned long temp;
-	gint result;
+	gint32 result;
 	__asm__ __volatile__ ("@ atomic_add_return\n"
 			      "1:  ldrex   %0,[%2]\n"
 			      "    add     %0,%0,%3\n"
@@ -117,7 +117,7 @@ g_atomic_int_exchange_and_add (
 #elif defined(G_OS_WIN32)
 	return InterlockedExchangeAdd (atomic, val);
 #else
-	gint result;
+	gint32 result;
 	g_mutex_lock (g_atomic_mutex);
 	result = *atomic;
 	*atomic += val;
