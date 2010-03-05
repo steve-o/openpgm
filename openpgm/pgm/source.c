@@ -53,7 +53,7 @@
 #	include <ws2tcpip.h>
 #endif
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/pgm.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
@@ -620,7 +620,7 @@ pgm_send_spm (
 				       sizeof(struct pgm_opt_fin);
 	}
 	guint8 buf[ tpdu_length ];
-	if (G_UNLIKELY(g_mem_gc_friendly))
+	if (G_UNLIKELY(pgm_mem_gc_friendly))
 		memset (buf, 0, tpdu_length);
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);

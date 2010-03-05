@@ -39,8 +39,8 @@ struct pgm_sk_buff_t;
 #	include <pgm/atomic.h>
 #endif
 
-#ifndef __PGM_MALLOC_H__
-#	include <pgm/malloc.h>
+#ifndef __PGM_MEM_H__
+#	include <pgm/mem.h>
 #endif
 
 #ifndef __PGM_LIST_H__

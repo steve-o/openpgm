@@ -8,7 +8,7 @@ Import('env')
 src = Split("""
 		atomic.c
 		thread.c
-		malloc.c
+		mem.c
 		string.c
 		list.c
 		slist.c

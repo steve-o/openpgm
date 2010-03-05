@@ -29,7 +29,7 @@
 
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/galois.h"
 
 

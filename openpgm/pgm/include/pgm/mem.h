@@ -19,13 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_MALLOC_H__
-#define __PGM_MALLOC_H__
+#ifndef __PGM_MEM_H__
+#define __PGM_MEM_H__
 
 #include <glib.h>
 
 
 G_BEGIN_DECLS
+
+extern gboolean pgm_mem_gc_friendly;
 
 gpointer pgm_malloc (gulong) G_GNUC_MALLOC;
 gpointer pgm_malloc0 (gulong) G_GNUC_MALLOC;
@@ -39,6 +41,9 @@ void pgm_free (gpointer);
 #define pgm_new0(struct_type, n_structs)	\
     ((struct_type *) pgm_malloc0 (((gsize) sizeof (struct_type)) * ((gsize) (n_structs))))
 
+void pgm_mem_init (void);
+void pgm_mem_shutdown (void);
+
 G_END_DECLS
 
-#endif /* __PGM_MALLOC_H__ */
+#endif /* __PGM_MEM_H__ */

@@ -43,7 +43,7 @@
 
 #include <glib.h>
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/queue.h"
 #include "pgm/txwi.h"
@@ -362,7 +362,7 @@ pgm_txw_remove_tail (
 	}
 
 /* remove reference to skb */
-	if (G_UNLIKELY(g_mem_gc_friendly)) {
+	if (G_UNLIKELY(pgm_mem_gc_friendly)) {
 		const guint32 index_ = skb->sequence % pgm_txw_max_length (window);
 		window->pdata[index_] = NULL;
 	}

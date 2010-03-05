@@ -56,7 +56,7 @@
 #	include <ws2tcpip.h>
 #endif
 
-#include "pgm/malloc.h"
+#include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/slist.h"
 #include "pgm/pgm.h"
