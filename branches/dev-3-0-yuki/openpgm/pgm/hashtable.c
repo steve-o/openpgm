@@ -23,6 +23,7 @@
 
 #include <glib.h>
 
+#include "pgm/atomic.h"
 #include "pgm/malloc.h"
 #include "pgm/hashtable.h"
 #include "pgm/math.h"
@@ -57,7 +58,7 @@ struct PGMHashTable
 	PGMHashNode**	nodes;
 	PGMHashFunc	hash_func;
 	PGMEqualFunc	key_equal_func;
-	volatile gint	ref_count;
+	volatile gint32	ref_count;
 };
 
 #define PGM_HASH_TABLE_RESIZE(hash_table)			\
@@ -106,7 +107,7 @@ pgm_hash_table_unref (
 	g_return_if_fail (hash_table != NULL);
 	g_return_if_fail (hash_table->ref_count > 0);
 
-	if (g_atomic_int_exchange_and_add (&hash_table->ref_count, -1) - 1 == 0)
+	if (pgm_atomic_int32_exchange_and_add (&hash_table->ref_count, -1) - 1 == 0)
 	{
 		for (int i = 0; i < hash_table->size; i++)
 			pgm_hash_nodes_destroy (hash_table->nodes[i]);

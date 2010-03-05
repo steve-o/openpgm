@@ -200,7 +200,7 @@ _pgm_peer_ref (
 /* pre-conditions */
 	g_assert (NULL != peer);
 
-	g_atomic_int_inc (&peer->ref_count);
+	pgm_atomic_int32_inc (&peer->ref_count);
 	return peer;
 }
 
@@ -215,7 +215,7 @@ pgm_peer_unref (
 /* pre-conditions */
 	g_assert (NULL != peer);
 
-	const gboolean is_zero = g_atomic_int_dec_and_test (&peer->ref_count);
+	const gboolean is_zero = pgm_atomic_int32_dec_and_test (&peer->ref_count);
 	if (G_UNLIKELY (is_zero))
 	{
 /* receive window */
