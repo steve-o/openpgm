@@ -73,8 +73,8 @@ struct pgm_txw_t {
 	const pgm_tsi_t*	tsi;
 
 /* option: lockless atomics */
-        guint32			lead;
-        guint32			trail;
+        volatile guint32	lead;
+        volatile guint32	trail;
 
         PGMQueue		retransmit_queue;
 
@@ -138,7 +138,7 @@ static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
 static inline guint32 pgm_txw_lead_atomic (const pgm_txw_t* const window)
 {
 	g_assert (window);
-	return pgm_atomic_int32_get (&window->lead);
+	return pgm_atomic_int32_get ((const volatile gint32*)&window->lead);
 }
 
 static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
@@ -156,7 +156,7 @@ static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
 static inline guint32 pgm_txw_trail_atomic (const pgm_txw_t* const window)
 {
 	g_assert (window);
-	return pgm_atomic_int32_get (&window->trail);
+	return pgm_atomic_int32_get ((const volatile gint32*)&window->trail);
 }
 
 static inline guint32 pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t* skb)

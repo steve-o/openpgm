@@ -6,6 +6,7 @@ import os;
 Import('env')
 
 src = Split("""
+		atomic.c
 		malloc.c
 		string.c
 		list.c
