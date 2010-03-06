@@ -96,9 +96,9 @@
 #	define CMSG_LEN(len)		WSA_CMSG_LEN(len)
 #endif
 
-static PGMRecvError pgm_recv_error_from_errno (gint);
+static pgm_recv_error_e pgm_recv_error_from_errno (gint);
 #ifdef G_OS_WIN32
-static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
+static pgm_recv_error_e pgm_recv_error_from_wsa_errno (gint);
 #endif
 
 
@@ -654,17 +654,17 @@ wait_for_event (
  * closed, returns PGM_IO_STATUS_EOF.  On error, returns PGM_IO_STATUS_ERROR.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recvmsgv (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msg_start,
 	const gsize		msg_len,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize*			_bytes_read,	/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
-	PGMIOStatus status = PGM_IO_STATUS_WOULD_BLOCK;
+	pgm_io_status_e status = PGM_IO_STATUS_WOULD_BLOCK;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
@@ -706,7 +706,7 @@ pgm_recvmsgv (
 		else if (error) {
 			char tsi[PGM_TSISTRLEN];
 			pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_RECV_ERROR,
 				     PGM_RECV_ERROR_CONNRESET,
 				     _("Transport has been reset on unrecoverable loss from %s."),
@@ -778,7 +778,7 @@ recv_again:
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
@@ -789,7 +789,7 @@ recv_again:
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_wsa_errno (save_wsa_errno),
 			     _("Transport socket error: %s"),
@@ -808,7 +808,7 @@ recv_again:
 		bytes_received += len;
 	}
 
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
 					pgm_parse_udp_encap (transport->rx_buffer, &err) :
 					pgm_parse_raw (transport->rx_buffer, (struct sockaddr*)&dst, &err);
@@ -873,7 +873,7 @@ check_for_repeat:
 				pgm_rw_lock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT:
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_RECV_ERROR,
 					     pgm_recv_error_from_errno (errno),
 					     _("Waiting for event: %s"),
@@ -905,7 +905,7 @@ out:
 			else if (error) {
 				char tsi[PGM_TSISTRLEN];
 				pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_RECV_ERROR,
 					     PGM_RECV_ERROR_CONNRESET,
 					     _("Transport has been reset on unrecoverable loss from %s."),
@@ -958,13 +958,13 @@ out:
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recvmsg (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msgv,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize*			bytes_read,	/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
@@ -983,7 +983,7 @@ pgm_recvmsg (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recvfrom (
 	pgm_transport_t* const	transport,
 	gpointer		data,
@@ -991,7 +991,7 @@ pgm_recvfrom (
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize*			_bytes_read,	/* may be NULL */
 	pgm_tsi_t*		from,		/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	pgm_msgv_t msgv;
@@ -1003,7 +1003,7 @@ pgm_recvfrom (
 	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
-	const PGMIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
+	const pgm_io_status_e status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
@@ -1037,14 +1037,14 @@ pgm_recvfrom (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recv (
 	pgm_transport_t* const	transport,
 	gpointer		data,
 	const gsize		len,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize* const		bytes_read,	/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
@@ -1056,14 +1056,8 @@ pgm_recv (
 	return pgm_recvfrom (transport, data, len, flags, bytes_read, NULL, error);
 }
 
-GQuark
-pgm_recv_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-recv-error-quark");
-}
-
 static
-PGMRecvError
+pgm_recv_error_e
 pgm_recv_error_from_errno (
 	gint		err_no
         )
@@ -1107,7 +1101,7 @@ pgm_recv_error_from_errno (
 
 #ifdef G_OS_WIN32
 static
-PGMRecvError
+pgm_recv_error_e
 pgm_recv_error_from_wsa_errno (
 	gint		err_no
         )

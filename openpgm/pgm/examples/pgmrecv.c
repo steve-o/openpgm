@@ -113,7 +113,10 @@ main (
 	char*		argv[]
 	)
 {
+#if defined(CONFIG_WITH_HTTP) || defined(CONFIG_WITH_SNMP)
 	GError* err = NULL;
+#endif
+	pgm_error_t* pgm_err = NULL;
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
 #endif
@@ -128,9 +131,9 @@ main (
 
 	g_thread_init (NULL);
 
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", err->message);
-		g_error_free (err);
+	if (!pgm_init (&pgm_err)) {
+		g_error ("Unable to start PGM engine: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
 		return EXIT_FAILURE;
 	}
 
@@ -295,6 +298,7 @@ on_startup (
 	)
 {
 	struct pgm_transport_info_t* res = NULL;
+	pgm_error_t* pgm_err = NULL;
 	GError* err = NULL;
 
 	g_message ("startup.");
@@ -303,16 +307,16 @@ on_startup (
 /* parse network parameter into transport address structure */
 	char network[1024];
 	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
-		g_error ("parsing network parameter: %s", err->message);
-		g_error_free (err);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
+		g_error ("parsing network parameter: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 /* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
-		g_error ("creating GSI: %s", err->message);
-		g_error_free (err);
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
+		g_error ("creating GSI: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
 		pgm_if_free_transport_info (res);
 		g_main_loop_quit(g_loop);
 		return FALSE;
@@ -328,9 +332,9 @@ on_startup (
 	}
 	if (g_port)
 		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &err)) {
-		g_error ("creating transport: %s", err->message);
-		g_error_free (err);
+	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
+		g_error ("creating transport: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
 		pgm_if_free_transport_info (res);
 		g_main_loop_quit(g_loop);
 		return FALSE;
@@ -353,9 +357,9 @@ on_startup (
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 /* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &err)) {
-		g_error ("binding transport: %s", err->message);
-		g_error_free (err);
+	if (!pgm_transport_bind (g_transport, &pgm_err)) {
+		g_error ("binding transport: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
 		pgm_transport_destroy (g_transport, FALSE);
 		g_transport = NULL;
 		g_main_loop_quit(g_loop);
@@ -462,13 +466,13 @@ receiver_thread (
 	do {
 		struct timeval tv;
 		gsize len;
-		GError* err = NULL;
-		const PGMIOStatus status = pgm_recvmsgv (transport,
+		pgm_error_t* pgm_err = NULL;
+		const pgm_io_status_e status = pgm_recvmsgv (transport,
 						       msgv,
 						       G_N_ELEMENTS(msgv),
 						       0,
 						       &len,
-						       &err);
+						       &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);
@@ -512,10 +516,10 @@ block:
 			break;
 
 		default:
-			if (err) {
-				g_warning ("%s", err->message);
-				g_error_free (err);
-				err = NULL;
+			if (pgm_err) {
+				g_warning ("%s", pgm_err->message);
+				pgm_error_free (pgm_err);
+				pgm_err = NULL;
 			}
 			if (PGM_IO_STATUS_ERROR == status)
 				break;

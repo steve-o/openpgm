@@ -41,7 +41,6 @@ src = Split("""
 		timer.c
 		net.c
 		rate_control.c
-		async.c
 		checksum.c
 		reed_solomon.c
 		galois_tables.c
@@ -99,7 +98,6 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('rate_control_unittest.c');
 	te.Program ('checksum_unittest.c');
 	te.Program (['packet_unittest.c', e.Object('checksum.c'), e.Object('sockaddr.c')]);
-	te.Program ('async_unittest.c');
 	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c')]);
 
 #-----------------------------------------------------------------------------

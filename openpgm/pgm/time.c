@@ -48,6 +48,8 @@
 #	define WIN32_LEAN_AND_MEAN
 #	include "windows.h"
 #	include "winsock2.h"
+#else
+#	include <pthread.h>
 #endif
 
 #include "pgm/time.h"
@@ -93,7 +95,7 @@ static pgm_time_t clock_update (void);
 #endif
 static pgm_time_t ftime_update (void);
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
-static int clock_init (GError**);
+static int clock_init (pgm_error_t**);
 static pgm_time_t clock_nano_sleep (gulong);
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
@@ -109,7 +111,7 @@ static pgm_time_t usleep_sleep (gulong);
 static pgm_time_t select_sleep (gulong);
 
 #ifdef CONFIG_HAVE_RTC
-static int rtc_init (GError**);
+static int rtc_init (pgm_error_t**);
 static gboolean rtc_shutdown (void);
 static pgm_time_t rtc_update (void);
 static pgm_time_t rtc_sleep (gulong);
@@ -121,7 +123,7 @@ static pgm_time_t rtc_sleep (gulong);
 static guint32 tsc_mhz = 0;
 static guint32 tsc_ns_mul = 0;
 static guint32 tsc_us_mul = 0;
-static int tsc_init (GError**);
+static int tsc_init (pgm_error_t**);
 static pgm_time_t tsc_update (void);
 static pgm_time_t tsc_sleep (gulong);
 #endif
@@ -131,7 +133,7 @@ static pgm_time_t tsc_sleep (gulong);
 #define HPET_US_SCALE	34
 static guint32 hpet_ns_mul = 0;
 static guint32 hpet_us_mul = 0;
-static int hpet_init (GError**);
+static int hpet_init (pgm_error_t**);
 static gboolean hpet_shutdown (void);
 static pgm_time_t hpet_update (void);
 static pgm_time_t hpet_sleep (gulong);
@@ -215,7 +217,7 @@ hpet_to_us (
 
 gboolean
 pgm_time_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	g_return_val_if_fail (FALSE == time_got_initialized, FALSE);
@@ -337,9 +339,9 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 	{
-		GError* sub_error = NULL;
+		pgm_error_t* sub_error = NULL;
 		if (!rtc_init (&sub_error)) {
-			g_propagate_error (error, sub_error);
+			pgm_propagate_error (error, sub_error);
 			return FALSE;
 		}
 	}
@@ -384,9 +386,9 @@ pgm_time_init (
 
 /* calibrate */
 		if (0 >= tsc_mhz) {
-			GError* sub_error = NULL;
+			pgm_error_t* sub_error = NULL;
 			if (!tsc_init (&sub_error)) {
-				g_propagate_error (error, sub_error);
+				pgm_propagate_error (error, sub_error);
 #ifdef CONFIG_HAVE_RTC
 				if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 					rtc_shutdown ();
@@ -401,9 +403,9 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_HPET
 	if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
 	{
-		GError* sub_error = NULL;
+		pgm_error_t* sub_error = NULL;
 		if (!hpet_init (&sub_error)) {
-			g_propagate_error (error, sub_error);
+			pgm_propagate_error (error, sub_error);
 #ifdef CONFIG_HAVE_RTC
 			if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 				rtc_shutdown ();
@@ -416,9 +418,9 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	if (pgm_time_sleep == clock_nano_sleep)
 	{
-		GError* sub_error = NULL;
+		pgm_error_t* sub_error = NULL;
 		if (!clock_init (&sub_error)) {
-			g_propagate_error (error, sub_error);
+			pgm_propagate_error (error, sub_error);
 #ifdef CONFIG_HAVE_RTC
 			if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 				rtc_shutdown ();
@@ -537,21 +539,21 @@ static pgm_time_t rtc_count = 0;
 static
 gboolean
 rtc_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	g_return_val_if_fail (rtc_fd == -1, FALSE);
 
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
 	if (rtc_fd < 0) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("Cannot open /dev/rtc for reading."));
 		return FALSE;
 	}
 	if ( ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency) < 0 ) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("Cannot set RTC frequency to %i Hz."),
@@ -559,7 +561,7 @@ rtc_init (
 		return FALSE;
 	}
 	if ( ioctl (rtc_fd, RTC_PIE_ON, 0) < 0 ) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("Cannot enable periodic interrupt (PIE) on RTC."));
@@ -657,7 +659,7 @@ rdtsc (void)
 static
 int
 tsc_init (
-	G_GNUC_UNUSED GError**	error
+	G_GNUC_UNUSED pgm_error_t**	error
 	)
 {
 	pgm_time_t start, stop;
@@ -722,8 +724,13 @@ tsc_sleep (gulong usec)
 
 	for (;;) {
 		now = tsc_to_us (rdtsc());
-		if (now < end) g_thread_yield();
-		else break;
+		if (now < end) {
+#ifdef G_OS_UNIX
+			pthread_yield ();
+#else
+			Sleep (0);
+#endif
+		} else break;
 	}
 
 	if (pgm_time_update_now == tsc_update)
@@ -753,14 +760,14 @@ static hpet_counter_t hpet_last = 0;
 static
 gboolean
 hpet_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	g_return_val_if_fail (hpet_fd == -1, FALSE);
 
 	hpet_fd = open("/dev/hpet", O_RDONLY);
 	if (hpet_fd < 0) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("Cannot open /dev/hpet for reading."));
@@ -769,7 +776,7 @@ hpet_init (
 
 	hpet_ptr = (unsigned char*)mmap(NULL, HPET_MMAP_SIZE, PROT_READ, MAP_SHARED, hpet_fd, 0);
 	if (MAP_FAILED == hpet_ptr) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("Error mapping HPET: %s"),
@@ -826,8 +833,13 @@ hpet_sleep (gulong usec)
 
 	for (;;) {
 		now = hpet_update();
-		if (now < end) g_thread_yield();
-		else break;
+		if (now < end) {
+#ifdef G_OS_UNIX
+			pthread_yield ();
+#else
+			Sleep (0);
+#endif
+		} else break;
 	}
 
 	if (pgm_time_update_now == hpet_update)
@@ -843,7 +855,7 @@ static clockid_t g_clock_id;
 static
 int
 clock_init (
-	G_GNUC_UNUSED GError**	error
+	G_GNUC_UNUSED pgm_error_t**	error
 	)
 {
 	g_clock_id = CLOCK_REALTIME;
@@ -857,7 +869,7 @@ clock_init (
 
 	struct timespec ts;
 	if (clock_getres (g_clock_id, &ts) > 0) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TIME_ERROR,
 			     PGM_TIME_ERROR_FAILED,
 			     _("clock_getres failed on clock id %d"),
@@ -976,10 +988,5 @@ pgm_time_conv_from_reset (
 	*time_t_time = pgm_to_secs (*pgm_time_t_time + rel_offset);
 }
 
-GQuark
-pgm_time_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-time-error-quark");
-}
 
 /* eof */
