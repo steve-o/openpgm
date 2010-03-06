@@ -26,25 +26,32 @@
 
 #include <glib.h>
 
-#ifndef __PGM_QUARK_H__
-#	include <pgm/quark.h>
-#endif
-
 
 G_BEGIN_DECLS
 
+typedef enum
+{
+	PGM_GSI_ERROR		= 219,
+	PGM_IF_ERROR,
+	PGM_PACKET_ERROR,
+	PGM_RECV_ERROR,
+	PGM_TIME_ERROR,
+	PGM_TRANSPORT_ERROR,
+	PGM_ENGINE_ERROR
+} pgm_error_domain_e;
+
 struct pgm_error_t
 {
-	pgm_quark_t	domain;
-	gint		code;
-	gchar*		message;
+	pgm_error_domain_e	domain;
+	gint			code;
+	gchar*			message;
 };
 
 typedef struct pgm_error_t pgm_error_t;
 
 
 void pgm_error_free (pgm_error_t*);
-void pgm_set_error (pgm_error_t**, pgm_quark_t, gint, const gchar*, ...) G_GNUC_PRINTF (4, 5);
+void pgm_set_error (pgm_error_t**, pgm_error_domain_e, gint, const gchar*, ...) G_GNUC_PRINTF (4, 5);
 void pgm_propagate_error (pgm_error_t**, pgm_error_t*);
 void pgm_clear_error (pgm_error_t**);
 void pgm_prefix_error (pgm_error_t**, const gchar*, ...) G_GNUC_PRINTF (2, 3);

@@ -60,7 +60,7 @@ pgm_if_indextoaddr (
 	const int		iffamily,
 	const unsigned		ifscope,
 	struct sockaddr*	ifsa,
-	GError**		error
+	pgm_error_t**		error
         )
 {
 	g_return_val_if_fail (NULL != ifsa, FALSE);
@@ -86,7 +86,7 @@ pgm_if_indextoaddr (
 
 	struct ifaddrs *ifap, *ifa;
 	if (0 != getifaddrs (&ifap)) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
@@ -112,7 +112,7 @@ pgm_if_indextoaddr (
 		}
 	}
 
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NODEV,
 		     _("No matching network interface index: %i"),

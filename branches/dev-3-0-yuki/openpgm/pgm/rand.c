@@ -129,7 +129,7 @@ pgm_random_int_range (
 	gint32		end
 	)
 {
-	const rand_value = pgm_random_int();
+	const guint32 rand_value = pgm_random_int();
 	return begin + rand_value % (end - begin);
 }
 

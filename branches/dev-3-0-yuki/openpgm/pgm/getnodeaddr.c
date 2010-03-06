@@ -61,7 +61,7 @@ pgm_if_getnodeaddr (
 	const int		family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
 	struct sockaddr*	addr,
 	const socklen_t		cnt,	/* size of address pointed to by addr */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
@@ -78,7 +78,7 @@ pgm_if_getnodeaddr (
 	struct hostent* he;
 
 	if (0 != gethostname (hostname, sizeof(hostname))) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
@@ -101,14 +101,14 @@ pgm_if_getnodeaddr (
 		freeaddrinfo (res);
 		return TRUE;
 	} else if (EAI_NONAME != e) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_eai_errno (e),
 			     _("Resolving hostname address: %s"),
 			     gai_strerror (e));
 		return FALSE;
 	} else if (AF_UNSPEC == family) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     PGM_IF_ERROR_NONAME,
 			     _("Resolving hostname address family."));
@@ -123,7 +123,7 @@ pgm_if_getnodeaddr (
  */
 	he = gethostbyname (hostname);
 	if (NULL == he) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_h_errno (h_errno),
 #ifdef G_OS_UNIX
@@ -139,7 +139,7 @@ pgm_if_getnodeaddr (
 	struct ifaddrs *ifap, *ifa, *ifa6;
 	e = getifaddrs (&ifap);
 	if (e < 0) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
@@ -159,7 +159,7 @@ pgm_if_getnodeaddr (
 		}
 	}
 	freeifaddrs (ifap);
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NONET,
 		     _("Discovering primary IPv4 network interface."));
@@ -177,7 +177,7 @@ ipv4_found:
 		}
 	}
 	freeifaddrs (ifap);
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NONET,
 		     _("Discovering primary IPv6 network interface."));

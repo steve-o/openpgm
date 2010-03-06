@@ -44,10 +44,10 @@
 static
 pgm_error_t*
 pgm_error_new_valist (
-	pgm_quark_t	domain,
-	gint		code,
-	const gchar*	format,
-	va_list		args
+	pgm_error_domain_e	domain,
+	gint			code,
+	const gchar*		format,
+	va_list			args
 	)
 {
 	pgm_error_t *error = pgm_new (pgm_error_t, 1);
@@ -69,10 +69,10 @@ pgm_error_free (
 
 void
 pgm_set_error (
-	pgm_error_t**	err,
-	pgm_quark_t	domain,
-	gint		code,
-	const gchar*	format,
+	pgm_error_t**		err,
+	pgm_error_domain_e	domain,
+	gint			code,
+	const gchar*		format,
 	...
 	)
 {

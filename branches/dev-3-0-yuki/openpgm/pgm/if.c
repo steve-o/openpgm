@@ -246,7 +246,7 @@ parse_interface (
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		ifname,			/* NULL terminated */
 	struct interface_req*	ir,			/* location to write interface details to */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	gboolean check_inet_network = FALSE, check_inet6_network = FALSE;
@@ -286,7 +286,7 @@ parse_interface (
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
 		if (IN_MULTICAST(g_ntohl(in_addr.s_addr))) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_XDEV,
 				     _("Expecting network interface address, found IPv4 multicast network: %s"),
@@ -305,7 +305,7 @@ parse_interface (
 	if (AF_INET  != family && 0 == pgm_inet6_network (ifname, &in6_addr))
 	{
 		if (IN6_IS_ADDR_MULTICAST(&in6_addr)) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_XDEV,
 				     _("Expecting network interface address, found IPv6 multicast network: %s"),
@@ -336,7 +336,7 @@ parse_interface (
 			if (AF_INET == res->ai_family &&
 			    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv4 multicast address: %s"),
@@ -347,7 +347,7 @@ parse_interface (
 			else if (AF_INET6 == res->ai_family &&
 				 IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv6 multicast address: %s"),
@@ -360,7 +360,7 @@ parse_interface (
 			freeaddrinfo (res);
 			check_addr = TRUE;
 		} else if (EAI_NONAME != eai) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     pgm_if_error_from_eai_errno (eai),
 				     _("Numeric host resolution: %s"),
@@ -378,7 +378,7 @@ parse_interface (
 			switch (ne->n_addrtype) {
 			case AF_INET:
 				if (AF_INET6 == family) {
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_NODEV,
 						     _("IP address family conflict when resolving network name \"%s\", found AF_INET when AF_INET6 expected."),
@@ -388,7 +388,7 @@ parse_interface (
 /* ne->n_net in network order */
 				in_addr.s_addr = ne->n_net;
 				if (IN_MULTICAST(g_ntohl(in_addr.s_addr))) {
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_XDEV,
 						     _("Network name resolves to IPv4 mulicast address: %s"),
@@ -399,7 +399,7 @@ parse_interface (
 				break;
 			case AF_INET6:
 #ifndef CONFIG_HAVE_IP6_NETWORKS
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
 					     _("Not configured for IPv6 network name support, \"%s\" is an IPv6 network name."),
@@ -407,7 +407,7 @@ parse_interface (
 				return FALSE;
 #else
 				if (AF_INET == family) {
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_NODEV,
 						     _("IP address family conflict when resolving network name \"%s\", found AF_INET6 when AF_INET expected."),
@@ -415,7 +415,7 @@ parse_interface (
 					return FALSE;
 				}
 				if (IN6_IS_ADDR_MULTICAST(&ne->n_net)) {
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_XDEV,
 						     _("Network name resolves to IPv6 mulicast address: %s"),
@@ -427,7 +427,7 @@ parse_interface (
 				break;
 #endif
 			default:
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
 					     _("Network name resolves to non-internet protocol address family: \"%s\""),
@@ -453,7 +453,7 @@ parse_interface (
 			if (AF_INET == res->ai_family &&
 			    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv4 multicast name: %s"),
@@ -464,7 +464,7 @@ parse_interface (
 			else if (AF_INET6 == res->ai_family &&
 				 IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv6 multicast name: %s"),
@@ -476,7 +476,7 @@ parse_interface (
 			freeaddrinfo (res);
 			check_addr = TRUE;
 		} else if (EAI_NONAME != eai && EAI_NODATA != eai) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     pgm_if_error_from_eai_errno (eai),
 				     _("Internet host resolution: %s"),
@@ -488,7 +488,7 @@ parse_interface (
 
 /* iterate through interface list and match device name, ip or net address */
 	if (getifaddrs (&ifap) < 0) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
@@ -569,7 +569,7 @@ parse_interface (
 
 /* check for multiple interfaces */
 			if (interface_matches++) {
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NOTUNIQ,
 					     _("Network interface name not unique: %s"),
@@ -587,7 +587,7 @@ parse_interface (
 	}
 
 	if (0 == interface_matches) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     PGM_IF_ERROR_NODEV,
 			     _("No matching network interface: %s"),
@@ -625,7 +625,7 @@ parse_group (
 	const int		family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		group,		/* NULL terminated */
 	struct sockaddr*	addr,		/* pointer to sockaddr_storage for writing */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 /* pre-conditions */
@@ -683,7 +683,7 @@ parse_group (
 		switch (ne->n_addrtype) {
 		case AF_INET:
 			if (AF_INET6 == family) {
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
 					     _("IP address family conflict when resolving network name \"%s\", found IPv4 when IPv6 expected."),
@@ -696,7 +696,7 @@ parse_group (
 				((struct sockaddr_in*)addr)->sin_addr.s_addr = ne->n_net;
 				return TRUE;
 			}
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
 				     _("IP address class conflict when resolving network name \"%s\", expected IPv4 multicast."),
@@ -704,7 +704,7 @@ parse_group (
 			return FALSE;
 		case AF_INET6:
 #ifndef CONFIG_HAVE_IP6_NETWORKS
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
 				     _("Not configured for IPv6 network name support, \"%s\" is an IPv6 network name."),
@@ -712,7 +712,7 @@ parse_group (
 			return FALSE;
 #else
 			if (AF_INET == family) {
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
 					     _("IP address family conflict when resolving network name \"%s\", found IPv6 when IPv4 expected."),
@@ -727,7 +727,7 @@ parse_group (
 				((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 				return TRUE;
 			}
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
 				     _("IP address class conflict when resolving network name \"%s\", expected IPv6 multicast."),
@@ -735,7 +735,7 @@ parse_group (
 			return FALSE;
 #endif /* CONFIG_HAVE_IP6_NETWORKS */
 		default:
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
 				     _("Network name resolves to non-internet protocol address family: \"%s\""),
@@ -755,7 +755,7 @@ parse_group (
 
 	const int eai = getaddrinfo (group, NULL, &hints, &res);
 	if (0 != eai) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_eai_errno (eai),
 			     _("Resolving receive group: %s"),
@@ -771,7 +771,7 @@ parse_group (
 		return TRUE;
 	}
 
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_INVAL,
 		     _("Unresolvable receive group: %s"),
@@ -803,7 +803,7 @@ parse_interface_entity (
 	int			family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,	/* NULL terminated */
 	pgm_list_t**		interface_list,	/* <struct interface_req*> */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	struct interface_req* ir;
@@ -835,7 +835,7 @@ parse_interface_entity (
 	int j = 0;
 	while (tokens && tokens[j])
 	{
-		GError* sub_error = NULL;
+		pgm_error_t* sub_error = NULL;
 		ir = pgm_new (struct interface_req, 1);
 		if (!parse_interface (family, tokens[j], ir, &sub_error))
 		{
@@ -843,12 +843,12 @@ parse_interface_entity (
 			if (sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code)
 			{
 				ir->ir_addr.ss_family = AF_UNSPEC;
-				g_error_free (sub_error);
+				pgm_error_free (sub_error);
 			}
 /* bail out on first interface with an error */
 			else
 			{
-				g_propagate_error (error, sub_error);
+				pgm_propagate_error (error, sub_error);
 				pgm_free (ir);
 				pgm_strfreev (tokens);
 				while (source_list) {
@@ -891,7 +891,7 @@ parse_receive_entity (
 	const char*		entity,		/* NULL terminated */
 	pgm_list_t**		interface_list,	/* <struct interface_req*> */
 	pgm_list_t**		recv_list,	/* <struct group_source_req*> */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 /* pre-conditions */
@@ -930,7 +930,7 @@ parse_receive_entity (
 				struct sockaddr_storage addr;
 				if (!pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
 				{
-					g_prefix_error (error,
+					pgm_prefix_error (error,
 							_("Node primary address family cannot be determined: "));
 					pgm_free (recv_gsr);
 					pgm_free (primary_interface);
@@ -945,7 +945,7 @@ parse_receive_entity (
 					struct interface_req ir;
 					if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 					{
-						g_prefix_error (error,
+						pgm_prefix_error (error,
 								_("Unique address cannot be determined for interface \"%s\": "),
 								primary_interface->ir_name);
 						pgm_free (recv_gsr);
@@ -980,7 +980,7 @@ parse_receive_entity (
 				struct interface_req ir;
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
-					g_prefix_error (error,
+					pgm_prefix_error (error,
 							_("Unique address cannot be determined for interface \"%s\": "),
 							primary_interface->ir_name);
 					pgm_free (recv_gsr);
@@ -1044,7 +1044,7 @@ parse_receive_entity (
 
 		if (!parse_group (recv_gsr->gsr_group.ss_family, tokens[j], (struct sockaddr*)&recv_gsr->gsr_group, error))
 		{
-			g_prefix_error (error,
+			pgm_prefix_error (error,
 					_("Unresolvable receive entity \"%s\": "),
 					tokens[j]);
 			pgm_free (recv_gsr);
@@ -1061,7 +1061,7 @@ parse_receive_entity (
 				struct interface_req ir;
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
-					g_prefix_error (error,
+					pgm_prefix_error (error,
 							_("Unique address cannot be determined for interface \"%s\": "),
 							primary_interface->ir_name);
 					pgm_free (recv_gsr);
@@ -1093,7 +1093,7 @@ parse_send_entity (
 	pgm_list_t**		interface_list,	/* <struct interface_req*> */
 	pgm_list_t**		recv_list,	/* <struct group_source_req*> */
 	pgm_list_t**		send_list,	/* <struct group_source_req*> */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 /* pre-conditions */
@@ -1127,7 +1127,7 @@ parse_send_entity (
 	send_gsr->gsr_interface = primary_interface->ir_interface;
 	if (!parse_group (family, entity, (struct sockaddr*)&send_gsr->gsr_group, error))
 	{
-		g_prefix_error (error,
+		pgm_prefix_error (error,
 				_("Unresolvable send entity \"%s\": "),
 				entity);
 		pgm_free (send_gsr);
@@ -1142,7 +1142,7 @@ parse_send_entity (
 			struct interface_req ir;
 			if (!parse_interface (send_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 			{
-				g_prefix_error (error,
+				pgm_prefix_error (error,
 						_("Unique address cannot be determined for interface \"%s\": "),
 						primary_interface->ir_name);
 				pgm_free (send_gsr);
@@ -1224,7 +1224,7 @@ network_parse (
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
 	pgm_list_t**		recv_list,		/* <struct group_source_req*> */
 	pgm_list_t**		send_list,		/* <struct group_source_req*> */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	gboolean retval = FALSE;
@@ -1233,7 +1233,7 @@ network_parse (
 	enum { ENTITY_INTERFACE, ENTITY_RECEIVE, ENTITY_SEND, ENTITY_ERROR } ec = ENTITY_INTERFACE;
 	const char *b = p;		/* begin of entity */
 	pgm_list_t* source_list = NULL;
-	GError* sub_error = NULL;
+	pgm_error_t* sub_error = NULL;
 
 /* pre-conditions */
 	g_assert (NULL != network);
@@ -1248,7 +1248,7 @@ network_parse (
 	{
 		if (!is_network_char (family, *p))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_INVAL,
 				     _("'%c' is not a valid character."),
@@ -1299,13 +1299,13 @@ network_parse (
 /* fall through on multicast */
 					if (!(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 					{
-						g_propagate_error (error, sub_error);
+						pgm_propagate_error (error, sub_error);
 						goto free_lists;
 					}
-					g_clear_error (&sub_error);
+					pgm_clear_error (&sub_error);
 /* FIXME: too many interfaces */
 					if (pgm_list_length (source_list) > 1) {
-						g_set_error (error,
+						pgm_set_error (error,
 				   			     PGM_IF_ERROR,
 							     PGM_IF_ERROR_INVAL,
 							     _("Send group list contains more than one entity."));
@@ -1313,7 +1313,7 @@ network_parse (
 					}
 					break;
 				}
-				g_clear_error (&sub_error);
+				pgm_clear_error (&sub_error);
 				while (source_list) {
 					pgm_free (source_list->data);
 					source_list = pgm_list_delete_link (source_list, source_list);
@@ -1321,10 +1321,10 @@ network_parse (
 				if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
 				    !(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 				{
-					g_propagate_error (error, sub_error);
+					pgm_propagate_error (error, sub_error);
 					goto free_lists;
 				}
-				g_clear_error (&sub_error);
+				pgm_clear_error (&sub_error);
 				ec++;
 
 			case ENTITY_RECEIVE:
@@ -1359,14 +1359,14 @@ network_parse (
 /* fall through on multicast */
 				if (!(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 				{
-					g_propagate_error (error, sub_error);
+					pgm_propagate_error (error, sub_error);
 					goto free_lists;
 				}
-				g_clear_error (&sub_error);
+				pgm_clear_error (&sub_error);
 
 /* FIXME: too many interfaces */
 				if (pgm_list_length (source_list) > 1) {
-					g_set_error (error,
+					pgm_set_error (error,
 			   			     PGM_IF_ERROR,
 						     PGM_IF_ERROR_INVAL,
 						     _("Send group list contains more than one entity."));
@@ -1374,7 +1374,7 @@ network_parse (
 				}
 				break;
 			}
-			g_clear_error (&sub_error);
+			pgm_clear_error (&sub_error);
 			while (source_list) {
 				pgm_free (source_list->data);
 				source_list = pgm_list_delete_link (source_list, source_list);
@@ -1382,7 +1382,7 @@ network_parse (
 			if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
 			    !(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 			{
-				g_propagate_error (error, sub_error);
+				pgm_propagate_error (error, sub_error);
 				goto free_lists;
 			}
 			ec++;
@@ -1465,7 +1465,7 @@ pgm_if_get_transport_info (
 	const char*					network,
 	const struct pgm_transport_info_t* const	hints,
 	struct pgm_transport_info_t**			res,
-	GError**					error
+	pgm_error_t**					error
 	)
 {
 	struct pgm_transport_info_t* ti;
@@ -1522,13 +1522,7 @@ pgm_if_free_transport_info (
 	pgm_free (res);
 }
 
-GQuark
-pgm_if_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-if-error-quark");
-}
-
-PGMIFError
+pgm_if_error_e
 pgm_if_error_from_errno (
 	gint		err_no
 	)
@@ -1561,7 +1555,7 @@ pgm_if_error_from_errno (
 /* h_errno from gethostbyname.
  */
 
-PGMIFError
+pgm_if_error_e
 pgm_if_error_from_h_errno (
 	gint		err_no
 	)
@@ -1601,7 +1595,7 @@ pgm_if_error_from_h_errno (
  * status with EAI_SYSTEM.
  */
 
-PGMIFError
+pgm_if_error_e
 pgm_if_error_from_eai_errno (
 	gint		err_no
 	)

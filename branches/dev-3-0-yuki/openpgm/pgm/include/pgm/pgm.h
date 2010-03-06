@@ -22,7 +22,6 @@
 #ifndef __PGM_H__
 #define __PGM_H__
 
-#include <pgm/async.h>
 #include <pgm/gsi.h>
 #include <pgm/tsi.h>
 #include <pgm/if.h>

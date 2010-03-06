@@ -29,8 +29,6 @@
 #endif
 
 
-#define PGM_RECV_ERROR		pgm_recv_error_quark ()
-
 typedef enum
 {
 	/* Derived from errno */
@@ -43,15 +41,14 @@ typedef enum
 	PGM_RECV_ERROR_NOPROTOOPT,
 	PGM_RECV_ERROR_CONNRESET,
 	PGM_RECV_ERROR_FAILED
-} PGMRecvError;
+} pgm_recv_error_e;
 
 G_BEGIN_DECLS
 
-GQuark pgm_recv_error_quark (void);
-PGMIOStatus pgm_recvmsg (pgm_transport_t* const, pgm_msgv_t* const, const int, gsize*, GError**) G_GNUC_WARN_UNUSED_RESULT;
-PGMIOStatus pgm_recvmsgv (pgm_transport_t* const, pgm_msgv_t* const, const gsize, const int, gsize*, GError**) G_GNUC_WARN_UNUSED_RESULT;
-PGMIOStatus pgm_recv (pgm_transport_t* const, gpointer, const gsize, const int, gsize* const, GError**) G_GNUC_WARN_UNUSED_RESULT;
-PGMIOStatus pgm_recvfrom (pgm_transport_t* const, gpointer, const gsize, const int, gsize*, pgm_tsi_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
+pgm_io_status_e pgm_recvmsg (pgm_transport_t* const, pgm_msgv_t* const, const int, gsize*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+pgm_io_status_e pgm_recvmsgv (pgm_transport_t* const, pgm_msgv_t* const, const gsize, const int, gsize*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+pgm_io_status_e pgm_recv (pgm_transport_t* const, gpointer, const gsize, const int, gsize* const, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+pgm_io_status_e pgm_recvfrom (pgm_transport_t* const, gpointer, const gsize, const int, gsize*, pgm_tsi_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

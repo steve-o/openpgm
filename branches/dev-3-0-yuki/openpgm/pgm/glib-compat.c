@@ -21,36 +21,6 @@
 
 
 #if GLIB_MAJOR_VERSION == 2 && GLIB_MINOR_VERSION < 16
-static
-void
-g_error_add_prefix (
-	gchar**		string,
-	const gchar*	format,
-	va_list		ap
-	)
-{
-	gchar* oldstring = *string;
-	gchar* prefix = g_strdup_vprintf (format, ap);
-	*string = g_strconcat (prefix, oldstring, NULL);
-	g_free (oldstring);
-	g_free (prefix);
-}
-
-void
-g_prefix_error (
-	GError**	err,
-	const gchar*	format,
-	...
-	)
-{
-	if (err && *err) {
-		va_list ap;
-		va_start (ap, format);
-		g_error_add_prefix (&(*err)->message, format, ap);
-		va_end (ap);
-	}
-}
-
 void
 g_warn_message (
 	const char*	domain,

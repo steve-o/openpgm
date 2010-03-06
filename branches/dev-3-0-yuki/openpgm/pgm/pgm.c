@@ -60,11 +60,11 @@ static gboolean pgm_got_initialized = FALSE;
 // TODO: fix valgrind errors in getprotobyname/_r
 gboolean
 pgm_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	if (TRUE == pgm_got_initialized) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_ENGINE_ERROR,
 			     PGM_ENGINE_ERROR_FAILED,
 			     _("Engine already initalized."));
@@ -82,7 +82,7 @@ pgm_init (
 	if (WSAStartup (wVersionRequested, &wsaData) != 0)
 	{
 		const int save_errno = WSAGetLastError ();
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_ENGINE_ERROR,
 			     pgm_engine_error_from_wsa_errno (save_errno),
 			     _("WSAStartup failure: %s"),
@@ -93,7 +93,7 @@ pgm_init (
 	if (LOBYTE (wsaData.wVersion) != 2 || HIBYTE (wsaData.wVersion) != 2)
 	{
 		WSACleanup ();
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_ENGINE_ERROR,
 			     PGM_ENGINE_ERROR_FAILED,
 			     _("WSAStartup failed to provide requested version 2.2."));
@@ -125,11 +125,11 @@ pgm_init (
 #endif
 
 /* ensure timing enabled */
-	GError* sub_error = NULL;
+	pgm_error_t* sub_error = NULL;
 	if (!pgm_time_supported () &&
 	    !pgm_time_init (&sub_error))
 	{
-		g_propagate_error (error, sub_error);
+		pgm_propagate_error (error, sub_error);
 		return FALSE;
 	}
 
@@ -177,13 +177,7 @@ pgm_shutdown (void)
 	return TRUE;
 }
 
-GQuark
-pgm_engine_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-engine-error-quark");
-}
-
-PGMEngineError
+pgm_engine_error_e
 pgm_engine_error_from_wsa_errno (
 	gint            err_no
 	)

@@ -33,10 +33,6 @@ if '-DCONFIG_HAVE_EPOLL' in e['CCFLAGS']:
 	e.Program(['enonblocksyncrecvmsg.c'])
 	e.Program(['enonblocksyncrecvmsgv.c'])
 
-# async examples
-e.Program(['asyncqrecv.c'])
-e.Program(['blockqrecv.c'])
-
 # ncurses examples
 if e['WITH_NCURSES'] == 'true':
 	ne = e.Clone()

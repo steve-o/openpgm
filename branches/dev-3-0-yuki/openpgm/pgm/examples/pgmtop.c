@@ -21,6 +21,7 @@
 
 
 #include <errno.h>
+#include <locale.h>
 #include <ncurses.h>
 #include <netdb.h>
 #include <panel.h>
@@ -170,13 +171,16 @@ main (
 	)
 {
 	GError* err = NULL;
+	pgm_error_t* pgm_err = NULL;
 
-	puts ("pgmtop");
+	setlocale (LC_ALL, "");
 
 	log_init ();
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", err->message);
-		g_error_free (err);
+	g_message ("pgmtop");
+
+	if (!pgm_init (&pgm_err)) {
+		g_error ("Unable to start PGM engine: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
 		return EXIT_FAILURE;
 	}
 
@@ -189,36 +193,34 @@ main (
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
-	puts ("scheduling startup.n");
+	g_message ("scheduling startup.n");
 	g_timeout_add(0, (GSourceFunc)on_startup, g_loop);
 
 /* dispatch loop */
-	puts ("entering main event loop ...");
+	g_message ("entering main event loop ...");
 	g_main_loop_run (g_loop);
 
 	endwin();
-	puts ("event loop terminated, cleaning up.");
+	g_message ("event loop terminated, cleaning up.");
 
 /* cleanup */
 	g_main_loop_unref (g_loop);
 	g_loop = NULL;
 	if (g_io_channel) {
-		puts ("closing socket.");
-
-		GError *err = NULL;
+		g_message ("closing socket.");
 		g_io_channel_shutdown (g_io_channel, FALSE, &err);
 		g_io_channel = NULL;
 	}
 
 	if (g_stdin_channel) {
-		puts ("unbinding stdin.");
+		g_message ("unbinding stdin.");
 		g_io_channel_unref (g_stdin_channel);
 		g_stdin_channel = NULL;
 	}
 
-	puts ("PGM engine shutdown.");
+	g_message ("PGM engine shutdown.");
 	pgm_shutdown ();
-	puts ("finished.");
+	g_message ("finished.");
 	return EXIT_SUCCESS;
 }
 

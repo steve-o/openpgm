@@ -41,6 +41,10 @@
 
 typedef struct pgm_transport_t pgm_transport_t;
 
+#ifndef __PGM_ERROR_H__
+#   include <pgm/error.h>
+#endif
+
 #ifndef __PGM_LIST_H__
 #   include <pgm/list.h>
 #endif
@@ -87,10 +91,6 @@ typedef struct pgm_transport_t pgm_transport_t;
 #endif
 
 
-#define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
-#define PGM_ENGINE_ERROR	pgm_engine_error_quark ()
-
-
 /* IO status */
 
 typedef enum {
@@ -102,7 +102,7 @@ typedef enum {
 	PGM_IO_STATUS_WOULD_BLOCK,	/* resource temporarily unavailable */
 	PGM_IO_STATUS_RATE_LIMITED,	/* would-block on rate limit, check timer */
 	PGM_IO_STATUS_TIMER_PENDING	/* would-block with pending timer */
-} PGMIOStatus;
+} pgm_io_status_e;
 
 
 /* Performance Counters */
@@ -218,7 +218,7 @@ typedef enum
 	PGM_TRANSPORT_ERROR_SERVICE,
 	PGM_TRANSPORT_ERROR_SOCKTYPE,
 	PGM_TRANSPORT_ERROR_FAILED
-} PGMTransportError;
+} pgm_transport_error_e;
 
 typedef enum
 {
@@ -229,7 +229,7 @@ typedef enum
 	PGM_ENGINE_ERROR_PROCLIM,
 	PGM_ENGINE_ERROR_FAULT,
 	PGM_ENGINE_ERROR_FAILED
-} PGMEngineError;
+} pgm_engine_error_e;
 
 struct pgm_sqn_list_t {
 	guint			len;
@@ -389,21 +389,19 @@ extern pgm_slist_t* pgm_transport_list;
 
 G_BEGIN_DECLS
 
-gboolean pgm_init (GError**);
+gboolean pgm_init (pgm_error_t**);
 gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_shutdown (void);
 
 void pgm_drop_superuser (void);
 
-GQuark pgm_transport_error_quark (void);
-GQuark pgm_engine_error_quark (void);
-PGMTransportError pgm_transport_error_from_errno (gint);
-PGMTransportError pgm_transport_error_from_eai_errno (gint);
-PGMTransportError pgm_transport_error_from_wsa_errno (gint);
-PGMEngineError pgm_engine_error_from_wsa_errno (gint);
+pgm_transport_error_e pgm_transport_error_from_errno (gint);
+pgm_transport_error_e pgm_transport_error_from_eai_errno (gint);
+pgm_transport_error_e pgm_transport_error_from_wsa_errno (gint);
+pgm_engine_error_e pgm_engine_error_from_wsa_errno (gint);
 gchar* pgm_wsastrerror (gint);
-gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_transport_bind (pgm_transport_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
+gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+gboolean pgm_transport_bind (pgm_transport_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_destroy (pgm_transport_t*, gboolean);
 gboolean pgm_transport_set_max_tpdu (pgm_transport_t* const, const guint16);
 gboolean pgm_transport_set_multicast_loop (pgm_transport_t* const, const gboolean);

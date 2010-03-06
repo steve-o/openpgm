@@ -71,7 +71,7 @@
 #endif
 
 
-static gboolean pgm_parse (struct pgm_sk_buff_t* const, GError**);
+static gboolean pgm_parse (struct pgm_sk_buff_t* const, pgm_error_t**);
 static gboolean pgm_print_spm (const struct pgm_header* const, gconstpointer, const gsize);
 static gboolean pgm_print_poll (const struct pgm_header* const, gconstpointer, const gsize);
 static gboolean pgm_print_polr (const struct pgm_header* const, gconstpointer, const gsize);
@@ -96,7 +96,7 @@ gboolean
 pgm_parse_raw (
 	struct pgm_sk_buff_t* const	skb,		/* data will be modified */
 	struct sockaddr* const		dst,
-	GError**			error
+	pgm_error_t**			error
 	)
 {
 /* pre-conditions */
@@ -106,7 +106,7 @@ pgm_parse_raw (
 /* minimum size should be IPv4 header plus PGM header, check IP version later */
 	if (G_UNLIKELY(skb->len < PGM_MIN_SIZE))
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_BOUNDS,
 			     _("IP packet too small at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GUINT16_FORMAT " bytes."),
@@ -171,14 +171,14 @@ pgm_parse_raw (
 	}
 
 	case 6:
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_AFNOSUPPORT,
 			     _("IPv6 is not supported for raw IP header parsing."));
 		return FALSE;
 
 	default:
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_AFNOSUPPORT,
 			     _("IP header reports an invalid version %d."),
@@ -189,7 +189,7 @@ pgm_parse_raw (
 	const gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
 	if (G_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_BOUNDS,
 			     _("IP header reports an invalid header length %" G_GSIZE_FORMAT " bytes."),
@@ -209,7 +209,7 @@ pgm_parse_raw (
 	}
 
 	if (G_UNLIKELY(skb->len < packet_length)) {	/* redundant: often handled in kernel */
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_BOUNDS,
 			     _("IP packet received at %" G_GUINT16_FORMAT " bytes whilst IP header reports %" G_GSIZE_FORMAT " bytes."),
@@ -223,7 +223,7 @@ pgm_parse_raw (
 	const int sum = in_cksum (data, packet_length, 0);
 	if (G_UNLIKELY(0 != sum)) {
 		const int ip_sum = g_ntohs (ip->ip_sum);
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_CKSUM,
 			     _("IP packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
@@ -235,7 +235,7 @@ pgm_parse_raw (
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
 	const guint offset = g_ntohs (ip->ip_off);
 	if (G_UNLIKELY((offset & 0x1fff) != 0)) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_PROTO,
 			     _("IP header reports packet fragmentation."));
@@ -270,13 +270,13 @@ pgm_parse_raw (
 gboolean
 pgm_parse_udp_encap (
 	struct pgm_sk_buff_t*	skb,		/* will be modified */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_assert (NULL != skb);
 
 	if (G_UNLIKELY(skb->len < sizeof(struct pgm_header))) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_PACKET_ERROR,
 			     PGM_PACKET_ERROR_BOUNDS,
 			     _("UDP payload too small for PGM packet at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes."),
@@ -295,7 +295,7 @@ static
 gboolean
 pgm_parse (
 	struct pgm_sk_buff_t* const	skb,		/* will be modified to calculate checksum */
-	GError**			error
+	pgm_error_t**			error
 	)
 {
 /* pre-conditions */
@@ -309,7 +309,7 @@ pgm_parse (
 		const int pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
 		skb->pgm_header->pgm_checksum = sum;
 		if (G_UNLIKELY(pgm_sum != sum)) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_PACKET_ERROR,
 				     PGM_PACKET_ERROR_CKSUM,
 			     	     _("PGM packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
@@ -320,7 +320,7 @@ pgm_parse (
 		if (PGM_ODATA == skb->pgm_header->pgm_type ||
 		    PGM_RDATA == skb->pgm_header->pgm_type)
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_PACKET_ERROR,
 				     PGM_PACKET_ERROR_PROTO,
 			     	     _("PGM checksum missing whilst mandatory for %cDATA packets."),
@@ -1496,12 +1496,6 @@ pgm_ipopt_print (
 		op += len;
 		length -= len;
 	}
-}
-
-GQuark
-pgm_packet_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-packet-error-quark");
 }
 
 /* eof */

@@ -283,7 +283,7 @@ gboolean
 pgm_transport_create (
 	pgm_transport_t**		transport,
 	struct pgm_transport_info_t*	tinfo,
-	GError**			error
+	pgm_error_t**			error
 	)
 {
 	pgm_transport_t* new_transport;
@@ -371,7 +371,7 @@ pgm_transport_create (
 	{
 #ifdef G_OS_UNIX
 		const int save_errno = errno;
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating receive socket: %s"),
@@ -381,7 +381,7 @@ pgm_transport_create (
 		}
 #else
 		const int save_errno = WSAGetLastError();
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_wsa_errno (save_errno),
 			     _("Creating receive socket: %s"),
@@ -393,7 +393,7 @@ pgm_transport_create (
 	new_transport->recv_sock2 = -1;
 	if (new_transport->udp_encap_ucast_port != new_transport->udp_encap_mcast_port)
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     PGM_TRANSPORT_ERROR_INVAL,
 			     _("Creating receive socket2: unsupported feature."));
@@ -404,7 +404,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating send socket: %s"),
@@ -416,7 +416,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
@@ -665,7 +665,7 @@ pgm_transport_set_rcvbuf (
 gboolean
 pgm_transport_bind (
 	pgm_transport_t*	transport,
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
@@ -690,7 +690,7 @@ pgm_transport_bind (
 
 	if (transport->can_send_data) {
 		if (0 != pgm_notify_init (&transport->rdata_notify)) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Creating RDATA notification channel: %s"),
@@ -700,7 +700,7 @@ pgm_transport_bind (
 		}
 	}
 	if (0 != pgm_notify_init (&transport->pending_notify)) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating waiting peer notification channel: %s"),
@@ -750,7 +750,7 @@ pgm_transport_bind (
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Enabling reuse of socket local address: %s"),
@@ -769,14 +769,14 @@ pgm_transport_bind (
 		{
 #ifdef G_OS_UNIX
 			int save_errno = errno;
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
 				     strerror (save_errno));
 #else
 			int save_errno = WSAGetLastError();
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_wsa_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
@@ -798,7 +798,7 @@ pgm_transport_bind (
 			     (-1 != transport->recv_sock2 &&
 			       0 != pgm_sockaddr_hdrincl (transport->recv_sock2, recv_family, TRUE)))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
 					     _("Enabling IP header in front of user data: %s"),
@@ -815,7 +815,7 @@ pgm_transport_bind (
 			     (-1 != transport->recv_sock2 &&
 			       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
 					     _("Enabling receipt of control message per incoming datagram: %s"),
@@ -836,7 +836,7 @@ pgm_transport_bind (
 		     (-1 != transport->recv_sock2 &&
 		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf))))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket receive buffer in bytes: %s"),
@@ -853,7 +853,7 @@ pgm_transport_bind (
 		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket send buffer in bytes: %s"),
@@ -918,7 +918,7 @@ pgm_transport_bind (
 		if (error) {
 			char addr[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Binding receive socket to address %s: %s"),
@@ -945,7 +945,7 @@ pgm_transport_bind (
 			if (error) {
 				char addr[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr2, addr, sizeof(addr));
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
 					     _("Binding receive socket2 to address %s: %s"),
@@ -982,7 +982,7 @@ pgm_transport_bind (
 		int save_errno = errno;
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Binding send socket to address %s: %s"),
@@ -1025,7 +1025,7 @@ pgm_transport_bind (
 		if (error) {
 			char addr[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
@@ -1064,14 +1064,14 @@ pgm_transport_bind (
 				char ifname[IF_NAMESIZE];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_TRANSPORT_ERROR,
 						     pgm_transport_error_from_errno (save_errno),
 						     _("Joining multicast group %s: %s"),
 						     group_addr,
 						     strerror (save_errno));
 				else
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_TRANSPORT_ERROR,
 						     pgm_transport_error_from_errno (save_errno),
 						     _("Joining multicast group %s on interface %s: %s"),
@@ -1102,7 +1102,7 @@ pgm_transport_bind (
 				char group_addr[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
 					     _("Joining multicast group %s from source %s: %s"),
@@ -1132,7 +1132,7 @@ pgm_transport_bind (
 	{
 		const int save_errno = errno;
 		char ifname[IF_NAMESIZE];
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Setting device %s for multicast send socket: %s"),
@@ -1155,7 +1155,7 @@ pgm_transport_bind (
 	{
 		const int save_errno = errno;
 		char ifname[IF_NAMESIZE];
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Setting device %s for multicast IP Router Alert (RFC 2113) send socket: %s"),
@@ -1188,7 +1188,7 @@ pgm_transport_bind (
 					      transport->use_multicast_loop))
 #endif /* G_OS_WIN32 */
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast loopback: %s"),
@@ -1207,7 +1207,7 @@ pgm_transport_bind (
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops))
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast hop limit to %i: %s"),
@@ -1255,7 +1255,7 @@ no_cap_net_admin:
 		    !pgm_send_spm (transport, PGM_OPT_SYN) ||
 		    !pgm_send_spm (transport, PGM_OPT_SYN))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Sending SPM broadcast: %s"),
@@ -1983,13 +1983,7 @@ pgm_transport_msfilter (
 	return (0 == status);
 }
 
-GQuark
-pgm_transport_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-transport-error-quark");
-}
-
-PGMTransportError
+pgm_transport_error_e
 pgm_transport_error_from_errno (
 	gint		err_no
         )
@@ -2049,7 +2043,7 @@ pgm_transport_error_from_errno (
 	}
 }
 
-PGMTransportError
+pgm_transport_error_e
 pgm_transport_error_from_eai_errno (
 	gint		err_no
         )
@@ -2126,7 +2120,7 @@ pgm_transport_error_from_eai_errno (
 	}
 }
 
-PGMTransportError
+pgm_transport_error_e
 pgm_transport_error_from_wsa_errno (
 	gint		err_no
         )
