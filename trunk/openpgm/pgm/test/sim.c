@@ -56,6 +56,7 @@
 #include <pgm/getnodeaddr.h>
 #include <pgm/txwi.h>
 #include <pgm/async.h>
+#include <pgm/sn.h>
 
 
 /* typedefs */
