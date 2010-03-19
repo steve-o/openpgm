@@ -866,6 +866,65 @@ START_TEST (test_readv_pass_005)
 }
 END_TEST
 
+/* add full window, readv 1 skb, add 1 more */
+START_TEST (test_readv_pass_006)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+	for (unsigned i = 0; i < 100; i++)
+	{
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* read one skb */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (1 == _pgm_rxw_commit_length (window));
+	}
+/* add one more new skb */
+	{
+		unsigned i = 100;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+	}
+/* read off 99 more skbs */
+	for (unsigned i = 0; i < 99; i++)
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless ((2 + i) == _pgm_rxw_commit_length (window));
+	}
+/* read end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
 /* NULL window */
 START_TEST (test_readv_fail_001)
 {
@@ -1133,6 +1192,56 @@ START_TEST (test_confirm_pass_001)
 }
 END_TEST
 
+/* constrained confirm */
+START_TEST (test_confirm_pass_002)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+	for (unsigned i = 0; i < 100; i++)
+	{
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* read one skb */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (1 == _pgm_rxw_commit_length (window));
+	}
+/* confirm next sequence */
+	const pgm_time_t now = 1;
+	const pgm_time_t nak_rdata_expiry = 2;
+	const pgm_time_t nak_rb_expiry = 2;
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 100, now, nak_rdata_expiry, nak_rb_expiry));
+/* read off 99 more skbs */
+	for (unsigned i = 0; i < 99; i++)
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless ((2 + i) == _pgm_rxw_commit_length (window));
+	}
+/* read end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
 START_TEST (test_confirm_fail_001)
 {
 	int retval = pgm_rxw_confirm (NULL, 0, 0, 0, 0);
@@ -1381,6 +1490,7 @@ make_basic_test_suite (void)
 	tcase_add_test (tc_readv, test_readv_pass_003);
 	tcase_add_test (tc_readv, test_readv_pass_004);
 	tcase_add_test (tc_readv, test_readv_pass_005);
+	tcase_add_test (tc_readv, test_readv_pass_006);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_002, SIGABRT);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_003, SIGABRT);
@@ -1399,6 +1509,7 @@ make_basic_test_suite (void)
         TCase* tc_confirm = tcase_create ("confirm");
 	suite_add_tcase (s, tc_confirm);
 	tcase_add_test (tc_confirm, test_confirm_pass_001);
+	tcase_add_test (tc_confirm, test_confirm_pass_002);
 	tcase_add_test_raise_signal (tc_confirm, test_confirm_fail_001, SIGABRT);
 
         TCase* tc_lost = tcase_create ("lost");
