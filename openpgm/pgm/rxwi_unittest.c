@@ -740,6 +740,132 @@ START_TEST (test_readv_pass_002)
 }
 END_TEST
 
+/* full window */
+START_TEST (test_readv_pass_003)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+	for (unsigned i = 0; i < 100; i++)
+	{
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+	for (unsigned i = 0; i < 100; i++)
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+	}
+	fail_unless (pgm_rxw_length (window) == _pgm_rxw_commit_length (window));
+	pmsg = msgv;
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
+/* full + 1 window */
+START_TEST (test_readv_pass_004)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+	for (unsigned i = 0; i < 101; i++)
+	{
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+	for (unsigned i = 0; i < 100; i++)
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+	}
+	fail_unless (pgm_rxw_length (window) == _pgm_rxw_commit_length (window));
+	pmsg = msgv;
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
+/* full - 2 lost last in window */
+START_TEST (test_readv_pass_005)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+	for (unsigned i = 0; i < 98; i++)
+	{
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_if (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+	{
+		unsigned i = 99;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+	for (unsigned i = 0; i < 98; i++)
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+	}
+	fail_unless (pgm_rxw_length (window) == (2 + _pgm_rxw_commit_length (window)));
+/* read end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
 /* NULL window */
 START_TEST (test_readv_fail_001)
 {
@@ -781,6 +907,96 @@ START_TEST (test_readv_fail_003)
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
 	pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (window, &pmsg, 0);
+	fail ();
+}
+END_TEST
+
+/* target:
+ *
+ * 	void
+ * 	pgm_rxw_remove_commit (
+ * 		pgm_rxw_t* const	window
+ * 		)
+ */
+
+/* full - 2 lost last in window */
+START_TEST (test_remove_commit_pass_001)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+	for (unsigned i = 0; i < 98; i++)
+	{
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_if (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+	{
+		unsigned i = 99;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+	pgm_rxw_lost (window, 98);
+	for (unsigned i = 0; i < 98; i++)
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+	}
+	fail_unless (100 == pgm_rxw_length (window));
+	fail_unless ( 98 == _pgm_rxw_commit_length (window));
+/* read end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	fail_unless (100 == pgm_rxw_length (window));
+	fail_unless ( 98 == _pgm_rxw_commit_length (window));
+	pgm_rxw_remove_commit (window);
+/* read lost skb #98 */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_remove_commit (window);
+/* read valid skb #99 */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+/* read end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
+START_TEST (test_remove_commit_fail_001)
+{
+	pgm_rxw_remove_commit (NULL);
 	fail ();
 }
 END_TEST
@@ -1162,9 +1378,17 @@ make_basic_test_suite (void)
 	suite_add_tcase (s, tc_readv);
 	tcase_add_test (tc_readv, test_readv_pass_001);
 	tcase_add_test (tc_readv, test_readv_pass_002);
+	tcase_add_test (tc_readv, test_readv_pass_003);
+	tcase_add_test (tc_readv, test_readv_pass_004);
+	tcase_add_test (tc_readv, test_readv_pass_005);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_002, SIGABRT);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_003, SIGABRT);
+
+	TCase* tc_remove_commit = tcase_create ("remove-commit");
+	suite_add_tcase (s, tc_remove_commit);
+	tcase_add_test (tc_remove_commit, test_remove_commit_pass_001);
+	tcase_add_test_raise_signal (tc_remove_commit, test_remove_commit_fail_001, SIGABRT);
 
 	TCase* tc_remove_trail = tcase_create ("remove-trail");
 	TCase* tc_update = tcase_create ("update");

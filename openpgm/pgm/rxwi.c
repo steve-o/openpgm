@@ -1196,8 +1196,12 @@ pgm_rxw_readv (
 
 	case PGM_PKT_LOST_DATA_STATE:
 /* do not purge in situ sequence */
-		if (window->trail == window->commit_lead)
+		if (window->trail == window->commit_lead) {
+			g_trace ("removing lost trail from window");
 			_pgm_rxw_remove_trail (window);
+		} else {
+			g_trace ("locking trail at commit window");
+		}
 /* fall through */
 	case PGM_PKT_BACK_OFF_STATE:
 	case PGM_PKT_WAIT_NCF_STATE:
