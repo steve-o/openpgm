@@ -22,6 +22,8 @@
 #include <glib.h>
 
 #include "pgm/atomic.h"
+#include "pgm/thread.h"
+
 
 //#define ATOMIC_DEBUG
 
@@ -32,8 +34,20 @@
 #endif
 
 
-static GStaticMutex g_atomic_mutex = G_STATIC_MUTEX_INIT;
+static pgm_mutex_t g_atomic_mutex;
 
+
+void
+pgm_atomic_init (void)
+{
+	pgm_mutex_init (&g_atomic_mutex);
+}
+
+void
+pgm_atomic_shutdown (void)
+{
+	pgm_mutex_free (&g_atomic_mutex);
+}
 
 gint32
 pgm_atomic_int32_exchange_and_add (
@@ -118,10 +132,10 @@ pgm_atomic_int32_exchange_and_add (
 	return InterlockedExchangeAdd (atomic, val);
 #else
 	gint32 result;
-	g_mutex_lock (g_atomic_mutex);
+	pgm_mutex_lock (&g_atomic_mutex);
 	result = *atomic;
 	*atomic += val;
-	g_mutex_unlock (g_atomic_mutex);
+	pgm_mutex_unlock (&g_atomic_mutex);
 	return result;
 #endif
 }
@@ -189,9 +203,9 @@ pgm_atomic_int32_add (
 #elif defined(G_OS_WIN32)
 	InterlockedExchangeAdd (atomic, val);
 #else
-	g_mutex_lock (g_atomic_mutex);
+	pgm_mutex_lock (&g_atomic_mutex);
 	*atomic += val;
-	g_mutex_unlock (g_atomic_mutex);
+	pgm_mutex_unlock (&g_atomic_mutex);
 #endif
 }
 
@@ -224,9 +238,9 @@ pgm_atomic_int32_set (
 #elif defined(G_OS_WIN32)
 	InterlockedExchange (atomic, newval);
 #else
-	g_mutex_lock (g_atomic_mutex);
+	pgm_mutex_lock (&g_atomic_mutex);
 	*atomic = newval;
-	g_mutex_unlock (g_atomic_mutex);
+	pgm_mutex_unlock (&g_atomic_mutex);
 #endif
 }
 
