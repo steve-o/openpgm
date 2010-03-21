@@ -91,6 +91,7 @@ pgm_vasprintf (
 	va_list args2;
 	G_VA_COPY (args2, args);
 	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
+/* NB: must be able to handle NULL args, fails on GCC */
 	const gint len = vsprintf (*string, format, args);
 	va_end (args2);
 #endif

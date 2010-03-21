@@ -34,6 +34,9 @@ void pgm_atomic_int32_set (volatile gint32*, const gint32);
 #define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
 #define pgm_atomic_int32_dec_and_test(atomic) (pgm_atomic_int32_exchange_and_add ((atomic), -1) == 1)
 
+void pgm_atomic_init (void);
+void pgm_atomic_shutdown (void);
+
 G_END_DECLS
 
 #endif /* __PGM_ATOMIC_H__ */

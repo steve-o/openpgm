@@ -20,6 +20,10 @@
 #ifndef __PGM_THREAD_H__
 #define __PGM_THREAD_H__
 
+#ifdef G_OS_UNIX
+#	include <pthread.h>
+#endif
+
 #include <glib.h>
 
 

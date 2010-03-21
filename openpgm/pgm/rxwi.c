@@ -682,8 +682,10 @@ _pgm_rxw_add_placeholder_range (
 		return PGM_RXW_BOUNDS;		/* effectively a slow consumer */
         }
 
-	if (pgm_rxw_is_full (window))
+	if (pgm_rxw_is_full (window)) {
+		g_assert (_pgm_rxw_commit_is_empty (window));
 		_pgm_rxw_remove_trail (window);
+	}
 
 /* if packet is non-contiguous to current leading edge add place holders
  * TODO: can be rather inefficient on packet loss looping through dropped sequence numbers
@@ -691,8 +693,10 @@ _pgm_rxw_add_placeholder_range (
 	while (pgm_rxw_next_lead (window) != sequence)
 	{
 		_pgm_rxw_add_placeholder (window, now, nak_rb_expiry);
-		if (pgm_rxw_is_full (window))
+		if (pgm_rxw_is_full (window)) {
+			g_assert (_pgm_rxw_commit_is_empty (window));
 			_pgm_rxw_remove_trail (window);
+		}
 	}
 
 /* post-conditions */
@@ -740,8 +744,8 @@ _pgm_rxw_update_lead (
 	while (window->lead != lead)
 	{
 /* slow consumer or fast producer */
-		if (pgm_rxw_is_full (window))
-		{
+		if (pgm_rxw_is_full (window)) {
+			g_assert (_pgm_rxw_commit_is_empty (window));
 			_pgm_rxw_remove_trail (window);
 		}
 		_pgm_rxw_add_placeholder (window, now, nak_rb_expiry);
@@ -1088,8 +1092,12 @@ _pgm_rxw_append (
 	    _pgm_rxw_is_invalid_payload_op (window, skb)))
 		return PGM_RXW_MALFORMED;
 
-	if (pgm_rxw_is_full (window))
-		_pgm_rxw_remove_trail (window);
+	if (pgm_rxw_is_full (window)) {
+		if (_pgm_rxw_commit_is_empty (window))
+			_pgm_rxw_remove_trail (window);
+		else
+			return PGM_RXW_BOUNDS;		/* constrained by commit window */
+	}
 
 /* advance leading edge */
 	window->lead++;
@@ -1200,8 +1208,12 @@ pgm_rxw_readv (
 
 	case PGM_PKT_LOST_DATA_STATE:
 /* do not purge in situ sequence */
-		if (window->trail == window->commit_lead)
+		if (_pgm_rxw_commit_is_empty (window)) {
+			g_trace ("removing lost trail from window");
 			_pgm_rxw_remove_trail (window);
+		} else {
+			g_trace ("locking trail at commit window");
+		}
 /* fall through */
 	case PGM_PKT_BACK_OFF_STATE:
 	case PGM_PKT_WAIT_NCF_STATE:
@@ -2000,6 +2012,7 @@ _pgm_rxw_recovery_update (
  *
  * returns:
  * PGM_RXW_APPENDED - lead is extended with state set waiting for data.
+ * PGM_RXW_BOUNDS   - constrained by commit window
  */
 
 static inline
@@ -2015,8 +2028,12 @@ _pgm_rxw_recovery_append (
 /* pre-conditions */
 	g_assert (window);
 
-	if (pgm_rxw_is_full (window))
-		_pgm_rxw_remove_trail (window);
+	if (pgm_rxw_is_full (window)) {
+		if (_pgm_rxw_commit_is_empty (window))
+			_pgm_rxw_remove_trail (window);
+		else
+			return PGM_RXW_BOUNDS;		/* constrained by commit window */
+	}
 
 /* advance leading edge */
 	window->lead++;
