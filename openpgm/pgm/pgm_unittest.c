@@ -56,9 +56,9 @@ mock_pgm_time_init (
 	)
 {
 	if (mock_time_init)
-		return -1;
+		return FALSE;
 	mock_time_init = TRUE;
-	return 0;
+	return TRUE;
 }
 
 gboolean
@@ -71,9 +71,9 @@ gboolean
 mock_pgm_time_shutdown (void)
 {
 	if (!mock_time_init)
-		return -1;
+		return FALSE;
 	mock_time_init = FALSE;
-	return 0;
+	return TRUE;
 }
 
 gboolean
