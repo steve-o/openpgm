@@ -1001,6 +1001,7 @@ START_TEST (test_remove_commit_pass_001)
 	}
 	fail_if (pgm_rxw_is_full (window));
 	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* #98 is missing */
 	{
 		unsigned i = 99;
 		skb = generate_valid_skb ();
@@ -1016,6 +1017,7 @@ START_TEST (test_remove_commit_pass_001)
 	}
 	fail_unless (pgm_rxw_is_full (window));
 	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* now mark #98 lost */
 	pgm_rxw_lost (window, 98);
 	for (unsigned i = 0; i < 98; i++)
 	{
@@ -1407,7 +1409,6 @@ START_TEST (test_has_pending_pass_001)
 }
 END_TEST
 
-
 static
 Suite*
 make_basic_test_suite (void)
@@ -1525,35 +1526,92 @@ make_basic_test_suite (void)
 	return s;
 }
 
-static
-Suite*
-make_advanced_test_suite (void)
+/* read beyond lost packet */
+START_TEST (test_readv_pass_007)
 {
-	Suite* s;
-
-	s = suite_create ("advanced transmit window API");
-
-	return s;
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+/* add #0 */
+	{
+		unsigned i = 0;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+/* add # 2 */
+	{
+		unsigned i = 2;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+/* lose #1 */
+	{
+		pgm_rxw_lost (window, 1);
+	}
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* read #0 */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+/* end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_remove_commit (window);
+/* read lost skb #1 */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_remove_commit (window);
+/* read #2 */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+/* end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
 }
+END_TEST
+
+/* a.k.a. unreliable delivery
+ */
 
 static
 Suite*
-make_fec_test_suite (void)
+make_best_effort_test_suite (void)
 {
 	Suite* s;
 
-	s = suite_create ("FEC transmit window");
+	s = suite_create ("Best effort delivery");
 
-	return s;
-}
-
-static
-Suite*
-make_internal_test_suite (void)
-{
-	Suite* s;
-
-	s = suite_create ("internal transmit window API");
+	TCase* tc_readv = tcase_create ("readv");
+	suite_add_tcase (s, tc_readv);
+	tcase_add_test (tc_readv, test_readv_pass_007);
 
 	return s;
 }
@@ -1571,9 +1629,7 @@ main (void)
 {
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_basic_test_suite ());
-	srunner_add_suite (sr, make_advanced_test_suite ());
-	srunner_add_suite (sr, make_fec_test_suite ());
-	srunner_add_suite (sr, make_internal_test_suite ());
+	srunner_add_suite (sr, make_best_effort_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
