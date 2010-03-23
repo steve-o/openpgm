@@ -1526,7 +1526,7 @@ make_basic_test_suite (void)
 	return s;
 }
 
-/* read beyond lost packet */
+/* read through lost packet */
 START_TEST (test_readv_pass_007)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
@@ -1598,6 +1598,154 @@ START_TEST (test_readv_pass_007)
 }
 END_TEST
 
+/* read through loss extended window */
+START_TEST (test_readv_pass_008)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+/* add #0 */
+	{
+		unsigned i = 0;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* read #0 */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_remove_commit (window);
+/* end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+/* add #100 */
+	{
+		unsigned i = 100;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	}
+/* lose #1-99 */
+	{
+		for (unsigned i = 1; i < 100; i++)
+			pgm_rxw_lost (window, i);
+	}
+/* read #100 */
+	{
+		int i = 0;
+		int bytes_read;
+		pmsg = msgv;
+		do {
+			bytes_read = pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv));
+			pgm_rxw_remove_commit (window);
+			i++;
+			if (i > 100) break;
+		} while (-1 == bytes_read);
+		fail_unless (100 == i);
+	}
+/* end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
+/* read through long data-loss */
+START_TEST (test_readv_pass_009)
+{
+	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	fail_if (NULL == window);
+	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_sk_buff_t* skb;
+/* add #0 */
+	{
+		unsigned i = 0;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+		fail_unless ((1 + i) == pgm_rxw_length (window));
+	}
+	fail_unless (_pgm_rxw_commit_is_empty (window));
+/* read #0 */
+	{
+		pmsg = msgv;
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_remove_commit (window);
+/* end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+/* add #2000 */
+	{
+		unsigned i = 2000;
+		skb = generate_valid_skb ();
+		fail_if (NULL == skb);
+		skb->pgm_header->pgm_tsdu_length = g_htons (0);
+		skb->tail = (guint8*)skb->tail - skb->len;
+		skb->len = 0;
+		skb->pgm_data->data_sqn = g_htonl (i);
+		const pgm_time_t now = 1;
+		const pgm_time_t nak_rb_expiry = 2;
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	}
+/* lose #1-1999 */
+	{
+		for (unsigned i = 1901; i < 2000; i++)
+			pgm_rxw_lost (window, i);
+	}
+/* read #2000 */
+	{
+		int i = 0;
+		int bytes_read;
+		pmsg = msgv;
+		do {
+			bytes_read = pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv));
+			pgm_rxw_remove_commit (window);
+			i++;
+			if (i > 100) break;
+		} while (-1 == bytes_read);
+		fail_unless (100 == i);
+	}
+/* end-of-window */
+	{
+		pmsg = msgv;
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	}
+	pgm_rxw_destroy (window);
+}
+END_TEST
+
 /* a.k.a. unreliable delivery
  */
 
@@ -1612,6 +1760,8 @@ make_best_effort_test_suite (void)
 	TCase* tc_readv = tcase_create ("readv");
 	suite_add_tcase (s, tc_readv);
 	tcase_add_test (tc_readv, test_readv_pass_007);
+	tcase_add_test (tc_readv, test_readv_pass_008);
+	tcase_add_test (tc_readv, test_readv_pass_009);
 
 	return s;
 }
