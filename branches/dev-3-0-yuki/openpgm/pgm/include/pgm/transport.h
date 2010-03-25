@@ -284,7 +284,7 @@ struct pgm_transport_t {
 	guint16			udp_encap_mcast_port;
 	guint32			rand_node_id;			/* node identifier */
 
-	pgm_rw_lock_t		lock;				/* running / destroyed */
+	pgm_rwlock_t		lock;				/* running / destroyed */
 	pgm_mutex_t		receiver_mutex;			/* receiver API */
 	pgm_mutex_t		source_mutex;			/* source API */
 	pgm_mutex_t		txw_mutex;			/* transmit window */
@@ -368,7 +368,7 @@ struct pgm_transport_t {
 	guint			tg_sqn_shift;
 	struct pgm_sk_buff_t* 	rx_buffer;
 
-	pgm_rw_lock_t		peers_lock;
+	pgm_rwlock_t		peers_lock;
 	pgm_hashtable_t*	peers_hashtable;	    /* fast lookup */
 	pgm_list_t*		peers_list;		    /* easy iteration */
 	pgm_slist_t*		peers_pending;		    /* rxw: have or lost data */
@@ -383,7 +383,7 @@ struct pgm_transport_t {
 
 
 /* global variables */
-extern pgm_rw_lock_t pgm_transport_list_lock;
+extern pgm_rwlock_t pgm_transport_list_lock;
 extern pgm_slist_t* pgm_transport_list;
 
 

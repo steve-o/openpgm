@@ -135,7 +135,7 @@ pgm_init (
 	}
 
 /* create global transport list lock */
-	pgm_rw_lock_init (&pgm_transport_list_lock);
+	pgm_rwlock_init (&pgm_transport_list_lock);
 
 	pgm_got_initialized = TRUE;
 	return TRUE;

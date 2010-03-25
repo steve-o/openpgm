@@ -281,17 +281,17 @@ pgm_transport_set_peer_expiry (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (peer_expiry > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed ||
 	    (peer_expiry < (2 * transport->spm_ambient_interval)))
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->peer_expiry = peer_expiry;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -311,18 +311,18 @@ pgm_transport_set_spmr_expiry (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (spmr_expiry > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed ||
 	    ( transport->can_send_data &&
 	      spmr_expiry >= transport->spm_ambient_interval ))
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->spmr_expiry = spmr_expiry;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -340,16 +340,16 @@ pgm_transport_set_rxw_sqns (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
 	g_return_val_if_fail (sqns > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->rxw_sqns = sqns;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -368,16 +368,16 @@ pgm_transport_set_rxw_secs (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (secs > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->rxw_secs = secs;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -400,16 +400,16 @@ pgm_transport_set_rxw_max_rte (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (max_rte > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->rxw_max_rte = max_rte;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -427,16 +427,16 @@ pgm_transport_set_nak_bo_ivl (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (usec > 1, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_bo_ivl = usec;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -452,16 +452,16 @@ pgm_transport_set_nak_rpt_ivl (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_rpt_ivl = usec;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -477,16 +477,16 @@ pgm_transport_set_nak_rdata_ivl (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_rdata_ivl = usec;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -502,16 +502,16 @@ pgm_transport_set_nak_data_retries (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_data_retries = cnt;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -527,16 +527,16 @@ pgm_transport_set_nak_ncf_retries (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_ncf_retries = cnt;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -594,12 +594,12 @@ pgm_new_peer (
 	peer->spmr_expiry = now + transport->spmr_expiry;
 
 /* add peer to hash table and linked list */
-	pgm_rw_lock_writer_lock (&transport->peers_lock);
+	pgm_rwlock_writer_lock (&transport->peers_lock);
 	gpointer entry = _pgm_peer_ref(peer);
 	pgm_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
 	peer->peers_link.data = peer;
 	transport->peers_list = pgm_list_prepend_link (transport->peers_list, &peer->peers_link);
-	pgm_rw_lock_writer_unlock (&transport->peers_lock);
+	pgm_rwlock_writer_unlock (&transport->peers_lock);
 
 	pgm_timer_lock (transport);
 	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))

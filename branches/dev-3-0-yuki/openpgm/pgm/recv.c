@@ -372,9 +372,9 @@ on_peer (
 	memcpy (&upstream_tsi.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
 	upstream_tsi.sport = skb->pgm_header->pgm_dport;
 
-	pgm_rw_lock_reader_lock (&transport->peers_lock);
+	pgm_rwlock_reader_lock (&transport->peers_lock);
 	*source = pgm_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
-	pgm_rw_lock_reader_unlock (&transport->peers_lock);
+	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
 		g_trace ("Discarded peer packet about new source.");
@@ -453,9 +453,9 @@ on_downstream (
 	}
 
 /* search for TSI peer context or create a new one */
-	pgm_rw_lock_reader_lock (&transport->peers_lock);
+	pgm_rwlock_reader_lock (&transport->peers_lock);
 	*source = pgm_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
-	pgm_rw_lock_reader_unlock (&transport->peers_lock);
+	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 		*source = pgm_new_peer (transport,
 				       &skb->tsi,
@@ -674,14 +674,14 @@ pgm_recvmsgv (
 	if (G_LIKELY(msg_len)) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
-	if (G_UNLIKELY(!pgm_rw_lock_reader_trylock (&transport->lock)))
+	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
@@ -715,7 +715,7 @@ pgm_recvmsgv (
 		if (!transport->is_abort_on_reset)
 			transport->is_reset = !transport->is_reset;
 		pgm_mutex_unlock (&transport->receiver_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return PGM_IO_STATUS_RESET;
 	}
 
@@ -870,7 +870,7 @@ check_for_repeat:
 				goto flush_pending;
 			case ENOENT:
 				pgm_mutex_unlock (&transport->receiver_mutex);
-				pgm_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT:
 				pgm_set_error (error,
@@ -879,7 +879,7 @@ check_for_repeat:
 					     _("Waiting for event: %s"),
 					     strerror (errno));
 				pgm_mutex_unlock (&transport->receiver_mutex);
-				pgm_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			default:
 				g_assert_not_reached();
@@ -914,11 +914,11 @@ out:
 			if (!transport->is_abort_on_reset)
 				transport->is_reset = !transport->is_reset;
 			pgm_mutex_unlock (&transport->receiver_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RESET;
 		}
 		pgm_mutex_unlock (&transport->receiver_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		if (PGM_IO_STATUS_WOULD_BLOCK == status &&
 		    ( transport->can_send_data ||
 		      ( transport->can_recv_data && NULL != transport->peers_list )))
@@ -948,7 +948,7 @@ out:
 	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
 	pgm_mutex_unlock (&transport->receiver_mutex);
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 }
 
