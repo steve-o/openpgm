@@ -40,7 +40,7 @@ struct rate_t {
 
 	gint		rate_limit;		/* signed for math */
 	pgm_time_t	last_rate_check;
-	pgm_mutex_t	mutex;
+	pgm_spinlock_t	spinlock;
 };
 
 typedef struct rate_t rate_t;
@@ -80,7 +80,7 @@ pgm_rate_create (
 	} else {
 		bucket->rate_limit	= bucket->rate_per_sec;
 	}
-	pgm_mutex_init (&bucket->mutex);
+	pgm_spinlock_init (&bucket->spinlock);
 	*bucket_ = bucket;
 }
 
@@ -92,7 +92,7 @@ pgm_rate_destroy (
 /* pre-conditions */
 	g_assert (NULL != bucket);
 
-	pgm_mutex_free (&bucket->mutex);
+	pgm_spinlock_free (&bucket->spinlock);
 	pgm_free (bucket);
 }
 
@@ -118,7 +118,7 @@ pgm_rate_check (
 	if (0 == bucket->rate_per_sec)
 		return TRUE;
 
-	pgm_mutex_lock (&bucket->mutex);
+	pgm_spinlock_lock (&bucket->spinlock);
 	pgm_time_t now = pgm_time_update_now();
 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
@@ -145,7 +145,7 @@ pgm_rate_check (
 
 	new_rate_limit -= ( bucket->iphdr_len + data_size );
 	if (is_nonblocking && new_rate_limit < 0) {
-		pgm_mutex_unlock (&bucket->mutex);
+		pgm_spinlock_unlock (&bucket->spinlock);
 		return FALSE;
 	}
 
@@ -162,7 +162,7 @@ pgm_rate_check (
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
 	} 
-	pgm_mutex_unlock (&bucket->mutex);
+	pgm_spinlock_unlock (&bucket->spinlock);
 	return TRUE;
 }
 
@@ -178,11 +178,11 @@ pgm_rate_remaining (
 	if (0 == bucket->rate_per_sec)
 		return 0;
 
-	pgm_mutex_lock (&bucket->mutex);
+	pgm_spinlock_lock (&bucket->spinlock);
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 	const gint bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - packetlen;
-	pgm_mutex_unlock (&bucket->mutex);
+	pgm_spinlock_unlock (&bucket->spinlock);
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
 }
 
