@@ -318,11 +318,11 @@ pgm_on_deferred_nak (
 /* peek from the retransmit queue so we can eliminate duplicate NAKs up until the repair packet
  * has been retransmitted.
  */
-	pgm_mutex_lock (&transport->txw_mutex);
+	pgm_spinlock_lock (&transport->txw_spinlock);
 	struct pgm_sk_buff_t* skb = pgm_txw_retransmit_try_peek (transport->window);
 	if (skb) {
 		skb = pgm_skb_get (skb);
-		pgm_mutex_unlock (&transport->txw_mutex);
+		pgm_spinlock_unlock (&transport->txw_spinlock);
 		if (!send_rdata (transport, skb)) {
 			pgm_free_skb (skb);
 			pgm_notify_send (&transport->rdata_notify);
@@ -332,7 +332,7 @@ pgm_on_deferred_nak (
 /* now remove sequence number from retransmit queue, re-enabling NAK processing for this sequence number */
 		pgm_txw_retransmit_remove_head (transport->window);
 	} else
-		pgm_mutex_unlock (&transport->txw_mutex);
+		pgm_spinlock_unlock (&transport->txw_spinlock);
 	return TRUE;
 }
 
@@ -985,9 +985,9 @@ send_odata (
         STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
-	pgm_mutex_lock (&transport->txw_mutex);
+	pgm_spinlock_lock (&transport->txw_spinlock);
 	pgm_txw_add (transport->window, STATE(skb));
-	pgm_mutex_unlock (&transport->txw_mutex);
+	pgm_spinlock_unlock (&transport->txw_spinlock);
 
 	gssize sent;
 retry_send:
@@ -1087,9 +1087,9 @@ send_odata_copy (
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
-	pgm_mutex_lock (&transport->txw_mutex);
+	pgm_spinlock_lock (&transport->txw_spinlock);
 	pgm_txw_add (transport->window, STATE(skb));
-	pgm_mutex_unlock (&transport->txw_mutex);
+	pgm_spinlock_unlock (&transport->txw_spinlock);
 
 	gssize sent;
 retry_send:
@@ -1216,9 +1216,9 @@ send_odatav (
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
-	pgm_mutex_lock (&transport->txw_mutex);
+	pgm_spinlock_lock (&transport->txw_spinlock);
 	pgm_txw_add (transport->window, STATE(skb));
-	pgm_mutex_unlock (&transport->txw_mutex);
+	pgm_spinlock_unlock (&transport->txw_spinlock);
 
 	gssize tpdu_length, sent;
 retry_send:
@@ -1368,9 +1368,9 @@ send_apdu (
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
-		pgm_mutex_lock (&transport->txw_mutex);
+		pgm_spinlock_lock (&transport->txw_spinlock);
 		pgm_txw_add (transport->window, STATE(skb));
-		pgm_mutex_unlock (&transport->txw_mutex);
+		pgm_spinlock_unlock (&transport->txw_spinlock);
 
 		gssize tpdu_length, sent;
 retry_send:
@@ -1758,9 +1758,9 @@ retry_send:
 		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
-		pgm_mutex_lock (&transport->txw_mutex);
+		pgm_spinlock_lock (&transport->txw_spinlock);
 		pgm_txw_add (transport->window, STATE(skb));
-		pgm_mutex_unlock (&transport->txw_mutex);
+		pgm_spinlock_unlock (&transport->txw_spinlock);
 
 		gssize tpdu_length, sent;
 retry_one_apdu_send:
@@ -1988,9 +1988,9 @@ pgm_send_skbv (
 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
-		pgm_mutex_lock (&transport->txw_mutex);
+		pgm_spinlock_lock (&transport->txw_spinlock);
 		pgm_txw_add (transport->window, STATE(skb));
-		pgm_mutex_unlock (&transport->txw_mutex);
+		pgm_spinlock_unlock (&transport->txw_spinlock);
 		gssize tpdu_length, sent;
 retry_send:
 		tpdu_length = (guint8*)STATE(skb)->tail - (guint8*)STATE(skb)->head;
