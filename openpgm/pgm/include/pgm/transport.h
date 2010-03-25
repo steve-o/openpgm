@@ -287,7 +287,7 @@ struct pgm_transport_t {
 	pgm_rwlock_t		lock;				/* running / destroyed */
 	pgm_mutex_t		receiver_mutex;			/* receiver API */
 	pgm_mutex_t		source_mutex;			/* source API */
-	pgm_mutex_t		txw_mutex;			/* transmit window */
+	pgm_spinlock_t		txw_spinlock;			/* transmit window */
 	pgm_mutex_t		send_mutex;			/* non-router alert socket */
 	pgm_mutex_t		timer_mutex;			/* next timer expiration */
 

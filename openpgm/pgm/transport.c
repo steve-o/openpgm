@@ -125,7 +125,7 @@ pgm_transport_pkt_offset (
  * 1) pgm_transport_t::lock
  * 2) pgm_transport_t::receiver_mutex
  * 3) pgm_transport_t::source_mutex
- * 4) pgm_transport_t::txw_mutex
+ * 4) pgm_transport_t::txw_spinlock
  * 5) pgm_transport_t::timer_mutex
  *
  * If application calls a function on the transport after destroy() it is a
@@ -248,7 +248,7 @@ pgm_transport_destroy (
 	pgm_notify_destroy (&transport->pending_notify);
 	g_trace ("INFO","freeing transport locks.");
 	pgm_rwlock_free (&transport->peers_lock);
-	pgm_mutex_free (&transport->txw_mutex);
+	pgm_spinlock_free (&transport->txw_spinlock);
 	pgm_mutex_free (&transport->send_mutex);
 	pgm_mutex_free (&transport->timer_mutex);
 	pgm_mutex_free (&transport->source_mutex);
@@ -318,7 +318,7 @@ pgm_transport_create (
 /* source-side */
 	pgm_mutex_init (&new_transport->source_mutex);
 /* transmit window */
-	pgm_mutex_init (&new_transport->txw_mutex);
+	pgm_spinlock_init (&new_transport->txw_spinlock);
 /* send socket */
 	pgm_mutex_init (&new_transport->send_mutex);
 /* next timer & spm expiration */
