@@ -97,19 +97,6 @@ pgm_mutex_init (
 #endif /* !G_OS_UNIX */
 }
 
-void
-pgm_mutex_lock (
-	pgm_mutex_t*	mutex
-	)
-{
-	g_assert (NULL != mutex);
-#ifdef G_OS_UNIX
-	pthread_mutex_lock (&mutex->pthread_mutex);
-#else
-	WaitForSingleObject (mutex->win32_mutex, INFINITE);
-#endif /* !G_OS_UNIX */
-}
-
 gboolean
 pgm_mutex_trylock (
 	pgm_mutex_t*	mutex
@@ -126,19 +113,6 @@ pgm_mutex_trylock (
 	const DWORD result = WaitForSingleObject (mutex->win32_mutex, 0);
 	win32_check_for_error (WAIT_FAILED != result);
 	return WAIT_TIMEOUT != result;
-#endif /* !G_OS_UNIX */
-}
-
-void
-pgm_mutex_unlock (
-	pgm_mutex_t*	mutex
-	)
-{
-	g_assert (NULL != mutex);
-#ifdef G_OS_UNIX
-	pthread_mutex_unlock (&mutex->pthread_mutex);
-#else
-	ReleaseMutex (mutex->win32_mutex);
 #endif /* !G_OS_UNIX */
 }
 
@@ -168,19 +142,6 @@ pgm_spinlock_init (
 #endif /* !G_OS_UNIX */
 }
 
-void
-pgm_spinlock_lock (
-	pgm_spinlock_t*	spinlock
-	)
-{
-	g_assert (NULL != spinlock);
-#ifdef G_OS_UNIX
-	pthread_spin_lock (&spinlock->pthread_spinlock);
-#else
-	EnterCriticalSection (&spinlock->win32_spinlock);
-#endif /* !G_OS_UNIX */
-}
-
 gboolean
 pgm_spinlock_trylock (
 	pgm_spinlock_t*	spinlock
@@ -195,19 +156,6 @@ pgm_spinlock_trylock (
 	return TRUE;
 #else
 	return TryEnterCriticalSection (&spinlock->win32_spinlock);
-#endif /* !G_OS_UNIX */
-}
-
-void
-pgm_spinlock_unlock (
-	pgm_spinlock_t*	spinlock
-	)
-{
-	g_assert (NULL != spinlock);
-#ifdef G_OS_UNIX
-	pthread_spin_unlock (&spinlock->pthread_spinlock);
-#else
-	LeaveCriticalSection (&spinlock->win32_spinlock);
 #endif /* !G_OS_UNIX */
 }
 
@@ -366,146 +314,6 @@ pgm_rwlock_init (
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
 
-#if !defined(CONFIG_HAVE_WIN_SRW_LOCK) && !defined(G_OS_UNIX)
-static inline
-void
-_pgm_rwlock_signal (
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-	if (rwlock->want_to_write)
-		pgm_cond_signal (&rwlock->write_cond);
-	else if (rwlock->want_to_read)
-		pgm_cond_broadcast (&rwlock->read_cond);
-}
-#endif
-
-void
-pgm_rwlock_reader_lock (
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	AcquireSRWLockShared (&rwlock->win32_lock);
-#elif defined(G_OS_UNIX)
-	pthread_rwlock_rdlock (&rwlock->pthread_rwlock);
-#else
-	EnterCriticalSection (&rwlock->win32_spinlock);
-	rwlock->want_to_read++;
-	while (rwlock->have_writer || rwlock->want_to_write)
-		_pgm_cond_wait (&rwlock->read_cond, &rwlock->win32_spinlock);
-	rwlock->want_to_read--;
-	rwlock->read_counter++;
-	LeaveCriticalSection (&rwlock->win32_spinlock);
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
-}
-
-gboolean
-pgm_rwlock_reader_trylock (
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	return TryAcquireSRWLockShared (&rwlock->win32_lock);
-#elif defined(G_OS_UNIX)
-	return !pthread_rwlock_tryrdlock (&rwlock->pthread_rwlock);
-#else
-	gboolean status;
-	EnterCriticalSection (&rwlock->win32_spinlock);
-	if (!rwlock->have_writer && !rwlock->want_to_write) {
-		rwlock->read_counter++;
-		status = TRUE;
-	} else
-		status = FALSE;
-	LeaveCriticalSection (&rwlock->win32_spinlock);
-	return status;
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
-}
-
-void
-pgm_rwlock_reader_unlock(
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	ReleaseSRWLockShared (&rwlock->win32_lock);
-#elif defined(G_OS_UNIX)
-	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
-#else
-	EnterCriticalSection (&rwlock->win32_spinlock);
-	rwlock->read_counter--;
-	if (rwlock->read_counter == 0)
-		_pgm_rwlock_signal (rwlock);
-	LeaveCriticalSection (&rwlock->win32_spinlock);
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
-}
-
-void
-pgm_rwlock_writer_lock (
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	AcquireSRWLockExclusive (&rwlock->win32_lock);
-#elif defined(G_OS_UNIX)
-	pthread_rwlock_wrlock (&rwlock->pthread_rwlock);
-#else
-	EnterCriticalSection (&rwlock->win32_spinlock);
-	rwlock->want_to_write++;
-	while (rwlock->have_writer || rwlock->read_counter)
-		_pgm_cond_wait (&rwlock->write_cond, &rwlock->win32_spinlock);
-	rwlock->want_to_write--;
-	rwlock->have_writer = TRUE;
-	LeaveCriticalSection (&rwlock->win32_spinlock);
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
-}
-
-gboolean
-pgm_rwlock_writer_trylock (
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	return AcquireSRWLockExclusive (&rwlock->win32_lock);
-#elif defined(G_OS_UNIX)
-	return !pthread_rwlock_trywrlock (&rwlock->pthread_rwlock);
-#else
-	gboolean status;
-	EnterCriticalSection (&rwlock->win32_spinlock);
-	if (!rwlock->have_writer && !rwlock->read_counter) {
-		rwlock->have_writer = TRUE;
-		status = TRUE;
-	} else
-		status = FALSE;
-	LeaveCriticalSection (&rwlock->win32_spinlock);
-	return status;
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
-}
-
-void
-pgm_rwlock_writer_unlock (
-	pgm_rwlock_t*	rwlock
-	)
-{
-	g_assert (NULL != rwlock);
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	ReleaseSRWLockExclusive (&rwlock->win32_lock);
-#elif defined(G_OS_UNIX)
-	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
-#else
-	EnterCriticalSection (&rwlock->win32_spinlock);
-	rwlock->have_writer = FALSE;
-	_pgm_rwlock_signal (rwlock);
-	LeaveCriticalSection (&rwlock->win32_spinlock);
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
-}
-
 void
 pgm_rwlock_free (
 	pgm_rwlock_t*	rwlock
@@ -522,6 +330,110 @@ pgm_rwlock_free (
 	DeleteCriticalSection (&rwlock->win32_spinlock);
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
+
+#if !defined(CONFIG_HAVE_WIN_SRW_LOCK) && !defined(G_OS_UNIX)
+static inline
+void
+_pgm_rwlock_signal (
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	if (rwlock->want_to_write)
+		pgm_cond_signal (&rwlock->write_cond);
+	else if (rwlock->want_to_read)
+		pgm_cond_broadcast (&rwlock->read_cond);
+}
+
+void
+pgm_rwlock_reader_lock (
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	EnterCriticalSection (&rwlock->win32_spinlock);
+	rwlock->want_to_read++;
+	while (rwlock->have_writer || rwlock->want_to_write)
+		_pgm_cond_wait (&rwlock->read_cond, &rwlock->win32_spinlock);
+	rwlock->want_to_read--;
+	rwlock->read_counter++;
+	LeaveCriticalSection (&rwlock->win32_spinlock);
+}
+
+gboolean
+pgm_rwlock_reader_trylock (
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	gboolean status;
+	EnterCriticalSection (&rwlock->win32_spinlock);
+	if (!rwlock->have_writer && !rwlock->want_to_write) {
+		rwlock->read_counter++;
+		status = TRUE;
+	} else
+		status = FALSE;
+	LeaveCriticalSection (&rwlock->win32_spinlock);
+	return status;
+}
+
+void
+pgm_rwlock_reader_unlock(
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	EnterCriticalSection (&rwlock->win32_spinlock);
+	rwlock->read_counter--;
+	if (rwlock->read_counter == 0)
+		_pgm_rwlock_signal (rwlock);
+	LeaveCriticalSection (&rwlock->win32_spinlock);
+}
+
+void
+pgm_rwlock_writer_lock (
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	EnterCriticalSection (&rwlock->win32_spinlock);
+	rwlock->want_to_write++;
+	while (rwlock->have_writer || rwlock->read_counter)
+		_pgm_cond_wait (&rwlock->write_cond, &rwlock->win32_spinlock);
+	rwlock->want_to_write--;
+	rwlock->have_writer = TRUE;
+	LeaveCriticalSection (&rwlock->win32_spinlock);
+}
+
+gboolean
+pgm_rwlock_writer_trylock (
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	gboolean status;
+	EnterCriticalSection (&rwlock->win32_spinlock);
+	if (!rwlock->have_writer && !rwlock->read_counter) {
+		rwlock->have_writer = TRUE;
+		status = TRUE;
+	} else
+		status = FALSE;
+	LeaveCriticalSection (&rwlock->win32_spinlock);
+	return status;
+}
+
+void
+pgm_rwlock_writer_unlock (
+	pgm_rwlock_t*	rwlock
+	)
+{
+	g_assert (NULL != rwlock);
+	EnterCriticalSection (&rwlock->win32_spinlock);
+	rwlock->have_writer = FALSE;
+	_pgm_rwlock_signal (rwlock);
+	LeaveCriticalSection (&rwlock->win32_spinlock);
+}
+#endif /* !G_OS_UNIX && !CONFIG_HAVE_WIN_SRW_LOCK */
 
 
 /* eof */

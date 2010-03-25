@@ -81,16 +81,44 @@ typedef struct pgm_rwlock_t pgm_rwlock_t;
 G_BEGIN_DECLS
 
 void pgm_mutex_init (pgm_mutex_t*);
-void pgm_mutex_lock (pgm_mutex_t*);
-gboolean pgm_mutex_trylock (pgm_mutex_t*);
-void pgm_mutex_unlock (pgm_mutex_t*);
 void pgm_mutex_free (pgm_mutex_t*);
+gboolean pgm_mutex_trylock (pgm_mutex_t*);
+
+static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
+#ifdef G_OS_UNIX
+	pthread_mutex_lock (&mutex->pthread_mutex);
+#else
+	WaitForSingleObject (mutex->win32_mutex, INFINITE);
+#endif /* !G_OS_UNIX */
+}
+
+static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
+#ifdef G_OS_UNIX
+	pthread_mutex_unlock (&mutex->pthread_mutex);
+#else
+	ReleaseMutex (mutex->win32_mutex);
+#endif /* !G_OS_UNIX */
+}
 
 void pgm_spinlock_init (pgm_spinlock_t*);
-void pgm_spinlock_lock (pgm_spinlock_t*);
-gboolean pgm_spinlock_trylock (pgm_spinlock_t*);
-void pgm_spinlock_unlock (pgm_spinlock_t*);
 void pgm_spinlock_free (pgm_spinlock_t*);
+gboolean pgm_spinlock_trylock (pgm_spinlock_t*);
+
+static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
+#ifdef G_OS_UNIX
+	pthread_spin_lock (&spinlock->pthread_spinlock);
+#else
+	EnterCriticalSection (&spinlock->win32_spinlock);
+#endif /* !G_OS_UNIX */
+}
+
+static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
+#ifdef G_OS_UNIX
+	pthread_spin_unlock (&spinlock->pthread_spinlock);
+#else
+	LeaveCriticalSection (&spinlock->win32_spinlock);
+#endif /* !G_OS_UNIX */
+}
 
 void pgm_cond_init (pgm_cond_t*);
 void pgm_cond_signal (pgm_cond_t*);
@@ -103,13 +131,56 @@ void pgm_cond_wait (pgm_cond_t*, CRITICAL_SECTION*);
 void pgm_cond_free (pgm_cond_t*);
 
 void pgm_rwlock_init (pgm_rwlock_t*);
+void pgm_rwlock_free (pgm_rwlock_t*);
+
+#ifdef G_OS_UNIX
+static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
+	pthread_rwlock_rdlock (&rwlock->pthread_rwlock);
+}
+static inline gboolean pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
+	return !pthread_rwlock_tryrdlock (&rwlock->pthread_rwlock);
+}
+static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
+	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
+}
+static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
+	pthread_rwlock_wrlock (&rwlock->pthread_rwlock);
+}
+static inline gboolean pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
+	return !pthread_rwlock_trywrlock (&rwlock->pthread_rwlock);
+}
+static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
+	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
+}
+#elif defined(CONFIG_HAVE_WIN_SRW_LOCK)
+static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
+	AcquireSRWLockShared (&rwlock->win32_lock);
+}
+static inline gboolean pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
+	return TryAcquireSRWLockShared (&rwlock->win32_lock);
+}
+static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
+	ReleaseSRWLockShared (&rwlock->win32_lock);
+}
+static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
+	AcquireSRWLockExclusive (&rwlock->win32_lock);
+}
+static inline gboolean pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
+	return AcquireSRWLockExclusive (&rwlock->win32_lock);
+}
+static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
+	ReleaseSRWLockExclusive (&rwlock->win32_lock);
+}
+#else
+void pgm_rwlock_init (pgm_rwlock_t*);
+void pgm_rwlock_free (pgm_rwlock_t*);
 void pgm_rwlock_reader_lock (pgm_rwlock_t*);
 gboolean pgm_rwlock_reader_trylock (pgm_rwlock_t*);
 void pgm_rwlock_reader_unlock(pgm_rwlock_t*);
 void pgm_rwlock_writer_lock (pgm_rwlock_t*);
 gboolean pgm_rwlock_writer_trylock (pgm_rwlock_t*);
 void pgm_rwlock_writer_unlock (pgm_rwlock_t*);
-void pgm_rwlock_free (pgm_rwlock_t*);
+#endif
 
 void pgm_thread_init (void);
 void pgm_thread_shutdown (void);
