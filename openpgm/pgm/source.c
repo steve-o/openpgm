@@ -138,16 +138,16 @@ pgm_transport_set_ambient_spm (
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
 	g_return_val_if_fail (spm_ambient_interval > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->spm_ambient_interval = spm_ambient_interval;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -169,12 +169,12 @@ pgm_transport_set_heartbeat_spm (
 	g_return_val_if_fail (len > 0, FALSE);
 	for (unsigned i = 0; i < len; i++)
 		g_return_val_if_fail (spm_heartbeat_interval[i] > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	if (transport->spm_heartbeat_interval)
@@ -183,7 +183,7 @@ pgm_transport_set_heartbeat_spm (
 	memcpy (&transport->spm_heartbeat_interval[1], spm_heartbeat_interval, sizeof(guint) * len);
 	transport->spm_heartbeat_interval[0] = 0;
 	transport->spm_heartbeat_len = len;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -201,16 +201,16 @@ pgm_transport_set_txw_sqns (
 	g_return_val_if_fail (NULL != transport, FALSE);
 	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
 	g_return_val_if_fail (sqns > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->txw_sqns = sqns;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -229,16 +229,16 @@ pgm_transport_set_txw_secs (
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
 	g_return_val_if_fail (secs > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->txw_secs = secs;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -261,16 +261,16 @@ pgm_transport_set_txw_max_rte (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (max_rte > 0, FALSE);
-	if (!pgm_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->txw_max_rte = max_rte;
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -1452,7 +1452,7 @@ pgm_send (
 	if (G_LIKELY(apdu_length)) g_return_val_if_fail (NULL != apdu, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
-	if (G_UNLIKELY(!pgm_rw_lock_reader_trylock (&transport->lock)))
+	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
@@ -1460,7 +1460,7 @@ pgm_send (
 	    transport->is_destroyed ||
 	    apdu_length > transport->max_apdu))
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
@@ -1473,13 +1473,13 @@ pgm_send (
 		pgm_io_status_e status;
 		status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
 
 	const pgm_io_status_e status = send_apdu (transport, apdu, apdu_length, bytes_written);
 	pgm_mutex_unlock (&transport->source_mutex);
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return status;
 }
 
@@ -1522,12 +1522,12 @@ pgm_sendv (
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
 	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
 	if (G_LIKELY(count)) g_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
-	if (G_UNLIKELY(!pgm_rw_lock_reader_trylock (&transport->lock)))
+	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
@@ -1539,7 +1539,7 @@ pgm_sendv (
 		pgm_io_status_e status;
 		status = send_odata_copy (transport, NULL, count, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
 
@@ -1555,7 +1555,7 @@ pgm_sendv (
 				pgm_io_status_e status;
 				status = send_odatav (transport, vector, count, bytes_written);
 				pgm_mutex_unlock (&transport->source_mutex);
-				pgm_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return status;
 			}
 			else
@@ -1578,7 +1578,7 @@ pgm_sendv (
 		    vector[i].iov_len > transport->max_apdu)
 		{
 			pgm_mutex_unlock (&transport->source_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 		}
 		STATE(apdu_length) += vector[i].iov_len;
@@ -1590,11 +1590,11 @@ pgm_sendv (
 			pgm_io_status_e status;
 			status = send_odatav (transport, vector, count, bytes_written);
 			pgm_mutex_unlock (&transport->source_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return status;
 		} else if (STATE(apdu_length) > transport->max_apdu) {
 			pgm_mutex_unlock (&transport->source_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 		}
 	}
@@ -1620,7 +1620,7 @@ pgm_sendv (
 		{
 			transport->blocklen = tpdu_length;
 			pgm_mutex_unlock (&transport->source_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1645,11 +1645,11 @@ retry_send:
 			case PGM_IO_STATUS_RATE_LIMITED:
 				transport->is_apdu_eagain = TRUE;
 				pgm_mutex_unlock (&transport->source_mutex);
-				pgm_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return status;
 			case PGM_IO_STATUS_ERROR:
 				pgm_mutex_unlock (&transport->source_mutex);
-				pgm_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return status;
 			default:
 				g_assert_not_reached();
@@ -1661,7 +1661,7 @@ retry_send:
 		if (bytes_written)
 			*bytes_written = data_bytes_sent;
 		pgm_mutex_unlock (&transport->source_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return PGM_IO_STATUS_NORMAL;
 	}
 
@@ -1809,7 +1809,7 @@ retry_one_apdu_send:
 	if (bytes_written)
 		*bytes_written = STATE(apdu_length);
 	pgm_mutex_unlock (&transport->source_mutex);
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 
 blocked:
@@ -1820,7 +1820,7 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
 	pgm_mutex_unlock (&transport->source_mutex);
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 
@@ -1854,12 +1854,12 @@ pgm_send_skbv (
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
 	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
 	if (G_LIKELY(count)) g_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
-	if (G_UNLIKELY(!pgm_rw_lock_reader_trylock (&transport->lock)))
+	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
@@ -1871,7 +1871,7 @@ pgm_send_skbv (
 		pgm_io_status_e status;
 		status = send_odata_copy (transport, NULL, count, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
 	if (1 == count)
@@ -1879,7 +1879,7 @@ pgm_send_skbv (
 		pgm_io_status_e status;
 		status = send_odata (transport, vector[0], bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
-		pgm_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
 
@@ -1906,7 +1906,7 @@ pgm_send_skbv (
 		{
 			transport->blocklen = total_tpdu_length;
 			pgm_mutex_unlock (&transport->source_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1920,14 +1920,14 @@ pgm_send_skbv (
 		{
 			if (vector[i]->len > transport->max_tsdu_fragment) {
 				pgm_mutex_unlock (&transport->source_mutex);
-				pgm_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			}
 			STATE(apdu_length) += vector[i]->len;
 		}
 		if (STATE(apdu_length) > transport->max_apdu) {
 			pgm_mutex_unlock (&transport->source_mutex);
-			pgm_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_ERROR;
 		}
 	}
@@ -2044,7 +2044,7 @@ retry_send:
 	if (bytes_written)
 		*bytes_written = data_bytes_sent;
 	pgm_mutex_unlock (&transport->source_mutex);
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 
 blocked:
@@ -2055,7 +2055,7 @@ blocked:
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
 	pgm_mutex_unlock (&transport->source_mutex);
-	pgm_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
 }
 
