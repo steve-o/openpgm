@@ -75,6 +75,7 @@ if env['WITH_CHECK'] == 'true':
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
 	te.ParseConfig ('pkg-config --static --cflags --libs check');
+	te.Program (['atomic_unittest.c', e.Object('thread.c')]);
 	te.Program (['txwi_unittest.c', e.Object('tsi.c')]);
 	te.Program (['rxwi_unittest.c', e.Object('tsi.c')]);
 	te.Program ('pgm_unittest.c');
