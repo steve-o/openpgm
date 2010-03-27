@@ -681,7 +681,7 @@ pgm_transport_bind (
 	g_trace ("INFO", "bind (transport:%p error:%p)",
 		 (gpointer)transport, (gpointer)error);
 
-	pgm_rand_new (&transport->rand_);
+	pgm_rand_create (&transport->rand_);
 
 /* PGM Children support of POLLs requires 32-bit random node identifier RAND_NODE_ID */
 	if (transport->can_recv_data) {

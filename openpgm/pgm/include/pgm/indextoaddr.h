@@ -24,6 +24,10 @@
 
 #include <glib.h>
 
+#ifndef __PGM_ERROR_H__
+#	include <pgm/error.h>
+#endif
+
 
 G_BEGIN_DECLS
 

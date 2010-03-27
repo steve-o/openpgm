@@ -33,7 +33,7 @@ typedef struct pgm_rand_t pgm_rand_t;
 
 G_BEGIN_DECLS
 
-void pgm_rand_new (pgm_rand_t*);
+void pgm_rand_create (pgm_rand_t*);
 guint32 pgm_rand_int (pgm_rand_t*);
 gint32 pgm_rand_int_range (pgm_rand_t*, gint32, gint32);
 guint32 pgm_random_int (void);
