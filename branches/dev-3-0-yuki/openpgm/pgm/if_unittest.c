@@ -576,7 +576,7 @@ mock_pgm_if_getnodeaddr (
 	const int		family,
 	struct sockaddr*	addr,
 	const socklen_t		cnt,
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	switch (family) {

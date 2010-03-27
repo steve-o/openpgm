@@ -55,7 +55,7 @@ pgm_rand_shutdown (void)
 }
 
 void
-pgm_rand_new (
+pgm_rand_create (
 	pgm_rand_t*	rand_
 	)
 {
@@ -117,7 +117,7 @@ pgm_random_int (void)
 	guint32 rand_value;
 	pgm_mutex_lock (&g_rand_mutex);
 	if (!g_rand.seed)
-		pgm_rand_new (&g_rand);
+		pgm_rand_create (&g_rand);
 	rand_value = pgm_rand_int (&g_rand);
 	pgm_mutex_unlock (&g_rand_mutex);
 	return rand_value;
