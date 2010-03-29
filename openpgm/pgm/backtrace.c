@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <glib.h>
 
-#ifdef G_OS_UNIX
+#ifdef CONFIG_HAVE_BACKTRACE
 #	include <execinfo.h>
 #	include <sys/types.h>
 #	include <unistd.h>
@@ -39,7 +39,7 @@ on_sigsegv (
 	G_GNUC_UNUSED int	signum
 	)
 {
-#ifdef G_OS_UNIX
+#ifdef CONFIG_HAVE_BACKTRACE
 	void* array[256];
 	char** names;
 	char cmd[1024];
@@ -64,7 +64,7 @@ on_sigsegv (
 		fprintf (stderr, "======= GDB Backtrace: =========\n");
 		fprintf (stderr, "%s\n", out);
 	}
-#endif
+#endif /* CONFIG_HAVE_BACKTRACE */
 
 	abort ();
 }
