@@ -5,30 +5,39 @@ import os
 import time
 import sys
 
-EnsureSConsVersion( 0, 97 )
+EnsureSConsVersion( 1, 0 )
 SConsignFile('scons.signatures');
 
-opt = Options(None, ARGUMENTS)
-opt.AddOptions (
-	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
-	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
-	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
-	(EnumOption ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true', ('true', 'false'))),
-	(EnumOption ('WITH_HTTP', 'HTTP administration', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_SNMP', 'SNMP administration', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
-	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_PLUS', 'libpgmplus GPL library', 'false', ('true', 'false'))),
+vars = Variables()
+vars.AddVariables (
+	EnumVariable ('BUILD', 'build environment', 'debug',
+			allowed_values=('release', 'debug', 'profile')),
+	EnumVariable ('BRANCH', 'branch prediction', 'none',
+			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_TEST', 'Network test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
+			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
 # Dependencies
 
 env = Environment();
-env.Tool('intelc', version='11.1', topdir='/opt/intel/Compiler/11.1/064/bin/intel64');
 
 def CheckPKGConfig(context, version):
 	context.Message( 'Checking for pkg-config... ' )
@@ -57,8 +66,8 @@ if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
 	Exit(1)
 
-if not conf.CheckPKG('libsoup-2.2'):
-	print 'libsoup-2.2 not found.'
+if not conf.CheckPKG('libsoup-2.4'):
+	print 'libsoup-2.4 not found.'
 	Exit(1)
 
 env = conf.Finish();
@@ -66,54 +75,58 @@ env = conf.Finish();
 #-----------------------------------------------------------------------------
 # Platform specifics
 
-env = Environment(ENV = os.environ,
+env = Environment(
+	variables = vars,
+	ENV = os.environ,
 	CCFLAGS = [	'-pipe',
 			'-Wall',
+				'-Wextra',
+				'-Wfloat-equal',
 				'-Wshadow',
+#				'-Wunsafe-loop-optimizations',
 				'-Wpointer-arith',
+				'-Wbad-function-cast',
+				'-Wcast-qual',
+				'-Wcast-align',
 				'-Wwrite-strings',
+				'-Waggregate-return',
 				'-Wstrict-prototypes',
+				'-Wold-style-definition',
 				'-Wmissing-prototypes',
 				'-Wmissing-declarations',
+				'-Wmissing-noreturn',
+				'-Wmissing-format-attribute',
+				'-Wredundant-decls',
+				'-Wnested-externs',
 				'-Winline',
-#  981: operands are evaluated in unspecified order
-				'-wd981',
-# 2259: non-pointer conversion from "*" to "*" may lose significant bits
-				'-wd2259',
-			'-std=c99',
-			'-gcc-version=420',
+			'-pedantic',
+			'-std=gnu99',
+			'--param', 'max-inline-insns-single=600',
 			'-D_REENTRANT',
 			'-D_GNU_SOURCE',
+			'-D_XOPEN_SOURCE=600',
+			'-D__EXTENSIONS__',
+			'-DBSD_COMP',
 			'-D__need_IOV_MAX',
-			'-DCONFIG_HAVE_BACKTRACE',
-			'-DCONFIG_HAVE_PSELECT',
-			'-DCONFIG_HAVE_POLL',
-			'-DCONFIG_HAVE_PPOLL',
-			'-DCONFIG_HAVE_EPOLL',
+			'-D__USE_BSD',
 			'-DCONFIG_HAVE_CLOCK_GETTIME',
 			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
 			'-DCONFIG_HAVE_NANOSLEEP',
 			'-DCONFIG_HAVE_USLEEP',
-# defect with ICC headers: __invalid_size_argument_for_IOC
-#			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
-			'-DCONFIG_HAVE_IFR_NETMASK',
-			'-DCONFIG_HAVE_GETIFADDRS',
-			'-DCONFIG_HAVE_GETHOSTBYNAME2',
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
+			'-DCONFIG_HAVE_POLL',
 			'-DCONFIG_HAVE_MCAST_JOIN',
-			'-DCONFIG_HAVE_IP_MREQN',
-			'-DCONFIG_HAVE_SPRINTF_GROUPING',
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
-			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
-	LINKFLAGS = [	'-pipe'
+	LINKFLAGS = [	'-pipe',
+			'-lresolv',
+			'-lsocket',
+			'-lnsl',
+			'-lm'
 		    ]
 )
-opt.Update (env)
-env.Tool('intelc');
 
 # Branch prediction
 if env['BRANCH'] == 'profile':
@@ -122,22 +135,15 @@ if env['BRANCH'] == 'profile':
 elif env['BRANCH'] == 'seed':
 	env.Append(CCFLAGS = '-fbranch-probabilities')
 
-# Coverage analysis
-if env['COVERAGE'] == 'full':
-	env.Append(CCFLAGS = '-fprofile-arcs')
-	env.Append(CCFLAGS = '-ftest-coverage')
-	env.Append(LINKFLAGS = '-fprofile-arcs')
-	env.Append(LINKFLAGS = '-lgcov')
-
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = '-g', LINKFLAGS = '-g')
+debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
 
 profile = env.Clone(BUILD = 'profile')
-profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
+profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
 thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
@@ -167,9 +173,12 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 # managed environment for libpgmsnmp, libpgmhttp
 env['SNMP_FLAGS'] = { 
         'CCFLAGS'       : [],
-        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
+        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp',
+			    'ssl', 'kstat', 'wrap', 'adm' ],
+	'CPPPATH'	: ['/opt/cws/include'],
+	'LIBPATH'	: ['/opt/csw/lib'],
 };
-env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.2');
+env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -215,15 +224,8 @@ if env['WITH_SNMP'] == 'true':
 conf = Configure(env, custom_tests = tests);
 
 if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
-	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
-	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
-	lastLIBS = conf.env['LIBS'];
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
-	conf.env['SNMP_FLAGS']['LIBS'].append(conf.env['LIBS']);
-	conf.env.Replace(LIBS = lastLIBS);
-	if not conf.CheckSNMP():
-		print 'Net-SNMP libraries not compatible.';
-		Exit(1);
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
 
 if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
@@ -240,7 +242,7 @@ env = conf.Finish();
 
 # DSO visibility flags
 if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
- 	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
+	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
 else:
 	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
 
@@ -276,5 +278,9 @@ if env['WITH_TEST'] == 'true':
 	SConscript(ref_node + 'test/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
+
+# unit testing framework optional.
+if env['WITH_CHECK'] and env['CHECK'] == 'true':
+ 	SConscript(ref_node + 'check/SConscript');
 
 # end of file

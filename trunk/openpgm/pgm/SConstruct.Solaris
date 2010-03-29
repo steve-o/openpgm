@@ -37,17 +37,21 @@ vars.AddVariables (
 #-----------------------------------------------------------------------------
 # Dependencies
 
+def force_gcc(env):
+	env.Tool('gcc', toolpath=['/usr/sfw/bin']);
+
 env = Environment();
+force_gcc(env);
 
 def CheckPKGConfig(context, version):
 	context.Message( 'Checking for pkg-config... ' )
-	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	ret = context.TryAction('/opt/glib-gcc/bin/pkg-config --atleast-pkgconfig-version=%s' % version)[0]
 	context.Result( ret )
 	return ret
 
 def CheckPKG(context, name):
 	context.Message( 'Checking for %s... ' % name )
-	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
+	ret = context.TryAction('/opt/glib-gcc/bin/pkg-config --exists \'%s\'' % name)[0]
 	context.Result( ret )
 	return ret
 
@@ -66,9 +70,9 @@ if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
 	Exit(1)
 
-if not conf.CheckPKG('libsoup-2.4'):
-	print 'libsoup-2.4 not found.'
-	Exit(1)
+#if not conf.CheckPKG('libsoup-2.4'):
+#	print 'libsoup-2.4 not found.'
+#	Exit(1)
 
 env = conf.Finish();
 
@@ -113,7 +117,6 @@ env = Environment(
 			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
 			'-DCONFIG_HAVE_NANOSLEEP',
 			'-DCONFIG_HAVE_USLEEP',
-			'-DCONFIG_HAVE_TSC',
 			'-DCONFIG_HAVE_POLL',
 			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
@@ -127,6 +130,7 @@ env = Environment(
 			'-lm'
 		    ]
 )
+force_gcc(env);
 
 # Branch prediction
 if env['BRANCH'] == 'profile':
@@ -164,7 +168,7 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+env.ParseConfig('/opt/glib-gcc/bin/pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -178,7 +182,10 @@ env['SNMP_FLAGS'] = {
 	'CPPPATH'	: ['/opt/cws/include'],
 	'LIBPATH'	: ['/opt/csw/lib'],
 };
-env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
+if env['WITH_HTTP'] == 'true':
+	env['LIBSOUP_FLAGS'] = env.ParseFlags('!/opt/glib-gcc/bin/pkg-config --cflags --libs libsoup-2.4');
+else:
+	env['LIBSOUP_FLAGS'] = '';
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -198,7 +205,7 @@ int main(int argc, char**argv)
 
 def CheckCheck(context):
 	context.Message('Checking Check unit test framework...');
-	result = context.TryAction('pkg-config --cflags --libs check')[0];
+	result = context.TryAction('/opt/glib-gcc/bin/pkg-config --cflags --libs check')[0];
 	context.Result(result);
 	return result;
 
