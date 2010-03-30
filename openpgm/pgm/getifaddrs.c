@@ -39,7 +39,7 @@
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 
-//#define GETIFADDRS_DEBUG
+#define GETIFADDRS_DEBUG
 
 #ifndef GETIFADDRS_DEBUG
 #define g_trace(...)		while (0)
@@ -105,6 +105,7 @@ pgm_getifaddrs (
 		return -1;
 	}
 	int if_count = lifn.lifn_count;
+	g_trace ("ioctl(AF_INET, SIOCGLIFNUM) = %d", lifn.lifn_count);
 
 /* repeat everything for IPv6 */
 	lifc6.lifc_family = AF_INET6;
@@ -125,6 +126,7 @@ pgm_getifaddrs (
 		return -1;
 	}
 	if_count += lifn.lifn_count;
+	g_trace ("ioctl(AF_INET6, SIOCGLIFNUM) = %d", lifn.lifn_count);
 
 /* alloc a contiguous block for entire list */
 	struct _pgm_ifaddrs* ifa = malloc (if_count * sizeof(struct _pgm_ifaddrs));
@@ -144,6 +146,7 @@ pgm_getifaddrs (
 		}
 
 /* name */
+		g_trace ("name: %s", lifr->lifr_name);
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
 		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
