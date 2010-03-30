@@ -39,7 +39,7 @@
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 
-#define GETIFADDRS_DEBUG
+//#define GETIFADDRS_DEBUG
 
 #ifndef GETIFADDRS_DEBUG
 #define g_trace(...)		while (0)
@@ -84,7 +84,7 @@ pgm_getifaddrs (
 /* process all interfaces with family-agnostic ioctl, unfortunately it still
  * must be called on each family socket despite what if_tcp(7P) says.
  */
-	char buf[1024],  buf6[1024];
+	char buf[32768],  buf6[32768];
 	struct lifconf lifc, lifc6;
 	lifc.lifc_family = AF_INET;
 	lifc.lifc_flags  = 0;
@@ -95,6 +95,7 @@ pgm_getifaddrs (
 		close (sock6);
 		return -1;
 	}
+	g_trace ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, lifc.lifc_len / sizeof(struct lifreq));
 
 	struct lifnum lifn;
 	lifn.lifn_family = AF_INET;
@@ -117,6 +118,7 @@ pgm_getifaddrs (
 		close (sock6);
 		return -1;
 	}
+	g_trace ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, lifc6.lifc_len / sizeof(struct lifreq));
 
 	lifn.lifn_family = AF_INET6;
 	lifn.lifn_flags  = 0;
@@ -146,7 +148,7 @@ pgm_getifaddrs (
 		}
 
 /* name */
-		g_trace ("name: %s", lifr->lifr_name);
+		g_trace ("AF_INET/name: %s", lifr->lifr_name);
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
 		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
@@ -191,6 +193,7 @@ pgm_getifaddrs (
 		}
 
 /* name */
+		g_trace ("AF_INET6/name: %s", lifr->lifr_name);
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
 		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
