@@ -37,21 +37,24 @@ vars.AddVariables (
 #-----------------------------------------------------------------------------
 # Dependencies
 
-def force_gcc(env):
-	env.Tool('gcc', toolpath=['/usr/sfw/bin']);
+def force_sunstudio(env):
+	env.Tool('sunc++', toolpath=['/opt/sunstudio12.1/bin']);
+	env.Tool('suncc', toolpath=['/opt/sunstudio12.1/bin']);
+	env.Tool('sunlink', toolpath=['/opt/sunstudio12.1/bin']);
+	env.Tool('sunar', toolpath=['/opt/sunstudio12.1/bin']);
 
 env = Environment();
-force_gcc(env);
+force_sunstudio(env);
 
 def CheckPKGConfig(context, version):
 	context.Message( 'Checking for pkg-config... ' )
-	ret = context.TryAction('/opt/glib-gcc64/bin/pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	ret = context.TryAction('/opt/glib-sunstudio/bin/pkg-config --atleast-pkgconfig-version=%s' % version)[0]
 	context.Result( ret )
 	return ret
 
 def CheckPKG(context, name):
 	context.Message( 'Checking for %s... ' % name )
-	ret = context.TryAction('/opt/glib-gcc64/bin/pkg-config --exists \'%s\'' % name)[0]
+	ret = context.TryAction('/opt/glib-sunstudio/bin/pkg-config --exists \'%s\'' % name)[0]
 	context.Result( ret )
 	return ret
 
@@ -82,30 +85,8 @@ env = conf.Finish();
 env = Environment(
 	variables = vars,
 	ENV = os.environ,
-	CCFLAGS = [	'-pipe',
-			'-Wall',
-				'-Wextra',
-				'-Wfloat-equal',
-				'-Wshadow',
-#				'-Wunsafe-loop-optimizations',
-				'-Wpointer-arith',
-				'-Wbad-function-cast',
-				'-Wcast-qual',
-				'-Wcast-align',
-				'-Wwrite-strings',
-				'-Waggregate-return',
-				'-Wstrict-prototypes',
-				'-Wold-style-definition',
-				'-Wmissing-prototypes',
-				'-Wmissing-declarations',
-				'-Wmissing-noreturn',
-				'-Wmissing-format-attribute',
-				'-Wredundant-decls',
-				'-Wnested-externs',
-				'-Winline',
-			'-pedantic',
-			'-std=gnu99',
-			'--param', 'max-inline-insns-single=600',
+	CCFLAGS = [	'-v',
+			'-xc99=all',
 			'-D_REENTRANT',
 			'-D_GNU_SOURCE',
 			'-D_XOPEN_SOURCE=600',
@@ -123,14 +104,14 @@ env = Environment(
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
-	LINKFLAGS = [	'-pipe',
-			'-lresolv',
-			'-lsocket',
-			'-lnsl',
-			'-lm'
+	LINKFLAGS = [],
+	LIBS = [	'resolv',
+			'socket',
+			'nsl',
+			'm'
 		    ]
 )
-force_gcc(env);
+force_sunstudio(env);
 
 # Branch prediction
 if env['BRANCH'] == 'profile':
@@ -144,13 +125,13 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = ['-O2','-m64'], LINKFLAGS = '-m64')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-ggdb','-m64'], LINKFLAGS = ['-gdb','-m64'])
+debug.Append(CCFLAGS = ['-g','-m64'], LINKFLAGS = ['-g','-m64'])
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
-thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
+thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32');
 
 # choose and environment to build
 if env['BUILD'] == 'release':
@@ -168,7 +149,7 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('/opt/glib-gcc64/bin/pkg-config --cflags --libs glib-2.0 gthread-2.0');
+env.ParseConfig('/opt/glib-sunstudio/bin/pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -183,7 +164,7 @@ env['SNMP_FLAGS'] = {
 	'LIBPATH'	: ['/opt/csw/lib'],
 };
 if env['WITH_HTTP'] == 'true':
-	env['LIBSOUP_FLAGS'] = env.ParseFlags('!/opt/glib-gcc64/bin/pkg-config --cflags --libs libsoup-2.4');
+	env['LIBSOUP_FLAGS'] = env.ParseFlags('!/opt/glib-sunstudio/bin/pkg-config --cflags --libs libsoup-2.4');
 else:
 	env['LIBSOUP_FLAGS'] = '';
 
@@ -205,7 +186,7 @@ int main(int argc, char**argv)
 
 def CheckCheck(context):
 	context.Message('Checking Check unit test framework...');
-	result = context.TryAction('/opt/glib-gcc64/bin/pkg-config --cflags --libs check')[0];
+	result = context.TryAction('/opt/glib-sunstudio/bin/pkg-config --cflags --libs check')[0];
 	context.Result(result);
 	return result;
 
