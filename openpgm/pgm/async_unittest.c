@@ -163,14 +163,14 @@ START_TEST (test_create_pass_001)
 	pgm_async_t* async = NULL;
 	pgm_transport_t* transport = generate_transport ();
 	GError* err = NULL;
-	fail_unless (TRUE == pgm_async_create (&async, transport, &err));
+	fail_unless (TRUE == pgm_async_create (&async, transport, &err), "create failed");
 }
 END_TEST
 
 START_TEST (test_create_fail_001)
 {
 	GError* err = NULL;
-	fail_unless (FALSE == pgm_async_create (NULL, NULL, &err));
+	fail_unless (FALSE == pgm_async_create (NULL, NULL, &err), "create failed");
 }
 END_TEST
 
@@ -178,7 +178,7 @@ START_TEST (test_create_fail_002)
 {
 	pgm_async_t* async = NULL;
 	GError* err = NULL;
-	fail_unless (FALSE == pgm_async_create (&async, NULL, &err));
+	fail_unless (FALSE == pgm_async_create (&async, NULL, &err), "create failed");
 }
 END_TEST
 
@@ -194,14 +194,14 @@ START_TEST (test_destroy_pass_001)
 	pgm_async_t* async = NULL;
 	pgm_transport_t* transport = generate_transport ();
 	GError* err = NULL;
-	fail_unless (TRUE == pgm_async_create (&async, transport, &err));
-	fail_unless (TRUE == pgm_async_destroy (async));
+	fail_unless (TRUE == pgm_async_create (&async, transport, &err), "create failed");
+	fail_unless (TRUE == pgm_async_destroy (async), "destroy failed");
 }
 END_TEST
 
 START_TEST (test_destroy_fail_001)
 {
-	fail_unless (FALSE == pgm_async_destroy (NULL));
+	fail_unless (FALSE == pgm_async_destroy (NULL), "destroy failed");
 }
 END_TEST
 
@@ -222,21 +222,21 @@ START_TEST (test_recv_pass_001)
 	pgm_async_t* async = NULL;
 	pgm_transport_t* transport = generate_transport ();
 	GError* err = NULL;
-	fail_unless (TRUE == pgm_async_create (&async, transport, &err));
+	fail_unless (TRUE == pgm_async_create (&async, transport, &err), "create failed");
 	struct pgm_msgv_t* msgv = generate_msgv ();
 	g_atomic_pointer_set (&mock_msgv, msgv);
 	pgm_notify_send (&transport->pending_notify);
 	char buffer[1024];
 	gsize bytes_read = 0;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_async_recv (async, &buffer, sizeof(buffer), &bytes_read, 0, &err));
-	fail_unless (TRUE == pgm_async_destroy (async));
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_async_recv (async, &buffer, sizeof(buffer), &bytes_read, 0, &err), "recv failed");
+	fail_unless (TRUE == pgm_async_destroy (async), "destroy failed");
 	g_message ("recv returned \"%s\"", buffer);
 }
 END_TEST
 
 START_TEST (test_recv_fail_001)
 {
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_async_recv (NULL, NULL, 0, NULL, 0, NULL));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_async_recv (NULL, NULL, 0, NULL, 0, NULL), "recv failed");
 }
 END_TEST
 

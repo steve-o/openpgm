@@ -38,23 +38,26 @@ vars.AddVariables (
 # Dependencies
 
 def force_sunstudio(env):
-	env.Tool('sunc++', toolpath=['/opt/sunstudio12.1/bin']);
-	env.Tool('suncc', toolpath=['/opt/sunstudio12.1/bin']);
-	env.Tool('sunlink', toolpath=['/opt/sunstudio12.1/bin']);
-	env.Tool('sunar', toolpath=['/opt/sunstudio12.1/bin']);
+	env.PrependENVPath('PATH', '/usr/ccs/bin');
+	env.PrependENVPath('PATH', '/opt/glib-sunstudio/bin');
+	env.PrependENVPath('PATH', '/opt/sunstudio12.1/bin');
+	env.Tool('sunc++');
+	env.Tool('suncc');
+	env.Tool('sunlink');
+	env.Tool('sunar');
 
 env = Environment();
 force_sunstudio(env);
 
 def CheckPKGConfig(context, version):
 	context.Message( 'Checking for pkg-config... ' )
-	ret = context.TryAction('/opt/glib-sunstudio/bin/pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
 	context.Result( ret )
 	return ret
 
 def CheckPKG(context, name):
 	context.Message( 'Checking for %s... ' % name )
-	ret = context.TryAction('/opt/glib-sunstudio/bin/pkg-config --exists \'%s\'' % name)[0]
+	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
 	context.Result( ret )
 	return ret
 
@@ -149,7 +152,7 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('/opt/glib-sunstudio/bin/pkg-config --cflags --libs glib-2.0 gthread-2.0');
+env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -164,7 +167,7 @@ env['SNMP_FLAGS'] = {
 	'LIBPATH'	: ['/opt/csw/lib'],
 };
 if env['WITH_HTTP'] == 'true':
-	env['LIBSOUP_FLAGS'] = env.ParseFlags('!/opt/glib-sunstudio/bin/pkg-config --cflags --libs libsoup-2.4');
+	env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 else:
 	env['LIBSOUP_FLAGS'] = '';
 
@@ -186,7 +189,7 @@ int main(int argc, char**argv)
 
 def CheckCheck(context):
 	context.Message('Checking Check unit test framework...');
-	result = context.TryAction('/opt/glib-sunstudio/bin/pkg-config --cflags --libs check')[0];
+	result = context.TryAction('pkg-config --cflags --libs check')[0];
 	context.Result(result);
 	return result;
 

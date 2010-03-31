@@ -128,16 +128,18 @@ START_TEST (test_getifaddrs_pass_001)
 {
 	char saddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
 	struct pgm_ifaddrs *ifap = NULL, *ifa;
-	fail_unless (0 == pgm_getifaddrs (&ifap));
+	fail_unless (0 == pgm_getifaddrs (&ifap), "getifaddrs failed");
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		fail_unless (NULL != ifa);
+		fail_unless (NULL != ifa, "invalid address");
 		if (ifa->ifa_addr) {
 			if (AF_INET  == ifa->ifa_addr->sa_family ||
 			    AF_INET6 == ifa->ifa_addr->sa_family)
 				pgm_sockaddr_ntop (ifa->ifa_addr, saddr, sizeof(saddr));
+#ifdef AF_PACKET
 			else if (AF_PACKET == ifa->ifa_addr->sa_family)
 				strcpy (saddr, "(AF_PACKET)");
+#endif
 			else
 				sprintf (saddr, "(AF = %d)", ifa->ifa_addr->sa_family);
 		} else
@@ -146,8 +148,10 @@ START_TEST (test_getifaddrs_pass_001)
 			if (AF_INET  == ifa->ifa_addr->sa_family ||
 			    AF_INET6 == ifa->ifa_addr->sa_family)
 				pgm_sockaddr_ntop (ifa->ifa_netmask, snetmask, sizeof(snetmask));
+#ifdef AF_PACKET
 			else if (AF_PACKET == ifa->ifa_addr->sa_family)
 				strcpy (snetmask, "(AF_PACKET)");
+#endif
 			else
 				sprintf (snetmask, "(AF = %d)", ifa->ifa_addr->sa_family);
 		} else
@@ -170,7 +174,7 @@ END_TEST
 
 START_TEST (test_getifaddrs_fail_001)
 {
-	fail_unless (-1 == pgm_getifaddrs (NULL));
+	fail_unless (-1 == pgm_getifaddrs (NULL), "getifaddrs failed");
 	g_message ("errno:%d", errno);
 }
 END_TEST
@@ -185,7 +189,7 @@ END_TEST
 START_TEST (test_freeifaddrs_pass_001)
 {
 	struct pgm_ifaddrs* ifap = NULL;
-	fail_unless (0 == pgm_getifaddrs (&ifap));
+	fail_unless (0 == pgm_getifaddrs (&ifap), "getifaddrs failed");
 	pgm_freeifaddrs (ifap);
 }
 END_TEST

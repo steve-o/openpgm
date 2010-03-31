@@ -51,14 +51,14 @@ START_TEST (test_inet_pass_001)
 	guint16 csum = pgm_inet_checksum (source, sizeof(source), 0);
 	g_message ("IP checksum of \"%s\" is 0x%04x",
 		   source, csum);
-	fail_unless (0xda1f == csum);
+	fail_unless (0xda1f == csum, "checksum mismatch");
 }
 END_TEST
 
 START_TEST (test_inet_fail_001)
 {
 	pgm_inet_checksum (NULL, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -94,14 +94,14 @@ START_TEST (test_partial_pass_001)
 	guint32 csum = pgm_csum_partial (source, sizeof(source), 0);
 	g_message ("Checksum of \"%s\" is 0x%08x",
 		   source, csum);
-	fail_unless (0x325dd == csum);
+	fail_unless (0x325dd == csum, "checksum mismatch");
 }
 END_TEST
 
 START_TEST (test_partial_fail_001)
 {
 	pgm_csum_partial (NULL, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -123,15 +123,15 @@ START_TEST (test_partial_copy_pass_001)
 	guint32 csum_dest = pgm_csum_partial (dest, sizeof(source), 0);
 	g_message ("Checksum of \"%s\" is 0x%08x, checksum of dest is 0x%08x",
 		   source, csum_source, csum_dest);
-	fail_unless (0x325dd == csum_source);
-	fail_unless (0x325dd == csum_dest);
+	fail_unless (0x325dd == csum_source, "checksum mismatch");
+	fail_unless (0x325dd == csum_dest, "checksum mismatch");
 }
 END_TEST
 
 START_TEST (test_partial_copy_fail_001)
 {
 	pgm_csum_partial_copy (NULL, NULL, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -153,7 +153,7 @@ START_TEST (test_block_add_pass_001)
 	guint16 fold   = pgm_csum_fold (csum);
 	g_message ("Checksum A:0x%08x + B:0x%08x = 0x%08x -> 0x%08x",
 		   csum_a, csum_b, csum, fold);
-	fail_unless (0xda1f == fold);
+	fail_unless (0xda1f == fold, "checksum mismatch");
 }
 END_TEST
 

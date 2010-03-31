@@ -472,16 +472,16 @@ START_TEST (test_getnodeaddr_pass_001)
 	if (!success && err) {
 		g_error ("Resolving node address with AF_UNSPEC: %s", err->message);
 	}
-	fail_unless (TRUE == success);
-	fail_unless (NULL == err);
+	fail_unless (TRUE == success, "getnodeaddr failed");
+	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_UNSPEC:%s", saddr);
-	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err));
-	fail_unless (NULL == err);
+	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
+	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_INET:%s", saddr);
-	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err));
-	fail_unless (NULL == err);
+	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
+	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_INET6:%s", saddr);
 }
@@ -490,7 +490,7 @@ END_TEST
 START_TEST (test_getnodeaddr_fail_001)
 {
 	GError* err = NULL;
-	fail_unless (FALSE == pgm_if_getnodeaddr (AF_UNSPEC, NULL, 0, &err));
+	fail_unless (FALSE == pgm_if_getnodeaddr (AF_UNSPEC, NULL, 0, &err), "getnodeaddr failed");
 }
 END_TEST
 
