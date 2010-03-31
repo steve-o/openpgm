@@ -56,7 +56,7 @@ END_TEST
 START_TEST (test_create_fail_001)
 {
 	pgm_rs_create (NULL, 255, 16);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -78,7 +78,7 @@ END_TEST
 START_TEST (test_destroy_fail_001)
 {
 	pgm_rs_destroy (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -118,7 +118,7 @@ END_TEST
 START_TEST (test_encode_fail_001)
 {
 	pgm_rs_encode (NULL, NULL, 0, NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -175,7 +175,7 @@ END_TEST
 START_TEST (test_decode_parity_inline_fail_001)
 {
 	pgm_rs_decode_parity_inline (NULL, NULL, NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -233,7 +233,7 @@ END_TEST
 START_TEST (test_decode_parity_appended_fail_001)
 {
 	pgm_rs_decode_parity_appended (NULL, NULL, NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
