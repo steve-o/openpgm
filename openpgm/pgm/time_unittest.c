@@ -43,8 +43,8 @@
 
 START_TEST (test_init_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init (NULL));
-	fail_unless (FALSE == pgm_time_init (NULL));
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	fail_unless (FALSE == pgm_time_init (NULL), "init failed");
 }
 END_TEST
 
@@ -55,9 +55,9 @@ END_TEST
 
 START_TEST (test_shutdown_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init (NULL));
-	fail_unless (TRUE == pgm_time_shutdown ());
-	fail_unless (FALSE == pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_time_shutdown (), "shutdown failed");
 }
 END_TEST
 
@@ -68,11 +68,11 @@ END_TEST
 
 START_TEST (test_supported_pass_001)
 {
-	fail_unless (FALSE == pgm_time_supported ());
-	fail_unless (TRUE == pgm_time_init (NULL));
-	fail_unless (TRUE == pgm_time_supported ());
-	fail_unless (TRUE == pgm_time_shutdown ());
-	fail_unless (FALSE == pgm_time_supported ());
+	fail_unless (FALSE == pgm_time_supported (), "supported failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_time_supported (), "supported failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_time_supported (), "supported failed");
 }
 END_TEST
 
@@ -84,7 +84,7 @@ END_TEST
 START_TEST (test_update_now_pass_001)
 {
 	pgm_time_t tstamps[11];
-	fail_unless (TRUE == pgm_time_init (NULL));
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
 	const pgm_time_t start_time = pgm_time_update_now ();
 	for (unsigned i = 1; i <= 10; i++)
 	{
@@ -97,12 +97,12 @@ START_TEST (test_update_now_pass_001)
 		const gint64 elapsed_time = check_time - start_time;
 
 /* must be monotonic */
-		fail_unless (G_LIKELY(check_time >= start_time));
+		fail_unless (G_LIKELY(check_time >= start_time), "non-monotonic");
 
 		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" G_GINT64_FORMAT "us)",
 			   i, check_time, pgm_to_usecs(elapsed_time));
 	}
-	fail_unless (TRUE == pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
 }
 END_TEST
 
@@ -117,7 +117,7 @@ START_TEST (test_sleep_pass_001)
 {
 	pgm_time_t tstamps[11];
 	const pgm_time_t sleep_time = 100 * 1000;	/* 100ms */
-	fail_unless (TRUE == pgm_time_init (NULL));
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
 	pgm_time_t start_time = pgm_time_update_now ();
 	for (unsigned i = 1; i <= 10; i++)
 	{
@@ -128,7 +128,7 @@ START_TEST (test_sleep_pass_001)
 	{
 		const pgm_time_t check_time = tstamps[i];
 
-		fail_unless (check_time >= start_time);
+		fail_unless (check_time >= start_time, "non-monotonic");
 		const gint64 elapsed_time = check_time - start_time;
 
 /* should be close to zero */
@@ -139,7 +139,7 @@ START_TEST (test_sleep_pass_001)
 
 		start_time = check_time;
 	}
-	fail_unless (TRUE == pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
 }
 END_TEST
 
@@ -156,15 +156,15 @@ START_TEST (test_since_epoch_pass_001)
 	char stime[1024];
 	time_t t;
 	struct tm* tmp;
-	fail_unless (TRUE == pgm_time_init (NULL));
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
 	pgm_time_t pgm_now = pgm_time_update_now ();
 	pgm_time_since_epoch (&pgm_now, &t);
 	tmp = localtime (&t);
-	fail_unless (NULL != tmp);
-	fail_unless (0 != strftime (stime, sizeof(stime), "%X", tmp));
+	fail_unless (NULL != tmp, "localtime failed");
+	fail_unless (0 != strftime (stime, sizeof(stime), "%X", tmp), "strftime failed");
 	g_message ("pgm-time:%" PGM_TIME_FORMAT " = %s",
 		   pgm_now, stime);
-	fail_unless (TRUE == pgm_time_shutdown ());
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
 }
 END_TEST
 

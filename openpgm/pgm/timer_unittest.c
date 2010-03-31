@@ -147,7 +147,7 @@ mock_pgm_time_update_now (void)
 }
 
 /** receiver module */
-static
+PGM_GNUC_INTERNAL
 pgm_time_t
 mock_pgm_min_nak_expiry (
 	pgm_time_t		expiration,
@@ -158,7 +158,7 @@ mock_pgm_min_nak_expiry (
 	return 0x1;
 }
 
-static
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_check_peer_nak_state (
 	pgm_transport_t*	transport,
@@ -170,7 +170,7 @@ mock_pgm_check_peer_nak_state (
 }
 
 /** source module */
-static
+PGM_GNUC_INTERNAL
 int
 mock_pgm_send_spm (
 	pgm_transport_t*	transport,
@@ -212,16 +212,17 @@ mock_pgm_send_spm (
 START_TEST (test_prepare_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->can_send_data = TRUE;
 	transport->next_ambient_spm = mock_pgm_time_now + pgm_secs(10);
-	fail_unless (FALSE == pgm_timer_prepare (transport));
+	fail_unless (FALSE == pgm_timer_prepare (transport), "prepare failed");
 }
 END_TEST
 
 START_TEST (test_prepare_fail_001)
 {
 	gboolean expired = pgm_timer_prepare (NULL);
-	fail();
+	fail ("reached");
 }
 END_TEST
 
@@ -235,14 +236,15 @@ END_TEST
 START_TEST (test_check_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_timer_check (transport));
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_timer_check (transport), "check failed");
 }
 END_TEST
 
 START_TEST (test_check_fail_001)
 {
 	gboolean expired = pgm_timer_check (NULL);
-	fail();
+	fail ("reached");
 }
 END_TEST
 
@@ -256,15 +258,16 @@ END_TEST
 START_TEST (test_expiration_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->next_poll = mock_pgm_time_now + pgm_secs(300);
-	fail_unless (pgm_secs(300) == pgm_timer_expiration (transport));
+	fail_unless (pgm_secs(300) == pgm_timer_expiration (transport), "expiration failed");
 }
 END_TEST
 
 START_TEST (test_expiration_fail_001)
 {
 	long expiration = pgm_timer_expiration (NULL);
-	fail();
+	fail ("reached");
 }
 END_TEST
 
@@ -278,6 +281,7 @@ END_TEST
 START_TEST (test_dispatch_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	pgm_timer_dispatch (transport);
 }
 END_TEST
@@ -285,7 +289,7 @@ END_TEST
 START_TEST (test_dispatch_fail_001)
 {
 	pgm_timer_dispatch (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
