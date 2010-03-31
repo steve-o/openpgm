@@ -50,6 +50,7 @@ mock_teardown (void)
 
 /* mock functions for external references */
 
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_time_init (
 	GError**	error
@@ -61,12 +62,16 @@ mock_pgm_time_init (
 	return TRUE;
 }
 
+
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_time_supported (void)
 {
 	return mock_time_init;
 }
 
+
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_time_shutdown (void)
 {
@@ -103,8 +108,8 @@ mock_pgm_transport_destroy (
 
 START_TEST (test_init_pass_001)
 {
-	fail_unless (TRUE == pgm_init (NULL));
-	fail_unless (FALSE == pgm_init (NULL));
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (FALSE == pgm_init (NULL), "init failed");
 }
 END_TEST
 
@@ -112,17 +117,17 @@ END_TEST
 START_TEST (test_init_pass_002)
 {
 	g_thread_init (NULL);
-	fail_unless (TRUE == pgm_init (NULL));
-	fail_unless (FALSE == pgm_init (NULL));
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (FALSE == pgm_init (NULL), "init failed");
 }
 END_TEST
 
 /* timing module already init */
 START_TEST (test_init_pass_003)
 {
-	fail_unless (TRUE == pgm_time_init (NULL));
-	fail_unless (TRUE == pgm_init (NULL));
-	fail_unless (FALSE == pgm_init (NULL));
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (FALSE == pgm_init (NULL), "init failed");
 }
 END_TEST
 
@@ -133,24 +138,24 @@ END_TEST
 
 START_TEST (test_shutdown_pass_001)
 {
-	fail_unless (TRUE == pgm_init (NULL));
-	fail_unless (TRUE == pgm_shutdown ());
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
 }
 END_TEST
 
 /* no init */
 START_TEST (test_shutdown_pass_002)
 {
-	fail_unless (FALSE == pgm_shutdown ());
+	fail_unless (FALSE == pgm_shutdown (), "shutdown failed");
 }
 END_TEST
 
 /* double call */
 START_TEST (test_shutdown_pass_003)
 {
-	fail_unless (TRUE == pgm_init (NULL));
-	fail_unless (TRUE == pgm_shutdown ());
-	fail_unless (FALSE == pgm_shutdown ());
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_shutdown (), "shutdown failed");
 }
 END_TEST
 
@@ -161,11 +166,11 @@ END_TEST
 
 START_TEST (test_supported_pass_001)
 {
-	fail_unless (FALSE == pgm_supported());
-	fail_unless (TRUE == pgm_init (NULL));
-	fail_unless (TRUE == pgm_supported());
-	fail_unless (TRUE == pgm_shutdown ());
-	fail_unless (FALSE == pgm_supported());
+	fail_unless (FALSE == pgm_supported(), "supported failed");
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_supported(), "supported failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_supported(), "supported failed");
 }
 END_TEST
 
