@@ -71,7 +71,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['gsi_unittest.c', e.Object('md5.c')]);
 	te.Program ('tsi_unittest.c');
 	te.Program (['if_unittest.c', e.Object('inet_network.c'), e.Object('sockaddr.c'), e.Object('getifaddrs.c')]);
-	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('sockaddr.c')]);
+	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('sockaddr.c'), e.Object('getifaddrs.c')]);
 	te.Program (['source_unittest.c', e.Object('sockaddr.c')]);
 	te.Program (['receiver_unittest.c', e.Object('tsi.c'), e.Object('sockaddr.c')]);
 	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c'), e.Object('sockaddr.c')]);
