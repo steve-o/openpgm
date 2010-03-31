@@ -103,18 +103,18 @@ START_TEST (test_create_from_hostname_pass_001)
 {
 	pgm_gsi_t gsi;
 	GError* err = NULL;
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, &err));
-	fail_if (err);
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL));
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, &err), "create_from_hostname failed");
+	fail_if (err, "error raised");
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
 }
 END_TEST
 
 START_TEST (test_create_from_hostname_pass_002)
 {
 	GError* err = NULL;
-	fail_if (pgm_gsi_create_from_hostname (NULL, &err));
-	fail_if (err);
-	fail_if (pgm_gsi_create_from_hostname (NULL, NULL));
+	fail_if (pgm_gsi_create_from_hostname (NULL, &err), "create_from_hostname failed");
+	fail_if (err, "error raised");
+	fail_if (pgm_gsi_create_from_hostname (NULL, NULL), "create_from_hostname failed");
 }
 END_TEST
 
@@ -123,11 +123,11 @@ START_TEST (test_create_from_hostname_pass_003)
 {
 	pgm_gsi_t gsi;
 	GError* err = NULL;
-	fail_if (pgm_gsi_create_from_hostname (&gsi, &err));
-	fail_if (NULL == err);
-	fail_if (NULL == err->message);
+	fail_if (pgm_gsi_create_from_hostname (&gsi, &err), "create_from_hostname failed");
+	fail_if (NULL == err, "error not raised");
+	fail_if (NULL == err->message, "no error message");
 	g_debug ("GError: %s", err->message);
-	fail_if (pgm_gsi_create_from_hostname (&gsi, NULL));
+	fail_if (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
 }
 END_TEST
 
@@ -143,17 +143,17 @@ START_TEST (test_create_from_addr_pass_001)
 {
 	pgm_gsi_t gsi;
 	GError* err = NULL;
-	fail_unless (pgm_gsi_create_from_addr (&gsi, &err));
-	fail_if (err);
-	fail_unless (pgm_gsi_create_from_addr (&gsi, NULL));
+	fail_unless (pgm_gsi_create_from_addr (&gsi, &err), "create_from_addr failed");
+	fail_if (err, "error raised");
+	fail_unless (pgm_gsi_create_from_addr (&gsi, NULL), "create_from_addr failed");
 }
 END_TEST
 
 START_TEST (test_create_from_addr_pass_002)
 {
 	GError* err = NULL;
-	fail_if (pgm_gsi_create_from_addr (NULL, &err));
-	fail_if (pgm_gsi_create_from_addr (NULL, NULL));
+	fail_if (pgm_gsi_create_from_addr (NULL, &err), "create_from_addr failed");
+	fail_if (pgm_gsi_create_from_addr (NULL, NULL), "create_from_addr failed");
 }
 END_TEST
 
@@ -162,11 +162,11 @@ START_TEST (test_create_from_addr_pass_003)
 {
 	pgm_gsi_t gsi;
 	GError* err = NULL;
-	fail_if (pgm_gsi_create_from_addr (&gsi, &err));
-	fail_if (NULL == err);
-	fail_if (NULL == err->message);
+	fail_if (pgm_gsi_create_from_addr (&gsi, &err), "create_from_addr failed");
+	fail_if (NULL == err, "error not raised");
+	fail_if (NULL == err->message, "no error message");
 	g_debug ("GError: %s", err->message);
-	fail_if (pgm_gsi_create_from_addr (&gsi, NULL));
+	fail_if (pgm_gsi_create_from_addr (&gsi, NULL), "create_from_addr failed");
 }
 END_TEST
 
@@ -180,14 +180,14 @@ END_TEST
 START_TEST (test_print_pass_001)
 {
 	pgm_gsi_t gsi;
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL));
-	fail_if (NULL == pgm_gsi_print (&gsi));
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
+	fail_if (NULL == pgm_gsi_print (&gsi), "print failed");
 }
 END_TEST
 
 START_TEST (test_print_pass_002)
 {
-	fail_unless (NULL == pgm_gsi_print (NULL));
+	fail_unless (NULL == pgm_gsi_print (NULL), "print failed");
 }
 END_TEST
 
@@ -204,8 +204,8 @@ START_TEST (test_print_r_pass_001)
 {
 	pgm_gsi_t gsi;
 	char buf[PGM_GSISTRLEN];
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL));
-	fail_unless (pgm_gsi_print_r (&gsi, buf, sizeof(buf)) > 0);
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
+	fail_unless (pgm_gsi_print_r (&gsi, buf, sizeof(buf)) > 0, "print_r failed");
 }
 END_TEST
 
@@ -213,10 +213,10 @@ START_TEST (test_print_r_pass_002)
 {
 	pgm_gsi_t gsi;
 	char buf[PGM_GSISTRLEN];
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL));
-	fail_unless (pgm_gsi_print_r (NULL, buf, sizeof(buf)) == -1);
-	fail_unless (pgm_gsi_print_r (&gsi, NULL, sizeof(buf)) == -1);
-	fail_unless (pgm_gsi_print_r (&gsi, buf, 0) == -1);
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
+	fail_unless (pgm_gsi_print_r (NULL, buf, sizeof(buf)) == -1, "print_r failed");
+	fail_unless (pgm_gsi_print_r (&gsi, NULL, sizeof(buf)) == -1, "print_r failed");
+	fail_unless (pgm_gsi_print_r (&gsi, buf, 0) == -1, "print_r failed");
 }
 END_TEST
 
@@ -231,36 +231,36 @@ END_TEST
 START_TEST (test_equal_pass_001)
 {
 	pgm_gsi_t gsi1, gsi2;
-	fail_unless (pgm_gsi_create_from_hostname (&gsi1, NULL));
-	fail_unless (pgm_gsi_create_from_hostname (&gsi2, NULL));
-	fail_unless (pgm_gsi_equal (&gsi1, &gsi2));
+	fail_unless (pgm_gsi_create_from_hostname (&gsi1, NULL), "create_from_hostname failed");
+	fail_unless (pgm_gsi_create_from_hostname (&gsi2, NULL), "create_from_hostname failed");
+	fail_unless (pgm_gsi_equal (&gsi1, &gsi2), "equal failed");
 }
 END_TEST
 
 START_TEST (test_equal_pass_002)
 {
 	pgm_gsi_t gsi1, gsi2;
-	fail_unless (pgm_gsi_create_from_hostname (&gsi1, NULL));
-	fail_unless (pgm_gsi_create_from_addr (&gsi2, NULL));
-	fail_if (pgm_gsi_equal (&gsi1, &gsi2));
+	fail_unless (pgm_gsi_create_from_hostname (&gsi1, NULL), "create_from_hostname failed");
+	fail_unless (pgm_gsi_create_from_addr (&gsi2, NULL), "create_from_addr failed");
+	fail_if (pgm_gsi_equal (&gsi1, &gsi2), "equal failed");
 }
 END_TEST
 
 START_TEST (test_equal_fail_001)
 {
 	pgm_gsi_t gsi;
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL));
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
 	gboolean retval = pgm_gsi_equal (NULL, &gsi);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_equal_fail_002)
 {
 	pgm_gsi_t gsi;
-	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL));
+	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
 	gboolean retval = pgm_gsi_equal (&gsi, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
