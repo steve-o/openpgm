@@ -38,10 +38,10 @@
  * level is the protocol number of the protocl that controls the option.
  */
 #ifndef SOL_IP
-#	define SOL_IP		PF_INET
+#	define SOL_IP		IPPROTO_IP
 #endif
 #ifndef SOL_IPV6
-#	define SOL_IPV6		PF_INET6
+#	define SOL_IPV6		IPPROTO_IPV6
 #endif
 
 
