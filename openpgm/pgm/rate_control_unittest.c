@@ -69,7 +69,7 @@ END_TEST
 START_TEST (test_create_fail_001)
 {
 	pgm_rate_create (NULL, 0, 0, 1500);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -91,7 +91,7 @@ END_TEST
 START_TEST (test_destroy_fail_001)
 {
 	pgm_rate_destroy (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -111,9 +111,9 @@ START_TEST (test_check_pass_001)
 	rate_t* rate = NULL;
 	pgm_rate_create (&rate, 2*1010, 10, 1500);
 	mock_pgm_time_now += pgm_secs(2);
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 	pgm_rate_destroy (rate);
 }
 END_TEST
@@ -121,7 +121,7 @@ END_TEST
 START_TEST (test_check_fail_001)
 {
 	pgm_rate_check (NULL, 1000, FALSE);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -133,8 +133,8 @@ START_TEST (test_check_pass_002)
 	rate_t* rate = NULL;
 	pgm_rate_create (&rate, 2*900, 10, 1500);
 	mock_pgm_time_now += pgm_secs(2);
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 	pgm_rate_destroy (rate);
 }
 END_TEST
@@ -147,28 +147,28 @@ START_TEST (test_check_pass_003)
 	rate_t* rate = NULL;
 	pgm_rate_create (&rate, 2*1010*1000, 10, 1500);
 	mock_pgm_time_now += pgm_secs(2);
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 /* duplicate check at same time point */
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 /* advance time causing a millisecond fill to occur */
 	mock_pgm_time_now += pgm_msecs(1);
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 /* advance time to fill bucket enough for only one packet */
 	mock_pgm_time_now += pgm_usecs(500);
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 /* advance time to fill the bucket a little but not enough for one packet */
 	mock_pgm_time_now += pgm_usecs(100);
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 /* advance time a lot, should be limited to millisecond fill rate */
 	mock_pgm_time_now += pgm_secs(10);
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE));
-	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE));
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (TRUE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
+	fail_unless (FALSE == pgm_rate_check (rate, 1000, TRUE), "rate_check failed");
 	pgm_rate_destroy (rate);
 }
 END_TEST
