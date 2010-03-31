@@ -69,7 +69,7 @@ generate_asm_tinfo (void)
 }
 
 /** receiver module */
-static
+PGM_GNUC_INTERNAL
 void
 mock_pgm_peer_unref (
 	pgm_peer_t*		peer
@@ -89,7 +89,7 @@ mock_pgm_on_nak_notify (
 	return TRUE;
 }
 
-static
+PGM_GNUC_INTERNAL
 int
 mock_pgm_send_spm (
 	pgm_transport_t*	transport,
@@ -100,7 +100,7 @@ mock_pgm_send_spm (
 }
 
 /** timer module */
-static
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_timer_prepare (
 	pgm_transport_t* const		transport
@@ -109,7 +109,7 @@ mock_pgm_timer_prepare (
 	return FALSE;
 }
 
-static
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_timer_check (
 	pgm_transport_t* const		transport
@@ -118,7 +118,7 @@ mock_pgm_timer_check (
 	return FALSE;
 }
 
-static
+PGM_GNUC_INTERNAL
 long
 mock_pgm_timer_expiration (
 	pgm_transport_t* const		transport
@@ -127,7 +127,7 @@ mock_pgm_timer_expiration (
 	return 100L;
 }
 
-static
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_timer_dispatch (
 	pgm_transport_t* const		transport
@@ -164,7 +164,7 @@ mock_pgm_txw_shutdown (
 }
 
 /** rate control module */
-static
+PGM_GNUC_INTERNAL
 void
 mock_pgm_rate_create (
 	gpointer*		bucket_,
@@ -175,7 +175,7 @@ mock_pgm_rate_create (
 {
 }
 
-static
+PGM_GNUC_INTERNAL
 void
 mock_pgm_rate_destroy (
 	gpointer		bucket
@@ -183,7 +183,7 @@ mock_pgm_rate_destroy (
 {
 }
 
-static
+PGM_GNUC_INTERNAL
 pgm_time_t
 mock_pgm_rate_remaining (
 	gpointer		bucket,
@@ -258,8 +258,9 @@ START_TEST (test_create_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
 }
 END_TEST
 
@@ -268,7 +269,8 @@ START_TEST (test_create_fail_002)
 {
 	GError* err = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (FALSE == pgm_transport_create (NULL, tinfo, &err));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (FALSE == pgm_transport_create (NULL, tinfo, &err), "create failed");
 }
 END_TEST
 
@@ -277,7 +279,7 @@ START_TEST (test_create_fail_003)
 {
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
-	fail_unless (FALSE == pgm_transport_create (&transport, NULL, &err));
+	fail_unless (FALSE == pgm_transport_create (&transport, NULL, &err), "create failed");
 }
 END_TEST
 
@@ -294,16 +296,17 @@ START_TEST (test_bind_fail_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (FALSE == pgm_transport_bind (transport, &err));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (FALSE == pgm_transport_bind (transport, &err), "bind failed");
 }
 END_TEST
 
 START_TEST (test_bind_fail_002)
 {
 	GError* err = NULL;
-	fail_unless (FALSE == pgm_transport_bind (NULL, &err));
+	fail_unless (FALSE == pgm_transport_bind (NULL, &err), "bind failed");
 }
 END_TEST
 
@@ -320,15 +323,16 @@ START_TEST (test_destroy_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_destroy (transport, FALSE));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_destroy (transport, FALSE), "destroy failed");
 }
 END_TEST
 
 START_TEST (test_destroy_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_destroy (NULL, FALSE));
+	fail_unless (FALSE == pgm_transport_destroy (NULL, FALSE), "destroy failed");
 }
 END_TEST
 
@@ -345,15 +349,16 @@ START_TEST (test_set_max_tpdu_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_max_tpdu (transport, 1500));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_max_tpdu (transport, 1500), "set_max_tpdu failed");
 }
 END_TEST
 
 START_TEST (test_set_max_tpdu_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_max_tpdu (NULL, 1500));
+	fail_unless (FALSE == pgm_transport_set_max_tpdu (NULL, 1500), "set_max_tpdu failed");
 }
 END_TEST
 
@@ -362,9 +367,10 @@ START_TEST (test_set_max_tpdu_fail_002)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (FALSE == pgm_transport_set_max_tpdu (transport, 1));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (FALSE == pgm_transport_set_max_tpdu (transport, 1), "set_max_tpdu failed");
 }
 END_TEST
 
@@ -381,15 +387,16 @@ START_TEST (test_set_multicast_loop_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_multicast_loop (transport, TRUE));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_multicast_loop (transport, TRUE), "set_multicast_loop failed");
 }
 END_TEST
 
 START_TEST (test_set_multicast_loop_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_multicast_loop (NULL, TRUE));
+	fail_unless (FALSE == pgm_transport_set_multicast_loop (NULL, TRUE), "set_multicast_loop failed");
 }
 END_TEST
 
@@ -406,15 +413,16 @@ START_TEST (test_set_hops_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_hops (transport, 16));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_hops (transport, 16), "set_hops failed");
 }
 END_TEST
 
 START_TEST (test_set_hops_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_hops (NULL, 16));
+	fail_unless (FALSE == pgm_transport_set_hops (NULL, 16), "set_hops failed");
 }
 END_TEST
 
@@ -431,15 +439,16 @@ START_TEST (test_set_sndbuf_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_sndbuf (transport, 131071));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_sndbuf (transport, 131071), "set_sndbuf failed");
 }
 END_TEST
 
 START_TEST (test_set_sndbuf_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_sndbuf (NULL, 131071));
+	fail_unless (FALSE == pgm_transport_set_sndbuf (NULL, 131071), "set_sndbuf failed");
 }
 END_TEST
 
@@ -456,15 +465,16 @@ START_TEST (test_set_rcvbuf_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_rcvbuf (transport, 131071));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_rcvbuf (transport, 131071), "set_rcvbuf failed");
 }
 END_TEST
 
 START_TEST (test_set_rcvbuf_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_rcvbuf (NULL, 131071));
+	fail_unless (FALSE == pgm_transport_set_rcvbuf (NULL, 131071), "set_rcvbuf failed");
 }
 END_TEST
 
@@ -485,15 +495,16 @@ START_TEST (test_set_fec_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_fec (transport, 239, TRUE, TRUE, 255, 16));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_fec (transport, 239, TRUE, TRUE, 255, 16), "set_fec failed");
 }
 END_TEST
 
 START_TEST (test_set_fec_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_fec (NULL, 0, TRUE, TRUE, 255, 16));
+	fail_unless (FALSE == pgm_transport_set_fec (NULL, 0, TRUE, TRUE, 255, 16), "set_fec failed");
 }
 END_TEST
 
@@ -513,15 +524,16 @@ START_TEST (test_set_send_only_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_send_only (transport, TRUE));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_send_only (transport, TRUE), "set_send_only failed");
 }
 END_TEST
 
 START_TEST (test_set_send_only_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_send_only (NULL, TRUE));
+	fail_unless (FALSE == pgm_transport_set_send_only (NULL, TRUE), "set_send_only failed");
 }
 END_TEST
 
@@ -539,15 +551,16 @@ START_TEST (test_set_recv_only_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_recv_only (transport, TRUE, FALSE));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_recv_only (transport, TRUE, FALSE), "set_recv_only failed");
 }
 END_TEST
 
 START_TEST (test_set_recv_only_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_recv_only (NULL, TRUE, FALSE));
+	fail_unless (FALSE == pgm_transport_set_recv_only (NULL, TRUE, FALSE), "set_recv_only failed");
 }
 END_TEST
 
@@ -564,15 +577,16 @@ START_TEST (test_set_abort_on_reset_pass_001)
 	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_transport_set_abort_on_reset (transport, TRUE));
+	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
+	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_transport_set_abort_on_reset (transport, TRUE), "set_abort_on_reset failed");
 }
 END_TEST
 
 START_TEST (test_set_abort_on_reset_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_abort_on_reset (NULL, TRUE));
+	fail_unless (FALSE == pgm_transport_set_abort_on_reset (NULL, TRUE), "set_abort_on_reset failed");
 }
 END_TEST
 
