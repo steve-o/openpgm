@@ -136,7 +136,7 @@ generate_valid_skb (void)
 START_TEST (test_create_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 100, 0, 0));
+	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 100, 0, 0), "create failed");
 }
 END_TEST
 
@@ -144,7 +144,7 @@ END_TEST
 START_TEST (test_create_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 0, 60, 800000));
+	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 0, 60, 800000), "create failed");
 }
 END_TEST
 
@@ -152,7 +152,7 @@ END_TEST
 START_TEST (test_create_pass_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 9000, 0, 60, 800000));
+	fail_if (NULL == pgm_rxw_create (&tsi, 9000, 0, 60, 800000), "create failed");
 }
 END_TEST
 
@@ -160,7 +160,7 @@ END_TEST
 START_TEST (test_create_pass_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, UINT16_MAX, 0, 60, 800000));
+	fail_if (NULL == pgm_rxw_create (&tsi, UINT16_MAX, 0, 60, 800000), "create failed");
 }
 END_TEST
 
@@ -168,7 +168,7 @@ END_TEST
 START_TEST (test_create_fail_001)
 {
 	pgm_rxw_t* window = pgm_rxw_create (NULL, 1500, 100, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -176,7 +176,7 @@ END_TEST
 START_TEST (test_create_fail_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 0, 100, 0, 0));
+	fail_if (NULL == pgm_rxw_create (&tsi, 0, 100, 0, 0), "create failed");
 }
 END_TEST
 
@@ -184,7 +184,7 @@ START_TEST (test_create_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 60, 800000);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -193,7 +193,7 @@ START_TEST (test_create_fail_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 0, 800000);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -202,7 +202,7 @@ START_TEST (test_create_fail_005)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 60, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -210,7 +210,7 @@ END_TEST
 START_TEST (test_create_fail_006)
 {
 	pgm_rxw_t* window = pgm_rxw_create (NULL, 0, 0, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -225,7 +225,7 @@ START_TEST (test_destroy_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -233,7 +233,7 @@ END_TEST
 START_TEST (test_destroy_fail_001)
 {
 	pgm_rxw_destroy (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -252,13 +252,13 @@ START_TEST (test_add_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -268,24 +268,24 @@ START_TEST (test_add_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
         pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-        fail_if (NULL == window);
+        fail_if (NULL == window, "create failed");
 /* #1 */
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
         const pgm_time_t nak_rb_expiry = 2;
-        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 /* #2 with jump */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (2);
-	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not missing");
 /* #3 to fill in gap */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (1);
-	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
         pgm_rxw_destroy (window);
 }
 END_TEST
@@ -295,24 +295,24 @@ START_TEST (test_add_pass_003)
 {
         pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
         pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-        fail_if (NULL == window);
+        fail_if (NULL == window, "create failed");
 /* #1 */
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
         const pgm_time_t nak_rb_expiry = 2;
-        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 /* #2 repeat sequence  */
         skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (0);
-        fail_unless (PGM_RXW_DUPLICATE == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_DUPLICATE == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not duplicate");
 /* #3 append */
         skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (1);
-        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
         pgm_rxw_destroy (window);
 }
 END_TEST
@@ -322,14 +322,14 @@ START_TEST (test_add_pass_004)
 {
         pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
         pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-        fail_if (NULL == window);
+        fail_if (NULL == window, "create failed");
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
-        fail_if (NULL == skb); 
+        fail_if (NULL == skb, "generate_valid_skb failed"); 
 	skb->pgm_header->pgm_tsdu_length = g_htons (65535);
         skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
         const pgm_time_t nak_rb_expiry = 2;
-        fail_unless (PGM_RXW_MALFORMED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_MALFORMED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not malformed");
 }
 END_TEST
 
@@ -338,39 +338,39 @@ START_TEST (test_add_pass_005)
 {
         pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
         pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-        fail_if (NULL == window);
+        fail_if (NULL == window, "create failed");
 /* #1 */
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
-        fail_if (NULL == skb); 
+        fail_if (NULL == skb, "generate_valid_skb failed"); 
         skb->pgm_data->data_sqn = g_htonl (0);
 	skb->pgm_data->data_trail = g_htonl (-10);
 	const pgm_time_t now = 1;
         const pgm_time_t nak_rb_expiry = 2;
-        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 /* #2 jump backwards  */
         skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (-1);
 	skb->pgm_data->data_trail = g_htonl (-10);
-        fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not bounds");
 /* #3 append */
         skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (1);
 	skb->pgm_data->data_trail = g_htonl (-10);
-        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 /* #4 jump forward */
         skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (100 + (UINT32_MAX / 2));
 	skb->pgm_data->data_trail = g_htonl (UINT32_MAX / 2);
-        fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not bounds");
 /* #5 append */
         skb = generate_valid_skb ();
-        fail_if (NULL == skb);
+        fail_if (NULL == skb, "generate_valid_skb failed");
         skb->pgm_data->data_sqn = g_htonl (2);
 	skb->pgm_data->data_trail = g_htonl (-10);
-        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+        fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
         pgm_rxw_destroy (window);
 }
 END_TEST
@@ -380,11 +380,11 @@ START_TEST (test_add_fail_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
 	int retval = pgm_rxw_add (window, NULL, now, nak_rb_expiry);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -392,12 +392,12 @@ END_TEST
 START_TEST (test_add_fail_002)
 {
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
 	int retval = pgm_rxw_add (NULL, skb, now, nak_rb_expiry);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -406,13 +406,13 @@ START_TEST (test_add_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	char buffer[1500];
 	memset (buffer, 0, sizeof(buffer));
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
 	int retval = pgm_rxw_add (window, (struct pgm_sk_buff_t*)buffer, now, nak_rb_expiry);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -421,13 +421,13 @@ START_TEST (test_add_fail_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	int retval = pgm_rxw_add (window, skb, now, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -443,17 +443,17 @@ START_TEST (test_peek_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	fail_unless (NULL == pgm_rxw_peek (window, 0));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (skb == pgm_rxw_peek (window, 0));
-	fail_unless (NULL == pgm_rxw_peek (window, 1));
-	fail_unless (NULL == pgm_rxw_peek (window, -1));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (skb == pgm_rxw_peek (window, 0), "peek failed");
+	fail_unless (NULL == pgm_rxw_peek (window, 1), "peek failed");
+	fail_unless (NULL == pgm_rxw_peek (window, -1), "peek failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -462,7 +462,7 @@ END_TEST
 START_TEST (test_peek_fail_001)
 {
 	struct pgm_sk_buff_t* skb = pgm_rxw_peek (NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -474,8 +474,8 @@ START_TEST (test_max_length_pass_001)
 	const guint window_length = 100;
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, window_length, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (window_length == pgm_rxw_max_length (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (window_length == pgm_rxw_max_length (window), "max_length failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -483,7 +483,7 @@ END_TEST
 START_TEST (test_max_length_fail_001)
 {
 	pgm_rxw_max_length (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -493,21 +493,21 @@ START_TEST (test_length_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (0 == pgm_rxw_length (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (0 == pgm_rxw_length (window), "length failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (1 == pgm_rxw_length (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (1 == pgm_rxw_length (window), "length failed");
 /* #2 */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (1);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (2 == pgm_rxw_length (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (2 == pgm_rxw_length (window), "length failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -515,7 +515,7 @@ END_TEST
 START_TEST (test_length_fail_001)
 {
 	pgm_rxw_length (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -525,21 +525,21 @@ START_TEST (test_size_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (0 == pgm_rxw_size (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (0 == pgm_rxw_size (window), "size failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (1000 == pgm_rxw_size (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (1000 == pgm_rxw_size (window), "size failed");
 /* #2 */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (1);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (2000 == pgm_rxw_size (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (2000 == pgm_rxw_size (window), "size failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -547,7 +547,7 @@ END_TEST
 START_TEST (test_size_fail_001)
 {
 	pgm_rxw_size (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -557,15 +557,15 @@ START_TEST (test_is_empty_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (pgm_rxw_is_empty (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (pgm_rxw_is_empty (window), "is_empty failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_if (pgm_rxw_is_empty (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_if (pgm_rxw_is_empty (window), "is_empty failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -573,7 +573,7 @@ END_TEST
 START_TEST (test_is_empty_fail_001)
 {
 	pgm_rxw_is_empty (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -583,15 +583,15 @@ START_TEST (test_is_full_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 1, 0, 0);
-	fail_if (NULL == window);
-	fail_if (pgm_rxw_is_full (window));
+	fail_if (NULL == window, "create failed");
+	fail_if (pgm_rxw_is_full (window), "is_full failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (pgm_rxw_is_full (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (pgm_rxw_is_full (window), "is_full failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -599,7 +599,7 @@ END_TEST
 START_TEST (test_is_full_fail_001)
 {
 	pgm_rxw_is_full (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -609,15 +609,15 @@ START_TEST (test_lead_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	guint32 lead = pgm_rxw_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (lead + 1 == pgm_rxw_lead (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (lead + 1 == pgm_rxw_lead (window), "lead failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -625,7 +625,7 @@ END_TEST
 START_TEST (test_lead_fail_001)
 {
 	pgm_rxw_lead (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -635,15 +635,15 @@ START_TEST (test_next_lead_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	guint32 next_lead = pgm_rxw_next_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (next_lead == pgm_rxw_lead (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (next_lead == pgm_rxw_lead (window), "lead failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -651,7 +651,7 @@ END_TEST
 START_TEST (test_next_lead_fail_001)
 {
 	pgm_rxw_next_lead (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -668,50 +668,50 @@ START_TEST (test_readv_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[2], *pmsg;
 /* #1 empty */
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 /* #2 single TPDU-APDU */
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pmsg = msgv;
-	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 /* #3,4 two APDUs */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (1);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (2);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pmsg = msgv;
-	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 /* #5,6 skip and repair APDU */
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (4);
-	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not missing");
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (3);
-	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
 	pmsg = msgv;
-	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -721,21 +721,21 @@ START_TEST (test_readv_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[2], *pmsg;
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_header->pgm_tsdu_length = g_htons (0);
 	skb->tail = (guint8*)skb->tail - skb->len;
 	skb->len = 0;
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pmsg = msgv;
-	fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -745,33 +745,33 @@ START_TEST (test_readv_pass_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 100; i++)
 	{
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless ((1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless ((1 + i) == pgm_rxw_length (window), "length failed");
 	}
-	fail_unless (pgm_rxw_is_full (window));
-	fail_unless (_pgm_rxw_commit_is_empty (window));
+	fail_unless (pgm_rxw_is_full (window), "is_full failed");
+	fail_unless (_pgm_rxw_commit_is_empty (window), "commit_is_empty failed");
 	for (unsigned i = 0; i < 100; i++)
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
-	fail_unless (pgm_rxw_length (window) == _pgm_rxw_commit_length (window));
+	fail_unless (pgm_rxw_length (window) == _pgm_rxw_commit_length (window), "commit_length failed");
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -781,33 +781,33 @@ START_TEST (test_readv_pass_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 101; i++)
 	{
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window), "length failed");
 	}
-	fail_unless (pgm_rxw_is_full (window));
-	fail_unless (_pgm_rxw_commit_is_empty (window));
+	fail_unless (pgm_rxw_is_full (window), "is_full failed");
+	fail_unless (_pgm_rxw_commit_is_empty (window), "commit_is_empty failed");
 	for (unsigned i = 0; i < 100; i++)
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
-	fail_unless (pgm_rxw_length (window) == _pgm_rxw_commit_length (window));
+	fail_unless (pgm_rxw_length (window) == _pgm_rxw_commit_length (window), "commit_length failed");
 	pmsg = msgv;
-	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -817,50 +817,50 @@ START_TEST (test_readv_pass_005)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 98; i++)
 	{
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless ((1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless ((1 + i) == pgm_rxw_length (window), "length failed");
 	}
-	fail_if (pgm_rxw_is_full (window));
-	fail_unless (_pgm_rxw_commit_is_empty (window));
+	fail_if (pgm_rxw_is_full (window), "is_full failed");
+	fail_unless (_pgm_rxw_commit_is_empty (window), "commit_is_empty failed");
 	{
 		unsigned i = 99;
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless ((1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not missing");
+		fail_unless ((1 + i) == pgm_rxw_length (window), "length failed");
 	}
 	fail_unless (pgm_rxw_is_full (window));
 	fail_unless (_pgm_rxw_commit_is_empty (window));
 	for (unsigned i = 0; i < 98; i++)
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
-	fail_unless (pgm_rxw_length (window) == (2 + _pgm_rxw_commit_length (window)));
+	fail_unless (pgm_rxw_length (window) == (2 + _pgm_rxw_commit_length (window)), "commit_length failed");
 /* read end-of-window */
 	{
 		pmsg = msgv;
-		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
 	pgm_rxw_destroy (window);
 }
@@ -871,55 +871,55 @@ START_TEST (test_readv_pass_006)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 100; i++)
 	{
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window), "length failed");
 	}
 	fail_unless (pgm_rxw_is_full (window));
 	fail_unless (_pgm_rxw_commit_is_empty (window));
 /* read one skb */
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless (1 == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless (1 == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
 /* add one more new skb */
 	{
 		unsigned i = 100;
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not bounds");
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window), "length failed");
 	}
 /* read off 99 more skbs */
 	for (unsigned i = 0; i < 99; i++)
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless ((2 + i) == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless ((2 + i) == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
 /* read end-of-window */
 	{
 		pmsg = msgv;
-		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
 	pgm_rxw_destroy (window);
 }
@@ -930,7 +930,7 @@ START_TEST (test_readv_fail_001)
 {
 	pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (NULL, &pmsg, G_N_ELEMENTS(msgv));
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -939,16 +939,16 @@ START_TEST (test_readv_fail_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (window, NULL, G_N_ELEMENTS(msgv));
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -957,16 +957,16 @@ START_TEST (test_readv_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (window, &pmsg, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -983,21 +983,21 @@ START_TEST (test_remove_commit_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 98; i++)
 	{
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless ((1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless ((1 + i) == pgm_rxw_length (window), "length failed");
 	}
 	fail_if (pgm_rxw_is_full (window));
 	fail_unless (_pgm_rxw_commit_is_empty (window));
@@ -1005,51 +1005,51 @@ START_TEST (test_remove_commit_pass_001)
 	{
 		unsigned i = 99;
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless ((1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless ((1 + i) == pgm_rxw_length (window), "length failed");
 	}
-	fail_unless (pgm_rxw_is_full (window));
-	fail_unless (_pgm_rxw_commit_is_empty (window));
+	fail_unless (pgm_rxw_is_full (window), "is_full failed");
+	fail_unless (_pgm_rxw_commit_is_empty (window), "commit_is_empty");
 /* now mark #98 lost */
 	pgm_rxw_lost (window, 98);
 	for (unsigned i = 0; i < 98; i++)
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless ((1 + i) == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless ((1 + i) == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
-	fail_unless (100 == pgm_rxw_length (window));
-	fail_unless ( 98 == _pgm_rxw_commit_length (window));
+	fail_unless (100 == pgm_rxw_length (window), "length failed");
+	fail_unless ( 98 == _pgm_rxw_commit_length (window), "commit_length failed");
 /* read end-of-window */
 	{
 		pmsg = msgv;
-		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
-	fail_unless (100 == pgm_rxw_length (window));
-	fail_unless ( 98 == _pgm_rxw_commit_length (window));
+	fail_unless (100 == pgm_rxw_length (window), "length failed");
+	fail_unless ( 98 == _pgm_rxw_commit_length (window), "commit_length failed");
 	pgm_rxw_remove_commit (window);
 /* read lost skb #98 */
 	{
 		pmsg = msgv;
-		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
 	pgm_rxw_remove_commit (window);
 /* read valid skb #99 */
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
 /* read end-of-window */
 	{
 		pmsg = msgv;
-		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
 	pgm_rxw_destroy (window);
 }
@@ -1058,7 +1058,7 @@ END_TEST
 START_TEST (test_remove_commit_fail_001)
 {
 	pgm_rxw_remove_commit (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1073,26 +1073,26 @@ START_TEST (test_remove_trail_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[2], *pmsg;
-	fail_unless (0 == pgm_rxw_remove_trail (window));
+	fail_unless (0 == pgm_rxw_remove_trail (window), "remove_trail failed");
 /* #1,2 two APDUs */
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (1);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (2);
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (1 == pgm_rxw_remove_trail (window));
-	fail_unless (1 == pgm_rxw_length (window));
-	fail_unless (1000 == pgm_rxw_size (window));
+	fail_unless (1 == pgm_rxw_remove_trail (window), "remove_trail failed");
+	fail_unless (1 == pgm_rxw_length (window), "length failed");
+	fail_unless (1000 == pgm_rxw_size (window), "size failed");
 	pmsg = msgv;
 	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-	fail_unless (0 == pgm_rxw_remove_trail (window));
+	fail_unless (0 == pgm_rxw_remove_trail (window), "remove_trail failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -1100,7 +1100,7 @@ END_TEST
 START_TEST (test_remove_trail_fail_001)
 {
 	guint count = pgm_rxw_remove_trail (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1119,28 +1119,28 @@ START_TEST (test_update_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry));
+	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry), "update failed");
 /* dupe */
-	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry));
+	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry), "update failed");
 /* #1 at 100 */
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (100);
-	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not bounds");
 /* #2 at 101 */
 	skb->pgm_data->data_sqn = g_htonl (101);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 	pgm_msgv_t msgv[1], *pmsg = msgv;
-	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 /* #3 at 102 */
-	fail_unless (1 == pgm_rxw_update (window, 102, 99, now, nak_rb_expiry));
+	fail_unless (1 == pgm_rxw_update (window, 102, 99, now, nak_rb_expiry), "update failed");
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (102);
-	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -1148,7 +1148,7 @@ END_TEST
 START_TEST (test_update_fail_001)
 {
 	guint count = pgm_rxw_update (NULL, 0, 0, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1167,29 +1167,29 @@ START_TEST (test_confirm_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 0, now, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 0, now, nak_rdata_expiry, nak_rb_expiry), "confirm not bounds");
 /* #1 at 100 */
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (100);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (1 == pgm_rxw_length (window));
-	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 99, now, nak_rdata_expiry, nak_rb_expiry));
-	fail_unless (PGM_RXW_DUPLICATE == pgm_rxw_confirm (window, 100, now, nak_rdata_expiry, nak_rb_expiry));
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (1 == pgm_rxw_length (window), "length failed");
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 99, now, nak_rdata_expiry, nak_rb_expiry), "confirm not bounds");
+	fail_unless (PGM_RXW_DUPLICATE == pgm_rxw_confirm (window, 100, now, nak_rdata_expiry, nak_rb_expiry), "confirm not duplicate");
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry), "confirm not appended");
 	fail_unless (2 == pgm_rxw_length (window));
-	fail_unless (PGM_RXW_UPDATED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (PGM_RXW_UPDATED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry), "confirm not updated");
 /* #2 at 101 */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (101);
-	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
 	pgm_msgv_t msgv[2], *pmsg = msgv;
-	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -1199,46 +1199,46 @@ START_TEST (test_confirm_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 100; i++)
 	{
 		skb = generate_valid_skb ();
-		fail_if (NULL == skb);
+		fail_if (NULL == skb, "generate_valid_skb failed");
 		skb->pgm_header->pgm_tsdu_length = g_htons (0);
 		skb->tail = (guint8*)skb->tail - skb->len;
 		skb->len = 0;
 		skb->pgm_data->data_sqn = g_htonl (i);
 		const pgm_time_t now = 1;
 		const pgm_time_t nak_rb_expiry = 2;
-		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window));
+		fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+		fail_unless (MIN(100, 1 + i) == pgm_rxw_length (window), "length failed");
 	}
-	fail_unless (pgm_rxw_is_full (window));
-	fail_unless (_pgm_rxw_commit_is_empty (window));
+	fail_unless (pgm_rxw_is_full (window), "is_full failed");
+	fail_unless (_pgm_rxw_commit_is_empty (window), "is_empty failed");
 /* read one skb */
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless (1 == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless (1 == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
 /* confirm next sequence */
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 100, now, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (PGM_RXW_BOUNDS == pgm_rxw_confirm (window, 100, now, nak_rdata_expiry, nak_rb_expiry), "confirm not bounds");
 /* read off 99 more skbs */
 	for (unsigned i = 0; i < 99; i++)
 	{
 		pmsg = msgv;
-		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-		fail_unless ((2 + i) == _pgm_rxw_commit_length (window));
+		fail_unless (0 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+		fail_unless ((2 + i) == _pgm_rxw_commit_length (window), "commit_length failed");
 	}
 /* read end-of-window */
 	{
 		pmsg = msgv;
-		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
+		fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	}
 	pgm_rxw_destroy (window);
 }
@@ -1247,7 +1247,7 @@ END_TEST
 START_TEST (test_confirm_fail_001)
 {
 	int retval = pgm_rxw_confirm (NULL, 0, 0, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1263,30 +1263,30 @@ START_TEST (test_lost_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
 	const pgm_time_t nak_rb_expiry = 2;
 /* #1 at 100 */
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (100);
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (1 == pgm_rxw_length (window));
-	fail_unless (1000 == pgm_rxw_size (window));
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry));
-	fail_unless (2 == pgm_rxw_length (window));
-	fail_unless (1000 == pgm_rxw_size (window));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
+	fail_unless (1 == pgm_rxw_length (window), "length failed");
+	fail_unless (1000 == pgm_rxw_size (window), "size failed");
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry), "confirm not appended");
+	fail_unless (2 == pgm_rxw_length (window), "length failed");
+	fail_unless (1000 == pgm_rxw_size (window), "size failed");
 	pgm_rxw_lost (window, 101);
-	fail_unless (2 == pgm_rxw_length (window));
-	fail_unless (1000 == pgm_rxw_size (window));
+	fail_unless (2 == pgm_rxw_length (window), "length failed");
+	fail_unless (1000 == pgm_rxw_size (window), "size failed");
 /* #2 at 101 */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (101);
-	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (2 == pgm_rxw_length (window));
-	fail_unless (2000 == pgm_rxw_size (window));
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
+	fail_unless (2 == pgm_rxw_length (window), "length failed");
+	fail_unless (2000 == pgm_rxw_size (window), "size failed");
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -1294,7 +1294,7 @@ END_TEST
 START_TEST (test_lost_fail_001)
 {
 	pgm_rxw_lost (NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1311,12 +1311,12 @@ START_TEST (test_state_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry));
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry));
+	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry), "update failed");
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry), "confirm not appended");
 	struct pgm_sk_buff_t* skb = pgm_rxw_peek (window, 101);
 	pgm_rxw_state (window, skb, PGM_PKT_WAIT_NCF_STATE);
 	pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
@@ -1327,10 +1327,10 @@ END_TEST
 START_TEST (test_state_fail_001)
 {
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	pgm_rxw_state (NULL, skb, PGM_PKT_BACK_OFF_STATE);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1338,9 +1338,9 @@ START_TEST (test_state_fail_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_rxw_state (window, NULL, PGM_PKT_BACK_OFF_STATE);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1348,12 +1348,12 @@ START_TEST (test_state_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	pgm_rxw_state (window, skb, -1);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -1364,47 +1364,47 @@ START_TEST (test_has_pending_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 /* empty */
-	fail_unless (0 == window->has_event);
+	fail_unless (0 == window->has_event, "unexpected event");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
 	const pgm_time_t nak_rb_expiry = 2;
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
 /* 1 sequence */
-	fail_unless (1 == window->has_event);
+	fail_unless (1 == window->has_event, "no event");
 	window->has_event = 0;
 /* jump */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (2);
-	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (0 == window->has_event);
+	fail_unless (PGM_RXW_MISSING == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not missing");
+	fail_unless (0 == window->has_event, "unexpected event");
 /* loss */
 	pgm_rxw_lost (window, 1);
-	fail_unless (1 == window->has_event);
+	fail_unless (1 == window->has_event, "no event");
 	window->has_event = 0;
 /* insert */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (1);
-	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry));
-	fail_unless (1 == window->has_event);
+	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
+	fail_unless (1 == window->has_event, "no event");
 	window->has_event = 0;
 /* confirm */
-	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 3, now, nak_rdata_expiry, nak_rb_expiry));
-	fail_unless (0 == window->has_event);
+	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 3, now, nak_rdata_expiry, nak_rb_expiry), "confirm not appended");
+	fail_unless (0 == window->has_event, "unexpected event");
 /* partial read */
 	pgm_msgv_t msgv[2], *pmsg = msgv;
-	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-	fail_unless (0 == window->has_event);
+	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+	fail_unless (0 == window->has_event, "unexpected event");
 /* finish read */
 	pmsg = msgv;
-	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)));
-	fail_unless (0 == window->has_event);
+	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
+	fail_unless (0 == window->has_event, "unexpected event");
 	pgm_rxw_destroy (window);
 }
 END_TEST
