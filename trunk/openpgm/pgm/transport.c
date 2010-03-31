@@ -2118,7 +2118,7 @@ pgm_transport_error_from_eai_errno (
 
 #ifdef EAI_SYSTEM
 	case EAI_SYSTEM:
-		return pgm_if_error_from_errno (errno);
+		return pgm_transport_error_from_errno (errno);
 		break;
 #endif
 
