@@ -81,23 +81,8 @@ pgm_getifaddrs (
 		return -1;
 	}
 
-/* process all interfaces with family-agnostic ioctl, unfortunately it still
- * must be called on each family socket despite what if_tcp(7P) says.
- */
-	char buf[32768],  buf6[32768];
-	struct lifconf lifc, lifc6;
-	lifc.lifc_family = AF_INET;
-	lifc.lifc_flags  = 0;
-	lifc.lifc_buf    = buf;
-	lifc.lifc_len    = sizeof(buf);
-	if (ioctl (sock, SIOCGLIFCONF, &lifc) < 0) {
-		close (sock);
-		close (sock6);
-		return -1;
-	}
-	g_trace ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, lifc.lifc_len / sizeof(struct lifreq));
-
 	struct lifnum lifn;
+again:
 	lifn.lifn_family = AF_INET;
 	lifn.lifn_flags  = 0;
 	if (ioctl (sock, SIOCGLIFNUM, &lifn) < 0) {
@@ -105,21 +90,30 @@ pgm_getifaddrs (
 		close (sock6);
 		return -1;
 	}
-	int if_count = lifn.lifn_count;
+	unsigned if_count = lifn.lifn_count;
 	g_trace ("ioctl(AF_INET, SIOCGLIFNUM) = %d", lifn.lifn_count);
 
-/* repeat everything for IPv6 */
-	lifc6.lifc_family = AF_INET6;
-	lifc6.lifc_flags  = 0;
-	lifc6.lifc_buf    = buf6;
-	lifc6.lifc_len    = sizeof(buf);
-	if (ioctl (sock6, SIOCGLIFCONF, &lifc6) < 0) {
+/* nb: Sun and Apple code likes to pad the interface count here in case interfaces
+ * are coming up between calls,
+ */
+	lifn.lifn_count += 4;
+
+/* process all interfaces with family-agnostic ioctl, unfortunately it still
+ * must be called on each family socket despite what if_tcp(7P) says.
+ */
+	struct lifconf lifc, lifc6;
+	lifc.lifc_family = AF_INET;
+	lifc.lifc_flags  = 0;
+	lifc.lifc_len    = lifn.lifn_count * sizeof(struct lifreq);
+	lifc.lifc_buf    = alloca (lifc.lifc_len);
+	if (ioctl (sock, SIOCGLIFCONF, &lifc) < 0) {
 		close (sock);
 		close (sock6);
 		return -1;
 	}
-	g_trace ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, lifc6.lifc_len / sizeof(struct lifreq));
+	g_trace ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, lifc.lifc_len / sizeof(struct lifreq));
 
+/* repeat everything for IPv6 */
 	lifn.lifn_family = AF_INET6;
 	lifn.lifn_flags  = 0;
 	if (ioctl (sock6, SIOCGLIFNUM, &lifn) < 0) {
@@ -130,32 +124,50 @@ pgm_getifaddrs (
 	if_count += lifn.lifn_count;
 	g_trace ("ioctl(AF_INET6, SIOCGLIFNUM) = %d", lifn.lifn_count);
 
+	lifn.lifn_count += 4;
+
+	lifc6.lifc_family = AF_INET6;
+	lifc6.lifc_flags  = 0;
+	lifc6.lifc_len     = lifn.lifn_count * sizeof(struct lifreq);
+	lifc6.lifc_buf     = alloca (lifc6.lifc_len);
+	if (ioctl (sock6, SIOCGLIFCONF, &lifc6) < 0) {
+		close (sock);
+		close (sock6);
+		return -1;
+	}
+	g_trace ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, lifc6.lifc_len / sizeof(struct lifreq));
+
+	unsigned nlifr = (lifc.lifc_len + lifc6.lifc_len) / sizeof(struct lifreq);
+	if (nlifr > if_count)
+		goto again;
+
 /* alloc a contiguous block for entire list */
-	struct _pgm_ifaddrs* ifa = malloc (if_count * sizeof(struct _pgm_ifaddrs));
+	struct _pgm_ifaddrs* ifa = calloc (nlifr, sizeof (struct _pgm_ifaddrs));
+	g_assert (NULL != ifa);
+
 	struct _pgm_ifaddrs* ift = ifa;
-	memset (ifa, 0, if_count * sizeof(struct _pgm_ifaddrs));
 	struct lifreq* lifr      = lifc.lifc_req;
 	struct lifreq* lifr_end  = (struct lifreq *)&lifc.lifc_buf[lifc.lifc_len];
 
-	g_assert (IF_NAMESIZE >= sizeof(lifr->lifr_name));
+	g_assert (IF_NAMESIZE >= LIFNAMSIZ);
 
 	while (lifr < lifr_end)
 	{
-/* address */
-		if (ioctl (sock, SIOCGLIFADDR, lifr) != -1) {
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
-			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
-		}
-
 /* name */
 		g_trace ("AF_INET/name: %s", lifr->lifr_name);
 		ift->_ifa.ifa_name = ift->_name;
-		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
-		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
+		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, LIFNAMSIZ);
+		ift->_ifa.ifa_name[LIFNAMSIZ - 1] = 0;
 
 /* flags */
 		if (ioctl (sock, SIOCGLIFFLAGS, lifr) != -1) {
 			ift->_ifa.ifa_flags = lifr->lifr_flags;
+		}
+
+/* address */
+		if (ioctl (sock, SIOCGLIFADDR, lifr) != -1) {
+			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 		}
 
 /* netmask */
