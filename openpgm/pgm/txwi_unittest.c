@@ -145,7 +145,7 @@ generate_valid_skb (void)
 START_TEST (test_create_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0));
+	fail_if (NULL == pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0), "create failed");
 }
 END_TEST
 
@@ -153,7 +153,7 @@ END_TEST
 START_TEST (test_create_pass_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_txw_create (&tsi, 1500, 0, 60, 800000, FALSE, 0, 0));
+	fail_if (NULL == pgm_txw_create (&tsi, 1500, 0, 60, 800000, FALSE, 0, 0), "create failed");
 }
 END_TEST
 
@@ -161,7 +161,7 @@ END_TEST
 START_TEST (test_create_pass_003)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_txw_create (&tsi, 9000, 0, 60, 800000, FALSE, 0, 0));
+	fail_if (NULL == pgm_txw_create (&tsi, 9000, 0, 60, 800000, FALSE, 0, 0), "create failed");
 }
 END_TEST
 
@@ -169,7 +169,7 @@ END_TEST
 START_TEST (test_create_pass_004)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_txw_create (&tsi, UINT16_MAX, 0, 60, 800000, FALSE, 0, 0));
+	fail_if (NULL == pgm_txw_create (&tsi, UINT16_MAX, 0, 60, 800000, FALSE, 0, 0), "create failed");
 }
 END_TEST
 
@@ -178,7 +178,7 @@ START_TEST (test_create_fail_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_create (&tsi, 0, 0, 60, 800000, FALSE, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -187,7 +187,7 @@ START_TEST (test_create_fail_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_create (&tsi, 0, 0, 0, 800000, FALSE, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -196,7 +196,7 @@ START_TEST (test_create_fail_003)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_create (&tsi, 0, 0, 60, 0, FALSE, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -205,7 +205,7 @@ START_TEST (test_create_fail_004)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_create (NULL, 0, 0, 0, 0, FALSE, 0, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -220,7 +220,7 @@ START_TEST (test_shutdown_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -228,7 +228,7 @@ END_TEST
 START_TEST (test_shutdown_fail_001)
 {
 	pgm_txw_shutdown (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -245,9 +245,9 @@ START_TEST (test_add_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
 	pgm_txw_shutdown (window);
 }
@@ -258,9 +258,9 @@ START_TEST (test_add_fail_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_txw_add (window, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -268,9 +268,9 @@ END_TEST
 START_TEST (test_add_fail_002)
 {
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (NULL, skb);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -279,11 +279,11 @@ START_TEST (test_add_fail_003)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	char buffer[1500];
 	memset (buffer, 0, sizeof(buffer));
 	pgm_txw_add (window, (struct pgm_sk_buff_t*)buffer);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -299,11 +299,11 @@ START_TEST (test_peek_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (skb == pgm_txw_peek (window, window->trail));
+	fail_unless (skb == pgm_txw_peek (window, window->trail), "peek failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -312,7 +312,7 @@ END_TEST
 START_TEST (test_peek_fail_001)
 {
 	pgm_txw_peek (NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -321,8 +321,8 @@ START_TEST (test_peek_fail_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (NULL == pgm_txw_peek (window, window->trail));
+	fail_if (NULL == window, "create failed");
+	fail_unless (NULL == pgm_txw_peek (window, window->trail), "peek failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -335,8 +335,8 @@ START_TEST (test_max_length_pass_001)
 	const guint window_length = 100;
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, window_length, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (window_length == pgm_txw_max_length (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (window_length == pgm_txw_max_length (window), "max_length failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -344,7 +344,7 @@ END_TEST
 START_TEST (test_max_length_fail_001)
 {
 	pgm_txw_max_length (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -354,12 +354,12 @@ START_TEST (test_length_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (0 == pgm_txw_length (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (0 == pgm_txw_length (window), "length failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (1 == pgm_txw_length (window));
+	fail_unless (1 == pgm_txw_length (window), "length failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -367,7 +367,7 @@ END_TEST
 START_TEST (test_length_fail_001)
 {
 	pgm_txw_length (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -377,12 +377,12 @@ START_TEST (test_size_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (0 == pgm_txw_size (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (0 == pgm_txw_size (window), "size failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (1000 == pgm_txw_size (window));
+	fail_unless (1000 == pgm_txw_size (window), "size failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -390,7 +390,7 @@ END_TEST
 START_TEST (test_size_fail_001)
 {
 	pgm_txw_size (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -400,12 +400,12 @@ START_TEST (test_is_empty_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	fail_unless (pgm_txw_is_empty (window));
+	fail_if (NULL == window, "create failed");
+	fail_unless (pgm_txw_is_empty (window), "is_empty failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_if (pgm_txw_is_empty (window));
+	fail_if (pgm_txw_is_empty (window), "is_empty failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -413,7 +413,7 @@ END_TEST
 START_TEST (test_is_empty_fail_001)
 {
 	pgm_txw_is_empty (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -423,12 +423,12 @@ START_TEST (test_is_full_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 1, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
-	fail_if (pgm_txw_is_full (window));
+	fail_if (NULL == window, "create failed");
+	fail_if (pgm_txw_is_full (window), "is_full failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (pgm_txw_is_full (window));
+	fail_unless (pgm_txw_is_full (window), "is_full failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -436,7 +436,7 @@ END_TEST
 START_TEST (test_is_full_fail_001)
 {
 	pgm_txw_is_full (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -446,12 +446,12 @@ START_TEST (test_lead_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	guint32 lead = pgm_txw_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (lead + 1 == pgm_txw_lead (window));
+	fail_unless (lead + 1 == pgm_txw_lead (window), "lead failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -459,7 +459,7 @@ END_TEST
 START_TEST (test_lead_fail_001)
 {
 	pgm_txw_lead (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -470,12 +470,12 @@ START_TEST (test_next_lead_pass_001)
 	const guint window_length = 100;
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, window_length, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	guint32 next_lead = pgm_txw_next_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (next_lead == pgm_txw_lead (window));
+	fail_unless (next_lead == pgm_txw_lead (window), "lead failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -483,7 +483,7 @@ END_TEST
 START_TEST (test_next_lead_fail_001)
 {
 	pgm_txw_next_lead (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -493,18 +493,18 @@ START_TEST (test_trail_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 1, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 /* does not advance with adding skb */
 	guint32 trail = pgm_txw_trail (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (trail == pgm_txw_trail (window));
+	fail_unless (trail == pgm_txw_trail (window), "trail failed");
 /* does advance when filling up window */
 	skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_if (trail == pgm_txw_trail (window));
+	fail_if (trail == pgm_txw_trail (window), "trail failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -512,7 +512,7 @@ END_TEST
 START_TEST (test_trail_fail_001)
 {
 	pgm_txw_trail (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -530,16 +530,16 @@ START_TEST (test_retransmit_push_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 /* empty window invalidates all requests */
-	fail_unless (FALSE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	fail_unless (FALSE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0), "retransmit_push failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
 /* first request */
-	fail_unless (TRUE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	fail_unless (TRUE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0), "retransmit_push failed");
 /* second request eliminated */
-	fail_unless (FALSE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
+	fail_unless (FALSE == pgm_txw_retransmit_push (window, window->trail, FALSE, 0), "retransmit_push failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -547,7 +547,7 @@ END_TEST
 START_TEST (test_retransmit_push_fail_001)
 {
 	pgm_txw_retransmit_push (NULL, 0, FALSE, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -562,12 +562,12 @@ START_TEST (test_retransmit_try_peek_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
-	fail_unless (NULL != pgm_txw_retransmit_try_peek (window));
+	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0), "retransmit_push failed");
+	fail_unless (NULL != pgm_txw_retransmit_try_peek (window), "retransmit_try_peek failed");
 	pgm_txw_shutdown (window);
 }
 END_TEST
@@ -576,7 +576,7 @@ END_TEST
 START_TEST (test_retransmit_try_peek_fail_001)
 {
 	pgm_txw_retransmit_try_peek (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -591,12 +591,12 @@ START_TEST (test_retransmit_remove_head_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
-	fail_if (NULL == skb);
+	fail_if (NULL == skb, "generate_valid_skb failed");
 	pgm_txw_add (window, skb);
-	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0));
-	fail_unless (NULL != pgm_txw_retransmit_try_peek (window));
+	fail_unless (1 == pgm_txw_retransmit_push (window, window->trail, FALSE, 0), "retransmit_push failed");
+	fail_unless (NULL != pgm_txw_retransmit_try_peek (window), "retransmit_try_peek failed");
 	pgm_txw_retransmit_remove_head (window);
 	pgm_txw_shutdown (window);
 }
@@ -606,7 +606,7 @@ END_TEST
 START_TEST (test_retransmit_remove_head_fail_001)
 {
 	pgm_txw_retransmit_remove_head (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -615,9 +615,9 @@ START_TEST (test_retransmit_remove_head_fail_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_txw_t* window = pgm_txw_create (&tsi, 0, 100, 0, 0, FALSE, 0, 0);
-	fail_if (NULL == window);
+	fail_if (NULL == window, "create failed");
 	pgm_txw_retransmit_remove_head (window);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
