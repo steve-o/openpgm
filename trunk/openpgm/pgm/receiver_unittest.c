@@ -120,7 +120,7 @@ mock_pgm_on_spmr (
 }
 
 /** net module */
-static
+PGM_GNUC_INTERNAL
 gssize
 mock_pgm_sendto (
 	pgm_transport_t*		transport,
@@ -381,7 +381,7 @@ END_TEST
 START_TEST (test_peer_unref_fail_001)
 {
 	pgm_peer_unref (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -403,7 +403,7 @@ END_TEST
 START_TEST (test_check_peer_nak_state_fail_001)
 {
 	pgm_check_peer_nak_state (NULL, mock_pgm_time_now);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -428,7 +428,7 @@ START_TEST (test_min_nak_expiry_fail_001)
 {
 	const pgm_time_t expiration = pgm_secs(1);
 	pgm_min_nak_expiry (expiration, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -443,13 +443,13 @@ END_TEST
 START_TEST (test_set_rxw_sqns_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_rxw_sqns (transport, 100));
+	fail_unless (TRUE == pgm_transport_set_rxw_sqns (transport, 100), "set_rxw_sqns failed");
 }
 END_TEST
 
 START_TEST (test_set_rxw_sqns_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_rxw_sqns (NULL, 100));
+	fail_unless (FALSE == pgm_transport_set_rxw_sqns (NULL, 100), "set_rxw_sqns failed");
 }
 END_TEST
 
@@ -464,13 +464,13 @@ END_TEST
 START_TEST (test_set_rxw_secs_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_rxw_secs (transport, 10));
+	fail_unless (TRUE == pgm_transport_set_rxw_secs (transport, 10), "set_rxw_secs failed");
 }
 END_TEST
 
 START_TEST (test_set_rxw_secs_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_rxw_secs (NULL, 10));
+	fail_unless (FALSE == pgm_transport_set_rxw_secs (NULL, 10), "set_rxw_secs failed");
 }
 END_TEST
 
@@ -485,13 +485,13 @@ END_TEST
 START_TEST (test_set_rxw_max_rte_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_rxw_max_rte (transport, 100*1000));
+	fail_unless (TRUE == pgm_transport_set_rxw_max_rte (transport, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
 START_TEST (test_set_rxw_max_rte_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_rxw_max_rte (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_rxw_max_rte (NULL, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
@@ -507,13 +507,13 @@ START_TEST (test_set_peer_expiry_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
 	transport->spm_ambient_interval = pgm_secs(30);
-	fail_unless (TRUE == pgm_transport_set_peer_expiry (transport, pgm_secs(100)));
+	fail_unless (TRUE == pgm_transport_set_peer_expiry (transport, pgm_secs(100)), "set_peer_expiry failed");
 }
 END_TEST
 
 START_TEST (test_set_peer_expiry_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_peer_expiry (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_peer_expiry (NULL, 100*1000), "set_peer_expiry failed");
 }
 END_TEST
 
@@ -529,13 +529,13 @@ START_TEST (test_set_spmr_expiry_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
 	transport->spm_ambient_interval = pgm_secs(30);
-	fail_unless (TRUE == pgm_transport_set_spmr_expiry (transport, pgm_secs(10)));
+	fail_unless (TRUE == pgm_transport_set_spmr_expiry (transport, pgm_secs(10)), "set_spmr_expiry failed");
 }
 END_TEST
 
 START_TEST (test_set_spmr_expiry_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_spmr_expiry (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_spmr_expiry (NULL, 100*1000), "set_spmr_expiry failed");
 }
 END_TEST
 
@@ -550,13 +550,13 @@ END_TEST
 START_TEST (test_set_nak_bo_ivl_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_nak_bo_ivl (transport, 100*1000));
+	fail_unless (TRUE == pgm_transport_set_nak_bo_ivl (transport, 100*1000), "set_nak_bo_ivl failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_bo_ivl_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_nak_bo_ivl (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_nak_bo_ivl (NULL, 100*1000), "set_nak_bo_ivl failed");
 }
 END_TEST
 
@@ -571,13 +571,13 @@ END_TEST
 START_TEST (test_set_nak_rpt_ivl_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_nak_rpt_ivl (transport, 100*1000));
+	fail_unless (TRUE == pgm_transport_set_nak_rpt_ivl (transport, 100*1000), "set_nak_rpt_ivl failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_rpt_ivl_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_nak_rpt_ivl (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_nak_rpt_ivl (NULL, 100*1000), "set_nak_rpt_ivl failed");
 }
 END_TEST
 
@@ -592,13 +592,13 @@ END_TEST
 START_TEST (test_set_nak_rdata_ivl_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_nak_rdata_ivl (transport, 100*1000));
+	fail_unless (TRUE == pgm_transport_set_nak_rdata_ivl (transport, 100*1000), "set_nak_rdata_ivl failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_rdata_ivl_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_nak_rdata_ivl (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_nak_rdata_ivl (NULL, 100*1000), "set_nak_rdata_ivl failed");
 }
 END_TEST
 
@@ -613,13 +613,13 @@ END_TEST
 START_TEST (test_set_nak_data_retries_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_nak_data_retries (transport, 100));
+	fail_unless (TRUE == pgm_transport_set_nak_data_retries (transport, 100), "set_nak_data_retries failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_data_retries_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_nak_data_retries (NULL, 100));
+	fail_unless (FALSE == pgm_transport_set_nak_data_retries (NULL, 100), "set_nak_data_retries failed");
 }
 END_TEST
 
@@ -634,13 +634,13 @@ END_TEST
 START_TEST (test_set_nak_ncf_retries_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_nak_ncf_retries (transport, 100));
+	fail_unless (TRUE == pgm_transport_set_nak_ncf_retries (transport, 100), "set_nak_ncf_retries failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_ncf_retries_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_nak_ncf_retries (NULL, 100));
+	fail_unless (FALSE == pgm_transport_set_nak_ncf_retries (NULL, 100), "set_nak_ncf_retries failed");
 }
 END_TEST
 
