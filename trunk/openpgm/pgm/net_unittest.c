@@ -116,7 +116,7 @@ flags_string (
 
 /* mock functions for external references */
 
-static
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_rate_check (
 	gpointer		bucket,
@@ -244,7 +244,7 @@ START_TEST (test_sendto_fail_001)
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
 	gssize len = pgm_sendto (NULL, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -257,7 +257,7 @@ START_TEST (test_sendto_fail_002)
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
 	gssize len = pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -270,7 +270,7 @@ START_TEST (test_sendto_fail_003)
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
 	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -283,7 +283,7 @@ START_TEST (test_sendto_fail_004)
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
 	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -296,7 +296,7 @@ START_TEST (test_sendto_fail_005)
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
 	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -317,7 +317,7 @@ END_TEST
 START_TEST (test_set_nonblocking_fail_001)
 {
 	int retval = pgm_set_nonblocking (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
