@@ -327,7 +327,7 @@ mock_pgm_rs_encode (
 		rs, src, offset, dst, len);
 }
 
-static
+PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_rate_check (
 	gpointer			bucket,
@@ -410,7 +410,7 @@ mock_pgm_csum_fold (
 	return 0x0;
 }
 
-static
+PGM_GNUC_INTERNAL
 gssize
 mock_pgm_sendto (
 	pgm_transport_t*		transport,
@@ -497,12 +497,13 @@ mock_pgm_transport_pkt_offset (
 START_TEST (test_send_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
-	fail_unless ((gssize)apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written), "send not normal");
+	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -510,12 +511,13 @@ END_TEST
 START_TEST (test_send_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written));
-	fail_unless ((gssize)apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written), "send not normal");
+	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -524,7 +526,7 @@ START_TEST (test_send_fail_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, &bytes_written));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, &bytes_written), "send not error");
 }
 END_TEST
 
@@ -542,13 +544,14 @@ END_TEST
 START_TEST (test_sendv_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
-	fail_unless ((gssize)apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written), "send not normal");
+	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -556,13 +559,14 @@ END_TEST
 START_TEST (test_sendv_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written));
-	fail_unless ((gssize)apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written), "send not normal");
+	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -570,6 +574,7 @@ END_TEST
 START_TEST (test_sendv_pass_003)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
@@ -579,8 +584,8 @@ START_TEST (test_sendv_pass_003)
 		vector[i].iov_len  = apdu_length / G_N_ELEMENTS(vector);
 	}
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written));
-	fail_unless ((gssize)apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written), "send not normal");
+	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -588,6 +593,7 @@ END_TEST
 START_TEST (test_sendv_pass_004)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	struct pgm_iovec vector[ 16 ];
@@ -596,8 +602,8 @@ START_TEST (test_sendv_pass_004)
 		vector[i].iov_len  = apdu_length;
 	}
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written));
-	fail_unless ((gssize)(apdu_length * G_N_ELEMENTS(vector)) == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written), "send not normal");
+	fail_unless ((gssize)(apdu_length * G_N_ELEMENTS(vector)) == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -607,7 +613,7 @@ START_TEST (test_sendv_fail_001)
 	const gsize tsdu_length = 100;
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_sendv (NULL, vector, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_sendv (NULL, vector, 1, TRUE, &bytes_written), "send not error");
 }
 END_TEST
 
@@ -625,12 +631,15 @@ END_TEST
 START_TEST (test_send_skbv_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
-	struct pgm_sk_buff_t* skb = generate_skb ();
+	struct pgm_sk_buff_t* skb = NULL;
+	skb = generate_skb ();
+	fail_if (NULL == skb, "generate_skb failed");
 	gsize apdu_length = (gsize)skb->len;
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, TRUE, &bytes_written));
-	fail_unless (apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, TRUE, &bytes_written), "send not normal");
+	fail_unless (apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -638,14 +647,17 @@ END_TEST
 START_TEST (test_send_skbv_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
-	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++)
+	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++) {
 		skb[i] = generate_fragment_skb ();
+		fail_if (NULL == skb[i], "generate_fragment_skb failed");
+	}
 	gsize apdu_length = (gsize)skb[0]->len * G_N_ELEMENTS(skb);
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written));
-	fail_unless (apdu_length == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written), "send not normal");
+	fail_unless (apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
@@ -653,24 +665,28 @@ END_TEST
 START_TEST (test_send_skbv_pass_003)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
-	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++)
+	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++) {
 		skb[i] = generate_skb ();
+		fail_if (NULL == skb[i], "generate_skb failed");
+	}
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written));
-	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == bytes_written);
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written), "send not normal");
+	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == bytes_written, "send underrun");
 }
 END_TEST
 
 START_TEST (test_send_skbv_fail_001)
 {
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	fail_if (NULL == skb, "alloc_skb failed");
 /* reserve PGM header */
 	pgm_skb_put (skb, mock_pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written));
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written), "send not error");
 }
 END_TEST
 
@@ -685,14 +701,15 @@ END_TEST
 START_TEST (test_send_spm_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_send_spm (transport, 0));
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_send_spm (transport, 0), "send_spm failed");
 }
 END_TEST
 
 START_TEST (test_send_spm_fail_001)
 {
 	pgm_send_spm (NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -706,6 +723,7 @@ END_TEST
 START_TEST (test_on_deferred_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	pgm_on_deferred_nak (transport);
 }
 END_TEST
@@ -713,7 +731,7 @@ END_TEST
 START_TEST (test_on_deferred_nak_fail_001)
 {
 	pgm_on_deferred_nak (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 	
@@ -730,10 +748,13 @@ END_TEST
 START_TEST (test_on_spmr_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	pgm_peer_t* peer = generate_peer ();
+	fail_if (NULL == peer, "generate_peer failed");
 	struct pgm_sk_buff_t* skb = generate_spmr ();
+	fail_if (NULL == skb, "generate_spmr failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_spmr (transport, peer, skb));
+	fail_unless (TRUE == pgm_on_spmr (transport, peer, skb), "on_spmr failed");
 }
 END_TEST
 
@@ -741,9 +762,11 @@ END_TEST
 START_TEST (test_on_spmr_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_spmr ();
+	fail_if (NULL == skb, "generate_spmr failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_spmr (transport, NULL, skb));
+	fail_unless (TRUE == pgm_on_spmr (transport, NULL, skb), "on_spmr failed");
 }
 END_TEST
 
@@ -751,18 +774,21 @@ END_TEST
 START_TEST (test_on_spmr_fail_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	pgm_peer_t* peer = generate_peer ();
+	fail_if (NULL == peer, "generate_peer failed");
 	struct pgm_sk_buff_t* skb = generate_spmr ();
+	fail_if (NULL == skb, "generate_spmr failed");
 	skb->transport = transport;
 	mock_is_valid_spmr = FALSE;
-	fail_unless (FALSE == pgm_on_spmr (transport, peer, skb));
+	fail_unless (FALSE == pgm_on_spmr (transport, peer, skb), "on_spmr failed");
 }
 END_TEST
 
 START_TEST (test_on_spmr_fail_002)
 {
 	pgm_on_spmr (NULL, NULL, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -778,9 +804,11 @@ END_TEST
 START_TEST (test_on_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nak ();
+	fail_if (NULL == skb, "generate_single_nak failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
@@ -788,9 +816,11 @@ END_TEST
 START_TEST (test_on_nak_pass_002)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_nak_list ();
+	fail_if (NULL == skb, "generate_nak_list failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
@@ -798,10 +828,12 @@ END_TEST
 START_TEST (test_on_nak_pass_003)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->use_ondemand_parity = TRUE;
 	struct pgm_sk_buff_t* skb = generate_parity_nak ();
+	fail_if (NULL == skb, "generate_parity_nak failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
@@ -809,27 +841,31 @@ END_TEST
 START_TEST (test_on_nak_pass_004)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->use_ondemand_parity = TRUE;
 	struct pgm_sk_buff_t* skb = generate_parity_nak_list ();
+	fail_if (NULL == skb, "generate_parity_nak_list failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_nak (transport, skb));
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
 START_TEST (test_on_nak_fail_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nak ();
+	fail_if (NULL == skb, "generate_single_nak failed");
 	skb->transport = transport;
 	mock_is_valid_nak = FALSE;
-	fail_unless (FALSE == pgm_on_nak (transport, skb));
+	fail_unless (FALSE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
 START_TEST (test_on_nak_fail_002)
 {
 	pgm_on_nak (NULL, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -844,26 +880,30 @@ END_TEST
 START_TEST (test_on_nnak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nnak ();
+	fail_if (NULL == skb, "generate_single_nnak failed");
 	skb->transport = transport;
-	fail_unless (TRUE == pgm_on_nnak (transport, skb));
+	fail_unless (TRUE == pgm_on_nnak (transport, skb), "on_nnak failed");
 }
 END_TEST
 
 START_TEST (test_on_nnak_fail_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nnak ();
+	fail_if (NULL == skb, "generate_single_nnak failed");
 	skb->transport = transport;
 	mock_is_valid_nnak = FALSE;
-	fail_unless (FALSE == pgm_on_nnak (transport, skb));
+	fail_unless (FALSE == pgm_on_nnak (transport, skb), "on_nnak failed");
 }
 END_TEST
 
 START_TEST (test_on_nnak_fail_002)
 {
 	pgm_on_nnak (NULL, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -878,13 +918,14 @@ END_TEST
 START_TEST (test_set_ambient_spm_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_ambient_spm (transport, 1000));
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_transport_set_ambient_spm (transport, 1000), "set_ambient_spm failed");
 }
 END_TEST
 
 START_TEST (test_set_ambient_spm_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_ambient_spm (NULL, 1000));
+	fail_unless (FALSE == pgm_transport_set_ambient_spm (NULL, 1000), "set_ambient_spm failed");
 }
 END_TEST
 
@@ -900,15 +941,16 @@ END_TEST
 START_TEST (test_set_heartbeat_spm_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	const guint intervals[] = { 1, 2, 3, 4, 5 };
-	fail_unless (TRUE == pgm_transport_set_heartbeat_spm (transport, intervals, G_N_ELEMENTS(intervals)));
+	fail_unless (TRUE == pgm_transport_set_heartbeat_spm (transport, intervals, G_N_ELEMENTS(intervals)), "set_heartbeat_spm failed");
 }
 END_TEST
 
 START_TEST (test_set_heartbeat_spm_fail_001)
 {
 	const guint intervals[] = { 1, 2, 3, 4, 5 };
-	fail_unless (FALSE == pgm_transport_set_heartbeat_spm (NULL, intervals, G_N_ELEMENTS(intervals)));
+	fail_unless (FALSE == pgm_transport_set_heartbeat_spm (NULL, intervals, G_N_ELEMENTS(intervals)), "set_heartbeat_spm failed");
 }
 END_TEST
 
@@ -923,13 +965,14 @@ END_TEST
 START_TEST (test_set_txw_sqns_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_txw_sqns (transport, 100));
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_transport_set_txw_sqns (transport, 100), "set_txw_sqns failed");
 }
 END_TEST
 
 START_TEST (test_set_txw_sqns_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_txw_sqns (NULL, 100));
+	fail_unless (FALSE == pgm_transport_set_txw_sqns (NULL, 100), "set_txw_sqns failed");
 }
 END_TEST
 
@@ -944,13 +987,14 @@ END_TEST
 START_TEST (test_set_txw_secs_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_txw_secs (transport, 10));
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_transport_set_txw_secs (transport, 10), "set_txw_secs failed");
 }
 END_TEST
 
 START_TEST (test_set_txw_secs_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_txw_secs (NULL, 10));
+	fail_unless (FALSE == pgm_transport_set_txw_secs (NULL, 10), "set_txw_secs failed");
 }
 END_TEST
 
@@ -965,13 +1009,13 @@ END_TEST
 START_TEST (test_set_txw_max_rte_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	fail_unless (TRUE == pgm_transport_set_txw_max_rte (transport, 100*1000));
+	fail_unless (TRUE == pgm_transport_set_txw_max_rte (transport, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
 START_TEST (test_set_txw_max_rte_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_txw_max_rte (NULL, 100*1000));
+	fail_unless (FALSE == pgm_transport_set_txw_max_rte (NULL, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
