@@ -55,7 +55,7 @@ END_TEST
 START_TEST (test_init_ctx_fail_001)
 {
 	_md5_init_ctx (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -119,7 +119,7 @@ START_TEST (test_finish_ctx_fail_001)
 {
 	char resblock[16];
 	_md5_finish_ctx (NULL, resblock);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
