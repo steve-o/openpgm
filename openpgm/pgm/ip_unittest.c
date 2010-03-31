@@ -34,6 +34,16 @@
 #include <pgm/indextoaddr.h>
 #include <pgm/sockaddr.h>
 
+/* getsockopt(3SOCKET)
+ * level is the protocol number of the protocl that controls the option.
+ */
+#ifndef SOL_IP
+#	define SOL_IP		PF_INET
+#endif
+#ifndef SOL_IPV6
+#	define SOL_IPV6		PF_INET6
+#endif
+
 
 /* target:
  *  testing platform capability to loop send multicast packets to a listening

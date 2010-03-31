@@ -89,7 +89,7 @@ if env['WITH_CHECK'] == 'true':
 	te.Program ('checksum_unittest.c');
 	te.Program (['packet_unittest.c', e.Object('checksum.c'), e.Object('sockaddr.c')]);
 	te.Program ('async_unittest.c');
-	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c')]);
+	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c'), e.Object('getifaddrs.c')]);
 
 #-----------------------------------------------------------------------------
 # GPL license, aka plus version
