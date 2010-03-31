@@ -204,8 +204,8 @@ pgm_engine_error_from_wsa_errno (
 		break;
 #endif
 
-	default :
-		return PGM_TRANSPORT_ERROR_FAILED;
+	default:
+		return PGM_ENGINE_ERROR_FAILED;
 		break;
 	}
 }
