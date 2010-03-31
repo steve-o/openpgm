@@ -168,7 +168,7 @@ START_TEST (test_parse_raw_pass_001)
 	if (!success && err) {
 		g_error ("Parsing raw packet: %s", err->message);
 	}
-	fail_unless (TRUE == success);
+	fail_unless (TRUE == success, "parse_raw failed");
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("Decoded destination NLA: %s", saddr);
@@ -180,7 +180,7 @@ START_TEST (test_parse_raw_fail_001)
 	struct sockaddr_storage addr;
 	GError* err = NULL;
 	pgm_parse_raw (NULL, (struct sockaddr*)&addr, &err);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -200,7 +200,7 @@ START_TEST (test_parse_udp_encap_pass_001)
 	if (!success && err) {
 		g_error ("Parsing UDP encapsulated packet: %s", err->message);
 	}
-	fail_unless (TRUE == success);
+	fail_unless (TRUE == success, "parse_udp_encap failed");
 }
 END_TEST
 
@@ -208,7 +208,7 @@ START_TEST (test_parse_udp_encap_fail_001)
 {
 	GError* err = NULL;
 	pgm_parse_udp_encap (NULL, &err);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -230,7 +230,7 @@ END_TEST
 START_TEST (test_print_packet_fail_001)
 {
 	pgm_print_packet (NULL, 0);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -249,7 +249,7 @@ END_TEST
 START_TEST (test_verify_spm_fail_001)
 {
 	pgm_verify_spm (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -268,7 +268,7 @@ END_TEST
 START_TEST (test_verify_spmr_fail_001)
 {
 	pgm_verify_spmr (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -287,7 +287,7 @@ END_TEST
 START_TEST (test_verify_nak_fail_001)
 {
 	pgm_verify_nak (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -306,7 +306,7 @@ END_TEST
 START_TEST (test_verify_nnak_fail_001)
 {
 	pgm_verify_nnak (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -325,7 +325,7 @@ END_TEST
 START_TEST (test_verify_ncf_fail_001)
 {
 	pgm_verify_ncf (NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
