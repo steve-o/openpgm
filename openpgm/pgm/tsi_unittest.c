@@ -47,13 +47,13 @@
 START_TEST (test_print_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_tsi_print (&tsi));
+	fail_if (NULL == pgm_tsi_print (&tsi), "print failed");
 }
 END_TEST
 
 START_TEST (test_print_pass_002)
 {
-	fail_unless (NULL == pgm_tsi_print (NULL));
+	fail_unless (NULL == pgm_tsi_print (NULL), "print failed");
 }
 END_TEST
 
@@ -70,7 +70,7 @@ START_TEST (test_print_r_pass_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	char buf[PGM_TSISTRLEN];
-	fail_unless (pgm_tsi_print_r (&tsi, buf, sizeof(buf)) > 0);
+	fail_unless (pgm_tsi_print_r (&tsi, buf, sizeof(buf)) > 0, "print_r failed");
 }
 END_TEST
 
@@ -78,9 +78,9 @@ START_TEST (test_print_r_pass_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	char buf[PGM_TSISTRLEN];
-	fail_unless (pgm_tsi_print_r (NULL, buf, sizeof(buf)) == -1);
-	fail_unless (pgm_tsi_print_r (&tsi, NULL, sizeof(buf)) == -1);
-	fail_unless (pgm_tsi_print_r (&tsi, buf, 0) == -1);
+	fail_unless (pgm_tsi_print_r (NULL, buf, sizeof(buf)) == -1, "print_r failed");
+	fail_unless (pgm_tsi_print_r (&tsi, NULL, sizeof(buf)) == -1, "print_r failed");
+	fail_unless (pgm_tsi_print_r (&tsi, buf, 0) == -1, "print_r failed");
 }
 END_TEST
 
@@ -96,7 +96,7 @@ START_TEST (test_equal_pass_001)
 {
 	const pgm_tsi_t tsi1 = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	const pgm_tsi_t tsi2 = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_unless (pgm_tsi_equal (&tsi1, &tsi2));
+	fail_unless (pgm_tsi_equal (&tsi1, &tsi2), "equal failed");
 }
 END_TEST
 
@@ -104,7 +104,7 @@ START_TEST (test_equal_pass_002)
 {
 	const pgm_tsi_t tsi1 = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	const pgm_tsi_t tsi2 = { { 9, 8, 7, 6, 5, 4 }, 2000 };
-	fail_if (pgm_tsi_equal (&tsi1, &tsi2));
+	fail_if (pgm_tsi_equal (&tsi1, &tsi2), "equal failed");
 }
 END_TEST
 
@@ -112,7 +112,7 @@ START_TEST (test_equal_fail_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	gboolean retval = pgm_tsi_equal (NULL, &tsi);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
@@ -120,7 +120,7 @@ START_TEST (test_equal_fail_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	gboolean retval = pgm_tsi_equal (&tsi, NULL);
-	fail ();
+	fail ("reached");
 }
 END_TEST
 
