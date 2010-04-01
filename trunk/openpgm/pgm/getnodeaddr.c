@@ -135,8 +135,8 @@ pgm_if_getnodeaddr (
 		return FALSE;
 	}
 
-	struct ifaddrs *ifap, *ifa, *ifa6;
-	e = getifaddrs (&ifap);
+	struct pgm_ifaddrs *ifap, *ifa, *ifa6;
+	e = pgm_getifaddrs (&ifap);
 	if (e < 0) {
 		g_set_error (error,
 			     PGM_IF_ERROR,
@@ -157,7 +157,7 @@ pgm_if_getnodeaddr (
 			goto ipv4_found;
 		}
 	}
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 	g_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NONET,
@@ -175,7 +175,7 @@ ipv4_found:
 			goto ipv6_found;
 		}
 	}
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 	g_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NONET,
@@ -184,7 +184,7 @@ ipv4_found:
 ipv6_found:
 
 	memcpy (addr, ifa6->ifa_addr, pgm_sockaddr_len (ifa6->ifa_addr));
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 	return TRUE;
 }
 

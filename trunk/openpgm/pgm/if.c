@@ -110,9 +110,9 @@ static const char* pgm_family_string (const int);
 void
 pgm_if_print_all (void)
 {
-	struct ifaddrs *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 
-	int e = getifaddrs (&ifap);
+	int e = pgm_getifaddrs (&ifap);
 	if (e < 0)
 		return;
 
@@ -123,7 +123,8 @@ pgm_if_print_all (void)
 		char b[IF_NAMESIZE * 2 + 3];
 
 		if_indextoname(i, rname);
-		sprintf (b, "%s (%s)", ifa->ifa_name, rname);
+		sprintf (b, "%s (%s)",
+			ifa->ifa_name ? ifa->ifa_name : "(null)", rname);
 
 		if (NULL == ifa->ifa_addr ||
 		     (ifa->ifa_addr->sa_family != AF_INET && 
@@ -159,7 +160,7 @@ pgm_if_print_all (void)
 			);
 	}
 
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 }
 
 static inline
@@ -250,7 +251,7 @@ parse_interface (
 	char literal[1024];
 	struct in_addr in_addr;
 	struct in6_addr in6_addr;
-	struct ifaddrs *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 	struct sockaddr_storage addr;
 	guint interface_matches = 0;
 
@@ -259,8 +260,11 @@ parse_interface (
 	g_assert (NULL != ifname);
 	g_assert (NULL != ir);
 
-	g_trace ("parse_interface (family:%s ifname:\"%s\" ir:%p error:%p)",
-		 pgm_family_string (family), ifname, (gpointer)ir, (gpointer)error);
+	g_trace ("parse_interface (family:%s ifname:%s%s%s ir:%p error:%p)",
+		pgm_family_string (family),
+		ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "",
+		(gpointer)ir,
+		(gpointer)error);
 
 /* strip any square brackets for IPv6 early evaluation */
 	if (AF_INET != family &&
@@ -284,8 +288,8 @@ parse_interface (
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_XDEV,
-				     _("Expecting network interface address, found IPv4 multicast network: %s"),
-				     ifname);
+				     _("Expecting network interface address, found IPv4 multicast network %s%s%s"),
+				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
 		}
 		struct sockaddr_in s4;
@@ -303,8 +307,8 @@ parse_interface (
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_XDEV,
-				     _("Expecting network interface address, found IPv6 multicast network: %s"),
-				     ifname);
+				     _("Expecting network interface address, found IPv6 multicast network %s%s%s"),
+				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
 		}
 		struct sockaddr_in6 s6;
@@ -334,8 +338,8 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
-					     _("Expecting interface address, found IPv4 multicast address: %s"),
-					     ifname);
+					     _("Expecting interface address, found IPv4 multicast address %s%s%s"),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
 				return FALSE;
 			}
@@ -345,8 +349,8 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
-					     _("Expecting interface address, found IPv6 multicast address: %s"),
-					     ifname);
+					     _("Expecting interface address, found IPv6 multicast address %s%s%s"),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
 				return FALSE;
 			}
@@ -376,8 +380,8 @@ parse_interface (
 					g_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_NODEV,
-						     _("IP address family conflict when resolving network name \"%s\", found AF_INET when AF_INET6 expected."),
-						     ifname);
+						     _("IP address family conflict when resolving network name %s%s%s, found AF_INET when AF_INET6 expected."),
+						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
 /* ne->n_net in network order */
@@ -386,8 +390,8 @@ parse_interface (
 					g_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_XDEV,
-						     _("Network name resolves to IPv4 mulicast address: %s"),
-						     ifname);
+						     _("Network name %s%s%s resolves to IPv4 mulicast address."),
+						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
 				check_inet_network = TRUE;
@@ -397,24 +401,24 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
-					     _("Not configured for IPv6 network name support, \"%s\" is an IPv6 network name."),
-					     ifname);
+					     _("Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				return FALSE;
 #else
 				if (AF_INET == family) {
 					g_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_NODEV,
-						     _("IP address family conflict when resolving network name \"%s\", found AF_INET6 when AF_INET expected."),
-						     ifname);
+						     _("IP address family conflict when resolving network name %s%s%s, found AF_INET6 when AF_INET expected."),
+						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
 				if (IN6_IS_ADDR_MULTICAST(&ne->n_net)) {
 					g_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_XDEV,
-						     _("Network name resolves to IPv6 mulicast address: %s"),
-						     ifname);
+						     _("Network name resolves to IPv6 mulicast address %s%s%s"),
+						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
 				in6_addr = *(const struct in6_addr*)&ne->n_net;
@@ -425,8 +429,8 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
-					     _("Network name resolves to non-internet protocol address family: \"%s\""),
-					     ifname);
+					     _("Network name resolves to non-internet protocol address family %s%s%s"),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				return FALSE;
 			}
 		}
@@ -451,8 +455,8 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
-					     _("Expecting interface address, found IPv4 multicast name: %s"),
-					     ifname);
+					     _("Expecting interface address, found IPv4 multicast name %s%s%s"),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
 				return FALSE;
 			}
@@ -462,8 +466,8 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_XDEV,
-					     _("Expecting interface address, found IPv6 multicast name: %s"),
-					     ifname);
+					     _("Expecting interface address, found IPv6 multicast name %s%s%s"),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
 				return FALSE;
 			}
@@ -482,7 +486,7 @@ parse_interface (
 	}
 
 /* iterate through interface list and match device name, ip or net address */
-	if (getifaddrs (&ifap) < 0) {
+	if (pgm_getifaddrs (&ifap) < 0) {
 		g_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
@@ -498,7 +502,7 @@ parse_interface (
 
 		switch (ifa->ifa_addr->sa_family) {
 /* ignore raw entries on Linux */
-#ifdef CONFIG_HAVE_GETIFADDRS
+#ifdef AF_PACKET
 		case AF_PACKET:
 			continue;
 #endif
@@ -524,7 +528,7 @@ parse_interface (
 			strcpy (ir->ir_name, ifa->ifa_name);
 			ir->ir_interface = ifindex;
 			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
-			freeifaddrs (ifap);
+			pgm_freeifaddrs (ifap);
 			return TRUE;
 		}
 
@@ -538,7 +542,7 @@ parse_interface (
 				strcpy (ir->ir_name, ifa->ifa_name);
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
-				freeifaddrs (ifap);
+				pgm_freeifaddrs (ifap);
 				return TRUE;
 			}
 		}
@@ -551,7 +555,7 @@ parse_interface (
 				strcpy (ir->ir_name, ifa->ifa_name);
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
-				freeifaddrs (ifap);
+				pgm_freeifaddrs (ifap);
 				return TRUE;
 			}
 		}
@@ -567,9 +571,9 @@ parse_interface (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NOTUNIQ,
-					     _("Network interface name not unique: %s"),
-					     ifname);
-				freeifaddrs (ifap);
+					     _("Network interface name not unique %s%s%s"),
+					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
+				pgm_freeifaddrs (ifap);
 				return FALSE;
 			}
 
@@ -585,13 +589,13 @@ parse_interface (
 		g_set_error (error,
 			     PGM_IF_ERROR,
 			     PGM_IF_ERROR_NODEV,
-			     _("No matching network interface: %s"),
-			     ifname);
-		freeifaddrs (ifap);
+			     _("No matching network interface %s%s%s"),
+			     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
+		pgm_freeifaddrs (ifap);
 		return FALSE;
 	}
 
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 	return TRUE;
 }
 
@@ -628,8 +632,11 @@ parse_group (
 	g_assert (NULL != group);
 	g_assert (NULL != addr);
 
-	g_trace ("parse_group (family:%s group:\"%s\" addr:%p error:%p)",
-		 pgm_family_string (family), group, (gpointer)addr, (gpointer)error);
+	g_trace ("parse_group (family:%s group:%s%s%s addr:%p error:%p)",
+		pgm_family_string (family),
+		group ? "\"" : "", group ? group : "(null)", group ? "\"" : "",
+		(gpointer)addr,
+		(gpointer)error);
 
 /* strip any square brackets for early IPv6 literal evaluation */
 	if (AF_INET != family &&
@@ -681,8 +688,8 @@ parse_group (
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
-					     _("IP address family conflict when resolving network name \"%s\", found IPv4 when IPv6 expected."),
-					     group);
+					     _("IP address family conflict when resolving network name %s%s%s, found IPv4 when IPv6 expected."),
+					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
 /* ne->n_net in network order */
@@ -694,24 +701,24 @@ parse_group (
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
-				     _("IP address class conflict when resolving network name \"%s\", expected IPv4 multicast."),
-				     group);
+				     _("IP address class conflict when resolving network name %s%s%s, expected IPv4 multicast."),
+				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 		case AF_INET6:
 #ifndef CONFIG_HAVE_IP6_NETWORKS
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
-				     _("Not configured for IPv6 network name support, \"%s\" is an IPv6 network name."),
-				     group);
+				     _("Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."),
+				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 #else
 			if (AF_INET == family) {
 				g_set_error (error,
 					     PGM_IF_ERROR,
 					     PGM_IF_ERROR_NODEV,
-					     _("IP address family conflict when resolving network name \"%s\", found IPv6 when IPv4 expected."),
-					     group);
+					     _("IP address family conflict when resolving network name %s%s%s, found IPv6 when IPv4 expected."),
+					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
 			if (IN6_IS_ADDR_MULTICAST(&ne->n_net)) {
@@ -725,16 +732,16 @@ parse_group (
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
-				     _("IP address class conflict when resolving network name \"%s\", expected IPv6 multicast."),
-				     group);
+				     _("IP address class conflict when resolving network name %s%s%s, expected IPv6 multicast."),
+				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 #endif /* CONFIG_HAVE_IP6_NETWORKS */
 		default:
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_NODEV,
-				     _("Network name resolves to non-internet protocol address family: \"%s\""),
-				     group);
+				     _("Network name resolves to non-internet protocol address family %s%s%s"),
+				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 		}
 	}
@@ -769,8 +776,8 @@ parse_group (
 	g_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_INVAL,
-		     _("Unresolvable receive group: %s"),
-		     group);
+		     _("Unresolvable receive group %s%s%s"),
+		     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 	freeaddrinfo (res);
 	return FALSE;
 }
@@ -812,7 +819,7 @@ parse_interface_entity (
 
 	g_trace ("parse_interface_entity (family:%s entity:%s%s%s interface_list:%p error:%p)",
 		pgm_family_string (family),
-		entity ? "\"":"", entity, entity ? "\"":"",
+		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
 		(gpointer)interface_list,
 		(gpointer)error);
 
@@ -897,7 +904,7 @@ parse_receive_entity (
 
 	g_trace ("parse_receive_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p error:%p)",
 		pgm_family_string (family),
-		entity ? "\"":"", entity, entity ? "\"":"",
+		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
 		(gpointer)interface_list,
 		(gpointer)recv_list,
 		(gpointer)error);
@@ -941,8 +948,8 @@ parse_receive_entity (
 					if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 					{
 						g_prefix_error (error,
-								_("Unique address cannot be determined for interface \"%s\": "),
-								primary_interface->ir_name);
+								_("Unique address cannot be determined for interface %s%s%s: "),
+								primary_interface->ir_name ? "\"" : "", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"" : "");
 						g_free (recv_gsr);
 						g_free (primary_interface);
 						return FALSE;
@@ -976,8 +983,8 @@ parse_receive_entity (
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
 					g_prefix_error (error,
-							_("Unique address cannot be determined for interface \"%s\": "),
-							primary_interface->ir_name);
+							_("Unique address cannot be determined for interface %s%s%s: "),
+							primary_interface->ir_name ? "\"" : "", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"" : "");
 					g_free (recv_gsr);
 					g_free (primary_interface);
 					return FALSE;
@@ -1040,8 +1047,8 @@ parse_receive_entity (
 		if (!parse_group (recv_gsr->gsr_group.ss_family, tokens[j], (struct sockaddr*)&recv_gsr->gsr_group, error))
 		{
 			g_prefix_error (error,
-					_("Unresolvable receive entity \"%s\": "),
-					tokens[j]);
+					_("Unresolvable receive entity %s%s%s: "),
+					tokens[j] ? "\"" : "", tokens[j] ? tokens[j] : "(null)", tokens[j] ? "\"" : "");
 			g_free (recv_gsr);
 			g_strfreev (tokens);
 			g_free (primary_interface);
@@ -1057,8 +1064,8 @@ parse_receive_entity (
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
 					g_prefix_error (error,
-							_("Unique address cannot be determined for interface \"%s\": "),
-							primary_interface->ir_name);
+							_("Unique address cannot be determined for interface %s%s%s: "),
+							primary_interface->ir_name ? "\"" : "", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"" : "");
 					g_free (recv_gsr);
 					g_free (primary_interface);
 					return FALSE;
@@ -1101,7 +1108,7 @@ parse_send_entity (
 
 	g_trace ("parse_send_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p send_list:%p error:%p)",
 		pgm_family_string (family),
-		entity ? "\"":"", entity, entity ? "\"":"",
+		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
 		(gpointer)interface_list,
 		(gpointer)recv_list,
 		(gpointer)send_list,
@@ -1123,8 +1130,8 @@ parse_send_entity (
 	if (!parse_group (family, entity, (struct sockaddr*)&send_gsr->gsr_group, error))
 	{
 		g_prefix_error (error,
-				_("Unresolvable send entity \"%s\": "),
-				entity);
+				_("Unresolvable send entity %s%s%s: "),
+				entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"");
 		g_free (send_gsr);
 		return FALSE;
 	}
@@ -1138,8 +1145,8 @@ parse_send_entity (
 			if (!parse_interface (send_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 			{
 				g_prefix_error (error,
-						_("Unique address cannot be determined for interface \"%s\": "),
-						primary_interface->ir_name);
+						_("Unique address cannot be determined for interface %s%s%s: "),
+						primary_interface->ir_name ? "\"":"", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"":"");
 				g_free (send_gsr);
 				return FALSE;
 			}
@@ -1236,8 +1243,12 @@ network_parse (
 	g_assert (NULL != recv_list);
 	g_assert (NULL != send_list);
 
-	g_trace ("network_parse (network:\"%s\" family:%s recv_list:%p send_list:%p error:%p)",
-		network, pgm_family_string (family), (gpointer)recv_list, (gpointer)send_list, (gpointer)error);
+	g_trace ("network_parse (network:%s%s%s family:%s recv_list:%p send_list:%p error:%p)",
+		network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
+		pgm_family_string (family),
+		(gpointer)recv_list,
+		(gpointer)send_list,
+		(gpointer)error);
 
 	while (p < e)
 	{
@@ -1473,11 +1484,17 @@ pgm_if_get_transport_info (
 	g_return_val_if_fail (NULL != res, FALSE);
 
 	if (hints) {
-		g_trace ("get_transport_info (network:\"%s\" hints: {family:%s} res:%p error:%p)",
-			network, pgm_family_string (family), (gpointer)res, (gpointer)error);
+		g_trace ("get_transport_info (network:%s%s%s hints: {family:%s} res:%p error:%p)",
+			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
+			pgm_family_string (family),
+			(gpointer)res,
+			(gpointer)error);
 	} else {
-		g_trace ("get_transport_info (network:\"%s\" hints:%p res:%p error:%p)",
-			network, (gpointer)hints, (gpointer)res, (gpointer)error);
+		g_trace ("get_transport_info (network:%s%s%s hints:%p res:%p error:%p)",
+			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
+			(gpointer)hints,
+			(gpointer)res,
+			(gpointer)error);
 	}
 
 	if (!network_parse (network, family, &recv_list, &send_list, error))

@@ -131,7 +131,8 @@ create_interface (
 			((struct sockaddr_in6*)&new_interface->addr)->sin6_scope_id = atoi (scope);
 		}
 		else
-			g_error ("parsing failed for flag \"%s\"", tokens[i]);
+			g_error ("parsing failed for flag %s%s%s",
+				tokens[i] ? "\"" : "", tokens[i] ? tokens[i] : "(null)", tokens[i] ? "\"" : "");
 	}
 			
 	g_strfreev (tokens);
@@ -228,8 +229,8 @@ mock_teardown_net (void)
 
 static 
 int
-mock_getifaddrs (
-	struct ifaddrs**	ifap
+mock_pgm_getifaddrs (
+	struct pgm_ifaddrs**	ifap
 	)
 {
 	if (NULL == ifap) {
@@ -241,9 +242,9 @@ mock_getifaddrs (
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
-	struct ifaddrs* ifa = malloc (n * sizeof(struct ifaddrs));
-	memset (ifa, 0, n * sizeof(struct ifaddrs));
-	struct ifaddrs* ift = ifa;
+	struct pgm_ifaddrs* ifa = malloc (n * sizeof(struct pgm_ifaddrs));
+	memset (ifa, 0, n * sizeof(struct pgm_ifaddrs));
+	struct pgm_ifaddrs* ift = ifa;
 	while (list) {
 		struct mock_interface_t* interface = list->data;
 		ift->ifa_addr = (gpointer)&interface->addr;
@@ -264,8 +265,8 @@ mock_getifaddrs (
 
 static
 void
-mock_freeifaddrs (
-	struct ifaddrs*		ifa
+mock_pgm_freeifaddrs (
+	struct pgm_ifaddrs*		ifa
 	)
 {
 	g_debug ("mock_freeifaddrs (ifa:%p)", (gpointer)ifa);
@@ -285,7 +286,8 @@ mock_gethostbyname (
 /* pre-conditions */
 	g_assert (NULL != name);
 
-	g_debug ("mock_gethostbyname (name:\"%s\")", name);
+	g_debug ("mock_gethostbyname (name:%s%s%s)",
+		name ? "\"" : "", name ? name : "(null)", name ? "\"" : "");
 
 	GList* list = mock_hosts;
 	while (list) {
@@ -346,10 +348,10 @@ mock_getaddrinfo (
 	g_assert (!(ai_flags & AI_V4MAPPED));
 
 	g_debug ("mock_getaddrinfo (node:\"%s\" service:%s hints:%p res:%p)",
-		node,
-		NULL == service ? "(null)" : service,
-		NULL == (gpointer)hints ? "(null)" : (gpointer)hints,
-		NULL == (gpointer)res ? "(null)" : (gpointer)res);
+		node ? node : "(null)",
+		service ? service : "(null)",
+		(gpointer)hints,
+		(gpointer)res);
 
 	gboolean has_ip4_config;
 	gboolean has_ip6_config;
@@ -473,20 +475,20 @@ START_TEST (test_getnodeaddr_pass_001)
 	GError* err = NULL;
 	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
-		g_error ("Resolving node address with AF_UNSPEC: %s", err->message);
+		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");
 	}
 	fail_unless (TRUE == success, "getnodeaddr failed");
 	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
-	g_message ("AF_UNSPEC:%s", saddr);
+	g_message ("AF_UNSPEC:%s", saddr ? saddr : "(null)");
 	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
 	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
-	g_message ("AF_INET:%s", saddr);
+	g_message ("AF_INET:%s", saddr ? saddr : "(null)");
 	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
 	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
-	g_message ("AF_INET6:%s", saddr);
+	g_message ("AF_INET6:%s", saddr ? saddr : "(null)");
 }
 END_TEST
 
@@ -512,7 +514,7 @@ make_test_suite (void)
 	GError* err = NULL;
 	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
-		g_error ("Resolving node address with AF_UNSPEC: %s", err->message);
+		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");
 	}
 }
 	s = suite_create (__FILE__);

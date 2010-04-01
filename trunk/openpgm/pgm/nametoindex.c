@@ -49,7 +49,7 @@
  */
 
 int
-pgm_if_nametoindex (
+pgm_compat_if_nametoindex (
 	const int		iffamily,
 	const char*		ifname
         )

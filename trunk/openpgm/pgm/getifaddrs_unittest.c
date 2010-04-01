@@ -158,13 +158,13 @@ START_TEST (test_getifaddrs_pass_001)
 			strcpy (snetmask, "(null)");
 		g_message ("ifa = {"
 			"ifa_next = %p, "
-			"ifa_name = \"%s\", "
+			"ifa_name = %s%s%s, "
 			"ifa_flags = %s, "
 			"ifa_addr = %s, "
 			"ifa_netmask = %s"
 			"}",
 			ifa->ifa_next,
-			ifa->ifa_name,
+			ifa->ifa_name ? "\"" : "", ifa->ifa_name ? ifa->ifa_name : "(null)", ifa->ifa_name ? "\"" : "",
 			ifflags_string (ifa->ifa_flags),
 			saddr,
 			snetmask);

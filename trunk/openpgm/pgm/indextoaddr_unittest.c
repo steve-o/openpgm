@@ -145,8 +145,8 @@ mock_teardown_net (void)
 
 static 
 int
-mock_getifaddrs (
-	struct ifaddrs**	ifap
+mock_pgm_getifaddrs (
+	struct pgm_ifaddrs**	ifap
 	)
 {
 	if (NULL == ifap) {
@@ -154,13 +154,13 @@ mock_getifaddrs (
 		return -1;
 	}
 
-	g_debug ("mock_getifaddrs (ifap:%p)", (gpointer)ifap);
+	g_debug ("mock_pgm_getifaddrs (ifap:%p)", (gpointer)ifap);
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
-	struct ifaddrs* ifa = malloc (n * sizeof(struct ifaddrs));
-	memset (ifa, 0, n * sizeof(struct ifaddrs));
-	struct ifaddrs* ift = ifa;
+	struct pgm_ifaddrs* ifa = malloc (n * sizeof(struct pgm_ifaddrs));
+	memset (ifa, 0, n * sizeof(struct pgm_ifaddrs));
+	struct pgm_ifaddrs* ift = ifa;
 	while (list) {
 		struct mock_interface_t* interface = list->data;
 		ift->ifa_addr = (gpointer)&interface->addr;
@@ -181,16 +181,16 @@ mock_getifaddrs (
 
 static
 void
-mock_freeifaddrs (
-	struct ifaddrs*		ifa
+mock_pgm_freeifaddrs (
+	struct pgm_ifaddrs*		ifa
 	)
 {
 	g_debug ("mock_freeifaddrs (ifa:%p)", (gpointer)ifa);
 	free (ifa);
 }
 
-#define getifaddrs	mock_getifaddrs
-#define freeifaddrs	mock_freeifaddrs
+#define pgm_getifaddrs	mock_pgm_getifaddrs
+#define pgm_freeifaddrs	mock_pgm_freeifaddrs
 
 
 #define INDEXTOADDR_DEBUG

@@ -39,7 +39,7 @@
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 
-//#define GETIFADDRS_DEBUG
+#define GETIFADDRS_DEBUG
 
 #ifndef GETIFADDRS_DEBUG
 #define g_trace(...)		while (0)
@@ -62,10 +62,12 @@ struct _pgm_ifaddrs
  */
 
 int
-pgm_getifaddrs (
+pgm_compat_getifaddrs (
 	struct pgm_ifaddrs**	ifap
 	)
 {
+	g_trace ("pgm_getifaddrs (ifap:%p)", (void*)ifap);
+
 #ifdef G_OS_UNIX
 	int sock = socket (AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
@@ -154,7 +156,7 @@ again:
 	while (lifr < lifr_end)
 	{
 /* name */
-		g_trace ("AF_INET/name: %s", lifr->lifr_name);
+		g_trace ("AF_INET/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, LIFNAMSIZ);
 		ift->_ifa.ifa_name[LIFNAMSIZ - 1] = 0;
@@ -205,7 +207,7 @@ again:
 		}
 
 /* name */
-		g_trace ("AF_INET6/name: %s", lifr->lifr_name);
+		g_trace ("AF_INET6/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
 		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
@@ -281,6 +283,7 @@ again:
 		}
 
 /* name */
+		g_trace ("AF_INET/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
 		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
@@ -327,6 +330,7 @@ again:
 		}
 
 /* name */
+		g_trace ("AF_INET6/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
 		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
@@ -423,6 +427,7 @@ again:
 			g_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
 
 /* name */
+			g_trace ("name:%s", pAdapter->AdapterName);
 			ift->_ifa.ifa_name = ift->_name;
 			strncpy (ift->_ifa.ifa_name, pAdapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
@@ -514,6 +519,7 @@ again:
 			memcpy (ift->_ifa.ifa_addr, unicast->Address.lpSockaddr, unicast->Address.iSockaddrLength);
 
 /* name */
+			g_trace ("name:%s", adapter->AdapterName);
 			ift->_ifa.ifa_name = ift->_name;
 			strncpy (ift->_ifa.ifa_name, adapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
@@ -583,7 +589,7 @@ again:
 }
 
 void
-pgm_freeifaddrs (
+pgm_compat_freeifaddrs (
 	struct pgm_ifaddrs*	ifa
 	)
 {

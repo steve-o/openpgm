@@ -314,7 +314,7 @@ write_ascii_header (
 {
 	g_string_append_printf (output,
 				 "Histogram: %s recorded %ld samples",
-				 histogram->histogram_name,
+				 histogram->histogram_name ? histogram->histogram_name : "(null)",
 				 (long)sample_count);
 	if (sample_count > 0) {
 		double average = sample_set->sum / sample_count;
