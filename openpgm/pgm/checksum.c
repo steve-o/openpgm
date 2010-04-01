@@ -28,6 +28,98 @@
 
 /* globals */
 
+/* endian independent checksum routine
+ */
+
+#if 0
+static
+guint16
+do_csum (
+	const void*	addr,
+	guint16		len,
+	int		csum
+	)
+{
+	guint32 acc;
+	guint16 src;
+	const guint8* buf;
+
+	acc = csum;
+	buf = (const guint8*)addr;
+	while (len > 1) {
+/* first byte as most significant */
+		src = (*buf) << 8;
+		buf++;
+/* second byte as least significant */
+		src |= (*buf);
+		buf++;
+		acc += src;
+		len -= 2;
+	}
+/* trailing odd byte */
+	if (len > 0) {
+		src = (*buf) << 8;
+		acc += src;
+	}
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	return g_htons ((guint16)acc);
+}
+#else
+static
+guint16
+do_csum (
+	const void*	addr,
+	guint16		len,
+	int		csum
+	)
+{
+	guint32 acc;
+	const guint8* buf;
+	guint16 remainder;
+	unsigned count8;
+	gboolean is_odd;
+
+	acc = csum;
+	buf = (const guint8*)addr;
+	remainder = 0;
+	is_odd = ((guint32)buf & 1);
+
+/* align first byte */
+	if (is_odd && len > 0) {
+		((guint8*)&remainder)[1] = *buf++;
+		len--;
+	}
+/* 8-way unrolls */
+	count8 = len >> 3;
+	if (count8)
+	{
+		while (count8--) {
+			acc += ((const guint16*)buf)[ 0 ];
+			acc += ((const guint16*)buf)[ 1 ];
+			acc += ((const guint16*)buf)[ 2 ];
+			acc += ((const guint16*)buf)[ 3 ];
+			buf  = &buf[ 8 ];
+		}
+		len %= 8;
+	}
+	while (len > 1) {
+		acc += ((const guint16*)buf)[ 0 ];
+		buf  = &buf[ 2 ];
+		len -= 2;
+	}
+/* trailing odd byte */
+	if (len > 0) {
+		((guint8*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (is_odd)
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return acc;
+}
+#endif
 
 /* Calculate an IP header style checksum
  */
@@ -42,25 +134,10 @@ pgm_inet_checksum (
 /* pre-conditions */
 	g_assert (NULL != addr);
 
-	guint nleft = len;
-	const guint16 *w = (const guint16*)addr;
-	guint answer;
-	int sum = csum;
-
-	while (nleft > 1) {
-		sum += *w++;
-		nleft -= 2;
-	}
-	if (nleft == 1)
-		sum += g_htons(*(const guchar *)w<<8);
-
-	sum = (sum >> 16) + (sum & 0xffff);
-	sum += (sum >> 16);
-	answer = ~sum;
-	return (answer);
+	return ~do_csum (addr, len, csum);
 }
 
-/* Calculate a partial (unfolded) PGM style checksum
+/* Calculate a partial (unfolded) checksum
  */
 
 guint32
@@ -73,24 +150,11 @@ pgm_compat_csum_partial (
 /* pre-conditions */
 	g_assert (NULL != addr);
 
-	const guint16 *w = (const guint16*)addr;
-	guint32 sum = csum;
-	guint16 odd_byte;
+	csum  = (csum >> 16) + (csum & 0xffff);
+	csum += do_csum (addr, len, 0);
+	csum  = (csum >> 16) + (csum & 0xffff);
 
-	while (len > 1) {
-		sum += *w++;
-		if (sum & 0x80000000)
-			sum = (sum & 0xFFFF) + (sum >> 16);
-		len -= 2;
-	}
-
-	if (len) {
-		odd_byte = 0;
-		*(guchar*)&odd_byte = *(const guchar*)w;
-		sum += odd_byte;
-	}
-
-	return sum;
+	return csum;
 }
 
 /* Calculate & copy a partial PGM checksum
@@ -120,9 +184,10 @@ pgm_csum_fold (
 	guint32		csum
 	)
 {
-	while (csum >> 16)
-		csum = (csum & 0xffff) + (csum >> 16);
+	csum  = (csum >> 16) + (csum & 0xffff);
+	csum += (csum >> 16);
 
+/* handle special case of no checksum */
 	return csum == 0xffff ? csum : ~csum;
 }
 

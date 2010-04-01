@@ -47,11 +47,15 @@
 
 START_TEST (test_inet_pass_001)
 {
-	const char source[] = "i am not a string";
+	const char source[]  = "i am not a string";
+	const guint16 answer = 0x1fda;		/* network order */
+
 	guint16 csum = pgm_inet_checksum (source, sizeof(source), 0);
-	g_message ("IP checksum of \"%s\" is 0x%04x",
-		   source, csum);
-	fail_unless (0xda1f == csum, "checksum mismatch");
+/* function calculates answer in host order */
+	csum = g_htons (csum);
+	g_message ("IP checksum of \"%s\" is %u (%u)", source, csum, answer);
+
+	fail_unless (answer == csum, "checksum mismatch");
 }
 END_TEST
 
@@ -71,10 +75,14 @@ END_TEST
 
 START_TEST (test_fold_pass_001)
 {
-	guint32 csum = 0x325dd;
-	guint16 folded_csum = pgm_csum_fold (csum);
-	g_message ("0x%08x folds into 0x%08x",
-		   csum, folded_csum);
+	const guint32 csum   = 0xdd250300;	/* network order */
+	const guint16 answer = 0x1fda;
+
+	guint16 folded_csum = pgm_csum_fold (g_ntohl (csum));
+	folded_csum = g_htons (folded_csum);
+	g_message ("32-bit checksum %u folds into %u (%u)", csum, folded_csum, answer);
+
+	fail_unless (answer == folded_csum, "folded checksum mismatch");
 }
 END_TEST
 
@@ -90,11 +98,20 @@ END_TEST
 
 START_TEST (test_partial_pass_001)
 {
-	const char source[] = "i am not a string";
+	const char source[]  = "i am not a string";
+#if __BYTE_ORDER == __BIG_ENDIAN
+	const guint32 answer = 0x0000e025;	/* network order */
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+	const guint32 answer = 0xe0250000;	/* network order */
+#else
+#	error "__BYTE_ORDER not supported."
+#endif
+
 	guint32 csum = pgm_csum_partial (source, sizeof(source), 0);
-	g_message ("Checksum of \"%s\" is 0x%08x",
-		   source, csum);
-	fail_unless (0x325dd == csum, "checksum mismatch");
+	csum = g_htonl (csum);
+	g_message ("Partial checksum of \"%s\" is %u (%u)", source, csum, answer);
+
+	fail_unless (answer == csum, "checksum mismatch");
 }
 END_TEST
 
@@ -118,13 +135,23 @@ END_TEST
 START_TEST (test_partial_copy_pass_001)
 {
 	const char source[] = "i am not a string";
+#if __BYTE_ORDER == __BIG_ENDIAN
+	const guint32 answer = 0x0000e025;	/* network order */
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+	const guint32 answer = 0xe0250000;	/* network order */
+#else
+#	error "__BYTE_ORDER not supported."
+#endif
+
 	char dest[1024];
 	guint32 csum_source = pgm_csum_partial_copy (source, dest, sizeof(source), 0);
-	guint32 csum_dest = pgm_csum_partial (dest, sizeof(source), 0);
-	g_message ("Checksum of \"%s\" is 0x%08x, checksum of dest is 0x%08x",
-		   source, csum_source, csum_dest);
-	fail_unless (0x325dd == csum_source, "checksum mismatch");
-	fail_unless (0x325dd == csum_dest, "checksum mismatch");
+	csum_source = g_htonl (csum_source);
+	guint32 csum_dest   = pgm_csum_partial (dest, sizeof(source), 0);
+	csum_dest = g_htonl (csum_dest);
+	g_message ("Partial copy checksum of \"%s\" is %u, partial checksum is %u (%u)",
+		   source, csum_source, csum_dest, answer);
+	fail_unless (answer == csum_source, "checksum mismatch in partial-copy");
+	fail_unless (answer == csum_dest,   "checksum mismatch in partial");
 }
 END_TEST
 
@@ -147,13 +174,20 @@ END_TEST
 START_TEST (test_block_add_pass_001)
 {
 	const char source[] = "i am not a string";
+	const guint16 answer = 0x1fda;		/* network order */
+
 	guint32 csum_a = pgm_csum_partial (source, sizeof(source) / 2, 0);
-	guint32 csum_b = pgm_csum_partial (source + sizeof(source) / 2, sizeof(source) - (sizeof(source) / 2), 0);
+	guint32 csum_b = pgm_csum_partial (source + (sizeof(source) / 2), sizeof(source) - (sizeof(source) / 2), 0);
 	guint32 csum   = pgm_csum_block_add (csum_a, csum_b, sizeof(source) / 2);
 	guint16 fold   = pgm_csum_fold (csum);
-	g_message ("Checksum A:0x%08x + B:0x%08x = 0x%08x -> 0x%08x",
-		   csum_a, csum_b, csum, fold);
-	fail_unless (0xda1f == fold, "checksum mismatch");
+/* convert to display in network order */
+	csum_a = g_htonl (csum_a);
+	csum_b = g_htonl (csum_b);
+	csum   = g_htonl (csum);
+	fold   = g_htons (fold);
+	g_message ("Checksum A:%u + B:%u = %u -> %u (%u)",
+		   csum_a, csum_b, csum, fold, answer);
+	fail_unless (answer == fold, "checksum mismatch");
 }
 END_TEST
 
