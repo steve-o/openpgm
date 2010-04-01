@@ -30,10 +30,6 @@
 
 #ifdef CONFIG_HAVE_GETIFADDRS
 #	include <ifaddrs.h>
-#else
-#	define getifaddrs	pgm_getifaddrs
-#	define freeifaddrs	pgm_freeifaddrs
-#	define ifaddrs		pgm_ifaddrs
 #endif
 
 #ifndef IF_NAMESIZE
@@ -60,8 +56,24 @@ struct pgm_ifaddrs
 
 G_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL int pgm_getifaddrs (struct pgm_ifaddrs**);
-PGM_GNUC_INTERNAL void pgm_freeifaddrs (struct pgm_ifaddrs*);
+int pgm_compat_getifaddrs (struct pgm_ifaddrs**);
+void pgm_compat_freeifaddrs (struct pgm_ifaddrs*);
+
+#ifdef CONFIG_HAVE_GETIFADDRS
+static inline int pgm_getifaddrs (struct pgm_ifaddrs** addrs) {
+	return getifaddrs ((struct ifaddrs**)addrs);
+}
+static inline void pgm_freeifaddrs (struct pgm_ifaddrs* addrs) {
+	freeifaddrs ((struct ifaddrs*)addrs);
+}
+#else
+static inline int pgm_getifaddrs (struct pgm_ifaddrs** addrs) {
+	return pgm_compat_getifaddrs (addrs);
+}
+static inline void pgm_freeifaddrs (struct pgm_ifaddrs* addrs) {
+	pgm_compat_freeifaddrs (addrs);
+}
+#endif
 
 G_END_DECLS
 

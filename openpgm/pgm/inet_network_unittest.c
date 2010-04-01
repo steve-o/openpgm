@@ -41,17 +41,23 @@
  *	int
  *	pgm_inet_network (
  *		const char*		s,
- *		struct in_addr*		in
+ *		struct in_addr*		in	-- in host byte order
  *	)
  */
 
 START_TEST (test_inet_network_pass_001)
 {
-	const char* network = "127.0.0.1/8";
+	const char network[] = "127.0.0.1/8";
+	const char answer[]  = "127.0.0.0";
+
 	struct in_addr addr;
-	fail_unless (0 == pgm_inet_network (network, &addr));
+//	fail_unless (0 == pgm_inet_network (network, &addr));
+addr.s_addr = inet_network ("127.0.0.1");
 	g_message ("Resolved \"%s\" to \"%s\"",
 		   network, inet_ntoa (addr));
+	struct in_addr network_addr = { .s_addr = g_htonl (addr.s_addr) };
+g_message ("network order: %s", inet_ntoa (network_addr));
+	fail_unless (0 == strcmp (answer, inet_ntoa (network_addr)));
 }
 END_TEST
 
@@ -71,7 +77,9 @@ END_TEST
 
 START_TEST (test_inet6_network_pass_001)
 {
-	const char* network = "::1/128";
+	const char network[] = "::1/128";
+	const char answer[] = "";
+
 	char snetwork[INET6_ADDRSTRLEN];
 	struct in6_addr addr;
 	fail_unless (0 == pgm_inet6_network (network, &addr));

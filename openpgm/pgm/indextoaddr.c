@@ -83,8 +83,8 @@ pgm_if_indextoaddr (
 		return TRUE;
 	}
 
-	struct ifaddrs *ifap, *ifa;
-	if (0 != getifaddrs (&ifap)) {
+	struct pgm_ifaddrs *ifap, *ifa;
+	if (0 != pgm_getifaddrs (&ifap)) {
 		g_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
@@ -106,7 +106,7 @@ pgm_if_indextoaddr (
 			if (ifscope && ifscope != pgm_sockaddr_scope_id (ifa->ifa_addr))
 				continue;
 			memcpy (ifsa, ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr));
-			freeifaddrs (ifap);
+			pgm_freeifaddrs (ifap);
 			return TRUE;
 		}
 	}
@@ -116,7 +116,7 @@ pgm_if_indextoaddr (
 		     PGM_IF_ERROR_NODEV,
 		     _("No matching network interface index: %i"),
 		     ifindex);
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 	return FALSE;
 }
 

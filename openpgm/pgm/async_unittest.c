@@ -230,7 +230,8 @@ START_TEST (test_recv_pass_001)
 	gsize bytes_read = 0;
 	fail_unless (PGM_IO_STATUS_NORMAL == pgm_async_recv (async, &buffer, sizeof(buffer), &bytes_read, 0, &err), "recv failed");
 	fail_unless (TRUE == pgm_async_destroy (async), "destroy failed");
-	g_message ("recv returned \"%s\"", buffer);
+	g_message ("recv returned %s%s%s",
+		buffer ? "\"" : "", buffer ? buffer : "(null)", buffer ? "\"" : "");
 }
 END_TEST
 
