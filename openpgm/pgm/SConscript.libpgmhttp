@@ -50,7 +50,7 @@ if env['WITH_CHECK'] == 'true':
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
 	te.ParseConfig ('pkg-config --cflags --libs check');
-	te.Program (['http_unittest.c', te.Object('sockaddr.c')]);
+	te.Program (['http_unittest.c', te.Object('sockaddr.c'), te.Object('getifaddrs.c')]);
 
 
 # end of file

@@ -533,10 +533,10 @@ interfaces_callback (
 {
 	GString* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
 	g_string_append (response, "<PRE>");
-	struct ifaddrs *ifap, *ifa;
-	int e = getifaddrs (&ifap);
+	struct pgm_ifaddrs *ifap, *ifa;
+	int e = pgm_getifaddrs (&ifap);
 	if (e < 0) {
-		g_string_append_printf (response, "getifaddrs(): %s", g_strerror (errno));
+		g_string_append_printf (response, "pgm_getifaddrs(): %s", g_strerror (errno));
 		http_finalize_response (response, msg);
 		return;
 	}
@@ -584,7 +584,7 @@ interfaces_callback (
 			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
 		);
 	}
-	freeifaddrs (ifap);
+	pgm_freeifaddrs (ifap);
 	g_string_append (response, "</PRE>\n");
 	http_finalize_response (response, msg);
 }
