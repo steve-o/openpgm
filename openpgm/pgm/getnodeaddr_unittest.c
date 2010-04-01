@@ -346,7 +346,10 @@ mock_getaddrinfo (
 	g_assert (!(ai_flags & AI_V4MAPPED));
 
 	g_debug ("mock_getaddrinfo (node:\"%s\" service:%s hints:%p res:%p)",
-		node, service, (gpointer)hints, (gpointer)res);
+		node,
+		NULL == service ? "(null)" : service,
+		NULL == (gpointer)hints ? "(null)" : (gpointer)hints,
+		NULL == (gpointer)res ? "(null)" : (gpointer)res);
 
 	gboolean has_ip4_config;
 	gboolean has_ip6_config;
@@ -501,6 +504,17 @@ make_test_suite (void)
 {
 	Suite* s;
 
+{
+	mock_setup_net();
+
+	struct sockaddr_storage addr;
+	char saddr[INET6_ADDRSTRLEN];
+	GError* err = NULL;
+	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
+	if (!success && err) {
+		g_error ("Resolving node address with AF_UNSPEC: %s", err->message);
+	}
+}
 	s = suite_create (__FILE__);
 
 	TCase* tc_getnodeaddr = tcase_create ("getnodeaddr");
