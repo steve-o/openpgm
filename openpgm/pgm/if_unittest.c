@@ -1383,6 +1383,31 @@ START_TEST (test_is_in_net_pass_001)
 }
 END_TEST
 
+static const struct test_case_net_t cases_005[] = {
+	{ "::1",			"::1",			"ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",		TRUE		},
+	{ "fe80::203:baff:fe4e:6cc8",	"fe80::",		"ffff:0000:0000:0000:0000:0000:0000:0000",		TRUE		},
+	{ "2002:dec8:d28e::36",		"2002:dec8:d28e::",	"ffff:ffff:ffff:0000:0000:0000:0000:0000",		TRUE		},
+	{ "2002:dec8:d28e::36",		"2002:dafa:939:0::",	"ffff:ffff:ffff:ffff:0000:0000:0000:0000",		FALSE		},
+};
+
+START_TEST (test_is_in_net6_pass_001)
+{
+	struct in6_addr addr, netaddr, netmask;
+	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].addr,    &addr));
+	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].netaddr, &netaddr));
+	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].netmask, &netmask));
+	const gboolean answer =		      cases_005[_i].answer;
+
+	gboolean result = is_in_net6 (&addr, &netaddr, &netmask);
+
+	g_message ("result %s (%s)",
+		result ? "TRUE" : "FALSE",
+		answer ? "TRUE" : "FALSE");
+
+	fail_unless (answer == result);
+}
+END_TEST
+
 
 
 static
@@ -1398,6 +1423,12 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_is_in_net, mock_setup_net, mock_teardown_net);
 	tcase_add_checked_fixture (tc_is_in_net, mock_setup_unspec, NULL);
 	tcase_add_loop_test (tc_is_in_net, test_is_in_net_pass_001, 0, G_N_ELEMENTS(cases_004));
+
+	TCase* tc_is_in_net6 = tcase_create ("is_in_net6");
+	suite_add_tcase (s, tc_is_in_net6);
+	tcase_add_checked_fixture (tc_is_in_net6, mock_setup_net, mock_teardown_net);
+	tcase_add_checked_fixture (tc_is_in_net6, mock_setup_unspec, NULL);
+	tcase_add_loop_test (tc_is_in_net6, test_is_in_net6_pass_001, 0, G_N_ELEMENTS(cases_005));
 
 /* three variations of all parse-transport tests, one for each valid
  * address family value: AF_UNSPEC, AF_INET, AF_INET6. 
