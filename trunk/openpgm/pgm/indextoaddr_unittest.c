@@ -33,7 +33,6 @@
 #include <glib.h>
 #include <check.h>
 
-#include <pgm/getifaddrs.h>
 #include <pgm/sockaddr.h>
 
 
@@ -141,9 +140,27 @@ mock_teardown_net (void)
 }
 
 
+#include "pgm/getifaddrs.h"
+
+int
+pgm_compat_getifaddrs (
+	struct pgm_ifaddrs**	ifap
+	)
+{
+	g_assert_not_reached();
+	return -1;
+}
+
+void
+pgm_compat_freeifaddrs (
+	struct pgm_ifaddrs*	ifap
+	)
+{
+	g_assert_not_reached();
+}
+
 /* mock functions for external references */
 
-static 
 int
 mock_pgm_getifaddrs (
 	struct pgm_ifaddrs**	ifap
@@ -158,8 +175,7 @@ mock_pgm_getifaddrs (
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
-	struct pgm_ifaddrs* ifa = malloc (n * sizeof(struct pgm_ifaddrs));
-	memset (ifa, 0, n * sizeof(struct pgm_ifaddrs));
+	struct pgm_ifaddrs* ifa = calloc (n, sizeof(struct pgm_ifaddrs));
 	struct pgm_ifaddrs* ift = ifa;
 	while (list) {
 		struct mock_interface_t* interface = list->data;
@@ -189,8 +205,38 @@ mock_pgm_freeifaddrs (
 	free (ifa);
 }
 
+#include "pgm/nametoindex.h"
+
+int
+pgm_compat_if_nametoindex (
+	const int		iffamily,
+	const char*		ifname
+	)
+{
+	g_assert_not_reached();
+	return -1;
+}
+
+int
+mock_pgm_if_nametoindex (
+	const int		iffamily,
+	const char*		ifname
+	)
+{
+	GList* list = mock_interfaces;
+	while (list) {
+		const struct mock_interface_t* interface = list->data;
+		if (0 == strcmp (ifname, interface->name))
+			return interface->index;
+		list = list->next;
+	}
+	return 0;
+}
+
+
 #define pgm_getifaddrs	mock_pgm_getifaddrs
 #define pgm_freeifaddrs	mock_pgm_freeifaddrs
+#define pgm_if_nametoindex	mock_pgm_if_nametoindex
 
 
 #define INDEXTOADDR_DEBUG
