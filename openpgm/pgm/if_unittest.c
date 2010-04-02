@@ -1330,6 +1330,61 @@ START_TEST (test_print_all_pass_001)
 END_TEST
 
 
+/* target:
+ * 	gboolean
+ * 	is_in_net (
+ * 		const struct in_addr*	addr,		-- in host byte order
+ * 		const struct in_addr*	netaddr,
+ * 		const struct in_addr*	netmask
+ * 		)
+ */
+
+struct test_case_net_t {
+        const char* addr;
+        const char* netaddr;
+        const char* netmask;
+	const gboolean answer;
+};
+
+static const struct test_case_net_t cases_004[] = {
+	{ "127.0.0.1",		"127.0.0.1",	"255.0.0.0",		TRUE		},
+	{ "127.0.0.1",		"127.0.0.1",	"255.255.0.0",		TRUE		},
+	{ "127.0.0.1",		"127.0.0.1",	"255.255.255.0",	TRUE		},
+	{ "127.0.0.1",		"127.0.0.1",	"255.255.255.255",	TRUE		},
+	{ "127.0.0.1",		"127.0.0.0",	"255.0.0.0",		TRUE		},
+	{ "127.0.0.1",		"127.0.0.0",	"255.255.0.0",		TRUE		},
+	{ "127.0.0.1",		"127.0.0.0",	"255.255.255.0",	TRUE		},
+	{ "127.0.0.1",		"127.0.0.0",	"255.255.255.255",	FALSE		},
+	{ "172.15.1.1",		"172.16.0.0",	"255.240.0.0",		FALSE		},
+	{ "172.16.1.1",		"172.16.0.0",	"255.240.0.0",		TRUE		},
+	{ "172.18.1.1",		"172.16.0.0",	"255.240.0.0",		TRUE		},
+	{ "172.31.1.1",		"172.16.0.0",	"255.240.0.0",		TRUE		},
+	{ "172.32.1.1",		"172.16.0.0",	"255.240.0.0",		FALSE		},
+};
+
+START_TEST (test_is_in_net_pass_001)
+{
+	struct in_addr addr, netaddr, netmask;
+	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].addr,    &addr));
+	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].netaddr, &netaddr));
+	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].netmask, &netmask));
+	const gboolean answer =		     cases_004[_i].answer;
+
+	addr.s_addr    = g_ntohl (addr.s_addr);
+	netaddr.s_addr = g_ntohl (netaddr.s_addr);
+	netmask.s_addr = g_ntohl (netmask.s_addr);
+	gboolean result = is_in_net (&addr, &netaddr, &netmask);
+
+	g_message ("result %s (%s)",
+		result ? "TRUE" : "FALSE",
+		answer ? "TRUE" : "FALSE");
+
+	fail_unless (answer == result);
+}
+END_TEST
+
+
+
 static
 Suite*
 make_test_suite (void)
@@ -1337,6 +1392,12 @@ make_test_suite (void)
 	Suite* s;
 
 	s = suite_create (__FILE__);
+
+	TCase* tc_is_in_net = tcase_create ("is_in_net");
+	suite_add_tcase (s, tc_is_in_net);
+	tcase_add_checked_fixture (tc_is_in_net, mock_setup_net, mock_teardown_net);
+	tcase_add_checked_fixture (tc_is_in_net, mock_setup_unspec, NULL);
+	tcase_add_loop_test (tc_is_in_net, test_is_in_net_pass_001, 0, G_N_ELEMENTS(cases_004));
 
 /* three variations of all parse-transport tests, one for each valid
  * address family value: AF_UNSPEC, AF_INET, AF_INET6. 
