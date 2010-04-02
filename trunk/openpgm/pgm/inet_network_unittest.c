@@ -21,9 +21,13 @@
 
 
 #include <errno.h>
+#include <sys/socket.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <glib.h>
 #include <check.h>
 
@@ -45,25 +49,67 @@
  *	)
  */
 
+struct test_case_t {
+	const char* network;
+	const char* answer;
+};
+
+static const struct test_case_t cases_001[] = {
+	{ "127",			"127.0.0.0"		}, /* different to inet_addr/inet_network */
+	{ "127/8",			"127.0.0.0"		},
+	{ "127.1/8",			"127.0.0.0"		},
+	{ "127.1",			"127.1.0.0"		}, /* different to inet_addr/inet_network */
+	{ "127.x.x.x",			"127.0.0.0"		},
+	{ "127.X.X.X",			"127.0.0.0"		},
+	{ "127.0.0.0",			"127.0.0.0"		},
+	{ "127.0.0.1/8",		"127.0.0.0"		},
+	{ "127.0.0.1/32",		"127.0.0.1"		},
+	{ "10.0.0.0/8",			"10.0.0.0"		},	/* RFC1918 class A */
+	{ "10.255.255.255/8",		"10.0.0.0"		},
+	{ "172.16.0.0/12",		"172.16.0.0"		},	/* RFC1918 class B */
+	{ "172.31.255.255/12",		"172.16.0.0"		},
+	{ "192.168.0.0/16",		"192.168.0.0"		},	/* RFC1918 class C */
+	{ "192.168.255.255/16",		"192.168.0.0"		},
+	{ "169.254.0.0/16",		"169.254.0.0"		},	/* RFC3927 link-local */
+	{ "192.88.99.0/24",		"192.88.99.0"		},	/* RFC3068 6to4 relay anycast */
+	{ "224.0.0.0/4",		"224.0.0.0"		},	/* RFC3171 multicast */
+	{ "0.0.0.0",			"0.0.0.0"		},
+	{ "255.255.255.255",		"255.255.255.255"	},
+};
+
 START_TEST (test_inet_network_pass_001)
 {
-	const char network[] = "127.0.0.1/8";
-	const char answer[]  = "127.0.0.0";
+	const char* network = cases_001[_i].network;
+	const char* answer  = cases_001[_i].answer;
 
-	struct in_addr addr;
-//	fail_unless (0 == pgm_inet_network (network, &addr));
-addr.s_addr = inet_network ("127.0.0.1");
+	struct in_addr host_order, network_order;
+	fail_unless (0 == pgm_inet_network (network, &host_order));
+	network_order.s_addr = g_htonl (host_order.s_addr);
+
 	g_message ("Resolved \"%s\" to \"%s\"",
-		   network, inet_ntoa (addr));
-	struct in_addr network_addr = { .s_addr = g_htonl (addr.s_addr) };
-g_message ("network order: %s", inet_ntoa (network_addr));
-	fail_unless (0 == strcmp (answer, inet_ntoa (network_addr)));
+		   network, inet_ntoa (network_order));
+
+{
+struct in_addr t = { .s_addr = g_htonl (inet_network (network)) };
+g_message ("inet_network (%s) = %s", network, inet_ntoa (t));
+}
+
+	fail_unless (0 == strcmp (answer, inet_ntoa (network_order)));
 }
 END_TEST
 
 START_TEST (test_inet_network_fail_001)
 {
 	fail_unless (-1 == pgm_inet_network (NULL, NULL));
+}
+END_TEST
+
+START_TEST (test_inet_network_fail_002)
+{
+	const char* network = "192.168.0.1/0";
+
+	struct in_addr host_order;
+	fail_unless (-1 == pgm_inet_network (network, &host_order));
 }
 END_TEST
 
@@ -75,16 +121,25 @@ END_TEST
  *	)
  */
 
+static const struct test_case_t cases6_001[] = {
+	{ "::1/128",				"::1"			},
+	{ "2002:dec8:d28e::36/64",		"2002:dec8:d28e::"	},	/* 6to4 */
+	{ "fe80::203:baff:fe4e:6cc8/10",	"fe00::"		},	/* link-local */
+	{ "ff02::1/8",				"ff00::"		},	/* multicast */
+};
+
 START_TEST (test_inet6_network_pass_001)
 {
-	const char network[] = "::1/128";
-	const char answer[] = "";
+	const char* network = cases6_001[_i].network;
+	const char* answer  = cases6_001[_i].answer;
 
 	char snetwork[INET6_ADDRSTRLEN];
 	struct in6_addr addr;
 	fail_unless (0 == pgm_inet6_network (network, &addr));
 	g_message ("Resolved \"%s\" to \"%s\"",
 		   network, pgm_inet_ntop (AF_INET6, &addr, snetwork, sizeof(snetwork)));
+
+	fail_unless (0 == strcmp (answer, snetwork));
 }
 END_TEST
 
@@ -105,12 +160,12 @@ make_test_suite (void)
 
 	TCase* tc_inet_network = tcase_create ("inet-network");
 	suite_add_tcase (s, tc_inet_network);
-	tcase_add_test (tc_inet_network, test_inet_network_pass_001);
+	tcase_add_loop_test (tc_inet_network, test_inet_network_pass_001, 0, G_N_ELEMENTS(cases_001));
 	tcase_add_test (tc_inet_network, test_inet_network_fail_001);
 
 	TCase* tc_inet6_network = tcase_create ("inet6-network");
 	suite_add_tcase (s, tc_inet6_network);
-	tcase_add_test (tc_inet6_network, test_inet6_network_pass_001);
+	tcase_add_loop_test (tc_inet6_network, test_inet6_network_pass_001, 0, G_N_ELEMENTS(cases6_001));
 	tcase_add_test (tc_inet6_network, test_inet6_network_fail_001);
 	return s;
 }
