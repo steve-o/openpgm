@@ -591,7 +591,7 @@ mock_getnetbyname (
 			ne.n_name	= network->name;
 			ne.n_aliases	= network->aliases;
 			ne.n_addrtype	= AF_INET;
-			ne.n_net	= ((struct sockaddr_in*)&network->number)->sin_addr.s_addr;
+			ne.n_net	= g_ntohl (((struct sockaddr_in*)&network->number)->sin_addr.s_addr);
 			return &ne;
 		}
 		list = list->next;
@@ -1439,13 +1439,9 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_parse_transport_unspec);
 	tcase_add_checked_fixture (tc_parse_transport_unspec, mock_setup_net, mock_teardown_net);
 	tcase_add_checked_fixture (tc_parse_transport_unspec, mock_setup_unspec, NULL);
-//	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_001, 0, G_N_ELEMENTS(cases_001));
-//	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_002, 0, G_N_ELEMENTS(cases_002));
-//	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_003, 0, G_N_ELEMENTS(cases_003));
-	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_003, 0, 1);
-{
-}
-#if 0
+	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_001, 0, G_N_ELEMENTS(cases_001));
+	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_002, 0, G_N_ELEMENTS(cases_002));
+	tcase_add_loop_test (tc_parse_transport_unspec, test_parse_transport_pass_003, 0, G_N_ELEMENTS(cases_003));
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_pass_004);
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_pass_005);
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_001);
@@ -1486,7 +1482,6 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_print_all, mock_setup_net, mock_teardown_net);
 	suite_add_tcase (s, tc_print_all);
 	tcase_add_test (tc_print_all, test_print_all_pass_001);
-#endif
 
 	return s;
 }

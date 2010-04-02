@@ -691,6 +691,7 @@ parse_group (
 #ifdef G_OS_UNIX
 /* NSS network */
 	const struct netent* ne = getnetbyname (group);
+/* ne::n_net in host byte order */
 	if (ne) {
 		switch (ne->n_addrtype) {
 		case AF_INET:
@@ -702,10 +703,9 @@ parse_group (
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
-/* ne->n_net in network order */
-			if (IN_MULTICAST(g_ntohl(ne->n_net))) {
+			if (IN_MULTICAST(ne->n_net)) {
 				addr->sa_family = AF_INET;
-				((struct sockaddr_in*)addr)->sin_addr.s_addr = ne->n_net;
+				((struct sockaddr_in*)addr)->sin_addr.s_addr = g_htonl (ne->n_net);
 				return TRUE;
 			}
 			g_set_error (error,
