@@ -124,8 +124,9 @@ END_TEST
 static const struct test_case_t cases6_001[] = {
 	{ "::1/128",				"::1"			},
 	{ "2002:dec8:d28e::36/64",		"2002:dec8:d28e::"	},	/* 6to4 */
-	{ "fe80::203:baff:fe4e:6cc8/10",	"fe00::"		},	/* link-local */
+	{ "fe80::203:baff:fe4e:6cc8/10",	"fe80::"		},	/* link-local */
 	{ "ff02::1/8",				"ff00::"		},	/* multicast */
+	{ "fc00:6::61/7",			"fc00::"		},	/* ULA */
 };
 
 START_TEST (test_inet6_network_pass_001)

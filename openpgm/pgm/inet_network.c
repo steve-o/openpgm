@@ -140,10 +140,12 @@ pgm_inet_network (
 
 /* zero out host bits */
 			const in_addr_t netaddr = cidr_to_netmask (val);
+#ifdef INET_NETWORK_DEBUG
 {
 struct in_addr na = { .s_addr = g_htonl (netaddr) };
-g_message ("netaddr %s", inet_ntoa (na));
+g_trace ("netaddr %s", inet_ntoa (na));
 }
+#endif
 			in->s_addr &= netaddr;
 			return 0;
 		
@@ -206,14 +208,14 @@ pgm_inet6_network (
 	}
 
 	*p2 = 0;
-//	g_trace ("net part %s", s2);
+	g_trace ("net part %s", s2);
 	if (!pgm_inet_pton (AF_INET6, s2, in6)) {
 		g_trace ("inet_pton failed parsing network part %s", s2);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
-#ifdef IF_DEBUG
+#ifdef INET_NETWORK_DEBUG
 	char sdebug[INET6_ADDRSTRLEN];
 	g_trace ("IPv6 network address: %s", pgm_inet_ntop(AF_INET6, in6, sdebug, sizeof(sdebug)));
 #endif
@@ -239,12 +241,10 @@ pgm_inet6_network (
 	g_trace ("subnet size %i", val);
 
 /* zero out host bits */
-	while (val < 128) {
-		int byte_index = val / 8;
-		int bit_index  = val % 8;
-
-		in6->s6_addr[byte_index] &= ~(1 << bit_index);
-		val++;
+	const int suffix_length = 128 - val;
+	for (int i = suffix_length, j = 15; i > 0; i -= 8, --j)
+	{
+		in6->s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
 	}
 
 	g_trace ("effective IPv6 network address after subnet mask: %s", pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
