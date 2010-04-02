@@ -166,7 +166,7 @@ pgm_if_print_all (void)
 static inline
 gboolean
 is_in_net (
-	const struct in_addr*	addr,		/* network order */
+	const struct in_addr*	addr,		/* host byte order */
 	const struct in_addr*	netaddr,
 	const struct in_addr*	netmask
 	)
@@ -176,16 +176,19 @@ is_in_net (
 	g_assert (NULL != netmask);
 
 #ifdef IF_DEBUG
+	const struct in_addr taddr    = { .s_addr = g_htonl (addr->s_addr) };
+	const struct in_addr tnetaddr = { .s_addr = g_htonl (netaddr->s_addr) };
+	const struct in_addr tnetmask = { .s_addr = g_htonl (netmask->s_addr) };
 	char saddr[INET_ADDRSTRLEN], snetaddr[INET_ADDRSTRLEN], snetmask[INET_ADDRSTRLEN];
 	g_trace ("is_in_net (addr:%s netaddr:%s netmask:%s)",
-		 pgm_inet_ntop (AF_INET, addr, saddr, sizeof(saddr)),
-		 pgm_inet_ntop (AF_INET, netaddr, snetaddr, sizeof(snetaddr)),
-		 pgm_inet_ntop (AF_INET, netmask, snetmask, sizeof(snetmask)));
+		 pgm_inet_ntop (AF_INET, &taddr,    saddr,    sizeof(saddr)),
+		 pgm_inet_ntop (AF_INET, &tnetaddr, snetaddr, sizeof(snetaddr)),
+		 pgm_inet_ntop (AF_INET, &tnetmask, snetmask, sizeof(snetmask)));
 #endif
 
-	if (addr->s_addr != (netaddr->s_addr & netmask->s_addr))
-		return FALSE;
-	return TRUE;
+	if ((addr->s_addr & netmask->s_addr) == (netaddr->s_addr & netmask->s_addr))
+		return TRUE;
+	return FALSE;
 }
 
 static
@@ -281,10 +284,15 @@ parse_interface (
 		}
 	}
 
-/* network address: in_addr in network order */
+/* network address: in_addr in host byte order */
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
-		if (IN_MULTICAST(g_ntohl(in_addr.s_addr))) {
+#ifdef IF_DEBUG
+		char s[INET6_ADDRSTRLEN];
+		struct in_addr t = { .s_addr = g_htonl (in_addr.s_addr) };
+		g_trace ("IPv4 network address: %s", inet_ntoa (t));
+#endif
+		if (IN_MULTICAST(in_addr.s_addr)) {
 			g_set_error (error,
 				     PGM_IF_ERROR,
 				     PGM_IF_ERROR_XDEV,
@@ -295,7 +303,7 @@ parse_interface (
 		struct sockaddr_in s4;
 		memset (&s4, 0, sizeof(s4));
 		s4.sin_family = AF_INET;
-		s4.sin_addr.s_addr = in_addr.s_addr;
+		s4.sin_addr.s_addr = g_htonl (in_addr.s_addr);
 		memcpy (&addr, &s4, sizeof(s4));
 
 		check_inet_network = TRUE;
@@ -373,6 +381,8 @@ parse_interface (
 	if (!(check_inet_network || check_inet6_network))
 	{
 		const struct netent* ne = getnetbyname (ifname);
+/* ne::n_net in host byte order */
+
 		if (ne) {
 			switch (ne->n_addrtype) {
 			case AF_INET:
@@ -386,7 +396,7 @@ parse_interface (
 				}
 /* ne->n_net in network order */
 				in_addr.s_addr = ne->n_net;
-				if (IN_MULTICAST(g_ntohl(in_addr.s_addr))) {
+				if (IN_MULTICAST(in_addr.s_addr)) {
 					g_set_error (error,
 						     PGM_IF_ERROR,
 						     PGM_IF_ERROR_XDEV,
@@ -536,9 +546,9 @@ parse_interface (
 		if (check_inet_network &&
 		    AF_INET == ifa->ifa_addr->sa_family)
 		{
-			const struct in_addr netaddr = ((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
+			const struct in_addr ifaddr = ((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
 			const struct in_addr netmask = ((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr;
-			if (is_in_net (&in_addr, &netaddr, &netmask)) {
+			if (is_in_net (&ifaddr, &in_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
@@ -549,9 +559,9 @@ parse_interface (
 		if (check_inet6_network &&
 		    AF_INET6 == ifa->ifa_addr->sa_family)
 		{
-			const struct in6_addr netaddr = ((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
+			const struct in6_addr ifaddr = ((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
-			if (is_in_net6 (&in6_addr, &netaddr, &netmask)) {
+			if (is_in_net6 (&ifaddr, &in6_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
