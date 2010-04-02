@@ -546,8 +546,8 @@ parse_interface (
 		if (check_inet_network &&
 		    AF_INET == ifa->ifa_addr->sa_family)
 		{
-			const struct in_addr ifaddr = ((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-			const struct in_addr netmask = ((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr;
+			const struct in_addr ifaddr  = { .s_addr = g_ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
+			const struct in_addr netmask = { .s_addr = g_ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
 			if (is_in_net (&ifaddr, &in_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
 				ir->ir_interface = ifindex;
