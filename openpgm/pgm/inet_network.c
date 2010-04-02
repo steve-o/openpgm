@@ -48,11 +48,30 @@
 #endif
 
 
-/* Converts a numbers-and-dots notation string into a network number.
- * Note parameters and return value differs from inet_network().
+/* calculate IPv4 netmask from network size, returns address in
+ * host byte order.
+ */
+
+static
+in_addr_t
+cidr_to_netmask (
+	const unsigned	cidr
+	)
+{
+	return (cidr == 0) ? 0 : (0xffffffff - (1 << (32 - cidr)) + 1);
+}
+
+
+/* Converts a numbers-and-dots notation string into a network number in
+ * host order.
+ * Note parameters and return value differs from inet_network().  This
+ * function will not interpret octal numbers, preceeded with a 0, or
+ * hexadecimal numbers, preceeded by 0x.
  *
  * 127		=> 127.0.0.0
- * 127.1/8	=> 127.0.0.0
+ * 127.1/8	=> 127.0.0.0	-- 127.1.0.0
+ *                                 inet_addr() would be 127.0.0.1
+ *                                 inet_network() would be 0.0.127.1
  *
  * returns 0 on success, returns -1 on invalid address.
  */
@@ -68,16 +87,16 @@ pgm_inet_network (
 
 	g_trace ("pgm_inet_network (s:\"%s\" in:%p)",
 		 s, (gpointer)in);
-	in->s_addr = INADDR_ANY;
 
 	const char *p = s;
-	const char *e = p + strlen(s);
 	int val = 0;
 	int shift = 24;
 
-	while (p <= e)
+	in->s_addr = INADDR_ANY;
+
+	while (*p)
 	{
-		if (isdigit(*p)) {
+		if (isdigit (*p)) {
 			val = 10 * val + (*p - '0');
 		} else if (*p == '.' || *p == 0) {
 			if (val > 0xff) {
@@ -103,9 +122,9 @@ pgm_inet_network (
 //g_trace ("elem %i", val);
 			in->s_addr |= val << shift;
 			p++; val = 0;
-			while (p < e)
+			while (*p)
 			{
-				if (isdigit(*p)) {
+				if (isdigit (*p)) {
 					val = 10 * val + (*p - '0');
 				} else {
 					in->s_addr = INADDR_NONE;
@@ -120,11 +139,12 @@ pgm_inet_network (
 //g_trace ("bit mask %i", val);
 
 /* zero out host bits */
-			in->s_addr = htonl(in->s_addr);
-			while (val < 32) {
-//g_trace ("s_addr=%s &= ~(1 << %i)", inet_ntoa(*in), val);
-				in->s_addr &= ~(1 << val++);
-			}
+			const in_addr_t netaddr = cidr_to_netmask (val);
+{
+struct in_addr na = { .s_addr = g_htonl (netaddr) };
+g_message ("netaddr %s", inet_ntoa (na));
+}
+			in->s_addr &= netaddr;
 			return 0;
 		
 		} else if (*p == 'x' || *p == 'X') {	/* skip number, e.g. 1.x.x.x */
@@ -140,8 +160,7 @@ pgm_inet_network (
 		p++;
 	}
 
-	in->s_addr = htonl(in->s_addr);
-
+	in->s_addr |= val << shift;
 	return 0;
 }
 
@@ -175,12 +194,11 @@ pgm_inet6_network (
 	char s2[INET6_ADDRSTRLEN];
 	const char *p = s;
 	char* p2 = s2;
-	const char *e = p + strlen(s);
 	while (*p) {
 		if (*p == '/') break;
 		*p2++ = *p++;
 	}
-	if (p == e) {
+	if (*p == 0) {
 		if (pgm_inet_pton (AF_INET6, s, in6)) return 0;
 		g_trace ("inet_pton failed");
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
@@ -202,7 +220,7 @@ pgm_inet6_network (
 
 	p++;
 	int val = 0;
-	while (p < e)
+	while (*p)
 	{
 		if (isdigit(*p)) {
 			val = 10 * val + (*p - '0');
