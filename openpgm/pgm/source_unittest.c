@@ -1117,6 +1117,7 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_set_txw_max_rte, mock_setup, NULL);
 	tcase_add_test (tc_set_txw_max_rte, test_set_txw_max_rte_pass_001);
 	tcase_add_test (tc_set_txw_max_rte, test_set_txw_max_rte_fail_001);
+
 	return s;
 }
 
