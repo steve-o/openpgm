@@ -695,6 +695,7 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_set_abort_on_reset, mock_setup, mock_teardown);
 	tcase_add_test (tc_set_abort_on_reset, test_set_abort_on_reset_pass_001);
 	tcase_add_test (tc_set_abort_on_reset, test_set_abort_on_reset_fail_001);
+
 	return s;
 }
 

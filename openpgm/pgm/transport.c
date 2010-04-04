@@ -587,7 +587,7 @@ pgm_transport_set_sndbuf (
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
-#ifdef G_OS_UNIX
+#ifdef CONFIG_HAVE_PROC
 	int wmem_max;
 	FILE* fp;
 
@@ -634,7 +634,7 @@ pgm_transport_set_rcvbuf (
 		g_static_rw_lock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
-#ifdef G_OS_UNIX
+#ifdef CONFIG_HAVE_PROC
 	int rmem_max;
 	FILE* fp;
 
