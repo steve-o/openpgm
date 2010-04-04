@@ -227,18 +227,19 @@ mock_fcntl (
 START_TEST (test_sendto_pass_001)
 {
 	pgm_transport_t* transport = generate_transport ();
-	const char buf[] = "i am not a string";
+	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
 	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	fail_unless (sizeof(buf) == len, "sendto underrun");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_001)
 {
-	const char buf[] = "i am not a string";
+	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
@@ -251,7 +252,7 @@ END_TEST
 START_TEST (test_sendto_fail_002)
 {
 	pgm_transport_t* transport = generate_transport ();
-	const char buf[] = "i am not a string";
+	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
@@ -264,7 +265,7 @@ END_TEST
 START_TEST (test_sendto_fail_003)
 {
 	pgm_transport_t* transport = generate_transport ();
-	const char buf[] = "i am not a string";
+	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
@@ -277,7 +278,7 @@ END_TEST
 START_TEST (test_sendto_fail_004)
 {
 	pgm_transport_t* transport = generate_transport ();
-	const char buf[] = "i am not a string";
+	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
@@ -290,7 +291,7 @@ END_TEST
 START_TEST (test_sendto_fail_005)
 {
 	pgm_transport_t* transport = generate_transport ();
-	const char buf[] = "i am not a string";
+	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
@@ -309,8 +310,8 @@ END_TEST
 
 START_TEST (test_set_nonblocking_pass_001)
 {
-	int fd = fileno (stdout);
-	int retval = pgm_set_nonblocking (&fd);
+	int filedes[2] = { fileno (stdout), fileno (stderr) };
+	int retval = pgm_set_nonblocking (&filedes);
 }
 END_TEST
 
