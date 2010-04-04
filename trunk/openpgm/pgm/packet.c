@@ -101,6 +101,9 @@ pgm_parse_raw (
 	g_assert (NULL != skb);
 	g_assert (NULL != dst);
 
+	g_trace ("pgm_parse_raw (skb:%p dst:%p error:%p)",
+		(gpointer)skb, (gpointer)dst, (gpointer)error);
+
 /* minimum size should be IPv4 header plus PGM header, check IP version later */
 	if (G_UNLIKELY(skb->len < PGM_MIN_SIZE))
 	{

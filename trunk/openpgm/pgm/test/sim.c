@@ -78,6 +78,14 @@ struct sim_session {
 #undef G_LOG_DOMAIN
 #define G_LOG_DOMAIN	"sim"
 
+#ifndef SOL_IP
+#	define SOL_IP			IPPROTO_IP
+#endif
+#ifndef SOL_IPV6
+#	define SOL_IPV6			IPPROTO_IPV6
+#endif
+
+
 static int g_port = 7500;
 static const char* g_network = ";239.192.0.1";
 
@@ -1044,7 +1052,7 @@ net_send_data (
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
+                                0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	g_static_mutex_unlock (&transport->send_mutex);
@@ -1155,7 +1163,7 @@ net_send_parity (
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
+                                0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	g_static_mutex_unlock (&transport->send_mutex);
@@ -1236,7 +1244,7 @@ net_send_spm (
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
+                                0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	puts ("READY");
@@ -1305,7 +1313,7 @@ net_send_spmr (
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
+                                0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 /* default TTL */
@@ -1316,7 +1324,7 @@ net_send_spmr (
 	        retval = sendto (transport->send_sock,
 	                                header,
 	                                tpdu_length,
-	                                MSG_CONFIRM,            /* not expecting a reply */
+	                                0,            /* not expecting a reply */
 					(struct sockaddr*)&peer_nla,
 					pgm_sockaddr_len((struct sockaddr*)&peer_nla));
 	}
@@ -1421,7 +1429,7 @@ net_send_ncf (
         retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
+                                0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 
@@ -1520,7 +1528,7 @@ net_send_nak (
         retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
-                                MSG_CONFIRM,            /* not expecting a reply */
+                                0,            /* not expecting a reply */
                                 (struct sockaddr*)&peer_nla,
                                 pgm_sockaddr_len((struct sockaddr*)&peer_nla));
 

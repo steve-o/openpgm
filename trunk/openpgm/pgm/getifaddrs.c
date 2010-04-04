@@ -39,7 +39,7 @@
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 
-#define GETIFADDRS_DEBUG
+//#define GETIFADDRS_DEBUG
 
 #ifndef GETIFADDRS_DEBUG
 #define g_trace(...)		while (0)
