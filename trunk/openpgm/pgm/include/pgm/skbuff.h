@@ -44,6 +44,7 @@ struct pgm_sk_buff_t {
 	pgm_tsi_t		tsi;
 
 	guint32			sequence;
+	guint32			__padding;	/* push alignment of pgm_sk_buff_t::cb to 8 bytes */
 
 	char			cb[48];		/* control buffer */
 
