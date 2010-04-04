@@ -605,7 +605,7 @@ pgm_sockaddr_multicast_if (
  */
 		struct sockaddr_in s4;
 		memcpy (&s4, address, sizeof(s4));
-		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&s4.sin_addr.s_addr, sizeof(struct in_addr));
+		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&s4.sin_addr, sizeof(s4.sin_addr));
 		break;
 	}
 

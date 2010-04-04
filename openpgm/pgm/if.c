@@ -288,7 +288,6 @@ parse_interface (
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
 #ifdef IF_DEBUG
-		char s[INET6_ADDRSTRLEN];
 		struct in_addr t = { .s_addr = g_htonl (in_addr.s_addr) };
 		g_trace ("IPv4 network address: %s", inet_ntoa (t));
 #endif
@@ -377,7 +376,11 @@ parse_interface (
 	}
 
 #ifdef G_OS_UNIX
-/* network name into network address, can be expensive with NSS network lookup */
+/* network name into network address, can be expensive with NSS network lookup
+ *
+ * Only Class A, B or C networks are supported, partitioned networks
+ * (i.e. network/26 or network/28) are not supported by this facility.
+ */
 	if (!(check_inet_network || check_inet6_network))
 	{
 		const struct netent* ne = getnetbyname (ifname);

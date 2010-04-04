@@ -97,6 +97,7 @@ env = Environment(
 			'-DBSD_COMP',
 			'-D__need_IOV_MAX',
 			'-D__USE_BSD',
+			'-DCONFIG_64BIT_CHECKSUM',
 			'-DCONFIG_HAVE_CLOCK_GETTIME',
 			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
 			'-DCONFIG_HAVE_NANOSLEEP',
@@ -125,16 +126,18 @@ elif env['BRANCH'] == 'seed':
 
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
-release.Append(CCFLAGS = ['-O2','-m64'], LINKFLAGS = '-m64')
+release.Append(CCFLAGS = ['-xO2','-m64'], LINKFLAGS = '-m64')
 
+# outstanding defect with 12u1 cannot compile extended asm without optimization.:w
+#
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-g','-m64'], LINKFLAGS = ['-g','-m64'])
+debug.Append(CCFLAGS = ['-xO1', '-g','-m64'], LINKFLAGS = ['-g','-m64'])
 
 profile = env.Clone(BUILD = 'profile')
-profile.Append(CCFLAGS = ['-O2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
+profile.Append(CCFLAGS = ['-xO2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
-thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32');
+thirtytwo.Append(CCFLAGS = ['-xO2','-m32'], LINKFLAGS = '-m32');
 
 # choose and environment to build
 if env['BUILD'] == 'release':

@@ -34,12 +34,12 @@
 #include "pgm/rate_control.h"
 #include "pgm/net.h"
 
-//#define NET_DEBUG
+#define NET_DEBUG
 
 #ifndef NET_DEBUG
-#	define g_trace(m,...)		while (0)
+#	define g_trace(...)		while (0)
 #else
-#	define g_trace(m,...)		g_debug(__VA_ARGS__)
+#	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
 
@@ -77,6 +77,20 @@ pgm_sendto (
 	g_assert( to );
 	g_assert( tolen > 0 );
 
+#ifdef NET_DEBUG
+	char saddr[INET_ADDRSTRLEN];
+	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
+	g_trace ("pgm_sendto (transport:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%d to:%s [toport:%d] tolen:%d)",
+		(gpointer)transport,
+		use_rate_limit ? "TRUE" : "FALSE",
+		use_router_alert ? "TRUE" : "FALSE",
+		(gpointer)buf,
+		len,
+		saddr,
+		((struct sockaddr_in*)to)->sin_port,
+		tolen);
+#endif
+
 	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
 	if (use_rate_limit &&
@@ -91,6 +105,7 @@ pgm_sendto (
 		g_static_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
+	g_trace ("sendto returned %d", sent);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
 		errno != EHOSTUNREACH &&	/* No route to host */

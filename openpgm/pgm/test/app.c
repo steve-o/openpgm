@@ -281,6 +281,7 @@ session_create (
 
 	res->ti_dport = g_port;
 	res->ti_sport = 0;
+printf ("pgm_transport_create (transport:%p res:%p err:%p)\n", (gpointer)sess->transport, (gpointer)res, (gpointer)&err);
 	if (!pgm_transport_create (&sess->transport, res, &err)) {
 		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
 		g_error_free (err);
@@ -488,6 +489,7 @@ session_bind (
 	if (!sess->transport->nak_ncf_retries && !pgm_transport_set_nak_ncf_retries (sess->transport, 50))
 		puts ("FAILED: pgm_transport_set_nak_ncf_retries");
 
+printf ("pgm_transport_bind (transport:%p err:%p)\n", (gpointer)sess->transport, (gpointer)&err);
 	if (!pgm_transport_bind (sess->transport, &err)) {
 		printf ("FAILED: pgm_transport_bind(): %s\n", err->message);
 		g_error_free (err);
@@ -517,6 +519,7 @@ session_send (
 	struct timeval tv;
 	int timeout;
 again:
+printf ("pgm_send (transport:%p string:\"%s\" stringlen:%d NULL)\n", (gpointer)sess->transport, string, stringlen);
 	status = pgm_send (sess->transport, string, stringlen, NULL);
 	switch (status) {
 	case PGM_IO_STATUS_NORMAL:
@@ -557,6 +560,7 @@ session_listen (
 	}
 
 /* listen */
+printf ("pgm_async_create (async:%p transport:%p err:%p)\n", (gpointer)&sess->async, (gpointer)sess->transport, (gpointer)&err);
 	if (!pgm_async_create (&sess->async, sess->transport, &err)) {
 		printf ("FAILED: pgm_async_create(): %s", err->message);
 		g_error_free (err);

@@ -53,7 +53,25 @@ START_TEST (test_inet_pass_001)
 	guint16 csum = pgm_inet_checksum (source, sizeof(source), 0);
 /* function calculates answer in host order */
 	csum = g_htons (csum);
-	g_message ("IP checksum of \"%s\" is %u (%u)", source, csum, answer);
+	g_message ("IP checksum of \"%s\" (%d) is %u (%u)",
+		source, sizeof(source), csum, answer);
+
+	fail_unless (answer == csum, "checksum mismatch");
+}
+END_TEST
+
+START_TEST (test_inet_pass_002)
+{
+	char* source = alloca (65535);
+	for (unsigned i = 0; i < 65535; i++)
+		source[i] = (i & 1) ? 0xff : 0xfe;
+	const guint16 answer = 0x17f;		/* network order */
+
+	guint16 csum = pgm_inet_checksum (source, 65535, 0);
+/* function calculates answer in host order */
+	csum = g_htons (csum);
+	g_message ("IP checksum of 64KB is %u (%u)",
+		csum, answer);
 
 	fail_unless (answer == csum, "checksum mismatch");
 }
@@ -203,6 +221,7 @@ make_test_suite (void)
 	TCase* tc_inet = tcase_create ("inet");
 	suite_add_tcase (s, tc_inet);
 	tcase_add_test (tc_inet, test_inet_pass_001);
+	tcase_add_test (tc_inet, test_inet_pass_002);
 	tcase_add_test_raise_signal (tc_inet, test_inet_fail_001, SIGABRT);
 
 	TCase* tc_fold = tcase_create ("fold");

@@ -33,31 +33,41 @@ guint32 pgm_csum_block_add (guint32, guint32, guint);
 guint32 pgm_compat_csum_partial (const void*, guint, guint32);
 guint32 pgm_compat_csum_partial_copy (const void*, void*, guint, guint32);
 
-#ifdef CONFIG_CKSUM_COPY
-
-#ifdef __x86_64__
-
+#if defined(__x86_64__) || defined(__i386__) || defined(__i386) || defined(__amd64)
 static inline unsigned add32_with_carry (unsigned a, unsigned b)
 {
-    asm("addl %2,%0\n\t"
-	    "adcl $0,%0"
-	    : "=r" (a)
-	    : "0" (a), "r" (b));
-    return a;
+	asm("addl %2, %0 \n\t"
+	    "adcl $0, %0"
+	    : "=r" (a)			/* output operands */
+	    : "0" (a), "r" (b));	/* input operands */
+	return a;
 }
+#elif defined(__sparc__) || defined(__sparc) || defined(__sparcv9)
+static inline unsigned add32_with_carry (unsigned a, unsigned b)
+{
+	asm("addcc %2, %0, %0 \n\t"
+	    "addx %%g0, 0, %1"
+	    : "=r" (a)			/* output operands */
+	    : "0" (a), "r" (b)		/* input operands */
+	    : "cc");			/* list of clobbered registers */
+	return a;
+}
+#else
+#	error "add32_with_carry undefined for this platform"
+#endif
 
+#ifdef CONFIG_CKSUM_COPY
+
+#	ifdef __x86_64__
 unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len);
 
 static inline guint32 pgm_csum_partial(const void *buff, guint len, guint32 sum)
 {
-    return (guint32)add32_with_carry(pgm_asm64_csum_partial(buff, len), sum);
+	return (guint32)add32_with_carry(pgm_asm64_csum_partial(buff, len), sum);
 }
-
-#else
-
+#	else
 guint32 pgm_csum_partial(const void *buff, guint len, guint32 sum);
-
-#endif /* __x86_64__ */
+#	endif /* __x86_64__ */
 
 guint32 pgm_csum_partial_copy_generic (const unsigned char *src, const unsigned char *dst,
 					unsigned len,
@@ -66,13 +76,13 @@ guint32 pgm_csum_partial_copy_generic (const unsigned char *src, const unsigned 
 
 static inline guint32 pgm_csum_partial_copy (const void *src, void *dst, unsigned len, unsigned sum)
 {
-    return pgm_csum_partial_copy_generic (src, dst, len, sum, NULL, NULL);
+	return pgm_csum_partial_copy_generic (src, dst, len, sum, NULL, NULL);
 }
 
 #else
 
-#   define pgm_csum_partial            pgm_compat_csum_partial
-#   define pgm_csum_partial_copy       pgm_compat_csum_partial_copy
+#	define pgm_csum_partial            pgm_compat_csum_partial
+#	define pgm_csum_partial_copy       pgm_compat_csum_partial_copy
 
 #endif /* CONFIG_CKSUM_COPY */
 
