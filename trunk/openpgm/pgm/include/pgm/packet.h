@@ -106,7 +106,8 @@ enum pgm_type_e {
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
 /* byte alignment for packet memory maps */
-#pragma pack(push, 1)
+#pragma pack(push)
+#pragma pack(1)
 
 /* 8. PGM header */
 struct pgm_header {
@@ -405,6 +406,7 @@ typedef enum
 
 
 #pragma pack(pop)
+#pragma pack()
 
 #ifndef __PGM_SKBUFF_H__
 #	include <pgm/skbuff.h>
