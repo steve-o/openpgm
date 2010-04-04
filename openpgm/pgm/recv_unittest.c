@@ -943,6 +943,7 @@ mock_recvmsg (
 START_TEST (test_block_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	push_block_event ();
 	gsize bytes_read;
@@ -956,6 +957,7 @@ START_TEST (test_data_pass_001)
 {
 	const char source[] = "i am not a string";
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_odata (source, sizeof(source), 0 /* sqn */, -1 /* trail */, &packet, &packet_len);
@@ -972,6 +974,7 @@ END_TEST
 START_TEST (test_spm_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_spm (200 /* spm-sqn */, -1 /* trail */, 0 /* lead */, &packet, &packet_len);
@@ -988,6 +991,7 @@ END_TEST
 START_TEST (test_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_nak (0 /* sqn */, &packet, &packet_len);
@@ -1004,6 +1008,7 @@ END_TEST
 START_TEST (test_peer_nak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_peer_nak (0 /* sqn */, &packet, &packet_len);
@@ -1020,6 +1025,7 @@ END_TEST
 START_TEST (test_nnak_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_nnak (0 /* sqn */, &packet, &packet_len);
@@ -1036,6 +1042,7 @@ END_TEST
 START_TEST (test_ncf_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_ncf (0 /* sqn */, &packet, &packet_len);
@@ -1052,6 +1059,7 @@ END_TEST
 START_TEST (test_spmr_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_spmr (&packet, &packet_len);
@@ -1068,6 +1076,7 @@ END_TEST
 START_TEST (test_peer_spmr_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gpointer packet; gsize packet_len;
 	generate_peer_spmr (&packet, &packet_len);
@@ -1084,6 +1093,7 @@ END_TEST
 START_TEST (test_lost_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_reset = TRUE;
 	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
 	struct sockaddr_in grp_addr = {
@@ -1094,6 +1104,7 @@ START_TEST (test_lost_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == peer, "new_peer failed");
 	mock_pgm_peer_set_pending (transport, peer);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -1114,6 +1125,7 @@ END_TEST
 START_TEST (test_abort_on_lost_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	transport->is_reset = TRUE;
 	transport->is_abort_on_reset = TRUE;
 	const pgm_tsi_t peer_tsi = { { 9, 8, 7, 6, 5, 4 }, g_htons(9000) };
@@ -1125,6 +1137,7 @@ START_TEST (test_abort_on_lost_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	pgm_peer_t* peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == peer, "new_peer failed");
 	mock_pgm_peer_set_pending (transport, peer);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
@@ -1145,6 +1158,7 @@ END_TEST
 START_TEST (test_then_lost_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	mock_reset_on_spmr = TRUE;
 	gpointer packet; gsize packet_len;
 	generate_spmr (&packet, &packet_len);
@@ -1158,6 +1172,7 @@ START_TEST (test_then_lost_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == mock_peer, "new_peer failed");
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
@@ -1177,6 +1192,7 @@ END_TEST
 START_TEST (test_then_abort_on_lost_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	mock_reset_on_spmr = TRUE;
 	transport->is_abort_on_reset = TRUE;
 	gpointer packet; gsize packet_len;
@@ -1191,6 +1207,7 @@ START_TEST (test_then_abort_on_lost_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == mock_peer, "new_peer failed");
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
@@ -1211,6 +1228,7 @@ START_TEST (test_on_data_pass_001)
 {
 	const char source[] = "i am not a string";
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	mock_data_on_spmr = TRUE;
 	gpointer packet; gsize packet_len;
 	generate_spmr (&packet, &packet_len);
@@ -1224,6 +1242,7 @@ START_TEST (test_on_data_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == mock_peer, "new_peer failed");
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
@@ -1247,6 +1266,7 @@ END_TEST
 START_TEST (test_on_zero_pass_001)
 {
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	mock_data_on_spmr = TRUE;
 	gpointer packet; gsize packet_len;
 	generate_spmr (&packet, &packet_len);
@@ -1260,6 +1280,7 @@ START_TEST (test_on_zero_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == mock_peer, "new_peer failed");
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_msgv_t* msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	msgv->msgv_len = 1;
@@ -1286,6 +1307,7 @@ START_TEST (test_on_many_data_pass_001)
 		"i am not a peach"
 	};
 	pgm_transport_t* transport = generate_transport();
+	fail_if (NULL == transport, "generate_transport failed");
 	mock_data_on_spmr = TRUE;
 	gpointer packet; gsize packet_len;
 	generate_spmr (&packet, &packet_len);
@@ -1299,6 +1321,7 @@ START_TEST (test_on_many_data_pass_001)
 		.sin_addr.s_addr	= inet_addr(PGM_END_ADDR)
 	};
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
+	fail_if (NULL == mock_peer, "new_peer failed");
 	struct pgm_sk_buff_t* skb;
 	pgm_msgv_t* msgv;
 /* #1 */
