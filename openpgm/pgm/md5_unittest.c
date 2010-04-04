@@ -95,7 +95,10 @@ END_TEST
 
 START_TEST (test_finish_ctx_pass_001)
 {
-	const char buffer[] = "i am not a string.";
+	const char* buffer = "i am not a string.";
+	const char* answer = "13de-6066-151e-e5a5-6451-e154-1fb7-3b16";
+
+	char md5[1024];
 	char resblock[16];
 	struct md5_ctx ctx;
 	memset (&ctx, 0, sizeof(ctx));
@@ -103,7 +106,7 @@ START_TEST (test_finish_ctx_pass_001)
 	_md5_init_ctx (&ctx);
 	_md5_process_bytes (&ctx, buffer, sizeof(buffer));
 	_md5_finish_ctx (&ctx, resblock);
-	g_message ("md5: %02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx",
+	sprintf (md5, "%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx",
 		   resblock[0], resblock[1],
 		   resblock[2], resblock[3],
 		   resblock[4], resblock[5],
@@ -112,6 +115,9 @@ START_TEST (test_finish_ctx_pass_001)
 		   resblock[10], resblock[11],
 		   resblock[12], resblock[13],
 		   resblock[14], resblock[15]);
+	g_message ("md5: %s", md5);
+
+	fail_unless (0 == strcmp (md5, answer), "md5 mismatch");
 }
 END_TEST
 
