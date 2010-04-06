@@ -63,9 +63,11 @@ END_TEST
 START_TEST (test_inet_pass_002)
 {
 	char* source = alloca (65535);
-	for (unsigned i = 0; i < 65535; i++)
-		source[i] = (i & 1) ? 0xff : 0xfe;
-	const guint16 answer = 0x17f;		/* network order */
+	for (unsigned i = 0, j = 0; i < 65535; i++) {
+		j = j * 1103515245 + 12345;
+		source[i] = j;
+	}
+	const guint16 answer = 0x3fc0;		/* network order */
 
 	guint16 csum = pgm_inet_checksum (source, 65535, 0);
 /* function calculates answer in host order */

@@ -31,10 +31,9 @@
 /* endian independent checksum routine
  */
 
-#ifdef CONFIG_8BIT_CHECKSUM
 static
 guint16
-do_csum (
+do_csum_8bit (
 	const void*	addr,
 	guint16		len,
 	int		csum
@@ -65,10 +64,10 @@ do_csum (
 	acc += (acc >> 16);
 	return g_htons ((guint16)acc);
 }
-#elif defined(CONFIG_16BIT_CHECKSUM)
+
 static
 guint16
-do_csum (
+do_csum_16bit (
 	const void*	addr,
 	guint16		len,
 	int		csum
@@ -121,10 +120,10 @@ do_csum (
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }
-#elif defined(CONFIG_32BIT_CHECKSUM)
+
 static
 guint16
-do_csum (
+do_csum_32bit (
 	const void*	addr,
 	guint16		len,
 	int		csum
@@ -162,19 +161,15 @@ do_csum (
 		count >>= 1;
 		if (count)
 		{
-			while (count >= 4) {
-				acc = add32_with_carry (acc, ((const guint32*)buf)[ 0 ]);
-				acc = add32_with_carry (acc, ((const guint32*)buf)[ 1 ]);
-				acc = add32_with_carry (acc, ((const guint32*)buf)[ 2 ]);
-				acc = add32_with_carry (acc, ((const guint32*)buf)[ 3 ]);
-				buf  = &buf[ 16 ];
-				count -= 4;
-			}
+			guint32 carry = 0;
 			while (count) {
-				acc = add32_with_carry (acc, ((const guint32*)buf)[ 0 ]);
+				acc += carry;
+				acc += ((const guint32*)buf)[ 0 ];
+				carry = ((const guint32*)buf)[ 0 ] > acc;
 				buf  = &buf[ 4 ];
 				count--;
 			}
+			acc += carry;
 			acc  = (acc >> 16) + (acc & 0xffff);
 		}
 		if (len & 2) {
@@ -193,10 +188,13 @@ do_csum (
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }
-#elif defined(CONFIG_64BIT_CHECKSUM)
+
+/* best if architecture has native 64-bit words
+ */
+
 static
 guint16
-do_csum (
+do_csum_64bit (
 	const void*	addr,
 	guint16		len,
 	int		csum
@@ -278,9 +276,121 @@ do_csum (
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }
+
+#if defined(__amd64) || defined(__x86_64__)
+/* simd instructions unique to AMD/Intel 64-bit
+ */
+
+static
+guint16
+do_csum_vector (
+	const void*	addr,
+	guint16		len,
+	int		csum
+	)
+{
+	guint64 acc;
+	const guint8* buf;
+	guint16 remainder;
+	unsigned count;
+	gboolean is_odd;
+
+	acc = csum;
+	buf = (const guint8*)addr;
+	remainder = 0;
+
+	if (G_UNLIKELY(len == 0))
+		return acc;
+	is_odd = ((guint64)buf & 1);
+/* align first byte */
+	if (G_UNLIKELY(is_odd)) {
+		((guint8*)&remainder)[1] = *buf++;
+		len--;
+	}
+/* 16-bit words */
+	count = len >> 1;
+	if (count)
+	{
+		if ((guint64)buf & 2) {
+			acc += ((const guint16*)buf)[ 0 ];
+			buf  = &buf[ 2 ];
+			count--;
+			len -= 2;
+		}
+/* 32-bit words */
+		count >>= 1;
+		if (count)
+		{
+			if ((guint64)buf & 4) {
+				acc += ((const guint32*)buf)[ 0 ];
+				buf  = &buf[ 4 ];
+				count--;
+				len -= 4;
+			}
+/* 64-bit words */
+			count >>= 1;
+			if (count)
+			{
+				guint64 carry = 0;
+				while (count) {
+					asm("addq %1, %0 \n\t"
+						"adcq %2, %0"
+						: "=r" (acc)
+						: "m" (*(guint64*)buf), "r" (carry), "0" (acc));
+					buf  = &buf[ 8 ];
+					count--;
+				}
+				acc += carry;
+				acc  = (acc >> 32) + (acc & 0xffffffff);
+			}
+			if (len & 4) {
+				acc += ((const guint32*)buf)[ 0 ];
+				buf  = &buf[ 4 ];
+			}
+		}
+		if (len & 2) {
+			acc += ((const guint16*)buf)[ 0 ];
+			buf  = &buf[ 2 ];
+		}
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((guint8*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (G_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return acc;
+}
+
+#endif
+
+static inline
+guint16
+do_csum (
+	const void*	addr,
+	guint16		len,
+	int		csum
+	)
+{
+#if defined(CONFIG_8BIT_CHECKSUM)
+	return do_csum_8bit (addr, len, csum);
+#elif defined(CONFIG_16BIT_CHECKSUM)
+	return do_csum_16bit (addr, len, csum);
+#elif defined(CONFIG_32BIT_CHECKSUM)
+	return do_csum_32bit (addr, len, csum);
+#elif defined(CONFIG_64BIT_CHECKSUM)
+	return do_csum_64bit (addr, len, csum);
+#elif defined(CONFIG_VECTOR_CHECKSUM)
+	return do_csum_vector (addr, len, csum);
 #else
 #	error "checksum routine undefined"
 #endif
+}
 
 /* Calculate an IP header style checksum
  */
