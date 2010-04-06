@@ -203,10 +203,19 @@
   * Juniper Networks contributes PGM packet dumping to <tt>tcpdump</tt>.
 
 == 2005 October ==
-  * IBM release WebSphere Message Broker V6 with PGM/IP, and PGM UDP implementations <[http://www.ibm.com/developerworks/websphere/library/techarticles/0510_dunn/0510_dunn.html Publish/subscribe]>
+  * IBM release !WebSphere Message Broker V6 with PGM/IP, and PGM UDP implementations <[http://www.ibm.com/developerworks/websphere/library/techarticles/0510_dunn/0510_dunn.html Publish/subscribe]>
 
 == 2006 August ==
   * Start of OpenPGM project.
 
 == 2009 May ==
   * General availability of OpenPGM version 1.0.
+
+== 2010 February ==
+  * General availability of OpenPGM version 2.0 introducing full support of IPv6 and the Microsoft Windows platform.
+
+== 2010 March ==
+  * Start of <[http://lkml.org/ LKML]> discussion for integrating PGM into the Linux kernel.
+
+== 2010 April ==
+  * General availability of OpenPGM version 2.1 introducing full support of the Solaris operating system on SPARC hardware.
