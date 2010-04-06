@@ -745,7 +745,7 @@ pgm_transport_bind (
 /* Stevens: "SO_REUSEADDR has datatype int."
  */
 		g_trace ("INFO","set socket sharing.");
-		gboolean v = TRUE;
+		int v = TRUE;
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		     (-1 != transport->recv_sock2 &&
 		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) ||
