@@ -46,14 +46,19 @@ static inline unsigned add32_with_carry (unsigned a, unsigned b)
 static inline unsigned add32_with_carry (unsigned a, unsigned b)
 {
 	asm("addcc %2, %0, %0 \n\t"
-	    "addx %%g0, 0, %1"
+	    "addx %0, %%g0, %0"
 	    : "=r" (a)			/* output operands */
 	    : "0" (a), "r" (b)		/* input operands */
 	    : "cc");			/* list of clobbered registers */
 	return a;
 }
 #else
-#	error "add32_with_carry undefined for this platform"
+static inline unsigned add32_with_carry (unsigned a, unsigned b)
+{
+	a += b;
+	a  = (a >> 16) + (a & 0xffff);
+	return a;
+}
 #endif
 
 #ifdef CONFIG_CKSUM_COPY
