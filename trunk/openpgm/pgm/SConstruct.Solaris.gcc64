@@ -37,17 +37,15 @@ vars.AddVariables (
 #-----------------------------------------------------------------------------
 # Dependencies
 
-def force_sunstudio(env):
-	env.PrependENVPath('PATH', '/usr/ccs/bin');
-	env.PrependENVPath('PATH', '/opt/glib-sunstudio/bin');
-	env.PrependENVPath('PATH', '/opt/sunstudio12.1/bin');
-	env.Tool('sunc++');
-	env.Tool('suncc');
-	env.Tool('sunlink');
-	env.Tool('sunar');
+def force_gcc(env):
+	env.PrependENVPath('PATH', '/usr/sfw/bin');
+	env.PrependENVPath('PATH', '/opt/glib-gcc64/bin');
+	env.PrependENVPath('PATH', '/usr/local/bin');
+	env.Tool('gcc');
+	env.Tool('g++');
 
 env = Environment();
-force_sunstudio(env);
+force_gcc(env);
 
 def CheckPKGConfig(context, version):
 	context.Message( 'Checking for pkg-config... ' )
@@ -88,8 +86,30 @@ env = conf.Finish();
 env = Environment(
 	variables = vars,
 	ENV = os.environ,
-	CCFLAGS = [	'-v',
-			'-xc99=all',
+	CCFLAGS = [	'-pipe',
+			'-Wall',
+				'-Wextra',
+				'-Wfloat-equal',
+				'-Wshadow',
+#				'-Wunsafe-loop-optimizations',
+				'-Wpointer-arith',
+				'-Wbad-function-cast',
+				'-Wcast-qual',
+				'-Wcast-align',
+				'-Wwrite-strings',
+				'-Waggregate-return',
+				'-Wstrict-prototypes',
+				'-Wold-style-definition',
+				'-Wmissing-prototypes',
+				'-Wmissing-declarations',
+				'-Wmissing-noreturn',
+				'-Wmissing-format-attribute',
+				'-Wredundant-decls',
+				'-Wnested-externs',
+				'-Winline',
+			'-pedantic',
+			'-std=gnu99',
+			'--param', 'max-inline-insns-single=600',
 			'-D_REENTRANT',
 			'-D_GNU_SOURCE',
 			'-D_XOPEN_SOURCE=600',
@@ -108,17 +128,17 @@ env = Environment(
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
-	LINKFLAGS = [],
-	LIBS = [	'resolv',
-			'socket',
-			'nsl',
-			'm'
+	LINKFLAGS = [	'-pipe',
+			'-lresolv',
+			'-lsocket',
+			'-lnsl',
+			'-lm'
 		    ],
-	PROTOBUF_CCFLAGS = '-I/opt/glib-sunstudio/include',
-	PROTOBUF_LIBS = '/opt/glib-sunstudio/lib/sparcv9/libprotobuf.a',
-	PROTOBUF_PROTOC = '/opt/glib-sunstudio/bin/protoc'
+	PROTOBUF_CCFLAGS = '-I/opt/glib-gcc64/include',
+	PROTOBUF_LIBS = '/opt/glib-gcc64/lib/sparcv9/libprotobuf.a',
+	PROTOBUF_PROTOC = '/opt/glib-gcc64/bin/protoc'
 )
-force_sunstudio(env);
+force_gcc(env);
 
 # Branch prediction
 if env['BRANCH'] == 'profile':
@@ -129,18 +149,16 @@ elif env['BRANCH'] == 'seed':
 
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
-release.Append(CCFLAGS = ['-xO2','-m64'], LINKFLAGS = '-m64')
+release.Append(CCFLAGS = ['-O2','-m64'], LINKFLAGS = '-m64')
 
-# outstanding defect with 12u1 cannot compile extended asm without optimization.:w
-#
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-xO1', '-g','-m64'], LINKFLAGS = ['-g','-m64'])
+debug.Append(CCFLAGS = ['-ggdb','-m64'], LINKFLAGS = ['-gdb','-m64'])
 
 profile = env.Clone(BUILD = 'profile')
-profile.Append(CCFLAGS = ['-xO2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
+profile.Append(CCFLAGS = ['-O2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
-thirtytwo.Append(CCFLAGS = ['-xO2','-m32'], LINKFLAGS = '-m32');
+thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
 
 # choose and environment to build
 if env['BUILD'] == 'release':
