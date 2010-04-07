@@ -27,6 +27,7 @@ Install libiconv as a dependency for GLib, it must be downloaded and built from 
  $ tar xf libiconv-1.13.1.tar 
  $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' \
 PATH=/usr/local/bin:/usr/sfw/bin:$PATH ./configure --prefix=/usr/local --libdir=/usr/local/lib/sparcv9
+
  $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
  $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
 </pre>
@@ -39,15 +40,17 @@ Scons must be downloaded from http://sourceforge.net/projects/scons/files/
 </pre>
 Install the remaining library dependencies, primarily GLib and pkg-config, this tutorial install everything into <tt>/opt/glib-gcc64</tt>.  <tt>pkg-config</tt> is a binary and doesn't need to be specially built for v9 architecture.
 <pre>
- $ /usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz
+ $ /usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz 
  $ gzcat pkg-config-0.23.tar.gz | tar xvf -
  $ cd pkg-config-0.23
  $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/local/bin:/usr/sfw/bin:$PATH \
 ./configure --with-installed-glib --prefix=/opt/glib-gcc64
+
  $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
  $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
  $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' LIBS='-lresolv -lsocket -lnsl' \
 PATH=/opt/glib-gcc64/bin:/usr/local/bin:/usr/sfw/bin:$PATH ./configure --prefix=/opt/glib-gcc64
+
  $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
  $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
 </pre>
@@ -86,6 +89,7 @@ Unit testing depends upon the Check unit test suite and must be downloaded and c
  $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64 -I/usr/local/include' \
 LDFLAGS='-L/usr/local/lib' LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-gcc64/bin:/usr/local/bin:/usr/sfw/bin:$PATH \
 ./configure --prefix=/opt/glib-gcc64 --disable-shared
+
  $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
  $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
 </pre>
