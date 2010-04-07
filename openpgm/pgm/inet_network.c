@@ -53,7 +53,7 @@
  */
 
 static
-in_addr_t
+guint32
 cidr_to_netmask (
 	const unsigned	cidr
 	)
@@ -139,14 +139,13 @@ pgm_inet_network (
 //g_trace ("bit mask %i", val);
 
 /* zero out host bits */
-			const in_addr_t netaddr = cidr_to_netmask (val);
+			const struct in_addr netaddr = { .s_addr = cidr_to_netmask (val) };
 #ifdef INET_NETWORK_DEBUG
 {
-struct in_addr na = { .s_addr = g_htonl (netaddr) };
-g_trace ("netaddr %s", inet_ntoa (na));
+g_trace ("netaddr %s", inet_ntoa (netaddr));
 }
 #endif
-			in->s_addr &= netaddr;
+			in->s_addr &= netaddr.s_addr;
 			return 0;
 		
 		} else if (*p == 'x' || *p == 'X') {	/* skip number, e.g. 1.x.x.x */
