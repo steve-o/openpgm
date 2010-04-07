@@ -42,7 +42,7 @@ typedef enum
 	PGM_ASYNC_ERROR_MFILE,
 	PGM_ASYNC_ERROR_NFILE,
 	PGM_ASYNC_ERROR_OVERFLOW,
-	PGM_ASYNC_ERROR_FAILED,
+	PGM_ASYNC_ERROR_FAILED
 } PGMAsyncError;
 
 typedef struct pgm_async_t pgm_async_t;
