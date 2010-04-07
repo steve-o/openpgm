@@ -53,15 +53,12 @@ if e['WITH_PROTOBUF'] == 'true':
 		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
 			newCCFLAGS.append("-D_XOPEN_SOURCE=500");
 	ge['CCFLAGS'] = newCCFLAGS;
-#	ge.Append(CPPPATH = ['/miru/projects/protobuf/protobuf-2.1.0/src', '.']);
 	ge.Append(CPPPATH = '.');
 	ge.Append(CCFLAGS = ge['PROTOBUF_CCFLAGS']);
 	ge.Depends('pgmping.cc', ['ping.pb.cc', 'ping.pb.h']);
-#	protobuf = Builder(action = 'cd ${SOURCE.dir} && /miru/projects/protobuf/protobuf-2.1.0/src/protoc ${SOURCE.file} --cpp_out=../${TARGET.dir}')
 	protobuf = Builder(action = 'cd ${SOURCE.dir} && %s ${SOURCE.file} --cpp_out=../${TARGET.dir}' % ge['PROTOBUF_PROTOC'])
 	ge.Append(BUILDERS = {'Protobuf' : protobuf})
 	ge.Protobuf('ping.pb.cc', 'ping.proto')
-#	ge.Program(['pgmping.cc', 'ping.pb.cc', '/miru/projects/protobuf/protobuf-2.1.0/src/.libs/libprotobuf.a'])
 	ge.Program(['pgmping.cc', 'ping.pb.cc', ge['PROTOBUF_LIBS']])
 
 # end of file
