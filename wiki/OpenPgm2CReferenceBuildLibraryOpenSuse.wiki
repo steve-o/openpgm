@@ -1,0 +1,29 @@
+﻿#summary OpenPGM 2 : C Reference : Build Library : openSUSE 11.1
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Building for openSUSE 11.1 ===
+First install the C compiler dependencies and the SCons build tool.
+<pre>
+ $ sudo zypper install gcc scons
+</pre>
+Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.
+<pre>
+ $ sudo zypper install libsoup-devel net-snmp-devel
+</pre>
+To download the source code Subversion is needed to contact the repository.
+<pre>
+ $ sudo zypper install subversion
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/branches/release-2-1
+</pre>
+Build without the ncurses examples as <tt>libpanel</tt> is not included.
+<pre>
+ $ cd release-2-1/openpgm/pgm
+ $ scons WITH_NCURSES=false
+</pre>
+By default SCons is configured to build the debug tree in <tt>./ref/debug</tt> to build the release version in <tt>./ref/release</tt>.
+<pre>
+ $ scons BUILD=release WITH_NCURSES=false
+</pre>

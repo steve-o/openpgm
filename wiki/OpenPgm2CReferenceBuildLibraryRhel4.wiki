@@ -1,0 +1,60 @@
+﻿#summary OpenPGM 2 : C Reference : Build Library : RHEL 4
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Building for RHEL 4 or CentOS 4 ===
+Don't, for the following reasons.
+
+==== Issues ====
+  # <tt>pkg-config</tt> does not support <tt>--static</tt> to provide static library parameters for GLib and other packages.
+  # <tt>libsoup-devel-2.2.1-4.i386.rpm</tt> is broken.
+  # Old <tt>gcc</tt> does not support new warnings, <tt>-Wunsafe-loop-optimizations</tt>.
+  # GLib 2.10 is required for the [http://library.gnome.org/devel/glib/stable/glib-Memory-Slices.html SLAB allocator], the default packaged version is 2.4.  A special 2.12 build is available as a dependency for Evolution, <tt>evolution28-glib2-devel.i386</tt>.
+  # <tt>libsoup</tt> 2.2.1 does not support asynchronous callbacks, however the <tt>evolution28-libsoup-devel.i386</tt> does.
+  # <tt>evolution28-libsoup-devel.i386</tt> has an extra hidden dependency on <tt>gobject</tt>.
+
+
+==== Rebuilding yum packages ====
+Setup user packaging as per [http://wiki.centos.org/TipsAndTricks/YumAndRPM YumAndRPM] in the CentOS wiki.  Download the source package from Red Hat or CentOS, then rebuild the package, installing any additional build dependencies as necessary.
+<pre>
+ $ wget http://mirror.centos.org/centos/4/os/SRPMS/libsoup-2.2.1-4.src.rpm 
+ $ sudo yum install gnutls-devel
+ $ rpmbuild --rebuild libsoup-`*`.src.rpm 
+ $ sudo rpm -i redat/RPMS/libsoup-devel-`*`.rpm
+</pre>
+
+==== Building ====
+First install the C compiler dependencies.
+<pre>
+ $ sudo yum install gcc
+</pre>
+Install SCons by downloading the [http://scons.org/download.php 0.97 stable package].
+<pre>
+ $ sudo rpm -i scons-0.97-1.noarch.rpm
+</pre>
+Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note we are install the Evolution 2.8 versions of the GLib suite, not the default packages.
+<pre>
+ $ sudo yum install evolution28-glib2-devel evolution28-libsoup-devel ncurses-devel net-snmp-devel
+</pre>
+Red Hat net-snmp libraries are a bit chunky and need some extras:
+<pre>
+ $ sudo yum install lm_sensors-devel
+</pre>
+To download the source code Subversion is needed to contact the repository.
+<pre>
+ $ sudo yum install subversion
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/branches/release-2-1
+</pre>
+For the default debug build use the following and look in <tt>./ref/debug</tt>:
+<pre>
+ $ scons -f SConstruct.RHEL4
+</pre>
+
+==== Testing ====
+The lack of static library support in <tt>pkg-config</tt> requires extra steps for testing, Red Hat <tt>sudo</tt> by default blocks <tt>LD_LIBRARY_PATH</tt> exports.
+<pre>
+ $ sudo bash
+ # LD_LIBRARY_PATH=/usr/evolution28/lib ./pgmrecv
+</pre>

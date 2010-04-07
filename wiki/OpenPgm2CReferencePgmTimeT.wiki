@@ -36,4 +36,5 @@ Display absolute local time.
 }}}
 
 === See Also ===
+  * <tt>[OpenPgm2CReferencePgmTimeSinceEpoch pgm_time_since_epoch()]</tt><br>
   * [OpenPgm2CReferenceTiming Timing] in OpenPGM C Reference.

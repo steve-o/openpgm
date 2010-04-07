@@ -1,0 +1,54 @@
+﻿#summary OpenPGM 2 : C Reference : Build Library : Intel C++ Compiler
+#labels Phase-Implementation
+#sidebar TOC2CReference
+=== Building with Intel C++ Compiler 11.1 for Ubuntu 8.04 or 8.10 ===
+First install all the C compiler dependencies, SCons, and Subversion.
+<pre>
+ $ sudo apt-get install build-essential scons subversion
+</pre>
+Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.  Note that the repository contains multiple versions of libsoup with incompatible API.
+<pre>
+ $ sudo apt-get install libglib2.0-dev libsoup2.2-dev libncurses5-dev libsnmp-dev
+</pre>
+Install the Intel Compiler Suite following provided instructions.
+<pre>
+ $ tar zxf l_cproc_p_11.1.064_intel64.tgz
+ $ cd l_cproc_p_11.1.064_intel64
+ $ sudo ./install.sh
+</pre>
+Patch Scons to support version 11 of the compiler.
+<pre>
+ $ cd /usr/lib/scons/SCons/Tool
+ $ sudo patch <
+--- /usr/lib/scons/SCons/Tool/intelc.py	2007-12-04 04:20:54.000000000 +0800
++++ /tmp/intelc.py	2010-01-21 13:50:46.000000000 +0800
+@@ -210,6 +210,10 @@
+             # Typical dir here is /opt/intel/cc/9.0 for IA32,
+             # /opt/intel/cce/9.0 for EMT64 (AMD64)
+             versions.append(re.search(r'(`[`0-9.`]`+)$', d).group(1))
++        for d in glob.glob('/opt/intel/Compiler/`*`'):
++            # Typical dir here is /opt/intel/cc/9.0 for IA32,
++            # /opt/intel/cce/9.0 for EMT64 (AMD64)
++            versions.append(re.search(r'(`[`0-9.`]`+)$', d).group(1))
+     versions = uniquify(versions)       # remove dups
+     versions.sort(vercmp)
+     return versions
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/branches/release-2-1
+</pre>
+Build.
+<pre>
+ $ cd release-2-1/openpgm/pgm 
+ $ . /opt/intel/Compiler/11.1/064/bin/iccvars.sh 
+ $ scons -f SConstruct.097.intelc
+</pre>
+By default SCons is configured to build a debug tree in <tt>./ref/debug</tt>:
+<pre>
+ $ scons -f SConstruct.097.intelc
+</pre>
+To build the release version in <tt>./ref/release</tt> use the following:
+<pre>
+ $ scons -f SConstruct.097.intelc BUILD=release
+</pre>

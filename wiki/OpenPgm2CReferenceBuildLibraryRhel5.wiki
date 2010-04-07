@@ -1,0 +1,37 @@
+﻿#summary OpenPGM 2 : C Reference : Build Library : RHEL 5
+#labels Phase-Implementation
+#sidebar TOC2CReference
+== Building for RHEL 5 or CentOS 5 ==
+First install the C compiler dependencies.
+<pre>
+ $ sudo yum install gcc
+</pre>
+Install SCons by downloading the [http://scons.org/download.php 0.97 stable package].
+<pre>
+ $ sudo rpm -i scons-0.97-1.noarch.rpm
+</pre>
+Install the library dependencies, primarily GLib, libsoup, and net-snmp libraries.  libncurses is only required for some examples.
+<pre>
+ $ sudo yum install glib2-devel libsoup-devel ncurses-devel net-snmp-devel
+</pre>
+Red Hat net-snmp libraries are a bit chunky and need some extras:
+<pre>
+ $ sudo yum install lm_sensors-devel
+</pre>
+To download the source code Subversion is needed to contact the repository.
+<pre>
+ $ sudo yum install subversion
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ svn checkout http://openpgm.googlecode.com/svn/branches/release-2-1
+</pre>
+Build.
+<pre>
+ $ cd release-2-1/openpgm/pgm
+ $ scons -f SConstruct.097
+</pre>
+By default SCons is configured to build the debug tree in <tt>./ref/debug</tt> to build the release version in <tt>./ref/release</tt>.
+<pre>
+ $ scons -f SConstruct.097 BUILD=release
+</pre>
