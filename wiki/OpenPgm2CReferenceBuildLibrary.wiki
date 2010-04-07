@@ -6,15 +6,15 @@ There are currently no official releases or pre-built packages in any distributi
 
 
 === Supported Platforms ===
+  * [OpenPgm2CReferenceBuildLibraryEtch Debian 4.0]
   * [OpenPgm2CReferenceBuildLibraryHardy Ubuntu 8.04 through 8.10]
+  * [OpenPgm2CReferenceBuildLibraryKarmic Ubuntu 9.04 through 10.04]
   * [OpenPgm2CReferenceBuildLibraryLinuxIntelCC Intel C++ Compiler 11.1] on Ubuntu 8.04 or 8.10
   * [OpenPgm2CReferenceBuildLibraryLinuxSunStudio Sun Studio 12u1] on Ubuntu 8.04 or 8.10
-  * [OpenPgm2CReferenceBuildLibraryKarmic Ubuntu 9.04 through 10.04]
-  * [OpenPgm2CReferenceBuildLibraryEtch Debign 4.0]
   * [OpenPgm2CReferenceBuildLibraryLinuxMinGw Microsoft Windows 32-bit], cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm2CReferenceBuildLibraryLinuxMinGwW64 Microsoft Windows 64-bit], cross-compiled on Ubuntu 8.04 using MinGW-w64.
-  * [OpenPgm2CReferenceBuildLibraryOpenSuse openSUSE 11.1]
   * [OpenPgm2CReferenceBuildLibraryOpenSolaris OpenSolaris 2008.11 or 2009.06]
+  * [OpenPgm2CReferenceBuildLibraryOpenSuse openSUSE 11.1]
   * [OpenPgm2CReferenceBuildLibraryRhel4 RHEL or CentOS 4]
   * [OpenPgm2CReferenceBuildLibraryRhel5 RHEL or CentOS 5]
   * [OpenPgm2CReferenceBuildLibrarySolarisSunGcc GCC 3.4.3] on Solaris 10 on SPARC (32-bit), supplied on Solaris 10 Companion Software CD

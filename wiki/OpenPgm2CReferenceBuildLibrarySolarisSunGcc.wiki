@@ -15,26 +15,29 @@ For convenience some executables are symlinked into the path.
 </pre>
 Scons must be downloaded from http://sourceforge.net/projects/scons/files/
 <pre>
- $ /usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download
+ $ /usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download 
  $ gzcat scons-1.2.0.tar.gz | tar xvf -
  $ cd scons-1.2.0
  $ sudo python setup.py install
 </pre>
 Install the library dependencies, primarily GLib and pkg-config, this tutorial install everything into <tt>/opt/glib-gcc</tt>.  <tt>pkg-config</tt> is a binary and doesn't need to be specially built for v9 architecture.
 <pre>
- $ /usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz
+ $ /usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz 
  $ gzcat pkg-config-0.23.tar.gz | tar xvf -
  $ cd pkg-config-0.23
- $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/sfw/bin:$PATH ./configure --with-installed-glib --prefix=/opt/glib-gcc
+ $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/sfw/bin:$PATH \
+./configure --with-installed-glib --prefix=/opt/glib-gcc
  $ PATH=/usr/sfw/bin:$PATH gmake
  $ /opt/sfw/bin/sudo PATH=/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
- $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-gcc/bin:/usr/sfw/bin:$PATH ./configure --prefix=/opt/glib-gcc
+ $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' \
+LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-gcc/bin:/usr/sfw/bin:$PATH \
+./configure --prefix=/opt/glib-gcc
  $ PATH=/usr/sfw/bin:$PATH gmake
  $ /opt/sfw/bin/sudo PATH=/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
 </pre>
 If you have subversion installed (requires a significant amount of dependencies), checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide], otherwise download the latest tarball.
 <pre>
- $ /usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-2.1.26.tar.gz
+ $ /usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-2.1.26.tar.gz 
  $ gzcat libpgm-2.1.26.tar.gz | xvf -
 </pre>
 Build.

@@ -13,20 +13,20 @@ Install the library dependencies, primarily GLib, libsoup, and net-snmp librarie
 Install the Sun Studio following provided instructions.  Prepare a helper source shell script or merge with the default environment.
 <pre>
  $ cat - | sudo dd of=/opt/sun/sunstudiovars.sh
- #!/bin/sh
- if [ -z "${PATH}" ]
- then
-     PATH="/opt/sun/sunstudio12.1/bin"; export PATH
- else
-     PATH="/opt/sun/sunstudio12.1/bin:${PATH}"; export PATH
- fi
- if [ -z "${MANPATH}" ]
- then
-     MANPATH="/opt/sun/sunstudio12.1/man"; export MANPATH
- else
-     MANPATH="/opt/sun/sunstudio12.1/man:${MANPATH}"; export MANPATH
- fi
- ^D
+#!/bin/sh
+if `[` -z "${PATH}" `]`
+then
+    PATH="/opt/sun/sunstudio12.1/bin"; export PATH
+else
+    PATH="/opt/sun/sunstudio12.1/bin:${PATH}"; export PATH
+fi
+if `[` -z "${MANPATH}" `]`
+then
+    MANPATH="/opt/sun/sunstudio12.1/man"; export MANPATH
+else
+    MANPATH="/opt/sun/sunstudio12.1/man:${MANPATH}"; export MANPATH
+fi
+^D
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
