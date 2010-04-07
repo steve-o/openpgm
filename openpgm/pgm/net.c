@@ -34,7 +34,7 @@
 #include "pgm/rate_control.h"
 #include "pgm/net.h"
 
-#define NET_DEBUG
+//#define NET_DEBUG
 
 #ifndef NET_DEBUG
 #	define g_trace(...)		while (0)

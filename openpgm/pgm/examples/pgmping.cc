@@ -33,6 +33,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
+#ifdef CONFIG_HAVE_EPOLL
+#	include <sys/epoll.h>
+#endif
 #include <sys/types.h>
 
 #ifndef _WIN32
@@ -100,7 +103,11 @@ static double g_latency_total = 0.0;
 static double g_latency_square_total = 0.0;
 static guint64 g_latency_count = 0;
 static double g_latency_max = 0.0;
+#ifdef INFINITY
 static double g_latency_min = INFINITY;
+#else
+static double g_latency_min = INT64_MAX;
+#endif
 static double g_latency_running_average = 0.0;
 static guint64 g_out_total = 0;
 static guint64 g_in_total = 0;
@@ -497,18 +504,10 @@ sender_thread (
 	char hostname[NI_MAXHOST + 1];
 	char payload[1000];
 	gpointer buffer = NULL;
-	struct epoll_event events[1];
 	guint64 latency, now, last;
 
-	gethostname (hostname, sizeof(hostname));
-	subject.append(hostname);
-	memset (payload, 0, sizeof(payload));
-
-	ping.mutable_subscription_header()->set_subject (subject);
-	ping.mutable_market_data_header()->set_msg_type (example::MarketDataHeader::MSG_VERIFY);
-	ping.mutable_market_data_header()->set_rec_type (example::MarketDataHeader::PING);
-	ping.mutable_market_data_header()->set_rec_status (example::MarketDataHeader::STATUS_OK);
-	ping.set_time (last);
+#ifdef CONFIG_HAVE_EPOLL
+	struct epoll_event events[1];
 
 	int efd_again = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd_again < 0) {
@@ -530,6 +529,20 @@ sender_thread (
 		g_main_loop_quit (g_loop);
 		return NULL;
 	}
+#elif defined(CONFIG_HAVE_POLL)
+	int n_fds = 2;
+	struct pollfd fds[ 2 + 1 ];
+#endif /* !CONFIG_HAVE_EPOLL */
+
+	gethostname (hostname, sizeof(hostname));
+	subject.append(hostname);
+	memset (payload, 0, sizeof(payload));
+
+	ping.mutable_subscription_header()->set_subject (subject);
+	ping.mutable_market_data_header()->set_msg_type (example::MarketDataHeader::MSG_VERIFY);
+	ping.mutable_market_data_header()->set_rec_type (example::MarketDataHeader::PING);
+	ping.mutable_market_data_header()->set_rec_status (example::MarketDataHeader::STATUS_OK);
+	ping.set_time (last);
 
 	last = now = pgm_time_update_now();
 	do {
@@ -568,13 +581,22 @@ again:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
 			if (timeout < 2) timeout = 0;
+#ifdef CONFIG_HAVE_EPOLL
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
+#elif defined(CONFIG_HAVE_POLL)
+			memset (fds, 0, sizeof(fds));
+			fds[0].fd = g_quit_pipe[0];
+			fds[0].events = POLLIN;
+			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
+			poll (fds, 1 + n_fds, timeout /* ms */);
+#endif /* !CONFIG_HAVE_EPOLL */
 			if (G_UNLIKELY(g_quit))
 				break;
 			goto again;
 		}
 		case PGM_IO_STATUS_WOULD_BLOCK:
 		{
+#ifdef CONFIG_HAVE_EPOLL
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
 			if (G_UNLIKELY(g_quit))
 				break;
@@ -585,6 +607,13 @@ again:
 				g_main_loop_quit (g_loop);
 				return NULL;
 			}
+#elif defined(CONFIG_HAVE_POLL)
+			memset (fds, 0, sizeof(fds));
+			fds[0].fd = g_quit_pipe[0];
+			fds[0].events = POLLIN;
+			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLOUT);
+			poll (fds, 1 + n_fds, -1 /* ms */);
+#endif /* !CONFIG_HAVE_EPOLL */
 			goto again;
 		}
 		case PGM_IO_STATUS_NORMAL:
@@ -598,6 +627,9 @@ again:
 		g_msg_sent++;
 	} while (!g_quit);
 
+#ifdef CONFIG_HAVE_EPOLL
+	close (efd_again);
+#endif
 	return NULL;
 }
 
@@ -609,12 +641,12 @@ receiver_thread (
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
 	pgm_msgv_t msgv[20];
-	struct epoll_event events[1];
 	pgm_time_t lost_tstamp = 0;
 	pgm_tsi_t  lost_tsi;
 	guint32	   lost_count = 0;
 
-	memset (&lost_tsi, 0, sizeof(lost_tsi));
+#ifdef CONFIG_HAVE_EPOLL
+	struct epoll_event events[1];
 
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
@@ -635,6 +667,12 @@ receiver_thread (
 		g_main_loop_quit (g_loop);
 		return NULL;
 	}
+#elif defined(CONFIG_HAVE_POLL)
+	int n_fds = 3;
+	struct pollfd fds[ 3 + 1 ];
+#endif /* !CONFIG_HAVE_EPOLL */
+
+	memset (&lost_tsi, 0, sizeof(lost_tsi));
 
 	do {
 		struct timeval tv;
@@ -670,7 +708,15 @@ receiver_thread (
 block:
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			if (timeout > 0 && timeout < 2) timeout = 0;
+#ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
+#elif defined(CONFIG_HAVE_POLL)
+			memset (fds, 0, sizeof(fds));
+			fds[0].fd = g_quit_pipe[0];
+			fds[0].events = POLLIN;
+			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
+			poll (fds, 1 + n_fds, timeout /* ms */);
+#endif /* !CONFIG_HAVE_EPOLL */
 			break;
 		case PGM_IO_STATUS_RESET:
 		{
@@ -695,7 +741,9 @@ block:
 		}
 	} while (!g_quit);
 
+#ifdef CONFIG_HAVE_EPOLL
 	close (efd);
+#endif
 	return NULL;
 }
 
@@ -846,7 +894,11 @@ on_mark (
 		g_latency_square_total	= 0.0;
 		g_latency_count		= 0;
 		g_last_seqno		= g_latency_seqno;
+#ifdef INFINITY
 		g_latency_min		= INFINITY;
+#else
+		g_latency_min		= INT64_MAX;
+#endif
 		g_latency_max		= 0.0;
 		g_out_total		= 0;
 		g_in_total		= 0;

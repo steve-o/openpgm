@@ -106,8 +106,11 @@ enum pgm_type_e {
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
 /* byte alignment for packet memory maps */
-#pragma pack(push)
-#pragma pack(1)
+#ifdef __GNUC__
+#	pragma pack(push)
+#else
+#	pragma pack(1)
+#endif
 
 /* 8. PGM header */
 struct pgm_header {
@@ -213,8 +216,10 @@ struct pgm_opt_fragment {
  */
 struct pgm_opt_nak_list {
     guint8	opt_reserved;		/* reserved */
-#if (__STDC_VERSION__ >= 199901L)
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
     guint32	opt_sqn[];		/* requested sequence number [62] */
+#elif defined(__SUNPRO_CC)
+    guint32	opt_sqn[1];
 #else
     guint32	opt_sqn[0];
 #endif
@@ -405,8 +410,11 @@ typedef enum
 } PGMPacketError;
 
 
-#pragma pack(pop)
-#pragma pack()
+#ifdef __GNUC__
+#	pragma pack(pop)
+#else
+#	pragma pack()
+#endif
 
 #ifndef __PGM_SKBUFF_H__
 #	include <pgm/skbuff.h>
