@@ -1501,7 +1501,7 @@ nak_rb_state (
 				if (	( nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
 					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
 				{
-					pgm_rxw_state (window, skb, PGM_PKT_WAIT_NCF_STATE);
+					pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_NCF);
 
 					if (!nak_pkt_cnt++)
 						nak_tg_sqn = tg_sqn;
@@ -1561,7 +1561,7 @@ nak_rb_state (
 					continue;
 				}
 
-				pgm_rxw_state (window, skb, PGM_PKT_WAIT_NCF_STATE);
+				pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_NCF);
 				nak_list.sqn[nak_list.len++] = skb->sequence;
 				state->nak_transmit_count++;
 
@@ -1851,7 +1851,7 @@ nak_rpt_state (
 /* retry */
 //				state->nak_rb_expiry = pkt->nak_rpt_expiry + nak_rb_ivl(transport);
 				state->nak_rb_expiry = now + nak_rb_ivl(transport);
-				pgm_rxw_state (window, skb, PGM_PKT_BACK_OFF_STATE);
+				pgm_rxw_state (window, skb, PGM_PKT_STATE_BACK_OFF);
 				g_trace("INFO", "retry #%u attempt %u/%u.", skb->sequence, state->ncf_retry_count, transport->nak_ncf_retries);
 			}
 		}
@@ -1980,7 +1980,7 @@ nak_rdata_state (
 
 //			rdata_state->nak_rb_expiry = rdata_pkt->nak_rdata_expiry + nak_rb_ivl(transport);
 			rdata_state->nak_rb_expiry = now + nak_rb_ivl(transport);
-			pgm_rxw_state (window, rdata_skb, PGM_PKT_BACK_OFF_STATE);
+			pgm_rxw_state (window, rdata_skb, PGM_PKT_STATE_BACK_OFF);
 
 /* retry back to back-off state */
 			g_trace("INFO", "retry #%u attempt %u/%u.", rdata_skb->sequence, rdata_state->data_retry_count, transport->nak_data_retries);

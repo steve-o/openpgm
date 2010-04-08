@@ -79,10 +79,15 @@ pgm_if_getnodeaddr (
 
 	if (0 != gethostname (hostname, sizeof(hostname))) {
 		pgm_set_error (error,
-			     PGM_IF_ERROR,
-			     pgm_if_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     strerror (errno));
+#ifdef G_OS_UNIX
+			     strerror (errno)
+#else
+			     pgm_wsastrerror (WSAGetLastError())
+#endif
+				);
 		return FALSE;
 	}
 
@@ -102,15 +107,15 @@ pgm_if_getnodeaddr (
 		return TRUE;
 	} else if (EAI_NONAME != e) {
 		pgm_set_error (error,
-			     PGM_IF_ERROR,
-			     pgm_if_error_from_eai_errno (e),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_eai_errno (e, errno),
 			     _("Resolving hostname address: %s"),
 			     gai_strerror (e));
 		return FALSE;
 	} else if (AF_UNSPEC == family) {
 		pgm_set_error (error,
-			     PGM_IF_ERROR,
-			     PGM_IF_ERROR_NONAME,
+			     PGM_ERROR_DOMAIN_IF,
+			     PGM_ERROR_NONAME,
 			     _("Resolving hostname address family."));
 		return FALSE;
 	}
@@ -124,15 +129,16 @@ pgm_if_getnodeaddr (
 	he = gethostbyname (hostname);
 	if (NULL == he) {
 		pgm_set_error (error,
-			     PGM_IF_ERROR,
-			     pgm_if_error_from_h_errno (h_errno),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_h_errno (h_errno),
 #ifdef G_OS_UNIX
 			     _("Resolving IPv4 hostname address: %s"),
-			     hstrerror (h_errno));
+			     hstrerror (h_errno)
 #else
-			     _("Resolving IPv4 hostname address: %d"),
-			     WSAGetLastError());
+			     _("Resolving IPv4 hostname address: %s"),
+			     pgm_wsastrerror (WSAGetLastError())
 #endif
+				);
 		return FALSE;
 	}
 
@@ -140,8 +146,8 @@ pgm_if_getnodeaddr (
 	e = pgm_getifaddrs (&ifap);
 	if (e < 0) {
 		pgm_set_error (error,
-			     PGM_IF_ERROR,
-			     pgm_if_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
 			     strerror (errno));
 		return FALSE;
@@ -160,8 +166,8 @@ pgm_if_getnodeaddr (
 	}
 	pgm_freeifaddrs (ifap);
 	pgm_set_error (error,
-		     PGM_IF_ERROR,
-		     PGM_IF_ERROR_NONET,
+		     PGM_ERROR_DOMAIN_IF,
+		     PGM_ERROR_NONET,
 		     _("Discovering primary IPv4 network interface."));
 	return FALSE;
 ipv4_found:
@@ -178,8 +184,8 @@ ipv4_found:
 	}
 	pgm_freeifaddrs (ifap);
 	pgm_set_error (error,
-		     PGM_IF_ERROR,
-		     PGM_IF_ERROR_NONET,
+		     PGM_ERROR_DOMAIN_IF,
+		     PGM_ERROR_NONET,
 		     _("Discovering primary IPv6 network interface."));
 	return FALSE;
 ipv6_found:

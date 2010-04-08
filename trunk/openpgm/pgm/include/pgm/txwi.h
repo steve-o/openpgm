@@ -78,7 +78,7 @@ struct pgm_txw_t {
 
         pgm_queue_t		retransmit_queue;
 
-	rs_t			rs;
+	pgm_rs_t		rs;
 	guint			tg_sqn_shift;
 	struct pgm_sk_buff_t*	parity_buffer;
 	unsigned		is_fec_enabled:1;

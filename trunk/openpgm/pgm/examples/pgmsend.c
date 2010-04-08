@@ -142,7 +142,7 @@ main (
 	if (create_transport ())
 	{
 		while (optind < argc) {
-			const pgm_io_status_e status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
+			const int status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
 		        if (PGM_IO_STATUS_NORMAL != status) {
 				g_warning ("pgm_send failed.");
 		        }

@@ -110,8 +110,8 @@ pgm_parse_raw (
 	if (G_UNLIKELY(skb->len < PGM_MIN_SIZE))
 	{
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_BOUNDS,
 			     _("IP packet too small at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GUINT16_FORMAT " bytes."),
 			     skb->len, (guint16)PGM_MIN_SIZE);
 		return FALSE;
@@ -175,15 +175,15 @@ pgm_parse_raw (
 
 	case 6:
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_AFNOSUPPORT,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_AFNOSUPPORT,
 			     _("IPv6 is not supported for raw IP header parsing."));
 		return FALSE;
 
 	default:
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_AFNOSUPPORT,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_AFNOSUPPORT,
 			     _("IP header reports an invalid version %d."),
 			     ip->ip_v);
 		return FALSE;
@@ -193,8 +193,8 @@ pgm_parse_raw (
 	if (G_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
 	{
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_BOUNDS,
 			     _("IP header reports an invalid header length %" G_GSIZE_FORMAT " bytes."),
 			     ip_header_length);
 		return FALSE;
@@ -213,8 +213,8 @@ pgm_parse_raw (
 
 	if (G_UNLIKELY(skb->len < packet_length)) {	/* redundant: often handled in kernel */
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_BOUNDS,
 			     _("IP packet received at %" G_GUINT16_FORMAT " bytes whilst IP header reports %" G_GSIZE_FORMAT " bytes."),
 			     skb->len, packet_length);
 		return FALSE;
@@ -227,8 +227,8 @@ pgm_parse_raw (
 	if (G_UNLIKELY(0 != sum)) {
 		const int ip_sum = g_ntohs (ip->ip_sum);
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_CKSUM,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_CKSUM,
 			     _("IP packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
 			     ip_sum, sum);
 		return FALSE;
@@ -239,8 +239,8 @@ pgm_parse_raw (
 	const guint offset = g_ntohs (ip->ip_off);
 	if (G_UNLIKELY((offset & 0x1fff) != 0)) {
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_PROTO,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_PROTO,
 			     _("IP header reports packet fragmentation."));
 		return FALSE;
 	}
@@ -280,8 +280,8 @@ pgm_parse_udp_encap (
 
 	if (G_UNLIKELY(skb->len < sizeof(struct pgm_header))) {
 		pgm_set_error (error,
-			     PGM_PACKET_ERROR,
-			     PGM_PACKET_ERROR_BOUNDS,
+			     PGM_ERROR_DOMAIN_PACKET,
+			     PGM_ERROR_BOUNDS,
 			     _("UDP payload too small for PGM packet at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes."),
 			     skb->len, sizeof(struct pgm_header));
 		return FALSE;
@@ -313,8 +313,8 @@ pgm_parse (
 		skb->pgm_header->pgm_checksum = sum;
 		if (G_UNLIKELY(pgm_sum != sum)) {
 			pgm_set_error (error,
-				     PGM_PACKET_ERROR,
-				     PGM_PACKET_ERROR_CKSUM,
+				     PGM_ERROR_DOMAIN_PACKET,
+				     PGM_ERROR_CKSUM,
 			     	     _("PGM packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
 			     	     pgm_sum, sum);
 			return FALSE;
@@ -324,8 +324,8 @@ pgm_parse (
 		    PGM_RDATA == skb->pgm_header->pgm_type)
 		{
 			pgm_set_error (error,
-				     PGM_PACKET_ERROR,
-				     PGM_PACKET_ERROR_PROTO,
+				     PGM_ERROR_DOMAIN_PACKET,
+				     PGM_ERROR_PROTO,
 			     	     _("PGM checksum missing whilst mandatory for %cDATA packets."),
 				     PGM_ODATA == skb->pgm_header->pgm_type ? 'O' : 'R');
 			return FALSE;

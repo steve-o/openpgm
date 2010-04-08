@@ -51,21 +51,19 @@
 
 G_BEGIN_DECLS
 
-typedef enum
+enum
 {
-    PGM_PKT_ERROR_STATE = 0,
-    PGM_PKT_BACK_OFF_STATE,	    /* PGM protocol recovery states */
-    PGM_PKT_WAIT_NCF_STATE,
-    PGM_PKT_WAIT_DATA_STATE,
+    PGM_PKT_STATE_ERROR = 0,
+    PGM_PKT_STATE_BACK_OFF,	    /* PGM protocol recovery states */
+    PGM_PKT_STATE_WAIT_NCF,
+    PGM_PKT_STATE_WAIT_DATA,
+    PGM_PKT_STATE_HAVE_DATA,	    /* data received waiting to commit to application layer */
+    PGM_PKT_STATE_HAVE_PARITY,	    /* contains parity information not original data */
+    PGM_PKT_STATE_COMMIT_DATA,	    /* commited data waiting for purging */
+    PGM_PKT_STATE_LOST_DATA,	    /* if recovery fails, but packet has not yet been commited */
+};
 
-    PGM_PKT_HAVE_DATA_STATE,	    /* data received waiting to commit to application layer */
-
-    PGM_PKT_HAVE_PARITY_STATE,	    /* contains parity information not original data */
-    PGM_PKT_COMMIT_DATA_STATE,	    /* commited data waiting for purging */
-    PGM_PKT_LOST_DATA_STATE,	    /* if recovery fails, but packet has not yet been commited */
-} pgm_pkt_state_e;
-
-typedef enum
+enum
 {
 	PGM_RXW_OK = 0,
 	PGM_RXW_INSERTED,
@@ -77,14 +75,14 @@ typedef enum
 	PGM_RXW_BOUNDS,
 	PGM_RXW_SLOW_CONSUMER,
 	PGM_RXW_UNKNOWN,
-} pgm_rxw_returns_e;
+};
 
 struct pgm_rxw_state_t {
 	pgm_time_t	nak_rb_expiry;
 	pgm_time_t	nak_rpt_expiry;
 	pgm_time_t	nak_rdata_expiry;
 
-        pgm_pkt_state_e state;
+        int		pkt_state;
 
 	guint8		nak_transmit_count;
         guint8          ncf_retry_count;
@@ -126,7 +124,7 @@ struct pgm_rxw_t {
         unsigned        is_defined:1;
 	unsigned	has_event:1;		/* edge triggered */
 	unsigned	is_fec_available:1;
-	rs_t		rs;
+	pgm_rs_t	rs;
 	guint32		tg_size;		/* transmission group size for parity recovery */
 	guint		tg_sqn_shift;
 
@@ -157,10 +155,10 @@ PGM_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const g
 PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const guint);
 PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const guint32);
-PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
+PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
 PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const guint32) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (pgm_pkt_state_e) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (pgm_rxw_returns_e) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (const int) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (const int) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t* const);
 
 static inline guint pgm_rxw_max_length (const pgm_rxw_t* const window)

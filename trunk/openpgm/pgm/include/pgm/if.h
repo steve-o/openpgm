@@ -29,30 +29,6 @@
 #endif
 
 
-typedef enum
-{
-	/* Derived from errno */
-	PGM_IF_ERROR_NONET,
-	PGM_IF_ERROR_NOTUNIQ,
-	PGM_IF_ERROR_NODEV,
-	PGM_IF_ERROR_XDEV,
-	PGM_IF_ERROR_FAULT,		/* gethostname returned EFAULT */
-	PGM_IF_ERROR_INVAL,
-	PGM_IF_ERROR_PERM,
-	PGM_IF_ERROR_ADDRFAMILY,	/* getaddrinfo return EAI_ADDRFAMILY */
-	PGM_IF_ERROR_AGAIN,
-	PGM_IF_ERROR_BADFLAGS,
-	PGM_IF_ERROR_FAIL,
-	PGM_IF_ERROR_FAMILY,
-	PGM_IF_ERROR_MEMORY,
-	PGM_IF_ERROR_NODATA,
-	PGM_IF_ERROR_NONAME,
-	PGM_IF_ERROR_SERVICE,
-	PGM_IF_ERROR_SOCKTYPE,
-	PGM_IF_ERROR_SYSTEM,
-	PGM_IF_ERROR_FAILED
-} pgm_if_error_e;
-
 struct pgm_transport_info_t {
 	pgm_gsi_t			ti_gsi;
 	int				ti_flags;
@@ -72,9 +48,6 @@ G_BEGIN_DECLS
 gboolean pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, pgm_error_t**);
 void pgm_if_free_transport_info (struct pgm_transport_info_t*);
 void pgm_if_print_all (void);
-pgm_if_error_e pgm_if_error_from_errno (gint);
-pgm_if_error_e pgm_if_error_from_h_errno (gint);
-pgm_if_error_e pgm_if_error_from_eai_errno (gint);
 
 G_END_DECLS
 

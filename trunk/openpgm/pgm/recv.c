@@ -96,11 +96,6 @@
 #	define CMSG_LEN(len)		WSA_CMSG_LEN(len)
 #endif
 
-static pgm_recv_error_e pgm_recv_error_from_errno (gint);
-#ifdef G_OS_WIN32
-static pgm_recv_error_e pgm_recv_error_from_wsa_errno (gint);
-#endif
-
 
 /* read a packet into a PGM skbuff
  * on success returns packet length, on closed socket returns 0,
@@ -591,17 +586,13 @@ wait_for_event (
 #ifdef CONFIG_HAVE_POLL
 		struct pollfd fds[ n_fds ];
 		memset (fds, 0, sizeof(fds));
-		if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, POLLIN)) {
-			g_trace ("poll_info returned errno=%i",errno);
-			return EFAULT;
-		}
+		const int status = pgm_transport_poll_info (transport, fds, &n_fds, POLLIN);
+		g_assert (-1 != status);
 #else
 		fd_set readfds;
 		FD_ZERO(&readfds);
-		if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
-			g_trace ("select_info returned errno=%i",errno);
-			return EFAULT;
-		}
+		const int status = pgm_transport_select_info (transport, &readfds, NULL, &n_fds);
+		g_assert (-1 != status);
 #endif /* CONFIG_HAVE_POLL */
 
 /* flush any waiting notifications */
@@ -654,7 +645,7 @@ wait_for_event (
  * closed, returns PGM_IO_STATUS_EOF.  On error, returns PGM_IO_STATUS_ERROR.
  */
 
-pgm_io_status_e
+int
 pgm_recvmsgv (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msg_start,
@@ -664,7 +655,7 @@ pgm_recvmsgv (
 	pgm_error_t**		error
 	)
 {
-	pgm_io_status_e status = PGM_IO_STATUS_WOULD_BLOCK;
+	int status = PGM_IO_STATUS_WOULD_BLOCK;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
@@ -707,8 +698,8 @@ pgm_recvmsgv (
 			char tsi[PGM_TSISTRLEN];
 			pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
 			pgm_set_error (error,
-				     PGM_RECV_ERROR,
-				     PGM_RECV_ERROR_CONNRESET,
+				     PGM_ERROR_DOMAIN_RECV,
+				     PGM_ERROR_CONNRESET,
 				     _("Transport has been reset on unrecoverable loss from %s."),
 				     tsi);
 		}
@@ -779,8 +770,8 @@ recv_again:
 		}
 		status = PGM_IO_STATUS_ERROR;
 		pgm_set_error (error,
-			     PGM_RECV_ERROR,
-			     pgm_recv_error_from_errno (save_errno),
+			     PGM_ERROR_DOMAIN_RECV,
+			     pgm_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
 			     strerror (save_errno));
 #else
@@ -790,10 +781,10 @@ recv_again:
 		}
 		status = PGM_IO_STATUS_ERROR;
 		pgm_set_error (error,
-			     PGM_RECV_ERROR,
-			     pgm_recv_error_from_wsa_errno (save_wsa_errno),
+			     PGM_ERROR_DOMAIN_RECV,
+			     pgm_error_from_wsa_errno (save_wsa_errno),
 			     _("Transport socket error: %s"),
-			     strerror (save_wsa_errno));
+			     wsastrerror (save_wsa_errno));
 #endif /* !G_OS_UNIX */
 		goto out;
 	}
@@ -817,7 +808,7 @@ recv_again:
 /* inherently cannot determine PGM_PC_RECEIVER_CKSUM_ERRORS unless only one receiver */
 		g_trace ("Discarded invalid packet.");
 		if (transport->can_send_data) {
-			if (err && PGM_PACKET_ERROR_CKSUM == err->code)
+			if (err && PGM_ERROR_CKSUM == err->code)
 				transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
 			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 		}
@@ -874,10 +865,15 @@ check_for_repeat:
 				return PGM_IO_STATUS_EOF;
 			case EFAULT:
 				pgm_set_error (error,
-					     PGM_RECV_ERROR,
-					     pgm_recv_error_from_errno (errno),
-					     _("Waiting for event: %s"),
-					     strerror (errno));
+						PGM_ERROR_DOMAIN_RECV,
+						pgm_error_from_errno (errno),
+						_("Waiting for event: %s"),
+#ifdef G_OS_UNIX
+						strerror (errno)
+#else
+						wsa_strerror (WSAGetLastError())	/* from select() */
+#endif
+						);
 				pgm_mutex_unlock (&transport->receiver_mutex);
 				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
@@ -906,8 +902,8 @@ out:
 				char tsi[PGM_TSISTRLEN];
 				pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
 				pgm_set_error (error,
-					     PGM_RECV_ERROR,
-					     PGM_RECV_ERROR_CONNRESET,
+					     PGM_ERROR_DOMAIN_RECV,
+					     PGM_ERROR_CONNRESET,
 					     _("Transport has been reset on unrecoverable loss from %s."),
 					     tsi);
 			}
@@ -958,7 +954,7 @@ out:
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-pgm_io_status_e
+int
 pgm_recvmsg (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msgv,
@@ -983,7 +979,7 @@ pgm_recvmsg (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-pgm_io_status_e
+int
 pgm_recvfrom (
 	pgm_transport_t* const	transport,
 	gpointer		data,
@@ -1003,7 +999,7 @@ pgm_recvfrom (
 	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
-	const pgm_io_status_e status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
+	const int status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
@@ -1037,7 +1033,7 @@ pgm_recvfrom (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-pgm_io_status_e
+int
 pgm_recv (
 	pgm_transport_t* const	transport,
 	gpointer		data,
@@ -1055,89 +1051,5 @@ pgm_recv (
 
 	return pgm_recvfrom (transport, data, len, flags, bytes_read, NULL, error);
 }
-
-static
-pgm_recv_error_e
-pgm_recv_error_from_errno (
-	gint		err_no
-        )
-{
-	switch (err_no) {
-#ifdef EBADF
-	case EBADF:
-		return PGM_RECV_ERROR_BADF;
-		break;
-#endif
-
-#ifdef EFAULT
-	case EFAULT:
-		return PGM_RECV_ERROR_FAULT;
-		break;
-#endif
-
-#ifdef EINTR
-	case EINTR:
-		return PGM_RECV_ERROR_INTR;
-		break;
-#endif
-
-#ifdef EINVAL
-	case EINVAL:
-		return PGM_RECV_ERROR_INVAL;
-		break;
-#endif
-
-#ifdef ENOMEM
-	case ENOMEM:
-		return PGM_RECV_ERROR_NOMEM;
-		break;
-#endif
-
-	default :
-		return PGM_RECV_ERROR_FAILED;
-		break;
-	}
-}
-
-#ifdef G_OS_WIN32
-static
-pgm_recv_error_e
-pgm_recv_error_from_wsa_errno (
-	gint		err_no
-        )
-{
-	switch (err_no) {
-#ifdef WSAEINVAL
-	case WSAEINVAL:
-		return PGM_RECV_ERROR_INVAL;
-		break;
-#endif
-#ifdef WSAEMFILE
-	case WSAEMFILE:
-		return PGM_RECV_ERROR_MFILE;
-		break;
-#endif
-#ifdef WSA_NOT_ENOUGH_MEMORY
-	case WSA_NOT_ENOUGH_MEMORY:
-		return PGM_RECV_ERROR_NOMEM;
-		break;
-#endif
-#ifdef WSAENOPROTOOPT
-	case WSAENOPROTOOPT:
-		return PGM_RECV_ERROR_NOPROTOOPT;
-		break;
-#endif
-#ifdef WSAECONNRESET
-	case WSAECONNRESET:
-		return PGM_RECV_ERROR_CONNRESET;
-		break;
-#endif
-
-	default :
-		return PGM_RECV_ERROR_FAILED;
-		break;
-	}
-}
-#endif /* G_OS_WIN32 */
 
 /* eof */
