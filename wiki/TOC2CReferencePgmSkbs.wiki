@@ -1,6 +1,6 @@
   * [OpenPgm2CReference Home]
   * [OpenPgm2CReferencePgmSkbs PGM Socket Buffers (SKBs)]
-    * <tt>[OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]</tt>
+    * [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]
     * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt>
     * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_skb_get()]</tt>
     * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_free_skb()]</tt>
