@@ -4,8 +4,8 @@
     * [OpenPgm2CReferenceProgrammingEnvironment Programming Environment]
     * [OpenPgmCReferenceIncludeTheseHeaderFiles Include these Header Files]
     * [OpenPgm2CReferenceSetTheseParameters Set these Parameters]
-    * [OpenPgm2CReferenceLinkTheseLibraryFiles Link these Library Files]
-    * [OpenPgm2CReferenceRunWithTheseCapabilities Run with these Capabilities]
+    * [OpenPgmCReferenceLinkTheseLibraryFiles Link these Library Files]
+    * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]
   * [OpenPgm2CReferenceMigration Migration from version 1.0]
   * [OpenPgm2CReferenceEnvironment Environment]
     * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt>
@@ -19,20 +19,89 @@
   * [OpenPgm2CReferencePgmSkbs PGM Socket Buffers (SKBs)]
     * <tt>[OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]</tt>
     * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt>
-    * <tt>[OpenPgm2CReferencePgmSkbGet pgm_skb_get()]</tt>
-    * <tt>[OpenPgm2CReferencePgmFreeSkb pgm_free_skb()]</tt>
+    * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_skb_get()]</tt>
+    * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_free_skb()]</tt>
     * <tt>[OpenPgm2CReferencePgmSkbPut pgm_skb_put()]</tt>
-    * <tt>[OpenPgm2CReferencePgmSkbPull pgm_skb_pull()]</tt>
-    * <tt>[OpenPgm2CReferencePgmSkbReserve pgm_skb_reserve()]</tt>
+    * <tt>[OpenPgm2CReferencePgmSkbPut pgm_skb_pull()]</tt>
+    * <tt>[OpenPgm2CReferencePgmSkbPut pgm_skb_reserve()]</tt>
     * <tt>[OpenPgm2CReferencePgmSkbCopy pgm_skb_copy()]</tt>
   * [OpenPgm2CReferenceInterface Interface]
     * <tt>[OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]</tt>
     * <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt>
-    * <tt>[OpenPgm2CReferencePgmIfFreeTransportInfo pgm_if_free_transport_info()]</tt>
+    * <tt>[OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]</tt>
   * [OpenPgm2CReferenceTiming Timing]
     * <tt>[OpenPgm2CReferencePgmTimeT pgm_time_t]</tt>
     * <tt>[OpenPgm2CReferencePgmTimeSinceEpoch pgm_time_since_epoch()]</tt>
   * [OpenPgm2CReferenceTransport Transport]
+    * <tt>[OpenPgm2CReferencePgmGsiT pgm_gsi_t]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiCreateFromString pgm_gsi_create_from_string()]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiCreateFromData pgm_gsi_create_from_data()]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiPrint pgm_gsi_print()]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiPrint pgm_gsi_print_r()]</tt>
+    * <tt>[OpenPgm2CReferencePgmGsiEqual pgm_gsi_equal()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTsiT pgm_tsi_t]</tt>
+    * <tt>[OpenPgm2CReferencePgmTsiPrint pgm_tsi_print()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTsiPrint pgm_tsi_print_r()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTsiEqual pgm_tsi_equal()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTsiEqual pgm_tsi_hash()]</tt>
+    * <tt>[OpenPgm2CReferencePgmIoStatus PGMIOStatus]</tt>
+    * <tt>[OpenPgm2CReferencePgmIoVec pgm_iovec]</tt>
+    * <tt>[OpenPgm2CReferencePgmMsgvT pgm_msgv_t]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportT pgm_transport_t]</tt>
+    * <tt>[OpenPgm2CReferencePgmRecv pgm_recv()]</tt>
+    * <tt>[OpenPgm2CReferencePgmRecv pgm_recvfrom()]</tt>
+    * <tt>[OpenPgm2CReferencePgmRecv pgm_recvmsg()]</tt>
+    * <tt>[OpenPgm2CReferencePgmRecvMsgv pgm_recvmsgv()]</tt>
+    * <tt>[OpenPgm2CReferencePgmSend pgm_send()]</tt>
+    * <tt>[OpenPgm2CReferencePgmSendv pgm_sendv()]</tt>
+    * <tt>[OpenPgm2CReferencePgmSendSkbv pgm_send_skbv()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportBind pgm_transport_bind()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportCreate pgm_transport_create()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportDestroy pgm_transport_destroy()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportGetRateRemaining pgm_transport_get_rate_remaining()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportGetTimerPending pgm_transport_get_timer_pending()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_recv_fd()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_pending_fd()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_repair_fd()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportGetRecvFd pgm_transport_get_send_fd()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSelectInfo pgm_transport_select_info()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportPollInfo pgm_transport_poll_info()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportEpollCtl pgm_transport_epoll_ctl()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportMaxTsdu pgm_transport_max_tsdu()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetAbortOnReset pgm_transport_set_abort_on_reset()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetFec pgm_transport_set_fec()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetHops pgm_transport_set_hops()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetMulticastLoop pgm_transport_set_multicast_loop()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetNakDataRetries pgm_transport_set_nak_data_retries()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetNakNcfRetries pgm_transport_set_nak_ncf_retries()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetNakBoIvl pgm_transport_set_nak_bo_ivl()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetNakRdataIvl pgm_transport_set_nak_rdata_ivl()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetNakRptIvl pgm_transport_set_nak_rpt_ivl()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetRcvBuf pgm_transport_set_rcvbuf()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetRecvOnly pgm_transport_set_recv_only()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetSendOnly pgm_transport_set_send_only()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetSndBuf pgm_transport_set_sndbuf()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportJoinGroup pgm_transport_join_group()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportJoinGroup pgm_transport_leave_group()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportBlockSource pgm_transport_block_source()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportBlockSource pgm_transport_unblock_source()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportJoinSourceGroup pgm_transport_join_source_group()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportJoinSourceGroup pgm_transport_leave_source_group()]</tt>
+    * <tt>[OpenPgm2CReferencePgmTransportMsFilter pgm_transport_msfilter()]</tt>
   * [OpenPgm2CReferenceAsynchronousReceiver Asynchronous Receiver]
     * <tt>[OpenPgm2CReferencePgmAsyncT pgm_aync_t]</tt>
     * <tt>[OpenPgm2CReferencePgmEventFnT pgm_eventfn_t]</tt>
@@ -41,7 +110,7 @@
     * <tt>[OpenPgm2CReferencePgmAsyncGetFd pgm_async_get_fd()]</tt>
     * <tt>[OpenPgm2CReferencePgmAsyncSetNonBlocking pgm_async_set_nonblocking()]</tt>
     * <tt>[OpenPgm2CReferencePgmAsyncAddWatch pgm_async_add_watch()]</tt>
-    * <tt>[OpenPgm2CReferencePgmAsyncAddWatchFull pgm_async_add_watch_full()]</tt>
+    * <tt>[OpenPgm2CReferencePgmAsyncAddWatch pgm_async_add_watch_full()]</tt>
     * <tt>[OpenPgm2CReferencePgmAsyncCreateWatch pgm_async_create_watch()]</tt>
     * <tt>[OpenPgm2CReferencePgmAsyncRecv pgm_async_recv()]</tt>
   * [OpenPgm2CReferenceErrorHandling Error Handling]
