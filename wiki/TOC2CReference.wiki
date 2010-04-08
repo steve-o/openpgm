@@ -1,4 +1,5 @@
   * C Reference for OpenPGM version 2
+  * [OpenPgm2CReference Contents]
   * [OpenPgm2CReferenceProgrammersChecklist Programmer's Checklist]
     * [OpenPgm2CReferenceBuildLibrary Build Library]
     * [OpenPgm2CReferenceProgrammingEnvironment Programming Environment]
