@@ -29,6 +29,7 @@
 
 #include <glib.h>
 
+#include "pgm/mem.h"
 #include "pgm/galois.h"
 
 
@@ -370,12 +371,12 @@ pgm_rs_create (
 	g_assert (n > 0);
 	g_assert (k > 0);
 
-	rs_t* rs = g_malloc0 (sizeof(rs_t));
+	rs_t* rs = pgm_malloc0 (sizeof(rs_t));
 
 	rs->n	= n;
 	rs->k	= k;
-	rs->GM	= g_malloc0 (n * k * sizeof(gf8_t));
-	rs->RM	= g_malloc0 (k * k * sizeof(gf8_t));
+	rs->GM	= pgm_malloc0 (n * k * sizeof(gf8_t));
+	rs->RM	= pgm_malloc0 (k * k * sizeof(gf8_t));
 
 /* alpha = root of primitive polynomial of degree m
  *                 ( 1 + x² + x³ + x⁴ + x⁸ )
@@ -384,7 +385,7 @@ pgm_rs_create (
  *
  * Be careful, Harry!
  */
-	gf8_t* V = g_malloc0 (n * k * sizeof(gf8_t));
+	gf8_t* V = pgm_malloc0 (n * k * sizeof(gf8_t));
 	gf8_t* p = V + k;
 	V[0] = 1;
 	for (guint j = 0; j < (n - 1); j++)
@@ -417,7 +418,7 @@ pgm_rs_create (
  */
 	matmul (V_kn, V_kk, rs->GM + (k * k), n - k, k, k);
 
-	g_free (V);
+	pgm_free (V);
 
 /* 4: set identity matrix for original data
  */
@@ -438,16 +439,16 @@ pgm_rs_destroy (
 	g_assert (NULL != rs);
 
 	if (rs->RM) {
-		g_free (rs->RM);
+		pgm_free (rs->RM);
 		rs->RM = NULL;
 	}
 
 	if (rs->GM) {
-		g_free (rs->GM);
+		pgm_free (rs->GM);
 		rs->GM = NULL;
 	}
 
-	g_free (rs);
+	pgm_free (rs);
 }
 
 /* create a parity packet from a vector of original data packets and
@@ -517,7 +518,7 @@ pgm_rs_decode_parity_inline (
 		if (offsets[ j ] < rs->k)
 			continue;
 
-		gf8_t* erasure = repairs[ j ] = g_slice_alloc0 (len);
+		gf8_t* erasure = repairs[ j ] = pgm_malloc0 (len);
 		for (guint i = 0; i < rs->k; i++)
 		{
 			gf8_t* src = block[ i ];
@@ -533,7 +534,7 @@ pgm_rs_decode_parity_inline (
 			continue;
 
 		memcpy (block[ j ], repairs[ j ], len * sizeof(gf8_t));
-		g_slice_free1 (len, repairs[ j ]);
+		pgm_free (repairs[ j ]);
 	}
 }
 

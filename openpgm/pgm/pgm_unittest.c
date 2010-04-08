@@ -31,7 +31,8 @@
 /* mock state */
 
 static gboolean mock_time_init;
-static GSList* mock_pgm_transport_list = NULL;
+static pgm_rwlock_t mock_pgm_transport_list_lock;
+static pgm_slist_t* mock_pgm_transport_list = NULL;
 
 static
 void
@@ -53,7 +54,7 @@ mock_teardown (void)
 PGM_GNUC_INTERNAL
 gboolean
 mock_pgm_time_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	if (mock_time_init)
@@ -95,6 +96,7 @@ mock_pgm_transport_destroy (
 #define pgm_time_supported	mock_pgm_time_supported
 #define pgm_time_shutdown	mock_pgm_time_shutdown
 #define pgm_transport_destroy	mock_pgm_transport_destroy
+#define pgm_transport_list_lock	mock_pgm_transport_list_lock
 #define pgm_transport_list	mock_pgm_transport_list
 
 #define PGM_DEBUG

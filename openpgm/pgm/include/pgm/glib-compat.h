@@ -26,8 +26,6 @@
 G_BEGIN_DECLS
 
 #if GLIB_MAJOR_VERSION == 2 && GLIB_MINOR_VERSION < 16
-void g_prefix_error (GError**, const gchar*, ...);
-
 void g_warn_message (const char*, const char*, int, const char*, const char*);
 #	define g_warn_if_fail(expr)	do { if G_LIKELY (expr) ; else \
 					g_warn_message (G_LOG_DOMAIN, __FILE__, __LINE__, G_STRFUNC, #expr); } while (0)

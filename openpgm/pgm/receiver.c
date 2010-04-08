@@ -38,8 +38,9 @@
 #	include <sys/epoll.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -54,6 +55,8 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/mem.h"
+#include "pgm/list.h"
 #include "pgm/pgm.h"
 #include "pgm/receiverp.h"
 #include "pgm/ip.h"
@@ -150,10 +153,9 @@ nak_rb_ivl (
 {
 /* pre-conditions */
 	g_assert (NULL != transport);
-	g_assert (NULL != transport->rand_);
 	g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
 
-	return g_rand_int_range (transport->rand_, 1 /* us */, transport->nak_bo_ivl);
+	return pgm_rand_int_range (&transport->rand_, 1 /* us */, transport->nak_bo_ivl);
 }
 
 /* mark sequence as recovery failed.
@@ -199,7 +201,7 @@ _pgm_peer_ref (
 /* pre-conditions */
 	g_assert (NULL != peer);
 
-	g_atomic_int_inc (&peer->ref_count);
+	pgm_atomic_int32_inc (&peer->ref_count);
 	return peer;
 }
 
@@ -214,7 +216,7 @@ pgm_peer_unref (
 /* pre-conditions */
 	g_assert (NULL != peer);
 
-	const gboolean is_zero = g_atomic_int_dec_and_test (&peer->ref_count);
+	const gboolean is_zero = pgm_atomic_int32_dec_and_test (&peer->ref_count);
 	if (G_UNLIKELY (is_zero))
 	{
 /* receive window */
@@ -222,7 +224,7 @@ pgm_peer_unref (
 		peer->window = NULL;
 
 /* object */
-		g_free (peer);
+		pgm_free (peer);
 	}
 }
 
@@ -279,17 +281,17 @@ pgm_transport_set_peer_expiry (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (peer_expiry > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed ||
 	    (peer_expiry < (2 * transport->spm_ambient_interval)))
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->peer_expiry = peer_expiry;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -309,18 +311,18 @@ pgm_transport_set_spmr_expiry (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (spmr_expiry > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed ||
 	    ( transport->can_send_data &&
 	      spmr_expiry >= transport->spm_ambient_interval ))
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->spmr_expiry = spmr_expiry;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -338,16 +340,16 @@ pgm_transport_set_rxw_sqns (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
 	g_return_val_if_fail (sqns > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->rxw_sqns = sqns;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -366,16 +368,16 @@ pgm_transport_set_rxw_secs (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (secs > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->rxw_secs = secs;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -398,16 +400,16 @@ pgm_transport_set_rxw_max_rte (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (max_rte > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->rxw_max_rte = max_rte;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -425,16 +427,16 @@ pgm_transport_set_nak_bo_ivl (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (usec > 1, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_bo_ivl = usec;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -450,16 +452,16 @@ pgm_transport_set_nak_rpt_ivl (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_rpt_ivl = usec;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -475,16 +477,16 @@ pgm_transport_set_nak_rdata_ivl (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_rdata_ivl = usec;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -500,16 +502,16 @@ pgm_transport_set_nak_data_retries (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_data_retries = cnt;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -525,16 +527,16 @@ pgm_transport_set_nak_ncf_retries (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->nak_ncf_retries = cnt;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -573,7 +575,7 @@ pgm_new_peer (
 		(gpointer)transport, pgm_tsi_print (tsi), saddr, src_addrlen, daddr, dst_addrlen);
 #endif
 
-	peer = g_malloc0 (sizeof(pgm_peer_t));
+	peer = pgm_malloc0 (sizeof(pgm_peer_t));
 	peer->expiry = now + transport->peer_expiry;
 	peer->transport = transport;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
@@ -592,18 +594,12 @@ pgm_new_peer (
 	peer->spmr_expiry = now + transport->spmr_expiry;
 
 /* add peer to hash table and linked list */
-	g_static_rw_lock_writer_lock (&transport->peers_lock);
+	pgm_rwlock_writer_lock (&transport->peers_lock);
 	gpointer entry = _pgm_peer_ref(peer);
-	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
-/* there is no g_list_prepend_link(): */
-	peer->peers_link.next = transport->peers_list;
+	pgm_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
 	peer->peers_link.data = peer;
-/* update next entries previous link */
-	if (transport->peers_list)
-		transport->peers_list->prev = &peer->peers_link;
-/* update head */
-	transport->peers_list = &peer->peers_link;
-	g_static_rw_lock_writer_unlock (&transport->peers_lock);
+	transport->peers_list = pgm_list_prepend_link (transport->peers_list, &peer->peers_link);
+	pgm_rwlock_writer_unlock (&transport->peers_lock);
 
 	pgm_timer_lock (transport);
 	if (pgm_time_after( transport->next_poll, peer->spmr_expiry ))
@@ -670,10 +666,7 @@ pgm_flush_peers_pending (
 			break;
 		}
 /* clear this reference and move to next */
-		transport->peers_pending->data = NULL;
-		GSList* next_peer = transport->peers_pending->next;
-		transport->peers_pending->next = NULL;
-		transport->peers_pending = next_peer;
+		transport->peers_pending = pgm_slist_remove_first (transport->peers_pending);
 	}
 
 	return retval;
@@ -712,8 +705,7 @@ pgm_peer_set_pending (
 
 	if (peer->pending_link.data) return;
 	peer->pending_link.data = peer;
-	peer->pending_link.next = transport->peers_pending;
-	transport->peers_pending = &peer->pending_link;
+	transport->peers_pending = pgm_slist_prepend_link (transport->peers_pending, &peer->pending_link);
 }
 
 /* Create a new error SKB detailing data loss.
@@ -1360,7 +1352,7 @@ send_nak_list (
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	guint8 buf[ tpdu_length ];
-	if (G_UNLIKELY(g_mem_gc_friendly))
+	if (G_UNLIKELY(pgm_mem_gc_friendly))
 		memset (buf, 0, tpdu_length);
 	struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_nak *nak = (struct pgm_nak*)(header + 1);
@@ -1446,7 +1438,7 @@ nak_rb_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	GList* list;
+	pgm_list_t* list;
 	pgm_sqn_list_t nak_list = { .len = 0 };
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
@@ -1487,7 +1479,7 @@ nak_rb_state (
 
 		while (list)
 		{
-			GList* next_list_el = list->prev;
+			pgm_list_t* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1552,7 +1544,7 @@ nak_rb_state (
 
 		while (list)
 		{
-			GList* next_list_el = list->prev;
+			pgm_list_t* next_list_el = list->prev;
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1676,9 +1668,9 @@ pgm_check_peer_nak_state (
 	if (!transport->peers_list)
 		return TRUE;
 
-	GList* list = transport->peers_list;
+	pgm_list_t* list = transport->peers_list;
 	do {
-		GList* next = list->next;
+		pgm_list_t* next = list->next;
 		pgm_peer_t* peer = list->data;
 		pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 
@@ -1727,8 +1719,8 @@ pgm_check_peer_nak_state (
 			else
 			{
 				g_warning (_("peer expired, tsi %s"), pgm_tsi_print (&peer->tsi));
-				g_hash_table_remove (transport->peers_hashtable, &peer->tsi);
-				transport->peers_list = g_list_remove_link (transport->peers_list, &peer->peers_link);
+				pgm_hash_table_remove (transport->peers_hashtable, &peer->tsi);
+				transport->peers_list = pgm_list_remove_link (transport->peers_list, &peer->peers_link);
 				pgm_peer_unref (peer);
 			}
 		}
@@ -1767,9 +1759,9 @@ pgm_min_nak_expiry (
 	if (!transport->peers_list)
 		return expiration;
 
-	GList* list = transport->peers_list;
+	pgm_list_t* list = transport->peers_list;
 	do {
-		GList* next = list->next;
+		pgm_list_t* next = list->next;
 		pgm_peer_t* peer = (pgm_peer_t*)list->data;
 		pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	
@@ -1821,7 +1813,7 @@ nak_rpt_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	GList* list = window->wait_ncf_queue.tail;
+	pgm_list_t* list = window->wait_ncf_queue.tail;
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -1831,7 +1823,7 @@ nak_rpt_state (
 
 	while (list)
 	{
-		GList* next_list_el = list->prev;
+		pgm_list_t* next_list_el = list->prev;
 		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
 		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
@@ -1949,7 +1941,7 @@ nak_rdata_state (
 
 	pgm_rxw_t* window = (pgm_rxw_t*)peer->window;
 	pgm_transport_t* transport = peer->transport;
-	GList* list = window->wait_data_queue.tail;
+	pgm_list_t* list = window->wait_data_queue.tail;
 
 	guint dropped_invalid = 0;
 	guint dropped = 0;
@@ -1959,7 +1951,7 @@ nak_rdata_state (
 
 	while (list)
 	{
-		GList* next_list_el = list->prev;
+		pgm_list_t* next_list_el = list->prev;
 		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)list;
 		g_assert (rdata_skb);
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
@@ -2209,7 +2201,7 @@ on_general_poll (
 
 /* defer response based on provided back-off interval */
 	const guint32 poll_bo_ivl = (AFI_IP6 == g_ntohs (poll4->poll_nla_afi)) ? g_ntohl (poll6->poll6_bo_ivl) : g_ntohl (poll4->poll_bo_ivl);
-	source->polr_expiry = skb->tstamp + g_rand_int_range (transport->rand_, 0, poll_bo_ivl);
+	source->polr_expiry = skb->tstamp + pgm_rand_int_range (&transport->rand_, 0, poll_bo_ivl);
 	pgm_nla_to_sockaddr (&poll4->poll_nla_afi, (struct sockaddr*)&source->poll_nla);
 /* TODO: schedule poll-response */
 

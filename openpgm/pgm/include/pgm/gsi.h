@@ -30,9 +30,12 @@
 #	include <arpa/inet.h>
 #endif
 
+#ifndef __PGM_ERROR_H__
+#	include <pgm/error.h>
+#endif
+
 
 #define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
-#define PGM_GSI_ERROR		pgm_gsi_error_quark ()
 
 typedef enum
 {
@@ -52,7 +55,7 @@ typedef enum
 	PGM_GSI_ERROR_SOCKTYPE,
 	PGM_GSI_ERROR_SYSTEM,
 	PGM_GSI_ERROR_FAILED
-} PGMGSIError;
+} pgm_gsi_error_e;
 
 typedef struct pgm_gsi_t pgm_gsi_t;
 
@@ -62,9 +65,8 @@ struct pgm_gsi_t {
 
 G_BEGIN_DECLS
 
-GQuark pgm_gsi_error_quark (void);
-gboolean pgm_gsi_create_from_hostname (pgm_gsi_t*, GError**);
-gboolean pgm_gsi_create_from_addr (pgm_gsi_t*, GError**);
+gboolean pgm_gsi_create_from_hostname (pgm_gsi_t*, pgm_error_t**);
+gboolean pgm_gsi_create_from_addr (pgm_gsi_t*, pgm_error_t**);
 gboolean pgm_gsi_create_from_data (pgm_gsi_t*, const guchar*, const gsize);
 gboolean pgm_gsi_create_from_string (pgm_gsi_t*, const gchar*, gssize);
 int pgm_gsi_print_r (const pgm_gsi_t*, char*, gsize);

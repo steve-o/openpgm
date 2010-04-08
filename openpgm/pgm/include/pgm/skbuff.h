@@ -35,9 +35,21 @@ struct pgm_sk_buff_t;
 #	include <pgm/packet.h>
 #endif
 
+#ifndef __PGM_ATOMIC_H__
+#	include <pgm/atomic.h>
+#endif
+
+#ifndef __PGM_MEM_H__
+#	include <pgm/mem.h>
+#endif
+
+#ifndef __PGM_LIST_H__
+#	include <pgm/list.h>
+#endif
+
 
 struct pgm_sk_buff_t {
-	GList			link_;
+	pgm_list_t		link_;
 
 	pgm_transport_t*	transport;
 	pgm_time_t		tstamp;
@@ -63,7 +75,7 @@ struct pgm_sk_buff_t {
 				tail,
 				end;
 	guint			truesize;
-	gint			users;		/* atomic */
+	volatile gint32		users;		/* atomic */
 };
 
 static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
@@ -86,14 +98,14 @@ static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
 {
 	struct pgm_sk_buff_t* skb;
 
-	skb = (struct pgm_sk_buff_t*)g_slice_alloc (size + sizeof(struct pgm_sk_buff_t));
+	skb = (struct pgm_sk_buff_t*)pgm_malloc (size + sizeof(struct pgm_sk_buff_t));
 	if (G_UNLIKELY(g_mem_gc_friendly)) {
 		memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
 		skb->zero_padded = 1;
 	} else
 		memset (skb, 0, sizeof(struct pgm_sk_buff_t));
 	skb->truesize = size + sizeof(struct pgm_sk_buff_t);
-	g_atomic_int_set (&skb->users, 1);
+	pgm_atomic_int32_set (&skb->users, 1);
 	skb->head = skb + 1;
 	skb->data = skb->tail = skb->head;
 	skb->end  = (guint8*)skb->data + size;
@@ -103,14 +115,14 @@ static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
 /* increase reference count */
 static inline struct pgm_sk_buff_t* pgm_skb_get (struct pgm_sk_buff_t* skb)
 {
-	g_atomic_int_inc (&skb->users);
+	pgm_atomic_int32_inc (&skb->users);
 	return skb;
 }
 
 static inline void pgm_free_skb (struct pgm_sk_buff_t* skb)
 {
-	if (g_atomic_int_dec_and_test (&skb->users))
-		g_slice_free1 (skb->truesize, skb);
+	if (pgm_atomic_int32_dec_and_test (&skb->users))
+		pgm_free (skb);
 }
 
 /* add data */
@@ -160,11 +172,11 @@ static inline void pgm_skb_reserve (struct pgm_sk_buff_t* skb, guint len)
 static inline struct pgm_sk_buff_t* pgm_skb_copy (const struct pgm_sk_buff_t* const skb)
 {
 	struct pgm_sk_buff_t* newskb;
-	newskb = (struct pgm_sk_buff_t*)g_slice_alloc (skb->truesize);
+	newskb = (struct pgm_sk_buff_t*)pgm_malloc (skb->truesize);
 	memcpy (newskb, skb, G_STRUCT_OFFSET(struct pgm_sk_buff_t, pgm_header));
 	newskb->zero_padded = 0;
 	newskb->truesize = skb->truesize;
-	g_atomic_int_set (&newskb->users, 1);
+	pgm_atomic_int32_set (&newskb->users, 1);
 	newskb->head = newskb + 1;
 	newskb->end  = (guint8*)newskb->head + ((guint8*)skb->end - (guint8*)skb->head);
 	newskb->data = (guint8*)newskb->head + ((guint8*)skb->data - (guint8*)skb->head);
@@ -243,7 +255,7 @@ static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
 	g_return_val_if_fail (skb->truesize >= sizeof(struct pgm_sk_buff_t*) + skb->len, FALSE);
 	g_return_val_if_fail (skb->truesize == (guint)((const guint8*)skb->end - (const guint8*)skb), FALSE);
 /* users */
-	g_return_val_if_fail (g_atomic_int_get (&skb->users) > 0, FALSE);
+	g_return_val_if_fail (pgm_atomic_int32_get (&skb->users) > 0, FALSE);
 #endif
 	return TRUE;
 }

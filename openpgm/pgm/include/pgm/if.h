@@ -29,8 +29,6 @@
 #endif
 
 
-#define PGM_IF_ERROR		pgm_if_error_quark ()
-
 typedef enum
 {
 	/* Derived from errno */
@@ -53,7 +51,7 @@ typedef enum
 	PGM_IF_ERROR_SOCKTYPE,
 	PGM_IF_ERROR_SYSTEM,
 	PGM_IF_ERROR_FAILED
-} PGMIFError;
+} pgm_if_error_e;
 
 struct pgm_transport_info_t {
 	pgm_gsi_t			ti_gsi;
@@ -71,13 +69,12 @@ struct pgm_transport_info_t {
 
 G_BEGIN_DECLS
 
-gboolean pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, GError**);
+gboolean pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, pgm_error_t**);
 void pgm_if_free_transport_info (struct pgm_transport_info_t*);
 void pgm_if_print_all (void);
-GQuark pgm_if_error_quark (void);
-PGMIFError pgm_if_error_from_errno (gint);
-PGMIFError pgm_if_error_from_h_errno (gint);
-PGMIFError pgm_if_error_from_eai_errno (gint);
+pgm_if_error_e pgm_if_error_from_errno (gint);
+pgm_if_error_e pgm_if_error_from_h_errno (gint);
+pgm_if_error_e pgm_if_error_from_eai_errno (gint);
 
 G_END_DECLS
 

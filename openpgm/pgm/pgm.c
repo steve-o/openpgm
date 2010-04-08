@@ -19,8 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -31,6 +32,8 @@
 #include "pgm/pgm.h"
 #include "pgm/packet.h"
 #include "pgm/timep.h"
+#include "pgm/thread.h"
+#include "pgm/rand.h"
 
 
 #ifndef PGM_DEBUG
@@ -57,11 +60,11 @@ static gboolean pgm_got_initialized = FALSE;
 // TODO: fix valgrind errors in getprotobyname/_r
 gboolean
 pgm_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	if (TRUE == pgm_got_initialized) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_ENGINE_ERROR,
 			     PGM_ENGINE_ERROR_FAILED,
 			     _("Engine already initalized."));
@@ -69,8 +72,10 @@ pgm_init (
 	}
 
 /* ensure threading enabled */
-	if (!g_thread_supported ())
-		g_thread_init (NULL);
+	pgm_thread_init ();
+	pgm_atomic_init ();
+	pgm_mem_init ();
+	pgm_rand_init ();
 
 #ifdef G_OS_WIN32
 	WORD wVersionRequested = MAKEWORD (2, 2);
@@ -78,7 +83,7 @@ pgm_init (
 	if (WSAStartup (wVersionRequested, &wsaData) != 0)
 	{
 		const int save_errno = WSAGetLastError ();
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_ENGINE_ERROR,
 			     pgm_engine_error_from_wsa_errno (save_errno),
 			     _("WSAStartup failure: %s"),
@@ -89,7 +94,7 @@ pgm_init (
 	if (LOBYTE (wsaData.wVersion) != 2 || HIBYTE (wsaData.wVersion) != 2)
 	{
 		WSACleanup ();
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_ENGINE_ERROR,
 			     PGM_ENGINE_ERROR_FAILED,
 			     _("WSAStartup failed to provide requested version 2.2."));
@@ -121,13 +126,16 @@ pgm_init (
 #endif
 
 /* ensure timing enabled */
-	GError* sub_error = NULL;
+	pgm_error_t* sub_error = NULL;
 	if (!pgm_time_supported () &&
 	    !pgm_time_init (&sub_error))
 	{
-		g_propagate_error (error, sub_error);
+		pgm_propagate_error (error, sub_error);
 		return FALSE;
 	}
+
+/* create global transport list lock */
+	pgm_rwlock_init (&pgm_transport_list_lock);
 
 	pgm_got_initialized = TRUE;
 	return TRUE;
@@ -162,17 +170,16 @@ pgm_shutdown (void)
 	WSACleanup ();
 #endif
 
+	pgm_rand_shutdown ();
+	pgm_mem_shutdown ();
+	pgm_atomic_shutdown ();
+	pgm_thread_shutdown ();
+
 	pgm_got_initialized = FALSE;
 	return TRUE;
 }
 
-GQuark
-pgm_engine_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-engine-error-quark");
-}
-
-PGMEngineError
+pgm_engine_error_e
 pgm_engine_error_from_wsa_errno (
 	gint            err_no
 	)
