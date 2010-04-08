@@ -1,5 +1,6 @@
 ﻿#summary OpenPGM 2 C Reference : Programmer's Checklist
 #labels Phase-Implementation
+#sidebar TOC2CReference
 
 === Introduction ===
 This section presents important general information for programmers using OpenPGM.
@@ -11,4 +12,3 @@ This section presents important general information for programmers using OpenPG
   * [OpenPgm2CReferenceSetTheseParameters Set these Parameters]
   * [OpenPgmCReferenceLinkTheseLibraryFiles Link these Library Files]
   * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]
-
