@@ -1,5 +1,6 @@
 #summary C Reference for OpenPGM version 2.
 #labels Featured,Phase-Implementation
+#sidebar TOC2CReference
 
 *OpenPGM version 2.1.26*
 
