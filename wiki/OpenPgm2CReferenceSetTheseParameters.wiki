@@ -1,5 +1,6 @@
 ﻿#summary OpenPGM 2 C Reference : Set These Parameters
 #labels Phase-Implementation
+#sidebar TOC2CReference
 
 OpenPGM does not default with a set of PGM parameters as it is necessary to customize to your messaging platform requirements. OpenPGM applications need to include calls to the following functions before binding a transport with a call to <tt>[OpenPgm2CReferencePgmTransportBind pgm_transport_bind()]</tt>
 
