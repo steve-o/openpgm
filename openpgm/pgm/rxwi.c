@@ -100,7 +100,7 @@ static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const
 static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const guint32, const pgm_time_t, const pgm_time_t);
 static void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
 static guint _pgm_rxw_remove_trail (pgm_rxw_t* const);
-static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, pgm_pkt_state_e);
+static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline gssize _pgm_rxw_incoming_read (pgm_rxw_t* const, pgm_msgv_t**, guint);
 static inline gboolean _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const guint32);
@@ -565,13 +565,13 @@ _pgm_rxw_update_trail (
 		g_assert (skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
 
-		switch (state->state) {
-		case PGM_PKT_HAVE_DATA_STATE:
-		case PGM_PKT_HAVE_PARITY_STATE:
-		case PGM_PKT_LOST_DATA_STATE:
+		switch (state->pkt_state) {
+		case PGM_PKT_STATE_HAVE_DATA:
+		case PGM_PKT_STATE_HAVE_PARITY:
+		case PGM_PKT_STATE_LOST_DATA:
 			break;
 
-		case PGM_PKT_ERROR_STATE:
+		case PGM_PKT_STATE_ERROR:
 			g_assert_not_reached();
 
 		default:
@@ -649,7 +649,7 @@ _pgm_rxw_add_placeholder (
 	const guint32 index_	= skb->sequence % pgm_rxw_max_length (window);
 	window->pdata[index_]	= skb;
 
-	pgm_rxw_state (window, skb, PGM_PKT_BACK_OFF_STATE);
+	pgm_rxw_state (window, skb, PGM_PKT_STATE_BACK_OFF);
 
 /* post-conditions */
 	g_assert_cmpuint (pgm_rxw_length (window), >, 0);
@@ -771,7 +771,7 @@ _pgm_rxw_is_apdu_lost (
 	g_assert (skb);
 
 /* lost is lost */
-	if (PGM_PKT_LOST_DATA_STATE == state->state)
+	if (PGM_PKT_STATE_LOST_DATA == state->pkt_state)
 		return TRUE;
 
 /* by definition, a single-TPDU APDU is complete */
@@ -790,7 +790,7 @@ _pgm_rxw_is_apdu_lost (
 		return TRUE;
 
 	const pgm_rxw_state_t* first_state = (pgm_rxw_state_t*)&first_skb->cb;
-	if (PGM_PKT_LOST_DATA_STATE == first_state->state)
+	if (PGM_PKT_STATE_LOST_DATA == first_state->pkt_state)
 		return TRUE;
 
 	return FALSE;
@@ -818,15 +818,15 @@ _pgm_rxw_find_missing (
 		skb = _pgm_rxw_peek (window, i);
 		g_assert (skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
-		switch (state->state) {
-		case PGM_PKT_BACK_OFF_STATE:
-		case PGM_PKT_WAIT_NCF_STATE:
-		case PGM_PKT_WAIT_DATA_STATE:
-		case PGM_PKT_LOST_DATA_STATE:
+		switch (state->pkt_state) {
+		case PGM_PKT_STATE_BACK_OFF:
+		case PGM_PKT_STATE_WAIT_NCF:
+		case PGM_PKT_STATE_WAIT_DATA:
+		case PGM_PKT_STATE_LOST_DATA:
 			return skb;
 
-		case PGM_PKT_HAVE_DATA_STATE:
-		case PGM_PKT_HAVE_PARITY_STATE:
+		case PGM_PKT_STATE_HAVE_DATA:
+		case PGM_PKT_STATE_HAVE_PARITY:
 			break;
 
 		default: g_assert_not_reached(); break;
@@ -961,7 +961,7 @@ _pgm_rxw_insert (
 		g_assert (skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
 
-		if (state->state == PGM_PKT_HAVE_DATA_STATE)
+		if (state->pkt_state == PGM_PKT_STATE_HAVE_DATA)
 			return PGM_RXW_DUPLICATE;
 	}
 
@@ -974,14 +974,14 @@ _pgm_rxw_insert (
 	}
 
 /* verify placeholder state */
-	switch (state->state) {
-	case PGM_PKT_BACK_OFF_STATE:
-	case PGM_PKT_WAIT_NCF_STATE:
-	case PGM_PKT_WAIT_DATA_STATE:
-	case PGM_PKT_LOST_DATA_STATE:
+	switch (state->pkt_state) {
+	case PGM_PKT_STATE_BACK_OFF:
+	case PGM_PKT_STATE_WAIT_NCF:
+	case PGM_PKT_STATE_WAIT_DATA:
+	case PGM_PKT_STATE_LOST_DATA:
 		break;
 
-	case PGM_PKT_HAVE_PARITY_STATE:
+	case PGM_PKT_STATE_HAVE_PARITY:
 		_pgm_rxw_shuffle_parity (window, skb);
 		break;
 
@@ -1017,15 +1017,15 @@ _pgm_rxw_insert (
 /* replace place holder skb with incoming skb */
 	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
 	pgm_rxw_state_t* rxw_state = (gpointer)new_skb->cb;
-	rxw_state->state = PGM_PKT_ERROR_STATE;
+	rxw_state->pkt_state = PGM_PKT_STATE_ERROR;
 	_pgm_rxw_unlink (window, skb);
 	pgm_free_skb (skb);
 	const guint32 index_ = new_skb->sequence % pgm_rxw_max_length (window);
 	window->pdata[index_] = new_skb;
 	if (new_skb->pgm_header->pgm_options & PGM_OPT_PARITY)
-		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_PARITY_STATE);
+		_pgm_rxw_state (window, new_skb, PGM_PKT_STATE_HAVE_PARITY);
 	else
-		_pgm_rxw_state (window, new_skb, PGM_PKT_HAVE_DATA_STATE);
+		_pgm_rxw_state (window, new_skb, PGM_PKT_STATE_HAVE_DATA);
 	window->size += new_skb->len;
 
 	return PGM_RXW_INSERTED;
@@ -1114,7 +1114,7 @@ _pgm_rxw_append (
 		const guint32 index_	= lost_skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_]	= lost_skb;
 
-		_pgm_rxw_state (window, lost_skb, PGM_PKT_LOST_DATA_STATE);
+		_pgm_rxw_state (window, lost_skb, PGM_PKT_STATE_LOST_DATA);
 		return PGM_RXW_BOUNDS;
 	}
 
@@ -1123,13 +1123,13 @@ _pgm_rxw_append (
 	{
 		const guint32 index_	= skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_]	= skb;
-		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_PARITY_STATE);
+		_pgm_rxw_state (window, skb, PGM_PKT_STATE_HAVE_PARITY);
 	}
 	else
 	{
 		const guint32 index_	= skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_]	= skb;
-		_pgm_rxw_state (window, skb, PGM_PKT_HAVE_DATA_STATE);
+		_pgm_rxw_state (window, skb, PGM_PKT_STATE_HAVE_DATA);
 	}
 
 /* statistics */
@@ -1201,12 +1201,12 @@ pgm_rxw_readv (
 	g_assert (skb);
 
 	state = (pgm_rxw_state_t*)&skb->cb;
-	switch (state->state) {
-	case PGM_PKT_HAVE_DATA_STATE:
+	switch (state->pkt_state) {
+	case PGM_PKT_STATE_HAVE_DATA:
 		bytes_read = _pgm_rxw_incoming_read (window, pmsg, msg_end - *pmsg + 1);
 		break;
 
-	case PGM_PKT_LOST_DATA_STATE:
+	case PGM_PKT_STATE_LOST_DATA:
 /* do not purge in situ sequence */
 		if (_pgm_rxw_commit_is_empty (window)) {
 			g_trace ("removing lost trail from window");
@@ -1215,15 +1215,15 @@ pgm_rxw_readv (
 			g_trace ("locking trail at commit window");
 		}
 /* fall through */
-	case PGM_PKT_BACK_OFF_STATE:
-	case PGM_PKT_WAIT_NCF_STATE:
-	case PGM_PKT_WAIT_DATA_STATE:
-	case PGM_PKT_HAVE_PARITY_STATE:
+	case PGM_PKT_STATE_BACK_OFF:
+	case PGM_PKT_STATE_WAIT_NCF:
+	case PGM_PKT_STATE_WAIT_DATA:
+	case PGM_PKT_STATE_HAVE_PARITY:
 		bytes_read = -1;
 		break;
 
-	case PGM_PKT_COMMIT_DATA_STATE:
-	case PGM_PKT_ERROR_STATE:
+	case PGM_PKT_STATE_COMMIT_DATA:
+	case PGM_PKT_STATE_ERROR:
 	default:
 		g_assert_not_reached();
 		break;
@@ -1391,25 +1391,25 @@ _pgm_rxw_reconstruct (
 		skb = _pgm_rxw_peek (window, i);
 		g_assert (skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
-		switch (state->state) {
-		case PGM_PKT_HAVE_DATA_STATE:
+		switch (state->pkt_state) {
+		case PGM_PKT_STATE_HAVE_DATA:
 			tg_skbs[ j ] = skb;
 			tg_data[ j ] = skb->data;
 			tg_opts[ j ] = (gpointer)skb->pgm_opt_fragment;
 			offsets[ j ] = j;
 			break;
 
-		case PGM_PKT_HAVE_PARITY_STATE:
+		case PGM_PKT_STATE_HAVE_PARITY:
 			tg_skbs[ window->rs.k + rs_h ] = skb;
 			tg_data[ window->rs.k + rs_h ] = skb->data;
 			tg_opts[ window->rs.k + rs_h ] = (gpointer)skb->pgm_opt_fragment;
 			offsets[ j ] = window->rs.k + rs_h;
 			++rs_h;
 /* fall through and alloc new skb for reconstructed data */
-		case PGM_PKT_BACK_OFF_STATE:
-		case PGM_PKT_WAIT_NCF_STATE:
-		case PGM_PKT_WAIT_DATA_STATE:
-		case PGM_PKT_LOST_DATA_STATE:
+		case PGM_PKT_STATE_BACK_OFF:
+		case PGM_PKT_STATE_WAIT_NCF:
+		case PGM_PKT_STATE_WAIT_DATA:
+		case PGM_PKT_STATE_LOST_DATA:
 			skb = pgm_alloc_skb (window->max_tpdu);
 			pgm_skb_reserve (skb, sizeof(struct pgm_header) + sizeof(struct pgm_data));
 			skb->pgm_header = skb->head;
@@ -1544,7 +1544,7 @@ _pgm_rxw_is_apdu_complete (
 		state = (pgm_rxw_state_t*)&skb->cb;
 
 		if (!check_parity &&
-		    PGM_PKT_HAVE_DATA_STATE != state->state)
+		    PGM_PKT_STATE_HAVE_DATA != state->pkt_state)
 		{
 			if (window->is_fec_available &&
 			    !_pgm_rxw_is_tg_sqn_lost (window, tg_sqn) )
@@ -1560,8 +1560,8 @@ _pgm_rxw_is_apdu_complete (
 
 		if (check_parity)
 		{
-			if (PGM_PKT_HAVE_DATA_STATE == state->state ||
-			    PGM_PKT_HAVE_PARITY_STATE == state->state)
+			if (PGM_PKT_STATE_HAVE_DATA == state->pkt_state ||
+			    PGM_PKT_STATE_HAVE_PARITY == state->pkt_state)
 				++contiguous_tpdus;
 
 /* have sufficient been received for reconstruction */
@@ -1573,7 +1573,7 @@ _pgm_rxw_is_apdu_complete (
 		else
 		{
 /* single packet APDU, already complete */
-			if (PGM_PKT_HAVE_DATA_STATE == state->state &&
+			if (PGM_PKT_STATE_HAVE_DATA == state->pkt_state &&
 			    !skb->pgm_opt_fragment)
 				return TRUE;
 
@@ -1638,7 +1638,7 @@ _pgm_rxw_incoming_read_apdu (
 	g_assert_cmpuint (apdu_len, >=, skb->len);
 	(*pmsg)->msgv_len = 0;
 	do {
-		_pgm_rxw_state (window, skb, PGM_PKT_COMMIT_DATA_STATE);
+		_pgm_rxw_state (window, skb, PGM_PKT_STATE_COMMIT_DATA);
 		(*pmsg)->msgv_skb[i++] = skb;
 		(*pmsg)->msgv_len++;
 		contiguous_len += skb->len;
@@ -1730,7 +1730,7 @@ void
 _pgm_rxw_state (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
-	const pgm_pkt_state_e		new_state
+	const int			new_pkt_state
 	)
 {
 	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
@@ -1740,63 +1740,63 @@ _pgm_rxw_state (
 	g_assert (NULL != skb);
 
 /* remove current state */
-	if (PGM_PKT_ERROR_STATE != state->state)
+	if (PGM_PKT_STATE_ERROR != state->pkt_state)
 		_pgm_rxw_unlink (window, skb);
 
-	switch (new_state) {
-	case PGM_PKT_BACK_OFF_STATE:
+	switch (new_pkt_state) {
+	case PGM_PKT_STATE_BACK_OFF:
 		pgm_queue_push_head_link (&window->backoff_queue, (pgm_list_t*)skb);
 		break;
 
-	case PGM_PKT_WAIT_NCF_STATE:
+	case PGM_PKT_STATE_WAIT_NCF:
 		pgm_queue_push_head_link (&window->wait_ncf_queue, (pgm_list_t*)skb);
 		break;
 
-	case PGM_PKT_WAIT_DATA_STATE:
+	case PGM_PKT_STATE_WAIT_DATA:
 		pgm_queue_push_head_link (&window->wait_data_queue, (pgm_list_t*)skb);
 		break;
 
-	case PGM_PKT_HAVE_DATA_STATE:
+	case PGM_PKT_STATE_HAVE_DATA:
 		window->fragment_count++;
 		g_assert_cmpuint (window->fragment_count, <=, pgm_rxw_length (window));
 		break;
 
-	case PGM_PKT_HAVE_PARITY_STATE:
+	case PGM_PKT_STATE_HAVE_PARITY:
 		window->parity_count++;
 		g_assert_cmpuint (window->parity_count, <=, pgm_rxw_length (window));
 		break;
 
-	case PGM_PKT_COMMIT_DATA_STATE:
+	case PGM_PKT_STATE_COMMIT_DATA:
 		window->committed_count++;
 		g_assert_cmpuint (window->committed_count, <=, pgm_rxw_length (window));
 		break;
 
-	case PGM_PKT_LOST_DATA_STATE:
+	case PGM_PKT_STATE_LOST_DATA:
 		window->lost_count++;
 		window->cumulative_losses++;
 		window->has_event = 1;
 		g_assert_cmpuint (window->lost_count, <=, pgm_rxw_length (window));
 		break;
 
-	case PGM_PKT_ERROR_STATE:
+	case PGM_PKT_STATE_ERROR:
 		break;
 
 	default: g_assert_not_reached(); break;
 	}
 
-	state->state = new_state;
+	state->pkt_state = new_pkt_state;
 }
 
 void
 pgm_rxw_state (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
-	const pgm_pkt_state_e		new_state
+	const int			new_pkt_state
 	)
 {
-	g_trace ("state (window:%p skb:%p new_state:%s)",
-		(gpointer)window, (gpointer)skb, pgm_pkt_state_string (new_state));
-	_pgm_rxw_state (window, skb, new_state);
+	g_trace ("state (window:%p skb:%p new_pkt_state:%s)",
+		(gpointer)window, (gpointer)skb, pgm_pkt_state_string (new_pkt_state));
+	_pgm_rxw_state (window, skb, new_pkt_state);
 }
 
 /* remove current state from sequence.
@@ -1817,51 +1817,51 @@ _pgm_rxw_unlink (
 
 	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
 
-	switch (state->state) {
-	case PGM_PKT_BACK_OFF_STATE:
+	switch (state->pkt_state) {
+	case PGM_PKT_STATE_BACK_OFF:
 		g_assert (!pgm_queue_is_empty (&window->backoff_queue));
 		queue = &window->backoff_queue;
 		goto unlink_queue;
 
-	case PGM_PKT_WAIT_NCF_STATE:
+	case PGM_PKT_STATE_WAIT_NCF:
 		g_assert (!pgm_queue_is_empty (&window->wait_ncf_queue));
 		queue = &window->wait_ncf_queue;
 		goto unlink_queue;
 
-	case PGM_PKT_WAIT_DATA_STATE:
+	case PGM_PKT_STATE_WAIT_DATA:
 		g_assert (!pgm_queue_is_empty (&window->wait_data_queue));
 		queue = &window->wait_data_queue;
 unlink_queue:
 		pgm_queue_unlink (queue, (pgm_list_t*)skb);
 		break;
 
-	case PGM_PKT_HAVE_DATA_STATE:
+	case PGM_PKT_STATE_HAVE_DATA:
 		g_assert_cmpuint (window->fragment_count, >, 0);
 		window->fragment_count--;
 		break;
 
-	case PGM_PKT_HAVE_PARITY_STATE:
+	case PGM_PKT_STATE_HAVE_PARITY:
 		g_assert_cmpuint (window->parity_count, >, 0);
 		window->parity_count--;
 		break;
 
-	case PGM_PKT_COMMIT_DATA_STATE:
+	case PGM_PKT_STATE_COMMIT_DATA:
 		g_assert_cmpuint (window->committed_count, >, 0);
 		window->committed_count--;
 		break;
 
-	case PGM_PKT_LOST_DATA_STATE:
+	case PGM_PKT_STATE_LOST_DATA:
 		g_assert_cmpuint (window->lost_count, >, 0);
 		window->lost_count--;
 		break;
 
-	case PGM_PKT_ERROR_STATE:
+	case PGM_PKT_STATE_ERROR:
 		break;
 
 	default: g_assert_not_reached(); break;
 	}
 
-	state->state = PGM_PKT_ERROR_STATE;
+	state->pkt_state = PGM_PKT_STATE_ERROR;
 	g_assert (((pgm_list_t*)skb)->next == NULL);
 	g_assert (((pgm_list_t*)skb)->prev == NULL);
 }
@@ -1903,17 +1903,17 @@ pgm_rxw_lost (
 
 	state = (pgm_rxw_state_t*)&skb->cb;
 
-	if (G_UNLIKELY(!(state->state == PGM_PKT_BACK_OFF_STATE  ||
-	                 state->state == PGM_PKT_WAIT_NCF_STATE  ||
-	                 state->state == PGM_PKT_WAIT_DATA_STATE ||
-			 state->state == PGM_PKT_HAVE_DATA_STATE ||	/* fragments */
-			 state->state == PGM_PKT_HAVE_PARITY_STATE)))
+	if (G_UNLIKELY(!(state->pkt_state == PGM_PKT_STATE_BACK_OFF  ||
+	                 state->pkt_state == PGM_PKT_STATE_WAIT_NCF  ||
+	                 state->pkt_state == PGM_PKT_STATE_WAIT_DATA ||
+			 state->pkt_state == PGM_PKT_STATE_HAVE_DATA ||	/* fragments */
+			 state->pkt_state == PGM_PKT_STATE_HAVE_PARITY)))
 	{
-		g_error (_("Unexpected state %s(%u)"), pgm_pkt_state_string (state->state), state->state);
+		g_error (_("Unexpected state %s(%u)"), pgm_pkt_state_string (state->pkt_state), state->pkt_state);
 		g_assert_not_reached();
 	}
 
-	_pgm_rxw_state (window, skb, PGM_PKT_LOST_DATA_STATE);
+	_pgm_rxw_state (window, skb, PGM_PKT_STATE_LOST_DATA);
 }
 
 /* received a uni/multicast ncf, search for a matching nak & tag or extend window if
@@ -1986,20 +1986,20 @@ _pgm_rxw_recovery_update (
 	struct pgm_sk_buff_t* skb = _pgm_rxw_peek (window, sequence);
 	g_assert (skb);
 	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
-	switch (state->state) {
-	case PGM_PKT_BACK_OFF_STATE:
-	case PGM_PKT_WAIT_NCF_STATE:
-		pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
+	switch (state->pkt_state) {
+	case PGM_PKT_STATE_BACK_OFF:
+	case PGM_PKT_STATE_WAIT_NCF:
+		pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
 
 /* fall through */
-	case PGM_PKT_WAIT_DATA_STATE:
+	case PGM_PKT_STATE_WAIT_DATA:
 		state->nak_rdata_expiry = nak_rdata_expiry;
 		return PGM_RXW_UPDATED;
 
-	case PGM_PKT_HAVE_DATA_STATE:
-	case PGM_PKT_HAVE_PARITY_STATE:
-	case PGM_PKT_COMMIT_DATA_STATE:
-	case PGM_PKT_LOST_DATA_STATE:
+	case PGM_PKT_STATE_HAVE_DATA:
+	case PGM_PKT_STATE_HAVE_PARITY:
+	case PGM_PKT_STATE_COMMIT_DATA:
+	case PGM_PKT_STATE_LOST_DATA:
 		break;
 
 	default: g_assert_not_reached(); break;
@@ -2046,7 +2046,7 @@ _pgm_rxw_recovery_append (
 
 	const guint32 index_	= pgm_rxw_lead (window) % pgm_rxw_max_length (window);
 	window->pdata[index_]	= skb;
-	_pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
+	_pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
 
 	return PGM_RXW_APPENDED;
 }
@@ -2140,20 +2140,20 @@ pgm_rxw_dump (
 
 const char*
 pgm_pkt_state_string (
-	pgm_pkt_state_e		state
+	const int		pkt_state
 	)
 {
 	const char* c;
 
-	switch (state) {
-	case PGM_PKT_BACK_OFF_STATE:	c = "PGM_PKT_BACK_OFF_STATE"; break;
-	case PGM_PKT_WAIT_NCF_STATE:	c = "PGM_PKT_WAIT_NCF_STATE"; break;
-	case PGM_PKT_WAIT_DATA_STATE:	c = "PGM_PKT_WAIT_DATA_STATE"; break;
-	case PGM_PKT_HAVE_DATA_STATE:	c = "PGM_PKT_HAVE_DATA_STATE"; break;
-	case PGM_PKT_HAVE_PARITY_STATE:	c = "PGM_PKT_HAVE_PARITY_STATE"; break;
-	case PGM_PKT_COMMIT_DATA_STATE: c = "PGM_PKT_COMMIT_DATA_STATE"; break;
-	case PGM_PKT_LOST_DATA_STATE:	c = "PGM_PKT_LOST_DATA_STATE"; break;
-	case PGM_PKT_ERROR_STATE:	c = "PGM_PKT_ERROR_STATE"; break;
+	switch (pkt_state) {
+	case PGM_PKT_STATE_BACK_OFF:	c = "PGM_PKT_STATE_BACK_OFF"; break;
+	case PGM_PKT_STATE_WAIT_NCF:	c = "PGM_PKT_STATE_WAIT_NCF"; break;
+	case PGM_PKT_STATE_WAIT_DATA:	c = "PGM_PKT_STATE_WAIT_DATA"; break;
+	case PGM_PKT_STATE_HAVE_DATA:	c = "PGM_PKT_STATE_HAVE_DATA"; break;
+	case PGM_PKT_STATE_HAVE_PARITY:	c = "PGM_PKT_STATE_HAVE_PARITY"; break;
+	case PGM_PKT_STATE_COMMIT_DATA: c = "PGM_PKT_STATE_COMMIT_DATA"; break;
+	case PGM_PKT_STATE_LOST_DATA:	c = "PGM_PKT_STATE_LOST_DATA"; break;
+	case PGM_PKT_STATE_ERROR:	c = "PGM_PKT_STATE_ERROR"; break;
 	default: c = "(unknown)"; break;
 	}
 
@@ -2162,12 +2162,12 @@ pgm_pkt_state_string (
 
 const char*
 pgm_rxw_returns_string (
-	pgm_rxw_returns_e	retval
+	const int		rxw_returns
 	)
 {
 	const char* c;
 
-	switch (retval) {
+	switch (rxw_returns) {
 	case PGM_RXW_OK:			c = "PGM_RXW_OK"; break;
 	case PGM_RXW_INSERTED:			c = "PGM_RXW_INSERTED"; break;
 	case PGM_RXW_APPENDED:			c = "PGM_RXW_APPENDED"; break;

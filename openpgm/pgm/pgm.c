@@ -65,8 +65,8 @@ pgm_init (
 {
 	if (TRUE == pgm_got_initialized) {
 		pgm_set_error (error,
-			     PGM_ENGINE_ERROR,
-			     PGM_ENGINE_ERROR_FAILED,
+			     PGM_ERROR_DOMAIN_ENGINE,
+			     PGM_ERROR_FAILED,
 			     _("Engine already initalized."));
 		return FALSE;
 	}
@@ -84,8 +84,8 @@ pgm_init (
 	{
 		const int save_errno = WSAGetLastError ();
 		pgm_set_error (error,
-			     PGM_ENGINE_ERROR,
-			     pgm_engine_error_from_wsa_errno (save_errno),
+			     PGM_ERROR_DOMAIN_ENGINE,
+			     pgm_error_from_wsa_errno (save_errno),
 			     _("WSAStartup failure: %s"),
 			     pgm_wsastrerror (save_errno));
 		return FALSE;
@@ -95,8 +95,8 @@ pgm_init (
 	{
 		WSACleanup ();
 		pgm_set_error (error,
-			     PGM_ENGINE_ERROR,
-			     PGM_ENGINE_ERROR_FAILED,
+			     PGM_ERROR_DOMAIN_ENGINE,
+			     PGM_ERROR_FAILED,
 			     _("WSAStartup failed to provide requested version 2.2."));
 		return FALSE;
 	}
@@ -177,44 +177,6 @@ pgm_shutdown (void)
 
 	pgm_got_initialized = FALSE;
 	return TRUE;
-}
-
-pgm_engine_error_e
-pgm_engine_error_from_wsa_errno (
-	gint            err_no
-	)
-{
-	switch (err_no) {
-#ifdef WSASYSNOTAREADY
-	case WSASYSNOTAREADY:
-		return PGM_ENGINE_ERROR_SYSNOTAREADY;
-		break;
-#endif
-#ifdef WSAVERNOTSUPPORTED
-	case WSAVERNOTSUPPORTED:
-		return PGM_ENGINE_ERROR_VERNOTSUPPORTED;
-		break;
-#endif
-#ifdef WSAEINPROGRESS
-	case WSAEINPROGRESS:
-		return PGM_ENGINE_ERROR_INPROGRESS;
-		break;
-#endif
-#ifdef WSAEPROCLIM
-	case WSAEPROCLIM:
-		return PGM_ENGINE_ERROR_PROCLIM;
-		break;
-#endif
-#ifdef WSAEFAULT
-	case WSAEFAULT:
-		return PGM_ENGINE_ERROR_FAULT;
-		break;
-#endif
-
-	default:
-		return PGM_ENGINE_ERROR_FAILED;
-		break;
-	}
 }
 
 /* eof */

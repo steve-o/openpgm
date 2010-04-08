@@ -29,10 +29,10 @@
 
 gchar*
 pgm_wsastrerror (
-	gint		err_no
+	const int	wsa_errno
 	)
 {
-	switch (err_no) {
+	switch (wsa_errno) {
 #ifdef WSA_INVALID_HANDLE
 	case WSA_INVALID_HANDLE: return _("Specified event object handle is invalid.");
 #endif

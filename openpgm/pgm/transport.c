@@ -159,15 +159,6 @@ pgm_transport_destroy (
 #endif
 		transport->recv_sock = -1;
 	}
-	if (-1 != transport->recv_sock2) {
-		g_trace ("INFO","closing receive socket2.");
-#ifdef G_OS_UNIX
-		close (transport->recv_sock2);
-#else
-		closesocket (transport->recv_sock2);
-#endif
-		transport->recv_sock2 = -1;
-	}
 	if (-1 != transport->send_sock) {
 		g_trace ("INFO","closing send socket.");
 #ifdef G_OS_UNIX
@@ -372,8 +363,8 @@ pgm_transport_create (
 #ifdef G_OS_UNIX
 		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (errno),
 			     _("Creating receive socket: %s"),
 			     strerror (errno));
 		if (EPERM == save_errno) {
@@ -382,21 +373,20 @@ pgm_transport_create (
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_wsa_errno (save_errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
 			     _("Creating receive socket: %s"),
 			     pgm_wsastrerror (save_errno));
 #endif
 		goto err_destroy;
 	}
 
-	new_transport->recv_sock2 = -1;
 	if (new_transport->udp_encap_ucast_port != new_transport->udp_encap_mcast_port)
 	{
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     PGM_TRANSPORT_ERROR_INVAL,
-			     _("Creating receive socket2: unsupported feature."));
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     PGM_ERROR_INVAL,
+			     _("Split unicast and multicast UDP encapsulation unsupported."));
 		goto err_destroy;
 	}
 
@@ -404,11 +394,21 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
 			     _("Creating send socket: %s"),
-			     strerror (errno));
+			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Creating send socket: %s"),
+			     pgm_wsastrerror (save_errno));
+#endif
 		goto err_destroy;
 	}
 
@@ -416,11 +416,21 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (errno),
 			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
 			     strerror (errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
+			     pgm_wsastrerror (save_errno));
+#endif
 		goto err_destroy;
 	}
 
@@ -434,33 +444,31 @@ pgm_transport_create (
 err_destroy:
 	if (-1 != new_transport->recv_sock) {
 #ifdef G_OS_UNIX
-		close (new_transport->recv_sock);
+		if (-1 == close (new_transport->recv_sock))
+			g_warning (_("Close on receive socket failed: %s"), strerror (errno));
 #else
-		closesocket (new_transport->recv_sock);
+		if (SOCKET_ERROR == closesocket (new_transport->recv_sock))
+			g_warning (_("Close on receive socket failed: %s"), wsa_strerror (WSAGetLastError()));
 #endif
 		new_transport->recv_sock = -1;
 	}
-	if (-1 != new_transport->recv_sock2) {
-#ifdef G_OS_UNIX
-		close (new_transport->recv_sock2);
-#else
-		closesocket (new_transport->recv_sock2);
-#endif
-		new_transport->recv_sock2 = -1;
-	}
 	if (-1 != new_transport->send_sock) {
 #ifdef G_OS_UNIX
-		close (new_transport->send_sock);
+		if (-1 == close (new_transport->send_sock))
+			g_warning (_("Close on send socket failed: %s"), strerror (errno));
 #else
-		closesocket (new_transport->send_sock);
+		if (SOCKET_ERROR == closesocket (new_transport->send_sock)) 
+			g_warning (_("Close on send socket failed: %s"), wsa_strerror (WSAGetLastError()));
 #endif
 		new_transport->send_sock = -1;
 	}
 	if (-1 != new_transport->send_with_router_alert_sock) {
 #ifdef G_OS_UNIX
-		close (new_transport->send_with_router_alert_sock);
+		if (-1 == close (new_transport->send_with_router_alert_sock))
+			g_warning (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), strerror (errno));
 #else
-		closesocket (new_transport->send_with_router_alert_sock);
+		if (SOCKET_ERROR == closesocket (new_transport->send_with_router_alert_sock))
+			g_warning (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), wsa_strerror (WSAGetLastError()));
 #endif
 		new_transport->send_with_router_alert_sock = -1;
 	}
@@ -600,7 +608,7 @@ pgm_transport_set_sndbuf (
 			return FALSE;
 		}
 	} else {
-		g_warning (_("cannot open /proc/sys/net/core/wmem_max"));
+		g_warning (_("cannot open /proc/sys/net/core/wmem_max: %s"), strerror(errno));
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -647,7 +655,7 @@ pgm_transport_set_rcvbuf (
 			return FALSE;
 		}
 	} else {
-		g_warning (_("cannot open /proc/sys/net/core/rmem_max"));
+		g_warning (_("cannot open /proc/sys/net/core/rmem_max: %s"), strerror(errno));
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -689,10 +697,13 @@ pgm_transport_bind (
 	}
 
 	if (transport->can_send_data) {
+/* Windows notify call will raise an assertion on error, only Unix versions will return
+ * a valid error.
+ */
 		if (0 != pgm_notify_init (&transport->rdata_notify)) {
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_errno (errno),
 				     _("Creating RDATA notification channel: %s"),
 				     strerror (errno));
 			pgm_rwlock_writer_unlock (&transport->lock);
@@ -701,8 +712,8 @@ pgm_transport_bind (
 	}
 	if (0 != pgm_notify_init (&transport->pending_notify)) {
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (errno),
 			     _("Creating waiting peer notification channel: %s"),
 			     strerror (errno));
 		pgm_rwlock_writer_unlock (&transport->lock);
@@ -745,16 +756,24 @@ pgm_transport_bind (
 		g_trace ("INFO","set socket sharing.");
 		int v = TRUE;
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
-		     (-1 != transport->recv_sock2 &&
-		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) ||
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
+#ifdef G_OS_UNIX
+			const int save_errno = errno;
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_errno (save_errno),
 				     _("Enabling reuse of socket local address: %s"),
-				     strerror (errno));
+				     strerror (save_errno));
+#else
+			const int save_errno = WSAGetLastError();
+			pgm_set_error (error,
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_wsa_errno (save_errno),
+				     _("Enabling reuse of socket local address: %s"),
+				     wsa_strerror (save_errno));
+#endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -763,22 +782,20 @@ pgm_transport_bind (
 #ifndef CONFIG_TARGET_WINE
 		g_trace ("INFO","request socket packet-info.");
 		const int recv_family = transport->recv_gsr[0].gsr_group.ss_family;
-		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE) ||
-		     (-1 != transport->recv_sock2 &&
-		       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
+		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 		{
 #ifdef G_OS_UNIX
-			int save_errno = errno;
+			const int save_errno = errno;
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
 				     strerror (save_errno));
 #else
-			int save_errno = WSAGetLastError();
+			const int save_errno = WSAGetLastError();
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_wsa_errno (save_errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_wsa_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
 				     pgm_wsastrerror (save_errno));
 #endif
@@ -794,15 +811,23 @@ pgm_transport_bind (
 		{
 /* include IP header only for incoming data, only works for IPv4 */
 			g_trace ("INFO","request IP headers.");
-			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE) ||
-			     (-1 != transport->recv_sock2 &&
-			       0 != pgm_sockaddr_hdrincl (transport->recv_sock2, recv_family, TRUE)))
+			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE))
 			{
+#ifdef G_OS_UNIX
+				const int save_errno = errno;
 				pgm_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (errno),
+					     PGM_ERROR_DOMAIN_TRANSPORT,
+					     pgm_error_from_errno (save_errno),
 					     _("Enabling IP header in front of user data: %s"),
-					     strerror (errno));
+					     strerror (save_errno));
+#else
+				const int save_errno = WSAGetLastError();
+				pgm_set_error (error,
+					     PGM_ERROR_DOMAIN_TRANSPORT,
+					     pgm_error_from_wsa_errno (save_errno),
+					     _("Enabling IP header in front of user data: %s"),
+					     wsa_strerror (save_errno));
+#endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -811,15 +836,23 @@ pgm_transport_bind (
 		{
 			g_assert (AF_INET6 == recv_family);
 			g_trace ("INFO","request socket packet-info.");
-			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE) ||
-			     (-1 != transport->recv_sock2 &&
-			       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
+			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 			{
+#ifdef G_OS_UNIX
+				const int save_errno = errno;
 				pgm_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (errno),
+					     PGM_ERROR_DOMAIN_TRANSPORT,
+					     pgm_error_from_errno (save_errno),
 					     _("Enabling receipt of control message per incoming datagram: %s"),
-					     strerror (errno));
+					     strerror (save_errno));
+#else
+				const int save_errno = WSAGetLastError();
+				pgm_set_error (error,
+					     PGM_ERROR_DOMAIN_TRANSPORT,
+					     pgm_error_from_wsa_errno (save_errno),
+					     _("Enabling receipt of control message per incoming datagram: %s"),
+					     wsa_strerror (save_errno));
+#endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -832,15 +865,23 @@ pgm_transport_bind (
 /* Stevens: "SO_RCVBUF has datatype int."
  */
 		g_trace ("INFO","set receive socket buffer size.");
-		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)) ||
-		     (-1 != transport->recv_sock2 &&
-		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf))))
+		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)))
 		{
+#ifdef G_OS_UNIX
+			const int save_errno = errno;
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_errno (save_errno),
 				     _("Setting maximum socket receive buffer in bytes: %s"),
-				     strerror (errno));
+				     strerror (save_errno));
+#else
+			const int save_errno = WSAGetLastError();
+			pgm_set_error (error,
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_wsa_errno (save_errno),
+				     _("Setting maximum socket receive buffer in bytes: %s"),
+				     wsa_strerror (save_errno));
+#endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -853,11 +894,21 @@ pgm_transport_bind (
 		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)))
 		{
+#ifdef G_OS_UNIX
+			const int save_errno = errno;
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_errno (save_errno),
 				     _("Setting maximum socket send buffer in bytes: %s"),
-				     strerror (errno));
+				     strerror (save_errno));
+#else
+			const int save_errno = WSAGetLastError();
+			pgm_set_error (error,
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_wsa_errno (save_errno),
+				     _("Setting maximum socket send buffer in bytes: %s"),
+				     wsa_strerror (save_errno));
+#endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -914,17 +965,25 @@ pgm_transport_bind (
 	((struct sockaddr_in*)&recv_addr)->sin_port = g_htons (transport->udp_encap_mcast_port);
 	if (0 != bind (transport->recv_sock, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa)))
 	{
-		int save_errno = errno;
-		if (error) {
-			char addr[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
-				     _("Binding receive socket to address %s: %s"),
-				     addr,
-				     strerror (save_errno));
-		}
+		char addr[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
+			     _("Binding receive socket to address %s: %s"),
+			     addr,
+			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Binding receive socket to address %s: %s"),
+			     addr,
+			     wsa_strerror (save_errno));
+#endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -936,26 +995,6 @@ pgm_transport_bind (
 		g_trace ("INFO","bind succeeded on recv_gsr[0] interface %s", s);
 	}
 #endif
-
-	if (-1 != transport->recv_sock2) {
-		((struct sockaddr_in*)&recv_addr2)->sin_port = g_htons (transport->udp_encap_ucast_port);
-		if (0 != bind (transport->recv_sock2, (struct sockaddr*)&recv_addr2, pgm_sockaddr_len ((struct sockaddr*)&recv_addr2)))
-		{
-			int save_errno = errno;
-			if (error) {
-				char addr[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr2, addr, sizeof(addr));
-				pgm_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
-					     _("Binding receive socket2 to address %s: %s"),
-					     addr,
-					     strerror (save_errno));
-			}
-			pgm_rwlock_writer_unlock (&transport->lock);
-			return FALSE;
-		}
-	}
 
 /* keep a copy of the original address source to re-use for router alert bind */
 	memset (&send_addr, 0, sizeof(send_addr));
@@ -979,15 +1018,25 @@ pgm_transport_bind (
 	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
 	if (0 != bind (transport->send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
 	{
-		int save_errno = errno;
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
 			     _("Binding send socket to address %s: %s"),
 			     addr,
 			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Binding send socket to address %s: %s"),
+			     addr,
+			     wsa_strerror (save_errno));
+#endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1021,17 +1070,25 @@ pgm_transport_bind (
 			(struct sockaddr*)&send_with_router_alert_addr,
 			pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr)))
 	{
-		int save_errno = errno;
-		if (error) {
-			char addr[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (save_errno),
-				     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
-				     addr,
-				     strerror (save_errno));
-		}
+		char addr[INET6_ADDRSTRLEN];
+		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
+			     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
+			     addr,
+			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
+			     addr,
+			     wsa_strerror (save_errno));
+#endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1059,25 +1116,48 @@ pgm_transport_bind (
 							  p->gsr_group.ss_family,
 							  (const struct group_req*)p))
 			{
+#ifdef G_OS_UNIX
 				const int save_errno = errno;
+#else
+				const int save_errno = WSAGetLastError();
+#endif
 				char group_addr[INET6_ADDRSTRLEN];
 				char ifname[IF_NAMESIZE];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
+#ifdef G_OS_UNIX
 					pgm_set_error (error,
-						     PGM_TRANSPORT_ERROR,
-						     pgm_transport_error_from_errno (save_errno),
+						     PGM_ERROR_DOMAIN_TRANSPORT,
+						     pgm_error_from_errno (save_errno),
 						     _("Joining multicast group %s: %s"),
 						     group_addr,
 						     strerror (save_errno));
-				else
+#else
 					pgm_set_error (error,
-						     PGM_TRANSPORT_ERROR,
-						     pgm_transport_error_from_errno (save_errno),
+						     PGM_ERROR_DOMAIN_TRANSPORT,
+						     pgm_error_from_wsa_errno (save_errno),
+						     _("Joining multicast group %s: %s"),
+						     group_addr,
+						     wsa_strerror (save_errno));
+#endif
+				else
+#ifdef G_OS_UNIX
+					pgm_set_error (error,
+						     PGM_ERROR_DOMAIN_TRANSPORT,
+						     pgm_error_from_errno (save_errno),
 						     _("Joining multicast group %s on interface %s: %s"),
 						     group_addr,
 						     if_indextoname (p->gsr_interface, ifname),
 						     strerror (save_errno));
+#else
+					pgm_set_error (error,
+						     PGM_ERROR_DOMAIN_TRANSPORT,
+						     pgm_error_from_wsa_errno (save_errno),
+						     _("Joining multicast group %s on interface %s: %s"),
+						     group_addr,
+						     if_indextoname (p->gsr_interface, ifname),
+						     wsa_strerror (save_errno));
+#endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -1097,18 +1177,29 @@ pgm_transport_bind (
 								 p->gsr_group.ss_family,
 								 p))
 			{
-				const int save_errno = errno;
 				char source_addr[INET6_ADDRSTRLEN];
 				char group_addr[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
+#ifdef G_OS_UNIX
+				const int save_errno = errno;
 				pgm_set_error (error,
-					     PGM_TRANSPORT_ERROR,
-					     pgm_transport_error_from_errno (save_errno),
+					     PGM_ERROR_DOMAIN_TRANSPORT,
+					     pgm_error_from_errno (save_errno),
 					     _("Joining multicast group %s from source %s: %s"),
 					     group_addr,
 					     source_addr,
 					     strerror (save_errno));
+#else
+				const int save_errno = WSAGetLastError();
+				pgm_set_error (error,
+					     PGM_ERROR_DOMAIN_TRANSPORT,
+					     pgm_error_from_wsa_errno (save_errno),
+					     _("Joining multicast group %s from source %s: %s"),
+					     group_addr,
+					     source_addr,
+					     wsa_strerror (save_errno));
+#endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
@@ -1130,14 +1221,24 @@ pgm_transport_bind (
 					    (struct sockaddr*)&transport->send_addr,
 					    transport->send_gsr.gsr_interface))
 	{
-		const int save_errno = errno;
 		char ifname[IF_NAMESIZE];
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
 			     _("Setting device %s for multicast send socket: %s"),
 			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
 			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Setting device %s for multicast send socket: %s"),
+			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
+			     wsa_strerror (save_errno));
+#endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1153,14 +1254,24 @@ pgm_transport_bind (
 					    (struct sockaddr*)&transport->send_addr,
 					    transport->send_gsr.gsr_interface))
 	{
-		const int save_errno = errno;
 		char ifname[IF_NAMESIZE];
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (save_errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
 			     _("Setting device %s for multicast IP Router Alert (RFC 2113) send socket: %s"),
 			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
 			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Setting device %s for multicast IP Router Alert (RFC 2113) send socket: %s"),
+			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
+			     wsa_strerror (save_errno));
+#endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1182,20 +1293,31 @@ pgm_transport_bind (
 	    0 != pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock,
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->use_multicast_loop))
+	{
+		const int save_errno = errno;
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
+			     _("Setting multicast loopback: %s"),
+			     strerror (save_errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
+		return FALSE;
+	}
 #else /* G_OS_WIN32 */
 	if (0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
 					      transport->recv_gsr[0].gsr_group.ss_family,
 					      transport->use_multicast_loop))
-#endif /* G_OS_WIN32 */
 	{
+		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
 			     _("Setting multicast loopback: %s"),
-			     strerror (errno));
+			     wsa_strerror (save_errno));
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
+#endif /* G_OS_WIN32 */
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 #ifndef CONFIG_TARGET_WINE
@@ -1207,16 +1329,27 @@ pgm_transport_bind (
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops))
 	{
+#ifdef G_OS_UNIX
+		const int save_errno = errno;
 		pgm_set_error (error,
-			     PGM_TRANSPORT_ERROR,
-			     pgm_transport_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
 			     _("Setting multicast hop limit to %i: %s"),
 			     transport->hops,
-			     strerror (errno));
+			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Setting multicast hop limit to %i: %s"),
+			     transport->hops,
+			     wsa_strerror (save_errno));
+#endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-#endif
+#endif /* CONFIG_TARGET_WINE */
 
 /* set Expedited Forwarding PHB for network elements, no ECN.
  * 
@@ -1255,11 +1388,21 @@ no_cap_net_admin:
 		    !pgm_send_spm (transport, PGM_OPT_SYN) ||
 		    !pgm_send_spm (transport, PGM_OPT_SYN))
 		{
+#ifdef G_OS_UNIX
+			const int save_errno = errno;
 			pgm_set_error (error,
-				     PGM_TRANSPORT_ERROR,
-				     pgm_transport_error_from_errno (errno),
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_errno (save_errno),
 				     _("Sending SPM broadcast: %s"),
-				     strerror (errno));
+				     strerror (save_errno));
+#else
+			const int save_errno = WSAGetLastError();
+			pgm_set_error (error,
+				     PGM_ERROR_DOMAIN_TRANSPORT,
+				     pgm_error_from_wsa_errno (save_errno),
+				     _("Sending SPM broadcast: %s"),
+				     wsa_strerror (save_errno));
+#endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
@@ -1276,8 +1419,6 @@ no_cap_net_admin:
 	g_trace ("INFO","set %s sockets",
 		transport->is_nonblocking ? "non-blocking" : "blocking");
 	pgm_sockaddr_nonblocking (transport->recv_sock, transport->is_nonblocking);
-	if (-1 != transport->recv_sock2)
-		pgm_sockaddr_nonblocking (transport->recv_sock2, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
 
@@ -1358,10 +1499,6 @@ pgm_transport_select_info (
 	{
 		FD_SET(transport->recv_sock, readfds);
 		fds = transport->recv_sock + 1;
-		if (-1 != transport->recv_sock2) {
-			FD_SET(transport->recv_sock2, readfds);
-			fds = MAX(fds, transport->recv_sock2 + 1);
-		}
 		if (transport->can_send_data) {
 			const int rdata_fd = pgm_notify_get_fd (&transport->rdata_notify);
 			FD_SET(rdata_fd, readfds);
@@ -1415,12 +1552,6 @@ pgm_transport_poll_info (
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
-		if (-1 != transport->recv_sock2) {
-			g_assert ( (1 + moo) <= *n_fds );
-			fds[moo].fd = transport->recv_sock2;
-			fds[moo].events = POLLIN;
-			moo++;
-		}
 		if (transport->can_send_data) {
 			g_assert ( (1 + moo) <= *n_fds );
 			fds[moo].fd = pgm_notify_get_fd (&transport->rdata_notify);
@@ -1482,11 +1613,6 @@ pgm_transport_epoll_ctl (
 		retval = epoll_ctl (epfd, op, transport->recv_sock, &event);
 		if (retval)
 			goto out;
-		if (-1 != transport->recv_sock2) {
-			retval = epoll_ctl (epfd, op, transport->recv_sock2, &event);
-			if (retval)
-				goto out;
-		}
 		if (transport->can_send_data) {
 			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&transport->rdata_notify), &event);
 			if (retval)
@@ -1981,181 +2107,6 @@ pgm_transport_msfilter (
 #endif
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
-}
-
-pgm_transport_error_e
-pgm_transport_error_from_errno (
-	gint		err_no
-        )
-{
-	switch (err_no) {
-#ifdef EFAULT
-	case EFAULT:
-		return PGM_TRANSPORT_ERROR_FAULT;
-		break;
-#endif
-
-#ifdef EINVAL
-	case EINVAL:
-		return PGM_TRANSPORT_ERROR_INVAL;
-		break;
-#endif
-
-#ifdef EPERM
-	case EPERM:
-		return PGM_TRANSPORT_ERROR_PERM;
-		break;
-#endif
-
-#ifdef EMFILE
-	case EMFILE:
-		return PGM_TRANSPORT_ERROR_MFILE;
-		break;
-#endif
-
-#ifdef ENFILE
-	case ENFILE:
-		return PGM_TRANSPORT_ERROR_NFILE;
-		break;
-#endif
-
-#ifdef ENODEV
-	case ENODEV:
-		return PGM_TRANSPORT_ERROR_NODEV;
-		break;
-#endif
-
-#ifdef ENOMEM
-	case ENOMEM:
-		return PGM_TRANSPORT_ERROR_NOMEM;
-		break;
-#endif
-
-#ifdef ENOPROTOOPT
-	case ENOPROTOOPT:
-		return PGM_TRANSPORT_ERROR_NOPROTOOPT;
-		break;
-#endif
-
-	default :
-		return PGM_TRANSPORT_ERROR_FAILED;
-		break;
-	}
-}
-
-pgm_transport_error_e
-pgm_transport_error_from_eai_errno (
-	gint		err_no
-        )
-{
-	switch (err_no) {
-#ifdef EAI_ADDRFAMILY
-	case EAI_ADDRFAMILY:
-		return PGM_TRANSPORT_ERROR_ADDRFAMILY;
-		break;
-#endif
-
-#ifdef EAI_AGAIN
-	case EAI_AGAIN:
-		return PGM_TRANSPORT_ERROR_AGAIN;
-		break;
-#endif
-
-#ifdef EAI_BADFLAGS
-	case EAI_BADFLAGS:
-		return PGM_TRANSPORT_ERROR_BADFLAGS;
-		break;
-#endif
-
-#ifdef EAI_FAIL
-	case EAI_FAIL:
-		return PGM_TRANSPORT_ERROR_FAIL;
-		break;
-#endif
-
-#ifdef EAI_FAMILY
-	case EAI_FAMILY:
-		return PGM_TRANSPORT_ERROR_FAMILY;
-		break;
-#endif
-
-#ifdef EAI_MEMORY
-	case EAI_MEMORY:
-		return PGM_TRANSPORT_ERROR_MEMORY;
-		break;
-#endif
-
-#ifdef EAI_NODATA
-	case EAI_NODATA:
-		return PGM_TRANSPORT_ERROR_NODATA;
-		break;
-#endif
-
-#if defined(EAI_NONAME) && EAI_NONAME != EAI_NODATA
-	case EAI_NONAME:
-		return PGM_TRANSPORT_ERROR_NONAME;
-		break;
-#endif
-#ifdef EAI_SERVICE
-	case EAI_SERVICE:
-		return PGM_TRANSPORT_ERROR_SERVICE;
-		break;
-#endif
-
-#ifdef EAI_SOCKTYPE
-	case EAI_SOCKTYPE:
-		return PGM_TRANSPORT_ERROR_SOCKTYPE;
-		break;
-#endif
-
-#ifdef EAI_SYSTEM
-	case EAI_SYSTEM:
-		return pgm_transport_error_from_errno (errno);
-		break;
-#endif
-
-	default :
-		return PGM_TRANSPORT_ERROR_FAILED;
-		break;
-	}
-}
-
-pgm_transport_error_e
-pgm_transport_error_from_wsa_errno (
-	gint		err_no
-        )
-{
-	switch (err_no) {
-#ifdef WSAEINVAL
-	case WSAEINVAL:
-		return PGM_TRANSPORT_ERROR_INVAL;
-		break;
-#endif
-#ifdef WSAEMFILE
-	case WSAEMFILE:
-		return PGM_TRANSPORT_ERROR_MFILE;
-		break;
-#endif
-#ifdef WSA_NOT_ENOUGH_MEMORY
-	case WSA_NOT_ENOUGH_MEMORY:
-		return PGM_TRANSPORT_ERROR_NOMEM;
-		break;
-#endif
-#ifdef WSAENOPROTOOPT
-	case WSAENOPROTOOPT:
-		return PGM_TRANSPORT_ERROR_NOPROTOOPT;
-		break;
-#endif
-#ifdef WSAECONNRESET
-	case WSAECONNRESET:
-		return PGM_TRANSPORT_ERROR_CONNRESET;
-		break;
-#endif
-
-	default :
-		return PGM_TRANSPORT_ERROR_FAILED;
-		break;
-	}
 }
 
 /* eof */

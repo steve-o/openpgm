@@ -59,9 +59,9 @@
 //#define TIME_DEBUG
 
 #ifndef TIME_DEBUG
-#	define g_trace(m,...)		while (0)
+#	define g_trace(...)		while (0)
 #else
-#	define g_trace(m,...)		g_debug(__VA_ARGS__)
+#	define g_trace(...)		g_debug(__VA_ARGS__)
 #endif
 
 
@@ -547,24 +547,27 @@ rtc_init (
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
 	if (rtc_fd < 0) {
 		pgm_set_error (error,
-			     PGM_TIME_ERROR,
-			     PGM_TIME_ERROR_FAILED,
-			     _("Cannot open /dev/rtc for reading."));
+			     PGM_ERROR_DOMAIN_TIME,
+			     PGM_ERROR_FAILED,
+			     _("Cannot open /dev/rtc for reading: %s"),
+			     strerror(errno));
 		return FALSE;
 	}
 	if ( ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency) < 0 ) {
 		pgm_set_error (error,
-			     PGM_TIME_ERROR,
-			     PGM_TIME_ERROR_FAILED,
-			     _("Cannot set RTC frequency to %i Hz."),
-			     rtc_frequency);
+			     PGM_ERROR_DOMAIN_TIME,
+			     PGM_ERROR_FAILED,
+			     _("Cannot set RTC frequency to %i Hz: %s"),
+			     rtc_frequency,
+			     strerror(errno));
 		return FALSE;
 	}
 	if ( ioctl (rtc_fd, RTC_PIE_ON, 0) < 0 ) {
 		pgm_set_error (error,
-			     PGM_TIME_ERROR,
-			     PGM_TIME_ERROR_FAILED,
-			     _("Cannot enable periodic interrupt (PIE) on RTC."));
+			     PGM_ERROR_DOMAIN_TIME,
+			     PGM_ERROR_FAILED,
+			     _("Cannot enable periodic interrupt (PIE) on RTC: %s"),
+			     strerror(errno));
 		return FALSE;
 	}
 	return TRUE;
@@ -768,18 +771,19 @@ hpet_init (
 	hpet_fd = open("/dev/hpet", O_RDONLY);
 	if (hpet_fd < 0) {
 		pgm_set_error (error,
-			     PGM_TIME_ERROR,
-			     PGM_TIME_ERROR_FAILED,
-			     _("Cannot open /dev/hpet for reading."));
+			     PGM_ERROR_DOMAIN_TIME,
+			     PGM_ERROR_FAILED,
+			     _("Cannot open /dev/hpet for reading: %s"),
+			     strerror(errno));
 		return FALSE;
 	}
 
 	hpet_ptr = (unsigned char*)mmap(NULL, HPET_MMAP_SIZE, PROT_READ, MAP_SHARED, hpet_fd, 0);
 	if (MAP_FAILED == hpet_ptr) {
 		pgm_set_error (error,
-			     PGM_TIME_ERROR,
-			     PGM_TIME_ERROR_FAILED,
-			     _("Error mapping HPET: %s"),
+			     PGM_ERROR_DOMAIN_TIME,
+			     PGM_ERROR_FAILED,
+			     _("Error mapping HPET device: %s"),
 			     strerror(errno));
 		close (hpet_fd);
 		hpet_fd = -1;
