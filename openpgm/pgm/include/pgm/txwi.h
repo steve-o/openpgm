@@ -24,6 +24,10 @@
 
 #include <glib.h>
 
+#ifndef __PGM_QUEUE_H__
+#	include <pgm/queue.h>
+#endif
+
 #ifndef __PGM_SKBUFF_H__
 #	include <pgm/skbuff.h>
 #endif
@@ -69,10 +73,10 @@ struct pgm_txw_t {
 	const pgm_tsi_t*	tsi;
 
 /* option: lockless atomics */
-        guint32			lead;
-        guint32			trail;
+        volatile guint32	lead;
+        volatile guint32	trail;
 
-        GQueue			retransmit_queue;
+        pgm_queue_t		retransmit_queue;
 
 	rs_t			rs;
 	guint			tg_sqn_shift;
@@ -134,7 +138,7 @@ static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
 static inline guint32 pgm_txw_lead_atomic (const pgm_txw_t* const window)
 {
 	g_assert (window);
-	return pgm_atomic_int32_get (&window->lead);
+	return pgm_atomic_int32_get ((const volatile gint32*)&window->lead);
 }
 
 static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
@@ -152,7 +156,7 @@ static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
 static inline guint32 pgm_txw_trail_atomic (const pgm_txw_t* const window)
 {
 	g_assert (window);
-	return pgm_atomic_int32_get (&window->trail);
+	return pgm_atomic_int32_get ((const volatile gint32*)&window->trail);
 }
 
 static inline guint32 pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t* skb)
@@ -176,7 +180,7 @@ static inline void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t* skb)
 static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
 {
 	g_assert (window);
-	return g_queue_is_empty (&window->retransmit_queue);
+	return pgm_queue_is_empty (&window->retransmit_queue);
 }
 
 G_END_DECLS

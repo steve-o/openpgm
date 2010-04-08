@@ -39,8 +39,9 @@
 #	include <sys/epoll.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -55,6 +56,9 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/mem.h"
+#include "pgm/list.h"
+#include "pgm/slist.h"
 #include "pgm/pgm.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
@@ -97,8 +101,8 @@
 
 
 /* global locals */
-GStaticRWLock pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;		/* list of all transports for admin interfaces */
-GSList* pgm_transport_list = NULL;
+pgm_rwlock_t pgm_transport_list_lock;		/* list of all transports for admin interfaces */
+pgm_slist_t* pgm_transport_list = NULL;
 
 
 gsize
@@ -121,7 +125,7 @@ pgm_transport_pkt_offset (
  * 1) pgm_transport_t::lock
  * 2) pgm_transport_t::receiver_mutex
  * 3) pgm_transport_t::source_mutex
- * 4) pgm_transport_t::txw_mutex
+ * 4) pgm_transport_t::txw_spinlock
  * 5) pgm_transport_t::timer_mutex
  *
  * If application calls a function on the transport after destroy() it is a
@@ -137,7 +141,7 @@ pgm_transport_destroy (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	g_return_val_if_fail (!transport->is_destroyed, FALSE);
 	g_trace ("INFO","pgm_transport_destroy (transport:%p flush:%s)",
@@ -173,14 +177,14 @@ pgm_transport_destroy (
 #endif
 		transport->send_sock = -1;
 	}
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	g_trace ("INFO","blocking on destroy lock ...");
-	g_static_rw_lock_writer_lock (&transport->lock);
+	pgm_rwlock_writer_lock (&transport->lock);
 
 	g_trace ("INFO","removing transport from inventory.");
-	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
-	pgm_transport_list = g_slist_remove (pgm_transport_list, transport);
-	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_writer_lock (&pgm_transport_list_lock);
+	pgm_transport_list = pgm_slist_remove (pgm_transport_list, transport);
+	pgm_rwlock_writer_unlock (&pgm_transport_list_lock);
 
 /* flush source side by sending heartbeat SPMs */
 	if (transport->can_send_data &&
@@ -198,13 +202,13 @@ pgm_transport_destroy (
 
 	if (transport->peers_hashtable) {
 		g_trace ("INFO","destroying peer lookup table.");
-		g_hash_table_destroy (transport->peers_hashtable);
+		pgm_hash_table_destroy (transport->peers_hashtable);
 		transport->peers_hashtable = NULL;
 	}
 	if (transport->peers_list) {
 		g_trace ("INFO","destroying peer list.");
 		do {
-			GList* next = transport->peers_list->next;
+			pgm_list_t* next = transport->peers_list->next;
 			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
 
 			transport->peers_list = next;
@@ -232,13 +236,8 @@ pgm_transport_destroy (
 	}
 	if (transport->spm_heartbeat_interval) {
 		g_trace ("INFO","freeing SPM heartbeat interval data.");
-		g_free (transport->spm_heartbeat_interval);
+		pgm_free (transport->spm_heartbeat_interval);
 		transport->spm_heartbeat_interval = NULL;
-	}
-	if (transport->rand_) {
-		g_trace ("INFO","freeing randomization data.");
-		g_rand_free (transport->rand_);
-		transport->rand_ = NULL;
 	}
 	if (transport->rx_buffer) {
 		g_trace ("INFO","freeing receive buffer.");
@@ -248,16 +247,16 @@ pgm_transport_destroy (
 	g_trace ("INFO","destroying notification channel.");
 	pgm_notify_destroy (&transport->pending_notify);
 	g_trace ("INFO","freeing transport locks.");
-	g_static_rw_lock_free (&transport->peers_lock);
-	g_static_mutex_free (&transport->txw_mutex);
-	g_static_mutex_free (&transport->send_mutex);
-	g_static_mutex_free (&transport->timer_mutex);
-	g_static_mutex_free (&transport->source_mutex);
-	g_static_mutex_free (&transport->receiver_mutex);
-	g_static_rw_lock_writer_unlock (&transport->lock);
-	g_static_rw_lock_free (&transport->lock);
+	pgm_rwlock_free (&transport->peers_lock);
+	pgm_spinlock_free (&transport->txw_spinlock);
+	pgm_mutex_free (&transport->send_mutex);
+	pgm_mutex_free (&transport->timer_mutex);
+	pgm_mutex_free (&transport->source_mutex);
+	pgm_mutex_free (&transport->receiver_mutex);
+	pgm_rwlock_writer_unlock (&transport->lock);
+	pgm_rwlock_free (&transport->lock);
 	g_trace ("INFO","freeing transport data.");
-	g_free (transport);
+	pgm_free (transport);
 	g_trace ("INFO","finished.");
 	return TRUE;
 }
@@ -284,7 +283,7 @@ gboolean
 pgm_transport_create (
 	pgm_transport_t**		transport,
 	struct pgm_transport_info_t*	tinfo,
-	GError**			error
+	pgm_error_t**			error
 	)
 {
 	pgm_transport_t* new_transport;
@@ -311,25 +310,25 @@ pgm_transport_create (
 	}
 	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
-	new_transport = g_malloc0 (sizeof(pgm_transport_t));
+	new_transport = pgm_malloc0 (sizeof(pgm_transport_t));
 	new_transport->can_send_data = TRUE;
 	new_transport->can_send_nak  = TRUE;
 	new_transport->can_recv_data = TRUE;
 
 /* source-side */
-	g_static_mutex_init (&new_transport->source_mutex);
+	pgm_mutex_init (&new_transport->source_mutex);
 /* transmit window */
-	g_static_mutex_init (&new_transport->txw_mutex);
+	pgm_spinlock_init (&new_transport->txw_spinlock);
 /* send socket */
-	g_static_mutex_init (&new_transport->send_mutex);
+	pgm_mutex_init (&new_transport->send_mutex);
 /* next timer & spm expiration */
-	g_static_mutex_init (&new_transport->timer_mutex);
+	pgm_mutex_init (&new_transport->timer_mutex);
 /* receiver-side */
-	g_static_mutex_init (&new_transport->receiver_mutex);
+	pgm_mutex_init (&new_transport->receiver_mutex);
 /* peer hash map & list lock */
-	g_static_rw_lock_init (&new_transport->peers_lock);
+	pgm_rwlock_init (&new_transport->peers_lock);
 /* destroy lock */
-	g_static_rw_lock_init (&new_transport->lock);
+	pgm_rwlock_init (&new_transport->lock);
 
 	memcpy (&new_transport->tsi.gsi, &tinfo->ti_gsi, sizeof(pgm_gsi_t));
 	new_transport->dport = g_htons (tinfo->ti_dport);
@@ -337,7 +336,7 @@ pgm_transport_create (
 		new_transport->tsi.sport = g_htons (tinfo->ti_sport);
 	} else {
 		do {
-			new_transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
+			new_transport->tsi.sport = g_htons (pgm_random_int_range (0, UINT16_MAX));
 		} while (new_transport->tsi.sport == new_transport->dport);
 	}
 
@@ -372,17 +371,17 @@ pgm_transport_create (
 	{
 #ifdef G_OS_UNIX
 		const int save_errno = errno;
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating receive socket: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		if (EPERM == save_errno) {
 			g_warning (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
 		}
 #else
 		const int save_errno = WSAGetLastError();
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_wsa_errno (save_errno),
 			     _("Creating receive socket: %s"),
@@ -394,7 +393,7 @@ pgm_transport_create (
 	new_transport->recv_sock2 = -1;
 	if (new_transport->udp_encap_ucast_port != new_transport->udp_encap_mcast_port)
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     PGM_TRANSPORT_ERROR_INVAL,
 			     _("Creating receive socket2: unsupported feature."));
@@ -405,11 +404,11 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating send socket: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		goto err_destroy;
 	}
 
@@ -417,19 +416,19 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		goto err_destroy;
 	}
 
 	*transport = new_transport;
 
-	g_static_rw_lock_writer_lock (&pgm_transport_list_lock);
-	pgm_transport_list = g_slist_append (pgm_transport_list, *transport);
-	g_static_rw_lock_writer_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_writer_lock (&pgm_transport_list_lock);
+	pgm_transport_list = pgm_slist_append (pgm_transport_list, *transport);
+	pgm_rwlock_writer_unlock (&pgm_transport_list_lock);
 	return TRUE;
 
 err_destroy:
@@ -465,7 +464,7 @@ err_destroy:
 #endif
 		new_transport->send_with_router_alert_sock = -1;
 	}
-	g_free (new_transport);
+	pgm_free (new_transport);
 	return FALSE;
 }
 
@@ -498,16 +497,16 @@ pgm_transport_set_max_tpdu (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (max_tpdu >= (sizeof(struct pgm_ip) + sizeof(struct pgm_header)), FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->max_tpdu = max_tpdu;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -524,16 +523,16 @@ pgm_transport_set_multicast_loop (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->use_multicast_loop = use_multicast_loop;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -551,16 +550,16 @@ pgm_transport_set_hops (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (hops > 0, FALSE);
 	g_return_val_if_fail (hops < 256, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 	transport->hops = hops;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -579,12 +578,12 @@ pgm_transport_set_sndbuf (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (size > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 #ifdef CONFIG_HAVE_PROC
@@ -597,17 +596,17 @@ pgm_transport_set_sndbuf (
 		g_assert (1 == matches);
 		fclose (fp);
 		if (size > wmem_max) {
-			g_static_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return FALSE;
 		}
 	} else {
 		g_warning (_("cannot open /proc/sys/net/core/wmem_max"));
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 #endif
 	transport->sndbuf = size;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -626,12 +625,12 @@ pgm_transport_set_rcvbuf (
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (size > 0, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 #ifdef CONFIG_HAVE_PROC
@@ -644,17 +643,17 @@ pgm_transport_set_rcvbuf (
 		g_assert (1 == matches);
 		fclose (fp);
 		if (size > rmem_max) {
-			g_static_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return FALSE;
 		}
 	} else {
 		g_warning (_("cannot open /proc/sys/net/core/rmem_max"));
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
 #endif
 	transport->rcvbuf = size;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -666,48 +665,47 @@ pgm_transport_set_rcvbuf (
 gboolean
 pgm_transport_bind (
 	pgm_transport_t*	transport,
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
-	if (!g_static_rw_lock_writer_trylock (&transport->lock))
+	if (!pgm_rwlock_writer_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_writer_unlock (&transport->lock);
+		pgm_rwlock_writer_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
 	g_trace ("INFO", "bind (transport:%p error:%p)",
 		 (gpointer)transport, (gpointer)error);
 
-	transport->rand_ = g_rand_new();
-	g_assert (transport->rand_);
+	pgm_rand_create (&transport->rand_);
 
 /* PGM Children support of POLLs requires 32-bit random node identifier RAND_NODE_ID */
 	if (transport->can_recv_data) {
-		transport->rand_node_id = g_rand_int (transport->rand_);
+		transport->rand_node_id = pgm_rand_int (&transport->rand_);
 	}
 
 	if (transport->can_send_data) {
 		if (0 != pgm_notify_init (&transport->rdata_notify)) {
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Creating RDATA notification channel: %s"),
-				     g_strerror (errno));
-			g_static_rw_lock_writer_unlock (&transport->lock);
+				     strerror (errno));
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 	}
 	if (0 != pgm_notify_init (&transport->pending_notify)) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Creating waiting peer notification channel: %s"),
-			     g_strerror (errno));
-		g_static_rw_lock_writer_unlock (&transport->lock);
+			     strerror (errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 
@@ -736,7 +734,7 @@ pgm_transport_bind (
 
 /* create peer list */
 	if (transport->can_recv_data) {
-		transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+		transport->peers_hashtable = pgm_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 		g_assert (transport->peers_hashtable);
 	}
 
@@ -752,12 +750,12 @@ pgm_transport_bind (
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Enabling reuse of socket local address: %s"),
-				     g_strerror (errno));
-			g_static_rw_lock_writer_unlock (&transport->lock);
+				     strerror (errno));
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 
@@ -771,20 +769,20 @@ pgm_transport_bind (
 		{
 #ifdef G_OS_UNIX
 			int save_errno = errno;
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
-				     g_strerror (save_errno));
+				     strerror (save_errno));
 #else
 			int save_errno = WSAGetLastError();
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_wsa_errno (save_errno),
 				     _("Enabling receipt of ancillary information per incoming packet: %s"),
 				     pgm_wsastrerror (save_errno));
 #endif
-			g_static_rw_lock_writer_unlock (&transport->lock);
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 #endif
@@ -800,12 +798,12 @@ pgm_transport_bind (
 			     (-1 != transport->recv_sock2 &&
 			       0 != pgm_sockaddr_hdrincl (transport->recv_sock2, recv_family, TRUE)))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
 					     _("Enabling IP header in front of user data: %s"),
-					     g_strerror (errno));
-				g_static_rw_lock_writer_unlock (&transport->lock);
+					     strerror (errno));
+				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
 		}
@@ -817,12 +815,12 @@ pgm_transport_bind (
 			     (-1 != transport->recv_sock2 &&
 			       0 != pgm_sockaddr_pktinfo (transport->recv_sock2, recv_family, TRUE)))
 			{
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (errno),
 					     _("Enabling receipt of control message per incoming datagram: %s"),
-					     g_strerror (errno));
-				g_static_rw_lock_writer_unlock (&transport->lock);
+					     strerror (errno));
+				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
 		}
@@ -838,12 +836,12 @@ pgm_transport_bind (
 		     (-1 != transport->recv_sock2 &&
 		       0 != setsockopt (transport->recv_sock2, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf))))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket receive buffer in bytes: %s"),
-				     g_strerror (errno));
-			g_static_rw_lock_writer_unlock (&transport->lock);
+				     strerror (errno));
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 	}
@@ -855,12 +853,12 @@ pgm_transport_bind (
 		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Setting maximum socket send buffer in bytes: %s"),
-				     g_strerror (errno));
-			g_static_rw_lock_writer_unlock (&transport->lock);
+				     strerror (errno));
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 	}
@@ -905,7 +903,7 @@ pgm_transport_bind (
 			       &recv_addr.sa,
 			       error))
 	{
-		g_static_rw_lock_writer_unlock (&transport->lock);
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 	g_trace ("INFO","binding receive socket to interface index %i", transport->recv_gsr[0].gsr_interface);
@@ -920,14 +918,14 @@ pgm_transport_bind (
 		if (error) {
 			char addr[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Binding receive socket to address %s: %s"),
 				     addr,
-				     g_strerror (save_errno));
+				     strerror (save_errno));
 		}
-		g_static_rw_lock_writer_unlock (&transport->lock);
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 
@@ -947,14 +945,14 @@ pgm_transport_bind (
 			if (error) {
 				char addr[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr2, addr, sizeof(addr));
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
 					     _("Binding receive socket2 to address %s: %s"),
 					     addr,
-					     g_strerror (save_errno));
+					     strerror (save_errno));
 			}
-			g_static_rw_lock_writer_unlock (&transport->lock);
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 	}
@@ -968,7 +966,7 @@ pgm_transport_bind (
 				  (struct sockaddr*)&send_addr,
 				  error))
 	{
-		g_static_rw_lock_writer_unlock (&transport->lock);
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -984,13 +982,13 @@ pgm_transport_bind (
 		int save_errno = errno;
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Binding send socket to address %s: %s"),
 			     addr,
-			     g_strerror (save_errno));
-		g_static_rw_lock_writer_unlock (&transport->lock);
+			     strerror (save_errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 
@@ -1000,14 +998,14 @@ pgm_transport_bind (
 		if ((INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr) &&
 		    !pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
 		{
-			g_static_rw_lock_writer_unlock (&transport->lock);
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 	}
 	else if ((memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0) &&
 		 !pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
 	{
-		g_static_rw_lock_writer_unlock (&transport->lock);
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 
@@ -1027,14 +1025,14 @@ pgm_transport_bind (
 		if (error) {
 			char addr[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (save_errno),
 				     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
 				     addr,
-				     g_strerror (save_errno));
+				     strerror (save_errno));
 		}
-		g_static_rw_lock_writer_unlock (&transport->lock);
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 
@@ -1064,23 +1062,23 @@ pgm_transport_bind (
 				const int save_errno = errno;
 				char group_addr[INET6_ADDRSTRLEN];
 				char ifname[IF_NAMESIZE];
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_TRANSPORT_ERROR,
 						     pgm_transport_error_from_errno (save_errno),
 						     _("Joining multicast group %s: %s"),
 						     group_addr,
-						     g_strerror (save_errno));
+						     strerror (save_errno));
 				else
-					g_set_error (error,
+					pgm_set_error (error,
 						     PGM_TRANSPORT_ERROR,
 						     pgm_transport_error_from_errno (save_errno),
 						     _("Joining multicast group %s on interface %s: %s"),
 						     group_addr,
 						     if_indextoname (p->gsr_interface, ifname),
-						     g_strerror (save_errno));
-				g_static_rw_lock_writer_unlock (&transport->lock);
+						     strerror (save_errno));
+				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
 #ifdef TRANSPORT_DEBUG
@@ -1102,16 +1100,16 @@ pgm_transport_bind (
 				const int save_errno = errno;
 				char source_addr[INET6_ADDRSTRLEN];
 				char group_addr[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
-				g_set_error (error,
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
+				pgm_set_error (error,
 					     PGM_TRANSPORT_ERROR,
 					     pgm_transport_error_from_errno (save_errno),
 					     _("Joining multicast group %s from source %s: %s"),
 					     group_addr,
 					     source_addr,
-					     g_strerror (save_errno));
-				g_static_rw_lock_writer_unlock (&transport->lock);
+					     strerror (save_errno));
+				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
 #ifdef TRANSPORT_DEBUG
@@ -1134,13 +1132,13 @@ pgm_transport_bind (
 	{
 		const int save_errno = errno;
 		char ifname[IF_NAMESIZE];
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Setting device %s for multicast send socket: %s"),
 			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
-			     g_strerror (save_errno));
-		g_static_rw_lock_writer_unlock (&transport->lock);
+			     strerror (save_errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -1157,13 +1155,13 @@ pgm_transport_bind (
 	{
 		const int save_errno = errno;
 		char ifname[IF_NAMESIZE];
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (save_errno),
 			     _("Setting device %s for multicast IP Router Alert (RFC 2113) send socket: %s"),
 			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
-			     g_strerror (save_errno));
-		g_static_rw_lock_writer_unlock (&transport->lock);
+			     strerror (save_errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 #ifdef TRANSPORT_DEBUG
@@ -1190,12 +1188,12 @@ pgm_transport_bind (
 					      transport->use_multicast_loop))
 #endif /* G_OS_WIN32 */
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast loopback: %s"),
-			     g_strerror (errno));
-		g_static_rw_lock_writer_unlock (&transport->lock);
+			     strerror (errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 
@@ -1209,13 +1207,13 @@ pgm_transport_bind (
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops))
 	{
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_TRANSPORT_ERROR,
 			     pgm_transport_error_from_errno (errno),
 			     _("Setting multicast hop limit to %i: %s"),
 			     transport->hops,
-			     g_strerror (errno));
-		g_static_rw_lock_writer_unlock (&transport->lock);
+			     strerror (errno));
+		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
 #endif
@@ -1257,12 +1255,12 @@ no_cap_net_admin:
 		    !pgm_send_spm (transport, PGM_OPT_SYN) ||
 		    !pgm_send_spm (transport, PGM_OPT_SYN))
 		{
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_TRANSPORT_ERROR,
 				     pgm_transport_error_from_errno (errno),
 				     _("Sending SPM broadcast: %s"),
-				     g_strerror (errno));
-			g_static_rw_lock_writer_unlock (&transport->lock);
+				     strerror (errno));
+			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
 		}
 
@@ -1291,7 +1289,7 @@ no_cap_net_admin:
 	pgm_timer_prepare (transport);
 
 	transport->is_bound = TRUE;
-	g_static_rw_lock_writer_unlock (&transport->lock);
+	pgm_rwlock_writer_unlock (&transport->lock);
 	g_trace ("INFO","transport successfully created.");
 	return TRUE;
 }
@@ -1558,12 +1556,12 @@ pgm_transport_set_fec (
 		return FALSE;
 	}
 
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
@@ -1574,7 +1572,7 @@ pgm_transport_set_fec (
 	transport->rs_k			= default_k;
 	transport->rs_proactive_h	= proactive_h;
 
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -1590,16 +1588,16 @@ pgm_transport_set_send_only (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->can_recv_data	= !send_only;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -1616,17 +1614,17 @@ pgm_transport_set_recv_only (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->can_send_data	= !recv_only;
 	transport->can_send_nak		= !is_passive;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -1642,16 +1640,16 @@ pgm_transport_set_abort_on_reset (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->is_abort_on_reset = abort_on_reset;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -1664,16 +1662,16 @@ pgm_transport_set_nonblocking (
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	transport->is_nonblocking = nonblocking;
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
 
@@ -1697,13 +1695,13 @@ pgm_transport_join_group (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (gr != NULL, FALSE);
 	g_return_val_if_fail (sizeof(struct group_req) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
@@ -1725,7 +1723,7 @@ pgm_transport_join_group (
 				g_trace("INFO", "transport has already joined group %s on all interfaces.", s);
 			}
 #endif
-			g_static_rw_lock_reader_unlock (&transport->lock);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return FALSE;
 		}
 	}
@@ -1735,7 +1733,7 @@ pgm_transport_join_group (
 	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len((struct sockaddr*)&gr->gr_group));
 	transport->recv_gsr_len++;
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, (const char*)gr, len);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
@@ -1754,13 +1752,13 @@ pgm_transport_leave_group (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (gr != NULL, FALSE);
 	g_return_val_if_fail (sizeof(struct group_req) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len == 0)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
@@ -1782,7 +1780,7 @@ pgm_transport_leave_group (
 		i++;
 	}
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, (const char*)gr, len);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
@@ -1801,16 +1799,16 @@ pgm_transport_block_source (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (gsr != NULL, FALSE);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_BLOCK_SOURCE, (const char*)gsr, len);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
@@ -1829,16 +1827,16 @@ pgm_transport_unblock_source (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (gsr != NULL, FALSE);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_UNBLOCK_SOURCE, (const char*)gsr, len);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
@@ -1859,13 +1857,13 @@ pgm_transport_join_source_group (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (gsr != NULL, FALSE);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
@@ -1891,7 +1889,7 @@ pgm_transport_join_source_group (
 						s1, s2);
 				}
 #endif
-				g_static_rw_lock_reader_unlock (&transport->lock);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return FALSE;
 			}
 			break;
@@ -1901,7 +1899,7 @@ pgm_transport_join_source_group (
 	memcpy (&transport->recv_gsr[transport->recv_gsr_len], &gsr, sizeof(struct group_source_req));
 	transport->recv_gsr_len++;
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_SOURCE_GROUP, (const char*)gsr, len);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
@@ -1920,13 +1918,13 @@ pgm_transport_leave_source_group (
 	g_return_val_if_fail (transport != NULL, FALSE);
 	g_return_val_if_fail (gsr != NULL, FALSE);
 	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len == 0)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
@@ -1947,7 +1945,7 @@ pgm_transport_leave_source_group (
 	}
 
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_SOURCE_GROUP, (const char*)gsr, len);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
@@ -1964,12 +1962,12 @@ pgm_transport_msfilter (
 	g_return_val_if_fail (gf_list != NULL, FALSE);
 	g_return_val_if_fail (len > 0, FALSE);
 	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, FALSE);
-	if (!g_static_rw_lock_reader_trylock (&transport->lock))
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
 		g_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (FALSE);
 	}
 
@@ -1981,17 +1979,11 @@ pgm_transport_msfilter (
 /* operation unsupported */
 	status = -1;
 #endif
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
 
-GQuark
-pgm_transport_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-transport-error-quark");
-}
-
-PGMTransportError
+pgm_transport_error_e
 pgm_transport_error_from_errno (
 	gint		err_no
         )
@@ -2051,7 +2043,7 @@ pgm_transport_error_from_errno (
 	}
 }
 
-PGMTransportError
+pgm_transport_error_e
 pgm_transport_error_from_eai_errno (
 	gint		err_no
         )
@@ -2128,7 +2120,7 @@ pgm_transport_error_from_eai_errno (
 	}
 }
 
-PGMTransportError
+pgm_transport_error_e
 pgm_transport_error_from_wsa_errno (
 	gint		err_no
         )

@@ -2,7 +2,7 @@
  *
  * portable function to return the nodes IP address.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,8 +24,9 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -60,7 +61,7 @@ pgm_if_getnodeaddr (
 	const int		family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
 	struct sockaddr*	addr,
 	const socklen_t		cnt,	/* size of address pointed to by addr */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
@@ -77,11 +78,11 @@ pgm_if_getnodeaddr (
 	struct hostent* he;
 
 	if (0 != gethostname (hostname, sizeof(hostname))) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 
@@ -100,14 +101,14 @@ pgm_if_getnodeaddr (
 		freeaddrinfo (res);
 		return TRUE;
 	} else if (EAI_NONAME != e) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_eai_errno (e),
 			     _("Resolving hostname address: %s"),
 			     gai_strerror (e));
 		return FALSE;
 	} else if (AF_UNSPEC == family) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     PGM_IF_ERROR_NONAME,
 			     _("Resolving hostname address family."));
@@ -122,7 +123,7 @@ pgm_if_getnodeaddr (
  */
 	he = gethostbyname (hostname);
 	if (NULL == he) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_h_errno (h_errno),
 #ifdef G_OS_UNIX
@@ -138,11 +139,11 @@ pgm_if_getnodeaddr (
 	struct pgm_ifaddrs *ifap, *ifa, *ifa6;
 	e = pgm_getifaddrs (&ifap);
 	if (e < 0) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 
@@ -158,7 +159,7 @@ pgm_if_getnodeaddr (
 		}
 	}
 	pgm_freeifaddrs (ifap);
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NONET,
 		     _("Discovering primary IPv4 network interface."));
@@ -176,7 +177,7 @@ ipv4_found:
 		}
 	}
 	pgm_freeifaddrs (ifap);
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NONET,
 		     _("Discovering primary IPv6 network interface."));

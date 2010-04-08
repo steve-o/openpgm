@@ -23,8 +23,9 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <net/if.h>
@@ -59,7 +60,7 @@ pgm_if_indextoaddr (
 	const int		iffamily,
 	const unsigned		ifscope,
 	struct sockaddr*	ifsa,
-	GError**		error
+	pgm_error_t**		error
         )
 {
 	g_return_val_if_fail (NULL != ifsa, FALSE);
@@ -85,11 +86,11 @@ pgm_if_indextoaddr (
 
 	struct pgm_ifaddrs *ifap, *ifa;
 	if (0 != pgm_getifaddrs (&ifap)) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_IF_ERROR,
 			     pgm_if_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 
@@ -111,7 +112,7 @@ pgm_if_indextoaddr (
 		}
 	}
 
-	g_set_error (error,
+	pgm_set_error (error,
 		     PGM_IF_ERROR,
 		     PGM_IF_ERROR_NODEV,
 		     _("No matching network interface index: %i"),

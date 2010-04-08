@@ -2,7 +2,7 @@
  *
  * network send wrapper.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,9 @@
 #	include <poll.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_WIN32
 #	include <ws2tcpip.h>
@@ -102,7 +103,7 @@ pgm_sendto (
 	}
 
 	if (!use_router_alert && transport->can_send_data)
-		g_static_mutex_lock (&transport->send_mutex);
+		pgm_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
 	g_trace ("sendto returned %d", sent);
@@ -137,7 +138,7 @@ pgm_sendto (
 			{
 				g_warning (_("sendto %s failed: %s"),
 						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						g_strerror (errno));
+						strerror (errno));
 			}
 		}
 		else if (ready == 0)
@@ -148,12 +149,12 @@ pgm_sendto (
 		else
 		{
 			g_warning (_("blocked socket failed: %s"),
-					g_strerror (errno));
+					strerror (errno));
 		}
 	}
 
 	if (!use_router_alert && transport->can_send_data)
-		g_static_mutex_unlock (&transport->send_mutex);
+		pgm_mutex_unlock (&transport->send_mutex);
 	return sent;
 }
 

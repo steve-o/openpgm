@@ -398,8 +398,6 @@ struct pgm_opt6_path_nla {
     struct in6_addr opt6_path_nla;	/* path nla */
 };
 
-#define PGM_PACKET_ERROR	pgm_packet_error_quark ()
-
 typedef enum
 {
 	PGM_PACKET_ERROR_BOUNDS,
@@ -407,7 +405,7 @@ typedef enum
 	PGM_PACKET_ERROR_CKSUM,
 	PGM_PACKET_ERROR_PROTO,
 	PGM_PACKET_ERROR_FAILED
-} PGMPacketError;
+} pgm_packet_error_e;
 
 
 #ifdef __GNUC__
@@ -422,9 +420,8 @@ typedef enum
 
 G_BEGIN_DECLS
 
-GQuark pgm_packet_error_quark (void);
-gboolean pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, GError**);
-gboolean pgm_parse_udp_encap (struct pgm_sk_buff_t* const, GError**);
+gboolean pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, pgm_error_t**);
+gboolean pgm_parse_udp_encap (struct pgm_sk_buff_t* const, pgm_error_t**);
 gboolean pgm_print_packet (gpointer, gsize);
 
 static inline gboolean pgm_is_upstream (guint8 type)

@@ -25,35 +25,17 @@
 
 G_BEGIN_DECLS
 
-#ifndef G_STATIC_ASSERT
-#	define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
-#	define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
-#	define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
-#endif
+gint32 pgm_atomic_int32_exchange_and_add (volatile gint32*, const gint32);
 
-G_STATIC_ASSERT(sizeof(gint) == sizeof(gint32));
-
-static inline void pgm_atomic_int32_add (volatile gint32* atomic, const gint32 val)
-{
-	g_atomic_int_add (atomic, val);
-}
-
-static inline gint32 pgm_atomic_int32_get (volatile gint32* atomic)
-{
-	return g_atomic_int_get (atomic);
-}
-
-static inline void pgm_atomic_int32_set (volatile gint32* atomic, const gint32 newval)
-{
-	g_atomic_int_set (atomic, newval);
-}
-
-#ifndef G_ATOMIC_OP_MEMORY_BARRIER_NEEDED
-#	define pgm_atomic_int32_get(atomic) 		(*(atomic))
-#	define pgm_atomic_int32_set(atomic, newval) 	((void) (*(atomic) = (newval)))
-#endif /* G_ATOMIC_OP_MEMORY_BARRIER_NEEDED */
+void pgm_atomic_int32_add (volatile gint32*, const gint32);
+gint32 pgm_atomic_int32_get (const volatile gint32*);
+void pgm_atomic_int32_set (volatile gint32*, const gint32);
 
 #define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
+#define pgm_atomic_int32_dec_and_test(atomic) (pgm_atomic_int32_exchange_and_add ((atomic), -1) == 1)
+
+void pgm_atomic_init (void);
+void pgm_atomic_shutdown (void);
 
 G_END_DECLS
 

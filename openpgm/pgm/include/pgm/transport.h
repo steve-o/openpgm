@@ -41,6 +41,26 @@
 
 typedef struct pgm_transport_t pgm_transport_t;
 
+#ifndef __PGM_ERROR_H__
+#   include <pgm/error.h>
+#endif
+
+#ifndef __PGM_LIST_H__
+#   include <pgm/list.h>
+#endif
+
+#ifndef __PGM_SLIST_H__
+#   include <pgm/slist.h>
+#endif
+
+#ifndef __PGM_HASHTABLE_H__
+#   include <pgm/hashtable.h>
+#endif
+
+#ifndef __PGM_THREAD_H__
+#   include <pgm/thread.h>
+#endif
+
 #ifndef __PGM_IF_H__
 #   include <pgm/if.h>
 #endif
@@ -51,6 +71,10 @@ typedef struct pgm_transport_t pgm_transport_t;
 
 #ifndef __PGM_TIME_H__
 #   include <pgm/time.h>
+#endif
+
+#ifndef __PGM_RAND_H__
+#   include <pgm/rand.h>
 #endif
 
 #ifndef __PGM_NOTIFY_H__
@@ -67,10 +91,6 @@ typedef struct pgm_transport_t pgm_transport_t;
 #endif
 
 
-#define PGM_TRANSPORT_ERROR	pgm_transport_error_quark ()
-#define PGM_ENGINE_ERROR	pgm_engine_error_quark ()
-
-
 /* IO status */
 
 typedef enum {
@@ -82,7 +102,7 @@ typedef enum {
 	PGM_IO_STATUS_WOULD_BLOCK,	/* resource temporarily unavailable */
 	PGM_IO_STATUS_RATE_LIMITED,	/* would-block on rate limit, check timer */
 	PGM_IO_STATUS_TIMER_PENDING	/* would-block with pending timer */
-} PGMIOStatus;
+} pgm_io_status_e;
 
 
 /* Performance Counters */
@@ -198,7 +218,7 @@ typedef enum
 	PGM_TRANSPORT_ERROR_SERVICE,
 	PGM_TRANSPORT_ERROR_SOCKTYPE,
 	PGM_TRANSPORT_ERROR_FAILED
-} PGMTransportError;
+} pgm_transport_error_e;
 
 typedef enum
 {
@@ -209,7 +229,7 @@ typedef enum
 	PGM_ENGINE_ERROR_PROCLIM,
 	PGM_ENGINE_ERROR_FAULT,
 	PGM_ENGINE_ERROR_FAILED
-} PGMEngineError;
+} pgm_engine_error_e;
 
 struct pgm_sqn_list_t {
 	guint			len;
@@ -219,7 +239,7 @@ struct pgm_sqn_list_t {
 typedef struct pgm_sqn_list_t pgm_sqn_list_t;
 
 struct pgm_peer_t {
-	gint			ref_count;		    /* atomic integer */
+	gint32			ref_count;		    /* atomic integer */
 
 	pgm_tsi_t		tsi;
 	struct sockaddr_storage	group_nla;
@@ -232,8 +252,8 @@ struct pgm_peer_t {
 
 	gpointer            	window;			/* pgm_rxw_t */
 	pgm_transport_t*    	transport;
-	GList			peers_link;
-	GSList			pending_link;
+	pgm_list_t		peers_link;
+	pgm_slist_t		pending_link;
 
 	unsigned		is_fec_enabled:1;
 	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
@@ -264,12 +284,12 @@ struct pgm_transport_t {
 	guint16			udp_encap_mcast_port;
 	guint32			rand_node_id;			/* node identifier */
 
-	GStaticRWLock		lock;				/* running / destroyed */
-	GStaticMutex		receiver_mutex;			/* receiver API */
-	GStaticMutex		source_mutex;			/* source API */
-	GStaticMutex		txw_mutex;			/* transmit window */
-	GStaticMutex		send_mutex;			/* non-router alert socket */
-	GStaticMutex		timer_mutex;			/* next timer expiration */
+	pgm_rwlock_t		lock;				/* running / destroyed */
+	pgm_mutex_t		receiver_mutex;			/* receiver API */
+	pgm_mutex_t		source_mutex;			/* source API */
+	pgm_spinlock_t		txw_spinlock;			/* transmit window */
+	pgm_mutex_t		send_mutex;			/* non-router alert socket */
+	pgm_mutex_t		timer_mutex;			/* next timer expiration */
 
 	gboolean		is_bound;
 	gboolean		is_destroyed;
@@ -334,7 +354,7 @@ struct pgm_transport_t {
 	guint			peer_expiry;		    /* from absence of SPMs */
 	guint			spmr_expiry;		    /* waiting for peer SPMRs */
 
-	GRand*			rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
+	pgm_rand_t		rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
 	guint			nak_data_retries, nak_ncf_retries;
 	pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
 	pgm_time_t		next_heartbeat_spm, next_ambient_spm;
@@ -348,10 +368,10 @@ struct pgm_transport_t {
 	guint			tg_sqn_shift;
 	struct pgm_sk_buff_t* 	rx_buffer;
 
-	GStaticRWLock		peers_lock;
-	GHashTable*		peers_hashtable;	    /* fast lookup */
-	GList*			peers_list;		    /* easy iteration */
-	GSList*			peers_pending;		    /* rxw: have or lost data */
+	pgm_rwlock_t		peers_lock;
+	pgm_hashtable_t*	peers_hashtable;	    /* fast lookup */
+	pgm_list_t*		peers_list;		    /* easy iteration */
+	pgm_slist_t*		peers_pending;		    /* rxw: have or lost data */
 	pgm_notify_t		pending_notify;		    /* timer to rx */
 	gboolean		is_pending_read;
 	pgm_time_t		next_poll;
@@ -363,27 +383,25 @@ struct pgm_transport_t {
 
 
 /* global variables */
-extern GStaticRWLock pgm_transport_list_lock;
-extern GSList* pgm_transport_list;
+extern pgm_rwlock_t pgm_transport_list_lock;
+extern pgm_slist_t* pgm_transport_list;
 
 
 G_BEGIN_DECLS
 
-gboolean pgm_init (GError**);
+gboolean pgm_init (pgm_error_t**);
 gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_shutdown (void);
 
 void pgm_drop_superuser (void);
 
-GQuark pgm_transport_error_quark (void);
-GQuark pgm_engine_error_quark (void);
-PGMTransportError pgm_transport_error_from_errno (gint);
-PGMTransportError pgm_transport_error_from_eai_errno (gint);
-PGMTransportError pgm_transport_error_from_wsa_errno (gint);
-PGMEngineError pgm_engine_error_from_wsa_errno (gint);
+pgm_transport_error_e pgm_transport_error_from_errno (gint);
+pgm_transport_error_e pgm_transport_error_from_eai_errno (gint);
+pgm_transport_error_e pgm_transport_error_from_wsa_errno (gint);
+pgm_engine_error_e pgm_engine_error_from_wsa_errno (gint);
 gchar* pgm_wsastrerror (gint);
-gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_transport_bind (pgm_transport_t*, GError**) G_GNUC_WARN_UNUSED_RESULT;
+gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+gboolean pgm_transport_bind (pgm_transport_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_destroy (pgm_transport_t*, gboolean);
 gboolean pgm_transport_set_max_tpdu (pgm_transport_t* const, const guint16);
 gboolean pgm_transport_set_multicast_loop (pgm_transport_t* const, const gboolean);

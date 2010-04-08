@@ -32,8 +32,6 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
-			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
@@ -127,6 +125,7 @@ env = Environment(
 			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_HAVE_IP_MREQN',
 			'-DCONFIG_HAVE_SPRINTF_GROUPING',
+			'-DCONFIG_HAVE_VASPRINTF',
 			'-DCONFIG_HAVE_HPET',
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
 			'-DCONFIG_BIND_INADDR_ANY',
