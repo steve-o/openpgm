@@ -1,6 +1,6 @@
 #summary OpenPGM 2 : C Reference : pgm_alloc_skb()
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferencePgmSkbs
 
 _Function_
 === Declaration ===
@@ -53,4 +53,3 @@ Create a skbuff with enough space for a regular Ethernet sized packet, create a 
 === See Also ===
   * <tt>struct [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]</tt><br>
   * [OpenPgm2CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.
-
