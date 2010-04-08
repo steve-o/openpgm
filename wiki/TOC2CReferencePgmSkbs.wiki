@@ -1,4 +1,5 @@
-  * [OpenPgm2CReference Home]
+  * C Reference for OpenPGM version 2
+  * [OpenPgm2CReference Contents]
   * [OpenPgm2CReferencePgmSkbs PGM Socket Buffers (SKBs)]
     * [OpenPgm2CReferencePgmSkBuffT pgm_sk_buff_t]
     * <tt>[OpenPgm2CReferencePgmAllocSkb pgm_alloc_skb()]</tt>
