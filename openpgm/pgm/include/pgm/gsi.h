@@ -37,26 +37,6 @@
 
 #define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
 
-typedef enum
-{
-	/* Derived from errno */
-	PGM_GSI_ERROR_FAULT,		/* gethostname returned EFAULT */
-	PGM_GSI_ERROR_INVAL,
-	PGM_GSI_ERROR_PERM,
-	PGM_GSI_ERROR_ADDRFAMILY,	/* getaddrinfo return EAI_ADDRFAMILY */
-	PGM_GSI_ERROR_AGAIN,
-	PGM_GSI_ERROR_BADFLAGS,
-	PGM_GSI_ERROR_FAIL,
-	PGM_GSI_ERROR_FAMILY,
-	PGM_GSI_ERROR_MEMORY,
-	PGM_GSI_ERROR_NODATA,
-	PGM_GSI_ERROR_NONAME,
-	PGM_GSI_ERROR_SERVICE,
-	PGM_GSI_ERROR_SOCKTYPE,
-	PGM_GSI_ERROR_SYSTEM,
-	PGM_GSI_ERROR_FAILED
-} pgm_gsi_error_e;
-
 typedef struct pgm_gsi_t pgm_gsi_t;
 
 struct pgm_gsi_t {

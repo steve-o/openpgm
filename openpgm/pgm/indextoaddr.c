@@ -87,8 +87,8 @@ pgm_if_indextoaddr (
 	struct pgm_ifaddrs *ifap, *ifa;
 	if (0 != pgm_getifaddrs (&ifap)) {
 		pgm_set_error (error,
-			     PGM_IF_ERROR,
-			     pgm_if_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_errno (errno),
 			     _("Enumerating network interfaces: %s"),
 			     strerror (errno));
 		return FALSE;
@@ -113,8 +113,8 @@ pgm_if_indextoaddr (
 	}
 
 	pgm_set_error (error,
-		     PGM_IF_ERROR,
-		     PGM_IF_ERROR_NODEV,
+		     PGM_ERROR_DOMAIN_IF,
+		     PGM_ERROR_NODEV,
 		     _("No matching network interface index: %i"),
 		     ifindex);
 	pgm_freeifaddrs (ifap);

@@ -52,9 +52,6 @@
 
 /* locals */
 
-static pgm_gsi_error_e pgm_gsi_error_from_errno (gint);
-static pgm_gsi_error_e pgm_gsi_error_from_eai_errno (gint);
-
 
 /* create a GSI based on md5 of a user provided data block.
  *
@@ -123,10 +120,15 @@ pgm_gsi_create_from_hostname (
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
 		pgm_set_error (error,
-			     PGM_GSI_ERROR,
-			     pgm_gsi_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     strerror (errno));
+#ifdef G_OS_UNIX
+			     strerror (errno)
+#else
+			     wsa_strerror (WSAGetLastError())
+#endif
+				);
 		return FALSE;
 	}
 
@@ -152,10 +154,15 @@ pgm_gsi_create_from_addr (
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
 		pgm_set_error (error,
-			     PGM_GSI_ERROR,
-			     pgm_gsi_error_from_errno (errno),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     strerror (errno));
+#ifdef G_OS_UNIX
+			     strerror (errno)
+#else
+			     wsa_strerror (WSAGetLastError())
+#endif
+				);
 		return FALSE;
 	}
 	memset (&hints, 0, sizeof(hints));
@@ -164,8 +171,8 @@ pgm_gsi_create_from_addr (
 	retval = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 != retval) {
 		pgm_set_error (error,
-			     PGM_GSI_ERROR,
-			     pgm_gsi_error_from_eai_errno (retval),
+			     PGM_ERROR_DOMAIN_IF,
+			     pgm_error_from_eai_errno (retval, errno),
 			     _("Resolving hostname address: %s"),
 			     gai_strerror (retval));
 		return FALSE;
@@ -232,120 +239,6 @@ pgm_gsi_equal (
 	g_assert (v2);
 
         return memcmp (v, v2, 6 * sizeof(guint8)) == 0;
-}
-
-static
-pgm_gsi_error_e
-pgm_gsi_error_from_errno (
-	gint		err_no
-	)
-{
-	switch (err_no) {
-#ifdef EFAULT
-	case EFAULT:
-		return PGM_GSI_ERROR_FAULT;
-		break;
-#endif
-
-#ifdef EINVAL
-	case EINVAL:
-		return PGM_GSI_ERROR_INVAL;
-		break;
-#endif
-
-#ifdef EPERM
-	case EPERM:
-		return PGM_GSI_ERROR_PERM;
-		break;
-#endif
-
-	default :
-		return PGM_GSI_ERROR_FAILED;
-		break;
-	}
-}
-
-/* errno must be preserved before calling to catch correct error
- * status with EAI_SYSTEM.
- */
-
-static
-pgm_gsi_error_e
-pgm_gsi_error_from_eai_errno (
-	gint		err_no
-	)
-{
-	switch (err_no) {
-#ifdef EAI_ADDRFAMILY
-	case EAI_ADDRFAMILY:
-		return PGM_GSI_ERROR_ADDRFAMILY;
-		break;
-#endif
-
-#ifdef EAI_AGAIN
-	case EAI_AGAIN:
-		return PGM_GSI_ERROR_AGAIN;
-		break;
-#endif
-
-#ifdef EAI_BADFLAGS
-	case EAI_BADFLAGS:
-		return PGM_GSI_ERROR_BADFLAGS;
-		break;
-#endif
-
-#ifdef EAI_FAIL
-	case EAI_FAIL:
-		return PGM_GSI_ERROR_FAIL;
-		break;
-#endif
-
-#ifdef EAI_FAMILY
-	case EAI_FAMILY:
-		return PGM_GSI_ERROR_FAMILY;
-		break;
-#endif
-
-#ifdef EAI_MEMORY
-	case EAI_MEMORY:
-		return PGM_GSI_ERROR_MEMORY;
-		break;
-#endif
-
-#ifdef EAI_NODATA
-	case EAI_NODATA:
-		return PGM_GSI_ERROR_NODATA;
-		break;
-#endif
-
-#if defined(EAI_NONAME) && EAI_NONAME != EAI_NODATA
-	case EAI_NONAME:
-		return PGM_GSI_ERROR_NONAME;
-		break;
-#endif
-
-#ifdef EAI_SERVICE
-	case EAI_SERVICE:
-		return PGM_GSI_ERROR_SERVICE;
-		break;
-#endif
-
-#ifdef EAI_SOCKTYPE
-	case EAI_SOCKTYPE:
-		return PGM_GSI_ERROR_SOCKTYPE;
-		break;
-#endif
-
-#ifdef EAI_SYSTEM
-	case EAI_SYSTEM:
-		return pgm_gsi_error_from_errno (errno);
-		break;
-#endif
-
-	default :
-		return PGM_GSI_ERROR_FAILED;
-		break;
-	}
 }
 
 /* eof */

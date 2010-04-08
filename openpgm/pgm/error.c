@@ -44,15 +44,15 @@
 static
 pgm_error_t*
 pgm_error_new_valist (
-	pgm_error_domain_e	domain,
-	gint			code,
+	const int		error_domain,
+	const int		error_code,
 	const gchar*		format,
 	va_list			args
 	)
 {
 	pgm_error_t *error = pgm_new (pgm_error_t, 1);
-	error->domain  = domain;
-	error->code    = code;
+	error->domain  = error_domain;
+	error->code    = error_code;
 	error->message = g_strdup_vprintf (format, args);
 	return error;
 }
@@ -70,8 +70,8 @@ pgm_error_free (
 void
 pgm_set_error (
 	pgm_error_t**		err,
-	pgm_error_domain_e	domain,
-	gint			code,
+	const int		error_domain,
+	const int		error_code,
 	const gchar*		format,
 	...
 	)
@@ -83,7 +83,7 @@ pgm_set_error (
 		return;
 
 	va_start (args, format);
-	new = pgm_error_new_valist (domain, code, format, args);
+	new = pgm_error_new_valist (error_domain, error_code, format, args);
 	va_end (args);
 
 	if (NULL == *err)
@@ -152,5 +152,306 @@ pgm_prefix_error (
 	}
 }
 
+/* error from libc.
+ */
+
+int
+pgm_error_from_errno (
+	const int	errno
+	)
+{
+	switch (errno) {
+#ifdef EAFNOSUPPORT
+	case EAFNOSUPPORT:
+		return PGM_ERROR_EAFNOSUPPORT;
+		break;
+#endif
+
+#ifdef EAGAIN
+	case EAGAIN:
+		return PGM_ERROR_EAGAIN;
+		break;
+#endif
+
+#ifdef EBADF
+	case EBADF:
+		return PGM_ERROR_BADF;
+		break;
+#endif
+
+#ifdef ECONNRESET
+	case ECONNRESET:
+		return PGM_ERROR_CONNRESET;
+		break;
+#endif
+
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EINTR
+	case EINTR:
+		return PGM_ERROR_INTR;
+		break;
+#endif
+
+#ifdef EINVAL
+	case EINVAL:
+		return PGM_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef EMFILE
+	case EMFILE:
+		return PGM_ERROR_MFILE;
+		break;
+#endif
+
+#ifdef ENFILE
+	case ENFILE:
+		return PGM_ERROR_NFILE;
+		break;
+#endif
+
+#ifdef ENODEV
+	case ENODEV:
+		return PGM_ERROR_NODEV;
+		break;
+#endif
+
+#ifdef ENOENT
+	case ENOENT:
+		return PGM_ERROR_NOENT;
+		break;
+#endif
+
+#ifdef ENOMEM
+	case ENOMEM:
+		return PGM_ERROR_NOMEM;
+		break;
+#endif
+
+#ifdef ENONET
+	case ENONET:
+		return PGM_ERROR_NONET;
+		break;
+#endif
+
+#ifdef ENOPROTOOPT
+	case ENOPROTOOPT:
+		return PGM_ERROR_NOPROTOOPT;
+		break;
+#endif
+
+#ifdef ENOTUNIQ
+	case ENOTUNIQ:
+		return PGM_ERROR_NOTUNIQ;
+		break;
+#endif
+
+#ifdef ENXIO
+	case ENXIO:
+		return PGM_ERROR_NXIO;
+		break;
+#endif
+
+#ifdef EPERM
+	case EPERM:
+		return PGM_ERROR_PERM;
+		break;
+#endif
+
+#ifdef EPROTO
+	case EPROTO:
+		return PGM_ERROR_PROTO;
+		break;
+#endif
+
+#ifdef ERANGE
+	case ERANGE:
+		return PGM_ERROR_RANGE;
+		break;
+#endif
+
+#ifdef EXDEV
+	case EXDEV:
+		return PGM_ERROR_XDEV;
+		break;
+#endif
+
+	default :
+		return PGM_ERROR_FAILED;
+		break;
+	}
+}
+
+/* h_errno from gethostbyname.
+ */
+
+int
+pgm_error_from_h_errno (
+	const int	h_errno
+	)
+{
+	switch (h_errno) {
+#ifdef HOST_NOT_FOUND
+	case HOST_NOT_FOUND:
+		return PGM_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef TRY_AGAIN
+	case TRY_AGAIN:
+		return PGM_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef NO_RECOVERY
+	case NO_RECOVERY:
+		return PGM_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef NO_DATA
+	case NO_DATA:
+		return PGM_ERROR_NODATA;
+		break;
+#endif
+
+	default:
+		return PGM_ERROR_FAILED;
+		break;
+	}
+}
+
+/* errno must be preserved before calling to catch correct error
+ * status with EAI_SYSTEM.
+ */
+
+int
+pgm_error_from_eai_errno (
+	const int	eai_errno,
+#ifdef EAI_SYSTEM
+	const int	errno
+#else
+	G_GNUC_UNUSED const int errno
+#endif
+	)
+{
+	switch (eai_errno) {
+#ifdef EAI_ADDRFAMILY
+	case EAI_ADDRFAMILY:
+		return PGM_ERROR_ADDRFAMILY;
+		break;
+#endif
+
+#ifdef EAI_AGAIN
+	case EAI_AGAIN:
+		return PGM_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef EAI_BADFLAGS
+	case EAI_BADFLAGS:
+		return PGM_ERROR_BADFLAGS;
+		break;
+#endif
+
+#ifdef EAI_FAIL
+	case EAI_FAIL:
+		return PGM_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef EAI_FAMILY
+	case EAI_FAMILY:
+		return PGM_ERROR_FAMILY;
+		break;
+#endif
+
+#ifdef EAI_MEMORY
+	case EAI_MEMORY:
+		return PGM_ERROR_MEMORY;
+		break;
+#endif
+
+#ifdef EAI_NODATA
+	case EAI_NODATA:
+		return PGM_ERROR_NODATA;
+		break;
+#endif
+
+#if defined(EAI_NONAME) && EAI_NONAME != EAI_NODATA
+	case EAI_NONAME:
+		return PGM_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef EAI_SERVICE
+	case EAI_SERVICE:
+		return PGM_ERROR_SERVICE;
+		break;
+#endif
+
+#ifdef EAI_SOCKTYPE
+	case EAI_SOCKTYPE:
+		return PGM_ERROR_SOCKTYPE;
+		break;
+#endif
+
+#ifdef EAI_SYSTEM
+	case EAI_SYSTEM:
+		return pgm_error_from_errno (errno);
+		break;
+#endif
+
+	default :
+		return PGM_ERROR_FAILED;
+		break;
+	}
+}
+
+/* from WSAGetLastError()
+ */
+
+int
+pgm_error_from_wsa_errno (
+	const int	wsa_errno
+        )
+{
+	switch (wsa_errno) {
+#ifdef WSAEINVAL
+	case WSAEINVAL:
+		return PGM_ERROR_INVAL;
+		break;
+#endif
+#ifdef WSAEMFILE
+	case WSAEMFILE:
+		return PGM_ERROR_MFILE;
+		break;
+#endif
+#ifdef WSA_NOT_ENOUGH_MEMORY
+	case WSA_NOT_ENOUGH_MEMORY:
+		return PGM_ERROR_NOMEM;
+		break;
+#endif
+#ifdef WSAENOPROTOOPT
+	case WSAENOPROTOOPT:
+		return PGM_ERROR_NOPROTOOPT;
+		break;
+#endif
+#ifdef WSAECONNRESET
+	case WSAECONNRESET:
+		return PGM_ERROR_CONNRESET;
+		break;
+#endif
+
+	default :
+		return PGM_ERROR_FAILED;
+		break;
+	}
+}
 
 /* eof */

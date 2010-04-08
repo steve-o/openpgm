@@ -398,15 +398,6 @@ struct pgm_opt6_path_nla {
     struct in6_addr opt6_path_nla;	/* path nla */
 };
 
-typedef enum
-{
-	PGM_PACKET_ERROR_BOUNDS,
-	PGM_PACKET_ERROR_AFNOSUPPORT,
-	PGM_PACKET_ERROR_CKSUM,
-	PGM_PACKET_ERROR_PROTO,
-	PGM_PACKET_ERROR_FAILED
-} pgm_packet_error_e;
-
 
 #ifdef __GNUC__
 #	pragma pack(pop)

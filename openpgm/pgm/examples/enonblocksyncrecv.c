@@ -153,13 +153,13 @@ main (
 		pgm_tsi_t from;
 		char buffer[4096];
 		gsize len;
-		const pgm_io_status_e status = pgm_recvfrom (g_transport,
-						         buffer,
-						         sizeof(buffer),
-						         0,
-						         &len,
-						         &from,
-						         &pgm_err);
+		const int status = pgm_recvfrom (g_transport,
+					         buffer,
+					         sizeof(buffer),
+					         0,
+					         &len,
+					         &from,
+					         &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_data (buffer, len, &from);

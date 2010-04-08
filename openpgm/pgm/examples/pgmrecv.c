@@ -467,12 +467,12 @@ receiver_thread (
 		struct timeval tv;
 		gsize len;
 		pgm_error_t* pgm_err = NULL;
-		const pgm_io_status_e status = pgm_recvmsgv (transport,
-						       msgv,
-						       G_N_ELEMENTS(msgv),
-						       0,
-						       &len,
-						       &pgm_err);
+		const int status = pgm_recvmsgv (transport,
+					       msgv,
+					       G_N_ELEMENTS(msgv),
+					       0,
+					       &len,
+					       &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);

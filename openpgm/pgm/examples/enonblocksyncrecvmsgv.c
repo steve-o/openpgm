@@ -165,12 +165,12 @@ main (
 		struct timeval tv;
 		int timeout;
 		gsize len;
-		const pgm_io_status_e status = pgm_recvmsgv (g_transport,
-						         msgv,
-						         iov_max,
-							 0,
-						         &len,
-						         &pgm_err);
+		const int status = pgm_recvmsgv (g_transport,
+					         msgv,
+					         iov_max,
+						 0,
+					         &len,
+					         &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);

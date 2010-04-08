@@ -90,9 +90,9 @@
 static void reset_heartbeat_spm (pgm_transport_t* const, const pgm_time_t);
 static gboolean send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const guint32, const gboolean);
 static gboolean send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, pgm_sqn_list_t* const, const gboolean);
-static pgm_io_status_e send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, gsize*);
-static pgm_io_status_e send_odata_copy (pgm_transport_t* const, gconstpointer, const gsize, gsize*);
-static pgm_io_status_e send_odatav (pgm_transport_t* const, const struct pgm_iovec* const, const guint, gsize*);
+static int send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, gsize*);
+static int send_odata_copy (pgm_transport_t* const, gconstpointer, const gsize, gsize*);
+static int send_odatav (pgm_transport_t* const, const struct pgm_iovec* const, const guint, gsize*);
 static gboolean send_rdata (pgm_transport_t* const, struct pgm_sk_buff_t* const);
 
 
@@ -938,7 +938,7 @@ reset_heartbeat_spm (
  */
 
 static
-pgm_io_status_e
+int
 send_odata (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb,
@@ -1039,7 +1039,7 @@ retry_send:
  */
 
 static
-pgm_io_status_e
+int
 send_odata_copy (
 	pgm_transport_t* const		transport,
 	gconstpointer			tsdu,
@@ -1144,7 +1144,7 @@ retry_send:
  */
 
 static
-pgm_io_status_e
+int
 send_odatav (
 	pgm_transport_t* const		transport,
 	const struct pgm_iovec* const	vector,
@@ -1271,7 +1271,7 @@ retry_send:
  */
 
 static
-pgm_io_status_e
+int
 send_apdu (
 	pgm_transport_t* const		transport,
 	gconstpointer			apdu,
@@ -1436,7 +1436,7 @@ blocked:
  * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
  * packet size exceeds the current rate limit.
  */
-pgm_io_status_e
+int
 pgm_send (
 	pgm_transport_t* const		transport,
 	gconstpointer			apdu,
@@ -1470,14 +1470,13 @@ pgm_send (
 /* pass on non-fragment calls */
 	if (apdu_length <= transport->max_tsdu)
 	{
-		pgm_io_status_e status;
-		status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
+		const int status = send_odata_copy (transport, apdu, apdu_length, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
 
-	const pgm_io_status_e status = send_apdu (transport, apdu, apdu_length, bytes_written);
+	const int status = send_apdu (transport, apdu, apdu_length, bytes_written);
 	pgm_mutex_unlock (&transport->source_mutex);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return status;
@@ -1503,7 +1502,7 @@ pgm_send (
  * packet size exceeds the current rate limit.
  */
 
-pgm_io_status_e
+int
 pgm_sendv (
 	pgm_transport_t* const		transport,
 	const struct pgm_iovec* const	vector,
@@ -1536,8 +1535,7 @@ pgm_sendv (
 /* pass on zero length as cannot count vector lengths */
 	if (count == 0)
 	{
-		pgm_io_status_e status;
-		status = send_odata_copy (transport, NULL, count, bytes_written);
+		const int status = send_odata_copy (transport, NULL, count, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
@@ -1552,8 +1550,7 @@ pgm_sendv (
 		if (is_one_apdu) {
 			if (STATE(apdu_length) <= transport->max_tsdu)
 			{
-				pgm_io_status_e status;
-				status = send_odatav (transport, vector, count, bytes_written);
+				const int status = send_odatav (transport, vector, count, bytes_written);
 				pgm_mutex_unlock (&transport->source_mutex);
 				pgm_rwlock_reader_unlock (&transport->lock);
 				return status;
@@ -1587,8 +1584,7 @@ pgm_sendv (
 /* pass on non-fragment calls */
 	if (is_one_apdu) {
 		if (STATE(apdu_length) <= transport->max_tsdu) {
-			pgm_io_status_e status;
-			status = send_odatav (transport, vector, count, bytes_written);
+			const int status = send_odatav (transport, vector, count, bytes_written);
 			pgm_mutex_unlock (&transport->source_mutex);
 			pgm_rwlock_reader_unlock (&transport->lock);
 			return status;
@@ -1632,7 +1628,7 @@ pgm_sendv (
 		for (STATE(data_pkt_offset) = 0; STATE(data_pkt_offset) < count; STATE(data_pkt_offset)++)
 		{
 			gsize wrote_bytes;
-			pgm_io_status_e status;
+			int status;
 retry_send:
 			status = send_apdu (transport,
 					    vector[STATE(data_pkt_offset)].iov_base,
@@ -1835,7 +1831,7 @@ blocked:
  * packet size exceeds the current rate limit.
  */
 
-pgm_io_status_e
+int
 pgm_send_skbv (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t** const	vector,		/* array of skb pointers vs. array of skbs */
@@ -1868,16 +1864,14 @@ pgm_send_skbv (
 /* pass on zero length as cannot count vector lengths */
 	if (0 == count)
 	{
-		pgm_io_status_e status;
-		status = send_odata_copy (transport, NULL, count, bytes_written);
+		const int status = send_odata_copy (transport, NULL, count, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
 	if (1 == count)
 	{
-		pgm_io_status_e status;
-		status = send_odata (transport, vector[0], bytes_written);
+		const int status = send_odata (transport, vector[0], bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
