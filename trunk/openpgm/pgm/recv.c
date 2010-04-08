@@ -37,8 +37,9 @@
 #	include <sys/epoll.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -95,9 +96,9 @@
 #	define CMSG_LEN(len)		WSA_CMSG_LEN(len)
 #endif
 
-static PGMRecvError pgm_recv_error_from_errno (gint);
+static pgm_recv_error_e pgm_recv_error_from_errno (gint);
 #ifdef G_OS_WIN32
-static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
+static pgm_recv_error_e pgm_recv_error_from_wsa_errno (gint);
 #endif
 
 
@@ -371,9 +372,9 @@ on_peer (
 	memcpy (&upstream_tsi.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
 	upstream_tsi.sport = skb->pgm_header->pgm_dport;
 
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	*source = g_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	pgm_rwlock_reader_lock (&transport->peers_lock);
+	*source = pgm_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
+	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
 		g_trace ("Discarded peer packet about new source.");
@@ -452,9 +453,9 @@ on_downstream (
 	}
 
 /* search for TSI peer context or create a new one */
-	g_static_rw_lock_reader_lock (&transport->peers_lock);
-	*source = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
-	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	pgm_rwlock_reader_lock (&transport->peers_lock);
+	*source = pgm_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
+	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 		*source = pgm_new_peer (transport,
 				       &skb->tsi,
@@ -653,17 +654,17 @@ wait_for_event (
  * closed, returns PGM_IO_STATUS_EOF.  On error, returns PGM_IO_STATUS_ERROR.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recvmsgv (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msg_start,
 	const gsize		msg_len,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize*			_bytes_read,	/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
-	PGMIOStatus status = PGM_IO_STATUS_WOULD_BLOCK;
+	pgm_io_status_e status = PGM_IO_STATUS_WOULD_BLOCK;
 
 	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
@@ -673,14 +674,14 @@ pgm_recvmsgv (
 	if (G_LIKELY(msg_len)) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
-	if (G_UNLIKELY(!g_static_rw_lock_reader_trylock (&transport->lock)))
+	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
@@ -689,13 +690,12 @@ pgm_recvmsgv (
 	g_assert (transport->max_tpdu > 0);
 	if (transport->can_recv_data) {
 		g_assert (NULL != transport->peers_hashtable);
-		g_assert (NULL != transport->rand_);
 		g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
 		g_assert (pgm_notify_is_valid (&transport->pending_notify));
 	}
 
 /* receiver */
-	g_static_mutex_lock (&transport->receiver_mutex);
+	pgm_mutex_lock (&transport->receiver_mutex);
 
 	if (G_UNLIKELY(transport->is_reset)) {
 		g_assert (NULL != transport->peers_pending);
@@ -706,7 +706,7 @@ pgm_recvmsgv (
 		else if (error) {
 			char tsi[PGM_TSISTRLEN];
 			pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
-			g_set_error (error,
+			pgm_set_error (error,
 				     PGM_RECV_ERROR,
 				     PGM_RECV_ERROR_CONNRESET,
 				     _("Transport has been reset on unrecoverable loss from %s."),
@@ -714,8 +714,8 @@ pgm_recvmsgv (
 		}
 		if (!transport->is_abort_on_reset)
 			transport->is_reset = !transport->is_reset;
-		g_static_mutex_unlock (&transport->receiver_mutex);
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_mutex_unlock (&transport->receiver_mutex);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		return PGM_IO_STATUS_RESET;
 	}
 
@@ -778,22 +778,22 @@ recv_again:
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
-			     g_strerror (save_errno));
+			     strerror (save_errno));
 #else
 		const int save_wsa_errno = WSAGetLastError ();
 		if (WSAEWOULDBLOCK == save_wsa_errno) {
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_RECV_ERROR,
 			     pgm_recv_error_from_wsa_errno (save_wsa_errno),
 			     _("Transport socket error: %s"),
-			     g_strerror (save_wsa_errno));
+			     strerror (save_wsa_errno));
 #endif /* !G_OS_UNIX */
 		goto out;
 	}
@@ -808,7 +808,7 @@ recv_again:
 		bytes_received += len;
 	}
 
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
 					pgm_parse_udp_encap (transport->rx_buffer, &err) :
 					pgm_parse_raw (transport->rx_buffer, (struct sockaddr*)&dst, &err);
@@ -869,17 +869,17 @@ check_for_repeat:
 					goto check_for_repeat;
 				goto flush_pending;
 			case ENOENT:
-				g_static_mutex_unlock (&transport->receiver_mutex);
-				g_static_rw_lock_reader_unlock (&transport->lock);
+				pgm_mutex_unlock (&transport->receiver_mutex);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT:
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_RECV_ERROR,
 					     pgm_recv_error_from_errno (errno),
 					     _("Waiting for event: %s"),
-					     g_strerror (errno));
-				g_static_mutex_unlock (&transport->receiver_mutex);
-				g_static_rw_lock_reader_unlock (&transport->lock);
+					     strerror (errno));
+				pgm_mutex_unlock (&transport->receiver_mutex);
+				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			default:
 				g_assert_not_reached();
@@ -905,7 +905,7 @@ out:
 			else if (error) {
 				char tsi[PGM_TSISTRLEN];
 				pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
-				g_set_error (error,
+				pgm_set_error (error,
 					     PGM_RECV_ERROR,
 					     PGM_RECV_ERROR_CONNRESET,
 					     _("Transport has been reset on unrecoverable loss from %s."),
@@ -913,12 +913,12 @@ out:
 			}
 			if (!transport->is_abort_on_reset)
 				transport->is_reset = !transport->is_reset;
-			g_static_mutex_unlock (&transport->receiver_mutex);
-			g_static_rw_lock_reader_unlock (&transport->lock);
+			pgm_mutex_unlock (&transport->receiver_mutex);
+			pgm_rwlock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RESET;
 		}
-		g_static_mutex_unlock (&transport->receiver_mutex);
-		g_static_rw_lock_reader_unlock (&transport->lock);
+		pgm_mutex_unlock (&transport->receiver_mutex);
+		pgm_rwlock_reader_unlock (&transport->lock);
 		if (PGM_IO_STATUS_WOULD_BLOCK == status &&
 		    ( transport->can_send_data ||
 		      ( transport->can_recv_data && NULL != transport->peers_list )))
@@ -947,8 +947,8 @@ out:
 
 	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
-	g_static_mutex_unlock (&transport->receiver_mutex);
-	g_static_rw_lock_reader_unlock (&transport->lock);
+	pgm_mutex_unlock (&transport->receiver_mutex);
+	pgm_rwlock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 }
 
@@ -958,13 +958,13 @@ out:
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recvmsg (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msgv,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize*			bytes_read,	/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
@@ -983,7 +983,7 @@ pgm_recvmsg (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recvfrom (
 	pgm_transport_t* const	transport,
 	gpointer		data,
@@ -991,7 +991,7 @@ pgm_recvfrom (
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize*			_bytes_read,	/* may be NULL */
 	pgm_tsi_t*		from,		/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	pgm_msgv_t msgv;
@@ -1003,7 +1003,7 @@ pgm_recvfrom (
 	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
-	const PGMIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
+	const pgm_io_status_e status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
@@ -1037,14 +1037,14 @@ pgm_recvfrom (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-PGMIOStatus
+pgm_io_status_e
 pgm_recv (
 	pgm_transport_t* const	transport,
 	gpointer		data,
 	const gsize		len,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
 	gsize* const		bytes_read,	/* may be NULL */
-	GError**		error
+	pgm_error_t**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
@@ -1056,14 +1056,8 @@ pgm_recv (
 	return pgm_recvfrom (transport, data, len, flags, bytes_read, NULL, error);
 }
 
-GQuark
-pgm_recv_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-recv-error-quark");
-}
-
 static
-PGMRecvError
+pgm_recv_error_e
 pgm_recv_error_from_errno (
 	gint		err_no
         )
@@ -1107,7 +1101,7 @@ pgm_recv_error_from_errno (
 
 #ifdef G_OS_WIN32
 static
-PGMRecvError
+pgm_recv_error_e
 pgm_recv_error_from_wsa_errno (
 	gint		err_no
         )

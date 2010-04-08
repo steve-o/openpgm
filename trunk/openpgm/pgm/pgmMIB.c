@@ -7,9 +7,12 @@
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
+#include "pgm/mem.h"
+#include "pgm/slist.h"
 #include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"
 #include "pgm/pgmMIB_columns.h"
@@ -29,8 +32,8 @@
 
 
 struct pgm_snmp_context_t {
-	GSList*		list;
-	GList*		node;
+	pgm_slist_t*	list;
+	pgm_list_t*	node;
 	gint		index;		/* table index */
 	unsigned 	instance;	/* unique number per node */
 };
@@ -223,15 +226,15 @@ pgmSourceTable_get_first_data_point(
 	g_trace ("pgmSourceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
 		(gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
-	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	pgm_snmp_context_t* context = pgm_malloc0 (sizeof(pgm_snmp_context_t));
 	context->list = pgm_transport_list;
 	*my_loop_context = context;
 
@@ -304,10 +307,10 @@ pgmSourceTable_free_loop_context (
 		(gpointer)my_loop_context, (gpointer)mydata);
 
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
-	g_free (context);
+	pgm_free (context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -499,15 +502,15 @@ pgmSourceConfigTable_get_first_data_point(
         g_trace ("pgmSourceConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
-	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	pgm_snmp_context_t* context = pgm_malloc0 (sizeof(pgm_snmp_context_t));
 	context->list = pgm_transport_list;
 	*my_loop_context = context;
 
@@ -580,10 +583,10 @@ pgmSourceConfigTable_free_loop_context (
                 (gpointer)my_loop_context, (gpointer)mydata);
 
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
-	g_free(context);
+	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -862,15 +865,15 @@ pgmSourcePerformanceTable_get_first_data_point(
         g_trace ("pgmSourcePerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
-	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	pgm_snmp_context_t* context = pgm_malloc0 (sizeof(pgm_snmp_context_t));
 	context->list = pgm_transport_list;
 	*my_loop_context = context;
 
@@ -943,10 +946,10 @@ pgmSourcePerformanceTable_free_loop_context (
                 (gpointer)my_loop_context, (gpointer)mydata);
  
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)my_loop_context;
-	g_free(context);
+	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -1398,35 +1401,35 @@ pgmReceiverTable_get_first_data_point(
         g_trace ("pgmReceiverTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
-	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	pgm_snmp_context_t* context = pgm_malloc0 (sizeof(pgm_snmp_context_t));
 
 /* hunt to find first node, through all transports */
 	for (context->list = pgm_transport_list; context->list; context->list = context->list->next)
 	{
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rwlock_reader_lock (&transport->peers_lock);
 		context->node = transport->peers_list;
 		if (context->node) {
 /* maintain this transport's peers lock */
 			break;
 		}
 
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (context->node == NULL) {
-		g_free( context );
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_free( context );
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1502,10 +1505,10 @@ pgmReceiverTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			pgm_rwlock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
 			transport = context->list->data;
-			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			pgm_rwlock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 			if (context->node) {
 /* keep lock */
@@ -1536,13 +1539,13 @@ pgmReceiverTable_free_loop_context (
 /* check for intra-peer state */
 	if (context->list) {
 		pgm_transport_t* transport = context->list->data;
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
-	g_free(context);
+	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -1755,33 +1758,33 @@ pgmReceiverConfigTable_get_first_data_point(
         g_trace ("pgmReceiverConfigTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
-	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	pgm_snmp_context_t* context = pgm_malloc0 (sizeof(pgm_snmp_context_t));
 
 /* hunt to find first node, through all transports */
 	for (context->list = pgm_transport_list; context->list; context->list = context->list->next)
 	{
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rwlock_reader_lock (&transport->peers_lock);
 		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (context->node == NULL) {
-		g_free( context );
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_free( context );
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1857,10 +1860,10 @@ pgmReceiverConfigTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			pgm_rwlock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
 			transport = context->list->data;
-			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			pgm_rwlock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 			if (context->node) {
 /* keep lock */
@@ -1891,13 +1894,13 @@ pgmReceiverConfigTable_free_loop_context (
 /* check for intra-peer state */
 	if (context->list) {
 		pgm_transport_t* transport = context->list->data;
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
-	g_free(context);
+	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -2143,33 +2146,33 @@ pgmReceiverPerformanceTable_get_first_data_point(
         g_trace ("pgmReceiverPerformanceTable_get_first_data_point (my_loop_context:%p my_data_context:%p put_index_data:%p mydata:%p)",
                 (gpointer)my_loop_context, (gpointer)my_data_context, (gpointer)put_index_data, (gpointer)mydata);
 
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	if (pgm_transport_list == NULL) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
-	pgm_snmp_context_t* context = g_malloc0 (sizeof(pgm_snmp_context_t));
+	pgm_snmp_context_t* context = pgm_malloc0 (sizeof(pgm_snmp_context_t));
 
 /* hunt to find first node, through all transports */
 	for (context->list = pgm_transport_list; context->list; context->list = context->list->next)
 	{
 /* and through all peers for each transport */
 		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		pgm_rwlock_reader_lock (&transport->peers_lock);
 		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (context->node == NULL) {
-		g_free( context );
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_free( context );
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -2245,10 +2248,10 @@ pgmReceiverPerformanceTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			g_static_rw_lock_reader_unlock (&transport->peers_lock);
+			pgm_rwlock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
 			transport = context->list->data;
-			g_static_rw_lock_reader_lock (&transport->peers_lock);
+			pgm_rwlock_reader_lock (&transport->peers_lock);
 			context->node = transport->peers_list;
 
 			if (context->node)
@@ -2278,13 +2281,13 @@ pgmReceiverPerformanceTable_free_loop_context (
 /* check for intra-peer state */
 	if (context->list) {
 		pgm_transport_t* transport = context->list->data;
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
-	g_free(context);
+	pgm_free(context);
 	my_loop_context = NULL;
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static

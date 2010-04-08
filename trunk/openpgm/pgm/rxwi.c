@@ -30,21 +30,25 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <sys/uio.h>
 #endif
 
-#include <pgm/skbuff.h>
-#include <pgm/rxwi.h>
-#include <pgm/sn.h>
-#include <pgm/time.h>
-#include <pgm/tsi.h>
-#include <pgm/math.h>
-#include <pgm/reed_solomon.h>
-#include <pgm/histogram.h>
+#include "pgm/mem.h"
+#include "pgm/list.h"
+#include "pgm/queue.h"
+#include "pgm/skbuff.h"
+#include "pgm/rxwi.h"
+#include "pgm/sn.h"
+#include "pgm/time.h"
+#include "pgm/tsi.h"
+#include "pgm/math.h"
+#include "pgm/reed_solomon.h"
+#include "pgm/histogram.h"
 
 
 //#define RXW_DEBUG
@@ -225,7 +229,7 @@ pgm_rxw_create (
 /* calculate receive window parameters */
 	g_assert (sqns || (secs && max_rte));
 	const guint32 alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
-	window = g_slice_alloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
+	window = pgm_malloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 
 	window->tsi		= tsi;
 	window->max_tpdu	= tpdu_size;
@@ -283,7 +287,7 @@ pgm_rxw_destroy (
 	g_assert (!pgm_rxw_is_full (window));
 
 /* window */
-	g_slice_free1 (sizeof(pgm_rxw_t) + ( window->alloc * sizeof(struct pgm_sk_buff_t*) ), window);
+	pgm_free (window);
 }
 
 /* add skb to receive window.  window has fixed size and will not grow.
@@ -328,8 +332,8 @@ pgm_rxw_add (
 	g_assert_cmpuint (nak_rb_expiry, >, 0);
 	g_assert_cmpuint (pgm_rxw_max_length (window), >, 0);
 	g_assert (pgm_skb_is_valid (skb));
-	g_assert (((const GList*)skb)->next == NULL);
-	g_assert (((const GList*)skb)->prev == NULL);
+	g_assert (((const pgm_list_t*)skb)->next == NULL);
+	g_assert (((const pgm_list_t*)skb)->prev == NULL);
 	g_assert (!_pgm_tsi_is_null (&skb->tsi));
 	g_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (guint)((guint8*)skb->data - (guint8*)skb->head));
 	g_assert ((gint)skb->len == (guint8*)skb->tail - (guint8*)skb->data);
@@ -1252,7 +1256,7 @@ _pgm_rxw_remove_trail (
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
 /* remove reference to skb */
-	if (G_UNLIKELY(g_mem_gc_friendly)) {
+	if (G_UNLIKELY(pgm_mem_gc_friendly)) {
 		const guint32 index_ = skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_] = NULL;
 	}
@@ -1741,15 +1745,15 @@ _pgm_rxw_state (
 
 	switch (new_state) {
 	case PGM_PKT_BACK_OFF_STATE:
-		g_queue_push_head_link (&window->backoff_queue, (GList*)skb);
+		pgm_queue_push_head_link (&window->backoff_queue, (pgm_list_t*)skb);
 		break;
 
 	case PGM_PKT_WAIT_NCF_STATE:
-		g_queue_push_head_link (&window->wait_ncf_queue, (GList*)skb);
+		pgm_queue_push_head_link (&window->wait_ncf_queue, (pgm_list_t*)skb);
 		break;
 
 	case PGM_PKT_WAIT_DATA_STATE:
-		g_queue_push_head_link (&window->wait_data_queue, (GList*)skb);
+		pgm_queue_push_head_link (&window->wait_data_queue, (pgm_list_t*)skb);
 		break;
 
 	case PGM_PKT_HAVE_DATA_STATE:
@@ -1805,7 +1809,7 @@ _pgm_rxw_unlink (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
-	GQueue* queue;
+	pgm_queue_t* queue;
 
 /* pre-conditions */
 	g_assert (NULL != window);
@@ -1815,20 +1819,20 @@ _pgm_rxw_unlink (
 
 	switch (state->state) {
 	case PGM_PKT_BACK_OFF_STATE:
-		g_assert (!g_queue_is_empty (&window->backoff_queue));
+		g_assert (!pgm_queue_is_empty (&window->backoff_queue));
 		queue = &window->backoff_queue;
 		goto unlink_queue;
 
 	case PGM_PKT_WAIT_NCF_STATE:
-		g_assert (!g_queue_is_empty (&window->wait_ncf_queue));
+		g_assert (!pgm_queue_is_empty (&window->wait_ncf_queue));
 		queue = &window->wait_ncf_queue;
 		goto unlink_queue;
 
 	case PGM_PKT_WAIT_DATA_STATE:
-		g_assert (!g_queue_is_empty (&window->wait_data_queue));
+		g_assert (!pgm_queue_is_empty (&window->wait_data_queue));
 		queue = &window->wait_data_queue;
 unlink_queue:
-		g_queue_unlink (queue, (GList*)skb);
+		pgm_queue_unlink (queue, (pgm_list_t*)skb);
 		break;
 
 	case PGM_PKT_HAVE_DATA_STATE:
@@ -1858,8 +1862,8 @@ unlink_queue:
 	}
 
 	state->state = PGM_PKT_ERROR_STATE;
-	g_assert (((GList*)skb)->next == NULL);
-	g_assert (((GList*)skb)->prev == NULL);
+	g_assert (((pgm_list_t*)skb)->next == NULL);
+	g_assert (((pgm_list_t*)skb)->prev == NULL);
 }
 
 /* returns the pointer at the given index of the window.

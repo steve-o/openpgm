@@ -44,6 +44,9 @@ pgm_power2_log2 (
 	return r;
 }
 
+guint pgm_spaced_primes_closest (guint);
+
+
 G_END_DECLS
 
 #endif /* __PGM_MATH_H__ */

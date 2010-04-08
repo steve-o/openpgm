@@ -24,12 +24,11 @@
 
 #include <glib.h>
 
-#define PGM_TIME_ERROR		pgm_time_error_quark ()
 
 typedef enum
 {
         PGM_TIME_ERROR_FAILED
-} PGMTimeError;
+} pgm_time_error_e;
 
 typedef guint64 pgm_time_t;
 
@@ -66,7 +65,6 @@ extern pgm_time_update_func pgm_time_update_now;
 extern pgm_time_sleep_func pgm_time_sleep;
 extern pgm_time_since_epoch_func pgm_time_since_epoch;
 
-GQuark pgm_time_error_quark (void);
 
 G_END_DECLS
 

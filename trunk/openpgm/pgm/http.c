@@ -27,8 +27,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #include <libsoup/soup.h>
 #include <libsoup/soup-server.h>
@@ -37,6 +38,7 @@
 #endif
 #include <libsoup/soup-address.h>
 
+#include "pgm/slist.h"
 #include "pgm/ip.h"
 #include "pgm/http.h"
 #include "pgm/transport.h"
@@ -346,7 +348,7 @@ http_create_response (
 #endif
 	);
 
-	g_free (timestamp);
+	pgm_free (timestamp);
 	return response;
 }
 
@@ -485,9 +487,9 @@ index_callback (
 		return;
 	}
 #endif
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
-	const int transport_count = g_slist_length (pgm_transport_list);
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
+	const int transport_count = pgm_slist_length (pgm_transport_list);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 
 	GString* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
 	g_string_append_printf (response,	"<table>"
@@ -621,12 +623,12 @@ transports_callback (
 
 	if (pgm_transport_list)
 	{
-		g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-		GSList* list = pgm_transport_list;
+		pgm_slist_t* list = pgm_transport_list;
 		while (list)
 		{
-			GSList* next = list->next;
+			pgm_slist_t* next = list->next;
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
@@ -658,7 +660,7 @@ transports_callback (
 						sport);
 			list = next;
 		}
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 	}
 	else
 	{
@@ -768,14 +770,14 @@ http_tsi_response (
 	)
 {
 /* first verify this is a valid TSI */
-	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
 	pgm_transport_t* transport = NULL;
-	GSList* list = pgm_transport_list;
+	pgm_slist_t* list = pgm_transport_list;
 	while (list)
 	{
 		pgm_transport_t* list_transport = (pgm_transport_t*)list->data;
-		GSList* next = list->next;
+		pgm_slist_t* next = list->next;
 
 /* check source */
 		if (pgm_tsi_equal (tsi, &list_transport->tsi))
@@ -785,21 +787,21 @@ http_tsi_response (
 		}
 
 /* check receivers */
-		g_static_rw_lock_reader_lock (&list_transport->peers_lock);
-		pgm_peer_t* receiver = g_hash_table_lookup (list_transport->peers_hashtable, tsi);
+		pgm_rwlock_reader_lock (&list_transport->peers_lock);
+		pgm_peer_t* receiver = pgm_hash_table_lookup (list_transport->peers_hashtable, tsi);
 		if (receiver) {
 			int retval = http_receiver_response (receiver, msg);
-			g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
-			g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+			pgm_rwlock_reader_unlock (&list_transport->peers_lock);
+			pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 			return retval;
 		}
-		g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
+		pgm_rwlock_reader_unlock (&list_transport->peers_lock);
 
 		list = next;
 	}
 
 	if (!transport) {
-		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return -1;
 	}
 
@@ -865,14 +867,14 @@ http_tsi_response (
 
 	if (transport->peers_list)
 	{
-		g_static_rw_lock_reader_lock (&transport->peers_lock);
-		GList* peers_list = transport->peers_list;
+		pgm_rwlock_reader_lock (&transport->peers_lock);
+		pgm_list_t* peers_list = transport->peers_list;
 		while (peers_list) {
-			GList* next = peers_list->next;
+			pgm_list_t* next = peers_list->next;
 			http_each_receiver (peers_list->data, response);
 			peers_list = next;
 		}
-		g_static_rw_lock_reader_unlock (&transport->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 	else
 	{
@@ -1007,7 +1009,7 @@ http_tsi_response (
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]);
 
-	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 
 	http_finalize_response (response, msg);
 

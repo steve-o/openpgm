@@ -25,8 +25,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 
 #ifdef G_OS_UNIX
 #	include <netdb.h>
@@ -37,6 +38,7 @@
 
 #include "pgm/md5.h"
 #include "pgm/gsi.h"
+#include "pgm/rand.h"
 
 
 //#define GSI_DEBUG
@@ -50,8 +52,8 @@
 
 /* locals */
 
-static PGMGSIError pgm_gsi_error_from_errno (gint);
-static PGMGSIError pgm_gsi_error_from_eai_errno (gint);
+static pgm_gsi_error_e pgm_gsi_error_from_errno (gint);
+static pgm_gsi_error_e pgm_gsi_error_from_eai_errno (gint);
 
 
 /* create a GSI based on md5 of a user provided data block.
@@ -112,7 +114,7 @@ pgm_gsi_create_from_string (
 gboolean
 pgm_gsi_create_from_hostname (
 	pgm_gsi_t*	gsi,
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	g_return_val_if_fail (NULL != gsi, FALSE);
@@ -120,11 +122,11 @@ pgm_gsi_create_from_hostname (
 	char hostname[NI_MAXHOST];
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_GSI_ERROR,
 			     pgm_gsi_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 
@@ -133,16 +135,13 @@ pgm_gsi_create_from_hostname (
 
 /* create a global session ID based on the IP address.
  *
- * GLib random API will need warming up before g_random_int_range returns
- * numbers that actually vary.
- *
  * returns TRUE on succcess, returns FALSE on error and sets error.
  */
 
 gboolean
 pgm_gsi_create_from_addr (
 	pgm_gsi_t*	gsi,
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	char hostname[NI_MAXHOST];
@@ -152,11 +151,11 @@ pgm_gsi_create_from_addr (
 
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_GSI_ERROR,
 			     pgm_gsi_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     g_strerror (errno));
+			     strerror (errno));
 		return FALSE;
 	}
 	memset (&hints, 0, sizeof(hints));
@@ -164,7 +163,7 @@ pgm_gsi_create_from_addr (
 	hints.ai_flags = AI_ADDRCONFIG;
 	retval = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 != retval) {
-		g_set_error (error,
+		pgm_set_error (error,
 			     PGM_GSI_ERROR,
 			     pgm_gsi_error_from_eai_errno (retval),
 			     _("Resolving hostname address: %s"),
@@ -173,7 +172,7 @@ pgm_gsi_create_from_addr (
 	}
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
 	freeaddrinfo (res);
-	guint16 random = g_random_int_range (0, UINT16_MAX);
+	guint16 random = pgm_random_int_range (0, UINT16_MAX);
 	memcpy ((guint8*)gsi + sizeof(struct in_addr), &random, sizeof(random));
 	return TRUE;
 }
@@ -235,14 +234,8 @@ pgm_gsi_equal (
         return memcmp (v, v2, 6 * sizeof(guint8)) == 0;
 }
 
-GQuark
-pgm_gsi_error_quark (void)
-{
-	return g_quark_from_static_string ("pgm-gsi-error-quark");
-}
-
 static
-PGMGSIError
+pgm_gsi_error_e
 pgm_gsi_error_from_errno (
 	gint		err_no
 	)
@@ -277,7 +270,7 @@ pgm_gsi_error_from_errno (
  */
 
 static
-PGMGSIError
+pgm_gsi_error_e
 pgm_gsi_error_from_eai_errno (
 	gint		err_no
 	)

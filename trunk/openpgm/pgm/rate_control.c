@@ -28,7 +28,9 @@
 #	include <sys/socket.h>
 #endif
 
+#include "pgm/mem.h"
 #include "pgm/time.h"
+#include "pgm/thread.h"
 
 
 struct rate_t {
@@ -38,7 +40,7 @@ struct rate_t {
 
 	gint		rate_limit;		/* signed for math */
 	pgm_time_t	last_rate_check;
-	GStaticMutex	mutex;
+	pgm_spinlock_t	spinlock;
 };
 
 typedef struct rate_t rate_t;
@@ -67,7 +69,7 @@ pgm_rate_create (
 	g_assert (NULL != bucket_);
 	g_assert (rate_per_sec >= max_tpdu);
 
-	rate_t* bucket = g_malloc0 (sizeof(rate_t));
+	rate_t* bucket = pgm_malloc0 (sizeof(rate_t));
 	bucket->rate_per_sec	= (gint)rate_per_sec;
 	bucket->iphdr_len	= iphdr_len;
 	bucket->last_rate_check	= pgm_time_update_now ();
@@ -78,7 +80,7 @@ pgm_rate_create (
 	} else {
 		bucket->rate_limit	= bucket->rate_per_sec;
 	}
-	g_static_mutex_init (&bucket->mutex);
+	pgm_spinlock_init (&bucket->spinlock);
 	*bucket_ = bucket;
 }
 
@@ -90,8 +92,8 @@ pgm_rate_destroy (
 /* pre-conditions */
 	g_assert (NULL != bucket);
 
-	g_static_mutex_free (&bucket->mutex);
-	g_free (bucket);
+	pgm_spinlock_free (&bucket->spinlock);
+	pgm_free (bucket);
 }
 
 /* check bit bucket whether an operation can proceed or should wait.
@@ -116,7 +118,7 @@ pgm_rate_check (
 	if (0 == bucket->rate_per_sec)
 		return TRUE;
 
-	g_static_mutex_lock (&bucket->mutex);
+	pgm_spinlock_lock (&bucket->spinlock);
 	pgm_time_t now = pgm_time_update_now();
 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
@@ -143,7 +145,7 @@ pgm_rate_check (
 
 	new_rate_limit -= ( bucket->iphdr_len + data_size );
 	if (is_nonblocking && new_rate_limit < 0) {
-		g_static_mutex_unlock (&bucket->mutex);
+		pgm_spinlock_unlock (&bucket->spinlock);
 		return FALSE;
 	}
 
@@ -160,7 +162,7 @@ pgm_rate_check (
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
 	} 
-	g_static_mutex_unlock (&bucket->mutex);
+	pgm_spinlock_unlock (&bucket->spinlock);
 	return TRUE;
 }
 
@@ -176,11 +178,11 @@ pgm_rate_remaining (
 	if (0 == bucket->rate_per_sec)
 		return 0;
 
-	g_static_mutex_lock (&bucket->mutex);
+	pgm_spinlock_lock (&bucket->spinlock);
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 	const gint bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - packetlen;
-	g_static_mutex_unlock (&bucket->mutex);
+	pgm_spinlock_unlock (&bucket->spinlock);
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
 }
 
