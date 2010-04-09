@@ -25,8 +25,6 @@
 #include <ws2tcpip.h>
 
 
-/* locals */
-
 gchar*
 pgm_wsastrerror (
 	const int	wsa_errno
@@ -322,6 +320,36 @@ pgm_wsastrerror (
 	}
 }
 
+gchar*
+pgm_adapter_strerror (
+	const int	adapter_errno
+	)
+{
+	switch (adapter_errno) {
+#ifdef ERROR_ADDRESS_NOT_ASSOCIATED
+	case ERROR_ADDRESS_NOT_ASSOCIATED: return _("DHCP lease information was available.");
+#endif
+#ifdef ERROR_BUFFER_OVERFLOW
+	case ERROR_BUFFER_OVERFLOW: return _("The buffer to receive the adapter information is too small.");
+#endif
+#ifdef ERROR_INVALID_DATA
+	case ERROR_INVALID_DATA: return _("Invalid adapter information was retrieved.");
+#endif
+#ifdef ERROR_INVALID_PARAMETER
+	case ERROR_INVALID_PARAMETER: return _("One of the parameters is invalid.");
+#endif
+#ifdef ERROR_NOT_ENOUGH_MEMORY
+	case ERROR_NOT_ENOUGH_MEMORY: return _("Insufficient memory resources are available to complete the operation.");
+#endif
+#ifdef ERROR_NO_DATA
+	case ERROR_NO_DATA: return _("No adapter information exists for the local computer.");
+#endif
+#ifdef ERROR_NOT_SUPPORTED
+	case ERROR_NOT_SUPPORTED: return _("The GetAdaptersInfo function is not supported by the operating system running on the local computer..");
+#endif
+	default: return _("Other.");
+	}
+}
 #endif /* G_OS_WIN32 */
 
 /* eof */

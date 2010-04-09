@@ -43,24 +43,23 @@ enum
 /* error codes */
 enum
 {
-	/* Derived from errno */
+	/* Derived from errno, eai_errno, etc */
 	PGM_ERROR_ADDRFAMILY,		/* EAI_ADDRFAMILY */
-	PGM_ERROR_AFNOSUPPORT,
+	PGM_ERROR_AFNOSUPPORT,		/* EAI_FAMILY */
 	PGM_ERROR_AGAIN,
+	PGM_ERROR_BADE,			/* ERROR_INVALID_DATA */
 	PGM_ERROR_BADF,
-	PGM_ERROR_BADFLAGS,		/* EAI_BADFLAGS */
 	PGM_ERROR_BOUNDS,		/* sequence out-of-bounds */
 	PGM_ERROR_CKSUM,		/* pkt cksum incorrect */
 	PGM_ERROR_CONNRESET,
 	PGM_ERROR_FAIL,			/* EAI_FAIL */
-	PGM_ERROR_FAMILY,		/* EAI_FAMILY */
 	PGM_ERROR_FAULT,
 	PGM_ERROR_INPROGRESS,		/* WSAEINPROGRESS */
 	PGM_ERROR_INTR,
 	PGM_ERROR_INVAL,
-	PGM_ERROR_MEMORY,		/* EAI_MEMORY */
 	PGM_ERROR_MFILE,
 	PGM_ERROR_NFILE,
+	PGM_ERROR_NOBUFS,		/* ERROR_BUFFER_OVERFLOW */
 	PGM_ERROR_NODATA,		/* EAI_NODATA */
 	PGM_ERROR_NODEV,
 	PGM_ERROR_NOENT,
@@ -68,6 +67,7 @@ enum
 	PGM_ERROR_NONAME,		/* EAI_NONAME */
 	PGM_ERROR_NONET,
 	PGM_ERROR_NOPROTOOPT,
+	PGM_ERROR_NOSYS,		/* ERROR_NOT_SUPPORTED */
 	PGM_ERROR_NOTUNIQ,
 	PGM_ERROR_NXIO,
 	PGM_ERROR_PERM,
@@ -75,7 +75,7 @@ enum
 	PGM_ERROR_PROTO,
 	PGM_ERROR_RANGE,
 	PGM_ERROR_SERVICE,		/* EAI_SERVICE */
-	PGM_ERROR_SOCKTYPE,		/* EAI_SOCKTYPE */
+	PGM_ERROR_SOCKTNOSUPPORT,	/* EAI_SOCKTYPE */
 	PGM_ERROR_SYSNOTAREADY,		/* WSASYSNOTAREADY */
 	PGM_ERROR_SYSTEM,		/* EAI_SYSTEM */
 	PGM_ERROR_VERNOTSUPPORTED,	/* WSAVERNOTSUPPORTED */
@@ -104,6 +104,7 @@ int pgm_error_from_errno (const int);
 int pgm_error_from_h_errno (const int);
 int pgm_error_from_eai_errno (const int, const int);
 int pgm_error_from_wsa_errno (const int);
+int pgm_error_from_adapter_errno (const int);
 
 G_END_DECLS
 
