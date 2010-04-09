@@ -358,7 +358,6 @@ gboolean pgm_shutdown (void);
 
 void pgm_drop_superuser (void);
 
-gchar* pgm_wsastrerror (const int);
 gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_bind (pgm_transport_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
 gboolean pgm_transport_destroy (pgm_transport_t*, gboolean);

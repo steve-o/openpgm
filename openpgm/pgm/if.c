@@ -117,8 +117,7 @@ pgm_if_print_all (void)
 {
 	struct pgm_ifaddrs *ifap, *ifa;
 
-	int e = pgm_getifaddrs (&ifap);
-	if (e < 0)
+	if (!pgm_getifaddrs (&ifap, NULL))
 		return;
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
@@ -504,12 +503,9 @@ parse_interface (
 	}
 
 /* iterate through interface list and match device name, ip or net address */
-	if (pgm_getifaddrs (&ifap) < 0) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_errno (errno),
-			     _("Enumerating network interfaces: %s"),
-			     strerror (errno));
+	if (!pgm_getifaddrs (&ifap, &error)) {
+		pgm_prefix_error (error,
+				_("Enumerating network interfaces: "));
 		return FALSE;
 	}
 

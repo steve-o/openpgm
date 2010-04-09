@@ -143,13 +143,9 @@ pgm_if_getnodeaddr (
 	}
 
 	struct pgm_ifaddrs *ifap, *ifa, *ifa6;
-	e = pgm_getifaddrs (&ifap);
-	if (e < 0) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_errno (errno),
-			     _("Enumerating network interfaces: %s"),
-			     strerror (errno));
+	if (!pgm_getifaddrs (&ifap, &error)) {
+		pgm_prefix_error (error,
+			     _("Enumerating network interfaces: "));
 		return FALSE;
 	}
 
