@@ -536,9 +536,9 @@ interfaces_callback (
 	GString* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
 	g_string_append (response, "<PRE>");
 	struct pgm_ifaddrs *ifap, *ifa;
-	int e = pgm_getifaddrs (&ifap);
-	if (e < 0) {
-		g_string_append_printf (response, "pgm_getifaddrs(): %s", g_strerror (errno));
+	pgm_error_t* err = NULL;
+	if (!pgm_getifaddrs (&ifap, &err)) {
+		g_string_append_printf (response, "pgm_getifaddrs(): %s", (err && err->message) ? err->message : "(null)");
 		http_finalize_response (response, msg);
 		return;
 	}

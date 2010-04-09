@@ -28,9 +28,10 @@
 #	include <net/if.h>
 #endif
 
-#ifdef CONFIG_HAVE_GETIFADDRS
-#	include <ifaddrs.h>
+#ifndef __PGM_ERROR_H__
+#	include <pgm/error.h>
 #endif
+
 
 #ifndef IF_NAMESIZE
 #	ifdef IFNAMSIZ
@@ -56,24 +57,8 @@ struct pgm_ifaddrs
 
 G_BEGIN_DECLS
 
-int pgm_compat_getifaddrs (struct pgm_ifaddrs**);
-void pgm_compat_freeifaddrs (struct pgm_ifaddrs*);
-
-#ifdef CONFIG_HAVE_GETIFADDRS
-static inline int pgm_getifaddrs (struct pgm_ifaddrs** addrs) {
-	return getifaddrs ((struct ifaddrs**)addrs);
-}
-static inline void pgm_freeifaddrs (struct pgm_ifaddrs* addrs) {
-	freeifaddrs ((struct ifaddrs*)addrs);
-}
-#else
-static inline int pgm_getifaddrs (struct pgm_ifaddrs** addrs) {
-	return pgm_compat_getifaddrs (addrs);
-}
-static inline void pgm_freeifaddrs (struct pgm_ifaddrs* addrs) {
-	pgm_compat_freeifaddrs (addrs);
-}
-#endif
+int pgm_getifaddrs (struct pgm_ifaddrs**, pgm_error_t**);
+void pgm_freeifaddrs (struct pgm_ifaddrs*);
 
 G_END_DECLS
 

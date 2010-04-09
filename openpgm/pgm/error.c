@@ -355,7 +355,7 @@ pgm_error_from_eai_errno (
 
 #ifdef EAI_BADFLAGS
 	case EAI_BADFLAGS:
-		return PGM_ERROR_BADFLAGS;
+		return PGM_ERROR_INVAL;
 		break;
 #endif
 
@@ -367,13 +367,13 @@ pgm_error_from_eai_errno (
 
 #ifdef EAI_FAMILY
 	case EAI_FAMILY:
-		return PGM_ERROR_FAMILY;
+		return PGM_ERROR_AFNOSUPPORT;
 		break;
 #endif
 
 #ifdef EAI_MEMORY
 	case EAI_MEMORY:
-		return PGM_ERROR_MEMORY;
+		return PGM_ERROR_NOMEM;
 		break;
 #endif
 
@@ -397,7 +397,7 @@ pgm_error_from_eai_errno (
 
 #ifdef EAI_SOCKTYPE
 	case EAI_SOCKTYPE:
-		return PGM_ERROR_SOCKTYPE;
+		return PGM_ERROR_SOCKTNOSUPPORT;
 		break;
 #endif
 
@@ -445,6 +445,63 @@ pgm_error_from_wsa_errno (
 #ifdef WSAECONNRESET
 	case WSAECONNRESET:
 		return PGM_ERROR_CONNRESET;
+		break;
+#endif
+
+	default :
+		return PGM_ERROR_FAILED;
+		break;
+	}
+}
+
+/* from GetAdaptersInfo() and GetAdaptersAddresses()
+ */
+
+int
+pgm_error_from_adapter_errno (
+	const int	adapter_errno
+        )
+{
+	switch (adapter_errno) {
+#ifdef ERROR_ADDRESS_NOT_ASSOCIATED
+	case ERROR_ADDRESS_NOT_ASSOCIATED:
+		return PGM_ERROR_NODATA;
+		break;
+#endif
+
+#ifdef ERROR_BUFFER_OVERFLOW
+	case ERROR_BUFFER_OVERFLOW:
+		return PGM_ERROR_NOBUFS;
+		break;
+#endif
+
+#ifdef ERROR_INVALID_DATA
+	case ERROR_INVALID_DATA:
+		return PGM_ERROR_BADE;
+		break;
+#endif
+
+#ifdef ERROR_INVALID_PARAMETER
+	case ERROR_INVALID_PARAMETER:
+		return PGM_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef ERROR_NOT_ENOUGH_MEMORY
+	case ERROR_NOT_ENOUGH_MEMORY:
+		return PGM_ERROR_NOMEM;
+		break;
+#endif
+
+#ifdef ERROR_NO_DATA
+	case ERROR_NO_DATA:
+		return PGM_ERROR_NODATA;
+		break;
+#endif
+
+#ifdef ERROR_NOT_SUPPORTED
+	case ERROR_NOT_SUPPORTED:
+		return PGM_ERROR_NOSYS;
 		break;
 #endif
 
