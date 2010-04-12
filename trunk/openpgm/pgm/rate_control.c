@@ -21,6 +21,7 @@
 
 #include <glib.h>
 
+#include <stdlib.h>
 #include <errno.h>
 #include <sys/types.h>
 
@@ -28,6 +29,7 @@
 #	include <sys/socket.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/time.h"
 #include "pgm/thread.h"
@@ -66,8 +68,8 @@ pgm_rate_create (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != bucket_);
-	g_assert (rate_per_sec >= max_tpdu);
+	pgm_assert (NULL != bucket_);
+	pgm_assert (rate_per_sec >= max_tpdu);
 
 	rate_t* bucket = pgm_malloc0 (sizeof(rate_t));
 	bucket->rate_per_sec	= (gint)rate_per_sec;
@@ -90,7 +92,7 @@ pgm_rate_destroy (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != bucket);
+	pgm_assert (NULL != bucket);
 
 	pgm_spinlock_free (&bucket->spinlock);
 	pgm_free (bucket);
@@ -112,8 +114,8 @@ pgm_rate_check (
 	gint new_rate_limit;
 
 /* pre-conditions */
-	g_assert (NULL != bucket);
-	g_assert (data_size > 0);
+	pgm_assert (NULL != bucket);
+	pgm_assert (data_size > 0);
 
 	if (0 == bucket->rate_per_sec)
 		return TRUE;
@@ -154,7 +156,11 @@ pgm_rate_check (
 	if (bucket->rate_limit < 0) {
 		gint sleep_amount;
 		do {
-			g_thread_yield();
+#ifdef G_OS_UNIX
+                        pthread_yield ();
+#else
+                        Sleep (0);
+#endif
 			now = pgm_time_update_now();
 			time_since_last_rate_check = now - bucket->last_rate_check;
 			sleep_amount = pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check);
@@ -173,7 +179,7 @@ pgm_rate_remaining (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != bucket);
+	pgm_assert (NULL != bucket);
 
 	if (0 == bucket->rate_per_sec)
 		return 0;

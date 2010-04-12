@@ -31,11 +31,6 @@
 
 //#define INDEXTONAME_DEBUG
 
-#ifndef INDEXTONAME_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 #ifdef G_OS_WIN32
@@ -45,7 +40,7 @@ pgm_if_indextoname (
 	char*			ifname
         )
 {
-	g_return_val_if_fail (NULL != ifname, NULL);
+	pgm_return_val_if_fail (NULL != ifname, NULL);
 
 	MIB_IFROW ifRow = { .dwIndex = ifindex };
 	const DWORD dwRetval = GetIfEntry (&ifRow);

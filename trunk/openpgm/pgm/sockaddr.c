@@ -36,6 +36,7 @@
 #endif
 
 
+#include "pgm/messages.h"
 #include "pgm/if.h"
 #include "pgm/indextoaddr.h"
 #include "pgm/sockaddr.h"
@@ -776,10 +777,10 @@ pgm_inet_ntop (
 	socklen_t	size
 	)
 {
-	g_assert (AF_INET == af || AF_INET6 == af);
-	g_assert (NULL != src);
-	g_assert (NULL != dst);
-	g_assert (size > 0);
+	pgm_assert (AF_INET == af || AF_INET6 == af);
+	pgm_assert (NULL != src);
+	pgm_assert (NULL != dst);
+	pgm_assert (size > 0);
 
 	switch (af) {
 	case AF_INET:
@@ -819,9 +820,9 @@ pgm_inet_pton (
 	void*		dst
 	)
 {
-	g_assert (AF_INET == af || AF_INET6 == af);
-	g_assert (NULL != src);
-	g_assert (NULL != dst);
+	pgm_assert (AF_INET == af || AF_INET6 == af);
+	pgm_assert (NULL != src);
+	pgm_assert (NULL != dst);
 
 	struct addrinfo hints = {
 		.ai_family	= af,
@@ -835,8 +836,8 @@ pgm_inet_pton (
 		return 0;	/* error */
 	}
 
-	g_assert (NULL != result->ai_addr);
-	g_assert (0 != result->ai_addrlen);
+	pgm_assert (NULL != result->ai_addr);
+	pgm_assert (0 != result->ai_addrlen);
 
 	switch (result->ai_addr->sa_family) {
 	case AF_INET: {
@@ -854,7 +855,7 @@ pgm_inet_pton (
 	}
 
 	default:
-		g_assert_not_reached();
+		pgm_assert_not_reached();
 		break;
 	}
 

@@ -23,6 +23,7 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/atomic.h"
 #include "pgm/mem.h"
 #include "pgm/hashtable.h"
@@ -30,12 +31,6 @@
 
 
 //#define HASHTABLE_DEBUG
-
-#ifndef HASHTABLE_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 #define HASH_TABLE_MIN_SIZE 11
@@ -83,8 +78,8 @@ pgm_hash_table_new (
 	PGMEqualFunc	key_equal_func
 	)
 {
-	g_return_val_if_fail (NULL != hash_func, NULL);
-	g_return_val_if_fail (NULL != key_equal_func, NULL);
+	pgm_return_val_if_fail (NULL != hash_func, NULL);
+	pgm_return_val_if_fail (NULL != key_equal_func, NULL);
 
 	pgm_hashtable_t *hash_table;
   
@@ -104,8 +99,8 @@ pgm_hash_table_unref (
 	pgm_hashtable_t*	hash_table
 	)
 {
-	g_return_if_fail (hash_table != NULL);
-	g_return_if_fail (hash_table->ref_count > 0);
+	pgm_return_if_fail (hash_table != NULL);
+	pgm_return_if_fail (hash_table->ref_count > 0);
 
 	if (pgm_atomic_int32_exchange_and_add (&hash_table->ref_count, -1) - 1 == 0)
 	{
@@ -121,8 +116,8 @@ pgm_hash_table_destroy (
 	pgm_hashtable_t*	hash_table
 	)
 {
-	g_return_if_fail (hash_table != NULL);
-	g_return_if_fail (hash_table->ref_count > 0);
+	pgm_return_if_fail (hash_table != NULL);
+	pgm_return_if_fail (hash_table->ref_count > 0);
   
 	pgm_hash_table_remove_all (hash_table);
 	pgm_hash_table_unref (hash_table);
@@ -162,7 +157,7 @@ pgm_hash_table_lookup (
 {
 	pgm_hashnode_t *node;
   
-	g_return_val_if_fail (hash_table != NULL, NULL);
+	pgm_return_val_if_fail (hash_table != NULL, NULL);
   
 	node = *pgm_hash_table_lookup_node (hash_table, key, NULL);
 	return node ? node->value : NULL;
@@ -178,11 +173,11 @@ pgm_hash_table_insert (
 	pgm_hashnode_t **node;
 	guint key_hash;
   
-	g_return_if_fail (hash_table != NULL);
-	g_return_if_fail (hash_table->ref_count > 0);
+	pgm_return_if_fail (hash_table != NULL);
+	pgm_return_if_fail (hash_table->ref_count > 0);
   
 	node = pgm_hash_table_lookup_node (hash_table, key, &key_hash);
-	g_return_if_fail (NULL == *node); 
+	pgm_return_if_fail (NULL == *node); 
 
 	*node = pgm_hash_node_new (key, value, key_hash);
 	hash_table->nnodes++;
@@ -197,7 +192,7 @@ pgm_hash_table_remove (
 {
 	pgm_hashnode_t **node, *dest;
   
-	g_return_val_if_fail (hash_table != NULL, FALSE);
+	pgm_return_val_if_fail (hash_table != NULL, FALSE);
   
 	node = pgm_hash_table_lookup_node (hash_table, key, NULL);
 	if (*node)
@@ -217,7 +212,7 @@ pgm_hash_table_remove_all (
 	pgm_hashtable_t*	hash_table
 	)
 {
-	g_return_if_fail (hash_table != NULL);
+	pgm_return_if_fail (hash_table != NULL);
 
 	for (int i = 0; i < hash_table->size; i++)
 	{

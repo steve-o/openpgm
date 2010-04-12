@@ -130,10 +130,13 @@ env = Environment(
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
-		 ],
-	LINKFLAGS = [	'-pipe',
-			'-lm'
-		    ]
+		],
+	LINKFLAGS = [	'-pipe'
+		],
+	LIBS = [
+			'm',
+			'rt'
+		]
 )
 
 # Branch prediction
@@ -179,7 +182,8 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+env.ParseConfig('pkg-config --cflags glib-2.0 gthread-2.0');
+env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':

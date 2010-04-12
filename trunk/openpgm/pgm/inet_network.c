@@ -35,17 +35,13 @@
 #	include <iphlpapi.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/inet_network.h"
 #include "pgm/sockaddr.h"
 
 
 //#define INET_NETWORK_DEBUG
 
-#ifndef INET_NETWORK_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* calculate IPv4 netmask from network size, returns address in
@@ -82,10 +78,10 @@ pgm_inet_network (
 	struct in_addr*		in
 	)
 {
-	g_return_val_if_fail (NULL != s,  -1);
-	g_return_val_if_fail (NULL != in, -1);
+	pgm_return_val_if_fail (NULL != s,  -1);
+	pgm_return_val_if_fail (NULL != in, -1);
 
-	g_trace ("pgm_inet_network (s:\"%s\" in:%p)",
+	pgm_debug ("pgm_inet_network (s:\"%s\" in:%p)",
 		 s, (gpointer)in);
 
 	const char *p = s;
@@ -180,10 +176,10 @@ pgm_inet6_network (
 	struct in6_addr*	in6
 	)
 {
-	g_return_val_if_fail (NULL != s,   -1);
-	g_return_val_if_fail (NULL != in6, -1);
+	pgm_return_val_if_fail (NULL != s,   -1);
+	pgm_return_val_if_fail (NULL != in6, -1);
 
-	g_trace ("pgm_inet6_network (s:\"%s\" in6:%p)",
+	pgm_debug ("pgm_inet6_network (s:\"%s\" in6:%p)",
 		 s, (gpointer)in6);
 
 /* inet_pton cannot parse IPv6 addresses with subnet declarations, so
@@ -201,22 +197,22 @@ pgm_inet6_network (
 	}
 	if (*p == 0) {
 		if (pgm_inet_pton (AF_INET6, s, in6)) return 0;
-		g_trace ("inet_pton failed");
+		pgm_debug ("inet_pton failed");
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
 	*p2 = 0;
-	g_trace ("net part %s", s2);
+	pgm_debug ("net part %s", s2);
 	if (!pgm_inet_pton (AF_INET6, s2, in6)) {
-		g_trace ("inet_pton failed parsing network part %s", s2);
+		pgm_debug ("inet_pton failed parsing network part %s", s2);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
 #ifdef INET_NETWORK_DEBUG
 	char sdebug[INET6_ADDRSTRLEN];
-	g_trace ("IPv6 network address: %s", pgm_inet_ntop(AF_INET6, in6, sdebug, sizeof(sdebug)));
+	pgm_debug ("IPv6 network address: %s", pgm_inet_ntop(AF_INET6, in6, sdebug, sizeof(sdebug)));
 #endif
 
 	p++;
@@ -226,18 +222,18 @@ pgm_inet6_network (
 		if (isdigit(*p)) {
 			val = 10 * val + (*p - '0');
 		} else {
-			g_trace ("failed parsing subnet size due to character '%c'", *p);
+			pgm_debug ("failed parsing subnet size due to character '%c'", *p);
 			memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 			return -1;
 		}
 		p++;
 	}
 	if (val == 0 || val > 128) {
-		g_trace ("subnet size invalid (%d)", val);
+		pgm_debug ("subnet size invalid (%d)", val);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
-	g_trace ("subnet size %i", val);
+	pgm_debug ("subnet size %i", val);
 
 /* zero out host bits */
 	const int suffix_length = 128 - val;
@@ -246,7 +242,7 @@ pgm_inet6_network (
 		in6->s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
 	}
 
-	g_trace ("effective IPv6 network address after subnet mask: %s", pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
+	pgm_debug ("effective IPv6 network address after subnet mask: %s", pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
 
 	return 0;
 }

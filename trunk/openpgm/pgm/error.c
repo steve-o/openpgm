@@ -23,6 +23,7 @@
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/string.h"
 #include "pgm/error.h"
@@ -53,7 +54,7 @@ pgm_error_new_valist (
 	pgm_error_t *error = pgm_new (pgm_error_t, 1);
 	error->domain  = error_domain;
 	error->code    = error_code;
-	error->message = g_strdup_vprintf (format, args);
+	error->message = pgm_strdup_vprintf (format, args);
 	return error;
 }
 
@@ -62,7 +63,7 @@ pgm_error_free (
 	pgm_error_t*	error
 	)
 {
-	g_return_if_fail (error != NULL);
+	pgm_return_if_fail (error != NULL);
 	pgm_free (error->message);
 	pgm_free (error);
 }
@@ -89,7 +90,7 @@ pgm_set_error (
 	if (NULL == *err)
 		*err = new;
 	else
-		g_warning (_(ERROR_OVERWRITTEN_WARNING), new->message); 
+		pgm_warn (_(ERROR_OVERWRITTEN_WARNING), new->message); 
 }
 
 void
@@ -98,17 +99,18 @@ pgm_propagate_error (
 	pgm_error_t*	src
 	)
 {
-	g_return_if_fail (src != NULL);
+	pgm_return_if_fail (src != NULL);
  
 	if (NULL == dest) {
 		if (src)
 			pgm_error_free (src);
 		return;
 	} else {
-		if (NULL != *dest)
-			g_warning (_(ERROR_OVERWRITTEN_WARNING), src->message);
-		else
+		if (NULL != *dest) {
+			pgm_warn (_(ERROR_OVERWRITTEN_WARNING), src->message);
+		} else {
 			*dest = src;
+		}
 	}
 }
 
@@ -132,7 +134,7 @@ pgm_error_add_prefix (
 {
 	gchar* prefix = pgm_strdup_vprintf (format, ap);
 	gchar* oldstring = *string;
-	*string = g_strconcat (prefix, oldstring, NULL);
+	*string = pgm_strconcat (prefix, oldstring, NULL);
 	pgm_free (oldstring);
 	pgm_free (prefix);
 }
@@ -478,6 +480,12 @@ pgm_error_from_adapter_errno (
 #ifdef ERROR_INVALID_DATA
 	case ERROR_INVALID_DATA:
 		return PGM_ERROR_BADE;
+		break;
+#endif
+
+#ifdef ERROR_INSUFFICIENT_BUFFER
+	case ERROR_INSUFFICIENT_BUFFER:
+		return PGM_ERROR_NOMEM;
 		break;
 #endif
 

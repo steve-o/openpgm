@@ -56,6 +56,7 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/slist.h"
@@ -81,16 +82,6 @@
 //#define TRANSPORT_DEBUG
 //#define TRANSPORT_SPM_DEBUG
 
-#ifndef TRANSPORT_DEBUG
-#	define g_trace(m,...)		while (0)
-#else
-#include <ctype.h>
-#	ifdef TRANSPORT_SPM_DEBUG
-#		define g_trace(m,...)		g_debug(__VA_ARGS__)
-#	else
-#		define g_trace(m,...)		do { if (strcmp((m),"SPM")) { g_debug(__VA_ARGS__); } } while (0)
-#	endif
-#endif
 
 #ifndef GROUP_FILTER_SIZE
 #	define GROUP_FILTER_SIZE(numsrc) (sizeof (struct group_filter) \
@@ -140,18 +131,18 @@ pgm_transport_destroy (
 	gboolean		flush
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
-	g_return_val_if_fail (!transport->is_destroyed, FALSE);
-	g_trace ("INFO","pgm_transport_destroy (transport:%p flush:%s)",
+		pgm_return_val_if_reached (FALSE);
+	pgm_return_val_if_fail (!transport->is_destroyed, FALSE);
+	pgm_debug ("pgm_transport_destroy (transport:%p flush:%s)",
 		(gpointer)transport,
 		flush ? "TRUE":"FALSE");
 /* flag existing calls */
 	transport->is_destroyed = TRUE;
 /* cancel running blocking operations */
 	if (-1 != transport->recv_sock) {
-		g_trace ("INFO","closing receive socket.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing receive socket."));
 #ifdef G_OS_UNIX
 		close (transport->recv_sock);
 #else
@@ -160,7 +151,7 @@ pgm_transport_destroy (
 		transport->recv_sock = -1;
 	}
 	if (-1 != transport->send_sock) {
-		g_trace ("INFO","closing send socket.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing send socket."));
 #ifdef G_OS_UNIX
 		close (transport->send_sock);
 #else
@@ -169,10 +160,10 @@ pgm_transport_destroy (
 		transport->send_sock = -1;
 	}
 	pgm_rwlock_reader_unlock (&transport->lock);
-	g_trace ("INFO","blocking on destroy lock ...");
+	pgm_debug ("blocking on destroy lock ...");
 	pgm_rwlock_writer_lock (&transport->lock);
 
-	g_trace ("INFO","removing transport from inventory.");
+	pgm_debug ("removing transport from inventory.");
 	pgm_rwlock_writer_lock (&pgm_transport_list_lock);
 	pgm_transport_list = pgm_slist_remove (pgm_transport_list, transport);
 	pgm_rwlock_writer_unlock (&pgm_transport_list_lock);
@@ -182,22 +173,22 @@ pgm_transport_destroy (
 	    transport->is_bound && 
 	    flush)
 	{
-		g_trace ("INFO","flushing PGM source with session finish option broadcast SPMs.");
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Flushing PGM source with session finish option broadcast SPMs."));
 		if (!pgm_send_spm (transport, PGM_OPT_FIN) ||
 		    !pgm_send_spm (transport, PGM_OPT_FIN) ||
 		    !pgm_send_spm (transport, PGM_OPT_FIN))
 		{
-			g_trace ("INFO","failed to send flushing SPMs.");
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Failed to send flushing SPMs."));
 		}
 	}
 
 	if (transport->peers_hashtable) {
-		g_trace ("INFO","destroying peer lookup table.");
+		pgm_debug ("destroying peer lookup table.");
 		pgm_hash_table_destroy (transport->peers_hashtable);
 		transport->peers_hashtable = NULL;
 	}
 	if (transport->peers_list) {
-		g_trace ("INFO","destroying peer list.");
+		pgm_debug ("destroying peer list.");
 		do {
 			pgm_list_t* next = transport->peers_list->next;
 			pgm_peer_unref ((pgm_peer_t*)transport->peers_list->data);
@@ -207,17 +198,17 @@ pgm_transport_destroy (
 	}
 
 	if (transport->window) {
-		g_trace ("INFO","destroying transmit window.");
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Destroying transmit window."));
 		pgm_txw_shutdown (transport->window);
 		transport->window = NULL;
 	}
 	if (transport->rate_control) {
-		g_trace ("INFO","destroying rate control.");
+		pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Destroying rate control."));
 		pgm_rate_destroy (transport->rate_control);
 		transport->rate_control = NULL;
 	}
 	if (transport->send_with_router_alert_sock) {
-		g_trace ("INFO","closing send with router alert socket.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing send with router alert socket."));
 #ifdef G_OS_UNIX
 		close (transport->send_with_router_alert_sock);
 #else
@@ -226,18 +217,18 @@ pgm_transport_destroy (
 		transport->send_with_router_alert_sock = 0;
 	}
 	if (transport->spm_heartbeat_interval) {
-		g_trace ("INFO","freeing SPM heartbeat interval data.");
+		pgm_debug ("freeing SPM heartbeat interval data.");
 		pgm_free (transport->spm_heartbeat_interval);
 		transport->spm_heartbeat_interval = NULL;
 	}
 	if (transport->rx_buffer) {
-		g_trace ("INFO","freeing receive buffer.");
+		pgm_debug ("freeing receive buffer.");
 		pgm_free_skb (transport->rx_buffer);
 		transport->rx_buffer = NULL;
 	}
-	g_trace ("INFO","destroying notification channel.");
+	pgm_debug ("destroying notification channel.");
 	pgm_notify_destroy (&transport->pending_notify);
-	g_trace ("INFO","freeing transport locks.");
+	pgm_debug ("freeing transport locks.");
 	pgm_rwlock_free (&transport->peers_lock);
 	pgm_spinlock_free (&transport->txw_spinlock);
 	pgm_mutex_free (&transport->send_mutex);
@@ -246,9 +237,9 @@ pgm_transport_destroy (
 	pgm_mutex_free (&transport->receiver_mutex);
 	pgm_rwlock_writer_unlock (&transport->lock);
 	pgm_rwlock_free (&transport->lock);
-	g_trace ("INFO","freeing transport data.");
+	pgm_debug ("freeing transport data.");
 	pgm_free (transport);
-	g_trace ("INFO","finished.");
+	pgm_debug ("finished.");
 	return TRUE;
 }
 
@@ -279,27 +270,27 @@ pgm_transport_create (
 {
 	pgm_transport_t* new_transport;
 
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (NULL != tinfo, FALSE);
-	if (tinfo->ti_sport) g_return_val_if_fail (tinfo->ti_sport != tinfo->ti_dport, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (NULL != tinfo, FALSE);
+	if (tinfo->ti_sport) pgm_return_val_if_fail (tinfo->ti_sport != tinfo->ti_dport, FALSE);
 	if (tinfo->ti_udp_encap_ucast_port)
-		g_return_val_if_fail (tinfo->ti_udp_encap_mcast_port, FALSE);
+		pgm_return_val_if_fail (tinfo->ti_udp_encap_mcast_port, FALSE);
 	else if (tinfo->ti_udp_encap_mcast_port)
-		g_return_val_if_fail (tinfo->ti_udp_encap_ucast_port, FALSE);
-	g_return_val_if_fail (tinfo->ti_recv_addrs_len > 0, FALSE);
+		pgm_return_val_if_fail (tinfo->ti_udp_encap_ucast_port, FALSE);
+	pgm_return_val_if_fail (tinfo->ti_recv_addrs_len > 0, FALSE);
 #ifdef CONFIG_TARGET_WINE
-	g_return_val_if_fail (tinfo->ti_recv_addrs_len == 1, FALSE);
+	pgm_return_val_if_fail (tinfo->ti_recv_addrs_len == 1, FALSE);
 #endif
-	g_return_val_if_fail (tinfo->ti_recv_addrs_len <= IP_MAX_MEMBERSHIPS, FALSE);
-	g_return_val_if_fail (NULL != tinfo->ti_recv_addrs, FALSE);
-	g_return_val_if_fail (1 == tinfo->ti_send_addrs_len, FALSE);
-	g_return_val_if_fail (NULL != tinfo->ti_send_addrs, FALSE);
+	pgm_return_val_if_fail (tinfo->ti_recv_addrs_len <= IP_MAX_MEMBERSHIPS, FALSE);
+	pgm_return_val_if_fail (NULL != tinfo->ti_recv_addrs, FALSE);
+	pgm_return_val_if_fail (1 == tinfo->ti_send_addrs_len, FALSE);
+	pgm_return_val_if_fail (NULL != tinfo->ti_send_addrs, FALSE);
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
-		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, -FALSE);
-		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, -FALSE);
+		pgm_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, -FALSE);
+		pgm_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, -FALSE);
 	}
-	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
+	pgm_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
 	new_transport = pgm_malloc0 (sizeof(pgm_transport_t));
 	new_transport->can_send_data = TRUE;
@@ -347,11 +338,11 @@ pgm_transport_create (
 /* open sockets to implement PGM */
 	int socket_type, protocol;
 	if (new_transport->udp_encap_ucast_port) {
-		g_trace ("INFO", "opening UDP encapsulated sockets.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Opening UDP encapsulated sockets."));
 		socket_type = SOCK_DGRAM;
 		protocol = IPPROTO_UDP;
 	} else {
-		g_trace ("INFO", "opening raw sockets.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Opening raw sockets."));
 		socket_type = SOCK_RAW;
 		protocol = ipproto_pgm;
 	}
@@ -368,7 +359,7 @@ pgm_transport_create (
 			     _("Creating receive socket: %s"),
 			     strerror (errno));
 		if (EPERM == save_errno) {
-			g_warning (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
+			pgm_error (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
 		}
 #else
 		const int save_errno = WSAGetLastError();
@@ -445,30 +436,30 @@ err_destroy:
 	if (-1 != new_transport->recv_sock) {
 #ifdef G_OS_UNIX
 		if (-1 == close (new_transport->recv_sock))
-			g_warning (_("Close on receive socket failed: %s"), strerror (errno));
+			pgm_warn (_("Close on receive socket failed: %s"), strerror (errno));
 #else
 		if (SOCKET_ERROR == closesocket (new_transport->recv_sock))
-			g_warning (_("Close on receive socket failed: %s"), wsa_strerror (WSAGetLastError()));
+			pgm_warn (_("Close on receive socket failed: %s"), wsa_strerror (WSAGetLastError()));
 #endif
 		new_transport->recv_sock = -1;
 	}
 	if (-1 != new_transport->send_sock) {
 #ifdef G_OS_UNIX
 		if (-1 == close (new_transport->send_sock))
-			g_warning (_("Close on send socket failed: %s"), strerror (errno));
+			pgm_warn (_("Close on send socket failed: %s"), strerror (errno));
 #else
 		if (SOCKET_ERROR == closesocket (new_transport->send_sock)) 
-			g_warning (_("Close on send socket failed: %s"), wsa_strerror (WSAGetLastError()));
+			pgm_warn (_("Close on send socket failed: %s"), wsa_strerror (WSAGetLastError()));
 #endif
 		new_transport->send_sock = -1;
 	}
 	if (-1 != new_transport->send_with_router_alert_sock) {
 #ifdef G_OS_UNIX
 		if (-1 == close (new_transport->send_with_router_alert_sock))
-			g_warning (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), strerror (errno));
+			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), strerror (errno));
 #else
 		if (SOCKET_ERROR == closesocket (new_transport->send_with_router_alert_sock))
-			g_warning (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), wsa_strerror (WSAGetLastError()));
+			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), wsa_strerror (WSAGetLastError()));
 #endif
 		new_transport->send_with_router_alert_sock = -1;
 	}
@@ -503,10 +494,10 @@ pgm_transport_set_max_tpdu (
 	const guint16		max_tpdu
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (max_tpdu >= (sizeof(struct pgm_ip) + sizeof(struct pgm_header)), FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (max_tpdu >= (sizeof(struct pgm_ip) + sizeof(struct pgm_header)), FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -530,9 +521,9 @@ pgm_transport_set_multicast_loop (
 	const gboolean		use_multicast_loop
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -555,11 +546,11 @@ pgm_transport_set_hops (
 	const gint		hops
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (hops > 0, FALSE);
-	g_return_val_if_fail (hops < 256, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (hops > 0, FALSE);
+	pgm_return_val_if_fail (hops < 256, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -584,10 +575,10 @@ pgm_transport_set_sndbuf (
 	const int		size		/* not gsize/gssize as we propogate to setsockopt() */
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (size > 0, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (size > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -601,14 +592,14 @@ pgm_transport_set_sndbuf (
 	fp = fopen ("/proc/sys/net/core/wmem_max", "r");
 	if (fp) {
 		const int matches = fscanf (fp, "%d", &wmem_max);
-		g_assert (1 == matches);
+		pgm_assert (1 == matches);
 		fclose (fp);
 		if (size > wmem_max) {
 			pgm_rwlock_reader_unlock (&transport->lock);
 			return FALSE;
 		}
 	} else {
-		g_warning (_("cannot open /proc/sys/net/core/wmem_max: %s"), strerror(errno));
+		pgm_warn (_("Cannot open /proc/sys/net/core/wmem_max: %s"), strerror(errno));
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -631,10 +622,10 @@ pgm_transport_set_rcvbuf (
 	const int		size		/* not gsize/gssize */
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (size > 0, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (size > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -648,14 +639,14 @@ pgm_transport_set_rcvbuf (
 	fp = fopen ("/proc/sys/net/core/rmem_max", "r");
 	if (fp) {
 		const int matches = fscanf (fp, "%d", &rmem_max);
-		g_assert (1 == matches);
+		pgm_assert (1 == matches);
 		fclose (fp);
 		if (size > rmem_max) {
 			pgm_rwlock_reader_unlock (&transport->lock);
 			return FALSE;
 		}
 	} else {
-		g_warning (_("cannot open /proc/sys/net/core/rmem_max: %s"), strerror(errno));
+		pgm_warn (_("Cannot open /proc/sys/net/core/rmem_max: %s"), strerror(errno));
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -676,17 +667,17 @@ pgm_transport_bind (
 	pgm_error_t**		error
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
 	if (!pgm_rwlock_writer_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_writer_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
-	g_trace ("INFO", "bind (transport:%p error:%p)",
+	pgm_debug ("bind (transport:%p error:%p)",
 		 (gpointer)transport, (gpointer)error);
 
 	pgm_rand_create (&transport->rand_);
@@ -722,11 +713,11 @@ pgm_transport_bind (
 
 /* determine IP header size for rate regulation engine & stats */
 	transport->iphdr_len = (AF_INET == transport->send_gsr.gsr_group.ss_family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
-	g_trace ("INFO","assuming IP header size of %" G_GSIZE_FORMAT " bytes", transport->iphdr_len);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming IP header size of %" G_GSIZE_FORMAT " bytes", transport->iphdr_len);
 
 	if (transport->udp_encap_ucast_port) {
 		const guint udphdr_len = sizeof(struct pgm_udphdr);
-		g_trace ("INFO","assuming UDP header size of %i bytes", udphdr_len);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming UDP header size of %i bytes", udphdr_len);
 		transport->iphdr_len += udphdr_len;
 	}
 
@@ -736,24 +727,24 @@ pgm_transport_bind (
 	transport->max_apdu = MIN(PGM_MAX_APDU, max_fragments * transport->max_tsdu_fragment);
 
 	if (transport->can_send_data) {
-		g_trace ("INFO","construct transmit window.");
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Create transmit window."));
 		transport->window = transport->txw_sqns ?
 					pgm_txw_create (&transport->tsi, 0, transport->txw_sqns, 0, 0, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k) :
 					pgm_txw_create (&transport->tsi, transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k);
-		g_assert (transport->window);
+		pgm_assert (transport->window);
 	}
 
 /* create peer list */
 	if (transport->can_recv_data) {
 		transport->peers_hashtable = pgm_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
-		g_assert (transport->peers_hashtable);
+		pgm_assert (transport->peers_hashtable);
 	}
 
 	if (transport->udp_encap_ucast_port)
 	{
 /* Stevens: "SO_REUSEADDR has datatype int."
  */
-		g_trace ("INFO","set socket sharing.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
 		int v = TRUE;
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
@@ -780,7 +771,7 @@ pgm_transport_bind (
 
 /* request extra packet information to determine destination address on each packet */
 #ifndef CONFIG_TARGET_WINE
-		g_trace ("INFO","request socket packet-info.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
 		const int recv_family = transport->recv_gsr[0].gsr_group.ss_family;
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 		{
@@ -810,7 +801,7 @@ pgm_transport_bind (
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
-			g_trace ("INFO","request IP headers.");
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP headers."));
 			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE))
 			{
 #ifdef G_OS_UNIX
@@ -834,8 +825,8 @@ pgm_transport_bind (
 		}
 		else
 		{
-			g_assert (AF_INET6 == recv_family);
-			g_trace ("INFO","request socket packet-info.");
+			pgm_assert (AF_INET6 == recv_family);
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
 			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 			{
 #ifdef G_OS_UNIX
@@ -864,7 +855,7 @@ pgm_transport_bind (
 	{
 /* Stevens: "SO_RCVBUF has datatype int."
  */
-		g_trace ("INFO","set receive socket buffer size.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set receive socket buffer size to %d bytes."), transport->rcvbuf);
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)))
 		{
 #ifdef G_OS_UNIX
@@ -890,7 +881,7 @@ pgm_transport_bind (
 	{
 /* Stevens: "SO_SNDBUF has datatype int."
  */
-		g_trace ("INFO","set send socket buffer size.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set send socket buffer size to %d bytes."), transport->sndbuf);
 		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)))
 		{
@@ -957,7 +948,7 @@ pgm_transport_bind (
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-	g_trace ("INFO","binding receive socket to interface index %i", transport->recv_gsr[0].gsr_interface);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %d"), transport->recv_gsr[0].gsr_interface);
 
 #endif /* CONFIG_BIND_INADDR_ANY */
 
@@ -992,7 +983,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, s, sizeof(s));
-		g_trace ("INFO","bind succeeded on recv_gsr[0] interface %s", s);
+		pgm_debug ("bind succeeded on recv_gsr[0] interface %s", s);
 	}
 #endif
 
@@ -1011,7 +1002,7 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	else
 	{
-		g_trace ("INFO","binding send socket to interface index %u", (unsigned)transport->send_gsr.gsr_interface);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %d"), transport->send_gsr.gsr_interface);
 	}
 #endif
 
@@ -1062,7 +1053,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, s, sizeof(s));
-		g_trace ("INFO","bind succeeded on send_gsr interface %s", s);
+		pgm_debug ("bind succeeded on send_gsr interface %s", s);
 	}
 #endif
 
@@ -1097,7 +1088,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, s, sizeof(s));
-		g_trace ("INFO","bind (router alert) succeeded on send_gsr interface %s", s);
+		pgm_debug ("bind (router alert) succeeded on send_gsr interface %s", s);
 	}
 #endif
 
@@ -1166,7 +1157,7 @@ pgm_transport_bind (
 			{
 				char s1[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
-				g_trace ("INFO","MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
+				pgm_debug ("MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
 					i, (unsigned)p->gsr_interface, s1);
 			}
 #endif /* TRANSPORT_DEBUG */
@@ -1209,7 +1200,7 @@ pgm_transport_bind (
 				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
 				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, s2, sizeof(s2));
-				g_trace ("INFO","MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %u group %s source %s",
+				pgm_debug ("MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %u group %s source %s",
 					i, (unsigned)p->gsr_interface, s1, s2);
 			}
 #endif /* TRANSPORT_DEBUG */
@@ -1246,7 +1237,7 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&transport->send_addr, s, sizeof(s));
-		g_trace ("INFO","pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %u",
+		pgm_debug ("pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %u",
 					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
 #endif
@@ -1279,13 +1270,13 @@ pgm_transport_bind (
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&transport->send_addr, s, sizeof(s));
-		g_trace ("INFO","pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %u",
+		pgm_debug ("pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %u",
 					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
 #endif
 
 /* multicast loopback */
-	g_trace ("INFO","set multicast loopback.");
+	pgm_trace (PGM_LOG_ROLE_NETWORK,transport->use_multicast_loop?_("Set multicast loopback.") : _("Unset multicast loopback."));
 #ifdef G_OS_UNIX
 	if (0 != pgm_sockaddr_multicast_loop (transport->send_sock,
 					      transport->send_gsr.gsr_group.ss_family,
@@ -1321,7 +1312,7 @@ pgm_transport_bind (
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 #ifndef CONFIG_TARGET_WINE
-	g_trace ("INFO","set multicast hop limit.");
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set multicast hop limit to %d."), transport->hops);
 	if (0 != pgm_sockaddr_multicast_hops (transport->send_sock,
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops) ||
@@ -1355,7 +1346,7 @@ pgm_transport_bind (
  * 
  * codepoint 101110 (RFC 3246)
  */
-	g_trace ("INFO","set packet differentiated services field to expedited forwarding.");
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set packet differentiated services field to expedited forwarding."));
 	const int dscp = 0x2e << 2;
 	if (0 != pgm_sockaddr_tos (transport->send_sock,
 				   transport->send_gsr.gsr_group.ss_family,
@@ -1364,7 +1355,7 @@ pgm_transport_bind (
 				   transport->send_gsr.gsr_group.ss_family,
 				   dscp))
 	{
-		g_warning (_("DSCP setting requires CAP_NET_ADMIN or ADMIN capability."));
+		pgm_warn (_("DSCP setting requires CAP_NET_ADMIN or ADMIN capability."));
 		goto no_cap_net_admin;
 	}
 
@@ -1376,7 +1367,7 @@ no_cap_net_admin:
 /* setup rate control */
 		if (transport->txw_max_rte)
 		{
-			g_trace ("INFO","setting rate regulation to %i bytes per second.",
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %i bytes per second."),
 					transport->txw_max_rte);
 	
 			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len, transport->max_tpdu);
@@ -1416,8 +1407,7 @@ no_cap_net_admin:
 	}
 
 /* non-blocking sockets */
-	g_trace ("INFO","set %s sockets",
-		transport->is_nonblocking ? "non-blocking" : "blocking");
+	pgm_trace (PGM_LOG_ROLE_NETWORK,transport->is_nonblocking ? _("Set non-blocking sockets") : _("Set blocking sockets"));
 	pgm_sockaddr_nonblocking (transport->recv_sock, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_sock, transport->is_nonblocking);
 	pgm_sockaddr_nonblocking (transport->send_with_router_alert_sock, transport->is_nonblocking);
@@ -1426,12 +1416,12 @@ no_cap_net_admin:
 	transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 
 /* cleanup */
-	g_trace ("INFO","preparing dynamic timer");
+	pgm_debug ("preparing dynamic timer");
 	pgm_timer_prepare (transport);
 
 	transport->is_bound = TRUE;
 	pgm_rwlock_writer_unlock (&transport->lock);
-	g_trace ("INFO","transport successfully created.");
+	pgm_debug ("transport successfully created.");
 	return TRUE;
 }
 
@@ -1444,8 +1434,8 @@ pgm_transport_get_timer_pending (
 	struct timeval*		tv
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (NULL != tv, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (NULL != tv, FALSE);
 	const long usecs = pgm_timer_expiration (transport);
 	tv->tv_sec  = usecs / 1000000UL;
 	tv->tv_usec = usecs % 1000000UL;
@@ -1462,8 +1452,8 @@ pgm_transport_get_rate_remaining (
 	struct timeval*		tv
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (NULL != tv, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (NULL != tv, FALSE);
 	const pgm_time_t pgm_time = pgm_rate_remaining (transport->rate_control, transport->blocklen);
 	tv->tv_sec  = pgm_time / 1000000UL;
 	tv->tv_usec = pgm_time % 1000000UL;
@@ -1485,8 +1475,8 @@ pgm_transport_select_info (
 {
 	int fds = 0;
 
-	g_assert (transport);
-	g_assert (n_fds);
+	pgm_assert (transport);
+	pgm_assert (n_fds);
 
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
@@ -1532,9 +1522,9 @@ pgm_transport_poll_info (
 	const int		events		/* POLLIN, POLLOUT */
 	)
 {
-	g_assert (transport);
-	g_assert (fds);
-	g_assert (n_fds);
+	pgm_assert (transport);
+	pgm_assert (fds);
+	pgm_assert (n_fds);
 
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
@@ -1548,17 +1538,17 @@ pgm_transport_poll_info (
 /* we currently only support one incoming socket */
 	if (events & POLLIN)
 	{
-		g_assert ( (1 + moo) <= *n_fds );
+		pgm_assert ( (1 + moo) <= *n_fds );
 		fds[moo].fd = transport->recv_sock;
 		fds[moo].events = POLLIN;
 		moo++;
 		if (transport->can_send_data) {
-			g_assert ( (1 + moo) <= *n_fds );
+			pgm_assert ( (1 + moo) <= *n_fds );
 			fds[moo].fd = pgm_notify_get_fd (&transport->rdata_notify);
 			fds[moo].events = POLLIN;
 			moo++;
 		}
-		g_assert ( (1 + moo) <= *n_fds );
+		pgm_assert ( (1 + moo) <= *n_fds );
 		fds[moo].fd = pgm_notify_get_fd (&transport->pending_notify);
 		fds[moo].events = POLLIN;
 		moo++;
@@ -1567,7 +1557,7 @@ pgm_transport_poll_info (
 /* ODATA only published on regular socket, no need to poll router-alert sock */
 	if (transport->can_send_data && events & POLLOUT)
 	{
-		g_assert ( (1 + moo) <= *n_fds );
+		pgm_assert ( (1 + moo) <= *n_fds );
 		fds[moo].fd = transport->send_sock;
 		fds[moo].events = POLLOUT;
 		moo++;
@@ -1665,30 +1655,30 @@ pgm_transport_set_fec (
 	const guint		default_k
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail ((default_k & (default_k -1)) == 0, FALSE);
-	g_return_val_if_fail (default_k >= 2 && default_k <= 128, FALSE);
-	g_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail ((default_k & (default_k -1)) == 0, FALSE);
+	pgm_return_val_if_fail (default_k >= 2 && default_k <= 128, FALSE);
+	pgm_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, FALSE);
 
 	const guint default_h = default_n - default_k;
 
-	g_return_val_if_fail (proactive_h <= default_h, FALSE);
+	pgm_return_val_if_fail (proactive_h <= default_h, FALSE);
 
 /* check validity of parameters */
 	if ( default_k > 223 &&
 		( (default_h * 223.0) / default_k ) < 1.0 )
 	{
-		g_error (_("k/h ratio too low to generate parity data."));
+		pgm_error (_("k/h ratio too low to generate parity data."));
 		return FALSE;
 	}
 
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
 	transport->use_proactive_parity	= proactive_h > 0;
@@ -1713,14 +1703,14 @@ pgm_transport_set_send_only (
 	const gboolean		send_only
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 	transport->can_recv_data	= !send_only;
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -1739,14 +1729,14 @@ pgm_transport_set_recv_only (
 	const gboolean		is_passive	/* don't send any request or responses */
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 	transport->can_send_data	= !recv_only;
 	transport->can_send_nak		= !is_passive;
@@ -1765,14 +1755,14 @@ pgm_transport_set_abort_on_reset (
 	const gboolean		abort_on_reset
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 	transport->is_abort_on_reset = abort_on_reset;
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -1787,14 +1777,14 @@ pgm_transport_set_nonblocking (
 	const gboolean		nonblocking
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 	transport->is_nonblocking = nonblocking;
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -1818,17 +1808,17 @@ pgm_transport_join_group (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gr != NULL, FALSE);
-	g_return_val_if_fail (sizeof(struct group_req) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gr != NULL, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_req) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
 /* verify not duplicate group/interface pairing */
@@ -1844,9 +1834,9 @@ pgm_transport_join_group (
 			char s[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop ((struct sockaddr*)&gr->gr_group, s, sizeof(s));
 			if (transport->recv_gsr[i].gsr_interface) {
-				g_trace("INFO", "transport has already joined group %s on interface %u", s, (unsigned)gr->gr_interface);
+				pgm_warn(_("Transport has already joined group %s on interface %d"), s, gr->gr_interface);
 			} else {
-				g_trace("INFO", "transport has already joined group %s on all interfaces.", s);
+				pgm_warn(_("Transport has already joined group %s on all interfaces."), s);
 			}
 #endif
 			pgm_rwlock_reader_unlock (&transport->lock);
@@ -1875,17 +1865,17 @@ pgm_transport_leave_group (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gr != NULL, FALSE);
-	g_return_val_if_fail (sizeof(struct group_req) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gr != NULL, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_req) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len == 0)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
 	for (unsigned i = 0; i < transport->recv_gsr_len;)
@@ -1922,16 +1912,16 @@ pgm_transport_block_source (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gsr != NULL, FALSE);
-	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gsr != NULL, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_BLOCK_SOURCE, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -1950,16 +1940,16 @@ pgm_transport_unblock_source (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gsr != NULL, FALSE);
-	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gsr != NULL, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_UNBLOCK_SOURCE, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -1980,17 +1970,17 @@ pgm_transport_join_source_group (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gsr != NULL, FALSE);
-	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gsr != NULL, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
 /* verify if existing group/interface pairing */
@@ -2008,10 +1998,10 @@ pgm_transport_join_source_group (
 				pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, s1, sizeof(s1));
 				pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_source, s2, sizeof(s2));
 				if (transport->recv_gsr[i].gsr_interface) {
-					g_trace("INFO", "transport has already joined group %s from source %s on interface %u",
+					pgm_warn(_("Transport has already joined group %s from source %s on interface %d"),
 						s1, s2, (unsigned)gsr->gsr_interface);
 				} else {
-					g_trace("INFO", "transport has already joined group %s from source %s on all interfaces",
+					pgm_warn(_("Transport has already joined group %s from source %s on all interfaces"),
 						s1, s2);
 				}
 #endif
@@ -2041,17 +2031,17 @@ pgm_transport_leave_source_group (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gsr != NULL, FALSE);
-	g_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gsr != NULL, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_source_req) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed ||
 	    transport->recv_gsr_len == 0)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
 /* verify if existing group/interface pairing */
@@ -2084,17 +2074,17 @@ pgm_transport_msfilter (
 {
 	int status;
 
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (gf_list != NULL, FALSE);
-	g_return_val_if_fail (len > 0, FALSE);
-	g_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (gf_list != NULL, FALSE);
+	pgm_return_val_if_fail (len > 0, FALSE);
+	pgm_return_val_if_fail (GROUP_FILTER_SIZE(gf_list->gf_numsrc) == len, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	}
 
 #ifdef MCAST_MSFILTER	

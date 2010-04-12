@@ -19,8 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/pgm.h"
 #include "pgm/receiverp.h"
 #include "pgm/sourcep.h"
@@ -28,13 +31,6 @@
 
 
 //#define TIMER_DEBUG
-
-#ifndef TIMER_DEBUG
-#	define G_DISABLE_ASSERT
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* determine which timer fires next: spm (ihb_tmr), nak_rb_ivl, nak_rpt_ivl, or nak_rdata_ivl
@@ -51,8 +47,8 @@ pgm_timer_prepare (
 	glong msec;
 
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (transport->can_send_data || transport->can_recv_data);
+	pgm_assert (NULL != transport);
+	pgm_assert (transport->can_send_data || transport->can_recv_data);
 
 	pgm_time_t now = pgm_time_update_now();
 	pgm_time_t expiration;
@@ -72,7 +68,7 @@ pgm_timer_prepare (
 		msec = 0;
 	else
 		msec = MIN (G_MAXINT, (guint)msec);
-	g_trace ("%dms", (gint)msec);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiration in %ldms"), msec);
 	return (msec == 0);
 }
 
@@ -85,7 +81,7 @@ pgm_timer_check (
 	gboolean expired;
 
 /* pre-conditions */
-	g_assert (NULL != transport);
+	pgm_assert (NULL != transport);
 
 	pgm_timer_lock (transport);
 	expired = pgm_time_after_eq (now, transport->next_poll);
@@ -105,7 +101,7 @@ pgm_timer_expiration (
 	long expiration;
 
 /* pre-conditions */
-	g_assert (NULL != transport);
+	pgm_assert (NULL != transport);
 
 	pgm_timer_lock (transport);
 	expiration = pgm_time_after (transport->next_poll, now) ? (long)pgm_to_usecs (transport->next_poll - now) : 0;
@@ -128,9 +124,9 @@ pgm_timer_dispatch (
 	pgm_time_t next_expiration = 0;
 
 /* pre-conditions */
-	g_assert (NULL != transport);
+	pgm_assert (NULL != transport);
 
-	g_trace ("pgm_timer_dispatch (transport:%p)", (gpointer)transport);
+	pgm_debug ("pgm_timer_dispatch (transport:%p)", (gpointer)transport);
 
 /* find which timers have expired and call each */
 	if (transport->can_recv_data)

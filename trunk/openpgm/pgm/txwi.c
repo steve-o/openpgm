@@ -31,18 +31,11 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-//#define TXW_DEBUG
-
-#ifndef TXW_DEBUG
-#	define G_DISABLE_ASSERT
-#	ifdef g_assert_cmpuint
-#		undef g_assert_cmpuint
-#	endif
-#	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
-#endif
-
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/queue.h"
@@ -55,11 +48,12 @@
 #include "pgm/histogram.h"
 
 
+//#define TXW_DEBUG
+
 #ifndef TXW_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
+#	define PGM_DISABLE_ASSERT
 #endif
+
 
 
 /* testing function: is TSI null
@@ -76,7 +70,7 @@ pgm_tsi_is_null (
 	pgm_tsi_t nulltsi;
 
 /* pre-conditions */
-	g_assert (tsi);
+	pgm_assert (tsi);
 
 	memset (&nulltsi, 0, sizeof(nulltsi));
 	return 0 == memcmp (&nulltsi, tsi, sizeof(nulltsi));
@@ -95,7 +89,7 @@ _pgm_txw_peek (
 	struct pgm_sk_buff_t* skb;
 
 /* pre-conditions */
-	g_assert (window);
+	pgm_assert (window);
 
 	if (pgm_txw_is_empty (window))
 		return NULL;
@@ -104,9 +98,9 @@ _pgm_txw_peek (
 	{
 		const guint32 index_ = sequence % pgm_txw_max_length (window);
 		skb = window->pdata[index_];
-		g_assert (skb);
-		g_assert (pgm_skb_is_valid (skb));
-		g_assert (pgm_tsi_is_null (&skb->tsi));
+		pgm_assert (skb);
+		pgm_assert (pgm_skb_is_valid (skb));
+		pgm_assert (pgm_tsi_is_null (&skb->tsi));
 	}
 	else
 		skb = NULL;
@@ -125,7 +119,7 @@ pgm_txw_retransmit_can_peek (
 	pgm_txw_t* const	window
 	)
 {
-	g_return_val_if_fail (window, FALSE);
+	pgm_return_val_if_fail (window, FALSE);
 	return NULL != pgm_txw_retransmit_try_peek (window);
 }
 
@@ -157,31 +151,31 @@ pgm_txw_create (
 	pgm_txw_t* window;
 
 /* pre-conditions */
-	g_assert (NULL != tsi);
+	pgm_assert (NULL != tsi);
 	if (sqns) {
-		g_assert_cmpuint (tpdu_size, ==, 0);
-		g_assert_cmpuint (sqns, >, 0);
-		g_assert_cmpuint (sqns & PGM_UINT32_SIGN_BIT, ==, 0);
-		g_assert_cmpuint (secs, ==, 0);
-		g_assert_cmpuint (max_rte, ==, 0);
+		pgm_assert_cmpuint (tpdu_size, ==, 0);
+		pgm_assert_cmpuint (sqns, >, 0);
+		pgm_assert_cmpuint (sqns & PGM_UINT32_SIGN_BIT, ==, 0);
+		pgm_assert_cmpuint (secs, ==, 0);
+		pgm_assert_cmpuint (max_rte, ==, 0);
 	} else {
-		g_assert_cmpuint (tpdu_size, >, 0);
-		g_assert_cmpuint (secs, >, 0);
-		g_assert_cmpuint (max_rte, >, 0);
+		pgm_assert_cmpuint (tpdu_size, >, 0);
+		pgm_assert_cmpuint (secs, >, 0);
+		pgm_assert_cmpuint (max_rte, >, 0);
 	}
 	if (use_fec) {
-		g_assert_cmpuint (rs_n, >, 0);
-		g_assert_cmpuint (rs_k, >, 0);
+		pgm_assert_cmpuint (rs_n, >, 0);
+		pgm_assert_cmpuint (rs_k, >, 0);
 	}
 
-	g_trace ("create (tsi:%s max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u use-fec:%s rs(n):%u rs(k):%u).\n",
+	pgm_debug ("create (tsi:%s max-tpdu:%" G_GUINT16_FORMAT " sqns:%" G_GUINT32_FORMAT  " secs %u max-rte %u use-fec:%s rs(n):%u rs(k):%u).\n",
 		pgm_tsi_print (tsi),
 		tpdu_size, sqns, secs, max_rte,
 		use_fec ? "YES" : "NO",
 		rs_n, rs_k);
 
 /* calculate transmit window parameters */
-	g_assert (sqns || (tpdu_size && secs && max_rte));
+	pgm_assert (sqns || (tpdu_size && secs && max_rte));
 	const guint32 alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
 	window = pgm_malloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 	window->tsi = tsi;
@@ -205,12 +199,12 @@ pgm_txw_create (
 	window->alloc = alloc_sqns;
 
 /* post-conditions */
-	g_assert_cmpuint (pgm_txw_max_length (window), ==, alloc_sqns);
-	g_assert_cmpuint (pgm_txw_length (window), ==, 0);
-	g_assert_cmpuint (pgm_txw_size (window), ==, 0);
-	g_assert (pgm_txw_is_empty (window));
-	g_assert (!pgm_txw_is_full (window));
-	g_assert (!pgm_txw_retransmit_can_peek (window));
+	pgm_assert_cmpuint (pgm_txw_max_length (window), ==, alloc_sqns);
+	pgm_assert_cmpuint (pgm_txw_length (window), ==, 0);
+	pgm_assert_cmpuint (pgm_txw_size (window), ==, 0);
+	pgm_assert (pgm_txw_is_empty (window));
+	pgm_assert (!pgm_txw_is_full (window));
+	pgm_assert (!pgm_txw_retransmit_can_peek (window));
 
 	return window;
 }
@@ -224,10 +218,10 @@ pgm_txw_shutdown (
 	)
 {
 /* pre-conditions */
-	g_assert (window);
-	g_assert_cmpuint (window->alloc, >, 0);
+	pgm_assert (window);
+	pgm_assert_cmpuint (window->alloc, >, 0);
 
-	g_trace ("shutdown (window:%p)", (gpointer)window);
+	pgm_debug ("shutdown (window:%p)", (gpointer)window);
 
 /* contents of window */
 	while (!pgm_txw_is_empty (window)) {
@@ -235,13 +229,13 @@ pgm_txw_shutdown (
 	}
 
 /* window must now be empty */
-	g_assert_cmpuint (pgm_txw_length (window), ==, 0);
-	g_assert_cmpuint (pgm_txw_size (window), ==, 0);
-	g_assert (pgm_txw_is_empty (window));
-	g_assert (!pgm_txw_is_full (window));
+	pgm_assert_cmpuint (pgm_txw_length (window), ==, 0);
+	pgm_assert_cmpuint (pgm_txw_size (window), ==, 0);
+	pgm_assert (pgm_txw_is_empty (window));
+	pgm_assert (!pgm_txw_is_full (window));
 
 /* retransmit queue must be empty */
-	g_assert (!pgm_txw_retransmit_can_peek (window));
+	pgm_assert (!pgm_txw_retransmit_can_peek (window));
 
 /* free reed-solomon state */
 	if (window->is_fec_enabled) {
@@ -275,16 +269,16 @@ pgm_txw_add (
 	)
 {
 /* pre-conditions */
-	g_assert (window);
-	g_assert (skb);
-	g_assert_cmpuint (pgm_txw_max_length (window), >, 0);
-	g_assert (pgm_skb_is_valid (skb));
-	g_assert (((const pgm_list_t*)skb)->next == NULL);
-	g_assert (((const pgm_list_t*)skb)->prev == NULL);
-	g_assert (pgm_tsi_is_null (&skb->tsi));
-	g_assert ((sizeof(struct pgm_header) + sizeof(struct pgm_data)) <= ((guint8*)skb->data - (guint8*)skb->head));
+	pgm_assert (window);
+	pgm_assert (skb);
+	pgm_assert_cmpuint (pgm_txw_max_length (window), >, 0);
+	pgm_assert (pgm_skb_is_valid (skb));
+	pgm_assert (((const pgm_list_t*)skb)->next == NULL);
+	pgm_assert (((const pgm_list_t*)skb)->prev == NULL);
+	pgm_assert (pgm_tsi_is_null (&skb->tsi));
+	pgm_assert ((sizeof(struct pgm_header) + sizeof(struct pgm_data)) <= ((guint8*)skb->data - (guint8*)skb->head));
 
-	g_trace ("add (window:%p skb:%p)", (gpointer)window, (gpointer)skb);
+	pgm_debug ("add (window:%p skb:%p)", (gpointer)window, (gpointer)skb);
 
 	if (pgm_txw_is_full (window))
 	{
@@ -304,8 +298,8 @@ pgm_txw_add (
 	window->size += skb->len;
 
 /* post-conditions */
-	g_assert_cmpuint (pgm_txw_length (window), >, 0);
-	g_assert_cmpuint (pgm_txw_length (window), <=, pgm_txw_max_length (window));
+	pgm_assert_cmpuint (pgm_txw_length (window), >, 0);
+	pgm_assert_cmpuint (pgm_txw_length (window), <=, pgm_txw_max_length (window));
 }
 
 /* peek an entry from the window for retransmission.
@@ -319,7 +313,7 @@ pgm_txw_peek (
 	const guint32		sequence
 	)
 {
-	g_trace ("peek (window:%p sequence:%" G_GUINT32_FORMAT ")", (gpointer)window, sequence);
+	pgm_debug ("peek (window:%p sequence:%" G_GUINT32_FORMAT ")", (gpointer)window, sequence);
 	return _pgm_txw_peek (window, sequence);
 }
 
@@ -335,16 +329,16 @@ pgm_txw_remove_tail (
 	struct pgm_sk_buff_t* skb;
 	pgm_txw_state_t* state;
 
-	g_trace ("pgm_txw_remove_tail (window:%p)", (gpointer)window);
+	pgm_debug ("pgm_txw_remove_tail (window:%p)", (gpointer)window);
 
 /* pre-conditions */
-	g_assert (window);
-	g_assert (!pgm_txw_is_empty (window));
+	pgm_assert (window);
+	pgm_assert (!pgm_txw_is_empty (window));
 
 	skb = _pgm_txw_peek (window, pgm_txw_trail (window));
-	g_assert (skb);
-	g_assert (pgm_skb_is_valid (skb));
-	g_assert (pgm_tsi_is_null (&skb->tsi));
+	pgm_assert (skb);
+	pgm_assert (pgm_skb_is_valid (skb));
+	pgm_assert (pgm_tsi_is_null (&skb->tsi));
 
 	state = (pgm_txw_state_t*)&skb->cb;
 	if (state->waiting_retransmit) {
@@ -372,7 +366,7 @@ pgm_txw_remove_tail (
 	pgm_atomic_int32_inc (&window->trail);
 
 /* post-conditions */
-	g_assert (!pgm_txw_is_full (window));
+	pgm_assert (!pgm_txw_is_full (window));
 }
 
 /* Try to add a sequence number to the retransmit queue, ignore if
@@ -397,10 +391,10 @@ pgm_txw_retransmit_push (
 	)
 {
 /* pre-conditions */
-	g_assert (window);
-	g_assert_cmpuint (tg_sqn_shift, <, sizeof(guint32));
+	pgm_assert (window);
+	pgm_assert_cmpuint (tg_sqn_shift, <, sizeof(guint32));
 
-	g_trace ("retransmit_push (window:%p sequence:%" G_GUINT32_FORMAT " is_parity:%s tg_sqn_shift:%u)",
+	pgm_debug ("retransmit_push (window:%p sequence:%" G_GUINT32_FORMAT " is_parity:%s tg_sqn_shift:%u)",
 		(gpointer)window, sequence, is_parity ? "TRUE" : "FALSE", tg_sqn_shift);
 
 /* early elimination */
@@ -428,8 +422,8 @@ pgm_txw_retransmit_push_parity (
 	pgm_txw_state_t* state;
 
 /* pre-conditions */
-	g_assert (window);
-	g_assert_cmpuint (tg_sqn_shift, <, sizeof(guint32));
+	pgm_assert (window);
+	pgm_assert_cmpuint (tg_sqn_shift, <, sizeof(guint32));
 
 	const guint32 tg_sqn_mask = 0xffffffff << tg_sqn_shift;
 	const guint32 nak_tg_sqn  = sequence &  tg_sqn_mask;	/* left unshifted */
@@ -437,19 +431,19 @@ pgm_txw_retransmit_push_parity (
 	skb = _pgm_txw_peek (window, nak_tg_sqn);
 
 	if (NULL == skb) {
-		g_trace ("transmission group lead #%" G_GUINT32_FORMAT " not in window.", nak_tg_sqn);
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Transmission group lead #%" G_GUINT32_FORMAT " not in window."), nak_tg_sqn);
 		return FALSE;
 	}
 
-	g_assert (pgm_skb_is_valid (skb));
-	g_assert (pgm_tsi_is_null (&skb->tsi));
+	pgm_assert (pgm_skb_is_valid (skb));
+	pgm_assert (pgm_tsi_is_null (&skb->tsi));
 	state = (pgm_txw_state_t*)&skb->cb;
 
 /* check if request can be eliminated */
 	if (state->waiting_retransmit)
 	{
-		g_assert (((const pgm_list_t*)skb)->next);
-		g_assert (((const pgm_list_t*)skb)->prev);
+		pgm_assert (((const pgm_list_t*)skb)->next);
+		pgm_assert (((const pgm_list_t*)skb)->prev);
 		if (state->pkt_cnt_requested < nak_pkt_cnt) {
 /* more parity packets requested than currently scheduled, simply bump up the count */
 			state->pkt_cnt_requested = nak_pkt_cnt;
@@ -459,14 +453,14 @@ pgm_txw_retransmit_push_parity (
 	}
 	else
 	{
-		g_assert (((const pgm_list_t*)skb)->next == NULL);
-		g_assert (((const pgm_list_t*)skb)->prev == NULL);
+		pgm_assert (((const pgm_list_t*)skb)->next == NULL);
+		pgm_assert (((const pgm_list_t*)skb)->prev == NULL);
 	}
 
 /* new request */
 	state->pkt_cnt_requested++;
 	pgm_queue_push_head_link (&window->retransmit_queue, (pgm_list_t*)skb);
-	g_assert (!pgm_queue_is_empty (&window->retransmit_queue));
+	pgm_assert (!pgm_queue_is_empty (&window->retransmit_queue));
 	state->waiting_retransmit = 1;
 	return TRUE;
 }
@@ -481,31 +475,31 @@ pgm_txw_retransmit_push_selective (
 	pgm_txw_state_t* state;
 
 /* pre-conditions */
-	g_assert (window);
+	pgm_assert (window);
 
 	skb = _pgm_txw_peek (window, sequence);
 	if (NULL == skb) {
-		g_trace ("requested packet #%" G_GUINT32_FORMAT " not in window.", sequence);
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Requested packet #%" G_GUINT32_FORMAT " not in window."), sequence);
 		return FALSE;
 	}
 
-	g_assert (pgm_skb_is_valid (skb));
-	g_assert (pgm_tsi_is_null (&skb->tsi));
+	pgm_assert (pgm_skb_is_valid (skb));
+	pgm_assert (pgm_tsi_is_null (&skb->tsi));
 	state = (pgm_txw_state_t*)&skb->cb;
 
 /* check if request can be eliminated */
 	if (state->waiting_retransmit) {
-		g_assert (!pgm_queue_is_empty (&window->retransmit_queue));
+		pgm_assert (!pgm_queue_is_empty (&window->retransmit_queue));
 		state->nak_elimination_count++;
 		return FALSE;
 	}
 
-	g_assert (((const pgm_list_t*)skb)->next == NULL);
-	g_assert (((const pgm_list_t*)skb)->prev == NULL);
+	pgm_assert (((const pgm_list_t*)skb)->next == NULL);
+	pgm_assert (((const pgm_list_t*)skb)->prev == NULL);
 
 /* new request */
 	pgm_queue_push_head_link (&window->retransmit_queue, (pgm_list_t*)skb);
-	g_assert (!pgm_queue_is_empty (&window->retransmit_queue));
+	pgm_assert (!pgm_queue_is_empty (&window->retransmit_queue));
 	state->waiting_retransmit = 1;
 	return TRUE;
 }
@@ -521,9 +515,9 @@ pgm_txw_retransmit_try_peek (
 	)
 {
 /* pre-conditions */
-	g_assert (window);
+	pgm_assert (window);
 
-	g_trace ("retransmit_try_peek (window:%p)", (gpointer)window);
+	pgm_debug ("retransmit_try_peek (window:%p)", (gpointer)window);
 
 /* no lock required to detect presence of a request */
 	pgm_list_t* tail_link = pgm_queue_peek_tail_link (&window->retransmit_queue);
@@ -531,12 +525,12 @@ pgm_txw_retransmit_try_peek (
 		return NULL;
 
 	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)tail_link;
-	g_assert (pgm_skb_is_valid (skb));
+	pgm_assert (pgm_skb_is_valid (skb));
 	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
 
 	if (!state->waiting_retransmit) {
-		g_assert (((const pgm_list_t*)skb)->next == NULL);
-		g_assert (((const pgm_list_t*)skb)->prev == NULL);
+		pgm_assert (((const pgm_list_t*)skb)->next == NULL);
+		pgm_assert (((const pgm_list_t*)skb)->prev == NULL);
 	}
 	if (!state->pkt_cnt_requested) {
 		return skb;
@@ -594,8 +588,8 @@ pgm_txw_retransmit_try_peek (
 			struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
 			const guint16 odata_tsdu_length = g_ntohs (odata_skb->pgm_header->pgm_tsdu_length);
 
-			g_assert (odata_tsdu_length == odata_skb->len);
-			g_assert (parity_length >= odata_tsdu_length);
+			pgm_assert (odata_tsdu_length == odata_skb->len);
+			pgm_assert (parity_length >= odata_tsdu_length);
 
 			if (!odata_skb->zero_padded) {
 				memset (odata_skb->tail, 0, parity_length - odata_tsdu_length);
@@ -631,7 +625,7 @@ pgm_txw_retransmit_try_peek (
 
 			if (odata_skb->pgm_opt_fragment)
 			{
-				g_assert (odata_skb->pgm_header->pgm_options & PGM_OPT_PRESENT);
+				pgm_assert (odata_skb->pgm_header->pgm_options & PGM_OPT_PRESENT);
 /* skip three bytes of header */
 				opt_src[i] = (guint8*)odata_skb->pgm_opt_fragment + sizeof (struct pgm_opt_header);
 			}
@@ -690,25 +684,25 @@ pgm_txw_retransmit_remove_head (
 	pgm_txw_state_t* state;
 
 /* pre-conditions */
-	g_assert (window);
+	pgm_assert (window);
 
-	g_trace ("retransmit_remove_head (window:%p)",
+	pgm_debug ("retransmit_remove_head (window:%p)",
 		(gpointer)window);
 
 /* tail link is valid without lock */
 	pgm_list_t* tail_link = pgm_queue_peek_tail_link (&window->retransmit_queue);
 
 /* link must be valid for pop */
-	g_assert (tail_link);
+	pgm_assert (tail_link);
 
 	skb = (struct pgm_sk_buff_t*)tail_link;
-	g_assert (pgm_skb_is_valid (skb));
-	g_assert (pgm_tsi_is_null (&skb->tsi));
+	pgm_assert (pgm_skb_is_valid (skb));
+	pgm_assert (pgm_tsi_is_null (&skb->tsi));
 	state = (pgm_txw_state_t*)&skb->cb;
 	if (!state->waiting_retransmit)
 	{
-		g_assert (((const pgm_list_t*)skb)->next == NULL);
-		g_assert (((const pgm_list_t*)skb)->prev == NULL);
+		pgm_assert (((const pgm_list_t*)skb)->next == NULL);
+		pgm_assert (((const pgm_list_t*)skb)->prev == NULL);
 	}
 	if (state->pkt_cnt_requested)
 	{

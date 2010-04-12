@@ -21,19 +21,15 @@
 
 #include <limits.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/histogram.h"
 
 
 //#define HISTOGRAM_DEBUG
-
-#ifndef HISTOGRAM_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 GSList* pgm_histograms = NULL;
@@ -69,8 +65,8 @@ pgm_histogram_add (
 	if (value < 0)
 		value = 0;
 	const gsize i = bucket_index (histogram, value);
-	g_assert (value >= histogram->ranges[ i ]);
-	g_assert (value  < histogram->ranges[ i + 1 ]);
+	pgm_assert (value >= histogram->ranges[ i ]);
+	pgm_assert (value  < histogram->ranges[ i + 1 ]);
 	accumulate (histogram, value, 1, i);
 }
 
@@ -110,13 +106,13 @@ sample_set_accumulate (
 	gsize			i
 	)
 {
-	g_assert (1 == count || -1 == count);
+	pgm_assert (1 == count || -1 == count);
 	sample_set->counts[ i ] += count;
 	sample_set->sum += count * value;
 	sample_set->square_sum += (count * value) * (gint64)value;
-	g_assert (sample_set->counts[ i ] >= 0);
-	g_assert (sample_set->sum >= 0);
-	g_assert (sample_set->square_sum >= 0);
+	pgm_assert (sample_set->counts[ i ] >= 0);
+	pgm_assert (sample_set->sum >= 0);
+	pgm_assert (sample_set->square_sum >= 0);
 }
 
 static
@@ -138,10 +134,10 @@ pgm_histogram_init (
 {
 	if (histogram->declared_min <= 0)
 		histogram->declared_min = 1;
-	g_assert (histogram->declared_min > 0);
+	pgm_assert (histogram->declared_min > 0);
 	histogram->declared_max = INT_MAX - 1;
-	g_assert (histogram->declared_min <= histogram->declared_max);
-	g_assert (1 < histogram->bucket_count);
+	pgm_assert (histogram->declared_min <= histogram->declared_max);
+	pgm_assert (1 < histogram->bucket_count);
 	set_bucket_range (histogram, histogram->bucket_count, INT_MAX);
 	initialize_bucket_range (histogram);
 
@@ -187,7 +183,7 @@ initialize_bucket_range (
 			current++;
 		set_bucket_range (histogram, i, current);
 	}
-	g_assert (histogram->bucket_count == i);
+	pgm_assert (histogram->bucket_count == i);
 }
 
 static
@@ -197,14 +193,14 @@ bucket_index (
 	pgm_sample_t		value
 	)
 {
-	g_assert (histogram->ranges[0] <= value);
-	g_assert (histogram->ranges[ histogram->bucket_count ] > value);
+	pgm_assert (histogram->ranges[0] <= value);
+	pgm_assert (histogram->ranges[ histogram->bucket_count ] > value);
 	gsize under = 0;
 	gsize over = histogram->bucket_count;
 	gsize mid;
 
 	do {
-		g_assert (over >= under);
+		pgm_assert (over >= under);
 		mid = ((unsigned int)under + (unsigned int)over) >> 1;
 		if (mid == under)
 			break;
@@ -213,7 +209,7 @@ bucket_index (
 		else
 			over = mid;
 	} while (TRUE);
-	g_assert (histogram->ranges[ mid ] <= value &&
+	pgm_assert (histogram->ranges[ mid ] <= value &&
 		  histogram->ranges[ mid + 1] > value);
 	return mid;
 }
@@ -398,7 +394,7 @@ get_bucket_size (
 	gsize			i
 	)
 {
-	g_assert (histogram->ranges[ i + 1 ] > histogram->ranges[ i ]);
+	pgm_assert (histogram->ranges[ i + 1 ] > histogram->ranges[ i ]);
 	static const double kTransitionWidth = 5;
 	double denominator = histogram->ranges[ i + 1 ] - histogram->ranges[ i ];
 	if (denominator > kTransitionWidth)

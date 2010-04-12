@@ -81,17 +81,17 @@ struct pgm_sk_buff_t {
 static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
 static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len)
 {
-	g_error ("skput:over: %d put:%d",
+	pgm_fatal ("skput:over: %d put:%d",
 		    skb->len, len);
-	g_assert_not_reached();
+	pgm_assert_not_reached();
 }
 
 static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
 static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint len)
 {
-	g_error ("skput:under: %d put:%d",
+	pgm_fatal ("skput:under: %d put:%d",
 		    skb->len, len);
-	g_assert_not_reached();
+	pgm_assert_not_reached();
 }
 
 static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
@@ -99,7 +99,7 @@ static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
 	struct pgm_sk_buff_t* skb;
 
 	skb = (struct pgm_sk_buff_t*)pgm_malloc (size + sizeof(struct pgm_sk_buff_t));
-	if (G_UNLIKELY(g_mem_gc_friendly)) {
+	if (G_UNLIKELY(pgm_mem_gc_friendly)) {
 		memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
 		skb->zero_padded = 1;
 	} else

@@ -21,17 +21,12 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/list.h"
 
 
 //#define LIST_DEBUG
-
-#ifndef LIST_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 pgm_list_t*
@@ -67,7 +62,7 @@ pgm_list_prepend_link (
 	pgm_list_t*	link_
 	)
 {
-	g_return_val_if_fail (NULL != link_, list);
+	pgm_return_val_if_fail (NULL != link_, list);
 
 	pgm_list_t* new_list = link_;
 
