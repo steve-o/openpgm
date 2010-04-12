@@ -91,7 +91,7 @@ pgm_messages_shutdown (void)
  */
 
 pgm_log_func_t
-pgm_set_handler (
+pgm_log_set_handler (
 	pgm_log_func_t		handler,
 	gpointer		closure
 	)
