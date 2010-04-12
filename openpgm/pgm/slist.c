@@ -27,11 +27,6 @@
 
 //#define SLIST_DEBUG
 
-#ifndef SLIST_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 pgm_slist_t*
@@ -139,7 +134,7 @@ pgm_slist_free (
 	{
 		pgm_slist_t* current = list;
 		list = list->next;
-		pgm_free (list);
+		pgm_free (current);
 	}
 }
 

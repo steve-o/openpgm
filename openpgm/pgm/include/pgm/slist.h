@@ -27,7 +27,7 @@
 
 struct pgm_slist_t
 {
-	gpointer		data;
+	gconstpointer		data;
 	struct pgm_slist_t*	next;
 };
 

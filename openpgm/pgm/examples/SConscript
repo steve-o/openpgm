@@ -4,22 +4,24 @@
 
 import os;
 
-Import('env')
-e = env.Clone()
+Import('env');
+e = env.Clone();
 e.Prepend(LIBS = ['libpgmex', 'libpgm']);
-if e['WITH_SNMP'] == 'true':
-	e.Append(CCFLAGS = ['-DCONFIG_WITH_SNMP']);
-	e.Prepend(LIBS = ['libpgmsnmp']);
-	e.MergeFlags(e['SNMP_FLAGS']);
-if e['WITH_HTTP'] == 'true':
-	e.Append(CCFLAGS = ['-DCONFIG_WITH_HTTP']);
-	e.Prepend(LIBS = ['libpgmhttp']);
-	e.MergeFlags(e['LIBSOUP_FLAGS']);
+e.MergeFlags(env['GLIB_FLAGS']);
+f = e.Clone();
+if f['WITH_SNMP'] == 'true':
+	f.Append(CCFLAGS = ['-DCONFIG_WITH_SNMP']);
+	f.Prepend(LIBS = ['libpgmsnmp']);
+	f.MergeFlags(e['SNMP_FLAGS']);
+if f['WITH_HTTP'] == 'true':
+	f.Append(CCFLAGS = ['-DCONFIG_WITH_HTTP']);
+	f.Prepend(LIBS = ['libpgmhttp']);
+	f.MergeFlags(e['LIBSOUP_FLAGS']);
 
 # core preferred examples
 e.Program(['pgmdump.c'])
-e.Program(['pgmsend.c'])
-e.Program(['pgmrecv.c'])
+f.Program(['pgmsend.c'])
+f.Program(['pgmrecv.c'])
 
 # sync examples
 e.Program(['blocksyncrecv.c'])
@@ -40,8 +42,8 @@ if e['WITH_NCURSES'] == 'true':
 	ne.Program(['pgmtop.c'])
 
 # Google Protocol Buffer example
-if e['WITH_PROTOBUF'] == 'true':
-	ge = e.Clone();
+if f['WITH_PROTOBUF'] == 'true':
+	ge = f.Clone();
 	newCCFLAGS = [];
 	for flag in ge['CCFLAGS']:
 		if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]):

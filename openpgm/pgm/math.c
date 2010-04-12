@@ -26,11 +26,7 @@
 
 //#define MATH_DEBUG
 
-#ifndef MATH_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
+
 
 static const guint g_primes[] =
 {

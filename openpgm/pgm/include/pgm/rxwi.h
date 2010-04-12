@@ -48,6 +48,10 @@
 #	include <pgm/reed_solomon.h>
 #endif
 
+#ifndef	__PGM_MESSAGES_H__
+#	include <pgm/messages.h>
+#endif
+
 
 G_BEGIN_DECLS
 
@@ -163,37 +167,37 @@ PGM_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t* const);
 
 static inline guint pgm_rxw_max_length (const pgm_rxw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->alloc;
 }
 
 static inline guint32 pgm_rxw_length (const pgm_rxw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
 static inline gsize pgm_rxw_size (const pgm_rxw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->size;
 }
 
 static inline gboolean pgm_rxw_is_empty (const pgm_rxw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_rxw_length (window) == 0;
 }
 
 static inline gboolean pgm_rxw_is_full (const pgm_rxw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_rxw_length (window) == pgm_rxw_max_length (window);
 }
 
 static inline guint32 pgm_rxw_lead (const pgm_rxw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->lead;
 }
 

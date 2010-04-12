@@ -7,7 +7,7 @@
  * draft-ietf-rmt-bb-fec-rs-05.txt
  * + rfc5052
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,10 +25,12 @@
  */
 
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/galois.h"
 
@@ -367,9 +369,9 @@ pgm_rs_create (
 	const guint		k
 	)
 {
-	g_assert (NULL != rs_);
-	g_assert (n > 0);
-	g_assert (k > 0);
+	pgm_assert (NULL != rs_);
+	pgm_assert (n > 0);
+	pgm_assert (k > 0);
 
 	rs_t* rs = pgm_malloc0 (sizeof(rs_t));
 
@@ -436,7 +438,7 @@ pgm_rs_destroy (
 	rs_t*			rs
 	)
 {
-	g_assert (NULL != rs);
+	pgm_assert (NULL != rs);
 
 	if (rs->RM) {
 		pgm_free (rs->RM);
@@ -464,11 +466,11 @@ pgm_rs_encode (
 	const gsize		len
 	)
 {
-	g_assert (NULL != rs);
-	g_assert (NULL != src);
-	g_assert (offset >= rs->k && offset < rs->n);	/* parity packet */
-	g_assert (NULL != dst);
-	g_assert (len > 0);
+	pgm_assert (NULL != rs);
+	pgm_assert (NULL != src);
+	pgm_assert (offset >= rs->k && offset < rs->n);	/* parity packet */
+	pgm_assert (NULL != dst);
+	pgm_assert (len > 0);
 
 	memset (dst, 0, len);
 	for (guint i = 0; i < rs->k; i++)
@@ -490,10 +492,10 @@ pgm_rs_decode_parity_inline (
 	const gsize		len		/* packet length */
 	)
 {
-	g_assert (NULL != rs);
-	g_assert (NULL != block);
-	g_assert (NULL != offsets);
-	g_assert (len > 0);
+	pgm_assert (NULL != rs);
+	pgm_assert (NULL != block);
+	pgm_assert (NULL != offsets);
+	pgm_assert (len > 0);
 
 /* create new recovery matrix from generator
  */
@@ -550,10 +552,10 @@ pgm_rs_decode_parity_appended (
 	const gsize		len		/* packet length */
 	)
 {
-	g_assert (NULL != rs);
-	g_assert (NULL != block);
-	g_assert (NULL != offsets);
-	g_assert (len > 0);
+	pgm_assert (NULL != rs);
+	pgm_assert (NULL != block);
+	pgm_assert (NULL != offsets);
+	pgm_assert (len > 0);
 
 /* create new recovery matrix from generator
  */

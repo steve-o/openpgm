@@ -132,7 +132,7 @@ main (
 	g_thread_init (NULL);
 
 	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
+		g_error ("Unable to start PGM engine: %s", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
 		pgm_error_free (pgm_err);
 		return EXIT_FAILURE;
 	}

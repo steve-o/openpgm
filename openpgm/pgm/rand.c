@@ -25,18 +25,13 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/time.h"
 #include "pgm/thread.h"
 #include "pgm/rand.h"
 
 
 //#define RAND_DEBUG
-
-#ifndef RAND_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 static pgm_rand_t g_rand = { .seed = 0 };
@@ -60,7 +55,7 @@ pgm_rand_create (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != rand_);
+	pgm_assert (NULL != rand_);
 
 #ifdef G_OS_UNIX
 /* attempt to read seed from kernel
@@ -92,7 +87,7 @@ pgm_rand_int (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != rand_);
+	pgm_assert (NULL != rand_);
 
 	rand_->seed = rand_->seed * 1103515245 + 12345;
 	return rand_->seed;
@@ -106,7 +101,7 @@ pgm_rand_int_range (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != rand_);
+	pgm_assert (NULL != rand_);
 
 	return begin + pgm_rand_int (rand_) % (end - begin);
 }

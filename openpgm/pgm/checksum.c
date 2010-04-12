@@ -19,10 +19,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/checksum.h"
 
 
@@ -403,7 +405,7 @@ pgm_inet_checksum (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != addr);
+	pgm_assert (NULL != addr);
 
 	return ~do_csum (addr, len, csum);
 }
@@ -419,7 +421,7 @@ pgm_compat_csum_partial (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != addr);
+	pgm_assert (NULL != addr);
 
 	csum  = (csum >> 16) + (csum & 0xffff);
 	csum += do_csum (addr, len, 0);
@@ -440,8 +442,8 @@ pgm_compat_csum_partial_copy (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != src);
-	g_assert (NULL != dst);
+	pgm_assert (NULL != src);
+	pgm_assert (NULL != dst);
 
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);

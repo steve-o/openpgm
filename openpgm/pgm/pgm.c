@@ -29,6 +29,7 @@
 #       include <ws2tcpip.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/pgm.h"
 #include "pgm/packet.h"
 #include "pgm/timep.h"
@@ -36,11 +37,7 @@
 #include "pgm/rand.h"
 
 
-#ifndef PGM_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
+//#define PGM_DEBUG
 
 
 /* globals */
@@ -74,6 +71,7 @@ pgm_init (
 /* ensure threading enabled */
 	pgm_thread_init ();
 	pgm_atomic_init ();
+	pgm_messages_init ();
 	pgm_mem_init ();
 	pgm_rand_init ();
 
@@ -109,7 +107,7 @@ pgm_init (
 	int e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			g_trace ("setting PGM protocol number to %i from /etc/protocols.",
+			pgm_minor ("Setting PGM protocol number to %i from /etc/protocols.",
 				proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
@@ -118,7 +116,7 @@ pgm_init (
 	struct protoent *proto = getprotobyname ("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			g_trace ("setting PGM protocol number to %i from /etc/protocols.",
+			pgm_minor ("Setting PGM protocol number to %i from /etc/protocols.",
 				proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
@@ -156,11 +154,11 @@ pgm_supported (void)
 gboolean
 pgm_shutdown (void)
 {
-	g_return_val_if_fail (pgm_supported() == TRUE, FALSE);
+	pgm_return_val_if_fail (pgm_supported() == TRUE, FALSE);
 
 /* destroy all open transports */
 	while (pgm_transport_list) {
-		pgm_transport_destroy (pgm_transport_list->data, FALSE);
+		pgm_transport_destroy ((pgm_transport_t*)pgm_transport_list->data, FALSE);
 	}
 
 	if (pgm_time_supported ())
@@ -172,6 +170,7 @@ pgm_shutdown (void)
 
 	pgm_rand_shutdown ();
 	pgm_mem_shutdown ();
+	pgm_messages_shutdown ();
 	pgm_atomic_shutdown ();
 	pgm_thread_shutdown ();
 

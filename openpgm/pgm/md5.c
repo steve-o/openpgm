@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -35,16 +36,11 @@
 #	include <netdb.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/md5.h"
 
 
 //#define MD5_DEBUG
-
-#ifndef MD5_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* locals */
@@ -71,7 +67,7 @@ _md5_init_ctx (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != ctx);
+	pgm_assert (NULL != ctx);
 
 	ctx->A = 0x67452301;
 	ctx->B = 0xefcdab89;
@@ -102,9 +98,9 @@ md5_process_block (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != buffer);
-	g_assert (len > 0);
-	g_assert (NULL != ctx);
+	pgm_assert (NULL != buffer);
+	pgm_assert (len > 0);
+	pgm_assert (NULL != ctx);
 
 	guint32 correct_words[16];
 	const guint32 *words = buffer;
@@ -268,9 +264,9 @@ _md5_process_bytes (
 {
 /* pre-conditions */
 	if (len > 0) {
-		g_assert (NULL != buffer);
+		pgm_assert (NULL != buffer);
 	}
-	g_assert (NULL != ctx);
+	pgm_assert (NULL != ctx);
 
 	if (len >= 64)
 	{
@@ -329,8 +325,8 @@ md5_read_ctx (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != ctx);
-	g_assert (NULL != resbuf);
+	pgm_assert (NULL != ctx);
+	pgm_assert (NULL != resbuf);
 
 	((guint32*)resbuf)[0] = SWAP (ctx->A);
 	((guint32*)resbuf)[1] = SWAP (ctx->B);
@@ -353,8 +349,8 @@ _md5_finish_ctx (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != ctx);
-	g_assert (NULL != resbuf);
+	pgm_assert (NULL != ctx);
+	pgm_assert (NULL != resbuf);
 
 /* Take yet unprocessed bytes into account.  */
 	const guint32 bytes = ctx->buflen;

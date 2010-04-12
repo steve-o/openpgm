@@ -33,17 +33,12 @@
 #	include <sys/socket.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/getnodeaddr.h"
 
 //#define GETNODEADDR_DEBUG
-
-#ifndef GETNODEADDR_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* globals */
@@ -64,14 +59,14 @@ pgm_if_getnodeaddr (
 	pgm_error_t**		error
 	)
 {
-	g_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
-	g_return_val_if_fail (NULL != addr, FALSE);
+	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
+	pgm_return_val_if_fail (NULL != addr, FALSE);
 	if (AF_INET == family || AF_UNSPEC == family)
-		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), FALSE);
+		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), FALSE);
 	else
-		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
+		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
 
-	g_trace ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
+	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
 		pgm_family_string (family), (gpointer)addr, cnt, (gpointer)error);
 
 	char hostname[NI_MAXHOST + 1];
@@ -143,7 +138,7 @@ pgm_if_getnodeaddr (
 	}
 
 	struct pgm_ifaddrs *ifap, *ifa, *ifa6;
-	if (!pgm_getifaddrs (&ifap, &error)) {
+	if (!pgm_getifaddrs (&ifap, error)) {
 		pgm_prefix_error (error,
 			     _("Enumerating network interfaces: "));
 		return FALSE;

@@ -41,18 +41,13 @@
 #	include <iphlpapi.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
 #include "pgm/mem.h"
 
 
 //#define GETIFADDRS_DEBUG
-
-#ifndef GETIFADDRS_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* locals */
@@ -113,7 +108,7 @@ again:
 		return FALSE;
 	}
 	unsigned if_count = lifn.lifn_count;
-	g_trace ("ioctl(AF_INET, SIOCGLIFNUM) = %d", lifn.lifn_count);
+	pgm_debug ("ioctl(AF_INET, SIOCGLIFNUM) = %d", lifn.lifn_count);
 
 /* nb: Sun and Apple code likes to pad the interface count here in case interfaces
  * are coming up between calls,
@@ -138,7 +133,7 @@ again:
 		close (sock6);
 		return FALSE;
 	}
-	g_trace ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, lifc.lifc_len / sizeof(struct lifreq));
+	pgm_debug ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, lifc.lifc_len / sizeof(struct lifreq));
 
 /* repeat everything for IPv6 */
 	lifn.lifn_family = AF_INET6;
@@ -154,7 +149,7 @@ again:
 		return FALSE;
 	}
 	if_count += lifn.lifn_count;
-	g_trace ("ioctl(AF_INET6, SIOCGLIFNUM) = %d", lifn.lifn_count);
+	pgm_debug ("ioctl(AF_INET6, SIOCGLIFNUM) = %d", lifn.lifn_count);
 
 	lifn.lifn_count += 4;
 
@@ -172,7 +167,7 @@ again:
 		close (sock6);
 		return FALSE;
 	}
-	g_trace ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, lifc6.lifc_len / sizeof(struct lifreq));
+	pgm_debug ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, lifc6.lifc_len / sizeof(struct lifreq));
 
 	unsigned nlifr = (lifc.lifc_len + lifc6.lifc_len) / sizeof(struct lifreq);
 	if (nlifr > if_count)
@@ -180,18 +175,18 @@ again:
 
 /* alloc a contiguous block for entire list */
 	struct _pgm_ifaddrs* ifa = calloc (nlifr, sizeof (struct _pgm_ifaddrs));
-	g_assert (NULL != ifa);
+	pgm_assert (NULL != ifa);
 
 	struct _pgm_ifaddrs* ift = ifa;
 	struct lifreq* lifr      = lifc.lifc_req;
 	struct lifreq* lifr_end  = (struct lifreq *)&lifc.lifc_buf[lifc.lifc_len];
 
-	g_assert (IF_NAMESIZE >= LIFNAMSIZ);
+	pgm_assert (IF_NAMESIZE >= LIFNAMSIZ);
 
 	while (lifr < lifr_end)
 	{
 /* name */
-		g_trace ("AF_INET/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
+		pgm_debug ("AF_INET/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, LIFNAMSIZ);
 		ift->_ifa.ifa_name[LIFNAMSIZ - 1] = 0;
@@ -200,7 +195,7 @@ again:
 		if (-1 != ioctl (sock, SIOCGLIFFLAGS, lifr)) {
 			ift->_ifa.ifa_flags = lifr->lifr_flags;
 		} else {
-			g_warning (_("SIOCGLIFFLAGS failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGLIFFLAGS failed on interface %s%s%s"),
 				lifr->lifr_name ? "\"" : "", lifr->lifr_name ? lifr->lifr_name : "(null)", lifr->lifr_name ? "\"" : "");
 		}
 
@@ -209,7 +204,7 @@ again:
 			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 		} else {
-			g_warning (_("SIOCGLIFADDR failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGLIFADDR failed on interface %s%s%s"),
 				lifr->lifr_name ? "\"" : "", lifr->lifr_name ? lifr->lifr_name : "(null)", lifr->lifr_name ? "\"" : "");
 		}
 
@@ -222,7 +217,7 @@ again:
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 #		endif
 		} else {
-			g_warning (_("SIOCGLIFNETMASK failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGLIFNETMASK failed on interface %s%s%s"),
 				lifr->lifr_name ? "\"" : "", lifr->lifr_name ? lifr->lifr_name : "(null)", lifr->lifr_name ? "\"" : "");
 		}
 
@@ -245,7 +240,7 @@ again:
 		}
 
 /* name */
-		g_trace ("AF_INET6/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
+		pgm_debug ("AF_INET6/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
 		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
@@ -254,7 +249,7 @@ again:
 		if (-1 != ioctl (sock6, SIOCGLIFFLAGS, lifr)) {
 			ift->_ifa.ifa_flags = lifr->lifr_flags;
 		} else {
-			g_warning (_("SIOCGLIFFLAGS failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGLIFFLAGS failed on interface %s%s%s"),
 				lifr->lifr_name ? "\"" : "", lifr->lifr_name ? lifr->lifr_name : "(null)", lifr->lifr_name ? "\"" : "");
 		}
 
@@ -263,7 +258,7 @@ again:
 			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 		} else {
-			g_warning (_("SIOCGLIFADDR failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGLIFADDR failed on interface %s%s%s"),
 				lifr->lifr_name ? "\"" : "", lifr->lifr_name ? lifr->lifr_name : "(null)", lifr->lifr_name ? "\"" : "");
 		}
 
@@ -276,7 +271,7 @@ again:
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 #		endif
 		} else {
-			g_warning (_("SIOCGLIFNETMASK failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGLIFNETMASK failed on interface %s%s%s"),
 				lifr->lifr_name ? "\"" : "", lifr->lifr_name ? lifr->lifr_name : "(null)", lifr->lifr_name ? "\"" : "");
 		}
 
@@ -284,9 +279,9 @@ again:
 	}
 
 	if (-1 == close (sock6))
-		g_warning (_("Closing IPv6 socket failed: %s"), strerror(errno));
+		pgm_warn (_("Closing IPv6 socket failed: %s"), strerror(errno));
 	if (-1 == close (sock))
-		g_warning (_("Closing IPv4 socket failed: %s"), strerror(errno));
+		pgm_warn (_("Closing IPv4 socket failed: %s"), strerror(errno));
 
 	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
@@ -363,12 +358,12 @@ _pgm_getifaddrs (
 	struct ifreq *ifr  = ifc.ifc_req;
 	struct ifreq *ifr_end = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
 
-	g_assert (IF_NAMESIZE >= sizeof(ifr->ifr_name));
+	pgm_assert (IF_NAMESIZE >= sizeof(ifr->ifr_name));
 
 	while (ifr < ifr_end)
 	{
 /* name */
-		g_trace ("AF_INET/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
+		pgm_debug ("AF_INET/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
 		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
@@ -377,7 +372,7 @@ _pgm_getifaddrs (
 		if (-1 != ioctl (sock, SIOCGIFFLAGS, ifr)) {
 			ift->_ifa.ifa_flags = ifr->ifr_flags;
 		} else {
-			g_warning (_("SIOCGIFFLAGS failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGIFFLAGS failed on interface %s%s%s"),
 				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
 		}
 
@@ -386,7 +381,7 @@ _pgm_getifaddrs (
 			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 		} else {
-			g_warning (_("SIOCGIFADDR failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGIFADDR failed on interface %s%s%s"),
 				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
 		}
 
@@ -399,7 +394,7 @@ _pgm_getifaddrs (
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 #	endif
 		} else {
-			g_warning (_("SIOCGIFNETMASK failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGIFNETMASK failed on interface %s%s%s"),
 				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
 		}
 
@@ -423,7 +418,7 @@ _pgm_getifaddrs (
 		}
 
 /* name */
-		g_trace ("AF_INET6/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
+		pgm_debug ("AF_INET6/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
 		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
 		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
@@ -432,7 +427,7 @@ _pgm_getifaddrs (
 		if (-1 != ioctl (sock6, SIOCGIFFLAGS, ifr)) {
 			ift->_ifa.ifa_flags = ifr->ifr_flags;
 		} else {
-			g_warning (_("SIOCGIFFLAGS failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGIFFLAGS failed on interface %s%s%s"),
 				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
 		}
 
@@ -441,7 +436,7 @@ _pgm_getifaddrs (
 			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 		} else {
-			g_warning (_("SIOCGIFADDR failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGIFADDR failed on interface %s%s%s"),
 				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
 		}
 
@@ -454,7 +449,7 @@ _pgm_getifaddrs (
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 #		endif
 		} else {
-			g_warning (_("SIOCGIFNETMASK failed on interface %s%s%s"),
+			pgm_warn (_("SIOCGIFNETMASK failed on interface %s%s%s"),
 				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
 		}
 
@@ -462,11 +457,11 @@ _pgm_getifaddrs (
 	}
 
 	if (-1 == close (sock6))
-		g_warning (_("Closing IPv6 socket failed: %s"), strerror(errno));
+		pgm_warn (_("Closing IPv6 socket failed: %s"), strerror(errno));
 #	endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
 
 	if (-1 == close (sock))
-		g_warning (_("Closing IPv4 socket failed: %s"), strerror(errno));
+		pgm_warn (_("Closing IPv4 socket failed: %s"), strerror(errno));
 
 	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
@@ -493,7 +488,7 @@ _pgm_getadaptersinfo (
 	for (unsigned i = 100; i; i--)
 	{
 		if (pAdapterInfo) {
-			free (pAdapterInfo);
+			pgm_free (pAdapterInfo);
 			pAdapterInfo = NULL;
 		}
 		pAdapterInfo = (IP_ADAPTER_INFO*)pgm_malloc (ulOutBufLen);
@@ -557,10 +552,10 @@ _pgm_getadaptersinfo (
 				continue;
 /* address */
 			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
-			g_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
+			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
 
 /* name */
-			g_trace ("name:%s", pAdapter->AdapterName);
+			pgm_debug ("name:%s", pAdapter->AdapterName);
 			ift->_ifa.ifa_name = ift->_name;
 			strncpy (ift->_ifa.ifa_name, pAdapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
@@ -570,7 +565,7 @@ _pgm_getadaptersinfo (
 
 /* netmask */
 			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
-			g_assert (pgm_sockaddr_pton (pIPAddr->IpMask.String, ift->_ifa.ifa_netmask));
+			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpMask.String, ift->_ifa.ifa_netmask));
 
 /* next */
 			if (k++ < (n - 1)) {
@@ -601,7 +596,7 @@ _pgm_getadaptersaddresses (
 	for (unsigned i = 100; i; i--)
 	{
 		if (pAdapterAddresses) {
-			free (pAdapterAddresses);
+			pgm_free (pAdapterAddresses);
 			pAdapterAddresses = NULL;
 		}
 		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)pgm_malloc (dwSize);
@@ -720,7 +715,7 @@ _pgm_getadaptersaddresses (
 			switch (unicast->Address.lpSockaddr->sa_family) {
 			case AF_INET:
 				if (0 == prefixLength) {
-					g_warning (_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
+					pgm_warn (_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
 					prefixLength = 32;
 				}
 				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = g_htonl( 0xffffffffU << ( 32 - prefixLength ) );
@@ -728,7 +723,7 @@ _pgm_getadaptersaddresses (
 
 			case AF_INET6:
 				if (0 == prefixLength) {
-					g_warning (_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
+					pgm_warn (_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
 					prefixLength = 128;
 				}
 				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
@@ -762,7 +757,7 @@ pgm_getifaddrs (
 	pgm_error_t**		error
 	)
 {
-	g_trace ("pgm_getifaddrs (ifap:%p error:%p)",
+	pgm_debug ("pgm_getifaddrs (ifap:%p error:%p)",
 		(void*)ifap, (void*)error);
 
 #ifdef CONFIG_HAVE_GETIFADDRS

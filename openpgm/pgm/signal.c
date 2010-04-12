@@ -2,7 +2,7 @@
  *
  * Re-entrant safe signal handling.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,17 +27,13 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/sockaddr.h"
 #include "pgm/signal.h"
 
 
 //#define SIGNAL_DEBUG
 
-#ifndef SIGNAL_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* globals */
@@ -61,7 +57,7 @@ pgm_signal_install (
 	gpointer		user_data
 	)
 {
-	g_trace ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
+	pgm_debug ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
 		signum, (gpointer)handler, user_data);
 
 	if (NULL == g_signal_io)
@@ -93,13 +89,13 @@ on_signal (
 	int		signum
 	)
 {
-	g_trace ("on_signal (signum:%d)", signum);
+	pgm_debug ("on_signal (signum:%d)", signum);
 	if (write (g_signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
 #ifdef G_OS_UNIX
-		g_critical ("Unix signal %s (%i) lost", strsignal(signum), signum);
+		pgm_warn ("Unix signal %s (%i) lost", strsignal(signum), signum);
 #else
-		g_critical ("Unix signal (%i) lost", signum);
+		pgm_warn ("Unix signal (%i) lost", signum);
 #endif
 	}
 }
@@ -118,7 +114,7 @@ on_io_signal (
 	g_assert (NULL != source);
 	g_assert (G_IO_IN == cond);
 
-	g_trace ("on_io_signal (source:%p cond:%s user_data:%p)",
+	pgm_debug ("on_io_signal (source:%p cond:%s user_data:%p)",
 		(gpointer)source, cond_string (cond), user_data);
 
 	int signum;
@@ -130,7 +126,7 @@ on_io_signal (
 	}
 	else
 	{
-		g_critical ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
+		pgm_warn ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
 				bytes_read, bytes_read > 1 ? "s" : "", sizeof(signum));
 	}
 

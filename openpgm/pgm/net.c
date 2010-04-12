@@ -31,17 +31,12 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/transport.h"
 #include "pgm/rate_control.h"
 #include "pgm/net.h"
 
 //#define NET_DEBUG
-
-#ifndef NET_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 #ifndef ENETUNREACH
@@ -72,16 +67,16 @@ pgm_sendto (
 	gsize			tolen
 	)
 {
-	g_assert( transport );
-	g_assert( buf );
-	g_assert( len > 0 );
-	g_assert( to );
-	g_assert( tolen > 0 );
+	pgm_assert( transport );
+	pgm_assert( buf );
+	pgm_assert( len > 0 );
+	pgm_assert( to );
+	pgm_assert( tolen > 0 );
 
 #ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	g_trace ("pgm_sendto (transport:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%d to:%s [toport:%d] tolen:%d)",
+	pgm_debug ("pgm_sendto (transport:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%d to:%s [toport:%d] tolen:%d)",
 		(gpointer)transport,
 		use_rate_limit ? "TRUE" : "FALSE",
 		use_router_alert ? "TRUE" : "FALSE",
@@ -106,7 +101,7 @@ pgm_sendto (
 		pgm_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
-	g_trace ("sendto returned %d", sent);
+	pgm_debug ("sendto returned %d", sent);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
 		errno != EHOSTUNREACH &&	/* No route to host */
@@ -136,19 +131,19 @@ pgm_sendto (
 			sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
 			if ( sent < 0 )
 			{
-				g_warning (_("sendto %s failed: %s"),
+				pgm_warn (_("sendto %s failed: %s"),
 						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
 						strerror (errno));
 			}
 		}
 		else if (ready == 0)
 		{
-			g_warning (_("sendto %s failed: socket timeout."),
+			pgm_warn (_("sendto %s failed: socket timeout."),
 					 inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
 		}
 		else
 		{
-			g_warning (_("blocked socket failed: %s"),
+			pgm_warn (_("blocked socket failed: %s"),
 					strerror (errno));
 		}
 	}
@@ -169,9 +164,9 @@ pgm_set_nonblocking (
 	)
 {
 /* pre-conditions */
-	g_assert (fd);
-	g_assert (fd[0]);
-	g_assert (fd[1]);
+	pgm_assert (fd);
+	pgm_assert (fd[0]);
+	pgm_assert (fd[1]);
 
 	pgm_sockaddr_nonblocking (fd[0], TRUE);
 	pgm_sockaddr_nonblocking (fd[1], TRUE);

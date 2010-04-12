@@ -52,17 +52,13 @@
 #	include <pthread.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/time.h"
 #include "pgm/timep.h"
 
 
 //#define TIME_DEBUG
 
-#ifndef TIME_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* globals */
@@ -220,7 +216,7 @@ pgm_time_init (
 	pgm_error_t**	error
 	)
 {
-	g_return_val_if_fail (FALSE == time_got_initialized, FALSE);
+	pgm_return_val_if_fail (FALSE == time_got_initialized, FALSE);
 
 /* current time */
 	const char *cfg = getenv ("PGM_TIMER");
@@ -236,33 +232,33 @@ pgm_time_init (
 
 	switch (cfg[0]) {
 	case 'F':
-		g_trace ("Using ftime() timer.");
+		pgm_minor (_("Using ftime() timer."));
 		pgm_time_update_now = ftime_update;
 		break;
 
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
 	case 'C':
-		g_trace ("Using clock_gettime() timer.");
+		pgm_minor (_("Using clock_gettime() timer."));
 		pgm_time_update_now = clock_update;
 		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':
-		g_trace ("Using /dev/rtc timer.");
+		pgm_minor (_("Using /dev/rtc timer."));
 		pgm_time_update_now = rtc_update;
 		pgm_time_since_epoch = pgm_time_conv_from_reset;
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':
-		g_trace ("Using TSC timer.");
+		pgm_minor (_("Using TSC timer."));
 		pgm_time_update_now = tsc_update;
 		pgm_time_since_epoch = pgm_time_conv_from_reset;
 		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
 	case 'H':
-		g_trace ("Using HPET timer.");
+		pgm_minor (_("Using HPET timer."));
 		pgm_time_update_now = hpet_update;
 		pgm_time_since_epoch = pgm_time_conv_from_reset;
 		break;
@@ -270,7 +266,7 @@ pgm_time_init (
 
 	default:
 	case 'G':
-		g_trace ("Using gettimeofday() timer.");
+		pgm_minor (_("Using gettimeofday() timer."));
 		pgm_time_update_now = gettimeofday_update;
 		break;
 	}
@@ -282,37 +278,37 @@ pgm_time_init (
 	switch (cfg[0]) {
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	case 'C':
-		g_trace ("Using clock_nanosleep() sleep.");
+		pgm_minor (_("Using clock_nanosleep() sleep."));
 		pgm_time_sleep = clock_nano_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
 	case 'N':
-		g_trace ("Using nanosleep() sleep.");
+		pgm_minor (_("Using nanosleep() sleep."));
 		pgm_time_sleep = nano_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':
-		g_trace ("Using /dev/rtc sleep.");
+		pgm_minor (_("Using /dev/rtc sleep."));
 		pgm_time_sleep = rtc_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':
-		g_trace ("Using TSC sleep.");
+		pgm_minor (_("Using TSC sleep."));
 		pgm_time_sleep = tsc_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
 	case 'H':
-		g_trace ("Using HPET sleep.");
+		pgm_minor (_("Using HPET sleep."));
 		pgm_time_sleep = hpet_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_PPOLL
 	case 'P':
-		g_trace ("Using ppoll() sleep.");
+		pgm_minor (_("Using ppoll() sleep."));
 		pgm_time_sleep = poll_sleep;
 		break;
 #endif
@@ -321,17 +317,17 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_USLEEP
 	case 'M':
 	case 'U':
-		g_trace ("Using usleep() sleep.");
+		pgm_minor (_("Using usleep() sleep."));
 		pgm_time_sleep = usleep_sleep;
 		break;
 #elif defined(G_OS_WIN32)
 	case 'M':
-		g_trace ("Using msleep() sleep.");
+		pgm_minor (_("Using msleep() sleep."));
 		pgm_time_sleep = msleep;
 		break;
 #endif /* CONFIG_HAVE_USLEEP */
 	case 'S':
-		g_trace ("Using select() sleep.");
+		pgm_minor (_("Using select() sleep."));
 		pgm_time_sleep = select_sleep;
 		break;
 	}
@@ -465,7 +461,7 @@ pgm_time_supported (void)
 gboolean
 pgm_time_shutdown (void)
 {
-	g_return_val_if_fail (TRUE == time_got_initialized, FALSE);
+	pgm_return_val_if_fail (TRUE == time_got_initialized, FALSE);
 
 	gboolean success = TRUE;
 #ifdef CONFIG_HAVE_RTC
@@ -542,7 +538,7 @@ rtc_init (
 	pgm_error_t**	error
 	)
 {
-	g_return_val_if_fail (rtc_fd == -1, FALSE);
+	pgm_return_val_if_fail (rtc_fd == -1, FALSE);
 
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
 	if (rtc_fd < 0) {
@@ -581,8 +577,8 @@ static
 gboolean
 rtc_shutdown (void)
 {
-	g_return_val_if_fail (rtc_fd, FALSE);
-	g_warn_if_fail (0 == close (rtc_fd));
+	pgm_return_val_if_fail (rtc_fd, FALSE);
+	pgm_warn_if_fail (0 == close (rtc_fd));
 	rtc_fd = -1;
 	return TRUE;
 }
@@ -668,7 +664,7 @@ tsc_init (
 	pgm_time_t start, stop;
 	const gulong calibration_usec = 4000 * 1000;
 
-	g_message (_("Running a benchmark to measure system clock frequency..."));
+	pgm_info (_("Running a benchmark to measure system clock frequency..."));
 
 	start = rdtsc();
 	pgm_time_sleep (calibration_usec);
@@ -676,7 +672,7 @@ tsc_init (
 
 	if (stop < start)
 	{
-		g_warning (_("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
+		pgm_info (_("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
 			   "non-monotonic time response rendering the TSC unsuitable for high resolution "
 			   "timing.  To prevent the start delay from this benchmark and use a stable clock "
 			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP."));
@@ -697,7 +693,7 @@ tsc_init (
 		tsc_mhz = -( calibration_usec / tsc_diff );
 	}
 
-	g_warning (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
+	pgm_info (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %i on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server."),
@@ -766,7 +762,7 @@ hpet_init (
 	pgm_error_t**	error
 	)
 {
-	g_return_val_if_fail (hpet_fd == -1, FALSE);
+	pgm_return_val_if_fail (hpet_fd == -1, FALSE);
 
 	hpet_fd = open("/dev/hpet", O_RDONLY);
 	if (hpet_fd < 0) {
@@ -809,8 +805,8 @@ static
 gboolean
 hpet_shutdown (void)
 {
-	g_return_val_if_fail (hpet_fd, FALSE);
-	g_warn_if_fail (0 == close (hpet_fd));
+	pgm_return_val_if_fail (hpet_fd, FALSE);
+	pgm_warn_if_fail (0 == close (hpet_fd));
 	hpet_fd = -1;
 	return TRUE;
 }
