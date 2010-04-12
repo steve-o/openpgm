@@ -66,11 +66,11 @@ log_init ( void )
 	g_timezone += dir * 24 * 60 * 60;
 //	printf ("timezone offset %u seconds.\n", g_timezone);
 	gethostname (g_hostname, sizeof(g_hostname));
-	g_log_set_handler ("Example",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("Pgm-Http",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler ("Pgm-Snmp",		G_LOG_LEVEL_MASK, log_handler, NULL);
-	g_log_set_handler (NULL,		G_LOG_LEVEL_MASK, log_handler, NULL);
-	pgm_set_handler (pgm_log_handler, NULL);
+	g_log_set_handler ("Example",		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
+	g_log_set_handler ("Pgm-Http",		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
+	g_log_set_handler ("Pgm-Snmp",		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
+	g_log_set_handler (NULL,		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
+	pgm_log_set_handler (pgm_log_handler, NULL);
 	return 0;
 }
 

@@ -58,7 +58,7 @@ extern int pgm_min_log_level;
 
 typedef void (*pgm_log_func_t) (const gint, const gchar*, gpointer);
 
-pgm_log_func_t pgm_set_handler (pgm_log_func_t, gpointer);
+pgm_log_func_t pgm_log_set_handler (pgm_log_func_t, gpointer);
 void pgm__log (const gint, const gchar*, ...) G_GNUC_PRINTF (2, 3);
 void pgm__logv (const gint, const gchar*, va_list);
 
