@@ -94,12 +94,12 @@ main (
 
 	setlocale (LC_ALL, "");
 
-	log_init ();
 	if (!pgm_init (&pgm_err)) {
 		g_error ("Unable to start PGM engine: %s", pgm_err->message);
 		pgm_error_free (pgm_err);
 		return EXIT_FAILURE;
 	}
+	log_init ();
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');

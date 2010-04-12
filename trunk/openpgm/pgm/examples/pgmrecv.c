@@ -126,16 +126,16 @@ main (
 
 	setlocale (LC_ALL, "");
 
-	log_init ();
-	g_message ("pgmrecv");
-
-	g_thread_init (NULL);
-
 	if (!pgm_init (&pgm_err)) {
 		g_error ("Unable to start PGM engine: %s", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
 		pgm_error_free (pgm_err);
 		return EXIT_FAILURE;
 	}
+
+	log_init ();
+	g_message ("pgmrecv");
+
+	g_thread_init (NULL);
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');

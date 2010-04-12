@@ -33,6 +33,7 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/log.h"
 
 
@@ -43,7 +44,8 @@
 static int g_timezone = 0;
 static char g_hostname[NI_MAXHOST + 1];
 
-static void log_handler (const gchar*, GLogLevelFlags, const gchar*, gpointer);
+static void glib_log_handler (const gchar*, GLogLevelFlags, const gchar*, gpointer);
+static void pgm_log_handler (const gint, const gchar*, gpointer);
 
 
 /* calculate time zone offset in seconds
@@ -64,17 +66,18 @@ log_init ( void )
 	g_timezone += dir * 24 * 60 * 60;
 //	printf ("timezone offset %u seconds.\n", g_timezone);
 	gethostname (g_hostname, sizeof(g_hostname));
-	g_log_set_handler ("Pgm",		G_LOG_LEVEL_MASK, log_handler, NULL);
+	g_log_set_handler ("Example",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler ("Pgm-Http",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler ("Pgm-Snmp",		G_LOG_LEVEL_MASK, log_handler, NULL);
 	g_log_set_handler (NULL,		G_LOG_LEVEL_MASK, log_handler, NULL);
+	pgm_set_handler (pgm_log_handler, NULL);
 	return 0;
 }
 
 /* log callback
  */
 static void
-log_handler (
+glib_log_handler (
 	const gchar*	log_domain,
 	G_GNUC_UNUSED GLogLevelFlags	log_level,
 	const gchar*	message,
@@ -129,6 +132,28 @@ log_handler (
 	write (STDOUT_FILENO, message, strlen(message));
 	write (STDOUT_FILENO, "\n", 1);
 #endif
+}
+
+static void
+pgm_log_handler (
+	const gint		pgm_log_level,
+	const gchar*		message,
+	G_GNUC_UNUSED gpointer	closure
+	)
+{
+	GLogLevelFlags glib_log_level;
+
+	switch (pgm_log_level) {
+	case PGM_LOG_LEVEL_DEBUG:	glib_log_level = G_LOG_LEVEL_DEBUG; break;
+	case PGM_LOG_LEVEL_TRACE:	glib_log_level = G_LOG_LEVEL_DEBUG; break;
+	case PGM_LOG_LEVEL_MINOR:	glib_log_level = G_LOG_LEVEL_INFO; break;
+	case PGM_LOG_LEVEL_NORMAL:	glib_log_level = G_LOG_LEVEL_MESSAGE; break;
+	case PGM_LOG_LEVEL_WARNING:	glib_log_level = G_LOG_LEVEL_WARNING; break;
+	case PGM_LOG_LEVEL_ERROR:	glib_log_level = G_LOG_LEVEL_CRITICAL; break;
+	case PGM_LOG_LEVEL_FATAL:	glib_log_level = G_LOG_LEVEL_ERROR; break;
+	}
+
+	g_log ("Example", glib_log_level, message, NULL);
 }
 
 /* eof */
