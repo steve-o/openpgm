@@ -34,6 +34,7 @@
 #	include <sys/socket.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/if.h"
 #include "pgm/sockaddr.h"
 #include "pgm/getifaddrs.h"
@@ -41,12 +42,6 @@
 #include "pgm/indextoaddr.h"
 
 //#define INDEXTOADDR_DEBUG
-
-#ifndef INDEXTOADDR_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* interfaces indexes refer to the link layer, we want to find the internet layer address.
@@ -63,7 +58,7 @@ pgm_if_indextoaddr (
 	pgm_error_t**		error
         )
 {
-	g_return_val_if_fail (NULL != ifsa, FALSE);
+	pgm_return_val_if_fail (NULL != ifsa, FALSE);
 
 	if (0 == ifindex)		/* any interface or address */
 	{

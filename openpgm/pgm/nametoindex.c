@@ -32,12 +32,6 @@
 
 //#define NAMETOINDEX_DEBUG
 
-#ifndef NAMETOINDEX_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-
 
 #ifdef G_OS_WIN32
 
@@ -54,75 +48,106 @@ pgm_compat_if_nametoindex (
 	const char*		ifname
         )
 {
-	g_return_val_if_fail (NULL != ifname, 0);
+	pgm_return_val_if_fail (NULL != ifname, 0);
 
 #ifdef CONFIG_TARGET_WINE
-	g_assert (AF_INET6 != iffamily);
+
+	pgm_assert (AF_INET6 != iffamily);
 
 	ULONG ifIndex = 0;
-	DWORD dwSize, dwRet;
-	MIB_IFTABLE *pIfTable;
+	DWORD dwSize = sizeof(MIB_IFTABLE), dwRet;
+	MIB_IFTABLE *pIfTable = NULL;
 	MIB_IFROW *pIfRow;
 
 	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
 	if (NO_ERROR == dwRet)
 		return ifIndex;
 
-	pIfTable = (MIB_IFTABLE *) malloc(sizeof (MIB_IFTABLE));
-	if (NULL == pIfTable) {
-		perror("malloc");
-		return 0;
-	}
-	dwSize = sizeof (MIB_IFTABLE);
-	dwRet = GetIfTable(pIfTable, &dwSize, FALSE);
-	if (ERROR_INSUFFICIENT_BUFFER == dwRet) {
-		free(pIfTable);
-		pIfTable = (MIB_IFTABLE *) malloc(dwSize);
-		if (NULL == pIfTable) {
-			perror("malloc");
-			return 0;
+/* loop to handle interfaces coming online causing a buffer overflow
+ * between first call to list buffer length and second call to enumerate.
+ */
+	for (unsigned i = 100; i; i--)
+	{
+		if (pIfTable) {
+			pgm_free (pIfTable);
+			pIfTable = NULL;
 		}
+		pIfTable = (MIB_IFTABLE *)pgm_malloc (dwSize);
+		dwRet = GetIfTable (pIfTable, &dwSize, FALSE);
+		if (ERROR_INSUFFICIENT_BUFFER != dwRet)
+			break;
 	}
-	dwRet = GetIfTable(pIfTable, &dwSize, FALSE);
-	if (NO_ERROR != dwRet) {
-		perror("GetIfTable did not return NO_ERROR");
+
+	switch (dwRet) {
+	case ERROR_SUCCESS:	/* NO_ERROR */
+		break;
+	case ERROR_INSUFFICIENT_BUFFER:
+		pgm_warn (_("GetIfTable repeatedly failed with ERROR_INSUFFICIENT_BUFFER"));
+		pgm_free (pIfTable);
+		return 0;
+	default:
+		pgm_warn (_("GetIfTable failed"));
+		pgm_free (pIfTable);
 		return 0;
 	}
-	for (int i = 0; i < (int) pIfTable->dwNumEntries; i++)
+
+	for (unsigned i = 0; i < pIfTable->dwNumEntries; i++)
 	{
 		pIfRow = (MIB_IFROW *) & pIfTable->table[i];
 		if (0 == strncmp (ifname, pIfRow->bDescr, pIfRow->dwDescrLen)) {
 			ifIndex = pIfRow->dwIndex;
-			free(pIfTable);
+			pgm_free (pIfTable);
 			return ifIndex;
 		}
 	}
-	free(pIfTable);
+	pgm_free (pIfTable);
 
 #else /* !CONFIG_TARGET_WINE */
-	ULONG ifIndex;
-	DWORD dwSize, dwRet;
-	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
 
+	ULONG ifIndex;
+	DWORD dwSize = sizeof(IP_ADAPTER_ADDRESSES), dwRet;
+	IP_ADAPTER_ADDRESSES *pAdapterAddresses = NULL, *adapter;
+
+/* first see if GetAdapterIndex is working
+ */
 	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
 	if (NO_ERROR == dwRet)
 		return ifIndex;
 
 /* fallback to finding index via iterating adapter list */
-	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
-	if (ERROR_BUFFER_OVERFLOW != dwRet) {
-		perror("GetAdaptersAddresses");
-		return 0;
+
+/* loop to handle interfaces coming online causing a buffer overflow
+ * between first call to list buffer length and second call to enumerate.
+ */
+	for (unsigned i = 100; i; i--)
+	{
+		if (pAdapterAddresses) {
+			pgm_free (pAdapterAddresses);
+			pAdapterAddresses = NULL;
+		}
+		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)pgm_malloc (dwSize);
+		dwRet = GetAdaptersAddresses (AF_UNSPEC,
+						GAA_FLAG_SKIP_ANYCAST |
+						GAA_FLAG_SKIP_DNS_SERVER |
+						GAA_FLAG_SKIP_FRIENDLY_NAME |
+						GAA_FLAG_SKIP_MULTICAST,
+						NULL,
+						NULL,
+						&dwSize);
+		if (ERROR_BUFFER_OVERFLOW != dwRet)
+			break;
 	}
-	pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)malloc (dwSize);
-	if (NULL == pAdapterAddresses) {
-		perror("malloc");
+
+	switch (dwRet) {
+	case ERROR_SUCCESS:
+		break;
+	case ERROR_BUFFER_OVERFLOW:
+		pgm_warn (_("GetAdaptersAddresses repeatedly failed with ERROR_BUFFER_OVERFLOW"));
+		pgm_free (pAdapterAddresses);
 		return 0;
-	}
-	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
-	if (ERROR_SUCCESS != dwRet) {
-		perror("GetAdaptersAddresses(2)");
-		free(pAdapterAddresses);
+	default:
+		pgm_warn (_("GetAdaptersAddresses failed"));
+		pgm_free (pAdapterAddresses);
 		return 0;
 	}
 
@@ -132,12 +157,13 @@ pgm_compat_if_nametoindex (
 	{
 		if (0 == strcmp (ifname, adapter->AdapterName)) {
 			ifIndex = AF_INET6 == iffamily ? adapter->Ipv6IfIndex : adapter->IfIndex;
-			free (pAdapterAddresses);
+			pgm_free (pAdapterAddresses);
 			return ifIndex;
 		}
 	}
 
-	free (pAdapterAddresses);
+	pgm_free (pAdapterAddresses);
+
 #endif
 	return 0;
 }

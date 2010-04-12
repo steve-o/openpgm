@@ -20,18 +20,15 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/tsi.h"
+#include "pgm/hashtable.h"
 
 //#define TSI_DEBUG
-
-#ifndef TSI_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* locals */
@@ -49,9 +46,9 @@ pgm_tsi_print_r (
 	gsize			bufsize
 	)
 {
-	g_return_val_if_fail (NULL != tsi, -1);
-	g_return_val_if_fail (NULL != buf, -1);
-	g_return_val_if_fail (bufsize > 0, -1);
+	pgm_return_val_if_fail (NULL != tsi, -1);
+	pgm_return_val_if_fail (NULL != buf, -1);
+	pgm_return_val_if_fail (bufsize > 0, -1);
 
 	const guint8* gsi = (const guint8*)tsi;
 	const guint16 source_port = tsi->sport;
@@ -69,7 +66,7 @@ pgm_tsi_print (
 	const pgm_tsi_t*	tsi
 	)
 {
-	g_return_val_if_fail (tsi != NULL, NULL);
+	pgm_return_val_if_fail (tsi != NULL, NULL);
 
 	static char buf[PGM_TSISTRLEN];
 	pgm_tsi_print_r (tsi, buf, sizeof(buf));
@@ -87,13 +84,13 @@ pgm_tsi_hash (
         )
 {
 /* pre-conditions */
-	g_assert (NULL != v);
+	pgm_assert (NULL != v);
 
 	const pgm_tsi_t* tsi = v;
 	char buf[PGM_TSISTRLEN];
 	const int valid = pgm_tsi_print_r (tsi, buf, sizeof(buf));
-	g_assert (valid > 0);
-	return g_str_hash (buf);
+	pgm_assert (valid > 0);
+	return pgm_str_hash (buf);
 }
 
 /* compare two transport session identifier TSI values.
@@ -107,8 +104,8 @@ pgm_tsi_equal (
         )
 {
 /* pre-conditions */
-	g_assert (v);
-	g_assert (v2);
+	pgm_assert (v);
+	pgm_assert (v2);
 
 	return memcmp (v, v2, sizeof(struct pgm_tsi_t)) == 0;
 }

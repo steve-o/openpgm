@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -36,18 +37,13 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/md5.h"
 #include "pgm/gsi.h"
 #include "pgm/rand.h"
 
 
 //#define GSI_DEBUG
-
-#ifndef GSI_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* locals */
@@ -65,13 +61,13 @@ pgm_gsi_create_from_data (
 	const gsize	length
 	)
 {
-	g_return_val_if_fail (NULL != gsi, FALSE);
-	g_return_val_if_fail (NULL != data, FALSE);
-	g_return_val_if_fail (length > 1, FALSE);
+	pgm_return_val_if_fail (NULL != gsi, FALSE);
+	pgm_return_val_if_fail (NULL != data, FALSE);
+	pgm_return_val_if_fail (length > 1, FALSE);
 
 #ifdef CONFIG_HAVE_GLIB_CHECKSUM
 	GChecksum* checksum = g_checksum_new (G_CHECKSUM_MD5);
-	g_return_val_if_fail (NULL != checksum, FALSE);
+	pgm_return_val_if_fail (NULL != checksum, FALSE);
 	g_checksum_update (checksum, data, length);
 	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
 	g_checksum_free (checksum);
@@ -93,8 +89,8 @@ pgm_gsi_create_from_string (
 	gssize		length
 	)
 {
-	g_return_val_if_fail (NULL != gsi, FALSE);
-	g_return_val_if_fail (NULL != str, FALSE);
+	pgm_return_val_if_fail (NULL != gsi, FALSE);
+	pgm_return_val_if_fail (NULL != str, FALSE);
 
 	if (length < 0)
 		length = strlen (str);
@@ -114,7 +110,7 @@ pgm_gsi_create_from_hostname (
 	pgm_error_t**	error
 	)
 {
-	g_return_val_if_fail (NULL != gsi, FALSE);
+	pgm_return_val_if_fail (NULL != gsi, FALSE);
 
 	char hostname[NI_MAXHOST];
 	int retval = gethostname (hostname, sizeof(hostname));
@@ -149,7 +145,7 @@ pgm_gsi_create_from_addr (
 	char hostname[NI_MAXHOST];
 	struct addrinfo hints, *res = NULL;
 
-	g_return_val_if_fail (NULL != gsi, FALSE);
+	pgm_return_val_if_fail (NULL != gsi, FALSE);
 
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
@@ -199,9 +195,9 @@ pgm_gsi_print_r (
 {
 	const guint8* src = (const guint8*)gsi;
 
-	g_return_val_if_fail (NULL != gsi, -1);
-	g_return_val_if_fail (NULL != buf, -1);
-	g_return_val_if_fail (bufsize > 0, -1);
+	pgm_return_val_if_fail (NULL != gsi, -1);
+	pgm_return_val_if_fail (NULL != buf, -1);
+	pgm_return_val_if_fail (bufsize > 0, -1);
 
 	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i",
 			src[0], src[1], src[2], src[3], src[4], src[5]);
@@ -219,7 +215,7 @@ pgm_gsi_print (
 {
 	static char buf[PGM_GSISTRLEN];
 
-	g_return_val_if_fail (NULL != gsi, NULL);
+	pgm_return_val_if_fail (NULL != gsi, NULL);
 
 	pgm_gsi_print_r (gsi, buf, sizeof(buf));
 	return buf;
@@ -235,8 +231,8 @@ pgm_gsi_equal (
         )
 {
 /* pre-conditions */
-	g_assert (v);
-	g_assert (v2);
+	pgm_assert (v);
+	pgm_assert (v2);
 
         return memcmp (v, v2, 6 * sizeof(guint8)) == 0;
 }

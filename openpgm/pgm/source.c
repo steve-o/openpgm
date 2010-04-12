@@ -38,6 +38,8 @@
 #	include <sys/epoll.h>
 #endif
 
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
 #ifdef G_OS_UNIX
@@ -53,6 +55,7 @@
 #	include <ws2tcpip.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/pgm.h"
 #include "pgm/ip.h"
@@ -67,18 +70,9 @@
 #include "pgm/reed_solomon.h"
 
 //#define SOURCE_DEBUG
-//#define SPM_DEBUG
 
 #ifndef SOURCE_DEBUG
-#	define G_DISABLE_ASSERT
-#	define g_trace(m,...)		while (0)
-#else
-#	include <ctype.h>
-#	ifdef SPM_DEBUG
-#		define g_trace(m,...)		g_debug(__VA_ARGS__)
-#	else
-#		define g_trace(m,...)		do { if (strcmp((m),"SPM")) { g_debug(__VA_ARGS__); } } while (0)
-#	endif
+#	define PGM_DISABLE_ASSERT
 #endif
 
 #ifndef ENOBUFS
@@ -136,10 +130,10 @@ pgm_transport_set_ambient_spm (
 	const guint		spm_ambient_interval	/* in microseconds */
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (spm_ambient_interval > 0, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (spm_ambient_interval > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -165,12 +159,12 @@ pgm_transport_set_heartbeat_spm (
 	const guint		len
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (len > 0, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (len > 0, FALSE);
 	for (unsigned i = 0; i < len; i++)
-		g_return_val_if_fail (spm_heartbeat_interval[i] > 0, FALSE);
+		pgm_return_val_if_fail (spm_heartbeat_interval[i] > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -198,11 +192,11 @@ pgm_transport_set_txw_sqns (
 	const guint		sqns
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
-	g_return_val_if_fail (sqns > 0, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (sqns < ((UINT32_MAX/2)-1), FALSE);
+	pgm_return_val_if_fail (sqns > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -227,10 +221,10 @@ pgm_transport_set_txw_secs (
 	const guint		secs
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
-	g_return_val_if_fail (secs > 0, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (secs > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -259,10 +253,10 @@ pgm_transport_set_txw_max_rte (
 	const guint		max_rte
 	)
 {
-	g_return_val_if_fail (transport != NULL, FALSE);
-	g_return_val_if_fail (max_rte > 0, FALSE);
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	pgm_return_val_if_fail (max_rte > 0, FALSE);
 	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		g_return_val_if_reached (FALSE);
+		pgm_return_val_if_reached (FALSE);
 	if (transport->is_bound ||
 	    transport->is_destroyed)
 	{
@@ -283,7 +277,7 @@ pgm_schedule_proactive_nak (
 	guint32			nak_tg_sqn	/* transmission group (shifted) */
 	)
 {
-	g_return_val_if_fail (NULL != transport, FALSE);
+	pgm_return_val_if_fail (NULL != transport, FALSE);
 	gboolean status = pgm_txw_retransmit_push (transport->window,
 						   nak_tg_sqn | transport->rs_proactive_h,
 						   TRUE /* is_parity */,
@@ -304,7 +298,7 @@ pgm_on_deferred_nak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
+	pgm_assert (NULL != transport);
 
 /* We can flush queue and block all odata, or process one set, or process each
  * sequence number individually.
@@ -351,21 +345,21 @@ pgm_on_spmr (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
 
-	g_trace ("INFO","pgm_on_spmr (transport:%p peer:%p skb:%p)",
+	pgm_debug ("pgm_on_spmr (transport:%p peer:%p skb:%p)",
 		(gpointer)transport, (gpointer)peer, (gpointer)skb);
 
 	if (G_UNLIKELY(!pgm_verify_spmr (skb))) {
-		g_trace ("DEBUG","Malformed SPMR rejected.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed SPMR rejected."));
 		return FALSE;
 	}
 
 	if (peer_is_source (peer))
 		pgm_send_spm (transport, 0);
 	else {
-		g_trace ("INFO", "suppressing SPMR due to peer multicast SPMR.");
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Suppressing SPMR due to peer multicast SPMR."));
 		reset_spmr_timer (peer);
 	}
 	return TRUE;
@@ -390,17 +384,17 @@ pgm_on_nak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
 
-	g_trace ("INFO","pgm_on_nak (transport:%p skb:%p)",
+	pgm_debug ("pgm_on_nak (transport:%p skb:%p)",
 		(gpointer)transport, (gpointer)skb);
 
 	const gboolean is_parity = skb->pgm_header->pgm_options & PGM_OPT_PARITY;
 	if (is_parity) {
 		transport->cumulative_stats[PGM_PC_SOURCE_PARITY_NAKS_RECEIVED]++;
 		if (!transport->use_ondemand_parity) {
-			g_trace ("DEBUG","Parity NAK rejected as on-demand parity is not enabled.");
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Parity NAK rejected as on-demand parity is not enabled."));
 			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
@@ -408,7 +402,7 @@ pgm_on_nak (
 		transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED]++;
 
 	if (G_UNLIKELY(!pgm_verify_nak (skb))) {
-		g_trace ("DEBUG","Malformed NAK rejected.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected."));
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -423,7 +417,7 @@ pgm_on_nak (
 	{
 		char saddr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&nak_src_nla, saddr, sizeof(saddr));
-		g_trace ("DEBUG","NAK rejected for unmatched NLA: %s", saddr);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("NAK rejected for unmatched NLA: %s"), saddr);
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -435,7 +429,7 @@ pgm_on_nak (
 	{
 		char sgroup[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&nak_src_nla, sgroup, sizeof(sgroup));
-		g_trace ("DEBUG","NAK rejected as targeted for different multicast group: %s", sgroup);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("NAK rejected as targeted for different multicast group: %s"), sgroup);
 		transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -445,7 +439,7 @@ pgm_on_nak (
 	sqn_list.sqn[0] = g_ntohl (nak->nak_sqn);
 	sqn_list.len = 1;
 
-	g_trace ("INFO", "nak_sqn %" G_GUINT32_FORMAT, sqn_list.sqn[0]);
+	pgm_debug ("nak_sqn %" G_GUINT32_FORMAT, sqn_list.sqn[0]);
 
 /* check NAK list */
 	const guint32* nak_list = NULL;
@@ -456,12 +450,12 @@ pgm_on_nak (
 							(const struct pgm_opt_length*)(nak6 + 1) :
 							(const struct pgm_opt_length*)(nak  + 1);
 		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH)) {
-			g_trace ("DEBUG","Malformed NAK rejected.");
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected."));
 			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
 		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length))) {
-			g_trace ("DEBUG","Malformed NAK rejected.");
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected."));
 			transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
@@ -479,7 +473,7 @@ pgm_on_nak (
 
 /* nak list numbers */
 	if (G_UNLIKELY(nak_list_len > 63)) {
-		g_trace ("DEBUG","Malformed NAK rejected on too long sequence list.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on too long sequence list."));
 		return FALSE;
 	}
 		
@@ -516,10 +510,10 @@ pgm_on_nnak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
 
-	g_trace ("INFO","pgm_on_nnak (transport:%p skb:%p)",
+	pgm_debug ("pgm_on_nnak (transport:%p skb:%p)",
 		(gpointer)transport, (gpointer)skb);
 
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED]++;
@@ -595,10 +589,10 @@ pgm_send_spm (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != transport->window);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != transport->window);
 
-	g_trace ("SPM","pgm_send_spm (transport:%p flags:%d)",
+	pgm_debug ("pgm_send_spm (transport:%p flags:%d)",
 		(gpointer)transport, flags);
 
 	gsize tpdu_length = sizeof(struct pgm_header);
@@ -732,16 +726,16 @@ send_ncf (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != nak_src_nla);
-	g_assert (NULL != nak_grp_nla);
-	g_assert (nak_src_nla->sa_family == nak_grp_nla->sa_family);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != nak_src_nla);
+	pgm_assert (NULL != nak_grp_nla);
+	pgm_assert (nak_src_nla->sa_family == nak_grp_nla->sa_family);
 
 #ifdef SOURCE_DEBUG
 	char saddr[INET6_ADDRSTRLEN], gaddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (nak_src_nla, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (nak_grp_nla, gaddr, sizeof(gaddr));
-	g_trace ("INFO", "send_ncf (transport:%p nak-src-nla:%s nak-grp-nla:%s sequence:%" G_GUINT32_FORMAT" is-parity:%s)",
+	pgm_debug ("send_ncf (transport:%p nak-src-nla:%s nak-grp-nla:%s sequence:%" G_GUINT32_FORMAT" is-parity:%s)",
 		(gpointer)transport,
 		saddr,
 		gaddr,
@@ -805,12 +799,12 @@ send_ncf_list (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != nak_src_nla);
-	g_assert (NULL != nak_grp_nla);
-	g_assert (sqn_list->len > 1);
-	g_assert (sqn_list->len <= 63);
-	g_assert (nak_src_nla->sa_family == nak_grp_nla->sa_family);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != nak_src_nla);
+	pgm_assert (NULL != nak_grp_nla);
+	pgm_assert (sqn_list->len > 1);
+	pgm_assert (sqn_list->len <= 63);
+	pgm_assert (nak_src_nla->sa_family == nak_grp_nla->sa_family);
 
 #ifdef SOURCE_DEBUG
 	char saddr[INET6_ADDRSTRLEN], gaddr[INET6_ADDRSTRLEN];
@@ -823,7 +817,7 @@ send_ncf_list (
 		sprintf (sequence, " %" G_GUINT32_FORMAT, sqn_list->sqn[i]);
 		strcat (list, sequence);
 	}
-	g_trace ("INFO", "send_ncf_list (transport:%p nak-src-nla:%s nak-grp-nla:%s sqn-list:[%s] is-parity:%s)",
+	pgm_debug ("send_ncf_list (transport:%p nak-src-nla:%s nak-grp-nla:%s sqn-list:[%s] is-parity:%s)",
 		(gpointer)transport,
 		saddr,
 		gaddr,
@@ -946,11 +940,11 @@ send_odata (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
-	g_assert (skb->len <= transport->max_tsdu);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+	pgm_assert (skb->len <= transport->max_tsdu);
 
-	g_trace ("INFO","send_odata (transport:%p skb:%p bytes-written:%p)",
+	pgm_debug ("send_odata (transport:%p skb:%p bytes-written:%p)",
 		(gpointer)transport, (gpointer)skb, (gpointer)bytes_written);
 
 	const guint16 tsdu_length = skb->len;
@@ -1048,11 +1042,11 @@ send_odata_copy (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (tsdu_length <= transport->max_tsdu);
-	if (G_LIKELY(tsdu_length)) g_assert (NULL != tsdu);
+	pgm_assert (NULL != transport);
+	pgm_assert (tsdu_length <= transport->max_tsdu);
+	if (G_LIKELY(tsdu_length)) pgm_assert (NULL != tsdu);
 
-	g_trace ("INFO","send_odata_copy (transport:%p tsdu:%p tsdu_length:%" G_GSIZE_FORMAT " bytes-written:%p)",
+	pgm_debug ("send_odata_copy (transport:%p tsdu:%p tsdu_length:%" G_GSIZE_FORMAT " bytes-written:%p)",
 		(gpointer)transport, tsdu, tsdu_length, (gpointer)bytes_written);
 
 	const guint16 tpdu_length = tsdu_length + pgm_transport_pkt_offset(FALSE);
@@ -1153,11 +1147,11 @@ send_odatav (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (count <= PGM_MAX_FRAGMENTS);
-	if (G_LIKELY(count)) g_assert (NULL != vector);
+	pgm_assert (NULL != transport);
+	pgm_assert (count <= PGM_MAX_FRAGMENTS);
+	if (G_LIKELY(count)) pgm_assert (NULL != vector);
 
-	g_trace ("INFO","send_odatav (transport:%p vector:%p count:%u bytes-written:%p)",
+	pgm_debug ("send_odatav (transport:%p vector:%p count:%u bytes-written:%p)",
 		(gpointer)transport, (gconstpointer)vector, count, (gpointer)bytes_written);
 
 	if (0 == count)
@@ -1172,12 +1166,12 @@ send_odatav (
 	{
 #ifdef TRANSPORT_DEBUG
 		if (vector[i].iov_len) {
-			g_assert( vector[i].iov_base );
+			pgm_assert( vector[i].iov_base );
 		}
 #endif
 		STATE(tsdu_length) += vector[i].iov_len;
 	}
-	g_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (STATE(tsdu_length) <= transport->max_tsdu, PGM_IO_STATUS_ERROR);
 
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
@@ -1283,8 +1277,8 @@ send_apdu (
 	guint packets_sent	= 0;		/* IP packets */
 	gsize data_bytes_sent	= 0;
 
-	g_assert (NULL != transport);
-	g_assert (NULL != apdu);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != apdu);
 
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain)
@@ -1408,7 +1402,7 @@ retry_send:
 		}
 
 	} while ( STATE(data_bytes_offset)  < apdu_length);
-	g_assert( STATE(data_bytes_offset) == apdu_length );
+	pgm_assert( STATE(data_bytes_offset) == apdu_length );
 
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
@@ -1444,16 +1438,16 @@ pgm_send (
 	gsize*				bytes_written
 	)
 {
-	g_trace ("INFO","pgm_send (transport:%p apdu:%p apdu-length:%" G_GSIZE_FORMAT" bytes-written:%p)",
+	pgm_debug ("pgm_send (transport:%p apdu:%p apdu-length:%" G_GSIZE_FORMAT" bytes-written:%p)",
 		(gpointer)transport, apdu, apdu_length, (gpointer)bytes_written);
 
 /* parameters */
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(apdu_length)) g_return_val_if_fail (NULL != apdu, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(apdu_length)) pgm_return_val_if_fail (NULL != apdu, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
 	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
 	if (G_UNLIKELY(!transport->is_bound ||
@@ -1461,7 +1455,7 @@ pgm_send (
 	    apdu_length > transport->max_apdu))
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
 /* source */
@@ -1511,23 +1505,23 @@ pgm_sendv (
         gsize*                     	bytes_written
 	)
 {
-	g_trace ("INFO","pgm_sendv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
+	pgm_debug ("pgm_sendv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
 		(gpointer)transport,
 		(gconstpointer)vector,
 		count,
 		is_one_apdu ? "TRUE" : "FALSE",
 		(gpointer)bytes_written);
 
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(count)) g_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(count)) pgm_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
 	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
 	pgm_mutex_lock (&transport->source_mutex);
@@ -1568,7 +1562,7 @@ pgm_sendv (
 	{
 #ifdef TRANSPORT_DEBUG
 		if (vector[i].iov_len) {
-			g_assert( vector[i].iov_base );
+			pgm_assert( vector[i].iov_base );
 		}
 #endif
 		if (!is_one_apdu &&
@@ -1576,7 +1570,7 @@ pgm_sendv (
 		{
 			pgm_mutex_unlock (&transport->source_mutex);
 			pgm_rwlock_reader_unlock (&transport->lock);
-			g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+			pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 		}
 		STATE(apdu_length) += vector[i].iov_len;
 	}
@@ -1591,7 +1585,7 @@ pgm_sendv (
 		} else if (STATE(apdu_length) > transport->max_apdu) {
 			pgm_mutex_unlock (&transport->source_mutex);
 			pgm_rwlock_reader_unlock (&transport->lock);
-			g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+			pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 		}
 	}
 
@@ -1648,7 +1642,7 @@ retry_send:
 				pgm_rwlock_reader_unlock (&transport->lock);
 				return status;
 			default:
-				g_assert_not_reached();
+				pgm_assert_not_reached();
 			}
 			data_bytes_sent += wrote_bytes;
 		}
@@ -1794,7 +1788,7 @@ retry_one_apdu_send:
 		}
 
 	} while ( STATE(data_bytes_offset)  < STATE(apdu_length) );
-	g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
+	pgm_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
@@ -1840,23 +1834,23 @@ pgm_send_skbv (
 	gsize*				bytes_written
 	)
 {
-	g_trace ("INFO","pgm_send_skbv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
+	pgm_debug ("pgm_send_skbv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
 		(gpointer)transport,
 		(gpointer)vector,
 		count,
 		is_one_apdu ? "TRUE" : "FALSE",
 		(gpointer)bytes_written);
 
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	g_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(count)) g_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (count <= PGM_MAX_FRAGMENTS, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(count)) pgm_return_val_if_fail (NULL != vector, PGM_IO_STATUS_ERROR);
 	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
 	pgm_mutex_lock (&transport->source_mutex);
@@ -1967,11 +1961,11 @@ pgm_send_skbv (
 			STATE(skb)->pgm_opt_fragment->opt_frag_off	= g_htonl (STATE(data_bytes_offset));
 			STATE(skb)->pgm_opt_fragment->opt_frag_len	= g_htonl (STATE(apdu_length));
 
-			g_assert (STATE(skb)->data == (STATE(skb)->pgm_opt_fragment + 1));
+			pgm_assert (STATE(skb)->data == (STATE(skb)->pgm_opt_fragment + 1));
 		}
 		else
 		{
-			g_assert (STATE(skb)->data == (STATE(skb)->pgm_data + 1));
+			pgm_assert (STATE(skb)->data == (STATE(skb)->pgm_data + 1));
 		}
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
@@ -2025,7 +2019,7 @@ retry_send:
 #ifdef TRANSPORT_DEBUG
 	if (is_one_apdu)
 	{
-		g_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
+		pgm_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 	}
 #endif
 
@@ -2070,8 +2064,8 @@ send_rdata (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
 
 	const gssize tpdu_length = (guint8*)skb->tail - (guint8*)skb->head;
 

@@ -101,61 +101,61 @@ PGM_GNUC_INTERNAL void pgm_txw_retransmit_remove_head (pgm_txw_t* const);
 
 static inline guint32 pgm_txw_max_length (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->alloc;
 }
 
 static inline guint32 pgm_txw_length (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
 static inline guint32 pgm_txw_size (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->size;
 }
 
 static inline gboolean pgm_txw_is_empty (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_txw_length (window) == 0;
 }
 
 static inline gboolean pgm_txw_is_full (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_txw_length (window) == pgm_txw_max_length (window);
 }
 
 static inline guint32 pgm_txw_lead (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->lead;
 }
 
 static inline guint32 pgm_txw_lead_atomic (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_atomic_int32_get ((const volatile gint32*)&window->lead);
 }
 
 static inline guint32 pgm_txw_next_lead (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return (guint32)(pgm_txw_lead (window) + 1);
 }
 
 static inline guint32 pgm_txw_trail (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return window->trail;
 }
 
 static inline guint32 pgm_txw_trail_atomic (const pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_atomic_int32_get ((const volatile gint32*)&window->trail);
 }
 
@@ -179,7 +179,7 @@ static inline void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t* skb)
 
 static inline gboolean pgm_txw_retransmit_is_empty (pgm_txw_t* const window)
 {
-	g_assert (window);
+	pgm_assert (window);
 	return pgm_queue_is_empty (&window->retransmit_queue);
 }
 

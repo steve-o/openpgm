@@ -20,6 +20,7 @@
  */
 
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <glib.h>
@@ -28,15 +29,11 @@
 #	include <pthread.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/thread.h"
 
 //#define THREAD_DEBUG
 
-#ifndef THREAD_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* Globals */
@@ -49,7 +46,7 @@ static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 #	define posix_check_err(err, name) G_STMT_START{			\
   int error = (err); 							\
   if (error)	 		 		 			\
-    g_error ("file %s: line %d (%s): error '%s' during '%s'",		\
+    pgm_error ("file %s: line %d (%s): error '%s' during '%s'",		\
            __FILE__, __LINE__, G_GNUC_PRETTY_FUNCTION,			\
            strerror (error), name);					\
   }G_STMT_END
@@ -58,7 +55,7 @@ static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 #define win32_check_err(err, name) G_STMT_START{			\
   int error = (err); 							\
   if (!error)	 		 		 			\
-    g_error ("file %s: line %d (%s): error '%s' during '%s'",		\
+    pgm_error ("file %s: line %d (%s): error '%s' during '%s'",		\
 	     __FILE__, __LINE__, G_GNUC_PRETTY_FUNCTION,		\
 	     g_win32_error_message (GetLastError ()), #what);		\
   }G_STMT_END
@@ -87,7 +84,7 @@ pgm_mutex_init (
 	pgm_mutex_t*	mutex
 	)
 {
-	g_assert (NULL != mutex);
+	pgm_assert (NULL != mutex);
 #ifdef G_OS_UNIX
 	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
 #else
@@ -102,7 +99,7 @@ pgm_mutex_trylock (
 	pgm_mutex_t*	mutex
 	)
 {
-	g_assert (NULL != mutex);
+	pgm_assert (NULL != mutex);
 #ifdef G_OS_UNIX
 	const int result = pthread_mutex_trylock (&mutex->pthread_mutex);
 	if (EBUSY == result)
@@ -121,7 +118,7 @@ pgm_mutex_free (
 	pgm_mutex_t*	mutex
 	)
 {
-	g_assert (NULL != mutex);
+	pgm_assert (NULL != mutex);
 #ifdef G_OS_UNIX
 	posix_check_cmd (pthread_mutex_destroy (&mutex->pthread_mutex));
 #else
@@ -134,7 +131,7 @@ pgm_spinlock_init (
 	pgm_spinlock_t*	spinlock
 	)
 {
-	g_assert (NULL != spinlock);
+	pgm_assert (NULL != spinlock);
 #ifdef G_OS_UNIX
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
 #else
@@ -147,7 +144,7 @@ pgm_spinlock_trylock (
 	pgm_spinlock_t*	spinlock
 	)
 {
-	g_assert (NULL != spinlock);
+	pgm_assert (NULL != spinlock);
 #ifdef G_OS_UNIX
 	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
 	if (EBUSY == result)
@@ -164,7 +161,7 @@ pgm_spinlock_free (
 	pgm_spinlock_t*	spinlock
 	)
 {
-	g_assert (NULL != spinlock);
+	pgm_assert (NULL != spinlock);
 #ifdef G_OS_UNIX
 	posix_check_cmd (pthread_spin_destroy (&spinlock->pthread_spinlock));
 #else
@@ -177,7 +174,7 @@ pgm_cond_init (
 	pgm_cond_t*	cond
 	)
 {
-	g_assert (NULL != cond);
+	pgm_assert (NULL != cond);
 #ifdef G_OS_UNIX
 	posix_check_cmd (pthread_cond_init (&cond->pthread_cond, NULL));
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -193,7 +190,7 @@ pgm_cond_signal (
 	pgm_cond_t*	cond
 	)
 {
-	g_assert (NULL != cond);
+	pgm_assert (NULL != cond);
 #ifdef G_OS_UNIX
 	pthread_cond_signal (&cond->pthread_cond);
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -213,7 +210,7 @@ pgm_cond_broadcast (
 	pgm_cond_t*	cond
 	)
 {
-	g_assert (NULL != cond);
+	pgm_assert (NULL != cond);
 #ifdef G_OS_UNIX
 	pthread_cond_broadcast (&cond->pthread_cond);
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -234,8 +231,8 @@ pgm_cond_wait (
 	pthread_mutex_t*	mutex
 	)
 {
-	g_assert (NULL != cond);
-	g_assert (NULL != mutex);
+	pgm_assert (NULL != cond);
+	pgm_assert (NULL != mutex);
 	pthread_cond_wait (&cond->pthread_cond, mutex);
 }
 #else
@@ -245,8 +242,8 @@ pgm_cond_wait (
 	CRITICAL_SECTION*	spinlock
 	)
 {
-	g_assert (NULL != cond);
-	g_assert (NULL != spinlock);
+	pgm_assert (NULL != cond);
+	pgm_assert (NULL != spinlock);
 #	if defined(CONFIG_HAVE_WIN_COND)
 	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
 #	else
@@ -259,7 +256,7 @@ pgm_cond_wait (
 	}
 
 	EnterCriticalSection (&cond->win32_spinlock);
-	g_assert (WAIT_TIMEOUT == WaitForSingleObject (event, 0));
+	pgm_assert (WAIT_TIMEOUT == WaitForSingleObject (event, 0));
 	g_ptr_array_add (cond->array, event);
 	LeaveCriticalSection (&cond->win32_spinlock);
 
@@ -282,7 +279,7 @@ pgm_cond_free (
 	pgm_cond_t*	cond
 	)
 {
-	g_assert (NULL != cond);
+	pgm_assert (NULL != cond);
 #ifdef G_OS_UNIX
 	posix_check_cmd (pthread_cond_destroy (&cond->pthread_cond));
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -298,7 +295,7 @@ pgm_rwlock_init (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 #ifdef CONFIG_HAVE_WIN_SRW_LOCK
 	InitializeSRWLock (&rwlock->win32_lock);
 #elif defined(G_OS_UNIX)
@@ -319,7 +316,7 @@ pgm_rwlock_free (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 #ifdef CONFIG_HAVE_WIN_SRW_LOCK
 	/* nop */
 #elif defined(G_OS_UNIX)
@@ -338,7 +335,7 @@ _pgm_rwlock_signal (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	if (rwlock->want_to_write)
 		pgm_cond_signal (&rwlock->write_cond);
 	else if (rwlock->want_to_read)
@@ -350,7 +347,7 @@ pgm_rwlock_reader_lock (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->want_to_read++;
 	while (rwlock->have_writer || rwlock->want_to_write)
@@ -365,7 +362,7 @@ pgm_rwlock_reader_trylock (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	gboolean status;
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	if (!rwlock->have_writer && !rwlock->want_to_write) {
@@ -382,7 +379,7 @@ pgm_rwlock_reader_unlock(
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->read_counter--;
 	if (rwlock->read_counter == 0)
@@ -395,7 +392,7 @@ pgm_rwlock_writer_lock (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->want_to_write++;
 	while (rwlock->have_writer || rwlock->read_counter)
@@ -410,7 +407,7 @@ pgm_rwlock_writer_trylock (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	gboolean status;
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	if (!rwlock->have_writer && !rwlock->read_counter) {
@@ -427,7 +424,7 @@ pgm_rwlock_writer_unlock (
 	pgm_rwlock_t*	rwlock
 	)
 {
-	g_assert (NULL != rwlock);
+	pgm_assert (NULL != rwlock);
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->have_writer = FALSE;
 	_pgm_rwlock_signal (rwlock);

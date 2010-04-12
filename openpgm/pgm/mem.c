@@ -19,23 +19,80 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 
 //#define MEM_DEBUG
 
-#ifndef MEM_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-
 
 gboolean pgm_mem_gc_friendly = FALSE;
+
+static
+gboolean
+debug_key_matches (
+	const char*		key,
+	const char*		token,
+	int			length
+	)
+{
+	for (; length; length--, key++, token++)
+	{
+		const char k = (*key   == '_') ? '-' : tolower (*key  );
+		const char t = (*token == '_') ? '-' : tolower (*token);
+		if (k != t)
+			return FALSE;
+	}
+	return *key == '\0';
+}
+
+static
+int
+pgm_parse_debug_string (
+	const char*		string,
+	const GDebugKey*	keys,
+	const unsigned		nkeys
+	)
+{
+	int result = 0;
+
+	if (NULL == string)
+		return result;
+
+	if (!strcasecmp (string, "all"))
+	{
+		for (unsigned i = 0; i < nkeys; i++)
+			result |= keys[i].value;
+	}
+	else if (!strcasecmp (string, "help"))
+	{
+		fprintf (stderr, "Supported debug values:");
+		for (unsigned i = 0; i < nkeys; i++)
+			fprintf (stderr, " %s", keys[i].key);
+		fprintf (stderr, "\n");
+	}
+	else
+	{
+		while (string) {
+			char* q = strpbrk (string, ":;, \t");
+			if (!q)
+				q = string + strlen (string);
+			for (unsigned i = 0; i < nkeys; i++)
+				if (debug_key_matches (keys[i].key, string, q - string))
+					result |= keys[i].value;
+			string = q;
+			if (*string)
+				string++;
+		}
+	}
+	return result;
+}
 
 void
 pgm_mem_init (void)
@@ -44,9 +101,9 @@ pgm_mem_init (void)
 		{ "gc-friendly", 1 },
 	};
 	const char *val = getenv ("PGM_DEBUG");
-	gint flags = !val ? 0 : g_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
+	gint flags = !val ? 0 : pgm_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
 	if (flags & 1)
-		g_mem_gc_friendly = TRUE;
+		pgm_mem_gc_friendly = TRUE;
 }
 
 void
@@ -65,7 +122,8 @@ pgm_malloc (
 		if (mem)
 			return mem;
 
-		g_error ("%s: failed to allocate %lu bytes", G_STRLOC, n_bytes);
+		pgm_fatal ("%s: failed to allocate %lu bytes", G_STRLOC, n_bytes);
+		abort ();
 	}
 	return NULL;
 }
@@ -81,7 +139,8 @@ pgm_malloc0 (
 		if (mem)
 			return mem;
 
-		g_error ("%s: failed to allocate %lu bytes", G_STRLOC, n_bytes);
+		pgm_fatal ("%s: failed to allocate %lu bytes", G_STRLOC, n_bytes);
+		abort ();
 	}
 	return NULL;
 }

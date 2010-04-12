@@ -39,6 +39,7 @@
 #	include <ipexport.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/string.h"
 #include "pgm/ip.h"
 #include "pgm/checksum.h"
@@ -48,25 +49,13 @@
 
 //#define PACKET_DEBUG
 
-#ifndef PACKET_DEBUG
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-
 
 /* globals */
 
-#ifndef IPOPT_NOP
+#if !defined(IPOPT_NOP) && defined(IP_OPT_NOP)
 #	define IPOPT_NOP	IP_OPT_NOP
-#endif
-#ifndef IPOPT_EOL
 #	define IPOPT_EOL	IP_OPT_EOL
-#endif
-#ifndef IPOPT_RR
 #	define IPOPT_RR		IP_OPT_RR
-#endif
-#ifndef IPOPT_TS
 #	define IPOPT_TS		IP_OPT_TS
 #endif
 
@@ -100,10 +89,10 @@ pgm_parse_raw (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
-	g_assert (NULL != dst);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != dst);
 
-	g_trace ("pgm_parse_raw (skb:%p dst:%p error:%p)",
+	pgm_debug ("pgm_parse_raw (skb:%p dst:%p error:%p)",
 		(gpointer)skb, (gpointer)dst, (gpointer)error);
 
 /* minimum size should be IPv4 header plus PGM header, check IP version later */
@@ -276,7 +265,7 @@ pgm_parse_udp_encap (
 	pgm_error_t**		error
 	)
 {
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 	if (G_UNLIKELY(skb->len < sizeof(struct pgm_header))) {
 		pgm_set_error (error,
@@ -302,7 +291,7 @@ pgm_parse (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 /* pgm_checksum == 0 means no transmitted checksum */
 	if (skb->pgm_header->pgm_checksum)
@@ -330,7 +319,7 @@ pgm_parse (
 				     PGM_ODATA == skb->pgm_header->pgm_type ? 'O' : 'R');
 			return FALSE;
 		}
-		g_trace ("No PGM checksum :O");
+		pgm_debug ("No PGM checksum :O");
 	}
 
 /* copy packets source transport identifier */
@@ -346,8 +335,8 @@ pgm_print_packet (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
@@ -562,7 +551,7 @@ pgm_verify_spm (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 	const struct pgm_spm* spm = (const struct pgm_spm*)skb->data;
 	switch (g_ntohs (spm->spm_nla_afi)) {
@@ -592,9 +581,9 @@ pgm_print_spm (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("SPM: ");
 
@@ -685,7 +674,7 @@ pgm_verify_poll (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
 	switch (g_ntohs (poll4->poll_nla_afi)) {
@@ -715,9 +704,9 @@ pgm_print_poll (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("POLL: ");
 
@@ -821,7 +810,7 @@ pgm_verify_polr (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 /* truncated packet */
 	if (G_UNLIKELY(skb->len < sizeof(struct pgm_polr)))
@@ -838,9 +827,9 @@ pgm_print_polr (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("POLR: ");
 
@@ -893,9 +882,9 @@ pgm_print_odata (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("ODATA: ");
 
@@ -948,9 +937,9 @@ pgm_print_rdata (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("RDATA: ");
 
@@ -1023,9 +1012,9 @@ pgm_verify_nak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
-	g_trace ("pgm_verify_nak (skb:%p)", (gconstpointer)skb);
+	pgm_debug ("pgm_verify_nak (skb:%p)", (gconstpointer)skb);
 
 /* truncated packet */
 	if (G_UNLIKELY(skb->len < PGM_MIN_NAK_SIZE))
@@ -1085,9 +1074,9 @@ pgm_print_nak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("NAK: ");
 
@@ -1174,7 +1163,7 @@ pgm_verify_nnak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 	return pgm_verify_nak (skb);
 }
@@ -1188,9 +1177,9 @@ pgm_print_nnak (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("N-NAK: ");
 
@@ -1213,7 +1202,7 @@ pgm_verify_ncf (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 	return pgm_verify_nak (skb);
 }
@@ -1226,9 +1215,9 @@ pgm_print_ncf (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("NCF: ");
 
@@ -1257,7 +1246,7 @@ pgm_verify_spmr (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != skb);
+	pgm_assert (NULL != skb);
 
 	return TRUE;
 }
@@ -1271,9 +1260,9 @@ pgm_print_spmr (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != header);
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf ("SPMR: ");
 
@@ -1301,8 +1290,8 @@ pgm_print_options (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != data);
-	g_assert (len > 0);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
 
 	printf (" OPTIONS:");
 	if (len < sizeof(struct pgm_opt_length)) {
@@ -1415,7 +1404,7 @@ pgm_udpport_string (
 	static pgm_hashtable_t *services = NULL;
 
 	if (!services) {
-		services = pgm_hash_table_new (g_int_hash, g_int_equal);
+		services = pgm_hash_table_new (pgm_int_hash, pgm_int_equal);
 	}
 
 	gpointer service_string = pgm_hash_table_lookup (services, &port);
@@ -1443,7 +1432,7 @@ pgm_gethostbyaddr (
 	static pgm_hashtable_t *hosts = NULL;
 
 	if (!hosts) {
-		hosts = pgm_hash_table_new (g_str_hash, g_str_equal);
+		hosts = pgm_hash_table_new (pgm_str_hash, pgm_str_equal);
 	}
 
 	gpointer host_string = pgm_hash_table_lookup (hosts, ap);
@@ -1470,7 +1459,7 @@ pgm_ipopt_print (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != ipopt);
+	pgm_assert (NULL != ipopt);
 
 	const char* op = ipopt;
 

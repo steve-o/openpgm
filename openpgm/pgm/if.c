@@ -41,6 +41,7 @@
 #	include <arpa/inet.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/string.h"
@@ -56,12 +57,6 @@
 
 
 //#define IF_DEBUG
-
-#ifndef IF_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
 
 /* temporary structure to contain interface name whilst address family
@@ -134,7 +129,7 @@ pgm_if_print_all (void)
 		     (ifa->ifa_addr->sa_family != AF_INET && 
 		      ifa->ifa_addr->sa_family != AF_INET6) )
 		{
-			g_message (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
+			pgm_info (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
 				i,
 				b,
 				"",
@@ -151,7 +146,7 @@ pgm_if_print_all (void)
 			     s, sizeof(s),
 			     NULL, 0,
 			     NI_NUMERICHOST);
-		g_message (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
+		pgm_info (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
 			i,
 			b,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
@@ -175,16 +170,16 @@ is_in_net (
 	const struct in_addr*	netmask
 	)
 {
-	g_assert (NULL != addr);
-	g_assert (NULL != netaddr);
-	g_assert (NULL != netmask);
+	pgm_assert (NULL != addr);
+	pgm_assert (NULL != netaddr);
+	pgm_assert (NULL != netmask);
 
 #ifdef IF_DEBUG
 	const struct in_addr taddr    = { .s_addr = g_htonl (addr->s_addr) };
 	const struct in_addr tnetaddr = { .s_addr = g_htonl (netaddr->s_addr) };
 	const struct in_addr tnetmask = { .s_addr = g_htonl (netmask->s_addr) };
 	char saddr[INET_ADDRSTRLEN], snetaddr[INET_ADDRSTRLEN], snetmask[INET_ADDRSTRLEN];
-	g_trace ("is_in_net (addr:%s netaddr:%s netmask:%s)",
+	pgm_debug ("is_in_net (addr:%s netaddr:%s netmask:%s)",
 		 pgm_inet_ntop (AF_INET, &taddr,    saddr,    sizeof(saddr)),
 		 pgm_inet_ntop (AF_INET, &tnetaddr, snetaddr, sizeof(snetaddr)),
 		 pgm_inet_ntop (AF_INET, &tnetmask, snetmask, sizeof(snetmask)));
@@ -203,13 +198,13 @@ is_in_net6 (
 	const struct in6_addr*	netmask
 	)
 {
-	g_assert (NULL != addr);
-	g_assert (NULL != netaddr);
-	g_assert (NULL != netmask);
+	pgm_assert (NULL != addr);
+	pgm_assert (NULL != netaddr);
+	pgm_assert (NULL != netmask);
 
 #ifdef IF_DEBUG
 	char saddr[INET6_ADDRSTRLEN], snetaddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
-	g_trace ("is_in_net6 (addr:%s netaddr:%s netmask:%s)",
+	pgm_debug ("is_in_net6 (addr:%s netaddr:%s netmask:%s)",
 		 pgm_inet_ntop (AF_INET6, addr, saddr, sizeof(saddr)),
 		 pgm_inet_ntop (AF_INET6, netaddr, snetaddr, sizeof(snetaddr)),
 		 pgm_inet_ntop (AF_INET6, netmask, snetmask, sizeof(snetmask)));
@@ -263,11 +258,11 @@ parse_interface (
 	guint interface_matches = 0;
 
 /* pre-conditions */
-	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	g_assert (NULL != ifname);
-	g_assert (NULL != ir);
+	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	pgm_assert (NULL != ifname);
+	pgm_assert (NULL != ir);
 
-	g_trace ("parse_interface (family:%s ifname:%s%s%s ir:%p error:%p)",
+	pgm_debug ("parse_interface (family:%s ifname:%s%s%s ir:%p error:%p)",
 		pgm_family_string (family),
 		ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "",
 		(gpointer)ir,
@@ -293,7 +288,7 @@ parse_interface (
 	{
 #ifdef IF_DEBUG
 		struct in_addr t = { .s_addr = g_htonl (in_addr.s_addr) };
-		g_trace ("IPv4 network address: %s", inet_ntoa (t));
+		pgm_debug ("IPv4 network address: %s", inet_ntoa (t));
 #endif
 		if (IN_MULTICAST(in_addr.s_addr)) {
 			pgm_set_error (error,
@@ -503,7 +498,7 @@ parse_interface (
 	}
 
 /* iterate through interface list and match device name, ip or net address */
-	if (!pgm_getifaddrs (&ifap, &error)) {
+	if (!pgm_getifaddrs (&ifap, error)) {
 		pgm_prefix_error (error,
 				_("Enumerating network interfaces: "));
 		return FALSE;
@@ -533,7 +528,7 @@ parse_interface (
 		}
 
 		const unsigned ifindex = pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
-		g_assert (0 != ifindex);
+		pgm_assert (0 != ifindex);
 
 /* check numeric host */
 		if (check_addr &&
@@ -642,11 +637,11 @@ parse_group (
 	)
 {
 /* pre-conditions */
-	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	g_assert (NULL != group);
-	g_assert (NULL != addr);
+	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	pgm_assert (NULL != group);
+	pgm_assert (NULL != addr);
 
-	g_trace ("parse_group (family:%s group:%s%s%s addr:%p error:%p)",
+	pgm_debug ("parse_group (family:%s group:%s%s%s addr:%p error:%p)",
 		pgm_family_string (family),
 		group ? "\"" : "", group ? group : "(null)", group ? "\"" : "",
 		(gpointer)addr,
@@ -826,12 +821,12 @@ parse_interface_entity (
 	pgm_list_t* source_list = NULL;
 
 /* pre-conditions */
-	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	g_assert (NULL != interface_list);
-	g_assert (NULL == *interface_list);
-	g_assert (NULL != error);
+	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	pgm_assert (NULL != interface_list);
+	pgm_assert (NULL == *interface_list);
+	pgm_assert (NULL != error);
 
-	g_trace ("parse_interface_entity (family:%s entity:%s%s%s interface_list:%p error:%p)",
+	pgm_debug ("parse_interface_entity (family:%s entity:%s%s%s interface_list:%p error:%p)",
 		pgm_family_string (family),
 		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
 		(gpointer)interface_list,
@@ -911,12 +906,12 @@ parse_receive_entity (
 	)
 {
 /* pre-conditions */
-	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	g_assert (NULL != recv_list);
-	g_assert (NULL == *recv_list);
-	g_assert (NULL != error);
+	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	pgm_assert (NULL != recv_list);
+	pgm_assert (NULL == *recv_list);
+	pgm_assert (NULL != error);
 
-	g_trace ("parse_receive_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p error:%p)",
+	pgm_debug ("parse_receive_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p error:%p)",
 		pgm_family_string (family),
 		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
 		(gpointer)interface_list,
@@ -983,10 +978,10 @@ parse_receive_entity (
 		}
 
 
-		g_assert (AF_UNSPEC != recv_gsr->gsr_group.ss_family);
+		pgm_assert (AF_UNSPEC != recv_gsr->gsr_group.ss_family);
 		if (AF_UNSPEC != primary_interface->ir_addr.ss_family)
 		{
-			g_assert (recv_gsr->gsr_group.ss_family == primary_interface->ir_addr.ss_family);
+			pgm_assert (recv_gsr->gsr_group.ss_family == primary_interface->ir_addr.ss_family);
 		}
 		else
 		{
@@ -1023,7 +1018,7 @@ parse_receive_entity (
 			break;
 	
 		default:
-			g_assert_not_reached();
+			pgm_assert_not_reached();
 		}
 
 /* ASM: source = group */
@@ -1049,7 +1044,7 @@ parse_receive_entity (
 		{
 			if (AF_UNSPEC == primary_interface->ir_addr.ss_family)
 			{
-				g_trace ("Address family of receive group cannot be determined from interface.");
+				pgm_debug ("Address family of receive group cannot be determined from interface.");
 			}
 			else
 			{
@@ -1113,14 +1108,14 @@ parse_send_entity (
 	)
 {
 /* pre-conditions */
-	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	g_assert (NULL != recv_list);
-	g_assert (NULL != *recv_list);
-	g_assert (NULL != send_list);
-	g_assert (NULL == *send_list);
-	g_assert (NULL != error);
+	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	pgm_assert (NULL != recv_list);
+	pgm_assert (NULL != *recv_list);
+	pgm_assert (NULL != send_list);
+	pgm_assert (NULL == *send_list);
+	pgm_assert (NULL != error);
 
-	g_trace ("parse_send_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p send_list:%p error:%p)",
+	pgm_debug ("parse_send_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p send_list:%p error:%p)",
 		pgm_family_string (family),
 		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
 		(gpointer)interface_list,
@@ -1252,12 +1247,12 @@ network_parse (
 	pgm_error_t* sub_error = NULL;
 
 /* pre-conditions */
-	g_assert (NULL != network);
-	g_assert (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family);
-	g_assert (NULL != recv_list);
-	g_assert (NULL != send_list);
+	pgm_assert (NULL != network);
+	pgm_assert (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family);
+	pgm_assert (NULL != recv_list);
+	pgm_assert (NULL != send_list);
 
-	g_trace ("network_parse (network:%s%s%s family:%s recv_list:%p send_list:%p error:%p)",
+	pgm_debug ("network_parse (network:%s%s%s family:%s recv_list:%p send_list:%p error:%p)",
 		network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 		pgm_family_string (family),
 		(gpointer)recv_list,
@@ -1294,7 +1289,7 @@ network_parse (
 					break;
 
 				default:
-					g_assert_not_reached();
+					pgm_assert_not_reached();
 					break;
 				}
 
@@ -1358,7 +1353,7 @@ network_parse (
 				break;
 
 			default:
-				g_assert_not_reached();
+				pgm_assert_not_reached();
 				break;
 			}
 
@@ -1418,7 +1413,7 @@ network_parse (
 			break;
 
 		default:
-			g_assert_not_reached();
+			pgm_assert_not_reached();
 			break;
 		}
 	}
@@ -1442,7 +1437,7 @@ network_parse (
 			break;
 
 		default:
-			g_assert_not_reached();
+			pgm_assert_not_reached();
 			break;
 		}
 	}
@@ -1489,22 +1484,22 @@ pgm_if_get_transport_info (
 	)
 {
 	struct pgm_transport_info_t* ti;
-	int family = hints ? hints->ti_family : AF_UNSPEC;
+	const int family = hints ? hints->ti_family : AF_UNSPEC;
 	pgm_list_t* recv_list = NULL;	/* <struct group_source_req*> */
 	pgm_list_t* send_list = NULL;	/* <struct group_source_req*> */
 
-	g_return_val_if_fail (NULL != network, FALSE);
-	g_return_val_if_fail (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family, FALSE);
-	g_return_val_if_fail (NULL != res, FALSE);
+	pgm_return_val_if_fail (NULL != network, FALSE);
+	pgm_return_val_if_fail (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family, FALSE);
+	pgm_return_val_if_fail (NULL != res, FALSE);
 
 	if (hints) {
-		g_trace ("get_transport_info (network:%s%s%s hints: {family:%s} res:%p error:%p)",
+		pgm_debug ("get_transport_info (network:%s%s%s hints: {family:%s} res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 			pgm_family_string (family),
 			(gpointer)res,
 			(gpointer)error);
 	} else {
-		g_trace ("get_transport_info (network:%s%s%s hints:%p res:%p error:%p)",
+		pgm_debug ("get_transport_info (network:%s%s%s hints:%p res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 			(gpointer)hints,
 			(gpointer)res,

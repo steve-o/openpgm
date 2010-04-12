@@ -25,6 +25,7 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/string.h"
 #include "pgm/slist.h"
@@ -82,7 +83,7 @@ pgm_vasprintf (
 	va_list		args
 	)
 {
-	g_return_val_if_fail (string != NULL, -1);
+	pgm_return_val_if_fail (string != NULL, -1);
 #ifdef CONFIG_HAVE_VASPRINTF
 	const gint len = vasprintf (string, format, args);
 	if (len < 0)
@@ -116,8 +117,8 @@ pgm_stpcpy (
 	const gchar*	src
 	)
 {
-	g_return_val_if_fail (dest != NULL, NULL);
-	g_return_val_if_fail (src != NULL, NULL);
+	pgm_return_val_if_fail (dest != NULL, NULL);
+	pgm_return_val_if_fail (src != NULL, NULL);
 #ifdef CONFIG_HAVE_STPCPY
 	return stpcpy (dest, src);
 #else
@@ -184,9 +185,9 @@ pgm_strsplit (
 	guint n = 0;
 	const gchar *remainder;
 
-	g_return_val_if_fail (string != NULL, NULL);
-	g_return_val_if_fail (delimiter != NULL, NULL);
-	g_return_val_if_fail (delimiter[0] != '\0', NULL);
+	pgm_return_val_if_fail (string != NULL, NULL);
+	pgm_return_val_if_fail (delimiter != NULL, NULL);
+	pgm_return_val_if_fail (delimiter[0] != '\0', NULL);
 
 	if (max_tokens < 1)
 		max_tokens = G_MAXINT;

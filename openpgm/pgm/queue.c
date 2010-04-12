@@ -21,6 +21,7 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/list.h"
 #include "pgm/queue.h"
@@ -28,19 +29,13 @@
 
 //#define QUEUE_DEBUG
 
-#ifndef QUEUE_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-
 
 gboolean
 pgm_queue_is_empty (
 	pgm_queue_t*	queue
 	)
 {
-	g_return_val_if_fail (queue != NULL, TRUE);
+	pgm_return_val_if_fail (queue != NULL, TRUE);
 
 	return queue->head == NULL;
 }
@@ -51,10 +46,10 @@ pgm_queue_push_head_link (
 	pgm_list_t*	link
 	)
 {
-	g_return_if_fail (queue != NULL);
-	g_return_if_fail (link != NULL);
-	g_return_if_fail (link->prev == NULL);
-	g_return_if_fail (link->next == NULL);
+	pgm_return_if_fail (queue != NULL);
+	pgm_return_if_fail (link != NULL);
+	pgm_return_if_fail (link->prev == NULL);
+	pgm_return_if_fail (link->next == NULL);
 
 	link->next = queue->head;
 	if (queue->head)
@@ -70,7 +65,7 @@ pgm_queue_pop_tail_link (
 	pgm_queue_t*	queue
 	)
 {
-	g_return_val_if_fail (queue != NULL, NULL);
+	pgm_return_val_if_fail (queue != NULL, NULL);
 
 	if (queue->tail)
 	{
@@ -97,7 +92,7 @@ pgm_queue_peek_tail_link (
 	pgm_queue_t*	queue
 	)
 {
-	g_return_val_if_fail (queue != NULL, NULL);
+	pgm_return_val_if_fail (queue != NULL, NULL);
 
 	return queue->tail;
 }
@@ -108,8 +103,8 @@ pgm_queue_unlink (
 	pgm_list_t*	link_
 	)
 {
-	g_return_if_fail (queue != NULL);
-	g_return_if_fail (link_ != NULL);
+	pgm_return_if_fail (queue != NULL);
+	pgm_return_if_fail (link_ != NULL);
 
 	if (link_ == queue->tail)
 		queue->tail = queue->tail->prev;

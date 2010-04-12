@@ -57,6 +57,7 @@
 #	include <mswsock.h>
 #endif
 
+#include "pgm/messages.h"
 #include "pgm/pgm.h"
 #include "pgm/ip.h"
 #include "pgm/packet.h"
@@ -74,13 +75,7 @@
 //#define RECV_DEBUG
 
 #ifndef RECV_DEBUG
-#	define G_DISABLE_ASSERT
-#	define g_trace(...)		while (0)
-#else
-#	define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-#ifndef g_assert_cmpuint
-#	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
+#	define PGM_DISABLE_ASSERT
 #endif
 
 #ifdef G_OS_WIN32
@@ -115,14 +110,14 @@ recvskb (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
-	g_assert (NULL != src_addr);
-	g_assert (src_addrlen > 0);
-	g_assert (NULL != dst_addr);
-	g_assert (dst_addrlen > 0);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != src_addr);
+	pgm_assert (src_addrlen > 0);
+	pgm_assert (NULL != dst_addr);
+	pgm_assert (dst_addrlen > 0);
 
-	g_trace ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
+	pgm_debug ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
 		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
 
 	if (G_UNLIKELY(transport->is_destroyed))
@@ -176,7 +171,8 @@ recvskb (
 					      NULL,
 					      NULL))
 		{
-			g_error (_("WSARecvMsg function not found."));
+			pgm_fatal (_("WSARecvMsg function not found."));
+			abort ();
 			return -1;
 		}
 	}
@@ -195,7 +191,7 @@ recvskb (
 	skb->tail		= (guint8*)skb->data + len;
 
 #ifdef CONFIG_TARGET_WINE
-	g_assert (pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group) <= dst_addrlen);
+	pgm_assert (pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group) <= dst_addrlen);
 	memcpy (dst_addr, &transport->recv_gsr[0].gsr_group, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group));
 #else
 	if (transport->udp_encap_ucast_port ||
@@ -217,7 +213,7 @@ recvskb (
 				pktinfo				= CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (G_UNLIKELY(NULL == pktinfo)) {
-					g_trace ("in_pktinfo is NULL");
+					pgm_debug ("in_pktinfo is NULL");
 					return -1;
 				}
 				const struct in_pktinfo* in	= pktinfo;
@@ -235,7 +231,7 @@ recvskb (
 				pktinfo				= CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (G_UNLIKELY(NULL == pktinfo)) {
-					g_trace ("in6_pktinfo is NULL");
+					pgm_debug ("in6_pktinfo is NULL");
 					return -1;
 				}
 				const struct in6_pktinfo* in6	= pktinfo;
@@ -270,28 +266,28 @@ on_upstream (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
-	g_assert_cmpuint (skb->pgm_header->pgm_dport, ==, transport->tsi.sport);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+	pgm_assert_cmpuint (skb->pgm_header->pgm_dport, ==, transport->tsi.sport);
 
-	g_trace ("on_upstream (transport:%p skb:%p)",
+	pgm_debug ("on_upstream (transport:%p skb:%p)",
 		(gpointer)transport, (gpointer)skb);
 
 	if (!transport->can_send_data) {
-		g_trace ("Discarded packet for muted source.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted source."));
 		goto out_discarded;
 	}
 
 /* unicast upstream message, note that dport & sport are reversed */
 	if (skb->pgm_header->pgm_sport != transport->dport) {
 /* its upstream/peer-to-peer for another session */
-		g_trace ("Discarded packet on data-destination port mismatch.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
 	}
 
 	if (!pgm_gsi_equal (&skb->tsi.gsi, &transport->tsi.gsi)) {
 /* its upstream/peer-to-peer for another session */
-		g_trace ("Discarded packet on data-destination port mismatch.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
 	}
 
@@ -317,7 +313,7 @@ on_upstream (
 
 	case PGM_POLR:
 	default:
-		g_trace ("Discarded unsupported PGM type packet.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));
 		goto out_discarded;
 	}
 
@@ -341,24 +337,24 @@ on_peer (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
-	g_assert_cmpuint (skb->pgm_header->pgm_dport, !=, transport->tsi.sport);
-	g_assert (NULL != source);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+	pgm_assert_cmpuint (skb->pgm_header->pgm_dport, !=, transport->tsi.sport);
+	pgm_assert (NULL != source);
 
-	g_trace ("on_peer (transport:%p skb:%p source:%p)",
+	pgm_debug ("on_peer (transport:%p skb:%p source:%p)",
 		(gpointer)transport, (gpointer)skb, (gpointer)source);
 
 /* we are not the source */
 	if (!transport->can_recv_data) {
-		g_trace ("Discarded packet for muted receiver.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted receiver."));
 		goto out_discarded;
 	}
 
 /* unicast upstream message, note that dport & sport are reversed */
 	if (skb->pgm_header->pgm_sport != transport->dport) {
 /* its upstream/peer-to-peer for another session */
-		g_trace ("Discarded packet on data-destination port mismatch.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
 	}
 
@@ -372,7 +368,7 @@ on_peer (
 	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (G_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
-		g_trace ("Discarded peer packet about new source.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded peer packet about new source."));
 		goto out_discarded;
 	}
 
@@ -394,7 +390,7 @@ on_peer (
 	case PGM_NNAK:
 	case PGM_POLR:
 	default:
-		g_trace ("Discarded unsupported PGM type packet.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));
 		goto out_discarded;
 	}
 
@@ -422,28 +418,28 @@ on_downstream (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
-	g_assert (NULL != src_addr);
-	g_assert (NULL != dst_addr);
-	g_assert (NULL != source);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != src_addr);
+	pgm_assert (NULL != dst_addr);
+	pgm_assert (NULL != source);
 
 #ifdef RECV_DEBUG
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
-	g_trace ("on_downstream (transport:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
+	pgm_debug ("on_downstream (transport:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
 		(gpointer)transport, (gpointer)skb, saddr, daddr, (gpointer)source);
 #endif
 
 	if (!transport->can_recv_data) {
-		g_trace ("Discarded packet for muted receiver.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted receiver."));
 		goto out_discarded;
 	}
 
 /* pgm packet DPORT contains our transport DPORT */
 	if (skb->pgm_header->pgm_dport != transport->dport) {
-		g_trace ("Discarded packet on data-destination port mismatch.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
 	}
 
@@ -496,7 +492,7 @@ on_downstream (
 #endif
 
 	default:
-		g_trace ("Discarded unsupported PGM type packet.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));
 		goto out_discarded;
 	}
 
@@ -524,17 +520,17 @@ on_pgm (
 	)
 {
 /* pre-conditions */
-	g_assert (NULL != transport);
-	g_assert (NULL != skb);
-	g_assert (NULL != src_addr);
-	g_assert (NULL != dst_addr);
-	g_assert (NULL != source);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != src_addr);
+	pgm_assert (NULL != dst_addr);
+	pgm_assert (NULL != source);
 
 #ifdef RECV_DEBUG
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
-	g_trace ("on_pgm (transport:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
+	pgm_debug ("on_pgm (transport:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
 		(gpointer)transport, (gpointer)skb, saddr, daddr, (gpointer)source);
 #endif
 
@@ -551,7 +547,7 @@ on_pgm (
 	else if (pgm_is_peer (skb->pgm_header->pgm_type))
 		return on_peer (transport, skb, source);
 
-	g_trace ("Discarded unknown PGM packet.");
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unknown PGM packet."));
 	if (transport->can_send_data)
 		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;
@@ -571,9 +567,9 @@ wait_for_event (
 	int n_fds = 3;
 
 /* pre-conditions */
-	g_assert (NULL != transport);
+	pgm_assert (NULL != transport);
 
-	g_trace ("wait_for_event (transport:%p)", (gpointer)transport);
+	pgm_debug ("wait_for_event (transport:%p)", (gpointer)transport);
 
 	do {
 		if (G_UNLIKELY(transport->is_destroyed))
@@ -587,12 +583,12 @@ wait_for_event (
 		struct pollfd fds[ n_fds ];
 		memset (fds, 0, sizeof(fds));
 		const int status = pgm_transport_poll_info (transport, fds, &n_fds, POLLIN);
-		g_assert (-1 != status);
+		pgm_assert (-1 != status);
 #else
 		fd_set readfds;
 		FD_ZERO(&readfds);
 		const int status = pgm_transport_select_info (transport, &readfds, NULL, &n_fds);
-		g_assert (-1 != status);
+		pgm_assert (-1 != status);
 #endif /* CONFIG_HAVE_POLL */
 
 /* flush any waiting notifications */
@@ -617,14 +613,14 @@ wait_for_event (
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif
 		if (-1 == ready) {
-			g_trace ("block returned errno=%i",errno);
+			pgm_debug ("block returned errno=%i",errno);
 			return EFAULT;
 		} else if (ready > 0) {
-			g_trace ("recv again on empty");
+			pgm_debug ("recv again on empty");
 			return EAGAIN;
 		}
 	} while (pgm_timer_check (transport));
-	g_trace ("state generated event");
+	pgm_debug ("state generated event");
 	return EINTR;
 }
 
@@ -657,40 +653,40 @@ pgm_recvmsgv (
 {
 	int status = PGM_IO_STATUS_WOULD_BLOCK;
 
-	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
+	pgm_debug ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
 
 /* parameters */
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(msg_len)) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(msg_len)) pgm_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
 	if (G_UNLIKELY(!pgm_rwlock_reader_trylock (&transport->lock)))
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
 	if (G_UNLIKELY(!transport->is_bound ||
 	    transport->is_destroyed))
 	{
 		pgm_rwlock_reader_unlock (&transport->lock);
-		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
 /* pre-conditions */
-	g_assert (NULL != transport->rx_buffer);
-	g_assert (transport->max_tpdu > 0);
+	pgm_assert (NULL != transport->rx_buffer);
+	pgm_assert (transport->max_tpdu > 0);
 	if (transport->can_recv_data) {
-		g_assert (NULL != transport->peers_hashtable);
-		g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
-		g_assert (pgm_notify_is_valid (&transport->pending_notify));
+		pgm_assert (NULL != transport->peers_hashtable);
+		pgm_assert_cmpuint (transport->nak_bo_ivl, >, 1);
+		pgm_assert (pgm_notify_is_valid (&transport->pending_notify));
 	}
 
 /* receiver */
 	pgm_mutex_lock (&transport->receiver_mutex);
 
 	if (G_UNLIKELY(transport->is_reset)) {
-		g_assert (NULL != transport->peers_pending);
-		g_assert (NULL != transport->peers_pending->data);
+		pgm_assert (NULL != transport->peers_pending);
+		pgm_assert (NULL != transport->peers_pending->data);
 		pgm_peer_t* peer = transport->peers_pending->data;
 		if (flags & MSG_ERRQUEUE)
 			pgm_set_reset_error (transport, peer, msg_start);
@@ -806,7 +802,7 @@ recv_again:
 	if (G_UNLIKELY(!is_valid))
 	{
 /* inherently cannot determine PGM_PC_RECEIVER_CKSUM_ERRORS unless only one receiver */
-		g_trace ("Discarded invalid packet.");
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded invalid packet."));
 		if (transport->can_send_data) {
 			if (err && PGM_ERROR_CKSUM == err->code)
 				transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
@@ -821,7 +817,7 @@ recv_again:
 
 /* check whether this source has waiting data */
 	if (source && pgm_peer_has_pending (source)) {
-		g_trace ("new pending data.");
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("New pending data."));
 		pgm_peer_set_pending (transport, source);
 	}
 
@@ -842,7 +838,7 @@ check_for_repeat:
 	    flags & MSG_DONTWAIT)
 	{
 		if (len > 0 && pmsg <= msg_end) {
-			g_trace ("recv again on not-full");
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Recv again on not-full"));
 			goto recv_again;		/* \:D/ */
 		}
 	}
@@ -878,7 +874,7 @@ check_for_repeat:
 				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			default:
-				g_assert_not_reached();
+				pgm_assert_not_reached();
 			}
 		}
 	}
@@ -893,8 +889,8 @@ out:
 		}
 /* report data loss */
 		if (G_UNLIKELY(transport->is_reset)) {
-			g_assert (NULL != transport->peers_pending);
-			g_assert (NULL != transport->peers_pending->data);
+			pgm_assert (NULL != transport->peers_pending);
+			pgm_assert (NULL != transport->peers_pending->data);
 			pgm_peer_t* peer = transport->peers_pending->data;
 			if (flags & MSG_ERRQUEUE)
 				pgm_set_reset_error (transport, peer, msg_start);
@@ -963,10 +959,10 @@ pgm_recvmsg (
 	pgm_error_t**		error
 	)
 {
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	g_return_val_if_fail (NULL != msgv, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != msgv, PGM_IO_STATUS_ERROR);
 
-	g_trace ("pgm_recvmsg (transport:%p msgv:%p flags:%d bytes_read:%p error:%p)",
+	pgm_debug ("pgm_recvmsg (transport:%p msgv:%p flags:%d bytes_read:%p error:%p)",
 		(gpointer)transport, (gpointer)msgv, flags, (gpointer)bytes_read, (gpointer)error);
 
 	return pgm_recvmsgv (transport, msgv, 1, flags, bytes_read, error);
@@ -993,10 +989,10 @@ pgm_recvfrom (
 	pgm_msgv_t msgv;
 	gsize bytes_read = 0;
 
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(len)) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(len)) pgm_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
-	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
+	pgm_debug ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
 	const int status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
@@ -1014,7 +1010,7 @@ pgm_recvfrom (
 	while (bytes_copied < bytes_read) {
 		gsize copy_len = skb->len;
 		if (bytes_copied + copy_len > len) {
-			g_error (_("APDU truncated, original length %" G_GSIZE_FORMAT " bytes."),
+			pgm_warn (_("APDU truncated, original length %" G_GSIZE_FORMAT " bytes."),
 				bytes_read);
 			copy_len = len - bytes_copied;
 			bytes_read = len;
@@ -1043,10 +1039,10 @@ pgm_recv (
 	pgm_error_t**		error
 	)
 {
-	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(len)) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
+	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(len)) pgm_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
-	g_trace ("pgm_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
+	pgm_debug ("pgm_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
 		(gpointer)transport, data, len, flags, (gpointer)bytes_read, (gpointer)error);
 
 	return pgm_recvfrom (transport, data, len, flags, bytes_read, NULL, error);

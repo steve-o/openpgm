@@ -23,6 +23,7 @@
 #define __PGM_NOTIFY_H__
 
 #include <fcntl.h>
+#include <stdlib.h>
 #ifdef G_OS_UNIX
 #	include <unistd.h>
 #endif
@@ -31,6 +32,10 @@
 
 #ifdef CONFIG_HAVE_EVENTFD
 #	include <sys/eventfd.h>
+#endif
+
+#ifndef __PGM_MESSAGES_H__
+#	include <pgm/messages.h>
 #endif
 
 
@@ -64,7 +69,7 @@ static inline gboolean pgm_notify_is_valid (pgm_notify_t* notify)
 
 static inline int pgm_notify_init (pgm_notify_t* notify)
 {
-	g_assert (notify);
+	pgm_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
 	int retval = eventfd (0, 0);
@@ -77,18 +82,18 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 	return 0;
 #elif defined(G_OS_UNIX)
 	int retval = pipe (notify->pipefd);
-	g_assert (0 == retval);
+	pgm_assert (0 == retval);
 /* set non-blocking */
 /* write-end */
 	int fd_flags = fcntl (notify->pipefd[1], F_GETFL);
 	if (fd_flags != -1)
 		retval = fcntl (notify->pipefd[1], F_SETFL, fd_flags | O_NONBLOCK);
-	g_assert (notify->pipefd[1]);
+	pgm_assert (notify->pipefd[1]);
 /* read-end */
 	fd_flags = fcntl (notify->pipefd[0], F_GETFL);
 	if (fd_flags != -1)
 		retval = fcntl (notify->pipefd[0], F_SETFL, fd_flags | O_NONBLOCK);
-	g_assert (notify->pipefd[0]);
+	pgm_assert (notify->pipefd[0]);
 	return retval;
 #else
 /* use loopback sockets to simulate a pipe suitable for win32/select() */
@@ -99,43 +104,43 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 	notify->s[0] = notify->s[1] = INVALID_SOCKET;
 
 	listener = socket (AF_INET, SOCK_STREAM, 0);
-	g_assert (listener != INVALID_SOCKET);
+	pgm_assert (listener != INVALID_SOCKET);
 
 	memset (&addr, 0, sizeof (addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr ("127.0.0.1");
-	g_assert (addr.sin_addr.s_addr != INADDR_NONE);
+	pgm_assert (addr.sin_addr.s_addr != INADDR_NONE);
 
 	int rc = bind (listener, (const struct sockaddr*)&addr, sizeof (addr));
-	g_assert (rc != SOCKET_ERROR);
+	pgm_assert (rc != SOCKET_ERROR);
 
 	rc = getsockname (listener, (struct sockaddr*)&addr, &addrlen);
-	g_assert (rc != SOCKET_ERROR);
+	pgm_assert (rc != SOCKET_ERROR);
 
 // Listen for incoming connections.
 	rc = listen (listener, 1);
-	g_assert (rc != SOCKET_ERROR);
+	pgm_assert (rc != SOCKET_ERROR);
 
 // Create the socket.
 	notify->s[1] = WSASocket (AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
-	g_assert (notify->s[1] != INVALID_SOCKET);
+	pgm_assert (notify->s[1] != INVALID_SOCKET);
 
 // Connect to the remote peer.
 	rc = connect (notify->s[1], (struct sockaddr*)&addr, addrlen);
-	g_assert (rc != SOCKET_ERROR);
+	pgm_assert (rc != SOCKET_ERROR);
 
 // Accept connection.
 	notify->s[0] = accept (listener, NULL, NULL);
-	g_assert (notify->s[0] != INVALID_SOCKET);
+	pgm_assert (notify->s[0] != INVALID_SOCKET);
 
 // Set read-end to non-blocking mode
 	unsigned long one = 1;
 	rc = ioctlsocket (notify->s[0], FIONBIO, &one);
-	g_assert (rc != SOCKET_ERROR);
+	pgm_assert (rc != SOCKET_ERROR);
 
 // We don't need the listening socket anymore. Close it.
 	rc = closesocket (listener);
-	g_assert (rc != SOCKET_ERROR);
+	pgm_assert (rc != SOCKET_ERROR);
 
 	return 0;
 #endif
@@ -143,7 +148,7 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 
 static inline int pgm_notify_destroy (pgm_notify_t* notify)
 {
-	g_assert (notify);
+	pgm_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
 	if (notify->eventfd) {
@@ -174,19 +179,19 @@ static inline int pgm_notify_destroy (pgm_notify_t* notify)
 
 static inline int pgm_notify_send (pgm_notify_t* notify)
 {
-	g_assert (notify);
+	pgm_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
-	g_assert (notify->eventfd);
+	pgm_assert (notify->eventfd);
 	uint64_t u = 1;
 	ssize_t s = write (notify->eventfd, &u, sizeof(u));
 	return (s == sizeof(u));
 #elif defined(G_OS_UNIX)
-	g_assert (notify->pipefd[1]);
+	pgm_assert (notify->pipefd[1]);
 	const char one = '1';
 	return (1 == write (notify->pipefd[1], &one, sizeof(one)));
 #else
-	g_assert (notify->s[1]);
+	pgm_assert (notify->s[1]);
 	const char one = '1';
 	return (1 == send (notify->s[1], &one, sizeof(one), 0));
 #endif
@@ -194,18 +199,18 @@ static inline int pgm_notify_send (pgm_notify_t* notify)
 
 static inline int pgm_notify_read (pgm_notify_t* notify)
 {
-	g_assert (notify);
+	pgm_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
-	g_assert (notify->eventfd);
+	pgm_assert (notify->eventfd);
 	uint64_t u;
 	return (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
 #elif defined(G_OS_UNIX)
-	g_assert (notify->pipefd[0]);
+	pgm_assert (notify->pipefd[0]);
 	char buf;
 	return (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
 #else
-	g_assert (notify->s[0]);
+	pgm_assert (notify->s[0]);
 	char buf;
 	return (sizeof(buf) == recv (notify->s[0], &buf, sizeof(buf), 0));
 #endif
@@ -213,18 +218,18 @@ static inline int pgm_notify_read (pgm_notify_t* notify)
 
 static inline void pgm_notify_clear (pgm_notify_t* notify)
 {
-	g_assert (notify);
+	pgm_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
-	g_assert (notify->eventfd);
+	pgm_assert (notify->eventfd);
 	uint64_t u;
 	while (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
 #elif defined(G_OS_UNIX)
-	g_assert (notify->pipefd[0]);
+	pgm_assert (notify->pipefd[0]);
 	char buf;
 	while (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
 #else
-	g_assert (notify->s[0]);
+	pgm_assert (notify->s[0]);
 	char buf;
 	while (sizeof(buf) == recv (notify->s[0], &buf, sizeof(buf), 0));
 #endif
@@ -232,16 +237,16 @@ static inline void pgm_notify_clear (pgm_notify_t* notify)
 
 static inline int pgm_notify_get_fd (pgm_notify_t* notify)
 {
-	g_assert (notify);
+	pgm_assert (notify);
 
 #ifdef CONFIG_HAVE_EVENTFD
-	g_assert (notify->eventfd);
+	pgm_assert (notify->eventfd);
 	return notify->eventfd;
 #elif defined(G_OS_UNIX)
-	g_assert (notify->pipefd[0]);
+	pgm_assert (notify->pipefd[0]);
 	return notify->pipefd[0];
 #else
-	g_assert (notify->s[0]);
+	pgm_assert (notify->s[0]);
 	return notify->s[0];
 #endif
 }
