@@ -18,9 +18,9 @@ vars.AddVariables (
 			allowed_values=('none', 'full')),
 	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_HTTP', 'HTTP administration', 'true',
+	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_SNMP', 'SNMP administration', 'true',
+	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
 			allowed_values=('true', 'false')),
@@ -68,7 +68,7 @@ if not conf.CheckPKG('gthread-2.0'):
 
 if not conf.CheckPKG('libsoup-2.4'):
 	print 'libsoup-2.4 not found.'
-	Exit(1)
+#	Exit(1)
 
 env = conf.Finish();
 
@@ -194,7 +194,8 @@ env['SNMP_FLAGS'] = {
         'CCFLAGS'        : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
-env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
+if env['WITH_HTTP'] == 'true':
+	env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');

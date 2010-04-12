@@ -128,7 +128,8 @@ pgm_init (
 	if (!pgm_time_supported () &&
 	    !pgm_time_init (&sub_error))
 	{
-		pgm_propagate_error (error, sub_error);
+		if (sub_error)
+			pgm_propagate_error (error, sub_error);
 		return FALSE;
 	}
 

@@ -149,6 +149,19 @@ static inline void pgm_fatal (const gchar* format, ...) {
 
 #endif /* varargs */
 
+#define pgm_warn_if_reached() \
+	do { \
+		pgm_warn ("file %s: line %d (%s): code should not be reached", \
+				__FILE__, __LINE__, __PRETTY_FUNCTION__); \
+	} while (0)
+#define pgm_warn_if_fail(expr) \
+	do { \
+		if (G_LIKELY (expr)); \
+		else \
+			pgm_warn ("file %s: line %d (%s): runtime check failed: (%s)", \
+				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
+	} while (0)
+
 
 #ifdef PGM_DISABLE_ASSERT
 
@@ -247,16 +260,20 @@ static inline void pgm_fatal (const gchar* format, ...) {
 #	define pgm_return_if_fail(expr)	\
 	do { \
 		if (G_LIKELY(expr)); \
-		else pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
+		else { \
+			pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
-		return; \
+			return; \
+		} \
 	} while (0)
 #	define pgm_return_val_if_fail(expr, val) \
 	do { \
 		if (G_LIKELY(expr)); \
-		else pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
+		else { \
+			pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
-		return (val); \
+			return (val); \
+		} \
 	} while (0)
 #	define pgm_return_if_reached() \
 	do { \
@@ -276,16 +293,20 @@ static inline void pgm_fatal (const gchar* format, ...) {
 #	define pgm_return_if_fail(expr)	\
 	do { \
 		if (G_LIKELY(expr)); \
-		else pgm_warn ("file %s: line %d: assertion `%s' failed", \
+		else { \
+			pgm_warn ("file %s: line %d: assertion `%s' failed", \
 				__FILE__, __LINE__, #expr); \
-		return; \
+			return; \
+		} \
 	} while (0)
 #	define pgm_return_val_if_fail(expr, val) \
 	do { \
 		if (G_LIKELY(expr)); \
-		else pgm_warn ("file %s: line %d: assertion `%s' failed", \
+		else { \
+			pgm_warn ("file %s: line %d: assertion `%s' failed", \
 				__FILE__, __LINE__, #expr); \
-		return (val); \
+			return (val); \
+		} \
 	} while (0)
 #	define pgm_return_if_reached() \
 	do { \
