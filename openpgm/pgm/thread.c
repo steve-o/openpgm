@@ -31,6 +31,7 @@
 
 #include "pgm/messages.h"
 #include "pgm/thread.h"
+#include "pgm/atomic.h"
 
 //#define THREAD_DEBUG
 
@@ -41,6 +42,9 @@
 #if defined(G_OS_WIN) && !defined(CONFIG_HAVE_WIN_COND)
 static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
+
+static volatile gint32 thread_ref_count = 0;
+
 
 #ifdef G_OS_UNIX
 #	define posix_check_err(err, name) G_STMT_START{			\
@@ -68,6 +72,9 @@ static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 void
 pgm_thread_init (void)
 {
+	if (pgm_atomic_int32_exchange_and_add (&thread_ref_count, 1) > 0)
+		return;
+
 #if defined(G_OS_WIN) && !defined(CONFIG_HAVE_WIN_COND)
 	win32_check_err (TLS_OUT_OF_INDEXES != (g_cond_event_tls = TlsAlloc ()));
 #endif
@@ -76,6 +83,11 @@ pgm_thread_init (void)
 void
 pgm_thread_shutdown (void)
 {
+	pgm_return_if_fail (pgm_atomic_int32_get (&thread_ref_count) > 0);
+
+	if (!pgm_atomic_int32_dec_and_test (&thread_ref_count))
+		return;
+
 #if defined(G_OS_WIN) && !defined(CONFIG_HAVE_WIN_COND)
 	TlsFree (g_cond_event_tls);
 #endif

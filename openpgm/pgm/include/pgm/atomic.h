@@ -32,6 +32,7 @@ gint32 pgm_atomic_int32_get (const volatile gint32*);
 void pgm_atomic_int32_set (volatile gint32*, const gint32);
 
 #define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
+#define pgm_atomic_int32_dec(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), -1))
 #define pgm_atomic_int32_dec_and_test(atomic) (pgm_atomic_int32_exchange_and_add ((atomic), -1) == 1)
 
 void pgm_atomic_init (void);

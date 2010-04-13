@@ -26,6 +26,7 @@
 #include <glib.h>
 
 #include "pgm/messages.h"
+#include "pgm/atomic.h"
 #include "pgm/time.h"
 #include "pgm/thread.h"
 #include "pgm/rand.h"
@@ -34,18 +35,31 @@
 //#define RAND_DEBUG
 
 
+/* globals */
+
 static pgm_rand_t g_rand = { .seed = 0 };
+
+static volatile gint32 g_rand_ref_count = 0;
 static pgm_mutex_t g_rand_mutex;
+
 
 void
 pgm_rand_init (void)
 {
+	if (pgm_atomic_int32_exchange_and_add (&g_rand_ref_count, 1) > 0)
+		return;
+
 	pgm_mutex_init (&g_rand_mutex);
 }
 
 void
 pgm_rand_shutdown (void)
 {
+	pgm_return_if_fail (pgm_atomic_int32_get (&g_rand_ref_count) > 0);
+
+	if (!pgm_atomic_int32_dec_and_test (&g_rand_ref_count))
+		return;
+
 	pgm_mutex_free (&g_rand_mutex);
 }
 

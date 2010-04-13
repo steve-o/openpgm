@@ -32,7 +32,6 @@
 G_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL gboolean pgm_time_init (pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL gboolean pgm_time_supported (void) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL gboolean pgm_time_shutdown (void);
 
 G_END_DECLS
