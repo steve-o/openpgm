@@ -53,6 +53,7 @@
 #endif
 
 #include "pgm/messages.h"
+#include "pgm/atomic.h"
 #include "pgm/time.h"
 #include "pgm/timep.h"
 
@@ -82,7 +83,7 @@ pgm_time_update_func pgm_time_update_now;
 pgm_time_sleep_func pgm_time_sleep;
 pgm_time_since_epoch_func pgm_time_since_epoch;
 
-static gboolean time_got_initialized = FALSE;
+static volatile gint32 time_ref_count = 0;
 static pgm_time_t rel_offset = 0;
 
 static pgm_time_t gettimeofday_update (void);
@@ -216,7 +217,8 @@ pgm_time_init (
 	pgm_error_t**	error
 	)
 {
-	pgm_return_val_if_fail (FALSE == time_got_initialized, FALSE);
+	if (pgm_atomic_int32_exchange_and_add (&time_ref_count, 1) > 0)
+		return TRUE;
 
 /* current time */
 	const char *cfg = getenv ("PGM_TIMER");
@@ -445,14 +447,7 @@ pgm_time_init (
 		rel_offset = gettimeofday_update() - pgm_time_update_now();
 	}
 
-	time_got_initialized = TRUE;
 	return TRUE;
-}
-
-gboolean
-pgm_time_supported (void)
-{
-	return ( time_got_initialized == TRUE );
 }
 
 /* returns TRUE if shutdown succeeded, returns FALSE on error.
@@ -461,7 +456,10 @@ pgm_time_supported (void)
 gboolean
 pgm_time_shutdown (void)
 {
-	pgm_return_val_if_fail (TRUE == time_got_initialized, FALSE);
+	pgm_return_val_if_fail (pgm_atomic_int32_get (&time_ref_count) > 0, FALSE);
+
+	if (!pgm_atomic_int32_dec_and_test (&time_ref_count))
+		return TRUE;
 
 	gboolean success = TRUE;
 #ifdef CONFIG_HAVE_RTC
@@ -472,8 +470,7 @@ pgm_time_shutdown (void)
 	if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
 		success = hpet_shutdown ();
 #endif
-	time_got_initialized = !success;
-	return TRUE;
+	return success;
 }
 
 static
