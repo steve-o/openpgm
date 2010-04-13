@@ -126,14 +126,17 @@ main (
 
 	setlocale (LC_ALL, "");
 
+/* pre-initialise PGM messages module to add hook for GLib logging */
+	pgm_messages_init();
+	log_init ();
+	g_message ("pgmrecv");
+
 	if (!pgm_init (&pgm_err)) {
 		g_error ("Unable to start PGM engine: %s", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
 		pgm_error_free (pgm_err);
+		pgm_messages_shutdown();
 		return EXIT_FAILURE;
 	}
-
-	log_init ();
-	g_message ("pgmrecv");
 
 	g_thread_init (NULL);
 
@@ -164,11 +167,13 @@ main (
 #endif
 
 		case 'i':
-			pgm_if_print_all ();
+			pgm_if_print_all();
+			pgm_messages_shutdown();
 			return EXIT_SUCCESS;
 
 		case 'h':
 		case '?':
+			pgm_messages_shutdown();
 			usage (binary_name);
 		}
 	}
@@ -178,7 +183,8 @@ main (
 		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
 			g_error ("Unable to start HTTP interface: %s", err->message);
 			g_error_free (err);
-			pgm_shutdown ();
+			pgm_shutdown();
+			pgm_messages_shutdown();
 			return EXIT_FAILURE;
 		}
 	}
@@ -193,7 +199,8 @@ main (
 				pgm_http_shutdown ();
 #endif
 			pgm_shutdown ();
-			return EXIT_FAILURE;
+			pgm_messages_shutdown();
+	 		return EXIT_FAILURE;
 		}
 	}
 #endif
@@ -240,7 +247,7 @@ main (
 	CloseHandle (g_quit_event);
 #endif
 
-	g_main_loop_unref(g_loop);
+	g_main_loop_unref (g_loop);
 	g_loop = NULL;
 
 	if (g_transport) {
@@ -260,8 +267,9 @@ main (
 #endif
 
 	g_message ("PGM engine shutdown.");
-	pgm_shutdown ();
+	pgm_shutdown();
 	g_message ("finished.");
+	pgm_messages_shutdown();
 	return EXIT_SUCCESS;
 }
 
