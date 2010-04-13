@@ -94,12 +94,15 @@ main (
 
 	setlocale (LC_ALL, "");
 
+/* pre-initialise PGM messages module to add hook for GLib logging */
+	pgm_messages_init();
+	log_init();
 	if (!pgm_init (&pgm_err)) {
 		g_error ("Unable to start PGM engine: %s", pgm_err->message);
 		pgm_error_free (pgm_err);
+		pgm_messages_shutdown();
 		return EXIT_FAILURE;
 	}
-	log_init ();
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -119,16 +122,19 @@ main (
 		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'i':
-			pgm_if_print_all ();
+			pgm_if_print_all();
+			pgm_messages_shutdown();
 			return EXIT_SUCCESS;
 
 		case 'h':
 		case '?':
+			pgm_messages_shutdown();
 			usage (binary_name);
 		}
 	}
 
 	if (g_fec && ( !g_k || !g_n )) {
+		pgm_messages_shutdown();
 		puts ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
@@ -139,7 +145,7 @@ main (
 	signal (SIGHUP, SIG_IGN);
 #endif
 
-	if (create_transport ())
+	if (create_transport())
 	{
 		while (optind < argc) {
 			const int status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
@@ -155,7 +161,8 @@ main (
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
-	pgm_shutdown ();
+	pgm_shutdown();
+	pgm_messages_shutdown();
 	return EXIT_SUCCESS;
 }
 

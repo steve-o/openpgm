@@ -63,6 +63,8 @@ static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif /* !G_OS_UNIX */
 
 
+/* only needed for Win32 pre-Vista read-write locks
+ */
 void
 pgm_thread_init (void)
 {
