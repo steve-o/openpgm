@@ -27,6 +27,7 @@
 #include <glib.h>
 
 #include "pgm/messages.h"
+#include "pgm/atomic.h"
 #include "pgm/thread.h"
 
 
@@ -51,7 +52,8 @@ static const char log_levels[8][6] = {
 	"Fatal"
 };
 
-static pgm_mutex_t log_mutex;
+static volatile gint32 messages_ref_count = 0;
+static pgm_mutex_t messages_mutex;
 static pgm_log_func_t log_handler = NULL;
 static gpointer log_handler_closure = NULL;
 
@@ -74,16 +76,27 @@ log_level_text (
 	}
 }
 
+/* reference counted init and shutdown
+ */
+
 void
 pgm_messages_init (void)
 {
-	pgm_mutex_init (&log_mutex);
+	if (pgm_atomic_int32_exchange_and_add (&messages_ref_count, 1) > 0)
+		return;
+
+	pgm_mutex_init (&messages_mutex);
 }
 
 void
 pgm_messages_shutdown (void)
 {
-	pgm_mutex_free (&log_mutex);
+	pgm_return_if_fail (pgm_atomic_int32_get (&messages_ref_count) > 0);
+
+	if (!pgm_atomic_int32_dec_and_test (&messages_ref_count))
+		return;
+
+	pgm_mutex_free (&messages_mutex);
 }
 
 /* set application handler for log messages, returns previous value,
@@ -96,10 +109,10 @@ pgm_log_set_handler (
 	gpointer		closure
 	)
 {
-	pgm_mutex_lock (&log_mutex);
+	pgm_mutex_lock (&messages_mutex);
 	log_handler		= handler;
 	log_handler_closure	= closure;
-	pgm_mutex_unlock (&log_mutex);
+	pgm_mutex_unlock (&messages_mutex);
 }
 
 void
@@ -120,15 +133,15 @@ void
 pgm__logv (
 	const gint		log_level,
 	const gchar*		format,
-	va_list			va_args
+	va_list			args
 	)
 {
 	char tbuf[ 1024 ];
 	int offset;
 
-	pgm_mutex_lock (&log_mutex);
+	pgm_mutex_lock (&messages_mutex);
 	offset = sprintf (tbuf, "%s: ", log_level_text (log_level));
-	vsnprintf (tbuf+offset, sizeof(tbuf)-offset, format, va_args);
+	vsnprintf (tbuf+offset, sizeof(tbuf)-offset, format, args);
 	tbuf[ sizeof(tbuf) ] = '\0';
 	if (log_handler)
 		log_handler (log_level, tbuf, log_handler_closure);
@@ -137,7 +150,7 @@ pgm__logv (
 		write (STDOUT_FILENO, "\n", 1);
 	}
 		
-	pgm_mutex_unlock (&log_mutex);
+	pgm_mutex_unlock (&messages_mutex);
 }
 
 /* eof */
