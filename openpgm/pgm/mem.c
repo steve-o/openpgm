@@ -27,12 +27,18 @@
 #include <glib.h>
 
 #include "pgm/messages.h"
+#include "pgm/atomic.h"
 #include "pgm/mem.h"
 
 //#define MEM_DEBUG
 
 
+/* globals */
+
 gboolean pgm_mem_gc_friendly = FALSE;
+
+static volatile gint32 mem_ref_count = 0;
+
 
 static
 gboolean
@@ -97,11 +103,15 @@ pgm_parse_debug_string (
 void
 pgm_mem_init (void)
 {
-	const GDebugKey keys[] = {
+	static const GDebugKey keys[] = {
 		{ "gc-friendly", 1 },
 	};
+
+	if (pgm_atomic_int32_exchange_and_add (&mem_ref_count, 1) > 0)
+		return;
+
 	const char *val = getenv ("PGM_DEBUG");
-	gint flags = !val ? 0 : pgm_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
+	const int flags = !val ? 0 : pgm_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
 	if (flags & 1)
 		pgm_mem_gc_friendly = TRUE;
 }
@@ -109,6 +119,12 @@ pgm_mem_init (void)
 void
 pgm_mem_shutdown (void)
 {
+	pgm_return_if_fail (pgm_atomic_int32_get (&mem_ref_count) > 0);
+
+	if (!pgm_atomic_int32_dec_and_test (&mem_ref_count))
+		return;
+
+	/* nop */
 }
 
 gpointer

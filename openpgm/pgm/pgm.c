@@ -30,6 +30,7 @@
 #endif
 
 #include "pgm/messages.h"
+#include "pgm/atomic.h"
 #include "pgm/pgm.h"
 #include "pgm/packet.h"
 #include "pgm/timep.h"
@@ -45,7 +46,8 @@ int ipproto_pgm = IPPROTO_PGM;
 
 
 /* locals */
-static gboolean pgm_got_initialized = FALSE;
+static gboolean pgm_is_supported = FALSE;
+static volatile gint32 pgm_ref_count = 0;
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -60,26 +62,21 @@ pgm_init (
 	pgm_error_t**	error
 	)
 {
-	if (TRUE == pgm_got_initialized) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_ENGINE,
-			     PGM_ERROR_FAILED,
-			     _("Engine already initalized."));
-		return FALSE;
-	}
+	if (pgm_atomic_int32_exchange_and_add (&pgm_ref_count, 1) > 0)
+		return TRUE;
 
 /* initialise dependent modules */
-	pgm_messages_init ();
+	pgm_messages_init();
 
 	pgm_minor ("OpenPGM %d.%d.%d%s%s%s %s %s %s",
 			pgm_major_version, pgm_minor_version, pgm_micro_version,
 			pgm_build_revision ? " (" : "", pgm_build_revision ? pgm_build_revision : "", pgm_build_revision ? ")" : "",
 			pgm_build_date, pgm_build_time, pgm_build_platform);
 
-	pgm_thread_init ();
-	pgm_atomic_init ();
-	pgm_mem_init ();
-	pgm_rand_init ();
+	pgm_atomic_init();
+	pgm_thread_init();
+	pgm_mem_init();
+	pgm_rand_init();
 
 #ifdef G_OS_WIN32
 	WORD wVersionRequested = MAKEWORD (2, 2);
@@ -92,17 +89,17 @@ pgm_init (
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("WSAStartup failure: %s"),
 			     pgm_wsastrerror (save_errno));
-		return FALSE;
+		goto err_shutdown;
 	}
 
 	if (LOBYTE (wsaData.wVersion) != 2 || HIBYTE (wsaData.wVersion) != 2)
 	{
-		WSACleanup ();
+		WSACleanup();
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_ENGINE,
 			     PGM_ERROR_FAILED,
 			     _("WSAStartup failed to provide requested version 2.2."));
-		return FALSE;
+		goto err_shutdown;
 	}
 #endif /* G_OS_WIN32 */
 
@@ -131,19 +128,26 @@ pgm_init (
 
 /* ensure timing enabled */
 	pgm_error_t* sub_error = NULL;
-	if (!pgm_time_supported () &&
-	    !pgm_time_init (&sub_error))
-	{
+	if (!pgm_time_init (&sub_error)) {
 		if (sub_error)
 			pgm_propagate_error (error, sub_error);
-		return FALSE;
+		goto err_shutdown;
 	}
 
 /* create global transport list lock */
 	pgm_rwlock_init (&pgm_transport_list_lock);
 
-	pgm_got_initialized = TRUE;
+	pgm_is_supported = TRUE;
 	return TRUE;
+
+err_shutdown:
+	pgm_rand_shutdown();
+	pgm_mem_shutdown();
+	pgm_thread_shutdown();
+	pgm_atomic_shutdown();
+	pgm_messages_shutdown();
+	pgm_atomic_int32_dec (&pgm_ref_count);
+	return FALSE;
 }
 
 /* returns TRUE if PGM engine has been initialized
@@ -152,7 +156,7 @@ pgm_init (
 gboolean
 pgm_supported (void)
 {
-	return ( pgm_got_initialized == TRUE );
+	return ( pgm_is_supported == TRUE );
 }
 
 /* returns TRUE on success, returns FALSE if an error occurred.
@@ -161,27 +165,29 @@ pgm_supported (void)
 gboolean
 pgm_shutdown (void)
 {
-	pgm_return_val_if_fail (pgm_supported() == TRUE, FALSE);
+	pgm_return_val_if_fail (pgm_atomic_int32_get (&pgm_ref_count) > 0, FALSE);
+
+	if (!pgm_atomic_int32_dec_and_test (&pgm_ref_count))
+		return;
+
+	pgm_is_supported = FALSE;
 
 /* destroy all open transports */
 	while (pgm_transport_list) {
 		pgm_transport_destroy ((pgm_transport_t*)pgm_transport_list->data, FALSE);
 	}
 
-	if (pgm_time_supported ())
-		pgm_time_shutdown ();
+	pgm_time_shutdown();
 
 #ifdef G_OS_WIN32
-	WSACleanup ();
+	WSACleanup();
 #endif
 
-	pgm_rand_shutdown ();
-	pgm_mem_shutdown ();
-	pgm_atomic_shutdown ();
-	pgm_thread_shutdown ();
-	pgm_messages_shutdown ();
-
-	pgm_got_initialized = FALSE;
+	pgm_rand_shutdown();
+	pgm_mem_shutdown();
+	pgm_thread_shutdown();
+	pgm_atomic_shutdown();
+	pgm_messages_shutdown();
 	return TRUE;
 }
 

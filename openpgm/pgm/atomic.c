@@ -21,31 +21,38 @@
 
 #include <glib.h>
 
+#include "pgm/messages.h"
 #include "pgm/atomic.h"
 #include "pgm/thread.h"
 
 
 //#define ATOMIC_DEBUG
 
-#ifndef ATOMIC_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
 
+/* globals */
 
 static pgm_mutex_t g_atomic_mutex;
+
+static volatile gint32 atomic_ref_count = 0;
 
 
 void
 pgm_atomic_init (void)
 {
+	if (pgm_atomic_int32_exchange_and_add (&atomic_ref_count, 1) > 0)
+		return;
+
 	pgm_mutex_init (&g_atomic_mutex);
 }
 
 void
 pgm_atomic_shutdown (void)
 {
+	pgm_return_if_fail (pgm_atomic_int32_get (&atomic_ref_count) > 0);
+
+	if (!pgm_atomic_int32_dec_and_test (&atomic_ref_count))
+		return;
+
 	pgm_mutex_free (&g_atomic_mutex);
 }
 
@@ -131,6 +138,7 @@ pgm_atomic_int32_exchange_and_add (
 #elif defined(G_OS_WIN32)
 	return InterlockedExchangeAdd (atomic, val);
 #else
+#	error "native interlocked exchange required for module startup"
 	gint32 result;
 	pgm_mutex_lock (&g_atomic_mutex);
 	result = *atomic;
