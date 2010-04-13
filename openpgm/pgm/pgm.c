@@ -70,6 +70,12 @@ pgm_init (
 
 /* initialise dependent modules */
 	pgm_messages_init ();
+
+	pgm_minor ("OpenPGM %d.%d.%d%s%s%s %s %s %s",
+			pgm_major_version, pgm_minor_version, pgm_micro_version,
+			pgm_build_revision ? " (" : "", pgm_build_revision ? pgm_build_revision : "", pgm_build_revision ? ")" : "",
+			pgm_build_date, pgm_build_time, pgm_build_platform);
+
 	pgm_thread_init ();
 	pgm_atomic_init ();
 	pgm_mem_init ();
