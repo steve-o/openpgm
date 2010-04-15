@@ -19,8 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
 
@@ -34,19 +37,19 @@
  */
 
 static
-guint16
+uint16_t
 do_csum_8bit (
 	const void*	addr,
-	guint16		len,
-	int		csum
+	uint16_t	len,
+	uint32_t	csum
 	)
 {
-	guint32 acc;
-	guint16 src;
-	const guint8* buf;
+	uint_fast32_t acc;
+	uint16_t src;
+	const uint8_t* buf;
 
 	acc = csum;
-	buf = (const guint8*)addr;
+	buf = (const uint8_t*)addr;
 	while (len > 1) {
 /* first byte as most significant */
 		src = (*buf) << 8;
@@ -64,30 +67,30 @@ do_csum_8bit (
 	}
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
-	return g_htons ((guint16)acc);
+	return htons ((uint16_t)acc);
 }
 
 static
-guint16
+uint16_t
 do_csum_16bit (
 	const void*	addr,
-	guint16		len,
-	int		csum
+	uint16_t	len,
+	uint32_t	csum
 	)
 {
-	guint32 acc;
-	const guint8* buf;
-	guint16 remainder;
-	unsigned count8;
-	gboolean is_odd;
+	uint_fast32_t acc;
+	const uint8_t* buf;
+	uint16_t remainder;
+	uint_fast16_t count8;
+	bool is_odd;
 
 	acc = csum;
-	buf = (const guint8*)addr;
+	buf = (const uint8_t*)addr;
 	remainder = 0;
 
 	if (G_UNLIKELY(len == 0))
 		return acc;
-	is_odd = ((guint32)buf & 1);
+	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (G_UNLIKELY(is_odd)) {
 		((guint8*)&remainder)[1] = *buf++;
@@ -98,22 +101,22 @@ do_csum_16bit (
 	if (count8)
 	{
 		while (count8--) {
-			acc += ((const guint16*)buf)[ 0 ];
-			acc += ((const guint16*)buf)[ 1 ];
-			acc += ((const guint16*)buf)[ 2 ];
-			acc += ((const guint16*)buf)[ 3 ];
+			acc += ((const uint16_t*)buf)[ 0 ];
+			acc += ((const uint16_t*)buf)[ 1 ];
+			acc += ((const uint16_t*)buf)[ 2 ];
+			acc += ((const uint16_t*)buf)[ 3 ];
 			buf  = &buf[ 8 ];
 		}
 		len %= 8;
 	}
 	while (len > 1) {
-		acc += ((const guint16*)buf)[ 0 ];
+		acc += ((const uint16_t*)buf)[ 0 ];
 		buf  = &buf[ 2 ];
 		len -= 2;
 	}
 /* trailing odd byte */
 	if (len > 0) {
-		((guint8*)&remainder)[0] = *buf;
+		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -124,37 +127,37 @@ do_csum_16bit (
 }
 
 static
-guint16
+uint16_t
 do_csum_32bit (
 	const void*	addr,
-	guint16		len,
-	int		csum
+	uint16_t	len,
+	uint32_t	csum
 	)
 {
-	guint32 acc;
-	const guint8* buf;
-	guint16 remainder;
-	unsigned count;
-	gboolean is_odd;
+	uint_fast32_t acc;
+	const uint8_t* buf;
+	uint16_t remainder;
+	uint_fast16_t count;
+	bool is_odd;
 
 	acc = csum;
-	buf = (const guint8*)addr;
+	buf = (const uint8_t*)addr;
 	remainder = 0;
 
 	if (G_UNLIKELY(len == 0))
 		return acc;
-	is_odd = ((guint32)buf & 1);
+	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (G_UNLIKELY(is_odd)) {
-		((guint8*)&remainder)[1] = *buf++;
+		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
 /* 16-bit words */
 	count = len >> 1;
 	if (count)
 	{
-		if ((guint32)buf & 2) {
-			acc += ((const guint16*)buf)[ 0 ];
+		if ((uintptr_t)buf & 2) {
+			acc += ((const uint16_t*)buf)[ 0 ];
 			buf  = &buf[ 2 ];
 			count--;
 			len -= 2;
@@ -163,11 +166,11 @@ do_csum_32bit (
 		count >>= 1;
 		if (count)
 		{
-			guint32 carry = 0;
+			uint32_t carry = 0;
 			while (count) {
 				acc += carry;
-				acc += ((const guint32*)buf)[ 0 ];
-				carry = ((const guint32*)buf)[ 0 ] > acc;
+				acc += ((const uint32_t*)buf)[ 0 ];
+				carry = ((const uint32_t*)buf)[ 0 ] > acc;
 				buf  = &buf[ 4 ];
 				count--;
 			}
@@ -175,13 +178,13 @@ do_csum_32bit (
 			acc  = (acc >> 16) + (acc & 0xffff);
 		}
 		if (len & 2) {
-			acc += ((const guint16*)buf)[ 0 ];
+			acc += ((const uint16_t*)buf)[ 0 ];
 			buf  = &buf[ 2 ];
 		}
 	}
 /* trailing odd byte */
 	if (len & 1) {
-		((guint8*)&remainder)[0] = *buf;
+		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -195,37 +198,37 @@ do_csum_32bit (
  */
 
 static
-guint16
+uint16_t
 do_csum_64bit (
 	const void*	addr,
-	guint16		len,
+	uint16_t	len,
 	int		csum
 	)
 {
-	guint64 acc;
-	const guint8* buf;
-	guint16 remainder;
-	unsigned count;
-	gboolean is_odd;
+	uint_fast64_t acc;
+	const uint8_t* buf;
+	uint16_t remainder;
+	uint_fast16_t count;
+	bool is_odd;
 
 	acc = csum;
-	buf = (const guint8*)addr;
+	buf = (const uint8_t*)addr;
 	remainder = 0;
 
 	if (G_UNLIKELY(len == 0))
 		return acc;
-	is_odd = ((guint64)buf & 1);
+	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (G_UNLIKELY(is_odd)) {
-		((guint8*)&remainder)[1] = *buf++;
+		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
 /* 16-bit words */
 	count = len >> 1;
 	if (count)
 	{
-		if ((guint64)buf & 2) {
-			acc += ((const guint16*)buf)[ 0 ];
+		if ((uintptr_t)buf & 2) {
+			acc += ((const uint16_t*)buf)[ 0 ];
 			buf  = &buf[ 2 ];
 			count--;
 			len -= 2;
@@ -234,8 +237,8 @@ do_csum_64bit (
 		count >>= 1;
 		if (count)
 		{
-			if ((guint64)buf & 4) {
-				acc += ((const guint32*)buf)[ 0 ];
+			if ((uintptr_t)buf & 4) {
+				acc += ((const uint32_t*)buf)[ 0 ];
 				buf  = &buf[ 4 ];
 				count--;
 				len -= 4;
@@ -244,11 +247,11 @@ do_csum_64bit (
 			count >>= 1;
 			if (count)
 			{
-				guint64 carry = 0;
+				uint_fast64_t carry = 0;
 				while (count) {
 					acc += carry;
-					acc += ((const guint64*)buf)[ 0 ];
-					carry = ((const guint64*)buf)[ 0 ] > acc;
+					acc += ((const uint64_t*)buf)[ 0 ];
+					carry = ((const uint64_t*)buf)[ 0 ] > acc;
 					buf  = &buf[ 8 ];
 					count--;
 				}
@@ -256,18 +259,18 @@ do_csum_64bit (
 				acc  = (acc >> 32) + (acc & 0xffffffff);
 			}
 			if (len & 4) {
-				acc += ((const guint32*)buf)[ 0 ];
+				acc += ((const uint32_t*)buf)[ 0 ];
 				buf  = &buf[ 4 ];
 			}
 		}
 		if (len & 2) {
-			acc += ((const guint16*)buf)[ 0 ];
+			acc += ((const uint16_t*)buf)[ 0 ];
 			buf  = &buf[ 2 ];
 		}
 	}
 /* trailing odd byte */
 	if (len & 1) {
-		((guint8*)&remainder)[0] = *buf;
+		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
 	acc  = (acc >> 32) + (acc & 0xffffffff);
@@ -280,41 +283,41 @@ do_csum_64bit (
 }
 
 #if defined(__amd64) || defined(__x86_64__)
-/* simd instructions unique to AMD/Intel 64-bit
+/* simd instructions unique to AMD/Intel 64-bit, so always little endian.
  */
 
 static
-guint16
+uint16_t
 do_csum_vector (
 	const void*	addr,
-	guint16		len,
-	int		csum
+	uint16_t	len,
+	uint32_t	csum
 	)
 {
-	guint64 acc;
-	const guint8* buf;
-	guint16 remainder;
-	unsigned count;
-	gboolean is_odd;
+	uint64_t acc;			/* fixed size for asm */
+	const uint8_t* buf;
+	uint16_t remainder;		/* fixed size for endian swap */
+	uint_fast16_t count;
+	bool is_odd;
 
 	acc = csum;
-	buf = (const guint8*)addr;
+	buf = (const uint8_t*)addr;
 	remainder = 0;
 
 	if (G_UNLIKELY(len == 0))
 		return acc;
-	is_odd = ((guint64)buf & 1);
+	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (G_UNLIKELY(is_odd)) {
-		((guint8*)&remainder)[1] = *buf++;
+		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
 /* 16-bit words */
 	count = len >> 1;
 	if (count)
 	{
-		if ((guint64)buf & 2) {
-			acc += ((const guint16*)buf)[ 0 ];
+		if ((uintptr_t)buf & 2) {
+			acc += ((const uint16_t*)buf)[ 0 ];
 			buf  = &buf[ 2 ];
 			count--;
 			len -= 2;
@@ -323,8 +326,8 @@ do_csum_vector (
 		count >>= 1;
 		if (count)
 		{
-			if ((guint64)buf & 4) {
-				acc += ((const guint32*)buf)[ 0 ];
+			if ((uintptr_t)buf & 4) {
+				acc += ((const uint32_t*)buf)[ 0 ];
 				buf  = &buf[ 4 ];
 				count--;
 				len -= 4;
@@ -333,12 +336,12 @@ do_csum_vector (
 			count >>= 1;
 			if (count)
 			{
-				guint64 carry = 0;
+				uint64_t carry = 0;
 				while (count) {
 					asm("addq %1, %0 \n\t"
 						"adcq %2, %0"
 						: "=r" (acc)
-						: "m" (*(guint64*)buf), "r" (carry), "0" (acc));
+						: "m" (*(uint64_t*)buf), "r" (carry), "0" (acc));
 					buf  = &buf[ 8 ];
 					count--;
 				}
@@ -346,18 +349,18 @@ do_csum_vector (
 				acc  = (acc >> 32) + (acc & 0xffffffff);
 			}
 			if (len & 4) {
-				acc += ((const guint32*)buf)[ 0 ];
+				acc += ((const uint32_t*)buf)[ 0 ];
 				buf  = &buf[ 4 ];
 			}
 		}
 		if (len & 2) {
-			acc += ((const guint16*)buf)[ 0 ];
+			acc += ((const uint16_t*)buf)[ 0 ];
 			buf  = &buf[ 2 ];
 		}
 	}
 /* trailing odd byte */
 	if (len & 1) {
-		((guint8*)&remainder)[0] = *buf;
+		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
 	acc  = (acc >> 32) + (acc & 0xffffffff);
@@ -372,11 +375,11 @@ do_csum_vector (
 #endif
 
 static inline
-guint16
+uint16_t
 do_csum (
 	const void*	addr,
-	guint16		len,
-	int		csum
+	uint16_t	len,
+	uint32_t	csum
 	)
 {
 #if defined(CONFIG_8BIT_CHECKSUM)
@@ -397,11 +400,11 @@ do_csum (
 /* Calculate an IP header style checksum
  */
 
-guint16
+uint16_t
 pgm_inet_checksum (
 	const void*	addr,
-	guint		len,
-	int		csum
+	uint16_t	len,
+	uint16_t	csum
 	)
 {
 /* pre-conditions */
@@ -413,11 +416,11 @@ pgm_inet_checksum (
 /* Calculate a partial (unfolded) checksum
  */
 
-guint32
+uint32_t
 pgm_compat_csum_partial (
 	const void*	addr,
-	guint		len,
-	guint32		csum
+	uint16_t	len,
+	uint32_t	csum
 	)
 {
 /* pre-conditions */
@@ -433,12 +436,12 @@ pgm_compat_csum_partial (
 /* Calculate & copy a partial PGM checksum
  */
 
-guint32
+uint32_t
 pgm_compat_csum_partial_copy (
-	const void*	src,
-	void*		dst,
-	guint		len,
-	guint32		csum
+	const void* restrict src,
+	void*	    restrict dst,
+	uint16_t	     len,
+	uint32_t	     csum
 	)
 {
 /* pre-conditions */
@@ -452,9 +455,9 @@ pgm_compat_csum_partial_copy (
 /* Fold 32 bit checksum accumulator into 16 bit final value.
  */
 
-guint16
+uint16_t
 pgm_csum_fold (
-	guint32		csum
+	uint32_t	csum
 	)
 {
 	csum  = (csum >> 16) + (csum & 0xffff);
@@ -467,11 +470,11 @@ pgm_csum_fold (
 /* Add together two unfolded checksum accumulators
  */
 
-guint32
+uint32_t
 pgm_csum_block_add (
-	guint32		csum,
-	guint32		csum2,
-	guint		offset
+	uint32_t	csum,
+	uint32_t	csum2,
+	const uint16_t	offset
 	)
 {
 	if (offset & 1)			/* byte magic on odd offset */

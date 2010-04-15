@@ -93,8 +93,8 @@ static
 void
 md5_process_block (
 	struct md5_ctx*		ctx,
-	gconstpointer		buffer,
-	gsize			len
+	const void*		buffer,
+	size_t			len
 	)
 {
 /* pre-conditions */
@@ -102,14 +102,14 @@ md5_process_block (
 	pgm_assert (len > 0);
 	pgm_assert (NULL != ctx);
 
-	guint32 correct_words[16];
-	const guint32 *words = buffer;
-	const gsize nwords = len / sizeof (guint32);
-	const guint32 *endp = words + nwords;
-	guint32 A = ctx->A;
-	guint32 B = ctx->B;
-	guint32 C = ctx->C;
-	guint32 D = ctx->D;
+	uint32_t correct_words[16];
+	const uint32_t *words = buffer;
+	const size_t nwords = len / sizeof (uint32_t);
+	const uint32_t *endp = words + nwords;
+	uint32_t A = ctx->A;
+	uint32_t B = ctx->B;
+	uint32_t C = ctx->C;
+	uint32_t D = ctx->D;
 
 /* First increment the byte count.  RFC 1321 specifies the possible
    length of the file up to 2^64 bits.  Here we only compute the
@@ -122,11 +122,11 @@ md5_process_block (
    the loop.  */
 	while (words < endp)
 	{
-		guint32 *cwp = correct_words;
-		guint32 A_save = A;
-		guint32 B_save = B;
-		guint32 C_save = C;
-		guint32 D_save = D;
+		uint32_t *cwp = correct_words;
+		uint32_t A_save = A;
+		uint32_t B_save = B;
+		uint32_t C_save = C;
+		uint32_t D_save = D;
 
 /* First round: using the given function, the context and a constant
    the next context is computed.  Because the algorithms processing
@@ -258,8 +258,8 @@ md5_process_block (
 void
 _md5_process_bytes (
 	struct md5_ctx*		ctx,
-	gconstpointer		buffer,
-	gsize			len
+	const void*		buffer,
+	size_t			len
 	)
 {
 /* pre-conditions */
@@ -282,14 +282,14 @@ _md5_process_bytes (
 			while (len > 64)
 			{
 				md5_process_block (ctx, memcpy (ctx->buffer, buffer, 64), 64);
-				buffer = (const char *) buffer + 64;
+				buffer = (const char*) buffer + 64;
 				len -= 64;
 			}
 		else
 #endif
 		{
 			md5_process_block (ctx, buffer, len & ~63);
-			buffer = (const char *) buffer + (len & ~63);
+			buffer = (const char*) buffer + (len & ~63);
 			len &= 63;
 		}
 	}
@@ -318,20 +318,20 @@ _md5_process_bytes (
    aligned for a 32 bits value.  */
 
 static
-gpointer
+void*
 md5_read_ctx (
-	const struct md5_ctx	*ctx,
-	gpointer		resbuf
+	const struct md5_ctx*	ctx,
+	void*			resbuf
 	)
 {
 /* pre-conditions */
 	pgm_assert (NULL != ctx);
 	pgm_assert (NULL != resbuf);
 
-	((guint32*)resbuf)[0] = SWAP (ctx->A);
-	((guint32*)resbuf)[1] = SWAP (ctx->B);
-	((guint32*)resbuf)[2] = SWAP (ctx->C);
-	((guint32*)resbuf)[3] = SWAP (ctx->D);
+	((uint32_t*)resbuf)[0] = SWAP (ctx->A);
+	((uint32_t*)resbuf)[1] = SWAP (ctx->B);
+	((uint32_t*)resbuf)[2] = SWAP (ctx->C);
+	((uint32_t*)resbuf)[3] = SWAP (ctx->D);
 
 	return resbuf;
 }
@@ -342,10 +342,10 @@ md5_read_ctx (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
-gpointer
+void*
 _md5_finish_ctx (
 	struct md5_ctx*		ctx,
-	gpointer		resbuf
+	void*			resbuf
 	)
 {
 /* pre-conditions */
@@ -353,8 +353,8 @@ _md5_finish_ctx (
 	pgm_assert (NULL != resbuf);
 
 /* Take yet unprocessed bytes into account.  */
-	const guint32 bytes = ctx->buflen;
-	gsize pad;
+	const uint32_t bytes = ctx->buflen;
+	size_t pad;
 
 /* Now count remaining bytes.  */
 	ctx->total[0] += bytes;
@@ -365,8 +365,8 @@ _md5_finish_ctx (
 	memcpy (&ctx->buffer[bytes], fillbuf, pad);
 
 	/* Put the 64-bit file length in *bits* at the end of the buffer.  */
-	*(guint32*) &ctx->buffer[bytes + pad] = SWAP (ctx->total[0] << 3);
-	*(guint32*) &ctx->buffer[bytes + pad + 4] = SWAP ((ctx->total[1] << 3) |
+	*(uint32_t*) &ctx->buffer[bytes + pad] = SWAP (ctx->total[0] << 3);
+	*(uint32_t*) &ctx->buffer[bytes + pad + 4] = SWAP ((ctx->total[1] << 3) |
 								(ctx->total[0] >> 29));
 
 /* Process last bytes.  */

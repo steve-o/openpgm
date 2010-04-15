@@ -19,14 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
 
 #include "pgm/messages.h"
 #include "pgm/pgm.h"
-#include "pgm/receiverp.h"
-#include "pgm/sourcep.h"
+#include "pgm/receiver.h"
+#include "pgm/source.h"
 #include "pgm/timer.h"
 
 
@@ -39,12 +41,12 @@
  * called in transport creation so locks unrequired.
  */
 
-gboolean
+bool
 pgm_timer_prepare (
 	pgm_transport_t* const	transport
 	)
 {
-	glong msec;
+	int32_t msec;
 
 /* pre-conditions */
 	pgm_assert (NULL != transport);
@@ -63,22 +65,22 @@ pgm_timer_prepare (
 /* advance time again to adjust for processing time out of the event loop, this
  * could cause further timers to expire even before checking for new wire data.
  */
-	msec = pgm_to_msecs ((gint64)expiration - (gint64)now);
+	msec = pgm_to_msecs ((int64_t)expiration - (int64_t)now);
 	if (msec < 0)
 		msec = 0;
 	else
-		msec = MIN (G_MAXINT, (guint)msec);
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiration in %ldms"), msec);
+		msec = MIN (INT32_MAX, msec);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiration in %" PRIi32 "ms"), msec);
 	return (msec == 0);
 }
 
-gboolean
+bool
 pgm_timer_check (
 	pgm_transport_t* const	transport
 	)
 {
 	const pgm_time_t now = pgm_time_update_now();
-	gboolean expired;
+	bool expired;
 
 /* pre-conditions */
 	pgm_assert (NULL != transport);
@@ -92,19 +94,19 @@ pgm_timer_check (
 /* return next timer expiration in microseconds (μs)
  */
 
-long
+pgm_time_t
 pgm_timer_expiration (
 	pgm_transport_t* const	transport
 	)
 {
 	const pgm_time_t now = pgm_time_update_now();
-	long expiration;
+	pgm_time_t expiration;
 
 /* pre-conditions */
 	pgm_assert (NULL != transport);
 
 	pgm_timer_lock (transport);
-	expiration = pgm_time_after (transport->next_poll, now) ? (long)pgm_to_usecs (transport->next_poll - now) : 0;
+	expiration = pgm_time_after (transport->next_poll, now) ? pgm_to_usecs (transport->next_poll - now) : 0;
 	pgm_timer_unlock (transport);
 	return expiration;
 }
@@ -115,7 +117,7 @@ pgm_timer_expiration (
  * returns TRUE on success, returns FALSE on blocked send-in-receive operation.
  */
 
-gboolean
+bool
 pgm_timer_dispatch (
 	pgm_transport_t* const	transport
 	)
@@ -139,7 +141,7 @@ pgm_timer_dispatch (
 	if (transport->can_send_data)
 	{
 		pgm_mutex_lock (&transport->timer_mutex);
-		const guint spm_heartbeat_state = transport->spm_heartbeat_state;
+		const unsigned spm_heartbeat_state = transport->spm_heartbeat_state;
 		const pgm_time_t next_heartbeat_spm = transport->next_heartbeat_spm;
 		pgm_mutex_unlock (&transport->timer_mutex);
 
@@ -161,7 +163,7 @@ pgm_timer_dispatch (
 /* heartbeat timing is often high resolution so base times to last event */
 		if (spm_heartbeat_state && pgm_time_after_eq (now, next_heartbeat_spm))
 		{
-			guint new_heartbeat_state    = spm_heartbeat_state;
+			unsigned new_heartbeat_state    = spm_heartbeat_state;
 			pgm_time_t new_heartbeat_spm = next_heartbeat_spm;
 			do {
 				new_heartbeat_spm += transport->spm_heartbeat_interval[new_heartbeat_state++];

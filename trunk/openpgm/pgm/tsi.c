@@ -39,29 +39,31 @@
  * returns number of bytes written to buffer on success, returns -1 on
  * invalid parameters.
  */
+
 int
 pgm_tsi_print_r (
 	const pgm_tsi_t*	tsi,
 	char*			buf,
-	gsize			bufsize
+	size_t			bufsize
 	)
 {
 	pgm_return_val_if_fail (NULL != tsi, -1);
 	pgm_return_val_if_fail (NULL != buf, -1);
 	pgm_return_val_if_fail (bufsize > 0, -1);
 
-	const guint8* gsi = (const guint8*)tsi;
-	const guint16 source_port = tsi->sport;
+	const uint8_t* gsi = (const uint8_t*)tsi;
+	const uint16_t source_port = tsi->sport;
 
 	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i.%i",
-			 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], g_ntohs (source_port));
+			 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
 }
 
 /* transform TSI to ASCII string form.
  *
  * on success, returns pointer to ASCII string.  on error, returns NULL.
  */
-gchar*
+
+char*
 pgm_tsi_print (
 	const pgm_tsi_t*	tsi
 	)
@@ -78,18 +80,20 @@ pgm_tsi_print (
  * on success, returns a hash value corresponding to the TSI.  on error, fails
  * on assert.
  */
-guint
+
+pgm_hash_t
 pgm_tsi_hash (
-	gconstpointer v
+	const void*	 p
         )
 {
-/* pre-conditions */
-	pgm_assert (NULL != v);
+	const pgm_tsi_t* tsi = p;
 
-	const pgm_tsi_t* tsi = v;
+/* pre-conditions */
+	pgm_assert (NULL != p);
+
 	char buf[PGM_TSISTRLEN];
-	const int valid = pgm_tsi_print_r (tsi, buf, sizeof(buf));
-	pgm_assert (valid > 0);
+	const int tsilen = pgm_tsi_print_r (tsi, buf, sizeof(buf));
+	pgm_assert (tsilen > 0);
 	return pgm_str_hash (buf);
 }
 
@@ -97,17 +101,20 @@ pgm_tsi_hash (
  *
  * returns TRUE if they are equal, FALSE if they are not.
  */
-gboolean
+
+bool
 pgm_tsi_equal (
-	gconstpointer   v,
-	gconstpointer   v2
+	const void*	p1,
+	const void*	p2
         )
 {
-/* pre-conditions */
-	pgm_assert (v);
-	pgm_assert (v2);
+	const pgm_tsi_t *tsi1 = p1, *tsi2 = p2;
 
-	return memcmp (v, v2, sizeof(struct pgm_tsi_t)) == 0;
+/* pre-conditions */
+	pgm_assert (tsi1);
+	pgm_assert (tsi2);
+
+	return (memcmp (tsi1, tsi2, sizeof(struct pgm_tsi_t)) == 0);
 }
 
 /* eof */

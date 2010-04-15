@@ -25,7 +25,7 @@
 #include <ws2tcpip.h>
 
 
-gchar*
+char*
 pgm_wsastrerror (
 	const int	wsa_errno
 	)
@@ -320,7 +320,7 @@ pgm_wsastrerror (
 	}
 }
 
-gchar*
+char*
 pgm_adapter_strerror (
 	const int	adapter_errno
 	)

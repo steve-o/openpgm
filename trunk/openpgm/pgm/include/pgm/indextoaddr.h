@@ -22,6 +22,8 @@
 #ifndef __PGM_INDEXTOADDR_H__
 #define __PGM_INDEXTOADDR_H__
 
+#include <stdbool.h>
+
 #include <glib.h>
 
 #ifndef __PGM_ERROR_H__
@@ -31,7 +33,7 @@
 
 G_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL gboolean pgm_if_indextoaddr (unsigned int, int, unsigned, struct sockaddr*, pgm_error_t**);
+PGM_GNUC_INTERNAL bool pgm_if_indextoaddr (unsigned int, int, unsigned, struct sockaddr*, pgm_error_t**);
 
 G_END_DECLS
 

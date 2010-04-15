@@ -22,6 +22,9 @@
 #ifndef __PGM_GSI_H__
 #define __PGM_GSI_H__
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include <glib.h>
 
 #ifdef G_OS_UNIX
@@ -30,6 +33,8 @@
 #	include <arpa/inet.h>
 #endif
 
+typedef struct pgm_gsi_t pgm_gsi_t;
+
 #ifndef __PGM_ERROR_H__
 #	include <pgm/error.h>
 #endif
@@ -37,21 +42,19 @@
 
 #define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
 
-typedef struct pgm_gsi_t pgm_gsi_t;
-
 struct pgm_gsi_t {
-	guint8	identifier[6];
+	uint8_t	identifier[6];
 };
 
 G_BEGIN_DECLS
 
-gboolean pgm_gsi_create_from_hostname (pgm_gsi_t*, pgm_error_t**);
-gboolean pgm_gsi_create_from_addr (pgm_gsi_t*, pgm_error_t**);
-gboolean pgm_gsi_create_from_data (pgm_gsi_t*, const guchar*, const gsize);
-gboolean pgm_gsi_create_from_string (pgm_gsi_t*, const gchar*, gssize);
+bool pgm_gsi_create_from_hostname (pgm_gsi_t*, pgm_error_t**);
+bool pgm_gsi_create_from_addr (pgm_gsi_t*, pgm_error_t**);
+bool pgm_gsi_create_from_data (pgm_gsi_t*, const uint8_t*, const size_t);
+bool pgm_gsi_create_from_string (pgm_gsi_t*, const char*, ssize_t);
 int pgm_gsi_print_r (const pgm_gsi_t*, char*, gsize);
-gchar* pgm_gsi_print (const pgm_gsi_t*);
-gint pgm_gsi_equal (gconstpointer, gconstpointer);
+char* pgm_gsi_print (const pgm_gsi_t*);
+bool pgm_gsi_equal (const void* restrict, const void* restrict) G_GNUC_WARN_UNUSED_RESULT;
 
 
 G_END_DECLS

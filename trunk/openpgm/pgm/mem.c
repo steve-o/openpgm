@@ -20,6 +20,8 @@
  */
 
 #include <ctype.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,17 +37,26 @@
 
 /* globals */
 
-gboolean pgm_mem_gc_friendly = FALSE;
+bool pgm_mem_gc_friendly = FALSE;
 
-static volatile gint32 mem_ref_count = 0;
+
+/* locals */
+
+struct pgm_debug_key_t {
+	const char*	key;
+	unsigned	value;
+};
+typedef struct pgm_debug_key_t pgm_debug_key_t;
+
+static volatile int32_t mem_ref_count = 0;
 
 
 static
-gboolean
+bool
 debug_key_matches (
 	const char*		key,
 	const char*		token,
-	int			length
+	unsigned		length
 	)
 {
 	for (; length; length--, key++, token++)
@@ -59,14 +70,14 @@ debug_key_matches (
 }
 
 static
-int
+unsigned
 pgm_parse_debug_string (
 	const char*		string,
-	const GDebugKey*	keys,
+	const pgm_debug_key_t*	keys,
 	const unsigned		nkeys
 	)
 {
-	int result = 0;
+	unsigned result = 0;
 
 	if (NULL == string)
 		return result;
@@ -86,7 +97,7 @@ pgm_parse_debug_string (
 	else
 	{
 		while (string) {
-			char* q = strpbrk (string, ":;, \t");
+			const char* q = strpbrk (string, ":;, \t");
 			if (!q)
 				q = string + strlen (string);
 			for (unsigned i = 0; i < nkeys; i++)
@@ -103,7 +114,7 @@ pgm_parse_debug_string (
 void
 pgm_mem_init (void)
 {
-	static const GDebugKey keys[] = {
+	static const pgm_debug_key_t keys[] = {
 		{ "gc-friendly", 1 },
 	};
 
@@ -111,7 +122,7 @@ pgm_mem_init (void)
 		return;
 
 	const char *val = getenv ("PGM_DEBUG");
-	const int flags = !val ? 0 : pgm_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
+	const unsigned flags = !val ? 0 : pgm_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
 	if (flags & 1)
 		pgm_mem_gc_friendly = TRUE;
 }
@@ -127,35 +138,72 @@ pgm_mem_shutdown (void)
 	/* nop */
 }
 
-gpointer
+/* malloc wrappers to hard fail */
+void*
 pgm_malloc (
-	gulong		n_bytes
+	size_t		n_bytes
 	)
 {
 	if (G_LIKELY (n_bytes))
 	{
-		gpointer mem = malloc (n_bytes);
+		void* mem = malloc (n_bytes);
 		if (mem)
 			return mem;
 
-		pgm_fatal ("%s: failed to allocate %lu bytes", G_STRLOC, n_bytes);
+		pgm_fatal ("%s: failed to allocate %zu bytes",
+			G_STRLOC, n_bytes);
 		abort ();
 	}
 	return NULL;
 }
 
-gpointer
+#define SIZE_OVERFLOWS(a,b) (G_UNLIKELY ((a) > SIZE_MAX / (b)))
+
+void*
+pgm_malloc_n (
+	size_t		n_blocks,
+	size_t		block_bytes
+	)
+{
+	if (SIZE_OVERFLOWS (n_blocks, block_bytes)) {
+		pgm_fatal ("%s: overflow allocating %zu*%zu bytes",
+			G_STRLOC, n_blocks, block_bytes);
+	}
+	return pgm_malloc (n_blocks * block_bytes);
+}
+
+void*
 pgm_malloc0 (
-	gulong		n_bytes
+	size_t		n_bytes
 	)
 {
 	if (G_LIKELY (n_bytes))
 	{
-		gpointer mem = calloc (1, n_bytes);
+		void* mem = calloc (1, n_bytes);
 		if (mem)
 			return mem;
 
-		pgm_fatal ("%s: failed to allocate %lu bytes", G_STRLOC, n_bytes);
+		pgm_fatal ("%s: failed to allocate %zu bytes",
+			G_STRLOC, n_bytes);
+		abort ();
+	}
+	return NULL;
+}
+
+void*
+pgm_malloc0_n (
+	size_t		n_blocks,
+	size_t		block_bytes
+	)
+{
+	if (G_LIKELY (n_blocks && block_bytes))
+	{
+		void* mem = calloc (n_blocks, block_bytes);
+		if (mem)
+			return mem;
+
+		pgm_fatal ("%s: failed to allocate %zu*%zu bytes",
+			G_STRLOC, n_blocks, block_bytes);
 		abort ();
 	}
 	return NULL;

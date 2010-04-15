@@ -28,7 +28,7 @@
 
 
 
-static const guint g_primes[] =
+static const unsigned g_primes[] =
 {
 	11,
 	19,
@@ -66,8 +66,8 @@ static const guint g_primes[] =
 	13845163,
 };
 
-guint
-pgm_spaced_primes_closest (guint num)
+unsigned
+pgm_spaced_primes_closest (unsigned num)
 {
 	for (unsigned i = 0; i < G_N_ELEMENTS(g_primes); i++)
 		if (g_primes[i] > num)

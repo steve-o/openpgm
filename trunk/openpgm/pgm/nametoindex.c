@@ -42,7 +42,7 @@
  * On error returns zero, no errors are defined.
  */
 
-int
+int						/* type matching if_nametoindex() */
 pgm_compat_if_nametoindex (
 	const int		iffamily,
 	const char*		ifname

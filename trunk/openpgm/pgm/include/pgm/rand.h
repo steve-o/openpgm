@@ -22,10 +22,11 @@
 #ifndef __PGM_RAND_H__
 #define __PGM_RAND_H__
 
+#include <stdint.h>
 #include <glib.h>
 
 struct pgm_rand_t {
-	guint32		seed;
+	uint32_t	seed;
 };
 
 typedef struct pgm_rand_t pgm_rand_t;
@@ -34,10 +35,10 @@ typedef struct pgm_rand_t pgm_rand_t;
 G_BEGIN_DECLS
 
 void pgm_rand_create (pgm_rand_t*);
-guint32 pgm_rand_int (pgm_rand_t*);
-gint32 pgm_rand_int_range (pgm_rand_t*, gint32, gint32);
-guint32 pgm_random_int (void);
-gint32 pgm_random_int_range (gint32, gint32);
+uint32_t pgm_rand_int (pgm_rand_t*);
+int32_t pgm_rand_int_range (pgm_rand_t*, int32_t, int32_t);
+uint32_t pgm_random_int (void);
+int32_t pgm_random_int_range (int32_t, int32_t);
 
 void pgm_rand_init (void);
 void pgm_rand_shutdown (void);

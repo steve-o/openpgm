@@ -117,11 +117,11 @@ pgm_if_print_all (void)
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
+		const unsigned int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
 		char rname[IF_NAMESIZE * 2 + 3];
 		char b[IF_NAMESIZE * 2 + 3];
 
-		if_indextoname(i, rname);
+		if_indextoname (i, rname);
 		sprintf (b, "%s (%s)",
 			ifa->ifa_name ? ifa->ifa_name : "(null)", rname);
 
@@ -163,7 +163,7 @@ pgm_if_print_all (void)
 }
 
 static inline
-gboolean
+bool
 is_in_net (
 	const struct in_addr*	addr,		/* host byte order */
 	const struct in_addr*	netaddr,
@@ -191,7 +191,7 @@ is_in_net (
 }
 
 static
-gboolean
+bool
 is_in_net6 (
 	const struct in6_addr*	addr,
 	const struct in6_addr*	netaddr,
@@ -239,7 +239,7 @@ is_in_net6 (
  */
 
 static
-gboolean
+bool
 parse_interface (
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		ifname,			/* NULL terminated */
@@ -247,15 +247,15 @@ parse_interface (
 	pgm_error_t**		error
 	)
 {
-	gboolean check_inet_network = FALSE, check_inet6_network = FALSE;
-	gboolean check_addr = FALSE;
-	gboolean check_ifname = FALSE;
+	bool check_inet_network = FALSE, check_inet6_network = FALSE;
+	bool check_addr = FALSE;
+	bool check_ifname = FALSE;
 	char literal[1024];
 	struct in_addr in_addr;
 	struct in6_addr in6_addr;
 	struct pgm_ifaddrs *ifap, *ifa;
 	struct sockaddr_storage addr;
-	guint interface_matches = 0;
+	unsigned interface_matches = 0;
 
 /* pre-conditions */
 	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
@@ -272,7 +272,7 @@ parse_interface (
 	if (AF_INET != family &&
 	    '[' == ifname[0])
 	{
-		const int ifnamelen = strlen(ifname);
+		const size_t ifnamelen = strlen(ifname);
 		if (']' == ifname[ ifnamelen - 1 ]) {
 			strncpy (literal, ifname + 1, ifnamelen - 2);
 			literal[ ifnamelen - 2 ] = 0;
@@ -628,7 +628,7 @@ parse_interface (
  */
 
 static
-gboolean
+bool
 parse_group (
 	const int		family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		group,		/* NULL terminated */
@@ -651,7 +651,7 @@ parse_group (
 	if (AF_INET != family &&
 	    '[' == group[0])
 	{
-		const int grouplen = strlen(group);
+		const size_t grouplen = strlen(group);
 		if (']' == group[ grouplen - 1 ]) {
 			char literal[1024];
 			strncpy (literal, group + 1, grouplen - 2);
@@ -809,7 +809,7 @@ parse_group (
  */
 
 static
-gboolean
+bool
 parse_interface_entity (
 	int			family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,	/* NULL terminated */
@@ -842,7 +842,7 @@ parse_interface_entity (
 	}
 
 /* check interface name length limit */
-	gchar** tokens = pgm_strsplit (entity, ",", 10);
+	char** tokens = pgm_strsplit (entity, ",", 10);
 	int j = 0;
 	while (tokens && tokens[j])
 	{
@@ -896,7 +896,7 @@ parse_interface_entity (
  */
 
 static
-gboolean
+bool
 parse_receive_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,		/* NULL terminated */
@@ -1032,7 +1032,7 @@ parse_receive_entity (
  */
 
 	int j = 0;	
-	gchar** tokens = pgm_strsplit (entity, ",", 10);
+	char** tokens = pgm_strsplit (entity, ",", 10);
 	while (tokens && tokens[j])
 	{
 /* default receive object */
@@ -1097,7 +1097,7 @@ parse_receive_entity (
 }
 
 static
-gboolean
+bool
 parse_send_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*		entity,		/* null = empty entity */
@@ -1213,7 +1213,7 @@ parse_send_entity (
 			)
 
 static inline
-gboolean
+bool
 is_network_char (
 	const int		family,
 	const char		c
@@ -1229,7 +1229,7 @@ is_network_char (
 }
 
 static
-gboolean
+bool
 network_parse (
 	const char*		network,		/* NULL terminated */
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
@@ -1238,7 +1238,7 @@ network_parse (
 	pgm_error_t**		error
 	)
 {
-	gboolean retval = FALSE;
+	bool retval = FALSE;
 	const char *p = network;
 	const char *e = p + strlen(network);
 	enum { ENTITY_INTERFACE, ENTITY_RECEIVE, ENTITY_SEND, ENTITY_ERROR } ec = ENTITY_INTERFACE;
@@ -1475,7 +1475,7 @@ free_lists:
  * returns TRUE on success, returns FALSE on error and sets error appropriately.
  */
 
-gboolean
+bool
 pgm_if_get_transport_info (
 	const char*					network,
 	const struct pgm_transport_info_t* const	hints,
@@ -1496,20 +1496,20 @@ pgm_if_get_transport_info (
 		pgm_debug ("get_transport_info (network:%s%s%s hints: {family:%s} res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 			pgm_family_string (family),
-			(gpointer)res,
-			(gpointer)error);
+			(const void*)res,
+			(const void*)error);
 	} else {
 		pgm_debug ("get_transport_info (network:%s%s%s hints:%p res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
-			(gpointer)hints,
-			(gpointer)res,
-			(gpointer)error);
+			(const void*)hints,
+			(const void*)res,
+			(const void*)error);
 	}
 
 	if (!network_parse (network, family, &recv_list, &send_list, error))
 		return FALSE;
-	const int recv_list_len = pgm_list_length (recv_list);
-	const int send_list_len = pgm_list_length (send_list);
+	const size_t recv_list_len = pgm_list_length (recv_list);
+	const size_t send_list_len = pgm_list_length (send_list);
 	ti = pgm_malloc0 (sizeof(struct pgm_transport_info_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
 	ti->ti_recv_addrs_len = recv_list_len;
@@ -1519,7 +1519,7 @@ pgm_if_get_transport_info (
 	ti->ti_dport = DEFAULT_DATA_DESTINATION_PORT;
 	ti->ti_sport = DEFAULT_DATA_SOURCE_PORT;
 			
-	gsize i = 0;
+	size_t i = 0;
 	while (recv_list) {
 		memcpy (&ti->ti_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
 		pgm_free (recv_list->data);

@@ -21,6 +21,7 @@
 
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -52,14 +53,14 @@ static const char log_levels[8][6] = {
 	"Fatal"
 };
 
-static volatile gint32 messages_ref_count = 0;
+static volatile int32_t messages_ref_count = 0;
 static pgm_mutex_t messages_mutex;
 static pgm_log_func_t log_handler = NULL;
-static gpointer log_handler_closure = NULL;
+static void* log_handler_closure = NULL;
 
 
 static inline
-const gchar*
+const char*
 log_level_text (
 	const int	log_level
 	)
@@ -106,7 +107,7 @@ pgm_messages_shutdown (void)
 pgm_log_func_t
 pgm_log_set_handler (
 	pgm_log_func_t		handler,
-	gpointer		closure
+	void*			closure
 	)
 {
 	pgm_mutex_lock (&messages_mutex);
@@ -117,8 +118,8 @@ pgm_log_set_handler (
 
 void
 pgm__log (
-	const gint		log_level,
-	const gchar*		format,
+	const int		log_level,
+	const char*		format,
 	...
 	)
 {
@@ -131,16 +132,15 @@ pgm__log (
 
 void
 pgm__logv (
-	const gint		log_level,
-	const gchar*		format,
+	const int		log_level,
+	const char*		format,
 	va_list			args
 	)
 {
 	char tbuf[ 1024 ];
-	int offset;
 
 	pgm_mutex_lock (&messages_mutex);
-	offset = sprintf (tbuf, "%s: ", log_level_text (log_level));
+	const int offset = sprintf (tbuf, "%s: ", log_level_text (log_level));
 	vsnprintf (tbuf+offset, sizeof(tbuf)-offset, format, args);
 	tbuf[ sizeof(tbuf) ] = '\0';
 	if (log_handler)

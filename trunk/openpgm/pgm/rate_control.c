@@ -33,26 +33,7 @@
 #include "pgm/mem.h"
 #include "pgm/time.h"
 #include "pgm/thread.h"
-
-
-struct rate_t {
-	gint		rate_per_sec;
-	gint		rate_per_msec;
-	guint		iphdr_len;
-
-	gint		rate_limit;		/* signed for math */
-	pgm_time_t	last_rate_check;
-	pgm_spinlock_t	spinlock;
-};
-
-typedef struct rate_t rate_t;
-
-/* globals */
-
-PGM_GNUC_INTERNAL void pgm_rate_create (rate_t**, const guint, const guint, const guint);
-PGM_GNUC_INTERNAL void pgm_rate_destroy (rate_t*);
-PGM_GNUC_INTERNAL gboolean pgm_rate_check (rate_t*, const guint, const int);
-PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (rate_t*, const gsize);
+#include "pgm/rate_control.h"
 
 
 /* create machinery for rate regulation.
@@ -61,18 +42,17 @@ PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (rate_t*, const gsize);
 
 void
 pgm_rate_create (
-	rate_t**		bucket_,
-	const guint		rate_per_sec,		/* 0 = disable */
-	const guint		iphdr_len,
-	const guint		max_tpdu
+	pgm_rate_t*		bucket,
+	const ssize_t		rate_per_sec,		/* 0 = disable */
+	const size_t		iphdr_len,
+	const uint16_t		max_tpdu
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != bucket_);
+	pgm_assert (NULL != bucket);
 	pgm_assert (rate_per_sec >= max_tpdu);
 
-	rate_t* bucket = pgm_malloc0 (sizeof(rate_t));
-	bucket->rate_per_sec	= (gint)rate_per_sec;
+	bucket->rate_per_sec	= rate_per_sec;
 	bucket->iphdr_len	= iphdr_len;
 	bucket->last_rate_check	= pgm_time_update_now ();
 /* pre-fill bucket */
@@ -83,19 +63,17 @@ pgm_rate_create (
 		bucket->rate_limit	= bucket->rate_per_sec;
 	}
 	pgm_spinlock_init (&bucket->spinlock);
-	*bucket_ = bucket;
 }
 
 void
 pgm_rate_destroy (
-	rate_t*			bucket
+	pgm_rate_t*		bucket
 	)
 {
 /* pre-conditions */
 	pgm_assert (NULL != bucket);
 
 	pgm_spinlock_free (&bucket->spinlock);
-	pgm_free (bucket);
 }
 
 /* check bit bucket whether an operation can proceed or should wait.
@@ -104,14 +82,14 @@ pgm_rate_destroy (
  * returns FALSE if operation should block and non-blocking flag is set.
  */
 
-gboolean
+bool
 pgm_rate_check (
-	rate_t*			bucket,
-	const guint		data_size,
-	const gboolean		is_nonblocking
+	pgm_rate_t*		bucket,
+	const size_t		data_size,
+	const bool		is_nonblocking
 	)
 {
-	gint new_rate_limit;
+	int new_rate_limit;
 
 /* pre-conditions */
 	pgm_assert (NULL != bucket);
@@ -154,7 +132,7 @@ pgm_rate_check (
 	bucket->rate_limit = new_rate_limit;
 	bucket->last_rate_check = now;
 	if (bucket->rate_limit < 0) {
-		gint sleep_amount;
+		int sleep_amount;
 		do {
 #ifdef G_OS_UNIX
                         pthread_yield ();
@@ -174,21 +152,22 @@ pgm_rate_check (
 
 pgm_time_t
 pgm_rate_remaining (
-	rate_t*			bucket,
-	const gsize		packetlen
+	pgm_rate_t*		bucket,
+	const size_t		n
 	)
 {
 /* pre-conditions */
 	pgm_assert (NULL != bucket);
 
-	if (0 == bucket->rate_per_sec)
+	if (G_UNLIKELY(0 == bucket->rate_per_sec))
 		return 0;
 
 	pgm_spinlock_lock (&bucket->spinlock);
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
-	const gint bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - packetlen;
+	const int bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
 	pgm_spinlock_unlock (&bucket->spinlock);
+
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
 }
 

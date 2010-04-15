@@ -56,15 +56,15 @@
  * errno set appropriately.
  */
 
-gssize
+ssize_t
 pgm_sendto (
 	pgm_transport_t*	transport,
-	gboolean		use_rate_limit,
-	gboolean		use_router_alert,
+	bool			use_rate_limit,
+	bool			use_router_alert,
 	const void*		buf,
-	gsize			len,
+	size_t			len,
 	const struct sockaddr*	to,
-	gsize			tolen
+	size_t			tolen
 	)
 {
 	pgm_assert( transport );
@@ -87,14 +87,13 @@ pgm_sendto (
 		tolen);
 #endif
 
-	int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
+	const int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
-	if (use_rate_limit &&
-	    transport->rate_control && 
-	    !pgm_rate_check (transport->rate_control, len, transport->is_nonblocking))
+	if (use_rate_limit && 
+	    !pgm_rate_check (&transport->rate_control, len, transport->is_nonblocking))
 	{
 		errno = ENOBUFS;
-		return (const gssize)-1;
+		return (const ssize_t)-1;
 	}
 
 	if (!use_router_alert && transport->can_send_data)

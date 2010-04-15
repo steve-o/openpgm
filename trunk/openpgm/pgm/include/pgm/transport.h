@@ -31,58 +31,72 @@
 
 #include <glib.h>
 
+typedef struct pgm_sqn_list_t pgm_sqn_list_t;
+typedef struct pgm_peer_t pgm_peer_t;
+typedef struct pgm_transport_t pgm_transport_t;
+
 #ifndef __PGM_GSI_H__
-#   include <pgm/gsi.h>
+#	 include <pgm/gsi.h>
 #endif
 
 #ifndef __PGM_TSI_H__
-#   include <pgm/tsi.h>
+#	 include <pgm/tsi.h>
 #endif
 
-typedef struct pgm_transport_t pgm_transport_t;
-
 #ifndef __PGM_ERROR_H__
-#   include <pgm/error.h>
+#	 include <pgm/error.h>
 #endif
 
 #ifndef __PGM_LIST_H__
-#   include <pgm/list.h>
+#	 include <pgm/list.h>
 #endif
 
 #ifndef __PGM_SLIST_H__
-#   include <pgm/slist.h>
+#	 include <pgm/slist.h>
 #endif
 
 #ifndef __PGM_HASHTABLE_H__
-#   include <pgm/hashtable.h>
+#	 include <pgm/hashtable.h>
 #endif
 
 #ifndef __PGM_THREAD_H__
-#   include <pgm/thread.h>
+#	 include <pgm/thread.h>
 #endif
 
 #ifndef __PGM_IF_H__
-#   include <pgm/if.h>
+#	 include <pgm/if.h>
 #endif
 
 #ifndef __PGM_SOCKADDR_H__
-#   include <pgm/sockaddr.h>
+#	 include <pgm/sockaddr.h>
 #endif
 
 #ifndef __PGM_TIME_H__
-#   include <pgm/time.h>
+#	 include <pgm/time.h>
 #endif
 
 #ifndef __PGM_RAND_H__
-#   include <pgm/rand.h>
+#	 include <pgm/rand.h>
 #endif
 
 #ifndef __PGM_NOTIFY_H__
-#   include <pgm/notify.h>
+#	 include <pgm/notify.h>
 #endif
 
 #ifndef __PGM_SKBUFF_H__
-#   include <pgm/skbuff.h>
+#	 include <pgm/skbuff.h>
+#endif
+
+#ifndef __PGM_RXW_H__
+#	include <pgm/rxw.h>
+#endif
+
+#ifndef __PGM_TXW_H__
+#	include <pgm/txw.h>
+#endif
+
+#ifndef __PGM_RATE_CONTROL_H__
+#	include <pgm/rate_control.h>
 #endif
 
 
@@ -196,14 +210,12 @@ enum {
 
 
 struct pgm_sqn_list_t {
-	guint			len;
-	guint32			sqn[63];	/* list of sequence numbers */
+	uint8_t			len;
+	uint32_t		sqn[63];	/* list of sequence numbers */
 };
 
-typedef struct pgm_sqn_list_t pgm_sqn_list_t;
-
 struct pgm_peer_t {
-	volatile gint32		ref_count;		    /* atomic integer */
+	volatile int32_t	ref_count;		    /* atomic integer */
 
 	pgm_tsi_t		tsi;
 	struct sockaddr_storage	group_nla;
@@ -214,7 +226,7 @@ struct pgm_peer_t {
 	pgm_time_t		spmr_expiry;
 	pgm_time_t		spmr_tstamp;
 
-	gpointer            	window;			/* pgm_rxw_t */
+	pgm_rxw_t*            	window;
 	pgm_transport_t*    	transport;
 	pgm_list_t		peers_link;
 	pgm_slist_t		pending_link;
@@ -223,30 +235,28 @@ struct pgm_peer_t {
 	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
 	unsigned		has_ondemand_parity:1;
 
-	guint32			spm_sqn;
+	uint32_t		spm_sqn;
 	pgm_time_t		expiry;
 
-	guint32			last_poll_sqn;
-	guint16			last_poll_round;
+	uint32_t		last_poll_sqn;
+	uint16_t		last_poll_round;
 	pgm_time_t		last_packet;
-	guint			last_commit;
-	guint32			lost_count;
-	guint32			last_cumulative_losses;
-	guint32			cumulative_stats[PGM_PC_RECEIVER_MAX];
-	guint32			snap_stats[PGM_PC_RECEIVER_MAX];
+	unsigned		last_commit;
+	uint32_t		lost_count;
+	uint32_t		last_cumulative_losses;
+	volatile uint32_t	cumulative_stats[PGM_PC_RECEIVER_MAX];
+	uint32_t		snap_stats[PGM_PC_RECEIVER_MAX];
 
-	guint32			min_fail_time;
-	guint32			max_fail_time;
+	uint32_t		min_fail_time;
+	uint32_t		max_fail_time;
 };
-
-typedef struct pgm_peer_t pgm_peer_t;
 
 struct pgm_transport_t {
 	pgm_tsi_t           	tsi;
-	guint16			dport;
-	guint16			udp_encap_ucast_port;
-	guint16			udp_encap_mcast_port;
-	guint32			rand_node_id;			/* node identifier */
+	uint16_t		dport;
+	uint16_t		udp_encap_ucast_port;
+	uint16_t		udp_encap_mcast_port;
+	uint32_t		rand_node_id;			/* node identifier */
 
 	pgm_rwlock_t		lock;				/* running / destroyed */
 	pgm_mutex_t		receiver_mutex;			/* receiver API */
@@ -255,80 +265,84 @@ struct pgm_transport_t {
 	pgm_mutex_t		send_mutex;			/* non-router alert socket */
 	pgm_mutex_t		timer_mutex;			/* next timer expiration */
 
-	gboolean		is_bound;
-	gboolean		is_destroyed;
-	gboolean            	is_reset;
-	gboolean		is_abort_on_reset;
+	bool			is_bound;
+	bool			is_destroyed;
+	bool	            	is_reset;
+	bool			is_abort_on_reset;
 
-	gboolean		can_send_data;			/* and SPMs */
-	gboolean		can_send_nak;			/* muted receiver */
-	gboolean		can_recv_data;			/* send-only */
-	gboolean		is_edge_triggered_recv;
-	gboolean		is_nonblocking;
+	bool			can_send_data;			/* and SPMs */
+	bool			can_send_nak;			/* muted receiver */
+	bool			can_recv_data;			/* send-only */
+	bool			is_edge_triggered_recv;
+	bool			is_nonblocking;
 
 	struct group_source_req send_gsr;			/* multicast */
 	struct sockaddr_storage send_addr;			/* unicast nla */
 	int			send_sock;
 	int			send_with_router_alert_sock;
 	struct group_source_req recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
-	guint			recv_gsr_len;
+	unsigned		recv_gsr_len;
 	int			recv_sock;
 
-	guint			max_apdu;
-	guint16			max_tpdu;
-	guint16			max_tsdu;		    /* excluding optional varpkt_len word */
-	guint16			max_tsdu_fragment;
-	gsize			iphdr_len;
-	gboolean		use_multicast_loop;    	    /* and reuseaddr for UDP encapsulation */
-	guint			hops;
-	guint			txw_sqns, txw_secs, txw_max_rte;
-	guint			rxw_sqns, rxw_secs, rxw_max_rte;
-	int			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
+	size_t			max_apdu;
+	uint16_t		max_tpdu;
+	uint16_t		max_tsdu;		    /* excluding optional varpkt_len word */
+	uint16_t		max_tsdu_fragment;
+	size_t			iphdr_len;
+	bool			use_multicast_loop;    	    /* and reuseaddr for UDP encapsulation */
+	unsigned		hops;
+	unsigned		txw_sqns, txw_secs;
+	unsigned		rxw_sqns, rxw_secs;
+	ssize_t			txw_max_rte, rxw_max_rte;
+	size_t			sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
-	gpointer       	     	window;		   	    /* pgm_txw_t */
-	gpointer		rate_control;		    /* rate_t */
+	pgm_txw_t*     	     	window;
+	pgm_rate_t		rate_control;
+	bool			is_controlled_spm;
+	bool			is_controlled_odata;
+	bool			is_controlled_rdata;
 
 	pgm_notify_t		rdata_notify;
 
-	guint			last_commit;
-	gsize			blocklen;		    /* length of buffer blocked */
-	gboolean		is_apdu_eagain;		    /* writer-lock on window_lock exists
+	unsigned		last_commit;
+	size_t			blocklen;		    /* length of buffer blocked */
+	bool			is_apdu_eagain;		    /* writer-lock on window_lock exists
 							       as send would block */
-	gboolean		is_spm_eagain;		    /* writer-lock in receiver */
+	bool			is_spm_eagain;		    /* writer-lock in receiver */
 
 	struct {
-		guint		    data_pkt_offset;
-		gsize		    data_bytes_offset;
-		guint32		    first_sqn;
+		size_t		    data_pkt_offset;
+		size_t		    data_bytes_offset;
+		uint32_t	    first_sqn;
 		struct pgm_sk_buff_t* skb;			/* references external buffer */
-		gsize		    tsdu_length;
-		guint32		    unfolded_odata;
-		gsize		    apdu_length;
-		guint		    vector_index;
-		gsize		    vector_offset;
-		gboolean	    is_rate_limited;
+		size_t		    tsdu_length;
+		uint32_t	    unfolded_odata;
+		size_t		    apdu_length;
+		unsigned	    vector_index;
+		size_t		    vector_offset;
+		bool		    is_rate_limited;
 	} pkt_dontwait_state;
 
-	guint32			spm_sqn;
-	guint			spm_ambient_interval;	    /* microseconds */
-	guint*			spm_heartbeat_interval;     /* zero terminated, zero lead-pad */
-	guint			spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
-	guint			spm_heartbeat_len;
-	guint			peer_expiry;		    /* from absence of SPMs */
-	guint			spmr_expiry;		    /* waiting for peer SPMRs */
+	uint32_t		spm_sqn;
+	unsigned		spm_ambient_interval;	    /* microseconds */
+	unsigned*		spm_heartbeat_interval;     /* zero terminated, zero lead-pad */
+	unsigned		spm_heartbeat_state;	    /* indexof spm_heartbeat_interval */
+	unsigned		spm_heartbeat_len;
+	unsigned		peer_expiry;		    /* from absence of SPMs */
+	unsigned		spmr_expiry;		    /* waiting for peer SPMRs */
 
 	pgm_rand_t		rand_;			    /* for calculating nak_rb_ivl from nak_bo_ivl */
-	guint			nak_data_retries, nak_ncf_retries;
+	unsigned		nak_data_retries, nak_ncf_retries;
 	pgm_time_t		nak_bo_ivl, nak_rpt_ivl, nak_rdata_ivl;
 	pgm_time_t		next_heartbeat_spm, next_ambient_spm;
 
-	gboolean		use_proactive_parity;
-	gboolean		use_ondemand_parity;
-	gboolean		use_varpkt_len;
-	guint			rs_n;
-	guint			rs_k;
-	guint			rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
-	guint			tg_sqn_shift;
+	bool			use_proactive_parity;
+	bool			use_ondemand_parity;
+	bool			use_varpkt_len;
+	uint8_t			rs_n;
+	uint8_t			rs_k;
+	uint8_t			rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */
+	uint8_t			tg_sqn_shift;
 	struct pgm_sk_buff_t* 	rx_buffer;
 
 	pgm_rwlock_t		peers_lock;
@@ -336,11 +350,11 @@ struct pgm_transport_t {
 	pgm_list_t*		peers_list;		    /* easy iteration */
 	pgm_slist_t*		peers_pending;		    /* rxw: have or lost data */
 	pgm_notify_t		pending_notify;		    /* timer to rx */
-	gboolean		is_pending_read;
+	bool			is_pending_read;
 	pgm_time_t		next_poll;
 
-	guint32			cumulative_stats[PGM_PC_SOURCE_MAX];
-	guint32			snap_stats[PGM_PC_SOURCE_MAX];
+	uint32_t		cumulative_stats[PGM_PC_SOURCE_MAX];
+	uint32_t		snap_stats[PGM_PC_SOURCE_MAX];
 	pgm_time_t		snap_time;
 };
 
@@ -352,33 +366,33 @@ extern pgm_slist_t* pgm_transport_list;
 
 G_BEGIN_DECLS
 
-gboolean pgm_init (pgm_error_t**);
-gboolean pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_shutdown (void);
+bool pgm_init (pgm_error_t**);
+bool pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
+bool pgm_shutdown (void);
 
 void pgm_drop_superuser (void);
 
-gboolean pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_transport_bind (pgm_transport_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_transport_destroy (pgm_transport_t*, gboolean);
-gboolean pgm_transport_set_max_tpdu (pgm_transport_t* const, const guint16);
-gboolean pgm_transport_set_multicast_loop (pgm_transport_t* const, const gboolean);
-gboolean pgm_transport_set_hops (pgm_transport_t* const, const gint);
-gboolean pgm_transport_set_sndbuf (pgm_transport_t* const, const int);
-gboolean pgm_transport_set_rcvbuf (pgm_transport_t* const, const int);
-gboolean pgm_transport_set_fec (pgm_transport_t* const, const guint, const gboolean, const gboolean, const guint, const guint);
-gboolean pgm_transport_set_send_only (pgm_transport_t* const, const gboolean);
-gboolean pgm_transport_set_recv_only (pgm_transport_t* const, const gboolean, const gboolean);
-gboolean pgm_transport_set_abort_on_reset (pgm_transport_t* const, const gboolean);
-gboolean pgm_transport_set_nonblocking (pgm_transport_t* const, const gboolean);
+bool pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+bool pgm_transport_bind (pgm_transport_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+bool pgm_transport_destroy (pgm_transport_t*, bool);
+bool pgm_transport_set_max_tpdu (pgm_transport_t* const, const uint16_t);
+bool pgm_transport_set_multicast_loop (pgm_transport_t* const, const bool);
+bool pgm_transport_set_hops (pgm_transport_t* const, const unsigned);
+bool pgm_transport_set_sndbuf (pgm_transport_t* const, const size_t);
+bool pgm_transport_set_rcvbuf (pgm_transport_t* const, const size_t);
+bool pgm_transport_set_fec (pgm_transport_t* const, const uint8_t, const bool, const bool, const uint8_t, const uint8_t);
+bool pgm_transport_set_send_only (pgm_transport_t* const, const bool);
+bool pgm_transport_set_recv_only (pgm_transport_t* const, const bool, const bool);
+bool pgm_transport_set_abort_on_reset (pgm_transport_t* const, const bool);
+bool pgm_transport_set_nonblocking (pgm_transport_t* const, const bool);
 
-gsize pgm_transport_pkt_offset (gboolean) G_GNUC_WARN_UNUSED_RESULT;
-static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
+size_t pgm_transport_pkt_offset (bool) G_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_transport_max_tsdu (pgm_transport_t* transport, bool can_fragment)
 {
-    gsize max_tsdu = can_fragment ? transport->max_tsdu_fragment : transport->max_tsdu;
-    if (transport->use_varpkt_len)
-	max_tsdu -= sizeof (guint16);
-    return max_tsdu;
+	size_t max_tsdu = can_fragment ? transport->max_tsdu_fragment : transport->max_tsdu;
+	if (transport->use_varpkt_len)
+		max_tsdu -= sizeof (guint16);
+	return max_tsdu;
 }
 
 static inline int pgm_transport_get_recv_fd (pgm_transport_t* transport)
@@ -398,8 +412,8 @@ static inline int pgm_transport_get_send_fd (pgm_transport_t* transport)
 	return transport->send_sock;
 }
 
-gboolean pgm_transport_get_timer_pending (pgm_transport_t* const, struct timeval* const);
-gboolean pgm_transport_get_rate_remaining (pgm_transport_t* const, struct timeval* const);
+bool pgm_transport_get_timer_pending (pgm_transport_t* const, struct timeval* const);
+bool pgm_transport_get_rate_remaining (pgm_transport_t* const, struct timeval* const);
 int pgm_transport_select_info (pgm_transport_t* const, fd_set* const, fd_set* const, int* const);
 #ifdef CONFIG_HAVE_POLL
 int pgm_transport_poll_info (pgm_transport_t* const, struct pollfd* const, int* const, const int);
@@ -408,13 +422,13 @@ int pgm_transport_poll_info (pgm_transport_t* const, struct pollfd* const, int* 
 int pgm_transport_epoll_ctl (pgm_transport_t* const, const int, const int, const int);
 #endif
 
-int pgm_transport_join_group (pgm_transport_t*, struct group_req*, gsize);
-int pgm_transport_leave_group (pgm_transport_t*, struct group_req*, gsize);
-int pgm_transport_block_source (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_unblock_source (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_join_source_group (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_leave_source_group (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_msfilter (pgm_transport_t*, struct group_filter*, gsize);
+bool pgm_transport_join_group (pgm_transport_t*, struct group_req*, socklen_t);
+bool pgm_transport_leave_group (pgm_transport_t*, struct group_req*, socklen_t);
+bool pgm_transport_block_source (pgm_transport_t*, struct group_source_req*, socklen_t);
+bool pgm_transport_unblock_source (pgm_transport_t*, struct group_source_req*, socklen_t);
+bool pgm_transport_join_source_group (pgm_transport_t*, struct group_source_req*, socklen_t);
+bool pgm_transport_leave_source_group (pgm_transport_t*, struct group_source_req*, socklen_t);
+bool pgm_transport_msfilter (pgm_transport_t*, struct group_filter*, socklen_t);
 
 G_END_DECLS
 

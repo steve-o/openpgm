@@ -69,10 +69,10 @@
 #include "pgm/ip.h"
 #include "pgm/packet.h"
 #include "pgm/net.h"
-#include "pgm/txwi.h"
-#include "pgm/sourcep.h"
-#include "pgm/rxwi.h"
-#include "pgm/receiverp.h"
+#include "pgm/txw.h"
+#include "pgm/source.h"
+#include "pgm/rxw.h"
+#include "pgm/receiver.h"
 #include "pgm/rate_control.h"
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
@@ -96,9 +96,9 @@ pgm_rwlock_t pgm_transport_list_lock;		/* list of all transports for admin inter
 pgm_slist_t* pgm_transport_list = NULL;
 
 
-gsize
+size_t
 pgm_transport_pkt_offset (
-	gboolean		can_fragment
+	bool		can_fragment
 	)
 {
 	return can_fragment ? ( sizeof(struct pgm_header)
@@ -125,10 +125,10 @@ pgm_transport_pkt_offset (
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_destroy (
 	pgm_transport_t*	transport,
-	gboolean		flush
+	bool			flush
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -136,7 +136,7 @@ pgm_transport_destroy (
 		pgm_return_val_if_reached (FALSE);
 	pgm_return_val_if_fail (!transport->is_destroyed, FALSE);
 	pgm_debug ("pgm_transport_destroy (transport:%p flush:%s)",
-		(gpointer)transport,
+		(const void*)transport,
 		flush ? "TRUE":"FALSE");
 /* flag existing calls */
 	transport->is_destroyed = TRUE;
@@ -202,11 +202,8 @@ pgm_transport_destroy (
 		pgm_txw_shutdown (transport->window);
 		transport->window = NULL;
 	}
-	if (transport->rate_control) {
-		pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Destroying rate control."));
-		pgm_rate_destroy (transport->rate_control);
-		transport->rate_control = NULL;
-	}
+	pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Destroying rate control."));
+	pgm_rate_destroy (&transport->rate_control);
 	if (transport->send_with_router_alert_sock) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing send with router alert socket."));
 #ifdef G_OS_UNIX
@@ -261,7 +258,7 @@ pgm_transport_destroy (
 #error AF_INET and PF_INET are different values, the bananas are jumping in their pyjamas!
 #endif
 
-gboolean
+bool
 pgm_transport_create (
 	pgm_transport_t**		transport,
 	struct pgm_transport_info_t*	tinfo,
@@ -292,7 +289,7 @@ pgm_transport_create (
 	}
 	pgm_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
-	new_transport = pgm_malloc0 (sizeof(pgm_transport_t));
+	new_transport = pgm_new0 (pgm_transport_t, 1);
 	new_transport->can_send_data = TRUE;
 	new_transport->can_send_nak  = TRUE;
 	new_transport->can_recv_data = TRUE;
@@ -315,10 +312,10 @@ pgm_transport_create (
 	memcpy (&new_transport->tsi.gsi, &tinfo->ti_gsi, sizeof(pgm_gsi_t));
 	new_transport->dport = g_htons (tinfo->ti_dport);
 	if (tinfo->ti_sport) {
-		new_transport->tsi.sport = g_htons (tinfo->ti_sport);
+		new_transport->tsi.sport = htons (tinfo->ti_sport);
 	} else {
 		do {
-			new_transport->tsi.sport = g_htons (pgm_random_int_range (0, UINT16_MAX));
+			new_transport->tsi.sport = htons (pgm_random_int_range (0, UINT16_MAX));
 		} while (new_transport->tsi.sport == new_transport->dport);
 	}
 
@@ -328,7 +325,7 @@ pgm_transport_create (
 
 /* copy network parameters */
 	memcpy (&new_transport->send_gsr, &tinfo->ti_send_addrs[0], sizeof(struct group_source_req));
-	((struct sockaddr_in*)&new_transport->send_gsr.gsr_group)->sin_port = g_htons (new_transport->udp_encap_mcast_port);
+	((struct sockaddr_in*)&new_transport->send_gsr.gsr_group)->sin_port = htons (new_transport->udp_encap_mcast_port);
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
 		memcpy (&new_transport->recv_gsr[i], &tinfo->ti_recv_addrs[i], sizeof(struct group_source_req));
@@ -344,7 +341,7 @@ pgm_transport_create (
 	} else {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Opening raw sockets."));
 		socket_type = SOCK_RAW;
-		protocol = ipproto_pgm;
+		protocol = pgm_ipproto_pgm;
 	}
 
 	if ((new_transport->recv_sock = socket (new_transport->recv_gsr[0].gsr_group.ss_family,
@@ -488,10 +485,10 @@ pgm_drop_superuser (void)
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_set_max_tpdu (
 	pgm_transport_t* const	transport,
-	const guint16		max_tpdu
+	const uint16_t		max_tpdu
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -515,10 +512,10 @@ pgm_transport_set_max_tpdu (
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_set_multicast_loop (
 	pgm_transport_t* const	transport,
-	const gboolean		use_multicast_loop
+	const bool		use_multicast_loop
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -540,10 +537,10 @@ pgm_transport_set_multicast_loop (
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_set_hops (
 	pgm_transport_t* const	transport,
-	const gint		hops
+	const unsigned		hops
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -569,10 +566,10 @@ pgm_transport_set_hops (
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_set_sndbuf (
 	pgm_transport_t* const	transport,
-	const int		size		/* not gsize/gssize as we propogate to setsockopt() */
+	const size_t		size
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -586,12 +583,12 @@ pgm_transport_set_sndbuf (
 		return FALSE;
 	}
 #ifdef CONFIG_HAVE_PROC
-	int wmem_max;
+	size_t wmem_max;
 	FILE* fp;
 
 	fp = fopen ("/proc/sys/net/core/wmem_max", "r");
 	if (fp) {
-		const int matches = fscanf (fp, "%d", &wmem_max);
+		const int matches = fscanf (fp, "%zu", &wmem_max);
 		pgm_assert (1 == matches);
 		fclose (fp);
 		if (size > wmem_max) {
@@ -616,10 +613,10 @@ pgm_transport_set_sndbuf (
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_set_rcvbuf (
 	pgm_transport_t* const	transport,
-	const int		size		/* not gsize/gssize */
+	const size_t		size
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -633,12 +630,12 @@ pgm_transport_set_rcvbuf (
 		return FALSE;
 	}
 #ifdef CONFIG_HAVE_PROC
-	int rmem_max;
+	size_t rmem_max;
 	FILE* fp;
 
 	fp = fopen ("/proc/sys/net/core/rmem_max", "r");
 	if (fp) {
-		const int matches = fscanf (fp, "%d", &rmem_max);
+		const int matches = fscanf (fp, "%zu", &rmem_max);
 		pgm_assert (1 == matches);
 		fclose (fp);
 		if (size > rmem_max) {
@@ -661,7 +658,7 @@ pgm_transport_set_rcvbuf (
  * returns TRUE on success, or FALSE on error and sets error appropriately,
  */
 
-gboolean
+bool
 pgm_transport_bind (
 	pgm_transport_t*	transport,
 	pgm_error_t**		error
@@ -678,7 +675,7 @@ pgm_transport_bind (
 	}
 
 	pgm_debug ("bind (transport:%p error:%p)",
-		 (gpointer)transport, (gpointer)error);
+		 (const void*)transport, (const void*)error);
 
 	pgm_rand_create (&transport->rand_);
 
@@ -716,14 +713,14 @@ pgm_transport_bind (
 	pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming IP header size of %" G_GSIZE_FORMAT " bytes", transport->iphdr_len);
 
 	if (transport->udp_encap_ucast_port) {
-		const guint udphdr_len = sizeof(struct pgm_udphdr);
+		const size_t udphdr_len = sizeof(struct pgm_udphdr);
 		pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming UDP header size of %i bytes", udphdr_len);
 		transport->iphdr_len += udphdr_len;
 	}
 
 	transport->max_tsdu = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (FALSE);
 	transport->max_tsdu_fragment = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (TRUE);
-	const guint max_fragments = transport->txw_sqns ? MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) : PGM_MAX_FRAGMENTS;
+	const unsigned max_fragments = transport->txw_sqns ? MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) : PGM_MAX_FRAGMENTS;
 	transport->max_apdu = MIN(PGM_MAX_APDU, max_fragments * transport->max_tsdu_fragment);
 
 	if (transport->can_send_data) {
@@ -745,7 +742,7 @@ pgm_transport_bind (
 /* Stevens: "SO_REUSEADDR has datatype int."
  */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
-		int v = TRUE;
+		const int v = 1;
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
@@ -772,7 +769,7 @@ pgm_transport_bind (
 /* request extra packet information to determine destination address on each packet */
 #ifndef CONFIG_TARGET_WINE
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
-		const int recv_family = transport->recv_gsr[0].gsr_group.ss_family;
+		const sa_family_t recv_family = transport->recv_gsr[0].gsr_group.ss_family;
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 		{
 #ifdef G_OS_UNIX
@@ -797,7 +794,7 @@ pgm_transport_bind (
 	}
 	else
 	{
-		const int recv_family = transport->recv_gsr[0].gsr_group.ss_family;
+		const sa_family_t recv_family = transport->recv_gsr[0].gsr_group.ss_family;
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
@@ -855,8 +852,9 @@ pgm_transport_bind (
 	{
 /* Stevens: "SO_RCVBUF has datatype int."
  */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set receive socket buffer size to %d bytes."), transport->rcvbuf);
-		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&transport->rcvbuf, sizeof(transport->rcvbuf)))
+		const int rcvbuf = transport->rcvbuf;	/* convert from size_t */
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set receive socket buffer size to %d bytes."), rcvbuf);
+		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&rcvbuf, sizeof(rcvbuf)))
 		{
 #ifdef G_OS_UNIX
 			const int save_errno = errno;
@@ -881,9 +879,10 @@ pgm_transport_bind (
 	{
 /* Stevens: "SO_SNDBUF has datatype int."
  */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set send socket buffer size to %d bytes."), transport->sndbuf);
-		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)) ||
-		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&transport->sndbuf, sizeof(transport->sndbuf)))
+		const int sndbuf = transport->sndbuf;
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set send socket buffer size to %d bytes."), sndbuf);
+		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&sndbuf, sizeof(sndbuf)) ||
+		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&sndbuf, sizeof(sndbuf)))
 		{
 #ifdef G_OS_UNIX
 			const int save_errno = errno;
@@ -1371,7 +1370,15 @@ no_cap_net_admin:
 					transport->txw_max_rte);
 	
 			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len, transport->max_tpdu);
-			g_assert (NULL != transport->rate_control);
+			transport->is_controlled_spm   = TRUE;	/* must always be set */
+			transport->is_controlled_odata = TRUE;
+			transport->is_controlled_rdata = TRUE;
+		}
+		else
+		{
+			transport->is_controlled_spm   = FALSE;
+			transport->is_controlled_odata = FALSE;
+			transport->is_controlled_rdata = FALSE;
 		}
 
 /* announce new transport by sending out SPMs */
@@ -1428,7 +1435,7 @@ no_cap_net_admin:
 /* returns timeout for pending timer.
  */
 
-gboolean
+bool
 pgm_transport_get_timer_pending (
 	pgm_transport_t* const	transport,
 	struct timeval*		tv
@@ -1436,7 +1443,7 @@ pgm_transport_get_timer_pending (
 {
 	pgm_return_val_if_fail (NULL != transport, FALSE);
 	pgm_return_val_if_fail (NULL != tv, FALSE);
-	const long usecs = pgm_timer_expiration (transport);
+	const pgm_time_t usecs = pgm_timer_expiration (transport);
 	tv->tv_sec  = usecs / 1000000UL;
 	tv->tv_usec = usecs % 1000000UL;
 	return TRUE;
@@ -1446,7 +1453,7 @@ pgm_transport_get_timer_pending (
  * or PGM_IO_STATUS_AGAIN on send().
  */
 
-gboolean
+bool
 pgm_transport_get_rate_remaining (
 	pgm_transport_t* const	transport,
 	struct timeval*		tv
@@ -1454,9 +1461,9 @@ pgm_transport_get_rate_remaining (
 {
 	pgm_return_val_if_fail (NULL != transport, FALSE);
 	pgm_return_val_if_fail (NULL != tv, FALSE);
-	const pgm_time_t pgm_time = pgm_rate_remaining (transport->rate_control, transport->blocklen);
-	tv->tv_sec  = pgm_time / 1000000UL;
-	tv->tv_usec = pgm_time % 1000000UL;
+	const pgm_time_t usecs = pgm_rate_remaining (&transport->rate_control, transport->blocklen);
+	tv->tv_sec  = usecs / 1000000UL;
+	tv->tv_usec = usecs % 1000000UL;
 	return TRUE;
 }
 
@@ -1645,22 +1652,22 @@ out:
  * on success, returns TRUE, on failure returns FALSE.
  */
 
-gboolean
+bool
 pgm_transport_set_fec (
 	pgm_transport_t* const	transport,
-	const guint		proactive_h,		/* 0 == no pro-active parity */
-	const gboolean		use_ondemand_parity,
-	const gboolean		use_varpkt_len,
-	const guint		default_n,
-	const guint		default_k
+	const uint8_t		proactive_h,		/* 0 == no pro-active parity */
+	const bool		use_ondemand_parity,
+	const bool		use_varpkt_len,
+	const uint8_t		default_n,
+	const uint8_t		default_k
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
 	pgm_return_val_if_fail ((default_k & (default_k -1)) == 0, FALSE);
 	pgm_return_val_if_fail (default_k >= 2 && default_k <= 128, FALSE);
-	pgm_return_val_if_fail (default_n >= default_k + 1 && default_n <= 255, FALSE);
+	pgm_return_val_if_fail (default_n >= default_k + 1, FALSE);
 
-	const guint default_h = default_n - default_k;
+	const uint8_t default_h = default_n - default_k;
 
 	pgm_return_val_if_fail (proactive_h <= default_h, FALSE);
 
@@ -1697,10 +1704,11 @@ pgm_transport_set_fec (
  *
  * on success, returns TRUE, on failure returns FALSE.
  */
-gboolean
+
+bool
 pgm_transport_set_send_only (
 	pgm_transport_t* const	transport,
-	const gboolean		send_only
+	const bool		send_only
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -1722,11 +1730,12 @@ pgm_transport_set_send_only (
  *
  * on success, returns TRUE, on failure returns FALSE.
  */
-gboolean
+
+bool
 pgm_transport_set_recv_only (
 	pgm_transport_t* const	transport,
-	const gboolean		recv_only,
-	const gboolean		is_passive	/* don't send any request or responses */
+	const bool		recv_only,
+	const bool		is_passive	/* don't send any request or responses */
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -1749,10 +1758,11 @@ pgm_transport_set_recv_only (
  *
  * on success, returns TRUE, on failure returns FALSE.
  */
-gboolean
+
+bool
 pgm_transport_set_abort_on_reset (
 	pgm_transport_t* const	transport,
-	const gboolean		abort_on_reset
+	const bool		abort_on_reset
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -1771,10 +1781,11 @@ pgm_transport_set_abort_on_reset (
 
 /* default non-blocking operation on send and receive sockets.
  */
-gboolean
+
+bool
 pgm_transport_set_nonblocking (
 	pgm_transport_t* const	transport,
-	const gboolean		nonblocking
+	const bool		nonblocking
 	)
 {
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -1799,11 +1810,11 @@ pgm_transport_set_nonblocking (
 /* for any-source applications (ASM), join a new group
  */
 
-gboolean
+bool
 pgm_transport_join_group (
 	pgm_transport_t*	transport,
 	struct group_req*	gr,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;
@@ -1845,10 +1856,10 @@ pgm_transport_join_group (
 	}
 
 	transport->recv_gsr[transport->recv_gsr_len].gsr_interface = 0;
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len((struct sockaddr*)&gr->gr_group));
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len((struct sockaddr*)&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((struct sockaddr*)&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((struct sockaddr*)&gr->gr_group));
 	transport->recv_gsr_len++;
-	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, (const char*)gr, len);
+	status = setsockopt (transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, (const char*)gr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
@@ -1856,11 +1867,11 @@ pgm_transport_join_group (
 /* for any-source applications (ASM), leave a joined group.
  */
 
-gboolean
+bool
 pgm_transport_leave_group (
 	pgm_transport_t*	transport,
 	struct group_req*	gr,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;
@@ -1903,11 +1914,11 @@ pgm_transport_leave_group (
 /* for any-source applications (ASM), turn off a given source
  */
 
-gboolean
+bool
 pgm_transport_block_source (
 	pgm_transport_t*	transport,
 	struct group_source_req* gsr,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;
@@ -1931,11 +1942,11 @@ pgm_transport_block_source (
 /* for any-source applications (ASM), re-allow a blocked source
  */
 
-gboolean
+bool
 pgm_transport_unblock_source (
 	pgm_transport_t*	transport,
 	struct group_source_req* gsr,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;
@@ -1961,11 +1972,11 @@ pgm_transport_unblock_source (
  * SSM joins are allowed on top of ASM in order to merge a remote source onto the local segment.
  */
 
-gboolean
+bool
 pgm_transport_join_source_group (
 	pgm_transport_t*	transport,
 	struct group_source_req* gsr,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;
@@ -2022,11 +2033,11 @@ pgm_transport_join_source_group (
 /* for controlled-source applications (SSM), leave each group/source pair
  */
 
-gboolean
+bool
 pgm_transport_leave_source_group (
 	pgm_transport_t*	transport,
 	struct group_source_req* gsr,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;
@@ -2065,11 +2076,11 @@ pgm_transport_leave_source_group (
 	return (0 == status);
 }
 
-gboolean
+bool
 pgm_transport_msfilter (
 	pgm_transport_t*	transport,
 	struct group_filter*	gf_list,
-	gsize			len
+	socklen_t		len
 	)
 {
 	int status;

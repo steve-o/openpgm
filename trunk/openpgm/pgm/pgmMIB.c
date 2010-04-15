@@ -17,8 +17,8 @@
 #include "pgm/pgmMIB.h"
 #include "pgm/pgmMIB_columns.h"
 #include "pgm/pgmMIB_enums.h"
-#include "pgm/txwi.h"
-#include "pgm/rxwi.h"
+#include "pgm/txw.h"
+#include "pgm/rxw.h"
 #include "pgm/transport.h"
 
 

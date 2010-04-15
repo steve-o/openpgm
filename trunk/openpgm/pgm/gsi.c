@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,19 +47,16 @@
 //#define GSI_DEBUG
 
 
-/* locals */
-
-
 /* create a GSI based on md5 of a user provided data block.
  *
  * returns TRUE on success, returns FALSE on error and sets error appropriately,
  */
 
-gboolean
+bool
 pgm_gsi_create_from_data (
-	pgm_gsi_t*	gsi,
-	const guchar*	data,
-	const gsize	length
+	pgm_gsi_t*     restrict	gsi,
+	const uint8_t* restrict	data,
+	const size_t		length
 	)
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
@@ -82,11 +80,11 @@ pgm_gsi_create_from_data (
 	return TRUE;
 }
 
-gboolean
+bool
 pgm_gsi_create_from_string (
-	pgm_gsi_t*	gsi,
-	const gchar*	str,
-	gssize		length
+	pgm_gsi_t*  restrict gsi,
+	const char* restrict str,
+	ssize_t		     length		/* -1 for NULL terminated */
 	)
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
@@ -95,7 +93,7 @@ pgm_gsi_create_from_string (
 	if (length < 0)
 		length = strlen (str);
 
-	return pgm_gsi_create_from_data (gsi, (const guchar*)str, length);
+	return pgm_gsi_create_from_data (gsi, (const uint8_t*)str, length);
 }
 
 /* create a global session ID as recommended by the PGM draft specification using
@@ -104,10 +102,10 @@ pgm_gsi_create_from_string (
  * returns TRUE on success, returns FALSE on error and sets error appropriately,
  */
 
-gboolean
+bool
 pgm_gsi_create_from_hostname (
-	pgm_gsi_t*	gsi,
-	pgm_error_t**	error
+	pgm_gsi_t*    restrict gsi,
+	pgm_error_t** restrict error
 	)
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
@@ -136,10 +134,10 @@ pgm_gsi_create_from_hostname (
  * returns TRUE on succcess, returns FALSE on error and sets error.
  */
 
-gboolean
+bool
 pgm_gsi_create_from_addr (
-	pgm_gsi_t*	gsi,
-	pgm_error_t**	error
+	pgm_gsi_t*    restrict gsi,
+	pgm_error_t** restrict error
 	)
 {
 	char hostname[NI_MAXHOST];
@@ -175,8 +173,8 @@ pgm_gsi_create_from_addr (
 	}
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
 	freeaddrinfo (res);
-	guint16 random = pgm_random_int_range (0, UINT16_MAX);
-	memcpy ((guint8*)gsi + sizeof(struct in_addr), &random, sizeof(random));
+	const uint16_t random_val = pgm_random_int_range (0, UINT16_MAX);
+	memcpy ((uint8_t*)gsi + sizeof(struct in_addr), &random_val, sizeof(random_val));
 	return TRUE;
 }
 
@@ -188,12 +186,12 @@ pgm_gsi_create_from_addr (
 
 int
 pgm_gsi_print_r (
-	const pgm_gsi_t*	gsi,
-	char*			buf,
-	gsize			bufsize
+	const pgm_gsi_t* restrict gsi,
+	char*	         restrict buf,
+	size_t			  bufsize
 	)
 {
-	const guint8* src = (const guint8*)gsi;
+	const uint8_t* restrict src = (const uint8_t* restrict)gsi;
 
 	pgm_return_val_if_fail (NULL != gsi, -1);
 	pgm_return_val_if_fail (NULL != buf, -1);
@@ -208,7 +206,7 @@ pgm_gsi_print_r (
  * on success, returns pointer to ASCII string.  on error, returns NULL.
  */
 
-gchar*
+char*
 pgm_gsi_print (
 	const pgm_gsi_t*	gsi
 	)
@@ -224,17 +222,19 @@ pgm_gsi_print (
 /* compare two global session identifier GSI values and return TRUE if they are equal
  */
 
-gint
+bool
 pgm_gsi_equal (
-        gconstpointer   v,
-        gconstpointer   v2
+        const void*	p1,
+        const void*	p2
         )
 {
-/* pre-conditions */
-	pgm_assert (v);
-	pgm_assert (v2);
+	const pgm_gsi_t *gsi1 = p1, *gsi2 = p2;
 
-        return memcmp (v, v2, 6 * sizeof(guint8)) == 0;
+/* pre-conditions */
+	pgm_assert (gsi1);
+	pgm_assert (gsi2);
+
+        return memcmp (gsi1, gsi2, sizeof(pgm_gsi_t)) == 0;
 }
 
 /* eof */

@@ -49,7 +49,7 @@
  */
 
 static
-guint32
+uint32_t
 cidr_to_netmask (
 	const unsigned	cidr
 	)
@@ -72,7 +72,7 @@ cidr_to_netmask (
  * returns 0 on success, returns -1 on invalid address.
  */
 
-int
+int					/* return type to match inet_network() */
 pgm_inet_network (
 	const char*		s,
 	struct in_addr*		in
@@ -85,7 +85,7 @@ pgm_inet_network (
 		 s, (gpointer)in);
 
 	const char *p = s;
-	int val = 0;
+	unsigned val = 0;
 	int shift = 24;
 
 	in->s_addr = INADDR_ANY;
@@ -216,7 +216,7 @@ pgm_inet6_network (
 #endif
 
 	p++;
-	int val = 0;
+	unsigned val = 0;
 	while (*p)
 	{
 		if (isdigit(*p)) {
@@ -236,8 +236,8 @@ pgm_inet6_network (
 	pgm_debug ("subnet size %i", val);
 
 /* zero out host bits */
-	const int suffix_length = 128 - val;
-	for (int i = suffix_length, j = 15; i > 0; i -= 8, --j)
+	const unsigned suffix_length = 128 - val;
+	for (unsigned i = suffix_length, j = 15; i > 0; i -= 8, --j)
 	{
 		in6->s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
 	}
