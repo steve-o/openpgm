@@ -20,6 +20,7 @@
 #ifndef __PGM_THREAD_H__
 #define __PGM_THREAD_H__
 
+#include <stdbool.h>
 #ifdef G_OS_UNIX
 #	include <pthread.h>
 #endif
@@ -82,7 +83,7 @@ G_BEGIN_DECLS
 
 void pgm_mutex_init (pgm_mutex_t*);
 void pgm_mutex_free (pgm_mutex_t*);
-gboolean pgm_mutex_trylock (pgm_mutex_t*);
+bool pgm_mutex_trylock (pgm_mutex_t*);
 
 static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
 #ifdef G_OS_UNIX
@@ -102,7 +103,7 @@ static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
 
 void pgm_spinlock_init (pgm_spinlock_t*);
 void pgm_spinlock_free (pgm_spinlock_t*);
-gboolean pgm_spinlock_trylock (pgm_spinlock_t*);
+bool pgm_spinlock_trylock (pgm_spinlock_t*);
 
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 #ifdef G_OS_UNIX
@@ -137,7 +138,7 @@ void pgm_rwlock_free (pgm_rwlock_t*);
 static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
 	pthread_rwlock_rdlock (&rwlock->pthread_rwlock);
 }
-static inline gboolean pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
+static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
 	return !pthread_rwlock_tryrdlock (&rwlock->pthread_rwlock);
 }
 static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
@@ -146,7 +147,7 @@ static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
 static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
 	pthread_rwlock_wrlock (&rwlock->pthread_rwlock);
 }
-static inline gboolean pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
+static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
 	return !pthread_rwlock_trywrlock (&rwlock->pthread_rwlock);
 }
 static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
@@ -156,7 +157,7 @@ static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
 static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
 	AcquireSRWLockShared (&rwlock->win32_lock);
 }
-static inline gboolean pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
+static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
 	return TryAcquireSRWLockShared (&rwlock->win32_lock);
 }
 static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
@@ -165,7 +166,7 @@ static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
 static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
 	AcquireSRWLockExclusive (&rwlock->win32_lock);
 }
-static inline gboolean pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
+static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
 	return AcquireSRWLockExclusive (&rwlock->win32_lock);
 }
 static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
@@ -175,10 +176,10 @@ static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
 void pgm_rwlock_init (pgm_rwlock_t*);
 void pgm_rwlock_free (pgm_rwlock_t*);
 void pgm_rwlock_reader_lock (pgm_rwlock_t*);
-gboolean pgm_rwlock_reader_trylock (pgm_rwlock_t*);
+bool pgm_rwlock_reader_trylock (pgm_rwlock_t*);
 void pgm_rwlock_reader_unlock(pgm_rwlock_t*);
 void pgm_rwlock_writer_lock (pgm_rwlock_t*);
-gboolean pgm_rwlock_writer_trylock (pgm_rwlock_t*);
+bool pgm_rwlock_writer_trylock (pgm_rwlock_t*);
 void pgm_rwlock_writer_unlock (pgm_rwlock_t*);
 #endif
 

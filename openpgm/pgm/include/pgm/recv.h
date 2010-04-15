@@ -31,10 +31,10 @@
 
 G_BEGIN_DECLS
 
-int pgm_recvmsg (pgm_transport_t* const, pgm_msgv_t* const, const int, gsize*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_recvmsgv (pgm_transport_t* const, pgm_msgv_t* const, const gsize, const int, gsize*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_recv (pgm_transport_t* const, gpointer, const gsize, const int, gsize* const, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_recvfrom (pgm_transport_t* const, gpointer, const gsize, const int, gsize*, pgm_tsi_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvmsg (pgm_transport_t* const, pgm_msgv_t* const, const int, size_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvmsgv (pgm_transport_t* const, pgm_msgv_t* const, const size_t, const int, size_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_recv (pgm_transport_t* const, void*, const size_t, const int, size_t* const, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvfrom (pgm_transport_t* const, void*, const size_t, const int, size_t*, pgm_tsi_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

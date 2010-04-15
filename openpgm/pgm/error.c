@@ -31,12 +31,6 @@
 
 //#define ERROR_DEBUG
 
-#ifndef ERROR_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-
 
 #define ERROR_OVERWRITTEN_WARNING "pgm_error_t set over the top of a previous pgm_error_t or uninitialized memory.\n" \
                "This indicates a bug. You must ensure an error is NULL before it's set.\n" \
@@ -47,7 +41,7 @@ pgm_error_t*
 pgm_error_new_valist (
 	const int		error_domain,
 	const int		error_code,
-	const gchar*		format,
+	const char*		format,
 	va_list			args
 	)
 {
@@ -73,7 +67,7 @@ pgm_set_error (
 	pgm_error_t**		err,
 	const int		error_domain,
 	const int		error_code,
-	const gchar*		format,
+	const char*		format,
 	...
 	)
 {
@@ -127,13 +121,13 @@ pgm_clear_error (
 
 static void
 pgm_error_add_prefix (
-	gchar**		string,
-	const gchar*	format,
+	char**		string,
+	const char*	format,
 	va_list		ap
 	)
 {
-	gchar* prefix = pgm_strdup_vprintf (format, ap);
-	gchar* oldstring = *string;
+	char* prefix = pgm_strdup_vprintf (format, ap);
+	char* oldstring = *string;
 	*string = pgm_strconcat (prefix, oldstring, NULL);
 	pgm_free (oldstring);
 	pgm_free (prefix);
@@ -142,7 +136,7 @@ pgm_error_add_prefix (
 void
 pgm_prefix_error (
 	pgm_error_t**	err,
-	const gchar*	format,
+	const char*	format,
 	...
 	)
 {

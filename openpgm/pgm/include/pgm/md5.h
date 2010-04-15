@@ -31,22 +31,22 @@
 
 struct md5_ctx
 {
-	guint32		A;
-	guint32		B;
-	guint32		C;
-	guint32		D;
+	uint32_t	A;
+	uint32_t	B;
+	uint32_t	C;
+	uint32_t	D;
 
-	guint32		total[2];
-	guint32		buflen;
-	char		buffer[128] __attribute__ ((__aligned__ (__alignof__ (guint32))));
+	uint32_t	total[2];
+	uint32_t	buflen;
+	char		buffer[128] __attribute__ ((__aligned__ (__alignof__ (uint32_t))));
 };
 
 
 G_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL void _md5_init_ctx (struct md5_ctx*);
-PGM_GNUC_INTERNAL void _md5_process_bytes (struct md5_ctx*, gconstpointer, gsize);
-PGM_GNUC_INTERNAL gpointer _md5_finish_ctx (struct md5_ctx*, gpointer);
+PGM_GNUC_INTERNAL void _md5_process_bytes (struct md5_ctx*, const void*, size_t);
+PGM_GNUC_INTERNAL void* _md5_finish_ctx (struct md5_ctx*, void*);
 
 G_END_DECLS
 

@@ -22,6 +22,8 @@
 #ifndef __PGM_QUEUE_H__
 #define __PGM_QUEUE_H__
 
+#include <stdbool.h>
+
 #include <glib.h>
 
 #ifndef __PGM_LIST_H__
@@ -33,7 +35,7 @@ struct pgm_queue_t
 {
 	pgm_list_t*	head;
 	pgm_list_t*	tail;
-	guint		length;
+	unsigned	length;
 };
 
 typedef struct pgm_queue_t pgm_queue_t;
@@ -41,7 +43,7 @@ typedef struct pgm_queue_t pgm_queue_t;
 
 G_BEGIN_DECLS
 
-gboolean pgm_queue_is_empty (pgm_queue_t*);
+bool pgm_queue_is_empty (pgm_queue_t*);
 void pgm_queue_push_head_link (pgm_queue_t*, pgm_list_t*);
 pgm_list_t* pgm_queue_pop_tail_link (pgm_queue_t*);
 pgm_list_t* pgm_queue_peek_tail_link (pgm_queue_t*);

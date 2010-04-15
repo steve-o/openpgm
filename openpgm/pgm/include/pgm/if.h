@@ -22,6 +22,9 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include <glib.h>
 
 #ifndef __PGM_GSI_H__
@@ -32,20 +35,20 @@
 struct pgm_transport_info_t {
 	pgm_gsi_t			ti_gsi;
 	int				ti_flags;
-	int				ti_family;
-	int				ti_udp_encap_ucast_port;
-	int				ti_udp_encap_mcast_port;
-	int				ti_sport;
-	int				ti_dport;
-	gsize				ti_recv_addrs_len;
+	sa_family_t			ti_family;
+	uint16_t			ti_udp_encap_ucast_port;
+	uint16_t			ti_udp_encap_mcast_port;
+	uint16_t			ti_sport;
+	uint16_t			ti_dport;
+	size_t				ti_recv_addrs_len;
 	struct group_source_req*	ti_recv_addrs;
-	gsize				ti_send_addrs_len;
+	size_t				ti_send_addrs_len;
 	struct group_source_req*	ti_send_addrs;
 };
 
 G_BEGIN_DECLS
 
-gboolean pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, pgm_error_t**);
+bool pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, pgm_error_t**);
 void pgm_if_free_transport_info (struct pgm_transport_info_t*);
 void pgm_if_print_all (void);
 

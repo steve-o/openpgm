@@ -21,6 +21,10 @@
 
 #include <ctype.h>
 #include <errno.h>
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -60,17 +64,17 @@
 #endif
 
 
-static gboolean pgm_parse (struct pgm_sk_buff_t* const, pgm_error_t**);
-static gboolean pgm_print_spm (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_poll (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_polr (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_odata (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_rdata (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_nak (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_nnak (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_ncf (const struct pgm_header* const, gconstpointer, const gsize);
-static gboolean pgm_print_spmr (const struct pgm_header* const, gconstpointer, const gsize);
-static gssize pgm_print_options (gconstpointer, gsize);
+static bool pgm_parse (struct pgm_sk_buff_t* const, pgm_error_t**);
+static bool pgm_print_spm (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_poll (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_polr (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_odata (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_rdata (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_nak (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_nnak (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_ncf (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_spmr (const struct pgm_header* const, const void*, const size_t);
+static ssize_t pgm_print_options (const void*, size_t);
 
 
 /* Parse a raw-IP packet for IP and PGM header and any payload.
@@ -81,7 +85,7 @@ static gssize pgm_print_options (gconstpointer, gsize);
 				sizeof(struct pgm_header) 	/* PGM header */ \
 			)
 
-gboolean
+bool
 pgm_parse_raw (
 	struct pgm_sk_buff_t* const	skb,		/* data will be modified */
 	struct sockaddr* const		dst,
@@ -102,7 +106,7 @@ pgm_parse_raw (
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_BOUNDS,
 			     _("IP packet too small at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GUINT16_FORMAT " bytes."),
-			     skb->len, (guint16)PGM_MIN_SIZE);
+			     skb->len, (uint16_t)PGM_MIN_SIZE);
 		return FALSE;
 	}
 
@@ -178,7 +182,7 @@ pgm_parse_raw (
 		return FALSE;
 	}
 
-	const gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
 	if (G_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
 	{
 		pgm_set_error (error,
@@ -212,9 +216,9 @@ pgm_parse_raw (
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
 #if PGM_CHECK_IN_CKSUM
-	const int sum = in_cksum (data, packet_length, 0);
+	const uint16_t sum = in_cksum (data, packet_length, 0);
 	if (G_UNLIKELY(0 != sum)) {
-		const int ip_sum = g_ntohs (ip->ip_sum);
+		const uint16_t ip_sum = ntohs (ip->ip_sum);
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_CKSUM,
@@ -225,7 +229,7 @@ pgm_parse_raw (
 #endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
-	const guint offset = g_ntohs (ip->ip_off);
+	const uint16_t offset = ntohs (ip->ip_off);
 	if (G_UNLIKELY((offset & 0x1fff) != 0)) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
@@ -259,7 +263,7 @@ pgm_parse_raw (
 	return pgm_parse (skb, error);
 }
 
-gboolean
+bool
 pgm_parse_udp_encap (
 	struct pgm_sk_buff_t*	skb,		/* will be modified */
 	pgm_error_t**		error
@@ -284,7 +288,7 @@ pgm_parse_udp_encap (
 /* will modify packet contents to calculate and check PGM checksum
  */
 static
-gboolean
+bool
 pgm_parse (
 	struct pgm_sk_buff_t* const	skb,		/* will be modified to calculate checksum */
 	pgm_error_t**			error
@@ -296,9 +300,9 @@ pgm_parse (
 /* pgm_checksum == 0 means no transmitted checksum */
 	if (skb->pgm_header->pgm_checksum)
 	{
-		const int sum = skb->pgm_header->pgm_checksum;
+		const uint16_t sum = skb->pgm_header->pgm_checksum;
 		skb->pgm_header->pgm_checksum = 0;
-		const int pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
+		const uint16_t pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
 		skb->pgm_header->pgm_checksum = sum;
 		if (G_UNLIKELY(pgm_sum != sum)) {
 			pgm_set_error (error,
@@ -328,10 +332,10 @@ pgm_parse (
 	return TRUE;
 }
 
-gboolean
+bool
 pgm_print_packet (
-	gpointer	data,
-	gsize		len
+	const void*	data,
+	size_t		len
 	)
 {
 /* pre-conditions */
@@ -355,14 +359,14 @@ pgm_print_packet (
 	}
 	printf ("IP ");
 
-	const gsize ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
 	if (ip_header_length < sizeof(struct pgm_ip)) 
 	{
 		puts ("bad IP header length :(");
 		return FALSE;
 	}
 
-	gsize packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+	size_t packet_length = g_ntohs(ip->ip_len);	/* total packet length */
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
@@ -384,7 +388,7 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	const guint offset = g_ntohs(ip->ip_off);
+	const uint16_t offset = g_ntohs(ip->ip_off);
 
 /* 3 bits routing priority, 4 bits type of service: delay, throughput, reliability, cost */
 	printf ("(tos 0x%x", (int)ip->ip_tos);
@@ -421,9 +425,9 @@ pgm_print_packet (
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
-	const int ip_sum = pgm_inet_checksum(data, packet_length, 0);
+	const uint16_t ip_sum = pgm_inet_checksum(data, packet_length, 0);
 	if (ip_sum != 0) {
-		const int encoded_ip_sum = g_ntohs(ip->ip_sum);
+		const uint16_t encoded_ip_sum = ntohs(ip->ip_sum);
 		printf (", bad cksum! %i", encoded_ip_sum);
 	}
 
@@ -452,7 +456,7 @@ pgm_print_packet (
  * +-+-+-+-+-+-+-+-+-+- ...
  */
 	struct pgm_header* pgm_header = (struct pgm_header*)((guint8*)data + ip_header_length);
-	const gsize pgm_length = packet_length - ip_header_length;
+	const size_t pgm_length = packet_length - ip_header_length;
 
 	if (pgm_length < sizeof(pgm_header)) {
 		puts ("bad packet size :(");
@@ -483,14 +487,14 @@ pgm_print_packet (
 			((pgm_header->pgm_options & (0x1 << 1)) ? "true" : "false"),
 
 		pgm_header->pgm_gsi[0], pgm_header->pgm_gsi[1], pgm_header->pgm_gsi[2], pgm_header->pgm_gsi[3], pgm_header->pgm_gsi[4], pgm_header->pgm_gsi[5],
-		g_ntohs(pgm_header->pgm_tsdu_length));
+		ntohs(pgm_header->pgm_tsdu_length));
 
 	if (pgm_header->pgm_checksum)
 	{
-		const int encoded_pgm_sum = pgm_header->pgm_checksum;
+		const uint16_t encoded_pgm_sum = pgm_header->pgm_checksum;
 /* requires modification of data buffer */
 		pgm_header->pgm_checksum = 0;
-		const int pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)pgm_header, pgm_length, 0));
+		const uint16_t pgm_sum = pgm_csum_fold (pgm_csum_partial((const char*)pgm_header, pgm_length, 0));
 		if (pgm_sum != encoded_pgm_sum) {
 			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", encoded_pgm_sum, pgm_sum);
 			return FALSE;
@@ -500,8 +504,8 @@ pgm_print_packet (
 	}
 
 /* now decode PGM packet types */
-	gconstpointer pgm_data = pgm_header + 1;
-	const gsize pgm_data_length = pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
+	const void* pgm_data = pgm_header + 1;
+	const size_t pgm_data_length = pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
 
 	gboolean err = FALSE;
 	switch (pgm_header->pgm_type) {
@@ -545,7 +549,7 @@ pgm_print_packet (
 
 #define PGM_MIN_SPM_SIZE	( sizeof(struct pgm_spm) )
 
-gboolean
+bool
 pgm_verify_spm (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -573,11 +577,11 @@ pgm_verify_spm (
 }
 
 static
-gboolean
+bool
 pgm_print_spm (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -594,22 +598,22 @@ pgm_print_spm (
 
 	const struct pgm_spm * spm  = (const struct pgm_spm *)data;
 	const struct pgm_spm6* spm6 = (const struct pgm_spm6*)data;
-	const guint spm_nla_afi = g_ntohs (spm->spm_nla_afi);
+	const uint16_t spm_nla_afi = ntohs (spm->spm_nla_afi);
 
-	printf ("sqn %lu trail %lu lead %lu nla-afi %u ",
-		(gulong)g_ntohl(spm->spm_sqn),
-		(gulong)g_ntohl(spm->spm_trail),
-		(gulong)g_ntohl(spm->spm_lead),
+	printf ("sqn %" PRIu32 " trail %" PRIu32 "lu lead %" PRIu32 "lu nla-afi %u ",
+		ntohl(spm->spm_sqn),
+		ntohl(spm->spm_trail),
+		ntohl(spm->spm_lead),
 		spm_nla_afi);	/* address family indicator */
 
 	char s[INET6_ADDRSTRLEN];
-	gconstpointer pgm_opt;
-	gsize pgm_opt_len;
+	const void* pgm_opt;
+	size_t pgm_opt_len;
 	switch (spm_nla_afi) {
 	case AFI_IP:
-		pgm_inet_ntop ( AF_INET, &spm->spm_nla, s, sizeof (s) );
-		pgm_opt = (const guint8*)data + sizeof( struct pgm_spm );
-		pgm_opt_len = len - sizeof( struct pgm_spm );
+		pgm_inet_ntop (AF_INET, &spm->spm_nla, s, sizeof(s));
+		pgm_opt = (const uint8_t*)data + sizeof(struct pgm_spm);
+		pgm_opt_len = len - sizeof(struct pgm_spm);
 		break;
 
 	case AFI_IP6:
@@ -618,8 +622,8 @@ pgm_print_spm (
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET6, &spm6->spm6_nla, s, sizeof(s) );
-		pgm_opt = (const guint8*)data + sizeof(struct pgm_spm6);
+		pgm_inet_ntop (AF_INET6, &spm6->spm6_nla, s, sizeof(s));
+		pgm_opt = (const uint8_t*)data + sizeof(struct pgm_spm6);
 		pgm_opt_len = len - sizeof(struct pgm_spm6);
 		break;
 
@@ -668,7 +672,7 @@ pgm_print_spm (
 
 #define PGM_MIN_POLL_SIZE	( sizeof(struct pgm_poll) )
 
-gboolean
+bool
 pgm_verify_poll (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -677,7 +681,7 @@ pgm_verify_poll (
 	pgm_assert (NULL != skb);
 
 	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
-	switch (g_ntohs (poll4->poll_nla_afi)) {
+	switch (ntohs (poll4->poll_nla_afi)) {
 /* truncated packet */
 	case AFI_IP6:
 		if (G_UNLIKELY(skb->len < sizeof(struct pgm_poll6)))
@@ -696,11 +700,11 @@ pgm_verify_poll (
 }
 
 static
-gboolean
+bool
 pgm_print_poll (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -717,7 +721,7 @@ pgm_print_poll (
 
 	const struct pgm_poll * poll4 = (const struct pgm_poll *)data;
 	const struct pgm_poll6* poll6 = (const struct pgm_poll6*)data;
-	const guint poll_nla_afi = g_ntohs (poll4->poll_nla_afi);
+	const uint16_t poll_nla_afi = ntohs (poll4->poll_nla_afi);
 
 	printf ("sqn %lu round %u sub-type %u nla-afi %u ",
 		(gulong)g_ntohl(poll4->poll_sqn),
@@ -726,12 +730,12 @@ pgm_print_poll (
 		poll_nla_afi);	/* address family indicator */
 
 	char s[INET6_ADDRSTRLEN];
-	gconstpointer pgm_opt;
-	gsize pgm_opt_len;
+	const void* pgm_opt;
+	size_t pgm_opt_len;
 	switch (poll_nla_afi) {
 	case AFI_IP:
-		pgm_inet_ntop ( AF_INET, &poll4->poll_nla, s, sizeof (s) );
-		pgm_opt = (const guint8*)data + sizeof(struct pgm_poll);
+		pgm_inet_ntop (AF_INET, &poll4->poll_nla, s, sizeof(s));
+		pgm_opt = (const uint8_t*)data + sizeof(struct pgm_poll);
 		pgm_opt_len = len - sizeof(struct pgm_poll);
 		printf ("%s", s);
 
@@ -755,8 +759,8 @@ pgm_print_poll (
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET6, &poll6->poll6_nla, s, sizeof (s) );
-		pgm_opt = (const guint8*)data + sizeof(struct pgm_poll6);
+		pgm_inet_ntop (AF_INET6, &poll6->poll6_nla, s, sizeof (s));
+		pgm_opt = (const uint8_t*)data + sizeof(struct pgm_poll6);
 		pgm_opt_len = len - sizeof(struct pgm_poll6);
 		printf ("%s", s);
 
@@ -804,7 +808,7 @@ pgm_print_poll (
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ... -+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
 
-gboolean
+bool
 pgm_verify_polr (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -819,11 +823,11 @@ pgm_verify_polr (
 }
 
 static
-gboolean
+bool
 pgm_print_polr (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -840,12 +844,12 @@ pgm_print_polr (
 
 	const struct pgm_polr* polr = (const struct pgm_polr*)data;
 
-	printf("sqn %lu round %u",
-		(gulong)g_ntohl(polr->polr_sqn),
-		g_ntohs(polr->polr_round));
+	printf("sqn %" PRIu32 " round %u",
+		ntohl(polr->polr_sqn),
+		ntohs(polr->polr_round));
 
-	gconstpointer pgm_opt = (const guint8*)data + sizeof(struct pgm_polr);
-	gsize pgm_opt_len = len - sizeof(struct pgm_polr);
+	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_polr);
+	size_t pgm_opt_len = len - sizeof(struct pgm_polr);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
@@ -874,11 +878,11 @@ pgm_print_polr (
  */
 
 static
-gboolean
+bool
 pgm_print_odata (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -895,29 +899,29 @@ pgm_print_odata (
 
 	const struct pgm_data* odata = (const struct pgm_data*)data;
 
-	printf ("sqn %lu trail %lu [",
-		(gulong)g_ntohl(odata->data_sqn),
-		(gulong)g_ntohl(odata->data_trail));
+	printf ("sqn %" PRIu32 " trail %" PRIu32 " [",
+		ntohl(odata->data_sqn),
+		ntohl(odata->data_trail));
 
 /* option extensions */
-	gconstpointer pgm_opt = (const guint8*)data + sizeof(struct pgm_data);
-	gsize pgm_opt_len = len - sizeof(struct pgm_data);
+	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_data);
+	size_t pgm_opt_len = len - sizeof(struct pgm_data);
 	const char* payload = pgm_opt;
 
 	if (header->pgm_options & PGM_OPT_PRESENT) {
-		const gssize opt_len = pgm_print_options (pgm_opt, pgm_opt_len);
+		const ssize_t opt_len = pgm_print_options (pgm_opt, pgm_opt_len);
 		if (opt_len < 0)
 			return FALSE;
 		payload	+= opt_len;
 	}
 
 /* data */
-	const char* end = payload + g_ntohs (header->pgm_tsdu_length);
+	const char* end = payload + ntohs (header->pgm_tsdu_length);
 	while (payload < end) {
-		if (isprint(*payload))
-			putchar(*payload);
+		if (isprint (*payload))
+			putchar (*payload);
 		else
-			putchar('.');
+			putchar ('.');
 		payload++;
 	}
 
@@ -929,11 +933,11 @@ pgm_print_odata (
  */
 
 static
-gboolean
+bool
 pgm_print_rdata (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -950,29 +954,29 @@ pgm_print_rdata (
 
 	const struct pgm_data* rdata = (const struct pgm_data*)data;
 
-	printf ("sqn %lu trail %lu [",
-		(gulong)g_ntohl(rdata->data_sqn),
-		(gulong)g_ntohl(rdata->data_trail));
+	printf ("sqn %" PRIu32 " trail %" PRIu32 " [",
+		ntohl (rdata->data_sqn),
+		ntohl (rdata->data_trail));
 
 /* option extensions */
-	gconstpointer pgm_opt = (const guint8*)data + sizeof(struct pgm_data);
-	gsize pgm_opt_len = len - sizeof(struct pgm_data);
+	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_data);
+	size_t pgm_opt_len = len - sizeof(struct pgm_data);
 	const char* payload = pgm_opt;
 
 	if (header->pgm_options & PGM_OPT_PRESENT) {
-		const gssize opt_len = pgm_print_options (pgm_opt, pgm_opt_len);
+		const ssize_t opt_len = pgm_print_options (pgm_opt, pgm_opt_len);
 		if (opt_len < 0)
 			return FALSE;
 		payload	+= opt_len;
 	}
 
 /* data */
-	const char* end = payload + g_ntohs (header->pgm_tsdu_length);
+	const char* end = payload + ntohs (header->pgm_tsdu_length);
 	while (payload < end) {
-		if (isprint(*payload))
-			putchar(*payload);
+		if (isprint (*payload))
+			putchar (*payload);
 		else
-			putchar('.');
+			putchar ('.');
 		payload++;
 	}
 
@@ -1006,7 +1010,7 @@ pgm_print_rdata (
 
 #define PGM_MIN_NAK_SIZE	( sizeof(struct pgm_nak) )
 
-gboolean
+bool
 pgm_verify_nak (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -1021,8 +1025,8 @@ pgm_verify_nak (
 		return FALSE;
 
 	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
-	const int nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
-	int nak_grp_nla_afi = -1;
+	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
+	uint16_t nak_grp_nla_afi = -1;
 
 /* check source NLA: unicast address of the ODATA sender */
 	switch (nak_src_nla_afi) {
@@ -1066,11 +1070,11 @@ pgm_verify_nak (
 }
 
 static
-gboolean
+bool
 pgm_print_nak (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -1087,30 +1091,30 @@ pgm_print_nak (
 
 	const struct pgm_nak * nak  = (const struct pgm_nak *)data;
 	const struct pgm_nak6* nak6 = (const struct pgm_nak6*)data;
-	const guint nak_src_nla_afi = g_ntohs (nak->nak_src_nla_afi);
+	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
 
 	printf ("sqn %lu src ", 
 		(gulong)g_ntohl(nak->nak_sqn));
 
 	char s[INET6_ADDRSTRLEN];
-	gconstpointer pgm_opt;
-	gsize pgm_opt_len;
+	const void* pgm_opt;
+	size_t pgm_opt_len;
 
 /* source nla */
 	switch (nak_src_nla_afi) {
 	case AFI_IP: {
-		const guint nak_grp_nla_afi = g_ntohs (nak->nak_grp_nla_afi);
+		const uint16_t nak_grp_nla_afi = ntohs (nak->nak_grp_nla_afi);
 		if (nak_src_nla_afi != nak_grp_nla_afi) {
 			puts ("different source & group afi very wibbly wobbly :(");
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
-		pgm_opt = (const guint8*)data + sizeof(struct pgm_nak);
+		pgm_inet_ntop (AF_INET, &nak->nak_src_nla, s, sizeof(s));
+		pgm_opt = (const uint8_t*)data + sizeof(struct pgm_nak);
 		pgm_opt_len = len - sizeof(struct pgm_nak);
 		printf ("%s grp ", s);
 
-		pgm_inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
+		pgm_inet_ntop (AF_INET, &nak->nak_grp_nla, s, sizeof(s));
 		printf ("%s", s);
 		break;
 	}
@@ -1121,18 +1125,18 @@ pgm_print_nak (
 			return FALSE;
 		}
 
-		const guint nak_grp_nla_afi = g_ntohs (nak6->nak6_grp_nla_afi);
+		const uint16_t nak_grp_nla_afi = ntohs (nak6->nak6_grp_nla_afi);
 		if (nak_src_nla_afi != nak_grp_nla_afi) {
 			puts ("different source & group afi very wibbly wobbly :(");
 			return FALSE;
 		}
 
-		pgm_inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
-		pgm_opt = (const guint8*)data + sizeof(struct pgm_nak6);
+		pgm_inet_ntop (AF_INET6, &nak6->nak6_src_nla, s, sizeof(s));
+		pgm_opt = (const uint8_t*)data + sizeof(struct pgm_nak6);
 		pgm_opt_len = len - sizeof(struct pgm_nak6);
 		printf ("%s grp ", s);
 
-		pgm_inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
+		pgm_inet_ntop (AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s));
 		printf ("%s", s);
 		break;
 	}
@@ -1157,7 +1161,7 @@ pgm_print_nak (
 /* 8.3.  N-NAK
  */
 
-gboolean
+bool
 pgm_verify_nnak (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -1169,11 +1173,11 @@ pgm_verify_nnak (
 }
 
 static
-gboolean
+bool
 pgm_print_nnak (
 	G_GNUC_UNUSED const struct pgm_header* const	header,
-	G_GNUC_UNUSED gconstpointer			data,
-	const gsize					len
+	G_GNUC_UNUSED const void*			data,
+	const size_t					len
 	)
 {
 /* pre-conditions */
@@ -1196,7 +1200,7 @@ pgm_print_nnak (
 /* 8.3.  NCF
  */
 
-gboolean
+bool
 pgm_verify_ncf (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -1207,11 +1211,11 @@ pgm_verify_ncf (
 	return pgm_verify_nak (skb);
 }
 
-gboolean
+bool
 pgm_print_ncf (
 	G_GNUC_UNUSED const struct pgm_header* const	header,
-	G_GNUC_UNUSED gconstpointer			data,
-	const gsize					len
+	G_GNUC_UNUSED const void*			data,
+	const size_t					len
 	)
 {
 /* pre-conditions */
@@ -1240,7 +1244,7 @@ pgm_print_ncf (
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
  */
 
-gboolean
+bool
 pgm_verify_spmr (
 	G_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
 	)
@@ -1252,11 +1256,11 @@ pgm_verify_spmr (
 }
 
 static
-gboolean
+bool
 pgm_print_spmr (
 	const struct pgm_header* const	header,
-	gconstpointer			data,
-	const gsize			len
+	const void*			data,
+	const size_t			len
 	)
 {
 /* pre-conditions */
@@ -1283,10 +1287,10 @@ pgm_print_spmr (
  */
 
 static
-gssize
+ssize_t
 pgm_print_options (
-	gconstpointer		data,
-	gsize			len
+	const void*		data,
+	size_t			len
 	)
 {
 /* pre-conditions */
@@ -1305,7 +1309,7 @@ pgm_print_options (
 		return -1;
 	}
 
-	guint opt_total_length = g_ntohs (opt_len->opt_total_length);
+	uint16_t opt_total_length = ntohs (opt_len->opt_total_length);
 	printf (" total len %u ", opt_total_length);
 	if (opt_total_length < (sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header)) ||
 	    opt_total_length > len)
@@ -1319,7 +1323,7 @@ pgm_print_options (
 	const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)(opt_len + 1);
 
 /* iterate through options (max 16) */
-	int count = 16;
+	unsigned count = 16;
 	while (opt_total_length && count)
 	{
 		if (opt_total_length < sizeof(struct pgm_opt_header) ||
@@ -1370,12 +1374,12 @@ pgm_print_options (
 		return -1;
 	}
 
-	return ((const guint8*)opt_header - (const guint8*)data);
+	return ((const uint8_t*)opt_header - (const uint8_t*)data);
 }
 
 const char*
 pgm_type_string (
-	guint8		type
+	uint8_t		type
 	)
 {
 	const char* c;
@@ -1398,7 +1402,7 @@ pgm_type_string (
 
 const char*
 pgm_udpport_string (
-	int		port
+	uint16_t		port
 	)
 {
 	static pgm_hashtable_t *services = NULL;
@@ -1454,8 +1458,8 @@ pgm_gethostbyaddr (
 
 void
 pgm_ipopt_print (
-	gconstpointer		ipopt,
-	gsize			length
+	const void*		ipopt,
+	size_t			length
 	)
 {
 /* pre-conditions */

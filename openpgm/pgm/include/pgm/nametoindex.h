@@ -29,16 +29,16 @@ G_BEGIN_DECLS
 
 #ifdef G_OS_UNIX
 #	include <net/if.h>
-static inline int pgm_if_nametoindex (G_GNUC_UNUSED const int iffamily, const char* ifname) {
+static inline unsigned pgm_if_nametoindex (G_GNUC_UNUSED const sa_family_t iffamily, const char* ifname) {
 	return if_nametoindex (ifname);
 }
 #else
-static inline int pgm_if_nametoindex (const int iffamily, const char* ifname) {
+static inline unsigned pgm_if_nametoindex (const sa_family_t iffamily, const char* ifname) {
 	return pgm_compat_if_nametoindex (iffamily, ifname);
 }
 #endif /* !G_OS_UNIX */
 
-int pgm_compat_if_nametoindex (const int, const char*);
+unsigned pgm_compat_if_nametoindex (const sa_family_t, const char*);
 
 G_END_DECLS
 

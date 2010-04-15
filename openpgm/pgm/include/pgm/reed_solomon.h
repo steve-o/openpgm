@@ -23,11 +23,15 @@
 
 #include <glib.h>
 
+#ifndef __PGM_GALOIS_H__
+#	include <pgm/galois.h>
+#endif
+
 
 struct pgm_rs_t {
-	guint		n, k;		/* RS(n, k) */
-	gpointer	GM;
-	gpointer	RM;
+	uint8_t		n, k;		/* RS(n, k) */
+	pgm_gf8_t*	GM;
+	pgm_gf8_t*	RM;
 };
 
 typedef struct pgm_rs_t pgm_rs_t;
@@ -38,11 +42,11 @@ G_BEGIN_DECLS
 #define PGM_RS_DEFAULT_N	255
 
 
-PGM_GNUC_INTERNAL void pgm_rs_create (pgm_rs_t*, guint, guint);
+PGM_GNUC_INTERNAL void pgm_rs_create (pgm_rs_t*, const uint8_t, const uint8_t);
 PGM_GNUC_INTERNAL void pgm_rs_destroy (pgm_rs_t*);
-PGM_GNUC_INTERNAL void pgm_rs_encode (pgm_rs_t*, const void**, guint, void*, gsize);
-PGM_GNUC_INTERNAL void pgm_rs_decode_parity_inline (pgm_rs_t*, void**, guint*, gsize);
-PGM_GNUC_INTERNAL void pgm_rs_decode_parity_appended (pgm_rs_t*, void**, guint*, gsize);
+PGM_GNUC_INTERNAL void pgm_rs_encode (pgm_rs_t*restrict, const pgm_gf8_t**restrict, const uint8_t, pgm_gf8_t*restrict, const uint16_t);
+PGM_GNUC_INTERNAL void pgm_rs_decode_parity_inline (pgm_rs_t*restrict, pgm_gf8_t**restrict, const uint8_t*restrict, const uint16_t);
+PGM_GNUC_INTERNAL void pgm_rs_decode_parity_appended (pgm_rs_t*restrict, pgm_gf8_t**restrict, const uint8_t*restrict, const uint16_t);
 
 G_END_DECLS
 

@@ -31,20 +31,20 @@ G_BEGIN_DECLS
  */
 
 static inline
-guint
+unsigned
 pgm_power2_log2 (
-	guint		v
+	unsigned	v
 	)
 {
 	static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
 	unsigned int r = (v & b[0]) != 0;
-	for (int i = 4; i > 0; i--) {
+	for (unsigned i = 4; i > 0; i--) {
 		r |= ((v & b[i]) != 0) << i;
 	}
 	return r;
 }
 
-guint pgm_spaced_primes_closest (guint);
+unsigned pgm_spaced_primes_closest (unsigned);
 
 
 G_END_DECLS

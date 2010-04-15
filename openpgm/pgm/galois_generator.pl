@@ -2,7 +2,7 @@
 #
 # Galois field table generator.
 #
-# Copyright (c) 2006-2008 Miru Limited.
+# Copyright (c) 2006-2010 Miru Limited.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -51,7 +51,7 @@ print<<MOO;
  *
  * Galois field tables
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -68,14 +68,12 @@ print<<MOO;
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
 #include "pgm/galois.h"
 
 
 /* globals */
 
-const gf8_t gflog[GF_NO_ELEMENTS] =
+const pgm_gf8_t pgm_gflog[PGM_GF_NO_ELEMENTS] =
 {
 MOO
 
@@ -91,7 +89,7 @@ for (my $i = 0; $i < $GF_NO_ELEMENTS; $i++)
 print<<MOO;
 };
 
-const gf8_t gfantilog[GF_NO_ELEMENTS] =
+const pgm_gf8_t pgm_gfantilog[PGM_GF_NO_ELEMENTS] =
 {
 MOO
 
@@ -108,7 +106,7 @@ print<<MOO;
 };
 
 #ifdef CONFIG_GALOIS_MUL_LUT
-const gf8_t gftable[GF_NO_ELEMENTS * GF_NO_ELEMENTS] =
+const pgm_gf8_t pgm_gftable[PGM_GF_NO_ELEMENTS * PGM_GF_NO_ELEMENTS] =
 {
 MOO
 

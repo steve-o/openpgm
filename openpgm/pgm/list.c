@@ -31,8 +31,8 @@
 
 pgm_list_t*
 pgm_list_append (
-	pgm_list_t*	list,
-	gpointer	data
+	pgm_list_t* restrict list,
+	void*	    restrict data
 	)
 {
 	pgm_list_t* new_list;
@@ -58,27 +58,26 @@ pgm_list_append (
 
 pgm_list_t*
 pgm_list_prepend_link (
-	pgm_list_t*	list,
-	pgm_list_t*	link_
+	pgm_list_t* restrict list,
+	pgm_list_t* restrict link_
 	)
 {
-	pgm_return_val_if_fail (NULL != link_, list);
-
 	pgm_list_t* new_list = link_;
+
+	pgm_return_val_if_fail (NULL != link_, list);
 
 	new_list->next = list;
 	new_list->prev = NULL;
 
 	if (list)
 		list->prev = new_list;
-
 	return new_list;
 }
 
 static inline
 pgm_list_t* 
 _pgm_list_remove_link (
-	pgm_list_t*	list,
+	pgm_list_t*	list,		/* list and link_ may be the same */
 	pgm_list_t*	link_
 	)
 {
@@ -99,7 +98,7 @@ _pgm_list_remove_link (
 
 pgm_list_t*
 pgm_list_remove_link (
-	pgm_list_t*	list,
+	pgm_list_t*	list,		/* list and link_ may be the same */
 	pgm_list_t*	link_
 	)
 {
@@ -108,7 +107,7 @@ pgm_list_remove_link (
 
 pgm_list_t*
 pgm_list_delete_link (
-	pgm_list_t*	list,
+	pgm_list_t*	list,		/* list and link_ may be the same */
 	pgm_list_t*	link_
 	)
 {

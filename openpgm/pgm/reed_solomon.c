@@ -25,6 +25,7 @@
  */
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,24 +34,7 @@
 #include "pgm/messages.h"
 #include "pgm/mem.h"
 #include "pgm/galois.h"
-
-
-struct rs_t {
-	guint		n, k;		/* RS(n, k) */
-	gf8_t*		GM;		/* Generator Matrix */
-	gf8_t*		RM;		/* Recovery Matrix */
-};
-
-typedef struct rs_t rs_t;
-
-
-/* globals */
-
-void pgm_rs_create (rs_t**, const guint, const guint);
-void pgm_rs_destroy (rs_t*);
-void pgm_rs_encode (rs_t*, const gf8_t**, const guint, gf8_t*, const gsize);
-void pgm_rs_decode_parity_inline (rs_t*, gf8_t**, const guint*, const gsize);
-void pgm_rs_decode_parity_appended (rs_t*, gf8_t**, const guint*, const gsize);
+#include "pgm/reed_solomon.h"
 
 
 /* Vector GF(2⁸) plus-equals multiplication.
@@ -60,21 +44,21 @@ void pgm_rs_decode_parity_appended (rs_t*, gf8_t**, const guint*, const gsize);
 
 static
 void
-gf_vec_addmul (
-	gf8_t*			d,
-	const gf8_t		b,
-	const gf8_t*		s,
-	guint			len		/* length of vectors */
+_pgm_gf_vec_addmul (
+	pgm_gf8_t*	 restrict d,
+	const pgm_gf8_t		  b,
+	const pgm_gf8_t* restrict s,
+	uint16_t		  len	/* length of vectors */
 	)
 {
-	unsigned i;
-	unsigned count8;
+	uint_fast16_t i;
+	uint_fast16_t count8;
 
 	if (G_UNLIKELY(b == 0))
 		return;
 
 #ifdef CONFIG_GALOIS_MUL_LUT
-        const gf8_t* gfmul_b = &gftable[ (guint16)b << 8 ];
+        const pgm_gf8_t* gfmul_b = &pgm_gftable[ (uint16_t)b << 8 ];
 #endif
 
 	i = 0;
@@ -128,24 +112,24 @@ gf_vec_addmul (
 
 static
 void
-matmul (
-	const gf8_t*		a,	/* m-by-n */
-	const gf8_t*		b,	/* n-by-p */
-	gf8_t*			c,	/* ∴ m-by-p */
-	const guint		m,
-	const guint		n,
-	const guint		p
+_pgm_matmul (
+	const pgm_gf8_t* restrict a,	/* m-by-n */
+	const pgm_gf8_t* restrict b,	/* n-by-p */
+	pgm_gf8_t*	 restrict c,	/* ∴ m-by-p */
+	const uint16_t		  m,
+	const uint16_t		  n,
+	const uint16_t		  p
 	)
 {
-	for (guint j = 0; j < m; j++)
+	for (uint_fast16_t j = 0; j < m; j++)
 	{
-		for (guint i = 0; i < p; i++)
+		for (uint_fast16_t i = 0; i < p; i++)
 		{
-			gf8_t sum = 0;
+			pgm_gf8_t sum = 0;
 
-			for (guint k = 0; k < n; k++)
+			for (uint_fast16_t k = 0; k < n; k++)
 			{
-				sum ^= gfmul( a[ (j * n) + k ], b[ (k * p) + i ] );
+				sum ^= pgm_gfmul ( a[ (j * n) + k ], b[ (k * p) + i ] );
 			}
 
 			c[ (j * p) + i ] = sum;
@@ -157,46 +141,45 @@ matmul (
  */
 
 #ifdef CONFIG_XOR_SWAP
+/* whilst cute the xor swap is quite slow */
 #define SWAP(a, b)	(((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b)))
 #else
-#define SWAP(a, b)	do { gf8_t _t = (b); (b) = (a); (a) = _t; } while (0)
+#define SWAP(a, b)	do { const pgm_gf8_t _t = (b); (b) = (a); (a) = _t; } while (0)
 #endif
 
 static
 void
-matinv (
-	gf8_t*			M,		/* is n-by-n */
-	const guint		n
+_pgm_matinv (
+	pgm_gf8_t*		M,		/* is n-by-n */
+	const uint8_t		n
 	)
 {
-	guint pivot_rows[ n ];
-	guint pivot_cols[ n ];
-	gboolean pivots[ n ];
+	uint8_t pivot_rows[ n ];
+	uint8_t pivot_cols[ n ];
+	bool pivots[ n ];
 	memset (pivots, 0, sizeof(pivots));
 
-	gf8_t identity[ n ];
+	pgm_gf8_t identity[ n ];
 	memset (identity, 0, sizeof(identity));
 
-	for (guint i = 0; i < n; i++)
+	for (uint_fast8_t i = 0; i < n; i++)
 	{
-		guint row = 0, col = 0;
+		uint_fast8_t row = 0, col = 0;
 
 /* check diagonal for new pivot */
-		if (!pivots[ i ] &&
-			M[ (i * n) + i ])
+		if (!pivots[ i ] && M[ (i * n) + i ])
 		{
 			row = col = i;
 		}
 		else
 		{
-			for (guint j = 0; j < n; j++)
+			for (uint_fast8_t j = 0; j < n; j++)
 			{
 				if (pivots[ j ]) continue;
 
-				for (guint x = 0; x < n; x++)
+				for (uint_fast8_t x = 0; x < n; x++)
 				{
-					if (!pivots[ x ] &&
-						M[ (j * n) + x ])
+					if (!pivots[ x ] && M[ (j * n) + x ])
 					{
 						row = j;
 						col = x;
@@ -212,10 +195,10 @@ found:
 /* pivot */
 		if (row != col)
 		{
-			for (guint x = 0; x < n; x++)
+			for (uint_fast8_t x = 0; x < n; x++)
 			{
-				gf8_t *pivot_row = &M[ (row * n) + x ],
-				      *pivot_col = &M[ (col * n) + x ];
+				pgm_gf8_t *pivot_row = &M[ (row * n) + x ],
+				          *pivot_col = &M[ (col * n) + x ];
 				SWAP( *pivot_row, *pivot_col );
 			}
 		}
@@ -227,43 +210,43 @@ found:
 /* divide row by pivot element */
 		if (M[ (col * n) + col ] != 1)
 		{
-			gf8_t c = M[ (col * n) + col ];
-			M[ (col * n) + col ] = 1;
+			const pgm_gf8_t c = M[ (col * n) + col ];
+			                    M[ (col * n) + col ] = 1;
 
-			for (guint x = 0; x < n; x++)
+			for (uint_fast8_t x = 0; x < n; x++)
 			{
-				M[ (col * n) + x ] = gfdiv( M[ (col * n) + x ], c );
+				M[ (col * n) + x ] = pgm_gfdiv( M[ (col * n) + x ], c );
 			}
 		}
 
 /* reduce if not an identity row */
 		identity[ col ] = 1;
-		if (memcmp (&M[ (col * n) ], identity, n * sizeof(gf8_t)))
+		if (memcmp (&M[ (col * n) ], identity, n * sizeof(pgm_gf8_t)))
 		{
-			for (	guint y = 0, x = 0;
+			for (	uint_fast8_t x = 0;
 				x < n;
-				x++, y++ )
+				x++ )
 			{
 				if (x == col) continue;
 
-				gf8_t c = M[ (y * n) + col ];
-				M[ (y * n) + col ] = 0;
+				const pgm_gf8_t c = M[ (x * n) + col ];
+				                    M[ (x * n) + col ] = 0;
 
-				gf_vec_addmul (&M[ y * n ], c, &M[ col * n ], n);
+				_pgm_gf_vec_addmul (&M[ x * n ], c, &M[ col * n ], n);
 			}
 		}
 		identity[ col ] = 0;
 	}
 
 /* revert all pivots */
-	for (int i = ((int)n - 1); i >= 0; i--)
+	for (int_fast16_t i = n - 1; i >= 0; i--)
 	{
 		if (pivot_rows[ i ] != pivot_cols[ i ])
 		{
-			for (guint j = 0; j < n; j++)
+			for (uint_fast8_t j = 0; j < n; j++)
 			{
-				gf8_t *pivot_row = &M[ (j * n) + pivot_rows[ i ] ],
-				      *pivot_col = &M[ (j * n) + pivot_cols[ i ] ];
+				pgm_gf8_t *pivot_row = &M[ (j * n) + pivot_rows[ i ] ],
+				          *pivot_col = &M[ (j * n) + pivot_cols[ i ] ];
 				SWAP( *pivot_row, *pivot_col );
 			}
 		}
@@ -287,9 +270,9 @@ found:
 
 static
 void
-matinv_vandermonde (
-	gf8_t*			V,		/* is n-by-n */
-	const guint		n
+_pgm_matinv_vandermonde (
+	pgm_gf8_t*		V,		/* is n-by-n */
+	const uint8_t		n
 	)
 {
 /* trivial cases */
@@ -304,24 +287,24 @@ matinv_vandermonde (
  * 1: Work out coefficients.
  */
 
-	gf8_t P[ n ];
+	pgm_gf8_t P[ n ];
 	memset (P, 0, sizeof(P));
 
 /* copy across second row, i.e. j = 2 */
-	for (guint i = 0; i < n; i++)
+	for (uint_fast8_t i = 0; i < n; i++)
 	{
 		P[ i ] = V[ (i * n) + 1 ];
 	}
 
-	gf8_t alpha[ n ];
+	pgm_gf8_t alpha[ n ];
 	memset (alpha, 0, sizeof(alpha));
 
 	alpha[ n - 1 ] = P[ 0 ];
-	for (guint i = 1; i < n; i++)
+	for (uint_fast8_t i = 1; i < n; i++)
 	{
-		for (guint j = (n - i); j < (n - 1); j++)
+		for (uint_fast8_t j = (n - i); j < (n - 1); j++)
 		{
-			alpha[ j ] ^= gfmul( P[ i ], alpha[ j + 1 ] );
+			alpha[ j ] ^= pgm_gfmul( P[ i ], alpha[ j + 1 ] );
 		}
 		alpha[ n - 1 ] ^= P[ i ];
 	}
@@ -329,23 +312,23 @@ matinv_vandermonde (
 /* 2: Obtain numberators and denominators by synthetic division.
  */
 
-	gf8_t b[ n ];
+	pgm_gf8_t b[ n ];
 	b[ n - 1 ] = 1;
-	for (guint j = 0; j < n; j++)
+	for (uint_fast8_t j = 0; j < n; j++)
 	{
-		gf8_t xx = P[ j ];
-		gf8_t t = 1;
+		const pgm_gf8_t xx = P[ j ];
+		pgm_gf8_t t = 1;
 
 /* skip first iteration */
-		for (int i = ((int)n - 2); i >= 0; i--)
+		for (int_fast16_t i = n - 2; i >= 0; i--)
 		{
-			b[ i ] = alpha[ i + 1 ] ^ gfmul( xx, b[ i + 1 ] );
-			t = gfmul( xx, t ) ^ b[ i ];
+			b[ i ] = alpha[ i + 1 ] ^ pgm_gfmul( xx, b[ i + 1 ] );
+			t = pgm_gfmul( xx, t ) ^ b[ i ];
 		}
 
-		for (guint i = 0; i < n; i++)
+		for (uint_fast8_t i = 0; i < n; i++)
 		{
-			V[ (i * n) + j ] = gfdiv ( b[ i ], t );
+			V[ (i * n) + j ] = pgm_gfdiv ( b[ i ], t );
 		}
 	}
 }
@@ -364,21 +347,19 @@ matinv_vandermonde (
 
 void
 pgm_rs_create (
-	rs_t**			rs_,
-	const guint		n,
-	const guint		k
+	pgm_rs_t*		rs,
+	const uint8_t		n,
+	const uint8_t		k
 	)
 {
-	pgm_assert (NULL != rs_);
+	pgm_assert (NULL != rs);
 	pgm_assert (n > 0);
 	pgm_assert (k > 0);
 
-	rs_t* rs = pgm_malloc0 (sizeof(rs_t));
-
 	rs->n	= n;
 	rs->k	= k;
-	rs->GM	= pgm_malloc0 (n * k * sizeof(gf8_t));
-	rs->RM	= pgm_malloc0 (k * k * sizeof(gf8_t));
+	rs->GM	= pgm_new0 (pgm_gf8_t, n * k);
+	rs->RM	= pgm_new0 (pgm_gf8_t, k * k);
 
 /* alpha = root of primitive polynomial of degree m
  *                 ( 1 + x² + x³ + x⁴ + x⁸ )
@@ -387,17 +368,22 @@ pgm_rs_create (
  *
  * Be careful, Harry!
  */
-	gf8_t* V = pgm_malloc0 (n * k * sizeof(gf8_t));
-	gf8_t* p = V + k;
+#ifdef CONFIG_PREFER_MALLOC
+	pgm_gf8_t* V = pgm_new0 (pgm_gf8_t, n * k);
+#else
+	pgm_gf8_t* V = pgm_newa (pgm_gf8_t, n * k);
+	memset (V, 0, n * k);
+#endif
+	pgm_gf8_t* p = V + k;
 	V[0] = 1;
-	for (guint j = 0; j < (n - 1); j++)
+	for (uint_fast8_t j = 0; j < (n - 1); j++)
 	{
-		for (guint i = 0; i < k; i++)
+		for (uint_fast8_t i = 0; i < k; i++)
 		{
 /* the {i, j} entry of V_{k,n} is v_{i,j} = α^^(i×j),
  * where 0 <= i <= k - 1 and 0 <= j <= n - 1.
  */
-			*p++ = gfantilog[ ( i * j ) % GF_MAX ];
+			*p++ = pgm_gfantilog[ ( i * j ) % PGM_GF_MAX ];
 		}
 	}
 
@@ -409,33 +395,32 @@ pgm_rs_create (
  *
  * 1: matrix V_{k,k} formed by the first k columns of V_{k,n}
  */
-	gf8_t* V_kk = V;
-	gf8_t* V_kn = V + (k * k);
+	pgm_gf8_t* V_kk = V;
+	pgm_gf8_t* V_kn = V + (k * k);
 
 /* 2: invert it
  */
-	matinv_vandermonde (V_kk, k);
+	_pgm_matinv_vandermonde (V_kk, k);
 
 /* 3: multiply by V_{k,n}
  */
-	matmul (V_kn, V_kk, rs->GM + (k * k), n - k, k, k);
+	_pgm_matmul (V_kn, V_kk, rs->GM + (k * k), n - k, k, k);
 
+#ifdef CONFIG_PREFER_MALLOC
 	pgm_free (V);
+#endif
 
 /* 4: set identity matrix for original data
  */
-	p = rs->GM;
-	for (guint i = 0; i < k; i++)
+	for (uint_fast8_t i = 0; i < k; i++)
 	{
-		p[ (i * k) + i ] = 1;
+		rs->GM[ (i * k) + i ] = 1;
 	}
-
-	*rs_	= rs;
 }
 
 void
 pgm_rs_destroy (
-	rs_t*			rs
+	pgm_rs_t*		rs
 	)
 {
 	pgm_assert (NULL != rs);
@@ -449,8 +434,6 @@ pgm_rs_destroy (
 		pgm_free (rs->GM);
 		rs->GM = NULL;
 	}
-
-	pgm_free (rs);
 }
 
 /* create a parity packet from a vector of original data packets and
@@ -459,11 +442,11 @@ pgm_rs_destroy (
 
 void
 pgm_rs_encode (
-	rs_t*			rs,
-	const gf8_t*		src[],		/* length rs_t::k */
-	const guint		offset,
-	gf8_t*			dst,
-	const gsize		len
+	pgm_rs_t*	  restrict rs,
+	const pgm_gf8_t** restrict src,		/* length rs_t::k */
+	const uint8_t		   offset,
+	pgm_gf8_t*	  restrict dst,
+	const uint16_t		   len
 	)
 {
 	pgm_assert (NULL != rs);
@@ -473,10 +456,10 @@ pgm_rs_encode (
 	pgm_assert (len > 0);
 
 	memset (dst, 0, len);
-	for (guint i = 0; i < rs->k; i++)
+	for (uint_fast8_t i = 0; i < rs->k; i++)
 	{
-		gf8_t c = rs->GM[ (offset * rs->k) + i ];
-		gf_vec_addmul (dst, c, src[i], len);
+		const pgm_gf8_t c = rs->GM[ (offset * rs->k) + i ];
+		_pgm_gf_vec_addmul (dst, c, src[i], len);
 	}
 }
 
@@ -486,10 +469,10 @@ pgm_rs_encode (
 
 void
 pgm_rs_decode_parity_inline (
-	rs_t*			rs,
-	gf8_t*			block[],	/* length rs_t::k */
-	const guint		offsets[],	/* offsets within FEC block, 0 < offset < n */
-	const gsize		len		/* packet length */
+	pgm_rs_t*      restrict rs,
+	pgm_gf8_t**    restrict block,		/* length rs_t::k */
+	const uint8_t* restrict	offsets,	/* offsets within FEC block, 0 < offset < n */
+	const uint16_t	        len		/* packet length */
 	)
 {
 	pgm_assert (NULL != rs);
@@ -499,44 +482,51 @@ pgm_rs_decode_parity_inline (
 
 /* create new recovery matrix from generator
  */
-	for (guint i = 0; i < rs->k; i++)
+	for (uint_fast8_t i = 0; i < rs->k; i++)
 	{
 		if (offsets[i] < rs->k) {
-			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(gf8_t));
+			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
 			rs->RM[ (i * rs->k) + i ] = 1;
 			continue;
 		}
-		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(gf8_t));
+		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
 	}
 
 /* invert */
-	matinv (rs->RM, rs->k);
+	_pgm_matinv (rs->RM, rs->k);
 
-	gf8_t* repairs[ rs->k ];
+	pgm_gf8_t* repairs[ rs->k ];
 
 /* multiply out, through the length of erasures[] */
-	for (guint j = 0; j < rs->k; j++)
+	for (uint_fast8_t j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
 
-		gf8_t* erasure = repairs[ j ] = pgm_malloc0 (len);
-		for (guint i = 0; i < rs->k; i++)
+#ifdef CONFIG_PREFER_MALLOC
+		pgm_gf8_t* erasure = repairs[ j ] = pgm_malloc0 (len);
+#else
+		pgm_gf8_t* erasure = repairs[ j ] = pgm_alloca (len);
+		memset (erasure, 0, len);
+#endif
+		for (uint_fast8_t i = 0; i < rs->k; i++)
 		{
-			gf8_t* src = block[ i ];
-			gf8_t c = rs->RM[ (j * rs->k) + i ];
-			gf_vec_addmul (erasure, c, src, len);
+			pgm_gf8_t* src = block[ i ];
+			pgm_gf8_t c = rs->RM[ (j * rs->k) + i ];
+			_pgm_gf_vec_addmul (erasure, c, src, len);
 		}
 	}
 
 /* move repaired over parity packets */
-	for (guint j = 0; j < rs->k; j++)
+	for (uint_fast8_t j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
 
-		memcpy (block[ j ], repairs[ j ], len * sizeof(gf8_t));
+		memcpy (block[ j ], repairs[ j ], len * sizeof(pgm_gf8_t));
+#ifdef CONFIG_PREFER_MALLOC
 		pgm_free (repairs[ j ]);
+#endif
 	}
 }
 
@@ -546,10 +536,10 @@ pgm_rs_decode_parity_inline (
  */
 void
 pgm_rs_decode_parity_appended (
-	rs_t*			rs,
-	gf8_t*			block[],	/* length rs_t::n, the FEC block */
-	const guint		offsets[],	/* ordered index of packets */
-	const gsize		len		/* packet length */
+	pgm_rs_t*      restrict rs,
+	pgm_gf8_t**    restrict block,	/* length rs_t::n, the FEC block */
+	const uint8_t* restrict offsets,	/* ordered index of packets */
+	const uint16_t	        len		/* packet length */
 	)
 {
 	pgm_assert (NULL != rs);
@@ -559,36 +549,36 @@ pgm_rs_decode_parity_appended (
 
 /* create new recovery matrix from generator
  */
-	for (guint i = 0; i < rs->k; i++)
+	for (uint_fast8_t i = 0; i < rs->k; i++)
 	{
 		if (offsets[i] < rs->k) {
-			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(gf8_t));
+			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
 			rs->RM[ (i * rs->k) + i ] = 1;
 			continue;
 		}
-		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(gf8_t));
+		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
 	}
 
 /* invert */
-	matinv (rs->RM, rs->k);
+	_pgm_matinv (rs->RM, rs->k);
 
 /* multiply out, through the length of erasures[] */
-	for (guint j = 0; j < rs->k; j++)
+	for (uint_fast8_t j = 0; j < rs->k; j++)
 	{
 		if (offsets[ j ] < rs->k)
 			continue;
 
-		int p = rs->k;
-		gf8_t* erasure = block[ j ];
-		for (guint i = 0; i < rs->k; i++)
+		uint_fast8_t p = rs->k;
+		pgm_gf8_t* erasure = block[ j ];
+		for (uint_fast8_t i = 0; i < rs->k; i++)
 		{
-			gf8_t* src;
+			pgm_gf8_t* src;
 			if (offsets[ i ] < rs->k)
 				src = block[ i ];
 			else
 				src = block[ p++ ];
-			gf8_t c = rs->RM[ (j * rs->k) + i ];
-			gf_vec_addmul (erasure, c, src, len);
+			const pgm_gf8_t c = rs->RM[ (j * rs->k) + i ];
+			_pgm_gf_vec_addmul (erasure, c, src, len);
 		}
 	}
 }

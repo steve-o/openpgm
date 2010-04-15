@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <glib.h>
@@ -33,7 +35,7 @@
 #include "pgm/atomic.h"
 #include "pgm/pgm.h"
 #include "pgm/packet.h"
-#include "pgm/timep.h"
+#include "pgm/time.h"
 #include "pgm/thread.h"
 #include "pgm/rand.h"
 
@@ -42,22 +44,22 @@
 
 
 /* globals */
-int ipproto_pgm = IPPROTO_PGM;
+int pgm_ipproto_pgm = IPPROTO_PGM;
 
 
 /* locals */
-static gboolean pgm_is_supported = FALSE;
-static volatile gint32 pgm_ref_count = 0;
+static bool pgm_is_supported = FALSE;
+static volatile int32_t pgm_ref_count = 0;
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
  *
  * returns TRUE on success, returns FALSE if an error occurred, implying some form of
  * system re-configuration is required to resolve before trying again.
+ *
+ * NB: Valgrind loves generating errors in getprotobyname().
  */
-// TODO: could wrap initialization with g_once_init_enter/leave.
-// TODO: fix valgrind errors in getprotobyname/_r
-gboolean
+bool
 pgm_init (
 	pgm_error_t**	error
 	)
@@ -107,21 +109,21 @@ pgm_init (
 #ifdef CONFIG_HAVE_GETPROTOBYNAME_R
 	char b[1024];
 	struct protoent protobuf, *proto;
-	int e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
+	const int e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
-		if (proto->p_proto != ipproto_pgm) {
-			pgm_minor ("Setting PGM protocol number to %i from /etc/protocols.",
+		if (proto->p_proto != pgm_ipproto_pgm) {
+			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
 				proto->p_proto);
-			ipproto_pgm = proto->p_proto;
+			pgm_ipproto_pgm = proto->p_proto;
 		}
 	}
 #else
-	struct protoent *proto = getprotobyname ("pgm");
+	const struct protoent *proto = getprotobyname ("pgm");
 	if (proto != NULL) {
-		if (proto->p_proto != ipproto_pgm) {
-			pgm_minor ("Setting PGM protocol number to %i from /etc/protocols.",
+		if (proto->p_proto != pgm_ipproto_pgm) {
+			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
 				proto->p_proto);
-			ipproto_pgm = proto->p_proto;
+			pgm_ipproto_pgm = proto->p_proto;
 		}
 	}
 #endif
@@ -153,7 +155,7 @@ err_shutdown:
 /* returns TRUE if PGM engine has been initialized
  */
 
-gboolean
+bool
 pgm_supported (void)
 {
 	return ( pgm_is_supported == TRUE );
@@ -162,13 +164,13 @@ pgm_supported (void)
 /* returns TRUE on success, returns FALSE if an error occurred.
  */
 
-gboolean
+bool
 pgm_shutdown (void)
 {
 	pgm_return_val_if_fail (pgm_atomic_int32_get (&pgm_ref_count) > 0, FALSE);
 
 	if (!pgm_atomic_int32_dec_and_test (&pgm_ref_count))
-		return;
+		return TRUE;
 
 	pgm_is_supported = FALSE;
 

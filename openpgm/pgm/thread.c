@@ -20,6 +20,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,7 +44,7 @@
 static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
 
-static volatile gint32 thread_ref_count = 0;
+static volatile int32_t thread_ref_count = 0;
 
 
 #ifdef G_OS_UNIX
@@ -108,7 +109,7 @@ pgm_mutex_init (
 #endif /* !G_OS_UNIX */
 }
 
-gboolean
+bool
 pgm_mutex_trylock (
 	pgm_mutex_t*	mutex
 	)
@@ -153,7 +154,7 @@ pgm_spinlock_init (
 #endif /* !G_OS_UNIX */
 }
 
-gboolean
+bool
 pgm_spinlock_trylock (
 	pgm_spinlock_t*	spinlock
 	)
@@ -416,13 +417,13 @@ pgm_rwlock_writer_lock (
 	LeaveCriticalSection (&rwlock->win32_spinlock);
 }
 
-gboolean
+bool
 pgm_rwlock_writer_trylock (
 	pgm_rwlock_t*	rwlock
 	)
 {
 	pgm_assert (NULL != rwlock);
-	gboolean status;
+	bool status;
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	if (!rwlock->have_writer && !rwlock->read_counter) {
 		rwlock->have_writer = TRUE;

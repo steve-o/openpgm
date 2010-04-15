@@ -22,15 +22,37 @@
 #ifndef __PGM_RATE_CONTROL_H__
 #define __PGM_RATE_CONTROL_H__
 
+#include <stdbool.h>
 #include <glib.h>
+
+typedef struct pgm_rate_t pgm_rate_t;
+
+#ifndef __PGM_THREAD_H__
+#	include <pgm/thread.h>
+#endif
+
+#ifndef __PGM_TIME_H__
+#	include <pgm/time.h>
+#endif
+
+
+struct pgm_rate_t {
+	ssize_t		rate_per_sec;
+	ssize_t		rate_per_msec;
+	size_t		iphdr_len;
+
+	ssize_t		rate_limit;		/* signed for math */
+	pgm_time_t	last_rate_check;
+	pgm_spinlock_t	spinlock;
+};
 
 
 G_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL void pgm_rate_create (gpointer*, const guint, const guint, const guint);
-PGM_GNUC_INTERNAL void pgm_rate_destroy (gpointer);
-PGM_GNUC_INTERNAL gboolean pgm_rate_check (gpointer, const guint, const gboolean);
-PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (gpointer, const gsize);
+PGM_GNUC_INTERNAL void pgm_rate_create (pgm_rate_t*, const ssize_t, const size_t, const uint16_t);
+PGM_GNUC_INTERNAL void pgm_rate_destroy (pgm_rate_t*);
+PGM_GNUC_INTERNAL bool pgm_rate_check (pgm_rate_t*, const size_t, const bool);
+PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (pgm_rate_t*, const size_t);
 
 G_END_DECLS
 

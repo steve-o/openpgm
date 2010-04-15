@@ -136,9 +136,9 @@ glib_log_handler (
 
 static void
 pgm_log_handler (
-	const gint		pgm_log_level,
-	const gchar*		message,
-	G_GNUC_UNUSED gpointer	closure
+	const int		pgm_log_level,
+	const char*		message,
+	G_GNUC_UNUSED void*	closure
 	)
 {
 	GLogLevelFlags glib_log_level;

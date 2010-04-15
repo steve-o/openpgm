@@ -56,11 +56,11 @@ enum {
 extern int pgm_log_mask;
 extern int pgm_min_log_level;
 
-typedef void (*pgm_log_func_t) (const gint, const gchar*, gpointer);
+typedef void (*pgm_log_func_t) (const int, const char*, void*);
 
-pgm_log_func_t pgm_log_set_handler (pgm_log_func_t, gpointer);
-void pgm__log (const gint, const gchar*, ...) G_GNUC_PRINTF (2, 3);
-void pgm__logv (const gint, const gchar*, va_list);
+pgm_log_func_t pgm_log_set_handler (pgm_log_func_t, void*);
+void pgm__log (const int, const char*, ...) G_GNUC_PRINTF (2, 3);
+void pgm__logv (const int, const char*, va_list);
 
 #ifdef G_HAVE_ISO_VARARGS
 
@@ -86,7 +86,7 @@ void pgm__logv (const gint, const gchar*, va_list);
 
 #else   /* no varargs macros */
 
-static inline void pgm_debug (const gchar* format, ...) {
+static inline void pgm_debug (const char* format, ...) {
 	if (PGM_LOG_LEVEL_DEBUG == pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
@@ -95,7 +95,7 @@ static inline void pgm_debug (const gchar* format, ...) {
 	}
 }
 
-static inline void pgm_trace (const guint role, const gchar* format, ...) {
+static inline void pgm_trace (const int role, const char* format, ...) {
 	if (PGM_LOG_LEVEL_TRACE => pgm_min_log_level && pgm_log_mask & role) {
 		va_list args;
 		va_start (args, format);
@@ -104,7 +104,7 @@ static inline void pgm_trace (const guint role, const gchar* format, ...) {
 	}
 }
 
-static inline void pgm_minor (const gchar* format, ...) {
+static inline void pgm_minor (const char* format, ...) {
 	if (PGM_LOG_LEVEL_MINOR => pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
@@ -113,7 +113,7 @@ static inline void pgm_minor (const gchar* format, ...) {
 	}
 }
 
-static inline void pgm_info (const gchar* format, ...) {
+static inline void pgm_info (const char* format, ...) {
 	if (PGM_LOG_LEVEL_NORMAL => pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
@@ -122,7 +122,7 @@ static inline void pgm_info (const gchar* format, ...) {
 	}
 }
 
-static inline void pgm_warn (const gchar* format, ...) {
+static inline void pgm_warn (const char* format, ...) {
 	if (PGM_LOG_LEVEL_WARNING => pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
@@ -131,7 +131,7 @@ static inline void pgm_warn (const gchar* format, ...) {
 	}
 }
 
-static inline void pgm_error (const gchar* format, ...) {
+static inline void pgm_error (const char* format, ...) {
 	if (PGM_LOG_LEVEL_ERROR => pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
@@ -140,7 +140,7 @@ static inline void pgm_error (const gchar* format, ...) {
 	}
 }
 
-static inline void pgm_fatal (const gchar* format, ...) {
+static inline void pgm_fatal (const char* format, ...) {
 	va_list args;
 	va_start (args, format);
 	pgm__logv (PGM_LOG_LEVEL_FATAL, format, args);

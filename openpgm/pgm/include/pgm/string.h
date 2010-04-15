@@ -30,13 +30,13 @@
 G_BEGIN_DECLS
 
 
-gchar* pgm_strdup (const gchar*) G_GNUC_MALLOC;
-gsize pgm_printf_string_upper_bound (const gchar*, va_list);
-gint pgm_vasprintf (gchar**, gchar const*, va_list args);
-gchar* pgm_strdup_vprintf (const gchar*, va_list) G_GNUC_MALLOC;
-gchar* pgm_strconcat (const gchar *, ...) G_GNUC_MALLOC G_GNUC_NULL_TERMINATED;
-gchar** pgm_strsplit (const gchar*, const gchar*, gint) G_GNUC_MALLOC;
-void pgm_strfreev (gchar**);
+char* pgm_strdup (const char*) G_GNUC_MALLOC;
+int pgm_printf_string_upper_bound (const char*, va_list);
+int pgm_vasprintf (char**, char const*, va_list args);
+char* pgm_strdup_vprintf (const char*, va_list) G_GNUC_MALLOC;
+char* pgm_strconcat (const char*, ...) G_GNUC_MALLOC G_GNUC_NULL_TERMINATED;
+char** pgm_strsplit (const char*, const char*, gint) G_GNUC_MALLOC;
+void pgm_strfreev (char**);
 
 
 G_END_DECLS

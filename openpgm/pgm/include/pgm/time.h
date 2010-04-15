@@ -22,7 +22,13 @@
 #ifndef __PGM_TIME_H__
 #define __PGM_TIME_H__
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <glib.h>
+
+#ifndef __PGM_ERROR_H__
+#	include <pgm/error.h>
+#endif
 
 
 typedef enum
@@ -30,12 +36,12 @@ typedef enum
         PGM_TIME_ERROR_FAILED
 } pgm_time_error_e;
 
-typedef guint64 pgm_time_t;
+typedef uint64_t pgm_time_t;
 
 G_BEGIN_DECLS
 
 typedef pgm_time_t (*pgm_time_update_func)(void);
-typedef pgm_time_t (*pgm_time_sleep_func)(gulong);
+typedef pgm_time_t (*pgm_time_sleep_func)(uint32_t);
 typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 
 #define pgm_time_after(a,b)	( (a) > (b) )
@@ -64,6 +70,9 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 extern pgm_time_update_func pgm_time_update_now;
 extern pgm_time_sleep_func pgm_time_sleep;
 extern pgm_time_since_epoch_func pgm_time_since_epoch;
+
+PGM_GNUC_INTERNAL bool pgm_time_init (pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_time_shutdown (void);
 
 
 G_END_DECLS

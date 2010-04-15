@@ -20,6 +20,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -49,7 +50,7 @@
  * we can just pick the first scope and let IP routing handle the rest.
  */
 
-gboolean
+bool
 pgm_if_indextoaddr (
 	const unsigned int	ifindex,
 	const int		iffamily,
