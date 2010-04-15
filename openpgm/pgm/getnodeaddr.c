@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -51,9 +52,9 @@ static const char* pgm_family_string (const int);
  * returns TRUE on success, returns FALSE on failure.
  */
 
-gboolean
+bool
 pgm_if_getnodeaddr (
-	const int		family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
+	const sa_family_t	family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
 	struct sockaddr*	addr,
 	const socklen_t		cnt,	/* size of address pointed to by addr */
 	pgm_error_t**		error

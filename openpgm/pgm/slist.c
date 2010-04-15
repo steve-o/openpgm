@@ -31,8 +31,8 @@
 
 pgm_slist_t*
 pgm_slist_append (
-	pgm_slist_t*	list,
-	gpointer	data
+	pgm_slist_t* restrict list,
+	void*	     restrict data
 	)
 {
 	pgm_slist_t* new_list;
@@ -54,8 +54,8 @@ pgm_slist_append (
 
 pgm_slist_t*
 pgm_slist_prepend (
-	pgm_slist_t*	list,
-	gconstpointer	data
+	pgm_slist_t* restrict list,
+	void*	     restrict data
 	)
 {
 	pgm_slist_t *new_list;
@@ -69,8 +69,8 @@ pgm_slist_prepend (
 
 pgm_slist_t*
 pgm_slist_prepend_link (
-	pgm_slist_t*	list,
-	pgm_slist_t*	link_
+	pgm_slist_t* restrict list,
+	pgm_slist_t* restrict link_
 	)
 {
 	pgm_slist_t *new_list;
@@ -83,8 +83,8 @@ pgm_slist_prepend_link (
 
 pgm_slist_t*
 pgm_slist_remove (
-	pgm_slist_t*	list,
-	gconstpointer	data
+	pgm_slist_t* restrict list,
+	const void*  restrict data
 	)
 {
 	pgm_slist_t *tmp = list, *prev = NULL;
@@ -152,12 +152,12 @@ pgm_slist_last (
 	return list;
 }
 
-guint
+unsigned
 pgm_slist_length (
 	pgm_slist_t*	list
 	)
 {
-	guint length = 0;
+	unsigned length = 0;
 
 	while (list)
 	{

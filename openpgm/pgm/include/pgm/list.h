@@ -27,9 +27,9 @@
 
 struct pgm_list_t
 {
-	gpointer 		data;
-	struct pgm_list_t*		next;
-	struct pgm_list_t*		prev;
+	void*	 		data;
+	struct pgm_list_t*	next;
+	struct pgm_list_t*	prev;
 };
 
 typedef struct pgm_list_t pgm_list_t;
@@ -37,12 +37,12 @@ typedef struct pgm_list_t pgm_list_t;
 
 G_BEGIN_DECLS
 
-pgm_list_t* pgm_list_append (pgm_list_t*, gpointer) G_GNUC_WARN_UNUSED_RESULT;
-pgm_list_t* pgm_list_prepend_link (pgm_list_t*, pgm_list_t*) G_GNUC_WARN_UNUSED_RESULT;
+pgm_list_t* pgm_list_append (pgm_list_t* restrict, void* restrict) G_GNUC_WARN_UNUSED_RESULT;
+pgm_list_t* pgm_list_prepend_link (pgm_list_t* restrict, pgm_list_t* restrict) G_GNUC_WARN_UNUSED_RESULT;
 pgm_list_t* pgm_list_remove_link (pgm_list_t*, pgm_list_t*) G_GNUC_WARN_UNUSED_RESULT;
 pgm_list_t* pgm_list_delete_link (pgm_list_t*, pgm_list_t*) G_GNUC_WARN_UNUSED_RESULT;
 pgm_list_t* pgm_list_last (pgm_list_t*);
-guint pgm_list_length (pgm_list_t*);
+size_t pgm_list_length (pgm_list_t*);
 
 
 G_END_DECLS

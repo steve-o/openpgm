@@ -24,6 +24,9 @@
 
 #include <glib.h>
 
+typedef struct pgm_rxw_state_t pgm_rxw_state_t;
+typedef struct pgm_rxw_t pgm_rxw_t;
+
 #ifndef __PGM_QUEUE_H__
 #	include <pgm/queue.h>
 #endif
@@ -81,6 +84,7 @@ enum
 	PGM_RXW_UNKNOWN,
 };
 
+/* must be smaller than PGM skbuff control buffer */
 struct pgm_rxw_state_t {
 	pgm_time_t	nak_rb_expiry;
 	pgm_time_t	nak_rpt_expiry;
@@ -88,122 +92,108 @@ struct pgm_rxw_state_t {
 
         int		pkt_state;
 
-	guint8		nak_transmit_count;
-        guint8          ncf_retry_count;
-        guint8          data_retry_count;
+	uint8_t		nak_transmit_count;	/* 8-bit for size constraints */
+        uint8_t		ncf_retry_count;
+        uint8_t		data_retry_count;
 
 /* only valid on tg_sqn::pkt_sqn = 0 */
 	unsigned	is_contiguous:1;	/* transmission group */
 };
 
-typedef struct pgm_rxw_state_t pgm_rxw_state_t;
-
-/* must be smaller than PGM skbuff control buffer */
-#ifndef G_STATIC_ASSERT
-#	define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
-#	define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
-#	define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
-#endif
-
-G_STATIC_ASSERT(sizeof(struct pgm_rxw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
-
-
 struct pgm_rxw_t {
 	const pgm_tsi_t*	tsi;
 
-        pgm_queue_t	backoff_queue;
-        pgm_queue_t	wait_ncf_queue;
-        pgm_queue_t	wait_data_queue;
+        pgm_queue_t		backoff_queue;
+        pgm_queue_t		wait_ncf_queue;
+        pgm_queue_t		wait_data_queue;
 /* window context counters */
-	guint32		lost_count;		/* failed to repair */
-	guint32		fragment_count;		/* incomplete apdu */
-	guint32		parity_count;		/* parity for repairs */
-	guint32		committed_count;	/* but still in window */
+	uint32_t		lost_count;		/* failed to repair */
+	uint32_t		fragment_count;		/* incomplete apdu */
+	uint32_t		parity_count;		/* parity for repairs */
+	uint32_t		committed_count;	/* but still in window */
 
-        guint16         max_tpdu;               /* maximum packet size */
-        guint32         lead, trail;
-        guint32         rxw_trail, rxw_trail_init;
-	guint32		commit_lead;
-        unsigned        is_constrained:1;
-        unsigned        is_defined:1;
-	unsigned	has_event:1;		/* edge triggered */
-	unsigned	is_fec_available:1;
-	pgm_rs_t	rs;
-	guint32		tg_size;		/* transmission group size for parity recovery */
-	guint		tg_sqn_shift;
+        uint16_t		max_tpdu;               /* maximum packet size */
+        uint32_t		lead, trail;
+        uint32_t		rxw_trail, rxw_trail_init;
+	uint32_t		commit_lead;
+        unsigned		is_constrained:1;
+        unsigned		is_defined:1;
+	unsigned		has_event:1;		/* edge triggered */
+	unsigned		is_fec_available:1;
+	pgm_rs_t		rs;
+	uint32_t		tg_size;		/* transmission group size for parity recovery */
+	uint8_t			tg_sqn_shift;
 
 /* counters all guint32 */
-	guint32		min_fill_time;		/* restricted from pgm_time_t */
-	guint32		max_fill_time;
-	guint32		min_nak_transmit_count;
-	guint32		max_nak_transmit_count;
-	guint32		cumulative_losses;
-	guint32		bytes_delivered;
-	guint32		msgs_delivered;
+	uint32_t		min_fill_time;		/* restricted from pgm_time_t */
+	uint32_t		max_fill_time;
+	uint32_t		min_nak_transmit_count;
+	uint32_t		max_nak_transmit_count;
+	uint32_t		cumulative_losses;
+	uint32_t		bytes_delivered;
+	uint32_t		msgs_delivered;
 
-	gsize		size;			/* in bytes */
-	guint		alloc;			/* in pkts */
+	size_t			size;			/* in bytes */
+	unsigned		alloc;			/* in pkts */
 	struct pgm_sk_buff_t*	pdata[];
 };
 
-typedef struct pgm_rxw_t pgm_rxw_t;
 
-
-PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const guint16, const guint32, const guint, const guint) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const uint16_t, const unsigned, const unsigned, const ssize_t) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t* const);
 PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t* const);
-PGM_GNUC_INTERNAL gssize pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const guint) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const unsigned) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL guint pgm_rxw_remove_trail (pgm_rxw_t* const) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const guint32, const guint32, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const guint);
-PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, guint32, pgm_time_t, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const guint32);
+PGM_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const uint32_t, const uint32_t, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const uint8_t);
+PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, uint32_t, pgm_time_t, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const uint32_t);
 PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
-PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const guint32) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const uint32_t) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (const int) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (const int) G_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t* const);
 
-static inline guint pgm_rxw_max_length (const pgm_rxw_t* const window)
+static inline unsigned pgm_rxw_max_length (const pgm_rxw_t* const window)
 {
 	pgm_assert (window);
 	return window->alloc;
 }
 
-static inline guint32 pgm_rxw_length (const pgm_rxw_t* const window)
+static inline uint32_t pgm_rxw_length (const pgm_rxw_t* const window)
 {
 	pgm_assert (window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
-static inline gsize pgm_rxw_size (const pgm_rxw_t* const window)
+static inline size_t pgm_rxw_size (const pgm_rxw_t* const window)
 {
 	pgm_assert (window);
 	return window->size;
 }
 
-static inline gboolean pgm_rxw_is_empty (const pgm_rxw_t* const window)
+static inline bool pgm_rxw_is_empty (const pgm_rxw_t* const window)
 {
 	pgm_assert (window);
 	return pgm_rxw_length (window) == 0;
 }
 
-static inline gboolean pgm_rxw_is_full (const pgm_rxw_t* const window)
+static inline bool pgm_rxw_is_full (const pgm_rxw_t* const window)
 {
 	pgm_assert (window);
 	return pgm_rxw_length (window) == pgm_rxw_max_length (window);
 }
 
-static inline guint32 pgm_rxw_lead (const pgm_rxw_t* const window)
+static inline uint32_t pgm_rxw_lead (const pgm_rxw_t* const window)
 {
 	pgm_assert (window);
 	return window->lead;
 }
 
-static inline guint32 pgm_rxw_next_lead (const pgm_rxw_t* const window)
+static inline uint32_t pgm_rxw_next_lead (const pgm_rxw_t* const window)
 {
-	return (guint32)(pgm_rxw_lead (window) + 1);
+	return (uint32_t)(pgm_rxw_lead (window) + 1);
 }
 
 G_END_DECLS

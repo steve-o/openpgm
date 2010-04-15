@@ -22,6 +22,7 @@
 #ifndef __PGM_SOCKADDR_H__
 #define __PGM_SOCKADDR_H__
 
+#include <stdbool.h>
 #include <glib.h>
 
 #ifdef G_OS_UNIX
@@ -49,31 +50,31 @@
 
 G_BEGIN_DECLS
 
-gushort pgm_sockaddr_family (const struct sockaddr* sa);
-guint16 pgm_sockaddr_port (const struct sockaddr* sa);
+sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);
+uint16_t pgm_sockaddr_port (const struct sockaddr* sa);
 socklen_t pgm_sockaddr_len (const struct sockaddr* sa);
 socklen_t pgm_sockaddr_storage_len (const struct sockaddr_storage* ss);
-guint32 pgm_sockaddr_scope_id (const struct sockaddr* sa);
-int pgm_sockaddr_ntop (const struct sockaddr* sa, char* dst, size_t ulen);
-int pgm_sockaddr_pton (const char* src, gpointer dst);
+uint32_t pgm_sockaddr_scope_id (const struct sockaddr* sa);
+int pgm_sockaddr_ntop (const struct sockaddr*restrict sa, char*restrict dst, size_t ulen);
+int pgm_sockaddr_pton (const char*restrict src, struct sockaddr*restrict dst);
 int pgm_sockaddr_is_addr_multicast (const struct sockaddr* sa);
-int pgm_sockaddr_cmp (const struct sockaddr *sa1, const struct sockaddr *sa2);
-int pgm_sockaddr_hdrincl (const int s, const int sa_family, const gboolean v);
-int pgm_sockaddr_pktinfo (const int s, const int sa_family, const gboolean v);
-int pgm_sockaddr_router_alert (const int s, const int sa_family, const gboolean v);
-int pgm_sockaddr_tos (const int s, const int sa_family, const int tos);
-int pgm_sockaddr_join_group (const int s, const int sa_family, const struct group_req* gr);
-int pgm_sockaddr_join_source_group (const int s, const int sa_family, const struct group_source_req* gsr);
-int pgm_sockaddr_multicast_if (int s, const struct sockaddr* address, int ifindex);
-int pgm_sockaddr_multicast_loop (const int s, const int sa_family, const gboolean v);
-int pgm_sockaddr_multicast_hops (const int s, const int sa_family, const gint hops);
-void pgm_sockaddr_nonblocking (const int s, const gboolean v);
+int pgm_sockaddr_cmp (const struct sockaddr*restrict sa1, const struct sockaddr*restrict sa2);
+int pgm_sockaddr_hdrincl (const int s, const sa_family_t sa_family, const bool v);
+int pgm_sockaddr_pktinfo (const int s, const sa_family_t sa_family, const bool v);
+int pgm_sockaddr_router_alert (const int s, const sa_family_t sa_family, const bool v);
+int pgm_sockaddr_tos (const int s, const sa_family_t sa_family, const int tos);
+int pgm_sockaddr_join_group (const int s, const sa_family_t sa_family, const struct group_req* gr);
+int pgm_sockaddr_join_source_group (const int s, const sa_family_t sa_family, const struct group_source_req* gsr);
+int pgm_sockaddr_multicast_if (int s, const struct sockaddr* address, unsigned ifindex);
+int pgm_sockaddr_multicast_loop (const int s, const sa_family_t sa_family, const bool v);
+int pgm_sockaddr_multicast_hops (const int s, const sa_family_t sa_family, const unsigned hops);
+void pgm_sockaddr_nonblocking (const int s, const bool v);
 
-const char* pgm_inet_ntop (int af, const void* src, char* dst, socklen_t size);
-int pgm_inet_pton (int af, const char* src, void* dst);
+const char* pgm_inet_ntop (int af, const void*restrict src, char*restrict dst, socklen_t size);
+int pgm_inet_pton (int af, const char*restrict src, void*restrict dst);
 
-int pgm_nla_to_sockaddr (gconstpointer nla, struct sockaddr* sa);
-int pgm_sockaddr_to_nla (const struct sockaddr* sa, gpointer nla);
+int pgm_nla_to_sockaddr (const void*restrict nla, struct sockaddr*restrict sa);
+int pgm_sockaddr_to_nla (const struct sockaddr*restrict sa, void*restrict nla);
 
 G_END_DECLS
 

@@ -24,8 +24,14 @@
 
 #include <glib.h>
 
+typedef struct pgm_msgv_t pgm_msgv_t;
+
 #ifndef __PGM_PACKET_H__
 #	include <pgm/packet.h>
+#endif
+
+#ifndef __PGM_SKBUFF_H__
+#	include <pgm/skbuff.h>
 #endif
 
 
@@ -46,8 +52,6 @@ struct pgm_msgv_t {
 	size_t			msgv_len;	/* number of elements in skb */
 	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
-
-typedef struct pgm_msgv_t pgm_msgv_t;
 
 
 #endif /* __PGM_MSGV_H__ */

@@ -72,7 +72,7 @@
 #endif
 
 
-gushort
+sa_family_t
 pgm_sockaddr_family (
 	const struct sockaddr*	sa
 	)
@@ -80,12 +80,12 @@ pgm_sockaddr_family (
 	return sa->sa_family;
 }
 
-guint16
+uint16_t
 pgm_sockaddr_port (
 	const struct sockaddr*	sa
 	)
 {
-	guint16 sa_port;
+	uint16_t sa_port;
 	switch (sa->sa_family) {
 	case AF_INET: {
 		struct sockaddr_in s4;
@@ -136,38 +136,38 @@ pgm_sockaddr_storage_len (
 	return ss_len;
 }
 
-guint32
+uint32_t
 pgm_sockaddr_scope_id (
 	const struct sockaddr*	sa
 	)
 {
-	gsize sa_scope_id;
+	uint32_t scope_id;
 	if (AF_INET6 == sa->sa_family) {
 		struct sockaddr_in6 s6;
 		memcpy (&s6, sa, sizeof(s6));
-		sa_scope_id = s6.sin6_scope_id;
+		scope_id = s6.sin6_scope_id;
 	} else
-		sa_scope_id = 0;
-	return sa_scope_id;
+		scope_id = 0;
+	return scope_id;
 }
 
 int
 pgm_sockaddr_ntop (
-	const struct sockaddr*	sa,
-	char*			dst,
-	size_t			ulen
+	const struct sockaddr* restrict sa,
+	char*		       restrict	host,
+	size_t			        hostlen
 	)
 {
 	return getnameinfo (sa, pgm_sockaddr_len (sa),
-			    dst, ulen,
+			    host, hostlen,
 			    NULL, 0,
 			    NI_NUMERICHOST);
 }
 
 int
 pgm_sockaddr_pton (
-	const char*		src,
-	gpointer		dst
+	const char*	 restrict src,
+	struct sockaddr* restrict dst		/* will error on wrong size */
 	)
 {
 	struct addrinfo hints = {
@@ -183,6 +183,9 @@ pgm_sockaddr_pton (
 	}
 	return 0;
 }
+
+/* returns tri-state value: 1 if sa is multicast, 0 if sa is not multicast, -1 on error
+ */
 
 int
 pgm_sockaddr_is_addr_multicast (
@@ -215,8 +218,8 @@ pgm_sockaddr_is_addr_multicast (
 
 int
 pgm_sockaddr_cmp (
-	const struct sockaddr*	sa1,
-	const struct sockaddr*	sa2
+	const struct sockaddr* restrict sa1,
+	const struct sockaddr* restrict sa2
 	)
 {
 	int retval = 0;
@@ -256,9 +259,9 @@ pgm_sockaddr_cmp (
 
 int
 pgm_sockaddr_hdrincl (
-	const int	s,
-	const int	sa_family,
-	const gboolean	v
+	const int		s,
+	const sa_family_t	sa_family,
+	const bool		v
 	)
 {
 	int retval = -1;
@@ -277,9 +280,9 @@ pgm_sockaddr_hdrincl (
  *
  * Stevens: "IP_HDRINCL has datatype int."
  */
-		const int optval = v;
+		const int optval = v ? 1 : 0;
 #else
-		const DWORD optval = v;
+		const DWORD optval = v ? 1 : 0;
 #endif
 		retval = setsockopt (s, IPPROTO_IP, IP_HDRINCL, (const char*)&optval, sizeof(optval));
 		break;
@@ -299,9 +302,9 @@ pgm_sockaddr_hdrincl (
 
 int
 pgm_sockaddr_pktinfo (
-	const int	s,
-	const int	sa_family,
-	const gboolean	v
+	const int		s,
+	const sa_family_t	sa_family,
+	const bool		v
 	)
 {
 	int retval = -1;
@@ -321,9 +324,9 @@ pgm_sockaddr_pktinfo (
  *
  * Stevens: "IP_RECVDSTADDR has datatype int."
  */
-	const int optval = v;
+	const int optval = v ? 1 : 0;
 #else
-	const DWORD optval = v;
+	const DWORD optval = v ? 1 : 0;
 #endif
 
 	switch (sa_family) {
@@ -347,9 +350,9 @@ pgm_sockaddr_pktinfo (
 
 int
 pgm_sockaddr_router_alert (
-	const int	s,
-	const int	sa_family,
-	const gboolean	v
+	const int		s,
+	const sa_family_t	sa_family,
+	const bool		v
 	)
 {
 	int retval = -1;
@@ -358,7 +361,7 @@ pgm_sockaddr_router_alert (
  * true.  Expects an integer flag."
  * Linux:ipv6(7) "Argument is a pointer to an integer."
  */
-	const unsigned char optval = v;
+	const unsigned char optval = v ? 1 : 0;
 
 	switch (sa_family) {
 	case AF_INET:
@@ -372,7 +375,7 @@ pgm_sockaddr_router_alert (
 	default: break;
 	}
 #else
-	const guint32 optval = v ? g_htonl(0x94040000) : 0;
+	const uint32_t optval = v ? htonl(0x94040000) : 0;
 
 	switch (sa_family) {
 	case AF_INET:
@@ -392,9 +395,9 @@ pgm_sockaddr_router_alert (
 
 int
 pgm_sockaddr_tos (
-	const int	s,
-	const int	sa_family,
-	const int	tos
+	const int		s,
+	const sa_family_t	sa_family,
+	const int		tos
 	)
 {
 	int retval = -1;
@@ -437,7 +440,7 @@ pgm_sockaddr_tos (
 int
 pgm_sockaddr_join_group (
 	const int		s,
-	const int		sa_family,
+	const sa_family_t	sa_family,
 	const struct group_req*	gr
 	)
 {
@@ -523,7 +526,7 @@ pgm_sockaddr_join_group (
 int
 pgm_sockaddr_join_source_group (
 	const int			s,
-	const int			sa_family,
+	const sa_family_t		sa_family,
 	const struct group_source_req*	gsr
 	)
 {
@@ -587,7 +590,7 @@ int
 pgm_sockaddr_multicast_if (
 	int			s,
 	const struct sockaddr*	address,
-	int			ifindex
+	unsigned		ifindex
 	)
 {
 	int retval = -1;
@@ -640,9 +643,9 @@ pgm_sockaddr_multicast_if (
 
 int
 pgm_sockaddr_multicast_loop (
-	const int	s,
-	const int	sa_family,
-	const gboolean	v
+	const int		s,
+	const sa_family_t	sa_family,
+	const bool		v
 	)
 {
 	int retval = -1;
@@ -660,9 +663,9 @@ pgm_sockaddr_multicast_loop (
  *
  * Stevens: "IP_MULTICAST_LOOP has datatype u_char."
  */
-		const unsigned char optval = v;
+		const unsigned char optval = v ? 1 : 0;
 #else
-		const DWORD optval = v;
+		const DWORD optval = v ? 1 : 0;
 #endif
 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
 		break;
@@ -678,9 +681,9 @@ pgm_sockaddr_multicast_loop (
  *
  * Stevens: "IPV6_MULTICAST_LOOP has datatype u_int."
  */
-		const unsigned int optval = v;
+		const unsigned int optval = v ? 1 : 0;
 #else
-		const DWORD optval = v;
+		const DWORD optval = v ? 1 : 0;
 #endif
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
 		break;
@@ -698,9 +701,9 @@ pgm_sockaddr_multicast_loop (
 
 int
 pgm_sockaddr_multicast_hops (
-	const int	s,
-	const int	sa_family,
-	const gint	hops
+	const int		s,
+	const sa_family_t	sa_family,
+	const unsigned		hops
 	)
 {
 	int retval = -1;
@@ -751,7 +754,7 @@ pgm_sockaddr_multicast_hops (
 void
 pgm_sockaddr_nonblocking (
 	const int	s,
-	const gboolean	v
+	const bool	v
 	)
 {
 #ifdef G_OS_UNIX
@@ -771,10 +774,10 @@ pgm_sockaddr_nonblocking (
  */
 const char*
 pgm_inet_ntop (
-	int		af,
-	const void*	src,
-	char*		dst,
-	socklen_t	size
+	int		     af,
+	const void* restrict src,
+	char*	    restrict dst,
+	socklen_t	     size
 	)
 {
 	pgm_assert (AF_INET == af || AF_INET6 == af);
@@ -815,9 +818,9 @@ pgm_inet_ntop (
 
 int
 pgm_inet_pton (
-	int		af,
-	const char*	src,
-	void*		dst
+	int		     af,
+	const char* restrict src,
+	void*	    restrict dst
 	)
 {
 	pgm_assert (AF_INET == af || AF_INET6 == af);
@@ -831,7 +834,7 @@ pgm_inet_pton (
 		.ai_flags	= AI_NUMERICHOST
 	}, *result = NULL;
 
-	int e = getaddrinfo (src, NULL, &hints, &result);
+	const int e = getaddrinfo (src, NULL, &hints, &result);
 	if (0 != e) {
 		return 0;	/* error */
 	}
@@ -865,24 +868,24 @@ pgm_inet_pton (
 
 int
 pgm_nla_to_sockaddr (
-	gconstpointer		nla,
-	struct sockaddr*	sa
+	const void*	 restrict nla,
+	struct sockaddr* restrict sa
 	)
 {
-	guint16 nla_family;
+	uint16_t nla_family;
 	int retval = 0;
 
 	memcpy (&nla_family, nla, sizeof(nla_family));
-	sa->sa_family = g_ntohs (nla_family);
+	sa->sa_family = ntohs (nla_family);
 	switch (sa->sa_family) {
 	case AFI_IP:
 		sa->sa_family = AF_INET;
-		((struct sockaddr_in*)sa)->sin_addr.s_addr = ((const struct in_addr*)((const guint8*)nla + sizeof(guint32)))->s_addr;
+		((struct sockaddr_in*)sa)->sin_addr.s_addr = ((const struct in_addr*)((const char*)nla + sizeof(uint32_t)))->s_addr;
 		break;
 
 	case AFI_IP6:
 		sa->sa_family = AF_INET6;
-		memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (const struct in6_addr*)((const guint8*)nla + sizeof(guint32)), sizeof(struct in6_addr));
+		memcpy (&((struct sockaddr_in6*)sa)->sin6_addr, (const struct in6_addr*)((const char*)nla + sizeof(uint32_t)), sizeof(struct in6_addr));
 		break;
 
 	default:
@@ -895,23 +898,23 @@ pgm_nla_to_sockaddr (
 
 int
 pgm_sockaddr_to_nla (
-	const struct sockaddr*	sa,
-	gpointer		nla
+	const struct sockaddr* restrict sa,
+	void*		       restrict	nla
 	)
 {
 	int retval = 0;
 
-	*(guint16*)nla = sa->sa_family;
-	*(guint16*)((guint8*)nla + sizeof(guint16)) = 0;	/* reserved 16bit space */
+	*(uint16_t*)nla = sa->sa_family;
+	*(uint16_t*)((char*)nla + sizeof(uint16_t)) = 0;	/* reserved 16bit space */
 	switch (sa->sa_family) {
 	case AF_INET:
-		*(guint16*)nla = g_htons (AFI_IP);
-		((struct in_addr*)((guint8*)nla + sizeof(guint32)))->s_addr = ((const struct sockaddr_in*)sa)->sin_addr.s_addr;
+		*(uint16_t*)nla = htons (AFI_IP);
+		((struct in_addr*)((char*)nla + sizeof(uint32_t)))->s_addr = ((const struct sockaddr_in*)sa)->sin_addr.s_addr;
 		break;
 
 	case AF_INET6:
-		*(guint16*)nla = g_htons (AFI_IP6);
-		memcpy ((struct in6_addr*)((guint8*)nla + sizeof(guint32)), &((const struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
+		*(uint16_t*)nla = htons (AFI_IP6);
+		memcpy ((struct in6_addr*)((char*)nla + sizeof(uint32_t)), &((const struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
 		break;
 
 	default:

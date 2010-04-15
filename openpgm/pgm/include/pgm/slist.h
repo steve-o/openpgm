@@ -27,7 +27,7 @@
 
 struct pgm_slist_t
 {
-	gconstpointer		data;
+	void*			data;
 	struct pgm_slist_t*	next;
 };
 
@@ -36,14 +36,14 @@ typedef struct pgm_slist_t pgm_slist_t;
 
 G_BEGIN_DECLS
 
-pgm_slist_t* pgm_slist_append (pgm_slist_t*, gpointer) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_prepend (pgm_slist_t*, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_prepend_link (pgm_slist_t*, pgm_slist_t*) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_remove (pgm_slist_t*, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_append (pgm_slist_t*restrict, void*restrict) G_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_prepend (pgm_slist_t*restrict, void*restrict) G_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_prepend_link (pgm_slist_t*restrict, pgm_slist_t*restrict) G_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_remove (pgm_slist_t*restrict, const void*restrict) G_GNUC_WARN_UNUSED_RESULT;
 pgm_slist_t* pgm_slist_remove_first (pgm_slist_t*) G_GNUC_WARN_UNUSED_RESULT;
 void pgm_slist_free (pgm_slist_t*);
 pgm_slist_t* pgm_slist_last (pgm_slist_t*);
-guint pgm_slist_length (pgm_slist_t*);
+unsigned pgm_slist_length (pgm_slist_t*);
 
 
 G_END_DECLS

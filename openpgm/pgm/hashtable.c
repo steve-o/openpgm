@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdint.h>
 #include <string.h>
 
 #include <glib.h>
@@ -38,22 +39,22 @@
 
 struct pgm_hashnode_t
 {
-	gconstpointer		key;
-	gpointer		value;
+	const void*		key;
+	void*			value;
 	struct pgm_hashnode_t*	next;
-	guint			key_hash;
+	uint_fast32_t		key_hash;
 };
 
 typedef struct pgm_hashnode_t pgm_hashnode_t;
 
 struct pgm_hashtable_t
 {
-	gint			size;
-	gint			nnodes;
+	unsigned		size;
+	unsigned		nnodes;
 	pgm_hashnode_t**	nodes;
 	PGMHashFunc		hash_func;
 	PGMEqualFunc		key_equal_func;
-	volatile gint32		ref_count;
+	volatile int32_t	ref_count;
 };
 
 #define PGM_HASH_TABLE_RESIZE(hash_table)			\
@@ -65,9 +66,9 @@ struct pgm_hashtable_t
 	   pgm_hash_table_resize (hash_table);			\
    } G_STMT_END
 
-static void pgm_hash_table_resize (pgm_hashtable_t	*);
-static pgm_hashnode_t** pgm_hash_table_lookup_node (pgm_hashtable_t*, gconstpointer, guint*);
-static pgm_hashnode_t* pgm_hash_node_new (gconstpointer, gpointer, guint);
+static void pgm_hash_table_resize (pgm_hashtable_t*);
+static pgm_hashnode_t** pgm_hash_table_lookup_node (pgm_hashtable_t* restrict, const void* restrict, pgm_hash_t* restrict);
+static pgm_hashnode_t* pgm_hash_node_new (const void* restrict, void* restrict, const pgm_hash_t);
 static void pgm_hash_node_destroy (pgm_hashnode_t*);
 static void pgm_hash_nodes_destroy (pgm_hashnode_t*);
 
@@ -100,11 +101,11 @@ pgm_hash_table_unref (
 	)
 {
 	pgm_return_if_fail (hash_table != NULL);
-	pgm_return_if_fail (hash_table->ref_count > 0);
+	pgm_return_if_fail (pgm_atomic_int32_get (&hash_table->ref_count) > 0);
 
 	if (pgm_atomic_int32_exchange_and_add (&hash_table->ref_count, -1) - 1 == 0)
 	{
-		for (int i = 0; i < hash_table->size; i++)
+		for (unsigned i = 0; i < hash_table->size; i++)
 			pgm_hash_nodes_destroy (hash_table->nodes[i]);
 		pgm_free (hash_table->nodes);
 		pgm_free (hash_table);
@@ -126,16 +127,13 @@ pgm_hash_table_destroy (
 static inline
 pgm_hashnode_t**
 pgm_hash_table_lookup_node (
-	pgm_hashtable_t*	hash_table,
-	gconstpointer		key,
-	guint*			hash_return
+	pgm_hashtable_t* restrict hash_table,
+	const void*	 restrict key,
+	pgm_hash_t*	 restrict hash_return	/* non-NULL to return hash value */
 	)
 {
-	pgm_hashnode_t **node;
-	guint hash_value;
-
-	hash_value = (* hash_table->hash_func) (key);
-	node = &hash_table->nodes[hash_value % hash_table->size];
+	const pgm_hash_t hash_value = (* hash_table->hash_func) (key);
+	pgm_hashnode_t** node = &hash_table->nodes[hash_value % hash_table->size];
   
 	if (hash_return)
 		*hash_return = hash_value;
@@ -151,27 +149,25 @@ pgm_hash_table_lookup_node (
 
 gpointer
 pgm_hash_table_lookup (
-	pgm_hashtable_t*	hash_table,
-	gconstpointer		key
+	pgm_hashtable_t* restrict hash_table,
+	const void*	 restrict key
 	)
 {
-	pgm_hashnode_t *node;
-  
 	pgm_return_val_if_fail (hash_table != NULL, NULL);
   
-	node = *pgm_hash_table_lookup_node (hash_table, key, NULL);
+	const pgm_hashnode_t* node = *pgm_hash_table_lookup_node (hash_table, key, NULL);
 	return node ? node->value : NULL;
 }
 
 void
 pgm_hash_table_insert (
-	pgm_hashtable_t*	hash_table,
-	gconstpointer		key,
-	gpointer		value
+	pgm_hashtable_t* restrict hash_table,
+	const void*	 restrict key,
+	void*		 restrict value
 	)
 {
 	pgm_hashnode_t **node;
-	guint key_hash;
+	pgm_hash_t key_hash;
   
 	pgm_return_if_fail (hash_table != NULL);
 	pgm_return_if_fail (hash_table->ref_count > 0);
@@ -184,10 +180,10 @@ pgm_hash_table_insert (
 	PGM_HASH_TABLE_RESIZE (hash_table);
 }
 
-gboolean
+bool
 pgm_hash_table_remove (
-	pgm_hashtable_t*	hash_table,
-	gconstpointer		key
+	pgm_hashtable_t* restrict hash_table,
+	const void*	 restrict key
 	)
 {
 	pgm_hashnode_t **node, *dest;
@@ -214,7 +210,7 @@ pgm_hash_table_remove_all (
 {
 	pgm_return_if_fail (hash_table != NULL);
 
-	for (int i = 0; i < hash_table->size; i++)
+	for (unsigned i = 0; i < hash_table->size; i++)
 	{
 		pgm_hash_nodes_destroy (hash_table->nodes[i]);
 		hash_table->nodes[i] = NULL;
@@ -223,21 +219,21 @@ pgm_hash_table_remove_all (
 	PGM_HASH_TABLE_RESIZE (hash_table);
 }
 
-static void
+static
+void
 pgm_hash_table_resize (
 	pgm_hashtable_t*	hash_table
 	)
 {
-	gint new_size = pgm_spaced_primes_closest (hash_table->nnodes);
-	new_size = CLAMP (new_size, HASH_TABLE_MIN_SIZE, HASH_TABLE_MAX_SIZE);
- 
+	const unsigned new_size = CLAMP (pgm_spaced_primes_closest (hash_table->nnodes),
+					 HASH_TABLE_MIN_SIZE, HASH_TABLE_MAX_SIZE);
 	pgm_hashnode_t** new_nodes = pgm_new0 (pgm_hashnode_t*, new_size);
   
-	for (int i = 0; i < hash_table->size; i++)
+	for (unsigned i = 0; i < hash_table->size; i++)
 		for (pgm_hashnode_t *node = hash_table->nodes[i], *next; node; node = next)
 		{
 			next = node->next;
-			const guint hash_val = node->key_hash % new_size;
+			const pgm_hash_t hash_val = node->key_hash % new_size;
 			node->next = new_nodes[hash_val];
 			new_nodes[hash_val] = node;
 		}
@@ -250,9 +246,9 @@ pgm_hash_table_resize (
 static
 pgm_hashnode_t*
 pgm_hash_node_new (
-	gconstpointer	key,
-	gpointer	value,
-	guint		key_hash
+	const void* restrict key,
+	void* 	    restrict value,
+	const pgm_hash_t     key_hash
 	)
 {
 	pgm_hashnode_t *hash_node = pgm_new (pgm_hashnode_t, 1);
@@ -278,56 +274,58 @@ pgm_hash_nodes_destroy (
 	pgm_hashnode_t*	hash_node
 	)
 {
-	while (hash_node)
-	{
+	while (hash_node) {
 		pgm_hashnode_t *next = hash_node->next;
 		pgm_free (hash_node);
 		hash_node = next;
 	}
 }
 
-gboolean
+/* common hash value compare and hash key generation functions */
+
+bool
 pgm_str_equal (
-	gconstpointer	v1,
-	gconstpointer	v2
+	const void* restrict p1,
+	const void* restrict p2
 	)
 {
-	const gchar* string1 = v1;
-	const gchar* string2 = v2;
-	return strcmp (string1, string2) == 0;
+	const char *s1 = p1, *s2 = p2;
+	return (strcmp (s1, s2) == 0);
 }
 
 /* 31 bit hash function */
 
-guint
+pgm_hash_t
 pgm_str_hash (
-	gconstpointer	v
+	const void*	p
 	)
 {
-	const signed char *p = v;
-	guint32 h = *p;
+	const char* s = p;
+	pgm_hash_t hash_val = *s;
 
-	if (G_LIKELY (h))
-		for (p += 1; *p != '\0'; p++)
-			h = (h << 5) - h + *p;
-	return h;
+	if (G_LIKELY (hash_val))
+		for (s++; *s; s++)
+			hash_val = (hash_val << 5) - hash_val + *s;
+	return hash_val;
 }
 
-gboolean
+bool
 pgm_int_equal (
-	gconstpointer	v1,
-	gconstpointer	v2
+	const void*	p1,
+	const void*	p2
 	)
 {
-	return *((const gint*) v1) == *((const gint*) v2);
+	const int i1 = *(const int*)p1, i2 = *(const int*)p2;
+	return (i1 == i2);
 }
 
-guint
+pgm_hash_t
 pgm_int_hash (
-	gconstpointer	v
+	const void*	p
 	)
 {
-	return *(const gint*) v;
+	const int i = *(const int*)p;
+	return (pgm_hash_t)i;
 }
 
 

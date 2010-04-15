@@ -27,14 +27,14 @@
 
 G_BEGIN_DECLS
 
-guint16 pgm_inet_checksum (const void*, guint, int);
-guint16 pgm_csum_fold (guint32);
-guint32 pgm_csum_block_add (guint32, guint32, guint);
-guint32 pgm_compat_csum_partial (const void*, guint, guint32);
-guint32 pgm_compat_csum_partial_copy (const void*, void*, guint, guint32);
+uint16_t pgm_inet_checksum (const void*, uint16_t, uint16_t);
+uint16_t pgm_csum_fold (uint32_t);
+uint32_t pgm_csum_block_add (uint32_t, uint32_t, const uint16_t);
+uint32_t pgm_compat_csum_partial (const void*, uint16_t, uint32_t);
+uint32_t pgm_compat_csum_partial_copy (const void*, void*, uint16_t, uint32_t);
 
 #if defined(__x86_64__) || defined(__i386__) || defined(__i386) || defined(__amd64)
-static inline unsigned add32_with_carry (unsigned a, unsigned b)
+static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
 	asm("addl %2, %0 \n\t"
 	    "adcl $0, %0"
@@ -43,7 +43,7 @@ static inline unsigned add32_with_carry (unsigned a, unsigned b)
 	return a;
 }
 #elif defined(__sparc__) || defined(__sparc) || defined(__sparcv9)
-static inline unsigned add32_with_carry (unsigned a, unsigned b)
+static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
 	asm("addcc %2, %0, %0 \n\t"
 	    "addx %0, %%g0, %0"
@@ -53,7 +53,7 @@ static inline unsigned add32_with_carry (unsigned a, unsigned b)
 	return a;
 }
 #else
-static inline unsigned add32_with_carry (unsigned a, unsigned b)
+static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
 	a += b;
 	a  = (a >> 16) + (a & 0xffff);
@@ -61,35 +61,8 @@ static inline unsigned add32_with_carry (unsigned a, unsigned b)
 }
 #endif
 
-#ifdef CONFIG_CKSUM_COPY
-
-#	ifdef __x86_64__
-unsigned pgm_asm64_csum_partial(const unsigned char *buff, unsigned len);
-
-static inline guint32 pgm_csum_partial(const void *buff, guint len, guint32 sum)
-{
-	return (guint32)add32_with_carry(pgm_asm64_csum_partial(buff, len), sum);
-}
-#	else
-guint32 pgm_csum_partial(const void *buff, guint len, guint32 sum);
-#	endif /* __x86_64__ */
-
-guint32 pgm_csum_partial_copy_generic (const unsigned char *src, const unsigned char *dst,
-					unsigned len,
-					unsigned sum, 
-					int *src_err_ptr, int *dst_err_ptr);
-
-static inline guint32 pgm_csum_partial_copy (const void *src, void *dst, unsigned len, unsigned sum)
-{
-	return pgm_csum_partial_copy_generic (src, dst, len, sum, NULL, NULL);
-}
-
-#else
-
 #	define pgm_csum_partial            pgm_compat_csum_partial
 #	define pgm_csum_partial_copy       pgm_compat_csum_partial_copy
-
-#endif /* CONFIG_CKSUM_COPY */
 
 G_END_DECLS
 

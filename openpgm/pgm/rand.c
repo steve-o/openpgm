@@ -20,6 +20,7 @@
  */
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -39,7 +40,7 @@
 
 static pgm_rand_t g_rand = { .seed = 0 };
 
-static volatile gint32 g_rand_ref_count = 0;
+static volatile int32_t g_rand_ref_count = 0;
 static pgm_mutex_t g_rand_mutex;
 
 
@@ -95,7 +96,7 @@ pgm_rand_create (
 /* derived from POSIX.1-2001 example implementation of rand()
  */
 
-guint32
+uint32_t
 pgm_rand_int (
 	pgm_rand_t*	rand_
 	)
@@ -107,11 +108,11 @@ pgm_rand_int (
 	return rand_->seed;
 }
 
-gint32
+int32_t
 pgm_rand_int_range (
 	pgm_rand_t*	rand_,
-	gint32		begin,
-	gint32		end
+	int32_t		begin,
+	int32_t		end
 	)
 {
 /* pre-conditions */
@@ -120,25 +121,24 @@ pgm_rand_int_range (
 	return begin + pgm_rand_int (rand_) % (end - begin);
 }
 
-guint32
+uint32_t
 pgm_random_int (void)
 {
-	guint32 rand_value;
 	pgm_mutex_lock (&g_rand_mutex);
 	if (!g_rand.seed)
 		pgm_rand_create (&g_rand);
-	rand_value = pgm_rand_int (&g_rand);
+	const uint32_t rand_value = pgm_rand_int (&g_rand);
 	pgm_mutex_unlock (&g_rand_mutex);
 	return rand_value;
 }
 
-gint32
+int32_t
 pgm_random_int_range (
-	gint32		begin,
-	gint32		end
+	int32_t		begin,
+	int32_t		end
 	)
 {
-	const guint32 rand_value = pgm_random_int();
+	const uint32_t rand_value = pgm_random_int();
 	return begin + rand_value % (end - begin);
 }
 

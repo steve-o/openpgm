@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdbool.h>
+
 #include <glib.h>
 
 #include "pgm/messages.h"
@@ -30,7 +32,7 @@
 //#define QUEUE_DEBUG
 
 
-gboolean
+bool
 pgm_queue_is_empty (
 	pgm_queue_t*	queue
 	)
@@ -42,8 +44,8 @@ pgm_queue_is_empty (
 
 void
 pgm_queue_push_head_link (
-	pgm_queue_t*	queue,
-	pgm_list_t*	link
+	pgm_queue_t* restrict queue,
+	pgm_list_t*  restrict link
 	)
 {
 	pgm_return_if_fail (queue != NULL);

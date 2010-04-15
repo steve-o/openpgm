@@ -22,24 +22,34 @@
 #ifndef __PGM_MEM_H__
 #define __PGM_MEM_H__
 
+#include <alloca.h>
+#include <stdbool.h>
+
 #include <glib.h>
 
 
 G_BEGIN_DECLS
 
-extern gboolean pgm_mem_gc_friendly;
+extern bool pgm_mem_gc_friendly;
 
-gpointer pgm_malloc (gulong) G_GNUC_MALLOC;
-gpointer pgm_malloc0 (gulong) G_GNUC_MALLOC;
-gpointer pgm_memdup (gconstpointer, guint) G_GNUC_MALLOC;
+void* pgm_malloc (size_t) G_GNUC_MALLOC;
+void* pgm_malloc_n (size_t, size_t) G_GNUC_MALLOC;
+void* pgm_malloc0 (size_t) G_GNUC_MALLOC;
+void* pgm_malloc0_n (size_t, size_t) G_GNUC_MALLOC;
+void* pgm_memdup (const void*, size_t) G_GNUC_MALLOC;
 void pgm_free (gpointer);
 
-/* Convenience memory allocators
+/* Convenience memory allocators that wont work well above 32-bit sizes
  */
-#define pgm_new(struct_type, n_structs)		\
-    ((struct_type *) pgm_malloc (((gsize) sizeof (struct_type)) * ((gsize) (n_structs))))
-#define pgm_new0(struct_type, n_structs)	\
-    ((struct_type *) pgm_malloc0 (((gsize) sizeof (struct_type)) * ((gsize) (n_structs))))
+#define pgm_new(struct_type, n_structs) \
+	((struct_type*)pgm_malloc_n ((size_t)sizeof(struct_type), (size_t)(n_structs)))
+#define pgm_new0(struct_type, n_structs) \
+	((struct_type*)pgm_malloc0_n ((size_t)sizeof(struct_type), (size_t)(n_structs)))
+
+#define pgm_alloca(size) \
+	alloca (size)
+#define pgm_newa(struct_type, n_structs) \
+	((struct_type*) pgm_alloca (sizeof(struct_type) * (size_t)(n_structs)))
 
 void pgm_mem_init (void);
 void pgm_mem_shutdown (void);

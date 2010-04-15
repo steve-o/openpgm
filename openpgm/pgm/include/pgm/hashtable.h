@@ -22,13 +22,16 @@
 #ifndef __PGM_HASHTABLE_H__
 #define __PGM_HASHTABLE_H__
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <glib.h>
 
 
 typedef struct pgm_hashtable_t pgm_hashtable_t;
+typedef uint_fast32_t pgm_hash_t;
 
-typedef guint (*PGMHashFunc) (gconstpointer);
-typedef gboolean (*PGMEqualFunc) (gconstpointer, gconstpointer);
+typedef pgm_hash_t (*PGMHashFunc) (gconstpointer);
+typedef bool (*PGMEqualFunc) (gconstpointer, gconstpointer);
 
 
 G_BEGIN_DECLS
@@ -36,7 +39,7 @@ G_BEGIN_DECLS
 pgm_hashtable_t* pgm_hash_table_new (PGMHashFunc, PGMEqualFunc);
 void pgm_hash_table_destroy (pgm_hashtable_t*);
 void pgm_hash_table_insert (pgm_hashtable_t*, gconstpointer, gpointer);
-gboolean pgm_hash_table_remove (pgm_hashtable_t*, gconstpointer);
+bool pgm_hash_table_remove (pgm_hashtable_t*, gconstpointer);
 void pgm_hash_table_remove_all (pgm_hashtable_t*);
 gpointer pgm_hash_table_lookup (pgm_hashtable_t*, gconstpointer);
 
@@ -44,10 +47,10 @@ void pgm_hash_table_unref (pgm_hashtable_t*);
 
 /* Hash Functions
  */
-gboolean pgm_str_equal (gconstpointer, gconstpointer);
-guint pgm_str_hash (gconstpointer);
-gboolean pgm_int_equal (gconstpointer, gconstpointer);
-guint pgm_int_hash (gconstpointer);
+bool pgm_str_equal (const void* restrict, const void* restrict) G_GNUC_WARN_UNUSED_RESULT;
+pgm_hash_t pgm_str_hash (const void*) G_GNUC_WARN_UNUSED_RESULT;
+bool pgm_int_equal (const void* restrict, const void* restrict) G_GNUC_WARN_UNUSED_RESULT;
+pgm_hash_t pgm_int_hash (const void*) G_GNUC_WARN_UNUSED_RESULT;
 
 
 G_END_DECLS

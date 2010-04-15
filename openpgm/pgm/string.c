@@ -43,13 +43,13 @@
 /* Return copy of string, must be freed with pgm_free().
  */
 
-gchar*
+char*
 pgm_strdup (
-	const gchar*	str
+	const char*	str
 	)
 {
-	gchar* new_str;
-	gsize length;
+	char* new_str;
+	size_t length;
 
 	if (G_LIKELY (str))
 	{
@@ -66,26 +66,26 @@ pgm_strdup (
 /* Calculates the maximum space needed to store the output of the sprintf() function.
  */
 
-gsize
+int
 pgm_printf_string_upper_bound (
-	const gchar*	format,
+	const char*	format,
 	va_list		args
 	)
 {
-	gchar c;
+	char c;
 	return vsnprintf (&c, 1, format, args) + 1;
 }
 
-gint
+int
 pgm_vasprintf (
-	gchar**		string,
-	gchar const*	format,
-	va_list		args
+	char**	    restrict string,
+	const char* restrict format,
+	va_list		     args
 	)
 {
 	pgm_return_val_if_fail (string != NULL, -1);
 #ifdef CONFIG_HAVE_VASPRINTF
-	const gint len = vasprintf (string, format, args);
+	const int len = vasprintf (string, format, args);
 	if (len < 0)
 		*string = NULL;
 #else
@@ -93,28 +93,28 @@ pgm_vasprintf (
 	G_VA_COPY (args2, args);
 	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
 /* NB: must be able to handle NULL args, fails on GCC */
-	const gint len = vsprintf (*string, format, args);
+	const int len = vsprintf (*string, format, args);
 	va_end (args2);
 #endif
 	return len;
 }
 
-gchar*
+char*
 pgm_strdup_vprintf (
-	const gchar*	format,
+	const char*	format,
 	va_list		args
 	)
 {
-	gchar *string = NULL;
+	char *string = NULL;
 	pgm_vasprintf (&string, format, args);
 	return string;
 }
 
 static
-gchar*
+char*
 pgm_stpcpy (
-	gchar*		dest,
-	const gchar*	src
+	char*	    restrict dest,
+	const char* restrict src
 	)
 {
 	pgm_return_val_if_fail (dest != NULL, NULL);
@@ -122,8 +122,8 @@ pgm_stpcpy (
 #ifdef CONFIG_HAVE_STPCPY
 	return stpcpy (dest, src);
 #else
-	gchar *d = dest;
-	const gchar *s = src;
+	char *d = dest;
+	const char *s = src;
 	do {
 		*d++ = *s;
 	} while (*s++ != '\0');
@@ -131,17 +131,17 @@ pgm_stpcpy (
 #endif
 }
 
-gchar*
+char*
 pgm_strconcat (
-	const gchar*	string1,
+	const char*	string1,
 	...
 	)
 {
-	gsize	l;     
+	size_t	l;     
 	va_list args;
-	gchar*	s;
-	gchar*	concat;
-	gchar*	ptr;
+	char*	s;
+	char*	concat;
+	char*	ptr;
 
 	if (!string1)
 		return NULL;
@@ -173,17 +173,17 @@ pgm_strconcat (
 /* Split a string with delimiter, result must be freed with pgm_strfreev().
  */
 
-gchar**
+char**
 pgm_strsplit (
-	const gchar*	string,
-	const gchar*	delimiter,
-	gint		max_tokens
+	const char*	string,
+	const char*	delimiter,
+	int		max_tokens
 	)
 {
 	pgm_slist_t *string_list = NULL, *slist;
-	gchar **str_array, *s;
-	guint n = 0;
-	const gchar *remainder;
+	char **str_array, *s;
+	unsigned n = 0;
+	const char *remainder;
 
 	pgm_return_val_if_fail (string != NULL, NULL);
 	pgm_return_val_if_fail (delimiter != NULL, NULL);
@@ -196,12 +196,12 @@ pgm_strsplit (
 	s = strstr (remainder, delimiter);
 	if (s)
 	{
-		const gsize delimiter_len = strlen (delimiter);   
+		const size_t delimiter_len = strlen (delimiter);   
 
 		while (--max_tokens && s)
 		{
-			const gsize len = s - remainder;
-			gchar *new_string = g_new (gchar, len + 1);
+			const size_t len = s - remainder;
+			char *new_string = pgm_new (char, len + 1);
 			strncpy (new_string, remainder, len);
 			new_string[len] = 0;
 			string_list = pgm_slist_prepend (string_list, new_string);
@@ -213,10 +213,10 @@ pgm_strsplit (
 	if (*string)
 	{
 		n++;
-		string_list = pgm_slist_prepend (string_list, g_strdup (remainder));
+		string_list = pgm_slist_prepend (string_list, pgm_strdup (remainder));
 	}
 
-	str_array = pgm_new (gchar*, n + 1);
+	str_array = pgm_new (char*, n + 1);
 	str_array[n--] = NULL;
 	for (slist = string_list; slist; slist = slist->next)
 		str_array[n--] = slist->data;
@@ -231,12 +231,12 @@ pgm_strsplit (
 
 void
 pgm_strfreev (
-	gchar**		str_array
+	char**		str_array
 	)
 {
 	if (G_LIKELY (str_array))
 	{
-		for (int i = 0; str_array[i] != NULL; i++)
+		for (unsigned i = 0; str_array[i] != NULL; i++)
 			pgm_free (str_array[i]);
 
 		pgm_free (str_array);

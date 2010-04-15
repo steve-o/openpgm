@@ -63,10 +63,10 @@
 #include "pgm/packet.h"
 #include "pgm/math.h"
 #include "pgm/net.h"
-#include "pgm/txwi.h"
-#include "pgm/sourcep.h"
-#include "pgm/rxwi.h"
-#include "pgm/receiverp.h"
+#include "pgm/txw.h"
+#include "pgm/source.h"
+#include "pgm/rxw.h"
+#include "pgm/receiver.h"
 #include "pgm/rate_control.h"
 #include "pgm/timer.h"
 #include "pgm/checksum.h"
@@ -104,9 +104,9 @@ recvskb (
 	struct pgm_sk_buff_t* const	skb,
 	const int			flags,
 	struct sockaddr* const		src_addr,
-	const gsize			src_addrlen,
+	const socklen_t			src_addrlen,
 	struct sockaddr* const		dst_addr,
-	const gsize			dst_addrlen
+	const socklen_t			dst_addrlen
 	)
 {
 /* pre-conditions */
@@ -118,14 +118,14 @@ recvskb (
 	pgm_assert (dst_addrlen > 0);
 
 	pgm_debug ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
-		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
+		(void*)transport, (void*)skb, flags, (void*)src_addr, src_addrlen, (void*)dst_addr, dst_addrlen);
 
 	if (G_UNLIKELY(transport->is_destroyed))
 		return 0;
 
 #ifdef CONFIG_TARGET_WINE
-	int fromlen = src_addrlen;
-	const int len = recvfrom (transport->recv_sock, skb->head, transport->max_tpdu, 0, src_addr, &fromlen);
+	socklen_t fromlen = src_addrlen;
+	const ssize_t len = recvfrom (transport->recv_sock, skb->head, transport->max_tpdu, 0, src_addr, &fromlen);
 	if (len <= 0)
 		return len;
 #else
@@ -133,12 +133,12 @@ recvskb (
 		.iov_base	= skb->head,
 		.iov_len	= transport->max_tpdu
 	};
-	size_t aux[1024 / sizeof(size_t)];
+	char aux[ 1024 ];
 #	ifdef G_OS_UNIX
 	struct msghdr msg = {
 		.msg_name	= src_addr,
 		.msg_namelen	= src_addrlen,
-		.msg_iov	= (gpointer)&iov,
+		.msg_iov	= (void*)&iov,
 		.msg_iovlen	= 1,
 		.msg_control	= aux,
 		.msg_controllen = sizeof(aux),
@@ -156,7 +156,7 @@ recvskb (
 		.dwBufferCount	= 1,
 		.dwFlags	= 0
 	};
-	msg.Control.buf		= (gpointer)aux;
+	msg.Control.buf		= aux;
 	msg.Control.len		= sizeof(aux);
 
 	LPFN_WSARECVMSG WSARecvMsg_ = NULL;
@@ -188,7 +188,7 @@ recvskb (
 	skb->data		= skb->head;
 	skb->len		= len;
 	skb->zero_padded	= 0;
-	skb->tail		= (guint8*)skb->data + len;
+	skb->tail		= (char*)skb->data + len;
 
 #ifdef CONFIG_TARGET_WINE
 	pgm_assert (pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group) <= dst_addrlen);
@@ -202,7 +202,6 @@ recvskb (
 #else
 		struct cmsghdr* cmsg;
 #endif
-		gpointer pktinfo = NULL;
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg != NULL;
 		     cmsg = CMSG_NXTHDR(&msg, cmsg))
@@ -210,7 +209,7 @@ recvskb (
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
-				pktinfo				= CMSG_DATA(cmsg);
+				const void* pktinfo		= CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (G_UNLIKELY(NULL == pktinfo)) {
 					pgm_debug ("in_pktinfo is NULL");
@@ -228,7 +227,7 @@ recvskb (
 			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
 			    IPV6_PKTINFO == cmsg->cmsg_type)
 			{
-				pktinfo				= CMSG_DATA(cmsg);
+				const void* pktinfo		= CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (G_UNLIKELY(NULL == pktinfo)) {
 					pgm_debug ("in6_pktinfo is NULL");
@@ -259,7 +258,7 @@ recvskb (
  */
 
 static
-gboolean
+bool
 on_upstream (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb
@@ -292,7 +291,7 @@ on_upstream (
 	}
 
 /* advance SKB pointer to PGM type header */
-	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
+	skb->data	= (char*)skb->data + sizeof(struct pgm_header);
 	skb->len       -= sizeof(struct pgm_header);
 
 	switch (skb->pgm_header->pgm_type) {
@@ -329,7 +328,7 @@ out_discarded:
  */
 
 static
-gboolean
+bool
 on_peer (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb,
@@ -373,7 +372,7 @@ on_peer (
 	}
 
 /* advance SKB pointer to PGM type header */
-	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
+	skb->data	= (char*)skb->data + sizeof(struct pgm_header);
 	skb->len       -= sizeof(struct pgm_header);
 
 	switch (skb->pgm_header->pgm_type) {
@@ -407,6 +406,7 @@ out_discarded:
  *
  * returns TRUE on valid processed packet, returns FALSE on discarded packet.
  */
+
 static
 gboolean
 on_downstream (
@@ -510,7 +510,7 @@ out_discarded:
  * returns TRUE on valid processed packet, returns FALSE on discarded packet.
  */
 static
-gboolean
+bool
 on_pgm (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb,
@@ -597,7 +597,7 @@ wait_for_event (
 			transport->is_pending_read = FALSE;
 		}
 
-		long timeout;
+		int timeout;
 		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
 			timeout = 0;
 		else
@@ -645,16 +645,16 @@ int
 pgm_recvmsgv (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msg_start,
-	const gsize		msg_len,
+	const size_t		msg_len,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	gsize*			_bytes_read,	/* may be NULL */
+	size_t*			_bytes_read,	/* may be NULL */
 	pgm_error_t**		error
 	)
 {
 	int status = PGM_IO_STATUS_WOULD_BLOCK;
 
 	pgm_debug ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
-		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
+		(void*)transport, (void*)msg_start, msg_len, flags, (void*)_bytes_read, (void*)error);
 
 /* parameters */
 	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
@@ -725,8 +725,8 @@ pgm_recvmsgv (
 			pgm_notify_clear (&transport->rdata_notify);
 	}
 
-	gsize bytes_read = 0;
-	guint data_read = 0;
+	size_t bytes_read = 0;
+	size_t data_read = 0;
 	pgm_msgv_t* pmsg = msg_start;
 	const pgm_msgv_t* msg_end = msg_start + msg_len - 1;
 
@@ -746,7 +746,7 @@ pgm_recvmsgv (
  */
 	struct sockaddr_storage src, dst;
 	ssize_t len;
-	gsize bytes_received = 0;
+	size_t bytes_received = 0;
 
 recv_again:
 
@@ -796,7 +796,7 @@ recv_again:
 	}
 
 	pgm_error_t* err = NULL;
-	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
+	const bool is_valid = (transport->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
 					pgm_parse_udp_encap (transport->rx_buffer, &err) :
 					pgm_parse_raw (transport->rx_buffer, (struct sockaddr*)&dst, &err);
 	if (G_UNLIKELY(!is_valid))
@@ -955,7 +955,7 @@ pgm_recvmsg (
 	pgm_transport_t* const	transport,
 	pgm_msgv_t* const	msgv,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	gsize*			bytes_read,	/* may be NULL */
+	size_t*			bytes_read,	/* may be NULL */
 	pgm_error_t**		error
 	)
 {
@@ -978,44 +978,44 @@ pgm_recvmsg (
 int
 pgm_recvfrom (
 	pgm_transport_t* const	transport,
-	gpointer		data,
-	const gsize		len,
+	void*			buf,
+	const size_t		buflen,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	gsize*			_bytes_read,	/* may be NULL */
+	size_t*			_bytes_read,	/* may be NULL */
 	pgm_tsi_t*		from,		/* may be NULL */
 	pgm_error_t**		error
 	)
 {
 	pgm_msgv_t msgv;
-	gsize bytes_read = 0;
+	size_t bytes_read = 0;
 
 	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(len)) pgm_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
 
-	pgm_debug ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
-		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
+	pgm_debug ("pgm_recvfrom (transport:%p buf:%p buflen:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
+		(void*)transport, buf, buflen, flags, (void*)_bytes_read, (void*)from, (void*)error);
 
 	const int status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
-	gsize bytes_copied = 0;
+	size_t bytes_copied = 0;
 	struct pgm_sk_buff_t* skb = msgv.msgv_skb[0];
 
 	if (from) {
 		memcpy (&from->gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
-		from->sport = g_ntohs (skb->tsi.sport);
+		from->sport = ntohs (skb->tsi.sport);
 	}
 
 	while (bytes_copied < bytes_read) {
-		gsize copy_len = skb->len;
-		if (bytes_copied + copy_len > len) {
+		size_t copy_len = skb->len;
+		if (bytes_copied + copy_len > buflen) {
 			pgm_warn (_("APDU truncated, original length %" G_GSIZE_FORMAT " bytes."),
 				bytes_read);
-			copy_len = len - bytes_copied;
-			bytes_read = len;
+			copy_len = buflen - bytes_copied;
+			bytes_read = buflen;
 		}
-		memcpy ((guint8*)data + bytes_copied, skb->data, copy_len);
+		memcpy ((char*)buf + bytes_copied, skb->data, copy_len);
 		bytes_copied += copy_len;
 		skb++;
 	}
@@ -1032,20 +1032,20 @@ pgm_recvfrom (
 int
 pgm_recv (
 	pgm_transport_t* const	transport,
-	gpointer		data,
-	const gsize		len,
+	void*			buf,
+	const size_t		buflen,
 	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	gsize* const		bytes_read,	/* may be NULL */
+	size_t* const		bytes_read,	/* may be NULL */
 	pgm_error_t**		error
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
-	if (G_LIKELY(len)) pgm_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
 
-	pgm_debug ("pgm_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
-		(gpointer)transport, data, len, flags, (gpointer)bytes_read, (gpointer)error);
+	pgm_debug ("pgm_recv (transport:%p buf:%p buflen:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
+		(gpointer)transport, buf, buflen, flags, (gpointer)bytes_read, (gpointer)error);
 
-	return pgm_recvfrom (transport, data, len, flags, bytes_read, NULL, error);
+	return pgm_recvfrom (transport, buf, buflen, flags, bytes_read, NULL, error);
 }
 
 /* eof */

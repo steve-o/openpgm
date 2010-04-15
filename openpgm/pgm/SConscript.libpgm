@@ -31,8 +31,8 @@ src = Split("""
 		rand.c
 		gsi.c
 		tsi.c
-		txwi.c
-		rxwi.c
+		txw.c
+		rxw.c
 		transport.c
 		source.c
 		receiver.c
@@ -45,7 +45,6 @@ src = Split("""
 		reed_solomon.c
 		galois_tables.c
 		wsastrerror.c
-		glib-compat.c
 		histogram.c
 """)
 
