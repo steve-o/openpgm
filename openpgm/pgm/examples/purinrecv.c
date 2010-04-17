@@ -23,21 +23,24 @@
 #include <signal.h>
 #include <stdio.h>
 #include <pgm/pgm.h>
-#include <pgm/pgm.h>
 
 
 /* globals */
 
 static int		port = 0;
 static const char*	network = "";
-static bool		multicast_loop = FALSE;
+static bool		use_multicast_loop = FALSE;
 static int		udp_encap_port = 0;
 
 static int		max_tpdu = 1500;
 static int		sqns = 100;
 
+static bool		use_fec = FALSE;
+static int		rs_k = 64;
+static int		rs_n = 255;
+
 static pgm_transport_t* transport = NULL;
-static bool		is_terminated;
+static bool		is_terminated = FALSE;
 
 #ifndef _WIN32
 static int		terminate_pipe[2];
@@ -61,7 +64,11 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
+	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
+	fprintf (stderr, "  -g <n>\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
+	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (EXIT_SUCCESS);
 }
 
@@ -86,20 +93,30 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:lh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:f:k:g:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
 		case 's':	port = atoi (optarg); break;
 		case 'p':	udp_encap_port = atoi (optarg); break;
-		case 'l':	multicast_loop = TRUE; break;
+		case 'f':	use_fec = TRUE; break;
+		case 'k':	rs_k = atoi (optarg); break;
+		case 'g':	rs_n = atoi (optarg); break;
+		case 'l':	use_multicast_loop = TRUE; break;
+
+		case 'i':
+			pgm_if_print_all();
+			return EXIT_SUCCESS;
 
 		case 'h':
 		case '?': usage (binary_name);
 		}
 	}
 
-	is_terminated = FALSE;
+	if (use_fec && ( !rs_n || !rs_k )) {
+		fprintf (stderr, "Invalid Reed-Solomon parameters RS(%d,%d).\n", rs_n, rs_k);
+		usage (binary_name);
+	}
 
 /* setup signal handlers */
 #ifdef SIGHUP
@@ -287,6 +304,7 @@ on_startup (void)
 	pgm_transport_set_recv_only (transport, TRUE, FALSE);
 	pgm_transport_set_max_tpdu (transport, max_tpdu);
 	pgm_transport_set_rxw_sqns (transport, sqns);
+	pgm_transport_set_multicast_loop (transport, use_multicast_loop);
 	pgm_transport_set_hops (transport, 16);
 	pgm_transport_set_peer_expiry (transport, pgm_secs(300));
 	pgm_transport_set_spmr_expiry (transport, pgm_msecs(250));
