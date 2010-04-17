@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * OpenPGM version.
+ * PGM packet formats, RFC 3208.
  *
- * Copyright (c) 2006-2008 Miru Limited.
+ * Copyright (c) 2006 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,22 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_VERSION_H__
-#define __PGM_VERSION_H__
+#ifndef __PGM_PACKET_PARSE_H__
+#define __PGM_PACKET_PARSE_H__
 
+#include <sys/socket.h>
 #include <pgm/framework.h>
+#include <pgm/skbuff.h>
 
 PGM_BEGIN_DECLS
 
-extern const unsigned pgm_major_version;
-extern const unsigned pgm_minor_version;
-extern const unsigned pgm_micro_version;
-
-extern const char* pgm_build_date;
-extern const char* pgm_build_time;
-extern const char* pgm_build_platform;
-extern const char* pgm_build_revision;
+bool pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, pgm_error_t**);
+bool pgm_parse_udp_encap (struct pgm_sk_buff_t* const, pgm_error_t**);
+bool pgm_verify_spm (const struct pgm_sk_buff_t* const);
+bool pgm_verify_spmr (const struct pgm_sk_buff_t* const);
+bool pgm_verify_nak (const struct pgm_sk_buff_t* const);
+bool pgm_verify_nnak (const struct pgm_sk_buff_t* const);
+bool pgm_verify_ncf (const struct pgm_sk_buff_t* const);
+bool pgm_verify_poll (const struct pgm_sk_buff_t* const);
+bool pgm_verify_polr (const struct pgm_sk_buff_t* const);
 
 PGM_END_DECLS
 
-#endif /* __PGM_VERSION_H__ */
+#endif /* __PGM_PACKET_PARSE_H__ */

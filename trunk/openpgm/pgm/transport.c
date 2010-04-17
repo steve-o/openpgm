@@ -21,62 +21,20 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <limits.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/types.h>
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
-
+#include <stdio.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <net/if.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#	include <netinet/udp.h>
-#	include <sys/socket.h>
-#	include <sys/time.h>
-#	include <arpa/inet.h>
-#else
-#	include <ws2tcpip.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/list.h"
-#include "pgm/slist.h"
-#include "pgm/pgm.h"
-#include "pgm/getifaddrs.h"
-#include "pgm/getnodeaddr.h"
-#include "pgm/indextoaddr.h"
-#include "pgm/indextoname.h"
-#include "pgm/nametoindex.h"
-#include "pgm/ip.h"
-#include "pgm/packet.h"
-#include "pgm/net.h"
-#include "pgm/txw.h"
-#include "pgm/source.h"
-#include "pgm/rxw.h"
+#include <pgm/framework.h>
+#include "pgm/transport.h"
 #include "pgm/receiver.h"
-#include "pgm/rate_control.h"
+#include "pgm/source.h"
 #include "pgm/timer.h"
-#include "pgm/checksum.h"
-#include "pgm/reed_solomon.h"
 
 
 //#define TRANSPORT_DEBUG
@@ -143,7 +101,7 @@ pgm_transport_destroy (
 /* cancel running blocking operations */
 	if (-1 != transport->recv_sock) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing receive socket."));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		close (transport->recv_sock);
 #else
 		closesocket (transport->recv_sock);
@@ -152,7 +110,7 @@ pgm_transport_destroy (
 	}
 	if (-1 != transport->send_sock) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing send socket."));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		close (transport->send_sock);
 #else
 		closesocket (transport->send_sock);
@@ -206,7 +164,7 @@ pgm_transport_destroy (
 	pgm_rate_destroy (&transport->rate_control);
 	if (transport->send_with_router_alert_sock) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Closing send with router alert socket."));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		close (transport->send_with_router_alert_sock);
 #else
 		closesocket (transport->send_with_router_alert_sock);
@@ -310,7 +268,7 @@ pgm_transport_create (
 	pgm_rwlock_init (&new_transport->lock);
 
 	memcpy (&new_transport->tsi.gsi, &tinfo->ti_gsi, sizeof(pgm_gsi_t));
-	new_transport->dport = g_htons (tinfo->ti_dport);
+	new_transport->dport = htons (tinfo->ti_dport);
 	if (tinfo->ti_sport) {
 		new_transport->tsi.sport = htons (tinfo->ti_sport);
 	} else {
@@ -348,7 +306,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -382,7 +340,7 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -404,13 +362,13 @@ pgm_transport_create (
 						socket_type,
 						protocol)) < 0)
 	{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_errno (save_errno),
 			     _("Creating IP Router Alert (RFC 2113) send socket: %s"),
-			     strerror (errno));
+			     strerror (save_errno));
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
@@ -431,7 +389,7 @@ pgm_transport_create (
 
 err_destroy:
 	if (-1 != new_transport->recv_sock) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		if (-1 == close (new_transport->recv_sock))
 			pgm_warn (_("Close on receive socket failed: %s"), strerror (errno));
 #else
@@ -441,7 +399,7 @@ err_destroy:
 		new_transport->recv_sock = -1;
 	}
 	if (-1 != new_transport->send_sock) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		if (-1 == close (new_transport->send_sock))
 			pgm_warn (_("Close on send socket failed: %s"), strerror (errno));
 #else
@@ -451,7 +409,7 @@ err_destroy:
 		new_transport->send_sock = -1;
 	}
 	if (-1 != new_transport->send_with_router_alert_sock) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		if (-1 == close (new_transport->send_with_router_alert_sock))
 			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), strerror (errno));
 #else
@@ -462,19 +420,6 @@ err_destroy:
 	}
 	pgm_free (new_transport);
 	return FALSE;
-}
-
-/* helper to drop out of setuid 0 after creating PGM sockets
- */
-void
-pgm_drop_superuser (void)
-{
-#ifdef G_OS_UNIX
-	if (0 == getuid()) {
-		setuid((gid_t)65534);
-		setgid((uid_t)65534);
-	}
-#endif
 }
 
 /* 0 < tpdu < 65536 by data type (guint16)
@@ -710,7 +655,7 @@ pgm_transport_bind (
 
 /* determine IP header size for rate regulation engine & stats */
 	transport->iphdr_len = (AF_INET == transport->send_gsr.gsr_group.ss_family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
-	pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming IP header size of %" G_GSIZE_FORMAT " bytes", transport->iphdr_len);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming IP header size of %zu bytes", transport->iphdr_len);
 
 	if (transport->udp_encap_ucast_port) {
 		const size_t udphdr_len = sizeof(struct pgm_udphdr);
@@ -747,7 +692,7 @@ pgm_transport_bind (
 		    0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			const int save_errno = errno;
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -772,7 +717,7 @@ pgm_transport_bind (
 		const sa_family_t recv_family = transport->recv_gsr[0].gsr_group.ss_family;
 		if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 		{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			const int save_errno = errno;
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -801,7 +746,7 @@ pgm_transport_bind (
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP headers."));
 			if (0 != pgm_sockaddr_hdrincl (transport->recv_sock, recv_family, TRUE))
 			{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 				const int save_errno = errno;
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -826,7 +771,7 @@ pgm_transport_bind (
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
 			if (0 != pgm_sockaddr_pktinfo (transport->recv_sock, recv_family, TRUE))
 			{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 				const int save_errno = errno;
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -856,7 +801,7 @@ pgm_transport_bind (
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set receive socket buffer size to %d bytes."), rcvbuf);
 		if (0 != setsockopt (transport->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)&rcvbuf, sizeof(rcvbuf)))
 		{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			const int save_errno = errno;
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -884,7 +829,7 @@ pgm_transport_bind (
 		if (0 != setsockopt (transport->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&sndbuf, sizeof(sndbuf)) ||
 		    0 != setsockopt (transport->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&sndbuf, sizeof(sndbuf)))
 		{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			const int save_errno = errno;
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -952,12 +897,12 @@ pgm_transport_bind (
 #endif /* CONFIG_BIND_INADDR_ANY */
 
 	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
-	((struct sockaddr_in*)&recv_addr)->sin_port = g_htons (transport->udp_encap_mcast_port);
+	((struct sockaddr_in*)&recv_addr)->sin_port = htons (transport->udp_encap_mcast_port);
 	if (0 != bind (transport->recv_sock, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa)))
 	{
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1010,7 +955,7 @@ pgm_transport_bind (
 	{
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1062,7 +1007,7 @@ pgm_transport_bind (
 	{
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1106,7 +1051,7 @@ pgm_transport_bind (
 							  p->gsr_group.ss_family,
 							  (const struct group_req*)p))
 			{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 				const int save_errno = errno;
 #else
 				const int save_errno = WSAGetLastError();
@@ -1115,7 +1060,7 @@ pgm_transport_bind (
 				char ifname[IF_NAMESIZE];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
 				if (0 == p->gsr_interface)
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_TRANSPORT,
 						     pgm_error_from_errno (save_errno),
@@ -1131,7 +1076,7 @@ pgm_transport_bind (
 						     wsa_strerror (save_errno));
 #endif
 				else
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_TRANSPORT,
 						     pgm_error_from_errno (save_errno),
@@ -1171,7 +1116,7 @@ pgm_transport_bind (
 				char group_addr[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_source, source_addr, sizeof(source_addr));
 				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, group_addr, sizeof(group_addr));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 				const int save_errno = errno;
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1212,7 +1157,7 @@ pgm_transport_bind (
 					    transport->send_gsr.gsr_interface))
 	{
 		char ifname[IF_NAMESIZE];
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1245,7 +1190,7 @@ pgm_transport_bind (
 					    transport->send_gsr.gsr_interface))
 	{
 		char ifname[IF_NAMESIZE];
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1276,7 +1221,7 @@ pgm_transport_bind (
 
 /* multicast loopback */
 	pgm_trace (PGM_LOG_ROLE_NETWORK,transport->use_multicast_loop?_("Set multicast loopback.") : _("Unset multicast loopback."));
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	if (0 != pgm_sockaddr_multicast_loop (transport->send_sock,
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->use_multicast_loop) ||
@@ -1293,7 +1238,7 @@ pgm_transport_bind (
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-#else /* G_OS_WIN32 */
+#else /* _WIN32 */
 	if (0 != pgm_sockaddr_multicast_loop (transport->recv_sock,
 					      transport->recv_gsr[0].gsr_group.ss_family,
 					      transport->use_multicast_loop))
@@ -1307,7 +1252,7 @@ pgm_transport_bind (
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-#endif /* G_OS_WIN32 */
+#endif /* _WIN32 */
 
 /* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
 #ifndef CONFIG_TARGET_WINE
@@ -1319,7 +1264,7 @@ pgm_transport_bind (
 					      transport->send_gsr.gsr_group.ss_family,
 					      transport->hops))
 	{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		const int save_errno = errno;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1386,7 +1331,7 @@ no_cap_net_admin:
 		    !pgm_send_spm (transport, PGM_OPT_SYN) ||
 		    !pgm_send_spm (transport, PGM_OPT_SYN))
 		{
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			const int save_errno = errno;
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_TRANSPORT,
@@ -1409,7 +1354,7 @@ no_cap_net_admin:
 	}
 	else
 	{
-		g_assert (transport->can_recv_data);
+		pgm_assert (transport->can_recv_data);
 		transport->next_poll = pgm_time_update_now() + pgm_secs( 30 );
 	}
 

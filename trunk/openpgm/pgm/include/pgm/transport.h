@@ -28,85 +28,33 @@
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <pgm/types.h>
 
-#include <glib.h>
-
-typedef struct pgm_sqn_list_t pgm_sqn_list_t;
-typedef struct pgm_peer_t pgm_peer_t;
 typedef struct pgm_transport_t pgm_transport_t;
 
-#ifndef __PGM_GSI_H__
-#	 include <pgm/gsi.h>
-#endif
+#include <pgm/error.h>
+#include <pgm/gsi.h>
+#include <pgm/tsi.h>
+#include <pgm/if.h>
+#include <pgm/txw.h>
+#include <pgm/thread.h>
+#include <pgm/notify.h>
+#include <pgm/time.h>
+#include <pgm/rand.h>
+#include <pgm/hashtable.h>
+#include <pgm/list.h>
+#include <pgm/slist.h>
+#include <pgm/rate_control.h>
 
-#ifndef __PGM_TSI_H__
-#	 include <pgm/tsi.h>
-#endif
-
-#ifndef __PGM_ERROR_H__
-#	 include <pgm/error.h>
-#endif
-
-#ifndef __PGM_LIST_H__
-#	 include <pgm/list.h>
-#endif
-
-#ifndef __PGM_SLIST_H__
-#	 include <pgm/slist.h>
-#endif
-
-#ifndef __PGM_HASHTABLE_H__
-#	 include <pgm/hashtable.h>
-#endif
-
-#ifndef __PGM_THREAD_H__
-#	 include <pgm/thread.h>
-#endif
-
-#ifndef __PGM_IF_H__
-#	 include <pgm/if.h>
-#endif
-
-#ifndef __PGM_SOCKADDR_H__
-#	 include <pgm/sockaddr.h>
-#endif
-
-#ifndef __PGM_TIME_H__
-#	 include <pgm/time.h>
-#endif
-
-#ifndef __PGM_RAND_H__
-#	 include <pgm/rand.h>
-#endif
-
-#ifndef __PGM_NOTIFY_H__
-#	 include <pgm/notify.h>
-#endif
-
-#ifndef __PGM_SKBUFF_H__
-#	 include <pgm/skbuff.h>
-#endif
-
-#ifndef __PGM_RXW_H__
-#	include <pgm/rxw.h>
-#endif
-
-#ifndef __PGM_TXW_H__
-#	include <pgm/txw.h>
-#endif
-
-#ifndef __PGM_RATE_CONTROL_H__
-#	include <pgm/rate_control.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 #ifndef IP_MAX_MEMBERSHIPS
 #	define IP_MAX_MEMBERSHIPS	20
 #endif
 
-
 /* IO status */
-
 enum {
 	PGM_IO_STATUS_ERROR,		/* an error occurred */
 	PGM_IO_STATUS_NORMAL,		/* success */
@@ -120,9 +68,7 @@ enum {
 
 
 /* Performance Counters */
-
 enum {
-/* source side */
 	PGM_PC_SOURCE_DATA_BYTES_SENT,
 	PGM_PC_SOURCE_DATA_MSGS_SENT,	    		/* msgs = packets not APDUs */
 /*	PGM_PC_SOURCE_BYTES_BUFFERED, */	    	/* tx window contents in bytes */
@@ -154,101 +100,6 @@ enum {
 
 /* marker */
 	PGM_PC_SOURCE_MAX
-};
-
-enum {
-/* receiver side */
-	PGM_PC_RECEIVER_DATA_BYTES_RECEIVED,
-	PGM_PC_RECEIVER_DATA_MSGS_RECEIVED,
-	PGM_PC_RECEIVER_NAK_FAILURES,
-	PGM_PC_RECEIVER_BYTES_RECEIVED,
-/*	PGM_PC_RECEIVER_CKSUM_ERRORS, */		/* inherently same as source */
-	PGM_PC_RECEIVER_MALFORMED_SPMS,
-	PGM_PC_RECEIVER_MALFORMED_ODATA,
-	PGM_PC_RECEIVER_MALFORMED_RDATA,
-	PGM_PC_RECEIVER_MALFORMED_NCFS,
-	PGM_PC_RECEIVER_PACKETS_DISCARDED,
-	PGM_PC_RECEIVER_LOSSES,
-/*	PGM_PC_RECEIVER_BYTES_DELIVERED_TO_APP, */
-/*	PGM_PC_RECEIVER_MSGS_DELIVERED_TO_APP, */
-	PGM_PC_RECEIVER_DUP_SPMS,
-	PGM_PC_RECEIVER_DUP_DATAS,
-	PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT,
-	PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT,
-	PGM_PC_RECEIVER_PARITY_NAKS_SENT,
-	PGM_PC_RECEIVER_SELECTIVE_NAKS_SENT,
-	PGM_PC_RECEIVER_PARITY_NAKS_RETRANSMITTED,
-	PGM_PC_RECEIVER_SELECTIVE_NAKS_RETRANSMITTED,
-	PGM_PC_RECEIVER_PARITY_NAKS_FAILED,
-	PGM_PC_RECEIVER_SELECTIVE_NAKS_FAILED,
-	PGM_PC_RECEIVER_NAKS_FAILED_RXW_ADVANCED,
-	PGM_PC_RECEIVER_NAKS_FAILED_NCF_RETRIES_EXCEEDED,
-	PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED,
-/*	PGM_PC_RECEIVER_NAKS_FAILED_GEN_EXPIRED */
-	PGM_PC_RECEIVER_NAK_FAILURES_DELIVERED,
-	PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED,
-	PGM_PC_RECEIVER_NAK_ERRORS,
-/*	PGM_PC_RECEIVER_LAST_ACTIVITY, */
-/*	PGM_PC_RECEIVER_NAK_SVC_TIME_MIN, */
-	PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN,
-/*	PGM_PC_RECEIVER_NAK_SVC_TIME_MAX, */
-/*	PGM_PC_RECEIVER_NAK_FAIL_TIME_MIN, */
-	PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN,
-/*	PGM_PC_RECEIVER_NAK_FAIL_TIME_MAX, */
-/*	PGM_PC_RECEIVER_TRANSMIT_MIN, */
-	PGM_PC_RECEIVER_TRANSMIT_MEAN,
-/*	PGM_PC_RECEIVER_TRANSMIT_MAX, */
-/*	PGM_PC_RECEIVER_ACKS_SENT, */
-
-/* marker */
-	PGM_PC_RECEIVER_MAX
-};
-
-#ifndef __PGM_MSGV_H__
-#   include <pgm/msgv.h>
-#endif
-
-
-struct pgm_sqn_list_t {
-	uint8_t			len;
-	uint32_t		sqn[63];	/* list of sequence numbers */
-};
-
-struct pgm_peer_t {
-	volatile int32_t	ref_count;		    /* atomic integer */
-
-	pgm_tsi_t		tsi;
-	struct sockaddr_storage	group_nla;
-	struct sockaddr_storage	nla, local_nla;		/* nla = advertised, local_nla = from packet */
-	struct sockaddr_storage poll_nla;		/* from parent to direct poll-response */
-	struct sockaddr_storage	redirect_nla;		/* from dlr */
-	pgm_time_t		polr_expiry;
-	pgm_time_t		spmr_expiry;
-	pgm_time_t		spmr_tstamp;
-
-	pgm_rxw_t*            	window;
-	pgm_transport_t*    	transport;
-	pgm_list_t		peers_link;
-	pgm_slist_t		pending_link;
-
-	unsigned		is_fec_enabled:1;
-	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
-	unsigned		has_ondemand_parity:1;
-
-	uint32_t		spm_sqn;
-	pgm_time_t		expiry;
-
-	uint32_t		last_poll_sqn;
-	uint16_t		last_poll_round;
-	pgm_time_t		last_packet;
-	unsigned		last_commit;
-	uint32_t		lost_count;
-	uint32_t		last_cumulative_losses;
-	volatile uint32_t	cumulative_stats[PGM_PC_RECEIVER_MAX];
-	uint32_t		snap_stats[PGM_PC_RECEIVER_MAX];
-
-	uint32_t		min_fail_time;
-	uint32_t		max_fail_time;
 };
 
 struct pgm_transport_t {
@@ -363,17 +214,8 @@ struct pgm_transport_t {
 extern pgm_rwlock_t pgm_transport_list_lock;
 extern pgm_slist_t* pgm_transport_list;
 
-
-G_BEGIN_DECLS
-
-bool pgm_init (pgm_error_t**);
-bool pgm_supported (void) G_GNUC_WARN_UNUSED_RESULT;
-bool pgm_shutdown (void);
-
-void pgm_drop_superuser (void);
-
-bool pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
-bool pgm_transport_bind (pgm_transport_t*, pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+bool pgm_transport_create (pgm_transport_t**, struct pgm_transport_info_t*, pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_transport_bind (pgm_transport_t*, pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_transport_destroy (pgm_transport_t*, bool);
 bool pgm_transport_set_max_tpdu (pgm_transport_t* const, const uint16_t);
 bool pgm_transport_set_multicast_loop (pgm_transport_t* const, const bool);
@@ -386,28 +228,53 @@ bool pgm_transport_set_recv_only (pgm_transport_t* const, const bool, const bool
 bool pgm_transport_set_abort_on_reset (pgm_transport_t* const, const bool);
 bool pgm_transport_set_nonblocking (pgm_transport_t* const, const bool);
 
-size_t pgm_transport_pkt_offset (bool) G_GNUC_WARN_UNUSED_RESULT;
-static inline size_t pgm_transport_max_tsdu (pgm_transport_t* transport, bool can_fragment)
+size_t pgm_transport_pkt_offset (bool) PGM_GNUC_WARN_UNUSED_RESULT;
+
+static inline
+size_t
+pgm_transport_max_tsdu (
+	pgm_transport_t*	transport,
+	bool			can_fragment
+	)
 {
 	size_t max_tsdu = can_fragment ? transport->max_tsdu_fragment : transport->max_tsdu;
 	if (transport->use_varpkt_len)
-		max_tsdu -= sizeof (guint16);
+		max_tsdu -= sizeof (uint16_t);
 	return max_tsdu;
 }
 
-static inline int pgm_transport_get_recv_fd (pgm_transport_t* transport)
+static inline
+int
+pgm_transport_get_recv_fd (
+	pgm_transport_t*	transport
+	)
 {
 	return transport->recv_sock;
 }
-static inline int pgm_transport_get_pending_fd (pgm_transport_t* transport)
+
+static inline
+int
+pgm_transport_get_pending_fd (
+	pgm_transport_t*	transport
+	)
 {
 	return pgm_notify_get_fd (&transport->pending_notify);
 }
-static inline int pgm_transport_get_repair_fd (pgm_transport_t* transport)
+
+static inline
+int
+pgm_transport_get_repair_fd (
+	pgm_transport_t*	transport
+	)
 {
 	return pgm_notify_get_fd (&transport->rdata_notify);
 }
-static inline int pgm_transport_get_send_fd (pgm_transport_t* transport)
+
+static inline
+int
+pgm_transport_get_send_fd (
+	pgm_transport_t*	transport
+	)
 {
 	return transport->send_sock;
 }
@@ -430,6 +297,6 @@ bool pgm_transport_join_source_group (pgm_transport_t*, struct group_source_req*
 bool pgm_transport_leave_source_group (pgm_transport_t*, struct group_source_req*, socklen_t);
 bool pgm_transport_msfilter (pgm_transport_t*, struct group_filter*, socklen_t);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_TRANSPORT_H__ */

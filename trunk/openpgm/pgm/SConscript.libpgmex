@@ -5,6 +5,7 @@
 Import('env')
 
 e = env.Clone();
+e.MergeFlags(env['GLIB_FLAGS']);
 
 src = Split("""
 		log.c

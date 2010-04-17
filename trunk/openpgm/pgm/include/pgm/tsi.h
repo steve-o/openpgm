@@ -22,34 +22,28 @@
 #ifndef __PGM_TSI_H__
 #define __PGM_TSI_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
 typedef struct pgm_tsi_t pgm_tsi_t;
 
-#ifndef __PGM_GSI_H__
-#	include <pgm/gsi.h>
-#endif
+#include <pgm/gsi.h>
 
-#ifndef __PGM_HASH_TABLE_H__
-#	include <pgm/hashtable.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 /* maximum length of TSI as a string */
 #define PGM_TSISTRLEN		(sizeof("000.000.000.000.000.000.00000"))
+#define PGM_TSI_INIT		{ PGM_GSI_INIT, 0 }
 
 struct pgm_tsi_t {
 	pgm_gsi_t	gsi;		/* global session identifier */
 	uint16_t	sport;		/* source port: a random number to help detect session re-starts */
 };
 
-G_BEGIN_DECLS
+char* pgm_tsi_print (const pgm_tsi_t*) PGM_GNUC_WARN_UNUSED_RESULT;
+int pgm_tsi_print_r (const pgm_tsi_t*restrict, char*restrict, size_t);
+pgm_hash_t pgm_tsi_hash (const void*) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_tsi_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
-char* pgm_tsi_print (const pgm_tsi_t*) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_tsi_print_r (const pgm_tsi_t*, char*, size_t);
-pgm_hash_t pgm_tsi_hash (const void*) G_GNUC_WARN_UNUSED_RESULT;
-bool pgm_tsi_equal (const void* restrict, const void* restrict) G_GNUC_WARN_UNUSED_RESULT;
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_TSI_H__ */

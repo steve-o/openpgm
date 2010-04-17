@@ -20,27 +20,9 @@
  */
 
 #include <errno.h>
-
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <fcntl.h>
-#	include <netdb.h>
-#	include <string.h>
-#	include <unistd.h>
-#	include <netinet/in.h>
-#	include <sys/types.h>
-#	include <sys/socket.h>
-#else
-#	include <ws2tcpip.h>
-#endif
-
-
-#include "pgm/messages.h"
-#include "pgm/if.h"
-#include "pgm/indextoaddr.h"
-#include "pgm/sockaddr.h"
-#include "pgm/packet.h"
+#include <sys/socket.h>
+#include <netdb.h>
+#include <pgm/framework.h>
 
 
 /* glibc 2.3 on debian etch doesn't include this */
@@ -198,7 +180,7 @@ pgm_sockaddr_is_addr_multicast (
 	case AF_INET: {
 		struct sockaddr_in s4;
 		memcpy (&s4, sa, sizeof(s4));
-		retval = IN_MULTICAST(g_ntohl( s4.sin_addr.s_addr ));
+		retval = IN_MULTICAST(ntohl( s4.sin_addr.s_addr ));
 		break;
 	}
 
@@ -268,7 +250,7 @@ pgm_sockaddr_hdrincl (
 
 	switch (sa_family) {
 	case AF_INET: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip(7P)  Mentioned but not detailed.
  *
  * Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
@@ -308,7 +290,7 @@ pgm_sockaddr_pktinfo (
 	)
 {
 	int retval = -1;
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip(7P) "The following options take in_pktinfo_t as the parameter"
  * Completely different, although ip6(7P) is a little better, "The following
  * options are boolean switches controlling the reception of ancillary data"
@@ -335,7 +317,7 @@ pgm_sockaddr_pktinfo (
 		break;
 
 	case AF_INET6:
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const char*)&optval, sizeof(optval));
 #else
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_PKTINFO, (const char*)&optval, sizeof(optval));
@@ -404,7 +386,7 @@ pgm_sockaddr_tos (
 
 	switch (sa_family) {
 	case AF_INET: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip(7P) "This option takes an integer argument as its input value."
  *
  * Linux:ip(7) "TOS is a byte."
@@ -614,7 +596,7 @@ pgm_sockaddr_multicast_if (
 	}
 
 	case AF_INET6: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip6(7P) "This option takes an integer as an argument; the integer
  * is the interface index of the selected interface."
  *
@@ -652,7 +634,7 @@ pgm_sockaddr_multicast_loop (
 
 	switch (sa_family) {
 	case AF_INET: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip(7P) "Setting the unsigned character argument to 0 causes the
  * opposite behavior, meaning that when multiple zones are present, the
  * datagrams are delivered to all zones except the sending zone."
@@ -672,7 +654,7 @@ pgm_sockaddr_multicast_loop (
 	}
 
 	case AF_INET6: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip(7P) "Setting the unsigned character argument to 0 will cause the opposite behavior."
  *
  * Linux:ipv6(7) "Argument is a pointer to boolean."
@@ -710,7 +692,7 @@ pgm_sockaddr_multicast_hops (
 
 	switch (sa_family) {
 	case AF_INET: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip(7P) "This option takes an unsigned character as an argument."
  *
  * Linux:ip(7) "Argument is an integer."
@@ -729,7 +711,7 @@ pgm_sockaddr_multicast_hops (
 	}
 
 	case AF_INET6: {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* Solaris:ip6(7P) "This option takes an integer as an argument."
  *
  * Linux:ipv6(7) "Argument is a pointer to an integer."
@@ -757,7 +739,7 @@ pgm_sockaddr_nonblocking (
 	const bool	v
 	)
 {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	int flags = fcntl (s, F_GETFL);
 	if (!v) flags &= ~O_NONBLOCK;
 	else flags |= O_NONBLOCK;

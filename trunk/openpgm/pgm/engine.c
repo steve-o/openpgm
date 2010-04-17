@@ -19,37 +19,24 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <stdbool.h>
-#include <stdint.h>
+#include <netdb.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#else
-#       include <ws2tcpip.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/pgm.h"
-#include "pgm/packet.h"
-#include "pgm/time.h"
-#include "pgm/thread.h"
-#include "pgm/rand.h"
+#include <pgm/framework.h>
+#include "pgm/engine.h"
+#include "pgm/version.h"
 
 
 //#define PGM_DEBUG
 
 
 /* globals */
-int pgm_ipproto_pgm = IPPROTO_PGM;
+int			pgm_ipproto_pgm = IPPROTO_PGM;
 
 
 /* locals */
-static bool pgm_is_supported = FALSE;
-static volatile int32_t pgm_ref_count = 0;
+static bool		pgm_is_supported = FALSE;
+static volatile int32_t	pgm_ref_count	 = 0;
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -191,6 +178,19 @@ pgm_shutdown (void)
 	pgm_atomic_shutdown();
 	pgm_messages_shutdown();
 	return TRUE;
+}
+
+/* helper to drop out of setuid 0 after creating PGM sockets
+ */
+void
+pgm_drop_superuser (void)
+{
+#ifndef _WIN32
+	if (0 == getuid()) {
+		setuid((gid_t)65534);
+		setgid((uid_t)65534);
+	}
+#endif
 }
 
 /* eof */

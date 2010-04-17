@@ -22,29 +22,17 @@
 #ifndef __PGM_TXW_H__
 #define __PGM_TXW_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
 typedef struct pgm_txw_state_t pgm_txw_state_t;
 typedef struct pgm_txw_t pgm_txw_t;
 
-#ifndef __PGM_QUEUE_H__
-#	include <pgm/queue.h>
-#endif
+#include <pgm/queue.h>
+#include <pgm/skbuff.h>
+#include <pgm/tsi.h>
+#include <pgm/reed_solomon.h>
 
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
-
-#ifndef __PGM_REED_SOLOMON_H__
-#	include <pgm/reed_solomon.h>
-#endif
-
-#ifndef __PGM_ATOMIC_H__
-#	include <pgm/atomic.h>
-#endif
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 /* must be smaller than PGM skbuff control buffer */
 struct pgm_txw_state_t {
@@ -81,79 +69,131 @@ struct pgm_txw_t {
 	struct pgm_sk_buff_t*	pdata[];
 };
 
-PGM_GNUC_INTERNAL pgm_txw_t* pgm_txw_create (const pgm_tsi_t* const, const uint16_t, const uint32_t, const unsigned, const ssize_t, const bool, const uint8_t, const uint8_t) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_txw_shutdown (pgm_txw_t* const);
-PGM_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t* const, struct pgm_sk_buff_t* const);
-PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_peek (pgm_txw_t* const, const uint32_t) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_txw_retransmit_push (pgm_txw_t* const, const uint32_t, const bool, const uint8_t) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_retransmit_try_peek (pgm_txw_t* const) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_txw_retransmit_remove_head (pgm_txw_t* const);
-PGM_GNUC_INTERNAL uint32_t pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t*);
-PGM_GNUC_INTERNAL void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t*, const uint32_t);
-PGM_GNUC_INTERNAL void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t*);
-PGM_GNUC_INTERNAL bool pgm_txw_retransmit_is_empty (pgm_txw_t* const);
+PGM_GNUC_INTERNAL pgm_txw_t* pgm_txw_create (const pgm_tsi_t*const, const uint16_t, const uint32_t, const unsigned, const ssize_t, const bool, const uint8_t, const uint8_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_txw_shutdown (pgm_txw_t*const);
+PGM_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t*const, struct pgm_sk_buff_t*const);
+PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_peek (const pgm_txw_t*const, const uint32_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_txw_retransmit_push (pgm_txw_t*const, const uint32_t, const bool, const uint8_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_retransmit_try_peek (pgm_txw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_txw_retransmit_remove_head (pgm_txw_t*const);
+PGM_GNUC_INTERNAL uint32_t pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t*const);
+PGM_GNUC_INTERNAL void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t*const, const uint32_t);
+PGM_GNUC_INTERNAL void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t*const);
+PGM_GNUC_INTERNAL bool pgm_txw_retransmit_is_empty (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
 
-static inline size_t pgm_txw_max_length (const pgm_txw_t* const window)
+/* declare for GCC attributes */
+static inline size_t pgm_txw_max_length (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_length (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_txw_size (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_txw_is_empty (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_txw_is_full (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_lead (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_lead_atomic (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_next_lead (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_trail (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_trail_atomic (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+
+static inline
+size_t
+pgm_txw_max_length (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return window->alloc;
 }
 
-static inline uint32_t pgm_txw_length (const pgm_txw_t* const window)
+static inline
+uint32_t
+pgm_txw_length (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
-static inline size_t pgm_txw_size (const pgm_txw_t* const window)
+static inline
+size_t
+pgm_txw_size (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return window->size;
 }
 
-static inline bool pgm_txw_is_empty (const pgm_txw_t* const window)
+static inline
+bool
+pgm_txw_is_empty (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return (0 == pgm_txw_length (window));
 }
 
-static inline bool pgm_txw_is_full (const pgm_txw_t* const window)
+static inline
+bool
+pgm_txw_is_full (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return (pgm_txw_length (window) == pgm_txw_max_length (window));
 }
 
-static inline uint32_t pgm_txw_lead (const pgm_txw_t* const window)
+static inline
+uint32_t
+pgm_txw_lead (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return window->lead;
 }
 
-static inline uint32_t pgm_txw_lead_atomic (const pgm_txw_t* const window)
+/* atomics may rely on global variables and so cannot be defined __pure__ */
+static inline
+uint32_t
+pgm_txw_lead_atomic (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return pgm_atomic_int32_get ((const volatile int32_t*)&window->lead);
 }
 
-static inline uint32_t pgm_txw_next_lead (const pgm_txw_t* const window)
+static inline
+uint32_t
+pgm_txw_next_lead (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return (uint32_t)(pgm_txw_lead (window) + 1);
 }
 
-static inline uint32_t pgm_txw_trail (const pgm_txw_t* const window)
+static inline
+uint32_t
+pgm_txw_trail (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
 	return window->trail;
 }
 
-static inline uint32_t pgm_txw_trail_atomic (const pgm_txw_t* const window)
+static inline
+uint32_t
+pgm_txw_trail_atomic (
+	const pgm_txw_t*const window
+	)
 {
 	pgm_assert (window);
-	return pgm_atomic_int32_get ((const volatile gint32*)&window->trail);
+	return pgm_atomic_int32_get ((const volatile int32_t*)&window->trail);
 }
 
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_TXW_H__ */

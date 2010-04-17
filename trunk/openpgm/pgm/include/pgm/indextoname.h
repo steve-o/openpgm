@@ -19,22 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_INDEXTONAME_H__
 #define __PGM_INDEXTONAME_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
-#ifdef G_OS_WIN32
+PGM_GNUC_INTERNAL char* pgm_if_indextoname (unsigned, char*);
 
-#define if_indextoname	pgm_if_indextoname
-
-G_BEGIN_DECLS
-
-PGM_GNUC_INTERNAL char* pgm_if_indextoname (unsigned int, char*);
-
-G_END_DECLS
-
-#endif
+PGM_END_DECLS
 
 #endif /* __PGM_INDEXTONAME_H__ */

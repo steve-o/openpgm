@@ -22,52 +22,25 @@
 #ifndef __PGM_RXW_H__
 #define __PGM_RXW_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
 typedef struct pgm_rxw_state_t pgm_rxw_state_t;
 typedef struct pgm_rxw_t pgm_rxw_t;
 
-#ifndef __PGM_QUEUE_H__
-#	include <pgm/queue.h>
-#endif
+#include <pgm/skbuff.h>
 
-#ifndef __PGM_TIME_H__
-#	include <pgm/time.h>
-#endif
-
-#ifndef __PGM_MSGV_H__
-#	include <pgm/msgv.h>
-#endif
-
-#ifndef __PGM_PACKET_H__
-#	include <pgm/packet.h>
-#endif
-
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
-
-#ifndef	__PGM_REED_SOLOMON_H__
-#	include <pgm/reed_solomon.h>
-#endif
-
-#ifndef	__PGM_MESSAGES_H__
-#	include <pgm/messages.h>
-#endif
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 enum
 {
-    PGM_PKT_STATE_ERROR = 0,
-    PGM_PKT_STATE_BACK_OFF,	    /* PGM protocol recovery states */
-    PGM_PKT_STATE_WAIT_NCF,
-    PGM_PKT_STATE_WAIT_DATA,
-    PGM_PKT_STATE_HAVE_DATA,	    /* data received waiting to commit to application layer */
-    PGM_PKT_STATE_HAVE_PARITY,	    /* contains parity information not original data */
-    PGM_PKT_STATE_COMMIT_DATA,	    /* commited data waiting for purging */
-    PGM_PKT_STATE_LOST_DATA,	    /* if recovery fails, but packet has not yet been commited */
+	PGM_PKT_STATE_ERROR = 0,
+	PGM_PKT_STATE_BACK_OFF,	    /* PGM protocol recovery states */
+	PGM_PKT_STATE_WAIT_NCF,
+	PGM_PKT_STATE_WAIT_DATA,
+	PGM_PKT_STATE_HAVE_DATA,	    /* data received waiting to commit to application layer */
+	PGM_PKT_STATE_HAVE_PARITY,	    /* contains parity information not original data */
+	PGM_PKT_STATE_COMMIT_DATA,	    /* commited data waiting for purging */
+	PGM_PKT_STATE_LOST_DATA,	    /* if recovery fails, but packet has not yet been commited */
 };
 
 enum
@@ -139,63 +112,100 @@ struct pgm_rxw_t {
 };
 
 
-PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const uint16_t, const unsigned, const unsigned, const ssize_t) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const uint16_t, const unsigned, const unsigned, const ssize_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t* const);
-PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t* const);
-PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t* const, pgm_msgv_t**, const unsigned) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL guint pgm_rxw_remove_trail (pgm_rxw_t* const) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL guint pgm_rxw_update (pgm_rxw_t* const, const uint32_t, const uint32_t, const pgm_time_t, const pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t* const, struct pgm_msgv_t**, const unsigned) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL unsigned pgm_rxw_remove_trail (pgm_rxw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL unsigned pgm_rxw_update (pgm_rxw_t* const, const uint32_t, const uint32_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const uint8_t);
-PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, uint32_t, pgm_time_t, pgm_time_t, pgm_time_t) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, uint32_t, pgm_time_t, pgm_time_t, pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const uint32_t);
 PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
-PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const uint32_t) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (const int) G_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (const int) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const uint32_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (const int) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (const int) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t* const);
 
-static inline unsigned pgm_rxw_max_length (const pgm_rxw_t* const window)
+/* declare for GCC attributes */
+static inline unsigned pgm_rxw_max_length (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_rxw_length (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_rxw_size (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_rxw_is_empty (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_rxw_is_full (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_rxw_lead (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_rxw_next_lead (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+
+static inline
+unsigned
+pgm_rxw_max_length (
+	const pgm_rxw_t* const window
+	)
 {
 	pgm_assert (window);
 	return window->alloc;
 }
 
-static inline uint32_t pgm_rxw_length (const pgm_rxw_t* const window)
+static inline
+uint32_t
+pgm_rxw_length (
+	const pgm_rxw_t* const window
+	)
 {
 	pgm_assert (window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
-static inline size_t pgm_rxw_size (const pgm_rxw_t* const window)
+static inline
+size_t
+pgm_rxw_size (
+	const pgm_rxw_t* const window
+	)
 {
 	pgm_assert (window);
 	return window->size;
 }
 
-static inline bool pgm_rxw_is_empty (const pgm_rxw_t* const window)
+static inline
+bool
+pgm_rxw_is_empty (
+	const pgm_rxw_t* const window
+	)
 {
 	pgm_assert (window);
 	return pgm_rxw_length (window) == 0;
 }
 
-static inline bool pgm_rxw_is_full (const pgm_rxw_t* const window)
+static inline
+bool
+pgm_rxw_is_full (
+	const pgm_rxw_t* const window
+	)
 {
 	pgm_assert (window);
 	return pgm_rxw_length (window) == pgm_rxw_max_length (window);
 }
 
-static inline uint32_t pgm_rxw_lead (const pgm_rxw_t* const window)
+static inline
+uint32_t
+pgm_rxw_lead (
+	const pgm_rxw_t* const window
+	)
 {
 	pgm_assert (window);
 	return window->lead;
 }
 
-static inline uint32_t pgm_rxw_next_lead (const pgm_rxw_t* const window)
+static inline
+uint32_t
+pgm_rxw_next_lead (
+	const pgm_rxw_t* const window
+	)
 {
 	return (uint32_t)(pgm_rxw_lead (window) + 1);
 }
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_RXW_H__ */

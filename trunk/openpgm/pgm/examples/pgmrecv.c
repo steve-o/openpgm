@@ -83,7 +83,7 @@ static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
 static gpointer receiver_thread (gpointer);
-static int on_msgv (pgm_msgv_t*, guint, gpointer);
+static int on_msgv (struct pgm_msgv_t*, guint, gpointer);
 
 
 G_GNUC_NORETURN static void
@@ -417,7 +417,7 @@ receiver_thread (
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
-	pgm_msgv_t msgv[ 20 ];
+	struct pgm_msgv_t msgv[ 20 ];
 
 #ifdef CONFIG_HAVE_EPOLL
 	struct epoll_event events[1];	/* wait for maximum 1 event */
@@ -548,8 +548,8 @@ block:
 
 static int
 on_msgv (
-	pgm_msgv_t*	msgv,		/* an array of msgvs */
-	guint		len,
+	struct pgm_msgv_t*	msgv,		/* an array of msgvs */
+	guint			len,
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {

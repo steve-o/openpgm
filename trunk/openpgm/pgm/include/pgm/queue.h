@@ -19,17 +19,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_QUEUE_H__
 #define __PGM_QUEUE_H__
 
-#include <stdbool.h>
+#include <pgm/macros.h>
+#include <pgm/list.h>
 
-#include <glib.h>
-
-#ifndef __PGM_LIST_H__
-#	include <pgm/list.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 struct pgm_queue_t
 {
@@ -40,16 +40,12 @@ struct pgm_queue_t
 
 typedef struct pgm_queue_t pgm_queue_t;
 
-
-G_BEGIN_DECLS
-
-bool pgm_queue_is_empty (pgm_queue_t*);
-void pgm_queue_push_head_link (pgm_queue_t*, pgm_list_t*);
+bool pgm_queue_is_empty (const pgm_queue_t*const);
+void pgm_queue_push_head_link (pgm_queue_t*restrict, pgm_list_t*restrict);
 pgm_list_t* pgm_queue_pop_tail_link (pgm_queue_t*);
 pgm_list_t* pgm_queue_peek_tail_link (pgm_queue_t*);
-void pgm_queue_unlink (pgm_queue_t*, pgm_list_t*);
+void pgm_queue_unlink (pgm_queue_t*restrict, pgm_list_t*restrict);
 
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_QUEUE_H__ */

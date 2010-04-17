@@ -19,68 +19,68 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_NOTIFY_H__
 #define __PGM_NOTIFY_H__
 
-#include <fcntl.h>
-#include <stdlib.h>
-#ifdef G_OS_UNIX
+#ifndef _WIN32
+#	include <fcntl.h>
 #	include <unistd.h>
+#	ifdef CONFIG_HAVE_EVENTFD
+#		include <sys/eventfd.h>
+#	endif
+#else /* _WIN32 */
+#	include <memory.h>
+#	include <winsock2.h>
 #endif
 
-#include <glib.h>
+#include <pgm/types.h>
+#include <pgm/messages.h>
 
-#ifdef CONFIG_HAVE_EVENTFD
-#	include <sys/eventfd.h>
-#endif
-
-#ifndef __PGM_MESSAGES_H__
-#	include <pgm/messages.h>
-#endif
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 struct pgm_notify_t {
-#ifdef CONFIG_HAVE_EVENTFD
-	int eventfd;
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	int pipefd[2];
+#elif defined(CONFIG_HAVE_EVENTFD)
+	int eventfd;
 #else
 	SOCKET s[2];
-#endif /* CONFIG_HAVE_EVENTFD */
+#endif /* _WIN32 */
 };
 
 typedef struct pgm_notify_t pgm_notify_t;
 
 
-static inline gboolean pgm_notify_is_valid (pgm_notify_t* notify)
+static inline
+bool
+pgm_notify_is_valid (
+	pgm_notify_t*	notify
+	)
 {
 	if (NULL == notify) return FALSE;
-#ifdef CONFIG_HAVE_EVENTFD
-	if (0 == notify->eventfd) return FALSE;
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	if (0 == notify->pipefd[0] || 0 == notify->pipefd[1]) return FALSE;
+#elif defined(CONFIG_HAVE_EVENTFD)
+	if (0 == notify->eventfd) return FALSE;
 #else
 	if (INVALID_SOCKET == notify->s[0] || INVALID_SOCKET == notify->s[1]) return FALSE;
-#endif /* CONFIG_HAVE_EVENTFD */
+#endif /* _WIN32 */
 	return TRUE;
 }
 
-static inline int pgm_notify_init (pgm_notify_t* notify)
+static inline
+int
+pgm_notify_init (
+	pgm_notify_t*	notify
+	)
 {
 	pgm_assert (notify);
 
-#ifdef CONFIG_HAVE_EVENTFD
-	int retval = eventfd (0, 0);
-	if (-1 == retval)
-		return retval;
-	notify->eventfd = retval;
-	const int fd_flags = fcntl (notify->eventfd, F_GETFL);
-	if (-1 != fd_flags)
-		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
-	return 0;
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	int retval = pipe (notify->pipefd);
 	pgm_assert (0 == retval);
 /* set non-blocking */
@@ -95,6 +95,15 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 		retval = fcntl (notify->pipefd[0], F_SETFL, fd_flags | O_NONBLOCK);
 	pgm_assert (notify->pipefd[0]);
 	return retval;
+#elif defined(CONFIG_HAVE_EVENTFD)
+	int retval = eventfd (0, 0);
+	if (-1 == retval)
+		return retval;
+	notify->eventfd = retval;
+	const int fd_flags = fcntl (notify->eventfd, F_GETFL);
+	if (-1 != fd_flags)
+		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
+	return 0;
 #else
 /* use loopback sockets to simulate a pipe suitable for win32/select() */
 	struct sockaddr_in addr;
@@ -134,7 +143,7 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 	pgm_assert (notify->s[0] != INVALID_SOCKET);
 
 // Set read-end to non-blocking mode
-	unsigned long one = 1;
+	const unsigned long one = 1;
 	rc = ioctlsocket (notify->s[0], FIONBIO, &one);
 	pgm_assert (rc != SOCKET_ERROR);
 
@@ -146,16 +155,15 @@ static inline int pgm_notify_init (pgm_notify_t* notify)
 #endif
 }
 
-static inline int pgm_notify_destroy (pgm_notify_t* notify)
+static inline
+int
+pgm_notify_destroy (
+	pgm_notify_t*	notify
+	)
 {
 	pgm_assert (notify);
 
-#ifdef CONFIG_HAVE_EVENTFD
-	if (notify->eventfd) {
-		close (notify->eventfd);
-		notify->eventfd = 0;
-	}
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	if (notify->pipefd[0]) {
 		close (notify->pipefd[0]);
 		notify->pipefd[0] = 0;
@@ -163,6 +171,11 @@ static inline int pgm_notify_destroy (pgm_notify_t* notify)
 	if (notify->pipefd[1]) {
 		close (notify->pipefd[1]);
 		notify->pipefd[1] = 0;
+	}
+#elif defined(CONFIG_HAVE_EVENTFD)
+	if (notify->eventfd) {
+		close (notify->eventfd);
+		notify->eventfd = 0;
 	}
 #else
 	if (notify->s[0]) {
@@ -177,19 +190,23 @@ static inline int pgm_notify_destroy (pgm_notify_t* notify)
 	return 0;
 }
 
-static inline int pgm_notify_send (pgm_notify_t* notify)
+static inline
+int
+pgm_notify_send (
+	pgm_notify_t*	notify
+	)
 {
 	pgm_assert (notify);
 
-#ifdef CONFIG_HAVE_EVENTFD
+#ifndef _WIN32
+	pgm_assert (notify->pipefd[1]);
+	const char one = '1';
+	return (1 == write (notify->pipefd[1], &one, sizeof(one)));
+#elif defined(CONFIG_HAVE_EVENTFD)
 	pgm_assert (notify->eventfd);
 	uint64_t u = 1;
 	ssize_t s = write (notify->eventfd, &u, sizeof(u));
 	return (s == sizeof(u));
-#elif defined(G_OS_UNIX)
-	pgm_assert (notify->pipefd[1]);
-	const char one = '1';
-	return (1 == write (notify->pipefd[1], &one, sizeof(one)));
 #else
 	pgm_assert (notify->s[1]);
 	const char one = '1';
@@ -197,18 +214,22 @@ static inline int pgm_notify_send (pgm_notify_t* notify)
 #endif
 }
 
-static inline int pgm_notify_read (pgm_notify_t* notify)
+static inline
+int
+pgm_notify_read (
+	pgm_notify_t*	notify
+	)
 {
 	pgm_assert (notify);
 
-#ifdef CONFIG_HAVE_EVENTFD
-	pgm_assert (notify->eventfd);
-	uint64_t u;
-	return (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	pgm_assert (notify->pipefd[0]);
 	char buf;
 	return (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
+#elif defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (notify->eventfd);
+	uint64_t u;
+	return (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
 #else
 	pgm_assert (notify->s[0]);
 	char buf;
@@ -216,18 +237,22 @@ static inline int pgm_notify_read (pgm_notify_t* notify)
 #endif
 }
 
-static inline void pgm_notify_clear (pgm_notify_t* notify)
+static inline
+void
+pgm_notify_clear (
+	pgm_notify_t*	notify
+	)
 {
 	pgm_assert (notify);
 
-#ifdef CONFIG_HAVE_EVENTFD
-	pgm_assert (notify->eventfd);
-	uint64_t u;
-	while (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	pgm_assert (notify->pipefd[0]);
 	char buf;
 	while (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
+#elif defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (notify->eventfd);
+	uint64_t u;
+	while (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
 #else
 	pgm_assert (notify->s[0]);
 	char buf;
@@ -235,22 +260,26 @@ static inline void pgm_notify_clear (pgm_notify_t* notify)
 #endif
 }
 
-static inline int pgm_notify_get_fd (pgm_notify_t* notify)
+static inline
+int
+pgm_notify_get_fd (
+	pgm_notify_t*	notify
+	)
 {
 	pgm_assert (notify);
 
-#ifdef CONFIG_HAVE_EVENTFD
-	pgm_assert (notify->eventfd);
-	return notify->eventfd;
-#elif defined(G_OS_UNIX)
+#ifndef _WIN32
 	pgm_assert (notify->pipefd[0]);
 	return notify->pipefd[0];
+#elif defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (notify->eventfd);
+	return notify->eventfd;
 #else
 	pgm_assert (notify->s[0]);
 	return notify->s[0];
 #endif
 }
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_NOTIFY_H__ */

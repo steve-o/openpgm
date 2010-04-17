@@ -45,59 +45,49 @@
  * SOFTWARE.
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_IP_H__
 #define __PGM_IP_H__
 
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
+#include <netinet/in.h>
+#include <pgm/types.h>
 
-#include <glib.h>
+PGM_BEGIN_DECLS
 
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <sys/socket.h>
-#else
-#	include <ws2tcpip.h>
+/* byte alignment for packet memory maps */
+#ifdef __GNUC__
+#	pragma pack(push)
 #endif
-
-
-/* 1-byte alignment */
-#pragma pack(push, 1)
+#pragma pack(1)
 
 /* RFC 791 */
 
 /* nb: first four bytes are forced bitfields for win32 "feature" */
 struct pgm_ip
 {
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-	unsigned int	ip_hl:4;		/* header length */
-	unsigned int	ip_v:4;			/* version */
-#elif G_BYTE_ORDER == G_BIG_ENDIAN
-	unsigned int	ip_v:4;			/* version */
-	unsigned int	ip_hl:4;		/* header length */
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned 	ip_hl:4;		/* header length */
+	unsigned 	ip_v:4;			/* version */
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned 	ip_v:4;			/* version */
+	unsigned 	ip_hl:4;		/* header length */
 #else
 #	error unknown ENDIAN type
 #endif
-	unsigned int	ip_tos:8;		/* type of service */
-	unsigned int	ip_len:16;		/* total length */
-	guint16		ip_id;			/* identification */
-	guint16		ip_off;			/* fragment offset field */
-	guint8		ip_ttl;			/* time to live */
-	guint8		ip_p;			/* protocol */
-	guint16		ip_sum;			/* checksum */
+	unsigned 	ip_tos:8;		/* type of service */
+	unsigned 	ip_len:16;		/* total length */
+	uint16_t	ip_id;			/* identification */
+	uint16_t	ip_off;			/* fragment offset field */
+	uint8_t		ip_ttl;			/* time to live */
+	uint8_t		ip_p;			/* protocol */
+	uint16_t	ip_sum;			/* checksum */
 	struct in_addr	ip_src, ip_dst;		/* source and dest address */
 };
 
-
-#ifndef G_STATIC_ASSERT
-#       define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
-#       define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
-#       define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
-#endif
-
-G_STATIC_ASSERT(sizeof(struct pgm_ip) == 20);
+PGM_STATIC_ASSERT(sizeof(struct pgm_ip) == 20);
 
 /* RFC 2460 */
 #ifdef ip6_vfc
@@ -114,26 +104,30 @@ G_STATIC_ASSERT(sizeof(struct pgm_ip) == 20);
 #endif
 struct pgm_ip6_hdr
 {
-	guint32		ip6_vfc;		/* version:4, traffic class:8, flow label:20 */
-	guint16		ip6_plen;		/* payload length: packet length - 40 */
-	guint8		ip6_nxt;		/* next header type */
-	guint8		ip6_hops;		/* hop limit */
+	uint32_t	ip6_vfc;		/* version:4, traffic class:8, flow label:20 */
+	uint16_t	ip6_plen;		/* payload length: packet length - 40 */
+	uint8_t		ip6_nxt;		/* next header type */
+	uint8_t		ip6_hops;		/* hop limit */
 	struct in6_addr	ip6_src, ip6_dst;	/* source and dest address */
 };
 
-G_STATIC_ASSERT(sizeof(struct pgm_ip6_hdr) == 40);
+PGM_STATIC_ASSERT(sizeof(struct pgm_ip6_hdr) == 40);
 
 /* RFC 768 */
 struct pgm_udphdr
 {
-	guint16		uh_sport;		/* source port */
-	guint16		uh_dport;		/* destination port */
-	guint16		uh_ulen;		/* udp length */
-	guint16		uh_sum;			/* udp checksum */
+	uint16_t	uh_sport;		/* source port */
+	uint16_t	uh_dport;		/* destination port */
+	uint16_t	uh_ulen;		/* udp length */
+	uint16_t	uh_sum;			/* udp checksum */
 };
 
-G_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
+PGM_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
-#pragma pack(pop)
+#ifdef __GNUC__
+#	pragma pack(pop)
+#else
+#	pragma pack()
+#endif
 
 #endif /* __PGM_IP_H__ */

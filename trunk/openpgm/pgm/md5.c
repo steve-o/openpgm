@@ -23,21 +23,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/md5.h"
+#include <pgm/framework.h>
 
 
 //#define MD5_DEBUG
@@ -62,8 +48,8 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
    (RFC 1321, 3.3: Step 3)  */
 
 void
-_md5_init_ctx (
-	struct md5_ctx*		ctx
+pgm_md5_init_ctx (
+	struct pgm_md5_t*	ctx
 	)
 {
 /* pre-conditions */
@@ -91,8 +77,8 @@ _md5_init_ctx (
 
 static
 void
-md5_process_block (
-	struct md5_ctx*		ctx,
+_pgm_md5_process_block (
+	struct pgm_md5_t*	ctx,
 	const void*		buffer,
 	size_t			len
 	)
@@ -256,8 +242,8 @@ md5_process_block (
 }
 
 void
-_md5_process_bytes (
-	struct md5_ctx*		ctx,
+pgm_md5_process_bytes (
+	struct pgm_md5_t*	ctx,
 	const void*		buffer,
 	size_t			len
 	)
@@ -274,22 +260,22 @@ _md5_process_bytes (
 /* To check alignment gcc has an appropriate operator.  Other
    compilers don't.  */
 #	if __GNUC__ >= 2
-#		define UNALIGNED_P(p) (((uintptr_t) p) % __alignof__ (guint32) != 0)
+#		define UNALIGNED_P(p) (((uintptr_t)p) % __alignof__ (uint32_t) != 0)
 #	else
-#		define UNALIGNED_P(p) (((uintptr_t) p) % sizeof (guint32) != 0)
+#		define UNALIGNED_P(p) (((uintptr_t)p) % sizeof(uint32_t) != 0)
 #	endif
 		if (UNALIGNED_P (buffer))
 			while (len > 64)
 			{
-				md5_process_block (ctx, memcpy (ctx->buffer, buffer, 64), 64);
-				buffer = (const char*) buffer + 64;
+				_pgm_md5_process_block (ctx, memcpy (ctx->buffer, buffer, 64), 64);
+				buffer = (const char*)buffer + 64;
 				len -= 64;
 			}
 		else
 #endif
 		{
-			md5_process_block (ctx, buffer, len & ~63);
-			buffer = (const char*) buffer + (len & ~63);
+			_pgm_md5_process_block (ctx, buffer, len & ~63);
+			buffer = (const char*)buffer + (len & ~63);
 			len &= 63;
 		}
 	}
@@ -303,7 +289,7 @@ _md5_process_bytes (
 		left_over += len;
 		if (left_over >= 64)
 		{
-			md5_process_block (ctx, ctx->buffer, 64);
+			_pgm_md5_process_block (ctx, ctx->buffer, 64);
 			left_over -= 64;
 			memcpy (ctx->buffer, &ctx->buffer[64], left_over);
 		}
@@ -319,8 +305,8 @@ _md5_process_bytes (
 
 static
 void*
-md5_read_ctx (
-	const struct md5_ctx*	ctx,
+_pgm_md5_read_ctx (
+	const struct pgm_md5_t*	ctx,
 	void*			resbuf
 	)
 {
@@ -343,8 +329,8 @@ md5_read_ctx (
    aligned for a 32 bits value.  */
 
 void*
-_md5_finish_ctx (
-	struct md5_ctx*		ctx,
+pgm_md5_finish_ctx (
+	struct pgm_md5_t*	ctx,
 	void*			resbuf
 	)
 {
@@ -370,9 +356,9 @@ _md5_finish_ctx (
 								(ctx->total[0] >> 29));
 
 /* Process last bytes.  */
-	md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
+	_pgm_md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
 
-	return md5_read_ctx (ctx, resbuf);
+	return _pgm_md5_read_ctx (ctx, resbuf);
 }
 
 /* eof */

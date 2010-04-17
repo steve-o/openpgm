@@ -19,58 +19,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <limits.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/types.h>
-#ifdef CONFIG_HAVE_POLL
-#	include <poll.h>
-#endif
-#ifdef CONFIG_HAVE_EPOLL
-#	include <sys/epoll.h>
-#endif
-
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <net/if.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#	include <netinet/udp.h>
-#	include <sys/socket.h>
-#	include <sys/time.h>
-#	include <arpa/inet.h>
-#else
-#	include <ws2tcpip.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/list.h"
-#include "pgm/pgm.h"
+#include <pgm/framework.h>
 #include "pgm/receiver.h"
-#include "pgm/ip.h"
-#include "pgm/packet.h"
-#include "pgm/math.h"
-#include "pgm/net.h"
-#include "pgm/txw.h"
-#include "pgm/rxw.h"
-#include "pgm/rate_control.h"
+#include "pgm/sqn_list.h"
 #include "pgm/timer.h"
-#include "pgm/checksum.h"
-#include "pgm/reed_solomon.h"
-#include "pgm/histogram.h"
+#include "pgm/packet_parse.h"
+#include "pgm/net.h"
 
 
 //#define RECEIVER_DEBUG
@@ -78,25 +37,19 @@
 
 #ifndef RECEIVER_DEBUG
 #	define PGM_DISABLE_ASSERT
-#else
-#include <ctype.h>
 #endif
 
-#ifndef ENOBUFS
+#if !defined(ENOBUFS) && defined(WSAENOBUFS)
 #	define ENOBUFS		WSAENOBUFS
 #endif
-#ifndef ECONNRESET
+#if !defined(ECONNRESET) && defined(WSAECONNRESET)
 #	define ECONNRESET	WSAECONNRESET
 #endif
-#ifndef ENOBUFS
-#	define ENOBUFS		WSAENOBUFS
-#endif
-
 
 static bool send_spmr (pgm_transport_t* const, pgm_peer_t* const);
 static bool send_nak (pgm_transport_t* const, pgm_peer_t* const, const uint32_t);
-static bool send_parity_nak (pgm_transport_t* const, pgm_peer_t* const, const guint, const guint);
-static bool send_nak_list (pgm_transport_t* const, pgm_peer_t* const, const pgm_sqn_list_t* const);
+static bool send_parity_nak (pgm_transport_t* const, pgm_peer_t* const, const unsigned, const unsigned);
+static bool send_nak_list (pgm_transport_t* const, pgm_peer_t* const, const struct pgm_sqn_list_t* const);
 static bool nak_rb_state (pgm_peer_t*, const pgm_time_t);
 static void nak_rpt_state (pgm_peer_t*, const pgm_time_t);
 static void nak_rdata_state (pgm_peer_t*, const pgm_time_t);
@@ -227,7 +180,7 @@ pgm_peer_unref (
 	pgm_assert (NULL != peer);
 
 	const bool is_zero = pgm_atomic_int32_dec_and_test (&peer->ref_count);
-	if (G_UNLIKELY (is_zero))
+	if (PGM_UNLIKELY (is_zero))
 	{
 /* receive window */
 		pgm_rxw_destroy (peer->window);
@@ -258,7 +211,7 @@ get_opt_fragment (
 	pgm_assert (opt_header->opt_length == sizeof(struct pgm_opt_length));
 
 	pgm_debug ("get_opt_fragment (opt-header:%p opt-fragment:%p)",
-		(gpointer)opt_header, (gpointer)opt_fragment);
+		(const void*)opt_header, (const void*)opt_fragment);
 
 /* always at least two options, first is always opt_length */
 	do {
@@ -501,7 +454,7 @@ pgm_transport_set_nak_rdata_ivl (
 	return TRUE;
 }
 
-/* statistics are limited to guint8, i.e. 255 retries
+/* statistics are limited to uint8_t, i.e. 255 retries
  *
  * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
@@ -526,7 +479,7 @@ pgm_transport_set_nak_data_retries (
 	return TRUE;
 }
 
-/* statistics are limited to guint8, i.e. 255 retries
+/* statistics are limited to uint8_t, i.e. 255 retries
  *
  * on success, returns TRUE.  on invalid setting, returns FALSE.
  */
@@ -582,7 +535,7 @@ pgm_new_peer (
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
-	pgm_debug ("pgm_new_peer (transport:%p tsi:%s src-addr:%s src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%s dst-addrlen:%" G_GSIZE_FORMAT ")",
+	pgm_debug ("pgm_new_peer (transport:%p tsi:%s src-addr:%s src-addrlen:%zu dst-addr:%s dst-addrlen:%zu)",
 		(void*)transport, pgm_tsi_print (tsi), saddr, src_addrlen, daddr, dst_addrlen);
 #endif
 
@@ -628,8 +581,8 @@ pgm_new_peer (
 int
 pgm_flush_peers_pending (
 	pgm_transport_t* const		transport,
-	pgm_msgv_t**			pmsg,
-	const pgm_msgv_t* const		msg_end,
+	struct pgm_msgv_t**		pmsg,
+	const struct pgm_msgv_t* const	msg_end,
 	size_t* const			bytes_read,	/* added to, not set */
 	size_t* const			data_read
 	)
@@ -645,7 +598,7 @@ pgm_flush_peers_pending (
 	pgm_assert (NULL != data_read);
 
 	pgm_debug ("pgm_flush_peers_pending (transport:%p pmsg:%p msg-end:%p bytes-read:%p data-read:%p)",
-		(gpointer)transport, (gpointer)pmsg, (gconstpointer)msg_end, (gpointer)bytes_read, (gpointer)data_read);
+		(const void*)transport, (const void*)pmsg, (const void*)msg_end, (const void*)bytes_read, (const void*)data_read);
 
 	while (transport->peers_pending)
 	{
@@ -672,7 +625,7 @@ pgm_flush_peers_pending (
 			}
 		} else
 			peer->last_commit = 0;
-		if (G_UNLIKELY(transport->is_reset)) {
+		if (PGM_UNLIKELY(transport->is_reset)) {
 			retval = -ECONNRESET;
 			break;
 		}
@@ -724,9 +677,9 @@ pgm_peer_set_pending (
 
 void
 pgm_set_reset_error (
-	pgm_transport_t* const	transport,
-	pgm_peer_t* const	source,
-	pgm_msgv_t* const	msgv
+	pgm_transport_t*const	transport,
+	pgm_peer_t*const	source,
+	struct pgm_msgv_t*const	msgv
 	)
 {
 /* pre-conditions */
@@ -762,9 +715,9 @@ pgm_on_spm (
 	pgm_assert (NULL != skb);
 
 	pgm_debug("pgm_on_spm (transport:%p source:%p skb:%p)",
-		(gpointer)transport, (gpointer)source, (gpointer)skb);
+		(const void*)transport, (const void*)source, (const void*)skb);
 
-	if (G_UNLIKELY(!pgm_verify_spm (skb))) {
+	if (PGM_UNLIKELY(!pgm_verify_spm (skb))) {
 		pgm_trace(PGM_LOG_ROLE_NETWORK,_("Discarded invalid SPM."));
 		source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 		return FALSE;
@@ -775,7 +728,7 @@ pgm_on_spm (
 	const uint32_t spm_sqn = ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
-	if (G_LIKELY(pgm_uint32_gte (spm_sqn, source->spm_sqn) ||
+	if (PGM_LIKELY(pgm_uint32_gte (spm_sqn, source->spm_sqn) ||
 	     ((struct sockaddr*)&source->nla)->sa_family == 0))
 	{
 /* copy NLA for replies */
@@ -822,13 +775,13 @@ pgm_on_spm (
 		const struct pgm_opt_length* opt_len = (AF_INET6 == source->nla.ss_family) ?
 							(const struct pgm_opt_length*)(spm6 + 1) :
 							(const struct pgm_opt_length*)(spm  + 1);
-		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
+		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
 			return FALSE;
 		}
-		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
+		if (PGM_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
@@ -841,7 +794,7 @@ pgm_on_spm (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_PARITY_PRM)
 			{
 				const struct pgm_opt_parity_prm* opt_parity_prm = (const struct pgm_opt_parity_prm*)(opt_header + 1);
-				if (G_UNLIKELY((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0))
+				if (PGM_UNLIKELY((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0))
 				{
 					pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
 					source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
@@ -849,7 +802,7 @@ pgm_on_spm (
 				}
 
 				const uint32_t parity_prm_tgs = ntohl (opt_parity_prm->parity_prm_tgs);
-				if (G_UNLIKELY(parity_prm_tgs < 2 || parity_prm_tgs > 128))
+				if (PGM_UNLIKELY(parity_prm_tgs < 2 || parity_prm_tgs > 128))
 				{
 					pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
 					source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS]++;
@@ -894,9 +847,9 @@ pgm_on_peer_nak (
 	pgm_assert (NULL != skb);
 
 	pgm_debug ("pgm_on_peer_nak (transport:%p peer:%p skb:%p)",
-		(gpointer)transport, (gpointer)peer, (gpointer)skb);
+		(const void*)transport, (const void*)peer, (const void*)skb);
 
-	if (G_UNLIKELY(!pgm_verify_nak (skb)))
+	if (PGM_UNLIKELY(!pgm_verify_nak (skb)))
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded invalid multicast NAK."));
 		peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS]++;
@@ -909,7 +862,7 @@ pgm_on_peer_nak (
 /* NAK_SRC_NLA must not contain our transport unicast NLA */
 	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
-	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0))
+	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&transport->send_addr) == 0))
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded multicast NAK on NLA mismatch."));
 		return FALSE;
@@ -928,7 +881,7 @@ pgm_on_peer_nak (
 		}
 	}
 
-	if (G_UNLIKELY(!found)) {
+	if (PGM_UNLIKELY(!found)) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded multicast NAK on multicast group mismatch."));
 		return FALSE;
 	}
@@ -950,13 +903,13 @@ pgm_on_peer_nak (
 		const struct pgm_opt_length* opt_len = (AF_INET6 == nak_src_nla.ss_family) ?
 							(const struct pgm_opt_length*)(nak6 + 1) :
 							(const struct pgm_opt_length*)(nak + 1);
-		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
+		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed multicast NAK."));
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
-		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
+		if (PGM_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed multicast NAK."));
 			peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
@@ -969,7 +922,7 @@ pgm_on_peer_nak (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				nak_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
-				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
+				nak_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(uint8_t) ) / sizeof(uint32_t);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -977,7 +930,7 @@ pgm_on_peer_nak (
 
 	while (nak_list_len) {
 		status = pgm_rxw_confirm (peer->window,
-					  g_ntohl (*nak_list),
+					  ntohl (*nak_list),
 					  skb->tstamp,
 					  skb->tstamp + transport->nak_rdata_ivl,
 					  skb->tstamp + nak_rb_ivl(transport));
@@ -1020,9 +973,9 @@ pgm_on_ncf (
 	pgm_assert (NULL != skb);
 
 	pgm_debug ("pgm_on_ncf (transport:%p source:%p skb:%p)",
-		(gpointer)transport, (gpointer)source, (gpointer)skb);
+		(const void*)transport, (const void*)source, (const void*)skb);
 
-	if (G_UNLIKELY(!pgm_verify_ncf (skb)))
+	if (PGM_UNLIKELY(!pgm_verify_ncf (skb)))
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded invalid NCF."));
 		source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
@@ -1037,7 +990,7 @@ pgm_on_ncf (
 	pgm_nla_to_sockaddr (&ncf->nak_src_nla_afi, (struct sockaddr*)&ncf_src_nla);
 
 #if 0
-	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_addr) != 0)) {
+	if (PGM(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_src_nla, (struct sockaddr*)&transport->send_addr) != 0)) {
 		g_trace ("INFO", "Discarded NCF on NLA mismatch.");
 		peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
 		return FALSE;
@@ -1047,7 +1000,7 @@ pgm_on_ncf (
 /* NCF_GRP_NLA contains our transport multicast group */ 
 	struct sockaddr_storage ncf_grp_nla;
 	pgm_nla_to_sockaddr ((AF_INET6 == ncf_src_nla.ss_family) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
-	if (G_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0))
+	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&transport->send_gsr.gsr_group) != 0))
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded NCF on multicast group mismatch."));
 		return FALSE;
@@ -1079,13 +1032,13 @@ pgm_on_ncf (
 		const struct pgm_opt_length* opt_len = (AF_INET6 == ncf_src_nla.ss_family) ?
 							(const struct pgm_opt_length*)(ncf6 + 1) :
 							(const struct pgm_opt_length*)(ncf  + 1);
-		if (G_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
+		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed NCF."));
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
 			return FALSE;
 		}
-		if (G_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
+		if (PGM_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length)))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed NCF."));
 			source->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS]++;
@@ -1098,7 +1051,7 @@ pgm_on_ncf (
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
 			{
 				ncf_list = ((const struct pgm_opt_nak_list*)(opt_header + 1))->opt_sqn;
-				ncf_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(guint8) ) / sizeof(guint32);
+				ncf_list_len = ( opt_header->opt_length - sizeof(struct pgm_opt_header) - sizeof(uint8_t) ) / sizeof(uint32_t);
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -1108,7 +1061,7 @@ pgm_on_ncf (
 	while (ncf_list_len)
 	{
 		status = pgm_rxw_confirm (source->window,
-					  g_ntohl (*ncf_list),
+					  ntohl (*ncf_list),
 					  skb->tstamp,
 					  ncf_rdata_ivl,
 					  ncf_rb_ivl);
@@ -1209,7 +1162,7 @@ send_nak (
 	pgm_assert (NULL != transport);
 	pgm_assert (NULL != source);
 
-	pgm_debug ("send_nak (transport:%p peer:%p sequence:%" G_GUINT32_FORMAT ")",
+	pgm_debug ("send_nak (transport:%p peer:%p sequence:%" PRIu32 ")",
 		(void*)transport, (void*)source, sequence);
 
 	size_t tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
@@ -1229,7 +1182,7 @@ send_nak (
         header->pgm_tsdu_length = 0;
 
 /* NAK */
-	nak->nak_sqn		= g_htonl (sequence);
+	nak->nak_sqn		= htonl (sequence);
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
@@ -1277,7 +1230,7 @@ send_parity_nak (
 	pgm_assert (NULL != source);
 	pgm_assert (nak_pkt_cnt > 0);
 
-	pgm_debug ("send_parity_nak (transport:%p source:%p nak-tg-sqn:%" G_GUINT32_FORMAT " nak-pkt-cnt:%" G_GUINT32_FORMAT ")",
+	pgm_debug ("send_parity_nak (transport:%p source:%p nak-tg-sqn:%" PRIu32 " nak-pkt-cnt:%" PRIu32 ")",
 		(void*)transport, (void*)source, nak_tg_sqn, nak_pkt_cnt);
 
 	size_t tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
@@ -1333,9 +1286,9 @@ send_parity_nak (
 static
 bool
 send_nak_list (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		source,
-	const pgm_sqn_list_t* const	sqn_list
+	pgm_transport_t* const			transport,
+	pgm_peer_t* const			source,
+	const struct pgm_sqn_list_t*const	sqn_list
 	)
 {
 /* pre-conditions */
@@ -1347,14 +1300,14 @@ send_nak_list (
 
 #ifdef RECEIVER_DEBUG
 	char list[1024];
-	sprintf (list, "%" G_GUINT32_FORMAT, sqn_list->sqn[0]);
+	sprintf (list, "%" PRIu32, sqn_list->sqn[0]);
 	for (unsigned i = 1; i < sqn_list->len; i++) {
 		char sequence[2 + strlen("4294967295")];
-		sprintf (sequence, " %" G_GUINT32_FORMAT, sqn_list->sqn[i]);
+		sprintf (sequence, " %" PRIu32, sqn_list->sqn[i]);
 		strcat (list, sequence);
 	}
 	pgm_debug("send_nak_list (transport:%p source:%p sqn-list:[%s])",
-		(gpointer)transport, (gpointer)source, list);
+		(const void*)transport, (const void*)source, list);
 #endif
 
 	size_t tpdu_length = sizeof(struct pgm_header) +
@@ -1366,7 +1319,7 @@ send_nak_list (
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
 	char buf[ tpdu_length ];
-	if (G_UNLIKELY(pgm_mem_gc_friendly))
+	if (PGM_UNLIKELY(pgm_mem_gc_friendly))
 		memset (buf, 0, tpdu_length);
 	struct pgm_header* header = (struct pgm_header*)buf;
 	struct pgm_nak*  nak  = (struct pgm_nak* )(header + 1);
@@ -1406,7 +1359,7 @@ send_nak_list (
 	opt_nak_list->opt_reserved = 0;
 
 	for (unsigned i = 1; i < sqn_list->len; i++)
-		opt_nak_list->opt_sqn[i-1] = g_htonl (sqn_list->sqn[i]);
+		opt_nak_list->opt_sqn[i-1] = htonl (sqn_list->sqn[i]);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
@@ -1418,7 +1371,7 @@ send_nak_list (
 					tpdu_length,
 					(struct sockaddr*)&source->nla,
 					pgm_sockaddr_len((struct sockaddr*)&source->nla));
-	if ( sent != (gssize)tpdu_length )
+	if ( sent != (ssize_t)tpdu_length )
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
@@ -1445,12 +1398,12 @@ nak_rb_state (
 	pgm_assert (NULL != peer);
 
 	pgm_debug ("nak_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
-		(gpointer)peer, now);
+		(const void*)peer, now);
 
 	pgm_rxw_t* window = peer->window;
 	pgm_transport_t* transport = peer->transport;
 	pgm_list_t* list;
-	pgm_sqn_list_t nak_list = { .len = 0 };
+	struct pgm_sqn_list_t nak_list = { .len = 0 };
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
  * better to get the notification out a.s.a.p. even though it might be waiting
@@ -1497,7 +1450,7 @@ nak_rb_state (
 /* check this packet for state expiration */
 			if (pgm_time_after_eq (now, state->nak_rb_expiry))
 			{
-				if (G_UNLIKELY(!is_valid_nla)) {
+				if (PGM_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
 					pgm_rxw_lost (window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
@@ -1561,7 +1514,7 @@ nak_rb_state (
 /* check this packet for state expiration */
 			if (pgm_time_after_eq(now, state->nak_rb_expiry))
 			{
-				if (G_UNLIKELY(!is_valid_nla)) {
+				if (PGM_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
 					pgm_rxw_lost (window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
@@ -1594,7 +1547,7 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("rp->nak_rpt_expiry in %f seconds."),
 					transport->next_poll = state->nak_rpt_expiry;
 				pgm_timer_unlock (transport);
 
-				if (nak_list.len == G_N_ELEMENTS(nak_list.sqn)) {
+				if (nak_list.len == PGM_N_ELEMENTS(nak_list.sqn)) {
 					if (transport->can_send_nak && !send_nak_list (transport, peer, &nak_list))
 						return FALSE;
 					nak_list.len = 0;
@@ -1618,7 +1571,7 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("rp->nak_rpt_expiry in %f seconds."),
 
 	}
 
-	if (G_UNLIKELY(dropped_invalid))
+	if (PGM_UNLIKELY(dropped_invalid))
 	{
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Dropped %u messages due to invalid NLA."), dropped_invalid);
 
@@ -1672,7 +1625,7 @@ pgm_check_peer_nak_state (
 	pgm_assert (NULL != transport);
 
 	pgm_debug ("pgm_check_peer_nak_state (transport:%p now:%" PGM_TIME_FORMAT ")",
-		(gpointer)transport, now);
+		(const void*)transport, now);
 
 	if (!transport->peers_list)
 		return TRUE;
@@ -1763,7 +1716,7 @@ pgm_min_nak_expiry (
 	pgm_assert (NULL != transport);
 
 	pgm_debug ("pgm_min_nak_expiry (expiration:%" PGM_TIME_FORMAT " transport:%p)",
-		expiration, (gpointer)transport);
+		expiration, (const void*)transport);
 
 	if (!transport->peers_list)
 		return expiration;
@@ -1824,8 +1777,8 @@ nak_rpt_state (
 	pgm_transport_t* transport = peer->transport;
 	pgm_list_t* list = window->wait_ncf_queue.tail;
 
-	guint dropped_invalid = 0;
-	guint dropped = 0;
+	unsigned dropped_invalid = 0;
+	unsigned dropped = 0;
 
 /* have not learned this peers NLA */
 	const bool is_valid_nla = 0 != peer->nla.ss_family;
@@ -1839,7 +1792,7 @@ nak_rpt_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq (now, state->nak_rpt_expiry))
 		{
-			if (G_UNLIKELY(!is_valid_nla)) {
+			if (PGM_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
 				pgm_rxw_lost (window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
@@ -1885,18 +1838,18 @@ nak_rpt_state (
 		pgm_assert ((pgm_rxw_state_t*)window->wait_ncf_queue.tail != NULL);
 	}
 
-	if (G_UNLIKELY(dropped_invalid)) {
+	if (PGM_UNLIKELY(dropped_invalid)) {
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Dropped %u messages due to invalid NLA."), dropped_invalid);
 	}
 
-	if (G_UNLIKELY(dropped)) {
+	if (PGM_UNLIKELY(dropped)) {
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Dropped %u messages due to ncf cancellation, "
-				"rxw_sqns %" G_GUINT32_FORMAT
-				" bo %" G_GUINT32_FORMAT
-				" ncf %" G_GUINT32_FORMAT
-				" wd %" G_GUINT32_FORMAT
-				" lost %" G_GUINT32_FORMAT
-				" frag %" G_GUINT32_FORMAT),
+				"rxw_sqns %" PRIu32
+				" bo %" PRIu32
+				" ncf %" PRIu32
+				" wd %" PRIu32
+				" lost %" PRIu32
+				" frag %" PRIu32),
 				dropped,
 				pgm_rxw_length (window),
 				window->backoff_queue.length,
@@ -1907,7 +1860,7 @@ nak_rpt_state (
 	}
 
 /* mark receiver window for flushing on next recv() */
-	if (G_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
+	if (PGM_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
 	    !peer->pending_link.data))
 	{
 		transport->is_reset = TRUE;
@@ -1945,7 +1898,7 @@ nak_rdata_state (
 	pgm_assert (NULL != peer);
 
 	pgm_debug ("nak_rdata_state (peer:%p now:%" PGM_TIME_FORMAT ")",
-		(gpointer)peer, now);
+		(const void*)peer, now);
 
 	pgm_rxw_t* window = peer->window;
 	pgm_transport_t* transport = peer->transport;
@@ -1967,7 +1920,7 @@ nak_rdata_state (
 /* check this packet for state expiration */
 		if (pgm_time_after_eq (now, rdata_state->nak_rdata_expiry))
 		{
-			if (G_UNLIKELY(!is_valid_nla)) {
+			if (PGM_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
 				pgm_rxw_lost (window, rdata_skb->sequence);
 /* mark receiver window for flushing on next recv() */
@@ -2012,16 +1965,16 @@ nak_rdata_state (
 		pgm_assert ((pgm_rxw_state_t*)window->wait_data_queue.tail);
 	}
 
-	if (G_UNLIKELY(dropped_invalid)) {
+	if (PGM_UNLIKELY(dropped_invalid)) {
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Dropped %u messages due to invalid NLA."), dropped_invalid);
 	}
 
-	if (G_UNLIKELY(dropped)) {
+	if (PGM_UNLIKELY(dropped)) {
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Dropped %u messages due to data cancellation."), dropped);
 	}
 
 /* mark receiver window for flushing on next recv() */
-	if (G_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
+	if (PGM_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
 	    !peer->pending_link.data))
 	{
 		transport->is_reset = TRUE;
@@ -2073,7 +2026,7 @@ pgm_on_data (
 	pgm_skb_pull (skb, sizeof(struct pgm_data) + opt_total_length);
 
 	if (opt_total_length > 0)
-		 get_opt_fragment ((gpointer)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
+		 get_opt_fragment ((void*)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
 
 	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
 
@@ -2138,7 +2091,7 @@ pgm_on_poll (
 	pgm_debug ("pgm_on_poll (transport:%p source:%p skb:%p)",
 		(void*)transport, (void*)source, (void*)skb);
 
-	if (G_UNLIKELY(!pgm_verify_poll (skb))) {
+	if (PGM_UNLIKELY(!pgm_verify_poll (skb))) {
 		pgm_trace(PGM_LOG_ROLE_NETWORK,_("Discarded invalid POLL."));
 		return FALSE;
 	}
@@ -2221,9 +2174,9 @@ on_general_poll (
 static
 bool
 on_dlr_poll (
-	G_GNUC_UNUSED pgm_transport_t* const		transport,
-	G_GNUC_UNUSED pgm_peer_t* const			source,
-	G_GNUC_UNUSED struct pgm_sk_buff_t* const	skb
+	PGM_GNUC_UNUSED pgm_transport_t* const		transport,
+	PGM_GNUC_UNUSED pgm_peer_t* const			source,
+	PGM_GNUC_UNUSED struct pgm_sk_buff_t* const	skb
 	)
 {
 /* we are not a DLR */

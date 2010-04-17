@@ -19,29 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
-#include <errno.h>
-#include <getopt.h>
 #include <locale.h>
-#include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <sys/types.h>
-
 #include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#endif
-
 #include <pgm/pgm.h>
+/* example project headers */
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 
@@ -50,25 +32,23 @@
 
 /* globals */
 
-static int g_port = 0;
-static const char* g_network = "";
-static gboolean g_multicast_loop = FALSE;
-static int g_udp_encap_port = 0;
+static int		g_port = 0;
+static const char*	g_network = "";
+static gboolean		g_multicast_loop = FALSE;
+static int		g_udp_encap_port = 0;
 
-static int g_max_tpdu = 1500;
-static int g_sqns = 100;
+static int		g_max_tpdu = 1500;
+static int		g_sqns = 100;
 
 static pgm_transport_t* g_transport = NULL;
-static gboolean g_quit = FALSE;
+static gboolean		g_quit = FALSE;
 
 #ifdef G_OS_UNIX
 static void on_signal (int);
 #else
 static BOOL on_console_ctrl (DWORD);
 #endif
-
 static gboolean on_startup (void);
-
 static int on_data (gpointer, guint, pgm_tsi_t*);
 
 

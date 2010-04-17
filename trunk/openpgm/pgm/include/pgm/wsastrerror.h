@@ -17,17 +17,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_WSASTRERROR_H__
 #define __PGM_WSASTRERROR_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
-G_BEGIN_DECLS
+char* pgm_wsastrerror (const int);
+char* pgm_adapter_strerror (const int);
 
-gchar* pgm_wsastrerror (const int);
-gchar* pgm_adapter_strerror (const int);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_WSASTRERROR_H__ */

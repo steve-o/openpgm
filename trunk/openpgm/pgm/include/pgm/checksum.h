@@ -19,13 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_CHECKSUM_H__
 #define __PGM_CHECKSUM_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 uint16_t pgm_inet_checksum (const void*, uint16_t, uint16_t);
 uint16_t pgm_csum_fold (uint32_t);
@@ -64,7 +67,7 @@ static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 #	define pgm_csum_partial            pgm_compat_csum_partial
 #	define pgm_csum_partial_copy       pgm_compat_csum_partial_copy
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_CHECKSUM_H__ */
 

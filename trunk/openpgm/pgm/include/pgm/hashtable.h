@@ -19,40 +19,41 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_HASHTABLE_H__
 #define __PGM_HASHTABLE_H__
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
 typedef struct pgm_hashtable_t pgm_hashtable_t;
 typedef uint_fast32_t pgm_hash_t;
 
-typedef pgm_hash_t (*PGMHashFunc) (gconstpointer);
-typedef bool (*PGMEqualFunc) (gconstpointer, gconstpointer);
+typedef pgm_hash_t (*pgm_hashfunc_t) (const void*);
+typedef bool (*pgm_equalfunc_t) (const void*restrict, const void*restrict);
 
-
-G_BEGIN_DECLS
-
-pgm_hashtable_t* pgm_hash_table_new (PGMHashFunc, PGMEqualFunc);
+pgm_hashtable_t* pgm_hash_table_new (pgm_hashfunc_t, pgm_equalfunc_t);
 void pgm_hash_table_destroy (pgm_hashtable_t*);
-void pgm_hash_table_insert (pgm_hashtable_t*, gconstpointer, gpointer);
-bool pgm_hash_table_remove (pgm_hashtable_t*, gconstpointer);
+void pgm_hash_table_insert (pgm_hashtable_t*restrict, const void*restrict, void*restrict);
+bool pgm_hash_table_remove (pgm_hashtable_t*restrict, const void*restrict);
 void pgm_hash_table_remove_all (pgm_hashtable_t*);
-gpointer pgm_hash_table_lookup (pgm_hashtable_t*, gconstpointer);
+void* pgm_hash_table_lookup (pgm_hashtable_t*restrict, const void*restrict);
 
 void pgm_hash_table_unref (pgm_hashtable_t*);
 
 /* Hash Functions
  */
-bool pgm_str_equal (const void* restrict, const void* restrict) G_GNUC_WARN_UNUSED_RESULT;
-pgm_hash_t pgm_str_hash (const void*) G_GNUC_WARN_UNUSED_RESULT;
-bool pgm_int_equal (const void* restrict, const void* restrict) G_GNUC_WARN_UNUSED_RESULT;
-pgm_hash_t pgm_int_hash (const void*) G_GNUC_WARN_UNUSED_RESULT;
+
+bool pgm_str_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+pgm_hash_t pgm_str_hash (const void*) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_int_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+pgm_hash_t pgm_int_hash (const void*) PGM_GNUC_WARN_UNUSED_RESULT;
 
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_HASHTABLE_H__ */

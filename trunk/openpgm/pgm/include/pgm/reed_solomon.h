@@ -18,15 +18,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_REED_SOLOMON_H__
 #define __PGM_REED_SOLOMON_H__
 
-#include <glib.h>
+#include <pgm/types.h>
+#include <pgm/galois.h>
 
-#ifndef __PGM_GALOIS_H__
-#	include <pgm/galois.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 struct pgm_rs_t {
 	uint8_t		n, k;		/* RS(n, k) */
@@ -36,11 +38,7 @@ struct pgm_rs_t {
 
 typedef struct pgm_rs_t pgm_rs_t;
 
-
-G_BEGIN_DECLS
-
 #define PGM_RS_DEFAULT_N	255
-
 
 PGM_GNUC_INTERNAL void pgm_rs_create (pgm_rs_t*, const uint8_t, const uint8_t);
 PGM_GNUC_INTERNAL void pgm_rs_destroy (pgm_rs_t*);
@@ -48,6 +46,6 @@ PGM_GNUC_INTERNAL void pgm_rs_encode (pgm_rs_t*restrict, const pgm_gf8_t**restri
 PGM_GNUC_INTERNAL void pgm_rs_decode_parity_inline (pgm_rs_t*restrict, pgm_gf8_t**restrict, const uint8_t*restrict, const uint16_t);
 PGM_GNUC_INTERNAL void pgm_rs_decode_parity_appended (pgm_rs_t*restrict, pgm_gf8_t**restrict, const uint8_t*restrict, const uint16_t);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_REED_SOLOMON_H__ */

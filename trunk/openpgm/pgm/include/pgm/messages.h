@@ -19,13 +19,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MESSAGES_H__
 #define __PGM_MESSAGES_H__
 
-#include <glib.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <pgm/types.h>
 
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 /* Set bitmask of log roles in environmental variable PGM_LOG_MASK,
  * borrowed from SmartPGM.
@@ -53,16 +58,16 @@ enum {
 	PGM_LOG_LEVEL_FATAL	= 6
 };
 
-extern int pgm_log_mask;
-extern int pgm_min_log_level;
+extern int	pgm_log_mask;
+extern int	pgm_min_log_level;
 
 typedef void (*pgm_log_func_t) (const int, const char*, void*);
 
 pgm_log_func_t pgm_log_set_handler (pgm_log_func_t, void*);
-void pgm__log (const int, const char*, ...) G_GNUC_PRINTF (2, 3);
-void pgm__logv (const int, const char*, va_list);
+void pgm__log  (const int, const char*, ...) PGM_GNUC_PRINTF (2, 3);
+void pgm__logv (const int, const char*, va_list) PGM_GNUC_PRINTF (2, 0);
 
-#ifdef G_HAVE_ISO_VARARGS
+#ifdef PGM_HAVE_ISO_VARARGS
 
 #define pgm_debug(...)		if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) pgm__log (PGM_LOG_LEVEL_DEBUG, __VA_ARGS__)
 #define pgm_trace(r,...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
@@ -73,7 +78,7 @@ void pgm__logv (const int, const char*, va_list);
 #define pgm_error(...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_ERROR) pgm__log (PGM_LOG_LEVEL_ERROR, __VA_ARGS__)
 #define pgm_fatal(...)		pgm__log (PGM_LOG_LEVEL_FATAL, __VA_ARGS__)
 
-#elif defined(G_HAVE_GNUC_VARARGS)
+#elif defined(PGM_HAVE_GNUC_VARARGS)
 
 #define pgm_debug(f...)		if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) pgm__log (PGM_LOG_LEVEL_DEBUG, f)
 #define pgm_trace(r,f...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
@@ -86,6 +91,15 @@ void pgm__logv (const int, const char*, va_list);
 
 #else   /* no varargs macros */
 
+/* declare for GCC attributes */
+static inline void pgm_debug (const char*, ...) PGM_GNUC_PRINTF (1, 2);
+static inline void pgm_trace (const int, const char*, ...) PGM_GNUC_PRINTF (2, 3);
+static inline void pgm_minor (const char*, ...) PGM_GNUC_PRINTF (1, 2);
+static inline void pgm_info (const char*, ...) PGM_GNUC_PRINTF (1, 2);
+static inline void pgm_warn (const char*, ...) PGM_GNUC_PRINTF (1, 2);
+static inline void pgm_error (const char*, ...) PGM_GNUC_PRINTF (1, 2);
+static inline void pgm_fatal (const char*, ...) PGM_GNUC_PRINTF (1, 2);
+
 static inline void pgm_debug (const char* format, ...) {
 	if (PGM_LOG_LEVEL_DEBUG == pgm_min_log_level) {
 		va_list args;
@@ -96,7 +110,7 @@ static inline void pgm_debug (const char* format, ...) {
 }
 
 static inline void pgm_trace (const int role, const char* format, ...) {
-	if (PGM_LOG_LEVEL_TRACE => pgm_min_log_level && pgm_log_mask & role) {
+	if (PGM_LOG_LEVEL_TRACE >= pgm_min_log_level && pgm_log_mask & role) {
 		va_list args;
 		va_start (args, format);
 		pgm__logv (PGM_LOG_LEVEL_TRACE, format, args);
@@ -105,7 +119,7 @@ static inline void pgm_trace (const int role, const char* format, ...) {
 }
 
 static inline void pgm_minor (const char* format, ...) {
-	if (PGM_LOG_LEVEL_MINOR => pgm_min_log_level) {
+	if (PGM_LOG_LEVEL_MINOR >= pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
 		pgm__logv (PGM_LOG_LEVEL_MINOR, format, args);
@@ -114,7 +128,7 @@ static inline void pgm_minor (const char* format, ...) {
 }
 
 static inline void pgm_info (const char* format, ...) {
-	if (PGM_LOG_LEVEL_NORMAL => pgm_min_log_level) {
+	if (PGM_LOG_LEVEL_NORMAL >= pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
 		pgm__logv (PGM_LOG_LEVEL_NORMAL, format, args);
@@ -123,7 +137,7 @@ static inline void pgm_info (const char* format, ...) {
 }
 
 static inline void pgm_warn (const char* format, ...) {
-	if (PGM_LOG_LEVEL_WARNING => pgm_min_log_level) {
+	if (PGM_LOG_LEVEL_WARNING >= pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
 		pgm__logv (PGM_LOG_LEVEL_WARNING, format, args);
@@ -132,7 +146,7 @@ static inline void pgm_warn (const char* format, ...) {
 }
 
 static inline void pgm_error (const char* format, ...) {
-	if (PGM_LOG_LEVEL_ERROR => pgm_min_log_level) {
+	if (PGM_LOG_LEVEL_ERROR >= pgm_min_log_level) {
 		va_list args;
 		va_start (args, format);
 		pgm__logv (PGM_LOG_LEVEL_WARNING, format, args);
@@ -156,7 +170,7 @@ static inline void pgm_fatal (const char* format, ...) {
 	} while (0)
 #define pgm_warn_if_fail(expr) \
 	do { \
-		if (G_LIKELY (expr)); \
+		if (PGM_LIKELY (expr)); \
 		else \
 			pgm_warn ("file %s: line %d (%s): runtime check failed: (%s)", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
@@ -174,7 +188,7 @@ static inline void pgm_fatal (const char* format, ...) {
 
 #	define pgm_assert(expr) \
 	do { \
-		if (G_LIKELY(expr)); \
+		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_fatal ("file %s: line %d (%s): assertion failed: (%s)", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
@@ -190,7 +204,7 @@ static inline void pgm_fatal (const char* format, ...) {
 #	define pgm_assert_cmpint(n1, cmp, n2) \
 	do { \
 		const int _n1 = (n1), _n2 = (n2); \
-		if (G_LIKELY(_n1 cmp _n2)); \
+		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%u %s %u)", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
@@ -200,7 +214,7 @@ static inline void pgm_fatal (const char* format, ...) {
 #	define pgm_assert_cmpuint(n1, cmp, n2) \
 	do { \
 		const unsigned _n1 = (n1), _n2 = (n2); \
-		if (G_LIKELY(_n1 cmp _n2)); \
+		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%u %s %u)", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
@@ -212,7 +226,7 @@ static inline void pgm_fatal (const char* format, ...) {
 
 #	define pgm_assert(expr) \
 	do { \
-		if (G_LIKELY(expr)); \
+		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_fatal ("file %s: line %d: assertion failed: (%s)", \
 				__FILE__, __LINE__, #expr); \
@@ -228,7 +242,7 @@ static inline void pgm_fatal (const char* format, ...) {
 #	define pgm_assert_cmpint(n1, cmp, n2) \
 	do { \
 		const int _n1 = (n1), _n2 = (n2); \
-		if (G_LIKELY(_n1 cmp _n2)); \
+		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d: assertion failed (%s): (%u %s %u)", \
 				__FILE__, __LINE__, #expr, _n1, #cmp, _n2); \
@@ -238,7 +252,7 @@ static inline void pgm_fatal (const char* format, ...) {
 #	define pgm_assert_cmpuint(n1, cmp, n2) \
 	do { \
 		const unsigned _n1 = (n1), _n2 = (n2); \
-		if (G_LIKELY(_n1 cmp _n2)); \
+		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d: assertion failed (%s): (%u %s %u)", \
 				__FILE__, __LINE__, #expr, _n1, #cmp, _n2); \
@@ -259,7 +273,7 @@ static inline void pgm_fatal (const char* format, ...) {
 
 #	define pgm_return_if_fail(expr)	\
 	do { \
-		if (G_LIKELY(expr)); \
+		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
@@ -268,7 +282,7 @@ static inline void pgm_fatal (const char* format, ...) {
 	} while (0)
 #	define pgm_return_val_if_fail(expr, val) \
 	do { \
-		if (G_LIKELY(expr)); \
+		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
@@ -292,7 +306,7 @@ static inline void pgm_fatal (const char* format, ...) {
 
 #	define pgm_return_if_fail(expr)	\
 	do { \
-		if (G_LIKELY(expr)); \
+		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_warn ("file %s: line %d: assertion `%s' failed", \
 				__FILE__, __LINE__, #expr); \
@@ -301,7 +315,7 @@ static inline void pgm_fatal (const char* format, ...) {
 	} while (0)
 #	define pgm_return_val_if_fail(expr, val) \
 	do { \
-		if (G_LIKELY(expr)); \
+		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_warn ("file %s: line %d: assertion `%s' failed", \
 				__FILE__, __LINE__, #expr); \
@@ -327,6 +341,6 @@ static inline void pgm_fatal (const char* format, ...) {
 void pgm_messages_init (void);
 void pgm_messages_shutdown (void);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_MESSAGES_H__ */
