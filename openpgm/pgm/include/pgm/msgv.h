@@ -19,28 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
-#include <glib.h>
+#include <pgm/types.h>
+#include <pgm/packet.h>
+#include <pgm/skbuff.h>
 
-typedef struct pgm_msgv_t pgm_msgv_t;
-
-#ifndef __PGM_PACKET_H__
-#	include <pgm/packet.h>
-#endif
-
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 /* struct for scatter/gather I/O */
 struct pgm_iovec {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* match struct iovec */
 	void*		iov_base;
-	size_t		iov_len;	/* length of data */
+	size_t		iov_len;	/* size of iov_base */
 #else
 /* match WSABUF */
 	u_long		iov_len;
@@ -49,9 +46,10 @@ struct pgm_iovec {
 };
 
 struct pgm_msgv_t {
-	size_t			msgv_len;	/* number of elements in skb */
+	unsigned		msgv_len;			/* number of elements in skb */
 	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
 
+PGM_END_DECLS
 
 #endif /* __PGM_MSGV_H__ */

@@ -19,11 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_SLIST_H__
 #define __PGM_SLIST_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
 struct pgm_slist_t
 {
@@ -33,19 +38,16 @@ struct pgm_slist_t
 
 typedef struct pgm_slist_t pgm_slist_t;
 
-
-G_BEGIN_DECLS
-
-pgm_slist_t* pgm_slist_append (pgm_slist_t*restrict, void*restrict) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_prepend (pgm_slist_t*restrict, void*restrict) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_prepend_link (pgm_slist_t*restrict, pgm_slist_t*restrict) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_remove (pgm_slist_t*restrict, const void*restrict) G_GNUC_WARN_UNUSED_RESULT;
-pgm_slist_t* pgm_slist_remove_first (pgm_slist_t*) G_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_append (pgm_slist_t*restrict, void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_prepend (pgm_slist_t*restrict, void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_prepend_link (pgm_slist_t*restrict, pgm_slist_t*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_remove (pgm_slist_t*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+pgm_slist_t* pgm_slist_remove_first (pgm_slist_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 void pgm_slist_free (pgm_slist_t*);
 pgm_slist_t* pgm_slist_last (pgm_slist_t*);
 unsigned pgm_slist_length (pgm_slist_t*);
 
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_SLIST_H__ */

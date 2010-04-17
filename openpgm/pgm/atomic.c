@@ -19,21 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/thread.h"
-
+#include <pgm/framework.h>
 
 //#define ATOMIC_DEBUG
 
 
 /* globals */
 
-static pgm_mutex_t g_atomic_mutex;
-
-static volatile gint32 atomic_ref_count = 0;
+static pgm_mutex_t atomic_mutex;
+static volatile int32_t atomic_ref_count = 0;
 
 
 void
@@ -42,7 +36,7 @@ pgm_atomic_init (void)
 	if (pgm_atomic_int32_exchange_and_add (&atomic_ref_count, 1) > 0)
 		return;
 
-	pgm_mutex_init (&g_atomic_mutex);
+	pgm_mutex_init (&atomic_mutex);
 }
 
 void
@@ -53,25 +47,25 @@ pgm_atomic_shutdown (void)
 	if (!pgm_atomic_int32_dec_and_test (&atomic_ref_count))
 		return;
 
-	pgm_mutex_free (&g_atomic_mutex);
+	pgm_mutex_free (&atomic_mutex);
 }
 
-gint32
+int32_t
 pgm_atomic_int32_exchange_and_add (
-	volatile gint32*	atomic,
-	const gint32		val
+	volatile int32_t*	atomic,
+	const int32_t		val
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	gint32 result;
+	int32_t result;
 	__asm__ __volatile__ ("lock; xaddl %0,%1"
 			      : "=r" (result), "=m" (*atomic) 
 			      : "0" (val), "m" (*atomic));
 	return result;
 #elif defined( __GNUC__ ) && defined( __sparc__ )
-	volatile gint32 *_atomic asm("g1") = atomic;
-	gint32 temp asm("o4");
-	gint32 result asm("o5");
+	volatile int32_t *_atomic asm("g1") = atomic;
+	int32_t temp   asm("o4");
+	int32_t result asm("o5");
 	__asm__ __volatile__("1:  ld	[%%g1],%%o4\n"
 			     "    add	%%o4,%3,%%o5\n"
 			     "    cas	[%%g1],%%o4,%%o5\n"
@@ -83,7 +77,7 @@ pgm_atomic_int32_exchange_and_add (
 			     : "memory", "cc");
 	return result;
 #elif defined( __GNUC__ ) && defined( __ppc__ )
-	gint32 result;
+	int32_t result;
 	__asm__ __volatile__ ("1:  lwarx   %0,0,%2\n"
 			      "    add     %0,%1,%0\n"
 			      "    stwcx.  %0,0,%2\n"
@@ -101,7 +95,7 @@ pgm_atomic_int32_exchange_and_add (
 			      : "cc", "memory");
 	return result;
 #elif defined( __GNUC__ ) && defined( __ppc64__ )
-	gint32 result;
+	int32_t result;
 	__asm__ __volatile__ (
 #ifdef CONFIG_HAVE_PPC_SMP
 			      "    eieio\n"
@@ -118,8 +112,7 @@ pgm_atomic_int32_exchange_and_add (
 			      : "cc", "memory");
 	return result;
 #elif defined( __GNUC__ ) && defined( __arm__ )
-	unsigned long temp;
-	gint32 result;
+	int32_t temp, result;
 	__asm__ __volatile__ ("@ atomic_add_return\n"
 			      "1:  ldrex   %0,[%2]\n"
 			      "    add     %0,%0,%3\n"
@@ -133,13 +126,13 @@ pgm_atomic_int32_exchange_and_add (
 #elif defined( __GNUC__ )
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( __SUNPRO_C ) && defined( __sparc__ )
-	const gint nv = atomic_add_32_nv (atomic, val);
+	const int32_t nv = atomic_add_32_nv (atomic, val);
 	return = nv - val;
 #elif defined(G_OS_WIN32)
 	return InterlockedExchangeAdd (atomic, val);
 #else
 #	error "native interlocked exchange required for module startup"
-	gint32 result;
+	int32_t result;
 	pgm_mutex_lock (&g_atomic_mutex);
 	result = *atomic;
 	*atomic += val;
@@ -152,8 +145,8 @@ pgm_atomic_int32_exchange_and_add (
  */
 void
 pgm_atomic_int32_add (
-	volatile gint32*	atomic,
-	const gint32		val
+	volatile int32_t*	atomic,
+	const int32_t		val
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
@@ -161,8 +154,8 @@ pgm_atomic_int32_add (
 			      : "=m" (*atomic)
 			      : "ir" (val), "m" (*atomic));
 #elif defined( __GNUC__ ) && defined( __sparc__ )
-	volatile gint32 *_atomic asm("g1") = atomic;
-	gint32 temp asm("o4");
+	volatile int32_t *_atomic asm("g1") = atomic;
+	int32_t temp asm("o4");
 	__asm__ __volatile__("1:  ld	[%%g1],%%o4\n"
 			     "    add	%%o4,%3,%%o5\n"
 			     "    cas	[%%g1],%%o4,%%o5\n"
@@ -173,7 +166,7 @@ pgm_atomic_int32_add (
 			     : "r" (_atomic), "r" (val)
 			     : "memory", "cc");
 #elif defined( __GNUC__ ) && defined( __ppc__ )
-	gint32 temp;
+	int32_t temp;
 	__asm__ __volatile__ ("1:  lwarx   %0,0,%3\n"
 			      "    add     %0,%2,%0\n"
 #ifdef CONFIG_HAVE_PPC405_ERR77
@@ -185,7 +178,7 @@ pgm_atomic_int32_add (
 			      : "r" (val), "r" (atomic), "m" (*atomic)
 			      : "cc");
 #elif defined( __GNUC__ ) && defined( __ppc64__ )
-	gint32 temp;
+	int32_t temp;
 	__asm__ __volatile__ ("1:  lwarx   %0,0,%3\n"
 			      "    add     %0,%2,%0\n"
 			      "    stwcx.  %0,0,%3\n"
@@ -194,7 +187,7 @@ pgm_atomic_int32_add (
 			      : "r" (val), "r" (atomic), "m" (*atomic)
 			      : "cc");
 #elif defined( __GNUC__ ) && defined( __arm__ )
-	unsigned long temp, temp2;
+	int32_t temp, temp2;
 	__asm__ __volatile__ ("@ atomic_add\n"
 			      "1:  ldrex   %0,[%2]\n"
 			      "    add     %0,%0,%3\n"
@@ -217,9 +210,9 @@ pgm_atomic_int32_add (
 #endif
 }
 
-gint32
+int32_t
 pgm_atomic_int32_get (
-	const volatile gint32*	atomic
+	const volatile int32_t*	atomic
 	)
 {
 	return *atomic;
@@ -227,12 +220,12 @@ pgm_atomic_int32_get (
 
 void
 pgm_atomic_int32_set (
-	volatile gint32*	atomic,
-	const gint32		newval
+	volatile int32_t*	atomic,
+	const int32_t		newval
 	)
 {
 #if defined( __GNUC__ ) && defined( __arm__ )
-	unsigned long temp;
+	int32_t temp;
 	__asm__ __volatile__ ("@ atomic_set\n"
 			      "1:  ldrex   %0,[%1]\n"
 			      "    strex   %0,%2,[%1]\n"

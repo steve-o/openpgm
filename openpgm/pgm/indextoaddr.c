@@ -19,28 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <stdbool.h>
-#include <string.h>
-#include <sys/types.h>
-
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
+#include <pgm/framework.h>
 
-#ifdef G_OS_UNIX
-#	include <net/if.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#	include <sys/socket.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/if.h"
-#include "pgm/sockaddr.h"
-#include "pgm/getifaddrs.h"
-#include "pgm/nametoindex.h"
-#include "pgm/indextoaddr.h"
 
 //#define INDEXTOADDR_DEBUG
 
@@ -52,9 +34,9 @@
 
 bool
 pgm_if_indextoaddr (
-	const unsigned int	ifindex,
-	const int		iffamily,
-	const unsigned		ifscope,
+	const unsigned		ifindex,
+	const sa_family_t	iffamily,
+	const uint32_t		ifscope,
 	struct sockaddr*	ifsa,
 	pgm_error_t**		error
         )
@@ -74,7 +56,7 @@ pgm_if_indextoaddr (
 			break;
 
 		default:
-			g_return_val_if_reached (FALSE);
+			pgm_return_val_if_reached (FALSE);
 			break;
 		}
 		return TRUE;
@@ -94,7 +76,7 @@ pgm_if_indextoaddr (
 			continue;
 
 		const unsigned i = pgm_if_nametoindex (iffamily, ifa->ifa_name);
-		g_assert (0 != i);
+		pgm_assert (0 != i);
 		if (i == ifindex)
 		{
 			if (ifscope && ifscope != pgm_sockaddr_scope_id (ifa->ifa_addr))

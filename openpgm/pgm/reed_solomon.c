@@ -24,17 +24,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/galois.h"
-#include "pgm/reed_solomon.h"
+#include <pgm/framework.h>
 
 
 /* Vector GF(2⁸) plus-equals multiplication.
@@ -54,7 +44,7 @@ _pgm_gf_vec_addmul (
 	uint_fast16_t i;
 	uint_fast16_t count8;
 
-	if (G_UNLIKELY(b == 0))
+	if (PGM_UNLIKELY(b == 0))
 		return;
 
 #ifdef CONFIG_GALOIS_MUL_LUT

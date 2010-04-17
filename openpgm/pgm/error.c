@@ -21,12 +21,8 @@
 
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/string.h"
-#include "pgm/error.h"
+#include <netdb.h>
+#include <pgm/framework.h>
 
 
 //#define ERROR_DEBUG
@@ -153,10 +149,10 @@ pgm_prefix_error (
 
 int
 pgm_error_from_errno (
-	const int	errno
+	const int	from_errno
 	)
 {
-	switch (errno) {
+	switch (from_errno) {
 #ifdef EAFNOSUPPORT
 	case EAFNOSUPPORT:
 		return PGM_ERROR_EAFNOSUPPORT;
@@ -288,10 +284,10 @@ pgm_error_from_errno (
 
 int
 pgm_error_from_h_errno (
-	const int	h_errno
+	const int	from_h_errno
 	)
 {
-	switch (h_errno) {
+	switch (from_h_errno) {
 #ifdef HOST_NOT_FOUND
 	case HOST_NOT_FOUND:
 		return PGM_ERROR_NONAME;
@@ -328,15 +324,15 @@ pgm_error_from_h_errno (
 
 int
 pgm_error_from_eai_errno (
-	const int	eai_errno,
+	const int	from_eai_errno,
 #ifdef EAI_SYSTEM
-	const int	errno
+	const int	from_errno
 #else
-	G_GNUC_UNUSED const int errno
+	PGM_GNUC_UNUSED const int from_errno
 #endif
 	)
 {
-	switch (eai_errno) {
+	switch (from_eai_errno) {
 #ifdef EAI_ADDRFAMILY
 	case EAI_ADDRFAMILY:
 		return PGM_ERROR_ADDRFAMILY;
@@ -399,7 +395,7 @@ pgm_error_from_eai_errno (
 
 #ifdef EAI_SYSTEM
 	case EAI_SYSTEM:
-		return pgm_error_from_errno (errno);
+		return pgm_error_from_errno (from_errno);
 		break;
 #endif
 
@@ -414,10 +410,10 @@ pgm_error_from_eai_errno (
 
 int
 pgm_error_from_wsa_errno (
-	const int	wsa_errno
+	const int	from_wsa_errno
         )
 {
-	switch (wsa_errno) {
+	switch (from_wsa_errno) {
 #ifdef WSAEINVAL
 	case WSAEINVAL:
 		return PGM_ERROR_INVAL;
@@ -455,10 +451,10 @@ pgm_error_from_wsa_errno (
 
 int
 pgm_error_from_adapter_errno (
-	const int	adapter_errno
+	const int	from_adapter_errno
         )
 {
-	switch (adapter_errno) {
+	switch (from_adapter_errno) {
 #ifdef ERROR_ADDRESS_NOT_ASSOCIATED
 	case ERROR_ADDRESS_NOT_ASSOCIATED:
 		return PGM_ERROR_NODATA;

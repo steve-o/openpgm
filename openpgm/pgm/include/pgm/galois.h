@@ -18,12 +18,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_GALOIS_H__
 #define __PGM_GALOIS_H__
 
-#include <stdint.h>
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
 /* 8 bit wide galois field integer: GF(2⁸) */
 typedef uint8_t pgm_gf8_t;
@@ -51,10 +55,6 @@ extern const pgm_gf8_t pgm_gfantilog[PGM_GF_NO_ELEMENTS];
 #ifdef CONFIG_GALOIS_MUL_LUT
 extern const pgm_gf8_t pgm_gftable[PGM_GF_NO_ELEMENTS * PGM_GF_NO_ELEMENTS];
 #endif
-
-
-G_BEGIN_DECLS
-
 
 /* In a finite field with characteristic 2, addition and subtraction are
  * identical, and are accomplished using the XOR operator. 
@@ -106,7 +106,7 @@ pgm_gfmul (
 	pgm_gf8_t	b
         )
 {
-	if (G_UNLIKELY( !(a && b) )) {
+	if (PGM_UNLIKELY( !(a && b) )) {
 		return 0;
 	}
 
@@ -125,7 +125,7 @@ pgm_gfdiv (
 	pgm_gf8_t	b
         )
 {
-	if (G_UNLIKELY( !a )) {
+	if (PGM_UNLIKELY( !a )) {
 		return 0;
 	}
 
@@ -133,6 +133,6 @@ pgm_gfdiv (
 	return sum < 0 ? pgm_gfantilog[ sum + PGM_GF_MAX ] : pgm_gfantilog[ sum ];
 }
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_GALOIS_H__ */

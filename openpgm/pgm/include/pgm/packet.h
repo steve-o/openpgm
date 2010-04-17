@@ -22,20 +22,9 @@
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
-#include <errno.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <pgm/framework.h>
 
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#	include <sys/types.h>
-#else
-#	include <ws2tcpip.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 /* protocol number assigned by IANA */
 #ifndef IPPROTO_PGM
@@ -110,9 +99,8 @@ enum pgm_type_e {
 /* byte alignment for packet memory maps */
 #ifdef __GNUC__
 #	pragma pack(push)
-#else
-#	pragma pack(1)
 #endif
+#pragma pack(1)
 
 /* 8. PGM header */
 struct pgm_header {
@@ -407,17 +395,11 @@ struct pgm_opt6_path_nla {
 #	pragma pack()
 #endif
 
-#ifndef __PGM_SKBUFF_H__
-#	include <pgm/skbuff.h>
-#endif
-
-G_BEGIN_DECLS
-
-bool pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, pgm_error_t**);
-bool pgm_parse_udp_encap (struct pgm_sk_buff_t* const, pgm_error_t**);
-bool pgm_print_packet (const void*, size_t);
-
-static inline bool pgm_is_upstream (uint8_t type)
+static inline
+bool
+pgm_is_upstream (
+	uint8_t		type
+	)
 {
 	return (type == PGM_NAK ||		/* unicast */
 		type == PGM_NNAK ||		/* unicast */
@@ -425,12 +407,20 @@ static inline bool pgm_is_upstream (uint8_t type)
 		type == PGM_POLR);		/* unicast */
 }
 
-static inline bool pgm_is_peer (uint8_t type)
+static inline
+bool
+pgm_is_peer (
+	uint8_t		type
+	)
 {
 	return (type == PGM_SPMR);		/* multicast */
 }
 
-static inline bool pgm_is_downstream (uint8_t type)
+static inline
+bool
+pgm_is_downstream (
+	uint8_t		type
+	)
 {
 	return (type == PGM_SPM   ||		/* all types are multicast */
 		type == PGM_ODATA ||
@@ -439,19 +429,6 @@ static inline bool pgm_is_downstream (uint8_t type)
 		type == PGM_NCF);
 }
 
-bool pgm_verify_spm (const struct pgm_sk_buff_t* const);
-bool pgm_verify_spmr (const struct pgm_sk_buff_t* const);
-bool pgm_verify_nak (const struct pgm_sk_buff_t* const);
-bool pgm_verify_nnak (const struct pgm_sk_buff_t* const);
-bool pgm_verify_ncf (const struct pgm_sk_buff_t* const);
-bool pgm_verify_poll (const struct pgm_sk_buff_t* const);
-bool pgm_verify_polr (const struct pgm_sk_buff_t* const);
-
-const char* pgm_type_string (uint8_t) G_GNUC_WARN_UNUSED_RESULT;
-const char* pgm_udpport_string (uint16_t) G_GNUC_WARN_UNUSED_RESULT;
-const char* pgm_gethostbyaddr (const struct in_addr*) G_GNUC_WARN_UNUSED_RESULT;
-void pgm_ipopt_print (const void*, size_t);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_PACKET_H__ */

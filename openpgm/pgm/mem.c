@@ -20,17 +20,8 @@
  */
 
 #include <ctype.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/mem.h"
+#include <pgm/framework.h>
 
 //#define MEM_DEBUG
 
@@ -54,9 +45,9 @@ static volatile int32_t mem_ref_count = 0;
 static
 bool
 debug_key_matches (
-	const char*		key,
-	const char*		token,
-	unsigned		length
+	const char* restrict key,
+	const char* restrict token,
+	unsigned	     length
 	)
 {
 	for (; length; length--, key++, token++)
@@ -72,9 +63,9 @@ debug_key_matches (
 static
 unsigned
 pgm_parse_debug_string (
-	const char*		string,
-	const pgm_debug_key_t*	keys,
-	const unsigned		nkeys
+	const char*	       restrict	string,
+	const pgm_debug_key_t* restrict	keys,
+	const unsigned			nkeys
 	)
 {
 	unsigned result = 0;
@@ -122,7 +113,7 @@ pgm_mem_init (void)
 		return;
 
 	const char *val = getenv ("PGM_DEBUG");
-	const unsigned flags = !val ? 0 : pgm_parse_debug_string (val, keys, G_N_ELEMENTS (keys));
+	const unsigned flags = !val ? 0 : pgm_parse_debug_string (val, keys, PGM_N_ELEMENTS (keys));
 	if (flags & 1)
 		pgm_mem_gc_friendly = TRUE;
 }
@@ -141,50 +132,53 @@ pgm_mem_shutdown (void)
 /* malloc wrappers to hard fail */
 void*
 pgm_malloc (
-	size_t		n_bytes
+	const size_t	n_bytes
 	)
 {
-	if (G_LIKELY (n_bytes))
+	if (PGM_LIKELY (n_bytes))
 	{
 		void* mem = malloc (n_bytes);
 		if (mem)
 			return mem;
 
-		pgm_fatal ("%s: failed to allocate %zu bytes",
-			G_STRLOC, n_bytes);
+		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu bytes",
+			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+			n_bytes);
 		abort ();
 	}
 	return NULL;
 }
 
-#define SIZE_OVERFLOWS(a,b) (G_UNLIKELY ((a) > SIZE_MAX / (b)))
+#define SIZE_OVERFLOWS(a,b) (PGM_UNLIKELY ((a) > SIZE_MAX / (b)))
 
 void*
 pgm_malloc_n (
-	size_t		n_blocks,
-	size_t		block_bytes
+	const size_t	n_blocks,
+	const size_t	block_bytes
 	)
 {
 	if (SIZE_OVERFLOWS (n_blocks, block_bytes)) {
-		pgm_fatal ("%s: overflow allocating %zu*%zu bytes",
-			G_STRLOC, n_blocks, block_bytes);
+		pgm_fatal ("file %s: line %d (%s): overflow allocating %zu*%zu bytes",
+			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+			n_blocks, block_bytes);
 	}
 	return pgm_malloc (n_blocks * block_bytes);
 }
 
 void*
 pgm_malloc0 (
-	size_t		n_bytes
+	const size_t	n_bytes
 	)
 {
-	if (G_LIKELY (n_bytes))
+	if (PGM_LIKELY (n_bytes))
 	{
 		void* mem = calloc (1, n_bytes);
 		if (mem)
 			return mem;
 
-		pgm_fatal ("%s: failed to allocate %zu bytes",
-			G_STRLOC, n_bytes);
+		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu bytes",
+			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+			n_bytes);
 		abort ();
 	}
 	return NULL;
@@ -192,32 +186,33 @@ pgm_malloc0 (
 
 void*
 pgm_malloc0_n (
-	size_t		n_blocks,
-	size_t		block_bytes
+	const size_t	n_blocks,
+	const size_t	block_bytes
 	)
 {
-	if (G_LIKELY (n_blocks && block_bytes))
+	if (PGM_LIKELY (n_blocks && block_bytes))
 	{
 		void* mem = calloc (n_blocks, block_bytes);
 		if (mem)
 			return mem;
 
-		pgm_fatal ("%s: failed to allocate %zu*%zu bytes",
-			G_STRLOC, n_blocks, block_bytes);
+		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu*%zu bytes",
+			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+			n_blocks, block_bytes);
 		abort ();
 	}
 	return NULL;
 }
 
-gpointer
+void*
 pgm_memdup (
-	gconstpointer	mem,
-	guint		n_bytes
+	const void*	mem,
+	const size_t	n_bytes
 	)
 {
-	gpointer new_mem;
+	void* new_mem;
 
-	if (G_LIKELY (mem))
+	if (PGM_LIKELY (mem))
 	{
 		new_mem = pgm_malloc (n_bytes);
 		memcpy (new_mem, mem, n_bytes);
@@ -228,12 +223,21 @@ pgm_memdup (
 	return new_mem;
 }
 
-void
-pgm_free (
-	gpointer	mem
+void*
+pgm_realloc (
+	void*		mem,
+	const size_t	n_bytes
 	)
 {
-	if (G_LIKELY (mem))
+	return realloc (mem, n_bytes);
+}
+
+void
+pgm_free (
+	void*		mem
+	)
+{
+	if (PGM_LIKELY (mem))
 		free (mem);
 }
 

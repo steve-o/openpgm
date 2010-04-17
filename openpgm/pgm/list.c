@@ -19,15 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/list.h"
+#include <pgm/framework.h>
 
 
 //#define LIST_DEBUG
-
 
 pgm_list_t*
 pgm_list_append (
@@ -81,7 +76,7 @@ _pgm_list_remove_link (
 	pgm_list_t*	link_
 	)
 {
-	if (G_LIKELY (link_))
+	if (PGM_LIKELY (link_))
 	{
 		if (link_->prev)
 			link_->prev->next = link_->next;
@@ -122,19 +117,19 @@ pgm_list_last (
 	pgm_list_t*	list
 	)
 {
-	if (G_LIKELY (list)) {
+	if (PGM_LIKELY (list)) {
 		while (list->next)
 			list = list->next;
 	}
 	return list;
 }
 
-guint
+unsigned
 pgm_list_length (
 	pgm_list_t*	list
 	)
 {
-	guint length = 0;
+	unsigned length = 0;
 
 	while (list)
 	{

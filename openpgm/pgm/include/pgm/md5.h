@@ -23,13 +23,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MD5_H__
 #define __PGM_MD5_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
-struct md5_ctx
+struct pgm_md5_t
 {
 	uint32_t	A;
 	uint32_t	B;
@@ -41,14 +46,11 @@ struct md5_ctx
 	char		buffer[128] __attribute__ ((__aligned__ (__alignof__ (uint32_t))));
 };
 
+PGM_GNUC_INTERNAL void pgm_md5_init_ctx (struct pgm_md5_t*);
+PGM_GNUC_INTERNAL void pgm_md5_process_bytes (struct pgm_md5_t*, const void*, size_t);
+PGM_GNUC_INTERNAL void* pgm_md5_finish_ctx (struct pgm_md5_t*, void*);
 
-G_BEGIN_DECLS
-
-PGM_GNUC_INTERNAL void _md5_init_ctx (struct md5_ctx*);
-PGM_GNUC_INTERNAL void _md5_process_bytes (struct md5_ctx*, const void*, size_t);
-PGM_GNUC_INTERNAL void* _md5_finish_ctx (struct md5_ctx*, void*);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_MD5_H__ */
 

@@ -19,47 +19,84 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_SN_H__
 #define __PGM_SN_H__
 
-#include <glib.h>
+#include <pgm/types.h>
+#include <pgm/messages.h>
 
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 enum {
 	PGM_UINT32_SIGN_BIT = (1<<31)
 };
-
 #define PGM_UINT64_SIGN_BIT (1ULL<<63)
 
+/* declare for GCC attributes */
+static inline bool pgm_uint32_lt  (const uint32_t, const uint32_t) PGM_GNUC_CONST;
+static inline bool pgm_uint32_lte (const uint32_t, const uint32_t) PGM_GNUC_CONST;
+static inline bool pgm_uint32_gt  (const uint32_t, const uint32_t) PGM_GNUC_CONST;
+static inline bool pgm_uint32_gte (const uint32_t, const uint32_t) PGM_GNUC_CONST;
+static inline bool pgm_uint64_lt  (const uint64_t, const uint64_t) PGM_GNUC_CONST;
+static inline bool pgm_uint64_lte (const uint64_t, const uint64_t) PGM_GNUC_CONST;
+static inline bool pgm_uint64_gt  (const uint64_t, const uint64_t) PGM_GNUC_CONST;
+static inline bool pgm_uint64_gte (const uint64_t, const uint64_t) PGM_GNUC_CONST;
+
 /* 32 bit */
-static inline gboolean pgm_uint32_lt (guint32 s, guint32 t)
+static inline
+bool pgm_uint32_lt (
+	const uint32_t	s,
+	const uint32_t	t
+	)
 {
-	g_assert(sizeof(int) >= 4);
+	pgm_assert (sizeof(int) >= 4);
 	return ( ((s) - (t)) & PGM_UINT32_SIGN_BIT );
 }
 
-static inline gboolean pgm_uint32_lte (guint32 s, guint32 t)
+static inline
+bool
+pgm_uint32_lte (
+	const uint32_t	s,
+	const uint32_t	t
+	)
 {
-	g_assert(sizeof(int) >= 4);
+	pgm_assert (sizeof(int) >= 4);
 	return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT32_SIGN_BIT ) );
 }
 
-static inline gboolean pgm_uint32_gt (guint32 s, guint32 t)
+static inline
+bool
+pgm_uint32_gt (
+	const uint32_t	s,
+	const uint32_t	t
+	)
 {
-	g_assert(sizeof(int) >= 4);
+	pgm_assert (sizeof(int) >= 4);
 	return ( ((t) - (s)) & PGM_UINT32_SIGN_BIT );
 }
 
-static inline gboolean pgm_uint32_gte (guint32 s, guint32 t)
+static inline
+bool
+pgm_uint32_gte (
+	const uint32_t	s,
+	const uint32_t	t
+	)
 {
-	g_assert(sizeof(int) >= 4);
+	pgm_assert (sizeof(int) >= 4);
 	return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT32_SIGN_BIT ) );
 }
 
 /* 64 bit */
-static inline gboolean pgm_uint64_lt (guint64 s, guint64 t)
+static inline
+bool
+pgm_uint64_lt (
+	const uint64_t	s,
+	const uint64_t	t
+	)
 {
 	if (sizeof(int) == 4)
 	{
@@ -70,12 +107,17 @@ static inline gboolean pgm_uint64_lt (guint64 s, guint64 t)
 	}
 	else
 	{
-		g_assert(sizeof(int) >= 8);
+		pgm_assert (sizeof(int) >= 8);
 		return ( ((s) - (t)) & PGM_UINT64_SIGN_BIT );
 	}
 }
 
-static inline gboolean pgm_uint64_lte (guint64 s, guint64 t)
+static inline
+bool
+pgm_uint64_lte (
+	const uint64_t	s,
+	const uint64_t	t
+	)
 {
 	if (sizeof(int) == 4)
 	{
@@ -90,12 +132,17 @@ static inline gboolean pgm_uint64_lte (guint64 s, guint64 t)
 	}
 	else
 	{
-		g_assert(sizeof(int) >= 8);
+		pgm_assert (sizeof(int) >= 8);
 		return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) );
 	}
 }
 
-static inline gboolean pgm_uint64_gt (guint64 s, guint64 t)
+static inline
+bool
+pgm_uint64_gt (
+	const uint64_t	s,
+	const uint64_t	t
+	)
 {
 	if (sizeof(int) == 4)
 	{
@@ -106,12 +153,17 @@ static inline gboolean pgm_uint64_gt (guint64 s, guint64 t)
 	}
 	else
 	{
-		g_assert(sizeof(int) >= 8);
+		pgm_assert (sizeof(int) >= 8);
 		return ( ((t) - (s)) & PGM_UINT64_SIGN_BIT );
 	}
 }
 
-static inline gboolean pgm_uint64_gte (guint64 s, guint64 t)
+static inline
+bool
+pgm_uint64_gte (
+	const uint64_t	s,
+	const uint64_t	t
+	)
 {
 	if (sizeof(int) == 4)
 	{
@@ -126,11 +178,11 @@ static inline gboolean pgm_uint64_gte (guint64 s, guint64 t)
 	}
 	else
 	{
-		g_assert(sizeof(int) >= 8);
+		pgm_assert (sizeof(int) >= 8);
 		return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) );
 	}
 }
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_SN_H__ */

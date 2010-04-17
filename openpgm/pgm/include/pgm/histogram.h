@@ -19,37 +19,41 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_HISTOGRAM_H__
 #define __PGM_HISTOGRAM_H__
 
-#include <glib.h>
+#include <pgm/types.h>
+#include <pgm/slist.h>
+#include <pgm/string.h>
+#include <pgm/time.h>
 
-#ifndef __PGM_TIME_H__
-#	include <pgm/time.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 typedef int pgm_sample_t;
 typedef int pgm_count_t;
 
 struct pgm_sample_set_t {
 	pgm_count_t*	counts;
-	gint		counts_len;
-	gint64		sum;
-	gint64		square_sum;
+	unsigned	counts_len;
+	int64_t		sum;
+	int64_t		square_sum;
 };
 
 typedef struct pgm_sample_set_t pgm_sample_set_t;
 
 struct pgm_histogram_t {
-	const gchar*		histogram_name;
-	gsize			bucket_count;
+	const char*		histogram_name;
+	unsigned		bucket_count;
 	pgm_sample_t		declared_min;
 	pgm_sample_t		declared_max;
 	pgm_sample_t*		ranges;
 	pgm_sample_set_t	sample;
-	gboolean		is_registered;
-	GSList			histograms_link;
+	bool			is_registered;
+	pgm_slist_t		histograms_link;
 };
 
 typedef struct pgm_histogram_t pgm_histogram_t;
@@ -74,7 +78,7 @@ typedef struct pgm_histogram_t pgm_histogram_t;
 
 #ifdef CONFIG_HISTOGRAMS
 
-#define PGM_HISTOGRAM_TIMES(name, sample) do { \
+#	define PGM_HISTOGRAM_TIMES(name, sample) do { \
 		PGM_HISTOGRAM_DEFINE(name, pgm_msecs(1), pgm_secs(10), 50); \
 		if (!counter.is_registered) { \
 			memset (counts, 0, sizeof(counts)); \
@@ -84,7 +88,7 @@ typedef struct pgm_histogram_t pgm_histogram_t;
 		pgm_histogram_add_time (&counter, sample); \
 	} while (0)
 
-#define PGM_HISTOGRAM_COUNTS(name, sample) do { \
+#	define PGM_HISTOGRAM_COUNTS(name, sample) do { \
 		PGM_HISTOGRAM_DEFINE(name, 1, 1000000, 50); \
 		if (!counter.is_registered) { \
 			memset (counts, 0, sizeof(counts)); \
@@ -96,25 +100,29 @@ typedef struct pgm_histogram_t pgm_histogram_t;
 
 #else /* !CONFIG_HISTOGRAMS */
 
-#define PGM_HISTOGRAM_TIMES(name, sample)
-#define PGM_HISTOGRAM_COUNTS(name, sample)
+#	define PGM_HISTOGRAM_TIMES(name, sample)
+#	define PGM_HISTOGRAM_COUNTS(name, sample)
 
 #endif /* !CONFIG_HISTOGRAMS */
 
 
-extern GSList* pgm_histograms;
-
-G_BEGIN_DECLS
+extern pgm_slist_t*	pgm_histograms;
 
 void pgm_histogram_init (pgm_histogram_t*);
 void pgm_histogram_add (pgm_histogram_t*, int);
-static inline void pgm_histogram_add_time (pgm_histogram_t* histogram, pgm_time_t sample_time) {
+void pgm_histogram_write_html_graph_all (pgm_string_t*);
+
+static inline
+void
+pgm_histogram_add_time (
+	pgm_histogram_t*const	histogram,
+	pgm_time_t		sample_time
+	)
+{
 	pgm_histogram_add (histogram, (int)pgm_to_msecs (sample_time));
 }
 
-void pgm_histogram_write_html_graph_all (GString*);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_HISTOGRAM_H__ */
 

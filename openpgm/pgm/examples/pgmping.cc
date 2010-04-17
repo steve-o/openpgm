@@ -129,7 +129,7 @@ static gboolean on_shutdown (gpointer);
 static gboolean on_mark (gpointer);
 
 static void send_odata (void);
-static int on_msgv (pgm_msgv_t*, guint, gpointer);
+static int on_msgv (struct pgm_msgv_t*, guint, gpointer);
 
 static gpointer sender_thread (gpointer);
 static gpointer receiver_thread (gpointer);
@@ -644,7 +644,7 @@ receiver_thread (
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
-	pgm_msgv_t msgv[20];
+	struct pgm_msgv_t msgv[20];
 	pgm_time_t lost_tstamp = 0;
 	pgm_tsi_t  lost_tsi;
 	guint32	   lost_count = 0;
@@ -754,8 +754,8 @@ block:
 static
 int
 on_msgv (
-	pgm_msgv_t*	msgv,		/* an array of msgvs */
-	guint		len,
+	struct pgm_msgv_t*	msgv,		/* an array of msgvs */
+	guint			len,
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {

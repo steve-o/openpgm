@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * GLIB compatibility functions for older library revisions.
+ * PGM engine.
+ *
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,20 +19,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_GLIB_COMPAT_H__
-#define __PGM_GLIB_COMPAT_H__
+#ifndef __PGM_ENGINE_H__
+#define __PGM_ENGINE_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
+PGM_BEGIN_DECLS
 
-G_BEGIN_DECLS
+bool pgm_init (pgm_error_t**);
+bool pgm_supported (void) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_shutdown (void);
+void pgm_drop_superuser (void);
 
-#if GLIB_MAJOR_VERSION == 2 && GLIB_MINOR_VERSION < 16
-void g_warn_message (const char*, const char*, int, const char*, const char*);
-#	define g_warn_if_fail(expr)	do { if G_LIKELY (expr) ; else \
-					g_warn_message (G_LOG_DOMAIN, __FILE__, __LINE__, G_STRFUNC, #expr); } while (0)
-#endif
+PGM_END_DECLS
 
-G_END_DECLS
-
-#endif /* __PGM_GLIB_COMPAT_H__ */
+#endif /* __PGM_ENGINE_H__ */

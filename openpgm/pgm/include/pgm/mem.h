@@ -19,25 +19,27 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MEM_H__
 #define __PGM_MEM_H__
 
 #include <alloca.h>
-#include <stdbool.h>
+#include <pgm/types.h>
 
-#include <glib.h>
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 extern bool pgm_mem_gc_friendly;
 
-void* pgm_malloc (size_t) G_GNUC_MALLOC;
-void* pgm_malloc_n (size_t, size_t) G_GNUC_MALLOC;
-void* pgm_malloc0 (size_t) G_GNUC_MALLOC;
-void* pgm_malloc0_n (size_t, size_t) G_GNUC_MALLOC;
-void* pgm_memdup (const void*, size_t) G_GNUC_MALLOC;
-void pgm_free (gpointer);
+void* pgm_malloc (const size_t) PGM_GNUC_MALLOC PGM_GNUC_ALLOC_SIZE(1);
+void* pgm_malloc_n (const size_t, const size_t) PGM_GNUC_MALLOC PGM_GNUC_ALLOC_SIZE2(1, 2);
+void* pgm_malloc0 (const size_t) PGM_GNUC_MALLOC PGM_GNUC_ALLOC_SIZE(1);
+void* pgm_malloc0_n (const size_t, const size_t) PGM_GNUC_MALLOC PGM_GNUC_ALLOC_SIZE2(1, 2);
+void* pgm_memdup (const void*, const size_t) PGM_GNUC_MALLOC;
+void* pgm_realloc (void*, const size_t) PGM_GNUC_WARN_UNUSED_RESULT;
+void pgm_free (void*);
 
 /* Convenience memory allocators that wont work well above 32-bit sizes
  */
@@ -54,6 +56,6 @@ void pgm_free (gpointer);
 void pgm_mem_init (void);
 void pgm_mem_shutdown (void);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_MEM_H__ */

@@ -23,13 +23,10 @@
 #include <inttypes.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/pgm.h"
+#include <pgm/framework.h>
+#include "pgm/timer.h"
 #include "pgm/receiver.h"
 #include "pgm/source.h"
-#include "pgm/timer.h"
 
 
 //#define TIMER_DEBUG
@@ -128,7 +125,7 @@ pgm_timer_dispatch (
 /* pre-conditions */
 	pgm_assert (NULL != transport);
 
-	pgm_debug ("pgm_timer_dispatch (transport:%p)", (gpointer)transport);
+	pgm_debug ("pgm_timer_dispatch (transport:%p)", (const void*)transport);
 
 /* find which timers have expired and call each */
 	if (transport->can_recv_data)

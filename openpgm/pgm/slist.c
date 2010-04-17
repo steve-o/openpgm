@@ -19,15 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#include "pgm/mem.h"
-#include "pgm/slist.h"
+#include <pgm/framework.h>
 
 
 //#define SLIST_DEBUG
-
-
 
 pgm_slist_t*
 pgm_slist_append (
@@ -114,7 +109,7 @@ pgm_slist_remove_first (
 {
 	pgm_slist_t *tmp;
 
-	if (G_LIKELY (list))
+	if (PGM_LIKELY (list))
 	{
 		tmp = list->next;
 		list->data = NULL;
@@ -143,7 +138,7 @@ pgm_slist_last (
 	pgm_slist_t*	list
 	)
 {
-	if (G_LIKELY (list))
+	if (PGM_LIKELY (list))
 	{
 		while (list->next)
 			list = list->next;

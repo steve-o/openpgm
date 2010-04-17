@@ -19,36 +19,28 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_SOCKADDR_H__
 #define __PGM_SOCKADDR_H__
 
-#include <stdbool.h>
-#include <glib.h>
+#include <sys/socket.h>
+#include <pgm/types.h>
 
-#ifdef G_OS_UNIX
-#	include <fcntl.h>
-#	include <netdb.h>
-#	include <string.h>
-#	include <unistd.h>
-#	include <netinet/in.h>
-#	include <sys/types.h>
-#	include <sys/socket.h>
-#else
-#	include <ws2tcpip.h>
-#endif
+PGM_BEGIN_DECLS
 
+/* fallback values where not directly supported */
 #ifndef MSG_DONTWAIT
 #	define MSG_DONTWAIT		0
 #endif
 #ifndef MSG_ERRQUEUE
 #	define MSG_ERRQUEUE		0x2000
 #endif
-#ifdef G_OS_WIN32
+#if !defined(EAFNOSUPPORT) && defined(WSAEAFNOSUPPORT)
 #	define EAFNOSUPPORT		WSAEAFNOSUPPORT
 #endif
-
-
-G_BEGIN_DECLS
 
 sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);
 uint16_t pgm_sockaddr_port (const struct sockaddr* sa);
@@ -76,6 +68,6 @@ int pgm_inet_pton (int af, const char*restrict src, void*restrict dst);
 int pgm_nla_to_sockaddr (const void*restrict nla, struct sockaddr*restrict sa);
 int pgm_sockaddr_to_nla (const struct sockaddr*restrict sa, void*restrict nla);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_SOCKADDR_H__ */

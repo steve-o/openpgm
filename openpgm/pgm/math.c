@@ -19,16 +19,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#include "pgm/math.h"
+#include <pgm/framework.h>
 
 
 //#define MATH_DEBUG
 
 
-
-static const unsigned g_primes[] =
+static const unsigned primes[] =
 {
 	11,
 	19,
@@ -69,10 +66,10 @@ static const unsigned g_primes[] =
 unsigned
 pgm_spaced_primes_closest (unsigned num)
 {
-	for (unsigned i = 0; i < G_N_ELEMENTS(g_primes); i++)
-		if (g_primes[i] > num)
-			return g_primes[i];
-	return g_primes[G_N_ELEMENTS(g_primes) - 1];
+	for (unsigned i = 0; i < PGM_N_ELEMENTS(primes); i++)
+		if (primes[i] > num)
+			return primes[i];
+	return primes[PGM_N_ELEMENTS(primes) - 1];
 }
 
 /* eof */

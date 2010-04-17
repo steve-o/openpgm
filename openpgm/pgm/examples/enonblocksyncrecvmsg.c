@@ -65,7 +65,7 @@ static gboolean g_quit = FALSE;
 static void on_signal (int);
 static gboolean on_startup (void);
 
-static int on_datav (pgm_msgv_t*, guint, gpointer);
+static int on_datav (struct pgm_msgv_t*, guint, gpointer);
 
 
 G_GNUC_NORETURN static void
@@ -143,7 +143,7 @@ main (
 	}
 
 /* incoming message buffer */
-	pgm_msgv_t msgv;
+	struct pgm_msgv_t msgv;
 	struct epoll_event events[1];	/* wait for maximum 1 event */
 
 /* dispatch loop */
@@ -278,9 +278,9 @@ on_startup (void)
 
 static int
 on_datav (
-	pgm_msgv_t*	datav,			/* one msgv object */
-	guint		len,
-	G_GNUC_UNUSED gpointer user_data
+	struct pgm_msgv_t*	datav,			/* one msgv object */
+	guint			len,
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	char tsi[PGM_TSISTRLEN];

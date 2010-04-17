@@ -19,23 +19,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <stdint.h>
-#include <string.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/mem.h"
-#include "pgm/hashtable.h"
-#include "pgm/math.h"
+#include <pgm/framework.h>
 
 
 //#define HASHTABLE_DEBUG
 
-
-#define HASH_TABLE_MIN_SIZE 11
-#define HASH_TABLE_MAX_SIZE 13845163
+#define HASH_TABLE_MIN_SIZE	11
+#define HASH_TABLE_MAX_SIZE	13845163
 
 struct pgm_hashnode_t
 {
@@ -52,31 +42,31 @@ struct pgm_hashtable_t
 	unsigned		size;
 	unsigned		nnodes;
 	pgm_hashnode_t**	nodes;
-	PGMHashFunc		hash_func;
-	PGMEqualFunc		key_equal_func;
+	pgm_hashfunc_t		hash_func;
+	pgm_equalfunc_t		key_equal_func;
 	volatile int32_t	ref_count;
 };
 
-#define PGM_HASH_TABLE_RESIZE(hash_table)			\
-   G_STMT_START {						\
-     if ((hash_table->size >= 3 * hash_table->nnodes &&	        \
-	  hash_table->size > HASH_TABLE_MIN_SIZE) ||		\
-	 (3 * hash_table->size <= hash_table->nnodes &&	        \
-	  hash_table->size < HASH_TABLE_MAX_SIZE))		\
-	   pgm_hash_table_resize (hash_table);			\
-   } G_STMT_END
+#define PGM_HASH_TABLE_RESIZE(hash_table) \
+	do { \
+		if ( (hash_table->size >= 3 * hash_table->nnodes && hash_table->size > HASH_TABLE_MIN_SIZE) || \
+		     (3 * hash_table->size <= hash_table->nnodes && hash_table->size < HASH_TABLE_MAX_SIZE) ) \
+		{ \
+			pgm_hash_table_resize (hash_table); \
+		} \
+	} while (0)
 
 static void pgm_hash_table_resize (pgm_hashtable_t*);
-static pgm_hashnode_t** pgm_hash_table_lookup_node (pgm_hashtable_t* restrict, const void* restrict, pgm_hash_t* restrict);
-static pgm_hashnode_t* pgm_hash_node_new (const void* restrict, void* restrict, const pgm_hash_t);
+static pgm_hashnode_t** pgm_hash_table_lookup_node (pgm_hashtable_t*restrict, const void*restrict, pgm_hash_t*restrict);
+static pgm_hashnode_t* pgm_hash_node_new (const void*restrict, void*restrict, const pgm_hash_t);
 static void pgm_hash_node_destroy (pgm_hashnode_t*);
 static void pgm_hash_nodes_destroy (pgm_hashnode_t*);
 
 
 pgm_hashtable_t*
 pgm_hash_table_new (
-	PGMHashFunc	hash_func,
-	PGMEqualFunc	key_equal_func
+	pgm_hashfunc_t	hash_func,
+	pgm_equalfunc_t	key_equal_func
 	)
 {
 	pgm_return_val_if_fail (NULL != hash_func, NULL);
@@ -147,7 +137,7 @@ pgm_hash_table_lookup_node (
 	return node;
 }
 
-gpointer
+void*
 pgm_hash_table_lookup (
 	pgm_hashtable_t* restrict hash_table,
 	const void*	 restrict key
@@ -289,7 +279,7 @@ pgm_str_equal (
 	const void* restrict p2
 	)
 {
-	const char *s1 = p1, *s2 = p2;
+	const char *restrict s1 = p1, *restrict s2 = p2;
 	return (strcmp (s1, s2) == 0);
 }
 
@@ -303,7 +293,7 @@ pgm_str_hash (
 	const char* s = p;
 	pgm_hash_t hash_val = *s;
 
-	if (G_LIKELY (hash_val))
+	if (PGM_LIKELY (hash_val))
 		for (s++; *s; s++)
 			hash_val = (hash_val << 5) - hash_val + *s;
 	return hash_val;
@@ -311,11 +301,11 @@ pgm_str_hash (
 
 bool
 pgm_int_equal (
-	const void*	p1,
-	const void*	p2
+	const void* restrict p1,
+	const void* restrict p2
 	)
 {
-	const int i1 = *(const int*)p1, i2 = *(const int*)p2;
+	const int i1 = *(const int*restrict)p1, i2 = *(const int*restrict)p2;
 	return (i1 == i2);
 }
 

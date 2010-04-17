@@ -20,13 +20,9 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <glib.h>
-
-#include "pgm/messages.h"
+#include <pgm/framework.h>
 #include "pgm/tsi.h"
-#include "pgm/hashtable.h"
+
 
 //#define TSI_DEBUG
 
@@ -42,9 +38,9 @@
 
 int
 pgm_tsi_print_r (
-	const pgm_tsi_t*	tsi,
-	char*			buf,
-	size_t			bufsize
+	const pgm_tsi_t* restrict tsi,
+	char*		 restrict buf,
+	size_t			  bufsize
 	)
 {
 	pgm_return_val_if_fail (NULL != tsi, -1);
@@ -104,11 +100,11 @@ pgm_tsi_hash (
 
 bool
 pgm_tsi_equal (
-	const void*	p1,
-	const void*	p2
+	const void*restrict p1,
+	const void*restrict p2
         )
 {
-	const pgm_tsi_t *tsi1 = p1, *tsi2 = p2;
+	const pgm_tsi_t *restrict tsi1 = p1, *restrict tsi2 = p2;
 
 /* pre-conditions */
 	pgm_assert (tsi1);

@@ -20,50 +20,29 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <sys/timeb.h>
-#ifdef CONFIG_HAVE_POLL
-#	include <poll.h>
-#endif
-#ifdef CONFIG_HAVE_RTC
-#	include <sys/ioctl.h>
-#	include <linux/rtc.h>
-#endif
-#ifdef CONFIG_HAVE_HPET
-#	include <sys/mman.h>
-#endif
-
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-#include "pgm/glib-compat.h"
-
-#ifdef G_OS_WIN32
+#include <stdlib.h>
+#ifndef _WIN32
+#	include <sys/select.h>
+#else
 #	define WIN32_LEAN_AND_MEAN
 #	include "windows.h"
-#	include "winsock2.h"
-#else
-#	include <pthread.h>
 #endif
 
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/time.h"
-
+#include <pgm/framework.h>
 
 //#define TIME_DEBUG
 
 
-
 /* globals */
+
+pgm_time_update_func		pgm_time_update_now;
+pgm_time_sleep_func		pgm_time_sleep;
+pgm_time_since_epoch_func	pgm_time_since_epoch;
+
+
+/* locals */
 
 #define msecs_to_secs(t)	( (t) / 1000 )
 #define usecs_to_secs(t)	( (t) / 1000000UL )
@@ -80,105 +59,57 @@
 #define fsecs_to_nsecs(t)	( (t) / 1000000UL )
 #define fsecs_to_usecs(t)	( (t) / 1000000000UL )
 
-pgm_time_update_func pgm_time_update_now;
-pgm_time_sleep_func pgm_time_sleep;
-pgm_time_since_epoch_func pgm_time_since_epoch;
+static volatile int32_t		time_ref_count = 0;
+static pgm_time_t		rel_offset = 0;
 
-static volatile int32_t time_ref_count = 0;
-static pgm_time_t rel_offset = 0;
+static void			pgm_time_conv (const pgm_time_t*const restrict, time_t*restrict);
+static void			pgm_time_conv_from_reset (const pgm_time_t*const restrict, time_t*restrict);
+static pgm_time_t		pgm_select_sleep (const uint32_t);
 
-static pgm_time_t gettimeofday_update (void);
-#ifdef CONFIG_HAVE_CLOCK_GETTIME
-static pgm_time_t clock_update (void);
+#if defined(CONFIG_HAVE_CLOCK_GETTIME) || defined(CONFIG_HAVE_CLOCK_NANOSLEEP)
+#	include <time.h>
+static clockid_t		clock_id;
+static bool			pgm_clock_init (pgm_error_t**);
+static pgm_time_t		pgm_clock_update (void);
+static pgm_time_t		pgm_clock_nanosleep (const uint32_t);
 #endif
-static pgm_time_t ftime_update (void);
-#ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
-static int clock_init (pgm_error_t**);
-static pgm_time_t clock_nano_sleep (uint32_t);
+#ifdef CONFIG_HAVE_FTIME
+#	include <sys/timeb.h>
+static pgm_time_t		pgm_ftime_update (void);
 #endif
-#ifdef CONFIG_HAVE_NANOSLEEP
-static pgm_time_t nano_sleep (uint32_t);
+#ifdef CONFIG_HAVE_GETTIMEOFDAY
+#	include <sys/time.h>
+static pgm_time_t		pgm_gettimeofday_update (void);
 #endif
-#ifdef G_OS_WIN32
-static pgm_time_t msleep (uint32_t);
-#endif
-#ifdef CONFIG_HAVE_USLEEP
-static pgm_time_t usleep_sleep (uint32_t);
-#endif
-
-static pgm_time_t select_sleep (uint32_t);
-
-#ifdef CONFIG_HAVE_RTC
-static bool rtc_init (pgm_error_t**);
-static bool rtc_shutdown (void);
-static pgm_time_t rtc_update (void);
-static pgm_time_t rtc_sleep (uint32_t);
-#endif
-
-#ifdef CONFIG_HAVE_TSC
-#define TSC_NS_SCALE	10 /* 2^10, carefully chosen */
-#define TSC_US_SCALE	20
-static uint_fast32_t tsc_mhz = 0;
-static uint_fast32_t tsc_ns_mul = 0;
-static uint_fast32_t tsc_us_mul = 0;
-static int tsc_init (pgm_error_t**);
-static pgm_time_t tsc_update (void);
-static pgm_time_t tsc_sleep (uint32_t);
-#endif
-
 #ifdef CONFIG_HAVE_HPET
-#define HPET_NS_SCALE	22
-#define HPET_US_SCALE	34
-static uint_fast32_t hpet_ns_mul = 0;
-static uint_fast32_t hpet_us_mul = 0;
-static int hpet_init (pgm_error_t**);
-static bool hpet_shutdown (void);
-static pgm_time_t hpet_update (void);
-static pgm_time_t hpet_sleep (uint32_t);
+#	include <fcntl.h>
+#	include <sys/types.h>
+#	include <sys/stat.h>
+#	include <unistd.h>
+#	include <sys/mman.h>
+#	define HPET_MMAP_SIZE			0x400
+#	define HPET_GENERAL_CAPS_REGISTER	0x00
+#	define HPET_COUNTER_CLK_PERIOD		0x004
+#	define HPET_MAIN_COUNTER_REGISTER	0x0f0
+#	define HPET_COUNT_SIZE_CAP		(1 << 13)
+/* HPET counter size maybe 64-bit or 32-bit */
+#	if defined(__x86_64__)
+typedef uint64_t hpet_counter_t;
+#else
+typedef uint32_t hpet_counter_t;
 #endif
+static int			hpet_fd = -1;
+static char*			hpet_ptr;
+static uint64_t			hpet_offset = 0;
+static uint64_t			hpet_wrap;
+static hpet_counter_t		hpet_last = 0;
 
-#ifdef CONFIG_HAVE_PPOLL
-static pgm_time_t poll_sleep (uint32_t);
-#endif
+#	define HPET_NS_SCALE	22
+#	define HPET_US_SCALE	34
+static uint_fast32_t		hpet_ns_mul = 0;
+static uint_fast32_t		hpet_us_mul = 0;
 
-static void pgm_time_conv (pgm_time_t*, time_t*);
-static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
-
-/* TSC helper functions */
-#ifdef CONFIG_HAVE_TSC
-static
-void
-set_tsc_mul (
-	const unsigned		khz
-	)
-{
-	tsc_ns_mul = (1000000 << TSC_NS_SCALE) / khz;
-	tsc_us_mul = (1000 << TSC_US_SCALE) / khz;
-}
-
-/* convert from clocks (64 bits) to nanoseconds (64 bits)
- */
-static
-uint64_t
-tsc_to_ns (
-	const uint64_t		tsc
-	)
-{
-	return (tsc * tsc_ns_mul) >> TSC_NS_SCALE;
-}
-
-static
-uint64_t
-tsc_to_us (
-	const uint64_t		tsc
-	)
-{
-	return (tsc * tsc_us_mul) >> TSC_US_SCALE;
-}
-#endif /* CONFIG_HAVE_TSC */
-
-#ifdef CONFIG_HAVE_HPET
-static
+static inline
 void
 set_hpet_mul (
 	const uint32_t		hpet_period
@@ -188,7 +119,7 @@ set_hpet_mul (
 	hpet_us_mul = fsecs_to_usecs((uint64_t)hpet_period << HPET_US_SCALE);
 }
 
-static
+static inline
 uint64_t
 hpet_to_ns (
 	const uint64_t		hpet
@@ -197,7 +128,7 @@ hpet_to_ns (
 	return (hpet * hpet_ns_mul) >> HPET_NS_SCALE;
 }
 
-static
+static inline
 uint64_t
 hpet_to_us (
 	const uint64_t		hpet
@@ -205,7 +136,80 @@ hpet_to_us (
 {
 	return (hpet * hpet_us_mul) >> HPET_US_SCALE;
 }
-#endif /* CONFIG_HAVE_HPET */
+
+static bool			pgm_hpet_init (pgm_error_t**);
+static bool			pgm_hpet_shutdown (void);
+static pgm_time_t		pgm_hpet_update (void);
+static pgm_time_t		pgm_hpet_sleep (const uint32_t);
+#endif
+#ifdef CONFIG_HAVE_NANOSLEEP
+#	include <time.h>
+static pgm_time_t		pgm_nanosleep (const uint32_t);
+#endif
+#ifdef CONFIG_HAVE_RTC
+#	include <fcntl.h>
+#	include <sys/types.h>
+#	include <sys/stat.h>
+#	include <unistd.h>
+#	include <sys/ioctl.h>
+#	include <linux/rtc.h>
+static int			rtc_fd = -1;
+static int			rtc_frequency = 8192;
+static pgm_time_t		rtc_count = 0;
+static bool			pgm_rtc_init (pgm_error_t**);
+static bool			pgm_rtc_shutdown (void);
+static pgm_time_t		pgm_rtc_update (void);
+static pgm_time_t		pgm_rtc_sleep (const uint32_t);
+#endif
+#ifdef CONFIG_HAVE_TSC
+#	include <stdio.h>
+#	include <string.h>
+#	define TSC_NS_SCALE	10 /* 2^10, carefully chosen */
+#	define TSC_US_SCALE	20
+static uint_fast32_t		tsc_mhz = 0;
+static uint_fast32_t		tsc_ns_mul = 0;
+static uint_fast32_t		tsc_us_mul = 0;
+
+static inline
+void
+set_tsc_mul (
+	const unsigned		khz
+	)
+{
+	tsc_ns_mul = (1000000 << TSC_NS_SCALE) / khz;
+	tsc_us_mul = (1000 << TSC_US_SCALE) / khz;
+}
+
+static inline
+uint64_t
+tsc_to_ns (
+	const uint64_t		tsc
+	)
+{
+	return (tsc * tsc_ns_mul) >> TSC_NS_SCALE;
+}
+
+static inline
+uint64_t
+tsc_to_us (
+	const uint64_t		tsc
+	)
+{
+	return (tsc * tsc_us_mul) >> TSC_US_SCALE;
+}
+
+static bool			pgm_tsc_init (pgm_error_t**);
+static pgm_time_t		pgm_tsc_update (void);
+static pgm_time_t		pgm_tsc_sleep (const uint32_t);
+#endif
+#ifdef CONFIG_HAVE_USLEEP
+#	include <unistd.h>
+static pgm_time_t		pgm_usleep (const uint32_t);
+#endif
+#ifdef _WIN32
+static pgm_time_t		pgm_msleep (const uint32_t);
+#endif
+
 
 /* initialize time system.
  *
@@ -234,43 +238,44 @@ pgm_time_init (
 	pgm_time_since_epoch = pgm_time_conv;
 
 	switch (cfg[0]) {
+#ifdef CONFIG_HAVE_FTIME
 	case 'F':
 		pgm_minor (_("Using ftime() timer."));
-		pgm_time_update_now = ftime_update;
+		pgm_time_update_now	= pgm_ftime_update;
 		break;
-
+#endif
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
 	case 'C':
 		pgm_minor (_("Using clock_gettime() timer."));
-		pgm_time_update_now = clock_update;
+		pgm_time_update_now	= pgm_clock_update;
 		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':
 		pgm_minor (_("Using /dev/rtc timer."));
-		pgm_time_update_now = rtc_update;
-		pgm_time_since_epoch = pgm_time_conv_from_reset;
+		pgm_time_update_now	= pgm_rtc_update;
+		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':
 		pgm_minor (_("Using TSC timer."));
-		pgm_time_update_now = tsc_update;
-		pgm_time_since_epoch = pgm_time_conv_from_reset;
+		pgm_time_update_now	= pgm_tsc_update;
+		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
 	case 'H':
 		pgm_minor (_("Using HPET timer."));
-		pgm_time_update_now = hpet_update;
-		pgm_time_since_epoch = pgm_time_conv_from_reset;
+		pgm_time_update_now	= pgm_hpet_update;
+		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
 
 	default:
 	case 'G':
 		pgm_minor (_("Using gettimeofday() timer."));
-		pgm_time_update_now = gettimeofday_update;
+		pgm_time_update_now	= pgm_gettimeofday_update;
 		break;
 	}
 
@@ -282,37 +287,31 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 	case 'C':
 		pgm_minor (_("Using clock_nanosleep() sleep."));
-		pgm_time_sleep = clock_nano_sleep;
+		pgm_time_sleep		= pgm_clock_nanosleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_NANOSLEEP
 	case 'N':
 		pgm_minor (_("Using nanosleep() sleep."));
-		pgm_time_sleep = nano_sleep;
+		pgm_time_sleep		= pgm_nanosleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_RTC
 	case 'R':
 		pgm_minor (_("Using /dev/rtc sleep."));
-		pgm_time_sleep = rtc_sleep;
+		pgm_time_sleep		= pgm_rtc_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
 	case 'T':
 		pgm_minor (_("Using TSC sleep."));
-		pgm_time_sleep = tsc_sleep;
+		pgm_time_sleep		= pgm_tsc_sleep;
 		break;
 #endif
 #ifdef CONFIG_HAVE_HPET
 	case 'H':
 		pgm_minor (_("Using HPET sleep."));
-		pgm_time_sleep = hpet_sleep;
-		break;
-#endif
-#ifdef CONFIG_HAVE_PPOLL
-	case 'P':
-		pgm_minor (_("Using ppoll() sleep."));
-		pgm_time_sleep = poll_sleep;
+		pgm_time_sleep		= pgm_hpet_sleep;
 		break;
 #endif
 
@@ -321,39 +320,38 @@ pgm_time_init (
 	case 'M':
 	case 'U':
 		pgm_minor (_("Using usleep() sleep."));
-		pgm_time_sleep = usleep_sleep;
+		pgm_time_sleep		= pgm_usleep;
 		break;
-#elif defined(G_OS_WIN32)
+#elif defined(_WIN32)
 	case 'M':
 		pgm_minor (_("Using msleep() sleep."));
-		pgm_time_sleep = msleep;
+		pgm_time_sleep		= pgm_msleep;
 		break;
 #endif /* CONFIG_HAVE_USLEEP */
 	case 'S':
 		pgm_minor (_("Using select() sleep."));
-		pgm_time_sleep = select_sleep;
+		pgm_time_sleep		= pgm_select_sleep;
 		break;
 	}
 
 #ifdef CONFIG_HAVE_RTC
-	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
+	if (pgm_time_update_now == pgm_rtc_update || pgm_time_sleep == pgm_rtc_sleep)
 	{
 		pgm_error_t* sub_error = NULL;
-		if (!rtc_init (&sub_error)) {
+		if (!pgm_rtc_init (&sub_error)) {
 			pgm_propagate_error (error, sub_error);
 			return FALSE;
 		}
 	}
 #endif
 #ifdef CONFIG_HAVE_TSC
-	if (pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
+	if (pgm_time_update_now == pgm_tsc_update || pgm_time_sleep == pgm_tsc_sleep)
 	{
-#ifdef G_OS_UNIX
+#ifdef CONFIG_HAVE_PROC
 /* attempt to parse clock ticks from kernel
  */
 		FILE* fp = fopen ("/proc/cpuinfo", "r");
 		char buffer[1024];
-
 		if (fp)
 		{
 			while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
@@ -367,13 +365,13 @@ pgm_time_init (
 			}
 			fclose (fp);
 		}
-#else
+#elif defined(_WIN32)
 		uint64_t frequency;
 		if (QueryPerformanceFrequency ((LARGE_INTEGER*)&frequency))
 		{
 			tsc_mhz = frequency / 1000;
 		}
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 
 /* e.g. export RDTSC_FREQUENCY=3200.000000
  *
@@ -386,11 +384,11 @@ pgm_time_init (
 /* calibrate */
 		if (0 >= tsc_mhz) {
 			pgm_error_t* sub_error = NULL;
-			if (!tsc_init (&sub_error)) {
+			if (!pgm_tsc_init (&sub_error)) {
 				pgm_propagate_error (error, sub_error);
 #ifdef CONFIG_HAVE_RTC
-				if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
-					rtc_shutdown ();
+				if (pgm_time_update_now == pgm_rtc_update || pgm_time_sleep == pgm_rtc_sleep)
+					pgm_rtc_shutdown ();
 #endif
 				return FALSE;
 			}
@@ -400,14 +398,14 @@ pgm_time_init (
 #endif /* CONFIG_HAVE_TSC */
 
 #ifdef CONFIG_HAVE_HPET
-	if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
+	if (pgm_time_update_now == pgm_hpet_update || pgm_time_sleep == pgm_hpet_sleep)
 	{
 		pgm_error_t* sub_error = NULL;
-		if (!hpet_init (&sub_error)) {
+		if (!pgm_hpet_init (&sub_error)) {
 			pgm_propagate_error (error, sub_error);
 #ifdef CONFIG_HAVE_RTC
-			if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
-				rtc_shutdown ();
+			if (pgm_time_update_now == pgm_rtc_update || pgm_time_sleep == pgm_rtc_sleep)
+				pgm_rtc_shutdown ();
 #endif
 			return FALSE;
 		}
@@ -415,18 +413,18 @@ pgm_time_init (
 #endif
 
 #ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
-	if (pgm_time_sleep == clock_nano_sleep)
+	if (pgm_time_sleep == pgm_clock_nanosleep)
 	{
 		pgm_error_t* sub_error = NULL;
-		if (!clock_init (&sub_error)) {
+		if (!pgm_clock_init (&sub_error)) {
 			pgm_propagate_error (error, sub_error);
 #ifdef CONFIG_HAVE_RTC
-			if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
-				rtc_shutdown ();
+			if (pgm_time_update_now == pgm_rtc_update || pgm_time_sleep == pgm_rtc_sleep)
+				pgm_rtc_shutdown ();
 #endif
 #ifdef CONFIG_HAVE_HPET
-			if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
-				hpet_shutdown ();
+			if (pgm_time_update_now == pgm_hpet_update || pgm_time_sleep == pgm_hpet_sleep)
+				pgm_hpet_shutdown ();
 #endif
 			return FALSE;
 		}
@@ -436,17 +434,24 @@ pgm_time_init (
 	pgm_time_update_now();
 
 /* calculate relative time offset */
+#if defined(CONFIG_HAVE_RTC) || defined(CONFIG_HAVE_TSC)
 	if (	0
-#ifdef CONFIG_HAVE_RTC
-		|| pgm_time_update_now == rtc_update
-#endif
-#ifdef CONFIG_HAVE_TSC
-		|| pgm_time_update_now == tsc_update
-#endif
+#	ifdef CONFIG_HAVE_RTC
+		|| pgm_time_update_now == pgm_rtc_update
+#	endif
+#	ifdef CONFIG_HAVE_TSC
+		|| pgm_time_update_now == pgm_tsc_update
+#	endif
 	   )
 	{
-		rel_offset = gettimeofday_update() - pgm_time_update_now();
+#	ifndef CONFIG_HAVE_GETTIMEOFDAY
+#		error "gettimeofday() required to calculate counter offset"
+#	endif
+		rel_offset = pgm_gettimeofday_update() - pgm_time_update_now();
 	}
+#else
+	rel_offset = 0;
+#endif
 
 	return TRUE;
 }
@@ -464,82 +469,83 @@ pgm_time_shutdown (void)
 
 	bool success = TRUE;
 #ifdef CONFIG_HAVE_RTC
-	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
-		success = rtc_shutdown ();
+	if (pgm_time_update_now == pgm_rtc_update || pgm_time_sleep == pgm_rtc_sleep)
+		success = pgm_rtc_shutdown ();
 #endif
 #ifdef CONFIG_HAVE_HPET
-	if (pgm_time_update_now == hpet_update || pgm_time_sleep == hpet_sleep)
-		success = hpet_shutdown ();
+	if (pgm_time_update_now == pgm_hpet_update || pgm_time_sleep == pgm_hpet_sleep)
+		success = pgm_hpet_shutdown ();
 #endif
 	return success;
 }
 
+#ifdef CONFIG_HAVE_GETTIMEOFDAY
 static
 pgm_time_t
-gettimeofday_update (void)
+pgm_gettimeofday_update (void)
 {
 	struct timeval gettimeofday_now;
 	static pgm_time_t last = 0;
 	gettimeofday (&gettimeofday_now, NULL);
 	const pgm_time_t now = secs_to_usecs (gettimeofday_now.tv_sec) + gettimeofday_now.tv_usec;
-	if (G_UNLIKELY(now < last))
+	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
 		return last = now;
 }
+#endif /* CONFIG_HAVE_GETTIMEOFDAY */
 
 #ifdef CONFIG_HAVE_CLOCK_GETTIME
 static
 pgm_time_t
-clock_update (void)
+pgm_clock_update (void)
 {
 	struct timespec clock_now;
 	static pgm_time_t last = 0;
 	clock_gettime (CLOCK_MONOTONIC, &clock_now);
 	const pgm_time_t now = secs_to_usecs (clock_now.tv_sec) + nsecs_to_usecs (clock_now.tv_nsec);
-	if (G_UNLIKELY(now < last))
+	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
 		return last = now;
 }
 #endif /* CONFIG_HAVE_CLOCK_GETTIME */
 
+#ifdef CONFIG_HAVE_FTIME
 static
 pgm_time_t
-ftime_update (void)
+pgm_ftime_update (void)
 {
 	struct timeb ftime_now;
 	static pgm_time_t last = 0;
 	ftime (&ftime_now);
 	const pgm_time_t now = secs_to_usecs (ftime_now.time) + msecs_to_usecs (ftime_now.millitm);
-	if (G_UNLIKELY(now < last))
+	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
 		return last = now;
 }
+#endif /* CONFIG_HAVE_FTIME */
 
+#ifdef CONFIG_HAVE_RTC
 /* Old PC/AT-Compatible driver:  /dev/rtc
  *
  * Not so speedy 8192 Hz timer, thats 122us resolution.
  *
  * WARNING: time is relative to start of timer.
+ * WARNING: only one process is allowed to access the RTC.
  */
-
-#ifdef CONFIG_HAVE_RTC
-static int rtc_fd = -1;
-static int rtc_frequency = 8192;
-static pgm_time_t rtc_count = 0;
 
 static
 bool
-rtc_init (
+pgm_rtc_init (
 	pgm_error_t**	error
 	)
 {
 	pgm_return_val_if_fail (rtc_fd == -1, FALSE);
 
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
-	if (rtc_fd < 0) {
+	if (-1 == rtc_fd) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
@@ -547,7 +553,7 @@ rtc_init (
 			     strerror(errno));
 		return FALSE;
 	}
-	if ( ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency) < 0 ) {
+	if (-1 == ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency)) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
@@ -556,7 +562,7 @@ rtc_init (
 			     strerror(errno));
 		return FALSE;
 	}
-	if ( ioctl (rtc_fd, RTC_PIE_ON, 0) < 0 ) {
+	if (-1 == ioctl (rtc_fd, RTC_PIE_ON, 0)) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
@@ -573,7 +579,7 @@ rtc_init (
 
 static
 bool
-rtc_shutdown (void)
+pgm_rtc_shutdown (void)
 {
 	pgm_return_val_if_fail (rtc_fd, FALSE);
 	pgm_warn_if_fail (0 == close (rtc_fd));
@@ -581,14 +587,18 @@ rtc_shutdown (void)
 	return TRUE;
 }
 
+/* RTC only indicates passed ticks therefore is by definition monotonic, we do not
+ * need to check the difference with respect to the last value.
+ */
+
 static
 pgm_time_t
-rtc_update (void)
+pgm_rtc_update (void)
 {
 	uint32_t data;
 
 /* returned value contains interrupt type and count of interrupts since last read */
-	read (rtc_fd, &data, sizeof(data));
+	pgm_warn_if_fail (sizeof(data) == read (rtc_fd, &data, sizeof(data)));
 	rtc_count += data >> 8;
 	return rtc_count * 1000000UL / rtc_frequency;
 }
@@ -598,7 +608,9 @@ rtc_update (void)
 
 static
 pgm_time_t
-rtc_sleep (uint32_t usec)
+pgm_rtc_sleep (
+	const uint32_t	usec
+	)
 {
 	uint32_t data;
 
@@ -619,22 +631,24 @@ rtc_sleep (uint32_t usec)
 	} while ( (count * 1000000UL) < rtc_frequency * usec );
 
 	rtc_count += count;
-	if (pgm_time_update_now == rtc_update)
+	if (pgm_time_update_now == pgm_rtc_update)
 		return rtc_count * 1000000UL / rtc_frequency;
 	else
 		return pgm_time_update_now();
 }
 #endif /* CONFIG_HAVE_RTC */
 
-/* read time stamp counter, count of ticks from processor reset.
+#ifdef CONFIG_HAVE_TSC
+/* read time stamp counter (TSC), count of ticks from processor reset.
+ *
+ * NB: On Windows this will usually be HPET or PIC timer interpolated with TSC.
  */
 
-#ifdef CONFIG_HAVE_TSC
 static inline
 pgm_time_t
 rdtsc (void)
 {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	uint32_t lo, hi;
 
 /* We cannot use "=A", since this would use %rax on x86_64 */
@@ -655,11 +669,43 @@ rdtsc (void)
  */
 
 static
-int
-tsc_init (
-	G_GNUC_UNUSED pgm_error_t**	error
+bool
+pgm_tsc_init (
+	PGM_GNUC_UNUSED pgm_error_t**	error
 	)
 {
+#ifdef CONFIG_HAVE_PROC
+/* Test for constant TSC from kernel
+ */
+	FILE* fp = fopen ("/proc/cpuinfo", "r");
+	char buffer[1024], *flags = NULL;
+	if (fp)
+	{
+		while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
+		{
+			if (strstr (buffer, "flags"))
+			{
+				flags = strchr (buffer, ':');
+				break;
+			}
+		}
+		fclose (fp);
+	}
+	if (!flags || !strstr (flags, " tsc")) {
+		pgm_warn (_("Linux kernel reports no Time Stamp Counter (TSC)."));
+/* force both to stable clocks even though one might be OK */
+		pgm_time_update_now	= pgm_gettimeofday_update;
+		pgm_time_sleep		= pgm_usleep;
+		return TRUE;
+	}
+	if (!strstr (flags, " constant_tsc")) {
+		pgm_warn (_("Linux kernel reports non-constant Time Stamp Counter (TSC)."));
+/* force both to stable clocks even though one might be OK */
+		pgm_time_update_now	= pgm_gettimeofday_update;
+		pgm_time_sleep		= pgm_usleep;
+		return TRUE;
+	}
+#endif /* CONFIG_HAVE_PROC */
 	pgm_time_t start, stop;
 	const pgm_time_t calibration_usec = 4000 * 1000;
 
@@ -671,14 +717,13 @@ tsc_init (
 
 	if (stop < start)
 	{
-		pgm_info (_("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
+		pgm_warn (_("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
 			   "non-monotonic time response rendering the TSC unsuitable for high resolution "
 			   "timing.  To prevent the start delay from this benchmark and use a stable clock "
 			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP."));
-
 /* force both to stable clocks even though one might be OK */
-		pgm_time_update_now = gettimeofday_update;
-		pgm_time_sleep = (pgm_time_sleep_func)usleep;
+		pgm_time_update_now	= pgm_gettimeofday_update;
+		pgm_time_sleep		= pgm_usleep;
 		return TRUE;
 	}
 
@@ -700,13 +745,18 @@ tsc_init (
 	return TRUE;
 }
 
+/* TSC is monotonic on the same core but we do neither force the same core or save the count
+ * for each core as if the counter is unstable system wide another timing mechanism should be
+ * used, preferably HPET on x86/AMD64 or gettimeofday() on SPARC.
+ */
+
 static
 pgm_time_t
-tsc_update (void)
+pgm_tsc_update (void)
 {
 	static pgm_time_t last = 0;
 	const pgm_time_t now = tsc_to_us (rdtsc());
-	if (G_UNLIKELY(now < last))
+	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
 		return last = now;
@@ -714,7 +764,9 @@ tsc_update (void)
 
 static
 pgm_time_t
-tsc_sleep (uint32_t usec)
+pgm_tsc_sleep (
+	const uint32_t	usec
+	)
 {
 	pgm_time_t now;
 	const pgm_time_t start = tsc_to_us (rdtsc());
@@ -723,15 +775,11 @@ tsc_sleep (uint32_t usec)
 	for (;;) {
 		now = tsc_to_us (rdtsc());
 		if (now < end) {
-#ifdef G_OS_UNIX
-			pthread_yield ();
-#else
-			Sleep (0);
-#endif
+			pgm_thread_yield ();
 		} else break;
 	}
 
-	if (pgm_time_update_now == tsc_update)
+	if (pgm_time_update_now == pgm_tsc_update)
 		return now;
 	else
 		return pgm_time_update_now();
@@ -739,25 +787,15 @@ tsc_sleep (uint32_t usec)
 #endif /* CONFIG_HAVE_TSC */
 
 #ifdef CONFIG_HAVE_HPET
-#define HPET_MMAP_SIZE			0x400
-#define HPET_GENERAL_CAPS_REGISTER	0x00
-#define HPET_COUNTER_CLK_PERIOD		0x004
-#define HPET_MAIN_COUNTER_REGISTER	0x0f0
-#define HPET_COUNT_SIZE_CAP		(1 << 13)
-#if defined(__x86_64__)
-typedef uint64_t hpet_counter_t;
-#else
-typedef uint32_t hpet_counter_t;
-#endif
-static int hpet_fd = -1;
-static char* hpet_ptr;
-static uint64_t hpet_offset = 0;
-static uint64_t hpet_wrap;
-static hpet_counter_t hpet_last = 0;
+/* High Precision Event Timer (HPET) created as a system wide stable high resolution timer
+ * to replace dependency on core specific counters (TSC).
+ *
+ * NB: Only available on x86/AMD64 hardware post 2007
+ */
 
 static
-gboolean
-hpet_init (
+bool
+pgm_hpet_init (
 	pgm_error_t**	error
 	)
 {
@@ -802,7 +840,7 @@ hpet_init (
 
 static
 bool
-hpet_shutdown (void)
+pgm_hpet_shutdown (void)
 {
 	pgm_return_val_if_fail (hpet_fd, FALSE);
 	pgm_warn_if_fail (0 == close (hpet_fd));
@@ -812,11 +850,11 @@ hpet_shutdown (void)
 
 static
 pgm_time_t
-hpet_update (void)
+pgm_hpet_update (void)
 {
 	const hpet_counter_t hpet_count = *((hpet_counter_t*)(hpet_ptr + HPET_MAIN_COUNTER_REGISTER));
 /* 32-bit HPET counters wrap after ~4 minutes */
-	if (G_UNLIKELY(hpet_count < hpet_last))
+	if (PGM_UNLIKELY(hpet_count < hpet_last))
 		hpet_offset += hpet_wrap;
 	hpet_last = hpet_count;
 	return hpet_to_us (hpet_offset + hpet_count);
@@ -824,76 +862,78 @@ hpet_update (void)
 
 static
 pgm_time_t
-hpet_sleep (uint32_t usec)
+pgm_hpet_sleep (
+	const uint32_t	usec
+	)
 {
 	pgm_time_t now;
-	const pgm_time_t start = hpet_update();
+	const pgm_time_t start = pgm_hpet_update();
 	const pgm_time_t end   = start + usec;
 
 	for (;;) {
-		now = hpet_update();
+		now = pgm_hpet_update();
 		if (now < end) {
-#ifdef G_OS_UNIX
-			pthread_yield ();
-#else
-			Sleep (0);
-#endif
+			pgm_thread_yield ();
 		} else break;
 	}
 
-	if (pgm_time_update_now == hpet_update)
+	if (pgm_time_update_now == pgm_hpet_update)
 		return now;
 	else
 		return pgm_time_update_now();
 }
 #endif /* CONFIG_HAVE_HPET */
 
-#ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
-static clockid_t g_clock_id;
+#if defined(CONFIG_HAVE_CLOCK_GETTIME) || defined(CONFIG_HAVE_CLOCK_NANOSLEEP)
+/* Allegedly a high performance set of flexible timers, but in reality less then
+ * meh performance, not even portable among Linux versions.
+ */
 
 static
-int
-clock_init (
-	G_GNUC_UNUSED pgm_error_t**	error
+bool
+pgm_clock_init (
+	PGM_GNUC_UNUSED pgm_error_t**	error
 	)
 {
-	g_clock_id = CLOCK_REALTIME;
-//	g_clock_id = CLOCK_MONOTONIC;
-//	g_clock_id = CLOCK_PROCESS_CPUTIME_ID;
-//	g_clock_id = CLOCK_THREAD_CPUTIME_ID;
+	clock_id = CLOCK_REALTIME;
+//	clock_id = CLOCK_MONOTONIC;
+//	clock_id = CLOCK_PROCESS_CPUTIME_ID;
+//	clock_id = CLOCK_THREAD_CPUTIME_ID;
 
 #if 0
-//	clock_getcpuclockid (0, &g_clock_id);
-//	pthread_getcpuclockid (pthread_self(), &g_clock_id);
+//	clock_getcpuclockid (0, &clock_id);
+//	pthread_getcpuclockid (pthread_self(), &clock_id);
 
 	struct timespec ts;
-	if (clock_getres (g_clock_id, &ts) > 0) {
+	if (clock_getres (clock_id, &ts) > 0) {
 		pgm_set_error (error,
-			     PGM_TIME_ERROR,
-			     PGM_TIME_ERROR_FAILED,
-			     _("clock_getres failed on clock id %d"),
-			     (int)g_clock_id);
+			     PGM_ERROR_DOMAIN_TIME,
+			     PGM_ERROR_FAILED,
+			     _("clock_getres() failed: %s"),
+			     strerror (errno));
 		return FALSE;
 	}
-	g_message ("clock resolution %lu.%.9lu", ts.tv_sec, ts.tv_nsec);
+	pgm_minor (_("Clock resolution %lu.%.9lu"), ts.tv_sec, ts.tv_nsec);
 #endif
 	return TRUE;
 }
 
 static
 pgm_time_t
-clock_nano_sleep (uint32_t usec)
+pgm_clock_nanosleep (
+	const uint32_t	usec
+	)
 {
 	struct timespec ts;
 #if 0
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
-	clock_nanosleep (g_clock_id, 0, &ts, NULL);
+	clock_nanosleep (clock_id, 0, &ts, NULL);
 #else
-	usec += pgm_time_update_now ();
+	const pgm_time_t abs_usec = usec + pgm_time_update_now ();
 	ts.tv_sec	= usec / 1000000UL;
 	ts.tv_nsec	= (usec % 1000000UL) * 1000;
-	clock_nanosleep (g_clock_id, TIMER_ABSTIME, &ts, NULL);
+	clock_nanosleep (clock_id, TIMER_ABSTIME, &ts, NULL);
 #endif
 	return pgm_time_update_now ();
 }
@@ -902,7 +942,9 @@ clock_nano_sleep (uint32_t usec)
 #ifdef CONFIG_HAVE_NANOSLEEP
 static
 pgm_time_t
-nano_sleep (uint32_t usec)
+pgm_nanosleep (
+	const uint32_t	usec
+	)
 {
 	struct timespec ts;
 	ts.tv_sec	= usec / 1000000UL;
@@ -912,12 +954,14 @@ nano_sleep (uint32_t usec)
 }
 #endif /* CONFIG_HAVE_NANOSLEEP */
 
-#ifdef G_OS_WIN32
+#ifdef _WIN32
 static
 pgm_time_t
-msleep (uint32_t usec)
+pgm_msleep (
+	const uint32_t	usec
+	)
 {
-	Sleep (usecs_to_msecs(usec));
+	Sleep (usecs_to_msecs (usec));
 	return pgm_time_update_now ();
 }
 #endif
@@ -925,7 +969,9 @@ msleep (uint32_t usec)
 #ifdef CONFIG_HAVE_USLEEP
 static
 pgm_time_t
-usleep_sleep (uint32_t usec)
+pgm_usleep (
+	const uint32_t	usec
+	)
 {
 	usleep (usec);
 	return pgm_time_update_now ();
@@ -934,7 +980,9 @@ usleep_sleep (uint32_t usec)
 
 static
 pgm_time_t
-select_sleep (uint32_t usec)
+pgm_select_sleep (
+	const uint32_t	usec
+	)
 {
 #ifdef CONFIG_HAVE_PSELECT
 	struct timespec ts;
@@ -950,26 +998,13 @@ select_sleep (uint32_t usec)
 	return pgm_time_update_now ();
 }
 
-#ifdef CONFIG_HAVE_PPOLL
-static
-pgm_time_t
-poll_sleep (uint32_t usec)
-{
-	struct timespec ts;
-	ts.tv_sec	= usec / 1000000UL;
-	ts.tv_nsec	= (usec % 1000000UL) * 1000;
-	ppoll (NULL, 0, &ts, NULL);
-	return pgm_time_update_now();
-}
-#endif
-
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
  */
 static
 void
 pgm_time_conv (
-	pgm_time_t*	pgm_time_t_time,
-	time_t*		time_t_time
+	const pgm_time_t* const restrict pgm_time_t_time,
+	time_t*	                restrict time_t_time
 	)
 {
 	*time_t_time = pgm_to_secs (*pgm_time_t_time);
@@ -980,12 +1015,11 @@ pgm_time_conv (
 static
 void
 pgm_time_conv_from_reset (
-	pgm_time_t*	pgm_time_t_time,
-	time_t*		time_t_time
+	const pgm_time_t* const restrict pgm_time_t_time,
+	time_t*			restrict time_t_time
 	)
 {
 	*time_t_time = pgm_to_secs (*pgm_time_t_time + rel_offset);
 }
-
 
 /* eof */

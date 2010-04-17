@@ -19,15 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_ERROR_H__
 #define __PGM_ERROR_H__
 
-#include <stdarg.h>
+#include <pgm/types.h>
 
-#include <glib.h>
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 /* error domains */
 enum
@@ -88,17 +89,17 @@ struct pgm_error_t
 {
 	int		domain;
 	int		code;
-	gchar*		message;
+	char*		message;
 };
 
 typedef struct pgm_error_t pgm_error_t;
 
 
 void pgm_error_free (pgm_error_t*);
-void pgm_set_error (pgm_error_t**, int, int, const char*, ...) G_GNUC_PRINTF (4, 5);
+void pgm_set_error (pgm_error_t**, int, int, const char*, ...) PGM_GNUC_PRINTF (4, 5);
 void pgm_propagate_error (pgm_error_t**, pgm_error_t*);
 void pgm_clear_error (pgm_error_t**);
-void pgm_prefix_error (pgm_error_t**, const char*, ...) G_GNUC_PRINTF (2, 3);
+void pgm_prefix_error (pgm_error_t**, const char*, ...) PGM_GNUC_PRINTF (2, 3);
 
 int pgm_error_from_errno (const int);
 int pgm_error_from_h_errno (const int);
@@ -106,6 +107,6 @@ int pgm_error_from_eai_errno (const int, const int);
 int pgm_error_from_wsa_errno (const int);
 int pgm_error_from_adapter_errno (const int);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_ERROR_H__ */

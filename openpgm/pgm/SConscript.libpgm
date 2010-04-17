@@ -17,7 +17,8 @@ src = Split("""
 		messages.c
 		error.c
 		math.c
-		packet.c
+		packet_parse.c
+		packet_test.c
 		sockaddr.c
 		time.c
 		if.c
@@ -37,7 +38,7 @@ src = Split("""
 		source.c
 		receiver.c
 		recv.c
-		pgm.c
+		engine.c
 		timer.c
 		net.c
 		rate_control.c
@@ -49,7 +50,6 @@ src = Split("""
 """)
 
 e = env.Clone();
-e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 # Galois tables

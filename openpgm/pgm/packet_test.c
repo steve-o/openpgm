@@ -19,42 +19,24 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <ctype.h>
-#include <errno.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
+#include <ctype.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+#include <pgm/framework.h>
 
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <sys/socket.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#	include <arpa/inet.h>
-#else
-#	include <ws2tcpip.h>
-#	include <ipexport.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/string.h"
-#include "pgm/ip.h"
-#include "pgm/checksum.h"
-#include "pgm/skbuff.h"
 #include "pgm/packet.h"
+#include "pgm/packet_test.h"
 
 
 //#define PACKET_DEBUG
-
-
-/* globals */
 
 #if !defined(IPOPT_NOP) && defined(IP_OPT_NOP)
 #	define IPOPT_NOP	IP_OPT_NOP
@@ -63,8 +45,6 @@
 #	define IPOPT_TS		IP_OPT_TS
 #endif
 
-
-static bool pgm_parse (struct pgm_sk_buff_t* const, pgm_error_t**);
 static bool pgm_print_spm (const struct pgm_header* const, const void*, const size_t);
 static bool pgm_print_poll (const struct pgm_header* const, const void*, const size_t);
 static bool pgm_print_polr (const struct pgm_header* const, const void*, const size_t);
@@ -75,262 +55,6 @@ static bool pgm_print_nnak (const struct pgm_header* const, const void*, const s
 static bool pgm_print_ncf (const struct pgm_header* const, const void*, const size_t);
 static bool pgm_print_spmr (const struct pgm_header* const, const void*, const size_t);
 static ssize_t pgm_print_options (const void*, size_t);
-
-
-/* Parse a raw-IP packet for IP and PGM header and any payload.
- */
-
-#define PGM_MIN_SIZE	( \
-				sizeof(struct pgm_ip) + 	/* IPv4 header */ \
-				sizeof(struct pgm_header) 	/* PGM header */ \
-			)
-
-bool
-pgm_parse_raw (
-	struct pgm_sk_buff_t* const	skb,		/* data will be modified */
-	struct sockaddr* const		dst,
-	pgm_error_t**			error
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-	pgm_assert (NULL != dst);
-
-	pgm_debug ("pgm_parse_raw (skb:%p dst:%p error:%p)",
-		(gpointer)skb, (gpointer)dst, (gpointer)error);
-
-/* minimum size should be IPv4 header plus PGM header, check IP version later */
-	if (G_UNLIKELY(skb->len < PGM_MIN_SIZE))
-	{
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_BOUNDS,
-			     _("IP packet too small at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GUINT16_FORMAT " bytes."),
-			     skb->len, (uint16_t)PGM_MIN_SIZE);
-		return FALSE;
-	}
-
-/* IP packet header: IPv4
- *
- *  0                   1                   2                   3
- *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |Version|  HL   |      ToS      |            Length             |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |           Fragment ID         |R|D|M|     Fragment Offset     |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |      TTL      |    Protocol   |           Checksum            |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                       Source IP Address                       |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                    Destination IP Address                     |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * | IP Options when present ...
- * +-+-+-+-+-+-+-+-+-+-+-+-+ ...
- * | Data ...
- * +-+-+- ...
- *
- * IPv6
- *
- *  0                   1                   2                   3
- *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |Version| Traffic Class |             Flow Label                |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |           Payload Length      |   Next Header |   Hop Limit   |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                                                               |
- * |                       Source IP Address                       |
- * |                                                               |
- * |                                                               |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                                                               |
- * |                     Destination IP Address                    |
- * |                                                               |
- * |                                                               |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * | IP Options when present ...
- * +-+-+-+-+-+-+-+-+-+-+-+-+ ...
- * | Data ...
- * +-+-+- ...
- *
- */
-
-/* decode IP header */
-	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
-	switch (ip->ip_v) {
-	case 4: {
-		struct sockaddr_in* sin = (struct sockaddr_in*)dst;
-		sin->sin_family		= AF_INET;
-		sin->sin_addr.s_addr	= ip->ip_dst.s_addr;
-		break;
-	}
-
-	case 6:
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_AFNOSUPPORT,
-			     _("IPv6 is not supported for raw IP header parsing."));
-		return FALSE;
-
-	default:
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_AFNOSUPPORT,
-			     _("IP header reports an invalid version %d."),
-			     ip->ip_v);
-		return FALSE;
-	}
-
-	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (G_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
-	{
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_BOUNDS,
-			     _("IP header reports an invalid header length %" G_GSIZE_FORMAT " bytes."),
-			     ip_header_length);
-		return FALSE;
-	}
-
-	gsize packet_length = g_ntohs(ip->ip_len);	/* total packet length */
-
-/* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
- * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
- * 
- * RFC3828 allows partial packets such that len < packet_length with UDP lite
- */
-	if (skb->len == packet_length + ip_header_length) {
-		packet_length += ip_header_length;
-	}
-
-	if (G_UNLIKELY(skb->len < packet_length)) {	/* redundant: often handled in kernel */
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_BOUNDS,
-			     _("IP packet received at %" G_GUINT16_FORMAT " bytes whilst IP header reports %" G_GSIZE_FORMAT " bytes."),
-			     skb->len, packet_length);
-		return FALSE;
-	}
-
-/* packets that fail checksum will generally not be passed upstream except with rfc3828
- */
-#if PGM_CHECK_IN_CKSUM
-	const uint16_t sum = in_cksum (data, packet_length, 0);
-	if (G_UNLIKELY(0 != sum)) {
-		const uint16_t ip_sum = ntohs (ip->ip_sum);
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_CKSUM,
-			     _("IP packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
-			     ip_sum, sum);
-		return FALSE;
-	}
-#endif
-
-/* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
-	const uint16_t offset = ntohs (ip->ip_off);
-	if (G_UNLIKELY((offset & 0x1fff) != 0)) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_PROTO,
-			     _("IP header reports packet fragmentation."));
-		return FALSE;
-	}
-
-/* PGM payload, header looks as follows:
- *
- *  0                   1                   2                   3
- *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |         Source Port           |       Destination Port        |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |      Type     |    Options    |           Checksum            |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                        Global Source ID                   ... |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * | ...    Global Source ID       |           TSDU Length         |
- * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * | Type specific data ...
- * +-+-+-+-+-+-+-+-+-+- ...
- */
-
-	skb->pgm_header = (gpointer)( (guint8*)skb->data + ip_header_length );
-
-/* advance DATA pointer to PGM packet */
-	skb->data	= skb->pgm_header;
-	skb->len       -= ip_header_length;
-	return pgm_parse (skb, error);
-}
-
-bool
-pgm_parse_udp_encap (
-	struct pgm_sk_buff_t*	skb,		/* will be modified */
-	pgm_error_t**		error
-	)
-{
-	pgm_assert (NULL != skb);
-
-	if (G_UNLIKELY(skb->len < sizeof(struct pgm_header))) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_PACKET,
-			     PGM_ERROR_BOUNDS,
-			     _("UDP payload too small for PGM packet at %" G_GUINT16_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes."),
-			     skb->len, sizeof(struct pgm_header));
-		return FALSE;
-	}
-
-/* DATA payload is PGM packet, no headers */
-	skb->pgm_header = skb->data;
-	return pgm_parse (skb, error);
-}
-
-/* will modify packet contents to calculate and check PGM checksum
- */
-static
-bool
-pgm_parse (
-	struct pgm_sk_buff_t* const	skb,		/* will be modified to calculate checksum */
-	pgm_error_t**			error
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-/* pgm_checksum == 0 means no transmitted checksum */
-	if (skb->pgm_header->pgm_checksum)
-	{
-		const uint16_t sum = skb->pgm_header->pgm_checksum;
-		skb->pgm_header->pgm_checksum = 0;
-		const uint16_t pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
-		skb->pgm_header->pgm_checksum = sum;
-		if (G_UNLIKELY(pgm_sum != sum)) {
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_PACKET,
-				     PGM_ERROR_CKSUM,
-			     	     _("PGM packet checksum mismatch, reported 0x%x whilst calculated 0x%x."),
-			     	     pgm_sum, sum);
-			return FALSE;
-		}
-	} else {
-		if (PGM_ODATA == skb->pgm_header->pgm_type ||
-		    PGM_RDATA == skb->pgm_header->pgm_type)
-		{
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_PACKET,
-				     PGM_ERROR_PROTO,
-			     	     _("PGM checksum missing whilst mandatory for %cDATA packets."),
-				     PGM_ODATA == skb->pgm_header->pgm_type ? 'O' : 'R');
-			return FALSE;
-		}
-		pgm_debug ("No PGM checksum :O");
-	}
-
-/* copy packets source transport identifier */
-	memcpy (&skb->tsi.gsi, skb->pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
-	skb->tsi.sport = skb->pgm_header->pgm_sport;
-	return TRUE;
-}
 
 bool
 pgm_print_packet (
@@ -345,13 +69,13 @@ pgm_print_packet (
 /* minimum size should be IP header plus PGM header */
 	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
 	{
-		printf ("Packet size too small: %" G_GSIZE_FORMAT " bytes, expecting at least %" G_GSIZE_FORMAT " bytes.\n",
+		printf ("Packet size too small: %zu bytes, expecting at least %zu bytes.\n",
 			len, sizeof(struct pgm_ip) + sizeof(struct pgm_header));
 		return FALSE;
 	}
 
 /* decode IP header */
-	const struct pgm_ip* ip = (struct pgm_ip*)data;
+	const struct pgm_ip* ip = (const struct pgm_ip*)data;
 	if (ip->ip_v != 4) 				/* IP version, 4 or 6 */
 	{
 		puts ("not IP4 packet :/");		/* v6 not currently handled */
@@ -366,7 +90,7 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	size_t packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+	size_t packet_length = ntohs(ip->ip_len);	/* total packet length */
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
@@ -388,7 +112,7 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	const uint16_t offset = g_ntohs(ip->ip_off);
+	const uint16_t offset = ntohs(ip->ip_off);
 
 /* 3 bits routing priority, 4 bits type of service: delay, throughput, reliability, cost */
 	printf ("(tos 0x%x", (int)ip->ip_tos);
@@ -410,16 +134,16 @@ pgm_print_packet (
 #define IP_OFFMASK	0x1fff
 
 	printf (", id %u, offset %u, flags [%s%s]",
-		g_ntohs(ip->ip_id),
+		ntohs(ip->ip_id),
 		(offset & 0x1fff) * 8,
 		((offset & IP_DF) ? "DF" : ""),
 		((offset & IP_MF) ? "+" : ""));
-	printf (", length %" G_GSIZE_FORMAT, packet_length);
+	printf (", length %zu", packet_length);
 
 /* IP options */
 	if ((ip_header_length - sizeof(struct pgm_ip)) > 0) {
 		printf (", options (");
-		pgm_ipopt_print((gconstpointer)(ip + 1), ip_header_length - sizeof(struct pgm_ip));
+		pgm_ipopt_print((const void*)(ip + 1), ip_header_length - sizeof(struct pgm_ip));
 		printf (" )");
 	}
 
@@ -455,7 +179,7 @@ pgm_print_packet (
  * | Type specific data ...
  * +-+-+-+-+-+-+-+-+-+- ...
  */
-	struct pgm_header* pgm_header = (struct pgm_header*)((guint8*)data + ip_header_length);
+	const struct pgm_header* pgm_header = (const struct pgm_header*)((const char*)data + ip_header_length);
 	const size_t pgm_length = packet_length - ip_header_length;
 
 	if (pgm_length < sizeof(pgm_header)) {
@@ -491,6 +215,7 @@ pgm_print_packet (
 
 	if (pgm_header->pgm_checksum)
 	{
+#if 0
 		const uint16_t encoded_pgm_sum = pgm_header->pgm_checksum;
 /* requires modification of data buffer */
 		pgm_header->pgm_checksum = 0;
@@ -499,6 +224,7 @@ pgm_print_packet (
 			printf ("PGM checksum incorrect, packet %x calculated %x  :(\n", encoded_pgm_sum, pgm_sum);
 			return FALSE;
 		}
+#endif
 	} else {
 		puts ("No PGM checksum :O");
 	}
@@ -507,7 +233,7 @@ pgm_print_packet (
 	const void* pgm_data = pgm_header + 1;
 	const size_t pgm_data_length = pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
 
-	gboolean err = FALSE;
+	bool err = FALSE;
 	switch (pgm_header->pgm_type) {
 	case PGM_SPM:	err = pgm_print_spm (pgm_header, pgm_data, pgm_data_length); break;
 	case PGM_POLL:	err = pgm_print_poll (pgm_header, pgm_data, pgm_data_length); break;
@@ -548,33 +274,6 @@ pgm_print_packet (
  */
 
 #define PGM_MIN_SPM_SIZE	( sizeof(struct pgm_spm) )
-
-bool
-pgm_verify_spm (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-	const struct pgm_spm* spm = (const struct pgm_spm*)skb->data;
-	switch (g_ntohs (spm->spm_nla_afi)) {
-/* truncated packet */
-	case AFI_IP6:
-		if (G_UNLIKELY(skb->len < sizeof(struct pgm_spm6)))
-			return FALSE;
-		break;
-	case AFI_IP:
-		if (G_UNLIKELY(skb->len < sizeof(struct pgm_spm)))
-			return FALSE;
-		break;
-
-	default:
-		return FALSE;
-	}
-
-	return TRUE;
-}
 
 static
 bool
@@ -672,33 +371,6 @@ pgm_print_spm (
 
 #define PGM_MIN_POLL_SIZE	( sizeof(struct pgm_poll) )
 
-bool
-pgm_verify_poll (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
-	switch (ntohs (poll4->poll_nla_afi)) {
-/* truncated packet */
-	case AFI_IP6:
-		if (G_UNLIKELY(skb->len < sizeof(struct pgm_poll6)))
-			return FALSE;
-		break;
-	case AFI_IP:
-		if (G_UNLIKELY(skb->len < sizeof(struct pgm_poll)))
-			return FALSE;
-		break;
-
-	default:
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
 static
 bool
 pgm_print_poll (
@@ -723,10 +395,10 @@ pgm_print_poll (
 	const struct pgm_poll6* poll6 = (const struct pgm_poll6*)data;
 	const uint16_t poll_nla_afi = ntohs (poll4->poll_nla_afi);
 
-	printf ("sqn %lu round %u sub-type %u nla-afi %u ",
-		(gulong)g_ntohl(poll4->poll_sqn),
-		g_ntohs(poll4->poll_round),
-		g_ntohs(poll4->poll_s_type),
+	printf ("sqn %" PRIu32 " round %u sub-type %u nla-afi %u ",
+		ntohl(poll4->poll_sqn),
+		ntohs(poll4->poll_round),
+		ntohs(poll4->poll_s_type),
 		poll_nla_afi);	/* address family indicator */
 
 	char s[INET6_ADDRSTRLEN];
@@ -807,20 +479,6 @@ pgm_print_poll (
  * | Option Extensions when present ...                            |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ... -+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
-
-bool
-pgm_verify_polr (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-/* truncated packet */
-	if (G_UNLIKELY(skb->len < sizeof(struct pgm_polr)))
-		return FALSE;
-	return TRUE;
-}
 
 static
 bool
@@ -1010,65 +668,6 @@ pgm_print_rdata (
 
 #define PGM_MIN_NAK_SIZE	( sizeof(struct pgm_nak) )
 
-bool
-pgm_verify_nak (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-	pgm_debug ("pgm_verify_nak (skb:%p)", (gconstpointer)skb);
-
-/* truncated packet */
-	if (G_UNLIKELY(skb->len < PGM_MIN_NAK_SIZE))
-		return FALSE;
-
-	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
-	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
-	uint16_t nak_grp_nla_afi = -1;
-
-/* check source NLA: unicast address of the ODATA sender */
-	switch (nak_src_nla_afi) {
-	case AFI_IP:
-		nak_grp_nla_afi = g_ntohs (nak->nak_grp_nla_afi);
-		break;
-
-	case AFI_IP6:
-		nak_grp_nla_afi = g_ntohs (((const struct pgm_nak6*)nak)->nak6_grp_nla_afi);
-		break;
-
-	default:
-		return FALSE;
-	}
-
-/* check multicast group NLA */
-	switch (nak_grp_nla_afi) {
-	case AFI_IP6:
-		switch (nak_src_nla_afi) {
-/* IPv4 + IPv6 NLA */
-		case AFI_IP:
-			if (G_UNLIKELY(skb->len < ( sizeof(struct pgm_nak) + sizeof(struct in6_addr) - sizeof(struct in_addr) )))
-				return FALSE;
-			break;
-
-/* IPv6 + IPv6 NLA */
-		case AFI_IP6:
-			if (G_UNLIKELY(skb->len < sizeof(struct pgm_nak6)))
-				return FALSE;
-			break;
-		}
-
-	case AFI_IP:
-		break;
-
-	default:
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
 static
 bool
 pgm_print_nak (
@@ -1093,8 +692,8 @@ pgm_print_nak (
 	const struct pgm_nak6* nak6 = (const struct pgm_nak6*)data;
 	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
 
-	printf ("sqn %lu src ", 
-		(gulong)g_ntohl(nak->nak_sqn));
+	printf ("sqn %" PRIu32 " src ", 
+		ntohl(nak->nak_sqn));
 
 	char s[INET6_ADDRSTRLEN];
 	const void* pgm_opt;
@@ -1161,22 +760,11 @@ pgm_print_nak (
 /* 8.3.  N-NAK
  */
 
-bool
-pgm_verify_nnak (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-	return pgm_verify_nak (skb);
-}
-
 static
 bool
 pgm_print_nnak (
-	G_GNUC_UNUSED const struct pgm_header* const	header,
-	G_GNUC_UNUSED const void*			data,
+	PGM_GNUC_UNUSED const struct pgm_header* const	header,
+	PGM_GNUC_UNUSED const void*			data,
 	const size_t					len
 	)
 {
@@ -1201,20 +789,9 @@ pgm_print_nnak (
  */
 
 bool
-pgm_verify_ncf (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-	return pgm_verify_nak (skb);
-}
-
-bool
 pgm_print_ncf (
-	G_GNUC_UNUSED const struct pgm_header* const	header,
-	G_GNUC_UNUSED const void*			data,
+	PGM_GNUC_UNUSED const struct pgm_header* const	header,
+	PGM_GNUC_UNUSED const void*			data,
 	const size_t					len
 	)
 {
@@ -1243,17 +820,6 @@ pgm_print_ncf (
  * | Option Extensions when present ...
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
  */
-
-bool
-pgm_verify_spmr (
-	G_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
-	)
-{
-/* pre-conditions */
-	pgm_assert (NULL != skb);
-
-	return TRUE;
-}
 
 static
 bool
@@ -1411,7 +977,7 @@ pgm_udpport_string (
 		services = pgm_hash_table_new (pgm_int_hash, pgm_int_equal);
 	}
 
-	gpointer service_string = pgm_hash_table_lookup (services, &port);
+	void* service_string = pgm_hash_table_lookup (services, &port);
 	if (service_string != NULL) {
 		return service_string;
 	}
@@ -1419,7 +985,7 @@ pgm_udpport_string (
 	struct servent* se = getservbyport (port, "udp");
 	if (se == NULL) {
 		char buf[sizeof("00000")];
-		snprintf(buf, sizeof(buf), "%i", g_ntohs(port));
+		snprintf(buf, sizeof(buf), "%u", ntohs(port));
 		service_string = pgm_strdup(buf);
 	} else {
 		service_string = pgm_strdup(se->s_name);
@@ -1439,7 +1005,7 @@ pgm_gethostbyaddr (
 		hosts = pgm_hash_table_new (pgm_str_hash, pgm_str_equal);
 	}
 
-	gpointer host_string = pgm_hash_table_lookup (hosts, ap);
+	void* host_string = pgm_hash_table_lookup (hosts, ap);
 	if (host_string != NULL) {
 		return host_string;
 	}

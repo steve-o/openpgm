@@ -20,28 +20,10 @@
  */
 
 #include <ctype.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#	include <sys/socket.h>
-#else
-#	include <ws2tcpip.h>
-#	include <iphlpapi.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/inet_network.h"
-#include "pgm/sockaddr.h"
+#include <pgm/framework.h>
 
 
 //#define INET_NETWORK_DEBUG
-
 
 
 /* calculate IPv4 netmask from network size, returns address in
@@ -82,7 +64,7 @@ pgm_inet_network (
 	pgm_return_val_if_fail (NULL != in, -1);
 
 	pgm_debug ("pgm_inet_network (s:\"%s\" in:%p)",
-		 s, (gpointer)in);
+		 s, (const void*)in);
 
 	const char *p = s;
 	unsigned val = 0;
@@ -180,7 +162,7 @@ pgm_inet6_network (
 	pgm_return_val_if_fail (NULL != in6, -1);
 
 	pgm_debug ("pgm_inet6_network (s:\"%s\" in6:%p)",
-		 s, (gpointer)in6);
+		 s, (const void*)in6);
 
 /* inet_pton cannot parse IPv6 addresses with subnet declarations, so
  * chop them off.
@@ -197,7 +179,7 @@ pgm_inet6_network (
 	}
 	if (*p == 0) {
 		if (pgm_inet_pton (AF_INET6, s, in6)) return 0;
-		pgm_debug ("inet_pton failed");
+		pgm_debug ("pgm_inet_pton(AF_INET6) failed on '%s'", s);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
@@ -205,7 +187,7 @@ pgm_inet6_network (
 	*p2 = 0;
 	pgm_debug ("net part %s", s2);
 	if (!pgm_inet_pton (AF_INET6, s2, in6)) {
-		pgm_debug ("inet_pton failed parsing network part %s", s2);
+		pgm_debug ("pgm_inet_pton(AF_INET) failed parsing network part '%s'", s2);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}

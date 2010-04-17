@@ -19,31 +19,21 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <string.h>
-#include <unistd.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/sockaddr.h"
+#include <pgm/framework.h>
 #include "pgm/signal.h"
 
 
 //#define SIGNAL_DEBUG
 
 
-
 /* globals */
 
-static pgm_sighandler_t g_signal_list[NSIG];
-static int g_signal_pipe[2];
-static GIOChannel* g_signal_io = NULL;
+static pgm_sighandler_t		signal_list[NSIG];
+static int			signal_pipe[2];
+static GIOChannel*		signal_io = NULL;
 
 static void on_signal (int);
-static gboolean on_io_signal (GIOChannel*, GIOCondition, gpointer);
+static gboolean	on_io_signal (GIOChannel*, GIOCondition, gpointer);
 static const char* cond_string (GIOCondition);
 
 
@@ -60,23 +50,23 @@ pgm_signal_install (
 	pgm_debug ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
 		signum, (gpointer)handler, user_data);
 
-	if (NULL == g_signal_io)
+	if (NULL == signal_io)
 	{
 #ifdef G_OS_UNIX
-		if (pipe (g_signal_pipe))
+		if (pipe (signal_pipe))
 #else
-		if (_pipe (g_signal_pipe, 4096, _O_BINARY | _O_NOINHERIT))
+		if (_pipe (signal_pipe, 4096, _O_BINARY | _O_NOINHERIT))
 #endif
 			return FALSE;
 
-		pgm_sockaddr_nonblocking (g_signal_pipe[0], TRUE);
-		pgm_sockaddr_nonblocking (g_signal_pipe[1], TRUE);
+		pgm_sockaddr_nonblocking (signal_pipe[0], TRUE);
+		pgm_sockaddr_nonblocking (signal_pipe[1], TRUE);
 /* add to evm */
-		g_signal_io = g_io_channel_unix_new (g_signal_pipe[0]);
-		g_io_add_watch (g_signal_io, G_IO_IN, on_io_signal, user_data);
+		signal_io = g_io_channel_unix_new (signal_pipe[0]);
+		g_io_add_watch (signal_io, G_IO_IN, on_io_signal, user_data);
 	}
 
-	g_signal_list[signum] = handler;
+	signal_list[signum] = handler;
 	return (SIG_ERR != signal (signum, on_signal));
 }
 
@@ -90,10 +80,10 @@ on_signal (
 	)
 {
 	pgm_debug ("on_signal (signum:%d)", signum);
-	if (write (g_signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
+	if (write (signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
 #ifdef G_OS_UNIX
-		pgm_warn ("Unix signal %s (%i) lost", strsignal(signum), signum);
+		pgm_warn ("Unix signal %s (%i) lost", strsignal (signum), signum);
 #else
 		pgm_warn ("Unix signal (%i) lost", signum);
 #endif
@@ -103,7 +93,8 @@ on_signal (
 /* process signal from pipe
  */
 
-static gboolean
+static
+gboolean
 on_io_signal (
 	GIOChannel*	source,
 	GIOCondition	cond,
@@ -122,7 +113,7 @@ on_io_signal (
 
 	if (sizeof(signum) == bytes_read)
 	{
-		g_signal_list[signum] (signum, user_data);
+		signal_list[signum] (signum, user_data);
 	}
 	else
 	{
