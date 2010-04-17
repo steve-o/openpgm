@@ -7,6 +7,7 @@ import os;
 Import('env');
 e = env.Clone();
 e.Prepend(LIBS = ['libpgmex', 'libpgm']);
+p = e.Clone();
 e.MergeFlags(env['GLIB_FLAGS']);
 f = e.Clone();
 if f['WITH_SNMP'] == 'true':
@@ -58,5 +59,8 @@ if f['WITH_PROTOBUF'] == 'true':
 	ge.Append(BUILDERS = {'Protobuf' : protobuf})
 	ge.Protobuf('ping.pb.cc', 'ping.proto')
 	ge.Program(['pgmping.cc', 'ping.pb.cc', ge['PROTOBUF_LIBS']])
+
+# Vanilla example
+p.Program(['purinrecv.c'])
 
 # end of file
