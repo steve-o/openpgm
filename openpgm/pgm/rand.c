@@ -19,78 +19,70 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/time.h"
-#include "pgm/thread.h"
-#include "pgm/rand.h"
+#ifndef _WIN32
+#	include <errno.h>
+#	include <stdio.h>
+#endif
+#include <pgm/framework.h>
 
 
 //#define RAND_DEBUG
 
 
-/* globals */
+/* locals */
 
-static pgm_rand_t g_rand = { .seed = 0 };
-
-static volatile int32_t g_rand_ref_count = 0;
-static pgm_mutex_t g_rand_mutex;
+static pgm_rand_t		global_rand = { .seed = 0 };
+static volatile int32_t		rand_ref_count = 0;
+static pgm_mutex_t		rand_mutex;
 
 
 void
 pgm_rand_init (void)
 {
-	if (pgm_atomic_int32_exchange_and_add (&g_rand_ref_count, 1) > 0)
+	if (pgm_atomic_int32_exchange_and_add (&rand_ref_count, 1) > 0)
 		return;
 
-	pgm_mutex_init (&g_rand_mutex);
+	pgm_mutex_init (&rand_mutex);
 }
 
 void
 pgm_rand_shutdown (void)
 {
-	pgm_return_if_fail (pgm_atomic_int32_get (&g_rand_ref_count) > 0);
+	pgm_return_if_fail (pgm_atomic_int32_get (&rand_ref_count) > 0);
 
-	if (!pgm_atomic_int32_dec_and_test (&g_rand_ref_count))
+	if (!pgm_atomic_int32_dec_and_test (&rand_ref_count))
 		return;
 
-	pgm_mutex_free (&g_rand_mutex);
+	pgm_mutex_free (&rand_mutex);
 }
 
 void
 pgm_rand_create (
-	pgm_rand_t*	rand_
+	pgm_rand_t*	new_rand
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != rand_);
+	pgm_assert (NULL != new_rand);
 
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 /* attempt to read seed from kernel
  */
 	FILE* fp;
 	do {
 		fp = fopen ("/dev/urandom", "rb");
-	} while (G_UNLIKELY(EINTR == errno));
+	} while (PGM_UNLIKELY(EINTR == errno));
 	if (fp) {
 		size_t items_read;
 		do {
-			items_read = fread (&rand_->seed, sizeof(rand_->seed), 1, fp);
-		} while (G_UNLIKELY(EINTR == errno));
+			items_read = fread (&new_rand->seed, sizeof(new_rand->seed), 1, fp);
+		} while (PGM_UNLIKELY(EINTR == errno));
 		fclose (fp);
 		if (1 == items_read)
 			return;
 	}
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 	const pgm_time_t now = pgm_time_update_now();
-	rand_->seed = (guint32)pgm_to_msecs (now);
+	new_rand->seed = (uint32_t)pgm_to_msecs (now);
 }
 
 /* derived from POSIX.1-2001 example implementation of rand()
@@ -98,37 +90,37 @@ pgm_rand_create (
 
 uint32_t
 pgm_rand_int (
-	pgm_rand_t*	rand_
+	pgm_rand_t*	r
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != rand_);
+	pgm_assert (NULL != r);
 
-	rand_->seed = rand_->seed * 1103515245 + 12345;
-	return rand_->seed;
+	r->seed = r->seed * 1103515245 + 12345;
+	return r->seed;
 }
 
 int32_t
 pgm_rand_int_range (
-	pgm_rand_t*	rand_,
+	pgm_rand_t*	r,
 	int32_t		begin,
 	int32_t		end
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != rand_);
+	pgm_assert (NULL != r);
 
-	return begin + pgm_rand_int (rand_) % (end - begin);
+	return begin + pgm_rand_int (r) % (end - begin);
 }
 
 uint32_t
 pgm_random_int (void)
 {
-	pgm_mutex_lock (&g_rand_mutex);
-	if (!g_rand.seed)
-		pgm_rand_create (&g_rand);
-	const uint32_t rand_value = pgm_rand_int (&g_rand);
-	pgm_mutex_unlock (&g_rand_mutex);
+	pgm_mutex_lock (&rand_mutex);
+	if (PGM_UNLIKELY(!global_rand.seed))
+		pgm_rand_create (&global_rand);
+	const uint32_t rand_value = pgm_rand_int (&global_rand);
+	pgm_mutex_unlock (&rand_mutex);
 	return rand_value;
 }
 

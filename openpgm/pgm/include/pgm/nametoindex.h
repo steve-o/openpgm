@@ -19,28 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_NAMETOINDEX_H__
 #define __PGM_NAMETOINDEX_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
-G_BEGIN_DECLS
+unsigned pgm_if_nametoindex (const sa_family_t, const char*);
 
-#ifdef G_OS_UNIX
-#	include <net/if.h>
-static inline unsigned pgm_if_nametoindex (G_GNUC_UNUSED const sa_family_t iffamily, const char* ifname) {
-	return if_nametoindex (ifname);
-}
-#else
-static inline unsigned pgm_if_nametoindex (const sa_family_t iffamily, const char* ifname) {
-	return pgm_compat_if_nametoindex (iffamily, ifname);
-}
-#endif /* !G_OS_UNIX */
-
-unsigned pgm_compat_if_nametoindex (const sa_family_t, const char*);
-
-G_END_DECLS
-
+PGM_END_DECLS
 
 #endif /* __PGM_NAMETOINDEX_H__ */

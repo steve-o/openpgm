@@ -19,30 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_TIME_H__
 #define __PGM_TIME_H__
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <glib.h>
+#include <pgm/macros.h>
+#include <pgm/error.h>
 
-#ifndef __PGM_ERROR_H__
-#	include <pgm/error.h>
-#endif
-
-
-typedef enum
-{
-        PGM_TIME_ERROR_FAILED
-} pgm_time_error_e;
+PGM_BEGIN_DECLS
 
 typedef uint64_t pgm_time_t;
 
-G_BEGIN_DECLS
-
 typedef pgm_time_t (*pgm_time_update_func)(void);
-typedef pgm_time_t (*pgm_time_sleep_func)(uint32_t);
-typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
+typedef pgm_time_t (*pgm_time_sleep_func)(const uint32_t);
+typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_t*restrict);
 
 #define pgm_time_after(a,b)	( (a) > (b) )
 #define pgm_time_before(a,b)    ( pgm_time_after((b),(a)) )
@@ -65,17 +60,16 @@ typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
 #define pgm_usecs(t)	((pgm_time_t)( (t) ))
 #define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000UL ))
 
-#define PGM_TIME_FORMAT	G_GUINT64_FORMAT
+#define PGM_TIME_FORMAT	PRIu64
 
-extern pgm_time_update_func pgm_time_update_now;
-extern pgm_time_sleep_func pgm_time_sleep;
-extern pgm_time_since_epoch_func pgm_time_since_epoch;
+extern pgm_time_update_func		pgm_time_update_now;
+extern pgm_time_sleep_func		pgm_time_sleep;
+extern pgm_time_since_epoch_func	pgm_time_since_epoch;
 
-PGM_GNUC_INTERNAL bool pgm_time_init (pgm_error_t**) G_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_time_init (pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_time_shutdown (void);
 
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_TIME_H__ */
 

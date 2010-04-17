@@ -19,19 +19,23 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_GETIFADDRS_H__
 #define __PGM_GETIFADDRS_H__
 
-#include <glib.h>
-
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 #	include <net/if.h>
+#else
+#	include <winsock2.h>
 #endif
 
-#ifndef __PGM_ERROR_H__
-#	include <pgm/error.h>
-#endif
+#include <pgm/types.h>
+#include <pgm/error.h>
 
+PGM_BEGIN_DECLS
 
 #ifndef IF_NAMESIZE
 #	ifdef IFNAMSIZ
@@ -54,12 +58,9 @@ struct pgm_ifaddrs
 	struct sockaddr*	ifa_netmask;	/* Netmask of this interface.  */
 };
 
-
-G_BEGIN_DECLS
-
-int pgm_getifaddrs (struct pgm_ifaddrs**, pgm_error_t**);
+bool pgm_getifaddrs (struct pgm_ifaddrs**restrict, pgm_error_t**restrict);
 void pgm_freeifaddrs (struct pgm_ifaddrs*);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_GETIFADDRS_H__ */

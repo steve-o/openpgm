@@ -19,33 +19,29 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <errno.h>
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
-
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#ifdef G_OS_WIN32
-#	include <ws2tcpip.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/transport.h"
-#include "pgm/rate_control.h"
+#include <pgm/framework.h>
 #include "pgm/net.h"
+
 
 //#define NET_DEBUG
 
 
-#ifndef ENETUNREACH
+#if !defined(ENETUNREACH) && defined(WSAENETUNREACH)
 #	define ENETUNREACH	WSAENETUNREACH
 #endif
-#ifndef EHOSTUNREACH
+#if !defined(EHOSTUNREACH) && defined(WSAEHOSTUNREACH)
 #	define EHOSTUNREACH	WSAEHOSTUNREACH
 #endif
-#ifndef ENOBUFS
+#if !defined(ENOBUFS) && defined(WSAENOBUFS)
 #	define ENOBUFS		WSAENOBUFS
 #endif
 

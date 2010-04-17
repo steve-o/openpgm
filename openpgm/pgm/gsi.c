@@ -19,29 +19,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <netinet/in.h>
-#else
-#	include <ws2tcpip.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/md5.h"
-#include "pgm/gsi.h"
-#include "pgm/rand.h"
+#include <errno.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <pgm/framework.h>
 
 
 //#define GSI_DEBUG
@@ -70,11 +53,11 @@ pgm_gsi_create_from_data (
 	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
 	g_checksum_free (checksum);
 #else
-	struct md5_ctx ctx;
+	struct pgm_md5_t ctx;
 	char resblock[16];
-	_md5_init_ctx (&ctx);
-	_md5_process_bytes (&ctx, data, length);
-	_md5_finish_ctx (&ctx, resblock);
+	pgm_md5_init_ctx (&ctx);
+	pgm_md5_process_bytes (&ctx, data, length);
+	pgm_md5_finish_ctx (&ctx, resblock);
 	memcpy (gsi, resblock + 10, 6);
 #endif
 	return TRUE;
@@ -84,7 +67,7 @@ bool
 pgm_gsi_create_from_string (
 	pgm_gsi_t*  restrict gsi,
 	const char* restrict str,
-	ssize_t		     length		/* -1 for NULL terminated */
+	ssize_t	     length		/* -1 for NULL terminated */
 	)
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
@@ -117,7 +100,7 @@ pgm_gsi_create_from_hostname (
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			     strerror (errno)
 #else
 			     wsa_strerror (WSAGetLastError())
@@ -151,7 +134,7 @@ pgm_gsi_create_from_addr (
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			     strerror (errno)
 #else
 			     wsa_strerror (WSAGetLastError())
@@ -188,7 +171,7 @@ int
 pgm_gsi_print_r (
 	const pgm_gsi_t* restrict gsi,
 	char*	         restrict buf,
-	size_t			  bufsize
+	const size_t		  bufsize
 	)
 {
 	const uint8_t* restrict src = (const uint8_t* restrict)gsi;

@@ -19,38 +19,29 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#ifdef G_OS_WIN32
-#	include <ws2tcpip.h>
-#	include <iphlpapi.h>
-#endif
-
-#include "pgm/nametoindex.h"
-
+#include <libintl.h>
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/framework.h>
 
 
 //#define NAMETOINDEX_DEBUG
 
 
-#ifdef G_OS_WIN32
-
-/* Retrieve interface index for a specified adapter name.
- *
- * On Windows is IPv4 specific, IPv6 indexes are separate (IP_ADAPTER_ADDRESSES::Ipv6IfIndex)
+#ifdef _WIN32
+/* Retrieve adapter index via name.
+ * Wine edition:  First try GetAdapterIndex() then fallback to enumerating
+ * adapters via GetIfTable().
  *
  * On error returns zero, no errors are defined.
  */
 
-int						/* type matching if_nametoindex() */
-pgm_compat_if_nametoindex (
-	const int		iffamily,
+unsigned					/* type matching if_nametoindex() */
+_pgm_getiftable_nametoindex (
+	const sa_family_t	iffamily,
 	const char*		ifname
         )
 {
 	pgm_return_val_if_fail (NULL != ifname, 0);
-
-#ifdef CONFIG_TARGET_WINE
 
 	pgm_assert (AF_INET6 != iffamily);
 
@@ -101,8 +92,22 @@ pgm_compat_if_nametoindex (
 		}
 	}
 	pgm_free (pIfTable);
+	return 0;
+}
 
-#else /* !CONFIG_TARGET_WINE */
+/* Retrieve adapter index via name.
+ * Windows edition:  First try GetAdapterIndex() then fallback to enumerating
+ * adapters via GetAdaptersAddresses().
+ *
+ * On error returns zero, no errors are defined.
+ */
+unsigned					/* type matching if_nametoindex() */
+_pgm_getadaptersaddresses_nametoindex (
+	const sa_family_t	iffamily,
+	const char*		ifname
+        )
+{
+	pgm_return_val_if_fail (NULL != ifname, 0);
 
 	ULONG ifIndex;
 	DWORD dwSize = sizeof(IP_ADAPTER_ADDRESSES), dwRet;
@@ -163,10 +168,33 @@ pgm_compat_if_nametoindex (
 	}
 
 	pgm_free (pAdapterAddresses);
-
-#endif
 	return 0;
 }
-#endif /* G_OS_WIN32 */
+#endif /* _WIN32 */
+
+/* Retrieve interface index for a specified adapter name.
+ * On error returns zero, no errors are defined.
+ */
+
+unsigned					/* type matching if_nametoindex() */
+pgm_if_nametoindex (
+#ifndef _WIN32
+	PGM_GNUC_UNUSED const sa_family_t iffamily,
+#else
+	const sa_family_t	iffamily,
+#endif
+	const char*		ifname
+        )
+{
+	pgm_return_val_if_fail (NULL != ifname, 0);
+
+#ifndef _WIN32
+	return if_nametoindex (ifname);
+#elif defined(CONFIG_TARGET_WINE)
+	return _pgm_getiftable_nametoindex (iffamily, ifname);
+#else
+	return _pgm_getadaptersaddresses_nametoindex (iffamily, ifname);
+#endif
+}
 
 /* eof */

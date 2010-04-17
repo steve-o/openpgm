@@ -22,13 +22,12 @@
 #ifndef __PGM_LOG_H__
 #define __PGM_LOG_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
+PGM_BEGIN_DECLS
 
-G_BEGIN_DECLS
+bool log_init (void);
 
-gboolean log_init (void);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_LOG_H__ */

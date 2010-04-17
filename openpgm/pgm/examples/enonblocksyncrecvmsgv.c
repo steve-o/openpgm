@@ -75,7 +75,7 @@ static gboolean g_quit = FALSE;
 static void on_signal (int);
 static gboolean on_startup (void);
 
-static int on_msgv (pgm_msgv_t*, guint, gpointer);
+static int on_msgv (struct pgm_msgv_t*, guint, gpointer);
 
 
 G_GNUC_NORETURN static void
@@ -143,7 +143,7 @@ main (
 	long iov_max = sysconf( SC_IOV_MAX );
 	g_message ("IOV_MAX defined as %li", iov_max);
 
-	pgm_msgv_t msgv[iov_max];
+	struct pgm_msgv_t msgv[iov_max];
 	struct epoll_event events[1];	/* wait for maximum 1 event */
 
 /* epoll file descriptor */
@@ -291,9 +291,9 @@ on_startup (void)
 
 static int
 on_msgv (
-	pgm_msgv_t*	msgv,		/* an array of msgv's */
-	guint		len,		/* total size of all msgv's */
-	G_GNUC_UNUSED gpointer user_data
+	struct pgm_msgv_t*	msgv,		/* an array of msgv's */
+	guint			len,		/* total size of all msgv's */
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
 	g_message ("(%i bytes)",

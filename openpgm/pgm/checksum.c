@@ -19,19 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <arpa/inet.h>
+#include <pgm/framework.h>
 
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/checksum.h"
-
-
-/* globals */
 
 /* endian independent checksum routine
  */
@@ -88,12 +77,12 @@ do_csum_16bit (
 	buf = (const uint8_t*)addr;
 	remainder = 0;
 
-	if (G_UNLIKELY(len == 0))
+	if (PGM_UNLIKELY(len == 0))
 		return acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
-	if (G_UNLIKELY(is_odd)) {
-		((guint8*)&remainder)[1] = *buf++;
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
 /* 8-way unrolls */
@@ -121,7 +110,7 @@ do_csum_16bit (
 	acc += remainder;
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
-	if (G_UNLIKELY(is_odd))
+	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }
@@ -144,11 +133,11 @@ do_csum_32bit (
 	buf = (const uint8_t*)addr;
 	remainder = 0;
 
-	if (G_UNLIKELY(len == 0))
+	if (PGM_UNLIKELY(len == 0))
 		return acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
-	if (G_UNLIKELY(is_odd)) {
+	if (PGM_UNLIKELY(is_odd)) {
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
@@ -189,7 +178,7 @@ do_csum_32bit (
 	acc += remainder;
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
-	if (G_UNLIKELY(is_odd))
+	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }
@@ -215,11 +204,11 @@ do_csum_64bit (
 	buf = (const uint8_t*)addr;
 	remainder = 0;
 
-	if (G_UNLIKELY(len == 0))
+	if (PGM_UNLIKELY(len == 0))
 		return acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
-	if (G_UNLIKELY(is_odd)) {
+	if (PGM_UNLIKELY(is_odd)) {
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
@@ -277,7 +266,7 @@ do_csum_64bit (
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
-	if (G_UNLIKELY(is_odd))
+	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }
@@ -304,11 +293,11 @@ do_csum_vector (
 	buf = (const uint8_t*)addr;
 	remainder = 0;
 
-	if (G_UNLIKELY(len == 0))
+	if (PGM_UNLIKELY(len == 0))
 		return acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
-	if (G_UNLIKELY(is_odd)) {
+	if (PGM_UNLIKELY(is_odd)) {
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
@@ -367,7 +356,7 @@ do_csum_vector (
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
-	if (G_UNLIKELY(is_odd))
+	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return acc;
 }

@@ -19,21 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/types.h>
-
-#ifdef G_OS_UNIX
-#	include <sys/socket.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/time.h"
-#include "pgm/thread.h"
-#include "pgm/rate_control.h"
+#include <pgm/framework.h>
 
 
 /* create machinery for rate regulation.
@@ -134,11 +120,7 @@ pgm_rate_check (
 	if (bucket->rate_limit < 0) {
 		int sleep_amount;
 		do {
-#ifdef G_OS_UNIX
-                        pthread_yield ();
-#else
-                        Sleep (0);
-#endif
+			pgm_thread_yield();
 			now = pgm_time_update_now();
 			time_since_last_rate_check = now - bucket->last_rate_check;
 			sleep_amount = pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check);
@@ -159,7 +141,7 @@ pgm_rate_remaining (
 /* pre-conditions */
 	pgm_assert (NULL != bucket);
 
-	if (G_UNLIKELY(0 == bucket->rate_per_sec))
+	if (PGM_UNLIKELY(0 == bucket->rate_per_sec))
 		return 0;
 
 	pgm_spinlock_lock (&bucket->spinlock);

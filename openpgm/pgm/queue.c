@@ -19,22 +19,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <stdbool.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/list.h"
-#include "pgm/queue.h"
+#include <pgm/framework.h>
 
 
 //#define QUEUE_DEBUG
 
-
 bool
 pgm_queue_is_empty (
-	pgm_queue_t*	queue
+	const pgm_queue_t*const queue
 	)
 {
 	pgm_return_val_if_fail (queue != NULL, TRUE);
@@ -45,20 +37,20 @@ pgm_queue_is_empty (
 void
 pgm_queue_push_head_link (
 	pgm_queue_t* restrict queue,
-	pgm_list_t*  restrict link
+	pgm_list_t*  restrict head_link
 	)
 {
 	pgm_return_if_fail (queue != NULL);
-	pgm_return_if_fail (link != NULL);
-	pgm_return_if_fail (link->prev == NULL);
-	pgm_return_if_fail (link->next == NULL);
+	pgm_return_if_fail (head_link != NULL);
+	pgm_return_if_fail (head_link->prev == NULL);
+	pgm_return_if_fail (head_link->next == NULL);
 
-	link->next = queue->head;
+	head_link->next = queue->head;
 	if (queue->head)
-		queue->head->prev = link;
+		queue->head->prev = head_link;
 	else
-		queue->tail = link;
-	queue->head = link;
+		queue->tail = head_link;
+	queue->head = head_link;
 	queue->length++;
 }
 
@@ -101,17 +93,17 @@ pgm_queue_peek_tail_link (
 
 void
 pgm_queue_unlink (
-	pgm_queue_t*	queue,
-	pgm_list_t*	link_
+	pgm_queue_t* restrict queue,
+	pgm_list_t*  restrict target_link
 	)
 {
 	pgm_return_if_fail (queue != NULL);
-	pgm_return_if_fail (link_ != NULL);
+	pgm_return_if_fail (target_link != NULL);
 
-	if (link_ == queue->tail)
+	if (target_link == queue->tail)
 		queue->tail = queue->tail->prev;
   
-	queue->head = pgm_list_remove_link (queue->head, link_);
+	queue->head = pgm_list_remove_link (queue->head, target_link);
 	queue->length--;
 }
 

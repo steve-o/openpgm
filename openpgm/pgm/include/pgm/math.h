@@ -19,16 +19,21 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MATH_H__
 #define __PGM_MATH_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 /* fast log base 2 of power of 2
  */
+
+static inline unsigned pgm_power2_log2 (unsigned) PGM_GNUC_CONST;
 
 static inline
 unsigned
@@ -44,9 +49,27 @@ pgm_power2_log2 (
 	return r;
 }
 
-unsigned pgm_spaced_primes_closest (unsigned);
+/* nearest power of 2
+ */
 
+static inline size_t pgm_nearest_power (size_t, size_t) PGM_GNUC_CONST;
 
-G_END_DECLS
+static inline
+size_t
+pgm_nearest_power (
+	size_t		b,
+	size_t		v
+	)
+{
+	if (v > (SIZE_MAX/2))
+		return SIZE_MAX;
+	while (b < v)
+		b <<= 1;
+	return b;
+}
+
+unsigned pgm_spaced_primes_closest (unsigned) PGM_GNUC_PURE;
+
+PGM_END_DECLS
 
 #endif /* __PGM_MATH_H__ */

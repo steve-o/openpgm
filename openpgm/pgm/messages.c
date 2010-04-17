@@ -19,25 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <unistd.h>
 #include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/atomic.h"
-#include "pgm/thread.h"
+#include <pgm/framework.h>
 
 
 /* globals */
 
 /* bit mask for trace role modules */
-int pgm_log_mask = 0xffff;
-
-int pgm_min_log_level = PGM_LOG_LEVEL_DEBUG;
+int pgm_log_mask		= 0xffff;
+int pgm_min_log_level		= PGM_LOG_LEVEL_DEBUG;
 
 
 /* locals */
@@ -53,10 +44,10 @@ static const char log_levels[8][6] = {
 	"Fatal"
 };
 
-static volatile int32_t messages_ref_count = 0;
-static pgm_mutex_t messages_mutex;
-static pgm_log_func_t log_handler = NULL;
-static void* log_handler_closure = NULL;
+static volatile int32_t		messages_ref_count = 0;
+static pgm_mutex_t		messages_mutex;
+static pgm_log_func_t		log_handler = NULL;
+static void*			log_handler_closure = NULL;
 
 
 static inline
@@ -110,10 +101,13 @@ pgm_log_set_handler (
 	void*			closure
 	)
 {
+	pgm_log_func_t previous_handler;
 	pgm_mutex_lock (&messages_mutex);
+	previous_handler	= log_handler;
 	log_handler		= handler;
 	log_handler_closure	= closure;
 	pgm_mutex_unlock (&messages_mutex);
+	return previous_handler;
 }
 
 void

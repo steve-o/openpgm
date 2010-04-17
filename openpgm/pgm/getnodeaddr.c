@@ -19,32 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <string.h>
-#include <sys/types.h>
-
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
+#include <errno.h>
+#include <netdb.h>
+#include <pgm/framework.h>
 
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <sys/socket.h>
-#endif
-
-#include "pgm/messages.h"
-#include "pgm/sockaddr.h"
-#include "pgm/getifaddrs.h"
-#include "pgm/getnodeaddr.h"
 
 //#define GETNODEADDR_DEBUG
 
 
 /* globals */
 
-static const char* pgm_family_string (const int);
+static const char* pgm_family_string (const sa_family_t);
 
 
 /* return node primary address on multi-address family interfaces.
@@ -68,7 +55,7 @@ pgm_if_getnodeaddr (
 		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
 
 	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
-		pgm_family_string (family), (gpointer)addr, cnt, (gpointer)error);
+		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
 
 	char hostname[NI_MAXHOST + 1];
 	struct hostent* he;
@@ -78,7 +65,7 @@ pgm_if_getnodeaddr (
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			     strerror (errno)
 #else
 			     pgm_wsastrerror (WSAGetLastError())
@@ -97,7 +84,7 @@ pgm_if_getnodeaddr (
 
 	int e = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 == e) {
-		const gsize addrlen = res->ai_addrlen;
+		const socklen_t addrlen = res->ai_addrlen;
 		memcpy (addr, res->ai_addr, addrlen);
 		freeaddrinfo (res);
 		return TRUE;
@@ -127,7 +114,7 @@ pgm_if_getnodeaddr (
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_h_errno (h_errno),
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 			     _("Resolving IPv4 hostname address: %s"),
 			     hstrerror (h_errno)
 #else
@@ -190,7 +177,7 @@ ipv6_found:
 static
 const char*
 pgm_family_string (
-	const int	family
+	const sa_family_t	family
 	)
 {
 	const char* c;

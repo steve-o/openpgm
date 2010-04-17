@@ -39,6 +39,7 @@
 #	include <sys/socket.h>
 #endif
 
+#include <pgm/packet_test.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/skbuff.h>
@@ -103,8 +104,6 @@ main (
 		g_io_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown ();
 	g_message ("finished.");
 	return EXIT_SUCCESS;
 }

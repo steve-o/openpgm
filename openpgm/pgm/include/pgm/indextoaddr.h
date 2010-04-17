@@ -19,22 +19,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_INDEXTOADDR_H__
 #define __PGM_INDEXTOADDR_H__
 
-#include <stdbool.h>
+#include <sys/socket.h>
+#include <pgm/types.h>
 
-#include <glib.h>
+PGM_BEGIN_DECLS
 
-#ifndef __PGM_ERROR_H__
-#	include <pgm/error.h>
-#endif
+PGM_GNUC_INTERNAL bool pgm_if_indextoaddr (unsigned, sa_family_t, uint32_t, struct sockaddr*, pgm_error_t**);
 
-
-G_BEGIN_DECLS
-
-PGM_GNUC_INTERNAL bool pgm_if_indextoaddr (unsigned int, int, unsigned, struct sockaddr*, pgm_error_t**);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_INDEXTOADDR_H__ */

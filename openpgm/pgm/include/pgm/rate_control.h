@@ -19,22 +19,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_RATE_CONTROL_H__
 #define __PGM_RATE_CONTROL_H__
 
-#include <stdbool.h>
-#include <glib.h>
+#include <pgm/macros.h>
+#include <pgm/thread.h>
+#include <pgm/time.h>
 
-typedef struct pgm_rate_t pgm_rate_t;
-
-#ifndef __PGM_THREAD_H__
-#	include <pgm/thread.h>
-#endif
-
-#ifndef __PGM_TIME_H__
-#	include <pgm/time.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 struct pgm_rate_t {
 	ssize_t		rate_per_sec;
@@ -46,14 +42,13 @@ struct pgm_rate_t {
 	pgm_spinlock_t	spinlock;
 };
 
-
-G_BEGIN_DECLS
+typedef struct pgm_rate_t pgm_rate_t;
 
 PGM_GNUC_INTERNAL void pgm_rate_create (pgm_rate_t*, const ssize_t, const size_t, const uint16_t);
 PGM_GNUC_INTERNAL void pgm_rate_destroy (pgm_rate_t*);
 PGM_GNUC_INTERNAL bool pgm_rate_check (pgm_rate_t*, const size_t, const bool);
 PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (pgm_rate_t*, const size_t);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_RATE_CONTROL_H__ */

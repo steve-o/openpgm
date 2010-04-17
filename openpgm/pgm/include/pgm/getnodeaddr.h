@@ -19,20 +19,21 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_GETNODEADDR_H__
 #define __PGM_GETNODEADDR_H__
 
-#include <glib.h>
+#include <sys/socket.h>
+#include <pgm/types.h>
+#include <pgm/error.h>
 
-#ifndef __PGM_IF_H__
-#	include <pgm/if.h>
-#endif
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL bool pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*, const socklen_t, pgm_error_t**);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_GETNODEADDR_H__ */

@@ -22,21 +22,16 @@
 #ifndef __PGM_NET_H__
 #define __PGM_NET_H__
 
-#include <stdbool.h>
+#include <sys/socket.h>
+#include <pgm/framework.h>
+#include <pgm/transport.h>
 
-#include <glib.h>
-
-#ifndef __PGM_TRANSPORT_H__
-#	include <pgm/transport.h>
-#endif
-
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL ssize_t pgm_sendto (pgm_transport_t*, bool, bool, const void*, size_t, const struct sockaddr*, size_t);
 PGM_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_NET_H__ */
 

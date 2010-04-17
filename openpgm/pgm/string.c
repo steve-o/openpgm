@@ -19,26 +19,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef CONFIG_HAVE_VASPRINTF
+#	define _GNU_SOURCE
+#	include <stdio.h>
+#endif
+#include <limits.h>
 #include <stdarg.h>
-#include <stdio.h>
 #include <string.h>
-
-#include <glib.h>
-
-#include "pgm/messages.h"
-#include "pgm/mem.h"
-#include "pgm/string.h"
-#include "pgm/slist.h"
+#include <pgm/framework.h>
 
 
 //#define STRING_DEBUG
-
-#ifndef STRING_DEBUG
-#define g_trace(...)		while (0)
-#else
-#define g_trace(...)		g_debug(__VA_ARGS__)
-#endif
-
 
 /* Return copy of string, must be freed with pgm_free().
  */
@@ -51,10 +42,10 @@ pgm_strdup (
 	char* new_str;
 	size_t length;
 
-	if (G_LIKELY (str))
+	if (PGM_LIKELY (str))
 	{
 		length = strlen (str) + 1;
-		new_str = pgm_new (char, length);
+		new_str = malloc (length);
 		memcpy (new_str, str, length);
 	}
 	else
@@ -76,6 +67,9 @@ pgm_printf_string_upper_bound (
 	return vsnprintf (&c, 1, format, args) + 1;
 }
 
+/* memory must be freed with free()
+ */
+
 int
 pgm_vasprintf (
 	char**	    restrict string,
@@ -90,8 +84,8 @@ pgm_vasprintf (
 		*string = NULL;
 #else
 	va_list args2;
-	G_VA_COPY (args2, args);
-	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
+	va_copy (args2, args);
+	*string = malloc (pgm_printf_string_upper_bound (format, args));
 /* NB: must be able to handle NULL args, fails on GCC */
 	const int len = vsprintf (*string, format, args);
 	va_end (args2);
@@ -148,22 +142,22 @@ pgm_strconcat (
 
 	l = 1 + strlen (string1);
 	va_start (args, string1);
-	s = va_arg (args, gchar*);
+	s = va_arg (args, char*);
 	while (s) {
 		l += strlen (s);
-		s = va_arg (args, gchar*);
+		s = va_arg (args, char*);
 	}
 	va_end (args);
 
-	concat = pgm_malloc (l);
+	concat = malloc (l);
 	ptr = concat;
 
 	ptr = pgm_stpcpy (ptr, string1);
 	va_start (args, string1);
-	s = va_arg (args, gchar*);
+	s = va_arg (args, char*);
 	while (s) {
 		ptr = pgm_stpcpy (ptr, s);
-		s = va_arg (args, gchar*);
+		s = va_arg (args, char*);
 	}
 	va_end (args);
 
@@ -175,9 +169,9 @@ pgm_strconcat (
 
 char**
 pgm_strsplit (
-	const char*	string,
-	const char*	delimiter,
-	int		max_tokens
+	const char* restrict string,
+	const char* restrict delimiter,
+	int		     max_tokens
 	)
 {
 	pgm_slist_t *string_list = NULL, *slist;
@@ -190,7 +184,7 @@ pgm_strsplit (
 	pgm_return_val_if_fail (delimiter[0] != '\0', NULL);
 
 	if (max_tokens < 1)
-		max_tokens = G_MAXINT;
+		max_tokens = INT_MAX;
 
 	remainder = string;
 	s = strstr (remainder, delimiter);
@@ -201,7 +195,7 @@ pgm_strsplit (
 		while (--max_tokens && s)
 		{
 			const size_t len = s - remainder;
-			char *new_string = pgm_new (char, len + 1);
+			char *new_string = malloc (len + 1);
 			strncpy (new_string, remainder, len);
 			new_string[len] = 0;
 			string_list = pgm_slist_prepend (string_list, new_string);
@@ -234,13 +228,228 @@ pgm_strfreev (
 	char**		str_array
 	)
 {
-	if (G_LIKELY (str_array))
+	if (PGM_LIKELY (str_array))
 	{
 		for (unsigned i = 0; str_array[i] != NULL; i++)
-			pgm_free (str_array[i]);
+			free (str_array[i]);
 
 		pgm_free (str_array);
 	}
+}
+
+/* resize dynamic string
+ */
+
+static
+void
+pgm_string_maybe_expand (
+	pgm_string_t*	string,
+	size_t		len
+	)
+{
+	if ((string->len + len) >= string->allocated_len)
+	{
+		string->allocated_len = pgm_nearest_power (1, string->len + len + 1);
+		string->str	      = pgm_realloc (string->str, string->allocated_len);
+	}
+}
+
+/* val may not be a part of string
+ */
+
+static
+pgm_string_t*
+pgm_string_insert_len (
+	pgm_string_t* restrict string,
+	ssize_t		       pos,
+	const char*   restrict val,
+	ssize_t		       len
+	)
+{
+	pgm_return_val_if_fail (NULL != string, NULL);
+	pgm_return_val_if_fail (NULL != val, string);
+
+	if (len < 0)
+		len = strlen (val);
+
+	if (pos < 0)
+		pos = string->len;
+	else
+		pgm_return_val_if_fail ((size_t)pos <= string->len, string);
+
+	pgm_string_maybe_expand (string, len);
+		
+	if ((size_t)pos < string->len)
+		memmove (string->str + pos + len, string->str + pos, string->len - pos);
+
+	if (len == 1)
+		string->str[pos] = *val;
+	else
+		memcpy (string->str + pos, val, len);
+	string->len += len;
+	string->str[string->len] = 0;
+	return string;
+}
+
+static
+pgm_string_t*
+pgm_string_insert_c (
+	pgm_string_t*	string,
+	ssize_t		pos,
+	char		c
+	)
+{
+	pgm_return_val_if_fail (NULL != string, NULL);
+
+	if (pos < 0)
+		pos = string->len;
+	else
+		pgm_return_val_if_fail ((size_t)pos <= string->len, string);
+
+	pgm_string_maybe_expand (string, 1);
+
+	if ((size_t)pos < string->len)
+		memmove (string->str + pos + 1, string->str + pos, string->len - pos);
+
+	string->str[pos] = c;
+	string->len ++;
+	string->str[string->len] = '\0';
+	return string;
+}
+
+static
+pgm_string_t*
+pgm_string_append_len (
+	pgm_string_t*	string,
+	const char*	val,
+	size_t		len
+	)
+{
+	pgm_return_val_if_fail (NULL != string, NULL);
+	pgm_return_val_if_fail (NULL != val, string);
+
+	return pgm_string_insert_len (string, -1, val, len);
+}
+
+/* create new dynamic string
+ */
+
+static
+pgm_string_t*
+pgm_string_sized_new (
+	size_t		init_size
+	)
+{
+	pgm_string_t* string = pgm_new (pgm_string_t, 1);
+	string->allocated_len	= 0;
+	string->len		= 0;
+	string->str		= NULL;
+	pgm_string_maybe_expand (string, MAX(init_size, 2));
+	string->str[0]		= '\0';
+	return string;
+}
+
+pgm_string_t*
+pgm_string_new (
+	const char*	init
+	)
+{
+	pgm_string_t* string;
+
+	if (NULL == init || '\0' == *init)
+		string = pgm_string_sized_new (2);
+	else
+	{
+		const size_t len = strlen (init);
+		string = pgm_string_sized_new (len + 2);
+		pgm_string_append_len (string, init, len);
+	}
+	return string;
+}
+
+/* free dynamic string, optionally just the wrapper object
+ */
+
+char*
+pgm_string_free (
+	pgm_string_t*	string,
+	bool		free_segment
+	)
+{
+	char* segment;
+
+	pgm_return_val_if_fail (NULL != string, NULL);
+
+	if (free_segment) {
+		pgm_free (string->str);
+		segment = NULL;
+	} else
+		segment = string->str;
+
+	pgm_free (string);
+	return segment;
+}
+
+pgm_string_t*
+pgm_string_append (
+	pgm_string_t* restrict string,
+	const char*   restrict val
+	)
+{
+	pgm_return_val_if_fail (NULL != string, NULL);
+	pgm_return_val_if_fail (NULL != val, string);
+
+	return pgm_string_insert_len (string, -1, val, -1);
+}
+
+pgm_string_t*
+pgm_string_append_c (
+	pgm_string_t*	string,
+	char		c
+	)
+{
+	pgm_return_val_if_fail (NULL != string, NULL);
+
+	return pgm_string_insert_c (string, -1, c);
+}
+
+static void pgm_string_append_vprintf (pgm_string_t*restrict, const char*restrict, va_list) PGM_GNUC_PRINTF(2, 0);
+
+static
+void
+pgm_string_append_vprintf (
+	pgm_string_t* restrict string,
+	const char*   restrict format,
+	va_list		       args
+	)
+{
+	char *buf;
+	int len;
+
+	pgm_return_if_fail (NULL != string);
+	pgm_return_if_fail (NULL != format);
+
+	len = pgm_vasprintf (&buf, format, args);
+	if (len >= 0) {
+		pgm_string_maybe_expand (string, len);
+		memcpy (string->str + string->len, buf, len + 1);
+		string->len += len;
+		free (buf);
+	}
+}
+
+void
+pgm_string_append_printf (
+	pgm_string_t* restrict string,
+	const char*   restrict format,
+	...
+	)
+{
+	va_list args;
+
+	va_start (args, format);
+	pgm_string_append_vprintf (string, format, args);
+	va_end (args);
 }
 
 /* eof */

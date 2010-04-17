@@ -19,17 +19,21 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_INET_NETWORK_H__
 #define __PGM_INET_NETWORK_H__
 
-#include <glib.h>
+#include <netinet/in.h>
+#include <pgm/types.h>
 
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL int pgm_inet_network (const char*, struct in_addr*);
 PGM_GNUC_INTERNAL int pgm_inet6_network (const char*, struct in6_addr*);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_INET_NETWORK_H__ */

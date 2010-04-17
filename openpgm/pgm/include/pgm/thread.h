@@ -17,19 +17,27 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_THREAD_H__
 #define __PGM_THREAD_H__
 
-#include <stdbool.h>
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 #	include <pthread.h>
+#	include <unistd.h>
+#else
+#	define WIN32_LEAN_AND_MEAN
+#	include <windows.h>
 #endif
+#include <stdbool.h>
+#include <pgm/macros.h>
 
-#include <glib.h>
-
+PGM_BEGIN_DECLS
 
 struct pgm_mutex_t {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_mutex_t		pthread_mutex;
 #else
 	HANDLE			win32_mutex;
@@ -39,7 +47,7 @@ struct pgm_mutex_t {
 typedef struct pgm_mutex_t pgm_mutex_t;
 
 struct pgm_spinlock_t {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_spinlock_t	pthread_spinlock;
 #else
 	CRITICAL_SECTION	win32_spinlock;
@@ -49,7 +57,7 @@ struct pgm_spinlock_t {
 typedef struct pgm_spinlock_t pgm_spinlock_t;
 
 struct pgm_cond_t {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_cond_t		pthread_cond;
 #elif defined(CONFIG_HAVE_WIN_COND)
 	CONDITION_VARIABLE	win32_cond;
@@ -62,9 +70,10 @@ struct pgm_cond_t {
 typedef struct pgm_cond_t pgm_cond_t;
 
 struct pgm_rwlock_t {
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
+#ifndef _WIN32
+	pthread_rwlock_t	pthread_rwlock;
+#elif CONFIG_HAVE_WIN_SRW_LOCK
 	SRWLOCK			win32_lock;
-#elif defined(G_OS_UNIX)
 	pthread_rwlock_t	pthread_rwlock;
 #else
 	CRITICAL_SECTION	win32_spinlock;
@@ -79,14 +88,12 @@ struct pgm_rwlock_t {
 
 typedef struct pgm_rwlock_t pgm_rwlock_t;
 
-G_BEGIN_DECLS
-
 void pgm_mutex_init (pgm_mutex_t*);
 void pgm_mutex_free (pgm_mutex_t*);
 bool pgm_mutex_trylock (pgm_mutex_t*);
 
 static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_mutex_lock (&mutex->pthread_mutex);
 #else
 	WaitForSingleObject (mutex->win32_mutex, INFINITE);
@@ -94,7 +101,7 @@ static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
 }
 
 static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_mutex_unlock (&mutex->pthread_mutex);
 #else
 	ReleaseMutex (mutex->win32_mutex);
@@ -106,7 +113,7 @@ void pgm_spinlock_free (pgm_spinlock_t*);
 bool pgm_spinlock_trylock (pgm_spinlock_t*);
 
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_spin_lock (&spinlock->pthread_spinlock);
 #else
 	EnterCriticalSection (&spinlock->win32_spinlock);
@@ -114,7 +121,7 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
 #else
 	LeaveCriticalSection (&spinlock->win32_spinlock);
@@ -124,7 +131,7 @@ static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
 void pgm_cond_init (pgm_cond_t*);
 void pgm_cond_signal (pgm_cond_t*);
 void pgm_cond_broadcast (pgm_cond_t*);
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 void pgm_cond_wait (pgm_cond_t*, pthread_mutex_t*);
 #else
 void pgm_cond_wait (pgm_cond_t*, CRITICAL_SECTION*);
@@ -134,7 +141,7 @@ void pgm_cond_free (pgm_cond_t*);
 void pgm_rwlock_init (pgm_rwlock_t*);
 void pgm_rwlock_free (pgm_rwlock_t*);
 
-#ifdef G_OS_UNIX
+#ifndef _WIN32
 static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
 	pthread_rwlock_rdlock (&rwlock->pthread_rwlock);
 }
@@ -186,6 +193,23 @@ void pgm_rwlock_writer_unlock (pgm_rwlock_t*);
 void pgm_thread_init (void);
 void pgm_thread_shutdown (void);
 
-G_END_DECLS
+static inline
+void
+pgm_thread_yield (void)
+{
+#ifndef _WIN32
+#	ifdef _POSIX_PRIORITY_SCHEDULING
+		sched_yield();
+#	else
+		pthread_yield();	/* requires _GNU */
+#	endif
+#else
+	Sleep (0);		/* If you specify 0 milliseconds, the thread will relinquish
+				 * the remainder of its time slice but remain ready. 
+				 */
+#endif /* _WIN32 */
+}
+
+PGM_END_DECLS
 
 #endif /* __PGM_THREAD_H__ */

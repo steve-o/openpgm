@@ -17,27 +17,30 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
-#include <glib.h>
+#include <pgm/types.h>
 
+PGM_BEGIN_DECLS
 
-G_BEGIN_DECLS
+int32_t pgm_atomic_int32_exchange_and_add (volatile int32_t*, const int32_t);
 
-gint32 pgm_atomic_int32_exchange_and_add (volatile gint32*, const gint32);
+void pgm_atomic_int32_add (volatile int32_t*, const int32_t);
+int32_t pgm_atomic_int32_get (const volatile int32_t*);
+void pgm_atomic_int32_set (volatile int32_t*, const int32_t);
 
-void pgm_atomic_int32_add (volatile gint32*, const gint32);
-gint32 pgm_atomic_int32_get (const volatile gint32*);
-void pgm_atomic_int32_set (volatile gint32*, const gint32);
-
-#define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
-#define pgm_atomic_int32_dec(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), -1))
+#define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile int32_t*)(atomic), 1))
+#define pgm_atomic_int32_dec(atomic) (pgm_atomic_int32_add ((volatile int32_t*)(atomic), -1))
 #define pgm_atomic_int32_dec_and_test(atomic) (pgm_atomic_int32_exchange_and_add ((atomic), -1) == 1)
 
 void pgm_atomic_init (void);
 void pgm_atomic_shutdown (void);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_ATOMIC_H__ */

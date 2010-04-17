@@ -19,27 +19,21 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <glib.h>
-
-#ifdef G_OS_WIN32
-#	include <ws2tcpip.h>
-#	include <iphlpapi.h>
-#endif
-
-#include "pgm/indextoname.h"
+#include <pgm/framework.h>
 
 
 //#define INDEXTONAME_DEBUG
 
 
-
-#ifdef G_OS_WIN32
 char*
 pgm_if_indextoname (
 	unsigned int		ifindex,
 	char*			ifname
         )
 {
+#ifndef _WIN32
+	return if_indextoname (ifindex, ifname);
+#else
 	pgm_return_val_if_fail (NULL != ifname, NULL);
 
 	MIB_IFROW ifRow = { .dwIndex = ifindex };
@@ -48,7 +42,7 @@ pgm_if_indextoname (
 		return NULL;
 	strcpy (ifname, (char*)ifRow.wszName);
 	return ifname;
+#endif /* _WIN32 */
 }
-#endif /* G_OS_WIN32 */
 
 /* eof */

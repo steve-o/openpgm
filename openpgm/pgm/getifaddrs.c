@@ -20,35 +20,15 @@
  */
 
 #include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
 #include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
-
-#ifdef G_OS_UNIX
-#	include <net/if.h>
-#	include <sys/ioctl.h>
-#	include <sys/types.h>
-#	include <sys/socket.h>
-#	ifdef CONFIG_HAVE_GETIFADDRS
-#		include <ifaddrs.h>
-#	endif
-#else
-#	include <ws2tcpip.h>
-#	include <iphlpapi.h>
+#ifdef CONFIG_HAVE_GETIFADDRS
+#	include <ifaddrs.h>
 #endif
-
-#include "pgm/messages.h"
-#include "pgm/sockaddr.h"
-#include "pgm/getifaddrs.h"
-#include "pgm/mem.h"
+#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/framework.h>
 
 
 //#define GETIFADDRS_DEBUG
-
 
 /* locals */
 struct _pgm_ifaddrs
@@ -751,10 +731,10 @@ _pgm_getadaptersaddresses (
  * returns FALSE on failure and sets error appropriately.
  */
 
-gboolean
+bool
 pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		error
+	struct pgm_ifaddrs** restrict ifap,
+	pgm_error_t**	     restrict error
 	)
 {
 	pgm_debug ("pgm_getifaddrs (ifap:%p error:%p)",

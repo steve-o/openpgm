@@ -19,9 +19,9 @@
 
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
-#include <glib.h>
+#include <pgm/framework.h>
 
-#ifdef G_OS_WIN32
+#ifdef _WIN32
 #include <ws2tcpip.h>
 
 
@@ -350,6 +350,6 @@ pgm_adapter_strerror (
 	default: return _("Other.");
 	}
 }
-#endif /* G_OS_WIN32 */
+#endif /* _WIN32 */
 
 /* eof */

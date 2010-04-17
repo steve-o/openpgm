@@ -22,15 +22,11 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
-#include <stdbool.h>
-#include <stdint.h>
+#include <sys/socket.h>
+#include <pgm/types.h>
+#include <pgm/gsi.h>
 
-#include <glib.h>
-
-#ifndef __PGM_GSI_H__
-#	include <pgm/gsi.h>
-#endif
-
+PGM_BEGIN_DECLS
 
 struct pgm_transport_info_t {
 	pgm_gsi_t			ti_gsi;
@@ -46,12 +42,10 @@ struct pgm_transport_info_t {
 	struct group_source_req*	ti_send_addrs;
 };
 
-G_BEGIN_DECLS
-
 bool pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, pgm_error_t**);
 void pgm_if_free_transport_info (struct pgm_transport_info_t*);
 void pgm_if_print_all (void);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_IF_H__ */
