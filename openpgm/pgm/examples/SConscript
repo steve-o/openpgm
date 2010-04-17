@@ -61,6 +61,7 @@ if f['WITH_PROTOBUF'] == 'true':
 	ge.Program(['pgmping.cc', 'ping.pb.cc', ge['PROTOBUF_LIBS']])
 
 # Vanilla example
+p.Program(['purinsend.c'])
 p.Program(['purinrecv.c'])
 
 # end of file
