@@ -75,10 +75,16 @@ if env['WITH_CHECK'] == 'true':
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
 	te.ParseConfig ('pkg-config --cflags --libs check');
+# log dependencies
+	tlog = [	e.Object('messages.c'),
+			e.Object('atomic.c'),
+			e.Object('thread.c')
+		];
 # framework
 	te.Program (['atomic_unittest.c',
-			e.Object('thread.c')]);
-	te.Program ('checksum_unittest.c');
+			e.Object('thread.c'),
+			e.Object('messages.c')]);
+	te.Program (['checksum_unittest.c'] + tlog);
 	te.Program (['error_unittest.c',
 			e.Object('mem.c'),
 			e.Object('string.c'),
@@ -145,6 +151,6 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['packet_unittest.c'] + tframework);
 	te.Program (['ip_unittest.c', e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('indextoaddr.c')] + tframework);
 # performance tests
-	te.Program (['checksum_perftest.c', e.Object('time.c')]);
+	te.Program (['checksum_perftest.c', e.Object('time.c'), e.Object('error.c'), e.Object('mem.c'), e.Object('string.c'), e.Object('slist.c')] + tlog);
 
 # end of file
