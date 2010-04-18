@@ -21,7 +21,6 @@
 
 
 #include <stdint.h>
-#include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <glib.h>
@@ -29,24 +28,6 @@
 
 
 /* mock state */
-
-int pgm_min_log_level = 0;
-
-
-/** messages module */
-void
-pgm__log (
-	const int		log_level,
-	const char*		format,
-	...
-	)
-{
-	va_list args;
-
-	va_start (args, format);
-	vprintf (format, args);
-	va_end (args);
-}
 
 
 /* mock functions for external references */
@@ -79,7 +60,7 @@ mock_teardown (void)
 
 START_TEST (test_int32_exchange_and_add_pass_001)
 {
-	volatile int32_t atomic = 0;
+	volatile gint32 atomic = 0;
 	fail_unless (0 == pgm_atomic_int32_exchange_and_add (&atomic, 5));
 	fail_unless (5 == atomic);
 	fail_unless (5 == pgm_atomic_int32_exchange_and_add (&atomic, -10));
@@ -97,7 +78,7 @@ END_TEST
 
 START_TEST (test_int32_add_pass_001)
 {
-	volatile int32_t atomic = -5;
+	volatile gint32 atomic = -5;
 	pgm_atomic_int32_add (&atomic, 20);
 	fail_unless (15 == atomic);
 	pgm_atomic_int32_add (&atomic, -35);
@@ -108,7 +89,7 @@ END_TEST
 /* ensure wrap around when casting uint32 */
 START_TEST (test_int32_add_pass_002)
 {
-	volatile uint32_t atomic = 0;
+	volatile guint32 atomic = 0;
 	pgm_atomic_int32_add ((volatile gint32*)&atomic, UINT32_MAX/2);
 	fail_unless ((UINT32_MAX/2) == atomic);
 	pgm_atomic_int32_add ((volatile gint32*)&atomic, UINT32_MAX - (UINT32_MAX/2));
@@ -127,7 +108,7 @@ END_TEST
 
 START_TEST (test_int32_get_pass_001)
 {
-	volatile int32_t atomic = -20;
+	volatile gint32 atomic = -20;
 	fail_unless (-20 == pgm_atomic_int32_get (&atomic));
 }
 END_TEST
@@ -142,7 +123,7 @@ END_TEST
 
 START_TEST (test_int32_set_pass_001)
 {
-	volatile int32_t atomic = -20;
+	volatile gint32 atomic = -20;
 	pgm_atomic_int32_set (&atomic, 5);
 	fail_unless (5 == atomic);
 }
