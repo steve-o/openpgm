@@ -41,9 +41,9 @@
  *	void
  *	pgm_set_error (
  *		pgm_error_t**		err,
- *		pgm_error_domain_e	domain,
- *		gint			code,
- *		const gchar*		format,
+ *		int			err_domain,
+ *		int			err_code,
+ *		const char*		format,
  *		...
  *	)
  */
@@ -51,7 +51,7 @@
 START_TEST (test_set_error_pass_001)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
@@ -61,7 +61,7 @@ END_TEST
 START_TEST (test_set_error_pass_002)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred: value=%d.", 123);
 	fail_unless (NULL != err);
@@ -72,7 +72,7 @@ END_TEST
 START_TEST (test_set_error_pass_003)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (NULL, err_domain, err_code, "an error occurred.");
 }
@@ -82,7 +82,7 @@ END_TEST
 START_TEST (test_set_error_pass_004)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
@@ -94,7 +94,7 @@ END_TEST
  *	void
  *	pgm_prefix_error (
  *		pgm_error_t**		err,
- *		const gchar*		format,
+ *		const char*		format,
  *		...
  *	)
  */
@@ -102,7 +102,7 @@ END_TEST
 START_TEST (test_prefix_error_pass_001)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
@@ -131,7 +131,7 @@ START_TEST (test_propagate_error_pass_001)
 {
 	pgm_error_t* dest = NULL;
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
@@ -144,7 +144,7 @@ END_TEST
 START_TEST (test_propagate_error_pass_002)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
@@ -171,7 +171,7 @@ END_TEST
 START_TEST (test_clear_error_pass_001)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
@@ -204,7 +204,7 @@ END_TEST
 START_TEST (test_error_free_pass_001)
 {
 	pgm_error_t* err = NULL;
-	const pgm_error_domain_e err_domain = PGM_ENGINE_ERROR;
+	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
 	fail_unless (NULL != err);
