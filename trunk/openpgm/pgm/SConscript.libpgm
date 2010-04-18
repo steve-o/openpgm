@@ -68,6 +68,7 @@ e.StaticSharedLibrary('libpgm-pic', src);
 
 if env['WITH_CHECK'] == 'true':
 	te = e.Clone();
+	te.MergeFlags(env['GLIB_FLAGS']);
 	newCCFLAGS = [];
 	for flag in te['CCFLAGS']:
 		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):

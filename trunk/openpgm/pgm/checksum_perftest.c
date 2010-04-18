@@ -19,14 +19,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
-
-#include <pgm/time.h>
-#include <pgm/timep.h>
+#include <pgm/framework.h>
 
 
 /* mock state */
@@ -39,14 +38,14 @@ static
 void
 mock_setup (void)
 {
-	pgm_time_init (NULL);
+	g_assert (pgm_time_init (NULL));
 }
 
 static
 void
 mock_teardown (void)
 {
-	pgm_time_shutdown ();
+	g_assert (pgm_time_shutdown ());
 }
 
 static
