@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <errno.h>
 #include <libintl.h>
 #define _(String) dgettext (GETTEXT_PACKAGE, String)
@@ -68,10 +70,14 @@ static pgm_time_t		pgm_select_sleep (const uint32_t);
 
 #if defined(CONFIG_HAVE_CLOCK_GETTIME) || defined(CONFIG_HAVE_CLOCK_NANOSLEEP)
 #	include <time.h>
+#	ifdef CONFIG_HAVE_CLOCK_GETTIME
+static pgm_time_t		pgm_clock_update (void);
+#	endif
+#	ifdef CONFIG_HAVE_CLOCK_NANOSLEEP
 static clockid_t		clock_id;
 static bool			pgm_clock_init (pgm_error_t**);
-static pgm_time_t		pgm_clock_update (void);
 static pgm_time_t		pgm_clock_nanosleep (const uint32_t);
+#	endif
 #endif
 #ifdef CONFIG_HAVE_FTIME
 #	include <sys/timeb.h>
@@ -738,7 +744,7 @@ pgm_tsc_init (
 	}
 
 	pgm_info (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
-		   "set the environment variable RDTSC_FREQUENCY to %i on this "
+		   "set the environment variable RDTSC_FREQUENCY to %" PRIuFAST32 " on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server."),
 		   tsc_mhz);
@@ -884,7 +890,7 @@ pgm_hpet_sleep (
 }
 #endif /* CONFIG_HAVE_HPET */
 
-#if defined(CONFIG_HAVE_CLOCK_GETTIME) || defined(CONFIG_HAVE_CLOCK_NANOSLEEP)
+#if defined(CONFIG_HAVE_CLOCK_NANOSLEEP)
 /* Allegedly a high performance set of flexible timers, but in reality less then
  * meh performance, not even portable among Linux versions.
  */
@@ -931,8 +937,8 @@ pgm_clock_nanosleep (
 	clock_nanosleep (clock_id, 0, &ts, NULL);
 #else
 	const pgm_time_t abs_usec = usec + pgm_time_update_now ();
-	ts.tv_sec	= usec / 1000000UL;
-	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	ts.tv_sec	= abs_usec / 1000000UL;
+	ts.tv_nsec	= (abs_usec % 1000000UL) * 1000;
 	clock_nanosleep (clock_id, TIMER_ABSTIME, &ts, NULL);
 #endif
 	return pgm_time_update_now ();

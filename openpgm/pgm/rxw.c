@@ -192,7 +192,7 @@ pgm_rxw_create (
 		pgm_assert_cmpuint (max_rte, >, 0);
 	}
 
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %u).\n",
+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zu).\n",
 		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte);
 
 /* calculate receive window parameters */

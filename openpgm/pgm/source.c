@@ -1002,7 +1002,7 @@ send_odata_copy (
 	pgm_assert (tsdu_length <= transport->max_tsdu);
 	if (PGM_LIKELY(tsdu_length)) pgm_assert (NULL != tsdu);
 
-	pgm_debug ("send_odata_copy (transport:%p tsdu:%p tsdu_length:%zu bytes-written:%p)",
+	pgm_debug ("send_odata_copy (transport:%p tsdu:%p tsdu_length:%u bytes-written:%p)",
 		(void*)transport, tsdu, tsdu_length, (void*)bytes_written);
 
 	const size_t tpdu_length = tsdu_length + pgm_transport_pkt_offset(FALSE);

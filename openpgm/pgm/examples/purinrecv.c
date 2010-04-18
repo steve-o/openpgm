@@ -339,7 +339,7 @@ on_data (
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
 	pgm_tsi_print_r (from, tsi, sizeof(tsi));
-	printf ("\"%s\" (%i bytes from %s)\n",
+	printf ("\"%s\" (%zu bytes from %s)\n",
 			buf, len, tsi);
 	return 0;
 }

@@ -104,6 +104,7 @@ env = Environment(
 			'-std=gnu99',
 # re-entrant libc
 			'-D_REENTRANT',
+			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 # variadic macros
 			'-DCONFIG_HAVE_ISO_VARARGS',
 #			'-DCONFIG_HAVE_GNUC_VARARGS',
@@ -128,8 +129,6 @@ env = Environment(
 # interface enumeration
 			'-DCONFIG_HAVE_GETIFADDRS',
 			'-DCONFIG_HAVE_IFR_NETMASK',
-# re-entrant protocol lookup
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 # win32 cmsg
 #			'-DCONFIG_HAVE_WSACMSGHDR',
 # multicast

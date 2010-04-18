@@ -390,6 +390,21 @@ pgm_string_free (
 	return segment;
 }
 
+static
+pgm_string_t*
+pgm_string_truncate (
+	pgm_string_t* restrict string,
+	size_t		       len
+	)
+{
+	pgm_return_val_if_fail (NULL != string, NULL);
+
+	string->len = MIN (len, string->len);
+	string->str[ string->len ] = '\0';
+
+	return string;
+}
+
 pgm_string_t*
 pgm_string_append (
 	pgm_string_t* restrict string,
@@ -436,6 +451,22 @@ pgm_string_append_vprintf (
 		string->len += len;
 		free (buf);
 	}
+}
+
+void
+pgm_string_printf (
+	pgm_string_t* restrict string,
+	const char*   restrict format,
+	...
+	)
+{
+	va_list args;
+
+	pgm_string_truncate (string, 0);
+
+	va_start (args, format);
+	pgm_string_append_vprintf (string, format, args);
+	va_end (args);
 }
 
 void
