@@ -673,13 +673,13 @@ pgm_transport_bind (
 		transport->window = transport->txw_sqns ?
 					pgm_txw_create (&transport->tsi, 0, transport->txw_sqns, 0, 0, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k) :
 					pgm_txw_create (&transport->tsi, transport->max_tpdu, 0, transport->txw_secs, transport->txw_max_rte, transport->use_ondemand_parity || transport->use_proactive_parity, transport->rs_n, transport->rs_k);
-		pgm_assert (transport->window);
+		pgm_assert (NULL != transport->window);
 	}
 
 /* create peer list */
 	if (transport->can_recv_data) {
 		transport->peers_hashtable = pgm_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
-		pgm_assert (transport->peers_hashtable);
+		pgm_assert (NULL != transport->peers_hashtable);
 	}
 
 	if (transport->udp_encap_ucast_port)
@@ -1427,8 +1427,8 @@ pgm_transport_select_info (
 {
 	int fds = 0;
 
-	pgm_assert (transport);
-	pgm_assert (n_fds);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != n_fds);
 
 	if (!transport->is_bound ||
 	    transport->is_destroyed)
@@ -1474,9 +1474,9 @@ pgm_transport_poll_info (
 	const int		events		/* POLLIN, POLLOUT */
 	)
 {
-	pgm_assert (transport);
-	pgm_assert (fds);
-	pgm_assert (n_fds);
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != fds);
+	pgm_assert (NULL != n_fds);
 
 	if (!transport->is_bound ||
 	    transport->is_destroyed)

@@ -76,7 +76,7 @@ _pgm_list_remove_link (
 	pgm_list_t*	link_
 	)
 {
-	if (PGM_LIKELY (link_))
+	if (PGM_LIKELY (NULL != link_))
 	{
 		if (link_->prev)
 			link_->prev->next = link_->next;
@@ -117,7 +117,7 @@ pgm_list_last (
 	pgm_list_t*	list
 	)
 {
-	if (PGM_LIKELY (list)) {
+	if (PGM_LIKELY (NULL != list)) {
 		while (list->next)
 			list = list->next;
 	}

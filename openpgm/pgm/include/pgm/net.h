@@ -28,7 +28,7 @@
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL ssize_t pgm_sendto (pgm_transport_t*, bool, bool, const void*, size_t, const struct sockaddr*, size_t);
+PGM_GNUC_INTERNAL ssize_t pgm_sendto (pgm_transport_t*, bool, bool, const void*, size_t, const struct sockaddr*, socklen_t);
 PGM_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
 
 PGM_END_DECLS

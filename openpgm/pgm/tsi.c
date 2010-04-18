@@ -107,8 +107,8 @@ pgm_tsi_equal (
 	const pgm_tsi_t *restrict tsi1 = p1, *restrict tsi2 = p2;
 
 /* pre-conditions */
-	pgm_assert (tsi1);
-	pgm_assert (tsi2);
+	pgm_assert (NULL != tsi1);
+	pgm_assert (NULL != tsi2);
 
 	return (memcmp (tsi1, tsi2, sizeof(struct pgm_tsi_t)) == 0);
 }

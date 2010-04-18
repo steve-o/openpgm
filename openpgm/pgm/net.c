@@ -60,13 +60,13 @@ pgm_sendto (
 	const void*		buf,
 	size_t			len,
 	const struct sockaddr*	to,
-	size_t			tolen
+	socklen_t		tolen
 	)
 {
-	pgm_assert( transport );
-	pgm_assert( buf );
+	pgm_assert( NULL != transport );
+	pgm_assert( NULL != buf );
 	pgm_assert( len > 0 );
-	pgm_assert( to );
+	pgm_assert( NULL != to );
 	pgm_assert( tolen > 0 );
 
 #ifdef NET_DEBUG
@@ -159,7 +159,6 @@ pgm_set_nonblocking (
 	)
 {
 /* pre-conditions */
-	pgm_assert (fd);
 	pgm_assert (fd[0]);
 	pgm_assert (fd[1]);
 
