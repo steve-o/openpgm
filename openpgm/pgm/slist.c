@@ -109,7 +109,7 @@ pgm_slist_remove_first (
 {
 	pgm_slist_t *tmp;
 
-	if (PGM_LIKELY (list))
+	if (PGM_LIKELY (NULL != list))
 	{
 		tmp = list->next;
 		list->data = NULL;
@@ -138,7 +138,7 @@ pgm_slist_last (
 	pgm_slist_t*	list
 	)
 {
-	if (PGM_LIKELY (list))
+	if (PGM_LIKELY (NULL != list))
 	{
 		while (list->next)
 			list = list->next;

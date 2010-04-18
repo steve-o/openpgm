@@ -78,7 +78,7 @@ pgm_notify_init (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (notify);
+	pgm_assert (NULL != notify);
 
 #ifndef _WIN32
 	int retval = pipe (notify->pipefd);
@@ -161,7 +161,7 @@ pgm_notify_destroy (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (notify);
+	pgm_assert (NULL != notify);
 
 #ifndef _WIN32
 	if (notify->pipefd[0]) {
@@ -196,7 +196,7 @@ pgm_notify_send (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (notify);
+	pgm_assert (NULL != notify);
 
 #ifndef _WIN32
 	pgm_assert (notify->pipefd[1]);
@@ -220,7 +220,7 @@ pgm_notify_read (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (notify);
+	pgm_assert (NULL != notify);
 
 #ifndef _WIN32
 	pgm_assert (notify->pipefd[0]);
@@ -243,7 +243,7 @@ pgm_notify_clear (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (notify);
+	pgm_assert (NULL != notify);
 
 #ifndef _WIN32
 	pgm_assert (notify->pipefd[0]);
@@ -266,7 +266,7 @@ pgm_notify_get_fd (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (notify);
+	pgm_assert (NULL != notify);
 
 #ifndef _WIN32
 	pgm_assert (notify->pipefd[0]);

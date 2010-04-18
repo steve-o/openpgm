@@ -65,8 +65,8 @@ next_nak_rb_expiry (
 	const pgm_rxw_t* window
 	)
 {
-	pgm_assert (window);
-	pgm_assert (window->backoff_queue.tail);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != window->backoff_queue.tail);
 
 	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->backoff_queue.tail;
 	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
@@ -79,8 +79,8 @@ next_nak_rpt_expiry (
 	const pgm_rxw_t* window
 	)
 {
-	pgm_assert (window);
-	pgm_assert (window->wait_ncf_queue.tail);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != window->wait_ncf_queue.tail);
 
 	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->wait_ncf_queue.tail;
 	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
@@ -93,8 +93,8 @@ next_nak_rdata_expiry (
 	const pgm_rxw_t* window
 	)
 {
-	pgm_assert (window);
-	pgm_assert (window->wait_data_queue.tail);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != window->wait_data_queue.tail);
 
 	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->wait_data_queue.tail;
 	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
@@ -1914,7 +1914,7 @@ nak_rdata_state (
 	{
 		pgm_list_t* next_list_el	= list->prev;
 		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)list;
-		pgm_assert (rdata_skb);
+		pgm_assert (NULL != rdata_skb);
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
 
 /* check this packet for state expiration */
@@ -1956,13 +1956,13 @@ nak_rdata_state (
 
 	if (window->wait_data_queue.length == 0)
 	{
-		pgm_assert ((pgm_rxw_state_t*)window->wait_data_queue.head == NULL);
-		pgm_assert ((pgm_rxw_state_t*)window->wait_data_queue.tail == NULL);
+		pgm_assert (NULL == (pgm_rxw_state_t*)window->wait_data_queue.head);
+		pgm_assert (NULL == (pgm_rxw_state_t*)window->wait_data_queue.tail);
 	}
 	else
 	{
-		pgm_assert ((pgm_rxw_state_t*)window->wait_data_queue.head);
-		pgm_assert ((pgm_rxw_state_t*)window->wait_data_queue.tail);
+		pgm_assert (NULL != (pgm_rxw_state_t*)window->wait_data_queue.head);
+		pgm_assert (NULL != (pgm_rxw_state_t*)window->wait_data_queue.tail);
 	}
 
 	if (PGM_UNLIKELY(dropped_invalid)) {

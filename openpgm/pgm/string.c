@@ -42,7 +42,7 @@ pgm_strdup (
 	char* new_str;
 	size_t length;
 
-	if (PGM_LIKELY (str))
+	if (PGM_LIKELY (NULL != str))
 	{
 		length = strlen (str) + 1;
 		new_str = malloc (length);
@@ -228,7 +228,7 @@ pgm_strfreev (
 	char**		str_array
 	)
 {
-	if (PGM_LIKELY (str_array))
+	if (PGM_LIKELY (NULL != str_array))
 	{
 		for (unsigned i = 0; str_array[i] != NULL; i++)
 			free (str_array[i]);
