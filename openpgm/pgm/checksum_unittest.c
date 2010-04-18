@@ -2,7 +2,7 @@
  *
  * unit tests for PGM checksum routines
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,11 +37,11 @@
 
 
 /* target:
- *	guint16
+ *	uint16_t
  *	pgm_inet_checksum (
  *		const void*		src,
- *		guint			len,
- *		int			csum
+ *		uint16_t		len,
+ *		uint16_t		csum
  *	)
  */
 

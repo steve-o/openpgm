@@ -25,7 +25,6 @@
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
-#include <pgm/framework.h>
 
 
 /* mock state */
@@ -33,20 +32,6 @@
 static unsigned perf_testsize	= 0;
 static unsigned perf_answer	= 0;
 
-
-static
-void
-mock_setup (void)
-{
-	g_assert (pgm_time_init (NULL));
-}
-
-static
-void
-mock_teardown (void)
-{
-	g_assert (pgm_time_shutdown ());
-}
 
 static
 void
@@ -93,6 +78,21 @@ mock_setup_64kb (void)
 
 #define CHECKSUM_DEBUG
 #include "checksum.c"
+
+
+static
+void
+mock_setup (void)
+{
+	g_assert (pgm_time_init (NULL));
+}
+
+static
+void
+mock_teardown (void)
+{
+	g_assert (pgm_time_shutdown ());
+}
 
 
 /* target:
