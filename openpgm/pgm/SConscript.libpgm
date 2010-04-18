@@ -91,11 +91,17 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('slist.c')] + tlog);
 	te.Program ('md5_unittest.c');
 	te.Program (['getifaddrs_unittest.c',
+			e.Object('error.c'),
 			e.Object('sockaddr.c'),
 			e.Object('indextoaddr.c'),
 			e.Object('if.c'),
 			e.Object('inet_network.c'),
-			e.Object('getnodeaddr.c')]);
+			e.Object('getnodeaddr.c'),
+			e.Object('slist.c'),
+			e.Object('list.c'),
+			e.Object('mem.c'),
+			e.Object('nametoindex.c'),
+			e.Object('string.c')] + tlog);
 	te.Program (['inet_network_unittest.c',
 			e.Object('sockaddr.c'),
 			e.Object('indextoaddr.c'),
