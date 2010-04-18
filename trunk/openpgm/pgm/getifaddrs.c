@@ -737,6 +737,8 @@ pgm_getifaddrs (
 	pgm_error_t**	     restrict error
 	)
 {
+	pgm_return_val_if_fail (NULL != ifap, FALSE);
+
 	pgm_debug ("pgm_getifaddrs (ifap:%p error:%p)",
 		(void*)ifap, (void*)error);
 
@@ -767,6 +769,8 @@ pgm_freeifaddrs (
 	struct pgm_ifaddrs*	ifa
 	)
 {
+	pgm_return_if_fail (NULL != ifa);
+
 #ifdef CONFIG_HAVE_GETIFADDRS
 	freeifaddrs ((struct ifaddrs*)ifa);
 #else

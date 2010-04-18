@@ -94,7 +94,6 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('error.c'),
 			e.Object('sockaddr.c'),
 			e.Object('indextoaddr.c'),
-			e.Object('if.c'),
 			e.Object('inet_network.c'),
 			e.Object('getnodeaddr.c'),
 			e.Object('slist.c'),
@@ -102,10 +101,17 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('mem.c'),
 			e.Object('nametoindex.c'),
 			e.Object('string.c')] + tlog);
+	te.Program (['getnodeaddr_unittest.c',
+			e.Object('error.c'),
+			e.Object('sockaddr.c'),
+			e.Object('mem.c'),
+			e.Object('string.c'),
+			e.Object('slist.c')] + tlog);
+	te.Program (['indextoaddr_unittest.c',
+			e.Object('getnodeaddr.c')] + tlog);
 	te.Program (['inet_network_unittest.c',
 			e.Object('sockaddr.c'),
 			e.Object('indextoaddr.c'),
-			e.Object('if.c'),
 			e.Object('getnodeaddr.c'),
 			e.Object('getifaddrs.c')]);
 	te.Program (['rate_control_unittest.c',
@@ -122,13 +128,18 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('error.c'),
 			e.Object('galois_tables.c'),
 			e.Object('getifaddrs.c'),
+			e.Object('getnodeaddr.c'),
 			e.Object('hashtable.c'),
+			e.Object('histogram.c'),
+			e.Object('indextoaddr.c'),
 			e.Object('indextoname.c'),
 			e.Object('inet_network.c'),
 			e.Object('list.c'),
 			e.Object('math.c'),
 			e.Object('md5.c'),
 			e.Object('mem.c'),
+			e.Object('messages.c'),
+			e.Object('nametoindex.c'),
 			e.Object('queue.c'),
 			e.Object('rand.c'),
 			e.Object('rate_control.c'),
@@ -137,14 +148,13 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('sockaddr.c'),
 			e.Object('string.c'),
 			e.Object('thread.c'),
-			e.Object('time.c')
+			e.Object('time.c'),
+			e.Object('wsastrerror.c')
 		];
 # library
 	te.Program (['txwi_unittest.c', e.Object('tsi.c')] + tframework);
 	te.Program (['rxwi_unittest.c', e.Object('tsi.c')] + tframework);
 	te.Program (['pgm_unittest.c'] + tframework);
-	te.Program (['getnodeaddr_unittest.c', e.Object('if.c')] + tframework);
-	te.Program (['indextoaddr_unittest.c', e.Object('if.c'), e.Object('getnodeaddr.c')] + tframework);
 	te.Program (['gsi_unittest.c', e.Object('if.c'), e.Object('getnodeaddr.c')] + tframework);
 	te.Program (['tsi_unittest.c'] + tframework);
 	te.Program (['if_unittest.c'] + tframework);
