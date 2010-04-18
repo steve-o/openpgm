@@ -2,7 +2,7 @@
  *
  * unit tests for global session ID helper functions.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -92,17 +92,17 @@ mock_gethostname (
 
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_gsi_create_from_hostname (
  *		pgm_gsi_t*		gsi,
- *		GError**		err
+ *		pgm_error_t**		err
  *	)
  */
 
 START_TEST (test_create_from_hostname_pass_001)
 {
 	pgm_gsi_t gsi;
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (pgm_gsi_create_from_hostname (&gsi, &err), "create_from_hostname failed");
 	fail_if (err, "error raised");
 	fail_unless (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
@@ -111,7 +111,7 @@ END_TEST
 
 START_TEST (test_create_from_hostname_pass_002)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_if (pgm_gsi_create_from_hostname (NULL, &err), "create_from_hostname failed");
 	fail_if (err, "error raised");
 	fail_if (pgm_gsi_create_from_hostname (NULL, NULL), "create_from_hostname failed");
@@ -122,27 +122,27 @@ END_TEST
 START_TEST (test_create_from_hostname_pass_003)
 {
 	pgm_gsi_t gsi;
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_if (pgm_gsi_create_from_hostname (&gsi, &err), "create_from_hostname failed");
 	fail_if (NULL == err, "error not raised");
 	fail_if (NULL == err->message, "no error message");
-	g_debug ("GError: %s", err->message);
+	g_debug ("pgm_error_t: %s", err->message);
 	fail_if (pgm_gsi_create_from_hostname (&gsi, NULL), "create_from_hostname failed");
 }
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_gsi_create_from_addr (
  *		pgm_gsi_t*		gsi,
- *		GError**		err
+ *		pgm_error_t**		err
  *	)
  */
 
 START_TEST (test_create_from_addr_pass_001)
 {
 	pgm_gsi_t gsi;
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (pgm_gsi_create_from_addr (&gsi, &err), "create_from_addr failed");
 	fail_if (err, "error raised");
 	fail_unless (pgm_gsi_create_from_addr (&gsi, NULL), "create_from_addr failed");
@@ -151,7 +151,7 @@ END_TEST
 
 START_TEST (test_create_from_addr_pass_002)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_if (pgm_gsi_create_from_addr (NULL, &err), "create_from_addr failed");
 	fail_if (pgm_gsi_create_from_addr (NULL, NULL), "create_from_addr failed");
 }
@@ -161,17 +161,17 @@ END_TEST
 START_TEST (test_create_from_addr_pass_003)
 {
 	pgm_gsi_t gsi;
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_if (pgm_gsi_create_from_addr (&gsi, &err), "create_from_addr failed");
 	fail_if (NULL == err, "error not raised");
 	fail_if (NULL == err->message, "no error message");
-	g_debug ("GError: %s", err->message);
+	g_debug ("pgm_error_t: %s", err->message);
 	fail_if (pgm_gsi_create_from_addr (&gsi, NULL), "create_from_addr failed");
 }
 END_TEST
 
 /* target:
- *	gchar*
+ *	char*
  *	pgm_gsi_print (
  *		const pgm_gsi_t*	gsi
  *	)
@@ -196,7 +196,7 @@ END_TEST
  *	pgm_gsi_print_r (
  *		const pgm_gsi_t*	gsi,
  *		char*			buf,
- *		gsize			bufsize
+ *		size_t			bufsize
  *	)
  */
 
@@ -221,10 +221,10 @@ START_TEST (test_print_r_pass_002)
 END_TEST
 
 /* target:
- *	gint
+ *	bool
  *	pgm_gsi_equal (
- *		gconstpointer	gsi1,
- *		gconstpointer	gsi2
+ *		const void*	gsi1,
+ *		const void*	gsi2
  *	)
  */
 
