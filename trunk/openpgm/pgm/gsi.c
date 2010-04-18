@@ -214,8 +214,8 @@ pgm_gsi_equal (
 	const pgm_gsi_t *gsi1 = p1, *gsi2 = p2;
 
 /* pre-conditions */
-	pgm_assert (gsi1);
-	pgm_assert (gsi2);
+	pgm_assert (NULL != gsi1);
+	pgm_assert (NULL != gsi2);
 
         return memcmp (gsi1, gsi2, sizeof(pgm_gsi_t)) == 0;
 }

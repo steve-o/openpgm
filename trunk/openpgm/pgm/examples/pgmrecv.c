@@ -48,6 +48,7 @@
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/signal.h>
 #ifdef CONFIG_WITH_HTTP
 #	include <pgm/http.h>
 #endif

@@ -143,7 +143,7 @@ pgm_rxw_max_length (
 	const pgm_rxw_t* const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->alloc;
 }
 
@@ -153,7 +153,7 @@ pgm_rxw_length (
 	const pgm_rxw_t* const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
@@ -163,7 +163,7 @@ pgm_rxw_size (
 	const pgm_rxw_t* const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->size;
 }
 
@@ -173,7 +173,7 @@ pgm_rxw_is_empty (
 	const pgm_rxw_t* const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return pgm_rxw_length (window) == 0;
 }
 
@@ -183,7 +183,7 @@ pgm_rxw_is_full (
 	const pgm_rxw_t* const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return pgm_rxw_length (window) == pgm_rxw_max_length (window);
 }
 
@@ -193,7 +193,7 @@ pgm_rxw_lead (
 	const pgm_rxw_t* const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->lead;
 }
 
@@ -203,6 +203,7 @@ pgm_rxw_next_lead (
 	const pgm_rxw_t* const window
 	)
 {
+	pgm_assert (NULL != window);
 	return (uint32_t)(pgm_rxw_lead (window) + 1);
 }
 

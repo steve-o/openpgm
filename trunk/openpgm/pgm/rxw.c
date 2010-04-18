@@ -48,7 +48,7 @@ _pgm_tsi_is_null (
 	pgm_tsi_t nulltsi;
 
 /* pre-conditions */
-	pgm_assert (tsi);
+	pgm_assert (NULL != tsi);
 
 	memset (&nulltsi, 0, sizeof(nulltsi));
 	return (0 == memcmp (&nulltsi, tsi, sizeof(nulltsi)));
@@ -72,7 +72,7 @@ static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t* const);
 static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
 static inline ssize_t _pgm_rxw_incoming_read (pgm_rxw_t* const, struct pgm_msgv_t**, uint32_t);
-static inline bool _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const uint32_t);
+static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const uint32_t);
 static inline ssize_t _pgm_rxw_incoming_read_apdu (pgm_rxw_t* const, struct pgm_msgv_t**);
 static inline int _pgm_rxw_recovery_update (pgm_rxw_t* const, const uint32_t, const pgm_time_t);
 static inline int _pgm_rxw_recovery_append (pgm_rxw_t* const, const pgm_time_t, const pgm_time_t);
@@ -89,7 +89,7 @@ _pgm_rxw_peek (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	if (pgm_rxw_is_empty (window))
 		return NULL;
@@ -100,7 +100,7 @@ _pgm_rxw_peek (
 		struct pgm_sk_buff_t* skb = window->pdata[index_];
 /* availability only guaranteed inside commit window */
 		if (pgm_uint32_lt (sequence, window->commit_lead)) {
-			pgm_assert (skb);
+			pgm_assert (NULL != skb);
 			pgm_assert (pgm_skb_is_valid (skb));
 			pgm_assert (!_pgm_tsi_is_null (&skb->tsi));
 		}
@@ -129,7 +129,7 @@ _pgm_rxw_commit_length (
 	const pgm_rxw_t* const	window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->commit_lead - window->trail;
 }
 
@@ -139,7 +139,7 @@ _pgm_rxw_commit_is_empty (
 	const pgm_rxw_t* const	window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return (_pgm_rxw_commit_length (window) == 0);
 }
 
@@ -149,7 +149,7 @@ _pgm_rxw_incoming_length (
 	const pgm_rxw_t* const	window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return ( 1 + window->lead ) - window->commit_lead;
 }
 
@@ -159,7 +159,7 @@ _pgm_rxw_incoming_is_empty (
 	const pgm_rxw_t* const	window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return (_pgm_rxw_incoming_length (window) == 0);
 }
 
@@ -180,7 +180,7 @@ pgm_rxw_create (
 	pgm_rxw_t* window;
 
 /* pre-conditions */
-	pgm_assert (tsi);
+	pgm_assert (NULL != tsi);
 	pgm_assert_cmpuint (tpdu_size, >, 0);
 	if (sqns) {
 		pgm_assert_cmpuint (sqns, >, 0);
@@ -239,7 +239,7 @@ pgm_rxw_destroy (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert_cmpuint (window->alloc, >, 0);
 
 	pgm_debug ("destroy (window:%p)", (const void*)window);
@@ -296,8 +296,8 @@ pgm_rxw_add (
 	int status;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (skb);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != skb);
 	pgm_assert_cmpuint (nak_rb_expiry, >, 0);
 	pgm_assert_cmpuint (pgm_rxw_max_length (window), >, 0);
 	pgm_assert (pgm_skb_is_valid (skb));
@@ -373,7 +373,7 @@ pgm_rxw_add (
 				return _pgm_rxw_insert (window, skb);
 		}
 
-		pgm_assert (first_state);
+		pgm_assert (NULL != first_state);
 		status = _pgm_rxw_add_placeholder_range (window, _pgm_rxw_tg_sqn (window, skb->sequence), now, nak_rb_expiry);
 	}
 	else
@@ -424,7 +424,7 @@ _pgm_rxw_define (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert (pgm_rxw_is_empty (window));
 	pgm_assert (_pgm_rxw_commit_is_empty (window));
 	pgm_assert (_pgm_rxw_incoming_is_empty (window));
@@ -457,7 +457,7 @@ pgm_rxw_update (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert_cmpuint (nak_rb_expiry, >, 0);
 
 	pgm_debug ("pgm_rxw_update (window:%p txw-lead:%" PRIu32 " txw-trail:%" PRIu32 " nak-rb-expiry:%" PGM_TIME_FORMAT ")",
@@ -483,7 +483,7 @@ _pgm_rxw_update_trail (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 /* advertised trail is less than the current value */
 	if (PGM_UNLIKELY(pgm_uint32_lte (txw_trail, window->rxw_trail)))
@@ -532,7 +532,7 @@ _pgm_rxw_update_trail (
 		pgm_rxw_state_t* state;
 
 		skb = _pgm_rxw_peek (window, sequence);
-		pgm_assert (skb);
+		pgm_assert (NULL != skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
 
 		switch (state->pkt_state) {
@@ -564,7 +564,7 @@ pgm_rxw_update_fec (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert_cmpuint (rs_k, >, 1);
 
 	pgm_debug ("pgm_rxw_update_fec (window:%p rs(k):%u)",
@@ -594,7 +594,7 @@ _pgm_rxw_add_placeholder (
 	struct pgm_sk_buff_t* skb;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert (!pgm_rxw_is_full (window));
 
 /* advance lead */
@@ -640,7 +640,7 @@ _pgm_rxw_add_placeholder_range (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert (pgm_uint32_gt (sequence, pgm_rxw_lead (window)));
 
 /* check bounds of commit window */
@@ -690,7 +690,7 @@ _pgm_rxw_update_lead (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 /* advertised lead is less than the current value */
 	if (PGM_UNLIKELY(pgm_uint32_lte (txw_lead, window->lead)))
@@ -737,8 +737,8 @@ _pgm_rxw_is_apdu_lost (
 	const pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (skb);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != skb);
 
 /* lost is lost */
 	if (PGM_PKT_STATE_LOST_DATA == state->pkt_state)
@@ -781,12 +781,12 @@ _pgm_rxw_find_missing (
 	pgm_rxw_state_t* state;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	for (uint32_t i = tg_sqn, j = 0; j < window->tg_size; i++, j++)
 	{
 		skb = _pgm_rxw_peek (window, i);
-		pgm_assert (skb);
+		pgm_assert (NULL != skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
 		switch (state->pkt_state) {
 		case PGM_PKT_STATE_BACK_OFF:
@@ -821,7 +821,7 @@ _pgm_rxw_is_invalid_var_pktlen (
 	const struct pgm_sk_buff_t* first_skb;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	if (!window->is_fec_available)
 		return FALSE;
@@ -850,8 +850,8 @@ _pgm_rxw_has_payload_op (
 	)
 {
 /* pre-conditions */
-	pgm_assert (skb);
-	pgm_assert (skb->pgm_header);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != skb->pgm_header);
 
 	return skb->pgm_opt_fragment || skb->pgm_header->pgm_options & PGM_OP_ENCODED;
 }
@@ -869,8 +869,8 @@ _pgm_rxw_is_invalid_payload_op (
 	const struct pgm_sk_buff_t* first_skb;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (skb);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != skb);
 
 	if (!window->is_fec_available)
 		return FALSE;
@@ -910,8 +910,8 @@ _pgm_rxw_insert (
 	pgm_rxw_state_t* state;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (new_skb);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != new_skb);
 	pgm_assert (!_pgm_rxw_incoming_is_empty (window));
 
 	if (PGM_UNLIKELY(_pgm_rxw_is_invalid_var_pktlen (window, new_skb) ||
@@ -928,7 +928,7 @@ _pgm_rxw_insert (
 	else
 	{
 		skb = _pgm_rxw_peek (window, new_skb->sequence);
-		pgm_assert (skb);
+		pgm_assert (NULL != skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
 
 		if (state->pkt_state == PGM_PKT_STATE_HAVE_DATA)
@@ -1014,8 +1014,8 @@ _pgm_rxw_shuffle_parity (
 	uint_fast32_t index_;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (skb);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != skb);
 
 	struct pgm_sk_buff_t* missing = _pgm_rxw_find_missing (window, skb->sequence);
 	if (NULL == missing)
@@ -1050,8 +1050,8 @@ _pgm_rxw_append (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (skb);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != skb);
 	if (skb->pgm_header->pgm_options & PGM_OPT_PARITY) {
 		pgm_assert (_pgm_rxw_tg_sqn (window, skb->sequence) == _pgm_rxw_tg_sqn (window, pgm_rxw_lead (window)));
 	} else {
@@ -1118,7 +1118,7 @@ pgm_rxw_remove_commit (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	const uint32_t tg_sqn_of_commit_lead = _pgm_rxw_tg_sqn (window, window->commit_lead);
 
@@ -1155,8 +1155,8 @@ pgm_rxw_readv (
 	ssize_t bytes_read;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (pmsg);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != pmsg);
 	pgm_assert_cmpuint (pmsglen, >, 0);
 
 	pgm_debug ("readv (window:%p pmsg:%p pmsglen:%u)",
@@ -1168,7 +1168,7 @@ pgm_rxw_readv (
 		return -1;
 
 	skb = _pgm_rxw_peek (window, window->commit_lead);
-	pgm_assert (skb);
+	pgm_assert (NULL != skb);
 
 	state = (pgm_rxw_state_t*)&skb->cb;
 	switch (state->pkt_state) {
@@ -1218,11 +1218,11 @@ _pgm_rxw_remove_trail (
 	struct pgm_sk_buff_t* skb;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert (!pgm_rxw_is_empty (window));
 
 	skb = _pgm_rxw_peek (window, window->trail);
-	pgm_assert (skb);
+	pgm_assert (NULL != skb);
 	_pgm_rxw_unlink (window, skb);
 	window->size -= skb->len;
 /* remove reference to skb */
@@ -1270,8 +1270,8 @@ _pgm_rxw_incoming_read (
 	struct pgm_sk_buff_t* skb;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (pmsg);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != pmsg);
 	pgm_assert_cmpuint (pmsglen, >, 0);
 	pgm_assert (!_pgm_rxw_incoming_is_empty (window));
 
@@ -1284,7 +1284,7 @@ _pgm_rxw_incoming_read (
 
 	do {
 		skb = _pgm_rxw_peek (window, window->commit_lead);
-		pgm_assert (skb);
+		pgm_assert (NULL != skb);
 		if (_pgm_rxw_is_apdu_complete (window,
 					      skb->pgm_opt_fragment ? ntohl (skb->of_apdu_first_sqn) : skb->sequence))
 		{
@@ -1312,7 +1312,7 @@ _pgm_rxw_is_tg_sqn_lost (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert_cmpuint (_pgm_rxw_pkt_sqn (window, tg_sqn), ==, 0);
 
 	if (pgm_rxw_is_empty (window))
@@ -1343,34 +1343,34 @@ _pgm_rxw_reconstruct (
 	pgm_assert_cmpuint (_pgm_rxw_pkt_sqn (window, tg_sqn), ==, 0);
 
 	skb = _pgm_rxw_peek (window, tg_sqn);
-	pgm_assert (skb);
+	pgm_assert (NULL != skb);
 
 	const bool is_var_pktlen = skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN;
 	const bool is_op_encoded = skb->pgm_header->pgm_options & PGM_OPT_PRESENT;
 	const uint16_t parity_length = ntohs (skb->pgm_header->pgm_tsdu_length);
 	struct pgm_sk_buff_t* tg_skbs[ window->rs.n ];
-	void* tg_data[ window->rs.n ];
-	void* tg_opts[ window->rs.n ];
+	pgm_gf8_t* tg_data[ window->rs.n ];
+	pgm_gf8_t* tg_opts[ window->rs.n ];
 	uint8_t offsets[ window->rs.k ];
 	uint8_t rs_h = 0;
 
 	for (uint32_t i = tg_sqn, j = 0; i != (tg_sqn + window->rs.k); i++, j++)
 	{
 		skb = _pgm_rxw_peek (window, i);
-		pgm_assert (skb);
+		pgm_assert (NULL != skb);
 		state = (pgm_rxw_state_t*)&skb->cb;
 		switch (state->pkt_state) {
 		case PGM_PKT_STATE_HAVE_DATA:
 			tg_skbs[ j ] = skb;
 			tg_data[ j ] = skb->data;
-			tg_opts[ j ] = skb->pgm_opt_fragment;
+			tg_opts[ j ] = (pgm_gf8_t*)skb->pgm_opt_fragment;
 			offsets[ j ] = j;
 			break;
 
 		case PGM_PKT_STATE_HAVE_PARITY:
 			tg_skbs[ window->rs.k + rs_h ] = skb;
 			tg_data[ window->rs.k + rs_h ] = skb->data;
-			tg_opts[ window->rs.k + rs_h ] = skb->pgm_opt_fragment;
+			tg_opts[ window->rs.k + rs_h ] = (pgm_gf8_t*)skb->pgm_opt_fragment;
 			offsets[ j ] = window->rs.k + rs_h;
 			++rs_h;
 /* fall through and alloc new skb for reconstructed data */
@@ -1411,14 +1411,14 @@ _pgm_rxw_reconstruct (
 
 /* reconstruct payload */
 	pgm_rs_decode_parity_appended (&window->rs,
-				       (pgm_gf8_t**)tg_data,
+				       tg_data,
 				       offsets,
 				       parity_length);
 
 /* reconstruct opt_fragment option */
 	if (is_op_encoded)
 		pgm_rs_decode_parity_appended (&window->rs,
-					       (pgm_gf8_t**)tg_opts,
+					       tg_opts,
 					       offsets,
 					       sizeof(struct pgm_opt_fragment));
 
@@ -1472,7 +1472,7 @@ _pgm_rxw_reconstruct (
  * returns FALSE if APDU is incomplete or longer than max_len sequences.
  */
 
-static inline
+static
 bool
 _pgm_rxw_is_apdu_complete (
 	pgm_rxw_t* const	window,
@@ -1483,7 +1483,7 @@ _pgm_rxw_is_apdu_complete (
 	pgm_rxw_state_t* state;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	pgm_debug ("_pgm_rxw_is_apdu_complete (window:%p first-sequence:%" PRIu32 ")",
 		(const void*)window, first_sequence);
@@ -1593,8 +1593,8 @@ _pgm_rxw_incoming_read_apdu (
 	struct pgm_sk_buff_t *skb;
 
 /* pre-conditions */
-	pgm_assert (window);
-	pgm_assert (pmsg);
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != pmsg);
 
 	pgm_debug ("_pgm_rxw_incoming_read_apdu (window:%p pmsg:%p)",
 		(const void*)window, (const void*)pmsg);
@@ -1635,7 +1635,7 @@ _pgm_rxw_tg_sqn (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	const uint32_t tg_sqn_mask = 0xffffffff << window->tg_sqn_shift;
 	return sequence & tg_sqn_mask;
@@ -1652,7 +1652,7 @@ _pgm_rxw_pkt_sqn (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	const uint32_t tg_sqn_mask = 0xffffffff << window->tg_sqn_shift;
 	return sequence & ~tg_sqn_mask;
@@ -1669,7 +1669,7 @@ _pgm_rxw_is_first_of_tg_sqn (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	return _pgm_rxw_pkt_sqn (window, sequence) == 0;
 }
@@ -1685,7 +1685,7 @@ _pgm_rxw_is_last_of_tg_sqn (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	return _pgm_rxw_pkt_sqn (window, sequence) == window->tg_size - 1;
 }
@@ -1860,14 +1860,14 @@ pgm_rxw_lost (
 	pgm_rxw_state_t* state;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	pgm_assert (!pgm_rxw_is_empty (window));
 
 	pgm_debug ("lost (window:%p sequence:%" PRIu32 ")",
 		 (const void*)window, sequence);
 
 	skb = _pgm_rxw_peek (window, sequence);
-	pgm_assert (skb);
+	pgm_assert (NULL != skb);
 
 	state = (pgm_rxw_state_t*)&skb->cb;
 
@@ -1904,7 +1904,7 @@ pgm_rxw_confirm (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	pgm_debug ("confirm (window:%p sequence:%" PRIu32 " nak_rdata_expiry:%" PGM_TIME_FORMAT " nak_rb_expiry:%" PGM_TIME_FORMAT ")",
 		(void*)window, sequence, nak_rdata_expiry, nak_rb_expiry);
@@ -1948,11 +1948,11 @@ _pgm_rxw_recovery_update (
 	)
 {
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 /* fetch skb from window and bump expiration times */
 	struct pgm_sk_buff_t* skb = _pgm_rxw_peek (window, sequence);
-	pgm_assert (skb);
+	pgm_assert (NULL != skb);
 	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
 	switch (state->pkt_state) {
 	case PGM_PKT_STATE_BACK_OFF:
@@ -1994,7 +1994,7 @@ _pgm_rxw_recovery_append (
 	struct pgm_sk_buff_t* skb;
 
 /* pre-conditions */
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 
 	if (pgm_rxw_is_full (window)) {
 		if (_pgm_rxw_commit_is_empty (window))

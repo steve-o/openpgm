@@ -30,7 +30,7 @@
 PGM_BEGIN_DECLS
 
 /* 8 bit wide galois field integer: GF(2⁸) */
-typedef uint8_t pgm_gf8_t;
+typedef uint8_t __attribute__((__may_alias__)) pgm_gf8_t;
 
 /* E denotes the encoding symbol length in bytes.
  * S denotes the symbol size in units of m-bit elements.  When m = 8,

@@ -67,7 +67,7 @@ pgm_log_func_t pgm_log_set_handler (pgm_log_func_t, void*);
 void pgm__log  (const int, const char*, ...) PGM_GNUC_PRINTF (2, 3);
 void pgm__logv (const int, const char*, va_list) PGM_GNUC_PRINTF (2, 0);
 
-#ifdef PGM_HAVE_ISO_VARARGS
+#ifdef CONFIG_HAVE_ISO_VARARGS
 
 #define pgm_debug(...)		if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) pgm__log (PGM_LOG_LEVEL_DEBUG, __VA_ARGS__)
 #define pgm_trace(r,...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
@@ -78,7 +78,7 @@ void pgm__logv (const int, const char*, va_list) PGM_GNUC_PRINTF (2, 0);
 #define pgm_error(...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_ERROR) pgm__log (PGM_LOG_LEVEL_ERROR, __VA_ARGS__)
 #define pgm_fatal(...)		pgm__log (PGM_LOG_LEVEL_FATAL, __VA_ARGS__)
 
-#elif defined(PGM_HAVE_GNUC_VARARGS)
+#elif defined(CONFIG_HAVE_GNUC_VARARGS)
 
 #define pgm_debug(f...)		if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) pgm__log (PGM_LOG_LEVEL_DEBUG, f)
 #define pgm_trace(r,f...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \

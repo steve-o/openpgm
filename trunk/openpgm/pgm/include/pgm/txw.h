@@ -99,7 +99,7 @@ pgm_txw_max_length (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->alloc;
 }
 
@@ -109,7 +109,7 @@ pgm_txw_length (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return ( 1 + window->lead ) - window->trail;
 }
 
@@ -119,7 +119,7 @@ pgm_txw_size (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->size;
 }
 
@@ -129,7 +129,7 @@ pgm_txw_is_empty (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return (0 == pgm_txw_length (window));
 }
 
@@ -139,7 +139,7 @@ pgm_txw_is_full (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return (pgm_txw_length (window) == pgm_txw_max_length (window));
 }
 
@@ -149,7 +149,7 @@ pgm_txw_lead (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->lead;
 }
 
@@ -160,7 +160,7 @@ pgm_txw_lead_atomic (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return pgm_atomic_int32_get ((const volatile int32_t*)&window->lead);
 }
 
@@ -170,7 +170,7 @@ pgm_txw_next_lead (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return (uint32_t)(pgm_txw_lead (window) + 1);
 }
 
@@ -180,7 +180,7 @@ pgm_txw_trail (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return window->trail;
 }
 
@@ -190,7 +190,7 @@ pgm_txw_trail_atomic (
 	const pgm_txw_t*const window
 	)
 {
-	pgm_assert (window);
+	pgm_assert (NULL != window);
 	return pgm_atomic_int32_get ((const volatile int32_t*)&window->trail);
 }
 
