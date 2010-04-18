@@ -330,7 +330,7 @@ do_csum_vector (
 					asm("addq %1, %0 \n\t"
 						"adcq %2, %0"
 						: "=r" (acc)
-						: "m" (*(uint64_t*)buf), "r" (carry), "0" (acc));
+						: "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc));
 					buf  = &buf[ 8 ];
 					count--;
 				}

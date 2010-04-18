@@ -96,7 +96,7 @@ pgm_sendto (
 		pgm_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
-	pgm_debug ("sendto returned %d", sent);
+	pgm_debug ("sendto returned %zu", sent);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
 		errno != EHOSTUNREACH &&	/* No route to host */

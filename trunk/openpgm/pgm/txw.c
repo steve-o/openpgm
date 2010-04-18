@@ -104,7 +104,6 @@ pgm_txw_retransmit_can_peek (
 /* sequence state must be smaller than PGM skbuff control buffer */
 PGM_STATIC_ASSERT(sizeof(struct pgm_txw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
 
-inline
 uint32_t
 pgm_txw_get_unfolded_checksum (
 	struct pgm_sk_buff_t*const skb
@@ -114,7 +113,6 @@ pgm_txw_get_unfolded_checksum (
 	return state->unfolded_checksum;
 }
 
-inline
 void
 pgm_txw_set_unfolded_checksum (
 	struct pgm_sk_buff_t*const skb,
@@ -125,7 +123,6 @@ pgm_txw_set_unfolded_checksum (
 	state->unfolded_checksum = csum;
 }
 
-inline
 void
 pgm_txw_inc_retransmit_count (
 	struct pgm_sk_buff_t*const skb
@@ -135,7 +132,6 @@ pgm_txw_inc_retransmit_count (
 	state->retransmit_count++;
 }
 
-inline
 bool
 pgm_txw_retransmit_is_empty (
 	const pgm_txw_t*const	window

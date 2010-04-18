@@ -78,8 +78,8 @@ recvskb (
 	pgm_assert (NULL != dst_addr);
 	pgm_assert (dst_addrlen > 0);
 
-	pgm_debug ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%zu dst-addr:%p dst-addrlen:%zu)",
-		(void*)transport, (void*)skb, flags, (void*)src_addr, src_addrlen, (void*)dst_addr, dst_addrlen);
+	pgm_debug ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%d dst-addr:%p dst-addrlen:%d)",
+		(void*)transport, (void*)skb, flags, (void*)src_addr, (int)src_addrlen, (void*)dst_addr, (int)dst_addrlen);
 
 	if (PGM_UNLIKELY(transport->is_destroyed))
 		return 0;

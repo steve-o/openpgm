@@ -49,6 +49,7 @@ void pgm_strfreev (char**);
 
 pgm_string_t* pgm_string_new (const char*);
 char* pgm_string_free (pgm_string_t*, bool);
+void pgm_string_printf (pgm_string_t*restrict, const char*restrict, ...) PGM_GNUC_PRINTF(2, 3);
 pgm_string_t* pgm_string_append (pgm_string_t*restrict, const char*restrict);
 pgm_string_t* pgm_string_append_c (pgm_string_t*, char);
 void pgm_string_append_printf (pgm_string_t*restrict, const char*restrict, ...) PGM_GNUC_PRINTF(2, 3);

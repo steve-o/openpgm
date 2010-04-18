@@ -32,23 +32,23 @@
 pgm_slist_t* pgm_histograms = NULL;
 
 
-static void sample_set_accumulate (pgm_sample_set_t*, pgm_sample_t, pgm_count_t, size_t);
+static void sample_set_accumulate (pgm_sample_set_t*, pgm_sample_t, pgm_count_t, unsigned);
 static pgm_count_t sample_set_total_count (pgm_sample_set_t*);
 
-static void set_bucket_range (pgm_histogram_t*, size_t, pgm_sample_t);
+static void set_bucket_range (pgm_histogram_t*, unsigned, pgm_sample_t);
 static void initialize_bucket_range (pgm_histogram_t*);
-static size_t bucket_index (pgm_histogram_t*, pgm_sample_t);
-static void accumulate (pgm_histogram_t*, pgm_sample_t, pgm_count_t, size_t);
+static unsigned bucket_index (pgm_histogram_t*, pgm_sample_t);
+static void accumulate (pgm_histogram_t*, pgm_sample_t, pgm_count_t, unsigned);
 static double get_peak_bucket_size (pgm_histogram_t*, pgm_sample_set_t*);
-static double get_bucket_size (pgm_histogram_t*, pgm_count_t, size_t);
+static double get_bucket_size (pgm_histogram_t*, pgm_count_t, unsigned);
 
 static void pgm_histogram_write_html_graph (pgm_histogram_t*, pgm_string_t*);
 static void write_ascii (pgm_histogram_t*, const char* newline, pgm_string_t*);
 static void write_ascii_header (pgm_histogram_t*, pgm_sample_set_t*, pgm_count_t, pgm_string_t*);
 static void write_ascii_bucket_graph (double, double, pgm_string_t*);
-static void write_ascii_bucket_context (int64_t, pgm_count_t, int64_t, size_t, pgm_string_t*);
+static void write_ascii_bucket_context (int64_t, pgm_count_t, int64_t, unsigned, pgm_string_t*);
 static void write_ascii_bucket_value (pgm_count_t, double, pgm_string_t*);
-static pgm_string_t* get_ascii_bucket_range (pgm_histogram_t*, size_t);
+static pgm_string_t* get_ascii_bucket_range (pgm_histogram_t*, unsigned);
 
 
 void
