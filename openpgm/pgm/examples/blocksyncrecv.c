@@ -20,6 +20,7 @@
  */
 
 #include <locale.h>
+#include <signal.h>
 #include <stdio.h>
 #include <glib.h>
 #include <pgm/pgm.h>

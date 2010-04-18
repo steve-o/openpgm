@@ -32,6 +32,10 @@
                "This indicates a bug. You must ensure an error is NULL before it's set.\n" \
                "The overwriting error message was: %s"
 
+static pgm_error_t* pgm_error_new_valist (const int, const int, const char*, va_list) PGM_GNUC_PRINTF(3, 0);
+static void pgm_error_add_prefix (char**, const char*, va_list) PGM_GNUC_PRINTF(2, 0);
+
+
 static
 pgm_error_t*
 pgm_error_new_valist (

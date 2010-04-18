@@ -44,7 +44,7 @@ pgm_list_t* pgm_list_prepend_link (pgm_list_t* restrict, pgm_list_t* restrict) P
 pgm_list_t* pgm_list_remove_link (pgm_list_t*, pgm_list_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 pgm_list_t* pgm_list_delete_link (pgm_list_t*, pgm_list_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 pgm_list_t* pgm_list_last (pgm_list_t*);
-size_t pgm_list_length (pgm_list_t*);
+unsigned pgm_list_length (pgm_list_t*);
 
 
 PGM_END_DECLS

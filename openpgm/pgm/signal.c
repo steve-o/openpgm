@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define _GNU_SOURCE
+#include <signal.h>		/* strsignal() */
 #include <pgm/framework.h>
 #include "pgm/signal.h"
 
@@ -82,10 +84,10 @@ on_signal (
 	pgm_debug ("on_signal (signum:%d)", signum);
 	if (write (signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
-#ifdef G_OS_UNIX
-		pgm_warn ("Unix signal %s (%i) lost", strsignal (signum), signum);
+#ifndef _WIN32
+		pgm_warn ("Unix signal %s (%d) lost", strsignal (signum), signum);
 #else
-		pgm_warn ("Unix signal (%i) lost", signum);
+		pgm_warn ("Unix signal (%d) lost", signum);
 #endif
 	}
 }

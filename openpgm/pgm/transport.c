@@ -659,7 +659,7 @@ pgm_transport_bind (
 
 	if (transport->udp_encap_ucast_port) {
 		const size_t udphdr_len = sizeof(struct pgm_udphdr);
-		pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming UDP header size of %i bytes", udphdr_len);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,"assuming UDP header size of %zu bytes", udphdr_len);
 		transport->iphdr_len += udphdr_len;
 	}
 
@@ -1311,7 +1311,7 @@ no_cap_net_admin:
 /* setup rate control */
 		if (transport->txw_max_rte)
 		{
-			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %i bytes per second."),
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zu bytes per second."),
 					transport->txw_max_rte);
 	
 			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len, transport->max_tpdu);
