@@ -24,8 +24,8 @@
 
 //#define HASHTABLE_DEBUG
 
-#define HASH_TABLE_MIN_SIZE	11
-#define HASH_TABLE_MAX_SIZE	13845163
+#define HASHTABLE_MIN_SIZE	11
+#define HASHTABLE_MAX_SIZE	13845163
 
 struct pgm_hashnode_t
 {
@@ -47,24 +47,24 @@ struct pgm_hashtable_t
 	volatile int32_t	ref_count;
 };
 
-#define PGM_HASH_TABLE_RESIZE(hash_table) \
+#define PGM_HASHTABLE_RESIZE(hash_ttable) \
 	do { \
-		if ( (hash_table->size >= 3 * hash_table->nnodes && hash_table->size > HASH_TABLE_MIN_SIZE) || \
-		     (3 * hash_table->size <= hash_table->nnodes && hash_table->size < HASH_TABLE_MAX_SIZE) ) \
+		if ( (hash_table->size >= 3 * hash_table->nnodes && hash_table->size > HASHTABLE_MIN_SIZE) || \
+		     (3 * hash_table->size <= hash_table->nnodes && hash_table->size < HASHTABLE_MAX_SIZE) ) \
 		{ \
-			pgm_hash_table_resize (hash_table); \
+			pgm_hashtable_resize (hash_table); \
 		} \
 	} while (0)
 
-static void pgm_hash_table_resize (pgm_hashtable_t*);
-static pgm_hashnode_t** pgm_hash_table_lookup_node (pgm_hashtable_t*restrict, const void*restrict, pgm_hash_t*restrict);
+static void pgm_hashtable_resize (pgm_hashtable_t*);
+static pgm_hashnode_t** pgm_hashtable_lookup_node (pgm_hashtable_t*restrict, const void*restrict, pgm_hash_t*restrict);
 static pgm_hashnode_t* pgm_hash_node_new (const void*restrict, void*restrict, const pgm_hash_t);
 static void pgm_hash_node_destroy (pgm_hashnode_t*);
 static void pgm_hash_nodes_destroy (pgm_hashnode_t*);
 
 
 pgm_hashtable_t*
-pgm_hash_table_new (
+pgm_hashtable_new (
 	pgm_hashfunc_t	hash_func,
 	pgm_equalfunc_t	key_equal_func
 	)
@@ -75,7 +75,7 @@ pgm_hash_table_new (
 	pgm_hashtable_t *hash_table;
   
 	hash_table = pgm_new (pgm_hashtable_t, 1);
-	hash_table->size               = HASH_TABLE_MIN_SIZE;
+	hash_table->size               = HASHTABLE_MIN_SIZE;
 	hash_table->nnodes             = 0;
 	hash_table->hash_func          = hash_func;
 	hash_table->key_equal_func     = key_equal_func;
@@ -86,7 +86,7 @@ pgm_hash_table_new (
 }
 
 void
-pgm_hash_table_unref (
+pgm_hashtable_unref (
 	pgm_hashtable_t*	hash_table
 	)
 {
@@ -103,20 +103,20 @@ pgm_hash_table_unref (
 }
 
 void
-pgm_hash_table_destroy (
+pgm_hashtable_destroy (
 	pgm_hashtable_t*	hash_table
 	)
 {
 	pgm_return_if_fail (hash_table != NULL);
 	pgm_return_if_fail (hash_table->ref_count > 0);
   
-	pgm_hash_table_remove_all (hash_table);
-	pgm_hash_table_unref (hash_table);
+	pgm_hashtable_remove_all (hash_table);
+	pgm_hashtable_unref (hash_table);
 }
 
 static inline
 pgm_hashnode_t**
-pgm_hash_table_lookup_node (
+pgm_hashtable_lookup_node (
 	pgm_hashtable_t* restrict hash_table,
 	const void*	 restrict key,
 	pgm_hash_t*	 restrict hash_return	/* non-NULL to return hash value */
@@ -138,19 +138,19 @@ pgm_hash_table_lookup_node (
 }
 
 void*
-pgm_hash_table_lookup (
+pgm_hashtable_lookup (
 	pgm_hashtable_t* restrict hash_table,
 	const void*	 restrict key
 	)
 {
 	pgm_return_val_if_fail (hash_table != NULL, NULL);
   
-	const pgm_hashnode_t* node = *pgm_hash_table_lookup_node (hash_table, key, NULL);
+	const pgm_hashnode_t* node = *pgm_hashtable_lookup_node (hash_table, key, NULL);
 	return node ? node->value : NULL;
 }
 
 void
-pgm_hash_table_insert (
+pgm_hashtable_insert (
 	pgm_hashtable_t* restrict hash_table,
 	const void*	 restrict key,
 	void*		 restrict value
@@ -162,16 +162,16 @@ pgm_hash_table_insert (
 	pgm_return_if_fail (hash_table != NULL);
 	pgm_return_if_fail (hash_table->ref_count > 0);
   
-	node = pgm_hash_table_lookup_node (hash_table, key, &key_hash);
+	node = pgm_hashtable_lookup_node (hash_table, key, &key_hash);
 	pgm_return_if_fail (NULL == *node); 
 
 	*node = pgm_hash_node_new (key, value, key_hash);
 	hash_table->nnodes++;
-	PGM_HASH_TABLE_RESIZE (hash_table);
+	PGM_HASHTABLE_RESIZE (hash_table);
 }
 
 bool
-pgm_hash_table_remove (
+pgm_hashtable_remove (
 	pgm_hashtable_t* restrict hash_table,
 	const void*	 restrict key
 	)
@@ -180,21 +180,21 @@ pgm_hash_table_remove (
   
 	pgm_return_val_if_fail (hash_table != NULL, FALSE);
   
-	node = pgm_hash_table_lookup_node (hash_table, key, NULL);
+	node = pgm_hashtable_lookup_node (hash_table, key, NULL);
 	if (*node)
 	{
 		dest = *node;
 		(*node) = dest->next;
 		pgm_hash_node_destroy (dest);
 		hash_table->nnodes--;
-		PGM_HASH_TABLE_RESIZE (hash_table);
+		PGM_HASHTABLE_RESIZE (hash_table);
 		return TRUE;
 	}
 	return FALSE;
 }
 
 void
-pgm_hash_table_remove_all (
+pgm_hashtable_remove_all (
 	pgm_hashtable_t*	hash_table
 	)
 {
@@ -206,17 +206,17 @@ pgm_hash_table_remove_all (
 		hash_table->nodes[i] = NULL;
 	}
 	hash_table->nnodes = 0;
-	PGM_HASH_TABLE_RESIZE (hash_table);
+	PGM_HASHTABLE_RESIZE (hash_table);
 }
 
 static
 void
-pgm_hash_table_resize (
+pgm_hashtable_resize (
 	pgm_hashtable_t*	hash_table
 	)
 {
 	const unsigned new_size = CLAMP (pgm_spaced_primes_closest (hash_table->nnodes),
-					 HASH_TABLE_MIN_SIZE, HASH_TABLE_MAX_SIZE);
+					 HASHTABLE_MIN_SIZE, HASHTABLE_MAX_SIZE);
 	pgm_hashnode_t** new_nodes = pgm_new0 (pgm_hashnode_t*, new_size);
   
 	for (unsigned i = 0; i < hash_table->size; i++)

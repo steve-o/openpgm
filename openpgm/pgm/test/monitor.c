@@ -35,15 +35,16 @@
 
 #include <glib.h>
 
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/signal.h>
 #include <pgm/log.h>
-#include <pgm/packet.h>
+
+#include "dump-json.h"
 
 
 /* globals */
 
-static int g_port = 7500;
 static const char* g_network = "239.192.0.1";
 static struct in_addr g_filter /* = { 0 } */;
 
@@ -67,9 +68,10 @@ main (
 	G_GNUC_UNUSED char   *argv[]
 	)
 {
-	puts ("monitor");
-
+/* pre-initialise PGM messages module to add hook for GLib logging */
+	pgm_messages_init();
 	log_init ();
+	puts ("monitor");
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
@@ -110,6 +112,7 @@ main (
 	}
 
 	puts ("finished.");
+	pgm_messages_shutdown();
 	return 0;
 }
 
