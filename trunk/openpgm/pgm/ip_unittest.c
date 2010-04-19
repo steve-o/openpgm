@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,11 +29,11 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
+
 #include <glib.h>
 #include <check.h>
 
-#include <pgm/indextoaddr.h>
-#include <pgm/sockaddr.h>
 
 /* getsockopt(3SOCKET)
  * level is the protocol number of the protocl that controls the option.
@@ -43,6 +44,12 @@
 #ifndef SOL_IPV6
 #	define SOL_IPV6		IPPROTO_IPV6
 #endif
+
+/* mock state */
+
+#define PGM_COMPILATION
+#include "pgm/sockaddr.h"
+#include "pgm/indextoaddr.h"
 
 
 /* target:
@@ -62,7 +69,7 @@ START_TEST (test_multicast_loop_pass_001)
 	struct sockaddr_in recv_addr;
 	memcpy (&recv_addr, &addr, sizeof(addr));
 	recv_addr.sin_port = 7500;
-	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len (&recv_addr)), "bind failed");
+	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len ((struct sockaddr*)&recv_addr)), "bind failed");
 	struct group_req gr;
 	memset (&gr, 0, sizeof(gr));
 	((struct sockaddr*)&gr.gr_group)->sa_family = addr.sin_family;
@@ -74,7 +81,7 @@ START_TEST (test_multicast_loop_pass_001)
 	fail_if (-1 == send_sock, "socket failed");
 	struct sockaddr_in send_addr;
 	memcpy (&send_addr, &addr, sizeof(addr));
-	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len (&send_addr)), "bind failed");
+	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)), "bind failed");
         struct sockaddr_in if_addr;
 	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
 	fail_unless (0 == pgm_sockaddr_multicast_if (send_sock, (struct sockaddr*)&if_addr, 0), "multicast_if failed");
@@ -82,7 +89,7 @@ START_TEST (test_multicast_loop_pass_001)
 
 	const char data[] = "apple pie";
 	addr.sin_port = 7500;
-	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len (&addr));
+	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
 	if (-1 == bytes_sent)
 		g_message ("sendto: %s", strerror (errno));
 	fail_unless (sizeof(data) == bytes_sent, "sendto underrun");
@@ -115,7 +122,7 @@ START_TEST (test_port_bind_pass_001)
 	struct sockaddr_in recv_addr;
 	memcpy (&recv_addr, &addr, sizeof(addr));
 	recv_addr.sin_port = 3056;
-	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len (&recv_addr)), "bind failed");
+	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len ((struct sockaddr*)&recv_addr)), "bind failed");
 	struct group_req gr;
 	memset (&gr, 0, sizeof(gr));
 	((struct sockaddr*)&gr.gr_group)->sa_family = addr.sin_family;
@@ -128,7 +135,7 @@ START_TEST (test_port_bind_pass_001)
 	fail_if (-1 == send_sock, "socket failed");
 	struct sockaddr_in send_addr;
 	memcpy (&send_addr, &addr, sizeof(addr));
-	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len (&send_addr)), "bind failed");
+	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)), "bind failed");
         struct sockaddr_in if_addr;
 	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
 	fail_unless (0 == pgm_sockaddr_multicast_if (send_sock, (struct sockaddr*)&if_addr, 0), "multicast_if failed");
@@ -136,7 +143,7 @@ START_TEST (test_port_bind_pass_001)
 
 	const char data[] = "apple pie";
 	addr.sin_port = 3056;
-	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len (&addr));
+	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
 	if (-1 == bytes_sent)
 		g_message ("sendto: %s", strerror (errno));
 	fail_unless (sizeof(data) == bytes_sent, "sendto underrun");

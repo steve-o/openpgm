@@ -28,6 +28,7 @@
 
 #include <sys/socket.h>
 #include <pgm/types.h>
+#include <pgm/error.h>
 
 PGM_BEGIN_DECLS
 
