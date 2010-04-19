@@ -89,7 +89,7 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('mem.c'),
 			e.Object('string.c'),
 			e.Object('slist.c')] + tlog);
-	te.Program ('md5_unittest.c');
+	te.Program (['md5_unittest.c'] + tlog);
 	te.Program (['getifaddrs_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c'),
