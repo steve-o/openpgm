@@ -120,7 +120,7 @@ pgm_inet_network (
 			const struct in_addr netaddr = { .s_addr = cidr_to_netmask (val) };
 #ifdef INET_NETWORK_DEBUG
 {
-g_trace ("netaddr %s", inet_ntoa (netaddr));
+g_debug ("netaddr %s", inet_ntoa (netaddr));
 }
 #endif
 			in->s_addr &= netaddr.s_addr;
@@ -219,7 +219,7 @@ pgm_inet6_network (
 
 /* zero out host bits */
 	const unsigned suffix_length = 128 - val;
-	for (unsigned i = suffix_length, j = 15; i > 0; i -= 8, --j)
+	for (int i = suffix_length, j = 15; i > 0; i -= 8, --j)
 	{
 		in6->s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
 	}
