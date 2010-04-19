@@ -19,57 +19,61 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <check.h>
 #include <glib.h>
 
-#include <pgm/reed_solomon.h>
-
-#define pgm_histogram_add	mock_pgm_histogram_add
-#include <pgm/histogram.h>
-
 
 /* mock global */
 
+#define pgm_histogram_add		mock_pgm_histogram_add
+#define pgm_rs_create			mock_pgm_rs_create
+#define pgm_rs_destroy			mock_pgm_rs_destroy
+#define pgm_rs_encode			mock_pgm_rs_encode
+#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
+#define pgm_histogram_init		mock_pgm_histogram_init
+
+#define TXW_DEBUG
+#include "txw.c"
+
+
 /** reed-solomon module */
-static
 void
 mock_pgm_rs_create (
-	rs_t*			rs_,
-	guint			n,
-	guint			k
+	pgm_rs_t*		rs,
+	uint8_t			n,
+	uint8_t			k
 	)
 {
 }
 
-static
 void
 mock_pgm_rs_destroy (
-	rs_t*			rs
+	pgm_rs_t*		rs
 	)
 {
 }
 
-static
 void
 mock_pgm_rs_encode(
-	rs_t*			rs,
-	const void**		src,
-	const guint		offset,
-	gpointer		dst,
-	const gsize		len
+	pgm_rs_t*		rs,
+	const pgm_gf8_t**	src,
+	const uint8_t		offset,
+	pgm_gf8_t*		dst,
+	const uint16_t		len
         )
 {
 }
 
 /** checksum module */
-static
-guint32
+uint32_t
 mock_pgm_compat_csum_partial (
 	const void*		addr,
-	guint			len,
-	guint32			csum
+	uint16_t		len,
+	uint32_t		csum
 	)
 {
 	return 0x0;
@@ -92,15 +96,6 @@ mock_pgm_histogram_add (
 
 
 /* mock functions for external references */
-
-#define pgm_rs_create			mock_pgm_rs_create
-#define pgm_rs_destroy			mock_pgm_rs_destroy
-#define pgm_rs_encode			mock_pgm_rs_encode
-#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
-#define pgm_histogram_init	mock_pgm_histogram_init
-
-#define TXW_DEBUG
-#include "txwi.c"
 
 
 /* generate valid skb, data pointer pointing to PGM payload
@@ -177,7 +172,7 @@ END_TEST
 START_TEST (test_create_fail_001)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_create (&tsi, 0, 0, 60, 800000, FALSE, 0, 0);
+	const pgm_txw_t* window = pgm_txw_create (&tsi, 0, 0, 60, 800000, FALSE, 0, 0);
 	fail ("reached");
 }
 END_TEST
@@ -186,7 +181,7 @@ END_TEST
 START_TEST (test_create_fail_002)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_create (&tsi, 0, 0, 0, 800000, FALSE, 0, 0);
+	const pgm_txw_t* window = pgm_txw_create (&tsi, 0, 0, 0, 800000, FALSE, 0, 0);
 	fail ("reached");
 }
 END_TEST
@@ -195,7 +190,7 @@ END_TEST
 START_TEST (test_create_fail_003)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_create (&tsi, 0, 0, 60, 0, FALSE, 0, 0);
+	const pgm_txw_t* window = pgm_txw_create (&tsi, 0, 0, 60, 0, FALSE, 0, 0);
 	fail ("reached");
 }
 END_TEST
@@ -204,7 +199,7 @@ END_TEST
 START_TEST (test_create_fail_004)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_txw_create (NULL, 0, 0, 0, 0, FALSE, 0, 0);
+	const pgm_txw_t* window = pgm_txw_create (NULL, 0, 0, 0, 0, FALSE, 0, 0);
 	fail ("reached");
 }
 END_TEST
@@ -311,7 +306,7 @@ END_TEST
 /* null window */
 START_TEST (test_peek_fail_001)
 {
-	pgm_txw_peek (NULL, 0);
+	const struct pgm_sk_buff_t* skb = pgm_txw_peek (NULL, 0);
 	fail ("reached");
 }
 END_TEST
@@ -343,7 +338,7 @@ END_TEST
 
 START_TEST (test_max_length_fail_001)
 {
-	pgm_txw_max_length (NULL);
+	const size_t answer = pgm_txw_max_length (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -366,7 +361,7 @@ END_TEST
 
 START_TEST (test_length_fail_001)
 {
-	pgm_txw_length (NULL);
+	const uint32_t answer = pgm_txw_length (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -389,7 +384,7 @@ END_TEST
 
 START_TEST (test_size_fail_001)
 {
-	pgm_txw_size (NULL);
+	const size_t answer = pgm_txw_size (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -412,7 +407,7 @@ END_TEST
 
 START_TEST (test_is_empty_fail_001)
 {
-	pgm_txw_is_empty (NULL);
+	const bool answer = pgm_txw_is_empty (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -435,7 +430,7 @@ END_TEST
 
 START_TEST (test_is_full_fail_001)
 {
-	pgm_txw_is_full (NULL);
+	const bool answer = pgm_txw_is_full (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -458,7 +453,7 @@ END_TEST
 
 START_TEST (test_lead_fail_001)
 {
-	pgm_txw_lead (NULL);
+	const uint32_t answer = pgm_txw_lead (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -482,7 +477,7 @@ END_TEST
 
 START_TEST (test_next_lead_fail_001)
 {
-	pgm_txw_next_lead (NULL);
+	const uint32_t answer = pgm_txw_next_lead (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -511,18 +506,18 @@ END_TEST
 
 START_TEST (test_trail_fail_001)
 {
-	pgm_txw_trail (NULL);
+	const uint32_t answer = pgm_txw_trail (NULL);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_txw_retransmit_push (
  *		pgm_txw_t* const	window,
- *		const guint32		sequence,
- *		const gboolean		is_parity,
- *		const guint		tg_sqn_shift
+ *		const uint32_t		sequence,
+ *		const bool		is_parity,
+ *		const uint8_t		tg_sqn_shift
  *		)
  */
 
@@ -546,7 +541,7 @@ END_TEST
 
 START_TEST (test_retransmit_push_fail_001)
 {
-	pgm_txw_retransmit_push (NULL, 0, FALSE, 0);
+	const bool answer = pgm_txw_retransmit_push (NULL, 0, FALSE, 0);
 	fail ("reached");
 }
 END_TEST
@@ -575,7 +570,7 @@ END_TEST
 /* null window */
 START_TEST (test_retransmit_try_peek_fail_001)
 {
-	pgm_txw_retransmit_try_peek (NULL);
+	const struct pgm_sk_buff_t* skb = pgm_txw_retransmit_try_peek (NULL);
 	fail ("reached");
 }
 END_TEST
