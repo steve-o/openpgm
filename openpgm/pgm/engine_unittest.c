@@ -25,14 +25,25 @@
 #include <glib.h>
 #include <check.h>
 
-#include "pgm/transport.h"
-
 
 /* mock state */
 
-static gboolean mock_time_init;
-static pgm_rwlock_t mock_pgm_transport_list_lock;
-static pgm_slist_t* mock_pgm_transport_list = NULL;
+struct pgm_rwlock_t;
+struct pgm_slist_t;
+
+static gint mock_time_init = 0;
+static struct pgm_rwlock_t mock_pgm_transport_list_lock;
+static struct pgm_slist_t* mock_pgm_transport_list = NULL;
+
+#define pgm_time_init		mock_pgm_time_init
+#define pgm_time_shutdown	mock_pgm_time_shutdown
+#define pgm_transport_destroy	mock_pgm_transport_destroy
+#define pgm_transport_list_lock	mock_pgm_transport_list_lock
+#define pgm_transport_list	mock_pgm_transport_list
+
+#define PGM_DEBUG
+#include "engine.c"
+
 
 static
 void
@@ -52,89 +63,60 @@ mock_teardown (void)
 /* mock functions for external references */
 
 PGM_GNUC_INTERNAL
-gboolean
+bool
 mock_pgm_time_init (
 	pgm_error_t**	error
 	)
 {
-	if (mock_time_init)
-		return FALSE;
-	mock_time_init = TRUE;
+	mock_time_init++;
 	return TRUE;
 }
 
-
 PGM_GNUC_INTERNAL
-gboolean
-mock_pgm_time_supported (void)
-{
-	return mock_time_init;
-}
-
-
-PGM_GNUC_INTERNAL
-gboolean
+bool
 mock_pgm_time_shutdown (void)
 {
 	if (!mock_time_init)
 		return FALSE;
-	mock_time_init = FALSE;
+	mock_time_init--;
 	return TRUE;
 }
 
-gboolean
+bool
 mock_pgm_transport_destroy (
-        pgm_transport_t*        transport,
-        gboolean                flush
+	pgm_transport_t*	transport,
+	bool			flush
         )
 {
 	return TRUE;
 }
 
 
-#define pgm_time_init		mock_pgm_time_init
-#define pgm_time_supported	mock_pgm_time_supported
-#define pgm_time_shutdown	mock_pgm_time_shutdown
-#define pgm_transport_destroy	mock_pgm_transport_destroy
-#define pgm_transport_list_lock	mock_pgm_transport_list_lock
-#define pgm_transport_list	mock_pgm_transport_list
-
-#define PGM_DEBUG
-#include "pgm.c"
-
-
 /* target:
- *	gboolean
- *	pgm_init (GError** error)
+ *	bool
+ *	pgm_init (pgm_error_t** error)
  */
 
+/* reference counting on init */
 START_TEST (test_init_pass_001)
 {
 	fail_unless (TRUE == pgm_init (NULL), "init failed");
-	fail_unless (FALSE == pgm_init (NULL), "init failed");
-}
-END_TEST
-
-/* init should succeed if glib threading already initialized */
-START_TEST (test_init_pass_002)
-{
-	g_thread_init (NULL);
 	fail_unless (TRUE == pgm_init (NULL), "init failed");
-	fail_unless (FALSE == pgm_init (NULL), "init failed");
 }
 END_TEST
 
 /* timing module already init */
 START_TEST (test_init_pass_003)
 {
-	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
-	fail_unless (TRUE == pgm_init (NULL), "init failed");
-	fail_unless (FALSE == pgm_init (NULL), "init failed");
+	pgm_error_t* err = NULL;
+	fail_unless (TRUE == pgm_time_init (&err), "time-init failed: %s", (err && err->message) ? err->message : "(null)");
+	fail_unless (TRUE == pgm_init (&err), "init failed: %s", (err && err->message) ? err->message : "(null)");
+	fail_unless (TRUE == pgm_init (&err), "init failed: %s", (err && err->message) ? err->message : "(null)");
 }
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_shutdown (void)
  */
 
@@ -161,8 +143,19 @@ START_TEST (test_shutdown_pass_003)
 }
 END_TEST
 
+/* check reference counting */
+START_TEST (test_shutdown_pass_004)
+{
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_shutdown (), "shutdown failed");
+}
+END_TEST
+
 /* target:
- *	gboolean
+ *	bool
  *	pgm_supported (void)
  */
 
@@ -189,7 +182,6 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_init, mock_setup, mock_teardown);
 	suite_add_tcase (s, tc_init);
 	tcase_add_test (tc_init, test_init_pass_001);
-	tcase_add_test (tc_init, test_init_pass_002);
 	tcase_add_test (tc_init, test_init_pass_003);
 
 	TCase* tc_shutdown = tcase_create ("shutdown");
@@ -198,6 +190,7 @@ make_test_suite (void)
 	tcase_add_test (tc_shutdown, test_shutdown_pass_001);
 	tcase_add_test (tc_shutdown, test_shutdown_pass_002);
 	tcase_add_test (tc_shutdown, test_shutdown_pass_003);
+	tcase_add_test (tc_shutdown, test_shutdown_pass_004);
 	
 	TCase* tc_supported = tcase_create ("supported");
 	tcase_add_checked_fixture (tc_supported, mock_setup, mock_teardown);
