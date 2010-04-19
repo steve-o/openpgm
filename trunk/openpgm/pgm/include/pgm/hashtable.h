@@ -36,14 +36,14 @@ typedef uint_fast32_t pgm_hash_t;
 typedef pgm_hash_t (*pgm_hashfunc_t) (const void*);
 typedef bool (*pgm_equalfunc_t) (const void*restrict, const void*restrict);
 
-pgm_hashtable_t* pgm_hash_table_new (pgm_hashfunc_t, pgm_equalfunc_t);
-void pgm_hash_table_destroy (pgm_hashtable_t*);
-void pgm_hash_table_insert (pgm_hashtable_t*restrict, const void*restrict, void*restrict);
-bool pgm_hash_table_remove (pgm_hashtable_t*restrict, const void*restrict);
-void pgm_hash_table_remove_all (pgm_hashtable_t*);
-void* pgm_hash_table_lookup (pgm_hashtable_t*restrict, const void*restrict);
+pgm_hashtable_t* pgm_hashtable_new (pgm_hashfunc_t, pgm_equalfunc_t);
+void pgm_hashtable_destroy (pgm_hashtable_t*);
+void pgm_hashtable_insert (pgm_hashtable_t*restrict, const void*restrict, void*restrict);
+bool pgm_hashtable_remove (pgm_hashtable_t*restrict, const void*restrict);
+void pgm_hashtable_remove_all (pgm_hashtable_t*);
+void* pgm_hashtable_lookup (pgm_hashtable_t*restrict, const void*restrict);
 
-void pgm_hash_table_unref (pgm_hashtable_t*);
+void pgm_hashtable_unref (pgm_hashtable_t*);
 
 /* Hash Functions
  */

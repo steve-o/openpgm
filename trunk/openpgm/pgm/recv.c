@@ -324,7 +324,7 @@ on_peer (
 	upstream_tsi.sport = skb->pgm_header->pgm_dport;
 
 	pgm_rwlock_reader_lock (&transport->peers_lock);
-	*source = pgm_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
+	*source = pgm_hashtable_lookup (transport->peers_hashtable, &upstream_tsi);
 	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (PGM_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
@@ -406,7 +406,7 @@ on_downstream (
 
 /* search for TSI peer context or create a new one */
 	pgm_rwlock_reader_lock (&transport->peers_lock);
-	*source = pgm_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
+	*source = pgm_hashtable_lookup (transport->peers_hashtable, &skb->tsi);
 	pgm_rwlock_reader_unlock (&transport->peers_lock);
 	if (PGM_UNLIKELY(NULL == *source)) {
 		*source = pgm_new_peer (transport,

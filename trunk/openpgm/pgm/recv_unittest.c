@@ -135,7 +135,7 @@ generate_transport (void)
 	transport->can_send_data = TRUE;
 	transport->can_send_nak = TRUE;
 	transport->can_recv_data = TRUE;
-	transport->peers_hashtable = pgm_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	transport->peers_hashtable = pgm_hashtable_new (pgm_tsi_hash, pgm_tsi_equal);
 	pgm_rand_create (&transport->rand_);
 	transport->nak_bo_ivl = 100*1000;
 	pgm_notify_init (&transport->pending_notify);
@@ -601,7 +601,7 @@ mock_pgm_new_peer (
 					    transport->rxw_max_rte);
 	peer->spmr_expiry = now + transport->spmr_expiry;
 	gpointer entry = mock__pgm_peer_ref(peer);
-	pgm_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
+	pgm_hashtable_insert (transport->peers_hashtable, &peer->tsi, entry);
 	peer->peers_link.next = transport->peers_list;
 	peer->peers_link.data = peer;
 	if (transport->peers_list)
