@@ -2,17 +2,7 @@
 #labels Featured,Phase-Design
 
 = Introduction =
-
 This section covers the points which might be considered negatives about this PGM implementation. Is could also conversely be considered a collection of goals for future development.
-
-= GLib Dependency =
-In order to accelerate the development of OpenPGM and provide a proven cross platform foundation the GLib toolkit is used.  Functionality provided by GLib includes:
-
-  * Basic data types: 32 bit, 64 bit integers and pointer definitions.
-  * Containers: linked lists, queues, pointer arrays, trash stacks, and hash tables.
-  * Asynchronous queue: for delivery of received contiguous packets from the wire to the application.
-  * Threading: mutexes, conditions, and read-write locks.
-  * Event loops: sources, dispatchers, and IO bindings.
 
 
 = Complicated Parameters =
