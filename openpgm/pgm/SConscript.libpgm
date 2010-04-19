@@ -161,7 +161,8 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c')] + tframework);
 	te.Program (['net_unittest.c'] + tframework);
 	te.Program (['timer_unittest.c'] + tframework);
-	te.Program (['packet_unittest.c'] + tframework);
+	te.Program (['packet_parse_unittest.c'] + tframework);
+	te.Program (['packet_test_unittest.c'] + tframework);
 	te.Program (['ip_unittest.c', e.Object('if.c')] + tframework);
 # performance tests
 	te.Program (['checksum_perftest.c', e.Object('time.c'), e.Object('error.c'), e.Object('mem.c'), e.Object('string.c'), e.Object('slist.c')] + tlog);
