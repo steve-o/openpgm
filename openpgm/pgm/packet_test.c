@@ -974,10 +974,10 @@ pgm_udpport_string (
 	static pgm_hashtable_t *services = NULL;
 
 	if (!services) {
-		services = pgm_hash_table_new (pgm_int_hash, pgm_int_equal);
+		services = pgm_hashtable_new (pgm_int_hash, pgm_int_equal);
 	}
 
-	void* service_string = pgm_hash_table_lookup (services, &port);
+	void* service_string = pgm_hashtable_lookup (services, &port);
 	if (service_string != NULL) {
 		return service_string;
 	}
@@ -990,7 +990,7 @@ pgm_udpport_string (
 	} else {
 		service_string = pgm_strdup(se->s_name);
 	}
-	pgm_hash_table_insert (services, &port, service_string);
+	pgm_hashtable_insert (services, &port, service_string);
 	return service_string;
 }
 
@@ -1002,10 +1002,10 @@ pgm_gethostbyaddr (
 	static pgm_hashtable_t *hosts = NULL;
 
 	if (!hosts) {
-		hosts = pgm_hash_table_new (pgm_str_hash, pgm_str_equal);
+		hosts = pgm_hashtable_new (pgm_str_hash, pgm_str_equal);
 	}
 
-	void* host_string = pgm_hash_table_lookup (hosts, ap);
+	void* host_string = pgm_hashtable_lookup (hosts, ap);
 	if (host_string != NULL) {
 		return host_string;
 	}
@@ -1018,7 +1018,7 @@ pgm_gethostbyaddr (
 	} else {
 		host_string = pgm_strdup(he->h_name);
 	}
-	pgm_hash_table_insert (hosts, ap, host_string);
+	pgm_hashtable_insert (hosts, ap, host_string);
 	return host_string;
 }
 

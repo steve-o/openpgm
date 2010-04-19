@@ -31,8 +31,10 @@
 
 #include <glib.h>
 
-#include "pgm/packet.h"
-#include "pgm/checksum.h"
+#include <pgm/pgm.h>
+#include <pgm/packet_test.h>
+
+#include "dump-json.h"
 
 
 /* globals */

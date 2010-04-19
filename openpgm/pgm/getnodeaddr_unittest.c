@@ -519,7 +519,7 @@ make_test_suite (void)
 
 	struct sockaddr_storage addr;
 	char saddr[INET6_ADDRSTRLEN];
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
 		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");
