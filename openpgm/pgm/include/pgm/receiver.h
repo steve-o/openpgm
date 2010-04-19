@@ -132,7 +132,7 @@ bool pgm_transport_set_nak_ncf_retries (pgm_transport_t*, unsigned);
 
 PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t* const, const pgm_tsi_t* const, const struct sockaddr* const, const socklen_t, const struct sockaddr* const, const socklen_t, const pgm_time_t);
 PGM_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
-PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t* const, struct pgm_msgv_t**, const struct pgm_msgv_t* const, size_t* const, size_t* const);
+PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t* const, struct pgm_msgv_t**, const struct pgm_msgv_t* const, size_t* const, unsigned* const);
 PGM_GNUC_INTERNAL bool pgm_peer_has_pending (pgm_peer_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t* const, pgm_peer_t* const);
 PGM_GNUC_INTERNAL bool pgm_check_peer_nak_state (pgm_transport_t* const, const pgm_time_t);

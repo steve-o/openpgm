@@ -687,7 +687,7 @@ pgm_recvmsgv (
 	}
 
 	size_t bytes_read = 0;
-	size_t data_read = 0;
+	unsigned data_read = 0;
 	struct pgm_msgv_t* pmsg = msg_start;
 	const struct pgm_msgv_t* msg_end = msg_start + msg_len - 1;
 
