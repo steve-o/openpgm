@@ -22,17 +22,18 @@
 
 #include <signal.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <glib.h>
 #include <check.h>
 
-#include <pgm/skbuff.h>
-#include <pgm/transport.h>
-#include <pgm/packet.h>
-#include <pgm/ip.h>
-#include <pgm/checksum.h>
-
 
 /* mock state */
+
+#define PACKET_DEBUG
+#include "packet_parse.c"
+
 
 static
 struct pgm_sk_buff_t*
@@ -146,23 +147,19 @@ generate_udp_encap_pgm (void)
 /* mock functions for external references */
 
 
-#define PACKET_DEBUG
-#include "packet.c"
-
-
 /* target:
- *	gboolean
+ *	bool
  *	pgm_parse_raw (
  *		struct pgm_sk_buff_t* const	skb,
  *		struct sockaddr* const		addr,
- *		GError**			error
+ *		pgm_error_t**			error
  *	)
  */
 
 START_TEST (test_parse_raw_pass_001)
 {
 	struct sockaddr_storage addr;
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	struct pgm_sk_buff_t* skb = generate_raw_pgm ();
 	gboolean success = pgm_parse_raw (skb, (struct sockaddr*)&addr, &err);
 	if (!success && err) {
@@ -178,23 +175,23 @@ END_TEST
 START_TEST (test_parse_raw_fail_001)
 {
 	struct sockaddr_storage addr;
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	pgm_parse_raw (NULL, (struct sockaddr*)&addr, &err);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_parse_udp_encap (
  *		struct pgm_sk_buff_t* const	skb,
- *		GError**			error
+ *		pgm_error_t**			error
  *	)
  */
 
 START_TEST (test_parse_udp_encap_pass_001)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	struct pgm_sk_buff_t* skb = generate_udp_encap_pgm ();
 	gboolean success = pgm_parse_udp_encap (skb, &err);
 	if (!success && err) {
@@ -206,36 +203,14 @@ END_TEST
 
 START_TEST (test_parse_udp_encap_fail_001)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	pgm_parse_udp_encap (NULL, &err);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
- *	gboolean
- *	pgm_print_packet (
- *		gpointer			data,
- *		gsize				len
- *	)
- */
-
-START_TEST (test_print_packet_pass_001)
-{
-	struct pgm_sk_buff_t* skb = generate_raw_pgm ();
-	pgm_print_packet (skb->head, skb->len);
-}
-END_TEST
-
-START_TEST (test_print_packet_fail_001)
-{
-	pgm_print_packet (NULL, 0);
-	fail ("reached");
-}
-END_TEST
-
-/* target:
- *	gboolean
+ *	bool
  *	pgm_verify_spm (
  *		struct pgm_sk_buff_t* const	skb
  *	)
@@ -254,7 +229,7 @@ START_TEST (test_verify_spm_fail_001)
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_verify_spmr (
  *		struct pgm_sk_buff_t* const	skb
  *	)
@@ -273,7 +248,7 @@ START_TEST (test_verify_spmr_fail_001)
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_verify_nak (
  *		struct pgm_sk_buff_t* const	skb
  *	)
@@ -292,7 +267,7 @@ START_TEST (test_verify_nak_fail_001)
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_verify_nnak (
  *		struct pgm_sk_buff_t* const	skb
  *	)
@@ -311,7 +286,7 @@ START_TEST (test_verify_nnak_fail_001)
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_verify_ncf (
  *		struct pgm_sk_buff_t* const	skb
  *	)
@@ -347,11 +322,6 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_parse_udp_encap);
 	tcase_add_test (tc_parse_udp_encap, test_parse_udp_encap_pass_001);
 	tcase_add_test_raise_signal (tc_parse_udp_encap, test_parse_udp_encap_fail_001, SIGABRT);
-
-	TCase* tc_print_packet = tcase_create ("print-packet");
-	suite_add_tcase (s, tc_print_packet);
-	tcase_add_test (tc_print_packet, test_print_packet_pass_001);
-	tcase_add_test_raise_signal (tc_print_packet, test_print_packet_fail_001, SIGABRT);
 
 	TCase* tc_verify_spm = tcase_create ("verify-spm");
 	suite_add_tcase (s, tc_verify_spm);
