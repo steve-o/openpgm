@@ -151,7 +151,7 @@ if env['WITH_CHECK'] == 'true':
 # library
 	te.Program (['txwi_unittest.c', e.Object('tsi.c')] + tframework);
 	te.Program (['rxwi_unittest.c', e.Object('tsi.c')] + tframework);
-	te.Program (['pgm_unittest.c'] + tframework);
+	te.Program (['engine_unittest.c', e.Object('version.c')] + tframework);
 	te.Program (['gsi_unittest.c', e.Object('if.c')] + tframework);
 	te.Program (['tsi_unittest.c'] + tframework);
 	te.Program (['if_unittest.c'] + tframework);
