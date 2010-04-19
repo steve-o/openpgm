@@ -21,15 +21,14 @@
 
 
 #include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <glib.h>
 #include <check.h>
-
-#include <pgm/source.h>
-#include <pgm/txwi.h>
-#include <pgm/skbuff.h>
-#include <pgm/ip.h>
-#include <pgm/transport.h>
 
 
 /* mock state */
@@ -54,7 +53,34 @@ static gboolean mock_is_valid_spmr = TRUE;
 static gboolean mock_is_valid_nak = TRUE;
 static gboolean mock_is_valid_nnak = TRUE;
 
-static gsize mock_pgm_transport_pkt_offset (const gboolean can_fragment);
+static size_t mock_pgm_transport_pkt_offset (const bool can_fragment);
+
+
+#define pgm_txw_get_unfolded_checksum	mock_pgm_txw_get_unfolded_checksum
+#define pgm_txw_set_unfolded_checksum	mock_pgm_txw_set_unfolded_checksum
+#define pgm_txw_inc_retransmit_count	mock_pgm_txw_inc_retransmit_count
+#define pgm_txw_add			mock_pgm_txw_add
+#define pgm_txw_peek			mock_pgm_txw_peek
+#define pgm_txw_retransmit_push		mock_pgm_txw_retransmit_push
+#define pgm_txw_retransmit_try_peek	mock_pgm_txw_retransmit_try_peek
+#define pgm_txw_retransmit_remove_head	mock_pgm_txw_retransmit_remove_head
+#define pgm_rs_encode			mock_pgm_rs_encode
+#define pgm_rate_check			mock_pgm_rate_check
+#define pgm_verify_spmr			mock_pgm_verify_spmr
+#define pgm_verify_nak			mock_pgm_verify_nak
+#define pgm_verify_nnak			mock_pgm_verify_nnak
+#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
+#define pgm_compat_csum_partial_copy	mock_pgm_compat_csum_partial_copy
+#define pgm_csum_block_add		mock_pgm_csum_block_add
+#define pgm_csum_fold			mock_pgm_csum_fold
+#define pgm_sendto			mock_pgm_sendto
+#define pgm_time_update_now		mock_pgm_time_update_now
+#define pgm_transport_pkt_offset	mock_pgm_transport_pkt_offset
+
+
+#define SOURCE_DEBUG
+#include "source.c"
+
 
 static
 void
@@ -68,7 +94,7 @@ struct pgm_transport_t*
 generate_transport (void)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
-	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	struct pgm_transport_t* transport = g_new0 (struct pgm_transport_t, 1);
 	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
 	((struct sockaddr*)&transport->send_addr)->sa_family = AF_INET;
 	((struct sockaddr_in*)&transport->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
@@ -84,6 +110,7 @@ generate_transport (void)
 	transport->iphdr_len = sizeof(struct pgm_ip);
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	transport->spm_heartbeat_interval[0] = pgm_secs(1);
+	pgm_spinlock_init (&transport->txw_spinlock);
 	transport->is_bound = FALSE;
 	transport->is_destroyed = FALSE;
 	return transport;
@@ -252,7 +279,6 @@ generate_parity_nak_list (void)
 	return skb;
 }
 
-static
 void
 mock_pgm_txw_add (
 	pgm_txw_t* const		window,
@@ -263,11 +289,10 @@ mock_pgm_txw_add (
 		(gpointer)window, (gpointer)skb);
 }
 
-static
 struct pgm_sk_buff_t*
 mock_pgm_txw_peek (
-	pgm_txw_t* const		window,
-	const guint32			sequence
+	const pgm_txw_t* const		window,
+	const uint32_t			sequence
 	)
 {
 	g_debug ("mock_pgm_txw_peek (window:%p sequence:%" G_GUINT32_FORMAT ")",
@@ -275,13 +300,12 @@ mock_pgm_txw_peek (
 	return NULL;
 }
 
-static
-gboolean
+bool
 mock_pgm_txw_retransmit_push (
 	pgm_txw_t* const		window,
-	const guint32			sequence,
-	const gboolean			is_parity,
-	const guint			tg_sqn_shift
+	const uint32_t			sequence,
+	const bool			is_parity,
+	const uint8_t			tg_sqn_shift
 	)
 {
 	g_debug ("mock_pgm_txw_retransmit_push (window:%p sequence:%" G_GUINT32_FORMAT " is-parity:%s tg-sqn-shift:%d)",
@@ -292,7 +316,29 @@ mock_pgm_txw_retransmit_push (
 	return TRUE;
 }
 
-static
+void
+mock_pgm_txw_set_unfolded_checksum (
+	struct pgm_sk_buff_t*const skb,
+	const uint32_t		csum
+	)
+{
+}
+
+uint32_t
+pgm_txw_get_unfolded_checksum (
+	struct pgm_sk_buff_t*const skb
+	)
+{
+	return 0;
+}
+
+void
+mock_pgm_txw_inc_retransmit_count (
+	struct pgm_sk_buff_t*const skb
+	)
+{
+}
+
 struct pgm_sk_buff_t*
 mock_pgm_txw_retransmit_try_peek (
 	pgm_txw_t* const		window
@@ -303,7 +349,6 @@ mock_pgm_txw_retransmit_try_peek (
 	return generate_odata (); 
 }
 
-static
 void
 mock_pgm_txw_retransmit_remove_head (
 	pgm_txw_t* const		window
@@ -313,14 +358,13 @@ mock_pgm_txw_retransmit_remove_head (
 		(gpointer)window);
 }
 
-static
 void
 mock_pgm_rs_encode (
-	gpointer			rs,
-	const void**			src,
-	guint				offset,
-	void*				dst,
-	gsize				len
+	pgm_rs_t*			rs,
+	const pgm_gf8_t**		src,
+	uint8_t				offset,
+	pgm_gf8_t*			dst,
+	uint16_t			len
 	)
 {
 	g_debug ("mock_pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%" G_GSIZE_FORMAT ")",
@@ -328,98 +372,91 @@ mock_pgm_rs_encode (
 }
 
 PGM_GNUC_INTERNAL
-gboolean
+bool
 mock_pgm_rate_check (
-	gpointer			bucket,
-	const guint			data_size,
-	const int			flags
+	pgm_rate_t*			bucket,
+	const size_t			data_size,
+	const bool			is_nonblocking
 	)
 {
-	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u flags:%d)",
-		bucket, data_size, flags);
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u is-nonblocking:%s)",
+		bucket, data_size, is_nonblocking ? "TRUE" : "FALSE");
 	return TRUE;
 }
 
-static
-gboolean
+bool
 mock_pgm_verify_spmr (
-	struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t* const	skb
 	)
 {
 	return mock_is_valid_spmr;
 }
 
-static
-gboolean
+bool
 mock_pgm_verify_nak (
-	struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t* const	skb
 	)
 {
 	return mock_is_valid_nak;
 }
 
-static
-gboolean
+bool
 mock_pgm_verify_nnak (
-	struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t* const	skb
 	)
 {
 	return mock_is_valid_nnak;
 }
 
-static
-guint32
+uint32_t
 mock_pgm_compat_csum_partial (
 	const void*			addr,
-	guint				len,
-	guint32				csum
+	uint16_t			len,
+	uint32_t			csum
 	)
 {
 	return 0x0;
 }
 
-static
-guint32
+uint32_t
 mock_pgm_compat_csum_partial_copy (
 	const void*			src,
 	void*				dst,
-	guint				len,
-	guint32				csum
+	uint16_t			len,
+	uint32_t			csum
 	)
 {
 	return 0x0;
 }
 
-static
-guint32
+uint32_t
 mock_pgm_csum_block_add (
-	guint32				csum,
-	guint32				csum2,
-	guint				offset
+	uint32_t			csum,
+	uint32_t			csum2,
+	uint16_t			offset
 	)
 {
 	return 0x0;
 }
 
-static
-guint16
+uint16_t
 mock_pgm_csum_fold (
-	guint32				csum
+	uint32_t			csum
 	)
 {
 	return 0x0;
 }
 
 PGM_GNUC_INTERNAL
-gssize
+ssize_t
 mock_pgm_sendto (
 	pgm_transport_t*		transport,
-	gboolean			use_rate_limit,
-	gboolean			use_router_alert,
+	bool				use_rate_limit,
+	bool				use_router_alert,
 	const void*			buf,
-	gsize				len,
+	size_t				len,
 	const struct sockaddr*		to,
-	gsize				tolen
+	socklen_t			tolen
 	)
 {
 	char saddr[INET6_ADDRSTRLEN];
@@ -436,18 +473,21 @@ mock_pgm_sendto (
 }
 
 /** time module */
+static pgm_time_t _mock_pgm_time_update_now (void);
+pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
+
 static
 pgm_time_t
-mock_pgm_time_update_now (void)
+_mock_pgm_time_update_now (void)
 {
 	return 0x1;
 }
 
 /** transport module */
 static
-gsize
+size_t
 mock_pgm_transport_pkt_offset (
-	const gboolean			can_fragment
+	const bool			can_fragment
 	)
 {
 	return can_fragment ? ( sizeof(struct pgm_header)
@@ -460,28 +500,6 @@ mock_pgm_transport_pkt_offset (
 
 
 /* mock functions for external references */
-
-#define pgm_txw_add			mock_pgm_txw_add
-#define pgm_txw_peek			mock_pgm_txw_peek
-#define pgm_txw_retransmit_push		mock_pgm_txw_retransmit_push
-#define pgm_txw_retransmit_try_peek	mock_pgm_txw_retransmit_try_peek
-#define pgm_txw_retransmit_remove_head	mock_pgm_txw_retransmit_remove_head
-#define pgm_rs_encode			mock_pgm_rs_encode
-#define pgm_rate_check			mock_pgm_rate_check
-#define pgm_verify_spmr			mock_pgm_verify_spmr
-#define pgm_verify_nak			mock_pgm_verify_nak
-#define pgm_verify_nnak			mock_pgm_verify_nnak
-#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
-#define pgm_compat_csum_partial_copy	mock_pgm_compat_csum_partial_copy
-#define pgm_csum_block_add		mock_pgm_csum_block_add
-#define pgm_csum_fold			mock_pgm_csum_fold
-#define pgm_sendto			mock_pgm_sendto
-#define pgm_time_update_now		mock_pgm_time_update_now
-#define pgm_transport_pkt_offset	mock_pgm_transport_pkt_offset
-
-
-#define SOURCE_DEBUG
-#include "source.c"
 
 
 /* target:
