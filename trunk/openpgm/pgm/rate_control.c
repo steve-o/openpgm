@@ -24,6 +24,8 @@
 
 /* create machinery for rate regulation.
  * the rate_per_sec is ammortized over millisecond time periods.
+ *
+ * NB: bucket MUST be memset 0 before calling.
  */
 
 void
