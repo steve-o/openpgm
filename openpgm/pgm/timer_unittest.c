@@ -21,16 +21,36 @@
 
 
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
 
 
-#include <pgm/transport.h>
-
-
 /* mock state */
 
+
+#define g_main_context_new		mock_g_main_context_new
+#define g_main_context_unref		mock_g_main_context_unref
+#define g_main_loop_new			mock_g_main_loop_new
+#define g_main_loop_run			mock_g_main_loop_run
+#define g_main_loop_unref		mock_g_main_loop_unref
+#define g_source_new			mock_g_source_new
+#define g_source_set_priority		mock_g_source_set_priority
+#define g_source_attach			mock_g_source_attach
+#define g_source_unref			mock_g_source_unref
+#define pgm_time_now			mock_pgm_time_now
+#define pgm_time_update_now		mock_pgm_time_update_now
+#define pgm_min_nak_expiry		mock_pgm_min_nak_expiry
+#define pgm_check_peer_nak_state	mock_pgm_check_peer_nak_state
+#define pgm_send_spm			mock_pgm_send_spm
+
+
+#define TIMER_DEBUG
+#include "timer.c"
+
+static pgm_time_t _mock_pgm_time_update_now(void);
+pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
 static pgm_time_t mock_pgm_time_now = 0x1;
 
 
@@ -38,7 +58,7 @@ static
 pgm_transport_t*
 generate_transport (void)
 {
-	pgm_transport_t* transport = g_malloc0 (sizeof(pgm_transport_t));
+	pgm_transport_t* transport = g_new0 (pgm_transport_t, 1);
 	return transport;
 }
 
@@ -141,7 +161,7 @@ mock_g_source_unref (
 /** time module */
 static
 pgm_time_t
-mock_pgm_time_update_now (void)
+_mock_pgm_time_update_now (void)
 {
 	return mock_pgm_time_now;
 }
@@ -159,7 +179,7 @@ mock_pgm_min_nak_expiry (
 }
 
 PGM_GNUC_INTERNAL
-gboolean
+bool
 mock_pgm_check_peer_nak_state (
 	pgm_transport_t*	transport,
 	pgm_time_t		now
@@ -171,39 +191,19 @@ mock_pgm_check_peer_nak_state (
 
 /** source module */
 PGM_GNUC_INTERNAL
-int
+bool
 mock_pgm_send_spm (
 	pgm_transport_t*	transport,
 	int			flags
 	)
 {
 	g_assert (NULL != transport);
-	return 0;
+	return TRUE;
 }
 
 
-#define g_main_context_new		mock_g_main_context_new
-#define g_main_context_unref		mock_g_main_context_unref
-#define g_main_loop_new			mock_g_main_loop_new
-#define g_main_loop_run			mock_g_main_loop_run
-#define g_main_loop_unref		mock_g_main_loop_unref
-#define g_source_new			mock_g_source_new
-#define g_source_set_priority		mock_g_source_set_priority
-#define g_source_attach			mock_g_source_attach
-#define g_source_unref			mock_g_source_unref
-#define pgm_time_now			mock_pgm_time_now
-#define pgm_time_update_now		mock_pgm_time_update_now
-#define pgm_min_nak_expiry		mock_pgm_min_nak_expiry
-#define pgm_check_peer_nak_state	mock_pgm_check_peer_nak_state
-#define pgm_send_spm			mock_pgm_send_spm
-
-
-#define TIMER_DEBUG
-#include "timer.c"
-
-
 /* target:
- *	gboolean
+ *	bool
  *	pgm_timer_prepare (
  *		pgm_transport_t*	transport
  *	)
@@ -227,7 +227,7 @@ START_TEST (test_prepare_fail_001)
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_timer_check (
  *		pgm_transport_t*	transport
  *	)
@@ -249,7 +249,7 @@ START_TEST (test_check_fail_001)
 END_TEST
 
 /* target:
- *	long
+ *	pgm_time_t
  *	pgm_timer_expiration (
  *		pgm_transport_t*	transport
  *	)
