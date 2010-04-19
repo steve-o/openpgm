@@ -619,6 +619,124 @@ pgm_transport_bind (
 		pgm_return_val_if_reached (FALSE);
 	}
 
+/* sanity checks on state */
+	if (PGM_UNLIKELY(0 == transport->max_tpdu)) {
+		pgm_set_error (error,
+			       PGM_ERROR_DOMAIN_TRANSPORT,
+			       PGM_ERROR_FAILED,
+			       _("Maximum TPDU size not configured."));
+		pgm_rwlock_writer_unlock (&transport->lock);
+		return FALSE;
+	}
+	if (transport->can_send_data) {
+		if (PGM_UNLIKELY(0 == transport->spm_ambient_interval)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("SPM ambient interval not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->spm_heartbeat_len)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("SPM heartbeat interval not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->txw_sqns && 0 == transport->txw_secs)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("TXW_SQNS not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->txw_sqns && 0 == transport->txw_max_rte)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("TXW_MAX_RTE not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+	}
+	if (transport->can_recv_data) {
+		if (PGM_UNLIKELY(0 == transport->rxw_sqns && 0 == transport->rxw_secs)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("RXW_SQNS not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->rxw_sqns && 0 == transport->rxw_max_rte)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("RXW_MAX_RTE not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->peer_expiry)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("Peer timeout not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->spmr_expiry)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("SPM-Request timeout not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->nak_bo_ivl)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("NAK_BO_IVL not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->nak_rpt_ivl)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("NAK_RPT_IVL not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->nak_rdata_ivl)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("NAK_RDATA_IVL not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->nak_data_retries)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("NAK_DATA_RETRIES not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(0 == transport->nak_ncf_retries)) {
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TRANSPORT,
+				       PGM_ERROR_FAILED,
+				       _("NAK_NCF_RETRIES not configured."));
+			pgm_rwlock_writer_unlock (&transport->lock);
+			return FALSE;
+		}
+	}
+
 	pgm_debug ("bind (transport:%p error:%p)",
 		 (const void*)transport, (const void*)error);
 
