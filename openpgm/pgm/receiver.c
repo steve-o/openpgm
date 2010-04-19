@@ -584,7 +584,7 @@ pgm_flush_peers_pending (
 	struct pgm_msgv_t**		pmsg,
 	const struct pgm_msgv_t* const	msg_end,
 	size_t* const			bytes_read,	/* added to, not set */
-	size_t* const			data_read
+	unsigned* const			data_read
 	)
 {
 	int retval = 0;
