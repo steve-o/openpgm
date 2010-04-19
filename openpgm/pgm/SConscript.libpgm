@@ -117,7 +117,7 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('slist.c')] + tlog);
 	te.Program (['reed_solomon_unittest.c',
 			e.Object('galois_tables.c'),
-			e.Object('mem.c')]);
+			e.Object('mem.c')] + tlog);
 # collate
 	tframework = [	e.Object('atomic.c'),
 			e.Object('checksum.c'),
