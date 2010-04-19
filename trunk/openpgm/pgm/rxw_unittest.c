@@ -19,51 +19,58 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <check.h>
-
-#include <pgm/transport.h>
-#include <pgm/time.h>
-#include <pgm/reed_solomon.h>
-
-#define pgm_histogram_add	mock_pgm_histogram_add
-#include <pgm/histogram.h>
+#include <glib.h>
 
 
 /* mock global */
 
+
+#define pgm_histogram_add		mock_pgm_histogram_add
+#define pgm_time_now			mock_pgm_time_now
+#define pgm_rs_create			mock_pgm_rs_create
+#define pgm_rs_destroy			mock_pgm_rs_destroy
+#define pgm_rs_decode_parity_appended	mock_pgm_rs_decode_parity_appended
+#define pgm_histogram_init		mock_pgm_histogram_init
+
+#define RXW_DEBUG
+#include "rxw.c"
+
+#ifdef PGM_DISABLE_ASSERT
+#	error "PGM_DISABLE_ASSERT set"
+#endif
+
 static pgm_time_t mock_pgm_time_now = 0x1;
+
 
 /* mock functions for external references */
 
 /** reed-solomon module */
-static
 void
 mock_pgm_rs_create (
-	rs_t*			rs_,
-	guint			n,
-	guint			k
+	pgm_rs_t*		rs,
+	uint8_t			n,
+	uint8_t			k
 	)
 {
 }
 
-static
 void
 mock_pgm_rs_destroy (
-	rs_t*			rs
+	pgm_rs_t*		rs
 	)
 {
 }
 
-static
 void
 mock_pgm_rs_decode_parity_appended (
-	rs_t*			rs,
-	void**			block,
-	guint*			offsets,
-	gsize			len
+	pgm_rs_t*		rs,
+	pgm_gf8_t**		block,
+	const uint8_t*		offsets,
+	uint16_t		len
 	)
 {
 // null
@@ -83,16 +90,6 @@ mock_pgm_histogram_add (
 	)
 {
 }
-
-
-#define pgm_time_now			mock_pgm_time_now
-#define pgm_rs_create			mock_pgm_rs_create
-#define pgm_rs_destroy			mock_pgm_rs_destroy
-#define pgm_rs_decode_parity_appended	mock_pgm_rs_decode_parity_appended
-#define pgm_histogram_init		mock_pgm_histogram_init
-
-#define RXW_DEBUG
-#include "rxwi.c"
 
 
 /* generate valid skb, data pointer pointing to PGM payload
@@ -125,10 +122,10 @@ generate_valid_skb (void)
  *	pgm_rxw_t*
  *	pgm_rxw_create (
  *		const pgm_tsi_t*	tsi,
- *		const guint16		tpdu_size,
- *		const guint32		sqns,
- *		const guint		secs,
- *		const guint		max_rte
+ *		const uint16_t		tpdu_size,
+ *		const unsigned		sqns,
+ *		const unsigned		secs,
+ *		const ssize_t		max_rte
  *		)
  */
 
@@ -435,7 +432,7 @@ END_TEST
  *	struct pgm_sk_buff_t*
  *	pgm_rxw_peek (
  *		pgm_rxw_t* const	window,
- *		const guint32		sequence
+ *		const uint32_t		sequence
  *		)
  */
 
@@ -482,7 +479,7 @@ END_TEST
 
 START_TEST (test_max_length_fail_001)
 {
-	pgm_rxw_max_length (NULL);
+	const unsigned len = pgm_rxw_max_length (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -514,7 +511,7 @@ END_TEST
 
 START_TEST (test_length_fail_001)
 {
-	pgm_rxw_length (NULL);
+	const uint32_t answer = pgm_rxw_length (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -546,7 +543,7 @@ END_TEST
 
 START_TEST (test_size_fail_001)
 {
-	pgm_rxw_size (NULL);
+	const size_t answer = pgm_rxw_size (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -572,7 +569,7 @@ END_TEST
 
 START_TEST (test_is_empty_fail_001)
 {
-	pgm_rxw_is_empty (NULL);
+	const bool answer = pgm_rxw_is_empty (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -598,7 +595,7 @@ END_TEST
 
 START_TEST (test_is_full_fail_001)
 {
-	pgm_rxw_is_full (NULL);
+	const bool answer = pgm_rxw_is_full (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -624,7 +621,7 @@ END_TEST
 
 START_TEST (test_lead_fail_001)
 {
-	pgm_rxw_lead (NULL);
+	const uint32_t answer = pgm_rxw_lead (NULL);
 	fail ("reached");
 }
 END_TEST
@@ -650,17 +647,17 @@ END_TEST
 
 START_TEST (test_next_lead_fail_001)
 {
-	pgm_rxw_next_lead (NULL);
+	const uint32_t answer = pgm_rxw_next_lead (NULL);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
- *	gssize
+ *	ssize_t
  *	pgm_rxw_readv (
  *		pgm_rxw_t* const	window,
- *		pgm_msgv_t**		pmsg,
- *		const guint		msg_len
+ *		struct pgm_msgv_t**	pmsg,
+ *		const unsigned		msg_len
  *		)
  */
 
@@ -669,7 +666,7 @@ START_TEST (test_readv_pass_001)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[2], *pmsg;
+	struct pgm_msgv_t msgv[2], *pmsg;
 /* #1 empty */
 	pmsg = msgv;
 	fail_unless (-1 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
@@ -722,7 +719,7 @@ START_TEST (test_readv_pass_002)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[2], *pmsg;
+	struct pgm_msgv_t msgv[2], *pmsg;
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_header->pgm_tsdu_length = g_htons (0);
@@ -746,7 +743,7 @@ START_TEST (test_readv_pass_003)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 100; i++)
 	{
@@ -782,7 +779,7 @@ START_TEST (test_readv_pass_004)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 101; i++)
 	{
@@ -818,7 +815,7 @@ START_TEST (test_readv_pass_005)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 98; i++)
 	{
@@ -872,7 +869,7 @@ START_TEST (test_readv_pass_006)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 100; i++)
 	{
@@ -928,7 +925,7 @@ END_TEST
 /* NULL window */
 START_TEST (test_readv_fail_001)
 {
-	pgm_msgv_t msgv[1], *pmsg = msgv;
+	struct pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (NULL, &pmsg, G_N_ELEMENTS(msgv));
 	fail ("reached");
 }
@@ -946,7 +943,7 @@ START_TEST (test_readv_fail_002)
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
-	pgm_msgv_t msgv[1], *pmsg = msgv;
+	struct pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (window, NULL, G_N_ELEMENTS(msgv));
 	fail ("reached");
 }
@@ -964,7 +961,7 @@ START_TEST (test_readv_fail_003)
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
-	pgm_msgv_t msgv[1], *pmsg = msgv;
+	struct pgm_msgv_t msgv[1], *pmsg = msgv;
 	gssize len = pgm_rxw_readv (window, &pmsg, 0);
 	fail ("reached");
 }
@@ -984,7 +981,7 @@ START_TEST (test_remove_commit_pass_001)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 98; i++)
 	{
@@ -1063,7 +1060,7 @@ START_TEST (test_remove_commit_fail_001)
 END_TEST
 
 /* target:
- *	guint
+ *	unsigned
  *	pgm_rxw_remove_trail (
  *		pgm_rxw_t* const	window
  *		)
@@ -1074,7 +1071,7 @@ START_TEST (test_remove_trail_pass_001)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[2], *pmsg;
+	struct pgm_msgv_t msgv[2], *pmsg;
 	fail_unless (0 == pgm_rxw_remove_trail (window), "remove_trail failed");
 /* #1,2 two APDUs */
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -1105,11 +1102,11 @@ START_TEST (test_remove_trail_fail_001)
 END_TEST
 
 /* target:
- *	guint32
+ *	unsigned
  *	pgm_rxw_update (
  *		pgm_rxw_t* const	window,
- *		const guint32		txw_trail,
- *		const guint32		txw_lead,
+ *		const uint32_t		txw_trail,
+ *		const uint32_t		txw_lead,
  *		const pgm_time_t	now,
  *		const pgm_time_t	nak_rb_expiry
  *		)
@@ -1133,7 +1130,7 @@ START_TEST (test_update_pass_001)
 /* #2 at 101 */
 	skb->pgm_data->data_sqn = g_htonl (101);
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not appended");
-	pgm_msgv_t msgv[1], *pmsg = msgv;
+	struct pgm_msgv_t msgv[1], *pmsg = msgv;
 	fail_unless (1000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 /* #3 at 102 */
 	fail_unless (1 == pgm_rxw_update (window, 102, 99, now, nak_rb_expiry), "update failed");
@@ -1156,7 +1153,7 @@ END_TEST
  *	int
  *	pgm_rxw_confirm (
  *		pgm_rxw_t* const	window,
- *		const guint32		sequence,
+ *		const uint32_t		sequence,
  *		const pgm_time_t	now,
  *		const pgm_time_t	nak_rdata_expiry,
  *		const pgm_time_t	nak_rb_expiry
@@ -1188,7 +1185,7 @@ START_TEST (test_confirm_pass_001)
 	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (101);
 	fail_unless (PGM_RXW_INSERTED == pgm_rxw_add (window, skb, now, nak_rb_expiry), "add not inserted");
-	pgm_msgv_t msgv[2], *pmsg = msgv;
+	struct pgm_msgv_t msgv[2], *pmsg = msgv;
 	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	pgm_rxw_destroy (window);
 }
@@ -1200,7 +1197,7 @@ START_TEST (test_confirm_pass_002)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 	for (unsigned i = 0; i < 100; i++)
 	{
@@ -1255,7 +1252,7 @@ END_TEST
  *	void
  *	pgm_rxw_lost (
  *		pgm_rxw_t* const	window,
- *		const guint32		sequence
+ *		const uint32_t		sequence
  *		)
  */
 
@@ -1303,7 +1300,7 @@ END_TEST
  *	pgm_rxw_state (
  *		pgm_rxw_t* const	window,
  *		struct pgm_sk_buff_t*	skb,
- *		pgm_pkt_state_e		new_state
+ *		int			new_state
  *		)
  */
 
@@ -1318,8 +1315,8 @@ START_TEST (test_state_pass_001)
 	fail_unless (0 == pgm_rxw_update (window, 100, 99, now, nak_rb_expiry), "update failed");
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 101, now, nak_rdata_expiry, nak_rb_expiry), "confirm not appended");
 	struct pgm_sk_buff_t* skb = pgm_rxw_peek (window, 101);
-	pgm_rxw_state (window, skb, PGM_PKT_WAIT_NCF_STATE);
-	pgm_rxw_state (window, skb, PGM_PKT_WAIT_DATA_STATE);
+	pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_NCF);
+	pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
 	pgm_rxw_destroy (window);
 }
 END_TEST
@@ -1329,7 +1326,7 @@ START_TEST (test_state_fail_001)
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
 	skb->pgm_data->data_sqn = g_htonl (0);
-	pgm_rxw_state (NULL, skb, PGM_PKT_BACK_OFF_STATE);
+	pgm_rxw_state (NULL, skb, PGM_PKT_STATE_BACK_OFF);
 	fail ("reached");
 }
 END_TEST
@@ -1339,7 +1336,7 @@ START_TEST (test_state_fail_002)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window, "create failed");
-	pgm_rxw_state (window, NULL, PGM_PKT_BACK_OFF_STATE);
+	pgm_rxw_state (window, NULL, PGM_PKT_STATE_BACK_OFF);
 	fail ("reached");
 }
 END_TEST
@@ -1398,7 +1395,7 @@ START_TEST (test_has_pending_pass_001)
 	fail_unless (PGM_RXW_APPENDED == pgm_rxw_confirm (window, 3, now, nak_rdata_expiry, nak_rb_expiry), "confirm not appended");
 	fail_unless (0 == window->has_event, "unexpected event");
 /* partial read */
-	pgm_msgv_t msgv[2], *pmsg = msgv;
+	struct pgm_msgv_t msgv[2], *pmsg = msgv;
 	fail_unless (2000 == pgm_rxw_readv (window, &pmsg, G_N_ELEMENTS(msgv)), "readv failed");
 	fail_unless (0 == window->has_event, "unexpected event");
 /* finish read */
@@ -1415,7 +1412,7 @@ make_basic_test_suite (void)
 {
 	Suite* s;
 
-	s = suite_create ("basic transmit window API");
+	s = suite_create ("basic receive window API");
 
 	TCase* tc_create = tcase_create ("create");
 	suite_add_tcase (s, tc_create);
@@ -1532,7 +1529,7 @@ START_TEST (test_readv_pass_007)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window);
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 /* add #0 */
 	{
@@ -1604,7 +1601,7 @@ START_TEST (test_readv_pass_008)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window);
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 /* add #0 */
 	{
@@ -1678,7 +1675,7 @@ START_TEST (test_readv_pass_009)
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
 	fail_if (NULL == window);
-	pgm_msgv_t msgv[1], *pmsg;
+	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
 /* add #0 */
 	{
