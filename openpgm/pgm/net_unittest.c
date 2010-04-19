@@ -26,10 +26,18 @@
 #include <glib.h>
 #include <check.h>
 
-#include <pgm/transport.h>
-
 
 /* mock state */
+
+#define pgm_rate_check		mock_pgm_rate_check
+#define sendto			mock_sendto
+#define poll			mock_poll
+#define select			mock_select
+#define fcntl			mock_fcntl
+
+#define NET_DEBUG
+#include "net.c"
+
 
 static
 pgm_transport_t*
@@ -117,19 +125,18 @@ flags_string (
 /* mock functions for external references */
 
 PGM_GNUC_INTERNAL
-gboolean
+bool
 mock_pgm_rate_check (
-	gpointer		bucket,
-	const guint		data_size,
-	const int		flags		/* MSG_DONTWAIT = non-blocking */
+	pgm_rate_t*		bucket,
+	const size_t		data_size,
+	const bool		is_nonblocking
 	)
 {
-	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u flags:%s)",
-		bucket, data_size, flags_string (flags));
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%zu is-nonblocking:%s)",
+		(gpointer)bucket, data_size, is_nonblocking ? "TRUE" : "FALSE");
 	return TRUE;
 }
 
-static
 ssize_t
 mock_sendto (
 	int			s,
@@ -148,7 +155,6 @@ mock_sendto (
 }
 
 #ifdef CONFIG_HAVE_POLL
-static
 int
 mock_poll (
 	struct pollfd*		fds,
@@ -161,7 +167,6 @@ mock_poll (
 	return 0;
 }
 #else
-static
 int
 mock_select (
 	int			nfds,
@@ -177,7 +182,6 @@ mock_select (
 }
 #endif
 
-static
 int
 mock_fcntl (
 	int			fd,
@@ -201,26 +205,17 @@ mock_fcntl (
 	g_assert_not_reached();
 }
 
-#define pgm_rate_check		mock_pgm_rate_check
-#define sendto			mock_sendto
-#define poll			mock_poll
-#define select			mock_select
-#define fcntl			mock_fcntl
-
-#define NET_DEBUG
-#include "net.c"
-
 
 /* target:
- *	gssize
- *	_pgm_sendto (
+ *	ssize_t
+ *	pgm_sendto (
  *		pgm_transport_t*	transport,
- *		gboolean		use_rate_limit,
- *		gboolean		use_router_alert,
+ *		bool			use_rate_limit,
+ *		bool			use_router_alert,
  *		const void*		buf,
- *		gsize			len,
+ *		size_t			len,
  *		const struct sockaddr*	to,
- *		gsize			tolen
+ *		socklen_t		tolen
  *	)
  */
 
@@ -311,13 +306,14 @@ END_TEST
 START_TEST (test_set_nonblocking_pass_001)
 {
 	int filedes[2] = { fileno (stdout), fileno (stderr) };
-	int retval = pgm_set_nonblocking (&filedes);
+	int retval = pgm_set_nonblocking (filedes);
 }
 END_TEST
 
 START_TEST (test_set_nonblocking_fail_001)
 {
-	int retval = pgm_set_nonblocking (NULL);
+	int filedes[2] = { 0, 0 };
+	int retval = pgm_set_nonblocking (filedes);
 	fail ("reached");
 }
 END_TEST
