@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -39,57 +40,57 @@
 
 /* target:
  *	void
- *	_md5_init_ctx (
- *		struct md5_ctx*		ctx
+ *	pgm_md5_init_ctx (
+ *		struct pgm_md5_t*	ctx
  *	)
  */
 
 START_TEST (test_init_ctx_pass_001)
 {
-	struct md5_ctx ctx;
+	struct pgm_md5_t ctx;
 	memset (&ctx, 0, sizeof(ctx));
-	_md5_init_ctx (&ctx);
+	pgm_md5_init_ctx (&ctx);
 }
 END_TEST
 
 START_TEST (test_init_ctx_fail_001)
 {
-	_md5_init_ctx (NULL);
+	pgm_md5_init_ctx (NULL);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
  *	void
- *	_md5_process_bytes (
- *		struct md5_ctx*		ctx,
- *		gconstpointer		buffer,
- *		gsize			len
+ *	pgm_md5_process_bytes (
+ *		struct pgm_md5_t*	ctx,
+ *		const void*		buffer,
+ *		size_t			len
  *	)
  */
 
 START_TEST (test_process_bytes_pass_001)
 {
 	const char buffer[] = "i am not a string.";
-	struct md5_ctx ctx;
+	struct pgm_md5_t ctx;
 	memset (&ctx, 0, sizeof(ctx));
-	_md5_init_ctx (&ctx);
-	_md5_process_bytes (&ctx, buffer, sizeof(buffer));
+	pgm_md5_init_ctx (&ctx);
+	pgm_md5_process_bytes (&ctx, buffer, sizeof(buffer));
 }
 END_TEST
 
 START_TEST (test_process_bytes_fail_001)
 {
 	const char buffer[] = "i am not a string.";
-	_md5_process_bytes (NULL, buffer, sizeof(buffer));
+	pgm_md5_process_bytes (NULL, buffer, sizeof(buffer));
 }
 END_TEST
 
 /* target:
- *	gpointer	
- *	_md5_finish_ctx (
- *		struct md5_ctx*		ctx,
- *		gpointer		resbuf
+ *	void*	
+ *	pgm_md5_finish_ctx (
+ *		struct pgm_md5_t*	ctx,
+ *		void*			resbuf
  *	)
  */
 
@@ -100,12 +101,12 @@ START_TEST (test_finish_ctx_pass_001)
 
 	char md5[1024];
 	char resblock[16];
-	struct md5_ctx ctx;
+	struct pgm_md5_t ctx;
 	memset (&ctx, 0, sizeof(ctx));
 	memset (resblock, 0, sizeof(resblock));
-	_md5_init_ctx (&ctx);
-	_md5_process_bytes (&ctx, buffer, sizeof(buffer));
-	_md5_finish_ctx (&ctx, resblock);
+	pgm_md5_init_ctx (&ctx);
+	pgm_md5_process_bytes (&ctx, buffer, sizeof(buffer));
+	pgm_md5_finish_ctx (&ctx, resblock);
 	sprintf (md5, "%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx",
 		   resblock[0], resblock[1],
 		   resblock[2], resblock[3],
@@ -124,7 +125,7 @@ END_TEST
 START_TEST (test_finish_ctx_fail_001)
 {
 	char resblock[16];
-	_md5_finish_ctx (NULL, resblock);
+	pgm_md5_finish_ctx (NULL, resblock);
 	fail ("reached");
 }
 END_TEST
