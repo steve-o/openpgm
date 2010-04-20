@@ -212,7 +212,7 @@ pgm_memdup (
 {
 	void* new_mem;
 
-	if (PGM_LIKELY (mem))
+	if (PGM_LIKELY (NULL != mem))
 	{
 		new_mem = pgm_malloc (n_bytes);
 		memcpy (new_mem, mem, n_bytes);
@@ -237,7 +237,7 @@ pgm_free (
 	void*		mem
 	)
 {
-	if (PGM_LIKELY (mem))
+	if (PGM_LIKELY (NULL != mem))
 		free (mem);
 }
 
