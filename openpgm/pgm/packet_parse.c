@@ -480,7 +480,7 @@ pgm_verify_nak (
 
 	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
 	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
-	uint16_t nak_grp_nla_afi = -1;
+	uint16_t nak_grp_nla_afi = 0;
 
 /* check source NLA: unicast address of the ODATA sender */
 	switch (nak_src_nla_afi) {

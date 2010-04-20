@@ -87,16 +87,16 @@ static char* mock_hostname =	NULL;
 struct pgm_ifaddrs;
 struct pgm_error_t;
 
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
-static unsigned mock_pgm_if_nametoindex (const sa_family_t, const char*);
-static char* mock_if_indextoname (unsigned int, char*);
-static int mock_getnameinfo (const struct sockaddr*, socklen_t, char*, size_t, char*, size_t, int);
-static int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
-static void mock_freeaddrinfo (struct addrinfo*);
-static int mock_gethostname (char*, size_t);
-static struct netent* mock_getnetbyname (const char*);
-static bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*, const socklen_t, struct pgm_error_t**);
+bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
+void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
+unsigned mock_pgm_if_nametoindex (const sa_family_t, const char*);
+char* mock_if_indextoname (unsigned int, char*);
+int mock_getnameinfo (const struct sockaddr*, socklen_t, char*, size_t, char*, size_t, int);
+int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
+void mock_freeaddrinfo (struct addrinfo*);
+int mock_gethostname (char*, size_t);
+struct netent* mock_getnetbyname (const char*);
+bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*, const socklen_t, struct pgm_error_t**);
 
 #define pgm_getifaddrs		mock_pgm_getifaddrs
 #define pgm_freeifaddrs		mock_pgm_freeifaddrs

@@ -24,7 +24,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
+#include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
 #include <arpa/inet.h>
 #include <glib.h>
 #include <check.h>

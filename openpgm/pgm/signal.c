@@ -20,7 +20,7 @@
  */
 
 #define _GNU_SOURCE
-#include <signal.h>		/* strsignal() */
+#include <signal.h>		/* _GNU_SOURCE for strsignal() */
 #include <pgm/framework.h>
 #include "pgm/signal.h"
 
