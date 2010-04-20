@@ -737,7 +737,7 @@ pgm_getifaddrs (
 	pgm_error_t**	     restrict error
 	)
 {
-	pgm_return_val_if_fail (NULL != ifap, FALSE);
+	pgm_assert (NULL != ifap);
 
 	pgm_debug ("pgm_getifaddrs (ifap:%p error:%p)",
 		(void*)ifap, (void*)error);
