@@ -6,7 +6,6 @@ import os;
 Import('env')
 
 src = Split("""
-		atomic.c
 		thread.c
 		mem.c
 		string.c
@@ -77,7 +76,6 @@ if env['WITH_CHECK'] == 'true':
 	te.ParseConfig ('pkg-config --cflags --libs check');
 # log dependencies
 	tlog = [	e.Object('messages.c'),
-			e.Object('atomic.c'),
 			e.Object('thread.c')
 		];
 # framework
@@ -124,8 +122,7 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('string.c'),
 			e.Object('slist.c')] + tlog);
 # collate
-	tframework = [	e.Object('atomic.c'),
-			e.Object('checksum.c'),
+	tframework = [	e.Object('checksum.c'),
 			e.Object('error.c'),
 			e.Object('galois_tables.c'),
 			e.Object('getifaddrs.c'),

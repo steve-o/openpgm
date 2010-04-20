@@ -21,8 +21,7 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/rxw.h"
 

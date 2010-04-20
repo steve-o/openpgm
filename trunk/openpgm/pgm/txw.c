@@ -21,8 +21,7 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/tsi.h"
 #include "pgm/txw.h"
@@ -306,7 +305,7 @@ pgm_txw_add (
 	}
 
 /* generate new sequence number */
-	pgm_atomic_int32_inc (&window->lead);
+	pgm_atomic_inc32 (&window->lead);
 	skb->sequence = window->lead;
 
 /* add skb to window */
@@ -383,7 +382,7 @@ pgm_txw_remove_tail (
 	pgm_free_skb (skb);
 
 /* advance trailing pointer */
-	pgm_atomic_int32_inc (&window->trail);
+	pgm_atomic_inc32 (&window->trail);
 
 /* post-conditions */
 	pgm_assert (!pgm_txw_is_full (window));

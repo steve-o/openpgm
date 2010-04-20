@@ -28,8 +28,7 @@
 #	include <sys/epoll.h>
 #endif
 #include <stdio.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/transport.h"
 #include "pgm/receiver.h"

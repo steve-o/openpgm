@@ -22,8 +22,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <errno.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <stdlib.h>
 #ifndef _WIN32
 #	include <sys/select.h>
@@ -31,7 +29,7 @@
 #	define WIN32_LEAN_AND_MEAN
 #	include "windows.h"
 #endif
-
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 
 //#define TIME_DEBUG
@@ -61,7 +59,7 @@ pgm_time_since_epoch_func	pgm_time_since_epoch;
 #define fsecs_to_nsecs(t)	( (t) / 1000000UL )
 #define fsecs_to_usecs(t)	( (t) / 1000000000UL )
 
-static volatile int32_t		time_ref_count = 0;
+static volatile uint32_t	time_ref_count = 0;
 static pgm_time_t		rel_offset = 0;
 
 static void			pgm_time_conv (const pgm_time_t*const restrict, time_t*restrict);
@@ -228,7 +226,7 @@ pgm_time_init (
 	pgm_error_t**	error
 	)
 {
-	if (pgm_atomic_int32_exchange_and_add (&time_ref_count, 1) > 0)
+	if (pgm_atomic_exchange_and_add32 (&time_ref_count, 1) > 0)
 		return TRUE;
 
 /* current time */
@@ -468,9 +466,9 @@ pgm_time_init (
 bool
 pgm_time_shutdown (void)
 {
-	pgm_return_val_if_fail (pgm_atomic_int32_get (&time_ref_count) > 0, FALSE);
+	pgm_return_val_if_fail (pgm_atomic_read32 (&time_ref_count) > 0, FALSE);
 
-	if (!pgm_atomic_int32_dec_and_test (&time_ref_count))
+	if (pgm_atomic_exchange_and_add32 (&time_ref_count, (uint32_t)-1) != 1)
 		return TRUE;
 
 	bool success = TRUE;
@@ -626,13 +624,15 @@ pgm_rtc_sleep (
 	FD_SET(rtc_fd, &readfds);
 	const int retval = select (rtc_fd + 1, &readfds, NULL, NULL, &zero_tv);
 	if (retval) {
-		read (rtc_fd, &data, sizeof(data));
+		const size_t readlen = read (rtc_fd, &data, sizeof(data));
+		pgm_assert (readlen == sizeof(data));
 		rtc_count += data >> 8;
 	}
 
 	pgm_time_t count = 0;
 	do {
-		read (rtc_fd, &data, sizeof(data));
+		const size_t readlen = read (rtc_fd, &data, sizeof(data));
+		pgm_assert (readlen == sizeof(data));
 		count += data >> 8;
 	} while ( (count * 1000000UL) < rtc_frequency * usec );
 

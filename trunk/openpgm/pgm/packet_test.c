@@ -22,14 +22,13 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <ctype.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <netdb.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 
 #include "pgm/packet.h"
