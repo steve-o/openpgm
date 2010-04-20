@@ -334,4 +334,6 @@ pgm_skb_is_valid (
 }
 #endif /* SKB_DEBUG */
 
+PGM_END_DECLS
+
 #endif /* __PGM_SKBUFF_H__ */

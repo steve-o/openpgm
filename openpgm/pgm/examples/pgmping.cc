@@ -21,7 +21,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* c99 compatibility for c++ */
+#define __STDC_LIMIT_MACROS
+#define restrict
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <errno.h>
 #include <getopt.h>
 #include <locale.h>
@@ -51,6 +56,7 @@
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/signal.h>
 #ifdef CONFIG_WITH_HTTP
 #	include <pgm/http.h>
 #endif
@@ -576,7 +582,7 @@ sender_thread (
 		struct timeval tv;
 		int timeout;
 		gsize bytes_written;
-		pgm_io_status_e status;
+		int status;
 again:
 		status = pgm_send_skbv (g_transport, &skb, 1, TRUE, &bytes_written);
 		switch (status) {
@@ -683,12 +689,12 @@ receiver_thread (
 		int timeout;
 		gsize len;
 		pgm_error_t* pgm_err = NULL;
-		const pgm_io_status_e status = pgm_recvmsgv (g_transport,
-						         msgv,
-						         G_N_ELEMENTS(msgv),
-						         MSG_ERRQUEUE,
-						         &len,
-						         &pgm_err);
+		const int status = pgm_recvmsgv (g_transport,
+					         msgv,
+					         G_N_ELEMENTS(msgv),
+					         MSG_ERRQUEUE,
+					         &len,
+					         &pgm_err);
 		if (lost_count) {
 			pgm_time_t elapsed = pgm_time_update_now() - lost_tstamp;
 			if (elapsed >= pgm_secs(1)) {
@@ -772,7 +778,7 @@ on_msgv (
 
 		if (PGMPING_MODE_REFLECTOR == g_mode)
 		{
-			pgm_io_status_e status;
+			int status;
 again:
 			status = pgm_send (g_transport, pskb->data, pskb->len, NULL);
 			switch (status) {
