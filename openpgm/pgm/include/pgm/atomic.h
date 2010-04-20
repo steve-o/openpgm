@@ -24,23 +24,109 @@
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
+#ifdef sun
+#	include <atomic.h>
+#endif
 #include <pgm/types.h>
 
-PGM_BEGIN_DECLS
+static inline
+uint32_t
+pgm_atomic_exchange_and_add32 (
+	volatile uint32_t*	atomic,
+	const uint32_t		val
+	)
+{
+#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	uint32_t result;
+	asm volatile (	"lock\n\t"
+			"xaddl %0, %1"
+		      : "=r" (result), "=m" (*atomic)
+		      : "0" (val), "m" (*atomic)  );
+	return result;
+#elif defined( sun )
+	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
+	return nv - val;
+#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+	return __sync_fetch_and_add (atomic, val);
+#elif defined( _WIN32 )
+	return InterlockedExchangeAdd (atomic, val);
+#else
+#	error "No supported atomic operations for this platform."
+#endif
+}
 
-int32_t pgm_atomic_int32_exchange_and_add (volatile int32_t*, const int32_t);
+static inline
+void
+pgm_atomic_add32 (
+	volatile uint32_t*	atomic,
+	const uint32_t		val
+	)
+{
+#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	asm volatile (	"lock\n\t"
+			"addl %1, %0"
+		      : "=m" (*atomic)
+		      : "ir" (val), "m" (*atomic));
+#elif defined( sun )
+	atomic_add_32 (atomic, (int32_t)val);
+#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+	__sync_fetch_and_add (atomic, val);
+#elif defined( _WIN32 )
+	InterlockedExchangeAdd (atomic, val);
+#endif
+}
 
-void pgm_atomic_int32_add (volatile int32_t*, const int32_t);
-int32_t pgm_atomic_int32_get (const volatile int32_t*);
-void pgm_atomic_int32_set (volatile int32_t*, const int32_t);
+static inline
+void
+pgm_atomic_inc32 (
+	volatile uint32_t*	atomic
+	)
+{
+#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	pgm_atomic_add32 (atomic, 1);
+#elif defined( sun )
+	atomic_inc_32 (atomic);
+#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+	pgm_atomic_add32 (atomic, 1);
+#elif defined( _WIN32 )
+	InterlockedIncrement (atomic);
+#endif
+}
 
-#define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile int32_t*)(atomic), 1))
-#define pgm_atomic_int32_dec(atomic) (pgm_atomic_int32_add ((volatile int32_t*)(atomic), -1))
-#define pgm_atomic_int32_dec_and_test(atomic) (pgm_atomic_int32_exchange_and_add ((atomic), -1) == 1)
+static inline
+void
+pgm_atomic_dec32 (
+	volatile uint32_t*	atomic
+	)
+{
+#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	pgm_atomic_add32 (atomic, (uint32_t)-1);
+#elif defined( sun )
+	atomic_dec_32 (atomic);
+#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+	pgm_atomic_add32 (atomic, (uint32_t)-1);
+#elif defined( _WIN32 )
+	InterlockedDecrement (atomic);
+#endif
+}
 
-void pgm_atomic_init (void);
-void pgm_atomic_shutdown (void);
+static inline
+uint32_t
+pgm_atomic_read32 (
+	const volatile uint32_t* atomic
+	)
+{
+	return *atomic;
+}
 
-PGM_END_DECLS
+static inline
+void
+pgm_atomic_write32 (
+	volatile uint32_t*	atomic,
+	const uint32_t		val
+	)
+{
+	*atomic = val;
+}
 
 #endif /* __PGM_ATOMIC_H__ */

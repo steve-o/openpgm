@@ -32,14 +32,14 @@
 /* locals */
 
 static pgm_rand_t		global_rand = { .seed = 0 };
-static volatile int32_t		rand_ref_count = 0;
+static volatile uint32_t	rand_ref_count = 0;
 static pgm_mutex_t		rand_mutex;
 
 
 void
 pgm_rand_init (void)
 {
-	if (pgm_atomic_int32_exchange_and_add (&rand_ref_count, 1) > 0)
+	if (pgm_atomic_exchange_and_add32 (&rand_ref_count, 1) > 0)
 		return;
 
 	pgm_mutex_init (&rand_mutex);
@@ -48,9 +48,9 @@ pgm_rand_init (void)
 void
 pgm_rand_shutdown (void)
 {
-	pgm_return_if_fail (pgm_atomic_int32_get (&rand_ref_count) > 0);
+	pgm_return_if_fail (pgm_atomic_read32 (&rand_ref_count) > 0);
 
-	if (!pgm_atomic_int32_dec_and_test (&rand_ref_count))
+	if (pgm_atomic_exchange_and_add32 (&rand_ref_count, (uint32_t)-1) != 1)
 		return;
 
 	pgm_mutex_free (&rand_mutex);

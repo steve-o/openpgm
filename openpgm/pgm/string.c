@@ -21,10 +21,10 @@
 
 #ifdef CONFIG_HAVE_VASPRINTF
 #	define _GNU_SOURCE
-#	include <stdio.h>
 #endif
 #include <limits.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <pgm/framework.h>
 

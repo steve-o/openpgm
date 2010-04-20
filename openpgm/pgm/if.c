@@ -26,8 +26,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 
 

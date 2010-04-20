@@ -20,11 +20,13 @@
  */
 
 #include <errno.h>
-#include <libintl.h>
 #ifdef CONFIG_HAVE_GETIFADDRS
 #	include <ifaddrs.h>
 #endif
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#if defined( sun )
+#	include <sys/sockio.h>
+#endif
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 
 
@@ -45,7 +47,7 @@ struct _pgm_ifaddrs
 
 #ifdef SIOCGLIFCONF
 static
-gboolean
+bool
 _pgm_getlifaddrs (
 	struct pgm_ifaddrs**	ifap,
 	pgm_error_t**		error
@@ -181,7 +183,7 @@ again:
 
 /* address */
 		if (-1 != ioctl (sock, SIOCGLIFADDR, lifr)) {
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 		} else {
 			pgm_warn (_("SIOCGLIFADDR failed on interface %s%s%s"),
@@ -190,7 +192,7 @@ again:
 
 /* netmask */
 		if (-1 != ioctl (sock, SIOCGLIFNETMASK, lifr)) {
-			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 #		ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_netmask, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_netmask));
 #		else
@@ -235,7 +237,7 @@ again:
 
 /* address */
 		if (-1 != ioctl (sock6, SIOCGLIFADDR, lifr)) {
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
 		} else {
 			pgm_warn (_("SIOCGLIFADDR failed on interface %s%s%s"),
@@ -244,7 +246,7 @@ again:
 
 /* netmask */
 		if (ioctl (sock6, SIOCGLIFNETMASK, lifr) != -1) {
-			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 #		ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_netmask, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_netmask));
 #		else
@@ -270,7 +272,7 @@ again:
 
 #ifdef SIOCGIFCONF
 static
-gboolean
+bool
 _pgm_getifaddrs (
 	struct pgm_ifaddrs**	ifap,
 	pgm_error_t**		error
@@ -358,7 +360,7 @@ _pgm_getifaddrs (
 
 /* address */
 		if (-1 != ioctl (sock, SIOCGIFADDR, ifr)) {
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 		} else {
 			pgm_warn (_("SIOCGIFADDR failed on interface %s%s%s"),
@@ -367,7 +369,7 @@ _pgm_getifaddrs (
 
 /* netmask */
 		if (-1 != ioctl (sock, SIOCGIFNETMASK, ifr)) {
-			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 #	ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
 #	else
@@ -413,7 +415,7 @@ _pgm_getifaddrs (
 
 /* address, note this does not work on Linux as struct ifreq is too small for an IPv6 address */
 		if (-1 != ioctl (sock6, SIOCGIFADDR, ifr)) {
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
 		} else {
 			pgm_warn (_("SIOCGIFADDR failed on interface %s%s%s"),
@@ -422,7 +424,7 @@ _pgm_getifaddrs (
 
 /* netmask */
 		if (-1 != ioctl (sock6, SIOCGIFNETMASK, ifr)) {
-			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 #		ifdef CONFIG_HAVE_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
 #		else
@@ -448,9 +450,9 @@ _pgm_getifaddrs (
 }
 #endif /* SIOCLIFCONF */
 
-#if defined(G_OS_WIN)
+#if defined(_WIN32)
 static
-gboolean
+bool
 _pgm_getadaptersinfo (
 	struct pgm_ifaddrs**	ifap,
 	pgm_error_t**		error
@@ -531,7 +533,7 @@ _pgm_getadaptersinfo (
 			if (strlen (pIPAddr->IpAddress.String) == 0)
 				continue;
 /* address */
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
 
 /* name */
@@ -544,7 +546,7 @@ _pgm_getadaptersinfo (
 			ift->_ifa.ifa_flags = 0;
 
 /* netmask */
-			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpMask.String, ift->_ifa.ifa_netmask));
 
 /* next */
@@ -561,7 +563,7 @@ _pgm_getadaptersinfo (
 }
 
 static
-gboolean
+bool
 _pgm_getadaptersaddresses (
 	struct pgm_ifaddrs**	ifap,
 	pgm_error_t**		error
@@ -656,7 +658,7 @@ _pgm_getadaptersaddresses (
 			}
 
 /* address */
-			ift->_ifa.ifa_addr = (gpointer)&ift->_addr;
+			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, unicast->Address.lpSockaddr, unicast->Address.iSockaddrLength);
 
 /* name */
@@ -675,7 +677,7 @@ _pgm_getadaptersaddresses (
 				ift->_ifa.ifa_flags |= IFF_MULTICAST;
 
 /* netmask */
-			ift->_ifa.ifa_netmask = (gpointer)&ift->_netmask;
+			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 
 /* pre-Vista must hunt for matching prefix in linked list, otherwise use OnLinkPrefixLength */
 			int prefixIndex = 0;
@@ -761,6 +763,8 @@ pgm_getifaddrs (
 	return _pgm_getlifaddrs (ifap, error);
 #elif defined(SIOCGIFCONF)
 	return _pgm_getifaddrs (ifap, error);
+#else
+#	error "Unsupported interface enumeration on this platform."
 #endif /* !CONFIG_HAVE_GETIFADDRS */
 }
 

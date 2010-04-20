@@ -22,8 +22,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <errno.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/receiver.h"
 #include "pgm/sqn_list.h"
@@ -164,7 +163,7 @@ _pgm_peer_ref (
 /* pre-conditions */
 	pgm_assert (NULL != peer);
 
-	pgm_atomic_int32_inc (&peer->ref_count);
+	pgm_atomic_inc32 (&peer->ref_count);
 	return peer;
 }
 
@@ -179,17 +178,16 @@ pgm_peer_unref (
 /* pre-conditions */
 	pgm_assert (NULL != peer);
 
-	const bool is_zero = pgm_atomic_int32_dec_and_test (&peer->ref_count);
-	if (PGM_UNLIKELY (is_zero))
-	{
+	if (pgm_atomic_exchange_and_add32 (&peer->ref_count, (uint32_t)-1) != 1)
+		return;
+
 /* receive window */
-		pgm_rxw_destroy (peer->window);
-		peer->window = NULL;
+	pgm_rxw_destroy (peer->window);
+	peer->window = NULL;
 
 /* object */
-		pgm_free (peer);
-		peer = NULL;
-	}
+	pgm_free (peer);
+	peer = NULL;
 }
 
 /* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.

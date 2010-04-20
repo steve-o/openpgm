@@ -69,25 +69,66 @@ void pgm__logv (const int, const char*, va_list) PGM_GNUC_PRINTF (2, 0);
 
 #ifdef CONFIG_HAVE_ISO_VARARGS
 
-#define pgm_debug(...)		if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) pgm__log (PGM_LOG_LEVEL_DEBUG, __VA_ARGS__)
-#define pgm_trace(r,...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
-					pgm__log (PGM_LOG_LEVEL_TRACE, __VA_ARGS__)
-#define pgm_minor(...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_MINOR) pgm__log (PGM_LOG_LEVEL_MINOR, __VA_ARGS__)
-#define pgm_info(...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_NORMAL) pgm__log (PGM_LOG_LEVEL_NORMAL, __VA_ARGS__)
-#define pgm_warn(...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_WARNING) pgm__log (PGM_LOG_LEVEL_WARNING, __VA_ARGS__)
-#define pgm_error(...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_ERROR) pgm__log (PGM_LOG_LEVEL_ERROR, __VA_ARGS__)
-#define pgm_fatal(...)		pgm__log (PGM_LOG_LEVEL_FATAL, __VA_ARGS__)
+/* debug trace level only valid in debug mode */
+#	ifdef PGM_DEBUG
+#		define pgm_debug(...) \
+			do { \
+				if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) \
+					pgm__log (PGM_LOG_LEVEL_DEBUG, __VA_ARGS__); \
+			} while (0)
+#	else
+#		define pgm_debug(...)	while (0)
+#	endif /* !PGM_DEBUG */
+
+#	define pgm_trace(r,...) \
+			do { \
+				if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
+					pgm__log (PGM_LOG_LEVEL_TRACE, __VA_ARGS__); \
+			} while (0)
+#	define pgm_minor(...) \
+			do { \
+				if (pgm_min_log_level <= PGM_LOG_LEVEL_MINOR) \
+					pgm__log (PGM_LOG_LEVEL_MINOR, __VA_ARGS__); \
+			} while (0)
+#	define pgm_info(...) \
+			do { \
+				if (pgm_min_log_level <= PGM_LOG_LEVEL_NORMAL) \
+					pgm__log (PGM_LOG_LEVEL_NORMAL, __VA_ARGS__); \
+			} while (0)
+#	define pgm_warn(...) \
+			do { \
+				if (pgm_min_log_level <= PGM_LOG_LEVEL_WARNING) \
+					pgm__log (PGM_LOG_LEVEL_WARNING, __VA_ARGS__); \
+			} while (0)
+#	define pgm_error(...) \
+			do { \
+				if (pgm_min_log_level <= PGM_LOG_LEVEL_ERROR) \
+					pgm__log (PGM_LOG_LEVEL_ERROR, __VA_ARGS__); \
+			} while (0)
+#	define pgm_fatal(...) \
+			do { \
+				pgm__log (PGM_LOG_LEVEL_FATAL, __VA_ARGS__); \
+			} while (0)
 
 #elif defined(CONFIG_HAVE_GNUC_VARARGS)
 
-#define pgm_debug(f...)		if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) pgm__log (PGM_LOG_LEVEL_DEBUG, f)
-#define pgm_trace(r,f...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
+#	ifdef PGM_DEBUG
+#		define pgm_debug(f...) \
+			do { \
+				if (pgm_min_log_level == PGM_LOG_LEVEL_DEBUG) \
+					pgm__log (PGM_LOG_LEVEL_DEBUG, f); \
+			} while (0)
+#	else
+#		define pgm_debug(f...)	while (0)
+#	endif /* !PGM_DEBUG */
+
+#	define pgm_trace(r,f...)	if (pgm_min_log_level <= PGM_LOG_LEVEL_TRACE && pgm_log_mask & (r)) \
 					pgm__log (PGM_LOG_LEVEL_TRACE, f)
-#define pgm_minor(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_MINOR) pgm__log (PGM_LOG_LEVEL_MINOR, f)
-#define pgm_info(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_NORMAL) pgm__log (PGM_LOG_LEVEL_NORMAL, f)
-#define pgm_warn(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_WARNING) pgm__log (PGM_LOG_LEVEL_WARNING, f)
-#define pgm_error(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_ERROR) pgm__log (PGM_LOG_LEVEL_ERROR, f)
-#define pgm_fatal(f...)		pgm__log (PGM_LOG_LEVEL_FATAL, f)
+#	define pgm_minor(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_MINOR) pgm__log (PGM_LOG_LEVEL_MINOR, f)
+#	define pgm_info(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_NORMAL) pgm__log (PGM_LOG_LEVEL_NORMAL, f)
+#	define pgm_warn(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_WARNING) pgm__log (PGM_LOG_LEVEL_WARNING, f)
+#	define pgm_error(f...)		if (pgm_min_log_level <= PGM_LOG_LEVEL_ERROR) pgm__log (PGM_LOG_LEVEL_ERROR, f)
+#	define pgm_fatal(f...)		pgm__log (PGM_LOG_LEVEL_FATAL, f)
 
 #else   /* no varargs macros */
 

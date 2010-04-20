@@ -44,7 +44,6 @@ struct pgm_hashtable_t
 	pgm_hashnode_t**	nodes;
 	pgm_hashfunc_t		hash_func;
 	pgm_equalfunc_t		key_equal_func;
-	volatile int32_t	ref_count;
 };
 
 #define PGM_HASHTABLE_RESIZE(hash_ttable) \
@@ -79,7 +78,6 @@ pgm_hashtable_new (
 	hash_table->nnodes             = 0;
 	hash_table->hash_func          = hash_func;
 	hash_table->key_equal_func     = key_equal_func;
-	hash_table->ref_count          = 1;
 	hash_table->nodes              = pgm_new0 (pgm_hashnode_t*, hash_table->size);
   
 	return hash_table;
@@ -91,15 +89,11 @@ pgm_hashtable_unref (
 	)
 {
 	pgm_return_if_fail (hash_table != NULL);
-	pgm_return_if_fail (pgm_atomic_int32_get (&hash_table->ref_count) > 0);
 
-	if (pgm_atomic_int32_exchange_and_add (&hash_table->ref_count, -1) - 1 == 0)
-	{
-		for (unsigned i = 0; i < hash_table->size; i++)
-			pgm_hash_nodes_destroy (hash_table->nodes[i]);
-		pgm_free (hash_table->nodes);
-		pgm_free (hash_table);
-	}
+	for (unsigned i = 0; i < hash_table->size; i++)
+		pgm_hash_nodes_destroy (hash_table->nodes[i]);
+	pgm_free (hash_table->nodes);
+	pgm_free (hash_table);
 }
 
 void
@@ -108,7 +102,6 @@ pgm_hashtable_destroy (
 	)
 {
 	pgm_return_if_fail (hash_table != NULL);
-	pgm_return_if_fail (hash_table->ref_count > 0);
   
 	pgm_hashtable_remove_all (hash_table);
 	pgm_hashtable_unref (hash_table);
@@ -160,7 +153,6 @@ pgm_hashtable_insert (
 	pgm_hash_t key_hash;
   
 	pgm_return_if_fail (hash_table != NULL);
-	pgm_return_if_fail (hash_table->ref_count > 0);
   
 	node = pgm_hashtable_lookup_node (hash_table, key, &key_hash);
 	pgm_return_if_fail (NULL == *node); 

@@ -24,8 +24,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>		/* _GNU for in6_pktinfo */
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/recv.h"
 #include "pgm/source.h"

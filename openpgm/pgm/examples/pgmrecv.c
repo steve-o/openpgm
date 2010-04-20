@@ -117,6 +117,7 @@ main (
 #if defined(CONFIG_WITH_HTTP) || defined(CONFIG_WITH_SNMP)
 	GError* err = NULL;
 #endif
+	int e;
 	pgm_error_t* pgm_err = NULL;
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
@@ -216,7 +217,8 @@ main (
 	signal (SIGHUP,  SIG_IGN);
 #endif
 #ifdef G_OS_UNIX
-	pipe (g_quit_pipe);
+	e = pipe (g_quit_pipe);
+	g_assert (0 == e);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 #else
@@ -238,7 +240,8 @@ main (
 	g_quit = TRUE;
 #ifdef G_OS_UNIX
 	const char one = '1';
-	write (g_quit_pipe[1], &one, sizeof(one));
+	const size_t writelen = write (g_quit_pipe[1], &one, sizeof(one));
+	g_assert (sizeof(one) == writelen);
 	g_thread_join (g_thread);
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);

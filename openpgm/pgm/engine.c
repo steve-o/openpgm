@@ -20,14 +20,13 @@
  */
 
 #include <netdb.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/engine.h"
 #include "pgm/version.h"
 
 
-//#define PGM_DEBUG
+//#define ENGINE_DEBUG
 
 
 /* globals */
@@ -36,7 +35,7 @@ int			pgm_ipproto_pgm = IPPROTO_PGM;
 
 /* locals */
 static bool		pgm_is_supported = FALSE;
-static volatile int32_t	pgm_ref_count	 = 0;
+static volatile uint32_t pgm_ref_count	 = 0;
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -51,7 +50,7 @@ pgm_init (
 	pgm_error_t**	error
 	)
 {
-	if (pgm_atomic_int32_exchange_and_add (&pgm_ref_count, 1) > 0)
+	if (pgm_atomic_exchange_and_add32 (&pgm_ref_count, 1) > 0)
 		return TRUE;
 
 /* initialise dependent modules */
@@ -62,7 +61,6 @@ pgm_init (
 			pgm_build_revision ? " (" : "", pgm_build_revision ? pgm_build_revision : "", pgm_build_revision ? ")" : "",
 			pgm_build_date, pgm_build_time, pgm_build_platform);
 
-	pgm_atomic_init();
 	pgm_thread_init();
 	pgm_mem_init();
 	pgm_rand_init();
@@ -92,8 +90,19 @@ pgm_init (
 	}
 #endif /* G_OS_WIN32 */
 
-/* find PGM protocol id overriding default value */
+/* find PGM protocol id overriding default value, use first value from NIS */
 #ifdef CONFIG_HAVE_GETPROTOBYNAME_R
+	char b[1024];
+	struct protoent protobuf;
+	const struct protoent* proto = getprotobyname_r ("pgm", &protobuf, b, sizeof(b));
+	if (NULL != proto) {
+		if (proto->p_proto != pgm_ipproto_pgm) {
+			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
+				proto->p_proto);
+			pgm_ipproto_pgm = proto->p_proto;
+		}
+	}
+#elif defined(CONFIG_HAVE_GETPROTOBYNAME_R2)
 	char b[1024];
 	struct protoent protobuf, *proto;
 	const int e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
@@ -133,9 +142,8 @@ err_shutdown:
 	pgm_rand_shutdown();
 	pgm_mem_shutdown();
 	pgm_thread_shutdown();
-	pgm_atomic_shutdown();
 	pgm_messages_shutdown();
-	pgm_atomic_int32_dec (&pgm_ref_count);
+	pgm_atomic_dec32 (&pgm_ref_count);
 	return FALSE;
 }
 
@@ -154,9 +162,9 @@ pgm_supported (void)
 bool
 pgm_shutdown (void)
 {
-	pgm_return_val_if_fail (pgm_atomic_int32_get (&pgm_ref_count) > 0, FALSE);
+	pgm_return_val_if_fail (pgm_atomic_read32 (&pgm_ref_count) > 0, FALSE);
 
-	if (!pgm_atomic_int32_dec_and_test (&pgm_ref_count))
+	if (pgm_atomic_exchange_and_add32 (&pgm_ref_count, (uint32_t)-1) != 1)
 		return TRUE;
 
 	pgm_is_supported = FALSE;
@@ -175,7 +183,6 @@ pgm_shutdown (void)
 	pgm_rand_shutdown();
 	pgm_mem_shutdown();
 	pgm_thread_shutdown();
-	pgm_atomic_shutdown();
 	pgm_messages_shutdown();
 	return TRUE;
 }
