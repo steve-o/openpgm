@@ -115,7 +115,7 @@ again:
 		close (sock6);
 		return FALSE;
 	}
-	pgm_debug ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, lifc.lifc_len / sizeof(struct lifreq));
+	pgm_debug ("ioctl(AF_INET, SIOCGLIFCONF) = %d (%d)", lifc.lifc_len, (int)(lifc.lifc_len / sizeof(struct lifreq)));
 
 /* repeat everything for IPv6 */
 	lifn.lifn_family = AF_INET6;
@@ -149,7 +149,7 @@ again:
 		close (sock6);
 		return FALSE;
 	}
-	pgm_debug ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, lifc6.lifc_len / sizeof(struct lifreq));
+	pgm_debug ("ioctl(AF_INET6, SIOCGLIFCONF) = %d (%d)", lifc6.lifc_len, (int)(lifc6.lifc_len / sizeof(struct lifreq)));
 
 	unsigned nlifr = (lifc.lifc_len + lifc6.lifc_len) / sizeof(struct lifreq);
 	if (nlifr > if_count)

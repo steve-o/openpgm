@@ -23,7 +23,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>		/* _GNU for in6_pktinfo */
+#include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/recv.h"
