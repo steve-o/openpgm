@@ -58,7 +58,7 @@
 PGM_BEGIN_DECLS
 
 /* byte alignment for packet memory maps */
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__sparc__)
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -124,7 +124,7 @@ struct pgm_udphdr
 
 PGM_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__sparc__)
 #	pragma pack(pop)
 #else
 #	pragma pack()

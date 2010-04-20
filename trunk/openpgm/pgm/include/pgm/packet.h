@@ -97,7 +97,7 @@ enum pgm_type_e {
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
 /* byte alignment for packet memory maps */
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__sparc__)
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -208,7 +208,7 @@ struct pgm_opt_nak_list {
 	uint8_t		opt_reserved;		/* reserved */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 	uint32_t	opt_sqn[];		/* requested sequence number [62] */
-#elif defined(__SUNPRO_CC) || defined(__cplusplus)
+#elif defined(__SUNPRO_C) || defined(__cplusplus)
 	uint32_t	opt_sqn[1];
 #else
 	uint32_t	opt_sqn[0];
@@ -389,7 +389,7 @@ struct pgm_opt6_path_nla {
 };
 
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__sparc__)
 #	pragma pack(pop)
 #else
 #	pragma pack()
