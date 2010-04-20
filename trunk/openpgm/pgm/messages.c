@@ -28,7 +28,7 @@
 
 /* bit mask for trace role modules */
 int pgm_log_mask		= 0xffff;
-int pgm_min_log_level		= PGM_LOG_LEVEL_DEBUG;
+int pgm_min_log_level		= PGM_LOG_LEVEL_NORMAL;
 
 
 /* locals */
@@ -78,6 +78,26 @@ pgm_messages_init (void)
 		return;
 
 	pgm_mutex_init (&messages_mutex);
+
+	const char* log_mask = getenv ("PGM_LOG_MASK");
+	if (NULL != log_mask) {
+		unsigned int value = 0;
+		if (1 == sscanf (log_mask, "0x%4x", &value))
+			pgm_log_mask = value;
+	}
+	const char *min_log_level = getenv ("PGM_MIN_LOG_LEVEL");
+	if (NULL != min_log_level) {
+		switch (min_log_level[0]) {
+		case 'D':	pgm_min_log_level = PGM_LOG_LEVEL_DEBUG; break;
+		case 'T':	pgm_min_log_level = PGM_LOG_LEVEL_TRACE; break;
+		case 'M':	pgm_min_log_level = PGM_LOG_LEVEL_MINOR; break;
+		case 'N':	pgm_min_log_level = PGM_LOG_LEVEL_NORMAL; break;
+		case 'W':	pgm_min_log_level = PGM_LOG_LEVEL_WARNING; break;
+		case 'E':	pgm_min_log_level = PGM_LOG_LEVEL_ERROR; break;
+		case 'F':	pgm_min_log_level = PGM_LOG_LEVEL_FATAL; break;
+		default: break;
+		}
+	}
 }
 
 void
