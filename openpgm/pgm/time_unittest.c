@@ -37,42 +37,39 @@
 
 
 /* target:
- *	gboolean
- *	pgm_time_init (GError** error)
+ *	boolean
+ *	pgm_time_init (pgm_error_t** error)
  */
+
+/* time initialisation uses reference counting */
 
 START_TEST (test_init_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
-	fail_unless (FALSE == pgm_time_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init #1 failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init #2 failed");
 }
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_time_shutdown (void)
  */
 
 START_TEST (test_shutdown_pass_001)
 {
 	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
-	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
-	fail_unless (FALSE == pgm_time_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #1 failed");
+	fail_unless (FALSE == pgm_time_shutdown (), "shutdown #2 failed");
 }
 END_TEST
 
-/* target:
- *	gboolean
- *	pgm_time_supported (void)
- */
-
-START_TEST (test_supported_pass_001)
+START_TEST (test_shutdown_pass_002)
 {
-	fail_unless (FALSE == pgm_time_supported (), "supported failed");
-	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
-	fail_unless (TRUE == pgm_time_supported (), "supported failed");
-	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
-	fail_unless (FALSE == pgm_time_supported (), "supported failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init #1 failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init #2 failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #1 failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #2 failed");
+	fail_unless (FALSE == pgm_time_shutdown (), "shutdown #3 failed");
 }
 END_TEST
 
@@ -184,10 +181,7 @@ make_test_suite (void)
 	TCase* tc_shutdown = tcase_create ("shutdown");
 	suite_add_tcase (s, tc_shutdown);
 	tcase_add_test (tc_shutdown, test_shutdown_pass_001);
-
-	TCase* tc_supported = tcase_create ("supported");
-	suite_add_tcase (s, tc_supported);
-	tcase_add_test (tc_supported, test_supported_pass_001);
+	tcase_add_test (tc_shutdown, test_shutdown_pass_002);
 
 	TCase* tc_update_now = tcase_create ("update-now");
 	suite_add_tcase (s, tc_update_now);
