@@ -130,4 +130,6 @@ PGM_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 #	pragma pack()
 #endif
 
+PGM_END_DECLS
+
 #endif /* __PGM_IP_H__ */
