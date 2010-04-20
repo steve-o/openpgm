@@ -28,7 +28,7 @@
 
 #include <pgm/macros.h>
 
-#include <endian.h>
+#include <sys/param.h>
 #include <stdbool.h>
 #include <stdint.h>
 

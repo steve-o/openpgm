@@ -30,8 +30,6 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
-			allowed_values=('true', 'false')),
 )
 
 #-----------------------------------------------------------------------------
@@ -63,15 +61,15 @@ conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
 
 if not conf.CheckPKGConfig('0.15.0'):
 	print 'pkg-config >= 0.15.0 not found.'
-	Exit(1)
+#	Exit(1)
 
 if not conf.CheckPKG('glib-2.0 >= 2.10'):
 	print 'glib-2.0 >= 2.10 not found.'
-	Exit(1)
+#	Exit(1)
 
 if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
-	Exit(1)
+#	Exit(1)
 
 #if not conf.CheckPKG('libsoup-2.4'):
 #	print 'libsoup-2.4 not found.'
@@ -107,35 +105,71 @@ env = Environment(
 				'-Wnested-externs',
 				'-Winline',
 			'-pedantic',
+# C99
 			'-std=gnu99',
-			'--param', 'max-inline-insns-single=600',
-			'-D_REENTRANT',
-			'-D_GNU_SOURCE',
 			'-D_XOPEN_SOURCE=600',
 			'-D__EXTENSIONS__',
 			'-DBSD_COMP',
-			'-D__need_IOV_MAX',
-			'-D__USE_BSD',
+			'-D_BSD_SOURCE',
+# re-entrant libc
+			'-D_REENTRANT',
+			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
+# variadic macros
+			'-DCONFIG_HAVE_ISO_VARARGS',
+#			'-DCONFIG_HAVE_GNUC_VARARGS',
+# optimium checksum implementation
+#			'-DCONFIG_8BIT_CHECKSUM',
 			'-DCONFIG_16BIT_CHECKSUM',
-			'-DCONFIG_HAVE_CLOCK_GETTIME',
-			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
-			'-DCONFIG_HAVE_NANOSLEEP',
-			'-DCONFIG_HAVE_USLEEP',
+#			'-DCONFIG_32BIT_CHECKSUM',
+#			'-DCONFIG_64BIT_CHECKSUM',
+#			'-DCONFIG_VECTOR_CHECKSUM',
+# useful /proc system
+#			'-DCONFIG_HAVE_PROC',
+# example: crash handling
+#			'-DCONFIG_HAVE_BACKTRACE',
+# timing
+#			'-DCONFIG_HAVE_PSELECT',
+#			'-DCONFIG_HAVE_RTC',
+#			'-DCONFIG_HAVE_TSC',
+#			'-DCONFIG_HAVE_HPET',
+# event handling
 			'-DCONFIG_HAVE_POLL',
+#			'-DCONFIG_HAVE_EPOLL',
+# interface enumeration
+#			'-DCONFIG_HAVE_GETIFADDRS',
+#			'-DCONFIG_HAVE_IFR_NETMASK',
+# win32 cmsg
+#			'-DCONFIG_HAVE_WSACMSGHDR',
+# multicast
 			'-DCONFIG_HAVE_MCAST_JOIN',
+#			'-DCONFIG_HAVE_IP_MREQN',
+# sprintf
+#			'-DCONFIG_HAVE_SPRINTF_GROUPING',
+#			'-DCONFIG_HAVE_VASPRINTF',
+# symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
+# socket binding
 			'-DCONFIG_BIND_INADDR_ANY',
+# optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
+# previous version HTTP library api
+#			'-DCONFIG_LIBSOUP22',
+# Wine limited API support
+#			'-DCONFIG_TARGET_WINE'
 		 ],
-	LINKFLAGS = [	'-pipe',
+	LINKFLAGS = [	'-pipe'
+		],
+	LIBS = [
+# histogram math
+			'-lm',
+# Solaris sockets
 			'-lresolv',
 			'-lsocket',
-			'-lnsl',
-			'-lm'
+			'-lnsl'
 		    ],
 	PROTOBUF_CCFLAGS = '-I/opt/glib-gcc/include',
-	PROTOBUF_LIBS = '/opt/glib-gcc/lib/libprotobuf.a',
-	PROTOBUF_PROTOC = '/opt/glib-gcc/bin/protoc'
+	PROTOBUF_LIBS    = '/opt/glib-gcc/lib/libprotobuf.a',
+	PROTOBUF_PROTOC  = '/opt/glib-gcc/bin/protoc'
 )
 force_gcc(env);
 
@@ -175,7 +209,7 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -216,22 +250,8 @@ def CheckCheck(context):
 	context.Result(result);
 	return result;
 
-def CheckEventFD(context):
-	context.Message('Checking eventfd...');
-	result = context.TryLink("""
-#include <sys/eventfd.h>
-int main(int argc, char**argv)
-{
-	eventfd(0,0);
-	return 0;
-}
-""", '.c')
-	context.Result(result);
-	return result;
-
 tests = {
-	'CheckCheck':	CheckCheck,
-	'CheckEventFD':	CheckEventFD
+	'CheckCheck':	CheckCheck
 }
 if env['WITH_SNMP'] == 'true':
 	tests['CheckSNMP'] = CheckSNMP;
@@ -248,17 +268,7 @@ else:
 	print 'Disabling Check unit tests.';
 	conf.env['CHECK'] = 'false';
 
-if conf.CheckEventFD():
-	print 'Enabling kernel eventfd notification mechanism.';
-	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
-
 env = conf.Finish();
-
-# DSO visibility flags
-if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
-	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
-else:
-	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
 
 # add builder to create PIC static libraries for including in shared libraries
 action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
