@@ -76,51 +76,34 @@ if env['WITH_CHECK'] == 'true':
 	te.ParseConfig ('pkg-config --cflags --libs check');
 # log dependencies
 	tlog = [	e.Object('messages.c'),
-			e.Object('thread.c')
+			e.Object('thread.c'),
+			e.Object('galois_tables.c'),
+			e.Object('mem.c'),
+			e.Object('histogram.c'),
+			e.Object('string.c'),
+			e.Object('slist.c')
 		];
 # framework
-	te.Program (['atomic_unittest.c',
-			e.Object('thread.c'),
-			e.Object('messages.c')]);
+	te.Program (['atomic_unittest.c']);
 	te.Program (['checksum_unittest.c'] + tlog);
-	te.Program (['error_unittest.c',
-			e.Object('mem.c'),
-			e.Object('string.c'),
-			e.Object('slist.c')] + tlog);
+	te.Program (['error_unittest.c'] + tlog);
 	te.Program (['md5_unittest.c'] + tlog);
 	te.Program (['getifaddrs_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c'),
-			e.Object('slist.c'),
-			e.Object('list.c'),
-			e.Object('mem.c'),
-			e.Object('string.c')] + tlog);
+			e.Object('list.c')] + tlog);
 	te.Program (['getnodeaddr_unittest.c',
 			e.Object('error.c'),
-			e.Object('sockaddr.c'),
-			e.Object('mem.c'),
-			e.Object('string.c'),
-			e.Object('slist.c')] + tlog);
+			e.Object('sockaddr.c')] + tlog);
 	te.Program (['indextoaddr_unittest.c',
 			e.Object('error.c'),
-			e.Object('sockaddr.c'),
-			e.Object('mem.c'),
-			e.Object('string.c'),
-			e.Object('slist.c')] + tlog);
+			e.Object('sockaddr.c')] + tlog);
 	te.Program (['inet_network_unittest.c',
 			e.Object('sockaddr.c')] + tlog);
-	te.Program (['rate_control_unittest.c',
-			e.Object('mem.c'),
-			e.Object('string.c'),
-			e.Object('slist.c')] + tlog);
-	te.Program (['reed_solomon_unittest.c',
-			e.Object('galois_tables.c'),
-			e.Object('mem.c')] + tlog);
+	te.Program (['rate_control_unittest.c'] + tlog);
+	te.Program (['reed_solomon_unittest.c'] + tlog);
 	te.Program (['time_unittest.c',
-			e.Object('error.c'),
-			e.Object('mem.c'),
-			e.Object('string.c'),
-			e.Object('slist.c')] + tlog);
+			e.Object('error.c')] + tlog);
 # collate
 	tframework = [	e.Object('checksum.c'),
 			e.Object('error.c'),
@@ -150,22 +133,34 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('wsastrerror.c')
 		];
 # library
-	te.Program (['txw_unittest.c', e.Object('tsi.c')] + tframework);
-	te.Program (['rxw_unittest.c', e.Object('tsi.c')] + tframework);
-	te.Program (['engine_unittest.c', e.Object('version.c')] + tframework);
-	te.Program (['gsi_unittest.c', e.Object('if.c')] + tframework);
+	te.Program (['txw_unittest.c',
+			e.Object('tsi.c')] + tframework);
+	te.Program (['rxw_unittest.c',
+			e.Object('tsi.c')] + tframework);
+	te.Program (['engine_unittest.c',
+			e.Object('version.c')] + tframework);
+	te.Program (['gsi_unittest.c',
+			e.Object('if.c')] + tframework);
 	te.Program (['tsi_unittest.c'] + tframework);
 	te.Program (['if_unittest.c'] + tframework);
-	te.Program (['transport_unittest.c', e.Object('if.c'), e.Object('tsi.c')] + tframework);
+	te.Program (['transport_unittest.c',
+			e.Object('if.c'),
+			e.Object('tsi.c')] + tframework);
 	te.Program (['source_unittest.c'] + tframework);
-	te.Program (['receiver_unittest.c', e.Object('tsi.c')] + tframework);
-	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c')] + tframework);
+	te.Program (['receiver_unittest.c',
+			e.Object('tsi.c')] + tframework);
+	te.Program (['recv_unittest.c',
+			e.Object('tsi.c'),
+			e.Object('gsi.c')] + tframework);
 	te.Program (['net_unittest.c'] + tframework);
 	te.Program (['timer_unittest.c'] + tframework);
 	te.Program (['packet_parse_unittest.c'] + tframework);
 	te.Program (['packet_test_unittest.c'] + tframework);
-	te.Program (['ip_unittest.c', e.Object('if.c')] + tframework);
+	te.Program (['ip_unittest.c',
+			e.Object('if.c')] + tframework);
 # performance tests
-	te.Program (['checksum_perftest.c', e.Object('time.c'), e.Object('error.c'), e.Object('mem.c'), e.Object('string.c'), e.Object('slist.c')] + tlog);
+	te.Program (['checksum_perftest.c',
+			e.Object('time.c'),
+			e.Object('error.c')] + tlog);
 
 # end of file

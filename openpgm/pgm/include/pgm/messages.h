@@ -286,7 +286,7 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d: assertion failed (%s): (%u %s %u)", \
-				__FILE__, __LINE__, #expr, _n1, #cmp, _n2); \
+				__FILE__, __LINE__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
 	} while (0)
@@ -296,7 +296,7 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d: assertion failed (%s): (%u %s %u)", \
-				__FILE__, __LINE__, #expr, _n1, #cmp, _n2); \
+				__FILE__, __LINE__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
 	} while (0)

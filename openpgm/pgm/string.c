@@ -24,7 +24,7 @@
 #endif
 #include <limits.h>
 #include <stdarg.h>
-#include <stdio.h>
+#include <stdio.h>	/* _GNU_SOURCE for vasprintf */
 #include <string.h>
 #include <pgm/framework.h>
 
