@@ -21,21 +21,21 @@
 
 
 #include <errno.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/if.h>
+#include <unistd.h>
 
 #include <glib.h>
 #include <check.h>
 
 
 /* mock state */
+
+struct addrinfo;
 
 struct mock_host_t {
 	struct sockaddr_storage	address;

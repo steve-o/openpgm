@@ -39,7 +39,7 @@ struct pgm_debug_key_t {
 };
 typedef struct pgm_debug_key_t pgm_debug_key_t;
 
-static volatile int32_t mem_ref_count = 0;
+static volatile uint32_t mem_ref_count = 0;
 
 
 static
@@ -109,7 +109,7 @@ pgm_mem_init (void)
 		{ "gc-friendly", 1 },
 	};
 
-	if (pgm_atomic_int32_exchange_and_add (&mem_ref_count, 1) > 0)
+	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, 1) > 0)
 		return;
 
 	const char *val = getenv ("PGM_DEBUG");
@@ -121,9 +121,9 @@ pgm_mem_init (void)
 void
 pgm_mem_shutdown (void)
 {
-	pgm_return_if_fail (pgm_atomic_int32_get (&mem_ref_count) > 0);
+	pgm_return_if_fail (pgm_atomic_read32 (&mem_ref_count) > 0);
 
-	if (!pgm_atomic_int32_dec_and_test (&mem_ref_count))
+	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, (uint32_t)-1) != 1)
 		return;
 
 	/* nop */

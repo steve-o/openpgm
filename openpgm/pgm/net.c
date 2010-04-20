@@ -26,8 +26,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/net.h"
 

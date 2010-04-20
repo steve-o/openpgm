@@ -64,7 +64,7 @@ struct pgm_sk_buff_t {
 				       *tail,
 				       *end;
 	uint32_t			truesize;
-	volatile int32_t		users;		/* atomic */
+	volatile uint32_t		users;		/* atomic */
 };
 
 /* declare for GCC attributes */
@@ -117,7 +117,7 @@ pgm_alloc_skb (
 		memset (skb, 0, sizeof(struct pgm_sk_buff_t));
 	}
 	skb->truesize = size + sizeof(struct pgm_sk_buff_t);
-	pgm_atomic_int32_set (&skb->users, 1);
+	pgm_atomic_write32 (&skb->users, 1);
 	skb->head = skb + 1;
 	skb->data = skb->tail = skb->head;
 	skb->end  = (char*)skb->data + size;
@@ -131,7 +131,7 @@ pgm_skb_get (
 	struct pgm_sk_buff_t*const skb
 	)
 {
-	pgm_atomic_int32_inc (&skb->users);
+	pgm_atomic_inc32 (&skb->users);
 	return skb;
 }
 
@@ -141,7 +141,7 @@ pgm_free_skb (
 	struct pgm_sk_buff_t*const skb
 	)
 {
-	if (pgm_atomic_int32_dec_and_test (&skb->users))
+	if (pgm_atomic_exchange_and_add32 (&skb->users, (uint32_t)-1) == 1)
 		pgm_free (skb);
 }
 
@@ -233,7 +233,7 @@ pgm_skb_copy (
 	memcpy (newskb, skb, PGM_OFFSETOF(struct pgm_sk_buff_t, pgm_header));
 	newskb->zero_padded = 0;
 	newskb->truesize = skb->truesize;
-	pgm_atomic_int32_set (&newskb->users, 1);
+	pgm_atomic_write32 (&newskb->users, 1);
 	newskb->head = newskb + 1;
 	newskb->end  = (char*)newskb->head + ((char*)skb->end  - (char*)skb->head);
 	newskb->data = (char*)newskb->head + ((char*)skb->data - (char*)skb->head);
@@ -329,7 +329,7 @@ pgm_skb_is_valid (
 	pgm_return_val_if_fail (skb->truesize >= sizeof(struct pgm_sk_buff_t*) + skb->len, FALSE);
 	pgm_return_val_if_fail (skb->truesize == ((const char*)skb->end - (const char*)skb), FALSE);
 /* users */
-	pgm_return_val_if_fail (pgm_atomic_int32_get (&skb->users) > 0, FALSE);
+	pgm_return_val_if_fail (pgm_atomic_read32 (&skb->users) > 0, FALSE);
 	return TRUE;
 }
 #endif /* SKB_DEBUG */

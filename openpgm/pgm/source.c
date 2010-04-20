@@ -22,8 +22,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <errno.h>
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/source.h"
 #include "pgm/sqn_list.h"
@@ -668,7 +667,7 @@ pgm_send_spm (
 	}
 /* advance SPM sequence only on successful transmission */
 	transport->spm_sqn++;
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
 
@@ -739,7 +738,7 @@ send_ncf (
 					pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
 
@@ -841,7 +840,7 @@ send_ncf_list (
 					pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
 
@@ -963,7 +962,7 @@ retry_send:
 	if ((size_t)sent == tpdu_length) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
+		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1065,7 +1064,7 @@ retry_send:
 	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
+		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1197,7 +1196,7 @@ retry_send:
 	if (PGM_LIKELY((size_t)sent == STATE(skb)->len)) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
+		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	}
 
 /* check for end of transmission group */
@@ -1366,7 +1365,7 @@ retry_send:
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
@@ -1376,7 +1375,7 @@ retry_send:
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (transport, STATE(skb)->tstamp);
-		pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
@@ -1752,7 +1751,7 @@ retry_one_apdu_send:
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
@@ -1764,7 +1763,7 @@ retry_one_apdu_send:
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (transport, STATE(skb)->tstamp);
-		pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
@@ -1987,7 +1986,7 @@ retry_send:
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
@@ -1999,7 +1998,7 @@ retry_send:
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (transport, STATE(skb)->tstamp);
-		pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
@@ -2069,7 +2068,7 @@ send_rdata (
 	pgm_txw_inc_retransmit_count (skb);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += ntohs(header->pgm_tsdu_length);
 	transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
-	pgm_atomic_int32_add ((volatile int32_t*)&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
+	pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
 	return TRUE;
 }
 

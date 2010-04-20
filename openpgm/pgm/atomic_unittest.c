@@ -32,84 +32,70 @@
 
 /* mock functions for external references */
 
-#define ATOMIC_DEBUG
-#include "atomic.c"
-
-static
-void
-mock_setup (void)
-{
-	pgm_atomic_init ();
-}
-
-static
-void
-mock_teardown (void)
-{
-	pgm_atomic_shutdown ();
-}
+#define PGM_COMPILATION
+#include "pgm/atomic.h"
 
 
 /* target:
- *	int32_t
- *	pgm_atomic_int32_exchange_and_add (
- *		volatile int32_t*	atomic,
- *		const int32_t		val
+ *	uint32_t
+ *	pgm_atomic_exchange_and_add32 (
+ *		volatile uint32_t*	atomic,
+ *		const uint32_t		val
  *	)
  */
 
 START_TEST (test_int32_exchange_and_add_pass_001)
 {
-	volatile gint32 atomic = 0;
-	fail_unless (0 == pgm_atomic_int32_exchange_and_add (&atomic, 5));
+	volatile uint32_t atomic = 0;
+	fail_unless (0 == pgm_atomic_exchange_and_add32 (&atomic, 5));
 	fail_unless (5 == atomic);
-	fail_unless (5 == pgm_atomic_int32_exchange_and_add (&atomic, -10));
-	fail_unless (-5 == atomic);
+	fail_unless (5 == pgm_atomic_exchange_and_add32 (&atomic, (uint32_t)-10));
+	fail_unless ((uint32_t)-5 == atomic);
 }
 END_TEST
 
 /* target:
  *	void
- *	pgm_atomic_int32_add (
- *		volatile int32_t*	atomic,
- *		const int32_t		val
+ *	pgm_atomic_add32 (
+ *		volatile uint32_t*	atomic,
+ *		const uint32_t		val
  *	)
  */
 
 START_TEST (test_int32_add_pass_001)
 {
-	volatile gint32 atomic = -5;
-	pgm_atomic_int32_add (&atomic, 20);
+	volatile uint32_t atomic = (uint32_t)-5;
+	pgm_atomic_add32 (&atomic, 20);
 	fail_unless (15 == atomic);
-	pgm_atomic_int32_add (&atomic, -35);
-	fail_unless (-20 == atomic);
+	pgm_atomic_add32 (&atomic, (uint32_t)-35);
+	fail_unless ((uint32_t)-20 == atomic);
 }
 END_TEST
 
 /* ensure wrap around when casting uint32 */
 START_TEST (test_int32_add_pass_002)
 {
-	volatile guint32 atomic = 0;
-	pgm_atomic_int32_add ((volatile gint32*)&atomic, UINT32_MAX/2);
+	volatile uint32_t atomic = 0;
+	pgm_atomic_add32 (&atomic, UINT32_MAX/2);
 	fail_unless ((UINT32_MAX/2) == atomic);
-	pgm_atomic_int32_add ((volatile gint32*)&atomic, UINT32_MAX - (UINT32_MAX/2));
+	pgm_atomic_add32 (&atomic, UINT32_MAX - (UINT32_MAX/2));
 	fail_unless (UINT32_MAX == atomic);
-	pgm_atomic_int32_add ((volatile gint32*)&atomic, 1);
+	pgm_atomic_add32 (&atomic, 1);
 	fail_unless (0 == atomic);
 }
 END_TEST
 
 /* target:
- *	int32_t
- *	pgm_atomic_int32_get (
- *		volatile int32_t*	atomic
+ *	uint32_t
+ *	pgm_atomic_read32 (
+ *		volatile uint32_t*	atomic
  *	)
  */
 
 START_TEST (test_int32_get_pass_001)
 {
-	volatile gint32 atomic = -20;
-	fail_unless (-20 == pgm_atomic_int32_get (&atomic));
+	volatile uint32_t atomic = (uint32_t)-20;
+	fail_unless ((uint32_t)-20 == pgm_atomic_read32 (&atomic));
 }
 END_TEST
 
@@ -123,8 +109,8 @@ END_TEST
 
 START_TEST (test_int32_set_pass_001)
 {
-	volatile gint32 atomic = -20;
-	pgm_atomic_int32_set (&atomic, 5);
+	volatile uint32_t atomic = (uint32_t)-20;
+	pgm_atomic_write32 (&atomic, 5);
 	fail_unless (5 == atomic);
 }
 END_TEST
@@ -140,23 +126,19 @@ make_test_suite (void)
 
 	TCase* tc_exchange_and_add = tcase_create ("exchange-and-add");
 	suite_add_tcase (s, tc_exchange_and_add);
-	tcase_add_checked_fixture (tc_exchange_and_add, mock_setup, mock_teardown);
 	tcase_add_test (tc_exchange_and_add, test_int32_exchange_and_add_pass_001);
 
 	TCase* tc_add = tcase_create ("add");
 	suite_add_tcase (s, tc_add);
-	tcase_add_checked_fixture (tc_add, mock_setup, mock_teardown);
 	tcase_add_test (tc_add, test_int32_add_pass_001);
 	tcase_add_test (tc_add, test_int32_add_pass_002);
 
 	TCase* tc_get = tcase_create ("get");
 	suite_add_tcase (s, tc_get);
-	tcase_add_checked_fixture (tc_get, mock_setup, mock_teardown);
 	tcase_add_test (tc_get, test_int32_get_pass_001);
 
 	TCase* tc_set = tcase_create ("set");
 	suite_add_tcase (s, tc_set);
-	tcase_add_checked_fixture (tc_set, mock_setup, mock_teardown);
 	tcase_add_test (tc_set, test_int32_set_pass_001);
 
 	return s;

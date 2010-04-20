@@ -31,7 +31,7 @@
 static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
 
-static volatile int32_t thread_ref_count = 0;
+static volatile uint32_t thread_ref_count = 0;
 
 
 #ifndef _WIN32
@@ -64,7 +64,7 @@ static volatile int32_t thread_ref_count = 0;
 void
 pgm_thread_init (void)
 {
-	if (pgm_atomic_int32_exchange_and_add (&thread_ref_count, 1) > 0)
+	if (pgm_atomic_exchange_and_add32 (&thread_ref_count, 1) > 0)
 		return;
 
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
@@ -75,9 +75,9 @@ pgm_thread_init (void)
 void
 pgm_thread_shutdown (void)
 {
-	pgm_return_if_fail (pgm_atomic_int32_get (&thread_ref_count) > 0);
+	pgm_return_if_fail (pgm_atomic_read32 (&thread_ref_count) > 0);
 
-	if (!pgm_atomic_int32_dec_and_test (&thread_ref_count))
+	if (pgm_atomic_exchange_and_add32 (&thread_ref_count, (uint32_t)-1) != 1)
 		return;
 
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)

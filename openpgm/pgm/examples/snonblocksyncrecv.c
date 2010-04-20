@@ -93,6 +93,7 @@ main (
 	char*		argv[]
 	)
 {
+	int e;
 	pgm_error_t* pgm_err = NULL;
 
 	setlocale (LC_ALL, "");
@@ -130,7 +131,8 @@ main (
 	signal(SIGHUP,  SIG_IGN);
 #endif
 #ifdef G_OS_UNIX
-	pipe (g_quit_pipe);
+	e = pipe (g_quit_pipe);
+	g_assert (0 == e);
 	signal(SIGINT,  on_signal);
 	signal(SIGTERM, on_signal);
 #else
@@ -254,7 +256,8 @@ on_signal (
 	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 	const char one = '1';
-	write (g_quit_pipe[1], &one, sizeof(one));
+	const size_t writelen = write (g_quit_pipe[1], &one, sizeof(one));
+	g_assert (sizeof(one) == writelen);
 }
 #else
 static

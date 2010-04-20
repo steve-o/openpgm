@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <assert.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -78,6 +79,7 @@ main (
 	char*		argv[]
 	)
 {
+	int e;
 	pgm_error_t* pgm_err = NULL;
 
 	setlocale (LC_ALL, "");
@@ -123,7 +125,8 @@ main (
 	signal (SIGHUP,  SIG_IGN);
 #endif
 #ifndef _WIN32
-	pipe (terminate_pipe);
+	e = pipe (terminate_pipe);
+	assert (0 == e);
 	signal (SIGINT,  on_signal);
 	signal (SIGTERM, on_signal);
 #else
@@ -246,7 +249,8 @@ on_signal (
 	printf ("on_signal (signum:%d)\n", signum);
 	is_terminated = TRUE;
 	const char one = '1';
-	write (terminate_pipe[1], &one, sizeof(one));
+	const size_t writelen = write (terminate_pipe[1], &one, sizeof(one));
+	assert (sizeof(one) == writelen);
 }
 #else
 static

@@ -41,7 +41,7 @@ static struct pgm_slist_t* mock_pgm_transport_list = NULL;
 #define pgm_transport_list_lock	mock_pgm_transport_list_lock
 #define pgm_transport_list	mock_pgm_transport_list
 
-#define PGM_DEBUG
+#define ENGINE_DEBUG
 #include "engine.c"
 
 

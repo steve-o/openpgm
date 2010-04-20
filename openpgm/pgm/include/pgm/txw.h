@@ -161,7 +161,7 @@ pgm_txw_lead_atomic (
 	)
 {
 	pgm_assert (NULL != window);
-	return pgm_atomic_int32_get ((const volatile int32_t*)&window->lead);
+	return pgm_atomic_read32 (&window->lead);
 }
 
 static inline
@@ -191,7 +191,7 @@ pgm_txw_trail_atomic (
 	)
 {
 	pgm_assert (NULL != window);
-	return pgm_atomic_int32_get ((const volatile int32_t*)&window->trail);
+	return pgm_atomic_read32 (&window->trail);
 }
 
 PGM_END_DECLS

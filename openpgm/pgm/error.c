@@ -19,9 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <libintl.h>
-#define _(String) dgettext (GETTEXT_PACKAGE, String)
 #include <netdb.h>
+#include <pgm/i18n.h>
 #include <pgm/framework.h>
 
 

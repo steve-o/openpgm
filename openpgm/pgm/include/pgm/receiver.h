@@ -83,7 +83,7 @@ enum {
 };
 
 struct pgm_peer_t {
-	volatile int32_t	ref_count;		    /* atomic integer */
+	volatile uint32_t	ref_count;		    /* atomic integer */
 
 	pgm_tsi_t		tsi;
 	struct sockaddr_storage	group_nla;
