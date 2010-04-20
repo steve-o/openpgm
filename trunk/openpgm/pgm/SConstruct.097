@@ -12,6 +12,8 @@ opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
+	(EnumOption ('WITH_GETTEXT', 'l10n support via libintl', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_GLIB', 'Build GLib dependent modules', 'false', ('true', 'false'))),
 	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
 	(EnumOption ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_HTTP', 'HTTP administration', 'false', ('true', 'false'))),
@@ -168,7 +170,7 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-gdb')
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
@@ -192,7 +194,14 @@ else:
 Import('env')
 
 # vanilla environment
-env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
+if env['WITH_GLIB'] == 'true':
+	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
+else:
+	env['GLIB_FLAGS'] = '';
+
+# l10n
+if env['WITH_GETTEXT'] == 'true':
+	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -295,8 +304,9 @@ BuildDir(ref_node, '.', duplicate=0)
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
+if env['WITH_GLIB'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
-SConscript(ref_node + 'SConscript.libpgmex');
 if env['WITH_HTTP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmhttp');
 if env['WITH_SNMP'] == 'true':
