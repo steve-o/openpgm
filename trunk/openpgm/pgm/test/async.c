@@ -247,6 +247,9 @@ pgm_async_create (
 	g_trace ("create (async:%p transport:%p error:%p)",
 		 (gpointer)async, (gpointer)transport, (gpointer)error);
 
+	if (!g_thread_supported())
+		g_thread_init (NULL);
+
 	new_async = g_new0 (pgm_async_t, 1);
 	new_async->transport = transport;
 	if (0 != pgm_notify_init (&new_async->commit_notify) ||
