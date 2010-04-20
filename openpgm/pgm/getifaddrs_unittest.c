@@ -216,7 +216,7 @@ make_test_suite (void)
 	TCase* tc_getifaddrs = tcase_create ("getifaddrs");
 	suite_add_tcase (s, tc_getifaddrs);
 	tcase_add_test (tc_getifaddrs, test_getifaddrs_pass_001);
-	tcase_add_test_raise_signal (tc_getifaddrs, test_getifaddrs_fail_001, SIGSEGV);
+	tcase_add_test_raise_signal (tc_getifaddrs, test_getifaddrs_fail_001, SIGABRT);
 
 	TCase* tc_freeifaddrs = tcase_create ("freeifaddrs");
 	suite_add_tcase (s, tc_freeifaddrs);
