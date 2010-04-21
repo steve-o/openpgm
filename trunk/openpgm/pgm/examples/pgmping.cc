@@ -21,17 +21,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* c99 compatibility for c++ */
+#define __STDC_LIMIT_MACROS
+
 /* Must be first for Sun */
 #include "ping.pb.h"
 
 /* c99 compatibility for c++ */
-#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
 #define restrict
 
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <locale.h>
 #include <math.h>
 #include <signal.h>
