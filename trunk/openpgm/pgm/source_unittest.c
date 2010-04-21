@@ -698,13 +698,13 @@ END_TEST
 
 START_TEST (test_send_skbv_fail_001)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU), *skbv = { skb };
 	fail_if (NULL == skb, "alloc_skb failed");
 /* reserve PGM header */
 	pgm_skb_put (skb, mock_pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written), "send not error");
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skbv, 1, TRUE, &bytes_written), "send not error");
 }
 END_TEST
 

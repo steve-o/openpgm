@@ -53,6 +53,7 @@
 #define __PGM_IP_H__
 
 #include <netinet/in.h>
+#include <sys/param.h>
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS
@@ -68,14 +69,12 @@ PGM_BEGIN_DECLS
 /* nb: first four bytes are forced bitfields for win32 "feature" */
 struct pgm_ip
 {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#ifdef _BIT_FIELDS_LTOH
 	unsigned 	ip_hl:4;		/* header length */
 	unsigned 	ip_v:4;			/* version */
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned 	ip_v:4;			/* version */
-	unsigned 	ip_hl:4;		/* header length */
 #else
-#	error unknown ENDIAN type
+	unsigned 	ip_v:4;			/* version */
+	unsigned 	ip_hl:4;		/* header length */
 #endif
 	unsigned 	ip_tos:8;		/* type of service */
 	unsigned 	ip_len:16;		/* total length */

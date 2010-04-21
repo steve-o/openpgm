@@ -1884,6 +1884,21 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
+/* set PGM network */
+		re = "^set[[:space:]]+network[[:space:]]+([[:print:]]*;[[:print:]]+)$";
+		regcomp (&preg, re, REG_EXTENDED);
+		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
+		{
+			char *pgm_network = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
+			pgm_network[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
+			g_network = pgm_network;
+			puts ("READY");
+
+			regfree (&preg);
+			goto out;
+		}
+		regfree (&preg);
+
                 printf ("unknown command: %s\n", str);
         }
 

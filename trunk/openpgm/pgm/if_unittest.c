@@ -359,7 +359,6 @@ mock_pgm_if_nametoindex (
 	return 0;
 }
 
-static
 char*
 mock_if_indextoname (
 	unsigned		ifindex,
@@ -379,7 +378,6 @@ mock_if_indextoname (
 	return NULL;
 }
 
-static
 int
 mock_getnameinfo (
 	const struct sockaddr*	sa,
@@ -451,7 +449,6 @@ mock_getnameinfo (
 	return 0;
 }
 
-static
 int
 mock_getaddrinfo (
 	const char*		node,
@@ -530,7 +527,6 @@ mock_getaddrinfo (
 	return EAI_NONAME;
 }
 
-static
 void
 mock_freeaddrinfo (
 	struct addrinfo*	res
@@ -539,7 +535,6 @@ mock_freeaddrinfo (
 	free (res);
 }
 
-static
 int
 mock_gethostname (
 	char*			name,
@@ -569,7 +564,6 @@ mock_gethostname (
 	return 0;
 }
 
-static
 struct netent*
 mock_getnetbyname (
 	const char*		name

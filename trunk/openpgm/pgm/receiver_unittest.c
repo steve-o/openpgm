@@ -96,7 +96,7 @@ generate_peer (void)
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
 	peer->window = g_malloc0 (sizeof(pgm_rxw_t));
-	g_atomic_int_inc (&peer->ref_count);
+	pgm_atomic_inc32 (&peer->ref_count);
 	return peer;
 }
 
