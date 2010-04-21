@@ -41,7 +41,7 @@ pgm_power2_log2 (
 	unsigned	v
 	)
 {
-	static const unsigned int b[] = {0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000};
+	static const unsigned int b[] = { 0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000 };
 	unsigned int r = (v & b[0]) != 0;
 	for (unsigned i = 4; i > 0; i--) {
 		r |= ((v & b[i]) != 0) << i;

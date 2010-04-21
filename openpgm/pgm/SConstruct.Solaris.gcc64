@@ -12,7 +12,7 @@ SConsignFile('scons.signatures' + '-' + platform.system() + '-' + platform.machi
 vars = Variables()
 vars.AddVariables (
 	EnumVariable ('BUILD', 'build environment', 'debug',
-			allowed_values=('release', 'debug', 'profile')),
+			allowed_values=('release', 'debug', 'profile', 'thirtytwo')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
 	EnumVariable ('WITH_GETTEXT', 'l10n support via libintl', 'false',
@@ -201,8 +201,8 @@ debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb','-m64'], LINKFLAGS = ['-gdb','-m64
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
 
-thirtytwo = release.Clone(BUILD = 'thirtytwo')
-thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
+thirtytwo = env.Clone(BUILD = 'thirtytwo')
+thirtytwo.Append(CCFLAGS = ['-O2','-m32'], LINKFLAGS = '-m32')
 
 # choose and environment to build
 if env['BUILD'] == 'release':

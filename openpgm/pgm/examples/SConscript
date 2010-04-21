@@ -56,7 +56,7 @@ if e['WITH_GLIB'] == 'true':
 				newCCFLAGS.append("-D_XOPEN_SOURCE=500");
 		ep['CCFLAGS'] = newCCFLAGS;
 		ep.Append(CPPPATH = '.');
-		ep.Append(CCFLAGS = ge['PROTOBUF_CCFLAGS']);
+		ep.Append(CCFLAGS = ep['PROTOBUF_CCFLAGS']);
 		ep.Depends('pgmping.cc', ['ping.pb.cc', 'ping.pb.h']);
 		protobuf = Builder(action = 'cd ${SOURCE.dir} && %s ${SOURCE.file} --cpp_out=../${TARGET.dir}' % ep['PROTOBUF_PROTOC'])
 		ep.Append(BUILDERS = {'Protobuf' : protobuf})
