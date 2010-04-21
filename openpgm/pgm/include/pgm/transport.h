@@ -155,6 +155,8 @@ struct pgm_transport_t {
 
 	pgm_notify_t		rdata_notify;
 
+	pgm_hash_t		last_hash_key;
+	void*			last_hash_value;
 	unsigned		last_commit;
 	size_t			blocklen;		    /* length of buffer blocked */
 	bool			is_apdu_eagain;		    /* writer-lock on window_lock exists

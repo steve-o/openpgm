@@ -82,15 +82,15 @@ pgm_tsi_hash (
 	const void*	 p
         )
 {
-	const pgm_tsi_t* tsi = p;
+	const union {
+		pgm_tsi_t	tsi;
+		uint32_t	l[2];
+	} *u = p;
 
 /* pre-conditions */
 	pgm_assert (NULL != p);
 
-	char buf[PGM_TSISTRLEN];
-	const int tsilen = pgm_tsi_print_r (tsi, buf, sizeof(buf));
-	pgm_assert (tsilen > 0);
-	return pgm_str_hash (buf);
+	return u->l[0] ^ u->l[1];
 }
 
 /* compare two transport session identifier TSI values.
@@ -104,13 +104,17 @@ pgm_tsi_equal (
 	const void*restrict p2
         )
 {
-	const pgm_tsi_t *restrict tsi1 = p1, *restrict tsi2 = p2;
+	const union {
+		pgm_tsi_t	tsi;
+		uint32_t	l[2];
+		uint64_t	ll;
+	} *restrict u1 = p1, *restrict u2 = p2;
 
 /* pre-conditions */
-	pgm_assert (NULL != tsi1);
-	pgm_assert (NULL != tsi2);
+	pgm_assert (NULL != p1);
+	pgm_assert (NULL != p2);
 
-	return (memcmp (tsi1, tsi2, sizeof(struct pgm_tsi_t)) == 0);
+	return (u1->l[0] == u2->l[0] && u1->l[1] == u2->l[1]);
 }
 
 /* eof */
