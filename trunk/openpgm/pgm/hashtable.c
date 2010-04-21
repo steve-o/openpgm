@@ -142,6 +142,19 @@ pgm_hashtable_lookup (
 	return node ? node->value : NULL;
 }
 
+void*
+pgm_hashtable_lookup_extended (
+	pgm_hashtable_t* restrict hash_table,
+	const void*	 restrict key,
+	void*		 restrict hash_return
+	)
+{
+	pgm_return_val_if_fail (hash_table != NULL, NULL);
+  
+	const pgm_hashnode_t* node = *pgm_hashtable_lookup_node (hash_table, key, hash_return);
+	return node ? node->value : NULL;
+}
+
 void
 pgm_hashtable_insert (
 	pgm_hashtable_t* restrict hash_table,
