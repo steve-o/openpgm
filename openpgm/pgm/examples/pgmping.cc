@@ -21,6 +21,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* Must be first for Sun */
+#include "ping.pb.h"
+
 /* c99 compatibility for c++ */
 #define __STDC_LIMIT_MACROS
 #define restrict
@@ -63,8 +66,6 @@
 #ifdef CONFIG_WITH_SNMP
 #	include <pgm/snmp.h>
 #endif
-
-#include "ping.pb.h"
 
 using namespace std;
 

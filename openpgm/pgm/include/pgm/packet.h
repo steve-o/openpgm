@@ -208,7 +208,7 @@ struct pgm_opt_nak_list {
 	uint8_t		opt_reserved;		/* reserved */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 	uint32_t	opt_sqn[];		/* requested sequence number [62] */
-#elif defined(__SUNPRO_C) || defined(__cplusplus)
+#elif defined(__cplusplus)
 	uint32_t	opt_sqn[1];
 #else
 	uint32_t	opt_sqn[0];

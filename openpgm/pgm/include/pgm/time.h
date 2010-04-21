@@ -26,9 +26,7 @@
 #ifndef __PGM_TIME_H__
 #define __PGM_TIME_H__
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <pgm/macros.h>
+#include <pgm/types.h>
 #include <pgm/error.h>
 
 PGM_BEGIN_DECLS

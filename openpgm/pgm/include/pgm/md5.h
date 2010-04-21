@@ -43,7 +43,11 @@ struct pgm_md5_t
 
 	uint32_t	total[2];
 	uint32_t	buflen;
-	char		buffer[128] __attribute__ ((__aligned__ (__alignof__ (uint32_t))));
+	char		buffer[128]
+#if (__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
+					__attribute__ ((__aligned__ (__alignof__ (uint32_t))))
+#endif
+					;
 };
 
 PGM_GNUC_INTERNAL void pgm_md5_init_ctx (struct pgm_md5_t*);

@@ -31,8 +31,7 @@
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
 #endif
-#include <stdbool.h>
-#include <pgm/macros.h>
+#include <pgm/types.h>
 
 PGM_BEGIN_DECLS
 
