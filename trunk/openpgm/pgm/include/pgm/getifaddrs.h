@@ -54,6 +54,9 @@ struct pgm_ifaddrs
 	char*			ifa_name;	/* Name of this network interface.  */
 	unsigned int		ifa_flags;	/* Flags as from SIOCGIFFLAGS ioctl.  */
 
+#ifdef ifa_addr
+#	undef ifa_addr
+#endif
 	struct sockaddr*	ifa_addr;	/* Network address of this interface.  */
 	struct sockaddr*	ifa_netmask;	/* Netmask of this interface.  */
 };

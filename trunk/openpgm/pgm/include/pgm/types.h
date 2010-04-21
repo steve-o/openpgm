@@ -29,8 +29,15 @@
 #include <pgm/macros.h>
 
 #include <sys/param.h>
-#include <stdbool.h>
-#include <stdint.h>
+/* g++ v4 handles C99 headers without complaints */
+#if !defined( __cplusplus) || (__GNUC__ > 4)
+#	include <stdbool.h>
+#	include <stdint.h>
+#else
+/* g++ v3 and other ancient compilers */
+#	define bool	int
+#	include <stdint.h>
+#endif
 
 PGM_BEGIN_DECLS
 

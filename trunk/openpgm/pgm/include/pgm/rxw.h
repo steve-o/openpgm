@@ -40,7 +40,7 @@ enum
 	PGM_PKT_STATE_HAVE_DATA,	    /* data received waiting to commit to application layer */
 	PGM_PKT_STATE_HAVE_PARITY,	    /* contains parity information not original data */
 	PGM_PKT_STATE_COMMIT_DATA,	    /* commited data waiting for purging */
-	PGM_PKT_STATE_LOST_DATA,	    /* if recovery fails, but packet has not yet been commited */
+	PGM_PKT_STATE_LOST_DATA		    /* if recovery fails, but packet has not yet been commited */
 };
 
 enum
@@ -54,7 +54,7 @@ enum
 	PGM_RXW_MALFORMED,
 	PGM_RXW_BOUNDS,
 	PGM_RXW_SLOW_CONSUMER,
-	PGM_RXW_UNKNOWN,
+	PGM_RXW_UNKNOWN
 };
 
 /* must be smaller than PGM skbuff control buffer */
@@ -108,7 +108,13 @@ struct pgm_rxw_t {
 
 	size_t			size;			/* in bytes */
 	unsigned		alloc;			/* in pkts */
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 	struct pgm_sk_buff_t*	pdata[];
+#elif defined(__cplusplus)
+	struct pgm_sk_buff_t*   pdata[1];
+#else
+	struct pgm_sk_buff_t*	pdata[0];
+#endif
 };
 
 
