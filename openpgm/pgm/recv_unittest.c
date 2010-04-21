@@ -570,7 +570,7 @@ mock__pgm_peer_ref (
 	pgm_peer_t*	peer
 	)
 {
-	g_atomic_int_inc (&peer->ref_count);
+	pgm_atomic_inc32 (&peer->ref_count);
 	return peer;
 }
 

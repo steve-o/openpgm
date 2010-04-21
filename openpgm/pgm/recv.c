@@ -762,7 +762,10 @@ recv_again:
 	if (PGM_UNLIKELY(!is_valid))
 	{
 /* inherently cannot determine PGM_PC_RECEIVER_CKSUM_ERRORS unless only one receiver */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded invalid packet."));
+		pgm_trace (PGM_LOG_ROLE_NETWORK,
+				_("Discarded invalid packet: %s"),
+				(err && err->message) ? err->message : "(null)");
+		pgm_error_free (err);
 		if (transport->can_send_data) {
 			if (err && PGM_ERROR_CKSUM == err->code)
 				transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;

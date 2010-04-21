@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import os
-import sys
+import platform
 import time
 
 build_date = time.strftime ("%Y-%m-%d")
@@ -41,11 +41,12 @@ const unsigned pgm_minor_version = 0;
 const unsigned pgm_micro_version = 42;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";
-const char* pgm_build_platform = "%s";
+const char* pgm_build_system = "%s";
+const char* pgm_build_machine = "%s";
 const char* pgm_build_revision = "%s";
 
 
 /* eof */
-"""%(build_date, build_time, sys.platform, build_rev)
+"""%(build_date, build_time, platform.system, platform.machine, build_rev)
 
 # end of file
