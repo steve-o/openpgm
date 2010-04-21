@@ -32,7 +32,8 @@ extern const unsigned pgm_micro_version;
 
 extern const char* pgm_build_date;
 extern const char* pgm_build_time;
-extern const char* pgm_build_platform;
+extern const char* pgm_build_system;
+extern const char* pgm_build_machine;
 extern const char* pgm_build_revision;
 
 PGM_END_DECLS

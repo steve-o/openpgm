@@ -1,12 +1,13 @@
 # -*- mode: python -*-
 # OpenPGM build script
 
+import platform
 import os
 import time
 import sys
 
 EnsureSConsVersion( 0, 97 )
-SConsignFile('scons.signatures');
+SConsignFile('scons.signatures'+ '-' + platform.system() + '-' + platform.machine());
 
 opt = Options(None, ARGUMENTS)
 opt.AddOptions (
@@ -298,7 +299,7 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 
 #-----------------------------------------------------------------------------
 
-ref_node = 'ref/' + env['BUILD'] + '/';
+ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '/';
 BuildDir(ref_node, '.', duplicate=0)
 
 env.Append(CPPPATH = os.getcwd() + '/include');
