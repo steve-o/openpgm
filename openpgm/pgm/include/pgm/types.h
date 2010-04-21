@@ -26,9 +26,9 @@
 #ifndef __PGM_TYPES_H__
 #define __PGM_TYPES_H__
 
+#include <sys/param.h>
 #include <pgm/macros.h>
 
-#include <sys/param.h>
 /* g++ v4 handles C99 headers without complaints */
 #if !defined( __cplusplus) || (__GNUC__ > 4)
 #	include <stdbool.h>
