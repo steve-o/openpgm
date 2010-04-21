@@ -404,15 +404,24 @@ on_downstream (
 	}
 
 /* search for TSI peer context or create a new one */
-	pgm_rwlock_reader_lock (&transport->peers_lock);
-	*source = pgm_hashtable_lookup (transport->peers_hashtable, &skb->tsi);
-	pgm_rwlock_reader_unlock (&transport->peers_lock);
-	if (PGM_UNLIKELY(NULL == *source)) {
-		*source = pgm_new_peer (transport,
-				       &skb->tsi,
-				       (struct sockaddr*)src_addr, pgm_sockaddr_len(src_addr),
-				       (struct sockaddr*)dst_addr, pgm_sockaddr_len(dst_addr),
-					skb->tstamp);
+	if (PGM_LIKELY(pgm_tsi_hash (&skb->tsi) == transport->last_hash_key &&
+			NULL != transport->last_hash_value))
+	{
+		*source = transport->last_hash_value;
+	}
+	else
+	{
+		pgm_rwlock_reader_lock (&transport->peers_lock);
+		*source = pgm_hashtable_lookup_extended (transport->peers_hashtable, &skb->tsi, &transport->last_hash_key);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
+		if (PGM_UNLIKELY(NULL == *source)) {
+			*source = pgm_new_peer (transport,
+					       &skb->tsi,
+					       (struct sockaddr*)src_addr, pgm_sockaddr_len(src_addr),
+					       (struct sockaddr*)dst_addr, pgm_sockaddr_len(dst_addr),
+						skb->tstamp);
+		}
+		transport->last_hash_value = *source;
 	}
 
 	(*source)->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += skb->len;
