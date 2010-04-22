@@ -29,7 +29,7 @@
 PGM_BEGIN_DECLS
 
 bool pgm_print_packet (const void*, size_t);
-const char* pgm_type_string (uint8_t) PGM_GNUC_WARN_UNUSED_RESULT;
+const char* pgm_type_string (uint8_t) PGM_GNUC_WARN_UNUSED_RESULT PGM_GNUC_CONST;
 const char* pgm_udpport_string (uint16_t) PGM_GNUC_WARN_UNUSED_RESULT;
 const char* pgm_gethostbyaddr (const struct in_addr*) PGM_GNUC_WARN_UNUSED_RESULT;
 void pgm_ipopt_print (const void*, size_t);

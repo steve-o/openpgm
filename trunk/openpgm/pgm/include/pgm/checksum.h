@@ -31,10 +31,12 @@
 PGM_BEGIN_DECLS
 
 uint16_t pgm_inet_checksum (const void*, uint16_t, uint16_t);
-uint16_t pgm_csum_fold (uint32_t);
-uint32_t pgm_csum_block_add (uint32_t, uint32_t, const uint16_t);
+uint16_t pgm_csum_fold (uint32_t) PGM_GNUC_CONST;
+uint32_t pgm_csum_block_add (uint32_t, uint32_t, const uint16_t) PGM_GNUC_CONST;
 uint32_t pgm_compat_csum_partial (const void*, uint16_t, uint32_t);
-uint32_t pgm_compat_csum_partial_copy (const void*, void*, uint16_t, uint32_t);
+uint32_t pgm_compat_csum_partial_copy (const void*restrict, void*restrict, uint16_t, uint32_t);
+
+static inline uint32_t add32_with_carry (uint32_t, uint32_t) PGM_GNUC_CONST;
 
 #if defined(__x86_64__) || defined(__i386__) || defined(__i386) || defined(__amd64)
 static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)

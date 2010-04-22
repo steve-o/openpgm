@@ -112,6 +112,9 @@ pgm_list_delete_link (
 	return new_list;
 }
 
+/* Has pure attribute as NULL is a valid list
+ */
+
 pgm_list_t*
 pgm_list_last (
 	pgm_list_t*	list

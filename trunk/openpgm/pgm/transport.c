@@ -217,9 +217,9 @@ pgm_transport_destroy (
 
 bool
 pgm_transport_create (
-	pgm_transport_t**		transport,
-	struct pgm_transport_info_t*	tinfo,
-	pgm_error_t**			error
+	pgm_transport_t**	     restrict transport,
+	struct pgm_transport_info_t* restrict tinfo,
+	pgm_error_t**		     restrict error
 	)
 {
 	pgm_transport_t* new_transport;
@@ -604,8 +604,8 @@ pgm_transport_set_rcvbuf (
 
 bool
 pgm_transport_bind (
-	pgm_transport_t*	transport,
-	pgm_error_t**		error
+	pgm_transport_t* restrict transport,
+	pgm_error_t**	 restrict error
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, FALSE);
@@ -1499,8 +1499,8 @@ no_cap_net_admin:
 
 bool
 pgm_transport_get_timer_pending (
-	pgm_transport_t* const	transport,
-	struct timeval*		tv
+	pgm_transport_t* const restrict	transport,
+	struct timeval*	       restrict	tv
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, FALSE);
@@ -1517,8 +1517,8 @@ pgm_transport_get_timer_pending (
 
 bool
 pgm_transport_get_rate_remaining (
-	pgm_transport_t* const	transport,
-	struct timeval*		tv
+	pgm_transport_t* const restrict	transport,
+	struct timeval*	       restrict	tv
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, FALSE);
@@ -1536,10 +1536,10 @@ pgm_transport_get_rate_remaining (
 
 int
 pgm_transport_select_info (
-	pgm_transport_t* const	transport,
-	fd_set* const		readfds,	/* blocking recv fds */
-	fd_set* const		writefds,	/* blocking send fds */
-	int* const		n_fds		/* in: max fds, out: max (in:fds, transport:fds) */
+	pgm_transport_t* const restrict	transport,
+	fd_set*		 const restrict	readfds,	/* blocking recv fds */
+	fd_set*		 const restrict	writefds,	/* blocking send fds */
+	int*		 const restrict	n_fds		/* in: max fds, out: max (in:fds, transport:fds) */
 	)
 {
 	int fds = 0;
@@ -1585,10 +1585,10 @@ pgm_transport_select_info (
 
 int
 pgm_transport_poll_info (
-	pgm_transport_t* const	transport,
-	struct pollfd* const	fds,
-	int* const		n_fds,		/* in: #fds, out: used #fds */
-	const int		events		/* POLLIN, POLLOUT */
+	pgm_transport_t* const restrict	transport,
+	struct pollfd*   const restrict	fds,
+	int*		 const restrict	n_fds,		/* in: #fds, out: used #fds */
+	const int			events		/* POLLIN, POLLOUT */
 	)
 {
 	pgm_assert (NULL != transport);
@@ -1874,9 +1874,9 @@ pgm_transport_set_nonblocking (
 
 bool
 pgm_transport_join_group (
-	pgm_transport_t*	transport,
-	struct group_req*	gr,
-	socklen_t		len
+	pgm_transport_t*  	restrict transport,
+	const struct group_req* restrict gr,
+	socklen_t			 len
 	)
 {
 	int status;
@@ -1897,15 +1897,15 @@ pgm_transport_join_group (
 /* verify not duplicate group/interface pairing */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
-		if (pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group)  == 0 &&
-		    pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0 &&
+		if (pgm_sockaddr_cmp ((const struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group)  == 0 &&
+		    pgm_sockaddr_cmp ((const struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0 &&
 			(gr->gr_interface == transport->recv_gsr[i].gsr_interface ||
 			                0 == transport->recv_gsr[i].gsr_interface    )
                    )
 		{
 #ifdef TRANSPORT_DEBUG
 			char s[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop ((struct sockaddr*)&gr->gr_group, s, sizeof(s));
+			pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, s, sizeof(s));
 			if (transport->recv_gsr[i].gsr_interface) {
 				pgm_warn(_("Transport has already joined group %s on interface %d"), s, gr->gr_interface);
 			} else {
@@ -1918,8 +1918,8 @@ pgm_transport_join_group (
 	}
 
 	transport->recv_gsr[transport->recv_gsr_len].gsr_interface = 0;
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((struct sockaddr*)&gr->gr_group));
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((struct sockaddr*)&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 	transport->recv_gsr_len++;
 	status = setsockopt (transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, (const char*)gr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -1931,9 +1931,9 @@ pgm_transport_join_group (
 
 bool
 pgm_transport_leave_group (
-	pgm_transport_t*	transport,
-	struct group_req*	gr,
-	socklen_t		len
+	pgm_transport_t*	restrict transport,
+	const struct group_req* restrict gr,
+	socklen_t			 len
 	)
 {
 	int status;
@@ -1953,7 +1953,7 @@ pgm_transport_leave_group (
 
 	for (unsigned i = 0; i < transport->recv_gsr_len;)
 	{
-		if ((pgm_sockaddr_cmp ((struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0) &&
+		if ((pgm_sockaddr_cmp ((const struct sockaddr*)&gr->gr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0) &&
 /* drop all matching receiver entries */
 		            (gr->gr_interface == 0 ||
 /* drop all sources with matching interface */
@@ -1978,9 +1978,9 @@ pgm_transport_leave_group (
 
 bool
 pgm_transport_block_source (
-	pgm_transport_t*	transport,
-	struct group_source_req* gsr,
-	socklen_t		len
+	pgm_transport_t*	       restrict transport,
+	const struct group_source_req* restrict gsr,
+	socklen_t				len
 	)
 {
 	int status;
@@ -2006,9 +2006,9 @@ pgm_transport_block_source (
 
 bool
 pgm_transport_unblock_source (
-	pgm_transport_t*	transport,
-	struct group_source_req* gsr,
-	socklen_t		len
+	pgm_transport_t*	       restrict transport,
+	const struct group_source_req* restrict gsr,
+	socklen_t				len
 	)
 {
 	int status;
@@ -2036,9 +2036,9 @@ pgm_transport_unblock_source (
 
 bool
 pgm_transport_join_source_group (
-	pgm_transport_t*	transport,
-	struct group_source_req* gsr,
-	socklen_t		len
+	pgm_transport_t*	       restrict transport,
+	const struct group_source_req* restrict gsr,
+	socklen_t				len
 	)
 {
 	int status;
@@ -2059,17 +2059,17 @@ pgm_transport_join_source_group (
 /* verify if existing group/interface pairing */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
-		if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0 &&
+		if (pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group) == 0 &&
 			(gsr->gsr_interface == transport->recv_gsr[i].gsr_interface ||
 			                  0 == transport->recv_gsr[i].gsr_interface    )
                    )
 		{
-			if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0)
+			if (pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0)
 			{
 #ifdef TRANSPORT_DEBUG
 				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, s1, sizeof(s1));
-				pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_source, s2, sizeof(s2));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_source, s2, sizeof(s2));
 				if (transport->recv_gsr[i].gsr_interface) {
 					pgm_warn(_("Transport has already joined group %s from source %s on interface %d"),
 						s1, s2, (unsigned)gsr->gsr_interface);
@@ -2085,7 +2085,7 @@ pgm_transport_join_source_group (
 		}
 	}
 
-	memcpy (&transport->recv_gsr[transport->recv_gsr_len], &gsr, sizeof(struct group_source_req));
+	memcpy (&transport->recv_gsr[transport->recv_gsr_len], gsr, sizeof(struct group_source_req));
 	transport->recv_gsr_len++;
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_SOURCE_GROUP, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
@@ -2097,9 +2097,9 @@ pgm_transport_join_source_group (
 
 bool
 pgm_transport_leave_source_group (
-	pgm_transport_t*	transport,
-	struct group_source_req* gsr,
-	socklen_t		len
+	pgm_transport_t*	       restrict transport,
+	const struct group_source_req* restrict gsr,
+	socklen_t				len
 	)
 {
 	int status;
@@ -2120,8 +2120,8 @@ pgm_transport_leave_source_group (
 /* verify if existing group/interface pairing */
 	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
 	{
-		if (pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group)   == 0 &&
-		    pgm_sockaddr_cmp ((struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0 &&
+		if (pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&transport->recv_gsr[i].gsr_group)   == 0 &&
+		    pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&transport->recv_gsr[i].gsr_source) == 0 &&
 		    gsr->gsr_interface == transport->recv_gsr[i].gsr_interface)
 		{
 			transport->recv_gsr_len--;
@@ -2140,9 +2140,9 @@ pgm_transport_leave_source_group (
 
 bool
 pgm_transport_msfilter (
-	pgm_transport_t*	transport,
-	struct group_filter*	gf_list,
-	socklen_t		len
+	pgm_transport_t*	   restrict transport,
+	const struct group_filter* restrict gf_list,
+	socklen_t		   	    len
 	)
 {
 	int status;

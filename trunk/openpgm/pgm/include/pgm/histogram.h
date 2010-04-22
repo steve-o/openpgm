@@ -46,11 +46,11 @@ struct pgm_sample_set_t {
 typedef struct pgm_sample_set_t pgm_sample_set_t;
 
 struct pgm_histogram_t {
-	const char*		histogram_name;
+	const char* restrict	histogram_name;
 	unsigned		bucket_count;
 	pgm_sample_t		declared_min;
 	pgm_sample_t		declared_max;
-	pgm_sample_t*		ranges;
+	pgm_sample_t* restrict	ranges;
 	pgm_sample_set_t	sample;
 	bool			is_registered;
 	pgm_slist_t		histograms_link;

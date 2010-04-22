@@ -42,15 +42,18 @@
 static inline
 bool
 pgm_tsi_is_null (
-	const pgm_tsi_t*const	tsi
+	const void*const	tsi
 	)
 {
-	static const pgm_tsi_t nulltsi = PGM_TSI_INIT;
+	const union {
+		pgm_tsi_t	tsi;
+		uint32_t	l[2];
+	} *u = tsi;
 
 /* pre-conditions */
 	pgm_assert (NULL != tsi);
 
-	return (0 == memcmp (&nulltsi, tsi, sizeof(nulltsi)));
+	return (0 == u->l[0] && 0 == u->l[1]);
 }
 
 /* returns the pointer at the given index of the window.
@@ -97,7 +100,7 @@ pgm_txw_retransmit_can_peek (
 	)
 {
 	pgm_return_val_if_fail (NULL != window, FALSE);
-	return NULL != pgm_txw_retransmit_try_peek (window);
+	return (NULL != pgm_txw_retransmit_try_peek (window));
 }
 
 /* sequence state must be smaller than PGM skbuff control buffer */
@@ -105,10 +108,10 @@ PGM_STATIC_ASSERT(sizeof(struct pgm_txw_state_t) <= sizeof(((struct pgm_sk_buff_
 
 uint32_t
 pgm_txw_get_unfolded_checksum (
-	struct pgm_sk_buff_t*const skb
+	const struct pgm_sk_buff_t*const skb
 	)
 {
-	pgm_txw_state_t*const state = (pgm_txw_state_t*const)&skb->cb;
+	const pgm_txw_state_t*const state = (const pgm_txw_state_t*const)&skb->cb;
 	return state->unfolded_checksum;
 }
 
@@ -281,8 +284,8 @@ pgm_txw_shutdown (
 
 void
 pgm_txw_add (
-	pgm_txw_t*const			window,
-	struct pgm_sk_buff_t* const	skb		/* cannot be NULL */
+	pgm_txw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb		/* cannot be NULL */
 	)
 {
 /* pre-conditions */
@@ -342,7 +345,7 @@ pgm_txw_peek (
 static
 void
 pgm_txw_remove_tail (
-	pgm_txw_t*const		window
+	pgm_txw_t* const	window
 	)
 {
 	struct pgm_sk_buff_t* skb;
@@ -403,7 +406,7 @@ pgm_txw_remove_tail (
 
 bool
 pgm_txw_retransmit_push (
-	pgm_txw_t*const		window,
+	pgm_txw_t* const	window,
 	const uint32_t		sequence,
 	const bool		is_parity,	/* parity NAK ⇒ sequence_number = transmission group | packet count */
 	const uint8_t		tg_sqn_shift
@@ -433,7 +436,7 @@ pgm_txw_retransmit_push (
 static
 bool
 pgm_txw_retransmit_push_parity (
-	pgm_txw_t*const		window,
+	pgm_txw_t* const	window,
 	const uint32_t		sequence,
 	const uint8_t		tg_sqn_shift
 	)
@@ -488,7 +491,7 @@ pgm_txw_retransmit_push_parity (
 static
 bool
 pgm_txw_retransmit_push_selective (
-	pgm_txw_t*const		window,
+	pgm_txw_t* const	window,
 	const uint32_t		sequence
 	)
 {
@@ -532,7 +535,7 @@ pgm_txw_retransmit_push_selective (
 
 struct pgm_sk_buff_t*
 pgm_txw_retransmit_try_peek (
-	pgm_txw_t*const		window
+	pgm_txw_t* const	window
 	)
 {
 /* pre-conditions */
@@ -706,7 +709,7 @@ pgm_txw_retransmit_try_peek (
 
 void
 pgm_txw_retransmit_remove_head (
-	pgm_txw_t*const		window
+	pgm_txw_t* const	window
 	)
 {
 	struct pgm_sk_buff_t* skb;

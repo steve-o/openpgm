@@ -60,13 +60,13 @@
 static
 ssize_t
 recvskb (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
-	const int			flags,
-	struct sockaddr* const		src_addr,
-	const socklen_t			src_addrlen,
-	struct sockaddr* const		dst_addr,
-	const socklen_t			dst_addrlen
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb,
+	const int			     flags,
+	struct sockaddr*      const restrict src_addr,
+	const socklen_t			     src_addrlen,
+	struct sockaddr*      const restrict dst_addr,
+	const socklen_t			     dst_addrlen
 	)
 {
 /* pre-conditions */
@@ -220,8 +220,8 @@ recvskb (
 static
 bool
 on_upstream (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -232,19 +232,19 @@ on_upstream (
 	pgm_debug ("on_upstream (transport:%p skb:%p)",
 		(const void*)transport, (const void*)skb);
 
-	if (!transport->can_send_data) {
+	if (PGM_UNLIKELY(!transport->can_send_data)) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted source."));
 		goto out_discarded;
 	}
 
 /* unicast upstream message, note that dport & sport are reversed */
-	if (skb->pgm_header->pgm_sport != transport->dport) {
+	if (PGM_UNLIKELY(skb->pgm_header->pgm_sport != transport->dport)) {
 /* its upstream/peer-to-peer for another session */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
 	}
 
-	if (!pgm_gsi_equal (&skb->tsi.gsi, &transport->tsi.gsi)) {
+	if (PGM_UNLIKELY(!pgm_gsi_equal (&skb->tsi.gsi, &transport->tsi.gsi))) {
 /* its upstream/peer-to-peer for another session */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
@@ -290,9 +290,9 @@ out_discarded:
 static
 bool
 on_peer (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
-	pgm_peer_t**			source
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb,
+	pgm_peer_t**		    restrict source
 	)
 {
 /* pre-conditions */
@@ -305,13 +305,13 @@ on_peer (
 		(const void*)transport, (const void*)skb, (const void*)source);
 
 /* we are not the source */
-	if (!transport->can_recv_data) {
+	if (PGM_UNLIKELY(!transport->can_recv_data)) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted receiver."));
 		goto out_discarded;
 	}
 
 /* unicast upstream message, note that dport & sport are reversed */
-	if (skb->pgm_header->pgm_sport != transport->dport) {
+	if (PGM_UNLIKELY(skb->pgm_header->pgm_sport != transport->dport)) {
 /* its upstream/peer-to-peer for another session */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
@@ -370,11 +370,11 @@ out_discarded:
 static
 bool
 on_downstream (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
-	struct sockaddr* const		src_addr,
-	struct sockaddr* const		dst_addr,
-	pgm_peer_t**			source
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb,
+	struct sockaddr*      const restrict src_addr,
+	struct sockaddr*      const restrict dst_addr,
+	pgm_peer_t**	  	    restrict source
 	)
 {
 /* pre-conditions */
@@ -392,13 +392,13 @@ on_downstream (
 		(const void*)transport, (const void*)skb, saddr, daddr, (const void*)source);
 #endif
 
-	if (!transport->can_recv_data) {
+	if (PGM_UNLIKELY(!transport->can_recv_data)) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted receiver."));
 		goto out_discarded;
 	}
 
 /* pgm packet DPORT contains our transport DPORT */
-	if (skb->pgm_header->pgm_dport != transport->dport) {
+	if (PGM_UNLIKELY(skb->pgm_header->pgm_dport != transport->dport)) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
 		goto out_discarded;
 	}
@@ -481,11 +481,11 @@ out_discarded:
 static
 bool
 on_pgm (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
-	struct sockaddr* const		src_addr,
-	struct sockaddr* const		dst_addr,
-	pgm_peer_t**			source
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb,
+	struct sockaddr*      const restrict src_addr,
+	struct sockaddr*      const restrict dst_addr,
+	pgm_peer_t**		    restrict source
 	)
 {
 /* pre-conditions */
@@ -581,7 +581,7 @@ wait_for_event (
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif
-		if (-1 == ready) {
+		if (PGM_UNLIKELY(-1 == ready)) {
 			pgm_debug ("block returned errno=%i",errno);
 			return EFAULT;
 		} else if (ready > 0) {
@@ -612,12 +612,12 @@ wait_for_event (
 
 int
 pgm_recvmsgv (
-	pgm_transport_t*const	transport,
-	struct pgm_msgv_t*const	msg_start,
-	const size_t		msg_len,
-	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	size_t*			_bytes_read,	/* may be NULL */
-	pgm_error_t**		error
+	pgm_transport_t*   const restrict transport,
+	struct pgm_msgv_t* const restrict msg_start,
+	const size_t			  msg_len,
+	const int			  flags,	/* MSG_DONTWAIT for non-blocking */
+	size_t*			 restrict _bytes_read,	/* may be NULL */
+	pgm_error_t**		 restrict error
 	)
 {
 	int status = PGM_IO_STATUS_WOULD_BLOCK;
@@ -730,7 +730,7 @@ recv_again:
 	{
 #ifndef _WIN32
 		const int save_errno = errno;
-		if (EAGAIN == save_errno) {
+		if (PGM_LIKELY(EAGAIN == save_errno)) {
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
@@ -741,7 +741,7 @@ recv_again:
 			     strerror (save_errno));
 #else
 		const int save_wsa_errno = WSAGetLastError ();
-		if (WSAEWOULDBLOCK == save_wsa_errno) {
+		if (PGM_LIKELY(WSAEWOULDBLOCK == save_wsa_errno)) {
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
@@ -784,7 +784,7 @@ recv_again:
 	}
 
 	pgm_peer_t* source = NULL;
-	if (!on_pgm (transport, transport->rx_buffer, (struct sockaddr*)&src, (struct sockaddr*)&dst, &source))
+	if (PGM_UNLIKELY(!on_pgm (transport, transport->rx_buffer, (struct sockaddr*)&src, (struct sockaddr*)&dst, &source)))
 		goto recv_again;
 
 /* check whether this source has waiting data */
@@ -924,11 +924,11 @@ out:
 
 int
 pgm_recvmsg (
-	pgm_transport_t*const	transport,
-	struct pgm_msgv_t*const	msgv,
-	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	size_t*			bytes_read,	/* may be NULL */
-	pgm_error_t**		error
+	pgm_transport_t*   const restrict transport,
+	struct pgm_msgv_t* const restrict msgv,
+	const int			  flags,	/* MSG_DONTWAIT for non-blocking */
+	size_t*			 restrict bytes_read,	/* may be NULL */
+	pgm_error_t**		 restrict error
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
@@ -949,13 +949,13 @@ pgm_recvmsg (
 
 int
 pgm_recvfrom (
-	pgm_transport_t* const	transport,
-	void*			buf,
-	const size_t		buflen,
-	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	size_t*			_bytes_read,	/* may be NULL */
-	pgm_tsi_t*		from,		/* may be NULL */
-	pgm_error_t**		error
+	pgm_transport_t* const restrict	transport,
+	void*		       restrict	buf,
+	const size_t			buflen,
+	const int			flags,		/* MSG_DONTWAIT for non-blocking */
+	size_t*		       restrict	_bytes_read,	/* may be NULL */
+	pgm_tsi_t*	       restrict	from,		/* may be NULL */
+	pgm_error_t**	       restrict	error
 	)
 {
 	struct pgm_msgv_t msgv;
@@ -1003,12 +1003,12 @@ pgm_recvfrom (
 
 int
 pgm_recv (
-	pgm_transport_t* const	transport,
-	void*			buf,
-	const size_t		buflen,
-	const int		flags,		/* MSG_DONTWAIT for non-blocking */
-	size_t* const		bytes_read,	/* may be NULL */
-	pgm_error_t**		error
+	pgm_transport_t* const restrict transport,
+	void*		       restrict buf,
+	const size_t			buflen,
+	const int			flags,		/* MSG_DONTWAIT for non-blocking */
+	size_t*		 const restrict bytes_read,	/* may be NULL */
+	pgm_error_t**	       restrict error
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);

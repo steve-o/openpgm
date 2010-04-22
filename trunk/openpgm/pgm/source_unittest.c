@@ -326,7 +326,7 @@ mock_pgm_txw_set_unfolded_checksum (
 
 uint32_t
 pgm_txw_get_unfolded_checksum (
-	struct pgm_sk_buff_t*const skb
+	const struct pgm_sk_buff_t*const skb
 	)
 {
 	return 0;
@@ -698,7 +698,7 @@ END_TEST
 
 START_TEST (test_send_skbv_fail_001)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU), *skbv = { skb };
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU), *skbv[] = { skb };
 	fail_if (NULL == skb, "alloc_skb failed");
 /* reserve PGM header */
 	pgm_skb_put (skb, mock_pgm_transport_pkt_offset (TRUE));

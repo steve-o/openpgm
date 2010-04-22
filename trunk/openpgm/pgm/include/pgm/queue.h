@@ -33,17 +33,17 @@ PGM_BEGIN_DECLS
 
 struct pgm_queue_t
 {
-	pgm_list_t*	head;
+	pgm_list_t*	head;		/* head & tail equal on 1 element */
 	pgm_list_t*	tail;
 	unsigned	length;
 };
 
 typedef struct pgm_queue_t pgm_queue_t;
 
-bool pgm_queue_is_empty (const pgm_queue_t*const);
+bool pgm_queue_is_empty (const pgm_queue_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
 void pgm_queue_push_head_link (pgm_queue_t*restrict, pgm_list_t*restrict);
 pgm_list_t* pgm_queue_pop_tail_link (pgm_queue_t*);
-pgm_list_t* pgm_queue_peek_tail_link (pgm_queue_t*);
+pgm_list_t* pgm_queue_peek_tail_link (pgm_queue_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 void pgm_queue_unlink (pgm_queue_t*restrict, pgm_list_t*restrict);
 
 PGM_END_DECLS

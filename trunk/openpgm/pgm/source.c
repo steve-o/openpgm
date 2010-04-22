@@ -42,13 +42,15 @@
 
 
 /* locals */
-static void reset_heartbeat_spm (pgm_transport_t* const, const pgm_time_t);
-static bool send_ncf (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr* const, const uint32_t, const bool);
-static bool send_ncf_list (pgm_transport_t* const, const struct sockaddr* const, const struct sockaddr*, struct pgm_sqn_list_t* const, const bool);
-static int send_odata (pgm_transport_t* const, struct pgm_sk_buff_t* const, size_t*);
-static int send_odata_copy (pgm_transport_t* const, const void*, const uint16_t, size_t*);
-static int send_odatav (pgm_transport_t* const, const struct pgm_iovec* const, const unsigned, size_t*);
-static bool send_rdata (pgm_transport_t* const, struct pgm_sk_buff_t* const);
+static inline bool peer_is_source (const pgm_peer_t*) PGM_GNUC_CONST;
+static inline bool peer_is_peer (const pgm_peer_t*) PGM_GNUC_CONST;
+static void reset_heartbeat_spm (pgm_transport_t*const, const pgm_time_t);
+static bool send_ncf (pgm_transport_t*const restrict, const struct sockaddr*const restrict, const struct sockaddr*const restrict, const uint32_t, const bool);
+static bool send_ncf_list (pgm_transport_t*const restrict, const struct sockaddr*const restrict, const struct sockaddr*restrict, struct pgm_sqn_list_t*const restrict, const bool);
+static int send_odata (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict, size_t*restrict);
+static int send_odata_copy (pgm_transport_t*const restrict, const void*restrict, const uint16_t, size_t*restrict);
+static int send_odatav (pgm_transport_t*const restrict, const struct pgm_iovec*const restrict, const unsigned, size_t*restrict);
+static bool send_rdata (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict);
 
 
 static inline
@@ -115,9 +117,9 @@ pgm_transport_set_ambient_spm (
 
 bool
 pgm_transport_set_heartbeat_spm (
-	pgm_transport_t* const	transport,
-	const unsigned* const	spm_heartbeat_interval,
-	const unsigned		len
+	pgm_transport_t* const restrict	transport,
+	const unsigned*  const restrict spm_heartbeat_interval,
+	const unsigned			len
 	)
 {
 	pgm_return_val_if_fail (NULL != transport, FALSE);
@@ -300,9 +302,9 @@ pgm_on_deferred_nak (
 
 bool
 pgm_on_spmr (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		peer,		/* maybe NULL if transport is source */
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict peer,	/* maybe NULL if transport is source */
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -317,9 +319,12 @@ pgm_on_spmr (
 		return FALSE;
 	}
 
-	if (peer_is_source (peer))
-		pgm_send_spm (transport, 0);
-	else {
+	if (peer_is_source (peer)) {
+		const bool send_status = pgm_send_spm (transport, 0);
+		if (PGM_UNLIKELY(!send_status)) {
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Failed to send SPM on SPM-Request."));
+		}
+	} else {
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Suppressing SPMR due to peer multicast SPMR."));
 		reset_spmr_timer (peer);
 	}
@@ -340,8 +345,8 @@ pgm_on_spmr (
 
 bool
 pgm_on_nak (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -454,8 +459,12 @@ pgm_on_nak (
 		send_ncf (transport, (struct sockaddr*)&nak_src_nla, (struct sockaddr*)&nak_grp_nla, sqn_list.sqn[0], is_parity);
 
 /* queue retransmit requests */
-	for (uint_fast8_t i = 0; i < sqn_list.len; i++)
-		pgm_txw_retransmit_push (transport->window, sqn_list.sqn[i], is_parity, transport->tg_sqn_shift);
+	for (uint_fast8_t i = 0; i < sqn_list.len; i++) {
+		const bool push_status = pgm_txw_retransmit_push (transport->window, sqn_list.sqn[i], is_parity, transport->tg_sqn_shift);
+		if (PGM_UNLIKELY(!push_status)) {
+			pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Failed to push retransmit request for #%" PRIu32), sqn_list.sqn[i]);
+		}
+	}
 	return TRUE;
 }
 
@@ -466,8 +475,8 @@ pgm_on_nak (
 
 bool
 pgm_on_nnak (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -679,11 +688,11 @@ pgm_send_spm (
 static
 bool
 send_ncf (
-	pgm_transport_t* const		transport,
-	const struct sockaddr* const	nak_src_nla,
-	const struct sockaddr* const	nak_grp_nla,
-	const uint32_t			sequence,
-	const bool			is_parity		/* send parity NCF */
+	pgm_transport_t*       const restrict transport,
+	const struct sockaddr* const restrict nak_src_nla,
+	const struct sockaddr* const restrict nak_grp_nla,
+	const uint32_t			      sequence,
+	const bool			      is_parity		/* send parity NCF */
 	)
 {
 /* pre-conditions */
@@ -750,11 +759,11 @@ send_ncf (
 static
 bool
 send_ncf_list (
-	pgm_transport_t* const 		transport,
-	const struct sockaddr* const	nak_src_nla,
-	const struct sockaddr* const	nak_grp_nla,
-	struct pgm_sqn_list_t* const	sqn_list,		/* will change to network-order */
-	const bool			is_parity		/* send parity NCF */
+	pgm_transport_t*       const restrict transport,
+	const struct sockaddr* const restrict nak_src_nla,
+	const struct sockaddr* const restrict nak_grp_nla,
+	struct pgm_sqn_list_t* const restrict sqn_list,		/* will change to network-order */
+	const bool			      is_parity		/* send parity NCF */
 	)
 {
 /* pre-conditions */
@@ -889,9 +898,9 @@ reset_heartbeat_spm (
 static
 int
 send_odata (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb,
-	size_t*				bytes_written
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb,
+	size_t*			    restrict bytes_written
 	)
 {
 /* pre-conditions */
@@ -959,7 +968,7 @@ retry_send:
 	transport->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (transport, STATE(skb)->tstamp);
 
-	if ((size_t)sent == tpdu_length) {
+	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
 		pgm_atomic_add32 (&transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + transport->iphdr_len);
@@ -990,10 +999,10 @@ retry_send:
 static
 int
 send_odata_copy (
-	pgm_transport_t* const		transport,
-	const void*			tsdu,
+	pgm_transport_t* const restrict	transport,
+	const void*	       restrict	tsdu,
 	const uint16_t			tsdu_length,
-	size_t*				bytes_written
+	size_t*		       restrict	bytes_written
 	)
 {
 /* pre-conditions */
@@ -1095,10 +1104,10 @@ retry_send:
 static
 int
 send_odatav (
-	pgm_transport_t* const		transport,
-	const struct pgm_iovec* const	vector,
-	const unsigned			count,		/* number of items in vector */
-	size_t*				bytes_written
+	pgm_transport_t*	const restrict transport,
+	const struct pgm_iovec* const restrict vector,
+	const unsigned			       count,		/* number of items in vector */
+	size_t*		 	      restrict bytes_written
 	)
 {
 /* pre-conditions */
@@ -1109,7 +1118,7 @@ send_odatav (
 	pgm_debug ("send_odatav (transport:%p vector:%p count:%u bytes-written:%p)",
 		(const void*)transport, (const void*)vector, count, (const void*)bytes_written);
 
-	if (0 == count)
+	if (PGM_UNLIKELY(0 == count))
 		return send_odata_copy (transport, NULL, 0, bytes_written);
 
 /* continue if blocked on send */
@@ -1120,7 +1129,7 @@ send_odatav (
 	for (unsigned i = 0; i < count; i++)
 	{
 #ifdef TRANSPORT_DEBUG
-		if (vector[i].iov_len) {
+		if (PGM_LIKELY(vector[i].iov_len)) {
 			pgm_assert( vector[i].iov_base );
 		}
 #endif
@@ -1224,10 +1233,10 @@ retry_send:
 static
 int
 send_apdu (
-	pgm_transport_t* const		transport,
-	const void*			apdu,
+	pgm_transport_t* const restrict	transport,
+	const void*	       restrict	apdu,
 	const size_t			apdu_length,
-	size_t*				bytes_written
+	size_t*		       restrict	bytes_written
 	)
 {
 	size_t   bytes_sent	 = 0;		/* counted at IP layer */
@@ -1390,10 +1399,10 @@ blocked:
  */
 int
 pgm_send (
-	pgm_transport_t* const		transport,
-	const void*			apdu,
+	pgm_transport_t* const restrict transport,
+	const void*	       restrict	apdu,
 	const size_t			apdu_length,
-	size_t*				bytes_written
+	size_t*	       	       restrict	bytes_written
 	)
 {
 	pgm_debug ("pgm_send (transport:%p apdu:%p apdu-length:%zu bytes-written:%p)",
@@ -1456,11 +1465,11 @@ pgm_send (
 
 int
 pgm_sendv (
-	pgm_transport_t* const		transport,
-	const struct pgm_iovec* const	vector,
-	const unsigned			count,		/* number of items in vector */
-	const bool			is_one_apdu,	/* true  = vector = apdu, false = vector::iov_base = apdu */
-        size_t*                     	bytes_written
+	pgm_transport_t*	const restrict transport,
+	const struct pgm_iovec* const restrict vector,
+	const unsigned			       count,		/* number of items in vector */
+	const bool			       is_one_apdu,	/* true  = vector = apdu, false = vector::iov_base = apdu */
+        size_t*                       restrict bytes_written
 	)
 {
 	pgm_debug ("pgm_sendv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
@@ -1485,7 +1494,7 @@ pgm_sendv (
 	pgm_mutex_lock (&transport->source_mutex);
 
 /* pass on zero length as cannot count vector lengths */
-	if (count == 0)
+	if (PGM_UNLIKELY(0 == count))
 	{
 		const int status = send_odata_copy (transport, NULL, count, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
@@ -1519,7 +1528,7 @@ pgm_sendv (
 	for (unsigned i = 0; i < count; i++)
 	{
 #ifdef TRANSPORT_DEBUG
-		if (vector[i].iov_len) {
+		if (PGM_LIKELY(vector[i].iov_len)) {
 			pgm_assert( vector[i].iov_base );
 		}
 #endif
@@ -1785,11 +1794,11 @@ blocked:
 
 int
 pgm_send_skbv (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t** const	vector,		/* array of skb pointers vs. array of skbs */
-	const unsigned			count,
-	const bool			is_one_apdu,	/* true: vector = apdu, false: vector::iov_base = apdu */
-	size_t*				bytes_written
+	pgm_transport_t*       const restrict transport,
+	struct pgm_sk_buff_t** const restrict vector,		/* array of skb pointers vs. array of skbs */
+	const unsigned			      count,
+	const bool			      is_one_apdu,	/* true: vector = apdu, false: vector::iov_base = apdu */
+	size_t*		 	     restrict bytes_written
 	)
 {
 	pgm_debug ("pgm_send_skbv (transport:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
@@ -1814,14 +1823,14 @@ pgm_send_skbv (
 	pgm_mutex_lock (&transport->source_mutex);
 
 /* pass on zero length as cannot count vector lengths */
-	if (0 == count)
+	if (PGM_UNLIKELY(0 == count))
 	{
 		const int status = send_odata_copy (transport, NULL, count, bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
 		pgm_rwlock_reader_unlock (&transport->lock);
 		return status;
 	}
-	if (1 == count)
+	else if (1 == count)
 	{
 		const int status = send_odata (transport, vector[0], bytes_written);
 		pgm_mutex_unlock (&transport->source_mutex);
@@ -1863,14 +1872,14 @@ pgm_send_skbv (
 		STATE(first_sqn)	= pgm_txw_next_lead(transport->window);
 		for (unsigned i = 0; i < count; i++)
 		{
-			if (vector[i]->len > transport->max_tsdu_fragment) {
+			if (PGM_UNLIKELY(vector[i]->len > transport->max_tsdu_fragment)) {
 				pgm_mutex_unlock (&transport->source_mutex);
 				pgm_rwlock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			}
 			STATE(apdu_length) += vector[i]->len;
 		}
-		if (STATE(apdu_length) > transport->max_apdu) {
+		if (PGM_UNLIKELY(STATE(apdu_length) > transport->max_apdu)) {
 			pgm_mutex_unlock (&transport->source_mutex);
 			pgm_rwlock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_ERROR;
@@ -2019,8 +2028,8 @@ blocked:
 static
 bool
 send_rdata (
-	pgm_transport_t*	transport,
-	struct pgm_sk_buff_t*	skb
+	pgm_transport_t*      restrict transport,
+	struct pgm_sk_buff_t* restrict skb
 	)
 {
 /* pre-conditions */

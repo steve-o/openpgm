@@ -66,7 +66,7 @@ bool
 pgm_gsi_create_from_string (
 	pgm_gsi_t*  restrict gsi,
 	const char* restrict str,
-	ssize_t	     length		/* -1 for NULL terminated */
+	ssize_t	     	     length		/* -1 for NULL terminated */
 	)
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
@@ -206,17 +206,20 @@ pgm_gsi_print (
 
 bool
 pgm_gsi_equal (
-        const void*	p1,
-        const void*	p2
+        const void* restrict	p1,
+        const void* restrict	p2
         )
 {
-	const pgm_gsi_t *gsi1 = p1, *gsi2 = p2;
+	const union {
+		pgm_gsi_t	gsi;
+		uint16_t	s[3];
+	} *u1 = p1, *u2 = p2;
 
 /* pre-conditions */
-	pgm_assert (NULL != gsi1);
-	pgm_assert (NULL != gsi2);
+	pgm_assert (NULL != p1);
+	pgm_assert (NULL != p2);
 
-        return memcmp (gsi1, gsi2, sizeof(pgm_gsi_t)) == 0;
+	return (u1->s[0] == u2->s[0] && u1->s[1] == u2->s[1] && u1->s[2] == u2->s[2]);
 }
 
 /* eof */

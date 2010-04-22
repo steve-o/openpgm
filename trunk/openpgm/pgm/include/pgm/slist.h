@@ -32,8 +32,8 @@ PGM_BEGIN_DECLS
 
 struct pgm_slist_t
 {
-	void*			data;
-	struct pgm_slist_t*	next;
+	void*		    restrict data;
+	struct pgm_slist_t* restrict next;
 };
 
 typedef struct pgm_slist_t pgm_slist_t;
@@ -44,8 +44,8 @@ pgm_slist_t* pgm_slist_prepend_link (pgm_slist_t*restrict, pgm_slist_t*restrict)
 pgm_slist_t* pgm_slist_remove (pgm_slist_t*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 pgm_slist_t* pgm_slist_remove_first (pgm_slist_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 void pgm_slist_free (pgm_slist_t*);
-pgm_slist_t* pgm_slist_last (pgm_slist_t*);
-unsigned pgm_slist_length (pgm_slist_t*);
+pgm_slist_t* pgm_slist_last (pgm_slist_t*) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+unsigned pgm_slist_length (pgm_slist_t*) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
 
 
 PGM_END_DECLS

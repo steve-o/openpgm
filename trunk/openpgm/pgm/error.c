@@ -32,7 +32,7 @@
                "The overwriting error message was: %s"
 
 static pgm_error_t* pgm_error_new_valist (const int, const int, const char*, va_list) PGM_GNUC_PRINTF(3, 0);
-static void pgm_error_add_prefix (char**, const char*, va_list) PGM_GNUC_PRINTF(2, 0);
+static void pgm_error_add_prefix (char**restrict, const char*restrict, va_list) PGM_GNUC_PRINTF(2, 0);
 
 
 static
@@ -63,10 +63,10 @@ pgm_error_free (
 
 void
 pgm_set_error (
-	pgm_error_t**		err,
+	pgm_error_t** restrict	err,
 	const int		error_domain,
 	const int		error_code,
-	const char*		format,
+	const char*   restrict	format,
 	...
 	)
 {
@@ -88,8 +88,8 @@ pgm_set_error (
 
 void
 pgm_propagate_error (
-	pgm_error_t**	dest,
-	pgm_error_t*	src
+	pgm_error_t** restrict	dest,
+	pgm_error_t*  restrict	src
 	)
 {
 	pgm_return_if_fail (src != NULL);
@@ -118,11 +118,12 @@ pgm_clear_error (
 	}
 }
 
-static void
+static
+void
 pgm_error_add_prefix (
-	char**		string,
-	const char*	format,
-	va_list		ap
+	char**	    restrict	string,
+	const char* restrict	format,
+	va_list			ap
 	)
 {
 	char* prefix = pgm_strdup_vprintf (format, ap);
@@ -134,8 +135,8 @@ pgm_error_add_prefix (
 
 void
 pgm_prefix_error (
-	pgm_error_t**	err,
-	const char*	format,
+	pgm_error_t** restrict	err,
+	const char*   restrict	format,
 	...
 	)
 {

@@ -45,16 +45,16 @@
 #	define ECONNRESET	WSAECONNRESET
 #endif
 
-static bool send_spmr (pgm_transport_t* const, pgm_peer_t* const);
-static bool send_nak (pgm_transport_t* const, pgm_peer_t* const, const uint32_t);
-static bool send_parity_nak (pgm_transport_t* const, pgm_peer_t* const, const unsigned, const unsigned);
-static bool send_nak_list (pgm_transport_t* const, pgm_peer_t* const, const struct pgm_sqn_list_t* const);
+static bool send_spmr (pgm_transport_t*const restrict, pgm_peer_t*const restrict);
+static bool send_nak (pgm_transport_t*const restrict, pgm_peer_t*const restrict, const uint32_t);
+static bool send_parity_nak (pgm_transport_t*const restrict, pgm_peer_t*const restrict, const unsigned, const unsigned);
+static bool send_nak_list (pgm_transport_t*const restrict, pgm_peer_t*const restrict, const struct pgm_sqn_list_t*const restrict);
 static bool nak_rb_state (pgm_peer_t*, const pgm_time_t);
 static void nak_rpt_state (pgm_peer_t*, const pgm_time_t);
 static void nak_rdata_state (pgm_peer_t*, const pgm_time_t);
 static inline pgm_peer_t* _pgm_peer_ref (pgm_peer_t*);
-static bool on_general_poll (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const);
-static bool on_dlr_poll (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const);
+static bool on_general_poll (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict);
+static bool on_dlr_poll (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict);
 
 
 /* helpers for pgm_peer_t */
@@ -198,8 +198,8 @@ pgm_peer_unref (
 static
 bool
 get_opt_fragment (
-	struct pgm_opt_header*		opt_header,
-	struct pgm_opt_fragment**	opt_fragment
+	struct pgm_opt_header*	  restrict opt_header,
+	struct pgm_opt_fragment** restrict opt_fragment
 	)
 {
 /* pre-conditions */
@@ -511,13 +511,13 @@ pgm_transport_set_nak_ncf_retries (
 
 pgm_peer_t*
 pgm_new_peer (
-	pgm_transport_t* const		transport,
-	const pgm_tsi_t* const		tsi,
-	const struct sockaddr* const	src_addr,
-	const socklen_t			src_addrlen,
-	const struct sockaddr* const	dst_addr,
-	const socklen_t			dst_addrlen,
-	const pgm_time_t		now
+	pgm_transport_t*       const restrict	transport,
+	const pgm_tsi_t*       const restrict	tsi,
+	const struct sockaddr* const restrict	src_addr,
+	const socklen_t				src_addrlen,
+	const struct sockaddr* const restrict	dst_addr,
+	const socklen_t				dst_addrlen,
+	const pgm_time_t			now
 	)
 {
 	pgm_peer_t* peer;
@@ -578,11 +578,11 @@ pgm_new_peer (
 
 int
 pgm_flush_peers_pending (
-	pgm_transport_t* const		transport,
-	struct pgm_msgv_t**		pmsg,
-	const struct pgm_msgv_t* const	msg_end,
-	size_t* const			bytes_read,	/* added to, not set */
-	unsigned* const			data_read
+	pgm_transport_t* 	 const restrict	transport,
+	struct pgm_msgv_t**    	       restrict	pmsg,
+	const struct pgm_msgv_t* const		msg_end,	/* at least pmsg + 1, same object */
+	size_t*		 	 const restrict	bytes_read,	/* added to, not set */
+	unsigned*	 	 const restrict	data_read
 	)
 {
 	int retval = 0;
@@ -657,8 +657,8 @@ pgm_peer_has_pending (
 
 void
 pgm_peer_set_pending (
-	pgm_transport_t* const	transport,
-	pgm_peer_t* const	peer
+	pgm_transport_t* const restrict	transport,
+	pgm_peer_t*	 const restrict	peer
 	)
 {
 /* pre-conditions */
@@ -675,9 +675,9 @@ pgm_peer_set_pending (
 
 void
 pgm_set_reset_error (
-	pgm_transport_t*const	transport,
-	pgm_peer_t*const	source,
-	struct pgm_msgv_t*const	msgv
+	pgm_transport_t*   const restrict transport,
+	pgm_peer_t*	   const restrict source,
+	struct pgm_msgv_t* const restrict msgv
 	)
 {
 /* pre-conditions */
@@ -702,9 +702,9 @@ pgm_set_reset_error (
 
 bool
 pgm_on_spm (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		source,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict source,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -834,9 +834,9 @@ pgm_on_spm (
 
 bool
 pgm_on_peer_nak (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		peer,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict peer,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -960,9 +960,9 @@ pgm_on_peer_nak (
 
 bool
 pgm_on_ncf (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		source,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict source,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -1091,8 +1091,8 @@ pgm_on_ncf (
 static
 bool
 send_spmr (
-	pgm_transport_t* const	transport,
-	pgm_peer_t*      const	source
+	pgm_transport_t* const restrict	transport,
+	pgm_peer_t*      const restrict	source
 	)
 {
 /* pre-conditions */
@@ -1151,9 +1151,9 @@ send_spmr (
 static
 bool
 send_nak (
-	pgm_transport_t* const	transport,
-	pgm_peer_t* const	source,
-	const uint32_t		sequence
+	pgm_transport_t* const restrict	transport,
+	pgm_peer_t*	 const restrict	source,
+	const uint32_t			sequence
 	)
 {
 /* pre-conditions */
@@ -1217,10 +1217,10 @@ send_nak (
 static
 bool
 send_parity_nak (
-	pgm_transport_t* const	transport,
-	pgm_peer_t* const	source,
-	const uint32_t		nak_tg_sqn,	/* transmission group (shifted) */
-	const uint32_t		nak_pkt_cnt	/* count of parity packets to request */
+	pgm_transport_t* const restrict	transport,
+	pgm_peer_t*	 const restrict	source,
+	const uint32_t			nak_tg_sqn,	/* transmission group (shifted) */
+	const uint32_t			nak_pkt_cnt	/* count of parity packets to request */
 	)
 {
 /* pre-conditions */
@@ -1284,9 +1284,9 @@ send_parity_nak (
 static
 bool
 send_nak_list (
-	pgm_transport_t* const			transport,
-	pgm_peer_t* const			source,
-	const struct pgm_sqn_list_t*const	sqn_list
+	pgm_transport_t*	     const restrict transport,
+	pgm_peer_t*		     const restrict source,
+	const struct pgm_sqn_list_t* const restrict sqn_list
 	)
 {
 /* pre-conditions */
@@ -1999,9 +1999,9 @@ nak_rdata_state (
 
 bool
 pgm_on_data (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		source,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict source,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -2076,9 +2076,9 @@ discarded:
 
 bool
 pgm_on_poll (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		source,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict source,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* pre-conditions */
@@ -2148,9 +2148,9 @@ pgm_on_poll (
 static
 bool
 on_general_poll (
-	pgm_transport_t* const		transport,
-	pgm_peer_t* const		source,
-	struct pgm_sk_buff_t* const	skb
+	pgm_transport_t*      const restrict transport,
+	pgm_peer_t*	      const restrict source,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 	struct pgm_poll*  poll4 = (struct pgm_poll*) skb->data;
@@ -2172,9 +2172,9 @@ on_general_poll (
 static
 bool
 on_dlr_poll (
-	PGM_GNUC_UNUSED pgm_transport_t* const		transport,
-	PGM_GNUC_UNUSED pgm_peer_t* const			source,
-	PGM_GNUC_UNUSED struct pgm_sk_buff_t* const	skb
+	PGM_GNUC_UNUSED pgm_transport_t*      const restrict transport,
+	PGM_GNUC_UNUSED pgm_peer_t*	      const restrict source,
+	PGM_GNUC_UNUSED struct pgm_sk_buff_t* const restrict skb
 	)
 {
 /* we are not a DLR */

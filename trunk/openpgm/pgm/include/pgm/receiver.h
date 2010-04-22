@@ -83,40 +83,40 @@ enum {
 };
 
 struct pgm_peer_t {
-	volatile uint32_t	ref_count;		    /* atomic integer */
+	volatile uint32_t		ref_count;		    /* atomic integer */
 
-	pgm_tsi_t		tsi;
-	struct sockaddr_storage	group_nla;
-	struct sockaddr_storage	nla, local_nla;		/* nla = advertised, local_nla = from packet */
-	struct sockaddr_storage poll_nla;		/* from parent to direct poll-response */
-	struct sockaddr_storage	redirect_nla;		/* from dlr */
-	pgm_time_t		polr_expiry;
-	pgm_time_t		spmr_expiry;
-	pgm_time_t		spmr_tstamp;
+	pgm_tsi_t			tsi;
+	struct sockaddr_storage		group_nla;
+	struct sockaddr_storage		nla, local_nla;		/* nla = advertised, local_nla = from packet */
+	struct sockaddr_storage		 poll_nla;		/* from parent to direct poll-response */
+	struct sockaddr_storage		redirect_nla;		/* from dlr */
+	pgm_time_t			polr_expiry;
+	pgm_time_t			spmr_expiry;
+	pgm_time_t			spmr_tstamp;
 
-	pgm_rxw_t*            	window;
-	pgm_transport_t*    	transport;
-	pgm_list_t		peers_link;
-	pgm_slist_t		pending_link;
+	pgm_rxw_t*       restrict      	window;
+	pgm_transport_t* restrict	transport;
+	pgm_list_t			peers_link;
+	pgm_slist_t			pending_link;
 
-	unsigned		is_fec_enabled:1;
-	unsigned		has_proactive_parity:1;	    /* indicating availability from this source */
-	unsigned		has_ondemand_parity:1;
+	unsigned			is_fec_enabled:1;
+	unsigned			has_proactive_parity:1;	    /* indicating availability from this source */
+	unsigned			has_ondemand_parity:1;
 
-	uint32_t		spm_sqn;
-	pgm_time_t		expiry;
+	uint32_t			spm_sqn;
+	pgm_time_t			expiry;
 
-	uint32_t		last_poll_sqn;
-	uint16_t		last_poll_round;
-	pgm_time_t		last_packet;
-	unsigned		last_commit;
-	uint32_t		lost_count;
-	uint32_t		last_cumulative_losses;
-	volatile uint32_t	cumulative_stats[PGM_PC_RECEIVER_MAX];
-	uint32_t		snap_stats[PGM_PC_RECEIVER_MAX];
+	uint32_t			last_poll_sqn;
+	uint16_t			last_poll_round;
+	pgm_time_t			last_packet;
+	unsigned			last_commit;
+	uint32_t			lost_count;
+	uint32_t			last_cumulative_losses;
+	volatile uint32_t		cumulative_stats[PGM_PC_RECEIVER_MAX];
+	uint32_t			snap_stats[PGM_PC_RECEIVER_MAX];
 
-	uint32_t		min_fail_time;
-	uint32_t		max_fail_time;
+	uint32_t			min_fail_time;
+	uint32_t			max_fail_time;
 };
 
 bool pgm_transport_set_rxw_sqns (pgm_transport_t*, unsigned);
@@ -130,19 +130,19 @@ bool pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, unsigned);
 bool pgm_transport_set_nak_data_retries (pgm_transport_t*, unsigned);
 bool pgm_transport_set_nak_ncf_retries (pgm_transport_t*, unsigned);
 
-PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t* const, const pgm_tsi_t* const, const struct sockaddr* const, const socklen_t, const struct sockaddr* const, const socklen_t, const pgm_time_t);
+PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t*const restrict, const pgm_tsi_t*const restrict, const struct sockaddr*const restrict, const socklen_t, const struct sockaddr*const restrict, const socklen_t, const pgm_time_t);
 PGM_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
-PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t* const, struct pgm_msgv_t**, const struct pgm_msgv_t* const, size_t* const, unsigned* const);
-PGM_GNUC_INTERNAL bool pgm_peer_has_pending (pgm_peer_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t* const, pgm_peer_t* const);
-PGM_GNUC_INTERNAL bool pgm_check_peer_nak_state (pgm_transport_t* const, const pgm_time_t);
-PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_transport_t* const, pgm_peer_t* const, struct pgm_msgv_t* const);
+PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t*const restrict, struct pgm_msgv_t**restrict, const struct pgm_msgv_t*const, size_t*const restrict, unsigned*const restrict);
+PGM_GNUC_INTERNAL bool pgm_peer_has_pending (pgm_peer_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t*const, pgm_peer_t*const);
+PGM_GNUC_INTERNAL bool pgm_check_peer_nak_state (pgm_transport_t*const, const pgm_time_t);
+PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_msgv_t*const restrict);
 PGM_GNUC_INTERNAL pgm_time_t pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_peer_nak (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_data (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_ncf (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_spm (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_poll (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_peer_nak (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_data (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_ncf (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_spm (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_poll (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 
 PGM_END_DECLS

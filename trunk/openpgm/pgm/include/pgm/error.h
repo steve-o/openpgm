@@ -96,16 +96,16 @@ typedef struct pgm_error_t pgm_error_t;
 
 
 void pgm_error_free (pgm_error_t*);
-void pgm_set_error (pgm_error_t**, int, int, const char*, ...) PGM_GNUC_PRINTF (4, 5);
-void pgm_propagate_error (pgm_error_t**, pgm_error_t*);
+void pgm_set_error (pgm_error_t**restrict, int, int, const char*restrict, ...) PGM_GNUC_PRINTF (4, 5);
+void pgm_propagate_error (pgm_error_t**restrict, pgm_error_t*restrict);
 void pgm_clear_error (pgm_error_t**);
-void pgm_prefix_error (pgm_error_t**, const char*, ...) PGM_GNUC_PRINTF (2, 3);
+void pgm_prefix_error (pgm_error_t**restrict, const char*restrict, ...) PGM_GNUC_PRINTF (2, 3);
 
-int pgm_error_from_errno (const int);
-int pgm_error_from_h_errno (const int);
-int pgm_error_from_eai_errno (const int, const int);
-int pgm_error_from_wsa_errno (const int);
-int pgm_error_from_adapter_errno (const int);
+int pgm_error_from_errno (const int) PGM_GNUC_CONST;
+int pgm_error_from_h_errno (const int) PGM_GNUC_CONST;
+int pgm_error_from_eai_errno (const int, const int) PGM_GNUC_CONST;
+int pgm_error_from_wsa_errno (const int) PGM_GNUC_CONST;
+int pgm_error_from_adapter_errno (const int) PGM_GNUC_CONST;
 
 PGM_END_DECLS
 
