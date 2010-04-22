@@ -1,0 +1,24 @@
+#summary OpenPGM 3 : C Reference : Timing
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTiming
+=== Introduction ===
+Functionality for high resolution timing, sleeping, and delays.
+
+=== Topics in Alphabetical Order ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td colspan="2"><h3>Timing API</h3></td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt></td>
+<td>Time value data type.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTimeSinceEpoch pgm_time_since_epoch()]</tt></td>
+<td>Convert <tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt> to <tt>time_t</tt> scoped time.</td>
+</tr>
+</table>
+
