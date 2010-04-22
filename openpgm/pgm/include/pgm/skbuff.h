@@ -40,7 +40,7 @@ PGM_BEGIN_DECLS
 struct pgm_sk_buff_t {
 	pgm_list_t			link_;
 
-	pgm_transport_t*		transport;
+	pgm_transport_t* restrict	transport;
 	pgm_time_t			tstamp;
 	pgm_tsi_t			tsi;
 
@@ -59,7 +59,7 @@ struct pgm_sk_buff_t {
 #define of_apdu_len			pgm_opt_fragment->opt_frag_len
 	struct pgm_data*		pgm_data;
 
-	void			       *head,
+	void			       *head,		/* all may-alias */
 				       *data,
 				       *tail,
 				       *end;

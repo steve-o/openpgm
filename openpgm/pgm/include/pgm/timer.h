@@ -27,10 +27,10 @@
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL bool pgm_timer_prepare (pgm_transport_t* const);
-PGM_GNUC_INTERNAL bool pgm_timer_check (pgm_transport_t* const);
-PGM_GNUC_INTERNAL pgm_time_t pgm_timer_expiration (pgm_transport_t* const);
-PGM_GNUC_INTERNAL bool pgm_timer_dispatch (pgm_transport_t* const);
+PGM_GNUC_INTERNAL bool pgm_timer_prepare (pgm_transport_t*const);
+PGM_GNUC_INTERNAL bool pgm_timer_check (pgm_transport_t*const);
+PGM_GNUC_INTERNAL pgm_time_t pgm_timer_expiration (pgm_transport_t*const);
+PGM_GNUC_INTERNAL bool pgm_timer_dispatch (pgm_transport_t*const);
 
 static inline
 void

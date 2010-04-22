@@ -56,7 +56,7 @@ struct pgm_hashtable_t
 	} while (0)
 
 static void pgm_hashtable_resize (pgm_hashtable_t*);
-static pgm_hashnode_t** pgm_hashtable_lookup_node (pgm_hashtable_t*restrict, const void*restrict, pgm_hash_t*restrict);
+static pgm_hashnode_t** pgm_hashtable_lookup_node (const pgm_hashtable_t*restrict, const void*restrict, pgm_hash_t*restrict) PGM_GNUC_PURE;
 static pgm_hashnode_t* pgm_hash_node_new (const void*restrict, void*restrict, const pgm_hash_t);
 static void pgm_hash_node_destroy (pgm_hashnode_t*);
 static void pgm_hash_nodes_destroy (pgm_hashnode_t*);
@@ -110,12 +110,12 @@ pgm_hashtable_destroy (
 static inline
 pgm_hashnode_t**
 pgm_hashtable_lookup_node (
-	pgm_hashtable_t* restrict hash_table,
-	const void*	 restrict key,
-	pgm_hash_t*	 restrict hash_return	/* non-NULL to return hash value */
+	const pgm_hashtable_t* restrict hash_table,
+	const void*	       restrict key,
+	pgm_hash_t*	       restrict hash_return	/* non-NULL to return hash value */
 	)
 {
-	const pgm_hash_t hash_value = (* hash_table->hash_func) (key);
+	const pgm_hash_t hash_value = (*hash_table->hash_func) (key);
 	pgm_hashnode_t** node = &hash_table->nodes[hash_value % hash_table->size];
   
 	if (hash_return)
@@ -132,8 +132,8 @@ pgm_hashtable_lookup_node (
 
 void*
 pgm_hashtable_lookup (
-	pgm_hashtable_t* restrict hash_table,
-	const void*	 restrict key
+	const pgm_hashtable_t* restrict hash_table,
+	const void*	       restrict key
 	)
 {
 	pgm_return_val_if_fail (hash_table != NULL, NULL);
@@ -144,9 +144,9 @@ pgm_hashtable_lookup (
 
 void*
 pgm_hashtable_lookup_extended (
-	pgm_hashtable_t* restrict hash_table,
-	const void*	 restrict key,
-	void*		 restrict hash_return
+	const pgm_hashtable_t* restrict hash_table,
+	const void*	       restrict key,
+	void*		       restrict hash_return
 	)
 {
 	pgm_return_val_if_fail (hash_table != NULL, NULL);

@@ -41,40 +41,42 @@
 static inline
 bool
 _pgm_tsi_is_null (
-	pgm_tsi_t* const	tsi
+	const void*const	tsi
 	)
 {
-	pgm_tsi_t nulltsi;
+	const union {
+		pgm_tsi_t	tsi;
+		uint32_t	l[2];
+	} *u = tsi;
 
 /* pre-conditions */
 	pgm_assert (NULL != tsi);
 
-	memset (&nulltsi, 0, sizeof(nulltsi));
-	return (0 == memcmp (&nulltsi, tsi, sizeof(nulltsi)));
+	return (0 == u->l[0] && 0 == u->l[1]);
 }
 
 /* sequence state must be smaller than PGM skbuff control buffer */
 PGM_STATIC_ASSERT(sizeof(struct pgm_rxw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
 
-static void _pgm_rxw_define (pgm_rxw_t* const, const uint32_t);
-static void _pgm_rxw_update_trail (pgm_rxw_t* const, const uint32_t);
-static inline uint32_t _pgm_rxw_update_lead (pgm_rxw_t* const, const uint32_t, const pgm_time_t, const pgm_time_t);
-static inline uint32_t _pgm_rxw_tg_sqn (pgm_rxw_t* const, const uint32_t);
-static inline uint32_t _pgm_rxw_pkt_sqn (pgm_rxw_t* const, const uint32_t);
-static inline bool _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t* const, const uint32_t);
-static inline bool _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t* const, const uint32_t);
-static int _pgm_rxw_insert (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static int _pgm_rxw_append (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t);
-static int _pgm_rxw_add_placeholder_range (pgm_rxw_t* const, const uint32_t, const pgm_time_t, const pgm_time_t);
-static void _pgm_rxw_unlink (pgm_rxw_t* const, struct pgm_sk_buff_t*);
-static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t* const);
-static void _pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
-static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t* const, struct pgm_sk_buff_t* const);
-static inline ssize_t _pgm_rxw_incoming_read (pgm_rxw_t* const, struct pgm_msgv_t**, uint32_t);
-static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t* const, const uint32_t);
-static inline ssize_t _pgm_rxw_incoming_read_apdu (pgm_rxw_t* const, struct pgm_msgv_t**);
-static inline int _pgm_rxw_recovery_update (pgm_rxw_t* const, const uint32_t, const pgm_time_t);
-static inline int _pgm_rxw_recovery_append (pgm_rxw_t* const, const pgm_time_t, const pgm_time_t);
+static void _pgm_rxw_define (pgm_rxw_t*const, const uint32_t);
+static void _pgm_rxw_update_trail (pgm_rxw_t*const, const uint32_t);
+static inline uint32_t _pgm_rxw_update_lead (pgm_rxw_t*const, const uint32_t, const pgm_time_t, const pgm_time_t);
+static inline uint32_t _pgm_rxw_tg_sqn (pgm_rxw_t*const, const uint32_t);
+static inline uint32_t _pgm_rxw_pkt_sqn (pgm_rxw_t*const, const uint32_t);
+static inline bool _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t*const, const uint32_t);
+static inline bool _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t*const, const uint32_t);
+static int _pgm_rxw_insert (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
+static int _pgm_rxw_append (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t);
+static int _pgm_rxw_add_placeholder_range (pgm_rxw_t*const, const uint32_t, const pgm_time_t, const pgm_time_t);
+static void _pgm_rxw_unlink (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*restrict);
+static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t*const);
+static void _pgm_rxw_state (pgm_rxw_t*restrict, struct pgm_sk_buff_t*restrict, const int);
+static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
+static inline ssize_t _pgm_rxw_incoming_read (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict, uint32_t);
+static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t*const restrict, const uint32_t);
+static inline ssize_t _pgm_rxw_incoming_read_apdu (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict);
+static inline int _pgm_rxw_recovery_update (pgm_rxw_t*const, const uint32_t, const pgm_time_t);
+static inline int _pgm_rxw_recovery_append (pgm_rxw_t*const, const pgm_time_t, const pgm_time_t);
 
 
 /* returns the pointer at the given index of the window.
@@ -285,10 +287,10 @@ pgm_rxw_destroy (
 
 int
 pgm_rxw_add (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb,
-	const pgm_time_t		now,
-	const pgm_time_t		nak_rb_expiry	/* calculated expiry time for this skb */
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb,
+	const pgm_time_t		     now,
+	const pgm_time_t		     nak_rb_expiry	/* calculated expiry time for this skb */
 	)
 {
 	pgm_rxw_state_t* const state = (pgm_rxw_state_t*)&skb->cb;
@@ -729,8 +731,8 @@ _pgm_rxw_update_lead (
 static inline
 bool
 _pgm_rxw_is_apdu_lost (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 	const pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
@@ -813,8 +815,8 @@ _pgm_rxw_find_missing (
 static inline
 bool
 _pgm_rxw_is_invalid_var_pktlen (
-	pgm_rxw_t* const			window,
-	const struct pgm_sk_buff_t* const	skb
+	pgm_rxw_t*		    const restrict window,
+	const struct pgm_sk_buff_t* const restrict skb
 	)
 {
 	const struct pgm_sk_buff_t* first_skb;
@@ -861,8 +863,8 @@ _pgm_rxw_has_payload_op (
 static inline
 bool
 _pgm_rxw_is_invalid_payload_op (
-	pgm_rxw_t* const			window,
-	const struct pgm_sk_buff_t* const	skb
+	pgm_rxw_t*		    const restrict window,
+	const struct pgm_sk_buff_t* const restrict skb
 	)
 {
 	const struct pgm_sk_buff_t* first_skb;
@@ -901,8 +903,8 @@ _pgm_rxw_is_invalid_payload_op (
 static
 int
 _pgm_rxw_insert (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	new_skb
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict new_skb
 	)
 {
 	struct pgm_sk_buff_t* skb;
@@ -1006,8 +1008,8 @@ _pgm_rxw_insert (
 static inline
 void
 _pgm_rxw_shuffle_parity (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 	uint_fast32_t index_;
@@ -1016,7 +1018,7 @@ _pgm_rxw_shuffle_parity (
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != skb);
 
-	struct pgm_sk_buff_t* missing = _pgm_rxw_find_missing (window, skb->sequence);
+	struct pgm_sk_buff_t* restrict missing = _pgm_rxw_find_missing (window, skb->sequence);
 	if (NULL == missing)
 		return;
 
@@ -1043,9 +1045,9 @@ _pgm_rxw_shuffle_parity (
 static
 int
 _pgm_rxw_append (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb,
-	const pgm_time_t		now
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb,
+	const pgm_time_t		     now
 	)
 {
 /* pre-conditions */
@@ -1143,9 +1145,9 @@ pgm_rxw_remove_commit (
 
 ssize_t
 pgm_rxw_readv (
-	pgm_rxw_t* const	window,
-	struct pgm_msgv_t**	pmsg,		/* message array, updated as messages appended */
-	const unsigned		pmsglen		/* number of items in pmsg */
+	pgm_rxw_t*    const restrict window,
+	struct pgm_msgv_t** restrict pmsg,		/* message array, updated as messages appended */
+	const unsigned		     pmsglen		/* number of items in pmsg */
 	)
 {
 	const struct pgm_msgv_t* msg_end;
@@ -1260,9 +1262,9 @@ pgm_rxw_remove_trail (
 static inline
 ssize_t
 _pgm_rxw_incoming_read (
-	pgm_rxw_t* const	window,
-	struct pgm_msgv_t**	pmsg,		/* message array, updated as messages appended */
-	unsigned		pmsglen		/* number of items in pmsg */
+	pgm_rxw_t*    const restrict window,
+	struct pgm_msgv_t** restrict pmsg,		/* message array, updated as messages appended */
+	unsigned		     pmsglen		/* number of items in pmsg */
 	)
 {
 	const struct pgm_msgv_t* msg_end;
@@ -1585,8 +1587,8 @@ _pgm_rxw_is_apdu_complete (
 static inline
 ssize_t
 _pgm_rxw_incoming_read_apdu (
-	pgm_rxw_t* const	window,
-	struct pgm_msgv_t**	pmsg		/* message array, updated as messages appended */
+	pgm_rxw_t*    const restrict window,
+	struct pgm_msgv_t** restrict pmsg		/* message array, updated as messages appended */
 	)
 {
 	struct pgm_sk_buff_t *skb;
@@ -1695,9 +1697,9 @@ _pgm_rxw_is_last_of_tg_sqn (
 static
 void
 _pgm_rxw_state (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb,
-	const int			new_pkt_state
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb,
+	const int			     new_pkt_state
 	)
 {
 	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
@@ -1756,9 +1758,9 @@ _pgm_rxw_state (
 
 void
 pgm_rxw_state (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb,
-	const int			new_pkt_state
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb,
+	const int			     new_pkt_state
 	)
 {
 	pgm_debug ("state (window:%p skb:%p new_pkt_state:%s)",
@@ -1772,8 +1774,8 @@ pgm_rxw_state (
 static
 void
 _pgm_rxw_unlink (
-	pgm_rxw_t* const		window,
-	struct pgm_sk_buff_t* const	skb
+	pgm_rxw_t*	      const restrict window,
+	struct pgm_sk_buff_t* const restrict skb
 	)
 {
 	pgm_queue_t* queue;

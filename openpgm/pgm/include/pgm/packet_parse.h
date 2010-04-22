@@ -28,8 +28,8 @@
 
 PGM_BEGIN_DECLS
 
-bool pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, pgm_error_t**);
-bool pgm_parse_udp_encap (struct pgm_sk_buff_t* const, pgm_error_t**);
+bool pgm_parse_raw (struct pgm_sk_buff_t*const restrict, struct sockaddr*const restrict, pgm_error_t**restrict);
+bool pgm_parse_udp_encap (struct pgm_sk_buff_t*const restrict, pgm_error_t**restrict);
 bool pgm_verify_spm (const struct pgm_sk_buff_t* const);
 bool pgm_verify_spmr (const struct pgm_sk_buff_t* const);
 bool pgm_verify_nak (const struct pgm_sk_buff_t* const);

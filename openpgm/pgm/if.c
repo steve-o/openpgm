@@ -42,7 +42,7 @@ struct interface_req {
 };
 
 
-/* globals */
+/* locals */
 
 #ifndef _WIN32
 #	define IF_DEFAULT_GROUP	((in_addr_t)0xefc00001) /* 239.192.0.1 */
@@ -55,7 +55,10 @@ struct interface_req {
 const struct in6_addr if6_default_group_addr = IF6_DEFAULT_INIT;
 
 
-static const char* pgm_family_string (const int);
+static inline bool is_in_net (const struct in_addr*restrict, const struct in_addr*restrict, const struct in_addr*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool is_in_net6 (const struct in6_addr*restrict, const struct in6_addr*restrict, const struct in6_addr*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool is_network_char (const int, const char) PGM_GNUC_CONST;
+static const char* pgm_family_string (const int) PGM_GNUC_CONST;
 
 
 /* recommended address space for multicast:
@@ -138,9 +141,9 @@ pgm_if_print_all (void)
 static inline
 bool
 is_in_net (
-	const struct in_addr*	addr,		/* host byte order */
-	const struct in_addr*	netaddr,
-	const struct in_addr*	netmask
+	const struct in_addr* restrict	addr,		/* host byte order */
+	const struct in_addr* restrict	netaddr,
+	const struct in_addr* restrict	netmask
 	)
 {
 	pgm_assert (NULL != addr);
@@ -166,9 +169,9 @@ is_in_net (
 static
 bool
 is_in_net6 (
-	const struct in6_addr*	addr,
-	const struct in6_addr*	netaddr,
-	const struct in6_addr*	netmask
+	const struct in6_addr* restrict	addr,
+	const struct in6_addr* restrict	netaddr,
+	const struct in6_addr* restrict	netmask
 	)
 {
 	pgm_assert (NULL != addr);
@@ -214,10 +217,10 @@ is_in_net6 (
 static
 bool
 parse_interface (
-	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*		ifname,			/* NULL terminated */
-	struct interface_req*	ir,			/* location to write interface details to */
-	pgm_error_t**		error
+	int				family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
+	const char*	      restrict	ifname,			/* NULL terminated */
+	struct interface_req* restrict	ir,			/* location to write interface details to */
+	pgm_error_t**	      restrict	error
 	)
 {
 	bool check_inet_network = FALSE, check_inet6_network = FALSE;
@@ -620,10 +623,10 @@ parse_interface (
 static
 bool
 parse_group (
-	const int		family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*		group,		/* NULL terminated */
-	struct sockaddr*	addr,		/* pointer to sockaddr_storage for writing */
-	pgm_error_t**		error
+	const int		  family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
+	const char*	 restrict group,	/* NULL terminated */
+	struct sockaddr* restrict addr,		/* pointer to sockaddr_storage for writing */
+	pgm_error_t**	 restrict error
 	)
 {
 /* pre-conditions */
@@ -802,9 +805,9 @@ static
 bool
 parse_interface_entity (
 	int			family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*		entity,	/* NULL terminated */
-	pgm_list_t**		interface_list,	/* <struct interface_req*> */
-	pgm_error_t**		error
+	const char*   restrict	entity,	/* NULL terminated */
+	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
+	pgm_error_t** restrict	error
 	)
 {
 	struct interface_req* ir;
@@ -889,10 +892,10 @@ static
 bool
 parse_receive_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*		entity,		/* NULL terminated */
-	pgm_list_t**		interface_list,	/* <struct interface_req*> */
-	pgm_list_t**		recv_list,	/* <struct group_source_req*> */
-	pgm_error_t**		error
+	const char*   restrict	entity,		/* NULL terminated */
+	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
+	pgm_list_t**  restrict	recv_list,	/* <struct group_source_req*> */
+	pgm_error_t** restrict	error
 	)
 {
 /* pre-conditions */
@@ -1090,11 +1093,11 @@ static
 bool
 parse_send_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*		entity,		/* null = empty entity */
-	pgm_list_t**		interface_list,	/* <struct interface_req*> */
-	pgm_list_t**		recv_list,	/* <struct group_source_req*> */
-	pgm_list_t**		send_list,	/* <struct group_source_req*> */
-	pgm_error_t**		error
+	const char*   restrict	entity,		/* null = empty entity */
+	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
+	pgm_list_t**  restrict	recv_list,	/* <struct group_source_req*> */
+	pgm_list_t**  restrict	send_list,	/* <struct group_source_req*> */
+	pgm_error_t** restrict	error
 	)
 {
 /* pre-conditions */
@@ -1221,11 +1224,11 @@ is_network_char (
 static
 bool
 network_parse (
-	const char*		network,		/* NULL terminated */
+	const char*   restrict	network,		/* NULL terminated */
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
-	pgm_list_t**		recv_list,		/* <struct group_source_req*> */
-	pgm_list_t**		send_list,		/* <struct group_source_req*> */
-	pgm_error_t**		error
+	pgm_list_t**  restrict	recv_list,		/* <struct group_source_req*> */
+	pgm_list_t**  restrict	send_list,		/* <struct group_source_req*> */
+	pgm_error_t** restrict	error
 	)
 {
 	bool retval = FALSE;
@@ -1467,10 +1470,10 @@ free_lists:
 
 bool
 pgm_if_get_transport_info (
-	const char*					network,
-	const struct pgm_transport_info_t* const	hints,
-	struct pgm_transport_info_t**			res,
-	pgm_error_t**					error
+	const char*				 restrict network,
+	const struct pgm_transport_info_t* const restrict hints,
+	struct pgm_transport_info_t**		 restrict res,
+	pgm_error_t**			         restrict error
 	)
 {
 	struct pgm_transport_info_t* ti;

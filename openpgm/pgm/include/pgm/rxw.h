@@ -118,30 +118,30 @@ struct pgm_rxw_t {
 };
 
 
-PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t* const, const uint16_t, const unsigned, const unsigned, const ssize_t) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t* const);
-PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t* const, struct pgm_sk_buff_t* const, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t* const);
-PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t* const, struct pgm_msgv_t**, const unsigned) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL unsigned pgm_rxw_remove_trail (pgm_rxw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL unsigned pgm_rxw_update (pgm_rxw_t* const, const uint32_t, const uint32_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t* const, const uint8_t);
-PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t* const, uint32_t, pgm_time_t, pgm_time_t, pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t* const, const uint32_t);
-PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*, struct pgm_sk_buff_t*, const int);
-PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t* const, const uint32_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t*const, const uint16_t, const unsigned, const unsigned, const ssize_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t*const);
+PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t*const);
+PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t*const restrict, struct pgm_msgv_t** restrict, const unsigned) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL unsigned pgm_rxw_remove_trail (pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL unsigned pgm_rxw_update (pgm_rxw_t*const, const uint32_t, const uint32_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t*const, const uint8_t);
+PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t*const, uint32_t, pgm_time_t, pgm_time_t, pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t*const, const uint32_t);
+PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t* restrict, struct pgm_sk_buff_t*restrict, const int);
+PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t*const, const uint32_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (const int) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (const int) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t* const);
+PGM_GNUC_INTERNAL void pgm_rxw_dump (const pgm_rxw_t*const);
 
 /* declare for GCC attributes */
-static inline unsigned pgm_rxw_max_length (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_rxw_length (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline size_t pgm_rxw_size (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline bool pgm_rxw_is_empty (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline bool pgm_rxw_is_full (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_rxw_lead (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_rxw_next_lead (const pgm_rxw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline unsigned pgm_rxw_max_length (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_rxw_length (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_rxw_size (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_rxw_is_empty (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_rxw_is_full (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_rxw_lead (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_rxw_next_lead (const pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
 
 static inline
 unsigned

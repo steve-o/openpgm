@@ -40,10 +40,10 @@ static const char* pgm_family_string (const sa_family_t);
 
 bool
 pgm_if_getnodeaddr (
-	const sa_family_t	family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
-	struct sockaddr*	addr,
-	const socklen_t		cnt,	/* size of address pointed to by addr */
-	pgm_error_t**		error
+	const sa_family_t	   family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
+	struct sockaddr*  restrict addr,
+	const socklen_t		   cnt,	/* size of address pointed to by addr */
+	pgm_error_t**	  restrict error
 	)
 {
 	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);

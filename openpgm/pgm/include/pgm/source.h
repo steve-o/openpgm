@@ -28,21 +28,21 @@
 
 PGM_BEGIN_DECLS
 
-bool pgm_transport_set_ambient_spm (pgm_transport_t* const, const unsigned);
-bool pgm_transport_set_heartbeat_spm (pgm_transport_t* const, const unsigned*, const unsigned);
-bool pgm_transport_set_txw_sqns (pgm_transport_t* const, const unsigned);
-bool pgm_transport_set_txw_secs (pgm_transport_t* const, const unsigned);
-bool pgm_transport_set_txw_max_rte (pgm_transport_t* const, const unsigned);
+bool pgm_transport_set_ambient_spm (pgm_transport_t*const, const unsigned);
+bool pgm_transport_set_heartbeat_spm (pgm_transport_t*const restrict, const unsigned* restrict, const unsigned);
+bool pgm_transport_set_txw_sqns (pgm_transport_t*const, const unsigned);
+bool pgm_transport_set_txw_secs (pgm_transport_t*const, const unsigned);
+bool pgm_transport_set_txw_max_rte (pgm_transport_t*const, const unsigned);
 
-int pgm_send (pgm_transport_t* const, const void*, const size_t, size_t*);
-int pgm_sendv (pgm_transport_t* const, const struct pgm_iovec* const, const unsigned, const bool, size_t*);
-int pgm_send_skbv (pgm_transport_t* const, struct pgm_sk_buff_t**, const unsigned, const bool, size_t*);
+int pgm_send (pgm_transport_t*const restrict, const void*restrict, const size_t, size_t*restrict);
+int pgm_sendv (pgm_transport_t*const restrict, const struct pgm_iovec*const restrict, const unsigned, const bool, size_t*restrict);
+int pgm_send_skbv (pgm_transport_t*const restrict, struct pgm_sk_buff_t**restrict, const unsigned, const bool, size_t*restrict);
 
 PGM_GNUC_INTERNAL bool pgm_send_spm (pgm_transport_t*, int) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_deferred_nak (pgm_transport_t* const);
-PGM_GNUC_INTERNAL bool pgm_on_spmr (pgm_transport_t* const, pgm_peer_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_nak (pgm_transport_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_nnak (pgm_transport_t* const, struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_deferred_nak (pgm_transport_t*const);
+PGM_GNUC_INTERNAL bool pgm_on_spmr (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_nak (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_nnak (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 PGM_END_DECLS
 

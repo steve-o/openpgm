@@ -49,8 +49,8 @@ struct _pgm_ifaddrs
 static
 bool
 _pgm_getlifaddrs (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	const int sock = socket (AF_INET, SOCK_DGRAM, 0);
@@ -274,8 +274,8 @@ again:
 static
 bool
 _pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	const int sock = socket (AF_INET, SOCK_DGRAM, 0);
@@ -454,8 +454,8 @@ _pgm_getifaddrs (
 static
 bool
 _pgm_getadaptersinfo (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	DWORD dwRet;
@@ -565,8 +565,8 @@ _pgm_getadaptersinfo (
 static
 bool
 _pgm_getadaptersaddresses (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	DWORD dwSize = sizeof(IP_ADAPTER_ADDRESSES), dwRet;

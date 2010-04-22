@@ -32,7 +32,7 @@
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL bool pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*, const socklen_t, pgm_error_t**);
+PGM_GNUC_INTERNAL bool pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*restrict, const socklen_t, pgm_error_t**restrict);
 
 PGM_END_DECLS
 
