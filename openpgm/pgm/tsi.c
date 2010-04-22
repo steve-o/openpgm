@@ -100,8 +100,8 @@ pgm_tsi_hash (
 
 bool
 pgm_tsi_equal (
-	const void*restrict p1,
-	const void*restrict p2
+	const void* restrict p1,
+	const void* restrict p2
         )
 {
 	const union {

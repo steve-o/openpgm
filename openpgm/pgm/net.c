@@ -53,13 +53,13 @@
 
 ssize_t
 pgm_sendto (
-	pgm_transport_t*	transport,
-	bool			use_rate_limit,
-	bool			use_router_alert,
-	const void*		buf,
-	size_t			len,
-	const struct sockaddr*	to,
-	socklen_t		tolen
+	pgm_transport_t*		transport,
+	bool				use_rate_limit,
+	bool				use_router_alert,
+	const void*	       restrict	buf,
+	size_t				len,
+	const struct sockaddr* restrict	to,
+	socklen_t			tolen
 	)
 {
 	pgm_assert( NULL != transport );

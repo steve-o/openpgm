@@ -30,7 +30,14 @@
 
 //#define PACKET_DEBUG
 
-static bool pgm_parse (struct pgm_sk_buff_t* const, pgm_error_t**);
+#ifndef PACKET_DEBUG
+#	define PGM_DISABLE_ASSERT
+#endif
+
+
+/* locals */
+
+static bool pgm_parse (struct pgm_sk_buff_t*const restrict, pgm_error_t**restrict);
 
 
 /* Parse a raw-IP packet for IP and PGM header and any payload.
@@ -43,9 +50,9 @@ static bool pgm_parse (struct pgm_sk_buff_t* const, pgm_error_t**);
 
 bool
 pgm_parse_raw (
-	struct pgm_sk_buff_t* const	skb,		/* data will be modified */
-	struct sockaddr* const		dst,
-	pgm_error_t**			error
+	struct pgm_sk_buff_t* const restrict skb,	/* data will be modified */
+	struct sockaddr*      const restrict dst,
+	pgm_error_t**		    restrict error
 	)
 {
 /* pre-conditions */
@@ -221,8 +228,8 @@ pgm_parse_raw (
 
 bool
 pgm_parse_udp_encap (
-	struct pgm_sk_buff_t*	skb,		/* will be modified */
-	pgm_error_t**		error
+	struct pgm_sk_buff_t* restrict skb,		/* will be modified */
+	pgm_error_t**	      restrict error
 	)
 {
 	pgm_assert (NULL != skb);
@@ -246,8 +253,8 @@ pgm_parse_udp_encap (
 static
 bool
 pgm_parse (
-	struct pgm_sk_buff_t* const	skb,		/* will be modified to calculate checksum */
-	pgm_error_t**			error
+	struct pgm_sk_buff_t* const restrict skb,		/* will be modified to calculate checksum */
+	pgm_error_t**		    restrict error
 	)
 {
 /* pre-conditions */

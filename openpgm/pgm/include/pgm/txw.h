@@ -51,52 +51,52 @@ struct pgm_txw_state_t {
 };
 
 struct pgm_txw_t {
-	const pgm_tsi_t*	tsi;
+	const pgm_tsi_t* restrict	tsi;
 
 /* option: lockless atomics */
-        volatile uint32_t	lead;
-        volatile uint32_t	trail;
+        volatile uint32_t		lead;
+        volatile uint32_t		trail;
 
-        pgm_queue_t		retransmit_queue;
+        pgm_queue_t			retransmit_queue;
 
-	pgm_rs_t		rs;
-	uint8_t			tg_sqn_shift;
-	struct pgm_sk_buff_t*	parity_buffer;
-	unsigned		is_fec_enabled:1;
+	pgm_rs_t			rs;
+	uint8_t				tg_sqn_shift;
+	struct pgm_sk_buff_t* restrict	parity_buffer;
+	unsigned			is_fec_enabled:1;
 
-	size_t			size;			/* window content size in bytes */
-	unsigned		alloc;			/* length of pdata[] */
+	size_t				size;			/* window content size in bytes */
+	unsigned			alloc;			/* length of pdata[] */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	struct pgm_sk_buff_t*	pdata[];
+	struct pgm_sk_buff_t*		pdata[];
 #elif defined(__cplusplus)
-	struct pgm_sk_buff_t*	pdata[1];
+	struct pgm_sk_buff_t*		pdata[1];
 #else
-	struct pgm_sk_buff_t*   pdata[0];
+	struct pgm_sk_buff_t*   	pdata[0];
 #endif
 };
 
 PGM_GNUC_INTERNAL pgm_txw_t* pgm_txw_create (const pgm_tsi_t*const, const uint16_t, const uint32_t, const unsigned, const ssize_t, const bool, const uint8_t, const uint8_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_txw_shutdown (pgm_txw_t*const);
-PGM_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t*const, struct pgm_sk_buff_t*const);
+PGM_GNUC_INTERNAL void pgm_txw_add (pgm_txw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_peek (const pgm_txw_t*const, const uint32_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_txw_retransmit_push (pgm_txw_t*const, const uint32_t, const bool, const uint8_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_txw_retransmit_try_peek (pgm_txw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_txw_retransmit_remove_head (pgm_txw_t*const);
-PGM_GNUC_INTERNAL uint32_t pgm_txw_get_unfolded_checksum (struct pgm_sk_buff_t*const);
+PGM_GNUC_INTERNAL uint32_t pgm_txw_get_unfolded_checksum (const struct pgm_sk_buff_t*const) PGM_GNUC_PURE;
 PGM_GNUC_INTERNAL void pgm_txw_set_unfolded_checksum (struct pgm_sk_buff_t*const, const uint32_t);
 PGM_GNUC_INTERNAL void pgm_txw_inc_retransmit_count (struct pgm_sk_buff_t*const);
-PGM_GNUC_INTERNAL bool pgm_txw_retransmit_is_empty (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_txw_retransmit_is_empty (const pgm_txw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
 
 /* declare for GCC attributes */
-static inline size_t pgm_txw_max_length (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_txw_length (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline size_t pgm_txw_size (const pgm_txw_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline bool pgm_txw_is_empty (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline bool pgm_txw_is_full (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_txw_lead (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_txw_max_length (const pgm_txw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_length (const pgm_txw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_txw_size (const pgm_txw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_txw_is_empty (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline bool pgm_txw_is_full (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_lead (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
 static inline uint32_t pgm_txw_lead_atomic (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_txw_next_lead (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint32_t pgm_txw_trail (const pgm_txw_t* const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_next_lead (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline uint32_t pgm_txw_trail (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
 static inline uint32_t pgm_txw_trail_atomic (const pgm_txw_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
 
 static inline

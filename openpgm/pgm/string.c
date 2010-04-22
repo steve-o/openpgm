@@ -320,9 +320,9 @@ pgm_string_insert_c (
 static
 pgm_string_t*
 pgm_string_append_len (
-	pgm_string_t*	string,
-	const char*	val,
-	size_t		len
+	pgm_string_t* restrict string,
+	const char*   restrict val,
+	size_t		       len
 	)
 {
 	pgm_return_val_if_fail (NULL != string, NULL);

@@ -61,7 +61,7 @@ enum {
 extern int	pgm_log_mask;
 extern int	pgm_min_log_level;
 
-typedef void (*pgm_log_func_t) (const int, const char*, void*);
+typedef void (*pgm_log_func_t) (const int, const char*restrict, void*restrict);
 
 pgm_log_func_t pgm_log_set_handler (pgm_log_func_t, void*);
 void pgm__log  (const int, const char*, ...) PGM_GNUC_PRINTF (2, 3);

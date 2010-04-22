@@ -41,8 +41,8 @@ void pgm_hashtable_destroy (pgm_hashtable_t*);
 void pgm_hashtable_insert (pgm_hashtable_t*restrict, const void*restrict, void*restrict);
 bool pgm_hashtable_remove (pgm_hashtable_t*restrict, const void*restrict);
 void pgm_hashtable_remove_all (pgm_hashtable_t*);
-void* pgm_hashtable_lookup (pgm_hashtable_t*restrict, const void*restrict);
-void* pgm_hashtable_lookup_extended (pgm_hashtable_t*restrict, const void*restrict, void*restrict);
+void* pgm_hashtable_lookup (const pgm_hashtable_t*restrict, const void*restrict);
+void* pgm_hashtable_lookup_extended (const pgm_hashtable_t*restrict, const void*restrict, void*restrict);
 
 void pgm_hashtable_unref (pgm_hashtable_t*);
 

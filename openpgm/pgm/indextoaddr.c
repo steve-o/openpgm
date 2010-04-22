@@ -33,11 +33,11 @@
 
 bool
 pgm_if_indextoaddr (
-	const unsigned		ifindex,
-	const sa_family_t	iffamily,
-	const uint32_t		ifscope,
-	struct sockaddr*	ifsa,
-	pgm_error_t**		error
+	const unsigned		  ifindex,
+	const sa_family_t	  iffamily,
+	const uint32_t		  ifscope,
+	struct sockaddr* restrict ifsa,
+	pgm_error_t**	 restrict error
         )
 {
 	pgm_return_val_if_fail (NULL != ifsa, FALSE);

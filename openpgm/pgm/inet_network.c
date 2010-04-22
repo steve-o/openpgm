@@ -25,6 +25,10 @@
 
 //#define INET_NETWORK_DEBUG
 
+/* locals */
+
+static uint32_t cidr_to_netmask (const unsigned) PGM_GNUC_CONST;
+
 
 /* calculate IPv4 netmask from network size, returns address in
  * host byte order.
@@ -56,8 +60,8 @@ cidr_to_netmask (
 
 int					/* return type to match inet_network() */
 pgm_inet_network (
-	const char*		s,
-	struct in_addr*		in
+	const char*	restrict s,
+	struct in_addr*	restrict in
 	)
 {
 	pgm_return_val_if_fail (NULL != s,  -1);
@@ -154,8 +158,8 @@ g_debug ("netaddr %s", inet_ntoa (netaddr));
 
 int
 pgm_inet6_network (
-	const char*		s,		/* NULL terminated */
-	struct in6_addr*	in6
+	const char*	 restrict s,		/* NULL terminated */
+	struct in6_addr* restrict in6
 	)
 {
 	pgm_return_val_if_fail (NULL != s,   -1);

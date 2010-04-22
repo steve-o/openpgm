@@ -33,18 +33,18 @@ pgm_slist_t* pgm_histograms = NULL;
 
 
 static void sample_set_accumulate (pgm_sample_set_t*, pgm_sample_t, pgm_count_t, unsigned);
-static pgm_count_t sample_set_total_count (pgm_sample_set_t*);
+static pgm_count_t sample_set_total_count (const pgm_sample_set_t*) PGM_GNUC_PURE;
 
 static void set_bucket_range (pgm_histogram_t*, unsigned, pgm_sample_t);
 static void initialize_bucket_range (pgm_histogram_t*);
-static unsigned bucket_index (pgm_histogram_t*, pgm_sample_t);
+static unsigned bucket_index (const pgm_histogram_t*, const pgm_sample_t);
 static void accumulate (pgm_histogram_t*, pgm_sample_t, pgm_count_t, unsigned);
-static double get_peak_bucket_size (pgm_histogram_t*, pgm_sample_set_t*);
-static double get_bucket_size (pgm_histogram_t*, pgm_count_t, unsigned);
+static double get_peak_bucket_size (const pgm_histogram_t*restrict, const pgm_sample_set_t*restrict);
+static double get_bucket_size (const pgm_histogram_t*, const pgm_count_t, const unsigned);
 
-static void pgm_histogram_write_html_graph (pgm_histogram_t*, pgm_string_t*);
-static void write_ascii (pgm_histogram_t*, const char* newline, pgm_string_t*);
-static void write_ascii_header (pgm_histogram_t*, pgm_sample_set_t*, pgm_count_t, pgm_string_t*);
+static void pgm_histogram_write_html_graph (pgm_histogram_t*restrict, pgm_string_t*restrict);
+static void write_ascii (pgm_histogram_t*restrict, const char*restrict, pgm_string_t*restrict);
+static void write_ascii_header (pgm_histogram_t*restrict, pgm_sample_set_t*restrict, pgm_count_t, pgm_string_t*restrict);
 static void write_ascii_bucket_graph (double, double, pgm_string_t*);
 static void write_ascii_bucket_context (int64_t, pgm_count_t, int64_t, unsigned, pgm_string_t*);
 static void write_ascii_bucket_value (pgm_count_t, double, pgm_string_t*);
@@ -115,7 +115,7 @@ sample_set_accumulate (
 static
 pgm_count_t
 sample_set_total_count (
-	pgm_sample_set_t*	sample_set
+	const pgm_sample_set_t*	sample_set
 	)
 {
 	pgm_count_t total = 0;
@@ -186,8 +186,8 @@ initialize_bucket_range (
 static
 unsigned
 bucket_index (
-	pgm_histogram_t*	histogram,
-	pgm_sample_t		value
+	const pgm_histogram_t*	histogram,
+	const pgm_sample_t	value
 	)
 {
 	pgm_assert (histogram->ranges[0] <= value);
@@ -226,9 +226,9 @@ accumulate (
 static
 void
 write_ascii (
-	pgm_histogram_t*	histogram,
-	const char*		newline,
-	pgm_string_t*		output
+	pgm_histogram_t* restrict histogram,
+	const char*	 restrict newline,
+	pgm_string_t*	 restrict output
 	)
 {
 	pgm_count_t snapshot_counts[ histogram->sample.counts_len ];
@@ -299,10 +299,10 @@ write_ascii (
 static
 void
 write_ascii_header (
-	pgm_histogram_t*	histogram,
-	pgm_sample_set_t*	sample_set,
-	pgm_count_t		sample_count,
-	pgm_string_t*		output
+	pgm_histogram_t*  restrict histogram,
+	pgm_sample_set_t* restrict sample_set,
+	pgm_count_t		   sample_count,
+	pgm_string_t*	  restrict output
 	)
 {
 	pgm_string_append_printf (output,
@@ -370,8 +370,8 @@ write_ascii_bucket_value (
 static
 double
 get_peak_bucket_size (
-	pgm_histogram_t*	histogram,
-	pgm_sample_set_t*	sample_set
+	const pgm_histogram_t*	restrict histogram,
+	const pgm_sample_set_t* restrict sample_set
 	)
 {
 	double max_size = 0;
@@ -386,9 +386,9 @@ get_peak_bucket_size (
 static
 double
 get_bucket_size (
-	pgm_histogram_t*	histogram,
-	pgm_count_t		current,
-	unsigned		i
+	const pgm_histogram_t*	histogram,
+	const pgm_count_t	current,
+	const unsigned		i
 	)
 {
 	pgm_assert (histogram->ranges[ i + 1 ] > histogram->ranges[ i ]);

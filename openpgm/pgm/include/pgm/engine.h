@@ -27,7 +27,7 @@
 PGM_BEGIN_DECLS
 
 bool pgm_init (pgm_error_t**);
-bool pgm_supported (void) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_supported (void) PGM_GNUC_WARN_UNUSED_RESULT PGM_GNUC_PURE;
 bool pgm_shutdown (void);
 void pgm_drop_superuser (void);
 

@@ -22,6 +22,18 @@
 #include <pgm/framework.h>
 
 
+/* locals */
+
+static inline uint16_t do_csum (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+static uint16_t do_csum_8bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+static uint16_t do_csum_16bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+static uint16_t do_csum_32bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#if defined(__amd64) || defined(__x86_64__)
+static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#endif
+
+
 /* endian independent checksum routine
  */
 
@@ -191,7 +203,7 @@ uint16_t
 do_csum_64bit (
 	const void*	addr,
 	uint16_t	len,
-	int		csum
+	uint32_t	csum
 	)
 {
 	uint_fast64_t acc;

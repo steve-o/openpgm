@@ -31,6 +31,10 @@
 
 /* locals */
 
+static void _pgm_md5_process_block (struct pgm_md5_t*restrict, const void*restrict, size_t);
+static void* _pgm_md5_read_ctx (const struct pgm_md5_t*, void*restrict);
+
+
 /* This array contains the bytes used to pad the buffer to the next
  * 64-byte boundary.  (RFC 1321, 3.1: Step 1)  */
 static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
@@ -78,9 +82,9 @@ pgm_md5_init_ctx (
 static
 void
 _pgm_md5_process_block (
-	struct pgm_md5_t*	ctx,
-	const void*		buffer,
-	size_t			len
+	struct pgm_md5_t* restrict ctx,
+	const void*	  restrict buffer,
+	size_t			   len
 	)
 {
 /* pre-conditions */
@@ -243,9 +247,9 @@ _pgm_md5_process_block (
 
 void
 pgm_md5_process_bytes (
-	struct pgm_md5_t*	ctx,
-	const void*		buffer,
-	size_t			len
+	struct pgm_md5_t* restrict ctx,
+	const void*	  restrict buffer,
+	size_t			   len
 	)
 {
 /* pre-conditions */
@@ -306,8 +310,8 @@ pgm_md5_process_bytes (
 static
 void*
 _pgm_md5_read_ctx (
-	const struct pgm_md5_t*	ctx,
-	void*			resbuf
+	const struct pgm_md5_t* restrict ctx,
+	void*			restrict resbuf
 	)
 {
 /* pre-conditions */
@@ -330,8 +334,8 @@ _pgm_md5_read_ctx (
 
 void*
 pgm_md5_finish_ctx (
-	struct pgm_md5_t*	ctx,
-	void*			resbuf
+	struct pgm_md5_t* restrict ctx,
+	void*		  restrict resbuf
 	)
 {
 /* pre-conditions */

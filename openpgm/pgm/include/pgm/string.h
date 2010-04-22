@@ -41,7 +41,7 @@ typedef struct pgm_string_t pgm_string_t;
 
 char* pgm_strdup (const char*) PGM_GNUC_MALLOC;
 int pgm_printf_string_upper_bound (const char*, va_list) PGM_GNUC_PRINTF(1, 0);
-int pgm_vasprintf (char**, char const*, va_list args) PGM_GNUC_PRINTF(2, 0);
+int pgm_vasprintf (char**restrict, char const*restrict, va_list args) PGM_GNUC_PRINTF(2, 0);
 char* pgm_strdup_vprintf (const char*, va_list) PGM_GNUC_PRINTF(1, 0) PGM_GNUC_MALLOC;
 char* pgm_strconcat (const char*, ...) PGM_GNUC_MALLOC PGM_GNUC_NULL_TERMINATED;
 char** pgm_strsplit (const char*restrict, const char*restrict, int) PGM_GNUC_MALLOC;

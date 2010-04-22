@@ -49,6 +49,8 @@ static pgm_mutex_t		messages_mutex;
 static pgm_log_func_t		log_handler = NULL;
 static void*			log_handler_closure = NULL;
 
+static inline const char* log_level_text (const int) PGM_GNUC_PURE;
+
 
 static inline
 const char*
