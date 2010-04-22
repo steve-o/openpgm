@@ -7,7 +7,7 @@ This section presents important general information for programmers using OpenPG
 === Topics ===
   * [OpenPgm3CReferenceBuildLibrary Build Library]
   * [OpenPgm3CReferenceProgrammingEnvironment Programming Environment]
-  * [OpenPgmCReferenceIncludeTheseHeaderFiles Include these Header Files]
+  * [OpenPgm3CReferenceIncludeTheseHeaderFiles Include these Header Files]
   * [OpenPgm3CReferenceSetTheseParameters Set these Parameters]
-  * [OpenPgmCReferenceLinkTheseLibraryFiles Link these Library Files]
+  * [OpenPgm3CReferenceLinkTheseLibraryFiles Link these Library Files]
   * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]
