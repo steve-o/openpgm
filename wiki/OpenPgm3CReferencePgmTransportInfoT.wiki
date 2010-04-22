@@ -1,0 +1,35 @@
+#summary OpenPGM 3 : C Reference : Interface : struct pgm_transport_info_t
+#labels Phase-Implementation
+#sidebar TOC3CReferenceInterface
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_transport_info_t *pgm_transport_info_t*;
+
+struct pgm_transport_info_t {
+	[OpenPgm3CReferencePgmGsiT pgm_gsi_t]                    ti_gsi;
+	int                          ti_flags;
+	int                          ti_family;
+	int                          ti_udp_encap_ucast_port;
+	int                          ti_udp_encap_mcast_port;
+	int                          ti_sport;
+	int                          ti_dport;
+	size_t                        ti_recv_addrs_len;
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_recv_addrs;
+	size_t                        ti_send_addrs_len;
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_send_addrs;
+	};
+</pre>
+
+=== Purpose ===
+A transport object represents network definition of a transport.
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmGsiT pgm_gsi_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * [OpenPgm3CReferenceInterface Interface] in OpenPGM C Reference.<br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

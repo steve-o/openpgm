@@ -1,0 +1,40 @@
+#summary OpenPGM 3 : C Reference : Timing : pgm_time_t
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTiming
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+typedef uint64_t *pgm_time_t*;
+
+#defined PGM_TIME_FORMAT PRIu64
+</pre>
+
+=== Purpose ===
+Time value data type.
+
+=== Remarks ===
+Depending on the runtime configuration <tt>pgm_time_t</tt> values may be absolute of offset to a particular time such as startup of the active core.  In order to calculate absolute time use <tt>pgm_time_since_epoch()</tt>.
+
+=== Example ===
+Display literal time value.
+{{{
+ pgm_time_t a_time;
+ printf ("a_time is %" PGM_TIME_FORMAT "\n", a_time);
+}}}
+Display absolute local time.
+{{{
+ pgm_time_t a_time;
+ time_t epoch_time;
+ struct tm local_time;
+ char outstr[1024];
+ pgm_time_since_epoch (&a_time, &epoch_time);
+ localtime_r (&epoch_time, &local_time);
+ strftime (outstr, sizeof(outstr), "%T", &local_time);
+ printf ("a_time is %s\n", outstr);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTimeSinceEpoch pgm_time_since_epoch()]</tt><br>
+  * [OpenPgm3CReferenceTiming Timing] in OpenPGM C Reference.
