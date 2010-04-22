@@ -1,0 +1,49 @@
+﻿#summary OpenPGM 3 : C Reference : PGM SKBs : struct pgm_sk_buff_t
+#labels Phase-Implementation
+#sidebar TOC3CReferencePgmSkbs
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_sk_buff_t {
+	pgm_list_t                        link_;
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`             transport;
+	[OpenPgm3CReferencePgmTimeT pgm_time_t]                   tstamp;
+	[OpenPgm3CReferencePgmTsiT pgm_tsi_t]                    tsi;
+	uint32_t                      sequence;
+	uint32_t                      __padding;
+	char                         cb`[`48`]`;
+	uint16_t                      len;
+	unsigned                     zero_padded:1;
+	struct pgm_header`*`           pgm_header;
+	struct pgm_opt_fragment`*`     pgm_opt_fragment;
+#define of_apdu_first_sqn               pgm_opt_fragment->opt_sqn
+#define of_frag_offset                  pgm_opt_fragment->opt_frag_off
+#define of_apdu_len                     pgm_opt_fragment->opt_frag_len
+	struct pgm_data`*`             pgm_data;
+	void`*`                     head;
+	void`*`                     data;
+	void`*`                     tail;
+	void`*`                     end;
+	size_t                        truesize;
+	uint32_t                         users;
+	};
+</pre>
+
+=== Purpose ===
+Object representing a PGM socket buffer.
+
+
+=== Remarks ===
+Incoming SKBs are tagged after the call to <tt>recvmsg</tt> or <tt>WSARecvMsg</tt> completes, incurring an inaccuracy due to propagation delays and scheduling.
+
+Whilst [http://lwn.net/Articles/325929/ kernel timestamping] mechanisms exist they are system specific.  Not all NICs support hardware timestamping, there are no guarantees that the NIC clock is monotonic, or even functions correctly at all and hence the extended API for software stamping fallback if the NIC failed.  The NIC clock need not be related to real time or core startup time, for instance it could be an offset to when the NIC processor started.  As the clock offset and resolution is likely to be incompatible to what is used for state timekeeping within OpenPGM this feature is not currently used.
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmAllocSkb pgm_free_skb()]</tt><br>
+  * [OpenPgm3CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.
