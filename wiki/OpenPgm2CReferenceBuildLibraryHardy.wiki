@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : Ubuntu 8.04 through 8.10
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building on Ubuntu 8.04 or 8.10 ===
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>

@@ -1,0 +1,23 @@
+#summary OpenPGM 3 : C Reference : Transport : pgm_transport_t
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_transport_t *pgm_transport_t*;
+</pre>
+
+=== Purpose ===
+A transport object represents a delivery mechanism for messages.
+
+=== Remarks ===
+A transport describes a carrier mechanism for messages across a network.
+
+Programs must explicitly destroy each transport object. Destroying a transport object invalidates subsequent send calls on that transport, invalidates any listeners using that transport, and frees its storage.
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportDestroy pgm_transport_destroy()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

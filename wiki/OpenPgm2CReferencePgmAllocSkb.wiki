@@ -1,4 +1,4 @@
-#summary OpenPGM 2 : C Reference : pgm_alloc_skb()
+#summary OpenPGM 2 : C Reference : PGM SKBs : pgm_alloc_skb()
 #labels Phase-Implementation
 #sidebar TOC2CReferencePgmSkbs
 

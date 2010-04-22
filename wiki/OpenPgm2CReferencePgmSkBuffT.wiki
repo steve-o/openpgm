@@ -1,7 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : struct pgm_sk_buff_t
+﻿#summary OpenPGM 2 : C Reference : PGM SKBs : struct pgm_sk_buff_t
 #labels Phase-Implementation
 #sidebar TOC2CReferencePgmSkbs
-
 _Type_
 === Declaration ===
 <pre>

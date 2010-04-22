@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : RHEL 5
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 == Building for RHEL 5 or CentOS 5 ==
 First install the C compiler dependencies.
 <pre>

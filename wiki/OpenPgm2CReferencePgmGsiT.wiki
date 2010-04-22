@@ -1,10 +1,13 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_gsi_t
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_gsi_t
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Type_
 === Declaration ===
 <pre>
 #include <pgm/pgm.h>
+
+/`*` maximum length of GSI as a string `*`/
+#define PGM_GSISTRLEN   (sizeof("000.000.000.000.000.000"))
 
 typedef struct pgm_gsi_t *pgm_gsi_t*;
 

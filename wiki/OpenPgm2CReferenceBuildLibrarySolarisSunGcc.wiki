@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : Sun GCC 3.4.3 on Solaris (32-bit)
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building with Sun GCC 3.4.3 for Solaris 10 SPARC ===
 First install all the C compiler dependencies, <tt>sudo</tt> and SCons.  GCC and <tt>sudo</tt> are included on the Solaris 10 Companion Software CD and <tt>sudo</tt> needs to be set setuid root and configured with <tt>visudo</tt>.  Scons must be installed with the default Python and not <tt>/usr/sfw/bin/python</tt>.
 
@@ -59,3 +59,41 @@ The dynamic GLib libraries require an extra step for testing, for example,
 <pre>
  $ sudo LD_LIBRARY_PATH=/opt/glib-gcc/lib:$LD_LIBRARY_PATH ./ref/release/pgmrecv
 </pre>
+
+==== Performance Testing ====
+Emulating a real world application, <tt>pgmping</tt>, the performance test utility is in C++
+and uses Protocol Buffers for the messaging layer.  Download and build with the GNU
+toolchain.
+<pre>
+ $ /usr/sfw/bin/wget http://protobuf.googlecode.com/files/protobuf-2.1.0.tar.gz
+ $ gzcat protobuf-2.1.0.tar.gz | tar xvf -
+ $ cd protobuf-2.1.0
+ $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/sfw/bin:$PATH \
+./configure --prefix=/opt/glib-gcc
+ $ PATH=/usr/sfw/bin:$PATH gmake
+ $ /opt/sfw/bin/sudo PATH=/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+</pre>
+The build environment needs to be updated with the location of the Protocol Buffers
+installation.
+<pre>
+PROTOBUF_CCFLAGS = '-I/opt/glib-gcc/include',
+PROTOBUF_LIBS    = '/opt/glib-gcc/lib/libprotobuf.a',
+PROTOBUF_PROTOC  = '/opt/glib-gcc/bin/protoc'
+</pre>
+Finally build the utility, noting that <tt>pgmping</tt> also depends upon GLib.
+<pre>
+ $ scons -f SConstruct.Solaris.sungcc BUILD=release WITH_PROTOBUF=true
+</pre>
+Run a PGM reflection server,
+<pre>
+ $ sudo LD_LIBRARY_PATH=/opt/glib-gcc/lib:$LD_LIBRARY_PATH \
+./ref/release/examples/pgmping \
+-n "eri0;239.192.0.1" -p 3065 -e
+</pre>
+and run a PGM client,
+<pre>
+ $ sudo LD_LIBRARY_PATH=/opt/glib-gcc/lib:$LD_LIBRARY_PATH \
+./ref/release/examples/pgmping \
+-n "eri0;239.192.0.1" -p 3065 -m 100
+</pre>
+

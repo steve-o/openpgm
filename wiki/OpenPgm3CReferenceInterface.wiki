@@ -1,0 +1,27 @@
+#summary OpenPGM 3 : C Reference : Interface
+#labels Phase-Implementation
+#sidebar TOC3CReferenceInterface
+=== Introduction ===
+Parsing network declarations into transport parameters.
+
+=== Topics in Alphabetical Order ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td colspan="2"><h3>Interface API</h3></td>
+</tr><tr>
+<td><tt>struct [OpenPgm3CReferencePgmTransportInfoT pgm_transport_info_t]</tt></td>
+<td>Structure detailing transport network parameters.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]</tt></td>
+<td>Decompose a string network specification into a transport definition.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]</tt></td>
+<td>Free memory used by a <tt>pgm_transport_info_t</tt> structure.</td>
+</tr>
+</table>
+

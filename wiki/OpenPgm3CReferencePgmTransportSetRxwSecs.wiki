@@ -1,0 +1,49 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_set_rxw_secs()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_set_rxw_secs* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	unsigned                secs
+	);
+</pre>
+
+=== Purpose ===
+Set receive window size in seconds.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>secs</tt></td>
+<td>Size of window in seconds.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
+
+=== Example ===
+Create a 10 second receive window with maximum data rate of 400,000 packets per second.
+
+{{{
+ pgm_transport_set_rxw_max_rte (transport, 400*1000);
+ *pgm_transport_set_rxw_secs* (transport, 10);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

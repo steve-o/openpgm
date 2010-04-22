@@ -1,0 +1,10 @@
+  * C Reference for OpenPGM version 2
+  * [OpenPgm2CReference Contents]
+  * [OpenPgm2CReferenceEnvironment Environment]
+    * [OpenPgm2CReferencePgmInit pgm_init()]
+    * [OpenPgm2CReferencePgmSupported pgm_supported()]
+    * [OpenPgm2CReferencePgmDropSuperUser pgm_drop_superuser()]
+    * [OpenPgm2CReferencePgmShutdown pgm_shutdown()]
+    * [OpenPgm2CReferencePgmCheckVersion pgm_major_version]
+    * [OpenPgm2CReferencePgmCheckVersion pgm_minor_version]
+    * [OpenPgm2CReferencePgmCheckVersion pgm_micro_version]

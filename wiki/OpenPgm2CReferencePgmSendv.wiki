@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_sendv()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_sendv()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>

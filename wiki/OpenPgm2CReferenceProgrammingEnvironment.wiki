@@ -1,7 +1,6 @@
 ﻿#summary OpenPGM 2 C Reference : Programming Environment
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceProgrammersChecklist
 When developing or deploying OpenPGM programs, remember these steps.
 
 === Code ===

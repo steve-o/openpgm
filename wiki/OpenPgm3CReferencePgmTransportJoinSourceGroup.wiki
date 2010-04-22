@@ -1,0 +1,66 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_join_source_group()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_join_source_group* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`            transport,
+	struct group_source_req`*`     gsr,
+	size_t                        len
+);
+
+bool *pgm_transport_leave_source_group* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`            transport,
+	struct group_source_req`*`     gsr,
+	size_t                        len
+);
+</pre>
+
+=== Purpose ===
+The <tt>pgm_transport_join_source_group</tt> function joins a multicast source/group pair.
+
+The <tt>pgm_transport_leave_source_group</tt> function leaves a previously joined multicast source/group pair.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>gsr</tt></td>
+<td>Multicast group and source with optional interface.</td>
+</tr><tr>
+<td><tt>len</tt></td>
+<td>Length of <tt>gr</tt> in bytes.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, <tt>true</tt> is returned.  On error, <tt>false</tt> is returned.
+
+=== Example ===
+Add group 239.192.0.2 from source 192.168.9.1 on default interface to transport.
+
+{{{
+ struct group_source_req gsr;
+ memset (&sgr, 0, sizeof(gsr));
+ ((struct sockaddr*)&gsr)->gsr_group.sa_family = AF_INET;
+ ((struct sockaddr_in*)&gsr)->gsr_group.sin_addr.s_addr = inet_addr("239.192.0.2");
+ ((struct sockaddr*)&gsr)->gsr_source.sa_family = AF_INET;
+ ((struct sockaddr_in*)&gsr)->gsr_source.sin_addr.s_addr = inet_addr("192.168.9.1");
+ pgm_transport_join_source_group (transport, &gsr, sizeof(gsr));
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportJoinGroup pgm_transport_join_group()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportBlockSource pgm_transport_block_source()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

@@ -1,0 +1,97 @@
+﻿#summary OpenPGM 3 : C Reference : Build Library : Sun GCC 3.4.3 on Solaris (32-bit)
+#labels Phase-Implementation
+#sidebar TOC3CReferenceProgrammersChecklist
+=== Building with Sun GCC 3.4.3 for Solaris 10 SPARC ===
+First install all the C compiler dependencies, <tt>sudo</tt> and SCons.  GCC and <tt>sudo</tt> are included on the Solaris 10 Companion Software CD and <tt>sudo</tt> needs to be set setuid root and configured with <tt>visudo</tt>.  Scons must be installed with the default Python and not <tt>/usr/sfw/bin/python</tt>.
+
+Note that the provided Sun GCC cannot build 64-bit binaries.
+
+For convenience some executables are symlinked into the path.
+<pre>
+ $ su -
+ # cd /usr/bin
+ # chmod +s /usr/sfw/bin/sudo
+ # ln -s /usr/sfw/bin/sudo
+</pre>
+Scons must be downloaded from http://sourceforge.net/projects/scons/files/
+<pre>
+ $ /usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download 
+ $ gzcat scons-1.2.0.tar.gz | tar xvf -
+ $ cd scons-1.2.0
+ $ sudo python setup.py install
+</pre>
+Optionally, install the library dependencies, primarily GLib and pkg-config, this tutorial install everything into <tt>/opt/glib-gcc</tt>.  <tt>pkg-config</tt> is a binary and doesn't need to be specially built for v9 architecture.
+<pre>
+ $ /usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz 
+ $ gzcat pkg-config-0.23.tar.gz | tar xvf -
+ $ cd pkg-config-0.23
+ $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/sfw/bin:$PATH \
+./configure --with-installed-glib --prefix=/opt/glib-gcc
+ $ PATH=/usr/sfw/bin:$PATH gmake
+ $ /opt/sfw/bin/sudo PATH=/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+ $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' \
+LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-gcc/bin:/usr/sfw/bin:$PATH \
+./configure --prefix=/opt/glib-gcc
+ $ PATH=/usr/sfw/bin:$PATH gmake
+ $ /opt/sfw/bin/sudo PATH=/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+</pre>
+If you have subversion installed (requires a significant amount of dependencies), checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide], otherwise download the latest tarball.
+<pre>
+ $ /usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-3.0.43.tar.gz 
+ $ gzcat libpgm-3.0.43.tar.gz | xvf -
+</pre>
+Build.
+<pre>
+ $ cd release-3.0.43/openpgm/pgm 
+ $ scons -f SConstruct.Solaris.sungcc WITH_GLIB=true
+</pre>
+By default SCons is configured to build a debug tree in <tt>./ref/debug-SunOS-sun4u-sungcc</tt>.
+
+To build the release version in <tt>./ref/release-SunOS-sun4u-sungcc</tt> use the following:
+<pre>
+ $ scons -f SConstruct.Solaris.sungcc BUILD=release WITH_GLIB=true
+</pre>
+
+==== Testing ====
+The dynamic GLib libraries require an extra step for testing, for example,
+<pre>
+ $ sudo LD_LIBRARY_PATH=/opt/glib-gcc/lib:$LD_LIBRARY_PATH ./ref/release-SunOS-sun4u-sungcc/pgmrecv
+</pre>
+
+==== Performance Testing ====
+Emulating a real world application, <tt>pgmping</tt>, the performance test utility is in C++
+and uses Protocol Buffers for the messaging layer.  Download and build with the GNU
+toolchain.
+<pre>
+ $ /usr/sfw/bin/wget http://protobuf.googlecode.com/files/protobuf-2.1.0.tar.gz
+ $ gzcat protobuf-2.1.0.tar.gz | tar xvf -
+ $ cd protobuf-2.1.0
+ $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/sfw/bin:$PATH \
+./configure --prefix=/opt/glib-gcc
+ $ PATH=/usr/sfw/bin:$PATH gmake
+ $ /opt/sfw/bin/sudo PATH=/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+</pre>
+The build environment needs to be updated with the location of the Protocol Buffers
+installation.
+<pre>
+PROTOBUF_CCFLAGS = '-I/opt/glib-gcc/include',
+PROTOBUF_LIBS    = '/opt/glib-gcc/lib/libprotobuf.a',
+PROTOBUF_PROTOC  = '/opt/glib-gcc/bin/protoc'
+</pre>
+Finally build the utility, noting that <tt>pgmping</tt> also depends upon GLib.
+<pre>
+ $ scons -f SConstruct.Solaris.sungcc BUILD=release WITH_GLIB=true WITH_PROTOBUF=true
+</pre>
+Run a PGM reflection server,
+<pre>
+ $ sudo LD_LIBRARY_PATH=/opt/glib-gcc/lib:$LD_LIBRARY_PATH \
+./ref/release-SunOS-sun4u-sungcc/examples/pgmping \
+-n "eri0;239.192.0.1" -p 3065 -e
+</pre>
+and run a PGM client,
+<pre>
+ $ sudo LD_LIBRARY_PATH=/opt/glib-gcc/lib:$LD_LIBRARY_PATH \
+./ref/release-SunOS-sun4u-sungcc/examples/pgmping \
+-n "eri0;239.192.0.1" -p 3065 -m 100
+</pre>
+

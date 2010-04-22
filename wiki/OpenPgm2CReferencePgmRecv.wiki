@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_recv()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_recv()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>

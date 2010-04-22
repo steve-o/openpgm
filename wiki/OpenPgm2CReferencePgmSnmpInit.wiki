@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_snmp_init()
+﻿#summary OpenPGM 2 : C Reference : Monitoring and Administration : pgm_snmp_init()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceMonitoringAndAdministration
 _Function_
 === Declaration ===
 <pre>

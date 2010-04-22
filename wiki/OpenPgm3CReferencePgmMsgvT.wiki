@@ -1,0 +1,30 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_msgv_t
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+#define PGM_MAX_FRAGMENTS 16
+
+typedef struct pgm_msgv_t pgm_msgv_t;
+
+struct pgm_msgv_t {
+	size_t                msgv_len;                        /`*` number of elements in msgv_skb `*`/
+	struct [OpenPgm3CReferencePgmSkBuffT pgm_sk_buff_t]`*` msgv_skb`[`PGM_MAX_FRAGMENTS`]`;     /`*` PGM socket buffer array `*`/
+};
+</pre>
+
+=== Purpose ===
+A scatter/gather message vector^2^.
+
+=== Remarks ===
+Received messages from a transport can be a populated scatter/gather vector. APDU arrays are owned by the transport object, and the TPDU buffers are owned by the receive window and both will be recycled on the next call.
+
+=== See Also ===
+  * <tt>struct [OpenPgm3CReferencePgmSkBuffT pgm_sk_buff_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmRecv pgm_recvmsg()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmRecvMsgv pgm_recvmsgv()]</tt><br>
+  * [OpenPgm3CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.<br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

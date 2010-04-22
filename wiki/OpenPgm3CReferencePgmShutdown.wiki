@@ -1,0 +1,21 @@
+#summary OpenPGM 3 : C Reference : Environment : pgm_shutdown()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceEnvironment
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_shutdown* (void);
+</pre>
+
+=== Purpose ===
+Shutdown OpenPGM internal machinery.
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On failure, returns <tt>false</tt>.
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmSupported pgm_supported()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt><br>
+  * [OpenPgm3CReferenceEnvironment Environment] in OpenPGM C Reference.

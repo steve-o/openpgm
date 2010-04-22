@@ -1,6 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_eventfn_t
+#summary OpenPGM 2 : C Reference : Asychronous Receiver : pgm_eventfn_t
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceAsynchronousReceiver
 _Type_
 === Declaration ===
 <pre>

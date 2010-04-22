@@ -1,7 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_check_version()
+#summary OpenPGM 2 : C Reference : Environment : pgm_check_version()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceEnvironment
 _Function_
 === Declaration ===
 <pre>
@@ -10,6 +9,10 @@ _Function_
 extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_major_version*;
 extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_minor_version*;
 extern const [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#guint guint] *pgm_micro_version*;
+extern const char`*` *pgm_build_date*;
+extern const char`*` *pgm_build_time*;
+extern const char`*` *pgm_build_platform*;
+extern const char`*` *pgm_build_revision*;
 </pre>
 
 === Purpose ===

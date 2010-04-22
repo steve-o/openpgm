@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_gsi_create_from_hostname()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_gsi_create_from_hostname()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>

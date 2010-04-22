@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : Microsoft Windows (32-bit)
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building for 32-bit Microsoft Windows ===
 Microsoft Windows is supported by cross-compiling on Ubuntu 9.04 through 10.04 with MinGW.  MSVC9 (C89) is not supported for building OpenPGM however you may build your application and link to a MinGW built OpenPGM library.
 

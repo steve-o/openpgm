@@ -1,0 +1,69 @@
+﻿#summary OpenPGM 3 : C Reference : Build Library
+#labels Phase-Implementation
+#sidebar TOC3CReferenceProgrammersChecklist
+=== Introduction ===
+There are currently no official releases or pre-built packages in any distributions.  The OpenPGM library must be built from source taken from the projects subversion repository or from a downloaded tarball.
+
+
+=== Supported Platforms ===
+  * [OpenPgm3CReferenceBuildLibraryKarmic GCC 4.2.4-4.4.3] on Ubuntu 9.04 through 10.04
+  * [OpenPgm3CReferenceBuildLibraryClang Clang 2.7] on Ubuntu 10.04
+  * [OpenPgm3CReferenceBuildLibrarySolarisSunGcc GCC 3.4.3] on Solaris 10 on SPARC (32-bit), supplied on Solaris 10 Companion Software CD
+  * [OpenPgm3CReferenceBuildLibrarySolarisGcc64 GCC 3.4.6] on Solaris 10 on SPARC (64-bit)
+  * [OpenPgm3CReferenceBuildLibrarySolarisSunStudio Sun Studio 12u1] on Solaris 10 on SPARC (64-bit)
+
+
+=== PGM Testing ===
+Two hosts are required for full PGM protocol testing, one to send the other to receive.  In this example <tt>ayaka</tt> is the sending host and <tt>kiku</tt> is receiving.
+
+On the receiving host run the OpenPGM receiver.
+<pre>
+ kiku$ sudo ./ref/debug/examples/pgmrecv 
+ `*``*` Message: pgmrecv
+ 2008-05-27 18:02:53 kiku: scheduling startup.
+ 2008-05-27 18:02:53 kiku: entering main event loop ... 
+ 2008-05-27 18:02:53 kiku: startup.
+ 2008-05-27 18:02:53 kiku: create transport.
+ 2008-05-27 18:02:53 kiku: startup complete.
+</pre>
+On the sending host run the OpenPGM publisher.
+<pre>
+ ayaka$ sudo ./ref/debug/examples/pgmsend mooooo baa
+</pre>
+Then on the receiver you should see the test messages.
+<pre>
+ 2008-05-27 18:03:25 kiku: (7 bytes)
+ 2008-05-27 18:03:25 kiku: 	1: "mooooo" (7 bytes)
+ 2008-05-27 18:03:25 kiku: (4 bytes)
+ 2008-05-27 18:03:25 kiku: 	1: "baa" (4 bytes)
+</pre>
+Without explicit network parameter passing OpenPGM will assume the default adapter and either IPv4 or IPv6 addressing.  If your operating system defaults to DHCP it is possible that the nodename of the host resolves to localhost and not a real adapter, it is then necessary to explicitly set the adapter name.  Similarly you might have problems with IPv6 auto-configuration and multiple scopes per adapter.  So on a default !OpenSolaris install you might wish to try the following:
+<pre>
+ opensolaris$ sudo ./ref/debug/examples/pgmsend -n "pcn0;239.192.0.1" ichigo milk 
+</pre>
+
+=== PGM Testing on Multicast Loopback ===
+
+For multicast loopback testing using only one host requires use of a low-resolution timing mechanism as the <tt>/dev/rtc</tt> real-time clock device cannot be shared.  The example <tt>pgmrecv</tt> and <tt>pgmsend</tt> applications have convenience parameters to automagically enable this configuration.  For this demonstration we will also use UDP encapsulation of the PGM protocol so as not to require any extra system privileges.  On one terminal start a receiver.
+<pre>
+ aiko$ ./ref/debug/examples/pgmrecv -lp 3065
+ `*``*` Message: pgmrecv
+ 2008-11-19 17:59:05 aiko: setting low resolution timers for multicast loopback.
+ 2008-11-19 17:59:05 aiko: scheduling startup.
+ 2008-11-19 17:59:05 aiko: entering main event loop ... 
+ 2008-11-19 17:59:05 aiko: startup.
+ 2008-11-19 17:59:05 aiko: create transport.
+ 2008-11-19 17:59:05 aiko: startup complete.
+</pre>
+In another terminal send some test messages:
+<pre>
+ $ ./ref/debug/examples/pgmsend -lp 3065 mooo baa
+ 2008-11-19 17:59:18 aiko: setting low resolution timers for multicast loopback.
+</pre>
+In the receiving terminal you should see the correct receipt of two messages.
+<pre>
+ 2008-11-19 17:59:18 aiko: (5 bytes)
+ 2008-11-19 17:59:18 aiko: 	1: "mooo" (5 bytes)
+ 2008-11-19 17:59:18 aiko: (4 bytes)
+ 2008-11-19 17:59:18 aiko: 	1: "baa" (4 bytes)
+</pre>

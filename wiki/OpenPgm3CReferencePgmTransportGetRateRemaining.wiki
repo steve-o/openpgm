@@ -1,0 +1,60 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_get_rate_remaining()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_get_rate_remaining* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	struct timeval`*`           tv
+);
+</pre>
+
+=== Purpose ===
+Get remaining time slice of the send rate limit engine.
+
+=== Remarks ===
+A transport set as non-blocking with <tt>[OpenPgm3CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> will return <tt>PGM_IO_STATUS_RATE_LIMITED</tt> on calls to <tt>[OpenPgm3CReferencePgmRecv pgm_recv()]</tt> and <tt>[OpenPgm3CReferencePgmSend pgm_send()]</tt> that would block due to the rate limit engine.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>tv</tt></td>
+<td>Pointer to store time remaining.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
+
+=== Example ===
+
+{{{
+  char* s = "hello world!";
+  size_t len = strlen (s) + 1;
+  int status;
+ again:
+   status = pgm_send (transport, s, len, NULL);
+   if (PGM_IO_STATUS_RATE_LIMITED == status) {
+     struct timeval tv;
+     pgm_transport_get_rate_remaining (transport, &tv);
+     usleep ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+     goto again;
+   }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmIoStatus PGMIOStatus]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmSend pgm_send()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_async_set_nonblocking()
+﻿#summary OpenPGM 2 : C Reference : Asynchronous Receiver : pgm_async_set_nonblocking()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceAsynchronousReceiver
 _Function_
 === Declaration ===
 <pre>

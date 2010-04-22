@@ -1,7 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_init()
+#summary OpenPGM 2 : C Reference : Environment : pgm_init()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceEnvionment
 _Function_
 === Declaration ===
 <pre>
@@ -22,7 +21,7 @@ This call creates the internal machinery that OpenPGM requires for its operation
  
 Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports are unusable.
 
-<tt>pgm_init()</tt> might only be called once. On the second call it will abort with an error. If you want to make sure that the thread system is initialized, you can do this:
+<tt>pgm_init()</tt> might only be called once. On the second call it will abort with an error. If you want to make sure that the PGM engine is initialized, you can do this:
 
 {{{
  if (!pgm_supported ()) pgm_init (NULL);

@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : Sun Studio 12u1 on Ubuntu
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building with Sun Studio 12u1 for Ubuntu 8.04 or 8.10 ===
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>

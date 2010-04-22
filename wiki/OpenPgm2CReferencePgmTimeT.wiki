@@ -1,6 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_time_t
+#summary OpenPGM 2 : C Reference : Timing : pgm_time_t
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTiming
 _Type_
 === Declaration ===
 <pre>

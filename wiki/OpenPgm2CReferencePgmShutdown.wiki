@@ -1,7 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_shutdown()
+#summary OpenPGM 2 : C Reference : Environment : pgm_shutdown()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceEnvironment
 _Function_
 === Declaration ===
 <pre>

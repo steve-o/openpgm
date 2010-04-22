@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Migration
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceMigration
 == Environment ==
 === Summary ===
   * Add [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError] parameter to <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt>.

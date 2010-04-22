@@ -1,6 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_http_shutdown()
+#summary OpenPGM 2 : C Reference : Monitoring and Administration : pgm_http_shutdown()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceMonitoringAndAdministration
 _Function_
 === Declaration ===
 <pre>

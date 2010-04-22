@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Introduction ===
 There are currently no official releases or pre-built packages in any distributions.  The OpenPGM library must be built from source taken from the projects subversion repository or from a downloaded tarball.
 

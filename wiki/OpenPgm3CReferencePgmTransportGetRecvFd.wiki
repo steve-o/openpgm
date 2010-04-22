@@ -1,0 +1,51 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_get_recv_fd()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+int *pgm_transport_get_recv_fd* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport
+);
+
+int *pgm_transport_get_pending_fd* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport
+);
+
+int *pgm_transport_get_repair_fd* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport
+);
+
+int *pgm_transport_get_send_fd* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport
+);
+</pre>
+
+=== Purpose ===
+Get event notification file descriptors.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, returns requested file descriptor.
+
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmSelectInfo pgm_transport_select_info()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmPollInfo pgm_transport_poll_info()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmEpollCtl pgm_transport_epoll_ctl()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

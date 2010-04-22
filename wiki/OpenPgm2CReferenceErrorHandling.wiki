@@ -1,6 +1,6 @@
 #summary OpenPGM 2 : C Reference : Error Handling
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceErrorHandling
 === Introduction ===
 Warnings and errors in OpenPGM maybe raised via log messages or return status values.
 
@@ -30,9 +30,9 @@ Log messages can be redirected using [http://library.gnome.org/devel/glib/stable
 {{{
  static void
  log_handler (
-        const gchar*      log_domain,
+        const gchar`*`      log_domain,
         GLogLevelFlags    log_level,
-        const gchar*      message,
+        const gchar`*`      message,
         gpointer          unused_data
         )
  {

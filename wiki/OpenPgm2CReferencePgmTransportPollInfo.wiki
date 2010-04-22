@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_transport_poll_info()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_transport_poll_info()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>

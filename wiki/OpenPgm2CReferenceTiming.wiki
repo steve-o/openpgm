@@ -1,6 +1,6 @@
 #summary OpenPGM 2 : C Reference : Timing
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceTiming
 === Introduction ===
 Functionality for high resolution timing, sleeping, and delays.
 

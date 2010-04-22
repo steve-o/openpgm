@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : OpenSolaris 2008.11 or 2009.06
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building for !OpenSolaris 2008.11 or 2009.06 ===
 First install all the C compiler dependencies and Subversion.  Install the library dependencies, primarily GLib.
 <pre>

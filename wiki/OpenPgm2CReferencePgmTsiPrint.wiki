@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_tsi_print()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_tsi_print()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>
@@ -12,7 +12,7 @@ _Function_
 	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi
 	);
 
-[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_tsi_print_r* (
+int`*` *pgm_tsi_print_r* (
 	const [OpenPgm2CReferencePgmTsiT pgm_tsi_t]`*`    tsi,
 	char`*`               buf,
 	size_t              bufsize

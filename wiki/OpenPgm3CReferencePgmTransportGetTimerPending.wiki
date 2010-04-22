@@ -1,0 +1,59 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_get_timer_pending()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_get_timer_pending* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport,
+	struct timeval`*`           tv
+);
+</pre>
+
+=== Purpose ===
+Get time before next timer event.
+
+=== Remarks ===
+A transport set as non-blocking with <tt>[OpenPgm3CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> will return <tt>PGM_IO_STATUS_TIMER_PENDING</tt> on calls to <tt>[OpenPgm3CReferencePgmRecv pgm_recv()]</tt> that have a pending timing event.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>tv</tt></td>
+<td>Pointer to store time remaining.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
+
+=== Example ===
+
+{{{
+  char s[1024];
+  int status;
+ again:
+   status = pgm_recv (transport, s, sizeof(s), 0, NULL, NULL);
+   if (PGM_IO_STATUS_TIMER_PENDING == status) {
+     struct timeval tv;
+     pgm_transport_get_timer_pending (transport, &tv);
+     usleep ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+     goto again;
+   }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmIoStatus PGMIOStatus]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmRecv pgm_recv()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

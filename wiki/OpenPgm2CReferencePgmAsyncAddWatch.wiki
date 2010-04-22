@@ -1,7 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_async_add_watch()
+﻿#summary OpenPGM 2 : C Reference : Asynchronous Receiver : pgm_async_add_watch()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceAsynchronousReceiver
 _Function_
 === Declaration ===
 <pre>

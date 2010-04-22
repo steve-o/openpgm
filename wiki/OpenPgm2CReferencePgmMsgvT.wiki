@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_msgv_t
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_msgv_t
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Type_
 === Declaration ===
 <pre>

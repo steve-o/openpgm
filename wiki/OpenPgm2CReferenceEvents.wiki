@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Events
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceEvents
 
 NAK and NCF processing requires that one thread is always processing incoming events.  With a synchronous strategy this should be one dedicated application thread reading messages and copying or processing into an internal queue, with asynchronous event handling a managed thread can be created with <tt>[OpenPgm2CReferencePgmAsyncCreate pgm_async_create()]</tt>.
 

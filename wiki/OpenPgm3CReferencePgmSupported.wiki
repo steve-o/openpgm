@@ -1,0 +1,21 @@
+#summary OpenPGM 3 : C Reference : Environment : pgm_supported()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceEnvironment
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_supported*(void);
+</pre>
+
+=== Purpose ===
+Check whether PGM engine initiated.
+
+=== Return Value ===
+Returns <tt>true</tt> if PGM engine is initialized, returns <tt>false</tt> if it is not.
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * [OpenPgm3CReferenceEnvironment Environment] in OpenPGM C Reference.

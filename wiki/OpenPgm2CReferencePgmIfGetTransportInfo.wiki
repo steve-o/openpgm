@@ -1,7 +1,6 @@
-#summary OpenPGM 2 : C Reference : pgm_if_get_transport_info()
+#summary OpenPGM 2 : C Reference : Interface : pgm_if_get_transport_info()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceInterface
 _Function_
 === Declaration ===
 <pre>

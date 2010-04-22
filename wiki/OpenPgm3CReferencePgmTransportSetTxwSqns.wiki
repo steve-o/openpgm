@@ -1,0 +1,51 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_set_txw_sqns()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_set_txw_sqns* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	unsigned                sqns
+	);
+</pre>
+
+=== Purpose ===
+Set send window size in sequence numbers.
+
+=== Remarks ===
+Microsoft PGM sets its transmt window size in bytes, a default size of 10 MB which is roughly 7,000 sequence numbers when using 1,500 MTU sized IPv4 packets.  Microsoft PGM stores its window contents on disk to enable large window sizes, OpenPGM only stores in memory.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>sqns</tt></td>
+<td>Size of window in sequence numbers.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
+
+=== Example ===
+Create a reliability window sufficient to store 400,000 packets.
+
+{{{
+ pgm_transport_set_txw_sqns (transport, 400*1000);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.
+

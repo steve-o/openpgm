@@ -1,0 +1,67 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_gsi_create_from_hostname()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_gsi_create_from_hostname* (
+	[OpenPgm3CReferencePgmGsiT pgm_gsi_t]`*`    gsi,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`     error
+	);
+</pre>
+
+=== Purpose ===
+Create a GSI based on the hostname.
+
+=== Remarks ===
+A globally unique source identifier (GSI) is required for PGM to track the sending state of peers. This function generates a GSI as suggested by the PGM draft specification using a MD5 hash of the system host name.
+
+The GSI is specified when creating a new PGM transport with <tt>[OpenPgm3CReferencePgmTransportCreate pgm_transport_create()]</tt>.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>gsi</tt></td>
+<td>A pointer to the GSI provided by the application that the function will fill.</td>
+</tr><tr>
+<td><tt>error</tt></td>
+<td>a return location for a <tt>[OpenPgm3CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, <tt>true</tt> is returned.  On error, <tt>false</tt> is returned.  If <tt>error</tt> is provided it may be set detailing the fault.
+
+=== Example ===
+Basic usage without error handling.
+
+{{{
+ pgm_gsi_t gsi;
+ pgm_gsi_create_from_hostname (&gsi, NULL);
+}}}
+
+Display an error message detailing failure.
+
+{{{
+ pgm_gsi_t gsi;
+ pgm_error_t *err = NULL;
+ if (!pgm_gsi_create_from_hostname (&gsi, &err)) {
+   fprintf (stderr, "GSI failed: %s\n", (err && err->message) ? err->message : "(null)");
+   pgm_error_free (err);
+   return EXIT_FAILURE;
+ }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmGsiT pgm_gsi_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmErrorT pgm_error_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportCreate pgm_transport_create()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

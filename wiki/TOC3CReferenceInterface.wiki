@@ -1,0 +1,6 @@
+  * C Reference for OpenPGM version 3
+  * [OpenPgm3CReference Contents]
+  * [OpenPgm3CReferenceInterface Interface]
+    * [OpenPgm3CReferencePgmTransportInfoT pgm_transport_info_t]
+    * [OpenPgm3CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]
+    * [OpenPgm3CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]

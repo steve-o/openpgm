@@ -1,0 +1,63 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_set_fec()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_set_fec* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	bool             use_proactive_parity,
+	bool             use_ondemand_parity,
+	bool             use_varpkt_len,
+	uint8_t          default_n,
+	uint8_t          default_k
+	);
+</pre>
+
+=== Purpose ===
+Set and enable Forward Error Correction parameters.
+
+=== Remarks ===
+To send parity encoded APDUs you will most likely require variable length packets and so must set the <tt>use_varpkt_len</tt> parameter to <tt>true</tt>.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>use_proactive_parity</tt></td>
+<td>Enable proactive parity generation.</td>
+</tr><tr>
+<td><tt>use_ondemand_parity</tt></td>
+<td>Enable on-demand (reactive) parity generation.</td>
+</tr><tr>
+<td><tt>use_varpkt_len</tt></td>
+<td>Packet sizes will vary within a transmission block.</td>
+</tr><tr>
+<td><tt>default_n</tt></td>
+<td>Transmission group size.</td>
+</tr><tr>
+<td><tt>default_k</tt></td>
+<td>Transmission block size.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
+
+=== Example ===
+{{{
+ pgm_transport_set_fec (transport, false, true, true, 255, 4);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

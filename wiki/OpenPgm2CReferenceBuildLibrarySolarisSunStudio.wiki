@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : Sun Studio 12u1 on Solaris
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building with Sun Studio 12u1 for Solaris 10 SPARC ===
 First install all the C compiler dependencies (including OS patches as needed), <tt>sudo</tt> and SCons.  Visit the Oracle website for the latest recommended patches to apply.  Sudo is included on the Solaris 10 Companion Software CD and needs to be set setuid root and configured with <tt>visudo</tt>.  Scons must be installed with the default Python and not <tt>/usr/sfw/bin/python</tt>.
 

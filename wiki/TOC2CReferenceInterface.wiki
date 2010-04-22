@@ -1,0 +1,6 @@
+  * C Reference for OpenPGM version 2
+  * [OpenPgm2CReference Contents]
+  * [OpenPgm2CReferenceInterface Interface]
+    * [OpenPgm2CReferencePgmTransportInfoT pgm_transport_info_t]
+    * [OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_get_transport_info()]
+    * [OpenPgm2CReferencePgmIfGetTransportInfo pgm_if_free_transport_info()]

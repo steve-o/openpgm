@@ -1,6 +1,6 @@
-﻿#summary OpenPGM : C Reference : pgm_time_since_epoch()
+﻿#summary OpenPGM : C Reference : Timing : pgm_time_since_epoch()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTiming
 _Function_
 === Declaration ===
 <pre>

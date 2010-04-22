@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : GCC 3.4.6 on Solaris (64-bit)
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building with GCC 3.4.6 for Solaris 10 SPARC ===
 First install all the C compiler dependencies, <tt>sudo</tt> and SCons.  GCC can be downloaded from http://sunfreeware.com and <tt>sudo</tt> is included on the Solaris 10 Companion Software CD, <tt>sudo</tt> must be set setuid root and configured with <tt>visudo</tt>.  Scons must be installed with the default Python and not <tt>/usr/sfw/bin/python</tt>.
 

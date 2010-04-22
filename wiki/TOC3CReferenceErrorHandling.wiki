@@ -1,0 +1,5 @@
+  * C Reference for OpenPGM version 3
+  * [OpenPgm3CReference Contents]
+  * [OpenPgm3CReferenceErrorHandling Error Handling]
+    * [OpenPgm2CReferencePgmErrorT pgm_error_t]
+    * [OpenPgm3CReferencePgmErrorFree pgm_error_free()]

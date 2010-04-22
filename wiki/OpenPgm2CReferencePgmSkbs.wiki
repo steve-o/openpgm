@@ -1,7 +1,6 @@
 #summary OpenPGM 2 : C Reference : PGM Socket Buffers (PGM SKBs)
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferencePgmSkbs
 === Introduction ===
 PGM socket buffer API.
 

@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_send_skbv()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_send_skbv()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>

@@ -1,11 +1,12 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_gsi_print()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_gsi_print()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>
 #include <pgm/pgm.h>
 
+/`*` maximum length of GSI as a string `*`/
 #define PGM_GSISTRLEN	 (sizeof("000.000.000.000.000.000"))
 
 [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gchar gchar]`*` *pgm_gsi_print* (

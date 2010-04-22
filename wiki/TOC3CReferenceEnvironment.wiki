@@ -1,0 +1,10 @@
+  * C Reference for OpenPGM version 3
+  * [OpenPgm3CReference Contents]
+  * [OpenPgm3CReferenceEnvironment Environment]
+    * [OpenPgm3CReferencePgmInit pgm_init()]
+    * [OpenPgm3CReferencePgmSupported pgm_supported()]
+    * [OpenPgm3CReferencePgmDropSuperUser pgm_drop_superuser()]
+    * [OpenPgm3CReferencePgmShutdown pgm_shutdown()]
+    * [OpenPgm3CReferencePgmCheckVersion pgm_major_version]
+    * [OpenPgm3CReferencePgmCheckVersion pgm_minor_version]
+    * [OpenPgm3CReferencePgmCheckVersion pgm_micro_version]

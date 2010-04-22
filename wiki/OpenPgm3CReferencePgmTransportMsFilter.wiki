@@ -1,0 +1,62 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_msfilter()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_msfilter* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`         transport,
+	struct group_filter`*`     gf_list,
+	size_t                    len
+);
+</pre>
+
+=== Purpose ===
+Block or re-allow packets from a list of source IP addresses.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>gf_list</tt></td>
+<td>List of source/group pairs with optional interfaces.</td>
+</tr><tr>
+<td><tt>len</tt></td>
+<td>Length of <tt>gf_list</tt> in bytes.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, <tt>true</tt> is returned.  On error, <tt>false</tt> is returned.
+
+=== Example ===
+Exclude sources 192.168.9.2/3 from group 239.192.0.2.
+
+{{{
+ struct group_filter* gf_list = calloc (1, GROUP_FILTER_SIZE(2));
+ ((struct sockaddr*)&gf_list->gf_group)->sa_family = AF_INET;
+ ((struct sockaddr_in*)&gf_list->gf_group)->sin_addr.s_addr = inet_addr("239.192.0.2");
+ gf_list->gf_fmode = MCAST_EXCLUDE;
+ gf_list->gf_numsrc = 2;
+ ((struct sockaddr*)&gf_list->gf_slist[0])->sa_family = AF_INET;
+ ((struct sockaddr_in*)&gf_list->gf_slist[0])->sin_addr.s_addr = inet_addr("192.168.9.2");
+ ((struct sockaddr*)&gf_list->gf_slist[1])->sa_family = AF_INET;
+ ((struct sockaddr_in*)&gf_list->gf_slist[1])->sin_addr.s_addr = inet_addr("192.168.9.3");
+ pgm_transport_msfilter (transport, gf_list, GROUP_FILTER_SIZE(2));
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportBlockSource pgm_transport_block_source()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportJoinGroup pgm_transport_join_group()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmTransportJoinSourceGroup pgm_transport_join_source_group()]</tt><br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.

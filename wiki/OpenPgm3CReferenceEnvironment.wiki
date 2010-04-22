@@ -1,0 +1,37 @@
+#summary OpenPGM 3 : C Reference : Environment
+#labels Phase-Implementation
+#sidebar TOC3CReferenceEnvironment
+=== Introduction ===
+This section describes the functions relating to the global dependencies of OpenPGM.
+
+=== Topics in Alphabetical Order ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt></td>
+<td>Start the PGM environment.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmSupported pgm_supported()]</tt></td>
+<td>Check whether PGM engine initiated.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmDropSuperUser pgm_drop_superuser()]</tt></td>
+<td>Drop superuser privileges, on Unix platforms, needed to create PGM protocol sockets.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmShutdown pgm_shutdown()]</tt></td>
+<td>Shutdown the PGM environment.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmCheckVersion pgm_major_version]</tt></td>
+<td>Major version number of OpenPGM.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmCheckVersion pgm_minor_version]</tt></td>
+<td>Minor version number of OpenPGM.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmCheckVersion pgm_micro_version]</tt></td>
+<td>Micro version number of OpenPGM.</td>
+</tr>
+</table>
+

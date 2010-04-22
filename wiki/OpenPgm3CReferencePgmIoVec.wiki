@@ -1,0 +1,33 @@
+#summary OpenPGM 3 : C Reference : Transport : pgm_iovec
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_iovec {
+#ifndef _WIN32
+	void`*`		iov_base;
+	size_t		iov_len;	/`*` length of data `*`/
+#else
+	u_long		iov_len;
+	char`*`		iov_base;
+#endif /`*` _WIN32 `*`/
+};
+</pre>
+
+=== Purpose ===
+A scatter/gather message vector.
+
+=== Remarks ===
+On Windows platforms <tt>pgm_iovec</tt> is compatible with <tt>[http://msdn.microsoft.com/en-us/library/ms741542(VS.85).aspx WSABUF]</tt>, on Unix is compatible with <tt>struct iovec</tt>.
+
+=== See Also ===
+  * <tt>struct [OpenPgm3CReferencePgmSkBuffT pgm_sk_buff_t]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmSendv pgm_sendv()]</tt><br>
+  * [OpenPgm3CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.<br>
+  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.<br>
+  * <tt>[http://msdn.microsoft.com/en-us/library/ms741542(VS.85).aspx WSABUF]</tt> in MSDN Winsock Reference.<br>
+  * [http://www.gnu.org/s/libc/manual/html_node/Scatter_002dGather.html Fast Scatter-Gather I/O] in the GNU C Library.<br>
+  * <tt>[http://www.linux.com/learn/docs/man/4465-writev2 readv(2) and writev(2)]</tt> in Linux Programmer's Manual.

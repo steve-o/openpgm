@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM 2 : C Reference : Build Library : Debian 4.0
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOC2CReferenceProgrammersChecklist
 === Building on Debian 4.0 ===
 Requires new installation of SCons as repository only contains version 0.96 which does not support <tt>autoconf</tt>.
 

@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_transport_set_nak_bo_ivl()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_transport_set_nak_bo_ivl()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>

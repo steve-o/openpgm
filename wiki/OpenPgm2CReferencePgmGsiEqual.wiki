@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_gsi_equal()
+﻿#summary OpenPGM 2 : C Reference : Transport : pgm_gsi_equal()
 #labels Phase-Implementation
-
+#sidebar TOC2CReferenceTransport
 _Function_
 === Declaration ===
 <pre>
@@ -32,8 +32,7 @@ Compare two GSI values.
 </table>
 
 === Return Value ===
-The <tt>pgm_gsi_equal()</tt> function returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if both values are equal and [h
-ttp://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] otherwise.
+The <tt>pgm_gsi_equal()</tt> function returns [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] if both values are equal and [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] otherwise.
 
 === Example ===
 {{{

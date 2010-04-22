@@ -1,7 +1,6 @@
-﻿#summary OpenPGM 2 : C Reference : pgm_drop_superuser()
+﻿#summary OpenPGM 2 : C Reference : Environment : pgm_drop_superuser()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOC2CReferenceEnvironment
 _Function_
 === Declaration ===
 <pre>
