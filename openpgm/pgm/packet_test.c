@@ -26,7 +26,6 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
@@ -37,12 +36,6 @@
 
 //#define PACKET_DEBUG
 
-#if !defined(IPOPT_NOP) && defined(IP_OPT_NOP)
-#	define IPOPT_NOP	IP_OPT_NOP
-#	define IPOPT_EOL	IP_OPT_EOL
-#	define IPOPT_RR		IP_OPT_RR
-#	define IPOPT_TS		IP_OPT_TS
-#endif
 
 static bool pgm_print_spm (const struct pgm_header* const, const void*, const size_t);
 static bool pgm_print_poll (const struct pgm_header* const, const void*, const size_t);
@@ -1036,19 +1029,19 @@ pgm_ipopt_print (
 
 	while (length)
 	{
-		char len = (*op == IPOPT_NOP || *op == IPOPT_EOL) ? 1 : op[1];
+		char len = (*op == PGM_IPOPT_NOP || *op == PGM_IPOPT_EOL) ? 1 : op[1];
 		switch (*op) {
-		case IPOPT_EOL:		printf(" eol"); break;
-		case IPOPT_NOP:		printf(" nop"); break;
-		case IPOPT_RR:		printf(" rr"); break;	/* 1 route */
-		case IPOPT_TS:		printf(" ts"); break;	/* 1 TS */
+		case PGM_IPOPT_EOL:		printf(" eol"); break;
+		case PGM_IPOPT_NOP:		printf(" nop"); break;
+		case PGM_IPOPT_RR:		printf(" rr"); break;	/* 1 route */
+		case PGM_IPOPT_TS:		printf(" ts"); break;	/* 1 TS */
 #if 0
-		case IPOPT_SECURITY:	printf(" sec-level"); break;
-		case IPOPT_LSRR:	printf(" lsrr"); break;	/* 1 route */
-		case IPOPT_SATID:	printf(" satid"); break;
-		case IPOPT_SSRR:	printf(" ssrr"); break;	/* 1 route */
+		case PGM_IPOPT_SECURITY:	printf(" sec-level"); break;
+		case PGM_IPOPT_LSRR:		printf(" lsrr"); break;	/* 1 route */
+		case PGM_IPOPT_SATID:		printf(" satid"); break;
+		case PGM_IPOPT_SSRR:		printf(" ssrr"); break;	/* 1 route */
 #endif
-		default:		printf(" %x{%d}", (int)*op, (int)len); break;
+		default:			printf(" %x{%d}", (int)*op, (int)len); break;
 		}
 
 		if (!len) {

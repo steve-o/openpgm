@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #ifdef CONFIG_HAVE_GETIFADDRS
+#	include <sys/types.h>
 #	include <ifaddrs.h>
 #endif
 #if defined( sun )

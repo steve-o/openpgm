@@ -169,7 +169,8 @@ pgm_spinlock_free (
 {
 	pgm_assert (NULL != spinlock);
 #ifndef _WIN32
-	posix_check_cmd (pthread_spin_destroy (&spinlock->pthread_spinlock));
+/* ignore return value */
+	pthread_spin_destroy (&spinlock->pthread_spinlock);
 #else
 	DeleteCriticalSection (&spinlock->win32_spinlock);
 #endif /* !_WIN32 */

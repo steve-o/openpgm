@@ -296,7 +296,9 @@ bool pgm_transport_block_source (pgm_transport_t*restrict, const struct group_so
 bool pgm_transport_unblock_source (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
 bool pgm_transport_join_source_group (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
 bool pgm_transport_leave_source_group (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
+#if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
 bool pgm_transport_msfilter (pgm_transport_t*restrict, const struct group_filter*restrict, socklen_t);
+#endif
 
 PGM_END_DECLS
 

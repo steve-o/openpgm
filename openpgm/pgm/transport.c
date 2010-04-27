@@ -378,6 +378,26 @@ pgm_transport_create (
 #endif
 		goto err_destroy;
 	}
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP Router Alert (RFC 2113)."));
+	if (0 != pgm_sockaddr_router_alert (new_transport->send_with_router_alert_sock, new_transport->send_gsr.gsr_group.ss_family, TRUE))
+	{
+#ifndef _WIN32
+		const int save_errno = errno;
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_errno (save_errno),
+			     _("Enabling IP Router Alert (RFC 2113): %s"),
+			     strerror (save_errno));
+#else
+		const int save_errno = WSAGetLastError();
+		pgm_set_error (error,
+			     PGM_ERROR_DOMAIN_TRANSPORT,
+			     pgm_error_from_wsa_errno (save_errno),
+			     _("Enabling IP Router Alert (RFC 2113): %s"),
+			     pgm_wsastrerror (save_errno));
+#endif
+		goto err_destroy;
+	}
 
 	*transport = new_transport;
 
@@ -2138,6 +2158,7 @@ pgm_transport_leave_source_group (
 	return (0 == status);
 }
 
+#if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
 bool
 pgm_transport_msfilter (
 	pgm_transport_t*	   restrict transport,
@@ -2171,5 +2192,6 @@ pgm_transport_msfilter (
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
 }
+#endif
 
 /* eof */

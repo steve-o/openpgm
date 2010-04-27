@@ -166,6 +166,7 @@ recvskb (
 		     cmsg != NULL;
 		     cmsg = CMSG_NXTHDR(&msg, cmsg))
 		{
+#ifdef IP_PKTINFO
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
@@ -183,6 +184,25 @@ recvskb (
 				memcpy (dst_addr, &s4, sizeof(s4));
 				break;
 			}
+#elif defined(IP_RECVDSTADDR)
+			if (IPPROTO_IP == cmsg->cmsg_level &&
+			    IP_RECVDSTADDR == cmsg->cmsg_type)
+			{
+				const void* recvdstaddr = CMSG_DATA(cmsg);
+/* discard on invalid address */
+				if (PGM_UNLIKELY(NULL == recvdstaddr)) {
+					pgm_debug ("in_recvdstaddr is NULL");
+					return -1;
+				}
+				const struct in_addr* in	= recvdstaddr;
+				struct sockaddr_in s4;
+				memset (&s4, 0, sizeof(s4));
+				s4.sin_family			= AF_INET;
+				s4.sin_addr.s_addr		= in->s_addr;
+				memcpy (dst_addr, &s4, sizeof(s4));
+				break;
+			}
+#endif
 
 			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
 			    IPV6_PKTINFO == cmsg->cmsg_type)

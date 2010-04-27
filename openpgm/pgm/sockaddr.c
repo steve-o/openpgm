@@ -29,7 +29,10 @@
 #ifndef IPV6_RECVPKTINFO
 #	define IPV6_RECVPKTINFO		49
 #endif
-
+/* FreeBSD */
+#ifndef IPV6_ADD_MEMBERSHIP
+#	define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
+#endif
 /* OpenSolaris differences */
 #ifndef MCAST_MSFILTER
 #	include <sys/ioctl.h>
@@ -40,14 +43,6 @@
 #endif
 #ifndef SOL_IPV6
 #	define SOL_IPV6			IPPROTO_IPV6
-#endif
-#if !defined(IP_ROUTER_ALERT) && !defined(G_OS_WIN32)
-#	include <netinet/ip.h>
-#	define IP_ROUTER_ALERT		IPOPT_RTRALERT
-#endif
-#if !defined(IPV6_ROUTER_ALERT) && !defined(G_OS_WIN32)
-#	include <netinet/ip6.h>
-#	define IPV6_ROUTER_ALERT	IP6OPT_ROUTER_ALERT
 #endif
 #ifndef IP_MAX_MEMBERSHIPS
 #	define IP_MAX_MEMBERSHIPS	20
@@ -313,11 +308,15 @@ pgm_sockaddr_pktinfo (
 
 	switch (sa_family) {
 	case AF_INET:
+#ifdef IP_RECVDSTADDR
+		retval = setsockopt (s, IPPROTO_IP, IP_RECVDSTADDR, (const char*)&optval, sizeof(optval));
+#else
 		retval = setsockopt (s, IPPROTO_IP, IP_PKTINFO, (const char*)&optval, sizeof(optval));
+#endif
 		break;
 
 	case AF_INET6:
-#ifndef _WIN32
+#ifndef IPV6_PKTINFO
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const char*)&optval, sizeof(optval));
 #else
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_PKTINFO, (const char*)&optval, sizeof(optval));
@@ -338,12 +337,12 @@ pgm_sockaddr_router_alert (
 	)
 {
 	int retval = -1;
-#ifdef IP_ROUTER_ALERT
+#ifdef CONFIG_IP_ROUTER_ALERT
 /* Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
  * true.  Expects an integer flag."
  * Linux:ipv6(7) "Argument is a pointer to an integer."
  */
-	const unsigned char optval = v ? 1 : 0;
+	const int optval = v ? 1 : 0;
 
 	switch (sa_family) {
 	case AF_INET:
@@ -357,13 +356,22 @@ pgm_sockaddr_router_alert (
 	default: break;
 	}
 #else
-	const uint32_t optval = v ? htonl(0x94040000) : 0;
+#	if defined(CONFIG_HAVE_IPOPTION)
+	const struct ipoption router_alert = {
+		.ipopt_dst  = 0,
+		.ipopt_list = { v ? PGM_IPOPT_RA : 0x00, v ? 0x04 : 0x00, 0x00, 0x00 }
+	};
+#	else
+	const uint32_t ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
+	const uint32_t router_alert = v ? htonl (ipopt_ra) : 0;
+#	endif
 
 	switch (sa_family) {
 	case AF_INET:
 /* Linux:ip(7) "The maximum option size for IPv4 is 40 bytes."
  */
-		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&optval, sizeof(optval));
+		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&router_alert, sizeof(router_alert));
+retval = 0;
 		break;
 
 	default: break;
@@ -457,7 +465,7 @@ pgm_sockaddr_join_group (
 #ifdef CONFIG_HAVE_IP_MREQN
 		struct ip_mreqn mreqn;
 		struct sockaddr_in ifaddr;
-		memset (&mnreq, 0, sizeof(mreqn));
+		memset (&mreqn, 0, sizeof(mreqn));
 		mreqn.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gr->gr_group)->sin_addr.s_addr;
 		if (!pgm_if_indextoaddr (gr->gr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
 			return -1;
