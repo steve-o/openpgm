@@ -27,6 +27,8 @@
 #define __PGM_GETIFADDRS_H__
 
 #ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
 #	include <net/if.h>
 #else
 #	include <winsock2.h>

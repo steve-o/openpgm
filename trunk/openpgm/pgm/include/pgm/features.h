@@ -26,12 +26,12 @@
 #ifndef __PGM_FEATURES_H__
 #define __PGM_FEATURES_H__
 
-#ifdef _POSIX_C_SOURCE
-#	if (_POSIX_C_SOURCE - 0) >= 200112L
+#if defined(_POSIX_C_SOURCE) || defined(__POSIX_VISIBLE)
+#	if (_POSIX_C_SOURCE - 0) >= 200112L || (__POSIX_VISIBLE - 0) >= 200112L
 #		define CONFIG_HAVE_FTIME		1
 #		define CONFIG_HAVE_GETTIMEOFDAY		1
 #	endif
-#	if (_POSIX_C_SOURCE - 0) >= 199309L
+#	if (_POSIX_C_SOURCE - 0) >= 199309L || (__POSIX_VISIBLE - 0) >= 199309L
 #		define CONFIG_HAVE_CLOCK_GETTIME	1
 #		define CONFIG_HAVE_NANOSLEEP		1
 #	endif
@@ -39,7 +39,7 @@
 #if (defined _XOPEN_SOURCE && (_XOPEN_SOURCE - 0) >= 600)
 #	define CONFIG_HAVE_CLOCK_NANOSLEEP
 #endif
-#if (defined _BSD_SOURCE || (_XOPEN_SOURCE - 0) >= 500)
+#if defined(_BSD_SOURCE) || defined(__BSD_VISIBLE) || (_XOPEN_SOURCE - 0) >= 500
 #	define CONFIG_HAVE_USLEEP
 #endif
 

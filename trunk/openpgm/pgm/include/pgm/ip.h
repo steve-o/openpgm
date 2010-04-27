@@ -69,7 +69,7 @@ PGM_BEGIN_DECLS
 /* nb: first four bytes are forced bitfields for win32 "feature" */
 struct pgm_ip
 {
-#ifdef _BIT_FIELDS_LTOH
+#if (defined( sun ) && defined( _BIT_FIELDS_LTOH )) || (!defined( sun ) && __BYTE_ORDER == __LITTLE_ENDIAN)
 	unsigned 	ip_hl:4;		/* header length */
 	unsigned 	ip_v:4;			/* version */
 #else
@@ -111,6 +111,18 @@ struct pgm_ip6_hdr
 };
 
 PGM_STATIC_ASSERT(sizeof(struct pgm_ip6_hdr) == 40);
+
+#define PGM_IPOPT_EOL		0	/* end of option list */
+#define PGM_IPOPT_NOP		1	/* no operation */
+#define PGM_IPOPT_RR		7	/* record packet route */
+#define PGM_IPOPT_TS		68	/* timestamp */
+#define PGM_IPOPT_SECURITY	130	/* provide s, c, h, tcc */
+#define PGM_IPOPT_LSRR		131	/* loose source route */
+#define PGM_IPOPT_ESO		133
+#define PGM_IPOPT_CIPSO		134
+#define PGM_IPOPT_SATID		136	/* satnet id */
+#define PGM_IPOPT_SSRR		137	/* strict source route */
+#define PGM_IPOPT_RA		148	/* router alert */
 
 /* RFC 768 */
 struct pgm_udphdr
