@@ -12,6 +12,24 @@ There are currently no official releases or pre-built packages in any distributi
   * [OpenPgm3CReferenceBuildLibrarySolarisGcc64 GCC 3.4.6] on Solaris 10 on SPARC (64-bit)
   * [OpenPgm3CReferenceBuildLibrarySolarisSunStudio Sun Studio 12u1] on Solaris 10 on SPARC (64-bit)
 
+=== Untested Platforms ===
+Functional build but no available test report.
+  * [OpenPgm3CReferenceBuildLibraryFreeBSD GCC 4.2.1] on FreeBSD 8.0
+
+=== Unsupported Platforms ===
+Platforms supported in OpenPGM version 2 but not supported in OpenPGM version 3.
+  * Debian
+  * OpenSUSE
+  * Red Hat Enterprise Linux, or CentOS
+  * Microsoft Windows
+  * OpenSolaris
+ 
+=== Unsupported Compilers ===
+Compilers supported in OpenPGM version 2 but not supported in OpenPGM version 3.
+  * MinGW
+  * MinGW-w64
+  * Intel C++ Compiler
+  * Sun Studio on Linux
 
 === PGM Testing ===
 Two hosts are required for full PGM protocol testing, one to send the other to receive.  In this example <tt>ayaka</tt> is the sending host and <tt>kiku</tt> is receiving.
