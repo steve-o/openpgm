@@ -26,7 +26,11 @@
 #ifndef __PGM_MEM_H__
 #define __PGM_MEM_H__
 
-#include <alloca.h>
+#ifdef CONFIG_HAVE_ALLOCA_H
+#	include <alloca.h>
+#else
+#	include <stdlib.h>
+#endif
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS
