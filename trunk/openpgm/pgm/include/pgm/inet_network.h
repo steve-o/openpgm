@@ -26,7 +26,9 @@
 #ifndef __PGM_INET_NETWORK_H__
 #define __PGM_INET_NETWORK_H__
 
-#include <netinet/in.h>
+#ifndef _WIN32
+#	include <netinet/in.h>
+#endif
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS

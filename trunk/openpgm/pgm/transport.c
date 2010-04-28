@@ -413,7 +413,7 @@ err_destroy:
 			pgm_warn (_("Close on receive socket failed: %s"), strerror (errno));
 #else
 		if (SOCKET_ERROR == closesocket (new_transport->recv_sock))
-			pgm_warn (_("Close on receive socket failed: %s"), wsa_strerror (WSAGetLastError()));
+			pgm_warn (_("Close on receive socket failed: %s"), pgm_wsastrerror (WSAGetLastError()));
 #endif
 		new_transport->recv_sock = -1;
 	}
@@ -423,7 +423,7 @@ err_destroy:
 			pgm_warn (_("Close on send socket failed: %s"), strerror (errno));
 #else
 		if (SOCKET_ERROR == closesocket (new_transport->send_sock)) 
-			pgm_warn (_("Close on send socket failed: %s"), wsa_strerror (WSAGetLastError()));
+			pgm_warn (_("Close on send socket failed: %s"), pgm_wsastrerror (WSAGetLastError()));
 #endif
 		new_transport->send_sock = -1;
 	}
@@ -433,7 +433,7 @@ err_destroy:
 			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), strerror (errno));
 #else
 		if (SOCKET_ERROR == closesocket (new_transport->send_with_router_alert_sock))
-			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), wsa_strerror (WSAGetLastError()));
+			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"), pgm_wsastrerror (WSAGetLastError()));
 #endif
 		new_transport->send_with_router_alert_sock = -1;
 	}
@@ -842,7 +842,7 @@ pgm_transport_bind (
 				     PGM_ERROR_DOMAIN_TRANSPORT,
 				     pgm_error_from_wsa_errno (save_errno),
 				     _("Enabling reuse of socket local address: %s"),
-				     wsa_strerror (save_errno));
+				     pgm_wsastrerror (save_errno));
 #endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
@@ -896,7 +896,7 @@ pgm_transport_bind (
 					     PGM_ERROR_DOMAIN_TRANSPORT,
 					     pgm_error_from_wsa_errno (save_errno),
 					     _("Enabling IP header in front of user data: %s"),
-					     wsa_strerror (save_errno));
+					     pgm_wsastrerror (save_errno));
 #endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
@@ -921,7 +921,7 @@ pgm_transport_bind (
 					     PGM_ERROR_DOMAIN_TRANSPORT,
 					     pgm_error_from_wsa_errno (save_errno),
 					     _("Enabling receipt of control message per incoming datagram: %s"),
-					     wsa_strerror (save_errno));
+					     pgm_wsastrerror (save_errno));
 #endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
@@ -951,7 +951,7 @@ pgm_transport_bind (
 				     PGM_ERROR_DOMAIN_TRANSPORT,
 				     pgm_error_from_wsa_errno (save_errno),
 				     _("Setting maximum socket receive buffer in bytes: %s"),
-				     wsa_strerror (save_errno));
+				     pgm_wsastrerror (save_errno));
 #endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
@@ -979,7 +979,7 @@ pgm_transport_bind (
 				     PGM_ERROR_DOMAIN_TRANSPORT,
 				     pgm_error_from_wsa_errno (save_errno),
 				     _("Setting maximum socket send buffer in bytes: %s"),
-				     wsa_strerror (save_errno));
+				     pgm_wsastrerror (save_errno));
 #endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;
@@ -1054,7 +1054,7 @@ pgm_transport_bind (
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Binding receive socket to address %s: %s"),
 			     addr,
-			     wsa_strerror (save_errno));
+			     pgm_wsastrerror (save_errno));
 #endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1107,7 +1107,7 @@ pgm_transport_bind (
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Binding send socket to address %s: %s"),
 			     addr,
-			     wsa_strerror (save_errno));
+			     pgm_wsastrerror (save_errno));
 #endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1159,7 +1159,7 @@ pgm_transport_bind (
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
 			     addr,
-			     wsa_strerror (save_errno));
+			     pgm_wsastrerror (save_errno));
 #endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1210,7 +1210,7 @@ pgm_transport_bind (
 						     pgm_error_from_wsa_errno (save_errno),
 						     _("Joining multicast group %s: %s"),
 						     group_addr,
-						     wsa_strerror (save_errno));
+						     pgm_wsastrerror (save_errno));
 #endif
 				else
 #ifndef _WIN32
@@ -1227,8 +1227,8 @@ pgm_transport_bind (
 						     pgm_error_from_wsa_errno (save_errno),
 						     _("Joining multicast group %s on interface %s: %s"),
 						     group_addr,
-						     if_indextoname (p->gsr_interface, ifname),
-						     wsa_strerror (save_errno));
+						     pgm_if_indextoname (p->gsr_interface, ifname),
+						     pgm_wsastrerror (save_errno));
 #endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
@@ -1270,7 +1270,7 @@ pgm_transport_bind (
 					     _("Joining multicast group %s from source %s: %s"),
 					     group_addr,
 					     source_addr,
-					     wsa_strerror (save_errno));
+					     pgm_wsastrerror (save_errno));
 #endif
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
@@ -1308,8 +1308,8 @@ pgm_transport_bind (
 			     PGM_ERROR_DOMAIN_TRANSPORT,
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Setting device %s for multicast send socket: %s"),
-			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
-			     wsa_strerror (save_errno));
+			     pgm_if_indextoname (transport->send_gsr.gsr_interface, ifname),
+			     pgm_wsastrerror (save_errno));
 #endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1341,8 +1341,8 @@ pgm_transport_bind (
 			     PGM_ERROR_DOMAIN_TRANSPORT,
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Setting device %s for multicast IP Router Alert (RFC 2113) send socket: %s"),
-			     if_indextoname (transport->send_gsr.gsr_interface, ifname),
-			     wsa_strerror (save_errno));
+			     pgm_if_indextoname (transport->send_gsr.gsr_interface, ifname),
+			     pgm_wsastrerror (save_errno));
 #endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1385,7 +1385,7 @@ pgm_transport_bind (
 			     PGM_ERROR_DOMAIN_TRANSPORT,
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Setting multicast loopback: %s"),
-			     wsa_strerror (save_errno));
+			     pgm_wsastrerror (save_errno));
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
@@ -1416,7 +1416,7 @@ pgm_transport_bind (
 			     pgm_error_from_wsa_errno (save_errno),
 			     _("Setting multicast hop limit to %i: %s"),
 			     transport->hops,
-			     wsa_strerror (save_errno));
+			     pgm_wsastrerror (save_errno));
 #endif
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
@@ -1448,7 +1448,7 @@ no_cap_net_admin:
 /* setup rate control */
 		if (transport->txw_max_rte)
 		{
-			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zu bytes per second."),
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zd bytes per second."),
 					transport->txw_max_rte);
 	
 			pgm_rate_create (&transport->rate_control, transport->txw_max_rte, transport->iphdr_len, transport->max_tpdu);
@@ -1481,7 +1481,7 @@ no_cap_net_admin:
 				     PGM_ERROR_DOMAIN_TRANSPORT,
 				     pgm_error_from_wsa_errno (save_errno),
 				     _("Sending SPM broadcast: %s"),
-				     wsa_strerror (save_errno));
+				     pgm_wsastrerror (save_errno));
 #endif
 			pgm_rwlock_writer_unlock (&transport->lock);
 			return FALSE;

@@ -21,9 +21,14 @@
 
 #define _GNU_SOURCE
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/recv.h"
@@ -769,7 +774,7 @@ recv_again:
 			     PGM_ERROR_DOMAIN_RECV,
 			     pgm_error_from_wsa_errno (save_wsa_errno),
 			     _("Transport socket error: %s"),
-			     wsastrerror (save_wsa_errno));
+			     pgm_wsastrerror (save_wsa_errno));
 #endif /* !_WIN32 */
 		goto out;
 	}
@@ -859,7 +864,7 @@ check_for_repeat:
 #ifndef _WIN32
 						strerror (errno)
 #else
-						wsa_strerror (WSAGetLastError())	/* from select() */
+						pgm_wsastrerror (WSAGetLastError())	/* from select() */
 #endif
 						);
 				pgm_mutex_unlock (&transport->receiver_mutex);

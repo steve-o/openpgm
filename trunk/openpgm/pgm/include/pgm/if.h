@@ -22,7 +22,9 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/types.h>
 #include <pgm/gsi.h>
 

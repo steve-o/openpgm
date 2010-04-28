@@ -22,11 +22,13 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <ctype.h>
-#include <netdb.h>
 #include <stdio.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#	include <netdb.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 

@@ -154,7 +154,9 @@ env = Environment(
 # previous version HTTP library api
 #			'-DCONFIG_LIBSOUP22',
 # Wine limited API support
-#			'-DCONFIG_TARGET_WINE'
+#			'-DCONFIG_TARGET_WINE',
+# GNU getopt
+			'-DCONFIG_HAVE_GETOPT'
 		],
 	LINKFLAGS = [	'-pipe'
 		],
