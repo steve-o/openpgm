@@ -30,7 +30,9 @@
 
 PGM_BEGIN_DECLS
 
+#ifdef _WIN32
 extern LPFN_WSARECVMSG pgm_WSARecvMsg;
+#endif
 
 bool pgm_init (pgm_error_t**);
 bool pgm_supported (void) PGM_GNUC_WARN_UNUSED_RESULT PGM_GNUC_PURE;
