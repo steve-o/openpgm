@@ -15,18 +15,18 @@ There are currently no official releases or pre-built packages in any distributi
 === Untested Platforms ===
 Functional build but no available test report.
   * [OpenPgm3CReferenceBuildLibraryFreeBSD GCC 4.2.1] on FreeBSD 8.0
+  * [OpenPgm3CReferenceBuildLibraryLinuxMinGW GCC 4.2.1] on Microsoft Windows XP, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
+  * [OpenPgm3CReferenceBuildLibraryLinuxWine GCC 4.2.1] on Wine 1.1.31, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
 
 === Unsupported Platforms ===
 Platforms supported in OpenPGM version 2 but not supported in OpenPGM version 3.
   * Debian
   * OpenSUSE
   * Red Hat Enterprise Linux, or CentOS
-  * Microsoft Windows
   * OpenSolaris
  
 === Unsupported Compilers ===
 Compilers supported in OpenPGM version 2 but not supported in OpenPGM version 3.
-  * MinGW
   * MinGW-w64
   * Intel C++ Compiler
   * Sun Studio on Linux
