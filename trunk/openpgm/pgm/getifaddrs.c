@@ -46,6 +46,10 @@ struct _pgm_ifaddrs
 	struct sockaddr_storage		_netmask;
 };
 
+/* Number of attempts to try enumerating the interface list */
+#define MAX_TRIES		3
+#define DEFAULT_BUFFER_SIZE	4096
+
 /* returns TRUE on success setting ifap to a linked list of system interfaces,
  * returns FALSE on failure and sets error appropriately.
  */
@@ -294,7 +298,7 @@ _pgm_getifaddrs (
 	}
 
 /* process IPv4 interfaces */
-	char buf[1024];
+	char buf[ DEFAULT_BUFFER_SIZE ];
 	struct ifconf ifc;
 	ifc.ifc_buf = buf;
 	ifc.ifc_len = sizeof(buf);
@@ -456,6 +460,33 @@ _pgm_getifaddrs (
 #endif /* SIOCLIFCONF */
 
 #if defined(_WIN32)
+static inline
+void*
+_pgm_heap_alloc (
+	const size_t	n_bytes
+	)
+{
+#	ifdef CONFIG_USE_HEAPALLOC
+/* Does not appear very safe with re-entrant calls on XP */
+	return HeapAlloc (GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS, n_bytes);
+#	else
+	return pgm_malloc (n_bytes);
+#	endif
+}
+
+static inline
+void
+_pgm_heap_free (
+	const void*	mem
+	)
+{
+#	ifdef CONFIG_USE_HEAPALLOC
+	HeapFree (GetProcessHeap(), 0, mem);
+#	else
+	pgm_free (mem);
+#	endif
+}
+
 static
 bool
 _pgm_getadaptersinfo (
@@ -464,23 +495,24 @@ _pgm_getadaptersinfo (
 	)
 {
 	DWORD dwRet;
-	ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
+	ULONG ulOutBufLen = DEFAULT_BUFFER_SIZE;
 	PIP_ADAPTER_INFO pAdapterInfo = NULL;
 	PIP_ADAPTER_INFO pAdapter = NULL;
 
 /* loop to handle interfaces coming online causing a buffer overflow
  * between first call to list buffer length and second call to enumerate.
  */
-	for (unsigned i = 100; i; i--)
+	for (unsigned i = MAX_TRIES; i; i--)
 	{
-		if (pAdapterInfo) {
-			pgm_free (pAdapterInfo);
+		pgm_debug ("IP_ADAPTER_INFO buffer length %lu bytes.", ulOutBufLen);
+		pAdapterInfo = (IP_ADAPTER_INFO*)_pgm_heap_alloc (ulOutBufLen);
+		dwRet = GetAdaptersInfo (pAdapterInfo, &ulOutBufLen);
+		if (ERROR_BUFFER_OVERFLOW == dwRet) {
+			_pgm_heap_free (pAdapterInfo);
 			pAdapterInfo = NULL;
-		}
-		pAdapterInfo = (IP_ADAPTER_INFO*)pgm_malloc (ulOutBufLen);
-		dwRet = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen);
-		if (ERROR_BUFFER_OVERFLOW != dwRet)
+		} else {
 			break;
+		}
 	}
 
 	switch (dwRet) {
@@ -491,7 +523,8 @@ _pgm_getadaptersinfo (
 				PGM_ERROR_DOMAIN_IF,
 				PGM_ERROR_NOBUFS,
 				_("GetAdaptersInfo repeatedly failed with ERROR_BUFFER_OVERFLOW."));
-		free (pAdapterInfo);
+		if (pAdapterInfo)
+			_pgm_heap_free (pAdapterInfo);
 		return FALSE;
 	default:
 		pgm_set_error (error,
@@ -499,7 +532,8 @@ _pgm_getadaptersinfo (
 				pgm_error_from_adapter_errno (dwRet),
 				_("GetAdaptersInfo failed: %s"),
 				pgm_adapter_strerror (dwRet));
-		free (pAdapterInfo);
+		if (pAdapterInfo)
+			_pgm_heap_free (pAdapterInfo);
 		return FALSE;
 	}
 
@@ -520,6 +554,8 @@ _pgm_getadaptersinfo (
 		}
 	}
 
+	pgm_debug ("GetAdaptersInfo() discovered %d interfaces.", n);
+
 /* contiguous block for adapter list */
 	struct _pgm_ifaddrs* ifa = pgm_new0 (struct _pgm_ifaddrs, n);
 	struct _pgm_ifaddrs* ift = ifa;
@@ -536,18 +572,22 @@ _pgm_getadaptersinfo (
 /* skip null adapters */
 			if (strlen (pIPAddr->IpAddress.String) == 0)
 				continue;
+
 /* address */
 			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
 
 /* name */
-			pgm_debug ("name:%s", pAdapter->AdapterName);
+			pgm_debug ("name:%s IPv4 index:%lu",
+				pAdapter->AdapterName, pAdapter->Index);
 			ift->_ifa.ifa_name = ift->_name;
 			strncpy (ift->_ifa.ifa_name, pAdapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
 
 /* flags */
-			ift->_ifa.ifa_flags = 0;
+			ift->_ifa.ifa_flags = IFF_UP | IFF_BROADCAST | IFF_MULTICAST;
+			if (pAdapter->Type == MIB_IF_TYPE_LOOPBACK)
+				ift->_ifa.ifa_flags |= IFF_LOOPBACK;
 
 /* netmask */
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
@@ -561,7 +601,8 @@ _pgm_getadaptersinfo (
 		}
 	}
 
-	free (pAdapterInfo);
+	if (pAdapterInfo)
+		free (pAdapterInfo);
 	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }
@@ -573,19 +614,16 @@ _pgm_getadaptersaddresses (
 	pgm_error_t**	     restrict	error
 	)
 {
-	DWORD dwSize = sizeof(IP_ADAPTER_ADDRESSES), dwRet;
+	DWORD dwSize = DEFAULT_BUFFER_SIZE, dwRet;
 	IP_ADAPTER_ADDRESSES *pAdapterAddresses = NULL, *adapter;
 
 /* loop to handle interfaces coming online causing a buffer overflow
  * between first call to list buffer length and second call to enumerate.
  */
-	for (unsigned i = 100; i; i--)
+	for (unsigned i = MAX_TRIES; i; i--)
 	{
-		if (pAdapterAddresses) {
-			pgm_free (pAdapterAddresses);
-			pAdapterAddresses = NULL;
-		}
-		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)pgm_malloc (dwSize);
+		pgm_debug ("IP_ADAPTER_ADDRESSES buffer length %lu bytes.", dwSize);
+		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
 		dwRet = GetAdaptersAddresses (AF_UNSPEC,
 						GAA_FLAG_INCLUDE_PREFIX |
 						GAA_FLAG_SKIP_ANYCAST |
@@ -593,10 +631,14 @@ _pgm_getadaptersaddresses (
 						GAA_FLAG_SKIP_FRIENDLY_NAME |
 						GAA_FLAG_SKIP_MULTICAST,
 						NULL,
-						NULL,
+						pAdapterAddresses,
 						&dwSize);
-		if (ERROR_BUFFER_OVERFLOW != dwRet)
+		if (ERROR_BUFFER_OVERFLOW == dwRet) {
+			_pgm_heap_free (pAdapterAddresses);
+			pAdapterAddresses = NULL;
+		} else {
 			break;
+		}
 	}
 
 	switch (dwRet) {
@@ -607,7 +649,8 @@ _pgm_getadaptersaddresses (
                                 PGM_ERROR_DOMAIN_IF,
 				PGM_ERROR_NOBUFS,
                                 _("GetAdaptersAddresses repeatedly failed with ERROR_BUFFER_OVERFLOW."));
-                free (pAdapterAddresses);
+		if (pAdapterAddresses)
+	                free (pAdapterAddresses);
                 return FALSE;
         default:
                 pgm_set_error (error,
@@ -615,7 +658,8 @@ _pgm_getadaptersaddresses (
                                 pgm_error_from_adapter_errno (dwRet),
                                 _("GetAdaptersAddresses failed: %s"),
                                 pgm_adapter_strerror (dwRet));
-                free (pAdapterAddresses);
+		if (pAdapterAddresses)
+                	free (pAdapterAddresses);
                 return FALSE;
 	}
 
@@ -666,7 +710,8 @@ _pgm_getadaptersaddresses (
 			memcpy (ift->_ifa.ifa_addr, unicast->Address.lpSockaddr, unicast->Address.iSockaddrLength);
 
 /* name */
-			pgm_debug ("name:%s", adapter->AdapterName);
+			pgm_debug ("name:%s IPv4 index:%lu IPv6 index:%lu",
+				adapter->AdapterName, adapter->IfIndex, adapter->Ipv6IfIndex);
 			ift->_ifa.ifa_name = ift->_name;
 			strncpy (ift->_ifa.ifa_name, adapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
@@ -727,7 +772,8 @@ _pgm_getadaptersaddresses (
 		}
 	}
 
-	free (pAdapterAddresses);
+	if (pAdapterAddresses)
+		free (pAdapterAddresses);
 	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }

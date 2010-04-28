@@ -1019,6 +1019,7 @@ pgm_transport_bind (
 		recv_addr.s6.sin6_family = AF_INET6;
 		recv_addr.s6.sin6_addr = in6addr_any;
 	}
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY."));
 #else
 	if (!_pgm_indextoaddr (transport->recv_gsr[0].gsr_interface,
 			       transport->recv_gsr[0].gsr_group.ss_family,
@@ -1083,7 +1084,7 @@ pgm_transport_bind (
 #ifdef TRANSPORT_DEBUG
 	else
 	{
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %d"), transport->send_gsr.gsr_interface);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u"), transport->send_gsr.gsr_interface);
 	}
 #endif
 
@@ -1288,6 +1289,7 @@ pgm_transport_bind (
 		}
 	}
 
+pgm_debug("find send interface"); fflush(stdout);
 /* send group (singular) */
 	if (0 != pgm_sockaddr_multicast_if (transport->send_sock,
 					    (struct sockaddr*)&transport->send_addr,
@@ -1927,7 +1929,7 @@ pgm_transport_join_group (
 			char s[INET6_ADDRSTRLEN];
 			pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, s, sizeof(s));
 			if (transport->recv_gsr[i].gsr_interface) {
-				pgm_warn(_("Transport has already joined group %s on interface %d"), s, gr->gr_interface);
+				pgm_warn(_("Transport has already joined group %s on interface %u"), s, gr->gr_interface);
 			} else {
 				pgm_warn(_("Transport has already joined group %s on all interfaces."), s);
 			}

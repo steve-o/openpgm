@@ -35,6 +35,9 @@
 #include "pgm/source.h"
 #include "pgm/packet_parse.h"
 #include "pgm/timer.h"
+#ifdef _WIN32
+#	include "pgm/engine.h"
+#endif
 
 
 //#define RECV_DEBUG
@@ -44,10 +47,6 @@
 #endif
 
 #ifdef _WIN32
-#	ifndef WSAID_WSARECVMSG
-/* http://cvs.winehq.org/cvsweb/wine/include/mswsock.h */
-#		define WSAID_WSARECVMSG {0xf689d7c8,0x6f1f,0x436b,{0x8a,0x53,0xe5,0x4f,0xe3,0x51,0xc3,0x22}}
-#	endif
 #	define cmsghdr wsacmsghdr
 #	define CMSG_FIRSTHDR(msg)	WSA_CMSG_FIRSTHDR(msg)
 #	define CMSG_NXTHDR(msg, cmsg)	WSA_CMSG_NXTHDR(msg, cmsg)
@@ -123,28 +122,13 @@ recvskb (
 	};
 	msg.Control.buf		= aux;
 	msg.Control.len		= sizeof(aux);
-
-	LPFN_WSARECVMSG WSARecvMsg_ = NULL;
-	if (PGM_UNLIKELY(!WSARecvMsg_)) {
-		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
-		DWORD cbBytesReturned;
-		if (SOCKET_ERROR == WSAIoctl (transport->recv_sock,
-					      SIO_GET_EXTENSION_FUNCTION_POINTER,
-				 	      &WSARecvMsg_GUID, sizeof(WSARecvMsg_GUID),
-		 			      &WSARecvMsg_, sizeof(WSARecvMsg_),
-		 			      &cbBytesReturned,
-					      NULL,
-					      NULL))
-		{
-			pgm_fatal (_("WSARecvMsg function not found."));
-			abort ();
-			return -1;
-		}
-	}
-
 	DWORD len;
-	if (SOCKET_ERROR == WSARecvMsg_ (transport->recv_sock, &msg, &len, NULL, NULL))
+pgm_debug ("call pgm_WSARecvMsg");
+	if (SOCKET_ERROR == pgm_WSARecvMsg (transport->recv_sock, &msg, &len, NULL, NULL)) {
+pgm_debug ("pgm_WSARecvMsg return SOCKET_ERROR, %s", pgm_wsastrerror (WSAGetLastError()));
 		return -1;
+	}
+pgm_debug ("pgm_WSARecvMsg return len %d", (int)len);
 #	endif /* !_WIN32 */
 #endif /* !CONFIG_TARGET_WINE */
 
