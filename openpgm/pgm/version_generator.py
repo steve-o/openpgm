@@ -38,7 +38,7 @@ print """
 
 const unsigned pgm_major_version = 3;
 const unsigned pgm_minor_version = 0;
-const unsigned pgm_micro_version = 46;
+const unsigned pgm_micro_version = 47;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";
 const char* pgm_build_system = "%s";
@@ -47,6 +47,6 @@ const char* pgm_build_revision = "%s";
 
 
 /* eof */
-"""%(build_date, build_time, platform.system, platform.machine, build_rev)
+"""%(build_date, build_time, platform.system(), platform.machine(), build_rev)
 
 # end of file

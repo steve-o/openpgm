@@ -40,7 +40,7 @@ struct pgm_mutex_t {
 	pthread_mutex_t		pthread_mutex;
 #else
 	HANDLE			win32_mutex;
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 };
 
 typedef struct pgm_mutex_t pgm_mutex_t;
@@ -65,7 +65,7 @@ struct pgm_cond_t {
 	size_t			len;
 	size_t			allocated_len;
 	HANDLE*			phandle;
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 };
 
 typedef struct pgm_cond_t pgm_cond_t;
