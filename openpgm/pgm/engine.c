@@ -34,7 +34,9 @@
 /* globals */
 int			pgm_ipproto_pgm = IPPROTO_PGM;
 
+#ifdef _WIN32
 LPFN_WSARECVMSG		pgm_WSARecvMsg = NULL;
+#endif
 
 
 /* locals */
