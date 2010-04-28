@@ -155,7 +155,8 @@ pgm_sockaddr_pton (
 		.ai_protocol	= IPPROTO_TCP,		/* not really */
 		.ai_flags	= AI_NUMERICHOST
 	}, *result = NULL;
-	if (0 == getaddrinfo (src, NULL, &hints, &result)) {
+	const int status = getaddrinfo (src, NULL, &hints, &result);
+	if (PGM_LIKELY(0 == status)) {
 		memcpy (dst, result->ai_addr, result->ai_addrlen);
 		freeaddrinfo (result);
 		return 1;

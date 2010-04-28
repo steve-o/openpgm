@@ -34,10 +34,19 @@
 /* globals */
 int			pgm_ipproto_pgm = IPPROTO_PGM;
 
+LPFN_WSARECVMSG		pgm_WSARecvMsg = NULL;
+
 
 /* locals */
 static bool		pgm_is_supported = FALSE;
 static volatile uint32_t pgm_ref_count	 = 0;
+
+#ifdef _WIN32
+#	ifndef WSAID_WSARECVMSG
+/* http://cvs.winehq.org/cvsweb/wine/include/mswsock.h */
+#		define WSAID_WSARECVMSG {0xf689d7c8,0x6f1f,0x436b,{0x8a,0x53,0xe5,0x4f,0xe3,0x51,0xc3,0x22}}
+#	endif
+#endif
 
 
 /* startup PGM engine, mainly finding PGM protocol definition, if any from NSS
@@ -67,7 +76,7 @@ pgm_init (
 	pgm_mem_init();
 	pgm_rand_init();
 
-#ifdef G_OS_WIN32
+#ifdef _WIN32
 	WORD wVersionRequested = MAKEWORD (2, 2);
 	WSADATA wsaData;
 	if (WSAStartup (wVersionRequested, &wsaData) != 0)
@@ -85,12 +94,47 @@ pgm_init (
 	{
 		WSACleanup();
 		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_ENGINE,
-			     PGM_ERROR_FAILED,
-			     _("WSAStartup failed to provide requested version 2.2."));
+			       PGM_ERROR_DOMAIN_ENGINE,
+			       PGM_ERROR_FAILED,
+			       _("WSAStartup failed to provide requested version 2.2."));
 		goto err_shutdown;
 	}
-#endif /* G_OS_WIN32 */
+
+#	ifndef CONFIG_TARGET_WINE
+/* find WSARecvMsg API */
+	if (NULL == pgm_WSARecvMsg) {
+		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
+		DWORD cbBytesReturned;
+		const SOCKET sock = socket (AF_INET, SOCK_DGRAM, 0);
+		if (SOCKET_ERROR == sock) {
+			WSACleanup();
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_ENGINE,
+				       PGM_ERROR_FAILED,
+				       _("Cannot open socket."));
+			goto err_shutdown;
+		}
+		if (SOCKET_ERROR == WSAIoctl (sock,
+					      SIO_GET_EXTENSION_FUNCTION_POINTER,
+					      &WSARecvMsg_GUID, sizeof(WSARecvMsg_GUID),
+					      &pgm_WSARecvMsg, sizeof(pgm_WSARecvMsg),
+					      &cbBytesReturned,
+					      NULL,
+					      NULL))
+		{
+			closesocket (sock);
+			WSACleanup();
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_ENGINE,
+				       PGM_ERROR_FAILED,
+				       _("WSARecvMsg function not found."));
+			goto err_shutdown;
+		}
+		pgm_debug ("Retrieved address of WSARecvMsg.");
+		closesocket (sock);
+	}
+#	endif
+#endif /* _WIN32 */
 
 /* find PGM protocol id overriding default value, use first value from NIS */
 #ifdef CONFIG_HAVE_GETPROTOBYNAME_R
@@ -119,8 +163,13 @@ pgm_init (
 	const struct protoent *proto = getprotobyname ("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != pgm_ipproto_pgm) {
+#ifndef _WIN32
 			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
 				proto->p_proto);
+#else
+			pgm_minor (_("Setting PGM protocol number to %i from %SYSTEMROOT%\\system32\\drivers\\etc\\protocols."),
+				proto->p_proto);
+#endif
 			pgm_ipproto_pgm = proto->p_proto;
 		}
 	}
@@ -131,6 +180,9 @@ pgm_init (
 	if (!pgm_time_init (&sub_error)) {
 		if (sub_error)
 			pgm_propagate_error (error, sub_error);
+#ifdef _WIN32
+		WSACleanup();
+#endif
 		goto err_shutdown;
 	}
 
@@ -178,7 +230,7 @@ pgm_shutdown (void)
 
 	pgm_time_shutdown();
 
-#ifdef G_OS_WIN32
+#ifdef _WIN32
 	WSACleanup();
 #endif
 

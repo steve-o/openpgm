@@ -118,7 +118,7 @@ main (
 		while (optind < argc) {
 			const int status = pgm_send (transport, argv[optind], strlen (argv[optind]) + 1, NULL);
 		        if (PGM_IO_STATUS_NORMAL != status) {
-				fprintf (stderr, "pgm_send() failed.");
+				fprintf (stderr, "pgm_send() failed.\n");
 		        }
 			optind++;
 		}

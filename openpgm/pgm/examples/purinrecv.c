@@ -138,7 +138,7 @@ main (
 #endif /* !_WIN32 */
 
 	if (!on_startup()) {
-		fprintf (stderr, "Startup failed");
+		fprintf (stderr, "Startup failed\n");
 		return EXIT_FAILURE;
 	}
 
@@ -180,12 +180,12 @@ main (
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
 			pgm_transport_get_timer_pending (transport, &tv);
-			printf ("Wait on fd or pending timer %ld:%ld",
+			printf ("Wait on fd or pending timer %ld:%ld\n",
 				   (long)tv.tv_sec, (long)tv.tv_usec);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (transport, &tv);
-			printf ("wait on fd or rate limit timeout %ld:%ld",
+			printf ("wait on fd or rate limit timeout %ld:%ld\n",
 				   (long)tv.tv_sec, (long)tv.tv_usec);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
@@ -209,7 +209,7 @@ block:
 
 		default:
 			if (pgm_err) {
-				fprintf (stderr, "%s", pgm_err->message);
+				fprintf (stderr, "%s\n", pgm_err->message);
 				pgm_error_free (pgm_err);
 				pgm_err = NULL;
 			}
@@ -263,6 +263,7 @@ on_console_ctrl (
 	)
 {
 	printf ("on_console_ctrl (dwCtrlType:%lu)\n", (unsigned long)dwCtrlType);
+	is_terminated = TRUE;
 	SetEvent (terminate_event);
 	return TRUE;
 }

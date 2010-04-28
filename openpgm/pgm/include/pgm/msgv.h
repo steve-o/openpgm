@@ -42,7 +42,7 @@ struct pgm_iovec {
 /* match WSABUF */
 	u_long		iov_len;
 	char*		iov_base;
-#endif /* G_OS_WIN32 */
+#endif /* _WIN32 */
 };
 
 struct pgm_msgv_t {
