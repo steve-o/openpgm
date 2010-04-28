@@ -26,7 +26,9 @@
 #ifndef __PGM_INDEXTOADDR_H__
 #define __PGM_INDEXTOADDR_H__
 
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/types.h>
 #include <pgm/error.h>
 

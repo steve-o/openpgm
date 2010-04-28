@@ -23,9 +23,11 @@
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 #include "pgm/net.h"
@@ -95,7 +97,7 @@ pgm_sendto (
 		pgm_mutex_lock (&transport->send_mutex);
 
 	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
-	pgm_debug ("sendto returned %zu", sent);
+	pgm_debug ("sendto returned %zd", sent);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
 		errno != EHOSTUNREACH &&	/* No route to host */

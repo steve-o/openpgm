@@ -20,8 +20,10 @@
  */
 
 #include <errno.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#	include <netdb.h>
+#endif
 #include <pgm/framework.h>
 
 

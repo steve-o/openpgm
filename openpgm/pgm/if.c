@@ -23,9 +23,11 @@
 #include <errno.h>
 #include <ctype.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 
@@ -97,7 +99,7 @@ pgm_if_print_all (void)
 		char rname[IF_NAMESIZE * 2 + 3];
 		char b[IF_NAMESIZE * 2 + 3];
 
-		if_indextoname (i, rname);
+		pgm_if_indextoname (i, rname);
 		sprintf (b, "%s (%s)",
 			ifa->ifa_name ? ifa->ifa_name : "(null)", rname);
 

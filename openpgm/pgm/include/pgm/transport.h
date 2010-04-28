@@ -28,8 +28,10 @@
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
-#include <sys/select.h>
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/select.h>
+#	include <sys/socket.h>
+#endif
 #include <pgm/types.h>
 
 typedef struct pgm_transport_t pgm_transport_t;

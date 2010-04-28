@@ -26,7 +26,9 @@
 #ifndef __PGM_SOCKADDR_H__
 #define __PGM_SOCKADDR_H__
 
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS

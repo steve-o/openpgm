@@ -35,8 +35,13 @@
 #	include <stdint.h>
 #else
 /* g++ v3 and other ancient compilers */
-#	define bool	int
+#	define bool		int
 #	include <stdint.h>
+#endif
+
+#ifdef _WIN32
+#	include <ws2tcpip.h>
+#	define sa_family_t	ULONG
 #endif
 
 PGM_BEGIN_DECLS

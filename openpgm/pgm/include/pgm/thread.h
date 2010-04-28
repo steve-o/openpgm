@@ -62,7 +62,9 @@ struct pgm_cond_t {
 	CONDITION_VARIABLE	win32_cond;
 #else
 	CRITICAL_SECTION	win32_spinlock;
-	GPtrArray		array;
+	size_t			len;
+	size_t			allocated_len;
+	HANDLE*			phandle;
 #endif /* !G_OS_UNIX */
 };
 
@@ -78,10 +80,10 @@ struct pgm_rwlock_t {
 	CRITICAL_SECTION	win32_spinlock;
 	pgm_cond_t		read_cond;
 	pgm_cond_t		write_cond;
-	guint			read_counter;
-	gboolean		have_writer;
-	guint			want_to_read;
-	guint			want_to_write;
+	unsigned		read_counter;
+	bool			have_writer;
+	unsigned		want_to_read;
+	unsigned		want_to_write;
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 };
 
@@ -96,7 +98,7 @@ static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
 	pthread_mutex_lock (&mutex->pthread_mutex);
 #else
 	WaitForSingleObject (mutex->win32_mutex, INFINITE);
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 }
 
 static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
@@ -104,7 +106,7 @@ static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
 	pthread_mutex_unlock (&mutex->pthread_mutex);
 #else
 	ReleaseMutex (mutex->win32_mutex);
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 }
 
 void pgm_spinlock_init (pgm_spinlock_t*);
@@ -116,7 +118,7 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 	pthread_spin_lock (&spinlock->pthread_spinlock);
 #else
 	EnterCriticalSection (&spinlock->win32_spinlock);
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
@@ -124,7 +126,7 @@ static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
 #else
 	LeaveCriticalSection (&spinlock->win32_spinlock);
-#endif /* !G_OS_UNIX */
+#endif /* !_WIN32 */
 }
 
 void pgm_cond_init (pgm_cond_t*);
@@ -136,9 +138,6 @@ void pgm_cond_wait (pgm_cond_t*, pthread_mutex_t*);
 void pgm_cond_wait (pgm_cond_t*, CRITICAL_SECTION*);
 #endif
 void pgm_cond_free (pgm_cond_t*);
-
-void pgm_rwlock_init (pgm_rwlock_t*);
-void pgm_rwlock_free (pgm_rwlock_t*);
 
 #ifndef _WIN32
 static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {

@@ -42,5 +42,8 @@
 #if defined(_BSD_SOURCE) || defined(__BSD_VISIBLE) || (_XOPEN_SOURCE - 0) >= 500
 #	define CONFIG_HAVE_USLEEP
 #endif
+#if defined(_WIN32)
+#	define CONFIG_HAVE_FTIME
+#endif
 
 #endif /* __PGM_FEATURES_H__ */

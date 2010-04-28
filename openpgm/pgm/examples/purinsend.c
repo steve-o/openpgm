@@ -21,6 +21,9 @@
 
 #include <locale.h>
 #include <stdio.h>
+#ifdef _WIN32
+#	include "getopt.h"
+#endif
 #include <pgm/pgm.h>
 
 

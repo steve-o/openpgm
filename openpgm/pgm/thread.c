@@ -28,7 +28,7 @@
 /* Globals */
 
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
-static DWORD g_cond_event_tls = TLS_OUT_OF_INDEXES;
+static DWORD cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
 
 static volatile uint32_t thread_ref_count = 0;
@@ -46,7 +46,7 @@ static volatile uint32_t thread_ref_count = 0;
 		} while (0)
 #	define posix_check_cmd(cmd) posix_check_err ((cmd), #cmd)
 #else
-#	define win32_check_err(err, name)
+#	define win32_check_err(err, name) \
 		do { \
 			const bool save_error = (err); \
 			if (PGM_UNLIKELY(!save_error)) { \
@@ -68,7 +68,7 @@ pgm_thread_init (void)
 		return;
 
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
-	win32_check_err (TLS_OUT_OF_INDEXES != (g_cond_event_tls = TlsAlloc ()));
+	win32_check_cmd (TLS_OUT_OF_INDEXES != (cond_event_tls = TlsAlloc ()));
 #endif
 }
 
@@ -81,7 +81,7 @@ pgm_thread_shutdown (void)
 		return;
 
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
-	TlsFree (g_cond_event_tls);
+	TlsFree (cond_event_tls);
 #endif
 }
 
@@ -113,7 +113,7 @@ pgm_mutex_trylock (
 	posix_check_err (result, "pthread_mutex_trylock");
 	return TRUE;
 #else
-	const DWORD result;
+	DWORD result;
 	win32_check_cmd (WAIT_FAILED != (result = WaitForSingleObject (mutex->win32_mutex, 0)));
 	return WAIT_TIMEOUT != result;
 #endif /* !_WIN32 */
@@ -187,7 +187,9 @@ pgm_cond_init (
 #elif defined(CONFIG_HAVE_WIN_COND)
 	InitializeConditionVariable (&cond->win32_cond);
 #else
-	cond->array = g_ptr_array_new ();
+	cond->len = 0;
+	cond->allocated_len = pgm_nearest_power (1, 2 + 1);
+	cond->phandle = pgm_new (HANDLE, cond->allocated_len);
 	InitializeCriticalSection (&cond->win32_spinlock);
 #endif /* !_WIN32 */
 }
@@ -204,9 +206,10 @@ pgm_cond_signal (
 	WakeConditionVariable (&cond->win32_cond);
 #else
 	EnterCriticalSection (&cond->win32_spinlock);
-	if (cond->array->len > 0) {
-		SetEvent (g_ptr_array_index (cond->array, 0));
-		g_ptr_array_remove_index (cond->array, 0);
+	if (cond->len > 0) {
+		SetEvent (cond->phandle[ 0 ]);
+		memmove (&cond->phandle[ 0 ], &cond->phandle[ 1 ], cond->len - 1);
+		cond->len--;
 	}
 	LeaveCriticalSection (&cond->win32_spinlock);
 #endif /* !_WIN32 */
@@ -224,10 +227,10 @@ pgm_cond_broadcast (
 	WakeAllConditionVariable (&cond->win32_cond);
 #else
 	EnterCriticalSection (&cond->win32_spinlock);
-	for (unsigned i = 0; i < cond->array->len; i++)
-		SetEvent (g_ptr_array_index (cond->array, i));
-	g_ptr_array_set_size (cond->array, 0);
-	LeaveCriticalSection (&mutex->win32_cond);
+	for (unsigned i = 0; i < cond->len; i++)
+		SetEvent (cond->phandle[ i ]);
+	cond->len = 0;
+	LeaveCriticalSection (&cond->win32_spinlock);
 #endif /* !_WIN32 */
 }
 
@@ -254,26 +257,37 @@ pgm_cond_wait (
 #	if defined(CONFIG_HAVE_WIN_COND)
 	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
 #	else
-	gulong status;
-	HANDLE event = TlsGetValue (g_cond_event_tls);
+	DWORD status;
+	HANDLE event = TlsGetValue (cond_event_tls);
 
 	if (!event) {
 		win32_check_cmd (event = CreateEvent (0, FALSE, FALSE, NULL));
-		TlsSetValue (g_cond_event_tls, event);
+		TlsSetValue (cond_event_tls, event);
 	}
 
 	EnterCriticalSection (&cond->win32_spinlock);
 	pgm_assert (WAIT_TIMEOUT == WaitForSingleObject (event, 0));
-	g_ptr_array_add (cond->array, event);
+	if ((cond->len + 1) > cond->allocated_len) {
+		cond->allocated_len = pgm_nearest_power (1, cond->len + 1 + 1);
+		cond->phandle	    = pgm_realloc (cond->phandle, cond->allocated_len);
+	}
+	cond->phandle[ cond->len++ ] = event;
 	LeaveCriticalSection (&cond->win32_spinlock);
 
 	EnterCriticalSection (spinlock);
 	win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, INFINITE)));
 	LeaveCriticalSection (spinlock);
 
-	if (WAIT_TIMEOUT == retval) {
+	if (WAIT_TIMEOUT == status) {
 		EnterCriticalSection (&cond->win32_spinlock);
-		g_ptr_array_remove (cond->array, event);
+		for (unsigned i = 0; i < cond->len; i++) {
+			if (cond->phandle[ i ] == event) {
+				if (i != cond->len - 1)
+					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
+				cond->len--;
+				break;
+			}
+		}
 		win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, 0)));
 		LeaveCriticalSection (&cond->win32_spinlock);
 	}
@@ -293,7 +307,7 @@ pgm_cond_free (
 	/* nop */
 #else
 	DeleteCriticalSection (&cond->win32_spinlock);
-	g_ptr_array_free (cond->array, TRUE);
+	pgm_free (cond->phandle);
 #endif /* !_WIN32 */
 }
 
@@ -309,8 +323,8 @@ pgm_rwlock_init (
 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
 #else
 	InitializeCriticalSection (&rwlock->win32_spinlock);
-	_pgm_cond_init (&rwlock->read_cond);
-	_pgm_cond_init (&rwlock->write_cond);
+	pgm_cond_init (&rwlock->read_cond);
+	pgm_cond_init (&rwlock->write_cond);
 	rwlock->read_counter	= 0;
 	rwlock->have_writer	= FALSE;
 	rwlock->want_to_read	= 0;
@@ -329,8 +343,8 @@ pgm_rwlock_free (
 #elif !defined(_WIN32)
 	pthread_rwlock_destroy (&rwlock->pthread_rwlock);
 #else
-	_pgm_cond_free (&rwlock->read_cond);
-	_pgm_cond_free (&rwlock->write_cond);
+	pgm_cond_free (&rwlock->read_cond);
+	pgm_cond_free (&rwlock->write_cond);
 	DeleteCriticalSection (&rwlock->win32_spinlock);
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
@@ -358,19 +372,19 @@ pgm_rwlock_reader_lock (
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->want_to_read++;
 	while (rwlock->have_writer || rwlock->want_to_write)
-		_pgm_cond_wait (&rwlock->read_cond, &rwlock->win32_spinlock);
+		pgm_cond_wait (&rwlock->read_cond, &rwlock->win32_spinlock);
 	rwlock->want_to_read--;
 	rwlock->read_counter++;
 	LeaveCriticalSection (&rwlock->win32_spinlock);
 }
 
-gboolean
+bool
 pgm_rwlock_reader_trylock (
 	pgm_rwlock_t*	rwlock
 	)
 {
 	pgm_assert (NULL != rwlock);
-	gboolean status;
+	bool status;
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	if (!rwlock->have_writer && !rwlock->want_to_write) {
 		rwlock->read_counter++;
@@ -403,7 +417,7 @@ pgm_rwlock_writer_lock (
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->want_to_write++;
 	while (rwlock->have_writer || rwlock->read_counter)
-		_pgm_cond_wait (&rwlock->write_cond, &rwlock->win32_spinlock);
+		pgm_cond_wait (&rwlock->write_cond, &rwlock->win32_spinlock);
 	rwlock->want_to_write--;
 	rwlock->have_writer = TRUE;
 	LeaveCriticalSection (&rwlock->win32_spinlock);

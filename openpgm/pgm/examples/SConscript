@@ -8,6 +8,10 @@ Import('env');
 e = env.Clone();
 e.Prepend(LIBS = ['libpgm']);
 p = e.Clone();
+if '-DCONFIG_HAVE_GETOPT' in env['CCFLAGS']:
+	getopt = []
+else:
+	getopt = ['getopt.c']
 
 if e['WITH_GLIB'] == 'true':
 	e.Prepend(LIBS = ['libpgmex']);
@@ -64,7 +68,7 @@ if e['WITH_GLIB'] == 'true':
 		ep.Program(['pgmping.cc', 'ping.pb.cc', ep['PROTOBUF_LIBS']])
 
 # Vanilla example
-p.Program(['purinsend.c'])
-p.Program(['purinrecv.c'])
+p.Program(['purinsend.c'] + getopt)
+p.Program(['purinrecv.c'] + getopt)
 
 # end of file

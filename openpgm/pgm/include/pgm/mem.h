@@ -28,6 +28,8 @@
 
 #ifdef CONFIG_HAVE_ALLOCA_H
 #	include <alloca.h>
+#elif defined(_WIN32)
+#	include <malloc.h>
 #else
 #	include <stdlib.h>
 #endif

@@ -22,7 +22,9 @@
 #ifndef __PGM_RECEIVER_H__
 #define __PGM_RECEIVER_H__
 
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/framework.h>
 
 typedef struct pgm_peer_t pgm_peer_t;
