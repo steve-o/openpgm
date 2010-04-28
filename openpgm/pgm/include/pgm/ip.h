@@ -52,7 +52,9 @@
 #ifndef __PGM_IP_H__
 #define __PGM_IP_H__
 
-#include <netinet/in.h>
+#ifndef _WIN32
+#	include <netinet/in.h>
+#endif
 #include <sys/param.h>
 #include <pgm/types.h>
 

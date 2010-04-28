@@ -20,7 +20,9 @@
  */
 
 #include <errno.h>
-#include <netdb.h>
+#ifndef _WIN32
+#	include <netdb.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 

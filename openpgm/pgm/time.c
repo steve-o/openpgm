@@ -79,6 +79,9 @@ static pgm_time_t		pgm_clock_nanosleep (const uint32_t);
 #endif
 #ifdef CONFIG_HAVE_FTIME
 #	include <sys/timeb.h>
+#	ifdef _WIN32
+#		define ftime	_ftime
+#	endif
 static pgm_time_t		pgm_ftime_update (void);
 #endif
 #ifdef CONFIG_HAVE_GETTIMEOFDAY
@@ -99,9 +102,9 @@ static pgm_time_t		pgm_gettimeofday_update (void);
 /* HPET counter size maybe 64-bit or 32-bit */
 #	if defined(__x86_64__)
 typedef uint64_t hpet_counter_t;
-#else
+#	else
 typedef uint32_t hpet_counter_t;
-#endif
+#	endif
 static int			hpet_fd = -1;
 static char*			hpet_ptr;
 static uint64_t			hpet_offset = 0;
@@ -262,6 +265,9 @@ pgm_time_init (
 		break;
 #endif
 #ifdef CONFIG_HAVE_TSC
+#	ifdef _WIN32
+	default:
+#	endif
 	case 'T':
 		pgm_minor (_("Using TSC timer."));
 		pgm_time_update_now	= pgm_tsc_update;
@@ -276,11 +282,15 @@ pgm_time_init (
 		break;
 #endif
 
+#ifdef CONFIG_HAVE_GETTIMEOFDAY
+#	ifndef _WIN32
 	default:
+#	endif
 	case 'G':
 		pgm_minor (_("Using gettimeofday() timer."));
 		pgm_time_update_now	= pgm_gettimeofday_update;
 		break;
+#endif
 	}
 
 /* sleeping */
@@ -448,10 +458,13 @@ pgm_time_init (
 #	endif
 	   )
 	{
-#	ifndef CONFIG_HAVE_GETTIMEOFDAY
-#		error "gettimeofday() required to calculate counter offset"
-#	endif
+#	if defined( CONFIG_HAVE_GETTIMEOFDAY )
 		rel_offset = pgm_gettimeofday_update() - pgm_time_update_now();
+#	elif defined( CONFIG_HAVE_FTIME )
+		rel_offset = pgm_ftime_update() - pgm_time_update_now();
+#	else
+#		error "gettimeofday() or ftime() required to calculate counter offset"
+#	endif
 	}
 #else
 	rel_offset = 0;
@@ -728,8 +741,13 @@ pgm_tsc_init (
 			   "timing.  To prevent the start delay from this benchmark and use a stable clock "
 			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP."));
 /* force both to stable clocks even though one might be OK */
+#ifndef _WIN32
 		pgm_time_update_now	= pgm_gettimeofday_update;
 		pgm_time_sleep		= pgm_usleep;
+#else
+		pgm_time_update_now	= pgm_ftime_update;
+		pgm_time_sleep		= pgm_msleep;
+#endif
 		return TRUE;
 	}
 

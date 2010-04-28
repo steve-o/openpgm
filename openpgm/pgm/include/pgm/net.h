@@ -22,7 +22,9 @@
 #ifndef __PGM_NET_H__
 #define __PGM_NET_H__
 
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/framework.h>
 #include <pgm/transport.h>
 

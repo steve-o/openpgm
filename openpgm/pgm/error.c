@@ -19,7 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <netdb.h>
+#ifndef _WIN32
+#	include <netdb.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 
@@ -159,13 +161,13 @@ pgm_error_from_errno (
 	switch (from_errno) {
 #ifdef EAFNOSUPPORT
 	case EAFNOSUPPORT:
-		return PGM_ERROR_EAFNOSUPPORT;
+		return PGM_ERROR_AFNOSUPPORT;
 		break;
 #endif
 
 #ifdef EAGAIN
 	case EAGAIN:
-		return PGM_ERROR_EAGAIN;
+		return PGM_ERROR_AGAIN;
 		break;
 #endif
 

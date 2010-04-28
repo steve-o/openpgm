@@ -22,7 +22,9 @@
 #ifndef __PGM_PACKET_TEST_H__
 #define __PGM_PACKET_TEST_H__
 
-#include <netinet/in.h>
+#ifndef _WIN32
+#	include <netinet/in.h>
+#endif
 #include <pgm/framework.h>
 #include <pgm/skbuff.h>
 

@@ -22,7 +22,9 @@
 #ifndef __PGM_PACKET_PARSE_H__
 #define __PGM_PACKET_PARSE_H__
 
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/framework.h>
 #include <pgm/skbuff.h>
 

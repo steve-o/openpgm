@@ -27,6 +27,10 @@
 #if defined( sun )
 #	include <sys/sockio.h>
 #endif
+#if defined( _WIN32 )
+#	include <ws2tcpip.h>
+#	include <iphlpapi.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 
@@ -460,7 +464,6 @@ _pgm_getadaptersinfo (
 	)
 {
 	DWORD dwRet;
-	LPVOID lpMsgBuf = NULL;
 	ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
 	PIP_ADAPTER_INFO pAdapterInfo = NULL;
 	PIP_ADAPTER_INFO pAdapter = NULL;
@@ -486,7 +489,7 @@ _pgm_getadaptersinfo (
 	case ERROR_BUFFER_OVERFLOW:
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (ENOBUFS),
+				PGM_ERROR_NOBUFS,
 				_("GetAdaptersInfo repeatedly failed with ERROR_BUFFER_OVERFLOW."));
 		free (pAdapterInfo);
 		return FALSE;
@@ -495,7 +498,7 @@ _pgm_getadaptersinfo (
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_adapter_errno (dwRet),
 				_("GetAdaptersInfo failed: %s"),
-				adapter_strerror (dwRet));
+				pgm_adapter_strerror (dwRet));
 		free (pAdapterInfo);
 		return FALSE;
 	}
@@ -602,7 +605,7 @@ _pgm_getadaptersaddresses (
 	case ERROR_BUFFER_OVERFLOW:
                 pgm_set_error (error,
                                 PGM_ERROR_DOMAIN_IF,
-                                pgm_error_from_errno (ENOBUFS),
+				PGM_ERROR_NOBUFS,
                                 _("GetAdaptersAddresses repeatedly failed with ERROR_BUFFER_OVERFLOW."));
                 free (pAdapterAddresses);
                 return FALSE;
@@ -611,7 +614,7 @@ _pgm_getadaptersaddresses (
                                 PGM_ERROR_DOMAIN_IF,
                                 pgm_error_from_adapter_errno (dwRet),
                                 _("GetAdaptersAddresses failed: %s"),
-                                adapter_strerror (dwRet));
+                                pgm_adapter_strerror (dwRet));
                 free (pAdapterAddresses);
                 return FALSE;
 	}
@@ -663,7 +666,7 @@ _pgm_getadaptersaddresses (
 			memcpy (ift->_ifa.ifa_addr, unicast->Address.lpSockaddr, unicast->Address.iSockaddrLength);
 
 /* name */
-			g_trace ("name:%s", adapter->AdapterName);
+			pgm_debug ("name:%s", adapter->AdapterName);
 			ift->_ifa.ifa_name = ift->_name;
 			strncpy (ift->_ifa.ifa_name, adapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
@@ -701,7 +704,7 @@ _pgm_getadaptersaddresses (
 					pgm_warn (_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
 					prefixLength = 32;
 				}
-				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = g_htonl( 0xffffffffU << ( 32 - prefixLength ) );
+				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( 0xffffffffU << ( 32 - prefixLength ) );
 				break;
 
 			case AF_INET6:
@@ -728,7 +731,7 @@ _pgm_getadaptersaddresses (
 	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }
-#endif /* G_OS_WIN */
+#endif /* _WIN32 */
 
 /* returns TRUE on success setting ifap to a linked list of system interfaces,
  * returns FALSE on failure and sets error appropriately.
@@ -758,7 +761,7 @@ pgm_getifaddrs (
 	return TRUE;
 #elif defined(CONFIG_TARGET_WINE)
 	return _pgm_getadaptersinfo (ifap, error);
-#elif defined(G_OS_WIN)
+#elif defined(_WIN32)
 	return _pgm_getadaptersaddresses (ifap, error);
 #elif defined(SIOCGLIFCONF)
 	return _pgm_getlifaddrs (ifap, error);

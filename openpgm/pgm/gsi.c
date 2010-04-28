@@ -20,8 +20,10 @@
  */
 
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
+#ifndef _WIN32
+#	include <netdb.h>
+#endif
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
 
@@ -102,7 +104,7 @@ pgm_gsi_create_from_hostname (
 #ifndef _WIN32
 			     strerror (errno)
 #else
-			     wsa_strerror (WSAGetLastError())
+			     pgm_wsastrerror (WSAGetLastError())
 #endif
 				);
 		return FALSE;
@@ -136,7 +138,7 @@ pgm_gsi_create_from_addr (
 #ifndef _WIN32
 			     strerror (errno)
 #else
-			     wsa_strerror (WSAGetLastError())
+			     pgm_wsastrerror (WSAGetLastError())
 #endif
 				);
 		return FALSE;
