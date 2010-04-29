@@ -8,7 +8,7 @@ First install all the C compiler dependencies, SCons, and Subversion.
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ *svn checkout -r 941 http://openpgm.googlecode.com/svn/trunk*
+ $ *svn checkout -r 941 http://openpgm.googlecode.com/svn/trunk *
 </pre>
 Build.
 <pre>
