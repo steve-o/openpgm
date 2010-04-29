@@ -12,7 +12,7 @@ Install the library optional dependencies, primarily GLib, libsoup, and net-snmp
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-3-0-43*
+ $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-3-0-43 *
 </pre>
 Build.
 <pre>
