@@ -6,7 +6,7 @@ First install all the C compiler dependencies (including OS patches as needed), 
 
 Install the Sun Studio following provided instructions.  Prepare a helper source shell script or merge with the default environment.
 <pre>
- $ *cat - | sudo dd of=/opt/sunstudio12.1/sunstudiovars.sh* 
+ $ *cat - | sudo dd of=/opt/sunstudio12.1/sunstudiovars.sh
 #!/bin/sh
 if `[` -z "${PATH}" `]`
 then
@@ -20,7 +20,7 @@ then
 else
     MANPATH="/opt/sunstudio12.1/man:${MANPATH}"; export MANPATH
 fi
-^D
+^D*
 </pre>
 For convenience some executables are symlinked into the path.
 <pre>
@@ -31,32 +31,32 @@ For convenience some executables are symlinked into the path.
 </pre>
 Scons must be downloaded from http://sourceforge.net/projects/scons/files/
 <pre>
- $ */usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download* 
+ $ */usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download * 
  $ *gzcat scons-1.2.0.tar.gz | tar xvf -* 
  $ *cd scons-1.2.0* 
  $ *sudo python setup.py install* 
 </pre>
 Optionally, install the library dependencies, primarily GLib and pkg-config, this tutorial install everything into <tt>/opt/glib-sunstudio</tt>.  <tt>pkg-config</tt> is a binary and doesn't need to be specially built for v9 architecture.
 <pre>
- $ */usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz* 
+ $ */usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz * 
  $ *gzcat pkg-config-0.23.tar.gz | tar xvf -* 
  $ *cd pkg-config-0.23* 
  $ *PATH=/usr/ccs/bin:$PATH ./configure --with-installed-glib --prefix=/opt/glib-sunstudio* 
  $ *PATH=/usr/ccs/bin:$PATH make* 
  $ *sudo /usr/ccs/bin/make install* 
- $ *CFLAGS='-m64' LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-sunstudio/bin:/usr/ccs/bin:$PATH \*
+ $ *CFLAGS='-m64' LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-sunstudio/bin:/usr/ccs/bin:$PATH \* 
         *./configure --prefix=/opt/glib-sunstudio* 
  $ *PATH=/usr/ccs/bin:$PATH make* 
  $ *sudo PATH=/usr/ccs/bin:$PATH /usr/ccs/bin/make install* 
 </pre>
 If you have subversion installed (requires a significant amount of dependencies), checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide], otherwise download the latest tarball.
 <pre>
- $ */usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-2.1.26.tar.gz* 
- $ *gzcat libpgm-2.1.26.tar.gz | xvf -* 
+ $ */usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-3.0.43.tar.gz * 
+ $ *gzcat libpgm-3.0.43.tar.gz | xvf -* 
 </pre>
 Build.
 <pre>
- $ *cd release-2-1/openpgm/pgm* 
+ $ *cd libpgm-3.0.43/openpgm/pgm* 
  $ *. /opt/sunstudio12.1/sunstudiovars.sh* 
  $ *scons -f SConstruct.Solaris.sunstudio WITH_GLIB=true WITH_GETTEXT=true* 
 </pre>
@@ -77,11 +77,12 @@ The dynamic GLib libraries require an extra step for testing, for example,
 ==== Unit testing ====
 Unit testing depends upon the Check unit test suite and must be downloaded and compiled for each compiler.  Unfortunately the current Check source <tt>configure</tt> script does not support non-GNU environments too well and <tt>gmake</tt> must be used instead of Sun <tt>make</tt>.
 <pre>
- $ *wget http://downloads.sourceforge.net/project/check/check/0.9.8/check-0.9.8.tar.gz/download* 
+ $ *wget http://downloads.sourceforge.net/project/check/check/0.9.8/check-0.9.8.tar.gz/download * 
  $ *gzcat check-0.9.8.tar.gz  | tar xvf -* 
  $ *cd check-0.9.8* 
- $ *CFLAGS='-m64' PATH=/usr/ccs/bin:$PATH ./configure --prefix=/opt/glib-sunstudio --disable-shared \* 
-        *PATH=/usr/ccs/bin:/usr/sfw/bin:$PATH gmake* 
+ $ *CFLAGS='-m64' PATH=/usr/ccs/bin:$PATH \* 
+        *./configure --prefix=/opt/glib-sunstudio --disable-shared* 
+ $ *PATH=/usr/ccs/bin:/usr/sfw/bin:$PATH gmake* 
  $ *sudo PATH=/usr/ccs/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install* 
 </pre>
 
