@@ -17,6 +17,7 @@ Functional build but no available test report.
   * [OpenPgm3CReferenceBuildLibraryFreeBSD GCC 4.2.1] on FreeBSD 8.0
   * [OpenPgm3CReferenceBuildLibraryLinuxMinGW GCC 4.2.1] on Microsoft Windows XP, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm3CReferenceBuildLibraryLinuxWine GCC 4.2.1] on Wine 1.1.31, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
+  * [OpenPgm3CReferenceBuildLibraryOpenSolaris GCC 3.4.3] on !OpenSolaris 2009.06
 
 === Unsupported Platforms ===
 Platforms supported in OpenPGM version 2 but not supported in OpenPGM version 3.
