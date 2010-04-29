@@ -123,12 +123,9 @@ recvskb (
 	msg.Control.buf		= aux;
 	msg.Control.len		= sizeof(aux);
 	DWORD len;
-pgm_debug ("call pgm_WSARecvMsg");
 	if (SOCKET_ERROR == pgm_WSARecvMsg (transport->recv_sock, &msg, &len, NULL, NULL)) {
-pgm_debug ("pgm_WSARecvMsg return SOCKET_ERROR, %s", pgm_wsastrerror (WSAGetLastError()));
 		return -1;
 	}
-pgm_debug ("pgm_WSARecvMsg return len %d", (int)len);
 #	endif /* !_WIN32 */
 #endif /* !CONFIG_TARGET_WINE */
 
@@ -155,6 +152,9 @@ pgm_debug ("pgm_WSARecvMsg return len %d", (int)len);
 		     cmsg != NULL;
 		     cmsg = CMSG_NXTHDR(&msg, cmsg))
 		{
+/* both IP_PKTINFO and IP_RECVDSTADDR exist on OpenSolaris, so capture
+ * each type if defined.
+ */
 #ifdef IP_PKTINFO
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
@@ -173,7 +173,8 @@ pgm_debug ("pgm_WSARecvMsg return len %d", (int)len);
 				memcpy (dst_addr, &s4, sizeof(s4));
 				break;
 			}
-#elif defined(IP_RECVDSTADDR)
+#endif
+#ifdef IP_RECVDSTADDR
 			if (IPPROTO_IP == cmsg->cmsg_level &&
 			    IP_RECVDSTADDR == cmsg->cmsg_type)
 			{
@@ -191,6 +192,9 @@ pgm_debug ("pgm_WSARecvMsg return len %d", (int)len);
 				memcpy (dst_addr, &s4, sizeof(s4));
 				break;
 			}
+#endif
+#if !defined(IP_PKTINFO) && !defined(IP_RECVDSTADDR)
+#	error "No defined CMSG type for IPv4 destination address."
 #endif
 
 			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
