@@ -6,37 +6,37 @@ Microsoft Windows is supported by cross-compiling on Ubuntu 9.04 through 10.04 w
 
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>
- $ sudo apt-get install build-essential scons subversion mingw32 wine1.2
+ $ *sudo apt-get install build-essential scons subversion mingw32 wine1.2*
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ svn checkout -r 952 http://openpgm.googlecode.com/svn/trunk
- $ cd trunk/openpgm/pgm 
+ $ *svn checkout -r 952 http://openpgm.googlecode.com/svn/trunk* 
+ $ *cd trunk/openpgm/pgm* 
 </pre>
 Patch the mingw32 installation with updated Win32 headers.  For Ubuntu 9.04 or 9.10 use the 3.13 runtime patch,
 <pre>
- $ sudo patch -d /usr/i586-mingw32msvc/include < mingw32-runtime_3.13-1openpgm3.diff
+ $ *sudo patch -d /usr/i586-mingw32msvc/include < mingw32-runtime_3.13-1openpgm3.diff*
 </pre>
 For Ubuntu 10.04 use the 3.15 runtime patch,
 <pre>
- $ sudo patch -d /usr/i586-mingw32msvc/include < mingw32-runtime_3.15.2-0openpgm1.diff
+ $ *sudo patch -d /usr/i586-mingw32msvc/include < mingw32-runtime_3.15.2-0openpgm1.diff*
 </pre>
 Build.
 <pre>
- $ cd ..
- $ scons -f SConstruct.mingw-wine
+ $ *cd ..* 
+ $ *scons -f SConstruct.mingw-wine* 
 </pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug-Wine-i686</tt>:
 
 To build the release version in <tt>./ref/release-Wine-i686</tt> use the following:
 <pre>
- $ scons -f SConstruct.mingw-wine BUILD=release
+ $ *scons -f SConstruct.mingw-wine BUILD=release*
 </pre>
 
 ==== Testing ====
 Testing must be performed with the pure examples unless GLib is installed.  Unicode output may not be displayed correctly depending upon your system settings.
 <pre>
- $ ./ref/debug-Wine-i686/examples/purinrecv.exe -lp 7500 -n "eth0;239.192.0.1"
+ $ *./ref/debug-Wine-i686/examples/purinrecv.exe -lp 7500 -n "eth0;239.192.0.1"*
 プリン プリン
 Create transport.
 fixme:winsock:convert_aiflag_w2u Unhandled windows AI_xxx flags 20
@@ -46,7 +46,7 @@ Entering PGM message loop ...
 </pre>
 Then send a few messages, for example from the same host, native, via loopback
 <pre>
- $ ./ref/debug-Linux-i686/examples/purinsend -lp 7500 -n "eth0;239.192.0.1" purin purin
+ $ *./ref/debug-Linux-i686/examples/purinsend -lp 7500 -n "eth0;239.192.0.1" purin purin*
 </pre>
 And witness the receiver processing the incoming messages.
 <pre>

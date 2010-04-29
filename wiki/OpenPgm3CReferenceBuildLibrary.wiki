@@ -24,7 +24,6 @@ Platforms supported in OpenPGM version 2 but not supported in OpenPGM version 3.
   * Debian
   * OpenSUSE
   * Red Hat Enterprise Linux, or CentOS
-  * OpenSolaris
  
 === Unsupported Compilers ===
 Compilers supported in OpenPGM version 2 but not supported in OpenPGM version 3.
@@ -37,7 +36,7 @@ Two hosts are required for full PGM protocol testing, one to send the other to r
 
 On the receiving host run the OpenPGM receiver.
 <pre>
- kiku$ sudo ./ref/debug/examples/pgmrecv 
+ kiku$ *sudo ./ref/debug/examples/pgmrecv* 
  `*``*` Message: pgmrecv
  2008-05-27 18:02:53 kiku: scheduling startup.
  2008-05-27 18:02:53 kiku: entering main event loop ... 
@@ -47,7 +46,7 @@ On the receiving host run the OpenPGM receiver.
 </pre>
 On the sending host run the OpenPGM publisher.
 <pre>
- ayaka$ sudo ./ref/debug/examples/pgmsend mooooo baa
+ ayaka$ *sudo ./ref/debug/examples/pgmsend mooooo baa*
 </pre>
 Then on the receiver you should see the test messages.
 <pre>
@@ -58,16 +57,15 @@ Then on the receiver you should see the test messages.
 </pre>
 Without explicit network parameter passing OpenPGM will assume the default adapter and either IPv4 or IPv6 addressing.  If your operating system defaults to DHCP it is possible that the nodename of the host resolves to localhost and not a real adapter, it is then necessary to explicitly set the adapter name.  Similarly you might have problems with IPv6 auto-configuration and multiple scopes per adapter.  So on a default !OpenSolaris install you might wish to try the following:
 <pre>
- opensolaris$ sudo ./ref/debug/examples/pgmsend -n "pcn0;239.192.0.1" ichigo milk 
+ opensolaris$ *sudo ./ref/debug/examples/pgmsend -n "pcn0;239.192.0.1" ichigo milk*
 </pre>
 
 === PGM Testing on Multicast Loopback ===
 
 For multicast loopback testing using only one host requires use of a low-resolution timing mechanism as the <tt>/dev/rtc</tt> real-time clock device cannot be shared.  The example <tt>pgmrecv</tt> and <tt>pgmsend</tt> applications have convenience parameters to automagically enable this configuration.  For this demonstration we will also use UDP encapsulation of the PGM protocol so as not to require any extra system privileges.  On one terminal start a receiver.
 <pre>
- aiko$ ./ref/debug/examples/pgmrecv -lp 3065
+ aiko$ *./ref/debug/examples/pgmrecv -lp 3065* 
  `*``*` Message: pgmrecv
- 2008-11-19 17:59:05 aiko: setting low resolution timers for multicast loopback.
  2008-11-19 17:59:05 aiko: scheduling startup.
  2008-11-19 17:59:05 aiko: entering main event loop ... 
  2008-11-19 17:59:05 aiko: startup.
@@ -76,8 +74,7 @@ For multicast loopback testing using only one host requires use of a low-resolut
 </pre>
 In another terminal send some test messages:
 <pre>
- $ ./ref/debug/examples/pgmsend -lp 3065 mooo baa
- 2008-11-19 17:59:18 aiko: setting low resolution timers for multicast loopback.
+ $ *./ref/debug/examples/pgmsend -lp 3065 mooo baa* 
 </pre>
 In the receiving terminal you should see the correct receipt of two messages.
 <pre>

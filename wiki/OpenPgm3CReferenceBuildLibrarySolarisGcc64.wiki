@@ -6,90 +6,93 @@ First install all the C compiler dependencies, <tt>sudo</tt> and SCons.  GCC can
 
 For convenience some executables are symlinked into the path.
 <pre>
- $ su -
- # cd /usr/bin
- # chmod +s /usr/sfw/bin/sudo
- # ln -s /usr/sfw/bin/sudo
+ $ *su -* 
+ # *cd /usr/bin* 
+ # *chmod +s /usr/sfw/bin/sudo* 
+ # *ln -s /usr/sfw/bin/sudo* 
 </pre>
 Install the 64-bit capable GCC compiler, by default installs to <tt>/usr/local</tt>.
 <pre>
- $ /usr/sfw/bin/wget ftp://ftp.sunfreeware.com/pub/freeware/sparc/10/gcc-3.4.6-sol10-sparc-local.gz 
- $ gzip -d gcc-3.4.6-sol10-sparc-local.gz 
- $ sudo /usr/sbin/pkgadd -d gcc-3.4.6-sol10-sparc-local 
+ $ */usr/sfw/bin/wget ftp://ftp.sunfreeware.com/pub/freeware/sparc/10/gcc-3.4.6-sol10-sparc-local.gz* 
+ $ *gzip -d gcc-3.4.6-sol10-sparc-local.gz* 
+ $ *sudo /usr/sbin/pkgadd -d gcc-3.4.6-sol10-sparc-local* 
 </pre>
 Optionally, install libiconv as a dependency for GLib, it must be downloaded and built from source as sunfreeware.com do not include 64-bit binaries.
 <pre>
- $ /usr/sfw/bin/wget ftp://ftp.sunfreeware.com/pub/freeware/sparc/10/libiconv-1.13.1-sol10-sparc-local.gz 
- $ gzip -d libiconv-1.13.1-sol10-sparc-local.gz 
- $ sudo /usr/sbin/pkgadd -d libiconv-1.13.1-sol10-sparc-local
- $ get ftp://ftp.sunfreeware.com/pub/freeware/SOURCES/libiconv-1.13.1.tar.gz 
- $ gzip -d libiconv-1.13.1.tar.gz 
- $ tar xf libiconv-1.13.1.tar 
- $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' \
-PATH=/usr/local/bin:/usr/sfw/bin:$PATH ./configure --prefix=/usr/local --libdir=/usr/local/lib/sparcv9
-
- $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
- $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+ $ */usr/sfw/bin/wget ftp://ftp.sunfreeware.com/pub/freeware/sparc/10/libiconv-1.13.1-sol10-sparc-local.gz* 
+ $ *gzip -d libiconv-1.13.1-sol10-sparc-local.gz* 
+ $ *sudo /usr/sbin/pkgadd -d libiconv-1.13.1-sol10-sparc-loca* 
+ $ *get ftp://ftp.sunfreeware.com/pub/freeware/SOURCES/libiconv-1.13.1.tar.gz* 
+ $ *gzip -d libiconv-1.13.1.tar.gz* 
+ $ *tar xf libiconv-1.13.1.tar* 
+ $ *MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' \* 
+        *PATH=/usr/local/bin:/usr/sfw/bin:$PATH \* 
+        *./configure --prefix=/usr/local --libdir=/usr/local/lib/sparcv9* 
+ $ *PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake* 
+ $ *sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install* 
 </pre>
 Scons must be downloaded from http://sourceforge.net/projects/scons/files/
 <pre>
- $ /usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download 
- $ gzcat scons-1.2.0.tar.gz | tar xvf -
- $ cd scons-1.2.0
- $ sudo python setup.py install
+ $ */usr/sfw/bin/wget http://sourceforge.net/projects/scons/files/scons/1.2.0/scons-1.2.0.tar.gz/download* 
+ $ *gzcat scons-1.2.0.tar.gz | tar xvf -* 
+ $ *cd scons-1.2.0* 
+ $ *sudo python setup.py install* 
 </pre>
 Optionally, install the remaining library dependencies, primarily GLib and pkg-config, this tutorial install everything into <tt>/opt/glib-gcc64</tt>.  <tt>pkg-config</tt> is a binary and doesn't need to be specially built for v9 architecture.
 <pre>
- $ /usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz 
- $ gzcat pkg-config-0.23.tar.gz | tar xvf -
- $ cd pkg-config-0.23
- $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc PATH=/usr/local/bin:/usr/sfw/bin:$PATH \
-./configure --with-installed-glib --prefix=/opt/glib-gcc64
-
- $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
- $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
- $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' LIBS='-lresolv -lsocket -lnsl' \
-PATH=/opt/glib-gcc64/bin:/usr/local/bin:/usr/sfw/bin:$PATH ./configure --prefix=/opt/glib-gcc64
-
- $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
- $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+ $ */usr/sfw/bin/wget http://pkgconfig.freedesktop.org/releases/pkg-config-0.23.tar.gz* 
+ $ *gzcat pkg-config-0.23.tar.gz | tar xvf -* 
+ $ *cd pkg-config-0.23* 
+ $ *MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc \* 
+        *PATH=/usr/local/bin:/usr/sfw/bin:$PATH \* 
+        *./configure --with-installed-glib --prefix=/opt/glib-gcc64* 
+ $ *PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake*
+ $ *sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+ $ *MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64' \* 
+        *LIBS='-lresolv -lsocket -lnsl' \* 
+        *PATH=/opt/glib-gcc64/bin:/usr/local/bin:/usr/sfw/bin:$PATH \* 
+        *./configure --prefix=/opt/glib-gcc64* 
+ $ *PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake* 
+ $ *sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install* 
 </pre>
 If you have subversion installed (requires a significant amount of dependencies), checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide], otherwise download the latest tarball.
 <pre>
- $ /usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-2.1.26.tar.gz 
- $ gzcat libpgm-2.1.26.tar.gz | xvf -
+ $ */usr/sfw/bin/wget http://openpgm.googlecode.com/files/libpgm-2.1.26.tar.gz* 
+ $ *gzcat libpgm-2.1.26.tar.gz | xvf -* 
 </pre>
 Build.
 <pre>
- $ cd release-2-1/openpgm/pgm 
- $ scons -f SConstruct.Solaris.gcc64 WITH_GLIB=true
+ $ *cd release-2-1/openpgm/pgm* 
+ $ *scons -f SConstruct.Solaris.gcc64 WITH_GLIB=true* 
 </pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug-SunOS-sun4u-gcc64</tt>.
 
 To build the release version in <tt>./ref/release-SunOS-sun4u-gcc64</tt> use the following:
 <pre>
- $ scons -f SConstruct.Solaris.gcc64 BUILD=release WITH_GLIB=true
+ $ *scons -f SConstruct.Solaris.gcc64 BUILD=release WITH_GLIB=true* 
 </pre>
 
 ==== Testing ====
 The dynamic GLib libraries require an extra step for testing, for example,
 <pre>
- $ sudo LD_LIBRARY_PATH=/opt/glib-gcc64/lib:$LD_LIBRARY_PATH ./ref/release-SunOS-sun4u-gcc64/pgmrecv
+ $ *sudo LD_LIBRARY_PATH=/opt/glib-gcc64/lib:$LD_LIBRARY_PATH \* 
+        *./ref/release-SunOS-sun4u-gcc64/pgmrecv* 
 </pre>
 
 
 ==== Unit testing ====
 Unit testing depends upon the Check unit test suite and must be downloaded and compiled for each compiler.
 <pre>
- $ wget http://downloads.sourceforge.net/project/check/check/0.9.8/check-0.9.8.tar.gz/download 
- $ gzcat check-0.9.8.tar.gz  | tar xvf -
- $ cd check-0.9.8
- $ MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc CFLAGS='-m64 -I/usr/local/include' \
-LDFLAGS='-L/usr/local/lib' LIBS='-lresolv -lsocket -lnsl' PATH=/opt/glib-gcc64/bin:/usr/local/bin:/usr/sfw/bin:$PATH \
-./configure --prefix=/opt/glib-gcc64 --disable-shared
-
- $ PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake
- $ sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install
+ $ *wget http://downloads.sourceforge.net/project/check/check/0.9.8/check-0.9.8.tar.gz/download* 
+ $ *gzcat check-0.9.8.tar.gz  | tar xvf -* 
+ $ *cd check-0.9.8* 
+ $ *MAKE=gmake AR=gar RANLIB=granlib STRIP=gstrip AS=gas CC=gcc \* 
+        *CFLAGS='-m64 -I/usr/local/include' LDFLAGS='-L/usr/local/lib' \* 
+        *LIBS='-lresolv -lsocket -lnsl' \* 
+        *PATH=/opt/glib-gcc64/bin:/usr/local/bin:/usr/sfw/bin:$PATH \* 
+        *./configure --prefix=/opt/glib-gcc64 --disable-shared* 
+ $ *PATH=/usr/local/bin:/usr/sfw/bin:$PATH gmake* 
+ $ *sudo PATH=/usr/local/bin:/usr/sfw/bin:$PATH /usr/sfw/bin/gmake install* 
 </pre>
 
 

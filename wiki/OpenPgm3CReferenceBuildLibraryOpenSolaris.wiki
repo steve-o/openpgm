@@ -20,19 +20,19 @@ Checkout the repository as per the [http://code.google.com/p/openpgm/source/chec
 Build.
 <pre>
  $ cd trunk/openpgm/pgm
- $ scons -f SConstruct.OpenSolaris
+ $ scons -f SConstruct.!OpenSolaris
 </pre>
-By default SCons is configured to build a debug tree in <tt>./ref/debug-OpenSolaris-i686pc-gcc</tt>:
+By default SCons is configured to build a debug tree in <tt>./ref/debug-!OpenSolaris-i686pc-gcc</tt>:
 
-To build the release version in <tt>./ref/release-OpenSolaris-i686pc-gcc</tt> use the following:
+To build the release version in <tt>./ref/release-!OpenSolaris-i686pc-gcc</tt> use the following:
 <pre>
- $ scons -f SConstruct.OpenSolaris BUILD=release
+ $ scons -f SConstruct.!OpenSolaris BUILD=release
 </pre>
 
 ==== Testing ====
 Testing must be performed with the pure examples unless GLib is installed.  Default configuration will use the TSC and it is recommended to set the environment variable <tt>RDTSC_FREQUENCY</tt> to accelerate startup.
 <pre>
- $ RDTSC_FREQUENCY=2800 ./ref/debug-OpenSolaris-i686pc-gcc/examples/purinrecv -lp 7500 -n "e1000g0;239.192.0.1"
+ $ RDTSC_FREQUENCY=2800 ./ref/debug-!OpenSolaris-i686pc-gcc/examples/purinrecv -lp 7500 -n "e1000g0;239.192.0.1"
 プリン プリン
 Create transport.
 Startup complete.
@@ -40,7 +40,7 @@ Entering PGM message loop ...
 </pre>
 Then send a few messages, for example from same host using loopback,
 <pre>
- $ ./ref/debug-OpenSolaris-i686pc-gcc/examples/purinsend -lp 7500 -n "e1000g0;239.192.0.1" purin purin
+ $ ./ref/debug-!OpenSolaris-i686pc-gcc/examples/purinsend -lp 7500 -n "e1000g0;239.192.0.1" purin purin
 </pre>
 And witness the receiver processing the incoming messages.
 <pre>
