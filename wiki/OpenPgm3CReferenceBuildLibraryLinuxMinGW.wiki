@@ -10,7 +10,7 @@ First install all the C compiler dependencies, SCons, and Subversion.
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ *svn checkout -r 952 http://openpgm.googlecode.com/svn/trunk* 
+ $ *svn checkout -r 952 http://openpgm.googlecode.com/svn/trunk * 
  $ *cd trunk/openpgm/pgm* 
 </pre>
 Patch the mingw32 installation with updated Win32 headers.  For Ubuntu 9.04 or 9.10 use the 3.13 runtime patch,
@@ -36,7 +36,7 @@ To build the release version in <tt>./ref/release-Win32-i686</tt> use the follow
 ==== Testing ====
 Testing must be performed with the pure examples unless GLib is installed.  Unicode output may not be displayed correctly depending upon your system settings.
 <pre>
- C:\pgm>*purinrecv.exe -lp 7500 -n "10.6.15.76;239.192.0.1"*
+ C:\pgm>*purinrecv.exe -lp 7500 -n "10.6.15.76;239.192.0.1"* 
 プリン プリン
 Create transport.
 Warn: IPv4 adapter MS TCP Loopback interface prefix length is 0, overriding to 32.
