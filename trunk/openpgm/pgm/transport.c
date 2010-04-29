@@ -1289,7 +1289,6 @@ pgm_transport_bind (
 		}
 	}
 
-pgm_debug("find send interface"); fflush(stdout);
 /* send group (singular) */
 	if (0 != pgm_sockaddr_multicast_if (transport->send_sock,
 					    (struct sockaddr*)&transport->send_addr,

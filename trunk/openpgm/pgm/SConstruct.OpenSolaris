@@ -1,12 +1,13 @@
 # -*- mode: python -*-
 # OpenPGM build script
 
+import platform
 import os
 import time
 import sys
 
 EnsureSConsVersion( 1, 0 )
-SConsignFile('scons.signatures');
+SConsignFile('scons.signatures'+ '-OpenSolaris-' + platform.machine() + '-gcc');
 
 vars = Variables()
 vars.AddVariables (
@@ -14,6 +15,10 @@ vars.AddVariables (
 			allowed_values=('release', 'debug', 'profile')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('WITH_GETTEXT', 'l10n support via libintl', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_GLIB', 'Build GLib dependent modules', 'false',
+			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
@@ -29,8 +34,6 @@ vars.AddVariables (
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
-			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
 			allowed_values=('true', 'false')),
 )
 
@@ -56,19 +59,19 @@ conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
 
 if not conf.CheckPKGConfig('0.15.0'):
 	print 'pkg-config >= 0.15.0 not found.'
-	Exit(1)
+#	Exit(1)
 
 if not conf.CheckPKG('glib-2.0 >= 2.10'):
 	print 'glib-2.0 >= 2.10 not found.'
-	Exit(1)
+#	Exit(1)
 
 if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
-	Exit(1)
+#	Exit(1)
 
-if not conf.CheckPKG('libsoup-2.4'):
-	print 'libsoup-2.4 not found.'
-	Exit(1)
+#if not conf.CheckPKG('libsoup-2.4'):
+#	print 'libsoup-2.4 not found.'
+#	Exit(1)
 
 env = conf.Finish();
 
@@ -100,32 +103,74 @@ env = Environment(
 				'-Wnested-externs',
 				'-Winline',
 			'-pedantic',
+# C99
 			'-std=gnu99',
-			'--param', 'max-inline-insns-single=600',
-			'-D_REENTRANT',
-			'-D_GNU_SOURCE',
 			'-D_XOPEN_SOURCE=600',
 			'-D__EXTENSIONS__',
 			'-DBSD_COMP',
-			'-D__need_IOV_MAX',
-			'-D__USE_BSD',
+			'-D_BSD_SOURCE',
+# re-entrant libc
+			'-D_REENTRANT',
+			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
+#			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
+# variadic macros
+			'-DCONFIG_HAVE_ISO_VARARGS',
+#			'-DCONFIG_HAVE_GNUC_VARARGS',
+# stack memory api header
+			'-DCONFIG_HAVE_ALLOCA_H',
+# optimium checksum implementation
+#			'-DCONFIG_8BIT_CHECKSUM',
 			'-DCONFIG_16BIT_CHECKSUM',
-			'-DCONFIG_HAVE_CLOCK_GETTIME',
-			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
-			'-DCONFIG_HAVE_NANOSLEEP',
-			'-DCONFIG_HAVE_USLEEP',
+#			'-DCONFIG_32BIT_CHECKSUM',
+#			'-DCONFIG_64BIT_CHECKSUM',
+#			'-DCONFIG_VECTOR_CHECKSUM',
+# useful /proc system
+#			'-DCONFIG_HAVE_PROC',
+# example: crash handling
+#			'-DCONFIG_HAVE_BACKTRACE',
+# timing
+			'-DCONFIG_HAVE_PSELECT',
+#			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
+#			'-DCONFIG_HAVE_HPET',
+# event handling
 			'-DCONFIG_HAVE_POLL',
+#			'-DCONFIG_HAVE_EPOLL',
+# interface enumeration
+#			'-DCONFIG_HAVE_GETIFADDRS',
+#			'-DCONFIG_HAVE_IFR_NETMASK',
+# win32 cmsg
+#			'-DCONFIG_HAVE_WSACMSGHDR',
+# multicast
 			'-DCONFIG_HAVE_MCAST_JOIN',
+#			'-DCONFIG_HAVE_IP_MREQN',
+# sprintf
+			'-DCONFIG_HAVE_SPRINTF_GROUPING',
+#			'-DCONFIG_HAVE_VASPRINTF',
+# symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
+# socket binding
 			'-DCONFIG_BIND_INADDR_ANY',
+# optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
+# previous version HTTP library api
+#			'-DCONFIG_LIBSOUP22',
+# Wine limited API support
+#			'-DCONFIG_TARGET_WINE',
+# GNU getopt
+			'-DCONFIG_HAVE_GETOPT'
 		 ],
-	LINKFLAGS = [	'-pipe',
-			'-lresolv',
-			'-lsocket',
-			'-lnsl',
-			'-lm'
+	LINKFLAGS = [	'-pipe'
+		],
+	LIBS = [
+# histogram math
+			'm',
+# clock_gettime()
+			'rt',
+# Solaris sockets
+			'resolv',
+			'socket',
+			'nsl'
 		    ]
 )
 
@@ -138,13 +183,13 @@ elif env['BRANCH'] == 'seed':
 
 # Define separate build environments
 release = env.Clone(BUILD = 'release')
-release.Append(CCFLAGS = '-O2')
+release.Append(CCFLAGS = ['-O2'], LINKFLAGS = [])
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG', '-ggdb'], LINKFLAGS = ['-gdb'])
 
 profile = env.Clone(BUILD = 'profile')
-profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
+profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = ['-pg'])
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
 thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
@@ -165,7 +210,14 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
+if env['WITH_GLIB'] == 'true':
+	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
+else:
+	env['GLIB_FLAGS'] = '';
+
+# l10n
+if env['WITH_GETTEXT'] == 'true':
+	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -179,7 +231,10 @@ env['SNMP_FLAGS'] = {
 	'CPPPATH'	: ['/opt/cws/include'],
 	'LIBPATH'	: ['/opt/csw/lib'],
 };
-env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
+if env['WITH_HTTP'] == 'true':
+	env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
+else:
+	env['LIBSOUP_FLAGS'] = '';
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -203,22 +258,8 @@ def CheckCheck(context):
 	context.Result(result);
 	return result;
 
-def CheckEventFD(context):
-	context.Message('Checking eventfd...');
-	result = context.TryLink("""
-#include <sys/eventfd.h>
-int main(int argc, char**argv)
-{
-	eventfd(0,0);
-	return 0;
-}
-""", '.c')
-	context.Result(result);
-	return result;
-
 tests = {
-	'CheckCheck':	CheckCheck,
-	'CheckEventFD':	CheckEventFD
+	'CheckCheck':	CheckCheck
 }
 if env['WITH_SNMP'] == 'true':
 	tests['CheckSNMP'] = CheckSNMP;
@@ -235,17 +276,7 @@ else:
 	print 'Disabling Check unit tests.';
 	conf.env['CHECK'] = 'false';
 
-if conf.CheckEventFD():
-	print 'Enabling kernel eventfd notification mechanism.';
-	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
-
 env = conf.Finish();
-
-# DSO visibility flags
-if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
-	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
-else:
-	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
 
 # add builder to create PIC static libraries for including in shared libraries
 action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
@@ -263,14 +294,15 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 
 #-----------------------------------------------------------------------------
 
-ref_node = 'ref/' + env['BUILD'] + '/';
+ref_node = 'ref/' + env['BUILD'] + '-OpenSolaris-' + platform.machine() + '-gcc/';
 BuildDir(ref_node, '.', duplicate=0)
 
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
+if env['WITH_GLIB'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
-SConscript(ref_node + 'SConscript.libpgmex');
 if env['WITH_HTTP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmhttp');
 if env['WITH_SNMP'] == 'true':
@@ -279,9 +311,5 @@ if env['WITH_TEST'] == 'true':
 	SConscript(ref_node + 'test/SConscript');
 if env['WITH_EXAMPLES'] == 'true':
 	SConscript(ref_node + 'examples/SConscript');
-
-# unit testing framework optional.
-if env['WITH_CHECK'] and env['CHECK'] == 'true':
- 	SConscript(ref_node + 'check/SConscript');
 
 # end of file
