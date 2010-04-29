@@ -41,7 +41,8 @@ pgm_atomic_exchange_and_add32 (
 	asm volatile (	"lock\n\t"
 			"xaddl %0, %1"
 		      : "=r" (result), "=m" (*atomic)
-		      : "0" (val), "m" (*atomic)  );
+		      : "0" (val), "m" (*atomic)
+		      : "memory", "cc"  );
 	return result;
 #elif defined( sun )
 	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
@@ -66,7 +67,8 @@ pgm_atomic_add32 (
 	asm volatile (	"lock\n\t"
 			"addl %1, %0"
 		      : "=m" (*atomic)
-		      : "ir" (val), "m" (*atomic));
+		      : "ir" (val), "m" (*atomic)
+		      : "memory", "cc"  );
 #elif defined( sun )
 	atomic_add_32 (atomic, (int32_t)val);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
