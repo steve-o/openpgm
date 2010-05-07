@@ -33,14 +33,7 @@
 #	endif
 #	if (_POSIX_C_SOURCE - 0) >= 199309L || (__POSIX_VISIBLE - 0) >= 199309L
 #		define CONFIG_HAVE_CLOCK_GETTIME	1
-#		define CONFIG_HAVE_NANOSLEEP		1
 #	endif
-#endif
-#if (defined _XOPEN_SOURCE && (_XOPEN_SOURCE - 0) >= 600)
-#	define CONFIG_HAVE_CLOCK_NANOSLEEP
-#endif
-#if defined(_BSD_SOURCE) || defined(__BSD_VISIBLE) || (_XOPEN_SOURCE - 0) >= 500
-#	define CONFIG_HAVE_USLEEP
 #endif
 #if defined(_WIN32)
 #	define CONFIG_HAVE_FTIME

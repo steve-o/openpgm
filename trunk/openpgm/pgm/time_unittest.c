@@ -105,43 +105,6 @@ END_TEST
 
 /* target:
  *	void
- *	pgm_time_sleep (
- *		gulong		usec
- *		)
- */
-
-START_TEST (test_sleep_pass_001)
-{
-	pgm_time_t tstamps[11];
-	const pgm_time_t sleep_time = 100 * 1000;	/* 100ms */
-	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
-	pgm_time_t start_time = pgm_time_update_now ();
-	for (unsigned i = 1; i <= 10; i++)
-	{
-		tstamps[i] = pgm_time_sleep (sleep_time);
-	}
-	g_message ("start-time:     %" PGM_TIME_FORMAT, start_time);
-	for (unsigned i = 1; i <= 10; i++)
-	{
-		const pgm_time_t check_time = tstamps[i];
-
-		fail_unless (check_time >= start_time, "non-monotonic");
-		const gint64 elapsed_time = check_time - start_time;
-
-/* should be close to zero */
-		const gint64 diff_time = elapsed_time - sleep_time;
-		const float percent_diff = ( 100.0 * pgm_to_usecsf (diff_time) ) / sleep_time;
-		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" G_GINT64_FORMAT "us %+3.1f%%)",
-			   i, check_time, pgm_to_usecs(elapsed_time), percent_diff);
-
-		start_time = check_time;
-	}
-	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
-}
-END_TEST
-
-/* target:
- *	void
  *	pgm_time_since_epoch (
  *		pgm_time_t*	pgm_time,
  *		time_t*		epoch_time
@@ -187,10 +150,6 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_update_now);
 	tcase_add_test (tc_update_now, test_update_now_pass_001);
 
-	TCase* tc_sleep = tcase_create ("sleep");
-	suite_add_tcase (s, tc_sleep);
-	tcase_add_test (tc_sleep, test_sleep_pass_001);
-
 	TCase* tc_since_epoch = tcase_create ("since-epoch");
 	suite_add_tcase (s, tc_since_epoch);
 	tcase_add_test (tc_since_epoch, test_since_epoch_pass_001);
@@ -208,10 +167,6 @@ make_master_suite (void)
 int
 main (void)
 {
-//	setenv ("PGM_TIMER", "GTOD", 1);
-	setenv ("PGM_TIMER", "HPET", 1);
-	setenv ("PGM_SLEEP", "USLEEP", 1);
-
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);

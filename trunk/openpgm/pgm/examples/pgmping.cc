@@ -559,32 +559,54 @@ sender_thread (
 
 	last = now = pgm_time_update_now();
 	do {
+		now = pgm_time_update_now();
+/* wait on packet rate limit, busy wait for less than 2ms delay.
+ */
+		const pgm_time_t end = last + g_odata_interval;
+		if ((now + pgm_msecs(2)) > end) {
+#	ifndef _WIN32
+			const unsigned int usec = end - now;
+			struct timespec ts = {
+				.tv_sec	 = (usec / 1000000UL),
+				.tv_nsec = (usec % 1000000UL) * 1000
+			};
+			nanosleep (&ts, NULL);
+#	else
+			const DWORD msec = usecs_to_msecs (end - now);
+			Sleep (msec);
+#	endif
+			now = pgm_time_update_now();
+		}
+		while (now < end) {
+#	if defined(__i386__) || defined(__i386) || defined(__x86_64__) || defined(__amd64)
+/* pause, aka "rep; nop" induces energy efficient state during spin loop */
+			asm volatile ("rep; nop" ::: "memory");
+#	else
+			asm volatile ("" ::: "memory");
+#	endif
+			now = pgm_time_update_now();
+		}
+		last = end;
+
 		if (g_msg_sent && g_latency_seqno + 1 == g_msg_sent)
 			latency = g_latency_current;
 		else
 			latency = g_odata_interval;
 
-		ping.set_seqno (g_msg_sent);
-		ping.set_latency (latency);
-		ping.set_payload (payload, sizeof(payload));
-
-		const int header_size = pgm_transport_pkt_offset(FALSE);
-		const int apdu_size = ping.ByteSize();
+		const size_t header_size = pgm_transport_pkt_offset(FALSE);
+		const size_t apdu_size = ping.ByteSize();
 		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_max_tpdu);
 		pgm_skb_reserve (skb, header_size);
 		pgm_skb_put (skb, apdu_size);
-
-/* wait on packet rate limit */
-		if ((last + g_odata_interval) > now) {
-			now = pgm_time_sleep (g_odata_interval - (now - last));
-		}
-		last += g_odata_interval;
+		ping.set_seqno (g_msg_sent);
+		ping.set_latency (latency);
+		ping.set_payload (payload, sizeof(payload));
 		ping.set_time (now);
 		ping.SerializeToArray (skb->data, skb->len);
 
 		struct timeval tv;
 		int timeout;
-		gsize bytes_written;
+		size_t bytes_written;
 		int status;
 again:
 		status = pgm_send_skbv (g_transport, &skb, 1, TRUE, &bytes_written);
@@ -593,6 +615,7 @@ again:
 		{
 			pgm_transport_get_rate_remaining (g_transport, &tv);
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+/* busy wait under 2ms */
 			if (timeout < 2) timeout = 0;
 #ifdef CONFIG_HAVE_EPOLL
 			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
@@ -653,7 +676,7 @@ receiver_thread (
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
-	struct pgm_msgv_t msgv[20];
+	struct pgm_msgv_t msgv[8];
 	pgm_time_t lost_tstamp = 0;
 	pgm_tsi_t  lost_tsi;
 	guint32	   lost_count = 0;
@@ -720,6 +743,7 @@ receiver_thread (
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+/* busy wait under 2ms */
 			if (timeout > 0 && timeout < 2) timeout = 0;
 #ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
@@ -787,6 +811,7 @@ again:
 			switch (status) {
 			case PGM_IO_STATUS_RATE_LIMITED:
 			case PGM_IO_STATUS_WOULD_BLOCK:
+/* busy wait always as reflector */
 				goto again;
 
 			case PGM_IO_STATUS_NORMAL:
@@ -820,7 +845,7 @@ again:
 			g_msg_received++;
 
 /* handle ping */
-const pgm_time_t now = pgm_time_update_now();
+			const pgm_time_t now = pgm_time_update_now();
 			if (send_time > now)
 				g_warning ("send time %" PGM_TIME_FORMAT " newer than now %" PGM_TIME_FORMAT,
 					   send_time, now);

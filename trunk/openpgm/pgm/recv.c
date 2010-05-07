@@ -283,6 +283,11 @@ on_upstream (
 			goto out_discarded;
 		break;
 
+	case PGM_ACK:
+		if (PGM_UNLIKELY(!pgm_on_ack (transport, skb)))
+			goto out_discarded;
+		break;
+
 	case PGM_POLR:
 	default:
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));

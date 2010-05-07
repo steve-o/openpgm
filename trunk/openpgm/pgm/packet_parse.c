@@ -578,4 +578,30 @@ pgm_verify_spmr (
 	return TRUE;
 }
 
+/* PGMCC: ACK
+ *
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                            RX_MAX                             |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                    Received Packet Bitmap                     |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * | Option Extensions when present ...
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
+ */
+
+#define PGM_MIN_ACK_SIZE	( sizeof(struct pgm_ack) )
+
+bool
+pgm_verify_ack (
+	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
+	)
+{
+/* pre-conditions */
+	pgm_assert (NULL != skb);
+
+	return TRUE;
+}
+
 /* eof */

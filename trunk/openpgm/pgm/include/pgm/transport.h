@@ -155,6 +155,28 @@ struct pgm_transport_t {
 	bool				is_controlled_odata;
 	bool				is_controlled_rdata;
 
+	bool				use_cr;			/* congestion reports */
+	bool				use_pgmcc;		/* congestion control */
+	bool				is_pending_crqst;
+	pgm_time_t			next_crqst;
+	pgm_time_t			mrtt;			/* multicast round-trip time */
+	pgm_time_t			crqst_ivl;
+	pgm_time_t			acker_ivl;
+	struct sockaddr_storage		acker_nla;
+/*
+ * ignore_cong    - previous congestion lead sqn
+ * cc_token
+ * cc_window
+ *   w_s16        - weight for lossrate computation, 0.992
+ *   ss_threshold - threshold for exponential window opening
+ * dupacks        - number of duplicate acks
+ * ack_bitmask    - S/R most recent ACKs for ODATA
+ *
+ * do_ack          - toggle ack generation
+ * rtt_cong_filter - ignore multiple cong.event per rtt
+ * dupack          - threshold for dup acks
+ */
+
 	pgm_notify_t			rdata_notify;
 
 	pgm_hash_t			last_hash_key;
@@ -226,6 +248,8 @@ bool pgm_transport_set_hops (pgm_transport_t*const, const unsigned);
 bool pgm_transport_set_sndbuf (pgm_transport_t*const, const size_t);
 bool pgm_transport_set_rcvbuf (pgm_transport_t*const, const size_t);
 bool pgm_transport_set_fec (pgm_transport_t*const, const uint8_t, const bool, const bool, const uint8_t, const uint8_t);
+bool pgm_transport_set_congestion_reports (pgm_transport_t*const, const bool, const unsigned);
+bool pgm_transport_set_congestion_control (pgm_transport_t*const, const bool, const unsigned);
 bool pgm_transport_set_send_only (pgm_transport_t*const, const bool);
 bool pgm_transport_set_recv_only (pgm_transport_t*const, const bool, const bool);
 bool pgm_transport_set_abort_on_reset (pgm_transport_t*const, const bool);

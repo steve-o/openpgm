@@ -48,6 +48,7 @@ static bool pgm_print_nak (const struct pgm_header* const, const void*, const si
 static bool pgm_print_nnak (const struct pgm_header* const, const void*, const size_t);
 static bool pgm_print_ncf (const struct pgm_header* const, const void*, const size_t);
 static bool pgm_print_spmr (const struct pgm_header* const, const void*, const size_t);
+static bool pgm_print_ack (const struct pgm_header* const, const void*, const size_t);
 static ssize_t pgm_print_options (const void*, size_t);
 
 bool
@@ -122,9 +123,9 @@ pgm_print_packet (
 	if (ip->ip_ttl >= 1) printf (", ttl %u", ip->ip_ttl);
 
 /* fragmentation */
-#define IP_RDF	0x8000
-#define IP_DF	0x4000
-#define IP_MF	0x2000
+#define IP_RDF		0x8000
+#define IP_DF		0x4000
+#define IP_MF		0x2000
 #define IP_OFFMASK	0x1fff
 
 	printf (", id %u, offset %u, flags [%s%s]",
@@ -238,6 +239,7 @@ pgm_print_packet (
 	case PGM_NNAK:	err = pgm_print_nnak (pgm_header, pgm_data, pgm_data_length); break;
 	case PGM_NCF:	err = pgm_print_ncf (pgm_header, pgm_data, pgm_data_length); break;
 	case PGM_SPMR:	err = pgm_print_spmr (pgm_header, pgm_data, pgm_data_length); break;
+	case PGM_ACK:	err = pgm_print_ack (pgm_header, pgm_data, pgm_data_length); break;
 	default:	puts ("unknown packet type :("); break;
 	}
 
@@ -841,6 +843,56 @@ pgm_print_spmr (
 	return TRUE;
 }
 
+/* PGMCC: ACK
+ *
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                            RX_MAX                             |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                    Received Packet Bitmap                     |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * | Option Extensions when present ...
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
+ */
+
+static
+bool
+pgm_print_ack (
+	const struct pgm_header* const	header,
+	const void*			data,
+	const size_t			len
+	)
+{
+/* pre-conditions */
+	pgm_assert (NULL != header);
+	pgm_assert (NULL != data);
+	pgm_assert (len > 0);
+
+	printf ("ACK: ");
+
+	const struct pgm_ack* ack = (const struct pgm_ack*)data;
+	char bitmap[33];
+
+	for (unsigned i = 31; i; i--)
+		bitmap[i] = (ack->ack_bitmap & (1 << i)) ? '1' : '0';
+	bitmap[32] = '\0';
+
+	printf ("rx_max %" PRIu32 " bitmap [%s] ",
+		ntohl(ack->ack_rx_max), bitmap);
+
+/* option extensions */
+	if (header->pgm_options & PGM_OPT_PRESENT &&
+	    pgm_print_options (data, len) < 0 )
+	{
+		return FALSE;
+	}
+
+	printf ("\n");
+	return TRUE;
+}
+
+
 /* Parse PGM options fields, alters contents of packet.
  * 
  * returns -1 on failure, or total length in octets of the option fields
@@ -898,6 +950,22 @@ pgm_print_options (
 		}
 
 		switch (opt_header->opt_type & PGM_OPT_MASK) {
+		case PGM_OPT_FRAGMENT:
+			printf ("OPT_FRAGMENT ");
+			break;
+
+		case PGM_OPT_NAK_LIST:
+			printf ("OPT_NAK_LIST ");
+			break;
+
+		case PGM_OPT_JOIN:
+			printf ("OPT_JOIN ");
+			break;
+
+		case PGM_OPT_REDIRECT:
+			printf ("OPT_REDIRECT ");
+			break;
+
 		case PGM_OPT_SYN:
 			printf ("OPT_SYN ");
 			break;
@@ -916,6 +984,38 @@ pgm_print_options (
 
 		case PGM_OPT_CURR_TGSIZE:
 			printf ("OPT_CURR_TGSIZE ");
+			break;
+
+		case PGM_OPT_CR:
+			printf ("OPT_CR ");
+			break;
+
+		case PGM_OPT_CRQST:
+			printf ("OPT_CRQST ");
+			break;
+
+		case PGM_OPT_PGMCC_DATA:
+			printf ("OPT_PGMCC_DATA ");
+			break;
+
+		case PGM_OPT_PGMCC_FEEDBACK:
+			printf ("OPT_PGMCC_FEEDBACK ");
+			break;
+
+		case PGM_OPT_NAK_BO_IVL:
+			printf ("OPT_NAK_BO_IVL ");
+			break;
+
+		case PGM_OPT_NAK_BO_RNG:
+			printf ("OPT_NAK_BO_RNG ");
+			break;
+
+		case PGM_OPT_NBR_UNREACH:
+			printf ("OPT_NBR_UNREACH ");
+			break;
+
+		case PGM_OPT_PATH_NLA:
+			printf ("OPT_PATH_NLA ");
 			break;
 
 		default:
@@ -954,6 +1054,7 @@ pgm_type_string (
 	case PGM_NNAK:		c = "PGM_NNAK"; break;
 	case PGM_NCF:		c = "PGM_NCF"; break;
 	case PGM_SPMR:		c = "PGM_SPMR"; break;
+	case PGM_ACK:		c = "PGM_ACK"; break;
 	default: c = "(unknown)"; break;
 	}
 
