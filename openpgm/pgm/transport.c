@@ -1782,6 +1782,55 @@ pgm_transport_set_fec (
 	return TRUE;
 }
 
+bool
+pgm_transport_set_congestion_reports (
+	pgm_transport_t* const	transport,
+	const bool		use_cr,
+	const unsigned		crqst_ivl	/* in milliseconds */
+	)
+{
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
+		pgm_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		pgm_rwlock_reader_unlock (&transport->lock);
+		pgm_return_val_if_reached (FALSE);
+	}
+	transport->use_cr	= use_cr;
+	transport->crqst_ivl	= pgm_msecs (crqst_ivl);
+	pgm_rwlock_reader_unlock (&transport->lock);
+	return TRUE;
+}
+
+/* declare whether congestion control should be enabled for this transport.
+ *
+ * on success, returns TRUE, on failure returns FALSE.
+ */
+
+bool
+pgm_transport_set_congestion_control (
+	pgm_transport_t* const	transport,
+	const bool		use_pgmcc,
+	const unsigned		acker_ivl	/* in milliseconds */
+	)
+{
+	pgm_return_val_if_fail (transport != NULL, FALSE);
+	if (!pgm_rwlock_reader_trylock (&transport->lock))
+		pgm_return_val_if_reached (FALSE);
+	if (transport->is_bound ||
+	    transport->is_destroyed)
+	{
+		pgm_rwlock_reader_unlock (&transport->lock);
+		pgm_return_val_if_reached (FALSE);
+	}
+	transport->use_pgmcc	= use_pgmcc;
+	transport->acker_ivl	= pgm_msecs (acker_ivl);
+	pgm_rwlock_reader_unlock (&transport->lock);
+	return TRUE;
+}
+
 /* declare transport only for sending, discard any incoming SPM, ODATA,
  * RDATA, etc, packets.
  *

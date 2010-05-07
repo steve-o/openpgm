@@ -39,6 +39,7 @@ bool pgm_verify_nnak (const struct pgm_sk_buff_t* const);
 bool pgm_verify_ncf (const struct pgm_sk_buff_t* const);
 bool pgm_verify_poll (const struct pgm_sk_buff_t* const);
 bool pgm_verify_polr (const struct pgm_sk_buff_t* const);
+bool pgm_verify_ack (const struct pgm_sk_buff_t* const);
 
 PGM_END_DECLS
 
