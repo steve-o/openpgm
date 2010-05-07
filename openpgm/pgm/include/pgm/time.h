@@ -34,7 +34,6 @@ PGM_BEGIN_DECLS
 typedef uint64_t pgm_time_t;
 
 typedef pgm_time_t (*pgm_time_update_func)(void);
-typedef pgm_time_t (*pgm_time_sleep_func)(const uint32_t);
 typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_t*restrict);
 
 #define pgm_time_after(a,b)	( (a) > (b) )
@@ -61,7 +60,6 @@ typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_
 #define PGM_TIME_FORMAT	PRIu64
 
 extern pgm_time_update_func		pgm_time_update_now;
-extern pgm_time_sleep_func		pgm_time_sleep;
 extern pgm_time_since_epoch_func	pgm_time_since_epoch;
 
 PGM_GNUC_INTERNAL bool pgm_time_init (pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;

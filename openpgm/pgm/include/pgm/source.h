@@ -43,6 +43,7 @@ PGM_GNUC_INTERNAL bool pgm_on_deferred_nak (pgm_transport_t*const);
 PGM_GNUC_INTERNAL bool pgm_on_spmr (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_nak (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_nnak (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_ack (pgm_transport_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 PGM_END_DECLS
 

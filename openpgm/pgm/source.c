@@ -545,6 +545,42 @@ pgm_on_nnak (
 	return TRUE;
 }
 
+/* ACK, sent upstream by one selected ACKER for congestion control feedback.
+ *
+ * if ACK is valid, returns TRUE.  on error, FALSE is returned.
+ */
+
+bool
+pgm_on_ack (
+	pgm_transport_t*      const restrict transport,
+	struct pgm_sk_buff_t* const restrict skb
+	)
+{
+/* pre-conditions */
+	pgm_assert (NULL != transport);
+	pgm_assert (NULL != skb);
+
+	pgm_debug ("pgm_on_ack (transport:%p skb:%p)",
+		(const void*)transport, (const void*)skb);
+
+	if (PGM_UNLIKELY(!pgm_verify_ack (skb))) {
+		return FALSE;
+	}
+
+	if (!transport->use_pgmcc)
+		return FALSE;
+
+	const struct pgm_ack* ack  = (struct pgm_ack*)skb->data;
+
+/* reset ACK expiration */
+	transport->next_crqst = 0;
+
+/* multicast round-trip time */
+	const uint32_t txw_lead = pgm_txw_lead_atomic (transport->window);
+	const uint32_t mrtt = transport->mrtt + (txw_lead - ntohl(ack->ack_rx_max));
+	return TRUE;
+}
+
 /* ambient/heartbeat SPM's
  *
  * heartbeat: ihb_tmr decaying between ihb_min and ihb_max 2x after last packet
@@ -572,6 +608,7 @@ pgm_send_spm (
 		tpdu_length += sizeof(struct pgm_spm6);
 	if (transport->use_proactive_parity ||
 	    transport->use_ondemand_parity ||
+	    transport->is_pending_crqst ||
 	    PGM_OPT_FIN == flags)
 	{
 		tpdu_length += sizeof(struct pgm_opt_length);
@@ -579,6 +616,9 @@ pgm_send_spm (
 		    transport->use_ondemand_parity)
 			tpdu_length += sizeof(struct pgm_opt_header) +
 				       sizeof(struct pgm_opt_parity_prm);
+		if (transport->is_pending_crqst)
+			tpdu_length += sizeof(struct pgm_opt_header) +
+				       sizeof(struct pgm_opt_crqst);
 		if (PGM_OPT_FIN == flags)
 			tpdu_length += sizeof(struct pgm_opt_header) +
 				       sizeof(struct pgm_opt_fin);
@@ -607,25 +647,23 @@ pgm_send_spm (
 /* PGM options */
 	if (transport->use_proactive_parity ||
 	    transport->use_ondemand_parity ||
+	    transport->is_pending_crqst ||
 	    PGM_OPT_FIN == flags)
 	{
-		void* data;
 		struct pgm_opt_length* opt_len;
-		struct pgm_opt_header* opt_header;
+		struct pgm_opt_header *opt_header, *last_opt_header;
 		uint16_t opt_total_length;
 
 		if (AF_INET == transport->send_gsr.gsr_group.ss_family)
-			data = (struct pgm_opt_length*)(spm + 1);
+			opt_header = (struct pgm_opt_length*)(spm + 1);
 		else
-			data = (struct pgm_opt_length*)(spm6 + 1);
+			opt_header = (struct pgm_opt_length*)(spm6 + 1);
 		header->pgm_options |= PGM_OPT_PRESENT;
-		opt_len			= data;
+		opt_len			= opt_header;
 		opt_len->opt_type	= PGM_OPT_LENGTH;
 		opt_len->opt_length	= sizeof(struct pgm_opt_length);
 		opt_total_length	= sizeof(struct pgm_opt_length);
-		data = opt_len + 1;
-
-		opt_header		= (struct pgm_opt_header*)data;
+		last_opt_header = opt_header = opt_len + 1;
 
 /* OPT_PARITY_PRM */
 		if (transport->use_proactive_parity ||
@@ -640,7 +678,24 @@ pgm_send_spm (
 			opt_parity_prm->opt_reserved = (transport->use_proactive_parity ? PGM_PARITY_PRM_PRO : 0) |
 						       (transport->use_ondemand_parity ? PGM_PARITY_PRM_OND : 0);
 			opt_parity_prm->parity_prm_tgs = htonl (transport->rs_k);
-			data = opt_parity_prm + 1;
+			last_opt_header = opt_header;
+			opt_header = opt_parity_prm + 1;
+		}
+
+/* OPT_CRQST */
+		if (transport->is_pending_crqst)
+		{
+			header->pgm_options |= PGM_OPT_NETWORK;
+			opt_total_length += sizeof(struct pgm_opt_header) +
+					    sizeof(struct pgm_opt_crqst);
+			opt_header->opt_type	= PGM_OPT_CRQST;
+			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_crqst);
+			struct pgm_opt_crqst* opt_crqst = (struct pgm_opt_crqst*)(opt_header + 1);
+/* request receiver worst path report, OPT_CR_RX_WP */
+			opt_crqst->opt_reserved = PGM_OPT_CRQST_RXP;
+			transport->is_pending_crqst = FALSE;
+			last_opt_header = opt_header;
+			opt_header = opt_crqst + 1;
 		}
 
 /* OPT_FIN */
@@ -652,10 +707,11 @@ pgm_send_spm (
 			opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fin);
 			struct pgm_opt_fin* opt_fin = (struct pgm_opt_fin*)(opt_header + 1);
 			opt_fin->opt_reserved = 0;
-			data = opt_fin + 1;
+			last_opt_header = opt_header;
+			opt_header = opt_fin + 1;
 		}
 
-		opt_header->opt_type |= PGM_OPT_END;
+		last_opt_header->opt_type |= PGM_OPT_END;
 		opt_len->opt_total_length = htons (opt_total_length);
 	}
 

@@ -54,7 +54,7 @@ extern int pgm_ipproto_pgm;
 #	define PGM_MAX_APDU			UINT16_MAX
 #endif
 
-/* Cisco default: 24 (max 8200), Juniper & H3C default: 16 */
+/* Cisco default: 24 (max 8200), Juniper & H3C default: 16, SmartPGM: 64 */
 #ifndef PGM_MAX_FRAGMENTS
 #	define PGM_MAX_FRAGMENTS		16
 #endif
@@ -70,6 +70,7 @@ enum pgm_type_e {
 	PGM_NNAK	= 0x09,	/* 8.3: N-NAK or null negative acknowledgement */
 	PGM_NCF		= 0x0a,	/* 8.3: NCF or NAK confirmation */
 	PGM_SPMR	= 0x0c,	/* 13.6: SPM request */
+	PGM_ACK		= 0x0d,	/* PGMCC: congestion control ACK */
 	PGM_MAX		= 0xff
 };
 
@@ -88,6 +89,9 @@ enum pgm_type_e {
 
 #define PGM_OPT_CR		    0x10	/* congestion report */
 #define PGM_OPT_CRQST		    0x11	/* congestion report request */
+
+#define PGM_OPT_PGMCC_DATA	    0x12
+#define PGM_OPT_PGMCC_FEEDBACK	    0x13
 
 #define PGM_OPT_NAK_BO_IVL	    0x04	/* nak back-off interval */
 #define PGM_OPT_NAK_BO_RNG	    0x05	/* nak back-off range */
@@ -284,6 +288,9 @@ struct pgm_opt_curr_tgsize {
 /* 12.7.1.  Option Congestion Report - OPT_CR */
 struct pgm_opt_cr {
 	uint8_t		opt_reserved;		/* reserved */
+#define PGM_OPT_CR_NEL		0x0	/* OPT_CR_NE_WL report */
+#define PGM_OPT_CR_NEP		0x1	/* OPT_CR_NE_WP report */
+#define PGM_OPT_CR_RXP		0x2	/* OPT_CR_RX_WP report */
 	uint32_t	opt_cr_lead;		/* congestion report reference sqn */
 	uint16_t	opt_cr_ne_wl;		/* ne worst link */
 	uint16_t	opt_cr_ne_wp;		/* ne worst path */
@@ -297,6 +304,45 @@ struct pgm_opt_cr {
 /* 12.7.2.  Option Congestion Report Request - OPT_CRQST */
 struct pgm_opt_crqst {
 	uint8_t		opt_reserved;		/* reserved */
+#define PGM_OPT_CRQST_NEL	0x0	/* request OPT_CR_NE_WL report */
+#define PGM_OPT_CRQST_NEP	0x1	/* request OPT_CR_NE_WP report */
+#define PGM_OPT_CRQST_RXP	0x2	/* request OPT_CR_RX_WP report */
+};
+
+/* PGMCC.  ACK Packet */
+struct pgm_ack {
+	uint32_t	ack_rx_max;		/* RX_MAX */
+	uint32_t	ack_bitmap;		/* received packets */
+	/* ... option extensions */
+};
+
+/* PGMCC  Options */
+struct pgm_opt_cc_data {
+	uint32_t	opt_tstamp;		/* timestamp */
+	uint16_t	opt_nla_afi;		/* nla afi */
+	uint16_t	opt_reserved;		/* reserved */
+	struct in_addr	opt_nla;		/* ACKER nla */
+};
+
+struct pgm_opt6_cc_data {
+	uint32_t	opt6_tstamp;		/* timestamp */
+	uint16_t	opt6_nla_afi;		/* nla afi */
+	uint16_t	opt6_reserved;		/* reserved */
+	struct in6_addr	opt6_nla;		/* ACKER nla */
+};
+
+struct pgm_opt_cc_feedback {
+	uint32_t	opt_tstamp;		/* timestamp */
+	uint16_t	opt_nla_afi;		/* nla afi */
+	uint16_t	opt_loss_rate;		/* loss rate */
+	struct in_addr	opt_nla;		/* ACKER nla */
+};
+
+struct pgm_opt6_cc_feedback {
+	uint32_t	opt6_tstamp;		/* timestamp */
+	uint16_t	opt6_nla_afi;		/* nla afi */
+	uint16_t	opt6_loss_rate;		/* loss rate */
+	struct in6_addr	opt6_nla;		/* ACKER nla */
 };
 
 
@@ -404,7 +450,8 @@ pgm_is_upstream (
 	return (type == PGM_NAK ||		/* unicast */
 		type == PGM_NNAK ||		/* unicast */
 		type == PGM_SPMR ||		/* multicast + unicast */
-		type == PGM_POLR);		/* unicast */
+		type == PGM_POLR ||		/* unicast */
+		type == PGM_ACK);		/* unicast */
 }
 
 static inline
