@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : Sessions
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 === Introduction ===
 The state of a transport is bounded by PGM sessions between a sender and one or more receivers.  The scope of session can be explicitly defined by PGM options or auto-discovered at runtime.
 

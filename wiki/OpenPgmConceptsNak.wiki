@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : NAK
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 <img src="http://miru.hk/wiki/NAK_-_ignore.png"/>
 
   * Reception of invalid NAKs will be ignored.

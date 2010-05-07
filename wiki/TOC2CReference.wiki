@@ -119,4 +119,4 @@
     * [OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]
     * [OpenPgm2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]
     * [OpenPgm2CReferencePgmHttpInit pgm_http_init()]
-* [OpenPgm2CReferencePgmHttpShutdown pgm_http_shutdown()]
+    * [OpenPgm2CReferencePgmHttpShutdown pgm_http_shutdown()]

@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : NCF
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 <img src="http://miru.hk/wiki/NCF_-_ignore.png"/>
 
   * Reception of NCF will be ignored unless a sequence number matches one in the receive window.

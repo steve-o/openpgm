@@ -1,6 +1,6 @@
 #summary OpenPGM Concepts : Benefits of Programming with OpenPGM
 #labels Phase-Design
-
+#sidebar TOCConcepts
 Compared with regular TCP/IP sockets there are many advantages that OpenPGM can provide throughout an applications life cycle.
 
 === Benefits During Development ===

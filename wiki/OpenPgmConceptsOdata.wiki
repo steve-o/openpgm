@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : ODATA
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 <img src="http://miru.hk/wiki/ODATA_incoming_-_valid.png"/>
 
   * Reception of a valid ODATA packet will start a new session passing packet payload to the application.

@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : Guidelines for Programming
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 This section describes techniques and guidelines to help you create programs that use OpenPGM to the fullest advantage.
 
   * [OpenPgmConceptsControlMessageSizes Control Message Sizes]

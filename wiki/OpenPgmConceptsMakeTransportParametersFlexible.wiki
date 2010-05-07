@@ -1,6 +1,5 @@
 #summary OpenPGM Concepts : Make Transport Parameters Flexible
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 Ensure that system administrators and end-users can alter your applications’s service port and network parameters. While it is proper and convenient for a program to use default values for these transport parameters, it is dangerous to assume that the default values you choose will work for every deployment.
 

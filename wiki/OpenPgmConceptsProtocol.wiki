@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : Protocol
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 === Topics in Alphabetical Order ===
 
 <table border="1" cellpadding="5" cellspacing="0">

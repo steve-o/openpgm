@@ -1,6 +1,6 @@
 #summary Software Overview
 #labels Phase-Design
-
+#sidebar TOCConcepts
 === Introduction ===
 This section introduces OpenPGM.
 

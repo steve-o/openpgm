@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : TXW_MAX_RTE
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 _Setting_
 === Syntax ===
 <table border="1" cellpadding="5" cellspacing="0">

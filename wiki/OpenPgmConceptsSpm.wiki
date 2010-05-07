@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : SPM
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 <img src="http://miru.hk/wiki/SPM_-_ignore.png"/>
 
   * Reception of invalid SPM will be ignored.

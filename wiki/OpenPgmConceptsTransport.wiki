@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : Transport
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 === Introduction ===
 The software mechanism for sending and delivering messages is called a transport. A transport defines the delivery scope—that is, the set of possible destinations for the messages it sends.
 

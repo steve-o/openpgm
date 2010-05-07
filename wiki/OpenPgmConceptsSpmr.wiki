@@ -1,7 +1,6 @@
 #summary OpenPGM Concepts : SPMR
 #labels Phase-Design
-#sidebar TOC2CReference
-
+#sidebar TOCConcepts
 <img src="http://miru.hk/wiki/SPMR_-_ignore.png"/>
 
   * Invalid SPM-Requests will be ignored.

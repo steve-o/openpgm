@@ -1,6 +1,6 @@
 #summary OpenPGM Concepts : Fundamentals
 #labels Phase-Design
-
+#sidebar TOCConcepts
 === Multicast and Point-to-Point Messages ===
 OpenPGM is a reliable multicast communication, point-to-point delivery is not within the scope of PGM.
 

@@ -1,6 +1,6 @@
 #summary OpenPGM Concepts : Events
 #labels Phase-Design
-
+#sidebar TOCConcepts
 OpenPGM is a flexible messaging API which allows the developer to choose between high speed edge-level polling or slower but conceptually friendly event-driven callbacks.
 
 <img src="http://miru.hk/wiki/OpenPGM_Events.png"/>
