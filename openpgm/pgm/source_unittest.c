@@ -53,7 +53,7 @@ static gboolean mock_is_valid_spmr = TRUE;
 static gboolean mock_is_valid_nak = TRUE;
 static gboolean mock_is_valid_nnak = TRUE;
 
-static size_t mock_pgm_transport_pkt_offset (const bool can_fragment);
+static size_t mock_pgm_transport_pkt_offset2 (const bool can_fragment, const bool use_pgmcc);
 
 
 #define pgm_txw_get_unfolded_checksum	mock_pgm_txw_get_unfolded_checksum
@@ -75,7 +75,7 @@ static size_t mock_pgm_transport_pkt_offset (const bool can_fragment);
 #define pgm_csum_fold			mock_pgm_csum_fold
 #define pgm_sendto			mock_pgm_sendto
 #define pgm_time_update_now		mock_pgm_time_update_now
-#define pgm_transport_pkt_offset	mock_pgm_transport_pkt_offset
+#define pgm_transport_pkt_offset2	mock_pgm_transport_pkt_offset2
 
 
 #define SOURCE_DEBUG
@@ -104,8 +104,8 @@ generate_transport (void)
 	transport->window = g_malloc0 (sizeof(pgm_txw_t));
 	transport->txw_sqns = PGM_TXW_SQNS;
 	transport->max_tpdu = PGM_MAX_TPDU;
-	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (FALSE);
-	transport->max_tsdu_fragment = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (TRUE);
+	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset2 (FALSE, FALSE);
+	transport->max_tsdu_fragment = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset2 (TRUE, FALSE);
 	transport->max_apdu = MIN(PGM_TXW_SQNS, PGM_MAX_FRAGMENTS) * transport->max_tsdu_fragment;
 	transport->iphdr_len = sizeof(struct pgm_ip);
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
@@ -122,7 +122,7 @@ generate_skb (void)
 {
 	const char source[] = "i am not a string";
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
-	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset (FALSE));
+	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset2 (FALSE, FALSE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -134,7 +134,7 @@ generate_fragment_skb (void)
 {
 	const char source[] = "i am not a string";
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
-	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset (TRUE));
+	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset2 (TRUE, FALSE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -486,8 +486,9 @@ _mock_pgm_time_update_now (void)
 /** transport module */
 static
 size_t
-mock_pgm_transport_pkt_offset (
-	const bool			can_fragment
+mock_pgm_transport_pkt_offset2 (
+	const bool			can_fragment,
+	const bool			use_pgmcc
 	)
 {
 	return can_fragment ? ( sizeof(struct pgm_header)
@@ -701,7 +702,7 @@ START_TEST (test_send_skbv_fail_001)
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU), *skbv[] = { skb };
 	fail_if (NULL == skb, "alloc_skb failed");
 /* reserve PGM header */
-	pgm_skb_put (skb, mock_pgm_transport_pkt_offset (TRUE));
+	pgm_skb_put (skb, mock_pgm_transport_pkt_offset2 (TRUE, FALSE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
 	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skbv, 1, TRUE, &bytes_written), "send not error");

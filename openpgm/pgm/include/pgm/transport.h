@@ -255,8 +255,16 @@ bool pgm_transport_set_recv_only (pgm_transport_t*const, const bool, const bool)
 bool pgm_transport_set_abort_on_reset (pgm_transport_t*const, const bool);
 bool pgm_transport_set_nonblocking (pgm_transport_t*const, const bool);
 
-size_t pgm_transport_pkt_offset (bool) PGM_GNUC_WARN_UNUSED_RESULT;
-
+size_t pgm_transport_pkt_offset2 (bool, bool) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline size_t pgm_transport_pkt_offset (bool) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline
+size_t pgm_transport_pkt_offset (
+	bool			can_fragment
+	)
+{
+	return pgm_transport_pkt_offset2 (can_fragment, FALSE);
+}
+	
 static inline
 size_t
 pgm_transport_max_tsdu (

@@ -54,16 +54,20 @@ pgm_slist_t* pgm_transport_list = NULL;
 
 
 size_t
-pgm_transport_pkt_offset (
-	bool		can_fragment
+pgm_transport_pkt_offset2 (
+	bool		can_fragment,
+	bool		use_pgmcc
 	)
 {
-	return can_fragment ? ( sizeof(struct pgm_header)
-			      + sizeof(struct pgm_data)
-			      + sizeof(struct pgm_opt_length)
-	                      + sizeof(struct pgm_opt_header)
-			      + sizeof(struct pgm_opt_fragment) )
-			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
+	static const size_t data_size = sizeof(struct pgm_header) + sizeof(struct pgm_data);
+	size_t pkt_size = data_size;
+	if (can_fragment || use_pgmcc)
+		pkt_size += sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header);
+	if (can_fragment)
+		pkt_size += sizeof(struct pgm_opt_fragment);
+	if (use_pgmcc)
+		pkt_size += sizeof(struct pgm_opt_cc_data);
+	return pkt_size;
 }
 
 /* destroy a pgm_transport object and contents, if last transport also destroy
@@ -800,8 +804,8 @@ pgm_transport_bind (
 		transport->iphdr_len += udphdr_len;
 	}
 
-	transport->max_tsdu = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (FALSE);
-	transport->max_tsdu_fragment = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset (TRUE);
+	transport->max_tsdu = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset2 (FALSE, transport->use_pgmcc);
+	transport->max_tsdu_fragment = transport->max_tpdu - transport->iphdr_len - pgm_transport_pkt_offset2 (TRUE, transport->use_pgmcc);
 	const unsigned max_fragments = transport->txw_sqns ? MIN(PGM_MAX_FRAGMENTS, transport->txw_sqns) : PGM_MAX_FRAGMENTS;
 	transport->max_apdu = MIN(PGM_MAX_APDU, max_fragments * transport->max_tsdu_fragment);
 
@@ -1061,13 +1065,12 @@ pgm_transport_bind (
 		return FALSE;
 	}
 
-#ifdef TRANSPORT_DEBUG
+	if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, s, sizeof(s));
 		pgm_debug ("bind succeeded on recv_gsr[0] interface %s", s);
 	}
-#endif
 
 /* keep a copy of the original address source to re-use for router alert bind */
 	memset (&send_addr, 0, sizeof(send_addr));
@@ -1081,12 +1084,10 @@ pgm_transport_bind (
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-#ifdef TRANSPORT_DEBUG
-	else
+	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u"), transport->send_gsr.gsr_interface);
 	}
-#endif
 
 	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
 	if (0 != bind (transport->send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
@@ -1131,13 +1132,12 @@ pgm_transport_bind (
 		return FALSE;
 	}
 
-#ifdef TRANSPORT_DEBUG
+	if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, s, sizeof(s));
 		pgm_debug ("bind succeeded on send_gsr interface %s", s);
 	}
-#endif
 
 	if (0 != bind (transport->send_with_router_alert_sock,
 			(struct sockaddr*)&send_with_router_alert_addr,
@@ -1166,13 +1166,12 @@ pgm_transport_bind (
 		return FALSE;
 	}
 
-#ifdef TRANSPORT_DEBUG
+	if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, s, sizeof(s));
 		pgm_debug ("bind (router alert) succeeded on send_gsr interface %s", s);
 	}
-#endif
 
 /* save send side address for broadcasting as source nla */
 	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
@@ -1234,15 +1233,13 @@ pgm_transport_bind (
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
-#ifdef TRANSPORT_DEBUG
-			else
+			else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 			{
 				char s1[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
-				pgm_debug ("MCAST_JOIN_GROUP succeeded on recv_gsr[%i] interface %u group %s",
-					i, (unsigned)p->gsr_interface, s1);
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
+				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Multicast group join succeeded on recv_gsr[%u] interface %u group %s"),
+					i, p->gsr_interface, s1);
 			}
-#endif /* TRANSPORT_DEBUG */
 		}
 		else /* source != group, i.e. SSM */
 		{
@@ -1276,16 +1273,14 @@ pgm_transport_bind (
 				pgm_rwlock_writer_unlock (&transport->lock);
 				return FALSE;
 			}
-#ifdef TRANSPORT_DEBUG
-			else
+			else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 			{
 				char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
-				pgm_sockaddr_ntop ((struct sockaddr*)&p->gsr_source, s2, sizeof(s2));
-				pgm_debug ("MCAST_JOIN_SOURCE_GROUP succeeded on recv_gsr[%i] interface %u group %s source %s",
-					i, (unsigned)p->gsr_interface, s1, s2);
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_group, s1, sizeof(s1));
+				pgm_sockaddr_ntop ((const struct sockaddr*)&p->gsr_source, s2, sizeof(s2));
+				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Multicast join source group succeeded on recv_gsr[%u] interface %u group %s source %s"),
+					i, p->gsr_interface, s1, s2);
 			}
-#endif /* TRANSPORT_DEBUG */
 		}
 	}
 
@@ -1315,14 +1310,14 @@ pgm_transport_bind (
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-#ifdef TRANSPORT_DEBUG
+	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&transport->send_addr, s, sizeof(s));
-		pgm_debug ("pgm_sockaddr_multicast_if succeeded on send_gsr address %s interface %u",
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set multicast local device succeeded on send_gsr address %s interface %u"),
 					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
-#endif
+
 	if (0 != pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock,
 					    (struct sockaddr*)&transport->send_addr,
 					    transport->send_gsr.gsr_interface))
@@ -1348,14 +1343,13 @@ pgm_transport_bind (
 		pgm_rwlock_writer_unlock (&transport->lock);
 		return FALSE;
 	}
-#ifdef TRANSPORT_DEBUG
+	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
 		char s[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&transport->send_addr, s, sizeof(s));
-		pgm_debug ("pgm_sockaddr_multicast_if (router alert) succeeded on send_gsr address %s interface %u",
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set multicast local device (router alert) succeeded on send_gsr address %s interface %u"),
 					s, (unsigned)transport->send_gsr.gsr_interface);
 	}
-#endif
 
 /* multicast loopback */
 	pgm_trace (PGM_LOG_ROLE_NETWORK,transport->use_multicast_loop?_("Set multicast loopback.") : _("Unset multicast loopback."));
