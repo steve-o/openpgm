@@ -35,9 +35,7 @@
 #include "pgm/source.h"
 #include "pgm/packet_parse.h"
 #include "pgm/timer.h"
-#ifdef _WIN32
-#	include "pgm/engine.h"
-#endif
+#include "pgm/engine.h"
 
 
 //#define RECV_DEBUG
@@ -128,6 +126,21 @@ recvskb (
 	}
 #	endif /* !_WIN32 */
 #endif /* !CONFIG_TARGET_WINE */
+
+#ifdef PGM_DEBUG
+	if (PGM_UNLIKELY(pgm_loss_rate > 0)) {
+		const unsigned percent = pgm_rand_int_range (&transport->rand_, 0, 100);
+		if (percent <= pgm_loss_rate) {
+			pgm_debug ("Simulated packet loss");
+#	ifndef _WIN32
+			errno = EAGAIN;
+#	else
+			WSASetLastError (WSAEWOULDBLOCK);
+#	endif
+			return -1;
+		}
+	}
+#endif
 
 	skb->transport		= transport;
 	skb->tstamp		= pgm_time_update_now();
@@ -594,8 +607,8 @@ wait_for_event (
 		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
 #else
 		struct timeval tv_timeout = {
-			.tv_sec		= timeout > 1000000UL ? timeout / 1000000UL : 0,
-			.tv_usec	= timeout > 1000000UL ? timeout % 1000000UL : timeout
+			.tv_sec		= timeout > 1000000L ? timeout / 1000000UL : 0,
+			.tv_usec	= timeout > 1000000L ? timeout % 1000000UL : timeout
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif
