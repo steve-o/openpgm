@@ -38,6 +38,9 @@ int			pgm_ipproto_pgm = IPPROTO_PGM;
 LPFN_WSARECVMSG		pgm_WSARecvMsg = NULL;
 #endif
 
+#ifdef PGM_DEBUG
+unsigned		pgm_loss_rate = 0;
+#endif
 
 /* locals */
 static bool		pgm_is_supported = FALSE;
@@ -169,7 +172,7 @@ pgm_init (
 			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
 				proto->p_proto);
 #else
-			pgm_minor (_("Setting PGM protocol number to %i from %SYSTEMROOT%\\system32\\drivers\\etc\\protocols."),
+			pgm_minor (_("Setting PGM protocol number to %i from %%SYSTEMROOT%%\\system32\\drivers\\etc\\protocols."),
 				proto->p_proto);
 #endif
 			pgm_ipproto_pgm = proto->p_proto;
@@ -187,6 +190,18 @@ pgm_init (
 #endif
 		goto err_shutdown;
 	}
+
+/* receiver simulated loss rate */
+#ifdef PGM_DEBUG
+	const char *loss_rate = getenv ("PGM_LOSS_RATE");
+	if (NULL != loss_rate) {
+		int value = atoi (loss_rate);
+		if (value > 0 && value <= 100) {
+			pgm_loss_rate = value;
+			pgm_minor (_("Setting PGM packet loss rate to %i%%."), pgm_loss_rate);
+		}
+	}
+#endif
 
 /* create global transport list lock */
 	pgm_rwlock_init (&pgm_transport_list_lock);

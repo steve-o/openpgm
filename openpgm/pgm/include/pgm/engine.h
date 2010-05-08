@@ -34,6 +34,10 @@ PGM_BEGIN_DECLS
 extern LPFN_WSARECVMSG pgm_WSARecvMsg;
 #endif
 
+#ifdef PGM_DEBUG
+extern unsigned pgm_loss_rate;
+#endif
+
 bool pgm_init (pgm_error_t**);
 bool pgm_supported (void) PGM_GNUC_WARN_UNUSED_RESULT PGM_GNUC_PURE;
 bool pgm_shutdown (void);
