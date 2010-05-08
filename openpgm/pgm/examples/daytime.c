@@ -28,6 +28,7 @@
 #include <time.h>
 #ifdef _WIN32
 #	include <process.h>
+#	include <wchar.h>
 #	include "getopt.h"
 #endif
 #include <pgm/pgm.h>
@@ -161,9 +162,19 @@ main (
 		time_t now;
 		time (&now);
 		const struct tm* time_ptr = localtime(&now);
+#ifndef _WIN32
 		char s[1024];
-		strftime (s, sizeof(s), TIME_FORMAT, time_ptr);
-		const int status = pgm_send (transport, s, strlen (s) + 1, NULL);
+		const size_t slen = strftime (s, sizeof(s), TIME_FORMAT, time_ptr);
+		const int status = pgm_send (transport, s, slen + 1, NULL);
+#else
+		char s[1024];
+		const size_t slen = strftime (s, sizeof(s), TIME_FORMAT, time_ptr);
+		wchar_t ws[1024];
+		size_t wslen = MultiByteToWideChar (CP_ACP, 0, s, slen, ws, 1024);
+		char us[1024];
+		size_t uslen = WideCharToMultiByte (CP_UTF8, 0, ws, wslen + 1, us, sizeof(us), NULL, NULL);
+		const int status = pgm_send (transport, us, uslen + 1, NULL);
+#endif
 	        if (PGM_IO_STATUS_NORMAL != status) {
 			fprintf (stderr, "pgm_send() failed.\n");
 		}
