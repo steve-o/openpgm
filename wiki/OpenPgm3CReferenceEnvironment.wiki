@@ -12,6 +12,24 @@ This section describes the functions relating to the global dependencies of Open
 <th>Description</th>
 </tr>
 <tr>
+<td><tt>[OpenPgm3CReferenceErrorHandling PGM_MIN_LOG_LEVEL]</tt></td>
+<td>Minimum log level.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferenceErrorHandling PGM_LOG_MASK]</tt></td>
+<td>Trace role mask for PGM logging.</td>
+</tr><tr>
+<td><tt>PGM_LOSS_RATE</tt></td>
+<td>Simulated packet loss rate.</td>
+</tr><tr>
+<td><tt>PGM_DEBUG<tt></td>
+<td>Debugging and memory profiling options.</td>
+</tr><tr>
+<td><tt>[OpenPgmCReferenceRunWithTheseCapabilities PGM_TIMER]<tt></td>
+<td>Timing source device.</td>
+</tr><tr>
+<td><tt>[OpenPgmCReferenceRunWithTheseCapabilities RDTSC_FREQUENCY]<tt></td>
+<td>Frequency of system TSC.</td>
+</tr><tr>
 <td><tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt></td>
 <td>Start the PGM environment.</td>
 </tr><tr>

@@ -17,7 +17,7 @@ int *pgm_recv* (
 
 int *pgm_recvfrom* (
 	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`    transport,
-	void`*`*            buf,
+	void`*``*`            buf,
 	size_t               len,
 	int                 flags,
 	size_t`*`              bytes_read,

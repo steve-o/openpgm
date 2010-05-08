@@ -11,7 +11,6 @@
   * [OpenPgmConceptsTransport Transport]
   * [OpenPgmConceptsSession Session]
   * [OpenPgmConceptsProtocol Protocol]
-    * [OpenPgm2CReferenceBuildLibrary Build Library]
   * [OpenPgmConceptsGuidelinesForProgramming Guidelines for Programming]
     * [OpenPgmConceptsControlMessageSizes Control Message Sizes]
     * [OpenPgmConceptsAvoidFloodingTheNetwork Avoid Flooding the Network]

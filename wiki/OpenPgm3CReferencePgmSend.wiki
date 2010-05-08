@@ -8,7 +8,7 @@ _Function_
 
 int *pgm_send* (
 	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*` const    transport,
-	const void*             buf,
+	const void`*`             buf,
 	size_t                     len,
 	size_t`*`                    bytes_written
 );
