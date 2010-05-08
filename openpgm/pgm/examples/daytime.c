@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * プリン PGM receiver
+ * Daytime broadcast service.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,16 +20,21 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #ifdef _WIN32
+#	include <process.h>
 #	include "getopt.h"
 #endif
 #include <pgm/pgm.h>
 
 
 /* globals */
+#define TIME_FORMAT	"%a, %d %b %Y %H:%M:%S %z"
 
 static int		port = 0;
 static const char*	network = "";
@@ -37,6 +42,7 @@ static bool		use_multicast_loop = FALSE;
 static int		udp_encap_port = 0;
 
 static int		max_tpdu = 1500;
+static int		max_rte = 400*1000;		/* very conservative rate, 2.5mb/s */
 static int		sqns = 100;
 
 static bool		use_fec = FALSE;
@@ -47,16 +53,21 @@ static pgm_transport_t* transport = NULL;
 static bool		is_terminated = FALSE;
 
 #ifndef _WIN32
+static pthread_t	nak_thread;
 static int		terminate_pipe[2];
 static void on_signal (int);
+static void* nak_routine (void*);
 #else
+static HANDLE		nak_thread;
 static HANDLE		terminate_event;
 static BOOL on_console_ctrl (DWORD);
+static unsigned __stdcall nak_routine (void*);
 #endif
 
 static void usage (const char*) __attribute__((__noreturn__));
 static bool on_startup (void);
-static int on_data (void*restrict, size_t, pgm_tsi_t*restrict);
+static bool create_transport (void);
+static bool create_nak_thread (void);
 
 
 static void
@@ -68,6 +79,7 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
 	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
 	fprintf (stderr, "  -g <n>\n");
@@ -78,15 +90,15 @@ usage (
 
 int
 main (
-	int		argc,
-	char*		argv[]
+	int	argc,
+	char   *argv[]
 	)
 {
 	pgm_error_t* pgm_err = NULL;
 
 	setlocale (LC_ALL, "");
 
-	puts ("プリン プリン");
+	puts ("PGM daytime service");
 
 	if (!pgm_init (&pgm_err)) {
 		fprintf (stderr, "Unable to start PGM engine: %s\n", pgm_err->message);
@@ -97,15 +109,17 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:f:k:g:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
 		case 's':	port = atoi (optarg); break;
 		case 'p':	udp_encap_port = atoi (optarg); break;
+		case 'r':	max_rte = atoi (optarg); break;
 		case 'f':	use_fec = TRUE; break;
 		case 'k':	rs_k = atoi (optarg); break;
 		case 'g':	rs_n = atoi (optarg); break;
+
 		case 'l':	use_multicast_loop = TRUE; break;
 
 		case 'i':
@@ -113,7 +127,8 @@ main (
 			return EXIT_SUCCESS;
 
 		case 'h':
-		case '?': usage (binary_name);
+		case '?':
+			usage (binary_name);
 		}
 	}
 
@@ -141,91 +156,33 @@ main (
 		return EXIT_FAILURE;
 	}
 
-/* dispatch loop */
-#ifndef _WIN32
-	int fds;
-	fd_set readfds;
-#else
-	int n_handles = 3;
-	HANDLE waitHandles[ n_handles ];
-	DWORD dwTimeout, dwEvents;
-	WSAEVENT recvEvent, pendingEvent;
-
-	recvEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_recv_fd (transport), recvEvent, FD_READ);
-	pendingEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_pending_fd (transport), pendingEvent, FD_READ);
-
-	waitHandles[0] = terminate_event;
-	waitHandles[1] = recvEvent;
-	waitHandles[2] = pendingEvent;
-#endif /* !_WIN32 */
-	puts ("Entering PGM message loop ... ");
+/* service loop */
 	do {
-		struct timeval tv;
-		char buffer[4096];
-		size_t len;
-		pgm_tsi_t from;
-		const int status = pgm_recvfrom (transport,
-					         buffer,
-					         sizeof(buffer),
-					         0,
-					         &len,
-					         &from,
-					         &pgm_err);
-		switch (status) {
-		case PGM_IO_STATUS_NORMAL:
-			on_data (buffer, len, &from);
-			break;
-		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_transport_get_timer_pending (transport, &tv);
-			printf ("Wait on fd or pending timer %ld:%ld\n",
-				   (long)tv.tv_sec, (long)tv.tv_usec);
-			goto block;
-		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_transport_get_rate_remaining (transport, &tv);
-			printf ("wait on fd or rate limit timeout %ld:%ld\n",
-				   (long)tv.tv_sec, (long)tv.tv_usec);
-		case PGM_IO_STATUS_WOULD_BLOCK:
-/* select for next event */
-block:
-#ifndef _WIN32
-			fds = terminate_pipe[0] + 1;
-			FD_ZERO(&readfds);
-			FD_SET(terminate_pipe[0], &readfds);
-			pgm_transport_select_info (transport, &readfds, NULL, &fds);
-			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
-#else
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
-			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
-			default: break;
-			}
-#endif /* !_WIN32 */
-			break;
-
-		default:
-			if (pgm_err) {
-				fprintf (stderr, "%s\n", pgm_err->message);
-				pgm_error_free (pgm_err);
-				pgm_err = NULL;
-			}
-			if (PGM_IO_STATUS_ERROR == status)
-				break;
+		time_t now;
+		time (&now);
+		const struct tm* time_ptr = localtime(&now);
+		char s[1024];
+		strftime (s, sizeof(s), TIME_FORMAT, time_ptr);
+		const int status = pgm_send (transport, s, strlen (s) + 1, NULL);
+	        if (PGM_IO_STATUS_NORMAL != status) {
+			fprintf (stderr, "pgm_send() failed.\n");
 		}
+#ifndef _WIN32
+		sleep (1);
+#else
+		Sleep (1 * 1000);
+#endif
 	} while (!is_terminated);
 
-	puts ("Message loop terminated, cleaning up.");
-
 /* cleanup */
+	puts ("Waiting for NAK thread.");
 #ifndef _WIN32
+	pthread_join (nak_thread, NULL);
 	close (terminate_pipe[0]);
 	close (terminate_pipe[1]);
 #else
-	WSACloseEvent (recvEvent);
-	WSACloseEvent (pendingEvent);
+	WaitForSingleObject (nak_thread, INFINITE);
+	CloseHandle (nak_thread);
 	CloseHandle (terminate_event);
 #endif /* !_WIN32 */
 
@@ -236,7 +193,7 @@ block:
 	}
 
 	puts ("PGM engine shutdown.");
-	pgm_shutdown ();
+	pgm_shutdown();
 	puts ("finished.");
 	return EXIT_SUCCESS;
 }
@@ -272,6 +229,16 @@ static
 bool
 on_startup (void)
 {
+	bool status = (create_transport() && create_nak_thread());
+	if (status)
+		puts ("Startup complete.");
+	return status;
+}
+
+static
+bool
+create_transport (void)
+{
 	struct pgm_transport_info_t* res = NULL;
 	pgm_error_t* pgm_err = NULL;
 
@@ -280,7 +247,7 @@ on_startup (void)
 /* parse network parameter into transport address structure */
 	char network_param[1024];
 	sprintf (network_param, "%s", network);
-	if (!pgm_if_get_transport_info (network_param, NULL, &res, &pgm_err)) {
+	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
 		pgm_error_free (pgm_err);
 		return FALSE;
@@ -308,18 +275,18 @@ on_startup (void)
 
 /* set PGM parameters */
 	pgm_transport_set_nonblocking (transport, TRUE);
-	pgm_transport_set_recv_only (transport, TRUE, FALSE);
+	pgm_transport_set_send_only (transport, TRUE);
 	pgm_transport_set_max_tpdu (transport, max_tpdu);
-	pgm_transport_set_rxw_sqns (transport, sqns);
+	pgm_transport_set_txw_sqns (transport, sqns);
+	pgm_transport_set_txw_max_rte (transport, max_rte);
 	pgm_transport_set_multicast_loop (transport, use_multicast_loop);
 	pgm_transport_set_hops (transport, 16);
-	pgm_transport_set_peer_expiry (transport, pgm_secs(300));
-	pgm_transport_set_spmr_expiry (transport, pgm_msecs(250));
-	pgm_transport_set_nak_bo_ivl (transport, pgm_msecs(50));
-	pgm_transport_set_nak_rpt_ivl (transport, pgm_secs(2));
-	pgm_transport_set_nak_rdata_ivl (transport, pgm_secs(2));
-	pgm_transport_set_nak_data_retries (transport, 50);
-	pgm_transport_set_nak_ncf_retries (transport, 50);
+	pgm_transport_set_ambient_spm (transport, pgm_secs(30));
+	unsigned spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+	pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, sizeof(spm_heartbeat)/sizeof(spm_heartbeat[0]));
+	if (use_fec) {
+		pgm_transport_set_fec (transport, 0, TRUE, TRUE, rs_n, rs_k);
+	}
 
 /* assign transport to specified address */
 	if (!pgm_transport_bind (transport, &pgm_err)) {
@@ -329,26 +296,109 @@ on_startup (void)
 		transport = NULL;
 		return FALSE;
 	}
-
-	puts ("Startup complete.");
 	return TRUE;
 }
 
 static
-int
-on_data (
-	void*      restrict data,
-	size_t		    len,
-	pgm_tsi_t* restrict from
+bool
+create_nak_thread (void)
+{
+#ifndef _WIN32
+	const int status = pthread_create (&nak_thread, NULL, &nak_routine, transport);
+	if (0 != status) {
+		fprintf (stderr, "Creating new thread: %s\n", strerror (status));
+		return FALSE;
+	}
+#else
+	nak_thread = (HANDLE)_beginthreadex (NULL, 0, &nak_routine, transport, 0, NULL);
+	const int save_errno = errno;
+	if (0 == nak_thread) {
+		fprintf (stderr, "Creating new thread: %s\n", strerror (save_errno));
+		return FALSE;
+	}
+#endif /* _WIN32 */
+	return TRUE;
+}
+
+static
+#ifndef _WIN32
+void*
+#else
+unsigned
+__stdcall
+#endif
+nak_routine (
+	void*		arg
 	)
 {
-/* protect against non-null terminated strings */
-	char buf[1024], tsi[PGM_TSISTRLEN];
-	snprintf (buf, sizeof(buf), "%s", (char*)data);
-	pgm_tsi_print_r (from, tsi, sizeof(tsi));
-	printf ("\"%s\" (%zu bytes from %s)\n",
-			buf, len, tsi);
+/* dispatch loop */
+	pgm_transport_t* nak_transport = arg;
+#ifndef _WIN32
+	int fds;
+	fd_set readfds;
+#else
+	int n_handles = 3;
+	HANDLE waitHandles[ n_handles ];
+	DWORD dwTimeout, dwEvents;
+	WSAEVENT recvEvent, pendingEvent;
+
+	recvEvent = WSACreateEvent ();
+	WSAEventSelect (pgm_transport_get_recv_fd (nak_transport), recvEvent, FD_READ);
+	pendingEvent = WSACreateEvent ();
+	WSAEventSelect (pgm_transport_get_pending_fd (nak_transport), pendingEvent, FD_READ);
+
+	waitHandles[0] = terminate_event;
+	waitHandles[1] = recvEvent;
+	waitHandles[2] = pendingEvent;
+#endif /* !_WIN32 */
+	do {
+		struct timeval tv;
+		char buf[4064];
+		pgm_error_t* pgm_err = NULL;
+		const int status = pgm_recv (nak_transport, buf, sizeof(buf), 0, NULL, &pgm_err);
+		switch (status) {
+		case PGM_IO_STATUS_TIMER_PENDING:
+			pgm_transport_get_timer_pending (nak_transport, &tv);
+			goto block;
+		case PGM_IO_STATUS_RATE_LIMITED:
+			pgm_transport_get_rate_remaining (nak_transport, &tv);
+		case PGM_IO_STATUS_WOULD_BLOCK:
+block:
+#ifndef _WIN32
+			fds = terminate_pipe[0] + 1;
+			FD_ZERO(&readfds);
+			FD_SET(terminate_pipe[0], &readfds);
+			pgm_transport_select_info (nak_transport, &readfds, NULL, &fds);
+			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
+#else
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+			switch (dwEvents) {
+			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			default: break;
+			}
+#endif /* !_WIN32 */
+			break;
+
+		default:
+			if (pgm_err) {
+				fprintf (stderr, "%s\n", pgm_err->message ? pgm_err->message : "(null)");
+				pgm_error_free (pgm_err);
+				pgm_err = NULL;
+			}
+			if (PGM_IO_STATUS_ERROR == status)
+				break;
+		}
+	} while (!is_terminated);
+#ifndef _WIN32
+	return NULL;
+#else
+	WSACloseEvent (recvEvent);
+	WSACloseEvent (pendingEvent);
+	_endthread();
 	return 0;
+#endif
 }
 
 /* eof */

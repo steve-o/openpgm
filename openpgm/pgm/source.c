@@ -612,13 +612,16 @@ pgm_send_spm (
 	    PGM_OPT_FIN == flags)
 	{
 		tpdu_length += sizeof(struct pgm_opt_length);
+/* forward error correction */
 		if (transport->use_proactive_parity ||
 		    transport->use_ondemand_parity)
 			tpdu_length += sizeof(struct pgm_opt_header) +
 				       sizeof(struct pgm_opt_parity_prm);
+/* congestion report request */
 		if (transport->is_pending_crqst)
 			tpdu_length += sizeof(struct pgm_opt_header) +
 				       sizeof(struct pgm_opt_crqst);
+/* end of session */
 		if (PGM_OPT_FIN == flags)
 			tpdu_length += sizeof(struct pgm_opt_header) +
 				       sizeof(struct pgm_opt_fin);
@@ -968,7 +971,7 @@ send_odata (
 		(void*)transport, (void*)skb, (void*)bytes_written);
 
 	const uint16_t tsdu_length = skb->len;
-	const size_t   tpdu_length = tsdu_length + pgm_transport_pkt_offset (FALSE);
+	const size_t   tpdu_length = tsdu_length + pgm_transport_pkt_offset2 (FALSE, transport->use_pgmcc);
 
 /* continue if send would block */
 	if (transport->is_apdu_eagain)
@@ -985,7 +988,7 @@ send_odata (
 	STATE(skb)->pgm_header->pgm_sport	= transport->tsi.sport;
 	STATE(skb)->pgm_header->pgm_dport	= transport->dport;
 	STATE(skb)->pgm_header->pgm_type        = PGM_ODATA;
-        STATE(skb)->pgm_header->pgm_options     = 0;
+        STATE(skb)->pgm_header->pgm_options     = transport->use_pgmcc ? PGM_OPT_PRESENT : 0;
         STATE(skb)->pgm_header->pgm_tsdu_length = htons (tsdu_length);
 
 /* ODATA */
@@ -993,15 +996,41 @@ send_odata (
         STATE(skb)->pgm_data->data_trail	= htonl (pgm_txw_trail(transport->window));
 
         STATE(skb)->pgm_header->pgm_checksum    = 0;
-	const size_t pgm_header_len		= (char*)(STATE(skb)->pgm_data + 1) - (char*)STATE(skb)->pgm_header;
+	void* data = STATE(skb)->pgm_data + 1;
+	if (transport->use_pgmcc) {
+		struct pgm_opt_length* opt_len = data;
+		opt_len->opt_type	= PGM_OPT_LENGTH;
+		opt_len->opt_length	= sizeof(struct pgm_opt_length);
+		opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+							sizeof(struct pgm_opt_header) +
+							(AF_INET6 == transport->acker_nla.ss_family) ? sizeof(struct pgm_opt6_cc_data) : sizeof(struct pgm_opt_cc_data) );
+		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
+		opt_header->opt_length	= sizeof(struct pgm_opt_header) + (AF_INET6 == transport->acker_nla.ss_family) ? sizeof(struct pgm_opt6_cc_data) : sizeof(struct pgm_opt_cc_data);
+		struct pgm_opt_cc_data*  cc_data  = (struct pgm_opt_cc_data*)(opt_header + 1);
+		struct pgm_opt6_cc_data* cc_data6 = (struct pgm_opt6_cc_data*)(opt_header + 1);
+
+		cc_data->opt_tstamp = pgm_to_msecs (STATE(skb)->tstamp);
+/* acker nla */
+		pgm_sockaddr_to_nla ((struct sockaddr*)&transport->acker_nla, (char*)&cc_data->opt_nla_afi);
+		if (AF_INET6 == transport->acker_nla.ss_family)
+			data = (char*)cc_data6 + sizeof(struct pgm_opt6_cc_data);
+		else
+			data = (char*)cc_data  + sizeof(struct pgm_opt_cc_data);
+	}
+	const size_t pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-	STATE(unfolded_odata)			= pgm_csum_partial ((char*)(STATE(skb)->pgm_data + 1), tsdu_length, 0);
+	STATE(unfolded_odata)			= pgm_csum_partial (data, tsdu_length, 0);
         STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 	pgm_spinlock_lock (&transport->txw_spinlock);
 	pgm_txw_add (transport->window, STATE(skb));
 	pgm_spinlock_unlock (&transport->txw_spinlock);
+
+/* the transmit window MUST check the user count to ensure it does not 
+ * attempt to send a repair-data packet based on in transit original data.
+ */
 
 	ssize_t sent;
 retry_send:
@@ -1069,7 +1098,7 @@ send_odata_copy (
 	pgm_debug ("send_odata_copy (transport:%p tsdu:%p tsdu_length:%u bytes-written:%p)",
 		(void*)transport, tsdu, tsdu_length, (void*)bytes_written);
 
-	const size_t tpdu_length = tsdu_length + pgm_transport_pkt_offset(FALSE);
+	const size_t tpdu_length = tsdu_length + pgm_transport_pkt_offset2 (FALSE, transport->use_pgmcc);
 
 /* continue if blocked mid-apdu */
 	if (transport->is_apdu_eagain)
@@ -1078,7 +1107,7 @@ send_odata_copy (
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
+	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset2  (FALSE, transport->use_pgmcc));
 	pgm_skb_put (STATE(skb), tsdu_length);
 
 	STATE(skb)->pgm_header	= (struct pgm_header*)STATE(skb)->head;
@@ -1196,7 +1225,7 @@ send_odatav (
 	STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 	STATE(skb)->transport = transport;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset (FALSE));
+	pgm_skb_reserve (STATE(skb), pgm_transport_pkt_offset2  (FALSE, transport->use_pgmcc));
 	pgm_skb_put (STATE(skb), STATE(tsdu_length));
 
 	STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
@@ -1310,7 +1339,7 @@ send_apdu (
 	STATE(is_rate_limited) = FALSE;
 	if (transport->is_nonblocking && transport->is_controlled_odata)
 	{
-		const size_t header_length = pgm_transport_pkt_offset (TRUE);
+		const size_t header_length = pgm_transport_pkt_offset2  (TRUE, transport->use_pgmcc);
 		size_t tpdu_length = 0;
 		size_t offset_	  = 0;
 		do {
@@ -1335,7 +1364,7 @@ send_apdu (
 
 	do {
 /* retrieve packet storage from transmit window */
-		size_t header_length = pgm_transport_pkt_offset (TRUE);
+		size_t header_length = pgm_transport_pkt_offset2  (TRUE, transport->use_pgmcc);
 		STATE(tsdu_length) = MIN( pgm_transport_max_tsdu (transport, TRUE), apdu_length - STATE(data_bytes_offset) );
 
 		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
@@ -1616,7 +1645,7 @@ pgm_sendv (
 	STATE(is_rate_limited) = FALSE;
 	if (transport->is_nonblocking && transport->is_controlled_odata)
         {
-		const size_t header_length = pgm_transport_pkt_offset (TRUE);
+		const size_t header_length = pgm_transport_pkt_offset2  (TRUE, transport->use_pgmcc);
                 size_t tpdu_length = 0;
 		size_t offset_	   = 0;
 		do {
@@ -1685,7 +1714,7 @@ retry_send:
 
 	do {
 /* retrieve packet storage from transmit window */
-		size_t header_length = pgm_transport_pkt_offset (TRUE);
+		size_t header_length = pgm_transport_pkt_offset2  (TRUE, transport->use_pgmcc);
 		STATE(tsdu_length) = MIN( pgm_transport_max_tsdu (transport, TRUE), STATE(apdu_length) - STATE(data_bytes_offset) );
 		STATE(skb) = pgm_alloc_skb (transport->max_tpdu);
 		STATE(skb)->transport = transport;
@@ -1907,7 +1936,7 @@ pgm_send_skbv (
 	{
 		size_t total_tpdu_length = 0;
 		for (unsigned i = 0; i < count; i++)
-			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset (is_one_apdu) + vector[i]->len;
+			total_tpdu_length += transport->iphdr_len + pgm_transport_pkt_offset2  (is_one_apdu, transport->use_pgmcc) + vector[i]->len;
 
 /* calculation includes one iphdr length already */
 		if (!pgm_rate_check (&transport->rate_control,

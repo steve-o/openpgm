@@ -56,7 +56,8 @@ pgm_tsi_is_null (
 	return (0 == u->l[0] && 0 == u->l[1]);
 }
 
-/* returns the pointer at the given index of the window.
+/* returns the pointer at the given index of the window.  responsibility
+ * is with the caller to verify a single user ownership.
  */
 
 static inline
@@ -545,8 +546,10 @@ pgm_txw_retransmit_try_peek (
 
 /* no lock required to detect presence of a request */
 	pgm_list_t* tail_link = pgm_queue_peek_tail_link (&window->retransmit_queue);
-	if (NULL == tail_link)
+	if (PGM_UNLIKELY(NULL == tail_link)) {
+		pgm_debug ("retransmit queue empty on peek.");
 		return NULL;
+	}
 
 	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)tail_link;
 	pgm_assert (pgm_skb_is_valid (skb));
@@ -555,6 +558,11 @@ pgm_txw_retransmit_try_peek (
 	if (!state->waiting_retransmit) {
 		pgm_assert (((const pgm_list_t*)skb)->next == NULL);
 		pgm_assert (((const pgm_list_t*)skb)->prev == NULL);
+	}
+/* packet payload still in transit */
+	if (PGM_UNLIKELY(1 != pgm_atomic_read32 (&skb->users))) {
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Retransmit sqn #" PRIu32 " is still in transit in transmit thread."), skb->sequence);
+		return NULL;
 	}
 	if (!state->pkt_cnt_requested) {
 		return skb;

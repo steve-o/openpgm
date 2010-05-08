@@ -593,7 +593,7 @@ sender_thread (
 		else
 			latency = g_odata_interval;
 
-		const size_t header_size = pgm_transport_pkt_offset(FALSE);
+		const size_t header_size = pgm_transport_pkt_offset2 (FALSE, FALSE);
 		const size_t apdu_size = ping.ByteSize();
 		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_max_tpdu);
 		pgm_skb_reserve (skb, header_size);
