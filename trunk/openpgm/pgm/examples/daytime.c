@@ -348,19 +348,22 @@ nak_routine (
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3;
+	int n_handles = 4;
 	HANDLE waitHandles[ n_handles ];
 	DWORD dwTimeout, dwEvents;
-	WSAEVENT recvEvent, pendingEvent;
+	WSAEVENT recvEvent, repairEvent, pendingEvent;
 
 	recvEvent = WSACreateEvent ();
 	WSAEventSelect (pgm_transport_get_recv_fd (nak_transport), recvEvent, FD_READ);
+	repairEvent = WSACreateEvent ();
+	WSAEventSelect (pgm_transport_get_repair_fd (nak_transport), repairEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
 	WSAEventSelect (pgm_transport_get_pending_fd (nak_transport), pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
 	waitHandles[1] = recvEvent;
-	waitHandles[2] = pendingEvent;
+	waitHandles[2] = repairEvent;
+	waitHandles[3] = pendingEvent;
 #endif /* !_WIN32 */
 	do {
 		struct timeval tv;
@@ -386,7 +389,8 @@ block:
 			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
 			switch (dwEvents) {
 			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (repairEvent); break;
+			case WAIT_OBJECT_0+3: WSAResetEvent (pendingEvent); break;
 			default: break;
 			}
 #endif /* !_WIN32 */
@@ -406,6 +410,7 @@ block:
 	return NULL;
 #else
 	WSACloseEvent (recvEvent);
+	WSACloseEvent (repairEvent);
 	WSACloseEvent (pendingEvent);
 	_endthread();
 	return 0;
