@@ -518,6 +518,7 @@ _pgm_rxw_update_trail (
 		window->commit_lead = window->trail += distance;
 		window->lead += distance;
 		window->cumulative_losses += distance;
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Data loss due to trailing edge update, fragment count %" PRIu32 "."),window->fragment_count);
 		pgm_assert (pgm_rxw_is_empty (window));
 		pgm_assert (_pgm_rxw_commit_is_empty (window));
 		pgm_assert (_pgm_rxw_incoming_is_empty (window));
@@ -655,6 +656,7 @@ _pgm_rxw_add_placeholder_range (
 
 	if (pgm_rxw_is_full (window)) {
 		pgm_assert (_pgm_rxw_commit_is_empty (window));
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Receive window full on placeholder sequence."));
 		_pgm_rxw_remove_trail (window);
 	}
 
@@ -666,6 +668,7 @@ _pgm_rxw_add_placeholder_range (
 		_pgm_rxw_add_placeholder (window, now, nak_rb_expiry);
 		if (pgm_rxw_is_full (window)) {
 			pgm_assert (_pgm_rxw_commit_is_empty (window));
+			pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Receive window full on placeholder sequence."));
 			_pgm_rxw_remove_trail (window);
 		}
 	}
@@ -717,6 +720,7 @@ _pgm_rxw_update_lead (
 /* slow consumer or fast producer */
 		if (pgm_rxw_is_full (window)) {
 			pgm_assert (_pgm_rxw_commit_is_empty (window));
+			pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Receive window full on window lead advancement."));
 			_pgm_rxw_remove_trail (window);
 		}
 		_pgm_rxw_add_placeholder (window, now, nak_rb_expiry);
@@ -1064,10 +1068,12 @@ _pgm_rxw_append (
 		return PGM_RXW_MALFORMED;
 
 	if (pgm_rxw_is_full (window)) {
-		if (_pgm_rxw_commit_is_empty (window))
+		if (_pgm_rxw_commit_is_empty (window)) {
+			pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Receive window full on new data."));
 			_pgm_rxw_remove_trail (window);
-		else
+		} else {
 			return PGM_RXW_BOUNDS;		/* constrained by commit window */
+		}
 	}
 
 /* advance leading edge */
@@ -1236,6 +1242,7 @@ _pgm_rxw_remove_trail (
 /* data-loss */
 		window->commit_lead++;
 		window->cumulative_losses++;
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Data loss due to pulled trailing edge, fragment count %" PRIu32 "."),window->fragment_count);
 		return 1;
 	}
 	return 0;
@@ -1998,10 +2005,12 @@ _pgm_rxw_recovery_append (
 	pgm_assert (NULL != window);
 
 	if (pgm_rxw_is_full (window)) {
-		if (_pgm_rxw_commit_is_empty (window))
+		if (_pgm_rxw_commit_is_empty (window)) {
+			pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Receive window full on confirmed sequence."));
 			_pgm_rxw_remove_trail (window);
-		else
+		} else {
 			return PGM_RXW_BOUNDS;		/* constrained by commit window */
+		}
 	}
 
 /* advance leading edge */
