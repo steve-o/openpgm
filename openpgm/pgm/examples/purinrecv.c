@@ -40,7 +40,7 @@ static int		max_tpdu = 1500;
 static int		sqns = 100;
 
 static bool		use_fec = FALSE;
-static int		rs_k = 64;
+static int		rs_k = 8;
 static int		rs_n = 255;
 
 static pgm_transport_t* transport = NULL;
@@ -179,13 +179,9 @@ main (
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
 			pgm_transport_get_timer_pending (transport, &tv);
-			printf ("Wait on fd or pending timer %ld:%ld\n",
-				   (long)tv.tv_sec, (long)tv.tv_usec);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (transport, &tv);
-			printf ("wait on fd or rate limit timeout %ld:%ld\n",
-				   (long)tv.tv_sec, (long)tv.tv_usec);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
@@ -320,6 +316,9 @@ on_startup (void)
 	pgm_transport_set_nak_rdata_ivl (transport, pgm_secs(2));
 	pgm_transport_set_nak_data_retries (transport, 50);
 	pgm_transport_set_nak_ncf_retries (transport, 50);
+	if (use_fec) {
+		pgm_transport_set_fec (transport, 0, TRUE, TRUE, rs_n, rs_k);
+	}
 
 /* assign transport to specified address */
 	if (!pgm_transport_bind (transport, &pgm_err)) {

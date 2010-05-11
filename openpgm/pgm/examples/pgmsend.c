@@ -60,7 +60,7 @@ static int g_max_rte = 400*1000;
 static int g_sqns = 100;
 
 static gboolean g_fec = FALSE;
-static int g_k = 64;
+static int g_k = 8;
 static int g_n = 255;
 
 static pgm_transport_t* g_transport = NULL;
