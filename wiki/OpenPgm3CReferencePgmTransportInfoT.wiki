@@ -1,4 +1,4 @@
-#summary OpenPGM 3 : C Reference : Interface : struct pgm_transport_info_t
+﻿#summary OpenPGM 3 : C Reference : Interface : struct pgm_transport_info_t
 #labels Phase-Implementation
 #sidebar TOC3CReferenceInterface
 _Type_
@@ -16,9 +16,10 @@ struct pgm_transport_info_t {
 	int                          ti_udp_encap_mcast_port;
 	int                          ti_sport;
 	int                          ti_dport;
-	size_t                        ti_recv_addrs_len;
+    unsigned                     ti_ip_router_alert:1;
+	size_t                       ti_recv_addrs_len;
 	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_recv_addrs;
-	size_t                        ti_send_addrs_len;
+	size_t                       ti_send_addrs_len;
 	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*`     ti_send_addrs;
 	};
 </pre>
