@@ -529,7 +529,7 @@ pgm_new_peer (
 	pgm_assert (NULL != dst_addr);
 	pgm_assert (dst_addrlen > 0);
 
-#ifdef RECEIVER_DEBUG
+#ifdef PGM_DEBUG
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
@@ -726,8 +726,7 @@ pgm_on_spm (
 	const uint32_t spm_sqn = ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
-	if (PGM_LIKELY(pgm_uint32_gte (spm_sqn, source->spm_sqn) ||
-	     ((struct sockaddr*)&source->nla)->sa_family == 0))
+	if (PGM_LIKELY(pgm_uint32_gte (spm_sqn, source->spm_sqn)))
 	{
 /* copy NLA for replies */
 		pgm_nla_to_sockaddr (&spm->spm_nla_afi, (struct sockaddr*)&source->nla);

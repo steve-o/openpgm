@@ -561,7 +561,7 @@ pgm_txw_retransmit_try_peek (
 	}
 /* packet payload still in transit */
 	if (PGM_UNLIKELY(1 != pgm_atomic_read32 (&skb->users))) {
-		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Retransmit sqn #" PRIu32 " is still in transit in transmit thread."), skb->sequence);
+		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Retransmit sqn #%" PRIu32 " is still in transit in transmit thread."), skb->sequence);
 		return NULL;
 	}
 	if (!state->pkt_cnt_requested) {
