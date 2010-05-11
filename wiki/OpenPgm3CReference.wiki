@@ -1,9 +1,9 @@
-#summary C Reference for OpenPGM version 3.
+﻿#summary C Reference for OpenPGM version 3.
 #labels Featured,Phase-Implementation
 
-*OpenPGM version 3.0.43*
+*OpenPGM version 3.0.55*
 
-*April 2010*
+*May 2010*
 
 
 === Contents ===

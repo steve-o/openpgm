@@ -1,0 +1,46 @@
+﻿#summary OpenPGM 3 : C Reference : Transport : pgm_transport_set_router_alert()
+#labels Phase-Implementation
+#sidebar TOC3CReferenceTransport
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_transport_set_router_alert* (
+	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`     transport,
+	bool             use_ip_router_alert
+	);
+</pre>
+
+=== Purpose ===
+Enable RFC 2113 IP Router Alert tagging on network significant packets.
+
+=== Parameters ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>transport</tt></td>
+<td>The PGM transport object.</td>
+</tr><tr>
+<td><tt>use_ip_router_alert</tt></td>
+<td>Set RFC 2113 tagging.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
+
+=== Example ===
+{{{
+ pgm_transport_set_router_alert (transport, true);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * [OpenPgm3CReferencePgmTransport Transport] in OpenPGM C Reference.<br>
+  * [http://www.ietf.org/rfc/rfc2113.txt IP Router Alert Option]</tt> in RFC 2113.
+

@@ -182,6 +182,9 @@ Transports manage network connections and send outbound messages.
 <td><tt>[OpenPgm3CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt></td>
 <td>Set receive window size in sequence numbers.</td>
 </tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTransportSetRouterAlert pgm_transport_set_router_alert()]</tt></td>
+<td>Enable RFC 2113 IP Router Alert tagging on network significant packets.</td>
+</tr><tr>
 <td><tt>[OpenPgm3CReferencePgmTransportSetRecvOnly pgm_transport_set_recv_only()]</tt></td>
 <td>Set transport to receive-only mode, data packets will not be published.</td>
 </tr><tr>

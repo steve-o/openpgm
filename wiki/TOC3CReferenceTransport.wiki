@@ -1,4 +1,4 @@
-  * C Reference for OpenPGM version 3
+﻿  * C Reference for OpenPGM version 3
   * [OpenPgm3CReference Contents]
   * [OpenPgm3CReferenceTransport Transport]
     * [OpenPgm3CReferencePgmGsiT pgm_gsi_t]
@@ -55,6 +55,7 @@
     * [OpenPgm3CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]
     * [OpenPgm3CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]
     * [OpenPgm3CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]
+    * [OpenPgm3CReferencePgmTransportSetRouterAlert pgm_transport_set_router_alert()]
     * [OpenPgm3CReferencePgmTransportSetRecvOnly pgm_transport_set_recv_only()]
     * [OpenPgm3CReferencePgmTransportSetSendOnly pgm_transport_set_send_only()]
     * [OpenPgm3CReferencePgmTransportSetSndBuf pgm_transport_set_sndbuf()]
