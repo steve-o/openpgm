@@ -183,13 +183,9 @@ main (
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
 			pgm_transport_get_timer_pending (g_transport, &tv);
-			g_message ("wait on fd or pending timer %u:%u",
-				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
-			g_message ("wait on fd or rate limit timeout %u:%u",
-				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:

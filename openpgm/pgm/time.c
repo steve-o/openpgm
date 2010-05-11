@@ -608,12 +608,12 @@ pgm_tsc_init (
 
 	pgm_info (_("Running a benchmark to measure system clock frequency..."));
 
-	const struct timespec calibration_ts = {
-		.tv_sec  = 0,
-		.tv_nsec = usecs_to_nsecs (calibration_usec)
+	struct timespec req = {
+		.tv_sec  = 4,
+		.tv_nsec = 0
 	};
 	start = rdtsc();
-	nanosleep (&calibration_ts, NULL);
+	while (-1 == nanosleep (&req, &req) && EINTR == errno);
 	stop = rdtsc();
 
 	if (stop < start)
