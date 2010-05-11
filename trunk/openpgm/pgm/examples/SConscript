@@ -71,5 +71,6 @@ if e['WITH_GLIB'] == 'true':
 p.Program(['purinsend.c'] + getopt)
 p.Program(['purinrecv.c'] + getopt)
 p.Program(['daytime.c'] + getopt)
+p.Program(['shortcakerecv.c', 'async.c'] + getopt)
 
 # end of file

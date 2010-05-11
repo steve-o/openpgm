@@ -46,8 +46,9 @@ static int		max_tpdu = 1500;
 static int		max_rte = 400*1000;		/* very conservative rate, 2.5mb/s */
 static int		sqns = 100;
 
-static bool		use_fec = FALSE;
-static int		rs_k = 64;
+static bool		use_ondemand_parity = FALSE;
+static int		rs_h = 0;			/* pro-active parity count */
+static int		rs_k = 8;
 static int		rs_n = 255;
 
 static pgm_transport_t* transport = NULL;
@@ -81,9 +82,10 @@ usage (
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
-	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
-	fprintf (stderr, "  -g <n>\n");
+	fprintf (stderr, "  -f <type>       : Enable FEC: proactive, ondemand, or both\n");
+	fprintf (stderr, "  -N <n>          : Reed-Solomon block size (255)\n");
+	fprintf (stderr, "  -K <k>          : Reed-Solomon group size (8)\n");
+	fprintf (stderr, "  -P <count>      : Number of pro-active parity packets (h)\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (EXIT_SUCCESS);
@@ -110,16 +112,31 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:N:K:P:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
 		case 's':	port = atoi (optarg); break;
 		case 'p':	udp_encap_port = atoi (optarg); break;
 		case 'r':	max_rte = atoi (optarg); break;
-		case 'f':	use_fec = TRUE; break;
-		case 'k':	rs_k = atoi (optarg); break;
-		case 'g':	rs_n = atoi (optarg); break;
+		case 'f':
+			switch (optarg[0]) {
+			case 'p':
+			case 'P':
+				rs_h = 1;
+				break;
+			case 'b':
+			case 'B':
+				rs_h = 1;
+			case 'o':
+			case 'O':
+				use_ondemand_parity = TRUE;
+				break;
+			}
+			break;
+		case 'N':	rs_n = atoi (optarg); break;
+		case 'K':	rs_k = atoi (optarg); break;
+		case 'P':	rs_h = atoi (optarg); break;
 
 		case 'l':	use_multicast_loop = TRUE; break;
 
@@ -133,7 +150,7 @@ main (
 		}
 	}
 
-	if (use_fec && ( !rs_n || !rs_k )) {
+	if ((use_ondemand_parity || rs_h > 0) && ( !rs_n || !rs_k )) {
 		fprintf (stderr, "Invalid Reed-Solomon parameters RS(%d,%d).\n", rs_n, rs_k);
 		usage (binary_name);
 	}
@@ -295,8 +312,8 @@ create_transport (void)
 	pgm_transport_set_ambient_spm (transport, pgm_secs(30));
 	unsigned spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 	pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, sizeof(spm_heartbeat)/sizeof(spm_heartbeat[0]));
-	if (use_fec) {
-		pgm_transport_set_fec (transport, 0, TRUE, TRUE, rs_n, rs_k);
+	if (use_ondemand_parity || (rs_h > 0)) {
+		pgm_transport_set_fec (transport, rs_h, use_ondemand_parity, TRUE, rs_n, rs_k);
 	}
 
 /* assign transport to specified address */
