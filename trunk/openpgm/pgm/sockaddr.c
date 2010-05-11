@@ -365,8 +365,8 @@ pgm_sockaddr_router_alert (
 		.ipopt_list = { v ? PGM_IPOPT_RA : 0x00, v ? 0x04 : 0x00, 0x00, 0x00 }
 	};
 #	else
-	const uint32_t ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
-	const uint32_t router_alert = v ? htonl (ipopt_ra) : 0;
+	const int ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
+	const int router_alert = v ? htonl (ipopt_ra) : 0;
 #	endif
 
 	switch (sa_family) {
