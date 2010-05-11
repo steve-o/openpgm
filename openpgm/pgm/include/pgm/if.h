@@ -38,6 +38,7 @@ struct pgm_transport_info_t {
 	uint16_t				ti_udp_encap_mcast_port;
 	uint16_t				ti_sport;
 	uint16_t				ti_dport;
+	unsigned				ti_ip_router_alert:1;
 	size_t					ti_recv_addrs_len;
 	struct group_source_req* restrict	ti_recv_addrs;
 	size_t					ti_send_addrs_len;

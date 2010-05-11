@@ -161,6 +161,8 @@ create_transport (void)
 	}
 	if (port)
 		res->ti_dport = port;
+/* Use RFC 2113 tagging for PGM Router Assist */
+//	res->ti_ip_router_alert = 1;
 	if (!pgm_transport_create (&transport, res, &pgm_err)) {
 		fprintf (stderr, "Creating transport: %s\n", pgm_err->message);
 		pgm_error_free (pgm_err);

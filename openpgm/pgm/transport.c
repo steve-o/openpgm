@@ -383,7 +383,7 @@ pgm_transport_create (
 		goto err_destroy;
 	}
 
-	if (new_transport->use_router_alert)
+	if (1 == tinfo->ti_ip_router_alert)
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP Router Alert (RFC 2113)."));
 		if (0 != pgm_sockaddr_router_alert (new_transport->send_with_router_alert_sock, new_transport->send_gsr.gsr_group.ss_family, TRUE))
@@ -1825,32 +1825,6 @@ pgm_transport_set_congestion_control (
 	}
 	transport->use_pgmcc	= use_pgmcc;
 	transport->acker_ivl	= pgm_msecs (acker_ivl);
-	pgm_rwlock_reader_unlock (&transport->lock);
-	return TRUE;
-}
-
-/* send IP Router Alert on IP/PGM packets as required, some networking infrastructure
- * may silently consume RFC 2113 packets breaking PGM.
- *
- * on success, returns TRUE, on failure returns FALSE.
- */
-
-bool
-pgm_transport_set_router_alert (
-	pgm_transport_t* const	transport,
-	const bool		use_ip_router_alert
-	)
-{
-	pgm_return_val_if_fail (transport != NULL, FALSE);
-	if (!pgm_rwlock_reader_trylock (&transport->lock))
-		pgm_return_val_if_reached (FALSE);
-	if (transport->is_bound ||
-	    transport->is_destroyed)
-	{
-		pgm_rwlock_reader_unlock (&transport->lock);
-		pgm_return_val_if_reached (FALSE);
-	}
-	transport->use_router_alert	= use_ip_router_alert;
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return TRUE;
 }
