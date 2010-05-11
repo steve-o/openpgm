@@ -123,7 +123,6 @@ struct pgm_transport_t {
 	bool	            		is_reset;
 	bool				is_abort_on_reset;
 
-	bool				use_router_alert;		/* IP Router Alert */
 	bool				can_send_data;			/* and SPMs */
 	bool				can_send_nak;			/* muted receiver */
 	bool				can_recv_data;			/* send-only */
@@ -251,7 +250,6 @@ bool pgm_transport_set_rcvbuf (pgm_transport_t*const, const size_t);
 bool pgm_transport_set_fec (pgm_transport_t*const, const uint8_t, const bool, const bool, const uint8_t, const uint8_t);
 bool pgm_transport_set_congestion_reports (pgm_transport_t*const, const bool, const unsigned);
 bool pgm_transport_set_congestion_control (pgm_transport_t*const, const bool, const unsigned);
-bool pgm_transport_set_router_alert (pgm_transport_t*const, const bool);
 bool pgm_transport_set_send_only (pgm_transport_t*const, const bool);
 bool pgm_transport_set_recv_only (pgm_transport_t*const, const bool, const bool);
 bool pgm_transport_set_abort_on_reset (pgm_transport_t*const, const bool);
