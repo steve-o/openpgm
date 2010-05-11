@@ -156,7 +156,12 @@ pgm_parse_raw (
 		return FALSE;
 	}
 
-	size_t packet_length = ip->ip_len;	/* total packet length */
+#ifndef CONFIG_HOST_ORDER_IP_LEN
+	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
+#else
+	size_t packet_length = ip->ip_len;		/* total packet length */
+#endif
+
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
@@ -181,7 +186,7 @@ pgm_parse_raw (
 #if PGM_CHECK_IN_CKSUM
 	const uint16_t sum = in_cksum (data, packet_length, 0);
 	if (PGM_UNLIKELY(0 != sum)) {
-		const uint16_t ip_sum = ip->ip_sum;
+		const uint16_t ip_sum = ntohs (ip->ip_sum);
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_CKSUM,
@@ -192,7 +197,11 @@ pgm_parse_raw (
 #endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
+#ifndef CONFIG_HOST_ORDER_IP_OFF
+	const uint16_t offset = ntohs (ip->ip_off);
+#else
 	const uint16_t offset = ip->ip_off;
+#endif
 	if (PGM_UNLIKELY((offset & 0x1fff) != 0)) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
