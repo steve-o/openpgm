@@ -6,12 +6,12 @@
 #ifndef __PGM_MIB_H__
 #define __PGM_MIB_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 /* function declarations */
-gboolean pgm_mib_init (GError**);
+bool pgm_mib_init (pgm_error_t**);
 
 int send_pgmStart_trap(void);
 int send_pgmStop_trap(void);
@@ -23,6 +23,6 @@ int send_pgmNakFailuresTrap_trap(void);
 int send_pgmNewDlrSourceTrap_trap(void);
 int send_pgmClosedDlrSourceTrap_trap(void);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_MIB_H__ */

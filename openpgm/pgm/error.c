@@ -452,15 +452,15 @@ pgm_error_from_wsa_errno (
 	}
 }
 
-/* from GetAdaptersInfo() and GetAdaptersAddresses()
+/* from Last-Error codes, i.e. Windows non-WinSock and non-DOS errors.
  */
 
 int
-pgm_error_from_adapter_errno (
-	const int	from_adapter_errno
+pgm_error_from_win_errno (
+	const int	from_win_errno
         )
 {
-	switch (from_adapter_errno) {
+	switch (from_win_errno) {
 #ifdef ERROR_ADDRESS_NOT_ASSOCIATED
 	case ERROR_ADDRESS_NOT_ASSOCIATED:
 		return PGM_ERROR_NODATA;

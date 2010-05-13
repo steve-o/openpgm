@@ -242,9 +242,9 @@ main (
 #endif
 #ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx) {
-		if (!pgm_snmp_init (&err)) {
-			g_error ("Unable to start SNMP interface: %s", err->message);
-			g_error_free (err);
+		if (!pgm_snmp_init (&pgm_err)) {
+			g_error ("Unable to start SNMP interface: %s", pgm_err->message);
+			pgm_error_free (pgm_err);
 #ifdef CONFIG_WITH_HTTP
 			if (enable_http)
 				pgm_http_shutdown ();

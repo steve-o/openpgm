@@ -230,10 +230,8 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
-env['SNMP_FLAGS'] = { 
-        'CCFLAGS'        : [],
-        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
-};
+if env['WITH_SNMP'] == 'true':
+	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --agent-libs');
 if env['WITH_HTTP'] == 'true':
 	env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 
@@ -281,15 +279,8 @@ if env['WITH_SNMP'] == 'true':
 conf = Configure(env, custom_tests = tests);
 
 if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
-	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
-	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
-	lastLIBS = conf.env['LIBS'];
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
-	conf.env['SNMP_FLAGS']['LIBS'].append(conf.env['LIBS']);
-	conf.env.Replace(LIBS = lastLIBS);
-	if not conf.CheckSNMP():
-		print 'Net-SNMP libraries not compatible.';
-		Exit(1);
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
 
 if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
