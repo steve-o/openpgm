@@ -529,7 +529,7 @@ _pgm_getadaptersinfo (
 	default:
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_adapter_errno (dwRet),
+				pgm_error_from_win_errno (dwRet),
 				_("GetAdaptersInfo failed: %s"),
 				pgm_adapter_strerror (dwRet));
 		if (pAdapterInfo)
@@ -655,7 +655,7 @@ _pgm_getadaptersaddresses (
         default:
                 pgm_set_error (error,
                                 PGM_ERROR_DOMAIN_IF,
-                                pgm_error_from_adapter_errno (dwRet),
+                                pgm_error_from_win_errno (dwRet),
                                 _("GetAdaptersAddresses failed: %s"),
                                 pgm_adapter_strerror (dwRet));
 		if (pAdapterAddresses)

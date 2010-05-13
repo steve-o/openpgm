@@ -374,6 +374,9 @@ async_recvfrom (
 #ifndef _WIN32
 	pthread_mutex_lock (&async->pthread_mutex);
 	if (0 == async->length) {
+/* flush event pipe */
+		char tmp;
+		while (sizeof(tmp) == read (async->notify_pipe[0], &tmp, sizeof(tmp)));
 		pthread_mutex_unlock (&async->pthread_mutex);
 		errno = EAGAIN;
 		return -1;
@@ -383,6 +386,8 @@ async_recvfrom (
 #else
 	WaitForSingleObject (async->win32_mutex, INFINITE);
 	if (0 == async->length) {
+/* clear event */
+		ResetEvent (async->notify_event);
 		ReleaseMutex (async->win32_mutex);
 		errno = EAGAIN;
 		return -1;
