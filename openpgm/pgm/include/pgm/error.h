@@ -38,7 +38,9 @@ enum
 	PGM_ERROR_DOMAIN_RECV,
 	PGM_ERROR_DOMAIN_TIME,
 	PGM_ERROR_DOMAIN_TRANSPORT,
-	PGM_ERROR_DOMAIN_ENGINE
+	PGM_ERROR_DOMAIN_ENGINE,
+	PGM_ERROR_DOMAIN_HTTP,
+	PGM_ERROR_DOMAIN_SNMP
 };
 
 /* error codes */
@@ -105,7 +107,7 @@ int pgm_error_from_errno (const int) PGM_GNUC_CONST;
 int pgm_error_from_h_errno (const int) PGM_GNUC_CONST;
 int pgm_error_from_eai_errno (const int, const int) PGM_GNUC_CONST;
 int pgm_error_from_wsa_errno (const int) PGM_GNUC_CONST;
-int pgm_error_from_adapter_errno (const int) PGM_GNUC_CONST;
+int pgm_error_from_win_errno (const int) PGM_GNUC_CONST;
 
 PGM_END_DECLS
 

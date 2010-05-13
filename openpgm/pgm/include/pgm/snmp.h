@@ -22,22 +22,13 @@
 #ifndef __PGM_SNMP_H__
 #define __PGM_SNMP_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
-#define PGM_SNMP_ERROR		pgm_snmp_error_quark ()
+PGM_BEGIN_DECLS
 
-typedef enum
-{
-	/* Derived from errno */
-	PGM_SNMP_ERROR_FAILED
-} PGMSNMPError;
+bool pgm_snmp_init (pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_snmp_shutdown (void);
 
-G_BEGIN_DECLS
-
-gboolean pgm_snmp_init (GError**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_snmp_shutdown (void);
-GQuark pgm_snmp_error_quark (void);
-
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_SNMP_H__ */
