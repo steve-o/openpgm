@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -31,6 +32,15 @@
 /* mock state */
 
 /* mock functions for external references */
+
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
 
 
 #define TSI_DEBUG

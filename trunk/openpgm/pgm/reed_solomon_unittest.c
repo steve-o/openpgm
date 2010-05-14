@@ -21,6 +21,7 @@
 
 
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
@@ -31,6 +32,15 @@
 
 
 /* mock functions for external references */
+
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
 
 
 #define REED_SOLOMON_DEBUG

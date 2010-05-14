@@ -73,6 +73,41 @@ do_csum_8bit (
 
 static
 uint16_t
+do_csumcpy_8bit (
+	const void* restrict srcaddr,
+	void*       restrict dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint_fast32_t acc;
+	uint16_t val16;
+	const uint8_t*restrict srcbuf;
+	uint8_t*restrict dstbuf;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	while (len > 1) {
+/* first byte as most significant */
+		val16 = (*dstbuf++ = *srcbuf++) << 8;
+/* second byte as least significant */
+		val16 |= (*dstbuf++ = *srcbuf++);
+		acc += val16;
+		len -= 2;
+	}
+/* trailing odd byte */
+	if (len > 0) {
+		val16 = (*dstbuf = *srcbuf) << 8;
+		acc += val16;
+	}
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	return htons ((uint16_t)acc);
+}
+
+static
+uint16_t
 do_csum_16bit (
 	const void*	addr,
 	uint16_t	len,
@@ -118,6 +153,67 @@ do_csum_16bit (
 /* trailing odd byte */
 	if (len > 0) {
 		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return acc;
+}
+
+static
+uint16_t
+do_csumcpy_16bit (
+	const void* restrict srcaddr,
+	void*	    restrict dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint_fast32_t acc;
+	const uint8_t*restrict srcbuf;
+	uint8_t*restrict dstbuf;
+	uint16_t remainder;
+	uint_fast16_t count8;
+	bool is_odd;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	remainder = 0;
+
+	if (PGM_UNLIKELY(len == 0))
+		return acc;
+	is_odd = ((uintptr_t)srcbuf & 1);
+/* align first byte */
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		len--;
+	}
+/* 8-way unrolls */
+	count8 = len >> 3;
+	if (count8)
+	{
+		while (count8--) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			acc += ((uint16_t*restrict)dstbuf)[ 1 ] = ((const uint16_t*restrict)srcbuf)[ 1 ];
+			acc += ((uint16_t*restrict)dstbuf)[ 2 ] = ((const uint16_t*restrict)srcbuf)[ 2 ];
+			acc += ((uint16_t*restrict)dstbuf)[ 3 ] = ((const uint16_t*restrict)srcbuf)[ 3 ];
+			srcbuf = &srcbuf[ 8 ];
+			dstbuf = &dstbuf[ 8 ];
+		}
+		len %= 8;
+	}
+	while (len > 1) {
+		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+		srcbuf = &srcbuf[ 2 ];
+		dstbuf = &dstbuf[ 2 ];
+		len -= 2;
+	}
+/* trailing odd byte */
+	if (len > 0) {
+		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
 	}
 	acc += remainder;
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -186,6 +282,80 @@ do_csum_32bit (
 /* trailing odd byte */
 	if (len & 1) {
 		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return acc;
+}
+
+static
+uint16_t
+do_csumcpy_32bit (
+	const void* restrict srcaddr,
+	void*       restrict dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint_fast32_t acc;
+	const uint8_t*restrict srcbuf;
+	uint8_t*restrict dstbuf;
+	uint16_t remainder;
+	uint_fast16_t count;
+	bool is_odd;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	remainder = 0;
+
+	if (PGM_UNLIKELY(len == 0))
+		return acc;
+	is_odd = ((uintptr_t)srcbuf & 1);
+/* align first byte */
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		len--;
+	}
+/* 16-bit words */
+	count = len >> 1;
+	if (count)
+	{
+		if ((uintptr_t)srcbuf & 2) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			srcbuf = &srcbuf[ 2 ];
+			dstbuf = &dstbuf[ 2 ];
+			count--;
+			len -= 2;
+		}
+/* 32-bit words */
+		count >>= 1;
+		if (count)
+		{
+			uint32_t carry = 0;
+			while (count) {
+				acc += carry;
+				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
+				carry = ((const uint32_t*restrict)dstbuf)[ 0 ] > acc;
+				srcbuf = &srcbuf[ 4 ];
+				dstbuf = &dstbuf[ 4 ];
+				count--;
+			}
+			acc += carry;
+			acc  = (acc >> 16) + (acc & 0xffff);
+		}
+		if (len & 2) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			srcbuf = &srcbuf[ 2 ];
+			dstbuf = &dstbuf[ 2 ];
+		}
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
 	}
 	acc += remainder;
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -272,6 +442,99 @@ do_csum_64bit (
 /* trailing odd byte */
 	if (len & 1) {
 		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return acc;
+}
+
+static
+uint16_t
+do_csumcpy_64bit (
+	const void* restrict srcaddr,
+	void*	    restrict dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint_fast64_t acc;
+	const uint8_t* restrict srcbuf;
+	uint8_t* restrict dstbuf;
+	uint16_t remainder;
+	uint_fast16_t count;
+	bool is_odd;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	remainder = 0;
+
+	if (PGM_UNLIKELY(len == 0))
+		return acc;
+	is_odd = ((uintptr_t)srcbuf & 1);
+/* align first byte */
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		len--;
+	}
+/* 16-bit words */
+	count = len >> 1;
+	if (count)
+	{
+		if ((uintptr_t)srcbuf & 2) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			srcbuf = &srcbuf[ 2 ];
+			dstbuf = &dstbuf[ 2 ];
+			count--;
+			len -= 2;
+		}
+/* 32-bit words */
+		count >>= 1;
+		if (count)
+		{
+			if ((uintptr_t)srcbuf & 4) {
+				acc += ((const uint32_t*restrict)srcbuf)[ 0 ];
+				srcbuf = &srcbuf[ 4 ];
+				dstbuf = &dstbuf[ 4 ];
+				count--;
+				len -= 4;
+			}
+/* 64-bit words */
+			count >>= 1;
+			if (count)
+			{
+				uint_fast64_t carry = 0;
+				while (count) {
+					acc += carry;
+					acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
+					carry = ((const uint64_t*restrict)dstbuf)[ 0 ] > acc;
+					srcbuf = &srcbuf[ 8 ];
+					dstbuf = &dstbuf[ 8 ];
+					count--;
+				}
+				acc += carry;
+				acc  = (acc >> 32) + (acc & 0xffffffff);
+			}
+			if (len & 4) {
+				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
+				srcbuf = &srcbuf[ 4 ];
+				dstbuf = &dstbuf[ 4 ];
+			}
+		}
+		if (len & 2) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			srcbuf = &srcbuf[ 2 ];
+			dstbuf = &dstbuf[ 2 ];
+		}
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
 	}
 	acc += remainder;
 	acc  = (acc >> 32) + (acc & 0xffffffff);
