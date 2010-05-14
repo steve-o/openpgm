@@ -498,7 +498,7 @@ do_csumcpy_64bit (
 		if (count)
 		{
 			if ((uintptr_t)srcbuf & 4) {
-				acc += ((const uint32_t*restrict)srcbuf)[ 0 ];
+				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
 				srcbuf = &srcbuf[ 4 ];
 				dstbuf = &dstbuf[ 4 ];
 				count--;
@@ -508,18 +508,8 @@ do_csumcpy_64bit (
 			count >>= 1;
 			if (count)
 			{
-				uint_fast64_t carry = 0;
-				while ((uintptr_t)srcbuf & 64) {
-					acc += carry;
-					acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
-					carry = ((const uint64_t*restrict)dstbuf)[ 0 ] > acc;
-					srcbuf = &srcbuf[ 8 ];
-					dstbuf = &dstbuf[ 8 ];
-					count--;
-				}
-				acc += carry;
-				acc  = (acc >> 32) + (acc & 0xffffffff);
 /* 64-byte blocks */
+				uint_fast64_t carry = 0;
 				uint_fast16_t count64 = count >> 3;
 				if (count64)
 				{
@@ -555,7 +545,7 @@ do_csumcpy_64bit (
 					}
 					acc += carry;
 					acc  = (acc >> 32) + (acc & 0xffffffff);
-					count &= 7;
+					count %= 8;
 				}
 
 /* last 56 bytes */
@@ -653,10 +643,11 @@ do_csum_vector (
 			{
 				uint64_t carry = 0;
 				while (count) {
-					asm("addq %1, %0 \n\t"
-						"adcq %2, %0"
-						: "=r" (acc)
-						: "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc));
+					asm volatile (	"addq %1, %0\n\t"
+							"adcq %2, %0"
+					     	      : "=r" (acc)
+					      	      : "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc)
+						      : "cc"  );
 					buf  = &buf[ 8 ];
 					count--;
 				}
@@ -676,6 +667,141 @@ do_csum_vector (
 /* trailing odd byte */
 	if (len & 1) {
 		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return acc;
+}
+
+static
+uint16_t
+do_csumcpy_vector (
+	const void* restrict srcaddr,
+	void* restrict       dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint64_t acc;			/* fixed size for asm */
+	const uint8_t*restrict srcbuf;
+	uint8_t*restrict dstbuf;
+	uint16_t remainder;		/* fixed size for endian swap */
+	uint_fast16_t count;
+	bool is_odd;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	remainder = 0;
+
+	if (PGM_UNLIKELY(len == 0))
+		return acc;
+/* prefetch */
+	asm volatile ("prefetcht0 (%0)" :: "r" (srcbuf));
+	is_odd = ((uintptr_t)srcbuf & 1);
+/* align first byte */
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		len--;
+	}
+/* 16-bit words */
+	count = len >> 1;
+	if (count)
+	{
+		if ((uintptr_t)srcbuf & 2) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			srcbuf = &srcbuf[ 2 ];
+			dstbuf = &dstbuf[ 2 ];
+			count--;
+			len -= 2;
+		}
+/* 32-bit words */
+		count >>= 1;
+		if (count)
+		{
+			if ((uintptr_t)srcbuf & 4) {
+				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
+				srcbuf = &srcbuf[ 4 ];
+				dstbuf = &dstbuf[ 4 ];
+				count--;
+				len -= 4;
+			}
+/* 64-bit words */
+			count >>= 1;
+			if (count)
+			{
+/* 64-byte blocks */
+				uint64_t carry = 0;
+				uint_fast16_t count64 = count >> 3;
+
+				while (count64) {
+					asm volatile (	"movq 0*8(%1), %%r8\n\t"	/* load */
+							"movq 1*8(%1), %%r9\n\t"
+							"movq 2*8(%1), %%r10\n\t"
+							"movq 3*8(%1), %%r11\n\t"
+							"movq 4*8(%1), %%r12\n\t"
+							"movq 5*8(%1), %%r13\n\t"
+							"movq 6*8(%1), %%r14\n\t"
+							"movq 7*8(%1), %%r15\n\t"
+							"prefetcht0 8*8(%1)\n\t"	/* hint for next loop, 32-128 bytes */
+							"adcq %%r8, %0\n\t"		/* checksum */
+							"adcq %%r9, %0\n\t"
+							"adcq %%r10, %0\n\t"
+							"adcq %%r11, %0\n\t"
+							"adcq %%r12, %0\n\t"
+							"adcq %%r13, %0\n\t"
+							"adcq %%r14, %0\n\t"
+							"adcq %%r15, %0\n\t"
+							"adcq %3, %0\n\t"
+							"movq %%r8, 0*8(%2)\n\t"	/* save */
+							"movq %%r9, 1*8(%2)\n\t"
+							"movq %%r10, 2*8(%2)\n\t"
+							"movq %%r11, 3*8(%2)\n\t"
+							"movq %%r12, 4*8(%2)\n\t"
+							"movq %%r13, 5*8(%2)\n\t"
+							"movq %%r14, 6*8(%2)\n\t"
+							"movq %%r15, 7*8(%2)"
+						      : "=r" (acc)
+						      : "r" (srcbuf), "r" (dstbuf), "r" (carry), "0" (acc)
+						      : "cc", "memory", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"  );
+					srcbuf = &srcbuf[ 64 ];
+					dstbuf = &dstbuf[ 64 ];
+					count64--;
+				}
+				count %= 8;
+/* last 56 bytes */
+				while (count) {
+					asm volatile (	"addq %1, %0\n\t"
+							"adcq %2, %0"
+						      : "=r" (acc)
+						      : "m" (*(const uint64_t*restrict)srcbuf), "r" (carry), "0" (acc)
+						      : "cc"  );
+					srcbuf  = &srcbuf[ 8 ];
+					count--;
+				}
+				acc += carry;
+				acc  = (acc >> 32) + (acc & 0xffffffff);
+			}
+			if (len & 4) {
+				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
+				srcbuf = &srcbuf[ 4 ];
+				dstbuf = &dstbuf[ 4 ];
+			}
+		}
+		if (len & 2) {
+			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+			srcbuf = &srcbuf[ 2 ];
+			dstbuf = &dstbuf[ 2 ];
+		}
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
 	}
 	acc += remainder;
 	acc  = (acc >> 32) + (acc & 0xffffffff);
