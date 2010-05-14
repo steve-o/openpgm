@@ -509,6 +509,57 @@ do_csumcpy_64bit (
 			if (count)
 			{
 				uint_fast64_t carry = 0;
+				while ((uintptr_t)srcbuf & 64) {
+					acc += carry;
+					acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
+					carry = ((const uint64_t*restrict)dstbuf)[ 0 ] > acc;
+					srcbuf = &srcbuf[ 8 ];
+					dstbuf = &dstbuf[ 8 ];
+					count--;
+				}
+				acc += carry;
+				acc  = (acc >> 32) + (acc & 0xffffffff);
+/* 64-byte blocks */
+				uint_fast16_t count64 = count >> 3;
+				if (count64)
+				{
+					carry = 0;
+					while (count64) {
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 0 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 1 ] = ((const uint64_t*restrict)srcbuf)[ 1 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 1 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 2 ] = ((const uint64_t*restrict)srcbuf)[ 2 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 2 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 3 ] = ((const uint64_t*restrict)srcbuf)[ 3 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 3 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 4 ] = ((const uint64_t*restrict)srcbuf)[ 4 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 4 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 5 ] = ((const uint64_t*restrict)srcbuf)[ 5 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 5 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 6 ] = ((const uint64_t*restrict)srcbuf)[ 6 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 6 ] > acc;
+						acc += carry;
+						acc += ((uint64_t*restrict)dstbuf)[ 7 ] = ((const uint64_t*restrict)srcbuf)[ 7 ];
+						carry  = ((const uint64_t*restrict)dstbuf)[ 7 ] > acc;
+						srcbuf = &srcbuf[ 64 ];
+						dstbuf = &dstbuf[ 64 ];
+						count64--;
+					}
+					acc += carry;
+					acc  = (acc >> 32) + (acc & 0xffffffff);
+					count &= 7;
+				}
+
+/* last 56 bytes */
+				carry = 0;
 				while (count) {
 					acc += carry;
 					acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
