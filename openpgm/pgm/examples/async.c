@@ -273,6 +273,8 @@ async_create (
 	e = pthread_mutex_init (&new_async->pthread_mutex, NULL);
 	if (0 != e) goto err_destroy;
 	e = pipe (new_async->notify_pipe);
+	const int flags = fcntl (new_async->notify_pipe[0], F_GETFL);
+	fcntl (new_async->notify_pipe[0], F_SETFL, flags | O_NONBLOCK);
 	if (0 != e) goto err_destroy;
 	e = pipe (new_async->destroy_pipe);
 	if (0 != e) goto err_destroy;
