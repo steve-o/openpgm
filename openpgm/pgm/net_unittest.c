@@ -21,6 +21,7 @@
 
 
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
@@ -123,6 +124,15 @@ flags_string (
 
 
 /* mock functions for external references */
+
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
 
 PGM_GNUC_INTERNAL
 bool

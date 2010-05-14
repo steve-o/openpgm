@@ -48,6 +48,16 @@
 
 /* mock state */
 
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
+
+
 #define PGM_COMPILATION
 #include "pgm/sockaddr.h"
 #include "pgm/indextoaddr.h"
