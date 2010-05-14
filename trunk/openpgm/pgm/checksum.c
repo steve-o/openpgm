@@ -53,11 +53,9 @@ do_csum_8bit (
 	buf = (const uint8_t*)addr;
 	while (len > 1) {
 /* first byte as most significant */
-		src = (*buf) << 8;
-		buf++;
+		src  = (*buf++) << 8;
 /* second byte as least significant */
-		src |= (*buf);
-		buf++;
+		src |= (*buf++);
 		acc += src;
 		len -= 2;
 	}
@@ -81,16 +79,16 @@ do_csumcpy_8bit (
 	)
 {
 	uint_fast32_t acc;
-	uint16_t val16;
 	const uint8_t*restrict srcbuf;
 	uint8_t*restrict dstbuf;
+	uint_fast16_t val16;
 
 	acc = csum;
 	srcbuf = (const uint8_t*restrict)srcaddr;
 	dstbuf = (uint8_t*restrict)dstaddr;
 	while (len > 1) {
 /* first byte as most significant */
-		val16 = (*dstbuf++ = *srcbuf++) << 8;
+		val16  = (*dstbuf++ = *srcbuf++) << 8;
 /* second byte as least significant */
 		val16 |= (*dstbuf++ = *srcbuf++);
 		acc += val16;
@@ -132,19 +130,17 @@ do_csum_16bit (
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
-/* 8-way unrolls */
+/* 8-byte unrolls */
 	count8 = len >> 3;
-	if (count8)
-	{
-		while (count8--) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			acc += ((const uint16_t*)buf)[ 1 ];
-			acc += ((const uint16_t*)buf)[ 2 ];
-			acc += ((const uint16_t*)buf)[ 3 ];
-			buf  = &buf[ 8 ];
-		}
-		len %= 8;
+	while (count8--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		acc += ((const uint16_t*)buf)[ 1 ];
+		acc += ((const uint16_t*)buf)[ 2 ];
+		acc += ((const uint16_t*)buf)[ 3 ];
+		buf  = &buf[ 8 ];
 	}
+	len %= 8;
+/* final 7 bytes */
 	while (len > 1) {
 		acc += ((const uint16_t*)buf)[ 0 ];
 		buf  = &buf[ 2 ];
@@ -191,20 +187,18 @@ do_csumcpy_16bit (
 		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
 		len--;
 	}
-/* 8-way unrolls */
+/* 8-byte unrolls, anything larger than 16-byte or less than 8 loses performance */
 	count8 = len >> 3;
-	if (count8)
-	{
-		while (count8--) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			acc += ((uint16_t*restrict)dstbuf)[ 1 ] = ((const uint16_t*restrict)srcbuf)[ 1 ];
-			acc += ((uint16_t*restrict)dstbuf)[ 2 ] = ((const uint16_t*restrict)srcbuf)[ 2 ];
-			acc += ((uint16_t*restrict)dstbuf)[ 3 ] = ((const uint16_t*restrict)srcbuf)[ 3 ];
-			srcbuf = &srcbuf[ 8 ];
-			dstbuf = &dstbuf[ 8 ];
-		}
-		len %= 8;
+	while (count8--) {
+		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+		acc += ((uint16_t*restrict)dstbuf)[ 1 ] = ((const uint16_t*restrict)srcbuf)[ 1 ];
+		acc += ((uint16_t*restrict)dstbuf)[ 2 ] = ((const uint16_t*restrict)srcbuf)[ 2 ];
+		acc += ((uint16_t*restrict)dstbuf)[ 3 ] = ((const uint16_t*restrict)srcbuf)[ 3 ];
+		srcbuf = &srcbuf[ 8 ];
+		dstbuf = &dstbuf[ 8 ];
 	}
+	len %= 8;
+/* final 7 bytes */
 	while (len > 1) {
 		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
 		srcbuf = &srcbuf[ 2 ];
@@ -889,8 +883,20 @@ pgm_compat_csum_partial_copy (
 	pgm_assert (NULL != src);
 	pgm_assert (NULL != dst);
 
+#if defined(CONFIG_8BIT_CHECKSUM)
+	return do_csumcpy_8bit (src, dst, len, csum);
+#elif defined(CONFIG_16BIT_CHECKSUM)
+	return do_csumcpy_16bit (src, dst, len, csum);
+#elif defined(CONFIG_32BIT_CHECKSUM)
+	return do_csumcpy_32bit (src, dst, len, csum);
+#elif defined(CONFIG_64BIT_CHECKSUM)
+	return do_csumcpy_64bit (src, dst, len, csum);
+#elif defined(CONFIG_VECTOR_CHECKSUM)
+	return do_csumcpy_vector (src, dst, len, csum);
+#else
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);
+#endif
 }
 
 /* Fold 32 bit checksum accumulator into 16 bit final value.
