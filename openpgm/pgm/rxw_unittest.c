@@ -20,6 +20,7 @@
  */
 
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <check.h>
@@ -47,6 +48,15 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 
 
 /* mock functions for external references */
+
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
 
 /** reed-solomon module */
 void

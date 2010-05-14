@@ -22,6 +22,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
@@ -42,6 +43,15 @@ pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
 
 
 /* mock functions for external references */
+
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
 
 static
 pgm_time_t

@@ -157,6 +157,15 @@ mock_teardown_net (void)
 
 /* mock functions for external references */
 
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
+
 bool
 mock_pgm_getifaddrs (
 	struct pgm_ifaddrs**	ifap,

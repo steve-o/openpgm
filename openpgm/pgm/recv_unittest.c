@@ -68,6 +68,7 @@ static gboolean mock_reset_on_spmr = FALSE;
 static gboolean mock_data_on_spmr = FALSE;
 static struct pgm_peer_t* mock_peer = NULL;
 GList* mock_data_list = NULL;
+unsigned mock_pgm_loss_rate = 0;
 
 
 static ssize_t mock_recvmsg (int, struct msghdr*, int);
@@ -88,6 +89,7 @@ static ssize_t mock_recvmsg (int, struct msghdr*, int);
 #define pgm_new_peer			mock_pgm_new_peer
 #define pgm_on_data			mock_pgm_on_data
 #define pgm_on_spm			mock_pgm_on_spm
+#define pgm_on_ack			mock_pgm_on_ack
 #define pgm_on_nak			mock_pgm_on_nak
 #define pgm_on_deferred_nak		mock_pgm_on_deferred_nak
 #define pgm_on_peer_nak			mock_pgm_on_peer_nak
@@ -102,6 +104,7 @@ static ssize_t mock_recvmsg (int, struct msghdr*, int);
 #define pgm_time_now			mock_pgm_time_now
 #define pgm_time_update_now		mock_pgm_time_update_now
 #define recvmsg				mock_recvmsg
+#define pgm_loss_rate			mock_pgm_loss_rate
 
 #define RECV_DEBUG
 #include "recv.c"
@@ -693,6 +696,19 @@ mock_pgm_on_data (
 
 PGM_GNUC_INTERNAL
 bool
+mock_pgm_on_ack (
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb
+	)
+{
+	g_debug ("mock_pgm_on_ack (transport:%p skb:%p)",
+		(gpointer)transport, (gpointer)skb);
+	mock_pgm_type = PGM_ACK;
+	return TRUE;
+}
+
+PGM_GNUC_INTERNAL
+bool
 mock_pgm_on_deferred_nak (
 	pgm_transport_t* const		transport
 	)
@@ -927,6 +943,15 @@ mock_recvmsg (
 
 
 /* mock functions for external references */
+
+size_t
+pgm_transport_pkt_offset2 (
+        const bool                      can_fragment,
+        const bool                      use_pgmcc
+        )
+{
+        return 0;
+}
 
 
 /* target:
