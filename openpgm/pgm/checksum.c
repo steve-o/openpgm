@@ -695,7 +695,10 @@ do_csumcpy_vector (
 
 	if (PGM_UNLIKELY(len == 0))
 		return acc;
-/* fill cache line with source buffer, invalidate destination buffer */
+/* fill cache line with source buffer, invalidate destination buffer,
+ * perversly for testing high temporal locality is better than no locality,
+ * whilst in production no locality may be preferred depending on skb re-use.
+ */
 	pgm_prefetch (srcbuf);
 	pgm_prefetchw (dstbuf);
 /* align first byte */
