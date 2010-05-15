@@ -46,6 +46,7 @@
 #include <pgm/msgv.h>
 #include <pgm/nametoindex.h>
 #include <pgm/notify.h>
+#include <pgm/processor.h>
 #include <pgm/queue.h>
 #include <pgm/rand.h>
 #include <pgm/rate_control.h>
