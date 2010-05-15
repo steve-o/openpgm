@@ -43,7 +43,7 @@ static inline void pgm_prefetchw (const void *x)
 #elif defined(__GNUC__) && (__GNUC__ > 2) && defined(__OPTIMIZE__)
 static inline void pgm_prefetch (const void *x)
 {
-	__builtin_prefetch (x, 0 /* read */, 3 /* no temporal locality */);
+	__builtin_prefetch (x, 0 /* read */, 0 /* no temporal locality */);
 }
 static inline void pgm_prefetchw (const void *x)
 {
