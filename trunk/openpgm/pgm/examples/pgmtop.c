@@ -19,7 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include <errno.h>
 #include <locale.h>
 #include <ncurses.h>
@@ -37,11 +36,15 @@
 #include <arpa/inet.h>
 
 #include <glib.h>
-
 #include <pgm/pgm.h>
+
+/* PGM internals */
+#include <pgm/packet.h>
+
+/* example dependencies */
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-#include <pgm/packet.h>
+
 
 struct ncurses_window;
 

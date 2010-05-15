@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include <errno.h>
-#include <getopt.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -32,9 +30,7 @@
 #	include <sys/epoll.h>
 #endif
 #include <sys/types.h>
-
 #include <glib.h>
-
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <arpa/inet.h>
@@ -44,17 +40,18 @@
 #	include <sys/uio.h>
 #	include <sys/time.h>
 #endif
-
 #include <pgm/pgm.h>
-#include <pgm/backtrace.h>
-#include <pgm/log.h>
-#include <pgm/signal.h>
 #ifdef CONFIG_WITH_HTTP
 #	include <pgm/http.h>
 #endif
 #ifdef CONFIG_WITH_SNMP
 #	include <pgm/snmp.h>
 #endif
+
+/* example dependencies */
+#include <pgm/backtrace.h>
+#include <pgm/log.h>
+#include <pgm/signal.h>
 
 
 /* globals */

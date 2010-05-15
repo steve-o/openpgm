@@ -24,7 +24,8 @@
 #include <stdio.h>
 #include <glib.h>
 #include <pgm/pgm.h>
-/* example project headers */
+
+/* example dependencies */
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 

@@ -19,7 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include <errno.h>
 #include <locale.h>
 #include <signal.h>
@@ -29,9 +28,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
-
 #include <glib.h>
-
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <arpa/inet.h>
@@ -39,11 +36,14 @@
 #	include <sys/socket.h>
 #endif
 
+/* PGM internals */
 #include <pgm/packet_test.h>
-#include <pgm/backtrace.h>
-#include <pgm/log.h>
 #include <pgm/skbuff.h>
 #include <pgm/packet.h>
+
+/* example dependencies */
+#include <pgm/backtrace.h>
+#include <pgm/log.h>
 
 
 /* globals */
