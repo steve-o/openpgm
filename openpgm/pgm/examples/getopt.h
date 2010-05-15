@@ -40,32 +40,22 @@
 #ifndef _GETOPT_H_
 #define _GETOPT_H_
 
-#ifdef _WIN32
-/* from <sys/cdefs.h> */
-# ifdef  __cplusplus
-#  define __BEGIN_DECLS  extern "C" {
-#  define __END_DECLS    }
-# else
-#  define __BEGIN_DECLS
-#  define __END_DECLS
-# endif
-# define __P(args)      args
+#ifdef  __cplusplus
+extern "C" {
 #endif
 
-#ifdef _WIN32
 /* These are global getopt variables */
-__BEGIN_DECLS
-
 extern int   opterr,   /* if error message should be printed */
-                        optind,   /* index into parent argv vector */
-                        optopt,   /* character checked for validity */
-                        optreset; /* reset getopt */
+	     optind,   /* index into parent argv vector */
+	     optopt,   /* character checked for validity */
+	     optreset; /* reset getopt */
 extern char* optarg;   /* argument associated with option */
 
 /* Original getopt */
-int getopt __P((int, char * const *, const char *));
+int getopt (int, char*const*, const char*);
 
-__END_DECLS
+#ifdef  __cplusplus
+}
 #endif
  
 #endif /* !_GETOPT_H_ */

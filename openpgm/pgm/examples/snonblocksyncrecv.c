@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
 #include <errno.h>
-#include <getopt.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -31,17 +29,16 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/types.h>
-
 #include <glib.h>
-
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <arpa/inet.h>
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #endif
-
 #include <pgm/pgm.h>
+
+/* example dependencies */
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 

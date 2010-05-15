@@ -31,37 +31,31 @@
 #define __STDC_FORMAT_MACROS
 #define restrict
 
-#include <errno.h>
-#include <getopt.h>
+#include <cerrno>
+#include <clocale>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #include <inttypes.h>
-#include <locale.h>
 #include <math.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/time.h>
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
 #include <sys/types.h>
-
 #ifndef _WIN32
-#	include <sched.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
+#	include <sched.h>
 #	include <sys/socket.h>
 #	include <arpa/inet.h>
 #endif
-
 #include <glib.h>
-
 #include <pgm/pgm.h>
-#include <pgm/backtrace.h>
-#include <pgm/log.h>
-#include <pgm/signal.h>
 #ifdef CONFIG_WITH_HTTP
 #	include <pgm/http.h>
 #endif
@@ -69,10 +63,13 @@
 #	include <pgm/snmp.h>
 #endif
 
+/* example dependencies */
+#include <pgm/backtrace.h>
+#include <pgm/log.h>
+#include <pgm/signal.h>
+
+
 using namespace std;
-
-
-/* typedefs */
 
 
 /* globals */
@@ -559,48 +556,33 @@ sender_thread (
 
 	last = now = pgm_time_update_now();
 	do {
-		now = pgm_time_update_now();
-/* wait on packet rate limit, busy wait for less than 2ms delay.
- */
-		const pgm_time_t end = last + g_odata_interval;
-		if ((now + pgm_msecs(2)) > end) {
-#	ifndef _WIN32
-			const unsigned int usec = end - now;
-			struct timespec ts = {
-				.tv_sec	 = (usec / 1000000UL),
-				.tv_nsec = (usec % 1000000UL) * 1000
-			};
-			nanosleep (&ts, NULL);
-#	else
-			const DWORD msec = usecs_to_msecs (end - now);
-			Sleep (msec);
-#	endif
-			now = pgm_time_update_now();
-		}
-		while (now < end) {
-#	if defined(__i386__) || defined(__i386) || defined(__x86_64__) || defined(__amd64)
-/* pause, aka "rep; nop" induces energy efficient state during spin loop */
-			asm volatile ("rep; nop" ::: "memory");
-#	else
-			asm volatile ("" ::: "memory");
-#	endif
-			now = pgm_time_update_now();
-		}
-		last = end;
-
 		if (g_msg_sent && g_latency_seqno + 1 == g_msg_sent)
 			latency = g_latency_current;
 		else
 			latency = g_odata_interval;
+
+		ping.set_seqno (g_msg_sent);
+		ping.set_latency (latency);
+		ping.set_payload (payload, sizeof(payload));
 
 		const size_t header_size = pgm_transport_pkt_offset2 (FALSE, FALSE);
 		const size_t apdu_size = ping.ByteSize();
 		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_max_tpdu);
 		pgm_skb_reserve (skb, header_size);
 		pgm_skb_put (skb, apdu_size);
-		ping.set_seqno (g_msg_sent);
-		ping.set_latency (latency);
-		ping.set_payload (payload, sizeof(payload));
+
+/* wait on packet rate limit */
+		if ((last + g_odata_interval) > now) {
+#ifndef _WIN32
+			const unsigned int usec = g_odata_interval - (now - last);
+			usleep (usec);
+#else
+			const DWORD msec = usecs_to_msecs (g_odata_interval - (now - last));
+			Sleep (msec);
+#endif
+			now = pgm_time_update_now();
+		}
+		last += g_odata_interval;
 		ping.set_time (now);
 		ping.SerializeToArray (skb->data, skb->len);
 
@@ -676,7 +658,7 @@ receiver_thread (
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
-	struct pgm_msgv_t msgv[8];
+	struct pgm_msgv_t msgv[20];
 	pgm_time_t lost_tstamp = 0;
 	pgm_tsi_t  lost_tsi;
 	guint32	   lost_count = 0;
