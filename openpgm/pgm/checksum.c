@@ -605,8 +605,8 @@ do_csum_vector (
 
 	if (PGM_UNLIKELY(len == 0))
 		return acc;
-	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
+	is_odd = ((uintptr_t)buf & 1);
 	if (PGM_UNLIKELY(is_odd)) {
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
@@ -695,10 +695,11 @@ do_csumcpy_vector (
 
 	if (PGM_UNLIKELY(len == 0))
 		return acc;
-/* prefetch */
-	asm volatile ("prefetcht0 (%0)" :: "r" (srcbuf));
-	is_odd = ((uintptr_t)srcbuf & 1);
+/* fill cache line with source buffer, invalidate destination buffer */
+	pgm_prefetch (srcbuf);
+	pgm_prefetchw (dstbuf);
 /* align first byte */
+	is_odd = ((uintptr_t)srcbuf & 1);
 	if (PGM_UNLIKELY(is_odd)) {
 		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
 		len--;
@@ -733,7 +734,10 @@ do_csumcpy_vector (
 				uint64_t carry = 0;
 				uint_fast16_t count64 = count >> 3;
 
-				while (count64) {
+				while (count64)
+				{
+					pgm_prefetch (&srcbuf[ 64 ]);
+					pgm_prefetchw (&dstbuf[ 64 ]);
 					asm volatile (	"movq 0*8(%1), %%r8\n\t"	/* load */
 							"movq 1*8(%1), %%r9\n\t"
 							"movq 2*8(%1), %%r10\n\t"
@@ -742,7 +746,6 @@ do_csumcpy_vector (
 							"movq 5*8(%1), %%r13\n\t"
 							"movq 6*8(%1), %%r14\n\t"
 							"movq 7*8(%1), %%r15\n\t"
-							"prefetcht0 8*8(%1)\n\t"	/* hint for next loop, 32-128 bytes */
 							"adcq %%r8, %0\n\t"		/* checksum */
 							"adcq %%r9, %0\n\t"
 							"adcq %%r10, %0\n\t"

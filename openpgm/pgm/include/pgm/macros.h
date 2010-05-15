@@ -158,8 +158,8 @@
 
 /* Branch prediction hint */
 #if defined(__GNUC__) && (__GNUC__ > 2) && defined(__OPTIMIZE__)
-#	define PGM_LIKELY(expr)		(__builtin_expect ((expr), 1))
-#	define PGM_UNLIKELY(expr)	(__builtin_expect ((expr), 0))
+#	define PGM_LIKELY(expr)		__builtin_expect ((expr), 1)
+#	define PGM_UNLIKELY(expr)	__builtin_expect ((expr), 0)
 #else
 #	define PGM_LIKELY(expr)		(expr)
 #	define PGM_UNLIKELY(expr)	(expr)
