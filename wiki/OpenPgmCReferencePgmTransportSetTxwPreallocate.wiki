@@ -1,7 +1,6 @@
 ﻿#summary OpenPGM : C Reference : pgm_transport_set_txw_preallocate()
 #labels Phase-Implementation
-#sidebar TOC2CReference
-
+#sidebar TOCCReference
 _Function_
 === Declaration ===
 <pre>

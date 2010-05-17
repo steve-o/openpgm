@@ -1,9 +1,8 @@
 #summary OpenPGM : C Reference : Monitoring and Administration
 #labels Phase-Implementation
 #sidebar TOCCReference
-
 = Introduction =
-﻿The OpenPGM suite provides two optional monitoring and administration interfaces, one a traditional SNMP agent that works with the popular [http://net-snmp.sourceforge.net/ Net-SNMP] daemon, the other a more convenient web-based HTTP or HTTPS interface.
+The OpenPGM suite provides two optional monitoring and administration interfaces, one a traditional SNMP agent that works with the popular [http://net-snmp.sourceforge.net/ Net-SNMP] daemon, the other a more convenient web-based HTTP or HTTPS interface.
 
 
 = Topics in Alphabetical Order =

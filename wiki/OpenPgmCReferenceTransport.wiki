@@ -1,6 +1,6 @@
 ﻿#summary OpenPGM : C Reference : Transport
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOCCReference
 
 === Introduction ===
 Transports manage network connections and send outbound messages.

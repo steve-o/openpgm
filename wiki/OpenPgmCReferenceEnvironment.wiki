@@ -1,6 +1,6 @@
 #summary OpenPGM : C Reference : Environment
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOCCReference
 === Introduction ===
 This section describes the functions relating to the global dependencies of OpenPGM.
 

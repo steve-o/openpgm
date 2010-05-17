@@ -1,8 +1,8 @@
 ﻿#summary OpenPGM : C Reference : Build Library
 #labels Phase-Implementation
-#sidebar TOC2CReference
+#sidebar TOCCReference
 === Introduction ===
-﻿There are currently no official releases or pre-built packages in any distributions.  The OpenPGM library must be built from source taken from the projects subversion repository.
+There are currently no official releases or pre-built packages in any distributions.  The OpenPGM library must be built from source taken from the projects subversion repository.
 
 == Building in openSUSE 11.1 ==
 First install the C compiler dependencies and the SCons build tool.

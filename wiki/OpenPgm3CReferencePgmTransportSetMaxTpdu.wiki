@@ -34,6 +34,9 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 <td>-8 bytes</td>
 <td>802.2 SNAP LLC header for subnets.</td>
 </tr><tr>
+<td>-4 bytes</td>
+<td>RFC2113 IP Router Alert option (repairs). ¶</td>
+</tr><tr>
 <td>-20 bytes</td>
 <td>UDP encapsulation header.</td>
 </tr><tr>
@@ -57,6 +60,13 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 <td>-4 bytes</td>
 <td>Session Finish Option (last packet and its repairs). ‡</td>
 </tr><tr>
+<td colspan="2"><h3>Congestion Control</h3></td>
+</tr><tr>
+<td>-16 bytes</td>
+<td>Congestion control data Option.</td>
+</tr><tr>
+<td colspan="2"><h3>Forward Error Correction</h3></td>
+</tr><tr>
 <td>-8 bytes</td>
 <td>Parity Group Number Option. §</td>
 </tr><tr>
@@ -66,7 +76,7 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 <td>-2 bytes</td>
 <td>Variable TSDU length encoding for parity packets †</td>
 </tr><tr>
-<td>*-102 bytes*</td>
+<td>*-122 bytes*</td>
 <td>*Worst case overhead.*</td>
 </tr>
 </table>
@@ -75,6 +85,7 @@ The actual maximum application protocol data unit (APDU) size per packet varies 
 <dl><dt>†</dt><dd>For APDUs greater than one TPDU in length, the per packet overhead is increased.
 </dd><dt>‡</dt><dd>Not implemented.
 </dd><dt>§</dt><dd>When Forward-Error Correction is enabled.
+</dd><dt>¶</dt><dd>For IP/PGM with IP Router Alert option enabled.
 </dd></dl>
 
 === Parameters ===
