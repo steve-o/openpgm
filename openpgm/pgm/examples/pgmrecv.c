@@ -39,6 +39,8 @@
 #	include <sys/socket.h>
 #	include <sys/uio.h>
 #	include <sys/time.h>
+#else
+#	include "getopt.h"
 #endif
 #include <pgm/pgm.h>
 #ifdef CONFIG_WITH_HTTP
@@ -96,10 +98,10 @@ usage (
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 #ifdef CONFIG_WITH_HTTP
-	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
+	fprintf (stderr, "  -H              : Enable HTTP administrative interface\n");
 #endif
 #ifdef CONFIG_WITH_SNMP
-	fprintf (stderr, "  -x              : Enable SNMP interface\n");
+	fprintf (stderr, "  -S              : Enable SNMP interface\n");
 #endif
 	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (1);
@@ -111,9 +113,6 @@ main (
 	char*		argv[]
 	)
 {
-#if defined(CONFIG_WITH_HTTP)
-	GError* err = NULL;
-#endif
 	int e;
 	pgm_error_t* pgm_err = NULL;
 #ifdef CONFIG_WITH_HTTP
@@ -144,10 +143,10 @@ main (
 	int c;
 	while ((c = getopt (argc, argv, "a:s:n:p:lih"
 #ifdef CONFIG_WITH_HTTP
-					"t"
+					"H"
 #endif
 #ifdef CONFIG_WITH_SNMP
-					"x"
+					"S"
 #endif
 					)) != -1)
 	{
@@ -159,10 +158,10 @@ main (
 
 		case 'l':	g_multicast_loop = TRUE; break;
 #ifdef CONFIG_WITH_HTTP
-		case 't':	enable_http = TRUE; break;
+		case 'H':	enable_http = TRUE; break;
 #endif
 #ifdef CONFIG_WITH_SNMP
-		case 'x':	enable_snmpx = TRUE; break;
+		case 'S':	enable_snmpx = TRUE; break;
 #endif
 
 		case 'i':
@@ -179,9 +178,9 @@ main (
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {
-		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
-			g_error ("Unable to start HTTP interface: %s", err->message);
-			g_error_free (err);
+		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &pgm_err)) {
+			g_error ("Unable to start HTTP interface: %s", pgm_err->message);
+			pgm_error_free (pgm_err);
 			pgm_shutdown();
 			pgm_messages_shutdown();
 			return EXIT_FAILURE;

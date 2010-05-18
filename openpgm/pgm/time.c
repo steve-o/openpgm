@@ -294,7 +294,7 @@ pgm_time_init (
 		pgm_error_t* sub_error = NULL;
 		if (!pgm_rtc_init (&sub_error)) {
 			pgm_propagate_error (error, sub_error);
-			return FALSE;
+			goto err_cleanup;
 		}
 	}
 #endif
@@ -341,7 +341,7 @@ pgm_time_init (
 			pgm_error_t* sub_error = NULL;
 			if (!pgm_tsc_init (&sub_error)) {
 				pgm_propagate_error (error, sub_error);
-				return FALSE;
+				goto err_cleanup;
 			}
 		}
 #endif
@@ -355,7 +355,7 @@ pgm_time_init (
 		pgm_error_t* sub_error = NULL;
 		if (!pgm_hpet_init (&sub_error)) {
 			pgm_propagate_error (error, sub_error);
-			return FALSE;
+			goto err_cleanup;
 		}
 	}
 #endif
@@ -386,6 +386,10 @@ pgm_time_init (
 #endif
 
 	return TRUE;
+
+err_cleanup:
+	pgm_atomic_dec32 (&time_ref_count);
+	return FALSE;
 }
 
 /* returns TRUE if shutdown succeeded, returns FALSE on error.

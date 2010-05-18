@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
+
 #include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"
 
@@ -45,7 +46,7 @@ static void*			snmp_routine (void*);
 static HANDLE			snmp_thread;
 static unsigned __stdcall	snmp_routine (void*);
 #endif
-static pgm_notify_t		snmp_notify;
+static pgm_notify_t		snmp_notify = PGM_NOTIFY_INIT;
 static volatile uint32_t	snmp_ref_count = 0;
 
 
@@ -82,11 +83,12 @@ pgm_snmp_init (
 			     PGM_ERROR_DOMAIN_SNMP,
 			     PGM_ERROR_FAILED,
 			     _("Initialise SNMP agent: see SNMP log for further details."));
-		return FALSE;
+		goto err_cleanup;
 	}
 
-	if (!pgm_mib_init (error))
-		return FALSE;
+	if (!pgm_mib_init (error)) {
+		goto err_cleanup;
+	}
 
 /* read config and parse mib */
 	pgm_minor (_("Initialising SNMP."));
@@ -101,7 +103,7 @@ pgm_snmp_init (
 				     PGM_ERROR_FAILED,
 				     _("Initialise SNMP master agent: see SNMP log for further details."));
 			snmp_shutdown (pgm_snmp_appname);
-			return FALSE;
+			goto err_cleanup;
 		}
 	}
 
@@ -113,7 +115,7 @@ pgm_snmp_init (
 			     _("Creating SNMP notification channel: %s"),
 			     strerror (errno));
 		snmp_shutdown (pgm_snmp_appname);
-		return FALSE;
+		goto err_cleanup;
 	}
 
 /* spawn thread to handle SNMP requests */
@@ -125,9 +127,8 @@ pgm_snmp_init (
 			     pgm_error_from_errno (errno),
 			     _("Creating SNMP thread: %s"),
 			     strerror (errno));
-		pgm_notify_destroy (&snmp_notify);
 		snmp_shutdown (pgm_snmp_appname);
-		return FALSE;
+		goto err_cleanup;
 	}
 #else
 	snmp_thread = (HANDLE)_beginthreadex (NULL, 0, &snmp_routine, NULL, 0, NULL);
@@ -138,12 +139,17 @@ pgm_snmp_init (
 			     pgm_error_from_errno (save_errno),
 			     _("Creating SNMP thread: %s"),
 			     strerror (save_errno));
-		pgm_notify_destroy (&snmp_notify);
 		snmp_shutdown (pgm_snmp_appname);
-		return FALSE;
+		goto err_cleanup;
 	}
 #endif /* _WIN32 */
 	return TRUE;
+err_cleanup:
+	if (pgm_notify_is_valid (&snmp_notify)) {
+		pgm_notify_destroy (&snmp_notify);
+	}
+	pgm_atomic_dec32 (&snmp_ref_count);
+	return FALSE;
 }
 
 /* Terminate SNMP thread and free resources.

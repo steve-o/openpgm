@@ -9,12 +9,13 @@
 
 #include <pgm/i18n.h>
 #include <pgm/framework.h>
+#include <pgm/receiver.h>
+#include <pgm/transport.h>
+
 #include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"
 #include "pgm/pgmMIB_columns.h"
 #include "pgm/pgmMIB_enums.h"
-#include "pgm/receiver.h"
-#include "pgm/transport.h"
 
 
 //#define PGMMIB_DEBUG

@@ -5,13 +5,10 @@
 Import('env')
 
 e = env.Clone()
-e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm-Http"\'');
 e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm-http"\'');
 
 # add binary tree to include path to find embedded htdocs
-e.Append(CPPPATH = '.');
-
-e.MergeFlags(e['LIBSOUP_FLAGS']);
+e.Append(CPPPATH = ['.']);
 
 src = Split("""
 		http.c
