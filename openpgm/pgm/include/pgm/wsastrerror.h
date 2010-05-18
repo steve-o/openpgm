@@ -30,6 +30,7 @@ PGM_BEGIN_DECLS
 
 char* pgm_wsastrerror (const int);
 char* pgm_adapter_strerror (const int);
+char* pgm_win_strerror (char*, size_t, const int);
 
 PGM_END_DECLS
 

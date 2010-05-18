@@ -71,10 +71,6 @@ if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
 #	Exit(1)
 
-if not conf.CheckPKG('libsoup-2.4'):
-	print 'libsoup-2.4 not found.'
-#	Exit(1)
-
 env = conf.Finish();
 
 #-----------------------------------------------------------------------------
@@ -156,8 +152,6 @@ env = Environment(
 #			'-DCONFIG_HOST_ORDER_IP_OFF',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
-# previous version HTTP library api
-#			'-DCONFIG_LIBSOUP22',
 # Wine limited API support
 #			'-DCONFIG_TARGET_WINE',
 # GNU getopt
@@ -232,8 +226,6 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 # managed environment for libpgmsnmp, libpgmhttp
 if env['WITH_SNMP'] == 'true':
 	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --agent-libs');
-if env['WITH_HTTP'] == 'true':
-	env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');

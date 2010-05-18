@@ -23,6 +23,9 @@
 #include <signal.h>
 #include <stdio.h>
 #include <glib.h>
+#ifdef G_OS_WIN32
+#	include "getopt.h"
+#endif
 #include <pgm/pgm.h>
 
 /* example dependencies */

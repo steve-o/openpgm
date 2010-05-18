@@ -56,10 +56,6 @@ if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
 	Exit(1)
 
-if not conf.CheckPKG('libsoup-2.2'):
-	print 'libsoup-2.2 not found.'
-	Exit(1)
-
 env = conf.Finish();
 
 #-----------------------------------------------------------------------------
@@ -110,7 +106,6 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_HAVE_IP_MREQN',
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
-			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
 			'-DCONFIG_GALOIS_MUL_LUT',
 		 ],
@@ -174,7 +169,6 @@ env['SNMP_FLAGS'] = {
         'CCFLAGS'       : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
-env['LIBSOUP_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkgconfig pkg-config --cflags --libs libsoup-2.2 gobject-2.0');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');

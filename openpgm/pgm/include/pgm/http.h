@@ -2,7 +2,7 @@
  * 
  * HTTP administrative interface
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,44 +22,15 @@
 #ifndef __PGM_HTTP_H__
 #define __PGM_HTTP_H__
 
-#include <glib.h>
+#include <pgm/framework.h>
 
-
-#define PGM_HTTP_ERROR		pgm_http_error_quark ()
-
-typedef enum
-{
-	/* Derived from errno */
-	PGM_HTTP_ERROR_FAULT,		/* gethostname returned EFAULT */
-	PGM_HTTP_ERROR_INVAL,
-	PGM_HTTP_ERROR_PERM,
-	PGM_HTTP_ERROR_MFILE,
-	PGM_HTTP_ERROR_NFILE,
-	PGM_HTTP_ERROR_NXIO,
-	PGM_HTTP_ERROR_RANGE,
-	PGM_HTTP_ERROR_NOENT,
-	PGM_HTTP_ERROR_ADDRFAMILY,	/* getaddrinfo return EAI_ADDRFAMILY */
-	PGM_HTTP_ERROR_AGAIN,
-	PGM_HTTP_ERROR_BADFLAGS,
-	PGM_HTTP_ERROR_FAIL,
-	PGM_HTTP_ERROR_FAMILY,
-	PGM_HTTP_ERROR_MEMORY,
-	PGM_HTTP_ERROR_NODATA,
-	PGM_HTTP_ERROR_NONAME,
-	PGM_HTTP_ERROR_SERVICE,
-	PGM_HTTP_ERROR_SOCKTYPE,
-	PGM_HTTP_ERROR_SYSTEM,
-	PGM_HTTP_ERROR_FAILED
-} PGMHTTPError;
-
-G_BEGIN_DECLS
+PGM_BEGIN_DECLS
 
 #define PGM_HTTP_DEFAULT_SERVER_PORT	4968
 
-gboolean pgm_http_init (guint16, GError**) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_http_shutdown (void);
-GQuark pgm_http_error_quark (void);
+bool pgm_http_init (uint16_t, pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_http_shutdown (void);
 
-G_END_DECLS
+PGM_END_DECLS
 
 #endif /* __PGM_SIGNAL_H__ */

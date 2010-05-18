@@ -21,6 +21,11 @@
 
 #define _GNU_SOURCE
 #include <signal.h>		/* _GNU_SOURCE for strsignal() */
+#include <glib.h>
+#ifdef G_OS_WIN32
+#	include <fcntl.h>
+#	include <io.h>
+#endif
 #include <pgm/framework.h>
 #include "pgm/signal.h"
 
@@ -84,7 +89,7 @@ on_signal (
 	pgm_debug ("on_signal (signum:%d)", signum);
 	if (write (signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
-#ifndef _WIN32
+#ifndef G_OS_WIN32
 		pgm_warn ("Unix signal %s (%d) lost", strsignal (signum), signum);
 #else
 		pgm_warn ("Unix signal (%d) lost", signum);

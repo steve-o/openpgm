@@ -311,6 +311,7 @@ struct pgm_opt_crqst {
 
 /* PGMCC.  ACK Packet */
 struct pgm_ack {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	ack_rx_max;		/* RX_MAX */
 	uint32_t	ack_bitmap;		/* received packets */
 	/* ... option extensions */
@@ -318,20 +319,23 @@ struct pgm_ack {
 
 /* PGMCC  Options */
 struct pgm_opt_cc_data {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	opt_tstamp;		/* timestamp */
 	uint16_t	opt_nla_afi;		/* nla afi */
-	uint16_t	opt_reserved;		/* reserved */
+	uint16_t	opt_reserved2;		/* reserved */
 	struct in_addr	opt_nla;		/* ACKER nla */
 };
 
 struct pgm_opt6_cc_data {
+	uint8_t		opt6_reserved;		/* reserved */
 	uint32_t	opt6_tstamp;		/* timestamp */
 	uint16_t	opt6_nla_afi;		/* nla afi */
-	uint16_t	opt6_reserved;		/* reserved */
+	uint16_t	opt6_reserved2;		/* reserved */
 	struct in6_addr	opt6_nla;		/* ACKER nla */
 };
 
 struct pgm_opt_cc_feedback {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	opt_tstamp;		/* timestamp */
 	uint16_t	opt_nla_afi;		/* nla afi */
 	uint16_t	opt_loss_rate;		/* loss rate */
@@ -339,6 +343,7 @@ struct pgm_opt_cc_feedback {
 };
 
 struct pgm_opt6_cc_feedback {
+	uint8_t		opt6_reserved;		/* reserved */
 	uint32_t	opt6_tstamp;		/* timestamp */
 	uint16_t	opt6_nla_afi;		/* nla afi */
 	uint16_t	opt6_loss_rate;		/* loss rate */
@@ -364,6 +369,7 @@ struct pgm_spmr {
 
 /* 14.7.1.  Poll Request */
 struct pgm_poll {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	poll_sqn;		/* poll sequence number */
 	uint16_t	poll_round;		/* poll round */
 	uint16_t	poll_s_type;		/* poll sub-type */
@@ -379,6 +385,7 @@ struct pgm_poll {
 };
 
 struct pgm_poll6 {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	poll6_sqn;		/* poll sequence number */
 	uint16_t	poll6_round;		/* poll round */
 	uint16_t	poll6_s_type;		/* poll sub-type */
@@ -393,6 +400,7 @@ struct pgm_poll6 {
 
 /* 14.7.2.  Poll Response */
 struct pgm_polr {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	polr_sqn;		/* polr sequence number */
 	uint16_t	polr_round;		/* polr round */
 	uint16_t	polr_reserved;		/* reserved */

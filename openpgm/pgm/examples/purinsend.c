@@ -59,8 +59,8 @@ usage (
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
-	fprintf (stderr, "  -g <n>\n");
+	fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
+	fprintf (stderr, "  -N <n>\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (EXIT_SUCCESS);
@@ -85,7 +85,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:K:N:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
@@ -93,8 +93,8 @@ main (
 		case 'p':	udp_encap_port = atoi (optarg); break;
 		case 'r':	max_rte = atoi (optarg); break;
 		case 'f':	use_fec = TRUE; break;
-		case 'k':	rs_k = atoi (optarg); break;
-		case 'g':	rs_n = atoi (optarg); break;
+		case 'K':	rs_k = atoi (optarg); break;
+		case 'N':	rs_n = atoi (optarg); break;
 
 		case 'l':	use_multicast_loop = TRUE; break;
 
