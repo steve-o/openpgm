@@ -24,7 +24,6 @@ if e['WITH_GLIB'] == 'true':
 	if e2['WITH_HTTP'] == 'true':
 		e2.Append(CCFLAGS = ['-DCONFIG_WITH_HTTP']);
 		e2.Prepend(LIBS = ['libpgmhttp']);
-		e2.MergeFlags(e['LIBSOUP_FLAGS']);
 
 # core preferred examples
 	e.Program(['pgmdump.c'])

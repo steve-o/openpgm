@@ -43,16 +43,24 @@
 PGM_BEGIN_DECLS
 
 struct pgm_notify_t {
-#ifndef _WIN32
-	int pipefd[2];
-#elif defined(CONFIG_HAVE_EVENTFD)
+#if defined(CONFIG_HAVE_EVENTFD)
 	int eventfd;
+#elif !defined(_WIN32)
+	int pipefd[2];
 #else
 	SOCKET s[2];
 #endif /* _WIN32 */
 };
 
 typedef struct pgm_notify_t pgm_notify_t;
+
+#if defined(CONFIG_HAVE_EVENTFD)
+#	define PGM_NOTIFY_INIT		{ -1 }
+#elif !defined(_WIN32)
+#	define PGM_NOTIFY_INIT		{ { -1, -1 } }
+#else
+#	define PGM_NOTIFY_INIT		{ { INVALID_SOCKET, INVALID_SOCKET } }
+#endif
 
 
 static inline
@@ -61,13 +69,17 @@ pgm_notify_is_valid (
 	pgm_notify_t*	notify
 	)
 {
-	if (NULL == notify) return FALSE;
-#ifndef _WIN32
-	if (0 == notify->pipefd[0] || 0 == notify->pipefd[1]) return FALSE;
-#elif defined(CONFIG_HAVE_EVENTFD)
-	if (0 == notify->eventfd) return FALSE;
+	if (PGM_UNLIKELY(NULL == notify))
+		return FALSE;
+#if defined(CONFIG_HAVE_EVENTFD)
+	if (PGM_UNLIKELY(-1 == notify->eventfd))
+		return FALSE;
+#elif !defined(_WIN32)
+	if (PGM_UNLIKELY(-1 == notify->pipefd[0] || -1 == notify->pipefd[1]))
+		return FALSE;
 #else
-	if (INVALID_SOCKET == notify->s[0] || INVALID_SOCKET == notify->s[1]) return FALSE;
+	if (PGM_UNLIKELY(INVALID_SOCKET == notify->s[0] || INVALID_SOCKET == notify->s[1]))
+		return FALSE;
 #endif /* _WIN32 */
 	return TRUE;
 }
@@ -80,7 +92,18 @@ pgm_notify_init (
 {
 	pgm_assert (NULL != notify);
 
-#ifndef _WIN32
+#if defined(CONFIG_HAVE_EVENTFD)
+	notify->eventfd = -1;
+	int retval = eventfd (0, 0);
+	if (-1 == retval)
+		return retval;
+	notify->eventfd = retval;
+	const int fd_flags = fcntl (notify->eventfd, F_GETFL);
+	if (-1 != fd_flags)
+		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
+	return 0;
+#elif !defined(_WIN32)
+	notify->pipefd[0] = notify->pipefd[1] = -1;
 	int retval = pipe (notify->pipefd);
 	pgm_assert (0 == retval);
 /* set non-blocking */
@@ -95,15 +118,6 @@ pgm_notify_init (
 		retval = fcntl (notify->pipefd[0], F_SETFL, fd_flags | O_NONBLOCK);
 	pgm_assert (notify->pipefd[0]);
 	return retval;
-#elif defined(CONFIG_HAVE_EVENTFD)
-	int retval = eventfd (0, 0);
-	if (-1 == retval)
-		return retval;
-	notify->eventfd = retval;
-	const int fd_flags = fcntl (notify->eventfd, F_GETFL);
-	if (-1 != fd_flags)
-		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
-	return 0;
 #else
 /* use loopback sockets to simulate a pipe suitable for win32/select() */
 	struct sockaddr_in addr;
@@ -163,26 +177,26 @@ pgm_notify_destroy (
 {
 	pgm_assert (NULL != notify);
 
-#ifndef _WIN32
-	if (notify->pipefd[0]) {
-		close (notify->pipefd[0]);
-		notify->pipefd[0] = 0;
-	}
-	if (notify->pipefd[1]) {
-		close (notify->pipefd[1]);
-		notify->pipefd[1] = 0;
-	}
-#elif defined(CONFIG_HAVE_EVENTFD)
-	if (notify->eventfd) {
+#if defined(CONFIG_HAVE_EVENTFD)
+	if (-1 != notify->eventfd) {
 		close (notify->eventfd);
-		notify->eventfd = 0;
+		notify->eventfd = -1;
+	}
+#elif !defined(_WIN32)
+	if (-1 != notify->pipefd[0]) {
+		close (notify->pipefd[0]);
+		notify->pipefd[0] = -1;
+	}
+	if (-1 != notify->pipefd[1]) {
+		close (notify->pipefd[1]);
+		notify->pipefd[1] = -1;
 	}
 #else
-	if (notify->s[0]) {
+	if (INVALID_SOCKET != notify->s[0]) {
 		closesocket (notify->s[0]);
 		notify->s[0] = INVALID_SOCKET;
 	}
-	if (notify->s[1]) {
+	if (INVALID_SOCKET != notify->s[1]) {
 		closesocket (notify->s[1]);
 		notify->s[1] = INVALID_SOCKET;
 	}
@@ -198,17 +212,17 @@ pgm_notify_send (
 {
 	pgm_assert (NULL != notify);
 
-#ifndef _WIN32
-	pgm_assert (notify->pipefd[1]);
-	const char one = '1';
-	return (1 == write (notify->pipefd[1], &one, sizeof(one)));
-#elif defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (notify->eventfd);
+#if defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (-1 != notify->eventfd);
 	uint64_t u = 1;
 	ssize_t s = write (notify->eventfd, &u, sizeof(u));
 	return (s == sizeof(u));
+#elif !defined(_WIN32)
+	pgm_assert (-1 != notify->pipefd[1]);
+	const char one = '1';
+	return (1 == write (notify->pipefd[1], &one, sizeof(one)));
 #else
-	pgm_assert (notify->s[1]);
+	pgm_assert (INVALID_SOCKET != notify->s[1]);
 	const char one = '1';
 	return (1 == send (notify->s[1], &one, sizeof(one), 0));
 #endif
@@ -222,16 +236,16 @@ pgm_notify_read (
 {
 	pgm_assert (NULL != notify);
 
-#ifndef _WIN32
-	pgm_assert (notify->pipefd[0]);
-	char buf;
-	return (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
-#elif defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (notify->eventfd);
+#if defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (-1 != notify->eventfd);
 	uint64_t u;
 	return (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
+#elif !defined(_WIN32)
+	pgm_assert (-1 != notify->pipefd[0]);
+	char buf;
+	return (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
 #else
-	pgm_assert (notify->s[0]);
+	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	char buf;
 	return (sizeof(buf) == recv (notify->s[0], &buf, sizeof(buf), 0));
 #endif
@@ -245,16 +259,16 @@ pgm_notify_clear (
 {
 	pgm_assert (NULL != notify);
 
-#ifndef _WIN32
-	pgm_assert (notify->pipefd[0]);
-	char buf;
-	while (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
-#elif defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (notify->eventfd);
+#if defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (-1 != notify->eventfd);
 	uint64_t u;
 	while (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
+#elif !defined(_WIN32)
+	pgm_assert (-1 != notify->pipefd[0]);
+	char buf;
+	while (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
 #else
-	pgm_assert (notify->s[0]);
+	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	char buf;
 	while (sizeof(buf) == recv (notify->s[0], &buf, sizeof(buf), 0));
 #endif
@@ -268,14 +282,14 @@ pgm_notify_get_fd (
 {
 	pgm_assert (NULL != notify);
 
-#ifndef _WIN32
-	pgm_assert (notify->pipefd[0]);
-	return notify->pipefd[0];
-#elif defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (notify->eventfd);
+#if defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (-1 != notify->eventfd);
 	return notify->eventfd;
+#elif !defined(_WIN32)
+	pgm_assert (-1 != notify->pipefd[0]);
+	return notify->pipefd[0];
 #else
-	pgm_assert (notify->s[0]);
+	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	return notify->s[0];
 #endif
 }

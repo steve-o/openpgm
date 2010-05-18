@@ -19,9 +19,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <netdb.h>
 #include <unistd.h>
+#include <stdio.h>
 #include <glib.h>
+#ifndef G_OS_WIN32
+#	include <netdb.h>
+#endif
 #include <pgm/framework.h>
 #include "pgm/log.h"
 

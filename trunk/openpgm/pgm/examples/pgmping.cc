@@ -155,10 +155,10 @@ usage (const char* bin)
 	fprintf (stderr, "  -e              : Relect mode\n");
         fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
         fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-        fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
-        fprintf (stderr, "  -g <n>\n");
-        fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
-        fprintf (stderr, "  -x              : Enable SNMP interface\n");
+        fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
+        fprintf (stderr, "  -N <n>\n");
+        fprintf (stderr, "  -H              : Enable HTTP administrative interface\n");
+        fprintf (stderr, "  -S              : Enable SNMP interface\n");
 	exit (1);
 }
 
@@ -194,7 +194,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:m:old:r:fek:g:txh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:old:r:feK:N:HSh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -203,11 +203,11 @@ main (
 		case 'r':	g_max_rte = atoi (optarg); break;
 
 		case 'f':	g_fec = TRUE; break;
-		case 'k':	g_k = atoi (optarg); break;
-		case 'g':	g_n = atoi (optarg); break;
+		case 'K':	g_k = atoi (optarg); break;
+		case 'N':	g_n = atoi (optarg); break;
 
-		case 't':	enable_http = TRUE; break;
-		case 'x':	enable_snmpx = TRUE; break;
+		case 'H':	enable_http = TRUE; break;
+		case 'S':	enable_snmpx = TRUE; break;
 
 		case 'm':	g_odata_rate = atoi (optarg);
 				g_odata_interval = (1000 * 1000) / g_odata_rate; break;
@@ -229,9 +229,9 @@ main (
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {
-		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
-			g_error ("Unable to start HTTP interface: %s", err->message);
-			g_error_free (err);
+		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &pgm_err)) {
+			g_error ("Unable to start HTTP interface: %s", pgm_err->message);
+			pgm_error_free (pgm_err);
 			pgm_shutdown ();
 			return EXIT_FAILURE;
 		}

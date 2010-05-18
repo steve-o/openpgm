@@ -35,6 +35,8 @@
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #	include <sys/time.h>
+#else
+#	include "getopt.h"
 #endif
 #include <pgm/pgm.h>
 

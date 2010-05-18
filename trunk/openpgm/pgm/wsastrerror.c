@@ -21,7 +21,7 @@
 #include <pgm/framework.h>
 
 #ifdef _WIN32
-#include <ws2tcpip.h>
+#	include <ws2tcpip.h>
 
 
 char*
@@ -348,6 +348,24 @@ pgm_adapter_strerror (
 #endif
 	default: return _("Other.");
 	}
+}
+
+char*
+pgm_win_strerror (
+	char*		buf,
+	size_t		buflen,
+	const int	win_errno
+	)
+{
+	const DWORD nSize = buflen;
+	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM,
+		       NULL,		/* source */
+		       win_errno,	/* message id */
+		       MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),	/* language id */
+		       (LPTSTR)buf,
+		       buflen,
+		       NULL);		/* arguments */
+	return buf;
 }
 #endif /* _WIN32 */
 

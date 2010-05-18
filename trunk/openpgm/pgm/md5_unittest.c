@@ -107,7 +107,7 @@ END_TEST
 START_TEST (test_finish_ctx_pass_001)
 {
 	const char* buffer = "i am not a string.";
-	const char* answer = "13de-6066-151e-e5a5-6451-e154-1fb7-3b16";
+	const char* answer = "ef71-1617-4eef-9737-5e2b-5d7a-d015-b064";
 
 	char md5[1024];
 	char resblock[16];
@@ -115,7 +115,7 @@ START_TEST (test_finish_ctx_pass_001)
 	memset (&ctx, 0, sizeof(ctx));
 	memset (resblock, 0, sizeof(resblock));
 	pgm_md5_init_ctx (&ctx);
-	pgm_md5_process_bytes (&ctx, buffer, sizeof(buffer));
+	pgm_md5_process_bytes (&ctx, buffer, strlen(buffer)+1);
 	pgm_md5_finish_ctx (&ctx, resblock);
 	sprintf (md5, "%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx",
 		   resblock[0], resblock[1],
