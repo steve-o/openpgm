@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * PGM transport.
+ * PGM socket.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,7 +34,7 @@
 #endif
 #include <pgm/types.h>
 
-typedef struct pgm_transport_t pgm_transport_t;
+typedef struct pgm_sock_t pgm_sock_t;
 
 #include <pgm/error.h>
 #include <pgm/gsi.h>
@@ -62,7 +62,7 @@ enum {
 	PGM_IO_STATUS_NORMAL,		/* success */
 	PGM_IO_STATUS_RESET,		/* session reset */
 	PGM_IO_STATUS_FIN,		/* session finished */
-	PGM_IO_STATUS_EOF,		/* transport closed */
+	PGM_IO_STATUS_EOF,		/* socket closed */
 	PGM_IO_STATUS_WOULD_BLOCK,	/* resource temporarily unavailable */
 	PGM_IO_STATUS_RATE_LIMITED,	/* would-block on rate limit, check timer */
 	PGM_IO_STATUS_TIMER_PENDING	/* would-block with pending timer */
@@ -104,7 +104,7 @@ enum {
 	PGM_PC_SOURCE_MAX
 };
 
-struct pgm_transport_t {
+struct pgm_sock_t {
 	pgm_tsi_t           		tsi;
 	uint16_t			dport;
 	uint16_t			udp_encap_ucast_port;
@@ -236,102 +236,20 @@ struct pgm_transport_t {
 
 
 /* global variables */
-extern pgm_rwlock_t pgm_transport_list_lock;
-extern pgm_slist_t* pgm_transport_list;
+extern pgm_rwlock_t pgm_sock_list_lock;
+extern pgm_slist_t* pgm_sock_list;
 
-bool pgm_transport_create (pgm_transport_t**restrict, struct pgm_transport_info_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_transport_bind (pgm_transport_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_transport_destroy (pgm_transport_t*, bool);
-bool pgm_transport_set_max_tpdu (pgm_transport_t*const, const uint16_t);
-bool pgm_transport_set_multicast_loop (pgm_transport_t*const, const bool);
-bool pgm_transport_set_hops (pgm_transport_t*const, const unsigned);
-bool pgm_transport_set_sndbuf (pgm_transport_t*const, const size_t);
-bool pgm_transport_set_rcvbuf (pgm_transport_t*const, const size_t);
-bool pgm_transport_set_fec (pgm_transport_t*const, const uint8_t, const bool, const bool, const uint8_t, const uint8_t);
-bool pgm_transport_set_congestion_reports (pgm_transport_t*const, const bool, const unsigned);
-bool pgm_transport_set_congestion_control (pgm_transport_t*const, const bool, const unsigned);
-bool pgm_transport_set_send_only (pgm_transport_t*const, const bool);
-bool pgm_transport_set_recv_only (pgm_transport_t*const, const bool, const bool);
-bool pgm_transport_set_abort_on_reset (pgm_transport_t*const, const bool);
-bool pgm_transport_set_nonblocking (pgm_transport_t*const, const bool);
+bool pgm_socket (pgm_sock_t**restrict, struct pgm_sock_info_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_bind (pgm_sock_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_close (pgm_sock_t*, bool);
+bool pgm_setsockopt (pgm_sock_t*const, const int, const int, const void*, const socklen_t);
 
-size_t pgm_transport_pkt_offset2 (bool, bool) PGM_GNUC_WARN_UNUSED_RESULT;
-static inline size_t pgm_transport_pkt_offset (bool) PGM_GNUC_WARN_UNUSED_RESULT;
-static inline
-size_t pgm_transport_pkt_offset (
-	bool			can_fragment
-	)
-{
-	return pgm_transport_pkt_offset2 (can_fragment, FALSE);
-}
-	
-static inline
-size_t
-pgm_transport_max_tsdu (
-	pgm_transport_t*	transport,
-	bool			can_fragment
-	)
-{
-	size_t max_tsdu = can_fragment ? transport->max_tsdu_fragment : transport->max_tsdu;
-	if (transport->use_varpkt_len)
-		max_tsdu -= sizeof (uint16_t);
-	return max_tsdu;
-}
-
-static inline
-int
-pgm_transport_get_recv_fd (
-	pgm_transport_t*	transport
-	)
-{
-	return transport->recv_sock;
-}
-
-static inline
-int
-pgm_transport_get_pending_fd (
-	pgm_transport_t*	transport
-	)
-{
-	return pgm_notify_get_fd (&transport->pending_notify);
-}
-
-static inline
-int
-pgm_transport_get_repair_fd (
-	pgm_transport_t*	transport
-	)
-{
-	return pgm_notify_get_fd (&transport->rdata_notify);
-}
-
-static inline
-int
-pgm_transport_get_send_fd (
-	pgm_transport_t*	transport
-	)
-{
-	return transport->send_sock;
-}
-
-bool pgm_transport_get_timer_pending (pgm_transport_t*const restrict, struct timeval*const restrict);
-bool pgm_transport_get_rate_remaining (pgm_transport_t*const restrict, struct timeval*const restrict);
-int pgm_transport_select_info (pgm_transport_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
+int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
 #ifdef CONFIG_HAVE_POLL
-int pgm_transport_poll_info (pgm_transport_t*const restrict, struct pollfd*const restrict, int*const restrict, const int);
+int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const int);
 #endif
 #ifdef CONFIG_HAVE_EPOLL
-int pgm_transport_epoll_ctl (pgm_transport_t*const, const int, const int, const int);
-#endif
-
-bool pgm_transport_join_group (pgm_transport_t*restrict, const struct group_req*restrict, socklen_t);
-bool pgm_transport_leave_group (pgm_transport_t*restrict, const struct group_req*restrict, socklen_t);
-bool pgm_transport_block_source (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
-bool pgm_transport_unblock_source (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
-bool pgm_transport_join_source_group (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
-bool pgm_transport_leave_source_group (pgm_transport_t*restrict, const struct group_source_req*restrict, socklen_t);
-#if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
-bool pgm_transport_msfilter (pgm_transport_t*restrict, const struct group_filter*restrict, socklen_t);
+int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);
 #endif
 
 PGM_END_DECLS

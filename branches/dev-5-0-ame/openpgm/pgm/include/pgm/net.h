@@ -26,11 +26,11 @@
 #	include <sys/socket.h>
 #endif
 #include <pgm/framework.h>
-#include <pgm/transport.h>
+#include <pgm/socket.h>
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL ssize_t pgm_sendto (pgm_transport_t*restrict, bool, bool, const void*restrict, size_t, const struct sockaddr*restrict, socklen_t);
+PGM_GNUC_INTERNAL ssize_t pgm_sendto (pgm_sock_t*restrict, bool, bool, const void*restrict, size_t, const struct sockaddr*restrict, socklen_t);
 PGM_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
 
 PGM_END_DECLS

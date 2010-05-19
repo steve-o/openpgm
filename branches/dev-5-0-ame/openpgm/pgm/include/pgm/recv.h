@@ -24,14 +24,14 @@
 
 #include <pgm/framework.h>
 #include <pgm/tsi.h>
-#include <pgm/transport.h>
+#include <pgm/socket.h>
 
 PGM_BEGIN_DECLS
 
-int pgm_recvmsg (pgm_transport_t*const restrict, struct pgm_msgv_t*const restrict, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-int pgm_recvmsgv (pgm_transport_t*const restrict, struct pgm_msgv_t*const restrict, const size_t, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-int pgm_recv (pgm_transport_t*const restrict, void*restrict, const size_t, const int, size_t*const restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-int pgm_recvfrom (pgm_transport_t*const restrict, void*restrict, const size_t, const int, size_t*restrict, pgm_tsi_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvmsg (pgm_sock_t*const restrict, struct pgm_msgv_t*const restrict, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvmsgv (pgm_sock_t*const restrict, struct pgm_msgv_t*const restrict, const size_t, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+int pgm_recv (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*const restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*restrict, pgm_tsi_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 PGM_END_DECLS
 

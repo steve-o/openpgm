@@ -33,14 +33,14 @@ struct pgm_sk_buff_t;
 #include <pgm/skbuff.h>
 #include <pgm/packet.h>
 #include <pgm/tsi.h>
-#include <pgm/transport.h>
+#include <pgm/socket.h>
 
 PGM_BEGIN_DECLS
 
 struct pgm_sk_buff_t {
 	pgm_list_t			link_;
 
-	pgm_transport_t* restrict	transport;
+	pgm_sock_t* restrict		sock;
 	pgm_time_t			tstamp;
 	pgm_tsi_t			tsi;
 
@@ -283,8 +283,8 @@ pgm_skb_is_valid (
 {
 	pgm_return_val_if_fail (skb, FALSE);
 /* link_ */
-/* transport */
-	pgm_return_val_if_fail (skb->transport, FALSE);
+/* socket */
+	pgm_return_val_if_fail (skb->sock, FALSE);
 /* tstamp */
 	pgm_return_val_if_fail (skb->tstamp > 0, FALSE);
 /* tsi */

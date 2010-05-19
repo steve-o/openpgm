@@ -36,7 +36,7 @@ print """
 
 /* globals */
 
-const unsigned pgm_major_version = 3;
+const unsigned pgm_major_version = 5;
 const unsigned pgm_minor_version = 0;
 const unsigned pgm_micro_version = 60;
 const char* pgm_build_date = "%s";
