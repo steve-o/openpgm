@@ -152,10 +152,10 @@ main (
 	WSAEVENT recvEvent, pendingEvent;
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_RCV_SOCK, &recv_fd, sizeof(recv_fd));
+	pgm_getsockopt (sock, PGM_RCV_SOCK, &recv_sock, sizeof(recv_sock));
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_fd, sizeof(pending_fd));
+	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
@@ -289,24 +289,21 @@ on_startup (void)
 			goto err_abort;
 		}
 	} else {
-		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_IP, &pgm_err)) {
+		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
 			fprintf (stderr, "Creating PGM/IP socket: %s\n", pgm_err->message);
 			goto err_abort;
 		}
 	}
 
 /* Use RFC 2113 tagging for PGM Router Assist */
-	const int router_assist = 0;
-	pgm_setsockopt (sock, PGM_IP_ROUTER_ALERT, &router_assist, sizeof(router_assist));
+	const int no_router_assist = 0;
+	pgm_setsockopt (sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
 
 	pgm_drop_superuser();
 
 /* set PGM parameters */
-	const int nonblocking = 1,
-		  recv_only = 1,
+	const int recv_only = 1,
 		  passive = 0,
-		  multicast_loop = use_multicast_loop ? 1 : 0,
-		  multicast_hops = 16,
 		  peer_expiry = pgm_secs (300),
 		  spmr_expiry = pgm_msecs (250),
 		  nak_bo_ivl = pgm_msecs (50),
@@ -315,13 +312,10 @@ on_startup (void)
 		  nak_rdata_ivl = 50,
 		  nak_ncf_retries = 50;
 
-	pgm_setsockopt (sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
 	pgm_setsockopt (sock, PGM_RCV_ONLY, &recv_only, sizeof(recv_only));
 	pgm_setsockopt (sock, PGM_PASSIVE, &passive, sizeof(passive));
 	pgm_setsockopt (sock, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
 	pgm_setsockopt (sock, PGM_RXW_SQNS, &sqns, sizeof(sqns));
-	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
 	pgm_setsockopt (sock, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
 	pgm_setsockopt (sock, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
 	pgm_setsockopt (sock, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
@@ -330,24 +324,19 @@ on_startup (void)
 	pgm_setsockopt (sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
 	pgm_setsockopt (sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
 	if (use_fec) {
-		const int pro_parity = 0,
-			  ondemand_parity = 1,
-			  var_pkt_len = 1,
-			  block_size = rs_n,
-			  group_size = rs_k;
-			  
-		pgm_setsockopt (sock, PGM_PROACTIVEPKTS, &pro_parity, sizeof(pro_parity));
-		pgm_setsockopt (sock, PGM_ONDEMANDPARITY, &ondemand_parity, sizeof(ondemand_parity));
-		pgm_setsockopt (sock, PGM_VARPKTLEN, &var_pkt_len, sizeof(var_pkt_len));
-		pgm_setsockopt (sock, PGM_FEC_BLOCK_SIZE, &block_size, sizeof(block_size));
-		pgm_setsockopt (sock, PGM_FEC_GROUP_SIZE, &group_size, sizeof(group_size));
+		struct pgm_fecinfo_t fecinfo;
+		fecinfo.block_size		= rs_n;
+		fecinfo.proactive_packets	= 0;
+		fecinfo.group_size		= rs_k;
+		fecinfo.ondemand_parity_enabled	= TRUE;
+		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
 	memset (addr, 0, sizeof(addr));
 	addr.sa_port = port;
-	if (!pgm_gsi_create_from_hostname (&addr.sa_addr, &pgm_err)) {
+	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
 		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
 		goto err_abort;
 	}
@@ -357,7 +346,7 @@ on_startup (void)
 		struct sockaddr_in udpaddr;
 		memset (udpaddr, 0, sizeof(udpaddr));
 		udpaddr.sin_port = udp_encap_port;
-		if (!pgm_bind_udp (sock, &addr, sizeof(addr), &udpaddr, sizeof(udpaddr), &pgm_err)) {
+		if (!pgm_bind2 (sock, &addr, sizeof(addr), &udpaddr, sizeof(udpaddr), &pgm_err)) {
 			fprintf (stderr, "Binding PGM/UDP socket: %s\n", pgm_err->message);
 			goto err_abort;
 		}
@@ -373,6 +362,17 @@ on_startup (void)
 		pgm_setsockopt (sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
 	pgm_setsockopt (sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
 	pgm_freeaddrinfo (res);
+
+/* set IP parameters */
+	const int nonblocking = 1,
+		  multicast_loop = use_multicast_loop ? 1 : 0,
+		  multicast_hops = 16,
+		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
+
+	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
+	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
+	pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
+	pgm_setsockopt (sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
 
 	puts ("Startup complete.");
 	return TRUE;

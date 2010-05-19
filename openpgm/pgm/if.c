@@ -39,6 +39,7 @@
  */
 struct interface_req {
 	char			ir_name[IF_NAMESIZE];
+	unsigned int		ir_flags;		/* from SIOCGIFFLAGS */
 	unsigned int		ir_interface;		/* interface index */
 	struct sockaddr_storage ir_addr;		/* interface address */
 };
@@ -530,6 +531,11 @@ parse_interface (
 		    (0 == pgm_sockaddr_cmp (ifa->ifa_addr, (const struct sockaddr*)&addr)))
 		{
 			strcpy (ir->ir_name, ifa->ifa_name);
+			ir->ir_flags = ifa->ifa_flags;
+			if (ir->ir_flags & IFF_LOOPBACK)
+				pgm_warn (_("Interface %s reports as a loopback device."), ir->ir_name);
+			if (!(ir->ir_flags & IFF_MULTICAST))
+				pgm_warn (_("Interface %s reports as a non-multicast capable device."), ir->ir_name);
 			ir->ir_interface = ifindex;
 			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 			pgm_freeifaddrs (ifap);
@@ -544,6 +550,15 @@ parse_interface (
 			const struct in_addr netmask = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
 			if (is_in_net (&ifaddr, &in_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
+				ir->ir_flags = ifa->ifa_flags;
+				if (ir->ir_flags & IFF_LOOPBACK) {
+					pgm_warn (_("Skipping matching loopback network device %s."), ir->ir_name);
+					goto skip_inet_network;
+				}
+				if (!(ir->ir_flags & IFF_MULTICAST)) {
+					pgm_warn (_("Skipping matching non-multicast capable network device %s."), ir->ir_name);
+					goto skip_inet_network;
+				}
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 				pgm_freeifaddrs (ifap);
@@ -557,17 +572,32 @@ parse_interface (
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
 			if (is_in_net6 (&ifaddr, &in6_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
+				ir->ir_flags = ifa->ifa_flags;
+				if (ir->ir_flags & IFF_LOOPBACK) {
+					pgm_warn (_("Skipping matching loopback network device %s."), ir->ir_name);
+					goto skip_inet_network;
+				}
+				if (!(ir->ir_flags & IFF_MULTICAST)) {
+					pgm_warn (_("Skipping matching non-multicast capable network device %s."), ir->ir_name);
+					goto skip_inet_network;
+				}
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 				pgm_freeifaddrs (ifap);
 				return TRUE;
 			}
 		}
+skip_inet_network:
 
 /* check interface name */
 		if (check_ifname)
 		{
 			if (0 != strcmp (ifname, ifa->ifa_name))
+				continue;
+
+			ir->ir_flags = ifa->ifa_flags;
+/* skip loopback and non-multicast capable devices */
+			if ((ir->ir_flags & IFF_LOOPBACK) || !(ir->ir_flags & IFF_MULTICAST))
 				continue;
 
 /* check for multiple interfaces */
@@ -593,7 +623,7 @@ parse_interface (
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     PGM_ERROR_NODEV,
-			     _("No matching network interface %s%s%s"),
+			     _("No matching non-loopback and multicast capable network interface %s%s%s"),
 			     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 		pgm_freeifaddrs (ifap);
 		return FALSE;
@@ -1471,15 +1501,15 @@ free_lists:
  */
 
 bool
-pgm_if_get_transport_info (
-	const char*				 restrict network,
-	const struct pgm_transport_info_t* const restrict hints,
-	struct pgm_transport_info_t**		 restrict res,
-	pgm_error_t**			         restrict error
+pgm_getaddrinfo (
+	const char*			   restrict network,
+	const struct pgm_addrinfo_t* const restrict hints,
+	struct pgm_addrinfo_t**		   restrict res,
+	pgm_error_t**			   restrict error
 	)
 {
-	struct pgm_transport_info_t* ti;
-	const int family = hints ? hints->ti_family : AF_UNSPEC;
+	struct pgm_addrinfo_t* ai;
+	const int family = hints ? hints->ai_family : AF_UNSPEC;
 	pgm_list_t* recv_list = NULL;	/* <struct group_source_req*> */
 	pgm_list_t* send_list = NULL;	/* <struct group_source_req*> */
 
@@ -1488,13 +1518,13 @@ pgm_if_get_transport_info (
 	pgm_return_val_if_fail (NULL != res, FALSE);
 
 	if (hints) {
-		pgm_debug ("get_transport_info (network:%s%s%s hints: {family:%s} res:%p error:%p)",
+		pgm_debug ("pgm_getaddrinfo (network:%s%s%s hints: {family:%s} res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 			pgm_family_string (family),
 			(const void*)res,
 			(const void*)error);
 	} else {
-		pgm_debug ("get_transport_info (network:%s%s%s hints:%p res:%p error:%p)",
+		pgm_debug ("pgm_getaddrinfo (network:%s%s%s hints:%p res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 			(const void*)hints,
 			(const void*)res,
@@ -1505,14 +1535,12 @@ pgm_if_get_transport_info (
 		return FALSE;
 	const size_t recv_list_len = pgm_list_length (recv_list);
 	const size_t send_list_len = pgm_list_length (send_list);
-	ti = pgm_malloc0 (sizeof(struct pgm_transport_info_t) + 
+	ti = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
 	ti->ti_recv_addrs_len = recv_list_len;
-	ti->ti_recv_addrs = (void*)((char*)ti + sizeof(struct pgm_transport_info_t));
+	ti->ti_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
 	ti->ti_send_addrs_len = send_list_len;
-	ti->ti_send_addrs = (void*)((char*)ti->ti_recv_addrs + recv_list_len * sizeof(struct group_source_req));
-	ti->ti_dport = DEFAULT_DATA_DESTINATION_PORT;
-	ti->ti_sport = DEFAULT_DATA_SOURCE_PORT;
+	ti->ti_send_addrs = (void*)((char*)ai->ti_recv_addrs + recv_list_len * sizeof(struct group_source_req));
 			
 	size_t i = 0;
 	while (recv_list) {
@@ -1526,13 +1554,13 @@ pgm_if_get_transport_info (
 		pgm_free (send_list->data);
 		send_list = pgm_list_delete_link (send_list, send_list);
 	}
-	*res = ti;
+	*res = ai;
 	return TRUE;
 }
 
 void
-pgm_if_free_transport_info (
-	struct pgm_transport_info_t*	res
+pgm_freeaddrinfo (
+	struct pgm_addrinfo_t*	res
 	)
 {
 	pgm_free (res);

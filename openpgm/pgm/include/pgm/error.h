@@ -19,10 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#	error "Only <framework.h> can be included directly."
-#endif
-
 #ifndef __PGM_ERROR_H__
 #define __PGM_ERROR_H__
 
@@ -37,7 +33,7 @@ enum
 	PGM_ERROR_DOMAIN_PACKET,
 	PGM_ERROR_DOMAIN_RECV,
 	PGM_ERROR_DOMAIN_TIME,
-	PGM_ERROR_DOMAIN_TRANSPORT,
+	PGM_ERROR_DOMAIN_SOCKET,
 	PGM_ERROR_DOMAIN_ENGINE,
 	PGM_ERROR_DOMAIN_HTTP,
 	PGM_ERROR_DOMAIN_SNMP
