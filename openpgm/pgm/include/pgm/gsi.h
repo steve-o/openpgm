@@ -27,7 +27,6 @@
 typedef struct pgm_gsi_t pgm_gsi_t;
 
 #include <pgm/error.h>
-#include <pgm/hashtable.h>
 
 PGM_BEGIN_DECLS
 

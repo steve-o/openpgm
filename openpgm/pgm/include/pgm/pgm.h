@@ -30,7 +30,7 @@
 #include <pgm/receiver.h>
 #include <pgm/recv.h>
 #include <pgm/source.h>
-#include <pgm/transport.h>
+#include <pgm/socket.h>
 #include <pgm/tsi.h>
 #include <pgm/version.h>
 

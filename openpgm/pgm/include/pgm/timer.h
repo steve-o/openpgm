@@ -23,33 +23,33 @@
 #define __PGM_TIMER_H__
 
 #include <pgm/framework.h>
-#include <pgm/transport.h>
+#include <pgm/socket.h>
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL bool pgm_timer_prepare (pgm_transport_t*const);
-PGM_GNUC_INTERNAL bool pgm_timer_check (pgm_transport_t*const);
-PGM_GNUC_INTERNAL pgm_time_t pgm_timer_expiration (pgm_transport_t*const);
-PGM_GNUC_INTERNAL bool pgm_timer_dispatch (pgm_transport_t*const);
+PGM_GNUC_INTERNAL bool pgm_timer_prepare (pgm_sock_t*const);
+PGM_GNUC_INTERNAL bool pgm_timer_check (pgm_sock_t*const);
+PGM_GNUC_INTERNAL pgm_time_t pgm_timer_expiration (pgm_sock_t*const);
+PGM_GNUC_INTERNAL bool pgm_timer_dispatch (pgm_sock_t*const);
 
 static inline
 void
 pgm_timer_lock (
-	pgm_transport_t* const transport
+	pgm_sock_t* const sock
 	)
 {
-	if (transport->can_send_data)
-		pgm_mutex_lock (&transport->timer_mutex);
+	if (sock->can_send_data)
+		pgm_mutex_lock (&sock->timer_mutex);
 }
 
 static inline
 void
 pgm_timer_unlock (
-	pgm_transport_t* const transport
+	pgm_sock_t* const sock
 	)
 {
-	if (transport->can_send_data)
-		pgm_mutex_unlock (&transport->timer_mutex);
+	if (sock->can_send_data)
+		pgm_mutex_unlock (&sock->timer_mutex);
 }
 
 PGM_END_DECLS

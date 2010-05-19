@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * PGM receiver transport.
+ * PGM receiver socket.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *
@@ -31,7 +31,7 @@ typedef struct pgm_peer_t pgm_peer_t;
 
 #include <pgm/tsi.h>
 #include <pgm/rxw.h>
-#include <pgm/transport.h>
+#include <pgm/socket.h>
 
 PGM_BEGIN_DECLS
 
@@ -97,7 +97,7 @@ struct pgm_peer_t {
 	pgm_time_t			spmr_tstamp;
 
 	pgm_rxw_t*       restrict      	window;
-	pgm_transport_t* restrict	transport;
+	pgm_sock_t* restrict		sock;
 	pgm_list_t			peers_link;
 	pgm_slist_t			pending_link;
 
@@ -121,30 +121,19 @@ struct pgm_peer_t {
 	uint32_t			max_fail_time;
 };
 
-bool pgm_transport_set_rxw_sqns (pgm_transport_t*, unsigned);
-bool pgm_transport_set_rxw_secs (pgm_transport_t*, unsigned);
-bool pgm_transport_set_rxw_max_rte (pgm_transport_t*, ssize_t);
-bool pgm_transport_set_peer_expiry (pgm_transport_t*, unsigned);
-bool pgm_transport_set_spmr_expiry (pgm_transport_t*, unsigned);
-bool pgm_transport_set_nak_bo_ivl (pgm_transport_t*, unsigned);
-bool pgm_transport_set_nak_rpt_ivl (pgm_transport_t*, unsigned);
-bool pgm_transport_set_nak_rdata_ivl (pgm_transport_t*, unsigned);
-bool pgm_transport_set_nak_data_retries (pgm_transport_t*, unsigned);
-bool pgm_transport_set_nak_ncf_retries (pgm_transport_t*, unsigned);
-
-PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_transport_t*const restrict, const pgm_tsi_t*const restrict, const struct sockaddr*const restrict, const socklen_t, const struct sockaddr*const restrict, const socklen_t, const pgm_time_t);
+PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_sock_t*const restrict, const pgm_tsi_t*const restrict, const struct sockaddr*const restrict, const socklen_t, const struct sockaddr*const restrict, const socklen_t, const pgm_time_t);
 PGM_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
-PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_transport_t*const restrict, struct pgm_msgv_t**restrict, const struct pgm_msgv_t*const, size_t*const restrict, unsigned*const restrict);
+PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_sock_t*const restrict, struct pgm_msgv_t**restrict, const struct pgm_msgv_t*const, size_t*const restrict, unsigned*const restrict);
 PGM_GNUC_INTERNAL bool pgm_peer_has_pending (pgm_peer_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_transport_t*const, pgm_peer_t*const);
-PGM_GNUC_INTERNAL bool pgm_check_peer_nak_state (pgm_transport_t*const, const pgm_time_t);
-PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_msgv_t*const restrict);
-PGM_GNUC_INTERNAL pgm_time_t pgm_min_nak_expiry (pgm_time_t, pgm_transport_t*) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_peer_nak (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_data (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_ncf (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_spm (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_on_poll (pgm_transport_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_sock_t*const, pgm_peer_t*const);
+PGM_GNUC_INTERNAL bool pgm_check_peer_nak_state (pgm_sock_t*const, const pgm_time_t);
+PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_msgv_t*const restrict);
+PGM_GNUC_INTERNAL pgm_time_t pgm_min_nak_expiry (pgm_time_t, pgm_sock_t*) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_peer_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_data (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_ncf (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_spm (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_on_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 
 PGM_END_DECLS
