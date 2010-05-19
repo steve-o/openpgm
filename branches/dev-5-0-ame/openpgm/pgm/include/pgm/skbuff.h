@@ -30,7 +30,6 @@ struct pgm_sk_buff_t;
 #include <pgm/mem.h>
 #include <pgm/list.h>
 #include <pgm/time.h>
-#include <pgm/skbuff.h>
 #include <pgm/packet.h>
 #include <pgm/tsi.h>
 #include <pgm/socket.h>

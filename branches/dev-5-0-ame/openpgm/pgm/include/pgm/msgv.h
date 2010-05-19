@@ -19,10 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#	error "Only <framework.h> can be included directly."
-#endif
-
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
@@ -46,7 +42,7 @@ struct pgm_iovec {
 };
 
 struct pgm_msgv_t {
-	unsigned		msgv_len;			/* number of elements in skb */
+	uint32_t		msgv_len;			/* number of elements in skb */
 	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
 

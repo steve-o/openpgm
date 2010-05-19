@@ -22,13 +22,13 @@
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
-#include <pgm/framework.h>
+#include <pgm/types.h>
 
 PGM_BEGIN_DECLS
 
 /* protocol number assigned by IANA */
 #ifndef IPPROTO_PGM
-#define IPPROTO_PGM 		    	113
+#	define IPPROTO_PGM 		    	113
 #endif
 
 /* read from /etc/protocols if available */
@@ -37,8 +37,8 @@ extern int pgm_ipproto_pgm;
 
 /* address family indicator, rfc 1700 (ADDRESS FAMILY NUMBERS) */
 #ifndef AFI_IP
-#define AFI_IP	    1	    /* IP (IP version 4) */
-#define AFI_IP6	    2	    /* IP6 (IP version 6) */
+#	define AFI_IP	    1	    /* IP (IP version 4) */
+#	define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
 /* UDP ports for UDP encapsulation, as per IBM WebSphere MQ */
@@ -449,40 +449,22 @@ struct pgm_opt6_path_nla {
 #	pragma pack()
 #endif
 
-static inline
-bool
-pgm_is_upstream (
-	uint8_t		type
-	)
-{
-	return (type == PGM_NAK ||		/* unicast */
-		type == PGM_NNAK ||		/* unicast */
-		type == PGM_SPMR ||		/* multicast + unicast */
-		type == PGM_POLR ||		/* unicast */
-		type == PGM_ACK);		/* unicast */
-}
+#define PGM_IS_UPSTREAM(t) \
+	((t) == PGM_NAK 	/* unicast */			\
+	 || (t) == PGM_NNAK	/* unicast */			\
+	 || (t) == PGM_SPMR	/* multicast + unicast */	\
+	 || (t) == PGM_POLR	/* unicast */			\
+	 || (t) == PGM_ACK)	/* unicast */
 
-static inline
-bool
-pgm_is_peer (
-	uint8_t		type
-	)
-{
-	return (type == PGM_SPMR);		/* multicast */
-}
+#define PGM_IS_PEER(t) \
+	((t) == PGM_SPMR)	/* multicast */
 
-static inline
-bool
-pgm_is_downstream (
-	uint8_t		type
-	)
-{
-	return (type == PGM_SPM   ||		/* all types are multicast */
-		type == PGM_ODATA ||
-		type == PGM_RDATA ||
-		type == PGM_POLL  ||
-		type == PGM_NCF);
-}
+#define PGM_IS_DOWNSTREAM(t) \
+	((t) == PGM_SPM		/* all types are multicast */	\
+	 || (t) == PGM_ODATA					\
+	 || (t) == PGM_RDATA					\
+	 || (t) == PGM_POLL					\
+	 || (t) == PGM_NCF)
 
 PGM_END_DECLS
 

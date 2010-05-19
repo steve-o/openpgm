@@ -487,7 +487,6 @@ END_TEST
  *		pgm_transport_t*	transport,
  *		uint8_t			proactive_h,
  *		bool			use_ondemand_parity,
- *		bool			use_varpkt_len,
  *		uint8_t			default_n,
  *		uint8_t			default_k
  *	)

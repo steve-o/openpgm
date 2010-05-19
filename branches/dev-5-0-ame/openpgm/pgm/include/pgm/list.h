@@ -19,10 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#       error "Only <framework.h> can be included directly."
-#endif
-
 #ifndef __PGM_LIST_H__
 #define __PGM_LIST_H__
 
@@ -38,14 +34,6 @@ struct pgm_list_t
 };
 
 typedef struct pgm_list_t pgm_list_t;
-
-pgm_list_t* pgm_list_append (pgm_list_t*restrict, void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-pgm_list_t* pgm_list_prepend_link (pgm_list_t*restrict, pgm_list_t*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-pgm_list_t* pgm_list_remove_link (pgm_list_t*, pgm_list_t*) PGM_GNUC_WARN_UNUSED_RESULT;
-pgm_list_t* pgm_list_delete_link (pgm_list_t*, pgm_list_t*) PGM_GNUC_WARN_UNUSED_RESULT;
-pgm_list_t* pgm_list_last (pgm_list_t*) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-unsigned pgm_list_length (pgm_list_t*) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-
 
 PGM_END_DECLS
 
