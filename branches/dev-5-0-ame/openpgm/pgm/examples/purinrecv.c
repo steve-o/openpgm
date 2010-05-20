@@ -195,6 +195,7 @@ block:
 			FD_ZERO(&readfds);
 			FD_SET(terminate_pipe[0], &readfds);
 			pgm_select_info (sock, &readfds, NULL, &fds);
+puts ("select");
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
@@ -285,8 +286,8 @@ on_startup (void)
 
 	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
 
-	puts ("Create PGM socket.");
 	if (udp_encap_port) {
+		puts ("Create PGM/UDP socket.");
 		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
 			fprintf (stderr, "Creating PGM/UDP socket: %s\n", pgm_err->message);
 			goto err_abort;
@@ -294,6 +295,7 @@ on_startup (void)
 		pgm_setsockopt (sock, PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 		pgm_setsockopt (sock, PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 	} else {
+		puts ("Create PGM/IP socket.");
 		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
 			fprintf (stderr, "Creating PGM/IP socket: %s\n", pgm_err->message);
 			goto err_abort;
@@ -340,7 +342,8 @@ on_startup (void)
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
 	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = port;
+	addr.sa_port = port ? port : DEFAULT_DATA_DESTINATION_PORT;
+	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
 	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
 		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
 		goto err_abort;
