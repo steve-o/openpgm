@@ -21,9 +21,9 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
-#include "pgm/rxw.h"
+#include <impl/i18n.h>
+#include <impl/framework.h>
+#include <impl/rxw.h>
 
 
 //#define RXW_DEBUG

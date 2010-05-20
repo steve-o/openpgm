@@ -22,6 +22,11 @@
 #ifndef __PGM_SOCKET_H__
 #define __PGM_SOCKET_H__
 
+typedef struct pgm_sock_t pgm_sock_t;
+struct pgm_sockaddr_t;
+struct pgm_addrinfo_t;
+struct pgm_fecinto_t;
+
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
@@ -33,9 +38,6 @@
 #	include <sys/socket.h>
 #endif
 #include <pgm/types.h>
-
-typedef struct pgm_sock_t pgm_sock_t;
-
 #include <pgm/error.h>
 #include <pgm/msgv.h>
 #include <pgm/tsi.h>
@@ -63,6 +65,50 @@ struct pgm_fecinfo_t {
 	bool					variable_sized_packets_enabled;
 };
 
+/* socket options */
+enum {
+	PGM_TIME_REMAIN,
+	PGM_RATE_REMAIN,
+	PGM_IP_ROUTER_ALERT,
+	PGM_MTU,
+	PGM_MULTICAST_LOOP,
+	PGM_MULTICAST_HOPS,
+	PGM_TOS,
+	PGM_SNDBUF,
+	PGM_RCVBUF,
+	PGM_AMBIENT_SPM,
+	PGM_HEARTBEAT_SPM,
+	PGM_TXW_SQNS,
+	PGM_TXW_SECS,
+	PGM_TXW_MAX_RTE,
+	PGM_PEER_EXPIRY,
+	PGM_SPMR_EXPIRY,
+	PGM_RXW_SQNS,
+	PGM_RXW_SECS,
+	PGM_RXW_MAX_RTE,
+	PGM_NAK_BO_IVL,
+	PGM_NAK_RPT_IVL,
+	PGM_NAK_RDATA_IVL,
+	PGM_NAK_DATA_RETRIES,
+	PGM_NAK_NCF_RETRIES,
+	PGM_USE_FEC,
+	PGM_USE_CR,
+	PGM_USE_PGMCC,
+	PGM_SEND_ONLY,
+	PGM_RECV_ONLY,
+	PGM_PASSIVE,
+	PGM_ABORT_ON_RESET,
+	PGM_NOBLOCK,
+	PGM_SEND_GROUP,
+	PGM_JOIN_GROUP,
+	PGM_LEAVE_GROUP,
+	PGM_BLOCK_SOURCE,
+	PGM_UNBLOCK_SOURCE,
+	PGM_JOIN_SOURCE_GROUP,
+	PGM_LEAVE_SOURCE_GROUP,
+	PGM_MSFILTER
+};
+
 /* IO status */
 enum {
 	PGM_IO_STATUS_ERROR,		/* an error occurred */
@@ -80,7 +126,7 @@ bool pgm_bind (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, 
 bool pgm_bind2 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct sockaddr*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_close (pgm_sock_t*, bool);
 bool pgm_setsockopt (pgm_sock_t*const, const int, const void*, const socklen_t);
-bool pgm_getsockopt (pgm_sock_t*const, const int, const void*, const socklen_t);
+bool pgm_getsockopt (pgm_sock_t*const, const int, void*, const socklen_t);
 bool pgm_getaddrinfo (const char*restrict, const struct pgm_addrinfo_t*restrict, struct pgm_addrinfo_t**restrict, pgm_error_t**restrict);
 void pgm_freeaddrinfo (struct pgm_addrinfo_t*);
 int pgm_send (pgm_sock_t*const restrict, const void*restrict, const size_t, size_t*restrict);

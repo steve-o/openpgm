@@ -23,7 +23,10 @@
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
-#ifdef _WIN32
+#include <stdlib.h>
+#ifndef _WIN32
+#	include <unistd.h>
+#else
 #	include "getopt.h"
 #endif
 #include <pgm/pgm.h>
@@ -180,10 +183,10 @@ main (
 			on_data (buffer, len, &from);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv);
+			pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, sizeof(tv));
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv);
+			pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, sizeof(tv));
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
@@ -280,7 +283,7 @@ on_startup (void)
 		goto err_abort;
 	}
 
-	sa_family = res->ai_send_addrs[0].gr_group.ss_family;
+	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
 
 	puts ("Create PGM socket.");
 	if (udp_encap_port) {
@@ -309,10 +312,10 @@ on_startup (void)
 		  nak_bo_ivl = pgm_msecs (50),
 		  nak_rpt_ivl = pgm_secs (2),
 		  nak_rdata_ivl = pgm_secs (2),
-		  nak_rdata_ivl = 50,
+		  nak_data_retries = 50,
 		  nak_ncf_retries = 50;
 
-	pgm_setsockopt (sock, PGM_RCV_ONLY, &recv_only, sizeof(recv_only));
+	pgm_setsockopt (sock, PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
 	pgm_setsockopt (sock, PGM_PASSIVE, &passive, sizeof(passive));
 	pgm_setsockopt (sock, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
 	pgm_setsockopt (sock, PGM_RXW_SQNS, &sqns, sizeof(sqns));
@@ -334,7 +337,7 @@ on_startup (void)
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
-	memset (addr, 0, sizeof(addr));
+	memset (&addr, 0, sizeof(addr));
 	addr.sa_port = port;
 	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
 		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
@@ -343,10 +346,11 @@ on_startup (void)
 
 /* assign socket to specified address */
 	if (udp_encap_port) {
-		struct sockaddr_in udpaddr;
-		memset (udpaddr, 0, sizeof(udpaddr));
-		udpaddr.sin_port = udp_encap_port;
-		if (!pgm_bind2 (sock, &addr, sizeof(addr), &udpaddr, sizeof(udpaddr), &pgm_err)) {
+		struct sockaddr_in encapaddr;
+		memset (&encapaddr, 0, sizeof(encapaddr));
+		encapaddr.sin_family = sa_family;
+		encapaddr.sin_port = udp_encap_port;
+		if (!pgm_bind2 (sock, &addr, sizeof(addr), (struct sockaddr*)&encapaddr, sizeof(encapaddr), &pgm_err)) {
 			fprintf (stderr, "Binding PGM/UDP socket: %s\n", pgm_err->message);
 			goto err_abort;
 		}

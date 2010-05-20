@@ -22,16 +22,13 @@
 #ifndef __PGM_IMPL_RECEIVER_H__
 #define __PGM_IMPL_RECEIVER_H__
 
+typedef struct pgm_peer_t pgm_peer_t;
+
 #ifndef _WIN32
 #	include <sys/socket.h>
 #endif
-#include <pgm/framework.h>
-
-typedef struct pgm_peer_t pgm_peer_t;
-
-#include <pgm/tsi.h>
-#include <pgm/rxw.h>
-#include <pgm/socket.h>
+#include <impl/framework.h>
+#include <impl/rxw.h>
 
 PGM_BEGIN_DECLS
 
@@ -134,7 +131,6 @@ PGM_GNUC_INTERNAL bool pgm_on_data (pgm_sock_t*const restrict, pgm_peer_t*const 
 PGM_GNUC_INTERNAL bool pgm_on_ncf (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_spm (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-
 
 PGM_END_DECLS
 

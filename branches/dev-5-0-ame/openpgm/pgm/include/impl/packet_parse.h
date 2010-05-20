@@ -25,9 +25,7 @@
 #ifndef _WIN32
 #	include <sys/socket.h>
 #endif
-#include <pgm/framework.h>
-#include <pgm/packet.h>
-#include <pgm/skbuff.h>
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

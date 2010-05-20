@@ -22,8 +22,13 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
-#ifdef _WIN32
+#ifndef _WIN32
+#	include <fcntl.h>
+#	include <unistd.h>
+#	include <pthread.h>
+#else
 #	include <process.h>
 #endif
 #include <pgm/pgm.h>
@@ -135,20 +140,22 @@ receiver_routine (
 {
 	assert (NULL != arg);
 	async_t* async = (async_t*)arg;
-	assert (NULL != async->transport);
+	assert (NULL != async->sock);
 #ifndef _WIN32
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3;
+	int n_handles = 3, recv_sock, pending_sock;
 	HANDLE waitHandles[ n_handles ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
 
 	recvEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_recv_fd (async->transport), recvEvent, FD_READ);
+	pgm_getsockopt (sock, PGM_RCV_SOCK, &recv_sock, sizeof(recv_sock));
+	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_pending_fd (async->transport), pendingEvent, FD_READ);
+	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
+	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = async->destroy_event;
 	waitHandles[1] = recvEvent;
@@ -161,7 +168,7 @@ receiver_routine (
 		char buffer[4096];
 		size_t len;
 		pgm_tsi_t from;
-		const int status = pgm_recvfrom (async->transport,
+		const int status = pgm_recvfrom (async->sock,
 						 buffer,
 						 sizeof(buffer),
 						 0,
@@ -173,10 +180,10 @@ receiver_routine (
 			on_data (async, buffer, len, &from);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_transport_get_timer_pending (async->transport, &tv);
+			pgm_getsockopt (async->sock, PGM_TIME_REMAIN, &tv, sizeof(tv));
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_transport_get_rate_remaining (async->transport, &tv);
+			pgm_getsockopt (async->sock, PGM_RATE_REMAIN, &tv, sizeof(tv));
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
@@ -184,7 +191,7 @@ block:
 			fds = async->destroy_pipe[0] + 1;
 			FD_ZERO(&readfds);
 			FD_SET(async->destroy_pipe[0], &readfds);
-			pgm_transport_select_info (async->transport, &readfds, NULL, &fds);
+			pgm_select_info (async->sock, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.
@@ -249,26 +256,26 @@ on_data (
 #endif /* _WIN32 */
 }
 
-/* create asynchronous thread handler from bound PGM transport.
+/* create asynchronous thread handler from bound PGM sock.
  *
  * on success, 0 is returned.  on error, -1 is returned, and errno set appropriately.
  */
 
 int
 async_create (
-	async_t**              restrict	async,
-	pgm_transport_t* const restrict	transport
+	async_t**         restrict async,
+	pgm_sock_t* const restrict sock
 	)
 {
 	async_t* new_async;
 
-	if (NULL == async || NULL == transport) {
+	if (NULL == async || NULL == sock) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	new_async = calloc (1, sizeof(async_t));
-	new_async->transport = transport;
+	new_async->sock = sock;
 #ifndef _WIN32
 	int e;
 	e = pthread_mutex_init (&new_async->pthread_mutex, NULL);

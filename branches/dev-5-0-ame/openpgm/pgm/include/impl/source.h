@@ -23,8 +23,7 @@
 #define __PGM_IMPL_SOURCE_H__
 
 #include <impl/framework.h>
-#include <pgm/receiver.h>
-#include <pgm/socket.h>
+#include <impl/receiver.h>
 
 PGM_BEGIN_DECLS
 

@@ -22,12 +22,10 @@
 #ifndef __PGM_IMPL_RXW_H__
 #define __PGM_IMPL_RXW_H__
 
-#include <pgm/framework.h>
-
 typedef struct pgm_rxw_state_t pgm_rxw_state_t;
 typedef struct pgm_rxw_t pgm_rxw_t;
 
-#include <pgm/skbuff.h>
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

@@ -22,6 +22,8 @@
 #ifndef __PGM_LIST_H__
 #define __PGM_LIST_H__
 
+typedef struct pgm_list_t pgm_list_t;
+
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS
@@ -32,8 +34,6 @@ struct pgm_list_t
 	struct pgm_list_t*	next;
 	struct pgm_list_t*	prev;
 };
-
-typedef struct pgm_list_t pgm_list_t;
 
 PGM_END_DECLS
 

@@ -22,7 +22,9 @@
 #ifndef __PGM_IMPL_SQN_LIST_H__
 #define __PGM_IMPL_SQN_LIST_H__
 
-#include <pgm/framework.h>
+struct pgm_sqn_list_t;
+
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

@@ -25,8 +25,7 @@
 #ifndef _WIN32
 #	include <netinet/in.h>
 #endif
-#include <pgm/framework.h>
-#include <pgm/skbuff.h>
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

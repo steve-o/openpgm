@@ -30,6 +30,8 @@
 #ifndef __PGM_IMPL_MD5_H__
 #define __PGM_IMPL_MD5_H__
 
+struct pgm_md5_t;
+
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS

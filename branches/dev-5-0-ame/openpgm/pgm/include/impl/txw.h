@@ -22,15 +22,10 @@
 #ifndef __PGM_IMPL_TXW_H__
 #define __PGM_IMPL_TXW_H__
 
-#include <pgm/types.h>
-
 typedef struct pgm_txw_state_t pgm_txw_state_t;
 typedef struct pgm_txw_t pgm_txw_t;
 
-#include <pgm/queue.h>
-#include <pgm/skbuff.h>
-#include <pgm/tsi.h>
-#include <pgm/reed_solomon.h>
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

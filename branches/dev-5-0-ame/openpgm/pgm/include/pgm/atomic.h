@@ -17,12 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_IMPL_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#	error "Only <framework.h> can be included directly."
-#endif
-
-#ifndef __PGM_IMPL_ATOMIC_H__
-#define __PGM_IMPL_ATOMIC_H__
+#ifndef __PGM_ATOMIC_H__
+#define __PGM_ATOMIC_H__
 
 #ifdef sun
 #	include <atomic.h>
@@ -131,4 +127,4 @@ pgm_atomic_write32 (
 	*atomic = val;
 }
 
-#endif /* __PGM_IMPL_ATOMIC_H__ */
+#endif /* __PGM_ATOMIC_H__ */

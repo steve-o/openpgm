@@ -24,13 +24,21 @@
 
 #define __PGM_IMPL_FRAMEWORK_H_INSIDE__
 
+#include <pgm/atomic.h>
 #include <pgm/error.h>
+#include <pgm/gsi.h>
+#include <pgm/list.h>
 #include <pgm/macros.h>
 #include <pgm/mem.h>
+#include <pgm/messages.h>
 #include <pgm/msgv.h>
+#include <pgm/packet.h>
+#include <pgm/skbuff.h>
+#include <pgm/socket.h>
+#include <pgm/time.h>
+#include <pgm/tsi.h>
 #include <pgm/types.h>
 
-#include <impl/atomic.h>
 #include <impl/checksum.h>
 #include <impl/features.h>
 #include <impl/galois.h>
@@ -59,6 +67,7 @@
 #include <impl/string.h>
 #include <impl/thread.h>
 #include <impl/time.h>
+#include <impl/tsi.h>
 #include <impl/wsastrerror.h>
 
 #undef __PGM_IMPL_FRAMEWORK_H_INSIDE__

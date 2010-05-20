@@ -26,6 +26,8 @@
 #ifndef __PGM_IMPL_NOTIFY_H__
 #define __PGM_IMPL_NOTIFY_H__
 
+typedef struct pgm_notify_t pgm_notify_t;
+
 #ifndef _WIN32
 #	include <fcntl.h>
 #	include <unistd.h>
@@ -36,9 +38,8 @@
 #	include <memory.h>
 #	include <winsock2.h>
 #endif
-
 #include <pgm/types.h>
-#include <pgm/messages.h>
+#include <impl/messages.h>
 
 PGM_BEGIN_DECLS
 
@@ -51,8 +52,6 @@ struct pgm_notify_t {
 	SOCKET s[2];
 #endif /* _WIN32 */
 };
-
-typedef struct pgm_notify_t pgm_notify_t;
 
 #if defined(CONFIG_HAVE_EVENTFD)
 #	define PGM_NOTIFY_INIT		{ -1 }

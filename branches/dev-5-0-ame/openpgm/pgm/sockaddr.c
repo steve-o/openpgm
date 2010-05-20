@@ -24,7 +24,7 @@
 #	include <sys/socket.h>
 #	include <netdb.h>
 #endif
-#include <pgm/framework.h>
+#include <impl/framework.h>
 
 
 /* glibc 2.3 on debian etch doesn't include this */
@@ -235,6 +235,10 @@ pgm_sockaddr_cmp (
 }
 
 /* IP header included with data.
+ *
+ * If no error occurs, pgm_sockaddr_hdrincl returns zero.  Otherwise, a value
+ * of PGM_SOCKET_ERROR is returned, and a specific error code can be retrieved
+ * by calling pgm_sock_errno().
  */
 
 int
@@ -244,7 +248,7 @@ pgm_sockaddr_hdrincl (
 	const bool		v
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -278,6 +282,10 @@ pgm_sockaddr_hdrincl (
 }
 
 /* Return destination IP address.
+ *
+ * If no error occurs, pgm_sockaddr_pktinfo returns zero.  Otherwise, a value
+ * of PGM_SOCKET_ERROR is returned, and a specific error code can be retrieved
+ * by calling pgm_sock_errno().
  */
 
 int
@@ -287,7 +295,7 @@ pgm_sockaddr_pktinfo (
 	const bool		v
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 #ifndef _WIN32
 /* Solaris:ip(7P) "The following options take in_pktinfo_t as the parameter"
  * Completely different, although ip6(7P) is a little better, "The following
@@ -331,6 +339,12 @@ pgm_sockaddr_pktinfo (
 	return retval;
 }
 
+/* Set IP Router Alert option for all outgoing packets.
+ *
+ * If no error occurs, pgm_sockaddr_router_alert returns zero.  Otherwise, a
+ * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * retrieved by calling pgm_sock_errno().
+ */
 
 int
 pgm_sockaddr_router_alert (
@@ -339,11 +353,13 @@ pgm_sockaddr_router_alert (
 	const bool		v
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 #ifdef CONFIG_IP_ROUTER_ALERT
 /* Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
  * true.  Expects an integer flag."
  * Linux:ipv6(7) "Argument is a pointer to an integer."
+ *
+ * NB: Doesn't actually perform as expected, maybe optval should be different?
  */
 	const int optval = v ? 1 : 0;
 
@@ -360,11 +376,13 @@ pgm_sockaddr_router_alert (
 	}
 #else
 #	if defined(CONFIG_HAVE_IPOPTION)
+/* NB: struct ipoption is not very portable and requires a lot of additional headers */
 	const struct ipoption router_alert = {
 		.ipopt_dst  = 0,
 		.ipopt_list = { v ? PGM_IPOPT_RA : 0x00, v ? 0x04 : 0x00, 0x00, 0x00 }
 	};
 #	else
+/* manually set the IP option */
 	const int ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
 	const int router_alert = v ? htonl (ipopt_ra) : 0;
 #	endif
@@ -384,6 +402,10 @@ retval = 0;
 }
 
 /* Type-of-service and precedence.
+ *
+ * If no error occurs, pgm_sockaddr_tos returns zero.  Otherwise, a value of
+ * PGM_SOCKET_ERROR is returned, and a specific error code can be retrieved by
+ * calling pgm_sock_errno().
  */
 
 int
@@ -393,7 +415,7 @@ pgm_sockaddr_tos (
 	const int		tos
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -427,9 +449,13 @@ pgm_sockaddr_tos (
 }
 
 /* Join multicast group.
- * 
- * nb: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
+ * NB: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
+ *
+ * If no error occurs, pgm_sockaddr_join_group returns zero.  Otherwise, a
+ * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * retrieved by calling pgm_sock_errno().
  */
+
 int
 pgm_sockaddr_join_group (
 	const int		s,
@@ -437,7 +463,7 @@ pgm_sockaddr_join_group (
 	const struct group_req*	gr
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."  Presumably with source field zeroed out.
@@ -512,8 +538,11 @@ pgm_sockaddr_join_group (
 }
 
 /* Join source-specific multicast.
+ * NB: Silently reverts to ASM if SSM not supported.
  *
- * nb: Silently revert to ASM if SSM not supported
+ * If no error occurs, pgm_sockaddr_join_source_group returns zero.
+ * Otherwise, a value of PGM_SOCKET_ERROR is returned, and a specific error
+ * code can be retrieved by calling pgm_sock_errno().
  */
 
 int
@@ -523,7 +552,7 @@ pgm_sockaddr_join_source_group (
 	const struct group_source_req*	gsr
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."
@@ -577,6 +606,10 @@ pgm_sockaddr_join_source_group (
 }
 
 /* Specify outgoing interface.
+ *
+ * If no error occurs, pgm_sockaddr_multicast_if returns zero.  Otherwise, a
+ * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * retrieved by calling pgm_sock_errno().
  */
 
 int
@@ -586,7 +619,7 @@ pgm_sockaddr_multicast_if (
 	unsigned		ifindex
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 
 	switch (address->sa_family) {
 	case AF_INET: {
@@ -631,7 +664,12 @@ pgm_sockaddr_multicast_if (
 	return retval;
 }
 
-/* Specify loopback.
+/* Specify multicast loop, other applications on the same host may receive
+ * outgoing packets.  This does not affect unicast packets such as NAKs.
+ *
+ * If no error occurs, pgm_sockaddr_multicast_loop returns zero.  Otherwise, a
+ * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * retrieved by calling pgm_sock_errno().
  */
 
 int
@@ -641,7 +679,7 @@ pgm_sockaddr_multicast_loop (
 	const bool		v
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -688,8 +726,11 @@ pgm_sockaddr_multicast_loop (
 }
 
 /* Specify TTL or outgoing hop limit.
+ * NB: Only affects multicast hops, unicast hop-limit is not changed.
  *
- * nb: Only multicast hops, unicast hop-limit is not changed
+ * If no error occurs, pgm_sockaddr_multicast_hops returns zero.  Otherwise, a
+ * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * retrieved by calling pgm_sock_errno().
  */
 
 int
@@ -699,7 +740,7 @@ pgm_sockaddr_multicast_hops (
 	const unsigned		hops
 	)
 {
-	int retval = -1;
+	int retval = PGM_SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {

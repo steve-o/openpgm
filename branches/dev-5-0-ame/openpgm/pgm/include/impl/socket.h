@@ -22,12 +22,11 @@
 #ifndef __PGM_IMPL_SOCKET_H__
 #define __PGM_IMPL_SOCKET_H__
 
+struct pgm_sock_t;
+
 #include <impl/framework.h>
 #include <impl/txw.h>
 #include <impl/source.h>
-#include <pgm/gsi.h>
-#include <pgm/tsi.h>
-#include <pgm/socket.h>
 
 PGM_BEGIN_DECLS
 
@@ -171,6 +170,8 @@ struct pgm_sock_t {
 /* global variables */
 extern pgm_rwlock_t pgm_sock_list_lock;
 extern pgm_slist_t* pgm_sock_list;
+
+size_t pgm_pkt_offset (bool, bool);
 
 PGM_END_DECLS
 

@@ -27,9 +27,9 @@
 #define __PGM_IMPL_HISTOGRAM_H__
 
 #include <pgm/types.h>
-#include <pgm/slist.h>
-#include <pgm/string.h>
 #include <pgm/time.h>
+#include <impl/slist.h>
+#include <impl/string.h>
 
 PGM_BEGIN_DECLS
 

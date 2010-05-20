@@ -29,11 +29,9 @@
 #	include <netinet/in.h>
 #	include <arpa/inet.h>
 #endif
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
-
-#include "pgm/packet.h"
-#include "pgm/packet_test.h"
+#include <impl/i18n.h>
+#include <impl/framework.h>
+#include <impl/packet_test.h>
 
 
 //#define PACKET_DEBUG
