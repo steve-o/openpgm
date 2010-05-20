@@ -195,7 +195,6 @@ block:
 			FD_ZERO(&readfds);
 			FD_SET(terminate_pipe[0], &readfds);
 			pgm_select_info (sock, &readfds, NULL, &fds);
-puts ("select");
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));

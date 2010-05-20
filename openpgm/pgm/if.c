@@ -30,6 +30,7 @@
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
+#include <pgm/if.h>
 
 
 //#define IF_DEBUG
@@ -449,6 +450,7 @@ parse_interface (
 
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
 		switch (eai) {
+		case 0:
 			if (AF_INET == res->ai_family &&
 			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{

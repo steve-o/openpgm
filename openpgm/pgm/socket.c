@@ -361,7 +361,7 @@ pgm_getsockopt (
 	pgm_return_val_if_fail (sock != NULL, status);
 	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
 		pgm_return_val_if_reached (status);
-	if (PGM_UNLIKELY(!sock->is_bound || sock->is_destroyed)) {
+	if (PGM_UNLIKELY(sock->is_destroyed)) {
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
 	}
@@ -406,6 +406,7 @@ pgm_getsockopt (
 
 
 	}
+	pgm_rwlock_reader_unlock (&sock->lock);
 	return status;
 }
 
