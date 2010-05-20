@@ -26,6 +26,9 @@
 #ifndef __PGM_IMPL_NAMETOINDEX_H__
 #define __PGM_IMPL_NAMETOINDEX_H__
 
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS

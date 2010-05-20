@@ -26,7 +26,7 @@
 #	include <ws2tcpip.h>
 #	include <mswsock.h>
 #endif
-#include <pgm/framework.h>
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

@@ -33,6 +33,7 @@ src = Split("""
 		tsi.c
 		txw.c
 		rxw.c
+		skbuff.c
 		socket.c
 		source.c
 		receiver.c

@@ -22,6 +22,8 @@
 #ifndef __PGM_ERROR_H__
 #define __PGM_ERROR_H__
 
+typedef struct pgm_error_t pgm_error_t;
+
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS
@@ -89,9 +91,6 @@ struct pgm_error_t
 	int		code;
 	char*		message;
 };
-
-typedef struct pgm_error_t pgm_error_t;
-
 
 void pgm_error_free (pgm_error_t*);
 void pgm_set_error (pgm_error_t**restrict, int, int, const char*restrict, ...) PGM_GNUC_PRINTF (4, 5);

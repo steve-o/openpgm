@@ -26,6 +26,8 @@
 #ifndef __PGM_IMPL_STRING_H__
 #define __PGM_IMPL_STRING_H__
 
+typedef struct pgm_string_t pgm_string_t;
+
 #include <stdarg.h>
 #include <pgm/types.h>
 
@@ -36,8 +38,6 @@ struct pgm_string_t {
 	size_t	len;
 	size_t	allocated_len;
 };
-
-typedef struct pgm_string_t pgm_string_t;
 
 PGM_GNUC_INTERNAL char* pgm_strdup (const char*) PGM_GNUC_MALLOC;
 PGM_GNUC_INTERNAL int pgm_printf_string_upper_bound (const char*, va_list) PGM_GNUC_PRINTF(1, 0);

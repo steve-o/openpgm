@@ -27,8 +27,8 @@
 #	define WIN32_LEAN_AND_MEAN
 #	include "windows.h"
 #endif
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
+#include <impl/i18n.h>
+#include <impl/framework.h>
 
 //#define TIME_DEBUG
 

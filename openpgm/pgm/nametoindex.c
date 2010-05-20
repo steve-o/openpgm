@@ -23,8 +23,8 @@
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>
 #endif
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
+#include <impl/i18n.h>
+#include <impl/framework.h>
 
 
 //#define NAMETOINDEX_DEBUG

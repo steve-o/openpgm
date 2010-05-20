@@ -28,9 +28,10 @@
 #	include <netinet/in.h>
 #	include <arpa/inet.h>
 #endif
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
-#include "pgm/net.h"
+#include <impl/i18n.h>
+#include <impl/framework.h>
+#include <impl/net.h>
+#include <impl/socket.h>
 
 
 //#define NET_DEBUG
@@ -55,7 +56,7 @@
 
 ssize_t
 pgm_sendto (
-	pgm_transport_t*		transport,
+	pgm_sock_t*		sock,
 	bool				use_rate_limit,
 	bool				use_router_alert,
 	const void*	       restrict	buf,
@@ -64,7 +65,7 @@ pgm_sendto (
 	socklen_t			tolen
 	)
 {
-	pgm_assert( NULL != transport );
+	pgm_assert( NULL != sock );
 	pgm_assert( NULL != buf );
 	pgm_assert( len > 0 );
 	pgm_assert( NULL != to );
@@ -73,8 +74,8 @@ pgm_sendto (
 #ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_debug ("pgm_sendto (transport:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%d to:%s [toport:%d] tolen:%d)",
-		(gpointer)transport,
+	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%d to:%s [toport:%d] tolen:%d)",
+		(gpointer)sock,
 		use_rate_limit ? "TRUE" : "FALSE",
 		use_router_alert ? "TRUE" : "FALSE",
 		(gpointer)buf,
@@ -84,19 +85,19 @@ pgm_sendto (
 		tolen);
 #endif
 
-	const int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
+	const int send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
 
 	if (use_rate_limit && 
-	    !pgm_rate_check (&transport->rate_control, len, transport->is_nonblocking))
+	    !pgm_rate_check (&sock->rate_control, len, sock->is_nonblocking))
 	{
 		errno = ENOBUFS;
 		return (const ssize_t)-1;
 	}
 
-	if (!use_router_alert && transport->can_send_data)
-		pgm_mutex_lock (&transport->send_mutex);
+	if (!use_router_alert && sock->can_send_data)
+		pgm_mutex_lock (&sock->send_mutex);
 
-	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
+	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 	pgm_debug ("sendto returned %zd", sent);
 	if (	sent < 0 &&
 		errno != ENETUNREACH &&		/* Network is unreachable */
@@ -107,7 +108,7 @@ pgm_sendto (
 #ifdef CONFIG_HAVE_POLL
 /* poll for cleared socket */
 		struct pollfd p = {
-			.fd		= transport->send_sock,
+			.fd		= send_sock,
 			.events		= POLLOUT,
 			.revents	= 0
 		};
@@ -115,7 +116,7 @@ pgm_sendto (
 #else
 		fd_set writefds;
 		FD_ZERO(&writefds);
-		FD_SET(transport->send_sock, &writefds);
+		FD_SET(send_sock, &writefds);
 		struct timeval tv = {
 			.tv_sec  = 0,
 			.tv_usec = 500 /* ms */ * 1000
@@ -124,7 +125,7 @@ pgm_sendto (
 #endif /* CONFIG_HAVE_POLL */
 		if (ready > 0)
 		{
-			sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
+			sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 			if ( sent < 0 )
 			{
 				pgm_warn (_("sendto %s failed: %s"),
@@ -144,8 +145,8 @@ pgm_sendto (
 		}
 	}
 
-	if (!use_router_alert && transport->can_send_data)
-		pgm_mutex_unlock (&transport->send_mutex);
+	if (!use_router_alert && sock->can_send_data)
+		pgm_mutex_unlock (&sock->send_mutex);
 	return sent;
 }
 

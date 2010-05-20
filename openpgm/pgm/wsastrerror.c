@@ -17,8 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
+#include <impl/i18n.h>
+#include <impl/framework.h>
 
 #ifdef _WIN32
 #	include <ws2tcpip.h>

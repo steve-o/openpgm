@@ -22,10 +22,9 @@
 #ifndef __PGM_TSI_H__
 #define __PGM_TSI_H__
 
-#include <pgm/types.h>
-
 typedef struct pgm_tsi_t pgm_tsi_t;
 
+#include <pgm/types.h>
 #include <pgm/gsi.h>
 
 PGM_BEGIN_DECLS

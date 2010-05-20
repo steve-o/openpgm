@@ -22,8 +22,8 @@
 #ifndef __PGM_IMPL_TIMER_H__
 #define __PGM_IMPL_TIMER_H__
 
-#include <pgm/framework.h>
-#include <pgm/socket.h>
+#include <impl/framework.h>
+#include <impl/socket.h>
 
 PGM_BEGIN_DECLS
 

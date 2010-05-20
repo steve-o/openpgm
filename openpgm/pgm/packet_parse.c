@@ -21,11 +21,9 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
-
-#include "pgm/packet.h"
-#include "pgm/packet_parse.h"
+#include <impl/i18n.h>
+#include <impl/framework.h>
+#include <impl/packet_parse.h>
 
 
 //#define PACKET_DEBUG

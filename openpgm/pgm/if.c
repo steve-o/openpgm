@@ -28,8 +28,8 @@
 #	include <sys/socket.h>
 #	include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
 #endif
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
+#include <impl/i18n.h>
+#include <impl/framework.h>
 
 
 //#define IF_DEBUG
@@ -89,7 +89,7 @@ static const char* pgm_family_string (const int) PGM_GNUC_CONST;
 void
 pgm_if_print_all (void)
 {
-	struct pgm_ifaddrs *ifap, *ifa;
+	struct pgm_ifaddrs_t *ifap, *ifa;
 
 	if (!pgm_getifaddrs (&ifap, NULL))
 		return;
@@ -232,7 +232,7 @@ parse_interface (
 	char literal[1024];
 	struct in_addr in_addr;
 	struct in6_addr in6_addr;
-	struct pgm_ifaddrs *ifap, *ifa;
+	struct pgm_ifaddrs_t *ifap, *ifa;
 	struct sockaddr_storage addr;
 	unsigned interface_matches = 0;
 
@@ -1535,22 +1535,22 @@ pgm_getaddrinfo (
 		return FALSE;
 	const size_t recv_list_len = pgm_list_length (recv_list);
 	const size_t send_list_len = pgm_list_length (send_list);
-	ti = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
+	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
-	ti->ti_recv_addrs_len = recv_list_len;
-	ti->ti_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
-	ti->ti_send_addrs_len = send_list_len;
-	ti->ti_send_addrs = (void*)((char*)ai->ti_recv_addrs + recv_list_len * sizeof(struct group_source_req));
+	ai->ai_recv_addrs_len = recv_list_len;
+	ai->ai_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
+	ai->ai_send_addrs_len = send_list_len;
+	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
 			
 	size_t i = 0;
 	while (recv_list) {
-		memcpy (&ti->ti_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
+		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
 		pgm_free (recv_list->data);
 		recv_list = pgm_list_delete_link (recv_list, recv_list);
 	}
 	i = 0;
 	while (send_list) {
-		memcpy (&ti->ti_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
+		memcpy (&ai->ai_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
 		pgm_free (send_list->data);
 		send_list = pgm_list_delete_link (send_list, send_list);
 	}

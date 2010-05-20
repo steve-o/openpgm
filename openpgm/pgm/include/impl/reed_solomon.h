@@ -25,8 +25,10 @@
 #ifndef __PGM_IMPL_REED_SOLOMON_H__
 #define __PGM_IMPL_REED_SOLOMON_H__
 
+typedef struct pgm_rs_t pgm_rs_t;
+
 #include <pgm/types.h>
-#include <pgm/galois.h>
+#include <impl/galois.h>
 
 PGM_BEGIN_DECLS
 
@@ -35,8 +37,6 @@ struct pgm_rs_t {
 	pgm_gf8_t*	GM;
 	pgm_gf8_t*	RM;
 };
-
-typedef struct pgm_rs_t pgm_rs_t;
 
 #define PGM_RS_DEFAULT_N	255
 

@@ -27,7 +27,7 @@
 #define __PGM_IMPL_SN_H__
 
 #include <pgm/types.h>
-#include <pgm/messages.h>
+#include <impl/messages.h>
 
 PGM_BEGIN_DECLS
 

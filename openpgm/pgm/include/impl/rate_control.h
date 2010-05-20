@@ -26,9 +26,11 @@
 #ifndef __PGM_IMPL_RATE_CONTROL_H__
 #define __PGM_IMPL_RATE_CONTROL_H__
 
-#include <pgm/macros.h>
-#include <pgm/thread.h>
+typedef struct pgm_rate_t pgm_rate_t;
+
+#include <pgm/types.h>
 #include <pgm/time.h>
+#include <impl/thread.h>
 
 PGM_BEGIN_DECLS
 
@@ -41,8 +43,6 @@ struct pgm_rate_t {
 	pgm_time_t	last_rate_check;
 	pgm_spinlock_t	spinlock;
 };
-
-typedef struct pgm_rate_t pgm_rate_t;
 
 PGM_GNUC_INTERNAL void pgm_rate_create (pgm_rate_t*, const ssize_t, const size_t, const uint16_t);
 PGM_GNUC_INTERNAL void pgm_rate_destroy (pgm_rate_t*);

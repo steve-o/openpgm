@@ -21,7 +21,10 @@
 
 #include <locale.h>
 #include <stdio.h>
-#ifdef _WIN32
+#include <stdlib.h>
+#ifndef _WIN32
+#	include <unistd.h>
+#else
 #	include "getopt.h"
 #endif
 #include <pgm/pgm.h>
@@ -147,7 +150,7 @@ create_sock (void)
 		goto err_abort;
 	}
 
-	sa_family = res->ai_send_addrs[0].gr_group.ss_family;
+	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
 
 	if (udp_encap_port) {
 		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
@@ -163,7 +166,7 @@ create_sock (void)
 
 /* Use RFC 2113 tagging for PGM Router Assist */
 	const int no_router_assist = 0;
-	pgm_setsockopt (sock, PGM_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+	pgm_setsockopt (sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
 
 	pgm_drop_superuser();
 
@@ -180,12 +183,10 @@ create_sock (void)
 				      pgm_secs  (25),
 				      pgm_secs  (30) };
 
-	pgm_setsockopt (sock, PGM_SND_ONLY, &send_only, sizeof(send_only));
+	pgm_setsockopt (sock, PGM_SEND_ONLY, &send_only, sizeof(send_only));
 	pgm_setsockopt (sock, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
 	pgm_setsockopt (sock, PGM_TXW_SQNS, &sqns, sizeof(sqns));
 	pgm_setsockopt (sock, PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
-	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
 	pgm_setsockopt (sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
 	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
 	if (use_fec) {
@@ -200,20 +201,20 @@ create_sock (void)
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
-	memset (addr, 0, sizeof(addr));
+	memset (&addr, 0, sizeof(addr));
 	addr.sa_port = port;
-	if (!pgm_gsi_create_from_hostname (&addr.sa_addr, &pgm_err)) {
+	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
 		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
 		goto err_abort;
 	}
 
 /* assign socket to specified address */
 	if (udp_encap_port) {
-		struct sockaddr_in udpaddr;
-		memset (udpaddr, 0, sizeof(udpaddr));
-		udpaddr.sin_family = sa_family;
-		udpaddr.sin_port = udp_encap_port;
-		if (!pgm_bind2 (sock, &addr, sizeof(addr), &udpaddr, sizeof(udpaddr), &pgm_err)) {
+		struct sockaddr_in encapaddr;
+		memset (&encapaddr, 0, sizeof(encapaddr));
+		encapaddr.sin_family = sa_family;
+		encapaddr.sin_port = udp_encap_port;
+		if (!pgm_bind2 (sock, &addr, sizeof(addr), (struct sockaddr*)&encapaddr, sizeof(encapaddr), &pgm_err)) {
 			fprintf (stderr, "Binding PGM/UDP socket: %s\n", pgm_err->message);
 			goto err_abort;
 		}

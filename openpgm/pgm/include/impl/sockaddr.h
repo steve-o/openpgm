@@ -44,6 +44,22 @@ PGM_BEGIN_DECLS
 #	define EAFNOSUPPORT		WSAEAFNOSUPPORT
 #endif
 
+#ifndef _WIN32
+#	define PGM_INVALID_SOCKET		-1
+#	define PGM_SOCKET_ERROR			-1
+#	define pgm_closesocket			close
+#	define pgm_sock_errno()			(errno)
+#	define pgm_sock_strerror(e)		strerror(e)
+#	define pgm_error_from_sock_errno	pgm_error_from_errno
+#else
+#	define PGM_INVALID_SOCKET		INVALID_SOCKET
+#	define PGM_SOCKET_ERROR			SOCKET_ERROR
+#	define pgm_closesocket			closesocket
+#	define pgm_sock_errno()			WSAGetLastError()
+#	define pgm_sock_strerror(e)		pgm_wsastrerror(e)
+#	define pgm_error_from_sock_errno	pgm_error_from_wsa_errno
+#endif
+
 PGM_GNUC_INTERNAL sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL uint16_t pgm_sockaddr_port (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL socklen_t pgm_sockaddr_len (const struct sockaddr* sa);

@@ -26,6 +26,8 @@
 #ifndef __PGM_IMPL_SLIST_H__
 #define __PGM_IMPL_SLIST_H__
 
+typedef struct pgm_slist_t pgm_slist_t;
+
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS
@@ -36,8 +38,6 @@ struct pgm_slist_t
 	struct pgm_slist_t* restrict next;
 };
 
-typedef struct pgm_slist_t pgm_slist_t;
-
 PGM_GNUC_INTERNAL pgm_slist_t* pgm_slist_append (pgm_slist_t*restrict, void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL pgm_slist_t* pgm_slist_prepend (pgm_slist_t*restrict, void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL pgm_slist_t* pgm_slist_prepend_link (pgm_slist_t*restrict, pgm_slist_t*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
@@ -46,7 +46,6 @@ PGM_GNUC_INTERNAL pgm_slist_t* pgm_slist_remove_first (pgm_slist_t*) PGM_GNUC_WA
 PGM_GNUC_INTERNAL void pgm_slist_free (pgm_slist_t*);
 PGM_GNUC_INTERNAL pgm_slist_t* pgm_slist_last (pgm_slist_t*) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL unsigned pgm_slist_length (pgm_slist_t*) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-
 
 PGM_END_DECLS
 

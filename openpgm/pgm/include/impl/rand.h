@@ -26,15 +26,15 @@
 #ifndef __PGM_IMPL_RAND_H__
 #define __PGM_IMPL_RAND_H__
 
-#include <pgm/macros.h>
+typedef struct pgm_rand_t pgm_rand_t;
+
+#include <pgm/types.h>
 
 PGM_BEGIN_DECLS
 
 struct pgm_rand_t {
 	uint32_t	seed;
 };
-
-typedef struct pgm_rand_t pgm_rand_t;
 
 PGM_GNUC_INTERNAL void pgm_rand_create (pgm_rand_t*);
 PGM_GNUC_INTERNAL uint32_t pgm_rand_int (pgm_rand_t*);

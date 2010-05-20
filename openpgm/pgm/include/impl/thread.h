@@ -24,6 +24,11 @@
 #ifndef __PGM_IMPL_THREAD_H__
 #define __PGM_IMPL_THREAD_H__
 
+typedef struct pgm_mutex_t pgm_mutex_t;
+typedef struct pgm_spinlock_t pgm_spinlock_t;
+typedef struct pgm_cond_t pgm_cond_t;
+typedef struct pgm_rwlock_t pgm_rwlock_t;
+
 #ifndef _WIN32
 #	include <pthread.h>
 #	include <unistd.h>
@@ -43,8 +48,6 @@ struct pgm_mutex_t {
 #endif /* !_WIN32 */
 };
 
-typedef struct pgm_mutex_t pgm_mutex_t;
-
 struct pgm_spinlock_t {
 #ifndef _WIN32
 	pthread_spinlock_t	pthread_spinlock;
@@ -52,8 +55,6 @@ struct pgm_spinlock_t {
 	CRITICAL_SECTION	win32_spinlock;
 #endif
 };
-
-typedef struct pgm_spinlock_t pgm_spinlock_t;
 
 struct pgm_cond_t {
 #ifndef _WIN32
@@ -67,8 +68,6 @@ struct pgm_cond_t {
 	HANDLE*			phandle;
 #endif /* !_WIN32 */
 };
-
-typedef struct pgm_cond_t pgm_cond_t;
 
 struct pgm_rwlock_t {
 #ifndef _WIN32
@@ -86,8 +85,6 @@ struct pgm_rwlock_t {
 	unsigned		want_to_write;
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 };
-
-typedef struct pgm_rwlock_t pgm_rwlock_t;
 
 PGM_GNUC_INTERNAL void pgm_mutex_init (pgm_mutex_t*);
 PGM_GNUC_INTERNAL void pgm_mutex_free (pgm_mutex_t*);

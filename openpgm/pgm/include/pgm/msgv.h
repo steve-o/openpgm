@@ -22,6 +22,9 @@
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
+struct pgm_iovec;
+struct pgm_msgv_t;
+
 #include <pgm/types.h>
 #include <pgm/packet.h>
 #include <pgm/skbuff.h>

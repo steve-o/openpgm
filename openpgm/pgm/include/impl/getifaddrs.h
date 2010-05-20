@@ -34,6 +34,8 @@
 #	include <winsock2.h>
 #endif
 
+struct pgm_ifaddrs_t;
+
 #include <pgm/types.h>
 #include <pgm/error.h>
 
@@ -49,9 +51,9 @@ PGM_BEGIN_DECLS
 #	endif
 #endif
 
-struct pgm_ifaddrs
+struct pgm_ifaddrs_t
 {
-	struct pgm_ifaddrs*	ifa_next;	/* Pointer to the next structure.  */
+	struct pgm_ifaddrs_t*	ifa_next;	/* Pointer to the next structure.  */
 
 	char*			ifa_name;	/* Name of this network interface.  */
 	unsigned int		ifa_flags;	/* Flags as from SIOCGIFFLAGS ioctl.  */
@@ -63,8 +65,8 @@ struct pgm_ifaddrs
 	struct sockaddr*	ifa_netmask;	/* Netmask of this interface.  */
 };
 
-bool pgm_getifaddrs (struct pgm_ifaddrs**restrict, pgm_error_t**restrict);
-void pgm_freeifaddrs (struct pgm_ifaddrs*);
+bool pgm_getifaddrs (struct pgm_ifaddrs_t**restrict, pgm_error_t**restrict);
+void pgm_freeifaddrs (struct pgm_ifaddrs_t*);
 
 PGM_END_DECLS
 

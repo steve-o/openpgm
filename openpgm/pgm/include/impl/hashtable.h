@@ -53,7 +53,6 @@ PGM_GNUC_INTERNAL pgm_hash_t pgm_str_hash (const void*) PGM_GNUC_WARN_UNUSED_RES
 PGM_GNUC_INTERNAL bool pgm_int_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL pgm_hash_t pgm_int_hash (const void*) PGM_GNUC_WARN_UNUSED_RESULT;
 
-
 PGM_END_DECLS
 
 #endif /* __PGM_IMPL_HASHTABLE_H__ */
