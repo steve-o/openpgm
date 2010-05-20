@@ -290,6 +290,8 @@ create_sock (void)
 			fprintf (stderr, "Creating PGM/UDP socket: %s\n", pgm_err->message);
 			goto err_abort;
 		}
+		pgm_setsockopt (sock, PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		pgm_setsockopt (sock, PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 	} else {
 		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
 			fprintf (stderr, "Creating PGM/IP socket: %s\n", pgm_err->message);
@@ -341,20 +343,9 @@ create_sock (void)
 	}
 
 /* assign socket to specified address */
-	if (udp_encap_port) {
-		struct sockaddr_in encapaddr;
-		memset (&encapaddr, 0, sizeof(encapaddr));
-		encapaddr.sin_family = sa_family;
-		encapaddr.sin_port = udp_encap_port;
-		if (!pgm_bind2 (sock, &addr, sizeof(addr), (struct sockaddr*)&encapaddr, sizeof(encapaddr), &pgm_err)) {
-			fprintf (stderr, "Binding PGM/UDP socket: %s\n", pgm_err->message);
-			goto err_abort;
-		}
-	} else {
-		if (!pgm_bind (sock, &addr, sizeof(addr), &pgm_err)) {
-			fprintf (stderr, "Binding PGM/IP socket: %s\n", pgm_err->message);
-			goto err_abort;
-		}
+	if (!pgm_bind (sock, &addr, sizeof(addr), &pgm_err)) {
+		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
+		goto err_abort;
 	}
 
 /* join IP multicast groups */
@@ -374,10 +365,19 @@ create_sock (void)
 	pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
 	pgm_setsockopt (sock, PGM_NOBLOCK, &blocking, sizeof(blocking));
 
+	if (!pgm_connect (sock, &pgm_err)) {
+		fprintf (stderr, "Connecting PGM socket: %s\n", pgm_err->message);
+		goto err_abort;
+	}
+
 	puts ("Startup complete.");
 	return TRUE;
 
 err_abort:
+	if (NULL != sock) {
+		pgm_close (sock, FALSE);
+		sock = NULL;
+	}
 	if (NULL != res) {
 		pgm_freeaddrinfo (res);
 		res = NULL;

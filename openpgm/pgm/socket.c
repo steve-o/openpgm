@@ -123,7 +123,7 @@ pgm_close (
 
 /* flush source side by sending heartbeat SPMs */
 	if (sock->can_send_data &&
-	    sock->is_bound && 
+	    sock->is_connected && 
 	    flush)
 	{
 		pgm_trace (PGM_LOG_ROLE_TX_WINDOW,_("Flushing PGM source with session finish option broadcast SPMs."));
@@ -251,6 +251,8 @@ pgm_socket (
 	if (IPPROTO_UDP == new_sock->protocol) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Opening UDP encapsulated sockets."));
 		socket_type = SOCK_DGRAM;
+		new_sock->udp_encap_ucast_port = DEFAULT_UDP_ENCAP_UCAST_PORT;
+		new_sock->udp_encap_mcast_port = DEFAULT_UDP_ENCAP_MCAST_PORT;
 	} else {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Opening raw sockets."));
 		socket_type = SOCK_RAW;
@@ -346,16 +348,16 @@ pgm_getsockopt (
 {
 	bool status = FALSE;
 	pgm_return_val_if_fail (sock != NULL, status);
-	if (!pgm_rwlock_reader_trylock (&sock->lock))
+	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
 		pgm_return_val_if_reached (status);
-	if (sock->is_bound || sock->is_destroyed) {
+	if (PGM_UNLIKELY(!sock->is_bound || sock->is_destroyed)) {
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
 	}
 	switch (optname) {
 /* maximum TPDU size */
 	case PGM_MTU:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		*(int*)optval = sock->max_tpdu;
 		status = TRUE;
@@ -363,7 +365,9 @@ pgm_getsockopt (
 
 /* timeout for pending timer */
 	case PGM_TIME_REMAIN:
-		if (optlen != sizeof (struct timeval))
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(optlen != sizeof (struct timeval)))
 			break;
 		{
 			struct timeval* tv = optval;
@@ -376,7 +380,9 @@ pgm_getsockopt (
 
 /* timeout for blocking sends */
 	case PGM_RATE_REMAIN:
-		if (optlen != sizeof (struct timeval))
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(optlen != sizeof (struct timeval)))
 			break;
 		{
 			struct timeval* tv = optval;
@@ -402,9 +408,9 @@ pgm_setsockopt (
 {
 	bool status = FALSE;
 	pgm_return_val_if_fail (sock != NULL, status);
-	if (!pgm_rwlock_reader_trylock (&sock->lock))
+	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
 		pgm_return_val_if_reached (status);
-	if (sock->is_bound || sock->is_destroyed) {
+	if (PGM_UNLIKELY(sock->is_connected || sock->is_destroyed)) {
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
 	}
@@ -413,7 +419,7 @@ pgm_setsockopt (
 /* RFC2113 IP Router Alert 
  */
 	case PGM_IP_ROUTER_ALERT:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		{
 			const bool v = (0 != *(const int*)optval);
@@ -427,11 +433,11 @@ pgm_setsockopt (
  * IPv6: 1280 <= tpdu < 65536		(RFC 2460)
  */
 	case PGM_MTU:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval < (sizeof(struct pgm_ip) + sizeof(struct pgm_header)))
+		if (PGM_UNLIKELY(*(const int*)optval < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))))
 			break;
-		if (*(const int*)optval > UINT16_MAX)
+		if (PGM_UNLIKELY(*(const int*)optval > UINT16_MAX))
 			break;
 		sock->max_tpdu = *(const int*)optval;
 		status = TRUE;
@@ -441,7 +447,7 @@ pgm_setsockopt (
  * 0 = default, to disable.
  */
 	case PGM_MULTICAST_LOOP:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		{
 			const bool v = (0 != *(const int*)optval);
@@ -461,11 +467,11 @@ pgm_setsockopt (
  */
 	case PGM_MULTICAST_HOPS:
 #ifndef CONFIG_TARGET_WINE
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (*(const int*)optval > UINT8_MAX)
+		if (PGM_UNLIKELY(*(const int*)optval > UINT8_MAX))
 			break;
 		{
 			const unsigned hops = *(const int*)optval;
@@ -480,7 +486,7 @@ pgm_setsockopt (
 /* IP Type of Service (ToS) or RFC 3246, differentiated services (DSCP)
  */
 	case PGM_TOS:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		if (PGM_SOCKET_ERROR == pgm_sockaddr_tos (sock->send_sock, sock->family, *(const int*)optval) ||
 		    PGM_SOCKET_ERROR == pgm_sockaddr_tos (sock->send_with_router_alert_sock, sock->family, *(const int*)optval))
@@ -515,9 +521,9 @@ pgm_setsockopt (
 /* periodic ambient broadcast SPM interval in milliseconds.
  */
 	case PGM_AMBIENT_SPM:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->spm_ambient_interval = *(const int*)optval;
 		status = TRUE;
@@ -526,7 +532,7 @@ pgm_setsockopt (
 /* sequence of heartbeat broadcast SPMS to flush out original 
  */
 	case PGM_HEARTBEAT_SPM:
-		if (0 != optlen % sizeof (int))
+		if (PGM_UNLIKELY(0 != optlen % sizeof (int)))
 			break;
 		{
 			sock->spm_heartbeat_len = optlen / sizeof (int);
@@ -542,11 +548,11 @@ pgm_setsockopt (
  * 0 < txw_sqns < one less than half sequence space
  */
 	case PGM_TXW_SQNS:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (*(const int*)optval >= ((UINT32_MAX/2)-1))
+		if (PGM_UNLIKELY(*(const int*)optval >= ((UINT32_MAX/2)-1)))
 			break;
 		sock->txw_sqns = *(const int*)optval;
 		status = TRUE;
@@ -556,9 +562,9 @@ pgm_setsockopt (
  * 0 < secs < ( txw_sqns / txw_max_rte )
  */
 	case PGM_TXW_SECS:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->txw_secs = *(const int*)optval;
 		status = TRUE;
@@ -571,9 +577,9 @@ pgm_setsockopt (
  *   1gb : 125000000
  */
 	case PGM_TXW_MAX_RTE:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->txw_max_rte = *(const int*)optval;
 		status = TRUE;
@@ -583,9 +589,9 @@ pgm_setsockopt (
  * 0 < 2 * spm_ambient_interval <= peer_expiry
  */
 	case PGM_PEER_EXPIRY:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->peer_expiry = *(const int*)optval;
 		status = TRUE;
@@ -595,9 +601,9 @@ pgm_setsockopt (
  * 0 < spmr_expiry < spm_ambient_interval
  */
 	case PGM_SPMR_EXPIRY:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->spmr_expiry = *(const int*)optval;
 		status = TRUE;
@@ -606,11 +612,11 @@ pgm_setsockopt (
  * 0 < rxw_sqns < one less than half sequence space
  */
 	case PGM_RXW_SQNS:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (*(const int*)optval >= ((UINT32_MAX/2)-1))
+		if (PGM_UNLIKELY(*(const int*)optval >= ((UINT32_MAX/2)-1)))
 			break;
 		sock->rxw_sqns = *(const int*)optval;
 		status = TRUE;
@@ -620,9 +626,9 @@ pgm_setsockopt (
  * 0 < secs < ( rxw_sqns / rxw_max_rte )
  */
 	case PGM_RXW_SECS:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->rxw_secs = *(const int*)optval;
 		status = TRUE;
@@ -632,9 +638,9 @@ pgm_setsockopt (
  * 0 < rxw_max_rte < interface capacity
  */
 	case PGM_RXW_MAX_RTE:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->rxw_max_rte = *(const int*)optval;
 		status = TRUE;
@@ -644,9 +650,9 @@ pgm_setsockopt (
  * 0 < nak_rb_ivl <= nak_bo_ivl
  */
 	case PGM_NAK_BO_IVL:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->nak_bo_ivl = *(const int*)optval;
 		status = TRUE;
@@ -655,9 +661,9 @@ pgm_setsockopt (
 /* repeat interval prior to re-sending a NAK, in milliseconds.
  */
 	case PGM_NAK_RPT_IVL:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->nak_rpt_ivl = *(const int*)optval;
 		status = TRUE;
@@ -666,9 +672,9 @@ pgm_setsockopt (
 /* interval waiting for repair data, in milliseconds.
  */
 	case PGM_NAK_RDATA_IVL:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->nak_rdata_ivl = *(const int*)optval;
 		status = TRUE;
@@ -678,11 +684,11 @@ pgm_setsockopt (
  * 0 < nak_data_retries < 256
  */
 	case PGM_NAK_DATA_RETRIES:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (*(const int*)optval > UINT8_MAX)
+		if (PGM_UNLIKELY(*(const int*)optval > UINT8_MAX))
 			break;
 		sock->nak_data_retries = *(const int*)optval;
 		status = TRUE;
@@ -692,11 +698,11 @@ pgm_setsockopt (
  * 0 < nak_ncf_retries < 256
  */
 	case PGM_NAK_NCF_RETRIES:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (*(const int*)optval > UINT8_MAX)
+		if (PGM_UNLIKELY(*(const int*)optval > UINT8_MAX))
 			break;
 		sock->nak_ncf_retries = *(const int*)optval;
 		status = TRUE;
@@ -718,22 +724,22 @@ pgm_setsockopt (
  * when h > k parity packets can be lost.
  */
 	case PGM_USE_FEC:
-		if (optlen != sizeof (struct pgm_fecinfo_t))
+		if (PGM_UNLIKELY(optlen != sizeof (struct pgm_fecinfo_t)))
 			break;
 		{
 			const struct pgm_fecinfo_t* fecinfo = optval;
-			if (0 != (fecinfo->group_size & (fecinfo->group_size - 1)))
+			if (PGM_UNLIKELY(0 != (fecinfo->group_size & (fecinfo->group_size - 1))))
 				break;
-			if (fecinfo->group_size < 2 || fecinfo->group_size > 128)
+			if (PGM_UNLIKELY(fecinfo->group_size < 2 || fecinfo->group_size > 128))
 				break;
-			if ((fecinfo->group_size + 1) < fecinfo->block_size)
+			if (PGM_UNLIKELY((fecinfo->group_size + 1) < fecinfo->block_size))
 				break;
 			const uint8_t parity_packets = fecinfo->block_size - fecinfo->group_size;
 /* technically could re-send previous packets */
-			if (fecinfo->proactive_packets > parity_packets)
+			if (PGM_UNLIKELY(fecinfo->proactive_packets > parity_packets))
 				break;
 /* check validity of parameters */
-			if (fecinfo->group_size > 223 && ((parity_packets * 223.0) / fecinfo->group_size) < 1.0)
+			if (PGM_UNLIKELY(fecinfo->group_size > 223 && ((parity_packets * 223.0) / fecinfo->group_size) < 1.0))
 			{
 				pgm_error (_("k/h ratio too low to generate parity data."));
 				break;
@@ -749,9 +755,9 @@ pgm_setsockopt (
 
 /* congestion reporting */
 	case PGM_USE_CR:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->crqst_ivl = pgm_msecs (*(const int*)optval);
 		sock->use_cr    = (sock->crqst_ivl > 0);
@@ -760,9 +766,9 @@ pgm_setsockopt (
 
 /* congestion control */
 	case PGM_USE_PGMCC:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (*(const int*)optval <= 0)
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->acker_ivl = pgm_msecs (*(const int*)optval);
 		sock->use_pgmcc = (sock->acker_ivl > 0);
@@ -773,7 +779,7 @@ pgm_setsockopt (
  * RDATA, etc, packets.
  */
 	case PGM_SEND_ONLY:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		sock->can_recv_data = (0 == *(const int*)optval);
 		status = TRUE;
@@ -783,7 +789,7 @@ pgm_setsockopt (
  * and no SPM broadcasts sent.
  */
 	case PGM_RECV_ONLY:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		sock->can_send_data = (0 == *(const int*)optval);
 		status = TRUE;
@@ -792,7 +798,7 @@ pgm_setsockopt (
 /* passive receiving socket, i.e. no back channel to source
  */
 	case PGM_PASSIVE:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		sock->can_send_nak = (0 == *(const int*)optval);
 		status = TRUE;
@@ -802,7 +808,7 @@ pgm_setsockopt (
  * receiving.
  */
 	case PGM_ABORT_ON_RESET:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		sock->is_abort_on_reset = (0 != *(const int*)optval);
 		status = TRUE;
@@ -811,7 +817,7 @@ pgm_setsockopt (
 /* default non-blocking operation on send and receive sockets.
  */
 	case PGM_NOBLOCK:
-		if (optlen != sizeof (int))
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		sock->is_nonblocking = (0 != *(const int*)optval);
 		pgm_sockaddr_nonblocking (sock->recv_sock, sock->is_nonblocking);
@@ -823,12 +829,26 @@ pgm_setsockopt (
 #define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((struct sockaddr*)(sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
 #define SOCK_TO_LEVEL(s)	( (AF_INET == (s)->recv_gsr[0].gsr_group.ss_family) ? IPPROTO_IP : IPPROTO_IPV6 )
 
+/* sending group, singular.
+ */
+	case PGM_SEND_GROUP:
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_req))))
+			break;
+		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
+			break;
+		{
+			memcpy (&sock->send_gsr, optval, optlen);
+			((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+		}
+		status = TRUE;
+		break;
+
 /* for any-source applications (ASM), join a new group
  */
 	case PGM_JOIN_GROUP:
-		if (optlen != sizeof (sizeof(struct group_req)))
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_req))))
 			break;
-		if (sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
+		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
 		{
 			const struct group_req* gr = optval;
@@ -865,9 +885,9 @@ pgm_setsockopt (
 /* for any-source applications (ASM), leave a joined group.
  */
 	case PGM_LEAVE_GROUP:
-		if (optlen != sizeof (sizeof(struct group_req)))
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_req))))
 			break;
-		if (0 == sock->recv_gsr_len)
+		if (PGM_UNLIKELY(0 == sock->recv_gsr_len))
 			break;
 		{
 			const struct group_req* gr = optval;
@@ -897,7 +917,7 @@ pgm_setsockopt (
 /* for any-source applications (ASM), turn off a given source
  */
 	case PGM_BLOCK_SOURCE:
-		if (optlen != sizeof (sizeof(struct group_source_req)))
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
 			break;
 		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_BLOCK_SOURCE, (const char*)optval, optlen))
 			break;
@@ -907,7 +927,7 @@ pgm_setsockopt (
 /* for any-source applications (ASM), re-allow a blocked source
  */
 	case PGM_UNBLOCK_SOURCE:
-		if (optlen != sizeof (sizeof(struct group_source_req)))
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
 			break;
 		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_UNBLOCK_SOURCE, (const char*)optval, optlen))
 			break;
@@ -919,9 +939,9 @@ pgm_setsockopt (
  * SSM joins are allowed on top of ASM in order to merge a remote source onto the local segment.
  */
 	case PGM_JOIN_SOURCE_GROUP:
-		if (optlen != sizeof (sizeof(struct group_source_req)))
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
 			break;
-		if (sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS)
+		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
 		{
 			const struct group_source_req* gsr = optval;
@@ -962,9 +982,9 @@ pgm_setsockopt (
 /* for controlled-source applications (SSM), leave each group/source pair
  */
 	case PGM_LEAVE_SOURCE_GROUP:
-		if (optlen != sizeof (sizeof(struct group_source_req)))
+		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
 			break;
-		if (0 == sock->recv_gsr_len)
+		if (PGM_UNLIKELY(0 == sock->recv_gsr_len))
 			break;
 		{
 			const struct group_source_req* gsr = optval;
@@ -992,7 +1012,7 @@ pgm_setsockopt (
 /* batch block and unblock sources */
 	case PGM_MSFILTER:
 #if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
-		if (optlen < sizeof(struct group_filter))
+		if (PGM_UNLIKELY(optlen < sizeof(struct group_filter)))
 			break;
 		{
 			const struct group_filter* gf_list = optval;
@@ -1010,6 +1030,21 @@ pgm_setsockopt (
 #endif
 		break;
 
+/* UDP encapsulation ports */
+	case PGM_UDP_ENCAP_UCAST_PORT:
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		sock->udp_encap_ucast_port = (0 == *(const int*)optval);
+		status = TRUE;
+		break;
+
+	case PGM_UDP_ENCAP_MCAST_PORT:
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		sock->udp_encap_mcast_port = (0 == *(const int*)optval);
+		status = TRUE;
+		break;
+
 	}
 
 	pgm_rwlock_reader_unlock (&sock->lock);
@@ -1024,7 +1059,10 @@ pgm_bind (
 	pgm_error_t**	                  restrict error
 	)
 {
-	return pgm_bind2 (sock, sockaddr, sockaddrlen, NULL, 0, error);
+	struct group_req null_req;
+	memset (&null_req, 0, sizeof(null_req));
+	null_req.gr_group.ss_family = sock->family;
+	return pgm_bind3 (sock, sockaddr, sockaddrlen, &null_req, sizeof(null_req), &null_req, sizeof(null_req), error);
 }
 
 /* bind the sockets to the link layer to start receiving data.
@@ -1033,12 +1071,14 @@ pgm_bind (
  */
 
 bool
-pgm_bind2 (
+pgm_bind3 (
 	pgm_sock_t*		      restrict sock,
 	const struct pgm_sockaddr_t*  restrict sockaddr,
 	const socklen_t			       sockaddrlen,
-	const struct sockaddr*	      restrict encapaddr,		/* maybe NULL */
-	const socklen_t			       encapaddrlen,
+	const struct group_req*	      restrict send_req,		/* only use gr_interface and gr_group::sin6_scope */
+	const socklen_t			       send_req_len,
+	const struct group_req*	      restrict recv_req,
+	const socklen_t			       recv_req_len,
 	pgm_error_t**		      restrict error			/* maybe NULL */
 	)
 {
@@ -1046,13 +1086,10 @@ pgm_bind2 (
 	pgm_return_val_if_fail (NULL != sockaddr, FALSE);
 	pgm_return_val_if_fail (0 != sockaddrlen, FALSE);
 	if (sockaddr->sa_addr.sport) pgm_return_val_if_fail (sockaddr->sa_addr.sport != sockaddr->sa_port, FALSE);
-	if (encapaddrlen) {
-		struct sockaddr_in addr;
-		pgm_return_val_if_fail (NULL != encapaddr, FALSE);
-		pgm_return_val_if_fail (encapaddrlen >= sizeof(addr), FALSE);
-		memcpy (&addr, encapaddr, sizeof(addr));
-		pgm_return_val_if_fail (0 != addr.sin_port, FALSE);
-	}
+	pgm_return_val_if_fail (NULL != send_req, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_req) == send_req_len, FALSE);
+	pgm_return_val_if_fail (NULL != recv_req, FALSE);
+	pgm_return_val_if_fail (sizeof(struct group_req) == recv_req_len, FALSE);
 
 	if (!pgm_rwlock_writer_trylock (&sock->lock))
 		pgm_return_val_if_reached (FALSE);
@@ -1068,7 +1105,7 @@ pgm_bind2 (
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       PGM_ERROR_FAILED,
-			       _("Maximum TPDU invalid."));
+			       _("Invalid maximum TPDU size."));
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
@@ -1195,10 +1232,8 @@ pgm_bind2 (
 	}
 
 /* UDP encapsulation port */
-	if (encapaddrlen) {
-		struct sockaddr_in addr;
-		memcpy (&addr, encapaddr, sizeof(addr));
-		sock->udp_encap_ucast_port = sock->udp_encap_mcast_port = addr.sin_port;
+	if (sock->udp_encap_mcast_port) {
+		((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
 	}
 
 /* pseudo-random number generator for back-off intervals */
@@ -1305,7 +1340,7 @@ pgm_bind2 (
 /* request extra packet information to determine destination address on each packet */
 #ifndef CONFIG_TARGET_WINE
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
-		const sa_family_t recv_family = sock->recv_gsr[0].gsr_group.ss_family;
+		const sa_family_t recv_family = sock->family;
 		if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (sock->recv_sock, recv_family, TRUE))
 		{
 			const int save_errno = pgm_sock_errno();
@@ -1321,7 +1356,7 @@ pgm_bind2 (
 	}
 	else
 	{
-		const sa_family_t recv_family = sock->recv_gsr[0].gsr_group.ss_family;
+		const sa_family_t recv_family = sock->family;
 		if (AF_INET == recv_family)
 		{
 /* include IP header only for incoming data, only works for IPv4 */
@@ -1380,7 +1415,7 @@ pgm_bind2 (
 /* force default interface for bind-only, source address is still valid for multicast membership.
  * effectively same as running getaddrinfo(hints = {ai_flags = AI_PASSIVE})
  */
-	if (AF_INET == sock->recv_gsr[0].gsr_group.ss_family) {
+	if (AF_INET == sock->family) {
 		memset (&recv_addr.s4, 0, sizeof(struct sockaddr_in));
 		recv_addr.s4.sin_family = AF_INET;
 		recv_addr.s4.sin_addr.s_addr = INADDR_ANY;
@@ -1391,16 +1426,16 @@ pgm_bind2 (
 	}
 	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY."));
 #else
-	if (!_pgm_indextoaddr (sock->recv_gsr[0].gsr_interface,
-			       sock->recv_gsr[0].gsr_group.ss_family,
-			       pgm_sockaddr_scope_id ((struct sockaddr*)&sock->recv_gsr[0].gsr_group),
+	if (!_pgm_indextoaddr (recv_req.gr_interface,
+			       sock->ss_family,
+			       pgm_sockaddr_scope_id (&recv_req.gr_group),
 			       &recv_addr.sa,
 			       error))
 	{
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %d"), sock->recv_gsr[0].gsr_interface);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %d"), recv_req.gr_interface);
 
 #endif /* CONFIG_BIND_INADDR_ANY */
 
@@ -1433,9 +1468,9 @@ pgm_bind2 (
 /* keep a copy of the original address source to re-use for router alert bind */
 	memset (&send_addr, 0, sizeof(send_addr));
 
-	if (!pgm_if_indextoaddr (sock->send_gsr.gsr_interface,
-				 sock->send_gsr.gsr_group.ss_family,
-				 pgm_sockaddr_scope_id ((struct sockaddr*)&sock->send_gsr.gsr_group),
+	if (!pgm_if_indextoaddr (send_req->gr_interface,
+				 sock->family,
+				 pgm_sockaddr_scope_id ((struct sockaddr*)&send_req->gr_group),
 				 (struct sockaddr*)&send_addr,
 				 error))
 	{
@@ -1444,7 +1479,7 @@ pgm_bind2 (
 	}
 	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u"), sock->send_gsr.gsr_interface);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u"), send_req->gr_interface);
 	}
 
 	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
@@ -1536,7 +1571,52 @@ pgm_bind2 (
 			sock->is_controlled_odata = FALSE;
 			sock->is_controlled_rdata = FALSE;
 		}
+	}
 
+/* allocate first incoming packet buffer */
+	sock->rx_buffer = pgm_alloc_skb (sock->max_tpdu);
+
+/* bind complete */
+	sock->is_bound = TRUE;
+
+/* cleanup */
+	pgm_rwlock_writer_unlock (&sock->lock);
+	pgm_debug ("PGM socket successfully created.");
+	return TRUE;
+}
+
+bool
+pgm_connect (
+	pgm_sock_t*   restrict sock,
+	pgm_error_t** restrict error	/* maybe NULL */
+	)
+{
+	pgm_return_val_if_fail (sock != NULL, FALSE);
+	pgm_return_val_if_fail (sock->recv_gsr_len > 0, FALSE);
+#ifdef CONFIG_TARGET_WINE
+	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
+#endif
+	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
+	{
+		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
+		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[i].gsr_source.ss_family, FALSE);
+	}
+	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->send_gsr.gsr_source.ss_family, FALSE);
+/* shutdown */
+	if (PGM_UNLIKELY(!pgm_rwlock_writer_trylock (&sock->lock)))
+		pgm_return_val_if_reached (FALSE);
+/* state */
+	if (PGM_UNLIKELY(sock->is_connected || !sock->is_bound || sock->is_destroyed)) {
+		pgm_rwlock_writer_unlock (&sock->lock);
+		pgm_return_val_if_reached (FALSE);
+	}
+
+	pgm_debug ("connect (sock:%p error:%p)",
+		 (const void*)sock, (const void*)error);
+
+/* rx to nak processor notify channel */
+	if (sock->can_send_data)
+	{
 /* announce new sock by sending out SPMs */
 		if (!pgm_send_spm (sock, PGM_OPT_SYN) ||
 		    !pgm_send_spm (sock, PGM_OPT_SYN) ||
@@ -1560,16 +1640,11 @@ pgm_bind2 (
 		sock->next_poll = pgm_time_update_now() + pgm_secs( 30 );
 	}
 
-/* allocate first incoming packet buffer */
-	sock->rx_buffer = pgm_alloc_skb (sock->max_tpdu);
+	sock->is_connected = TRUE;
 
 /* cleanup */
-	pgm_debug ("preparing dynamic timer");
-	pgm_timer_prepare (sock);
-
-	sock->is_bound = TRUE;
 	pgm_rwlock_writer_unlock (&sock->lock);
-	pgm_debug ("PGM socket successfully created.");
+	pgm_debug ("PGM socket successfully connected.");
 	return TRUE;
 }
 
