@@ -52,6 +52,7 @@ struct pgm_sock_t {
 	pgm_mutex_t			timer_mutex;			/* next timer expiration */
 
 	bool				is_bound;
+	bool				is_connected;
 	bool				is_destroyed;
 	bool	            		is_reset;
 	bool				is_abort_on_reset;

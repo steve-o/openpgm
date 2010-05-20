@@ -664,8 +664,7 @@ pgm_recvmsgv (
 		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
-	if (PGM_UNLIKELY(!sock->is_bound ||
-	    sock->is_destroyed))
+	if (PGM_UNLIKELY(!sock->is_bound || sock->is_destroyed))
 	{
 		pgm_rwlock_reader_unlock (&sock->lock);
 		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);

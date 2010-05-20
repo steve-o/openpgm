@@ -106,7 +106,9 @@ enum {
 	PGM_UNBLOCK_SOURCE,
 	PGM_JOIN_SOURCE_GROUP,
 	PGM_LEAVE_SOURCE_GROUP,
-	PGM_MSFILTER
+	PGM_MSFILTER,
+	PGM_UDP_ENCAP_UCAST_PORT,
+	PGM_UDP_ENCAP_MCAST_PORT
 };
 
 /* IO status */
@@ -123,7 +125,8 @@ enum {
 
 bool pgm_socket (pgm_sock_t**restrict, const sa_family_t, const int, const int, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_bind (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_bind2 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct sockaddr*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_bind3 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct group_req*const restrict, const socklen_t, const struct group_req*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_connect (pgm_sock_t*, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_close (pgm_sock_t*, bool);
 bool pgm_setsockopt (pgm_sock_t*const, const int, const void*, const socklen_t);
 bool pgm_getsockopt (pgm_sock_t*const, const int, void*, const socklen_t);
