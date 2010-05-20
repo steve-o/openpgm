@@ -374,6 +374,36 @@ pgm_getsockopt (
 		status = TRUE;
 		break;
 
+/* receive socket */
+	case PGM_RECV_SOCK:
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		*(int*)optval = sock->recv_sock;
+		status = TRUE;
+		break;
+
+/* repair socket */
+	case PGM_REPAIR_SOCK:
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		*(int*)optval = pgm_notify_get_fd (&sock->rdata_notify);
+		status = TRUE;
+		break;
+
+/* pending socket */
+	case PGM_PENDING_SOCK:
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		*(int*)optval = pgm_notify_get_fd (&sock->pending_notify);
+		status = TRUE;
+		break;
+
 /* timeout for pending timer */
 	case PGM_TIME_REMAIN:
 		if (PGM_UNLIKELY(!sock->is_connected))

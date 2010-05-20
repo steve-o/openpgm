@@ -50,7 +50,7 @@ _pgm_heap_alloc (
 static inline
 void
 _pgm_heap_free (
-	const void*	mem
+	void*		mem
 	)
 {
 #       ifdef CONFIG_USE_HEAPALLOC
