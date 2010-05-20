@@ -22,9 +22,11 @@
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
+#ifndef _WIN32
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#endif
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS

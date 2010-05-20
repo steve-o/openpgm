@@ -67,6 +67,9 @@ struct pgm_fecinfo_t {
 
 /* socket options */
 enum {
+	PGM_RECV_SOCK,
+	PGM_REPAIR_SOCK,
+	PGM_PENDING_SOCK,
 	PGM_TIME_REMAIN,
 	PGM_RATE_REMAIN,
 	PGM_IP_ROUTER_ALERT,
