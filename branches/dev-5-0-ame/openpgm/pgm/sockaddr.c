@@ -27,10 +27,6 @@
 #include <impl/framework.h>
 
 
-/* glibc 2.3 on debian etch doesn't include this */
-#ifndef IPV6_RECVPKTINFO
-#	define IPV6_RECVPKTINFO		49
-#endif
 /* FreeBSD */
 #ifndef IPV6_ADD_MEMBERSHIP
 #	define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
@@ -327,7 +323,7 @@ pgm_sockaddr_pktinfo (
 		break;
 
 	case AF_INET6:
-#ifndef IPV6_PKTINFO
+#ifdef IPV6_RECVPKTINFO
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const char*)&optval, sizeof(optval));
 #else
 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_PKTINFO, (const char*)&optval, sizeof(optval));
