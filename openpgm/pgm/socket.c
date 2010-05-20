@@ -53,6 +53,11 @@ pgm_rwlock_t pgm_sock_list_lock;		/* list of all sockets for admin interfaces */
 pgm_slist_t* pgm_sock_list = NULL;
 
 
+static const char* pgm_family_string (const int) PGM_GNUC_CONST;
+static const char* pgm_sock_type_string (const int) PGM_GNUC_CONST;
+static const char* pgm_protocol_string (const int) PGM_GNUC_CONST;
+
+
 size_t
 pgm_pkt_offset (
 	bool		can_fragment,
@@ -211,7 +216,7 @@ bool
 pgm_socket (
 	pgm_sock_t**	     restrict sock,
 	const sa_family_t	      family,		/* communications domain */
-	const int		      pgm_type,
+	const int		      pgm_sock_type,
 	const int		      protocol,
 	pgm_error_t**	     restrict error
 	)
@@ -220,16 +225,21 @@ pgm_socket (
 
 	pgm_return_val_if_fail (NULL != sock, FALSE);
 	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family, FALSE);
-	pgm_return_val_if_fail (SOCK_SEQPACKET == pgm_type, FALSE);
+	pgm_return_val_if_fail (SOCK_SEQPACKET == pgm_sock_type, FALSE);
 	pgm_return_val_if_fail (IPPROTO_UDP == protocol || IPPROTO_PGM == protocol, FALSE);
+
+	pgm_debug ("socket (sock:%p family:%s sock-type:%s protocol:%s error:%p)",
+		 (const void*)sock, pgm_family_string(family), pgm_sock_type_string(pgm_sock_type), pgm_protocol_string(protocol), (const void*)error);
 
 	new_sock = pgm_new0 (pgm_sock_t, 1);
 	new_sock->family	= family;
-	new_sock->socket_type	= pgm_type;
+	new_sock->socket_type	= pgm_sock_type;
 	new_sock->protocol	= protocol;
 	new_sock->can_send_data = TRUE;
 	new_sock->can_send_nak  = TRUE;
 	new_sock->can_recv_data = TRUE;
+	new_sock->dport		= DEFAULT_DATA_DESTINATION_PORT;
+	new_sock->tsi.sport	= DEFAULT_DATA_SOURCE_PORT;
 
 /* source-side */
 	pgm_mutex_init (&new_sock->source_mutex);
@@ -307,6 +317,7 @@ pgm_socket (
 	pgm_rwlock_writer_lock (&pgm_sock_list_lock);
 	pgm_sock_list = pgm_slist_append (pgm_sock_list, *sock);
 	pgm_rwlock_writer_unlock (&pgm_sock_list_lock);
+	pgm_debug ("PGM socket successfully created.");
 	return TRUE;
 
 err_destroy:
@@ -827,26 +838,22 @@ pgm_setsockopt (
 		break;
 
 #define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((struct sockaddr*)(sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
-#define SOCK_TO_LEVEL(s)	( (AF_INET == (s)->recv_gsr[0].gsr_group.ss_family) ? IPPROTO_IP : IPPROTO_IPV6 )
+#define SOCK_TO_LEVEL(s)	( (AF_INET == (s)->family) ? IPPROTO_IP : IPPROTO_IPV6 )
 
 /* sending group, singular.
  */
 	case PGM_SEND_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
 			break;
-		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
-			break;
-		{
-			memcpy (&sock->send_gsr, optval, optlen);
-			((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
-		}
+		memcpy (&sock->send_gsr, optval, optlen);
+		((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
 		status = TRUE;
 		break;
 
 /* for any-source applications (ASM), join a new group
  */
 	case PGM_JOIN_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
 			break;
 		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
@@ -885,7 +892,7 @@ pgm_setsockopt (
 /* for any-source applications (ASM), leave a joined group.
  */
 	case PGM_LEAVE_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
 			break;
 		if (PGM_UNLIKELY(0 == sock->recv_gsr_len))
 			break;
@@ -917,7 +924,7 @@ pgm_setsockopt (
 /* for any-source applications (ASM), turn off a given source
  */
 	case PGM_BLOCK_SOURCE:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_source_req)))
 			break;
 		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_BLOCK_SOURCE, (const char*)optval, optlen))
 			break;
@@ -927,7 +934,7 @@ pgm_setsockopt (
 /* for any-source applications (ASM), re-allow a blocked source
  */
 	case PGM_UNBLOCK_SOURCE:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_source_req)))
 			break;
 		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_UNBLOCK_SOURCE, (const char*)optval, optlen))
 			break;
@@ -939,7 +946,7 @@ pgm_setsockopt (
  * SSM joins are allowed on top of ASM in order to merge a remote source onto the local segment.
  */
 	case PGM_JOIN_SOURCE_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_source_req)))
 			break;
 		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
@@ -982,7 +989,7 @@ pgm_setsockopt (
 /* for controlled-source applications (SSM), leave each group/source pair
  */
 	case PGM_LEAVE_SOURCE_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof (sizeof(struct group_source_req))))
+		if (PGM_UNLIKELY(optlen != sizeof(struct group_source_req)))
 			break;
 		if (PGM_UNLIKELY(0 == sock->recv_gsr_len))
 			break;
@@ -1034,14 +1041,14 @@ pgm_setsockopt (
 	case PGM_UDP_ENCAP_UCAST_PORT:
 		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		sock->udp_encap_ucast_port = (0 == *(const int*)optval);
+		sock->udp_encap_ucast_port = *(const int*)optval;
 		status = TRUE;
 		break;
 
 	case PGM_UDP_ENCAP_MCAST_PORT:
 		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		sock->udp_encap_mcast_port = (0 == *(const int*)optval);
+		sock->udp_encap_mcast_port = *(const int*)optval;
 		status = TRUE;
 		break;
 
@@ -1317,7 +1324,7 @@ pgm_bind3 (
 		pgm_assert (NULL != sock->peers_hashtable);
 	}
 
-	if (sock->udp_encap_ucast_port)
+	if (IPPROTO_UDP == sock->protocol)
 	{
 /* Stevens: "SO_REUSEADDR has datatype int."
  */
@@ -1581,7 +1588,7 @@ pgm_bind3 (
 
 /* cleanup */
 	pgm_rwlock_writer_unlock (&sock->lock);
-	pgm_debug ("PGM socket successfully created.");
+	pgm_debug ("PGM socket successfully bound.");
 	return TRUE;
 }
 
@@ -1601,7 +1608,7 @@ pgm_connect (
 		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
 		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[i].gsr_source.ss_family, FALSE);
 	}
-	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->send_gsr.gsr_source.ss_family, FALSE);
+	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
 /* shutdown */
 	if (PGM_UNLIKELY(!pgm_rwlock_writer_trylock (&sock->lock)))
 		pgm_return_val_if_reached (FALSE);
@@ -1812,5 +1819,56 @@ out:
 	return retval;
 }
 #endif
+
+static
+const char*
+pgm_family_string (
+	const int	family
+	)
+{
+	const char* c;
+
+	switch (family) {
+	case AF_UNSPEC:		c = "AF_UNSPEC"; break;
+	case AF_INET:		c = "AF_INET"; break;
+	case AF_INET6:		c = "AF_INET6"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
+}
+
+static
+const char*
+pgm_sock_type_string (
+	const int	sock_type
+	)
+{
+	const char* c;
+
+	switch (sock_type) {
+	case SOCK_SEQPACKET:	c = "SOCK_SEQPACKET"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
+}
+
+static
+const char*
+pgm_protocol_string (
+	const int	protocol
+	)
+{
+	const char* c;
+
+	switch (protocol) {
+	case IPPROTO_UDP:	c = "IPPROTO_UDP"; break;
+	case IPPROTO_PGM:	c = "IPPROTO_PGM"; break;
+	default: c = "(unknown)"; break;
+	}
+
+	return c;
+}
 
 /* eof */

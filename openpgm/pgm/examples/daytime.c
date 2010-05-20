@@ -336,7 +336,8 @@ create_sock (void)
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
 	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = port;
+	addr.sa_port = port ? port : DEFAULT_DATA_DESTINATION_PORT;
+	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
 	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
 		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
 		goto err_abort;
