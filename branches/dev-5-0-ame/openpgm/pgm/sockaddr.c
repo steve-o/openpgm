@@ -30,11 +30,11 @@
 /* FreeBSD */
 #ifndef IPV6_ADD_MEMBERSHIP
 #	define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
+#	define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP
 #endif
 /* OpenSolaris differences */
 #ifndef MCAST_MSFILTER
 #	include <sys/ioctl.h>
-#	define MCAST_MSFILTER		SIOCSMSFILTER
 #endif
 #ifndef SOL_IP
 #	define SOL_IP			IPPROTO_IP
@@ -533,6 +533,139 @@ pgm_sockaddr_join_group (
 	return retval;
 }
 
+/* leave a joined group
+ */
+
+int
+pgm_sockaddr_leave_group (
+	const int		s,
+	const sa_family_t	sa_family,
+	const struct group_req*	gr
+	)
+{
+	int retval = PGM_SOCKET_ERROR;
+#ifdef CONFIG_HAVE_MCAST_JOIN
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	retval = setsockopt (s, recv_level, MCAST_LEAVE_GROUP, gr, sizeof(struct group_req));
+#else
+	switch (sa_family) {
+	case AF_INET: {
+#ifdef CONFIG_HAVE_IP_MREQN
+		struct ip_mreqn mreqn;
+		struct sockaddr_in ifaddr;
+		memset (&mreqn, 0, sizeof(mreqn));
+		mreqn.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gr->gr_group)->sin_addr.s_addr;
+		if (!pgm_if_indextoaddr (gr->gr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
+			return -1;
+		mreqn.imr_address.s_addr = ifaddr.sin_addr.s_addr;
+		mreqn.imr_ifindex = gr->gr_interface;
+		retval = setsockopt (s, SOL_IP, IP_DROP_MEMBERSHIP, (const char*)&mreqn, sizeof(mreqn));
+#else
+		struct ip_mreq mreq;
+		struct sockaddr_in ifaddr;
+		memset (&mreq, 0, sizeof(mreq));
+		mreq.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gr->gr_group)->sin_addr.s_addr;
+		if (!pgm_if_indextoaddr (gr->gr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL))
+			return -1;
+		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		retval = setsockopt (s, SOL_IP, IP_DROP_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
+#endif /* !CONFIG_HAVE_IP_MREQN */
+		break;
+	}
+
+	case AF_INET6: {
+		struct ipv6_mreq mreq6;
+		memset (&mreq6, 0, sizeof(mreq6));
+		mreq6.ipv6mr_multiaddr = ((const struct sockaddr_in6*)&gr->gr_group)->sin6_addr;
+		mreq6.ipv6mr_interface = gr->gr_interface;
+		retval = setsockopt (s, SOL_IPV6, IPV6_DROP_MEMBERSHIP, (const char*)&mreq6, sizeof(mreq6));
+		break;
+	}
+
+	default: break;
+	}
+#endif /* CONFIG_HAVE_MCAST_JOIN */
+	return retval;
+}
+
+/* block either at the NIC or kernel, packets from a particular source
+ */
+
+int
+pgm_sockaddr_block_source (
+	const int			s,
+	const sa_family_t		sa_family,
+	const struct group_source_req*	gsr
+	)
+{
+	int retval = PGM_SOCKET_ERROR;
+#ifdef CONFIG_HAVE_MCAST_JOIN
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	retval = setsockopt (s, recv_level, MCAST_BLOCK_SOURCE, gsr, sizeof(struct group_source_req));
+#elif defined(IP_BLOCK_SOURCE)
+	switch (sa_family) {
+	case AF_INET: {
+		struct ip_mreq_source mreqs;
+		struct sockaddr_in ifaddr;
+		memset (&mreqs, 0, sizeof(mreqs));
+		mreqs.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
+		mreqs.imr_sourceaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
+		pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL);
+		mreqs.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		retval = setsockopt (s, SOL_IP, IP_BLOCK_SOURCE, (const char*)&mreqs, sizeof(mreqs));
+		break;
+	}
+
+	case AF_INET6:
+/* No IPv6 API implemented, MCAST_BLOCK_SOURCE should be available instead.
+ */
+		break;
+
+	default: break;
+	}
+#endif /* CONFIG_HAVE_MCAST_JOIN */
+	return retval;
+}
+
+/* unblock a blocked multicast source.
+ */
+
+int
+pgm_sockaddr_unblock_source (
+	const int			s,
+	const sa_family_t		sa_family,
+	const struct group_source_req*	gsr
+	)
+{
+	int retval = PGM_SOCKET_ERROR;
+#ifdef CONFIG_HAVE_MCAST_JOIN
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	retval = setsockopt (s, recv_level, MCAST_UNBLOCK_SOURCE, gsr, sizeof(struct group_source_req));
+#elif defined(IP_UNBLOCK_SOURCE)
+	switch (sa_family) {
+	case AF_INET: {
+		struct ip_mreq_source mreqs;
+		struct sockaddr_in ifaddr;
+		memset (&mreqs, 0, sizeof(mreqs));
+		mreqs.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
+		mreqs.imr_sourceaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
+		pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL);
+		mreqs.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		retval = setsockopt (s, SOL_IP, IP_UNBLOCK_SOURCE, (const char*)&mreqs, sizeof(mreqs));
+		break;
+	}
+
+	case AF_INET6:
+/* No IPv6 API implemented, MCAST_UNBLOCK_SOURCE should be available instead.
+ */
+		break;
+
+	default: break;
+	}
+#endif /* CONFIG_HAVE_MCAST_JOIN */
+	return retval;
+}
+
 /* Join source-specific multicast.
  * NB: Silently reverts to ASM if SSM not supported.
  *
@@ -600,6 +733,71 @@ pgm_sockaddr_join_source_group (
 #endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
+
+/* drop a SSM source
+ */
+
+int
+pgm_sockaddr_leave_source_group (
+	const int			s,
+	const sa_family_t		sa_family,
+	const struct group_source_req*	gsr
+	)
+{
+	int retval = PGM_SOCKET_ERROR;
+#ifdef CONFIG_HAVE_MCAST_JOIN
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	retval = setsockopt (s, recv_level, MCAST_LEAVE_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
+#elif defined(IP_ADD_SOURCE_MEMBERSHIP)
+	switch (sa_family) {
+	case AF_INET: {
+		struct ip_mreq_source mreqs;
+		struct sockaddr_in ifaddr;
+		memset (&mreqs, 0, sizeof(mreqs));
+		mreqs.imr_multiaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_group)->sin_addr.s_addr;
+		mreqs.imr_sourceaddr.s_addr = ((const struct sockaddr_in*)&gsr->gsr_source)->sin_addr.s_addr;
+		pgm_if_indextoaddr (gsr->gsr_interface, AF_INET, 0, (struct sockaddr*)&ifaddr, NULL);
+		mreqs.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
+		retval = setsockopt (s, SOL_IP, IP_DROP_SOURCE_MEMBERSHIP, (const char*)&mreqs, sizeof(mreqs));
+		break;
+	}
+
+	case AF_INET6:
+/* No IPv6 API implemented, MCAST_LEAVE_SOURCE_GROUP should be available instead.
+ */
+		retval = pgm_sockaddr_leave_group (s, sa_family, (const struct group_req*)gsr);
+		break;
+
+	default: break;
+	}
+#else
+	retval = pgm_sockaddr_leave_group (s, sa_family, (const struct group_req*)gsr);	
+#endif /* CONFIG_HAVE_MCAST_JOIN */
+	return retval;
+}
+
+#if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
+/* Batch block and unblock sources.
+ */
+
+int
+pgm_sockaddr_msfilter (
+	const int			s,
+	const sa_family_t		sa_family,
+	const struct group_filter*	gf_list
+	)
+{
+	int retval = PGM_SOCKET_ERROR;
+#ifdef MCAST_MSFILTER
+	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
+	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
+	retval = setsockopt (s, recv_level, MCAST_MSFILTER, (const char*)gf_list, len);
+#elif defined(SIOCSMSFILTER)
+	retval = ioctl (s, SIOCSMSFILTER, (const char*)gf_list);
+#endif
+	return retval;
+}
+#endif /* MCAST_MSFILTER || SIOCSMSFILTER */
 
 /* Specify outgoing interface.
  *

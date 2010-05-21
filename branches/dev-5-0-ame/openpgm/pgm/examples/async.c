@@ -151,10 +151,10 @@ receiver_routine (
 	WSAEVENT recvEvent, pendingEvent;
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_RCV_SOCK, &recv_sock, sizeof(recv_sock));
+	pgm_getsockopt (async->sock, PGM_RECV_SOCK, &recv_sock, sizeof(recv_sock));
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
+	pgm_getsockopt (async->sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = async->destroy_event;

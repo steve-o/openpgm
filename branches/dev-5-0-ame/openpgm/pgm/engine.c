@@ -24,6 +24,7 @@
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
+#include <impl/engine.h>
 #include <impl/mem.h>
 #include <impl/socket.h>
 #include <pgm/engine.h>
