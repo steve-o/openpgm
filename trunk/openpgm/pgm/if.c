@@ -448,6 +448,7 @@ parse_interface (
 
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
 		switch (eai) {
+		case 0:
 			if (AF_INET == res->ai_family &&
 			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
