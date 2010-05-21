@@ -22,6 +22,8 @@
 #ifndef __PGM_ASYNC_H__
 #define __PGM_ASYNC_H__
 
+struct async_event_t;
+
 #include <errno.h>
 #include <pgm/pgm.h>
 
@@ -29,10 +31,8 @@
 extern "C" {
 #endif
 
-struct async_event_t;
-
 struct async_t {
-	pgm_transport_t*	transport;
+	pgm_sock_t*		sock;
 #ifndef _WIN32
 	pthread_t		thread;
 	int			notify_pipe[2];
@@ -50,7 +50,7 @@ struct async_t {
 };
 typedef struct async_t async_t;
 
-int async_create (async_t**, pgm_transport_t* const);
+int async_create (async_t**, pgm_sock_t* const);
 int async_destroy (async_t* const);
 ssize_t async_recv (async_t* const, void*, size_t);
 ssize_t async_recvfrom (async_t* const, void*, size_t, pgm_tsi_t*);

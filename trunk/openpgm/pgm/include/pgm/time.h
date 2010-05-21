@@ -19,28 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#	error "Only <framework.h> can be included directly."
-#endif
-
 #ifndef __PGM_TIME_H__
 #define __PGM_TIME_H__
 
 #include <pgm/types.h>
-#include <pgm/error.h>
 
 PGM_BEGIN_DECLS
 
 typedef uint64_t pgm_time_t;
-
-typedef pgm_time_t (*pgm_time_update_func)(void);
 typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_t*restrict);
-
-#define pgm_time_after(a,b)	( (a) > (b) )
-#define pgm_time_before(a,b)    ( pgm_time_after((b),(a)) )
-
-#define pgm_time_after_eq(a,b)  ( (a) >= (b) )
-#define pgm_time_before_eq(a,b) ( pgm_time_after_eq((b),(a)) )
 
 #define pgm_to_secs(t)	((pgm_time_t)( (t) / 1000000UL ))
 #define pgm_to_msecs(t)	((pgm_time_t)( (t) / 1000UL ))
@@ -59,11 +46,7 @@ typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_
 
 #define PGM_TIME_FORMAT	PRIu64
 
-extern pgm_time_update_func		pgm_time_update_now;
 extern pgm_time_since_epoch_func	pgm_time_since_epoch;
-
-PGM_GNUC_INTERNAL bool pgm_time_init (pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL bool pgm_time_shutdown (void);
 
 PGM_END_DECLS
 

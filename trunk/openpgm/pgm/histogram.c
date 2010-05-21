@@ -23,7 +23,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pgm/framework.h>
+#include <impl/framework.h>
 
 
 //#define HISTOGRAM_DEBUG

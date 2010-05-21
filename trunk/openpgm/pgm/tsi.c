@@ -20,8 +20,7 @@
  */
 
 #include <stdio.h>
-#include <pgm/framework.h>
-#include "pgm/tsi.h"
+#include <impl/framework.h>
 
 
 //#define TSI_DEBUG

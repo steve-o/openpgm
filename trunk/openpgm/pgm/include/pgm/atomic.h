@@ -17,10 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#	error "Only <framework.h> can be included directly."
-#endif
-
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
