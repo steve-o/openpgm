@@ -306,10 +306,10 @@ pgm_transport_create (
 	g_return_val_if_fail (NULL != tinfo->ti_send_addrs, FALSE);
 	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
 	{
-		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, -FALSE);
-		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, -FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, FALSE);
 	}
-	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
+	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, FALSE);
 
 	new_transport = g_malloc0 (sizeof(pgm_transport_t));
 	new_transport->can_send_data = TRUE;
