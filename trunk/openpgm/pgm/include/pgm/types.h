@@ -22,22 +22,30 @@
 #ifndef __PGM_TYPES_H__
 #define __PGM_TYPES_H__
 
-#include <sys/param.h>
+#ifndef _MSC_VER
+#	include <sys/param.h>
+#endif
 #include <pgm/macros.h>
 
+#ifdef _WIN32
+#	include <ws2tcpip.h>
+#	define sa_family_t	ULONG
+#endif
+
+#ifdef _MSC_VER
+#	include <pgm/winint.h>
+#	define bool		BOOL
+#	define ssize_t		SSIZE_T
+#	define inline		__inline
+#	define restrict
+#elif !defined( __cplusplus) || (__GNUC__ > 4)
 /* g++ v4 handles C99 headers without complaints */
-#if !defined( __cplusplus) || (__GNUC__ > 4)
 #	include <stdbool.h>
 #	include <stdint.h>
 #else
 /* g++ v3 and other ancient compilers */
 #	define bool		int
 #	include <stdint.h>
-#endif
-
-#ifdef _WIN32
-#	include <ws2tcpip.h>
-#	define sa_family_t	ULONG
 #endif
 
 PGM_BEGIN_DECLS

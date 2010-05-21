@@ -33,6 +33,7 @@
 #	include <process.h>
 #	include <wchar.h>
 #	include "getopt.h"
+#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -63,14 +64,15 @@ static pthread_t	nak_thread;
 static int		terminate_pipe[2];
 static void on_signal (int);
 static void* nak_routine (void*);
+static void usage (const char*) __attribute__((__noreturn__));
 #else
 static HANDLE		nak_thread;
 static HANDLE		terminate_event;
 static BOOL on_console_ctrl (DWORD);
 static unsigned __stdcall nak_routine (void*);
+static void usage (const char*);
 #endif
 
-static void usage (const char*) __attribute__((__noreturn__));
 static bool on_startup (void);
 static bool create_sock (void);
 static bool create_nak_thread (void);
@@ -330,6 +332,7 @@ create_sock (void)
 		fecinfo.proactive_packets	= proactive_packets;
 		fecinfo.group_size		= rs_k;
 		fecinfo.ondemand_parity_enabled	= use_ondemand_parity;
+		fecinfo.var_pktlen_enabled	= TRUE;
 		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
@@ -427,13 +430,13 @@ nak_routine (
 	)
 {
 /* dispatch loop */
-	pgm_sock_t* nak_sock = arg;
+	pgm_sock_t* nak_sock = (pgm_sock_t*)arg;
 #ifndef _WIN32
 	int fds;
 	fd_set readfds;
 #else
 	int n_handles = 4, recv_sock, repair_sock, pending_sock;
-	HANDLE waitHandles[ n_handles ];
+	HANDLE waitHandles[ 4 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, repairEvent, pendingEvent;
 

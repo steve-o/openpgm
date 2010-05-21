@@ -28,6 +28,7 @@
 #	include <unistd.h>
 #else
 #	include "getopt.h"
+#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -52,12 +53,13 @@ static bool		is_terminated = FALSE;
 #ifndef _WIN32
 static int		terminate_pipe[2];
 static void on_signal (int);
+static void usage (const char*) __attribute__((__noreturn__));
 #else
 static HANDLE		terminate_event;
 static BOOL on_console_ctrl (DWORD);
+static void usage (const char*);
 #endif
 
-static void usage (const char*) __attribute__((__noreturn__));
 static bool on_startup (void);
 static int on_data (void*restrict, size_t, pgm_tsi_t*restrict);
 
@@ -89,7 +91,11 @@ main (
 
 	setlocale (LC_ALL, "");
 
+#ifndef _WIN32
 	puts ("プリン プリン");
+#else
+	_putws (L"プリン プリン");
+#endif
 
 	if (!pgm_init (&pgm_err)) {
 		fprintf (stderr, "Unable to start PGM engine: %s\n", pgm_err->message);
@@ -150,7 +156,7 @@ main (
 	fd_set readfds;
 #else
 	int n_handles = 3, recv_sock, pending_sock;
-	HANDLE waitHandles[ n_handles ];
+	HANDLE waitHandles[ 3 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
 
@@ -335,6 +341,7 @@ on_startup (void)
 		fecinfo.proactive_packets	= 0;
 		fecinfo.group_size		= rs_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
+		fecinfo.var_pktlen_enabled	= FALSE;
 		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 

@@ -780,6 +780,7 @@ pgm_setsockopt (
 			}
 			sock->use_proactive_parity	= (fecinfo->proactive_packets > 0);
 			sock->use_ondemand_parity	= fecinfo->ondemand_parity_enabled;
+			sock->use_var_pktlen		= fecinfo->var_pktlen_enabled;
 			sock->rs_n			= fecinfo->block_size;
 			sock->rs_k			= fecinfo->group_size;
 			sock->rs_proactive_h		= fecinfo->proactive_packets;
