@@ -21,10 +21,9 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
-#include "pgm/tsi.h"
-#include "pgm/txw.h"
+#include <impl/i18n.h>
+#include <impl/framework.h>
+#include <impl/txw.h>
 
 
 //#define TXW_DEBUG
