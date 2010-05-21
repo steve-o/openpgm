@@ -22,6 +22,8 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <impl/framework.h>
+#include <impl/mem.h>
+
 
 //#define MEM_DEBUG
 

@@ -40,14 +40,6 @@
 //#define SOCK_SPM_DEBUG
 
 
-#ifndef GROUP_FILTER_SIZE
-#	define GROUP_FILTER_SIZE(numsrc) (sizeof (struct group_filter) \
-					  - sizeof (struct sockaddr_storage)         \
-					  + ((numsrc)                                \
-					     * sizeof (struct sockaddr_storage)))
-#endif
-
-
 /* global locals */
 pgm_rwlock_t pgm_sock_list_lock;		/* list of all sockets for admin interfaces */
 pgm_slist_t* pgm_sock_list = NULL;
@@ -868,9 +860,6 @@ pgm_setsockopt (
 		status = TRUE;
 		break;
 
-#define SOCKADDR_TO_LEVEL(sa)	( (AF_INET == pgm_sockaddr_family((struct sockaddr*)(sa))) ? IPPROTO_IP : IPPROTO_IPV6 )
-#define SOCK_TO_LEVEL(s)	( (AF_INET == (s)->family) ? IPPROTO_IP : IPPROTO_IPV6 )
-
 /* sending group, singular.
  */
 	case PGM_SEND_GROUP:
@@ -884,8 +873,10 @@ pgm_setsockopt (
 /* for any-source applications (ASM), join a new group
  */
 	case PGM_JOIN_GROUP:
+pgm_warn ("optlen:%d sizeof:%d", (int)optlen, (int)sizeof(struct group_req));
 		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
 			break;
+pgm_warn ("len:%d max:%d", (int)sock->recv_gsr_len, IP_MAX_MEMBERSHIPS);
 		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
 		{
@@ -910,8 +901,12 @@ pgm_setsockopt (
 					break;
 				}
 			}
-			if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_JOIN_GROUP, (const char*)gr, optlen))
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
+{
+pgm_warn ("setsockopt returned %d:%s", errno, strerror(errno));
 				break;
+}
+pgm_warn ("setsockopt returned %d:%s", errno, strerror(errno));
 			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = 0;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
@@ -946,7 +941,7 @@ pgm_setsockopt (
 				}
 				i++;
 			}
-			if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_LEAVE_GROUP, (const char*)gr, optlen))
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_leave_group (sock->recv_sock, sock->family, gr))
 				break;
 		}
 		status = TRUE;
@@ -957,8 +952,11 @@ pgm_setsockopt (
 	case PGM_BLOCK_SOURCE:
 		if (PGM_UNLIKELY(optlen != sizeof(struct group_source_req)))
 			break;
-		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_BLOCK_SOURCE, (const char*)optval, optlen))
-			break;
+		{
+			const struct group_source_req* gsr = optval;
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_block_source (sock->recv_sock, sock->family, gsr))
+				break;
+		}
 		status = TRUE;
 		break;
 
@@ -967,8 +965,11 @@ pgm_setsockopt (
 	case PGM_UNBLOCK_SOURCE:
 		if (PGM_UNLIKELY(optlen != sizeof(struct group_source_req)))
 			break;
-		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_UNBLOCK_SOURCE, (const char*)optval, optlen))
-			break;
+		{
+			const struct group_source_req* gsr = optval;
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_unblock_source (sock->recv_sock, sock->family, gsr))
+				break;
+		}
 		status = TRUE;
 		break;
 
@@ -1009,7 +1010,7 @@ pgm_setsockopt (
 					break;
 				}
 			}
-			if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_JOIN_SOURCE_GROUP, (const char*)gsr, optlen))
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_source_group (sock->recv_sock, sock->family, gsr))
 				break;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len], gsr, sizeof(struct group_source_req));
 			sock->recv_gsr_len++;
@@ -1041,7 +1042,7 @@ pgm_setsockopt (
 					}
 				}
 			}
-			if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_LEAVE_SOURCE_GROUP, (const char*)gsr, optlen))
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_leave_source_group (sock->recv_sock, sock->family, gsr))
 				break;
 		}
 		status = TRUE;
@@ -1056,13 +1057,8 @@ pgm_setsockopt (
 			const struct group_filter* gf_list = optval;
 			if (GROUP_FILTER_SIZE( gf_list->gf_numsrc ) != optlen)
 				break;
-#	ifdef MCAST_MSFILTER	
-			if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOCK_TO_LEVEL(sock), MCAST_MSFILTER, (const char*)gf_list, optlen))
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_msfilter (sock->recv_sock, sock->family, gf_list))
 				break;
-#	elif defined(SIOCSMSFILTER)
-			if (ioctl (sock->recv_sock, SIOCSMSFILTER, (const char*)gf_list) < 0)
-				break;
-#	endif
 		}
 		status = TRUE;
 #endif
