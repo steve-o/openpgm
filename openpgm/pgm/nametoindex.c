@@ -23,8 +23,8 @@
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>
 #endif
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
+#include <impl/i18n.h>
+#include <impl/framework.h>
 
 
 //#define NAMETOINDEX_DEBUG
@@ -50,7 +50,7 @@ _pgm_heap_alloc (
 static inline
 void
 _pgm_heap_free (
-	const void*	mem
+	void*		mem
 	)
 {
 #       ifdef CONFIG_USE_HEAPALLOC

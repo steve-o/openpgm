@@ -22,7 +22,8 @@
 #ifndef __PGM_SNMP_H__
 #define __PGM_SNMP_H__
 
-#include <pgm/framework.h>
+#include <pgm/types.h>
+#include <pgm/error.h>
 
 PGM_BEGIN_DECLS
 
