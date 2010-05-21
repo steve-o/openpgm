@@ -336,7 +336,7 @@ pgm_sendto (
 	{
 /* poll for cleared socket */
 		struct pollfd p = {
-			.fd		= transport->send_sock,
+			.fd		= sock,
 			.events		= POLLOUT,
 			.revents	= 0
 				  };
