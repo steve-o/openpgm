@@ -46,7 +46,7 @@ pgm_atomic_exchange_and_add32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
-	return InterlockedExchangeAdd (atomic, val);
+	return InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #else
 #	error "No supported atomic operations for this platform."
 #endif
@@ -70,7 +70,7 @@ pgm_atomic_add32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	__sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
-	InterlockedExchangeAdd (atomic, val);
+	InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #endif
 }
 
@@ -87,7 +87,7 @@ pgm_atomic_inc32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
 #elif defined( _WIN32 )
-	InterlockedIncrement (atomic);
+	InterlockedIncrement ((volatile LONG*)atomic);
 #endif
 }
 
@@ -104,7 +104,7 @@ pgm_atomic_dec32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
 #elif defined( _WIN32 )
-	InterlockedDecrement (atomic);
+	InterlockedDecrement ((volatile LONG*)atomic);
 #endif
 }
 
