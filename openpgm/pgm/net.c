@@ -107,7 +107,7 @@ pgm_sendto (
 #ifdef CONFIG_HAVE_POLL
 /* poll for cleared socket */
 		struct pollfd p = {
-			.fd		= transport->send_sock,
+			.fd		= sock,
 			.events		= POLLOUT,
 			.revents	= 0
 		};
@@ -115,7 +115,7 @@ pgm_sendto (
 #else
 		fd_set writefds;
 		FD_ZERO(&writefds);
-		FD_SET(transport->send_sock, &writefds);
+		FD_SET(sock, &writefds);
 		struct timeval tv = {
 			.tv_sec  = 0,
 			.tv_usec = 500 /* ms */ * 1000
