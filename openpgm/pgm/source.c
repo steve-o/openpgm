@@ -89,7 +89,7 @@ source_max_tsdu (
 	)
 {
 	size_t max_tsdu = can_fragment ? sock->max_tsdu_fragment : sock->max_tsdu;
-	if (sock->use_proactive_parity || sock->use_ondemand_parity /* OPT_VAR_PKT_LEN */)
+	if (sock->use_var_pktlen /* OPT_VAR_PKT_LEN */)
 		max_tsdu -= sizeof (uint16_t);
 	return max_tsdu;
 }

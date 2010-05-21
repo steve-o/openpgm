@@ -65,7 +65,7 @@ async_event_alloc (
 	)
 {
 	struct async_event_t* event;
-	event = calloc (1, len + sizeof(struct async_event_t));
+	event = (struct async_event_t*)calloc (1, len + sizeof(struct async_event_t));
 	event->len = len;
 	return event;
 }
@@ -146,7 +146,7 @@ receiver_routine (
 	fd_set readfds;
 #else
 	int n_handles = 3, recv_sock, pending_sock;
-	HANDLE waitHandles[ n_handles ];
+	HANDLE waitHandles[ 3 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
 
@@ -274,7 +274,7 @@ async_create (
 		return -1;
 	}
 
-	new_async = calloc (1, sizeof(async_t));
+	new_async = (async_t*)calloc (1, sizeof(async_t));
 	new_async->sock = sock;
 #ifndef _WIN32
 	int e;

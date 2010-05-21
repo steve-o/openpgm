@@ -148,6 +148,7 @@ struct pgm_sock_t {
 
 	bool				use_proactive_parity;
 	bool				use_ondemand_parity;
+	bool				use_var_pktlen;
 	uint8_t				rs_n;
 	uint8_t				rs_k;
 	uint8_t				rs_proactive_h;		    /* 0 <= proactive-h <= ( n - k ) */

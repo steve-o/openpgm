@@ -26,6 +26,7 @@
 #	include <unistd.h>
 #else
 #	include "getopt.h"
+#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -47,7 +48,11 @@ static int		rs_n = 255;
 
 static pgm_sock_t*	sock = NULL;
 
+#ifndef _WIN32
 static void usage (const char*) __attribute__((__noreturn__));
+#else
+static void usage (const char*);
+#endif
 static bool create_sock (void);
 
 
@@ -193,11 +198,11 @@ create_sock (void)
 	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
 	if (use_fec) {
 		struct pgm_fecinfo_t fecinfo; 
-		fecinfo.block_size			= rs_n;
-		fecinfo.proactive_packets		= 0;
-		fecinfo.group_size			= rs_k;
-		fecinfo.ondemand_parity_enabled		= TRUE;
-		fecinfo.variable_sized_packets_enabled	= TRUE;
+		fecinfo.block_size		= rs_n;
+		fecinfo.proactive_packets	= 0;
+		fecinfo.group_size		= rs_k;
+		fecinfo.ondemand_parity_enabled	= TRUE;
+		fecinfo.var_pktlen_enabled	= TRUE;
 		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
