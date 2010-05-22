@@ -1,0 +1,18 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+e = env.Clone();
+e.MergeFlags(env['GLIB_FLAGS']);
+
+src = Split("""
+		log.c
+		backtrace.c
+		signal.c
+""")
+
+e.StaticLibrary('libpgmex', src);
+
+# end of file
