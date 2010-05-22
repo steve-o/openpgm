@@ -874,10 +874,8 @@ pgm_setsockopt (
 /* for any-source applications (ASM), join a new group
  */
 	case PGM_JOIN_GROUP:
-pgm_warn ("optlen:%d sizeof:%d", (int)optlen, (int)sizeof(struct group_req));
 		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
 			break;
-pgm_warn ("len:%d max:%d", (int)sock->recv_gsr_len, IP_MAX_MEMBERSHIPS);
 		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
 		{
@@ -903,11 +901,7 @@ pgm_warn ("len:%d max:%d", (int)sock->recv_gsr_len, IP_MAX_MEMBERSHIPS);
 				}
 			}
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
-{
-pgm_warn ("setsockopt returned %d:%s", errno, strerror(errno));
 				break;
-}
-pgm_warn ("setsockopt returned %d:%s", errno, strerror(errno));
 			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = 0;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
