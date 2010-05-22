@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * Cross-platform data types.
+ * OpenPGM C++ wrapper.
  *
  * Copyright (c) 2010 Miru Limited.
  *
@@ -19,38 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __PGM_TYPES_H__
-#define __PGM_TYPES_H__
+#ifndef __PGM_HH__
+#define __PGM_HH__
 
-#ifndef _MSC_VER
-#	include <sys/param.h>
-#endif
-#include <pgm/macros.h>
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#ifdef _WIN32
-#	include <ws2tcpip.h>
-#	define sa_family_t	ULONG
-#endif
+#include <pgm/pgm_socket.hh>
+#include <pgm/ip/pgm_endpoint.hh>
+#include <pgm/ip/pgm.hh>
 
-#ifdef _MSC_VER
-#	include <pgm/winint.h>
-#	define bool		BOOL
-#	define ssize_t		SSIZE_T
-#	define restrict
-#elif !defined( __cplusplus) || (__GNUC__ > 4)
-/* g++ v4 handles C99 headers without complaints */
-#	include <stdbool.h>
-#	include <stdint.h>
-#else
-/* g++ v3 and other ancient compilers */
-#	define bool		int
-#	include <stdint.h>
-#endif
-
-PGM_BEGIN_DECLS
-
-/* nc */
-
-PGM_END_DECLS
-
-#endif /* __PGM_TYPES_H__ */
+#endif /* __PGM_HH__ */
