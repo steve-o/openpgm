@@ -48,7 +48,7 @@ static int		rs_n = 255;
 
 static pgm_sock_t*	sock = NULL;
 
-#ifndef _WIN32
+#ifndef _MSC_VER
 static void usage (const char*) __attribute__((__noreturn__));
 #else
 static void usage (const char*);

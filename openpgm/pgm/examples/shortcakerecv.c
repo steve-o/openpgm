@@ -56,10 +56,13 @@ static bool		is_terminated = FALSE;
 #ifndef _WIN32
 static int		terminate_pipe[2];
 static void on_signal (int);
-static void usage (const char*) __attribute__((__noreturn__));
 #else
 static HANDLE		terminate_event;
 static BOOL on_console_ctrl (DWORD);
+#endif
+#ifndef _MSC_VER
+static void usage (const char*) __attribute__((__noreturn__));
+#else
 static void usage (const char*);
 #endif
 
@@ -396,10 +399,18 @@ on_data (
 {
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
-	snprintf (buf, sizeof(buf), "%s", (char*)data);
+	const size_t buflen = MIN(sizeof(buf) - 1, len);
+	strncpy (buf, (char*)data, buflen);
+	buf[buflen] = '\0';
 	pgm_tsi_print_r (from, tsi, sizeof(tsi));
+#ifndef _MSC_VER
 	printf ("\"%s\" (%zu bytes from %s)\n",
 			buf, len, tsi);
+#else
+/* Microsoft CRT will crash on %zu */
+	printf ("\"%s\" (%u bytes from %s)\n",
+			buf, (unsigned)len, tsi);
+#endif
 	return 0;
 }
 

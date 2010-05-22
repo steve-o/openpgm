@@ -483,6 +483,8 @@ pgm_sockaddr_join_group (
  *
  * FreeBSD,OS X:IP(4) provided by example "struct ip_mreq mreq;"
  *
+ * Windows can optionally abuse imt_interface to be 0.0.0.<imr_ifindex>
+ *
  * Stevens: "IP_ADD_MEMBERSHIP has datatype ip_mreq{}."
  *
  * RFC3678: Argument type struct ip_mreq
