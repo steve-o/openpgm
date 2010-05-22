@@ -22,7 +22,7 @@ p.Append(BUILDERS = {'C89Source' : c89source})
 for c99file in ['purinsend.c', 'purinrecv.c']:
 	p.C89Source(c99file);
 
-p.Program(['purinsend.c89.c'] + getopt)
-p.Program(['purinrecv.c89.c'] + getopt)
+p.Program('purinsend', ['purinsend.c89.c'] + getopt)
+p.Program('purinrecv', ['purinrecv.c89.c'] + getopt)
 
 # end of file
