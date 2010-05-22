@@ -64,12 +64,15 @@ static pthread_t	nak_thread;
 static int		terminate_pipe[2];
 static void on_signal (int);
 static void* nak_routine (void*);
-static void usage (const char*) __attribute__((__noreturn__));
 #else
 static HANDLE		nak_thread;
 static HANDLE		terminate_event;
 static BOOL on_console_ctrl (DWORD);
 static unsigned __stdcall nak_routine (void*);
+#endif
+#ifndef _MSC_VER
+static void usage (const char*) __attribute__((__noreturn__));
+#else
 static void usage (const char*);
 #endif
 

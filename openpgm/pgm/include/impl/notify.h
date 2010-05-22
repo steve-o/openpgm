@@ -36,7 +36,7 @@ typedef struct pgm_notify_t pgm_notify_t;
 #	endif
 #else /* _WIN32 */
 #	include <memory.h>
-#	include <winsock2.h>
+#	include <ws2tcpip.h>
 #endif
 #include <pgm/types.h>
 #include <impl/messages.h>

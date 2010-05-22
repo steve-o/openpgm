@@ -31,7 +31,7 @@
 #	include <sys/socket.h>
 #	include <net/if.h>
 #else
-#	include <winsock2.h>
+#	include <ws2tcpip.h>
 #endif
 
 struct pgm_ifaddrs_t;
