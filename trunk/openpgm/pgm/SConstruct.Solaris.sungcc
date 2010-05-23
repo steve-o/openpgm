@@ -29,6 +29,8 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_TEST', 'Network test system', 'false',
 			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CC', 'C++ examples', 'true',
+			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',

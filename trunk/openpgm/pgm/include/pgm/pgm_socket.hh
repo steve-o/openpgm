@@ -92,12 +92,11 @@ public:
 	}
 
 	/// Get a socket option.
-	bool get_option (int optname, void* optval, ::socklen_t optlen)
+	bool get_option (int optname, void* optval, ::socklen_t* optlen)
 	{
 		return pgm_getsockopt (this->native_type_, optname, optval, optlen);
 	}
 
-#if 0
 	/// Get the local endpoint.
 	endpoint_type local_endpoint() const
 	{
@@ -105,7 +104,6 @@ public:
 		pgm_getsockname (this->native_type_, &endpoint);
 		return endpoint;
 	}
-#endif
 
 	/// Disable sends or receives on the socket.
 	bool shutdown (int what)
@@ -138,9 +136,11 @@ public:
 	int receive_from (void* buf, std::size_t len, int flags, std::size_t* bytes_read, endpoint_type* from, cpgm::pgm_error_t** error)
 	{
 		int ec;
-		cpgm::pgm_tsi_t tsi;
-		ec = pgm_recvfrom (this->native_type_, buf, len, flags, bytes_read, &tsi, error);
-		from->address (tsi);
+		struct cpgm::pgm_sockaddr_t addr;
+		socklen_t addrlen = sizeof (addr);
+		ec = pgm_recvfrom (this->native_type_, buf, len, flags, bytes_read, &addr, &addrlen, error);
+		from->port (addr.sa_port);
+		from->address (addr.sa_addr);
 /* TODO: set data-destination port */
 		return ec;
 	}

@@ -129,10 +129,10 @@ enum {
 bool pgm_socket (pgm_sock_t**restrict, const sa_family_t, const int, const int, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_bind (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_bind3 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct group_req*const restrict, const socklen_t, const struct group_req*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_connect (pgm_sock_t*, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_connect (pgm_sock_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_close (pgm_sock_t*, bool);
-bool pgm_setsockopt (pgm_sock_t*const, const int, const void*, const socklen_t);
-bool pgm_getsockopt (pgm_sock_t*const, const int, void*, const socklen_t);
+bool pgm_setsockopt (pgm_sock_t*const restrict, const int, const void*restrict, const socklen_t);
+bool pgm_getsockopt (pgm_sock_t*const restrict, const int, void*restrict, socklen_t*restrict);
 bool pgm_getaddrinfo (const char*restrict, const struct pgm_addrinfo_t*restrict, struct pgm_addrinfo_t**restrict, pgm_error_t**restrict);
 void pgm_freeaddrinfo (struct pgm_addrinfo_t*);
 int pgm_send (pgm_sock_t*const restrict, const void*restrict, const size_t, size_t*restrict);
@@ -141,8 +141,9 @@ int pgm_send_skbv (pgm_sock_t*const restrict, struct pgm_sk_buff_t**restrict, co
 int pgm_recvmsg (pgm_sock_t*const restrict, struct pgm_msgv_t*const restrict, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 int pgm_recvmsgv (pgm_sock_t*const restrict, struct pgm_msgv_t*const restrict, const size_t, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 int pgm_recv (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*const restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*restrict, pgm_tsi_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
+bool pgm_getsockname (pgm_sock_t*const restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
 int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
 #ifdef CONFIG_HAVE_POLL
 int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const int);

@@ -40,9 +40,15 @@
 /* Returns new memory like malloc() */
 #	define PGM_GNUC_MALLOC			__attribute__((__malloc__))
 
+#	define PGM_GNUC_CACHELINE_ALIGNED	__attribute__((__aligned__(SMP_CACHE_BYTES), \
+						__section__((".data.cacheline_aligned")))
+#	define PGM_GNUC_READ_MOSTLY		__attribute__((__section__(".data.read_mostly")))
+
 #else
 #	define PGM_GNUC_PURE
 #	define PGM_GNUC_MALLOC
+#	define PGM_GNUC_CACHELINE_ALIGNED
+#	define PGM_GNUC_READ_MOSTLY
 #endif
 
 #if (__GNUC__ >= 4)
@@ -106,6 +112,7 @@
 #		define PGM_GNUC_INTERNAL
 #	endif
 #endif /* __GNUC__ */
+
 
 /* Compiler time assertions, must be on unique lines in the project */
 #define PGM_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2

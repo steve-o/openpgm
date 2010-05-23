@@ -50,10 +50,10 @@ struct async_t {
 };
 typedef struct async_t async_t;
 
-int async_create (async_t**, pgm_sock_t* const);
+int async_create (async_t** restrict, pgm_sock_t*const restrict);
 int async_destroy (async_t* const);
-ssize_t async_recv (async_t* const, void*, size_t);
-ssize_t async_recvfrom (async_t* const, void*, size_t, pgm_tsi_t*);
+ssize_t async_recv (async_t*const restrict, void* restrict, size_t);
+ssize_t async_recvfrom (async_t*const restrict, void*restrict, size_t, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
 
 #ifndef _WIN32
 static inline int async_get_fd (async_t* async)
