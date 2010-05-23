@@ -180,6 +180,7 @@ main (
 #endif /* !_WIN32 */
 	puts ("Entering PGM message loop ... ");
 	do {
+		socklen_t optlen;
 		struct timeval tv;
 		char buffer[4096];
 		size_t len;
@@ -195,10 +196,12 @@ main (
 			on_data (buffer, len, from);
 			break;
 		case cpgm::PGM_IO_STATUS_TIMER_PENDING:
-			sock->get_option (cpgm::PGM_TIME_REMAIN, &tv, sizeof(tv));
+			optlen = sizeof (tv);
+			sock->get_option (cpgm::PGM_TIME_REMAIN, &tv, &optlen);
 			goto block;
 		case cpgm::PGM_IO_STATUS_RATE_LIMITED:
-			sock->get_option (cpgm::PGM_RATE_REMAIN, &tv, sizeof(tv));
+			optlen = sizeof (tv);
+			sock->get_option (cpgm::PGM_RATE_REMAIN, &tv, &optlen);
 		case cpgm::PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:

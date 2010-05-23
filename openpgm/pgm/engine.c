@@ -35,14 +35,14 @@
 
 
 /* globals */
-int			pgm_ipproto_pgm = IPPROTO_PGM;
+int			pgm_ipproto_pgm PGM_GNUC_READ_MOSTLY = IPPROTO_PGM;
 
 #ifdef _WIN32
-LPFN_WSARECVMSG		pgm_WSARecvMsg = NULL;
+LPFN_WSARECVMSG		pgm_WSARecvMsg PGM_GNUC_READ_MOSTLY = NULL;
 #endif
 
 #ifdef PGM_DEBUG
-unsigned		pgm_loss_rate = 0;
+unsigned		pgm_loss_rate PGM_GNUC_READ_MOSTLY = 0;
 #endif
 
 /* locals */

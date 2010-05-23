@@ -33,8 +33,8 @@
 
 #define TIME_FORMAT		"%Y-%m-%d %H:%M:%S "
 
-static int log_timezone = 0;
-static char log_hostname[NI_MAXHOST + 1];
+static int log_timezone PGM_GNUC_READ_MOSTLY = 0;
+static char log_hostname[NI_MAXHOST + 1] PGM_GNUC_READ_MOSTLY;
 
 static void glib_log_handler (const gchar*, GLogLevelFlags, const gchar*, gpointer);
 static void pgm_log_handler (const int, const char*, void*);

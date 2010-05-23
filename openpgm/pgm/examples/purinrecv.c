@@ -64,7 +64,7 @@ static void usage (const char*);
 #endif
 
 static bool on_startup (void);
-static int on_data (void*restrict, size_t, pgm_tsi_t*restrict);
+static int on_data (const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict, const socklen_t);
 
 
 static void
@@ -179,23 +179,31 @@ main (
 		struct timeval tv;
 		char buffer[4096];
 		size_t len;
-		pgm_tsi_t from;
+		struct pgm_sockaddr_t from;
+		socklen_t fromlen = sizeof (from);
 		const int status = pgm_recvfrom (sock,
 					         buffer,
 					         sizeof(buffer),
 					         0,
 					         &len,
 					         &from,
+						 &fromlen,
 					         &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
-			on_data (buffer, len, &from);
+			on_data (buffer, len, &from, fromlen);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, sizeof(tv));
+			{
+				socklen_t optlen = sizeof (tv);
+				pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, &optlen);
+			}
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, sizeof(tv));
+			{
+				socklen_t optlen = sizeof (tv);
+				pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, &optlen);
+			}
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
@@ -412,9 +420,10 @@ err_abort:
 static
 int
 on_data (
-	void*      restrict data,
-	size_t		    len,
-	pgm_tsi_t* restrict from
+	const void*     	     restrict data,
+	const size_t		  	      len,
+	const struct pgm_sockaddr_t* restrict from,
+	const socklen_t		  	      fromlen
 	)
 {
 /* protect against non-null terminated strings */
@@ -422,7 +431,7 @@ on_data (
 	const size_t buflen = MIN(sizeof(buf) - 1, len);
 	strncpy (buf, (char*)data, buflen);
 	buf[buflen] = '\0';
-	pgm_tsi_print_r (from, tsi, sizeof(tsi));
+	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
 #ifndef _MSC_VER
 	printf ("\"%s\" (%zu bytes from %s)\n",
 			buf, len, tsi);
