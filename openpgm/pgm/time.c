@@ -35,8 +35,8 @@
 
 /* globals */
 
-pgm_time_update_func		pgm_time_update_now;
-pgm_time_since_epoch_func	pgm_time_since_epoch;
+pgm_time_update_func		pgm_time_update_now PGM_GNUC_READ_MOSTLY;
+pgm_time_since_epoch_func	pgm_time_since_epoch PGM_GNUC_READ_MOSTLY;
 
 
 /* locals */
@@ -57,7 +57,7 @@ pgm_time_since_epoch_func	pgm_time_since_epoch;
 #define fsecs_to_usecs(t)	( (t) / 1000000000UL )
 
 static volatile uint32_t	time_ref_count = 0;
-static pgm_time_t		rel_offset = 0;
+static pgm_time_t		rel_offset PGM_GNUC_READ_MOSTLY = 0;
 
 static void			pgm_time_conv (const pgm_time_t*const restrict, time_t*restrict);
 static void			pgm_time_conv_from_reset (const pgm_time_t*const restrict, time_t*restrict);
@@ -94,16 +94,16 @@ typedef uint64_t hpet_counter_t;
 #	else
 typedef uint32_t hpet_counter_t;
 #	endif
-static int			hpet_fd = -1;
-static char*			hpet_ptr;
+static int			hpet_fd PGM_GNUC_READ_MOSTLY = -1;
+static char*			hpet_ptr PGM_GNUC_READ_MOSTLY;
 static uint64_t			hpet_offset = 0;
-static uint64_t			hpet_wrap;
+static uint64_t			hpet_wrap PGM_GNUC_READ_MOSTLY;
 static hpet_counter_t		hpet_last = 0;
 
 #	define HPET_NS_SCALE	22
 #	define HPET_US_SCALE	34
-static uint_fast32_t		hpet_ns_mul = 0;
-static uint_fast32_t		hpet_us_mul = 0;
+static uint_fast32_t		hpet_ns_mul PGM_GNUC_READ_MOSTLY = 0;
+static uint_fast32_t		hpet_us_mul PGM_GNUC_READ_MOSTLY = 0;
 
 static inline
 void
@@ -144,8 +144,8 @@ static pgm_time_t		pgm_hpet_update (void);
 #	include <unistd.h>
 #	include <sys/ioctl.h>
 #	include <linux/rtc.h>
-static int			rtc_fd = -1;
-static int			rtc_frequency = 8192;
+static int			rtc_fd PGM_GNUC_READ_MOSTLY = -1;
+static int			rtc_frequency PGM_GNUC_READ_MOSTLY = 8192;
 static pgm_time_t		rtc_count = 0;
 static bool			pgm_rtc_init (pgm_error_t**);
 static bool			pgm_rtc_shutdown (void);
@@ -156,9 +156,9 @@ static pgm_time_t		pgm_rtc_update (void);
 #	include <string.h>
 #	define TSC_NS_SCALE	10 /* 2^10, carefully chosen */
 #	define TSC_US_SCALE	20
-static uint_fast32_t		tsc_mhz = 0;
-static uint_fast32_t		tsc_ns_mul = 0;
-static uint_fast32_t		tsc_us_mul = 0;
+static uint_fast32_t		tsc_mhz PGM_GNUC_READ_MOSTLY = 0;
+static uint_fast32_t		tsc_ns_mul PGM_GNUC_READ_MOSTLY = 0;
+static uint_fast32_t		tsc_us_mul PGM_GNUC_READ_MOSTLY = 0;
 
 static inline
 void
@@ -710,7 +710,7 @@ pgm_hpet_init (
  */
 	const uint32_t hpet_period = *((uint32_t*)(hpet_ptr + HPET_COUNTER_CLK_PERIOD));
 	set_hpet_mul (hpet_period);
-#if defined(__x86_64__)
+#if defined( __x86_64__ ) || defined( __amd64 )
 	const uint32_t hpet_caps = *((uint32_t*)(hpet_ptr + HPET_GENERAL_CAPS_REGISTER));
 	hpet_wrap = hpet_caps & HPET_COUNT_SIZE_CAP ? 0 : (1ULL << 32);
 #else

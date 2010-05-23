@@ -978,13 +978,14 @@ pgm_recvmsg (
 
 int
 pgm_recvfrom (
-	pgm_sock_t* const restrict sock,
-	void*		  restrict buf,
-	const size_t		   buflen,
-	const int		   flags,		/* MSG_DONTWAIT for non-blocking */
-	size_t*		  restrict _bytes_read,	/* may be NULL */
-	pgm_tsi_t*	  restrict from,		/* may be NULL */
-	pgm_error_t**	  restrict error
+	pgm_sock_t*	 const restrict sock,
+	void*			  restrict buf,
+	const size_t			   buflen,
+	const int			   flags,		/* MSG_DONTWAIT for non-blocking */
+	size_t*			  restrict _bytes_read,	/* may be NULL */
+	struct pgm_sockaddr_t*	  restrict from,		/* may be NULL */
+	socklen_t*		  restrict fromlen,
+	pgm_error_t**		  restrict error
 	)
 {
 	struct pgm_msgv_t msgv;
@@ -992,9 +993,13 @@ pgm_recvfrom (
 
 	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
 	if (PGM_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
+	if (fromlen) {
+		pgm_return_val_if_fail (NULL != from, PGM_IO_STATUS_ERROR);
+		pgm_return_val_if_fail (sizeof (struct pgm_sockaddr_t) == *fromlen, PGM_IO_STATUS_ERROR);
+	}
 
-	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p from:%p error:%p)",
-		(void*)sock, buf, buflen, flags, (void*)_bytes_read, (void*)from, (void*)error);
+	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p from:%p from:%p error:%p)",
+		(const void*)sock, buf, buflen, flags, (const void*)_bytes_read, (const void*)from, (const void*)fromlen, (const void*)error);
 
 	const int status = pgm_recvmsg (sock, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
@@ -1004,8 +1009,9 @@ pgm_recvfrom (
 	struct pgm_sk_buff_t* skb = msgv.msgv_skb[0];
 
 	if (from) {
-		memcpy (&from->gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
-		from->sport = ntohs (skb->tsi.sport);
+		from->sa_port = ntohs (sock->dport);
+		from->sa_addr.sport = ntohs (skb->tsi.sport);
+		memcpy (&from->sa_addr.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
 	}
 
 	while (bytes_copied < bytes_read) {
@@ -1046,7 +1052,7 @@ pgm_recv (
 	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p error:%p)",
 		(const void*)sock, buf, buflen, flags, (const void*)bytes_read, (const void*)error);
 
-	return pgm_recvfrom (sock, buf, buflen, flags, bytes_read, NULL, error);
+	return pgm_recvfrom (sock, buf, buflen, flags, bytes_read, NULL, NULL, error);
 }
 
 /* eof */

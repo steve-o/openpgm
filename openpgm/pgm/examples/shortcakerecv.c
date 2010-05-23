@@ -67,7 +67,7 @@ static void usage (const char*);
 #endif
 
 static bool on_startup (void);
-static int on_data (void*restrict, size_t, pgm_tsi_t*restrict);
+static int on_data (const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict, const socklen_t);
 
 
 static void
@@ -174,13 +174,15 @@ main (
 	puts ("Entering PGM message loop ... ");
 	do {
 		char buffer[4096];
-		pgm_tsi_t from;
+		struct pgm_sockaddr_t from;
+		socklen_t fromlen = sizeof (from);
 		const ssize_t len = async_recvfrom (async,
 					            buffer,
 					            sizeof(buffer),
-					            &from);
+					            &from,
+						    &fromlen);
 		if (len >= 0) {
-			on_data (buffer, len, &from);
+			on_data (buffer, len, &from, fromlen);
 		} else {
 #ifndef _WIN32
 			fds = MAX(terminate_pipe[0], read_fd) + 1;
@@ -392,9 +394,10 @@ err_abort:
 static
 int
 on_data (
-	void*      restrict data,
-	size_t		    len,
-	pgm_tsi_t* restrict from
+	const void*      	     restrict data,
+	const size_t		    	      len,
+	const struct pgm_sockaddr_t* restrict from,
+	const socklen_t			      fromlen
 	)
 {
 /* protect against non-null terminated strings */
@@ -402,7 +405,7 @@ on_data (
 	const size_t buflen = MIN(sizeof(buf) - 1, len);
 	strncpy (buf, (char*)data, buflen);
 	buf[buflen] = '\0';
-	pgm_tsi_print_r (from, tsi, sizeof(tsi));
+	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
 #ifndef _MSC_VER
 	printf ("\"%s\" (%zu bytes from %s)\n",
 			buf, len, tsi);

@@ -258,8 +258,8 @@ pgm_new_peer (
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
-	pgm_debug ("pgm_new_peer (sock:%p tsi:%s src-addr:%s src-addrlen:%zu dst-addr:%s dst-addrlen:%zu)",
-		(void*)sock, pgm_tsi_print (tsi), saddr, src_addrlen, daddr, dst_addrlen);
+	pgm_debug ("pgm_new_peer (sock:%p tsi:%s src-addr:%s src-addrlen:%u dst-addr:%s dst-addrlen:%u)",
+		(void*)sock, pgm_tsi_print (tsi), saddr, (unsigned)src_addrlen, daddr, (unsigned)dst_addrlen);
 #endif
 
 	peer = pgm_new0 (pgm_peer_t, 1);

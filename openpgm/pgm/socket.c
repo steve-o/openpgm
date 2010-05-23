@@ -343,14 +343,16 @@ err_destroy:
 
 bool
 pgm_getsockopt (
-	pgm_sock_t* const	sock,
-	const int		optname,
-	void*			optval,
-	const socklen_t		optlen
+	pgm_sock_t* const restrict sock,
+	const int		   optname,
+	void*		  restrict optval,
+	socklen_t*	  restrict optlen	/* required */
 	)
 {
 	bool status = FALSE;
 	pgm_return_val_if_fail (sock != NULL, status);
+	pgm_return_val_if_fail (optval != NULL, status);
+	pgm_return_val_if_fail (optlen != NULL, status);
 	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
 		pgm_return_val_if_reached (status);
 	if (PGM_UNLIKELY(sock->is_destroyed)) {
@@ -360,9 +362,9 @@ pgm_getsockopt (
 	switch (optname) {
 /* maximum TPDU size */
 	case PGM_MTU:
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*)optval = sock->max_tpdu;
+		*(int*restrict)optval = sock->max_tpdu;
 		status = TRUE;
 		break;
 
@@ -370,7 +372,7 @@ pgm_getsockopt (
 	case PGM_RECV_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*)optval = sock->recv_sock;
 		status = TRUE;
@@ -380,7 +382,7 @@ pgm_getsockopt (
 	case PGM_REPAIR_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*)optval = pgm_notify_get_fd (&sock->rdata_notify);
 		status = TRUE;
@@ -390,7 +392,7 @@ pgm_getsockopt (
 	case PGM_PENDING_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*)optval = pgm_notify_get_fd (&sock->pending_notify);
 		status = TRUE;
@@ -400,7 +402,7 @@ pgm_getsockopt (
 	case PGM_TIME_REMAIN:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(optlen != sizeof (struct timeval)))
+		if (PGM_UNLIKELY(*optlen != sizeof (struct timeval)))
 			break;
 		{
 			struct timeval* tv = optval;
@@ -415,7 +417,7 @@ pgm_getsockopt (
 	case PGM_RATE_REMAIN:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(optlen != sizeof (struct timeval)))
+		if (PGM_UNLIKELY(*optlen != sizeof (struct timeval)))
 			break;
 		{
 			struct timeval* tv = optval;
@@ -1674,6 +1676,31 @@ pgm_connect (
 /* cleanup */
 	pgm_rwlock_writer_unlock (&sock->lock);
 	pgm_debug ("PGM socket successfully connected.");
+	return TRUE;
+}
+
+/* return local endpoint address
+ */
+
+bool
+pgm_getsockname (
+	pgm_sock_t*      const restrict sock,
+	struct pgm_sockaddr_t* restrict addr,
+	socklen_t*             restrict addrlen
+	)
+{
+	pgm_assert (NULL != sock);
+	pgm_assert (NULL != addr);
+	pgm_assert (NULL != addrlen);
+	pgm_assert (sizeof(struct pgm_sockaddr_t) == *addrlen);
+
+	if (!sock->is_bound) {
+		errno = EBADF;
+		return FALSE;
+	}
+
+	addr->sa_port = sock->dport;
+	memcpy (&addr->sa_addr, &sock->tsi, sizeof(pgm_tsi_t));
 	return TRUE;
 }
 
