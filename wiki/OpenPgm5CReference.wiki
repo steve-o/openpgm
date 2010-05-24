@@ -1,4 +1,4 @@
-﻿#summary C Reference for OpenPGM version 3.
+﻿#summary C Reference for OpenPGM version 5.
 #labels Featured,Phase-Implementation
 
 *OpenPGM version 5.0.65*

@@ -1,0 +1,24 @@
+﻿#summary OpenPGM 5 : C Reference : Interface : struct pgm_addrinfo_t
+#labels Phase-Implementation
+#sidebar TOC5CReferenceInterface
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_addrinfo_t {
+        sa_family_t                  ai_family;
+	uint32_t                     ai_recv_addrs_len;
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*` restrict     ai_recv_addrs;
+	uint32_t                     ai_send_addrs_len;
+	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*` restrict     ai_send_addrs;
+	};
+</pre>
+
+=== Purpose ===
+A transport object represents network definition of a PGM transport.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmGetAddrInfo pgm_getaddrinfo()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmGetAddrInfo pgm_freeaddrinfo()]</tt><br>
+  * [OpenPgm5CReferenceInterface Interface] in OpenPGM C Reference.

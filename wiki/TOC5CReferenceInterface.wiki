@@ -1,0 +1,6 @@
+  * C Reference for OpenPGM version 5
+  * [OpenPgm5CReference Contents]
+  * [OpenPgm5CReferenceInterface Interface]
+    * [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]
+    * [OpenPgm5CReferencePgmGetAddrInfo pgm_getaddrinfo()]
+    * [OpenPgm5CReferencePgmGetAddrInfo pgm_freeaddrinfo()]
