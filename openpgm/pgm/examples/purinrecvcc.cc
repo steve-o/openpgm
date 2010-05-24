@@ -25,13 +25,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #ifndef _WIN32
 #	include <unistd.h>
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #else
 #	include "getopt.h"
-#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.hh>
 
@@ -76,15 +76,15 @@ usage (
 	const char*	bin
 	)
 {
-	fprintf (stderr, "Usage: %s [options]\n", bin);
-	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
-	fprintf (stderr, "  -s <port>       : IP port\n");
-	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-	fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
-	fprintf (stderr, "  -N <n>\n");
-	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
-	fprintf (stderr, "  -i              : List available interfaces\n");
+	std::cerr << "Usage: " << bin << " [options]" << std::endl;
+	std::cerr << "  -n <network>    : Multicast group or unicast IP address" << std::endl;
+	std::cerr << "  -s <port>       : IP port" << std::endl;
+	std::cerr << "  -p <port>       : Encapsulate PGM in UDP on IP port" << std::endl;
+	std::cerr << "  -f <type>       : Enable FEC with either proactive or ondemand parity" << std::endl;
+	std::cerr << "  -K <k>          : Configure Reed-Solomon code (n, k)" << std::endl;
+	std::cerr << "  -N <n>" << std::endl;
+	std::cerr << "  -l              : Enable multicast loopback and address sharing" << std::endl;
+	std::cerr << "  -i              : List available interfaces" << std::endl;
 	exit (EXIT_SUCCESS);
 }
 
@@ -99,14 +99,14 @@ main (
 	setlocale (LC_ALL, "");
 
 #ifndef _WIN32
-	puts ("プリン プリン");
+	std::cout << "プリン プリン" << std::endl;
 #else
 	_putws (L"プリン プリン");
 #endif
 
-	if (!pgm_init (&pgm_err)) {
-		fprintf (stderr, "Unable to start PGM engine: %s\n", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!cpgm::pgm_init (&pgm_err)) {
+		std::cerr << "Unable to start PGM engine: " << pgm_err->message << std::endl;
+		cpgm::pgm_error_free (pgm_err);
 		return EXIT_FAILURE;
 	}
 
@@ -134,7 +134,7 @@ main (
 	}
 
 	if (use_fec && ( !rs_n || !rs_k )) {
-		fprintf (stderr, "Invalid Reed-Solomon parameters RS(%d,%d).\n", rs_n, rs_k);
+		std::cerr << "Invalid Reed-Solomon parameters RS(" << rs_n << "," << rs_k << ")." << std::endl;
 		usage (binary_name);
 	}
 
@@ -153,7 +153,7 @@ main (
 #endif /* !_WIN32 */
 
 	if (!on_startup()) {
-		fprintf (stderr, "Startup failed\n");
+		std::cerr << "Startup failed" << std::endl;
 		return EXIT_FAILURE;
 	}
 
@@ -178,7 +178,7 @@ main (
 	waitHandles[1] = recvEvent;
 	waitHandles[2] = pendingEvent;
 #endif /* !_WIN32 */
-	puts ("Entering PGM message loop ... ");
+	std::cout << "Entering PGM message loop ... " << std::endl;
 	do {
 		socklen_t optlen;
 		struct timeval tv;
@@ -224,8 +224,8 @@ block:
 
 		default:
 			if (pgm_err) {
-				fprintf (stderr, "%s\n", pgm_err->message);
-				pgm_error_free (pgm_err);
+				std::cerr << pgm_err->message << std::endl;
+				cpgm::pgm_error_free (pgm_err);
 				pgm_err = NULL;
 			}
 			if (cpgm::PGM_IO_STATUS_ERROR == status)
@@ -233,7 +233,7 @@ block:
 		}
 	} while (!is_terminated);
 
-	puts ("Message loop terminated, cleaning up.");
+	std::cout << "Message loop terminated, cleaning up." << std::endl;
 
 /* cleanup */
 #ifndef _WIN32
@@ -246,14 +246,14 @@ block:
 #endif /* !_WIN32 */
 
 	if (sock) {
-		puts ("Closing PGM socket.");
+		std::cout << "Closing PGM socket." << std::endl;
 		sock->close (TRUE);
 		sock = NULL;
 	}
 
-	puts ("PGM engine shutdown.");
+	std::cout << "PGM engine shutdown." << std::endl;
 	cpgm::pgm_shutdown ();
-	puts ("finished.");
+	std::cout << "finished." << std::endl;
 	return EXIT_SUCCESS;
 }
 
@@ -264,7 +264,7 @@ on_signal (
 	int		signum
 	)
 {
-	printf ("on_signal (signum:%d)\n", signum);
+	std::cout << "on_signal (signum:" << signum << ")" << std::endl;
 	is_terminated = TRUE;
 	const char one = '1';
 	const size_t writelen = write (terminate_pipe[1], &one, sizeof(one));
@@ -277,7 +277,7 @@ on_console_ctrl (
 	DWORD		dwCtrlType
 	)
 {
-	printf ("on_console_ctrl (dwCtrlType:%lu)\n", (unsigned long)dwCtrlType);
+	std::cout << "on_console_ctrl (dwCtrlType:" << dwCtrlType << ")" << std::endl;
 	is_terminated = TRUE;
 	SetEvent (terminate_event);
 	return TRUE;
@@ -294,7 +294,7 @@ on_startup (void)
 
 /* parse network parameter into PGM socket address structure */
 	if (!pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
-		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
+		std::cerr << "Parsing network parameter: " << pgm_err->message << std::endl;
 		goto err_abort;
 	}
 
@@ -303,17 +303,17 @@ on_startup (void)
 	sock = new ip::pgm::socket();
 
 	if (udp_encap_port) {
-		puts ("Create PGM/UDP socket.");
+		std::cout << "Create PGM/UDP socket." << std::endl;
 		if (!sock->open (sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
-			fprintf (stderr, "Creating PGM/UDP socket: %s\n", pgm_err->message);
+			std::cerr << "Creating PGM/UDP socket: " << pgm_err->message << std::endl;
 			goto err_abort;
 		}
 		sock->set_option (cpgm::PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 		sock->set_option (cpgm::PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 	} else {
-		puts ("Create PGM/IP socket.");
+		std::cout << "Create PGM/IP socket." << std::endl;
 		if (!sock->open (sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
-			fprintf (stderr, "Creating PGM/IP socket: %s\n", pgm_err->message);
+			std::cerr << "Creating PGM/IP socket: " << pgm_err->message << std::endl;
 			goto err_abort;
 		}
 	}
@@ -365,7 +365,7 @@ on_startup (void)
 
 /* assign socket to specified address */
 	if (!sock->bind (*endpoint, &pgm_err)) {
-		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
+		std::cerr << "Binding PGM socket: " << pgm_err->message << std::endl;
 		goto err_abort;
 	}
 
@@ -389,11 +389,11 @@ on_startup (void)
 	}
 
 	if (!sock->connect (&pgm_err)) {
-		fprintf (stderr, "Connecting PGM socket: %s\n", pgm_err->message);
+		std::cerr << "Connecting PGM socket: " << pgm_err->message << std::endl;
 		goto err_abort;
 	}
 
-	puts ("Startup complete.");
+	std::cout << "Startup complete." << std::endl;
 	return TRUE;
 
 err_abort:
@@ -402,11 +402,11 @@ err_abort:
 		sock = NULL;
 	}
 	if (NULL != res) {
-		pgm_freeaddrinfo (res);
+		cpgm::pgm_freeaddrinfo (res);
 		res = NULL;
 	}
 	if (NULL != pgm_err) {
-		pgm_error_free (pgm_err);
+		cpgm::pgm_error_free (pgm_err);
 		pgm_err = NULL;
 	}
 	return FALSE;
@@ -426,14 +426,7 @@ on_data (
 	strncpy (buf, (char*)data, buflen);
 	buf[buflen] = '\0';
 	cpgm::pgm_tsi_print_r (from.address(), tsi, sizeof(tsi));
-#ifndef _MSC_VER
-	printf ("\"%s\" (%zu bytes from %s)\n",
-			buf, len, tsi);
-#else
-/* Microsoft CRT will crash on %zu */
-	printf ("\"%s\" (%u bytes from %s)\n",
-			buf, (unsigned)len, tsi);
-#endif
+	std::cout << "\"" << buf << "\" (" << len << " bytes from " << tsi << ")" << std::endl;
 	return 0;
 }
 

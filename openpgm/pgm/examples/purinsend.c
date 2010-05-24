@@ -218,7 +218,7 @@ create_sock (void)
 
 /* assign socket to specified address */
 	if (!pgm_bind (sock, &addr, sizeof(addr), &pgm_err)) {
-		fprintf (stderr, "Binding PGM/IP socket: %s\n", pgm_err->message);
+		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
 		goto err_abort;
 	}
 
@@ -258,10 +258,6 @@ err_abort:
 	if (NULL != pgm_err) {
 		pgm_error_free (pgm_err);
 		pgm_err = NULL;
-	}
-	if (NULL != sock) {
-		pgm_close (sock, FALSE);
-		sock = NULL;
 	}
 	return FALSE;
 }
