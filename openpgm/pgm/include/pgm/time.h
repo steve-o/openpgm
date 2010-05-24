@@ -29,20 +29,20 @@ PGM_BEGIN_DECLS
 typedef uint64_t pgm_time_t;
 typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_t*restrict);
 
-#define pgm_to_secs(t)	((pgm_time_t)( (t) / 1000000UL ))
-#define pgm_to_msecs(t)	((pgm_time_t)( (t) / 1000UL ))
+#define pgm_to_secs(t)	((uint64_t)( (t) / 1000000UL ))
+#define pgm_to_msecs(t)	((uint64_t)( (t) / 1000UL ))
 #define pgm_to_usecs(t)	( (t) )
-#define pgm_to_nsecs(t)	((pgm_time_t)( (t) * 1000UL ))
+#define pgm_to_nsecs(t)	((uint64_t)( (t) * 1000UL ))
 
 #define pgm_to_secsf(t)	 ( (double)(t) / 1000000.0 )
 #define pgm_to_msecsf(t) ( (double)(t) / 1000.0 )
 #define pgm_to_usecsf(t) ( (double)(t) )
 #define pgm_to_nsecsf(t) ( (double)(t) * 1000.0 )
 
-#define pgm_secs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000000UL ))
-#define pgm_msecs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000UL ))
-#define pgm_usecs(t)	((pgm_time_t)( (t) ))
-#define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000UL ))
+#define pgm_secs(t)	((uint64_t)( (uint64_t)(t) * 1000000UL ))
+#define pgm_msecs(t)	((uint64_t)( (uint64_t)(t) * 1000UL ))
+#define pgm_usecs(t)	((uint64_t)( (t) ))
+#define pgm_nsecs(t)	((uint64_t)( (t) / 1000UL ))
 
 #define PGM_TIME_FORMAT	PRIu64
 
