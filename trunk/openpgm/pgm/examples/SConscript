@@ -82,8 +82,6 @@ if e['WITH_CC'] == 'true':
 		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
 			newCCFLAGS.append("-D_XOPEN_SOURCE=500");
 	pcc['CCFLAGS'] = newCCFLAGS;
-	pcc.Append(CPPPATH = ['.']);
-	pcc.Append(CCFLAGS = pcc['PROTOBUF_CCFLAGS']);
 	pcc.Program('purinrecvcc', ['purinrecvcc.cc'] + getopt)
 
 # end of file
