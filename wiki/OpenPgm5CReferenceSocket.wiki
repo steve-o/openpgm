@@ -1,0 +1,120 @@
+﻿#summary OpenPGM 5 : C Reference : Socket
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+=== Introduction ===
+PGM Sockets manage network connections and send outbound messages.
+
+=== Topics in Alphabetical Order ===
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td colspan="2"><h3>GSI API</h3></td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiT pgm_gsi_t]</tt></td>
+<td>Object representing a GSI.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt></td>
+<td>Create a GSI based on IPv4 host address.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt></td>
+<td>Create a GSI based on MD5 of system host name.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiCreateFromString pgm_gsi_create_from_string()]</tt></td>
+<td>Create a GSI based on MD5 of a text string.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiCreateFromData pgm_gsi_create_from_data()]</tt></td>
+<td>Create a GSI based on MD5 of a data buffer.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiPrint pgm_gsi_print()]</tt></td>
+<td>Display a GSI in human friendly form.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiPrint pgm_gsi_print_r()]</tt></td>
+<td>Display a GSI in human friendly form, re-entrant form.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmGsiEqual pgm_gsi_equal()]</tt></td>
+<td>Compare two GSI values.</td>
+</tr><tr>
+<td colspan="2"><h3>TSI API</h3></td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTsiT pgm_tsi_t]</tt></td>
+<td>Object representing a TSI.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTsiPrint pgm_tsi_print()]</tt></td>
+<td>Display a TSI in human friendly form.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTsiPrint pgm_tsi_print_r()]</tt></td>
+<td>Display a TSI in human friendly form, re-entrant version.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmTsiEqual pgm_tsi_equal()]</tt></td>
+<td>Compare two TSI values.</td>
+</tr><tr>
+<td colspan="2"><h3>Socket API</h3></td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmIoStatus PGMIOStatus]</tt></td>
+<td>Return status for PGM IO functions.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmIoVec pgm_iovec]</tt></td>
+<td>A scatter/gather message vector.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]</tt></td>
+<td>A scatter/gather message vector^2^.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt></td>
+<td>A PGM socket object represents a delivery mechanism for messages.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmRecv pgm_recv()]</tt></td>
+<td>Receive a message from the PGM socket.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmRecv pgm_recvfrom()]</tt></td>
+<td>Receive a message from the PGM socket saving source address.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmRecv pgm_recvmsg()]</tt></td>
+<td>Receive a message from the PGM socket with scatter/gather vector buffers.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmRecvMsgv pgm_recvmsgv()]</tt></td>
+<td>Receive a message vector from the PGM socket with scatter/gather vector buffers.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmSend pgm_send()]</tt></td>
+<td>Send a message.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmSendv pgm_sendv()]</tt></td>
+<td>Send a vector of messages.</td>
+</tr><tr>
+<td><tt>[OpenPgm3CReferencePgmSendSkbv pgm_send_skbv()]</tt></td>
+<td>Zero-copy send a vector of PGM skbuffs.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt></td>
+<td>Bind a PGM socket to the specified network devices.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt></td>
+<td>Initiate a PGM socket connection.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt></td>
+<td>Create a PGM socket.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt></td>
+<td>Close a PGM socket.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmGetSockOpt pgm_getsockopt()]</tt></td>
+<td>Get a PGM socket option.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmGetSockOpt pgm_setsockopt()]</tt></td>
+<td>Set a PGM socket option.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmGetSockName pgm_getsockname()]</tt></td>
+<td>Get the PGM socket name.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmSelectInfo pgm_select_info()]</tt></td>
+<td>Set parameters suitable for feeding into <tt>select()</tt>.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmPollInfo pgm_poll_info()]</tt></td>
+<td>Set parameters suitable for feeding into <tt>poll()</tt>.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmEpollCtl pgm_epoll_ctl()]</tt></td>
+<td>Fill <tt>epoll_event</tt> parameters in preparation for <tt>epoll_wait()</tt>.</td>
+</tr>
+</table>
+
