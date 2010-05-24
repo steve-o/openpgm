@@ -1,13 +1,13 @@
-﻿#summary OpenPGM 2 : C Reference : Monitoring and Administration : pgm_snmp_init()
+﻿#summary OpenPGM 3 : C Reference : Monitoring and Administration : pgm_snmp_init()
 #labels Phase-Implementation
-#sidebar TOC2CReferenceMonitoringAndAdministration
+#sidebar TOC3CReferenceMonitoringAndAdministration
 _Function_
 === Declaration ===
 <pre>
 #include <pgm/snmp.h>
 
-[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] *pgm_snmp_init* (
-        [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]`*``*`     error
+bool *pgm_snmp_init* (
+        [OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`     error
 	);
 </pre>
 
@@ -53,29 +53,28 @@ Example <tt>snmpd.conf</tt>:
 </tr>
 <tr>
 <td><tt>err</tt></td>
-<td>a return location for a <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt>, or <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#NULL--CAPS NULL]</tt>.</td>
+<td>a return location for a <tt>[OpenPgm3CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
 </tr>
 </table>
 
 
 === Return Value ===
-On success, <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt> is returned.  On error, <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt> is returned.  If <tt>err</tt> is provided it may be set detailing any threading or issue connecting to the SNMP agent or daemon.  SNMP errors will be reported to its log system.
+On success, <tt>TRUE</tt> is returned.  On error, <tt>FALSE</tt> is returned.  If <tt>err</tt> is provided it may be set detailing any threading or issue connecting to the SNMP agent or daemon.  SNMP errors will be reported to its log system.
 
 === Example ===
 
 {{{
- GError* err = NULL;
+ pgm_error_t* err = NULL;
  if (!pgm_snmp_init (&err)) {
-   g_error ("Unable to start SNMP interface: %s", err->message);
-   g_error_free (err);
+   fprintf (stderr, "Starting SNMP interface: %s\n", (err && err->message) ? err->message : "(null)");
+   pgm_error_free (err);
    return EXIT_FAILURE;
  }
 }}}
 
 === See Also ===
-  * <tt>[OpenPgm2CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
-  * <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]</tt><br>
-  * <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt><br>
-  * [OpenPgm2CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
-  * [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html GLib Error Reporting].<br>
+  * <tt>[OpenPgm3CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmHttpInit pgm_http_init()]</tt><br>
+  * <tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt><br>
+  * [OpenPgm3CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
   * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].

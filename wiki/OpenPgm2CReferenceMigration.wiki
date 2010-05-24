@@ -3,13 +3,13 @@
 #sidebar TOC2CReferenceMigration
 == Environment ==
 === Summary ===
-  * Add [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError] parameter to <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt>.
+  * Add <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter to <tt>[OpenPgm2CReferencePgmInit pgm_init()]</tt>.
   * Add call to <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt> on application shutdown.
 
 === Details ===
 Version 2.0 introduces a <tt>[OpenPgm2CReferencePgmShutdown pgm_shutdown()]</tt> function to free resources used by the PGM engine together with <tt>[OpenPgm2CReferencePgmSupported pgm_supported()]</tt>, a method to detect previously initialized PGM engine allowing multiple subsystems to use PGM, for example within a library and inside an application core.
 
-Additional error reporting on version 2 adds [http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError] return values to all major functions, this extra information can be ignored by passing a NULL value.
+Additional error reporting on version 2 adds <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> return values to all major functions, this extra information can be ignored by passing a NULL value.
 
 *Version 1.0 code example.*
 {{{
@@ -106,7 +106,7 @@ Improved error reporting means that detailed error messages are available on inv
 === Summary ===
   * Update transport create and bind functions with <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters.
   * <tt>Update pgm_transport_recv</tt> calls with shortened name version, <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameters, and <tt>[http://library.gnome.org/devel/glib/stable/glib-IO-Channels.html#GIOStatus GIOStatus]</tt> return values.
-  * Update transport parameter setters to check for [http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean] return values instead of <tt>int</tt> based ones.
+  * Update transport parameter setters to check for <tt>[http://library.gnome.org/devel/glib/stable/glib-Basic-Types.html#gboolean gboolean]</tt> return values instead of <tt>int</tt> based ones.
   * Non-blocking flag <tt>MSG_DONTWAIT</tt> needs to be replaced with transport wide <tt>[OpenPgm2CReferencePgmTransportSetNonBlocking pgm_transport_set_nonblocking()]</tt> for support on Windows platforms.
   * Remove setters for transmit or receive window pre-allocation sizes.
 
@@ -250,8 +250,8 @@ Send and receive zero-copy handling has been consolidating into to using new PGM
 
 == Monitoring and Administration ==
 === Summary ===
-  * Update calls to <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
-  * Update calls to <tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
+  * Update calls to <tt>[OpenPgm2CReferencePgmSnmpInit pgm_snmp_init()]</tt> with optional <tt>[http://library.gnome.org/devel/glib/stable/glib-Error-Reporting.html#GError GError]</tt> parameter.
 
 
 === Details ===

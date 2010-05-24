@@ -13,7 +13,7 @@ _Function_
 Stop and destroy a running HTTP interface.
 
 === Return Value ===
-On success, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE] is returned.  On error, [http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE] is returned.
+On success, <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#TRUE--CAPS TRUE]</tt> is returned.  On error, <tt>[http://library.gnome.org/devel/glib/stable/glib-Standard-Macros.html#FALSE--CAPS FALSE]</tt> is returned.
 
 === See Also ===
   * <tt>[OpenPgm2CReferencePgmHttpInit pgm_http_init()]</tt><br>

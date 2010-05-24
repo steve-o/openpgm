@@ -1,7 +1,7 @@
 ﻿#summary C Reference for OpenPGM version 3.
 #labels Featured,Phase-Implementation
 
-*OpenPGM version 3.0.56*
+*OpenPGM version 3.0.60*
 
 *May 2010*
 
@@ -16,3 +16,4 @@
   # [OpenPgm3CReferenceTiming Timing]
   # [OpenPgm3CReferenceTransport Transport]
   # [OpenPgm3CReferenceErrorHandling Error Handling]
+  # [OpenPgm3CReferenceMonitoringAndAdministration Monitoring and Administration]
