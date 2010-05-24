@@ -1,13 +1,13 @@
-﻿#summary OpenPGM 3 : C Reference : Transport : pgm_recv()
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_recv()
 #labels Phase-Implementation
-#sidebar TOC3CReferenceTransport
+#sidebar TOC5CReferenceSocket
 _Function_
 === Declaration ===
 <pre>
 #include <pgm/pgm.h>
 
 int *pgm_recv* (
-	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
 	void`*`            buf,
 	size_t               len,
 	int                 flags,
@@ -16,17 +16,17 @@ int *pgm_recv* (
 );
 
 int *pgm_recvfrom* (
-	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
 	void`*``*`            buf,
 	size_t               len,
 	int                 flags,
 	size_t`*`              bytes_read,
-	[OpenPgm3CReferencePgmTsiT pgm_tsi_t]`*`          from,
+	[OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*`          from,
 	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`            error
 );
 
 int *pgm_recvmsg* (
-	[OpenPgm3CReferencePgmTransportT pgm_transport_t]`*`    transport,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
 	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*`         msgv,
 	int                 flags,
 	size_t`*`              bytes_read,
@@ -50,7 +50,7 @@ The <tt>pgm_recv()</tt> is identical to <tt>pgm_recvfrom()</tt> with a <tt>NULL<
 
 Memory is returned to the receive window on the next call or transport destruction.
 
-Unrecoverable data loss will cause the function to immediately return with <tt>PGM_IO_STATUS_RESET</tt>, setting flags to <tt>MSG_ERR_QUEUE</tt> will return a populated <tt>msgv</tt> with an error skbuff detailing the error.  If <tt>[OpenPgm3CReferencePgmTransportSetAbortOnReset pgm_transport_set_abort_on_reset()]</tt> is called with <tt>false</tt> (the default mode) processing can continue with subsequent calls to <tt>pgm_recv()</tt>, if <tt>true</tt> then the transport will continue to return <tt>PGM_IO_STATUS_RESET</tt> until destroyed.
+Unrecoverable data loss will cause the function to immediately return with <tt>PGM_IO_STATUS_RESET</tt>, setting flags to <tt>MSG_ERR_QUEUE</tt> will return a populated <tt>msgv</tt> with an error skbuff detailing the error.  If <tt>PGM_ABORT_ON_RESET</tt> is set with <tt>false</tt> (the default mode) processing can continue with subsequent calls to <tt>pgm_recv()</tt>, if <tt>true</tt> then the transport will continue to return <tt>PGM_IO_STATUS_RESET</tt> until destroyed.
 
 It is valid to send and receive zero length PGM packets.
 
@@ -62,8 +62,8 @@ It is valid to send and receive zero length PGM packets.
 <th>Description</th>
 </tr>
 <tr>
-<td><tt>transport</tt></td>
-<td>The PGM transport object.</td>
+<td><tt>sock</tt></td>
+<td>The PGM socket object.</td>
 </tr><tr>
 <td><tt>buf</tt></td>
 <td>Data buffer to fill.</td>
@@ -104,10 +104,10 @@ Receive an APDU with source TSI.
 
 {{{
  char buf[4096];
- pgm_tsi_t from;
+ struct pgm_sockaddr_t from;
  size_t bytes_read;
  pgm_recvfrom (transport, buf, sizeof(buf), 0, &from, &bytes_read, NULL);
- printf ("%zu bytes received from %s\n", pgm_tsi_print (&from));
+ printf ("%zu bytes received from %s\n", pgm_tsi_print (&from.sa_addr));
 }}}
 
 Receive a scatter/gather vector APDU message.
@@ -154,8 +154,8 @@ Display details from error skbuff.
 
 === See Also ===
   * <tt>[OpenPgm3CReferencePgmIoStatus PGMIOStatus]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmTransportT pgm_transport_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * <tt>[OpenPgm3CReferencePgmRecvMsgv pgm_recvmsgv()]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmTransportCreate pgm_transport_create()]</tt><br>
-  * [OpenPgm3CReferenceTransport Transport] in OpenPGM C Reference.<br>
+  * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.<br>
   * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.

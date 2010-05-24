@@ -1,0 +1,25 @@
+#summary OpenPGM 5 : C Reference : Socket : pgm_sock_t
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct pgm_sock_t *pgm_sock_t*;
+</pre>
+
+=== Purpose ===
+A PGM socket object represents a delivery mechanism for messages.
+
+=== Remarks ===
+A PGM socket describes a carrier mechanism for messages across a network.
+
+Programs must explicitly destroy each transport object. Destroying a PGM socket object invalidates subsequent send calls on that transport, invalidates any listeners using that transport, and frees its storage.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt><br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.
