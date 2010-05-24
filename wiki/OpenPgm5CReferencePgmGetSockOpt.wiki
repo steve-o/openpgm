@@ -61,5 +61,5 @@ On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>
 
 
 === See Also ===
-  * <tt>[OpenPgm5CReferencePgmSockT pgm_sockt]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.
