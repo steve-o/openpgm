@@ -62,8 +62,14 @@ PGM Sockets manage network connections and send outbound messages.
 <td><tt>[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]</tt></td>
 <td>A scatter/gather message vector^2^.</td>
 </tr><tr>
+<td><tt>[OpenPgm5CReferencePgmFecInfoT pgm_fecinfo_t]</tt></td>
+<td>Settings for forward error correction (FEC).</td>
+</tr><tr>
 <td><tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt></td>
 <td>A PGM socket object represents a delivery mechanism for messages.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]</tt></td>
+<td>PGM endpoint address.</td>
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmRecv pgm_recv()]</tt></td>
 <td>Receive a message from the PGM socket.</td>

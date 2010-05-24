@@ -1,0 +1,23 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_fecinfo_t
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_fecinfo_t {
+	uint8_t        block_size;
+        uint8_t        proactive_packets;
+        uint8_t        group_size;
+        bool           ondemand_parity_enabled;
+        bool           var_pktlen_enabled;
+	};
+</pre>
+
+=== Purpose ===
+Settings for forward error correction (FEC).
+
+=== See Also ===
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.<br>
+  * [http://msdn.microsoft.com/en-us/library/ms740132(VS.85).aspx RM_FEC_INFO] structure on MSDN.

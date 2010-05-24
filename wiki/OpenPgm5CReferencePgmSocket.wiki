@@ -1,0 +1,57 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_socket()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_socket* (
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*``*` restrict           sock,
+	const sa_family_t                       family,
+	const int                               sock_type,
+	const int                               protocol,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict         error
+	);
+</pre>
+
+=== Purpose ===
+Create a PGM socket.
+
+=== Remarks ===
+A custom network protocol requires super-user privileges to open the necessary raw sockets.  An application can call <tt>pgm_socket()</tt> to create unbound raw sockets, drop the privileges to maintain security, and then bind with <tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt> and finally <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt> to start processing incoming packets.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>sock</tt></td>
+<td>Location to store the PGM socket object.</td>
+</tr><tr>
+<td><tt>family</tt></td>
+<td>The desired IP address family, <tt>AF_INET</tt> or <tt>AF_INET6</tt>.</td>
+</tr><tr>
+<td><tt>sock_type</tt></td>
+<td>Socket type, must be <tt>SOCK_SEQPACKET</tt>.</td>
+</tr><tr>
+<td><tt>protocol</tt></td>
+<td>The protocol layer to use, <tt>IPPROTO_PGM</tt> or <tt>IPPROTO_UDP</tt>.</td>
+</tr><tr>
+<td><tt>error</tt></td>
+<td>a return location for a <tt>[OpenPgm3CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned and if <tt>error</tt> is set it may be populated with details of the exception.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt><br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

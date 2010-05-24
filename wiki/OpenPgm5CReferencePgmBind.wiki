@@ -1,0 +1,78 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_bind()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_bind* (
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` restrict    sock,
+	const struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` const restrict    sockaddr,
+	const socklen_t                               sockaddrlen,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict     error
+	);
+
+bool *pgm_bind3* (
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` restrict    sock,
+	const struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` const restrict    sockaddr,
+	const socklen_t                               sockaddrlen,
+	const struct group_req`*` restrict              send_req,
+	const socklen_t                               send_req_len,
+	const struct group_req`*` restrict              recv_req,
+	const socklen_t                               recv_req_len,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict     error
+	);
+</pre>
+
+=== Purpose ===
+Bind a transport to the specified network devices.
+
+=== Remarks ===
+Assigns local addresses to the PGM transport sockets which will initiate delivery of reconstructed messages to the asynchronous queue and its associated dispatcher threads.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>sock</tt></td>
+<td>The PGM socket object.</td>
+</tr><tr>
+<td><tt>sockaddr</tt></td>
+<td>The PGM socket address to bind.</td>
+</tr><tr>
+<td><tt>sockaddrlen</tt></td>
+<td>The size of the <tt>sockaddr</tt> parameter.</td>
+</tr><tr>
+<td><tt>send_req</tt></td>
+<td>Interface to bind for sending.</td>
+</tr><tr>
+<td><tt>send_req_len</tt></td>
+<td>The size of the <tt>send_req</tt> parameter.</td>
+</tr><tr>
+<td><tt>recv_req</tt></td>
+<td>Interface to bind for receiving.</td>
+</tr><tr>
+<td><tt>recv_req_len</tt></td>
+<td>The size of the <tt>recv_req</tt> parameter.</td>
+</tr><tr>
+<td><tt>error</tt></td>
+<td>a return location for a [OpenPgm3CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned and if <tt>error</tt> is set it may be populated with details of the exception.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt><br>
+  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

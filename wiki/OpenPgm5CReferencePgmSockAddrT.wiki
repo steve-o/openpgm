@@ -1,0 +1,20 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_sockaddr_t
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_sockaddr_t {
+	uint16_t       sa_port;            /`*` data-destination port `*`/
+	[OpenPgm3CReferencePgmTsiT pgm_tsi_t]     sa_addr;
+	};
+</pre>
+
+=== Purpose ===
+PGM endpoint address.
+
+=== See Also ===
+  * <tt>[OpenPgm3CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

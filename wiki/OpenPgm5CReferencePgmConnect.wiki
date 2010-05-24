@@ -1,0 +1,43 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_connect()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_connect* (
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`                  error
+	);
+</pre>
+
+=== Purpose ===
+Initiate a PGM socket connection.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>sock</tt></td>
+<td>The PGM socket object.</td>
+</tr><tr>
+<td><tt>error</tt></td>
+<td>a return location for a [OpenPgm3CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+</tr>
+</table>
+
+=== Return Value ===
+On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned and if <tt>error</tt> is set it may be populated with details of the exception.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt><br>
+  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.
