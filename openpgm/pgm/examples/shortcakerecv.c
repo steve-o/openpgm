@@ -384,10 +384,6 @@ err_abort:
 		pgm_error_free (pgm_err);
 		pgm_err = NULL;
 	}
-	if (NULL != sock) {
-		pgm_close (sock, FALSE);
-		sock = NULL;
-	}
 	return FALSE;
 }
 
