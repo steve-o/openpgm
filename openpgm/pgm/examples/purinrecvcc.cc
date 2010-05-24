@@ -330,11 +330,11 @@ on_startup (void)
 /* set PGM parameters */
 		const int recv_only = 1,
 			  passive = 0,
-			  peer_expiry = (300*1000000UL) /* pgm_secs (300) */,
-			  spmr_expiry = (250*1000UL) /* pgm_msecs (250) */,
-			  nak_bo_ivl = (50*1000UL) /* pgm_msecs (50) */,
-			  nak_rpt_ivl = (2*1000000UL) /* pgm_secs (2) */,
-			  nak_rdata_ivl = (2*1000000UL) /* pgm_secs (2) */,
+			  peer_expiry = pgm_secs (300),
+			  spmr_expiry = pgm_msecs (250),
+			  nak_bo_ivl = pgm_msecs (50),
+			  nak_rpt_ivl = pgm_secs (2),
+			  nak_rdata_ivl = pgm_secs (2),
 			  nak_data_retries = 50,
 			  nak_ncf_retries = 50;
 
