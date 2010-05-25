@@ -30,6 +30,8 @@
 #ifndef _WIN32
 #	include <cstddef>
 #	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
 #endif
 
 namespace cpgm {
@@ -109,10 +111,13 @@ public:
 	bool shutdown (int what)
 	{
 		int optname, v = 1;
-		if (SHUT_RD == what)
-			optname = cpgm::PGM_SEND_ONLY;
-		else if (SHUT_WR == what)
-			optname = cpgm::PGM_RECV_ONLY;
+#ifndef _WIN32
+		if (SHUT_RD == what)		optname = cpgm::PGM_SEND_ONLY;
+		else if (SHUT_WR == what)	optname = cpgm::PGM_RECV_ONLY;
+#else
+		if (SD_RECEIVE == what)		optname = cpgm::PGM_SEND_ONLY;
+		else if (SD_SEND == what)	optname = cpgm::PGM_RECV_ONLY;
+#endif
 		else {
 			errno = EINVAL;
 			return false;

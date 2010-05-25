@@ -149,12 +149,13 @@ receiver_routine (
 	HANDLE waitHandles[ 3 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (async->sock, PGM_RECV_SOCK, &recv_sock, sizeof(recv_sock));
+	pgm_getsockopt (async->sock, PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (async->sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
+	pgm_getsockopt (async->sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = async->destroy_event;

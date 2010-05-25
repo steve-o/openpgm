@@ -97,7 +97,7 @@ main (
 
 	setlocale (LC_ALL, "");
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(CONFIG_TARGET_WINE)
 	puts ("いちごのショートケーキ");
 #else
 	_putws (L"いちごのショートケーキ");
@@ -399,7 +399,7 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	const size_t buflen = MIN(sizeof(buf) - 1, len);
-	strncpy (buf, (char*)data, buflen);
+	strncpy (buf, (const char*)data, buflen);
 	buf[buflen] = '\0';
 	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
 #ifndef _MSC_VER

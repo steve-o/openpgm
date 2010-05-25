@@ -94,7 +94,7 @@ main (
 
 	setlocale (LC_ALL, "");
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(CONFIG_TARGET_WINE)
 	puts ("プリン プリン");
 #else
 	_putws (L"プリン プリン");
@@ -162,12 +162,13 @@ main (
 	HANDLE waitHandles[ 3 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_RECV_SOCK, &recv_sock, sizeof(recv_sock));
+	pgm_getsockopt (sock, PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
+	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
@@ -429,7 +430,7 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	const size_t buflen = MIN(sizeof(buf) - 1, len);
-	strncpy (buf, (char*)data, buflen);
+	strncpy (buf, (const char*)data, buflen);
 	buf[buflen] = '\0';
 	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
 #ifndef _MSC_VER
