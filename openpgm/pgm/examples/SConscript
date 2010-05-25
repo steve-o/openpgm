@@ -82,7 +82,7 @@ if e['WITH_CC'] == 'true':
 		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
 			newCCFLAGS.append("-D_XOPEN_SOURCE=500");
 	pcc['CCFLAGS'] = newCCFLAGS;
-	pcc.Program('purinsendcc', ['purinsendcc.cc'] + getopt)
-	pcc.Program('purinrecvcc', ['purinrecvcc.cc'] + getopt)
+	pcc.Program('purinsendcc', ['purinsendcc.cc'] + p.Object(getopt))
+	pcc.Program('purinrecvcc', ['purinrecvcc.cc'] + p.Object(getopt))
 
 # end of file

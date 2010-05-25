@@ -98,10 +98,10 @@ main (
 
 	setlocale (LC_ALL, "");
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(CONFIG_TARGET_WINE)
 	std::cout << "プリン プリン" << std::endl;
 #else
-	std::wcout << L"プリン プリン";
+	std::wcout << L"プリン プリン" << std::endl;
 #endif
 
 	if (!cpgm::pgm_init (&pgm_err)) {
@@ -166,12 +166,13 @@ main (
 	HANDLE waitHandles[ 3 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	sock->get_option (cpgm::PGM_RECV_SOCK, &recv_sock, sizeof(recv_sock));
+	sock->get_option (cpgm::PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	sock->get_option (cpgm::PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
+	sock->get_option (cpgm::PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
