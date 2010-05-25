@@ -22,6 +22,7 @@
 #include <clocale>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #ifndef _WIN32
 #	include <unistd.h>

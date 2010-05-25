@@ -101,7 +101,7 @@ main (
 #ifndef _WIN32
 	std::cout << "プリン プリン" << std::endl;
 #else
-	_putws (L"プリン プリン");
+	std::wcout << L"プリン プリン";
 #endif
 
 	if (!cpgm::pgm_init (&pgm_err)) {
