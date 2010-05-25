@@ -26,7 +26,7 @@ OpenPGM C programs must link the appropriate library files.
 <td>Change the GLib line to<br/><tt>```pkg-config --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.2``` -lpgmhttp </tt><br/> or libsoup version 2.4 as appropriate,<br/><tt>```pkg-config --cflags --libs  glib-2.0 gthread-2.0 libsoup-2.4``` -lpgmhttp </tt></td>
 <td>Include this for the HTTP/HTTPS interface.</td>
 </tr><tr>
-<td><tt>-lpgmsnmp -lnetsnmpagent -lnetsnmpmibs -lnetsnmphelpers -lnetsnmp</tt></td>
+<td><tt>-lpgmsnmp ```net-snmp-config --agent-libs```</tt></td>
 <td>Include this for a Net-SNMP based sub-agent.</td>
 </tr><tr>
 <td><tt>-lm</tt></td>

@@ -23,6 +23,14 @@ OpenPGM C programs must link the appropriate library files.
 </tr><tr>
 <td><tt>-lresolv -lsocket -lnsl</tt></td>
 <td>Required for Solaris socket support.</td>
+</tr><tr>
+<td colspan="2"><h3>Monitoring and Administration</h3></td>
+</tr><tr>
+<td><tt>-lpgmhttp </tt></td>
+<td>Include this for the HTTP/HTTPS interface.</td>
+</tr><tr>
+<td><tt>-lpgmsnmp ```net-snmp-config --agent-libs```</tt></td>
+<td>Include this for a Net-SNMP based sub-agent.</td>
 </tr>
 </table>
 
