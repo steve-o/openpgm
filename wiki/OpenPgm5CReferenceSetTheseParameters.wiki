@@ -1,7 +1,7 @@
-﻿#summary OpenPGM 3 C Reference : Set These Parameters
+﻿#summary OpenPGM 5 C Reference : Set These Parameters
 #labels Phase-Implementation
-#sidebar TOC3CReferenceProgrammersChecklist
-OpenPGM does not default with a set of PGM parameters as it is necessary to customize to your messaging platform requirements. OpenPGM applications need to include calls to the following functions before binding a transport with a call to <tt>[OpenPgm3CReferencePgmTransportBind pgm_transport_bind()]</tt>
+#sidebar TOC5CReferenceProgrammersChecklist
+OpenPGM does not default with a set of PGM parameters as it is necessary to customize to your messaging platform requirements. OpenPGM applications need to include calls to the following functions before connecting a PGM socket with a call to <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt>
 
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -12,53 +12,53 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 <tr>
 <td colspan="2"><h3>Sending</h3></td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
+<td><tt>PGM_MTU</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm3CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgm3CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
+<td><tt>PGM_TXW_SQNS</tt>, or<br/>
+<tt>[OpenPgmConceptsTxwMaxRte PGM_TXW_MAX_RTE]</tt> and <tt>PGM_TXW_SECS</tt></td>
 <td>Set send window size, optionally enabling rate regulation engine.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
+<td><tt>PGM_MULTICAST_HOPS</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
+<td><tt>PGM_AMBIENT_SPM</tt></td>
 <td>Set interval of background SPM packets.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
+<td><tt>PGM_HEARTBEAT_SPM</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
 <td colspan="2"><h3>Receiving</h3></td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
+<td><tt>PGM_MTU</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm3CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgm3CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
+<td><tt>PGM_RXW_SQNS</tt>, or<br/>
+<tt>PGM_RXW_MAX_RTE</tt> and <tt>PGM_RXW_SECS</tt></td>
 <td>Set receive window size.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
+<td><tt>PGM_MULTICAST_HOPS</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
+<td><tt>PGM_PEER_EXPIRY</tt></td>
 <td>Set timeout for removing a dead peer.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>
+<td><tt>PGM_SPMR_EXPIRY</tt></td>
 <td>Set expiration time of SPM Requests.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetNakBoIvl pgm_transport_set_nak_bo_ivl()]</tt></td>
+<td><tt>PGM_NAK_BO_IVL</tt></td>
 <td>Set NAK transmit back-off interval.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetNakRptIvl pgm_transport_set_nak_rpt_ivl()]</tt></td>
+<td><tt>PGM_NAK_RPT_IVL</tt></td>
 <td>Set timeout before repeating NAK.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetNakRdataIvl pgm_transport_set_nak_rdata_ivl()]</tt></td>
+<td><tt>PGM_NAK_RDATA_IVL</tt></td>
 <td>Set timeout for receiving RDATA.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetNakDataRetries pgm_transport_set_nak_data_retries()]</tt></td>
+<td><tt>PGM_NAK_DATA_RETRIES</tt></td>
 <td>Set retries for DATA packets after NAK.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTransportSetNakNcfRetries pgm_transport_set_nak_ncf_retries()]</tt></td>
+<td><tt>PGM_NAK_NCF_RETRIES</tt></td>
 <td>Set retries for DATA after NCF.</td>
 </tr>
 </table>
@@ -69,13 +69,13 @@ All the example code specifies the default values used by TIBCO Rendezvous, Smar
 
 ==1:  Choose a suitable window size==
 
-<tt>[OpenPgm3CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm3CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <br/>
-<tt>[OpenPgm3CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt>.
+<tt>PGM_TXW_SQNS</tt>, or<br/>
+<tt>PGM_TXW_MAX_RTE</tt> and <br/>
+<tt>PGM_TXW_SECS</tt>.
 
-<tt>[OpenPgm3CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm3CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and<br/>
-<tt>[OpenPgm3CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt>.
+<tt>PGM_RXW_SQNS</tt>, or<br/>
+<tt>PGM_RXW_MAX_RTE</tt> and<br/>
+<tt>PGM_RXW_SECS</tt>.
 
 
 This can be difficult, Rendezvous defaults to a 60s buffer which will cripple you machine if you publish fast.  Rendezvous can only specify the window size in seconds, with OpenPGM you can specify seconds + bandwidth or individual sequence numbers.  The goal is to have the lowest possible window size that keeps your applications happy.  Too large a window consumes extra memory and can harm your applications cache locality with stale buffers.
@@ -83,21 +83,21 @@ This can be difficult, Rendezvous defaults to a 60s buffer which will cripple yo
 
 ==2:  Choose a maximum packet size or TPDU==
 
-<tt>[OpenPgm3CReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt>
+<tt>PGM_MTU</tt>
 
 The TPDU is the fundamental packet size, send and receive buffers are always allocated with this size.  Receiving packets larger than the set TPDU will truncate the data causing data loss.  Default size is 1,500 bytes, you might want to increase to 9,000 bytes for jumbograms, or reduce to smaller size if you application does not use the entire space.  Reducing the TPDU will reduce the total size of the window, improving cache locality and potentially increase messaging throughput.
 
 
 ==3:  Dead peer expiration timeout==
 
-<tt>[OpenPgm3CReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt>
+<tt>PGM_PEER_EXPIRY</tt>
 
 How long do you want to wait before dead peers are reaped?  Rendezvous defaults to 300s, if you have publishing applications frequently bouncing up and down this will adversely increase the resource usage in subscribing applications.  Set the value too low and brief network faults will disrupt all the transports bringing all the applications down.
 
 
 ==4:  Hops or TTL==
 
-<tt>[OpenPgm3CReferencePgmTransportSetHops pgm_transport_set_hops()]</tt>
+<tt>PGM_MULTICAST_HOPS</tt>
 
 How wide is you network?  By default Rendezvous uses a multicast hop limit of 16, you might wish to increase this for larger networks.
 
@@ -105,15 +105,15 @@ How wide is you network?  By default Rendezvous uses a multicast hop limit of 16
 ==5:  Recovery latency, limiting broadcast storms and yappy clients==
 
 
-<tt>[OpenPgm3CReferencePgmTransportSetNakBoIvl pgm_transport_set_nak_bo_ivl()]</tt>
+<tt>PGM_NAK_BO_IVL</tt>
 
-<tt>[OpenPgm3CReferencePgmTransportSetNakRptIvl pgm_transport_set_nak_rpt_ivl()]</tt>
+<tt>PGM_NAK_RPT_IVL</tt>
 
-<tt>[OpenPgm3CReferencePgmTransportSetNakRdataIvl pgm_transport_set_nak_rdata_ivl()]</tt>
+<tt>PGM_NAK_RDATA_IVL</tt>
 
-<tt>[OpenPgm3CReferencePgmTransportSetNakDataRetries pgm_transport_set_nak_data_retries()]</tt>
+<tt>PGM_NAK_DATA_RETRIES</tt>
 
-<tt>[OpenPgm3CReferencePgmTransportSetNakNcfRetries pgm_transport_set_nak_ncf_retries()]</tt>
+<tt>PGM_NAK_NCF_RETRIES</tt>
 
 For most of the time your network is going to not have packet loss, however there is no hard and fast rule for what is acceptable packet loss.  On a very large distribution network you may see 5-10% packet loss for instance.  From the rate of packet loss and business requirements you should be able to determine a latency target for recovered packets.  Business requirements might include how fresh data can be considered, how long before data is stale and can be discarded.
 
@@ -130,11 +130,11 @@ The important factor when choosing times is also what the target architecture ca
 
 ==6:  End of stream notification==
 
-<tt>[OpenPgm3CReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt>
+<tt>PGM_AMBIENT_SPM</tt>
 
-<tt>[OpenPgm3CReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt>
+<tt>PGM_HEARTBEAT_SPM</tt>
 
-<tt>[OpenPgm3CReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt> 
+<tt>PGM_SPMR_EXPIRY</tt>
 
 SPMs are used to keep multicast path in your routing infrastructure, to update clients with the lead sequence of the transmit window, to provide an address to request repairs.  Imagine sending three packets and the last is lost, when is the client aware of that loss?
 

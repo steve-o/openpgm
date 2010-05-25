@@ -19,10 +19,6 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 <tt>[OpenPgmCReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size, optionally enabling rate regulation engine.</td>
 </tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
-<tt>[OpenPgmCReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
-<td>Set receive window size.</td>
-</tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
@@ -31,34 +27,18 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
-</tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
-<td>Set timeout for removing a dead peer.</td>
-</tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>
-<td>Set expiration time of SPM Requests.</td>
 </tr><tr>
 <td colspan="2"><h3>Receiving</h3></td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgmCReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
-<td>Set send window size.</td>
-</tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
 <tt>[OpenPgmCReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgmCReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
 <td>Set receive window size.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
-</tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
-<td>Set interval of background SPM packets.</td>
-</tr><tr>
-<td><tt>[OpenPgmCReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
-<td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
 <td><tt>[OpenPgmCReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
 <td>Set timeout for removing a dead peer.</td>

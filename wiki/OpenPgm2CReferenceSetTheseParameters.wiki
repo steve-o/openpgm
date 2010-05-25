@@ -19,10 +19,6 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 <tt>[OpenPgm2CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
 <td>Set send window size, optionally enabling rate regulation engine.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm2CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgm2CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
-<td>Set receive window size.</td>
-</tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
 </tr><tr>
@@ -31,34 +27,18 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
 <td>Set intervals of data flushing SPM packets.</td>
-</tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
-<td>Set timeout for removing a dead peer.</td>
-</tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetSpmrExpiry pgm_transport_set_spmr_expiry()]</tt></td>
-<td>Set expiration time of SPM Requests.</td>
 </tr><tr>
 <td colspan="2"><h3>Receiving</h3></td>
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetMaxTpdu pgm_transport_set_max_tpdu()]</tt></td>
 <td>Set maximum transport data unit size.</td>
 </tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm2CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt></td>
-<td>Set send window size.</td>
-</tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
 <tt>[OpenPgm2CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and <tt>[OpenPgm2CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt></td>
 <td>Set receive window size.</td>
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetHops pgm_transport_set_hops()]</tt></td>
 <td>Set maximum number of network hops to cross.</td>
-</tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetAmbientSpm pgm_transport_set_ambient_spm()]</tt></td>
-<td>Set interval of background SPM packets.</td>
-</tr><tr>
-<td><tt>[OpenPgm2CReferencePgmTransportSetHeartbeatSpm pgm_transport_set_heartbeat_spm()]</tt></td>
-<td>Set intervals of data flushing SPM packets.</td>
 </tr><tr>
 <td><tt>[OpenPgm2CReferencePgmTransportSetPeerExpiry pgm_transport_set_peer_expiry()]</tt></td>
 <td>Set timeout for removing a dead peer.</td>
@@ -93,9 +73,9 @@ All the example code specifies the default values used by TIBCO Rendezvous, Smar
 <tt>[OpenPgm2CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and <br/>
 <tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt>.
 
-<tt>[OpenPgm2CReferencePgmTransportSetTxwSqns pgm_transport_set_txw_sqns()]</tt>, or<br/>
-<tt>[OpenPgm2CReferencePgmTransportSetTxwMaxRte pgm_transport_set_txw_max_rte()]</tt> and<br/>
-<tt>[OpenPgm2CReferencePgmTransportSetTxwSecs pgm_transport_set_txw_secs()]</tt>.
+<tt>[OpenPgm2CReferencePgmTransportSetRxwSqns pgm_transport_set_rxw_sqns()]</tt>, or<br/>
+<tt>[OpenPgm2CReferencePgmTransportSetRxwMaxRte pgm_transport_set_rxw_max_rte()]</tt> and<br/>
+<tt>[OpenPgm2CReferencePgmTransportSetRxwSecs pgm_transport_set_rxw_secs()]</tt>.
 
 
 This can be difficult, Rendezvous defaults to a 60s buffer which will cripple you machine if you publish fast.  Rendezvous can only specify the window size in seconds, with OpenPGM you can specify seconds + bandwidth or individual sequence numbers.  The goal is to have the lowest possible window size that keeps your applications happy.  Too large a window consumes extra memory and can harm your applications cache locality with stale buffers.

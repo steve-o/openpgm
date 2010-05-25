@@ -1,0 +1,20 @@
+﻿#summary OpenPGM 5 C Reference : Programming Environment
+#labels Phase-Implementation
+#sidebar TOC5CReferenceProgrammersChecklist
+When developing or deploying OpenPGM programs, remember these steps.
+
+=== Code ===
+  * Include the appropriate OpenPGM C header files; see [OpenPgm3CReferenceIncludeTheseHeaderFiles Include these Header Files].
+  * Configure the PGM protocol; see [OpenPgm5CReferenceSetTheseParameters Set these Parameters].
+
+
+=== Compile ===
+  * Compile programs with a C compiler supporting ISO C99 plus GNU extensions.
+
+
+=== Link ===
+  * Link with the appropriate OpenPGM C library files; see [OpenPgm5CReferenceLinkTheseLibraryFiles Link these Library Files].
+
+
+=== Run ===
+  * Run with the appropriate system capabilities; see [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities].

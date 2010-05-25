@@ -1,0 +1,13 @@
+﻿#summary OpenPGM 5 C Reference : Programmer's Checklist
+#labels Phase-Implementation
+#sidebar TOC5CReferenceProgrammersChecklist
+=== Introduction ===
+This section presents important general information for programmers using OpenPGM.
+
+=== Topics ===
+  * [OpenPgm3CReferenceBuildLibrary Build Library]
+  * [OpenPgm5CReferenceProgrammingEnvironment Programming Environment]
+  * [OpenPgm3CReferenceIncludeTheseHeaderFiles Include these Header Files]
+  * [OpenPgm5CReferenceSetTheseParameters Set these Parameters]
+  * [OpenPgm5CReferenceLinkTheseLibraryFiles Link these Library Files]
+  * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]

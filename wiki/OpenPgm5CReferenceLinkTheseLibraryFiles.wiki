@@ -1,0 +1,104 @@
+﻿#summary OpenPGM 5 C Reference : Link these Library Files
+#labels Phase-Implementation
+#sidebar TOC5CReferenceProgrammersChecklist
+OpenPGM C programs must link the appropriate library files.
+
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Linker Flag</th>
+<th>Description</th>
+</tr>
+<tr>
+<td colspan="2"><h3>Communications and Events</h3></td>
+</tr><tr>
+<td><tt>-lpgm</tt></td>
+<td>All OpenPGM programs must use this link flag.</td>
+</tr><tr>
+<td><tt>-lm</tt></td>
+<td>Required for support of histogram math enabled via <tt>-DCONFIG_HISTOGRAMS</tt>.</td>
+</tr><tr>
+<td><tt>-lrt</tt></td>
+<td>Required for <tt>clock_gettime()</tt> support.</td>
+</tr><tr>
+<td><tt>-lresolv -lsocket -lnsl</tt></td>
+<td>Required for Solaris socket support.</td>
+</tr>
+</table>
+
+
+== Microsoft Visual Studio Compiler ==
+
+As the Microsoft Windows 32-bit and 64-bit builds are cross compiled additional dependencies are
+introduced from the compiler in addition to the Windows platform dependencies,
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Library</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>libgcc.a</tt></td>
+<td>GCC cross-compiler C runtime library.</td>
+</tr><tr>
+<td><tt>libmingwex.a</tt></td>
+<td>Glibc compatibility runtime library.</td>
+</tr><tr>
+<td><tt>iphlpapi.lib</tt></td>
+<td>Interface enumeration support.</td>
+</tr><tr>
+<td><tt>ws2_32.lib</tt></td>
+<td>Windows Sockets support.</td>
+</tr>
+</table>
+
+To build the example applications in MSVC use the following screenshots for configuration.
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc-unicode.png"><img src="http://miru.hk/
+wiki/320px-msvc-unicode.png"/><br/><br/><img align="right" src="http://miru.
+hk/wiki/magnify-clip.png"/></a>Tag source files as Unicode</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc-compile as.png"><img src="http://miru.hk/
+wiki/320px-msvc-compile as.png"/><br/><br/><img align="right" src="http://miru.
+hk/wiki/magnify-clip.png"/></a>Compile as C++ Code</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc-includes.png"><img src="http://miru.hk/
+wiki/320px-msvc-includes.png"/><br/><br/><img align="right" src="http://miru.
+hk/wiki/magnify-clip.png"/></a>Additional Include Directories</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc-crt.png"><img src="http://miru.hk/
+wiki/320px-msvc-crt.png"/><br/><br/><img align="right" src="http://miru.
+hk/wiki/magnify-clip.png"/></a>Multi-Threaded Runtime Library</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc-libpath.png"><img src="http://miru.hk/
+wiki/320px-msvc-libpath.png"/><br/><br/><img align="right" src="http://miru.
+hk/wiki/magnify-clip.png"/></a>Additional Library Directories</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc-libs.png"><img src="http://miru.hk/
+wiki/320px-msvc-libs.png"/><br/><br/><img align="right" src="http://miru.
+hk/wiki/magnify-clip.png"/></a>Additional Dependencies</td>
+</tr>
+</table>
+
