@@ -1719,7 +1719,12 @@ pgm_check_peer_nak_state (
 /* expired, remove from hash table and linked list */
 		if (pgm_time_after_eq (now, peer->expiry))
 		{
-			if (window->committed_count)
+			if (peer->pending_link.data)
+			{
+				g_trace ("INFO", "peer expiration postponed due to committing data, tsi %s", pgm_tsi_print (&peer->tsi));
+				peer->expiry += transport->peer_expiry;
+			}
+			else if (window->committed_count)
 			{
 				g_trace ("INFO", "peer expiration postponed due to committed data, tsi %s", pgm_tsi_print (&peer->tsi));
 				peer->expiry += transport->peer_expiry;
