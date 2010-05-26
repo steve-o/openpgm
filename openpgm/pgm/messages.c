@@ -27,8 +27,8 @@
 /* globals */
 
 /* bit mask for trace role modules */
-int pgm_log_mask		= 0xffff;
-int pgm_min_log_level		= PGM_LOG_LEVEL_NORMAL;
+int pgm_log_mask PGM_GNUC_READ_MOSTLY		= 0xffff;
+int pgm_min_log_level PGM_GNUC_READ_MOSTLY	= PGM_LOG_LEVEL_NORMAL;
 
 
 /* locals */
@@ -46,8 +46,8 @@ static const char log_levels[8][6] = {
 
 static volatile uint32_t	messages_ref_count = 0;
 static pgm_mutex_t		messages_mutex;
-static pgm_log_func_t		log_handler = NULL;
-static void*			log_handler_closure = NULL;
+static pgm_log_func_t		log_handler PGM_GNUC_READ_MOSTLY = NULL;
+static void*			log_handler_closure PGM_GNUC_READ_MOSTLY = NULL;
 
 static inline const char* log_level_text (const int) PGM_GNUC_PURE;
 

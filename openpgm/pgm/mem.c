@@ -28,7 +28,7 @@
 
 /* globals */
 
-bool pgm_mem_gc_friendly = FALSE;
+bool pgm_mem_gc_friendly PGM_GNUC_READ_MOSTLY = FALSE;
 
 
 /* locals */
