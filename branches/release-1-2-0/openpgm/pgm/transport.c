@@ -4934,7 +4934,13 @@ check_peer_nak_state (
 /* expired, remove from hash table and linked list */
 		if (pgm_time_after_eq (pgm_time_now, peer->expiry))
 		{
-			if (((pgm_rxw_t*)peer->rxw)->committed_count)
+			if (((pgm_rxw_t*)peer->rxw)->waiting_link.data)
+			{
+				g_trace ("INFO", "peer expiration postponed due to committing data, tsi %s", pgm_print_tsi (&peer->tsi));
+				peer->expiry += transport->peer_expiry;
+				g_static_mutex_unlock (&peer->mutex);
+			}
+			else if (((pgm_rxw_t*)peer->rxw)->committed_count)
 			{
 				g_trace ("INFO", "peer expiration postponed due to committed data, tsi %s", pgm_print_tsi (&peer->tsi));
 				peer->expiry += transport->peer_expiry;
