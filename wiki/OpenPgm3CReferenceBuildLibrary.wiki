@@ -18,18 +18,28 @@ Functional build but no available test report.
   * [OpenPgm3CReferenceBuildLibraryLinuxMinGW GCC 4.2.1] on Microsoft Windows XP, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm3CReferenceBuildLibraryLinuxWine GCC 4.2.1] on Wine 1.1.31, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm3CReferenceBuildLibraryOpenSolaris GCC 3.4.3] on !OpenSolaris 2009.06
+  * GCC on SUSE Linux Enterprise Server 10.2
+  * GCC on OpenSUSE 11.2
+  * GCC on Red Hat Enterprise Linux, or CentOS 5.4
+  * MinGW-w64 on Ubuntu 8.04
+  * Intel C Compiler on Ubuntu 8.04
+  * Sun Studio on Linux on Ubuntu 8.04
 
 === Unsupported Platforms ===
 Platforms supported in OpenPGM version 2 but not supported in OpenPGM version 3.
-  * Debian
-  * OpenSUSE
-  * Red Hat Enterprise Linux, or CentOS
+  * GCC on Debian 4
+  * GCC on Red Hat Enterprise Linux, or CentOS 4.8
  
 === Unsupported Compilers ===
-Compilers supported in OpenPGM version 2 but not supported in OpenPGM version 3.
-  * MinGW-w64
-  * Intel C++ Compiler
-  * Sun Studio on Linux
+Compilers known not to work or have not been visited.
+  * MSVC on Microsoft Windows
+  * LCC on Microsoft Windows
+  * GCC 3.4.3 on Solaris 10 on SPARC (64-bit)
+  * Open64 on Ubuntu 8.04
+  * Open Watcom on Ubuntu 8.04
+  * aCC on HP/UX 11i
+  * xlC on Ubuntu 8.04 or AIX 6.1
+
 
 === PGM Testing ===
 Two hosts are required for full PGM protocol testing, one to send the other to receive.  In this example <tt>ayaka</tt> is the sending host and <tt>kiku</tt> is receiving.
