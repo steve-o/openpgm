@@ -57,6 +57,7 @@ struct pgm_sk_buff_t {
 #define of_apdu_first_sqn		pgm_opt_fragment->opt_sqn
 #define of_frag_offset			pgm_opt_fragment->opt_frag_off
 #define of_apdu_len			pgm_opt_fragment->opt_frag_len
+	struct pgm_opt_pgmcc_data*	pgm_opt_pgmcc_data;
 	struct pgm_data*		pgm_data;
 
 	void			       *head,		/* all may-alias */

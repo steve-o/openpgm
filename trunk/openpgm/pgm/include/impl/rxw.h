@@ -57,10 +57,7 @@ enum
 
 /* must be smaller than PGM skbuff control buffer */
 struct pgm_rxw_state_t {
-	pgm_time_t	nak_rb_expiry;
-	pgm_time_t	nak_rpt_expiry;
-	pgm_time_t	nak_rdata_expiry;
-
+	pgm_time_t	timer_expiry;
         int		pkt_state;
 
 	uint8_t		nak_transmit_count;	/* 8-bit for size constraints */
@@ -69,12 +66,15 @@ struct pgm_rxw_state_t {
 
 /* only valid on tg_sqn::pkt_sqn = 0 */
 	unsigned	is_contiguous:1;	/* transmission group */
+/* congestion control */
+	unsigned	is_ack_pending:1;
 };
 
 struct pgm_rxw_t {
 	const pgm_tsi_t*	tsi;
 
-        pgm_queue_t		backoff_queue;
+        pgm_queue_t		ack_backoff_queue;
+        pgm_queue_t		nak_backoff_queue;
         pgm_queue_t		wait_ncf_queue;
         pgm_queue_t		wait_data_queue;
 /* window context counters */
@@ -118,7 +118,9 @@ struct pgm_rxw_t {
 
 PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t*const, const uint16_t, const unsigned, const unsigned, const ssize_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t*const);
-PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL void pgm_rxw_add_ack (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t);
+PGM_GNUC_INTERNAL void pgm_rxw_remove_ack (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 PGM_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t*const);
 PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t*const restrict, struct pgm_msgv_t** restrict, const unsigned) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL unsigned pgm_rxw_remove_trail (pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;

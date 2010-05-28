@@ -323,7 +323,7 @@ struct pgm_ack {
 };
 
 /* PGMCC  Options */
-struct pgm_opt_cc_data {
+struct pgm_opt_pgmcc_data {
 	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	opt_tstamp;		/* timestamp */
 	uint16_t	opt_nla_afi;		/* nla afi */
@@ -331,7 +331,7 @@ struct pgm_opt_cc_data {
 	struct in_addr	opt_nla;		/* ACKER nla */
 };
 
-struct pgm_opt6_cc_data {
+struct pgm_opt6_pgmcc_data {
 	uint8_t		opt6_reserved;		/* reserved */
 	uint32_t	opt6_tstamp;		/* timestamp */
 	uint16_t	opt6_nla_afi;		/* nla afi */
@@ -339,7 +339,7 @@ struct pgm_opt6_cc_data {
 	struct in6_addr	opt6_nla;		/* ACKER nla */
 };
 
-struct pgm_opt_cc_feedback {
+struct pgm_opt_pgmcc_feedback {
 	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	opt_tstamp;		/* timestamp */
 	uint16_t	opt_nla_afi;		/* nla afi */
@@ -347,7 +347,7 @@ struct pgm_opt_cc_feedback {
 	struct in_addr	opt_nla;		/* ACKER nla */
 };
 
-struct pgm_opt6_cc_feedback {
+struct pgm_opt6_pgmcc_feedback {
 	uint8_t		opt6_reserved;		/* reserved */
 	uint32_t	opt6_tstamp;		/* timestamp */
 	uint16_t	opt6_nla_afi;		/* nla afi */

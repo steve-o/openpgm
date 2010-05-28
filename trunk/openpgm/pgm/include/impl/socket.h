@@ -92,10 +92,11 @@ struct pgm_sock_t {
 	bool				use_cr;			/* congestion reports */
 	bool				use_pgmcc;		/* congestion control */
 	bool				is_pending_crqst;
+	unsigned			acker_c;		/* constant C */
 	pgm_time_t			next_crqst;
 	pgm_time_t			mrtt;			/* multicast round-trip time */
 	pgm_time_t			crqst_ivl;
-	pgm_time_t			acker_ivl;
+	pgm_time_t			ack_bo_ivl;
 	struct sockaddr_storage		acker_nla;
 /*
  * ignore_cong    - previous congestion lead sqn
