@@ -347,6 +347,12 @@ on_startup (void)
 	pgm_setsockopt (sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
 	pgm_setsockopt (sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
 	pgm_setsockopt (sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
+	if (1) {
+		struct pgm_pgmccinfo_t pgmccinfo;
+		pgmccinfo.ack_bo_ivl 		= pgm_msecs (50);
+		pgmccinfo.acker_c		= 75;
+		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
+	}
 	if (use_fec) {
 		struct pgm_fecinfo_t fecinfo;
 		fecinfo.block_size		= rs_n;

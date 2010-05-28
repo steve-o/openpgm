@@ -87,7 +87,7 @@ struct pgm_peer_t {
 	pgm_tsi_t			tsi;
 	struct sockaddr_storage		group_nla;
 	struct sockaddr_storage		nla, local_nla;		/* nla = advertised, local_nla = from packet */
-	struct sockaddr_storage		 poll_nla;		/* from parent to direct poll-response */
+	struct sockaddr_storage		poll_nla;		/* from parent to direct poll-response */
 	struct sockaddr_storage		redirect_nla;		/* from dlr */
 	pgm_time_t			polr_expiry;
 	pgm_time_t			spmr_expiry;

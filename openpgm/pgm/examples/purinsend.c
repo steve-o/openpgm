@@ -196,6 +196,12 @@ create_sock (void)
 	pgm_setsockopt (sock, PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
 	pgm_setsockopt (sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
 	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
+	if (1) {
+		struct pgm_pgmccinfo_t pgmccinfo;
+		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
+		pgmccinfo.acker_c		= 75;
+		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
+	}
 	if (use_fec) {
 		struct pgm_fecinfo_t fecinfo; 
 		fecinfo.block_size		= rs_n;

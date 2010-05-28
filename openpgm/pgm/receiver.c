@@ -60,16 +60,30 @@ static bool on_dlr_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, s
 /* helpers for pgm_peer_t */
 static inline
 pgm_time_t
+next_ack_rb_expiry (
+	const pgm_rxw_t*	window
+	)
+{
+	pgm_assert (NULL != window);
+	pgm_assert (NULL != window->ack_backoff_queue.tail);
+
+	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->ack_backoff_queue.tail;
+	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
+	return state->timer_expiry;
+}
+
+static inline
+pgm_time_t
 next_nak_rb_expiry (
 	const pgm_rxw_t*	window
 	)
 {
 	pgm_assert (NULL != window);
-	pgm_assert (NULL != window->backoff_queue.tail);
+	pgm_assert (NULL != window->nak_backoff_queue.tail);
 
-	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->backoff_queue.tail;
+	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->nak_backoff_queue.tail;
 	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
-	return state->nak_rb_expiry;
+	return state->timer_expiry;
 }
 
 static inline
@@ -83,7 +97,7 @@ next_nak_rpt_expiry (
 
 	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->wait_ncf_queue.tail;
 	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
-	return state->nak_rpt_expiry;
+	return state->timer_expiry;
 }
 
 static inline
@@ -97,7 +111,22 @@ next_nak_rdata_expiry (
 
 	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->wait_data_queue.tail;
 	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
-	return state->nak_rdata_expiry;
+	return state->timer_expiry;
+}
+
+/* calculate ACK_RB_IVL.
+ */
+static inline
+uint32_t
+ack_rb_ivl (
+	pgm_sock_t*		sock
+	)	/* not const as rand() updates the seed */
+{
+/* pre-conditions */
+	pgm_assert (NULL != sock);
+	pgm_assert_cmpuint (sock->ack_bo_ivl, >, 1);
+
+	return pgm_rand_int_range (&sock->rand_, 1 /* us */, sock->ack_bo_ivl);
 }
 
 /* calculate NAK_RB_IVL as random time interval 1 - NAK_BO_IVL.
@@ -149,6 +178,27 @@ cancel_skb (
 	pgm_peer_set_pending (sock, peer);
 }
 
+/* check whether this receiver is the designated acker for the source
+ */
+
+static inline
+bool
+_pgm_is_acker (
+	const pgm_peer_t*	    restrict peer,
+	const struct pgm_sk_buff_t* restrict skb
+	)
+{
+	struct sockaddr_storage acker_nla;
+
+/* pre-conditions */
+	pgm_assert (NULL != peer);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
+
+	pgm_nla_to_sockaddr (&skb->pgm_opt_pgmcc_data->opt_nla_afi, (struct sockaddr*)&acker_nla);
+	return (0 == pgm_sockaddr_cmp ((struct sockaddr*)&acker_nla, (struct sockaddr*)&peer->sock->send_addr));
+}
+
 /* increase reference count for peer object
  *
  * on success, returns peer object.
@@ -190,41 +240,53 @@ pgm_peer_unref (
 	peer = NULL;
 }
 
-/* TODO: this should be in on_io_data to be more streamlined, or a generic options parser.
+/* find PGM options in received SKB.
  *
  * returns TRUE if opt_fragment is found, otherwise FALSE is returned.
  */
 
 static
 bool
-get_opt_fragment (
-	struct pgm_opt_header*	  restrict opt_header,
-	struct pgm_opt_fragment** restrict opt_fragment
+get_pgm_options (
+	struct pgm_sk_buff_t* const	skb
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != opt_header);
-	pgm_assert (NULL != opt_fragment);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != skb->pgm_data);
+
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(skb->pgm_data + 1);
+	bool found_opt = FALSE;
+
 	pgm_assert (opt_header->opt_type   == PGM_OPT_LENGTH);
 	pgm_assert (opt_header->opt_length == sizeof(struct pgm_opt_length));
 
-	pgm_debug ("get_opt_fragment (opt-header:%p opt-fragment:%p)",
-		(const void*)opt_header, (const void*)opt_fragment);
+	pgm_debug ("get_pgm_options (skb:%p)",
+		(const void*)skb);
+
+	skb->pgm_opt_fragment = NULL;
+	skb->pgm_opt_pgmcc_data = NULL;
 
 /* always at least two options, first is always opt_length */
 	do {
 		opt_header = (struct pgm_opt_header*)((char*)opt_header + opt_header->opt_length);
 
-		if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_FRAGMENT)
-		{
-			*opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
-			return TRUE;
+		switch (opt_header->opt_type & PGM_OPT_MASK) {
+		case PGM_OPT_FRAGMENT:
+			skb->pgm_opt_fragment = (struct pgm_opt_fragment*)(opt_header + 1);
+			found_opt = TRUE;
+			break;
+
+		case PGM_OPT_PGMCC_DATA:
+			skb->pgm_opt_pgmcc_data = (struct pgm_opt_pgmcc_data*)(opt_header + 1);
+			found_opt = TRUE;
+			break;
+
+		default: break;
 		}
 
 	} while (!(opt_header->opt_type & PGM_OPT_END));
-
-	*opt_fragment = NULL;
-	return FALSE;
+	return found_opt;
 }
 
 /* a peer in the context of the sock is another party on the network sending PGM
@@ -1101,6 +1163,177 @@ send_nak_list (
 	return TRUE;
 }
 
+/* send ACK upstream to source
+ *
+ * on success, TRUE is returned.  on error, FALSE is returned.
+ */
+
+static
+bool
+send_ack (
+	pgm_sock_t*           const restrict sock,
+	pgm_peer_t*           const restrict source,
+	const struct pgm_sk_buff_t* restrict skb,
+	const pgm_time_t		     now
+	)
+{
+/* pre-conditions */
+	pgm_assert (NULL != sock);
+	pgm_assert (NULL != source);
+	pgm_assert (NULL != skb);
+	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
+
+	pgm_debug ("send_ack (sock:%p source:%p skb:%p now:%" PGM_TIME_FORMAT ")",
+		(const void*)sock, (const void*)source, (const void*)skb, now);
+
+	size_t tpdu_length = sizeof(struct pgm_header) +
+			     sizeof(struct pgm_ack) +
+			     sizeof(struct pgm_opt_length) +		/* includes header */
+			     sizeof(struct pgm_opt_header) +
+			     sizeof(struct pgm_opt_pgmcc_feedback);
+	if (AF_INET6 == sock->send_addr.ss_family)
+		tpdu_length += sizeof(struct pgm_opt6_pgmcc_feedback) - sizeof(struct pgm_opt_pgmcc_feedback);
+	char buf[ tpdu_length ];
+	if (PGM_UNLIKELY(pgm_mem_gc_friendly))
+		memset (buf, 0, tpdu_length);
+	struct pgm_header* header = (struct pgm_header*)buf;
+	struct pgm_ack* ack = (struct pgm_ack*)(header + 1);
+	memcpy (header->pgm_gsi, &source->tsi.gsi, sizeof(pgm_gsi_t));
+
+/* dport & sport swap over for an ack */
+	header->pgm_sport	= sock->dport;
+	header->pgm_dport	= source->tsi.sport;
+	header->pgm_type	= PGM_ACK;
+	header->pgm_options	= PGM_OPT_PRESENT;
+	header->pgm_tsdu_length = 0;
+
+/* ACK */
+	ack->ack_rx_max		= htonl (pgm_rxw_lead (source->window));
+	ack->ack_bitmap		= 0;	/* TODO: fill in acker bitmap */
+
+/* OPT_PGMCC_FEEDBACK */
+	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(ack + 1);
+	opt_len->opt_type	= PGM_OPT_LENGTH;
+	opt_len->opt_length	= sizeof(struct pgm_opt_length);
+	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+						sizeof(struct pgm_opt_header) +
+						(AF_INET6 == sock->send_addr.ss_family) ?
+							sizeof(struct pgm_opt6_pgmcc_feedback) :
+							sizeof(struct pgm_opt_pgmcc_feedback) );
+	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+	opt_header->opt_type	= PGM_OPT_PGMCC_FEEDBACK | PGM_OPT_END;
+	opt_header->opt_length	= sizeof(struct pgm_opt_header) +
+				  ( (AF_INET6 == sock->send_addr.ss_family) ?
+					sizeof(struct pgm_opt6_pgmcc_feedback) :
+					sizeof(struct pgm_opt_pgmcc_feedback) );
+	struct pgm_opt_pgmcc_feedback* opt_pgmcc_feedback = (struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
+	opt_pgmcc_feedback->opt_reserved = 0;
+
+/* TODO: this skb timestamp or actual last skb timestamp */
+	const pgm_time_t t = ntohl (skb->pgm_opt_pgmcc_data->opt_tstamp) + ( now - skb->tstamp );
+	opt_pgmcc_feedback->opt_tstamp = pgm_to_msecs (t);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
+	opt_pgmcc_feedback->opt_loss_rate = 0;	/* TODO fill in loss rate */
+
+	header->pgm_checksum	= 0;
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+
+	const ssize_t sent = pgm_sendto (sock,
+					 FALSE,			/* not rate limited */
+					 FALSE,			/* regular socket */
+					 header,
+					 tpdu_length,
+					 (struct sockaddr*)&source->nla,
+					 pgm_sockaddr_len((struct sockaddr*)&source->nla));
+	if ( sent != (ssize_t)tpdu_length )
+		return FALSE;
+
+	return TRUE;
+}
+
+/* check all receiver windows for ACKer elections, on expiration send an ACK.
+ *
+ * returns TRUE on success, returns FALSE if operation would block.
+ */
+
+static
+bool
+ack_rb_state (
+	pgm_peer_t*		peer,
+	const pgm_time_t	now
+	)
+{
+/* pre-conditions */
+	pgm_assert (NULL != peer);
+
+	pgm_debug ("ack_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
+		(const void*)peer, now);
+
+	pgm_rxw_t* window = peer->window;
+	pgm_sock_t* sock = peer->sock;
+	pgm_list_t* list;
+
+	list = window->ack_backoff_queue.tail;
+	if (!list) {
+		pgm_assert (window->ack_backoff_queue.head == NULL);
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Backoff queue is empty in ack_rb_state."));
+		return TRUE;
+	} else {
+		pgm_assert (window->ack_backoff_queue.head != NULL);
+	}
+
+/* have not learned this peers NLA */
+	const bool is_valid_nla = 0 != peer->nla.ss_family;
+
+	while (list)
+	{
+		pgm_list_t* next_list_el = list->prev;
+		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
+		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
+
+/* check this packet for ACK backoff expiration */
+		if (pgm_time_after_eq(now, state->timer_expiry))
+		{
+			if (PGM_UNLIKELY(!is_valid_nla)) {
+				list = next_list_el;
+				continue;
+			}
+
+			if (!send_ack (sock, peer, skb, now))
+				return FALSE;
+			pgm_rxw_remove_ack (peer->window, skb);
+		}
+		else
+		{	/* packet expires some time later */
+			break;
+		}
+
+		list = next_list_el;
+	}
+
+	if (window->ack_backoff_queue.length == 0)
+	{
+		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.head == NULL);
+		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.tail == NULL);
+	}
+	else
+	{
+		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.head != NULL);
+		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.tail != NULL);
+	}
+
+	if (window->ack_backoff_queue.tail)
+	{
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."),
+			pgm_to_secsf(next_ack_rb_expiry(window) - now));
+	}
+	else
+	{
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("ACK backoff queue empty."));
+	}
+	return TRUE;
+}
+
 /* check all receiver windows for packets in BACK-OFF_STATE, on expiration send a NAK.
  * update sock::next_nak_rb_timestamp for next expiration time.
  *
@@ -1134,13 +1367,13 @@ nak_rb_state (
  * alternative: after each packet check for incoming data and return to the
  * event loop.  bias for shorter loops as retry count increases.
  */
-	list = window->backoff_queue.tail;
+	list = window->nak_backoff_queue.tail;
 	if (!list) {
-		pgm_assert (window->backoff_queue.head == NULL);
+		pgm_assert (window->nak_backoff_queue.head == NULL);
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Backoff queue is empty in nak_rb_state."));
 		return TRUE;
 	} else {
-		pgm_assert (window->backoff_queue.head != NULL);
+		pgm_assert (window->nak_backoff_queue.head != NULL);
 	}
 
 	unsigned dropped_invalid = 0;
@@ -1170,7 +1403,7 @@ nak_rb_state (
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
-			if (pgm_time_after_eq (now, state->nak_rb_expiry))
+			if (pgm_time_after_eq (now, state->timer_expiry))
 			{
 				if (PGM_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
@@ -1193,17 +1426,17 @@ nak_rb_state (
 					state->nak_transmit_count++;
 
 #ifdef PGM_ABSOLUTE_EXPIRY
-					state->nak_rpt_expiry = state->nak_rb_expiry + sock->nak_rpt_ivl;
-					while (pgm_time_after_eq (now, state->nak_rpt_expiry)) {
-						state->nak_rpt_expiry += sock->nak_rpt_ivl;
+					state->timer_expiry += sock->nak_rpt_ivl;
+					while (pgm_time_after_eq (now, state->timer_expiry)) {
+						state->timer_expiry += sock->nak_rpt_ivl;
 						state->ncf_retry_count++;
 					}
 #else
-					state->nak_rpt_expiry = now + sock->nak_rpt_ivl;
+					state->timer_expiry = now + sock->nak_rpt_ivl;
 #endif
 					pgm_timer_lock (sock);
-					if (pgm_time_after (sock->next_poll, state->nak_rpt_expiry))
-						sock->next_poll = state->nak_rpt_expiry;
+					if (pgm_time_after (sock->next_poll, state->timer_expiry))
+						sock->next_poll = state->timer_expiry;
 					pgm_timer_unlock (sock);
 				}
 				else
@@ -1234,7 +1467,7 @@ nak_rb_state (
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
-			if (pgm_time_after_eq(now, state->nak_rb_expiry))
+			if (pgm_time_after_eq(now, state->timer_expiry))
 			{
 				if (PGM_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
@@ -1254,19 +1487,19 @@ nak_rb_state (
  * from the actual current time.
  */
 #ifdef PGM_ABSOLUTE_EXPIRY
-				state->nak_rpt_expiry = state->nak_rb_expiry + sock->nak_rpt_ivl;
-				while (pgm_time_after_eq(now, state->nak_rpt_expiry)){
-					state->nak_rpt_expiry += sock->nak_rpt_ivl;
+				state->timer_expiry += sock->nak_rpt_ivl;
+				while (pgm_time_after_eq(now, state->timer_expiry)){
+					state->timer_expiry += sock->nak_rpt_ivl;
 					state->ncf_retry_count++;
 				}
 #else
-				state->nak_rpt_expiry = now + sock->nak_rpt_ivl;
-pgm_trace(PGM_LOG_ROLE_NETWORK,_("rp->nak_rpt_expiry in %f seconds."),
-		pgm_to_secsf( state->nak_rpt_expiry - now ) );
+				state->timer_expiry = now + sock->nak_rpt_ivl;
+pgm_trace(PGM_LOG_ROLE_NETWORK,_("nak_rpt_expiry in %f seconds."),
+		pgm_to_secsf( state->timer_expiry - now ) );
 #endif
 				pgm_timer_lock (sock);
-				if (pgm_time_after (sock->next_poll, state->nak_rpt_expiry))
-					sock->next_poll = state->nak_rpt_expiry;
+				if (pgm_time_after (sock->next_poll, state->timer_expiry))
+					sock->next_poll = state->timer_expiry;
 				pgm_timer_unlock (sock);
 
 				if (nak_list.len == PGM_N_ELEMENTS(nak_list.sqn)) {
@@ -1308,25 +1541,25 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("rp->nak_rpt_expiry in %f seconds."),
 		}
 	}
 
-	if (window->backoff_queue.length == 0)
+	if (window->nak_backoff_queue.length == 0)
 	{
-		pgm_assert ((struct rxw_packet*)window->backoff_queue.head == NULL);
-		pgm_assert ((struct rxw_packet*)window->backoff_queue.tail == NULL);
+		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.head == NULL);
+		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.tail == NULL);
 	}
 	else
 	{
-		pgm_assert ((struct rxw_packet*)window->backoff_queue.head != NULL);
-		pgm_assert ((struct rxw_packet*)window->backoff_queue.tail != NULL);
+		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.head != NULL);
+		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.tail != NULL);
 	}
 
-	if (window->backoff_queue.tail)
+	if (window->nak_backoff_queue.tail)
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."),
 			pgm_to_secsf(next_nak_rb_expiry(window) - now));
 	}
 	else
 	{
-		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Backoff queue empty."));
+		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("NAK backoff queue empty."));
 	}
 	return TRUE;
 }
@@ -1372,7 +1605,15 @@ pgm_check_peer_nak_state (
 			}
 		}
 
-		if (window->backoff_queue.tail)
+		if (window->ack_backoff_queue.tail)
+		{
+			if (pgm_time_after_eq (now, next_ack_rb_expiry (window)))
+				if (!ack_rb_state (peer, now)) {
+					return FALSE;
+				}
+		}
+
+		if (window->nak_backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (now, next_nak_rb_expiry (window)))
 				if (!nak_rb_state (peer, now)) {
@@ -1460,7 +1701,7 @@ pgm_min_nak_expiry (
 				expiration = peer->spmr_expiry;
 		}
 
-		if (window->backoff_queue.tail)
+		if (window->nak_backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (expiration, next_nak_rb_expiry (window)))
 				expiration = next_nak_rb_expiry (window);
@@ -1517,7 +1758,7 @@ nak_rpt_state (
 		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
-		if (pgm_time_after_eq (now, state->nak_rpt_expiry))
+		if (pgm_time_after_eq (now, state->timer_expiry))
 		{
 			if (PGM_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
@@ -1537,8 +1778,8 @@ nak_rpt_state (
 			else
 			{
 /* retry */
-//				state->nak_rb_expiry = pkt->nak_rpt_expiry + nak_rb_ivl(sock);
-				state->nak_rb_expiry = now + nak_rb_ivl (sock);
+//				state->timer_expiry += nak_rb_ivl(sock);
+				state->timer_expiry = now + nak_rb_ivl (sock);
 				pgm_rxw_state (window, skb, PGM_PKT_STATE_BACK_OFF);
 				pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("NCF retry #%u attempt %u/%u."), skb->sequence, state->ncf_retry_count, sock->nak_ncf_retries);
 			}
@@ -1547,7 +1788,7 @@ nak_rpt_state (
 		{
 /* packet expires some time later */
 			pgm_trace(PGM_LOG_ROLE_RX_WINDOW,_("NCF retry #%u is delayed %f seconds."),
-				skb->sequence, pgm_to_secsf (state->nak_rpt_expiry - now));
+				skb->sequence, pgm_to_secsf (state->timer_expiry - now));
 			break;
 		}
 		
@@ -1579,7 +1820,7 @@ nak_rpt_state (
 				" frag %" PRIu32),
 				dropped,
 				pgm_rxw_length (window),
-				window->backoff_queue.length,
+				window->nak_backoff_queue.length,
 				window->wait_ncf_queue.length,
 				window->wait_data_queue.length,
 				window->lost_count,
@@ -1645,7 +1886,7 @@ nak_rdata_state (
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
 
 /* check this packet for state expiration */
-		if (pgm_time_after_eq (now, rdata_state->nak_rdata_expiry))
+		if (pgm_time_after_eq (now, rdata_state->timer_expiry))
 		{
 			if (PGM_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
@@ -1665,8 +1906,8 @@ nak_rdata_state (
 				continue;
 			}
 
-//			rdata_state->nak_rb_expiry = rdata_pkt->nak_rdata_expiry + nak_rb_ivl(sock);
-			rdata_state->nak_rb_expiry = now + nak_rb_ivl (sock);
+//			rdata_state->timer_expiry += nak_rb_ivl(sock);
+			rdata_state->timer_expiry = now + nak_rb_ivl (sock);
 			pgm_rxw_state (window, rdata_skb, PGM_PKT_STATE_BACK_OFF);
 
 /* retry back to back-off state */
@@ -1743,6 +1984,7 @@ pgm_on_data (
 
 	unsigned msg_count = 0;
 	const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl (sock);
+	pgm_time_t ack_rb_expiry = 0;
 	const unsigned tsdu_length = ntohs (skb->pgm_header->pgm_tsdu_length);
 
 	skb->pgm_data = skb->data;
@@ -1752,10 +1994,15 @@ pgm_on_data (
 /* advance data pointer to payload */
 	pgm_skb_pull (skb, sizeof(struct pgm_data) + opt_total_length);
 
-	if (opt_total_length > 0)
-		 get_opt_fragment ((void*)(skb->pgm_data + 1), &skb->pgm_opt_fragment);
+	if (opt_total_length > 0 &&
+	    get_pgm_options (skb) &&
+	    sock->use_pgmcc &&
+	    NULL != skb->pgm_opt_pgmcc_data)
+	{
+		ack_rb_expiry = skb->tstamp + ack_rb_ivl (sock);
+	}
 
-	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
+	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, ack_rb_expiry, nak_rb_expiry);
 
 /* skb reference is now invalid */
 	bool flush_naks = FALSE;
@@ -1787,6 +2034,30 @@ discarded:
 	PGM_HISTOGRAM_COUNTS("Rx.DataBytesReceived", tsdu_length);
 	source->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED] += tsdu_length;
 	source->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED]  += msg_count;
+
+/* congestion control */
+	if (0 != ack_rb_expiry)
+	{
+		if (_pgm_is_acker (source, skb))
+		{
+			if (PGM_UNLIKELY(!send_ack (sock, source, skb, skb->tstamp)))
+			{
+/* queue for later delivery attempt */
+				pgm_rxw_add_ack (source->window, skb, ack_rb_expiry);
+			}
+		}
+		else if (0 != source->window->ack_backoff_queue.length)
+		{
+/* remove all pending ACKs */
+			for (pgm_list_t* list = source->window->ack_backoff_queue.tail;
+			     list;
+			     list = list->prev)
+			{
+				struct pgm_sk_buff_t* ack_skb = (struct pgm_sk_buff_t*)list;
+				pgm_rxw_remove_ack (source->window, ack_skb);
+			}
+		}
+	}
 
 	if (flush_naks) {
 /* flush out 1st time nak packets */

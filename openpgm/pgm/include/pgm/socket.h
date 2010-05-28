@@ -65,6 +65,11 @@ struct pgm_fecinfo_t {
 	bool					var_pktlen_enabled;
 };
 
+struct pgm_pgmccinfo_t {
+	uint32_t				ack_bo_ivl;
+	uint8_t					acker_c;
+};
+
 /* socket options */
 enum {
 	PGM_RECV_SOCK,
