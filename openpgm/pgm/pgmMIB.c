@@ -2663,7 +2663,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVEROUTSTANDINGSELECTIVENAKS:
 				{
-					const unsigned outstanding_selective = window->backoff_queue.length +
+					const unsigned outstanding_selective = window->nak_backoff_queue.length +
 										window->wait_ncf_queue.length +
 										window->wait_data_queue.length;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */

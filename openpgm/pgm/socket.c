@@ -63,7 +63,7 @@ pgm_pkt_offset (
 	if (can_fragment)
 		pkt_size += sizeof(struct pgm_opt_fragment);
 	if (use_pgmcc)
-		pkt_size += sizeof(struct pgm_opt_cc_data);
+		pkt_size += sizeof(struct pgm_opt_pgmcc_data);
 	return pkt_size;
 }
 
@@ -232,6 +232,9 @@ pgm_socket (
 	new_sock->can_recv_data = TRUE;
 	new_sock->dport		= DEFAULT_DATA_DESTINATION_PORT;
 	new_sock->tsi.sport	= DEFAULT_DATA_SOURCE_PORT;
+
+/* PGMCC */
+	new_sock->acker_nla.ss_family = family;
 
 /* source-side */
 	pgm_mutex_init (&new_sock->source_mutex);
@@ -796,19 +799,21 @@ pgm_setsockopt (
 			break;
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		sock->crqst_ivl = pgm_msecs (*(const int*)optval);
+		sock->crqst_ivl = *(const int*)optval;
 		sock->use_cr    = (sock->crqst_ivl > 0);
 		status = TRUE;
 		break;
 
 /* congestion control */
 	case PGM_USE_PGMCC:
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
+		if (PGM_UNLIKELY(optlen != sizeof (struct pgm_pgmccinfo_t)))
 			break;
-		if (PGM_UNLIKELY(*(const int*)optval <= 0))
-			break;
-		sock->acker_ivl = pgm_msecs (*(const int*)optval);
-		sock->use_pgmcc = (sock->acker_ivl > 0);
+		{
+			const struct pgm_pgmccinfo_t* pgmccinfo = optval;
+			sock->ack_bo_ivl = pgmccinfo->ack_bo_ivl;
+			sock->acker_c    = pgmccinfo->acker_c;
+			sock->use_pgmcc  = (sock->acker_c > 0);
+		}
 		status = TRUE;
 		break;
 
@@ -1501,7 +1506,7 @@ pgm_bind3 (
 
 	if (!pgm_if_indextoaddr (send_req->gr_interface,
 				 sock->family,
-				 pgm_sockaddr_scope_id ((struct sockaddr*)&send_req->gr_group),
+				 pgm_sockaddr_scope_id ((const struct sockaddr*)&send_req->gr_group),
 				 (struct sockaddr*)&send_addr,
 				 error))
 	{
