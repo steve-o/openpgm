@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <time.h>
 #ifndef _WIN32
+#	include <fcntl.h>
 #	include <unistd.h>
 #	include <pthread.h>
 #else
@@ -172,6 +173,8 @@ main (
 #ifndef _WIN32
 	int e = pipe (terminate_pipe);
 	assert (0 == e);
+	const int flags = fcntl (terminate_pipe[0], F_GETFL);
+	fcntl (terminate_pipe[0], F_SETFL, flags | O_NONBLOCK);
 	signal (SIGINT,  on_signal);
 	signal (SIGTERM, on_signal);
 #else
@@ -329,6 +332,12 @@ create_sock (void)
 	pgm_setsockopt (sock, PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
 	pgm_setsockopt (sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
 	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
+	if (1) {
+		struct pgm_pgmccinfo_t pgmccinfo;
+		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
+		pgmccinfo.acker_c		= 75;
+		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
+	}
 	if (use_fec) {
 		struct pgm_fecinfo_t fecinfo; 
 		fecinfo.block_size		= rs_n;
@@ -350,7 +359,21 @@ create_sock (void)
 	}
 
 /* assign socket to specified address */
-	if (!pgm_bind (sock, &addr, sizeof(addr), &pgm_err)) {
+	struct pgm_interface_req_t if_req;
+	memset (&if_req, 0, sizeof(if_req));
+	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
+	if_req.ir_scope_id  = 0;
+	if (AF_INET6 == sa_family) {
+		struct sockaddr_in6 sa6;
+		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
+		if_req.ir_scope_id = sa6.sin6_scope_id;
+	}
+	if (!pgm_bind3 (sock,
+			&addr, sizeof(addr),
+			&if_req, sizeof(if_req),        /* tx interface */
+			&if_req, sizeof(if_req),        /* rx interface */
+			&pgm_err))
+	{
 		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
 		goto err_abort;
 	}
@@ -362,22 +385,22 @@ create_sock (void)
 	pgm_freeaddrinfo (res);
 
 /* set IP parameters */
-	const int blocking = 0,
+	const int nonblocking = 1,
 		  multicast_loop = use_multicast_loop ? 1 : 0,
 		  multicast_hops = 16,
 		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
 
 	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
 	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-	pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
-	pgm_setsockopt (sock, PGM_NOBLOCK, &blocking, sizeof(blocking));
+	if (AF_INET6 != sa_family)
+		pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
+	pgm_setsockopt (sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
 
 	if (!pgm_connect (sock, &pgm_err)) {
 		fprintf (stderr, "Connecting PGM socket: %s\n", pgm_err->message);
 		goto err_abort;
 	}
 
-	puts ("Startup complete.");
 	return TRUE;
 
 err_abort:
@@ -438,15 +461,16 @@ nak_routine (
 	HANDLE waitHandles[ 4 ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, repairEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (nak_sock, PGM_RECV_SOCK, &recv_sock, sizeof(recv_sock));
+	pgm_getsockopt (nak_sock, PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	repairEvent = WSACreateEvent ();
-	pgm_getsockopt (nak_sock, PGM_REPAIR_SOCK, &repair_sock, sizeof(repair_sock));
+	pgm_getsockopt (nak_sock, PGM_REPAIR_SOCK, &repair_sock, &socklen);
 	WSAEventSelect (repair_sock, repairEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (nak_sock, PGM_PENDING_SOCK, &pending_sock, sizeof(pending_sock));
+	pgm_getsockopt (nak_sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
@@ -461,10 +485,16 @@ nak_routine (
 		const int status = pgm_recv (nak_sock, buf, sizeof(buf), 0, NULL, &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, sizeof(tv));
+			{
+				socklen_t optlen = sizeof (tv);
+				pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, &optlen);
+			}
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, sizeof(tv));
+			{
+				socklen_t optlen = sizeof (tv);
+				pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, &optlen);
+			}
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 #ifndef _WIN32

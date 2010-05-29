@@ -174,7 +174,7 @@ struct pgm_sock_t {
 extern pgm_rwlock_t pgm_sock_list_lock;
 extern pgm_slist_t* pgm_sock_list;
 
-size_t pgm_pkt_offset (bool, bool);
+size_t pgm_pkt_offset (bool, sa_family_t);
 
 PGM_END_DECLS
 

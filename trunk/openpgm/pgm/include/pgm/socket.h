@@ -57,6 +57,11 @@ struct pgm_addrinfo_t {
 	struct group_source_req* restrict	ai_send_addrs;
 };
 
+struct pgm_interface_req_t {
+	uint32_t				ir_interface;
+	uint32_t				ir_scope_id;
+};
+
 struct pgm_fecinfo_t {
 	uint8_t					block_size;
 	uint8_t					proactive_packets;
@@ -133,7 +138,7 @@ enum {
 
 bool pgm_socket (pgm_sock_t**restrict, const sa_family_t, const int, const int, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_bind (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_bind3 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct group_req*const restrict, const socklen_t, const struct group_req*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+bool pgm_bind3 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct pgm_interface_req_t*const, const socklen_t, const struct pgm_interface_req_t*const, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_connect (pgm_sock_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_close (pgm_sock_t*, bool);
 bool pgm_setsockopt (pgm_sock_t*const restrict, const int, const void*restrict, const socklen_t);

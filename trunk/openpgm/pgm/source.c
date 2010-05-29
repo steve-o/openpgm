@@ -834,7 +834,8 @@ send_odata (
 		(void*)sock, (void*)skb, (void*)bytes_written);
 
 	const uint16_t tsdu_length = skb->len;
-	const size_t   tpdu_length = tsdu_length + pgm_pkt_offset (FALSE, sock->use_pgmcc);
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
+	const size_t   tpdu_length = tsdu_length + pgm_pkt_offset (FALSE, pgmcc_family);
 
 /* continue if send would block */
 	if (sock->is_apdu_eagain)
@@ -866,15 +867,15 @@ send_odata (
 		opt_len->opt_length	= sizeof(struct pgm_opt_length);
 		opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
-							(AF_INET6 == sock->acker_nla.ss_family) ?
+							((AF_INET6 == sock->acker_nla.ss_family) ?
 								sizeof(struct pgm_opt6_pgmcc_data) :
-								sizeof(struct pgm_opt_pgmcc_data) );
+								sizeof(struct pgm_opt_pgmcc_data))   );
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
 		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
-					  (AF_INET6 == sock->acker_nla.ss_family) ?
+					  ((AF_INET6 == sock->acker_nla.ss_family) ?
 						sizeof(struct pgm_opt6_pgmcc_data) :
-						sizeof(struct pgm_opt_pgmcc_data);
+						sizeof(struct pgm_opt_pgmcc_data));
 		struct pgm_opt_pgmcc_data*  pgmcc_data  = (struct pgm_opt_pgmcc_data*)(opt_header + 1);
 		struct pgm_opt6_pgmcc_data* pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
 
@@ -966,7 +967,8 @@ send_odata_copy (
 	pgm_debug ("send_odata_copy (sock:%p tsdu:%p tsdu_length:%u bytes-written:%p)",
 		(void*)sock, tsdu, tsdu_length, (void*)bytes_written);
 
-	const size_t tpdu_length = tsdu_length + pgm_pkt_offset (FALSE, sock->use_pgmcc);
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
+	const size_t tpdu_length = tsdu_length + pgm_pkt_offset (FALSE, pgmcc_family);
 
 /* continue if blocked mid-apdu */
 	if (sock->is_apdu_eagain)
@@ -975,7 +977,7 @@ send_odata_copy (
 	STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 	STATE(skb)->sock = sock;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, sock->use_pgmcc));
+	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, pgmcc_family));
 	pgm_skb_put (STATE(skb), tsdu_length);
 
 	STATE(skb)->pgm_header	= (struct pgm_header*)STATE(skb)->head;
@@ -999,9 +1001,9 @@ send_odata_copy (
 		opt_len->opt_length	= sizeof(struct pgm_opt_length);
 		opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
-							(AF_INET6 == sock->acker_nla.ss_family) ?
+							((AF_INET6 == sock->acker_nla.ss_family) ?
 								sizeof(struct pgm_opt6_pgmcc_data) :
-								sizeof(struct pgm_opt_pgmcc_data) );
+								sizeof(struct pgm_opt_pgmcc_data))   );
 		struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
 		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
@@ -1118,7 +1120,8 @@ send_odatav (
 	STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 	STATE(skb)->sock = sock;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, sock->use_pgmcc));
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
+	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, pgmcc_family));
 	pgm_skb_put (STATE(skb), STATE(tsdu_length));
 
 	STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
@@ -1220,6 +1223,7 @@ send_apdu (
 	size_t   bytes_sent	 = 0;		/* counted at IP layer */
 	unsigned packets_sent	 = 0;		/* IP packets */
 	size_t   data_bytes_sent = 0;
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
 
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != apdu);
@@ -1232,7 +1236,7 @@ send_apdu (
 	STATE(is_rate_limited) = FALSE;
 	if (sock->is_nonblocking && sock->is_controlled_odata)
 	{
-		const size_t header_length = pgm_pkt_offset (TRUE, sock->use_pgmcc);
+		const size_t header_length = pgm_pkt_offset (TRUE, pgmcc_family);
 		size_t tpdu_length = 0;
 		size_t offset_	  = 0;
 		do {
@@ -1257,7 +1261,7 @@ send_apdu (
 
 	do {
 /* retrieve packet storage from transmit window */
-		size_t header_length = pgm_pkt_offset (TRUE, sock->use_pgmcc);
+		size_t header_length = pgm_pkt_offset (TRUE, pgmcc_family);
 		STATE(tsdu_length) = MIN( source_max_tsdu (sock, TRUE), apdu_length - STATE(data_bytes_offset) );
 
 		STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
@@ -1483,6 +1487,7 @@ pgm_sendv (
 	size_t   bytes_sent	 = 0;
 	unsigned packets_sent	 = 0;
 	size_t   data_bytes_sent = 0;
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
 
 /* continue if blocked mid-apdu */
 	if (sock->is_apdu_eagain) {
@@ -1538,7 +1543,7 @@ pgm_sendv (
 	STATE(is_rate_limited) = FALSE;
 	if (sock->is_nonblocking && sock->is_controlled_odata)
         {
-		const size_t header_length = pgm_pkt_offset (TRUE, sock->use_pgmcc);
+		const size_t header_length = pgm_pkt_offset (TRUE, pgmcc_family);
                 size_t tpdu_length = 0;
 		size_t offset_	   = 0;
 		do {
@@ -1607,7 +1612,7 @@ retry_send:
 
 	do {
 /* retrieve packet storage from transmit window */
-		size_t header_length = pgm_pkt_offset (TRUE, sock->use_pgmcc);
+		size_t header_length = pgm_pkt_offset (TRUE, pgmcc_family);
 		STATE(tsdu_length) = MIN( source_max_tsdu (sock, TRUE), STATE(apdu_length) - STATE(data_bytes_offset) );
 		STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 		STATE(skb)->sock = sock;
@@ -1819,6 +1824,7 @@ pgm_send_skbv (
 	size_t   bytes_sent	 = 0;
 	unsigned packets_sent	 = 0;
 	size_t   data_bytes_sent = 0;
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
 
 /* continue if blocked mid-apdu */
 	if (sock->is_apdu_eagain)
@@ -1829,7 +1835,7 @@ pgm_send_skbv (
 	{
 		size_t total_tpdu_length = 0;
 		for (unsigned i = 0; i < count; i++)
-			total_tpdu_length += sock->iphdr_len + pgm_pkt_offset (is_one_apdu, sock->use_pgmcc) + vector[i]->len;
+			total_tpdu_length += sock->iphdr_len + pgm_pkt_offset (is_one_apdu, pgmcc_family) + vector[i]->len;
 
 /* calculation includes one iphdr length already */
 		if (!pgm_rate_check (&sock->rate_control,
