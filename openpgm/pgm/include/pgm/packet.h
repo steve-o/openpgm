@@ -316,7 +316,6 @@ struct pgm_opt_crqst {
 
 /* PGMCC.  ACK Packet */
 struct pgm_ack {
-	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	ack_rx_max;		/* RX_MAX */
 	uint32_t	ack_bitmap;		/* received packets */
 	/* ... option extensions */
@@ -374,7 +373,6 @@ struct pgm_spmr {
 
 /* 14.7.1.  Poll Request */
 struct pgm_poll {
-	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	poll_sqn;		/* poll sequence number */
 	uint16_t	poll_round;		/* poll round */
 	uint16_t	poll_s_type;		/* poll sub-type */
@@ -390,7 +388,6 @@ struct pgm_poll {
 };
 
 struct pgm_poll6 {
-	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	poll6_sqn;		/* poll sequence number */
 	uint16_t	poll6_round;		/* poll round */
 	uint16_t	poll6_s_type;		/* poll sub-type */
@@ -405,7 +402,6 @@ struct pgm_poll6 {
 
 /* 14.7.2.  Poll Response */
 struct pgm_polr {
-	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	polr_sqn;		/* polr sequence number */
 	uint16_t	polr_round;		/* polr round */
 	uint16_t	polr_reserved;		/* reserved */

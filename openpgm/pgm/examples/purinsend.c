@@ -223,7 +223,21 @@ create_sock (void)
 	}
 
 /* assign socket to specified address */
-	if (!pgm_bind (sock, &addr, sizeof(addr), &pgm_err)) {
+	struct pgm_interface_req_t if_req;
+	memset (&if_req, 0, sizeof(if_req));
+	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
+	if_req.ir_scope_id  = 0;
+	if (AF_INET6 == sa_family) {
+		struct sockaddr_in6 sa6;
+		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
+		if_req.ir_scope_id = sa6.sin6_scope_id;
+	}
+	if (!pgm_bind3 (sock,
+			&addr, sizeof(addr),
+			&if_req, sizeof(if_req),	/* tx interface */
+			&if_req, sizeof(if_req),	/* rx interface */
+			&pgm_err))
+	{
 		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
 		goto err_abort;
 	}
@@ -242,7 +256,8 @@ create_sock (void)
 
 	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
 	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-	pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
+	if (AF_INET6 != sa_family)
+		pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
 	pgm_setsockopt (sock, PGM_NOBLOCK, &blocking, sizeof(blocking));
 
 	if (!pgm_connect (sock, &pgm_err)) {

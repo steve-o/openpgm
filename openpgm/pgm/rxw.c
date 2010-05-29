@@ -65,8 +65,8 @@ static inline uint32_t _pgm_rxw_tg_sqn (pgm_rxw_t*const, const uint32_t);
 static inline uint32_t _pgm_rxw_pkt_sqn (pgm_rxw_t*const, const uint32_t);
 static inline bool _pgm_rxw_is_first_of_tg_sqn (pgm_rxw_t*const, const uint32_t);
 static inline bool _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t*const, const uint32_t);
-static int _pgm_rxw_insert (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t);
-static int _pgm_rxw_append (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t, const pgm_time_t);
+static int _pgm_rxw_insert (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
+static int _pgm_rxw_append (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t);
 static int _pgm_rxw_add_placeholder_range (pgm_rxw_t*const, const uint32_t, const pgm_time_t, const pgm_time_t);
 static void _pgm_rxw_unlink (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*restrict);
 static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t*const);
@@ -164,37 +164,6 @@ _pgm_rxw_incoming_is_empty (
 	return (_pgm_rxw_incoming_length (window) == 0);
 }
 
-/* is the source holding an acker election
- */
-
-static inline
-bool
-_pgm_rxw_is_acker_election (
-	const pgm_rxw_t*	    restrict window,
-	const struct pgm_sk_buff_t* restrict skb
-	)
-{
-	pgm_assert (NULL != window);
-	pgm_assert (NULL != skb);
-	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
-
-	switch (skb->pgm_opt_pgmcc_data->opt_nla_afi) {
-	case AFI_IP:
-		if (INADDR_ANY == skb->pgm_opt_pgmcc_data->opt_nla.s_addr)
-			return TRUE;
-		break;
-
-	case AFI_IP6:
-		if (0 == memcmp (&skb->pgm_opt_pgmcc_data->opt_nla, &in6addr_any, sizeof(in6addr_any)))
-			return TRUE;
-		break;
-
-	default: break;
-	}
-
-	return FALSE;
-}
-
 /* constructor for receive window.  zero-length windows are not permitted.
  *
  * returns pointer to window.
@@ -224,7 +193,7 @@ pgm_rxw_create (
 		pgm_assert_cmpuint (max_rte, >, 0);
 	}
 
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd).\n",
+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd)",
 		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte);
 
 /* calculate receive window parameters */
@@ -321,7 +290,6 @@ pgm_rxw_add (
 	pgm_rxw_t*	      const restrict window,
 	struct pgm_sk_buff_t* const restrict skb,
 	const pgm_time_t		     now,
-	const pgm_time_t		     ack_rb_expiry,
 	const pgm_time_t		     nak_rb_expiry	/* calculated expiry time for this skb */
 	)
 {
@@ -341,8 +309,8 @@ pgm_rxw_add (
 	pgm_assert (sizeof(struct pgm_header) + sizeof(struct pgm_data) <= (size_t)((char*)skb->data - (char*)skb->head));
 	pgm_assert (skb->len == ((char*)skb->tail - (char*)skb->data));
 
-	pgm_debug ("add (window:%p skb:%p ack_rb_expiry:%" PGM_TIME_FORMAT " nak_rb_expiry:%" PGM_TIME_FORMAT ")",
-		(const void*)window, (const void*)skb, ack_rb_expiry, nak_rb_expiry);
+	pgm_debug ("add (window:%p skb:%p nak_rb_expiry:%" PGM_TIME_FORMAT ")",
+		(const void*)window, (const void*)skb, nak_rb_expiry);
 
 	skb->sequence = ntohl (skb->pgm_data->data_sqn);
 
@@ -391,7 +359,7 @@ pgm_rxw_add (
 
 		if (pgm_uint32_lt (_pgm_rxw_tg_sqn (window, skb->sequence), _pgm_rxw_tg_sqn (window, window->lead))) {
 			window->has_event = 1;
-			return _pgm_rxw_insert (window, skb, ack_rb_expiry);
+			return _pgm_rxw_insert (window, skb);
 		}
 
 		const struct pgm_sk_buff_t* const first_skb = _pgm_rxw_peek (window, _pgm_rxw_tg_sqn (window, skb->sequence));
@@ -401,9 +369,9 @@ pgm_rxw_add (
 			window->has_event = 1;
 			if (NULL == first_state || first_state->is_contiguous) {
 				state->is_contiguous = 1;
-				return _pgm_rxw_append (window, skb, now, ack_rb_expiry);
+				return _pgm_rxw_append (window, skb, now);
 			} else
-				return _pgm_rxw_insert (window, skb, ack_rb_expiry);
+				return _pgm_rxw_insert (window, skb);
 		}
 
 		pgm_assert (NULL != first_state);
@@ -420,87 +388,25 @@ pgm_rxw_add (
 
 		if (pgm_uint32_lte (skb->sequence, window->lead)) {
 			window->has_event = 1;
-			return _pgm_rxw_insert (window, skb, ack_rb_expiry);
+			return _pgm_rxw_insert (window, skb);
 		}
 
 		if (skb->sequence == pgm_rxw_next_lead (window)) {
 			window->has_event = 1;
 			if (_pgm_rxw_is_first_of_tg_sqn (window, skb->sequence))
 				state->is_contiguous = 1;
-			return _pgm_rxw_append (window, skb, now, ack_rb_expiry);
+			return _pgm_rxw_append (window, skb, now);
 		}
 
 		status = _pgm_rxw_add_placeholder_range (window, skb->sequence, now, nak_rb_expiry);
 	}
 
 	if (PGM_RXW_APPENDED == status) {
-		status = _pgm_rxw_append (window, skb, now, ack_rb_expiry);
+		status = _pgm_rxw_append (window, skb, now);
 		if (PGM_RXW_APPENDED == status)
 			status = PGM_RXW_MISSING;
 	}
 	return status;
-}
-
-/* add state for an ACK on a data packet.
- */
-
-static inline
-void
-_pgm_rxw_add_ack (
-	pgm_rxw_t*	      const restrict window,
-	struct pgm_sk_buff_t* const restrict skb,
-	const pgm_time_t		     ack_rb_expiry
-	)
-{
-	pgm_rxw_state_t* const state = (pgm_rxw_state_t*)&skb->cb;
-	state->timer_expiry	= ack_rb_expiry;
-	state->is_ack_pending	= 1;
-	pgm_queue_push_head_link (&window->ack_backoff_queue, (pgm_list_t*)skb);
-}
-
-/* external invocation for failed immediate delivery requiring deferred 
- * re-attempts in order not to stall the source.
- */
-
-void
-pgm_rxw_add_ack (
-	pgm_rxw_t*	      const restrict window,
-	struct pgm_sk_buff_t* const restrict skb,
-	const pgm_time_t		     ack_rb_expiry
-	)
-{
-	pgm_debug ("add-ack (window:%p skb:%p ack_rb_expiry:%" PGM_TIME_FORMAT ")",
-		(const void*)window, (const void*)skb, ack_rb_expiry);
-
-	_pgm_rxw_add_ack (window, skb, ack_rb_expiry);
-}
-
-/* remove outstanding ACK
- */
-
-static inline
-void
-_pgm_rxw_remove_ack (
-	pgm_rxw_t*	      const restrict window,
-	struct pgm_sk_buff_t* const restrict skb
-	)
-{
-	pgm_rxw_state_t* const state = (pgm_rxw_state_t*)&skb->cb;
-	pgm_assert (!pgm_queue_is_empty (&window->ack_backoff_queue));
-	pgm_queue_unlink (&window->ack_backoff_queue, (pgm_list_t*)skb);
-	state->is_ack_pending = 0;
-}
-
-void
-pgm_rxw_remove_ack (
-	pgm_rxw_t*	      const restrict window,
-	struct pgm_sk_buff_t* const restrict skb
-	)
-{
-	pgm_debug ("remove-ack (window:%p skb:%p)",
-		(const void*)window, (const void*)skb);
-
-	_pgm_rxw_remove_ack (window, skb);
 }
 
 /* trail is the next packet to commit upstream, lead is the leading edge
@@ -1002,8 +908,7 @@ static
 int
 _pgm_rxw_insert (
 	pgm_rxw_t*	      const restrict window,
-	struct pgm_sk_buff_t* const restrict new_skb,
-	const pgm_time_t		     ack_rb_expiry
+	struct pgm_sk_buff_t* const restrict new_skb
 	)
 {
 	struct pgm_sk_buff_t* skb;
@@ -1092,15 +997,10 @@ _pgm_rxw_insert (
 	pgm_free_skb (skb);
 	const uint_fast32_t index_ = new_skb->sequence % pgm_rxw_max_length (window);
 	window->pdata[index_] = new_skb;
-	if (new_skb->pgm_header->pgm_options & PGM_OPT_PARITY) {
+	if (new_skb->pgm_header->pgm_options & PGM_OPT_PARITY)
 		_pgm_rxw_state (window, new_skb, PGM_PKT_STATE_HAVE_PARITY);
-	} else {
+	else
 		_pgm_rxw_state (window, new_skb, PGM_PKT_STATE_HAVE_DATA);
-
-/* congestion control */
-		if (0 != ack_rb_expiry && _pgm_rxw_is_acker_election (window, new_skb))
-			_pgm_rxw_add_ack (window, new_skb, ack_rb_expiry);
-	}
 	window->size += new_skb->len;
 
 	return PGM_RXW_INSERTED;
@@ -1151,8 +1051,7 @@ int
 _pgm_rxw_append (
 	pgm_rxw_t*	      const restrict window,
 	struct pgm_sk_buff_t* const restrict skb,
-	const pgm_time_t		     now,
-	const pgm_time_t		     ack_rb_expiry
+	const pgm_time_t		     now
 	)
 {
 /* pre-conditions */
@@ -1208,10 +1107,6 @@ _pgm_rxw_append (
 		const uint_fast32_t index_	= skb->sequence % pgm_rxw_max_length (window);
 		window->pdata[index_]		= skb;
 		_pgm_rxw_state (window, skb, PGM_PKT_STATE_HAVE_DATA);
-
-/* congestion control */
-		if (0 != ack_rb_expiry && _pgm_rxw_is_acker_election (window, skb))
-			_pgm_rxw_add_ack (window, skb, ack_rb_expiry);
 	}
 
 /* statistics */
@@ -1563,9 +1458,9 @@ _pgm_rxw_reconstruct (
 		}
 
 #ifdef PGM_DISABLE_ASSERT
-		_pgm_rxw_insert (window, repair_skb, 0);
+		_pgm_rxw_insert (window, repair_skb);
 #else
-		pgm_assert_cmpint (_pgm_rxw_insert (window, repair_skb, 0), ==, PGM_RXW_INSERTED);
+		pgm_assert_cmpint (_pgm_rxw_insert (window, repair_skb), ==, PGM_RXW_INSERTED);
 #endif
 	}
 }
@@ -1941,10 +1836,6 @@ unlink_queue:
 
 	default: pgm_assert_not_reached(); break;
 	}
-
-/* congestion control */
-	if (state->is_ack_pending)
-		_pgm_rxw_remove_ack (window, skb);
 
 	state->pkt_state = PGM_PKT_STATE_ERROR;
 	pgm_assert (((pgm_list_t*)skb)->next == NULL);

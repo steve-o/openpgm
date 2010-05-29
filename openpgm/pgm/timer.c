@@ -129,9 +129,9 @@ pgm_timer_dispatch (
 /* find which timers have expired and call each */
 	if (sock->can_recv_data)
 	{
-		if (!pgm_check_peer_nak_state (sock, now))
+		if (!pgm_check_peer_state (sock, now))
 			return FALSE;
-		next_expiration = pgm_min_nak_expiry (now + sock->peer_expiry, sock);
+		next_expiration = pgm_min_receiver_expiry (now + sock->peer_expiry, sock);
 	}
 
 	if (sock->can_send_data)
