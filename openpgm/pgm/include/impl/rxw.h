@@ -66,8 +66,6 @@ struct pgm_rxw_state_t {
 
 /* only valid on tg_sqn::pkt_sqn = 0 */
 	unsigned	is_contiguous:1;	/* transmission group */
-/* congestion control */
-	unsigned	is_ack_pending:1;
 };
 
 struct pgm_rxw_t {
@@ -118,7 +116,7 @@ struct pgm_rxw_t {
 
 PGM_GNUC_INTERNAL pgm_rxw_t* pgm_rxw_create (const pgm_tsi_t*const, const uint16_t, const unsigned, const unsigned, const ssize_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_destroy (pgm_rxw_t*const);
-PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL int pgm_rxw_add (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_add_ack (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t);
 PGM_GNUC_INTERNAL void pgm_rxw_remove_ack (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 PGM_GNUC_INTERNAL void pgm_rxw_remove_commit (pgm_rxw_t*const);

@@ -53,17 +53,19 @@ static const char* pgm_protocol_string (const int) PGM_GNUC_CONST;
 size_t
 pgm_pkt_offset (
 	bool		can_fragment,
-	bool		use_pgmcc
+	sa_family_t	pgmcc_family		/* 0 = disable */
 	)
 {
 	static const size_t data_size = sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	size_t pkt_size = data_size;
-	if (can_fragment || use_pgmcc)
+	if (can_fragment || 0 != pgmcc_family)
 		pkt_size += sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header);
 	if (can_fragment)
 		pkt_size += sizeof(struct pgm_opt_fragment);
-	if (use_pgmcc)
+	if (AF_INET == pgmcc_family)
 		pkt_size += sizeof(struct pgm_opt_pgmcc_data);
+	else if (AF_INET6 == pgmcc_family)
+		pkt_size += sizeof(struct pgm_opt6_pgmcc_data);
 	return pkt_size;
 }
 
@@ -875,6 +877,11 @@ pgm_setsockopt (
 			break;
 		memcpy (&sock->send_gsr, optval, optlen);
 		((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+		if (PGM_UNLIKELY(sock->family != sock->send_gsr.gsr_group.ss_family))
+			break;
+		if (PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_sock, (const struct sockaddr*)&sock->send_gsr.gsr_group, sock->send_gsr.gsr_interface) ||
+		    PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_with_router_alert_sock, (const struct sockaddr*)&sock->send_gsr.gsr_group, sock->send_gsr.gsr_interface))
+			break;
 		status = TRUE;
 		break;
 
@@ -907,9 +914,11 @@ pgm_setsockopt (
 					break;
 				}
 			}
+			if (PGM_UNLIKELY(sock->family != gr->gr_group.ss_family))
+				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
 				break;
-			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = 0;
+			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = gr->gr_interface;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			sock->recv_gsr_len++;
@@ -943,6 +952,8 @@ pgm_setsockopt (
 				}
 				i++;
 			}
+			if (PGM_UNLIKELY(sock->family != gr->gr_group.ss_family))
+				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_leave_group (sock->recv_sock, sock->family, gr))
 				break;
 		}
@@ -956,6 +967,8 @@ pgm_setsockopt (
 			break;
 		{
 			const struct group_source_req* gsr = optval;
+			if (PGM_UNLIKELY(sock->family != gsr->gsr_group.ss_family))
+				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_block_source (sock->recv_sock, sock->family, gsr))
 				break;
 		}
@@ -969,6 +982,8 @@ pgm_setsockopt (
 			break;
 		{
 			const struct group_source_req* gsr = optval;
+			if (PGM_UNLIKELY(sock->family != gsr->gsr_group.ss_family))
+				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_unblock_source (sock->recv_sock, sock->family, gsr))
 				break;
 		}
@@ -1012,6 +1027,10 @@ pgm_setsockopt (
 					break;
 				}
 			}
+			if (PGM_UNLIKELY(sock->family != gsr->gsr_group.ss_family))
+				break;
+			if (PGM_UNLIKELY(sock->family != gsr->gsr_source.ss_family))
+				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_source_group (sock->recv_sock, sock->family, gsr))
 				break;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len], gsr, sizeof(struct group_source_req));
@@ -1044,6 +1063,10 @@ pgm_setsockopt (
 					}
 				}
 			}
+			if (PGM_UNLIKELY(sock->family != gsr->gsr_group.ss_family))
+				break;
+			if (PGM_UNLIKELY(sock->family != gsr->gsr_source.ss_family))
+				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_leave_source_group (sock->recv_sock, sock->family, gsr))
 				break;
 		}
@@ -1058,6 +1081,11 @@ pgm_setsockopt (
 		{
 			const struct group_filter* gf_list = optval;
 			if (GROUP_FILTER_SIZE( gf_list->gf_numsrc ) != optlen)
+				break;
+			if (PGM_UNLIKELY(sock->family != gf_list->gf_group.ss_family))
+				break;
+/* check only first */
+			if (PGM_UNLIKELY(sock->family != gf_list->gf_slist[0].ss_family))
 				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_msfilter (sock->recv_sock, sock->family, gf_list))
 				break;
@@ -1111,9 +1139,9 @@ pgm_bind3 (
 	pgm_sock_t*		      restrict sock,
 	const struct pgm_sockaddr_t*  restrict sockaddr,
 	const socklen_t			       sockaddrlen,
-	const struct group_req*	      restrict send_req,		/* only use gr_interface and gr_group::sin6_scope */
+	const struct pgm_interface_req_t*      send_req,		/* only use gr_interface and gr_group::sin6_scope */
 	const socklen_t			       send_req_len,
-	const struct group_req*	      restrict recv_req,
+	const struct pgm_interface_req_t*      recv_req,
 	const socklen_t			       recv_req_len,
 	pgm_error_t**		      restrict error			/* maybe NULL */
 	)
@@ -1123,9 +1151,9 @@ pgm_bind3 (
 	pgm_return_val_if_fail (0 != sockaddrlen, FALSE);
 	if (sockaddr->sa_addr.sport) pgm_return_val_if_fail (sockaddr->sa_addr.sport != sockaddr->sa_port, FALSE);
 	pgm_return_val_if_fail (NULL != send_req, FALSE);
-	pgm_return_val_if_fail (sizeof(struct group_req) == send_req_len, FALSE);
+	pgm_return_val_if_fail (sizeof(struct pgm_interface_req_t) == send_req_len, FALSE);
 	pgm_return_val_if_fail (NULL != recv_req, FALSE);
-	pgm_return_val_if_fail (sizeof(struct group_req) == recv_req_len, FALSE);
+	pgm_return_val_if_fail (sizeof(struct pgm_interface_req_t) == recv_req_len, FALSE);
 
 	if (!pgm_rwlock_writer_trylock (&sock->lock))
 		pgm_return_val_if_reached (FALSE);
@@ -1254,8 +1282,8 @@ pgm_bind3 (
 		}
 	}
 
-	pgm_debug ("bind (sock:%p error:%p)",
-		 (const void*)sock, (const void*)error);
+	pgm_debug ("bind3 (sock:%p sockaddr:%p sockaddrlen:%u send-req:%p send-req-len:%u recv-req:%p recv-req-len:%u error:%p)",
+		 (const void*)sock, (const void*)sockaddr, (unsigned)sockaddrlen, (const void*)send_req, (unsigned)send_req_len, (const void*)recv_req, (unsigned)recv_req_len, (const void*)error);
 
 	memcpy (&sock->tsi, &sockaddr->sa_addr, sizeof(pgm_tsi_t));
 	sock->dport = htons (sockaddr->sa_port);
@@ -1319,8 +1347,9 @@ pgm_bind3 (
 		sock->iphdr_len += udphdr_len;
 	}
 
-	sock->max_tsdu = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, sock->use_pgmcc);
-	sock->max_tsdu_fragment = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, sock->use_pgmcc);
+	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
+	sock->max_tsdu = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, pgmcc_family);
+	sock->max_tsdu_fragment = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, pgmcc_family);
 	const unsigned max_fragments = sock->txw_sqns ? MIN( PGM_MAX_FRAGMENTS, sock->txw_sqns ) : PGM_MAX_FRAGMENTS;
 	sock->max_apdu = MIN( PGM_MAX_APDU, max_fragments * sock->max_tsdu_fragment );
 
@@ -1462,16 +1491,18 @@ pgm_bind3 (
 	}
 	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY."));
 #else
-	if (!_pgm_indextoaddr (recv_req.gr_interface,
-			       sock->ss_family,
-			       pgm_sockaddr_scope_id (&recv_req.gr_group),
-			       &recv_addr.sa,
-			       error))
+	if (!pgm_if_indextoaddr (recv_req->ir_interface,
+			         sock->family,
+				 recv_req->ir_scope_id,
+			         &recv_addr.sa,
+			         error))
 	{
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %d"), recv_req.gr_interface);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %u scope %u"),
+		   recv_req->ir_interface,
+		   recv_req->ir_scope_id);
 
 #endif /* CONFIG_BIND_INADDR_ANY */
 
@@ -1504,9 +1535,9 @@ pgm_bind3 (
 /* keep a copy of the original address source to re-use for router alert bind */
 	memset (&send_addr, 0, sizeof(send_addr));
 
-	if (!pgm_if_indextoaddr (send_req->gr_interface,
+	if (!pgm_if_indextoaddr (send_req->ir_interface,
 				 sock->family,
-				 pgm_sockaddr_scope_id ((const struct sockaddr*)&send_req->gr_group),
+				 send_req->ir_scope_id,
 				 (struct sockaddr*)&send_addr,
 				 error))
 	{
@@ -1515,7 +1546,9 @@ pgm_bind3 (
 	}
 	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u"), send_req->gr_interface);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u scope %u"),
+			   send_req->ir_interface,
+			   send_req->ir_scope_id);
 	}
 
 	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
