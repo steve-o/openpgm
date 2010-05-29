@@ -1123,9 +1123,8 @@ pgm_bind (
 	pgm_error_t**	                  restrict error
 	)
 {
-	struct group_req null_req;
+	struct pgm_interface_req_t null_req;
 	memset (&null_req, 0, sizeof(null_req));
-	null_req.gr_group.ss_family = sock->family;
 	return pgm_bind3 (sock, sockaddr, sockaddrlen, &null_req, sizeof(null_req), &null_req, sizeof(null_req), error);
 }
 
