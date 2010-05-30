@@ -426,7 +426,10 @@ pgm_on_ack (
 	pgm_debug ("pgm_on_ack (sock:%p skb:%p)",
 		(const void*)sock, (const void*)skb);
 
+	sock->cumulative_stats[PGM_PC_SOURCE_ACK_PACKETS_RECEIVED]++;
+
 	if (PGM_UNLIKELY(!pgm_verify_ack (skb))) {
+		sock->cumulative_stats[PGM_PC_SOURCE_ACK_ERRORS]++;
 		return FALSE;
 	}
 
