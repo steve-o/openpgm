@@ -10,7 +10,7 @@ http://www.ietf.org/rfc/rfc1112.txt
   * RFC 2113 - IP Router Alert Option
 http://www.ietf.org/rfc/rfc2113.txt
 
-  * RFC1321 - The MD5 Message-Digest Algorithm
+  * RFC 1321 - The MD5 Message-Digest Algorithm
 http://www.ietf.org/rfc/rfc1321.txt
 
   * RFC 3678 - Socket Interface Extensions for Multicast Source Filters
@@ -24,6 +24,9 @@ http://www.ietf.org/rfc/rfc3168.txt
 
   * RFC 1700 - Assigned Numbers
 http://www.ietf.org/rfc/rfc1700.txt
+
+  * RFC 4654 - TCP-Friendly Multicast Congestion Control (TFMCC)
+http://www.ietf.org/rfc/rfc4654.txt
 
   * Reed-Solomon Forward Error Correction (FEC) Schemes
 http://www.ietf.org/internet-drafts/draft-ietf-rmt-bb-fec-rs-05.txt
@@ -176,3 +179,6 @@ http://lara.inist.fr/bitstream/2332/822/1/LIP-RR2003-05.pdf
 http://web.archive.org/web/20060812013021/http://www.ntu.edu.sg/home5/ZHOU0022/papers/YLiu04.pdf
 
 _Proposes an enhanced congestion control scheme called EPGMCC (Enhanced PGMCC)._
+
+  * MTCP: Scalable TCP-like Congestion Control for Reliable Multicast
+ftp://ftp.csc.ncsu.edu/pub/tech/98/TR-98-01.ps.Z
