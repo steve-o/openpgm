@@ -1203,10 +1203,9 @@ pgmSourcePerformanceTable_handler (
 				}
 				break;
 
-/* FIXED: 0 */
 			case COLUMN_PGMSOURCEACKERRORS:
 				{
-					const unsigned ack_errors = 0;
+					const unsigned ack_errors = transport->cumulative_stats[PGM_PC_SOURCE_ACK_ERRORS];;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&ack_errors, sizeof(ack_errors) );
 				}
@@ -1233,10 +1232,9 @@ pgmSourcePerformanceTable_handler (
 				}
 				break;
 
-/* FIXED: 0 */
 			case COLUMN_PGMSOURCEACKPACKETSRECEIVED:
 				{
-					const unsigned ack_packets = 0;
+					const unsigned ack_packets = transport->cumulative_stats[PGM_PC_SOURCE_ACK_PACKETS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&ack_packets, sizeof(ack_packets) );
 				}
@@ -2755,10 +2753,9 @@ pgmReceiverPerformanceTable_handler (
 				}
 				break;
 	
-/* FIXED: 0 (PGMCC) */	
 			case COLUMN_PGMRECEIVERACKSSENT:
 				{
-					const unsigned acks_sent = 0;
+					const unsigned acks_sent = peer->cumulative_states[PGM_PC_RECEIVER_ACKS_SENT];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&acks_sent, sizeof(acks_sent) );
 				}
