@@ -1306,6 +1306,7 @@ send_ack (
 	if ( sent != (ssize_t)tpdu_length )
 		return FALSE;
 
+	source->cumulative_stats[PGM_PC_RECEIVER_ACKS_SENT]++;
 	return TRUE;
 }
 
