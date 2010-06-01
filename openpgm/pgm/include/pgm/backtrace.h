@@ -22,7 +22,7 @@
 #ifndef __PGM_BACKTRACE_H__
 #define __PGM_BACKTRACE_H__
 
-#include <pgm/types.h>
+#include <pgm/framework.h>
 
 PGM_BEGIN_DECLS
 

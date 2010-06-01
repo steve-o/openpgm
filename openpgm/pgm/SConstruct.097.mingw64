@@ -21,8 +21,6 @@ opt.AddOptions (
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
-# C++ broken scope
-	(EnumOption ('WITH_CC', 'C++ examples', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
@@ -32,7 +30,6 @@ opt.AddOptions (
 # Dependencies
 
 def force_mingw(env):
-	env.PrependENVPath('PATH', '/opt/mingw/bin');
 	env.Tool('crossmingw64', toolpath=['.']);
 
 env = Environment();

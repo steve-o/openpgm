@@ -31,8 +31,6 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_TEST', 'Network test system', 'false',
 			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_CC', 'C++ examples', 'true',
-			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
@@ -148,7 +146,7 @@ env = Environment(
 # symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
 # socket binding
-#			'-DCONFIG_BIND_INADDR_ANY',
+			'-DCONFIG_BIND_INADDR_ANY',
 # IP header order as per IP(4) on FreeBSD
 #			'-DCONFIG_HOST_ORDER_IP_LEN',
 #			'-DCONFIG_HOST_ORDER_IP_OFF',

@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <impl/i18n.h>
-#include <impl/framework.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
 
 
 //#define INDEXTOADDR_DEBUG
@@ -61,7 +61,7 @@ pgm_if_indextoaddr (
 		return TRUE;
 	}
 
-	struct pgm_ifaddrs_t *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 	if (!pgm_getifaddrs (&ifap, error)) {
 		pgm_prefix_error (error,
 			     _("Enumerating network interfaces: "));

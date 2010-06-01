@@ -22,9 +22,10 @@
 #ifndef __PGM_TSI_H__
 #define __PGM_TSI_H__
 
+#include <pgm/framework.h>
+
 typedef struct pgm_tsi_t pgm_tsi_t;
 
-#include <pgm/types.h>
 #include <pgm/gsi.h>
 
 PGM_BEGIN_DECLS
@@ -40,6 +41,7 @@ struct pgm_tsi_t {
 
 char* pgm_tsi_print (const pgm_tsi_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 int pgm_tsi_print_r (const pgm_tsi_t*restrict, char*restrict, size_t);
+pgm_hash_t pgm_tsi_hash (const void*) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_tsi_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 PGM_END_DECLS

@@ -22,10 +22,21 @@
 #ifndef __PGM_ENGINE_H__
 #define __PGM_ENGINE_H__
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#ifdef _WIN32
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
+#include <pgm/framework.h>
 
 PGM_BEGIN_DECLS
+
+#ifdef _WIN32
+extern LPFN_WSARECVMSG pgm_WSARecvMsg;
+#endif
+
+#ifdef PGM_DEBUG
+extern unsigned pgm_loss_rate;
+#endif
 
 bool pgm_init (pgm_error_t**);
 bool pgm_supported (void) PGM_GNUC_WARN_UNUSED_RESULT PGM_GNUC_PURE;

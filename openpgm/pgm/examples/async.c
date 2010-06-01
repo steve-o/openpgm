@@ -22,13 +22,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
-#ifndef _WIN32
-#	include <fcntl.h>
-#	include <unistd.h>
-#	include <pthread.h>
-#else
+#ifdef _WIN32
 #	include <process.h>
 #endif
 #include <pgm/pgm.h>
@@ -41,7 +36,7 @@
 struct async_event_t {
 	struct async_event_t   *next, *prev;
 	size_t			len;
-	struct pgm_sockaddr_t	addr;
+	pgm_tsi_t		tsi;
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 	char			data[];
 #elif defined(__cplusplus)
@@ -52,7 +47,7 @@ struct async_event_t {
 };
 
 
-static void on_data (async_t*const restrict, const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict, const socklen_t);
+static void on_data (async_t*const restrict, void*restrict, size_t, pgm_tsi_t*restrict);
 
 
 /* queued data is stored as async_event_t objects
@@ -65,7 +60,7 @@ async_event_alloc (
 	)
 {
 	struct async_event_t* event;
-	event = (struct async_event_t*)calloc (1, len + sizeof(struct async_event_t));
+	event = calloc (1, len + sizeof(struct async_event_t));
 	event->len = len;
 	return event;
 }
@@ -140,23 +135,20 @@ receiver_routine (
 {
 	assert (NULL != arg);
 	async_t* async = (async_t*)arg;
-	assert (NULL != async->sock);
+	assert (NULL != async->transport);
 #ifndef _WIN32
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3, recv_sock, pending_sock;
-	HANDLE waitHandles[ 3 ];
+	int n_handles = 3;
+	HANDLE waitHandles[ n_handles ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
-	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (async->sock, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, recvEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_recv_fd (async->transport), recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (async->sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_pending_fd (async->transport), pendingEvent, FD_READ);
 
 	waitHandles[0] = async->destroy_event;
 	waitHandles[1] = recvEvent;
@@ -168,31 +160,23 @@ receiver_routine (
 		struct timeval tv;
 		char buffer[4096];
 		size_t len;
-		struct pgm_sockaddr_t from;
-		socklen_t fromlen = sizeof (from);
-		const int status = pgm_recvfrom (async->sock,
+		pgm_tsi_t from;
+		const int status = pgm_recvfrom (async->transport,
 						 buffer,
 						 sizeof(buffer),
 						 0,
 						 &len,
 						 &from,
-						 &fromlen,
 						 NULL);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
-			on_data (async, buffer, len, &from, fromlen);
+			on_data (async, buffer, len, &from);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
-			{
-				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (async->sock, PGM_TIME_REMAIN, &tv, &optlen);
-			}
+			pgm_transport_get_timer_pending (async->transport, &tv);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			{
-				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (async->sock, PGM_RATE_REMAIN, &tv, &optlen);
-			}
+			pgm_transport_get_rate_remaining (async->transport, &tv);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
@@ -200,7 +184,7 @@ block:
 			fds = async->destroy_pipe[0] + 1;
 			FD_ZERO(&readfds);
 			FD_SET(async->destroy_pipe[0], &readfds);
-			pgm_select_info (async->sock, &readfds, NULL, &fds);
+			pgm_transport_select_info (async->transport, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.
@@ -237,15 +221,14 @@ tv_usec / 1000));
 static
 void
 on_data (
-	async_t*const		     restrict async,
-	const void*		     restrict data,
-	const size_t			      len,
-	const struct pgm_sockaddr_t* restrict from,
-	const socklen_t			      fromlen
+	async_t*const     restrict async,
+	void*	   	  restrict data,
+	size_t			   len,
+	pgm_tsi_t* 	  restrict from
 	)
 {
 	struct async_event_t* event = async_event_alloc (len);
-	memcpy (&event->addr, from, fromlen);
+	memcpy (&event->tsi, from, sizeof(pgm_tsi_t));
 	memcpy (&event->data, data, len);
 #ifndef _WIN32
 	pthread_mutex_lock (&async->pthread_mutex);
@@ -266,26 +249,26 @@ on_data (
 #endif /* _WIN32 */
 }
 
-/* create asynchronous thread handler from bound PGM sock.
+/* create asynchronous thread handler from bound PGM transport.
  *
  * on success, 0 is returned.  on error, -1 is returned, and errno set appropriately.
  */
 
 int
 async_create (
-	async_t**         restrict async,
-	pgm_sock_t* const restrict sock
+	async_t**              restrict	async,
+	pgm_transport_t* const restrict	transport
 	)
 {
 	async_t* new_async;
 
-	if (NULL == async || NULL == sock) {
+	if (NULL == async || NULL == transport) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	new_async = (async_t*)calloc (1, sizeof(async_t));
-	new_async->sock = sock;
+	new_async = calloc (1, sizeof(async_t));
+	new_async->transport = transport;
 #ifndef _WIN32
 	int e;
 	e = pthread_mutex_init (&new_async->pthread_mutex, NULL);
@@ -378,11 +361,10 @@ async_destroy (
 
 ssize_t
 async_recvfrom (
-	async_t*  	 const restrict async,
-	void*		       restrict	buf,
-	size_t				len,
-	struct pgm_sockaddr_t* restrict from,
-	socklen_t*     	       restrict fromlen
+	async_t* const restrict async,
+	void*	       restrict	buf,
+	size_t			len,
+	pgm_tsi_t*     restrict from
 	)
 {
 	struct async_event_t* event;
@@ -420,8 +402,8 @@ async_recvfrom (
 
 /* pass data back to callee */
 	const size_t event_len = MIN(event->len, len);
-	if (NULL != from && sizeof(struct pgm_sockaddr_t) == *fromlen) {
-		memcpy (from, &event->addr, *fromlen);
+	if (from) {
+		memcpy (from, &event->tsi, sizeof(pgm_tsi_t));
 	}
 	memcpy (buf, event->data, event_len);
 	async_event_unref (event);
@@ -435,7 +417,7 @@ async_recv (
 	size_t			len
 	)
 {
-	return async_recvfrom (async, buf, len, NULL, NULL);
+	return async_recvfrom (async, buf, len, NULL);
 }
 
 /* eof */

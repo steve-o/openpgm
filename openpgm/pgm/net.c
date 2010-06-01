@@ -28,13 +28,12 @@
 #	include <netinet/in.h>
 #	include <arpa/inet.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <impl/net.h>
-#include <impl/socket.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
+#include "pgm/net.h"
 
 
-#define NET_DEBUG
+//#define NET_DEBUG
 
 
 #if !defined(ENETUNREACH) && defined(WSAENETUNREACH)
@@ -56,7 +55,7 @@
 
 ssize_t
 pgm_sendto (
-	pgm_sock_t*		sock,
+	pgm_transport_t*		transport,
 	bool				use_rate_limit,
 	bool				use_router_alert,
 	const void*	       restrict	buf,
@@ -65,7 +64,7 @@ pgm_sendto (
 	socklen_t			tolen
 	)
 {
-	pgm_assert( NULL != sock );
+	pgm_assert( NULL != transport );
 	pgm_assert( NULL != buf );
 	pgm_assert( len > 0 );
 	pgm_assert( NULL != to );
@@ -74,82 +73,79 @@ pgm_sendto (
 #ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
-		(const void*)sock,
+	pgm_debug ("pgm_sendto (transport:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%d to:%s [toport:%d] tolen:%d)",
+		(gpointer)transport,
 		use_rate_limit ? "TRUE" : "FALSE",
 		use_router_alert ? "TRUE" : "FALSE",
-		(const void*)buf,
+		(gpointer)buf,
 		len,
 		saddr,
-		ntohs (((const struct sockaddr_in*)to)->sin_port),
-		(int)tolen);
+		((struct sockaddr_in*)to)->sin_port,
+		tolen);
 #endif
 
-	const int send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
+	const int sock = use_router_alert ? transport->send_with_router_alert_sock : transport->send_sock;
 
 	if (use_rate_limit && 
-	    !pgm_rate_check (&sock->rate_control, len, sock->is_nonblocking))
+	    !pgm_rate_check (&transport->rate_control, len, transport->is_nonblocking))
 	{
 		errno = ENOBUFS;
 		return (const ssize_t)-1;
 	}
 
-	if (!use_router_alert && sock->can_send_data)
-		pgm_mutex_lock (&sock->send_mutex);
+	if (!use_router_alert && transport->can_send_data)
+		pgm_mutex_lock (&transport->send_mutex);
 
-	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
+	ssize_t sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
 	pgm_debug ("sendto returned %zd", sent);
-	if (sent < 0) {
-		int save_errno = pgm_sock_errno();
-		if (PGM_UNLIKELY(errno != ENETUNREACH &&	/* Network is unreachable */
-		 		 errno != EHOSTUNREACH &&	/* No route to host */
-		    		 errno != EAGAIN)) 		/* would block on non-blocking send */
-		{
+	if (	sent < 0 &&
+		errno != ENETUNREACH &&		/* Network is unreachable */
+		errno != EHOSTUNREACH &&	/* No route to host */
+		errno != EAGAIN 		/* would block on non-blocking send */
+	   )
+	{
 #ifdef CONFIG_HAVE_POLL
 /* poll for cleared socket */
-			struct pollfd p = {
-				.fd		= send_sock,
-				.events		= POLLOUT,
-				.revents	= 0
-			};
-			const int ready = poll (&p, 1, 500 /* ms */);
+		struct pollfd p = {
+			.fd		= sock,
+			.events		= POLLOUT,
+			.revents	= 0
+		};
+		const int ready = poll (&p, 1, 500 /* ms */);
 #else
-			fd_set writefds;
-			FD_ZERO(&writefds);
-			FD_SET(send_sock, &writefds);
-			struct timeval tv = {
-				.tv_sec  = 0,
-				.tv_usec = 500 /* ms */ * 1000
-			};
-			const int ready = select (1, NULL, &writefds, NULL, &tv);
+		fd_set writefds;
+		FD_ZERO(&writefds);
+		FD_SET(sock, &writefds);
+		struct timeval tv = {
+			.tv_sec  = 0,
+			.tv_usec = 500 /* ms */ * 1000
+		};
+		const int ready = select (1, NULL, &writefds, NULL, &tv);
 #endif /* CONFIG_HAVE_POLL */
-			if (ready > 0)
+		if (ready > 0)
+		{
+			sent = sendto (sock, buf, len, 0, to, (socklen_t)tolen);
+			if ( sent < 0 )
 			{
-				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
-				if ( sent < 0 )
-				{
-					save_errno = pgm_sock_errno();
-					pgm_warn (_("sendto() %s failed: %s"),
-						  inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						  pgm_sock_strerror (save_errno));
-				}
+				pgm_warn (_("sendto %s failed: %s"),
+						inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
+						strerror (errno));
 			}
-			else if (ready == 0)
-			{
-				pgm_warn (_("sendto() %s failed: socket timeout."),
-					  inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
-			}
-			else
-			{
-				save_errno = pgm_sock_errno();
-				pgm_warn (_("blocked socket failed: %s"),
-					  pgm_sock_strerror (save_errno));
-			}
+		}
+		else if (ready == 0)
+		{
+			pgm_warn (_("sendto %s failed: socket timeout."),
+					 inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
+		}
+		else
+		{
+			pgm_warn (_("blocked socket failed: %s"),
+					strerror (errno));
 		}
 	}
 
-	if (!use_router_alert && sock->can_send_data)
-		pgm_mutex_unlock (&sock->send_mutex);
+	if (!use_router_alert && transport->can_send_data)
+		pgm_mutex_unlock (&transport->send_mutex);
 	return sent;
 }
 

@@ -23,6 +23,7 @@
 #define __PGM_SIGNAL_H__
 
 #include <signal.h>
+
 #include <glib.h>
 
 typedef void (*pgm_sighandler_t)(int, gpointer);

@@ -22,10 +22,31 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
+#ifndef _WIN32
+#	include <sys/socket.h>
+#endif
 #include <pgm/types.h>
+#include <pgm/gsi.h>
 
 PGM_BEGIN_DECLS
 
+struct pgm_transport_info_t {
+	pgm_gsi_t				ti_gsi;
+	int					ti_flags;
+	sa_family_t				ti_family;
+	uint16_t				ti_udp_encap_ucast_port;
+	uint16_t				ti_udp_encap_mcast_port;
+	uint16_t				ti_sport;
+	uint16_t				ti_dport;
+	unsigned				ti_ip_router_alert:1;
+	size_t					ti_recv_addrs_len;
+	struct group_source_req* restrict	ti_recv_addrs;
+	size_t					ti_send_addrs_len;
+	struct group_source_req* restrict	ti_send_addrs;
+};
+
+bool pgm_if_get_transport_info (const char*restrict, const struct pgm_transport_info_t*const restrict, struct pgm_transport_info_t**restrict, pgm_error_t**restrict);
+void pgm_if_free_transport_info (struct pgm_transport_info_t*);
 void pgm_if_print_all (void);
 
 PGM_END_DECLS

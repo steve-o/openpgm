@@ -31,16 +31,16 @@
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
 
 
 //#define GETIFADDRS_DEBUG
 
 /* locals */
-struct _pgm_ifaddrs_t
+struct _pgm_ifaddrs
 {
-	struct pgm_ifaddrs_t		_ifa;
+	struct pgm_ifaddrs		_ifa;
 	char				_name[IF_NAMESIZE];
 	struct sockaddr_storage		_addr;
 	struct sockaddr_storage		_netmask;
@@ -58,8 +58,8 @@ struct _pgm_ifaddrs_t
 static
 bool
 _pgm_getlifaddrs (
-	struct pgm_ifaddrs_t** restrict	ifap,
-	pgm_error_t**	       restrict	error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	const int sock = socket (AF_INET, SOCK_DGRAM, 0);
@@ -165,10 +165,10 @@ again:
 		goto again;
 
 /* alloc a contiguous block for entire list */
-	struct _pgm_ifaddrs_t* ifa = calloc (nlifr, sizeof (struct _pgm_ifaddrs_t));
+	struct _pgm_ifaddrs* ifa = calloc (nlifr, sizeof (struct _pgm_ifaddrs));
 	pgm_assert (NULL != ifa);
 
-	struct _pgm_ifaddrs_t* ift = ifa;
+	struct _pgm_ifaddrs* ift = ifa;
 	struct lifreq* lifr      = lifc.lifc_req;
 	struct lifreq* lifr_end  = (struct lifreq *)&lifc.lifc_buf[lifc.lifc_len];
 
@@ -214,8 +214,8 @@ again:
 
 		++lifr;
 		if (lifr < lifr_end) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 	}
 
@@ -226,8 +226,8 @@ again:
 	while (lifr < lifr_end)
 	{
 		if (ift != ifa) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 
 /* name */
@@ -274,7 +274,7 @@ again:
 	if (-1 == close (sock))
 		pgm_warn (_("Closing IPv4 socket failed: %s"), strerror(errno));
 
-	*ifap = (struct pgm_ifaddrs_t*)ifa;
+	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }
 #endif /* SIOCGLIFCONF */
@@ -283,8 +283,8 @@ again:
 static
 bool
 _pgm_getifaddrs (
-	struct pgm_ifaddrs_t** restrict	ifap,
-	pgm_error_t**	       restrict	error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	const int sock = socket (AF_INET, SOCK_DGRAM, 0);
@@ -344,8 +344,8 @@ _pgm_getifaddrs (
 #	endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
 
 /* alloc a contiguous block for entire list */
-	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, if_count);
-	struct _pgm_ifaddrs_t* ift = ifa;
+	struct _pgm_ifaddrs* ifa = pgm_new0 (struct _pgm_ifaddrs, if_count);
+	struct _pgm_ifaddrs* ift = ifa;
 	struct ifreq *ifr  = ifc.ifc_req;
 	struct ifreq *ifr_end = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
 
@@ -391,8 +391,8 @@ _pgm_getifaddrs (
 
 		++ifr;
 		if (ifr < ifr_end) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 	}
 
@@ -404,8 +404,8 @@ _pgm_getifaddrs (
 	while (ifr < ifr_end)
 	{
 		if (ift != ifa) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+			ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 		}
 
 /* name */
@@ -454,7 +454,7 @@ _pgm_getifaddrs (
 	if (-1 == close (sock))
 		pgm_warn (_("Closing IPv4 socket failed: %s"), strerror(errno));
 
-	*ifap = (struct pgm_ifaddrs_t*)ifa;
+	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }
 #endif /* SIOCLIFCONF */
@@ -477,7 +477,7 @@ _pgm_heap_alloc (
 static inline
 void
 _pgm_heap_free (
-	void*		mem
+	const void*	mem
 	)
 {
 #	ifdef CONFIG_USE_HEAPALLOC
@@ -490,8 +490,8 @@ _pgm_heap_free (
 static
 bool
 _pgm_getadaptersinfo (
-	struct pgm_ifaddrs_t** restrict	ifap,
-	pgm_error_t**	       restrict	error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	DWORD dwRet;
@@ -557,8 +557,8 @@ _pgm_getadaptersinfo (
 	pgm_debug ("GetAdaptersInfo() discovered %d interfaces.", n);
 
 /* contiguous block for adapter list */
-	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
-	struct _pgm_ifaddrs_t* ift = ifa;
+	struct _pgm_ifaddrs* ifa = pgm_new0 (struct _pgm_ifaddrs, n);
+	struct _pgm_ifaddrs* ift = ifa;
 
 /* now populate list */
 	for (pAdapter = pAdapterInfo;
@@ -595,23 +595,23 @@ _pgm_getadaptersinfo (
 
 /* next */
 			if (k++ < (n - 1)) {
-				ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+				ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+				ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 			}
 		}
 	}
 
 	if (pAdapterInfo)
 		free (pAdapterInfo);
-	*ifap = (struct pgm_ifaddrs_t*)ifa;
+	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }
 
 static
 bool
 _pgm_getadaptersaddresses (
-	struct pgm_ifaddrs_t** restrict	ifap,
-	pgm_error_t**	       restrict	error
+	struct pgm_ifaddrs** restrict	ifap,
+	pgm_error_t**	     restrict	error
 	)
 {
 	DWORD dwSize = DEFAULT_BUFFER_SIZE, dwRet;
@@ -685,8 +685,8 @@ _pgm_getadaptersaddresses (
 	}
 
 /* contiguous block for adapter list */
-	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
-	struct _pgm_ifaddrs_t* ift = ifa;
+	struct _pgm_ifaddrs* ifa = pgm_new0 (struct _pgm_ifaddrs, n);
+	struct _pgm_ifaddrs* ift = ifa;
 
 /* now populate list */
 	for (adapter = pAdapterAddresses;
@@ -766,15 +766,15 @@ _pgm_getadaptersaddresses (
 
 /* next */
 			if (k++ < (n - 1)) {
-				ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+				ift->_ifa.ifa_next = (struct pgm_ifaddrs*)(ift + 1);
+				ift = (struct _pgm_ifaddrs*)(ift->_ifa.ifa_next);
 			}
 		}
 	}
 
 	if (pAdapterAddresses)
 		free (pAdapterAddresses);
-	*ifap = (struct pgm_ifaddrs_t*)ifa;
+	*ifap = (struct pgm_ifaddrs*)ifa;
 	return TRUE;
 }
 #endif /* _WIN32 */
@@ -785,8 +785,8 @@ _pgm_getadaptersaddresses (
 
 bool
 pgm_getifaddrs (
-	struct pgm_ifaddrs_t** restrict ifap,
-	pgm_error_t**	       restrict error
+	struct pgm_ifaddrs** restrict ifap,
+	pgm_error_t**	     restrict error
 	)
 {
 	pgm_assert (NULL != ifap);
@@ -820,7 +820,7 @@ pgm_getifaddrs (
 
 void
 pgm_freeifaddrs (
-	struct pgm_ifaddrs_t*	ifa
+	struct pgm_ifaddrs*	ifa
 	)
 {
 	pgm_return_if_fail (NULL != ifa);
