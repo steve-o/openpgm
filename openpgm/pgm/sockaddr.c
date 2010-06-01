@@ -355,7 +355,7 @@ pgm_sockaddr_router_alert (
  * true.  Expects an integer flag."
  * Linux:ipv6(7) "Argument is a pointer to an integer."
  *
- * NB: Doesn't actually perform as expected, maybe optval should be different?
+ * Sent on special queue to rsvpd on Linux and so best avoided.
  */
 	const int optval = v ? 1 : 0;
 
@@ -375,19 +375,21 @@ pgm_sockaddr_router_alert (
 /* NB: struct ipoption is not very portable and requires a lot of additional headers */
 	const struct ipoption router_alert = {
 		.ipopt_dst  = 0,
-		.ipopt_list = { v ? PGM_IPOPT_RA : 0x00, v ? 0x04 : 0x00, 0x00, 0x00 }
+		.ipopt_list = { PGM_IPOPT_RA, 0x04, 0x00, 0x00 }
 	};
+	const int optlen = v ? sizeof(router_alert) : 0;
 #	else
 /* manually set the IP option */
 	const int ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
-	const int router_alert = v ? htonl (ipopt_ra) : 0;
+	const int router_alert = htonl (ipopt_ra);
+	const int optlen = v ? sizeof(router_alert) : 0;
 #	endif
 
 	switch (sa_family) {
 	case AF_INET:
 /* Linux:ip(7) "The maximum option size for IPv4 is 40 bytes."
  */
-		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&router_alert, sizeof(router_alert));
+		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&router_alert, optlen);
 retval = 0;
 		break;
 
