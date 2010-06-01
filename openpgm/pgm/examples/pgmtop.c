@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
-#include <locale.h>
 #include <ncurses.h>
 #include <netdb.h>
 #include <panel.h>
@@ -36,15 +36,11 @@
 #include <arpa/inet.h>
 
 #include <glib.h>
+
 #include <pgm/pgm.h>
-
-/* PGM internals */
-#include <pgm/packet.h>
-
-/* example dependencies */
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-
+#include <pgm/packet.h>
 
 struct ncurses_window;
 
@@ -156,7 +152,7 @@ static void resize_status (struct ncurses_window*, int, int);
 static void write_status (const gchar*, ...) G_GNUC_PRINTF (1, 2);
 static void write_statusv (const gchar*, va_list);
 
-static void on_signal (int, gpointer);
+static void on_signal (int);
 static void on_winch (int);
 static gboolean on_startup (gpointer);
 static gboolean on_snap (gpointer);
@@ -170,61 +166,52 @@ static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 int
 main (
 	G_GNUC_UNUSED int	argc,
-	G_GNUC_UNUSED char     *argv[]
+	G_GNUC_UNUSED char   *argv[]
 	)
 {
-	GError* err = NULL;
-	pgm_error_t* pgm_err = NULL;
-
-	setlocale (LC_ALL, "");
+	puts ("pgmtop");
 
 	log_init ();
-	g_message ("pgmtop");
-
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return EXIT_FAILURE;
-	}
-
-	g_loop = g_main_loop_new (NULL, FALSE);
+	pgm_init ();
 
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-	signal (SIGHUP,  SIG_IGN);
-	pgm_signal_install (SIGINT,  on_signal, g_loop);
-	pgm_signal_install (SIGTERM, on_signal, g_loop);
+	pgm_signal_install (SIGINT, on_signal);
+	pgm_signal_install (SIGTERM, on_signal);
+	pgm_signal_install (SIGHUP, SIG_IGN);
+
+	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* delayed startup */
-	g_message ("scheduling startup.n");
-	g_timeout_add(0, (GSourceFunc)on_startup, g_loop);
+	puts ("scheduling startup.n");
+	g_timeout_add(0, (GSourceFunc)on_startup, NULL);
 
 /* dispatch loop */
-	g_message ("entering main event loop ...");
+	puts ("entering main event loop ...");
 	g_main_loop_run (g_loop);
 
 	endwin();
-	g_message ("event loop terminated, cleaning up.");
+	puts ("event loop terminated, cleaning up.");
 
 /* cleanup */
-	g_main_loop_unref (g_loop);
+	g_main_loop_unref(g_loop);
 	g_loop = NULL;
 	if (g_io_channel) {
-		g_message ("closing socket.");
+		puts ("closing socket.");
+
+		GError *err = NULL;
 		g_io_channel_shutdown (g_io_channel, FALSE, &err);
 		g_io_channel = NULL;
 	}
 
 	if (g_stdin_channel) {
-		g_message ("unbinding stdin.");
+		puts ("unbinding stdin.");
 		g_io_channel_unref (g_stdin_channel);
 		g_stdin_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown ();
-	g_message ("finished.");
-	return EXIT_SUCCESS;
+	puts ("finished.");
+	return 0;
 }
 
 static struct ncurses_window*
@@ -398,7 +385,7 @@ tsi_row (
 			( (g_now.tv_usec - g_last_snap.tv_usec) / 1000.0 / 1000.0 );
 
 /* TSI */
-	char* tsi_string = pgm_tsi_print (&hoststat->tsi);
+	char* tsi_string = pgm_print_tsi (&hoststat->tsi);
 	mvwaddstr (g_peer->window, *row,  1, tsi_string);
 
 /* Packets */
@@ -552,16 +539,14 @@ write_statusv (
 	g_status_list = g_list_append (g_status_list, g_memdup (buffer, strlen(buffer)+1));
 }
 
-static
-void
+static void
 on_signal (
-	int			signum,
-	gpointer		user_data
+	G_GNUC_UNUSED int signum
 	)
 {
-	GMainLoop* loop = (GMainLoop*)user_data;
 	puts ("on_signal");
-	g_main_loop_quit (loop);
+
+	g_main_loop_quit(g_loop);
 }
 
 /* terminal resize signal
@@ -577,10 +562,9 @@ on_winch (
 
 static gboolean
 on_startup (
-	gpointer		user_data
+	G_GNUC_UNUSED gpointer data
 	)
 {
-	GMainLoop* loop = (GMainLoop*)user_data;
 	int e;
 
 	puts ("startup.");
@@ -591,15 +575,15 @@ on_startup (
 #if HAVE_GETPROTOBYNAME_R
 	char b[1024];
 	struct protoent protobuf, *proto;
-	e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
+	e = getprotobyname_r("pgm", &protobuf, b, sizeof(b), &proto);
 	if (e != -1 && proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
-			print f("Setting PGM protocol number to %i from /etc/protocols.\n", proto->p_proto);
+			printf("Setting PGM protocol number to %i from /etc/protocols.\n", proto->p_proto);
 			ipproto_pgm = proto->p_proto;
 		}
 	}
 #else
-	struct protoent *proto = getprotobyname ("pgm");
+	struct protoent *proto = getprotobyname("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
 			printf("Setting PGM protocol number to %i from /etc/protocols.\n", proto->p_proto);
@@ -610,72 +594,72 @@ on_startup (
 
 /* open socket for snooping */
 	puts ("opening raw socket.");
-	int sock = socket (PF_INET, SOCK_RAW, ipproto_pgm);
+	int sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
 	if (sock < 0) {
 		int _e = errno;
-		puts ("on_startup() failed");
+		puts("on_startup() failed");
 
 		if (_e == EPERM && 0 != getuid()) {
 			puts ("PGM protocol requires this program to run as superuser.");
 		}
-		g_main_loop_quit (loop);
+		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
 /* drop out of setuid 0 */
-	if (0 == getuid ()) {
+	if (0 == getuid()) {
 		puts ("dropping superuser privileges.");
-		setuid ((gid_t)65534);
-		setgid ((uid_t)65534);
+		setuid((gid_t)65534);
+		setgid((uid_t)65534);
 	}
 
 	char _t = 1;
-	e = setsockopt (sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
+	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
 	if (e < 0) {
-		printw ("on_startup() failed\n");
-		close (sock);
-		g_main_loop_quit (loop);
+		printw("on_startup() failed\n");
+		close(sock);
+		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
 /* buffers */
 	int buffer_size = 0;
 	socklen_t len = 0;
-	e = getsockopt (sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("receive buffer set at %i bytes.\n", buffer_size);
 	}
-	e = getsockopt (sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
 	if (e == 0) {
 		printf ("send buffer set at %i bytes.\n", buffer_size);
 	}
 
 /* bind */
 	struct sockaddr_in addr;
-	memset (&addr, 0, sizeof(addr));
+	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	e = bind (sock, (struct sockaddr*)&addr, sizeof(addr));
+	e = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
 	if (e < 0) {
-		printw ("on_startup() failed\n");
-		close (sock);
-		g_main_loop_quit (loop);
+		printw("on_startup() failed\n");
+		close(sock);
+		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
 /* multicast */
 	struct ip_mreq mreq;
-	memset (&mreq, 0, sizeof(mreq));
+	memset(&mreq, 0, sizeof(mreq));
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
 	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
 	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
-	e = setsockopt (sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 	if (e < 0) {
-		printw ("on_startup() failed\n");
-		close (sock);
-		g_main_loop_quit (loop);
+		printw("on_startup() failed\n");
+		close(sock);
+		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
@@ -704,6 +688,7 @@ on_startup (
 	puts ("READY");
 
 	init_ncurses();
+
 	return FALSE;
 }
 
@@ -722,7 +707,7 @@ tsi_hash (
         gconstpointer v
         )
 {
-	return g_str_hash(pgm_tsi_print(v));
+	return g_str_hash(pgm_print_tsi(v));
 }
 
 static gint
@@ -738,46 +723,47 @@ static gboolean
 on_io_data (
 	GIOChannel* source,
 	G_GNUC_UNUSED GIOCondition condition,
-	G_GNUC_UNUSED gpointer user_data
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	struct timeval now;
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (4096);
-	struct sockaddr_storage src, dst;
-	struct sockaddr_in* sin = (struct sockaddr_in*)&src;
-	socklen_t src_addr_len = sizeof(src);
+	char buffer[4096];
 	int fd = g_io_channel_unix_get_fd(source);
-
-	skb->len = recvfrom(fd, skb->head, 4096, MSG_DONTWAIT, (struct sockaddr*)&src, &src_addr_len);
+	struct sockaddr_in src_addr;
+	socklen_t src_addr_len = sizeof(src_addr);
+	int len = recvfrom(fd, buffer, sizeof(buffer), MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
 
 	gettimeofday (&now, NULL);
 	g_packets++;
 
-	GError* err = NULL;
-	gboolean is_valid = pgm_parse_raw (skb, (struct sockaddr*)&dst, &err);
-	if (!is_valid && err && PGM_PACKET_ERROR_CKSUM == err->code)
+	struct sockaddr_in dst_addr;
+	socklen_t dst_addr_len;
+	struct pgm_header *pgm_header;
+	gpointer packet;
+	gsize packet_length;
+	int e = pgm_parse_raw(buffer, len, (struct sockaddr*)&dst_addr, &dst_addr_len, &pgm_header, &packet, &packet_length);
+	if (e == -2)
 	{
 /* corrupt packet */
 		if (!g_nets) {
 			g_nets = g_hash_table_new (g_int_hash, g_int_equal);
 		}
 
-		struct pgm_netstat* netstat = g_hash_table_lookup (g_nets, &sin->sin_addr);
+		struct pgm_netstat* netstat = g_hash_table_lookup (g_nets, &src_addr.sin_addr);
 		if (netstat == NULL) {
-			write_status ("new host publishing corrupt data, local nla %s", inet_ntoa(sin->sin_addr));
+			write_status ("new host publishing corrupt data, local nla %s", inet_ntoa(src_addr.sin_addr));
 			netstat = g_malloc0(sizeof(struct pgm_netstat));
-			netstat->addr = sin->sin_addr;
+			netstat->addr = src_addr.sin_addr;
 			g_hash_table_insert (g_nets, (gpointer)&netstat->addr, (gpointer)netstat);
 		}
 
 		netstat->corrupt++;
-		pgm_free_skb (skb);
 		return TRUE;
 	}
-	else if (!is_valid)
+
+	if (e == -1)
 	{
 /* general error */
-		pgm_free_skb (skb);
 		return TRUE;
 	}
 
@@ -786,49 +772,48 @@ on_io_data (
 		g_hosts = g_hash_table_new (tsi_hash, tsi_equal);
 	}
 
-	struct pgm_hoststat* hoststat = g_hash_table_lookup (g_hosts, &skb->tsi);
+	pgm_tsi_t tsi;
+	memcpy (&tsi.gsi, pgm_header->pgm_gsi, sizeof(pgm_gsi_t));
+	tsi.sport = pgm_header->pgm_sport;
+
+	struct pgm_hoststat* hoststat = g_hash_table_lookup (g_hosts, &tsi);
 	if (hoststat == NULL) {
-		write_status ("new tsi %s with local nla %s", pgm_tsi_print (&skb->tsi), inet_ntoa(sin->sin_addr));
+		write_status ("new tsi %s with local nla %s", pgm_print_tsi (&tsi), inet_ntoa(src_addr.sin_addr));
 
 		hoststat = g_malloc0(sizeof(struct pgm_hoststat));
-		memcpy (&hoststat->tsi, &skb->tsi, sizeof(pgm_tsi_t));
+		memcpy (&hoststat->tsi, &tsi, sizeof(pgm_tsi_t));
 		hoststat->session_start = now;
 
 		g_hash_table_insert (g_hosts, (gpointer)&hoststat->tsi, (gpointer)hoststat);
 	}
 
 /* increment statistics */
-	memcpy (&hoststat->last_addr, &sin->sin_addr, sizeof(sin->sin_addr));
+	memcpy (&hoststat->last_addr, &src_addr.sin_addr, sizeof(src_addr.sin_addr));
 	hoststat->general.count++;
-	hoststat->general.bytes += skb->len;
+	hoststat->general.bytes += len;
 	hoststat->general.last = now;
 
-	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
-	skb->len       -= sizeof(struct pgm_header);
-
-/* repurpose is_valid for PGM subtype */
-	is_valid = FALSE;
-	switch (skb->pgm_header->pgm_type) {
+	gboolean err = FALSE;
+	switch (pgm_header->pgm_type) {
 	case PGM_SPM:
 		hoststat->spm.count++;
-		hoststat->spm.bytes += skb->len;
+		hoststat->spm.bytes += len;
 		hoststat->spm.last = now;
 
-		is_valid = pgm_verify_spm (skb);
-		if (!is_valid) {
+		err = pgm_verify_spm (pgm_header, packet, packet_length);
+		
+		if (err) {
 			hoststat->spm.invalid++;
 			hoststat->spm.last_invalid = now;
 		} else {
-			const struct pgm_spm* spm = (struct pgm_spm*)skb->data;
-
-			hoststat->nla.s_addr = spm->spm_nla.s_addr;
-			if (pgm_uint32_lte (g_ntohl( spm->spm_sqn ), hoststat->spm_sqn)) {
+			hoststat->nla.s_addr = ((struct pgm_spm*)packet)->spm_nla.s_addr;
+			if (pgm_uint32_lte (g_ntohl( ((struct pgm_spm*)packet)->spm_sqn ), hoststat->spm_sqn)) {
 				hoststat->general.duplicate++;
 				break;
 			}
-			hoststat->spm_sqn = g_ntohl( spm->spm_sqn );
-			hoststat->txw_trail = g_ntohl( spm->spm_trail );
-			hoststat->txw_lead = g_ntohl( spm->spm_lead );
+			hoststat->spm_sqn = g_ntohl( ((struct pgm_spm*)packet)->spm_sqn );
+			hoststat->txw_trail = g_ntohl( ((struct pgm_spm*)packet)->spm_trail );
+			hoststat->txw_lead = g_ntohl( ((struct pgm_spm*)packet)->spm_lead );
 			hoststat->rxw_trail = hoststat->txw_trail;
 			hoststat->window_defined = TRUE;
 		}
@@ -836,65 +821,64 @@ on_io_data (
 
 	case PGM_ODATA:
 		hoststat->odata.count++;
-		hoststat->odata.bytes += skb->len;
+		hoststat->odata.bytes += len;
 		hoststat->odata.last = now;
 
-		const struct pgm_data* data = (struct pgm_data*)skb->data;
-
 		if (!hoststat->window_defined) {
-			hoststat->rxw_lead = g_ntohl (data->data_sqn) - 1;
+			hoststat->rxw_lead = g_ntohl (((struct pgm_data*)packet)->data_sqn) - 1;
 			hoststat->rxw_trail = hoststat->rxw_trail_init = hoststat->rxw_lead + 1;
 			hoststat->rxw_constrained = TRUE;
 			hoststat->window_defined = TRUE;
 		} else {
-			if (! pgm_uint32_gte( g_ntohl (data->data_sqn) , hoststat->rxw_trail ) )
+			if (! pgm_uint32_gte( g_ntohl (((struct pgm_data*)packet)->data_sqn) , hoststat->rxw_trail ) )
 			{
 				hoststat->odata.invalid++;
 				hoststat->odata.last_invalid = now;
 				break;
 			}
-			hoststat->rxw_trail = g_ntohl (data->data_trail);
+			hoststat->rxw_trail = g_ntohl (((struct pgm_data*)packet)->data_trail);
 		}
 
 		if (hoststat->rxw_constrained && hoststat->txw_trail > hoststat->rxw_trail_init) {
 			hoststat->rxw_constrained = FALSE;
 		}
 
-		if ( pgm_uint32_lte ( g_ntohl (data->data_sqn), hoststat->rxw_lead ) ) {
+		if ( pgm_uint32_lte ( g_ntohl (((struct pgm_data*)packet)->data_sqn), hoststat->rxw_lead ) ) {
 			hoststat->general.duplicate++;
 			break;
 		} else {
-			hoststat->rxw_lead = g_ntohl (data->data_sqn);
+			hoststat->rxw_lead = g_ntohl (((struct pgm_data*)packet)->data_sqn);
 
-			hoststat->odata.tsdu += g_ntohs (skb->pgm_header->pgm_tsdu_length);
+			hoststat->odata.tsdu += g_ntohs (pgm_header->pgm_tsdu_length);
 		}
 		break;
 
 	case PGM_RDATA:
 		hoststat->rdata.count++;
-		hoststat->rdata.bytes += skb->len;
+		hoststat->rdata.bytes += len;
 		hoststat->rdata.last = now;
 		break;
 
 	case PGM_POLL:
 		hoststat->poll.count++;
-		hoststat->poll.bytes += skb->len;
+		hoststat->poll.bytes += len;
 		hoststat->poll.last = now;
 		break;
 
 	case PGM_POLR:
 		hoststat->polr.count++;
-		hoststat->polr.bytes += skb->len;
+		hoststat->polr.bytes += len;
 		hoststat->polr.last = now;
 		break;
 
 	case PGM_NAK:
 		hoststat->nak.count++;
-		hoststat->nak.bytes += skb->len;
+		hoststat->nak.bytes += len;
 		hoststat->nak.last = now;
 
-		is_valid = pgm_verify_nak (skb);
-		if (!is_valid) {
+		err = pgm_verify_nak (pgm_header, packet, packet_length);
+
+		if (err) {
 			hoststat->nak.invalid++;
 			hoststat->nak.last_invalid = now;
 		}
@@ -902,40 +886,41 @@ on_io_data (
 
 	case PGM_NNAK:
 		hoststat->nnak.count++;
-		hoststat->nnak.bytes += skb->len;
+		hoststat->nnak.bytes += len;
 		hoststat->nnak.last = now;
 		break;
 
 	case PGM_NCF:
 		hoststat->ncf.count++;
-		hoststat->ncf.bytes += skb->len;
+		hoststat->ncf.bytes += len;
 		hoststat->ncf.last = now;
 		break;
 
 	case PGM_SPMR:
 		hoststat->spmr.count++;
-		hoststat->spmr.bytes += skb->len;
+		hoststat->spmr.bytes += len;
 		hoststat->spmr.last = now;
 
-		is_valid = pgm_verify_spmr (skb);
-		if (!is_valid) {
+		err = pgm_verify_spmr (pgm_header, packet, packet_length);
+
+		if (err) {
 			hoststat->spmr.invalid++;
 			hoststat->spmr.last_invalid = now;
 		}
 		break;
 
 	default:
+		err = TRUE;
 		break;
 	}
 
-	if (!is_valid) {
+	if (err) {
 		hoststat->general.invalid++;
 		hoststat->general.last_invalid = now;
 	} else {
 		hoststat->general.last_valid = now;
 	}
 
-	pgm_free_skb (skb);
 	return TRUE;
 }
 

@@ -35,16 +35,15 @@
 
 #include <glib.h>
 
-#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/signal.h>
 #include <pgm/log.h>
-
-#include "dump-json.h"
+#include <pgm/packet.h>
 
 
 /* globals */
 
+static int g_port = 7500;
 static const char* g_network = "239.192.0.1";
 static struct in_addr g_filter /* = { 0 } */;
 
@@ -53,7 +52,7 @@ static GIOChannel* g_stdin_channel = NULL;
 static GMainLoop* g_loop = NULL;
 
 
-static void on_signal (int, gpointer);
+static void on_signal (int);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
@@ -68,16 +67,15 @@ main (
 	G_GNUC_UNUSED char   *argv[]
 	)
 {
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init ();
 	puts ("monitor");
 
+	log_init ();
+
 /* setup signal handlers */
-	signal (SIGSEGV, on_sigsegv);
-	signal (SIGHUP, SIG_IGN);
-	pgm_signal_install (SIGINT, on_signal, g_loop);
-	pgm_signal_install (SIGTERM, on_signal, g_loop);
+	signal(SIGSEGV, on_sigsegv);
+	pgm_signal_install(SIGINT, on_signal);
+	pgm_signal_install(SIGTERM, on_signal);
+	pgm_signal_install(SIGHUP, SIG_IGN);
 
 	g_filter.s_addr = 0;
 
@@ -112,19 +110,17 @@ main (
 	}
 
 	puts ("finished.");
-	pgm_messages_shutdown();
 	return 0;
 }
 
 static void
 on_signal (
-	int		signum,
-	gpointer	user_data
+	G_GNUC_UNUSED int	signum
 	)
 {
-	GMainLoop* loop = (GMainLoop*)user_data;
-	g_message ("on_signal (signum:%d user-data:%p)", signum, user_data);
-	g_main_loop_quit (loop);
+	puts ("on_signal");
+
+	g_main_loop_quit(g_loop);
 }
 
 static gboolean

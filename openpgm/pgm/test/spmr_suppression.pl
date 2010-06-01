@@ -26,7 +26,7 @@ $SIG{'INT'} = sub { print "interrupt caught.\n"; close_ssh(); };
 
 $sim->say ("create fake ao");
 $sim->say ("bind ao");
-print "sim: publish ODATA sqn 90,001 to monitor for GSI.\n";
+print "sim: publish ODATA sqn 90,001.\n";
 $sim->say ("net send odata ao 90001 90001 ringo");
 
 ## capture GSI of test sim (not app!)
@@ -37,7 +37,7 @@ $app->say ("create ao");
 $app->say ("bind ao");
 $app->say ("listen ao");
 
-print "sim: re-publish ODATA sqn 90,001 to app.\n";
+print "sim: publish ODATA sqn 90,001.\n";
 $sim->say ("net send odata ao 90001 90001 ringo");
 $sim->say ("net send spmr ao $odata->{PGM}->{gsi}.$odata->{PGM}->{sourcePort}");
 

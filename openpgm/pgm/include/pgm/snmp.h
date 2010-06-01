@@ -2,7 +2,7 @@
  * 
  * SNMP
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,14 +22,14 @@
 #ifndef __PGM_SNMP_H__
 #define __PGM_SNMP_H__
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
 
-bool pgm_snmp_init (pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_snmp_shutdown (void);
+G_BEGIN_DECLS
 
-PGM_END_DECLS
+int pgm_snmp_init (void);
+int pgm_snmp_shutdown (void);
+
+G_END_DECLS
 
 #endif /* __PGM_SNMP_H__ */

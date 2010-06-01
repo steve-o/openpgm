@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * PGM timer thread.
+ * high resolution timers.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,180 +19,531 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <impl/timer.h>
-#include <impl/receiver.h>
-#include <impl/source.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <sched.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
+#include <sys/timeb.h>
+#ifdef CONFIG_HAVE_RTC
+#	include <linux/rtc.h>
+#endif
+
+#include <glib.h>
+
+#include "pgm/timer.h"
 
 
-//#define TIMER_DEBUG
+/* globals */
 
+#define msecs_to_secs(t)	( (t) / 1000 )
+#define usecs_to_secs(t)	( (t) / 1000000UL )
+#define nsecs_to_secs(t)	( (t) / 1000000000UL )
+#define secs_to_msecs(t)	( (pgm_time_t)(t) * 1000 )
+#define secs_to_usecs(t)	( (pgm_time_t)(t) * 1000000UL )
+#define secs_to_nsecs(t)	( (pgm_time_t)(t) * 1000000000UL )
+#define msecs_to_usecs(t)	( (pgm_time_t)(t) * 1000 )
+#define msecs_to_nsecs(t)	( (pgm_time_t)(t) * 1000000UL )
+#define usecs_to_msecs(t)	( (t) / 1000 )
+#define usecs_to_nsecs(t)	( (pgm_time_t)(t) * 1000 )
+#define nsecs_to_msecs(t)	( (t) / 1000000UL )
+#define nsecs_to_usecs(t)	( (t) / 1000 )
 
-/* determine which timer fires next: spm (ihb_tmr), nak_rb_ivl, nak_rpt_ivl, or nak_rdata_ivl
- * and check whether its already due.
- *
- * called in sock creation so locks unrequired.
- */
+pgm_time_t pgm_time_now = 0;
+pgm_time_update_func pgm_time_update_now;
+pgm_time_sleep_func pgm_time_sleep;
+pgm_time_since_epoch_func pgm_time_since_epoch;
 
-bool
-pgm_timer_prepare (
-	pgm_sock_t* const	sock
-	)
+static gboolean time_got_initialized = FALSE;
+static pgm_time_t rel_offset = 0;
+
+static pgm_time_t gettimeofday_update (void);
+static pgm_time_t clock_update (void);
+static pgm_time_t ftime_update (void);
+static int clock_init (void);
+static void clock_nano_sleep (gulong);
+static void nano_sleep (gulong);
+static void select_sleep (gulong);
+
+#ifdef CONFIG_HAVE_RTC
+static int rtc_init (void);
+static int rtc_destroy (void);
+static pgm_time_t rtc_update (void);
+static void rtc_sleep (gulong);
+#endif
+
+#ifdef CONFIG_HAVE_TSC
+static int tsc_us_scaler = 0;
+static int tsc_init (void);
+static pgm_time_t tsc_update (void);
+static void tsc_sleep (gulong);
+#endif
+
+#ifdef CONFIG_HAVE_PPOLL
+static void poll_sleep (gulong);
+#endif
+
+static void pgm_time_conv (pgm_time_t*, time_t*);
+static void pgm_time_conv_from_reset (pgm_time_t*, time_t*);
+
+int
+pgm_time_init ( void )
 {
-	int32_t msec;
+	g_return_val_if_fail (time_got_initialized == FALSE, -1);
 
-/* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (sock->can_send_data || sock->can_recv_data);
-
-	pgm_time_t now = pgm_time_update_now();
-	pgm_time_t expiration;
-
-	if (sock->can_send_data)
-		expiration = sock->next_ambient_spm;
-	else
-		expiration = now + sock->peer_expiry;
-
-	sock->next_poll = expiration;
-
-/* advance time again to adjust for processing time out of the event loop, this
- * could cause further timers to expire even before checking for new wire data.
- */
-	msec = pgm_to_msecs ((int64_t)expiration - (int64_t)now);
-	if (msec < 0)
-		msec = 0;
-	else
-		msec = MIN (INT32_MAX, msec);
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiration in %" PRIi32 "ms"), msec);
-	return (msec == 0);
-}
-
-bool
-pgm_timer_check (
-	pgm_sock_t* const	sock
-	)
-{
-	const pgm_time_t now = pgm_time_update_now();
-	bool expired;
-
-/* pre-conditions */
-	pgm_assert (NULL != sock);
-
-	pgm_timer_lock (sock);
-	expired = pgm_time_after_eq (now, sock->next_poll);
-	pgm_timer_unlock (sock);
-	return expired;
-}
-
-/* return next timer expiration in microseconds (μs)
- */
-
-pgm_time_t
-pgm_timer_expiration (
-	pgm_sock_t* const	sock
-	)
-{
-	const pgm_time_t now = pgm_time_update_now();
-	pgm_time_t expiration;
-
-/* pre-conditions */
-	pgm_assert (NULL != sock);
-
-	pgm_timer_lock (sock);
-	expiration = pgm_time_after (sock->next_poll, now) ? pgm_to_usecs (sock->next_poll - now) : 0;
-	pgm_timer_unlock (sock);
-	return expiration;
-}
-
-/* call all timers, assume that time_now has been updated by either pgm_timer_prepare
- * or pgm_timer_check and no other method calls here.
- * 
- * returns TRUE on success, returns FALSE on blocked send-in-receive operation.
- */
-
-bool
-pgm_timer_dispatch (
-	pgm_sock_t* const	sock
-	)
-{
-	const pgm_time_t now = pgm_time_update_now();
-	pgm_time_t next_expiration = 0;
-
-/* pre-conditions */
-	pgm_assert (NULL != sock);
-
-	pgm_debug ("pgm_timer_dispatch (sock:%p)", (const void*)sock);
-
-/* find which timers have expired and call each */
-	if (sock->can_recv_data)
-	{
-		if (!pgm_check_peer_state (sock, now))
-			return FALSE;
-		next_expiration = pgm_min_receiver_expiry (now + sock->peer_expiry, sock);
+/* current time */
+	const char *cfg = getenv ("PGM_TIMER");
+	if (cfg == NULL) {
+#ifdef CONFIG_HAVE_TSC
+		cfg = "TSC";
+#else
+		cfg = "GTOD";
+#endif
 	}
 
-	if (sock->can_send_data)
+	pgm_time_since_epoch = pgm_time_conv;
+
+	switch (cfg[0]) {
+	case 'C':	pgm_time_update_now = clock_update; break;
+	case 'F':	pgm_time_update_now = ftime_update; break;
+
+#ifdef CONFIG_HAVE_RTC
+	case 'R':	pgm_time_update_now = rtc_update;
+			pgm_time_since_epoch = pgm_time_conv_from_reset;
+			break;
+#endif
+#ifdef CONFIG_HAVE_TSC
+	case 'T':	pgm_time_update_now = tsc_update;
+			pgm_time_since_epoch = pgm_time_conv_from_reset;
+			break;
+#endif
+
+	default:
+	case 'G':	pgm_time_update_now = gettimeofday_update; break;
+	}
+
+/* sleeping */
+	cfg = getenv ("PGM_SLEEP");
+	if (cfg == NULL) cfg = "USLEEP";
+
+	switch (cfg[0]) {
+	case 'C':	pgm_time_sleep = clock_nano_sleep; break;
+	case 'N':	pgm_time_sleep = nano_sleep; break;
+	case 'S':	pgm_time_sleep = select_sleep; break;			/* mainly for testing glib loop */
+
+#ifdef CONFIG_HAVE_RTC
+	case 'R':	pgm_time_sleep = rtc_sleep; break;
+#endif
+#ifdef CONFIG_HAVE_TSC
+	case 'T':	pgm_time_sleep = tsc_sleep; break;
+#endif
+#ifdef CONFIG_HAVE_PPOLL
+	case 'P':	pgm_time_sleep = poll_sleep; break;
+#endif
+
+	default:
+	case 'M':
+	case 'U':	pgm_time_sleep = (pgm_time_sleep_func)usleep; break;	/* direct to glibc, function is deprecated */
+	}
+
+#ifdef CONFIG_HAVE_RTC
+	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
 	{
-		pgm_mutex_lock (&sock->timer_mutex);
-		const unsigned spm_heartbeat_state = sock->spm_heartbeat_state;
-		const pgm_time_t next_heartbeat_spm = sock->next_heartbeat_spm;
-		pgm_mutex_unlock (&sock->timer_mutex);
+		rtc_init();
+	}
+#endif
+#ifdef CONFIG_HAVE_TSC
+	if (pgm_time_update_now == tsc_update || pgm_time_sleep == tsc_sleep)
+	{
+/* attempt to parse clock ticks from kernel
+ */
+		FILE* fp = fopen ("/proc/cpuinfo", "r");
+		char buffer[1024];
 
-/* no lock needed on ambient */
-		const pgm_time_t next_ambient_spm = sock->next_ambient_spm;
-		pgm_time_t next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, next_ambient_spm) : next_ambient_spm;
-
-		if (pgm_time_after_eq (now, next_spm)
-		    && !pgm_send_spm (sock, 0))
-			return FALSE;
-
-/* ambient timing not so important so base next event off current time */
-		if (pgm_time_after_eq (now, next_ambient_spm))
+		if (fp)
 		{
-			sock->next_ambient_spm = now + sock->spm_ambient_interval;
-			next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, sock->next_ambient_spm) : sock->next_ambient_spm;
-		}
-
-/* heartbeat timing is often high resolution so base times to last event */
-		if (spm_heartbeat_state && pgm_time_after_eq (now, next_heartbeat_spm))
-		{
-			unsigned new_heartbeat_state    = spm_heartbeat_state;
-			pgm_time_t new_heartbeat_spm = next_heartbeat_spm;
-			do {
-				new_heartbeat_spm += sock->spm_heartbeat_interval[new_heartbeat_state++];
-				if (new_heartbeat_state == sock->spm_heartbeat_len) {
-					new_heartbeat_state = 0;
-					new_heartbeat_spm   = now + sock->spm_ambient_interval;
+			while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
+			{
+				if (strstr (buffer, "cpu MHz"))
+				{
+					char *p = strchr (buffer, ':');
+					if (p) tsc_us_scaler = atoi (p + 1);
 					break;
 				}
-			} while (pgm_time_after_eq (now, new_heartbeat_spm));
-/* check for reset heartbeat */
-			pgm_mutex_lock (&sock->timer_mutex);
-			if (next_heartbeat_spm == sock->next_heartbeat_spm) {
-				sock->spm_heartbeat_state = new_heartbeat_state;
-				sock->next_heartbeat_spm  = new_heartbeat_spm;
-				next_spm = MIN(sock->next_ambient_spm, new_heartbeat_spm);
-			} else
-				next_spm = MIN(sock->next_ambient_spm, sock->next_heartbeat_spm);
-			sock->next_poll = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
-			pgm_mutex_unlock (&sock->timer_mutex);
-			return TRUE;
+			}
+			fclose (fp);
 		}
 
-		next_expiration = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
+/* e.g. export RDTSC_FREQUENCY=3200.000000
+ *
+ * Value can be used to override kernel tick rate as well as internal calibration
+ */
+		const char *scaler = getenv ("RDTSC_FREQUENCY");
+		if (scaler) {
+			tsc_us_scaler = atoi (scaler);
+		}
 
-/* check for reset */
-		pgm_mutex_lock (&sock->timer_mutex);
-		sock->next_poll = sock->next_poll > now ? MIN(sock->next_poll, next_expiration) : next_expiration;
-		pgm_mutex_unlock (&sock->timer_mutex);
+/* calibrate */
+		if (0 >= tsc_us_scaler)
+		{
+			tsc_init();
+		}
 	}
-	else
-		sock->next_poll = next_expiration;
+#endif
 
-	return TRUE;
+	if (pgm_time_sleep == clock_nano_sleep)
+	{
+		clock_init();
+	}
+
+	pgm_time_update_now();
+
+/* calculate relative time offset */
+	if (	0
+#ifdef CONFIG_HAVE_RTC
+		|| pgm_time_update_now == rtc_update
+#endif
+#ifdef CONFIG_HAVE_TSC
+		|| pgm_time_update_now == tsc_update
+#endif
+	   )
+	{
+		rel_offset = gettimeofday_update() - pgm_time_update_now();
+	}
+
+	time_got_initialized = TRUE;
+	return 0;
+}
+
+gboolean
+pgm_time_supported (void)
+{
+	return ( time_got_initialized == TRUE );
+}
+
+int
+pgm_time_destroy (void)
+{
+#ifdef CONFIG_HAVE_RTC
+	if (pgm_time_update_now == rtc_update || pgm_time_sleep == rtc_sleep)
+	{
+		rtc_destroy();
+	}
+#endif
+
+	return 0;
+}
+
+static pgm_time_t
+gettimeofday_update (void)
+{
+	struct timeval gettimeofday_now;
+	gettimeofday (&gettimeofday_now, NULL);
+	const pgm_time_t now = secs_to_usecs(gettimeofday_now.tv_sec) + gettimeofday_now.tv_usec;
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
+}
+
+static pgm_time_t
+clock_update (void)
+{
+	struct timespec clock_now;
+	clock_gettime (CLOCK_MONOTONIC, &clock_now);
+	const pgm_time_t now = secs_to_usecs(clock_now.tv_sec) + nsecs_to_usecs(clock_now.tv_nsec);
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
+}
+
+static pgm_time_t
+ftime_update (void)
+{
+	struct timeb ftime_now;
+	ftime (&ftime_now);
+	const pgm_time_t now = secs_to_usecs(ftime_now.time) + msecs_to_usecs(ftime_now.millitm);
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
+}
+
+/* Old PC/AT-Compatible driver:  /dev/rtc
+ *
+ * Not so speedy 8192 Hz timer, thats 122us resolution.
+ *
+ * WARNING: time is relative to start of timer.
+ */
+
+#ifdef CONFIG_HAVE_RTC
+static int rtc_fd = -1;
+static int rtc_frequency = 8192;
+static pgm_time_t rtc_count = 0;
+
+static int
+rtc_init (void)
+{
+	g_return_val_if_fail (rtc_fd == -1, -1);
+
+	rtc_fd = open ("/dev/rtc", O_RDONLY);
+	if (rtc_fd < 0) {
+		g_critical ("Cannot open /dev/rtc for reading.");
+		g_assert_not_reached();
+	}
+
+	if ( ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency) < 0 ) {
+		g_critical ("Cannot set RTC frequency to %i Hz.", rtc_frequency);
+		g_assert_not_reached();
+	}
+
+	if ( ioctl (rtc_fd, RTC_PIE_ON, 0) < 0 ) {
+		g_critical ("Cannot enable periodic interrupt (PIE) on RTC.");
+		g_assert_not_reached();
+	}
+
+	return 0;
+}
+
+static int
+rtc_destroy (void)
+{
+	g_return_val_if_fail (rtc_fd, -1);
+
+	close (rtc_fd);
+	rtc_fd = -1;
+
+	return 0;
+}
+
+static pgm_time_t
+rtc_update (void)
+{
+	unsigned long data;
+/* returned value contains interrupt type and count of interrupts since last read */
+	read (rtc_fd, &data, sizeof(data));
+	rtc_count += data >> 8;
+	return pgm_time_now = rtc_count * 1000000UL / rtc_frequency;
+}
+
+/* use a select to check if we have to clear the current interrupt count
+ */
+
+static void
+rtc_sleep (gulong usec)
+{
+	unsigned long data;
+
+	struct timeval zero_tv = {0, 0};
+	fd_set readfds;
+	FD_ZERO(&readfds);
+	FD_SET(rtc_fd, &readfds);
+	int retval = select (rtc_fd + 1, &readfds, NULL, NULL, &zero_tv);
+	if (retval) {
+		read (rtc_fd, &data, sizeof(data));
+		rtc_count += data >> 8;
+	}
+
+	pgm_time_t count = 0;
+	do {
+		read (rtc_fd, &data, sizeof(data));
+		count += data >> 8;
+	} while ( (count * 1000000UL) < rtc_frequency * usec );
+
+	rtc_count += count;
+}
+#endif /* CONFIG_HAVE_RTC */
+
+/* read time stamp counter, count of ticks from processor reset.
+ */
+
+#ifdef CONFIG_HAVE_TSC
+static inline pgm_time_t
+rdtsc (void)
+{
+	guint32 lo, hi;
+
+/* We cannot use "=A", since this would use %rax on x86_64 */
+	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+
+	return (pgm_time_t)hi << 32 | lo;
+}
+
+/* determine ratio of ticks to nano-seconds, use /dev/rtc for high accuracy
+ * millisecond timer and convert.
+ *
+ * WARNING: time is relative to start of timer.
+ */
+
+static int
+tsc_init (void)
+{
+	pgm_time_t start, stop;
+	gulong calibration_usec = 4000 * 1000;
+
+	g_message ("Running a benchmark to measure system clock frequency...");
+
+	start = rdtsc();
+	pgm_time_sleep (calibration_usec);
+	stop = rdtsc();
+
+	if (stop < start)
+	{
+		g_warning ("Finished RDTSC test.  Unstable TSC detected.  The benchmark resulted in a "
+			   "non-monotonic time response rendering the TSC unsuitable for high resolution "
+			   "timing.  To prevent the start delay from this benchmark and use a stable clock "
+			   "source set the environment variables PGM_TIMER to GTOD and PGM_SLEEP to USLEEP.");
+
+/* force both to stable clocks even though one might be OK */
+		pgm_time_destroy();
+
+		pgm_time_update_now = gettimeofday_update;
+		pgm_time_sleep = (pgm_time_sleep_func)usleep;
+
+		return 0;
+	}
+
+/* TODO: this math needs to be scaled to reduce rounding errors */
+	pgm_time_t tsc_diff = stop - start;
+	if (tsc_diff > calibration_usec) {
+/* cpu > 1 Ghz */
+		tsc_us_scaler = tsc_diff / calibration_usec;
+	} else {
+/* cpu < 1 Ghz */
+		tsc_us_scaler = -( calibration_usec / tsc_diff );
+	}
+
+	g_warning ("Finished RDTSC test. To prevent the startup delay from this benchmark, "
+		   "set the environment variable RDTSC_FREQUENCY to %i on this "
+		   "system. This value is dependent upon the CPU clock speed and "
+		   "architecture and should be determined separately for each server.",
+		   tsc_us_scaler);
+
+	return 0;
+}
+
+static pgm_time_t
+tsc_update (void)
+{
+	const pgm_time_t count = rdtsc();
+	const pgm_time_t now = tsc_us_scaler > 0 ? (count / tsc_us_scaler) : (count * tsc_us_scaler);
+	if (G_UNLIKELY(now < pgm_time_now))
+		return pgm_time_now;
+	else
+		return pgm_time_now = now;
+}	
+
+static void
+tsc_sleep (gulong usec)
+{
+	pgm_time_t start, now, end;
+
+	start = rdtsc();
+	end = start + ( tsc_us_scaler > 0 ? (usec * tsc_us_scaler) : (usec / tsc_us_scaler) );
+
+	for (;;) {
+		now = rdtsc();
+		if (now < end) g_thread_yield();
+		else break;
+	}
+}
+#endif /* CONFIG_HAVE_TSC */
+
+static clockid_t g_clock_id;
+
+static int
+clock_init (void)
+{
+	g_clock_id = CLOCK_REALTIME;
+//	g_clock_id = CLOCK_MONOTONIC;
+//	g_clock_id = CLOCK_PROCESS_CPUTIME_ID;
+//	g_clock_id = CLOCK_THREAD_CPUTIME_ID;
+
+#if 0
+//	clock_getcpuclockid (0, &g_clock_id);
+//	pthread_getcpuclockid (pthread_self(), &g_clock_id);
+
+	struct timespec ts;
+	if (clock_getres (g_clock_id, &ts) > 0) {
+		g_critical ("clock_getres failed on clock id %i", (int)g_clock_id);
+		return -1;
+	}
+	g_message ("clock resolution %lu.%.9lu", ts.tv_sec, ts.tv_nsec);
+#endif
+	return 0;
+}
+
+static void
+clock_nano_sleep (gulong usec)
+{
+	struct timespec ts;
+#if 0
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	clock_nanosleep (g_clock_id, 0, &ts, NULL);
+#else
+	usec += pgm_time_now;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	clock_nanosleep (g_clock_id, TIMER_ABSTIME, &ts, NULL);
+#endif
+}
+
+static void
+nano_sleep (gulong usec)
+{
+	struct timespec ts;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	nanosleep (&ts, NULL);
+}
+
+static void
+select_sleep (gulong usec)
+{
+	struct timespec ts;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	pselect (0, NULL, NULL, NULL, &ts, NULL);
+}
+
+#ifdef CONFIG_HAVE_PPOLL
+static void
+poll_sleep (gulong usec)
+{
+	struct timespec ts;
+	ts.tv_sec	= usec / 1000000UL;
+	ts.tv_nsec	= (usec % 1000000UL) * 1000;
+	ppoll (NULL, 0, &ts, NULL);
+}
+#endif
+
+/* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
+ */
+static void
+pgm_time_conv (
+	pgm_time_t*	pgm_time_t_time,
+	time_t*		time_t_time
+	)
+{
+	*time_t_time = pgm_to_secs (*pgm_time_t_time);
+}
+
+/* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the core started.
+ */
+static void
+pgm_time_conv_from_reset (
+	pgm_time_t*	pgm_time_t_time,
+	time_t*		time_t_time
+	)
+{
+	*time_t_time = pgm_to_secs (*pgm_time_t_time + rel_offset);
 }
 
 /* eof */

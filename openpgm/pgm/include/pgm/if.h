@@ -22,12 +22,19 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
-#include <pgm/types.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
 
-void pgm_if_print_all (void);
+G_BEGIN_DECLS
 
-PGM_END_DECLS
+int pgm_if_getnodeaddr (int, struct sockaddr*, socklen_t);
+int pgm_if_print_all (void);
+int pgm_if_indextosockaddr (unsigned int, int, struct sockaddr*);
+int pgm_if_parse_transport (const char*, int, struct group_source_req*, gsize*, struct group_source_req*);
+
+int pgm_if_inet_network (const char*, struct in_addr*);
+int pgm_if_inet6_network (const char*, struct in6_addr*);
+
+G_END_DECLS
 
 #endif /* __PGM_IF_H__ */

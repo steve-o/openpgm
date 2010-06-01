@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * SNMP agent, single session.
+ * SNMP
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,13 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <glib.h>
+
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
-
-#include <errno.h>
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
 
 #include "pgm/snmp.h"
 #include "pgm/pgmMIB.h"
@@ -33,41 +35,63 @@
 
 /* globals */
 
-bool				pgm_agentx_subagent = TRUE;
-char*				pgm_agentx_socket = NULL;
-char*				pgm_snmp_appname = "PGM";
+gboolean pgm_agentx_subagent = TRUE;
+char* pgm_agentx_socket = NULL;
+gboolean pgm_snmp_syslog = FALSE;
+const char* pgm_snmp_appname = "PGM";
 
-/* locals */
+static GThread*	g_thread;
+static int g_pipe[2];
 
-#ifndef _WIN32
-static pthread_t		snmp_thread;
-static void*			snmp_routine (void*);
-#else
-static HANDLE			snmp_thread;
-static unsigned __stdcall	snmp_routine (void*);
-#endif
-static pgm_notify_t		snmp_notify = PGM_NOTIFY_INIT;
-static volatile uint32_t	snmp_ref_count = 0;
+static gpointer agent_thread(gpointer);
 
 
-/* Calling application needs to redirect SNMP logging before prior to this
- * function.
- */
-
-bool
-pgm_snmp_init (
-	pgm_error_t**	error
+static int
+log_handler (
+	G_GNUC_UNUSED netsnmp_log_handler*	logh,
+	int			pri,
+	const char*		string
 	)
 {
-	if (pgm_atomic_exchange_and_add32 (&snmp_ref_count, 1) > 0)
-		return TRUE;
+	GLogLevelFlags log_level = G_LOG_LEVEL_DEBUG;
+	switch (pri) {
+	case LOG_EMERG:
+	case LOG_ALERT:
+	case LOG_CRIT:		/*log_level = G_LOG_LEVEL_CRITICAL; break;*/	/* net-snmp 5.4.1 borken */
+	case LOG_ERR:		/*log_level = G_LOG_LEVEL_ERROR; break;*/
+	case LOG_WARNING:	log_level = G_LOG_LEVEL_WARNING; break;
+	case LOG_NOTICE:	log_level = G_LOG_LEVEL_MESSAGE; break;
+	case LOG_INFO:		log_level = G_LOG_LEVEL_INFO; break;
+	}
+	int len = strlen(string);
+	if ( string[len - 1] == '\n' ) len--;
+	char sbuf[1024];
+	strncpy (sbuf, string, len);
+	if (len > 0)
+		sbuf[len - 1] = '\0';
+	g_log (G_LOG_DOMAIN, log_level, "%s", sbuf);
+	return 1;
+}
+
+int
+pgm_snmp_init (void)
+{
+	int retval = 0;
+	GError* err;
+	GThread* tmp_thread;
+
+/* ensure threading enabled */
+	if (!g_thread_supported ()) g_thread_init (NULL);
+
+/* redirect snmp logging */
+	snmp_disable_log();
+	netsnmp_log_handler* logh = netsnmp_register_loghandler (NETSNMP_LOGHANDLER_CALLBACK, LOG_DEBUG);
+	logh->handler = log_handler;
 
 	if (pgm_agentx_subagent)
 	{
-		pgm_minor (_("Configuring as SNMP AgentX sub-agent."));
 		if (pgm_agentx_socket)
 		{
-			pgm_minor (_("Using AgentX socket %s."), pgm_agentx_socket);
 			netsnmp_ds_set_string (NETSNMP_DS_APPLICATION_ID,
 						NETSNMP_DS_AGENT_X_SOCKET,
 						pgm_agentx_socket);
@@ -77,119 +101,94 @@ pgm_snmp_init (
 					TRUE);
 	}
 
-	pgm_minor (_("Initialising SNMP agent."));
-	if (0 != init_agent (pgm_snmp_appname)) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_SNMP,
-			     PGM_ERROR_FAILED,
-			     _("Initialise SNMP agent: see SNMP log for further details."));
-		goto err_cleanup;
+/* initialise */
+	retval = init_agent (pgm_snmp_appname);
+	if (retval < 0) {
+		g_error ("failed to initialise SNMP agent.");
+		goto out;
 	}
 
-	if (!pgm_mib_init (error)) {
-		goto err_cleanup;
-	}
+	pgm_mib_init ();
 
 /* read config and parse mib */
-	pgm_minor (_("Initialising SNMP."));
 	init_snmp (pgm_snmp_appname);
 
 	if (!pgm_agentx_subagent)
 	{
-		pgm_minor (_("Connecting to SNMP master agent."));
-		if (0 != init_master_agent ()) {
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_SNMP,
-				     PGM_ERROR_FAILED,
-				     _("Initialise SNMP master agent: see SNMP log for further details."));
-			snmp_shutdown (pgm_snmp_appname);
-			goto err_cleanup;
+		retval = init_master_agent();
+		if (retval < 0) {
+			g_error ("failed to initialise SNMP master agent.");
+			goto out;
 		}
 	}
 
-/* create notification channel */
-	if (0 != pgm_notify_init (&snmp_notify)) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_SNMP,
-			     pgm_error_from_errno (errno),
-			     _("Creating SNMP notification channel: %s"),
-			     strerror (errno));
-		snmp_shutdown (pgm_snmp_appname);
-		goto err_cleanup;
+/* create shutdown pipe */
+	if (pipe (g_pipe))
+		goto err_destroy;
+
+/* write-end */
+	int fd_flags = fcntl (g_pipe[1], F_GETFL);
+	if (fd_flags < 0)
+		goto err_destroy;
+	if (fcntl (g_pipe[1], F_SETFL, fd_flags | O_NONBLOCK))
+		goto err_destroy;
+
+/* read-end */
+	fd_flags = fcntl (g_pipe[0], F_GETFL);
+	if (fd_flags < 0)
+		goto err_destroy;
+	if (fcntl (g_pipe[0], F_SETFL, fd_flags | O_NONBLOCK))
+		goto err_destroy;
+
+	tmp_thread = g_thread_create_full (agent_thread,
+					NULL,
+					0,		/* stack size */
+					TRUE,		/* joinable */
+					TRUE,		/* native thread */
+					G_THREAD_PRIORITY_LOW,	/* lowest */
+					&err);
+	if (!tmp_thread) {
+		g_error ("thread failed: %i %s", err->code, err->message);
+		goto err_destroy;
 	}
 
-/* spawn thread to handle SNMP requests */
-#ifndef _WIN32
-	const int status = pthread_create (&snmp_thread, NULL, &snmp_routine, NULL);
-	if (0 != status) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_SNMP,
-			     pgm_error_from_errno (errno),
-			     _("Creating SNMP thread: %s"),
-			     strerror (errno));
-		snmp_shutdown (pgm_snmp_appname);
-		goto err_cleanup;
-	}
-#else
-	snmp_thread = (HANDLE)_beginthreadex (NULL, 0, &snmp_routine, NULL, 0, NULL);
-	const int save_errno = errno;
-	if (0 == snmp_thread) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_SNMP,
-			     pgm_error_from_errno (save_errno),
-			     _("Creating SNMP thread: %s"),
-			     strerror (save_errno));
-		snmp_shutdown (pgm_snmp_appname);
-		goto err_cleanup;
-	}
-#endif /* _WIN32 */
-	return TRUE;
-err_cleanup:
-	if (pgm_notify_is_valid (&snmp_notify)) {
-		pgm_notify_destroy (&snmp_notify);
-	}
-	pgm_atomic_dec32 (&snmp_ref_count);
-	return FALSE;
+	g_thread = tmp_thread;
+
+out:
+	return retval;
+
+err_destroy:
+	return 0;
 }
 
-/* Terminate SNMP thread and free resources.
- */
-
-bool
+int
 pgm_snmp_shutdown (void)
 {
-	pgm_return_val_if_fail (pgm_atomic_read32 (&snmp_ref_count) > 0, FALSE);
+/* prod agent thread via pipe */
+	const char one = '1';
+	if (write (g_pipe[1], &one, sizeof(one)) != sizeof(one))
+	{
+		g_critical ("write to pipe failed :(");
+	}
 
-	if (pgm_atomic_exchange_and_add32 (&snmp_ref_count, (uint32_t)-1) != 1)
-		return TRUE;
+	if (g_thread) {
+		g_thread_join (g_thread);
+		g_thread = NULL;
+	}
 
-	pgm_notify_send (&snmp_notify);
-#ifndef _WIN32
-	pthread_join (snmp_thread, NULL);
-#else
-	CloseHandle (snmp_thread);
-#endif
-	pgm_notify_destroy (&snmp_notify);
 	snmp_shutdown (pgm_snmp_appname);
-	return TRUE;
+
+	close (g_pipe[0]);
+	close (g_pipe[1]);
+
+	return 0;
 }
 
-/* Thread routine for processing SNMP requests
- */
-
-static
-#ifndef _WIN32
-void*
-#else
-unsigned
-__stdcall
-#endif
-snmp_routine (
-	PGM_GNUC_UNUSED	void*	arg
+static gpointer
+agent_thread (
+	G_GNUC_UNUSED	gpointer	data
 	)
 {
-	const int notify_fd = pgm_notify_get_fd (&snmp_notify);
-
 	for (;;)
 	{
 		int fds = 0, block = 1;
@@ -197,26 +196,21 @@ snmp_routine (
 		struct timeval timeout;
 
 		FD_ZERO(&fdset);
-		snmp_select_info (&fds, &fdset, &timeout, &block);
-		FD_SET(notify_fd, &fdset);
-		if (notify_fd+1 > fds)
-			fds = notify_fd+1;
-		fds = select (fds, &fdset, NULL, NULL, block ? NULL : &timeout);
-		if (FD_ISSET(notify_fd, &fdset))
+		snmp_select_info(&fds, &fdset, &timeout, &block);
+		FD_SET(g_pipe[0], &fdset);
+		if (g_pipe[0]+1 > fds)
+			fds = g_pipe[0]+1;
+		fds = select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
+		if (FD_ISSET(g_pipe[0], &fdset))
 			break;
 		if (fds)
-			snmp_read (&fdset);
+			snmp_read(&fdset);
 		else
 			snmp_timeout();
 	}
 
 /* cleanup */
-#ifndef _WIN32
 	return NULL;
-#else
-	_endthread();
-	return 0;
-#endif /* WIN32 */
 }
 
 /* eof */

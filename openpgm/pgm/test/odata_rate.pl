@@ -27,7 +27,7 @@ $mon->say ("filter $config{app}{ip}");
 print "mon: ready.\n";
 
 $app->say ("create ao");
-$app->say ("set ao TXW_MAX_RTE 1500");
+$app->say ("set ao TXW_MAX_RTE 1000");
 $app->say ("bind ao");
 
 print "app: send 50 data packets ...\n";
@@ -57,7 +57,7 @@ my $rate = $bytes / $elapsed;
 $rate = $bytes if ($rate > $bytes);
 print "mon: incoming data rate $rate bps.\n";
 
-die "incoming rate exceeds set TXW_MAX_RTE\n" unless $rate < 1650;
+die "incoming rate exceeds set TXW_MAX_RTE\n" unless $rate < 1000;
 
 print "test completed successfully.\n";
 

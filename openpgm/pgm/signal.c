@@ -2,7 +2,7 @@
  *
  * Re-entrant safe signal handling.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,138 +19,115 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE
-#include <signal.h>		/* _GNU_SOURCE for strsignal() */
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <glib.h>
-#ifdef G_OS_WIN32
-#	include <fcntl.h>
-#	include <io.h>
-#endif
-#include <pgm/framework.h>
+
 #include "pgm/signal.h"
-
-
-//#define SIGNAL_DEBUG
 
 
 /* globals */
 
-static pgm_sighandler_t		signal_list[NSIG];
-static int			signal_pipe[2];
-static GIOChannel*		signal_io = NULL;
+static pgm_sighandler_t g_signal_list[NSIG];
+static int g_signal_pipe[2];
+static GIOChannel* g_signal_io = NULL;
 
 static void on_signal (int);
-static gboolean	on_io_signal (GIOChannel*, GIOCondition, gpointer);
-static const char* cond_string (GIOCondition);
+static gboolean on_io_signal (GIOChannel*, GIOCondition, gpointer);
 
 
 /* install signal handler and return unix fd to add to event loop
  */
 
-gboolean
+pgm_sighandler_t
 pgm_signal_install (
-	int			signum,
-	pgm_sighandler_t	handler,
-	gpointer		user_data
+	int		signum,
+	pgm_sighandler_t	handler
 	)
 {
-	pgm_debug ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
-		signum, (gpointer)handler, user_data);
-
-	if (NULL == signal_io)
+	if (g_signal_io == NULL)
 	{
-#ifdef G_OS_UNIX
-		if (pipe (signal_pipe))
-#else
-		if (_pipe (signal_pipe, 4096, _O_BINARY | _O_NOINHERIT))
-#endif
-			return FALSE;
+		if (pipe (g_signal_pipe))
+		{
+			return SIG_ERR;
+		}
 
-		pgm_sockaddr_nonblocking (signal_pipe[0], TRUE);
-		pgm_sockaddr_nonblocking (signal_pipe[1], TRUE);
+/* write-end */
+		int fd_flags = fcntl (g_signal_pipe[1], F_GETFL);
+		if (fd_flags < 0)
+		{
+			return SIG_ERR;
+		}
+		if (fcntl (g_signal_pipe[1], F_SETFL, fd_flags | O_NONBLOCK))
+		{
+			return SIG_ERR;
+		}
+
+/* read-end */
+		fd_flags = fcntl (g_signal_pipe[0], F_GETFL);
+		if (fd_flags < 0)
+		{
+			return SIG_ERR;
+		}
+		if (fcntl (g_signal_pipe[0], F_SETFL, fd_flags | O_NONBLOCK))
+		{
+			return SIG_ERR;
+		}
+
 /* add to evm */
-		signal_io = g_io_channel_unix_new (signal_pipe[0]);
-		g_io_add_watch (signal_io, G_IO_IN, on_io_signal, user_data);
+		g_signal_io = g_io_channel_unix_new (g_signal_pipe[0]);
+		g_io_add_watch (g_signal_io, G_IO_IN, on_io_signal, NULL);
 	}
 
-	signal_list[signum] = handler;
-	return (SIG_ERR != signal (signum, on_signal));
+	g_signal_list[signum] = handler;
+	return signal (signum, on_signal);
 }
 
 /* process signal from operating system
  */
 
-static
-void
+static void
 on_signal (
 	int		signum
 	)
 {
-	pgm_debug ("on_signal (signum:%d)", signum);
-	if (write (signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
+	if (write (g_signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
-#ifndef G_OS_WIN32
-		pgm_warn ("Unix signal %s (%d) lost", strsignal (signum), signum);
-#else
-		pgm_warn ("Unix signal (%d) lost", signum);
-#endif
+		g_critical ("Unix signal %s (%i) lost", strsignal(signum), signum);
 	}
 }
 
 /* process signal from pipe
  */
 
-static
-gboolean
+static gboolean
 on_io_signal (
 	GIOChannel*	source,
-	GIOCondition	cond,
-	gpointer	user_data
+	G_GNUC_UNUSED GIOCondition	cond,
+	G_GNUC_UNUSED gpointer		user_data
 	)
 {
-/* pre-conditions */
-	g_assert (NULL != source);
-	g_assert (G_IO_IN == cond);
-
-	pgm_debug ("on_io_signal (source:%p cond:%s user_data:%p)",
-		(gpointer)source, cond_string (cond), user_data);
-
 	int signum;
-	const gsize bytes_read = read (g_io_channel_unix_get_fd (source), &signum, sizeof(signum));
+	gsize bytes_read;
 
-	if (sizeof(signum) == bytes_read)
+	bytes_read = read (g_io_channel_unix_get_fd (source), &signum, sizeof(signum));
+
+	if (bytes_read == sizeof(signum))
 	{
-		signal_list[signum] (signum, user_data);
+		g_signal_list[signum] (signum);
 	}
 	else
 	{
-		pgm_warn ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
+		g_critical ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
 				bytes_read, bytes_read > 1 ? "s" : "", sizeof(signum));
 	}
 
 	return TRUE;
 }
 
-static
-const char*
-cond_string (
-	GIOCondition	cond
-	)
-{
-	const char* c;
-
-	switch (cond) {
-	case G_IO_IN:		c = "G_IO_IN"; break;
-	case G_IO_OUT:		c = "G_IO_OUT"; break;
-	case G_IO_PRI:		c = "G_IO_PRI"; break;
-	case G_IO_ERR:		c = "G_IO_ERR"; break;
-	case G_IO_HUP:		c = "G_IO_HUP"; break;
-	case G_IO_NVAL:		c = "G_IO_NVAL"; break;
-	default: c = "(unknown)"; break;
-	}
-
-	return c;
-}
-
-
 /* eof */
+

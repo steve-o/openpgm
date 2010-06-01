@@ -2,7 +2,7 @@
  * 
  * global session ID helper functions
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,28 +22,34 @@
 #ifndef __PGM_GSI_H__
 #define __PGM_GSI_H__
 
-typedef struct pgm_gsi_t pgm_gsi_t;
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
 
 #define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
-#define PGM_GSI_INIT		{{ 0, 0, 0, 0, 0, 0 }}
+
+
+typedef struct pgm_gsi_t pgm_gsi_t;
 
 struct pgm_gsi_t {
-	uint8_t	identifier[6];
+	guint8	identifier[6];
 };
 
-bool pgm_gsi_create_from_hostname (pgm_gsi_t*restrict, pgm_error_t**restrict);
-bool pgm_gsi_create_from_addr (pgm_gsi_t*restrict, pgm_error_t**restrict);
-bool pgm_gsi_create_from_data (pgm_gsi_t*restrict, const uint8_t*restrict, const size_t);
-bool pgm_gsi_create_from_string (pgm_gsi_t*restrict, const char*restrict, ssize_t);
-int pgm_gsi_print_r (const pgm_gsi_t*restrict, char*restrict, const size_t);
-char* pgm_gsi_print (const pgm_gsi_t*);
-bool pgm_gsi_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+G_BEGIN_DECLS
 
-PGM_END_DECLS
+int pgm_create_md5_gsi (pgm_gsi_t*);
+int pgm_create_ipv4_gsi (pgm_gsi_t*);
+int pgm_create_data_gsi (pgm_gsi_t*, const unsigned char*, gsize);
+int pgm_create_str_gsi (pgm_gsi_t*, const char*, gssize);
+
+int pgm_print_gsi_r (const pgm_gsi_t*, char*, gsize);
+gchar* pgm_print_gsi (const pgm_gsi_t*);
+gint pgm_gsi_equal (gconstpointer, gconstpointer);
+
+
+G_END_DECLS
 
 #endif /* __PGM_GSI_H__ */

@@ -2,7 +2,7 @@
  * 
  * HTTP administrative interface
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,16 +22,16 @@
 #ifndef __PGM_HTTP_H__
 #define __PGM_HTTP_H__
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
+
+G_BEGIN_DECLS
 
 #define PGM_HTTP_DEFAULT_SERVER_PORT	4968
 
-bool pgm_http_init (uint16_t, pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_http_shutdown (void);
+int pgm_http_init (guint16);
+int pgm_http_shutdown (void);
 
-PGM_END_DECLS
+G_END_DECLS
 
-#endif /* __PGM_HTTP_H__ */
+#endif /* __PGM_SIGNAL_H__ */

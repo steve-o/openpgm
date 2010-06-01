@@ -89,9 +89,9 @@ $sim->wait_for_nak;
 my $outofwindow_backoff = tv_interval ( $t0, [gettimeofday] );
 print "sim: NAK received in $outofwindow_backoff seconds.\n";
 
-# allow 100ms tolerance
+# allow 10ms tolerance
 my $fabs = abs( ($outofwindow_backoff - $normal_backoff) * 1000 );
-die "Out-of-window NCF altered back-off interval by $fabs ms.\n" unless ($fabs < 100);
+die "Out-of-window NCF altered back-off interval by $fabs ms.\n" unless ($fabs < 10);
 
 print "test completed successfully.\n";
 

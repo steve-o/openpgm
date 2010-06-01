@@ -22,21 +22,16 @@
 #ifndef __PGM_H__
 #define __PGM_H__
 
-#include <pgm/atomic.h>
-#include <pgm/engine.h>
-#include <pgm/error.h>
+#include <pgm/async.h>
+#include <pgm/err.h>
 #include <pgm/gsi.h>
 #include <pgm/if.h>
-#include <pgm/macros.h>
-#include <pgm/mem.h>
-#include <pgm/messages.h>
 #include <pgm/msgv.h>
-#include <pgm/packet.h>
-#include <pgm/skbuff.h>
-#include <pgm/socket.h>
-#include <pgm/time.h>
-#include <pgm/tsi.h>
-#include <pgm/types.h>
+#include <pgm/signal.h>
+#include <pgm/sn.h>
+#include <pgm/sockaddr.h>
+#include <pgm/timer.h>
+#include <pgm/transport.h>
 #include <pgm/version.h>
 
 #endif /* __PGM_H__ */

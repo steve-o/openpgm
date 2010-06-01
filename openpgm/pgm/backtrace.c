@@ -19,23 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef CONFIG_HAVE_BACKTRACE
-#	include <stdio.h>
-#	include <stdlib.h>
-#	include <execinfo.h>
-#	include <sys/types.h>
-#	include <unistd.h>
-#endif
-#include <glib.h>
-#include <pgm/backtrace.h>
 
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <glib.h>
+
+#include "pgm/backtrace.h"
+
+
+/* globals */
 
 void
 on_sigsegv (
 	G_GNUC_UNUSED int	signum
 	)
 {
-#ifdef CONFIG_HAVE_BACKTRACE
 	void* array[256];
 	char** names;
 	char cmd[1024];
@@ -54,13 +56,14 @@ on_sigsegv (
 	free (names);
 	fflush (stderr);
 
+#ifndef G_PLATFORM_WIN32
 	sprintf (cmd, "gdb --ex 'attach %ld' --ex 'info threads' --ex 'thread apply all bt' --batch", (long)getpid ());
 	if ( g_spawn_command_line_sync (cmd, &out, &err, &exit_status, NULL) )
 	{
 		fprintf (stderr, "======= GDB Backtrace: =========\n");
 		fprintf (stderr, "%s\n", out);
 	}
-#endif /* CONFIG_HAVE_BACKTRACE */
+#endif
 
 	abort ();
 }

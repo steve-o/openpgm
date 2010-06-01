@@ -25,7 +25,7 @@
 
 G_BEGIN_DECLS
 
-int monitor_packet (char*, guint);
+int monitor_packet (char*, int);
 
 
 G_END_DECLS

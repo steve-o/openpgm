@@ -32,7 +32,6 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
-$app->say ("listen ao");
 
 if (my $pid = fork) {
 # parent 
@@ -42,7 +41,7 @@ if (my $pid = fork) {
 	$mon->wait_for_odata;
 	print "mon: odata received.\n";
 	print "mon: wait for spm ...\n";
-	$mon->wait_for_spm ({ 'timeout' => 45 });
+	$mon->wait_for_spm ({ 'timeout' => 30 });
 	print "mon: received spm.\n";
 
 	print TO_CHILD "die\n";

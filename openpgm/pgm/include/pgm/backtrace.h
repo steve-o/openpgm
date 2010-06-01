@@ -22,12 +22,14 @@
 #ifndef __PGM_BACKTRACE_H__
 #define __PGM_BACKTRACE_H__
 
-#include <pgm/types.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
 
-PGM_GNUC_NORETURN void on_sigsegv (int);
+G_BEGIN_DECLS
 
-PGM_END_DECLS
+G_GNUC_NORETURN void on_sigsegv (int);
+
+
+G_END_DECLS
 
 #endif /* __PGM_BACKTRACE_H__ */

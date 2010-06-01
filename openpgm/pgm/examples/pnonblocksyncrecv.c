@@ -19,8 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
-#include <locale.h>
+#include <getopt.h>
+#include <netdb.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -28,18 +30,15 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <glib.h>
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#endif
-#include <pgm/pgm.h>
+#include <arpa/inet.h>
 
-/* example dependencies */
+#include <glib.h>
+
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 
@@ -48,17 +47,15 @@
 
 /* globals */
 
-static int g_port = 0;
+static int g_port = 7500;
 static const char* g_network = "";
-static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
 
 static int g_max_tpdu = 1500;
 static int g_sqns = 100;
 
 static pgm_transport_t* g_transport = NULL;
-static gboolean g_quit;
-static int g_quit_pipe[2];
+static gboolean g_quit = FALSE;
 
 static void on_signal (int);
 static gboolean on_startup (void);
@@ -75,7 +72,6 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	exit (1);
 }
 
@@ -85,110 +81,75 @@ main (
 	char*		argv[]
 	)
 {
-	int e;
-	pgm_error_t* pgm_err = NULL;
-
-	setlocale (LC_ALL, "");
-
-	log_init ();
 	g_message ("syncrecv");
-
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:lh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:h")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
-		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'h':
 		case '?': usage (binary_name);
 		}
 	}
 
-	g_quit = FALSE;
-#ifdef G_OS_UNIX
-	e = pipe (g_quit_pipe);
-#else
-	e = _pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
-#endif
-	g_assert (0 == e);
+	log_init ();
+	pgm_init ();
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
-	signal(SIGINT,  on_signal);
+	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
-#ifdef SIGHUP
-	signal(SIGHUP,  SIG_IGN);
-#endif
+	signal(SIGHUP, SIG_IGN);
 
-	if (!on_startup()) {
-		g_error ("startup failed");
-		exit(1);
-	}
+	on_startup();
 
 /* dispatch loop */
 	g_message ("entering PGM message loop ... ");
 	do {
-		struct timeval tv;
-		int timeout;
-		int n_fds = 2;
-		struct pollfd fds[ 1 + n_fds ];
-		char buffer[4096];
-		gsize len;
 		pgm_tsi_t from;
-		const int status = pgm_recvfrom (g_transport,
-					         buffer,
-					         sizeof(buffer),
-						 0,
-					         &len,
-					         &from,
-					         &pgm_err);
-		switch (status) {
-		case PGM_IO_STATUS_NORMAL:
+		char buffer[4096];
+		gssize len = pgm_transport_recvfrom (g_transport, buffer, sizeof(buffer), MSG_DONTWAIT /* non-blocking */, &from);
+		if (len >= 0)
+		{
 			on_data (buffer, len, &from);
-			break;
-		case PGM_IO_STATUS_TIMER_PENDING:
-			pgm_transport_get_timer_pending (g_transport, &tv);
-			goto block;
-		case PGM_IO_STATUS_RATE_LIMITED:
-			pgm_transport_get_rate_remaining (g_transport, &tv);
-		case PGM_IO_STATUS_WOULD_BLOCK:
+		}
+		else if (errno == EAGAIN)
+		{
 /* poll for next event */
-block:
-			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			int n_fds = 2;
+			struct pollfd fds[ n_fds ];
 			memset (fds, 0, sizeof(fds));
-			fds[0].fd = g_quit_pipe[0];
-			fds[0].events = POLLIN;
-			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
-			poll (fds, 1 + n_fds, timeout /* ms */);
+			pgm_transport_poll_info (g_transport, fds, &n_fds, POLLIN);
+			poll (fds, n_fds, 1000 /* ms */);
+		}
+		else if (errno == ECONNRESET)
+		{
+			pgm_sock_err_t* pgm_sock_err = (pgm_sock_err_t*)buffer;
+                        g_warning ("pgm socket lost %" G_GUINT32_FORMAT " packets detected from %s",
+					pgm_sock_err->lost_count,
+					pgm_print_tsi(&pgm_sock_err->tsi));
+			continue;
+		}
+		else if (errno == ENOTCONN)
+		{
+			g_error ("pgm socket closed.");
+		}
+		else
+		{
+			g_error ("pgm socket failed errno %i: \"%s\"", errno, strerror(errno));
 			break;
-		default:
-			if (pgm_err) {
-				g_warning ("%s", pgm_err->message);
-				pgm_error_free (pgm_err);
-				pgm_err = NULL;
-			}
-			if (PGM_IO_STATUS_ERROR == status)
-				break;
 		}
 	} while (!g_quit);
 
 	g_message ("message loop terminated, cleaning up.");
 
 /* cleanup */
-	close (g_quit_pipe[0]);
-	close (g_quit_pipe[1]);
-
 	if (g_transport) {
 		g_message ("destroying transport.");
 
@@ -196,65 +157,47 @@ block:
 		g_transport = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown ();
 	g_message ("finished.");
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static void
 on_signal (
-	int		signum
+	G_GNUC_UNUSED int signum
 	)
 {
-	g_message ("on_signal (signum:%d)", signum);
+	g_message ("on_signal");
+
 	g_quit = TRUE;
-	const char one = '1';
-	const size_t writelen = write (g_quit_pipe[1], &one, sizeof(one));
-	g_assert (sizeof(one) == writelen);
 }
 
 static gboolean
 on_startup (void)
 {
-	struct pgm_transport_info_t* res = NULL;
-	pgm_error_t* pgm_err = NULL;
-
 	g_message ("startup.");
 	g_message ("create transport.");
 
-/* parse network parameter into transport address structure */
-	char network[1024];
-	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return FALSE;
-	}
-/* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	if (g_udp_encap_port) {
-		res->ti_udp_encap_ucast_port = g_udp_encap_port;
-		res->ti_udp_encap_mcast_port = g_udp_encap_port;
-	}
-	if (g_port)
-		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	pgm_if_free_transport_info (res);
+	pgm_gsi_t gsi;
+	int e = pgm_create_md5_gsi (&gsi);
+	g_assert (e == 0);
 
-/* set PGM parameters */
-	pgm_transport_set_nonblocking (g_transport, TRUE);
-	pgm_transport_set_recv_only (g_transport, TRUE, FALSE);
+	struct group_source_req recv_gsr, send_gsr;
+	char network[1024];
+	sprintf (network, ";%s", g_network);
+	gsize recv_len = 1;
+	e = pgm_if_parse_transport (network, AF_INET, &recv_gsr, &recv_len, &send_gsr);
+	g_assert (e == 0);
+	g_assert (recv_len == 1);
+
+	if (g_udp_encap_port) {
+		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+	}
+
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
+	g_assert (e == 0);
+
+	pgm_transport_set_recv_only (g_transport, FALSE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
 	pgm_transport_set_hops (g_transport, 16);
@@ -266,17 +209,20 @@ on_startup (void)
 	pgm_transport_set_nak_data_retries (g_transport, 50);
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
-/* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_transport_destroy (g_transport, FALSE);
-		g_transport = NULL;
-		return FALSE;
+	e = pgm_transport_bind (g_transport);
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		G_BREAKPOINT();
 	}
+	g_assert (e == 0);
 
 	g_message ("startup complete.");
-	return TRUE;
+	return FALSE;
 }
 
 static int
@@ -289,7 +235,7 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	snprintf (buf, sizeof(buf), "%s", (char*)data);
-	pgm_tsi_print_r (from, tsi, sizeof(tsi));
+	pgm_print_tsi_r (from, tsi, sizeof(tsi));
 
 	g_message ("\"%s\" (%i bytes from %s)",
 			buf,

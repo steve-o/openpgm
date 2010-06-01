@@ -19,28 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
-#include <locale.h>
+#include <getopt.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
-#include <glib.h>
-#ifdef G_OS_UNIX
-#	include <netdb.h>
-#	include <unistd.h>
-#	include <arpa/inet.h>
-#	include <netinet/in.h>
-#	include <sys/socket.h>
-#	include <sys/time.h>
-#else
-#	include "getopt.h"
-#endif
-#include <pgm/pgm.h>
+#include <arpa/inet.h>
 
-/* example dependencies */
+#include <glib.h>
+
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 
@@ -49,7 +46,7 @@
 
 /* globals */
 
-static int g_port = 0;
+static int g_port = 7500;
 static const char* g_network = "";
 static gboolean g_multicast_loop = FALSE;
 static int g_udp_encap_port = 0;
@@ -59,7 +56,7 @@ static int g_max_rte = 400*1000;
 static int g_sqns = 100;
 
 static gboolean g_fec = FALSE;
-static int g_k = 8;
+static int g_k = 64;
 static int g_n = 255;
 
 static pgm_transport_t* g_transport = NULL;
@@ -79,7 +76,6 @@ usage (const char* bin)
 	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
 	fprintf (stderr, "  -g <n>\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
-	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (1);
 }
 
@@ -89,24 +85,10 @@ main (
 	char   *argv[]
 	)
 {
-	pgm_error_t* pgm_err = NULL;
-
-	setlocale (LC_ALL, "");
-
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init();
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_messages_shutdown();
-		return EXIT_FAILURE;
-	}
-
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -120,37 +102,32 @@ main (
 
 		case 'l':	g_multicast_loop = TRUE; break;
 
-		case 'i':
-			pgm_if_print_all();
-			pgm_messages_shutdown();
-			return EXIT_SUCCESS;
-
 		case 'h':
-		case '?':
-			pgm_messages_shutdown();
-			usage (binary_name);
+		case '?': usage (binary_name);
 		}
 	}
 
 	if (g_fec && ( !g_k || !g_n )) {
-		pgm_messages_shutdown();
 		puts ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
 
+	log_init ();
+	pgm_init ();
+
 /* setup signal handlers */
 	signal (SIGSEGV, on_sigsegv);
-#ifdef SIGHUP
 	signal (SIGHUP, SIG_IGN);
-#endif
 
-	if (create_transport())
+	if (!create_transport ())
 	{
-		while (optind < argc) {
-			const int status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
-		        if (PGM_IO_STATUS_NORMAL != status) {
-				g_warning ("pgm_send failed.");
+		while (optind < argc)
+		{
+			gssize e = pgm_transport_send (g_transport, argv[optind], strlen(argv[optind]) + 1, 0);
+		        if (e < 0) {
+				g_warning ("pgm_transport_send failed.");
 		        }
+
 			optind++;
 		}
 	}
@@ -160,47 +137,32 @@ main (
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
-	pgm_shutdown();
-	pgm_messages_shutdown();
-	return EXIT_SUCCESS;
+
+	return 0;
 }
 
 static gboolean
 create_transport (void)
 {
-	struct pgm_transport_info_t* res = NULL;
-	pgm_error_t* pgm_err = NULL;
+	pgm_gsi_t gsi;
 
-/* parse network parameter into transport address structure */
-	char network[1024];
-	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return FALSE;
-	}
-/* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
+	int e = pgm_create_md5_gsi (&gsi);
+	g_assert (e == 0);
+
+	struct group_source_req recv_gsr, send_gsr;
+	gsize recv_len = 1;
+	e = pgm_if_parse_transport (g_network, AF_UNSPEC, &recv_gsr, &recv_len, &send_gsr);
+	g_assert (e == 0);
+	g_assert (recv_len == 1);
+
 	if (g_udp_encap_port) {
-		res->ti_udp_encap_ucast_port = g_udp_encap_port;
-		res->ti_udp_encap_mcast_port = g_udp_encap_port;
+		((struct sockaddr_in*)&send_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
+		((struct sockaddr_in*)&recv_gsr.gsr_group)->sin_port = g_htons (g_udp_encap_port);
 	}
-	if (g_port)
-		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	pgm_if_free_transport_info (res);
 
-/* set PGM parameters */
+	e = pgm_transport_create (&g_transport, &gsi, 0, g_port, &recv_gsr, 1, &send_gsr);
+	g_assert (e == 0);
+
 	pgm_transport_set_send_only (g_transport, TRUE);
 	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
 	pgm_transport_set_txw_sqns (g_transport, g_sqns);
@@ -211,19 +173,24 @@ create_transport (void)
 	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
 ), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
 	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+
 	if (g_fec) {
 		pgm_transport_set_fec (g_transport, 0, TRUE, TRUE, g_n, g_k);
 	}
 
-/* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_transport_destroy (g_transport, FALSE);
-		g_transport = NULL;
-		return FALSE;
+	e = pgm_transport_bind (g_transport);
+	if (e < 0) {
+		if      (e == -1)
+			g_critical ("pgm_transport_bind failed errno %i: \"%s\"", errno, strerror(errno));
+		else if (e == -2)
+			g_critical ("pgm_transport_bind failed h_errno %i: \"%s\"", h_errno, hstrerror(h_errno));
+		else
+			g_critical ("pgm_transport_bind failed e %i", e);
+		return TRUE;
 	}
-	return TRUE;
+	g_assert (e == 0);
+
+	return FALSE;
 }
 
 /* eof */

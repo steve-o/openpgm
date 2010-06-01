@@ -2,7 +2,7 @@
  * 
  * Vector message container
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,33 +22,17 @@
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
-struct pgm_iovec;
-struct pgm_msgv_t;
-
-#include <pgm/types.h>
-#include <pgm/packet.h>
-#include <pgm/skbuff.h>
-
-PGM_BEGIN_DECLS
-
-/* struct for scatter/gather I/O */
-struct pgm_iovec {
-#ifndef _WIN32
-/* match struct iovec */
-	void*		iov_base;
-	size_t		iov_len;	/* size of iov_base */
-#else
-/* match WSABUF */
-	u_long		iov_len;
-	char*		iov_base;
-#endif /* _WIN32 */
-};
-
 struct pgm_msgv_t {
-	uint32_t		msgv_len;			/* number of elements in skb */
-	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
+#ifdef __PGM_TRANSPORT_H__
+	const pgm_tsi_t*	msgv_tsi;
+#else
+	const void*	msgv_identifier;
+#endif
+	struct iovec*	msgv_iov;	/* scatter/gather array */
+	size_t		msgv_iovlen;	/* # elements in iov */
 };
 
-PGM_END_DECLS
+typedef struct pgm_msgv_t pgm_msgv_t;
+
 
 #endif /* __PGM_MSGV_H__ */
