@@ -22,28 +22,56 @@
 #ifndef __PGM_GSI_H__
 #define __PGM_GSI_H__
 
-typedef struct pgm_gsi_t pgm_gsi_t;
+#include <glib.h>
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#ifdef G_OS_UNIX
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <arpa/inet.h>
+#endif
 
-PGM_BEGIN_DECLS
 
 #define PGM_GSISTRLEN		(sizeof("000.000.000.000.000.000"))
-#define PGM_GSI_INIT		{{ 0, 0, 0, 0, 0, 0 }}
+#define PGM_GSI_ERROR		pgm_gsi_error_quark ()
+
+typedef enum
+{
+	/* Derived from errno */
+	PGM_GSI_ERROR_FAULT,		/* gethostname returned EFAULT */
+	PGM_GSI_ERROR_INVAL,
+	PGM_GSI_ERROR_PERM,
+	PGM_GSI_ERROR_ADDRFAMILY,	/* getaddrinfo return EAI_ADDRFAMILY */
+	PGM_GSI_ERROR_AGAIN,
+	PGM_GSI_ERROR_BADFLAGS,
+	PGM_GSI_ERROR_FAIL,
+	PGM_GSI_ERROR_FAMILY,
+	PGM_GSI_ERROR_MEMORY,
+	PGM_GSI_ERROR_NODATA,
+	PGM_GSI_ERROR_NONAME,
+	PGM_GSI_ERROR_SERVICE,
+	PGM_GSI_ERROR_SOCKTYPE,
+	PGM_GSI_ERROR_SYSTEM,
+	PGM_GSI_ERROR_FAILED
+} PGMGSIError;
+
+typedef struct pgm_gsi_t pgm_gsi_t;
 
 struct pgm_gsi_t {
-	uint8_t	identifier[6];
+	guint8	identifier[6];
 };
 
-bool pgm_gsi_create_from_hostname (pgm_gsi_t*restrict, pgm_error_t**restrict);
-bool pgm_gsi_create_from_addr (pgm_gsi_t*restrict, pgm_error_t**restrict);
-bool pgm_gsi_create_from_data (pgm_gsi_t*restrict, const uint8_t*restrict, const size_t);
-bool pgm_gsi_create_from_string (pgm_gsi_t*restrict, const char*restrict, ssize_t);
-int pgm_gsi_print_r (const pgm_gsi_t*restrict, char*restrict, const size_t);
-char* pgm_gsi_print (const pgm_gsi_t*);
-bool pgm_gsi_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+G_BEGIN_DECLS
 
-PGM_END_DECLS
+GQuark pgm_gsi_error_quark (void);
+gboolean pgm_gsi_create_from_hostname (pgm_gsi_t*, GError**);
+gboolean pgm_gsi_create_from_addr (pgm_gsi_t*, GError**);
+gboolean pgm_gsi_create_from_data (pgm_gsi_t*, const guchar*, const gsize);
+gboolean pgm_gsi_create_from_string (pgm_gsi_t*, const gchar*, gssize);
+int pgm_gsi_print_r (const pgm_gsi_t*, char*, gsize);
+gchar* pgm_gsi_print (const pgm_gsi_t*);
+gint pgm_gsi_equal (gconstpointer, gconstpointer);
+
+
+G_END_DECLS
 
 #endif /* __PGM_GSI_H__ */

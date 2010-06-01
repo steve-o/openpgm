@@ -1,30 +1,27 @@
 # -*- mode: python -*-
 # OpenPGM build script
 
-import platform
 import os
 import time
 import sys
 
 EnsureSConsVersion( 0, 97 )
-SConsignFile('scons.signatures'+ '-' + platform.system() + '-' + platform.machine());
+SConsignFile('scons.signatures');
 
 opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
-	(EnumOption ('WITH_GETTEXT', 'l10n support via libintl', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_GLIB', 'Build GLib dependent modules', 'false', ('true', 'false'))),
 	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
 	(EnumOption ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true', ('true', 'false'))),
-	(EnumOption ('WITH_HTTP', 'HTTP administration', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_SNMP', 'SNMP administration', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_CC', 'C++ Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_PLUS', 'libpgmplus GPL library', 'false', ('true', 'false'))),
 )
 
 #-----------------------------------------------------------------------------
@@ -49,15 +46,19 @@ conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
 
 if not conf.CheckPKGConfig('0.15.0'):
 	print 'pkg-config >= 0.15.0 not found.'
-#	Exit(1)
+	Exit(1)
 
 if not conf.CheckPKG('glib-2.0 >= 2.10'):
 	print 'glib-2.0 >= 2.10 not found.'
-#	Exit(1)
+	Exit(1)
 
 if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
-#	Exit(1)
+	Exit(1)
+
+if not conf.CheckPKG('libsoup-2.2'):
+	print 'libsoup-2.2 not found.'
+	Exit(1)
 
 env = conf.Finish();
 
@@ -87,68 +88,42 @@ env = Environment(ENV = os.environ,
 				'-Wnested-externs',
 				'-Winline',
 			'-pedantic',
-# C99
 			'-std=gnu99',
-			'-D_XOPEN_SOURCE=600',
-# re-entrant libc
 			'-D_REENTRANT',
-#			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
-# variadic macros
- 			'-DCONFIG_HAVE_ISO_VARARGS',
-#			'-DCONFIG_HAVE_GNUC_VARARGS',
-# stack memory api header
-			'-DCONFIG_HAVE_ALLOCA_H',
-# optimium checksum implementation
+			'-D_GNU_SOURCE',
+			'-D__need_IOV_MAX',
 #			'-DCONFIG_8BIT_CHECKSUM',
-			'-DCONFIG_16BIT_CHECKSUM',
+#			'-DCONFIG_16BIT_CHECKSUM',
 #			'-DCONFIG_32BIT_CHECKSUM',
 #			'-DCONFIG_64BIT_CHECKSUM',
-#			'-DCONFIG_VECTOR_CHECKSUM',
-# useful /proc system
+			'-DCONFIG_VECTOR_CHECKSUM',
 			'-DCONFIG_HAVE_PROC',
-# example: crash handling
 			'-DCONFIG_HAVE_BACKTRACE',
-# timing
 			'-DCONFIG_HAVE_PSELECT',
+			'-DCONFIG_HAVE_POLL',
+			'-DCONFIG_HAVE_PPOLL',
+			'-DCONFIG_HAVE_EPOLL',
+			'-DCONFIG_HAVE_CLOCK_GETTIME',
+			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
+			'-DCONFIG_HAVE_NANOSLEEP',
+			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
-# event handling
-			'-DCONFIG_HAVE_POLL',
-			'-DCONFIG_HAVE_EPOLL',
-# interface enumeration
-			'-DCONFIG_HAVE_GETIFADDRS',
 			'-DCONFIG_HAVE_IFR_NETMASK',
-# win32 cmsg
-#			'-DCONFIG_HAVE_WSACMSGHDR',
-# multicast
+#			'-DCONFIG_HAVE_GETIFADDRS',
+			'-DCONFIG_HAVE_GETHOSTBYNAME2',
+			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_HAVE_IP_MREQN',
-# sprintf
 			'-DCONFIG_HAVE_SPRINTF_GROUPING',
-			'-DCONFIG_HAVE_VASPRINTF',
-# symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
-# socket binding
+			'-DCONFIG_LIBSOUP22',
 			'-DCONFIG_BIND_INADDR_ANY',
-# IP header order as per IP(4) on FreeBSD
-#			'-DCONFIG_HOST_ORDER_IP_LEN',
-#			'-DCONFIG_HOST_ORDER_IP_OFF',
-# optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
-# Wine limited API support
-#			'-DCONFIG_TARGET_WINE',
-# GNU getopt
-			'-DCONFIG_HAVE_GETOPT'
 		 ],
-	LINKFLAGS = [	'-pipe'
+	LINKFLAGS = [	'-pipe',
+			'-lm'
 		    ],
-	LIBS = [
-# histogram math
-			'm',
-# clock_gettime()
-			'rt'
-		],
 	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.1.0/src',
 	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.1.0/src/.libs/libprotobuf.a',
 	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.1.0/src/protoc'
@@ -174,7 +149,7 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-gdb')
+debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
@@ -198,14 +173,7 @@ else:
 Import('env')
 
 # vanilla environment
-if env['WITH_GLIB'] == 'true':
-	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
-else:
-	env['GLIB_FLAGS'] = '';
-
-# l10n
-if env['WITH_GETTEXT'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
+env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
@@ -216,6 +184,7 @@ env['SNMP_FLAGS'] = {
         'CCFLAGS'       : [],
         'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
 };
+env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.2');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -284,6 +253,12 @@ if conf.CheckEventFD():
 
 env = conf.Finish();
 
+# DSO visibility flags
+if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
+ 	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
+else:
+	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
+
 # add builder to create PIC static libraries for including in shared libraries
 action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
 if env.Detect('ranlib'):
@@ -300,15 +275,14 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 
 #-----------------------------------------------------------------------------
 
-ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '/';
+ref_node = 'ref/' + env['BUILD'] + '/';
 BuildDir(ref_node, '.', duplicate=0)
 
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
-if env['WITH_GLIB'] == 'true':
-	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
+SConscript(ref_node + 'SConscript.libpgmex');
 if env['WITH_HTTP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmhttp');
 if env['WITH_SNMP'] == 'true':

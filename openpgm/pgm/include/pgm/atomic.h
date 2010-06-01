@@ -20,121 +20,41 @@
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
-#ifdef sun
-#	include <atomic.h>
+#include <glib.h>
+
+
+G_BEGIN_DECLS
+
+#ifndef G_STATIC_ASSERT
+#	define G_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
+#	define G_PASTE(identifier1,identifier2) G_PASTE_ARGS (identifier1, identifier2)
+#	define G_STATIC_ASSERT(expr) typedef struct { char Compile_Time_Assertion[(expr) ? 1 : -1]; } G_PASTE (_GStaticAssert_, __LINE__)
 #endif
-#include <pgm/types.h>
 
-static inline
-uint32_t
-pgm_atomic_exchange_and_add32 (
-	volatile uint32_t*	atomic,
-	const uint32_t		val
-	)
+G_STATIC_ASSERT(sizeof(gint) == sizeof(gint32));
+
+static inline void pgm_atomic_int32_add (volatile gint32* atomic, const gint32 val)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	uint32_t result;
-	asm volatile (	"lock\n\t"
-			"xaddl %0, %1"
-		      : "=r" (result), "=m" (*atomic)
-		      : "0" (val), "m" (*atomic)
-		      : "memory", "cc"  );
-	return result;
-#elif defined( __SUNPRO_C ) && (defined( __i386 ) || defined( __amd64 ))
-	uint32_t result = val;
-	asm volatile (	"lock\n\t"
-			"xaddl %0, %1"
-		      :: "r" (result), "m" (*atomic)  );
-	return result;
-#elif defined( sun )
-	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
-	return nv - val;
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-	return __sync_fetch_and_add (atomic, val);
-#elif defined( _WIN32 )
-	return InterlockedExchangeAdd ((volatile LONG*)atomic, val);
-#else
-#	error "No supported atomic operations for this platform."
-#endif
+	g_atomic_int_add (atomic, val);
 }
 
-static inline
-void
-pgm_atomic_add32 (
-	volatile uint32_t*	atomic,
-	const uint32_t		val
-	)
+static inline gint32 pgm_atomic_int32_get (volatile gint32* atomic)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	asm volatile (	"lock\n\t"
-			"addl %1, %0"
-		      : "=m" (*atomic)
-		      : "ir" (val), "m" (*atomic)
-		      : "memory", "cc"  );
-#elif defined( __SUNPRO_C ) && (defined( __i386 ) || defined( __amd64 ))
-	asm volatile (	"lock\n\t"
-			"addl %1, %0"
-		      :: "r" (val), "m" (*atomic)  );
-#elif defined( sun )
-	atomic_add_32 (atomic, (int32_t)val);
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-	__sync_fetch_and_add (atomic, val);
-#elif defined( _WIN32 )
-	InterlockedExchangeAdd ((volatile LONG*)atomic, val);
-#endif
+	return g_atomic_int_get (atomic);
 }
 
-static inline
-void
-pgm_atomic_inc32 (
-	volatile uint32_t*	atomic
-	)
+static inline void pgm_atomic_int32_set (volatile gint32* atomic, const gint32 newval)
 {
-#if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || (defined( __SUNPRO_C ) && (defined( __i386 ) || defined( __amd64 )))
-	pgm_atomic_add32 (atomic, 1);
-#elif defined( sun )
-	atomic_inc_32 (atomic);
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-	pgm_atomic_add32 (atomic, 1);
-#elif defined( _WIN32 )
-	InterlockedIncrement ((volatile LONG*)atomic);
-#endif
+	g_atomic_int_set (atomic, newval);
 }
 
-static inline
-void
-pgm_atomic_dec32 (
-	volatile uint32_t*	atomic
-	)
-{
-#if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || (defined( __SUNPRO_C ) && (defined( __i386 ) || defined( __amd64 )))
-	pgm_atomic_add32 (atomic, (uint32_t)-1);
-#elif defined( sun )
-	atomic_dec_32 (atomic);
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-	pgm_atomic_add32 (atomic, (uint32_t)-1);
-#elif defined( _WIN32 )
-	InterlockedDecrement ((volatile LONG*)atomic);
-#endif
-}
+#ifndef G_ATOMIC_OP_MEMORY_BARRIER_NEEDED
+#	define pgm_atomic_int32_get(atomic) 		(*(atomic))
+#	define pgm_atomic_int32_set(atomic, newval) 	((void) (*(atomic) = (newval)))
+#endif /* G_ATOMIC_OP_MEMORY_BARRIER_NEEDED */
 
-static inline
-uint32_t
-pgm_atomic_read32 (
-	const volatile uint32_t* atomic
-	)
-{
-	return *atomic;
-}
+#define pgm_atomic_int32_inc(atomic) (pgm_atomic_int32_add ((volatile gint32*)(atomic), 1))
 
-static inline
-void
-pgm_atomic_write32 (
-	volatile uint32_t*	atomic,
-	const uint32_t		val
-	)
-{
-	*atomic = val;
-}
+G_END_DECLS
 
 #endif /* __PGM_ATOMIC_H__ */

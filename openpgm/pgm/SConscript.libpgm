@@ -6,18 +6,7 @@ import os;
 Import('env')
 
 src = Split("""
-		thread.c
-		mem.c
-		string.c
-		list.c
-		slist.c
-		queue.c
-		hashtable.c
-		messages.c
-		error.c
-		math.c
-		packet_parse.c
-		packet_test.c
+		packet.c
 		sockaddr.c
 		time.c
 		if.c
@@ -28,28 +17,30 @@ src = Split("""
 		nametoindex.c
 		inet_network.c
 		md5.c
-		rand.c
 		gsi.c
 		tsi.c
-		txw.c
-		rxw.c
-		skbuff.c
-		socket.c
+		signal.c
+		txwi.c
+		rxwi.c
+		transport.c
 		source.c
 		receiver.c
 		recv.c
-		engine.c
+		pgm.c
 		timer.c
 		net.c
 		rate_control.c
+		async.c
 		checksum.c
 		reed_solomon.c
 		galois_tables.c
 		wsastrerror.c
+		glib-compat.c
 		histogram.c
 """)
 
 e = env.Clone();
+e.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
 e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 # Galois tables
@@ -68,100 +59,62 @@ e.StaticSharedLibrary('libpgm-pic', src);
 
 if env['WITH_CHECK'] == 'true':
 	te = e.Clone();
-	te.MergeFlags(env['GLIB_FLAGS']);
 	newCCFLAGS = [];
 	for flag in te['CCFLAGS']:
 		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
 	te.ParseConfig ('pkg-config --cflags --libs check');
-# log dependencies
-	tlog = [	e.Object('messages.c'),
-			e.Object('thread.c'),
-			e.Object('galois_tables.c'),
-			e.Object('mem.c'),
-			e.Object('histogram.c'),
-			e.Object('string.c'),
-			e.Object('slist.c')
-		];
-# framework
-	te.Program (['atomic_unittest.c']);
-	te.Program (['checksum_unittest.c'] + tlog);
-	te.Program (['error_unittest.c'] + tlog);
-	te.Program (['md5_unittest.c'] + tlog);
-	te.Program (['getifaddrs_unittest.c',
-			e.Object('error.c'),
-			e.Object('sockaddr.c'),
-			e.Object('list.c')] + tlog);
-	te.Program (['getnodeaddr_unittest.c',
-			e.Object('error.c'),
-			e.Object('sockaddr.c')] + tlog);
-	te.Program (['indextoaddr_unittest.c',
-			e.Object('error.c'),
-			e.Object('sockaddr.c')] + tlog);
-	te.Program (['inet_network_unittest.c',
-			e.Object('sockaddr.c')] + tlog);
-	te.Program (['rate_control_unittest.c'] + tlog);
-	te.Program (['reed_solomon_unittest.c'] + tlog);
-	te.Program (['time_unittest.c',
-			e.Object('error.c')] + tlog);
-# collate
-	tframework = [	e.Object('checksum.c'),
-			e.Object('error.c'),
-			e.Object('galois_tables.c'),
-			e.Object('getifaddrs.c'),
-			e.Object('getnodeaddr.c'),
-			e.Object('hashtable.c'),
-			e.Object('histogram.c'),
-			e.Object('indextoaddr.c'),
-			e.Object('indextoname.c'),
-			e.Object('inet_network.c'),
-			e.Object('list.c'),
-			e.Object('math.c'),
-			e.Object('md5.c'),
-			e.Object('mem.c'),
-			e.Object('messages.c'),
-			e.Object('nametoindex.c'),
-			e.Object('queue.c'),
-			e.Object('rand.c'),
-			e.Object('rate_control.c'),
-			e.Object('reed_solomon.c'),
-			e.Object('slist.c'),
-			e.Object('sockaddr.c'),
-			e.Object('string.c'),
-			e.Object('thread.c'),
-			e.Object('time.c'),
-			e.Object('wsastrerror.c')
-		];
-# library
-	te.Program (['txw_unittest.c',
-			e.Object('tsi.c')] + tframework);
-	te.Program (['rxw_unittest.c',
-			e.Object('tsi.c')] + tframework);
-	te.Program (['engine_unittest.c',
-			e.Object('version.c')] + tframework);
-	te.Program (['gsi_unittest.c',
-			e.Object('if.c')] + tframework);
-	te.Program (['tsi_unittest.c'] + tframework);
-	te.Program (['if_unittest.c'] + tframework);
-	te.Program (['transport_unittest.c',
-			e.Object('if.c'),
-			e.Object('tsi.c')] + tframework);
-	te.Program (['source_unittest.c'] + tframework);
-	te.Program (['receiver_unittest.c',
-			e.Object('tsi.c')] + tframework);
-	te.Program (['recv_unittest.c',
-			e.Object('tsi.c'),
-			e.Object('gsi.c')] + tframework);
-	te.Program (['net_unittest.c'] + tframework);
-	te.Program (['timer_unittest.c'] + tframework);
-	te.Program (['packet_parse_unittest.c'] + tframework);
-	te.Program (['packet_test_unittest.c'] + tframework);
-	te.Program (['ip_unittest.c',
-			e.Object('if.c')] + tframework);
+	te.Program (['txwi_unittest.c', e.Object('tsi.c')]);
+	te.Program (['rxwi_unittest.c', e.Object('tsi.c')]);
+	te.Program ('pgm_unittest.c');
+	te.Program (['gsi_unittest.c', e.Object('md5.c')]);
+	te.Program ('tsi_unittest.c');
+	te.Program (['if_unittest.c', e.Object('inet_network.c'), e.Object('sockaddr.c'), e.Object('indextoaddr.c')]);
+	te.Program (['transport_unittest.c', e.Object('tsi.c'), e.Object('indextoaddr.c'), e.Object('getnodeaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('sockaddr.c'), e.Object('getifaddrs.c')]);
+	te.Program (['source_unittest.c', e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('getifaddrs.c'), e.Object('inet_network.c')]);
+	te.Program (['receiver_unittest.c', e.Object('tsi.c'), e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('getifaddrs.c'), e.Object('inet_network.c')]);
+	te.Program (['recv_unittest.c', e.Object('tsi.c'), e.Object('gsi.c'), e.Object('md5.c'), e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('getifaddrs.c'), e.Object('inet_network.c')]);
+	te.Program ('md5_unittest.c');
+	te.Program (['getifaddrs_unittest.c', e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
+	te.Program (['inet_network_unittest.c', e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('getifaddrs.c')]);
+	te.Program (['getnodeaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('sockaddr.c'), e.Object('getifaddrs.c'), e.Object('indextoaddr.c')]);
+	te.Program (['indextoaddr_unittest.c', e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c')]);
+	te.Program (['net_unittest.c', e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getifaddrs.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c')]);
+	te.Program ('timer_unittest.c');
+	te.Program ('time_unittest.c');
+	te.Program (['signal_unittest.c', e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('getifaddrs.c'), e.Object('inet_network.c')]);
+	te.Program (['reed_solomon_unittest.c', e.Object('galois_tables.c')]);
+	te.Program ('rate_control_unittest.c');
+	te.Program ('checksum_unittest.c');
+	te.Program (['packet_unittest.c', e.Object('checksum.c'), e.Object('sockaddr.c'), e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('getnodeaddr.c'), e.Object('getifaddrs.c'), e.Object('inet_network.c')]);
+	te.Program ('async_unittest.c');
+	te.Program (['ip_unittest.c', e.Object('indextoaddr.c'), e.Object('if.c'), e.Object('inet_network.c'), e.Object('getnodeaddr.c'), e.Object('sockaddr.c'), e.Object('getifaddrs.c')]);
 # performance tests
-	te.Program (['checksum_perftest.c',
-			e.Object('time.c'),
-			e.Object('error.c')] + tlog);
+	te.Program (['checksum_perftest.c', e.Object('time.c')]);
+
+#-----------------------------------------------------------------------------
+# GPL license, aka plus version
+
+if env['WITH_PLUS'] == 'true':
+	pe = env.Clone();
+	pe.Append(CCFLAGS = '-DG_LOG_DOMAIN=\'"Pgm"\'');
+	pe.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
+
+# add new suffix so objects don't interfere with LGPL license library
+	pe['SHOBJSUFFIX'] = '.plus' + pe['SHOBJSUFFIX'];
+	pe['OBJSUFFIX']   = '.plus' + pe['OBJSUFFIX'];
+
+	uname_s = os.uname()[0];
+	if uname_s == 'Linux':
+		uname_m = os.uname()[4];
+		if uname_m == 'x86_64':
+			pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+			src += ['csum-copy64.S', 'csum-partial64.c'];
+		else:
+			pe.Append(CCFLAGS = '-DCONFIG_CKSUM_COPY');
+			src += ['checksum32.S'];
+		pe.StaticLibrary('libpgmplus', src);
+		pe.StaticSharedLibrary('libpgmplus-pic', src);
 
 # end of file

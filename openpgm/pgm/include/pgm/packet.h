@@ -22,28 +22,32 @@
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
-#ifndef _WIN32
-#	include <sys/socket.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#endif
-#include <pgm/types.h>
+#include <errno.h>
 
-PGM_BEGIN_DECLS
+#include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netinet/in.h>
+#	include <sys/socket.h>
+#	include <sys/types.h>
+#else
+#	include <ws2tcpip.h>
+#endif
+
 
 /* protocol number assigned by IANA */
 #ifndef IPPROTO_PGM
-#	define IPPROTO_PGM 		    	113
+#define IPPROTO_PGM 		    	113
 #endif
 
 /* read from /etc/protocols if available */
-extern int pgm_ipproto_pgm;
+extern int ipproto_pgm;
 
 
 /* address family indicator, rfc 1700 (ADDRESS FAMILY NUMBERS) */
 #ifndef AFI_IP
-#	define AFI_IP	    1	    /* IP (IP version 4) */
-#	define AFI_IP6	    2	    /* IP6 (IP version 6) */
+#define AFI_IP	    1	    /* IP (IP version 4) */
+#define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
 /* UDP ports for UDP encapsulation, as per IBM WebSphere MQ */
@@ -59,24 +63,23 @@ extern int pgm_ipproto_pgm;
 #	define PGM_MAX_APDU			UINT16_MAX
 #endif
 
-/* Cisco default: 24 (max 8200), Juniper & H3C default: 16, SmartPGM: 64 */
+/* Cisco default: 24 (max 8200), Juniper & H3C default: 16 */
 #ifndef PGM_MAX_FRAGMENTS
 #	define PGM_MAX_FRAGMENTS		16
 #endif
 
 
 enum pgm_type_e {
-	PGM_SPM		= 0x00,	/* 8.1: source path message */
-	PGM_POLL	= 0x01,	/* 14.7.1: poll request */
-	PGM_POLR	= 0x02,	/* 14.7.2: poll response */
-	PGM_ODATA	= 0x04,	/* 8.2: original data */
-	PGM_RDATA	= 0x05,	/* 8.2: repair data */
-	PGM_NAK		= 0x08,	/* 8.3: NAK or negative acknowledgement */
-	PGM_NNAK	= 0x09,	/* 8.3: N-NAK or null negative acknowledgement */
-	PGM_NCF		= 0x0a,	/* 8.3: NCF or NAK confirmation */
-	PGM_SPMR	= 0x0c,	/* 13.6: SPM request */
-	PGM_ACK		= 0x0d,	/* PGMCC: congestion control ACK */
-	PGM_MAX		= 0xff
+    PGM_SPM = 0x00,	/* 8.1: source path message */
+    PGM_POLL = 0x01,	/* 14.7.1: poll request */
+    PGM_POLR = 0x02,	/* 14.7.2: poll response */
+    PGM_ODATA = 0x04,	/* 8.2: original data */
+    PGM_RDATA = 0x05,	/* 8.2: repair data */
+    PGM_NAK = 0x08,	/* 8.3: NAK or negative acknowledgement */
+    PGM_NNAK = 0x09,	/* 8.3: N-NAK or null negative acknowledgement */
+    PGM_NCF = 0x0a,	/* 8.3: NCF or NAK confirmation */
+    PGM_SPMR = 0x0c,	/* 13.6: SPM request */
+    PGM_MAX = 0xff
 };
 
 #define PGM_OPT_LENGTH		    0x00	/* options length */
@@ -95,9 +98,6 @@ enum pgm_type_e {
 #define PGM_OPT_CR		    0x10	/* congestion report */
 #define PGM_OPT_CRQST		    0x11	/* congestion report request */
 
-#define PGM_OPT_PGMCC_DATA	    0x12
-#define PGM_OPT_PGMCC_FEEDBACK	    0x13
-
 #define PGM_OPT_NAK_BO_IVL	    0x04	/* nak back-off interval */
 #define PGM_OPT_NAK_BO_RNG	    0x05	/* nak back-off range */
 #define PGM_OPT_NBR_UNREACH	    0x0b	/* neighbour unreachable */
@@ -106,86 +106,87 @@ enum pgm_type_e {
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
 /* byte alignment for packet memory maps */
-#if defined( __GNUC__ ) && !defined( sun )
+#ifdef __GNUC__
 #	pragma pack(push)
+#else
+#	pragma pack(1)
 #endif
-#pragma pack(1)
 
 /* 8. PGM header */
 struct pgm_header {
-	uint16_t	pgm_sport;		/* source port: tsi::sport or UDP port depending on direction */
-	uint16_t	pgm_dport;		/* destination port */
-	uint8_t		pgm_type;		/* version / packet type */
-	uint8_t		pgm_options;		/* options */
+    guint16	pgm_sport;		/* source port: tsi::sport or UDP port depending on direction */
+    guint16	pgm_dport;		/* destination port */
+    guint8	pgm_type;		/* version / packet type */
+    guint8	pgm_options;		/* options */
 #define PGM_OPT_PARITY		0x80	/* parity packet */
 #define PGM_OPT_VAR_PKTLEN	0x40	/* + variable sized packets */
 #define PGM_OPT_NETWORK		0x02    /* network-significant: must be interpreted by network elements */
 #define PGM_OPT_PRESENT		0x01	/* option extension are present */
-	uint16_t	pgm_checksum;		/* checksum */
-	uint8_t		pgm_gsi[6];		/* global source id */
-	uint16_t	pgm_tsdu_length;	/* tsdu length */
+    guint16	pgm_checksum;		/* checksum */
+    guint8	pgm_gsi[6];		/* global source id */
+    guint16	pgm_tsdu_length;	/* tsdu length */
 				/* tpdu length = th length (header + options) + tsdu length */
 };
 
 /* 8.1.  Source Path Messages (SPM) */
 struct pgm_spm {
-	uint32_t	spm_sqn;		/* spm sequence number */
-	uint32_t	spm_trail;		/* trailing edge sequence number */
-	uint32_t	spm_lead;		/* leading edge sequence number */
-	uint16_t	spm_nla_afi;		/* nla afi */
-	uint16_t	spm_reserved;		/* reserved */
-	struct in_addr	spm_nla;		/* path nla */
-	/* ... option extensions */
+    guint32	spm_sqn;		/* spm sequence number */
+    guint32	spm_trail;		/* trailing edge sequence number */
+    guint32	spm_lead;		/* leading edge sequence number */
+    guint16	spm_nla_afi;		/* nla afi */
+    guint16	spm_reserved;		/* reserved */
+    struct in_addr spm_nla;		/* path nla */
+    /* ... option extensions */
 };
 
 struct pgm_spm6 {
-	uint32_t	spm6_sqn;		/* spm sequence number */
-	uint32_t	spm6_trail;		/* trailing edge sequence number */
-	uint32_t	spm6_lead;		/* leading edge sequence number */
-	uint16_t	spm6_nla_afi;		/* nla afi */
-	uint16_t	spm6_reserved;		/* reserved */
-	struct in6_addr spm6_nla;		/* path nla */
-	/* ... option extensions */
+    guint32	spm6_sqn;		/* spm sequence number */
+    guint32	spm6_trail;		/* trailing edge sequence number */
+    guint32	spm6_lead;		/* leading edge sequence number */
+    guint16	spm6_nla_afi;		/* nla afi */
+    guint16	spm6_reserved;		/* reserved */
+    struct in6_addr spm6_nla;		/* path nla */
+    /* ... option extensions */
 };
 
 /* 8.2.  Data Packet */
 struct pgm_data {
-	uint32_t	data_sqn;		/* data packet sequence number */
-	uint32_t	data_trail;		/* trailing edge sequence number */
-	/* ... option extensions */
-	/* ... data */
+    guint32	data_sqn;		/* data packet sequence number */
+    guint32	data_trail;		/* trailing edge sequence number */
+    /* ... option extensions */
+    /* ... data */
 };
 
 /* 8.3.  Negative Acknowledgments and Confirmations (NAK, N-NAK, & NCF) */
 struct pgm_nak {
-	uint32_t	nak_sqn;		/* requested sequence number */
-	uint16_t	nak_src_nla_afi;	/* nla afi */
-	uint16_t	nak_reserved;		/* reserved */
-	struct in_addr	nak_src_nla;		/* source nla */
-	uint16_t	nak_grp_nla_afi;	/* nla afi */
-	uint16_t	nak_reserved2;		/* reserved */
-	struct in_addr	nak_grp_nla;		/* multicast group nla */
-	/* ... option extension */
+    guint32	nak_sqn;		/* requested sequence number */
+    guint16	nak_src_nla_afi;	/* nla afi */
+    guint16	nak_reserved;		/* reserved */
+    struct in_addr nak_src_nla;		/* source nla */
+    guint16	nak_grp_nla_afi;	/* nla afi */
+    guint16	nak_reserved2;		/* reserved */
+    struct in_addr nak_grp_nla;		/* multicast group nla */
+    /* ... option extension */
 };
 
 struct pgm_nak6 {
-	uint32_t	nak6_sqn;		/* requested sequence number */
-	uint16_t	nak6_src_nla_afi;	/* nla afi */
-	uint16_t	nak6_reserved;		/* reserved */
-	struct in6_addr nak6_src_nla;	/* source nla */
-	uint16_t	nak6_grp_nla_afi;	/* nla afi */
-	uint16_t	nak6_reserved2;		/* reserved */
-	struct in6_addr nak6_grp_nla;	/* multicast group nla */
-	/* ... option extension */
+    guint32	nak6_sqn;		/* requested sequence number */
+    guint16	nak6_src_nla_afi;	/* nla afi */
+    guint16	nak6_reserved;		/* reserved */
+    struct in6_addr nak6_src_nla;	/* source nla */
+    guint16	nak6_grp_nla_afi;	/* nla afi */
+    guint16	nak6_reserved2;		/* reserved */
+    struct in6_addr nak6_grp_nla;	/* multicast group nla */
+    /* ... option extension */
 };
 
 /* 9.  Option header (max 16 per packet) */
 struct pgm_opt_header {
-	uint8_t		opt_type;		/* option type */
-#define PGM_OPT_MASK		0x7f
-#define PGM_OPT_END		0x80	/* end of options flag */
-	uint8_t		opt_length;		/* option length */
-	uint8_t		opt_reserved;
+    guint8	opt_type;		/* option type */
+#define PGM_OPT_MASK	0x7f
+#define PGM_OPT_END	0x80		/* end of options flag */
+    guint8	opt_length;		/* option length */
+    guint8	opt_reserved;
 #define PGM_OP_ENCODED		0x8	/* F-bit */
 #define PGM_OPX_MASK		0x3
 #define PGM_OPX_IGNORE		0x0	/* extensibility bits */
@@ -196,17 +197,17 @@ struct pgm_opt_header {
 
 /* 9.1.  Option extension length - OPT_LENGTH */
 struct pgm_opt_length {
-	uint8_t		opt_type;		/* include header as total length overwrites reserved/OPX bits */
-	uint8_t		opt_length;
-	uint16_t	opt_total_length;	/* total length of all options */
+    guint8	opt_type;		/* include header as total length overwrites reserved/OPX bits */
+    guint8	opt_length;
+    guint16	opt_total_length;	/* total length of all options */
 };
 
 /* 9.2.  Option fragment - OPT_FRAGMENT */
 struct pgm_opt_fragment {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	opt_sqn;		/* first sequence number */
-	uint32_t	opt_frag_off;		/* offset */
-	uint32_t	opt_frag_len;		/* length */
+    guint8	opt_reserved;		/* reserved */
+    guint32	opt_sqn;		/* first sequence number */
+    guint32	opt_frag_off;		/* offset */
+    guint32	opt_frag_len;		/* length */
 };
 
 /* 9.3.5.  Option NAK List - OPT_NAK_LIST
@@ -214,50 +215,50 @@ struct pgm_opt_fragment {
  * GNU C allows opt_sqn[0], ISO C89 requireqs opt_sqn[1], ISO C99 permits opt_sqn[]
  */
 struct pgm_opt_nak_list {
-	uint8_t		opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-	uint32_t	opt_sqn[];		/* requested sequence number [62] */
-#elif defined(__cplusplus)
-	uint32_t	opt_sqn[1];
+    guint32	opt_sqn[];		/* requested sequence number [62] */
+#elif defined(__SUNPRO_CC)
+    guint32	opt_sqn[1];
 #else
-	uint32_t	opt_sqn[0];
+    guint32	opt_sqn[0];
 #endif
 };
 
 /* 9.4.2.  Option Join - OPT_JOIN */
 struct pgm_opt_join {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	opt_join_min;		/* minimum sequence number */
+    guint8	opt_reserved;		/* reserved */
+    guint32	opt_join_min;		/* minimum sequence number */
 };
 
 /* 9.5.5.  Option Redirect - OPT_REDIRECT */
 struct pgm_opt_redirect {
-	uint8_t		opt_reserved;		/* reserved */
-	uint16_t	opt_nla_afi;		/* nla afi */
-	uint16_t	opt_reserved2;		/* reserved */
-	struct in_addr	opt_nla;		/* dlr nla */
+    guint8	opt_reserved;		/* reserved */
+    guint16	opt_nla_afi;		/* nla afi */
+    guint16	opt_reserved2;		/* reserved */
+    struct in_addr opt_nla;		/* dlr nla */
 };
 
 struct pgm_opt6_redirect {
-	uint8_t		opt6_reserved;		/* reserved */
-	uint16_t	opt6_nla_afi;		/* nla afi */
-	uint16_t	opt6_reserved2;		/* reserved */
-	struct in6_addr opt6_nla;		/* dlr nla */
+    guint8	opt6_reserved;		/* reserved */
+    guint16	opt6_nla_afi;		/* nla afi */
+    guint16	opt6_reserved2;		/* reserved */
+    struct in6_addr opt6_nla;		/* dlr nla */
 };
 
 /* 9.6.2.  Option Sources - OPT_SYN */
 struct pgm_opt_syn {
-	uint8_t		opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 /* 9.7.4.  Option End Session - OPT_FIN */
 struct pgm_opt_fin {
-	uint8_t		opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 /* 9.8.4.  Option Reset - OPT_RST */
 struct pgm_opt_rst {
-	uint8_t		opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 
@@ -267,23 +268,23 @@ struct pgm_opt_rst {
 
 /* 11.8.1.  Option Parity - OPT_PARITY_PRM */
 struct pgm_opt_parity_prm {
-	uint8_t		opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 #define PGM_PARITY_PRM_MASK 0x3
 #define PGM_PARITY_PRM_PRO  0x1		/* source provides pro-active parity packets */
 #define PGM_PARITY_PRM_OND  0x2		/*                 on-demand parity packets */
-	uint32_t	parity_prm_tgs;		/* transmission group size */
+    guint32	parity_prm_tgs;		/* transmission group size */
 };
 
 /* 11.8.2.  Option Parity Group - OPT_PARITY_GRP */
 struct pgm_opt_parity_grp {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	prm_group;		/* parity group number */
+    guint8	opt_reserved;		/* reserved */
+    guint32	prm_group;		/* parity group number */
 };
 
 /* 11.8.3.  Option Current Transmission Group Size - OPT_CURR_TGSIZE */
 struct pgm_opt_curr_tgsize {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	prm_atgsize;		/* actual transmission group size */
+    guint8	opt_reserved;		/* reserved */
+    guint32	prm_atgsize;		/* actual transmission group size */
 };
 
 /*
@@ -292,66 +293,20 @@ struct pgm_opt_curr_tgsize {
 
 /* 12.7.1.  Option Congestion Report - OPT_CR */
 struct pgm_opt_cr {
-	uint8_t		opt_reserved;		/* reserved */
-#define PGM_OPT_CR_NEL		0x0	/* OPT_CR_NE_WL report */
-#define PGM_OPT_CR_NEP		0x1	/* OPT_CR_NE_WP report */
-#define PGM_OPT_CR_RXP		0x2	/* OPT_CR_RX_WP report */
-	uint32_t	opt_cr_lead;		/* congestion report reference sqn */
-	uint16_t	opt_cr_ne_wl;		/* ne worst link */
-	uint16_t	opt_cr_ne_wp;		/* ne worst path */
-	uint16_t	opt_cr_rx_wp;		/* rcvr worst path */
-	uint16_t	opt_reserved2;		/* reserved */
-	uint16_t	opt_nla_afi;		/* nla afi */
-	uint16_t	opt_reserved3;		/* reserved */
-	uint32_t	opt_cr_rcvr;		/* worst receivers nla */
+    guint8	opt_reserved;		/* reserved */
+    guint32	opt_cr_lead;		/* congestion report reference sqn */
+    guint16	opt_cr_ne_wl;		/* ne worst link */
+    guint16	opt_cr_ne_wp;		/* ne worst path */
+    guint16	opt_cr_rx_wp;		/* rcvr worst path */
+    guint16	opt_reserved2;		/* reserved */
+    guint16	opt_nla_afi;		/* nla afi */
+    guint16	opt_reserved3;		/* reserved */
+    guint32	opt_cr_rcvr;		/* worst receivers nla */
 };
 
 /* 12.7.2.  Option Congestion Report Request - OPT_CRQST */
 struct pgm_opt_crqst {
-	uint8_t		opt_reserved;		/* reserved */
-#define PGM_OPT_CRQST_NEL	0x0	/* request OPT_CR_NE_WL report */
-#define PGM_OPT_CRQST_NEP	0x1	/* request OPT_CR_NE_WP report */
-#define PGM_OPT_CRQST_RXP	0x2	/* request OPT_CR_RX_WP report */
-};
-
-/* PGMCC.  ACK Packet */
-struct pgm_ack {
-	uint32_t	ack_rx_max;		/* RX_MAX */
-	uint32_t	ack_bitmap;		/* received packets */
-	/* ... option extensions */
-};
-
-/* PGMCC  Options */
-struct pgm_opt_pgmcc_data {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	opt_tstamp;		/* timestamp */
-	uint16_t	opt_nla_afi;		/* nla afi */
-	uint16_t	opt_reserved2;		/* reserved */
-	struct in_addr	opt_nla;		/* ACKER nla */
-};
-
-struct pgm_opt6_pgmcc_data {
-	uint8_t		opt6_reserved;		/* reserved */
-	uint32_t	opt6_tstamp;		/* timestamp */
-	uint16_t	opt6_nla_afi;		/* nla afi */
-	uint16_t	opt6_reserved2;		/* reserved */
-	struct in6_addr	opt6_nla;		/* ACKER nla */
-};
-
-struct pgm_opt_pgmcc_feedback {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	opt_tstamp;		/* timestamp */
-	uint16_t	opt_nla_afi;		/* nla afi */
-	uint16_t	opt_loss_rate;		/* loss rate */
-	struct in_addr	opt_nla;		/* ACKER nla */
-};
-
-struct pgm_opt6_pgmcc_feedback {
-	uint8_t		opt6_reserved;		/* reserved */
-	uint32_t	opt6_tstamp;		/* timestamp */
-	uint16_t	opt6_nla_afi;		/* nla afi */
-	uint16_t	opt6_loss_rate;		/* loss rate */
-	struct in6_addr	opt6_nla;		/* ACKER nla */
+    guint8	opt_reserved;		/* reserved */
 };
 
 
@@ -373,38 +328,38 @@ struct pgm_spmr {
 
 /* 14.7.1.  Poll Request */
 struct pgm_poll {
-	uint32_t	poll_sqn;		/* poll sequence number */
-	uint16_t	poll_round;		/* poll round */
-	uint16_t	poll_s_type;		/* poll sub-type */
+    guint32	poll_sqn;		/* poll sequence number */
+    guint16	poll_round;		/* poll round */
+    guint16	poll_s_type;		/* poll sub-type */
 #define PGM_POLL_GENERAL	0x0	/* general poll  */
 #define PGM_POLL_DLR		0x1	/* DLR poll */
-	uint16_t	poll_nla_afi;		/* nla afi */
-	uint16_t	poll_reserved;		/* reserved */
-	struct in_addr	poll_nla;		/* path nla */
-	uint32_t	poll_bo_ivl;		/* poll back-off interval */
-	char		poll_rand[4];		/* random string */
-	uint32_t	poll_mask;		/* matching bit-mask */
+    guint16	poll_nla_afi;		/* nla afi */
+    guint16	poll_reserved;		/* reserved */
+    struct in_addr poll_nla;		/* path nla */
+    guint32	poll_bo_ivl;		/* poll back-off interval */
+    gchar	poll_rand[4];		/* random string */
+    guint32	poll_mask;		/* matching bit-mask */
     /* ... option extensions */
 };
 
 struct pgm_poll6 {
-	uint32_t	poll6_sqn;		/* poll sequence number */
-	uint16_t	poll6_round;		/* poll round */
-	uint16_t	poll6_s_type;		/* poll sub-type */
-	uint16_t	poll6_nla_afi;		/* nla afi */
-	uint16_t	poll6_reserved;		/* reserved */
-	struct in6_addr poll6_nla;		/* path nla */
-	uint32_t	poll6_bo_ivl;		/* poll back-off interval */
-	char		poll6_rand[4];		/* random string */
-	uint32_t	poll6_mask;		/* matching bit-mask */
+    guint32	poll6_sqn;		/* poll sequence number */
+    guint16	poll6_round;		/* poll round */
+    guint16	poll6_s_type;		/* poll sub-type */
+    guint16	poll6_nla_afi;		/* nla afi */
+    guint16	poll6_reserved;		/* reserved */
+    struct in6_addr poll6_nla;		/* path nla */
+    guint32	poll6_bo_ivl;		/* poll back-off interval */
+    gchar	poll6_rand[4];		/* random string */
+    guint32	poll6_mask;		/* matching bit-mask */
     /* ... option extensions */
 };
 
 /* 14.7.2.  Poll Response */
 struct pgm_polr {
-	uint32_t	polr_sqn;		/* polr sequence number */
-	uint16_t	polr_round;		/* polr round */
-	uint16_t	polr_reserved;		/* reserved */
+    guint32	polr_sqn;		/* polr sequence number */
+    guint16	polr_round;		/* polr round */
+    guint16	polr_reserved;		/* reserved */
     /* ... option extensions */
 };
 
@@ -415,58 +370,98 @@ struct pgm_polr {
 
 /* 15.4.1.  Option NAK Back-Off Interval - OPT_NAK_BO_IVL */
 struct pgm_opt_nak_bo_ivl {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	opt_nak_bo_ivl;		/* nak back-off interval */
-	uint32_t	opt_nak_bo_ivl_sqn;	/* nak back-off interval sqn */
+    guint8	opt_reserved;		/* reserved */
+    guint32	opt_nak_bo_ivl;		/* nak back-off interval */
+    guint32	opt_nak_bo_ivl_sqn;	/* nak back-off interval sqn */
 };
 
 /* 15.4.2.  Option NAK Back-Off Range - OPT_NAK_BO_RNG */
 struct pgm_opt_nak_bo_rng {
-	uint8_t		opt_reserved;		/* reserved */
-	uint32_t	opt_nak_max_bo_ivl;	/* maximum nak back-off interval */
-	uint32_t	opt_nak_min_bo_ivl;	/* minimum nak back-off interval */
+    guint8	opt_reserved;		/* reserved */
+    guint32	opt_nak_max_bo_ivl;	/* maximum nak back-off interval */
+    guint32	opt_nak_min_bo_ivl;	/* minimum nak back-off interval */
 };
 
 /* 15.4.3.  Option Neighbour Unreachable - OPT_NBR_UNREACH */
 struct pgm_opt_nbr_unreach {
-	uint8_t		opt_reserved;		/* reserved */
+    guint8	opt_reserved;		/* reserved */
 };
 
 /* 15.4.4.  Option Path - OPT_PATH_NLA */
 struct pgm_opt_path_nla {
-	uint8_t		opt_reserved;		/* reserved */
-	struct in_addr	opt_path_nla;		/* path nla */
+    guint8	opt_reserved;		/* reserved */
+    struct in_addr opt_path_nla;	/* path nla */
 };
 
 struct pgm_opt6_path_nla {
-	uint8_t		opt6_reserved;		/* reserved */
-	struct in6_addr opt6_path_nla;		/* path nla */
+    guint8	opt6_reserved;		/* reserved */
+    struct in6_addr opt6_path_nla;	/* path nla */
 };
 
+#define PGM_PACKET_ERROR	pgm_packet_error_quark ()
 
-#if defined( __GNUC__ ) && !defined( sun )
+typedef enum
+{
+	PGM_PACKET_ERROR_BOUNDS,
+	PGM_PACKET_ERROR_AFNOSUPPORT,
+	PGM_PACKET_ERROR_CKSUM,
+	PGM_PACKET_ERROR_PROTO,
+	PGM_PACKET_ERROR_FAILED
+} PGMPacketError;
+
+
+#ifdef __GNUC__
 #	pragma pack(pop)
 #else
 #	pragma pack()
 #endif
 
-#define PGM_IS_UPSTREAM(t) \
-	((t) == PGM_NAK 	/* unicast */			\
-	 || (t) == PGM_NNAK	/* unicast */			\
-	 || (t) == PGM_SPMR	/* multicast + unicast */	\
-	 || (t) == PGM_POLR	/* unicast */			\
-	 || (t) == PGM_ACK)	/* unicast */
+#ifndef __PGM_SKBUFF_H__
+#	include <pgm/skbuff.h>
+#endif
 
-#define PGM_IS_PEER(t) \
-	((t) == PGM_SPMR)	/* multicast */
+G_BEGIN_DECLS
 
-#define PGM_IS_DOWNSTREAM(t) \
-	((t) == PGM_SPM		/* all types are multicast */	\
-	 || (t) == PGM_ODATA					\
-	 || (t) == PGM_RDATA					\
-	 || (t) == PGM_POLL					\
-	 || (t) == PGM_NCF)
+GQuark pgm_packet_error_quark (void);
+gboolean pgm_parse_raw (struct pgm_sk_buff_t* const, struct sockaddr* const, GError**);
+gboolean pgm_parse_udp_encap (struct pgm_sk_buff_t* const, GError**);
+gboolean pgm_print_packet (gpointer, gsize);
 
-PGM_END_DECLS
+static inline gboolean pgm_is_upstream (guint8 type)
+{
+    return (type == PGM_NAK ||		/* unicast */
+	    type == PGM_NNAK ||		/* unicast */
+	    type == PGM_SPMR ||		/* multicast + unicast */
+	    type == PGM_POLR);		/* unicast */
+}
+
+static inline gboolean pgm_is_peer (guint8 type)
+{
+    return (type == PGM_SPMR);		/* multicast */
+}
+
+static inline gboolean pgm_is_downstream (guint8 type)
+{
+    return (type == PGM_SPM   ||	/* all multicast */
+	    type == PGM_ODATA ||
+	    type == PGM_RDATA ||
+	    type == PGM_POLL  ||
+	    type == PGM_NCF);
+}
+
+gboolean pgm_verify_spm (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_spmr (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_nak (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_nnak (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_ncf (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_poll (const struct pgm_sk_buff_t* const);
+gboolean pgm_verify_polr (const struct pgm_sk_buff_t* const);
+
+const char* pgm_type_string (guint8) G_GNUC_WARN_UNUSED_RESULT;
+const char* pgm_udpport_string (int) G_GNUC_WARN_UNUSED_RESULT;
+const char* pgm_gethostbyaddr (const struct in_addr*) G_GNUC_WARN_UNUSED_RESULT;
+void pgm_ipopt_print (gconstpointer, gsize);
+
+G_END_DECLS
 
 #endif /* __PGM_PACKET_H__ */

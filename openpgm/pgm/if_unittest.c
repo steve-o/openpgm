@@ -4,7 +4,7 @@
  *
  * CAUTION: Assumes host is IPv4 by default for AF_UNSPEC
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,17 +24,18 @@
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <net/if.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <sys/types.h>
 
 #include <glib.h>
 #include <check.h>
+
+#include "pgm/if.h"
+#include "pgm/ip.h"
+#include "pgm/sockaddr.h"
 
 
 /* mock state */
@@ -84,35 +85,6 @@ static char* mock_invalid =	"invalid.invalid";		/* RFC 2606 */
 static char* mock_toolong =	"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
 static char* mock_hostname =	NULL;
 
-struct pgm_ifaddrs;
-struct pgm_error_t;
-
-bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
-void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
-unsigned mock_pgm_if_nametoindex (const sa_family_t, const char*);
-char* mock_if_indextoname (unsigned int, char*);
-int mock_getnameinfo (const struct sockaddr*, socklen_t, char*, size_t, char*, size_t, int);
-int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
-void mock_freeaddrinfo (struct addrinfo*);
-int mock_gethostname (char*, size_t);
-struct netent* mock_getnetbyname (const char*);
-bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*, const socklen_t, struct pgm_error_t**);
-
-#define pgm_getifaddrs		mock_pgm_getifaddrs
-#define pgm_freeifaddrs		mock_pgm_freeifaddrs
-#define pgm_if_nametoindex	mock_pgm_if_nametoindex
-#define if_indextoname		mock_if_indextoname
-#define getnameinfo		mock_getnameinfo
-#define getaddrinfo		mock_getaddrinfo
-#define freeaddrinfo		mock_freeaddrinfo
-#define gethostname		mock_gethostname
-#define getnetbyname		mock_getnetbyname
-#define pgm_if_getnodeaddr	mock_pgm_if_getnodeaddr
-
-
-#define IF_DEBUG
-#include "if.c"
-
 
 static
 gpointer
@@ -128,7 +100,7 @@ create_host (
 	g_assert (canonical_hostname);
 
 	new_host = g_slice_alloc0 (sizeof(struct mock_host_t));
-	g_assert (pgm_sockaddr_pton (address, (struct sockaddr*)&new_host->address));
+	g_assert (pgm_sockaddr_pton (address, &new_host->address));
 	new_host->canonical_hostname = g_strdup (canonical_hostname);
 	new_host->alias = alias ? g_strdup (alias) : NULL;
 
@@ -149,7 +121,7 @@ create_network (
 
 	new_network = g_slice_alloc0 (sizeof(struct mock_network_t));
 	new_network->name = g_strdup (name);
-	g_assert (pgm_sockaddr_pton (number, (struct sockaddr*)&new_network->number));
+	g_assert (pgm_sockaddr_pton (number, &new_network->number));
 
 	return new_network;
 }
@@ -189,11 +161,11 @@ create_interface (
 			new_interface->flags |= IFF_MULTICAST;
 		else if (strncmp (tokens[i], "ip=", strlen("ip=")) == 0) {
 			const char* addr = tokens[i] + strlen("ip=");
-			g_assert (pgm_sockaddr_pton (addr, (struct sockaddr*)&new_interface->addr));
+			g_assert (pgm_sockaddr_pton (addr, &new_interface->addr));
 		}
 		else if (strncmp (tokens[i], "netmask=", strlen("netmask=")) == 0) {
 			const char* addr = tokens[i] + strlen("netmask=");
-			g_assert (pgm_sockaddr_pton (addr, (struct sockaddr*)&new_interface->netmask));
+			g_assert (pgm_sockaddr_pton (addr, &new_interface->netmask));
 		}
 		else if (strncmp (tokens[i], "scope=", strlen("scope=")) == 0) {
 			const char* scope = tokens[i] + strlen("scope=");
@@ -300,28 +272,38 @@ mock_teardown_net (void)
 	g_list_free (mock_interfaces);
 }
 
-/* mock functions for external references */
+#include "pgm/getifaddrs.h"
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
-
-bool
-mock_pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		err
+int
+pgm_compat_getifaddrs (
+	struct pgm_ifaddrs**	ifap
 	)
 {
+	g_assert_not_reached();
+	return -1;
+}
+
+void
+pgm_compat_freeifaddrs (
+	struct pgm_ifaddrs*	ifap
+	)
+{
+	g_assert_not_reached();
+}
+
+/* mock functions for external references */
+
+int
+mock_pgm_getifaddrs (
+	struct pgm_ifaddrs**	ifap
+	)
+{
+	g_debug ("mock_pgm_getifaddrs (ifap:%p)", (void*)ifap);
+
 	if (NULL == ifap) {
+		errno = EINVAL;
 		return -1;
 	}
-
-	g_debug ("mock_getifaddrs (ifap:%p err:%p)", (gpointer)ifap, (gpointer)err);
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
@@ -341,7 +323,8 @@ mock_pgm_getifaddrs (
 	}
 
 	*ifap = ifa;
-	return TRUE;
+
+	return 0;
 }
 
 void
@@ -352,9 +335,21 @@ mock_pgm_freeifaddrs (
 	free (ifa);
 }
 
-unsigned
+#include "pgm/nametoindex.h"
+
+int
+pgm_compat_if_nametoindex (
+	const int		iffamily,
+	const char*		ifname
+	)
+{
+	g_assert_not_reached();
+	return -1;
+}
+
+int
 mock_pgm_if_nametoindex (
-	const sa_family_t	iffamily,
+	const int		iffamily,
 	const char*		ifname
 	)
 {
@@ -368,9 +363,10 @@ mock_pgm_if_nametoindex (
 	return 0;
 }
 
+static
 char*
 mock_if_indextoname (
-	unsigned		ifindex,
+	unsigned int		ifindex,
 	char*			ifname
 	)
 {
@@ -387,6 +383,7 @@ mock_if_indextoname (
 	return NULL;
 }
 
+static
 int
 mock_getnameinfo (
 	const struct sockaddr*	sa,
@@ -458,6 +455,7 @@ mock_getnameinfo (
 	return 0;
 }
 
+static
 int
 mock_getaddrinfo (
 	const char*		node,
@@ -509,7 +507,7 @@ mock_getaddrinfo (
 	}
 
 	if (ai_flags & AI_NUMERICHOST) {
-		pgm_sockaddr_pton (node, (struct sockaddr*)&addr);
+		pgm_sockaddr_pton (node, &addr);
 	}
 	list = mock_hosts;
 	while (list) {
@@ -536,6 +534,7 @@ mock_getaddrinfo (
 	return EAI_NONAME;
 }
 
+static
 void
 mock_freeaddrinfo (
 	struct addrinfo*	res
@@ -544,6 +543,7 @@ mock_freeaddrinfo (
 	free (res);
 }
 
+static
 int
 mock_gethostname (
 	char*			name,
@@ -573,6 +573,7 @@ mock_gethostname (
 	return 0;
 }
 
+static
 struct netent*
 mock_getnetbyname (
 	const char*		name
@@ -599,12 +600,12 @@ mock_getnetbyname (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_if_getnodeaddr (
-	const sa_family_t	family,
+	const int		family,
 	struct sockaddr*	addr,
 	const socklen_t		cnt,
-	pgm_error_t**		error
+	GError**		error
 	)
 {
 	switch (family) {
@@ -649,6 +650,20 @@ mock_setup_ip6 (void)
 {
 	mock_family = AF_INET6;
 }
+
+#define pgm_getifaddrs	mock_pgm_getifaddrs
+#define pgm_freeifaddrs	mock_pgm_freeifaddrs
+#define pgm_if_nametoindex	mock_pgm_if_nametoindex
+#define if_indextoname	mock_if_indextoname
+#define getnameinfo	mock_getnameinfo
+#define getaddrinfo	mock_getaddrinfo
+#define freeaddrinfo	mock_freeaddrinfo
+#define gethostname	mock_gethostname
+#define getnetbyname	mock_getnetbyname
+#define pgm_if_getnodeaddr	mock_pgm_if_getnodeaddr
+
+#define IF_DEBUG
+#include "if.c"
 
 
 /* return 0 if gsr multicast group does not match the default PGM group for
@@ -738,12 +753,13 @@ match_default_interface (
 }
 
 /* target:
- *	bool
- *	pgm_if_get_transport_info (
- *		const char*				s,
- *		const struct pgm_transport_info_t*	hints,
- *		struct pgm_transport_info_t**		res,
- *		pgm_error_t**				err
+ *	int
+ *	pgm_if_parse_transport (
+ *		const char*			s,
+ *		int				ai_family,
+ *		struct group_source_req*	recv_gsr,
+ *		gsize*				recv_len,
+ *		struct group_source_req*	send_gsr
  *	)
  */
 
@@ -790,7 +806,7 @@ START_TEST (test_parse_transport_pass_001)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= mock_family
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	g_message ("%i: test_parse_transport_001(%s, %s%s%s)",
 		   _i,
@@ -910,7 +926,7 @@ START_TEST (test_parse_transport_pass_002)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= mock_family
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	g_message ("%i: test_parse_transport_002(%s, %s%s%s)",
 		   _i,
@@ -937,7 +953,7 @@ START_TEST (test_parse_transport_pass_002)
 		fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 		fail_unless (NULL == res, "unexpected result");
 		fail_if     (NULL == err, "error not raised");
-		fail_unless (PGM_ERROR_NOTUNIQ == err->code, "interfaces not found unique");
+		fail_unless (PGM_IF_ERROR_NOTUNIQ == err->code, "interfaces not found unique");
 		return;
 	}
 
@@ -990,7 +1006,7 @@ START_TEST (test_parse_transport_pass_003)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= mock_family
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	g_message ("%i: test_parse_transport_003(%s, %s%s%s)",
 		   _i,
@@ -1035,7 +1051,7 @@ START_TEST (test_parse_transport_pass_004)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= mock_family
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	struct sockaddr_storage addr;
 
 	fail_unless (TRUE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
@@ -1080,7 +1096,7 @@ START_TEST (test_parse_transport_pass_005)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= mock_family
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	struct sockaddr_storage addr;
 
 	fail_unless (TRUE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
@@ -1131,7 +1147,7 @@ START_TEST (test_parse_transport_fail_001)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 	fail_unless (NULL == res, "unexpected result");
@@ -1146,7 +1162,7 @@ START_TEST (test_parse_transport_fail_002)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 	fail_unless (NULL == res, "unexpected result");
@@ -1161,7 +1177,7 @@ START_TEST (test_parse_transport_fail_003)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 	fail_unless (NULL == res, "unexpected result");
@@ -1176,7 +1192,7 @@ START_TEST (test_parse_transport_fail_004)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 	fail_unless (NULL == res, "unexpected result");
@@ -1191,7 +1207,7 @@ START_TEST (test_parse_transport_fail_005)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 	fail_unless (NULL == res, "unexpected result");
@@ -1206,7 +1222,7 @@ START_TEST (test_parse_transport_fail_006)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_IPX
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, &hints, &res, &err), "get_transport_info failed");
 	fail_unless (NULL == res, "unexpected result");
@@ -1218,7 +1234,7 @@ END_TEST
 START_TEST (test_parse_transport_fail_007)
 {
         const char* s = ";";
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	fail_unless (FALSE == pgm_if_get_transport_info (s, NULL, NULL, &err), "get_transport_info failed");
 }
@@ -1232,7 +1248,7 @@ START_TEST (test_parse_transport_fail_008)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
 	if (!retval) {
@@ -1251,7 +1267,7 @@ START_TEST (test_parse_transport_fail_009)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
 	if (!retval) {
@@ -1271,7 +1287,7 @@ START_TEST (test_parse_transport_fail_010)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
 	if (!retval) {
@@ -1291,7 +1307,7 @@ START_TEST (test_parse_transport_fail_011)
 	struct pgm_transport_info_t hints = {
 		.ti_family	= AF_UNSPEC
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 	gboolean retval = pgm_if_get_transport_info (s, &hints, &res, &err);
 	if (!retval) {
@@ -1315,7 +1331,7 @@ END_TEST
 
 
 /* target:
- * 	bool
+ * 	gboolean
  * 	is_in_net (
  * 		const struct in_addr*	addr,		-- in host byte order
  * 		const struct in_addr*	netaddr,

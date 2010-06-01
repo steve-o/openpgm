@@ -2,7 +2,7 @@
  *
  * Re-entrant safe signal handling.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,28 +19,35 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE
-#include <signal.h>		/* _GNU_SOURCE for strsignal() */
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <glib.h>
-#ifdef G_OS_WIN32
-#	include <fcntl.h>
-#	include <io.h>
-#endif
-#include <pgm/framework.h>
+
+#include "pgm/sockaddr.h"
 #include "pgm/signal.h"
 
 
 //#define SIGNAL_DEBUG
 
+#ifndef SIGNAL_DEBUG
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
+
 
 /* globals */
 
-static pgm_sighandler_t		signal_list[NSIG];
-static int			signal_pipe[2];
-static GIOChannel*		signal_io = NULL;
+static pgm_sighandler_t g_signal_list[NSIG];
+static int g_signal_pipe[2];
+static GIOChannel* g_signal_io = NULL;
 
 static void on_signal (int);
-static gboolean	on_io_signal (GIOChannel*, GIOCondition, gpointer);
+static gboolean on_io_signal (GIOChannel*, GIOCondition, gpointer);
 static const char* cond_string (GIOCondition);
 
 
@@ -54,26 +61,26 @@ pgm_signal_install (
 	gpointer		user_data
 	)
 {
-	pgm_debug ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
+	g_trace ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
 		signum, (gpointer)handler, user_data);
 
-	if (NULL == signal_io)
+	if (NULL == g_signal_io)
 	{
 #ifdef G_OS_UNIX
-		if (pipe (signal_pipe))
+		if (pipe (g_signal_pipe))
 #else
-		if (_pipe (signal_pipe, 4096, _O_BINARY | _O_NOINHERIT))
+		if (_pipe (g_signal_pipe, 4096, _O_BINARY | _O_NOINHERIT))
 #endif
 			return FALSE;
 
-		pgm_sockaddr_nonblocking (signal_pipe[0], TRUE);
-		pgm_sockaddr_nonblocking (signal_pipe[1], TRUE);
+		pgm_sockaddr_nonblocking (g_signal_pipe[0], TRUE);
+		pgm_sockaddr_nonblocking (g_signal_pipe[1], TRUE);
 /* add to evm */
-		signal_io = g_io_channel_unix_new (signal_pipe[0]);
-		g_io_add_watch (signal_io, G_IO_IN, on_io_signal, user_data);
+		g_signal_io = g_io_channel_unix_new (g_signal_pipe[0]);
+		g_io_add_watch (g_signal_io, G_IO_IN, on_io_signal, user_data);
 	}
 
-	signal_list[signum] = handler;
+	g_signal_list[signum] = handler;
 	return (SIG_ERR != signal (signum, on_signal));
 }
 
@@ -86,13 +93,13 @@ on_signal (
 	int		signum
 	)
 {
-	pgm_debug ("on_signal (signum:%d)", signum);
-	if (write (signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
+	g_trace ("on_signal (signum:%d)", signum);
+	if (write (g_signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
-#ifndef G_OS_WIN32
-		pgm_warn ("Unix signal %s (%d) lost", strsignal (signum), signum);
+#ifdef G_OS_UNIX
+		g_critical ("Unix signal %s (%i) lost", strsignal(signum), signum);
 #else
-		pgm_warn ("Unix signal (%d) lost", signum);
+		g_critical ("Unix signal (%i) lost", signum);
 #endif
 	}
 }
@@ -100,8 +107,7 @@ on_signal (
 /* process signal from pipe
  */
 
-static
-gboolean
+static gboolean
 on_io_signal (
 	GIOChannel*	source,
 	GIOCondition	cond,
@@ -112,7 +118,7 @@ on_io_signal (
 	g_assert (NULL != source);
 	g_assert (G_IO_IN == cond);
 
-	pgm_debug ("on_io_signal (source:%p cond:%s user_data:%p)",
+	g_trace ("on_io_signal (source:%p cond:%s user_data:%p)",
 		(gpointer)source, cond_string (cond), user_data);
 
 	int signum;
@@ -120,11 +126,11 @@ on_io_signal (
 
 	if (sizeof(signum) == bytes_read)
 	{
-		signal_list[signum] (signum, user_data);
+		g_signal_list[signum] (signum, user_data);
 	}
 	else
 	{
-		pgm_warn ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
+		g_critical ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
 				bytes_read, bytes_read > 1 ? "s" : "", sizeof(signum));
 	}
 

@@ -39,13 +39,16 @@
 
 #include <glib.h>
 
-#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/transport.h>
+#include <pgm/source.h>
+#include <pgm/receiver.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
-
-#include "async.h"
+#include <pgm/timer.h>
+#include <pgm/if.h>
+#include <pgm/async.h>
 
 
 /* typedefs */
@@ -65,21 +68,23 @@ struct app_session {
 #undef G_LOG_DOMAIN
 #define G_LOG_DOMAIN	"app"
 
-static int		g_port = 7500;
-static const char*	g_network = ";239.192.0.1";
+static int g_port = 7500;
+static const char* g_network = ";239.192.0.1";
 
-static guint		g_max_tpdu = 1500;
-static guint		g_sqns = 100 * 1000;
+static guint g_max_tpdu = 1500;
+static guint g_sqns = 100 * 1000;
 
-static GHashTable*	g_sessions = NULL;
-static GMainLoop*	g_loop = NULL;
-static GIOChannel*	g_stdin_channel = NULL;
+static GHashTable* g_sessions = NULL;
+static GMainLoop* g_loop = NULL;
+static GIOChannel* g_stdin_channel = NULL;
 
 
 static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
+
 static void destroy_session (gpointer, gpointer, gpointer);
+
 static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
@@ -100,19 +105,9 @@ main (
 	char   *argv[]
 	)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init ();
 	g_message ("app");
-
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
-		pgm_messages_shutdown();
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -124,10 +119,15 @@ main (
 		case 's':	g_port = atoi (optarg); break;
 
 		case 'h':
-		case '?':
-				pgm_messages_shutdown();
-				usage (binary_name);
+		case '?': usage (binary_name);
 		}
+	}
+
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
 	}
 
 	g_loop = g_main_loop_new (NULL, FALSE);
@@ -165,11 +165,8 @@ main (
 		g_stdin_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown();
 	g_message ("finished.");
-	pgm_messages_shutdown();
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static
@@ -256,7 +253,7 @@ session_create (
 	struct pgm_transport_info_t hints = {
 		.ti_family = AF_INET
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 /* check for duplicate */
 	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
@@ -266,18 +263,18 @@ session_create (
 	}
 
 /* create new and fill in bits */
-	sess = g_new0(struct app_session, 1);
+	sess = g_malloc0(sizeof(struct app_session));
 	sess->name = g_memdup (name, strlen(name)+1);
 
 	if (!pgm_if_get_transport_info (g_network, &hints, &res, &err)) {
-		printf ("FAILED: pgm_if_get_transport_info(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_if_get_transport_info(): %s\n", err->message);
+		g_error_free (err);
 		goto err_free;
 	}
 
 	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
-		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		goto err_free;
 	}
@@ -286,8 +283,8 @@ session_create (
 	res->ti_sport = 0;
 printf ("pgm_transport_create (transport:%p res:%p err:%p)\n", (gpointer)sess->transport, (gpointer)res, (gpointer)&err);
 	if (!pgm_transport_create (&sess->transport, res, &err)) {
-		printf ("FAILED: pgm_transport_create(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		goto err_free;
 	}
@@ -441,19 +438,10 @@ session_set_fec (
 		return;
 	}
 
-	if (!pgm_transport_set_fec (sess->transport,
-				    FALSE /* pro-active */,
-				    TRUE /* on-demand */,
-				    TRUE /* varpkt-len */,
-				    default_n,
-				    default_k))
-	{
+	if (!pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k))
 		puts ("FAILED: pgm_transport_set_fec");
-	}
 	else
-	{
 		puts ("READY");
-	}
 }
 
 static
@@ -463,7 +451,7 @@ session_bind (
 	)
 {
 	const guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
 /* check that session exists */
 	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
@@ -503,8 +491,8 @@ session_bind (
 
 printf ("pgm_transport_bind (transport:%p err:%p)\n", (gpointer)sess->transport, (gpointer)&err);
 	if (!pgm_transport_bind (sess->transport, &err)) {
-		printf ("FAILED: pgm_transport_bind(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_transport_bind(): %s\n", err->message);
+		g_error_free (err);
 	} else 
 		puts ("READY");
 }
@@ -524,14 +512,14 @@ session_send (
 	}
 
 /* send message */
-	int status;
+	PGMIOStatus status;
 	gsize stringlen = strlen(string) + 1;
 	int n_fds = 1;
 	struct pollfd fds[ n_fds ];
 	struct timeval tv;
 	int timeout;
 again:
-printf ("pgm_send (transport:%p string:\"%s\" stringlen:%" G_GSIZE_FORMAT " NULL)\n", (gpointer)sess->transport, string, stringlen);
+printf ("pgm_send (transport:%p string:\"%s\" stringlen:%d NULL)\n", (gpointer)sess->transport, string, stringlen);
 	status = pgm_send (sess->transport, string, stringlen, NULL);
 	switch (status) {
 	case PGM_IO_STATUS_NORMAL:
@@ -859,21 +847,6 @@ on_stdin_data (
 			session_destroy (name);
 
 			g_free (name);
-			regfree (&preg);
-			goto out;
-		}
-		regfree (&preg);
-
-/* set PGM network */
-		re = "^set[[:space:]]+network[[:space:]]+([[:print:]]*;[[:print:]]+)$";
-		regcomp (&preg, re, REG_EXTENDED);
-		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
-		{
-			char* pgm_network = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			pgm_network[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
-			g_network = pgm_network;
-			puts ("READY");
-
 			regfree (&preg);
 			goto out;
 		}

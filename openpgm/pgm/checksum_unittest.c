@@ -2,7 +2,7 @@
  *
  * unit tests for PGM checksum routines
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,6 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
@@ -32,26 +31,17 @@
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
-
 
 #define CHECKSUM_DEBUG
 #include "checksum.c"
 
 
 /* target:
- *	uint16_t
+ *	guint16
  *	pgm_inet_checksum (
  *		const void*		src,
- *		uint16_t		len,
- *		uint16_t		csum
+ *		guint			len,
+ *		int			csum
  *	)
  */
 

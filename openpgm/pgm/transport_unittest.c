@@ -21,41 +21,17 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <glib.h>
 #include <check.h>
+
+#include <pgm/transport.h>
+#include <pgm/txwi.h>
 
 
 /* mock state */
 
-
-
-#define pgm_ipproto_pgm		mock_pgm_ipproto_pgm
-#define pgm_peer_unref		mock_pgm_peer_unref
-#define pgm_on_nak_notify	mock_pgm_on_nak_notify
-#define pgm_send_spm		mock_pgm_send_spm
-#define pgm_timer_prepare	mock_pgm_timer_prepare
-#define pgm_timer_check		mock_pgm_timer_check
-#define pgm_timer_expiration	mock_pgm_timer_expiration
-#define pgm_timer_dispatch	mock_pgm_timer_dispatch
-#define pgm_txw_create		mock_pgm_txw_create
-#define pgm_txw_shutdown	mock_pgm_txw_shutdown
-#define pgm_rate_create		mock_pgm_rate_create
-#define pgm_rate_destroy	mock_pgm_rate_destroy
-#define pgm_rate_remaining	mock_pgm_rate_remaining
-#define pgm_rs_create		mock_pgm_rs_create
-#define pgm_rs_destroy		mock_pgm_rs_destroy
-#define pgm_time_update_now	mock_pgm_time_update_now
-
-#define TRANSPORT_DEBUG
-#include "transport.c"
-
-int mock_pgm_ipproto_pgm = IPPROTO_PGM;
-
+static int mock_ipproto_pgm = IPPROTO_PGM;
 
 static
 void
@@ -76,15 +52,15 @@ generate_asm_tinfo (void)
 {
 	const in_addr_t default_group = inet_addr("239.192.0.1");
 	const pgm_gsi_t gsi = { 200, 202, 203, 204, 205, 206 };
-	struct pgm_transport_info_t* tinfo = g_new0(struct pgm_transport_info_t, 1);
+	struct pgm_transport_info_t* tinfo = g_malloc0(sizeof(struct pgm_transport_info_t));
 	tinfo->ti_recv_addrs_len = 1;
-	tinfo->ti_recv_addrs = g_new0(struct group_source_req, 1);
+	tinfo->ti_recv_addrs = g_malloc0(sizeof(struct group_source_req));
 	((struct sockaddr*)&tinfo->ti_recv_addrs[0].gsr_group)->sa_family = AF_INET;
 	((struct sockaddr_in*)&tinfo->ti_recv_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
 	((struct sockaddr*)&tinfo->ti_recv_addrs[0].gsr_source)->sa_family = AF_INET;
 	((struct sockaddr_in*)&tinfo->ti_recv_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
 	tinfo->ti_send_addrs_len = 1;
-	tinfo->ti_send_addrs = g_new0(struct group_source_req, 1);
+	tinfo->ti_send_addrs = g_malloc0(sizeof(struct group_source_req));
 	((struct sockaddr*)&tinfo->ti_send_addrs[0].gsr_group)->sa_family = AF_INET;
 	((struct sockaddr_in*)&tinfo->ti_send_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
 	((struct sockaddr*)&tinfo->ti_send_addrs[0].gsr_source)->sa_family = AF_INET;
@@ -103,7 +79,7 @@ mock_pgm_peer_unref (
 
 /** source module */
 static
-bool
+gboolean
 mock_pgm_on_nak_notify (
 	GIOChannel*		source,
 	GIOCondition		condition,
@@ -114,18 +90,18 @@ mock_pgm_on_nak_notify (
 }
 
 PGM_GNUC_INTERNAL
-bool
+int
 mock_pgm_send_spm (
 	pgm_transport_t*	transport,
 	int			flags
 	)
 {
-	return TRUE;
+	return 0;
 }
 
 /** timer module */
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_timer_prepare (
 	pgm_transport_t* const		transport
 	)
@@ -134,7 +110,7 @@ mock_pgm_timer_prepare (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_timer_check (
 	pgm_transport_t* const		transport
 	)
@@ -143,7 +119,7 @@ mock_pgm_timer_check (
 }
 
 PGM_GNUC_INTERNAL
-pgm_time_t
+long
 mock_pgm_timer_expiration (
 	pgm_transport_t* const		transport
 	)
@@ -152,7 +128,7 @@ mock_pgm_timer_expiration (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_timer_dispatch (
 	pgm_transport_t* const		transport
 	)
@@ -161,22 +137,24 @@ mock_pgm_timer_dispatch (
 }
 
 /** transmit window module */
+static
 pgm_txw_t*
 mock_pgm_txw_create (
 	const pgm_tsi_t* const	tsi,
-	const uint16_t		tpdu_size,
-	const uint32_t		sqns,
-	const unsigned		secs,
-	const ssize_t		max_rte,
-	const bool		use_fec,
-	const uint8_t		rs_n,
-	const uint8_t		rs_k
+	const guint16		tpdu_size,
+	const guint32		sqns,
+	const guint		secs,
+	const guint		max_rte,
+	const gboolean		use_fec,
+	const guint		rs_n,
+	const guint		rs_k
 	)
 {
-	pgm_txw_t* window = g_new0 (pgm_txw_t, 1);
+	pgm_txw_t* window = g_malloc0 (sizeof(pgm_txw_t));
 	return window;
 }
 
+static
 void
 mock_pgm_txw_shutdown (
 	pgm_txw_t* const	window
@@ -189,10 +167,10 @@ mock_pgm_txw_shutdown (
 PGM_GNUC_INTERNAL
 void
 mock_pgm_rate_create (
-	pgm_rate_t*		bucket,
-	ssize_t			rate_per_sec,
-	size_t			iphdr_len,
-	uint16_t		max_tpdu
+	gpointer*		bucket_,
+	guint			rate_per_sec,
+	guint			iphdr_len,
+	guint			max_tpdu
 	)
 {
 }
@@ -200,7 +178,7 @@ mock_pgm_rate_create (
 PGM_GNUC_INTERNAL
 void
 mock_pgm_rate_destroy (
-	pgm_rate_t*		bucket
+	gpointer		bucket
 	)
 {
 }
@@ -208,7 +186,7 @@ mock_pgm_rate_destroy (
 PGM_GNUC_INTERNAL
 pgm_time_t
 mock_pgm_rate_remaining (
-	pgm_rate_t*		bucket,
+	gpointer		bucket,
 	gsize			packetlen
 	)
 {
@@ -216,29 +194,28 @@ mock_pgm_rate_remaining (
 }
 
 /** reed solomon module */
+static
 void
 mock_pgm_rs_create (
-	pgm_rs_t*		rs,
-	const uint8_t		n,
-	const uint8_t		k
+	gpointer*		rs_,
+	const guint		n,
+	const guint		k
 	)
 {
 }
 
+static
 void
 mock_pgm_rs_destroy (
-	pgm_rs_t*		rs
+	gpointer		rs
 	)
 {
 }
 
 /** time module */
-static pgm_time_t _mock_pgm_time_update_now (void);
-pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
-
 static
 pgm_time_t
-_mock_pgm_time_update_now (void)
+mock_pgm_time_update_now (void)
 {
 	return 0x1;
 }
@@ -246,19 +223,39 @@ _mock_pgm_time_update_now (void)
 
 /* mock functions for external references */
 
+#define ipproto_pgm		mock_ipproto_pgm
+#define pgm_peer_unref		mock_pgm_peer_unref
+#define pgm_on_nak_notify	mock_pgm_on_nak_notify
+#define pgm_send_spm		mock_pgm_send_spm
+#define pgm_timer_prepare	mock_pgm_timer_prepare
+#define pgm_timer_check		mock_pgm_timer_check
+#define pgm_timer_expiration	mock_pgm_timer_expiration
+#define pgm_timer_dispatch	mock_pgm_timer_dispatch
+#define pgm_txw_create		mock_pgm_txw_create
+#define pgm_txw_shutdown	mock_pgm_txw_shutdown
+#define pgm_rate_create		mock_pgm_rate_create
+#define pgm_rate_destroy	mock_pgm_rate_destroy
+#define pgm_rate_remaining	mock_pgm_rate_remaining
+#define pgm_rs_create		mock_pgm_rs_create
+#define pgm_rs_destroy		mock_pgm_rs_destroy
+#define pgm_time_update_now	mock_pgm_time_update_now
+
+#define TRANSPORT_DEBUG
+#include "transport.c"
+
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_create (
  *		pgm_transport_t**		transport,
  *		struct pgm_transport_info_t*	tinfo,
- *		pgm_error_t**			error
+ *		GError**			error
  *	)
  */
 
 START_TEST (test_create_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -270,7 +267,7 @@ END_TEST
 /* NULL transport */
 START_TEST (test_create_fail_002)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
 	fail_unless (FALSE == pgm_transport_create (NULL, tinfo, &err), "create failed");
@@ -280,23 +277,23 @@ END_TEST
 /* NULL tinfo */
 START_TEST (test_create_fail_003)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	fail_unless (FALSE == pgm_transport_create (&transport, NULL, &err), "create failed");
 }
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_bind (
  *		pgm_transport_t*	transport,
- *		pgm_error_t**		error
+ *		GError**		error
  *		)
  */
 
 START_TEST (test_bind_fail_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -308,22 +305,22 @@ END_TEST
 
 START_TEST (test_bind_fail_002)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (FALSE == pgm_transport_bind (NULL, &err), "bind failed");
 }
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_destroy (
  *		pgm_transport_t*	transport,
- *		bool			flush
+ *		gboolean		flush
  *		)
  */
 
 START_TEST (test_destroy_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -340,16 +337,16 @@ START_TEST (test_destroy_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_max_tpdu (
  *		pgm_transport_t*	transport,
- *		uint16_t		max_tpdu
+ *		guint16			max_tpdu
  *		)
  */
 
 START_TEST (test_set_max_tpdu_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -367,7 +364,7 @@ END_TEST
 
 START_TEST (test_set_max_tpdu_fail_002)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -378,16 +375,16 @@ START_TEST (test_set_max_tpdu_fail_002)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_multicast_loop (
  *		pgm_transport_t*	transport,
- *		bool			use_multicast_loop
+ *		gboolean		use_multicast_loop
  *		)
  */
 
 START_TEST (test_set_multicast_loop_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -404,16 +401,16 @@ START_TEST (test_set_multicast_loop_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_hops (
  *		pgm_transport_t*	transport,
- *		unsigned		hops
+ *		gint			hops
  *	)
  */
 
 START_TEST (test_set_hops_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -430,16 +427,16 @@ START_TEST (test_set_hops_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_sndbuf (
  *		pgm_transport_t*	transport,
- *		size_t			size
+ *		int			size
  *	)
  */
 
 START_TEST (test_set_sndbuf_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -456,16 +453,16 @@ START_TEST (test_set_sndbuf_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_rcvbuf (
  *		pgm_transport_t*	transport,
- *		size_t			size
+ *		int			size
  *	)
  */
 
 START_TEST (test_set_rcvbuf_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -482,20 +479,20 @@ START_TEST (test_set_rcvbuf_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_fec (
  *		pgm_transport_t*	transport,
- *		uint8_t			proactive_h,
- *		bool			use_ondemand_parity,
- *		bool			use_varpkt_len,
- *		uint8_t			default_n,
- *		uint8_t			default_k
+ *		guint			proactive_h,
+ *		gboolean		use_ondemand_parity,
+ *		gboolean		use_varpkt_len,
+ *		guint			default_n,
+ *		guint			default_k
  *	)
  */
 
 START_TEST (test_set_fec_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -515,16 +512,16 @@ END_TEST
  */
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_send_only (
  *		pgm_transport_t*	transport,
- *		bool			send_only
+ *		gboolean		send_only
  *	)
  */
 
 START_TEST (test_set_send_only_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -541,17 +538,17 @@ START_TEST (test_set_send_only_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_recv_only (
  *		pgm_transport_t*	transport,
- *		bool			recv_only,
- *		bool			is_passive
+ *		gboolean		recv_only,
+ *		gboolean		is_passive
  *	)
  */
 
 START_TEST (test_set_recv_only_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
@@ -568,16 +565,16 @@ START_TEST (test_set_recv_only_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_abort_on_reset (
  *		pgm_transport_t*	transport,
- *		bool		abort_on_reset
+ *		gboolean		abort_on_reset
  *	)
  */
 
 START_TEST (test_set_abort_on_reset_pass_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	pgm_transport_t* transport = NULL;
 	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
 	fail_if (NULL == tinfo, "generate_asm_tinfo failed");

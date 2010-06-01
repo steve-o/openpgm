@@ -19,7 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
+#include <getopt.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -30,7 +32,9 @@
 #	include <sys/epoll.h>
 #endif
 #include <sys/types.h>
+
 #include <glib.h>
+
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <arpa/inet.h>
@@ -39,21 +43,17 @@
 #	include <sys/socket.h>
 #	include <sys/uio.h>
 #	include <sys/time.h>
-#else
-#	include "getopt.h"
 #endif
+
 #include <pgm/pgm.h>
+#include <pgm/backtrace.h>
+#include <pgm/log.h>
 #ifdef CONFIG_WITH_HTTP
 #	include <pgm/http.h>
 #endif
 #ifdef CONFIG_WITH_SNMP
 #	include <pgm/snmp.h>
 #endif
-
-/* example dependencies */
-#include <pgm/backtrace.h>
-#include <pgm/log.h>
-#include <pgm/signal.h>
 
 
 /* globals */
@@ -83,7 +83,7 @@ static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
 static gpointer receiver_thread (gpointer);
-static int on_msgv (struct pgm_msgv_t*, guint, gpointer);
+static int on_msgv (pgm_msgv_t*, guint, gpointer);
 
 
 G_GNUC_NORETURN static void
@@ -98,10 +98,10 @@ usage (
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 #ifdef CONFIG_WITH_HTTP
-	fprintf (stderr, "  -H              : Enable HTTP administrative interface\n");
+	fprintf (stderr, "  -t              : Enable HTTP administrative interface\n");
 #endif
 #ifdef CONFIG_WITH_SNMP
-	fprintf (stderr, "  -S              : Enable SNMP interface\n");
+	fprintf (stderr, "  -x              : Enable SNMP interface\n");
 #endif
 	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (1);
@@ -113,8 +113,7 @@ main (
 	char*		argv[]
 	)
 {
-	int e;
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
 #endif
@@ -124,29 +123,24 @@ main (
 
 	setlocale (LC_ALL, "");
 
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init ();
 	g_message ("pgmrecv");
 
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-		pgm_error_free (pgm_err);
-		pgm_messages_shutdown();
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
 		return EXIT_FAILURE;
 	}
-
-	g_thread_init (NULL);
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
 	while ((c = getopt (argc, argv, "a:s:n:p:lih"
 #ifdef CONFIG_WITH_HTTP
-					"H"
+					"t"
 #endif
 #ifdef CONFIG_WITH_SNMP
-					"S"
+					"x"
 #endif
 					)) != -1)
 	{
@@ -158,47 +152,43 @@ main (
 
 		case 'l':	g_multicast_loop = TRUE; break;
 #ifdef CONFIG_WITH_HTTP
-		case 'H':	enable_http = TRUE; break;
+		case 't':	enable_http = TRUE; break;
 #endif
 #ifdef CONFIG_WITH_SNMP
-		case 'S':	enable_snmpx = TRUE; break;
+		case 'x':	enable_snmpx = TRUE; break;
 #endif
 
 		case 'i':
-			pgm_if_print_all();
-			pgm_messages_shutdown();
+			pgm_if_print_all ();
 			return EXIT_SUCCESS;
 
 		case 'h':
 		case '?':
-			pgm_messages_shutdown();
 			usage (binary_name);
 		}
 	}
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {
-		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &pgm_err)) {
-			g_error ("Unable to start HTTP interface: %s", pgm_err->message);
-			pgm_error_free (pgm_err);
-			pgm_shutdown();
-			pgm_messages_shutdown();
+		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &err)) {
+			g_error ("Unable to start HTTP interface: %s", err->message);
+			g_error_free (err);
+			pgm_shutdown ();
 			return EXIT_FAILURE;
 		}
 	}
 #endif
 #ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx) {
-		if (!pgm_snmp_init (&pgm_err)) {
-			g_error ("Unable to start SNMP interface: %s", pgm_err->message);
-			pgm_error_free (pgm_err);
+		if (!pgm_snmp_init (&err)) {
+			g_error ("Unable to start SNMP interface: %s", err->message);
+			g_error_free (err);
 #ifdef CONFIG_WITH_HTTP
 			if (enable_http)
 				pgm_http_shutdown ();
 #endif
 			pgm_shutdown ();
-			pgm_messages_shutdown();
-	 		return EXIT_FAILURE;
+			return EXIT_FAILURE;
 		}
 	}
 #endif
@@ -213,8 +203,7 @@ main (
 	signal (SIGHUP,  SIG_IGN);
 #endif
 #ifdef G_OS_UNIX
-	e = pipe (g_quit_pipe);
-	g_assert (0 == e);
+	pipe (g_quit_pipe);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 #else
@@ -236,8 +225,7 @@ main (
 	g_quit = TRUE;
 #ifdef G_OS_UNIX
 	const char one = '1';
-	const size_t writelen = write (g_quit_pipe[1], &one, sizeof(one));
-	g_assert (sizeof(one) == writelen);
+	write (g_quit_pipe[1], &one, sizeof(one));
 	g_thread_join (g_thread);
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
@@ -247,7 +235,7 @@ main (
 	CloseHandle (g_quit_event);
 #endif
 
-	g_main_loop_unref (g_loop);
+	g_main_loop_unref(g_loop);
 	g_loop = NULL;
 
 	if (g_transport) {
@@ -267,9 +255,8 @@ main (
 #endif
 
 	g_message ("PGM engine shutdown.");
-	pgm_shutdown();
+	pgm_shutdown ();
 	g_message ("finished.");
-	pgm_messages_shutdown();
 	return EXIT_SUCCESS;
 }
 
@@ -306,7 +293,6 @@ on_startup (
 	)
 {
 	struct pgm_transport_info_t* res = NULL;
-	pgm_error_t* pgm_err = NULL;
 	GError* err = NULL;
 
 	g_message ("startup.");
@@ -315,16 +301,16 @@ on_startup (
 /* parse network parameter into transport address structure */
 	char network[1024];
 	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
+		g_error ("parsing network parameter: %s", err->message);
+		g_error_free (err);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 /* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		g_main_loop_quit(g_loop);
 		return FALSE;
@@ -340,9 +326,9 @@ on_startup (
 	}
 	if (g_port)
 		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_create (&g_transport, res, &err)) {
+		g_error ("creating transport: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		g_main_loop_quit(g_loop);
 		return FALSE;
@@ -365,9 +351,9 @@ on_startup (
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 /* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_bind (g_transport, &err)) {
+		g_error ("binding transport: %s", err->message);
+		g_error_free (err);
 		pgm_transport_destroy (g_transport, FALSE);
 		g_transport = NULL;
 		g_main_loop_quit(g_loop);
@@ -417,7 +403,7 @@ receiver_thread (
 	)
 {
 	pgm_transport_t* transport = (pgm_transport_t*)data;
-	struct pgm_msgv_t msgv[ 20 ];
+	pgm_msgv_t msgv[ 20 ];
 
 #ifdef CONFIG_HAVE_EPOLL
 	struct epoll_event events[1];	/* wait for maximum 1 event */
@@ -474,22 +460,26 @@ receiver_thread (
 	do {
 		struct timeval tv;
 		gsize len;
-		pgm_error_t* pgm_err = NULL;
-		const int status = pgm_recvmsgv (transport,
-					       msgv,
-					       G_N_ELEMENTS(msgv),
-					       0,
-					       &len,
-					       &pgm_err);
+		GError* err = NULL;
+		const PGMIOStatus status = pgm_recvmsgv (transport,
+						       msgv,
+						       G_N_ELEMENTS(msgv),
+						       0,
+						       &len,
+						       &err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_msgv (msgv, len, NULL);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
 			pgm_transport_get_timer_pending (g_transport, &tv);
+			g_message ("wait on fd or pending timer %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
+			g_message ("wait on fd or rate limit timeout %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 #ifdef CONFIG_HAVE_EPOLL
@@ -520,10 +510,10 @@ block:
 			break;
 
 		default:
-			if (pgm_err) {
-				g_warning ("%s", pgm_err->message);
-				pgm_error_free (pgm_err);
-				pgm_err = NULL;
+			if (err) {
+				g_warning ("%s", err->message);
+				g_error_free (err);
+				err = NULL;
 			}
 			if (PGM_IO_STATUS_ERROR == status)
 				break;
@@ -544,8 +534,8 @@ block:
 
 static int
 on_msgv (
-	struct pgm_msgv_t*	msgv,		/* an array of msgvs */
-	guint			len,
+	pgm_msgv_t*	msgv,		/* an array of msgvs */
+	guint		len,
 	G_GNUC_UNUSED gpointer	user_data
 	)
 {

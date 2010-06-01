@@ -21,21 +21,23 @@
 
 
 #include <errno.h>
+#include <netdb.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <net/if.h>
 
 #include <glib.h>
 #include <check.h>
 
+#include <pgm/getifaddrs.h>
+#include <pgm/sockaddr.h>
+
 
 /* mock state */
-
-struct addrinfo;
 
 struct mock_host_t {
 	struct sockaddr_storage	address;
@@ -60,28 +62,6 @@ static char* mock_invalid =	"invalid.invalid";		/* RFC 2606 */
 static char* mock_toolong =	"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
 static char* mock_hostname =	NULL;
 
-struct pgm_ifaddrs;
-struct pgm_error_t;
-
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
-static int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
-static void mock_freeaddrinfo (struct addrinfo*);
-static int mock_gethostname (char*, size_t);
-static struct hostent* mock_gethostbyname (const char*);
-
-
-#define pgm_getifaddrs		mock_pgm_getifaddrs
-#define pgm_freeifaddrs		mock_pgm_freeifaddrs
-#define getaddrinfo		mock_getaddrinfo
-#define freeaddrinfo		mock_freeaddrinfo
-#define gethostname		mock_gethostname
-#define gethostbyname		mock_gethostbyname
-
-
-#define GETNODEADDR_DEBUG
-#include "getnodeaddr.c"
-
 
 static
 gpointer
@@ -97,7 +77,7 @@ create_host (
 	g_assert (canonical_hostname);
 
 	new_host = g_slice_alloc0 (sizeof(struct mock_host_t));
-	g_assert (pgm_sockaddr_pton (address, (struct sockaddr*)&new_host->address));
+	g_assert (pgm_sockaddr_pton (address, &new_host->address));
 	new_host->canonical_hostname = g_strdup (canonical_hostname);
 	new_host->alias = alias ? g_strdup (alias) : NULL;
 
@@ -139,11 +119,11 @@ create_interface (
 			new_interface->flags |= IFF_MULTICAST;
 		else if (strncmp (tokens[i], "ip=", strlen("ip=")) == 0) {
 			const char* addr = tokens[i] + strlen("ip=");
-			g_assert (pgm_sockaddr_pton (addr, (struct sockaddr*)&new_interface->addr));
+			g_assert (pgm_sockaddr_pton (addr, &new_interface->addr));
 		}
 		else if (strncmp (tokens[i], "netmask=", strlen("netmask=")) == 0) {
 			const char* addr = tokens[i] + strlen("netmask=");
-			g_assert (pgm_sockaddr_pton (addr, (struct sockaddr*)&new_interface->netmask));
+			g_assert (pgm_sockaddr_pton (addr, &new_interface->netmask));
 		}
 		else if (strncmp (tokens[i], "scope=", strlen("scope=")) == 0) {
 			const char* scope = tokens[i] + strlen("scope=");
@@ -247,27 +227,18 @@ mock_teardown_net (void)
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
-
 static 
-bool
+int
 mock_pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		err
+	struct pgm_ifaddrs**	ifap
 	)
 {
 	if (NULL == ifap) {
-		return FALSE;
+		errno = EINVAL;
+		return -1;
 	}
 
-	g_debug ("mock_getifaddrs (ifap:%p err:%p)", (gpointer)ifap, (gpointer)err);
+	g_debug ("mock_getifaddrs (ifap:%p)", (gpointer)ifap);
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
@@ -288,7 +259,8 @@ mock_pgm_getifaddrs (
 	}
 
 	*ifap = ifa;
-	return TRUE;
+
+	return 0;
 }
 
 static
@@ -403,7 +375,7 @@ mock_getaddrinfo (
 	}
 
 	if (ai_flags & AI_NUMERICHOST) {
-		pgm_sockaddr_pton (node, (struct sockaddr*)&addr);
+		pgm_sockaddr_pton (node, &addr);
 	}
 	list = mock_hosts;
 	while (list) {
@@ -474,14 +446,25 @@ mock_gethostname (
 	return 0;
 }
 
+#define getifaddrs	mock_getifaddrs
+#define freeifaddrs	mock_freeifaddrs
+#define getaddrinfo	mock_getaddrinfo
+#define freeaddrinfo	mock_freeaddrinfo
+#define gethostname	mock_gethostname
+#define gethostbyname	mock_gethostbyname
+
+
+#define GETNODEADDR_DEBUG
+#include "getnodeaddr.c"
+
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_if_getnodeaddr (
- *		const sa_family_t	family,
+ *		const int		family,
  *		struct sockaddr*	addr,
  *		const socklen_t		cnt,
- *		pgm_error_t**		error
+ *		GError**		error
  *	)
  */
 
@@ -489,7 +472,7 @@ START_TEST (test_getnodeaddr_pass_001)
 {
 	struct sockaddr_storage addr;
 	char saddr[INET6_ADDRSTRLEN];
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
 		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");
@@ -511,7 +494,7 @@ END_TEST
 
 START_TEST (test_getnodeaddr_fail_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (FALSE == pgm_if_getnodeaddr (AF_UNSPEC, NULL, 0, &err), "getnodeaddr failed");
 }
 END_TEST
@@ -528,7 +511,7 @@ make_test_suite (void)
 
 	struct sockaddr_storage addr;
 	char saddr[INET6_ADDRSTRLEN];
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
 		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");

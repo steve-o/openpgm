@@ -19,8 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
-#include <locale.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,16 +31,17 @@
 #include <sys/epoll.h>
 #include <sys/time.h>
 #include <sys/types.h>
+
 #include <glib.h>
+
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <arpa/inet.h>
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #endif
-#include <pgm/pgm.h>
 
-/* example dependencies */
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 
@@ -62,7 +64,7 @@ static gboolean g_quit = FALSE;
 static void on_signal (int);
 static gboolean on_startup (void);
 
-static int on_datav (struct pgm_msgv_t*, guint, gpointer);
+static int on_datav (pgm_msgv_t*, guint, gpointer);
 
 
 G_GNUC_NORETURN static void
@@ -84,18 +86,9 @@ main (
 	char*		argv[]
 	)
 {
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
-	setlocale (LC_ALL, "");
-
-	log_init ();
 	g_message ("syncrecv");
-
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -113,34 +106,41 @@ main (
 		}
 	}
 
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
+
 /* setup signal handlers */
-	signal (SIGSEGV, on_sigsegv);
-	signal (SIGINT,  on_signal);
-	signal (SIGTERM, on_signal);
+	signal(SIGSEGV, on_sigsegv);
+	signal(SIGINT,  on_signal);
+	signal(SIGTERM, on_signal);
 #ifdef SIGHUP
-	signal (SIGHUP,  SIG_IGN);
+	signal(SIGHUP,  SIG_IGN);
 #endif
 
-	if (!on_startup ()) {
+	if (!on_startup()) {
 		g_error ("startup failed");
-		return EXIT_FAILURE;
+		exit(1);
 	}
 
 /* epoll file descriptor */
 	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
-		return EXIT_FAILURE;
+		exit(1);
 	}
 
 	int retval = pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN);
 	if (retval < 0) {
 		g_error ("pgm_epoll_ctl failed.");
-		return EXIT_FAILURE;
+		exit(1);
 	}
 
 /* incoming message buffer */
-	struct pgm_msgv_t msgv;
+	pgm_msgv_t msgv;
 	struct epoll_event events[1];	/* wait for maximum 1 event */
 
 /* dispatch loop */
@@ -149,11 +149,11 @@ main (
 		struct timeval tv;
 		int timeout;
 		gsize len;
-		const int status = pgm_recvmsg (g_transport,
-					        &msgv,
-					        0,
-					        &len,
-					        &pgm_err);
+		const PGMIOStatus status = pgm_recvmsg (g_transport,
+						        &msgv,
+						        0,
+						        &len,
+						        &err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_datav (&msgv, len, NULL);
@@ -173,10 +173,10 @@ block:
 			break;
 
 		default:
-			if (pgm_err) {
-				g_warning ("%s", pgm_err->message);
-				pgm_error_free (pgm_err);
-				pgm_err = NULL;
+			if (err) {
+				g_warning ("%s", err->message);
+				g_error_free (err);
+				err = NULL;
 			}
 			if (PGM_IO_STATUS_ERROR == status)
 				break;
@@ -212,7 +212,7 @@ static gboolean
 on_startup (void)
 {
 	struct pgm_transport_info_t* res = NULL;
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
 	g_message ("startup.");
 	g_message ("create transport.");
@@ -220,15 +220,15 @@ on_startup (void)
 /* parse network parameter into transport address structure */
 	char network[1024];
 	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
+		g_error ("parsing network parameter: %s", err->message);
+		g_error_free (err);
 		return FALSE;
 	}
 /* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		return FALSE;
 	}
@@ -238,9 +238,9 @@ on_startup (void)
 	}
 	if (g_port)
 		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_create (&g_transport, res, &err)) {
+		g_error ("creating transport: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		return FALSE;
 	}
@@ -261,9 +261,9 @@ on_startup (void)
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 /* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_bind (g_transport, &err)) {
+		g_error ("binding transport: %s", err->message);
+		g_error_free (err);
 		pgm_transport_destroy (g_transport, FALSE);
 		g_transport = NULL;
 		return FALSE;
@@ -275,9 +275,9 @@ on_startup (void)
 
 static int
 on_datav (
-	struct pgm_msgv_t*	datav,			/* one msgv object */
-	guint			len,
-	G_GNUC_UNUSED gpointer	user_data
+	pgm_msgv_t*	datav,			/* one msgv object */
+	guint		len,
+	G_GNUC_UNUSED gpointer user_data
 	)
 {
 	char tsi[PGM_TSISTRLEN];

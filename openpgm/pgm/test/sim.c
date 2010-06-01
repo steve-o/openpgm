@@ -40,15 +40,23 @@
 
 #include <glib.h>
 
-#include <pgm/pgm.h>
+#include <pgm/if.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/packet.h>
+#include <pgm/transport.h>
+#include <pgm/source.h>
+#include <pgm/receiver.h>
+#include <pgm/gsi.h>
 #include <pgm/signal.h>
-#include <pgm/sqn_list.h>
-#include <pgm/packet_parse.h>
-
-#include "dump-json.h"
-#include "async.h"
+#include <pgm/timer.h>
+#include <pgm/checksum.h>
+#include <pgm/reed_solomon.h>
+#include <pgm/indextoaddr.h>
+#include <pgm/getnodeaddr.h>
+#include <pgm/txwi.h>
+#include <pgm/async.h>
+#include <pgm/sn.h>
 
 
 /* typedefs */
@@ -78,25 +86,24 @@ struct sim_session {
 #endif
 
 
-static int		g_port = 7500;
-static const char*	g_network = ";239.192.0.1";
+static int g_port = 7500;
+static const char* g_network = ";239.192.0.1";
 
-static int		g_max_tpdu = 1500;
-static int		g_sqns = 100 * 1000;
+static int g_max_tpdu = 1500;
+static int g_sqns = 100 * 1000;
 
-static GList*		g_sessions_list = NULL;
-static GHashTable*	g_sessions = NULL;
-static GMainLoop*	g_loop = NULL;
-static GIOChannel*	g_stdin_channel = NULL;
+static GHashTable* g_sessions = NULL;
+static GMainLoop* g_loop = NULL;
+static GIOChannel* g_stdin_channel = NULL;
 
 
 static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
-static void destroy_session (struct sim_session*);
+static void destroy_session (gpointer, gpointer, gpointer);
 static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
-void generic_net_send_nak (guint8, char*, pgm_tsi_t*, struct pgm_sqn_list_t*);
+void generic_net_send_nak (guint8, char*, pgm_tsi_t*, pgm_sqn_list_t*);
 	
 
 G_GNUC_NORETURN static
@@ -115,19 +122,9 @@ main (
 	char   *argv[]
 	)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init ();
 	g_message ("sim");
-
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
-		pgm_messages_shutdown();
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -139,10 +136,15 @@ main (
 		case 's':	g_port = atoi (optarg); break;
 
 		case 'h':
-		case '?':
-				pgm_messages_shutdown();
-				usage (binary_name);
+		case '?': usage (binary_name);
 		}
+	}
+
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
 	}
 
 	g_loop = g_main_loop_new (NULL, FALSE);
@@ -169,10 +171,7 @@ main (
 
 	if (g_sessions) {
 		g_message ("destroying sessions.");
-		while (g_sessions_list) {
-			destroy_session (g_sessions_list->data);
-			g_sessions_list = g_list_delete_link (g_sessions_list, g_sessions_list);
-		}
+		g_hash_table_foreach_remove (g_sessions, (GHRFunc)destroy_session, NULL);
 		g_hash_table_unref (g_sessions);
 		g_sessions = NULL;
 	}
@@ -183,20 +182,20 @@ main (
 		g_stdin_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown();
 	g_message ("finished.");
-	pgm_messages_shutdown();
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static
 void
 destroy_session (
-		struct sim_session* sess
+                gpointer        key,		/* session name */
+                gpointer        value,		/* transport_session object */
+                G_GNUC_UNUSED gpointer        user_data
                 )
 {
-	printf ("destroying transport \"%s\"\n", sess->name);
+	printf ("destroying transport \"%s\"\n", (char*)key);
+	struct sim_session* sess = (struct sim_session*)value;
 	pgm_transport_destroy (sess->transport, TRUE);
 	sess->transport = NULL;
 	g_free (sess->name);
@@ -242,11 +241,11 @@ on_startup (
 }
 
 static
-bool
+gboolean
 fake_pgm_transport_create (
 	pgm_transport_t**		transport,
 	struct pgm_transport_info_t*	tinfo,
-	G_GNUC_UNUSED pgm_error_t**	error
+	GError**			error
 	)
 {
 	pgm_transport_t* new_transport;
@@ -271,7 +270,7 @@ fake_pgm_transport_create (
 	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
 /* create transport object */
-	new_transport = g_new0 (pgm_transport_t, 1);
+	new_transport = g_malloc0 (sizeof(pgm_transport_t));
 
 /* transport defaults */
 	new_transport->can_send_data = TRUE;
@@ -403,20 +402,20 @@ on_io_data (
                 goto out;
 
 /* search for TSI peer context or create a new one */
-        pgm_peer_t* sender = pgm_hashtable_lookup (transport->peers_hashtable, &skb->tsi);
+        pgm_peer_t* sender = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
         if (sender == NULL)
         {
 		printf ("new peer, tsi %s, local nla %s\n",
 			pgm_tsi_print (&skb->tsi),
 			inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
-		pgm_peer_t* peer = g_new0 (pgm_peer_t, 1);
+		pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
 		peer->transport = transport;
 		memcpy (&peer->tsi, &skb->tsi, sizeof(pgm_tsi_t));
 		((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 		memcpy (&peer->local_nla, &src_addr, src_addr_len);
 
-		pgm_hashtable_insert (transport->peers_hashtable, &peer->tsi, peer);
+		g_hash_table_insert (transport->peers_hashtable, &peer->tsi, peer);
 		sender = peer;
         }
 
@@ -440,17 +439,34 @@ out:
 }
 
 static
-bool
+gboolean
+on_io_error (
+        GIOChannel* source,
+        G_GNUC_UNUSED GIOCondition condition,
+        G_GNUC_UNUSED gpointer data
+        )
+{
+        puts ("on_error.");
+
+        GError *err;
+        g_io_channel_shutdown (source, FALSE, &err);
+
+/* remove event */
+        return FALSE;
+}
+
+static
+gboolean
 fake_pgm_transport_bind (
-	pgm_transport_t*		transport,
-	G_GNUC_UNUSED pgm_error_t**	error
+	pgm_transport_t*	transport,
+	GError**		error
 	)
 {
 	g_return_val_if_fail (NULL != transport, FALSE);
 	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 /* create peer list */
-	transport->peers_hashtable = pgm_hashtable_new (pgm_tsi_hash, pgm_tsi_equal);
+	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 
 /* bind udp unicast sockets to interfaces, note multicast on a bound interface is
  * fruity on some platforms so callee should specify any interface.
@@ -566,10 +582,10 @@ out:
 }
 
 static
-bool
+gboolean
 fake_pgm_transport_destroy (
 	pgm_transport_t*	transport,
-	G_GNUC_UNUSED bool	flush
+	G_GNUC_UNUSED gboolean		flush
 	)
 {
 	g_return_val_if_fail (transport != NULL, FALSE);
@@ -603,7 +619,7 @@ session_create (
 	struct pgm_transport_info_t hints = {
 		.ti_family = AF_INET
 	}, *res = NULL;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	gboolean status;
 
 /* check for duplicate */
@@ -614,18 +630,18 @@ session_create (
 	}
 
 /* create new and fill in bits */
-	sess = g_new0(struct sim_session, 1);
+	sess = g_malloc0(sizeof(struct sim_session));
 	sess->name = g_memdup (name, strlen(name)+1);
 
 	if (!pgm_if_get_transport_info (g_network, &hints, &res, &err)) {
-		printf ("FAILED: pgm_if_get_transport_info(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_if_get_transport_info(): %s\n", err->message);
+		g_error_free (err);
 		goto err_free;
 	}
 
 	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
-		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		goto err_free;
 	}
@@ -638,8 +654,8 @@ session_create (
 	} else
 		status = pgm_transport_create (&sess->transport, res, &err);
 	if (!status) {
-		printf ("FAILED: pgm_transport_create(): %s\n", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
+		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		goto err_free;
 	}
@@ -648,7 +664,6 @@ session_create (
 
 /* success */
 	g_hash_table_insert (g_sessions, sess->name, sess);
-	g_sessions_list = g_list_prepend (g_sessions_list, sess);
 	printf ("created new session \"%s\"\n", sess->name);
 	puts ("READY");
 	return;
@@ -707,7 +722,7 @@ session_bind (
 	pgm_transport_set_nak_data_retries (sess->transport, 50);
 	pgm_transport_set_nak_ncf_retries (sess->transport, 50);
 
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	gboolean status;
 	if (sess->is_transport_fake)
 		status = fake_pgm_transport_bind (sess->transport, &err);
@@ -715,7 +730,7 @@ session_bind (
 		status = pgm_transport_bind (sess->transport, &err);
 	if (!status) {
 		printf ("FAILED: pgm_transport_bind(): %s\n", err->message);
-		pgm_error_free (err);
+		g_error_free (err);
 		return;
 	}
 
@@ -741,20 +756,12 @@ session_bind (
 
 static inline
 gssize
-pgm_sendto (
-	pgm_transport_t*	transport,
-	gboolean		rl,
-	gboolean		ra,
-	const void*		buf,
-	gsize			len,
-	const struct sockaddr*	to,
-	socklen_t		tolen
-	)
+pgm_sendto (pgm_transport_t* transport, gboolean rl, gboolean ra, const void* buf, gsize len, const struct sockaddr* to, socklen_t tolen)
 {
         int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
-        pgm_mutex_lock (&transport->send_mutex);
+        g_static_mutex_lock (&transport->send_mutex);
         ssize_t sent = sendto (sock, buf, len, 0, to, tolen);
-        pgm_mutex_unlock (&transport->send_mutex);
+        g_static_mutex_unlock (&transport->send_mutex);
         return sent > 0 ? (gssize)len : (gssize)sent;
 }
 
@@ -764,7 +771,7 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 {
         int retval = 0;
 
-        pgm_mutex_lock (&transport->timer_mutex);
+        g_static_mutex_lock (&transport->timer_mutex);
 
 /* re-set spm timer */
         transport->spm_heartbeat_state = 1;
@@ -774,13 +781,13 @@ pgm_reset_heartbeat_spm (pgm_transport_t* transport)
         if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
                 transport->next_poll = transport->next_heartbeat_spm;
 
-        pgm_mutex_unlock (&transport->timer_mutex);
+        g_static_mutex_unlock (&transport->timer_mutex);
 
         return retval;
 }
 
 static inline
-int
+PGMIOStatus
 brokn_send_apdu_unlocked (
         pgm_transport_t*        transport,
         const gchar*            buf,
@@ -793,7 +800,7 @@ brokn_send_apdu_unlocked (
         guint bytes_sent = 0;
         guint data_bytes_sent = 0;
 
-	pgm_mutex_lock (&transport->source_mutex);
+        g_static_mutex_lock (&transport->source_mutex);
 
         do {
 /* retrieve packet storage from transmit window */
@@ -846,9 +853,9 @@ brokn_send_apdu_unlocked (
                 skb->pgm_header->pgm_checksum    = pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
-		pgm_spinlock_lock (&transport->txw_spinlock);
+		g_static_mutex_lock (&transport->txw_mutex);
                 pgm_txw_add (transport->window, skb);
-		pgm_spinlock_unlock (&transport->txw_spinlock);
+		g_static_mutex_unlock (&transport->txw_mutex);
 
 /* do not send send packet */
 		if (packets != 1)
@@ -873,13 +880,13 @@ brokn_send_apdu_unlocked (
 		*bytes_written = data_bytes_sent;
 
 /* release txw lock here in order to allow spms to lock mutex */
-	pgm_mutex_unlock (&transport->source_mutex);
-	pgm_reset_heartbeat_spm (transport);
-	return PGM_IO_STATUS_NORMAL;
+        g_static_mutex_unlock (&transport->source_mutex);
+        pgm_reset_heartbeat_spm (transport);
+        return PGM_IO_STATUS_NORMAL;
 }
 
 static
-int
+PGMIOStatus
 brokn_send (
         pgm_transport_t*        transport,      
         const gchar*            data,
@@ -913,7 +920,7 @@ session_send (
 	}
 
 /* send message */
-	int status;
+        PGMIOStatus status;
 	gsize stringlen = strlen(string) + 1;
 	int n_fds = 1;
 	struct pollfd fds[ n_fds ];
@@ -1041,14 +1048,14 @@ net_send_data (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	pgm_mutex_lock (&transport->send_mutex);
+	g_static_mutex_lock (&transport->send_mutex);
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
-	pgm_mutex_unlock (&transport->send_mutex);
+	g_static_mutex_unlock (&transport->send_mutex);
 
 	puts ("READY");
 }
@@ -1144,22 +1151,22 @@ net_send_parity (
 	data->data_trail	= g_htonl (txw_trail);
 
 	memset (data + 1, 0, parity_length);
-	pgm_rs_t rs;
+	rs_t rs;
 	pgm_rs_create (&rs, transport->rs_n, transport->rs_k);
-	pgm_rs_encode (&rs, (const pgm_gf8_t**)src, transport->rs_k + rs_h, (pgm_gf8_t*)(data + 1), parity_length);
+	pgm_rs_encode (&rs, (const void**)src, transport->rs_k + rs_h, data + 1, parity_length);
 	pgm_rs_destroy (&rs);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	pgm_mutex_lock (&transport->send_mutex);
+	g_static_mutex_lock (&transport->send_mutex);
         retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&transport->send_gsr.gsr_group,
 				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
-	pgm_mutex_unlock (&transport->send_mutex);
+	g_static_mutex_unlock (&transport->send_mutex);
 
 	g_strfreev (src);
 	src = NULL;
@@ -1260,7 +1267,7 @@ net_send_spmr (
 	pgm_transport_t* transport = sess->transport;
 
 /* check that the peer exists */
-	pgm_peer_t* peer = pgm_hashtable_lookup (transport->peers_hashtable, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	struct sockaddr_storage peer_nla;
 	pgm_gsi_t* peer_gsi;
 	guint16 peer_sport;
@@ -1300,7 +1307,7 @@ net_send_spmr (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	pgm_mutex_lock (&transport->send_mutex);
+	g_static_mutex_lock (&transport->send_mutex);
 /* TTL 1 */
 	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, 1);
         retval = sendto (transport->send_sock,
@@ -1322,7 +1329,7 @@ net_send_spmr (
 					pgm_sockaddr_len((struct sockaddr*)&peer_nla));
 	}
 
-	pgm_mutex_unlock (&transport->send_mutex);
+	g_static_mutex_unlock (&transport->send_mutex);
 
 	puts ("READY");
 }
@@ -1334,9 +1341,9 @@ net_send_spmr (
 static
 void
 net_send_ncf (
-	char*			name,
-	pgm_tsi_t*		tsi,
-	struct pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
+	char*		name,
+	pgm_tsi_t*	tsi,
+	pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
 	)
 {
 /* check that session exists */
@@ -1348,7 +1355,7 @@ net_send_ncf (
 
 /* check that the peer exists */
 	pgm_transport_t* transport = sess->transport;
-	pgm_peer_t* peer = pgm_hashtable_lookup (transport->peers_hashtable, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_tsi_print (tsi));
 		return;
@@ -1432,10 +1439,10 @@ net_send_ncf (
 static
 void
 net_send_nak (
-	char*			name,
-	pgm_tsi_t*		tsi,
-	struct pgm_sqn_list_t*	sqn_list,	/* list of sequence numbers */
-	gboolean		is_parity	/* TRUE = parity, FALSE = selective */
+	char*		name,
+	pgm_tsi_t*	tsi,
+	pgm_sqn_list_t*	sqn_list,	/* list of sequence numbers */
+	gboolean	is_parity	/* TRUE = parity, FALSE = selective */
 	)
 {
 /* check that session exists */
@@ -1447,7 +1454,7 @@ net_send_nak (
 
 /* check that the peer exists */
 	pgm_transport_t* transport = sess->transport;
-	pgm_peer_t* peer = pgm_hashtable_lookup (transport->peers_hashtable, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_tsi_print(tsi));
 		return;
@@ -1740,7 +1747,7 @@ on_stdin_data (
 			tsi.sport = g_htons ( strtol (p, NULL, 10) );
 
 /* parse list of sequence numbers */
-			struct pgm_sqn_list_t sqn_list;
+			pgm_sqn_list_t sqn_list;
 			sqn_list.len = 0;
 			{
 				char* saveptr = NULL;
@@ -1879,21 +1886,6 @@ on_stdin_data (
 			session_destroy (name);
 
 			g_free (name);
-			regfree (&preg);
-			goto out;
-		}
-		regfree (&preg);
-
-/* set PGM network */
-		re = "^set[[:space:]]+network[[:space:]]+([[:print:]]*;[[:print:]]+)$";
-		regcomp (&preg, re, REG_EXTENDED);
-		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
-		{
-			char *pgm_network = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			pgm_network[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
-			g_network = pgm_network;
-			puts ("READY");
-
 			regfree (&preg);
 			goto out;
 		}

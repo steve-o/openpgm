@@ -23,17 +23,31 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <impl/framework.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#endif
+
+#include "pgm/md5.h"
 
 
 //#define MD5_DEBUG
 
+#ifndef MD5_DEBUG
+#	define g_trace(...)		while (0)
+#else
+#	define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
+
 
 /* locals */
-
-static void _pgm_md5_process_block (struct pgm_md5_t*restrict, const void*restrict, size_t);
-static void* _pgm_md5_read_ctx (const struct pgm_md5_t*, void*restrict);
-
 
 /* This array contains the bytes used to pad the buffer to the next
  * 64-byte boundary.  (RFC 1321, 3.1: Step 1)  */
@@ -52,12 +66,12 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
    (RFC 1321, 3.3: Step 3)  */
 
 void
-pgm_md5_init_ctx (
-	struct pgm_md5_t*	ctx
+_md5_init_ctx (
+	struct md5_ctx*		ctx
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != ctx);
+	g_assert (NULL != ctx);
 
 	ctx->A = 0x67452301;
 	ctx->B = 0xefcdab89;
@@ -81,25 +95,25 @@ pgm_md5_init_ctx (
 
 static
 void
-_pgm_md5_process_block (
-	struct pgm_md5_t* restrict ctx,
-	const void*	  restrict buffer,
-	size_t			   len
+md5_process_block (
+	struct md5_ctx*		ctx,
+	gconstpointer		buffer,
+	gsize			len
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != buffer);
-	pgm_assert (len > 0);
-	pgm_assert (NULL != ctx);
+	g_assert (NULL != buffer);
+	g_assert (len > 0);
+	g_assert (NULL != ctx);
 
-	uint32_t correct_words[16];
-	const uint32_t *words = buffer;
-	const size_t nwords = len / sizeof (uint32_t);
-	const uint32_t *endp = words + nwords;
-	uint32_t A = ctx->A;
-	uint32_t B = ctx->B;
-	uint32_t C = ctx->C;
-	uint32_t D = ctx->D;
+	guint32 correct_words[16];
+	const guint32 *words = buffer;
+	const gsize nwords = len / sizeof (guint32);
+	const guint32 *endp = words + nwords;
+	guint32 A = ctx->A;
+	guint32 B = ctx->B;
+	guint32 C = ctx->C;
+	guint32 D = ctx->D;
 
 /* First increment the byte count.  RFC 1321 specifies the possible
    length of the file up to 2^64 bits.  Here we only compute the
@@ -112,11 +126,11 @@ _pgm_md5_process_block (
    the loop.  */
 	while (words < endp)
 	{
-		uint32_t *cwp = correct_words;
-		uint32_t A_save = A;
-		uint32_t B_save = B;
-		uint32_t C_save = C;
-		uint32_t D_save = D;
+		guint32 *cwp = correct_words;
+		guint32 A_save = A;
+		guint32 B_save = B;
+		guint32 C_save = C;
+		guint32 D_save = D;
 
 /* First round: using the given function, the context and a constant
    the next context is computed.  Because the algorithms processing
@@ -246,17 +260,17 @@ _pgm_md5_process_block (
 }
 
 void
-pgm_md5_process_bytes (
-	struct pgm_md5_t* restrict ctx,
-	const void*	  restrict buffer,
-	size_t			   len
+_md5_process_bytes (
+	struct md5_ctx*		ctx,
+	gconstpointer		buffer,
+	gsize			len
 	)
 {
 /* pre-conditions */
 	if (len > 0) {
-		pgm_assert (NULL != buffer);
+		g_assert (NULL != buffer);
 	}
-	pgm_assert (NULL != ctx);
+	g_assert (NULL != ctx);
 
 	if (len >= 64)
 	{
@@ -264,22 +278,22 @@ pgm_md5_process_bytes (
 /* To check alignment gcc has an appropriate operator.  Other
    compilers don't.  */
 #	if __GNUC__ >= 2
-#		define UNALIGNED_P(p) (((uintptr_t)p) % __alignof__ (uint32_t) != 0)
+#		define UNALIGNED_P(p) (((uintptr_t) p) % __alignof__ (guint32) != 0)
 #	else
-#		define UNALIGNED_P(p) (((uintptr_t)p) % sizeof(uint32_t) != 0)
+#		define UNALIGNED_P(p) (((uintptr_t) p) % sizeof (guint32) != 0)
 #	endif
 		if (UNALIGNED_P (buffer))
 			while (len > 64)
 			{
-				_pgm_md5_process_block (ctx, memcpy (ctx->buffer, buffer, 64), 64);
-				buffer = (const char*)buffer + 64;
+				md5_process_block (ctx, memcpy (ctx->buffer, buffer, 64), 64);
+				buffer = (const char *) buffer + 64;
 				len -= 64;
 			}
 		else
 #endif
 		{
-			_pgm_md5_process_block (ctx, buffer, len & ~63);
-			buffer = (const char*)buffer + (len & ~63);
+			md5_process_block (ctx, buffer, len & ~63);
+			buffer = (const char *) buffer + (len & ~63);
 			len &= 63;
 		}
 	}
@@ -293,7 +307,7 @@ pgm_md5_process_bytes (
 		left_over += len;
 		if (left_over >= 64)
 		{
-			_pgm_md5_process_block (ctx, ctx->buffer, 64);
+			md5_process_block (ctx, ctx->buffer, 64);
 			left_over -= 64;
 			memcpy (ctx->buffer, &ctx->buffer[64], left_over);
 		}
@@ -308,20 +322,20 @@ pgm_md5_process_bytes (
    aligned for a 32 bits value.  */
 
 static
-void*
-_pgm_md5_read_ctx (
-	const struct pgm_md5_t* restrict ctx,
-	void*			restrict resbuf
+gpointer
+md5_read_ctx (
+	const struct md5_ctx	*ctx,
+	gpointer		resbuf
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != ctx);
-	pgm_assert (NULL != resbuf);
+	g_assert (NULL != ctx);
+	g_assert (NULL != resbuf);
 
-	((uint32_t*)resbuf)[0] = SWAP (ctx->A);
-	((uint32_t*)resbuf)[1] = SWAP (ctx->B);
-	((uint32_t*)resbuf)[2] = SWAP (ctx->C);
-	((uint32_t*)resbuf)[3] = SWAP (ctx->D);
+	((guint32*)resbuf)[0] = SWAP (ctx->A);
+	((guint32*)resbuf)[1] = SWAP (ctx->B);
+	((guint32*)resbuf)[2] = SWAP (ctx->C);
+	((guint32*)resbuf)[3] = SWAP (ctx->D);
 
 	return resbuf;
 }
@@ -332,19 +346,19 @@ _pgm_md5_read_ctx (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
-void*
-pgm_md5_finish_ctx (
-	struct pgm_md5_t* restrict ctx,
-	void*		  restrict resbuf
+gpointer
+_md5_finish_ctx (
+	struct md5_ctx*		ctx,
+	gpointer		resbuf
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != ctx);
-	pgm_assert (NULL != resbuf);
+	g_assert (NULL != ctx);
+	g_assert (NULL != resbuf);
 
 /* Take yet unprocessed bytes into account.  */
-	const uint32_t bytes = ctx->buflen;
-	size_t pad;
+	const guint32 bytes = ctx->buflen;
+	gsize pad;
 
 /* Now count remaining bytes.  */
 	ctx->total[0] += bytes;
@@ -355,14 +369,14 @@ pgm_md5_finish_ctx (
 	memcpy (&ctx->buffer[bytes], fillbuf, pad);
 
 	/* Put the 64-bit file length in *bits* at the end of the buffer.  */
-	*(uint32_t*) &ctx->buffer[bytes + pad] = SWAP (ctx->total[0] << 3);
-	*(uint32_t*) &ctx->buffer[bytes + pad + 4] = SWAP ((ctx->total[1] << 3) |
+	*(guint32*) &ctx->buffer[bytes + pad] = SWAP (ctx->total[0] << 3);
+	*(guint32*) &ctx->buffer[bytes + pad + 4] = SWAP ((ctx->total[1] << 3) |
 								(ctx->total[0] >> 29));
 
 /* Process last bytes.  */
-	_pgm_md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
+	md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
 
-	return _pgm_md5_read_ctx (ctx, resbuf);
+	return md5_read_ctx (ctx, resbuf);
 }
 
 /* eof */

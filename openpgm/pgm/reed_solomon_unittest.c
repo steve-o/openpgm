@@ -21,7 +21,6 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
@@ -33,15 +32,6 @@
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
-
 
 #define REED_SOLOMON_DEBUG
 #include "reed_solomon.c"
@@ -50,15 +40,15 @@ pgm_transport_pkt_offset2 (
 /* target:
  *	void
  *	pgm_rs_create (
- *		pgm_rs_t*		rs,
- *		const uint8_t		n,
- *		const uint8_t		k
+ *		gpointer*		rs_,
+ *		const guint		n,
+ *		const guint		k
  *	)
  */
 
 START_TEST (test_create_pass_001)
 {
-	pgm_rs_t rs;
+	gpointer rs;
 	pgm_rs_create (&rs, 255, 16);
 }
 END_TEST
@@ -73,15 +63,15 @@ END_TEST
 /* target:
  *	void
  *	pgm_rs_destroy (
- *		pgm_rs_t*		rs,
+ *		gpointer		rs,
  *	)
  */
 
 START_TEST (test_destroy_pass_001)
 {
-	pgm_rs_t rs;
+	gpointer rs;
 	pgm_rs_create (&rs, 255, 16);
-	pgm_rs_destroy (&rs);
+	pgm_rs_destroy (rs);
 }
 END_TEST
 
@@ -95,33 +85,33 @@ END_TEST
 /* target:
  *	void
  *	pgm_rs_encode (
- *		pgm_rs_t*		rs,
- *		const pgm_gf8_t**	src,
- *		const uint8_t		offset,
- *		pgm_gf8_t*		dst,
- *		const uint16_t		len
+ *		gpointer		rs,
+ *		const gpointer		src[],
+ *		const guint		offset,
+ *		gpointer		dst,
+ *		const gsize		len
  *	)
  */
 
 START_TEST (test_encode_pass_001)
 {
 	const gchar source[] = "i am not a string";
-	const guint16 source_len = strlen (source);
-	pgm_rs_t rs;
-	const guint8 k = source_len;
-	const guint8 parity_index = k;
-	const guint16 packet_len = 100;
-	pgm_gf8_t* source_packets[k];
-	pgm_gf8_t* parity_packet = g_malloc0 (packet_len);
+	const guint source_len = strlen (source);
+	gpointer rs;
+	const guint k = source_len;
+	const guint parity_index = k;
+	const gsize packet_len = 100;
+	gpointer source_packets[k];
+	gpointer parity_packet = g_malloc0 (packet_len);
 	pgm_rs_create (&rs, 255, k);
 	for (unsigned i = 0; i < k; i++) {
 		source_packets[i] = g_malloc0 (packet_len);
-		source_packets[i][0] = source[i];
+		((gchar*)source_packets[i])[0] = source[i];
 		g_message ("packet#%2.2d: 0x%02.2x '%c'", i, source[i], source[i]);
 	}
-	pgm_rs_encode (&rs, (const pgm_gf8_t**)source_packets, parity_index, parity_packet, packet_len);
-	g_message ("parity-packet: %02.2x", parity_packet[0]);
-	pgm_rs_destroy (&rs);
+	pgm_rs_encode (rs, source_packets, parity_index, parity_packet, packet_len);
+	g_message ("parity-packet: %02.2x", ((gchar*)parity_packet)[0]);
+	pgm_rs_destroy (rs);
 }
 END_TEST
 
@@ -135,37 +125,37 @@ END_TEST
 /* target:
  *	void
  *	pgm_rs_decode_parity_inline (
- *		pgm_rs_t*		rs,
- *		pgm_gf8_t**		block,
- *		const uint8_t*		offsets,
- *		const uint16_t		len
+ *		gpointer		rs,
+ *		gpointer		block[],
+ *		const guint		offsets[],
+ *		const gsize		len
  *	)
  */
 
 START_TEST (test_decode_parity_inline_pass_001)
 {
 	const gchar source[] = "i am not a string";
-	const guint16 source_len = strlen (source);
-	pgm_rs_t rs;
-	const guint8 k = source_len;
-	const guint8 parity_index = k;
-	const guint16 packet_len = 100;
-	pgm_gf8_t* source_packets[k];
-	pgm_gf8_t* parity_packet = g_malloc0 (packet_len);
+	const guint source_len = strlen (source);
+	gpointer rs;
+	const guint k = source_len;
+	const guint parity_index = k;
+	const gsize packet_len = 100;
+	gpointer source_packets[k];
+	gpointer parity_packet = g_malloc0 (packet_len);
 	pgm_rs_create (&rs, 255, k);
 	for (unsigned i = 0; i < k; i++) {
 		source_packets[i] = g_malloc0 (packet_len);
-		source_packets[i][0] = source[i];
+		((gchar*)source_packets[i])[0] = source[i];
 	}
-	pgm_rs_encode (&rs, (const pgm_gf8_t**)source_packets, parity_index, parity_packet, packet_len);
+	pgm_rs_encode (rs, source_packets, parity_index, parity_packet, packet_len);
 /* simulate error occuring at index #3 */
 	const guint erased_index = 3;
-	source_packets[erased_index][0] = 'X';
+	((gchar*)source_packets[erased_index])[0] = 'X';
 	for (unsigned i = 0; i < k; i++) {
 		g_message ("damaged-packet#%2.2d: 0x%02.2x '%c'",
-			   i, source_packets[i][0], source_packets[i][0]);
+			   i, ((gchar*)source_packets[i])[0], ((gchar*)source_packets[i])[0]);
 	}
-	guint8 offsets[k];
+	guint offsets[k];
 	for (unsigned i = 0; i < k; i++)
 		offsets[i] = i;
 /* erased offset now points to parity packet at k */
@@ -173,11 +163,11 @@ START_TEST (test_decode_parity_inline_pass_001)
 /* move parity inline */
 	g_free (source_packets[erased_index]);
 	source_packets[erased_index] = parity_packet;
-	pgm_rs_decode_parity_inline (&rs, source_packets, offsets, packet_len);
-	pgm_rs_destroy (&rs);
+	pgm_rs_decode_parity_inline (rs, source_packets, offsets, packet_len);
+	pgm_rs_destroy (rs);
 	for (unsigned i = 0; i < k; i++) {
 		g_message ("repaired-packet#%2.2d: 0x%02.2x '%c'",
-			   i, source_packets[i][0], source_packets[i][0]);
+			   i, ((gchar*)source_packets[i])[0], ((gchar*)source_packets[i])[0]);
 	}
 }
 END_TEST
@@ -192,37 +182,37 @@ END_TEST
 /* target:
  *	void
  *	pgm_rs_decode_parity_appended (
- *		pgm_rs_t*		rs,
- *		pgm_gf8_t*		block,
- *		const uint8_t*		offsets,
- *		const uint16_t		len
+ *		gpointer		rs,
+ *		gpointer		block[],
+ *		const guint		offsets[],
+ *		const gsize		len
  *	)
  */
 
 START_TEST (test_decode_parity_appended_pass_001)
 {
 	const gchar source[] = "i am not a string";
-	const guint16 source_len = strlen (source);
-	pgm_rs_t rs;
-	const guint8 k = source_len;
-	const guint8 parity_index = k;
-	const guint16 packet_len = 100;
-	pgm_gf8_t* source_packets[k+1];	/* include 1 appended parity packet */
-	pgm_gf8_t* parity_packet = g_malloc0 (packet_len);
+	const guint source_len = strlen (source);
+	gpointer rs;
+	const guint k = source_len;
+	const guint parity_index = k;
+	const gsize packet_len = 100;
+	gpointer source_packets[k+1];	/* include 1 appended parity packet */
+	gpointer parity_packet = g_malloc0 (packet_len);
 	pgm_rs_create (&rs, 255, k);
 	for (unsigned i = 0; i < k; i++) {
 		source_packets[i] = g_malloc0 (packet_len);
-		source_packets[i][0] = source[i];
+		((gchar*)source_packets[i])[0] = source[i];
 	}
-	pgm_rs_encode (&rs, (const pgm_gf8_t**)source_packets, parity_index, parity_packet, packet_len);
+	pgm_rs_encode (rs, source_packets, parity_index, parity_packet, packet_len);
 /* simulate error occuring at index #3 */
 	const guint erased_index = 3;
-	source_packets[erased_index][0] = 'X';
+	((gchar*)source_packets[erased_index])[0] = 'X';
 	for (unsigned i = 0; i < k; i++) {
 		g_message ("damaged-packet#%2.2d: 0x%02.2x '%c'",
-			   i, source_packets[i][0], source_packets[i][0]);
+			   i, ((gchar*)source_packets[i])[0], ((gchar*)source_packets[i])[0]);
 	}
-	guint8 offsets[k];
+	guint offsets[k];
 	for (unsigned i = 0; i < k; i++)
 		offsets[i] = i;
 /* erased offset now points to parity packet at k */
@@ -231,11 +221,11 @@ START_TEST (test_decode_parity_appended_pass_001)
 	memset (source_packets[erased_index], 0, packet_len);
 /* append parity to source packet block */
 	source_packets[parity_index] = parity_packet;
-	pgm_rs_decode_parity_appended (&rs, source_packets, offsets, packet_len);
-	pgm_rs_destroy (&rs);
+	pgm_rs_decode_parity_appended (rs, source_packets, offsets, packet_len);
+	pgm_rs_destroy (rs);
 	for (unsigned i = 0; i < k; i++) {
 		g_message ("repaired-packet#%2.2d: 0x%02.2x '%c'",
-			   i, source_packets[i][0], source_packets[i][0]);
+			   i, ((gchar*)source_packets[i])[0], ((gchar*)source_packets[i])[0]);
 	}
 }
 END_TEST

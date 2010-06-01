@@ -22,33 +22,53 @@
 #ifndef __PGM_TIME_H__
 #define __PGM_TIME_H__
 
-#include <pgm/types.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
+#define PGM_TIME_ERROR		pgm_time_error_quark ()
 
-typedef uint64_t pgm_time_t;
-typedef void (*pgm_time_since_epoch_func)(const pgm_time_t*const restrict, time_t*restrict);
+typedef enum
+{
+        PGM_TIME_ERROR_FAILED
+} PGMTimeError;
 
-#define pgm_to_secs(t)	((uint64_t)( (t) / 1000000UL ))
-#define pgm_to_msecs(t)	((uint64_t)( (t) / 1000UL ))
+typedef guint64 pgm_time_t;
+
+G_BEGIN_DECLS
+
+typedef pgm_time_t (*pgm_time_update_func)(void);
+typedef pgm_time_t (*pgm_time_sleep_func)(gulong);
+typedef void (*pgm_time_since_epoch_func)(pgm_time_t*, time_t*);
+
+#define pgm_time_after(a,b)	( (a) > (b) )
+#define pgm_time_before(a,b)    ( pgm_time_after((b),(a)) )
+
+#define pgm_time_after_eq(a,b)  ( (a) >= (b) )
+#define pgm_time_before_eq(a,b) ( pgm_time_after_eq((b),(a)) )
+
+#define pgm_to_secs(t)	((pgm_time_t)( (t) / 1000000UL ))
+#define pgm_to_msecs(t)	((pgm_time_t)( (t) / 1000UL ))
 #define pgm_to_usecs(t)	( (t) )
-#define pgm_to_nsecs(t)	((uint64_t)( (t) * 1000UL ))
+#define pgm_to_nsecs(t)	((pgm_time_t)( (t) * 1000UL ))
 
 #define pgm_to_secsf(t)	 ( (double)(t) / 1000000.0 )
 #define pgm_to_msecsf(t) ( (double)(t) / 1000.0 )
 #define pgm_to_usecsf(t) ( (double)(t) )
 #define pgm_to_nsecsf(t) ( (double)(t) * 1000.0 )
 
-#define pgm_secs(t)	((uint64_t)( (uint64_t)(t) * 1000000UL ))
-#define pgm_msecs(t)	((uint64_t)( (uint64_t)(t) * 1000UL ))
-#define pgm_usecs(t)	((uint64_t)( (t) ))
-#define pgm_nsecs(t)	((uint64_t)( (t) / 1000UL ))
+#define pgm_secs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000000UL ))
+#define pgm_msecs(t)	((pgm_time_t)( (pgm_time_t)(t) * 1000UL ))
+#define pgm_usecs(t)	((pgm_time_t)( (t) ))
+#define pgm_nsecs(t)	((pgm_time_t)( (t) / 1000UL ))
 
-#define PGM_TIME_FORMAT	PRIu64
+#define PGM_TIME_FORMAT	G_GUINT64_FORMAT
 
-extern pgm_time_since_epoch_func	pgm_time_since_epoch;
+extern pgm_time_update_func pgm_time_update_now;
+extern pgm_time_sleep_func pgm_time_sleep;
+extern pgm_time_since_epoch_func pgm_time_since_epoch;
 
-PGM_END_DECLS
+GQuark pgm_time_error_quark (void);
+
+G_END_DECLS
 
 #endif /* __PGM_TIME_H__ */
 

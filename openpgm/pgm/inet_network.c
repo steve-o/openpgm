@@ -20,14 +20,32 @@
  */
 
 #include <ctype.h>
-#include <impl/framework.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+
+#include <glib.h>
+
+#ifdef G_OS_UNIX
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
+#	include <iphlpapi.h>
+#endif
+
+#include "pgm/inet_network.h"
+#include "pgm/sockaddr.h"
 
 
 //#define INET_NETWORK_DEBUG
 
-/* locals */
-
-static uint32_t cidr_to_netmask (const unsigned) PGM_GNUC_CONST;
+#ifndef INET_NETWORK_DEBUG
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
 
 
 /* calculate IPv4 netmask from network size, returns address in
@@ -35,7 +53,7 @@ static uint32_t cidr_to_netmask (const unsigned) PGM_GNUC_CONST;
  */
 
 static
-uint32_t
+guint32
 cidr_to_netmask (
 	const unsigned	cidr
 	)
@@ -58,20 +76,20 @@ cidr_to_netmask (
  * returns 0 on success, returns -1 on invalid address.
  */
 
-int					/* return type to match inet_network() */
+int
 pgm_inet_network (
-	const char*	restrict s,
-	struct in_addr*	restrict in
+	const char*		s,
+	struct in_addr*		in
 	)
 {
-	pgm_return_val_if_fail (NULL != s,  -1);
-	pgm_return_val_if_fail (NULL != in, -1);
+	g_return_val_if_fail (NULL != s,  -1);
+	g_return_val_if_fail (NULL != in, -1);
 
-	pgm_debug ("pgm_inet_network (s:\"%s\" in:%p)",
-		 s, (const void*)in);
+	g_trace ("pgm_inet_network (s:\"%s\" in:%p)",
+		 s, (gpointer)in);
 
 	const char *p = s;
-	unsigned val = 0;
+	int val = 0;
 	int shift = 24;
 
 	in->s_addr = INADDR_ANY;
@@ -124,7 +142,7 @@ pgm_inet_network (
 			const struct in_addr netaddr = { .s_addr = cidr_to_netmask (val) };
 #ifdef INET_NETWORK_DEBUG
 {
-g_debug ("netaddr %s", inet_ntoa (netaddr));
+g_trace ("netaddr %s", inet_ntoa (netaddr));
 }
 #endif
 			in->s_addr &= netaddr.s_addr;
@@ -158,15 +176,15 @@ g_debug ("netaddr %s", inet_ntoa (netaddr));
 
 int
 pgm_inet6_network (
-	const char*	 restrict s,		/* NULL terminated */
-	struct in6_addr* restrict in6
+	const char*		s,		/* NULL terminated */
+	struct in6_addr*	in6
 	)
 {
-	pgm_return_val_if_fail (NULL != s,   -1);
-	pgm_return_val_if_fail (NULL != in6, -1);
+	g_return_val_if_fail (NULL != s,   -1);
+	g_return_val_if_fail (NULL != in6, -1);
 
-	pgm_debug ("pgm_inet6_network (s:\"%s\" in6:%p)",
-		 s, (const void*)in6);
+	g_trace ("pgm_inet6_network (s:\"%s\" in6:%p)",
+		 s, (gpointer)in6);
 
 /* inet_pton cannot parse IPv6 addresses with subnet declarations, so
  * chop them off.
@@ -183,52 +201,52 @@ pgm_inet6_network (
 	}
 	if (*p == 0) {
 		if (pgm_inet_pton (AF_INET6, s, in6)) return 0;
-		pgm_debug ("pgm_inet_pton(AF_INET6) failed on '%s'", s);
+		g_trace ("inet_pton failed");
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
 	*p2 = 0;
-	pgm_debug ("net part %s", s2);
+	g_trace ("net part %s", s2);
 	if (!pgm_inet_pton (AF_INET6, s2, in6)) {
-		pgm_debug ("pgm_inet_pton(AF_INET) failed parsing network part '%s'", s2);
+		g_trace ("inet_pton failed parsing network part %s", s2);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
 
 #ifdef INET_NETWORK_DEBUG
 	char sdebug[INET6_ADDRSTRLEN];
-	pgm_debug ("IPv6 network address: %s", pgm_inet_ntop(AF_INET6, in6, sdebug, sizeof(sdebug)));
+	g_trace ("IPv6 network address: %s", pgm_inet_ntop(AF_INET6, in6, sdebug, sizeof(sdebug)));
 #endif
 
 	p++;
-	unsigned val = 0;
+	int val = 0;
 	while (*p)
 	{
 		if (isdigit(*p)) {
 			val = 10 * val + (*p - '0');
 		} else {
-			pgm_debug ("failed parsing subnet size due to character '%c'", *p);
+			g_trace ("failed parsing subnet size due to character '%c'", *p);
 			memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 			return -1;
 		}
 		p++;
 	}
 	if (val == 0 || val > 128) {
-		pgm_debug ("subnet size invalid (%d)", val);
+		g_trace ("subnet size invalid (%d)", val);
 		memcpy (in6, &in6addr_any, sizeof(in6addr_any));
 		return -1;
 	}
-	pgm_debug ("subnet size %i", val);
+	g_trace ("subnet size %i", val);
 
 /* zero out host bits */
-	const unsigned suffix_length = 128 - val;
+	const int suffix_length = 128 - val;
 	for (int i = suffix_length, j = 15; i > 0; i -= 8, --j)
 	{
 		in6->s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
 	}
 
-	pgm_debug ("effective IPv6 network address after subnet mask: %s", pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
+	g_trace ("effective IPv6 network address after subnet mask: %s", pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
 
 	return 0;
 }

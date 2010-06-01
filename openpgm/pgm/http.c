@@ -19,44 +19,42 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <errno.h>
-#include <inttypes.h>
-#ifndef _WIN32
-#	include <netdb.h>
-#else
-#	include <io.h>
-#	include <lmcons.h>
-#	include <process.h>
-#endif
-#include <stdio.h>
-#include <time.h>
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
-#include <pgm/receiver.h>
-#include <pgm/transport.h>
-#include <pgm/version.h>
 
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+#include <glib.h>
+#include <glib/gi18n-lib.h>
+
+#include <libsoup/soup.h>
+#include <libsoup/soup-server.h>
+#ifdef CONFIG_LIBSOUP22
+#	include <libsoup/soup-server-message.h>
+#endif
+#include <libsoup/soup-address.h>
+
+#include "pgm/ip.h"
 #include "pgm/http.h"
+#include "pgm/transport.h"
+#include "pgm/txwi.h"
+#include "pgm/rxwi.h"
+#include "pgm/version.h"
+#include "pgm/histogram.h"
+#include "pgm/getifaddrs.h"
+#include "pgm/nametoindex.h"
+
 #include "htdocs/404.html.h"
 #include "htdocs/base.css.h"
 #include "htdocs/robots.txt.h"
 #include "htdocs/xhtml10_strict.doctype.h"
 
-
 /* OpenSolaris */
 #ifndef LOGIN_NAME_MAX
-#	ifdef _WIN32
-#		define LOGIN_NAME_MAX		(UNLEN + 1)
-#	else
-#		define LOGIN_NAME_MAX		256
-#	endif
-#endif
-
-#ifdef _WIN32
-#	define getpid		_getpid
-#	define read		_read
-#	define write		_write
-#	define SHUT_WR		SD_SEND
+#	define LOGIN_NAME_MAX		256
 #endif
 
 #ifdef CONFIG_HAVE_SPRINTF_GROUPING
@@ -65,138 +63,70 @@
 #	define GROUP_FORMAT			""
 #endif
 
-#define HTTP_BACKLOG			10 /* connections */
-#define HTTP_TIMEOUT			60 /* seconds */
 
+/* globals */
 
-/* locals */
+/* local globals */
 
-struct http_connection_t {
-	pgm_list_t	link_;
-	int		sock;
-	enum {
-		HTTP_STATE_READ,
-		HTTP_STATE_WRITE,
-		HTTP_STATE_FINWAIT
-	}		state;
+static SoupServer*	g_soup_server = NULL;
+static GThread*		g_thread;
+static GCond*		g_thread_cond;
+static GMutex*		g_thread_mutex;
+static GError*		g_error;
+static char		g_hostname[NI_MAXHOST + 1];
+static char		g_address[INET6_ADDRSTRLEN];
+static char		g_username[LOGIN_NAME_MAX + 1];
+static int		g_pid;
 
-	char*		buf;
-	size_t		buflen;
-	size_t		bufoff;
-	unsigned	status_code;
-	const char*	status_text;
-	const char*	content_type;
-};
+static gpointer http_thread (gpointer);
+static int http_tsi_response (pgm_tsi_t*, SoupMessage*);
 
-enum {
-	HTTP_MEMORY_STATIC,
-	HTTP_MEMORY_TAKE
-};
-
-static char		http_hostname[NI_MAXHOST + 1];
-static char		http_address[INET6_ADDRSTRLEN];
-static char		http_username[LOGIN_NAME_MAX + 1];
-static int		http_pid;
-
-#ifndef _WIN32
-static int			http_sock = -1;
-static pthread_t		http_thread;
-static void*			http_routine (void*);
+#ifdef CONFIG_LIBSOUP22
+static void default_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void robots_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void css_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void index_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void interfaces_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void transports_callback (SoupServerContext*, SoupMessage*, gpointer);
+static void histograms_callback (SoupServerContext*, SoupMessage*, gpointer);
 #else
-static int			http_sock = INVALID_SOCKET;
-static HANDLE			http_thread;
-static unsigned __stdcall	http_routine (void*);
+static void default_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void robots_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void css_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void index_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void interfaces_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void transports_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
+static void histograms_callback (SoupServer*, SoupMessage*, const char*, GHashTable*, SoupClientContext*, gpointer);
 #endif
-static int			http_max_sock = -1;
-static fd_set			http_readfds, http_writefds, http_exceptfds;
-static pgm_list_t*		http_socks = NULL;
-static pgm_notify_t		http_notify = PGM_NOTIFY_INIT;
-static volatile uint32_t	http_ref_count = 0;
+
+static void http_each_receiver (pgm_peer_t*, GString*);
+static int http_receiver_response (pgm_peer_t*, SoupMessage*);
+
+static PGMHTTPError pgm_http_error_from_errno (gint);
+static PGMHTTPError pgm_http_error_from_eai_errno (gint);
 
 
-static int http_tsi_response (struct http_connection_t*, pgm_tsi_t*);
-static void http_each_receiver (pgm_peer_t*, pgm_string_t*);
-static int http_receiver_response (struct http_connection_t*, pgm_peer_t*);
-
-static void default_callback (struct http_connection_t*, const char*);
-static void robots_callback (struct http_connection_t*, const char*);
-static void css_callback (struct http_connection_t*, const char*);
-static void index_callback (struct http_connection_t*, const char*);
-static void interfaces_callback (struct http_connection_t*, const char*);
-static void transports_callback (struct http_connection_t*, const char*);
-static void histograms_callback (struct http_connection_t*, const char*);
-
-static struct {
-	const char*	path;
-	void	      (*callback) (struct http_connection_t*, const char*);
-} http_directory[] = {
-	{ "/robots.txt",	robots_callback },
-	{ "/base.css",		css_callback },
-	{ "/",			index_callback },
-	{ "/interfaces",	interfaces_callback },
-	{ "/transports",	transports_callback }
-#ifdef CONFIG_HISTOGRAMS
-       ,{ "/histograms",	histograms_callback }
-#endif
-};
-
-
-static
-int
-http_sock_rcvtimeo (
-	int			sock,
-	int			seconds
-	)
-{
-#if defined( sun )
-	return 0;
-#elif !defined( _WIN32 )
-	const struct timeval timeout = { .tv_sec = seconds, .tv_usec = 0 };
-	return setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
-#else
-	const int optval = seconds * 1000;
-	return setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&optval, sizeof(optval));
-#endif
-}
-
-static
-int
-http_sock_sndtimeo (
-	int			sock,
-	int			seconds
-	)
-{
-#if defined( sun )
-	return 0;
-#elif !defined( _WIN32 )
-	const struct timeval timeout = { .tv_sec = seconds, .tv_usec = 0 };
-	return setsockopt (sock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout));
-#else
-	const int optval = seconds * 1000;
-	return setsockopt (sock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&optval, sizeof(optval));
-#endif
-}
-
-bool
+gboolean
 pgm_http_init (
-	uint16_t		http_port,
-	pgm_error_t**		error
+	guint16			http_port,
+	GError**		error
 	)
 {
-	int e;
+	g_return_val_if_fail (NULL == g_soup_server, FALSE);
 
-	if (pgm_atomic_exchange_and_add32 (&http_ref_count, 1) > 0)
-		return TRUE;
+	g_type_init ();
 
-/* resolve and store relatively constant runtime information */
-	if (0 != gethostname (http_hostname, sizeof(http_hostname))) {
-		const int save_errno = errno;
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (save_errno),
+/* ensure threading enabled */
+	if (!g_thread_supported ()) g_thread_init (NULL);
+
+/* resolve (relatively) constant host details */
+	if (0 != gethostname (g_hostname, sizeof(g_hostname))) {
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-			     strerror (save_errno));
-		goto err_cleanup;
+			     g_strerror (errno));
+		return FALSE;
 	}
 	struct addrinfo hints = {
 		.ai_family	= AF_UNSPEC,
@@ -204,618 +134,150 @@ pgm_http_init (
 		.ai_protocol	= IPPROTO_TCP,
 		.ai_flags	= AI_ADDRCONFIG
 	}, *res = NULL;
-	e = getaddrinfo (http_hostname, NULL, &hints, &res);
+	int e = getaddrinfo (g_hostname, NULL, &hints, &res);
 	if (0 != e) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_eai_errno (e, errno),
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_eai_errno (e),
 			     _("Resolving hostname address: %s"),
 			     gai_strerror (e));
-		goto err_cleanup;
+		return FALSE;
 	}
 	e = getnameinfo (res->ai_addr, res->ai_addrlen,
-		         http_address, sizeof(http_address),
+		         g_address, sizeof(g_address),
 			 NULL, 0,
 			 NI_NUMERICHOST);
 	if (0 != e) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_eai_errno (e, errno),
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_eai_errno (e),
 			     _("Resolving numeric hostname: %s"),
 			     gai_strerror (e));
-		goto err_cleanup;
+		return FALSE;
 	}
 	freeaddrinfo (res);
-#ifndef _WIN32
-	e = getlogin_r (http_username, sizeof(http_username));
+	e = getlogin_r (g_username, sizeof(g_username));
 	if (0 != e) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
+		g_set_error (error,
+			     PGM_HTTP_ERROR,
+			     pgm_http_error_from_errno (errno),
 			     _("Retrieving user name: %s"),
-			     strerror (errno));
-		goto err_cleanup;
+			     g_strerror (errno));
+		return FALSE;
 	}
-#else
-	wchar_t wusername[UNLEN + 1];
-	DWORD nSize = PGM_N_ELEMENTS( wusername );
-	if (!GetUserNameW (wusername, &nSize)) {
-		const DWORD save_errno = GetLastError();
-		char winstr[1024];
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_win_errno (save_errno),
-			     _("Retrieving user name: %s"),
-			     pgm_win_strerror (winstr, sizeof(winstr), save_errno));
-		goto err_cleanup;
-	}
-	WideCharToMultiByte (CP_UTF8, 0, wusername, nSize + 1, http_username, sizeof(http_username), NULL, NULL);
-#endif /* _WIN32 */
-	http_pid = getpid();
+	g_pid = getpid();
 
-/* create HTTP listen socket */
-	if ((http_sock = socket (AF_INET,  SOCK_STREAM, 0)) < 0) {
-#ifndef _WIN32
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_errno (errno),
-				_("Creating HTTP socket: %s"),
-				strerror (errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_wsa_errno (save_errno),
-				_("Creating HTTP socket: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
-		goto err_cleanup;
-	}
-	const int v = 1;
-	if (0 != setsockopt (http_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) {
-#ifndef _WIN32
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_errno (errno),
-				_("Enabling reuse of socket local address: %s"),
-				strerror (errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_wsa_errno (save_errno),
-				_("Enabling reuse of socket local address: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
-		goto err_cleanup;
-	}
-	if (0 != http_sock_rcvtimeo (http_sock, HTTP_TIMEOUT) ||
-	    0 != http_sock_sndtimeo (http_sock, HTTP_TIMEOUT)) {
-#ifndef _WIN32
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_errno (errno),
-				_("Setting socket timeout: %s"),
-				strerror (errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_wsa_errno (save_errno),
-				_("Setting socket timeout: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
-		goto err_cleanup;
-	}
-	struct sockaddr_in http_addr;
-	memset (&http_addr, 0, sizeof(http_addr));
-	http_addr.sin_family = AF_INET;
-	http_addr.sin_addr.s_addr = INADDR_ANY;
-	http_addr.sin_port = htons (http_port);
-	if (0 != bind (http_sock, (struct sockaddr*)&http_addr, sizeof(http_addr))) {
-		char addr[INET6_ADDRSTRLEN];
-		pgm_sockaddr_ntop ((struct sockaddr*)&http_addr, addr, sizeof(addr));
-#ifndef _WIN32
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
-			     _("Binding HTTP socket to address %s: %s"),
-			     addr,
-			     strerror (errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-			    PGM_ERROR_DOMAIN_HTTP,
-			    pgm_error_from_wsa_errno (save_errno),
-			    _("Binding HTTP socket to address %s: %s"),
-			    addr,
-			    pgm_wsastrerror (save_errno));
-#endif
-		goto err_cleanup;
-	}
-	if (listen (http_sock, HTTP_BACKLOG) < 0) {
-#ifndef _WIN32
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
-			     _("Listening to HTTP socket: %s"),
-			     strerror (errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-			    PGM_ERROR_DOMAIN_HTTP,
-			    pgm_error_from_wsa_errno (save_errno),
-			     _("Listening to HTTP socket: %s"),
-			    pgm_wsastrerror (save_errno));
-#endif
-		goto err_cleanup;
+	g_thread_mutex	= g_mutex_new();
+	g_thread_cond	= g_cond_new();
+
+	GThread* thread = g_thread_create_full (http_thread,
+						(gpointer)&http_port,
+						0,		/* stack size */
+						TRUE,		/* joinable */
+						TRUE,		/* native thread */
+						G_THREAD_PRIORITY_LOW,	/* lowest */
+						error);
+	if (!thread) {
+		g_prefix_error (error,
+				_("Creating HTTP thread: "));
+		g_cond_free  (g_thread_cond);
+		g_mutex_free (g_thread_mutex);
+		return FALSE;
 	}
 
-/* non-blocking notification of new connections */
-	pgm_sockaddr_nonblocking (http_sock, TRUE);
+	g_thread = thread;
 
-/* create notification channel */
-	if (0 != pgm_notify_init (&http_notify)) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
-			     _("Creating HTTP notification channel: %s"),
-			     strerror (errno));
-		goto err_cleanup;
-	}
+/* spin lock around condition waiting for thread startup */
+	g_mutex_lock (g_thread_mutex);
+	while (!g_soup_server)
+		g_cond_wait (g_thread_cond, g_thread_mutex);
+	g_mutex_unlock (g_thread_mutex);
 
-/* spawn thread to handle HTTP requests */
-#ifndef _WIN32
-	const int status = pthread_create (&http_thread, NULL, &http_routine, NULL);
-	if (0 != status) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
-			     _("Creating HTTP thread: %s"),
-			     strerror (errno));
-		goto err_cleanup;
-	}
-#else
-	http_thread = (HANDLE)_beginthreadex (NULL, 0, &http_routine, NULL, 0, NULL);
-	const int save_errno = errno;
-	if (0 == http_thread) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (save_errno),
-			     _("Creating HTTP thread: %s"),
-			     strerror (save_errno));
-		goto err_cleanup;
-	}
-#endif /* _WIN32 */
-	pgm_minor (_("Web interface: http://%s:%i"),
-			http_hostname,
-			http_port);
-	return TRUE;
-
-err_cleanup:
-#ifndef _WIN32
-	if (-1 != http_sock) {
-		close (http_sock);
-		http_sock = -1;
-	}
-#else
-	if (INVALID_SOCKET != http_sock) {
-		closesocket (http_sock);
-		http_sock = INVALID_SOCKET;
-	}
-#endif /* _WIN32 */
-	if (pgm_notify_is_valid (&http_notify)) {
-		pgm_notify_destroy (&http_notify);
-	}
-	pgm_atomic_dec32 (&http_ref_count);
-	return FALSE;
-}
-
-/* notify HTTP thread to shutdown, wait for shutdown and cleanup.
- */
-
-bool
-pgm_http_shutdown (void)
-{
-	pgm_return_val_if_fail (pgm_atomic_read32 (&http_ref_count) > 0, FALSE);
-
-	if (pgm_atomic_exchange_and_add32 (&http_ref_count, (uint32_t)-1) != 1)
-		return TRUE;
-
-	pgm_notify_send (&http_notify);
-#ifndef _WIN32
-	pthread_join (http_thread, NULL);
-#else
-	CloseHandle (http_thread);
-#endif
-#ifndef _WIN32
-	if (-1 != http_sock) {
-		close (http_sock);
-		http_sock = -1;
-	}
-#else
-	if (INVALID_SOCKET != http_sock) {
-		closesocket (http_sock);
-		http_sock = INVALID_SOCKET;
-	}
-#endif /* _WIN32 */
-	pgm_notify_destroy (&http_notify);
-	return TRUE;
-}
-
-/* accept a new incoming HTTP connection.
- */
-
-static
-void
-http_accept (
-	int		listen_sock
-	)
-{
-/* new connection */
-	struct sockaddr_storage addr;
-	socklen_t addrlen = sizeof(addr);
-	int new_sock = accept (listen_sock, (struct sockaddr*)&addr, &addrlen);
-	if (-1 == new_sock) {
-		if (EAGAIN == errno)
-			return;
-#ifndef _WIN32
-		pgm_warn (_("HTTP accept: %s"), strerror (errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_warn (_("HTTP accept: %s"), pgm_wsastrerror (save_errno));
-#endif
-		return;
-	}
-
-#ifndef _WIN32
-/* out of bounds file descriptor for select() */
-	if (new_sock >= FD_SETSIZE) {
-		close (new_sock);
-		pgm_warn (_("Rejected new HTTP client socket due to out of bounds file descriptor."));
-		return;
-	}
-#endif
-
-	pgm_sockaddr_nonblocking (new_sock, TRUE);
-
-	struct http_connection_t* connection = pgm_new0 (struct http_connection_t, 1);
-	connection->sock = new_sock;
-	connection->state = HTTP_STATE_READ;
-	http_socks = pgm_list_prepend_link (http_socks, &connection->link_);
-	FD_SET( new_sock, &http_readfds );
-	FD_SET( new_sock, &http_exceptfds );
-	if (new_sock > http_max_sock)
-		http_max_sock = new_sock;
-}
-
-static
-void
-http_close (
-	struct http_connection_t*	connection
-	)
-{
-#ifndef _WIN32
-	if (0 != close (connection->sock)) {
-		pgm_warn (_("Close HTTP client socket: %s"), strerror (errno));
-	}
-#else
-	if (0 != closesocket (connection->sock)) {
-		const int save_errno = WSAGetLastError();
-		pgm_warn (_("Close HTTP client socket: %s"), pgm_wsastrerror (save_errno));
-	}
-#endif
-	switch (connection->state) {
-	case HTTP_STATE_READ:
-	case HTTP_STATE_FINWAIT:
-		FD_CLR( connection->sock, &http_readfds );
-		break;
-	case HTTP_STATE_WRITE:
-		FD_CLR( connection->sock, &http_writefds );
-		break;
-	}
-	FD_CLR( connection->sock, &http_exceptfds );
-	http_socks = pgm_list_remove_link (http_socks, &connection->link_);
-	if (connection->buflen > 0) {
-		pgm_free (connection->buf);
-		connection->buf = NULL;
-		connection->buflen = 0;
-	}
-/* find new highest fd */
-	if (connection->sock == http_max_sock)
-	{
-		http_max_sock = -1;
-		for (pgm_list_t* list = http_socks; list; list = list->next)
-		{
-			struct http_connection_t* c = (void*)list;
-			if (c->sock > http_max_sock)
-				http_max_sock = c->sock;
-		}
-	}
-	pgm_free (connection);
-}
-
-/* non-blocking read an incoming HTTP request
- */
-
-static
-void
-http_read (
-	struct http_connection_t*	connection
-	)
-{
-	for (;;)
-	{
-/* grow buffer as needed */
-		if (connection->bufoff + 1024  > connection->buflen) {
-			connection->buf = pgm_realloc (connection->buf, connection->buflen + 1024);
-			connection->buflen += 1024;
-		}
-		const ssize_t bytes_read = recv (connection->sock, &connection->buf[ connection->bufoff ], connection->buflen - connection->bufoff, 0);
-		if (bytes_read < 0) {
-			if (EINTR == errno || EAGAIN == errno)
-				return;
-#ifndef _WIN32
-			pgm_warn (_("HTTP client read: %s"), strerror (errno));
-#else
-			const int save_errno = WSAGetLastError();
-			pgm_warn (_("HTTP client read: %s"), pgm_wsastrerror (save_errno));
-#endif
-			http_close (connection);
-			return;
-		}
-
-/* complete */
-		if (strstr (connection->buf, "\r\n\r\n"))
-			break;
-	}
-
-/* process request, e.g. GET /index.html HTTP/1.1\r\n
- */
-	connection->buf[ connection->buflen - 1 ] = '\0';
-	if (0 != memcmp (connection->buf, "GET ", strlen("GET "))) {
-/* 501 (not implemented) */
-		http_close (connection);
-		return;
-	}
-
-	char* request_uri = connection->buf + strlen("GET ");
-	char* p = request_uri;
-	do {
-		if (*p == '?' || *p == ' ') {
-			*p = '\0';
-			break;
-		}
-	} while (*(++p));
-
-	connection->status_code	 = 200;	/* OK */
-	connection->status_text  = "OK";
-	connection->content_type = "text/html";
-	connection->bufoff       = 0;
-	for (unsigned i = 0; i < PGM_N_ELEMENTS(http_directory); i++)
-	{
-		if (0 == strcmp (request_uri, http_directory[i].path))
-		{
-			http_directory[i].callback (connection, request_uri);
-			goto complete;
-		}
-	}
-	default_callback (connection, request_uri);
-
-complete:
-	connection->state = HTTP_STATE_WRITE;
-	FD_CLR( connection->sock, &http_readfds );
-	FD_SET( connection->sock, &http_writefds );
-}
-
-/* non-blocking write a HTTP response
- */
-
-static
-void
-http_write (
-	struct http_connection_t*	connection
-	)
-{
-	do {
-		const ssize_t bytes_written = send (connection->sock, &connection->buf[ connection->bufoff ], connection->buflen - connection->bufoff, 0);
-		if (bytes_written < 0) {
-			if (EINTR == errno || EAGAIN == errno)
-				return;
-#ifndef _WIN32
-			pgm_warn (_("HTTP client write: %s"), strerror (errno));
-#else
-			const int save_errno = WSAGetLastError();
-			pgm_warn (_("HTTP client write: %s"), pgm_wsastrerror (save_errno));
-#endif
-			http_close (connection);
-			return;
-		}
-		connection->bufoff += bytes_written;
-	} while (connection->bufoff < connection->buflen);
-
-	if (0 == shutdown (connection->sock, SHUT_WR)) {
-		http_close (connection);
-	} else {
-		pgm_debug ("HTTP socket entering finwait state.");
-		connection->state = HTTP_STATE_FINWAIT;
-		FD_CLR( connection->sock, &http_writefds );
-		FD_SET( connection->sock, &http_readfds );
-	}
-}
-
-/* read and discard pending data waiting for FIN
- */
-
-static
-void
-http_finwait (
-	struct http_connection_t*	connection
-	)
-{
-	char buf[1024];
-	const ssize_t bytes_read = read (connection->sock, buf, sizeof(buf));
-	if (bytes_read < 0 && (EINTR == errno || EAGAIN == errno))
-		return;
-	http_close (connection);
-}
-
-static
-void
-http_process (
-	struct http_connection_t*	connection
-	)
-{
-	switch (connection->state) {
-	case HTTP_STATE_READ:		http_read (connection); break;
-	case HTTP_STATE_WRITE:		http_write (connection); break;
-	case HTTP_STATE_FINWAIT:	http_finwait (connection); break;
-	}
-}
-
-static
-void
-http_set_status (
-	struct http_connection_t*	connection,
-	int				status_code,
-	const char*			status_text
-	)
-{
-	connection->status_code = status_code;
-	connection->status_text = status_text;
-}
-
-static
-void
-http_set_content_type (
-	struct http_connection_t*	connection,
-	const char*			content_type
-	)
-{
-	connection->content_type = content_type;
-}
-
-/* finalise response buffer with headers and content */
-
-static
-void
-http_set_static_response (
-	struct http_connection_t*	connection,
-	const char*			content,
-	size_t				content_length
-	)
-{
-	pgm_string_t* response = pgm_string_new (NULL);
-	pgm_string_printf (response, "HTTP/1.0 %d %s\r\n"
-				     "Server: OpenPGM HTTP Server %u.%u.%u\r\n"
-			   	     "Last-Modified: Fri, 1 Jan 2010, 00:00:01 GMT\r\n"
-				     "Content-Length: %d\r\n"
-				     "Content-Type: %s\r\n"
-				     "Connection: close\r\n"
-				     "\r\n",
-			   connection->status_code,
-			   connection->status_text,
-			   pgm_major_version, pgm_minor_version, pgm_micro_version,
-			   content_length,
-			   connection->content_type
-			);
-	pgm_string_append (response, content);
-	if (connection->buflen)
-		pgm_free (connection->buf);
-	connection->buflen = response->len;
-	connection->buf = pgm_string_free (response, FALSE);
-}
-
-static
-void
-http_set_response (
-	struct http_connection_t*	connection,
-	char*				content,
-	size_t				content_length
-	)
-{
-	pgm_string_t* response = pgm_string_new (NULL);
-	pgm_string_printf (response, "HTTP/1.0 %d %s\r\n"
-				     "Server: OpenPGM HTTP Server %u.%u.%u\r\n"
-				     "Content-Length: %d\r\n"
-				     "Content-Type: %s\r\n"
-				     "Connection: close\r\n"
-				     "\r\n",
-			   connection->status_code,
-			   connection->status_text,
-			   pgm_major_version, pgm_minor_version, pgm_micro_version,
-			   content_length,
-			   connection->content_type
-			);
-	pgm_string_append (response, content);
-	pgm_free (content);
-	if (connection->buflen)
-		pgm_free (connection->buf);
-	connection->buflen = response->len;
-	connection->buf = pgm_string_free (response, FALSE);
-}
-
-/* Thread routine for processing HTTP requests
- */
-
-static
-#ifndef _WIN32
-void*
-#else
-unsigned
-__stdcall
-#endif
-http_routine (
-	PGM_GNUC_UNUSED	void*	arg
-	)
-{
-	const int notify_fd = pgm_notify_get_fd (&http_notify);
-	const int max_fd = MAX( notify_fd, http_sock );
-
-	FD_ZERO( &http_readfds );
-	FD_ZERO( &http_writefds );
-	FD_ZERO( &http_exceptfds );
-	FD_SET( notify_fd, &http_readfds );
-	FD_SET( http_sock, &http_readfds );
-
-	for (;;)
-	{
-		int fds = MAX( http_max_sock, max_fd ) + 1;
-		fd_set readfds = http_readfds, writefds = http_writefds, exceptfds = http_exceptfds;
-
-		fds = select (fds, &readfds, &writefds, &exceptfds, NULL);
-/* signal interrupt */
-		if (PGM_UNLIKELY(fds < 0 && EINTR == errno))
-			continue;
-/* terminate */
-		if (PGM_UNLIKELY(FD_ISSET( notify_fd, &readfds )))
-			break;
-/* new connection */
-		if (FD_ISSET( http_sock, &readfds )) {
-			http_accept (http_sock);
-			continue;
-		}
-/* existing connection */
-		for (pgm_list_t* list = http_socks; list;)
-		{
-			struct http_connection_t* c = (void*)list;
-			list = list->next;
-			if ((FD_ISSET( c->sock, &readfds )  && HTTP_STATE_READ  == c->state) ||
-			    (FD_ISSET( c->sock, &writefds ) && HTTP_STATE_WRITE == c->state) ||
-			    (FD_ISSET( c->sock, &exceptfds )))
-			{
-				http_process (c);
-			}
-		}
+/* catch failure */
+	if (NULL == g_soup_server) {
+		g_propagate_error (error, g_error);
+		g_cond_free  (g_thread_cond);
+		g_mutex_free (g_thread_mutex);
+		return FALSE;
 	}
 
 /* cleanup */
-#ifndef _WIN32
+	g_cond_free  (g_thread_cond);
+	g_mutex_free (g_thread_mutex);
+	return TRUE;
+}
+
+gboolean
+pgm_http_shutdown (void)
+{
+	g_return_val_if_fail (NULL != g_soup_server, FALSE);
+	soup_server_quit (g_soup_server);
+	g_thread_join (g_thread);
+	g_thread = NULL; g_soup_server = NULL;
+	return TRUE;
+}
+
+static
+gpointer
+http_thread (
+	gpointer		data
+	)
+{
+	g_assert (NULL != data);
+
+	const guint16 http_port = *(guint16*)data;
+	GMainContext* context = g_main_context_new ();
+	g_mutex_lock (g_thread_mutex);
+	g_soup_server = soup_server_new (SOUP_SERVER_PORT, http_port,
+					 SOUP_SERVER_ASYNC_CONTEXT, context,
+					 NULL);
+	if (!g_soup_server) {
+		g_set_error (&g_error,
+			     PGM_HTTP_ERROR,
+			     PGM_HTTP_ERROR_FAILED,
+			     _("Creating new Soup Server: %s"),
+			     g_strerror (errno));
+		g_main_context_unref (context);
+		g_cond_signal  (g_thread_cond);
+		g_mutex_unlock (g_thread_mutex);
+		return NULL;
+	}
+
+	g_message ("web interface: http://%s:%i",
+			g_hostname,
+			soup_server_get_port (g_soup_server));
+
+#ifdef CONFIG_LIBSOUP22
+	soup_server_add_handler (g_soup_server, NULL,		NULL, default_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/robots.txt",	NULL, robots_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/base.css",	NULL, css_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/",		NULL, index_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/interfaces",	NULL, interfaces_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/transports",	NULL, transports_callback, NULL, NULL);
+#ifdef CONFIG_HISTOGRAMS
+	soup_server_add_handler (g_soup_server, "/histograms",	NULL, histograms_callback, NULL, NULL);
+#endif /* CONFIG_HISTOGRAMS */
+#else /* !CONFIG_LIBSOUP22 */
+	soup_server_add_handler (g_soup_server, NULL,		default_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/robots.txt",	robots_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/base.css",	css_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/",		index_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/interfaces",	interfaces_callback, NULL, NULL);
+	soup_server_add_handler (g_soup_server, "/transports",	transports_callback, NULL, NULL);
+#ifdef CONFIG_HISTOGRAMS
+	soup_server_add_handler (g_soup_server, "/histograms",	histograms_callback, NULL, NULL);
+#endif /* CONFIG_HISTOGRAMS */
+#endif /* !CONFIG_LIBSOUP22 */
+
+/* signal parent thread we are ready to run */
+	g_cond_signal  (g_thread_cond);
+	g_mutex_unlock (g_thread_mutex);
+/* main loop */
+	soup_server_run (g_soup_server);
+/* cleanup */
+	g_object_unref (g_soup_server);
+	g_main_context_unref (context);
 	return NULL;
-#else
-	_endthread();
-	return 0;
-#endif /* WIN32 */
 }
 
 /* add xhtml doctype and head, populate with runtime values
@@ -829,34 +291,29 @@ typedef enum {
 } http_tab_e;
 
 static
-pgm_string_t*
+GString*
 http_create_response (
-	const char*		subtitle,
+	const gchar*		subtitle,
 	http_tab_e		tab
 	)
 {
-	pgm_assert (NULL != subtitle);
-	pgm_assert (tab == HTTP_TAB_GENERAL_INFORMATION ||
-		    tab == HTTP_TAB_INTERFACES ||
-		    tab == HTTP_TAB_TRANSPORTS ||
-		    tab == HTTP_TAB_HISTOGRAMS);
+	g_assert (NULL != subtitle);
+	g_assert (tab == HTTP_TAB_GENERAL_INFORMATION ||
+		  tab == HTTP_TAB_INTERFACES ||
+		  tab == HTTP_TAB_TRANSPORTS ||
+		  tab == HTTP_TAB_HISTOGRAMS);
 
 /* surprising deficiency of GLib is no support of display locale time */
-	char timestamp[100];
-	time_t now;
-	time (&now);
-	const struct tm* time_ptr = localtime (&now);
-#ifndef _WIN32
-	strftime (timestamp, sizeof(timestamp), "%c", time_ptr);
-#else
-	wchar_t wtimestamp[100];
-	const size_t slen  = strftime (timestamp, sizeof(timestamp), "%c", time_ptr);
-	const size_t wslen = MultiByteToWideChar (CP_ACP, 0, timestamp, slen, wtimestamp, 100);
-	WideCharToMultiByte (CP_UTF8, 0, wtimestamp, wslen + 1, timestamp, sizeof(timestamp), NULL, NULL);
-#endif
+	char buf[100];
+	const time_t nowdate = time(NULL);
+	struct tm now;
+	localtime_r (&nowdate, &now);
+	gsize ret = strftime (buf, sizeof(buf), "%c", &now);
+	gsize bytes_written;
+	gchar* timestamp = g_locale_to_utf8 (buf, ret, NULL, &bytes_written, NULL);
 
-	pgm_string_t* response = pgm_string_new (WWW_XHTML10_STRICT_DOCTYPE);
-	pgm_string_append_printf (response, "\n<head>"
+	GString* response = g_string_new (WWW_XHTML10_STRICT_DOCTYPE);
+	g_string_append_printf (response, "\n<head>"
 						"<title>%s - %s</title>"
 						"<link rel=\"stylesheet\" href=\"/base.css\" type=\"text/css\" charset=\"utf-8\" />"
 					"</head>\n"
@@ -876,79 +333,164 @@ http_create_response (
 						"<div id=\"tabline\"></div>"
 					"</div>"
 					"<div id=\"content\">",
-				http_hostname,
+				g_hostname,
 				subtitle,
-				http_hostname,
+				g_hostname,
 				pgm_major_version, pgm_minor_version, pgm_micro_version,
 				timestamp,
 				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
 				tab == HTTP_TAB_INTERFACES ? "top" : "bottom",
 				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom"
 #ifdef CONFIG_HISTOGRAMS
-			       ,tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom"
+				,tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom"
 #endif
 	);
 
+	g_free (timestamp);
 	return response;
 }
 
 static
 void
 http_finalize_response (
-	struct http_connection_t*	connection,
-	pgm_string_t*			response
+	GString*		response,
+	SoupMessage*		msg
 	)
 {
-	pgm_string_append (response,	"</div>"
+	g_string_append (response,	"</div>"
 					"<div id=\"footer\">"
 						"&copy;2010 Miru"
 					"</div>"
 					"</body>\n"
 					"</html>");
 
-	char* buf = pgm_string_free (response, FALSE);
-	http_set_response (connection, buf, strlen (buf));
+	gchar* buf = g_string_free (response, FALSE);
+	soup_message_set_status (msg, SOUP_STATUS_OK);
+#ifdef CONFIG_LIBSOUP22
+	soup_server_message_set_encoding (SOUP_SERVER_MESSAGE (msg), SOUP_TRANSFER_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/html", SOUP_BUFFER_SYSTEM_OWNED,
+					buf, strlen(buf));
+#else
+	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/html", SOUP_MEMORY_TAKE,
+					buf, strlen(buf));
+#endif
 }
 
+#ifdef CONFIG_LIBSOUP22	
 static
 void
 robots_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	SoupServerContext*	context,
+	SoupMessage*		msg,
+	G_GNUC_UNUSED gpointer	data
+	)
+{
+	if (context->method_id != SOUP_METHOD_ID_GET) {
+		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+		return;
+	}
+
+	soup_message_set_status (msg, SOUP_STATUS_OK);
+	soup_server_message_set_encoding (SOUP_SERVER_MESSAGE (msg), SOUP_TRANSFER_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/plain", SOUP_BUFFER_STATIC,
+					WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
+}
+#else
+static
+void
+robots_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
         )
 {
-	http_set_content_type (connection, "text/plain");
-        http_set_static_response (connection, WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
-}
+	if (0 != g_strcmp0 (msg->method, "GET")) {
+		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+		return;
+	}
 
-static
-void
+	soup_message_set_status (msg, SOUP_STATUS_OK);
+	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+        soup_message_set_response (msg, "text/plain", SOUP_MEMORY_STATIC,
+                                WWW_ROBOTS_TXT, strlen(WWW_ROBOTS_TXT));
+}
+#endif
+
+#ifdef CONFIG_LIBSOUP22 
+static void
 css_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	SoupServerContext*	context,
+	SoupMessage*		msg,
+	G_GNUC_UNUSED gpointer	data
+	)
+{
+	if (context->method_id != SOUP_METHOD_ID_GET) {
+		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+		return;
+	}
+
+	soup_message_set_status (msg, SOUP_STATUS_OK);
+	soup_server_message_set_encoding (SOUP_SERVER_MESSAGE (msg), SOUP_TRANSFER_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/css", SOUP_BUFFER_STATIC,
+					WWW_BASE_CSS, strlen(WWW_BASE_CSS));
+}
+#else
+static void
+css_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
         )
 {       
-	http_set_content_type (connection, "text/css");
-        http_set_static_response (connection, WWW_BASE_CSS, strlen(WWW_BASE_CSS));
-}
+        if (0 != g_strcmp0 (msg->method, "GET")) {
+                soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+                return;
+        }
 
-static
-void
+        soup_message_set_status (msg, SOUP_STATUS_OK);
+        soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+        soup_message_set_response (msg, "text/css", SOUP_MEMORY_STATIC,
+                                WWW_BASE_CSS, strlen(WWW_BASE_CSS));
+}
+#endif
+
+#ifdef CONFIG_LIBSOUP22
+static void
 index_callback (
-	struct http_connection_t*	connection,
-	const char*			path
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
+	)
+{
+#else
+static void
+index_callback (
+        SoupServer*		server,
+        SoupMessage*    	msg,
+        const char*       	path,
+        GHashTable* 		query,
+        SoupClientContext*	client,
+        gpointer 		data
         )
 {
 	if (strlen (path) > 1) {
-		default_callback (connection, path);
+		default_callback (server, msg, path, query, client, data);
 		return;
 	}
-	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
-	const unsigned transport_count = pgm_slist_length (pgm_transport_list);
-	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
+#endif
+	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
+	const int transport_count = g_slist_length (pgm_transport_list);
+	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 
-	pgm_string_t* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
-	pgm_string_append_printf (response,	"<table>"
+	GString* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
+	g_string_append_printf (response,	"<table>"
 						"<tr>"
 							"<th>host name:</th><td>%s</td>"
 						"</tr><tr>"
@@ -961,28 +503,41 @@ index_callback (
 							"<th>process ID:</th><td>%i</td>"
 						"</tr>"
 						"</table>\n",
-				http_hostname,
-				http_username,
-				http_address,
+				g_hostname,
+				g_username,
+				g_address,
 				transport_count,
-				http_pid);
-	http_finalize_response (connection, response);
+				g_pid);
+
+	http_finalize_response (response, msg);
 }
 
-static
-void
+#ifdef CONFIG_LIBSOUP22
+static void
 interfaces_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
+	)
+#else
+static void
+interfaces_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
         )
+#endif
 {
-	pgm_string_t* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
-	pgm_string_append (response, "<PRE>");
+	GString* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
+	g_string_append (response, "<PRE>");
 	struct pgm_ifaddrs *ifap, *ifa;
-	pgm_error_t* err = NULL;
-	if (!pgm_getifaddrs (&ifap, &err)) {
-		pgm_string_append_printf (response, "pgm_getifaddrs(): %s", (err && err->message) ? err->message : "(null)");
-		http_finalize_response (connection, response);
+	int e = pgm_getifaddrs (&ifap);
+	if (e < 0) {
+		g_string_append_printf (response, "pgm_getifaddrs(): %s", g_strerror (errno));
+		http_finalize_response (response, msg);
 		return;
 	}
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
@@ -991,14 +546,14 @@ interfaces_callback (
 		char rname[IF_NAMESIZE * 2 + 3];
 		char b[IF_NAMESIZE * 2 + 3];
 
-		pgm_if_indextoname (i, rname);
+		if_indextoname(i, rname);
 		sprintf (b, "%s (%s)", ifa->ifa_name, rname);
 
 		 if (NULL == ifa->ifa_addr ||
 		      (ifa->ifa_addr->sa_family != AF_INET &&
 		       ifa->ifa_addr->sa_family != AF_INET6) )
 		{
-			pgm_string_append_printf (response,
+			g_string_append_printf (response,
 				"#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s<BR/>\n",
 				i,
 				b,
@@ -1016,7 +571,7 @@ interfaces_callback (
 			     s, sizeof(s),
 			     NULL, 0,
 			     NI_NUMERICHOST);
-		pgm_string_append_printf (response,
+		g_string_append_printf (response,
 			"#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s<BR/>\n",
 			i,
 			b,
@@ -1030,19 +585,31 @@ interfaces_callback (
 		);
 	}
 	pgm_freeifaddrs (ifap);
-	pgm_string_append (response, "</PRE>\n");
-	http_finalize_response (connection, response);
+	g_string_append (response, "</PRE>\n");
+	http_finalize_response (response, msg);
 }
 
-static
-void
+#ifdef CONFIG_LIBSOUP22
+static void
 transports_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
+	)
+#else
+static void
+transports_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
         )
+#endif
 {
-	pgm_string_t* response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
-	pgm_string_append (response,	"<div class=\"bubbly\">"
+	GString* response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
+	g_string_append (response,	"<div class=\"bubbly\">"
 					"\n<table cellspacing=\"0\">"
 					"<tr>"
 						"<th>Group address</th>"
@@ -1054,12 +621,12 @@ transports_callback (
 
 	if (pgm_transport_list)
 	{
-		pgm_rwlock_reader_lock (&pgm_transport_list_lock);
+		g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
-		pgm_slist_t* list = pgm_transport_list;
+		GSList* list = pgm_transport_list;
 		while (list)
 		{
-			pgm_slist_t* next = list->next;
+			GSList* next = list->next;
 			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
@@ -1067,15 +634,21 @@ transports_callback (
 				     group_address, sizeof(group_address),
 				     NULL, 0,
 				     NI_NUMERICHOST);
-			char gsi[ PGM_GSISTRLEN ];
-			pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
-			const uint16_t sport = ntohs (transport->tsi.sport);
-			const uint16_t dport = ntohs (transport->dport);
-			pgm_string_append_printf (response,	"<tr>"
+			char gsi[sizeof("000.000.000.000.000.000")];
+			snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+				transport->tsi.gsi.identifier[0],
+				transport->tsi.gsi.identifier[1],
+				transport->tsi.gsi.identifier[2],
+				transport->tsi.gsi.identifier[3],
+				transport->tsi.gsi.identifier[4],
+				transport->tsi.gsi.identifier[5]);
+			const int sport = g_ntohs (transport->tsi.sport);
+			const int dport = g_ntohs (transport->dport);
+			g_string_append_printf (response,	"<tr>"
 									"<td>%s</td>"
 									"<td>%i</td>"
-									"<td><a href=\"/%s.%u\">%s</a></td>"
-									"<td><a href=\"/%s.%u\">%u</a></td>"
+									"<td><a href=\"/%s.%hu\">%s</a></td>"
+									"<td><a href=\"/%s.%hu\">%hu</a></td>"
 								"</tr>",
 						group_address,
 						dport,
@@ -1085,41 +658,78 @@ transports_callback (
 						sport);
 			list = next;
 		}
-		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
+		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 	}
 	else
 	{
 /* no transports */
-		pgm_string_append (response,		"<tr>"
+		g_string_append (response,		"<tr>"
 							"<td colspan=\"6\"><div class=\"empty\">This transport has no peers.</div></td>"
 							"</tr>"
 				);
 	}
 
-	pgm_string_append (response,		"</table>\n"
+	g_string_append (response,		"</table>\n"
 						"</div>");
-	http_finalize_response (connection, response);
+	http_finalize_response (response, msg);
 }
 
-static
-void
+#ifdef CONFIG_LIBSOUP22
+static void
 histograms_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	G_GNUC_UNUSED SoupServerContext* context,
+	SoupMessage*			msg,
+	G_GNUC_UNUSED gpointer		data
+	)
+#else
+static void
+histograms_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
         )
+#endif
 {
-	pgm_string_t* response = http_create_response ("Histograms", HTTP_TAB_HISTOGRAMS);
+	GString* response = http_create_response ("Histograms", HTTP_TAB_HISTOGRAMS);
 	pgm_histogram_write_html_graph_all (response);
-	http_finalize_response (connection, response);
+	http_finalize_response (response, msg);
 }
 
-static
-void
+#ifdef CONFIG_LIBSOUP22
+static void
 default_callback (
-	struct http_connection_t*	connection,
-	const char*			path
+	SoupServerContext*	context,
+	SoupMessage*		msg,
+	G_GNUC_UNUSED gpointer	data
+	)
+{
+	if (context->method_id != SOUP_METHOD_ID_GET) {
+		soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+		return;
+	}
+
+/* magical mysterious GSI hunting from path */
+	char *path = soup_uri_to_string (soup_message_get_uri (msg), TRUE);
+#else
+static void
+default_callback (
+        G_GNUC_UNUSED SoupServer*       server,
+        SoupMessage*    		msg,
+        G_GNUC_UNUSED const char*       path,
+        G_GNUC_UNUSED GHashTable* 	query,
+        G_GNUC_UNUSED SoupClientContext* client,
+        G_GNUC_UNUSED gpointer 		data
         )
 {
+        if (0 != g_strcmp0 (msg->method, "GET")) {
+                soup_message_set_status (msg, SOUP_STATUS_NOT_IMPLEMENTED);
+                return;
+        }
+#endif
+
 	pgm_tsi_t tsi;
 	const int count = sscanf (path, "/%hhu.%hhu.%hhu.%hhu.%hhu.%hhu.%hu",
 				(unsigned char*)&tsi.gsi.identifier[0],
@@ -1129,33 +739,43 @@ default_callback (
 				(unsigned char*)&tsi.gsi.identifier[4],
 				(unsigned char*)&tsi.gsi.identifier[5],
 				&tsi.sport);
-	tsi.sport = htons (tsi.sport);
+	tsi.sport = g_htons (tsi.sport);
+#ifdef CONFIG_LIBSOUP22
+	g_free (path);
+#endif
 	if (count == 7)
 	{
-		int retval = http_tsi_response (connection, &tsi);
+		int retval = http_tsi_response (&tsi, msg);
 		if (!retval) return;
 	}
 
-	http_set_status (connection, 404, "Not Found");
-	http_set_static_response (connection, WWW_404_HTML, strlen(WWW_404_HTML));
+	soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+#ifdef CONFIG_LIBSOUP22
+	soup_server_message_set_encoding (SOUP_SERVER_MESSAGE (msg), SOUP_TRANSFER_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/html", SOUP_BUFFER_STATIC,
+					WWW_404_HTML, strlen(WWW_404_HTML));
+#else
+	soup_message_headers_set_encoding (msg->response_headers, SOUP_ENCODING_CONTENT_LENGTH);
+	soup_message_set_response (msg, "text/html", SOUP_MEMORY_STATIC,
+					WWW_404_HTML, strlen(WWW_404_HTML));
+#endif
 }
 
-static
-int
+static int
 http_tsi_response (
-	struct http_connection_t*	connection,
-	pgm_tsi_t*			tsi
+	pgm_tsi_t*		tsi,
+	SoupMessage*		msg
 	)
 {
 /* first verify this is a valid TSI */
-	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
+	g_static_rw_lock_reader_lock (&pgm_transport_list_lock);
 
 	pgm_transport_t* transport = NULL;
-	pgm_slist_t* list = pgm_transport_list;
+	GSList* list = pgm_transport_list;
 	while (list)
 	{
 		pgm_transport_t* list_transport = (pgm_transport_t*)list->data;
-		pgm_slist_t* next = list->next;
+		GSList* next = list->next;
 
 /* check source */
 		if (pgm_tsi_equal (tsi, &list_transport->tsi))
@@ -1165,32 +785,38 @@ http_tsi_response (
 		}
 
 /* check receivers */
-		pgm_rwlock_reader_lock (&list_transport->peers_lock);
-		pgm_peer_t* receiver = pgm_hashtable_lookup (list_transport->peers_hashtable, tsi);
+		g_static_rw_lock_reader_lock (&list_transport->peers_lock);
+		pgm_peer_t* receiver = g_hash_table_lookup (list_transport->peers_hashtable, tsi);
 		if (receiver) {
-			int retval = http_receiver_response (connection, receiver);
-			pgm_rwlock_reader_unlock (&list_transport->peers_lock);
-			pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
+			int retval = http_receiver_response (receiver, msg);
+			g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
+			g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 			return retval;
 		}
-		pgm_rwlock_reader_unlock (&list_transport->peers_lock);
+		g_static_rw_lock_reader_unlock (&list_transport->peers_lock);
 
 		list = next;
 	}
 
 	if (!transport) {
-		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
+		g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
 		return -1;
 	}
 
 /* transport now contains valid matching TSI */
-	char gsi[ PGM_GSISTRLEN ];
-	pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
+	char gsi[sizeof("000.000.000.000.000.000")];
+	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+			transport->tsi.gsi.identifier[0],
+			transport->tsi.gsi.identifier[1],
+			transport->tsi.gsi.identifier[2],
+			transport->tsi.gsi.identifier[3],
+			transport->tsi.gsi.identifier[4],
+			transport->tsi.gsi.identifier[5]);
 
-	char title[ sizeof("Transport .00000") + PGM_GSISTRLEN ];
-	sprintf (title, "Transport %s.%hu",
-		 gsi,
-		 ntohs (transport->tsi.sport));
+	char title[ sizeof("Transport 000.000.000.000.000.000.00000") ];
+	sprintf (title, "Transport %s.%i",
+		gsi,
+		g_ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_source, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_source),
@@ -1204,11 +830,11 @@ http_tsi_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const uint16_t dport = ntohs (transport->dport);
-	const uint16_t sport = ntohs (transport->tsi.sport);
+	const int dport = g_ntohs (transport->dport);
+	const int sport = g_ntohs (transport->tsi.sport);
 
-	const pgm_time_t ihb_min = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ 1 ] : 0;
-	const pgm_time_t ihb_max = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ transport->spm_heartbeat_len - 1 ] : 0;
+	pgm_time_t ihb_min = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ 1 ] : 0;
+	pgm_time_t ihb_max = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ transport->spm_heartbeat_len - 1 ] : 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len ((struct sockaddr*)&transport->recv_gsr[0].gsr_source),
@@ -1216,16 +842,16 @@ http_tsi_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	pgm_string_t* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
-	pgm_string_append_printf (response,	"<div class=\"heading\">"
+	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
+	g_string_append_printf (response,	"<div class=\"heading\">"
 							"<strong>Transport: </strong>"
-							"%s.%hu"
+							"%s.%i"
 						"</div>",
-				  gsi, sport);
+				gsi, sport);
 
 /* peers */
 
-	pgm_string_append (response,		"<div class=\"bubbly\">"
+	g_string_append (response,		"<div class=\"bubbly\">"
 						"\n<table cellspacing=\"0\">"
 						"<tr>"
 							"<th>Group address</th>"
@@ -1239,43 +865,43 @@ http_tsi_response (
 
 	if (transport->peers_list)
 	{
-		pgm_rwlock_reader_lock (&transport->peers_lock);
-		pgm_list_t* peers_list = transport->peers_list;
+		g_static_rw_lock_reader_lock (&transport->peers_lock);
+		GList* peers_list = transport->peers_list;
 		while (peers_list) {
-			pgm_list_t* next = peers_list->next;
+			GList* next = peers_list->next;
 			http_each_receiver (peers_list->data, response);
 			peers_list = next;
 		}
-		pgm_rwlock_reader_unlock (&transport->peers_lock);
+		g_static_rw_lock_reader_unlock (&transport->peers_lock);
 	}
 	else
 	{
 /* no peers */
 
-		pgm_string_append (response,	"<tr>"
+		g_string_append (response,	"<tr>"
 							"<td colspan=\"6\"><div class=\"empty\">This transport has no peers.</div></td>"
 						"</tr>"
 				);
 
 	}
 
-	pgm_string_append (response,		"</table>\n"
+	g_string_append (response,		"</table>\n"
 						"</div>");
 
 /* source and configuration information */
 
-	pgm_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
+	g_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
 						"\n<table>"
 						"<tr>"
 							"<th>Source address</th><td>%s</td>"
 						"</tr><tr>"
 							"<th>Group address</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>Dest port</th><td>%u</td>"
+							"<th>Dest port</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Source GSI</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>Source port</th><td>%u</td>"
+							"<th>Source port</th><td>%i</td>"
 						"</tr>",
 				source_address,
 				group_address,
@@ -1285,7 +911,7 @@ http_tsi_response (
 
 /* continue with source information */
 
-	pgm_string_append_printf (response,	"<tr>"
+	g_string_append_printf (response,	"<tr>"
 							"<td colspan=\"2\"><div class=\"break\"></div></td>"
 						"</tr><tr>"
 							"<th>Ttl</th><td>%u</td>"
@@ -1294,7 +920,7 @@ http_tsi_response (
 						"</tr><tr>"
 							"<th>Late join</th><td>disable(2)</td>"
 						"</tr><tr>"
-							"<th>TXW_MAX_RTE</th><td>%" GROUP_FORMAT "zd</td>"
+							"<th>TXW_MAX_RTE</th><td>%" GROUP_FORMAT "u</td>"
 						"</tr><tr>"
 							"<th>TXW_SECS</th><td>%" GROUP_FORMAT "u</td>"
 						"</tr><tr>"
@@ -1325,49 +951,48 @@ http_tsi_response (
 
 /* performance information */
 
-	const pgm_txw_t* window = transport->window;
-	pgm_string_append_printf (response,	"\n<h2>Performance information</h2>"
+	g_string_append_printf (response,	"\n<h2>Performance information</h2>"
 						"\n<table>"
 						"<tr>"
-							"<th>Data bytes sent</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Data bytes sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Data packets sent</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Data packets sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes buffered</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Bytes buffered</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets buffered</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Packets buffered</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes sent</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Bytes sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Raw NAKs received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Raw NAKs received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Checksum errors</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Checksum errors</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NAKs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed NAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets discarded</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Packets discarded</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes retransmitted</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Bytes retransmitted</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets retransmitted</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Packets retransmitted</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs ignored</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs ignored</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Transmission rate</th><td>%" GROUP_FORMAT PRIu32 " bps</td>"
+							"<th>Transmission rate</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " bps</td>"
 						"</tr><tr>"
-							"<th>NNAK packets received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NNAK packets received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NNAKs received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NNAKs received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NNAKs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed NNAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr>"
 						"</table>\n",
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						window ? pgm_txw_size (window) : 0,	/* minus IP & any UDP header */
-						window ? pgm_txw_length (window) : 0,
+						transport->window ? pgm_txw_size((pgm_txw_t*)transport->window) : 0,	/* minus IP & any UDP header */
+						transport->window ? pgm_txw_length((pgm_txw_t*)transport->window) : 0,
 						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
@@ -1382,16 +1007,17 @@ http_tsi_response (
 						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED],
 						transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]);
 
-	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
-	http_finalize_response (connection, response);
+	g_static_rw_lock_reader_unlock (&pgm_transport_list_lock);
+
+	http_finalize_response (response, msg);
+
 	return 0;
 }
 
-static
-void
+static void
 http_each_receiver (
 	pgm_peer_t*		peer,
-	pgm_string_t*		response
+	GString*		response
 	)
 {
 	char group_address[INET6_ADDRSTRLEN];
@@ -1412,18 +1038,24 @@ http_each_receiver (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	char gsi[ PGM_GSISTRLEN + sizeof(".00000") ];
-	pgm_gsi_print_r (&peer->tsi.gsi, gsi, sizeof(gsi));
+	char gsi[sizeof("000.000.000.000.000.000")];
+	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+			peer->tsi.gsi.identifier[0],
+			peer->tsi.gsi.identifier[1],
+			peer->tsi.gsi.identifier[2],
+			peer->tsi.gsi.identifier[3],
+			peer->tsi.gsi.identifier[4],
+			peer->tsi.gsi.identifier[5]);
 
-	const int sport = ntohs (peer->tsi.sport);
-	const int dport = ntohs (peer->transport->dport);	/* by definition must be the same */
-	pgm_string_append_printf (response,	"<tr>"
+	const int sport = g_ntohs (peer->tsi.sport);
+	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
+	g_string_append_printf (response,	"<tr>"
 							"<td>%s</td>"
-							"<td>%u</td>"
+							"<td>%i</td>"
 							"<td>%s</td>"
 							"<td>%s</td>"
-							"<td><a href=\"/%s.%u\">%s</a></td>"
-							"<td><a href=\"/%s.%u\">%u</a></td>"
+							"<td><a href=\"/%s.%i\">%s</a></td>"
+							"<td><a href=\"/%s.%i\">%i</a></td>"
 						"</tr>",
 				group_address,
 				dport,
@@ -1434,20 +1066,20 @@ http_each_receiver (
 			);
 }
 
-static
-int
+static int
 http_time_summary (
 	const time_t* 		activity_time,
 	char* 			sz
 	)
 {
-	time_t now_time = time (NULL);
+	time_t now_time = time(NULL);
 
 	if (*activity_time > now_time) {
 		return sprintf (sz, "clock skew");
 	}
 
-	struct tm* activity_tm = localtime (activity_time);
+	struct tm activity_tm;
+	localtime_r (activity_time, &activity_tm);
 
 	now_time -= *activity_time;
 
@@ -1472,14 +1104,7 @@ http_time_summary (
 	else
 	{
 		char daymonth[32];
-#ifndef _WIN32
 		strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
-#else
-		wchar_t wdaymonth[32];
-		const size_t slen  = strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
-		const size_t wslen = MultiByteToWideChar (CP_ACP, 0, daymonth, slen, wdaymonth, 32);
-		WideCharToMultiByte (CP_UTF8, 0, wdaymonth, wslen + 1, daymonth, sizeof(daymonth), NULL, NULL);
-#endif
 		now_time /= 24;
 		if (now_time < 14) {
 			return sprintf (sz, "%s (%li day%s ago)",
@@ -1490,19 +1115,25 @@ http_time_summary (
 	}
 }
 
-static
-int
+static int
 http_receiver_response (
-	struct http_connection_t*	connection,
-	pgm_peer_t*			peer
+	pgm_peer_t*		peer,
+	SoupMessage*		msg
 	)
 {
-	char gsi[ PGM_GSISTRLEN ];
-	pgm_gsi_print_r (&peer->tsi.gsi, gsi, sizeof(gsi));
-	char title[ sizeof("Peer .00000") + PGM_GSISTRLEN ];
-	sprintf (title, "Peer %s.%u",
-		 gsi,
-		 ntohs (peer->tsi.sport));
+	char gsi[sizeof("000.000.000.000.000.000")];
+	snprintf(gsi, sizeof(gsi), "%hhu.%hhu.%hhu.%hhu.%hhu.%hhu",
+			peer->tsi.gsi.identifier[0],
+			peer->tsi.gsi.identifier[1],
+			peer->tsi.gsi.identifier[2],
+			peer->tsi.gsi.identifier[3],
+			peer->tsi.gsi.identifier[4],
+			peer->tsi.gsi.identifier[5]);
+
+	char title[ sizeof("Peer 000.000.000.000.000.000.00000") ];
+	sprintf (title, "Peer %s.%hu",
+		gsi,
+		g_ntohs (peer->tsi.sport));
 
 	char group_address[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->group_nla),
@@ -1522,34 +1153,36 @@ http_receiver_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const uint16_t sport = ntohs (peer->tsi.sport);
-	const uint16_t dport = ntohs (peer->transport->dport);	/* by definition must be the same */
-	const pgm_rxw_t* window = peer->window;
-	const uint32_t outstanding_naks = window->nak_backoff_queue.length +
-					  window->wait_ncf_queue.length +
-					  window->wait_data_queue.length;
+	const int sport = g_ntohs (peer->tsi.sport);
+	const int dport = g_ntohs (peer->transport->dport);	/* by definition must be the same */
+	const guint32 outstanding_naks = ((pgm_rxw_t*)peer->window)->backoff_queue.length +
+					 ((pgm_rxw_t*)peer->window)->wait_ncf_queue.length +
+					 ((pgm_rxw_t*)peer->window)->wait_data_queue.length;
 
 	time_t last_activity_time;
 	pgm_time_since_epoch (&peer->last_packet, &last_activity_time);
 
-	char last_activity[100];
-	http_time_summary (&last_activity_time, last_activity);
+	char buf[100];
+	http_time_summary (&last_activity_time, buf);
 
-	pgm_string_t* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
-	pgm_string_append_printf (response,	"<div class=\"heading\">"
+	gsize bytes_written;
+	gchar* last_activity = g_locale_to_utf8 (buf, strlen(buf), NULL, &bytes_written, NULL);
+
+	GString* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
+	g_string_append_printf (response,	"<div class=\"heading\">"
 							"<strong>Peer: </strong>"
-							"%s.%u"
+							"%s.%i"
 						"</div>",
-				  gsi, sport);
+				gsi, sport);
 
 
 /* peer information */
-	pgm_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
+	g_string_append_printf (response,	"<div class=\"rounded\" id=\"information\">"
 						"\n<table>"
 						"<tr>"
 							"<th>Group address</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>Dest port</th><td>%u</td>"
+							"<th>Dest port</th><td>%i</td>"
 						"</tr><tr>"
 							"<th>Source address</th><td>%s</td>"
 						"</tr><tr>"
@@ -1557,7 +1190,7 @@ http_receiver_response (
 						"</tr><tr>"
 							"<th>Source GSI</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>Source port</th><td>%u</td>"
+							"<th>Source port</th><td>%i</td>"
 						"</tr>",
 				group_address,
 				dport,
@@ -1566,7 +1199,7 @@ http_receiver_response (
 				gsi,
 				sport);
 
-	pgm_string_append_printf (response,	"<tr>"
+	g_string_append_printf (response,	"<tr>"
 							"<td colspan=\"2\"><div class=\"break\"></div></td>"
 						"</tr><tr>"
 							"<th>NAK_BO_IVL</th><td>%" GROUP_FORMAT PGM_TIME_FORMAT " ms</td>"
@@ -1598,80 +1231,80 @@ http_receiver_response (
 						peer->transport->nak_data_retries,
 						peer->transport->hops);
 
-	pgm_string_append_printf (response,	"\n<h2>Performance information</h2>"
+	g_string_append_printf (response,	"\n<h2>Performance information</h2>"
 						"\n<table>"
 						"<tr>"
-							"<th>Data bytes received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Data bytes received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Data packets received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Data packets received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK failures</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAK failures</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Bytes received</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Bytes received</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Checksum errors</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Checksum errors</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed SPMs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed SPMs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed ODATA</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed ODATA</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed RDATA</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed RDATA</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NCFs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed NCFs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets discarded</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Packets discarded</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Losses</th><td>%" GROUP_FORMAT PRIu32 "</td>"	/* detected missed packets */
+							"<th>Losses</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"	/* detected missed packets */
 						"</tr><tr>"
-							"<th>Bytes delivered to app</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Bytes delivered to app</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Packets delivered to app</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Packets delivered to app</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Duplicate SPMs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Duplicate SPMs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Duplicate ODATA/RDATA</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Duplicate ODATA/RDATA</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK packets sent</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAK packets sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs sent</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs sent</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs retransmitted</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs retransmitted</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs failed</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to RXW advance</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs failed due to RXW advance</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to NCF retries</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs failed due to NCF retries</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs failed due to DATA retries</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs failed due to DATA retries</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK failures delivered to app</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAK failures delivered to app</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAKs suppressed</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAKs suppressed</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Malformed NAKs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Malformed NAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>Outstanding NAKs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>Outstanding NAKs</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
 							"<th>Last activity</th><td>%s</td>"
 						"</tr><tr>"
-							"<th>NAK repair min time</th><td>%" GROUP_FORMAT PRIu32 " μs</td>"
+							"<th>NAK repair min time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair mean time</th><td>%" GROUP_FORMAT PRIu32 " μs</td>"
+							"<th>NAK repair mean time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK repair max time</th><td>%" GROUP_FORMAT PRIu32 " μs</td>"
+							"<th>NAK repair max time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail min time</th><td>%" GROUP_FORMAT PRIu32 " μs</td>"
+							"<th>NAK fail min time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail mean time</th><td>%" GROUP_FORMAT PRIu32 " μs</td>"
+							"<th>NAK fail mean time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK fail max time</th><td>%" GROUP_FORMAT PRIu32 " μs</td>"
+							"<th>NAK fail max time</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT " μs</td>"
 						"</tr><tr>"
-							"<th>NAK min retransmit count</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAK min retransmit count</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK mean retransmit count</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAK mean retransmit count</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr><tr>"
-							"<th>NAK max retransmit count</th><td>%" GROUP_FORMAT PRIu32 "</td>"
+							"<th>NAK max retransmit count</th><td>%" GROUP_FORMAT G_GUINT32_FORMAT "</td>"
 						"</tr>"
 						"</table>\n",
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_BYTES_RECEIVED],
@@ -1684,9 +1317,9 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_NCFS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED],
-						window->cumulative_losses,
-						window->bytes_delivered,
-						window->msgs_delivered,
+						((pgm_rxw_t*)peer->window)->cumulative_losses,
+						((pgm_rxw_t*)peer->window)->bytes_delivered,
+						((pgm_rxw_t*)peer->window)->msgs_delivered,
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_SPMS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_DUP_DATAS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT],
@@ -1701,17 +1334,168 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_ERRORS],
 						outstanding_naks,
 						last_activity,
-						window->min_fill_time,
+						((pgm_rxw_t*)peer->window)->min_fill_time,
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_SVC_TIME_MEAN],
-						window->max_fill_time,
+						((pgm_rxw_t*)peer->window)->max_fill_time,
 						peer->min_fail_time,
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAIL_TIME_MEAN],
 						peer->max_fail_time,
-						window->min_nak_transmit_count,
+						((pgm_rxw_t*)peer->window)->min_nak_transmit_count,
 						peer->cumulative_stats[PGM_PC_RECEIVER_TRANSMIT_MEAN],
-						window->max_nak_transmit_count);
-	http_finalize_response (connection, response);
+						((pgm_rxw_t*)peer->window)->max_nak_transmit_count);
+	http_finalize_response (response, msg);
+	g_free (last_activity);
 	return 0;
+}
+
+GQuark
+pgm_http_error_quark (void)
+{
+	return g_quark_from_static_string ("pgm-http-error-quark");
+}
+
+static
+PGMHTTPError
+pgm_http_error_from_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_HTTP_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EINVAL
+	case EINVAL:
+		return PGM_HTTP_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef EPERM
+	case EPERM:
+		return PGM_HTTP_ERROR_PERM;
+		break;
+#endif
+
+#ifdef EMFILE
+	case EMFILE:
+		return PGM_HTTP_ERROR_MFILE;
+		break;
+#endif
+
+#ifdef ENFILE
+	case ENFILE:
+		return PGM_HTTP_ERROR_NFILE;
+		break;
+#endif
+
+#ifdef ENXIO
+	case ENXIO:
+		return PGM_HTTP_ERROR_NXIO;
+		break;
+#endif
+
+#ifdef ERANGE
+	case ERANGE:
+		return PGM_HTTP_ERROR_RANGE;
+		break;
+#endif
+
+#ifdef ENOENT
+	case ENOENT:
+		return PGM_HTTP_ERROR_NOENT;
+		break;
+#endif
+
+	default :
+		return PGM_HTTP_ERROR_FAILED;
+		break;
+	}
+}
+
+/* errno must be preserved before calling to catch correct error
+ * status with EAI_SYSTEM.
+ */
+
+static
+PGMHTTPError
+pgm_http_error_from_eai_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EAI_ADDRFAMILY
+	case EAI_ADDRFAMILY:
+		return PGM_HTTP_ERROR_ADDRFAMILY;
+		break;
+#endif
+
+#ifdef EAI_AGAIN
+	case EAI_AGAIN:
+		return PGM_HTTP_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef EAI_BADFLAGS
+	case EAI_BADFLAGS:
+		return PGM_HTTP_ERROR_BADFLAGS;
+		break;
+#endif
+
+#ifdef EAI_FAIL
+	case EAI_FAIL:
+		return PGM_HTTP_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef EAI_FAMILY
+	case EAI_FAMILY:
+		return PGM_HTTP_ERROR_FAMILY;
+		break;
+#endif
+
+#ifdef EAI_MEMORY
+	case EAI_MEMORY:
+		return PGM_HTTP_ERROR_MEMORY;
+		break;
+#endif
+
+#ifdef EAI_NODATA
+	case EAI_NODATA:
+		return PGM_HTTP_ERROR_NODATA;
+		break;
+#endif
+
+#ifdef EAI_NONAME
+	case EAI_NONAME:
+		return PGM_HTTP_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef EAI_SERVICE
+	case EAI_SERVICE:
+		return PGM_HTTP_ERROR_SERVICE;
+		break;
+#endif
+
+#ifdef EAI_SOCKTYPE
+	case EAI_SOCKTYPE:
+		return PGM_HTTP_ERROR_SOCKTYPE;
+		break;
+#endif
+
+#ifdef EAI_SYSTEM
+	case EAI_SYSTEM:
+		return pgm_http_error_from_errno (errno);
+		break;
+#endif
+
+	default :
+		return PGM_HTTP_ERROR_FAILED;
+		break;
+	}
 }
 
 /* eof */

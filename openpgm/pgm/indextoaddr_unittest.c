@@ -23,7 +23,6 @@
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -33,6 +32,8 @@
 
 #include <glib.h>
 #include <check.h>
+
+#include <pgm/sockaddr.h>
 
 
 /* mock state */
@@ -46,23 +47,6 @@ struct mock_interface_t {
 };
 
 static GList *mock_interfaces = NULL;
-
-struct pgm_ifaddrs;
-struct pgm_error_t;
-
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
-static unsigned mock_pgm_if_nametoindex (const sa_family_t, const char*);
-
-
-#define pgm_getifaddrs		mock_pgm_getifaddrs
-#define pgm_freeifaddrs		mock_pgm_freeifaddrs
-#define pgm_if_nametoindex	mock_pgm_if_nametoindex
-
-
-#define INDEXTOADDR_DEBUG
-#include "indextoaddr.c"
-
 
 static
 gpointer
@@ -99,11 +83,11 @@ create_interface (
 			new_interface->flags |= IFF_MULTICAST;
 		else if (strncmp (tokens[i], "ip=", strlen("ip=")) == 0) {
 			const char* addr = tokens[i] + strlen("ip=");
-			g_assert (pgm_sockaddr_pton (addr, (struct sockaddr*)&new_interface->addr));
+			g_assert (pgm_sockaddr_pton (addr, &new_interface->addr));
 		}
 		else if (strncmp (tokens[i], "netmask=", strlen("netmask=")) == 0) {
 			const char* addr = tokens[i] + strlen("netmask=");
-			g_assert (pgm_sockaddr_pton (addr, (struct sockaddr*)&new_interface->netmask));
+			g_assert (pgm_sockaddr_pton (addr, &new_interface->netmask));
 		}
 		else if (strncmp (tokens[i], "scope=", strlen("scope=")) == 0) {
 			const char* scope = tokens[i] + strlen("scope=");
@@ -155,28 +139,39 @@ mock_teardown_net (void)
 	g_list_free (mock_interfaces);
 }
 
-/* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
+#include "pgm/getifaddrs.h"
+
+int
+pgm_compat_getifaddrs (
+	struct pgm_ifaddrs**	ifap
+	)
 {
-        return 0;
+	g_assert_not_reached();
+	return -1;
 }
 
-bool
+void
+pgm_compat_freeifaddrs (
+	struct pgm_ifaddrs*	ifap
+	)
+{
+	g_assert_not_reached();
+}
+
+/* mock functions for external references */
+
+int
 mock_pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
-	pgm_error_t**		err
+	struct pgm_ifaddrs**	ifap
 	)
 {
 	if (NULL == ifap) {
-		return FALSE;
+		errno = EINVAL;
+		return -1;
 	}
 
-	g_debug ("mock_getifaddrs (ifap:%p err:%p)", (gpointer)ifap, (gpointer)err);
+	g_debug ("mock_pgm_getifaddrs (ifap:%p)", (gpointer)ifap);
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
@@ -196,7 +191,8 @@ mock_pgm_getifaddrs (
 	}
 
 	*ifap = ifa;
-	return TRUE;
+
+	return 0;
 }
 
 static
@@ -209,9 +205,21 @@ mock_pgm_freeifaddrs (
 	free (ifa);
 }
 
-unsigned
+#include "pgm/nametoindex.h"
+
+int
+pgm_compat_if_nametoindex (
+	const int		iffamily,
+	const char*		ifname
+	)
+{
+	g_assert_not_reached();
+	return -1;
+}
+
+int
 mock_pgm_if_nametoindex (
-	const sa_family_t	iffamily,
+	const int		iffamily,
 	const char*		ifname
 	)
 {
@@ -226,14 +234,23 @@ mock_pgm_if_nametoindex (
 }
 
 
+#define pgm_getifaddrs	mock_pgm_getifaddrs
+#define pgm_freeifaddrs	mock_pgm_freeifaddrs
+#define pgm_if_nametoindex	mock_pgm_if_nametoindex
+
+
+#define INDEXTOADDR_DEBUG
+#include "indextoaddr.c"
+
+
 /* target:
- *	bool
+ *	gboolean
  *	pgm_if_indextoaddr (
- *		const unsigned		ifindex,
- *		const sa_family_t	iffamily,
- *		const uint32_t		ifscope,
+ *		const unsigned int	ifindex,
+ *		const int		iffamily,
+ *		const unsigned		ifscope,
  *		struct sockaddr*	ifsa,
- *		pgm_error_t**		error
+ *		GError**		error
  *	)
  */
 
@@ -241,7 +258,7 @@ START_TEST (test_indextoaddr_pass_001)
 {
 	char saddr[INET6_ADDRSTRLEN];
 	struct sockaddr_storage addr;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	const unsigned int ifindex = 2;
 	fail_unless (TRUE == pgm_if_indextoaddr (ifindex, AF_INET, 0, (struct sockaddr*)&addr, &err));
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
@@ -256,7 +273,7 @@ END_TEST
 
 START_TEST (test_indextoaddr_fail_001)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (FALSE == pgm_if_indextoaddr (0, 0, 0, NULL, &err));
 }
 END_TEST

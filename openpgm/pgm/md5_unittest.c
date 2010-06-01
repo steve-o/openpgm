@@ -22,8 +22,6 @@
 
 #include <errno.h>
 #include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -34,15 +32,6 @@
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
-
 
 #define MD5_DEBUG
 #include "md5.c"
@@ -50,73 +39,73 @@ pgm_transport_pkt_offset2 (
 
 /* target:
  *	void
- *	pgm_md5_init_ctx (
- *		struct pgm_md5_t*	ctx
+ *	_md5_init_ctx (
+ *		struct md5_ctx*		ctx
  *	)
  */
 
 START_TEST (test_init_ctx_pass_001)
 {
-	struct pgm_md5_t ctx;
+	struct md5_ctx ctx;
 	memset (&ctx, 0, sizeof(ctx));
-	pgm_md5_init_ctx (&ctx);
+	_md5_init_ctx (&ctx);
 }
 END_TEST
 
 START_TEST (test_init_ctx_fail_001)
 {
-	pgm_md5_init_ctx (NULL);
+	_md5_init_ctx (NULL);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
  *	void
- *	pgm_md5_process_bytes (
- *		struct pgm_md5_t*	ctx,
- *		const void*		buffer,
- *		size_t			len
+ *	_md5_process_bytes (
+ *		struct md5_ctx*		ctx,
+ *		gconstpointer		buffer,
+ *		gsize			len
  *	)
  */
 
 START_TEST (test_process_bytes_pass_001)
 {
 	const char buffer[] = "i am not a string.";
-	struct pgm_md5_t ctx;
+	struct md5_ctx ctx;
 	memset (&ctx, 0, sizeof(ctx));
-	pgm_md5_init_ctx (&ctx);
-	pgm_md5_process_bytes (&ctx, buffer, sizeof(buffer));
+	_md5_init_ctx (&ctx);
+	_md5_process_bytes (&ctx, buffer, sizeof(buffer));
 }
 END_TEST
 
 START_TEST (test_process_bytes_fail_001)
 {
 	const char buffer[] = "i am not a string.";
-	pgm_md5_process_bytes (NULL, buffer, sizeof(buffer));
+	_md5_process_bytes (NULL, buffer, sizeof(buffer));
 }
 END_TEST
 
 /* target:
- *	void*	
- *	pgm_md5_finish_ctx (
- *		struct pgm_md5_t*	ctx,
- *		void*			resbuf
+ *	gpointer	
+ *	_md5_finish_ctx (
+ *		struct md5_ctx*		ctx,
+ *		gpointer		resbuf
  *	)
  */
 
 START_TEST (test_finish_ctx_pass_001)
 {
 	const char* buffer = "i am not a string.";
-	const char* answer = "ef71-1617-4eef-9737-5e2b-5d7a-d015-b064";
+	const char* answer = "13de-6066-151e-e5a5-6451-e154-1fb7-3b16";
 
 	char md5[1024];
 	char resblock[16];
-	struct pgm_md5_t ctx;
+	struct md5_ctx ctx;
 	memset (&ctx, 0, sizeof(ctx));
 	memset (resblock, 0, sizeof(resblock));
-	pgm_md5_init_ctx (&ctx);
-	pgm_md5_process_bytes (&ctx, buffer, strlen(buffer)+1);
-	pgm_md5_finish_ctx (&ctx, resblock);
+	_md5_init_ctx (&ctx);
+	_md5_process_bytes (&ctx, buffer, sizeof(buffer));
+	_md5_finish_ctx (&ctx, resblock);
 	sprintf (md5, "%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx",
 		   resblock[0], resblock[1],
 		   resblock[2], resblock[3],
@@ -135,7 +124,7 @@ END_TEST
 START_TEST (test_finish_ctx_fail_001)
 {
 	char resblock[16];
-	pgm_md5_finish_ctx (NULL, resblock);
+	_md5_finish_ctx (NULL, resblock);
 	fail ("reached");
 }
 END_TEST

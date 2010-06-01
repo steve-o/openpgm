@@ -19,36 +19,59 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE
 #include <errno.h>
-#include <ctype.h>
 #include <stdio.h>
-#ifndef _WIN32
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <glib.h>
+#include <glib/gi18n-lib.h>
+#include "pgm/glib-compat.h"
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <net/if.h>
 #	include <sys/types.h>
 #	include <sys/socket.h>
-#	include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
+#	include <sys/ioctl.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <pgm/if.h>
+
+#include "pgm/if.h"
+#include "pgm/ip.h"
+#include "pgm/sockaddr.h"
+#include "pgm/getifaddrs.h"
+#include "pgm/getnodeaddr.h"
+#include "pgm/inet_network.h"
+#include "pgm/indextoname.h"
+#include "pgm/nametoindex.h"
+#include "pgm/packet.h"
 
 
 //#define IF_DEBUG
+
+#ifndef IF_DEBUG
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
+
 
 /* temporary structure to contain interface name whilst address family
  * has not been resolved.
  */
 struct interface_req {
 	char			ir_name[IF_NAMESIZE];
-	unsigned int		ir_flags;		/* from SIOCGIFFLAGS */
 	unsigned int		ir_interface;		/* interface index */
 	struct sockaddr_storage ir_addr;		/* interface address */
 };
 
 
-/* locals */
+/* globals */
 
-#ifndef _WIN32
+#ifdef G_OS_UNIX
 #	define IF_DEFAULT_GROUP	((in_addr_t)0xefc00001) /* 239.192.0.1 */
 #else
 #	define IF_DEFAULT_GROUP	((u_long)0xefc00001)
@@ -59,10 +82,7 @@ struct interface_req {
 const struct in6_addr if6_default_group_addr = IF6_DEFAULT_INIT;
 
 
-static inline bool is_in_net (const struct in_addr*restrict, const struct in_addr*restrict, const struct in_addr*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-static inline bool is_in_net6 (const struct in6_addr*restrict, const struct in6_addr*restrict, const struct in6_addr*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
-static inline bool is_network_char (const int, const char) PGM_GNUC_CONST;
-static const char* pgm_family_string (const int) PGM_GNUC_CONST;
+static const char* pgm_family_string (const int);
 
 
 /* recommended address space for multicast:
@@ -90,18 +110,19 @@ static const char* pgm_family_string (const int) PGM_GNUC_CONST;
 void
 pgm_if_print_all (void)
 {
-	struct pgm_ifaddrs_t *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 
-	if (!pgm_getifaddrs (&ifap, NULL))
+	int e = pgm_getifaddrs (&ifap);
+	if (e < 0)
 		return;
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		const unsigned int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
+		int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
 		char rname[IF_NAMESIZE * 2 + 3];
 		char b[IF_NAMESIZE * 2 + 3];
 
-		pgm_if_indextoname (i, rname);
+		if_indextoname(i, rname);
 		sprintf (b, "%s (%s)",
 			ifa->ifa_name ? ifa->ifa_name : "(null)", rname);
 
@@ -109,7 +130,7 @@ pgm_if_print_all (void)
 		     (ifa->ifa_addr->sa_family != AF_INET && 
 		      ifa->ifa_addr->sa_family != AF_INET6) )
 		{
-			pgm_info (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
+			g_message (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
 				i,
 				b,
 				"",
@@ -126,7 +147,7 @@ pgm_if_print_all (void)
 			     s, sizeof(s),
 			     NULL, 0,
 			     NI_NUMERICHOST);
-		pgm_info (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
+		g_message (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
 			i,
 			b,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
@@ -143,23 +164,23 @@ pgm_if_print_all (void)
 }
 
 static inline
-bool
+gboolean
 is_in_net (
-	const struct in_addr* restrict	addr,		/* host byte order */
-	const struct in_addr* restrict	netaddr,
-	const struct in_addr* restrict	netmask
+	const struct in_addr*	addr,		/* host byte order */
+	const struct in_addr*	netaddr,
+	const struct in_addr*	netmask
 	)
 {
-	pgm_assert (NULL != addr);
-	pgm_assert (NULL != netaddr);
-	pgm_assert (NULL != netmask);
+	g_assert (NULL != addr);
+	g_assert (NULL != netaddr);
+	g_assert (NULL != netmask);
 
 #ifdef IF_DEBUG
-	const struct in_addr taddr    = { .s_addr = htonl (addr->s_addr) };
-	const struct in_addr tnetaddr = { .s_addr = htonl (netaddr->s_addr) };
-	const struct in_addr tnetmask = { .s_addr = htonl (netmask->s_addr) };
+	const struct in_addr taddr    = { .s_addr = g_htonl (addr->s_addr) };
+	const struct in_addr tnetaddr = { .s_addr = g_htonl (netaddr->s_addr) };
+	const struct in_addr tnetmask = { .s_addr = g_htonl (netmask->s_addr) };
 	char saddr[INET_ADDRSTRLEN], snetaddr[INET_ADDRSTRLEN], snetmask[INET_ADDRSTRLEN];
-	pgm_debug ("is_in_net (addr:%s netaddr:%s netmask:%s)",
+	g_trace ("is_in_net (addr:%s netaddr:%s netmask:%s)",
 		 pgm_inet_ntop (AF_INET, &taddr,    saddr,    sizeof(saddr)),
 		 pgm_inet_ntop (AF_INET, &tnetaddr, snetaddr, sizeof(snetaddr)),
 		 pgm_inet_ntop (AF_INET, &tnetmask, snetmask, sizeof(snetmask)));
@@ -171,20 +192,20 @@ is_in_net (
 }
 
 static
-bool
+gboolean
 is_in_net6 (
-	const struct in6_addr* restrict	addr,
-	const struct in6_addr* restrict	netaddr,
-	const struct in6_addr* restrict	netmask
+	const struct in6_addr*	addr,
+	const struct in6_addr*	netaddr,
+	const struct in6_addr*	netmask
 	)
 {
-	pgm_assert (NULL != addr);
-	pgm_assert (NULL != netaddr);
-	pgm_assert (NULL != netmask);
+	g_assert (NULL != addr);
+	g_assert (NULL != netaddr);
+	g_assert (NULL != netmask);
 
 #ifdef IF_DEBUG
 	char saddr[INET6_ADDRSTRLEN], snetaddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
-	pgm_debug ("is_in_net6 (addr:%s netaddr:%s netmask:%s)",
+	g_trace ("is_in_net6 (addr:%s netaddr:%s netmask:%s)",
 		 pgm_inet_ntop (AF_INET6, addr, saddr, sizeof(saddr)),
 		 pgm_inet_ntop (AF_INET6, netaddr, snetaddr, sizeof(snetaddr)),
 		 pgm_inet_ntop (AF_INET6, netmask, snetmask, sizeof(snetmask)));
@@ -219,40 +240,40 @@ is_in_net6 (
  */
 
 static
-bool
+gboolean
 parse_interface (
-	int				family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*	      restrict	ifname,			/* NULL terminated */
-	struct interface_req* restrict	ir,			/* location to write interface details to */
-	pgm_error_t**	      restrict	error
+	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
+	const char*		ifname,			/* NULL terminated */
+	struct interface_req*	ir,			/* location to write interface details to */
+	GError**		error
 	)
 {
-	bool check_inet_network = FALSE, check_inet6_network = FALSE;
-	bool check_addr = FALSE;
-	bool check_ifname = FALSE;
+	gboolean check_inet_network = FALSE, check_inet6_network = FALSE;
+	gboolean check_addr = FALSE;
+	gboolean check_ifname = FALSE;
 	char literal[1024];
 	struct in_addr in_addr;
 	struct in6_addr in6_addr;
-	struct pgm_ifaddrs_t *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 	struct sockaddr_storage addr;
-	unsigned interface_matches = 0;
+	guint interface_matches = 0;
 
 /* pre-conditions */
-	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	pgm_assert (NULL != ifname);
-	pgm_assert (NULL != ir);
+	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	g_assert (NULL != ifname);
+	g_assert (NULL != ir);
 
-	pgm_debug ("parse_interface (family:%s ifname:%s%s%s ir:%p error:%p)",
+	g_trace ("parse_interface (family:%s ifname:%s%s%s ir:%p error:%p)",
 		pgm_family_string (family),
 		ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "",
-		(const void*)ir,
-		(const void*)error);
+		(gpointer)ir,
+		(gpointer)error);
 
 /* strip any square brackets for IPv6 early evaluation */
 	if (AF_INET != family &&
 	    '[' == ifname[0])
 	{
-		const size_t ifnamelen = strlen(ifname);
+		const int ifnamelen = strlen(ifname);
 		if (']' == ifname[ ifnamelen - 1 ]) {
 			strncpy (literal, ifname + 1, ifnamelen - 2);
 			literal[ ifnamelen - 2 ] = 0;
@@ -267,13 +288,13 @@ parse_interface (
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
 #ifdef IF_DEBUG
-		struct in_addr t = { .s_addr = htonl (in_addr.s_addr) };
-		pgm_debug ("IPv4 network address: %s", inet_ntoa (t));
+		struct in_addr t = { .s_addr = g_htonl (in_addr.s_addr) };
+		g_trace ("IPv4 network address: %s", inet_ntoa (t));
 #endif
 		if (IN_MULTICAST(in_addr.s_addr)) {
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_XDEV,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_XDEV,
 				     _("Expecting network interface address, found IPv4 multicast network %s%s%s"),
 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
@@ -281,7 +302,7 @@ parse_interface (
 		struct sockaddr_in s4;
 		memset (&s4, 0, sizeof(s4));
 		s4.sin_family = AF_INET;
-		s4.sin_addr.s_addr = htonl (in_addr.s_addr);
+		s4.sin_addr.s_addr = g_htonl (in_addr.s_addr);
 		memcpy (&addr, &s4, sizeof(s4));
 
 		check_inet_network = TRUE;
@@ -290,9 +311,9 @@ parse_interface (
 	if (AF_INET  != family && 0 == pgm_inet6_network (ifname, &in6_addr))
 	{
 		if (IN6_IS_ADDR_MULTICAST(&in6_addr)) {
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_XDEV,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_XDEV,
 				     _("Expecting network interface address, found IPv6 multicast network %s%s%s"),
 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
@@ -317,14 +338,13 @@ parse_interface (
 			.ai_flags	= AI_ADDRCONFIG | AI_NUMERICHOST	/* AI_V4MAPPED is unhelpful */
 		}, *res;
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
-		switch (eai) {
-		case 0:
+		if (0 == eai) {
 			if (AF_INET == res->ai_family &&
-			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+			    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_XDEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv4 multicast address %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
@@ -333,9 +353,9 @@ parse_interface (
 			else if (AF_INET6 == res->ai_family &&
 				 IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 			{
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_XDEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv6 multicast address %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
@@ -345,25 +365,17 @@ parse_interface (
 			memcpy (&addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
 			freeaddrinfo (res);
 			check_addr = TRUE;
-			break;
-
-#if defined(EAI_NODATA) && EAI_NODATA != EAI_NONAME
-		case EAI_NODATA:
-#endif
-		case EAI_NONAME:
-			break;
-
-		default:
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     pgm_error_from_eai_errno (eai, errno),
+		} else if (EAI_NONAME != eai) {
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     pgm_if_error_from_eai_errno (eai),
 				     _("Numeric host resolution: %s"),
 				     gai_strerror (eai));
 			return FALSE;
 		}
 	}
 
-#ifndef _WIN32
+#ifdef G_OS_UNIX
 /* network name into network address, can be expensive with NSS network lookup
  *
  * Only Class A, B or C networks are supported, partitioned networks
@@ -378,9 +390,9 @@ parse_interface (
 			switch (ne->n_addrtype) {
 			case AF_INET:
 				if (AF_INET6 == family) {
-					pgm_set_error (error,
-						     PGM_ERROR_DOMAIN_IF,
-						     PGM_ERROR_NODEV,
+					g_set_error (error,
+						     PGM_IF_ERROR,
+						     PGM_IF_ERROR_NODEV,
 						     _("IP address family conflict when resolving network name %s%s%s, found AF_INET when AF_INET6 expected."),
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
@@ -388,9 +400,9 @@ parse_interface (
 /* ne->n_net in network order */
 				in_addr.s_addr = ne->n_net;
 				if (IN_MULTICAST(in_addr.s_addr)) {
-					pgm_set_error (error,
-						     PGM_ERROR_DOMAIN_IF,
-						     PGM_ERROR_XDEV,
+					g_set_error (error,
+						     PGM_IF_ERROR,
+						     PGM_IF_ERROR_XDEV,
 						     _("Network name %s%s%s resolves to IPv4 mulicast address."),
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
@@ -399,25 +411,25 @@ parse_interface (
 				break;
 			case AF_INET6:
 #ifndef CONFIG_HAVE_IP6_NETWORKS
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NODEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_NODEV,
 					     _("Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				return FALSE;
 #else
 				if (AF_INET == family) {
-					pgm_set_error (error,
-						     PGM_ERROR_DOMAIN_IF,
-						     PGM_ERROR_NODEV,
+					g_set_error (error,
+						     PGM_IF_ERROR,
+						     PGM_IF_ERROR_NODEV,
 						     _("IP address family conflict when resolving network name %s%s%s, found AF_INET6 when AF_INET expected."),
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
 				if (IN6_IS_ADDR_MULTICAST(&ne->n_net)) {
-					pgm_set_error (error,
-						     PGM_ERROR_DOMAIN_IF,
-						     PGM_ERROR_XDEV,
+					g_set_error (error,
+						     PGM_IF_ERROR,
+						     PGM_IF_ERROR_XDEV,
 						     _("Network name resolves to IPv6 mulicast address %s%s%s"),
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
@@ -427,16 +439,16 @@ parse_interface (
 				break;
 #endif
 			default:
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NODEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_NODEV,
 					     _("Network name resolves to non-internet protocol address family %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				return FALSE;
 			}
 		}
 	}
-#endif /* _WIN32 */
+#endif /* G_OS_UNIX */
 
 /* hostname lookup with potential DNS delay or error */
 	if (!check_addr)
@@ -449,14 +461,13 @@ parse_interface (
 		}, *res;
 
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
-		switch (eai) {
-		case 0:
+		if (0 == eai) {
 			if (AF_INET == res->ai_family &&
-			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+			    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_XDEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv4 multicast name %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
@@ -465,9 +476,9 @@ parse_interface (
 			else if (AF_INET6 == res->ai_family &&
 				 IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr))
 			{
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_XDEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_XDEV,
 					     _("Expecting interface address, found IPv6 multicast name %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				freeaddrinfo (res);
@@ -476,29 +487,24 @@ parse_interface (
 			memcpy (&addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
 			freeaddrinfo (res);
 			check_addr = TRUE;
-			break;
-
-#if defined(EAI_NODATA) && EAI_NODATA != EAI_NONAME
-		case EAI_NODATA:
-#endif
-		case EAI_NONAME:
-			check_ifname = TRUE;
-			break;
-
-		default:
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     pgm_error_from_eai_errno (eai, errno),
-				     _("Internet host resolution: %s(%d)"),
-				     gai_strerror (eai), eai);
+		} else if (EAI_NONAME != eai && EAI_NODATA != eai) {
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     pgm_if_error_from_eai_errno (eai),
+				     _("Internet host resolution: %s"),
+				     gai_strerror (eai));
 			return FALSE;
-		}
+		} else
+			check_ifname = TRUE;
 	}
 
 /* iterate through interface list and match device name, ip or net address */
-	if (!pgm_getifaddrs (&ifap, error)) {
-		pgm_prefix_error (error,
-				_("Enumerating network interfaces: "));
+	if (pgm_getifaddrs (&ifap) < 0) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_errno (errno),
+			     _("Enumerating network interfaces: %s"),
+			     g_strerror (errno));
 		return FALSE;
 	}
 
@@ -526,18 +532,13 @@ parse_interface (
 		}
 
 		const unsigned ifindex = pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
-		pgm_assert (0 != ifindex);
+		g_assert (0 != ifindex);
 
 /* check numeric host */
 		if (check_addr &&
 		    (0 == pgm_sockaddr_cmp (ifa->ifa_addr, (const struct sockaddr*)&addr)))
 		{
 			strcpy (ir->ir_name, ifa->ifa_name);
-			ir->ir_flags = ifa->ifa_flags;
-			if (ir->ir_flags & IFF_LOOPBACK)
-				pgm_warn (_("Interface %s reports as a loopback device."), ir->ir_name);
-			if (!(ir->ir_flags & IFF_MULTICAST))
-				pgm_warn (_("Interface %s reports as a non-multicast capable device."), ir->ir_name);
 			ir->ir_interface = ifindex;
 			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 			pgm_freeifaddrs (ifap);
@@ -548,19 +549,10 @@ parse_interface (
 		if (check_inet_network &&
 		    AF_INET == ifa->ifa_addr->sa_family)
 		{
-			const struct in_addr ifaddr  = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
-			const struct in_addr netmask = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
+			const struct in_addr ifaddr  = { .s_addr = g_ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
+			const struct in_addr netmask = { .s_addr = g_ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
 			if (is_in_net (&ifaddr, &in_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
-				ir->ir_flags = ifa->ifa_flags;
-				if (ir->ir_flags & IFF_LOOPBACK) {
-					pgm_warn (_("Skipping matching loopback network device %s."), ir->ir_name);
-					goto skip_inet_network;
-				}
-				if (!(ir->ir_flags & IFF_MULTICAST)) {
-					pgm_warn (_("Skipping matching non-multicast capable network device %s."), ir->ir_name);
-					goto skip_inet_network;
-				}
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 				pgm_freeifaddrs (ifap);
@@ -574,22 +566,12 @@ parse_interface (
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
 			if (is_in_net6 (&ifaddr, &in6_addr, &netmask)) {
 				strcpy (ir->ir_name, ifa->ifa_name);
-				ir->ir_flags = ifa->ifa_flags;
-				if (ir->ir_flags & IFF_LOOPBACK) {
-					pgm_warn (_("Skipping matching loopback network device %s."), ir->ir_name);
-					goto skip_inet_network;
-				}
-				if (!(ir->ir_flags & IFF_MULTICAST)) {
-					pgm_warn (_("Skipping matching non-multicast capable network device %s."), ir->ir_name);
-					goto skip_inet_network;
-				}
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 				pgm_freeifaddrs (ifap);
 				return TRUE;
 			}
 		}
-skip_inet_network:
 
 /* check interface name */
 		if (check_ifname)
@@ -597,16 +579,11 @@ skip_inet_network:
 			if (0 != strcmp (ifname, ifa->ifa_name))
 				continue;
 
-			ir->ir_flags = ifa->ifa_flags;
-/* skip loopback and non-multicast capable devices */
-			if ((ir->ir_flags & IFF_LOOPBACK) || !(ir->ir_flags & IFF_MULTICAST))
-				continue;
-
 /* check for multiple interfaces */
 			if (interface_matches++) {
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NOTUNIQ,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_NOTUNIQ,
 					     _("Network interface name not unique %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				pgm_freeifaddrs (ifap);
@@ -622,10 +599,10 @@ skip_inet_network:
 	}
 
 	if (0 == interface_matches) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     PGM_ERROR_NODEV,
-			     _("No matching non-loopback and multicast capable network interface %s%s%s"),
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     PGM_IF_ERROR_NODEV,
+			     _("No matching network interface %s%s%s"),
 			     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 		pgm_freeifaddrs (ifap);
 		return FALSE;
@@ -655,30 +632,30 @@ skip_inet_network:
  */
 
 static
-bool
+gboolean
 parse_group (
-	const int		  family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*	 restrict group,	/* NULL terminated */
-	struct sockaddr* restrict addr,		/* pointer to sockaddr_storage for writing */
-	pgm_error_t**	 restrict error
+	const int		family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
+	const char*		group,		/* NULL terminated */
+	struct sockaddr*	addr,		/* pointer to sockaddr_storage for writing */
+	GError**		error
 	)
 {
 /* pre-conditions */
-	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	pgm_assert (NULL != group);
-	pgm_assert (NULL != addr);
+	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	g_assert (NULL != group);
+	g_assert (NULL != addr);
 
-	pgm_debug ("parse_group (family:%s group:%s%s%s addr:%p error:%p)",
+	g_trace ("parse_group (family:%s group:%s%s%s addr:%p error:%p)",
 		pgm_family_string (family),
 		group ? "\"" : "", group ? group : "(null)", group ? "\"" : "",
-		(const void*)addr,
-		(const void*)error);
+		(gpointer)addr,
+		(gpointer)error);
 
 /* strip any square brackets for early IPv6 literal evaluation */
 	if (AF_INET != family &&
 	    '[' == group[0])
 	{
-		const size_t grouplen = strlen(group);
+		const int grouplen = strlen(group);
 		if (']' == group[ grouplen - 1 ]) {
 			char literal[1024];
 			strncpy (literal, group + 1, grouplen - 2);
@@ -698,7 +675,7 @@ parse_group (
 /* IPv4 address */
 	if (AF_INET6 != family &&
 	    pgm_inet_pton (AF_INET, group, &((struct sockaddr_in*)addr)->sin_addr) &&
-	    IN_MULTICAST(ntohl (((struct sockaddr_in*)addr)->sin_addr.s_addr)))
+	    IN_MULTICAST(g_ntohl (((struct sockaddr_in*)addr)->sin_addr.s_addr)))
 	{
 		addr->sa_family = AF_INET;
 		return TRUE;
@@ -714,7 +691,7 @@ parse_group (
 		return TRUE;
 	}
 
-#ifndef _WIN32
+#ifdef G_OS_UNIX
 /* NSS network */
 	const struct netent* ne = getnetbyname (group);
 /* ne::n_net in host byte order */
@@ -722,37 +699,37 @@ parse_group (
 		switch (ne->n_addrtype) {
 		case AF_INET:
 			if (AF_INET6 == family) {
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NODEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_NODEV,
 					     _("IP address family conflict when resolving network name %s%s%s, found IPv4 when IPv6 expected."),
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
 			if (IN_MULTICAST(ne->n_net)) {
 				addr->sa_family = AF_INET;
-				((struct sockaddr_in*)addr)->sin_addr.s_addr = htonl (ne->n_net);
+				((struct sockaddr_in*)addr)->sin_addr.s_addr = g_htonl (ne->n_net);
 				return TRUE;
 			}
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_NODEV,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_NODEV,
 				     _("IP address class conflict when resolving network name %s%s%s, expected IPv4 multicast."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 		case AF_INET6:
 #ifndef CONFIG_HAVE_IP6_NETWORKS
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_NODEV,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_NODEV,
 				     _("Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 #else
 			if (AF_INET == family) {
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NODEV,
+				g_set_error (error,
+					     PGM_IF_ERROR,
+					     PGM_IF_ERROR_NODEV,
 					     _("IP address family conflict when resolving network name %s%s%s, found IPv6 when IPv4 expected."),
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
@@ -765,23 +742,23 @@ parse_group (
 				((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 				return TRUE;
 			}
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_NODEV,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_NODEV,
 				     _("IP address class conflict when resolving network name %s%s%s, expected IPv6 multicast."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 #endif /* CONFIG_HAVE_IP6_NETWORKS */
 		default:
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_NODEV,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_NODEV,
 				     _("Network name resolves to non-internet protocol address family %s%s%s"),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 		}
 	}
-#endif /* _WIN32 */
+#endif /* G_OS_UNIX */
 
 /* lookup group through name service */
 	struct addrinfo hints = {
@@ -793,15 +770,15 @@ parse_group (
 
 	const int eai = getaddrinfo (group, NULL, &hints, &res);
 	if (0 != eai) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_eai_errno (eai, errno),
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_eai_errno (eai),
 			     _("Resolving receive group: %s"),
 			     gai_strerror (eai));
 		return FALSE;
 	}
 
-	if ((AF_INET6 != family && IN_MULTICAST(ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
+	if ((AF_INET6 != family && IN_MULTICAST(g_ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
 	    (AF_INET  != family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 	{
 		memcpy (addr, res->ai_addr, res->ai_addrlen);
@@ -809,9 +786,9 @@ parse_group (
 		return TRUE;
 	}
 
-	pgm_set_error (error,
-		     PGM_ERROR_DOMAIN_IF,
-		     PGM_ERROR_INVAL,
+	g_set_error (error,
+		     PGM_IF_ERROR,
+		     PGM_IF_ERROR_INVAL,
 		     _("Unresolvable receive group %s%s%s"),
 		     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 	freeaddrinfo (res);
@@ -831,77 +808,77 @@ parse_group (
  * returns TRUE on success with device_list containing double linked list of devices as
  * sockaddr/idx pairs.  returns FALSE on error, including multiple matching adapters.
  *
- * memory ownership of linked list is passed to caller and must be freed with pgm_free
- * and the pgm_list_free* api.
+ * memory ownership of linked list is passed to caller and must be freed with g_free
+ * and the g_list_free* api.
  */
 
 static
-bool
+gboolean
 parse_interface_entity (
 	int			family,	/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*   restrict	entity,	/* NULL terminated */
-	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
-	pgm_error_t** restrict	error
+	const char*		entity,	/* NULL terminated */
+	GList**			interface_list,	/* <struct interface_req*> */
+	GError**		error
 	)
 {
 	struct interface_req* ir;
-	pgm_list_t* source_list = NULL;
+	GList* source_list = NULL;
 
 /* pre-conditions */
-	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	pgm_assert (NULL != interface_list);
-	pgm_assert (NULL == *interface_list);
-	pgm_assert (NULL != error);
+	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	g_assert (NULL != interface_list);
+	g_assert (NULL == *interface_list);
+	g_assert (NULL != error);
 
-	pgm_debug ("parse_interface_entity (family:%s entity:%s%s%s interface_list:%p error:%p)",
+	g_trace ("parse_interface_entity (family:%s entity:%s%s%s interface_list:%p error:%p)",
 		pgm_family_string (family),
 		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
-		(const void*)interface_list,
-		(const void*)error);
+		(gpointer)interface_list,
+		(gpointer)error);
 
 /* the empty entity, returns in_addr_any for both receive and send interfaces */
 	if (NULL == entity)
 	{
-		ir = pgm_new0 (struct interface_req, 1);
+		ir = g_new0 (struct interface_req, 1);
 		ir->ir_addr.ss_family = family;
-		*interface_list = pgm_list_append (*interface_list, ir);
+		*interface_list = g_list_append (*interface_list, ir);
 		return TRUE;
 	}
 
 /* check interface name length limit */
-	char** tokens = pgm_strsplit (entity, ",", 10);
+	gchar** tokens = g_strsplit (entity, ",", 10);
 	int j = 0;
 	while (tokens && tokens[j])
 	{
-		pgm_error_t* sub_error = NULL;
-		ir = pgm_new (struct interface_req, 1);
+		GError* sub_error = NULL;
+		ir = g_new (struct interface_req, 1);
 		if (!parse_interface (family, tokens[j], ir, &sub_error))
 		{
 /* mark multiple interfaces for later decision based on group families */
-			if (sub_error && PGM_ERROR_NOTUNIQ == sub_error->code)
+			if (sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code)
 			{
 				ir->ir_addr.ss_family = AF_UNSPEC;
-				pgm_error_free (sub_error);
+				g_error_free (sub_error);
 			}
 /* bail out on first interface with an error */
 			else
 			{
-				pgm_propagate_error (error, sub_error);
-				pgm_free (ir);
-				pgm_strfreev (tokens);
+				g_propagate_error (error, sub_error);
+				g_free (ir);
+				g_strfreev (tokens);
 				while (source_list) {
-					pgm_free (source_list->data);
-					source_list = pgm_list_delete_link (source_list, source_list);
+					g_free (source_list->data);
+					source_list = g_list_delete_link (source_list, source_list);
 				}
 				return FALSE;
 			}
 		}
 
-		source_list = pgm_list_append (source_list, ir);
+		source_list = g_list_append (source_list, ir);
 		++j;
 	}
 
-	pgm_strfreev (tokens);
+	g_strfreev (tokens);
 	*interface_list = source_list;
 	return TRUE;
 }
@@ -923,36 +900,36 @@ parse_interface_entity (
  */
 
 static
-bool
+gboolean
 parse_receive_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*   restrict	entity,		/* NULL terminated */
-	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
-	pgm_list_t**  restrict	recv_list,	/* <struct group_source_req*> */
-	pgm_error_t** restrict	error
+	const char*		entity,		/* NULL terminated */
+	GList**			interface_list,	/* <struct interface_req*> */
+	GList**			recv_list,	/* <struct group_source_req*> */
+	GError**		error
 	)
 {
 /* pre-conditions */
-	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	pgm_assert (NULL != recv_list);
-	pgm_assert (NULL == *recv_list);
-	pgm_assert (NULL != error);
+	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	g_assert (NULL != recv_list);
+	g_assert (NULL == *recv_list);
+	g_assert (NULL != error);
 
-	pgm_debug ("parse_receive_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p error:%p)",
+	g_trace ("parse_receive_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p error:%p)",
 		pgm_family_string (family),
 		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
-		(const void*)interface_list,
-		(const void*)recv_list,
-		(const void*)error);
+		(gpointer)interface_list,
+		(gpointer)recv_list,
+		(gpointer)error);
 
 	struct group_source_req* recv_gsr;
-	struct interface_req* primary_interface = (struct interface_req*)pgm_memdup ((*interface_list)->data, sizeof(struct interface_req));
+	struct interface_req* primary_interface = (struct interface_req*)g_memdup ((*interface_list)->data, sizeof(struct interface_req));
 
 /* the empty entity */
 	if (NULL == entity)
 	{
 /* default receive object */
-		recv_gsr = pgm_new0 (struct group_source_req, 1);
+		recv_gsr = g_new0 (struct group_source_req, 1);
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
 
@@ -968,10 +945,10 @@ parse_receive_entity (
 				struct sockaddr_storage addr;
 				if (!pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
 				{
-					pgm_prefix_error (error,
+					g_prefix_error (error,
 							_("Node primary address family cannot be determined: "));
-					pgm_free (recv_gsr);
-					pgm_free (primary_interface);
+					g_free (recv_gsr);
+					g_free (primary_interface);
 					return FALSE;
 				}
 				recv_gsr->gsr_group.ss_family = addr.ss_family;
@@ -983,11 +960,11 @@ parse_receive_entity (
 					struct interface_req ir;
 					if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 					{
-						pgm_prefix_error (error,
+						g_prefix_error (error,
 								_("Unique address cannot be determined for interface %s%s%s: "),
 								primary_interface->ir_name ? "\"" : "", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"" : "");
-						pgm_free (recv_gsr);
-						pgm_free (primary_interface);
+						g_free (recv_gsr);
+						g_free (primary_interface);
 						return FALSE;
 					}
 
@@ -1005,10 +982,10 @@ parse_receive_entity (
 		}
 
 
-		pgm_assert (AF_UNSPEC != recv_gsr->gsr_group.ss_family);
+		g_assert (AF_UNSPEC != recv_gsr->gsr_group.ss_family);
 		if (AF_UNSPEC != primary_interface->ir_addr.ss_family)
 		{
-			pgm_assert (recv_gsr->gsr_group.ss_family == primary_interface->ir_addr.ss_family);
+			g_assert (recv_gsr->gsr_group.ss_family == primary_interface->ir_addr.ss_family);
 		}
 		else
 		{
@@ -1018,11 +995,11 @@ parse_receive_entity (
 				struct interface_req ir;
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
-					pgm_prefix_error (error,
+					g_prefix_error (error,
 							_("Unique address cannot be determined for interface %s%s%s: "),
 							primary_interface->ir_name ? "\"" : "", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"" : "");
-					pgm_free (recv_gsr);
-					pgm_free (primary_interface);
+					g_free (recv_gsr);
+					g_free (primary_interface);
 					return FALSE;
 				}
 
@@ -1045,13 +1022,13 @@ parse_receive_entity (
 			break;
 	
 		default:
-			pgm_assert_not_reached();
+			g_assert_not_reached();
 		}
 
 /* ASM: source = group */
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
-		*recv_list = pgm_list_append (*recv_list, recv_gsr);
-		pgm_free (primary_interface);
+		*recv_list = g_list_append (*recv_list, recv_gsr);
+		g_free (primary_interface);
 		return TRUE;
 	}
 
@@ -1059,11 +1036,11 @@ parse_receive_entity (
  */
 
 	int j = 0;	
-	char** tokens = pgm_strsplit (entity, ",", 10);
+	gchar** tokens = g_strsplit (entity, ",", 10);
 	while (tokens && tokens[j])
 	{
 /* default receive object */
-		recv_gsr = pgm_new0 (struct group_source_req, 1);
+		recv_gsr = g_new0 (struct group_source_req, 1);
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
 
@@ -1071,7 +1048,7 @@ parse_receive_entity (
 		{
 			if (AF_UNSPEC == primary_interface->ir_addr.ss_family)
 			{
-				pgm_debug ("Address family of receive group cannot be determined from interface.");
+				g_trace ("Address family of receive group cannot be determined from interface.");
 			}
 			else
 			{
@@ -1082,12 +1059,12 @@ parse_receive_entity (
 
 		if (!parse_group (recv_gsr->gsr_group.ss_family, tokens[j], (struct sockaddr*)&recv_gsr->gsr_group, error))
 		{
-			pgm_prefix_error (error,
+			g_prefix_error (error,
 					_("Unresolvable receive entity %s%s%s: "),
 					tokens[j] ? "\"" : "", tokens[j] ? tokens[j] : "(null)", tokens[j] ? "\"" : "");
-			pgm_free (recv_gsr);
-			pgm_strfreev (tokens);
-			pgm_free (primary_interface);
+			g_free (recv_gsr);
+			g_strfreev (tokens);
+			g_free (primary_interface);
 			return FALSE;
 		}
 
@@ -1099,11 +1076,11 @@ parse_receive_entity (
 				struct interface_req ir;
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
-					pgm_prefix_error (error,
+					g_prefix_error (error,
 							_("Unique address cannot be determined for interface %s%s%s: "),
 							primary_interface->ir_name ? "\"" : "", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"" : "");
-					pgm_free (recv_gsr);
-					pgm_free (primary_interface);
+					g_free (recv_gsr);
+					g_free (primary_interface);
 					return FALSE;
 				}
 
@@ -1111,69 +1088,64 @@ parse_receive_entity (
 				((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
 			}
 		}
-		else
-		{
-/* keep interface scope */
-			((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&primary_interface->ir_addr);
-		}
 
 /* ASM: source = group */
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
-		*recv_list = pgm_list_append (*recv_list, recv_gsr);
+		*recv_list = g_list_append (*recv_list, recv_gsr);
 		++j;
 	}
 
-	pgm_strfreev (tokens);
-	pgm_free (primary_interface);
+	g_strfreev (tokens);
+	g_free (primary_interface);
 	return TRUE;
 }
 
 static
-bool
+gboolean
 parse_send_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
-	const char*   restrict	entity,		/* null = empty entity */
-	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
-	pgm_list_t**  restrict	recv_list,	/* <struct group_source_req*> */
-	pgm_list_t**  restrict	send_list,	/* <struct group_source_req*> */
-	pgm_error_t** restrict	error
+	const char*		entity,		/* null = empty entity */
+	GList**			interface_list,	/* <struct interface_req*> */
+	GList**			recv_list,	/* <struct group_source_req*> */
+	GList**			send_list,	/* <struct group_source_req*> */
+	GError**		error
 	)
 {
 /* pre-conditions */
-	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
-	pgm_assert (NULL != recv_list);
-	pgm_assert (NULL != *recv_list);
-	pgm_assert (NULL != send_list);
-	pgm_assert (NULL == *send_list);
-	pgm_assert (NULL != error);
+	g_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
+	g_assert (NULL != recv_list);
+	g_assert (NULL != *recv_list);
+	g_assert (NULL != send_list);
+	g_assert (NULL == *send_list);
+	g_assert (NULL != error);
 
-	pgm_debug ("parse_send_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p send_list:%p error:%p)",
+	g_trace ("parse_send_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p send_list:%p error:%p)",
 		pgm_family_string (family),
 		entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"",
-		(const void*)interface_list,
-		(const void*)recv_list,
-		(const void*)send_list,
-		(const void*)error);
+		(gpointer)interface_list,
+		(gpointer)recv_list,
+		(gpointer)send_list,
+		(gpointer)error);
 
 	struct group_source_req* send_gsr;
 	const struct interface_req* primary_interface = (struct interface_req*)(*interface_list)->data;
 
 	if (entity == NULL)
 	{
-		send_gsr = pgm_memdup ((*recv_list)->data, sizeof(struct group_source_req));
-		*send_list = pgm_list_append (*send_list, send_gsr);
+		send_gsr = g_memdup ((*recv_list)->data, sizeof(struct group_source_req));
+		*send_list = g_list_append (*send_list, send_gsr);
 		return TRUE;
 	}
 
 /* default send object */
-	send_gsr = pgm_new0 (struct group_source_req, 1);
+	send_gsr = g_new0 (struct group_source_req, 1);
 	send_gsr->gsr_interface = primary_interface->ir_interface;
 	if (!parse_group (family, entity, (struct sockaddr*)&send_gsr->gsr_group, error))
 	{
-		pgm_prefix_error (error,
+		g_prefix_error (error,
 				_("Unresolvable send entity %s%s%s: "),
 				entity ? "\"":"", entity ? entity : "(null)", entity ? "\"":"");
-		pgm_free (send_gsr);
+		g_free (send_gsr);
 		return FALSE;
 	}
 
@@ -1185,10 +1157,10 @@ parse_send_entity (
 			struct interface_req ir;
 			if (!parse_interface (send_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 			{
-				pgm_prefix_error (error,
+				g_prefix_error (error,
 						_("Unique address cannot be determined for interface %s%s%s: "),
 						primary_interface->ir_name ? "\"":"", primary_interface->ir_name ? primary_interface->ir_name : "(null)", primary_interface->ir_name ? "\"":"");
-				pgm_free (send_gsr);
+				g_free (send_gsr);
 				return FALSE;
 			}
 
@@ -1199,7 +1171,7 @@ parse_send_entity (
 
 /* ASM: source = group */
 	memcpy (&send_gsr->gsr_source, &send_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&send_gsr->gsr_group));
-	*send_list = pgm_list_append (*send_list, send_gsr);
+	*send_list = g_list_append (*send_list, send_gsr);
 	return TRUE;
 }
 
@@ -1209,17 +1181,17 @@ parse_send_entity (
  */
 
 #define IS_HOSTNAME(x) ( 				/* RFC 952 */ \
-				isalnum(x) || \
+				g_ascii_isalnum(x) || \
 				((x) == '-') || \
 				((x) == '.') \
 			)
 #define IS_IP(x) ( \
-				isdigit(x) || \
+				g_ascii_isdigit(x) || \
 				((x) == '.') || \
 				((x) == '/') \
 			)
 #define IS_IP6(x) ( \
-				isxdigit(x) || \
+				g_ascii_isxdigit(x) || \
 				((x) == ':') || \
 				((x) == '/') || \
 				((x) == '.') || \
@@ -1236,7 +1208,7 @@ parse_send_entity (
 #define IS_IP6_WITH_ZONE(x) ( \
 				IS_IP6(x) || \
 				((x) == '%') || \
-				isalpha(x) || \
+				g_ascii_isalpha(x) || \
 				((x) == '_') \
 			    )
 #define IS_NETPARAM(x) ( \
@@ -1245,7 +1217,7 @@ parse_send_entity (
 			)
 
 static inline
-bool
+gboolean
 is_network_char (
 	const int		family,
 	const char		c
@@ -1261,43 +1233,43 @@ is_network_char (
 }
 
 static
-bool
+gboolean
 network_parse (
-	const char*   restrict	network,		/* NULL terminated */
+	const char*		network,		/* NULL terminated */
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
-	pgm_list_t**  restrict	recv_list,		/* <struct group_source_req*> */
-	pgm_list_t**  restrict	send_list,		/* <struct group_source_req*> */
-	pgm_error_t** restrict	error
+	GList**			recv_list,		/* <struct group_source_req*> */
+	GList**			send_list,		/* <struct group_source_req*> */
+	GError**		error
 	)
 {
-	bool retval = FALSE;
+	gboolean retval = FALSE;
 	const char *p = network;
 	const char *e = p + strlen(network);
 	enum { ENTITY_INTERFACE, ENTITY_RECEIVE, ENTITY_SEND, ENTITY_ERROR } ec = ENTITY_INTERFACE;
 	const char *b = p;		/* begin of entity */
-	pgm_list_t* source_list = NULL;
-	pgm_error_t* sub_error = NULL;
+	GList* source_list = NULL;
+	GError* sub_error = NULL;
 
 /* pre-conditions */
-	pgm_assert (NULL != network);
-	pgm_assert (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family);
-	pgm_assert (NULL != recv_list);
-	pgm_assert (NULL != send_list);
+	g_assert (NULL != network);
+	g_assert (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family);
+	g_assert (NULL != recv_list);
+	g_assert (NULL != send_list);
 
-	pgm_debug ("network_parse (network:%s%s%s family:%s recv_list:%p send_list:%p error:%p)",
+	g_trace ("network_parse (network:%s%s%s family:%s recv_list:%p send_list:%p error:%p)",
 		network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 		pgm_family_string (family),
-		(const void*)recv_list,
-		(const void*)send_list,
-		(const void*)error);
+		(gpointer)recv_list,
+		(gpointer)send_list,
+		(gpointer)error);
 
 	while (p < e)
 	{
 		if (!is_network_char (family, *p))
 		{
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_IF,
-				     PGM_ERROR_INVAL,
+			g_set_error (error,
+				     PGM_IF_ERROR,
+				     PGM_IF_ERROR_INVAL,
 				     _("'%c' is not a valid character."),
 				     *p);
 			goto free_lists;
@@ -1321,7 +1293,7 @@ network_parse (
 					break;
 
 				default:
-					pgm_assert_not_reached();
+					g_assert_not_reached();
 					break;
 				}
 
@@ -1341,37 +1313,37 @@ network_parse (
 			case ENTITY_INTERFACE:
 				if (parse_interface_entity (family, entity, &source_list, &sub_error))
 					break;
-				if (!(sub_error && PGM_ERROR_XDEV == sub_error->code))
+				if (!(sub_error && PGM_IF_ERROR_XDEV == sub_error->code))
 				{
 /* fall through on multicast */
-					if (!(sub_error && PGM_ERROR_NOTUNIQ == sub_error->code))
+					if (!(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 					{
-						pgm_propagate_error (error, sub_error);
+						g_propagate_error (error, sub_error);
 						goto free_lists;
 					}
-					pgm_clear_error (&sub_error);
+					g_clear_error (&sub_error);
 /* FIXME: too many interfaces */
-					if (pgm_list_length (source_list) > 1) {
-						pgm_set_error (error,
-				   			     PGM_ERROR_DOMAIN_IF,
-							     PGM_ERROR_INVAL,
+					if (g_list_length (source_list) > 1) {
+						g_set_error (error,
+				   			     PGM_IF_ERROR,
+							     PGM_IF_ERROR_INVAL,
 							     _("Send group list contains more than one entity."));
 						goto free_lists;
 					}
 					break;
 				}
-				pgm_clear_error (&sub_error);
+				g_clear_error (&sub_error);
 				while (source_list) {
-					pgm_free (source_list->data);
-					source_list = pgm_list_delete_link (source_list, source_list);
+					g_free (source_list->data);
+					source_list = g_list_delete_link (source_list, source_list);
 				}
 				if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
-				    !(sub_error && PGM_ERROR_NOTUNIQ == sub_error->code))
+				    !(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 				{
-					pgm_propagate_error (error, sub_error);
+					g_propagate_error (error, sub_error);
 					goto free_lists;
 				}
-				pgm_clear_error (&sub_error);
+				g_clear_error (&sub_error);
 				ec++;
 
 			case ENTITY_RECEIVE:
@@ -1385,7 +1357,7 @@ network_parse (
 				break;
 
 			default:
-				pgm_assert_not_reached();
+				g_assert_not_reached();
 				break;
 			}
 
@@ -1401,35 +1373,35 @@ network_parse (
 		case ENTITY_INTERFACE:
 			if (parse_interface_entity (family, b, &source_list, &sub_error))
 				break;
-			if (!(sub_error && PGM_ERROR_XDEV == sub_error->code))
+			if (!(sub_error && PGM_IF_ERROR_XDEV == sub_error->code))
 			{
 /* fall through on multicast */
-				if (!(sub_error && PGM_ERROR_NOTUNIQ == sub_error->code))
+				if (!(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 				{
-					pgm_propagate_error (error, sub_error);
+					g_propagate_error (error, sub_error);
 					goto free_lists;
 				}
-				pgm_clear_error (&sub_error);
+				g_clear_error (&sub_error);
 
 /* FIXME: too many interfaces */
-				if (pgm_list_length (source_list) > 1) {
-					pgm_set_error (error,
-			   			     PGM_ERROR_DOMAIN_IF,
-						     PGM_ERROR_INVAL,
+				if (g_list_length (source_list) > 1) {
+					g_set_error (error,
+			   			     PGM_IF_ERROR,
+						     PGM_IF_ERROR_INVAL,
 						     _("Send group list contains more than one entity."));
 					goto free_lists;
 				}
 				break;
 			}
-			pgm_clear_error (&sub_error);
+			g_clear_error (&sub_error);
 			while (source_list) {
-				pgm_free (source_list->data);
-				source_list = pgm_list_delete_link (source_list, source_list);
+				g_free (source_list->data);
+				source_list = g_list_delete_link (source_list, source_list);
 			}
 			if (!parse_interface_entity (family, NULL, &source_list, &sub_error) &&
-			    !(sub_error && PGM_ERROR_NOTUNIQ == sub_error->code))
+			    !(sub_error && PGM_IF_ERROR_NOTUNIQ == sub_error->code))
 			{
-				pgm_propagate_error (error, sub_error);
+				g_propagate_error (error, sub_error);
 				goto free_lists;
 			}
 			ec++;
@@ -1445,7 +1417,7 @@ network_parse (
 			break;
 
 		default:
-			pgm_assert_not_reached();
+			g_assert_not_reached();
 			break;
 		}
 	}
@@ -1469,34 +1441,34 @@ network_parse (
 			break;
 
 		default:
-			pgm_assert_not_reached();
+			g_assert_not_reached();
 			break;
 		}
 	}
 
-	if (pgm_list_length (source_list) > 1)
+	if (g_list_length (source_list) > 1)
 		goto free_lists;
 
 /* cleanup source interface list */
 	while (source_list) {
-		pgm_free (source_list->data);
-		source_list = pgm_list_delete_link (source_list, source_list);
+		g_free (source_list->data);
+		source_list = g_list_delete_link (source_list, source_list);
 	}
 
 	return TRUE;
 
 free_lists:
 	while (source_list) {
-		pgm_free (source_list->data);
-		source_list = pgm_list_delete_link (source_list, source_list);
+		g_free (source_list->data);
+		source_list = g_list_delete_link (source_list, source_list);
 	}
 	while (*recv_list) {
-		pgm_free ((*recv_list)->data);
-		*recv_list = pgm_list_delete_link (*recv_list, *recv_list);
+		g_free ((*recv_list)->data);
+		*recv_list = g_list_delete_link (*recv_list, *recv_list);
 	}
 	while (*send_list) {
-		pgm_free ((*send_list)->data);
-		*send_list = pgm_list_delete_link (*send_list, *send_list);
+		g_free ((*send_list)->data);
+		*send_list = g_list_delete_link (*send_list, *send_list);
 	}
 	return FALSE;
 }
@@ -1507,72 +1479,230 @@ free_lists:
  * returns TRUE on success, returns FALSE on error and sets error appropriately.
  */
 
-bool
-pgm_getaddrinfo (
-	const char*			   restrict network,
-	const struct pgm_addrinfo_t* const restrict hints,
-	struct pgm_addrinfo_t**		   restrict res,
-	pgm_error_t**			   restrict error
+gboolean
+pgm_if_get_transport_info (
+	const char*					network,
+	const struct pgm_transport_info_t* const	hints,
+	struct pgm_transport_info_t**			res,
+	GError**					error
 	)
 {
-	struct pgm_addrinfo_t* ai;
-	const int family = hints ? hints->ai_family : AF_UNSPEC;
-	pgm_list_t* recv_list = NULL;	/* <struct group_source_req*> */
-	pgm_list_t* send_list = NULL;	/* <struct group_source_req*> */
+	struct pgm_transport_info_t* ti;
+	int family = hints ? hints->ti_family : AF_UNSPEC;
+	GList* recv_list = NULL;	/* <struct group_source_req*> */
+	GList* send_list = NULL;	/* <struct group_source_req*> */
 
-	pgm_return_val_if_fail (NULL != network, FALSE);
-	pgm_return_val_if_fail (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family, FALSE);
-	pgm_return_val_if_fail (NULL != res, FALSE);
+	g_return_val_if_fail (NULL != network, FALSE);
+	g_return_val_if_fail (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family, FALSE);
+	g_return_val_if_fail (NULL != res, FALSE);
 
 	if (hints) {
-		pgm_debug ("pgm_getaddrinfo (network:%s%s%s hints: {family:%s} res:%p error:%p)",
+		g_trace ("get_transport_info (network:%s%s%s hints: {family:%s} res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
 			pgm_family_string (family),
-			(const void*)res,
-			(const void*)error);
+			(gpointer)res,
+			(gpointer)error);
 	} else {
-		pgm_debug ("pgm_getaddrinfo (network:%s%s%s hints:%p res:%p error:%p)",
+		g_trace ("get_transport_info (network:%s%s%s hints:%p res:%p error:%p)",
 			network ? "\"" : "", network ? network : "(null)", network ? "\"" : "",
-			(const void*)hints,
-			(const void*)res,
-			(const void*)error);
+			(gpointer)hints,
+			(gpointer)res,
+			(gpointer)error);
 	}
 
 	if (!network_parse (network, family, &recv_list, &send_list, error))
 		return FALSE;
-	const size_t recv_list_len = pgm_list_length (recv_list);
-	const size_t send_list_len = pgm_list_length (send_list);
-	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
+	const int recv_list_len = g_list_length (recv_list);
+	const int send_list_len = g_list_length (send_list);
+	ti = g_malloc0 (sizeof(struct pgm_transport_info_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
-	ai->ai_recv_addrs_len = recv_list_len;
-	ai->ai_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
-	ai->ai_send_addrs_len = send_list_len;
-	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
+	ti->ti_recv_addrs_len = recv_list_len;
+	ti->ti_recv_addrs = (gpointer)((guint8*)ti + sizeof(struct pgm_transport_info_t));
+	ti->ti_send_addrs_len = send_list_len;
+	ti->ti_send_addrs = (gpointer)((guint8*)ti->ti_recv_addrs + recv_list_len * sizeof(struct group_source_req));
+	ti->ti_dport = DEFAULT_DATA_DESTINATION_PORT;
+	ti->ti_sport = DEFAULT_DATA_SOURCE_PORT;
 			
-	size_t i = 0;
+	gsize i = 0;
 	while (recv_list) {
-		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
-		pgm_free (recv_list->data);
-		recv_list = pgm_list_delete_link (recv_list, recv_list);
+		memcpy (&ti->ti_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
+		g_free (recv_list->data);
+		recv_list = g_list_delete_link (recv_list, recv_list);
 	}
 	i = 0;
 	while (send_list) {
-		memcpy (&ai->ai_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
-		pgm_free (send_list->data);
-		send_list = pgm_list_delete_link (send_list, send_list);
+		memcpy (&ti->ti_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
+		g_free (send_list->data);
+		send_list = g_list_delete_link (send_list, send_list);
 	}
-	*res = ai;
+	*res = ti;
 	return TRUE;
 }
 
 void
-pgm_freeaddrinfo (
-	struct pgm_addrinfo_t*	res
+pgm_if_free_transport_info (
+	struct pgm_transport_info_t*	res
 	)
 {
-	pgm_free (res);
+	g_free (res);
 }
 
+GQuark
+pgm_if_error_quark (void)
+{
+	return g_quark_from_static_string ("pgm-if-error-quark");
+}
+
+PGMIFError
+pgm_if_error_from_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_IF_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EINVAL
+	case EINVAL:
+		return PGM_IF_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef EPERM
+	case EPERM:
+		return PGM_IF_ERROR_PERM;
+		break;
+#endif
+
+	default :
+		return PGM_IF_ERROR_FAILED;
+		break;
+	}
+}
+
+/* h_errno from gethostbyname.
+ */
+
+PGMIFError
+pgm_if_error_from_h_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef HOST_NOT_FOUND
+	case HOST_NOT_FOUND:
+		return PGM_IF_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef TRY_AGAIN
+	case TRY_AGAIN:
+		return PGM_IF_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef NO_RECOVERY
+	case NO_RECOVERY:
+		return PGM_IF_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef NO_DATA
+	case NO_DATA:
+		return PGM_IF_ERROR_NODATA;
+		break;
+#endif
+
+	default:
+		return PGM_IF_ERROR_FAILED;
+		break;
+	}
+}
+
+/* errno must be preserved before calling to catch correct error
+ * status with EAI_SYSTEM.
+ */
+
+PGMIFError
+pgm_if_error_from_eai_errno (
+	gint		err_no
+	)
+{
+	switch (err_no) {
+#ifdef EAI_ADDRFAMILY
+	case EAI_ADDRFAMILY:
+		return PGM_IF_ERROR_ADDRFAMILY;
+		break;
+#endif
+
+#ifdef EAI_AGAIN
+	case EAI_AGAIN:
+		return PGM_IF_ERROR_AGAIN;
+		break;
+#endif
+
+#ifdef EAI_BADFLAGS
+	case EAI_BADFLAGS:
+		return PGM_IF_ERROR_BADFLAGS;
+		break;
+#endif
+
+#ifdef EAI_FAIL
+	case EAI_FAIL:
+		return PGM_IF_ERROR_FAIL;
+		break;
+#endif
+
+#ifdef EAI_FAMILY
+	case EAI_FAMILY:
+		return PGM_IF_ERROR_FAMILY;
+		break;
+#endif
+
+#ifdef EAI_MEMORY
+	case EAI_MEMORY:
+		return PGM_IF_ERROR_MEMORY;
+		break;
+#endif
+
+#ifdef EAI_NODATA
+	case EAI_NODATA:
+		return PGM_IF_ERROR_NODATA;
+		break;
+#endif
+
+#if defined(EAI_NONAME) && EAI_NONAME != EAI_NODATA
+	case EAI_NONAME:
+		return PGM_IF_ERROR_NONAME;
+		break;
+#endif
+
+#ifdef EAI_SERVICE
+	case EAI_SERVICE:
+		return PGM_IF_ERROR_SERVICE;
+		break;
+#endif
+
+#ifdef EAI_SOCKTYPE
+	case EAI_SOCKTYPE:
+		return PGM_IF_ERROR_SOCKTYPE;
+		break;
+#endif
+
+#ifdef EAI_SYSTEM
+	case EAI_SYSTEM:
+		return pgm_if_error_from_errno (errno);
+		break;
+#endif
+
+	default :
+		return PGM_IF_ERROR_FAILED;
+		break;
+	}
+}
 
 static
 const char*

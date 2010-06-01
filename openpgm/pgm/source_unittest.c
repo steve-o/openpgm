@@ -21,14 +21,15 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <glib.h>
 #include <check.h>
+
+#include <pgm/source.h>
+#include <pgm/txwi.h>
+#include <pgm/skbuff.h>
+#include <pgm/ip.h>
+#include <pgm/transport.h>
 
 
 /* mock state */
@@ -50,36 +51,10 @@
 #define PGM_NAK_NCF_RETRIES	2
 
 static gboolean mock_is_valid_spmr = TRUE;
-static gboolean mock_is_valid_ack = TRUE;
 static gboolean mock_is_valid_nak = TRUE;
 static gboolean mock_is_valid_nnak = TRUE;
 
-
-#define pgm_txw_get_unfolded_checksum	mock_pgm_txw_get_unfolded_checksum
-#define pgm_txw_set_unfolded_checksum	mock_pgm_txw_set_unfolded_checksum
-#define pgm_txw_inc_retransmit_count	mock_pgm_txw_inc_retransmit_count
-#define pgm_txw_add			mock_pgm_txw_add
-#define pgm_txw_peek			mock_pgm_txw_peek
-#define pgm_txw_retransmit_push		mock_pgm_txw_retransmit_push
-#define pgm_txw_retransmit_try_peek	mock_pgm_txw_retransmit_try_peek
-#define pgm_txw_retransmit_remove_head	mock_pgm_txw_retransmit_remove_head
-#define pgm_rs_encode			mock_pgm_rs_encode
-#define pgm_rate_check			mock_pgm_rate_check
-#define pgm_verify_spmr			mock_pgm_verify_spmr
-#define pgm_verify_ack			mock_pgm_verify_ack
-#define pgm_verify_nak			mock_pgm_verify_nak
-#define pgm_verify_nnak			mock_pgm_verify_nnak
-#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
-#define pgm_compat_csum_partial_copy	mock_pgm_compat_csum_partial_copy
-#define pgm_csum_block_add		mock_pgm_csum_block_add
-#define pgm_csum_fold			mock_pgm_csum_fold
-#define pgm_sendto			mock_pgm_sendto
-#define pgm_time_update_now		mock_pgm_time_update_now
-
-
-#define SOURCE_DEBUG
-#include "source.c"
-
+static gsize mock_pgm_transport_pkt_offset (const gboolean can_fragment);
 
 static
 void
@@ -93,7 +68,7 @@ struct pgm_transport_t*
 generate_transport (void)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
-	struct pgm_transport_t* transport = g_new0 (struct pgm_transport_t, 1);
+	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
 	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
 	((struct sockaddr*)&transport->send_addr)->sa_family = AF_INET;
 	((struct sockaddr_in*)&transport->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
@@ -103,13 +78,12 @@ generate_transport (void)
 	transport->window = g_malloc0 (sizeof(pgm_txw_t));
 	transport->txw_sqns = PGM_TXW_SQNS;
 	transport->max_tpdu = PGM_MAX_TPDU;
-	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - pgm_transport_pkt_offset2 (FALSE, FALSE);
-	transport->max_tsdu_fragment = PGM_MAX_TPDU - sizeof(struct pgm_ip) - pgm_transport_pkt_offset2 (TRUE, FALSE);
+	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (FALSE);
+	transport->max_tsdu_fragment = PGM_MAX_TPDU - sizeof(struct pgm_ip) - mock_pgm_transport_pkt_offset (TRUE);
 	transport->max_apdu = MIN(PGM_TXW_SQNS, PGM_MAX_FRAGMENTS) * transport->max_tsdu_fragment;
 	transport->iphdr_len = sizeof(struct pgm_ip);
 	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	transport->spm_heartbeat_interval[0] = pgm_secs(1);
-	pgm_spinlock_init (&transport->txw_spinlock);
 	transport->is_bound = FALSE;
 	transport->is_destroyed = FALSE;
 	return transport;
@@ -121,7 +95,7 @@ generate_skb (void)
 {
 	const char source[] = "i am not a string";
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
-	pgm_skb_reserve (skb, pgm_transport_pkt_offset2 (FALSE, FALSE));
+	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset (FALSE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -133,7 +107,7 @@ generate_fragment_skb (void)
 {
 	const char source[] = "i am not a string";
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
-	pgm_skb_reserve (skb, pgm_transport_pkt_offset2 (TRUE, FALSE));
+	pgm_skb_reserve (skb, mock_pgm_transport_pkt_offset (TRUE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -278,6 +252,7 @@ generate_parity_nak_list (void)
 	return skb;
 }
 
+static
 void
 mock_pgm_txw_add (
 	pgm_txw_t* const		window,
@@ -288,10 +263,11 @@ mock_pgm_txw_add (
 		(gpointer)window, (gpointer)skb);
 }
 
+static
 struct pgm_sk_buff_t*
 mock_pgm_txw_peek (
-	const pgm_txw_t* const		window,
-	const uint32_t			sequence
+	pgm_txw_t* const		window,
+	const guint32			sequence
 	)
 {
 	g_debug ("mock_pgm_txw_peek (window:%p sequence:%" G_GUINT32_FORMAT ")",
@@ -299,12 +275,13 @@ mock_pgm_txw_peek (
 	return NULL;
 }
 
-bool
+static
+gboolean
 mock_pgm_txw_retransmit_push (
 	pgm_txw_t* const		window,
-	const uint32_t			sequence,
-	const bool			is_parity,
-	const uint8_t			tg_sqn_shift
+	const guint32			sequence,
+	const gboolean			is_parity,
+	const guint			tg_sqn_shift
 	)
 {
 	g_debug ("mock_pgm_txw_retransmit_push (window:%p sequence:%" G_GUINT32_FORMAT " is-parity:%s tg-sqn-shift:%d)",
@@ -315,29 +292,7 @@ mock_pgm_txw_retransmit_push (
 	return TRUE;
 }
 
-void
-mock_pgm_txw_set_unfolded_checksum (
-	struct pgm_sk_buff_t*const skb,
-	const uint32_t		csum
-	)
-{
-}
-
-uint32_t
-pgm_txw_get_unfolded_checksum (
-	const struct pgm_sk_buff_t*const skb
-	)
-{
-	return 0;
-}
-
-void
-mock_pgm_txw_inc_retransmit_count (
-	struct pgm_sk_buff_t*const skb
-	)
-{
-}
-
+static
 struct pgm_sk_buff_t*
 mock_pgm_txw_retransmit_try_peek (
 	pgm_txw_t* const		window
@@ -348,6 +303,7 @@ mock_pgm_txw_retransmit_try_peek (
 	return generate_odata (); 
 }
 
+static
 void
 mock_pgm_txw_retransmit_remove_head (
 	pgm_txw_t* const		window
@@ -357,13 +313,14 @@ mock_pgm_txw_retransmit_remove_head (
 		(gpointer)window);
 }
 
+static
 void
 mock_pgm_rs_encode (
-	pgm_rs_t*			rs,
-	const pgm_gf8_t**		src,
-	uint8_t				offset,
-	pgm_gf8_t*			dst,
-	uint16_t			len
+	gpointer			rs,
+	const void**			src,
+	guint				offset,
+	void*				dst,
+	gsize				len
 	)
 {
 	g_debug ("mock_pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%" G_GSIZE_FORMAT ")",
@@ -371,99 +328,98 @@ mock_pgm_rs_encode (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_rate_check (
-	pgm_rate_t*			bucket,
-	const size_t			data_size,
-	const bool			is_nonblocking
+	gpointer			bucket,
+	const guint			data_size,
+	const int			flags
 	)
 {
-	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u is-nonblocking:%s)",
-		bucket, data_size, is_nonblocking ? "TRUE" : "FALSE");
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u flags:%d)",
+		bucket, data_size, flags);
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_spmr (
-	const struct pgm_sk_buff_t* const	skb
+	struct pgm_sk_buff_t* const	skb
 	)
 {
 	return mock_is_valid_spmr;
 }
 
-bool
-mock_pgm_verify_ack (
-	const struct pgm_sk_buff_t* const	skb
-	)
-{
-	return mock_is_valid_ack;
-}
-
-bool
+static
+gboolean
 mock_pgm_verify_nak (
-	const struct pgm_sk_buff_t* const	skb
+	struct pgm_sk_buff_t* const	skb
 	)
 {
 	return mock_is_valid_nak;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_nnak (
-	const struct pgm_sk_buff_t* const	skb
+	struct pgm_sk_buff_t* const	skb
 	)
 {
 	return mock_is_valid_nnak;
 }
 
-uint32_t
+static
+guint32
 mock_pgm_compat_csum_partial (
 	const void*			addr,
-	uint16_t			len,
-	uint32_t			csum
+	guint				len,
+	guint32				csum
 	)
 {
 	return 0x0;
 }
 
-uint32_t
+static
+guint32
 mock_pgm_compat_csum_partial_copy (
 	const void*			src,
 	void*				dst,
-	uint16_t			len,
-	uint32_t			csum
+	guint				len,
+	guint32				csum
 	)
 {
 	return 0x0;
 }
 
-uint32_t
+static
+guint32
 mock_pgm_csum_block_add (
-	uint32_t			csum,
-	uint32_t			csum2,
-	uint16_t			offset
+	guint32				csum,
+	guint32				csum2,
+	guint				offset
 	)
 {
 	return 0x0;
 }
 
-uint16_t
+static
+guint16
 mock_pgm_csum_fold (
-	uint32_t			csum
+	guint32				csum
 	)
 {
 	return 0x0;
 }
 
 PGM_GNUC_INTERNAL
-ssize_t
+gssize
 mock_pgm_sendto (
 	pgm_transport_t*		transport,
-	bool				use_rate_limit,
-	bool				use_router_alert,
+	gboolean			use_rate_limit,
+	gboolean			use_router_alert,
 	const void*			buf,
-	size_t				len,
+	gsize				len,
 	const struct sockaddr*		to,
-	socklen_t			tolen
+	gsize				tolen
 	)
 {
 	char saddr[INET6_ADDRSTRLEN];
@@ -480,21 +436,18 @@ mock_pgm_sendto (
 }
 
 /** time module */
-static pgm_time_t _mock_pgm_time_update_now (void);
-pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
-
 static
 pgm_time_t
-_mock_pgm_time_update_now (void)
+mock_pgm_time_update_now (void)
 {
 	return 0x1;
 }
 
 /** transport module */
-size_t
-pgm_transport_pkt_offset2 (
-	const bool			can_fragment,
-	const bool			use_pgmcc
+static
+gsize
+mock_pgm_transport_pkt_offset (
+	const gboolean			can_fragment
 	)
 {
 	return can_fragment ? ( sizeof(struct pgm_header)
@@ -507,6 +460,28 @@ pgm_transport_pkt_offset2 (
 
 
 /* mock functions for external references */
+
+#define pgm_txw_add			mock_pgm_txw_add
+#define pgm_txw_peek			mock_pgm_txw_peek
+#define pgm_txw_retransmit_push		mock_pgm_txw_retransmit_push
+#define pgm_txw_retransmit_try_peek	mock_pgm_txw_retransmit_try_peek
+#define pgm_txw_retransmit_remove_head	mock_pgm_txw_retransmit_remove_head
+#define pgm_rs_encode			mock_pgm_rs_encode
+#define pgm_rate_check			mock_pgm_rate_check
+#define pgm_verify_spmr			mock_pgm_verify_spmr
+#define pgm_verify_nak			mock_pgm_verify_nak
+#define pgm_verify_nnak			mock_pgm_verify_nnak
+#define pgm_compat_csum_partial		mock_pgm_compat_csum_partial
+#define pgm_compat_csum_partial_copy	mock_pgm_compat_csum_partial_copy
+#define pgm_csum_block_add		mock_pgm_csum_block_add
+#define pgm_csum_fold			mock_pgm_csum_fold
+#define pgm_sendto			mock_pgm_sendto
+#define pgm_time_update_now		mock_pgm_time_update_now
+#define pgm_transport_pkt_offset	mock_pgm_transport_pkt_offset
+
+
+#define SOURCE_DEBUG
+#include "source.c"
 
 
 /* target:
@@ -705,13 +680,13 @@ END_TEST
 
 START_TEST (test_send_skbv_fail_001)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU), *skbv[] = { skb };
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	fail_if (NULL == skb, "alloc_skb failed");
 /* reserve PGM header */
-	pgm_skb_put (skb, pgm_transport_pkt_offset2 (TRUE, FALSE));
+	pgm_skb_put (skb, mock_pgm_transport_pkt_offset (TRUE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skbv, 1, TRUE, &bytes_written), "send not error");
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skb, 1, TRUE, &bytes_written), "send not error");
 }
 END_TEST
 

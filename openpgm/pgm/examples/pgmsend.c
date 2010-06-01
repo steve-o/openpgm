@@ -19,7 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
+#include <getopt.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -27,7 +29,9 @@
 #include <string.h>
 #include <time.h>
 #include <sys/types.h>
+
 #include <glib.h>
+
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <unistd.h>
@@ -35,12 +39,9 @@
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #	include <sys/time.h>
-#else
-#	include "getopt.h"
 #endif
-#include <pgm/pgm.h>
 
-/* example dependencies */
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 
@@ -59,7 +60,7 @@ static int g_max_rte = 400*1000;
 static int g_sqns = 100;
 
 static gboolean g_fec = FALSE;
-static int g_k = 8;
+static int g_k = 64;
 static int g_n = 255;
 
 static pgm_transport_t* g_transport = NULL;
@@ -89,17 +90,14 @@ main (
 	char   *argv[]
 	)
 {
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
 	setlocale (LC_ALL, "");
 
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init();
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_messages_shutdown();
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
 		return EXIT_FAILURE;
 	}
 
@@ -121,19 +119,16 @@ main (
 		case 'l':	g_multicast_loop = TRUE; break;
 
 		case 'i':
-			pgm_if_print_all();
-			pgm_messages_shutdown();
+			pgm_if_print_all ();
 			return EXIT_SUCCESS;
 
 		case 'h':
 		case '?':
-			pgm_messages_shutdown();
 			usage (binary_name);
 		}
 	}
 
 	if (g_fec && ( !g_k || !g_n )) {
-		pgm_messages_shutdown();
 		puts ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
@@ -144,10 +139,10 @@ main (
 	signal (SIGHUP, SIG_IGN);
 #endif
 
-	if (create_transport())
+	if (create_transport ())
 	{
 		while (optind < argc) {
-			const int status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
+			const PGMIOStatus status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
 		        if (PGM_IO_STATUS_NORMAL != status) {
 				g_warning ("pgm_send failed.");
 		        }
@@ -160,8 +155,7 @@ main (
 		pgm_transport_destroy (g_transport, TRUE);
 		g_transport = NULL;
 	}
-	pgm_shutdown();
-	pgm_messages_shutdown();
+	pgm_shutdown ();
 	return EXIT_SUCCESS;
 }
 
@@ -169,20 +163,20 @@ static gboolean
 create_transport (void)
 {
 	struct pgm_transport_info_t* res = NULL;
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
 /* parse network parameter into transport address structure */
 	char network[1024];
 	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
+		g_error ("parsing network parameter: %s", err->message);
+		g_error_free (err);
 		return FALSE;
 	}
 /* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		return FALSE;
 	}
@@ -192,9 +186,9 @@ create_transport (void)
 	}
 	if (g_port)
 		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_create (&g_transport, res, &err)) {
+		g_error ("creating transport: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		return FALSE;
 	}
@@ -216,9 +210,9 @@ create_transport (void)
 	}
 
 /* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_bind (g_transport, &err)) {
+		g_error ("binding transport: %s", err->message);
+		g_error_free (err);
 		pgm_transport_destroy (g_transport, FALSE);
 		g_transport = NULL;
 		return FALSE;

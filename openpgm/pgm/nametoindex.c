@@ -19,188 +19,110 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef _WIN32
+#include <glib.h>
+
+#ifdef G_OS_WIN32
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
+
+#include "pgm/nametoindex.h"
+
 
 
 //#define NAMETOINDEX_DEBUG
 
-#define MAX_TRIES		3
-#define DEFAULT_BUFFER_SIZE	4096
+#ifndef NAMETOINDEX_DEBUG
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
 
 
-#ifdef _WIN32
-static inline
-void*
-_pgm_heap_alloc (
-	const size_t	n_bytes
-	)
-{
-#       ifdef CONFIG_USE_HEAPALLOC
-	return HeapAlloc (GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS, n_bytes);
-#	else
-	return pgm_malloc (n_bytes);
-#	endif
-}
+#ifdef G_OS_WIN32
 
-static inline
-void
-_pgm_heap_free (
-	void*		mem
-	)
-{
-#       ifdef CONFIG_USE_HEAPALLOC
-	HeapFree (GetProcessHeap(), 0, mem);
-#	else
-	pgm_free (mem);
-#	endif
-}
-
-/* Retrieve adapter index via name.
- * Wine edition:  First try GetAdapterIndex() then fallback to enumerating
- * adapters via GetAdaptersInfo().
+/* Retrieve interface index for a specified adapter name.
+ *
+ * On Windows is IPv4 specific, IPv6 indexes are separate (IP_ADAPTER_ADDRESSES::Ipv6IfIndex)
  *
  * On error returns zero, no errors are defined.
  */
 
-static
-unsigned					/* type matching if_nametoindex() */
-_pgm_getadaptersinfo_nametoindex (
-	const sa_family_t	iffamily,
+int
+pgm_compat_if_nametoindex (
+	const int		iffamily,
 	const char*		ifname
         )
 {
-	pgm_return_val_if_fail (NULL != ifname, 0);
+	g_return_val_if_fail (NULL != ifname, 0);
 
-	pgm_assert (AF_INET6 != iffamily);
+#ifdef CONFIG_TARGET_WINE
+	g_assert (AF_INET6 != iffamily);
 
-	DWORD dwRet, ifIndex;
-	ULONG ulOutBufLen = DEFAULT_BUFFER_SIZE;
-	PIP_ADAPTER_INFO pAdapterInfo = NULL;
-	PIP_ADAPTER_INFO pAdapter = NULL;
+	ULONG ifIndex = 0;
+	DWORD dwSize, dwRet;
+	MIB_IFTABLE *pIfTable;
+	MIB_IFROW *pIfRow;
 
-/* loop to handle interfaces coming online causing a buffer overflow
- * between first call to list buffer length and second call to enumerate.
- */
-	for (unsigned i = MAX_TRIES; i; i--)
-	{
-		pgm_debug ("IP_ADAPTER_INFO buffer length %lu bytes.", ulOutBufLen);
-		pAdapterInfo = (IP_ADAPTER_INFO*)_pgm_heap_alloc (ulOutBufLen);
-		dwRet = GetAdaptersInfo (pAdapterInfo, &ulOutBufLen);
-		if (ERROR_BUFFER_OVERFLOW == dwRet) {
-			_pgm_heap_free (pAdapterInfo);
-			pAdapterInfo = NULL;
-		} else {
-			break;
-		}
-	}
+	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
+	if (NO_ERROR == dwRet)
+		return ifIndex;
 
-	switch (dwRet) {
-	case ERROR_SUCCESS:	/* NO_ERROR */
-		break;
-	case ERROR_BUFFER_OVERFLOW:
-		pgm_warn (_("GetAdaptersInfo repeatedly failed with ERROR_BUFFER_OVERFLOW."));
-		if (pAdapterInfo)
-			_pgm_heap_free (pAdapterInfo);
-		return 0;
-	default:
-		pgm_warn (_("GetAdaptersInfo failed"));
-		if (pAdapterInfo)
-			_pgm_heap_free (pAdapterInfo);
+	pIfTable = (MIB_IFTABLE *) malloc(sizeof (MIB_IFTABLE));
+	if (NULL == pIfTable) {
+		perror("malloc");
 		return 0;
 	}
-
-	for (pAdapter = pAdapterInfo;
-		 pAdapter;
-		 pAdapter = pAdapter->Next)
-	{
-		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
-			 pIPAddr;
-			 pIPAddr = pIPAddr->Next)
-		{
-/* skip null adapters */
-			if (strlen (pIPAddr->IpAddress.String) == 0)
-				continue;
-
-			if (0 == strncmp (ifname, pAdapter->AdapterName, IF_NAMESIZE)) {
-				ifIndex = pAdapter->Index;
-				_pgm_heap_free (pAdapterInfo);
-				return ifIndex;
-			}
+	dwSize = sizeof (MIB_IFTABLE);
+	dwRet = GetIfTable(pIfTable, &dwSize, FALSE);
+	if (ERROR_INSUFFICIENT_BUFFER == dwRet) {
+		free(pIfTable);
+		pIfTable = (MIB_IFTABLE *) malloc(dwSize);
+		if (NULL == pIfTable) {
+			perror("malloc");
+			return 0;
 		}
 	}
+	dwRet = GetIfTable(pIfTable, &dwSize, FALSE);
+	if (NO_ERROR != dwRet) {
+		perror("GetIfTable did not return NO_ERROR");
+		return 0;
+	}
+	for (int i = 0; i < (int) pIfTable->dwNumEntries; i++)
+	{
+		pIfRow = (MIB_IFROW *) & pIfTable->table[i];
+		if (0 == strncmp (ifname, pIfRow->bDescr, pIfRow->dwDescrLen)) {
+			ifIndex = pIfRow->dwIndex;
+			free(pIfTable);
+			return ifIndex;
+		}
+	}
+	free(pIfTable);
 
-	if (pAdapterInfo)
-		_pgm_heap_free (pAdapterInfo);
-	return 0;
-}
-
-/* Retrieve adapter index via name.
- * Windows edition:  First try GetAdapterIndex() then fallback to enumerating
- * adapters via GetAdaptersAddresses().
- *
- * On error returns zero, no errors are defined.
- */
-
-static
-unsigned					/* type matching if_nametoindex() */
-_pgm_getadaptersaddresses_nametoindex (
-	const sa_family_t	iffamily,
-	const char*		ifname
-        )
-{
-	pgm_return_val_if_fail (NULL != ifname, 0);
-
+#else /* !CONFIG_TARGET_WINE */
 	ULONG ifIndex;
-	DWORD dwSize = DEFAULT_BUFFER_SIZE, dwRet;
-	IP_ADAPTER_ADDRESSES *pAdapterAddresses = NULL, *adapter;
+	DWORD dwSize, dwRet;
+	IP_ADAPTER_ADDRESSES *pAdapterAddresses, *adapter;
 
-/* first see if GetAdapterIndex is working
- */
 	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
 	if (NO_ERROR == dwRet)
 		return ifIndex;
 
 /* fallback to finding index via iterating adapter list */
-
-/* loop to handle interfaces coming online causing a buffer overflow
- * between first call to list buffer length and second call to enumerate.
- */
-	for (unsigned i = MAX_TRIES; i; i--)
-	{
-		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
-		dwRet = GetAdaptersAddresses (AF_UNSPEC,
-						GAA_FLAG_SKIP_ANYCAST |
-						GAA_FLAG_SKIP_DNS_SERVER |
-						GAA_FLAG_SKIP_FRIENDLY_NAME |
-						GAA_FLAG_SKIP_MULTICAST,
-						NULL,
-						pAdapterAddresses,
-						&dwSize);
-		if (ERROR_BUFFER_OVERFLOW == dwRet) {
-			_pgm_heap_free (pAdapterAddresses);
-			pAdapterAddresses = NULL;
-		} else {
-			break;
-		}
-	}
-
-	switch (dwRet) {
-	case ERROR_SUCCESS:
-		break;
-	case ERROR_BUFFER_OVERFLOW:
-		pgm_warn (_("GetAdaptersAddresses repeatedly failed with ERROR_BUFFER_OVERFLOW"));
-		if (pAdapterAddresses)
-			_pgm_heap_free (pAdapterAddresses);
+	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, NULL, &dwSize);
+	if (ERROR_BUFFER_OVERFLOW != dwRet) {
+		perror("GetAdaptersAddresses");
 		return 0;
-	default:
-		pgm_warn (_("GetAdaptersAddresses failed"));
-		if (pAdapterAddresses)
-			_pgm_heap_free (pAdapterAddresses);
+	}
+	pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)malloc (dwSize);
+	if (NULL == pAdapterAddresses) {
+		perror("malloc");
+		return 0;
+	}
+	dwRet = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_SKIP_FRIENDLY_NAME | GAA_FLAG_SKIP_MULTICAST, NULL, pAdapterAddresses, &dwSize);
+	if (ERROR_SUCCESS != dwRet) {
+		perror("GetAdaptersAddresses(2)");
+		free(pAdapterAddresses);
 		return 0;
 	}
 
@@ -210,40 +132,15 @@ _pgm_getadaptersaddresses_nametoindex (
 	{
 		if (0 == strcmp (ifname, adapter->AdapterName)) {
 			ifIndex = AF_INET6 == iffamily ? adapter->Ipv6IfIndex : adapter->IfIndex;
-			_pgm_heap_free (pAdapterAddresses);
+			free (pAdapterAddresses);
 			return ifIndex;
 		}
 	}
 
-	if (pAdapterAddresses)
-		_pgm_heap_free (pAdapterAddresses);
+	free (pAdapterAddresses);
+#endif
 	return 0;
 }
-#endif /* _WIN32 */
-
-/* Retrieve interface index for a specified adapter name.
- * On error returns zero, no errors are defined.
- */
-
-unsigned					/* type matching if_nametoindex() */
-pgm_if_nametoindex (
-#ifndef _WIN32
-	PGM_GNUC_UNUSED const sa_family_t iffamily,
-#else
-	const sa_family_t	iffamily,
-#endif
-	const char*		ifname
-        )
-{
-	pgm_return_val_if_fail (NULL != ifname, 0);
-
-#ifndef _WIN32
-	return if_nametoindex (ifname);
-#elif defined(CONFIG_TARGET_WINE)
-	return _pgm_getadaptersinfo_nametoindex (iffamily, ifname);
-#else
-	return _pgm_getadaptersaddresses_nametoindex (iffamily, ifname);
-#endif
-}
+#endif /* G_OS_WIN32 */
 
 /* eof */

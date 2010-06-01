@@ -22,7 +22,6 @@
 
 #include <math.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
@@ -33,53 +32,47 @@
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
-
 
 #include "time.c"
 
 
 /* target:
- *	boolean
- *	pgm_time_init (pgm_error_t** error)
+ *	gboolean
+ *	pgm_time_init (GError** error)
  */
-
-/* time initialisation uses reference counting */
 
 START_TEST (test_init_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init (NULL), "init #1 failed");
-	fail_unless (TRUE == pgm_time_init (NULL), "init #2 failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	fail_unless (FALSE == pgm_time_init (NULL), "init failed");
 }
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_time_shutdown (void)
  */
 
 START_TEST (test_shutdown_pass_001)
 {
 	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
-	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #1 failed");
-	fail_unless (FALSE == pgm_time_shutdown (), "shutdown #2 failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_time_shutdown (), "shutdown failed");
 }
 END_TEST
 
-START_TEST (test_shutdown_pass_002)
+/* target:
+ *	gboolean
+ *	pgm_time_supported (void)
+ */
+
+START_TEST (test_supported_pass_001)
 {
-	fail_unless (TRUE == pgm_time_init (NULL), "init #1 failed");
-	fail_unless (TRUE == pgm_time_init (NULL), "init #2 failed");
-	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #1 failed");
-	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #2 failed");
-	fail_unless (FALSE == pgm_time_shutdown (), "shutdown #3 failed");
+	fail_unless (FALSE == pgm_time_supported (), "supported failed");
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	fail_unless (TRUE == pgm_time_supported (), "supported failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_time_supported (), "supported failed");
 }
 END_TEST
 
@@ -108,6 +101,43 @@ START_TEST (test_update_now_pass_001)
 
 		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" G_GINT64_FORMAT "us)",
 			   i, check_time, pgm_to_usecs(elapsed_time));
+	}
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
+}
+END_TEST
+
+/* target:
+ *	void
+ *	pgm_time_sleep (
+ *		gulong		usec
+ *		)
+ */
+
+START_TEST (test_sleep_pass_001)
+{
+	pgm_time_t tstamps[11];
+	const pgm_time_t sleep_time = 100 * 1000;	/* 100ms */
+	fail_unless (TRUE == pgm_time_init (NULL), "init failed");
+	pgm_time_t start_time = pgm_time_update_now ();
+	for (unsigned i = 1; i <= 10; i++)
+	{
+		tstamps[i] = pgm_time_sleep (sleep_time);
+	}
+	g_message ("start-time:     %" PGM_TIME_FORMAT, start_time);
+	for (unsigned i = 1; i <= 10; i++)
+	{
+		const pgm_time_t check_time = tstamps[i];
+
+		fail_unless (check_time >= start_time, "non-monotonic");
+		const gint64 elapsed_time = check_time - start_time;
+
+/* should be close to zero */
+		const gint64 diff_time = elapsed_time - sleep_time;
+		const float percent_diff = ( 100.0 * pgm_to_usecsf (diff_time) ) / sleep_time;
+		g_message ("check-point-%2.2u: %" PGM_TIME_FORMAT " (%+" G_GINT64_FORMAT "us %+3.1f%%)",
+			   i, check_time, pgm_to_usecs(elapsed_time), percent_diff);
+
+		start_time = check_time;
 	}
 	fail_unless (TRUE == pgm_time_shutdown (), "shutdown failed");
 }
@@ -154,11 +184,18 @@ make_test_suite (void)
 	TCase* tc_shutdown = tcase_create ("shutdown");
 	suite_add_tcase (s, tc_shutdown);
 	tcase_add_test (tc_shutdown, test_shutdown_pass_001);
-	tcase_add_test (tc_shutdown, test_shutdown_pass_002);
+
+	TCase* tc_supported = tcase_create ("supported");
+	suite_add_tcase (s, tc_supported);
+	tcase_add_test (tc_supported, test_supported_pass_001);
 
 	TCase* tc_update_now = tcase_create ("update-now");
 	suite_add_tcase (s, tc_update_now);
 	tcase_add_test (tc_update_now, test_update_now_pass_001);
+
+	TCase* tc_sleep = tcase_create ("sleep");
+	suite_add_tcase (s, tc_sleep);
+	tcase_add_test (tc_sleep, test_sleep_pass_001);
 
 	TCase* tc_since_epoch = tcase_create ("since-epoch");
 	suite_add_tcase (s, tc_since_epoch);
@@ -177,6 +214,10 @@ make_master_suite (void)
 int
 main (void)
 {
+//	setenv ("PGM_TIMER", "GTOD", 1);
+	setenv ("PGM_TIMER", "HPET", 1);
+	setenv ("PGM_SLEEP", "USLEEP", 1);
+
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);

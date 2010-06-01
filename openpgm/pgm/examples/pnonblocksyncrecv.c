@@ -19,8 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
-#include <locale.h>
+#include <getopt.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -30,16 +31,17 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/types.h>
+
 #include <glib.h>
+
 #ifdef G_OS_UNIX
 #	include <netdb.h>
 #	include <arpa/inet.h>
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #endif
-#include <pgm/pgm.h>
 
-/* example dependencies */
+#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 
@@ -85,19 +87,9 @@ main (
 	char*		argv[]
 	)
 {
-	int e;
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
-	setlocale (LC_ALL, "");
-
-	log_init ();
 	g_message ("syncrecv");
-
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -115,13 +107,19 @@ main (
 		}
 	}
 
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
+	}
+
 	g_quit = FALSE;
 #ifdef G_OS_UNIX
-	e = pipe (g_quit_pipe);
+	pipe (g_quit_pipe);
 #else
-	e = _pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
+	_pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
 #endif
-	g_assert (0 == e);
 
 /* setup signal handlers */
 	signal(SIGSEGV, on_sigsegv);
@@ -146,22 +144,26 @@ main (
 		char buffer[4096];
 		gsize len;
 		pgm_tsi_t from;
-		const int status = pgm_recvfrom (g_transport,
-					         buffer,
-					         sizeof(buffer),
-						 0,
-					         &len,
-					         &from,
-					         &pgm_err);
+		const PGMIOStatus status = pgm_recvfrom (g_transport,
+						         buffer,
+						         sizeof(buffer),
+							 0,
+						         &len,
+						         &from,
+						         &err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 			on_data (buffer, len, &from);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
 			pgm_transport_get_timer_pending (g_transport, &tv);
+			g_message ("wait on fd or pending timer %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			pgm_transport_get_rate_remaining (g_transport, &tv);
+			g_message ("wait on fd or rate limit timeout %u:%u",
+				   (unsigned)tv.tv_sec, (unsigned)tv.tv_usec);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* poll for next event */
 block:
@@ -173,10 +175,10 @@ block:
 			poll (fds, 1 + n_fds, timeout /* ms */);
 			break;
 		default:
-			if (pgm_err) {
-				g_warning ("%s", pgm_err->message);
-				pgm_error_free (pgm_err);
-				pgm_err = NULL;
+			if (err) {
+				g_warning ("%s", err->message);
+				g_error_free (err);
+				err = NULL;
 			}
 			if (PGM_IO_STATUS_ERROR == status)
 				break;
@@ -210,15 +212,14 @@ on_signal (
 	g_message ("on_signal (signum:%d)", signum);
 	g_quit = TRUE;
 	const char one = '1';
-	const size_t writelen = write (g_quit_pipe[1], &one, sizeof(one));
-	g_assert (sizeof(one) == writelen);
+	write (g_quit_pipe[1], &one, sizeof(one));
 }
 
 static gboolean
 on_startup (void)
 {
 	struct pgm_transport_info_t* res = NULL;
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
 	g_message ("startup.");
 	g_message ("create transport.");
@@ -226,15 +227,15 @@ on_startup (void)
 /* parse network parameter into transport address structure */
 	char network[1024];
 	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &err)) {
+		g_error ("parsing network parameter: %s", err->message);
+		g_error_free (err);
 		return FALSE;
 	}
 /* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		g_error ("creating GSI: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		return FALSE;
 	}
@@ -244,9 +245,9 @@ on_startup (void)
 	}
 	if (g_port)
 		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_create (&g_transport, res, &err)) {
+		g_error ("creating transport: %s", err->message);
+		g_error_free (err);
 		pgm_if_free_transport_info (res);
 		return FALSE;
 	}
@@ -267,9 +268,9 @@ on_startup (void)
 	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
 /* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_transport_bind (g_transport, &err)) {
+		g_error ("binding transport: %s", err->message);
+		g_error_free (err);
 		pgm_transport_destroy (g_transport, FALSE);
 		g_transport = NULL;
 		return FALSE;

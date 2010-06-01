@@ -2,7 +2,7 @@
  *
  * unit tests for portable getifaddrs implementation.
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -33,15 +32,6 @@
 /* mock state */
 
 /* mock functions for external references */
-
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
 
 
 #define GETIFADDRS_DEBUG
@@ -128,10 +118,9 @@ ifflags_string (
 }
 
 /* target:
- *	bool
+ *	int
  *	pgm_getifaddrs (
- *		struct pgm_ifaddrs**restrict	ifap,
- *		pgm_error_t**restrict           error
+ *		struct pgm_ifaddrs**	ifap
  *	)
  */
 
@@ -139,8 +128,7 @@ START_TEST (test_getifaddrs_pass_001)
 {
 	char saddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
 	struct pgm_ifaddrs *ifap = NULL, *ifa;
-	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_getifaddrs (&ifap, &err), "getifaddrs failed");
+	fail_unless (0 == pgm_getifaddrs (&ifap), "getifaddrs failed");
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
 		fail_unless (NULL != ifa, "invalid address");
@@ -186,7 +174,7 @@ END_TEST
 
 START_TEST (test_getifaddrs_fail_001)
 {
-	fail_unless (FALSE == pgm_getifaddrs (NULL, NULL), "getifaddrs failed");
+	fail_unless (-1 == pgm_getifaddrs (NULL), "getifaddrs failed");
 	g_message ("errno:%d", errno);
 }
 END_TEST
@@ -201,8 +189,7 @@ END_TEST
 START_TEST (test_freeifaddrs_pass_001)
 {
 	struct pgm_ifaddrs* ifap = NULL;
-	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_getifaddrs (&ifap, &err), "getifaddrs failed");
+	fail_unless (0 == pgm_getifaddrs (&ifap), "getifaddrs failed");
 	pgm_freeifaddrs (ifap);
 }
 END_TEST
@@ -226,7 +213,7 @@ make_test_suite (void)
 	TCase* tc_getifaddrs = tcase_create ("getifaddrs");
 	suite_add_tcase (s, tc_getifaddrs);
 	tcase_add_test (tc_getifaddrs, test_getifaddrs_pass_001);
-	tcase_add_test_raise_signal (tc_getifaddrs, test_getifaddrs_fail_001, SIGABRT);
+	tcase_add_test_raise_signal (tc_getifaddrs, test_getifaddrs_fail_001, SIGSEGV);
 
 	TCase* tc_freeifaddrs = tcase_create ("freeifaddrs");
 	suite_add_tcase (s, tc_freeifaddrs);

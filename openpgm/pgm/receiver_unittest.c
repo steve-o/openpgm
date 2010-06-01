@@ -21,11 +21,15 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
+
+#include <pgm/receiver.h>
+#include <pgm/rxwi.h>
+
+#define pgm_histogram_add	mock_pgm_histogram_add
+#include <pgm/histogram.h>
 
 
 /* mock state */
@@ -45,34 +49,6 @@
 #define PGM_NAK_RDATA_IVL	( pgm_secs(2) )
 #define PGM_NAK_DATA_RETRIES	5
 #define PGM_NAK_NCF_RETRIES	2
-
-
-#define pgm_histogram_add	mock_pgm_histogram_add
-#define pgm_verify_spm		mock_pgm_verify_spm
-#define pgm_verify_nak		mock_pgm_verify_nak
-#define pgm_verify_ncf		mock_pgm_verify_ncf
-#define pgm_verify_poll		mock_pgm_verify_poll
-#define pgm_sendto		mock_pgm_sendto
-#define pgm_time_now		mock_pgm_time_now
-#define pgm_time_update_now	mock_pgm_time_update_now
-#define pgm_rxw_destroy		mock_pgm_rxw_destroy
-#define pgm_rxw_create		mock_pgm_rxw_create
-#define pgm_rxw_update		mock_pgm_rxw_update
-#define pgm_rxw_update_fec	mock_pgm_rxw_update_fec
-#define pgm_rxw_confirm		mock_pgm_rxw_confirm
-#define pgm_rxw_lost		mock_pgm_rxw_lost
-#define pgm_rxw_state		mock_pgm_rxw_state
-#define pgm_rxw_add		mock_pgm_rxw_add
-#define pgm_rxw_remove_commit	mock_pgm_rxw_remove_commit
-#define pgm_rxw_readv		mock_pgm_rxw_readv
-#define pgm_csum_fold		mock_pgm_csum_fold
-#define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
-#define pgm_histogram_init	mock_pgm_histogram_init
-
-
-#define RECEIVER_DEBUG
-#include "receiver.c"
-
 
 static
 void
@@ -96,7 +72,7 @@ generate_peer (void)
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
 	peer->window = g_malloc0 (sizeof(pgm_rxw_t));
-	pgm_atomic_inc32 (&peer->ref_count);
+	g_atomic_int_inc (&peer->ref_count);
 	return peer;
 }
 
@@ -145,15 +121,15 @@ mock_pgm_on_spmr (
 
 /** net module */
 PGM_GNUC_INTERNAL
-ssize_t
+gssize
 mock_pgm_sendto (
 	pgm_transport_t*		transport,
-	bool				use_rate_limit,
-	bool				use_router_alert,
+	gboolean			use_rate_limit,
+	gboolean			use_router_alert,
 	const void*			buf,
-	size_t				len,
+	gsize				len,
 	const struct sockaddr*		to,
-	socklen_t			tolen
+	gsize				tolen
 	)
 {
 	return len;
@@ -161,17 +137,17 @@ mock_pgm_sendto (
 
 /** time module */
 static pgm_time_t mock_pgm_time_now = 0x1;
-static pgm_time_t _mock_pgm_time_update_now (void);
-pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
 
+static
 pgm_time_t
-_mock_pgm_time_update_now (void)
+mock_pgm_time_update_now (void)
 {
 	return mock_pgm_time_now;
 }
 
 /* packet module */
-bool
+static
+gboolean
 mock_pgm_verify_spm (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -179,7 +155,8 @@ mock_pgm_verify_spm (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_nak (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -187,7 +164,8 @@ mock_pgm_verify_nak (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_ncf (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -195,7 +173,8 @@ mock_pgm_verify_ncf (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_poll (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -204,18 +183,20 @@ mock_pgm_verify_poll (
 }
 
 /* receive window module */
+static
 pgm_rxw_t*
 mock_pgm_rxw_create (
 	const pgm_tsi_t*	tsi,
-	const uint16_t		tpdu_size,
-	const unsigned		sqns,
-	const unsigned		secs,
-	const ssize_t		max_rte
+	const guint16		tpdu_size,
+	const guint32		sqns,
+	const guint		secs,
+	const guint		max_rte
 	)
 {
 	return g_malloc0 (sizeof(pgm_rxw_t));
 }
 
+static
 void
 mock_pgm_rxw_destroy (
 	pgm_rxw_t* const	window
@@ -225,10 +206,11 @@ mock_pgm_rxw_destroy (
 	g_free (window);
 }
 
+static
 int
 mock_pgm_rxw_confirm (
 	pgm_rxw_t* const	window,
-	const uint32_t		sequence,
+	const guint32		sequence,
 	const pgm_time_t	now,
 	const pgm_time_t	nak_rdata_expiry,
 	const pgm_time_t	nak_rb_expiry
@@ -237,28 +219,31 @@ mock_pgm_rxw_confirm (
 	return PGM_RXW_DUPLICATE;
 }
 
+static
 void
 mock_pgm_rxw_lost (
 	pgm_rxw_t* const	window,
-	const uint32_t		sequence
+	const guint32		sequence
 	)
 {
 }
 
+static
 void
 mock_pgm_rxw_state (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
-	const int			new_state
+	const pgm_pkt_state_e		new_state
 	)
 {
 }
 
-unsigned
+static
+guint
 mock_pgm_rxw_update (
 	pgm_rxw_t* const		window,
-	const uint32_t			txw_lead,
-	const uint32_t			txw_trail,
+	const guint32			txw_lead,
+	const guint32			txw_trail,
 	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry
 	)
@@ -266,14 +251,16 @@ mock_pgm_rxw_update (
 	return 0;
 }
 
+static
 void
 mock_pgm_rxw_update_fec (
 	pgm_rxw_t* const		window,
-	const uint8_t			rs_k
+	const guint			rs_k
 	)
 {
 }
 
+static
 int
 mock_pgm_rxw_add (
 	pgm_rxw_t* const		window,
@@ -285,6 +272,7 @@ mock_pgm_rxw_add (
 	return PGM_RXW_APPENDED;
 }
 
+static
 void
 mock_pgm_rxw_remove_commit (
 	pgm_rxw_t* const		window
@@ -292,30 +280,33 @@ mock_pgm_rxw_remove_commit (
 {
 }
 
-ssize_t
+static
+gssize
 mock_pgm_rxw_readv (
 	pgm_rxw_t* const		window,
-	struct pgm_msgv_t**		pmsg,
-	const unsigned			pmsglen
+	pgm_msgv_t**			pmsg,
+	const guint			pmsglen
 	)
 {
 	return 0;
 }
 
 /* checksum module */
-uint16_t
+static
+guint16
 mock_pgm_csum_fold (
-	uint32_t			csum
+	guint32				csum
 	)
 {
 	return 0x0;
 }
 
-uint32_t
+static
+guint32
 mock_pgm_compat_csum_partial (
 	const void*			addr,
-	uint16_t			len,
-	uint32_t			csum
+	guint				len,
+	guint32				csum
 	)
 {
 	return 0x0;
@@ -338,14 +329,29 @@ mock_pgm_histogram_add (
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
+#define pgm_verify_spm		mock_pgm_verify_spm
+#define pgm_verify_nak		mock_pgm_verify_nak
+#define pgm_verify_ncf		mock_pgm_verify_ncf
+#define pgm_verify_poll		mock_pgm_verify_poll
+#define pgm_sendto		mock_pgm_sendto
+#define pgm_time_now		mock_pgm_time_now
+#define pgm_time_update_now	mock_pgm_time_update_now
+#define pgm_rxw_destroy		mock_pgm_rxw_destroy
+#define pgm_rxw_create		mock_pgm_rxw_create
+#define pgm_rxw_update		mock_pgm_rxw_update
+#define pgm_rxw_update_fec	mock_pgm_rxw_update_fec
+#define pgm_rxw_confirm		mock_pgm_rxw_confirm
+#define pgm_rxw_lost		mock_pgm_rxw_lost
+#define pgm_rxw_state		mock_pgm_rxw_state
+#define pgm_rxw_add		mock_pgm_rxw_add
+#define pgm_rxw_remove_commit	mock_pgm_rxw_remove_commit
+#define pgm_rxw_readv		mock_pgm_rxw_readv
+#define pgm_csum_fold		mock_pgm_csum_fold
+#define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
+#define pgm_histogram_init	mock_pgm_histogram_init
+
+#define RECEIVER_DEBUG
+#include "receiver.c"
 
 
 /* target:
@@ -427,10 +433,10 @@ START_TEST (test_min_nak_expiry_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_rxw_sqns (
  *		pgm_transport_t*	transport,
- *		const unsigned		sqns
+ *		const guint		sqns
  *	)
  */
 
@@ -448,10 +454,10 @@ START_TEST (test_set_rxw_sqns_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_rxw_secs (
  *		pgm_transport_t*	transport,
- *		const unsigned		secs
+ *		const guint		secs
  *	)
  */
 
@@ -469,10 +475,10 @@ START_TEST (test_set_rxw_secs_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_rxw_max_rte (
  *		pgm_transport_t*	transport,
- *		const unsigned		rate
+ *		const guint		rate
  *	)
  */
 
@@ -490,10 +496,10 @@ START_TEST (test_set_rxw_max_rte_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_peer_expiry (
  *		pgm_transport_t*	transport,
- *		const unsigned		expiration_time
+ *		const guint		expiration_time
  *	)
  */
 
@@ -512,10 +518,10 @@ START_TEST (test_set_peer_expiry_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_spmr_expiry (
  *		pgm_transport_t*	transport,
- *		const unsigned		expiration_time
+ *		const guint		expiration_time
  *	)
  */
 
@@ -534,10 +540,10 @@ START_TEST (test_set_spmr_expiry_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_nak_bo_ivl (
  *		pgm_transport_t*	transport,
- *		const unsigned		interval
+ *		const guint		interval
  *	)
  */
 
@@ -555,10 +561,10 @@ START_TEST (test_set_nak_bo_ivl_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_nak_rpt_ivl (
  *		pgm_transport_t*	transport,
- *		const unsigned		interval
+ *		const guint		interval
  *	)
  */
 
@@ -576,10 +582,10 @@ START_TEST (test_set_nak_rpt_ivl_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_nak_rdata_ivl (
  *		pgm_transport_t*	transport,
- *		const unsigned		interval
+ *		const guint		interval
  *	)
  */
 
@@ -597,10 +603,10 @@ START_TEST (test_set_nak_rdata_ivl_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_nak_data_retries (
  *		pgm_transport_t*	transport,
- *		const unsigned		cnt
+ *		const guint		cnt
  *	)
  */
 
@@ -618,10 +624,10 @@ START_TEST (test_set_nak_data_retries_fail_001)
 END_TEST
 
 /* target:
- *	bool
+ *	gboolean
  *	pgm_transport_set_nak_ncf_retries (
  *		pgm_transport_t*	transport,
- *		const unsigned		cnt
+ *		const guint		cnt
  *	)
  */
 

@@ -19,15 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE
+
 #include <signal.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
-#include <arpa/inet.h>
 #include <glib.h>
 #include <check.h>
+
+#include <pgm/recv.h>
+#include <pgm/txwi.h>
+#include <pgm/rxwi.h>
+#include <pgm/ip.h>
+#include <pgm/skbuff.h>
+#include <pgm/reed_solomon.h>
+#include <pgm/checksum.h>
 
 
 /* mock state */
@@ -60,59 +64,15 @@ struct mock_recvmsg_t {
 	int			mr_errno;
 };
 
-struct pgm_peer_t;
-
 GList* mock_recvmsg_list = NULL;
 static int mock_pgm_type = -1;
 static gboolean mock_reset_on_spmr = FALSE;
 static gboolean mock_data_on_spmr = FALSE;
-static struct pgm_peer_t* mock_peer = NULL;
+static pgm_peer_t* mock_peer = NULL;
 GList* mock_data_list = NULL;
-unsigned mock_pgm_loss_rate = 0;
 
-
-static ssize_t mock_recvmsg (int, struct msghdr*, int);
-
-#define pgm_parse_raw			mock_pgm_parse_raw
-#define pgm_parse_udp_encap		mock_pgm_parse_udp_encap
-#define pgm_verify_spm			mock_pgm_verify_spm
-#define pgm_verify_nak			mock_pgm_verify_nak
-#define pgm_verify_ncf			mock_pgm_verify_ncf
-#define pgm_transport_poll_info		mock_pgm_transport_poll_info
-#define pgm_set_reset_error		mock_pgm_set_reset_error
-#define pgm_flush_peers_pending		mock_pgm_flush_peers_pending
-#define pgm_peer_has_pending		mock_pgm_peer_has_pending
-#define pgm_peer_set_pending		mock_pgm_peer_set_pending
-#define pgm_txw_retransmit_is_empty	mock_pgm_txw_retransmit_is_empty
-#define pgm_rxw_create			mock_pgm_rxw_create
-#define pgm_rxw_readv			mock_pgm_rxw_readv
-#define pgm_new_peer			mock_pgm_new_peer
-#define pgm_on_data			mock_pgm_on_data
-#define pgm_on_spm			mock_pgm_on_spm
-#define pgm_on_ack			mock_pgm_on_ack
-#define pgm_on_nak			mock_pgm_on_nak
-#define pgm_on_deferred_nak		mock_pgm_on_deferred_nak
-#define pgm_on_peer_nak			mock_pgm_on_peer_nak
-#define pgm_on_nnak			mock_pgm_on_nnak
-#define pgm_on_ncf			mock_pgm_on_ncf
-#define pgm_on_spmr			mock_pgm_on_spmr
-#define pgm_sendto			mock_pgm_sendto
-#define pgm_timer_prepare		mock_pgm_timer_prepare
-#define pgm_timer_check			mock_pgm_timer_check
-#define pgm_timer_expiration		mock_pgm_timer_expiration
-#define pgm_timer_dispatch		mock_pgm_timer_dispatch
-#define pgm_time_now			mock_pgm_time_now
-#define pgm_time_update_now		mock_pgm_time_update_now
-#define recvmsg				mock_recvmsg
-#define pgm_loss_rate			mock_pgm_loss_rate
-
-#define RECV_DEBUG
-#include "recv.c"
-
-
-pgm_rxw_t* mock_pgm_rxw_create (const pgm_tsi_t*, const uint16_t, const unsigned, const unsigned, const ssize_t);
-static pgm_time_t _mock_pgm_time_update_now (void);
-pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
+static pgm_rxw_t* mock_pgm_rxw_create (const pgm_tsi_t*, const guint16, const guint32, const guint, const guint);
+static pgm_time_t mock_pgm_time_update_now (void);
 
 
 static
@@ -127,8 +87,8 @@ struct pgm_transport_t*
 generate_transport (void)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(PGM_SPORT) };
-	struct pgm_transport_t* transport = g_new0 (struct pgm_transport_t, 1);
-	transport->window = g_new0 (pgm_txw_t, 1);
+	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	transport->window = g_malloc0 (sizeof(pgm_txw_t));
 	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
 	transport->is_bound = TRUE;
 	transport->rx_buffer = pgm_alloc_skb (PGM_MAX_TPDU);
@@ -138,8 +98,8 @@ generate_transport (void)
 	transport->can_send_data = TRUE;
 	transport->can_send_nak = TRUE;
 	transport->can_recv_data = TRUE;
-	transport->peers_hashtable = pgm_hashtable_new (pgm_tsi_hash, pgm_tsi_equal);
-	pgm_rand_create (&transport->rand_);
+	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
+	transport->rand_ = g_rand_new();
 	transport->nak_bo_ivl = 100*1000;
 	pgm_notify_init (&transport->pending_notify);
 	pgm_notify_init (&transport->rdata_notify);
@@ -501,11 +461,12 @@ push_block_event (void)
 }
 
 /** packet module */
-bool
+static
+gboolean
 mock_pgm_parse_raw (
 	struct pgm_sk_buff_t* const	skb,
 	struct sockaddr* const		dst,
-	pgm_error_t**			error
+	GError**			error
 	)
 {
 	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
@@ -521,10 +482,11 @@ mock_pgm_parse_raw (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_parse_udp_encap (
 	struct pgm_sk_buff_t* const	skb,
-	pgm_error_t**			error
+	GError**			error
 	)
 {
 	skb->pgm_header = skb->data;
@@ -533,7 +495,8 @@ mock_pgm_parse_udp_encap (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_spm (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -541,7 +504,8 @@ mock_pgm_verify_spm (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_nak (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -549,7 +513,8 @@ mock_pgm_verify_nak (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_ncf (
 	const struct pgm_sk_buff_t* const	skb
 	)
@@ -558,6 +523,7 @@ mock_pgm_verify_ncf (
 }
 
 /** transport module */
+static
 int
 mock_pgm_transport_poll_info (
 	pgm_transport_t* const	transport,
@@ -568,12 +534,13 @@ mock_pgm_transport_poll_info (
 {
 }
 
+static
 pgm_peer_t*
 mock__pgm_peer_ref (
 	pgm_peer_t*	peer
 	)
 {
-	pgm_atomic_inc32 (&peer->ref_count);
+	g_atomic_int_inc (&peer->ref_count);
 	return peer;
 }
 
@@ -583,9 +550,9 @@ mock_pgm_new_peer (
 	pgm_transport_t* const		transport,
 	const pgm_tsi_t* const		tsi,
 	const struct sockaddr* const	src_addr,
-	const socklen_t			src_addr_len,
+	const gsize			src_addr_len,
 	const struct sockaddr* const	dst_addr,
-	const socklen_t			dst_addr_len,
+	const gsize			dst_addr_len,
 	const pgm_time_t		now
 	)
 {
@@ -604,7 +571,7 @@ mock_pgm_new_peer (
 					    transport->rxw_max_rte);
 	peer->spmr_expiry = now + transport->spmr_expiry;
 	gpointer entry = mock__pgm_peer_ref(peer);
-	pgm_hashtable_insert (transport->peers_hashtable, &peer->tsi, entry);
+	g_hash_table_insert (transport->peers_hashtable, &peer->tsi, entry);
 	peer->peers_link.next = transport->peers_list;
 	peer->peers_link.data = peer;
 	if (transport->peers_list)
@@ -618,7 +585,7 @@ void
 mock_pgm_set_reset_error (
 	pgm_transport_t* const          transport,
 	pgm_peer_t* const               source,
-	struct pgm_msgv_t* const	msgv
+	pgm_msgv_t* const               msgv
 	)
 {
 }
@@ -627,17 +594,17 @@ PGM_GNUC_INTERNAL
 int
 mock_pgm_flush_peers_pending (
 	pgm_transport_t* const          transport,
-	struct pgm_msgv_t**		pmsg,
-	const struct pgm_msgv_t* const	msg_end,
-	size_t* const			bytes_read,
-	unsigned* const			data_read
+	pgm_msgv_t**                    pmsg,
+	const pgm_msgv_t* const         msg_end,
+	gsize* const                    bytes_read,
+	guint* const                    data_read
 	)
 {
 	if (mock_data_list) {
-		size_t len = 0;
-		unsigned count = 0;
+		gsize len = 0;
+		guint count = 0;
 		while (mock_data_list && *pmsg <= msg_end) {
-			 struct pgm_msgv_t* mock_msgv = mock_data_list->data;
+			pgm_msgv_t* mock_msgv = mock_data_list->data;
 			(*pmsg)->msgv_len = mock_msgv->msgv_len;
 			for (unsigned i = 0; i < mock_msgv->msgv_len; i++) {
 				(*pmsg)->msgv_skb[i] = mock_msgv->msgv_skb[i];
@@ -656,7 +623,7 @@ mock_pgm_flush_peers_pending (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_peer_has_pending (
 	pgm_peer_t* const               peer
 	)
@@ -680,7 +647,7 @@ mock_pgm_peer_set_pending (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_data (
 	pgm_transport_t* const		transport,
 	pgm_peer_t* const		sender,
@@ -695,20 +662,7 @@ mock_pgm_on_data (
 }
 
 PGM_GNUC_INTERNAL
-bool
-mock_pgm_on_ack (
-	pgm_transport_t* const		transport,
-	struct pgm_sk_buff_t* const	skb
-	)
-{
-	g_debug ("mock_pgm_on_ack (transport:%p skb:%p)",
-		(gpointer)transport, (gpointer)skb);
-	mock_pgm_type = PGM_ACK;
-	return TRUE;
-}
-
-PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_deferred_nak (
 	pgm_transport_t* const		transport
 	)
@@ -717,7 +671,7 @@ mock_pgm_on_deferred_nak (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_nak (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb
@@ -730,7 +684,7 @@ mock_pgm_on_nak (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_peer_nak (
 	pgm_transport_t* const		transport,
 	pgm_peer_t* const		sender,
@@ -744,7 +698,7 @@ mock_pgm_on_peer_nak (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_ncf (
 	pgm_transport_t* const		transport,
 	pgm_peer_t* const		sender,
@@ -758,7 +712,7 @@ mock_pgm_on_ncf (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_nnak (
 	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb
@@ -771,7 +725,7 @@ mock_pgm_on_nnak (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_spm (
 	pgm_transport_t* const		transport,
 	pgm_peer_t* const		sender,
@@ -785,7 +739,7 @@ mock_pgm_on_spm (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_on_spmr (
 	pgm_transport_t* const		transport,
 	pgm_peer_t* const		peer,
@@ -805,34 +759,26 @@ mock_pgm_on_spmr (
 	return TRUE;
 }
 
-/** transmit window */
-PGM_GNUC_INTERNAL
-bool
-mock_pgm_txw_retransmit_is_empty (
-	const pgm_txw_t*const	window
-	)
-{
-	return TRUE;
-}
-
 /** receive window */
+static
 pgm_rxw_t*
 mock_pgm_rxw_create (
 	const pgm_tsi_t*	tsi,
-	const uint16_t		tpdu_size,
-	const unsigned		sqns,
-	const unsigned		secs,
-	const ssize_t		max_rte
+	const guint16		tpdu_size,
+	const guint32		sqns,
+	const guint		secs,
+	const guint		max_rte
 	)
 {
-	return g_new0 (pgm_rxw_t, 1);
+	return g_malloc0 (sizeof(pgm_rxw_t));
 }
 
-ssize_t
+static
+gssize
 mock_pgm_rxw_readv (
 	pgm_rxw_t* const	window,
-	struct pgm_msgv_t**	pmsg,
-	const unsigned		pmsglen
+	pgm_msgv_t**		pmsg,
+	const guint		pmsglen
 	)
 {
 	return -1;
@@ -840,15 +786,15 @@ mock_pgm_rxw_readv (
 
 /** net module */
 PGM_GNUC_INTERNAL
-ssize_t
+gssize
 mock_pgm_sendto (
 	pgm_transport_t*		transport,
-	bool				use_rate_limit,
-	bool				use_router_alert,
+	gboolean			use_rate_limit,
+	gboolean			use_router_alert,
 	const void*			buf,
-	size_t				len,
+	gsize				len,
 	const struct sockaddr*		to,
-	socklen_t			tolen
+	gsize				tolen
 	)
 {
 	return len;
@@ -856,7 +802,7 @@ mock_pgm_sendto (
 
 /** timer module */
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_timer_prepare (
 	pgm_transport_t* const		transport
 	)
@@ -865,7 +811,7 @@ mock_pgm_timer_prepare (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_timer_check (
 	pgm_transport_t* const		transport
 	)
@@ -874,7 +820,7 @@ mock_pgm_timer_check (
 }
 
 PGM_GNUC_INTERNAL
-pgm_time_t
+long
 mock_pgm_timer_expiration (
 	pgm_transport_t* const		transport
 	)
@@ -883,7 +829,7 @@ mock_pgm_timer_expiration (
 }
 
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_timer_dispatch (
 	pgm_transport_t* const		transport
 	)
@@ -896,7 +842,7 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 
 static
 pgm_time_t
-_mock_pgm_time_update_now (void)
+mock_pgm_time_update_now (void)
 {
 	return mock_pgm_time_now;
 }
@@ -944,25 +890,50 @@ mock_recvmsg (
 
 /* mock functions for external references */
 
-size_t
-pgm_transport_pkt_offset2 (
-        const bool                      can_fragment,
-        const bool                      use_pgmcc
-        )
-{
-        return 0;
-}
+#define pgm_parse_raw		mock_pgm_parse_raw
+#define pgm_parse_udp_encap	mock_pgm_parse_udp_encap
+#define pgm_verify_spm		mock_pgm_verify_spm
+#define pgm_verify_nak		mock_pgm_verify_nak
+#define pgm_verify_ncf		mock_pgm_verify_ncf
+#define pgm_transport_poll_info	mock_pgm_transport_poll_info
+#define pgm_set_reset_error	mock_pgm_set_reset_error
+#define pgm_flush_peers_pending	mock_pgm_flush_peers_pending
+#define pgm_peer_has_pending	mock_pgm_peer_has_pending
+#define pgm_peer_set_pending	mock_pgm_peer_set_pending
+#define pgm_rxw_create		mock_pgm_rxw_create
+#define pgm_rxw_readv		mock_pgm_rxw_readv
+#define pgm_new_peer		mock_pgm_new_peer
+#define pgm_on_data		mock_pgm_on_data
+#define pgm_on_spm		mock_pgm_on_spm
+#define pgm_on_nak		mock_pgm_on_nak
+#define pgm_on_deferred_nak	mock_pgm_on_deferred_nak
+#define pgm_on_peer_nak		mock_pgm_on_peer_nak
+#define pgm_on_nnak		mock_pgm_on_nnak
+#define pgm_on_ncf		mock_pgm_on_ncf
+#define pgm_on_spmr		mock_pgm_on_spmr
+#define pgm_sendto		mock_pgm_sendto
+#define pgm_timer_prepare	mock_pgm_timer_prepare
+#define pgm_timer_check		mock_pgm_timer_check
+#define pgm_timer_expiration	mock_pgm_timer_expiration
+#define pgm_timer_dispatch	mock_pgm_timer_dispatch
+#define pgm_time_now		mock_pgm_time_now
+#define pgm_time_update_now	mock_pgm_time_update_now
+#define recvmsg			mock_recvmsg
+
+#define RECV_DEBUG
+#include "recv.c"
+#undef g_trace
 
 
 /* target:
- *	int
+ *	PGMIOStatus
  *	pgm_recv (
  *		pgm_transport_t*	transport,
- *		void*			data,
- *		size_t			len,
+ *		gpointer		data,
+ *		gsize			len,
  *		int			flags,
- *		size_t*			bytes_read,
- *		pgm_error_t**		error
+ *		gsize*			bytes_read,
+ *		GError**		error
  *		)
  *
  * Most tests default to PGM_IO_STATUS_TIMER_PENDING, PGM_IO_STATUS_WOULD_BLOCK is not expected due
@@ -976,7 +947,7 @@ START_TEST (test_block_pass_001)
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 }
 END_TEST
@@ -993,7 +964,7 @@ START_TEST (test_data_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_ODATA == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1010,7 +981,7 @@ START_TEST (test_spm_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_SPM == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1027,7 +998,7 @@ START_TEST (test_nak_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_NAK == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1044,7 +1015,7 @@ START_TEST (test_peer_nak_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_NAK == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1061,7 +1032,7 @@ START_TEST (test_nnak_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_NNAK == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1078,7 +1049,7 @@ START_TEST (test_ncf_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_NCF == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1095,7 +1066,7 @@ START_TEST (test_spmr_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_SPMR == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1112,7 +1083,7 @@ START_TEST (test_peer_spmr_pass_001)
 	generate_msghdr (packet, packet_len);
 	push_block_event ();
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (PGM_SPMR == mock_pgm_type, "unexpected PGM packet");
 }
@@ -1138,11 +1109,11 @@ START_TEST (test_lost_pass_001)
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	if (err) {
 		g_message (err->message);
-		pgm_error_free (err);
+		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
@@ -1171,11 +1142,11 @@ START_TEST (test_abort_on_lost_pass_001)
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	if (err) {
 		g_message (err->message);
-		pgm_error_free (err);
+		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
@@ -1205,11 +1176,11 @@ START_TEST (test_then_lost_pass_001)
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	if (err) {
 		g_message (err->message);
-		pgm_error_free (err);
+		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
@@ -1240,11 +1211,11 @@ START_TEST (test_then_abort_on_lost_pass_001)
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	if (err) {
 		g_message (err->message);
-		pgm_error_free (err);
+		g_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
@@ -1275,14 +1246,14 @@ START_TEST (test_on_data_pass_001)
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
-	struct pgm_msgv_t* msgv = g_new0 (struct pgm_msgv_t, 1);
+	pgm_msgv_t* msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	msgv->msgv_len = 1;
 	msgv->msgv_skb[0] = skb;
 	mock_data_list = g_list_append (mock_data_list, msgv);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)sizeof(source) == bytes_read, "unexpected data length");
@@ -1311,14 +1282,14 @@ START_TEST (test_on_zero_pass_001)
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	fail_if (NULL == mock_peer, "new_peer failed");
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
-	struct pgm_msgv_t* msgv = g_new0 (struct pgm_msgv_t, 1);
+	pgm_msgv_t* msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	msgv->msgv_len = 1;
 	msgv->msgv_skb[0] = skb;
 	mock_data_list = g_list_append (mock_data_list, msgv);
 	push_block_event ();
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)0 == bytes_read, "unexpected data length");
@@ -1352,9 +1323,9 @@ START_TEST (test_on_many_data_pass_001)
 	mock_peer = mock_pgm_new_peer (transport, &peer_tsi, (struct sockaddr*)&grp_addr, sizeof(grp_addr), (struct sockaddr*)&peer_addr, sizeof(peer_addr), mock_pgm_time_now);
 	fail_if (NULL == mock_peer, "new_peer failed");
 	struct pgm_sk_buff_t* skb;
-	struct pgm_msgv_t* msgv;
+	pgm_msgv_t* msgv;
 /* #1 */
-	msgv = g_new0 (struct pgm_msgv_t, 1);
+	msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_put (skb, strlen(source[0]) + 1);
 	memcpy (skb->data, source[0], strlen(source[0]));
@@ -1362,7 +1333,7 @@ START_TEST (test_on_many_data_pass_001)
 	msgv->msgv_skb[0] = skb;
 	mock_data_list = g_list_append (mock_data_list, msgv);
 /* #2 */
-	msgv = g_new0 (struct pgm_msgv_t, 1);
+	msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_put (skb, strlen(source[1]) + 1);
 	memcpy (skb->data, source[1], strlen(source[1]));
@@ -1370,7 +1341,7 @@ START_TEST (test_on_many_data_pass_001)
 	msgv->msgv_skb[0] = skb;
 	mock_data_list = g_list_append (mock_data_list, msgv);
 /* #3 */
-	msgv = g_new0 (struct pgm_msgv_t, 1);
+	msgv = g_malloc0 (sizeof(pgm_msgv_t));
 	skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_put (skb, strlen(source[2]) + 1);
 	memcpy (skb->data, source[2], strlen(source[2]));
@@ -1379,7 +1350,7 @@ START_TEST (test_on_many_data_pass_001)
 	mock_data_list = g_list_append (mock_data_list, msgv);
 	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	gsize bytes_read;
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (transport, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)(strlen(source[0]) + 1) == bytes_read, "unexpected data length");
@@ -1405,15 +1376,15 @@ START_TEST (test_recv_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	PGMIOStatus
  *	pgm_recvfrom (
  *		pgm_transport_t*	transport,
- *		void*			data,
- *		size_t			len,
+ *		gpointer		data,
+ *		gsize			len,
  *		int			flags,
- *		size_t*			bytes_read,
+ *		gsize*			bytes_read,
  *		pgm_tsi_t*		from,
- *		pgm_error_t**		error
+ *		GError**		error
  *		)
  */
 
@@ -1426,38 +1397,38 @@ START_TEST (test_recvfrom_fail_001)
 END_TEST
 
 /* target:
- *	int
+ *	PGMIOStatus
  *	pgm_recvmsg (
  *		pgm_transport_t*	transport,
  *		pgm_msgv_t*		msgv,
  *		int			flags,
- *		size_t*			bytes_read,
- *		pgm_error_t**		error
+ *		gsize*			bytes_read,
+ *		GError**		error
  *		)
  */
 
 START_TEST (test_recvmsg_fail_001)
 {
-	struct pgm_msgv_t msgv;
+	pgm_msgv_t msgv;
 	fail_unless (PGM_IO_STATUS_ERROR == pgm_recvmsg (NULL, &msgv, 0, NULL, NULL), "recvmsg failed");
 }
 END_TEST
 
 /* target:
- *	int
+ *	PGMIOStatus
  *	pgm_recvmsgv (
  *		pgm_transport_t*	transport,
  *		pgm_msgv_t*		msgv,
- *		unsigned		msgv_length,
+ *		guint			msgv_length,
  *		int			flags,
- *		size_t*			bytes_read,
- *		pgm_error_t**		error
+ *		gsize*			bytes_read,
+ *		GError**		error
  *		)
  */
 
 START_TEST (test_recvmsgv_fail_001)
 {
-	struct pgm_msgv_t msgv[1];
+	pgm_msgv_t msgv[1];
 	fail_unless (PGM_IO_STATUS_ERROR == pgm_recvmsgv (NULL, msgv, G_N_ELEMENTS(msgv), 0, NULL, NULL), "recvmsgv failed");
 }
 END_TEST
