@@ -112,7 +112,7 @@ struct pgm_peer_t {
 	uint32_t			last_poll_sqn;
 	uint16_t			last_poll_round;
 	pgm_time_t			last_packet;
-	pgm_time_t			last_data_tstamp;
+	pgm_time_t			last_data_tstamp;		/* local timestamp of ack_last_tstamp */
 	unsigned			last_commit;
 	uint32_t			lost_count;
 	uint32_t			last_cumulative_losses;

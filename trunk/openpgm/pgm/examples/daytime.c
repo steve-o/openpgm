@@ -335,7 +335,8 @@ create_sock (void)
 	if (1) {
 		struct pgm_pgmccinfo_t pgmccinfo;
 		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
-		pgmccinfo.acker_c		= 75;
+		pgmccinfo.ack_c			= 75;
+		pgmccinfo.ack_c_p		= 500;
 		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
 	}
 	if (use_fec) {
