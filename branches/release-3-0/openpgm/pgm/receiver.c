@@ -1685,6 +1685,8 @@ pgm_check_peer_nak_state (
 				pgm_trace (PGM_LOG_ROLE_SESSION,_("Peer expired, tsi %s"), pgm_tsi_print (&peer->tsi));
 				pgm_hashtable_remove (transport->peers_hashtable, &peer->tsi);
 				transport->peers_list = pgm_list_remove_link (transport->peers_list, &peer->peers_link);
+				if (transport->last_hash_value == peer)
+					transport->last_hash_value = NULL;
 				pgm_peer_unref (peer);
 			}
 		}
