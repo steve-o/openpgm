@@ -443,7 +443,41 @@ pgm_on_ack (
 
 /* multicast round-trip time */
 	const uint32_t txw_lead = pgm_txw_lead_atomic (sock->window);
-	const uint32_t mrtt = sock->mrtt + (txw_lead - ntohl(ack->ack_rx_max));
+	const uint32_t ack_rx_max = ntohl (ack->ack_rx_max);
+	const uint32_t mrtt = (sock->mrtt * (((1 << 16) - sock->ack_c_p) >> 8) + (txw_lead - ack_rx_max) * sock->ack_c_p) >> 8;
+
+/* check for PGMCC feedback */
+	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
+	{
+		const struct pgm_opt_length* opt_len = (const struct pgm_opt_length*)(ack + 1);
+		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH)) {
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed ACK rejected."));
+			return FALSE;
+		}
+		if (PGM_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length))) {
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed ACK rejected."));
+			return FALSE;
+		}
+		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
+		do {
+			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
+			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_PGMCC_FEEDBACK) {
+				const struct pgm_opt_pgmcc_feedback* opt_pgmcc_feedback = (const struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
+				const uint32_t ack_tstamp = ntohl (opt_pgmcc_feedback->opt_tstamp);
+				const uint16_t ack_loss_rate = ntohs (opt_pgmcc_feedback->opt_loss_rate);
+
+uint32_t rtt = pgm_to_msecs (skb->tstamp) - ack_tstamp;
+uint32_t rttn = (txw_lead - ack_rx_max) << 8;
+uint64_t nacker_loss = ((rttn * rttn) >> 8) * ack_loss_rate;
+pgm_info ("rtt %" PRIu32 "ms rttn %" PRIu32 " mrtt %" PRIu32 " nacker_loss %" PRIu64,
+	rtt, rttn, mrtt, nacker_loss);
+			}
+		} while (!(opt_header->opt_type & PGM_OPT_END));
+	}
+
+/* calculate new ACKs */
+
+/* add tokens */
 	return TRUE;
 }
 
@@ -882,7 +916,7 @@ send_odata (
 		struct pgm_opt_pgmcc_data*  pgmcc_data  = (struct pgm_opt_pgmcc_data*)(opt_header + 1);
 		struct pgm_opt6_pgmcc_data* pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
 
-		pgmcc_data->opt_tstamp = pgm_to_msecs (STATE(skb)->tstamp);
+		pgmcc_data->opt_tstamp = htonl (pgm_to_msecs (STATE(skb)->tstamp));
 /* acker nla */
 		pgm_sockaddr_to_nla ((struct sockaddr*)&sock->acker_nla, (char*)&pgmcc_data->opt_nla_afi);
 		if (AF_INET6 == sock->acker_nla.ss_family)
@@ -1017,7 +1051,7 @@ send_odata_copy (
 		struct pgm_opt6_pgmcc_data* pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
 
 		pgmcc_data->opt_reserved = 0;
-		pgmcc_data->opt_tstamp = pgm_to_msecs (STATE(skb)->tstamp);
+		pgmcc_data->opt_tstamp = htonl (pgm_to_msecs (STATE(skb)->tstamp));
 /* acker nla */
 		pgm_sockaddr_to_nla ((struct sockaddr*)&sock->acker_nla, (char*)&pgmcc_data->opt_nla_afi);
 		data = (char*)opt_header + opt_header->opt_length;
