@@ -401,7 +401,8 @@ pgm_new_peer (
 					sock->max_tpdu,
 					sock->rxw_sqns,
 					sock->rxw_secs,
-					sock->rxw_max_rte);
+					sock->rxw_max_rte,
+					sock->ack_c_p);
 	peer->spmr_expiry = now + sock->spmr_expiry;
 
 /* add peer to hash table and linked list */
@@ -1268,7 +1269,7 @@ send_ack (
 
 /* ACK */
 	ack->ack_rx_max		= htonl (pgm_rxw_lead (source->window));
-	ack->ack_bitmap		= 0;	/* TODO: fill in acker bitmap */
+	ack->ack_bitmap		= htonl (source->window->bitmap);
 
 /* OPT_PGMCC_FEEDBACK */
 	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(ack + 1);
@@ -1291,7 +1292,7 @@ send_ack (
 	const pgm_time_t t = ntohl (source->ack_last_tstamp) + ( now - source->last_data_tstamp );
 	opt_pgmcc_feedback->opt_tstamp = pgm_to_msecs (t);
 	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
-	opt_pgmcc_feedback->opt_loss_rate = 0;	/* TODO fill in loss rate */
+	opt_pgmcc_feedback->opt_loss_rate = htonl (source->window->data_loss);
 
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));

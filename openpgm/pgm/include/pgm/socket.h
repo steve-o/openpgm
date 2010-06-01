@@ -72,7 +72,8 @@ struct pgm_fecinfo_t {
 
 struct pgm_pgmccinfo_t {
 	uint32_t				ack_bo_ivl;
-	uint8_t					acker_c;
+	uint32_t				ack_c;
+	uint32_t				ack_c_p;
 };
 
 /* socket options */
