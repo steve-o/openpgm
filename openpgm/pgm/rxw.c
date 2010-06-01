@@ -175,7 +175,8 @@ pgm_rxw_create (
 	const uint16_t		tpdu_size,
 	const unsigned		sqns,		/* transmit window size in sequence numbers */
 	const unsigned		secs,		/* size in seconds */
-	const ssize_t		max_rte		/* max bandwidth */
+	const ssize_t		max_rte,	/* max bandwidth */
+	const uint32_t		ack_c_p
 	)
 {
 	pgm_rxw_t* window;
@@ -193,8 +194,8 @@ pgm_rxw_create (
 		pgm_assert_cmpuint (max_rte, >, 0);
 	}
 
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd)",
-		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte);
+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd ack-c_p %" PRIu32 ")",
+		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte, ack_c_p);
 
 /* calculate receive window parameters */
 	pgm_assert (sqns || (secs && max_rte));
@@ -217,6 +218,9 @@ pgm_rxw_create (
 
 /* minimum value of RS::k = 1 */
 	window->tg_size = 1;
+
+/* PGMCC filter weight */
+	window->ack_c_p = ack_c_p;
 
 /* pointer array */
 	window->alloc = alloc_sqns;
@@ -517,6 +521,28 @@ _pgm_rxw_update_trail (
 		const uint32_t distance = (int32_t)(window->rxw_trail) - (int32_t)(window->trail);
 		window->commit_lead = window->trail += distance;
 		window->lead += distance;
+
+/* add loss to bitmap */
+		if (distance > 32)	window->bitmap = 0;
+		else			window->bitmap <<= distance;
+
+/* update the Exponential Moving Average (EMA) data loss with long jump:
+ *  s_t = α × (p₁ + (1 - α) × p₂ + (1 - α)² × p₃ + ⋯)
+ * omitting the weight by stopping after k terms,
+ *      = α × ((1 - α)^^k + (1 - α)^^{k+1} +(1 - α)^^{k+1} + ⋯)
+ *      = α × (1 - α)^^k × (1 + (1 - α) + (1 - α)² + ⋯)
+ *      = (1 - α)^^k
+ */
+		uint_fast32_t stn = (1 << 16);
+		for (uint_fast32_t i = (1 << 16) - window->ack_c_p, e = distance;
+		     e;
+		     e >>= 1)
+		{
+			if (e & 1) stn = (stn * i) >> 16;
+			i = (i * i) >> 16;
+		}
+		window->data_loss = (window->data_loss * stn) >> 16;
+
 		window->cumulative_losses += distance;
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Data loss due to trailing edge update, fragment count %" PRIu32 "."),window->fragment_count);
 		pgm_assert (pgm_rxw_is_empty (window));
@@ -601,6 +627,16 @@ _pgm_rxw_add_placeholder (
 
 /* advance lead */
 	window->lead++;
+
+/* add loss to bitmap */
+	window->bitmap <<= 1;
+
+/* update the Exponential Moving Average (EMA) data loss with loss:
+ *     s_t = α × x_{t-1} + (1 - α) × s_{t-1}
+ * x_{t-1} = 1
+ *   ∴ s_t = α + (1 - α) × s_{t-1}
+ */
+	window->data_loss = window->ack_c_p + ((((1 << 16) - window->ack_c_p) * window->data_loss) >> 16);
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
@@ -989,6 +1025,28 @@ _pgm_rxw_insert (
 		}
 	}
 
+/* add packet to bitmap */
+	const uint_fast32_t pos = window->lead - new_skb->sequence;
+	if (pos < 32) {
+		window->bitmap |= 1 << pos;
+	}
+
+/* update the Exponential Moving Average (EMA) data loss with repair data.
+ *     s_t = α × x_{t-1} + (1 - α) × s_{t-1}
+ * x_{t-1} = 0
+ *   ∴ s_t = (1 - α) × s_{t-1}
+ */
+	uint_fast32_t stn = (1 << 16);
+	for (uint_fast32_t i = (1 << 16) - window->ack_c_p, e = pos;
+	     e;
+	     e >>= 1)
+	{
+		if (e & 1) stn = (stn * i) >> 16;
+		i = (i * i) >> 16;
+	}
+	if (stn > window->data_loss)	window->data_loss = 0;
+	else				window->data_loss -= stn;
+
 /* replace place holder skb with incoming skb */
 	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
 	pgm_rxw_state_t* rxw_state = (void*)new_skb->cb;
@@ -1079,9 +1137,19 @@ _pgm_rxw_append (
 /* advance leading edge */
 	window->lead++;
 
+/* add packet to bitmap */
+	window->bitmap = (window->bitmap << 1) | 1;
+
+/* update the Exponential Moving Average (EMA) data loss with data:
+ *     s_t = α × x_{t-1} + (1 - α) × s_{t-1}
+ * x_{t-1} = 0
+ *   ∴ s_t = (1 - α) × s_{t-1}
+ */
+	window->data_loss = (window->data_loss * ((1 << 16) - window->ack_c_p)) >> 16;
+
 /* APDU fragments are already declared lost */
-	if (skb->pgm_opt_fragment &&
-	    _pgm_rxw_is_apdu_lost (window, skb))
+	if (PGM_UNLIKELY(skb->pgm_opt_fragment &&
+	    _pgm_rxw_is_apdu_lost (window, skb)))
 	{
 		struct pgm_sk_buff_t* lost_skb	= pgm_alloc_skb (window->max_tpdu);
 		lost_skb->tstamp		= now;
@@ -2015,6 +2083,16 @@ _pgm_rxw_recovery_append (
 
 /* advance leading edge */
 	window->lead++;
+
+/* add loss to bitmap */
+	window->bitmap <<= 1;
+
+/* update the Exponential Moving Average (EMA) data loss with loss:
+ *     s_t = α × x_{t-1} + (1 - α) × s_{t-1}
+ * x_{t-1} = 1
+ *   ∴ s_t = α + (1 - α) × s_{t-1}
+ */
+	window->data_loss = window->ack_c_p + ((((1 << 16) - window->ack_c_p) * window->data_loss) >> 16);
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;

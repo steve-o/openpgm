@@ -813,8 +813,9 @@ pgm_setsockopt (
 		{
 			const struct pgm_pgmccinfo_t* pgmccinfo = optval;
 			sock->ack_bo_ivl = pgmccinfo->ack_bo_ivl;
-			sock->acker_c    = pgmccinfo->acker_c;
-			sock->use_pgmcc  = (sock->acker_c > 0);
+			sock->ack_c      = pgmccinfo->ack_c;
+			sock->ack_c_p    = pgmccinfo->ack_c_p;
+			sock->use_pgmcc  = (sock->ack_c > 0);
 		}
 		status = TRUE;
 		break;
