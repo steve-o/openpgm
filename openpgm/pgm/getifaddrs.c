@@ -487,6 +487,11 @@ _pgm_heap_free (
 #	endif
 }
 
+/* NB: IP_ADAPTER_INFO size varies size due to sizeof (time_t), the API assumes
+ * 4-byte datatype whilst compiler uses an 8-byte datatype.  Size can be forced
+ * with -D_USE_32BIT_TIME_T with side effects to everything else.
+ */
+
 static
 bool
 _pgm_getadaptersinfo (
@@ -584,7 +589,7 @@ _pgm_getadaptersinfo (
 			strncpy (ift->_ifa.ifa_name, pAdapter->AdapterName, IF_NAMESIZE);
 			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
 
-/* flags */
+/* flags: assume up, broadcast and multicast */
 			ift->_ifa.ifa_flags = IFF_UP | IFF_BROADCAST | IFF_MULTICAST;
 			if (pAdapter->Type == MIB_IF_TYPE_LOOPBACK)
 				ift->_ifa.ifa_flags |= IFF_LOOPBACK;

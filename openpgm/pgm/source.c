@@ -441,11 +441,6 @@ pgm_on_ack (
 /* reset ACK expiration */
 	sock->next_crqst = 0;
 
-/* multicast round-trip time */
-	const uint32_t txw_lead = pgm_txw_lead_atomic (sock->window);
-	const uint32_t ack_rx_max = ntohl (ack->ack_rx_max);
-	const uint32_t mrtt = (sock->mrtt * (((1 << 16) - sock->ack_c_p) >> 8) + (txw_lead - ack_rx_max) * sock->ack_c_p) >> 8;
-
 /* check for PGMCC feedback */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
@@ -466,11 +461,29 @@ pgm_on_ack (
 				const uint32_t ack_tstamp = ntohl (opt_pgmcc_feedback->opt_tstamp);
 				const uint16_t ack_loss_rate = ntohs (opt_pgmcc_feedback->opt_loss_rate);
 
-uint32_t rtt = pgm_to_msecs (skb->tstamp) - ack_tstamp;
-uint32_t rttn = (txw_lead - ack_rx_max) << 8;
-uint64_t nacker_loss = ((rttn * rttn) >> 8) * ack_loss_rate;
-pgm_info ("rtt %" PRIu32 "ms rttn %" PRIu32 " mrtt %" PRIu32 " nacker_loss %" PRIu64,
-	rtt, rttn, mrtt, nacker_loss);
+				const uint32_t rtt = pgm_to_msecs (skb->tstamp) - ack_tstamp;
+				const uint64_t acker_loss = rtt * rtt * ack_loss_rate;
+
+				struct sockaddr_storage ack_nla;
+				pgm_nla_to_sockaddr (&opt_pgmcc_feedback->opt_nla_afi, (struct sockaddr*)&ack_nla);
+/* ACKer elections */
+				if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified ((const struct sockaddr*)&sock->acker_nla)))
+				{
+					pgm_info ("Elected first ACKer");
+					memcpy (&sock->acker_nla, &ack_nla, pgm_sockaddr_storage_len (&ack_nla));
+				}
+				else if (acker_loss > sock->acker_loss &&
+					 0 != pgm_sockaddr_cmp ((const struct sockaddr*)&ack_nla, (const struct sockaddr*)&sock->acker_nla))
+				{
+					pgm_info ("Elected new ACKer");
+					memcpy (&sock->acker_nla, &ack_nla, pgm_sockaddr_storage_len (&ack_nla));
+				}
+
+/* update ACKer state */
+				if (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&ack_nla, (const struct sockaddr*)&sock->acker_nla))
+				{
+					sock->acker_loss = acker_loss;
+				}
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
 	}
