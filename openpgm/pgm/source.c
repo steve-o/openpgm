@@ -483,6 +483,8 @@ pgm_on_ack (
 				if (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&ack_nla, (const struct sockaddr*)&sock->acker_nla))
 				{
 					sock->acker_loss = acker_loss;
+					sock->tokens++;
+printf ("%u tokens++\n", sock->tokens);
 				}
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -947,6 +949,17 @@ send_odata (
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
 
+/* congestion control */
+	if (sock->use_pgmcc) {
+		if (sock->tokens < 1) {
+			pgm_info ("Token limit reached");
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			return PGM_IO_STATUS_TIMER_PENDING;	/* peer expiration to re-elect ACKer */
+		}
+		sock->tokens--;
+	}
+
 /* the transmit window MUST check the user count to ensure it does not 
  * attempt to send a repair-data packet based on in transit original data.
  */
@@ -1078,6 +1091,18 @@ send_odata_copy (
 	pgm_spinlock_lock (&sock->txw_spinlock);
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
+
+/* congestion control */
+	if (sock->use_pgmcc) {
+		if (sock->tokens < 1) {
+			pgm_info ("Token limit reached");
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			return PGM_IO_STATUS_TIMER_PENDING;
+		}
+		sock->tokens--;
+printf ("%u tokens--\n", sock->tokens);
+	}
 
 	ssize_t sent;
 retry_send:
