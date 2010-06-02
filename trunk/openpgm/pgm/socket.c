@@ -1702,6 +1702,9 @@ pgm_connect (
 		}
 
 		sock->next_poll = sock->next_ambient_spm = pgm_time_update_now() + sock->spm_ambient_interval;
+
+/* start PGMCC with one token */
+		sock->tokens = 1;
 	}
 	else
 	{
