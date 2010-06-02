@@ -192,6 +192,38 @@ pgm_sockaddr_is_addr_multicast (
 	return retval;
 }
 
+/* returns 1 if sa is unspecified, 0 if specified.
+ */
+
+int
+pgm_sockaddr_is_addr_unspecified (
+	const struct sockaddr*	sa
+	)
+{
+	int retval;
+
+	switch (sa->sa_family) {
+	case AF_INET: {
+		struct sockaddr_in s4;
+		memcpy (&s4, sa, sizeof(s4));
+		retval = (INADDR_ANY == s4.sin_addr.s_addr);
+		break;
+	}
+
+	case AF_INET6: {
+		struct sockaddr_in6 s6;
+		memcpy (&s6, sa, sizeof(s6));
+		retval = IN6_IS_ADDR_UNSPECIFIED( &s6.sin6_addr );
+		break;
+	}
+
+	default:
+		retval = -1;
+		break;
+	}
+	return retval;
+}
+
 int
 pgm_sockaddr_cmp (
 	const struct sockaddr* restrict sa1,
@@ -213,6 +245,7 @@ pgm_sockaddr_cmp (
 			break;
 		}
 
+/* IN6_ARE_ADDR_EQUAL(a,b) only returns true or false */
 		case AF_INET6: {
 			struct sockaddr_in6 sa1_in6, sa2_in6;
 			memcpy (&sa1_in6, sa1, sizeof(sa1_in6));

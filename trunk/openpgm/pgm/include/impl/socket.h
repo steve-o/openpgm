@@ -99,6 +99,7 @@ struct pgm_sock_t {
 	pgm_time_t			crqst_ivl;
 	pgm_time_t			ack_bo_ivl;
 	struct sockaddr_storage		acker_nla;
+	uint64_t			acker_loss;
 /*
  * ignore_cong    - previous congestion lead sqn
  * cc_token
