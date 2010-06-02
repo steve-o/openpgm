@@ -68,6 +68,7 @@ PGM_GNUC_INTERNAL uint32_t pgm_sockaddr_scope_id (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL int pgm_sockaddr_ntop (const struct sockaddr*restrict sa, char*restrict dst, size_t ulen);
 PGM_GNUC_INTERNAL int pgm_sockaddr_pton (const char*restrict src, struct sockaddr*restrict dst);
 PGM_GNUC_INTERNAL int pgm_sockaddr_is_addr_multicast (const struct sockaddr* sa);
+PGM_GNUC_INTERNAL int pgm_sockaddr_is_addr_unspecified (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL int pgm_sockaddr_cmp (const struct sockaddr*restrict sa1, const struct sockaddr*restrict sa2);
 PGM_GNUC_INTERNAL int pgm_sockaddr_hdrincl (const int s, const sa_family_t sa_family, const bool v);
 PGM_GNUC_INTERNAL int pgm_sockaddr_pktinfo (const int s, const sa_family_t sa_family, const bool v);
