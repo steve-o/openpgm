@@ -94,7 +94,11 @@ struct pgm_sock_t {
 	bool				is_pending_crqst;
 	unsigned			ack_c;			/* constant C */
 	unsigned			ack_c_p;		/* constant Cᵨ */
-	unsigned			tokens;
+	uint32_t			ssthresh;		/* slow-start threshold */
+	uint32_t			tokens;
+	uint32_t			cwnd_size;		/* congestion window size */
+	uint32_t			ack_rx_max;
+	uint32_t			ack_bitmap;
 	pgm_time_t			next_crqst;
 	pgm_time_t			mrtt;			/* multicast round-trip time */
 	pgm_time_t			crqst_ivl;

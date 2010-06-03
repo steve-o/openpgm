@@ -55,6 +55,22 @@ static bool send_rdata (pgm_sock_t*const restrict, struct pgm_sk_buff_t*const re
 
 
 static inline
+unsigned
+_pgm_popcount (
+	uint32_t		n
+	)
+{
+#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
+	return __builtin_popcount (n);
+#else
+/* MIT HAKMEM 169 */
+	const uint32_t t = n - ((n >> 1) & 033333333333)
+			     - ((n >> 2) & 011111111111);
+	return ((t + (t >> 3) & 030707070707) % 63;
+#endif
+}
+
+static inline
 bool
 peer_is_source (
 	const pgm_peer_t*	peer
@@ -441,6 +457,44 @@ pgm_on_ack (
 /* reset ACK expiration */
 	sock->next_crqst = 0;
 
+/* count new ACK sequences */
+	const uint32_t ack_rx_max = ntohl (ack->ack_rx_max);
+	const int32_t delta = ack_rx_max - sock->ack_rx_max;
+	sock->ack_rx_max = ack_rx_max;
+	uint32_t ack_bitmap = ntohl (ack->ack_bitmap);
+	if (delta > 32)		sock->ack_bitmap = 0;		/* sequence jump ahead beyond past bitmap */
+	else if (delta > 0)	sock->ack_bitmap <<= delta;	/* immediate sequence */
+	else if (delta > -32)	ack_bitmap <<= -delta;		/* repair sequence scoped by bitmap */
+	else			ack_bitmap = 0;			/* old sequence */
+	const unsigned new_acks = _pgm_popcount (ack_bitmap & ~sock->ack_bitmap);
+	sock->ack_bitmap |= ack_bitmap;
+
+/* count outstanding lost sequences */
+	const unsigned total_lost = _pgm_popcount (~sock->ack_bitmap);
+
+printf ("new-acks %d total-lost %d (%" PRIu32 ")\n", new_acks, total_lost, delta);
+
+/* no detected data loss at ACKer, increase congestion window size */
+	if (0 == total_lost)
+	{
+		uint_fast32_t n = pgm_fp8 (new_acks);
+
+/* slow-start */
+		if (sock->cwnd_size < sock->ssthresh) {
+			const uint_fast32_t d = MIN( n, sock->ssthresh - sock->cwnd_size );
+			n -= d;
+			sock->tokens    += d + d;
+			sock->cwnd_size += d;
+		}
+
+		const uint_fast32_t iw = pgm_fp8div (pgm_fp8 (1), sock->cwnd_size);
+
+/* linear window increase */
+		sock->tokens    += pgm_fp8mul (n, pgm_fp8 (1) + iw);
+		sock->cwnd_size += pgm_fp8mul (n, iw);
+printf ("%u tokens++, W %u\n", pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
+	}
+
 /* check for PGMCC feedback */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
@@ -483,8 +537,6 @@ pgm_on_ack (
 				if (0 == pgm_sockaddr_cmp ((const struct sockaddr*)&ack_nla, (const struct sockaddr*)&sock->acker_nla))
 				{
 					sock->acker_loss = acker_loss;
-					sock->tokens++;
-printf ("%u tokens++\n", sock->tokens);
 				}
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
@@ -951,13 +1003,13 @@ send_odata (
 
 /* congestion control */
 	if (sock->use_pgmcc) {
-		if (sock->tokens < 1) {
+		if (sock->tokens < pgm_fp8 (1)) {
 			pgm_info ("Token limit reached");
 			sock->is_apdu_eagain = TRUE;
 			sock->blocklen = tpdu_length;
 			return PGM_IO_STATUS_TIMER_PENDING;	/* peer expiration to re-elect ACKer */
 		}
-		sock->tokens--;
+		sock->tokens -= pgm_fp8 (1);
 	}
 
 /* the transmit window MUST check the user count to ensure it does not 
@@ -1094,14 +1146,14 @@ send_odata_copy (
 
 /* congestion control */
 	if (sock->use_pgmcc) {
-		if (sock->tokens < 1) {
+		if (sock->tokens < pgm_fp8 (1)) {
 			pgm_info ("Token limit reached");
 			sock->is_apdu_eagain = TRUE;
 			sock->blocklen = tpdu_length;
 			return PGM_IO_STATUS_TIMER_PENDING;
 		}
-		sock->tokens--;
-printf ("%u tokens--\n", sock->tokens);
+		sock->tokens -= pgm_fp8 (1);
+printf ("%u tokens--\n", pgm_fp8tou (sock->tokens));
 	}
 
 	ssize_t sent;

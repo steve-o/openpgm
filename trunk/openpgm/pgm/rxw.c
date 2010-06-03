@@ -220,7 +220,8 @@ pgm_rxw_create (
 	window->tg_size = 1;
 
 /* PGMCC filter weight */
-	window->ack_c_p = ack_c_p;
+	window->ack_c_p = pgm_fp16 (ack_c_p);
+	window->bitmap = 0xffffffff;
 
 /* pointer array */
 	window->alloc = alloc_sqns;
@@ -533,15 +534,7 @@ _pgm_rxw_update_trail (
  *      = α × (1 - α)^^k × (1 + (1 - α) + (1 - α)² + ⋯)
  *      = (1 - α)^^k
  */
-		uint_fast32_t stn = (1 << 16);
-		for (uint_fast32_t i = (1 << 16) - window->ack_c_p, e = distance;
-		     e;
-		     e >>= 1)
-		{
-			if (e & 1) stn = (stn * i) >> 16;
-			i = (i * i) >> 16;
-		}
-		window->data_loss = (window->data_loss * stn) >> 16;
+		window->data_loss = pgm_fp16mul (window->data_loss, pgm_fp16pow (pgm_fp16 (1) - window->ack_c_p, distance));
 
 		window->cumulative_losses += distance;
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Data loss due to trailing edge update, fragment count %" PRIu32 "."),window->fragment_count);
@@ -636,7 +629,7 @@ _pgm_rxw_add_placeholder (
  * x_{t-1} = 1
  *   ∴ s_t = α + (1 - α) × s_{t-1}
  */
-	window->data_loss = window->ack_c_p + ((((1 << 16) - window->ack_c_p) * window->data_loss) >> 16);
+	window->data_loss = window->ack_c_p + pgm_fp16mul ((pgm_fp16 (1) - window->ack_c_p), window->data_loss);
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
@@ -1036,16 +1029,9 @@ _pgm_rxw_insert (
  * x_{t-1} = 0
  *   ∴ s_t = (1 - α) × s_{t-1}
  */
-	uint_fast32_t stn = (1 << 16);
-	for (uint_fast32_t i = (1 << 16) - window->ack_c_p, e = pos;
-	     e;
-	     e >>= 1)
-	{
-		if (e & 1) stn = (stn * i) >> 16;
-		i = (i * i) >> 16;
-	}
-	if (stn > window->data_loss)	window->data_loss = 0;
-	else				window->data_loss -= stn;
+	const uint_fast32_t s = pgm_fp16pow (pgm_fp16 (1) - window->ack_c_p, pos);
+	if (s > window->data_loss)	window->data_loss = 0;
+	else				window->data_loss -= s;
 
 /* replace place holder skb with incoming skb */
 	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
@@ -1145,7 +1131,7 @@ _pgm_rxw_append (
  * x_{t-1} = 0
  *   ∴ s_t = (1 - α) × s_{t-1}
  */
-	window->data_loss = (window->data_loss * ((1 << 16) - window->ack_c_p)) >> 16;
+	window->data_loss = pgm_fp16mul (window->data_loss, pgm_fp16 (1) - window->ack_c_p);
 
 /* APDU fragments are already declared lost */
 	if (PGM_UNLIKELY(skb->pgm_opt_fragment &&
@@ -2092,7 +2078,7 @@ _pgm_rxw_recovery_append (
  * x_{t-1} = 1
  *   ∴ s_t = α + (1 - α) × s_{t-1}
  */
-	window->data_loss = window->ack_c_p + ((((1 << 16) - window->ack_c_p) * window->data_loss) >> 16);
+	window->data_loss = window->ack_c_p + pgm_fp16mul (pgm_fp16 (1) - window->ack_c_p, window->data_loss);
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
 	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
