@@ -1704,7 +1704,11 @@ pgm_connect (
 		sock->next_poll = sock->next_ambient_spm = pgm_time_update_now() + sock->spm_ambient_interval;
 
 /* start PGMCC with one token */
-		sock->tokens = 1;
+		sock->tokens = sock->cwnd_size = pgm_fp8 (1);
+		sock->ssthresh = pgm_fp8 (4);
+
+/* start full history */
+		sock->ack_bitmap = 0xffffffff;
 	}
 	else
 	{
