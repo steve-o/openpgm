@@ -30,11 +30,13 @@
 #include <pgm/macros.h>
 
 /* g++ v4 handles C99 headers without complaints */
-#if !defined( __cplusplus) || (__GNUC__ > 4)
+#if !defined(__cplusplus) || (__GNUC__ >= 4)
 #	include <stdbool.h>
 #	include <stdint.h>
 #else
-/* g++ v3 and other ancient compilers */
+/* g++ v3 and other ancient compilers, Solaris compilation error:
+ * "Use of <stdbool.h> is valid only in a c99 compilation environment."
+ */
 #	define bool		int
 #	include <stdint.h>
 #endif
