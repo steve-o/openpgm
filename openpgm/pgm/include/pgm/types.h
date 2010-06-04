@@ -19,32 +19,31 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_TYPES_H__
 #define __PGM_TYPES_H__
 
-#ifndef _MSC_VER
-#	include <sys/param.h>
-#endif
+#include <sys/param.h>
 #include <pgm/macros.h>
+
+/* g++ v4 handles C99 headers without complaints */
+#if !defined(__cplusplus) || (__GNUC__ >= 4)
+#	include <stdbool.h>
+#	include <stdint.h>
+#else
+/* g++ v3 and other ancient compilers, Solaris compilation error:
+ * "Use of <stdbool.h> is valid only in a c99 compilation environment."
+ */
+#	define bool		int
+#	include <stdint.h>
+#endif
 
 #ifdef _WIN32
 #	include <ws2tcpip.h>
 #	define sa_family_t	ULONG
-#endif
-
-#ifdef _MSC_VER
-#	include <pgm/winint.h>
-#	define bool		BOOL
-#	define ssize_t		SSIZE_T
-#	define restrict
-#elif !defined( __cplusplus) || (__GNUC__ > 4)
-/* g++ v4 handles C99 headers without complaints */
-#	include <stdbool.h>
-#	include <stdint.h>
-#else
-/* g++ v3 and other ancient compilers */
-#	define bool		int
-#	include <stdint.h>
 #endif
 
 PGM_BEGIN_DECLS

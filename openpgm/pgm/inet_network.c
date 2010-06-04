@@ -20,7 +20,7 @@
  */
 
 #include <ctype.h>
-#include <impl/framework.h>
+#include <pgm/framework.h>
 
 
 //#define INET_NETWORK_DEBUG

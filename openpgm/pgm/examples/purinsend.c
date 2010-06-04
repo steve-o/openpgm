@@ -21,12 +21,8 @@
 
 #include <locale.h>
 #include <stdio.h>
-#include <stdlib.h>
-#ifndef _WIN32
-#	include <unistd.h>
-#else
+#ifdef _WIN32
 #	include "getopt.h"
-#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -46,14 +42,10 @@ static bool		use_fec = FALSE;
 static int		rs_k = 8;
 static int		rs_n = 255;
 
-static pgm_sock_t*	sock = NULL;
+static pgm_transport_t* transport = NULL;
 
-#ifndef _MSC_VER
 static void usage (const char*) __attribute__((__noreturn__));
-#else
-static void usage (const char*);
-#endif
-static bool create_sock (void);
+static bool create_transport (void);
 
 
 static void
@@ -121,10 +113,10 @@ main (
 		usage (binary_name);
 	}
 
-	if (create_sock())
+	if (create_transport())
 	{
 		while (optind < argc) {
-			const int status = pgm_send (sock, argv[optind], strlen (argv[optind]) + 1, NULL);
+			const int status = pgm_send (transport, argv[optind], strlen (argv[optind]) + 1, NULL);
 		        if (PGM_IO_STATUS_NORMAL != status) {
 				fprintf (stderr, "pgm_send() failed.\n");
 		        }
@@ -133,9 +125,9 @@ main (
 	}
 
 /* cleanup */
-	if (sock) {
-		pgm_close (sock, TRUE);
-		sock = NULL;
+	if (transport) {
+		pgm_transport_destroy (transport, TRUE);
+		transport = NULL;
 	}
 	pgm_shutdown();
 	return EXIT_SUCCESS;
@@ -143,145 +135,66 @@ main (
 
 static
 bool
-create_sock (void)
+create_transport (void)
 {
-	struct pgm_addrinfo_t* res = NULL;
+	struct pgm_transport_info_t* res = NULL;
 	pgm_error_t* pgm_err = NULL;
-	sa_family_t sa_family = AF_UNSPEC;
 
-/* parse network parameter into PGM socket address structure */
-	if (!pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
+/* parse network parameter into transport address structure */
+	char network_param[1024];
+	sprintf (network_param, "%s", network);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
-		goto err_abort;
+		pgm_error_free (pgm_err);
+		return FALSE;
 	}
-
-	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
-
+/* create global session identifier */
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
+		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_if_free_transport_info (res);
+		return FALSE;
+	}
 	if (udp_encap_port) {
-		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
-			fprintf (stderr, "Creating PGM/UDP socket: %s\n", pgm_err->message);
-			goto err_abort;
-		}
-		pgm_setsockopt (sock, PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-		pgm_setsockopt (sock, PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-	} else {
-		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
-			fprintf (stderr, "Creating PGM/IP socket: %s\n", pgm_err->message);
-			goto err_abort;
-		}
+		res->ti_udp_encap_ucast_port = udp_encap_port;
+		res->ti_udp_encap_mcast_port = udp_encap_port;
 	}
-
+	if (port)
+		res->ti_dport = port;
 /* Use RFC 2113 tagging for PGM Router Assist */
-	const int no_router_assist = 0;
-	pgm_setsockopt (sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
-
-	pgm_drop_superuser();
+//	res->ti_ip_router_alert = 1;
+	if (!pgm_transport_create (&transport, res, &pgm_err)) {
+		fprintf (stderr, "Creating transport: %s\n", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_if_free_transport_info (res);
+		return FALSE;
+	}
+	pgm_if_free_transport_info (res);
 
 /* set PGM parameters */
-	const int send_only = 1,
-		  ambient_spm = pgm_secs (30),
-		  heartbeat_spm[] = { pgm_msecs (100),
-				      pgm_msecs (100),
-                                      pgm_msecs (100),
-				      pgm_msecs (100),
-				      pgm_msecs (1300),
-				      pgm_secs  (7),
-				      pgm_secs  (16),
-				      pgm_secs  (25),
-				      pgm_secs  (30) };
-
-	pgm_setsockopt (sock, PGM_SEND_ONLY, &send_only, sizeof(send_only));
-	pgm_setsockopt (sock, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
-	pgm_setsockopt (sock, PGM_TXW_SQNS, &sqns, sizeof(sqns));
-	pgm_setsockopt (sock, PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
-	pgm_setsockopt (sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
-	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
-	if (1) {
-		struct pgm_pgmccinfo_t pgmccinfo;
-		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
-		pgmccinfo.ack_c			= 75;
-		pgmccinfo.ack_c_p		= 500;
-		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
-	}
+	pgm_transport_set_send_only (transport, TRUE);
+	pgm_transport_set_max_tpdu (transport, max_tpdu);
+	pgm_transport_set_txw_sqns (transport, sqns);
+	pgm_transport_set_txw_max_rte (transport, max_rte);
+	pgm_transport_set_multicast_loop (transport, use_multicast_loop);
+	pgm_transport_set_hops (transport, 16);
+	pgm_transport_set_ambient_spm (transport, pgm_secs(30));
+	unsigned spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
+), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+	pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, sizeof(spm_heartbeat)/sizeof(spm_heartbeat[0]));
 	if (use_fec) {
-		struct pgm_fecinfo_t fecinfo; 
-		fecinfo.block_size		= rs_n;
-		fecinfo.proactive_packets	= 0;
-		fecinfo.group_size		= rs_k;
-		fecinfo.ondemand_parity_enabled	= TRUE;
-		fecinfo.var_pktlen_enabled	= TRUE;
-		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
+		pgm_transport_set_fec (transport, 0, TRUE, TRUE, rs_n, rs_k);
 	}
 
-/* create global session identifier */
-	struct pgm_sockaddr_t addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = port ? port : DEFAULT_DATA_DESTINATION_PORT;
-	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
-	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
-		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
-		goto err_abort;
-	}
-
-/* assign socket to specified address */
-	struct pgm_interface_req_t if_req;
-	memset (&if_req, 0, sizeof(if_req));
-	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
-	if_req.ir_scope_id  = 0;
-	if (AF_INET6 == sa_family) {
-		struct sockaddr_in6 sa6;
-		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
-		if_req.ir_scope_id = sa6.sin6_scope_id;
-	}
-	if (!pgm_bind3 (sock,
-			&addr, sizeof(addr),
-			&if_req, sizeof(if_req),	/* tx interface */
-			&if_req, sizeof(if_req),	/* rx interface */
-			&pgm_err))
-	{
-		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
-		goto err_abort;
-	}
-
-/* join IP multicast groups */
-	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
-	pgm_freeaddrinfo (res);
-
-/* set IP parameters */
-	const int blocking = 0,
-		  multicast_loop = use_multicast_loop ? 1 : 0,
-		  multicast_hops = 16,
-		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
-
-	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-	if (AF_INET6 != sa_family)
-		pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
-	pgm_setsockopt (sock, PGM_NOBLOCK, &blocking, sizeof(blocking));
-
-	if (!pgm_connect (sock, &pgm_err)) {
-		fprintf (stderr, "Connecting PGM socket: %s\n", pgm_err->message);
-		goto err_abort;
-	}
-
-	return TRUE;
-
-err_abort:
-	if (NULL != sock) {
-		pgm_close (sock, FALSE);
-		sock = NULL;
-	}
-	if (NULL != res) {
-		pgm_freeaddrinfo (res);
-		res = NULL;
-	}
-	if (NULL != pgm_err) {
+/* assign transport to specified address */
+	if (!pgm_transport_bind (transport, &pgm_err)) {
+		fprintf (stderr, "Binding transport: %s\n", pgm_err->message);
 		pgm_error_free (pgm_err);
-		pgm_err = NULL;
+		pgm_transport_destroy (transport, FALSE);
+		transport = NULL;
+		return FALSE;
 	}
-	return FALSE;
+	return TRUE;
 }
 
 /* eof */

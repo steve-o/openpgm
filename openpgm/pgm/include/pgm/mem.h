@@ -19,6 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MEM_H__
 #define __PGM_MEM_H__
 
@@ -54,6 +58,9 @@ void pgm_free (void*);
 	alloca (size)
 #define pgm_newa(struct_type, n_structs) \
 	((struct_type*) pgm_alloca (sizeof(struct_type) * (size_t)(n_structs)))
+
+void pgm_mem_init (void);
+void pgm_mem_shutdown (void);
 
 PGM_END_DECLS
 

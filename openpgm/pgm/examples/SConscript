@@ -49,7 +49,7 @@ if e['WITH_GLIB'] == 'true':
 		en.Program(['pgmtop.c'])
 
 # Google Protocol Buffer example
-	if e['WITH_PROTOBUF'] == 'true':
+	if e2['WITH_PROTOBUF'] == 'true':
 		ep = e2.Clone();
 		newCCFLAGS = [];
 		for flag in ep['CCFLAGS']:
@@ -71,18 +71,5 @@ p.Program(['purinsend.c'] + getopt)
 p.Program(['purinrecv.c'] + getopt)
 p.Program(['daytime.c'] + getopt)
 p.Program(['shortcakerecv.c', 'async.c'] + getopt)
-
-# Vanilla C++ example
-if e['WITH_CC'] == 'true':
-	pcc = p.Clone();
-	newCCFLAGS = [];
-	for flag in pcc['CCFLAGS']:
-		if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]):
-			newCCFLAGS.append(flag);
-		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
-			newCCFLAGS.append("-D_XOPEN_SOURCE=500");
-	pcc['CCFLAGS'] = newCCFLAGS;
-	pcc.Program('purinsendcc', ['purinsendcc.cc'] + p.Object(getopt))
-	pcc.Program('purinrecvcc', ['purinrecvcc.cc'] + p.Object(getopt))
 
 # end of file

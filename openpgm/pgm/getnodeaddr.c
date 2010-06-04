@@ -23,8 +23,8 @@
 #ifndef _WIN32
 #	include <netdb.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
 
 
 //#define GETNODEADDR_DEBUG
@@ -126,7 +126,7 @@ pgm_if_getnodeaddr (
 		return FALSE;
 	}
 
-	struct pgm_ifaddrs_t *ifap, *ifa, *ifa6;
+	struct pgm_ifaddrs *ifap, *ifa, *ifa6;
 	if (!pgm_getifaddrs (&ifap, error)) {
 		pgm_prefix_error (error,
 			     _("Enumerating network interfaces: "));

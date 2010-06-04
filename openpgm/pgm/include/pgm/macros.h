@@ -19,6 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#       error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_MACROS_H__
 #define __PGM_MACROS_H__
 
@@ -40,15 +44,15 @@
 /* Returns new memory like malloc() */
 #	define PGM_GNUC_MALLOC			__attribute__((__malloc__))
 
-#	define PGM_GNUC_CACHELINE_ALIGNED	__attribute__((__aligned__(SMP_CACHE_BYTES), \
-						__section__((".data.cacheline_aligned")))
-#	define PGM_GNUC_READ_MOSTLY		__attribute__((__section__(".data.read_mostly")))
+#       define PGM_GNUC_CACHELINE_ALIGNED       __attribute__((__aligned__(SMP_CACHE_BYTES), \
+                                                __section__((".data.cacheline_aligned")))
+#       define PGM_GNUC_READ_MOSTLY             __attribute__((__section__(".data.read_mostly")))
 
 #else
 #	define PGM_GNUC_PURE
 #	define PGM_GNUC_MALLOC
-#	define PGM_GNUC_CACHELINE_ALIGNED
-#	define PGM_GNUC_READ_MOSTLY
+#       define PGM_GNUC_CACHELINE_ALIGNED
+#       define PGM_GNUC_READ_MOSTLY
 #endif
 
 #if (__GNUC__ >= 4)
@@ -112,7 +116,6 @@
 #		define PGM_GNUC_INTERNAL
 #	endif
 #endif /* __GNUC__ */
-
 
 /* Compiler time assertions, must be on unique lines in the project */
 #define PGM_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2

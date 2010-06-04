@@ -22,18 +22,13 @@
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
-#ifndef _WIN32
-#	include <sys/socket.h>
-#	include <netinet/in.h>
-#	include <netinet/ip.h>
-#endif
-#include <pgm/types.h>
+#include <pgm/framework.h>
 
 PGM_BEGIN_DECLS
 
 /* protocol number assigned by IANA */
 #ifndef IPPROTO_PGM
-#	define IPPROTO_PGM 		    	113
+#define IPPROTO_PGM 		    	113
 #endif
 
 /* read from /etc/protocols if available */
@@ -42,8 +37,8 @@ extern int pgm_ipproto_pgm;
 
 /* address family indicator, rfc 1700 (ADDRESS FAMILY NUMBERS) */
 #ifndef AFI_IP
-#	define AFI_IP	    1	    /* IP (IP version 4) */
-#	define AFI_IP6	    2	    /* IP6 (IP version 6) */
+#define AFI_IP	    1	    /* IP (IP version 4) */
+#define AFI_IP6	    2	    /* IP6 (IP version 6) */
 #endif
 
 /* UDP ports for UDP encapsulation, as per IBM WebSphere MQ */
@@ -316,13 +311,14 @@ struct pgm_opt_crqst {
 
 /* PGMCC.  ACK Packet */
 struct pgm_ack {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	ack_rx_max;		/* RX_MAX */
 	uint32_t	ack_bitmap;		/* received packets */
 	/* ... option extensions */
 };
 
 /* PGMCC  Options */
-struct pgm_opt_pgmcc_data {
+struct pgm_opt_cc_data {
 	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	opt_tstamp;		/* timestamp */
 	uint16_t	opt_nla_afi;		/* nla afi */
@@ -330,7 +326,7 @@ struct pgm_opt_pgmcc_data {
 	struct in_addr	opt_nla;		/* ACKER nla */
 };
 
-struct pgm_opt6_pgmcc_data {
+struct pgm_opt6_cc_data {
 	uint8_t		opt6_reserved;		/* reserved */
 	uint32_t	opt6_tstamp;		/* timestamp */
 	uint16_t	opt6_nla_afi;		/* nla afi */
@@ -338,7 +334,7 @@ struct pgm_opt6_pgmcc_data {
 	struct in6_addr	opt6_nla;		/* ACKER nla */
 };
 
-struct pgm_opt_pgmcc_feedback {
+struct pgm_opt_cc_feedback {
 	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	opt_tstamp;		/* timestamp */
 	uint16_t	opt_nla_afi;		/* nla afi */
@@ -346,7 +342,7 @@ struct pgm_opt_pgmcc_feedback {
 	struct in_addr	opt_nla;		/* ACKER nla */
 };
 
-struct pgm_opt6_pgmcc_feedback {
+struct pgm_opt6_cc_feedback {
 	uint8_t		opt6_reserved;		/* reserved */
 	uint32_t	opt6_tstamp;		/* timestamp */
 	uint16_t	opt6_nla_afi;		/* nla afi */
@@ -373,6 +369,7 @@ struct pgm_spmr {
 
 /* 14.7.1.  Poll Request */
 struct pgm_poll {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	poll_sqn;		/* poll sequence number */
 	uint16_t	poll_round;		/* poll round */
 	uint16_t	poll_s_type;		/* poll sub-type */
@@ -388,6 +385,7 @@ struct pgm_poll {
 };
 
 struct pgm_poll6 {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	poll6_sqn;		/* poll sequence number */
 	uint16_t	poll6_round;		/* poll round */
 	uint16_t	poll6_s_type;		/* poll sub-type */
@@ -402,6 +400,7 @@ struct pgm_poll6 {
 
 /* 14.7.2.  Poll Response */
 struct pgm_polr {
+	uint8_t		opt_reserved;		/* reserved */
 	uint32_t	polr_sqn;		/* polr sequence number */
 	uint16_t	polr_round;		/* polr round */
 	uint16_t	polr_reserved;		/* reserved */
@@ -450,22 +449,40 @@ struct pgm_opt6_path_nla {
 #	pragma pack()
 #endif
 
-#define PGM_IS_UPSTREAM(t) \
-	((t) == PGM_NAK 	/* unicast */			\
-	 || (t) == PGM_NNAK	/* unicast */			\
-	 || (t) == PGM_SPMR	/* multicast + unicast */	\
-	 || (t) == PGM_POLR	/* unicast */			\
-	 || (t) == PGM_ACK)	/* unicast */
+static inline
+bool
+pgm_is_upstream (
+	uint8_t		type
+	)
+{
+	return (type == PGM_NAK ||		/* unicast */
+		type == PGM_NNAK ||		/* unicast */
+		type == PGM_SPMR ||		/* multicast + unicast */
+		type == PGM_POLR ||		/* unicast */
+		type == PGM_ACK);		/* unicast */
+}
 
-#define PGM_IS_PEER(t) \
-	((t) == PGM_SPMR)	/* multicast */
+static inline
+bool
+pgm_is_peer (
+	uint8_t		type
+	)
+{
+	return (type == PGM_SPMR);		/* multicast */
+}
 
-#define PGM_IS_DOWNSTREAM(t) \
-	((t) == PGM_SPM		/* all types are multicast */	\
-	 || (t) == PGM_ODATA					\
-	 || (t) == PGM_RDATA					\
-	 || (t) == PGM_POLL					\
-	 || (t) == PGM_NCF)
+static inline
+bool
+pgm_is_downstream (
+	uint8_t		type
+	)
+{
+	return (type == PGM_SPM   ||		/* all types are multicast */
+		type == PGM_ODATA ||
+		type == PGM_RDATA ||
+		type == PGM_POLL  ||
+		type == PGM_NCF);
+}
 
 PGM_END_DECLS
 

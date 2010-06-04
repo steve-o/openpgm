@@ -1525,7 +1525,7 @@ http_receiver_response (
 	const uint16_t sport = ntohs (peer->tsi.sport);
 	const uint16_t dport = ntohs (peer->transport->dport);	/* by definition must be the same */
 	const pgm_rxw_t* window = peer->window;
-	const uint32_t outstanding_naks = window->nak_backoff_queue.length +
+	const uint32_t outstanding_naks = window->backoff_queue.length +
 					  window->wait_ncf_queue.length +
 					  window->wait_data_queue.length;
 

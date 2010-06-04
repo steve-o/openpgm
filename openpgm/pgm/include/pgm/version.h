@@ -22,7 +22,7 @@
 #ifndef __PGM_VERSION_H__
 #define __PGM_VERSION_H__
 
-#include <pgm/types.h>
+#include <pgm/framework.h>
 
 PGM_BEGIN_DECLS
 

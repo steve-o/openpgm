@@ -22,10 +22,12 @@
 #ifndef __PGM_GSI_H__
 #define __PGM_GSI_H__
 
+#include <pgm/types.h>
+
 typedef struct pgm_gsi_t pgm_gsi_t;
 
-#include <pgm/types.h>
 #include <pgm/error.h>
+#include <pgm/hashtable.h>
 
 PGM_BEGIN_DECLS
 
@@ -43,6 +45,7 @@ bool pgm_gsi_create_from_string (pgm_gsi_t*restrict, const char*restrict, ssize_
 int pgm_gsi_print_r (const pgm_gsi_t*restrict, char*restrict, const size_t);
 char* pgm_gsi_print (const pgm_gsi_t*);
 bool pgm_gsi_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
+
 
 PGM_END_DECLS
 
