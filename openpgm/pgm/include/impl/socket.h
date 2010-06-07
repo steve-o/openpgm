@@ -99,6 +99,8 @@ struct pgm_sock_t {
 	uint32_t			cwnd_size;		/* congestion window size */
 	uint32_t			ack_rx_max;
 	uint32_t			ack_bitmap;
+	uint32_t			acks_after_loss;
+	uint32_t			suspended_sqn;
 	pgm_time_t			next_crqst;
 	pgm_time_t			mrtt;			/* multicast round-trip time */
 	pgm_time_t			crqst_ivl;

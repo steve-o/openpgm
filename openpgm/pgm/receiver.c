@@ -1363,6 +1363,8 @@ pgm_warn ("invalid nla");
 				continue;
 			}
 
+			pgm_assert (!pgm_sockaddr_is_addr_unspecified (&peer->nla));
+
 			if (!send_ack (sock, peer, now))
 				return FALSE;
 pgm_warn ("sent");
@@ -2119,7 +2121,11 @@ discarded:
 		if (_pgm_is_acker (source, skb))
 		{
 printf ("i am acker\n");
-			if (PGM_UNLIKELY(!send_ack (sock, source, skb->tstamp)))
+			if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified (&source->nla)))
+			{
+printf ("but i don't know source nla\n");
+			}
+			else if (PGM_UNLIKELY(!send_ack (sock, source, skb->tstamp)))
 			{
 				pgm_debug ("send_ack failed");
 			}
