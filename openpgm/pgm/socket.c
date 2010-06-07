@@ -1705,6 +1705,8 @@ pgm_connect (
 
 /* start PGMCC with one token */
 		sock->tokens = sock->cwnd_size = pgm_fp8 (1);
+
+/* slow start threshold */
 		sock->ssthresh = pgm_fp8 (4);
 
 /* start full history */

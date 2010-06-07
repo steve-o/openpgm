@@ -37,7 +37,7 @@
 #	define bool		BOOL
 #	define ssize_t		SSIZE_T
 #	define restrict
-#elif !defined( __cplusplus) || (__GNUC__ > 4)
+#elif !defined( __cplusplus) || (__GNUC__ >= 4)
 /* g++ v4 handles C99 headers without complaints */
 #	include <stdbool.h>
 #	include <stdint.h>
