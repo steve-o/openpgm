@@ -182,3 +182,29 @@ _Proposes an enhanced congestion control scheme called EPGMCC (Enhanced PGMCC)._
 
   * MTCP: Scalable TCP-like Congestion Control for Reliable Multicast
 ftp://ftp.csc.ncsu.edu/pub/tech/98/TR-98-01.ps.Z
+
+  * PGMCC의 공정성 향상 (Improving the fairness of PGMCC)
+http://eeca2.sogang.ac.kr/publications/international/PGMCC.pdf
+
+_Discusses alternative ACKer selection timeout algorithms_
+
+  * Extending Equation-based Congestion Control to Multicast Applications
+http://www.cs.ucl.ac.uk/staff/m.handley/papers/tfmcc-sigcomm.pdf 
+
+_Introduction to TFMCC (RFC4654)_
+
+  * High-Performance, Reliable Multicasting: Foundations for Future Internet Groupware Applications
+http://airex.tksc.jaxa.jp/pl/dr/19980019497/en
+
+  * Pacifier: High-Throughput, Reliable Multicast without "Crying Babies" in Wireless Mesh Networks
+http://web.ics.purdue.edu/~dkoutson/publications/pacifier.pdf
+
+  * Reliable Multicast Transport Protocols Performances in Emulated Satellite Environment Taking into Account an Adaptive Physical Layer for the Geocast System
+http://www.cost280.rl.ac.uk/documents/WS2%20Proceedings/documents/pm-5-068.pdf
+
+  * Locating repair servers in hierarchical reliable multicast networks to reduce the makespan
+http://os.korea.ac.kr/publication_papers/inter_journal/ssbyun_IJCS_2009.pdf
+
+_makespan is the time that is required to fully and successfully transmit a packet from the sender to all receivers._
+
+
