@@ -148,7 +148,7 @@ env = Environment(
 # symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
 # socket binding
-#			'-DCONFIG_BIND_INADDR_ANY',
+			'-DCONFIG_BIND_INADDR_ANY',
 # IP header order as per IP(4) on FreeBSD
 #			'-DCONFIG_HOST_ORDER_IP_LEN',
 #			'-DCONFIG_HOST_ORDER_IP_OFF',
