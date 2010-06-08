@@ -2,7 +2,7 @@
  *
  * Simple sender using the PGM transport.
  *
- * Copyright (c) 2006-2007 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -49,25 +49,26 @@
 
 /* globals */
 
-static int g_port = 0;
-static const char* g_network = "";
-static gboolean g_multicast_loop = FALSE;
-static int g_udp_encap_port = 0;
+static int		g_port = 0;
+static const char*	g_network = "";
+static gboolean		g_multicast_loop = FALSE;
+static int		g_udp_encap_port = 0;
 
-static int g_max_tpdu = 1500;
-static int g_max_rte = 400*1000;
-static int g_sqns = 100;
+static int		g_max_tpdu = 1500;
+static int		g_max_rte = 400*1000;
+static int		g_sqns = 100;
 
-static gboolean g_fec = FALSE;
-static int g_k = 8;
-static int g_n = 255;
+static gboolean		g_fec = FALSE;
+static int		g_k = 8;
+static int		g_n = 255;
 
-static pgm_transport_t* g_transport = NULL;
+static pgm_sock_t*	g_sock = NULL;
 
-static gboolean create_transport (void);
+static gboolean create_pgm_socket (void);
 
 
-G_GNUC_NORETURN static void
+G_GNUC_NORETURN static
+void
 usage (const char* bin)
 {
 	fprintf (stderr, "Usage: %s [options] message\n", bin);
@@ -76,8 +77,8 @@ usage (const char* bin)
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
-	fprintf (stderr, "  -k <k>          : Configure Reed-Solomon code (n, k)\n");
-	fprintf (stderr, "  -g <n>\n");
+	fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
+	fprintf (stderr, "  -N <n>\n");
 	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
 	fprintf (stderr, "  -i              : List available interfaces\n");
 	exit (1);
@@ -106,7 +107,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:k:g:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:K:N:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -115,8 +116,8 @@ main (
 		case 'r':	g_max_rte = atoi (optarg); break;
 
 		case 'f':	g_fec = TRUE; break;
-		case 'k':	g_k = atoi (optarg); break;
-		case 'g':	g_n = atoi (optarg); break;
+		case 'K':	g_k = atoi (optarg); break;
+		case 'N':	g_n = atoi (optarg); break;
 
 		case 'l':	g_multicast_loop = TRUE; break;
 
@@ -134,7 +135,7 @@ main (
 
 	if (g_fec && ( !g_k || !g_n )) {
 		pgm_messages_shutdown();
-		puts ("Invalid Reed-Solomon parameters.");
+		g_error ("Invalid Reed-Solomon parameters RS(%d, %d).", g_n, g_k);
 		usage (binary_name);
 	}
 
@@ -144,10 +145,10 @@ main (
 	signal (SIGHUP, SIG_IGN);
 #endif
 
-	if (create_transport())
+	if (create_pgm_socket())
 	{
 		while (optind < argc) {
-			const int status = pgm_send (g_transport, argv[optind], strlen(argv[optind]) + 1, NULL);
+			const int status = pgm_send (g_sock, argv[optind], strlen(argv[optind]) + 1, NULL);
 		        if (PGM_IO_STATUS_NORMAL != status) {
 				g_warning ("pgm_send failed.");
 		        }
@@ -156,74 +157,149 @@ main (
 	}
 
 /* cleanup */
-	if (g_transport) {
-		pgm_transport_destroy (g_transport, TRUE);
-		g_transport = NULL;
+	if (g_sock) {
+		pgm_close (g_sock, TRUE);
+		g_sock = NULL;
 	}
 	pgm_shutdown();
 	pgm_messages_shutdown();
 	return EXIT_SUCCESS;
 }
 
-static gboolean
-create_transport (void)
+static
+gboolean
+create_pgm_socket (void)
 {
-	struct pgm_transport_info_t* res = NULL;
+	struct pgm_addrinfo_t* res = NULL;
 	pgm_error_t* pgm_err = NULL;
+	sa_family_t sa_family = AF_UNSPEC;
 
-/* parse network parameter into transport address structure */
-	char network[1024];
-	sprintf (network, "%s", g_network);
-	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
-		g_error ("parsing network parameter: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		return FALSE;
+/* parse network parameter into PGM socket address structure */
+	if (!pgm_getaddrinfo (g_network, NULL, &res, &pgm_err)) {
+		g_error ("Parsing network parameter: %s", pgm_err->message);
+		goto err_abort;
 	}
-/* create global session identifier */
-	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
+
+	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
+
 	if (g_udp_encap_port) {
-		res->ti_udp_encap_ucast_port = g_udp_encap_port;
-		res->ti_udp_encap_mcast_port = g_udp_encap_port;
+		if (!pgm_socket (&g_sock, sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
+			g_error ("Creating PGM/UDP socket: %s", pgm_err->message);
+			goto err_abort;
+		}
+		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_UCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
+		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_MCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
+	} else {
+		if (!pgm_socket (&g_sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
+			g_error ("Creating PGM/IP socket: %s", pgm_err->message);
+			goto err_abort;
+		}
 	}
-	if (g_port)
-		res->ti_dport = g_port;
-	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
-		g_error ("creating transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_if_free_transport_info (res);
-		return FALSE;
-	}
-	pgm_if_free_transport_info (res);
+
+/* Use RFC 2113 tagging for PGM Router Assist */
+	const int no_router_assist = 0;
+	pgm_setsockopt (g_sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+
+	pgm_drop_superuser();
 
 /* set PGM parameters */
-	pgm_transport_set_send_only (g_transport, TRUE);
-	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
-	pgm_transport_set_txw_sqns (g_transport, g_sqns);
-	pgm_transport_set_txw_max_rte (g_transport, g_max_rte);
-	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
-	pgm_transport_set_hops (g_transport, 16);
-	pgm_transport_set_ambient_spm (g_transport, pgm_secs(30));
-	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7
-), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
-	pgm_transport_set_heartbeat_spm (g_transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+	const int send_only = 1,
+		  ambient_spm = pgm_secs (30),
+		  heartbeat_spm[] = { pgm_msecs (100),
+				      pgm_msecs (100),
+                                      pgm_msecs (100),
+				      pgm_msecs (100),
+				      pgm_msecs (1300),
+				      pgm_secs  (7),
+				      pgm_secs  (16),
+				      pgm_secs  (25),
+				      pgm_secs  (30) };
+
+	pgm_setsockopt (g_sock, PGM_SEND_ONLY, &send_only, sizeof(send_only));
+	pgm_setsockopt (g_sock, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu));
+	pgm_setsockopt (g_sock, PGM_TXW_SQNS, &g_sqns, sizeof(g_sqns));
+	pgm_setsockopt (g_sock, PGM_TXW_MAX_RTE, &g_max_rte, sizeof(g_max_rte));
+	pgm_setsockopt (g_sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
+	pgm_setsockopt (g_sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
 	if (g_fec) {
-		pgm_transport_set_fec (g_transport, 0, TRUE, TRUE, g_n, g_k);
+		struct pgm_fecinfo_t fecinfo; 
+		fecinfo.block_size		= g_n;
+		fecinfo.proactive_packets	= 0;
+		fecinfo.group_size		= g_k;
+		fecinfo.ondemand_parity_enabled	= TRUE;
+		fecinfo.var_pktlen_enabled	= TRUE;
+		pgm_setsockopt (g_sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
-/* assign transport to specified address */
-	if (!pgm_transport_bind (g_transport, &pgm_err)) {
-		g_error ("binding transport: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
-		pgm_transport_destroy (g_transport, FALSE);
-		g_transport = NULL;
-		return FALSE;
+/* create global session identifier */
+	struct pgm_sockaddr_t addr;
+	memset (&addr, 0, sizeof(addr));
+	addr.sa_port = g_port ? g_port : DEFAULT_DATA_DESTINATION_PORT;
+	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
+	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
+		g_error ("Creating GSI: %s", pgm_err->message);
+		goto err_abort;
 	}
+
+/* assign socket to specified address */
+	struct pgm_interface_req_t if_req;
+	memset (&if_req, 0, sizeof(if_req));
+	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
+	if_req.ir_scope_id  = 0;
+	if (AF_INET6 == sa_family) {
+		struct sockaddr_in6 sa6;
+		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
+		if_req.ir_scope_id = sa6.sin6_scope_id;
+	}
+	if (!pgm_bind3 (g_sock,
+			&addr, sizeof(addr),
+			&if_req, sizeof(if_req),	/* tx interface */
+			&if_req, sizeof(if_req),	/* rx interface */
+			&pgm_err))
+	{
+		g_error ("Binding PGM socket: %s", pgm_err->message);
+		goto err_abort;
+	}
+
+/* join IP multicast groups */
+	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
+		pgm_setsockopt (g_sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
+	pgm_setsockopt (g_sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+	pgm_freeaddrinfo (res);
+
+/* set IP parameters */
+	const int blocking = 0,
+		  multicast_loop = g_multicast_loop ? 1 : 0,
+		  multicast_hops = 16,
+		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
+
+	pgm_setsockopt (g_sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
+	pgm_setsockopt (g_sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
+	if (AF_INET6 != sa_family)
+		pgm_setsockopt (g_sock, PGM_TOS, &dscp, sizeof(dscp));
+	pgm_setsockopt (g_sock, PGM_NOBLOCK, &blocking, sizeof(blocking));
+
+	if (!pgm_connect (g_sock, &pgm_err)) {
+		g_error ("Connecting PGM socket: %s", pgm_err->message);
+		goto err_abort;
+	}
+
 	return TRUE;
+
+err_abort:
+	if (NULL != g_sock) {
+		pgm_close (g_sock, FALSE);
+		g_sock = NULL;
+	}
+	if (NULL != res) {
+		pgm_freeaddrinfo (res);
+		res = NULL;
+	}
+	if (NULL != pgm_err) {
+		pgm_error_free (pgm_err);
+		pgm_err = NULL;
+	}
+	return FALSE;
 }
 
 /* eof */
