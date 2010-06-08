@@ -556,11 +556,15 @@ pgm_on_ack (
 /* after loss detection cancel any further manipulation of the window
  * until feedback is received for the next transmitted packet.
  */
-	if (pgm_uint32_lte (ack_rx_max, sock->suspended_sqn))
+	if (sock->is_congested)
 	{
+		if (pgm_uint32_lte (ack_rx_max, sock->suspended_sqn))
+		{
 printf ("suspended window token increment\n");
-		sock->tokens += pgm_fp8mul (pgm_fp8 (new_acks), pgm_fp8 (1) + pgm_fp8div (pgm_fp8 (1), sock->cwnd_size));
-		return TRUE;
+			sock->tokens += pgm_fp8mul (pgm_fp8 (new_acks), pgm_fp8 (1) + pgm_fp8div (pgm_fp8 (1), sock->cwnd_size));
+			return TRUE;
+		}
+		sock->is_congested = FALSE;
 	}
 
 /* count outstanding lost sequences */
@@ -602,11 +606,13 @@ printf ("%u tokens++, W %u\n", pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd
 printf ("congestion, half window size\n");
 			sock->acks_after_loss = 0;
 			sock->suspended_sqn = ack_rx_max;
+			sock->is_congested = TRUE;
 			sock->cwnd_size = pgm_fp8div (sock->cwnd_size, pgm_fp8 (2));
-			if (sock->cwnd_size > (sock->tokens + pgm_fp8 (1)))
+			if ((sock->cwnd_size + pgm_fp8 (1)) > sock->tokens)
 				sock->tokens = pgm_fp8 (1);
 			else
 				sock->tokens -= sock->cwnd_size;
+printf ("tokens = %u, %u >= %u\n", pgm_fp8tou (sock->tokens), sock->tokens, pgm_fp8 (1));
 			sock->ack_bitmap = 0xffffffff;
 		}
 	}
@@ -1008,8 +1014,10 @@ send_odata (
 	const size_t   tpdu_length = tsdu_length + pgm_pkt_offset (FALSE, pgmcc_family);
 
 /* continue if send would block */
-	if (sock->is_apdu_eagain)
+	if (sock->is_apdu_eagain) {
+		STATE(skb)->tstamp = pgm_time_update_now();
 		goto retry_send;
+	}
 
 /* add PGM header to skbuff */
 	STATE(skb) = pgm_skb_get(skb);
@@ -1067,23 +1075,23 @@ send_odata (
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
 
-/* congestion control */
-	if (sock->use_pgmcc) {
-		if (sock->tokens < pgm_fp8 (1)) {
-			pgm_info ("Token limit reached");
-			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
-			return PGM_IO_STATUS_TIMER_PENDING;	/* peer expiration to re-elect ACKer */
-		}
-		sock->tokens -= pgm_fp8 (1);
-	}
-
 /* the transmit window MUST check the user count to ensure it does not 
  * attempt to send a repair-data packet based on in transit original data.
  */
 
 	ssize_t sent;
 retry_send:
+
+/* congestion control */
+	if (sock->use_pgmcc &&
+	    sock->tokens < pgm_fp8 (1))
+	{
+		pgm_info ("Token limit reached");
+		sock->is_apdu_eagain = TRUE;
+		sock->blocklen = tpdu_length;
+		return PGM_IO_STATUS_TIMER_PENDING;	/* peer expiration to re-elect ACKer */
+	}
+
 	sent = pgm_sendto (sock,
 			   sock->is_controlled_odata,	/* rate limited */
 			   FALSE,				/* regular socket */
@@ -1102,6 +1110,10 @@ retry_send:
 
 	sock->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+	if (sock->use_pgmcc) {
+		sock->tokens -= pgm_fp8 (1);
+		sock->ack_expiry = STATE(skb)->tstamp + sock->ack_expiry_ivl;
+	}
 
 	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
@@ -1151,9 +1163,11 @@ send_odata_copy (
 	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
 	const size_t tpdu_length = tsdu_length + pgm_pkt_offset (FALSE, pgmcc_family);
 
-/* continue if blocked mid-apdu */
-	if (sock->is_apdu_eagain)
+/* continue if blocked mid-apdu, updating timestamp */
+	if (sock->is_apdu_eagain) {
+		STATE(skb)->tstamp = pgm_time_update_now();
 		goto retry_send;
+	}
 
 	STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 	STATE(skb)->sock = sock;
@@ -1210,20 +1224,19 @@ send_odata_copy (
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
 
-/* congestion control */
-	if (sock->use_pgmcc) {
-		if (sock->tokens < pgm_fp8 (1)) {
-			pgm_info ("Token limit reached");
-			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
-			return PGM_IO_STATUS_TIMER_PENDING;
-		}
-		sock->tokens -= pgm_fp8 (1);
-printf ("%u tokens--\n", pgm_fp8tou (sock->tokens));
-	}
-
 	ssize_t sent;
 retry_send:
+
+/* congestion control */
+	if (sock->use_pgmcc && 
+	    sock->tokens < pgm_fp8 (1))
+	{
+		pgm_info ("Token limit reached");
+		sock->is_apdu_eagain = TRUE;
+		sock->blocklen = tpdu_length;
+		return PGM_IO_STATUS_TIMER_PENDING;
+	}
+
 	sent = pgm_sendto (sock,
 			   sock->is_controlled_odata,	/* rate limited */
 			   FALSE,			/* regular socket */
@@ -1235,6 +1248,17 @@ retry_send:
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
 		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+	}
+
+	if (sock->use_pgmcc) {
+		sock->tokens -= pgm_fp8 (1);
+printf ("%u tokens--\n", pgm_fp8tou (sock->tokens));
+		sock->ack_expiry = STATE(skb)->tstamp + sock->ack_expiry_ivl;
+char nows[1024];
+time_t t = time (NULL);
+struct tm* tmp = localtime (&t);
+strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
+printf ("now:%s, ack-expiry set at %" PRIu64 "\n", nows, sock->ack_expiry);
 	}
 
 /* save unfolded odata for retransmissions */

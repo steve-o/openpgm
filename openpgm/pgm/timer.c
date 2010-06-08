@@ -136,6 +136,26 @@ pgm_timer_dispatch (
 
 	if (sock->can_send_data)
 	{
+/* reset congestion control on ACK timeout */
+		if (sock->use_pgmcc &&
+		    sock->tokens < pgm_fp8 (1) &&
+		    0 != sock->ack_expiry)
+		{
+			if (pgm_time_after_eq (now, sock->ack_expiry))
+			{
+char nows[1024];
+time_t t = time (NULL);
+struct tm* tmp = localtime (&t);
+strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
+printf ("ACK timeout, reset cc now:%s ack-expiry:%" PRIu64 "\n", nows, sock->ack_expiry);
+				sock->tokens = sock->cwnd_size = pgm_fp8 (1);
+				sock->ack_bitmap = 0xffffffff;
+				sock->ack_expiry = 0;
+			}
+			next_expiration = next_expiration > 0 ? MIN(next_expiration, sock->ack_expiry) : sock->ack_expiry;
+		}
+
+/* SPM broadcast */
 		pgm_mutex_lock (&sock->timer_mutex);
 		const unsigned spm_heartbeat_state = sock->spm_heartbeat_state;
 		const pgm_time_t next_heartbeat_spm = sock->next_heartbeat_spm;
@@ -145,8 +165,8 @@ pgm_timer_dispatch (
 		const pgm_time_t next_ambient_spm = sock->next_ambient_spm;
 		pgm_time_t next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, next_ambient_spm) : next_ambient_spm;
 
-		if (pgm_time_after_eq (now, next_spm)
-		    && !pgm_send_spm (sock, 0))
+		if (pgm_time_after_eq (now, next_spm) &&
+		   !pgm_send_spm (sock, 0))
 			return FALSE;
 
 /* ambient timing not so important so base next event off current time */
