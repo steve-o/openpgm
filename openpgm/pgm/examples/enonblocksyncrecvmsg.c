@@ -225,7 +225,6 @@ on_startup (void)
 	sa_family_t sa_family = AF_UNSPEC;
 
 	g_message ("startup.");
-	g_message ("create PGM socket.");
 
 /* parse network parameter into transport address structure */
 	if (!pgm_getaddrinfo (g_network, NULL, &res, &pgm_err)) {
