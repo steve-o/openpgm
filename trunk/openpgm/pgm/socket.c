@@ -1709,6 +1709,9 @@ pgm_connect (
 /* slow start threshold */
 		sock->ssthresh = pgm_fp8 (4);
 
+/* ACK timeout, should be greater than first SPM heartbeat interval in order to be scheduled correctly */
+		sock->ack_expiry_ivl = pgm_secs (3);
+
 /* start full history */
 		sock->ack_bitmap = 0xffffffff;
 	}

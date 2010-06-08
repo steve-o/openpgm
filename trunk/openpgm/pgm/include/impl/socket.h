@@ -101,25 +101,14 @@ struct pgm_sock_t {
 	uint32_t			ack_bitmap;
 	uint32_t			acks_after_loss;
 	uint32_t			suspended_sqn;
+	bool				is_congested;
+	pgm_time_t			ack_expiry;
+	pgm_time_t			ack_expiry_ivl;
 	pgm_time_t			next_crqst;
-	pgm_time_t			mrtt;			/* multicast round-trip time */
 	pgm_time_t			crqst_ivl;
 	pgm_time_t			ack_bo_ivl;
 	struct sockaddr_storage		acker_nla;
 	uint64_t			acker_loss;
-/*
- * ignore_cong    - previous congestion lead sqn
- * cc_token
- * cc_window
- *   w_s16        - weight for lossrate computation, 0.992
- *   ss_threshold - threshold for exponential window opening
- * dupacks        - number of duplicate acks
- * ack_bitmask    - S/R most recent ACKs for ODATA
- *
- * do_ack          - toggle ack generation
- * rtt_cong_filter - ignore multiple cong.event per rtt
- * dupack          - threshold for dup acks
- */
 
 	pgm_notify_t			rdata_notify;
 
