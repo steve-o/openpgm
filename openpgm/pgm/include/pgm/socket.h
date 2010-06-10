@@ -81,6 +81,7 @@ enum {
 	PGM_RECV_SOCK,
 	PGM_REPAIR_SOCK,
 	PGM_PENDING_SOCK,
+	PGM_ACK_SOCK,
 	PGM_TIME_REMAIN,
 	PGM_RATE_REMAIN,
 	PGM_IP_ROUTER_ALERT,
@@ -134,7 +135,8 @@ enum {
 	PGM_IO_STATUS_EOF,		/* socket closed */
 	PGM_IO_STATUS_WOULD_BLOCK,	/* resource temporarily unavailable */
 	PGM_IO_STATUS_RATE_LIMITED,	/* would-block on rate limit, check timer */
-	PGM_IO_STATUS_TIMER_PENDING	/* would-block with pending timer */
+	PGM_IO_STATUS_TIMER_PENDING,	/* would-block with pending timer */
+	PGM_IO_STATUS_CONGESTION	/* would-block waiting on ACK or timeout */
 };
 
 bool pgm_socket (pgm_sock_t**restrict, const sa_family_t, const int, const int, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;

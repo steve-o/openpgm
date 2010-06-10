@@ -92,9 +92,11 @@ static int		g_max_tpdu = 1500;
 static int		g_max_rte = 16*1000*1000;
 static int		g_sqns = 200;
 
-static gboolean		g_fec = FALSE;
-static int		g_k = 8;
-static int		g_n = 255;
+static gboolean		g_use_pgmcc = FALSE;
+
+static gboolean		g_use_fec = FALSE;
+static int		g_rs_k = 8;
+static int		g_rs_n = 255;
 
 static enum {
 	PGMPING_MODE_SOURCE,
@@ -161,6 +163,7 @@ usage (const char* bin)
 	fprintf (stderr, "  -l              : Listen-only mode\n");
 	fprintf (stderr, "  -e              : Relect mode\n");
         fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
+	fprintf (stderr, "  -c              : Enable PGMCC\n");
         fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
         fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
         fprintf (stderr, "  -N <n>\n");
@@ -201,7 +204,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:m:old:r:feK:N:HSh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:old:r:cfeK:N:HSh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -209,9 +212,11 @@ main (
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
 		case 'r':	g_max_rte = atoi (optarg); break;
 
-		case 'f':	g_fec = TRUE; break;
-		case 'K':	g_k = atoi (optarg); break;
-		case 'N':	g_n = atoi (optarg); break;
+		case 'c':	g_use_pgmcc = TRUE; break;
+
+		case 'f':	g_use_fec = TRUE; break;
+		case 'K':	g_rs_k = atoi (optarg); break;
+		case 'N':	g_rs_n = atoi (optarg); break;
 
 		case 'H':	enable_http = TRUE; break;
 		case 'S':	enable_snmpx = TRUE; break;
@@ -229,7 +234,7 @@ main (
 		}
 	}
 
-	if (g_fec && ( !g_k || !g_n )) {
+	if (g_use_fec && ( !g_rs_k || !g_rs_n )) {
 		g_error ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
@@ -471,11 +476,21 @@ on_startup (
 		pgm_setsockopt (g_sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
 	}
 
-	if (g_fec) {
+/* PGMCC congestion control */
+	if (g_use_pgmcc) {
+		struct pgm_pgmccinfo_t pgmccinfo;
+		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
+		pgmccinfo.ack_c			= 75;
+		pgmccinfo.ack_c_p		= 500;
+		pgm_setsockopt (g_sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
+	}
+
+/* Reed Solomon forward error correction */
+	if (g_use_fec) {
 		struct pgm_fecinfo_t fecinfo; 
-		fecinfo.block_size		= g_n;
+		fecinfo.block_size		= g_rs_n;
 		fecinfo.proactive_packets	= 0;
-		fecinfo.group_size		= g_k;
+		fecinfo.group_size		= g_rs_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
 		fecinfo.var_pktlen_enabled	= TRUE;
 		pgm_setsockopt (g_sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
@@ -613,11 +628,6 @@ sender_thread (
 		g_main_loop_quit (g_loop);
 		return NULL;
 	}
-	if (pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_ADD, EPOLLOUT | EPOLLONESHOT) < 0) {
-		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
-		g_main_loop_quit (g_loop);
-		return NULL;
-	}
 	struct epoll_event event;
 	memset (&event, 0, sizeof(event));
 	event.events = EPOLLIN;
@@ -681,6 +691,7 @@ sender_thread (
 again:
 		status = pgm_send_skbv (tx_sock, &skb, 1, TRUE, &bytes_written);
 		switch (status) {
+/* rate control */
 		case PGM_IO_STATUS_RATE_LIMITED:
 		{
 			socklen_t optlen = sizeof (tv);
@@ -689,7 +700,7 @@ again:
 /* busy wait under 2ms */
 			if (timeout < 2) timeout = 0;
 #ifdef CONFIG_HAVE_EPOLL
-			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
+			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
@@ -701,19 +712,21 @@ again:
 				break;
 			goto again;
 		}
+/* congestion control */
+		case PGM_IO_STATUS_CONGESTION:
+/* kernel feedback */
 		case PGM_IO_STATUS_WOULD_BLOCK:
 		{
 #ifdef CONFIG_HAVE_EPOLL
-			int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
-			if (G_UNLIKELY(g_quit))
-				break;
-			if (ready > 0 &&
-			    pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_MOD, EPOLLOUT | EPOLLONESHOT) < 0)
+			if (pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_MOD, EPOLLOUT | EPOLLONESHOT) < 0)
 			{
 				g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
 				g_main_loop_quit (g_loop);
 				return NULL;
 			}
+			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
+			if (G_UNLIKELY(g_quit))
+				break;
 #elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
@@ -723,6 +736,7 @@ again:
 #endif /* !CONFIG_HAVE_EPOLL */
 			goto again;
 		}
+/* successful delivery */
 		case PGM_IO_STATUS_NORMAL:
 			break;
 		default:
