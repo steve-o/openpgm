@@ -553,6 +553,8 @@ pgm_on_ack (
 	if (0 == new_acks)
 		return TRUE;
 
+	const bool is_congestion_limited = (sock->tokens < pgm_fp8 (1));
+
 /* after loss detection cancel any further manipulation of the window
  * until feedback is received for the next transmitted packet.
  */
@@ -562,7 +564,7 @@ pgm_on_ack (
 		{
 printf ("suspended window token increment\n");
 			sock->tokens += pgm_fp8mul (pgm_fp8 (new_acks), pgm_fp8 (1) + pgm_fp8div (pgm_fp8 (1), sock->cwnd_size));
-			return TRUE;
+			goto notify_tx;
 		}
 		sock->is_congested = FALSE;
 	}
@@ -617,6 +619,13 @@ printf ("tokens = %u, %u >= %u\n", pgm_fp8tou (sock->tokens), sock->tokens, pgm_
 		}
 	}
 
+/* token is now available so notify tx thread that transmission time is available */
+notify_tx:
+	if (is_congestion_limited &&
+	    sock->tokens >= pgm_fp8 (1))
+	{
+		pgm_notify_send (&sock->ack_notify);
+	}
 	return TRUE;
 }
 
@@ -1089,7 +1098,7 @@ retry_send:
 		pgm_info ("Token limit reached");
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
-		return PGM_IO_STATUS_TIMER_PENDING;	/* peer expiration to re-elect ACKer */
+		return PGM_IO_STATUS_CONGESTION;	/* peer expiration to re-elect ACKer */
 	}
 
 	sent = pgm_sendto (sock,
@@ -1102,7 +1111,12 @@ retry_send:
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
-		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+		if (EAGAIN == errno) {
+			if (sock->use_pgmcc)
+				pgm_notify_clear (&sock->ack_notify);
+			return PGM_IO_STATUS_WOULD_BLOCK;
+		}
+		return PGM_IO_STATUS_RATE_LIMITED;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1234,7 +1248,7 @@ retry_send:
 		pgm_info ("Token limit reached");
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
-		return PGM_IO_STATUS_TIMER_PENDING;
+		return PGM_IO_STATUS_CONGESTION;
 	}
 
 	sent = pgm_sendto (sock,
@@ -1247,7 +1261,12 @@ retry_send:
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
-		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+		if (EAGAIN == errno) {
+			if (sock->use_pgmcc)
+				pgm_notify_clear (&sock->ack_notify);
+			return PGM_IO_STATUS_WOULD_BLOCK;
+		}
+		return PGM_IO_STATUS_RATE_LIMITED;
 	}
 
 	if (sock->use_pgmcc) {
@@ -1391,7 +1410,12 @@ retry_send:
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
-		return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+		if (EAGAIN == errno) {
+			if (sock->use_pgmcc)
+				pgm_notify_clear (&sock->ack_notify);
+			return PGM_IO_STATUS_WOULD_BLOCK;
+		}
+		return PGM_IO_STATUS_RATE_LIMITED;
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1587,7 +1611,12 @@ blocked:
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+	if (EAGAIN == errno) {
+		if (sock->use_pgmcc)
+			pgm_notify_clear (&sock->ack_notify);
+		return PGM_IO_STATUS_WOULD_BLOCK;
+	}
+	return PGM_IO_STATUS_RATE_LIMITED;
 }
 
 /* Send one APDU, whether it fits within one TPDU or more.
@@ -1978,7 +2007,12 @@ blocked:
 	}
 	pgm_mutex_unlock (&sock->source_mutex);
 	pgm_rwlock_reader_unlock (&sock->lock);
-	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+	if (EAGAIN == errno) {
+		if (sock->use_pgmcc)
+			pgm_notify_clear (&sock->ack_notify);
+		return PGM_IO_STATUS_WOULD_BLOCK;
+	}
+	return PGM_IO_STATUS_RATE_LIMITED;
 }
 
 /* send PGM original data, transmit window owned scatter/gather IO vector.
@@ -2214,7 +2248,12 @@ blocked:
 	}
 	pgm_mutex_unlock (&sock->source_mutex);
 	pgm_rwlock_reader_unlock (&sock->lock);
-	return EAGAIN == errno ? PGM_IO_STATUS_WOULD_BLOCK : PGM_IO_STATUS_RATE_LIMITED;
+	if (EAGAIN == errno) {
+		if (sock->use_pgmcc)
+			pgm_notify_clear (&sock->ack_notify);
+		return PGM_IO_STATUS_WOULD_BLOCK;
+	}
+	return PGM_IO_STATUS_RATE_LIMITED;
 }
 
 /* cleanup resuming send state helper 

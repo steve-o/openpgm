@@ -151,6 +151,9 @@ printf ("ACK timeout, reset cc now:%s ack-expiry:%" PRIu64 "\n", nows, sock->ack
 				sock->tokens = sock->cwnd_size = pgm_fp8 (1);
 				sock->ack_bitmap = 0xffffffff;
 				sock->ack_expiry = 0;
+
+/* notify blocking tx thread that transmission time is now available */
+				pgm_notify_send (&sock->ack_notify);
 			}
 			next_expiration = next_expiration > 0 ? MIN(next_expiration, sock->ack_expiry) : sock->ack_expiry;
 		}
