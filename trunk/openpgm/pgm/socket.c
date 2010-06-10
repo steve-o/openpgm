@@ -171,7 +171,13 @@ pgm_close (
 		pgm_free_skb (sock->rx_buffer);
 		sock->rx_buffer = NULL;
 	}
-	pgm_debug ("destroying notification channel.");
+	pgm_debug ("destroying notification channels.");
+	if (sock->can_send_data) {
+		if (sock->use_pgmcc) {
+			pgm_notify_destroy (&sock->ack_notify);
+		}
+		pgm_notify_destroy (&sock->rdata_notify);
+	}
 	pgm_notify_destroy (&sock->pending_notify);
 	pgm_debug ("freeing sock locks.");
 	pgm_rwlock_free (&sock->peers_lock);
@@ -402,6 +408,19 @@ pgm_getsockopt (
 		*(int*)optval = pgm_notify_get_fd (&sock->pending_notify);
 		status = TRUE;
 		break;
+
+/* ACK or congestion socket */
+	case PGM_ACK_SOCK:
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		if (PGM_UNLIKELY(!sock->use_pgmcc))
+			break;
+		*(int*)optval = pgm_notify_get_fd (&sock->ack_notify);
+		status = TRUE;
+		break;
+
 
 /* timeout for pending timer */
 	case PGM_TIME_REMAIN:
@@ -773,7 +792,7 @@ pgm_setsockopt (
 				break;
 			if (PGM_UNLIKELY(fecinfo->group_size < 2 || fecinfo->group_size > 128))
 				break;
-			if (PGM_UNLIKELY((fecinfo->group_size + 1) < fecinfo->block_size))
+			if (PGM_UNLIKELY(fecinfo->group_size > fecinfo->block_size))
 				break;
 			const uint8_t parity_packets = fecinfo->block_size - fecinfo->group_size;
 /* technically could re-send previous packets */
@@ -1313,6 +1332,18 @@ pgm_bind3 (
 /* Windows notify call will raise an assertion on error, only Unix versions will return
  * a valid error.
  */
+		if (sock->use_pgmcc &&
+		    0 != pgm_notify_init (&sock->ack_notify))
+		{
+			const int save_errno = errno;
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_SOCKET,
+				       pgm_error_from_errno (save_errno),
+				       _("Creating ACK notification channel: %s"),
+				       strerror (save_errno));
+			pgm_rwlock_writer_unlock (&sock->lock);
+			return FALSE;
+		}
 		if (0 != pgm_notify_init (&sock->rdata_notify))
 		{
 			const int save_errno = errno;
@@ -1778,6 +1809,8 @@ pgm_select_info (
 		return -1;
 	}
 
+	const bool is_congested = (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) ? TRUE : FALSE;
+
 	if (readfds)
 	{
 		FD_SET(sock->recv_sock, readfds);
@@ -1786,13 +1819,18 @@ pgm_select_info (
 			const int rdata_fd = pgm_notify_get_fd (&sock->rdata_notify);
 			FD_SET(rdata_fd, readfds);
 			fds = MAX(fds, rdata_fd + 1);
+			if (is_congested) {
+				const int ack_fd = pgm_notify_get_fd (&sock->ack_notify);
+				FD_SET(ack_fd, readfds);
+				fds = MAX(fds, ack_fd + 1);
+			}
 		}
 		const int pending_fd = pgm_notify_get_fd (&sock->pending_notify);
 		FD_SET(pending_fd, readfds);
 		fds = MAX(fds, pending_fd + 1);
 	}
 
-	if (sock->can_send_data && writefds)
+	if (sock->can_send_data && writefds && !is_congested)
 	{
 		FD_SET(sock->send_sock, writefds);
 		fds = MAX(sock->send_sock + 1, fds);
@@ -1850,8 +1888,15 @@ pgm_poll_info (
 	if (sock->can_send_data && events & POLLOUT)
 	{
 		pgm_assert ( (1 + moo) <= *n_fds );
-		fds[moo].fd = sock->send_sock;
-		fds[moo].events = POLLOUT;
+		if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) {
+/* rx thread poll for ACK */
+			fds[moo].fd = pgm_notify_get_fd (&sock->ack_notify);
+			fds[moo].events = POLLIN;
+		} else {
+/* kernel resource poll */
+			fds[moo].fd = sock->send_sock;
+			fds[moo].events = POLLOUT;
+		}
 		moo++;
 	}
 
@@ -1910,9 +1955,17 @@ pgm_epoll_ctl (
 
 	if (sock->can_send_data && events & EPOLLOUT)
 	{
-		event.events = events & (EPOLLOUT | EPOLLET | EPOLLONESHOT);
-		event.data.ptr = sock;
-		retval = epoll_ctl (epfd, op, sock->send_sock, &event);
+		if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) {
+/* rx thread poll for ACK */
+			event.events = events & (EPOLLIN | EPOLLONESHOT);
+			event.data.ptr = sock;
+			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&sock->ack_notify), &event);
+		} else {
+/* kernel resource poll */
+			event.events = events & (EPOLLOUT | EPOLLET | EPOLLONESHOT);
+			event.data.ptr = sock;
+			retval = epoll_ctl (epfd, op, sock->send_sock, &event);
+		}
 	}
 out:
 	return retval;

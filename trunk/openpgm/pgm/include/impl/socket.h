@@ -110,6 +110,7 @@ struct pgm_sock_t {
 	struct sockaddr_storage		acker_nla;
 	uint64_t			acker_loss;
 
+	pgm_notify_t			ack_notify;
 	pgm_notify_t			rdata_notify;
 
 	pgm_hash_t			last_hash_key;

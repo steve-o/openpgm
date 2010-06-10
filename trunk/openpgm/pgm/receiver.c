@@ -240,7 +240,6 @@ _pgm_add_ack (
 {
 	peer->ack_rb_expiry = ack_rb_expiry;
 	pgm_queue_push_head_link (&peer->window->ack_backoff_queue, &peer->ack_link);
-printf ("post add:ack_backoff_queue length %u\n", peer->window->ack_backoff_queue.length);
 }
 
 /* remove outstanding ACK
@@ -255,7 +254,6 @@ _pgm_remove_ack (
 	pgm_assert (!pgm_queue_is_empty (&peer->window->ack_backoff_queue));
 	pgm_queue_unlink (&peer->window->ack_backoff_queue, &peer->ack_link);
 	peer->ack_rb_expiry = 0;
-printf ("post remove:ack_backoff_queue length %u\n", peer->window->ack_backoff_queue.length);
 }
 
 /* increase reference count for peer object
@@ -1290,7 +1288,6 @@ send_ack (
 	opt_pgmcc_feedback->opt_reserved = 0;
 
 	const uint32_t t = source->ack_last_tstamp + pgm_to_msecs( now - source->last_data_tstamp );
-printf ("t %" PRIu32 "us diff %" PRIu32 "ms\n", t, (uint32_t)pgm_to_msecs(now - source->last_data_tstamp));
 	opt_pgmcc_feedback->opt_tstamp = htonl (t);
 	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
 	opt_pgmcc_feedback->opt_loss_rate = htonl (source->window->data_loss);
@@ -1672,7 +1669,6 @@ pgm_check_peer_state (
 			}
 		}
 
-printf ("ack_backoff_queue length %u\n", window->ack_backoff_queue.length);
 		if (window->ack_backoff_queue.tail)
 		{
 			if (pgm_time_after_eq (now, next_ack_rb_expiry (window)))
