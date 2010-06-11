@@ -725,6 +725,7 @@ again:
 		}
 /* congestion control */
 		case PGM_IO_STATUS_CONGESTION:
+g_message ("congestion");
 /* kernel feedback */
 		case PGM_IO_STATUS_WOULD_BLOCK:
 		{
