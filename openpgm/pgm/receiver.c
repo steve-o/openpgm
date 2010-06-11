@@ -1324,7 +1324,7 @@ ack_rb_state (
 /* pre-conditions */
 	pgm_assert (NULL != peer);
 
-	pgm_info ("ack_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
+	pgm_debug ("ack_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
 		(const void*)peer, now);
 
 	pgm_rxw_t* window = peer->window;
@@ -1350,12 +1350,11 @@ ack_rb_state (
 /* check for ACK backoff expiration */
 		if (pgm_time_after_eq(now, peer->ack_rb_expiry))
 		{
-pgm_warn ("now");
 /* unreliable delivery */
 			_pgm_remove_ack (peer);
 
 			if (PGM_UNLIKELY(!is_valid_nla)) {
-pgm_warn ("invalid nla");
+				pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Unable to send ACK due to unknown NLA."));
 				list = next_list_el;
 				continue;
 			}
@@ -1364,11 +1363,9 @@ pgm_warn ("invalid nla");
 
 			if (!send_ack (sock, peer, now))
 				return FALSE;
-pgm_warn ("sent");
 		}
 		else
 		{	/* packet expires some time later */
-pgm_warn ("later");
 			break;
 		}
 
@@ -2116,10 +2113,9 @@ discarded:
 		source->last_data_tstamp = skb->tstamp;
 		if (_pgm_is_acker (source, skb))
 		{
-printf ("i am acker\n");
 			if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified (&source->nla)))
 			{
-printf ("but i don't know source nla\n");
+				pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Unable to send ACK due to unknown NLA."));
 			}
 			else if (PGM_UNLIKELY(!send_ack (sock, source, skb->tstamp)))
 			{
@@ -2129,18 +2125,18 @@ printf ("but i don't know source nla\n");
 		}
 		else if (_pgm_is_acker_election (skb))
 		{
-printf ("acker election\n");
+			pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("ACKer election."));
 			_pgm_add_ack (source, ack_rb_expiry);
 		}
 		else if (0 != source->window->ack_backoff_queue.length)
 		{
-printf ("i am not acker => purge backoff queue\n");
+/* purge ACK backoff queue as host is not elected ACKer */
 			_pgm_remove_ack (source);
 			ack_rb_expiry = 0;
 		}
 		else
 		{
-printf ("not acker election, not acker, no outstanding acks\n");
+/* no election, not the elected ACKer, no outstanding ACKs */
 			ack_rb_expiry = 0;
 		}
 	}

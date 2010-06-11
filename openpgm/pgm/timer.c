@@ -147,7 +147,7 @@ char nows[1024];
 time_t t = time (NULL);
 struct tm* tmp = localtime (&t);
 strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
-printf ("ACK timeout, reset cc now:%s ack-expiry:%" PRIu64 "\n", nows, sock->ack_expiry);
+printf ("ACK timeout, T:%u W:%u\n", pgm_fp8tou(sock->tokens), pgm_fp8tou(sock->cwnd_size));
 				sock->tokens = sock->cwnd_size = pgm_fp8 (1);
 				sock->ack_bitmap = 0xffffffff;
 				sock->ack_expiry = 0;
