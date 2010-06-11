@@ -628,6 +628,15 @@ sender_thread (
 		g_main_loop_quit (g_loop);
 		return NULL;
 	}
+/* Add write event to epoll domain in order to re-enable as required by return
+ * value.  We use one-shot flag to disable ASAP, as we don't want such events
+ * until triggered.
+ */
+	if (pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_ADD, EPOLLOUT | EPOLLONESHOT) < 0) {
+		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+		g_main_loop_quit (g_loop);
+		return NULL;
+	}
 	struct epoll_event event;
 	memset (&event, 0, sizeof(event));
 	event.events = EPOLLIN;
@@ -718,6 +727,7 @@ again:
 		case PGM_IO_STATUS_WOULD_BLOCK:
 		{
 #ifdef CONFIG_HAVE_EPOLL
+/* re-enable write event for one-shot */
 			if (pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_MOD, EPOLLOUT | EPOLLONESHOT) < 0)
 			{
 				g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));

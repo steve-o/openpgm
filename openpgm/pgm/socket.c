@@ -1955,12 +1955,30 @@ pgm_epoll_ctl (
 
 	if (sock->can_send_data && events & EPOLLOUT)
 	{
-		if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) {
+		bool enable_ack_socket = FALSE;
+		bool enable_send_socket = FALSE;
+
+/* both sockets need to be added when PGMCC is enabled */
+		if (sock->use_pgmcc && EPOLL_CTL_ADD == op) {
+			enable_ack_socket = enable_send_socket = TRUE;
+		} else {
+/* automagically switch socket when congestion stall occurs */
+			if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1))
+				enable_ack_socket = TRUE;
+			else
+				enable_send_socket = TRUE;
+		}
+
+		if (enable_ack_socket)
+		{
 /* rx thread poll for ACK */
 			event.events = events & (EPOLLIN | EPOLLONESHOT);
 			event.data.ptr = sock;
 			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&sock->ack_notify), &event);
-		} else {
+		}
+
+		if (enable_send_socket)
+		{
 /* kernel resource poll */
 			event.events = events & (EPOLLOUT | EPOLLET | EPOLLONESHOT);
 			event.data.ptr = sock;
