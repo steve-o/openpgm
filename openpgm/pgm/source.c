@@ -241,13 +241,13 @@ on_opt_pgmcc_feedback (
 /* ACKer elections */
 	if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified ((const struct sockaddr*)&sock->acker_nla)))
 	{
-		pgm_info ("Elected first ACKer");
+		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Elected first ACKer"));
 		memcpy (&sock->acker_nla, &peer_nla, pgm_sockaddr_storage_len (&peer_nla));
 	}
 	else if (peer_loss > sock->acker_loss &&
 		 0 != pgm_sockaddr_cmp ((const struct sockaddr*)&peer_nla, (const struct sockaddr*)&sock->acker_nla))
 	{
-		pgm_info ("Elected new ACKer");
+		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Elected new ACKer"));
 		memcpy (&sock->acker_nla, &peer_nla, pgm_sockaddr_storage_len (&peer_nla));
 	}
 
@@ -490,7 +490,7 @@ pgm_on_ack (
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != skb);
 
-	pgm_info ("pgm_on_ack (sock:%p skb:%p)",
+	pgm_debug ("pgm_on_ack (sock:%p skb:%p)",
 		(const void*)sock, (const void*)skb);
 
 	sock->cumulative_stats[PGM_PC_SOURCE_ACK_PACKETS_RECEIVED]++;
@@ -562,7 +562,8 @@ pgm_on_ack (
 	{
 		if (pgm_uint32_lte (ack_rx_max, sock->suspended_sqn))
 		{
-printf ("suspended window token increment\n");
+			pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC window token manipulation suspended due to congestion (T:%u W:%u)"),
+				   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
 			sock->tokens += pgm_fp8mul (pgm_fp8 (new_acks), pgm_fp8 (1) + pgm_fp8div (pgm_fp8 (1), sock->cwnd_size));
 			goto notify_tx;
 		}
@@ -571,8 +572,6 @@ printf ("suspended window token increment\n");
 
 /* count outstanding lost sequences */
 	const unsigned total_lost = _pgm_popcount (~sock->ack_bitmap);
-
-printf ("new-acks %d total-lost %d (%" PRIu32 ")\n", new_acks, total_lost, delta);
 
 /* no detected data loss at ACKer, increase congestion window size */
 	if (0 == total_lost)
@@ -594,7 +593,8 @@ printf ("new-acks %d total-lost %d (%" PRIu32 ")\n", new_acks, total_lost, delta
 /* linear window increase */
 		sock->tokens    += pgm_fp8mul (n, pgm_fp8 (1) + iw);
 		sock->cwnd_size += pgm_fp8mul (n, iw);
-printf ("%u tokens++, W %u\n", pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
+		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC++ (T:%u W:%u)"),
+			   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
 	}
 	else
 	{
@@ -605,7 +605,6 @@ printf ("%u tokens++, W %u\n", pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd
 		sock->acks_after_loss += new_acks;
 		if (sock->acks_after_loss >= 3)
 		{
-printf ("congestion, half window size\n");
 			sock->acks_after_loss = 0;
 			sock->suspended_sqn = ack_rx_max;
 			sock->is_congested = TRUE;
@@ -614,8 +613,9 @@ printf ("congestion, half window size\n");
 				sock->tokens = pgm_fp8 (1);
 			else
 				sock->tokens -= sock->cwnd_size;
-printf ("tokens = %u, %u >= %u\n", pgm_fp8tou (sock->tokens), sock->tokens, pgm_fp8 (1));
 			sock->ack_bitmap = 0xffffffff;
+			pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC congestion, half window size (T:%u W:%u)"),
+				   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
 		}
 	}
 
@@ -1095,7 +1095,7 @@ retry_send:
 	if (sock->use_pgmcc &&
 	    sock->tokens < pgm_fp8 (1))
 	{
-		pgm_info ("Token limit reached");
+		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
 		return PGM_IO_STATUS_CONGESTION;	/* peer expiration to re-elect ACKer */
@@ -1245,7 +1245,7 @@ retry_send:
 	if (sock->use_pgmcc && 
 	    sock->tokens < pgm_fp8 (1))
 	{
-		pgm_info ("Token limit reached");
+		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
 		return PGM_IO_STATUS_CONGESTION;
@@ -1271,13 +1271,9 @@ retry_send:
 
 	if (sock->use_pgmcc) {
 		sock->tokens -= pgm_fp8 (1);
-printf ("%u tokens--\n", pgm_fp8tou (sock->tokens));
+		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC tokens-- (T:%u W:%u)"),
+		 	   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
 		sock->ack_expiry = STATE(skb)->tstamp + sock->ack_expiry_ivl;
-char nows[1024];
-time_t t = time (NULL);
-struct tm* tmp = localtime (&t);
-strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
-printf ("now:%s, ack-expiry set at %" PRIu64 "\n", nows, sock->ack_expiry);
 	}
 
 /* save unfolded odata for retransmissions */
