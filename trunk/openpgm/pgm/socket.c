@@ -1972,7 +1972,7 @@ pgm_epoll_ctl (
 		if (enable_ack_socket)
 		{
 /* rx thread poll for ACK */
-			event.events = events & (EPOLLIN | EPOLLONESHOT);
+			event.events = EPOLLIN | (events & (EPOLLONESHOT));
 			event.data.ptr = sock;
 			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&sock->ack_notify), &event);
 		}
