@@ -93,6 +93,7 @@ static int		g_max_rte = 16*1000*1000;
 static int		g_sqns = 200;
 
 static gboolean		g_use_pgmcc = FALSE;
+static sa_family_t	g_pgmcc_family = 0;	/* 0 = disabled */
 
 static gboolean		g_use_fec = FALSE;
 static int		g_rs_k = 8;
@@ -399,7 +400,7 @@ on_startup (
 		goto err_abort;
 	}
 
-	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
+	g_pgmcc_family = sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
 
 	if (g_udp_encap_port) {
 		g_message ("create PGM/UDP socket.");
@@ -672,7 +673,7 @@ sender_thread (
 		ping.set_latency (latency);
 		ping.set_payload (payload, sizeof(payload));
 
-		const size_t header_size = pgm_pkt_offset (FALSE, FALSE);
+		const size_t header_size = pgm_pkt_offset (FALSE, g_pgmcc_family);
 		const size_t apdu_size = ping.ByteSize();
 		struct pgm_sk_buff_t* skb = pgm_alloc_skb (g_max_tpdu);
 		pgm_skb_reserve (skb, header_size);
@@ -692,6 +693,7 @@ sender_thread (
 		last += g_odata_interval;
 		ping.set_time (now);
 		ping.SerializeToArray (skb->data, skb->len);
+g_message ("data-head:%u skb::len %u", (unsigned)((char*)skb->data - (char*)skb->head), (unsigned)skb->len);
 
 		struct timeval tv;
 		int timeout;
@@ -748,6 +750,8 @@ again:
 		}
 /* successful delivery */
 		case PGM_IO_STATUS_NORMAL:
+//			g_message ("sent payload: %s", ping.DebugString().c_str());
+			g_message ("sent %u bytes", (unsigned)bytes_written);
 			break;
 		default:
 			g_warning ("pgm_send_skbv failed");
@@ -829,6 +833,7 @@ receiver_thread (
 
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
+			g_message ("recv %u bytes", (unsigned)len);
 			on_msgv (msgv, len);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
@@ -927,10 +932,11 @@ again:
 			goto next_msg;
 		}
 
+g_message ("data-head:%u skb::len %u", (unsigned)((char*)pskb->data - (char*)pskb->head), (unsigned)pskb->len);
 /* only parse first fragment of each apdu */
 		if (!ping.ParseFromArray (pskb->data, pskb->len))
 			goto next_msg;
-//		g_message ("payload: %s", ping.DebugString().c_str());
+		g_message ("payload: %s", ping.DebugString().c_str());
 
 		{
 			const pgm_time_t send_time	= ping.time();
