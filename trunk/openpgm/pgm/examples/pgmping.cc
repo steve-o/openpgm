@@ -433,8 +433,8 @@ on_startup (
 	    PGMPING_MODE_INITIATOR == g_mode ||
 	    PGMPING_MODE_REFLECTOR == g_mode)
 	{
-		const int send_only = PGMPING_MODE_SOURCE == g_mode ? 1 : 0,
-			  ambient_spm = pgm_secs (30),
+		const int send_only	  = PGMPING_MODE_SOURCE == g_mode ? 1 : 0,
+			  ambient_spm	  = pgm_secs (30),
 			  heartbeat_spm[] = { pgm_msecs (100),
 					      pgm_msecs (100),
 					      pgm_msecs (100),
@@ -456,15 +456,15 @@ on_startup (
 	    PGMPING_MODE_INITIATOR == g_mode ||
 	    PGMPING_MODE_REFLECTOR == g_mode)
 	{
-		const int recv_only = PGMPING_MODE_RECEIVER == g_mode ? 1 : 0,
-			  passive = 0,
-			  peer_expiry = pgm_secs (300),
-			  spmr_expiry = pgm_msecs (250),
-			  nak_bo_ivl = pgm_msecs (50),
-			  nak_rpt_ivl = pgm_secs (2),
-			  nak_rdata_ivl = pgm_secs (2),
+		const int recv_only	   = PGMPING_MODE_RECEIVER == g_mode ? 1 : 0,
+			  passive	   = 0,
+			  peer_expiry	   = pgm_secs (300),
+			  spmr_expiry	   = pgm_msecs (250),
+			  nak_bo_ivl	   = pgm_msecs (50),
+			  nak_rpt_ivl	   = pgm_msecs (200), //pgm_secs (2),
+			  nak_rdata_ivl    = pgm_msecs (200), //pgm_secs (2),
 			  nak_data_retries = 50,
-			  nak_ncf_retries = 50;
+			  nak_ncf_retries  = 50;
 
 		pgm_setsockopt (g_sock, PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
 		pgm_setsockopt (g_sock, PGM_PASSIVE, &passive, sizeof(passive));
@@ -537,10 +537,10 @@ on_startup (
 
 /* set IP parameters */
 	{
-		const int nonblocking = 1,
+		const int nonblocking	 = 1,
 			  multicast_loop = 0,
 			  multicast_hops = 16,
-			  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
+			  dscp		 = 0x2e << 2;	/* Expedited Forwarding PHB for network elements, no ECN. */
 
 		pgm_setsockopt (g_sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
 		pgm_setsockopt (g_sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
