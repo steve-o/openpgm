@@ -564,7 +564,8 @@ pgm_on_ack (
 		{
 			pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC window token manipulation suspended due to congestion (T:%u W:%u)"),
 				   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
-			sock->tokens += pgm_fp8mul (pgm_fp8 (new_acks), pgm_fp8 (1) + pgm_fp8div (pgm_fp8 (1), sock->cwnd_size));
+			const uint_fast32_t token_inc = pgm_fp8mul (pgm_fp8 (new_acks), pgm_fp8 (1) + pgm_fp8div (pgm_fp8 (1), sock->cwnd_size));
+			sock->tokens = MIN( sock->tokens + token_inc, sock->cwnd_size );
 			goto notify_tx;
 		}
 		sock->is_congested = FALSE;
@@ -579,28 +580,32 @@ pgm_on_ack (
 		new_acks += sock->acks_after_loss;
 		sock->acks_after_loss = 0;
 		uint_fast32_t n = pgm_fp8 (new_acks);
+		uint_fast32_t token_inc = 0;
 
 /* slow-start phase, exponential increase to SSTHRESH */
 		if (sock->cwnd_size < sock->ssthresh) {
 			const uint_fast32_t d = MIN( n, sock->ssthresh - sock->cwnd_size );
 			n -= d;
-			sock->tokens    += d + d;
+			token_inc	 = d + d;
 			sock->cwnd_size += d;
 		}
 
 		const uint_fast32_t iw = pgm_fp8div (pgm_fp8 (1), sock->cwnd_size);
 
 /* linear window increase */
-		sock->tokens    += pgm_fp8mul (n, pgm_fp8 (1) + iw);
+		token_inc	+= pgm_fp8mul (n, pgm_fp8 (1) + iw);
 		sock->cwnd_size += pgm_fp8mul (n, iw);
-		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC++ (T:%u W:%u)"),
-			   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
+		sock->tokens	 = MIN( sock->tokens + token_inc, sock->cwnd_size );
+//		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC++ (T:%u W:%u)"),
+//			   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
 	}
 	else
 	{
-/* look for an unacknowledged data packet which is followed by at least three
+/* Look for an unacknowledged data packet which is followed by at least three
  * acknowledged data packets, then the packet is assumed to be lost and PGMCC
- * reacts by halving the window
+ * reacts by halving the window.
+ *
+ * Common value will be 0xfffffff7.
  */
 		sock->acks_after_loss += new_acks;
 		if (sock->acks_after_loss >= 3)
@@ -609,8 +614,8 @@ pgm_on_ack (
 			sock->suspended_sqn = ack_rx_max;
 			sock->is_congested = TRUE;
 			sock->cwnd_size = pgm_fp8div (sock->cwnd_size, pgm_fp8 (2));
-			if ((sock->cwnd_size + pgm_fp8 (1)) > sock->tokens)
-				sock->tokens = pgm_fp8 (1);
+			if (sock->cwnd_size > sock->tokens)
+				sock->tokens = 0;
 			else
 				sock->tokens -= sock->cwnd_size;
 			sock->ack_bitmap = 0xffffffff;
@@ -1095,7 +1100,7 @@ retry_send:
 	if (sock->use_pgmcc &&
 	    sock->tokens < pgm_fp8 (1))
 	{
-		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
+//		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
 		return PGM_IO_STATUS_CONGESTION;	/* peer expiration to re-elect ACKer */
@@ -1245,7 +1250,7 @@ retry_send:
 	if (sock->use_pgmcc && 
 	    sock->tokens < pgm_fp8 (1))
 	{
-		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
+//		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
 		sock->is_apdu_eagain = TRUE;
 		sock->blocklen = tpdu_length;
 		return PGM_IO_STATUS_CONGESTION;
@@ -2288,6 +2293,15 @@ send_rdata (
 	uint32_t unfolded_odata		= pgm_txw_get_unfolded_checksum (skb);
 	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
+/* congestion control */
+	if (sock->use_pgmcc &&
+	    sock->tokens < pgm_fp8 (1))
+	{
+//		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
+		sock->blocklen = tpdu_length;
+		return FALSE;
+	}
+
 	const ssize_t sent = pgm_sendto (sock,
 					 sock->is_controlled_rdata,	/* rate limited */
 					 TRUE,				/* with router alert */
@@ -2295,19 +2309,24 @@ send_rdata (
 					 tpdu_length,
 					 (struct sockaddr*)&sock->send_gsr.gsr_group,
 					 pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-/* re-save unfolded payload for further retransmissions */
-	pgm_txw_set_unfolded_checksum (skb, unfolded_odata);
 
 	if (sent < 0 && EAGAIN == errno) {
 		sock->blocklen = tpdu_length;
 		return FALSE;
 	}
 
+	const pgm_time_t now = pgm_time_update_now();
+
+	if (sock->use_pgmcc) {
+		sock->tokens -= pgm_fp8 (1);
+		sock->ack_expiry = now + sock->ack_expiry_ivl;
+	}
+
 /* re-set spm timer: we are already in the timer thread, no need to prod timers
  */
 	pgm_mutex_lock (&sock->timer_mutex);
 	sock->spm_heartbeat_state = 1;
-	sock->next_heartbeat_spm = pgm_time_update_now() + sock->spm_heartbeat_interval[sock->spm_heartbeat_state++];
+	sock->next_heartbeat_spm = now + sock->spm_heartbeat_interval[sock->spm_heartbeat_state++];
 	pgm_mutex_unlock (&sock->timer_mutex);
 
 	pgm_txw_inc_retransmit_count (skb);
