@@ -8,16 +8,16 @@ _Function_
 
 bool *pgm_getsockopt* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const restrict sock,
-	const int                optname,
-	void`*` restrict           optval,
-	socklen_t`*` restrict      optlen
+	const int                  optname,
+	void`*`             restrict optval,
+	socklen_t`*`        restrict optlen
 	);
 
 bool *pgm_setsockopt* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const restrict sock,
-	const int                optname,
-	const void`*` restrict     optval,
-	socklen_t                optlen
+	const int                  optname,
+	const void`*`       restrict optval,
+	socklen_t                  optlen
 	);
 </pre>
 

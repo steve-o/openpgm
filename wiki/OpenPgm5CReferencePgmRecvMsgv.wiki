@@ -7,12 +7,12 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_recvmsgv* (
-	[OpenPgm3CReferencePgmSockT pgm_sock_t]`*`      sock,
-	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*` const     msgv,
-	size_t                 count,
-	int                   flags,
-	size_t`*`                bytes_read,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`              error
+	[OpenPgm3CReferencePgmSockT pgm_sock_t]`*`       sock,
+	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*` const msgv,
+	size_t            count,
+	int               flags,
+	size_t`*`           bytes_read,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`     error
 );
 </pre>
 

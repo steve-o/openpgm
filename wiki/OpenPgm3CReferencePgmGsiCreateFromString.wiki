@@ -8,8 +8,8 @@ _Function_
 
 bool *pgm_gsi_create_from_string* (
 	[OpenPgm3CReferencePgmGsiT pgm_gsi_t]`*`    gsi,
-	const char`*`  str,
-	ssize_t        length,
+	const char`*`   str,
+	ssize_t       length,
 	);
 </pre>
 

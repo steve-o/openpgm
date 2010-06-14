@@ -7,12 +7,12 @@ _Type_
 #include <pgm/pgm.h>
 
 struct pgm_addrinfo_t {
-        sa_family_t                  ai_family;
-	uint32_t                     ai_recv_addrs_len;
-	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*` restrict     ai_recv_addrs;
-	uint32_t                     ai_send_addrs_len;
-	struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*` restrict     ai_send_addrs;
-	};
+        sa_family_t                           ai_family;
+        uint32_t                              ai_recv_addrs_len;
+        struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*` restrict     ai_recv_addrs;
+        uint32_t                              ai_send_addrs_len;
+        struct [http://www.ietf.org/rfc/rfc3678.txt group_source_req]`*` restrict     ai_send_addrs;
+        };
 </pre>
 
 === Purpose ===

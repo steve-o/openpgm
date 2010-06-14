@@ -8,29 +8,29 @@ _Function_
 
 int *pgm_recv* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
-	void`*`            buf,
-	size_t               len,
-	int                 flags,
-	size_t`*`              bytes_read,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`            error
+	void`*`          buf,
+	size_t         len,
+	int            flags,
+	size_t`*`        bytes_read,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`  error
 );
 
 int *pgm_recvfrom* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
-	void`*``*`            buf,
-	size_t               len,
-	int                 flags,
-	size_t`*`              bytes_read,
-	struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*`          from,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`            error
+	void`*``*`         buf,
+	size_t         len,
+	int            flags,
+	size_t`*`        bytes_read,
+	struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` from,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`  error
 );
 
 int *pgm_recvmsg* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
-	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*`         msgv,
-	int                 flags,
-	size_t`*`              bytes_read,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`            error
+	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*`    msgv,
+	int            flags,
+	size_t`*`        bytes_read,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`  error
 );
 </pre>
 

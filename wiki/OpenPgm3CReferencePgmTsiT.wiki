@@ -14,7 +14,7 @@ typedef struct pgm_tsi_t *pgm_tsi_t*;
 
 struct pgm_tsi_t {
 	[OpenPgm3CReferencePgmGsiT pgm_gsi_t]     gsi;
-	uint16_t       sport;
+	uint16_t      sport;
 	};
 </pre>
 

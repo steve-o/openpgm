@@ -9,9 +9,9 @@ _Function_
 
 int *pgm_epoll_ctl* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
-	int                       epfd,
-	int                       op,
-	int                       events
+	int                  epfd,
+	int                  op,
+	int                  events
 	);
 </pre>
 

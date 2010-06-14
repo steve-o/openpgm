@@ -7,9 +7,9 @@ _Function_
 #include <pgm/pgm.h>
 
 bool *pgm_getsockname* (
-	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const restrict sock,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`      const restrict sock,
 	strict [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` restrict addr,
-	socklen_t`*` restrict      addrlen
+	socklen_t`*`             restrict addrlen
 	);
 </pre>
 

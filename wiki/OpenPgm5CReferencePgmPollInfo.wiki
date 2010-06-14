@@ -9,9 +9,9 @@ _Function_
 
 int *pgm_poll_info* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
-	struct pollfd`*`            fds,
-	int`*`                      nfds,
-	int                       events
+	struct pollfd`*`       fds,
+	int`*`                 nfds,
+	int                  events
 	);
 </pre>
 

@@ -7,7 +7,7 @@ _Function_
 #include <pgm/pgm.h>
 
 bool *pgm_gsi_create_from_hostname* (
-	[OpenPgm3CReferencePgmGsiT pgm_gsi_t]`*`    gsi,
+	[OpenPgm3CReferencePgmGsiT pgm_gsi_t]`*`        gsi,
 	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`     error
 	);
 </pre>

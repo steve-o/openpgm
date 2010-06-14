@@ -1,14 +1,14 @@
-﻿#summary OpenPGM 3 : C Reference : PGM SKBs : struct pgm_sk_buff_t
+﻿#summary OpenPGM 5 : C Reference : PGM SKBs : struct pgm_sk_buff_t
 #labels Phase-Implementation
-#sidebar TOC3CReferencePgmSkbs
+#sidebar TOC5CReferencePgmSkbs
 _Type_
 === Declaration ===
 <pre>
 #include <pgm/pgm.h>
 
 struct pgm_sk_buff_t {
-        pgm_list_t                        link_;
-        [OpenPgm5CReferencePgmSockT pgm_sock_t]`*`             sock;
+         pgm_list_t                        link_;
+        [OpenPgm5CReferencePgmSockT pgm_sock_t]`*`                  sock;
         [OpenPgm3CReferencePgmTimeT pgm_time_t]                   tstamp;
         [OpenPgm3CReferencePgmTsiT pgm_tsi_t]                    tsi;
         uint32_t                     sequence;
@@ -18,9 +18,9 @@ struct pgm_sk_buff_t {
         unsigned                     zero_padded:1;
         struct pgm_header`*`           pgm_header;
         struct pgm_opt_fragment`*`     pgm_opt_fragment;
-#define of_apdu_first_sqn           pgm_opt_fragment->opt_sqn
-#define of_frag_offset              pgm_opt_fragment->opt_frag_off
-#define of_apdu_len                 pgm_opt_fragment->opt_frag_len
+#define of_apdu_first_sqn            pgm_opt_fragment->opt_sqn
+#define of_frag_offset               pgm_opt_fragment->opt_frag_off
+#define of_apdu_len                  pgm_opt_fragment->opt_frag_len
         struct pgm_opt_pgmcc_data`*`   pgm_opt_pgmcc_data;
         struct pgm_data`*`             pgm_data;
         void`*`                        head;           /`*` all may-alias `*`/

@@ -7,14 +7,14 @@ _Function_
 #include <pgm/pgm.h>
 
 bool *pgm_getaddrinfo* (
-	const char`*` restrict                        network,
-	const struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*` restrict     hints,
-	struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*``*` restrict     res,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict                  error
+	const char`*`                  restrict network,
+	const struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*` restrict hints,
+	struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*``*`      restrict res,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`                restrict error
 	);
 
 void *pgm_freeaddrinfo* (
-	struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*`           res
+	struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*`   res
 	);
 </pre>
 

@@ -7,11 +7,11 @@ _Function_
 #include <pgm/pgm.h>
 
 bool *pgm_socket* (
-	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*``*` restrict           sock,
-	const sa_family_t                       family,
-	const int                               sock_type,
-	const int                               protocol,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict         error
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*``*`  restrict sock,
+	const sa_family_t      family,
+	const int              sock_type,
+	const int              protocol,
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict error
 	);
 </pre>
 

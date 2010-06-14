@@ -7,11 +7,11 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_send_skbv* (
-	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const           sock,
-	const struct [OpenPgm3CReferencePgmSkBuffT pgm_sk_buff_t]`*``*`     vector,
-	unsigned                            count,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`            const sock,
+	const struct [OpenPgm3CReferencePgmSkBuffT pgm_sk_buff_t]`*``*` vector,
+	unsigned                     count,
 	bool                         is_one_apdu,
-	size_t`*`                           bytes_written
+	size_t`*`                      bytes_written
 	);
 </pre>
 

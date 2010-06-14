@@ -8,7 +8,7 @@ _Function_
 
 bool *pgm_connect* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`                  error
+	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`        error
 	);
 </pre>
 

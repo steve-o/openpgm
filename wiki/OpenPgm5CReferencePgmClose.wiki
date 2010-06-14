@@ -8,7 +8,7 @@ _Function_
 
 bool *pgm_close* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
-	bool                  flush
+	bool                 flush
 	);
 </pre>
 

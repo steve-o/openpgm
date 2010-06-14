@@ -8,9 +8,9 @@ _Function_
 
 int *pgm_select_info* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
-	fd_set`*`                   readfds,
-	fd_set`*`                   writefds,
-	int`*`                      nfds
+	fd_set`*`              readfds,
+	fd_set`*`              writefds,
+	int`*`                 nfds
 	);
 </pre>
 
