@@ -10,7 +10,7 @@
   # [OpenPgm5CReferenceProgrammersChecklist Programmer’s Checklist]
   # [OpenPgm5CReferenceMigration Migration from version 3.0]
   # [OpenPgm3CReferenceEnvironment Environment]
-  # [OpenPgm3CReferenceEvents Events]
+  # [OpenPgm5CReferenceEvents Events]
   # [OpenPgm3CReferencePgmSkbs PGM Socket Buffers (SKBs)]
   # [OpenPgm5CReferenceInterface Interface]
   # [OpenPgm3CReferenceTiming Timing]
