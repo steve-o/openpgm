@@ -53,7 +53,7 @@ PGM Sockets manage network connections and send outbound messages.
 </tr><tr>
 <td colspan="2"><h3>Socket API</h3></td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmIoStatus PGMIOStatus]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmIoStatus PGMIOStatus]</tt></td>
 <td>Return status for PGM IO functions.</td>
 </tr><tr>
 <td><tt>[OpenPgm3CReferencePgmIoVec pgm_iovec]</tt></td>
@@ -64,6 +64,9 @@ PGM Sockets manage network connections and send outbound messages.
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmFecInfoT pgm_fecinfo_t]</tt></td>
 <td>Settings for forward error correction (FEC).</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmPgmCcInfoT pgm_pgmccinfo_t]</tt></td>
+<td>Settings for PGM Congestion Control (PGMCC).</td>
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt></td>
 <td>A PGM socket object represents a delivery mechanism for messages.</td>
@@ -80,16 +83,16 @@ PGM Sockets manage network connections and send outbound messages.
 <td><tt>[OpenPgm5CReferencePgmRecv pgm_recvmsg()]</tt></td>
 <td>Receive a message from the PGM socket with scatter/gather vector buffers.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmRecvMsgv pgm_recvmsgv()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmRecvMsgv pgm_recvmsgv()]</tt></td>
 <td>Receive a message vector from the PGM socket with scatter/gather vector buffers.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSend pgm_send()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSend pgm_send()]</tt></td>
 <td>Send a message.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSendv pgm_sendv()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSendv pgm_sendv()]</tt></td>
 <td>Send a vector of messages.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSendSkbv pgm_send_skbv()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSendSkbv pgm_send_skbv()]</tt></td>
 <td>Zero-copy send a vector of PGM skbuffs.</td>
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt></td>

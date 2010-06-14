@@ -1,0 +1,28 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_pgmccinfo_t
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct pgm_pgmccinfo_t {
+        uint32_t       ack_bo_ivl;
+        uint32_t       ack_c;           /`*` constant C `*`/
+        uint32_t       ack_c_p;         /`*` constant C,,p,, `*`/
+        };
+</pre>
+
+=== Purpose ===
+Settings for PGM Congestion Control (PGMCC)
+
+=== Remarks ===
+The following parameters of PGMCC are fixed values:
+
+  * <tt>ssthresh</tt>, slow-start threshold to slowly probe the network to determine its available capacity.  Setting is currently 4 packets as per PGMCC draft recommendations.
+  * Packet loss is assumed after _3 duplicate ACKs_.
+
+
+=== See Also ===
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.<br>
+  * [http://en.wikipedia.org/wiki/Slow-start Slow-start] in Wikipedia.

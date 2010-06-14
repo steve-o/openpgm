@@ -7,12 +7,12 @@ _Type_
 #include <pgm/pgm.h>
 
 struct pgm_fecinfo_t {
-	uint8_t        block_size;
+        uint8_t        block_size;                /`*` RS(n) `*`/
         uint8_t        proactive_packets;
-        uint8_t        group_size;
+        uint8_t        group_size;                /`*` RS(k) `*`/
         bool           ondemand_parity_enabled;
         bool           var_pktlen_enabled;
-	};
+        };
 </pre>
 
 === Purpose ===
