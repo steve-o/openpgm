@@ -7,7 +7,7 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_recvmsgv* (
-	[OpenPgm3CReferencePgmSockT pgm_sock_t]`*`       sock,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`       sock,
 	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*` const msgv,
 	size_t            count,
 	int               flags,

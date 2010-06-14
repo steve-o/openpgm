@@ -7,7 +7,7 @@ _Type_
 #include <pgm/pgm.h>
 
 struct pgm_sockaddr_t {
-	uint16_t       sa_port;            /`*` data-destination port `*`/
+	uint16_t      sa_port;    /`*` data-destination port `*`/
 	[OpenPgm3CReferencePgmTsiT pgm_tsi_t]     sa_addr;
 	};
 </pre>

@@ -7,7 +7,7 @@ _Function_
 #include <pgm/pgm.h>
 
 int *pgm_send* (
-	[OpenPgm5CReferencePgmSocketT pgm_sock_t]`*` const sock,
+	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const sock,
 	const void`*`       buf,
 	size_t            len,
 	size_t`*`           bytes_written
