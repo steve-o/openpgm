@@ -59,9 +59,9 @@ pgm_transport_pkt_offset2 (
 
 
 #define PGM_COMPILATION
-#include "pgm/sockaddr.h"
-#include "pgm/indextoaddr.h"
-#include "pgm/ip.h"
+#include "impl/sockaddr.h"
+#include "impl/indextoaddr.h"
+#include "impl/ip.h"
 
 
 /* target:
