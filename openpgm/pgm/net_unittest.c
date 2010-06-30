@@ -2,7 +2,7 @@
  *
  * unit tests for network send wrapper.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -41,11 +41,11 @@
 
 
 static
-pgm_transport_t*
-generate_transport (void)
+pgm_sock_t*
+generate_sock (void)
 {
-	pgm_transport_t* transport = g_malloc0 (sizeof(pgm_transport_t));
-	return transport;
+	pgm_sock_t* sock = g_malloc0 (sizeof(pgm_sock_t));
+	return sock;
 }
 
 static
@@ -126,9 +126,9 @@ flags_string (
 /* mock functions for external references */
 
 size_t
-pgm_transport_pkt_offset2 (
+pgm_pkt_offset (
         const bool                      can_fragment,
-        const bool                      use_pgmcc
+        const sa_family_t		pgmcc_family	/* 0 = disable */
         )
 {
         return 0;
@@ -219,7 +219,7 @@ mock_fcntl (
 /* target:
  *	ssize_t
  *	pgm_sendto (
- *		pgm_transport_t*	transport,
+ *		pgm_sock_t*		sock,
  *		bool			use_rate_limit,
  *		bool			use_router_alert,
  *		const void*		buf,
@@ -231,13 +231,13 @@ mock_fcntl (
 
 START_TEST (test_sendto_pass_001)
 {
-	pgm_transport_t* transport = generate_transport ();
+	pgm_sock_t* sock = generate_sock ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail_unless (sizeof(buf) == len, "sendto underrun");
 }
 END_TEST
@@ -256,52 +256,52 @@ END_TEST
 
 START_TEST (test_sendto_fail_002)
 {
-	pgm_transport_t* transport = generate_transport ();
+	pgm_sock_t* sock = generate_sock ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_003)
 {
-	pgm_transport_t* transport = generate_transport ();
+	pgm_sock_t* sock = generate_sock ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_004)
 {
-	pgm_transport_t* transport = generate_transport ();
+	pgm_sock_t* sock = generate_sock ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_005)
 {
-	pgm_transport_t* transport = generate_transport ();
+	pgm_sock_t* sock = generate_sock ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
+	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
 	fail ("reached");
 }
 END_TEST
