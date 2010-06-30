@@ -67,7 +67,7 @@ static void usage (const char*);
 #endif
 
 static bool on_startup (void);
-static int on_data (const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict, const socklen_t);
+static int on_data (const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict);
 
 
 static void
@@ -182,7 +182,7 @@ main (
 					            &from,
 						    &fromlen);
 		if (len >= 0) {
-			on_data (buffer, len, &from, fromlen);
+			on_data (buffer, len, &from);
 		} else {
 #ifndef _WIN32
 			fds = MAX(terminate_pipe[0], read_fd) + 1;
@@ -407,8 +407,7 @@ int
 on_data (
 	const void*      	     restrict data,
 	const size_t		    	      len,
-	const struct pgm_sockaddr_t* restrict from,
-	const socklen_t			      fromlen
+	const struct pgm_sockaddr_t* restrict from
 	)
 {
 /* protect against non-null terminated strings */
