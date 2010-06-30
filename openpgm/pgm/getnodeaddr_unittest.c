@@ -60,11 +60,11 @@ static char* mock_invalid =	"invalid.invalid";		/* RFC 2606 */
 static char* mock_toolong =	"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
 static char* mock_hostname =	NULL;
 
-struct pgm_ifaddrs;
+struct pgm_ifaddrs_t;
 struct pgm_error_t;
 
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
+static bool mock_pgm_getifaddrs (struct pgm_ifaddrs_t**, struct pgm_error_t**);
+static void mock_pgm_freeifaddrs (struct pgm_ifaddrs_t*);
 static int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
 static void mock_freeaddrinfo (struct addrinfo*);
 static int mock_gethostname (char*, size_t);
@@ -248,9 +248,9 @@ mock_teardown_net (void)
 /* mock functions for external references */
 
 size_t
-pgm_transport_pkt_offset2 (
+pgm_pkt_offset (
         const bool                      can_fragment,
-        const bool                      use_pgmcc
+        const sa_family_t		pgmcc_family	/* 0 = disable */
         )
 {
         return 0;
@@ -259,7 +259,7 @@ pgm_transport_pkt_offset2 (
 static 
 bool
 mock_pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
+	struct pgm_ifaddrs_t**	ifap,
 	pgm_error_t**		err
 	)
 {
@@ -271,9 +271,9 @@ mock_pgm_getifaddrs (
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
-	struct pgm_ifaddrs* ifa = malloc (n * sizeof(struct pgm_ifaddrs));
-	memset (ifa, 0, n * sizeof(struct pgm_ifaddrs));
-	struct pgm_ifaddrs* ift = ifa;
+	struct pgm_ifaddrs_t* ifa = malloc (n * sizeof(struct pgm_ifaddrs_t));
+	memset (ifa, 0, n * sizeof(struct pgm_ifaddrs_t));
+	struct pgm_ifaddrs_t* ift = ifa;
 	while (list) {
 		struct mock_interface_t* interface = list->data;
 		ift->ifa_addr = (gpointer)&interface->addr;
@@ -294,7 +294,7 @@ mock_pgm_getifaddrs (
 static
 void
 mock_pgm_freeifaddrs (
-	struct pgm_ifaddrs*		ifa
+	struct pgm_ifaddrs_t*		ifa
 	)
 {
 	g_debug ("mock_freeifaddrs (ifa:%p)", (gpointer)ifa);
