@@ -2,7 +2,7 @@
  *
  * unit tests for receive window.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -50,9 +50,9 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 /* mock functions for external references */
 
 size_t
-pgm_transport_pkt_offset2 (
+pgm_pkt_offset (
         const bool                      can_fragment,
-        const bool                      use_pgmcc
+        const sa_family_t		pgmcc_family	/* 0 = disable */
         )
 {
         return 0;
@@ -113,8 +113,8 @@ generate_valid_skb (void)
 	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (1500);
 	memcpy (&skb->tsi, &tsi, sizeof(tsi));
-/* fake but valid transport and timestamp */
-	skb->transport = (pgm_transport_t*)0x1;
+/* fake but valid socket and timestamp */
+	skb->sock = (pgm_sock_t*)0x1;
 	skb->tstamp = pgm_time_now;
 /* header */
 	pgm_skb_reserve (skb, header_length);
@@ -135,7 +135,8 @@ generate_valid_skb (void)
  *		const uint16_t		tpdu_size,
  *		const unsigned		sqns,
  *		const unsigned		secs,
- *		const ssize_t		max_rte
+ *		const ssize_t		max_rte,
+ *		const uint32_t		ack_c_p
  *		)
  */
 
@@ -143,7 +144,8 @@ generate_valid_skb (void)
 START_TEST (test_create_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 100, 0, 0), "create failed");
+	const uint32_t ack_c_p = 500;
+	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p), "create failed");
 }
 END_TEST
 
@@ -151,7 +153,8 @@ END_TEST
 START_TEST (test_create_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 0, 60, 800000), "create failed");
+	const uint32_t ack_c_p = 500;
+	fail_if (NULL == pgm_rxw_create (&tsi, 1500, 0, 60, 800000, ack_c_p), "create failed");
 }
 END_TEST
 
@@ -159,7 +162,8 @@ END_TEST
 START_TEST (test_create_pass_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 9000, 0, 60, 800000), "create failed");
+	const uint32_t ack_c_p = 500;
+	fail_if (NULL == pgm_rxw_create (&tsi, 9000, 0, 60, 800000, ack_c_p), "create failed");
 }
 END_TEST
 
@@ -167,14 +171,16 @@ END_TEST
 START_TEST (test_create_pass_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, UINT16_MAX, 0, 60, 800000), "create failed");
+	const uint32_t ack_c_p = 500;
+	fail_if (NULL == pgm_rxw_create (&tsi, UINT16_MAX, 0, 60, 800000, ack_c_p), "create failed");
 }
 END_TEST
 
 /* invalid tsi pointer */
 START_TEST (test_create_fail_001)
 {
-	pgm_rxw_t* window = pgm_rxw_create (NULL, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (NULL, 1500, 100, 0, 0, ack_c_p);
 	fail ("reached");
 }
 END_TEST
@@ -183,14 +189,16 @@ END_TEST
 START_TEST (test_create_fail_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	fail_if (NULL == pgm_rxw_create (&tsi, 0, 100, 0, 0), "create failed");
+	const uint32_t ack_c_p = 500;
+	fail_if (NULL == pgm_rxw_create (&tsi, 0, 100, 0, 0, ack_c_p), "create failed");
 }
 END_TEST
 
 START_TEST (test_create_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 60, 800000);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 60, 800000, ack_c_p);
 	fail ("reached");
 }
 END_TEST
@@ -199,7 +207,8 @@ END_TEST
 START_TEST (test_create_fail_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 0, 800000);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 0, 800000, ack_c_p);
 	fail ("reached");
 }
 END_TEST
@@ -208,7 +217,8 @@ END_TEST
 START_TEST (test_create_fail_005)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 60, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 0, 0, 60, 0, ack_c_p);
 	fail ("reached");
 }
 END_TEST
@@ -216,7 +226,7 @@ END_TEST
 /* all invalid */
 START_TEST (test_create_fail_006)
 {
-	pgm_rxw_t* window = pgm_rxw_create (NULL, 0, 0, 0, 0);
+	pgm_rxw_t* window = pgm_rxw_create (NULL, 0, 0, 0, 0, 0);
 	fail ("reached");
 }
 END_TEST
@@ -231,7 +241,8 @@ END_TEST
 START_TEST (test_destroy_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	pgm_rxw_destroy (window);
 }
@@ -258,7 +269,8 @@ END_TEST
 START_TEST (test_add_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
@@ -274,7 +286,8 @@ END_TEST
 START_TEST (test_add_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
         fail_if (NULL == window, "create failed");
 /* #1 */
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -301,7 +314,8 @@ END_TEST
 START_TEST (test_add_pass_003)
 {
         pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
         fail_if (NULL == window, "create failed");
 /* #1 */
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -328,7 +342,8 @@ END_TEST
 START_TEST (test_add_pass_004)
 {
         pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
         fail_if (NULL == window, "create failed");
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
         fail_if (NULL == skb, "generate_valid_skb failed"); 
@@ -344,7 +359,8 @@ END_TEST
 START_TEST (test_add_pass_005)
 {
         pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+        pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
         fail_if (NULL == window, "create failed");
 /* #1 */
         struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -386,7 +402,8 @@ END_TEST
 START_TEST (test_add_fail_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
@@ -412,7 +429,8 @@ END_TEST
 START_TEST (test_add_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	char buffer[1500];
 	memset (buffer, 0, sizeof(buffer));
@@ -427,7 +445,8 @@ END_TEST
 START_TEST (test_add_fail_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
@@ -449,7 +468,8 @@ END_TEST
 START_TEST (test_peek_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	fail_unless (NULL == pgm_rxw_peek (window, 0));
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -480,7 +500,8 @@ START_TEST (test_max_length_pass_001)
 {
 	const guint window_length = 100;
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, window_length, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, window_length, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	fail_unless (window_length == pgm_rxw_max_length (window), "max_length failed");
 	pgm_rxw_destroy (window);
@@ -499,7 +520,8 @@ END_TEST
 START_TEST (test_length_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	fail_unless (0 == pgm_rxw_length (window), "length failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -531,7 +553,8 @@ END_TEST
 START_TEST (test_size_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	fail_unless (0 == pgm_rxw_size (window), "size failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -563,7 +586,8 @@ END_TEST
 START_TEST (test_is_empty_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	fail_unless (pgm_rxw_is_empty (window), "is_empty failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -589,7 +613,8 @@ END_TEST
 START_TEST (test_is_full_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 1, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 1, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	fail_if (pgm_rxw_is_full (window), "is_full failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -615,7 +640,8 @@ END_TEST
 START_TEST (test_lead_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	guint32 lead = pgm_rxw_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -641,7 +667,8 @@ END_TEST
 START_TEST (test_next_lead_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	guint32 next_lead = pgm_rxw_next_lead (window);
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -674,7 +701,8 @@ END_TEST
 START_TEST (test_readv_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[2], *pmsg;
 /* #1 empty */
@@ -727,7 +755,8 @@ END_TEST
 START_TEST (test_readv_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[2], *pmsg;
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
@@ -751,7 +780,8 @@ END_TEST
 START_TEST (test_readv_pass_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -787,7 +817,8 @@ END_TEST
 START_TEST (test_readv_pass_004)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -823,7 +854,8 @@ END_TEST
 START_TEST (test_readv_pass_005)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -877,7 +909,8 @@ END_TEST
 START_TEST (test_readv_pass_006)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -945,7 +978,8 @@ END_TEST
 START_TEST (test_readv_fail_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
@@ -963,7 +997,8 @@ END_TEST
 START_TEST (test_readv_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
@@ -989,7 +1024,8 @@ END_TEST
 START_TEST (test_remove_commit_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -1079,7 +1115,8 @@ END_TEST
 START_TEST (test_remove_trail_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[2], *pmsg;
 	fail_unless (0 == pgm_rxw_remove_trail (window), "remove_trail failed");
@@ -1125,7 +1162,8 @@ END_TEST
 START_TEST (test_update_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rb_expiry = 2;
@@ -1173,7 +1211,8 @@ END_TEST
 START_TEST (test_confirm_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
@@ -1205,7 +1244,8 @@ END_TEST
 START_TEST (test_confirm_pass_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -1269,7 +1309,8 @@ END_TEST
 START_TEST (test_lost_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
@@ -1317,7 +1358,8 @@ END_TEST
 START_TEST (test_state_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	const pgm_time_t now = 1;
 	const pgm_time_t nak_rdata_expiry = 2;
@@ -1344,7 +1386,8 @@ END_TEST
 START_TEST (test_state_fail_002)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	pgm_rxw_state (window, NULL, PGM_PKT_STATE_BACK_OFF);
 	fail ("reached");
@@ -1354,7 +1397,8 @@ END_TEST
 START_TEST (test_state_fail_003)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 	struct pgm_sk_buff_t* skb = generate_valid_skb ();
 	fail_if (NULL == skb, "generate_valid_skb failed");
@@ -1370,7 +1414,8 @@ END_TEST
 START_TEST (test_has_pending_pass_001)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window, "create failed");
 /* empty */
 	fail_unless (0 == window->has_event, "unexpected event");
@@ -1537,7 +1582,8 @@ make_basic_test_suite (void)
 START_TEST (test_readv_pass_007)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window);
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -1609,7 +1655,8 @@ END_TEST
 START_TEST (test_readv_pass_008)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window);
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
@@ -1683,7 +1730,8 @@ END_TEST
 START_TEST (test_readv_pass_009)
 {
 	pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
-	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0);
+	const uint32_t ack_c_p = 500;
+	pgm_rxw_t* window = pgm_rxw_create (&tsi, 1500, 100, 0, 0, ack_c_p);
 	fail_if (NULL == window);
 	struct pgm_msgv_t msgv[1], *pmsg;
 	struct pgm_sk_buff_t* skb;
