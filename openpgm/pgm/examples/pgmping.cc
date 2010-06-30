@@ -479,6 +479,7 @@ on_startup (
 		pgm_setsockopt (g_sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
 	}
 
+#ifdef I_UNDERSTAND_PGMCC_AND_FEC_ARE_NOT_SUPPORTED
 /* PGMCC congestion control */
 	if (g_use_pgmcc) {
 		struct pgm_pgmccinfo_t pgmccinfo;
@@ -498,6 +499,7 @@ on_startup (
 		fecinfo.var_pktlen_enabled	= TRUE;
 		pgm_setsockopt (g_sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
+#endif
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;

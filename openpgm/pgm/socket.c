@@ -240,6 +240,7 @@ pgm_socket (
 	new_sock->can_recv_data = TRUE;
 	new_sock->dport		= DEFAULT_DATA_DESTINATION_PORT;
 	new_sock->tsi.sport	= DEFAULT_DATA_SOURCE_PORT;
+	new_sock->adv_mode	= 0;	/* advance with time */
 
 /* PGMCC */
 	new_sock->acker_nla.ss_family = family;

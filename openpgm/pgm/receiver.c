@@ -1359,7 +1359,7 @@ ack_rb_state (
 				continue;
 			}
 
-			pgm_assert (!pgm_sockaddr_is_addr_unspecified (&peer->nla));
+			pgm_assert (!pgm_sockaddr_is_addr_unspecified ((struct sockaddr*)&peer->nla));
 
 			if (!send_ack (sock, peer, now))
 				return FALSE;
@@ -2113,7 +2113,7 @@ discarded:
 		source->last_data_tstamp = skb->tstamp;
 		if (_pgm_is_acker (source, skb))
 		{
-			if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified (&source->nla)))
+			if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified ((struct sockaddr*)&source->nla)))
 			{
 				pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Unable to send ACK due to unknown NLA."));
 			}
