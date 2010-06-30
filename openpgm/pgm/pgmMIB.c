@@ -631,10 +631,9 @@ pgmSourceConfigTable_handler (
 				}
 				break;
 
-/* FIXED: pgmSourceAdvMode = data(1) */
 			case COLUMN_PGMSOURCEADVMODE:
 				{
-					const unsigned adv_mode = PGMSOURCEADVMODE_DATA;
+					const unsigned adv_mode = 0 == transport->adv_mode ? PGMSOURCEADVMODE_TIME : PGMSOURCEADVMODE_DATA;
 					snmp_set_var_typed_value (var, ASN_INTEGER,
 								  (const u_char*)&adv_mode, sizeof(adv_mode) );
 				}
