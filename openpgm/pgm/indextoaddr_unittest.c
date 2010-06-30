@@ -2,7 +2,7 @@
  *
  * unit tests for portable interface index to socket address function.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -47,11 +47,11 @@ struct mock_interface_t {
 
 static GList *mock_interfaces = NULL;
 
-struct pgm_ifaddrs;
+struct pgm_ifaddrs_t;
 struct pgm_error_t;
 
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
+static bool mock_pgm_getifaddrs (struct pgm_ifaddrs_t**, struct pgm_error_t**);
+static void mock_pgm_freeifaddrs (struct pgm_ifaddrs_t*);
 static unsigned mock_pgm_if_nametoindex (const sa_family_t, const char*);
 
 
@@ -168,7 +168,7 @@ pgm_transport_pkt_offset2 (
 
 bool
 mock_pgm_getifaddrs (
-	struct pgm_ifaddrs**	ifap,
+	struct pgm_ifaddrs_t**	ifap,
 	pgm_error_t**		err
 	)
 {
@@ -180,8 +180,8 @@ mock_pgm_getifaddrs (
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
-	struct pgm_ifaddrs* ifa = calloc (n, sizeof(struct pgm_ifaddrs));
-	struct pgm_ifaddrs* ift = ifa;
+	struct pgm_ifaddrs_t* ifa = calloc (n, sizeof(struct pgm_ifaddrs_t));
+	struct pgm_ifaddrs_t* ift = ifa;
 	while (list) {
 		struct mock_interface_t* interface = list->data;
 		ift->ifa_addr = (gpointer)&interface->addr;
@@ -202,7 +202,7 @@ mock_pgm_getifaddrs (
 static
 void
 mock_pgm_freeifaddrs (
-	struct pgm_ifaddrs*		ifa
+	struct pgm_ifaddrs_t*		ifa
 	)
 {
 	g_debug ("mock_freeifaddrs (ifa:%p)", (gpointer)ifa);
