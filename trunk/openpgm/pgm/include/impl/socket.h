@@ -85,6 +85,8 @@ struct pgm_sock_t {
 
 	pgm_txw_t* restrict    		window;
 	pgm_rate_t			rate_control;
+	pgm_time_t			adv_ivl;		/* advancing with data */
+	unsigned			adv_mode;		/* 0 = time, 1 = data */
 	bool				is_controlled_spm;
 	bool				is_controlled_odata;
 	bool				is_controlled_rdata;

@@ -51,6 +51,7 @@ static int		max_tpdu = 1500;
 static int		max_rte = 400*1000;		/* very conservative rate, 2.5mb/s */
 static int		sqns = 100;
 
+static bool		use_pgmcc = FALSE;
 static bool		use_fec = FALSE;
 static bool		use_ondemand_parity = FALSE;
 static int		proactive_packets = 0;
@@ -92,6 +93,7 @@ usage (
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
+	fprintf (stderr, "  -c              : Enable PGMCC\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC: proactive, ondemand, or both\n");
 	fprintf (stderr, "  -N <n>          : Reed-Solomon block size (255)\n");
 	fprintf (stderr, "  -K <k>          : Reed-Solomon group size (8)\n");
@@ -122,13 +124,14 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:f:N:K:P:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:cf:N:K:P:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
 		case 's':	port = atoi (optarg); break;
 		case 'p':	udp_encap_port = atoi (optarg); break;
 		case 'r':	max_rte = atoi (optarg); break;
+		case 'c':	use_pgmcc = TRUE; break;
 		case 'f':
 			use_fec = TRUE;
 			switch (optarg[0]) {
@@ -332,7 +335,9 @@ create_sock (void)
 	pgm_setsockopt (sock, PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
 	pgm_setsockopt (sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
 	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
-	if (1) {
+
+#ifdef I_UNDERSTAND_PGMCC_AND_FEC_ARE_NOT_SUPPORTED
+	if (use_pgmcc) {
 		struct pgm_pgmccinfo_t pgmccinfo;
 		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
 		pgmccinfo.ack_c			= 75;
@@ -348,6 +353,7 @@ create_sock (void)
 		fecinfo.var_pktlen_enabled	= TRUE;
 		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
+#endif
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;

@@ -1290,7 +1290,7 @@ http_tsi_response (
 						"</tr><tr>"
 							"<th>Ttl</th><td>%u</td>"
 						"</tr><tr>"
-							"<th>Adv Mode</th><td>data(1)</td>"
+							"<th>Adv Mode</th><td>%s</td>"
 						"</tr><tr>"
 							"<th>Late join</th><td>disable(2)</td>"
 						"</tr><tr>"
@@ -1315,6 +1315,7 @@ http_tsi_response (
 						"</table>\n"
 						"</div>",
 				transport->hops,
+				0 == transport->adv_mode ? "time(0)" : "data(1)",
 				transport->txw_max_rte,
 				transport->txw_secs,
 				pgm_to_msecs(transport->spm_ambient_interval),

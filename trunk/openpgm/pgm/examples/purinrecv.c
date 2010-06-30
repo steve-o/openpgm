@@ -43,6 +43,7 @@ static int		udp_encap_port = 0;
 static int		max_tpdu = 1500;
 static int		sqns = 100;
 
+static bool		use_pgmcc = FALSE;
 static bool		use_fec = FALSE;
 static int		rs_k = 8;
 static int		rs_n = 255;
@@ -64,7 +65,7 @@ static void usage (const char*);
 #endif
 
 static bool on_startup (void);
-static int on_data (const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict, const socklen_t);
+static int on_data (const void*restrict, const size_t, const struct pgm_sockaddr_t*restrict);
 
 
 static void
@@ -76,6 +77,7 @@ usage (
 	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -c              : Enable PGMCC\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
 	fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
 	fprintf (stderr, "  -N <n>\n");
@@ -109,12 +111,13 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:f:K:N:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:cf:K:N:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
 		case 's':	port = atoi (optarg); break;
 		case 'p':	udp_encap_port = atoi (optarg); break;
+		case 'c':	use_pgmcc = TRUE; break;
 		case 'f':	use_fec = TRUE; break;
 		case 'K':	rs_k = atoi (optarg); break;
 		case 'N':	rs_n = atoi (optarg); break;
@@ -192,7 +195,7 @@ main (
 					         &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
-			on_data (buffer, len, &from, fromlen);
+			on_data (buffer, len, &from);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
 			{
@@ -347,7 +350,9 @@ on_startup (void)
 	pgm_setsockopt (sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
 	pgm_setsockopt (sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
 	pgm_setsockopt (sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
-	if (1) {
+
+#ifdef I_UNDERSTAND_PGMCC_AND_FEC_ARE_NOT_SUPPORTED
+	if (use_pgmcc) {
 		struct pgm_pgmccinfo_t pgmccinfo;
 		pgmccinfo.ack_bo_ivl 		= pgm_msecs (50);
 		pgmccinfo.ack_c			= 75;
@@ -363,6 +368,7 @@ on_startup (void)
 		fecinfo.var_pktlen_enabled	= FALSE;
 		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
+#endif
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
@@ -445,8 +451,7 @@ int
 on_data (
 	const void*     	     restrict data,
 	const size_t		  	      len,
-	const struct pgm_sockaddr_t* restrict from,
-	const socklen_t		  	      fromlen
+	const struct pgm_sockaddr_t* restrict from
 	)
 {
 /* protect against non-null terminated strings */

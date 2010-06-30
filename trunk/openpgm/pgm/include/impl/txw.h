@@ -37,10 +37,6 @@ struct pgm_txw_state_t {
 	unsigned	retransmit_count:15;
 	unsigned	nak_elimination_count:16;
 
-#if 0
-        struct timeval  expiry;			/* Advance with time */
-        struct timeval  last_retransmit;	/* NAK elimination */
-#endif
 	uint8_t		pkt_cnt_requested;	/* # parity packets to send */
 	uint8_t		pkt_cnt_sent;		/* # parity packets already sent */
 };
@@ -57,7 +53,15 @@ struct pgm_txw_t {
 	pgm_rs_t			rs;
 	uint8_t				tg_sqn_shift;
 	struct pgm_sk_buff_t* restrict	parity_buffer;
+
+/* Advance with data */
+	pgm_time_t			adv_ivl_expiry;	
+	unsigned			increment_window_naks;
+	unsigned			adv_secs;		/* TXW_ADV_SECS */
+	unsigned			adv_sqns;		/* TXW_ADV_SECS in sequences */
+
 	unsigned			is_fec_enabled:1;
+	unsigned			adv_mode:1;		/* 0 = advance by time, 1 = advance by data */
 
 	size_t				size;			/* window content size in bytes */
 	unsigned			alloc;			/* length of pdata[] */

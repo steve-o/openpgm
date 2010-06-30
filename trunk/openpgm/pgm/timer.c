@@ -143,11 +143,13 @@ pgm_timer_dispatch (
 		{
 			if (pgm_time_after_eq (now, sock->ack_expiry))
 			{
+#ifdef DEBUG_PGMCC
 char nows[1024];
 time_t t = time (NULL);
 struct tm* tmp = localtime (&t);
 strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
 printf ("ACK timeout, T:%u W:%u\n", pgm_fp8tou(sock->tokens), pgm_fp8tou(sock->cwnd_size));
+#endif
 				sock->tokens = sock->cwnd_size = pgm_fp8 (1);
 				sock->ack_bitmap = 0xffffffff;
 				sock->ack_expiry = 0;
