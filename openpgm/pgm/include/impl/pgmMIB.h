@@ -6,7 +6,7 @@
 #ifndef __PGM_IMPL_MIB_H__
 #define __PGM_IMPL_MIB_H__
 
-#include <pgm/framework.h>
+#include <impl/framework.h>
 
 PGM_BEGIN_DECLS
 

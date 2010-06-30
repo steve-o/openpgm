@@ -24,11 +24,11 @@
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
 #include <errno.h>
-#include <pgm/i18n.h>
-#include <pgm/framework.h>
+#include <impl/i18n.h>
+#include <impl/framework.h>
 
 #include "pgm/snmp.h"
-#include "pgm/pgmMIB.h"
+#include "impl/pgmMIB.h"
 
 
 /* globals */
