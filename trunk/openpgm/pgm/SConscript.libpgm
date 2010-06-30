@@ -148,11 +148,12 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('if.c'),
 			e.Object('tsi.c')] + tframework);
 	te.Program (['source_unittest.c'] + tframework);
-	te.Program (['receiver_unittest.c',
-			e.Object('tsi.c')] + tframework);
+#	te.Program (['receiver_unittest.c',
+#			e.Object('tsi.c')] + tframework);
 	te.Program (['recv_unittest.c',
 			e.Object('tsi.c'),
-			e.Object('gsi.c')] + tframework);
+			e.Object('gsi.c'),
+			e.Object('skbuff.c')] + tframework);
 	te.Program (['net_unittest.c'] + tframework);
 	te.Program (['timer_unittest.c'] + tframework);
 	te.Program (['packet_parse_unittest.c'] + tframework);
