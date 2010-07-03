@@ -1006,25 +1006,26 @@ pgm_recvfrom (
 		return status;
 
 	size_t bytes_copied = 0;
-	struct pgm_sk_buff_t* skb = msgv.msgv_skb[0];
+	struct pgm_sk_buff_t** skb = msgv.msgv_skb;
+	struct pgm_sk_buff_t* pskb = *skb;
 
 	if (from) {
 		from->sa_port = ntohs (sock->dport);
-		from->sa_addr.sport = ntohs (skb->tsi.sport);
-		memcpy (&from->sa_addr.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
+		from->sa_addr.sport = ntohs (pskb->tsi.sport);
+		memcpy (&from->sa_addr.gsi, &pskb->tsi.gsi, sizeof(pgm_gsi_t));
 	}
 
 	while (bytes_copied < bytes_read) {
-		size_t copy_len = skb->len;
+		size_t copy_len = pskb->len;
 		if (bytes_copied + copy_len > buflen) {
 			pgm_warn (_("APDU truncated, original length %zu bytes."),
 				bytes_read);
 			copy_len = buflen - bytes_copied;
 			bytes_read = buflen;
 		}
-		memcpy ((char*)buf + bytes_copied, skb->data, copy_len);
+		memcpy ((char*)buf + bytes_copied, pskb->data, copy_len);
 		bytes_copied += copy_len;
-		skb++;
+		pskb = ++skb;
 	}
 	if (_bytes_read)
 		*_bytes_read = bytes_copied;

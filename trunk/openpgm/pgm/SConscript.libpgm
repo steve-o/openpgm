@@ -145,7 +145,7 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('if.c')] + tframework);
 	te.Program (['tsi_unittest.c'] + tframework);
 	te.Program (['if_unittest.c'] + tframework);
-	te.Program (['transport_unittest.c',
+	te.Program (['socket_unittest.c',
 			e.Object('if.c'),
 			e.Object('tsi.c')] + tframework);
 #	te.Program (['source_unittest.c'] + tframework);

@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * unit tests for PGM transport.
+ * unit tests for PGM socket.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -51,8 +51,8 @@
 #define pgm_rs_destroy		mock_pgm_rs_destroy
 #define pgm_time_update_now	mock_pgm_time_update_now
 
-#define TRANSPORT_DEBUG
-#include "transport.c"
+#define SOCK_DEBUG
+#include "socket.c"
 
 int mock_pgm_ipproto_pgm = IPPROTO_PGM;
 
@@ -71,25 +71,25 @@ mock_teardown (void)
 }
 
 static
-struct pgm_transport_info_t*
-generate_asm_tinfo (void)
+struct pgm_sockaddr_t*
+generate_asm_sockaddr (void)
 {
 	const in_addr_t default_group = inet_addr("239.192.0.1");
 	const pgm_gsi_t gsi = { 200, 202, 203, 204, 205, 206 };
-	struct pgm_transport_info_t* tinfo = g_new0(struct pgm_transport_info_t, 1);
-	tinfo->ti_recv_addrs_len = 1;
-	tinfo->ti_recv_addrs = g_new0(struct group_source_req, 1);
-	((struct sockaddr*)&tinfo->ti_recv_addrs[0].gsr_group)->sa_family = AF_INET;
-	((struct sockaddr_in*)&tinfo->ti_recv_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
-	((struct sockaddr*)&tinfo->ti_recv_addrs[0].gsr_source)->sa_family = AF_INET;
-	((struct sockaddr_in*)&tinfo->ti_recv_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
-	tinfo->ti_send_addrs_len = 1;
-	tinfo->ti_send_addrs = g_new0(struct group_source_req, 1);
-	((struct sockaddr*)&tinfo->ti_send_addrs[0].gsr_group)->sa_family = AF_INET;
-	((struct sockaddr_in*)&tinfo->ti_send_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
-	((struct sockaddr*)&tinfo->ti_send_addrs[0].gsr_source)->sa_family = AF_INET;
-	((struct sockaddr_in*)&tinfo->ti_send_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
-	return tinfo;
+	struct pgm_addrinfo_t* addrinfo = g_new0(struct pgm_addrinfo_t, 1);
+	addrinfo->ai_recv_addrs_len = 1;
+	addrinfo->ai_recv_addrs = g_new0(struct group_source_req, 1);
+	((struct sockaddr*)&addrinfo->ai_recv_addrs[0].gsr_group)->sa_family = AF_INET;
+	((struct sockaddr_in*)&addrinfo->ai_recv_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
+	((struct sockaddr*)&addrinfo->ai_recv_addrs[0].gsr_source)->sa_family = AF_INET;
+	((struct sockaddr_in*)&addrinfo->ai_recv_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
+	addrinfo->ai_send_addrs_len = 1;
+	addrinfo->ai_send_addrs = g_new0(struct group_source_req, 1);
+	((struct sockaddr*)&addrinfo->ai_send_addrs[0].gsr_group)->sa_family = AF_INET;
+	((struct sockaddr_in*)&addrinfo->ai_send_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
+	((struct sockaddr*)&addrinfo->ai_send_addrs[0].gsr_source)->sa_family = AF_INET;
+	((struct sockaddr_in*)&addrinfo->ai_send_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
+	return addrinfo;
 }
 
 /** receiver module */
@@ -116,7 +116,7 @@ mock_pgm_on_nak_notify (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_send_spm (
-	pgm_transport_t*	transport,
+	pgm_sock_t*		sock,
 	int			flags
 	)
 {
@@ -127,7 +127,7 @@ mock_pgm_send_spm (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_timer_prepare (
-	pgm_transport_t* const		transport
+	pgm_sock_t* const		sock
 	)
 {
 	return FALSE;
@@ -136,7 +136,7 @@ mock_pgm_timer_prepare (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_timer_check (
-	pgm_transport_t* const		transport
+	pgm_sock_t* const		sock
 	)
 {
 	return FALSE;
@@ -145,7 +145,7 @@ mock_pgm_timer_check (
 PGM_GNUC_INTERNAL
 pgm_time_t
 mock_pgm_timer_expiration (
-	pgm_transport_t* const		transport
+	pgm_sock_t* const		sock
 	)
 {
 	return 100L;
@@ -154,7 +154,7 @@ mock_pgm_timer_expiration (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_timer_dispatch (
-	pgm_transport_t* const		transport
+	pgm_sock_t* const		sock
 	)
 {
 	return TRUE;
@@ -249,265 +249,416 @@ _mock_pgm_time_update_now (void)
 
 /* target:
  *	bool
- *	pgm_transport_create (
- *		pgm_transport_t**		transport,
- *		struct pgm_transport_info_t*	tinfo,
- *		pgm_error_t**			error
+ *	pgm_socket (
+ *		pgm_sock_t**		sock,
+ *		const sa_family_t	family,
+ *		const int		pgm_sock_type,
+ *		const int		protocol,
+ *		pgm_error_t**		error
  *	)
  */
 
 START_TEST (test_create_pass_001)
 {
 	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
+	pgm_sock_t* sock;
+/* only one type currently implemented */
+	const int pgm_sock_type = SOCK_SEQPACKET;
+/* PGM/IPv4 */
+	sock = NULL;
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+/* PGM/UDP over IPv4 */
+	sock = NULL;
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_UDP, &err), "create failed");
+/* PGM/IPv6 */
+	sock = NULL;
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+/* PGM/UDP over IPv6 */
+	sock = NULL;
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_UDP, &err), "create failed");
 	fail_unless (NULL == err, "error raised");
 }
 END_TEST
 
-/* NULL transport */
+/* NULL socket */
 START_TEST (test_create_fail_002)
 {
 	pgm_error_t* err = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (FALSE == pgm_transport_create (NULL, tinfo, &err), "create failed");
+	fail_unless (FALSE == pgm_socket (NULL, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
 }
 END_TEST
 
-/* NULL tinfo */
+/* invalid protocol family */
 START_TEST (test_create_fail_003)
 {
 	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	fail_unless (FALSE == pgm_transport_create (&transport, NULL, &err), "create failed");
+	pgm_sock_t* sock = NULL;
+	fail_unless (FALSE == pgm_socket (&sock, AF_UNSPEC, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
+}
+END_TEST
+
+/* invalid socket type */
+START_TEST (test_create_fail_004)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	fail_unless (FALSE == pgm_socket (&sock, AF_INET, SOCK_STREAM, IPPROTO_PGM, &err), "create failed");
+	fail_unless (FALSE == pgm_socket (&sock, AF_INET, SOCK_DGRAM, IPPROTO_PGM, &err), "create failed");
+}
+END_TEST
+
+/* invalid protocol */
+START_TEST (test_create_fail_005)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	fail_unless (FALSE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_TCP, &err), "create failed");
+}
+END_TEST
+
+
+/* target:
+ *	bool
+ *	pgm_bind (
+ *		pgm_sock_t*			sock,
+ *		const struct pgm_sockaddr_t*	sockaddr,
+ *		const socklen_t			sockaddrlen,
+ *		pgm_error_t**			error
+ *		)
+ */
+
+/* fail on unset options */
+START_TEST (test_bind_fail_001)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	struct pgm_sockaddr_t* pgmsa = generate_asm_sockaddr ();
+	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (FALSE == pgm_bind (sock, pgmsa, sizeof(*pgmsa), &err), "bind failed");
+}
+END_TEST
+
+/* invalid parameters */
+START_TEST (test_bind_fail_002)
+{
+	pgm_error_t* err = NULL;
+	fail_unless (FALSE == pgm_bind (NULL, NULL, 0, &err), "bind failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_bind (
- *		pgm_transport_t*	transport,
+ *	pgm_bind3 (
+ *		pgm_sock_t*				sock,
+ *		const struct pgm_sockaddr_t*		sockaddr,
+ *		const socklen_t				sockaddrlen,
+ *		const struct pgm_interface_req_t*	send_req,
+ *		const socklen_t				send_req_len,
+ *		const struct pgm_interface_req_t*	recv_req,
+ *		const socklen_t				recv_req_len,
+ *		pgm_error_t**				error
+ *		)
+ */
+
+/* fail on unset options */
+START_TEST (test_bind3_fail_001)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	struct pgm_addrinfo_t* addrinfo = generate_asm_addrinfo ();
+	fail_if (NULL == addrinfo, "generate_asm_addrinfo failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	struct pgm_interface_req_t send_req = { .ir_interface = 0, .ir_scope_id = 0 },
+				   recv_req = { .ir_interface = 0, .ir_scope_id = 0 };
+	fail_unless (FALSE == pgm_bind3 (sock,
+					 addrinfo, sizeof(struct pgm_addrinfo_t),
+					 send_req, sizeof(send_req),
+					 recv_req, sizeof(recv_req),
+					 &err), "bind failed");
+}
+END_TEST
+
+/* invalid parameters */
+START_TEST (test_bind3_fail_002)
+{
+	pgm_error_t* err = NULL;
+	fail_unless (FALSE == pgm_bind3 (NULL, NULL, 0, NULL, 0, NULL, 0, &err), "bind failed");
+}
+END_TEST
+
+/* target:
+ *	bool
+ *	pgm_connect (
+ *		pgm_sock_t*		sock,
  *		pgm_error_t**		error
  *		)
  */
 
-START_TEST (test_bind_fail_001)
+/* invalid parameters */
+START_TEST (test_connect_fail_001)
 {
 	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (FALSE == pgm_transport_bind (transport, &err), "bind failed");
-}
-END_TEST
-
-START_TEST (test_bind_fail_002)
-{
-	pgm_error_t* err = NULL;
-	fail_unless (FALSE == pgm_transport_bind (NULL, &err), "bind failed");
+	fail_unless (FALSE == pgm_connect (NULL, &err), "connect failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_destroy (
- *		pgm_transport_t*	transport,
+ *	pgm_close (
+ *		pgm_sock_t*		sock,
  *		bool			flush
  *		)
  */
 
+/* socket > close */
 START_TEST (test_destroy_pass_001)
 {
 	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_destroy (transport, FALSE), "destroy failed");
+	pgm_sock_t* sock = NULL;
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+	fail_unless (TRUE == pgm_close (sock, FALSE), "destroy failed");
 }
 END_TEST
 
+/* socket > bind > close */
+START_TEST (test_destroy_pass_002)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	struct pgm_addrinfo_t* addrinfo = generate_asm_addrinfo ();
+	fail_if (NULL == addrinfo, "generate_asm_addrinfo failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (FALSE == pgm_bind (sock, addrinfo, sizeof(struct pgm_addrinfo_t), &err), "bind failed");
+	fail_unless (TRUE == pgm_close (sock, FALSE), "destroy failed");
+}
+END_TEST
+
+/* invalid parameters */
 START_TEST (test_destroy_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_destroy (NULL, FALSE), "destroy failed");
+	fail_unless (FALSE == pgm_close (NULL, FALSE), "destroy failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_max_tpdu (
- *		pgm_transport_t*	transport,
- *		uint16_t		max_tpdu
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_MAX_TPDU,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *		)
  */
 
 START_TEST (test_set_max_tpdu_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_max_tpdu (transport, 1500), "set_max_tpdu failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_MTU;
+	const int max_tpdu	= 1500;
+	const void* optval	= &max_tpdu;
+	const socklen_t optlen	= sizeof(max_tpdu);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_max_tpdu failed");
 }
 END_TEST
 
+/* invalid parameters */
 START_TEST (test_set_max_tpdu_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_max_tpdu (NULL, 1500), "set_max_tpdu failed");
+	const int optname	= PGM_MTU;
+	const int max_tpdu	= 1500;
+	const void* optval	= &max_tpdu;
+	const socklen_t optlen	= sizeof(max_tpdu);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_max_tpdu failed");
 }
 END_TEST
 
+/* too small */
 START_TEST (test_set_max_tpdu_fail_002)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (FALSE == pgm_transport_set_max_tpdu (transport, 1), "set_max_tpdu failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_MTU;
+	const int max_tpdu	= 1;
+	const void* optval	= &max_tpdu;
+	const socklen_t optlen	= sizeof(max_tpdu);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_max_tpdu failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_multicast_loop (
- *		pgm_transport_t*	transport,
- *		bool			use_multicast_loop
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_MULTICAST_LOOP,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *		)
  */
 
 START_TEST (test_set_multicast_loop_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_multicast_loop (transport, TRUE), "set_multicast_loop failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_MULTICAST_LOOP;
+	const int loop_enabled	= 1;
+	const void* optval	= &loop_enabled;
+	const socklen_t optlen	= sizeof(loop_enabled);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_multicast_loop failed");
 }
 END_TEST
 
 START_TEST (test_set_multicast_loop_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_multicast_loop (NULL, TRUE), "set_multicast_loop failed");
+	const int optname	= PGM_MULTICAST_LOOP;
+	const int loop_enabled	= 1;
+	const void* optval	= &loop_enabled;
+	const socklen_t optlen	= sizeof(loop_enabled);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_multicast_loop failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_hops (
- *		pgm_transport_t*	transport,
- *		unsigned		hops
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_HOPS,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *	)
  */
 
 START_TEST (test_set_hops_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_hops (transport, 16), "set_hops failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_HOPS;
+	const int hops		= 16;
+	const void* optval	= &hops;
+	const socklen_t optlen	= sizeof(hops);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_hops failed");
 }
 END_TEST
 
 START_TEST (test_set_hops_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_hops (NULL, 16), "set_hops failed");
+	const int optname	= PGM_HOPS;
+	const int hops		= 16;
+	const void* optval	= &hops;
+	const socklen_t optlen	= sizeof(hops);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_hops failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_sndbuf (
- *		pgm_transport_t*	transport,
- *		size_t			size
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_SNDBUF,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *	)
  */
 
 START_TEST (test_set_sndbuf_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_sndbuf (transport, 131071), "set_sndbuf failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_SNDBUF;
+	const int bufsize	= 131071;	/* 128kB */
+	const void* optval	= &bufsize;
+	const socklen_t optlen	= sizeof(bufsize);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_sndbuf failed");
 }
 END_TEST
 
 START_TEST (test_set_sndbuf_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_sndbuf (NULL, 131071), "set_sndbuf failed");
+	const int optname	= PGM_SNDBUF;
+	const int bufsize	= 131071;	/* 128kB */
+	const void* optval	= &bufsize;
+	const socklen_t optlen	= sizeof(bufsize);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_sndbuf failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_rcvbuf (
- *		pgm_transport_t*	transport,
- *		size_t			size
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_RCVBUF,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *	)
  */
 
 START_TEST (test_set_rcvbuf_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_rcvbuf (transport, 131071), "set_rcvbuf failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_RCVBUF;
+	const int bufsize	= 131071;	/* 128kB */
+	const void* optval	= &bufsize;
+	const socklen_t optlen	= sizeof(bufsize);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_rcvbuf failed");
 }
 END_TEST
 
 START_TEST (test_set_rcvbuf_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_rcvbuf (NULL, 131071), "set_rcvbuf failed");
+	const int optname	= PGM_RCVBUF;
+	const int bufsize	= 131071;	/* 128kB */
+	const void* optval	= &bufsize;
+	const socklen_t optlen	= sizeof(bufsize);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_rcvbuf failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_fec (
- *		pgm_transport_t*	transport,
- *		uint8_t			proactive_h,
- *		bool			use_ondemand_parity,
- *		bool			use_varpkt_len,
- *		uint8_t			default_n,
- *		uint8_t			default_k
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_USE_FEC,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(struct pgm_fecinfo_t)
  *	)
  */
 
 START_TEST (test_set_fec_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_fec (transport, 239, TRUE, TRUE, 255, 16), "set_fec failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_USE_FEC;
+	const struct pgm_fecinfo_t fecinfo = {
+		.ondemand_parity_enabled	= TRUE,
+		.proactive_packets		= 16,
+		.var_pktlen_enabled		= TRUE,
+		.block_size			= 255,
+		.group_size			= 239
+	};
+	const void* optval	= &fecinfo;
+	const socklen_t optlen	= sizeof(fecinfo);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_fec failed");
 }
 END_TEST
 
 START_TEST (test_set_fec_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_fec (NULL, 0, TRUE, TRUE, 255, 16), "set_fec failed");
+	const int optname	= PGM_USE_FEC;
+	const struct pgm_fecinfo_t fecinfo = {
+		.ondemand_parity_enabled	= TRUE,
+		.proactive_packets		= 16,
+		.var_pktlen_enabled		= TRUE,
+		.block_size			= 255,
+		.group_size			= 239
+	};
+	const void* optval	= &fecinfo;
+	const socklen_t optlen	= sizeof(fecinfo);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_fec failed");
 }
 END_TEST
 
@@ -516,107 +667,300 @@ END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_send_only (
- *		pgm_transport_t*	transport,
- *		bool			send_only
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_USE_PGMCC,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(struct pgm_pgmccinfo_t)
+ *	)
+ */
+
+START_TEST (test_set_pgmcc_pass_001)
+{
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_USE_PGMCC;
+	const struct pgm_pgmccinfo_t pgmccinfo = {
+		.ack_bo_ivl	= pgm_msecs(100),
+		.ack_c		= 123,
+		.ack_c_p	= 456
+	};
+	const void* optval	= &pgmccinfo;
+	const socklen_t optlen	= sizeof(pgmccinfo);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_pgmcc failed");
+}
+END_TEST
+
+START_TEST (test_set_pgmcc_fail_001)
+{
+	const int optname	= PGM_USE_PGMCC;
+	const struct pgm_pgmccinfo_t pgmccinfo = {
+		.ack_bo_ivl	= pgm_msecs(100),
+		.ack_c		= 123,
+		.ack_c_p	= 456
+	};
+	const void* optval	= &pgmccinfo;
+	const socklen_t optlen	= sizeof(pgmccinfo);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_pgmcc failed");
+}
+END_TEST
+
+/* target:
+ *	bool
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_USE_CR,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
+ *	)
+ */
+
+START_TEST (test_set_cr_pass_001)
+{
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_USE_CR;
+	const int magic_bunny	= 1;
+	const void* optval	= &magic_bunny;
+	const socklen_t optlen	= sizeof(magic_bunny);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_cr failed");
+}
+END_TEST
+
+START_TEST (test_set_cr_fail_001)
+{
+	const int optname	= PGM_USE_CR;
+	const int magic_bunny	= 1;
+	const void* optval	= &magic_bunny;
+	const socklen_t optlen	= sizeof(magic_bunny);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_cr failed");
+}
+END_TEST
+
+
+/* target:
+ *	bool
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_SEND_ONLY,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *	)
  */
 
 START_TEST (test_set_send_only_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_send_only (transport, TRUE), "set_send_only failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_SEND_ONLY;
+	const int send_only	= 1;
+	const void* optval	= &send_only;
+	const socklen_t optlen	= sizeof(send_only);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_send_only failed");
 }
 END_TEST
 
 START_TEST (test_set_send_only_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_send_only (NULL, TRUE), "set_send_only failed");
+	const int optname	= PGM_SEND_ONLY;
+	const int send_only	= 1;
+	const void* optval	= &send_only;
+	const socklen_t optlen	= sizeof(send_only);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_send_only failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_recv_only (
- *		pgm_transport_t*	transport,
- *		bool			recv_only,
- *		bool			is_passive
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_RECV_ONLY,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *	)
  */
 
 START_TEST (test_set_recv_only_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_recv_only (transport, TRUE, FALSE), "set_recv_only failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_RECV_ONLY;
+	const int recv_only	= 1;
+	const void* optval	= &recv_only;
+	const socklen_t optlen	= sizeof(recv_only);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_recv_only failed");
 }
 END_TEST
 
 START_TEST (test_set_recv_only_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_recv_only (NULL, TRUE, FALSE), "set_recv_only failed");
+	const int optname	= PGM_RECV_ONLY;
+	const int recv_only	= 1;
+	const void* optval	= &recv_only;
+	const socklen_t optlen	= sizeof(recv_only);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_recv_only failed");
 }
 END_TEST
 
 /* target:
  *	bool
- *	pgm_transport_set_abort_on_reset (
- *		pgm_transport_t*	transport,
- *		bool		abort_on_reset
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_PASSIVE,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
+ *	)
+ */
+
+START_TEST (test_set_recv_only_pass_002)
+{
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_PASSIVE;
+	const int passive	= 1;
+	const void* optval	= &passive;
+	const socklen_t optlen	= sizeof(passive);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_passive failed");
+}
+END_TEST
+
+START_TEST (test_set_recv_only_fail_002)
+{
+	const int optname	= PGM_PASSIVE;
+	const int passive	= 1;
+	const void* optval	= &passive;
+	const socklen_t optlen	= sizeof(passive);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_passive failed");
+}
+END_TEST
+
+/* target:
+ *	bool
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_ABORT_ON_RESET,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
  *	)
  */
 
 START_TEST (test_set_abort_on_reset_pass_001)
 {
-	pgm_error_t* err = NULL;
-	pgm_transport_t* transport = NULL;
-	struct pgm_transport_info_t* tinfo = generate_asm_tinfo ();
-	fail_if (NULL == tinfo, "generate_asm_tinfo failed");
-	fail_unless (TRUE == pgm_transport_create (&transport, tinfo, &err), "create failed");
-	fail_unless (NULL == err, "error raised");
-	fail_unless (TRUE == pgm_transport_set_abort_on_reset (transport, TRUE), "set_abort_on_reset failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_ABORT_ON_RESET;
+	const int abort_on_reset= 1;
+	const void* optval	= &abort_on_reset;
+	const socklen_t optlen	= sizeof(abort_on_reset);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_abort_on_reset failed");
 }
 END_TEST
 
 START_TEST (test_set_abort_on_reset_fail_001)
 {
-	fail_unless (FALSE == pgm_transport_set_abort_on_reset (NULL, TRUE), "set_abort_on_reset failed");
+	const int optname	= PGM_ABORT_ON_RESET;
+	const int abort_on_reset= 1;
+	const void* optval	= &abort_on_reset;
+	const socklen_t optlen	= sizeof(abort_on_reset);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_abort_on_reset failed");
 }
 END_TEST
 
-#if 0
-static inline gsize pgm_transport_max_tsdu (pgm_transport_t* transport, gboolean can_fragment)
-int pgm_transport_select_info (pgm_transport_t*, fd_set*, fd_set*, int*);
-#ifdef CONFIG_HAVE_POLL
-int pgm_transport_poll_info (pgm_transport_t*, struct pollfd*, int*, int);
-#endif
-#ifdef CONFIG_HAVE_EPOLL
-int pgm_transport_epoll_ctl (pgm_transport_t*, int, int, int);
-#endif
+/* target:
+ *	bool
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_NOBLOCK,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
+ *	)
+ */
 
-int pgm_transport_join_group (pgm_transport_t*, struct group_req*, gsize);
-int pgm_transport_leave_group (pgm_transport_t*, struct group_req*, gsize);
-int pgm_transport_block_source (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_unblock_source (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_join_source_group (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_leave_source_group (pgm_transport_t*, struct group_source_req*, gsize);
-int pgm_transport_msfilter (pgm_transport_t*, struct group_filter*, gsize);
+START_TEST (test_set_noblock_pass_001)
+{
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_NOBLOCK;
+	const int noblock       = 1;
+	const void* optval	= &noblock;
+	const socklen_t optlen	= sizeof(noblock);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_noblock failed");
+}
+END_TEST
 
-gchar* pgm_print_tsi (const pgm_tsi_t*) G_GNUC_WARN_UNUSED_RESULT;
-int pgm_print_tsi_r (const pgm_tsi_t*, char*, gsize);
-guint pgm_tsi_hash (gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
-gboolean pgm_tsi_equal (gconstpointer, gconstpointer) G_GNUC_WARN_UNUSED_RESULT;
-void pgm_drop_superuser (void);
-#endif
+START_TEST (test_set_noblock_fail_001)
+{
+	const int optname	= PGM_NOBLOCK;
+	const int noblock       = 1;
+	const void* optval	= &noblock;
+	const socklen_t optlen	= sizeof(noblock);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_noblock failed");
+}
+END_TEST
+
+/* target:
+ *	bool
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_UDP_ENCAP_UCAST_PORT,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
+ *	)
+ */
+
+START_TEST (test_set_udp_unicast_pass_001)
+{
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_NOBLOCK;
+	const int unicast_port  = 10001;
+	const void* optval	= &unicast_port;
+	const socklen_t optlen	= sizeof(unicast_port);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_udp_unicast failed");
+}
+END_TEST
+
+START_TEST (test_set_udp_unicast_fail_001)
+{
+	const int optname	= PGM_NOBLOCK;
+	const int unicast_port  = 10001;
+	const void* optval	= &unicast_port;
+	const socklen_t optlen	= sizeof(uniicast_port);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_udp_unicast failed");
+}
+END_TEST
+
+/* target:
+ *	bool
+ *	pgm_setsockopt (
+ *		pgm_sock_t* const	sock,
+ *		const int		optname = PGM_UDP_ENCAP_MCAST_PORT,
+ *		const void*		optval,
+ *		const socklen_t		optlen = sizeof(int)
+ *	)
+ */
+
+START_TEST (test_set_udp_multicast_pass_001)
+{
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	const int optname	= PGM_NOBLOCK;
+	const int multicast_port= 10001;
+	const void* optval	= &multicast_port;
+	const socklen_t optlen	= sizeof(multicast_port);
+	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_udp_multicast failed");
+}
+END_TEST
+
+START_TEST (test_set_udp_multicast_fail_001)
+{
+	const int optname	= PGM_NOBLOCK;
+	const int multicast_port= 10002;
+	const void* optval	= &multicast_port;
+	const socklen_t optlen	= sizeof(multicast_port);
+	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_udp_multicast failed");
+}
+END_TEST
 
 static
 Suite*
@@ -632,12 +976,20 @@ make_test_suite (void)
 	tcase_add_test (tc_create, test_create_pass_001);
 	tcase_add_test (tc_create, test_create_fail_002);
 	tcase_add_test (tc_create, test_create_fail_003);
+	tcase_add_test (tc_create, test_create_fail_004);
+	tcase_add_test (tc_create, test_create_fail_005);
 
 	TCase* tc_bind = tcase_create ("bind");
 	suite_add_tcase (s, tc_bind);
 	tcase_add_checked_fixture (tc_bind, mock_setup, mock_teardown);
 	tcase_add_test (tc_bind, test_bind_fail_001);
 	tcase_add_test (tc_bind, test_bind_fail_002);
+
+	TCase* tc_connect = tcase_create ("connect");
+	suite_add_tcase (s, tc_connect);
+	tcase_add_checked_fixture (tc_connect, mock_setup, mock_teardown);
+	tcase_add_test (tc_connect, test_connect_fail_001);
+	tcase_add_test (tc_connect, test_connect_fail_002);
 
 	TCase* tc_destroy = tcase_create ("destroy");
 	suite_add_tcase (s, tc_destroy);
@@ -681,6 +1033,18 @@ make_test_suite (void)
 	tcase_add_test (tc_set_fec, test_set_fec_pass_001);
 	tcase_add_test (tc_set_fec, test_set_fec_fail_001);
 
+	TCase* tc_set_pgmcc = tcase_create ("set-pgmcc");
+	suite_add_tcase (s, tc_set_pgmcc);
+	tcase_add_checked_fixture (tc_set_pgmcc, mock_setup, mock_teardown);
+	tcase_add_test (tc_set_pgmcc, test_set_pgmcc_pass_001);
+	tcase_add_test (tc_set_pgmcc, test_set_pgmcc_fail_001);
+
+	TCase* tc_set_cr = tcase_create ("set-cr");
+	suite_add_tcase (s, tc_set_cr);
+	tcase_add_checked_fixture (tc_set_cr, mock_setup, mock_teardown);
+	tcase_add_test (tc_set_cr, test_set_cr_pass_001);
+	tcase_add_test (tc_set_cr, test_set_cr_fail_001);
+
 	TCase* tc_set_send_only = tcase_create ("set-send-only");
 	suite_add_tcase (s, tc_set_send_only);
 	tcase_add_checked_fixture (tc_set_send_only, mock_setup, mock_teardown);
@@ -691,13 +1055,33 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_set_recv_only);
 	tcase_add_checked_fixture (tc_set_recv_only, mock_setup, mock_teardown);
 	tcase_add_test (tc_set_recv_only, test_set_recv_only_pass_001);
+	tcase_add_test (tc_set_recv_only, test_set_recv_only_pass_002);
 	tcase_add_test (tc_set_recv_only, test_set_recv_only_fail_001);
+	tcase_add_test (tc_set_recv_only, test_set_recv_only_fail_002);
 
 	TCase* tc_set_abort_on_reset = tcase_create ("set-abort-on-reset");
 	suite_add_tcase (s, tc_set_abort_on_reset);
 	tcase_add_checked_fixture (tc_set_abort_on_reset, mock_setup, mock_teardown);
 	tcase_add_test (tc_set_abort_on_reset, test_set_abort_on_reset_pass_001);
 	tcase_add_test (tc_set_abort_on_reset, test_set_abort_on_reset_fail_001);
+
+	TCase* tc_set_noblock = tcase_create ("set-non-blocking");
+	suite_add_tcase (s, tc_set_noblock);
+	tcase_add_checked_fixture (tc_set_noblock, mock_setup, mock_teardown);
+	tcase_add_test (tc_set_noblock, test_set_noblock_pass_001);
+	tcase_add_test (tc_set_noblock, test_set_noblock_fail_001);
+
+	TCase* tc_set_udp_unicast = tcase_create ("set-udp-encap-ucast-port");
+	suite_add_tcase (s, tc_set_udp_unicast);
+	tcase_add_checked_fixture (tc_set_udp_unicast, mock_setup, mock_teardown);
+	tcase_add_test (tc_set_udp_unicast, test_set_udp_unicast_pass_001);
+	tcase_add_test (tc_set_udp_unicast, test_set_udp_unicast_fail_001);
+
+	TCase* tc_set_udp_multicast = tcase_create ("set-udp-encap-mcast-port");
+	suite_add_tcase (s, tc_set_udp_multicast);
+	tcase_add_checked_fixture (tc_set_udp_multicast, mock_setup, mock_teardown);
+	tcase_add_test (tc_set_udp_multicast, test_set_udp_multicast_pass_001);
+	tcase_add_test (tc_set_udp_multicast, test_set_udp_multicast_fail_001);
 
 	return s;
 }
