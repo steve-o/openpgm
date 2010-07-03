@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* IFF_UP */
+#define _BSD_SOURCE
 
 #include <errno.h>
 #include <signal.h>
@@ -26,6 +28,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <glib.h>
 #include <check.h>
 
@@ -35,9 +39,9 @@
 /* mock functions for external references */
 
 size_t
-pgm_transport_pkt_offset2 (
+pgm_pkt_offset (
         const bool                      can_fragment,
-        const bool                      use_pgmcc
+        const sa_family_t		pgmcc_family	/* 0 = disable */
         )
 {
         return 0;
