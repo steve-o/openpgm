@@ -1025,7 +1025,7 @@ pgm_recvfrom (
 		}
 		memcpy ((char*)buf + bytes_copied, pskb->data, copy_len);
 		bytes_copied += copy_len;
-		pskb = ++skb;
+		pskb = *(++skb);
 	}
 	if (_bytes_read)
 		*_bytes_read = bytes_copied;
