@@ -21,6 +21,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* IFF_UP */
+#define _BSD_SOURCE
+
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
