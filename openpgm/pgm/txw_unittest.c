@@ -98,9 +98,9 @@ mock_pgm_histogram_add (
 /* mock functions for external references */
 
 size_t
-pgm_transport_pkt_offset2 (
+pgm_pkt_offset (
         const bool                      can_fragment,
-        const bool                      use_pgmcc
+        const sa_family_t		pgmcc_family	/* 0 = disable */
         )
 {
         return 0;
@@ -117,7 +117,7 @@ generate_valid_skb (void)
 	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	struct pgm_sk_buff_t* skb = pgm_alloc_skb (1500);
 /* fake but valid transport and timestamp */
-	skb->transport = (pgm_transport_t*)0x1;
+	skb->sock = (pgm_sock_t*)0x1;
 	skb->tstamp = 1;
 /* header */
 	pgm_skb_reserve (skb, header_length);

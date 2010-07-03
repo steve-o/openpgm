@@ -32,7 +32,21 @@
 
 /* mock state */
 
-
+#define TEST_NETWORK		""
+#define TEST_PORT		7500
+#define TEST_MAX_TPDU		1500
+#define TEST_TXW_SQNS		32
+#define TEST_RXW_SQNS		32
+#define TEST_HOPS		16
+#define TEST_SPM_AMBIENT	( pgm_secs(30) )
+#define TEST_SPM_HEARTBEAT_INIT	{ pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) }
+#define TEST_PEER_EXPIRY	( pgm_secs(300) )
+#define TEST_SPMR_EXPIRY	( pgm_msecs(250) )
+#define TEST_NAK_BO_IVL		( pgm_msecs(50) )
+#define TEST_NAK_RPT_IVL	( pgm_secs(2) )
+#define TEST_NAK_RDATA_IVL	( pgm_secs(2) )
+#define TEST_NAK_DATA_RETRIES	5
+#define TEST_NAK_NCF_RETRIES	2
 
 #define pgm_ipproto_pgm		mock_pgm_ipproto_pgm
 #define pgm_peer_unref		mock_pgm_peer_unref
@@ -70,26 +84,50 @@ mock_teardown (void)
 {
 }
 
+/* stock create pgm sockaddr structure for calls to pgm_bind()
+ */
+
 static
 struct pgm_sockaddr_t*
 generate_asm_sockaddr (void)
 {
-	const in_addr_t default_group = inet_addr("239.192.0.1");
 	const pgm_gsi_t gsi = { 200, 202, 203, 204, 205, 206 };
-	struct pgm_addrinfo_t* addrinfo = g_new0(struct pgm_addrinfo_t, 1);
-	addrinfo->ai_recv_addrs_len = 1;
-	addrinfo->ai_recv_addrs = g_new0(struct group_source_req, 1);
-	((struct sockaddr*)&addrinfo->ai_recv_addrs[0].gsr_group)->sa_family = AF_INET;
-	((struct sockaddr_in*)&addrinfo->ai_recv_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
-	((struct sockaddr*)&addrinfo->ai_recv_addrs[0].gsr_source)->sa_family = AF_INET;
-	((struct sockaddr_in*)&addrinfo->ai_recv_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
-	addrinfo->ai_send_addrs_len = 1;
-	addrinfo->ai_send_addrs = g_new0(struct group_source_req, 1);
-	((struct sockaddr*)&addrinfo->ai_send_addrs[0].gsr_group)->sa_family = AF_INET;
-	((struct sockaddr_in*)&addrinfo->ai_send_addrs[0].gsr_group)->sin_addr.s_addr = default_group;
-	((struct sockaddr*)&addrinfo->ai_send_addrs[0].gsr_source)->sa_family = AF_INET;
-	((struct sockaddr_in*)&addrinfo->ai_send_addrs[0].gsr_source)->sin_addr.s_addr = default_group;
-	return addrinfo;
+	struct pgm_sockaddr_t* pgmsa = g_new0 (struct pgm_sockaddr_t, 1);
+	pgmsa->sa_port = 123;
+	memcpy (&pgmsa->sa_addr.gsi, &gsi, sizeof(gsi));
+	return pgmsa;
+}
+
+/* stock create unconnected socket for pgm_setsockopt(), etc.
+ */
+
+static
+struct pgm_sock_t*
+generate_sock (void)
+{
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
+	struct pgm_sock_t* sock = g_new0 (struct pgm_sock_t, 1);
+	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
+	((struct sockaddr*)&sock->send_addr)->sa_family = AF_INET;
+	((struct sockaddr_in*)&sock->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
+	((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family = AF_INET;
+	((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
+	sock->dport = g_htons(TEST_PORT);
+	sock->window = g_malloc0 (sizeof(pgm_txw_t));
+	sock->txw_sqns = TEST_TXW_SQNS;
+	sock->max_tpdu = TEST_MAX_TPDU;
+	sock->max_tsdu = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (FALSE, FALSE);
+	sock->max_tsdu_fragment = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (TRUE, FALSE);
+	sock->max_apdu = MIN(TEST_TXW_SQNS, PGM_MAX_FRAGMENTS) * sock->max_tsdu_fragment;
+	sock->iphdr_len = sizeof(struct pgm_ip);
+	sock->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
+	sock->spm_heartbeat_interval[0] = pgm_secs(1);
+	pgm_spinlock_init (&sock->txw_spinlock);
+	sock->is_bound = FALSE;
+	sock->is_connected = FALSE;
+	sock->is_destroyed = FALSE;
+	sock->is_reset = FALSE;
+	return sock;
 }
 
 /** receiver module */
@@ -327,6 +365,18 @@ END_TEST
  *		)
  */
 
+START_TEST (test_bind_pass_001)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	struct pgm_sockaddr_t* pgmsa = generate_asm_sockaddr ();
+	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_bind (sock, pgmsa, sizeof(*pgmsa), &err), "bind failed");
+}
+END_TEST
+
 /* fail on unset options */
 START_TEST (test_bind_fail_001)
 {
@@ -367,16 +417,16 @@ START_TEST (test_bind3_fail_001)
 {
 	pgm_error_t* err = NULL;
 	pgm_sock_t* sock = NULL;
-	struct pgm_addrinfo_t* addrinfo = generate_asm_addrinfo ();
-	fail_if (NULL == addrinfo, "generate_asm_addrinfo failed");
+	struct pgm_sockaddr_t* pgmsa = generate_asm_sockaddr ();
+	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
 	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
 	fail_unless (NULL == err, "error raised");
 	struct pgm_interface_req_t send_req = { .ir_interface = 0, .ir_scope_id = 0 },
 				   recv_req = { .ir_interface = 0, .ir_scope_id = 0 };
 	fail_unless (FALSE == pgm_bind3 (sock,
-					 addrinfo, sizeof(struct pgm_addrinfo_t),
-					 send_req, sizeof(send_req),
-					 recv_req, sizeof(recv_req),
+					 pgmsa, sizeof(*pgmsa),
+					 &send_req, sizeof(send_req),
+					 &recv_req, sizeof(recv_req),
 					 &err), "bind failed");
 }
 END_TEST
@@ -396,6 +446,19 @@ END_TEST
  *		pgm_error_t**		error
  *		)
  */
+
+START_TEST (test_connect_pass_001)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	struct pgm_sockaddr_t* pgmsa = generate_asm_sockaddr ();
+	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_bind (sock, pgmsa, sizeof(*pgmsa), &err), "bind failed");
+	fail_unless (TRUE == pgm_connect (sock, &err), "connect failed");
+}
+END_TEST
 
 /* invalid parameters */
 START_TEST (test_connect_fail_001)
@@ -418,7 +481,7 @@ START_TEST (test_destroy_pass_001)
 {
 	pgm_error_t* err = NULL;
 	pgm_sock_t* sock = NULL;
-	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
 	fail_unless (TRUE == pgm_close (sock, FALSE), "destroy failed");
 }
 END_TEST
@@ -428,11 +491,26 @@ START_TEST (test_destroy_pass_002)
 {
 	pgm_error_t* err = NULL;
 	pgm_sock_t* sock = NULL;
-	struct pgm_addrinfo_t* addrinfo = generate_asm_addrinfo ();
-	fail_if (NULL == addrinfo, "generate_asm_addrinfo failed");
-	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+	struct pgm_sockaddr_t* pgmsa = generate_asm_sockaddr ();
+	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
 	fail_unless (NULL == err, "error raised");
-	fail_unless (FALSE == pgm_bind (sock, addrinfo, sizeof(struct pgm_addrinfo_t), &err), "bind failed");
+	fail_unless (TRUE == pgm_bind (sock, pgmsa, sizeof(*pgmsa), &err), "bind failed");
+	fail_unless (TRUE == pgm_close (sock, FALSE), "destroy failed");
+}
+END_TEST
+
+/* socket > bind > connect > close */
+START_TEST (test_destroy_pass_003)
+{
+	pgm_error_t* err = NULL;
+	pgm_sock_t* sock = NULL;
+	struct pgm_sockaddr_t* pgmsa = generate_asm_sockaddr ();
+	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
+	fail_unless (NULL == err, "error raised");
+	fail_unless (TRUE == pgm_bind (sock, pgmsa, sizeof(*pgmsa), &err), "bind failed");
+	fail_unless (TRUE == pgm_connect (sock, &err), "connect failed");
 	fail_unless (TRUE == pgm_close (sock, FALSE), "destroy failed");
 }
 END_TEST
@@ -526,7 +604,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_HOPS,
+ *		const int		optname = PGM_MULTICAST_HOPS,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
  *	)
@@ -536,7 +614,7 @@ START_TEST (test_set_hops_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_HOPS;
+	const int optname	= PGM_MULTICAST_HOPS;
 	const int hops		= 16;
 	const void* optval	= &hops;
 	const socklen_t optlen	= sizeof(hops);
@@ -546,7 +624,7 @@ END_TEST
 
 START_TEST (test_set_hops_fail_001)
 {
-	const int optname	= PGM_HOPS;
+	const int optname	= PGM_MULTICAST_HOPS;
 	const int hops		= 16;
 	const void* optval	= &hops;
 	const socklen_t optlen	= sizeof(hops);
@@ -925,7 +1003,7 @@ START_TEST (test_set_udp_unicast_fail_001)
 	const int optname	= PGM_NOBLOCK;
 	const int unicast_port  = 10001;
 	const void* optval	= &unicast_port;
-	const socklen_t optlen	= sizeof(uniicast_port);
+	const socklen_t optlen	= sizeof(unicast_port);
 	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_udp_unicast failed");
 }
 END_TEST
@@ -988,8 +1066,8 @@ make_test_suite (void)
 	TCase* tc_connect = tcase_create ("connect");
 	suite_add_tcase (s, tc_connect);
 	tcase_add_checked_fixture (tc_connect, mock_setup, mock_teardown);
+	tcase_add_test (tc_connect, test_connect_pass_001);
 	tcase_add_test (tc_connect, test_connect_fail_001);
-	tcase_add_test (tc_connect, test_connect_fail_002);
 
 	TCase* tc_destroy = tcase_create ("destroy");
 	suite_add_tcase (s, tc_destroy);
