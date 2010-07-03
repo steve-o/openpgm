@@ -2,7 +2,7 @@
  *
  * unit tests for PGM timer thread.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -41,8 +41,8 @@
 #define g_source_unref			mock_g_source_unref
 #define pgm_time_now			mock_pgm_time_now
 #define pgm_time_update_now		mock_pgm_time_update_now
-#define pgm_min_nak_expiry		mock_pgm_min_nak_expiry
-#define pgm_check_peer_nak_state	mock_pgm_check_peer_nak_state
+#define pgm_min_receiver_expiry		mock_pgm_min_receiver_expiry
+#define pgm_check_peer_state		mock_pgm_check_peer_state
 #define pgm_send_spm			mock_pgm_send_spm
 
 
@@ -55,20 +55,20 @@ static pgm_time_t mock_pgm_time_now = 0x1;
 
 
 static
-pgm_transport_t*
-generate_transport (void)
+pgm_sock_t*
+generate_sock (void)
 {
-	pgm_transport_t* transport = g_new0 (pgm_transport_t, 1);
-	return transport;
+	pgm_sock_t* sock = g_new0 (pgm_sock_t, 1);
+	return sock;
 }
 
 
 /* mock functions for external references */
 
 size_t
-pgm_transport_pkt_offset2 (
+pgm_pkt_offset (
         const bool                      can_fragment,
-        const bool                      use_pgmcc
+        const sa_family_t		pgmcc_family	/* 0 = disable */
         )
 {
         return 0;
@@ -178,23 +178,23 @@ _mock_pgm_time_update_now (void)
 /** receiver module */
 PGM_GNUC_INTERNAL
 pgm_time_t
-mock_pgm_min_nak_expiry (
+mock_pgm_min_receiver_expiry (
 	pgm_time_t		expiration,
-	pgm_transport_t*	transport
+	pgm_sock_t*	sock
 	)
 {
-	g_assert (NULL != transport);
+	g_assert (NULL != sock);
 	return 0x1;
 }
 
 PGM_GNUC_INTERNAL
 bool
-mock_pgm_check_peer_nak_state (
-	pgm_transport_t*	transport,
+mock_pgm_check_peer_state (
+	pgm_sock_t*	sock,
 	pgm_time_t		now
 	)
 {
-	g_assert (NULL != transport);
+	g_assert (NULL != sock);
 	return TRUE;
 }
 
@@ -202,11 +202,11 @@ mock_pgm_check_peer_nak_state (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_send_spm (
-	pgm_transport_t*	transport,
+	pgm_sock_t*	sock,
 	int			flags
 	)
 {
-	g_assert (NULL != transport);
+	g_assert (NULL != sock);
 	return TRUE;
 }
 
@@ -214,17 +214,17 @@ mock_pgm_send_spm (
 /* target:
  *	bool
  *	pgm_timer_prepare (
- *		pgm_transport_t*	transport
+ *		pgm_sock_t*	sock
  *	)
  */
 
 START_TEST (test_prepare_pass_001)
 {
-	pgm_transport_t* transport = generate_transport ();
-	fail_if (NULL == transport, "generate_transport failed");
-	transport->can_send_data = TRUE;
-	transport->next_ambient_spm = mock_pgm_time_now + pgm_secs(10);
-	fail_unless (FALSE == pgm_timer_prepare (transport), "prepare failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	sock->can_send_data = TRUE;
+	sock->next_ambient_spm = mock_pgm_time_now + pgm_secs(10);
+	fail_unless (FALSE == pgm_timer_prepare (sock), "prepare failed");
 }
 END_TEST
 
@@ -238,15 +238,15 @@ END_TEST
 /* target:
  *	bool
  *	pgm_timer_check (
- *		pgm_transport_t*	transport
+ *		pgm_sock_t*	sock
  *	)
  */
 
 START_TEST (test_check_pass_001)
 {
-	pgm_transport_t* transport = generate_transport ();
-	fail_if (NULL == transport, "generate_transport failed");
-	fail_unless (TRUE == pgm_timer_check (transport), "check failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	fail_unless (TRUE == pgm_timer_check (sock), "check failed");
 }
 END_TEST
 
@@ -260,16 +260,16 @@ END_TEST
 /* target:
  *	pgm_time_t
  *	pgm_timer_expiration (
- *		pgm_transport_t*	transport
+ *		pgm_sock_t*	sock
  *	)
  */
 
 START_TEST (test_expiration_pass_001)
 {
-	pgm_transport_t* transport = generate_transport ();
-	fail_if (NULL == transport, "generate_transport failed");
-	transport->next_poll = mock_pgm_time_now + pgm_secs(300);
-	fail_unless (pgm_secs(300) == pgm_timer_expiration (transport), "expiration failed");
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	sock->next_poll = mock_pgm_time_now + pgm_secs(300);
+	fail_unless (pgm_secs(300) == pgm_timer_expiration (sock), "expiration failed");
 }
 END_TEST
 
@@ -283,15 +283,15 @@ END_TEST
 /* target:
  *	void
  *	pgm_timer_dispatch (
- *		pgm_transport_t*	transport
+ *		pgm_sock_t*	sock
  *	)
  */
 
 START_TEST (test_dispatch_pass_001)
 {
-	pgm_transport_t* transport = generate_transport ();
-	fail_if (NULL == transport, "generate_transport failed");
-	pgm_timer_dispatch (transport);
+	pgm_sock_t* sock = generate_sock ();
+	fail_if (NULL == sock, "generate_sock failed");
+	pgm_timer_dispatch (sock);
 }
 END_TEST
 
