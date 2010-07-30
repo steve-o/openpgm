@@ -46,10 +46,12 @@ struct pgm_mutex_t {
 typedef struct pgm_mutex_t pgm_mutex_t;
 
 struct pgm_spinlock_t {
-#ifndef _WIN32
+#ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spinlock_t	pthread_spinlock;
-#else
+#elif defined(_WIN32)
 	CRITICAL_SECTION	win32_spinlock;
+#else
+	volatile uint32_t	taken;
 #endif
 };
 
@@ -114,19 +116,26 @@ void pgm_spinlock_free (pgm_spinlock_t*);
 bool pgm_spinlock_trylock (pgm_spinlock_t*);
 
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
-#ifndef _WIN32
+#ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spin_lock (&spinlock->pthread_spinlock);
-#else
+#elif defined(_WIN32)
 	EnterCriticalSection (&spinlock->win32_spinlock);
-#endif /* !_WIN32 */
+#else /* GCC atomics */
+	uint32_t prev;
+	do {
+		prev = __sync_lock_test_and_set (&spinlock->taken, 1);
+	} while (prev);
+#endif
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
-#ifndef _WIN32
+#ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
-#else
+#elif defined(_WIN32)
 	LeaveCriticalSection (&spinlock->win32_spinlock);
-#endif /* !_WIN32 */
+#else /* GCC atomics */
+	spinlock->taken = 0;
+#endif
 }
 
 void pgm_cond_init (pgm_cond_t*);
