@@ -43,6 +43,21 @@ PGM_BEGIN_DECLS
 #if !defined(EAFNOSUPPORT) && defined(WSAEAFNOSUPPORT)
 #	define EAFNOSUPPORT		WSAEAFNOSUPPORT
 #endif
+#if !defined(CONFIG_HAVE_GROUP_REQ)
+/* sections 5 and 8.2 of RFC 3768: Multicast group request */
+struct group_req
+{
+	uint32_t		gr_interface;	/* interface index */
+	struct sockaddr_storage	gr_group;	/* group address */
+};
+
+struct group_source_req
+{
+	uint32_t		gsr_interface;	/* interface index */
+	struct sockaddr_storage	gsr_group;	/* group address */
+	struct sockaddr_storage	gsr_source;	/* group source */
+};
+#endif /* !CONFIG_HAVE_GROUP_REQ */
 
 sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);
 uint16_t pgm_sockaddr_port (const struct sockaddr* sa);

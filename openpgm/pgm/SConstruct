@@ -109,6 +109,7 @@ env = Environment(
 			'-D_REENTRANT',
 # POSIX spinlocks
 			'-DCONFIG_HAVE_POSIX_SPINLOCK',
+# NSS protocol lookup
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
 # variadic macros
@@ -140,6 +141,7 @@ env = Environment(
 # win32 cmsg
 #			'-DCONFIG_HAVE_WSACMSGHDR',
 # multicast
+			'-DCONFIG_HAVE_GROUP_REQ',
 			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_HAVE_IP_MREQN',
 # sprintf
