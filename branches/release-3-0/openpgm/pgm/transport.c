@@ -1947,6 +1947,7 @@ pgm_transport_join_group (
 	socklen_t			 len
 	)
 {
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	int status;
 
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -1992,6 +1993,9 @@ pgm_transport_join_group (
 	status = setsockopt (transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_GROUP, (const char*)gr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
+#else /* CONFIG_HAVE_MCAST_JOIN */
+	return FALSE;	/* unsupported */
+#endif
 }
 
 /* for any-source applications (ASM), leave a joined group.
@@ -2004,6 +2008,7 @@ pgm_transport_leave_group (
 	socklen_t			 len
 	)
 {
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	int status;
 
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -2039,6 +2044,9 @@ pgm_transport_leave_group (
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_GROUP, (const char*)gr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
+#else /* CONFIG_HAVE_MCAST_JOIN */
+	return FALSE;	/* unsupported */
+#endif
 }
 
 /* for any-source applications (ASM), turn off a given source
@@ -2051,6 +2059,7 @@ pgm_transport_block_source (
 	socklen_t				len
 	)
 {
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	int status;
 
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -2067,6 +2076,9 @@ pgm_transport_block_source (
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_BLOCK_SOURCE, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
+#else /* CONFIG_HAVE_MCAST_JOIN */
+	return FALSE;	/* unsupported */
+#endif
 }
 
 /* for any-source applications (ASM), re-allow a blocked source
@@ -2079,6 +2091,7 @@ pgm_transport_unblock_source (
 	socklen_t				len
 	)
 {
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	int status;
 
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -2095,6 +2108,9 @@ pgm_transport_unblock_source (
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_UNBLOCK_SOURCE, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
+#else /* CONFIG_HAVE_MCAST_JOIN */
+	return FALSE;	/* unsupported */
+#endif
 }
 
 /* for controlled-source applications (SSM), join each group/source pair.
@@ -2109,6 +2125,7 @@ pgm_transport_join_source_group (
 	socklen_t				len
 	)
 {
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	int status;
 
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -2158,6 +2175,9 @@ pgm_transport_join_source_group (
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_JOIN_SOURCE_GROUP, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
+#else /* CONFIG_HAVE_MCAST_JOIN */
+	return FALSE;	/* unsupported */
+#endif
 }
 
 /* for controlled-source applications (SSM), leave each group/source pair
@@ -2170,6 +2190,7 @@ pgm_transport_leave_source_group (
 	socklen_t				len
 	)
 {
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	int status;
 
 	pgm_return_val_if_fail (transport != NULL, FALSE);
@@ -2204,6 +2225,9 @@ pgm_transport_leave_source_group (
 	status = setsockopt(transport->recv_sock, TRANSPORT_TO_LEVEL(transport), MCAST_LEAVE_SOURCE_GROUP, (const char*)gsr, len);
 	pgm_rwlock_reader_unlock (&transport->lock);
 	return (0 == status);
+#else /* CONFIG_HAVE_MCAST_JOIN */
+	return FALSE;	/* unsupported */
+#endif
 }
 
 #if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)

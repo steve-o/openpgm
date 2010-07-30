@@ -36,7 +36,11 @@
 #	endif
 #endif
 #if defined(_WIN32)
-#	define CONFIG_HAVE_FTIME
+#	define CONFIG_HAVE_FTIME		1
+#endif
+#if defined(__APPLE__)
+#	define CONFIG_HAVE_FTIME		1
+#	define CONFIG_HAVE_GETTIMEOFDAY		1
 #endif
 
 #endif /* __PGM_FEATURES_H__ */
