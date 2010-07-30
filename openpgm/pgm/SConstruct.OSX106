@@ -128,7 +128,8 @@ env = Environment(
 # timing
 			'-DCONFIG_HAVE_PSELECT',
 #			'-DCONFIG_HAVE_RTC',
-			'-DCONFIG_HAVE_TSC',
+# TSC results invalid from testing on 2010 Mac mini
+#			'-DCONFIG_HAVE_TSC',
 #			'-DCONFIG_HAVE_HPET',
 # event handling
 			'-DCONFIG_HAVE_POLL',
