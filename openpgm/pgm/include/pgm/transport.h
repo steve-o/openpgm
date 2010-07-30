@@ -49,6 +49,7 @@ typedef struct pgm_transport_t pgm_transport_t;
 #include <pgm/list.h>
 #include <pgm/slist.h>
 #include <pgm/rate_control.h>
+#include <pgm/sockaddr.h>
 
 PGM_BEGIN_DECLS
 

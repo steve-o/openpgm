@@ -44,13 +44,17 @@
 /* Returns new memory like malloc() */
 #	define PGM_GNUC_MALLOC			__attribute__((__malloc__))
 
+#else
+#	define PGM_GNUC_PURE
+#	define PGM_GNUC_MALLOC
+#endif
+
+#if !defined(__APPLE__) && ((__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96))
 #       define PGM_GNUC_CACHELINE_ALIGNED       __attribute__((__aligned__(SMP_CACHE_BYTES), \
                                                 __section__((".data.cacheline_aligned")))
 #       define PGM_GNUC_READ_MOSTLY             __attribute__((__section__(".data.read_mostly")))
 
 #else
-#	define PGM_GNUC_PURE
-#	define PGM_GNUC_MALLOC
 #       define PGM_GNUC_CACHELINE_ALIGNED
 #       define PGM_GNUC_READ_MOSTLY
 #endif
