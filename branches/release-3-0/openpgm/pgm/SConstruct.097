@@ -91,6 +91,8 @@ env = Environment(ENV = os.environ,
 			'-D_XOPEN_SOURCE=600',
 # re-entrant libc
 			'-D_REENTRANT',
+# POSIX spinlocks
+			'-DCONFIG_HAVE_POSIX_SPINLOCK',
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
 # variadic macros
