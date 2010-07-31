@@ -11,7 +11,7 @@
   # [OpenPgm5CReferenceMigration Migration from version 3.0]
   # [OpenPgm3CReferenceEnvironment Environment]
   # [OpenPgm5CReferenceEvents Events]
-  # [OpenPgm3CReferencePgmSkbs PGM Socket Buffers (SKBs)]
+  # [OpenPgm5CReferencePgmSkbs PGM Socket Buffers (SKBs)]
   # [OpenPgm5CReferenceInterface Interface]
   # [OpenPgm3CReferenceTiming Timing]
   # [OpenPgm5CReferenceSocket Socket]

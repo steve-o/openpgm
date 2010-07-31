@@ -18,6 +18,7 @@ Functional build but no available test report.
   * [OpenPgm3CReferenceBuildLibraryLinuxMinGW GCC 4.2.1] on Microsoft Windows XP, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm3CReferenceBuildLibraryLinuxWine GCC 4.2.1] on Wine 1.1.31, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm3CReferenceBuildLibraryOpenSolaris GCC 3.4.3] on !OpenSolaris 2009.06
+  * [OpenPgm3CReferenceBuildLibraryOSX GCC 4.2.1] on OS X 10.6
   * GCC on SUSE Linux Enterprise Server 10.2
   * GCC on OpenSUSE 11.2
   * GCC on Red Hat Enterprise Linux, or CentOS 5.4

@@ -1,0 +1,45 @@
+﻿#summary OpenPGM 3 : C Reference : Build Library : GCC 4 on OS X 10.6
+#labels Phase-Implementation
+#sidebar TOC3CReferenceProgrammersChecklist
+=== Building with GCC for OS X 10.6 ===
+Download and build stable release of SCons, you may need to set a password before using <tt>sudo</tt>.
+<pre>
+ $ *wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz* 
+ $ *tar zxf scons-1.2.0.tar.gz* 
+ $ *cd scons-1.2.0* 
+ $ *sudo python setup.py install* 
+</pre>
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
+<pre>
+ $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-3-0-66/* 
+</pre>
+Build.
+<pre>
+ $ *cd trunk/openpgm/pgm* 
+ $ *scons -f SConstruct.OSX106* 
+</pre>
+By default SCons is configured to build a debug tree in <tt>./ref/debug-Darwin-i386</tt>, noting the architecture name.
+
+To build the release version in <tt>./ref/release-Darwin-i386</tt> use the following:
+<pre>
+ $ *scons -f SConstruct.OSX106 BUILD=release*
+</pre>
+
+==== Testing ====
+Testing must be performed with the pure examples unless GLib is installed.
+<pre>
+ $ *./ref/debug-Darwin-i386/examples/purinrecv -lp 7500 -n "en0;239.192.0.1"* 
+プリン プリン
+Create transport.
+Startup complete.
+Entering PGM message loop ... 
+</pre>
+Then send a few messages, for example from the same host,
+<pre>
+ $ *./ref/debug-Darwin-i386/examples/purinsend  -lp 7500 -n "en0;239.192.0.1" purin purin*
+</pre>
+And witness the receiver processing the incoming messages.
+<pre>
+"purin" (6 bytes from 170.29.65.155.237.36.57140)
+"purin" (6 bytes from 170.29.65.155.237.36.57140)
+</pre>
