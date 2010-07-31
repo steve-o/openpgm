@@ -30,10 +30,10 @@
 #endif
 #include <stdio.h>
 #include <time.h>
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <impl/receiver.h>
-#include <impl/socket.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
+#include <pgm/receiver.h>
+#include <pgm/transport.h>
 #include <pgm/version.h>
 
 #include "pgm/http.h"
@@ -943,9 +943,9 @@ index_callback (
 		default_callback (connection, path);
 		return;
 	}
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
-	const unsigned transport_count = pgm_slist_length (pgm_sock_list);
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
+	const unsigned transport_count = pgm_slist_length (pgm_transport_list);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 
 	pgm_string_t* response = http_create_response ("OpenPGM", HTTP_TAB_GENERAL_INFORMATION);
 	pgm_string_append_printf (response,	"<table>"
@@ -978,7 +978,7 @@ interfaces_callback (
 {
 	pgm_string_t* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
 	pgm_string_append (response, "<PRE>");
-	struct pgm_ifaddrs_t *ifap, *ifa;
+	struct pgm_ifaddrs *ifap, *ifa;
 	pgm_error_t* err = NULL;
 	if (!pgm_getifaddrs (&ifap, &err)) {
 		pgm_string_append_printf (response, "pgm_getifaddrs(): %s", (err && err->message) ? err->message : "(null)");
@@ -1052,25 +1052,25 @@ transports_callback (
 					"</tr>"
 				);
 
-	if (pgm_sock_list)
+	if (pgm_transport_list)
 	{
-		pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+		pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-		pgm_slist_t* list = pgm_sock_list;
+		pgm_slist_t* list = pgm_transport_list;
 		while (list)
 		{
 			pgm_slist_t* next = list->next;
-			pgm_sock_t*  sock = list->data;
+			pgm_transport_t* transport = list->data;
 
 			char group_address[INET6_ADDRSTRLEN];
-			getnameinfo ((struct sockaddr*)&sock->send_gsr.gsr_group, pgm_sockaddr_len ((struct sockaddr*)&sock->send_gsr.gsr_group),
+			getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_group),
 				     group_address, sizeof(group_address),
 				     NULL, 0,
 				     NI_NUMERICHOST);
 			char gsi[ PGM_GSISTRLEN ];
-			pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
-			const uint16_t sport = ntohs (sock->tsi.sport);
-			const uint16_t dport = ntohs (sock->dport);
+			pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
+			const uint16_t sport = ntohs (transport->tsi.sport);
+			const uint16_t dport = ntohs (transport->dport);
 			pgm_string_append_printf (response,	"<tr>"
 									"<td>%s</td>"
 									"<td>%i</td>"
@@ -1085,7 +1085,7 @@ transports_callback (
 						sport);
 			list = next;
 		}
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 	}
 	else
 	{
@@ -1148,70 +1148,70 @@ http_tsi_response (
 	)
 {
 /* first verify this is a valid TSI */
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	pgm_sock_t* sock = NULL;
-	pgm_slist_t* list = pgm_sock_list;
+	pgm_transport_t* transport = NULL;
+	pgm_slist_t* list = pgm_transport_list;
 	while (list)
 	{
-		pgm_sock_t* list_sock = (pgm_sock_t*)list->data;
+		pgm_transport_t* list_transport = (pgm_transport_t*)list->data;
 		pgm_slist_t* next = list->next;
 
 /* check source */
-		if (pgm_tsi_equal (tsi, &list_sock->tsi))
+		if (pgm_tsi_equal (tsi, &list_transport->tsi))
 		{
-			sock = list_sock;
+			transport = list_transport;
 			break;
 		}
 
 /* check receivers */
-		pgm_rwlock_reader_lock (&list_sock->peers_lock);
-		pgm_peer_t* receiver = pgm_hashtable_lookup (list_sock->peers_hashtable, tsi);
+		pgm_rwlock_reader_lock (&list_transport->peers_lock);
+		pgm_peer_t* receiver = pgm_hashtable_lookup (list_transport->peers_hashtable, tsi);
 		if (receiver) {
 			int retval = http_receiver_response (connection, receiver);
-			pgm_rwlock_reader_unlock (&list_sock->peers_lock);
-			pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+			pgm_rwlock_reader_unlock (&list_transport->peers_lock);
+			pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 			return retval;
 		}
-		pgm_rwlock_reader_unlock (&list_sock->peers_lock);
+		pgm_rwlock_reader_unlock (&list_transport->peers_lock);
 
 		list = next;
 	}
 
-	if (!sock) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!transport) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return -1;
 	}
 
 /* transport now contains valid matching TSI */
 	char gsi[ PGM_GSISTRLEN ];
-	pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
+	pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
 
 	char title[ sizeof("Transport .00000") + PGM_GSISTRLEN ];
 	sprintf (title, "Transport %s.%hu",
 		 gsi,
-		 ntohs (sock->tsi.sport));
+		 ntohs (transport->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&sock->send_gsr.gsr_source, pgm_sockaddr_len ((struct sockaddr*)&sock->send_gsr.gsr_source),
+	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_source, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_source),
 		     source_address, sizeof(source_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&sock->send_gsr.gsr_group, pgm_sockaddr_len ((struct sockaddr*)&sock->send_gsr.gsr_group),
+	getnameinfo ((struct sockaddr*)&transport->send_gsr.gsr_group, pgm_sockaddr_len ((struct sockaddr*)&transport->send_gsr.gsr_group),
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const uint16_t dport = ntohs (sock->dport);
-	const uint16_t sport = ntohs (sock->tsi.sport);
+	const uint16_t dport = ntohs (transport->dport);
+	const uint16_t sport = ntohs (transport->tsi.sport);
 
-	const pgm_time_t ihb_min = sock->spm_heartbeat_len ? sock->spm_heartbeat_interval[ 1 ] : 0;
-	const pgm_time_t ihb_max = sock->spm_heartbeat_len ? sock->spm_heartbeat_interval[ sock->spm_heartbeat_len - 1 ] : 0;
+	const pgm_time_t ihb_min = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ 1 ] : 0;
+	const pgm_time_t ihb_max = transport->spm_heartbeat_len ? transport->spm_heartbeat_interval[ transport->spm_heartbeat_len - 1 ] : 0;
 
 	char spm_path[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&sock->recv_gsr[0].gsr_source, pgm_sockaddr_len ((struct sockaddr*)&sock->recv_gsr[0].gsr_source),
+	getnameinfo ((struct sockaddr*)&transport->recv_gsr[0].gsr_source, pgm_sockaddr_len ((struct sockaddr*)&transport->recv_gsr[0].gsr_source),
 		     spm_path, sizeof(spm_path),
 		     NULL, 0,
 		     NI_NUMERICHOST);
@@ -1237,16 +1237,16 @@ http_tsi_response (
 						"</tr>"
 			);
 
-	if (sock->peers_list)
+	if (transport->peers_list)
 	{
-		pgm_rwlock_reader_lock (&sock->peers_lock);
-		pgm_list_t* peers_list = sock->peers_list;
+		pgm_rwlock_reader_lock (&transport->peers_lock);
+		pgm_list_t* peers_list = transport->peers_list;
 		while (peers_list) {
 			pgm_list_t* next = peers_list->next;
 			http_each_receiver (peers_list->data, response);
 			peers_list = next;
 		}
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 	else
 	{
@@ -1290,7 +1290,7 @@ http_tsi_response (
 						"</tr><tr>"
 							"<th>Ttl</th><td>%u</td>"
 						"</tr><tr>"
-							"<th>Adv Mode</th><td>%s</td>"
+							"<th>Adv Mode</th><td>data(1)</td>"
 						"</tr><tr>"
 							"<th>Late join</th><td>disable(2)</td>"
 						"</tr><tr>"
@@ -1314,19 +1314,18 @@ http_tsi_response (
 						"</tr>"
 						"</table>\n"
 						"</div>",
-				sock->hops,
-				0 == sock->adv_mode ? "time(0)" : "data(1)",
-				sock->txw_max_rte,
-				sock->txw_secs,
-				pgm_to_msecs(sock->spm_ambient_interval),
+				transport->hops,
+				transport->txw_max_rte,
+				transport->txw_secs,
+				pgm_to_msecs(transport->spm_ambient_interval),
 				ihb_min,
 				ihb_max,
-				pgm_to_msecs(sock->nak_bo_ivl),
+				pgm_to_msecs(transport->nak_bo_ivl),
 				spm_path);
 
 /* performance information */
 
-	const pgm_txw_t* window = sock->window;
+	const pgm_txw_t* window = transport->window;
 	pgm_string_append_printf (response,	"\n<h2>Performance information</h2>"
 						"\n<table>"
 						"<tr>"
@@ -1365,25 +1364,25 @@ http_tsi_response (
 							"<th>Malformed NNAKs</th><td>%" GROUP_FORMAT PRIu32 "</td>"
 						"</tr>"
 						"</table>\n",
-						sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
-						sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
+						transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
+						transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
 						window ? pgm_txw_size (window) : 0,	/* minus IP & any UDP header */
 						window ? pgm_txw_length (window) : 0,
-						sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
-						sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
-						sock->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS],
-						sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED],
-						sock->cumulative_stats[PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED],
-						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED],
-						sock->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]);
+						transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
+						transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS],
+						transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED],
+						transport->cumulative_stats[PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED],
+						transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS]);
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 	http_finalize_response (connection, response);
 	return 0;
 }
@@ -1417,7 +1416,7 @@ http_each_receiver (
 	pgm_gsi_print_r (&peer->tsi.gsi, gsi, sizeof(gsi));
 
 	const int sport = ntohs (peer->tsi.sport);
-	const int dport = ntohs (peer->sock->dport);	/* by definition must be the same */
+	const int dport = ntohs (peer->transport->dport);	/* by definition must be the same */
 	pgm_string_append_printf (response,	"<tr>"
 							"<td>%s</td>"
 							"<td>%u</td>"
@@ -1455,7 +1454,7 @@ http_time_summary (
 	if (now_time < (24 * 60 * 60))
 	{
 		char hourmin[6];
-		strftime (hourmin, sizeof(hourmin), "%H:%M", activity_tm);
+		strftime (hourmin, sizeof(hourmin), "%H:%M", &activity_tm);
 
 		if (now_time < 60) {
 			return sprintf (sz, "%s (%li second%s ago)",
@@ -1474,7 +1473,7 @@ http_time_summary (
 	{
 		char daymonth[32];
 #ifndef _WIN32
-		strftime (daymonth, sizeof(daymonth), "%d %b", activity_tm);
+		strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
 #else
 		wchar_t wdaymonth[32];
 		const size_t slen  = strftime (daymonth, sizeof(daymonth), "%d %b", &activity_tm);
@@ -1524,9 +1523,9 @@ http_receiver_response (
 		     NI_NUMERICHOST);
 
 	const uint16_t sport = ntohs (peer->tsi.sport);
-	const uint16_t dport = ntohs (peer->sock->dport);	/* by definition must be the same */
+	const uint16_t dport = ntohs (peer->transport->dport);	/* by definition must be the same */
 	const pgm_rxw_t* window = peer->window;
-	const uint32_t outstanding_naks = window->nak_backoff_queue.length +
+	const uint32_t outstanding_naks = window->backoff_queue.length +
 					  window->wait_ncf_queue.length +
 					  window->wait_data_queue.length;
 
@@ -1592,12 +1591,12 @@ http_receiver_response (
 						"</tr>"
 						"</table>\n"
 						"</div>",
-						pgm_to_msecs(peer->sock->nak_bo_ivl),
-						pgm_to_msecs(peer->sock->nak_rpt_ivl),
-						peer->sock->nak_ncf_retries,
-						pgm_to_msecs(peer->sock->nak_rdata_ivl),
-						peer->sock->nak_data_retries,
-						peer->sock->hops);
+						pgm_to_msecs(peer->transport->nak_bo_ivl),
+						pgm_to_msecs(peer->transport->nak_rpt_ivl),
+						peer->transport->nak_ncf_retries,
+						pgm_to_msecs(peer->transport->nak_rdata_ivl),
+						peer->transport->nak_data_retries,
+						peer->transport->hops);
 
 	pgm_string_append_printf (response,	"\n<h2>Performance information</h2>"
 						"\n<table>"
@@ -1679,7 +1678,7 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED],
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES],
 						peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED],
-						peer->sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
+						peer->transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],

@@ -24,8 +24,8 @@
 #ifndef _WIN32
 #	include <netdb.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
 
 
 //#define GSI_DEBUG

@@ -25,7 +25,7 @@
 #ifndef G_OS_WIN32
 #	include <netdb.h>
 #endif
-#include <pgm/pgm.h>
+#include <pgm/framework.h>
 #include "pgm/log.h"
 
 

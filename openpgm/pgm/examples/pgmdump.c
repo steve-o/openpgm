@@ -36,10 +36,10 @@
 #	include <sys/socket.h>
 #endif
 
-#include <pgm/pgm.h>
-
 /* PGM internals */
-#include <impl/packet_test.h>
+#include <pgm/packet_test.h>
+#include <pgm/skbuff.h>
+#include <pgm/packet.h>
 
 /* example dependencies */
 #include <pgm/backtrace.h>

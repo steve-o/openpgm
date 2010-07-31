@@ -33,14 +33,14 @@ struct pgm_rwlock_t;
 struct pgm_slist_t;
 
 static gint mock_time_init = 0;
-static struct pgm_rwlock_t mock_pgm_sock_list_lock;
-static struct pgm_slist_t* mock_pgm_sock_list = NULL;
+static struct pgm_rwlock_t mock_pgm_transport_list_lock;
+static struct pgm_slist_t* mock_pgm_transport_list = NULL;
 
 #define pgm_time_init		mock_pgm_time_init
 #define pgm_time_shutdown	mock_pgm_time_shutdown
-#define pgm_close		mock_pgm_close
-#define pgm_sock_list_lock	mock_pgm_sock_list_lock
-#define pgm_sock_list		mock_pgm_sock_list
+#define pgm_transport_destroy	mock_pgm_transport_destroy
+#define pgm_transport_list_lock	mock_pgm_transport_list_lock
+#define pgm_transport_list	mock_pgm_transport_list
 
 #define ENGINE_DEBUG
 #include "engine.c"
@@ -64,9 +64,9 @@ mock_teardown (void)
 /* mock functions for external references */
 
 size_t
-pgm_pkt_offset (
+pgm_transport_pkt_offset2 (
         const bool                      can_fragment,
-        const sa_family_t		pgmcc_family	/* 0 = disable */
+        const bool                      use_pgmcc
         )
 {
         return 0;
@@ -93,8 +93,8 @@ mock_pgm_time_shutdown (void)
 }
 
 bool
-mock_pgm_close (
-	pgm_sock_t*		sock,
+mock_pgm_transport_destroy (
+	pgm_transport_t*	transport,
 	bool			flush
         )
 {

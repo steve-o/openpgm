@@ -20,15 +20,13 @@
  */
 
 #define _GNU_SOURCE
-#include <fcntl.h>
 #include <signal.h>		/* _GNU_SOURCE for strsignal() */
 #include <glib.h>
-#ifndef G_OS_WIN32
-#	include <unistd.h>
-#else
+#ifdef G_OS_WIN32
+#	include <fcntl.h>
 #	include <io.h>
 #endif
-#include <pgm/pgm.h>
+#include <pgm/framework.h>
 #include "pgm/signal.h"
 
 
@@ -46,24 +44,6 @@ static gboolean	on_io_signal (GIOChannel*, GIOCondition, gpointer);
 static const char* cond_string (GIOCondition);
 
 
-static
-void
-set_nonblock (
-	const int	s,
-	const gboolean	v
-	)
-{
-#ifndef G_OS_WIN32
-	int flags = fcntl (s, F_GETFL);
-	if (!v) flags &= ~O_NONBLOCK;
-	else flags |= O_NONBLOCK;
-	fcntl (s, F_SETFL, flags);
-#else
-	u_long mode = v;
-	ioctlsocket (s, FIONBIO, &mode);
-#endif
-}
-
 /* install signal handler and return unix fd to add to event loop
  */
 
@@ -74,8 +54,8 @@ pgm_signal_install (
 	gpointer		user_data
 	)
 {
-	g_debug ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
-		signum, (const void*)handler, user_data);
+	pgm_debug ("pgm_signal_install (signum:%d handler:%p user_data:%p)",
+		signum, (gpointer)handler, user_data);
 
 	if (NULL == signal_io)
 	{
@@ -86,8 +66,8 @@ pgm_signal_install (
 #endif
 			return FALSE;
 
-		set_nonblock (signal_pipe[0], TRUE);
-		set_nonblock (signal_pipe[1], TRUE);
+		pgm_sockaddr_nonblocking (signal_pipe[0], TRUE);
+		pgm_sockaddr_nonblocking (signal_pipe[1], TRUE);
 /* add to evm */
 		signal_io = g_io_channel_unix_new (signal_pipe[0]);
 		g_io_add_watch (signal_io, G_IO_IN, on_io_signal, user_data);
@@ -106,13 +86,13 @@ on_signal (
 	int		signum
 	)
 {
-	g_debug ("on_signal (signum:%d)", signum);
+	pgm_debug ("on_signal (signum:%d)", signum);
 	if (write (signal_pipe[1], &signum, sizeof(signum)) != sizeof(signum))
 	{
 #ifndef G_OS_WIN32
-		g_warning ("Unix signal %s (%d) lost", strsignal (signum), signum);
+		pgm_warn ("Unix signal %s (%d) lost", strsignal (signum), signum);
 #else
-		g_warning ("Unix signal (%d) lost", signum);
+		pgm_warn ("Unix signal (%d) lost", signum);
 #endif
 	}
 }
@@ -132,7 +112,7 @@ on_io_signal (
 	g_assert (NULL != source);
 	g_assert (G_IO_IN == cond);
 
-	g_debug ("on_io_signal (source:%p cond:%s user_data:%p)",
+	pgm_debug ("on_io_signal (source:%p cond:%s user_data:%p)",
 		(gpointer)source, cond_string (cond), user_data);
 
 	int signum;
@@ -144,7 +124,7 @@ on_io_signal (
 	}
 	else
 	{
-		g_warning ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
+		pgm_warn ("Lost data in signal pipe, read %" G_GSIZE_FORMAT " byte%s expected %" G_GSIZE_FORMAT ".",
 				bytes_read, bytes_read > 1 ? "s" : "", sizeof(signum));
 	}
 

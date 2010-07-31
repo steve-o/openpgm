@@ -33,8 +33,7 @@ src = Split("""
 		tsi.c
 		txw.c
 		rxw.c
-		skbuff.c
-		socket.c
+		transport.c
 		source.c
 		receiver.c
 		recv.c
@@ -135,27 +134,24 @@ if env['WITH_CHECK'] == 'true':
 		];
 # library
 	te.Program (['txw_unittest.c',
-			e.Object('tsi.c'),
-			e.Object('skbuff.c')] + tframework);
+			e.Object('tsi.c')] + tframework);
 	te.Program (['rxw_unittest.c',
-			e.Object('tsi.c'),
-			e.Object('skbuff.c')] + tframework);
+			e.Object('tsi.c')] + tframework);
 	te.Program (['engine_unittest.c',
 			e.Object('version.c')] + tframework);
 	te.Program (['gsi_unittest.c',
 			e.Object('if.c')] + tframework);
 	te.Program (['tsi_unittest.c'] + tframework);
 	te.Program (['if_unittest.c'] + tframework);
-	te.Program (['socket_unittest.c',
+	te.Program (['transport_unittest.c',
 			e.Object('if.c'),
 			e.Object('tsi.c')] + tframework);
-#	te.Program (['source_unittest.c'] + tframework);
-#	te.Program (['receiver_unittest.c',
-#			e.Object('tsi.c')] + tframework);
+	te.Program (['source_unittest.c'] + tframework);
+	te.Program (['receiver_unittest.c',
+			e.Object('tsi.c')] + tframework);
 	te.Program (['recv_unittest.c',
 			e.Object('tsi.c'),
-			e.Object('gsi.c'),
-			e.Object('skbuff.c')] + tframework);
+			e.Object('gsi.c')] + tframework);
 	te.Program (['net_unittest.c'] + tframework);
 	te.Program (['timer_unittest.c'] + tframework);
 	te.Program (['packet_parse_unittest.c'] + tframework);

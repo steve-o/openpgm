@@ -21,12 +21,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
-#ifdef _WIN32
-#	define strcasecmp	stricmp
-#endif
-#include <impl/framework.h>
-#include <impl/mem.h>
-
+#include <pgm/framework.h>
 
 //#define MEM_DEBUG
 

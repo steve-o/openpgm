@@ -17,6 +17,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#if !defined (__PGM_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
+
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
@@ -32,7 +36,7 @@ pgm_atomic_exchange_and_add32 (
 	const uint32_t		val
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#if defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))
 	uint32_t result;
 	asm volatile (	"lock\n\t"
 			"xaddl %0, %1"
@@ -52,7 +56,7 @@ pgm_atomic_exchange_and_add32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
-	return InterlockedExchangeAdd ((volatile LONG*)atomic, val);
+	return InterlockedExchangeAdd (atomic, val);
 #else
 #	error "No supported atomic operations for this platform."
 #endif
@@ -65,7 +69,7 @@ pgm_atomic_add32 (
 	const uint32_t		val
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#if defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))
 	asm volatile (	"lock\n\t"
 			"addl %1, %0"
 		      : "=m" (*atomic)
@@ -80,7 +84,7 @@ pgm_atomic_add32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	__sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
-	InterlockedExchangeAdd ((volatile LONG*)atomic, val);
+	InterlockedExchangeAdd (atomic, val);
 #endif
 }
 
@@ -97,7 +101,7 @@ pgm_atomic_inc32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
 #elif defined( _WIN32 )
-	InterlockedIncrement ((volatile LONG*)atomic);
+	InterlockedIncrement (atomic);
 #endif
 }
 
@@ -114,7 +118,7 @@ pgm_atomic_dec32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
 #elif defined( _WIN32 )
-	InterlockedDecrement ((volatile LONG*)atomic);
+	InterlockedDecrement (atomic);
 #endif
 }
 

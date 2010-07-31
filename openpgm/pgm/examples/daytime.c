@@ -26,15 +26,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#ifndef _WIN32
-#	include <fcntl.h>
-#	include <unistd.h>
-#	include <pthread.h>
-#else
+#ifdef _WIN32
 #	include <process.h>
 #	include <wchar.h>
 #	include "getopt.h"
-#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -51,14 +46,12 @@ static int		max_tpdu = 1500;
 static int		max_rte = 400*1000;		/* very conservative rate, 2.5mb/s */
 static int		sqns = 100;
 
-static bool		use_pgmcc = FALSE;
-static bool		use_fec = FALSE;
 static bool		use_ondemand_parity = FALSE;
-static int		proactive_packets = 0;
+static int		rs_h = 0;			/* pro-active parity count */
 static int		rs_k = 8;
 static int		rs_n = 255;
 
-static pgm_sock_t*	sock = NULL;
+static pgm_transport_t* transport = NULL;
 static bool		is_terminated = FALSE;
 
 #ifndef _WIN32
@@ -72,14 +65,10 @@ static HANDLE		terminate_event;
 static BOOL on_console_ctrl (DWORD);
 static unsigned __stdcall nak_routine (void*);
 #endif
-#ifndef _MSC_VER
-static void usage (const char*) __attribute__((__noreturn__));
-#else
-static void usage (const char*);
-#endif
 
+static void usage (const char*) __attribute__((__noreturn__));
 static bool on_startup (void);
-static bool create_sock (void);
+static bool create_transport (void);
 static bool create_nak_thread (void);
 
 
@@ -93,7 +82,6 @@ usage (
 	fprintf (stderr, "  -s <port>       : IP port\n");
 	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
 	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
-	fprintf (stderr, "  -c              : Enable PGMCC\n");
 	fprintf (stderr, "  -f <type>       : Enable FEC: proactive, ondemand, or both\n");
 	fprintf (stderr, "  -N <n>          : Reed-Solomon block size (255)\n");
 	fprintf (stderr, "  -K <k>          : Reed-Solomon group size (8)\n");
@@ -124,24 +112,22 @@ main (
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:cf:N:K:P:lih")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:r:f:N:K:P:lih")) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;
 		case 's':	port = atoi (optarg); break;
 		case 'p':	udp_encap_port = atoi (optarg); break;
 		case 'r':	max_rte = atoi (optarg); break;
-		case 'c':	use_pgmcc = TRUE; break;
 		case 'f':
-			use_fec = TRUE;
 			switch (optarg[0]) {
 			case 'p':
 			case 'P':
-				proactive_packets = 1;
+				rs_h = 1;
 				break;
 			case 'b':
 			case 'B':
-				proactive_packets = 1;
+				rs_h = 1;
 			case 'o':
 			case 'O':
 				use_ondemand_parity = TRUE;
@@ -150,7 +136,7 @@ main (
 			break;
 		case 'N':	rs_n = atoi (optarg); break;
 		case 'K':	rs_k = atoi (optarg); break;
-		case 'P':	proactive_packets = atoi (optarg); break;
+		case 'P':	rs_h = atoi (optarg); break;
 
 		case 'l':	use_multicast_loop = TRUE; break;
 
@@ -164,7 +150,7 @@ main (
 		}
 	}
 
-	if (use_fec && ( !rs_n || !rs_k )) {
+	if ((use_ondemand_parity || rs_h > 0) && ( !rs_n || !rs_k )) {
 		fprintf (stderr, "Invalid Reed-Solomon parameters RS(%d,%d).\n", rs_n, rs_k);
 		usage (binary_name);
 	}
@@ -176,8 +162,6 @@ main (
 #ifndef _WIN32
 	int e = pipe (terminate_pipe);
 	assert (0 == e);
-	const int flags = fcntl (terminate_pipe[0], F_GETFL);
-	fcntl (terminate_pipe[0], F_SETFL, flags | O_NONBLOCK);
 	signal (SIGINT,  on_signal);
 	signal (SIGTERM, on_signal);
 #else
@@ -198,7 +182,7 @@ main (
 #ifndef _WIN32
 		char s[1024];
 		const size_t slen = strftime (s, sizeof(s), TIME_FORMAT, time_ptr);
-		const int status = pgm_send (sock, s, slen + 1, NULL);
+		const int status = pgm_send (transport, s, slen + 1, NULL);
 #else
 		char s[1024];
 		const size_t slen = strftime (s, sizeof(s), TIME_FORMAT, time_ptr);
@@ -206,7 +190,7 @@ main (
 		size_t wslen = MultiByteToWideChar (CP_ACP, 0, s, slen, ws, 1024);
 		char us[1024];
 		size_t uslen = WideCharToMultiByte (CP_UTF8, 0, ws, wslen + 1, us, sizeof(us), NULL, NULL);
-		const int status = pgm_send (sock, us, uslen + 1, NULL);
+		const int status = pgm_send (transport, us, uslen + 1, NULL);
 #endif
 	        if (PGM_IO_STATUS_NORMAL != status) {
 			fprintf (stderr, "pgm_send() failed.\n");
@@ -230,10 +214,10 @@ main (
 	CloseHandle (terminate_event);
 #endif /* !_WIN32 */
 
-	if (sock) {
-		puts ("Closing PGM sock.");
-		pgm_close (sock, TRUE);
-		sock = NULL;
+	if (transport) {
+		puts ("Destroying transport.");
+		pgm_transport_destroy (transport, TRUE);
+		transport = NULL;
 	}
 
 	puts ("PGM engine shutdown.");
@@ -273,7 +257,7 @@ static
 bool
 on_startup (void)
 {
-	bool status = (create_sock() && create_nak_thread());
+	bool status = (create_transport() && create_nak_thread());
 	if (status)
 		puts ("Startup complete.");
 	return status;
@@ -281,149 +265,66 @@ on_startup (void)
 
 static
 bool
-create_sock (void)
+create_transport (void)
 {
-	struct pgm_addrinfo_t* res = NULL;
+	struct pgm_transport_info_t* res = NULL;
 	pgm_error_t* pgm_err = NULL;
-	sa_family_t sa_family = AF_UNSPEC;
 
-/* parse network parameter into sock address structure */
-	if (!pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
+	puts ("Create transport.");
+
+/* parse network parameter into transport address structure */
+	char network_param[1024];
+	sprintf (network_param, "%s", network);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
-		goto err_abort;
+		pgm_error_free (pgm_err);
+		return FALSE;
 	}
-
-	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
-
-	puts ("Create PGM socket.");
+/* create global session identifier */
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
+		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_if_free_transport_info (res);
+		return FALSE;
+	}
 	if (udp_encap_port) {
-		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
-			fprintf (stderr, "Creating PGM/UDP socket: %s\n", pgm_err->message);
-			goto err_abort;
-		}
-		pgm_setsockopt (sock, PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-		pgm_setsockopt (sock, PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-	} else {
-		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
-			fprintf (stderr, "Creating PGM/IP socket: %s\n", pgm_err->message);
-			goto err_abort;
-		}
+		res->ti_udp_encap_ucast_port = udp_encap_port;
+		res->ti_udp_encap_mcast_port = udp_encap_port;
 	}
-
-/* Use RFC 2113 tagging for PGM Router Assist */
-	const int no_router_assist = 0;
-	pgm_setsockopt (sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
-
-	pgm_drop_superuser();
+	if (port)
+		res->ti_dport = port;
+	if (!pgm_transport_create (&transport, res, &pgm_err)) {
+		fprintf (stderr, "Creating transport: %s\n", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_if_free_transport_info (res);
+		return FALSE;
+	}
+	pgm_if_free_transport_info (res);
 
 /* set PGM parameters */
-	const int send_only = 1,
-		  ambient_spm = pgm_secs (30),
-		  heartbeat_spm[] = { pgm_msecs (100),
-				      pgm_msecs (100),
-                                      pgm_msecs (100),
-				      pgm_msecs (100),
-				      pgm_msecs (1300),
-				      pgm_secs  (7),
-				      pgm_secs  (16),
-				      pgm_secs  (25),
-				      pgm_secs  (30) };
-
-	pgm_setsockopt (sock, PGM_SEND_ONLY, &send_only, sizeof(send_only));
-	pgm_setsockopt (sock, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
-	pgm_setsockopt (sock, PGM_TXW_SQNS, &sqns, sizeof(sqns));
-	pgm_setsockopt (sock, PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
-	pgm_setsockopt (sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
-	pgm_setsockopt (sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
-
-#ifdef I_UNDERSTAND_PGMCC_AND_FEC_ARE_NOT_SUPPORTED
-	if (use_pgmcc) {
-		struct pgm_pgmccinfo_t pgmccinfo;
-		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
-		pgmccinfo.ack_c			= 75;
-		pgmccinfo.ack_c_p		= 500;
-		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
-	}
-	if (use_fec) {
-		struct pgm_fecinfo_t fecinfo; 
-		fecinfo.block_size		= rs_n;
-		fecinfo.proactive_packets	= proactive_packets;
-		fecinfo.group_size		= rs_k;
-		fecinfo.ondemand_parity_enabled	= use_ondemand_parity;
-		fecinfo.var_pktlen_enabled	= TRUE;
-		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
-	}
-#endif
-
-/* create global session identifier */
-	struct pgm_sockaddr_t addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = port ? port : DEFAULT_DATA_DESTINATION_PORT;
-	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
-	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
-		fprintf (stderr, "Creating GSI: %s\n", pgm_err->message);
-		goto err_abort;
+	pgm_transport_set_nonblocking (transport, TRUE);
+	pgm_transport_set_send_only (transport, TRUE);
+	pgm_transport_set_max_tpdu (transport, max_tpdu);
+	pgm_transport_set_txw_sqns (transport, sqns);
+	pgm_transport_set_txw_max_rte (transport, max_rte);
+	pgm_transport_set_multicast_loop (transport, use_multicast_loop);
+	pgm_transport_set_hops (transport, 16);
+	pgm_transport_set_ambient_spm (transport, pgm_secs(30));
+	unsigned spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+	pgm_transport_set_heartbeat_spm (transport, spm_heartbeat, sizeof(spm_heartbeat)/sizeof(spm_heartbeat[0]));
+	if (use_ondemand_parity || (rs_h > 0)) {
+		pgm_transport_set_fec (transport, rs_h, use_ondemand_parity, TRUE, rs_n, rs_k);
 	}
 
-/* assign socket to specified address */
-	struct pgm_interface_req_t if_req;
-	memset (&if_req, 0, sizeof(if_req));
-	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
-	if_req.ir_scope_id  = 0;
-	if (AF_INET6 == sa_family) {
-		struct sockaddr_in6 sa6;
-		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
-		if_req.ir_scope_id = sa6.sin6_scope_id;
-	}
-	if (!pgm_bind3 (sock,
-			&addr, sizeof(addr),
-			&if_req, sizeof(if_req),        /* tx interface */
-			&if_req, sizeof(if_req),        /* rx interface */
-			&pgm_err))
-	{
-		fprintf (stderr, "Binding PGM socket: %s\n", pgm_err->message);
-		goto err_abort;
-	}
-
-/* join IP multicast groups */
-	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
-	pgm_freeaddrinfo (res);
-
-/* set IP parameters */
-	const int nonblocking = 1,
-		  multicast_loop = use_multicast_loop ? 1 : 0,
-		  multicast_hops = 16,
-		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
-
-	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-	if (AF_INET6 != sa_family)
-		pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
-	pgm_setsockopt (sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
-
-	if (!pgm_connect (sock, &pgm_err)) {
-		fprintf (stderr, "Connecting PGM socket: %s\n", pgm_err->message);
-		goto err_abort;
-	}
-
-	return TRUE;
-
-err_abort:
-	if (NULL != sock) {
-		pgm_close (sock, FALSE);
-		sock = NULL;
-	}
-	if (NULL != res) {
-		pgm_freeaddrinfo (res);
-		res = NULL;
-	}
-	if (NULL != pgm_err) {
+/* assign transport to specified address */
+	if (!pgm_transport_bind (transport, &pgm_err)) {
+		fprintf (stderr, "Binding transport: %s\n", pgm_err->message);
 		pgm_error_free (pgm_err);
-		pgm_err = NULL;
+		pgm_transport_destroy (transport, FALSE);
+		transport = NULL;
+		return FALSE;
 	}
-	return FALSE;
+	return TRUE;
 }
 
 static
@@ -431,13 +332,13 @@ bool
 create_nak_thread (void)
 {
 #ifndef _WIN32
-	const int status = pthread_create (&nak_thread, NULL, &nak_routine, sock);
+	const int status = pthread_create (&nak_thread, NULL, &nak_routine, transport);
 	if (0 != status) {
 		fprintf (stderr, "Creating new thread: %s\n", strerror (status));
 		return FALSE;
 	}
 #else
-	nak_thread = (HANDLE)_beginthreadex (NULL, 0, &nak_routine, sock, 0, NULL);
+	nak_thread = (HANDLE)_beginthreadex (NULL, 0, &nak_routine, transport, 0, NULL);
 	const int save_errno = errno;
 	if (0 == nak_thread) {
 		fprintf (stderr, "Creating new thread: %s\n", strerror (save_errno));
@@ -459,26 +360,22 @@ nak_routine (
 	)
 {
 /* dispatch loop */
-	pgm_sock_t* nak_sock = (pgm_sock_t*)arg;
+	pgm_transport_t* nak_transport = arg;
 #ifndef _WIN32
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 4, recv_sock, repair_sock, pending_sock;
-	HANDLE waitHandles[ 4 ];
+	int n_handles = 4;
+	HANDLE waitHandles[ n_handles ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, repairEvent, pendingEvent;
-	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (nak_sock, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, recvEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_recv_fd (nak_transport), recvEvent, FD_READ);
 	repairEvent = WSACreateEvent ();
-	pgm_getsockopt (nak_sock, PGM_REPAIR_SOCK, &repair_sock, &socklen);
-	WSAEventSelect (repair_sock, repairEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_repair_fd (nak_transport), repairEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (nak_sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
+	WSAEventSelect (pgm_transport_get_pending_fd (nak_transport), pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
 	waitHandles[1] = recvEvent;
@@ -489,26 +386,20 @@ nak_routine (
 		struct timeval tv;
 		char buf[4064];
 		pgm_error_t* pgm_err = NULL;
-		const int status = pgm_recv (nak_sock, buf, sizeof(buf), 0, NULL, &pgm_err);
+		const int status = pgm_recv (nak_transport, buf, sizeof(buf), 0, NULL, &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_TIMER_PENDING:
-			{
-				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, &optlen);
-			}
+			pgm_transport_get_timer_pending (nak_transport, &tv);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			{
-				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, &optlen);
-			}
+			pgm_transport_get_rate_remaining (nak_transport, &tv);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 #ifndef _WIN32
 			fds = terminate_pipe[0] + 1;
 			FD_ZERO(&readfds);
 			FD_SET(terminate_pipe[0], &readfds);
-			pgm_select_info (nak_sock, &readfds, NULL, &fds);
+			pgm_transport_select_info (nak_transport, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));

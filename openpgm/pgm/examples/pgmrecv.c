@@ -2,7 +2,7 @@
  *
  * Simple receiver using the PGM transport, based on enonblocksyncrecvmsgv :/
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -58,24 +58,24 @@
 
 /* globals */
 
-static int		g_port = 0;
-static const char*	g_network = "";
-static const char*	g_source = "";
-static gboolean		g_multicast_loop = FALSE;
-static int		g_udp_encap_port = 0;
+static int g_port = 0;
+static const char* g_network = "";
+static const char* g_source = "";
+static gboolean g_multicast_loop = FALSE;
+static int g_udp_encap_port = 0;
 
-static int		g_max_tpdu = 1500;
-static int		g_sqns = 100;
+static int g_max_tpdu = 1500;
+static int g_sqns = 100;
 
-static pgm_sock_t*	g_sock = NULL;
-static GThread*		g_thread = NULL;
-static GMainLoop*	g_loop = NULL;
-static gboolean		g_quit;
+static pgm_transport_t* g_transport = NULL;
+static GThread* g_thread = NULL;
+static GMainLoop* g_loop = NULL;
+static gboolean g_quit;
 #ifdef G_OS_UNIX
-static int		g_quit_pipe[2];
+static int g_quit_pipe[2];
 static void on_signal (int, gpointer);
 #else
-static HANDLE		g_quit_event;
+static HANDLE g_quit_event;
 static BOOL on_console_ctrl (DWORD);
 #endif
 
@@ -83,7 +83,7 @@ static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
 static gpointer receiver_thread (gpointer);
-static int on_msgv (struct pgm_msgv_t*, size_t);
+static int on_msgv (struct pgm_msgv_t*, guint, gpointer);
 
 
 G_GNUC_NORETURN static void
@@ -250,11 +250,11 @@ main (
 	g_main_loop_unref (g_loop);
 	g_loop = NULL;
 
-	if (g_sock) {
-		g_message ("closing PGM socket.");
+	if (g_transport) {
+		g_message ("destroying transport.");
 
-		pgm_close (g_sock, TRUE);
-		g_sock = NULL;
+		pgm_transport_destroy (g_transport, TRUE);
+		g_transport = NULL;
 	}
 
 #ifdef CONFIG_WITH_HTTP
@@ -305,131 +305,90 @@ on_startup (
 	G_GNUC_UNUSED gpointer data
 	)
 {
-	struct pgm_addrinfo_t* res = NULL;
+	struct pgm_transport_info_t* res = NULL;
 	pgm_error_t* pgm_err = NULL;
-	sa_family_t sa_family = AF_UNSPEC;
+	GError* err = NULL;
 
 	g_message ("startup.");
+	g_message ("create transport.");
 
 /* parse network parameter into transport address structure */
-	if (!pgm_getaddrinfo (g_network, NULL, &res, &pgm_err)) {
+	char network[1024];
+	sprintf (network, "%s", g_network);
+	if (!pgm_if_get_transport_info (network, NULL, &res, &pgm_err)) {
 		g_error ("parsing network parameter: %s", pgm_err->message);
-		goto err_abort;
+		pgm_error_free (pgm_err);
+		g_main_loop_quit(g_loop);
+		return FALSE;
 	}
-
-	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
-
+/* create global session identifier */
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &pgm_err)) {
+		g_error ("creating GSI: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_if_free_transport_info (res);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+/* source-specific multicast (SSM) */
+	if (g_source[0]) {
+		((struct sockaddr_in*)&res->ti_recv_addrs[0].gsr_source)->sin_addr.s_addr = inet_addr(g_source);
+	}
+/* UDP encapsulation */
 	if (g_udp_encap_port) {
-		g_message ("create PGM/UDP socket.");
-		if (!pgm_socket (&g_sock, sa_family, SOCK_SEQPACKET, IPPROTO_UDP, &pgm_err)) {
-			g_error ("socket: %s", pgm_err->message);
-			goto err_abort;
-		}
-		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_UCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
-		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_MCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
-	} else {
-		g_message ("create PGM/IP socket.");
-		if (!pgm_socket (&g_sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
-			g_error ("socket: %s", pgm_err->message);
-			goto err_abort;
-		}
+		res->ti_udp_encap_ucast_port = g_udp_encap_port;
+		res->ti_udp_encap_mcast_port = g_udp_encap_port;
 	}
-
-/* Use RFC 2113 tagging for PGM Router Assist */
-	const int no_router_assist = 0;
-	pgm_setsockopt (g_sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
-
-	pgm_drop_superuser();
+	if (g_port)
+		res->ti_dport = g_port;
+	if (!pgm_transport_create (&g_transport, res, &pgm_err)) {
+		g_error ("creating transport: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_if_free_transport_info (res);
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
+	pgm_if_free_transport_info (res);
 
 /* set PGM parameters */
-	const int recv_only = 1,
-		  passive = 0,
-		  peer_expiry = pgm_secs (300),
-		  spmr_expiry = pgm_msecs (250),
-		  nak_bo_ivl = pgm_msecs (50),
-		  nak_rpt_ivl = pgm_secs (2),
-		  nak_rdata_ivl = pgm_secs (2),
-		  nak_data_retries = 50,
-		  nak_ncf_retries = 50;
+	pgm_transport_set_nonblocking (g_transport, TRUE);
+	pgm_transport_set_recv_only (g_transport, TRUE, FALSE);
+	pgm_transport_set_max_tpdu (g_transport, g_max_tpdu);
+	pgm_transport_set_rxw_sqns (g_transport, g_sqns);
+	pgm_transport_set_multicast_loop (g_transport, g_multicast_loop);
+	pgm_transport_set_hops (g_transport, 16);
+	pgm_transport_set_peer_expiry (g_transport, pgm_secs(300));
+	pgm_transport_set_spmr_expiry (g_transport, pgm_msecs(250));
+	pgm_transport_set_nak_bo_ivl (g_transport, pgm_msecs(50));
+	pgm_transport_set_nak_rpt_ivl (g_transport, pgm_secs(2));
+	pgm_transport_set_nak_rdata_ivl (g_transport, pgm_secs(2));
+	pgm_transport_set_nak_data_retries (g_transport, 50);
+	pgm_transport_set_nak_ncf_retries (g_transport, 50);
 
-	pgm_setsockopt (g_sock, PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
-	pgm_setsockopt (g_sock, PGM_PASSIVE, &passive, sizeof(passive));
-	pgm_setsockopt (g_sock, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu));
-	pgm_setsockopt (g_sock, PGM_RXW_SQNS, &g_sqns, sizeof(g_sqns));
-	pgm_setsockopt (g_sock, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
-	pgm_setsockopt (g_sock, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
-	pgm_setsockopt (g_sock, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
-	pgm_setsockopt (g_sock, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl));
-	pgm_setsockopt (g_sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
-	pgm_setsockopt (g_sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
-	pgm_setsockopt (g_sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
-
-/* create global session identifier */
-	struct pgm_sockaddr_t addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = g_port ? g_port : DEFAULT_DATA_DESTINATION_PORT;
-	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
-	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
-		g_error ("creating GSI: %s", pgm_err->message);
-		goto err_abort;
-	}
-
-/* assign socket to specified address */
-	struct pgm_interface_req_t if_req;
-	memset (&if_req, 0, sizeof(if_req));
-	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
-	if_req.ir_scope_id  = 0;
-	if (AF_INET6 == sa_family) {
-		struct sockaddr_in6 sa6;
-		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
-		if_req.ir_scope_id = sa6.sin6_scope_id;
-	}
-	if (!pgm_bind3 (g_sock,
-			&addr, sizeof(addr),
-			&if_req, sizeof(if_req),	/* tx interface */
-			&if_req, sizeof(if_req),	/* rx interface */
-			&pgm_err))
-	{
-		g_error ("binding PGM socket: %s", pgm_err->message);
-		goto err_abort;
-	}
-
-/* join IP multicast groups */
-	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (g_sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (g_sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
-	pgm_freeaddrinfo (res);
-
-/* set IP parameters */
-	const int nonblocking = 1,
-		  multicast_loop = g_multicast_loop ? 1 : 0,
-		  multicast_hops = 16,
-		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
-
-	pgm_setsockopt (g_sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (g_sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-	if (AF_INET6 != sa_family)
-		pgm_setsockopt (g_sock, PGM_TOS, &dscp, sizeof(dscp));
-	pgm_setsockopt (g_sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
-
-	if (!pgm_connect (g_sock, &pgm_err)) {
-		g_error ("connecting PGM socket: %s", pgm_err->message);
-		goto err_abort;
+/* assign transport to specified address */
+	if (!pgm_transport_bind (g_transport, &pgm_err)) {
+		g_error ("binding transport: %s", pgm_err->message);
+		pgm_error_free (pgm_err);
+		pgm_transport_destroy (g_transport, FALSE);
+		g_transport = NULL;
+		g_main_loop_quit(g_loop);
+		return FALSE;
 	}
 
 /* create receiver thread */
-	GError* glib_err = NULL;
 	g_thread = g_thread_create_full (receiver_thread,
-					 g_sock,
+					 g_transport,
 					 0,
 					 TRUE,
 					 TRUE,
 					 G_THREAD_PRIORITY_HIGH,
-					 &glib_err);
+					 &err);
 	if (!g_thread) {
-		g_error ("g_thread_create_full failed errno %i: \"%s\"", glib_err->code, glib_err->message);
-		g_error_free (glib_err);
-		goto err_abort;
+		g_error ("g_thread_create_full failed errno %i: \"%s\"", err->code, err->message);
+		g_error_free (err);
+		pgm_transport_destroy (g_transport, FALSE);
+		g_transport = NULL;
+		g_main_loop_quit(g_loop);
+		return FALSE;
 	}
 
 /* period timer to indicate some form of life */
@@ -438,29 +397,12 @@ on_startup (
 
 	g_message ("startup complete.");
 	return FALSE;
-
-err_abort:
-	if (NULL != g_sock) {
-		pgm_close (g_sock, FALSE);
-		g_sock = NULL;
-	}
-	if (NULL != res) {
-		pgm_freeaddrinfo (res);
-		res = NULL;
-	}
-	if (NULL != pgm_err) {
-		pgm_error_free (pgm_err);
-		pgm_err = NULL;
-	}
-	g_main_loop_quit (g_loop);
-	return FALSE;
 }
 
 /* idle log notification
  */
 
-static
-gboolean
+static gboolean
 on_mark (
 	G_GNUC_UNUSED gpointer data
 	)
@@ -469,31 +411,28 @@ on_mark (
 	return TRUE;
 }
 
-static
-gpointer
+static gpointer
 receiver_thread (
 	gpointer	data
 	)
 {
-	pgm_sock_t* rx_sock = (pgm_sock_t*)data;
-	const long iov_len = 20;
-	const long ev_len  = 1;
-	struct pgm_msgv_t msgv[iov_len];
+	pgm_transport_t* transport = (pgm_transport_t*)data;
+	struct pgm_msgv_t msgv[ 20 ];
 
 #ifdef CONFIG_HAVE_EPOLL
-	struct epoll_event events[ev_len];	/* wait for maximum 1 event */
+	struct epoll_event events[1];	/* wait for maximum 1 event */
 	int timeout;
-	const int efd = epoll_create (IP_MAX_MEMBERSHIPS);
+	int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
-		g_main_loop_quit (g_loop);
+		g_main_loop_quit(g_loop);
 		return NULL;
 	}
 
-	if (pgm_epoll_ctl (rx_sock, efd, EPOLL_CTL_ADD, EPOLLIN) < 0)
+	if (pgm_transport_epoll_ctl (g_transport, efd, EPOLL_CTL_ADD, EPOLLIN) < 0)
 	{
 		g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
-		g_main_loop_quit (g_loop);
+		g_main_loop_quit(g_loop);
 		return NULL;
 	}
 	struct epoll_event event;
@@ -502,7 +441,7 @@ receiver_thread (
 	if (epoll_ctl (efd, EPOLL_CTL_ADD, g_quit_pipe[0], &event) < 0)
 	{
 		g_error ("epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
-		g_main_loop_quit (g_loop);
+		g_main_loop_quit(g_loop);
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
@@ -515,7 +454,7 @@ receiver_thread (
 #else /* G_OS_WIN32 */
 	int n_handles = 3;
 #  if (__STDC_VERSION__ >= 199901L)
-	HANDLE waitHandles[n_handles];
+	HANDLE waitHandles[ n_handles ];
 #  else
 	HANDLE* waitHandles = (HANDLE*)g_malloc (n_handles * sizeof(HANDLE));;
 #  endif
@@ -534,30 +473,23 @@ receiver_thread (
 
 	do {
 		struct timeval tv;
-		size_t len;
+		gsize len;
 		pgm_error_t* pgm_err = NULL;
-		const int status = pgm_recvmsgv (rx_sock,
-					         msgv,
-					         G_N_ELEMENTS(msgv),
-					         0,
-					         &len,
-					         &pgm_err);
+		const int status = pgm_recvmsgv (transport,
+					       msgv,
+					       G_N_ELEMENTS(msgv),
+					       0,
+					       &len,
+					       &pgm_err);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
-			on_msgv (msgv, len);
+			on_msgv (msgv, len, NULL);
 			break;
 		case PGM_IO_STATUS_TIMER_PENDING:
-			{
-				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (rx_sock, PGM_TIME_REMAIN, &tv, &optlen);
-			}
+			pgm_transport_get_timer_pending (g_transport, &tv);
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
-			{
-				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (rx_sock, PGM_RATE_REMAIN, &tv, &optlen);
-			}
-/* fall through */
+			pgm_transport_get_rate_remaining (g_transport, &tv);
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 #ifdef CONFIG_HAVE_EPOLL
@@ -568,13 +500,13 @@ block:
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
-			pgm_poll_info (rx_sock, &fds[1], &n_fds, POLLIN);
+			pgm_transport_poll_info (g_transport, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
 #elif defined(G_OS_UNIX) /* HAVE_SELECT */
 			FD_ZERO(&readfds);
 			FD_SET(g_quit_pipe[0], &readfds);
 			n_fds = g_quit_pipe[0] + 1;
-			pgm_select_info (rx_sock, &readfds, NULL, &n_fds);
+			pgm_transport_select_info (g_transport, &readfds, NULL, &n_fds);
 			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
 #else /* G_OS_WIN32 */
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
@@ -610,27 +542,27 @@ block:
 	return NULL;
 }
 
-static
-int
+static int
 on_msgv (
 	struct pgm_msgv_t*	msgv,		/* an array of msgvs */
-	size_t			len
+	guint			len,
+	G_GNUC_UNUSED gpointer	user_data
 	)
 {
-        g_message ("(%u bytes)",
-                        (unsigned)len);
+        g_message ("(%i bytes)",
+                        len);
 
         guint i = 0;
 /* for each apdu */
 	do {
-                const struct pgm_sk_buff_t* pskb = msgv[i].msgv_skb[0];
+                struct pgm_sk_buff_t* pskb = msgv[i].msgv_skb[0];
 		gsize apdu_len = 0;
 		for (unsigned j = 0; j < msgv[i].msgv_len; j++)
 			apdu_len += msgv[i].msgv_skb[j]->len;
 /* truncate to first fragment to make GLib printing happy */
-		char buf[2048], tsi[PGM_TSISTRLEN];
+		char buf[2000], tsi[PGM_TSISTRLEN];
 		const gsize buflen = MIN(sizeof(buf) - 1, pskb->len);
-		strncpy (buf, (const char*)pskb->data, buflen);
+		strncpy (buf, (char*)pskb->data, buflen);
 		buf[buflen] = '\0';
 		pgm_tsi_print_r (&pskb->tsi, tsi, sizeof(tsi));
 		if (msgv[i].msgv_len > 1)

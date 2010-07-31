@@ -22,8 +22,7 @@
 #ifndef __PGM_HTTP_H__
 #define __PGM_HTTP_H__
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#include <pgm/framework.h>
 
 PGM_BEGIN_DECLS
 
@@ -34,4 +33,4 @@ bool pgm_http_shutdown (void);
 
 PGM_END_DECLS
 
-#endif /* __PGM_HTTP_H__ */
+#endif /* __PGM_SIGNAL_H__ */

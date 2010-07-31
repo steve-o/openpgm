@@ -7,15 +7,15 @@
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <impl/receiver.h>
-#include <impl/socket.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
+#include <pgm/receiver.h>
+#include <pgm/transport.h>
 
 #include "pgm/snmp.h"
-#include "impl/pgmMIB.h"
-#include "impl/pgmMIB_columns.h"
-#include "impl/pgmMIB_enums.h"
+#include "pgm/pgmMIB.h"
+#include "pgm/pgmMIB_columns.h"
+#include "pgm/pgmMIB_enums.h"
 
 
 //#define PGMMIB_DEBUG
@@ -213,16 +213,16 @@ pgmSourceTable_get_first_data_point(
 		(const void*)put_index_data,
 		(const void*)mydata);
 
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	if (!pgm_sock_list) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!pgm_transport_list) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = pgm_new0 (pgm_snmp_context_t, 1);
-	context->list = pgm_sock_list;
+	context->list = pgm_transport_list;
 	*my_loop_context = context;
 
 /* pass on for generic row access */
@@ -256,19 +256,19 @@ pgmSourceTable_get_next_data_point(
 	if (!context->list)
 		return NULL;
 
-	pgm_sock_t* sock = context->list->data;
+	pgm_transport_t* transport = context->list->data;
 
 /* pgmSourceGlobalId */
 	char gsi[ PGM_GSISTRLEN ];
-	pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
+	pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
 	snmp_set_var_typed_value (idx, ASN_OCTET_STR, (const u_char*)&gsi, strlen (gsi));
 	idx = idx->next_variable;
 
 /* pgmSourceSourcePort */
-	const unsigned sport = ntohs (sock->tsi.sport);
+	const unsigned sport = ntohs (transport->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 
-	*my_data_context = sock;
+	*my_data_context = transport;
 	context->list = context->list->next;
 
 	return put_index_data;
@@ -293,7 +293,7 @@ pgmSourceTable_free_loop_context (
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -326,9 +326,9 @@ pgmSourceTable_handler (
 		     request;
 		     request = request->next)
 		{
-			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context (request);
+			const pgm_transport_t* transport = (pgm_transport_t*)netsnmp_extract_iterator_context (request);
 
-			if (!sock) {
+			if (!transport) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
@@ -346,8 +346,8 @@ pgmSourceTable_handler (
 			case COLUMN_PGMSOURCESOURCEADDRESS:
 				{
 					struct sockaddr_in s4;
-					if (AF_INET == sock->send_gsr.gsr_source.ss_family)
-						memcpy (&s4, &sock->send_gsr.gsr_source, sizeof(s4));
+					if (AF_INET == transport->send_gsr.gsr_source.ss_family)
+						memcpy (&s4, &transport->send_gsr.gsr_source, sizeof(s4));
 					else
 						memset (&s4, 0, sizeof(s4));
 					snmp_set_var_typed_value (var, ASN_IPADDRESS,
@@ -359,8 +359,8 @@ pgmSourceTable_handler (
 			case COLUMN_PGMSOURCEGROUPADDRESS:
 				{
 					struct sockaddr_in s4;
-					if (AF_INET == sock->send_gsr.gsr_group.ss_family)
-						memcpy (&s4, &sock->send_gsr.gsr_group, sizeof(s4));
+					if (AF_INET == transport->send_gsr.gsr_group.ss_family)
+						memcpy (&s4, &transport->send_gsr.gsr_group, sizeof(s4));
 					else
 						memset (&s4, 0, sizeof(s4));
 					snmp_set_var_typed_value (var, ASN_IPADDRESS,
@@ -371,7 +371,7 @@ pgmSourceTable_handler (
 
 			case COLUMN_PGMSOURCEDESTPORT:
 				{
-					const unsigned dport = ntohs (sock->dport);
+					const unsigned dport = ntohs (transport->dport);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&dport, sizeof(dport) );
 				}
@@ -493,16 +493,16 @@ pgmSourceConfigTable_get_first_data_point(
 		(const void*)put_index_data,
 		(const void*)mydata);
 
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	if (!pgm_sock_list) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!pgm_transport_list) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = pgm_new0 (pgm_snmp_context_t, 1);
-	context->list = pgm_sock_list;
+	context->list = pgm_transport_list;
 	*my_loop_context = context;
 
 /* pass on for generic row access */
@@ -536,19 +536,19 @@ pgmSourceConfigTable_get_next_data_point(
 	if (!context->list)
 		return NULL;
 
-	pgm_sock_t* sock = context->list->data;
+	pgm_transport_t* transport = context->list->data;
 
 /* pgmSourceGlobalId */
 	char gsi[ PGM_GSISTRLEN ];
-	pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
+	pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
 	snmp_set_var_typed_value (idx, ASN_OCTET_STR, (const u_char*)&gsi, strlen (gsi));
 	idx = idx->next_variable;
 
 /* pgmSourceSourcePort */
-	const unsigned sport = ntohs (sock->tsi.sport);
+	const unsigned sport = ntohs (transport->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 
-	*my_data_context = sock;
+	*my_data_context = transport;
 	context->list = context->list->next;
 
 	return put_index_data;
@@ -573,7 +573,7 @@ pgmSourceConfigTable_free_loop_context (
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -606,9 +606,9 @@ pgmSourceConfigTable_handler (
 		     request;
 		     request = request->next)
 		{
-			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context (request);
+			const pgm_transport_t* transport = (pgm_transport_t*)netsnmp_extract_iterator_context (request);
 
-			if (!sock) {
+			if (!transport) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
@@ -625,15 +625,16 @@ pgmSourceConfigTable_handler (
 
 			case COLUMN_PGMSOURCETTL:
 				{
-					const unsigned hops = sock->hops;
+					const unsigned hops = transport->hops;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&hops, sizeof(hops) );
 				}
 				break;
 
+/* FIXED: pgmSourceAdvMode = data(1) */
 			case COLUMN_PGMSOURCEADVMODE:
 				{
-					const unsigned adv_mode = 0 == sock->adv_mode ? PGMSOURCEADVMODE_TIME : PGMSOURCEADVMODE_DATA;
+					const unsigned adv_mode = PGMSOURCEADVMODE_DATA;
 					snmp_set_var_typed_value (var, ASN_INTEGER,
 								  (const u_char*)&adv_mode, sizeof(adv_mode) );
 				}
@@ -650,7 +651,7 @@ pgmSourceConfigTable_handler (
 
 			case COLUMN_PGMSOURCETXWMAXRTE:
 				{
-					const unsigned txw_max_rte = sock->txw_max_rte;
+					const unsigned txw_max_rte = transport->txw_max_rte;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&txw_max_rte, sizeof(txw_max_rte) );
 				}
@@ -658,7 +659,7 @@ pgmSourceConfigTable_handler (
 
 			case COLUMN_PGMSOURCETXWSECS:
 				{
-					const unsigned txw_secs = sock->txw_secs;
+					const unsigned txw_secs = transport->txw_secs;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&txw_secs, sizeof(txw_secs) );
 				}
@@ -684,7 +685,7 @@ pgmSourceConfigTable_handler (
 
 			case COLUMN_PGMSOURCESPMIVL:
 				{
-					const unsigned spm_ivl = pgm_to_msecs (sock->spm_ambient_interval);
+					const unsigned spm_ivl = pgm_to_msecs (transport->spm_ambient_interval);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&spm_ivl, sizeof(spm_ivl) );
 				}
@@ -711,7 +712,7 @@ pgmSourceConfigTable_handler (
 /* NAK_BO_IVL */
 			case COLUMN_PGMSOURCERDATABACKOFFIVL:
 				{
-					const unsigned nak_bo_ivl = pgm_to_msecs (sock->nak_bo_ivl);
+					const unsigned nak_bo_ivl = pgm_to_msecs (transport->nak_bo_ivl);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_bo_ivl, sizeof(nak_bo_ivl) );
 				}
@@ -720,7 +721,7 @@ pgmSourceConfigTable_handler (
 /* FIXED: pgmSourceFEC = disabled(1) */
 			case COLUMN_PGMSOURCEFEC:
 				{
-					const unsigned fec = (sock->use_ondemand_parity || sock->use_proactive_parity) ? 1 : 0;
+					const unsigned fec = (transport->use_ondemand_parity || transport->use_proactive_parity) ? 1 : 0;
 					snmp_set_var_typed_value (var, ASN_INTEGER,
 								  (const u_char*)&fec, sizeof(fec) );
 				}
@@ -729,7 +730,7 @@ pgmSourceConfigTable_handler (
 /* FIXED: pgmSourceFECTransmissionGrpSize = 0 */
 			case COLUMN_PGMSOURCEFECTRANSMISSIONGRPSIZE:
 				{
-					const unsigned fec_tgs = sock->rs_k;
+					const unsigned fec_tgs = transport->rs_k;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&fec_tgs, sizeof(fec_tgs) );
 				}
@@ -738,7 +739,7 @@ pgmSourceConfigTable_handler (
 /* FIXED: pgmSourceFECProactiveParitySize = 0 */
 			case COLUMN_PGMSOURCEFECPROACTIVEPARITYSIZE:
 				{
-					const unsigned fec_paps = sock->rs_proactive_h;
+					const unsigned fec_paps = transport->rs_proactive_h;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&fec_paps, sizeof(fec_paps) );
 				}
@@ -748,8 +749,8 @@ pgmSourceConfigTable_handler (
 			case COLUMN_PGMSOURCESPMPATHADDRESS:
 				{
 					struct sockaddr_in s4;
-					if (AF_INET == sock->recv_gsr[0].gsr_source.ss_family)
-						memcpy (&s4, &sock->recv_gsr[0].gsr_source, sizeof(s4));
+					if (AF_INET == transport->recv_gsr[0].gsr_source.ss_family)
+						memcpy (&s4, &transport->recv_gsr[0].gsr_source, sizeof(s4));
 					else
 						memset (&s4, 0, sizeof(s4));
 					snmp_set_var_typed_value (var, ASN_IPADDRESS,
@@ -858,16 +859,16 @@ pgmSourcePerformanceTable_get_first_data_point (
 		(const void*)put_index_data,
 		(const void*)mydata);
 
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	if (!pgm_sock_list) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!pgm_transport_list) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = pgm_new0 (pgm_snmp_context_t, 1);
-	context->list = pgm_sock_list;
+	context->list = pgm_transport_list;
 	*my_loop_context = context;
 
 /* pass on for generic row access */
@@ -901,19 +902,19 @@ pgmSourcePerformanceTable_get_next_data_point (
 	if (!context->list)
 		return NULL;
 
-	pgm_sock_t* sock = context->list->data;
+	pgm_transport_t* transport = context->list->data;
 
 /* pgmSourceGlobalId */
 	char gsi[ PGM_GSISTRLEN ];
-	pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
+	pgm_gsi_print_r (&transport->tsi.gsi, gsi, sizeof(gsi));
 	snmp_set_var_typed_value (idx, ASN_OCTET_STR, (const u_char*)&gsi, strlen (gsi));
 	idx = idx->next_variable;
 
 /* pgmSourceSourcePort */
-	const unsigned sport = ntohs (sock->tsi.sport);
+	const unsigned sport = ntohs (transport->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 
-	*my_data_context = sock;
+	*my_data_context = transport;
 	context->list = context->list->next;
 
 	return put_index_data;
@@ -938,7 +939,7 @@ pgmSourcePerformanceTable_free_loop_context (
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -971,14 +972,14 @@ pgmSourcePerformanceTable_handler (
 		     request;
 		     request = request->next)
 		{
-			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context (request);
+			const pgm_transport_t* transport = (pgm_transport_t*)netsnmp_extract_iterator_context (request);
 
-			if (!sock) {
+			if (!transport) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
 
-			const pgm_txw_t* window = (const pgm_txw_t*)sock->window;
+			const pgm_txw_t* window = (const pgm_txw_t*)transport->window;
 
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info (request);
@@ -992,7 +993,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEDATABYTESSENT:
 				{
-					const unsigned data_bytes = sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT];
+					const unsigned data_bytes = transport->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&data_bytes, sizeof(data_bytes) );
 				}
@@ -1000,7 +1001,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEDATAMSGSSENT:
 				{
-					const unsigned data_msgs = sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT];
+					const unsigned data_msgs = transport->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&data_msgs, sizeof(data_msgs) );
 				}
@@ -1008,7 +1009,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEBYTESBUFFERED:
 				{
-					const unsigned bytes_buffered = sock->can_send_data ? pgm_txw_size (window) : 0;
+					const unsigned bytes_buffered = transport->can_send_data ? pgm_txw_size (window) : 0;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&bytes_buffered, sizeof(bytes_buffered) );
 				}
@@ -1016,7 +1017,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEMSGSBUFFERED:
 				{
-					const unsigned msgs_buffered = sock->can_send_data ? pgm_txw_length (window) : 0;
+					const unsigned msgs_buffered = transport->can_send_data ? pgm_txw_length (window) : 0;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&msgs_buffered, sizeof(msgs_buffered) );
 				}
@@ -1025,7 +1026,7 @@ pgmSourcePerformanceTable_handler (
 /* PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED + COLUMN_PGMSOURCEPARITYBYTESRETRANSMITTED */
 			case COLUMN_PGMSOURCEBYTESRETRANSMITTED:
 				{
-					const unsigned bytes_resent = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED];
+					const unsigned bytes_resent = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&bytes_resent, sizeof(bytes_resent) );
 				}
@@ -1034,7 +1035,7 @@ pgmSourcePerformanceTable_handler (
 /* PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED + COLUMN_PGMSOURCEPARITYMSGSRETRANSMITTED */
 			case COLUMN_PGMSOURCEMSGSRETRANSMITTED:
 				{
-					const unsigned msgs_resent = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED];
+					const unsigned msgs_resent = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&msgs_resent, sizeof(msgs_resent) );
 				}
@@ -1042,7 +1043,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEBYTESSENT:
 				{
-					const unsigned bytes_sent = sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT];
+					const unsigned bytes_sent = transport->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&bytes_sent, sizeof(bytes_sent) );
 				}
@@ -1051,7 +1052,7 @@ pgmSourcePerformanceTable_handler (
 /* COLUMN_PGMSOURCEPARITYNAKPACKETSRECEIVED + COLUMN_PGMSOURCESELECTIVENAKPACKETSRECEIVED */
 			case COLUMN_PGMSOURCERAWNAKSRECEIVED:
 				{
-					const unsigned nak_packets = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
+					const unsigned nak_packets = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&nak_packets, sizeof(nak_packets) );
 				}
@@ -1060,7 +1061,7 @@ pgmSourcePerformanceTable_handler (
 /* PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED + COLUMN_PGMSOURCEPARITYNAKSIGNORED */
 			case COLUMN_PGMSOURCENAKSIGNORED:
 				{
-					const unsigned naks_ignored = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED];
+					const unsigned naks_ignored = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&naks_ignored, sizeof(naks_ignored) );
 				}
@@ -1068,7 +1069,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCECKSUMERRORS:
 				{
-					const unsigned cksum_errors = sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
+					const unsigned cksum_errors = transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&cksum_errors, sizeof(cksum_errors) );
 				}
@@ -1076,7 +1077,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEMALFORMEDNAKS:
 				{
-					const unsigned malformed_naks = sock->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS];
+					const unsigned malformed_naks = transport->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&malformed_naks, sizeof(malformed_naks) );
 				}
@@ -1084,7 +1085,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCEPACKETSDISCARDED:
 				{
-					const unsigned packets_discarded = sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED];
+					const unsigned packets_discarded = transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&packets_discarded, sizeof(packets_discarded) );
 				}
@@ -1093,7 +1094,7 @@ pgmSourcePerformanceTable_handler (
 /* PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED + COLUMN_PGMSOURCEPARITYNAKSRECEIVED */
 			case COLUMN_PGMSOURCENAKSRCVD:
 				{
-					const unsigned naks_received = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
+					const unsigned naks_received = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&naks_received, sizeof(naks_received) );
 				}
@@ -1110,7 +1111,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVEBYTESRETRANSMITED:
 				{
-					const unsigned selective_bytes_resent = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED];
+					const unsigned selective_bytes_resent = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_bytes_resent, sizeof(selective_bytes_resent) );
 				}
@@ -1127,7 +1128,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVEMSGSRETRANSMITTED:
 				{
-					const unsigned selective_msgs_resent = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED];
+					const unsigned selective_msgs_resent = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_msgs_resent, sizeof(selective_msgs_resent) );
 				}
@@ -1162,7 +1163,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVENAKPACKETSRECEIVED:
 				{
-					const unsigned selective_nak_packets = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
+					const unsigned selective_nak_packets = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_nak_packets, sizeof(selective_nak_packets) );
 				}
@@ -1179,7 +1180,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVENAKSRECEIVED:
 				{
-					const unsigned selective_naks = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
+					const unsigned selective_naks = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_naks, sizeof(selective_naks) );
 				}
@@ -1196,15 +1197,16 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVENAKSIGNORED:
 				{
-					const unsigned selective_naks_ignored = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED];
+					const unsigned selective_naks_ignored = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_IGNORED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_naks_ignored, sizeof(selective_naks_ignored) );
 				}
 				break;
 
+/* FIXED: 0 */
 			case COLUMN_PGMSOURCEACKERRORS:
 				{
-					const unsigned ack_errors = sock->cumulative_stats[PGM_PC_SOURCE_ACK_ERRORS];;
+					const unsigned ack_errors = 0;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&ack_errors, sizeof(ack_errors) );
 				}
@@ -1213,8 +1215,8 @@ pgmSourcePerformanceTable_handler (
 			case COLUMN_PGMSOURCEPGMCCACKER:
 				{
 					struct sockaddr_in s4;
-					if (AF_INET == sock->acker_nla.ss_family)
-						memcpy (&s4, &sock->acker_nla, sizeof(s4));
+					if (AF_INET == transport->acker_nla.ss_family)
+						memcpy (&s4, &transport->acker_nla, sizeof(s4));
 					else
 						memset (&s4, 0, sizeof(s4));
 					snmp_set_var_typed_value (var, ASN_IPADDRESS,
@@ -1225,15 +1227,16 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCETRANSMISSIONCURRENTRATE:
 				{
-					const unsigned tx_current_rate = sock->cumulative_stats[PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE];
+					const unsigned tx_current_rate = transport->cumulative_stats[PGM_PC_SOURCE_TRANSMISSION_CURRENT_RATE];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&tx_current_rate, sizeof(tx_current_rate) );
 				}
 				break;
 
+/* FIXED: 0 */
 			case COLUMN_PGMSOURCEACKPACKETSRECEIVED:
 				{
-					const unsigned ack_packets = sock->cumulative_stats[PGM_PC_SOURCE_ACK_PACKETS_RECEIVED];
+					const unsigned ack_packets = 0;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&ack_packets, sizeof(ack_packets) );
 				}
@@ -1242,7 +1245,7 @@ pgmSourcePerformanceTable_handler (
 /* COLUMN_PGMSOURCEPARITYNNAKPACKETSRECEIVED + COLUMN_PGMSOURCESELECTIVENNAKPACKETSRECEIVED */
 			case COLUMN_PGMSOURCENNAKPACKETSRECEIVED:
 				{
-					const unsigned nnak_packets = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED];
+					const unsigned nnak_packets = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&nnak_packets, sizeof(nnak_packets) );
 				}
@@ -1259,7 +1262,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVENNAKPACKETSRECEIVED:
 				{
-					const unsigned selective_nnak_packets = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED];
+					const unsigned selective_nnak_packets = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAK_PACKETS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_nnak_packets, sizeof(selective_nnak_packets) );
 				}
@@ -1268,7 +1271,7 @@ pgmSourcePerformanceTable_handler (
 /* COLUMN_PGMSOURCEPARITYNNAKSRECEIVED + COLUMN_PGMSOURCESELECTIVENNAKSRECEIVED */
 			case COLUMN_PGMSOURCENNAKSRECEIVED:
 				{
-					const unsigned nnaks_received = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED];
+					const unsigned nnaks_received = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&nnaks_received, sizeof(nnaks_received) );
 				}
@@ -1285,7 +1288,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCESELECTIVENNAKSRECEIVED:
 				{
-					const unsigned selective_nnaks = sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED];
+					const unsigned selective_nnaks = transport->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NNAKS_RECEIVED];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&selective_nnaks, sizeof(selective_nnaks) );
 				}
@@ -1293,7 +1296,7 @@ pgmSourcePerformanceTable_handler (
 
 			case COLUMN_PGMSOURCENNAKERRORS:
 				{
-					const unsigned malformed_nnaks = sock->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS];
+					const unsigned malformed_nnaks = transport->cumulative_stats[PGM_PC_SOURCE_NNAK_ERRORS];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&malformed_nnaks, sizeof(malformed_nnaks) );
 				}
@@ -1400,37 +1403,37 @@ pgmReceiverTable_get_first_data_point (
 		(const void*)put_index_data,
 		(const void*)mydata);
 
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	if (!pgm_sock_list) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!pgm_transport_list) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = pgm_new0 (pgm_snmp_context_t, 1);
 
-/* hunt to find first node, through all socks */
-	for (context->list = pgm_sock_list;
+/* hunt to find first node, through all transports */
+	for (context->list = pgm_transport_list;
 	     context->list;
 	     context->list = context->list->next)
 	{
-/* and through all peers for each sock */
-		pgm_sock_t* sock = (pgm_sock_t*)context->list->data;
-		pgm_rwlock_reader_lock (&sock->peers_lock);
-		context->node = sock->peers_list;
+/* and through all peers for each transport */
+		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
+		pgm_rwlock_reader_lock (&transport->peers_lock);
+		context->node = transport->peers_list;
 		if (context->node) {
-/* maintain this sock's peers lock */
+/* maintain this transport's peers lock */
 			break;
 		}
 
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (!context->node) {
 		pgm_free (context);
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1467,7 +1470,7 @@ pgmReceiverTable_get_next_data_point (
 	if (!context->list)
 		return NULL;
 
-	pgm_sock_t* sock = context->list->data;
+	pgm_transport_t* transport = context->list->data;
 
 	if (!context->node)
 		return NULL;
@@ -1499,11 +1502,11 @@ pgmReceiverTable_get_next_data_point (
 		context->node = NULL;
 		while (context->list->next)
 		{
-			pgm_rwlock_reader_unlock (&sock->peers_lock);
+			pgm_rwlock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
-			sock = context->list->data;
-			pgm_rwlock_reader_lock (&sock->peers_lock);
-			context->node = sock->peers_list;
+			transport = context->list->data;
+			pgm_rwlock_reader_lock (&transport->peers_lock);
+			context->node = transport->peers_list;
 			if (context->node) {
 /* keep lock */
 				break;
@@ -1533,14 +1536,14 @@ pgmReceiverTable_free_loop_context (
 
 /* check for intra-peer state */
 	if (context->list) {
-		pgm_sock_t* sock = context->list->data;
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_transport_t* transport = context->list->data;
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -1603,10 +1606,10 @@ pgmReceiverTable_handler (
 				}
 				break;
 
-/* by definition same as sock */
+/* by definition same as transport */
 			case COLUMN_PGMRECEIVERDESTPORT:
 				{
-					const unsigned dport = ntohs (peer->sock->dport);
+					const unsigned dport = ntohs (peer->transport->dport);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&dport, sizeof(dport) );
 				}
@@ -1761,35 +1764,35 @@ pgmReceiverConfigTable_get_first_data_point(
 		(const void*)put_index_data,
 		(const void*)mydata);
 
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	if (!pgm_sock_list) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!pgm_transport_list) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = pgm_new0 (pgm_snmp_context_t, 1);
 
-/* hunt to find first node, through all socks */
-	for (context->list = pgm_sock_list;
+/* hunt to find first node, through all transports */
+	for (context->list = pgm_transport_list;
 	     context->list;
 	     context->list = context->list->next)
 	{
-/* and through all peers for each sock */
-		pgm_sock_t* sock = (pgm_sock_t*)context->list->data;
-		pgm_rwlock_reader_lock (&sock->peers_lock);
-		context->node = sock->peers_list;
+/* and through all peers for each transport */
+		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
+		pgm_rwlock_reader_lock (&transport->peers_lock);
+		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (!context->node) {
 		pgm_free (context);
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -1826,7 +1829,7 @@ pgmReceiverConfigTable_get_next_data_point(
 	if (!context->list)
 		return NULL;
 
-	pgm_sock_t* sock = context->list->data;
+	pgm_transport_t* transport = context->list->data;
 
 	if (!context->node)
 		return NULL;
@@ -1858,11 +1861,11 @@ pgmReceiverConfigTable_get_next_data_point(
 		context->node = NULL;
 		while (context->list->next)
 		{
-			pgm_rwlock_reader_unlock (&sock->peers_lock);
+			pgm_rwlock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
-			sock = context->list->data;
-			pgm_rwlock_reader_lock (&sock->peers_lock);
-			context->node = sock->peers_list;
+			transport = context->list->data;
+			pgm_rwlock_reader_lock (&transport->peers_lock);
+			context->node = transport->peers_list;
 			if (context->node) {
 /* keep lock */
 				break;
@@ -1892,14 +1895,14 @@ pgmReceiverConfigTable_free_loop_context (
 
 /* check for intra-peer state */
 	if (context->list) {
-		pgm_sock_t* sock = context->list->data;
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_transport_t* transport = context->list->data;
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -1949,46 +1952,46 @@ pgmReceiverConfigTable_handler (
 
 			switch (table_info->colnum) {
 
-/* nak_bo_ivl from sock */
+/* nak_bo_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKBACKOFFIVL:
 				{
-					const unsigned nak_bo_ivl = peer->sock->nak_bo_ivl;
+					const unsigned nak_bo_ivl = peer->transport->nak_bo_ivl;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_bo_ivl, sizeof(nak_bo_ivl) );
 				}
 				break;
 
-/* nak_rpt_ivl from sock */
+/* nak_rpt_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKREPEATIVL:
 				{
-					const unsigned nak_rpt_ivl = peer->sock->nak_rpt_ivl;
+					const unsigned nak_rpt_ivl = peer->transport->nak_rpt_ivl;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_rpt_ivl, sizeof(nak_rpt_ivl) );
 				}
 				break;
 
-/* nak_ncf_retries from sock */
+/* nak_ncf_retries from transport */
 			case COLUMN_PGMRECEIVERNAKNCFRETRIES:
 				{
-					const unsigned nak_ncf_retries = peer->sock->nak_ncf_retries;
+					const unsigned nak_ncf_retries = peer->transport->nak_ncf_retries;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_ncf_retries, sizeof(nak_ncf_retries) );
 				}
 				break;
 
-/* nak_rdata_ivl from sock */
+/* nak_rdata_ivl from transport */
 			case COLUMN_PGMRECEIVERNAKRDATAIVL:
 				{
-					const unsigned nak_rdata_ivl = peer->sock->nak_rdata_ivl;
+					const unsigned nak_rdata_ivl = peer->transport->nak_rdata_ivl;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_rdata_ivl, sizeof(nak_rdata_ivl) );
 				}
 				break;
 
-/* nak_data_retries from sock */
+/* nak_data_retries from transport */
 			case COLUMN_PGMRECEIVERNAKDATARETRIES:
 				{
-					const unsigned nak_data_retries = peer->sock->nak_data_retries;
+					const unsigned nak_data_retries = peer->transport->nak_data_retries;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_data_retries, sizeof(nak_data_retries) );
 				}
@@ -2150,35 +2153,35 @@ pgmReceiverPerformanceTable_get_first_data_point (
 		(const void*)put_index_data,
 		(const void*)mydata);
 
-	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_lock (&pgm_transport_list_lock);
 
-	if (!pgm_sock_list) {
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	if (!pgm_transport_list) {
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
 /* create our own context for this SNMP loop */
 	pgm_snmp_context_t* context = pgm_new0 (pgm_snmp_context_t, 1);
 
-/* hunt to find first node, through all socks */
-	for (context->list = pgm_sock_list;
+/* hunt to find first node, through all transports */
+	for (context->list = pgm_transport_list;
 	     context->list;
 	     context->list = context->list->next)
 	{
-/* and through all peers for each sock */
-		pgm_sock_t* sock = (pgm_sock_t*)context->list->data;
-		pgm_rwlock_reader_lock (&sock->peers_lock);
-		context->node = sock->peers_list;
+/* and through all peers for each transport */
+		pgm_transport_t* transport = (pgm_transport_t*)context->list->data;
+		pgm_rwlock_reader_lock (&transport->peers_lock);
+		context->node = transport->peers_list;
 		if (context->node)
 			break;
 
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 /* no node found */
 	if (!context->node) {
 		pgm_free (context);
-		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+		pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 		return NULL;
 	}
 
@@ -2215,7 +2218,7 @@ pgmReceiverPerformanceTable_get_next_data_point (
 	if (!context->list)
 		return NULL;
 
-	pgm_sock_t* sock = context->list->data;
+	pgm_transport_t* transport = context->list->data;
 
 	if (!context->node)
 		return NULL;
@@ -2247,11 +2250,11 @@ pgmReceiverPerformanceTable_get_next_data_point (
 		context->node = NULL;
 		while (context->list->next)
 		{
-			pgm_rwlock_reader_unlock (&sock->peers_lock);
+			pgm_rwlock_reader_unlock (&transport->peers_lock);
 			context->list = context->list->next;
-			sock = context->list->data;
-			pgm_rwlock_reader_lock (&sock->peers_lock);
-			context->node = sock->peers_list;
+			transport = context->list->data;
+			pgm_rwlock_reader_lock (&transport->peers_lock);
+			context->node = transport->peers_list;
 
 			if (context->node)
 				break;
@@ -2280,14 +2283,14 @@ pgmReceiverPerformanceTable_free_loop_context (
 
 /* check for intra-peer state */
 	if (context->list) {
-		pgm_sock_t* sock = context->list->data;
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
+		pgm_transport_t* transport = context->list->data;
+		pgm_rwlock_reader_unlock (&transport->peers_lock);
 	}
 
 	pgm_free (context);
 	my_loop_context = NULL;
 
-	pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
+	pgm_rwlock_reader_unlock (&pgm_transport_list_lock);
 }
 
 static
@@ -2402,7 +2405,7 @@ pgmReceiverPerformanceTable_handler (
 /* bogus: same as source checksum errors */	
 			case COLUMN_PGMRECEIVERCKSUMERRORS:
 				{
-					const unsigned cksum_errors = peer->sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
+					const unsigned cksum_errors = peer->transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&cksum_errors, sizeof(cksum_errors) );
 				}
@@ -2660,7 +2663,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVEROUTSTANDINGSELECTIVENAKS:
 				{
-					const unsigned outstanding_selective = window->nak_backoff_queue.length +
+					const unsigned outstanding_selective = window->backoff_queue.length +
 										window->wait_ncf_queue.length +
 										window->wait_data_queue.length;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
@@ -2752,9 +2755,10 @@ pgmReceiverPerformanceTable_handler (
 				}
 				break;
 	
+/* FIXED: 0 (PGMCC) */	
 			case COLUMN_PGMRECEIVERACKSSENT:
 				{
-					const unsigned acks_sent = peer->cumulative_stats[PGM_PC_RECEIVER_ACKS_SENT];
+					const unsigned acks_sent = 0;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&acks_sent, sizeof(acks_sent) );
 				}

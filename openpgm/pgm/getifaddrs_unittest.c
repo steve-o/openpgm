@@ -19,8 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* IFF_UP */
-#define _BSD_SOURCE
 
 #include <errno.h>
 #include <signal.h>
@@ -28,8 +26,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <glib.h>
 #include <check.h>
 
@@ -39,9 +35,9 @@
 /* mock functions for external references */
 
 size_t
-pgm_pkt_offset (
+pgm_transport_pkt_offset2 (
         const bool                      can_fragment,
-        const sa_family_t		pgmcc_family	/* 0 = disable */
+        const bool                      use_pgmcc
         )
 {
         return 0;
@@ -134,7 +130,7 @@ ifflags_string (
 /* target:
  *	bool
  *	pgm_getifaddrs (
- *		struct pgm_ifaddrs_t**restrict	ifap,
+ *		struct pgm_ifaddrs**restrict	ifap,
  *		pgm_error_t**restrict           error
  *	)
  */
@@ -142,7 +138,7 @@ ifflags_string (
 START_TEST (test_getifaddrs_pass_001)
 {
 	char saddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
-	struct pgm_ifaddrs_t *ifap = NULL, *ifa;
+	struct pgm_ifaddrs *ifap = NULL, *ifa;
 	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_getifaddrs (&ifap, &err), "getifaddrs failed");
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
@@ -204,7 +200,7 @@ END_TEST
 
 START_TEST (test_freeifaddrs_pass_001)
 {
-	struct pgm_ifaddrs_t* ifap = NULL;
+	struct pgm_ifaddrs* ifap = NULL;
 	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_getifaddrs (&ifap, &err), "getifaddrs failed");
 	pgm_freeifaddrs (ifap);

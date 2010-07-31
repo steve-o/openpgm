@@ -2,7 +2,7 @@
  *
  * unit tests for portable interface index to socket address function.
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,8 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* IFF_UP */
-#define _BSD_SOURCE
 
 #include <errno.h>
 #include <netdb.h>
@@ -49,11 +47,11 @@ struct mock_interface_t {
 
 static GList *mock_interfaces = NULL;
 
-struct pgm_ifaddrs_t;
+struct pgm_ifaddrs;
 struct pgm_error_t;
 
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs_t**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs_t*);
+static bool mock_pgm_getifaddrs (struct pgm_ifaddrs**, struct pgm_error_t**);
+static void mock_pgm_freeifaddrs (struct pgm_ifaddrs*);
 static unsigned mock_pgm_if_nametoindex (const sa_family_t, const char*);
 
 
@@ -170,7 +168,7 @@ pgm_transport_pkt_offset2 (
 
 bool
 mock_pgm_getifaddrs (
-	struct pgm_ifaddrs_t**	ifap,
+	struct pgm_ifaddrs**	ifap,
 	pgm_error_t**		err
 	)
 {
@@ -182,8 +180,8 @@ mock_pgm_getifaddrs (
 
 	GList* list = mock_interfaces;
 	int n = g_list_length (list);
-	struct pgm_ifaddrs_t* ifa = calloc (n, sizeof(struct pgm_ifaddrs_t));
-	struct pgm_ifaddrs_t* ift = ifa;
+	struct pgm_ifaddrs* ifa = calloc (n, sizeof(struct pgm_ifaddrs));
+	struct pgm_ifaddrs* ift = ifa;
 	while (list) {
 		struct mock_interface_t* interface = list->data;
 		ift->ifa_addr = (gpointer)&interface->addr;
@@ -204,7 +202,7 @@ mock_pgm_getifaddrs (
 static
 void
 mock_pgm_freeifaddrs (
-	struct pgm_ifaddrs_t*		ifa
+	struct pgm_ifaddrs*		ifa
 	)
 {
 	g_debug ("mock_freeifaddrs (ifa:%p)", (gpointer)ifa);

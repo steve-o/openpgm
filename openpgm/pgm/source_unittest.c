@@ -33,21 +33,21 @@
 
 /* mock state */
 
-#define TEST_NETWORK		""
-#define TEST_PORT		7500
-#define TEST_MAX_TPDU		1500
-#define TEST_TXW_SQNS		32
-#define TEST_RXW_SQNS		32
-#define TEST_HOPS		16
-#define TEST_SPM_AMBIENT	( pgm_secs(30) )
-#define TEST_SPM_HEARTBEAT_INIT	{ pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) }
-#define TEST_PEER_EXPIRY	( pgm_secs(300) )
-#define TEST_SPMR_EXPIRY	( pgm_msecs(250) )
-#define TEST_NAK_BO_IVL		( pgm_msecs(50) )
-#define TEST_NAK_RPT_IVL	( pgm_secs(2) )
-#define TEST_NAK_RDATA_IVL	( pgm_secs(2) )
-#define TEST_NAK_DATA_RETRIES	5
-#define TEST_NAK_NCF_RETRIES	2
+#define PGM_NETWORK		""
+#define PGM_PORT		7500
+#define PGM_MAX_TPDU		1500
+#define PGM_TXW_SQNS		32
+#define PGM_RXW_SQNS		32
+#define PGM_HOPS		16
+#define PGM_SPM_AMBIENT		( pgm_secs(30) )
+#define PGM_SPM_HEARTBEAT_INIT	{ pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) }
+#define PGM_PEER_EXPIRY		( pgm_secs(300) )
+#define PGM_SPMR_EXPIRY		( pgm_msecs(250) )
+#define PGM_NAK_BO_IVL		( pgm_msecs(50) )
+#define PGM_NAK_RPT_IVL		( pgm_secs(2) )
+#define PGM_NAK_RDATA_IVL	( pgm_secs(2) )
+#define PGM_NAK_DATA_RETRIES	5
+#define PGM_NAK_NCF_RETRIES	2
 
 static gboolean mock_is_valid_spmr = TRUE;
 static gboolean mock_is_valid_ack = TRUE;
@@ -89,30 +89,30 @@ mock_setup (void)
 }
 
 static
-struct pgm_sock_t*
-generate_sock (void)
+struct pgm_transport_t*
+generate_transport (void)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
-	struct pgm_sock_t* sock = g_new0 (struct pgm_sock_t, 1);
-	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
-	((struct sockaddr*)&sock->send_addr)->sa_family = AF_INET;
-	((struct sockaddr_in*)&sock->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
-	((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family = AF_INET;
-	((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
-	sock->dport = g_htons(TEST_PORT);
-	sock->window = g_malloc0 (sizeof(pgm_txw_t));
-	sock->txw_sqns = TEST_TXW_SQNS;
-	sock->max_tpdu = TEST_MAX_TPDU;
-	sock->max_tsdu = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (FALSE, FALSE);
-	sock->max_tsdu_fragment = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (TRUE, FALSE);
-	sock->max_apdu = MIN(TEST_TXW_SQNS, PGM_MAX_FRAGMENTS) * sock->max_tsdu_fragment;
-	sock->iphdr_len = sizeof(struct pgm_ip);
-	sock->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
-	sock->spm_heartbeat_interval[0] = pgm_secs(1);
-	pgm_spinlock_init (&sock->txw_spinlock);
-	sock->is_bound = FALSE;
-	sock->is_destroyed = FALSE;
-	return sock;
+	struct pgm_transport_t* transport = g_new0 (struct pgm_transport_t, 1);
+	memcpy (&transport->tsi, &tsi, sizeof(pgm_tsi_t));
+	((struct sockaddr*)&transport->send_addr)->sa_family = AF_INET;
+	((struct sockaddr_in*)&transport->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
+	((struct sockaddr*)&transport->send_gsr.gsr_group)->sa_family = AF_INET;
+	((struct sockaddr_in*)&transport->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
+	transport->dport = g_htons(PGM_PORT);
+	transport->window = g_malloc0 (sizeof(pgm_txw_t));
+	transport->txw_sqns = PGM_TXW_SQNS;
+	transport->max_tpdu = PGM_MAX_TPDU;
+	transport->max_tsdu = PGM_MAX_TPDU - sizeof(struct pgm_ip) - pgm_transport_pkt_offset2 (FALSE, FALSE);
+	transport->max_tsdu_fragment = PGM_MAX_TPDU - sizeof(struct pgm_ip) - pgm_transport_pkt_offset2 (TRUE, FALSE);
+	transport->max_apdu = MIN(PGM_TXW_SQNS, PGM_MAX_FRAGMENTS) * transport->max_tsdu_fragment;
+	transport->iphdr_len = sizeof(struct pgm_ip);
+	transport->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
+	transport->spm_heartbeat_interval[0] = pgm_secs(1);
+	pgm_spinlock_init (&transport->txw_spinlock);
+	transport->is_bound = FALSE;
+	transport->is_destroyed = FALSE;
+	return transport;
 }
 
 static
@@ -120,8 +120,8 @@ struct pgm_sk_buff_t*
 generate_skb (void)
 {
 	const char source[] = "i am not a string";
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU);
-	pgm_skb_reserve (skb, pgm_pkt_offset (FALSE, FALSE));
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_reserve (skb, pgm_transport_pkt_offset2 (FALSE, FALSE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -132,8 +132,8 @@ struct pgm_sk_buff_t*
 generate_fragment_skb (void)
 {
 	const char source[] = "i am not a string";
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU);
-	pgm_skb_reserve (skb, pgm_pkt_offset (TRUE, FALSE));
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
+	pgm_skb_reserve (skb, pgm_transport_pkt_offset2 (TRUE, FALSE));
 	pgm_skb_put (skb, sizeof(source));
 	memcpy (skb->data, source, sizeof(source));
 	return skb;
@@ -145,7 +145,7 @@ generate_odata (void)
 {
 	const char source[] = "i am not a string";
 	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data);
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	pgm_skb_reserve (skb, header_length);
 	memset (skb->head, 0, header_length);
 	skb->pgm_header = (struct pgm_header*)skb->head;
@@ -172,7 +172,7 @@ static
 struct pgm_sk_buff_t*
 generate_spmr (void)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	const guint16 header_length = sizeof(struct pgm_header);
 	pgm_skb_reserve (skb, header_length);
 	memset (skb->head, 0, header_length);
@@ -186,7 +186,7 @@ static
 struct pgm_sk_buff_t*
 generate_single_nak (void)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 	pgm_skb_reserve (skb, sizeof(struct pgm_header));
 	memset (skb->head, 0, header_length);
@@ -229,7 +229,7 @@ static
 struct pgm_sk_buff_t*
 generate_nak_list (void)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU);
 	const guint16 header_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak) +
 				      sizeof(struct pgm_opt_length) +
 				      sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
@@ -457,7 +457,7 @@ mock_pgm_csum_fold (
 PGM_GNUC_INTERNAL
 ssize_t
 mock_pgm_sendto (
-	pgm_sock_t*		sock,
+	pgm_transport_t*		transport,
 	bool				use_rate_limit,
 	bool				use_router_alert,
 	const void*			buf,
@@ -468,8 +468,8 @@ mock_pgm_sendto (
 {
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	g_debug ("mock_pgm_sendto (sock:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d to:%s tolen:%d)",
-		(gpointer)sock,
+	g_debug ("mock_pgm_sendto (transport:%p use-rate-limit:%s use-router-alert:%s buf:%p len:%d to:%s tolen:%d)",
+		(gpointer)transport,
 		use_rate_limit ? "YES" : "NO",
 		use_router_alert ? "YES" : "NO",
 		buf,
@@ -490,11 +490,11 @@ _mock_pgm_time_update_now (void)
 	return 0x1;
 }
 
-/** socket module */
+/** transport module */
 size_t
-pgm_pkt_offset (
+pgm_transport_pkt_offset2 (
 	const bool			can_fragment,
-	const sa_family_t		pgmcc_family	/* 0 = disable */
+	const bool			use_pgmcc
 	)
 {
 	return can_fragment ? ( sizeof(struct pgm_header)
@@ -512,7 +512,7 @@ pgm_pkt_offset (
 /* target:
  *	PGMIOStatus
  *	pgm_send (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		gconstpointer		apdu,
  *		gsize			apdu_length,
  *		gsize*			bytes_written
@@ -521,13 +521,13 @@ pgm_pkt_offset (
 
 START_TEST (test_send_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (sock, buffer, apdu_length, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written), "send not normal");
 	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
@@ -535,20 +535,20 @@ END_TEST
 /* large apdu */
 START_TEST (test_send_pass_002)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (sock, buffer, apdu_length, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send (transport, buffer, apdu_length, &bytes_written), "send not normal");
 	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
 
 START_TEST (test_send_fail_001)
 {
-	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize apdu_length = 100;
 	gsize bytes_written;
 	fail_unless (PGM_IO_STATUS_ERROR == pgm_send (NULL, buffer, apdu_length, &bytes_written), "send not error");
@@ -558,7 +558,7 @@ END_TEST
 /* target:
  *	PGMIOStatus
  *	pgm_sendv (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		const struct pgmiovec*	vector,
  *		guint			count,
  *		gboolean		is_one_apdu,
@@ -568,14 +568,14 @@ END_TEST
 
 START_TEST (test_sendv_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 100;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (sock, vector, 1, TRUE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written), "send not normal");
 	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
@@ -583,14 +583,14 @@ END_TEST
 /* large apdu */
 START_TEST (test_sendv_pass_002)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = apdu_length } };
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (sock, vector, 1, TRUE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, 1, TRUE, &bytes_written), "send not normal");
 	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
@@ -598,9 +598,9 @@ END_TEST
 /* multipart apdu */
 START_TEST (test_sendv_pass_003)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	guint8 buffer[ apdu_length ];
 	struct pgm_iovec vector[ 16 ];
@@ -609,7 +609,7 @@ START_TEST (test_sendv_pass_003)
 		vector[i].iov_len  = apdu_length / G_N_ELEMENTS(vector);
 	}
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (sock, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), TRUE, &bytes_written), "send not normal");
 	fail_unless ((gssize)apdu_length == bytes_written, "send underrun");
 }
 END_TEST
@@ -617,9 +617,9 @@ END_TEST
 /* multiple apdus */
 START_TEST (test_sendv_pass_004)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	const gsize apdu_length = 16000;
 	struct pgm_iovec vector[ 16 ];
 	for (unsigned i = 0; i < G_N_ELEMENTS(vector); i++) {
@@ -627,14 +627,14 @@ START_TEST (test_sendv_pass_004)
 		vector[i].iov_len  = apdu_length;
 	}
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (sock, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_sendv (transport, vector, G_N_ELEMENTS(vector), FALSE, &bytes_written), "send not normal");
 	fail_unless ((gssize)(apdu_length * G_N_ELEMENTS(vector)) == bytes_written, "send underrun");
 }
 END_TEST
 
 START_TEST (test_sendv_fail_001)
 {
-	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
+	guint8 buffer[ PGM_TXW_SQNS * PGM_MAX_TPDU ];
 	const gsize tsdu_length = 100;
 	struct pgm_iovec vector[] = { { .iov_base = buffer, .iov_len = tsdu_length } };
 	gsize bytes_written;
@@ -645,7 +645,7 @@ END_TEST
 /* target:
  *	PGMIOStatus
  *	pgm_send_skbv (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	vector[],
  *		guint			count,
  *		gboolean		is_one_apdu,
@@ -655,15 +655,15 @@ END_TEST
 
 START_TEST (test_send_skbv_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb = NULL;
 	skb = generate_skb ();
 	fail_if (NULL == skb, "generate_skb failed");
 	gsize apdu_length = (gsize)skb->len;
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (sock, &skb, 1, TRUE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, &skb, 1, TRUE, &bytes_written), "send not normal");
 	fail_unless (apdu_length == bytes_written, "send underrun");
 }
 END_TEST
@@ -671,9 +671,9 @@ END_TEST
 /* multipart apdu */
 START_TEST (test_send_skbv_pass_002)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
 	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++) {
 		skb[i] = generate_fragment_skb ();
@@ -681,7 +681,7 @@ START_TEST (test_send_skbv_pass_002)
 	}
 	gsize apdu_length = (gsize)skb[0]->len * G_N_ELEMENTS(skb);
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (sock, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), TRUE, &bytes_written), "send not normal");
 	fail_unless (apdu_length == bytes_written, "send underrun");
 }
 END_TEST
@@ -689,26 +689,26 @@ END_TEST
 /* multiple apdus */
 START_TEST (test_send_skbv_pass_003)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->is_bound = TRUE;
 	struct pgm_sk_buff_t* skb[16];
 	for (unsigned i = 0; i < G_N_ELEMENTS(skb); i++) {
 		skb[i] = generate_skb ();
 		fail_if (NULL == skb[i], "generate_skb failed");
 	}
 	gsize bytes_written;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (sock, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written), "send not normal");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_send_skbv (transport, skb, G_N_ELEMENTS(skb), FALSE, &bytes_written), "send not normal");
 	fail_unless ((gssize)(skb[0]->len * G_N_ELEMENTS(skb)) == bytes_written, "send underrun");
 }
 END_TEST
 
 START_TEST (test_send_skbv_fail_001)
 {
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (TEST_MAX_TPDU), *skbv[] = { skb };
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (PGM_MAX_TPDU), *skbv[] = { skb };
 	fail_if (NULL == skb, "alloc_skb failed");
 /* reserve PGM header */
-	pgm_skb_put (skb, pgm_pkt_offset (TRUE, FALSE));
+	pgm_skb_put (skb, pgm_transport_pkt_offset2 (TRUE, FALSE));
 	const gsize tsdu_length = 100;
 	gsize bytes_written;
 	fail_unless (PGM_IO_STATUS_ERROR == pgm_send_skbv (NULL, skbv, 1, TRUE, &bytes_written), "send not error");
@@ -718,16 +718,16 @@ END_TEST
 /* target:
  *	gboolean
  *	pgm_send_spm (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		int			flags
  *		)
  */
 
 START_TEST (test_send_spm_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	fail_unless (TRUE == pgm_send_spm (sock, 0), "send_spm failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_send_spm (transport, 0), "send_spm failed");
 }
 END_TEST
 
@@ -741,15 +741,15 @@ END_TEST
 /* target:
  *	void
  *	pgm_on_deferred_nak (
- *		pgm_sock_t*	sock
+ *		pgm_transport_t*	transport
  *		)
  */
 
 START_TEST (test_on_deferred_nak_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	pgm_on_deferred_nak (sock);
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	pgm_on_deferred_nak (transport);
 }
 END_TEST
 	
@@ -763,7 +763,7 @@ END_TEST
 /* target:
  *	gboolean
  *	pgm_on_spmr (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		pgm_peer_t*		peer,
  *		struct pgm_sk_buff_t*	skb
  *	)
@@ -772,41 +772,41 @@ END_TEST
 /* peer spmr */
 START_TEST (test_on_spmr_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	pgm_peer_t* peer = generate_peer ();
 	fail_if (NULL == peer, "generate_peer failed");
 	struct pgm_sk_buff_t* skb = generate_spmr ();
 	fail_if (NULL == skb, "generate_spmr failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_spmr (sock, peer, skb), "on_spmr failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_spmr (transport, peer, skb), "on_spmr failed");
 }
 END_TEST
 
 /* source spmr */
 START_TEST (test_on_spmr_pass_002)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_spmr ();
 	fail_if (NULL == skb, "generate_spmr failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_spmr (sock, NULL, skb), "on_spmr failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_spmr (transport, NULL, skb), "on_spmr failed");
 }
 END_TEST
 
 /* invalid spmr */
 START_TEST (test_on_spmr_fail_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	pgm_peer_t* peer = generate_peer ();
 	fail_if (NULL == peer, "generate_peer failed");
 	struct pgm_sk_buff_t* skb = generate_spmr ();
 	fail_if (NULL == skb, "generate_spmr failed");
-	skb->sock = sock;
+	skb->transport = transport;
 	mock_is_valid_spmr = FALSE;
-	fail_unless (FALSE == pgm_on_spmr (sock, peer, skb), "on_spmr failed");
+	fail_unless (FALSE == pgm_on_spmr (transport, peer, skb), "on_spmr failed");
 }
 END_TEST
 
@@ -820,7 +820,7 @@ END_TEST
 /* target:
  *	gboolean
  *	pgm_on_nak (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	skb
  *	)
  */
@@ -828,62 +828,62 @@ END_TEST
 /* single nak */
 START_TEST (test_on_nak_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nak ();
 	fail_if (NULL == skb, "generate_single_nak failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_nak (sock, skb), "on_nak failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
 /* nak list */
 START_TEST (test_on_nak_pass_002)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_nak_list ();
 	fail_if (NULL == skb, "generate_nak_list failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_nak (sock, skb), "on_nak failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
 /* single parity nak */
 START_TEST (test_on_nak_pass_003)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->use_ondemand_parity = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->use_ondemand_parity = TRUE;
 	struct pgm_sk_buff_t* skb = generate_parity_nak ();
 	fail_if (NULL == skb, "generate_parity_nak failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_nak (sock, skb), "on_nak failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
 /* parity nak list */
 START_TEST (test_on_nak_pass_004)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	sock->use_ondemand_parity = TRUE;
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	transport->use_ondemand_parity = TRUE;
 	struct pgm_sk_buff_t* skb = generate_parity_nak_list ();
 	fail_if (NULL == skb, "generate_parity_nak_list failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_nak (sock, skb), "on_nak failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
 START_TEST (test_on_nak_fail_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nak ();
 	fail_if (NULL == skb, "generate_single_nak failed");
-	skb->sock = sock;
+	skb->transport = transport;
 	mock_is_valid_nak = FALSE;
-	fail_unless (FALSE == pgm_on_nak (sock, skb), "on_nak failed");
+	fail_unless (FALSE == pgm_on_nak (transport, skb), "on_nak failed");
 }
 END_TEST
 
@@ -897,31 +897,31 @@ END_TEST
 /* target:
  *	gboolean
  *	pgm_on_nnak (
- *		pgm_sock_t*	sock,
+ *		pgm_transport_t*	transport,
  *		struct pgm_sk_buff_t*	skb
  *	)
  */
 
 START_TEST (test_on_nnak_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nnak ();
 	fail_if (NULL == skb, "generate_single_nnak failed");
-	skb->sock = sock;
-	fail_unless (TRUE == pgm_on_nnak (sock, skb), "on_nnak failed");
+	skb->transport = transport;
+	fail_unless (TRUE == pgm_on_nnak (transport, skb), "on_nnak failed");
 }
 END_TEST
 
 START_TEST (test_on_nnak_fail_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
 	struct pgm_sk_buff_t* skb = generate_single_nnak ();
 	fail_if (NULL == skb, "generate_single_nnak failed");
-	skb->sock = sock;
+	skb->transport = transport;
 	mock_is_valid_nnak = FALSE;
-	fail_unless (FALSE == pgm_on_nnak (sock, skb), "on_nnak failed");
+	fail_unless (FALSE == pgm_on_nnak (transport, skb), "on_nnak failed");
 }
 END_TEST
 
@@ -933,162 +933,114 @@ START_TEST (test_on_nnak_fail_002)
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_AMBIENT_SPM,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_ambient_spm (
+ *		pgm_transport_t*	transport,
+ *		guint			interval
  *		)
  */
 
 START_TEST (test_set_ambient_spm_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_AMBIENT_SPM;
-	const int ambient_spm	= pgm_msecs(1000);
-	const void* optval	= &ambient_spm;
-	const socklen_t optlen	= sizeof(ambient_spm);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_ambient_spm failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_transport_set_ambient_spm (transport, 1000), "set_ambient_spm failed");
 }
 END_TEST
 
 START_TEST (test_set_ambient_spm_fail_001)
 {
-	const int optname	= PGM_AMBIENT_SPM;
-	const int ambient_spm	= pgm_msecs(1000);
-	const void* optval	= &ambient_spm;
-	const socklen_t optlen	= sizeof(ambient_spm);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_ambient_spm failed");
+	fail_unless (FALSE == pgm_transport_set_ambient_spm (NULL, 1000), "set_ambient_spm failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_HEARTBEAT_SPM,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int) * n
+ *	gboolean
+ *	pgm_transport_set_heartbeat_spm (
+ *		pgm_transport_t*	transport,
+ *		const guint*		intervals,
+		const int		count
  *		)
  */
 
 START_TEST (test_set_heartbeat_spm_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_HEARTBEAT_SPM;
-	const int intervals[]	= { 1, 2, 3, 4, 5 };
-	const void* optval	= &intervals;
-	const socklen_t optlen	= sizeof(intervals);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_heartbeat_spm failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	const guint intervals[] = { 1, 2, 3, 4, 5 };
+	fail_unless (TRUE == pgm_transport_set_heartbeat_spm (transport, intervals, G_N_ELEMENTS(intervals)), "set_heartbeat_spm failed");
 }
 END_TEST
 
 START_TEST (test_set_heartbeat_spm_fail_001)
 {
-	const int optname	= PGM_HEARTBEAT_SPM;
-	const int intervals[]	= { 1, 2, 3, 4, 5 };
-	const void* optval	= &intervals;
-	const socklen_t optlen	= sizeof(intervals);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_heartbeat_spm failed");
+	const guint intervals[] = { 1, 2, 3, 4, 5 };
+	fail_unless (FALSE == pgm_transport_set_heartbeat_spm (NULL, intervals, G_N_ELEMENTS(intervals)), "set_heartbeat_spm failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_TXW_SQNS,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_txw_sqns (
+ *		pgm_transport_t*	transport,
+ *		const guint		sqns
  *	)
  */
 
 START_TEST (test_set_txw_sqns_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_TXW_SQNS;
-	const int txw_sqns	= 100;
-	const void* optval	= &txw_sqns;
-	const socklen_t optlen	= sizeof(txw_sqns);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_txw_sqns failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_transport_set_txw_sqns (transport, 100), "set_txw_sqns failed");
 }
 END_TEST
 
 START_TEST (test_set_txw_sqns_fail_001)
 {
-	const int optname	= PGM_TXW_SQNS;
-	const int txw_sqns	= 100;
-	const void* optval	= &txw_sqns;
-	const socklen_t optlen	= sizeof(txw_sqns);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_txw_sqns failed");
+	fail_unless (FALSE == pgm_transport_set_txw_sqns (NULL, 100), "set_txw_sqns failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_TXW_SECS,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_txw_secs (
+ *		pgm_transport_t*	transport,
+ *		const guint		secs
  *	)
  */
 
 START_TEST (test_set_txw_secs_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_TXW_SECS;
-	const int txw_secs	= pgm_secs(10);
-	const void* optval	= &txw_secs;
-	const socklen_t optlen	= sizeof(txw_secs);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_txw_secs failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_if (NULL == transport, "generate_transport failed");
+	fail_unless (TRUE == pgm_transport_set_txw_secs (transport, 10), "set_txw_secs failed");
 }
 END_TEST
 
 START_TEST (test_set_txw_secs_fail_001)
 {
-	const int optname	= PGM_TXW_SECS;
-	const int txw_secs	= pgm_secs(10);
-	const void* optval	= &txw_secs;
-	const socklen_t optlen	= sizeof(txw_secs);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_txw_secs failed");
+	fail_unless (FALSE == pgm_transport_set_txw_secs (NULL, 10), "set_txw_secs failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_TXW_MAX_RTE,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_txw_max_rte (
+ *		pgm_transport_t*	transport,
+ *		const guint		rate
  *	)
  */
 
 START_TEST (test_set_txw_max_rte_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
-	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_TXW_MAX_RTE;
-	const int txw_max_rte	= 100*1000;
-	const void* optval	= &txw_max_rte;
-	const socklen_t optlen	= sizeof(txw_max_rte);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_txw_max_rte failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_txw_max_rte (transport, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
 START_TEST (test_set_txw_max_rte_fail_001)
 {
-	const int optname	= PGM_TXW_MAX_RTE;
-	const int txw_max_rte	= 100*1000;
-	const void* optval	= &txw_max_rte;
-	const socklen_t optlen	= sizeof(txw_max_rte);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_txw_max_rte failed");
+	fail_unless (FALSE == pgm_transport_set_txw_max_rte (NULL, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 

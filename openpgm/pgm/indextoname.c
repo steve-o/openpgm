@@ -23,7 +23,7 @@
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>
 #endif
-#include <impl/framework.h>
+#include <pgm/framework.h>
 
 
 //#define INDEXTONAME_DEBUG

@@ -34,8 +34,7 @@ src = Split("""
 		tsi.c
 		txw.c
 		rxw.c
-		skbuff.c
-		socket.c
+		transport.c
 		source.c
 		receiver.c
 		recv.c

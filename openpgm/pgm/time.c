@@ -27,8 +27,8 @@
 #	define WIN32_LEAN_AND_MEAN
 #	include "windows.h"
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
 
 //#define TIME_DEBUG
 
@@ -89,12 +89,12 @@ static pgm_time_t		pgm_gettimeofday_update (void);
 #	define HPET_MAIN_COUNTER_REGISTER	0x0f0
 #	define HPET_COUNT_SIZE_CAP		(1 << 13)
 /* HPET counter size maybe 64-bit or 32-bit */
-#	if defined(__x86_64__)
+#	if defined( __x86_64__ ) || defined( __amd64 )
 typedef uint64_t hpet_counter_t;
 #	else
 typedef uint32_t hpet_counter_t;
 #	endif
-static int			hpet_fd PGM_GNUC_READ_MOSTLY = -1;
+static int			hpet_fd = -1;
 static char*			hpet_ptr PGM_GNUC_READ_MOSTLY;
 static uint64_t			hpet_offset = 0;
 static uint64_t			hpet_wrap PGM_GNUC_READ_MOSTLY;

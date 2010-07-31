@@ -2,7 +2,7 @@
  *
  * unit tests for PGM packet handling.
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -46,7 +46,7 @@ generate_raw_pgm (void)
 	GError* err = NULL;
 
 	skb = pgm_alloc_skb (1500);
-	skb->sock		= (pgm_sock_t*)0x1;
+	skb->transport		= (pgm_transport_t*)0x1;
 	skb->tstamp		= 0x1;
 	skb->data		= skb->head;
 	skb->len		= sizeof(struct pgm_ip) + sizeof(struct pgm_header) + sizeof(struct pgm_data) + source_len;
@@ -109,7 +109,7 @@ generate_udp_encap_pgm (void)
 	GError* err = NULL;
 
 	skb = pgm_alloc_skb (1500);
-	skb->sock		= (pgm_sock_t*)0x1;
+	skb->transport		= (pgm_transport_t*)0x1;
 	skb->tstamp		= 0x1;
 	skb->data		= skb->head;
 	skb->len		= sizeof(struct pgm_header) + sizeof(struct pgm_data) + source_len;
@@ -148,9 +148,9 @@ generate_udp_encap_pgm (void)
 /* mock functions for external references */
 
 size_t
-pgm_pkt_offset (
+pgm_transport_pkt_offset2 (
         const bool                      can_fragment,
-        const sa_family_t		pgmcc_family	/* 0 = disable */
+        const bool                      use_pgmcc
         )
 {
         return 0;

@@ -22,13 +22,10 @@
 #ifndef _WIN32
 #	include <netdb.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <impl/engine.h>
-#include <impl/mem.h>
-#include <impl/socket.h>
-#include <pgm/engine.h>
-#include <pgm/version.h>
+#include <pgm/i18n.h>
+#include <pgm/framework.h>
+#include "pgm/engine.h"
+#include "pgm/version.h"
 
 
 //#define ENGINE_DEBUG
@@ -206,8 +203,8 @@ pgm_init (
 	}
 #endif
 
-/* create global sock list lock */
-	pgm_rwlock_init (&pgm_sock_list_lock);
+/* create global transport list lock */
+	pgm_rwlock_init (&pgm_transport_list_lock);
 
 	pgm_is_supported = TRUE;
 	return TRUE;
@@ -243,9 +240,9 @@ pgm_shutdown (void)
 
 	pgm_is_supported = FALSE;
 
-/* destroy all open socks */
-	while (pgm_sock_list) {
-		pgm_close ((pgm_sock_t*)pgm_sock_list->data, FALSE);
+/* destroy all open transports */
+	while (pgm_transport_list) {
+		pgm_transport_destroy ((pgm_transport_t*)pgm_transport_list->data, FALSE);
 	}
 
 	pgm_time_shutdown();
