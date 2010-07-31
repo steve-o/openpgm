@@ -4,14 +4,14 @@
 === Building with GCC for OS X 10.6 ===
 Download and build stable release of SCons, you may need to set a password before using <tt>sudo</tt>.
 <pre>
- $ *wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz* 
+ $ *wget http://nchc.dl.sourceforge.net/sourceforge/scons/scons-1.2.0.tar.gz * 
  $ *tar zxf scons-1.2.0.tar.gz* 
  $ *cd scons-1.2.0* 
  $ *sudo python setup.py install* 
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-3-0-66/* 
+ $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-3-0-66/ * 
 </pre>
 Build.
 <pre>
