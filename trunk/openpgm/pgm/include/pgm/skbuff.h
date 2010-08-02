@@ -87,6 +87,9 @@ pgm_alloc_skb (
 	struct pgm_sk_buff_t* skb;
 
 	skb = (struct pgm_sk_buff_t*)pgm_malloc (size + sizeof(struct pgm_sk_buff_t));
+/* Requires fast FSB to test
+	pgm_prefetchw (skb);
+ */
 	if (PGM_UNLIKELY(pgm_mem_gc_friendly)) {
 		memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
 		skb->zero_padded = 1;
