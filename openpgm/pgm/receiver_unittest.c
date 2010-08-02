@@ -68,6 +68,7 @@
 #define pgm_csum_fold		mock_pgm_csum_fold
 #define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
 #define pgm_histogram_init	mock_pgm_histogram_init
+#define pgm_setsockopt		mock_pgm_setsockopt
 
 
 #define RECEIVER_DEBUG
@@ -348,6 +349,18 @@ pgm_pkt_offset (
         return 0;
 }
 
+bool
+mock_pgm_setsockopt (
+        pgm_sock_t* const       sock,
+        const int               optname,
+        const void*             optval,
+        const socklen_t         optlen
+        )
+{
+        if (NULL == sock)
+                return FALSE;
+        return TRUE;
+}
 
 /* target:
  *	void

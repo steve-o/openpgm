@@ -151,8 +151,8 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('tsi.c')] + tframework);
 	te.Program (['source_unittest.c',
 			e.Object('skbuff.c')] + tframework);
-#	te.Program (['receiver_unittest.c',
-#			e.Object('tsi.c')] + tframework);
+	te.Program (['receiver_unittest.c',
+			e.Object('tsi.c')] + tframework);
 	te.Program (['recv_unittest.c',
 			e.Object('tsi.c'),
 			e.Object('gsi.c'),
