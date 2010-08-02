@@ -21,7 +21,7 @@ diff -urN include-original/./ws2tcpip.h x86_64-w64-mingw32/include/./ws2tcpip.h
 +	struct sockaddr_storage	gf_group;
 +	u_long		gf_fmode;
 +	u_long		gf_numsrc;
-+	struct in_addr	gf_slist[1];
++	struct sockaddr_storage	gf_slist[1];
 +};
 +
  struct ip_msfilter {
