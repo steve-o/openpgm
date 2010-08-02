@@ -93,9 +93,66 @@ generate_asm_sockaddr (void)
 {
 	const pgm_gsi_t gsi = { 200, 202, 203, 204, 205, 206 };
 	struct pgm_sockaddr_t* pgmsa = g_new0 (struct pgm_sockaddr_t, 1);
-	pgmsa->sa_port = 123;
+	pgmsa->sa_port = TEST_PORT;
 	memcpy (&pgmsa->sa_addr.gsi, &gsi, sizeof(gsi));
 	return pgmsa;
+}
+
+/* apply minimum socket options to new socket to pass bind()
+ */
+
+static
+void
+prebind_socket (
+	struct pgm_sock_t*	sock
+	)
+{
+	sock->max_tpdu = TEST_MAX_TPDU;
+	sock->max_tsdu = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (FALSE, FALSE);
+	sock->max_tsdu_fragment = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (TRUE, FALSE);
+	sock->max_apdu = MIN(TEST_TXW_SQNS, PGM_MAX_FRAGMENTS) * sock->max_tsdu_fragment;
+
+/* tx */
+	sock->can_send_data = TRUE;
+	sock->spm_ambient_interval = TEST_SPM_AMBIENT;
+	const guint interval_init[] = TEST_SPM_HEARTBEAT_INIT;
+	sock->spm_heartbeat_len = sizeof(interval_init) / sizeof(interval_init[0]);
+	sock->spm_heartbeat_interval = g_new0 (guint, sock->spm_heartbeat_len + 1);
+	for (guint i = 1; i < sock->spm_heartbeat_len; i++)
+		sock->spm_heartbeat_interval[i] = interval_init[i];
+	sock->txw_sqns = TEST_TXW_SQNS;
+
+/* rx */
+	sock->can_recv_data = TRUE;
+	sock->rxw_sqns = TEST_RXW_SQNS;
+	sock->peer_expiry = TEST_PEER_EXPIRY;
+	sock->spmr_expiry = TEST_SPMR_EXPIRY;
+	sock->nak_bo_ivl = TEST_NAK_BO_IVL;
+	sock->nak_rpt_ivl = TEST_NAK_RPT_IVL;
+	sock->nak_rdata_ivl = TEST_NAK_RDATA_IVL;
+	sock->nak_data_retries = TEST_NAK_DATA_RETRIES;
+	sock->nak_ncf_retries = TEST_NAK_NCF_RETRIES;
+}
+
+/* apply minimum sockets options to pass connect()
+ */
+
+static
+void
+preconnect_socket (
+	struct pgm_sock_t*	sock
+	)
+{
+/* tx */
+	((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family = AF_INET;
+	((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
+
+/* rx */
+	sock->recv_gsr_len = 1;
+	((struct sockaddr*)&sock->recv_gsr[0].gsr_group)->sa_family = ((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family;
+	((struct sockaddr*)&sock->recv_gsr[0].gsr_source)->sa_family = ((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family;
+	((struct sockaddr_in*)&sock->recv_gsr[0].gsr_group)->sin_addr.s_addr = ((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_addr.s_addr;
+	((struct sockaddr_in*)&sock->recv_gsr[0].gsr_source)->sin_addr.s_addr = ((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_addr.s_addr;
 }
 
 /* stock create unconnected socket for pgm_setsockopt(), etc.
@@ -105,23 +162,20 @@ static
 struct pgm_sock_t*
 generate_sock (void)
 {
-	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(TEST_PORT) };
 	struct pgm_sock_t* sock = g_new0 (struct pgm_sock_t, 1);
-	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
+	sock->family = AF_INET;
+	sock->protocol = IPPROTO_IP;
+	sock->recv_sock = socket (AF_INET, SOCK_RAW, 113);
+	sock->send_sock = socket (AF_INET, SOCK_RAW, 113);
+	sock->send_with_router_alert_sock = socket (AF_INET, SOCK_RAW, 113);
 	((struct sockaddr*)&sock->send_addr)->sa_family = AF_INET;
 	((struct sockaddr_in*)&sock->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
-	((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family = AF_INET;
-	((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_addr.s_addr = inet_addr ("239.192.0.1");
+	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
 	sock->dport = g_htons(TEST_PORT);
-	sock->window = g_malloc0 (sizeof(pgm_txw_t));
-	sock->txw_sqns = TEST_TXW_SQNS;
-	sock->max_tpdu = TEST_MAX_TPDU;
-	sock->max_tsdu = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (FALSE, FALSE);
-	sock->max_tsdu_fragment = TEST_MAX_TPDU - sizeof(struct pgm_ip) - pgm_pkt_offset (TRUE, FALSE);
-	sock->max_apdu = MIN(TEST_TXW_SQNS, PGM_MAX_FRAGMENTS) * sock->max_tsdu_fragment;
+	sock->window = g_new0 (pgm_txw_t, 1);
 	sock->iphdr_len = sizeof(struct pgm_ip);
-	sock->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
-	sock->spm_heartbeat_interval[0] = pgm_secs(1);
+	pgm_rwlock_init (&sock->lock);
 	pgm_spinlock_init (&sock->txw_spinlock);
 	sock->is_bound = FALSE;
 	sock->is_connected = FALSE;
@@ -455,7 +509,9 @@ START_TEST (test_connect_pass_001)
 	fail_if (NULL == pgmsa, "generate_asm_sockaddr failed");
 	fail_unless (TRUE == pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &err), "create failed");
 	fail_unless (NULL == err, "error raised");
+	prebind_socket (sock);
 	fail_unless (TRUE == pgm_bind (sock, pgmsa, sizeof(*pgmsa), &err), "bind failed");
+	preconnect_socket (sock);
 	fail_unless (TRUE == pgm_connect (sock, &err), "connect failed");
 }
 END_TEST
@@ -716,7 +772,7 @@ START_TEST (test_set_fec_pass_001)
 		.proactive_packets		= 16,
 		.var_pktlen_enabled		= TRUE,
 		.block_size			= 255,
-		.group_size			= 239
+		.group_size			= 64
 	};
 	const void* optval	= &fecinfo;
 	const socklen_t optlen	= sizeof(fecinfo);
@@ -732,7 +788,7 @@ START_TEST (test_set_fec_fail_001)
 		.proactive_packets		= 16,
 		.var_pktlen_enabled		= TRUE,
 		.block_size			= 255,
-		.group_size			= 239
+		.group_size			= 64
 	};
 	const void* optval	= &fecinfo;
 	const socklen_t optlen	= sizeof(fecinfo);
@@ -1175,6 +1231,11 @@ make_master_suite (void)
 int
 main (void)
 {
+	if (0 != getuid()) {
+		fprintf (stderr, "This test requires super-user privileges to run.\n");
+		return EXIT_FAILURE;
+	}
+
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
