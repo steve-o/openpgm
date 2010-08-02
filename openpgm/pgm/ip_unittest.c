@@ -351,6 +351,11 @@ make_master_suite (void)
 int
 main (void)
 {
+	if (0 != getuid()) {
+		fprintf (stderr, "This test requires super-user privileges to run.\n");
+		return EXIT_FAILURE;
+	}
+
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
