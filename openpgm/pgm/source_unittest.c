@@ -75,6 +75,7 @@ static gboolean mock_is_valid_nnak = TRUE;
 #define pgm_csum_fold			mock_pgm_csum_fold
 #define pgm_sendto			mock_pgm_sendto
 #define pgm_time_update_now		mock_pgm_time_update_now
+#define pgm_setsockopt			mock_pgm_setsockopt
 
 
 #define SOURCE_DEBUG
@@ -503,6 +504,19 @@ pgm_pkt_offset (
 	                      + sizeof(struct pgm_opt_header)
 			      + sizeof(struct pgm_opt_fragment) )
 			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
+}
+
+bool
+mock_pgm_setsockopt (
+	pgm_sock_t* const	sock,
+	const int		optname,
+	const void*		optval,
+	const socklen_t		optlen
+	)
+{
+	if (NULL == sock)
+		return FALSE;
+	return TRUE;
 }
 
 
