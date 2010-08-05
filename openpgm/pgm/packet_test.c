@@ -20,7 +20,11 @@
  */
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#ifdef _MSC_VER
+#	include <pgm/wininttypes.h>
+#else
+#	include <inttypes.h>
+#endif
 #include <ctype.h>
 #include <stdio.h>
 #ifndef _WIN32

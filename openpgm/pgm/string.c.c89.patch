@@ -1,0 +1,39 @@
+65a66,68
+> #ifdef _MSC_VER
+> 	return _vscprintf (format, args) + 1;
+> #else
+67a71
+> #endif
+80a85
+> 	{
+81a87
+> 	{
+85a92,94
+> #	ifdef _MSC_VER
+> 	va_list args2 = args;
+> #	else
+87a97
+> #	endif
+89a100
+> 	{
+93a105,106
+> 	}
+> 	}
+118a132
+> 	{
+124a139
+> 	}
+198a214,216
+> #ifdef _MSC_VER
+> 			strncpy_s (new_string, len + 1, remainder, len);
+> #else
+199a218
+> #endif
+233c252,254
+< 		for (unsigned i = 0; str_array[i] != NULL; i++)
+---
+> 		{
+> 		unsigned i;
+> 		for (i = 0; str_array[i] != NULL; i++)
+234a256
+> 		}

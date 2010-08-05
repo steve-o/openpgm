@@ -30,7 +30,11 @@
 PGM_BEGIN_DECLS
 
 /* 8 bit wide galois field integer: GF(2⁸) */
+#ifdef _MSC_VER
+typedef uint8_t pgm_gf8_t;
+#else
 typedef uint8_t __attribute__((__may_alias__)) pgm_gf8_t;
+#endif
 
 /* E denotes the encoding symbol length in bytes.
  * S denotes the symbol size in units of m-bit elements.  When m = 8,
@@ -125,12 +129,23 @@ pgm_gfdiv (
 	pgm_gf8_t	b
         )
 {
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+/* C99 version */
 	if (PGM_UNLIKELY( !a )) {
 		return 0;
 	}
 
-	int sum = pgm_gflog[ a ] - pgm_gflog[ b ];
+	const int sum = pgm_gflog[ a ] - pgm_gflog[ b ];
 	return sum < 0 ? pgm_gfantilog[ sum + PGM_GF_MAX ] : pgm_gfantilog[ sum ];
+#else
+/* C89 version */
+	const int sum = pgm_gflog[ a ] - pgm_gflog[ b ];
+	if (PGM_UNLIKELY( !a )) {
+		return 0;
+	}
+
+	return sum < 0 ? pgm_gfantilog[ sum + PGM_GF_MAX ] : pgm_gfantilog[ sum ];
+#endif
 }
 
 PGM_END_DECLS

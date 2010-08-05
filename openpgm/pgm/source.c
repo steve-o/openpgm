@@ -20,7 +20,11 @@
  */
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#ifdef _MSC_VER
+#	include <pgm/wininttypes.h>
+#else
+#	include <inttypes.h>
+#endif
 #include <errno.h>
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -47,11 +51,11 @@ static inline bool peer_is_source (const pgm_peer_t*) PGM_GNUC_CONST;
 static inline bool peer_is_peer (const pgm_peer_t*) PGM_GNUC_CONST;
 static void reset_heartbeat_spm (pgm_sock_t*const, const pgm_time_t);
 static bool send_ncf (pgm_sock_t*const restrict, const struct sockaddr*const restrict, const struct sockaddr*const restrict, const uint32_t, const bool);
-static bool send_ncf_list (pgm_sock_t*const restrict, const struct sockaddr*const restrict, const struct sockaddr*restrict, struct pgm_sqn_list_t*const restrict, const bool);
+static bool send_ncf_list (pgm_sock_t*const restrict, const struct sockaddr*const restrict, const struct sockaddr*const restrict, struct pgm_sqn_list_t*const restrict, const bool);
 static int send_odata (pgm_sock_t*const restrict, struct pgm_sk_buff_t*const restrict, size_t*restrict);
 static int send_odata_copy (pgm_sock_t*const restrict, const void*restrict, const uint16_t, size_t*restrict);
 static int send_odatav (pgm_sock_t*const restrict, const struct pgm_iovec*const restrict, const unsigned, size_t*restrict);
-static bool send_rdata (pgm_sock_t*const restrict, struct pgm_sk_buff_t*const restrict);
+static bool send_rdata (pgm_sock_t*restrict, struct pgm_sk_buff_t*restrict);
 
 
 static inline
@@ -971,7 +975,7 @@ send_ncf_list (
 static
 void
 reset_heartbeat_spm (
-	pgm_sock_t*		sock,
+	pgm_sock_t*const	sock,
 	const pgm_time_t	now
 	)
 {

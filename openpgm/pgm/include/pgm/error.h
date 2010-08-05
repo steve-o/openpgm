@@ -93,7 +93,7 @@ struct pgm_error_t
 };
 
 void pgm_error_free (pgm_error_t*);
-void pgm_set_error (pgm_error_t**restrict, int, int, const char*restrict, ...) PGM_GNUC_PRINTF (4, 5);
+void pgm_set_error (pgm_error_t**restrict, const int, const int, const char*restrict, ...) PGM_GNUC_PRINTF (4, 5);
 void pgm_propagate_error (pgm_error_t**restrict, pgm_error_t*restrict);
 void pgm_clear_error (pgm_error_t**);
 void pgm_prefix_error (pgm_error_t**restrict, const char*restrict, ...) PGM_GNUC_PRINTF (2, 3);

@@ -1,0 +1,63 @@
+--- timer.c	2010-08-04 18:16:05.000000000 +0800
++++ timer.c89	2010-08-05 11:34:01.000000000 +0800
+@@ -52,6 +52,7 @@
+ 	pgm_assert (NULL != sock);
+ 	pgm_assert (sock->can_send_data || sock->can_recv_data);
+ 
++	{
+ 	pgm_time_t now = pgm_time_update_now();
+ 	pgm_time_t expiration;
+ 
+@@ -65,13 +66,14 @@
+ /* advance time again to adjust for processing time out of the event loop, this
+  * could cause further timers to expire even before checking for new wire data.
+  */
+-	msec = pgm_to_msecs ((int64_t)expiration - (int64_t)now);
++	msec = (int32_t)pgm_to_msecs ((int64_t)expiration - (int64_t)now);
+ 	if (msec < 0)
+ 		msec = 0;
+ 	else
+ 		msec = MIN (INT32_MAX, msec);
+ 	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiration in %" PRIi32 "ms"), msec);
+ 	return (msec == 0);
++	}
+ }
+ 
+ bool
+@@ -148,11 +150,13 @@
+ 			if (pgm_time_after_eq (now, sock->ack_expiry))
+ 			{
+ #ifdef DEBUG_PGMCC
++{
+ char nows[1024];
+ time_t t = time (NULL);
+ struct tm* tmp = localtime (&t);
+ strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
+ printf ("ACK timeout, T:%u W:%u\n", pgm_fp8tou(sock->tokens), pgm_fp8tou(sock->cwnd_size));
++}
+ #endif
+ 				sock->tokens = sock->cwnd_size = pgm_fp8 (1);
+ 				sock->ack_bitmap = 0xffffffff;
+@@ -166,11 +170,13 @@
+ 
+ /* SPM broadcast */
+ 		pgm_mutex_lock (&sock->timer_mutex);
++		{
+ 		const unsigned spm_heartbeat_state = sock->spm_heartbeat_state;
+ 		const pgm_time_t next_heartbeat_spm = sock->next_heartbeat_spm;
+ 		pgm_mutex_unlock (&sock->timer_mutex);
+ 
+ /* no lock needed on ambient */
++		{
+ 		const pgm_time_t next_ambient_spm = sock->next_ambient_spm;
+ 		pgm_time_t next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, next_ambient_spm) : next_ambient_spm;
+ 
+@@ -217,6 +223,8 @@
+ 		pgm_mutex_lock (&sock->timer_mutex);
+ 		sock->next_poll = sock->next_poll > now ? MIN(sock->next_poll, next_expiration) : next_expiration;
+ 		pgm_mutex_unlock (&sock->timer_mutex);
++		}
++		}
+ 	}
+ 	else
+ 		sock->next_poll = next_expiration;

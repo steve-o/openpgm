@@ -54,8 +54,8 @@
 
 #ifndef _WIN32
 #	include <netinet/in.h>
+#	include <sys/param.h>
 #endif
-#include <sys/param.h>
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS

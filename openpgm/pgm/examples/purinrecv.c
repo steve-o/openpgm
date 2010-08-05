@@ -28,7 +28,6 @@
 #	include <unistd.h>
 #else
 #	include "getopt.h"
-#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -109,7 +108,11 @@ main (
 	}
 
 /* parse program arguments */
-	const char* binary_name = strrchr (argv[0], '/');
+#ifdef _WIN32
+	const char* binary_name = strrchr (argv[0], '\\') + 1;
+#else
+	const char* binary_name = strrchr (argv[0], '/') + 1;
+#endif
 	int c;
 	while ((c = getopt (argc, argv, "s:n:p:cf:K:N:lih")) != -1)
 	{
@@ -457,13 +460,15 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	const size_t buflen = MIN(sizeof(buf) - 1, len);
+#ifndef _MSC_VER
 	strncpy (buf, (const char*)data, buflen);
 	buf[buflen] = '\0';
 	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
-#ifndef _MSC_VER
 	printf ("\"%s\" (%zu bytes from %s)\n",
 			buf, len, tsi);
 #else
+	strncpy_s (buf, buflen, (const char*)data, _TRUNCATE);
+	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
 /* Microsoft CRT will crash on %zu */
 	printf ("\"%s\" (%u bytes from %s)\n",
 			buf, (unsigned)len, tsi);

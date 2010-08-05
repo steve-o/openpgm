@@ -52,7 +52,7 @@ bool pgm_uint32_lt (
 	)
 {
 	pgm_assert (sizeof(int) >= 4);
-	return ( ((s) - (t)) & PGM_UINT32_SIGN_BIT );
+	return ((s) - (t)) & PGM_UINT32_SIGN_BIT;
 }
 
 static inline
@@ -63,7 +63,7 @@ pgm_uint32_lte (
 	)
 {
 	pgm_assert (sizeof(int) >= 4);
-	return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT32_SIGN_BIT ) );
+	return ((s) == (t)) || ( ((s) - (t)) & PGM_UINT32_SIGN_BIT );
 }
 
 static inline
@@ -74,7 +74,7 @@ pgm_uint32_gt (
 	)
 {
 	pgm_assert (sizeof(int) >= 4);
-	return ( ((t) - (s)) & PGM_UINT32_SIGN_BIT );
+	return ((t) - (s)) & PGM_UINT32_SIGN_BIT;
 }
 
 static inline
@@ -85,7 +85,7 @@ pgm_uint32_gte (
 	)
 {
 	pgm_assert (sizeof(int) >= 4);
-	return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT32_SIGN_BIT ) );
+	return ((s) == (t)) || ( ((t) - (s)) & PGM_UINT32_SIGN_BIT );
 }
 
 /* 64 bit */
@@ -98,15 +98,13 @@ pgm_uint64_lt (
 {
 	if (sizeof(int) == 4)
 	{
-		return (
-				( ((s) - (t)) & PGM_UINT64_SIGN_BIT )
-				> 0	/* need to force boolean conversion when int = 32bits */
-		       );
+/* need to force boolean conversion when int = 32bits */
+		return ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) != 0;
 	}
 	else
 	{
 		pgm_assert (sizeof(int) >= 8);
-		return ( ((s) - (t)) & PGM_UINT64_SIGN_BIT );
+		return ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) != 0;
 	}
 }
 
@@ -119,19 +117,15 @@ pgm_uint64_lte (
 {
 	if (sizeof(int) == 4)
 	{
-		return (
-				( (s) == (t) )
-			    ||
-				(
-					( ((s) - (t)) & PGM_UINT64_SIGN_BIT )
-					> 0	/* need to force boolean conversion when int = 32bits */
-				)
-		       );
+/* need to force boolean conversion when int = 32bits */
+		return	( (s) == (t) )
+			||
+			( ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) != 0 );
 	}
 	else
 	{
 		pgm_assert (sizeof(int) >= 8);
-		return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) );
+		return ( ((s) == (t)) || ( ((s) - (t)) & PGM_UINT64_SIGN_BIT ) ) != 0;
 	}
 }
 
@@ -144,15 +138,13 @@ pgm_uint64_gt (
 {
 	if (sizeof(int) == 4)
 	{
-		return (
-				( ((t) - (s)) & PGM_UINT64_SIGN_BIT )
-				> 0	/* need to force boolean conversion when int = 32bits */
-		       );
+/* need to force boolean conversion when int = 32bits */
+		return ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) != 0;
 	}
 	else
 	{
 		pgm_assert (sizeof(int) >= 8);
-		return ( ((t) - (s)) & PGM_UINT64_SIGN_BIT );
+		return ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) != 0;
 	}
 }
 
@@ -165,19 +157,15 @@ pgm_uint64_gte (
 {
 	if (sizeof(int) == 4)
 	{
-		return (
-				( (s) == (t) )
-			    ||
-				(
-					( ((t) - (s)) & PGM_UINT64_SIGN_BIT )
-					> 0	/* need to force boolean conversion when int = 32bits */
-				)
-		       );
+/* need to force boolean conversion when int = 32bits */
+		return	( (s) == (t) )
+			||
+			( ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) != 0 );
 	}
 	else
 	{
 		pgm_assert (sizeof(int) >= 8);
-		return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) );
+		return ( ((s) == (t)) || ( ((t) - (s)) & PGM_UINT64_SIGN_BIT ) ) != 0;
 	}
 }
 

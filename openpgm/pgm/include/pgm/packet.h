@@ -216,10 +216,13 @@ struct pgm_opt_fragment {
 struct pgm_opt_nak_list {
 	uint8_t		opt_reserved;		/* reserved */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+/* C99 flexible array, sizeof() invalid */
 	uint32_t	opt_sqn[];		/* requested sequence number [62] */
-#elif defined(__cplusplus)
+#elif !defined(__STDC_VERSION__) || defined(__cplusplus)
+/* C90 and older */
 	uint32_t	opt_sqn[1];
 #else
+/* GNU C variable-length object */
 	uint32_t	opt_sqn[0];
 #endif
 };
