@@ -26,7 +26,6 @@
 #	include <unistd.h>
 #else
 #	include "getopt.h"
-#	define snprintf		_snprintf
 #endif
 #include <pgm/pgm.h>
 
@@ -91,7 +90,11 @@ main (
 	}
 
 /* parse program arguments */
-	const char* binary_name = strrchr (argv[0], '/');
+#ifdef _WIN32
+	const char* binary_name = strrchr (argv[0], '\\') + 1;
+#else
+	const char* binary_name = strrchr (argv[0], '/') + 1;
+#endif
 	int c;
 	while ((c = getopt (argc, argv, "s:n:p:r:f:K:N:lih")) != -1)
 	{
@@ -237,7 +240,8 @@ create_sock (void)
 	}
 
 /* join IP multicast groups */
-	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
+	unsigned i;
+	for (i = 0; i < res->ai_recv_addrs_len; i++)
 		pgm_setsockopt (sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
 	pgm_setsockopt (sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
 	pgm_freeaddrinfo (res);

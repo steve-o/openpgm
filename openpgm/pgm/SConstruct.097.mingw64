@@ -1,4 +1,4 @@
-# -*- mode: python -*-
+# -*- coding: utf-8 mode: python -*-
 # OpenPGM build script
 
 import platform
@@ -93,8 +93,9 @@ env = Environment(ENV = os.environ,
 				'-Wnested-externs',
 				'-Winline',
 			'-pedantic',
-# C99
 			'-std=gnu99',
+# ¡C89, not C99!
+#			'-std=gnu89',
 			'-D_GNU_SOURCE',
 			'-D_WIN32_WINNT=0x0501',
 # re-entrant libc

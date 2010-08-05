@@ -43,9 +43,20 @@ pgm_power2_log2 (
 {
 	static const unsigned int b[] = { 0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000 };
 	unsigned int r = (v & b[0]) != 0;
+#if defined(__STDC_VERSION__) && (__STDC_VERSION >= 199901L)
+/* C99 version */
 	for (unsigned i = 4; i > 0; i--) {
 		r |= ((v & b[i]) != 0) << i;
 	}
+#else
+/* C89 version */
+	{
+	unsigned i;
+	for (i = 4; i > 0; i--) {
+		r |= ((v & b[i]) != 0) << i;
+	}
+	}
+#endif
 	return r;
 }
 

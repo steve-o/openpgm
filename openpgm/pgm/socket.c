@@ -1157,11 +1157,11 @@ pgm_bind (
 bool
 pgm_bind3 (
 	pgm_sock_t*		      restrict sock,
-	const struct pgm_sockaddr_t*  restrict sockaddr,
+	const struct pgm_sockaddr_t*const restrict sockaddr,
 	const socklen_t			       sockaddrlen,
-	const struct pgm_interface_req_t*      send_req,		/* only use gr_interface and gr_group::sin6_scope */
+	const struct pgm_interface_req_t*const send_req,		/* only use gr_interface and gr_group::sin6_scope */
 	const socklen_t			       send_req_len,
-	const struct pgm_interface_req_t*      recv_req,
+	const struct pgm_interface_req_t*const recv_req,
 	const socklen_t			       recv_req_len,
 	pgm_error_t**		      restrict error			/* maybe NULL */
 	)

@@ -33,7 +33,7 @@
 #	define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP
 #endif
 /* OpenSolaris differences */
-#ifndef MCAST_MSFILTER
+#if !defined(_WIN32) && !defined(MCAST_MSFILTER)
 #	include <sys/ioctl.h>
 #endif
 #ifndef SOL_IP

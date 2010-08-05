@@ -123,7 +123,7 @@ do_csum_16bit (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
@@ -155,7 +155,7 @@ do_csum_16bit (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 static
@@ -180,7 +180,7 @@ do_csumcpy_16bit (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 	is_odd = ((uintptr_t)srcbuf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
@@ -214,7 +214,7 @@ do_csumcpy_16bit (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 static
@@ -236,7 +236,7 @@ do_csum_32bit (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
@@ -282,7 +282,7 @@ do_csum_32bit (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 static
@@ -307,7 +307,7 @@ do_csumcpy_32bit (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 	is_odd = ((uintptr_t)srcbuf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
@@ -356,7 +356,7 @@ do_csumcpy_32bit (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 /* best if architecture has native 64-bit words
@@ -381,7 +381,7 @@ do_csum_64bit (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 	is_odd = ((uintptr_t)buf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
@@ -444,7 +444,7 @@ do_csum_64bit (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 static
@@ -469,7 +469,7 @@ do_csumcpy_64bit (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 	is_odd = ((uintptr_t)srcbuf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
@@ -578,7 +578,7 @@ do_csumcpy_64bit (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 #if defined(__amd64) || defined(__x86_64__)
@@ -604,7 +604,7 @@ do_csum_vector (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 /* align first byte */
 	is_odd = ((uintptr_t)buf & 1);
 	if (PGM_UNLIKELY(is_odd)) {
@@ -669,7 +669,7 @@ do_csum_vector (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 static
@@ -694,7 +694,7 @@ do_csumcpy_vector (
 	remainder = 0;
 
 	if (PGM_UNLIKELY(len == 0))
-		return acc;
+		return (uint16_t)acc;
 /* fill cache line with source buffer, invalidate destination buffer,
  * perversly for testing high temporal locality is better than no locality,
  * whilst in production no locality may be preferred depending on skb re-use.
@@ -810,7 +810,7 @@ do_csumcpy_vector (
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
-	return acc;
+	return (uint16_t)acc;
 }
 
 #endif
@@ -917,7 +917,7 @@ pgm_csum_fold (
 	csum += (csum >> 16);
 
 /* handle special case of no checksum */
-	return csum == 0xffff ? csum : ~csum;
+	return (uint16_t)(csum == 0xffff ? csum : ~csum);
 }
 
 /* Add together two unfolded checksum accumulators

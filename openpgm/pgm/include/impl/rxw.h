@@ -109,10 +109,13 @@ struct pgm_rxw_t {
 	size_t			size;			/* in bytes */
 	unsigned		alloc;			/* in pkts */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+/* C99 flexible array, sizeof() invalid */
 	struct pgm_sk_buff_t*	pdata[];
-#elif defined(__cplusplus)
+#elif !defined(__STDC_VERSION__) || defined(__cplusplus)
+/* C90 and older */
 	struct pgm_sk_buff_t*   pdata[1];
 #else
+/* GNU C variable-length object */
 	struct pgm_sk_buff_t*	pdata[0];
 #endif
 };
@@ -128,9 +131,9 @@ PGM_GNUC_INTERNAL ssize_t pgm_rxw_readv (pgm_rxw_t*const restrict, struct pgm_ms
 PGM_GNUC_INTERNAL unsigned pgm_rxw_remove_trail (pgm_rxw_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL unsigned pgm_rxw_update (pgm_rxw_t*const, const uint32_t, const uint32_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_update_fec (pgm_rxw_t*const, const uint8_t);
-PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t*const, uint32_t, pgm_time_t, pgm_time_t, pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL int pgm_rxw_confirm (pgm_rxw_t*const, const uint32_t, const pgm_time_t, const pgm_time_t, const pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL void pgm_rxw_lost (pgm_rxw_t*const, const uint32_t);
-PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t* restrict, struct pgm_sk_buff_t*restrict, const int);
+PGM_GNUC_INTERNAL void pgm_rxw_state (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const int);
 PGM_GNUC_INTERNAL struct pgm_sk_buff_t* pgm_rxw_peek (pgm_rxw_t*const, const uint32_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL const char* pgm_pkt_state_string (const int) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL const char* pgm_rxw_returns_string (const int) PGM_GNUC_WARN_UNUSED_RESULT;

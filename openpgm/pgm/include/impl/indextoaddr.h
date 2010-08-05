@@ -34,7 +34,7 @@
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL bool pgm_if_indextoaddr (unsigned, sa_family_t, uint32_t, struct sockaddr*restrict, pgm_error_t**restrict);
+PGM_GNUC_INTERNAL bool pgm_if_indextoaddr (const unsigned, const sa_family_t, const uint32_t, struct sockaddr*restrict, pgm_error_t**restrict);
 
 PGM_END_DECLS
 

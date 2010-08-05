@@ -20,7 +20,11 @@
  */
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#ifdef _MSC_VER
+#	include <pgm/wininttypes.h>
+#else
+#	include <inttypes.h>
+#endif
 #include <errno.h>
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -1290,7 +1294,7 @@ send_ack (
 	const uint32_t t = source->ack_last_tstamp + pgm_to_msecs( now - source->last_data_tstamp );
 	opt_pgmcc_feedback->opt_tstamp = htonl (t);
 	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
-	opt_pgmcc_feedback->opt_loss_rate = htonl (source->window->data_loss);
+	opt_pgmcc_feedback->opt_loss_rate = htons ((uint16_t)source->window->data_loss);
 
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
@@ -1633,7 +1637,7 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("nak_rpt_expiry in %f seconds."),
 
 bool
 pgm_check_peer_state (
-	pgm_sock_t*		sock,
+	pgm_sock_t*const	sock,
 	const pgm_time_t	now
 	)
 {

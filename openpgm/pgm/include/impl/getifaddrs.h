@@ -44,8 +44,11 @@ PGM_BEGIN_DECLS
 #ifndef IF_NAMESIZE
 #	ifdef IFNAMSIZ
 #		define IF_NAMESIZE	IFNAMSIZ
+#	elif defined(MAX_INTERFACE_NAME_LEN)
+#		define IF_NAMESIZE	MAX_INTERFACE_NAME_LEN
 #	elif defined(_WIN32)
-#		define IF_NAMESIZE	40
+/* 40 for UUID, 256 for device path */
+#		define IF_NAMESIZE	256
 #	else
 #		define IF_NAMESIZE	16
 #	endif
