@@ -181,8 +181,13 @@ pgm_gsi_print_r (
 	pgm_return_val_if_fail (NULL != buf, -1);
 	pgm_return_val_if_fail (bufsize > 0, -1);
 
+#ifdef _MSC_VER
+	return _snprintf_s (buf, bufsize, _TRUNCATE, "%i.%i.%i.%i.%i.%i",
+			src[0], src[1], src[2], src[3], src[4], src[5]);
+#else
 	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i",
 			src[0], src[1], src[2], src[3], src[4], src[5]);
+#endif
 }
 
 /* transform GSI to ASCII string form.

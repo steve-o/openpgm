@@ -20,7 +20,11 @@
  */
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#ifdef _MSC_VER
+#	include <pgm/wininttypes.h>
+#else
+#	include <inttypes.h>
+#endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
 #include <impl/packet_parse.h>
@@ -236,7 +240,7 @@ pgm_parse_raw (
 
 bool
 pgm_parse_udp_encap (
-	struct pgm_sk_buff_t* restrict skb,		/* will be modified */
+	struct pgm_sk_buff_t*const restrict skb,		/* will be modified */
 	pgm_error_t**	      restrict error
 	)
 {
@@ -261,7 +265,7 @@ pgm_parse_udp_encap (
 static
 bool
 pgm_parse (
-	struct pgm_sk_buff_t* const restrict skb,		/* will be modified to calculate checksum */
+	struct pgm_sk_buff_t*const restrict skb,		/* will be modified to calculate checksum */
 	pgm_error_t**		    restrict error
 	)
 {
@@ -330,7 +334,7 @@ pgm_parse (
 
 bool
 pgm_verify_spm (
-	const struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -384,7 +388,7 @@ pgm_verify_spm (
 
 bool
 pgm_verify_poll (
-	const struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -424,7 +428,7 @@ pgm_verify_poll (
 
 bool
 pgm_verify_polr (
-	const struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -481,7 +485,7 @@ pgm_verify_polr (
 
 bool
 pgm_verify_nak (
-	const struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -543,7 +547,7 @@ pgm_verify_nak (
 
 bool
 pgm_verify_nnak (
-	const struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -557,7 +561,7 @@ pgm_verify_nnak (
 
 bool
 pgm_verify_ncf (
-	const struct pgm_sk_buff_t* const	skb
+	const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -577,7 +581,7 @@ pgm_verify_ncf (
 
 bool
 pgm_verify_spmr (
-	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
+	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */
@@ -603,7 +607,7 @@ pgm_verify_spmr (
 
 bool
 pgm_verify_ack (
-	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*	skb
+	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*const	skb
 	)
 {
 /* pre-conditions */

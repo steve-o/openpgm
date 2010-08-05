@@ -146,11 +146,11 @@ bool pgm_connect (pgm_sock_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUS
 bool pgm_close (pgm_sock_t*, bool);
 bool pgm_setsockopt (pgm_sock_t*const restrict, const int, const void*restrict, const socklen_t);
 bool pgm_getsockopt (pgm_sock_t*const restrict, const int, void*restrict, socklen_t*restrict);
-bool pgm_getaddrinfo (const char*restrict, const struct pgm_addrinfo_t*restrict, struct pgm_addrinfo_t**restrict, pgm_error_t**restrict);
+bool pgm_getaddrinfo (const char*restrict, const struct pgm_addrinfo_t*const restrict, struct pgm_addrinfo_t**restrict, pgm_error_t**restrict);
 void pgm_freeaddrinfo (struct pgm_addrinfo_t*);
 int pgm_send (pgm_sock_t*const restrict, const void*restrict, const size_t, size_t*restrict);
 int pgm_sendv (pgm_sock_t*const restrict, const struct pgm_iovec*const restrict, const unsigned, const bool, size_t*restrict);
-int pgm_send_skbv (pgm_sock_t*const restrict, struct pgm_sk_buff_t**restrict, const unsigned, const bool, size_t*restrict);
+int pgm_send_skbv (pgm_sock_t*const restrict, struct pgm_sk_buff_t**const restrict, const unsigned, const bool, size_t*restrict);
 int pgm_recvmsg (pgm_sock_t*const restrict, struct pgm_msgv_t*const restrict, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 int pgm_recvmsgv (pgm_sock_t*const restrict, struct pgm_msgv_t*const restrict, const size_t, const int, size_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 int pgm_recv (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*const restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;

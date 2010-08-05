@@ -62,7 +62,7 @@ enum {
 	PGM_PC_SOURCE_MAX
 };
 
-PGM_GNUC_INTERNAL bool pgm_send_spm (pgm_sock_t*, int) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL bool pgm_send_spm (pgm_sock_t*const, const int) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_deferred_nak (pgm_sock_t*const);
 PGM_GNUC_INTERNAL bool pgm_on_spmr (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_nak (pgm_sock_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;

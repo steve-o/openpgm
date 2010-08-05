@@ -20,7 +20,11 @@
  */
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#ifdef _MSC_VER
+#	include <pgm/wininttypes.h>
+#else
+#	include <inttypes.h>
+#endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
 #include <impl/rxw.h>
@@ -68,9 +72,9 @@ static inline bool _pgm_rxw_is_last_of_tg_sqn (pgm_rxw_t*const, const uint32_t);
 static int _pgm_rxw_insert (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static int _pgm_rxw_append (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const pgm_time_t);
 static int _pgm_rxw_add_placeholder_range (pgm_rxw_t*const, const uint32_t, const pgm_time_t, const pgm_time_t);
-static void _pgm_rxw_unlink (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*restrict);
+static void _pgm_rxw_unlink (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t*const);
-static void _pgm_rxw_state (pgm_rxw_t*restrict, struct pgm_sk_buff_t*restrict, const int);
+static void _pgm_rxw_state (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const int);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static inline ssize_t _pgm_rxw_incoming_read (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict, uint32_t);
 static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t*const restrict, const uint32_t);
@@ -171,7 +175,7 @@ _pgm_rxw_incoming_is_empty (
 
 pgm_rxw_t*
 pgm_rxw_create (
-	const pgm_tsi_t*	tsi,
+	const pgm_tsi_t*const	tsi,
 	const uint16_t		tpdu_size,
 	const unsigned		sqns,		/* transmit window size in sequence numbers */
 	const unsigned		secs,		/* size in seconds */

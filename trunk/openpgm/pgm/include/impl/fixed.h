@@ -124,6 +124,8 @@ pgm_fp16pow (
 	)
 {
 	uint_fast32_t result = pgm_fp16 (1);
+#if defined(__STDC_VERSION__) && (__STDC_VERSION >= 199901L)
+/* C99 version */
 	for (uint_fast32_t i = x;
 	     y;
 	     y >>= 1)
@@ -132,6 +134,20 @@ pgm_fp16pow (
 			result = (result * i + 32768) >> 16;
 		i = (i * i + 32768) >> 16;
 	}
+#else
+/* C89 version */
+	{
+	uint_fast32_t i;
+	for (i = x;
+	     y;
+	     y >>= 1)
+	{
+		if (y & 1)
+			result = (result * i + 32768) >> 16;
+		i = (i * i + 32768) >> 16;
+	}
+	}
+#endif
 	return result;
 }
 

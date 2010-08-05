@@ -89,9 +89,8 @@ pgm_notify_init (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (NULL != notify);
-
 #if defined(CONFIG_HAVE_EVENTFD)
+	pgm_assert (NULL != notify);
 	notify->eventfd = -1;
 	int retval = eventfd (0, 0);
 	if (-1 == retval)
@@ -102,6 +101,7 @@ pgm_notify_init (
 		retval = fcntl (notify->eventfd, F_SETFL, fd_flags | O_NONBLOCK);
 	return 0;
 #elif !defined(_WIN32)
+	pgm_assert (NULL != notify);
 	notify->pipefd[0] = notify->pipefd[1] = -1;
 	int retval = pipe (notify->pipefd);
 	pgm_assert (0 == retval);
@@ -121,8 +121,11 @@ pgm_notify_init (
 /* use loopback sockets to simulate a pipe suitable for win32/select() */
 	struct sockaddr_in addr;
 	SOCKET listener;
+	int sockerr;
 	int addrlen = sizeof (addr);
+	const unsigned long one = 1;
 
+	pgm_assert (NULL != notify);
 	notify->s[0] = notify->s[1] = INVALID_SOCKET;
 
 	listener = socket (AF_INET, SOCK_STREAM, 0);
@@ -133,36 +136,37 @@ pgm_notify_init (
 	addr.sin_addr.s_addr = inet_addr ("127.0.0.1");
 	pgm_assert (addr.sin_addr.s_addr != INADDR_NONE);
 
-	int rc = bind (listener, (const struct sockaddr*)&addr, sizeof (addr));
-	pgm_assert (rc != SOCKET_ERROR);
+	sockerr = bind (listener, (const struct sockaddr*)&addr, sizeof (addr));
+	pgm_assert (sockerr != SOCKET_ERROR);
 
-	rc = getsockname (listener, (struct sockaddr*)&addr, &addrlen);
-	pgm_assert (rc != SOCKET_ERROR);
+	sockerr = getsockname (listener, (struct sockaddr*)&addr, &addrlen);
+	pgm_assert (sockerr != SOCKET_ERROR);
 
 // Listen for incoming connections.
-	rc = listen (listener, 1);
-	pgm_assert (rc != SOCKET_ERROR);
+	sockerr = listen (listener, 1);
+	pgm_assert (sockerr != SOCKET_ERROR);
 
 // Create the socket.
 	notify->s[1] = WSASocket (AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
 	pgm_assert (notify->s[1] != INVALID_SOCKET);
 
 // Connect to the remote peer.
-	rc = connect (notify->s[1], (struct sockaddr*)&addr, addrlen);
-	pgm_assert (rc != SOCKET_ERROR);
+	sockerr = connect (notify->s[1], (struct sockaddr*)&addr, addrlen);
+	pgm_assert (sockerr != SOCKET_ERROR);
 
 // Accept connection.
 	notify->s[0] = accept (listener, NULL, NULL);
 	pgm_assert (notify->s[0] != INVALID_SOCKET);
 
 // Set read-end to non-blocking mode
-	const unsigned long one = 1;
-	rc = ioctlsocket (notify->s[0], FIONBIO, &one);
-	pgm_assert (rc != SOCKET_ERROR);
+#pragma warning( disable : 4090 )
+	sockerr = ioctlsocket (notify->s[0], FIONBIO, &one);
+#pragma warning( default : 4090 )
+	pgm_assert (sockerr != SOCKET_ERROR);
 
 // We don't need the listening socket anymore. Close it.
-	rc = closesocket (listener);
-	pgm_assert (rc != SOCKET_ERROR);
+	sockerr = closesocket (listener);
+	pgm_assert (sockerr != SOCKET_ERROR);
 
 	return 0;
 #endif
@@ -209,20 +213,21 @@ pgm_notify_send (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (NULL != notify);
-
 #if defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (-1 != notify->eventfd);
 	uint64_t u = 1;
+	pgm_assert (NULL != notify);
+	pgm_assert (-1 != notify->eventfd);
 	ssize_t s = write (notify->eventfd, &u, sizeof(u));
 	return (s == sizeof(u));
 #elif !defined(_WIN32)
-	pgm_assert (-1 != notify->pipefd[1]);
 	const char one = '1';
+	pgm_assert (NULL != notify);
+	pgm_assert (-1 != notify->pipefd[1]);
 	return (1 == write (notify->pipefd[1], &one, sizeof(one)));
 #else
-	pgm_assert (INVALID_SOCKET != notify->s[1]);
 	const char one = '1';
+	pgm_assert (NULL != notify);
+	pgm_assert (INVALID_SOCKET != notify->s[1]);
 	return (1 == send (notify->s[1], &one, sizeof(one), 0));
 #endif
 }
@@ -233,19 +238,20 @@ pgm_notify_read (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (NULL != notify);
-
 #if defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (-1 != notify->eventfd);
 	uint64_t u;
+	pgm_assert (NULL != notify);
+	pgm_assert (-1 != notify->eventfd);
 	return (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
 #elif !defined(_WIN32)
-	pgm_assert (-1 != notify->pipefd[0]);
 	char buf;
+	pgm_assert (NULL != notify);
+	pgm_assert (-1 != notify->pipefd[0]);
 	return (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
 #else
-	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	char buf;
+	pgm_assert (NULL != notify);
+	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	return (sizeof(buf) == recv (notify->s[0], &buf, sizeof(buf), 0));
 #endif
 }
@@ -256,19 +262,20 @@ pgm_notify_clear (
 	pgm_notify_t*	notify
 	)
 {
-	pgm_assert (NULL != notify);
-
 #if defined(CONFIG_HAVE_EVENTFD)
-	pgm_assert (-1 != notify->eventfd);
 	uint64_t u;
+	pgm_assert (NULL != notify);
+	pgm_assert (-1 != notify->eventfd);
 	while (sizeof(u) == read (notify->eventfd, &u, sizeof(u)));
 #elif !defined(_WIN32)
-	pgm_assert (-1 != notify->pipefd[0]);
 	char buf;
+	pgm_assert (NULL != notify);
+	pgm_assert (-1 != notify->pipefd[0]);
 	while (sizeof(buf) == read (notify->pipefd[0], &buf, sizeof(buf)));
 #else
-	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	char buf;
+	pgm_assert (NULL != notify);
+	pgm_assert (INVALID_SOCKET != notify->s[0]);
 	while (sizeof(buf) == recv (notify->s[0], &buf, sizeof(buf), 0));
 #endif
 }

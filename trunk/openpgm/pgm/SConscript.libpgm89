@@ -62,7 +62,7 @@ e.Depends ('version.c', src);
 src += ['version.c'];
 
 # C89 degrading
-c89source = Builder(action = 'perl -p -e "s/%z(u|d)/%l\\1/g" $SOURCE > $TARGET',
+c89source = Builder(action = 'cp $SOURCE $TARGET && if test -f "${SOURCE}.c89.patch"; then patch -i ${SOURCE}.c89.patch $TARGET; fi',
                     suffix = '.c89.c',
                     src_suffix = '.c',
                     single_source = 1);
@@ -72,6 +72,9 @@ c89src = []
 for c99file in src:
 	c89file = c99file.replace('.c', '.c89.c');
 	c89src += [ c89file ];
+	patchFile = c99file + '.c89.patch';
+	if os.path.exists (patchFile):
+		e.Depends (c89file, patchFile);
 	e.C89Source(c99file);
 
 e.StaticLibrary('libpgm89', c89src);

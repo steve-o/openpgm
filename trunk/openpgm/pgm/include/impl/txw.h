@@ -66,10 +66,13 @@ struct pgm_txw_t {
 	size_t				size;			/* window content size in bytes */
 	unsigned			alloc;			/* length of pdata[] */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
+/* C99 flexible array, sizeof() invalid */
 	struct pgm_sk_buff_t*		pdata[];
-#elif defined(__cplusplus)
+#elif !defined(__STDC_VERSION__) || defined(__cplusplus)
+/* C90 and older */
 	struct pgm_sk_buff_t*		pdata[1];
 #else
+/* GNU C variable-length object */
 	struct pgm_sk_buff_t*   	pdata[0];
 #endif
 };

@@ -1,0 +1,91 @@
+--- messages.c	2010-05-23 16:50:35.000000000 +0800
++++ messages.c89	2010-08-05 12:18:49.000000000 +0800
+@@ -19,6 +19,9 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ 
++#ifdef _MSC_VER
++#	include <io.h>
++#endif
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <impl/framework.h>
+@@ -81,14 +84,37 @@
+ 
+ 	pgm_mutex_init (&messages_mutex);
+ 
++	{
++#ifdef _MSC_VER
++	char* log_mask;
++	size_t len;
++	errno_t err = _dupenv_s (&log_mask, &len, "PGM_LOG_MASK");
++	if (!err && len > 0) {
++		unsigned int value = 0;
++		if (1 == sscanf_s (log_mask, "0x%4x", &value))
++			pgm_log_mask = value;
++		free (log_mask);
++	}
++#else
+ 	const char* log_mask = getenv ("PGM_LOG_MASK");
+ 	if (NULL != log_mask) {
+ 		unsigned int value = 0;
+ 		if (1 == sscanf (log_mask, "0x%4x", &value))
+ 			pgm_log_mask = value;
+ 	}
++#endif
++	}
++	{
++#ifdef _MSC_VER
++	char *min_log_level;
++	size_t len;
++	errno_t err = _dupenv_s (&min_log_level, &len, "PGM_MIN_LOG_LEVEL");
++	if (!err && len > 0)
++#else
+ 	const char *min_log_level = getenv ("PGM_MIN_LOG_LEVEL");
+-	if (NULL != min_log_level) {
++	if (NULL != min_log_level)
++#endif
++	{
+ 		switch (min_log_level[0]) {
+ 		case 'D':	pgm_min_log_level = PGM_LOG_LEVEL_DEBUG; break;
+ 		case 'T':	pgm_min_log_level = PGM_LOG_LEVEL_TRACE; break;
+@@ -99,6 +125,10 @@
+ 		case 'F':	pgm_min_log_level = PGM_LOG_LEVEL_FATAL; break;
+ 		default: break;
+ 		}
++#ifdef _MSC_VER
++		free (min_log_level);
++#endif
++	}
+ 	}
+ }
+ 
+@@ -156,15 +186,28 @@
+ 	char tbuf[ 1024 ];
+ 
+ 	pgm_mutex_lock (&messages_mutex);
++	{
++#ifdef _MSC_VER
++	const int offset = sprintf_s (tbuf, sizeof(tbuf), "%s: ", log_level_text (log_level));
++	vsnprintf_s (tbuf+offset, sizeof(tbuf)-offset, _TRUNCATE, format, args);
++#else
+ 	const int offset = sprintf (tbuf, "%s: ", log_level_text (log_level));
+ 	vsnprintf (tbuf+offset, sizeof(tbuf)-offset, format, args);
+ 	tbuf[ sizeof(tbuf) ] = '\0';
++#endif
++	}
+ 	if (log_handler)
+ 		log_handler (log_level, tbuf, log_handler_closure);
+ 	else {
+ /* ignore return value */
++#ifdef _MSC_VER
++		const int stdoutfd = _fileno (stdout);
++		_write (stdoutfd, tbuf, strlen (tbuf));
++		_write (stdoutfd, "\n", 1);
++#else
+ 		write (STDOUT_FILENO, tbuf, strlen (tbuf));
+ 		write (STDOUT_FILENO, "\n", 1);
++#endif
+ 	}
+ 		
+ 	pgm_mutex_unlock (&messages_mutex);

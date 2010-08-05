@@ -29,15 +29,20 @@
 
 #ifdef _WIN32
 #	include <ws2tcpip.h>
-#	define sa_family_t	ULONG
+#	include <winsock2.h>
+#	ifdef ADDRESS_FAMILY
+#		define sa_family_t	ADDRESS_FAMILY
+#	else
+#		define sa_family_t	ULONG
+#	endif
 #endif
 
 #ifdef _MSC_VER
 #	include <pgm/winint.h>
 #	define bool		BOOL
 #	define ssize_t		SSIZE_T
-#	define restrict
-#elif !defined( __cplusplus) || (__GNUC__ >= 4)
+#	define inline		__inline
+#elif !defined(__cplusplus) || (__GNUC__ >= 4)
 /* g++ v4 handles C99 headers without complaints */
 #	include <stdbool.h>
 #	include <stdint.h>
@@ -45,6 +50,11 @@
 /* g++ v3 and other ancient compilers */
 #	define bool		int
 #	include <stdint.h>
+#endif
+
+#if !defined(restrict) || (__STDC_VERSION__ < 199901L)
+/* C89 ANSI standard */
+#	define restrict
 #endif
 
 PGM_BEGIN_DECLS

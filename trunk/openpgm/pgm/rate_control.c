@@ -77,7 +77,7 @@ pgm_rate_check (
 	const bool		is_nonblocking
 	)
 {
-	int new_rate_limit;
+	int64_t new_rate_limit;
 
 /* pre-conditions */
 	pgm_assert (NULL != bucket);
@@ -120,12 +120,12 @@ pgm_rate_check (
 	bucket->rate_limit = new_rate_limit;
 	bucket->last_rate_check = now;
 	if (bucket->rate_limit < 0) {
-		int sleep_amount;
+		ssize_t sleep_amount;
 		do {
 			pgm_thread_yield();
 			now = pgm_time_update_now();
 			time_since_last_rate_check = now - bucket->last_rate_check;
-			sleep_amount = pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check);
+			sleep_amount = (ssize_t)pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check);
 		} while (sleep_amount + bucket->rate_limit < 0);
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
@@ -149,7 +149,7 @@ pgm_rate_remaining (
 	pgm_spinlock_lock (&bucket->spinlock);
 	const pgm_time_t now = pgm_time_update_now();
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
-	const int bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
+	const int64_t bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
 	pgm_spinlock_unlock (&bucket->spinlock);
 
 	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
