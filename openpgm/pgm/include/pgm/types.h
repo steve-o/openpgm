@@ -30,10 +30,10 @@
 #ifdef _WIN32
 #	include <ws2tcpip.h>
 #	include <winsock2.h>
-#	ifdef ADDRESS_FAMILY
+#	ifdef _MSC_VER
 #		define sa_family_t	ADDRESS_FAMILY
 #	else
-#		define sa_family_t	ULONG
+#		define sa_family_t	USHORT
 #	endif
 #endif
 
