@@ -33,7 +33,7 @@ int pgm_min_log_level PGM_GNUC_READ_MOSTLY	= PGM_LOG_LEVEL_NORMAL;
 
 /* locals */
 
-static const char log_levels[8][6] = {
+static const char log_levels[8][7] = {
 	"Uknown",
 	"Debug",
 	"Trace",
