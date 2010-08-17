@@ -24,7 +24,7 @@
 
 #include <errno.h>
 #include <glib.h>
-#include <pgm/pgm.h>
+#include <impl/framework.h>
 
 
 #define PGM_ASYNC_ERROR		pgm_async_error_quark ()
@@ -42,7 +42,7 @@ typedef enum
 typedef struct pgm_async_t pgm_async_t;
 
 struct pgm_async_t {
-	pgm_transport_t*	transport;
+	pgm_sock_t*		sock;
 	GThread*		thread;
 	GAsyncQueue*		commit_queue;
 	pgm_notify_t		commit_notify;
@@ -56,7 +56,7 @@ typedef int (*pgm_eventfn_t)(gpointer, guint, gpointer);
 
 G_BEGIN_DECLS
 
-int pgm_async_create (pgm_async_t**, pgm_transport_t* const, GError**);
+int pgm_async_create (pgm_async_t**, pgm_sock_t* const, GError**);
 int pgm_async_destroy (pgm_async_t* const);
 GIOStatus pgm_async_recv (pgm_async_t* const, gpointer, const gsize, gsize* const, const int, GError**);
 gboolean pgm_async_set_nonblocking (pgm_async_t* const, const gboolean);

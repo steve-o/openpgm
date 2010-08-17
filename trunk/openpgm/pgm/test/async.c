@@ -125,7 +125,7 @@ pgm_receiver_thread (
 
 	do {
 /* blocking read */
-		const int status = pgm_recvmsg (async->transport, &msgv, 0, &bytes_read, NULL);
+		const int status = pgm_recvmsg (async->sock, &msgv, 0, &bytes_read, NULL);
 		switch (status) {
 		case PGM_IO_STATUS_NORMAL:
 		{
@@ -155,13 +155,15 @@ pgm_receiver_thread (
 
 		case PGM_IO_STATUS_TIMER_PENDING:
 		{
-			pgm_transport_get_timer_pending (async->transport, &tv);
-			goto block;
+			socklen_t optlen = sizeof (tv);
+			pgm_getsockopt (async->sock, PGM_TIME_REMAIN, &tv, &optlen);
 		}
+		goto block;
 
 		case PGM_IO_STATUS_RATE_LIMITED:
 		{
-			pgm_transport_get_rate_remaining (async->transport, &tv);
+			socklen_t optlen = sizeof (tv);
+			pgm_getsockopt (async->sock, PGM_RATE_REMAIN, &tv, &optlen);
 		}
 /* fall through */
 		case PGM_IO_STATUS_WOULD_BLOCK:
@@ -174,7 +176,7 @@ block:
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = pgm_notify_get_fd (&async->destroy_notify);
 			fds[0].events = POLLIN;
-			if (-1 == pgm_transport_poll_info (async->transport, &fds[1], &n_fds, POLLIN)) {
+			if (-1 == pgm_poll_info (async->sock, &fds[1], &n_fds, POLLIN)) {
 				g_trace ("poll_info returned errno=%i",errno);
 				goto cleanup;
 			}
@@ -184,7 +186,7 @@ block:
 			int fd = pgm_notify_get_fd (&async->destroy_notify), n_fds = 1 + fd;
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
-			if (-1 == pgm_transport_select_info (async->transport, &readfds, NULL, &n_fds)) {
+			if (-1 == pgm_select_info (async->sock, &readfds, NULL, &n_fds)) {
 				g_trace ("select_info returned errno=%i",errno);
 				goto cleanup;
 			}
@@ -208,9 +210,14 @@ block:
 			goto cleanup;
 
 		case PGM_IO_STATUS_RESET:
-			if (async->transport->is_abort_on_reset)
+		{
+			int is_abort_on_reset;
+			socklen_t optlen = sizeof (is_abort_on_reset);
+			pgm_getsockopt (async->sock, PGM_ABORT_ON_RESET, &is_abort_on_reset, &optlen);
+			if (is_abort_on_reset)
 				goto cleanup;
 			break;
+		}
 
 /* TODO: report to user */
 		case PGM_IO_STATUS_FIN:
@@ -235,23 +242,23 @@ cleanup:
 gboolean
 pgm_async_create (
 	pgm_async_t**		async,
-	pgm_transport_t* const	transport,
+	pgm_sock_t* const	sock,
 	GError**		error
 	)
 {
 	pgm_async_t* new_async;
 
 	g_return_val_if_fail (NULL != async, FALSE);
-	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (NULL != sock, FALSE);
 
-	g_trace ("create (async:%p transport:%p error:%p)",
-		 (gpointer)async, (gpointer)transport, (gpointer)error);
+	g_trace ("create (async:%p sock:%p error:%p)",
+		 (gpointer)async, (gpointer)sock, (gpointer)error);
 
 	if (!g_thread_supported())
 		g_thread_init (NULL);
 
 	new_async = g_new0 (pgm_async_t, 1);
-	new_async->transport = transport;
+	new_async->sock = sock;
 	if (0 != pgm_notify_init (&new_async->commit_notify) ||
 	    0 != pgm_notify_init (&new_async->destroy_notify))
 	{
