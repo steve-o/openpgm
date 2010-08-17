@@ -31,8 +31,8 @@
 
 #include <glib.h>
 
-#include <pgm/pgm.h>
-#include <pgm/packet_test.h>
+#include <impl/framework.h>
+#include <impl/packet_test.h>
 
 #include "dump-json.h"
 
@@ -184,8 +184,8 @@ verify_ip_header (
 	}
 
 	guint ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (ip_header_length < sizeof(struct ip)) {
-		printf ("\t\"message\": \"IP: bad IP header length %i, should be at least %" G_GSIZE_FORMAT "lu bytes.\",\n", ip_header_length, sizeof(struct ip));
+	if (ip_header_length < sizeof(struct pgm_ip)) {
+		printf ("\t\"message\": \"IP: bad IP header length %i, should be at least %" G_GSIZE_FORMAT "lu bytes.\",\n", ip_header_length, sizeof(struct pgm_ip));
 		return -1;
 	}
 

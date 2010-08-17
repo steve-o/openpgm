@@ -380,6 +380,13 @@ pgm_getsockopt (
 		status = TRUE;
 		break;
 
+	case PGM_ABORT_ON_RESET:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->is_abort_on_reset ? 1 : 0;
+		status = TRUE;
+		break;
+
 /* receive socket */
 	case PGM_RECV_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
