@@ -898,18 +898,26 @@ pgm_setsockopt (
 		status = TRUE;
 		break;
 
-/* sending group, singular.
+/* sending group, singular.  note that the address is only stored and used
+ * later in sendto() calls, this routine only considers the interface.
  */
 	case PGM_SEND_GROUP:
 		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
 			break;
-		memcpy (&sock->send_gsr, optval, optlen);
-		((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+		memcpy (&sock->send_gsr, optval, sizeof(struct group_req));
 		if (PGM_UNLIKELY(sock->family != sock->send_gsr.gsr_group.ss_family))
 			break;
-		if (PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_sock, (const struct sockaddr*)&sock->send_gsr.gsr_group, sock->send_gsr.gsr_interface) ||
-		    PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_with_router_alert_sock, (const struct sockaddr*)&sock->send_gsr.gsr_group, sock->send_gsr.gsr_interface))
+		if (sock->udp_encap_mcast_port)
+			((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+		if ((PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_sock,
+								   (const struct sockaddr*)&sock->send_addr,
+								   sock->send_gsr.gsr_interface)) ||
+		    (PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_with_router_alert_sock,
+								   (const struct sockaddr*)&sock->send_addr,
+								   sock->send_gsr.gsr_interface)))
+		{
 			break;
+		}
 		status = TRUE;
 		break;
 
@@ -944,11 +952,13 @@ pgm_setsockopt (
 			}
 			if (PGM_UNLIKELY(sock->family != gr->gr_group.ss_family))
 				break;
-			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
-				break;
 			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = gr->gr_interface;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
+			if (sock->udp_encap_mcast_port)
+				((struct sockaddr_in*)&sock->recv_gsr[sock->recv_gsr_len].gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
+				break;
 			sock->recv_gsr_len++;
 		}
 		status = TRUE;
@@ -1322,11 +1332,6 @@ pgm_bind3 (
 		} while (sock->tsi.sport == sock->dport);
 	}
 
-/* UDP encapsulation port */
-	if (sock->udp_encap_mcast_port) {
-		((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
-	}
-
 /* pseudo-random number generator for back-off intervals */
 	pgm_rand_create (&sock->rand_);
 
@@ -1546,7 +1551,6 @@ pgm_bind3 (
 #endif /* CONFIG_BIND_INADDR_ANY */
 
 	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
-	((struct sockaddr_in*)&recv_addr)->sin_port = htons (sock->udp_encap_mcast_port);
 	if (PGM_SOCKET_ERROR == bind (sock->recv_sock,
 				      &recv_addr.sa,
 				      pgm_sockaddr_len (&recv_addr.sa)))
