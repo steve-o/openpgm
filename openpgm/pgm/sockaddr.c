@@ -865,7 +865,7 @@ pgm_sockaddr_multicast_if (
  * Stevens: "IP_MULTICAST_IF has datatype struct in_addr{}."
  */
 		struct sockaddr_in s4;
-		memcpy (&s4, address, sizeof(s4));
+		memcpy (&s4, address, sizeof(struct sockaddr_in));
 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&s4.sin_addr, sizeof(s4.sin_addr));
 		break;
 	}
