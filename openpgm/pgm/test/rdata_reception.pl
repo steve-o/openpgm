@@ -29,10 +29,12 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("connect ao");
 $app->say ("listen ao");
 
 $sim->say ("create fake ao");
 $sim->say ("bind ao");
+$sim->say ("connect ao");
 
 print "sim: publish RDATA sqn 90,000.\n";
 $sim->say ("net send rdata ao 90000 90000 ringo");
