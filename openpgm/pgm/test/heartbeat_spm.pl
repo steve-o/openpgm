@@ -28,6 +28,7 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("connect ao");
 $app->say ("listen ao");
 
 print "app: publish test data.\n";

@@ -29,10 +29,12 @@ print "mon: ready.\n";
 
 $sim->say ("create ao");
 $sim->say ("bind ao");
+$sim->say ("connect ao");
 print "sim: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("connect ao");
 $app->say ("listen ao");	# to process NAK requests
 
 print "app: publish test data.\n";
