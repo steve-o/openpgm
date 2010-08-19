@@ -30,6 +30,7 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("connect ao");
 $app->say ("listen ao");
 
 ## capture GSI of test spp
@@ -50,6 +51,7 @@ do {
 
 $sim->say ("create fake ao");
 $sim->say ("bind ao");
+$sim->say ("connect ao");
 print "sim: ready.\n";
 
 ## app needs to send packet for sim to learn of local NLA

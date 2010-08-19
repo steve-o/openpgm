@@ -27,6 +27,7 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
+$app->say ("connect ao");
 $app->say ("listen ao");
 
 print "app: send 1000 data packets ...\n";

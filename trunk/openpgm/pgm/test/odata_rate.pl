@@ -29,6 +29,7 @@ print "mon: ready.\n";
 $app->say ("create ao");
 $app->say ("set ao TXW_MAX_RTE 1500");
 $app->say ("bind ao");
+$app->say ("connect ao");
 
 print "app: send 50 data packets ...\n";
 my $t0 = [gettimeofday];
