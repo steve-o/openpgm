@@ -954,9 +954,9 @@ pgm_setsockopt (
 				break;
 			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = gr->gr_interface;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
-			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			if (sock->udp_encap_mcast_port)
 				((struct sockaddr_in*)&sock->recv_gsr[sock->recv_gsr_len].gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
 				break;
 			sock->recv_gsr_len++;
@@ -1551,6 +1551,10 @@ pgm_bind3 (
 #endif /* CONFIG_BIND_INADDR_ANY */
 
 	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
+
+/* UDP port */
+	((struct sockaddr_in*)&recv_addr)->sin_port = htons (sock->udp_encap_mcast_port);
+
 	if (PGM_SOCKET_ERROR == bind (sock->recv_sock,
 				      &recv_addr.sa,
 				      pgm_sockaddr_len (&recv_addr.sa)))
