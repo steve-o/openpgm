@@ -569,6 +569,7 @@ pgm_setsockopt (
  *
  * operating system and sysctl dependent maximum, minimum on Linux 256 (doubled).
  */
+	case SO_SNDBUF:
 	case PGM_SNDBUF:
 		if (PGM_SOCKET_ERROR == setsockopt (sock->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen) ||
 		    PGM_SOCKET_ERROR == setsockopt (sock->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen))
@@ -580,6 +581,7 @@ pgm_setsockopt (
  *
  * minimum on Linux is 2048 (doubled).
  */
+	case SO_RCVBUF:
 	case PGM_RCVBUF:
 		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)optval, optlen))
 			break;

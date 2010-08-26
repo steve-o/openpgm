@@ -410,8 +410,14 @@ on_startup (
 			g_error ("socket: %s", pgm_err->message);
 			goto err_abort;
 		}
-		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_UCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
-		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_MCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
+		if (!pgm_setsockopt (g_sock, PGM_UDP_ENCAP_UCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port))) {
+			g_error ("setting PGM_UDP_ENCAP_UCAST_PORT = %d", g_udp_encap_port);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_UDP_ENCAP_MCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port))) {
+			g_error ("setting PGM_UDP_ENCAP_MCAST_PORT = %d", g_udp_encap_port);
+			goto err_abort;
+		}
 	} else {
 		g_message ("create PGM/IP socket.");
 		if (!pgm_socket (&g_sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
@@ -423,17 +429,39 @@ on_startup (
 /* Use RFC 2113 tagging for PGM Router Assist */
 	{
 		const int no_router_assist = 0;
-		pgm_setsockopt (g_sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+		if (!pgm_setsockopt (g_sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist))) {
+			g_error ("setting PGM_IP_ROUTER_ALERT = %d", no_router_assist);
+			goto err_abort;
+		}
 	}
 
 	pgm_drop_superuser();
 
 /* set PGM parameters */
-	if (PGMPING_MODE_SOURCE == g_mode ||
-	    PGMPING_MODE_INITIATOR == g_mode ||
-	    PGMPING_MODE_REFLECTOR == g_mode)
+/* common */
 	{
-		const int send_only	  = PGMPING_MODE_SOURCE == g_mode ? 1 : 0,
+		const int bufsize = 1024 * 1024;
+
+		if (!pgm_setsockopt (g_sock, SO_SNDBUF, &bufsize, sizeof(bufsize))) {
+			g_error ("setting SO_SNDBUF = %d", bufsize);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, SO_RCVBUF, &bufsize, sizeof(bufsize))) {
+			g_error ("setting SO_RCVBUF = %d", bufsize);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu))) {
+			g_error ("setting PGM_MTU = %d", g_max_tpdu);
+			goto err_abort;
+		}
+	}
+
+/* send side */
+	if (PGMPING_MODE_SOURCE    == g_mode ||
+	    PGMPING_MODE_INITIATOR == g_mode ||
+	    PGMPING_MODE_REFLECTOR == g_mode    )
+	{
+		const int send_only	  = (PGMPING_MODE_SOURCE == g_mode) ? 1 : 0,
 			  ambient_spm	  = pgm_secs (30),
 			  heartbeat_spm[] = { pgm_msecs (100),
 					      pgm_msecs (100),
@@ -445,19 +473,43 @@ on_startup (
 					      pgm_secs  (25),
 					      pgm_secs  (30) };
 
-		pgm_setsockopt (g_sock, PGM_SEND_ONLY, &send_only, sizeof(send_only));
-		pgm_setsockopt (g_sock, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu));
-		pgm_setsockopt (g_sock, PGM_TXW_SQNS, &g_sqns, sizeof(g_sqns));
-		pgm_setsockopt (g_sock, PGM_TXW_MAX_RTE, &g_max_rte, sizeof(g_max_rte));
-		pgm_setsockopt (g_sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
-		pgm_setsockopt (g_sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
+		if (!pgm_setsockopt (g_sock, PGM_SEND_ONLY, &send_only, sizeof(send_only))) {
+			g_error ("setting PGM_SEND_ONLY = %d", send_only);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_TXW_SQNS, &g_sqns, sizeof(g_sqns))) {
+			g_error ("setting PGM_TXW_SQNS = %d", g_sqns);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_TXW_MAX_RTE, &g_max_rte, sizeof(g_max_rte))) {
+			g_error ("setting PGM_TXW_MAX_RTE = %d", g_max_rte);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm))) {
+			g_error ("setting PGM_AMBIENT_SPM = %d", ambient_spm);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm))) {
+	                char buffer[1024];
+	                sprintf (buffer, "%d", heartbeat_spm[0]);
+	                for (unsigned i = 1; i < G_N_ELEMENTS(heartbeat_spm); i++) {
+	                        char t[1024];
+	                        sprintf (t, ", %d", heartbeat_spm[i]);
+	                        strcat (buffer, t);
+	                }
+	                g_error ("setting HEARTBEAT_SPM = { %s }", buffer);
+			goto err_abort;
+	        }
+
 	}
-	if (PGMPING_MODE_RECEIVER == g_mode ||
+
+/* receive side */
+	if (PGMPING_MODE_RECEIVER  == g_mode ||
 	    PGMPING_MODE_INITIATOR == g_mode ||
-	    PGMPING_MODE_REFLECTOR == g_mode)
+	    PGMPING_MODE_REFLECTOR == g_mode    )
 	{
-		const int recv_only	   = PGMPING_MODE_RECEIVER == g_mode ? 1 : 0,
-			  passive	   = 0,
+		const int recv_only	   = (PGMPING_MODE_RECEIVER == g_mode) ? 1 : 0,
+			  not_passive	   = 0,
 			  peer_expiry	   = pgm_secs (300),
 			  spmr_expiry	   = pgm_msecs (250),
 			  nak_bo_ivl	   = pgm_msecs (50),
@@ -466,17 +518,46 @@ on_startup (
 			  nak_data_retries = 50,
 			  nak_ncf_retries  = 50;
 
-		pgm_setsockopt (g_sock, PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
-		pgm_setsockopt (g_sock, PGM_PASSIVE, &passive, sizeof(passive));
-		pgm_setsockopt (g_sock, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu));
-		pgm_setsockopt (g_sock, PGM_RXW_SQNS, &g_sqns, sizeof(g_sqns));
-		pgm_setsockopt (g_sock, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
-		pgm_setsockopt (g_sock, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
-		pgm_setsockopt (g_sock, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
-		pgm_setsockopt (g_sock, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl));
-		pgm_setsockopt (g_sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
-		pgm_setsockopt (g_sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
-		pgm_setsockopt (g_sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
+		if (!pgm_setsockopt (g_sock, PGM_RECV_ONLY, &recv_only, sizeof(recv_only))) {
+			g_error ("setting PGM_RECV_ONLY = %d", recv_only);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_PASSIVE, &not_passive, sizeof(not_passive))) {
+			g_error ("setting PGM_PASSIVE = %d", not_passive);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_RXW_SQNS, &g_sqns, sizeof(g_sqns))) {
+			g_error ("setting PGM_RXW_SQNS = %d", g_sqns);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry))) {
+			g_error ("setting PGM_PEER_EXPIRY = %d", peer_expiry);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry))) {
+			g_error ("setting PGM_SPMR_EXPIRY = %d", spmr_expiry);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl))) {
+			g_error ("setting PGM_NAK_BO_IVL = %d", nak_bo_ivl);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl))) {
+			g_error ("setting PGM_NAK_RPT_IVL = %d", nak_rpt_ivl);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl))) {
+			g_error ("setting PGM_NAK_RDATA_IVL = %d", nak_rdata_ivl);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries))) {
+			g_error ("setting PGM_NAK_DATA_RETRIES = %d", nak_data_retries);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries))) {
+			g_error ("setting PGM_NAK_NCF_RETRIES = %d", nak_ncf_retries);
+			goto err_abort;
+		}
 	}
 
 #ifdef I_UNDERSTAND_PGMCC_AND_FEC_ARE_NOT_SUPPORTED
@@ -486,7 +567,13 @@ on_startup (
 		pgmccinfo.ack_bo_ivl		= pgm_msecs (50);
 		pgmccinfo.ack_c			= 75;
 		pgmccinfo.ack_c_p		= 500;
-		pgm_setsockopt (g_sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
+		if (!pgm_setsockopt (g_sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo))) {
+			g_error ("setting PGM_USE_PGMCC = { ack_bo_ivl = %d ack_c = %d ack_c_p = %d }",
+				pgmccinfo.ack_bo_ivl,
+				pgmccinfo.ack_c,
+				pgmccinfo.ack_c_p);
+			goto err_abort;
+		}
 	}
 
 /* Reed Solomon forward error correction */
@@ -497,14 +584,22 @@ on_startup (
 		fecinfo.group_size		= g_rs_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
 		fecinfo.var_pktlen_enabled	= TRUE;
-		pgm_setsockopt (g_sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
+		if (!pgm_setsockopt (g_sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo))) {
+			g_error ("setting PGM_USE_FEC = { block_size = %d proactive_packets = %d group_size = %d ondemand_parity_enabled = %s var_pktlen_enabled = %s }",
+				fecinfo.block_size,
+				fecinfo.proactive_packets,
+				fecinfo.group_size,
+				fecinfo.ondemand_parity_enabled ? "TRUE" : "FALSE",
+				fecinfo.var_pktlen_enabled ? "TRUE" : "FALSE");
+			goto err_abort;
+		}
 	}
 #endif
 
 /* create global session identifier */
 	struct pgm_sockaddr_t addr;
 	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = g_port ? g_port : DEFAULT_DATA_DESTINATION_PORT;
+	addr.sa_port = (0 != g_port) ? g_port : DEFAULT_DATA_DESTINATION_PORT;
 	addr.sa_addr.sport = DEFAULT_DATA_SOURCE_PORT;
 	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
 		g_error ("creating GSI: %s", pgm_err->message);
@@ -533,8 +628,30 @@ on_startup (
 
 /* join IP multicast groups */
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (g_sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (g_sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+	{
+		if (!pgm_setsockopt (g_sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req))) {
+			char group[INET6_ADDRSTRLEN];
+			getnameinfo ((struct sockaddr*)&res->ai_recv_addrs[i].gsr_group, sizeof(struct sockaddr_in),
+                                        group, sizeof(group),
+                                        NULL, 0,
+                                        NI_NUMERICHOST);
+			g_error ("setting PGM_JOIN_GROUP = { #%u %s }",
+				(unsigned)res->ai_recv_addrs[i].gsr_interface,
+				group);
+			goto err_abort;
+		}
+	}
+	if (!pgm_setsockopt (g_sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req))) {
+                char group[INET6_ADDRSTRLEN];
+                getnameinfo ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, sizeof(struct sockaddr_in),
+				group, sizeof(group),
+                                NULL, 0,
+                                NI_NUMERICHOST);
+		g_error ("setting PGM_SEND_GROUP = { #%u %s }",
+			(unsigned)res->ai_send_addrs[0].gsr_interface,
+			group);
+		goto err_abort;
+	}
 	pgm_freeaddrinfo (res);
 
 /* set IP parameters */
@@ -544,11 +661,24 @@ on_startup (
 			  multicast_hops = 16,
 			  dscp		 = 0x2e << 2;	/* Expedited Forwarding PHB for network elements, no ECN. */
 
-		pgm_setsockopt (g_sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-		pgm_setsockopt (g_sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-		if (AF_INET6 != sa_family)
-			pgm_setsockopt (g_sock, PGM_TOS, &dscp, sizeof(dscp));
-		pgm_setsockopt (g_sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
+		if (!pgm_setsockopt (g_sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop))) {
+			g_error ("setting PGM_MULTICAST_LOOP = %d", multicast_loop);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops))) {
+			g_error ("setting PGM_MULTICAST_HOPS = %d", multicast_loop);
+			goto err_abort;
+		}
+		if (AF_INET6 != sa_family) {
+			if (!pgm_setsockopt (g_sock, PGM_TOS, &dscp, sizeof(dscp))) {
+				g_error ("setting PGM_TOS = 0x%x", dscp);
+				goto err_abort;
+			}
+		}
+		if (!pgm_setsockopt (g_sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking))) {
+			g_error ("setting PGM_NOBLOCK = %d", nonblocking);
+			goto err_abort;
+		}
 	}
 
 	if (!pgm_connect (g_sock, &pgm_err)) {
@@ -732,6 +862,7 @@ again:
 		case PGM_IO_STATUS_WOULD_BLOCK:
 		{
 #ifdef CONFIG_HAVE_EPOLL
+#	if 1
 /* re-enable write event for one-shot */
 			if (pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_MOD, EPOLLOUT | EPOLLONESHOT) < 0)
 			{
@@ -742,6 +873,18 @@ again:
 			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
 			if (G_UNLIKELY(g_quit))
 				break;
+#	else
+			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), -1 /* ms */);
+			if (G_UNLIKELY(g_quit))
+				break;
+			if (ready > 0 &&
+			    pgm_epoll_ctl (tx_sock, efd_again, EPOLL_CTL_MOD, EPOLLOUT | EPOLLONESHOT) < 0)
+			{
+				g_error ("pgm_epoll_ctl failed errno %i: \"%s\"", errno, strerror(errno));
+				g_main_loop_quit (g_loop);
+				return NULL;
+			}
+#	endif
 #elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
