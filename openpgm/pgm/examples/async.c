@@ -185,13 +185,13 @@ receiver_routine (
 		case PGM_IO_STATUS_TIMER_PENDING:
 			{
 				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (async->sock, PGM_TIME_REMAIN, &tv, &optlen);
+				pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
 			}
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			{
 				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (async->sock, PGM_RATE_REMAIN, &tv, &optlen);
+				pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
 			}
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */

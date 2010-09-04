@@ -546,7 +546,7 @@ on_pgm (
 	else if (PGM_IS_PEER (skb->pgm_header->pgm_type))
 		return on_peer (sock, skb, source);
 
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unknown PGM packet."));
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded PGM packet."));
 	if (sock->can_send_data)
 		sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;

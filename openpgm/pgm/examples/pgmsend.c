@@ -187,8 +187,8 @@ create_pgm_socket (void)
 			g_error ("Creating PGM/UDP socket: %s", pgm_err->message);
 			goto err_abort;
 		}
-		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_UCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
-		pgm_setsockopt (g_sock, PGM_UDP_ENCAP_MCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
+		pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_UDP_ENCAP_UCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
+		pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_UDP_ENCAP_MCAST_PORT, &g_udp_encap_port, sizeof(g_udp_encap_port));
 	} else {
 		if (!pgm_socket (&g_sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
 			g_error ("Creating PGM/IP socket: %s", pgm_err->message);
@@ -198,7 +198,7 @@ create_pgm_socket (void)
 
 /* Use RFC 2113 tagging for PGM Router Assist */
 	const int no_router_assist = 0;
-	pgm_setsockopt (g_sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
 
 	pgm_drop_superuser();
 
@@ -215,12 +215,12 @@ create_pgm_socket (void)
 				      pgm_secs  (25),
 				      pgm_secs  (30) };
 
-	pgm_setsockopt (g_sock, PGM_SEND_ONLY, &send_only, sizeof(send_only));
-	pgm_setsockopt (g_sock, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu));
-	pgm_setsockopt (g_sock, PGM_TXW_SQNS, &g_sqns, sizeof(g_sqns));
-	pgm_setsockopt (g_sock, PGM_TXW_MAX_RTE, &g_max_rte, sizeof(g_max_rte));
-	pgm_setsockopt (g_sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
-	pgm_setsockopt (g_sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_SEND_ONLY, &send_only, sizeof(send_only));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_MTU, &g_max_tpdu, sizeof(g_max_tpdu));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_SQNS, &g_sqns, sizeof(g_sqns));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &g_max_rte, sizeof(g_max_rte));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
 	if (g_fec) {
 		struct pgm_fecinfo_t fecinfo; 
 		fecinfo.block_size		= g_n;
@@ -228,7 +228,7 @@ create_pgm_socket (void)
 		fecinfo.group_size		= g_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
 		fecinfo.var_pktlen_enabled	= TRUE;
-		pgm_setsockopt (g_sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
+		pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
 /* create global session identifier */
@@ -263,8 +263,8 @@ create_pgm_socket (void)
 
 /* join IP multicast groups */
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (g_sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (g_sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+		pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
 	pgm_freeaddrinfo (res);
 
 /* set IP parameters */
@@ -273,11 +273,11 @@ create_pgm_socket (void)
 		  multicast_hops = 16,
 		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
 
-	pgm_setsockopt (g_sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (g_sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
 	if (AF_INET6 != sa_family)
-		pgm_setsockopt (g_sock, PGM_TOS, &dscp, sizeof(dscp));
-	pgm_setsockopt (g_sock, PGM_NOBLOCK, &blocking, sizeof(blocking));
+		pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TOS, &dscp, sizeof(dscp));
+	pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_NOBLOCK, &blocking, sizeof(blocking));
 
 	if (!pgm_connect (g_sock, &pgm_err)) {
 		g_error ("Connecting PGM socket: %s", pgm_err->message);
