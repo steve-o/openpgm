@@ -89,8 +89,6 @@ enum {
 	PGM_MULTICAST_LOOP,
 	PGM_MULTICAST_HOPS,
 	PGM_TOS,
-	PGM_SNDBUF,
-	PGM_RCVBUF,
 	PGM_AMBIENT_SPM,
 	PGM_HEARTBEAT_SPM,
 	PGM_TXW_SQNS,
@@ -144,8 +142,8 @@ bool pgm_bind (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, 
 bool pgm_bind3 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct pgm_interface_req_t*const, const socklen_t, const struct pgm_interface_req_t*const, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_connect (pgm_sock_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_close (pgm_sock_t*, bool);
-bool pgm_setsockopt (pgm_sock_t*const restrict, const int, const void*restrict, const socklen_t);
-bool pgm_getsockopt (pgm_sock_t*const restrict, const int, void*restrict, socklen_t*restrict);
+bool pgm_setsockopt (pgm_sock_t*const restrict, const int, const int, const void*restrict, const socklen_t);
+bool pgm_getsockopt (pgm_sock_t*const restrict, const int, const int, void*restrict, socklen_t*restrict);
 bool pgm_getaddrinfo (const char*restrict, const struct pgm_addrinfo_t*const restrict, struct pgm_addrinfo_t**restrict, pgm_error_t**restrict);
 void pgm_freeaddrinfo (struct pgm_addrinfo_t*);
 int pgm_send (pgm_sock_t*const restrict, const void*restrict, const size_t, size_t*restrict);

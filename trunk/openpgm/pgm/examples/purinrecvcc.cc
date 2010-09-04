@@ -169,10 +169,10 @@ main (
 	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	sock->get_option (cpgm::PGM_RECV_SOCK, &recv_sock, &socklen);
+	sock->get_option (IPPROTO_PGM, cpgm::PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	sock->get_option (cpgm::PGM_PENDING_SOCK, &pending_sock, &socklen);
+	sock->get_option (IPPROTO_PGM, cpgm::PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
@@ -198,11 +198,11 @@ main (
 			break;
 		case cpgm::PGM_IO_STATUS_TIMER_PENDING:
 			optlen = sizeof (tv);
-			sock->get_option (cpgm::PGM_TIME_REMAIN, &tv, &optlen);
+			sock->get_option (IPPROTO_PGM, cpgm::PGM_TIME_REMAIN, &tv, &optlen);
 			goto block;
 		case cpgm::PGM_IO_STATUS_RATE_LIMITED:
 			optlen = sizeof (tv);
-			sock->get_option (cpgm::PGM_RATE_REMAIN, &tv, &optlen);
+			sock->get_option (IPPROTO_PGM, cpgm::PGM_RATE_REMAIN, &tv, &optlen);
 		case cpgm::PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
 block:
@@ -309,8 +309,8 @@ on_startup (void)
 			std::cerr << "Creating PGM/UDP socket: " << pgm_err->message << std::endl;
 			goto err_abort;
 		}
-		sock->set_option (cpgm::PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-		sock->set_option (cpgm::PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 	} else {
 		std::cout << "Create PGM/IP socket." << std::endl;
 		if (!sock->open (sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
@@ -322,7 +322,7 @@ on_startup (void)
 	{
 /* Use RFC 2113 tagging for PGM Router Assist */
 		const int no_router_assist = 0;
-		sock->set_option (cpgm::PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
 	}
 
 	cpgm::pgm_drop_superuser();
@@ -339,17 +339,17 @@ on_startup (void)
 			  nak_data_retries = 50,
 			  nak_ncf_retries = 50;
 
-		sock->set_option (cpgm::PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
-		sock->set_option (cpgm::PGM_PASSIVE, &passive, sizeof(passive));
-		sock->set_option (cpgm::PGM_MTU, &max_tpdu, sizeof(max_tpdu));
-		sock->set_option (cpgm::PGM_RXW_SQNS, &sqns, sizeof(sqns));
-		sock->set_option (cpgm::PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
-		sock->set_option (cpgm::PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
-		sock->set_option (cpgm::PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
-		sock->set_option (cpgm::PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl));
-		sock->set_option (cpgm::PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
-		sock->set_option (cpgm::PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
-		sock->set_option (cpgm::PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_PASSIVE, &passive, sizeof(passive));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_MTU, &max_tpdu, sizeof(max_tpdu));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_RXW_SQNS, &sqns, sizeof(sqns));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
 	}
 	if (use_fec) {
 		struct cpgm::pgm_fecinfo_t fecinfo;
@@ -358,7 +358,7 @@ on_startup (void)
 		fecinfo.group_size		= rs_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
 		fecinfo.var_pktlen_enabled	= FALSE;
-		sock->set_option (cpgm::PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
 /* create global session identifier */
@@ -372,8 +372,8 @@ on_startup (void)
 
 /* join IP multicast groups */
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		sock->set_option (cpgm::PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	sock->set_option (cpgm::PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
+	sock->set_option (IPPROTO_PGM, cpgm::PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
 	pgm_freeaddrinfo (res);
 
 	{
@@ -383,10 +383,10 @@ on_startup (void)
 			  multicast_hops = 16,
 			  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
 
-		sock->set_option (cpgm::PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-		sock->set_option (cpgm::PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-		sock->set_option (cpgm::PGM_TOS, &dscp, sizeof(dscp));
-		sock->set_option (cpgm::PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_TOS, &dscp, sizeof(dscp));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
 	}
 
 	if (!sock->connect (&pgm_err)) {

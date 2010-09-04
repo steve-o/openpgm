@@ -171,10 +171,10 @@ main (
 	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_RECV_SOCK, &recv_sock, &socklen);
+	pgm_getsockopt (sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
+	pgm_getsockopt (sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = terminate_event;
@@ -203,13 +203,13 @@ main (
 		case PGM_IO_STATUS_TIMER_PENDING:
 			{
 				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (sock, PGM_TIME_REMAIN, &tv, &optlen);
+				pgm_getsockopt (sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
 			}
 			goto block;
 		case PGM_IO_STATUS_RATE_LIMITED:
 			{
 				socklen_t optlen = sizeof (tv);
-				pgm_getsockopt (sock, PGM_RATE_REMAIN, &tv, &optlen);
+				pgm_getsockopt (sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
 			}
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* select for next event */
@@ -315,8 +315,8 @@ on_startup (void)
 			fprintf (stderr, "Creating PGM/UDP socket: %s\n", pgm_err->message);
 			goto err_abort;
 		}
-		pgm_setsockopt (sock, PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-		pgm_setsockopt (sock, PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 	} else {
 		puts ("Create PGM/IP socket.");
 		if (!pgm_socket (&sock, sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
@@ -327,7 +327,7 @@ on_startup (void)
 
 /* Use RFC 2113 tagging for PGM Router Assist */
 	const int no_router_assist = 0;
-	pgm_setsockopt (sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
 
 	pgm_drop_superuser();
 
@@ -342,17 +342,17 @@ on_startup (void)
 		  nak_data_retries = 50,
 		  nak_ncf_retries = 50;
 
-	pgm_setsockopt (sock, PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
-	pgm_setsockopt (sock, PGM_PASSIVE, &passive, sizeof(passive));
-	pgm_setsockopt (sock, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
-	pgm_setsockopt (sock, PGM_RXW_SQNS, &sqns, sizeof(sqns));
-	pgm_setsockopt (sock, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
-	pgm_setsockopt (sock, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
-	pgm_setsockopt (sock, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
-	pgm_setsockopt (sock, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl));
-	pgm_setsockopt (sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
-	pgm_setsockopt (sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
-	pgm_setsockopt (sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_RECV_ONLY, &recv_only, sizeof(recv_only));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_PASSIVE, &passive, sizeof(passive));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_MTU, &max_tpdu, sizeof(max_tpdu));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_RXW_SQNS, &sqns, sizeof(sqns));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries));
 
 #ifdef I_UNDERSTAND_PGMCC_AND_FEC_ARE_NOT_SUPPORTED
 	if (use_pgmcc) {
@@ -360,7 +360,7 @@ on_startup (void)
 		pgmccinfo.ack_bo_ivl 		= pgm_msecs (50);
 		pgmccinfo.ack_c			= 75;
 		pgmccinfo.ack_c_p		= 500;
-		pgm_setsockopt (sock, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_USE_PGMCC, &pgmccinfo, sizeof(pgmccinfo));
 	}
 	if (use_fec) {
 		struct pgm_fecinfo_t fecinfo;
@@ -369,7 +369,7 @@ on_startup (void)
 		fecinfo.group_size		= rs_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
 		fecinfo.var_pktlen_enabled	= FALSE;
-		pgm_setsockopt (sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 #endif
 
@@ -405,8 +405,8 @@ on_startup (void)
 
 /* join IP multicast groups */
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
 	pgm_freeaddrinfo (res);
 
 /* set IP parameters */
@@ -415,11 +415,11 @@ on_startup (void)
 		  multicast_hops = 16,
 		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
 
-	pgm_setsockopt (sock, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-	pgm_setsockopt (sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
 	if (AF_INET6 != sa_family)
-		pgm_setsockopt (sock, PGM_TOS, &dscp, sizeof(dscp));
-	pgm_setsockopt (sock, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_TOS, &dscp, sizeof(dscp));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking));
 
 	if (!pgm_connect (sock, &pgm_err)) {
 		fprintf (stderr, "Connecting PGM socket: %s\n", pgm_err->message);

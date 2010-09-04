@@ -56,9 +56,9 @@ pgm_pkt_offset (
 	sa_family_t	pgmcc_family		/* 0 = disable */
 	)
 {
-	static const size_t data_size = sizeof(struct pgm_header) + sizeof(struct pgm_data);
+	const size_t data_size = sizeof(struct pgm_header) + sizeof(struct pgm_data);
 	size_t pkt_size = data_size;
-	if (can_fragment || 0 != pgmcc_family)
+	if (can_fragment || (0 != pgmcc_family))
 		pkt_size += sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header);
 	if (can_fragment)
 		pkt_size += sizeof(struct pgm_opt_fragment);
@@ -356,6 +356,7 @@ err_destroy:
 bool
 pgm_getsockopt (
 	pgm_sock_t* const restrict sock,
+	const int		   level,	/* always IPPROTO_PGM */
 	const int		   optname,
 	void*		  restrict optval,
 	socklen_t*	  restrict optlen	/* required */
@@ -363,6 +364,7 @@ pgm_getsockopt (
 {
 	bool status = FALSE;
 	pgm_return_val_if_fail (sock != NULL, status);
+	pgm_return_val_if_fail (level == IPPROTO_PGM, status);
 	pgm_return_val_if_fail (optval != NULL, status);
 	pgm_return_val_if_fail (optlen != NULL, status);
 	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
@@ -469,6 +471,7 @@ pgm_getsockopt (
 bool
 pgm_setsockopt (
 	pgm_sock_t* const	sock,
+	const int		level,		/* IPPROTO_PGM or SOL_SOCKET */
 	const int		optname,
 	const void*		optval,
 	const socklen_t		optlen
@@ -476,12 +479,45 @@ pgm_setsockopt (
 {
 	bool status = FALSE;
 	pgm_return_val_if_fail (sock != NULL, status);
+	pgm_return_val_if_fail (IPPROTO_PGM == level || SOL_SOCKET == level, status);
 	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
 		pgm_return_val_if_reached (status);
 	if (PGM_UNLIKELY(sock->is_connected || sock->is_destroyed)) {
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
 	}
+
+	switch (level) {
+	case SOL_SOCKET:
+	switch (optname) {
+
+/* 0 < wmem < wmem_max (user)
+ *
+ * operating system and sysctl dependent maximum, minimum on Linux 256 (doubled).
+ */
+	case SO_SNDBUF:
+		if (PGM_SOCKET_ERROR == setsockopt (sock->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen) ||
+		    PGM_SOCKET_ERROR == setsockopt (sock->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen))
+			break;
+		status = TRUE;
+		break;
+
+/* 0 < rmem < rmem_max (user)
+ *
+ * minimum on Linux is 2048 (doubled).
+ */
+	case SO_RCVBUF:
+		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)optval, optlen))
+			break;
+		status = TRUE;
+		break;
+
+	default:
+		break;
+	}
+	break;
+
+	case IPPROTO_PGM:
 	switch (optname) {
 
 /* RFC2113 IP Router Alert 
@@ -562,29 +598,6 @@ pgm_setsockopt (
 			pgm_warn (_("ToS/DSCP setting requires CAP_NET_ADMIN or ADMIN capability."));
 			break;
 		}
-		status = TRUE;
-		break;
-
-/* 0 < wmem < wmem_max (user)
- *
- * operating system and sysctl dependent maximum, minimum on Linux 256 (doubled).
- */
-	case SO_SNDBUF:
-	case PGM_SNDBUF:
-		if (PGM_SOCKET_ERROR == setsockopt (sock->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen) ||
-		    PGM_SOCKET_ERROR == setsockopt (sock->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen))
-			break;
-		status = TRUE;
-		break;
-
-/* 0 < rmem < rmem_max (user)
- *
- * minimum on Linux is 2048 (doubled).
- */
-	case SO_RCVBUF:
-	case PGM_RCVBUF:
-		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOL_SOCKET, SO_RCVBUF, (const char*)optval, optlen))
-			break;
 		status = TRUE;
 		break;
 
@@ -1149,6 +1162,13 @@ pgm_setsockopt (
 		status = TRUE;
 		break;
 
+	default:
+		break;
+	}
+	break;
+
+	default:
+	break;
 	}
 
 	pgm_rwlock_reader_unlock (&sock->lock);

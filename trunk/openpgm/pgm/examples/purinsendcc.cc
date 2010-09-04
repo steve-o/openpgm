@@ -167,8 +167,8 @@ create_sock (void)
 			std::cerr << "Creating PGM/UDP socket: " << pgm_err->message << std::endl;
 			goto err_abort;
 		}
-		sock->set_option (cpgm::PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
-		sock->set_option (cpgm::PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_UDP_ENCAP_UCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_UDP_ENCAP_MCAST_PORT, &udp_encap_port, sizeof(udp_encap_port));
 	} else {
 		if (!sock->open (sa_family, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
 			std::cerr << "Creating PGM/IP socket: " << pgm_err->message << std::endl;
@@ -179,7 +179,7 @@ create_sock (void)
 	{
 /* Use RFC 2113 tagging for PGM Router Assist */
 		const int no_router_assist = 0;
-		sock->set_option (cpgm::PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist));
 	}
 
 	cpgm::pgm_drop_superuser();
@@ -198,12 +198,12 @@ create_sock (void)
 					      pgm_secs  (25),
 					      pgm_secs  (30) };
 
-		sock->set_option (cpgm::PGM_SEND_ONLY, &send_only, sizeof(send_only));
-		sock->set_option (cpgm::PGM_MTU, &max_tpdu, sizeof(max_tpdu));
-		sock->set_option (cpgm::PGM_TXW_SQNS, &sqns, sizeof(sqns));
-		sock->set_option (cpgm::PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
-		sock->set_option (cpgm::PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
-		sock->set_option (cpgm::PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_SEND_ONLY, &send_only, sizeof(send_only));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_MTU, &max_tpdu, sizeof(max_tpdu));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_TXW_SQNS, &sqns, sizeof(sqns));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_TXW_MAX_RTE, &max_rte, sizeof(max_rte));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm));
 	}
 	if (use_fec) {
 		struct cpgm::pgm_fecinfo_t fecinfo; 
@@ -212,7 +212,7 @@ create_sock (void)
 		fecinfo.group_size		= rs_k;
 		fecinfo.ondemand_parity_enabled	= TRUE;
 		fecinfo.var_pktlen_enabled	= TRUE;
-		sock->set_option (cpgm::PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_USE_FEC, &fecinfo, sizeof(fecinfo));
 	}
 
 /* create global session identifier */
@@ -226,8 +226,8 @@ create_sock (void)
 
 /* join IP multicast groups */
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		sock->set_option (cpgm::PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	sock->set_option (cpgm::PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
+	sock->set_option (IPPROTO_PGM, cpgm::PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
 	cpgm::pgm_freeaddrinfo (res);
 
 	{
@@ -237,10 +237,10 @@ create_sock (void)
 			  multicast_hops = 16,
 			  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
 
-		sock->set_option (cpgm::PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
-		sock->set_option (cpgm::PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
-		sock->set_option (cpgm::PGM_TOS, &dscp, sizeof(dscp));
-		sock->set_option (cpgm::PGM_NOBLOCK, &blocking, sizeof(blocking));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_MULTICAST_LOOP, &multicast_loop, sizeof(multicast_loop));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_TOS, &dscp, sizeof(dscp));
+		sock->set_option (IPPROTO_PGM, cpgm::PGM_NOBLOCK, &blocking, sizeof(blocking));
 	}
 
 	if (!sock->connect (&pgm_err)) {

@@ -194,7 +194,7 @@ pgm_on_spmr (
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != skb);
 
-	pgm_debug ("pgm_on_spmr (sock:%p peer:%p skb:%p)",
+	pgm_info ("pgm_on_spmr (sock:%p peer:%p skb:%p)",
 		(void*)sock, (void*)peer, (void*)skb);
 
 	if (PGM_UNLIKELY(!pgm_verify_spmr (skb))) {
@@ -1033,6 +1033,7 @@ send_odata (
 
 /* continue if send would block */
 	if (sock->is_apdu_eagain) {
+pgm_info ("retry");
 		STATE(skb)->tstamp = pgm_time_update_now();
 		goto retry_send;
 	}
