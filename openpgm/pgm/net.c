@@ -71,10 +71,11 @@ pgm_sendto (
 	pgm_assert( NULL != to );
 	pgm_assert( tolen > 0 );
 
-#ifdef NET_DEBUG
+//#ifdef NET_DEBUG
+#if 1
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
+	pgm_info ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
 		(const void*)sock,
 		use_rate_limit ? "TRUE" : "FALSE",
 		use_router_alert ? "TRUE" : "FALSE",
@@ -98,7 +99,7 @@ pgm_sendto (
 		pgm_mutex_lock (&sock->send_mutex);
 
 	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
-	pgm_debug ("sendto returned %zd", sent);
+	pgm_info ("sendto returned %zd", sent);
 	if (sent < 0) {
 		int save_errno = pgm_sock_errno();
 		if (PGM_UNLIKELY(errno != ENETUNREACH &&	/* Network is unreachable */

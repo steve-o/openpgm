@@ -72,6 +72,7 @@ next_ack_rb_expiry (
 	pgm_assert (NULL != window->ack_backoff_queue.tail);
 
 	const struct pgm_peer_t* peer = (const struct pgm_peer_t*)window->ack_backoff_queue.tail;
+	pgm_assert (peer->sock->use_pgmcc);
 	return peer->ack_rb_expiry;
 }
 
@@ -127,6 +128,7 @@ ack_rb_ivl (
 {
 /* pre-conditions */
 	pgm_assert (NULL != sock);
+	pgm_assert (sock->use_pgmcc);
 	pgm_assert_cmpuint (sock->ack_bo_ivl, >, 1);
 
 	return pgm_rand_int_range (&sock->rand_, 1 /* us */, sock->ack_bo_ivl);
@@ -195,6 +197,7 @@ _pgm_is_acker (
 
 /* pre-conditions */
 	pgm_assert (NULL != peer);
+	pgm_assert (peer->sock->use_pgmcc);
 	pgm_assert (NULL != skb);
 	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
 
@@ -242,6 +245,9 @@ _pgm_add_ack (
 	const pgm_time_t		     ack_rb_expiry
 	)
 {
+	pgm_assert (NULL != peer);
+	pgm_assert (peer->sock->use_pgmcc);
+
 	peer->ack_rb_expiry = ack_rb_expiry;
 	pgm_queue_push_head_link (&peer->window->ack_backoff_queue, &peer->ack_link);
 }
@@ -255,7 +261,10 @@ _pgm_remove_ack (
 	pgm_peer_t*	      const restrict peer
 	)
 {
+	pgm_assert (NULL != peer);
+	pgm_assert (peer->sock->use_pgmcc);
 	pgm_assert (!pgm_queue_is_empty (&peer->window->ack_backoff_queue));
+
 	pgm_queue_unlink (&peer->window->ack_backoff_queue, &peer->ack_link);
 	peer->ack_rb_expiry = 0;
 }
@@ -564,7 +573,7 @@ pgm_on_spm (
 	pgm_assert (NULL != source);
 	pgm_assert (NULL != skb);
 
-	pgm_debug("pgm_on_spm (sock:%p source:%p skb:%p)",
+	pgm_info("pgm_on_spm (sock:%p source:%p skb:%p)",
 		(const void*)sock, (const void*)source, (const void*)skb);
 
 	if (PGM_UNLIKELY(!pgm_verify_spm (skb))) {
@@ -950,7 +959,7 @@ send_spmr (
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
 
-	pgm_debug ("send_spmr (sock:%p source:%p)",
+	pgm_info ("send_spmr (sock:%p source:%p)",
 		(const void*)sock, (const void*)source);
 
 	const size_t tpdu_length = sizeof(struct pgm_header);
@@ -1243,6 +1252,7 @@ send_ack (
 {
 /* pre-conditions */
 	pgm_assert (NULL != sock);
+	pgm_assert (sock->use_pgmcc);
 	pgm_assert (NULL != source);
 
 	pgm_debug ("send_ack (sock:%p source:%p now:%" PGM_TIME_FORMAT ")",
@@ -1327,6 +1337,7 @@ ack_rb_state (
 {
 /* pre-conditions */
 	pgm_assert (NULL != peer);
+	pgm_assert (peer->sock->use_pgmcc);
 
 	pgm_debug ("ack_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
 		(const void*)peer, now);
@@ -1535,6 +1546,7 @@ nak_rb_state (
 			if (pgm_time_after_eq(now, state->timer_expiry))
 			{
 				if (PGM_UNLIKELY(!is_valid_nla)) {
+pgm_info ("invalid nla");
 					dropped_invalid++;
 					pgm_rxw_lost (window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
@@ -1672,6 +1684,8 @@ pgm_check_peer_state (
 
 		if (window->ack_backoff_queue.tail)
 		{
+			pgm_assert (sock->use_pgmcc);
+
 			if (pgm_time_after_eq (now, next_ack_rb_expiry (window)))
 				if (!ack_rb_state (peer, now)) {
 					return FALSE;
@@ -1770,6 +1784,7 @@ pgm_min_receiver_expiry (
 
 		if (window->ack_backoff_queue.tail)
 		{
+			pgm_assert (sock->use_pgmcc);
 			if (pgm_time_after_eq (expiration, next_ack_rb_expiry (window)))
 				expiration = next_ack_rb_expiry (window);
 		}

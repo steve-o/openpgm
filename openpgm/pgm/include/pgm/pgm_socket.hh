@@ -88,15 +88,15 @@ public:
 	}
 
 	/// Set a socket option.
-	bool set_option (int optname, const void* optval, ::socklen_t optlen)
+	bool set_option (int level, int optname, const void* optval, ::socklen_t optlen)
 	{
-		return pgm_setsockopt (this->native_type_, optname, optval, optlen);
+		return pgm_setsockopt (this->native_type_, level, optname, optval, optlen);
 	}
 
 	/// Get a socket option.
-	bool get_option (int optname, void* optval, ::socklen_t* optlen)
+	bool get_option (int level, int optname, void* optval, ::socklen_t* optlen)
 	{
-		return pgm_getsockopt (this->native_type_, optname, optval, optlen);
+		return pgm_getsockopt (this->native_type_, level, optname, optval, optlen);
 	}
 
 	/// Get the local endpoint.
