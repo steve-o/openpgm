@@ -8,6 +8,7 @@ _Function_
 
 bool *pgm_getsockopt* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const restrict sock,
+	const int                  level,
 	const int                  optname,
 	void`*`             restrict optval,
 	socklen_t`*`        restrict optlen
@@ -15,6 +16,7 @@ bool *pgm_getsockopt* (
 
 bool *pgm_setsockopt* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const restrict sock,
+	const int                  level,
 	const int                  optname,
 	const void`*`       restrict optval,
 	socklen_t                  optlen
@@ -26,6 +28,8 @@ Get and set options on PGM sockets.
 
 === Remarks ===
 <tt>pgm_getsockopt()</tt> and <tt>pgm_setsockopt()</tt> manipulate options for the PGM socket referred to by <tt>sock</tt>.
+
+When manipulating socket options, the level at which the option resides and the name of the option must be specified.  To manipulate options at the sockets API level, level is specified as <tt>SOL_SOCKET</tt>.  To manipulate options for the PGM protocol, level is specified as <tt>IPPROTO_PGM</tt>.
 
 The arguments <tt>optval</tt> and <tt>optlen</tt> are used to access option values for <tt>pgm_setsockopt()</tt>.  For
 <tt>pgm_getsockopt()</tt> they identify a buffer in which the value for the requested option(s) are to be returned.
@@ -43,6 +47,9 @@ Most socket-level options utilise an <tt>int</tt> argument for <tt>optval</tt>.
 <tr>
 <td><tt>sock</tt></td>
 <td>The PGM socket object.</td>
+</tr><tr>
+<td><tt>level</tt></td>
+<td>API level.</td>
 </tr><tr>
 <td><tt>optname</tt></td>
 <td>Option name.</td>
