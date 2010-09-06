@@ -582,6 +582,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_MAX_TPDU,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -592,22 +593,24 @@ START_TEST (test_set_max_tpdu_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MTU;
 	const int max_tpdu	= 1500;
 	const void* optval	= &max_tpdu;
 	const socklen_t optlen	= sizeof(max_tpdu);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_max_tpdu failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_max_tpdu failed");
 }
 END_TEST
 
 /* invalid parameters */
 START_TEST (test_set_max_tpdu_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MTU;
 	const int max_tpdu	= 1500;
 	const void* optval	= &max_tpdu;
 	const socklen_t optlen	= sizeof(max_tpdu);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_max_tpdu failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_max_tpdu failed");
 }
 END_TEST
 
@@ -616,11 +619,12 @@ START_TEST (test_set_max_tpdu_fail_002)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MTU;
 	const int max_tpdu	= 1;
 	const void* optval	= &max_tpdu;
 	const socklen_t optlen	= sizeof(max_tpdu);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_max_tpdu failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_max_tpdu failed");
 }
 END_TEST
 
@@ -628,6 +632,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_MULTICAST_LOOP,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -638,21 +643,23 @@ START_TEST (test_set_multicast_loop_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MULTICAST_LOOP;
 	const int loop_enabled	= 1;
 	const void* optval	= &loop_enabled;
 	const socklen_t optlen	= sizeof(loop_enabled);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_multicast_loop failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_multicast_loop failed");
 }
 END_TEST
 
 START_TEST (test_set_multicast_loop_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MULTICAST_LOOP;
 	const int loop_enabled	= 1;
 	const void* optval	= &loop_enabled;
 	const socklen_t optlen	= sizeof(loop_enabled);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_multicast_loop failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_multicast_loop failed");
 }
 END_TEST
 
@@ -660,6 +667,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_MULTICAST_HOPS,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -670,21 +678,23 @@ START_TEST (test_set_hops_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MULTICAST_HOPS;
 	const int hops		= 16;
 	const void* optval	= &hops;
 	const socklen_t optlen	= sizeof(hops);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_hops failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_hops failed");
 }
 END_TEST
 
 START_TEST (test_set_hops_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_MULTICAST_HOPS;
 	const int hops		= 16;
 	const void* optval	= &hops;
 	const socklen_t optlen	= sizeof(hops);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_hops failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_hops failed");
 }
 END_TEST
 
@@ -692,7 +702,8 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
- *		const int		optname = PGM_SNDBUF,
+ *		const int		level = SOL_SOCKET,
+ *		const int		optname = SO_SNDBUF,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
  *	)
@@ -702,21 +713,23 @@ START_TEST (test_set_sndbuf_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_SNDBUF;
+	const int level		= SOL_SOCKET;
+	const int optname	= SO_SNDBUF;
 	const int bufsize	= 131071;	/* 128kB */
 	const void* optval	= &bufsize;
 	const socklen_t optlen	= sizeof(bufsize);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_sndbuf failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_sndbuf failed");
 }
 END_TEST
 
 START_TEST (test_set_sndbuf_fail_001)
 {
-	const int optname	= PGM_SNDBUF;
+	const int level		= SOL_SOCKET;
+	const int optname	= SO_SNDBUF;
 	const int bufsize	= 131071;	/* 128kB */
 	const void* optval	= &bufsize;
 	const socklen_t optlen	= sizeof(bufsize);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_sndbuf failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_sndbuf failed");
 }
 END_TEST
 
@@ -724,6 +737,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = SOL_SOCKET,
  *		const int		optname = PGM_RCVBUF,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -734,21 +748,23 @@ START_TEST (test_set_rcvbuf_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
-	const int optname	= PGM_RCVBUF;
+	const int level		= SOL_SOCKET;
+	const int optname	= SO_RCVBUF;
 	const int bufsize	= 131071;	/* 128kB */
 	const void* optval	= &bufsize;
 	const socklen_t optlen	= sizeof(bufsize);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_rcvbuf failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_rcvbuf failed");
 }
 END_TEST
 
 START_TEST (test_set_rcvbuf_fail_001)
 {
-	const int optname	= PGM_RCVBUF;
+	const int level		= SOL_SOCKET;
+	const int optname	= SO_RCVBUF;
 	const int bufsize	= 131071;	/* 128kB */
 	const void* optval	= &bufsize;
 	const socklen_t optlen	= sizeof(bufsize);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_rcvbuf failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_rcvbuf failed");
 }
 END_TEST
 
@@ -756,6 +772,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_USE_FEC,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(struct pgm_fecinfo_t)
@@ -766,6 +783,7 @@ START_TEST (test_set_fec_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_USE_FEC;
 	const struct pgm_fecinfo_t fecinfo = {
 		.ondemand_parity_enabled	= TRUE,
@@ -776,12 +794,13 @@ START_TEST (test_set_fec_pass_001)
 	};
 	const void* optval	= &fecinfo;
 	const socklen_t optlen	= sizeof(fecinfo);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_fec failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_fec failed");
 }
 END_TEST
 
 START_TEST (test_set_fec_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_USE_FEC;
 	const struct pgm_fecinfo_t fecinfo = {
 		.ondemand_parity_enabled	= TRUE,
@@ -792,7 +811,7 @@ START_TEST (test_set_fec_fail_001)
 	};
 	const void* optval	= &fecinfo;
 	const socklen_t optlen	= sizeof(fecinfo);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_fec failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_fec failed");
 }
 END_TEST
 
@@ -803,6 +822,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_USE_PGMCC,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(struct pgm_pgmccinfo_t)
@@ -813,6 +833,7 @@ START_TEST (test_set_pgmcc_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_USE_PGMCC;
 	const struct pgm_pgmccinfo_t pgmccinfo = {
 		.ack_bo_ivl	= pgm_msecs(100),
@@ -821,12 +842,13 @@ START_TEST (test_set_pgmcc_pass_001)
 	};
 	const void* optval	= &pgmccinfo;
 	const socklen_t optlen	= sizeof(pgmccinfo);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_pgmcc failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_pgmcc failed");
 }
 END_TEST
 
 START_TEST (test_set_pgmcc_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_USE_PGMCC;
 	const struct pgm_pgmccinfo_t pgmccinfo = {
 		.ack_bo_ivl	= pgm_msecs(100),
@@ -835,7 +857,7 @@ START_TEST (test_set_pgmcc_fail_001)
 	};
 	const void* optval	= &pgmccinfo;
 	const socklen_t optlen	= sizeof(pgmccinfo);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_pgmcc failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_pgmcc failed");
 }
 END_TEST
 
@@ -843,6 +865,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_USE_CR,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -853,21 +876,23 @@ START_TEST (test_set_cr_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_USE_CR;
 	const int magic_bunny	= 1;
 	const void* optval	= &magic_bunny;
 	const socklen_t optlen	= sizeof(magic_bunny);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_cr failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_cr failed");
 }
 END_TEST
 
 START_TEST (test_set_cr_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_USE_CR;
 	const int magic_bunny	= 1;
 	const void* optval	= &magic_bunny;
 	const socklen_t optlen	= sizeof(magic_bunny);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_cr failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_cr failed");
 }
 END_TEST
 
@@ -876,6 +901,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_SEND_ONLY,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -886,21 +912,23 @@ START_TEST (test_set_send_only_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_SEND_ONLY;
 	const int send_only	= 1;
 	const void* optval	= &send_only;
 	const socklen_t optlen	= sizeof(send_only);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_send_only failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_send_only failed");
 }
 END_TEST
 
 START_TEST (test_set_send_only_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_SEND_ONLY;
 	const int send_only	= 1;
 	const void* optval	= &send_only;
 	const socklen_t optlen	= sizeof(send_only);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_send_only failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_send_only failed");
 }
 END_TEST
 
@@ -908,6 +936,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_RECV_ONLY,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -918,21 +947,23 @@ START_TEST (test_set_recv_only_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_RECV_ONLY;
 	const int recv_only	= 1;
 	const void* optval	= &recv_only;
 	const socklen_t optlen	= sizeof(recv_only);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_recv_only failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_recv_only failed");
 }
 END_TEST
 
 START_TEST (test_set_recv_only_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_RECV_ONLY;
 	const int recv_only	= 1;
 	const void* optval	= &recv_only;
 	const socklen_t optlen	= sizeof(recv_only);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_recv_only failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_recv_only failed");
 }
 END_TEST
 
@@ -940,6 +971,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_PASSIVE,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -950,21 +982,23 @@ START_TEST (test_set_recv_only_pass_002)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_PASSIVE;
 	const int passive	= 1;
 	const void* optval	= &passive;
 	const socklen_t optlen	= sizeof(passive);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_passive failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_passive failed");
 }
 END_TEST
 
 START_TEST (test_set_recv_only_fail_002)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_PASSIVE;
 	const int passive	= 1;
 	const void* optval	= &passive;
 	const socklen_t optlen	= sizeof(passive);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_passive failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_passive failed");
 }
 END_TEST
 
@@ -972,6 +1006,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_ABORT_ON_RESET,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -982,21 +1017,23 @@ START_TEST (test_set_abort_on_reset_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_ABORT_ON_RESET;
 	const int abort_on_reset= 1;
 	const void* optval	= &abort_on_reset;
 	const socklen_t optlen	= sizeof(abort_on_reset);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_abort_on_reset failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_abort_on_reset failed");
 }
 END_TEST
 
 START_TEST (test_set_abort_on_reset_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_ABORT_ON_RESET;
 	const int abort_on_reset= 1;
 	const void* optval	= &abort_on_reset;
 	const socklen_t optlen	= sizeof(abort_on_reset);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_abort_on_reset failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_abort_on_reset failed");
 }
 END_TEST
 
@@ -1004,6 +1041,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_NOBLOCK,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -1014,21 +1052,23 @@ START_TEST (test_set_noblock_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_NOBLOCK;
 	const int noblock       = 1;
 	const void* optval	= &noblock;
 	const socklen_t optlen	= sizeof(noblock);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_noblock failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_noblock failed");
 }
 END_TEST
 
 START_TEST (test_set_noblock_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_NOBLOCK;
 	const int noblock       = 1;
 	const void* optval	= &noblock;
 	const socklen_t optlen	= sizeof(noblock);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_noblock failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_noblock failed");
 }
 END_TEST
 
@@ -1036,6 +1076,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_UDP_ENCAP_UCAST_PORT,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -1046,21 +1087,23 @@ START_TEST (test_set_udp_unicast_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_NOBLOCK;
 	const int unicast_port  = 10001;
 	const void* optval	= &unicast_port;
 	const socklen_t optlen	= sizeof(unicast_port);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_udp_unicast failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_udp_unicast failed");
 }
 END_TEST
 
 START_TEST (test_set_udp_unicast_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_NOBLOCK;
 	const int unicast_port  = 10001;
 	const void* optval	= &unicast_port;
 	const socklen_t optlen	= sizeof(unicast_port);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_udp_unicast failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_udp_unicast failed");
 }
 END_TEST
 
@@ -1068,6 +1111,7 @@ END_TEST
  *	bool
  *	pgm_setsockopt (
  *		pgm_sock_t* const	sock,
+ *		const int		level = IPPROTO_PGM,
  *		const int		optname = PGM_UDP_ENCAP_MCAST_PORT,
  *		const void*		optval,
  *		const socklen_t		optlen = sizeof(int)
@@ -1078,21 +1122,23 @@ START_TEST (test_set_udp_multicast_pass_001)
 {
 	pgm_sock_t* sock = generate_sock ();
 	fail_if (NULL == sock, "generate_sock failed");
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_NOBLOCK;
 	const int multicast_port= 10001;
 	const void* optval	= &multicast_port;
 	const socklen_t optlen	= sizeof(multicast_port);
-	fail_unless (TRUE == pgm_setsockopt (sock, optname, optval, optlen), "set_udp_multicast failed");
+	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_udp_multicast failed");
 }
 END_TEST
 
 START_TEST (test_set_udp_multicast_fail_001)
 {
+	const int level		= IPPROTO_PGM;
 	const int optname	= PGM_NOBLOCK;
 	const int multicast_port= 10002;
 	const void* optval	= &multicast_port;
 	const socklen_t optlen	= sizeof(multicast_port);
-	fail_unless (FALSE == pgm_setsockopt (NULL, optname, optval, optlen), "set_udp_multicast failed");
+	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_udp_multicast failed");
 }
 END_TEST
 
