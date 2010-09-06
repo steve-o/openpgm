@@ -55,10 +55,11 @@
  */
 
 ssize_t
-pgm_sendto (
-	pgm_sock_t*		sock,
+pgm_sendto_hops (
+	pgm_sock_t*			sock,
 	bool				use_rate_limit,
 	bool				use_router_alert,
+	int				hops,			/* -1 == system default */
 	const void*	       restrict	buf,
 	size_t				len,
 	const struct sockaddr* restrict	to,
@@ -71,11 +72,10 @@ pgm_sendto (
 	pgm_assert( NULL != to );
 	pgm_assert( tolen > 0 );
 
-//#ifdef NET_DEBUG
-#if 1
+#ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_info ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
+	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
 		(const void*)sock,
 		use_rate_limit ? "TRUE" : "FALSE",
 		use_router_alert ? "TRUE" : "FALSE",
@@ -97,9 +97,11 @@ pgm_sendto (
 
 	if (!use_router_alert && sock->can_send_data)
 		pgm_mutex_lock (&sock->send_mutex);
+	if (-1 != hops)
+		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, hops);
 
 	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
-	pgm_info ("sendto returned %zd", sent);
+	pgm_debug ("sendto returned %zd", sent);
 	if (sent < 0) {
 		int save_errno = pgm_sock_errno();
 		if (PGM_UNLIKELY(errno != ENETUNREACH &&	/* Network is unreachable */
@@ -149,6 +151,9 @@ pgm_sendto (
 		}
 	}
 
+/* revert to default value hop limit */
+	if (-1 != hops)
+		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, sock->hops);
 	if (!use_router_alert && sock->can_send_data)
 		pgm_mutex_unlock (&sock->send_mutex);
 	return sent;

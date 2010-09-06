@@ -29,8 +29,23 @@
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL ssize_t pgm_sendto (pgm_sock_t*restrict, bool, bool, const void*restrict, size_t, const struct sockaddr*restrict, socklen_t);
+PGM_GNUC_INTERNAL ssize_t pgm_sendto_hops (pgm_sock_t*restrict, bool, bool, int, const void*restrict, size_t, const struct sockaddr*restrict, socklen_t);
 PGM_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
+
+static inline
+ssize_t
+pgm_sendto (
+	pgm_sock_t*restrict		sock,
+	bool				use_rate_limit,
+	bool				use_router_alert,
+	const void*restrict		buf,
+	size_t				len,
+	const struct sockaddr*restrict	to,
+	socklen_t			tolen
+	)
+{
+	return pgm_sendto_hops (sock, use_rate_limit, use_router_alert, -1, buf, len, to, tolen);
+}
 
 PGM_END_DECLS
 
