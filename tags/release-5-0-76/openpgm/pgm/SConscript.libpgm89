@@ -1,0 +1,83 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+import os;
+import string;
+Import('env')
+
+src = Split("""
+		thread.c
+		mem.c
+		string.c
+		list.c
+		slist.c
+		queue.c
+		hashtable.c
+		messages.c
+		error.c
+		math.c
+		packet_parse.c
+		packet_test.c
+		sockaddr.c
+		time.c
+		if.c
+		getifaddrs.c
+		getnodeaddr.c
+		indextoaddr.c
+		indextoname.c
+		nametoindex.c
+		inet_network.c
+		md5.c
+		rand.c
+		gsi.c
+		tsi.c
+		txw.c
+		rxw.c
+		skbuff.c
+		socket.c
+		source.c
+		receiver.c
+		recv.c
+		engine.c
+		timer.c
+		net.c
+		rate_control.c
+		checksum.c
+		reed_solomon.c
+		galois_tables.c
+		wsastrerror.c
+		histogram.c
+""")
+
+e = env.Clone();
+e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
+
+# Galois tables
+e.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
+
+# Version stamping
+e.Command ('version.c', 'version_generator.py', "python $SOURCE > $TARGET");
+e.Depends ('version.c', src);
+src += ['version.c'];
+
+# C89 degrading
+c89source = Builder(action = 'cp $SOURCE $TARGET && if test -f "${SOURCE}.c89.patch"; then patch -i ${SOURCE}.c89.patch $TARGET; fi',
+                    suffix = '.c89.c',
+                    src_suffix = '.c',
+                    single_source = 1);
+e.Append(BUILDERS = {'C89Source' : c89source})
+
+c89src = []
+for c99file in src:
+	c89file = c99file.replace('.c', '.c89.c');
+	c89src += [ c89file ];
+	patchFile = c99file + '.c89.patch';
+	if os.path.exists (patchFile):
+		e.Depends (c89file, patchFile);
+	e.C89Source(c99file);
+
+e.StaticLibrary('libpgm89', c89src);
+e.StaticSharedLibrary('libpgm89-pic', c89src);
+
+# end of file

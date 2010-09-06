@@ -1,0 +1,47 @@
+73a74
+> 	{
+83a85
+> 	}
+93c95,97
+< 	for (unsigned i = 0; i < hash_table->size; i++)
+---
+> 	{
+> 	unsigned i;
+> 	for (i = 0; i < hash_table->size; i++)
+94a99
+> 	}
+140a146
+> 	{
+142a149
+> 	}
+153a161
+> 	{
+155a164
+> 	}
+208c217,219
+< 	for (unsigned i = 0; i < hash_table->size; i++)
+---
+> 	{
+> 	unsigned i;
+> 	for (i = 0; i < hash_table->size; i++)
+212a224
+> 	}
+226,228c238,244
+<   
+< 	for (unsigned i = 0; i < hash_table->size; i++)
+< 		for (pgm_hashnode_t *node = hash_table->nodes[i], *next; node; node = next)
+---
+>  
+> 	{
+> 	unsigned i; 
+> 	for (i = 0; i < hash_table->size; i++)
+> 		{
+> 		pgm_hashnode_t *node, *next;
+> 		for (node = hash_table->nodes[i]; node; node = next)
+230a247
+> 			{
+233a251,252
+> 			}
+> 		}
+234a254
+> 	}
