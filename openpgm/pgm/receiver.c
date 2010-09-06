@@ -573,7 +573,7 @@ pgm_on_spm (
 	pgm_assert (NULL != source);
 	pgm_assert (NULL != skb);
 
-	pgm_info("pgm_on_spm (sock:%p source:%p skb:%p)",
+	pgm_debug("pgm_on_spm (sock:%p source:%p skb:%p)",
 		(const void*)sock, (const void*)source, (const void*)skb);
 
 	if (PGM_UNLIKELY(!pgm_verify_spm (skb))) {
@@ -955,11 +955,13 @@ send_spmr (
 	pgm_peer_t* const restrict source
 	)
 {
+	ssize_t sent;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
 
-	pgm_info ("send_spmr (sock:%p source:%p)",
+	pgm_debug ("send_spmr (sock:%p source:%p)",
 		(const void*)sock, (const void*)source);
 
 	const size_t tpdu_length = sizeof(struct pgm_header);
@@ -976,10 +978,10 @@ send_spmr (
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
 /* send multicast SPMR TTL 1 */
-	pgm_sockaddr_multicast_hops (sock->send_sock, sock->send_gsr.gsr_group.ss_family, 1);
-	ssize_t sent = pgm_sendto (sock,
+	sent = pgm_sendto_hops (sock,
 				   FALSE,			/* not rate limited */
 				   FALSE,			/* regular socket */
+				   1,
 				   header,
 				   tpdu_length,
 				   (struct sockaddr*)&sock->send_gsr.gsr_group,
@@ -988,7 +990,6 @@ send_spmr (
 		return FALSE;
 
 /* send unicast SPMR with regular TTL */
-	pgm_sockaddr_multicast_hops (sock->send_sock, sock->send_gsr.gsr_group.ss_family, sock->hops);
 	sent = pgm_sendto (sock,
 			   FALSE,
 			   FALSE,
@@ -1546,7 +1547,6 @@ nak_rb_state (
 			if (pgm_time_after_eq(now, state->timer_expiry))
 			{
 				if (PGM_UNLIKELY(!is_valid_nla)) {
-pgm_info ("invalid nla");
 					dropped_invalid++;
 					pgm_rxw_lost (window, skb->sequence);
 /* mark receiver window for flushing on next recv() */

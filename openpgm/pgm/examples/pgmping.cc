@@ -443,12 +443,12 @@ on_startup (
 		const int bufsize  = 1024 * 1024,
 			  max_tpdu = g_max_tpdu;
 
-		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize))) {
-			g_error ("setting SO_SNDBUF = %d", bufsize);
-			goto err_abort;
-		}
 		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize))) {
 			g_error ("setting SO_RCVBUF = %d", bufsize);
+			goto err_abort;
+		}
+		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize))) {
+			g_error ("setting SO_SNDBUF = %d", bufsize);
 			goto err_abort;
 		}
 		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_MTU, &max_tpdu, sizeof(max_tpdu))) {
@@ -914,7 +914,6 @@ again:
 		}
 		g_out_total += bytes_written;
 		g_msg_sent++;
-if (0 == (g_msg_sent % 100)) g_warning("s:%d", g_msg_sent);
 	} while (!g_quit);
 
 #ifdef CONFIG_HAVE_EPOLL
@@ -1080,13 +1079,6 @@ on_msgv (
 		if (PGMPING_MODE_REFLECTOR == g_mode)
 		{
 			int status;
-{
-	if (ping.ParseFromArray (pskb->data, pskb->len)) {
-		const guint64 seqno		= ping.seqno();
-//		if (0 == (seqno % 100)) g_warning("r:%d", seqno);
-		g_warning("r:%d", seqno);
-	}
-}
 again:
 			status = pgm_send (g_sock, pskb->data, pskb->len, NULL);
 			switch (status) {
@@ -1125,8 +1117,6 @@ g_message ("would block");
 				g_message ("seqno replay?");
 				goto next_msg;
 			}
-//if (0 == (seqno % 100)) g_warning("r:%d", seqno);
-g_warning("r:%d", seqno);
 
 			g_in_total += pskb->len;
 			g_msg_received++;
