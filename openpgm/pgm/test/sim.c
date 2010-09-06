@@ -1092,10 +1092,11 @@ session_connect (
 
 static inline
 gssize
-pgm_sendto (
+pgm_sendto_hops (
 	pgm_sock_t*		sock,
-	G_GNUC_UNUSED gboolean		rl,
+	G_GNUC_UNUSED gboolean	rl,
 	gboolean		ra,
+	const int		hops,
 	const void*		buf,
 	gsize			len,
 	const struct sockaddr*	to,
@@ -1205,9 +1206,10 @@ brokn_send_apdu_unlocked (
 
 /* do not send send packet */
 		if (packets != 1)
-                	pgm_sendto (sock,
+                	pgm_sendto_hops (sock,
 				    TRUE,
                                     FALSE,
+				    sock->hops,
                                     skb->data,
                                     tpdu_length,
                                     (struct sockaddr*)&sock->send_gsr.gsr_group,
