@@ -316,6 +316,76 @@ pgm_socket (
 		goto err_destroy;
 	}
 
+	if (IPPROTO_UDP == new_sock->protocol)
+	{
+/* Stevens: "SO_REUSEADDR has datatype int."
+ */
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
+		const int v = 1;
+		if (PGM_SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+		    PGM_SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+		    PGM_SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
+		{
+			const int save_errno = pgm_sock_errno();
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_SOCKET,
+				       pgm_error_from_sock_errno (save_errno),
+				       _("Enabling reuse of socket local address: %s"),
+				       pgm_sock_strerror (save_errno));
+			goto err_destroy;
+		}
+
+/* request extra packet information to determine destination address on each packet */
+#ifndef CONFIG_TARGET_WINE
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
+		const sa_family_t recv_family = new_sock->family;
+		if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
+		{
+			const int save_errno = pgm_sock_errno();
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_SOCKET,
+				       pgm_error_from_sock_errno (save_errno),
+				       _("Enabling receipt of ancillary information per incoming packet: %s"),
+				       pgm_sock_strerror (save_errno));
+			goto err_destroy;
+		}
+#endif
+	}
+	else
+	{
+		const sa_family_t recv_family = new_sock->family;
+		if (AF_INET == recv_family)
+		{
+/* include IP header only for incoming data, only works for IPv4 */
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP headers."));
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_hdrincl (new_sock->recv_sock, recv_family, TRUE))
+			{
+				const int save_errno = pgm_sock_errno();
+				pgm_set_error (error,
+					       PGM_ERROR_DOMAIN_SOCKET,
+					       pgm_error_from_sock_errno (save_errno),
+					       _("Enabling IP header in front of user data: %s"),
+					       pgm_sock_strerror (save_errno));
+				goto err_destroy;
+			}
+		}
+		else
+		{
+			pgm_assert (AF_INET6 == recv_family);
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
+			{
+				const int save_errno = pgm_sock_errno();
+				pgm_set_error (error,
+					       PGM_ERROR_DOMAIN_SOCKET,
+					       pgm_error_from_sock_errno (save_errno),
+					       _("Enabling receipt of control message per incoming datagram: %s"),
+					       pgm_sock_strerror (save_errno));
+				goto err_destroy;
+			}
+		}
+	}
+
 	*sock = new_sock;
 
 	pgm_rwlock_writer_lock (&pgm_sock_list_lock);
@@ -578,9 +648,9 @@ pgm_setsockopt (
 		if (PGM_UNLIKELY(*(const int*)optval > UINT8_MAX))
 			break;
 		{
-			const unsigned hops = *(const int*)optval;
-			if (PGM_SOCKET_ERROR == pgm_sockaddr_multicast_hops (sock->send_sock, sock->family, hops) ||
-			    PGM_SOCKET_ERROR == pgm_sockaddr_multicast_hops (sock->send_with_router_alert_sock, sock->family, hops))
+			sock->hops = *(const int*)optval;
+			if (PGM_SOCKET_ERROR == pgm_sockaddr_multicast_hops (sock->send_sock, sock->family, sock->hops) ||
+			    PGM_SOCKET_ERROR == pgm_sockaddr_multicast_hops (sock->send_with_router_alert_sock, sock->family, sock->hops))
 				break;
 		}
 #endif
@@ -922,8 +992,10 @@ pgm_setsockopt (
 		memcpy (&sock->send_gsr, optval, sizeof(struct group_req));
 		if (PGM_UNLIKELY(sock->family != sock->send_gsr.gsr_group.ss_family))
 			break;
+/* multicast group for later usage with sendto() */
 		if (sock->udp_encap_mcast_port)
 			((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+/* interface */
 		if ((PGM_SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_sock,
 								   (const struct sockaddr*)&sock->send_addr,
 								   sock->send_gsr.gsr_interface)) ||
@@ -932,6 +1004,14 @@ pgm_setsockopt (
 								   sock->send_gsr.gsr_interface)))
 		{
 			break;
+		}
+		else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
+		{
+			char addr[INET6_ADDRSTRLEN];
+			pgm_sockaddr_ntop ((const struct sockaddr*)&sock->send_addr, addr, sizeof(addr));
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Multicast send interface set to %s index %u"),
+				addr,
+				sock->send_gsr.gsr_interface);
 		}
 		status = TRUE;
 		break;
@@ -974,6 +1054,14 @@ pgm_setsockopt (
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
 				break;
+			else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
+			{
+				char addr[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, addr, sizeof(addr));
+				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Join multicast group %s on interface index %u"),
+					addr,
+					gr->gr_interface);
+			}
 			sock->recv_gsr_len++;
 		}
 		status = TRUE;
@@ -1009,6 +1097,14 @@ pgm_setsockopt (
 				break;
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_leave_group (sock->recv_sock, sock->family, gr))
 				break;
+			else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
+			{
+				char addr[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, addr, sizeof(addr));
+				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Leave multicast group %s on interface index %u"),
+					addr,
+					gr->gr_interface);
+			}
 		}
 		status = TRUE;
 		break;
@@ -1448,80 +1544,6 @@ pgm_bind3 (
 		pgm_assert (NULL != sock->peers_hashtable);
 	}
 
-	if (IPPROTO_UDP == sock->protocol)
-	{
-/* Stevens: "SO_REUSEADDR has datatype int."
- */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
-		const int v = 1;
-		if (PGM_SOCKET_ERROR == setsockopt (sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
-		    PGM_SOCKET_ERROR == setsockopt (sock->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
-		    PGM_SOCKET_ERROR == setsockopt (sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
-		{
-			const int save_errno = pgm_sock_errno();
-			pgm_set_error (error,
-				       PGM_ERROR_DOMAIN_SOCKET,
-				       pgm_error_from_sock_errno (save_errno),
-				       _("Enabling reuse of socket local address: %s"),
-				       pgm_sock_strerror (save_errno));
-			pgm_rwlock_writer_unlock (&sock->lock);
-			return FALSE;
-		}
-
-/* request extra packet information to determine destination address on each packet */
-#ifndef CONFIG_TARGET_WINE
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
-		const sa_family_t recv_family = sock->family;
-		if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (sock->recv_sock, recv_family, TRUE))
-		{
-			const int save_errno = pgm_sock_errno();
-			pgm_set_error (error,
-				       PGM_ERROR_DOMAIN_SOCKET,
-				       pgm_error_from_sock_errno (save_errno),
-				       _("Enabling receipt of ancillary information per incoming packet: %s"),
-				       pgm_sock_strerror (save_errno));
-			pgm_rwlock_writer_unlock (&sock->lock);
-			return FALSE;
-		}
-#endif
-	}
-	else
-	{
-		const sa_family_t recv_family = sock->family;
-		if (AF_INET == recv_family)
-		{
-/* include IP header only for incoming data, only works for IPv4 */
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP headers."));
-			if (PGM_SOCKET_ERROR == pgm_sockaddr_hdrincl (sock->recv_sock, recv_family, TRUE))
-			{
-				const int save_errno = pgm_sock_errno();
-				pgm_set_error (error,
-					       PGM_ERROR_DOMAIN_SOCKET,
-					       pgm_error_from_sock_errno (save_errno),
-					       _("Enabling IP header in front of user data: %s"),
-					       pgm_sock_strerror (save_errno));
-				pgm_rwlock_writer_unlock (&sock->lock);
-				return FALSE;
-			}
-		}
-		else
-		{
-			pgm_assert (AF_INET6 == recv_family);
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
-			if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (sock->recv_sock, recv_family, TRUE))
-			{
-				const int save_errno = pgm_sock_errno();
-				pgm_set_error (error,
-					       PGM_ERROR_DOMAIN_SOCKET,
-					       pgm_error_from_sock_errno (save_errno),
-					       _("Enabling receipt of control message per incoming datagram: %s"),
-					       pgm_sock_strerror (save_errno));
-				pgm_rwlock_writer_unlock (&sock->lock);
-				return FALSE;
-			}
-		}
-	}
-
 /* Bind UDP sockets to interfaces, note multicast on a bound interface is
  * fruity on some platforms.  Roughly,  binding to INADDR_ANY provides all
  * data, binding to the multicast group provides only multicast traffic,
@@ -1555,7 +1577,7 @@ pgm_bind3 (
 		recv_addr.s6.sin6_family = AF_INET6;
 		recv_addr.s6.sin6_addr = in6addr_any;
 	}
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY."));
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY"));
 #else
 	if (!pgm_if_indextoaddr (recv_req->ir_interface,
 			         sock->family,
@@ -1566,9 +1588,16 @@ pgm_bind3 (
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %u scope %u"),
-		   recv_req->ir_interface,
-		   recv_req->ir_scope_id);
+	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
+	{
+		if (AF_INET6 == sock_family)
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %u scope %u"),
+				   recv_req->ir_interface,
+				   recv_req->ir_scope_id);
+		else
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %u"),
+				   recv_req->ir_interface);
+	}
 
 #endif /* CONFIG_BIND_INADDR_ANY */
 
@@ -1615,9 +1644,13 @@ pgm_bind3 (
 	}
 	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u scope %u"),
-			   send_req->ir_interface,
-			   send_req->ir_scope_id);
+		if (AF_INET6 == sock->family)
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u scope %u"),
+				   send_req->ir_interface,
+				   send_req->ir_scope_id);
+		else
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding send socket to interface index %u"),
+				   send_req->ir_interface);
 	}
 
 	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
