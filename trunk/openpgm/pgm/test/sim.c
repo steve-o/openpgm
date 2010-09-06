@@ -882,7 +882,7 @@ session_set_fec (
                 .ondemand_parity_enabled        = TRUE,
                 .var_pktlen_enabled             = TRUE
         };
-        if (!pgm_setsockopt (sess->sock, PGM_USE_FEC, &fecinfo, sizeof(fecinfo)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_USE_FEC, &fecinfo, sizeof(fecinfo)))
                 printf ("FAILED: set FEC = RS(%d, %d)\n", block_size, group_size);
         else
                 puts ("READY");
@@ -905,7 +905,7 @@ session_bind (
 
 /* Use RFC 2113 tagging for PGM Router Assist */
         const int no_router_assist = 0;
-        if (!pgm_setsockopt (sess->sock, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist)))
                 puts ("FAILED: disable IP_ROUTER_ALERT");
 
 /* set PGM parameters */
@@ -934,21 +934,21 @@ session_bind (
 
         g_assert (G_N_ELEMENTS(heartbeat_spm) > 0);
 
-        if (!pgm_setsockopt (sess->sock, PGM_SEND_ONLY, &send_and_receive, sizeof(send_and_receive)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_ONLY, &send_and_receive, sizeof(send_and_receive)))
                 puts ("FAILED: set bi-directional transport");
-        if (!pgm_setsockopt (sess->sock, PGM_RECV_ONLY, &send_and_receive, sizeof(send_and_receive)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_RECV_ONLY, &send_and_receive, sizeof(send_and_receive)))
                 puts ("FAILED: set bi-directional transport");
-        if (!pgm_setsockopt (sess->sock, PGM_PASSIVE, &active, sizeof(active)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_PASSIVE, &active, sizeof(active)))
                 puts ("FAILED: set active transport");
-        if (!pgm_setsockopt (sess->sock, PGM_MTU, &mtu, sizeof(mtu)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MTU, &mtu, sizeof(mtu)))
                 printf ("FAILED: set MAX_TPDU = %d bytes\n", mtu);
-        if (!pgm_setsockopt (sess->sock, PGM_TXW_SQNS, &txw_sqns, sizeof(txw_sqns)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TXW_SQNS, &txw_sqns, sizeof(txw_sqns)))
                 printf ("FAILED: set TXW_SQNS = %d\n", txw_sqns);
-        if (!pgm_setsockopt (sess->sock, PGM_RXW_SQNS, &rxw_sqns, sizeof(rxw_sqns)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_RXW_SQNS, &rxw_sqns, sizeof(rxw_sqns)))
                 printf ("FAILED: set RXW_SQNS = %d\n", rxw_sqns);
-        if (!pgm_setsockopt (sess->sock, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm)))
                 printf ("FAILED: set AMBIENT_SPM = %ds\n", (int)pgm_to_secs (ambient_spm));
-	if (!pgm_setsockopt (sess->sock, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm)))
+	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm)))
         {
                 char buffer[1024];
                 sprintf (buffer, "%d", heartbeat_spm[0]);
@@ -959,19 +959,19 @@ session_bind (
                 }
                 printf ("FAILED: set HEARTBEAT_SPM = { %s }\n", buffer);
         }
-        if (!pgm_setsockopt (sess->sock, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry)))
                 printf ("FAILED: set PEER_EXPIRY = %ds\n",(int) pgm_to_secs (peer_expiry));
-        if (!pgm_setsockopt (sess->sock, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry)))
                 printf ("FAILED: set SPMR_EXPIRY = %dms\n", (int)pgm_to_msecs (spmr_expiry));
-        if (!pgm_setsockopt (sess->sock, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl)))
                 printf ("FAILED: set NAK_BO_IVL = %dms\n", (int)pgm_to_msecs (nak_bo_ivl));
-        if (!pgm_setsockopt (sess->sock, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl)))
                 printf ("FAILED: set NAK_RPT_IVL = %dms\n", (int)pgm_to_msecs (nak_rpt_ivl));
-        if (!pgm_setsockopt (sess->sock, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl)))
                 printf ("FAILED: set NAK_RDATA_IVL = %dms\n", (int)pgm_to_msecs (nak_rdata_ivl));
-        if (!pgm_setsockopt (sess->sock, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries)))
                 printf ("FAILED: set NAK_DATA_RETRIES = %d\n", nak_data_retries);
-        if (!pgm_setsockopt (sess->sock, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries)))
                 printf ("FAILED: set NAK_NCF_RETRIES = %d\n", nak_ncf_retries);
 
 /* create global session identifier */
@@ -1027,7 +1027,7 @@ session_connect (
 
 /* join IP multicast groups */
         for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-                if (!pgm_setsockopt (sess->sock, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req)))
+                if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req)))
                 {
                         char group[INET6_ADDRSTRLEN];
                         getnameinfo ((struct sockaddr*)&res->ai_recv_addrs[i].gsr_group, sizeof(struct sockaddr_in),
@@ -1036,7 +1036,7 @@ session_connect (
                                         NI_NUMERICHOST);
                         printf ("FAILED: join group (#%u %s)\n", (unsigned)res->ai_recv_addrs[i].gsr_interface, group);
                 }
-        if (!pgm_setsockopt (sess->sock, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req)))
                 {
                         char group[INET6_ADDRSTRLEN];
                         getnameinfo ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, sizeof(struct sockaddr_in),
@@ -1053,13 +1053,13 @@ session_connect (
                   multicast_hops = 16,
                   dscp = 0x2e << 2;             /* Expedited Forwarding PHB for network elements, no ECN. */
 
-        if (!pgm_setsockopt (sess->sock, PGM_MULTICAST_LOOP, &no_multicast_loop, sizeof(no_multicast_loop)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MULTICAST_LOOP, &no_multicast_loop, sizeof(no_multicast_loop)))
                 puts ("FAILED: disable multicast loop");
-        if (!pgm_setsockopt (sess->sock, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops)))
                 printf ("FAILED: set TTL = %d\n", multicast_hops);
-        if (!pgm_setsockopt (sess->sock, PGM_TOS, &dscp, sizeof(dscp)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TOS, &dscp, sizeof(dscp)))
                 printf ("FAILED: set TOS = 0x%x\n", dscp);
-        if (!pgm_setsockopt (sess->sock, PGM_NOBLOCK, &non_blocking, sizeof(non_blocking)))
+        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NOBLOCK, &non_blocking, sizeof(non_blocking)))
                 puts ("FAILED: set non-blocking sockets");
 
 	const bool status = sess->is_transport_fake ?
@@ -1284,13 +1284,13 @@ again:
 	case PGM_IO_STATUS_TIMER_PENDING:
 	{
 		socklen_t optlen = sizeof (tv);
-		pgm_getsockopt (sess->sock, PGM_TIME_REMAIN, &tv, &optlen);
+		pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
 	}
 	goto block;
 	case PGM_IO_STATUS_RATE_LIMITED:
 	{
 		socklen_t optlen = sizeof (tv);
-		pgm_getsockopt (sess->sock, PGM_RATE_REMAIN, &tv, &optlen);
+		pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
 	}
 /* fall through */
 	case PGM_IO_STATUS_WOULD_BLOCK:

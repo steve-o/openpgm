@@ -156,14 +156,14 @@ pgm_receiver_thread (
 		case PGM_IO_STATUS_TIMER_PENDING:
 		{
 			socklen_t optlen = sizeof (tv);
-			pgm_getsockopt (async->sock, PGM_TIME_REMAIN, &tv, &optlen);
+			pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
 		}
 		goto block;
 
 		case PGM_IO_STATUS_RATE_LIMITED:
 		{
 			socklen_t optlen = sizeof (tv);
-			pgm_getsockopt (async->sock, PGM_RATE_REMAIN, &tv, &optlen);
+			pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
 		}
 /* fall through */
 		case PGM_IO_STATUS_WOULD_BLOCK:
@@ -213,7 +213,7 @@ block:
 		{
 			int is_abort_on_reset;
 			socklen_t optlen = sizeof (is_abort_on_reset);
-			pgm_getsockopt (async->sock, PGM_ABORT_ON_RESET, &is_abort_on_reset, &optlen);
+			pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_ABORT_ON_RESET, &is_abort_on_reset, &optlen);
 			if (is_abort_on_reset)
 				goto cleanup;
 			break;
