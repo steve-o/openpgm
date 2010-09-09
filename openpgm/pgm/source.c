@@ -1229,7 +1229,8 @@ send_odata_copy (
 						sizeof(struct pgm_opt6_pgmcc_data) :
 						sizeof(struct pgm_opt_pgmcc_data));
 		struct pgm_opt_pgmcc_data*  pgmcc_data  = (struct pgm_opt_pgmcc_data*)(opt_header + 1);
-		struct pgm_opt6_pgmcc_data* pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
+/* unused */
+//		struct pgm_opt6_pgmcc_data* pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
 
 		pgmcc_data->opt_reserved = 0;
 		pgmcc_data->opt_tstamp = htonl (pgm_to_msecs (STATE(skb)->tstamp));

@@ -78,7 +78,8 @@ struct pgm_pgmccinfo_t {
 
 /* socket options */
 enum {
-	PGM_RECV_SOCK		= 0x2000,
+	PGM_SEND_SOCK		= 0x2000,
+	PGM_RECV_SOCK,
 	PGM_REPAIR_SOCK,
 	PGM_PENDING_SOCK,
 	PGM_ACK_SOCK,

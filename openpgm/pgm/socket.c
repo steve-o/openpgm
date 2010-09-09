@@ -459,6 +459,16 @@ pgm_getsockopt (
 		status = TRUE;
 		break;
 
+/* send socket */
+	case PGM_SEND_SOCK:
+		if (PGM_UNLIKELY(!sock->is_connected))
+			break;
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*)optval = sock->send_sock;
+		status = TRUE;
+		break;
+
 /* receive socket */
 	case PGM_RECV_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
@@ -609,7 +619,7 @@ pgm_setsockopt (
 	case PGM_MTU:
 		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
-		if (PGM_UNLIKELY(*(const int*)optval < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))))
+		if (PGM_UNLIKELY(*(const int*)optval < (int)(sizeof(struct pgm_ip) + sizeof(struct pgm_header))))
 			break;
 		if (PGM_UNLIKELY(*(const int*)optval > UINT16_MAX))
 			break;
@@ -705,7 +715,7 @@ pgm_setsockopt (
 			break;
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (PGM_UNLIKELY(*(const int*)optval >= ((UINT32_MAX/2)-1)))
+		if (PGM_UNLIKELY(*(const int*)optval >= (int)((UINT32_MAX/2)-1)))
 			break;
 		sock->txw_sqns = *(const int*)optval;
 		status = TRUE;
@@ -769,7 +779,7 @@ pgm_setsockopt (
 			break;
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
-		if (PGM_UNLIKELY(*(const int*)optval >= ((UINT32_MAX/2)-1)))
+		if (PGM_UNLIKELY(*(const int*)optval >= (int)((UINT32_MAX/2)-1)))
 			break;
 		sock->rxw_sqns = *(const int*)optval;
 		status = TRUE;
