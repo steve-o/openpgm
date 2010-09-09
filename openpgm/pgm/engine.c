@@ -19,6 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* getprotobyname_r */
+#ifndef _BSD_SOURCE
+#	define _BSD_SOURCE	1
+#endif
+
 #ifndef _WIN32
 #	include <netdb.h>
 #endif

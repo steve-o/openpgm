@@ -22,7 +22,9 @@
  */
 
 /* IFF_UP */
-#define _BSD_SOURCE
+#ifndef _BSD_SOURCE
+#	define _BSD_SOURCE	1
+#endif
 
 #include <errno.h>
 #include <netdb.h>

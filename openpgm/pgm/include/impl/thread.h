@@ -175,8 +175,6 @@ static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
 	ReleaseSRWLockExclusive (&rwlock->win32_lock);
 }
 #else
-PGM_GNUC_INTERNAL void pgm_rwlock_init (pgm_rwlock_t*);
-PGM_GNUC_INTERNAL void pgm_rwlock_free (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL void pgm_rwlock_reader_lock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL bool pgm_rwlock_reader_trylock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL void pgm_rwlock_reader_unlock(pgm_rwlock_t*);
@@ -184,6 +182,9 @@ PGM_GNUC_INTERNAL void pgm_rwlock_writer_lock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL bool pgm_rwlock_writer_trylock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL void pgm_rwlock_writer_unlock (pgm_rwlock_t*);
 #endif
+
+PGM_GNUC_INTERNAL void pgm_rwlock_init (pgm_rwlock_t*);
+PGM_GNUC_INTERNAL void pgm_rwlock_free (pgm_rwlock_t*);
 
 PGM_GNUC_INTERNAL void pgm_thread_init (void);
 PGM_GNUC_INTERNAL void pgm_thread_shutdown (void);
