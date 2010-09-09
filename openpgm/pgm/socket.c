@@ -444,11 +444,35 @@ pgm_getsockopt (
 		return status;
 	}
 	switch (optname) {
-/* maximum TPDU size */
+/* maximum transmission packet size */
 	case PGM_MTU:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*restrict)optval = sock->max_tpdu;
+		status = TRUE;
+		break;
+
+/* maximum segment size for unfragmented APDU */
+	case PGM_MSSS:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->max_tsdu;
+		status = TRUE;
+		break;
+
+/* maximum segment size for fragmented APDU */
+	case PGM_MSS:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->max_tsdu_fragment;
+		status = TRUE;
+		break;
+
+/* maximum payload size for an APDU */
+	case PGM_PDU:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->max_apdu;
 		status = TRUE;
 		break;
 
