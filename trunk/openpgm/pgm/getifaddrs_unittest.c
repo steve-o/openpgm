@@ -20,7 +20,7 @@
  */
 
 /* IFF_UP */
-#define _BSD_SOURCE
+#define _BSD_SOURCE	1
 
 #include <errno.h>
 #include <signal.h>

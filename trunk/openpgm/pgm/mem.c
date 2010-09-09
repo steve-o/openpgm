@@ -21,6 +21,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <strings.h>
 #ifdef _WIN32
 #	define strcasecmp	stricmp
 #endif
