@@ -1,0 +1,121 @@
+--- packet_parse.c	2010-08-04 15:32:09.000000000 +0800
++++ packet_parse.c89	2010-08-04 15:32:40.000000000 +0800
+@@ -122,6 +122,7 @@
+  */
+ 
+ /* decode IP header */
++	{
+ 	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
+ 	switch (ip->ip_v) {
+ 	case 4: {
+@@ -147,6 +148,7 @@
+ 		return FALSE;
+ 	}
+ 
++	{
+ 	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+ 	if (PGM_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
+ 	{
+@@ -158,6 +160,7 @@
+ 		return FALSE;
+ 	}
+ 
++	{
+ #ifndef CONFIG_HOST_ORDER_IP_LEN
+ 	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
+ #else
+@@ -186,6 +189,7 @@
+ /* packets that fail checksum will generally not be passed upstream except with rfc3828
+  */
+ #if PGM_CHECK_IN_CKSUM
++	{
+ 	const uint16_t sum = in_cksum (data, packet_length, 0);
+ 	if (PGM_UNLIKELY(0 != sum)) {
+ 		const uint16_t ip_sum = ntohs (ip->ip_sum);
+@@ -196,9 +200,11 @@
+ 			     ip_sum, sum);
+ 		return FALSE;
+ 	}
++	}
+ #endif
+ 
+ /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
++	{
+ #ifndef CONFIG_HOST_ORDER_IP_OFF
+ 	const uint16_t offset = ntohs (ip->ip_off);
+ #else
+@@ -236,6 +242,10 @@
+ 	skb->data	= skb->pgm_header;
+ 	skb->len       -= ip_header_length;
+ 	return pgm_parse (skb, error);
++	}
++	}
++	}
++	}
+ }
+ 
+ bool
+@@ -277,6 +287,7 @@
+ 	{
+ 		const uint16_t sum = skb->pgm_header->pgm_checksum;
+ 		skb->pgm_header->pgm_checksum = 0;
++		{
+ 		const uint16_t pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
+ 		skb->pgm_header->pgm_checksum = sum;
+ 		if (PGM_UNLIKELY(pgm_sum != sum)) {
+@@ -287,6 +298,7 @@
+ 			     	     pgm_sum, sum);
+ 			return FALSE;
+ 		}
++		}
+ 	} else {
+ 		if (PGM_ODATA == skb->pgm_header->pgm_type ||
+ 		    PGM_RDATA == skb->pgm_header->pgm_type)
+@@ -340,6 +352,7 @@
+ /* pre-conditions */
+ 	pgm_assert (NULL != skb);
+ 
++	{
+ 	const struct pgm_spm* spm = (const struct pgm_spm*)skb->data;
+ 	switch (ntohs (spm->spm_nla_afi)) {
+ /* truncated packet */
+@@ -357,6 +370,7 @@
+ 	}
+ 
+ 	return TRUE;
++	}
+ }
+ 
+ /* 14.7.1.  Poll Request
+@@ -394,6 +408,7 @@
+ /* pre-conditions */
+ 	pgm_assert (NULL != skb);
+ 
++	{
+ 	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
+ 	switch (ntohs (poll4->poll_nla_afi)) {
+ /* truncated packet */
+@@ -411,6 +426,7 @@
+ 	}
+ 
+ 	return TRUE;
++	}
+ }
+ 
+ /* 14.7.2.  Poll Response
+@@ -497,6 +513,7 @@
+ 	if (PGM_UNLIKELY(skb->len < PGM_MIN_NAK_SIZE))
+ 		return FALSE;
+ 
++	{
+ 	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
+ 	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
+ 	uint16_t nak_grp_nla_afi = 0;
+@@ -540,6 +557,7 @@
+ 	}
+ 
+ 	return TRUE;
++	}
+ }
+ 
+ /* 8.3.  N-NAK
