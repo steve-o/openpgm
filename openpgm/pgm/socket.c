@@ -794,6 +794,7 @@ pgm_setsockopt (
 			break;
 		sock->spmr_expiry = *(const int*)optval;
 		status = TRUE;
+		break;
 
 /* size of receive window in sequence numbers.
  * 0 < rxw_sqns < one less than half sequence space
