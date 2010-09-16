@@ -46,7 +46,7 @@ struct pgm_hashtable_t
 	pgm_equalfunc_t		key_equal_func;
 };
 
-#define PGM_HASHTABLE_RESIZE(hash_ttable) \
+#define PGM_HASHTABLE_RESIZE(hash_table) \
 	do { \
 		if ( (hash_table->size >= 3 * hash_table->nnodes && hash_table->size > HASHTABLE_MIN_SIZE) || \
 		     (3 * hash_table->size <= hash_table->nnodes && hash_table->size < HASHTABLE_MAX_SIZE) ) \
