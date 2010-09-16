@@ -36,6 +36,8 @@ struct pgm_gsi_t {
 	uint8_t	identifier[6];
 };
 
+PGM_STATIC_ASSERT(sizeof(struct pgm_gsi_t) == 6);
+
 bool pgm_gsi_create_from_hostname (pgm_gsi_t*restrict, pgm_error_t**restrict);
 bool pgm_gsi_create_from_addr (pgm_gsi_t*restrict, pgm_error_t**restrict);
 bool pgm_gsi_create_from_data (pgm_gsi_t*restrict, const uint8_t*restrict, const size_t);
