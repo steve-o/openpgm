@@ -38,6 +38,8 @@ struct pgm_tsi_t {
 	uint16_t	sport;		/* source port: a random number to help detect session re-starts */
 };
 
+PGM_STATIC_ASSERT(sizeof(struct pgm_tsi_t) == 8);
+
 char* pgm_tsi_print (const pgm_tsi_t*) PGM_GNUC_WARN_UNUSED_RESULT;
 int pgm_tsi_print_r (const pgm_tsi_t*restrict, char*restrict, size_t);
 bool pgm_tsi_equal (const void*restrict, const void*restrict) PGM_GNUC_WARN_UNUSED_RESULT;
