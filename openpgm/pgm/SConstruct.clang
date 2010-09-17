@@ -109,6 +109,8 @@ env = Environment(
 #			'-pedantic',
 # C99
 			'-std=gnu99',
+			'-D_XOPEN_SOURCE=600',
+			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
@@ -116,6 +118,8 @@ env = Environment(
 # variadic macros
 			'-DCONFIG_HAVE_ISO_VARARGS',
 #			'-DCONFIG_HAVE_GNUC_VARARGS',
+# stack memory api header
+			'-DCONFIG_HAVE_ALLOCA_H',
 # optimium checksum implementation
 #			'-DCONFIG_8BIT_CHECKSUM',
 			'-DCONFIG_16BIT_CHECKSUM',
@@ -143,7 +147,8 @@ env = Environment(
 			'-DCONFIG_HAVE_MCAST_JOIN',
 			'-DCONFIG_HAVE_IP_MREQN',
 # sprintf
-			'-DCONFIG_HAVE_SPRINTF_GROUPING',
+# NB: raises invalid conversion specifier ''' [-Wformat] in clang
+#			'-DCONFIG_HAVE_SPRINTF_GROUPING',
 			'-DCONFIG_HAVE_VASPRINTF',
 # symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
@@ -227,10 +232,8 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
-env['SNMP_FLAGS'] = { 
-        'CCFLAGS'        : [],
-        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
-};
+if env['WITH_SNMP'] == 'true':
+	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --base-cflags --agent-libs');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -276,15 +279,8 @@ if env['WITH_SNMP'] == 'true':
 conf = Configure(env, custom_tests = tests);
 
 if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
-	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
-	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
-	lastLIBS = conf.env['LIBS'];
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
-	conf.env['SNMP_FLAGS']['LIBS'].append(conf.env['LIBS']);
-	conf.env.Replace(LIBS = lastLIBS);
-	if not conf.CheckSNMP():
-		print 'Net-SNMP libraries not compatible.';
-		Exit(1);
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
 
 if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
