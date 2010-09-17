@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef CONFIG_HAVE_VASPRINTF
+#if defined(CONFIG_HAVE_VASPRINTF) && !defined(_GNU_SOURCE)
 #	define _GNU_SOURCE
 #endif
 #include <limits.h>
