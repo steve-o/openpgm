@@ -152,10 +152,10 @@ receiver_routine (
 	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (async->sock, PGM_RECV_SOCK, &recv_sock, &socklen);
+	pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (async->sock, PGM_PENDING_SOCK, &pending_sock, &socklen);
+	pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
 	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = async->destroy_event;

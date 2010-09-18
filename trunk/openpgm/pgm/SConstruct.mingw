@@ -109,7 +109,7 @@ env = Environment(
 			'-pedantic',
 # C99
 			'-std=gnu99',
-			'-D_GNU_SOURCE',
+			'-D_BSD_SOURCE',
 			'-D_WIN32_WINNT=0x0501',
 # re-entrant libc
 			'-D_REENTRANT',
@@ -231,7 +231,8 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 
 # managed environment for libpgmsnmp, libpgmhttp
 if env['WITH_SNMP'] == 'true':
-	env['SNMP_FLAGS'] = env.ParseFlags('-Iwin/include -Lwin/lib -lnetsnmpagent -lnetsnmphelpers -lnetsnmp');
+# no command line helper, so hard code
+	env['SNMP_FLAGS'] = env.ParseFlags('-Iwin/include -Lwin/lib -lnetsnmpagent -lnetsnmphelpers -lnetsnmpmibs -lnetsnmp');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
