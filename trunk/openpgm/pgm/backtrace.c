@@ -21,11 +21,11 @@
 
 #ifdef CONFIG_HAVE_BACKTRACE
 #	include <stdio.h>
-#	include <stdlib.h>
 #	include <execinfo.h>
 #	include <sys/types.h>
 #	include <unistd.h>
 #endif
+#include <stdlib.h>
 #include <glib.h>
 #include <pgm/backtrace.h>
 
