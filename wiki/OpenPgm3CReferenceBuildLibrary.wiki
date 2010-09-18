@@ -6,6 +6,7 @@ There are currently no official releases or pre-built packages in any distributi
 
 
 === Supported Platforms ===
+Platforms supported by paid contract.
   * [OpenPgm3CReferenceBuildLibraryKarmic GCC 4.2.4-4.4.3] on Ubuntu 9.04 through 10.04
   * [OpenPgm3CReferenceBuildLibraryClang Clang 2.7] on Ubuntu 10.04
   * [OpenPgm3CReferenceBuildLibrarySolarisSunGcc GCC 3.4.3] on Solaris 10 on SPARC (32-bit), supplied on Solaris 10 Companion Software CD
@@ -13,7 +14,7 @@ There are currently no official releases or pre-built packages in any distributi
   * [OpenPgm3CReferenceBuildLibrarySolarisSunStudio Sun Studio 12u1] on Solaris 10 on SPARC (64-bit)
 
 === Untested Platforms ===
-Functional build but no available test report.
+<img align="right" src="http://miru.hk/wiki/womm.png" width="200" height="193"/>Functional build but no available test report.
   * [OpenPgm3CReferenceBuildLibraryFreeBSD GCC 4.2.1] on FreeBSD 8.0
   * [OpenPgm3CReferenceBuildLibraryLinuxMinGW GCC 4.2.1] on Microsoft Windows XP, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
   * [OpenPgm3CReferenceBuildLibraryLinuxWine GCC 4.2.1] on Wine 1.1.31, cross-compiled on Ubuntu 9.04 through 10.04 using MinGW.
