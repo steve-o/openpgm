@@ -96,7 +96,7 @@ main (
 {
 	cpgm::pgm_error_t* pgm_err = NULL;
 
-	setlocale (LC_ALL, "");
+	std::setlocale (LC_ALL, "");
 
 #if !defined(_WIN32) || defined(CONFIG_TARGET_WINE)
 	std::cout << "プリン プリン" << std::endl;
@@ -140,13 +140,13 @@ main (
 
 /* setup signal handlers */
 #ifdef SIGHUP
-	signal (SIGHUP,  SIG_IGN);
+	std::signal (SIGHUP,  SIG_IGN);
 #endif
 #ifndef _WIN32
 	int e = pipe (terminate_pipe);
 	assert (0 == e);
-	signal (SIGINT,  on_signal);
-	signal (SIGTERM, on_signal);
+	std::signal (SIGINT,  on_signal);
+	std::signal (SIGTERM, on_signal);
 #else
 	terminate_event = CreateEvent (NULL, TRUE, FALSE, TEXT("TerminateEvent"));
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);

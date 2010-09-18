@@ -85,7 +85,7 @@ main (
 {
 	cpgm::pgm_error_t* pgm_err = NULL;
 
-	setlocale (LC_ALL, "");
+	std::setlocale (LC_ALL, "");
 
 	if (!cpgm::pgm_init (&pgm_err)) {
 		std::cerr << "Unable to start PGM engine: " << pgm_err->message << std::endl;

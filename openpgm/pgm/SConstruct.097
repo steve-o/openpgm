@@ -90,6 +90,7 @@ env = Environment(ENV = os.environ,
 # C99
 			'-std=gnu99',
 			'-D_XOPEN_SOURCE=600',
+			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
