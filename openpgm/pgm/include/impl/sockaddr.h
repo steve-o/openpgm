@@ -52,8 +52,8 @@ PGM_BEGIN_DECLS
 #	define pgm_sock_strerror(e)		strerror(e)
 #	define pgm_error_from_sock_errno	pgm_error_from_errno
 #else
-#	define PGM_INVALID_SOCKET		INVALID_SOCKET
-#	define PGM_SOCKET_ERROR			SOCKET_ERROR
+#	define PGM_INVALID_SOCKET		(int)INVALID_SOCKET
+#	define PGM_SOCKET_ERROR			(int)SOCKET_ERROR
 #	define pgm_closesocket			closesocket
 #	define pgm_sock_errno()			WSAGetLastError()
 #	define pgm_sock_strerror(e)		pgm_wsastrerror(e)

@@ -1046,7 +1046,7 @@ pgm_setsockopt (
 			pgm_sockaddr_ntop ((const struct sockaddr*)&sock->send_addr, addr, sizeof(addr));
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Multicast send interface set to %s index %u"),
 				addr,
-				sock->send_gsr.gsr_interface);
+				(unsigned)sock->send_gsr.gsr_interface);
 		}
 		status = TRUE;
 		break;
@@ -1095,7 +1095,7 @@ pgm_setsockopt (
 				pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, addr, sizeof(addr));
 				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Join multicast group %s on interface index %u"),
 					addr,
-					gr->gr_interface);
+					(unsigned)gr->gr_interface);
 			}
 			sock->recv_gsr_len++;
 		}
@@ -1138,7 +1138,7 @@ pgm_setsockopt (
 				pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, addr, sizeof(addr));
 				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Leave multicast group %s on interface index %u"),
 					addr,
-					gr->gr_interface);
+					(unsigned)gr->gr_interface);
 			}
 		}
 		status = TRUE;
@@ -1260,11 +1260,11 @@ pgm_setsockopt (
 /* batch block and unblock sources */
 	case PGM_MSFILTER:
 #if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
-		if (PGM_UNLIKELY(optlen < sizeof(struct group_filter)))
+		if (PGM_UNLIKELY(optlen < (socklen_t)sizeof(struct group_filter)))
 			break;
 		{
 			const struct group_filter* gf_list = optval;
-			if (GROUP_FILTER_SIZE( gf_list->gf_numsrc ) != optlen)
+			if ((socklen_t)GROUP_FILTER_SIZE( gf_list->gf_numsrc ) != optlen)
 				break;
 			if (PGM_UNLIKELY(sock->family != gf_list->gf_group.ss_family))
 				break;
