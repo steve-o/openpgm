@@ -131,7 +131,7 @@ on_startup (
 /* find PGM protocol id */
 // TODO: fix valgrind errors
 	int ipproto_pgm = IPPROTO_PGM;
-#if HAVE_GETPROTOBYNAME_R
+#ifdef HAVE_GETPROTOBYNAME_R
 	char b[1024];
 	struct protoent protobuf, *proto;
 	e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
