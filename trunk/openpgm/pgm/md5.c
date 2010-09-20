@@ -260,7 +260,7 @@ pgm_md5_process_bytes (
 
 	if (len >= 64)
 	{
-#if !_STRING_ARCH_unaligned
+#ifndef _STRING_ARCH_unaligned
 /* To check alignment gcc has an appropriate operator.  Other
    compilers don't.  */
 #	if __GNUC__ >= 2

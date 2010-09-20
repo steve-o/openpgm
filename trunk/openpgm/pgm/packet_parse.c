@@ -185,7 +185,7 @@ pgm_parse_raw (
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
-#if PGM_CHECK_IN_CKSUM
+#ifdef PGM_CHECK_IN_CKSUM
 	const uint16_t sum = in_cksum (data, packet_length, 0);
 	if (PGM_UNLIKELY(0 != sum)) {
 		const uint16_t ip_sum = ntohs (ip->ip_sum);

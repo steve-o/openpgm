@@ -89,15 +89,33 @@ env = Environment(ENV = os.environ,
 #				'-Wmissing-format-attribute',
 #				'-Wredundant-decls',
 #				'-Wnested-externs',
-				'-Winline',
+# Verbose inlining reports
+#				'-Winline',
+#  175: subscript out of range
+				'-wd175',
+#  177: function was declared but never referenced
+				'-wd177',
+#  181: argument is incompatible with corresponding format string conversion
+				'-wd181',
+#  191: type qualifier is meaningless on cast type
+				'-wd191',
+#  269: invalid format string conversion
+				'-wd269',
+#  556: cannot assign to an entity of type "void *"
+				'-wd556',
+#  589: transfer of control bypasses initialization (C++ 2003 errors)
+				'-wd589',
+#  593: variable was set but never used
+				'-wd593',
 #  981: operands are evaluated in unspecified order
 				'-wd981',
 # 2259: non-pointer conversion from "*" to "*" may lose significant bits
-				 '-wd2259',
+				'-wd2259',
 #			'-pedantic',
 # C99
 			'-std=c99',
 			'-D_XOPEN_SOURCE=600',
+			'-D_BSD_SOURCE',
 			'-gcc-version=420',
 # re-entrant libc
 			'-D_REENTRANT',
@@ -120,7 +138,8 @@ env = Environment(ENV = os.environ,
 			'-DCONFIG_HAVE_BACKTRACE',
 # timing
 			'-DCONFIG_HAVE_PSELECT',
-			'-DCONFIG_HAVE_RTC',
+# ioctl RTC_IRQP_SET: undefined reference to `__invalid_size_argument_for_IOC'
+#			'-DCONFIG_HAVE_RTC',
 			'-DCONFIG_HAVE_TSC',
 # event handling
 			'-DCONFIG_HAVE_POLL',
@@ -184,7 +203,7 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-gdb')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-ggdb')
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
@@ -222,15 +241,22 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
-env['SNMP_FLAGS'] = { 
-        'CCFLAGS'       : [],
-        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
-};
+if env['WITH_SNMP'] == 'true':
+	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --agent-libs');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
-	lastLIBS = context.env['LIBS'];
-	lastCCFLAGS= context.env['CCFLAGS'];
+#	backup = context.env.Clone().Dictionary();
+	lastASFLAGS	= context.env.get('ASFLAGS', '');
+	lastCCFLAGS	= context.env.get('CCFLAGS', '');
+	lastCFLAGS	= context.env.get('CFLAGS', '');
+	lastCPPDEFINES	= context.env.get('CPPDEFINES', '');
+	lastCPPFLAGS	= context.env.get('CPPFLAGS', '');
+	lastCPPPATH	= context.env.get('CPPPATH', '');
+	lastLIBPATH	= context.env.get('LIBPATH', '');
+	lastLIBS	= context.env.get('LIBS', '');
+	lastLINKFLAGS	= context.env.get('LINKFLAGS', '');
+	lastRPATH	= context.env.get('RPATH', '');
 	context.env.MergeFlags(env['SNMP_FLAGS']);
 	result = context.TryLink("""
 int main(int argc, char**argv)
@@ -239,7 +265,17 @@ int main(int argc, char**argv)
 	return 0;
 }
 """, '.c');
-	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
+#	context.env.Replace(**backup);
+	context.env.Replace(ASFLAGS	= lastASFLAGS,
+			    CCFLAGS	= lastCCFLAGS,
+			    CFLAGS	= lastCFLAGS,
+			    CPPDEFINES	= lastCPPDEFINES,
+			    CPPFLAGS	= lastCPPFLAGS,
+			    CPPPATH	= lastCPPPATH,
+			    LIBPATH	= lastLIBPATH,
+			    LIBS	= lastLIBS,
+			    LINKFLAGS	= lastLINKFLAGS,
+			    RPATH	= lastRPATH);
 	context.Result(not result);
 	return result;
 
@@ -271,15 +307,8 @@ if env['WITH_SNMP'] == 'true':
 conf = Configure(env, custom_tests = tests);
 
 if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
-	print 'Enabling extra Red Hat dependencies for Net-SNMP.';
-	conf.env['SNMP_FLAGS']['LIBS'].append(['librpm', 'libsensors', 'libdl', 'libwrap']);
-	lastLIBS = conf.env['LIBS'];
-	conf.env.ParseConfig('perl -MExtUtils::Embed -e ldopts');
-	conf.env['SNMP_FLAGS']['LIBS'].append(conf.env['LIBS']);
-	conf.env.Replace(LIBS = lastLIBS);
-	if not conf.CheckSNMP():
-		print 'Net-SNMP libraries not compatible.';
-		Exit(1);
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
 
 if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
