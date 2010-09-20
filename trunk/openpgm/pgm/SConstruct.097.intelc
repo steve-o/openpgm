@@ -242,7 +242,7 @@ if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 
 # managed environment for libpgmsnmp, libpgmhttp
 if env['WITH_SNMP'] == 'true':
-	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --agent-libs');
+	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --cflags --agent-libs');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
