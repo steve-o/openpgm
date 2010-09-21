@@ -91,26 +91,53 @@ env = Environment(ENV = os.environ,
 #				'-Wnested-externs',
 # Verbose inlining reports
 #				'-Winline',
+
 #  175: subscript out of range
+#  - Ignored for broken compiler C99 support
+#    e.g. tbuf[ sizeof(tbuf) ] = '\0';
 				'-wd175',
+
 #  177: function was declared but never referenced
+#  - Ignored as side effect of portability pre-processor blocks.
 				'-wd177',
+
 #  181: argument is incompatible with corresponding format string conversion
+#  - Ignored as pre-processor fails to parse variadic printf style macros.
 				'-wd181',
+
 #  191: type qualifier is meaningless on cast type
+#  - Ignored as cast required for portability
+#    e.g. pgm_txw_state_t*const state = (pgm_txw_state_t*const)&skb->cb;
 				'-wd191',
+
 #  269: invalid format string conversion
+#  - Ignored with failure to display PRIu32 with (volatile uint32_t)
 				'-wd269',
+
 #  556: cannot assign to an entity of type "void *"
+#  - Ignored, it's a C++2003 error, valid in C99 aside of const down-converting.
+#    e.g. const char *s = ""; void *p = s;
 				'-wd556',
-#  589: transfer of control bypasses initialization (C++ 2003 errors)
+
+#  589: transfer of control bypasses initialization
+#  - Ignored, it's a C++2003 error, perfectly valid in C99.
 				'-wd589',
+
 #  593: variable was set but never used
-				'-wd593',
+#				'-wd593',
+
 #  981: operands are evaluated in unspecified order
+#  - Ignored as pedantic warning against possible side effects.
+#    e.g. printf ("%s.%s > ",
+#                 pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src),
+#                 pgm_udpport_string(pgm_header->pgm_sport));
 				'-wd981',
-# 2259: non-pointer conversion from "*" to "*" may lose significant bits
+
+# 2259: non-pointer conversion from "/type a/" to "/type b/" may lose significant bits
+# - Ignored for really pedantic compiler temporary value conversions,
+#   e.g. uint16_t j = 1, i = ~j;
 				'-wd2259',
+
 #			'-pedantic',
 # C99
 			'-std=c99',
