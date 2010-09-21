@@ -6,7 +6,11 @@ _Type_
 <pre>
 #include <pgm/pgm.h>
 
-typedef struct pgm_error_t *pgm_error_t*;
+typedef struct {
+  int    domain;
+  int    code;
+  char`*`  message;
+} *pgm_error_t*;
 </pre>
 
 === Purpose ===
