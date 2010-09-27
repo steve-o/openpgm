@@ -11,7 +11,7 @@ bool *pgm_socket* (
 	const sa_family_t      family,
 	const int              sock_type,
 	const int              protocol,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*` restrict error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*` restrict error
 	);
 </pre>
 
@@ -42,7 +42,7 @@ A custom network protocol requires super-user privileges to open the necessary r
 <td>The protocol layer to use, <tt>IPPROTO_PGM</tt> or <tt>IPPROTO_UDP</tt>.</td>
 </tr><tr>
 <td><tt>error</tt></td>
-<td>a return location for a <tt>[OpenPgm3CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
+<td>a return location for a <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
 </tr>
 </table>
 

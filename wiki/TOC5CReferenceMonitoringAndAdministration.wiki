@@ -1,0 +1,7 @@
+  * C Reference for OpenPGM version 5
+  * [OpenPgm5CReference Contents]
+  * [OpenPgm5CReferenceMonitoringAndAdministration Monitoring and Administration]
+    * [OpenPgm5CReferencePgmSnmpInit pgm_snmp_init()]
+    * [OpenPgm5CReferencePgmSnmpShutdown pgm_snmp_shutdown()]
+    * [OpenPgm5CReferencePgmHttpInit pgm_http_init()]
+    * [OpenPgm5CReferencePgmHttpShutdown pgm_http_shutdown()]

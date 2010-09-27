@@ -8,7 +8,7 @@ _Type_
 
 struct pgm_sockaddr_t {
 	uint16_t      sa_port;    /`*` data-destination port `*`/
-	[OpenPgm3CReferencePgmTsiT pgm_tsi_t]     sa_addr;
+	[OpenPgm5CReferencePgmTsiT pgm_tsi_t]     sa_addr;
 	};
 </pre>
 
@@ -16,5 +16,5 @@ struct pgm_sockaddr_t {
 PGM endpoint address.
 
 === See Also ===
-  * <tt>[OpenPgm3CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmTsiT pgm_tsi_t]</tt><br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

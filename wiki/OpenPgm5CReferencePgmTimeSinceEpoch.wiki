@@ -1,6 +1,6 @@
-﻿#summary OpenPGM 3 : C Reference : Timing : pgm_time_since_epoch()
+﻿#summary OpenPGM 5 : C Reference : Timing : pgm_time_since_epoch()
 #labels Phase-Implementation
-#sidebar TOC3CReferenceTiming
+#sidebar TOC5CReferenceTiming
 _Function_
 === Declaration ===
 <pre>
@@ -8,17 +8,17 @@ _Function_
 #include <pgm/pgm.h>
 
 void *pgm_time_since_epoch* (
-	const [OpenPgm3CReferencePgmTimeT pgm_time_t]`*`    pgm_time_t_time,
+	const [OpenPgm5CReferencePgmTimeT pgm_time_t]`*`    pgm_time_t_time,
 	time_t`*`    time_t_time
 	);
 </pre>
 
 === Purpose ===
-Convert <tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt> to <tt>time_t</tt> scoped time.
+Convert <tt>[OpenPgm5CReferencePgmTimeT pgm_time_t]</tt> to <tt>time_t</tt> scoped time.
 
 === Remarks ===
 Some timing sources use a counter based from the core or timing device boot time, other timing
- sources use a counting frequency different to the resolution provided by <tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt>.  Calling <tt>pgm_time_since_epoch()</tt> will scale the timing source to microseconds and use an offset calculated at timer module startup.
+ sources use a counting frequency different to the resolution provided by <tt>[OpenPgm5CReferencePgmTimeT pgm_time_t]</tt>.  Calling <tt>pgm_time_since_epoch()</tt> will scale the timing source to microseconds and use an offset calculated at timer module startup.
 
 === Parameters ===
 
@@ -52,5 +52,5 @@ Display absolute local time.
 }}}
 
 === See Also ===
-  * <tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt><br>
-  * [OpenPgm3CReferenceTiming Timing] in OpenPGM C Reference.
+  * <tt>[OpenPgm5CReferencePgmTimeT pgm_time_t]</tt><br>
+  * [OpenPgm5CReferenceTiming Timing] in OpenPGM C Reference.

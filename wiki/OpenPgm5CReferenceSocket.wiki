@@ -11,44 +11,49 @@ PGM Sockets manage network connections and send outbound messages.
 <th>Description</th>
 </tr>
 <tr>
+<td colspan="2"><h3>Protocols</h3></td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgm pgm]</tt>(7)</td>
+<td>PGM protocol.</td>
+</tr><tr>
 <td colspan="2"><h3>GSI API</h3></td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiT pgm_gsi_t]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiT pgm_gsi_t]</tt></td>
 <td>Object representing a GSI.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt></td>
 <td>Create a GSI based on IPv4 host address.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt></td>
 <td>Create a GSI based on MD5 of system host name.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiCreateFromString pgm_gsi_create_from_string()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiCreateFromString pgm_gsi_create_from_string()]</tt></td>
 <td>Create a GSI based on MD5 of a text string.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiCreateFromData pgm_gsi_create_from_data()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiCreateFromData pgm_gsi_create_from_data()]</tt></td>
 <td>Create a GSI based on MD5 of a data buffer.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiPrint pgm_gsi_print()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiPrint pgm_gsi_print()]</tt></td>
 <td>Display a GSI in human friendly form.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiPrint pgm_gsi_print_r()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiPrint pgm_gsi_print_r()]</tt></td>
 <td>Display a GSI in human friendly form, re-entrant form.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmGsiEqual pgm_gsi_equal()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmGsiEqual pgm_gsi_equal()]</tt></td>
 <td>Compare two GSI values.</td>
 </tr><tr>
 <td colspan="2"><h3>TSI API</h3></td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTsiT pgm_tsi_t]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmTsiT pgm_tsi_t]</tt></td>
 <td>Object representing a TSI.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTsiPrint pgm_tsi_print()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmTsiPrint pgm_tsi_print()]</tt></td>
 <td>Display a TSI in human friendly form.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTsiPrint pgm_tsi_print_r()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmTsiPrint pgm_tsi_print_r()]</tt></td>
 <td>Display a TSI in human friendly form, re-entrant version.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmTsiEqual pgm_tsi_equal()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmTsiEqual pgm_tsi_equal()]</tt></td>
 <td>Compare two TSI values.</td>
 </tr><tr>
 <td colspan="2"><h3>Socket API</h3></td>
@@ -56,10 +61,10 @@ PGM Sockets manage network connections and send outbound messages.
 <td><tt>[OpenPgm5CReferencePgmIoStatus PGMIOStatus]</tt></td>
 <td>Return status for PGM IO functions.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmIoVec pgm_iovec]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmIoVec pgm_iovec]</tt></td>
 <td>A scatter/gather message vector.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmMsgvT pgm_msgv_t]</tt></td>
 <td>A scatter/gather message vector^2^.</td>
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmFecInfoT pgm_fecinfo_t]</tt></td>

@@ -12,7 +12,7 @@ int *pgm_recv* (
 	size_t         len,
 	int            flags,
 	size_t`*`        bytes_read,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`  error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`  error
 );
 
 int *pgm_recvfrom* (
@@ -22,15 +22,15 @@ int *pgm_recvfrom* (
 	int            flags,
 	size_t`*`        bytes_read,
 	struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` from,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`  error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`  error
 );
 
 int *pgm_recvmsg* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`    sock,
-	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*`    msgv,
+	[OpenPgm5CReferencePgmMsgvT pgm_msgv_t]`*`    msgv,
 	int            flags,
 	size_t`*`        bytes_read,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`  error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`  error
 );
 </pre>
 
@@ -84,7 +84,7 @@ It is valid to send and receive zero length PGM packets.
 </tr><tr>
 </tr><tr>
 <td><tt>error</tt></td>
-<td>a return location for a [OpenPgm3CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+<td>a return location for a [OpenPgm5CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
 </tr>
 </table>
 
@@ -153,9 +153,9 @@ Display details from error skbuff.
 }}}
 
 === See Also ===
-  * <tt>[OpenPgm3CReferencePgmIoStatus PGMIOStatus]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmIoStatus PGMIOStatus]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmRecvMsgv pgm_recvmsgv()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmRecvMsgv pgm_recvmsgv()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.<br>
-  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.

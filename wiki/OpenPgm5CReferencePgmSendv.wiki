@@ -8,7 +8,7 @@ _Function_
 
 int *pgm_sendv* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const       sock,
-	const struct [OpenPgm3CReferencePgmIoVec pgm_iovec]`*` vector,
+	const struct [OpenPgm5CReferencePgmIoVec pgm_iovec]`*` vector,
 	unsigned                count,
 	bool                    is_one_apdu,
 	size_t`*`                 bytes_written

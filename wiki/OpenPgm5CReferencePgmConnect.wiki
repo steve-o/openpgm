@@ -8,7 +8,7 @@ _Function_
 
 bool *pgm_connect* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*` const    sock,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`        error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`        error
 	);
 </pre>
 
@@ -27,7 +27,7 @@ Initiate a PGM socket connection.
 <td>The PGM socket object.</td>
 </tr><tr>
 <td><tt>error</tt></td>
-<td>a return location for a [OpenPgm3CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+<td>a return location for a [OpenPgm5CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
 </tr>
 </table>
 
@@ -39,5 +39,5 @@ On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned a
   * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt><br>
-  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

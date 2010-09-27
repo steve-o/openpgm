@@ -1,0 +1,39 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_tsi_equal()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+bool *pgm_tsi_equal* (
+	const void`*`    tsi1,
+	const void`*`    tsi2
+	);
+</pre>
+
+=== Purpose ===
+Compare two TSI values.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>tsi1</tt></td>
+<td>Globally unique transport session identifier (TSI).</td>
+</tr><tr>
+<td><tt>tsi2</tt></td>
+<td>Globally unique transport session identifier (TSI).</td>
+</tr>
+</table>
+
+=== Return Value ===
+The <tt>pgm_tsi_equal()</tt> function returns <tt>true</tt> if both values are equal and <tt>false</tt> otherwise.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

@@ -1,0 +1,25 @@
+﻿#summary OpenPGM 5 : C Reference : Environment : pgm_drop_superuser()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceEnvironment
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+void *pgm_drop_superuser* (void);
+</pre>
+
+=== Purpose ===
+Drop superuser privileges needed to create PGM protocol sockets.
+
+
+=== Example ===
+{{{
+ pgm_sock_t* sock = NULL;
+ pgm_socket (&sock, AF_INET, SOCK_SEQPACKET, IPPROTO_UDP, NULL);
+ pgm_drop_superuser ();
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
+  * [OpenPgm5CReferenceEnvironment Environment] in OpenPGM C Reference.

@@ -4,7 +4,7 @@
 When developing or deploying OpenPGM programs, remember these steps.
 
 === Code ===
-  * Include the appropriate OpenPGM C header files; see [OpenPgm3CReferenceIncludeTheseHeaderFiles Include these Header Files].
+  * Include the appropriate OpenPGM C header files; see [OpenPgm5CReferenceIncludeTheseHeaderFiles Include these Header Files].
   * Configure the PGM protocol; see [OpenPgm5CReferenceSetTheseParameters Set these Parameters].
 
 

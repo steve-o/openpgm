@@ -1,0 +1,22 @@
+#summary OpenPGM 5 : C Reference : Monitoring and Administration : pgm_http_shutdown()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceMonitoringAndAdministration
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/http.h>
+
+bool *pgm_http_shutdown* (void);
+</pre>
+
+=== Purpose ===
+Stop and destroy a running HTTP interface.
+
+=== Return Value ===
+On success, <tt>TRUE</tt> is returned.  On error, <tt>FALSE</tt> is returned.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmHttpInit pgm_http_init()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * [OpenPgm5CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.

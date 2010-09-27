@@ -18,25 +18,25 @@ PGM socket buffer API.
 <td><tt>struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]</tt></td>
 <td>Socket buffer.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmAllocSkb pgm_alloc_skb()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmAllocSkb pgm_alloc_skb()]</tt></td>
 <td>Allocate memory for a skbuff.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmAllocSkb pgm_skb_get()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmAllocSkb pgm_skb_get()]</tt></td>
 <td>Increase reference count on a skbuff.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmAllocSkb pgm_free_skb()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmAllocSkb pgm_free_skb()]</tt></td>
 <td>Free memory used by a skbuff.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSkbPut pgm_skb_put()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSkbPut pgm_skb_put()]</tt></td>
 <td>Put data to the end of a skbuff.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSkbPut pgm_skb_pull()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSkbPut pgm_skb_pull()]</tt></td>
 <td>Pull the data from the start of a skbuff.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSkbPut pgm_skb_reserve()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSkbPut pgm_skb_reserve()]</tt></td>
 <td>Reserve space to add data in a skbuff.</td>
 </tr><tr>
-<td><tt>[OpenPgm3CReferencePgmSkbCopy pgm_skb_copy()]</tt></td>
+<td><tt>[OpenPgm5CReferencePgmSkbCopy pgm_skb_copy()]</tt></td>
 <td>Create a copy of a skbuff.</td>
 </tr>
 </table>

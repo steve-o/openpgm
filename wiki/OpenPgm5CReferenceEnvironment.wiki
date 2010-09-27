@@ -1,0 +1,54 @@
+#summary OpenPGM 5 : C Reference : Environment
+#labels Phase-Implementation
+#sidebar TOC5CReferenceEnvironment
+=== Introduction ===
+This section describes the functions relating to the global dependencies of OpenPGM.
+
+=== Topics in Alphabetical Order ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Function or Type</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>[OpenPgm5CReferenceErrorHandling PGM_MIN_LOG_LEVEL]</tt></td>
+<td>Minimum log level.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferenceErrorHandling PGM_LOG_MASK]</tt></td>
+<td>Trace role mask for PGM logging.</td>
+</tr><tr>
+<td><tt>PGM_LOSS_RATE</tt></td>
+<td>Simulated packet loss rate.</td>
+</tr><tr>
+<td><tt>PGM_DEBUG</tt></td>
+<td>Debugging and memory profiling options.</td>
+</tr><tr>
+<td><tt>[OpenPgmCReferenceRunWithTheseCapabilities PGM_TIMER]</tt></td>
+<td>Timing source device.</td>
+</tr><tr>
+<td><tt>[OpenPgmCReferenceRunWithTheseCapabilities RDTSC_FREQUENCY]</tt></td>
+<td>Frequency of system TSC.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmInit pgm_init()]</tt></td>
+<td>Start the PGM environment.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmSupported pgm_supported()]</tt></td>
+<td>Check whether PGM engine initiated.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmDropSuperUser pgm_drop_superuser()]</tt></td>
+<td>Drop superuser privileges, on Unix platforms, needed to create PGM protocol sockets.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt></td>
+<td>Shutdown the PGM environment.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmCheckVersion pgm_major_version]</tt></td>
+<td>Major version number of OpenPGM.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmCheckVersion pgm_minor_version]</tt></td>
+<td>Minor version number of OpenPGM.</td>
+</tr><tr>
+<td><tt>[OpenPgm5CReferencePgmCheckVersion pgm_micro_version]</tt></td>
+<td>Micro version number of OpenPGM.</td>
+</tr>
+</table>

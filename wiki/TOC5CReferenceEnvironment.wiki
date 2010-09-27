@@ -1,0 +1,10 @@
+  * C Reference for OpenPGM version 5
+  * [OpenPgm5CReference Contents]
+  * [OpenPgm5CReferenceEnvironment Environment]
+    * [OpenPgm5CReferencePgmInit pgm_init()]
+    * [OpenPgm5CReferencePgmSupported pgm_supported()]
+    * [OpenPgm5CReferencePgmDropSuperUser pgm_drop_superuser()]
+    * [OpenPgm5CReferencePgmShutdown pgm_shutdown()]
+    * [OpenPgm5CReferencePgmCheckVersion pgm_major_version]
+    * [OpenPgm5CReferencePgmCheckVersion pgm_minor_version]
+    * [OpenPgm5CReferencePgmCheckVersion pgm_micro_version]

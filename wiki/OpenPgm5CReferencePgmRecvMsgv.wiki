@@ -8,11 +8,11 @@ _Function_
 
 int *pgm_recvmsgv* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`       sock,
-	[OpenPgm3CReferencePgmMsgvT pgm_msgv_t]`*` const msgv,
+	[OpenPgm5CReferencePgmMsgvT pgm_msgv_t]`*` const msgv,
 	size_t            count,
 	int               flags,
 	size_t`*`           bytes_read,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`     error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`     error
 );
 </pre>
 
@@ -57,7 +57,7 @@ It is valid to send and receive zero length PGM packets.
 </tr><tr>
 </tr><tr>
 <td><tt>error</tt></td>
-<td>a return location for a [OpenPgm3CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+<td>a return location for a [OpenPgm5CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
 </tr>
 </table>
 
@@ -89,7 +89,7 @@ Display error details on unrecoverable error.
  }
 }}}
 
-Take ownership of a PGM SKB by incrementing the reference count with <tt>[OpenPgm3CReferencePgmAllocSkb pgm_skb_get()]</tt>.
+Take ownership of a PGM SKB by incrementing the reference count with <tt>[OpenPgm5CReferencePgmAllocSkb pgm_skb_get()]</tt>.
 
 {{{
  pgm_msgv_t msgv[1];
@@ -109,4 +109,4 @@ Take ownership of a PGM SKB by incrementing the reference count with <tt>[OpenPg
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmRecv pgm_recv()]</tt><br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.<br>
-  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.

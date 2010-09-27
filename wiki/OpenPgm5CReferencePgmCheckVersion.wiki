@@ -1,0 +1,25 @@
+#summary OpenPGM 5 : C Reference : Environment : pgm_check_version()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceEnvironment
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+extern const unsigned *pgm_major_version*;
+extern const unsigned *pgm_minor_version*;
+extern const unsigned *pgm_micro_version*;
+
+extern const char`*` *pgm_build_date*;
+extern const char`*` *pgm_build_time*;
+extern const char`*` *pgm_build_system*;
+extern const char`*` *pgm_build_machine*;
+extern const char`*` *pgm_build_revision*;
+</pre>
+
+=== Purpose ===
+OpenPGM version information.
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSupported pgm_supported()]</tt><br>
+  * [OpenPgm5CReferenceEnvironment Environment] in OpenPGM C Reference.

@@ -1,0 +1,55 @@
+#summary OpenPGM 5 : C Reference : PGM SKBs : pgm_alloc_skb()
+#labels Phase-Implementation
+#sidebar TOC5CReferencePgmSkbs
+
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]`*` *pgm_alloc_skb* (
+	uint16_t                   size
+	);
+
+struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]`*` *pgm_skb_get* (
+	struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb
+	);
+
+void *pgm_free_skb* (
+	struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]`*`     skb
+	);
+</pre>
+
+=== Purpose ===
+<tt>pgm_alloc_skb()</tt> creates a PGM socket buffer.
+
+<tt>pgm_skb_get()</tt> increments the reference count of a PGM socket buffer.
+
+<tt>pgm_free_skb()</tt> decrements the reference count a PGM socket buffer and if zero frees the underlying memory.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>size</tt></td>
+<td>Size of the data segment.</td>
+</tr>
+</table>
+
+
+=== Example ===
+Create a skbuff with enough space for a regular Ethernet sized packet, create a reference and free the original.
+{{{
+ struct pgm_sk_buff_t *skb, *ref_skb;
+ skb = pgm_alloc_skb (1500);
+ ref_skb = pgm_skb_get (skb);
+ pgm_free_skb (skb);
+}}}
+
+=== See Also ===
+  * <tt>struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]</tt><br>
+  * [OpenPgm5CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.

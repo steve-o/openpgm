@@ -10,7 +10,7 @@ bool *pgm_getaddrinfo* (
 	const char`*`                  restrict network,
 	const struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*` restrict hints,
 	struct [OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]`*``*`      restrict res,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`                restrict error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`                restrict error
 	);
 
 void *pgm_freeaddrinfo* (
@@ -67,9 +67,9 @@ Basic example using default hints.
 }}}
 
 === See Also ===
-  * <tt>[OpenPgm3CReferencePgmErrorT pgm_error_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmGetSockOpt pgm_setsockopt()]</tt><br>
   * [OpenPgm5CReferenceInterface Interface] in OpenPGM C Reference.<br>
-  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.
 

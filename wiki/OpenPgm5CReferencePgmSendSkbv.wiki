@@ -8,7 +8,7 @@ _Function_
 
 int *pgm_send_skbv* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`            const sock,
-	const struct [OpenPgm3CReferencePgmSkBuffT pgm_sk_buff_t]`*``*` vector,
+	const struct [OpenPgm5CReferencePgmSkBuffT pgm_sk_buff_t]`*``*` vector,
 	unsigned                     count,
 	bool                         is_one_apdu,
 	size_t`*`                      bytes_written
@@ -19,7 +19,7 @@ int *pgm_send_skbv* (
 Send a vector of transmit window buffers as one Application Protocol Data Unit (APDU), or a vector of APDUs to the network.
 
 === Remarks ===
-Network delivery of APDUs can be interspersed with ambient SPM and RDATA packets as necessary.  Vector element PGM SKBs must be retrieved from the transmit window via <tt>[OpenPgm3CReferencePgmAllocSkb pgm_alloc_skb()].</tt>
+Network delivery of APDUs can be interspersed with ambient SPM and RDATA packets as necessary.  Vector element PGM SKBs must be retrieved from the transmit window via <tt>[OpenPgm5CReferencePgmAllocSkb pgm_alloc_skb()].</tt>
 
 Calling with non-blocking transport set will return with <tt>PGM_IO_STATUS_WOULD_BLOCK</tt> or <tt>PGM_IO_STATUS_RATE_LIMITED</tt>. on any TPDU in the APDU failing to be immediately delivered.  The next call to <tt>pgm_sendv()</tt> MUST be with exactly the same parameters until transmission is complete.
 
@@ -97,8 +97,8 @@ Send with non-blocking APDU with basic event detection.
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmIoStatus PGMIOStatus]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSend pgm_send()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSendv pgm_sendv()]</tt><br>
-  * [OpenPgm3CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.<br>
+  * [OpenPgm5CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.<br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

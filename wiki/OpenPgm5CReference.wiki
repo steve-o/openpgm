@@ -1,7 +1,7 @@
 ﻿#summary C Reference for OpenPGM version 5.
 #labels Featured,Phase-Implementation
 
-*OpenPGM version 5.0.76*
+*OpenPGM version 5.0.79*
 
 *September 2010*
 
@@ -9,11 +9,11 @@
 === Contents ===
   # [OpenPgm5CReferenceProgrammersChecklist Programmer’s Checklist]
   # [OpenPgm5CReferenceMigration Migration from version 3.0]
-  # [OpenPgm3CReferenceEnvironment Environment]
+  # [OpenPgm5CReferenceEnvironment Environment]
   # [OpenPgm5CReferenceEvents Events]
   # [OpenPgm5CReferencePgmSkbs PGM Socket Buffers (SKBs)]
   # [OpenPgm5CReferenceInterface Interface]
-  # [OpenPgm3CReferenceTiming Timing]
+  # [OpenPgm5CReferenceTiming Timing]
   # [OpenPgm5CReferenceSocket Socket]
-  # [OpenPgm3CReferenceErrorHandling Error Handling]
-  # [OpenPgm3CReferenceMonitoringAndAdministration Monitoring and Administration]
+  # [OpenPgm5CReferenceErrorHandling Error Handling]
+  # [OpenPgm5CReferenceMonitoringAndAdministration Monitoring and Administration]

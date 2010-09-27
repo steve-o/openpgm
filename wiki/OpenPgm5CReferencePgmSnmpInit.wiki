@@ -1,0 +1,80 @@
+﻿#summary OpenPGM 5 : C Reference : Monitoring and Administration : pgm_snmp_init()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceMonitoringAndAdministration
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/snmp.h>
+
+bool *pgm_snmp_init* (
+        [OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`     error
+	);
+</pre>
+
+=== Purpose ===
+Create and start a SNMP agent or master agent.
+
+=== Remarks ===
+The included PGM MIB <tt>PGM-MIB-petrova-01.txt</tt> should be installed in the NET-SNMP MIB directory, and the <tt>snmpd</tt> started and configured appropriately before calling this function.
+
+Example <tt>snmpd.conf</tt>:
+<pre>
+ com2sec readonly  default         public
+ 
+ group MyROSystem v1        paranoid
+ group MyROSystem v2c       paranoid
+ group MyROSystem usm       paranoid
+ group MyROGroup v1         readonly
+ group MyROGroup v2c        readonly
+ group MyROGroup usm        readonly
+ group MyRWGroup v1         readwrite
+ group MyRWGroup v2c        readwrite
+ group MyRWGroup usm        readwrite
+ 
+ view all    included  .1                               80
+ view system included  .iso.org.dod.internet.mgmt.mib-2.system
+ 
+ access MyROSystem ""     any       noauth    exact  system none   none
+ access MyROGroup ""      any       noauth    exact  all    none   none
+ access MyRWGroup ""      any       noauth    exact  all    all    none
+ 
+ syslocation Unknown (configure /etc/snmp/snmpd.local.conf)
+ syscontact Root <root@localhost> (configure /etc/snmp/snmpd.local.conf)
+ 
+ master  agentx
+</pre>
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>err</tt></td>
+<td>a return location for a <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
+</tr>
+</table>
+
+
+=== Return Value ===
+On success, <tt>TRUE</tt> is returned.  On error, <tt>FALSE</tt> is returned.  If <tt>err</tt> is provided it may be set detailing any threading or issue connecting to the SNMP agent or daemon.  SNMP errors will be reported to its log system.
+
+=== Example ===
+
+{{{
+ pgm_error_t* err = NULL;
+ if (!pgm_snmp_init (&err)) {
+   fprintf (stderr, "Starting SNMP interface: %s\n", (err && err->message) ? err->message : "(null)");
+   pgm_error_free (err);
+   return EXIT_FAILURE;
+ }
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmSnmpShutdown pgm_snmp_shutdown()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmHttpInit pgm_http_init()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmInit pgm_init()]</tt><br>
+  * [OpenPgm5CReferenceMonitoringAndAdministration Monitoring and Administration] in OpenPGM C Reference.<br>
+  * [http://net-snmp.sourceforge.net/docs/readmefiles.html Net-SNMP Documentation].

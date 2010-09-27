@@ -9,8 +9,8 @@ _Type_
 struct pgm_sk_buff_t {
          pgm_list_t                        link_;
         [OpenPgm5CReferencePgmSockT pgm_sock_t]`*`                  sock;
-        [OpenPgm3CReferencePgmTimeT pgm_time_t]                   tstamp;
-        [OpenPgm3CReferencePgmTsiT pgm_tsi_t]                    tsi;
+        [OpenPgm5CReferencePgmTimeT pgm_time_t]                   tstamp;
+        [OpenPgm5CReferencePgmTsiT pgm_tsi_t]                    tsi;
         uint32_t                     sequence;
         uint32_t                     __padding;
         char                         cb`[`48`]`;
@@ -43,8 +43,8 @@ Whilst [http://lwn.net/Articles/325929/ kernel timestamping] mechanisms exist th
 
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmTimeT pgm_time_t]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmTsiT pgm_tsi_t]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
-  * <tt>[OpenPgm3CReferencePgmAllocSkb pgm_free_skb()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmTimeT pgm_time_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmAllocSkb pgm_alloc_skb()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmAllocSkb pgm_free_skb()]</tt><br>
   * [OpenPgm5CReferencePgmSkbs PGM SKBs] in OpenPGM C Reference.

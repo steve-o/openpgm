@@ -10,7 +10,7 @@ bool *pgm_bind* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`                        restrict sock,
 	const struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` const restrict sockaddr,
 	const socklen_t                             sockaddrlen,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`                      restrict error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`                      restrict error
 	);
 
 bool *pgm_bind3* (
@@ -21,7 +21,7 @@ bool *pgm_bind3* (
 	const socklen_t                             send_req_len,
 	const struct group_req`*`                     restrict recv_req,
 	const socklen_t                             recv_req_len,
-	[OpenPgm3CReferencePgmErrorT pgm_error_t]`*``*`                      restrict error
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`                      restrict error
 	);
 </pre>
 
@@ -61,7 +61,7 @@ Assigns local addresses to the PGM transport sockets which will initiate deliver
 <td>The size of the <tt>recv_req</tt> parameter.</td>
 </tr><tr>
 <td><tt>error</tt></td>
-<td>a return location for a [OpenPgm3CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+<td>a return location for a [OpenPgm5CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
 </tr>
 </table>
 
@@ -74,5 +74,5 @@ On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned a
   * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmClose pgm_close()]</tt><br>
-  * [OpenPgm3CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

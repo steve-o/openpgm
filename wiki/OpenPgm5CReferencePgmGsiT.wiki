@@ -1,0 +1,27 @@
+﻿#summary OpenPGM 5 : C Reference : Socket : pgm_gsi_t
+#labels Phase-Implementation
+#sidebar TOC5CReferenceSocket
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+/`*` maximum length of GSI as a string `*`/
+#define PGM_GSISTRLEN   (sizeof("000.000.000.000.000.000"))
+#define PGM_GSI_INIT    {{ 0, 0, 0, 0, 0, 0 }}
+
+typedef struct pgm_gsi_t *pgm_gsi_t*;
+
+struct pgm_gsi_t {
+	char identifier`[`6`]`;
+};
+</pre>
+
+=== Purpose ===
+A globally unique source identifier (GSI).
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmTsiT pgm_tsi_t]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmGsiCreateFromAddr pgm_gsi_create_from_addr()]</tt><br>
+  * <tt>[OpenPgm5CReferencePgmGsiCreateFromHostname pgm_gsi_create_from_hostname()]</tt><br>
+  * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.

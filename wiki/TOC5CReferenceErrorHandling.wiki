@@ -1,0 +1,5 @@
+  * C Reference for OpenPGM version 5
+  * [OpenPgm5CReference Contents]
+  * [OpenPgm5CReferenceErrorHandling Error Handling]
+    * [OpenPgm5CReferencePgmErrorT pgm_error_t]
+    * [OpenPgm5CReferencePgmErrorFree pgm_error_free()]

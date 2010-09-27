@@ -1,7 +1,7 @@
-﻿#summary OpenPGM 3 : C Reference : Build Library : GCC 4 on Ubuntu 9.04 through 10.04
+﻿#summary OpenPGM 5 : C Reference : Build Library : GCC 4 on Ubuntu 10.04
 #labels Phase-Implementation
-#sidebar TOC3CReferenceProgrammersChecklist
-=== Building with GCC for Ubuntu 9.04 through 10.04 ===
+#sidebar TOC5CReferenceProgrammersChecklist
+=== Building with GCC for Ubuntu 10.04 ===
 First install all the C compiler dependencies, SCons, and Subversion.
 <pre>
  $ *sudo apt-get install build-essential scons subversion*
@@ -12,11 +12,11 @@ Install the library optional dependencies, primarily GLib and net-snmp libraries
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-3-0-43 *
+ $ *svn checkout -r 1135 http://openpgm.googlecode.com/svn/trunk *
 </pre>
 Build.
 <pre>
- $ *cd release-3-0-43/openpgm/pgm* 
+ $ *cd trunk/openpgm/pgm* 
  $ *scons WITH_GLIB=true WITH_GETTEXT=true* 
 </pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug-Linux-x86_64</tt> or <tt>./ref/debug-Linux-i686</tt> dependent upon your machine.

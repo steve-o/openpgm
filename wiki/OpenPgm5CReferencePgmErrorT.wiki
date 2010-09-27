@@ -1,0 +1,33 @@
+#summary OpenPGM 5 : C Reference : Error Handling : pgm_error_t
+#labels Phase-Implementation
+#sidebar TOC5ReferenceErrorHandling
+_Type_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+typedef struct {
+  int    domain;
+  int    code;
+  char`*`  message;
+} *pgm_error_t*;
+</pre>
+
+=== Purpose ===
+A object containing information about an error that has occurred.
+
+=== Remarks ===
+<tt>pgm_error_t</tt> is used to report recoverable runtime errors.
+
+=== Example ===
+{{{
+ pgm_error_t* err = NULL;
+ ...
+ printf ("An error has occured, domain:%d code:%d message:%s\n",
+         err->domain, err->code, err->message ? err->message : "(null)");
+ pgm_error_free (err);
+}}}
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmErrorFree pgm_error_free()]</tt><br>
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.
