@@ -7,7 +7,7 @@ _Type_
 #include <pgm/pgm.h>
 
 struct pgm_sk_buff_t {
-         pgm_list_t                        link_;
+        pgm_list_t                   link_;
         [OpenPgm5CReferencePgmSockT pgm_sock_t]`*`                  sock;
         [OpenPgm5CReferencePgmTimeT pgm_time_t]                   tstamp;
         [OpenPgm5CReferencePgmTsiT pgm_tsi_t]                    tsi;

@@ -1,0 +1,32 @@
+﻿#summary OpenPGM 5 : C Reference : Error Handling : pgm_error_free()
+#labels Phase-Implementation
+#sidebar TOC5CReferenceErrorHandling
+_Function_
+=== Declaration ===
+<pre>
+#include <pgm/pgm.h>
+
+void *pgm_error_free* (
+	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*`    error
+	);
+</pre>
+
+=== Purpose ===
+Frees a <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt> and associated resources.
+
+=== Parameters ===
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><tt>error</tt></td>
+<td>A <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt>.</td>
+</tr>
+</table>
+
+=== See Also ===
+  * <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt><br>
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.

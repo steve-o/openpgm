@@ -1,6 +1,6 @@
 #summary OpenPGM 5 : C Reference : Error Handling : pgm_error_t
 #labels Phase-Implementation
-#sidebar TOC5ReferenceErrorHandling
+#sidebar TOC5CReferenceErrorHandling
 _Type_
 === Declaration ===
 <pre>
