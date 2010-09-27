@@ -434,7 +434,7 @@ pgm_getsockopt (
 {
 	bool status = FALSE;
 	pgm_return_val_if_fail (sock != NULL, status);
-	pgm_return_val_if_fail (level == IPPROTO_PGM, status);
+	pgm_return_val_if_fail (IPPROTO_PGM == level || SOL_SOCKET == level, status);
 	pgm_return_val_if_fail (optval != NULL, status);
 	pgm_return_val_if_fail (optlen != NULL, status);
 	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
@@ -443,15 +443,34 @@ pgm_getsockopt (
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
 	}
+
+	switch (level) {
+	case SOL_SOCKET:
 	switch (optname) {
-/* maximum transmission packet size */
-	case PGM_MTU:
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+
+/* socket send buffer, only read one socket as both should match */
+	case SO_SNDBUF:
+		if (PGM_SOCKET_ERROR == getsockopt (sock->send_sock, SOL_SOCKET, SO_SNDBUF, optval, optlen))
 			break;
-		*(int*restrict)optval = sock->max_tpdu;
 		status = TRUE;
 		break;
 
+/* socket receive buffer */
+	case SO_RCVBUF:
+		if (PGM_SOCKET_ERROR == getsockopt (sock->recv_sock, SOL_SOCKET, SO_RCVBUF, optval, optlen))
+			break;
+		status = TRUE;
+		break;
+
+	default:
+		break;
+	}
+	break;
+
+	case IPPROTO_PGM:
+	switch (optname) {
+
+/** read-only options **/
 /* maximum segment size for unfragmented APDU */
 	case PGM_MSSS:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
@@ -473,13 +492,6 @@ pgm_getsockopt (
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*restrict)optval = sock->max_apdu;
-		status = TRUE;
-		break;
-
-	case PGM_ABORT_ON_RESET:
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
-			break;
-		*(int*restrict)optval = sock->is_abort_on_reset ? 1 : 0;
 		status = TRUE;
 		break;
 
@@ -566,8 +578,278 @@ pgm_getsockopt (
 		status = TRUE;
 		break;
 
+/** read-write options **/
+/* maximum transmission packet size */
+	case PGM_MTU:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->max_tpdu;
+		status = TRUE;
+		break;
 
+	case PGM_AMBIENT_SPM:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->spm_ambient_interval;
+		status = TRUE;
+		break;
+
+	case PGM_HEARTBEAT_SPM:
+		if (PGM_UNLIKELY(*optlen < (sock->spm_heartbeat_len * sizeof (int))))
+			break;
+		{
+			int*restrict intervals = (int*restrict)optval;
+			*optlen = sock->spm_heartbeat_len;
+			for (unsigned i = 0; i < sock->spm_heartbeat_len; i++)
+				intervals[i] = sock->spm_heartbeat_interval[i + 1];
+		}
+		status = TRUE;
+		break;
+
+	case PGM_TXW_BYTES:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		if (!sock->is_bound)
+			break;
+		*(int*restrict)optval = pgm_txw_max_length (sock->window) * sock->max_tpdu;
+		status = TRUE;
+		break;
+
+	case PGM_TXW_SQNS:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		if (sock->is_bound)
+			*(int*restrict)optval = pgm_txw_max_length (sock->window);
+		else
+			*(int*restrict)optval = sock->txw_sqns;
+		status = TRUE;
+		break;
+
+	case PGM_TXW_SECS:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+/* TXW_SECS is unknown if rate is not defined */
+		if (sock->is_bound && (0 == sock->txw_max_rte))
+			break;
+		if (sock->is_bound)
+			*(int*restrict)optval = (pgm_txw_max_length (sock->window) * sock->max_tpdu) / sock->txw_max_rte;
+		else
+			*(int*restrict)optval = sock->txw_secs;
+		status = TRUE;
+		break;
+
+	case PGM_TXW_MAX_RTE:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->txw_max_rte;
+		status = TRUE;
+		break;
+
+	case PGM_PEER_EXPIRY:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->peer_expiry;
+		status = TRUE;
+		break;
+
+	case PGM_SPMR_EXPIRY:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->spmr_expiry;
+		status = TRUE;
+		break;
+
+	case PGM_RXW_BYTES:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		if (!sock->is_bound)
+			break;
+		{
+			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : ( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
+			*(int*restrict)optval = rxw_sqns * sock->max_tpdu;
+		}
+		status = TRUE;
+		break;
+
+	case PGM_RXW_SQNS:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		if (sock->is_bound) {
+			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : ( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
+			*(int*restrict)optval = rxw_sqns;
+		} else {
+			*(int*restrict)optval = sock->rxw_sqns;
+		}
+		status = TRUE;
+		break;
+
+	case PGM_RXW_SECS:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+/* RXW_SECS is unknown if rate is not defined */
+		if (sock->is_bound && (0 == sock->rxw_max_rte))
+			break;
+		if (sock->is_bound) {
+			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : ( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
+			*(int*restrict)optval = (rxw_sqns * sock->max_tpdu) / sock->rxw_max_rte;
+		} else {
+			*(int*restrict)optval = sock->rxw_secs;
+		}
+		status = TRUE;
+		break;
+
+	case PGM_RXW_MAX_RTE:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->rxw_max_rte;
+		status = TRUE;
+		break;
+
+	case PGM_NAK_BO_IVL:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->nak_bo_ivl;
+		status = TRUE;
+		break;
+
+	case PGM_NAK_RPT_IVL:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->nak_rpt_ivl;
+		status = TRUE;
+		break;
+
+	case PGM_NAK_RDATA_IVL:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->nak_rdata_ivl;
+		status = TRUE;
+		break;
+
+	case PGM_NAK_DATA_RETRIES:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->nak_data_retries;
+		status = TRUE;
+		break;
+
+	case PGM_NAK_NCF_RETRIES:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->nak_ncf_retries;
+		status = TRUE;
+		break;
+
+	case PGM_USE_FEC:
+		if (PGM_UNLIKELY(*optlen != sizeof (struct pgm_fecinfo_t)))
+			break;
+		{
+			struct pgm_fecinfo_t*restrict fecinfo = optval;
+			fecinfo->ondemand_parity_enabled = sock->use_ondemand_parity;
+			fecinfo->var_pktlen_enabled	 = sock->use_var_pktlen;
+			fecinfo->block_size		 = sock->rs_n;
+			fecinfo->group_size		 = sock->rs_k;
+			fecinfo->proactive_packets	 = sock->rs_proactive_h;
+		}
+		status = TRUE;
+		break;
+
+	case PGM_USE_CR:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->crqst_ivl;
+		status = TRUE;
+		break;
+
+	case PGM_USE_PGMCC:
+		if (PGM_UNLIKELY(*optlen != sizeof (struct pgm_pgmccinfo_t)))
+			break;
+		{
+			struct pgm_pgmccinfo_t*restrict pgmccinfo = optval;
+			pgmccinfo->ack_bo_ivl = sock->ack_bo_ivl;
+			pgmccinfo->ack_c      = sock->ack_c;
+			pgmccinfo->ack_c_p    = sock->ack_c_p;
+		}
+		status = TRUE;
+		break;
+
+	case PGM_SEND_ONLY:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->can_recv_data ? 0 : 1;
+		status = TRUE;
+		break;
+
+	case PGM_RECV_ONLY:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->can_send_data ? 0 : 1;
+		status = TRUE;
+		break;
+
+	case PGM_PASSIVE:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->can_send_nak ? 0 : 1;
+		status = TRUE;
+		break;
+
+	case PGM_ABORT_ON_RESET:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->is_abort_on_reset ? 1 : 0;
+		status = TRUE;
+		break;
+
+	case PGM_NOBLOCK:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->is_nonblocking ? 1 : 0;
+		status = TRUE;
+		break;
+
+	case PGM_SEND_GROUP:
+		if (PGM_UNLIKELY(*optlen != sizeof (struct group_req)))
+			break;
+		memcpy (optval, &sock->send_gsr, sizeof (struct group_req));
+		status = TRUE;
+		break;
+
+	case PGM_UDP_ENCAP_UCAST_PORT:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->udp_encap_ucast_port;
+		status = TRUE;
+		break;
+
+	case PGM_UDP_ENCAP_MCAST_PORT:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->udp_encap_mcast_port;
+		status = TRUE;
+		break;
+
+/** write-only options **/
+	case PGM_IP_ROUTER_ALERT:
+	case PGM_MULTICAST_LOOP:
+	case PGM_MULTICAST_HOPS:
+	case PGM_TOS:
+	case PGM_JOIN_GROUP:
+	case PGM_LEAVE_GROUP:
+	case PGM_BLOCK_SOURCE:
+	case PGM_UNBLOCK_SOURCE:
+	case PGM_JOIN_SOURCE_GROUP:
+	case PGM_LEAVE_SOURCE_GROUP:
+	case PGM_MSFILTER:
+	default:
+		break;
 	}
+	break;
+
+	default:
+	break;
+	}
+
 	pgm_rwlock_reader_unlock (&sock->lock);
 	return status;
 }
@@ -1293,6 +1575,17 @@ pgm_setsockopt (
 		status = TRUE;
 		break;
 
+/** read-only options **/
+	case PGM_MSSS:
+	case PGM_MSS:
+	case PGM_PDU:
+	case PGM_SEND_SOCK:
+	case PGM_RECV_SOCK:
+	case PGM_REPAIR_SOCK:
+	case PGM_PENDING_SOCK:
+	case PGM_ACK_SOCK:
+	case PGM_TIME_REMAIN:
+	case PGM_RATE_REMAIN:
 	default:
 		break;
 	}
