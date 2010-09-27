@@ -1,4 +1,4 @@
-#summary OpenPGM 5 : C Reference : Socket : PGM(7)
+﻿#summary OpenPGM 5 : C Reference : Socket : PGM(7)
 #labels Phase-Implementation
 #sidebar TOC5CReferenceSocket
 _Type_
@@ -119,7 +119,7 @@ struct group_filter {
 <dd>Set a boolean integer argument that determines whether sent PGM packets should be looped back to the local sockets.  Only valid as a <tt>[OpenPgm5CReferencePgmGetSockOpt pgm_setsockopt()]</tt>.</dd>
 <dt><tt>PGM_NAK_BO_IVL</tt></dt>
 <dd>Set or read <tt>NAK_BO_IVL</tt>, the NAK back-off interval (in microseconds), the maximum time period a receiver must wait before transmitting a NAK.</dd>
-<dt><tt>GM_NAK_DATA_RETRIES</tt></dt>
+<dt><tt>PGM_NAK_DATA_RETRIES</tt></dt>
 <dd>Set or read <tt>NAK_DATA_RETRIES</tt>, the maximum number of attempts waiting for incoming data from receipt of NCF.</dd>
 <dt><tt>PGM_NAK_NCF_RETRIES</tt></dt>
 <dd>Set or read <tt>NAK_NCF_RETRIES</tt>, the maximum number of retries waiting for a NAK confirmation.</dd>
@@ -181,7 +181,7 @@ struct group_filter {
 <dt><tt>PGM_USE_CR</tt></dt>
 <dd>Set or read an integer argument that when enabled sends congestion reports from PGM receivers to congestion report-requesting PGM sources.</dd>
 <dt><tt>PGM_USE_FEC</tt></dt>
-<dd><p>Set or read Forward Error Correction parameters for PGM sources and receivers.  Argument is a <tt>pgm_fecinfo_t</tt> structure.</p>
+<dd>Set or read Forward Error Correction parameters for PGM sources and receivers.  Argument is a <tt>pgm_fecinfo_t</tt> structure.
 <pre>
 struct pgm_fecinfo_t {
     uint8_t   block_size;
@@ -193,7 +193,7 @@ struct pgm_fecinfo_t {
 </pre>
 </dd>
 <dt><tt>PGM_USE_PGMCC</tt></dt>
-<dd><p>Set or read PGM Congestion Control parameters for PGM sources and receivers.  Argument is a <tt>pgm_ccinfo_t</tt> structure.</p>
+<dd>Set or read PGM Congestion Control parameters for PGM sources and receivers.  Argument is a <tt>pgm_ccinfo_t</tt> structure.
 <pre>
 struct pgm_ccinfo_t {
     uint32_t  ack_bo_ivl;
