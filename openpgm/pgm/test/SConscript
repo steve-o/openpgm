@@ -4,12 +4,10 @@
 
 Import('env')
 e = env.Clone();
-e.MergeFlags(env['GLIB_FLAGS']);
 e.Append(LIBS = ['libpgm', 'libpgmex']);
-e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 e.Program(['monitor.c', 'dump-json.c'])
-e.Program(['app.c', 'async.c'])
-e.Program(['sim.c', 'dump-json.c', 'async.c'])
+e.Program(['app.c'])
+e.Program(['sim.c', 'dump-json.c'])
 
 # end of file

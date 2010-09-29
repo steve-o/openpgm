@@ -2,7 +2,7 @@
  * 
  * basic logging.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,12 +22,13 @@
 #ifndef __PGM_LOG_H__
 #define __PGM_LOG_H__
 
-#include <pgm/types.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
 
-bool log_init (void);
+G_BEGIN_DECLS
 
-PGM_END_DECLS
+gboolean log_init (void);
+
+G_END_DECLS
 
 #endif /* __PGM_LOG_H__ */

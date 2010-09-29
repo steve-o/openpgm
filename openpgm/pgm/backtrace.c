@@ -19,16 +19,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <glib.h>
+
 #ifdef CONFIG_HAVE_BACKTRACE
-#	include <stdio.h>
 #	include <execinfo.h>
 #	include <sys/types.h>
 #	include <unistd.h>
 #endif
-#include <stdlib.h>
-#include <glib.h>
-#include <pgm/backtrace.h>
 
+#include "pgm/backtrace.h"
+
+
+/* globals */
 
 void
 on_sigsegv (

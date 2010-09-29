@@ -2,7 +2,7 @@
  *
  * PGM conformance test application.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2007 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
 
 #include <errno.h>
 #include <getopt.h>
@@ -38,47 +39,52 @@
 
 #include <glib.h>
 
-#include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/transport.h>
+#include <pgm/source.h>
+#include <pgm/receiver.h>
 #include <pgm/gsi.h>
 #include <pgm/signal.h>
-
-#include "async.h"
+#include <pgm/timer.h>
+#include <pgm/if.h>
+#include <pgm/async.h>
 
 
 /* typedefs */
 
 struct idle_source {
-	GSource		source;
-	guint64		expiration;
+	GSource			source;
+	guint64			expiration;
 };
 
 struct app_session {
-	char*		name;
-	pgm_sock_t*	sock;
-	pgm_async_t*	async;
+	char*			name;
+	pgm_transport_t*	transport;
+	pgm_async_t*		async;
 };
 
 /* globals */
 #undef G_LOG_DOMAIN
 #define G_LOG_DOMAIN	"app"
 
-static int		g_port = 7500;
-static const char*	g_network = ";239.192.0.1";
+static int g_port = 7500;
+static const char* g_network = ";239.192.0.1";
 
-static guint		g_max_tpdu = 1500;
-static guint		g_sqns = 100 * 1000;
+static guint g_max_tpdu = 1500;
+static guint g_sqns = 100 * 1000;
 
-static GHashTable*	g_sessions = NULL;
-static GMainLoop*	g_loop = NULL;
-static GIOChannel*	g_stdin_channel = NULL;
+static GHashTable* g_sessions = NULL;
+static GMainLoop* g_loop = NULL;
+static GIOChannel* g_stdin_channel = NULL;
 
 
 static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
+
 static void destroy_session (gpointer, gpointer, gpointer);
+
 static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
 
@@ -99,19 +105,9 @@ main (
 	char   *argv[]
 	)
 {
-	pgm_error_t* err = NULL;
+	GError* err = NULL;
 
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init ();
 	g_message ("app");
-
-	if (!pgm_init (&err)) {
-		g_error ("Unable to start PGM engine: %s", (err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
-		pgm_messages_shutdown();
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -123,10 +119,15 @@ main (
 		case 's':	g_port = atoi (optarg); break;
 
 		case 'h':
-		case '?':
-				pgm_messages_shutdown();
-				usage (binary_name);
+		case '?': usage (binary_name);
 		}
+	}
+
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
 	}
 
 	g_loop = g_main_loop_new (NULL, FALSE);
@@ -164,11 +165,8 @@ main (
 		g_stdin_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown();
 	g_message ("finished.");
-	pgm_messages_shutdown();
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static
@@ -181,9 +179,9 @@ destroy_session (
 {
 	struct app_session* sess = (struct app_session*)value;
 
-	g_message ("closing socket \"%s\"", (char*)key);
-	pgm_close (sess->sock, TRUE);
-	sess->sock = NULL;
+	g_message ("destroying transport \"%s\"", (char*)key);
+	pgm_transport_destroy (sess->transport, TRUE);
+	sess->transport = NULL;
 
 	if (sess->async) {
 		g_message ("destroying asynchronous session on \"%s\"", (char*)key);
@@ -249,27 +247,49 @@ on_data (
 static
 void
 session_create (
-	char*		session_name
+	char*		name
 	)
 {
-	pgm_error_t* pgm_err = NULL;
+	struct pgm_transport_info_t hints = {
+		.ti_family = AF_INET
+	}, *res = NULL;
+	GError* err = NULL;
 
 /* check for duplicate */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess != NULL) {
-		printf ("FAILED: duplicate session name '%s'\n", session_name);
+		puts ("FAILED: duplicate session");
 		return;
 	}
 
 /* create new and fill in bits */
-	sess = g_new0(struct app_session, 1);
-	sess->name = g_memdup (session_name, strlen(session_name)+1);
+	sess = g_malloc0(sizeof(struct app_session));
+	sess->name = g_memdup (name, strlen(name)+1);
 
-	if (!pgm_socket (&sess->sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err)) {
-		printf ("FAILED: pgm_socket(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-		pgm_error_free (pgm_err);
+	if (!pgm_if_get_transport_info (g_network, &hints, &res, &err)) {
+		printf ("FAILED: pgm_if_get_transport_info(): %s\n", err->message);
+		g_error_free (err);
 		goto err_free;
 	}
+
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		goto err_free;
+	}
+
+	res->ti_dport = g_port;
+	res->ti_sport = 0;
+printf ("pgm_transport_create (transport:%p res:%p err:%p)\n", (gpointer)sess->transport, (gpointer)res, (gpointer)&err);
+	if (!pgm_transport_create (&sess->transport, res, &err)) {
+		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		goto err_free;
+	}
+
+	pgm_if_free_transport_info (res);
 
 /* success */
 	g_hash_table_insert (g_sessions, sess->name, sess);
@@ -286,25 +306,19 @@ err_free:
 static
 void
 session_set_nak_bo_ivl (
-	char*		session_name,
-	guint		milliseconds
+	char*		name,
+	guint		nak_bo_ivl		/* milliseconds */
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (pgm_msecs (milliseconds) > INT_MAX) {
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const int nak_bo_ivl = pgm_msecs (milliseconds);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl)))
-		printf ("FAILED: set NAK_BO_IVL = %dms\n", milliseconds);
+	if (!pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(nak_bo_ivl)))
+		puts ("FAILED: pgm_transport_set_nak_bo_ivl");
 	else
 		puts ("READY");
 }
@@ -312,25 +326,19 @@ session_set_nak_bo_ivl (
 static
 void
 session_set_nak_rpt_ivl (
-	char*		session_name,
-	guint		milliseconds
+	char*		name,
+	guint		nak_rpt_ivl		/* milliseconds */
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (pgm_msecs (milliseconds) > INT_MAX) {
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const int nak_rpt_ivl = pgm_msecs (milliseconds);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl)))
-		printf ("FAILED: set NAK_RPT_IVL = %dms\n", milliseconds);
+	if (!pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_msecs(nak_rpt_ivl)))
+		puts ("FAILED: pgm_transport_set_nak_rpt_ivl");
 	else
 		puts ("READY");
 }
@@ -338,25 +346,19 @@ session_set_nak_rpt_ivl (
 static
 void
 session_set_nak_rdata_ivl (
-	char*		session_name,
-	guint		milliseconds
+	char*		name,
+	guint		nak_rdata_ivl		/* milliseconds */
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (pgm_msecs (milliseconds) > INT_MAX) {
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const int nak_rdata_ivl = pgm_msecs (milliseconds);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl)))
-		printf ("FAILED: set NAK_RDATA_IVL = %dms\n", milliseconds);
+	if (!pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_msecs(nak_rdata_ivl)))
+		puts ("FAILED: pgm_transport_set_nak_rdata_ivl");
 	else
 		puts ("READY");
 }
@@ -364,25 +366,19 @@ session_set_nak_rdata_ivl (
 static
 void
 session_set_nak_ncf_retries (
-	char*		session_name,
-	guint		retry_count
+	char*		name,
+	guint		nak_ncf_retries
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (retry_count > INT_MAX) {
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const int nak_ncf_retries = retry_count;
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries)))
-		printf ("FAILED: set NAK_NCF_RETRIES = %d\n", retry_count);
+	if (!pgm_transport_set_nak_ncf_retries (sess->transport, nak_ncf_retries))
+		puts ("FAILED pgm_transport_set_nak_ncf_retries");
 	else
 		puts ("READY");
 }
@@ -390,25 +386,19 @@ session_set_nak_ncf_retries (
 static
 void
 session_set_nak_data_retries (
-	char*		session_name,
-	guint		retry_count
+	char*		name,
+	guint		nak_data_retries
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (retry_count > INT_MAX) {
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const int nak_data_retries = retry_count;
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries)))
-		printf ("FAILED: set NAK_DATA_RETRIES = %d\n", retry_count);
+	if (!pgm_transport_set_nak_data_retries (sess->transport, nak_data_retries))
+		puts ("FAILED: pgm_transport_set_nak_data_retries");
 	else
 		puts ("READY");
 }
@@ -416,25 +406,19 @@ session_set_nak_data_retries (
 static
 void
 session_set_txw_max_rte (
-	char*		session_name,
-	guint		bitrate
+	char*		name,
+	guint		txw_max_rte
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (bitrate > INT_MAX) {
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const int txw_max_rte = bitrate;
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &txw_max_rte, sizeof(txw_max_rte)))
-		printf ("FAILED: set TXW_MAX_RTE = %d\n", bitrate);
+	if (!pgm_transport_set_txw_max_rte (sess->transport, txw_max_rte))
+		puts ("FAILED:pgm_transport_set_txw_max_rte");
 	else
 		puts ("READY");
 }
@@ -442,34 +426,20 @@ session_set_txw_max_rte (
 static
 void
 session_set_fec (
-	char*		session_name,
-	guint		block_size,
-	guint		group_size
+	char*		name,
+	guint		default_n,
+	guint		default_k
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (block_size > UINT8_MAX ||
-	    group_size > UINT8_MAX)
-	{
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const struct pgm_fecinfo_t fecinfo = {
-		.block_size			= block_size,
-		.proactive_packets		= 0,
-		.group_size			= group_size,
-		.ondemand_parity_enabled	= TRUE,
-		.var_pktlen_enabled		= TRUE
-	};
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_USE_FEC, &fecinfo, sizeof(fecinfo)))
-		printf ("FAILED: set FEC = RS(%d, %d)\n", block_size, group_size);
+	if (!pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k))
+		puts ("FAILED: pgm_transport_set_fec");
 	else
 		puts ("READY");
 }
@@ -477,225 +447,95 @@ session_set_fec (
 static
 void
 session_bind (
-	char*		session_name
+	char*		name
 	)
 {
-	pgm_error_t* pgm_err = NULL;
+	const guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+	GError* err = NULL;
 
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-/* Use RFC 2113 tagging for PGM Router Assist */
-	const int no_router_assist = 0;
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist)))
-		puts ("FAILED: disable IP_ROUTER_ALERT");
+	if (!pgm_transport_set_nonblocking (sess->transport, TRUE))
+		puts ("FAILED: pgm_transport_set_nonblocking");
+	if (!pgm_transport_set_max_tpdu (sess->transport, g_max_tpdu))
+		puts ("FAILED: pgm_transport_set_max_tpdu");
+	if (!pgm_transport_set_txw_sqns (sess->transport, g_sqns))
+		puts ("FAILED: pgm_transport_set_txw_sqns");
+	if (!pgm_transport_set_rxw_sqns (sess->transport, g_sqns))
+		puts ("FAILED: pgm_transport_set_rxw_sqns");
+	if (!pgm_transport_set_hops (sess->transport, 16))
+		puts ("FAILED: pgm_transport_set_hops");
+	if (!pgm_transport_set_ambient_spm (sess->transport, pgm_secs(30)))
+		puts ("FAILED: pgm_transport_set_ambient_spm");
+	if (!pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat)))
+		puts ("FAILED: pgm_transport_set_heartbeat_spm");
+	if (!pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300)))
+		puts ("FAILED: pgm_transport_set_peer_expiry");
+	if (!pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250)))
+		puts ("FAILED: pgm_transport_set_spmr_expiry");
+	if (!sess->transport->nak_bo_ivl && !pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(50)))
+		puts ("FAILED: pgm_transport_set_nak_bo_ivl");
+	if (!sess->transport->nak_rpt_ivl && !pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2)))
+		puts ("FAILED: pgm_transport_set_nak_rpt_ivl");
+	if (!sess->transport->nak_rdata_ivl && !pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2)))
+		puts ("FAILED: pgm_transport_set_nak_rdata_ivl");
+	if (!sess->transport->nak_data_retries && !pgm_transport_set_nak_data_retries (sess->transport, 50))
+		puts ("FAILED: pgm_transport_set_nak_data_retries");
+	if (!sess->transport->nak_ncf_retries && !pgm_transport_set_nak_ncf_retries (sess->transport, 50))
+		puts ("FAILED: pgm_transport_set_nak_ncf_retries");
 
-/* set PGM parameters */
-	const int send_and_receive = 0,
-		  active = 0,
-		  mtu = g_max_tpdu,
-		  txw_sqns = g_sqns,
-		  rxw_sqns = g_sqns,
-		  ambient_spm = pgm_secs (30),
-		  heartbeat_spm[] = { pgm_msecs (100),
-				      pgm_msecs (100),
-                                      pgm_msecs (100),
-				      pgm_msecs (100),
-				      pgm_msecs (1300),
-				      pgm_secs  (7),
-				      pgm_secs  (16),
-				      pgm_secs  (25),
-				      pgm_secs  (30) },
-		  peer_expiry = pgm_secs (300),
-		  spmr_expiry = pgm_msecs (250),
-		  nak_bo_ivl = pgm_msecs (50),
-		  nak_rpt_ivl = pgm_secs (2),
-		  nak_rdata_ivl = pgm_secs (2),
-		  nak_data_retries = 50,
-		  nak_ncf_retries = 50;
-
-	g_assert (G_N_ELEMENTS(heartbeat_spm) > 0);
-
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_ONLY, &send_and_receive, sizeof(send_and_receive)))
-		puts ("FAILED: set bi-directional transport");
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_RECV_ONLY, &send_and_receive, sizeof(send_and_receive)))
-		puts ("FAILED: set bi-directional transport");
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_PASSIVE, &active, sizeof(active)))
-		puts ("FAILED: set active transport");
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MTU, &mtu, sizeof(mtu)))
-		printf ("FAILED: set MAX_TPDU = %d bytes\n", mtu);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TXW_SQNS, &txw_sqns, sizeof(txw_sqns)))
-		printf ("FAILED: set TXW_SQNS = %d\n", txw_sqns);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_RXW_SQNS, &rxw_sqns, sizeof(rxw_sqns)))
-		printf ("FAILED: set RXW_SQNS = %d\n", rxw_sqns);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm)))
-		printf ("FAILED: set AMBIENT_SPM = %ds\n", (int)pgm_to_secs (ambient_spm));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm)))
-	{
-		char buffer[1024];
-		sprintf (buffer, "%d", heartbeat_spm[0]);
-		for (unsigned i = 1; i < G_N_ELEMENTS(heartbeat_spm); i++) {
-			char t[1024];
-			sprintf (t, ", %d", heartbeat_spm[i]);
-			strcat (buffer, t);
-		}
-		printf ("FAILED: set HEARTBEAT_SPM = { %s }\n", buffer);
-	}
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry)))
-		printf ("FAILED: set PEER_EXPIRY = %ds\n",(int) pgm_to_secs (peer_expiry));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry)))
-		printf ("FAILED: set SPMR_EXPIRY = %dms\n", (int)pgm_to_msecs (spmr_expiry));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl)))
-		printf ("FAILED: set NAK_BO_IVL = %dms\n", (int)pgm_to_msecs (nak_bo_ivl));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl)))
-		printf ("FAILED: set NAK_RPT_IVL = %dms\n", (int)pgm_to_msecs (nak_rpt_ivl));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl)))
-		printf ("FAILED: set NAK_RDATA_IVL = %dms\n", (int)pgm_to_msecs (nak_rdata_ivl));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries)))
-		printf ("FAILED: set NAK_DATA_RETRIES = %d\n", nak_data_retries);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries)))
-		printf ("FAILED: set NAK_NCF_RETRIES = %d\n", nak_ncf_retries);
-
-/* create global session identifier */
-	struct pgm_sockaddr_t addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sa_port = g_port;
-	addr.sa_addr.sport = 0;
-	if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
-		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-	}
-
-{
-	char buffer[1024];
-	pgm_tsi_print_r (&addr.sa_addr, buffer, sizeof(buffer));
-	printf ("pgm_bind (sock:%p addr:{port:%d tsi:%s} err:%p)\n",
-		(gpointer)sess->sock,
-		addr.sa_port, buffer,
-		(gpointer)&pgm_err);
-}
-	if (!pgm_bind (sess->sock, &addr, sizeof(addr), &pgm_err)) {
-		printf ("FAILED: pgm_bind(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-		pgm_error_free (pgm_err);
+printf ("pgm_transport_bind (transport:%p err:%p)\n", (gpointer)sess->transport, (gpointer)&err);
+	if (!pgm_transport_bind (sess->transport, &err)) {
+		printf ("FAILED: pgm_transport_bind(): %s\n", err->message);
+		g_error_free (err);
 	} else 
 		puts ("READY");
 }
 
 static
 void
-session_connect (
-	char*		session_name
-	)
-{
-	struct pgm_addrinfo_t hints = {
-                .ai_family = AF_INET
-        }, *res = NULL;
-        pgm_error_t* pgm_err = NULL;
-
-/* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
-	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
-		return;
-	}
-
-	if (!pgm_getaddrinfo (g_network, &hints, &res, &pgm_err)) {
-                printf ("FAILED: pgm_getaddrinfo(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-                pgm_error_free (pgm_err);
-		return;
-        }
-
-/* join IP multicast groups */
-	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req)))
-		{
-			char group[INET6_ADDRSTRLEN];
-			getnameinfo ((struct sockaddr*)&res->ai_recv_addrs[i].gsr_group, sizeof(struct sockaddr_in),
-					group, sizeof(group),
-					NULL, 0,
-					NI_NUMERICHOST);
-			printf ("FAILED: join group (#%u %s)\n", (unsigned)res->ai_recv_addrs[i].gsr_interface, group);
-		}
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req)))
-		{
-			char group[INET6_ADDRSTRLEN];
-			getnameinfo ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, sizeof(struct sockaddr_in),
-					group, sizeof(group),
-					NULL, 0,
-					NI_NUMERICHOST);
-			printf ("FAILED: send group (#%u %s)\n", (unsigned)res->ai_send_addrs[0].gsr_interface, group);
-		}
-	pgm_freeaddrinfo (res);
-
-/* set IP parameters */
-	const int non_blocking = 1,
-		  no_multicast_loop = 0,
-		  multicast_hops = 16,
-		  dscp = 0x2e << 2;		/* Expedited Forwarding PHB for network elements, no ECN. */
-
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MULTICAST_LOOP, &no_multicast_loop, sizeof(no_multicast_loop)))
-		puts ("FAILED: disable multicast loop");
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops)))
-		printf ("FAILED: set TTL = %d\n", multicast_hops);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TOS, &dscp, sizeof(dscp)))
-		printf ("FAILED: set TOS = 0x%x\n", dscp);
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NOBLOCK, &non_blocking, sizeof(non_blocking)))
-		puts ("FAILED: set non-blocking sockets");
-
-	if (!pgm_connect (sess->sock, &pgm_err)) {
-		printf ("FAILED: pgm_connect(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-	} else
-		puts ("READY");
-}
-
-static
-void
 session_send (
-	char*		session_name,
+	char*		name,
 	char*		string
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* send message */
-	int status;
+	PGMIOStatus status;
 	gsize stringlen = strlen(string) + 1;
 	int n_fds = 1;
 	struct pollfd fds[ n_fds ];
 	struct timeval tv;
 	int timeout;
 again:
-printf ("pgm_send (sock:%p string:\"%s\" stringlen:%" G_GSIZE_FORMAT " NULL)\n", (gpointer)sess->sock, string, stringlen);
-	status = pgm_send (sess->sock, string, stringlen, NULL);
+printf ("pgm_send (transport:%p string:\"%s\" stringlen:%d NULL)\n", (gpointer)sess->transport, string, stringlen);
+	status = pgm_send (sess->transport, string, stringlen, NULL);
 	switch (status) {
 	case PGM_IO_STATUS_NORMAL:
 		puts ("READY");
 		break;
 	case PGM_IO_STATUS_TIMER_PENDING:
-		{
-			socklen_t optlen = sizeof (tv);
-			pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
-		}
+		pgm_transport_get_timer_pending (sess->transport, &tv);
 		goto block;
 	case PGM_IO_STATUS_RATE_LIMITED:
-		{
-			socklen_t optlen = sizeof (tv);
-			pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
-		}
+		pgm_transport_get_rate_remaining (sess->transport, &tv);
 /* fall through */
 	case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		memset (fds, 0, sizeof(fds));
-		pgm_poll_info (sess->sock, fds, &n_fds, POLLOUT);
+		pgm_transport_poll_info (sess->transport, fds, &n_fds, POLLOUT);
 		poll (fds, n_fds, timeout /* ms */);
 		goto again;
 	default:
@@ -707,21 +547,21 @@ block:
 static
 void
 session_listen (
-	char*		session_name
+	char*		name
 	)
 {
 	GError* err = NULL;
 
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* listen */
-printf ("pgm_async_create (async:%p sock:%p err:%p)\n", (gpointer)&sess->async, (gpointer)sess->sock, (gpointer)&err);
-	if (!pgm_async_create (&sess->async, sess->sock, &err)) {
+printf ("pgm_async_create (async:%p transport:%p err:%p)\n", (gpointer)&sess->async, (gpointer)sess->transport, (gpointer)&err);
+	if (!pgm_async_create (&sess->async, sess->transport, &err)) {
 		printf ("FAILED: pgm_async_create(): %s", err->message);
 		g_error_free (err);
 		return;
@@ -733,18 +573,18 @@ printf ("pgm_async_create (async:%p sock:%p err:%p)\n", (gpointer)&sess->async, 
 static
 void
 session_destroy (
-	char*		session_name
+	char*		name
 	)
 {
 /* check that session exists */
-	struct app_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct app_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* remove from hash table */
-	g_hash_table_remove (g_sessions, session_name);
+	g_hash_table_remove (g_sessions, name);
 
 /* stop any async thread */
 	if (sess->async) {
@@ -752,8 +592,8 @@ session_destroy (
 		sess->async = NULL;
 	}
 
-	pgm_close (sess->sock, TRUE);
-	sess->sock = NULL;
+	pgm_transport_destroy (sess->transport, TRUE);
+	sess->transport = NULL;
 	g_free (sess->name);
 	sess->name = NULL;
 	g_free (sess);
@@ -791,7 +631,7 @@ on_stdin_data (
 		regex_t preg;
 		regmatch_t pmatch[10];
 
-/* create socket */
+/* create transport */
 		const char *re = "^create[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -944,7 +784,7 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
-/* bind socket */
+/* bind transport */
 		re = "^bind[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -953,22 +793,6 @@ on_stdin_data (
 			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
 
 			session_bind (name);
-
-			g_free (name);
-			regfree (&preg);
-			goto out;
-		}
-		regfree (&preg);
-
-/* connect socket */
-		re = "^connect[[:space:]]+([[:alnum:]]+)$";
-		regcomp (&preg, re, REG_EXTENDED);
-		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
-		{
-			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
-
-			session_connect (name);
 
 			g_free (name);
 			regfree (&preg);
@@ -1023,21 +847,6 @@ on_stdin_data (
 			session_destroy (name);
 
 			g_free (name);
-			regfree (&preg);
-			goto out;
-		}
-		regfree (&preg);
-
-/* set PGM network */
-		re = "^set[[:space:]]+network[[:space:]]+([[:print:]]*;[[:print:]]+)$";
-		regcomp (&preg, re, REG_EXTENDED);
-		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
-		{
-			char* pgm_network = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			pgm_network[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
-			g_network = pgm_network;
-			puts ("READY");
-
 			regfree (&preg);
 			goto out;
 		}

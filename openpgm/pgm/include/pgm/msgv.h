@@ -22,33 +22,32 @@
 #ifndef __PGM_MSGV_H__
 #define __PGM_MSGV_H__
 
-struct pgm_iovec;
-struct pgm_msgv_t;
+#include <glib.h>
 
-#include <pgm/types.h>
-#include <pgm/packet.h>
-#include <pgm/skbuff.h>
+#ifndef __PGM_PACKET_H__
+#	include <pgm/packet.h>
+#endif
 
-PGM_BEGIN_DECLS
 
 /* struct for scatter/gather I/O */
 struct pgm_iovec {
-#ifndef _WIN32
+#ifdef G_OS_UNIX
 /* match struct iovec */
 	void*		iov_base;
-	size_t		iov_len;	/* size of iov_base */
+	size_t		iov_len;	/* length of data */
 #else
 /* match WSABUF */
 	u_long		iov_len;
 	char*		iov_base;
-#endif /* _WIN32 */
+#endif /* G_OS_WIN32 */
 };
 
 struct pgm_msgv_t {
-	uint32_t		msgv_len;			/* number of elements in skb */
+	size_t			msgv_len;	/* number of elements in skb */
 	struct pgm_sk_buff_t*	msgv_skb[PGM_MAX_FRAGMENTS];	/* PGM socket buffer array */
 };
 
-PGM_END_DECLS
+typedef struct pgm_msgv_t pgm_msgv_t;
+
 
 #endif /* __PGM_MSGV_H__ */

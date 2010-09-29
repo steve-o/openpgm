@@ -27,16 +27,12 @@ $SIG{'INT'} = sub { print "interrupt caught.\n"; close_ssh(); };
 $mon->say ("filter $config{app}{ip}");
 print "mon: ready.\n";
 
-$app->say ("set network $config{app}{network}");
 $app->say ("create ao");
 $app->say ("bind ao");
-$app->say ("connect ao");
 $app->say ("listen ao");
 
-$sim->say ("set network $config{sim}{network}");
 $sim->say ("create ao");
 $sim->say ("bind ao");
-$sim->say ("connect ao");
 
 print "sim: publish APDU.\n";
 $sim->say ("send ao ringo x 1000");

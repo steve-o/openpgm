@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import os
-import platform
+import sys
 import time
 
 build_date = time.strftime ("%Y-%m-%d")
@@ -13,7 +13,7 @@ print """
  * 
  * OpenPGM version.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -30,23 +30,23 @@ print """
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <impl/framework.h>
-#include <pgm/version.h>
+#include <glib.h>
+
+#include "pgm/version.h"
 
 
 /* globals */
 
-const unsigned pgm_major_version = 5;
-const unsigned pgm_minor_version = 0;
-const unsigned pgm_micro_version = 79;
+const guint pgm_major_version = 2;
+const guint pgm_minor_version = 1;
+const guint pgm_micro_version = 28;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";
-const char* pgm_build_system = "%s";
-const char* pgm_build_machine = "%s";
+const char* pgm_build_platform = "%s";
 const char* pgm_build_revision = "%s";
 
 
 /* eof */
-"""%(build_date, build_time, platform.system(), platform.machine(), build_rev)
+"""%(build_date, build_time, sys.platform, build_rev)
 
 # end of file

@@ -40,17 +40,23 @@
 
 #include <glib.h>
 
-#include <impl/framework.h>
-#include <impl/socket.h>
-#include <impl/sqn_list.h>
-#include <impl/packet_parse.h>
-#include <pgm/pgm.h>
+#include <pgm/if.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
+#include <pgm/packet.h>
+#include <pgm/transport.h>
+#include <pgm/source.h>
+#include <pgm/receiver.h>
+#include <pgm/gsi.h>
 #include <pgm/signal.h>
-
-#include "dump-json.h"
-#include "async.h"
+#include <pgm/timer.h>
+#include <pgm/checksum.h>
+#include <pgm/reed_solomon.h>
+#include <pgm/indextoaddr.h>
+#include <pgm/getnodeaddr.h>
+#include <pgm/txwi.h>
+#include <pgm/async.h>
+#include <pgm/sn.h>
 
 
 /* typedefs */
@@ -62,7 +68,7 @@ struct idle_source {
 
 struct sim_session {
 	char*			name;
-	pgm_sock_t*	 	sock;
+	pgm_transport_t* 	transport;
 	gboolean		is_transport_fake;
 	GIOChannel*		recv_channel;
 	pgm_async_t*		async;
@@ -80,25 +86,24 @@ struct sim_session {
 #endif
 
 
-static int		g_port = 7500;
-static const char*	g_network = ";239.192.0.1";
+static int g_port = 7500;
+static const char* g_network = ";239.192.0.1";
 
-static int		g_max_tpdu = 1500;
-static int		g_sqns = 100 * 1000;
+static int g_max_tpdu = 1500;
+static int g_sqns = 100 * 1000;
 
-static GList*		g_sessions_list = NULL;
-static GHashTable*	g_sessions = NULL;
-static GMainLoop*	g_loop = NULL;
-static GIOChannel*	g_stdin_channel = NULL;
+static GHashTable* g_sessions = NULL;
+static GMainLoop* g_loop = NULL;
+static GIOChannel* g_stdin_channel = NULL;
 
 
 static void on_signal (int, gpointer);
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
-static void destroy_session (struct sim_session*);
+static void destroy_session (gpointer, gpointer, gpointer);
 static int on_data (gpointer, guint, gpointer);
 static gboolean on_stdin_data (GIOChannel*, GIOCondition, gpointer);
-void generic_net_send_nak (guint8, char*, pgm_tsi_t*, struct pgm_sqn_list_t*);
+void generic_net_send_nak (guint8, char*, pgm_tsi_t*, pgm_sqn_list_t*);
 	
 
 G_GNUC_NORETURN static
@@ -117,19 +122,9 @@ main (
 	char   *argv[]
 	)
 {
-	pgm_error_t* pgm_err = NULL;
+	GError* err = NULL;
 
-/* pre-initialise PGM messages module to add hook for GLib logging */
-	pgm_messages_init();
-	log_init ();
 	g_message ("sim");
-
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-		pgm_error_free (pgm_err);
-		pgm_messages_shutdown();
-		return EXIT_FAILURE;
-	}
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
@@ -141,10 +136,15 @@ main (
 		case 's':	g_port = atoi (optarg); break;
 
 		case 'h':
-		case '?':
-				pgm_messages_shutdown();
-				usage (binary_name);
+		case '?': usage (binary_name);
 		}
+	}
+
+	log_init ();
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
+		return EXIT_FAILURE;
 	}
 
 	g_loop = g_main_loop_new (NULL, FALSE);
@@ -171,10 +171,7 @@ main (
 
 	if (g_sessions) {
 		g_message ("destroying sessions.");
-		while (g_sessions_list) {
-			destroy_session (g_sessions_list->data);
-			g_sessions_list = g_list_delete_link (g_sessions_list, g_sessions_list);
-		}
+		g_hash_table_foreach_remove (g_sessions, (GHRFunc)destroy_session, NULL);
 		g_hash_table_unref (g_sessions);
 		g_sessions = NULL;
 	}
@@ -185,22 +182,22 @@ main (
 		g_stdin_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
-	pgm_shutdown();
 	g_message ("finished.");
-	pgm_messages_shutdown();
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static
 void
 destroy_session (
-		struct sim_session* sess
+                gpointer        key,		/* session name */
+                gpointer        value,		/* transport_session object */
+                G_GNUC_UNUSED gpointer        user_data
                 )
 {
-	printf ("destroying socket \"%s\"\n", sess->name);
-	pgm_close (sess->sock, TRUE);
-	sess->sock = NULL;
+	printf ("destroying transport \"%s\"\n", (char*)key);
+	struct sim_session* sess = (struct sim_session*)value;
+	pgm_transport_destroy (sess->transport, TRUE);
+	sess->transport = NULL;
 	g_free (sess->name);
 	sess->name = NULL;
 	g_free (sess);
@@ -244,141 +241,138 @@ on_startup (
 }
 
 static
-bool
-fake_pgm_socket (
-	pgm_sock_t**restrict	sock,
-	const sa_family_t	family,
-	const int		pgm_sock_type,
-	const int		protocol,
-	G_GNUC_UNUSED pgm_error_t**restrict	error
+gboolean
+fake_pgm_transport_create (
+	pgm_transport_t**		transport,
+	struct pgm_transport_info_t*	tinfo,
+	GError**			error
 	)
 {
-	pgm_sock_t* new_sock;
+	pgm_transport_t* new_transport;
 
-	g_return_val_if_fail (NULL != sock, FALSE);
-	g_return_val_if_fail (AF_INET == family || AF_INET6 == family, FALSE);
-        g_return_val_if_fail (SOCK_SEQPACKET == pgm_sock_type, FALSE);
-        g_return_val_if_fail (IPPROTO_UDP == protocol || IPPROTO_PGM == protocol, FALSE);
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (NULL != tinfo, FALSE);
+	if (tinfo->ti_sport) g_return_val_if_fail (tinfo->ti_sport != tinfo->ti_dport, FALSE);
+	if (tinfo->ti_udp_encap_ucast_port)
+		g_return_val_if_fail (tinfo->ti_udp_encap_mcast_port, FALSE);
+	else if (tinfo->ti_udp_encap_mcast_port)
+		g_return_val_if_fail (tinfo->ti_udp_encap_ucast_port, FALSE);
+	g_return_val_if_fail (tinfo->ti_recv_addrs_len > 0, FALSE);
+	g_return_val_if_fail (tinfo->ti_recv_addrs_len <= IP_MAX_MEMBERSHIPS, FALSE);
+	g_return_val_if_fail (NULL != tinfo->ti_recv_addrs, FALSE);
+	g_return_val_if_fail (1 == tinfo->ti_send_addrs_len, FALSE);
+	g_return_val_if_fail (NULL != tinfo->ti_send_addrs, FALSE);
+	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
+	{
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[0].gsr_group.ss_family, -FALSE);
+		g_return_val_if_fail (tinfo->ti_recv_addrs[i].gsr_group.ss_family == tinfo->ti_recv_addrs[i].gsr_source.ss_family, -FALSE);
+	}
+	g_return_val_if_fail (tinfo->ti_send_addrs[0].gsr_group.ss_family == tinfo->ti_send_addrs[0].gsr_source.ss_family, -FALSE);
 
-	new_sock = pgm_new0 (pgm_sock_t, 1);
-        new_sock->family        = family;
-        new_sock->socket_type   = pgm_sock_type;
-        new_sock->protocol      = protocol;
-        new_sock->can_send_data = TRUE;
-        new_sock->can_send_nak  = TRUE;
-        new_sock->can_recv_data = TRUE;
-        new_sock->dport         = DEFAULT_DATA_DESTINATION_PORT;
-        new_sock->tsi.sport     = DEFAULT_DATA_SOURCE_PORT;
-        new_sock->adv_mode      = 0;    /* advance with time */
+/* create transport object */
+	new_transport = g_malloc0 (sizeof(pgm_transport_t));
 
-/* PGMCC */
-        new_sock->acker_nla.ss_family = family;
+/* transport defaults */
+	new_transport->can_send_data = TRUE;
+	new_transport->can_send_nak  = FALSE;
+	new_transport->can_recv_data = TRUE;
+
+	memcpy (&new_transport->tsi.gsi, &tinfo->ti_gsi, sizeof(pgm_gsi_t));
+	new_transport->dport = g_htons (tinfo->ti_dport);
+	if (tinfo->ti_sport) {
+		new_transport->tsi.sport = tinfo->ti_sport;
+	} else {
+		do {
+			new_transport->tsi.sport = g_htons (g_random_int_range (0, UINT16_MAX));
+		} while (new_transport->tsi.sport == new_transport->dport);
+	}
+
+/* network data ports */
+	new_transport->udp_encap_ucast_port = tinfo->ti_udp_encap_ucast_port;
+	new_transport->udp_encap_mcast_port = tinfo->ti_udp_encap_mcast_port;
+
+/* copy network parameters */
+	memcpy (&new_transport->send_gsr, &tinfo->ti_send_addrs[0], sizeof(struct group_source_req));
+	for (unsigned i = 0; i < tinfo->ti_recv_addrs_len; i++)
+	{
+		memcpy (&new_transport->recv_gsr[i], &tinfo->ti_recv_addrs[i], sizeof(struct group_source_req));
+		((struct sockaddr_in*)&new_transport->recv_gsr[i].gsr_group)->sin_port = g_htons (new_transport->udp_encap_mcast_port);
+	}
+	new_transport->recv_gsr_len = tinfo->ti_recv_addrs_len;
 
 /* open sockets to implement PGM */
-        int socket_type;
-        if (IPPROTO_UDP == new_sock->protocol) {
-                puts ("Opening UDP encapsulated sockets.");
+	int socket_type, protocol;
+	if (new_transport->udp_encap_ucast_port) {
+                puts ("opening UDP encapsulated sockets.");
                 socket_type = SOCK_DGRAM;
-                new_sock->udp_encap_ucast_port = DEFAULT_UDP_ENCAP_UCAST_PORT;
-                new_sock->udp_encap_mcast_port = DEFAULT_UDP_ENCAP_MCAST_PORT;
+                protocol = IPPROTO_UDP;
         } else {
-                puts ("Opening raw sockets.");
+                puts ("opening raw sockets.");
                 socket_type = SOCK_RAW;
+                protocol = IPPROTO_PGM;
         }
 
-        if ((new_sock->recv_sock = socket (new_sock->family,
-                                           socket_type,
-                                           new_sock->protocol)) == PGM_INVALID_SOCKET)
+	if ((new_transport->recv_sock = socket (new_transport->recv_gsr[0].gsr_group.ss_family,
+                                                socket_type,
+                                                protocol)) < 0)
         {
-                const int save_errno = pgm_sock_errno();
-                pgm_set_error (error,
-                               PGM_ERROR_DOMAIN_SOCKET,
-                               pgm_error_from_sock_errno (save_errno),
-                               "Creating receive socket: %s",
-                               pgm_sock_strerror (save_errno));
-#ifndef _WIN32
-                if (EPERM == save_errno) {
-                        g_critical ("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'");
+                if (errno == EPERM && 0 != getuid()) {
+                        g_critical ("PGM protocol requires this program to run as superuser.");
                 }
-#endif
                 goto err_destroy;
         }
 
-	if ((new_sock->send_sock = socket (new_sock->family,
-                                           socket_type,
-                                           new_sock->protocol)) == PGM_INVALID_SOCKET)
+        if ((new_transport->send_sock = socket (new_transport->send_gsr.gsr_group.ss_family,
+                                                socket_type,
+                                                protocol)) < 0)
         {
-                const int save_errno = pgm_sock_errno();
-                pgm_set_error (error,
-                               PGM_ERROR_DOMAIN_SOCKET,
-                               pgm_error_from_sock_errno (save_errno),
-                               "Creating send socket: %s",
-                               pgm_sock_strerror (save_errno));
                 goto err_destroy;
         }
 
-        if ((new_sock->send_with_router_alert_sock = socket (new_sock->family,
-                                                             socket_type,
-                                                             new_sock->protocol)) == PGM_INVALID_SOCKET)
+        if ((new_transport->send_with_router_alert_sock = socket (new_transport->send_gsr.gsr_group.ss_family,
+                                                		  socket_type,
+                                                		  protocol)) < 0)
         {
-                const int save_errno = pgm_sock_errno();
-                pgm_set_error (error,
-                               PGM_ERROR_DOMAIN_SOCKET,
-                               pgm_error_from_sock_errno (save_errno),
-                               "Creating IP Router Alert (RFC 2113) send socket: %s",
-                               pgm_sock_strerror (save_errno));
                 goto err_destroy;
         }
 
-        *sock = new_sock;
-
-	puts ("PGM socket successfully created.");
-        return TRUE;
+	*transport = new_transport;
+	return TRUE;
 
 err_destroy:
-        if (PGM_INVALID_SOCKET != new_sock->recv_sock) {
-                if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->recv_sock)) {
-                        const int save_errno = pgm_sock_errno();
-                        g_warning ("Close on receive socket failed: %s",
-                                  pgm_sock_strerror (save_errno));
-                }
-                new_sock->recv_sock = PGM_INVALID_SOCKET;
+	if (new_transport->recv_sock) {
+                close(new_transport->recv_sock);
+                new_transport->recv_sock = 0;
         }
-        if (PGM_INVALID_SOCKET != new_sock->send_sock) {
-                if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->send_sock)) {
-                        const int save_errno = pgm_sock_errno();
-                        g_warning ("Close on send socket failed: %s",
-                                  pgm_sock_strerror (save_errno));
-                }
-                new_sock->send_sock = PGM_INVALID_SOCKET;
+        if (new_transport->send_sock) {
+                close(new_transport->send_sock);
+                new_transport->send_sock = 0;
         }
-        if (PGM_INVALID_SOCKET != new_sock->send_with_router_alert_sock) {
-                if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->send_with_router_alert_sock)) {
-                        const int save_errno = pgm_sock_errno();
-                        g_warning ("Close on IP Router Alert (RFC 2113) send socket failed: %s",
-                                  pgm_sock_strerror (save_errno));
-                }
-                new_sock->send_with_router_alert_sock = PGM_INVALID_SOCKET;
+        if (new_transport->send_with_router_alert_sock) {
+                close(new_transport->send_with_router_alert_sock);
+                new_transport->send_with_router_alert_sock = 0;
         }
-        pgm_free (new_sock);
+
+        g_free (new_transport);
+        new_transport = NULL;
         return FALSE;
 }
 
 static
 gboolean
 on_io_data (
-        GIOChannel*	source,
+        GIOChannel* source,
         G_GNUC_UNUSED GIOCondition condition,
-        gpointer	data
+        gpointer data
         )
 {
-	pgm_sock_t* sock = data;
+	pgm_transport_t* transport = data;
 
-	struct pgm_sk_buff_t* skb = pgm_alloc_skb (sock->max_tpdu);
+	struct pgm_sk_buff_t* skb = pgm_alloc_skb (transport->max_tpdu);
         int fd = g_io_channel_unix_get_fd(source);
 	struct sockaddr_storage src_addr;
 	socklen_t src_addr_len = sizeof(src_addr);
-        skb->len = recvfrom(fd, skb->head, sock->max_tpdu, MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
+        skb->len = recvfrom(fd, skb->head, transport->max_tpdu, MSG_DONTWAIT, (struct sockaddr*)&src_addr, &src_addr_len);
 
         printf ("%i bytes received from %s.\n", skb->len, inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
@@ -386,7 +380,7 @@ on_io_data (
         fflush (stdout);
 
 /* parse packet to maintain peer database */
-	if (sock->udp_encap_ucast_port) {
+	if (transport->udp_encap_ucast_port) {
 		if (!pgm_parse_udp_encap (skb, NULL))
 			goto out;
         } else {
@@ -395,33 +389,33 @@ on_io_data (
                         goto out;
         }
 
-	if (PGM_IS_UPSTREAM (skb->pgm_header->pgm_type) ||
-	    PGM_IS_PEER (skb->pgm_header->pgm_type))
+	if (pgm_is_upstream (skb->pgm_header->pgm_type) ||
+	    pgm_is_peer (skb->pgm_header->pgm_type))
 		goto out;	/* ignore */
 
 /* downstream = source to receivers */
-	if (!PGM_IS_DOWNSTREAM (skb->pgm_header->pgm_type))
+	if (!pgm_is_downstream (skb->pgm_header->pgm_type))
 		goto out;
 
 /* pgm packet DPORT contains our transport DPORT */
-        if (skb->pgm_header->pgm_dport != sock->dport)
+        if (skb->pgm_header->pgm_dport != transport->dport)
                 goto out;
 
 /* search for TSI peer context or create a new one */
-        pgm_peer_t* sender = pgm_hashtable_lookup (sock->peers_hashtable, &skb->tsi);
+        pgm_peer_t* sender = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
         if (sender == NULL)
         {
 		printf ("new peer, tsi %s, local nla %s\n",
 			pgm_tsi_print (&skb->tsi),
 			inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
-		pgm_peer_t* peer = g_new0 (pgm_peer_t, 1);
-		peer->sock = sock;
+		pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
+		peer->transport = transport;
 		memcpy (&peer->tsi, &skb->tsi, sizeof(pgm_tsi_t));
 		((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 		memcpy (&peer->local_nla, &src_addr, src_addr_len);
 
-		pgm_hashtable_insert (sock->peers_hashtable, &peer->tsi, peer);
+		g_hash_table_insert (transport->peers_hashtable, &peer->tsi, peer);
 		sender = peer;
         }
 
@@ -445,405 +439,231 @@ out:
 }
 
 static
-bool
-fake_pgm_bind3 (
-        pgm_sock_t*                   restrict sock,
-        const struct pgm_sockaddr_t*const restrict sockaddr,
-        const socklen_t                        sockaddrlen,
-        const struct pgm_interface_req_t*const send_req,                /* only use gr_interface and gr_group::sin6_scope */
-        const socklen_t                        send_req_len,
-        const struct pgm_interface_req_t*const recv_req,
-        const socklen_t                        recv_req_len,
-        pgm_error_t**                 restrict error                    /* maybe NULL */
+gboolean
+on_io_error (
+        GIOChannel* source,
+        G_GNUC_UNUSED GIOCondition condition,
+        G_GNUC_UNUSED gpointer data
         )
 {
-	g_return_val_if_fail (NULL != sock, FALSE);
-        g_return_val_if_fail (NULL != sockaddr, FALSE);
-        g_return_val_if_fail (0 != sockaddrlen, FALSE);
-        if (sockaddr->sa_addr.sport) pgm_return_val_if_fail (sockaddr->sa_addr.sport != sockaddr->sa_port, FALSE);
-        g_return_val_if_fail (NULL != send_req, FALSE);
-        g_return_val_if_fail (sizeof(struct pgm_interface_req_t) == send_req_len, FALSE);
-        g_return_val_if_fail (NULL != recv_req, FALSE);
-        g_return_val_if_fail (sizeof(struct pgm_interface_req_t) == recv_req_len, FALSE);
+        puts ("on_error.");
 
-	if (sock->is_bound ||
-            sock->is_destroyed)
-        {
-                pgm_return_val_if_reached (FALSE);
-        }
+        GError *err;
+        g_io_channel_shutdown (source, FALSE, &err);
 
-	memcpy (&sock->tsi, &sockaddr->sa_addr, sizeof(pgm_tsi_t));
-        sock->dport = htons (sockaddr->sa_port);
-        if (sock->tsi.sport) {
-                sock->tsi.sport = htons (sock->tsi.sport);
-        } else {
-                do {
-                        sock->tsi.sport = htons (pgm_random_int_range (0, UINT16_MAX));
-                } while (sock->tsi.sport == sock->dport);
-        }
+/* remove event */
+        return FALSE;
+}
 
-/* UDP encapsulation port */
-        if (sock->udp_encap_mcast_port) {
-                ((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
-        }
-
-/* pseudo-random number generator for back-off intervals */
-        pgm_rand_create (&sock->rand_);
-
-/* PGM Children support of POLLs requires 32-bit random node identifier RAND_NODE_ID */
-        if (sock->can_recv_data) {
-                sock->rand_node_id = pgm_rand_int (&sock->rand_);
-        }
-
-/* determine IP header size for rate regulation engine & stats */
-        sock->iphdr_len = (AF_INET == sock->family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
-        pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %zu bytes", sock->iphdr_len);
-
-        if (sock->udp_encap_ucast_port) {
-                const size_t udphdr_len = sizeof(struct pgm_udphdr);
-                printf ("Assuming UDP header size of %zu bytes\n", udphdr_len);
-                sock->iphdr_len += udphdr_len;
-        }
-
-        const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
-        sock->max_tsdu = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, pgmcc_family);
-        sock->max_tsdu_fragment = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, pgmcc_family);
-        const unsigned max_fragments = sock->txw_sqns ? MIN( PGM_MAX_FRAGMENTS, sock->txw_sqns ) : PGM_MAX_FRAGMENTS;
-        sock->max_apdu = MIN( PGM_MAX_APDU, max_fragments * sock->max_tsdu_fragment );
+static
+gboolean
+fake_pgm_transport_bind (
+	pgm_transport_t*	transport,
+	GError**		error
+	)
+{
+	g_return_val_if_fail (NULL != transport, FALSE);
+	g_return_val_if_fail (!transport->is_bound, FALSE);
 
 /* create peer list */
-        if (sock->can_recv_data) {
-                sock->peers_hashtable = pgm_hashtable_new (pgm_tsi_hash, pgm_tsi_equal);
-                pgm_assert (NULL != sock->peers_hashtable);
-        }
+	transport->peers_hashtable = g_hash_table_new (pgm_tsi_hash, pgm_tsi_equal);
 
-/* IP/PGM only */
-	{
-		const sa_family_t recv_family = sock->family;
-                if (AF_INET == recv_family)
-                {
-/* include IP header only for incoming data, only works for IPv4 */
-                        puts ("Request IP headers.");
-                        if (PGM_SOCKET_ERROR == pgm_sockaddr_hdrincl (sock->recv_sock, recv_family, TRUE))
-                        {
-                                const int save_errno = pgm_sock_errno();
-                                pgm_set_error (error,
-                                               PGM_ERROR_DOMAIN_SOCKET,
-                                               pgm_error_from_sock_errno (save_errno),
-                                               "Enabling IP header in front of user data: %s",
-                                               pgm_sock_strerror (save_errno));
-                                return FALSE;
-                        }
-                }
-                else
-                {
-                        pgm_assert (AF_INET6 == recv_family);
-                        puts ("Request socket packet-info.");
-                        if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (sock->recv_sock, recv_family, TRUE))
-                        {
-                                const int save_errno = pgm_sock_errno();
-                                pgm_set_error (error,
-                                               PGM_ERROR_DOMAIN_SOCKET,
-                                               pgm_error_from_sock_errno (save_errno),
-                                               "Enabling receipt of control message per incoming datagram: %s",
-                                               pgm_sock_strerror (save_errno));
-                                return FALSE;
-                        }
-                }
-	}
-
-	union {
-                struct sockaddr         sa;
-                struct sockaddr_in      s4;
-                struct sockaddr_in6     s6;
-                struct sockaddr_storage ss;
-        } recv_addr, recv_addr2, send_addr, send_with_router_alert_addr;
-
-#ifdef CONFIG_BIND_INADDR_ANY
-/* force default interface for bind-only, source address is still valid for multicast membership.
- * effectively same as running getaddrinfo(hints = {ai_flags = AI_PASSIVE})
+/* bind udp unicast sockets to interfaces, note multicast on a bound interface is
+ * fruity on some platforms so callee should specify any interface.
+ *
+ * after binding default interfaces (0.0.0.0) are resolved
  */
-        if (AF_INET == sock->family) {
-                memset (&recv_addr.s4, 0, sizeof(struct sockaddr_in));
-                recv_addr.s4.sin_family = AF_INET;
-                recv_addr.s4.sin_addr.s_addr = INADDR_ANY;
-        } else {
-                memset (&recv_addr.s6, 0, sizeof(struct sockaddr_in6));
-                recv_addr.s6.sin6_family = AF_INET6;
-                recv_addr.s6.sin6_addr = in6addr_any;
-        }
-        puts ("Binding receive socket to INADDR_ANY.");
-#else
-        if (!pgm_if_indextoaddr (recv_req->ir_interface,
-                                 sock->family,
-                                 recv_req->ir_scope_id,
-                                 &recv_addr.sa,
-                                 error))
-        {
-                return FALSE;
-        }
-        printf ("Binding receive socket to interface index %u scope %u\n"),
-                   recv_req->ir_interface,
-                   recv_req->ir_scope_id);
+	struct sockaddr_storage recv_addr;
+	memset (&recv_addr, 0, sizeof(recv_addr));
+	((struct sockaddr*)&recv_addr)->sa_family = AF_INET;
+	((struct sockaddr_in*)&recv_addr)->sin_port = transport->udp_encap_ucast_port;
+	((struct sockaddr_in*)&recv_addr)->sin_addr.s_addr = INADDR_ANY;
 
-#endif /* CONFIG_BIND_INADDR_ANY */
-
-	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
-        ((struct sockaddr_in*)&recv_addr)->sin_port = htons (sock->udp_encap_mcast_port);
-        if (PGM_SOCKET_ERROR == bind (sock->recv_sock,
-                                      &recv_addr.sa,
-                                      pgm_sockaddr_len (&recv_addr.sa)))
-        {
-                char addr[INET6_ADDRSTRLEN];
-                pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-                const int save_errno = pgm_sock_errno();
-                pgm_set_error (error,
-                               PGM_ERROR_DOMAIN_SOCKET,
-                               pgm_error_from_sock_errno (save_errno),
-                               "Binding receive socket to address %s: %s",
-                               addr,
-                               pgm_sock_strerror (save_errno));
-                return FALSE;
+	int retval = bind (transport->recv_sock,
+			   (struct sockaddr*)&recv_addr,
+			   pgm_sockaddr_len((struct sockaddr*)&recv_addr));
+        if (retval < 0) {
+                goto out;
         }
 
-        {
-                char s[INET6_ADDRSTRLEN];
-                pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, s, sizeof(s));
-                printf ("bind succeeded on recv_gsr[0] interface %s\n", s);
-        }
-
-/* keep a copy of the original address source to re-use for router alert bind */
-        memset (&send_addr, 0, sizeof(send_addr));
-
-        if (!pgm_if_indextoaddr (send_req->ir_interface,
-                                 sock->family,
-                                 send_req->ir_scope_id,
-                                 (struct sockaddr*)&send_addr,
-                                 error))
-        {
-                return FALSE;
-        }
-	else
+	struct sockaddr_storage send_addr, send_with_router_alert_addr;
+	memset (&send_addr, 0, sizeof(send_addr));
+	if (!pgm_if_indextoaddr (transport->send_gsr.gsr_interface,
+				 transport->send_gsr.gsr_group.ss_family,
+				 pgm_sockaddr_scope_id((struct sockaddr*)&transport->send_gsr.gsr_group),
+				 (struct sockaddr*)&send_addr,
+				 NULL))
 	{
-		printf ("Binding send socket to interface index %u scope %u\n",
-			send_req->ir_interface,
-                        send_req->ir_scope_id);
+		goto out;
         }
-
-        memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
-        if (PGM_SOCKET_ERROR == bind (sock->send_sock,
-                                      (struct sockaddr*)&send_addr,
-                                      pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
-        {
-                char addr[INET6_ADDRSTRLEN];
-                pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
-                const int save_errno = pgm_sock_errno();
-                pgm_set_error (error,
-                               PGM_ERROR_DOMAIN_SOCKET,
-                               pgm_error_from_sock_errno (save_errno),
-                               "Binding send socket to address %s: %s",
-                               addr,
-                               pgm_sock_strerror (save_errno));
-                return FALSE;
-        }
+	memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len((struct sockaddr*)&send_addr));
+	retval = bind (transport->send_sock,
+		       (struct sockaddr*)&send_addr,
+		       pgm_sockaddr_len((struct sockaddr*)&send_addr));
+        if (retval < 0)
+		goto out;
 
 /* resolve bound address if 0.0.0.0 */
-        if (AF_INET == send_addr.ss.ss_family)
+        if (((struct sockaddr_in*)&send_addr)->sin_addr.s_addr == INADDR_ANY)
         {
-                if ((INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr) &&
-                    !pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
-                {
-                        return FALSE;
-                }
-        }
-        else if ((memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0) &&
-                 !pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
-        {
-                return FALSE;
+		if (!pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), NULL))
+			goto out;
         }
 
-        {
-                char s[INET6_ADDRSTRLEN];
-                pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, s, sizeof(s));
-                printf ("bind succeeded on send_gsr interface %s\n", s);
-        }
+	retval = bind (transport->send_with_router_alert_sock,
+			(struct sockaddr*)&send_with_router_alert_addr,
+			pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr));
+        if (retval < 0)
+		goto out;
 
-	if (PGM_SOCKET_ERROR == bind (sock->send_with_router_alert_sock,
-                                      (struct sockaddr*)&send_with_router_alert_addr,
-                                      pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr)))
-        {
-                char addr[INET6_ADDRSTRLEN];
-                pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-                const int save_errno = pgm_sock_errno();
-                pgm_set_error (error,
-                               PGM_ERROR_DOMAIN_SOCKET,
-                               pgm_error_from_sock_errno (save_errno),
-                               "Binding IP Router Alert (RFC 2113) send socket to address %s: %s",
-                               addr,
-                               pgm_sock_strerror (save_errno));
-                return FALSE;
-        }
+	memcpy (&transport->send_addr, &send_addr, pgm_sockaddr_len((struct sockaddr*)&send_addr));
 
-        {
-                char s[INET6_ADDRSTRLEN];
-                pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, s, sizeof(s));
-                printf ("bind (router alert) succeeded on send_gsr interface %s\n", s);
-        }
+/* receiving groups (multiple) */
+	for (unsigned i = 0; i < transport->recv_gsr_len; i++)
+	{
+		struct group_source_req* p = &transport->recv_gsr[i];
+		int optname = (pgm_sockaddr_cmp ((struct sockaddr*)&p->gsr_group, (struct sockaddr*)&p->gsr_source) == 0)
+				? MCAST_JOIN_GROUP : MCAST_JOIN_SOURCE_GROUP;
+		socklen_t plen = MCAST_JOIN_GROUP == optname ? sizeof(struct group_req) : sizeof(struct group_source_req);
+		retval = setsockopt(transport->recv_sock, SOL_IP, optname, p, plen);
+                if (retval < 0)
+			goto out;
+	}
 
-/* save send side address for broadcasting as source nla */
-        memcpy (&sock->send_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
+/* send group (singular) */
+        retval = pgm_sockaddr_multicast_if (transport->send_sock, (struct sockaddr*)&transport->send_addr, transport->send_gsr.gsr_interface);
+        if (retval < 0)
+                goto out;
 
-	sock->is_controlled_spm   = FALSE;
-	sock->is_controlled_odata = FALSE;
-	sock->is_controlled_rdata = FALSE;
+	retval = pgm_sockaddr_multicast_if (transport->send_with_router_alert_sock, (struct sockaddr*)&transport->send_addr, transport->send_gsr.gsr_interface);
+        if (retval < 0)
+		goto out;
 
-/* allocate first incoming packet buffer */
-        sock->rx_buffer = pgm_alloc_skb (sock->max_tpdu);
+/* multicast loopback */
+	retval = pgm_sockaddr_multicast_loop (transport->recv_sock, transport->recv_gsr[0].gsr_group.ss_family, FALSE);
+        if (retval < 0)
+                goto out;
+        retval = pgm_sockaddr_multicast_loop (transport->send_sock, transport->send_gsr.gsr_group.ss_family, FALSE);
+        if (retval < 0)
+                goto out;
+        retval = pgm_sockaddr_multicast_loop (transport->send_with_router_alert_sock, transport->send_gsr.gsr_group.ss_family, FALSE);
+        if (retval < 0)
+                goto out;
 
-/* bind complete */
-        sock->is_bound = TRUE;
+/* multicast ttl: many crappy network devices go CPU ape with TTL=1, 16 is a popular alternative */
+	retval = pgm_sockaddr_multicast_hops (transport->recv_sock, transport->recv_gsr[0].gsr_group.ss_family, transport->hops);
+        if (retval < 0)
+                goto out;
+        retval = pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
+        if (retval < 0)
+                goto out;
+        retval = pgm_sockaddr_multicast_hops (transport->send_with_router_alert_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
+        if (retval < 0)
+                goto out;
+
+/* set Expedited Forwarding PHB for network elements, no ECN.
+ * 
+ * codepoint 101110 (RFC 3246)
+ */
+        int dscp = 0x2e << 2;
+        retval = pgm_sockaddr_tos (transport->send_sock, transport->send_gsr.gsr_group.ss_family, dscp);
+        if (retval < 0)
+                goto out;
+        retval = pgm_sockaddr_tos (transport->send_with_router_alert_sock, transport->send_gsr.gsr_group.ss_family, dscp);
+        if (retval < 0)
+                goto out;
 
 /* cleanup */
-        puts ("PGM socket successfully bound.");
-        return TRUE;
+	transport->is_bound = TRUE;
+	return TRUE;
+
+out:
+	return FALSE;
 }
 
 static
-bool
-fake_pgm_bind (
-	pgm_sock_t*                       restrict sock,
-        const struct pgm_sockaddr_t*const restrict sockaddr,
-        const socklen_t                            sockaddrlen,
-        pgm_error_t**                     restrict error
+gboolean
+fake_pgm_transport_destroy (
+	pgm_transport_t*	transport,
+	G_GNUC_UNUSED gboolean		flush
 	)
 {
-	struct pgm_interface_req_t null_req;
-        memset (&null_req, 0, sizeof(null_req));
-        return fake_pgm_bind3 (sock, sockaddr, sockaddrlen, &null_req, sizeof(null_req), &null_req, sizeof(null_req), error);
-}
+	g_return_val_if_fail (transport != NULL, FALSE);
 
-static
-bool
-fake_pgm_connect (
-        pgm_sock_t*   restrict sock,
-        G_GNUC_UNUSED pgm_error_t** restrict error    /* maybe NULL */
-        )
-{
-        g_return_val_if_fail (sock != NULL, FALSE);
-        g_return_val_if_fail (sock->recv_gsr_len > 0, FALSE);
-#ifdef CONFIG_TARGET_WINE
-        g_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
-#endif
-        for (unsigned i = 0; i < sock->recv_gsr_len; i++)
-        {
-                g_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
-                g_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[i].gsr_source.ss_family, FALSE);
+	if (transport->recv_sock) {
+                puts ("closing receive socket.");
+                close(transport->recv_sock);
+                transport->recv_sock = 0;
         }
-        g_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
-/* state */
-        if (PGM_UNLIKELY(sock->is_connected || !sock->is_bound || sock->is_destroyed)) {
-                g_return_val_if_reached (FALSE);
+	if (transport->send_sock) {
+                puts ("closing send socket.");
+                close(transport->send_sock);
+                transport->send_sock = 0;
         }
-
-	sock->next_poll = pgm_time_update_now() + pgm_secs( 30 );
-	sock->is_connected = TRUE;
-
-/* cleanup */
-	puts ("PGM socket successfully connected.");
-        return TRUE;
-}
-
-
-static
-bool
-fake_pgm_close (
-	pgm_sock_t*	sock,
-	G_GNUC_UNUSED bool	flush
-	)
-{
-	g_return_val_if_fail (sock != NULL, FALSE);
-	g_return_val_if_fail (!sock->is_destroyed, FALSE);
-/* flag existing calls */
-        sock->is_destroyed = TRUE;
-/* cancel running blocking operations */
-	if (PGM_INVALID_SOCKET != sock->recv_sock) {
-                puts ("Closing receive socket.");
-		pgm_closesocket (sock->recv_sock);
-                sock->recv_sock = PGM_INVALID_SOCKET;
+        if (transport->send_with_router_alert_sock) {
+                puts ("closing send with router alert socket.");
+                close(transport->send_with_router_alert_sock);
+                transport->send_with_router_alert_sock = 0;
         }
-	if (PGM_INVALID_SOCKET != sock->send_sock) {
-                puts ("Closing send socket.");
-                pgm_closesocket (sock->send_sock);
-                sock->send_sock = PGM_INVALID_SOCKET;
-        }
-	if (sock->peers_hashtable) {
-		pgm_hashtable_destroy (sock->peers_hashtable);
-                sock->peers_hashtable = NULL;
-        }
-        if (sock->peers_list) {
-		do {
-                        pgm_list_t* next = sock->peers_list->next;
-                        pgm_peer_unref ((pgm_peer_t*)sock->peers_list->data);
-
-                        sock->peers_list = next;
-                } while (sock->peers_list);
-        }
-	if (PGM_INVALID_SOCKET != sock->send_with_router_alert_sock) {
-                puts ("Closing send with router alert socket.");
-                pgm_closesocket (sock->send_with_router_alert_sock);
-                sock->send_with_router_alert_sock = PGM_INVALID_SOCKET;
-        }
-        if (sock->spm_heartbeat_interval) {
-                puts ("freeing SPM heartbeat interval data.");
-                g_free (sock->spm_heartbeat_interval);
-                sock->spm_heartbeat_interval = NULL;
-        }
-        if (sock->rx_buffer) {
-                puts ("freeing receive buffer.");
-                pgm_free_skb (sock->rx_buffer);
-                sock->rx_buffer = NULL;
-        }
-
-	g_free (sock);
+	g_free (transport);
 	return TRUE;
 }
 
 static
 void
 session_create (
-	char*		session_name,
+	char*		name,
 	gboolean	is_fake
 	)
 {
-	pgm_error_t* pgm_err = NULL;
+	struct pgm_transport_info_t hints = {
+		.ti_family = AF_INET
+	}, *res = NULL;
+	GError* err = NULL;
 	gboolean status;
 
 /* check for duplicate */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess != NULL) {
-		printf ("FAILED: duplicate session name '%s'\n", session_name);
+		puts ("FAILED: duplicate session");
 		return;
 	}
 
 /* create new and fill in bits */
-	sess = g_new0(struct sim_session, 1);
-	sess->name = g_memdup (session_name, strlen(session_name)+1);
+	sess = g_malloc0(sizeof(struct sim_session));
+	sess->name = g_memdup (name, strlen(name)+1);
 
-	if (is_fake) {
-		sess->is_transport_fake = TRUE;
-		status = fake_pgm_socket (&sess->sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err);
-	} else {
-		status = pgm_socket (&sess->sock, AF_INET, SOCK_SEQPACKET, IPPROTO_PGM, &pgm_err);
-	}
-	if (!status) {
-		printf ("FAILED: pgm_socket(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-		pgm_error_free (pgm_err);
+	if (!pgm_if_get_transport_info (g_network, &hints, &res, &err)) {
+		printf ("FAILED: pgm_if_get_transport_info(): %s\n", err->message);
+		g_error_free (err);
 		goto err_free;
 	}
 
+	if (!pgm_gsi_create_from_hostname (&res->ti_gsi, &err)) {
+		printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		goto err_free;
+	}
+
+	res->ti_dport = g_port;
+	res->ti_sport = 0;
+	if (is_fake) {
+		sess->is_transport_fake = TRUE;
+		status = fake_pgm_transport_create (&sess->transport, res, &err);
+	} else
+		status = pgm_transport_create (&sess->transport, res, &err);
+	if (!status) {
+		printf ("FAILED: pgm_transport_create(): %s\n", err->message);
+		g_error_free (err);
+		pgm_if_free_transport_info (res);
+		goto err_free;
+	}
+
+	pgm_if_free_transport_info (res);
+
 /* success */
 	g_hash_table_insert (g_sessions, sess->name, sess);
-	g_sessions_list = g_list_prepend (g_sessions_list, sess);
 	printf ("created new session \"%s\"\n", sess->name);
 	puts ("READY");
 	return;
@@ -856,234 +676,78 @@ err_free:
 static
 void
 session_set_fec (
-	char*		session_name,
-	guint		block_size,
-	guint		group_size
+	char*		name,
+	guint		default_n,
+	guint		default_k
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	if (block_size > UINT8_MAX ||
-	    group_size > UINT8_MAX)
-	{
-		puts ("FAILED: value out of bounds");
-		return;
-	}
-
-	const struct pgm_fecinfo_t fecinfo = {
-                .block_size                     = block_size,
-                .proactive_packets              = 0,
-                .group_size                     = group_size,
-                .ondemand_parity_enabled        = TRUE,
-                .var_pktlen_enabled             = TRUE
-        };
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_USE_FEC, &fecinfo, sizeof(fecinfo)))
-                printf ("FAILED: set FEC = RS(%d, %d)\n", block_size, group_size);
-        else
-                puts ("READY");
+	pgm_transport_set_fec (sess->transport, FALSE /* pro-active */, TRUE /* on-demand */, TRUE /* varpkt-len */, default_n, default_k);
+	puts ("READY");
 }
 
 static
 void
 session_bind (
-	char*		session_name
+	char*		name
 	)
 {
-	pgm_error_t* pgm_err = NULL;
-
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-/* Use RFC 2113 tagging for PGM Router Assist */
-        const int no_router_assist = 0;
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_IP_ROUTER_ALERT, &no_router_assist, sizeof(no_router_assist)))
-                puts ("FAILED: disable IP_ROUTER_ALERT");
+	pgm_transport_set_nonblocking (sess->transport, TRUE);
+	pgm_sockaddr_nonblocking (sess->transport->send_sock, FALSE);
+	pgm_transport_set_max_tpdu (sess->transport, g_max_tpdu);
+	pgm_transport_set_txw_sqns (sess->transport, g_sqns);
+	pgm_transport_set_rxw_sqns (sess->transport, g_sqns);
+	pgm_transport_set_hops (sess->transport, 16);
+	pgm_transport_set_ambient_spm (sess->transport, pgm_secs(30));
+	guint spm_heartbeat[] = { pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) };
+	pgm_transport_set_heartbeat_spm (sess->transport, spm_heartbeat, G_N_ELEMENTS(spm_heartbeat));
+	pgm_transport_set_peer_expiry (sess->transport, pgm_secs(300));
+	pgm_transport_set_spmr_expiry (sess->transport, pgm_msecs(250));
+	pgm_transport_set_nak_bo_ivl (sess->transport, pgm_msecs(50));
+	pgm_transport_set_nak_rpt_ivl (sess->transport, pgm_secs(2));
+	pgm_transport_set_nak_rdata_ivl (sess->transport, pgm_secs(2));
+	pgm_transport_set_nak_data_retries (sess->transport, 50);
+	pgm_transport_set_nak_ncf_retries (sess->transport, 50);
 
-/* set PGM parameters */
-        const int send_and_receive = 0,
-                  active = 0,
-                  mtu = g_max_tpdu,
-                  txw_sqns = g_sqns,
-                  rxw_sqns = g_sqns,
-                  ambient_spm = pgm_secs (30),
-                  heartbeat_spm[] = { pgm_msecs (100),
-                                      pgm_msecs (100),
-                                      pgm_msecs (100),
-                                      pgm_msecs (100),
-                                      pgm_msecs (1300),
-                                      pgm_secs  (7),
-                                      pgm_secs  (16),
-                                      pgm_secs  (25),
-                                      pgm_secs  (30) },
-                  peer_expiry = pgm_secs (300),
-                  spmr_expiry = pgm_msecs (250),
-                  nak_bo_ivl = pgm_msecs (50),
-                  nak_rpt_ivl = pgm_secs (2),
-                  nak_rdata_ivl = pgm_secs (2),
-                  nak_data_retries = 50,
-                  nak_ncf_retries = 50;
-
-        g_assert (G_N_ELEMENTS(heartbeat_spm) > 0);
-
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_ONLY, &send_and_receive, sizeof(send_and_receive)))
-                puts ("FAILED: set bi-directional transport");
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_RECV_ONLY, &send_and_receive, sizeof(send_and_receive)))
-                puts ("FAILED: set bi-directional transport");
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_PASSIVE, &active, sizeof(active)))
-                puts ("FAILED: set active transport");
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MTU, &mtu, sizeof(mtu)))
-                printf ("FAILED: set MAX_TPDU = %d bytes\n", mtu);
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TXW_SQNS, &txw_sqns, sizeof(txw_sqns)))
-                printf ("FAILED: set TXW_SQNS = %d\n", txw_sqns);
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_RXW_SQNS, &rxw_sqns, sizeof(rxw_sqns)))
-                printf ("FAILED: set RXW_SQNS = %d\n", rxw_sqns);
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm)))
-                printf ("FAILED: set AMBIENT_SPM = %ds\n", (int)pgm_to_secs (ambient_spm));
-	if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_HEARTBEAT_SPM, &heartbeat_spm, sizeof(heartbeat_spm)))
-        {
-                char buffer[1024];
-                sprintf (buffer, "%d", heartbeat_spm[0]);
-                for (unsigned i = 1; i < G_N_ELEMENTS(heartbeat_spm); i++) {
-                        char t[1024];
-                        sprintf (t, ", %d", heartbeat_spm[i]);
-                        strcat (buffer, t);
-                }
-                printf ("FAILED: set HEARTBEAT_SPM = { %s }\n", buffer);
-        }
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_PEER_EXPIRY, &peer_expiry, sizeof(peer_expiry)))
-                printf ("FAILED: set PEER_EXPIRY = %ds\n",(int) pgm_to_secs (peer_expiry));
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SPMR_EXPIRY, &spmr_expiry, sizeof(spmr_expiry)))
-                printf ("FAILED: set SPMR_EXPIRY = %dms\n", (int)pgm_to_msecs (spmr_expiry));
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_BO_IVL, &nak_bo_ivl, sizeof(nak_bo_ivl)))
-                printf ("FAILED: set NAK_BO_IVL = %dms\n", (int)pgm_to_msecs (nak_bo_ivl));
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RPT_IVL, &nak_rpt_ivl, sizeof(nak_rpt_ivl)))
-                printf ("FAILED: set NAK_RPT_IVL = %dms\n", (int)pgm_to_msecs (nak_rpt_ivl));
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_RDATA_IVL, &nak_rdata_ivl, sizeof(nak_rdata_ivl)))
-                printf ("FAILED: set NAK_RDATA_IVL = %dms\n", (int)pgm_to_msecs (nak_rdata_ivl));
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_DATA_RETRIES, &nak_data_retries, sizeof(nak_data_retries)))
-                printf ("FAILED: set NAK_DATA_RETRIES = %d\n", nak_data_retries);
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NAK_NCF_RETRIES, &nak_ncf_retries, sizeof(nak_ncf_retries)))
-                printf ("FAILED: set NAK_NCF_RETRIES = %d\n", nak_ncf_retries);
-
-/* create global session identifier */
-        struct pgm_sockaddr_t addr;
-        memset (&addr, 0, sizeof(addr));
-        addr.sa_port = g_port;
-        addr.sa_addr.sport = 0;
-        if (!pgm_gsi_create_from_hostname (&addr.sa_addr.gsi, &pgm_err)) {
-                printf ("FAILED: pgm_gsi_create_from_hostname(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-        }
-
-{
-        char buffer[1024];
-        pgm_tsi_print_r (&addr.sa_addr, buffer, sizeof(buffer));
-        printf ("pgm_bind (sock:%p addr:{port:%d tsi:%s} err:%p)\n",
-                (gpointer)sess->sock,
-                addr.sa_port, buffer,
-                (gpointer)&pgm_err);
-}
-	const bool status = sess->is_transport_fake ?
-			fake_pgm_bind (sess->sock, &addr, sizeof(addr), &pgm_err) :
-			pgm_bind (sess->sock, &addr, sizeof(addr), &pgm_err);
+	GError* err = NULL;
+	gboolean status;
+	if (sess->is_transport_fake)
+		status = fake_pgm_transport_bind (sess->transport, &err);
+	else
+		status = pgm_transport_bind (sess->transport, &err);
 	if (!status) {
-                printf ("FAILED: pgm_bind(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-                pgm_error_free (pgm_err);
-        } else
-		puts ("READY");
-}
-
-static
-void
-session_connect (
-        char*           session_name
-        )
-{
-        struct pgm_addrinfo_t hints = {
-                .ai_family = AF_INET
-        }, *res = NULL;
-        pgm_error_t* pgm_err = NULL;
-
-/* check that session exists */
-        struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
-        if (sess == NULL) {
-                printf ("FAILED: session '%s' not found\n", session_name);
-                return;
-        }
-
-	if (!pgm_getaddrinfo (g_network, &hints, &res, &pgm_err)) {
-                printf ("FAILED: pgm_getaddrinfo(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
-                pgm_error_free (pgm_err);
-                return;
-        }
-
-/* join IP multicast groups */
-        for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-                if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req)))
-                {
-                        char group[INET6_ADDRSTRLEN];
-                        getnameinfo ((struct sockaddr*)&res->ai_recv_addrs[i].gsr_group, sizeof(struct sockaddr_in),
-                                        group, sizeof(group),
-                                        NULL, 0,
-                                        NI_NUMERICHOST);
-                        printf ("FAILED: join group (#%u %s)\n", (unsigned)res->ai_recv_addrs[i].gsr_interface, group);
-                }
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req)))
-                {
-                        char group[INET6_ADDRSTRLEN];
-                        getnameinfo ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, sizeof(struct sockaddr_in),
-                                        group, sizeof(group),
-                                        NULL, 0,
-                                        NI_NUMERICHOST);
-                        printf ("FAILED: send group (#%u %s)\n", (unsigned)res->ai_send_addrs[0].gsr_interface, group);
-                }
-        pgm_freeaddrinfo (res);
-
-/* set IP parameters */
-        const int non_blocking = 1,
-                  no_multicast_loop = 0,
-                  multicast_hops = 16,
-                  dscp = 0x2e << 2;             /* Expedited Forwarding PHB for network elements, no ECN. */
-
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MULTICAST_LOOP, &no_multicast_loop, sizeof(no_multicast_loop)))
-                puts ("FAILED: disable multicast loop");
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_MULTICAST_HOPS, &multicast_hops, sizeof(multicast_hops)))
-                printf ("FAILED: set TTL = %d\n", multicast_hops);
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_TOS, &dscp, sizeof(dscp)))
-                printf ("FAILED: set TOS = 0x%x\n", dscp);
-        if (!pgm_setsockopt (sess->sock, IPPROTO_PGM, PGM_NOBLOCK, &non_blocking, sizeof(non_blocking)))
-                puts ("FAILED: set non-blocking sockets");
-
-	const bool status = sess->is_transport_fake ?
-				fake_pgm_connect (sess->sock, &pgm_err) :
-				pgm_connect (sess->sock, &pgm_err);
-        if (!status) {
-                printf ("FAILED: pgm_connect(): %s\n", (pgm_err && pgm_err->message) ? pgm_err->message : "(null)");
+		printf ("FAILED: pgm_transport_bind(): %s\n", err->message);
+		g_error_free (err);
 		return;
 	}
 
 	if (sess->is_transport_fake)
 	{
 /* add receive socket(s) to event manager */
-		sess->recv_channel = g_io_channel_unix_new (sess->sock->recv_sock);
+		sess->recv_channel = g_io_channel_unix_new (sess->transport->recv_sock);
 
 		GSource *source;
 		source = g_io_create_watch (sess->recv_channel, G_IO_IN);
-		g_source_set_callback (source, (GSourceFunc)on_io_data, sess->sock, NULL);
+		g_source_set_callback (source, (GSourceFunc)on_io_data, sess->transport, NULL);
 		g_source_attach (source, NULL);
 		g_source_unref (source);
 	}
 	else
 	{
-		pgm_async_create (&sess->async, sess->sock, 0);
+		pgm_async_create (&sess->async, sess->transport, 0);
 		pgm_async_add_watch (sess->async, on_data, sess);
 	}
 
@@ -1092,86 +756,75 @@ session_connect (
 
 static inline
 gssize
-pgm_sendto_hops (
-	pgm_sock_t*		sock,
-	G_GNUC_UNUSED gboolean	rl,
-	gboolean		ra,
-	const int		hops,
-	const void*		buf,
-	gsize			len,
-	const struct sockaddr*	to,
-	socklen_t		tolen
-	)
+pgm_sendto (pgm_transport_t* transport, gboolean rl, gboolean ra, const void* buf, gsize len, const struct sockaddr* to, socklen_t tolen)
 {
-        const int send_sock = ra ? sock->send_with_router_alert_sock : sock->send_sock;
-        pgm_mutex_lock (&sock->send_mutex);
-        const ssize_t sent = sendto (send_sock, buf, len, 0, to, tolen);
-        pgm_mutex_unlock (&sock->send_mutex);
+        int sock = ra ? transport->send_with_router_alert_sock : transport->send_sock;
+        g_static_mutex_lock (&transport->send_mutex);
+        ssize_t sent = sendto (sock, buf, len, 0, to, tolen);
+        g_static_mutex_unlock (&transport->send_mutex);
         return sent > 0 ? (gssize)len : (gssize)sent;
 }
 
 static
 int
-pgm_reset_heartbeat_spm (
-	pgm_sock_t*	sock
-	)
+pgm_reset_heartbeat_spm (pgm_transport_t* transport)
 {
         int retval = 0;
 
-        pgm_mutex_lock (&sock->timer_mutex);
+        g_static_mutex_lock (&transport->timer_mutex);
 
 /* re-set spm timer */
-        sock->spm_heartbeat_state = 1;
-        sock->next_heartbeat_spm = pgm_time_update_now() + sock->spm_heartbeat_interval[sock->spm_heartbeat_state++];
+        transport->spm_heartbeat_state = 1;
+        transport->next_heartbeat_spm = pgm_time_update_now() + transport->spm_heartbeat_interval[transport->spm_heartbeat_state++];
 
 /* prod timer thread if sleeping */
-        if (pgm_time_after( sock->next_poll, sock->next_heartbeat_spm ))
-                sock->next_poll = sock->next_heartbeat_spm;
+        if (pgm_time_after( transport->next_poll, transport->next_heartbeat_spm ))
+                transport->next_poll = transport->next_heartbeat_spm;
 
-        pgm_mutex_unlock (&sock->timer_mutex);
+        g_static_mutex_unlock (&transport->timer_mutex);
 
         return retval;
 }
 
 static inline
-int
+PGMIOStatus
 brokn_send_apdu_unlocked (
-        pgm_sock_t*	sock,
-        const gchar*    buf,
-        gsize           count,
-	gsize*		bytes_written
+        pgm_transport_t*        transport,
+        const gchar*            buf,
+        gsize                   count,
+	gsize*			bytes_written
 	)
 {
-        guint32 opt_sqn = pgm_txw_next_lead(sock->window);
+        guint32 opt_sqn = pgm_txw_next_lead(transport->window);
         guint packets = 0;
         guint bytes_sent = 0;
         guint data_bytes_sent = 0;
 
-	pgm_mutex_lock (&sock->source_mutex);
+        g_static_mutex_lock (&transport->source_mutex);
 
         do {
 /* retrieve packet storage from transmit window */
                 int header_length = sizeof(struct pgm_header) + sizeof(struct pgm_data) + 
                                 sizeof(struct pgm_opt_length) +         /* includes header */
                                 sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-                int tsdu_length = MIN(sock->max_tpdu - sock->iphdr_len - header_length, count - data_bytes_sent);
+                int tsdu_length = MIN(transport->max_tpdu - transport->iphdr_len - header_length, count - data_bytes_sent);
                 int tpdu_length = header_length + tsdu_length;
 
 		struct pgm_sk_buff_t* skb = pgm_alloc_skb (tsdu_length);
 		pgm_skb_put (skb, tpdu_length);
 
                 skb->pgm_header = (struct pgm_header*)skb->data;
-                memcpy (skb->pgm_header->pgm_gsi, &sock->tsi.gsi, sizeof(pgm_gsi_t));
-                skb->pgm_header->pgm_sport       = sock->tsi.sport;
-                skb->pgm_header->pgm_dport       = sock->dport;
+                memcpy (skb->pgm_header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+                skb->pgm_header->pgm_sport       = transport->tsi.sport;
+                skb->pgm_header->pgm_dport       = transport->dport;
                 skb->pgm_header->pgm_type        = PGM_ODATA;
                 skb->pgm_header->pgm_options     = PGM_OPT_PRESENT;
                 skb->pgm_header->pgm_tsdu_length = g_htons (tsdu_length);
 
 /* ODATA */
                 skb->pgm_data = (struct pgm_data*)(skb->pgm_header + 1);
-                skb->pgm_data->data_sqn         = g_htonl (pgm_txw_next_lead(sock->window));
-                skb->pgm_data->data_trail       = g_htonl (pgm_txw_trail(sock->window));
+                skb->pgm_data->data_sqn         = g_htonl (pgm_txw_next_lead(transport->window));
+                skb->pgm_data->data_trail       = g_htonl (pgm_txw_trail(transport->window));
 
 /* OPT_LENGTH */
                 struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(skb->pgm_data + 1);
@@ -1200,26 +853,25 @@ brokn_send_apdu_unlocked (
                 skb->pgm_header->pgm_checksum    = pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, pgm_header_len));
 
 /* add to transmit window */
-		pgm_spinlock_lock (&sock->txw_spinlock);
-                pgm_txw_add (sock->window, skb);
-		pgm_spinlock_unlock (&sock->txw_spinlock);
+		g_static_mutex_lock (&transport->txw_mutex);
+                pgm_txw_add (transport->window, skb);
+		g_static_mutex_unlock (&transport->txw_mutex);
 
 /* do not send send packet */
 		if (packets != 1)
-                	pgm_sendto_hops (sock,
+                	pgm_sendto (transport,
 				    TRUE,
                                     FALSE,
-				    sock->hops,
                                     skb->data,
                                     tpdu_length,
-                                    (struct sockaddr*)&sock->send_gsr.gsr_group,
-                                    pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+                                    (struct sockaddr*)&transport->send_gsr.gsr_group,
+                                    pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 
 /* save unfolded odata for retransmissions */
 		*(guint32*)&skb->cb = unfolded_odata;
 
                 packets++;
-                bytes_sent += tpdu_length + sock->iphdr_len;
+                bytes_sent += tpdu_length + transport->iphdr_len;
                 data_bytes_sent += tsdu_length;
 
         } while (data_bytes_sent < count);
@@ -1228,47 +880,47 @@ brokn_send_apdu_unlocked (
 		*bytes_written = data_bytes_sent;
 
 /* release txw lock here in order to allow spms to lock mutex */
-	pgm_mutex_unlock (&sock->source_mutex);
-	pgm_reset_heartbeat_spm (sock);
-	return PGM_IO_STATUS_NORMAL;
+        g_static_mutex_unlock (&transport->source_mutex);
+        pgm_reset_heartbeat_spm (transport);
+        return PGM_IO_STATUS_NORMAL;
 }
 
 static
-int
+PGMIOStatus
 brokn_send (
-        pgm_sock_t*	sock,      
-        const gchar*	data,
-        gsize		len,
-	gsize*		bytes_written
+        pgm_transport_t*        transport,      
+        const gchar*            data,
+        gsize                   len,
+	gsize*			bytes_written
         )
 {
-        if ( len <= ( sock->max_tpdu - (  sizeof(struct pgm_header) +
-                                          sizeof(struct pgm_data) ) ) )
+        if ( len <= ( transport->max_tpdu - (  sizeof(struct pgm_header) +
+                                               sizeof(struct pgm_data) ) ) )
         {
 		puts ("FAILED: cannot send brokn single TPDU length APDU");
 		return PGM_IO_STATUS_ERROR;
         }
 
-        return brokn_send_apdu_unlocked (sock, data, len, bytes_written);
+        return brokn_send_apdu_unlocked (transport, data, len, bytes_written);
 }
 
 static
 void
 session_send (
-	char*		session_name,
+	char*		name,
 	char*		string,
 	gboolean	is_brokn		/* send broken apdu */
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* send message */
-	int status;
+        PGMIOStatus status;
 	gsize stringlen = strlen(string) + 1;
 	int n_fds = 1;
 	struct pollfd fds[ n_fds ];
@@ -1276,30 +928,24 @@ session_send (
 	int timeout;
 again:
 	if (is_brokn)
-		status = brokn_send (sess->sock, string, stringlen, NULL);
+		status = brokn_send (sess->transport, string, stringlen, NULL);
 	else
-		status = pgm_send (sess->sock, string, stringlen, NULL);
+		status = pgm_send (sess->transport, string, stringlen, NULL);
 	switch (status) {
 	case PGM_IO_STATUS_NORMAL:
 		puts ("READY");
 		break;
 	case PGM_IO_STATUS_TIMER_PENDING:
-	{
-		socklen_t optlen = sizeof (tv);
-		pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
-	}
-	goto block;
+		pgm_transport_get_timer_pending (sess->transport, &tv);
+		goto block;
 	case PGM_IO_STATUS_RATE_LIMITED:
-	{
-		socklen_t optlen = sizeof (tv);
-		pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
-	}
+		pgm_transport_get_rate_remaining (sess->transport, &tv);
 /* fall through */
 	case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		memset (fds, 0, sizeof(fds));
-		pgm_poll_info (sess->sock, fds, &n_fds, POLLOUT);
+		pgm_transport_poll_info (sess->transport, fds, &n_fds, POLLOUT);
 		poll (fds, n_fds, timeout /* ms */);
 		goto again;
 	default:
@@ -1311,18 +957,18 @@ block:
 static
 void
 session_destroy (
-	char*		session_name
+	char*		name
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* remove from hash table */
-	g_hash_table_remove (g_sessions, session_name);
+	g_hash_table_remove (g_sessions, name);
 
 /* close down receive side first to stop new data incoming */
         if (sess->recv_channel) { 
@@ -1342,13 +988,13 @@ session_destroy (
 
 	if (sess->is_transport_fake)
 	{
-		fake_pgm_close (sess->sock, TRUE);
+		fake_pgm_transport_destroy (sess->transport, TRUE);
 	}
 	else
 	{
-		pgm_close (sess->sock, TRUE);
+		pgm_transport_destroy (sess->transport, TRUE);
 	}
-	sess->sock = NULL;
+	sess->transport = NULL;
 	g_free (sess->name);
 	sess->name = NULL;
 	g_free (sess);
@@ -1359,7 +1005,7 @@ session_destroy (
 static
 void
 net_send_data (
-	char*		session_name,
+	char*		name,
 	guint8		pgm_type,		/* PGM_ODATA or PGM_RDATA */
 	guint32		data_sqn,
 	guint32		txw_trail,
@@ -1367,13 +1013,13 @@ net_send_data (
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	pgm_sock_t* sock = sess->sock;
+	pgm_transport_t* transport = sess->transport;
 
 /* payload is string including terminating null. */
 	int count = strlen(string) + 1;
@@ -1386,9 +1032,9 @@ net_send_data (
 
         struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_data *data = (struct pgm_data*)(header + 1);
-	memcpy (header->pgm_gsi, &sock->tsi.gsi, sizeof(pgm_gsi_t));
-	header->pgm_sport       = sock->tsi.sport;
-	header->pgm_dport       = sock->dport;
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->tsi.sport;
+	header->pgm_dport       = transport->dport;
 	header->pgm_type        = pgm_type;
 	header->pgm_options     = 0;
 	header->pgm_tsdu_length = g_htons (count);
@@ -1402,14 +1048,14 @@ net_send_data (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	pgm_mutex_lock (&sock->send_mutex);
-        retval = sendto (sock->send_sock,
+	g_static_mutex_lock (&transport->send_mutex);
+        retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
-				(struct sockaddr*)&sock->send_gsr.gsr_group,
-				pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	pgm_mutex_unlock (&sock->send_mutex);
+				(struct sockaddr*)&transport->send_gsr.gsr_group,
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
+	g_static_mutex_unlock (&transport->send_mutex);
 
 	puts ("READY");
 }
@@ -1423,7 +1069,7 @@ net_send_data (
 static
 void
 net_send_parity (
-	char*		session_name,
+	char*		name,
 	guint8		pgm_type,		/* PGM_ODATA or PGM_RDATA */
 	guint32		data_sqn,
 	guint32		txw_trail,
@@ -1431,18 +1077,18 @@ net_send_parity (
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	pgm_sock_t* sock = sess->sock;
+	pgm_transport_t* transport = sess->transport;
 
 /* split string into individual payloads */
 	guint16 parity_length = 0;
 	gchar** src;
-	src = g_strsplit (string, " ", sock->rs_k);
+	src = g_strsplit (string, " ", transport->rs_k);
 
 /* payload is string including terminating null. */
 	parity_length = strlen(*src) + 1;
@@ -1461,8 +1107,8 @@ net_send_parity (
 		}
 	}
 
-	if ( i != sock->rs_k ) {
-		printf ("FAILED: payload array length %u, whilst rs_k is %u.\n", i, sock->rs_k);
+	if ( i != transport->rs_k ) {
+		printf ("FAILED: payload array length %u, whilst rs_k is %u.\n", i, transport->rs_k);
 		return;
 	}
 
@@ -1482,7 +1128,7 @@ net_send_parity (
 	}
 
 /* calculate FEC block offset */
-	guint32 tg_sqn_mask = 0xffffffff << sock->tg_sqn_shift;
+	guint32 tg_sqn_mask = 0xffffffff << transport->tg_sqn_shift;
 	guint rs_h = data_sqn & ~tg_sqn_mask;
 
 /* send */
@@ -1493,9 +1139,9 @@ net_send_parity (
 
         struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_data *data = (struct pgm_data*)(header + 1);
-	memcpy (header->pgm_gsi, &sock->tsi.gsi, sizeof(pgm_gsi_t));
-	header->pgm_sport       = sock->tsi.sport;
-	header->pgm_dport       = sock->dport;
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->tsi.sport;
+	header->pgm_dport       = transport->dport;
 	header->pgm_type        = pgm_type;
 	header->pgm_options     = is_var_pktlen ? (PGM_OPT_PARITY | PGM_OPT_VAR_PKTLEN) : PGM_OPT_PARITY;
 	header->pgm_tsdu_length = g_htons (parity_length);
@@ -1505,22 +1151,22 @@ net_send_parity (
 	data->data_trail	= g_htonl (txw_trail);
 
 	memset (data + 1, 0, parity_length);
-	pgm_rs_t rs;
-	pgm_rs_create (&rs, sock->rs_n, sock->rs_k);
-	pgm_rs_encode (&rs, (const pgm_gf8_t**)src, sock->rs_k + rs_h, (pgm_gf8_t*)(data + 1), parity_length);
+	rs_t rs;
+	pgm_rs_create (&rs, transport->rs_n, transport->rs_k);
+	pgm_rs_encode (&rs, (const void**)src, transport->rs_k + rs_h, data + 1, parity_length);
 	pgm_rs_destroy (&rs);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	pgm_mutex_lock (&sock->send_mutex);
-        retval = sendto (sock->send_sock,
+	g_static_mutex_lock (&transport->send_mutex);
+        retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
-				(struct sockaddr*)&sock->send_gsr.gsr_group,
-				pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	pgm_mutex_unlock (&sock->send_mutex);
+				(struct sockaddr*)&transport->send_gsr.gsr_group,
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
+	g_static_mutex_unlock (&transport->send_mutex);
 
 	g_strfreev (src);
 	src = NULL;
@@ -1531,7 +1177,7 @@ net_send_parity (
 static
 void
 net_send_spm (
-	char*		session_name,
+	char*		name,
 	guint32		spm_sqn,
 	guint32		txw_trail,
 	guint32		txw_lead,
@@ -1541,13 +1187,13 @@ net_send_spm (
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	pgm_sock_t* sock = sess->sock;
+	pgm_transport_t* transport = sess->transport;
 
 /* send */
         int retval = 0;
@@ -1563,9 +1209,9 @@ net_send_spm (
 
         struct pgm_header *header = (struct pgm_header*)buf;
 	struct pgm_spm *spm = (struct pgm_spm*)(header + 1);
-	memcpy (header->pgm_gsi, &sock->tsi.gsi, sizeof(pgm_gsi_t));
-	header->pgm_sport       = sock->tsi.sport;
-	header->pgm_dport       = sock->dport;
+	memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
+	header->pgm_sport       = transport->tsi.sport;
+	header->pgm_dport       = transport->dport;
 	header->pgm_type        = PGM_SPM;
 	header->pgm_options	= (proactive_parity || ondemand_parity) ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK) : 0;
 	header->pgm_tsdu_length	= 0;
@@ -1574,7 +1220,7 @@ net_send_spm (
 	spm->spm_sqn		= g_htonl (spm_sqn);
 	spm->spm_trail		= g_htonl (txw_trail);
 	spm->spm_lead		= g_htonl (txw_lead);
-	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&spm->spm_nla_afi);
+	pgm_sockaddr_to_nla ((struct sockaddr*)&transport->send_addr, (char*)&spm->spm_nla_afi);
 
 	if (proactive_parity || ondemand_parity) {
 		struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(spm + 1);
@@ -1595,43 +1241,43 @@ net_send_spm (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-        retval = sendto (sock->send_sock,
+        retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
-				(struct sockaddr*)&sock->send_gsr.gsr_group,
-				pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+				(struct sockaddr*)&transport->send_gsr.gsr_group,
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 	puts ("READY");
 }
 
 static
 void
 net_send_spmr (
-	char*		session_name,
+	char*		name,
 	pgm_tsi_t*	tsi
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
-	pgm_sock_t* sock = sess->sock;
+	pgm_transport_t* transport = sess->transport;
 
 /* check that the peer exists */
-	pgm_peer_t* peer = pgm_hashtable_lookup (sock->peers_hashtable, tsi);
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	struct sockaddr_storage peer_nla;
 	pgm_gsi_t* peer_gsi;
 	guint16 peer_sport;
 
 	if (peer == NULL) {
 /* ourself */
-		if (pgm_tsi_equal (tsi, &sock->tsi))
+		if (pgm_tsi_equal (tsi, &transport->tsi))
 		{
-			peer_gsi   = &sock->tsi.gsi;
-			peer_sport = sock->tsi.sport;
+			peer_gsi   = &transport->tsi.gsi;
+			peer_sport = transport->tsi.sport;
 		}
 		else
 		{
@@ -1653,7 +1299,7 @@ net_send_spmr (
 
         struct pgm_header *header = (struct pgm_header*)buf;
 	memcpy (header->pgm_gsi, peer_gsi, sizeof(pgm_gsi_t));
-	header->pgm_sport       = sock->dport;
+	header->pgm_sport       = transport->dport;
 	header->pgm_dport       = peer_sport;
 	header->pgm_type        = PGM_SPMR;
 	header->pgm_options     = 0;
@@ -1661,21 +1307,21 @@ net_send_spmr (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-	pgm_mutex_lock (&sock->send_mutex);
+	g_static_mutex_lock (&transport->send_mutex);
 /* TTL 1 */
-	pgm_sockaddr_multicast_hops (sock->send_sock, sock->send_gsr.gsr_group.ss_family, 1);
-        retval = sendto (sock->send_sock,
+	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, 1);
+        retval = sendto (transport->send_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
-				(struct sockaddr*)&sock->send_gsr.gsr_group,
-				pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+				(struct sockaddr*)&transport->send_gsr.gsr_group,
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 /* default TTL */
-	pgm_sockaddr_multicast_hops (sock->send_sock, sock->send_gsr.gsr_group.ss_family, sock->hops);
+	pgm_sockaddr_multicast_hops (transport->send_sock, transport->send_gsr.gsr_group.ss_family, transport->hops);
 
-	if (!pgm_tsi_equal (tsi, &sock->tsi))
+	if (!pgm_tsi_equal (tsi, &transport->tsi))
 	{
-	        retval = sendto (sock->send_sock,
+	        retval = sendto (transport->send_sock,
 	                                header,
 	                                tpdu_length,
 	                                0,            /* not expecting a reply */
@@ -1683,7 +1329,7 @@ net_send_spmr (
 					pgm_sockaddr_len((struct sockaddr*)&peer_nla));
 	}
 
-	pgm_mutex_unlock (&sock->send_mutex);
+	g_static_mutex_unlock (&transport->send_mutex);
 
 	puts ("READY");
 }
@@ -1695,21 +1341,21 @@ net_send_spmr (
 static
 void
 net_send_ncf (
-	char*			session_name,
-	pgm_tsi_t*		tsi,
-	struct pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
+	char*		name,
+	pgm_tsi_t*	tsi,
+	pgm_sqn_list_t*	sqn_list	/* list of sequence numbers */
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* check that the peer exists */
-	pgm_sock_t* sock = sess->sock;
-	pgm_peer_t* peer = pgm_hashtable_lookup (sock->peers_hashtable, tsi);
+	pgm_transport_t* transport = sess->transport;
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_tsi_print (tsi));
 		return;
@@ -1735,14 +1381,14 @@ net_send_ncf (
 
         struct pgm_header *header = (struct pgm_header*)buf;
         struct pgm_nak *ncf = (struct pgm_nak*)(header + 1);
-        memcpy (header->pgm_gsi, &sock->tsi.gsi, sizeof(pgm_gsi_t));
+        memcpy (header->pgm_gsi, &transport->tsi.gsi, sizeof(pgm_gsi_t));
 
 	struct sockaddr_storage peer_nla;
 	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
 
 /* dport & sport swap over for a nak */
-        header->pgm_sport       = sock->tsi.sport;
-        header->pgm_dport       = sock->dport;
+        header->pgm_sport       = transport->tsi.sport;
+        header->pgm_dport       = transport->dport;
         header->pgm_type        = PGM_NCF;
         header->pgm_options     = (sqn_list->len > 1) ? (PGM_OPT_PRESENT | PGM_OPT_NETWORK) : 0;
         header->pgm_tsdu_length = 0;
@@ -1754,7 +1400,7 @@ net_send_ncf (
         pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&ncf->nak_src_nla_afi);
 
 /* group nla */
-        pgm_sockaddr_to_nla ((struct sockaddr*)&sock->recv_gsr[0].gsr_group, (char*)&ncf->nak_grp_nla_afi);
+        pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_gsr[0].gsr_group, (char*)&ncf->nak_grp_nla_afi);
 
 /* OPT_NAK_LIST */
 	if (sqn_list->len > 1)
@@ -1780,12 +1426,12 @@ net_send_ncf (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-        retval = sendto (sock->send_with_router_alert_sock,
+        retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
-				(struct sockaddr*)&sock->send_gsr.gsr_group,
-				pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+				(struct sockaddr*)&transport->send_gsr.gsr_group,
+				pgm_sockaddr_len((struct sockaddr*)&transport->send_gsr.gsr_group));
 
 	puts ("READY");
 }
@@ -1793,22 +1439,22 @@ net_send_ncf (
 static
 void
 net_send_nak (
-	char*			session_name,
-	pgm_tsi_t*		tsi,
-	struct pgm_sqn_list_t*	sqn_list,	/* list of sequence numbers */
-	gboolean		is_parity	/* TRUE = parity, FALSE = selective */
+	char*		name,
+	pgm_tsi_t*	tsi,
+	pgm_sqn_list_t*	sqn_list,	/* list of sequence numbers */
+	gboolean	is_parity	/* TRUE = parity, FALSE = selective */
 	)
 {
 /* check that session exists */
-	struct sim_session* sess = g_hash_table_lookup (g_sessions, session_name);
+	struct sim_session* sess = g_hash_table_lookup (g_sessions, name);
 	if (sess == NULL) {
-		printf ("FAILED: session '%s' not found\n", session_name);
+		puts ("FAILED: session not found");
 		return;
 	}
 
 /* check that the peer exists */
-	pgm_sock_t* sock = sess->sock;
-	pgm_peer_t* peer = pgm_hashtable_lookup (sock->peers_hashtable, tsi);
+	pgm_transport_t* transport = sess->transport;
+	pgm_peer_t* peer = g_hash_table_lookup (transport->peers_hashtable, tsi);
 	if (peer == NULL) {
 		printf ("FAILED: peer \"%s\" not found\n", pgm_tsi_print(tsi));
 		return;
@@ -1835,7 +1481,7 @@ net_send_nak (
 	memcpy (&peer_nla, &peer->nla, sizeof(struct sockaddr_storage));
 
 /* dport & sport swap over for a nak */
-        header->pgm_sport       = sock->dport;
+        header->pgm_sport       = transport->dport;
         header->pgm_dport       = peer_sport;
         header->pgm_type        = PGM_NAK;
 	if (is_parity) {
@@ -1853,7 +1499,7 @@ net_send_nak (
         pgm_sockaddr_to_nla ((struct sockaddr*)&peer_nla, (char*)&nak->nak_src_nla_afi);
 
 /* group nla */
-        pgm_sockaddr_to_nla ((struct sockaddr*)&sock->recv_gsr[0].gsr_group, (char*)&nak->nak_grp_nla_afi);
+        pgm_sockaddr_to_nla ((struct sockaddr*)&transport->recv_gsr[0].gsr_group, (char*)&nak->nak_grp_nla_afi);
 
 /* OPT_NAK_LIST */
 	if (sqn_list->len > 1)
@@ -1879,7 +1525,7 @@ net_send_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
-        retval = sendto (sock->send_with_router_alert_sock,
+        retval = sendto (transport->send_with_router_alert_sock,
                                 header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
@@ -1909,9 +1555,9 @@ on_data (
 static
 gboolean
 on_stdin_data (
-	GIOChannel*	source,
-	G_GNUC_UNUSED GIOCondition	condition,
-	G_GNUC_UNUSED gpointer		data
+	GIOChannel* source,
+	G_GNUC_UNUSED GIOCondition condition,
+	G_GNUC_UNUSED gpointer data
 	)
 {
 	gchar* str = NULL;
@@ -1988,7 +1634,7 @@ on_stdin_data (
 			p = str + pmatch[4].rm_so;
 			guint txw_trail = strtoul (p, &p, 10);
 
-/* ideally confirm number of payloads matches sess->sock::rs_k ... */
+/* ideally confirm number of payloads matches sess->transport::rs_k ... */
 			char *string = g_memdup (str + pmatch[5].rm_so, pmatch[5].rm_eo - pmatch[5].rm_so + 1 );
 			string[ pmatch[5].rm_eo - pmatch[5].rm_so ] = 0;
 
@@ -2101,7 +1747,7 @@ on_stdin_data (
 			tsi.sport = g_htons ( strtol (p, NULL, 10) );
 
 /* parse list of sequence numbers */
-			struct pgm_sqn_list_t sqn_list;
+			pgm_sqn_list_t sqn_list;
 			sqn_list.len = 0;
 			{
 				char* saveptr = NULL;
@@ -2167,7 +1813,7 @@ on_stdin_data (
 		}
 		regfree (&preg);
 
-/* bind socket */
+/* bind transport */
 		re = "^bind[[:space:]]+([[:alnum:]]+)$";
 		regcomp (&preg, re, REG_EXTENDED);
 		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
@@ -2176,22 +1822,6 @@ on_stdin_data (
 			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
 
 			session_bind (name);
-
-			g_free (name);
-			regfree (&preg);
-			goto out;
-		}
-		regfree (&preg);
-
-/* connect socket */
-		re = "^connect[[:space:]]+([[:alnum:]]+)$";
-		regcomp (&preg, re, REG_EXTENDED);
-		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
-		{
-			char *name = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			name[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
-
-			session_connect (name);
 
 			g_free (name);
 			regfree (&preg);
@@ -2256,21 +1886,6 @@ on_stdin_data (
 			session_destroy (name);
 
 			g_free (name);
-			regfree (&preg);
-			goto out;
-		}
-		regfree (&preg);
-
-/* set PGM network */
-		re = "^set[[:space:]]+network[[:space:]]+([[:print:]]*;[[:print:]]+)$";
-		regcomp (&preg, re, REG_EXTENDED);
-		if (0 == regexec (&preg, str, G_N_ELEMENTS(pmatch), pmatch, 0))
-		{
-			char *pgm_network = g_memdup (str + pmatch[1].rm_so, pmatch[1].rm_eo - pmatch[1].rm_so + 1 );
-			pgm_network[ pmatch[1].rm_eo - pmatch[1].rm_so ] = 0;
-			g_network = pgm_network;
-			puts ("READY");
-
 			regfree (&preg);
 			goto out;
 		}

@@ -19,40 +19,85 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _GNU_SOURCE
-#	define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/types.h>
+#ifdef CONFIG_HAVE_POLL
+#	include <poll.h>
+#endif
+#ifdef CONFIG_HAVE_EPOLL
+#	include <sys/epoll.h>
 #endif
 
-#include <errno.h>
-#ifndef _WIN32
-#	include <sys/types.h>
+#include <glib.h>
+#include <glib/gi18n-lib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <net/if.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <netinet/udp.h>
 #	include <sys/socket.h>
-#	include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
+#	include <sys/time.h>
+#	include <arpa/inet.h>
 #else
-#	include <ws2tcpip.h>
+#	define WIN32_LEAN_AND_MEAN
+#	include <windows.h>
+#	include <winsock2.h>
 #	include <mswsock.h>
 #endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
-#include <impl/source.h>
-#include <impl/packet_parse.h>
-#include <impl/timer.h>
-#include <impl/engine.h>
 
+#include "pgm/pgm.h"
+#include "pgm/ip.h"
+#include "pgm/packet.h"
+#include "pgm/math.h"
+#include "pgm/net.h"
+#include "pgm/txwi.h"
+#include "pgm/sourcep.h"
+#include "pgm/rxwi.h"
+#include "pgm/receiverp.h"
+#include "pgm/rate_control.h"
+#include "pgm/timer.h"
+#include "pgm/checksum.h"
+#include "pgm/reed_solomon.h"
 
 //#define RECV_DEBUG
 
 #ifndef RECV_DEBUG
-#	define PGM_DISABLE_ASSERT
+#	define G_DISABLE_ASSERT
+#	define g_trace(...)		while (0)
+#else
+#	define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
+#ifndef g_assert_cmpuint
+#	define g_assert_cmpuint(n1, cmp, n2)	do { (void) 0; } while (0)
 #endif
 
-#ifdef _WIN32
+#ifdef G_OS_WIN32
+#	ifndef WSAID_WSARECVMSG
+/* http://cvs.winehq.org/cvsweb/wine/include/mswsock.h */
+#		define WSAID_WSARECVMSG {0xf689d7c8,0x6f1f,0x436b,{0x8a,0x53,0xe5,0x4f,0xe3,0x51,0xc3,0x22}}
+#	endif
 #	define cmsghdr wsacmsghdr
 #	define CMSG_FIRSTHDR(msg)	WSA_CMSG_FIRSTHDR(msg)
 #	define CMSG_NXTHDR(msg, cmsg)	WSA_CMSG_NXTHDR(msg, cmsg)
 #	define CMSG_DATA(cmsg)		WSA_CMSG_DATA(cmsg)
 #	define CMSG_SPACE(len)		WSA_CMSG_SPACE(len)
 #	define CMSG_LEN(len)		WSA_CMSG_LEN(len)
+#endif
+
+static PGMRecvError pgm_recv_error_from_errno (gint);
+#ifdef G_OS_WIN32
+static PGMRecvError pgm_recv_error_from_wsa_errno (gint);
 #endif
 
 
@@ -64,55 +109,55 @@
 static
 ssize_t
 recvskb (
-	pgm_sock_t*           const restrict sock,
-	struct pgm_sk_buff_t* const restrict skb,
-	const int			     flags,
-	struct sockaddr*      const restrict src_addr,
-	const socklen_t			     src_addrlen,
-	struct sockaddr*      const restrict dst_addr,
-	const socklen_t			     dst_addrlen
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb,
+	const int			flags,
+	struct sockaddr* const		src_addr,
+	const gsize			src_addrlen,
+	struct sockaddr* const		dst_addr,
+	const gsize			dst_addrlen
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (NULL != skb);
-	pgm_assert (NULL != src_addr);
-	pgm_assert (src_addrlen > 0);
-	pgm_assert (NULL != dst_addr);
-	pgm_assert (dst_addrlen > 0);
+	g_assert (NULL != transport);
+	g_assert (NULL != skb);
+	g_assert (NULL != src_addr);
+	g_assert (src_addrlen > 0);
+	g_assert (NULL != dst_addr);
+	g_assert (dst_addrlen > 0);
 
-	pgm_debug ("recvskb (sock:%p skb:%p flags:%d src-addr:%p src-addrlen:%d dst-addr:%p dst-addrlen:%d)",
-		(void*)sock, (void*)skb, flags, (void*)src_addr, (int)src_addrlen, (void*)dst_addr, (int)dst_addrlen);
+	g_trace ("recvskb (transport:%p skb:%p flags:%d src-addr:%p src-addrlen:%" G_GSIZE_FORMAT " dst-addr:%p dst-addrlen:%" G_GSIZE_FORMAT ")",
+		(gpointer)transport, (gpointer)skb, flags, (gpointer)src_addr, src_addrlen, (gpointer)dst_addr, dst_addrlen);
 
-	if (PGM_UNLIKELY(sock->is_destroyed))
+	if (G_UNLIKELY(transport->is_destroyed))
 		return 0;
 
 #ifdef CONFIG_TARGET_WINE
-	socklen_t fromlen = src_addrlen;
-	const ssize_t len = recvfrom (sock->recv_sock, skb->head, sock->max_tpdu, 0, src_addr, &fromlen);
+	int fromlen = src_addrlen;
+	const int len = recvfrom (transport->recv_sock, skb->head, transport->max_tpdu, 0, src_addr, &fromlen);
 	if (len <= 0)
 		return len;
 #else
 	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
-		.iov_len	= sock->max_tpdu
+		.iov_len	= transport->max_tpdu
 	};
-	char aux[ 1024 ];
-#	ifndef _WIN32
+	size_t aux[1024 / sizeof(size_t)];
+#	ifdef G_OS_UNIX
 	struct msghdr msg = {
 		.msg_name	= src_addr,
 		.msg_namelen	= src_addrlen,
-		.msg_iov	= (void*)&iov,
+		.msg_iov	= (gpointer)&iov,
 		.msg_iovlen	= 1,
 		.msg_control	= aux,
 		.msg_controllen = sizeof(aux),
 		.msg_flags	= 0
 	};
 
-	ssize_t len = recvmsg (sock->recv_sock, &msg, flags);
+	ssize_t len = recvmsg (transport->recv_sock, &msg, flags);
 	if (len <= 0)
 		return len;
-#	else /* !_WIN32 */
+#	else /* !G_OS_UNIX */
 	WSAMSG msg = {
 		.name		= (LPSOCKADDR)src_addr,
 		.namelen	= src_addrlen,
@@ -120,42 +165,44 @@ recvskb (
 		.dwBufferCount	= 1,
 		.dwFlags	= 0
 	};
-	msg.Control.buf		= aux;
+	msg.Control.buf		= (gpointer)aux;
 	msg.Control.len		= sizeof(aux);
-	DWORD len;
-	if (SOCKET_ERROR == pgm_WSARecvMsg (sock->recv_sock, &msg, &len, NULL, NULL)) {
-		return -1;
-	}
-#	endif /* !_WIN32 */
-#endif /* !CONFIG_TARGET_WINE */
 
-#ifdef PGM_DEBUG
-	if (PGM_UNLIKELY(pgm_loss_rate > 0)) {
-		const unsigned percent = pgm_rand_int_range (&sock->rand_, 0, 100);
-		if (percent <= pgm_loss_rate) {
-			pgm_debug ("Simulated packet loss");
-#	ifndef _WIN32
-			errno = EAGAIN;
-#	else
-			WSASetLastError (WSAEWOULDBLOCK);
-#	endif
+	LPFN_WSARECVMSG WSARecvMsg_ = NULL;
+	if (G_UNLIKELY(!WSARecvMsg_)) {
+		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
+		DWORD cbBytesReturned;
+		if (SOCKET_ERROR == WSAIoctl (transport->recv_sock,
+					      SIO_GET_EXTENSION_FUNCTION_POINTER,
+				 	      &WSARecvMsg_GUID, sizeof(WSARecvMsg_GUID),
+		 			      &WSARecvMsg_, sizeof(WSARecvMsg_),
+		 			      &cbBytesReturned,
+					      NULL,
+					      NULL))
+		{
+			g_error (_("WSARecvMsg function not found."));
 			return -1;
 		}
 	}
-#endif
 
-	skb->sock		= sock;
+	DWORD len;
+	if (SOCKET_ERROR == WSARecvMsg_ (transport->recv_sock, &msg, &len, NULL, NULL))
+		return -1;
+#	endif /* !G_OS_UNIX */
+#endif /* !CONFIG_TARGET_WINE */
+
+	skb->transport		= transport;
 	skb->tstamp		= pgm_time_update_now();
 	skb->data		= skb->head;
 	skb->len		= len;
 	skb->zero_padded	= 0;
-	skb->tail		= (char*)skb->data + len;
+	skb->tail		= (guint8*)skb->data + len;
 
 #ifdef CONFIG_TARGET_WINE
-	pgm_assert (pgm_sockaddr_len (&sock->recv_gsr[0].gsr_group) <= dst_addrlen);
-	memcpy (dst_addr, &sock->recv_gsr[0].gsr_group, pgm_sockaddr_len (&sock->recv_gsr[0].gsr_group));
+	g_assert (pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group) <= dst_addrlen);
+	memcpy (dst_addr, &transport->recv_gsr[0].gsr_group, pgm_sockaddr_len (&transport->recv_gsr[0].gsr_group));
 #else
-	if (sock->udp_encap_ucast_port ||
+	if (transport->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
 #ifdef CONFIG_HAVE_WSACMSGHDR
@@ -163,21 +210,18 @@ recvskb (
 #else
 		struct cmsghdr* cmsg;
 #endif
+		gpointer pktinfo = NULL;
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg != NULL;
 		     cmsg = CMSG_NXTHDR(&msg, cmsg))
 		{
-/* both IP_PKTINFO and IP_RECVDSTADDR exist on OpenSolaris, so capture
- * each type if defined.
- */
-#ifdef IP_PKTINFO
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
-				const void* pktinfo		= CMSG_DATA(cmsg);
+				pktinfo				= CMSG_DATA(cmsg);
 /* discard on invalid address */
-				if (PGM_UNLIKELY(NULL == pktinfo)) {
-					pgm_debug ("in_pktinfo is NULL");
+				if (G_UNLIKELY(NULL == pktinfo)) {
+					g_trace ("in_pktinfo is NULL");
 					return -1;
 				}
 				const struct in_pktinfo* in	= pktinfo;
@@ -188,37 +232,14 @@ recvskb (
 				memcpy (dst_addr, &s4, sizeof(s4));
 				break;
 			}
-#endif
-#ifdef IP_RECVDSTADDR
-			if (IPPROTO_IP == cmsg->cmsg_level &&
-			    IP_RECVDSTADDR == cmsg->cmsg_type)
-			{
-				const void* recvdstaddr = CMSG_DATA(cmsg);
-/* discard on invalid address */
-				if (PGM_UNLIKELY(NULL == recvdstaddr)) {
-					pgm_debug ("in_recvdstaddr is NULL");
-					return -1;
-				}
-				const struct in_addr* in	= recvdstaddr;
-				struct sockaddr_in s4;
-				memset (&s4, 0, sizeof(s4));
-				s4.sin_family			= AF_INET;
-				s4.sin_addr.s_addr		= in->s_addr;
-				memcpy (dst_addr, &s4, sizeof(s4));
-				break;
-			}
-#endif
-#if !defined(IP_PKTINFO) && !defined(IP_RECVDSTADDR)
-#	error "No defined CMSG type for IPv4 destination address."
-#endif
 
 			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
 			    IPV6_PKTINFO == cmsg->cmsg_type)
 			{
-				const void* pktinfo		= CMSG_DATA(cmsg);
+				pktinfo				= CMSG_DATA(cmsg);
 /* discard on invalid address */
-				if (PGM_UNLIKELY(NULL == pktinfo)) {
-					pgm_debug ("in6_pktinfo is NULL");
+				if (G_UNLIKELY(NULL == pktinfo)) {
+					g_trace ("in6_pktinfo is NULL");
 					return -1;
 				}
 				const struct in6_pktinfo* in6	= pktinfo;
@@ -246,72 +267,67 @@ recvskb (
  */
 
 static
-bool
+gboolean
 on_upstream (
-	pgm_sock_t*           const restrict sock,
-	struct pgm_sk_buff_t* const restrict skb
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (NULL != skb);
-	pgm_assert_cmpuint (skb->pgm_header->pgm_dport, ==, sock->tsi.sport);
+	g_assert (NULL != transport);
+	g_assert (NULL != skb);
+	g_assert_cmpuint (skb->pgm_header->pgm_dport, ==, transport->tsi.sport);
 
-	pgm_debug ("on_upstream (sock:%p skb:%p)",
-		(const void*)sock, (const void*)skb);
+	g_trace ("on_upstream (transport:%p skb:%p)",
+		(gpointer)transport, (gpointer)skb);
 
-	if (PGM_UNLIKELY(!sock->can_send_data)) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted source."));
+	if (!transport->can_send_data) {
+		g_trace ("Discarded packet for muted source.");
 		goto out_discarded;
 	}
 
 /* unicast upstream message, note that dport & sport are reversed */
-	if (PGM_UNLIKELY(skb->pgm_header->pgm_sport != sock->dport)) {
+	if (skb->pgm_header->pgm_sport != transport->dport) {
 /* its upstream/peer-to-peer for another session */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
+		g_trace ("Discarded packet on data-destination port mismatch.");
 		goto out_discarded;
 	}
 
-	if (PGM_UNLIKELY(!pgm_gsi_equal (&skb->tsi.gsi, &sock->tsi.gsi))) {
+	if (!pgm_gsi_equal (&skb->tsi.gsi, &transport->tsi.gsi)) {
 /* its upstream/peer-to-peer for another session */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
+		g_trace ("Discarded packet on data-destination port mismatch.");
 		goto out_discarded;
 	}
 
 /* advance SKB pointer to PGM type header */
-	skb->data	= (char*)skb->data + sizeof(struct pgm_header);
+	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
 	skb->len       -= sizeof(struct pgm_header);
 
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_NAK:
-		if (PGM_UNLIKELY(!pgm_on_nak (sock, skb)))
+		if (G_UNLIKELY(!pgm_on_nak (transport, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_NNAK:
-		if (PGM_UNLIKELY(!pgm_on_nnak (sock, skb)))
+		if (G_UNLIKELY(!pgm_on_nnak (transport, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_SPMR:
-		if (PGM_UNLIKELY(!pgm_on_spmr (sock, NULL, skb)))
-			goto out_discarded;
-		break;
-
-	case PGM_ACK:
-		if (PGM_UNLIKELY(!pgm_on_ack (sock, skb)))
+		if (G_UNLIKELY(!pgm_on_spmr (transport, NULL, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_POLR:
 	default:
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));
+		g_trace ("Discarded unsupported PGM type packet.");
 		goto out_discarded;
 	}
 
 	return TRUE;
 out_discarded:
-	sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+	transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;
 }
 
@@ -321,32 +337,32 @@ out_discarded:
  */
 
 static
-bool
+gboolean
 on_peer (
-	pgm_sock_t*           const restrict sock,
-	struct pgm_sk_buff_t* const restrict skb,
-	pgm_peer_t**		    restrict source
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb,
+	pgm_peer_t**			source
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (NULL != skb);
-	pgm_assert_cmpuint (skb->pgm_header->pgm_dport, !=, sock->tsi.sport);
-	pgm_assert (NULL != source);
+	g_assert (NULL != transport);
+	g_assert (NULL != skb);
+	g_assert_cmpuint (skb->pgm_header->pgm_dport, !=, transport->tsi.sport);
+	g_assert (NULL != source);
 
-	pgm_debug ("on_peer (sock:%p skb:%p source:%p)",
-		(const void*)sock, (const void*)skb, (const void*)source);
+	g_trace ("on_peer (transport:%p skb:%p source:%p)",
+		(gpointer)transport, (gpointer)skb, (gpointer)source);
 
 /* we are not the source */
-	if (PGM_UNLIKELY(!sock->can_recv_data)) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted receiver."));
+	if (!transport->can_recv_data) {
+		g_trace ("Discarded packet for muted receiver.");
 		goto out_discarded;
 	}
 
 /* unicast upstream message, note that dport & sport are reversed */
-	if (PGM_UNLIKELY(skb->pgm_header->pgm_sport != sock->dport)) {
+	if (skb->pgm_header->pgm_sport != transport->dport) {
 /* its upstream/peer-to-peer for another session */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
+		g_trace ("Discarded packet on data-destination port mismatch.");
 		goto out_discarded;
 	}
 
@@ -355,34 +371,34 @@ on_peer (
 	memcpy (&upstream_tsi.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
 	upstream_tsi.sport = skb->pgm_header->pgm_dport;
 
-	pgm_rwlock_reader_lock (&sock->peers_lock);
-	*source = pgm_hashtable_lookup (sock->peers_hashtable, &upstream_tsi);
-	pgm_rwlock_reader_unlock (&sock->peers_lock);
-	if (PGM_UNLIKELY(NULL == *source)) {
+	g_static_rw_lock_reader_lock (&transport->peers_lock);
+	*source = g_hash_table_lookup (transport->peers_hashtable, &upstream_tsi);
+	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	if (G_UNLIKELY(NULL == *source)) {
 /* this source is unknown, we don't care about messages about it */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded peer packet about new source."));
+		g_trace ("Discarded peer packet about new source.");
 		goto out_discarded;
 	}
 
 /* advance SKB pointer to PGM type header */
-	skb->data	= (char*)skb->data + sizeof(struct pgm_header);
+	skb->data	= (guint8*)skb->data + sizeof(struct pgm_header);
 	skb->len       -= sizeof(struct pgm_header);
 
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_NAK:
-		if (PGM_UNLIKELY(!pgm_on_peer_nak (sock, *source, skb)))
+		if (G_UNLIKELY(!pgm_on_peer_nak (transport, *source, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_SPMR:
-		if (PGM_UNLIKELY(!pgm_on_spmr (sock, *source, skb)))
+		if (G_UNLIKELY(!pgm_on_spmr (transport, *source, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_NNAK:
 	case PGM_POLR:
 	default:
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));
+		g_trace ("Discarded unsupported PGM type packet.");
 		goto out_discarded;
 	}
 
@@ -390,8 +406,8 @@ on_peer (
 out_discarded:
 	if (*source)
 		(*source)->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-	else if (sock->can_send_data)
-		sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+	else if (transport->can_send_data)
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;
 }
 
@@ -399,102 +415,92 @@ out_discarded:
  *
  * returns TRUE on valid processed packet, returns FALSE on discarded packet.
  */
-
 static
-bool
+gboolean
 on_downstream (
-	pgm_sock_t*           const restrict sock,
-	struct pgm_sk_buff_t* const restrict skb,
-	struct sockaddr*      const restrict src_addr,
-	struct sockaddr*      const restrict dst_addr,
-	pgm_peer_t**	  	    restrict source
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb,
+	struct sockaddr* const		src_addr,
+	struct sockaddr* const		dst_addr,
+	pgm_peer_t**			source
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (NULL != skb);
-	pgm_assert (NULL != src_addr);
-	pgm_assert (NULL != dst_addr);
-	pgm_assert (NULL != source);
+	g_assert (NULL != transport);
+	g_assert (NULL != skb);
+	g_assert (NULL != src_addr);
+	g_assert (NULL != dst_addr);
+	g_assert (NULL != source);
 
 #ifdef RECV_DEBUG
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
-	pgm_debug ("on_downstream (sock:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
-		(const void*)sock, (const void*)skb, saddr, daddr, (const void*)source);
+	g_trace ("on_downstream (transport:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
+		(gpointer)transport, (gpointer)skb, saddr, daddr, (gpointer)source);
 #endif
 
-	if (PGM_UNLIKELY(!sock->can_recv_data)) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet for muted receiver."));
+	if (!transport->can_recv_data) {
+		g_trace ("Discarded packet for muted receiver.");
 		goto out_discarded;
 	}
 
-/* pgm packet DPORT contains our sock DPORT */
-	if (PGM_UNLIKELY(skb->pgm_header->pgm_dport != sock->dport)) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded packet on data-destination port mismatch."));
+/* pgm packet DPORT contains our transport DPORT */
+	if (skb->pgm_header->pgm_dport != transport->dport) {
+		g_trace ("Discarded packet on data-destination port mismatch.");
 		goto out_discarded;
 	}
 
 /* search for TSI peer context or create a new one */
-	if (PGM_LIKELY(pgm_tsi_hash (&skb->tsi) == sock->last_hash_key &&
-			NULL != sock->last_hash_value))
-	{
-		*source = sock->last_hash_value;
-	}
-	else
-	{
-		pgm_rwlock_reader_lock (&sock->peers_lock);
-		*source = pgm_hashtable_lookup_extended (sock->peers_hashtable, &skb->tsi, &sock->last_hash_key);
-		pgm_rwlock_reader_unlock (&sock->peers_lock);
-		if (PGM_UNLIKELY(NULL == *source)) {
-			*source = pgm_new_peer (sock,
-					       &skb->tsi,
-					       (struct sockaddr*)src_addr, pgm_sockaddr_len(src_addr),
-					       (struct sockaddr*)dst_addr, pgm_sockaddr_len(dst_addr),
-						skb->tstamp);
-		}
-		sock->last_hash_value = *source;
+	g_static_rw_lock_reader_lock (&transport->peers_lock);
+	*source = g_hash_table_lookup (transport->peers_hashtable, &skb->tsi);
+	g_static_rw_lock_reader_unlock (&transport->peers_lock);
+	if (G_UNLIKELY(NULL == *source)) {
+		*source = pgm_new_peer (transport,
+				       &skb->tsi,
+				       (struct sockaddr*)src_addr, pgm_sockaddr_len(src_addr),
+				       (struct sockaddr*)dst_addr, pgm_sockaddr_len(dst_addr),
+					skb->tstamp);
 	}
 
 	(*source)->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED] += skb->len;
 	(*source)->last_packet = skb->tstamp;
 
-	skb->data       = (void*)( skb->pgm_header + 1 );
+	skb->data       = (gpointer)( skb->pgm_header + 1 );
 	skb->len       -= sizeof(struct pgm_header);
 
 /* handle PGM packet type */
 	switch (skb->pgm_header->pgm_type) {
 	case PGM_ODATA:
 	case PGM_RDATA:
-		if (PGM_UNLIKELY(!pgm_on_data (sock, *source, skb)))
+		if (G_UNLIKELY(!pgm_on_data (transport, *source, skb)))
 			goto out_discarded;
-		sock->rx_buffer = pgm_alloc_skb (sock->max_tpdu);
+		transport->rx_buffer = pgm_alloc_skb (transport->max_tpdu);
 		break;
 
 	case PGM_NCF:
-		if (PGM_UNLIKELY(!pgm_on_ncf (sock, *source, skb)))
+		if (G_UNLIKELY(!pgm_on_ncf (transport, *source, skb)))
 			goto out_discarded;
 		break;
 
 	case PGM_SPM:
-		if (PGM_UNLIKELY(!pgm_on_spm (sock, *source, skb)))
+		if (G_UNLIKELY(!pgm_on_spm (transport, *source, skb)))
 			goto out_discarded;
 
 /* update group NLA if appropriate */
-		if (PGM_LIKELY(pgm_sockaddr_is_addr_multicast ((struct sockaddr*)dst_addr)))
+		if (G_LIKELY(pgm_sockaddr_is_addr_multicast ((struct sockaddr*)dst_addr)))
 			memcpy (&(*source)->group_nla, dst_addr, pgm_sockaddr_len(dst_addr));
 		break;
 
 #ifdef CONFIG_PGM_POLLING
 	case PGM_POLL:
-		if (PGM_UNLIKELY(!pgm_on_poll (sock, *source, skb)))
+		if (G_UNLIKELY(!pgm_on_poll (transport, *source, skb)))
 			goto out_discarded;
 		break;
 #endif
 
 	default:
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unsupported PGM type packet."));
+		g_trace ("Discarded unsupported PGM type packet.");
 		goto out_discarded;
 	}
 
@@ -502,8 +508,8 @@ on_downstream (
 out_discarded:
 	if (*source)
 		(*source)->cumulative_stats[PGM_PC_RECEIVER_PACKETS_DISCARDED]++;
-	else if (sock->can_send_data)
-		sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+	else if (transport->can_send_data)
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;
 }
 
@@ -512,117 +518,121 @@ out_discarded:
  * returns TRUE on valid processed packet, returns FALSE on discarded packet.
  */
 static
-bool
+gboolean
 on_pgm (
-	pgm_sock_t*           const restrict sock,
-	struct pgm_sk_buff_t* const restrict skb,
-	struct sockaddr*      const restrict src_addr,
-	struct sockaddr*      const restrict dst_addr,
-	pgm_peer_t**		    restrict source
+	pgm_transport_t* const		transport,
+	struct pgm_sk_buff_t* const	skb,
+	struct sockaddr* const		src_addr,
+	struct sockaddr* const		dst_addr,
+	pgm_peer_t**			source
 	)
 {
 /* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (NULL != skb);
-	pgm_assert (NULL != src_addr);
-	pgm_assert (NULL != dst_addr);
-	pgm_assert (NULL != source);
+	g_assert (NULL != transport);
+	g_assert (NULL != skb);
+	g_assert (NULL != src_addr);
+	g_assert (NULL != dst_addr);
+	g_assert (NULL != source);
 
 #ifdef RECV_DEBUG
 	char saddr[INET6_ADDRSTRLEN], daddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (src_addr, saddr, sizeof(saddr));
 	pgm_sockaddr_ntop (dst_addr, daddr, sizeof(daddr));
-	pgm_debug ("on_pgm (sock:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
-		(const void*)sock, (const void*)skb, saddr, daddr, (const void*)source);
+	g_trace ("on_pgm (transport:%p skb:%p src-addr:%s dst-addr:%s source:%p)",
+		(gpointer)transport, (gpointer)skb, saddr, daddr, (gpointer)source);
 #endif
 
-	if (PGM_IS_DOWNSTREAM (skb->pgm_header->pgm_type))
-		return on_downstream (sock, skb, src_addr, dst_addr, source);
-	if (skb->pgm_header->pgm_dport == sock->tsi.sport)
+	if (pgm_is_downstream (skb->pgm_header->pgm_type))
+		return on_downstream (transport, skb, src_addr, dst_addr, source);
+	if (skb->pgm_header->pgm_dport == transport->tsi.sport)
 	{
-		if (PGM_IS_UPSTREAM (skb->pgm_header->pgm_type) ||
-		    PGM_IS_PEER (skb->pgm_header->pgm_type))
+		if (pgm_is_upstream (skb->pgm_header->pgm_type) ||
+		    pgm_is_peer (skb->pgm_header->pgm_type))
 		{
-			return on_upstream (sock, skb);
+			return on_upstream (transport, skb);
 		}
 	}
-	else if (PGM_IS_PEER (skb->pgm_header->pgm_type))
-		return on_peer (sock, skb, source);
+	else if (pgm_is_peer (skb->pgm_header->pgm_type))
+		return on_peer (transport, skb, source);
 
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded PGM packet."));
-	if (sock->can_send_data)
-		sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+	g_trace ("Discarded unknown PGM packet.");
+	if (transport->can_send_data)
+		transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;
 }
 
-/* block on receiving socket whilst holding sock::waiting-mutex
+/* block on receiving socket whilst holding transport::waiting-mutex
  * returns EAGAIN for waiting data, returns EINTR for waiting timer event,
- * returns ENOENT on closed sock, and returns EFAULT for libc error.
+ * returns ENOENT on closed transport, and returns EFAULT for libc error.
  */
 
 static
 int
 wait_for_event (
-	pgm_sock_t* const	sock
+	pgm_transport_t* const	transport
 	)
 {
 	int n_fds = 3;
 
 /* pre-conditions */
-	pgm_assert (NULL != sock);
+	g_assert (NULL != transport);
 
-	pgm_debug ("wait_for_event (sock:%p)", (const void*)sock);
+	g_trace ("wait_for_event (transport:%p)", (gpointer)transport);
 
 	do {
-		if (PGM_UNLIKELY(sock->is_destroyed))
+		if (G_UNLIKELY(transport->is_destroyed))
 			return ENOENT;
 
-		if (sock->can_send_data && !pgm_txw_retransmit_is_empty (sock->window))
+		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
 /* tight loop on blocked send */
-			pgm_on_deferred_nak (sock);
+			pgm_on_deferred_nak (transport);
 
 #ifdef CONFIG_HAVE_POLL
 		struct pollfd fds[ n_fds ];
 		memset (fds, 0, sizeof(fds));
-		const int status = pgm_poll_info (sock, fds, &n_fds, POLLIN);
-		pgm_assert (-1 != status);
+		if (-1 == pgm_transport_poll_info (transport, fds, &n_fds, POLLIN)) {
+			g_trace ("poll_info returned errno=%i",errno);
+			return EFAULT;
+		}
 #else
 		fd_set readfds;
 		FD_ZERO(&readfds);
-		const int status = pgm_select_info (sock, &readfds, NULL, &n_fds);
-		pgm_assert (-1 != status);
+		if (-1 == pgm_transport_select_info (transport, &readfds, NULL, &n_fds)) {
+			g_trace ("select_info returned errno=%i",errno);
+			return EFAULT;
+		}
 #endif /* CONFIG_HAVE_POLL */
 
 /* flush any waiting notifications */
-		if (sock->is_pending_read) {
-			pgm_notify_clear (&sock->pending_notify);
-			sock->is_pending_read = FALSE;
+		if (transport->is_pending_read) {
+			pgm_notify_clear (&transport->pending_notify);
+			transport->is_pending_read = FALSE;
 		}
 
-		int timeout;
-		if (sock->can_send_data && !pgm_txw_retransmit_is_empty (sock->window))
+		long timeout;
+		if (transport->can_send_data && !pgm_txw_retransmit_is_empty (transport->window))
 			timeout = 0;
 		else
-			timeout = pgm_timer_expiration (sock);
+			timeout = pgm_timer_expiration (transport);
 		
 #ifdef CONFIG_HAVE_POLL
 		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
 #else
 		struct timeval tv_timeout = {
-			.tv_sec		= timeout > 1000000L ? timeout / 1000000UL : 0,
-			.tv_usec	= timeout > 1000000L ? timeout % 1000000UL : timeout
+			.tv_sec		= timeout > 1000000UL ? timeout / 1000000UL : 0,
+			.tv_usec	= timeout > 1000000UL ? timeout % 1000000UL : timeout
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif
-		if (PGM_UNLIKELY(-1 == ready)) {
-			pgm_debug ("block returned errno=%i",errno);
+		if (-1 == ready) {
+			g_trace ("block returned errno=%i",errno);
 			return EFAULT;
 		} else if (ready > 0) {
-			pgm_debug ("recv again on empty");
+			g_trace ("recv again on empty");
 			return EAGAIN;
 		}
-	} while (pgm_timer_check (sock));
-	pgm_debug ("state generated event");
+	} while (pgm_timer_check (transport));
+	g_trace ("state generated event");
 	return EINTR;
 }
 
@@ -643,100 +653,102 @@ wait_for_event (
  * closed, returns PGM_IO_STATUS_EOF.  On error, returns PGM_IO_STATUS_ERROR.
  */
 
-int
+PGMIOStatus
 pgm_recvmsgv (
-	pgm_sock_t*   	   const restrict sock,
-	struct pgm_msgv_t* const restrict msg_start,
-	const size_t			  msg_len,
-	const int			  flags,	/* MSG_DONTWAIT for non-blocking */
-	size_t*			 restrict _bytes_read,	/* may be NULL */
-	pgm_error_t**		 restrict error
+	pgm_transport_t* const	transport,
+	pgm_msgv_t* const	msg_start,
+	const gsize		msg_len,
+	const int		flags,		/* MSG_DONTWAIT for non-blocking */
+	gsize*			_bytes_read,	/* may be NULL */
+	GError**		error
 	)
 {
-	int status = PGM_IO_STATUS_WOULD_BLOCK;
+	PGMIOStatus status = PGM_IO_STATUS_WOULD_BLOCK;
 
-	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%zu flags:%d bytes-read:%p error:%p)",
-		(void*)sock, (void*)msg_start, msg_len, flags, (void*)_bytes_read, (void*)error);
+	g_trace ("pgm_recvmsgv (transport:%p msg-start:%p msg-len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
+		(gpointer)transport, (gpointer)msg_start, msg_len, flags, (gpointer)_bytes_read, (gpointer)error);
 
 /* parameters */
-	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
-	if (PGM_LIKELY(msg_len)) pgm_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(msg_len)) g_return_val_if_fail (NULL != msg_start, PGM_IO_STATUS_ERROR);
 
 /* shutdown */
-	if (PGM_UNLIKELY(!pgm_rwlock_reader_trylock (&sock->lock)))
-		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
+	if (G_UNLIKELY(!g_static_rw_lock_reader_trylock (&transport->lock)))
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 
 /* state */
-	if (PGM_UNLIKELY(!sock->is_bound || sock->is_destroyed))
+	if (G_UNLIKELY(!transport->is_bound ||
+	    transport->is_destroyed))
 	{
-		pgm_rwlock_reader_unlock (&sock->lock);
-		pgm_return_val_if_reached (PGM_IO_STATUS_ERROR);
+		g_static_rw_lock_reader_unlock (&transport->lock);
+		g_return_val_if_reached (PGM_IO_STATUS_ERROR);
 	}
 
 /* pre-conditions */
-	pgm_assert (NULL != sock->rx_buffer);
-	pgm_assert (sock->max_tpdu > 0);
-	if (sock->can_recv_data) {
-		pgm_assert (NULL != sock->peers_hashtable);
-		pgm_assert_cmpuint (sock->nak_bo_ivl, >, 1);
-		pgm_assert (pgm_notify_is_valid (&sock->pending_notify));
+	g_assert (NULL != transport->rx_buffer);
+	g_assert (transport->max_tpdu > 0);
+	if (transport->can_recv_data) {
+		g_assert (NULL != transport->peers_hashtable);
+		g_assert (NULL != transport->rand_);
+		g_assert_cmpuint (transport->nak_bo_ivl, >, 1);
+		g_assert (pgm_notify_is_valid (&transport->pending_notify));
 	}
 
 /* receiver */
-	pgm_mutex_lock (&sock->receiver_mutex);
+	g_static_mutex_lock (&transport->receiver_mutex);
 
-	if (PGM_UNLIKELY(sock->is_reset)) {
-		pgm_assert (NULL != sock->peers_pending);
-		pgm_assert (NULL != sock->peers_pending->data);
-		pgm_peer_t* peer = sock->peers_pending->data;
+	if (G_UNLIKELY(transport->is_reset)) {
+		g_assert (NULL != transport->peers_pending);
+		g_assert (NULL != transport->peers_pending->data);
+		pgm_peer_t* peer = transport->peers_pending->data;
 		if (flags & MSG_ERRQUEUE)
-			pgm_set_reset_error (sock, peer, msg_start);
+			pgm_set_reset_error (transport, peer, msg_start);
 		else if (error) {
 			char tsi[PGM_TSISTRLEN];
 			pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
-			pgm_set_error (error,
-				     PGM_ERROR_DOMAIN_RECV,
-				     PGM_ERROR_CONNRESET,
+			g_set_error (error,
+				     PGM_RECV_ERROR,
+				     PGM_RECV_ERROR_CONNRESET,
 				     _("Transport has been reset on unrecoverable loss from %s."),
 				     tsi);
 		}
-		if (!sock->is_abort_on_reset)
-			sock->is_reset = !sock->is_reset;
-		pgm_mutex_unlock (&sock->receiver_mutex);
-		pgm_rwlock_reader_unlock (&sock->lock);
+		if (!transport->is_abort_on_reset)
+			transport->is_reset = !transport->is_reset;
+		g_static_mutex_unlock (&transport->receiver_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
 		return PGM_IO_STATUS_RESET;
 	}
 
 /* timer status */
-	if (pgm_timer_check (sock) &&
-	    !pgm_timer_dispatch (sock))
+	if (pgm_timer_check (transport) &&
+	    !pgm_timer_dispatch (transport))
 	{
 /* block on send-in-recv */
 		status = PGM_IO_STATUS_RATE_LIMITED;
 	}
 /* NAK status */
-	else if (sock->can_send_data)
+	else if (transport->can_send_data)
 	{
-		if (!pgm_txw_retransmit_is_empty (sock->window))
+		if (!pgm_txw_retransmit_is_empty (transport->window))
 		{
-			if (!pgm_on_deferred_nak (sock))
+			if (!pgm_on_deferred_nak (transport))
 				status = PGM_IO_STATUS_RATE_LIMITED;
 		}
 		else
-			pgm_notify_clear (&sock->rdata_notify);
+			pgm_notify_clear (&transport->rdata_notify);
 	}
 
-	size_t bytes_read = 0;
-	unsigned data_read = 0;
-	struct pgm_msgv_t* pmsg = msg_start;
-	const struct pgm_msgv_t* msg_end = msg_start + msg_len - 1;
+	gsize bytes_read = 0;
+	guint data_read = 0;
+	pgm_msgv_t* pmsg = msg_start;
+	const pgm_msgv_t* msg_end = msg_start + msg_len - 1;
 
-	if (PGM_UNLIKELY(0 == ++(sock->last_commit)))
-		++(sock->last_commit);
+	if (G_UNLIKELY(0 == ++(transport->last_commit)))
+		++(transport->last_commit);
 
 	/* second, flush any remaining contiguous messages from previous call(s) */
-	if (sock->peers_pending) {
-		if (0 != pgm_flush_peers_pending (sock, &pmsg, msg_end, &bytes_read, &data_read))
+	if (transport->peers_pending) {
+		if (0 != pgm_flush_peers_pending (transport, &pmsg, msg_end, &bytes_read, &data_read))
 			goto out;
 /* returns on: reset or full buffer */
 	}
@@ -747,12 +759,12 @@ pgm_recvmsgv (
  */
 	struct sockaddr_storage src, dst;
 	ssize_t len;
-	size_t bytes_received = 0;
+	gsize bytes_received = 0;
 
 recv_again:
 
-	len = recvskb (sock,
-		       sock->rx_buffer,		/* PGM skbuff */
+	len = recvskb (transport,
+		       transport->rx_buffer,		/* PGM skbuff */
 		       0,
 		       (struct sockaddr*)&src,
 		       sizeof(src),
@@ -760,29 +772,29 @@ recv_again:
 		       sizeof(dst));
 	if (len < 0)
 	{
-#ifndef _WIN32
+#ifdef G_OS_UNIX
 		const int save_errno = errno;
-		if (PGM_LIKELY(EAGAIN == save_errno)) {
+		if (EAGAIN == save_errno) {
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_RECV,
-			     pgm_error_from_errno (save_errno),
+		g_set_error (error,
+			     PGM_RECV_ERROR,
+			     pgm_recv_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
-			     strerror (save_errno));
+			     g_strerror (save_errno));
 #else
 		const int save_wsa_errno = WSAGetLastError ();
-		if (PGM_LIKELY(WSAEWOULDBLOCK == save_wsa_errno)) {
+		if (WSAEWOULDBLOCK == save_wsa_errno) {
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_RECV,
-			     pgm_error_from_wsa_errno (save_wsa_errno),
+		g_set_error (error,
+			     PGM_RECV_ERROR,
+			     pgm_recv_error_from_wsa_errno (save_wsa_errno),
 			     _("Transport socket error: %s"),
-			     pgm_wsastrerror (save_wsa_errno));
-#endif /* !_WIN32 */
+			     g_strerror (save_wsa_errno));
+#endif /* !G_OS_UNIX */
 		goto out;
 	}
 	else if (0 == len)
@@ -796,40 +808,37 @@ recv_again:
 		bytes_received += len;
 	}
 
-	pgm_error_t* err = NULL;
-	const bool is_valid = (sock->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
-					pgm_parse_udp_encap (sock->rx_buffer, &err) :
-					pgm_parse_raw (sock->rx_buffer, (struct sockaddr*)&dst, &err);
-	if (PGM_UNLIKELY(!is_valid))
+	GError* err = NULL;
+	const gboolean is_valid = (transport->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
+					pgm_parse_udp_encap (transport->rx_buffer, &err) :
+					pgm_parse_raw (transport->rx_buffer, (struct sockaddr*)&dst, &err);
+	if (G_UNLIKELY(!is_valid))
 	{
 /* inherently cannot determine PGM_PC_RECEIVER_CKSUM_ERRORS unless only one receiver */
-		pgm_trace (PGM_LOG_ROLE_NETWORK,
-				_("Discarded invalid packet: %s"),
-				(err && err->message) ? err->message : "(null)");
-		pgm_error_free (err);
-		if (sock->can_send_data) {
-			if (err && PGM_ERROR_CKSUM == err->code)
-				sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
-			sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
+		g_trace ("Discarded invalid packet.");
+		if (transport->can_send_data) {
+			if (err && PGM_PACKET_ERROR_CKSUM == err->code)
+				transport->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS]++;
+			transport->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 		}
 		goto recv_again;
 	}
 
 	pgm_peer_t* source = NULL;
-	if (PGM_UNLIKELY(!on_pgm (sock, sock->rx_buffer, (struct sockaddr*)&src, (struct sockaddr*)&dst, &source)))
+	if (!on_pgm (transport, transport->rx_buffer, (struct sockaddr*)&src, (struct sockaddr*)&dst, &source))
 		goto recv_again;
 
 /* check whether this source has waiting data */
 	if (source && pgm_peer_has_pending (source)) {
-		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("New pending data."));
-		pgm_peer_set_pending (sock, source);
+		g_trace ("new pending data.");
+		pgm_peer_set_pending (transport, source);
 	}
 
 flush_pending:
 /* flush any congtiguous packets generated by the receipt of this packet */
-	if (sock->peers_pending)
+	if (transport->peers_pending)
 	{
-		if (0 != pgm_flush_peers_pending (sock, &pmsg, msg_end, &bytes_read, &data_read))
+		if (0 != pgm_flush_peers_pending (transport, &pmsg, msg_end, &bytes_read, &data_read))
 		{
 /* recv vector is now full */
 			goto out;
@@ -838,11 +847,11 @@ flush_pending:
 
 check_for_repeat:
 /* repeat if non-blocking and not full */
-	if (sock->is_nonblocking ||
+	if (transport->is_nonblocking ||
 	    flags & MSG_DONTWAIT)
 	{
 		if (len > 0 && pmsg <= msg_end) {
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Recv again on not-full"));
+			g_trace ("recv again on not-full");
 			goto recv_again;		/* \:D/ */
 		}
 	}
@@ -851,34 +860,29 @@ check_for_repeat:
 /* repeat if blocking and empty, i.e. received non data packet.
  */
 		if (0 == data_read) {
-			const int wait_status = wait_for_event (sock);
+			const int wait_status = wait_for_event (transport);
 			switch (wait_status) {
 			case EAGAIN:
 				goto recv_again;
 			case EINTR:
-				if (!pgm_timer_dispatch (sock))
+				if (!pgm_timer_dispatch (transport))
 					goto check_for_repeat;
 				goto flush_pending;
 			case ENOENT:
-				pgm_mutex_unlock (&sock->receiver_mutex);
-				pgm_rwlock_reader_unlock (&sock->lock);
+				g_static_mutex_unlock (&transport->receiver_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT:
-				pgm_set_error (error,
-						PGM_ERROR_DOMAIN_RECV,
-						pgm_error_from_errno (errno),
-						_("Waiting for event: %s"),
-#ifndef _WIN32
-						strerror (errno)
-#else
-						pgm_wsastrerror (WSAGetLastError())	/* from select() */
-#endif
-						);
-				pgm_mutex_unlock (&sock->receiver_mutex);
-				pgm_rwlock_reader_unlock (&sock->lock);
+				g_set_error (error,
+					     PGM_RECV_ERROR,
+					     pgm_recv_error_from_errno (errno),
+					     _("Waiting for event: %s"),
+					     g_strerror (errno));
+				g_static_mutex_unlock (&transport->receiver_mutex);
+				g_static_rw_lock_reader_unlock (&transport->lock);
 				return PGM_IO_STATUS_ERROR;
 			default:
-				pgm_assert_not_reached();
+				g_assert_not_reached();
 			}
 		}
 	}
@@ -887,64 +891,64 @@ out:
 	if (0 == data_read)
 	{
 /* clear event notification */
-		if (sock->is_pending_read) {
-			pgm_notify_clear (&sock->pending_notify);
-			sock->is_pending_read = FALSE;
+		if (transport->is_pending_read) {
+			pgm_notify_clear (&transport->pending_notify);
+			transport->is_pending_read = FALSE;
 		}
 /* report data loss */
-		if (PGM_UNLIKELY(sock->is_reset)) {
-			pgm_assert (NULL != sock->peers_pending);
-			pgm_assert (NULL != sock->peers_pending->data);
-			pgm_peer_t* peer = sock->peers_pending->data;
+		if (G_UNLIKELY(transport->is_reset)) {
+			g_assert (NULL != transport->peers_pending);
+			g_assert (NULL != transport->peers_pending->data);
+			pgm_peer_t* peer = transport->peers_pending->data;
 			if (flags & MSG_ERRQUEUE)
-				pgm_set_reset_error (sock, peer, msg_start);
+				pgm_set_reset_error (transport, peer, msg_start);
 			else if (error) {
 				char tsi[PGM_TSISTRLEN];
 				pgm_tsi_print_r (&peer->tsi, tsi, sizeof(tsi));
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_RECV,
-					     PGM_ERROR_CONNRESET,
+				g_set_error (error,
+					     PGM_RECV_ERROR,
+					     PGM_RECV_ERROR_CONNRESET,
 					     _("Transport has been reset on unrecoverable loss from %s."),
 					     tsi);
 			}
-			if (!sock->is_abort_on_reset)
-				sock->is_reset = !sock->is_reset;
-			pgm_mutex_unlock (&sock->receiver_mutex);
-			pgm_rwlock_reader_unlock (&sock->lock);
+			if (!transport->is_abort_on_reset)
+				transport->is_reset = !transport->is_reset;
+			g_static_mutex_unlock (&transport->receiver_mutex);
+			g_static_rw_lock_reader_unlock (&transport->lock);
 			return PGM_IO_STATUS_RESET;
 		}
-		pgm_mutex_unlock (&sock->receiver_mutex);
-		pgm_rwlock_reader_unlock (&sock->lock);
+		g_static_mutex_unlock (&transport->receiver_mutex);
+		g_static_rw_lock_reader_unlock (&transport->lock);
 		if (PGM_IO_STATUS_WOULD_BLOCK == status &&
-		    ( sock->can_send_data ||
-		      ( sock->can_recv_data && NULL != sock->peers_list )))
+		    ( transport->can_send_data ||
+		      ( transport->can_recv_data && NULL != transport->peers_list )))
 		{
 			status = PGM_IO_STATUS_TIMER_PENDING;
 		}
 		return status;
 	}
 
-	if (sock->peers_pending)
+	if (transport->peers_pending)
 	{
 /* set event notification for additional available data */
-		if (sock->is_pending_read && sock->is_edge_triggered_recv)
+		if (transport->is_pending_read && transport->is_edge_triggered_recv)
 		{
 /* empty pending-pipe */
-			pgm_notify_clear (&sock->pending_notify);
-			sock->is_pending_read = FALSE;
+			pgm_notify_clear (&transport->pending_notify);
+			transport->is_pending_read = FALSE;
 		}
-		else if (!sock->is_pending_read && !sock->is_edge_triggered_recv)
+		else if (!transport->is_pending_read && !transport->is_edge_triggered_recv)
 		{
 /* fill pending-pipe */
-			pgm_notify_send (&sock->pending_notify);
-			sock->is_pending_read = TRUE;
+			pgm_notify_send (&transport->pending_notify);
+			transport->is_pending_read = TRUE;
 		}
 	}
 
 	if (NULL != _bytes_read)
 		*_bytes_read = bytes_read;
-	pgm_mutex_unlock (&sock->receiver_mutex);
-	pgm_rwlock_reader_unlock (&sock->lock);
+	g_static_mutex_unlock (&transport->receiver_mutex);
+	g_static_rw_lock_reader_unlock (&transport->lock);
 	return PGM_IO_STATUS_NORMAL;
 }
 
@@ -954,22 +958,22 @@ out:
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-int
+PGMIOStatus
 pgm_recvmsg (
-	pgm_sock_t*   	   const restrict sock,
-	struct pgm_msgv_t* const restrict msgv,
-	const int			  flags,	/* MSG_DONTWAIT for non-blocking */
-	size_t*			 restrict bytes_read,	/* may be NULL */
-	pgm_error_t**		 restrict error
+	pgm_transport_t* const	transport,
+	pgm_msgv_t* const	msgv,
+	const int		flags,		/* MSG_DONTWAIT for non-blocking */
+	gsize*			bytes_read,	/* may be NULL */
+	GError**		error
 	)
 {
-	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
-	pgm_return_val_if_fail (NULL != msgv, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != msgv, PGM_IO_STATUS_ERROR);
 
-	pgm_debug ("pgm_recvmsg (sock:%p msgv:%p flags:%d bytes_read:%p error:%p)",
-		(const void*)sock, (const void*)msgv, flags, (const void*)bytes_read, (const void*)error);
+	g_trace ("pgm_recvmsg (transport:%p msgv:%p flags:%d bytes_read:%p error:%p)",
+		(gpointer)transport, (gpointer)msgv, flags, (gpointer)bytes_read, (gpointer)error);
 
-	return pgm_recvmsgv (sock, msgv, 1, flags, bytes_read, error);
+	return pgm_recvmsgv (transport, msgv, 1, flags, bytes_read, error);
 }
 
 /* vanilla read function.  copies from the receive window to the provided buffer
@@ -979,54 +983,48 @@ pgm_recvmsg (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-int
+PGMIOStatus
 pgm_recvfrom (
-	pgm_sock_t*	 const restrict sock,
-	void*			  restrict buf,
-	const size_t			   buflen,
-	const int			   flags,		/* MSG_DONTWAIT for non-blocking */
-	size_t*			  restrict _bytes_read,	/* may be NULL */
-	struct pgm_sockaddr_t*	  restrict from,		/* may be NULL */
-	socklen_t*		  restrict fromlen,
-	pgm_error_t**		  restrict error
+	pgm_transport_t* const	transport,
+	gpointer		data,
+	const gsize		len,
+	const int		flags,		/* MSG_DONTWAIT for non-blocking */
+	gsize*			_bytes_read,	/* may be NULL */
+	pgm_tsi_t*		from,		/* may be NULL */
+	GError**		error
 	)
 {
-	struct pgm_msgv_t msgv;
-	size_t bytes_read = 0;
+	pgm_msgv_t msgv;
+	gsize bytes_read = 0;
 
-	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
-	if (PGM_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
-	if (fromlen) {
-		pgm_return_val_if_fail (NULL != from, PGM_IO_STATUS_ERROR);
-		pgm_return_val_if_fail (sizeof (struct pgm_sockaddr_t) == *fromlen, PGM_IO_STATUS_ERROR);
-	}
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(len)) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
-	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p from:%p from:%p error:%p)",
-		(const void*)sock, buf, buflen, flags, (const void*)_bytes_read, (const void*)from, (const void*)fromlen, (const void*)error);
+	g_trace ("pgm_recvfrom (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p from:%p error:%p)",
+		(gpointer)transport, data, len, flags, (gpointer)_bytes_read, (gpointer)from, (gpointer)error);
 
-	const int status = pgm_recvmsg (sock, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
+	const PGMIOStatus status = pgm_recvmsg (transport, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
 	if (PGM_IO_STATUS_NORMAL != status)
 		return status;
 
-	size_t bytes_copied = 0;
+	gsize bytes_copied = 0;
 	struct pgm_sk_buff_t** skb = msgv.msgv_skb;
 	struct pgm_sk_buff_t* pskb = *skb;
 
 	if (from) {
-		from->sa_port = ntohs (sock->dport);
-		from->sa_addr.sport = ntohs (pskb->tsi.sport);
-		memcpy (&from->sa_addr.gsi, &pskb->tsi.gsi, sizeof(pgm_gsi_t));
+		memcpy (&from->gsi, &pskb->tsi.gsi, sizeof(pgm_gsi_t));
+		from->sport = g_ntohs (pskb->tsi.sport);
 	}
 
 	while (bytes_copied < bytes_read) {
-		size_t copy_len = pskb->len;
-		if (bytes_copied + copy_len > buflen) {
-			pgm_warn (_("APDU truncated, original length %zu bytes."),
+		gsize copy_len = pskb->len;
+		if (bytes_copied + copy_len > len) {
+			g_error (_("APDU truncated, original length %" G_GSIZE_FORMAT " bytes."),
 				bytes_read);
-			copy_len = buflen - bytes_copied;
-			bytes_read = buflen;
+			copy_len = len - bytes_copied;
+			bytes_read = len;
 		}
-		memcpy ((char*)buf + bytes_copied, pskb->data, copy_len);
+		memcpy ((guint8*)data + bytes_copied, pskb->data, copy_len);
 		bytes_copied += copy_len;
 		pskb = *(++skb);
 	}
@@ -1040,23 +1038,113 @@ pgm_recvfrom (
  * on success, returns PGM_IO_STATUS_NORMAL.
  */
 
-int
+PGMIOStatus
 pgm_recv (
-	pgm_sock_t* const restrict sock,
-	void*		  restrict buf,
-	const size_t		   buflen,
-	const int		   flags,	/* MSG_DONTWAIT for non-blocking */
-	size_t*	    const restrict bytes_read,	/* may be NULL */
-	pgm_error_t**     restrict error
+	pgm_transport_t* const	transport,
+	gpointer		data,
+	const gsize		len,
+	const int		flags,		/* MSG_DONTWAIT for non-blocking */
+	gsize* const		bytes_read,	/* may be NULL */
+	GError**		error
 	)
 {
-	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
-	if (PGM_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
+	g_return_val_if_fail (NULL != transport, PGM_IO_STATUS_ERROR);
+	if (G_LIKELY(len)) g_return_val_if_fail (NULL != data, PGM_IO_STATUS_ERROR);
 
-	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p error:%p)",
-		(const void*)sock, buf, buflen, flags, (const void*)bytes_read, (const void*)error);
+	g_trace ("pgm_recv (transport:%p data:%p len:%" G_GSIZE_FORMAT " flags:%d bytes-read:%p error:%p)",
+		(gpointer)transport, data, len, flags, (gpointer)bytes_read, (gpointer)error);
 
-	return pgm_recvfrom (sock, buf, buflen, flags, bytes_read, NULL, NULL, error);
+	return pgm_recvfrom (transport, data, len, flags, bytes_read, NULL, error);
 }
+
+GQuark
+pgm_recv_error_quark (void)
+{
+	return g_quark_from_static_string ("pgm-recv-error-quark");
+}
+
+static
+PGMRecvError
+pgm_recv_error_from_errno (
+	gint		err_no
+        )
+{
+	switch (err_no) {
+#ifdef EBADF
+	case EBADF:
+		return PGM_RECV_ERROR_BADF;
+		break;
+#endif
+
+#ifdef EFAULT
+	case EFAULT:
+		return PGM_RECV_ERROR_FAULT;
+		break;
+#endif
+
+#ifdef EINTR
+	case EINTR:
+		return PGM_RECV_ERROR_INTR;
+		break;
+#endif
+
+#ifdef EINVAL
+	case EINVAL:
+		return PGM_RECV_ERROR_INVAL;
+		break;
+#endif
+
+#ifdef ENOMEM
+	case ENOMEM:
+		return PGM_RECV_ERROR_NOMEM;
+		break;
+#endif
+
+	default :
+		return PGM_RECV_ERROR_FAILED;
+		break;
+	}
+}
+
+#ifdef G_OS_WIN32
+static
+PGMRecvError
+pgm_recv_error_from_wsa_errno (
+	gint		err_no
+        )
+{
+	switch (err_no) {
+#ifdef WSAEINVAL
+	case WSAEINVAL:
+		return PGM_RECV_ERROR_INVAL;
+		break;
+#endif
+#ifdef WSAEMFILE
+	case WSAEMFILE:
+		return PGM_RECV_ERROR_MFILE;
+		break;
+#endif
+#ifdef WSA_NOT_ENOUGH_MEMORY
+	case WSA_NOT_ENOUGH_MEMORY:
+		return PGM_RECV_ERROR_NOMEM;
+		break;
+#endif
+#ifdef WSAENOPROTOOPT
+	case WSAENOPROTOOPT:
+		return PGM_RECV_ERROR_NOPROTOOPT;
+		break;
+#endif
+#ifdef WSAECONNRESET
+	case WSAECONNRESET:
+		return PGM_RECV_ERROR_CONNRESET;
+		break;
+#endif
+
+	default :
+		return PGM_RECV_ERROR_FAILED;
+		break;
+	}
+}
+#endif /* G_OS_WIN32 */
 
 /* eof */

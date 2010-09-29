@@ -22,237 +22,230 @@
 #ifndef __PGM_SKBUFF_H__
 #define __PGM_SKBUFF_H__
 
-#include <string.h>
+#include <stdlib.h>
+#include <glib.h>
 
 struct pgm_sk_buff_t;
 
-#include <pgm/types.h>
-#include <pgm/atomic.h>
-#include <pgm/mem.h>
-#include <pgm/list.h>
-#include <pgm/time.h>
-#include <pgm/packet.h>
-#include <pgm/tsi.h>
-#include <pgm/socket.h>
+#ifndef __PGM_TRANSPORT_H__
+#	include <pgm/transport.h>
+#endif
 
-PGM_BEGIN_DECLS
+#ifndef __PGM_PACKET_H__
+#	include <pgm/packet.h>
+#endif
+
 
 struct pgm_sk_buff_t {
-	pgm_list_t			link_;
+	GList			link_;
 
-	pgm_sock_t* restrict		sock;
-	pgm_time_t			tstamp;
-	pgm_tsi_t			tsi;
+	pgm_transport_t*	transport;
+	pgm_time_t		tstamp;
+	pgm_tsi_t		tsi;
 
-	uint32_t			sequence;
-	uint32_t			__padding;	/* push alignment of pgm_sk_buff_t::cb to 8 bytes */
+	guint32			sequence;
+	guint32			__padding;	/* push alignment of pgm_sk_buff_t::cb to 8 bytes */
 
-	char				cb[48];		/* control buffer */
+	char			cb[48];		/* control buffer */
 
-	uint16_t			len;		/* actual data */
-	unsigned			zero_padded:1;
+	guint			len;		/* actual data */
+	unsigned		zero_padded:1;
 
-	struct pgm_header*		pgm_header;
-	struct pgm_opt_fragment* 	pgm_opt_fragment;
-#define of_apdu_first_sqn		pgm_opt_fragment->opt_sqn
-#define of_frag_offset			pgm_opt_fragment->opt_frag_off
-#define of_apdu_len			pgm_opt_fragment->opt_frag_len
-	struct pgm_opt_pgmcc_data*	pgm_opt_pgmcc_data;
-	struct pgm_data*		pgm_data;
+	struct pgm_header*	pgm_header;
+	struct pgm_opt_fragment* pgm_opt_fragment;
+#define of_apdu_first_sqn	pgm_opt_fragment->opt_sqn
+#define of_frag_offset		pgm_opt_fragment->opt_frag_off
+#define of_apdu_len		pgm_opt_fragment->opt_frag_len
+	struct pgm_data*	pgm_data;
 
-	void			       *head,		/* all may-alias */
-				       *data,
-				       *tail,
-				       *end;
-	uint32_t			truesize;
-	volatile uint32_t		users;		/* atomic */
+	gpointer		head,
+				data,
+				tail,
+				end;
+	guint			truesize;
+	gint			users;		/* atomic */
 };
 
-void pgm_skb_over_panic (const struct pgm_sk_buff_t*const, const uint16_t) PGM_GNUC_NORETURN;
-void pgm_skb_under_panic (const struct pgm_sk_buff_t*const, const uint16_t) PGM_GNUC_NORETURN;
-bool pgm_skb_is_valid (const struct pgm_sk_buff_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
+static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
+static inline void pgm_skb_over_panic (struct pgm_sk_buff_t* skb, guint len)
+{
+	g_error ("skput:over: %d put:%d",
+		    skb->len, len);
+	g_assert_not_reached();
+}
 
-/* attribute __pure__ only valid for platforms with atomic ops.
- * attribute __malloc__ not used as only part of the memory should be aliased.
- * attribute __alloc_size__ does not allow headroom.
- */
-static inline struct pgm_sk_buff_t* pgm_alloc_skb (const uint16_t) PGM_GNUC_WARN_UNUSED_RESULT;
+static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint len) G_GNUC_NORETURN;
+static inline void pgm_skb_under_panic (struct pgm_sk_buff_t* skb, guint len)
+{
+	g_error ("skput:under: %d put:%d",
+		    skb->len, len);
+	g_assert_not_reached();
+}
 
-static inline
-struct pgm_sk_buff_t*
-pgm_alloc_skb (
-	const uint16_t		size
-	)
+static inline struct pgm_sk_buff_t* pgm_alloc_skb (guint size)
 {
 	struct pgm_sk_buff_t* skb;
 
-	skb = (struct pgm_sk_buff_t*)pgm_malloc (size + sizeof(struct pgm_sk_buff_t));
-/* Requires fast FSB to test
-	pgm_prefetchw (skb);
- */
-	if (PGM_UNLIKELY(pgm_mem_gc_friendly)) {
+	skb = (struct pgm_sk_buff_t*)g_slice_alloc (size + sizeof(struct pgm_sk_buff_t));
+	if (G_UNLIKELY(g_mem_gc_friendly)) {
 		memset (skb, 0, size + sizeof(struct pgm_sk_buff_t));
 		skb->zero_padded = 1;
-	} else {
+	} else
 		memset (skb, 0, sizeof(struct pgm_sk_buff_t));
-	}
 	skb->truesize = size + sizeof(struct pgm_sk_buff_t);
-	pgm_atomic_write32 (&skb->users, 1);
+	g_atomic_int_set (&skb->users, 1);
 	skb->head = skb + 1;
 	skb->data = skb->tail = skb->head;
-	skb->end  = (char*)skb->data + size;
+	skb->end  = (guint8*)skb->data + size;
 	return skb;
 }
 
 /* increase reference count */
-static inline
-struct pgm_sk_buff_t*
-pgm_skb_get (
-	struct pgm_sk_buff_t*const skb
-	)
+static inline struct pgm_sk_buff_t* pgm_skb_get (struct pgm_sk_buff_t* skb)
 {
-	pgm_atomic_inc32 (&skb->users);
+	g_atomic_int_inc (&skb->users);
 	return skb;
 }
 
-static inline
-void
-pgm_free_skb (
-	struct pgm_sk_buff_t*const skb
-	)
+static inline void pgm_free_skb (struct pgm_sk_buff_t* skb)
 {
-	if (pgm_atomic_exchange_and_add32 (&skb->users, (uint32_t)-1) == 1)
-		pgm_free (skb);
+	if (g_atomic_int_dec_and_test (&skb->users))
+		g_slice_free1 (skb->truesize, skb);
 }
 
 /* add data */
-static inline
-void*
-pgm_skb_put (
-	struct pgm_sk_buff_t* const skb,
-	const uint16_t		len
-	)
+static inline gpointer pgm_skb_put (struct pgm_sk_buff_t* skb, guint len)
 {
-	void* tmp = skb->tail;
-	skb->tail = (char*)skb->tail + len;
+	gpointer tmp = skb->tail;
+	skb->tail = (guint8*)skb->tail + len;
 	skb->len  += len;
-	if (PGM_UNLIKELY(skb->tail > skb->end))
+	if (G_UNLIKELY(skb->tail > skb->end))
 		pgm_skb_over_panic (skb, len);
 	return tmp;
 }
 
-static inline
-void*
-__pgm_skb_pull (
-	struct pgm_sk_buff_t*const skb,
-	const uint16_t		len
-	)
+static inline gpointer __pgm_skb_pull (struct pgm_sk_buff_t *skb, guint len)
 {
 	skb->len -= len;
-	return skb->data = (char*)skb->data + len;
+	return skb->data = (guint8*)skb->data + len;
 }
 
 /* remove data from start of buffer */
-static inline
-void*
-pgm_skb_pull (
-	struct pgm_sk_buff_t*const skb,
-	const uint16_t		len
-	)
+static inline gpointer pgm_skb_pull (struct pgm_sk_buff_t* skb, guint len)
 {
-	return PGM_UNLIKELY(len > skb->len) ? NULL : __pgm_skb_pull (skb, len);
+	return G_UNLIKELY(len > skb->len) ? NULL : __pgm_skb_pull (skb, len);
 }
 
-static inline uint16_t pgm_skb_headroom (const struct pgm_sk_buff_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-static inline uint16_t pgm_skb_tailroom (const struct pgm_sk_buff_t*const) PGM_GNUC_PURE PGM_GNUC_WARN_UNUSED_RESULT;
-
-static inline
-uint16_t
-pgm_skb_headroom (
-	const struct pgm_sk_buff_t*const skb
-	)
+static inline gint pgm_skb_headroom (const struct pgm_sk_buff_t* skb)
 {
-	return (char*)skb->data - (char*)skb->head;
+	return (guint8*)skb->data - (guint8*)skb->head;
 }
 
-static inline
-uint16_t
-pgm_skb_tailroom (
-	const struct pgm_sk_buff_t*const skb
-	)
+static inline gint pgm_skb_tailroom (const struct pgm_sk_buff_t* skb)
 {
-	return (char*)skb->end - (char*)skb->tail;
+	return (guint8*)skb->end - (guint8*)skb->tail;
 }
 
 /* reserve space to add data */
-static inline
-void
-pgm_skb_reserve (
-	struct pgm_sk_buff_t*const skb,
-	const uint16_t		len
-	)
+static inline void pgm_skb_reserve (struct pgm_sk_buff_t* skb, guint len)
 {
-	skb->data = (char*)skb->data + len;
-	skb->tail = (char*)skb->tail + len;
-	if (PGM_UNLIKELY(skb->tail > skb->end))
+	skb->data = (guint8*)skb->data + len;
+	skb->tail = (guint8*)skb->tail + len;
+	if (G_UNLIKELY(skb->tail > skb->end))
 		pgm_skb_over_panic (skb, len);
-	if (PGM_UNLIKELY(skb->data < skb->head))
+	if (G_UNLIKELY(skb->data < skb->head))
 		pgm_skb_under_panic (skb, len);
 }
 
-static inline struct pgm_sk_buff_t* pgm_skb_copy (const struct pgm_sk_buff_t* const) PGM_GNUC_WARN_UNUSED_RESULT;
-
-static inline
-struct pgm_sk_buff_t*
-pgm_skb_copy (
-	const struct pgm_sk_buff_t* const skb
-	)
+static inline struct pgm_sk_buff_t* pgm_skb_copy (const struct pgm_sk_buff_t* const skb)
 {
 	struct pgm_sk_buff_t* newskb;
-	newskb = (struct pgm_sk_buff_t*)pgm_malloc (skb->truesize);
-	memcpy (newskb, skb, PGM_OFFSETOF(struct pgm_sk_buff_t, pgm_header));
+	newskb = (struct pgm_sk_buff_t*)g_slice_alloc (skb->truesize);
+	memcpy (newskb, skb, G_STRUCT_OFFSET(struct pgm_sk_buff_t, pgm_header));
 	newskb->zero_padded = 0;
 	newskb->truesize = skb->truesize;
-	pgm_atomic_write32 (&newskb->users, 1);
+	g_atomic_int_set (&newskb->users, 1);
 	newskb->head = newskb + 1;
-	newskb->end  = (char*)newskb->head + ((char*)skb->end  - (char*)skb->head);
-	newskb->data = (char*)newskb->head + ((char*)skb->data - (char*)skb->head);
-	newskb->tail = (char*)newskb->head + ((char*)skb->tail - (char*)skb->head);
-	newskb->pgm_header = skb->pgm_header ? (struct pgm_header*)((char*)newskb->head + ((char*)skb->pgm_header - (char*)skb->head)) : skb->pgm_header;
-	newskb->pgm_opt_fragment = skb->pgm_opt_fragment ? (struct pgm_opt_fragment*)((char*)newskb->head + ((char*)skb->pgm_opt_fragment - (char*)skb->head)) : skb->pgm_opt_fragment;
-	newskb->pgm_data = skb->pgm_data ? (struct pgm_data*)((char*)newskb->head + ((char*)skb->pgm_data - (char*)skb->head)) : skb->pgm_data;
-	memcpy (newskb->head, skb->head, (char*)skb->end - (char*)skb->head);
+	newskb->end  = (guint8*)newskb->head + ((guint8*)skb->end - (guint8*)skb->head);
+	newskb->data = (guint8*)newskb->head + ((guint8*)skb->data - (guint8*)skb->head);
+	newskb->tail = (guint8*)newskb->head + ((guint8*)skb->tail - (guint8*)skb->head);
+	newskb->pgm_header = skb->pgm_header ? (struct pgm_header*)((guint8*)newskb->head + ((guint8*)skb->pgm_header - (guint8*)skb->head)) : skb->pgm_header;
+	newskb->pgm_opt_fragment = skb->pgm_opt_fragment ? (struct pgm_opt_fragment*)((guint8*)newskb->head + ((guint8*)skb->pgm_opt_fragment - (guint8*)skb->head)) : skb->pgm_opt_fragment;
+	newskb->pgm_data = skb->pgm_data ? (struct pgm_data*)((guint8*)newskb->head + ((guint8*)skb->pgm_data - (guint8*)skb->head)) : skb->pgm_data;
+	memcpy (newskb->head, skb->head, (guint8*)skb->end - (guint8*)skb->head);
 	return newskb;
 }
 
-static inline
-void
-pgm_skb_zero_pad (
-	struct pgm_sk_buff_t* const	skb,
-	const uint16_t			len
-	)
+static inline void pgm_skb_zero_pad (struct pgm_sk_buff_t* const skb, const guint len)
 {
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-/* C99 version */
 	if (skb->zero_padded)
 		return;
 
-	const uint16_t tailroom = MIN(pgm_skb_tailroom (skb), len);
+	const guint tailroom = MIN((guint)pgm_skb_tailroom (skb), len);
 	if (tailroom > 0)
 		memset (skb->tail, 0, tailroom);
 	skb->zero_padded = 1;
-#else
-/* C89 version */
-	const uint16_t tailroom = MIN(pgm_skb_tailroom (skb), len);
-	if (skb->zero_padded)
-		return;
-
-	if (tailroom > 0)
-		memset (skb->tail, 0, tailroom);
-	skb->zero_padded = 1;
-#endif
 }
 
-PGM_END_DECLS
+/* PGM skbuff for data, in-state skbuffs will return FALSE.
+ */
+#ifndef SKB_DEBUG
+static inline gboolean pgm_skb_is_valid (G_GNUC_UNUSED const struct pgm_sk_buff_t* const skb)
+{
+#else
+static inline gboolean pgm_skb_is_valid (const struct pgm_sk_buff_t* const skb)
+{
+	g_return_val_if_fail (skb, FALSE);
+/* link_ */
+/* transport */
+	g_return_val_if_fail (skb->transport, FALSE);
+/* tstamp */
+	g_return_val_if_fail (skb->tstamp > 0, FALSE);
+/* tsi */
+/* sequence can be any value */
+/* cb can be any value */
+/* len can be any value */
+/* zero_padded can be any value */
+/* gpointers */
+	g_return_val_if_fail (skb->head, FALSE);
+	g_return_val_if_fail ((const guint8*)skb->head > (const guint8*)&skb->users, FALSE);
+	g_return_val_if_fail (skb->data, FALSE);
+	g_return_val_if_fail ((const guint8*)skb->data >= (const guint8*)skb->head, FALSE);
+	g_return_val_if_fail (skb->tail, FALSE);
+	g_return_val_if_fail ((const guint8*)skb->tail >= (const guint8*)skb->data, FALSE);
+	g_return_val_if_fail (skb->len == (guint8*)skb->tail - (const guint8*)skb->data, FALSE);
+	g_return_val_if_fail (skb->end, FALSE);
+	g_return_val_if_fail ((const guint8*)skb->end >= (const guint8*)skb->tail, FALSE);
+/* pgm_header */
+	if (skb->pgm_header) {
+		g_return_val_if_fail ((const guint8*)skb->pgm_header >= (const guint8*)skb->head, FALSE);
+		g_return_val_if_fail ((const guint8*)skb->pgm_header + sizeof(struct pgm_header) <= (const guint8*)skb->tail, FALSE);
+		g_return_val_if_fail (skb->pgm_data, FALSE);
+		g_return_val_if_fail ((const guint8*)skb->pgm_data >= (const guint8*)skb->pgm_header + sizeof(struct pgm_header), FALSE);
+		g_return_val_if_fail ((const guint8*)skb->pgm_data <= (const guint8*)skb->tail, FALSE);
+		if (skb->pgm_opt_fragment) {
+			g_return_val_if_fail ((const guint8*)skb->pgm_opt_fragment > (const guint8*)skb->pgm_data, FALSE);
+			g_return_val_if_fail ((const guint8*)skb->pgm_opt_fragment + sizeof(struct pgm_opt_fragment) < (const guint8*)skb->tail, FALSE);
+/* of_apdu_first_sqn can be any value */
+/* of_frag_offset */
+			g_return_val_if_fail (g_ntohl (skb->of_frag_offset) < g_ntohl (skb->of_apdu_len), FALSE);
+/* of_apdu_len can be any value */
+		}
+		g_return_val_if_fail (PGM_ODATA == skb->pgm_header->pgm_type || PGM_RDATA == skb->pgm_header->pgm_type, FALSE);
+/* FEC broken */
+		g_return_val_if_fail (0 == (skb->pgm_header->pgm_options & PGM_OPT_PARITY), FALSE);
+		g_return_val_if_fail (0 == (skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN), FALSE);
+	} else {
+		g_return_val_if_fail (NULL == skb->pgm_data, FALSE);
+		g_return_val_if_fail (NULL == skb->pgm_opt_fragment, FALSE);
+	}
+/* truesize */
+	g_return_val_if_fail (skb->truesize >= sizeof(struct pgm_sk_buff_t*) + skb->len, FALSE);
+	g_return_val_if_fail (skb->truesize == (guint)((const guint8*)skb->end - (const guint8*)skb), FALSE);
+/* users */
+	g_return_val_if_fail (g_atomic_int_get (&skb->users) > 0, FALSE);
+#endif
+	return TRUE;
+}
 
 #endif /* __PGM_SKBUFF_H__ */

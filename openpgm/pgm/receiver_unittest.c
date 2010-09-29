@@ -2,7 +2,7 @@
  *
  * unit tests for PGM receiver transport.
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,59 +21,34 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
 
+#include <pgm/receiver.h>
+#include <pgm/rxwi.h>
+
+#define pgm_histogram_add	mock_pgm_histogram_add
+#include <pgm/histogram.h>
+
 
 /* mock state */
 
-#define TEST_NETWORK		""
-#define TEST_PORT		7500
-#define TEST_MAX_TPDU		1500
-#define TEST_TXW_SQNS		32
-#define TEST_RXW_SQNS		32
-#define TEST_HOPS		16
-#define TEST_SPM_AMBIENT	( pgm_secs(30) )
-#define TEST_SPM_HEARTBEAT_INIT	{ pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) }
-#define TEST_PEER_EXPIRY	( pgm_secs(300) )
-#define TEST_SPMR_EXPIRY	( pgm_msecs(250) )
-#define TEST_NAK_BO_IVL		( pgm_msecs(50) )
-#define TEST_NAK_RPT_IVL	( pgm_secs(2) )
-#define TEST_NAK_RDATA_IVL	( pgm_secs(2) )
-#define TEST_NAK_DATA_RETRIES	5
-#define TEST_NAK_NCF_RETRIES	2
-
-
-#define pgm_histogram_add	mock_pgm_histogram_add
-#define pgm_verify_spm		mock_pgm_verify_spm
-#define pgm_verify_nak		mock_pgm_verify_nak
-#define pgm_verify_ncf		mock_pgm_verify_ncf
-#define pgm_verify_poll		mock_pgm_verify_poll
-#define pgm_sendto_hops		mock_pgm_sendto_hops
-#define pgm_time_now		mock_pgm_time_now
-#define pgm_time_update_now	mock_pgm_time_update_now
-#define pgm_rxw_destroy		mock_pgm_rxw_destroy
-#define pgm_rxw_create		mock_pgm_rxw_create
-#define pgm_rxw_update		mock_pgm_rxw_update
-#define pgm_rxw_update_fec	mock_pgm_rxw_update_fec
-#define pgm_rxw_confirm		mock_pgm_rxw_confirm
-#define pgm_rxw_lost		mock_pgm_rxw_lost
-#define pgm_rxw_state		mock_pgm_rxw_state
-#define pgm_rxw_add		mock_pgm_rxw_add
-#define pgm_rxw_remove_commit	mock_pgm_rxw_remove_commit
-#define pgm_rxw_readv		mock_pgm_rxw_readv
-#define pgm_csum_fold		mock_pgm_csum_fold
-#define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
-#define pgm_histogram_init	mock_pgm_histogram_init
-#define pgm_setsockopt		mock_pgm_setsockopt
-
-
-#define RECEIVER_DEBUG
-#include "receiver.c"
-
+#define PGM_NETWORK		""
+#define PGM_PORT		7500
+#define PGM_MAX_TPDU		1500
+#define PGM_TXW_SQNS		32
+#define PGM_RXW_SQNS		32
+#define PGM_HOPS		16
+#define PGM_SPM_AMBIENT		( pgm_secs(30) )
+#define PGM_SPM_HEARTBEAT_INIT	{ pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(100), pgm_msecs(1300), pgm_secs(7), pgm_secs(16), pgm_secs(25), pgm_secs(30) }
+#define PGM_PEER_EXPIRY		( pgm_secs(300) )
+#define PGM_SPMR_EXPIRY		( pgm_msecs(250) )
+#define PGM_NAK_BO_IVL		( pgm_msecs(50) )
+#define PGM_NAK_RPT_IVL		( pgm_secs(2) )
+#define PGM_NAK_RDATA_IVL	( pgm_secs(2) )
+#define PGM_NAK_DATA_RETRIES	5
+#define PGM_NAK_NCF_RETRIES	2
 
 static
 void
@@ -83,11 +58,11 @@ mock_setup (void)
 }
 
 static
-struct pgm_sock_t*
-generate_sock (void)
+struct pgm_transport_t*
+generate_transport (void)
 {
-	struct pgm_sock_t* sock = g_malloc0 (sizeof(struct pgm_sock_t));
-	return sock;
+	struct pgm_transport_t* transport = g_malloc0 (sizeof(struct pgm_transport_t));
+	return transport;
 }
 
 static
@@ -97,15 +72,15 @@ generate_peer (void)
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, 1000 };
 	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
 	peer->window = g_malloc0 (sizeof(pgm_rxw_t));
-	pgm_atomic_inc32 (&peer->ref_count);
+	g_atomic_int_inc (&peer->ref_count);
 	return peer;
 }
 
-/** socket module */
+/** transport module */
 static
 int
-mock_pgm_poll_info (
-	pgm_sock_t* const	sock,
+mock_pgm_transport_poll_info (
+	pgm_transport_t* const	transport,
 	struct pollfd*		fds,
 	int*			n_fds,
 	int			events
@@ -116,7 +91,7 @@ mock_pgm_poll_info (
 static
 gboolean
 mock_pgm_on_nak (
-	pgm_sock_t* const		sock,
+	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb
 	)
 {
@@ -126,7 +101,7 @@ mock_pgm_on_nak (
 static
 gboolean
 mock_pgm_on_nnak (
-	pgm_sock_t* const		sock,
+	pgm_transport_t* const		transport,
 	struct pgm_sk_buff_t* const	skb
 	)
 {
@@ -136,7 +111,7 @@ mock_pgm_on_nnak (
 static
 gboolean
 mock_pgm_on_spmr (
-	pgm_sock_t* const		sock,
+	pgm_transport_t* const		transport,
 	pgm_peer_t* const		peer,
 	struct pgm_sk_buff_t* const	skb
 	)
@@ -146,16 +121,15 @@ mock_pgm_on_spmr (
 
 /** net module */
 PGM_GNUC_INTERNAL
-ssize_t
-mock_pgm_sendto_hops (
-	pgm_sock_t*			sock,
-	bool				use_rate_limit,
-	bool				use_router_alert,
-	int				hops,
+gssize
+mock_pgm_sendto (
+	pgm_transport_t*		transport,
+	gboolean			use_rate_limit,
+	gboolean			use_router_alert,
 	const void*			buf,
-	size_t				len,
+	gsize				len,
 	const struct sockaddr*		to,
-	socklen_t			tolen
+	gsize				tolen
 	)
 {
 	return len;
@@ -163,17 +137,17 @@ mock_pgm_sendto_hops (
 
 /** time module */
 static pgm_time_t mock_pgm_time_now = 0x1;
-static pgm_time_t _mock_pgm_time_update_now (void);
-pgm_time_update_func mock_pgm_time_update_now = _mock_pgm_time_update_now;
 
+static
 pgm_time_t
-_mock_pgm_time_update_now (void)
+mock_pgm_time_update_now (void)
 {
 	return mock_pgm_time_now;
 }
 
 /* packet module */
-bool
+static
+gboolean
 mock_pgm_verify_spm (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -181,7 +155,8 @@ mock_pgm_verify_spm (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_nak (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -189,7 +164,8 @@ mock_pgm_verify_nak (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_ncf (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -197,7 +173,8 @@ mock_pgm_verify_ncf (
 	return TRUE;
 }
 
-bool
+static
+gboolean
 mock_pgm_verify_poll (
 	const struct pgm_sk_buff_t* const       skb
 	)
@@ -206,19 +183,20 @@ mock_pgm_verify_poll (
 }
 
 /* receive window module */
+static
 pgm_rxw_t*
 mock_pgm_rxw_create (
 	const pgm_tsi_t*	tsi,
-	const uint16_t		tpdu_size,
-	const unsigned		sqns,
-	const unsigned		secs,
-	const ssize_t		max_rte,
-	const uint32_t		ack_c_p
+	const guint16		tpdu_size,
+	const guint32		sqns,
+	const guint		secs,
+	const guint		max_rte
 	)
 {
 	return g_malloc0 (sizeof(pgm_rxw_t));
 }
 
+static
 void
 mock_pgm_rxw_destroy (
 	pgm_rxw_t* const	window
@@ -228,10 +206,11 @@ mock_pgm_rxw_destroy (
 	g_free (window);
 }
 
+static
 int
 mock_pgm_rxw_confirm (
 	pgm_rxw_t* const	window,
-	const uint32_t		sequence,
+	const guint32		sequence,
 	const pgm_time_t	now,
 	const pgm_time_t	nak_rdata_expiry,
 	const pgm_time_t	nak_rb_expiry
@@ -240,28 +219,31 @@ mock_pgm_rxw_confirm (
 	return PGM_RXW_DUPLICATE;
 }
 
+static
 void
 mock_pgm_rxw_lost (
 	pgm_rxw_t* const	window,
-	const uint32_t		sequence
+	const guint32		sequence
 	)
 {
 }
 
+static
 void
 mock_pgm_rxw_state (
 	pgm_rxw_t* const		window,
 	struct pgm_sk_buff_t* const	skb,
-	const int			new_state
+	const pgm_pkt_state_e		new_state
 	)
 {
 }
 
-unsigned
+static
+guint
 mock_pgm_rxw_update (
 	pgm_rxw_t* const		window,
-	const uint32_t			txw_lead,
-	const uint32_t			txw_trail,
+	const guint32			txw_lead,
+	const guint32			txw_trail,
 	const pgm_time_t		now,
 	const pgm_time_t		nak_rb_expiry
 	)
@@ -269,14 +251,16 @@ mock_pgm_rxw_update (
 	return 0;
 }
 
+static
 void
 mock_pgm_rxw_update_fec (
 	pgm_rxw_t* const		window,
-	const uint8_t			rs_k
+	const guint			rs_k
 	)
 {
 }
 
+static
 int
 mock_pgm_rxw_add (
 	pgm_rxw_t* const		window,
@@ -288,6 +272,7 @@ mock_pgm_rxw_add (
 	return PGM_RXW_APPENDED;
 }
 
+static
 void
 mock_pgm_rxw_remove_commit (
 	pgm_rxw_t* const		window
@@ -295,30 +280,33 @@ mock_pgm_rxw_remove_commit (
 {
 }
 
-ssize_t
+static
+gssize
 mock_pgm_rxw_readv (
 	pgm_rxw_t* const		window,
-	struct pgm_msgv_t**		pmsg,
-	const unsigned			pmsglen
+	pgm_msgv_t**			pmsg,
+	const guint			pmsglen
 	)
 {
 	return 0;
 }
 
 /* checksum module */
-uint16_t
+static
+guint16
 mock_pgm_csum_fold (
-	uint32_t			csum
+	guint32				csum
 	)
 {
 	return 0x0;
 }
 
-uint32_t
+static
+guint32
 mock_pgm_compat_csum_partial (
 	const void*			addr,
-	uint16_t			len,
-	uint32_t			csum
+	guint				len,
+	guint32				csum
 	)
 {
 	return 0x0;
@@ -341,28 +329,30 @@ mock_pgm_histogram_add (
 
 /* mock functions for external references */
 
-size_t
-pgm_pkt_offset (
-        const bool                      can_fragment,
-        const sa_family_t		pgmcc_family	/* 0 = disable */
-        )
-{
-        return 0;
-}
+#define pgm_verify_spm		mock_pgm_verify_spm
+#define pgm_verify_nak		mock_pgm_verify_nak
+#define pgm_verify_ncf		mock_pgm_verify_ncf
+#define pgm_verify_poll		mock_pgm_verify_poll
+#define pgm_sendto		mock_pgm_sendto
+#define pgm_time_now		mock_pgm_time_now
+#define pgm_time_update_now	mock_pgm_time_update_now
+#define pgm_rxw_destroy		mock_pgm_rxw_destroy
+#define pgm_rxw_create		mock_pgm_rxw_create
+#define pgm_rxw_update		mock_pgm_rxw_update
+#define pgm_rxw_update_fec	mock_pgm_rxw_update_fec
+#define pgm_rxw_confirm		mock_pgm_rxw_confirm
+#define pgm_rxw_lost		mock_pgm_rxw_lost
+#define pgm_rxw_state		mock_pgm_rxw_state
+#define pgm_rxw_add		mock_pgm_rxw_add
+#define pgm_rxw_remove_commit	mock_pgm_rxw_remove_commit
+#define pgm_rxw_readv		mock_pgm_rxw_readv
+#define pgm_csum_fold		mock_pgm_csum_fold
+#define pgm_compat_csum_partial	mock_pgm_compat_csum_partial
+#define pgm_histogram_init	mock_pgm_histogram_init
 
-bool
-mock_pgm_setsockopt (
-        pgm_sock_t* const       sock,
-	const int		level,
-        const int               optname,
-        const void*             optval,
-        const socklen_t         optlen
-        )
-{
-        if (NULL == sock)
-                return FALSE;
-        return TRUE;
-}
+#define RECEIVER_DEBUG
+#include "receiver.c"
+
 
 /* target:
  *	void
@@ -396,396 +386,261 @@ START_TEST (test_peer_unref_fail_001)
 END_TEST
 
 /* target:
- *	bool
- *	pgm_check_peer_state (
- *		pgm_sock_t*		sock,
- *		const pgm_time_t	now
+ *	void
+ *	pgm_check_peer_nak_state (
+ *		pgm_transport_t*	transport
  *		)
  */
 
-START_TEST (test_check_peer_state_pass_001)
+START_TEST (test_check_peer_nak_state_pass_001)
 {
-	pgm_sock_t* sock = generate_sock();
-	sock->is_bound = TRUE;
-	pgm_check_peer_state (sock, mock_pgm_time_now);
+	pgm_transport_t* transport = generate_transport();
+	transport->is_bound = TRUE;
+	pgm_check_peer_nak_state (transport, mock_pgm_time_now);
 }
 END_TEST
 
-START_TEST (test_check_peer_state_fail_001)
+START_TEST (test_check_peer_nak_state_fail_001)
 {
-	pgm_check_peer_state (NULL, mock_pgm_time_now);
+	pgm_check_peer_nak_state (NULL, mock_pgm_time_now);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
  *	pgm_time_t
- *	pgm_min_receiver_expiry (
+ *	pgm_min_nak_expiry (
  *		pgm_time_t		expiration,
- *		pgm_sock_t*		sock
+ *		pgm_transport_t*	transport
  *		)
  */
 
-START_TEST (test_min_receiver_expiry_pass_001)
+START_TEST (test_min_nak_expiry_pass_001)
 {
-	pgm_sock_t* sock = generate_sock();
-	sock->is_bound = TRUE;
+	pgm_transport_t* transport = generate_transport();
+	transport->is_bound = TRUE;
 	const pgm_time_t expiration = pgm_secs(1);
-	pgm_time_t next_expiration = pgm_min_receiver_expiry (expiration, sock);
+	pgm_time_t next_expiration = pgm_min_nak_expiry (expiration, transport);
 }
 END_TEST
 
-START_TEST (test_min_receiver_expiry_fail_001)
+START_TEST (test_min_nak_expiry_fail_001)
 {
 	const pgm_time_t expiration = pgm_secs(1);
-	pgm_min_receiver_expiry (expiration, NULL);
+	pgm_min_nak_expiry (expiration, NULL);
 	fail ("reached");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_RXW_SQNS,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_rxw_sqns (
+ *		pgm_transport_t*	transport,
+ *		const guint		sqns
  *	)
  */
 
 START_TEST (test_set_rxw_sqns_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_RXW_SQNS;
-	const int rxw_sqns	= 100;
-	const void* optval	= &rxw_sqns;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_rxw_sqns failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_rxw_sqns (transport, 100), "set_rxw_sqns failed");
 }
 END_TEST
 
 START_TEST (test_set_rxw_sqns_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_RXW_SQNS;
-	const int rxw_sqns	= 100;
-	const void* optval	= &rxw_sqns;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_rxw_sqns failed");
+	fail_unless (FALSE == pgm_transport_set_rxw_sqns (NULL, 100), "set_rxw_sqns failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_RXW_SECS,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_rxw_secs (
+ *		pgm_transport_t*	transport,
+ *		const guint		secs
  *	)
  */
 
 START_TEST (test_set_rxw_secs_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_RXW_SECS;
-	const int rxw_secs	= 10;
-	const void* optval	= &rxw_secs;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_rxw_secs failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_rxw_secs (transport, 10), "set_rxw_secs failed");
 }
 END_TEST
 
 START_TEST (test_set_rxw_secs_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_RXW_SECS;
-	const int rxw_secs	= 10;
-	const void* optval	= &rxw_secs;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_rxw_secs failed");
+	fail_unless (FALSE == pgm_transport_set_rxw_secs (NULL, 10), "set_rxw_secs failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_RXW_MAX_RTE,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_rxw_max_rte (
+ *		pgm_transport_t*	transport,
+ *		const guint		rate
  *	)
  */
 
 START_TEST (test_set_rxw_max_rte_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_RXW_MAX_RTE;
-	const int rxw_max_rte	= 100*1000;
-	const void* optval	= &rxw_max_rte;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_rxw_max_rte failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_rxw_max_rte (transport, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
 START_TEST (test_set_rxw_max_rte_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_RXW_MAX_RTE;
-	const int rxw_max_rte	= 100*1000;
-	const void* optval	= &rxw_max_rte;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_rxw_max_rte failed");
+	fail_unless (FALSE == pgm_transport_set_rxw_max_rte (NULL, 100*1000), "set_txw_max_rte failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_PEER_EXPIRY,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_peer_expiry (
+ *		pgm_transport_t*	transport,
+ *		const guint		expiration_time
  *	)
  */
 
 START_TEST (test_set_peer_expiry_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_PEER_EXPIRY;
-	const int peer_expiry	= pgm_secs(100);
-	const void* optval	= &peer_expiry;
-	const socklen_t optlen	= sizeof(int);
-/* pre-checking should verify value to spm ambient interval
-	sock->spm_ambient_interval = pgm_secs(30);
- */
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_peer_expiry failed");
+	pgm_transport_t* transport = generate_transport ();
+	transport->spm_ambient_interval = pgm_secs(30);
+	fail_unless (TRUE == pgm_transport_set_peer_expiry (transport, pgm_secs(100)), "set_peer_expiry failed");
 }
 END_TEST
 
 START_TEST (test_set_peer_expiry_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_PEER_EXPIRY;
-	const int peer_expiry	= pgm_secs(100);
-	const void* optval	= &peer_expiry;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_peer_expiry failed");
+	fail_unless (FALSE == pgm_transport_set_peer_expiry (NULL, 100*1000), "set_peer_expiry failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_SPMR_EXPIRY,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_spmr_expiry (
+ *		pgm_transport_t*	transport,
+ *		const guint		expiration_time
  *	)
  */
 
 START_TEST (test_set_spmr_expiry_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_SPMR_EXPIRY;
-	const int spmr_expiry	= pgm_secs(10);
-	const void* optval	= &spmr_expiry;
-	const socklen_t optlen	= sizeof(int);
-/* pre-checking should verify value to spm ambient interval
-	sock->spm_ambient_interval = pgm_secs(30);
- */
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_spmr_expiry failed");
+	pgm_transport_t* transport = generate_transport ();
+	transport->spm_ambient_interval = pgm_secs(30);
+	fail_unless (TRUE == pgm_transport_set_spmr_expiry (transport, pgm_secs(10)), "set_spmr_expiry failed");
 }
 END_TEST
 
 START_TEST (test_set_spmr_expiry_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_SPMR_EXPIRY;
-	const int spmr_expiry	= pgm_secs(10);
-	const void* optval	= &spmr_expiry;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_spmr_expiry failed");
+	fail_unless (FALSE == pgm_transport_set_spmr_expiry (NULL, 100*1000), "set_spmr_expiry failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_NAK_BO_IVL,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_nak_bo_ivl (
+ *		pgm_transport_t*	transport,
+ *		const guint		interval
  *	)
  */
 
 START_TEST (test_set_nak_bo_ivl_pass_001)
 {
-	const int level		= IPPROTO_PGM;
-	pgm_sock_t* sock	= generate_sock ();
-	const int optname	= PGM_NAK_BO_IVL;
-	const int nak_bo_ivl	= pgm_msecs(1000);
-	const void* optval	= &nak_bo_ivl;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_nak_bo_ivl failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_nak_bo_ivl (transport, 100*1000), "set_nak_bo_ivl failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_bo_ivl_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_BO_IVL;
-	const int nak_bo_ivl	= pgm_msecs(1000);
-	const void* optval	= &nak_bo_ivl;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_nak_bo_ivl failed");
+	fail_unless (FALSE == pgm_transport_set_nak_bo_ivl (NULL, 100*1000), "set_nak_bo_ivl failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_NAK_RPT_IVL,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_nak_rpt_ivl (
+ *		pgm_transport_t*	transport,
+ *		const guint		interval
  *	)
  */
 
 START_TEST (test_set_nak_rpt_ivl_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_RPT_IVL;
-	const int nak_rpt_ivl	= pgm_msecs(1000);
-	const void* optval	= &nak_rpt_ivl;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_nak_rpt_ivl failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_nak_rpt_ivl (transport, 100*1000), "set_nak_rpt_ivl failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_rpt_ivl_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_RPT_IVL;
-	const int nak_rpt_ivl	= pgm_msecs(1000);
-	const void* optval	= &nak_rpt_ivl;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_nak_rpt_ivl failed");
+	fail_unless (FALSE == pgm_transport_set_nak_rpt_ivl (NULL, 100*1000), "set_nak_rpt_ivl failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_NAK_RDATA_IVL,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_nak_rdata_ivl (
+ *		pgm_transport_t*	transport,
+ *		const guint		interval
  *	)
  */
 
 START_TEST (test_set_nak_rdata_ivl_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_RDATA_IVL;
-	const int nak_rdata_ivl	= pgm_msecs(1000);
-	const void* optval	= &nak_rdata_ivl;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_nak_rdata_ivl failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_nak_rdata_ivl (transport, 100*1000), "set_nak_rdata_ivl failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_rdata_ivl_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_RDATA_IVL;
-	const int nak_rdata_ivl	= pgm_msecs(1000);
-	const void* optval	= &nak_rdata_ivl;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_nak_rdata_ivl failed");
+	fail_unless (FALSE == pgm_transport_set_nak_rdata_ivl (NULL, 100*1000), "set_nak_rdata_ivl failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_NAK_DATA_RETRIES,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_nak_data_retries (
+ *		pgm_transport_t*	transport,
+ *		const guint		cnt
  *	)
  */
 
 START_TEST (test_set_nak_data_retries_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_DATA_RETRIES;
-	const int retries	= 1000;
-	const void* optval	= &retries;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_nak_data_retries failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_nak_data_retries (transport, 100), "set_nak_data_retries failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_data_retries_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_DATA_RETRIES;
-	const int retries	= 1000;
-	const void* optval	= &retries;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_nak_data_retries failed");
+	fail_unless (FALSE == pgm_transport_set_nak_data_retries (NULL, 100), "set_nak_data_retries failed");
 }
 END_TEST
 
 /* target:
- *	bool
- *	pgm_setsockopt (
- *		pgm_sock_t* const	sock,
- *		const int		level = IPPROTO_PGM,
- *		const int		optname = PGM_NAK_NCF_RETRIES,
- *		const void*		optval,
- *		const socklen_t		optlen = sizeof(int)
+ *	gboolean
+ *	pgm_transport_set_nak_ncf_retries (
+ *		pgm_transport_t*	transport,
+ *		const guint		cnt
  *	)
  */
 
 START_TEST (test_set_nak_ncf_retries_pass_001)
 {
-	pgm_sock_t* sock	= generate_sock ();
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_NCF_RETRIES;
-	const int retries	= 1000;
-	const void* optval	= &retries;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (TRUE == pgm_setsockopt (sock, level, optname, optval, optlen), "set_ncf_data_retries failed");
+	pgm_transport_t* transport = generate_transport ();
+	fail_unless (TRUE == pgm_transport_set_nak_ncf_retries (transport, 100), "set_nak_ncf_retries failed");
 }
 END_TEST
 
 START_TEST (test_set_nak_ncf_retries_fail_001)
 {
-	const int level		= IPPROTO_PGM;
-	const int optname	= PGM_NAK_NCF_RETRIES;
-	const int retries	= 1000;
-	const void* optval	= &retries;
-	const socklen_t optlen	= sizeof(int);
-	fail_unless (FALSE == pgm_setsockopt (NULL, level, optname, optval, optlen), "set_ncf_data_retries failed");
+	fail_unless (FALSE == pgm_transport_set_nak_ncf_retries (NULL, 100), "set_nak_ncf_retries failed");
 }
 END_TEST
 
@@ -804,19 +659,17 @@ make_test_suite (void)
 	tcase_add_test (tc_peer_unref, test_peer_unref_pass_001);
 	tcase_add_test_raise_signal (tc_peer_unref, test_peer_unref_fail_001, SIGABRT);
 
-/* formally check-peer-nak-state */
-	TCase* tc_check_peer_state = tcase_create ("check-peer-state");
-	suite_add_tcase (s, tc_check_peer_state);
-	tcase_add_checked_fixture (tc_check_peer_state, mock_setup, NULL);
-	tcase_add_test (tc_check_peer_state, test_check_peer_state_pass_001);
-	tcase_add_test_raise_signal (tc_check_peer_state, test_check_peer_state_fail_001, SIGABRT);
+	TCase* tc_check_peer_nak_state = tcase_create ("check-peer-nak-state");
+	suite_add_tcase (s, tc_check_peer_nak_state);
+	tcase_add_checked_fixture (tc_check_peer_nak_state, mock_setup, NULL);
+	tcase_add_test (tc_check_peer_nak_state, test_check_peer_nak_state_pass_001);
+	tcase_add_test_raise_signal (tc_check_peer_nak_state, test_check_peer_nak_state_fail_001, SIGABRT);
 
-/* formally min-nak-expiry */
-	TCase* tc_min_receiver_expiry = tcase_create ("min-receiver-expiry");
-	suite_add_tcase (s, tc_min_receiver_expiry);
-	tcase_add_checked_fixture (tc_min_receiver_expiry, mock_setup, NULL);
-	tcase_add_test (tc_min_receiver_expiry, test_min_receiver_expiry_pass_001);
-	tcase_add_test_raise_signal (tc_min_receiver_expiry, test_min_receiver_expiry_fail_001, SIGABRT);
+	TCase* tc_min_nak_expiry = tcase_create ("min-nak-expiry");
+	suite_add_tcase (s, tc_min_nak_expiry);
+	tcase_add_checked_fixture (tc_min_nak_expiry, mock_setup, NULL);
+	tcase_add_test (tc_min_nak_expiry, test_min_nak_expiry_pass_001);
+	tcase_add_test_raise_signal (tc_min_nak_expiry, test_min_nak_expiry_fail_001, SIGABRT);
 
 	TCase* tc_set_rxw_sqns = tcase_create ("set-rxw_sqns");
 	suite_add_tcase (s, tc_set_rxw_sqns);

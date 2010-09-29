@@ -22,12 +22,63 @@
 #ifndef __PGM_IF_H__
 #define __PGM_IF_H__
 
-#include <pgm/types.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
+#ifndef __PGM_GSI_H__
+#	include <pgm/gsi.h>
+#endif
 
+
+#define PGM_IF_ERROR		pgm_if_error_quark ()
+
+typedef enum
+{
+	/* Derived from errno */
+	PGM_IF_ERROR_NONET,
+	PGM_IF_ERROR_NOTUNIQ,
+	PGM_IF_ERROR_NODEV,
+	PGM_IF_ERROR_XDEV,
+	PGM_IF_ERROR_FAULT,		/* gethostname returned EFAULT */
+	PGM_IF_ERROR_INVAL,
+	PGM_IF_ERROR_PERM,
+	PGM_IF_ERROR_ADDRFAMILY,	/* getaddrinfo return EAI_ADDRFAMILY */
+	PGM_IF_ERROR_AGAIN,
+	PGM_IF_ERROR_BADFLAGS,
+	PGM_IF_ERROR_FAIL,
+	PGM_IF_ERROR_FAMILY,
+	PGM_IF_ERROR_MEMORY,
+	PGM_IF_ERROR_NODATA,
+	PGM_IF_ERROR_NONAME,
+	PGM_IF_ERROR_SERVICE,
+	PGM_IF_ERROR_SOCKTYPE,
+	PGM_IF_ERROR_SYSTEM,
+	PGM_IF_ERROR_FAILED
+} PGMIFError;
+
+struct pgm_transport_info_t {
+	pgm_gsi_t			ti_gsi;
+	int				ti_flags;
+	int				ti_family;
+	int				ti_udp_encap_ucast_port;
+	int				ti_udp_encap_mcast_port;
+	int				ti_sport;
+	int				ti_dport;
+	gsize				ti_recv_addrs_len;
+	struct group_source_req*	ti_recv_addrs;
+	gsize				ti_send_addrs_len;
+	struct group_source_req*	ti_send_addrs;
+};
+
+G_BEGIN_DECLS
+
+gboolean pgm_if_get_transport_info (const char*, const struct pgm_transport_info_t*, struct pgm_transport_info_t**, GError**);
+void pgm_if_free_transport_info (struct pgm_transport_info_t*);
 void pgm_if_print_all (void);
+GQuark pgm_if_error_quark (void);
+PGMIFError pgm_if_error_from_errno (gint);
+PGMIFError pgm_if_error_from_h_errno (gint);
+PGMIFError pgm_if_error_from_eai_errno (gint);
 
-PGM_END_DECLS
+G_END_DECLS
 
 #endif /* __PGM_IF_H__ */

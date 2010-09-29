@@ -22,20 +22,21 @@
 #ifndef __PGM_VERSION_H__
 #define __PGM_VERSION_H__
 
-#include <pgm/types.h>
+#include <glib.h>
 
-PGM_BEGIN_DECLS
 
-extern const unsigned pgm_major_version;
-extern const unsigned pgm_minor_version;
-extern const unsigned pgm_micro_version;
+G_BEGIN_DECLS
+
+extern const guint pgm_major_version;
+extern const guint pgm_minor_version;
+extern const guint pgm_micro_version;
 
 extern const char* pgm_build_date;
 extern const char* pgm_build_time;
-extern const char* pgm_build_system;
-extern const char* pgm_build_machine;
+extern const char* pgm_build_platform;
 extern const char* pgm_build_revision;
 
-PGM_END_DECLS
+
+G_END_DECLS
 
 #endif /* __PGM_VERSION_H__ */

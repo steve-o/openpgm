@@ -1,13 +1,12 @@
 # -*- mode: python -*-
 # OpenPGM build script
 
-import platform
 import os
 import time
 import sys
 
 EnsureSConsVersion( 1, 0 )
-SConsignFile('scons.signatures' + '-' + platform.system() + '-' + platform.machine() + '-sunstudio');
+SConsignFile('scons.signatures');
 
 vars = Variables()
 vars.AddVariables (
@@ -15,10 +14,6 @@ vars.AddVariables (
 			allowed_values=('release', 'debug', 'profile')),
 	EnumVariable ('BRANCH', 'branch prediction', 'none',
 			allowed_values=('none', 'profile', 'seed')),
-	EnumVariable ('WITH_GETTEXT', 'l10n support via libintl', 'false',
-			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_GLIB', 'Build GLib dependent modules', 'false',
-			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
@@ -28,8 +23,6 @@ vars.AddVariables (
 	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_TEST', 'Network test system', 'false',
-			allowed_values=('true', 'false')),
-	EnumVariable ('WITH_CC', 'C++ examples', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
 			allowed_values=('true', 'false')),
@@ -83,6 +76,10 @@ if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
 	Exit(1)
 
+#if not conf.CheckPKG('libsoup-2.4'):
+#	print 'libsoup-2.4 not found.'
+#	Exit(1)
+
 env = conf.Finish();
 
 #-----------------------------------------------------------------------------
@@ -92,78 +89,34 @@ env = Environment(
 	variables = vars,
 	ENV = os.environ,
 	CCFLAGS = [	'-v',
-# C99
 			'-xc99=all',
+			'-D_REENTRANT',
+			'-D_GNU_SOURCE',
 			'-D_XOPEN_SOURCE=600',
 			'-D__EXTENSIONS__',
 			'-DBSD_COMP',
-			'-D_BSD_SOURCE',
-# re-entrant libc
-			'-D_REENTRANT',
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
-#			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
-# variadic macros
-			'-DCONFIG_HAVE_ISO_VARARGS',
-#			'-DCONFIG_HAVE_GNUC_VARARGS',
-# stack memory api header
-			'-DCONFIG_HAVE_ALLOCA_H',
-# optimium checksum implementation
-#			'-DCONFIG_8BIT_CHECKSUM',
+			'-D__need_IOV_MAX',
+			'-D__USE_BSD',
 			'-DCONFIG_16BIT_CHECKSUM',
-#			'-DCONFIG_32BIT_CHECKSUM',
-#			'-DCONFIG_64BIT_CHECKSUM',
-#			'-DCONFIG_VECTOR_CHECKSUM',
-# useful /proc system
-#			'-DCONFIG_HAVE_PROC',
-# example: crash handling
-#			'-DCONFIG_HAVE_BACKTRACE',
-# timing
-#			'-DCONFIG_HAVE_PSELECT',
-#			'-DCONFIG_HAVE_RTC',
-#			'-DCONFIG_HAVE_TSC',
-#			'-DCONFIG_HAVE_HPET',
-# event handling
+			'-DCONFIG_HAVE_CLOCK_GETTIME',
+			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
+			'-DCONFIG_HAVE_NANOSLEEP',
+			'-DCONFIG_HAVE_USLEEP',
 			'-DCONFIG_HAVE_POLL',
-#			'-DCONFIG_HAVE_EPOLL',
-# interface enumeration
-#			'-DCONFIG_HAVE_GETIFADDRS',
-#			'-DCONFIG_HAVE_IFR_NETMASK',
-# win32 cmsg
-#			'-DCONFIG_HAVE_WSACMSGHDR',
-# multicast
 			'-DCONFIG_HAVE_MCAST_JOIN',
-#			'-DCONFIG_HAVE_IP_MREQN',
-# sprintf
-#			'-DCONFIG_HAVE_SPRINTF_GROUPING',
-#			'-DCONFIG_HAVE_VASPRINTF',
-# symbol linking scope
 			'-DCONFIG_HAVE_DSO_VISIBILITY',
-# socket binding
 			'-DCONFIG_BIND_INADDR_ANY',
-# IP header order as per IP(4) on FreeBSD
-#			'-DCONFIG_HOST_ORDER_IP_LEN',
-#			'-DCONFIG_HOST_ORDER_IP_OFF',
-# optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
-# Wine limited API support
-#			'-DCONFIG_TARGET_WINE',
-# GNU getopt
-			'-DCONFIG_HAVE_GETOPT'
 		 ],
 	LINKFLAGS = [],
-	LIBS = [
-# histogram math
-			'm',
-# clock_gettime()
-			'rt',
-# Solaris sockets
-			'resolv',
+	LIBS = [	'resolv',
 			'socket',
-			'nsl'
+			'nsl',
+			'm'
 		    ],
 	PROTOBUF_CCFLAGS = '-I/opt/glib-sunstudio/include',
-	PROTOBUF_LIBS    = '/opt/glib-sunstudio/lib/sparcv9/libprotobuf.a',
-	PROTOBUF_PROTOC  = '/opt/glib-sunstudio/bin/protoc'
+	PROTOBUF_LIBS = '/opt/glib-sunstudio/lib/sparcv9/libprotobuf.a',
+	PROTOBUF_PROTOC = '/opt/glib-sunstudio/bin/protoc'
 )
 force_sunstudio(env);
 
@@ -181,7 +134,7 @@ release.Append(CCFLAGS = ['-xO2','-m64'], LINKFLAGS = '-m64')
 # outstanding defect with 12u1 cannot compile extended asm without optimization.:w
 #
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-DPGM_DEBUG','-xO1', '-g','-m64'], LINKFLAGS = ['-g','-m64'])
+debug.Append(CCFLAGS = ['-xO1', '-g','-m64'], LINKFLAGS = ['-g','-m64'])
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-xO2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
@@ -205,38 +158,29 @@ else:
 Import('env')
 
 # vanilla environment
-if env['WITH_GLIB'] == 'true':
-	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
-else:
-	env['GLIB_FLAGS'] = '';
-
-# l10n
-if env['WITH_GETTEXT'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
+env.ParseConfig('pkg-config --cflags --libs glib-2.0 gthread-2.0');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
 	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
-if env['WITH_SNMP'] == 'true':
-# net-snmp-config is broken in Solaris 10 and requires two separate calls
-	env['SNMP_FLAGS'] = env.ParseFlags(['!/usr/sfw/bin/net-snmp-config-64 --cflags',
-					    '!/usr/sfw/bin/net-snmp-config-64 --agent-libs']);
+env['SNMP_FLAGS'] = { 
+        'CCFLAGS'       : [],
+        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp',
+			    'ssl', 'kstat', 'wrap', 'adm' ],
+	'CPPPATH'	: ['/opt/cws/include'],
+	'LIBPATH'	: ['/opt/csw/lib'],
+};
+if env['WITH_HTTP'] == 'true':
+	env['LIBSOUP_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs libsoup-2.4');
+else:
+	env['LIBSOUP_FLAGS'] = '';
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
-#       backup = context.env.Clone().Dictionary();
-        lastASFLAGS     = context.env.get('ASFLAGS', '');
-        lastCCFLAGS     = context.env.get('CCFLAGS', '');
-        lastCFLAGS      = context.env.get('CFLAGS', '');
-        lastCPPDEFINES  = context.env.get('CPPDEFINES', '');
-        lastCPPFLAGS    = context.env.get('CPPFLAGS', '');
-        lastCPPPATH     = context.env.get('CPPPATH', '');
-        lastLIBPATH     = context.env.get('LIBPATH', '');
-        lastLIBS        = context.env.get('LIBS', '');
-        lastLINKFLAGS   = context.env.get('LINKFLAGS', '');
-        lastRPATH       = context.env.get('RPATH', '');
+	lastLIBS = context.env['LIBS'];
+	lastCCFLAGS= context.env['CCFLAGS'];
 	context.env.MergeFlags(env['SNMP_FLAGS']);
 	result = context.TryLink("""
 int main(int argc, char**argv)
@@ -245,17 +189,7 @@ int main(int argc, char**argv)
 	return 0;
 }
 """, '.c');
-#       context.env.Replace(**backup);
-        context.env.Replace(ASFLAGS     = lastASFLAGS,
-                            CCFLAGS     = lastCCFLAGS,
-                            CFLAGS      = lastCFLAGS,
-                            CPPDEFINES  = lastCPPDEFINES,
-                            CPPFLAGS    = lastCPPFLAGS,
-                            CPPPATH     = lastCPPPATH,
-                            LIBPATH     = lastLIBPATH,
-                            LIBS        = lastLIBS,
-                            LINKFLAGS   = lastLINKFLAGS,
-                            RPATH       = lastRPATH);
+	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
 	context.Result(not result);
 	return result;
 
@@ -265,8 +199,22 @@ def CheckCheck(context):
 	context.Result(result);
 	return result;
 
+def CheckEventFD(context):
+	context.Message('Checking eventfd...');
+	result = context.TryLink("""
+#include <sys/eventfd.h>
+int main(int argc, char**argv)
+{
+	eventfd(0,0);
+	return 0;
+}
+""", '.c')
+	context.Result(result);
+	return result;
+
 tests = {
-	'CheckCheck':	CheckCheck
+	'CheckCheck':	CheckCheck,
+	'CheckEventFD':	CheckEventFD
 }
 if env['WITH_SNMP'] == 'true':
 	tests['CheckSNMP'] = CheckSNMP;
@@ -283,7 +231,17 @@ else:
 	print 'Disabling Check unit tests.';
 	conf.env['CHECK'] = 'false';
 
+if conf.CheckEventFD():
+	print 'Enabling kernel eventfd notification mechanism.';
+	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
+
 env = conf.Finish();
+
+# DSO visibility flags
+if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
+	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
+else:
+	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
 
 # add builder to create PIC static libraries for including in shared libraries
 action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
@@ -301,15 +259,14 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 
 #-----------------------------------------------------------------------------
 
-ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '-sunstudio/';
+ref_node = 'ref/' + env['BUILD'] + '/';
 BuildDir(ref_node, '.', duplicate=0)
 
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
-if env['WITH_GLIB'] == 'true':
-	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
+SConscript(ref_node + 'SConscript.libpgmex');
 if env['WITH_HTTP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmhttp');
 if env['WITH_SNMP'] == 'true':

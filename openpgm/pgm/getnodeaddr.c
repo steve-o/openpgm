@@ -2,7 +2,7 @@
  *
  * portable function to return the nodes IP address.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,19 +20,34 @@
  */
 
 #include <errno.h>
-#ifndef _WIN32
-#	include <netdb.h>
-#endif
-#include <impl/i18n.h>
-#include <impl/framework.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
 
+#include <glib.h>
+#include <glib/gi18n-lib.h>
+
+#ifdef G_OS_UNIX
+#	include <netdb.h>
+#	include <sys/socket.h>
+#endif
+
+#include "pgm/sockaddr.h"
+#include "pgm/getifaddrs.h"
+#include "pgm/getnodeaddr.h"
 
 //#define GETNODEADDR_DEBUG
+
+#ifndef GETNODEADDR_DEBUG
+#define g_trace(...)		while (0)
+#else
+#define g_trace(...)		g_debug(__VA_ARGS__)
+#endif
 
 
 /* globals */
 
-static const char* pgm_family_string (const sa_family_t);
+static const char* pgm_family_string (const int);
 
 
 /* return node primary address on multi-address family interfaces.
@@ -40,38 +55,33 @@ static const char* pgm_family_string (const sa_family_t);
  * returns TRUE on success, returns FALSE on failure.
  */
 
-bool
+gboolean
 pgm_if_getnodeaddr (
-	const sa_family_t	   family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
-	struct sockaddr*  restrict addr,
-	const socklen_t		   cnt,	/* size of address pointed to by addr */
-	pgm_error_t**	  restrict error
+	const int		family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
+	struct sockaddr*	addr,
+	const socklen_t		cnt,	/* size of address pointed to by addr */
+	GError**		error
 	)
 {
-	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
-	pgm_return_val_if_fail (NULL != addr, FALSE);
+	g_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
+	g_return_val_if_fail (NULL != addr, FALSE);
 	if (AF_INET == family || AF_UNSPEC == family)
-		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), FALSE);
+		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), FALSE);
 	else
-		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
+		g_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
 
-	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
-		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
+	g_trace ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
+		pgm_family_string (family), (gpointer)addr, cnt, (gpointer)error);
 
 	char hostname[NI_MAXHOST + 1];
 	struct hostent* he;
 
 	if (0 != gethostname (hostname, sizeof(hostname))) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_errno (errno),
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
-#ifndef _WIN32
-			     strerror (errno)
-#else
-			     pgm_wsastrerror (WSAGetLastError())
-#endif
-				);
+			     g_strerror (errno));
 		return FALSE;
 	}
 
@@ -85,21 +95,21 @@ pgm_if_getnodeaddr (
 
 	int e = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 == e) {
-		const socklen_t addrlen = res->ai_addrlen;
+		const gsize addrlen = res->ai_addrlen;
 		memcpy (addr, res->ai_addr, addrlen);
 		freeaddrinfo (res);
 		return TRUE;
 	} else if (EAI_NONAME != e) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_eai_errno (e, errno),
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_eai_errno (e),
 			     _("Resolving hostname address: %s"),
 			     gai_strerror (e));
 		return FALSE;
 	} else if (AF_UNSPEC == family) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     PGM_ERROR_NONAME,
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     PGM_IF_ERROR_NONAME,
 			     _("Resolving hostname address family."));
 		return FALSE;
 	}
@@ -112,24 +122,27 @@ pgm_if_getnodeaddr (
  */
 	he = gethostbyname (hostname);
 	if (NULL == he) {
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_h_errno (h_errno),
-#ifndef _WIN32
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_h_errno (h_errno),
+#ifdef G_OS_UNIX
 			     _("Resolving IPv4 hostname address: %s"),
-			     hstrerror (h_errno)
+			     hstrerror (h_errno));
 #else
-			     _("Resolving IPv4 hostname address: %s"),
-			     pgm_wsastrerror (WSAGetLastError())
+			     _("Resolving IPv4 hostname address: %d"),
+			     WSAGetLastError());
 #endif
-				);
 		return FALSE;
 	}
 
-	struct pgm_ifaddrs_t *ifap, *ifa, *ifa6;
-	if (!pgm_getifaddrs (&ifap, error)) {
-		pgm_prefix_error (error,
-			     _("Enumerating network interfaces: "));
+	struct pgm_ifaddrs *ifap, *ifa, *ifa6;
+	e = pgm_getifaddrs (&ifap);
+	if (e < 0) {
+		g_set_error (error,
+			     PGM_IF_ERROR,
+			     pgm_if_error_from_errno (errno),
+			     _("Enumerating network interfaces: %s"),
+			     g_strerror (errno));
 		return FALSE;
 	}
 
@@ -145,9 +158,9 @@ pgm_if_getnodeaddr (
 		}
 	}
 	pgm_freeifaddrs (ifap);
-	pgm_set_error (error,
-		     PGM_ERROR_DOMAIN_IF,
-		     PGM_ERROR_NONET,
+	g_set_error (error,
+		     PGM_IF_ERROR,
+		     PGM_IF_ERROR_NONET,
 		     _("Discovering primary IPv4 network interface."));
 	return FALSE;
 ipv4_found:
@@ -163,9 +176,9 @@ ipv4_found:
 		}
 	}
 	pgm_freeifaddrs (ifap);
-	pgm_set_error (error,
-		     PGM_ERROR_DOMAIN_IF,
-		     PGM_ERROR_NONET,
+	g_set_error (error,
+		     PGM_IF_ERROR,
+		     PGM_IF_ERROR_NONET,
 		     _("Discovering primary IPv6 network interface."));
 	return FALSE;
 ipv6_found:
@@ -178,7 +191,7 @@ ipv6_found:
 static
 const char*
 pgm_family_string (
-	const sa_family_t	family
+	const int	family
 	)
 {
 	const char* c;

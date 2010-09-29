@@ -27,7 +27,6 @@ print "mon: ready.\n";
 
 $app->say ("create ao");
 $app->say ("bind ao");
-$app->say ("connect ao");
 print "app: ready.\n";
 
 print "mon: wait for spm ...\n";

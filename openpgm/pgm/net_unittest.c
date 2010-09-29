@@ -2,7 +2,7 @@
  *
  * unit tests for network send wrapper.
  *
- * Copyright (c) 2009-2010 Miru Limited.
+ * Copyright (c) 2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,31 +21,22 @@
 
 
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <check.h>
 
+#include <pgm/transport.h>
+
 
 /* mock state */
 
-#define pgm_rate_check		mock_pgm_rate_check
-#define sendto			mock_sendto
-#define poll			mock_poll
-#define select			mock_select
-#define fcntl			mock_fcntl
-
-#define NET_DEBUG
-#include "net.c"
-
-
 static
-pgm_sock_t*
-generate_sock (void)
+pgm_transport_t*
+generate_transport (void)
 {
-	pgm_sock_t* sock = g_malloc0 (sizeof(pgm_sock_t));
-	return sock;
+	pgm_transport_t* transport = g_malloc0 (sizeof(pgm_transport_t));
+	return transport;
 }
 
 static
@@ -125,28 +116,20 @@ flags_string (
 
 /* mock functions for external references */
 
-size_t
-pgm_pkt_offset (
-        const bool                      can_fragment,
-        const sa_family_t		pgmcc_family	/* 0 = disable */
-        )
-{
-        return 0;
-}
-
 PGM_GNUC_INTERNAL
-bool
+gboolean
 mock_pgm_rate_check (
-	pgm_rate_t*		bucket,
-	const size_t		data_size,
-	const bool		is_nonblocking
+	gpointer		bucket,
+	const guint		data_size,
+	const int		flags		/* MSG_DONTWAIT = non-blocking */
 	)
 {
-	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%zu is-nonblocking:%s)",
-		(gpointer)bucket, data_size, is_nonblocking ? "TRUE" : "FALSE");
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u flags:%s)",
+		bucket, data_size, flags_string (flags));
 	return TRUE;
 }
 
+static
 ssize_t
 mock_sendto (
 	int			s,
@@ -165,6 +148,7 @@ mock_sendto (
 }
 
 #ifdef CONFIG_HAVE_POLL
+static
 int
 mock_poll (
 	struct pollfd*		fds,
@@ -177,6 +161,7 @@ mock_poll (
 	return 0;
 }
 #else
+static
 int
 mock_select (
 	int			nfds,
@@ -192,6 +177,7 @@ mock_select (
 }
 #endif
 
+static
 int
 mock_fcntl (
 	int			fd,
@@ -215,29 +201,38 @@ mock_fcntl (
 	g_assert_not_reached();
 }
 
+#define pgm_rate_check		mock_pgm_rate_check
+#define sendto			mock_sendto
+#define poll			mock_poll
+#define select			mock_select
+#define fcntl			mock_fcntl
+
+#define NET_DEBUG
+#include "net.c"
+
 
 /* target:
- *	ssize_t
- *	pgm_sendto (
- *		pgm_sock_t*		sock,
- *		bool			use_rate_limit,
- *		bool			use_router_alert,
+ *	gssize
+ *	_pgm_sendto (
+ *		pgm_transport_t*	transport,
+ *		gboolean		use_rate_limit,
+ *		gboolean		use_router_alert,
  *		const void*		buf,
- *		size_t			len,
+ *		gsize			len,
  *		const struct sockaddr*	to,
- *		socklen_t		tolen
+ *		gsize			tolen
  *	)
  */
 
 START_TEST (test_sendto_pass_001)
 {
-	pgm_sock_t* sock = generate_sock ();
+	pgm_transport_t* transport = generate_transport ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail_unless (sizeof(buf) == len, "sendto underrun");
 }
 END_TEST
@@ -256,52 +251,52 @@ END_TEST
 
 START_TEST (test_sendto_fail_002)
 {
-	pgm_sock_t* sock = generate_sock ();
+	pgm_transport_t* transport = generate_transport ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_003)
 {
-	pgm_sock_t* sock = generate_sock ();
+	pgm_transport_t* transport = generate_transport ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_004)
 {
-	pgm_sock_t* sock = generate_sock ();
+	pgm_transport_t* transport = generate_transport ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
 
 START_TEST (test_sendto_fail_005)
 {
-	pgm_sock_t* sock = generate_sock ();
+	pgm_transport_t* transport = generate_transport ();
 	const char* buf = "i am not a string";
 	struct sockaddr_in addr = {
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
+	gssize len = pgm_sendto (transport, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
 	fail ("reached");
 }
 END_TEST
@@ -316,14 +311,13 @@ END_TEST
 START_TEST (test_set_nonblocking_pass_001)
 {
 	int filedes[2] = { fileno (stdout), fileno (stderr) };
-	int retval = pgm_set_nonblocking (filedes);
+	int retval = pgm_set_nonblocking (&filedes);
 }
 END_TEST
 
 START_TEST (test_set_nonblocking_fail_001)
 {
-	int filedes[2] = { 0, 0 };
-	int retval = pgm_set_nonblocking (filedes);
+	int retval = pgm_set_nonblocking (NULL);
 	fail ("reached");
 }
 END_TEST

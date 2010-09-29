@@ -41,7 +41,6 @@ $app->say ("set ao NAK_RDATA_IVL 10000");
 $app->say ("set ao NAK_NCF_RETRIES 15");
 $app->say ("set ao NAK_DATA_RETRIES 10");
 $app->say ("bind ao");
-$app->say ("connect ao");
 $app->say ("listen ao");
 
 ## capture GSI of test spp
@@ -52,7 +51,6 @@ print "mon: odata received.\n";
 
 $sim->say ("create fake ao");
 $sim->say ("bind ao");
-$sim->say ("connect ao");
 
 print "sim: publish SPM txw_trail 90,001 txw_lead 90,000 at spm_sqn 3200.\n";
 $sim->say ("net send spm ao 3200 90001 90000");

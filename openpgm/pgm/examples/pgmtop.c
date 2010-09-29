@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+
 #include <errno.h>
-#include <locale.h>
 #include <ncurses.h>
 #include <netdb.h>
 #include <panel.h>
@@ -36,15 +36,11 @@
 #include <arpa/inet.h>
 
 #include <glib.h>
+
 #include <pgm/pgm.h>
-
-/* PGM internals */
-#include <pgm/packet.h>
-
-/* example dependencies */
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
-
+#include <pgm/packet.h>
 
 struct ncurses_window;
 
@@ -174,16 +170,13 @@ main (
 	)
 {
 	GError* err = NULL;
-	pgm_error_t* pgm_err = NULL;
 
-	setlocale (LC_ALL, "");
+	puts ("pgmtop");
 
 	log_init ();
-	g_message ("pgmtop");
-
-	if (!pgm_init (&pgm_err)) {
-		g_error ("Unable to start PGM engine: %s", pgm_err->message);
-		pgm_error_free (pgm_err);
+	if (!pgm_init (&err)) {
+		g_error ("Unable to start PGM engine: %s", err->message);
+		g_error_free (err);
 		return EXIT_FAILURE;
 	}
 
@@ -196,34 +189,36 @@ main (
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 
 /* delayed startup */
-	g_message ("scheduling startup.n");
+	puts ("scheduling startup.n");
 	g_timeout_add(0, (GSourceFunc)on_startup, g_loop);
 
 /* dispatch loop */
-	g_message ("entering main event loop ...");
+	puts ("entering main event loop ...");
 	g_main_loop_run (g_loop);
 
 	endwin();
-	g_message ("event loop terminated, cleaning up.");
+	puts ("event loop terminated, cleaning up.");
 
 /* cleanup */
 	g_main_loop_unref (g_loop);
 	g_loop = NULL;
 	if (g_io_channel) {
-		g_message ("closing socket.");
+		puts ("closing socket.");
+
+		GError *err = NULL;
 		g_io_channel_shutdown (g_io_channel, FALSE, &err);
 		g_io_channel = NULL;
 	}
 
 	if (g_stdin_channel) {
-		g_message ("unbinding stdin.");
+		puts ("unbinding stdin.");
 		g_io_channel_unref (g_stdin_channel);
 		g_stdin_channel = NULL;
 	}
 
-	g_message ("PGM engine shutdown.");
+	puts ("PGM engine shutdown.");
 	pgm_shutdown ();
-	g_message ("finished.");
+	puts ("finished.");
 	return EXIT_SUCCESS;
 }
 
