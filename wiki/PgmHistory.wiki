@@ -219,3 +219,7 @@
 
 == 2010 April ==
   * General availability of OpenPGM version 2.1 introducing full support of the Solaris operating system on SPARC hardware.
+  * General availability of OpenPGM version 3.0, removing the dependency upon the GLib library thereby reducing the complexity of integrating upon multiple platforms.
+
+== 2010 September ==
+  * General availability of OpenPGM version 5.0 introducing a new BSD-socket styled API.
