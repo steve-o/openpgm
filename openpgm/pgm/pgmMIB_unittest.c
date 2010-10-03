@@ -2,7 +2,7 @@
  *
  * unit tests for PGM MIB routines.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,16 +28,18 @@
 #include <glib.h>
 #include <check.h>
 
-#include <pgm/time.h>
+#include "impl/framework.h"
 
 
 /* mock state */
-
-static GStaticRWLock mock_pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;
-static GSList* mock_pgm_transport_list = NULL;
-
+static pgm_rwlock_t     mock_pgm_sock_list_lock;
+static pgm_slist_t*     mock_pgm_sock_list;
 
 /* mock functions for external references */
+
+#define pgm_sock_list_lock      mock_pgm_sock_list_lock
+#define pgm_sock_list           mock_pgm_sock_list
+
 
 static
 netsnmp_handler_registration*
@@ -198,24 +200,21 @@ mock_pgm_time_since_epoch (
 #define snmp_free_var				mock_snmp_free_var
 #define snmp_log				mock_snmp_log
 #define send_v2trap				mock_send_v2trap
-#define pgm_transport_list			mock_pgm_transport_list
-#define pgm_transport_list_lock			mock_pgm_transport_list_lock
-#define pgm_time_since_epoch			mock_pgm_time_since_epoch
 
 #define PGMMIB_DEBUG
 #include "pgmMIB.c"
 
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_mib_init (
- *		GError**		error
+ *		pgm_error_t**		error
  *	)
  */
 
 START_TEST (test_init_pass_001)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_mib_init (&err));
 }
 END_TEST
