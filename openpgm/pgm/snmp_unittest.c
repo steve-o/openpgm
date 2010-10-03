@@ -2,7 +2,7 @@
  *
  * unit tests for SNMP.
  *
- * Copyright (c) 2009 Miru Limited.
+ * Copyright (c) 2009-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,40 +25,17 @@
 #include <glib.h>
 #include <check.h>
 
-#include "pgm/transport.h"
+#include "impl/framework.h"
 
 
 /* mock state */
-static const guint mock_pgm_major_version = 0;
-static const guint mock_pgm_minor_version = 0;
-static const guint mock_pgm_micro_version = 0;
-static GStaticRWLock mock_pgm_transport_list_lock = G_STATIC_RW_LOCK_INIT;
-static GSList* mock_pgm_transport_list = NULL;
+static pgm_rwlock_t     mock_pgm_sock_list_lock;
+static pgm_slist_t*     mock_pgm_sock_list;
 
 static
-gboolean
-mock_pgm_tsi_equal (
-	gconstpointer	v1,
-	gconstpointer	v2
-	)
-{
-	return memcmp (v1, v2, sizeof(struct pgm_tsi_t)) == 0;
-}
-
-static
-void
-mock_pgm_time_since_epoch (
-	pgm_time_t*	pgm_time_t_time,
-	time_t*		time_t_time
-	)
-{
-	*time_t_time = pgm_to_secs (*pgm_time_t_time + 0);
-}
-
-static
-gboolean
+bool
 mock_pgm_mib_init (
-	GError**	error
+	pgm_error_t**	error
 	)
 {
 	return TRUE;
@@ -66,13 +43,8 @@ mock_pgm_mib_init (
 
 /* mock functions for external references */
 
-#define pgm_major_version	mock_pgm_major_version
-#define pgm_minor_version	mock_pgm_minor_version
-#define pgm_micro_version	mock_pgm_micro_version
-#define pgm_transport_list_lock	mock_pgm_transport_list_lock
-#define pgm_transport_list	mock_pgm_transport_list
-#define pgm_tsi_equal		mock_pgm_tsi_equal
-#define pgm_time_since_epoch	mock_pgm_time_since_epoch
+#define pgm_sock_list_lock      mock_pgm_sock_list_lock
+#define pgm_sock_list           mock_pgm_sock_list
 #define pgm_mib_init		mock_pgm_mib_init
 
 
@@ -81,15 +53,15 @@ mock_pgm_mib_init (
 
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_snmp_init (
- *		GError**	error
+ *		pgm_error_t**	error
  *	)
  */
 
 START_TEST (test_init_pass_001)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_snmp_init (&err));
 	fail_unless (NULL == err);
 }
@@ -98,20 +70,20 @@ END_TEST
 /* duplicate servers */
 START_TEST (test_init_fail_001)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_snmp_init (&err));
 	fail_unless (FALSE == pgm_snmp_init (&err));
 }
 END_TEST
 
 /* target:
- *	gboolean
+ *	bool
  *	pgm_snmp_shutdown (void)
  */
 
 START_TEST (test_shutdown_pass_001)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_snmp_init (&err));
 	fail_unless (NULL == err);
 	fail_unless (TRUE == pgm_snmp_shutdown ());
@@ -122,7 +94,7 @@ END_TEST
  */
 START_TEST (test_shutdown_pass_002)
 {
-	GError* err = NULL;
+	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_snmp_init (&err));
 	fail_unless (NULL == err);
 	fail_unless (TRUE == pgm_snmp_shutdown ());
