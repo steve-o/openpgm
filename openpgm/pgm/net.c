@@ -104,6 +104,7 @@ pgm_sendto_hops (
 	pgm_debug ("sendto returned %zd", sent);
 	if (sent < 0) {
 		int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		if (PGM_UNLIKELY(errno != ENETUNREACH &&	/* Network is unreachable */
 		 		 errno != EHOSTUNREACH &&	/* No route to host */
 		    		 errno != EAGAIN)) 		/* would block on non-blocking send */
@@ -134,7 +135,7 @@ pgm_sendto_hops (
 					save_errno = pgm_sock_errno();
 					pgm_warn (_("sendto() %s failed: %s"),
 						  inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						  pgm_sock_strerror (save_errno));
+						  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 				}
 			}
 			else if (ready == 0)
@@ -146,7 +147,7 @@ pgm_sendto_hops (
 			{
 				save_errno = pgm_sock_errno();
 				pgm_warn (_("blocked socket failed: %s"),
-					  pgm_sock_strerror (save_errno));
+					  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			}
 		}
 	}

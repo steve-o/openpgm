@@ -192,11 +192,12 @@ pgm_http_init (
 /* resolve and store relatively constant runtime information */
 	if (0 != gethostname (http_hostname, sizeof(http_hostname))) {
 		const int save_errno = errno;
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (save_errno),
 			     _("Resolving hostname: %s"),
-			     strerror (save_errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 	struct addrinfo hints = {
@@ -230,11 +231,12 @@ pgm_http_init (
 #ifndef _WIN32
 	e = getlogin_r (http_username, sizeof(http_username));
 	if (0 != e) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (errno),
 			     _("Retrieving user name: %s"),
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		goto err_cleanup;
 	}
 #else
@@ -257,11 +259,12 @@ pgm_http_init (
 /* create HTTP listen socket */
 	if ((http_sock = socket (AF_INET,  SOCK_STREAM, 0)) < 0) {
 #ifndef _WIN32
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
 				pgm_error_from_errno (errno),
 				_("Creating HTTP socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
@@ -275,11 +278,12 @@ pgm_http_init (
 	const int v = 1;
 	if (0 != setsockopt (http_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) {
 #ifndef _WIN32
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
 				pgm_error_from_errno (errno),
 				_("Enabling reuse of socket local address: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
@@ -293,11 +297,12 @@ pgm_http_init (
 	if (0 != http_sock_rcvtimeo (http_sock, HTTP_TIMEOUT) ||
 	    0 != http_sock_sndtimeo (http_sock, HTTP_TIMEOUT)) {
 #ifndef _WIN32
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
 				pgm_error_from_errno (errno),
 				_("Setting socket timeout: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
@@ -317,12 +322,13 @@ pgm_http_init (
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&http_addr, addr, sizeof(addr));
 #ifndef _WIN32
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (errno),
 			     _("Binding HTTP socket to address %s: %s"),
 			     addr,
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
@@ -336,11 +342,12 @@ pgm_http_init (
 	}
 	if (listen (http_sock, HTTP_BACKLOG) < 0) {
 #ifndef _WIN32
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (errno),
 			     _("Listening to HTTP socket: %s"),
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 		const int save_errno = WSAGetLastError();
 		pgm_set_error (error,
@@ -357,11 +364,12 @@ pgm_http_init (
 
 /* create notification channel */
 	if (0 != pgm_notify_init (&http_notify)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (errno),
 			     _("Creating HTTP notification channel: %s"),
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		goto err_cleanup;
 	}
 
@@ -369,22 +377,24 @@ pgm_http_init (
 #ifndef _WIN32
 	const int status = pthread_create (&http_thread, NULL, &http_routine, NULL);
 	if (0 != status) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (errno),
 			     _("Creating HTTP thread: %s"),
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		goto err_cleanup;
 	}
 #else
 	http_thread = (HANDLE)_beginthreadex (NULL, 0, &http_routine, NULL, 0, NULL);
 	const int save_errno = errno;
 	if (0 == http_thread) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_errno (save_errno),
 			     _("Creating HTTP thread: %s"),
-			     strerror (save_errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 #endif /* _WIN32 */
@@ -461,10 +471,13 @@ http_accept (
 		if (EAGAIN == errno)
 			return;
 #ifndef _WIN32
-		pgm_warn (_("HTTP accept: %s"), strerror (errno));
+		char errbuf[1024];
+		pgm_warn (_("HTTP accept: %s"),
+			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 		const int save_errno = WSAGetLastError();
-		pgm_warn (_("HTTP accept: %s"), pgm_wsastrerror (save_errno));
+		pgm_warn (_("HTTP accept: %s"),
+			pgm_wsastrerror (save_errno));
 #endif
 		return;
 	}
@@ -498,12 +511,15 @@ http_close (
 {
 #ifndef _WIN32
 	if (0 != close (connection->sock)) {
-		pgm_warn (_("Close HTTP client socket: %s"), strerror (errno));
+		char errbuf[1024];
+		pgm_warn (_("Close HTTP client socket: %s"),
+			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 	}
 #else
 	if (0 != closesocket (connection->sock)) {
 		const int save_errno = WSAGetLastError();
-		pgm_warn (_("Close HTTP client socket: %s"), pgm_wsastrerror (save_errno));
+		pgm_warn (_("Close HTTP client socket: %s"),
+			pgm_wsastrerror (save_errno));
 	}
 #endif
 	switch (connection->state) {
@@ -557,10 +573,13 @@ http_read (
 			if (EINTR == errno || EAGAIN == errno)
 				return;
 #ifndef _WIN32
-			pgm_warn (_("HTTP client read: %s"), strerror (errno));
+			char errbuf[1024];
+			pgm_warn (_("HTTP client read: %s"),
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 			const int save_errno = WSAGetLastError();
-			pgm_warn (_("HTTP client read: %s"), pgm_wsastrerror (save_errno));
+			pgm_warn (_("HTTP client read: %s"),
+				pgm_wsastrerror (save_errno));
 #endif
 			http_close (connection);
 			return;
@@ -624,10 +643,13 @@ http_write (
 			if (EINTR == errno || EAGAIN == errno)
 				return;
 #ifndef _WIN32
-			pgm_warn (_("HTTP client write: %s"), strerror (errno));
+			char errbuf[1024];
+			pgm_warn (_("HTTP client write: %s"),
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 #else
 			const int save_errno = WSAGetLastError();
-			pgm_warn (_("HTTP client write: %s"), pgm_wsastrerror (save_errno));
+			pgm_warn (_("HTTP client write: %s"),
+				pgm_wsastrerror (save_errno));
 #endif
 			http_close (connection);
 			return;

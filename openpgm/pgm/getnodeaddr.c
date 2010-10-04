@@ -62,12 +62,15 @@ pgm_if_getnodeaddr (
 	struct hostent* he;
 
 	if (0 != gethostname (hostname, sizeof(hostname))) {
+#ifndef _WIN32
+		char errbuf[1024];
+#endif
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
 #ifndef _WIN32
-			     strerror (errno)
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno)
 #else
 			     pgm_wsastrerror (WSAGetLastError())
 #endif

@@ -762,6 +762,7 @@ recv_again:
 	{
 #ifndef _WIN32
 		const int save_errno = errno;
+		char errbuf[1024];
 		if (PGM_LIKELY(EAGAIN == save_errno)) {
 			goto check_for_repeat;
 		}
@@ -770,7 +771,7 @@ recv_again:
 			     PGM_ERROR_DOMAIN_RECV,
 			     pgm_error_from_errno (save_errno),
 			     _("Transport socket error: %s"),
-			     strerror (save_errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 #else
 		const int save_wsa_errno = WSAGetLastError ();
 		if (PGM_LIKELY(WSAEWOULDBLOCK == save_wsa_errno)) {
@@ -863,13 +864,16 @@ check_for_repeat:
 				pgm_mutex_unlock (&sock->receiver_mutex);
 				pgm_rwlock_reader_unlock (&sock->lock);
 				return PGM_IO_STATUS_EOF;
-			case EFAULT:
+			case EFAULT: {
+#ifndef _WIN32
+				char errbuf[1024];
+#endif
 				pgm_set_error (error,
 						PGM_ERROR_DOMAIN_RECV,
 						pgm_error_from_errno (errno),
 						_("Waiting for event: %s"),
 #ifndef _WIN32
-						strerror (errno)
+						pgm_strerror_s (errbuf, sizeof (errbuf), errno)
 #else
 						pgm_wsastrerror (WSAGetLastError())	/* from select() */
 #endif
@@ -877,6 +881,7 @@ check_for_repeat:
 				pgm_mutex_unlock (&sock->receiver_mutex);
 				pgm_rwlock_reader_unlock (&sock->lock);
 				return PGM_IO_STATUS_ERROR;
+			}
 			default:
 				pgm_assert_not_reached();
 			}

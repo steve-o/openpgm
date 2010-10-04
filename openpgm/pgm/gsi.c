@@ -97,12 +97,15 @@ pgm_gsi_create_from_hostname (
 	char hostname[NI_MAXHOST];
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
+#ifndef _WIN32
+		char errbuf[1024];
+#endif
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
 #ifndef _WIN32
-			     strerror (errno)
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno)
 #else
 			     pgm_wsastrerror (WSAGetLastError())
 #endif
@@ -131,12 +134,15 @@ pgm_gsi_create_from_addr (
 
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
+#ifndef _WIN32
+		char errbuf[1024];
+#endif
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_errno (errno),
 			     _("Resolving hostname: %s"),
 #ifndef _WIN32
-			     strerror (errno)
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno)
 #else
 			     pgm_wsastrerror (WSAGetLastError())
 #endif
@@ -181,13 +187,8 @@ pgm_gsi_print_r (
 	pgm_return_val_if_fail (NULL != buf, -1);
 	pgm_return_val_if_fail (bufsize > 0, -1);
 
-#ifdef _MSC_VER
-	return _snprintf_s (buf, bufsize, _TRUNCATE, "%i.%i.%i.%i.%i.%i",
-			src[0], src[1], src[2], src[3], src[4], src[5]);
-#else
-	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i",
-			src[0], src[1], src[2], src[3], src[4], src[5]);
-#endif
+	return pgm_snprintf_s (buf, bufsize, _TRUNCATE, "%u.%u.%u.%u.%u.%u",
+				src[0], src[1], src[2], src[3], src[4], src[5]);
 }
 
 /* transform GSI to ASCII string form.

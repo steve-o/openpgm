@@ -72,9 +72,6 @@ static pgm_time_t		pgm_clock_update (void);
 #endif
 #ifdef CONFIG_HAVE_FTIME
 #	include <sys/timeb.h>
-#	ifdef _WIN32
-#		define ftime	_ftime
-#	endif
 static pgm_time_t		pgm_ftime_update (void);
 #endif
 #ifdef CONFIG_HAVE_GETTIMEOFDAY
@@ -228,22 +225,31 @@ pgm_time_init (
 	pgm_error_t**	error
 	)
 {
+	char* env;
+	size_t envlen;
+
 	if (pgm_atomic_exchange_and_add32 (&time_ref_count, 1) > 0)
 		return TRUE;
 
 /* current time */
-	const char *cfg = getenv ("PGM_TIMER");
-	if (cfg == NULL) {
-#ifdef CONFIG_HAVE_TSC
-		cfg = "TSC";
+#ifndef _WIN32
+	const int err = pgm_dupenv_s (&env, &envlen, "PGM_TIMER");
 #else
-		cfg = "GTOD";
+	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_TIMER");
 #endif
+	if (0 != err || 0 == envlen) {
+		env = pgm_strdup (
+#ifdef CONFIG_HAVE_TSC
+			"TSC"
+#else
+			"GTOD"
+#endif
+				);
 	}
 
 	pgm_time_since_epoch = pgm_time_conv;
 
-	switch (cfg[0]) {
+	switch (env[0]) {
 #ifdef CONFIG_HAVE_FTIME
 	case 'F':
 		pgm_minor (_("Using ftime() timer."));
@@ -291,6 +297,9 @@ pgm_time_init (
 		break;
 #endif
 	}
+
+/* clean environment copy */
+	free (env);
 
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
@@ -456,9 +465,13 @@ static
 pgm_time_t
 pgm_ftime_update (void)
 {
-	struct timeb ftime_now;
 	static pgm_time_t last = 0;
-	ftime (&ftime_now);
+#ifndef _MSC_VER
+	struct timeb ftime_now;
+#else
+	struct __timeb64 ftime_now;
+#endif
+	pgm_ftime_s (&ftime_now);
 	const pgm_time_t now = secs_to_usecs (ftime_now.time) + msecs_to_usecs (ftime_now.millitm);
 	if (PGM_UNLIKELY(now < last))
 		return last;
@@ -486,28 +499,31 @@ pgm_rtc_init (
 
 	rtc_fd = open ("/dev/rtc", O_RDONLY);
 	if (-1 == rtc_fd) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
 			     _("Cannot open /dev/rtc for reading: %s"),
-			     strerror(errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 	if (-1 == ioctl (rtc_fd, RTC_IRQP_SET, rtc_frequency)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
 			     _("Cannot set RTC frequency to %i Hz: %s"),
 			     rtc_frequency,
-			     strerror(errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 	if (-1 == ioctl (rtc_fd, RTC_PIE_ON, 0)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
 			     _("Cannot enable periodic interrupt (PIE) on RTC: %s"),
-			     strerror(errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 	return TRUE;
@@ -689,21 +705,23 @@ pgm_hpet_init (
 
 	hpet_fd = open("/dev/hpet", O_RDONLY);
 	if (hpet_fd < 0) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
 			     _("Cannot open /dev/hpet for reading: %s"),
-			     strerror(errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 
 	hpet_ptr = mmap(NULL, HPET_MMAP_SIZE, PROT_READ, MAP_SHARED, hpet_fd, 0);
 	if (MAP_FAILED == hpet_ptr) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_TIME,
 			     PGM_ERROR_FAILED,
 			     _("Error mapping HPET device: %s"),
-			     strerror(errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (hpet_fd);
 		hpet_fd = -1;
 		return FALSE;

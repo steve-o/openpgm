@@ -114,12 +114,23 @@ pgm_mem_init (void)
 	static const pgm_debug_key_t keys[] = {
 		{ "gc-friendly", 1 },
 	};
+	char* env;
+	size_t envlen;
+	unsigned flags = 0;
 
 	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, 1) > 0)
 		return;
 
-	const char *val = getenv ("PGM_DEBUG");
-	const unsigned flags = !val ? 0 : pgm_parse_debug_string (val, keys, PGM_N_ELEMENTS (keys));
+#ifndef _WIN32
+	const int err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
+#else
+	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
+#endif
+	if (0 == err && envlen > 0) {
+		flags = pgm_parse_debug_string (env, keys, PGM_N_ELEMENTS (keys));
+		free (env);
+	}
+
 	if (flags & 1)
 		pgm_mem_gc_friendly = TRUE;
 }

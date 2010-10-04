@@ -49,8 +49,8 @@ pgm_tsi_print_r (
 	const uint8_t* gsi = (const uint8_t*)tsi;
 	const uint16_t source_port = tsi->sport;
 
-	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i.%i",
-			 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
+	return pgm_snprintf_s (buf, bufsize, _TRUNCATE, "%u.%u.%u.%u.%u.%u.%u",
+				 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
 }
 
 /* transform TSI to ASCII string form.
