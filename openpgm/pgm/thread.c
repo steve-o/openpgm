@@ -39,9 +39,10 @@ static volatile uint32_t thread_ref_count = 0;
 		do { \
 			const int save_error = (err); \
 			if (PGM_UNLIKELY(save_error)) { \
+				char errbuf[1024]; \
 				pgm_error ("file %s: line %d (%s): error '%s' during '%s'", \
 					__FILE__, __LINE__, __PRETTY_FUNCTION__, \
-					strerror (save_error), name); \
+					pgm_strerror_s (errbuf, sizeof (errbuf), save_error), name); \
 			} \
 		} while (0)
 #	define posix_check_cmd(cmd) posix_check_err ((cmd), #cmd)

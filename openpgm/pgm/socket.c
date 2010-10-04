@@ -277,11 +277,12 @@ pgm_socket (
 					   new_sock->protocol)) == PGM_INVALID_SOCKET)
 	{
 		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
 			       _("Creating receive socket: %s"),
-			       pgm_sock_strerror (save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 #ifndef _WIN32
 		if (EPERM == save_errno) {
 			pgm_error (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
@@ -295,11 +296,12 @@ pgm_socket (
 					   new_sock->protocol)) == PGM_INVALID_SOCKET)
 	{
 		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
 			       _("Creating send socket: %s"),
-			       pgm_sock_strerror (save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_destroy;
 	}
 
@@ -308,11 +310,12 @@ pgm_socket (
 							     new_sock->protocol)) == PGM_INVALID_SOCKET)
 	{
 		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
 			       _("Creating IP Router Alert (RFC 2113) send socket: %s"),
-			       pgm_sock_strerror (save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_destroy;
 	}
 
@@ -327,11 +330,12 @@ pgm_socket (
 		    PGM_SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
 			const int save_errno = pgm_sock_errno();
+			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
 				       pgm_error_from_sock_errno (save_errno),
 				       _("Enabling reuse of socket local address: %s"),
-				       pgm_sock_strerror (save_errno));
+				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			goto err_destroy;
 		}
 
@@ -342,11 +346,12 @@ pgm_socket (
 		if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
 		{
 			const int save_errno = pgm_sock_errno();
+			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
 				       pgm_error_from_sock_errno (save_errno),
 				       _("Enabling receipt of ancillary information per incoming packet: %s"),
-				       pgm_sock_strerror (save_errno));
+				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			goto err_destroy;
 		}
 #endif
@@ -361,11 +366,12 @@ pgm_socket (
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_hdrincl (new_sock->recv_sock, recv_family, TRUE))
 			{
 				const int save_errno = pgm_sock_errno();
+				char errbuf[1024];
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_SOCKET,
 					       pgm_error_from_sock_errno (save_errno),
 					       _("Enabling IP header in front of user data: %s"),
-					       pgm_sock_strerror (save_errno));
+					       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 				goto err_destroy;
 			}
 		}
@@ -376,11 +382,12 @@ pgm_socket (
 			if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
 			{
 				const int save_errno = pgm_sock_errno();
+				char errbuf[1024];
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_SOCKET,
 					       pgm_error_from_sock_errno (save_errno),
 					       _("Enabling receipt of control message per incoming datagram: %s"),
-					       pgm_sock_strerror (save_errno));
+					       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 				goto err_destroy;
 			}
 		}
@@ -398,24 +405,27 @@ err_destroy:
 	if (PGM_INVALID_SOCKET != new_sock->recv_sock) {
 		if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->recv_sock)) {
 			const int save_errno = pgm_sock_errno();
+			char errbuf[1024];
 			pgm_warn (_("Close on receive socket failed: %s"),
-				  pgm_sock_strerror (save_errno));
+				  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		}
 		new_sock->recv_sock = PGM_INVALID_SOCKET;
 	}
 	if (PGM_INVALID_SOCKET != new_sock->send_sock) {
 		if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->send_sock)) {
 			const int save_errno = pgm_sock_errno();
+			char errbuf[1024];
 			pgm_warn (_("Close on send socket failed: %s"),
-				  pgm_sock_strerror (save_errno));
+				  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		}
 		new_sock->send_sock = PGM_INVALID_SOCKET;
 	}
 	if (PGM_INVALID_SOCKET != new_sock->send_with_router_alert_sock) {
 		if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->send_with_router_alert_sock)) {
 			const int save_errno = pgm_sock_errno();
+			char errbuf[1024];
 			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"),
-				  pgm_sock_strerror (save_errno));
+				  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		}
 		new_sock->send_with_router_alert_sock = PGM_INVALID_SOCKET;
 	}
@@ -1795,22 +1805,24 @@ pgm_bind3 (
 		    0 != pgm_notify_init (&sock->ack_notify))
 		{
 			const int save_errno = errno;
+			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
 				       pgm_error_from_errno (save_errno),
 				       _("Creating ACK notification channel: %s"),
-				       strerror (save_errno));
+				       pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			pgm_rwlock_writer_unlock (&sock->lock);
 			return FALSE;
 		}
 		if (0 != pgm_notify_init (&sock->rdata_notify))
 		{
 			const int save_errno = errno;
+			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
 				       pgm_error_from_errno (save_errno),
 				       _("Creating RDATA notification channel: %s"),
-				       strerror (save_errno));
+				       pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			pgm_rwlock_writer_unlock (&sock->lock);
 			return FALSE;
 		}
@@ -1818,11 +1830,12 @@ pgm_bind3 (
 	if (0 != pgm_notify_init (&sock->pending_notify))
 	{
 		const int save_errno = errno;
+		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_errno (save_errno),
 			       _("Creating waiting peer notification channel: %s"),
-			       strerror (save_errno));
+			       pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
@@ -1938,15 +1951,16 @@ pgm_bind3 (
 				      &recv_addr.sa,
 				      pgm_sockaddr_len (&recv_addr.sa)))
 	{
+		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-		const int save_errno = pgm_sock_errno();
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
 			       _("Binding receive socket to address %s: %s"),
 			       addr,
-			       pgm_sock_strerror (save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
@@ -1986,15 +2000,16 @@ pgm_bind3 (
 				      (struct sockaddr*)&send_addr,
 				      pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
 	{
+		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
-		const int save_errno = pgm_sock_errno();
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
 			       _("Binding send socket to address %s: %s"),
 			       addr,
-			       pgm_sock_strerror (save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
@@ -2027,15 +2042,16 @@ pgm_bind3 (
 				      (struct sockaddr*)&send_with_router_alert_addr,
 				      pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr)))
 	{
+		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-		const int save_errno = pgm_sock_errno();
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
 			       _("Binding IP Router Alert (RFC 2113) send socket to address %s: %s"),
 			       addr,
-			       pgm_sock_strerror (save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
@@ -2122,11 +2138,12 @@ pgm_connect (
 		    !pgm_send_spm (sock, PGM_OPT_SYN))
 		{
 			const int save_errno = pgm_sock_errno();
+			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
 				       pgm_error_from_sock_errno (save_errno),
 				       _("Sending SPM broadcast: %s"),
-				       pgm_sock_strerror (save_errno));
+				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			pgm_rwlock_writer_unlock (&sock->lock);
 			return FALSE;
 		}

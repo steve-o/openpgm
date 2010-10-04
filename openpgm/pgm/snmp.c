@@ -109,11 +109,12 @@ pgm_snmp_init (
 
 /* create notification channel */
 	if (0 != pgm_notify_init (&snmp_notify)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_SNMP,
 			     pgm_error_from_errno (errno),
 			     _("Creating SNMP notification channel: %s"),
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		snmp_shutdown (pgm_snmp_appname);
 		goto err_cleanup;
 	}
@@ -122,11 +123,12 @@ pgm_snmp_init (
 #ifndef _WIN32
 	const int status = pthread_create (&snmp_thread, NULL, &snmp_routine, NULL);
 	if (0 != status) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_SNMP,
 			     pgm_error_from_errno (errno),
 			     _("Creating SNMP thread: %s"),
-			     strerror (errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		snmp_shutdown (pgm_snmp_appname);
 		goto err_cleanup;
 	}
@@ -134,11 +136,12 @@ pgm_snmp_init (
 	snmp_thread = (HANDLE)_beginthreadex (NULL, 0, &snmp_routine, NULL, 0, NULL);
 	const int save_errno = errno;
 	if (0 == snmp_thread) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_SNMP,
 			     pgm_error_from_errno (save_errno),
 			     _("Creating SNMP thread: %s"),
-			     strerror (save_errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		snmp_shutdown (pgm_snmp_appname);
 		goto err_cleanup;
 	}
