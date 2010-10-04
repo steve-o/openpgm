@@ -62,6 +62,7 @@
 #include <impl/rand.h>
 #include <impl/rate_control.h>
 #include <impl/reed_solomon.h>
+#include <impl/security.h>
 #include <impl/slist.h>
 #include <impl/sn.h>
 #include <impl/sockaddr.h>

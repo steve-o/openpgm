@@ -63,8 +63,12 @@ pgm_printf_string_upper_bound (
 	va_list		args
 	)
 {
+#ifdef _MSC_VER
+	return _vscprintf (format, args) + 1;
+#else
 	char c;
 	return vsnprintf (&c, 1, format, args) + 1;
+#endif
 }
 
 /* memory must be freed with free()
@@ -196,8 +200,7 @@ pgm_strsplit (
 		{
 			const size_t len = s - remainder;
 			char *new_string = malloc (len + 1);
-			strncpy (new_string, remainder, len);
-			new_string[len] = 0;
+			pgm_strncpy_s (new_string, len + 1, remainder, len);
 			string_list = pgm_slist_prepend (string_list, new_string);
 			n++;
 			remainder = s + delimiter_len;

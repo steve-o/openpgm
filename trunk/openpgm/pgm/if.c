@@ -255,10 +255,9 @@ parse_interface (
 	if (AF_INET != family &&
 	    '[' == ifname[0])
 	{
-		const size_t ifnamelen = strlen(ifname);
+		const size_t ifnamelen = strlen (ifname);
 		if (']' == ifname[ ifnamelen - 1 ]) {
-			strncpy (literal, ifname + 1, ifnamelen - 2);
-			literal[ ifnamelen - 2 ] = 0;
+			pgm_strncpy_s (literal, sizeof (literal), ifname + 1, ifnamelen - 2);
 			family = AF_INET6;		/* force IPv6 evaluation */
 			check_inet6_network = TRUE;	/* may be a network IP or CIDR block */
 			check_addr = TRUE;		/* cannot be not a name */
@@ -684,8 +683,7 @@ parse_group (
 		const size_t grouplen = strlen(group);
 		if (']' == group[ grouplen - 1 ]) {
 			char literal[1024];
-			strncpy (literal, group + 1, grouplen - 2);
-			literal[ grouplen - 2 ] = 0;
+			pgm_strncpy_s (literal, sizeof (literal), group + 1, grouplen - 2);
 			if (pgm_inet_pton (AF_INET6, literal, &((struct sockaddr_in6*)addr)->sin6_addr) &&
 			    IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)addr)->sin6_addr))
 			{
@@ -1337,8 +1335,7 @@ network_parse (
 
 /* entity from b to p-1 */
 			char entity[1024];
-			strncpy (entity, b, sizeof(entity));
-			entity[p - b] = 0;
+			pgm_strncpy_s (entity, sizeof (entity), b, p - b);
 
 			switch (ec++) {
 			case ENTITY_INTERFACE:

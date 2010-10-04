@@ -153,12 +153,11 @@ pgm__logv (
 	va_list			args
 	)
 {
-	char tbuf[ 1024 ];
+	char tbuf[1024];
 
 	pgm_mutex_lock (&messages_mutex);
-	const int offset = sprintf (tbuf, "%s: ", log_level_text (log_level));
-	vsnprintf (tbuf+offset, sizeof(tbuf)-offset, format, args);
-	tbuf[ sizeof(tbuf) ] = '\0';
+	const int offset = pgm_snprintf_s (tbuf, sizeof (tbuf), _TRUNCATE, "%s: ", log_level_text (log_level));
+	pgm_vsnprintf_s (tbuf + offset, sizeof(tbuf) - offset, _TRUNCATE, format, args);
 	if (log_handler)
 		log_handler (log_level, tbuf, log_handler_closure);
 	else {

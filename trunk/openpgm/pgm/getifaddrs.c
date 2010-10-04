@@ -64,22 +64,24 @@ _pgm_getlifaddrs (
 {
 	const int sock = socket (AF_INET, SOCK_DGRAM, 0);
 	if (-1 == sock) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("Opening IPv4 datagram socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 
 /* process IPv6 interfaces */
 	const int sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (-1 == sock6) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("Opening IPv6 datagram socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		return FALSE;
 	}
@@ -89,11 +91,12 @@ again:
 	lifn.lifn_family = AF_INET;
 	lifn.lifn_flags  = 0;
 	if (-1 == ioctl (sock, SIOCGLIFNUM, &lifn)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("SIOCGLIFNUM failed on IPv4 socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		close (sock6);
 		return FALSE;
@@ -115,11 +118,12 @@ again:
 	lifc.lifc_len    = lifn.lifn_count * sizeof(struct lifreq);
 	lifc.lifc_buf    = alloca (lifc.lifc_len);
 	if (-1 == ioctl (sock, SIOCGLIFCONF, &lifc)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("SIOCGLIFCONF failed on IPv4 socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		close (sock6);
 		return FALSE;
@@ -130,11 +134,12 @@ again:
 	lifn.lifn_family = AF_INET6;
 	lifn.lifn_flags  = 0;
 	if (-1 == ioctl (sock6, SIOCGLIFNUM, &lifn)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("SIOCGLIFNUM failed on IPv6 socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		close (sock6);
 		return FALSE;
@@ -149,11 +154,12 @@ again:
 	lifc6.lifc_len     = lifn.lifn_count * sizeof(struct lifreq);
 	lifc6.lifc_buf     = alloca (lifc6.lifc_len);
 	if (-1 == ioctl (sock6, SIOCGLIFCONF, &lifc6)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("SIOCGLIFCONF failed on IPv6 socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		close (sock6);
 		return FALSE;
@@ -179,8 +185,7 @@ again:
 /* name */
 		pgm_debug ("AF_INET/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
-		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, LIFNAMSIZ);
-		ift->_ifa.ifa_name[LIFNAMSIZ - 1] = 0;
+		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, lifr->lifr_name, _TRUNCATE);
 
 /* flags */
 		if (-1 != ioctl (sock, SIOCGLIFFLAGS, lifr)) {
@@ -233,8 +238,7 @@ again:
 /* name */
 		pgm_debug ("AF_INET6/name: %s", lifr->lifr_name ? lifr->lifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
-		strncpy (ift->_ifa.ifa_name, lifr->lifr_name, sizeof(lifr->lifr_name));
-		ift->_ifa.ifa_name[sizeof(lifr->lifr_name) - 1] = 0;
+		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, lifr->lifr_name, _TRUNCATE);
 
 /* flags */
 		if (-1 != ioctl (sock6, SIOCGLIFFLAGS, lifr)) {
@@ -269,10 +273,16 @@ again:
 		++lifr;
 	}
 
-	if (-1 == close (sock6))
-		pgm_warn (_("Closing IPv6 socket failed: %s"), strerror(errno));
-	if (-1 == close (sock))
-		pgm_warn (_("Closing IPv4 socket failed: %s"), strerror(errno));
+	if (-1 == close (sock6)) {
+		char errbuf[1024];
+		pgm_warn (_("Closing IPv6 socket failed: %s"),
+			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+	}
+	if (-1 == close (sock)) {
+		char errbuf[1024];
+		pgm_warn (_("Closing IPv4 socket failed: %s"),
+			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+	}
 
 	*ifap = (struct pgm_ifaddrs_t*)ifa;
 	return TRUE;
@@ -289,11 +299,12 @@ _pgm_getifaddrs (
 {
 	const int sock = socket (AF_INET, SOCK_DGRAM, 0);
 	if (-1 == sock) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("Opening IPv4 datagram socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 
@@ -303,11 +314,12 @@ _pgm_getifaddrs (
 	ifc.ifc_buf = buf;
 	ifc.ifc_len = sizeof(buf);
 	if (-1 == ioctl (sock, SIOCGIFCONF, &ifc)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("SIOCGIFCONF failed on IPv4 socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		return FALSE;
 	}
@@ -317,11 +329,12 @@ _pgm_getifaddrs (
 /* process IPv6 interfaces */
 	const int sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (-1 == sock6) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("Opening IPv6 datagram socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		return FALSE;
 	}
@@ -331,11 +344,12 @@ _pgm_getifaddrs (
 	ifc6.ifc_buf = buf6;
 	ifc6.ifc_len = sizeof(buf6);
 	if (-1 == ioctl (sock6, SIOCGIFCONF, &ifc6)) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("SIOCGIFCONF failed on IPv6 socket: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		close (sock);
 		close (sock6);
 		return FALSE;
@@ -356,8 +370,7 @@ _pgm_getifaddrs (
 /* name */
 		pgm_debug ("AF_INET/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
-		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
-		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
+		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, ifr->ifr_name, _TRUNCATE);
 
 /* flags */
 		if (-1 != ioctl (sock, SIOCGIFFLAGS, ifr)) {
@@ -411,8 +424,7 @@ _pgm_getifaddrs (
 /* name */
 		pgm_debug ("AF_INET6/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
 		ift->_ifa.ifa_name = ift->_name;
-		strncpy (ift->_ifa.ifa_name, ifr->ifr_name, sizeof(ifr->ifr_name));
-		ift->_ifa.ifa_name[sizeof(ifr->ifr_name) - 1] = 0;
+		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, ifr->ifr_name, _TRUNCATE);
 
 /* flags */
 		if (-1 != ioctl (sock6, SIOCGIFFLAGS, ifr)) {
@@ -586,8 +598,7 @@ _pgm_getadaptersinfo (
 			pgm_debug ("name:%s IPv4 index:%lu",
 				pAdapter->AdapterName, pAdapter->Index);
 			ift->_ifa.ifa_name = ift->_name;
-			strncpy (ift->_ifa.ifa_name, pAdapter->AdapterName, IF_NAMESIZE);
-			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
+			pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, pAdapter->AdapterName, _TRUNCATE);
 
 /* flags: assume up, broadcast and multicast */
 			ift->_ifa.ifa_flags = IFF_UP | IFF_BROADCAST | IFF_MULTICAST;
@@ -718,8 +729,7 @@ _pgm_getadaptersaddresses (
 			pgm_debug ("name:%s IPv4 index:%lu IPv6 index:%lu",
 				adapter->AdapterName, adapter->IfIndex, adapter->Ipv6IfIndex);
 			ift->_ifa.ifa_name = ift->_name;
-			strncpy (ift->_ifa.ifa_name, adapter->AdapterName, IF_NAMESIZE);
-			ift->_ifa.ifa_name[IF_NAMESIZE - 1] = 0;
+			pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, adapter->AdapterName, _TRUNCATE);
 
 /* flags */
 			ift->_ifa.ifa_flags = 0;
@@ -802,11 +812,12 @@ pgm_getifaddrs (
 #ifdef CONFIG_HAVE_GETIFADDRS
 	const int e = getifaddrs ((struct ifaddrs**)ifap);
 	if (-1 == e) {
+		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
 				pgm_error_from_errno (errno),
 				_("getifaddrs failed: %s"),
-				strerror (errno));
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
 		return FALSE;
 	}
 	return TRUE;

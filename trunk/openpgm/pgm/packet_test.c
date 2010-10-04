@@ -1083,7 +1083,7 @@ pgm_udpport_string (
 	struct servent* se = getservbyport (port, "udp");
 	if (se == NULL) {
 		char buf[sizeof("00000")];
-		snprintf(buf, sizeof(buf), "%u", ntohs(port));
+		pgm_snprintf_s (buf, sizeof (buf), sizeof (buf), "%u", ntohs (port));
 		service_string = pgm_strdup(buf);
 	} else {
 		service_string = pgm_strdup(se->s_name);

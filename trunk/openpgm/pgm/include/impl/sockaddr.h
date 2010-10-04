@@ -49,15 +49,30 @@ PGM_BEGIN_DECLS
 #	define PGM_SOCKET_ERROR			-1
 #	define pgm_closesocket			close
 #	define pgm_sock_errno()			(errno)
-#	define pgm_sock_strerror(e)		strerror(e)
 #	define pgm_error_from_sock_errno	pgm_error_from_errno
+
+static inline
+char*
+pgm_sock_strerror_s (char *buffer, size_t size, int errnum)
+{
+	return pgm_strerror_s (buffer, size, errnum);
+}
+
 #else
 #	define PGM_INVALID_SOCKET		(int)INVALID_SOCKET
 #	define PGM_SOCKET_ERROR			(int)SOCKET_ERROR
 #	define pgm_closesocket			closesocket
 #	define pgm_sock_errno()			WSAGetLastError()
-#	define pgm_sock_strerror(e)		pgm_wsastrerror(e)
 #	define pgm_error_from_sock_errno	pgm_error_from_wsa_errno
+
+static inline
+char*
+pgm_sock_strerror_s (char *buffer, size_t size, int errnum)
+{
+	pgm_strncpy_s (buffer, size, pgm_wsastrerror (errnum), _TRUNCATE);
+	return buffer;
+}
+
 #endif
 
 PGM_GNUC_INTERNAL sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);

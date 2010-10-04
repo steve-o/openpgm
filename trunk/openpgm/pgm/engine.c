@@ -201,13 +201,21 @@ pgm_init (
 
 /* receiver simulated loss rate */
 #ifdef PGM_DEBUG
-	const char *loss_rate = getenv ("PGM_LOSS_RATE");
-	if (NULL != loss_rate) {
-		int value = atoi (loss_rate);
-		if (value > 0 && value <= 100) {
-			pgm_loss_rate = value;
+	char* env;
+	size_t envlen;
+
+#	ifndef _WIN32
+	const int err = pgm_dupenv_s (&env, &envlen, "PGM_LOSS_RATE");
+#	else
+	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_LOSS_RATE");
+#	endif
+	if (0 == err && envlen > 0) {
+		const int loss_rate = atoi (env);
+		if (loss_rate > 0 && loss_rate <= 100) {
+			pgm_loss_rate = loss_rate;
 			pgm_minor (_("Setting PGM packet loss rate to %i%%."), pgm_loss_rate);
 		}
+		free (env);
 	}
 #endif
 
