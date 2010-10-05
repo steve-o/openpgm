@@ -131,8 +131,8 @@ PGM_STATIC_ASSERT(sizeof(struct pgm_ip6_hdr) == 40);
 /* RFC 768 */
 struct pgm_udphdr
 {
-	uint16_t	uh_sport;		/* source port */
-	uint16_t	uh_dport;		/* destination port */
+	in_port_t	uh_sport;		/* source port */
+	in_port_t	uh_dport;		/* destination port */
 	uint16_t	uh_ulen;		/* udp length */
 	uint16_t	uh_sum;			/* udp checksum */
 };

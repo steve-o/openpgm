@@ -363,7 +363,7 @@ pgm_win_strerror (
 		       win_errno,	/* message id */
 		       MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),	/* language id */
 		       (LPTSTR)buf,
-		       buflen,
+		       nSize,
 		       NULL);		/* arguments */
 	return buf;
 }

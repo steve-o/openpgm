@@ -86,7 +86,7 @@ pgm_sendto_hops (
 		(int)tolen);
 #endif
 
-	const int send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
+	const SOCKET send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
 
 	if (use_rate_limit && 
 	    !pgm_rate_check (&sock->rate_control, len, sock->is_nonblocking))
@@ -167,7 +167,7 @@ pgm_sendto_hops (
 
 int
 pgm_set_nonblocking (
-	int		fd[2]
+	SOCKET		fd[2]
 	)
 {
 /* pre-conditions */

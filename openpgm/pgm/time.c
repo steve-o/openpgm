@@ -222,7 +222,11 @@ static pgm_time_t		pgm_tsc_update (void);
 
 bool
 pgm_time_init (
+#ifndef _WIN32
 	pgm_error_t**	error
+#else
+	PGM_GNUC_UNUSED pgm_error_t**	error
+#endif
 	)
 {
 	char* env;
@@ -232,11 +236,7 @@ pgm_time_init (
 		return TRUE;
 
 /* current time */
-#ifndef _WIN32
-	const int err = pgm_dupenv_s (&env, &envlen, "PGM_TIMER");
-#else
 	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_TIMER");
-#endif
 	if (0 != err || 0 == envlen) {
 		env = pgm_strdup (
 #ifdef CONFIG_HAVE_TSC
@@ -399,10 +399,11 @@ pgm_time_init (
 #endif
 
 	return TRUE;
-
+#ifndef _WIN32
 err_cleanup:
 	pgm_atomic_dec32 (&time_ref_count);
 	return FALSE;
+#endif
 }
 
 /* returns TRUE if shutdown succeeded, returns FALSE on error.
@@ -466,8 +467,10 @@ pgm_time_t
 pgm_ftime_update (void)
 {
 	static pgm_time_t last = 0;
-#ifndef _MSC_VER
+#ifndef _WIN32
 	struct timeb ftime_now;
+#elif !defined( _MSC_VER )
+	struct _timeb ftime_now;
 #else
 	struct __timeb64 ftime_now;
 #endif

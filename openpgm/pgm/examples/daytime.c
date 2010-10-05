@@ -437,6 +437,7 @@ create_nak_thread (void)
 		return FALSE;
 	}
 #else
+/* expect warning on MinGW due to lack of native uintptr_t */
 	nak_thread = (HANDLE)_beginthreadex (NULL, 0, &nak_routine, sock, 0, NULL);
 	const int save_errno = errno;
 	if (0 == nak_thread) {
