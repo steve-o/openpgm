@@ -55,12 +55,12 @@ pgm_sockaddr_family (
 	return sa->sa_family;
 }
 
-uint16_t
+in_port_t
 pgm_sockaddr_port (
 	const struct sockaddr*	sa
 	)
 {
-	uint16_t sa_port;
+	in_port_t sa_port;
 	switch (sa->sa_family) {
 	case AF_INET: {
 		struct sockaddr_in s4;
@@ -266,18 +266,18 @@ pgm_sockaddr_cmp (
 /* IP header included with data.
  *
  * If no error occurs, pgm_sockaddr_hdrincl returns zero.  Otherwise, a value
- * of PGM_SOCKET_ERROR is returned, and a specific error code can be retrieved
+ * of SOCKET_ERROR is returned, and a specific error code can be retrieved
  * by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_hdrincl (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const bool		v
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -313,18 +313,18 @@ pgm_sockaddr_hdrincl (
 /* Return destination IP address.
  *
  * If no error occurs, pgm_sockaddr_pktinfo returns zero.  Otherwise, a value
- * of PGM_SOCKET_ERROR is returned, and a specific error code can be retrieved
+ * of SOCKET_ERROR is returned, and a specific error code can be retrieved
  * by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_pktinfo (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const bool		v
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifndef _WIN32
 /* Solaris:ip(7P) "The following options take in_pktinfo_t as the parameter"
  * Completely different, although ip6(7P) is a little better, "The following
@@ -371,18 +371,18 @@ pgm_sockaddr_pktinfo (
 /* Set IP Router Alert option for all outgoing packets.
  *
  * If no error occurs, pgm_sockaddr_router_alert returns zero.  Otherwise, a
- * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_router_alert (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const bool		v
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_IP_ROUTER_ALERT
 /* Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
  * true.  Expects an integer flag."
@@ -435,18 +435,18 @@ retval = 0;
 /* Type-of-service and precedence.
  *
  * If no error occurs, pgm_sockaddr_tos returns zero.  Otherwise, a value of
- * PGM_SOCKET_ERROR is returned, and a specific error code can be retrieved by
+ * SOCKET_ERROR is returned, and a specific error code can be retrieved by
  * calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_tos (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const int		tos
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -483,18 +483,18 @@ pgm_sockaddr_tos (
  * NB: IPV6_JOIN_GROUP == IPV6_ADD_MEMBERSHIP
  *
  * If no error occurs, pgm_sockaddr_join_group returns zero.  Otherwise, a
- * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_join_group (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const struct group_req*	gr
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."  Presumably with source field zeroed out.
@@ -575,12 +575,12 @@ pgm_sockaddr_join_group (
 
 int
 pgm_sockaddr_leave_group (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const struct group_req*	gr
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_LEAVE_GROUP, gr, sizeof(struct group_req));
@@ -630,12 +630,12 @@ pgm_sockaddr_leave_group (
 
 int
 pgm_sockaddr_block_source (
-	const int			s,
+	const SOCKET			s,
 	const sa_family_t		sa_family,
 	const struct group_source_req*	gsr
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_BLOCK_SOURCE, gsr, sizeof(struct group_source_req));
@@ -669,12 +669,12 @@ pgm_sockaddr_block_source (
 
 int
 pgm_sockaddr_unblock_source (
-	const int			s,
+	const SOCKET			s,
 	const sa_family_t		sa_family,
 	const struct group_source_req*	gsr
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_UNBLOCK_SOURCE, gsr, sizeof(struct group_source_req));
@@ -707,18 +707,18 @@ pgm_sockaddr_unblock_source (
  * NB: Silently reverts to ASM if SSM not supported.
  *
  * If no error occurs, pgm_sockaddr_join_source_group returns zero.
- * Otherwise, a value of PGM_SOCKET_ERROR is returned, and a specific error
+ * Otherwise, a value of SOCKET_ERROR is returned, and a specific error
  * code can be retrieved by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_join_source_group (
-	const int			s,
+	const SOCKET			s,
 	const sa_family_t		sa_family,
 	const struct group_source_req*	gsr
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."
@@ -776,12 +776,12 @@ pgm_sockaddr_join_source_group (
 
 int
 pgm_sockaddr_leave_source_group (
-	const int			s,
+	const SOCKET			s,
 	const sa_family_t		sa_family,
 	const struct group_source_req*	gsr
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_LEAVE_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
@@ -819,18 +819,18 @@ pgm_sockaddr_leave_source_group (
 
 int
 pgm_sockaddr_msfilter (
-	const int			s,
+	const SOCKET			s,
 	const sa_family_t		sa_family,
 	const struct group_filter*	gf_list
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 #ifdef MCAST_MSFILTER
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
 	retval = setsockopt (s, recv_level, MCAST_MSFILTER, (const char*)gf_list, len);
 #elif defined(SIOCSMSFILTER)
-	retval = ioctl (s, SIOCSMSFILTER, (const char*)gf_list);
+	retval = ioctlsocket (s, SIOCSMSFILTER, (const char*)gf_list);
 #endif
 	return retval;
 }
@@ -839,18 +839,18 @@ pgm_sockaddr_msfilter (
 /* Specify outgoing interface.
  *
  * If no error occurs, pgm_sockaddr_multicast_if returns zero.  Otherwise, a
- * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_multicast_if (
-	int			s,
+	const SOCKET		s,
 	const struct sockaddr*	address,
-	unsigned		ifindex
+	const unsigned		ifindex
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 
 	switch (address->sa_family) {
 	case AF_INET: {
@@ -899,18 +899,18 @@ pgm_sockaddr_multicast_if (
  * outgoing packets.  This does not affect unicast packets such as NAKs.
  *
  * If no error occurs, pgm_sockaddr_multicast_loop returns zero.  Otherwise, a
- * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_multicast_loop (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const bool		v
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -960,18 +960,18 @@ pgm_sockaddr_multicast_loop (
  * NB: Only affects multicast hops, unicast hop-limit is not changed.
  *
  * If no error occurs, pgm_sockaddr_multicast_hops returns zero.  Otherwise, a
- * value of PGM_SOCKET_ERROR is returned, and a specific error code can be
+ * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_sock_errno().
  */
 
 int
 pgm_sockaddr_multicast_hops (
-	const int		s,
+	const SOCKET		s,
 	const sa_family_t	sa_family,
 	const unsigned		hops
 	)
 {
-	int retval = PGM_SOCKET_ERROR;
+	int retval = SOCKET_ERROR;
 
 	switch (sa_family) {
 	case AF_INET: {
@@ -1018,7 +1018,7 @@ pgm_sockaddr_multicast_hops (
 
 void
 pgm_sockaddr_nonblocking (
-	const int	s,
+	const SOCKET	s,
 	const bool	v
 	)
 {

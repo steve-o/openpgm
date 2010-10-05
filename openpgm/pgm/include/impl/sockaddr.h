@@ -30,6 +30,7 @@
 #	include <sys/socket.h>
 #endif
 #include <pgm/types.h>
+#include <impl/wsastrerror.h>
 
 PGM_BEGIN_DECLS
 
@@ -45,9 +46,11 @@ PGM_BEGIN_DECLS
 #endif
 
 #ifndef _WIN32
-#	define PGM_INVALID_SOCKET		-1
-#	define PGM_SOCKET_ERROR			-1
-#	define pgm_closesocket			close
+#	define SOCKET				int
+#	define INVALID_SOCKET			(int)-1
+#	define SOCKET_ERROR			(int)-1
+#	define closesocket			close
+#	define ioctlsocket			ioctl
 #	define pgm_sock_errno()			(errno)
 #	define pgm_error_from_sock_errno	pgm_error_from_errno
 
@@ -58,10 +61,15 @@ pgm_sock_strerror_s (char *buffer, size_t size, int errnum)
 	return pgm_strerror_s (buffer, size, errnum);
 }
 
+static inline
+char*
+pgm_gai_strerror_s (char* buffer, size_t size, int errnum)
+{
+	pgm_strncpy_s (buffer, size, gai_strerror (errnum), _TRUNCATE);
+	return buffer;
+}
+
 #else
-#	define PGM_INVALID_SOCKET		(int)INVALID_SOCKET
-#	define PGM_SOCKET_ERROR			(int)SOCKET_ERROR
-#	define pgm_closesocket			closesocket
 #	define pgm_sock_errno()			WSAGetLastError()
 #	define pgm_error_from_sock_errno	pgm_error_from_wsa_errno
 
@@ -73,10 +81,18 @@ pgm_sock_strerror_s (char *buffer, size_t size, int errnum)
 	return buffer;
 }
 
+static inline
+char*
+pgm_gai_strerror_s (char* buffer, size_t size, int errnum)
+{
+/* Windows maps EAI error codes onto WSA error codes */
+	return pgm_sock_strerror_s (buffer, size, errnum);
+}
+
 #endif
 
 PGM_GNUC_INTERNAL sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);
-PGM_GNUC_INTERNAL uint16_t pgm_sockaddr_port (const struct sockaddr* sa);
+PGM_GNUC_INTERNAL in_port_t pgm_sockaddr_port (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL socklen_t pgm_sockaddr_len (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL socklen_t pgm_sockaddr_storage_len (const struct sockaddr_storage* ss);
 PGM_GNUC_INTERNAL uint32_t pgm_sockaddr_scope_id (const struct sockaddr* sa);
@@ -85,16 +101,16 @@ PGM_GNUC_INTERNAL int pgm_sockaddr_pton (const char*restrict src, struct sockadd
 PGM_GNUC_INTERNAL int pgm_sockaddr_is_addr_multicast (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL int pgm_sockaddr_is_addr_unspecified (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL int pgm_sockaddr_cmp (const struct sockaddr*restrict sa1, const struct sockaddr*restrict sa2);
-PGM_GNUC_INTERNAL int pgm_sockaddr_hdrincl (const int s, const sa_family_t sa_family, const bool v);
-PGM_GNUC_INTERNAL int pgm_sockaddr_pktinfo (const int s, const sa_family_t sa_family, const bool v);
-PGM_GNUC_INTERNAL int pgm_sockaddr_router_alert (const int s, const sa_family_t sa_family, const bool v);
-PGM_GNUC_INTERNAL int pgm_sockaddr_tos (const int s, const sa_family_t sa_family, const int tos);
-PGM_GNUC_INTERNAL int pgm_sockaddr_join_group (const int s, const sa_family_t sa_family, const struct group_req* gr);
-PGM_GNUC_INTERNAL int pgm_sockaddr_leave_group (const int s, const sa_family_t sa_family, const struct group_req* gr);
-PGM_GNUC_INTERNAL int pgm_sockaddr_block_source (const int s, const sa_family_t sa_family, const struct group_source_req* gsr);
-PGM_GNUC_INTERNAL int pgm_sockaddr_unblock_source (const int s, const sa_family_t sa_family, const struct group_source_req* gsr);
-PGM_GNUC_INTERNAL int pgm_sockaddr_join_source_group (const int s, const sa_family_t sa_family, const struct group_source_req* gsr);
-PGM_GNUC_INTERNAL int pgm_sockaddr_leave_source_group (const int s, const sa_family_t sa_family, const struct group_source_req* gsr);
+PGM_GNUC_INTERNAL int pgm_sockaddr_hdrincl (const SOCKET s, const sa_family_t sa_family, const bool v);
+PGM_GNUC_INTERNAL int pgm_sockaddr_pktinfo (const SOCKET s, const sa_family_t sa_family, const bool v);
+PGM_GNUC_INTERNAL int pgm_sockaddr_router_alert (const SOCKET s, const sa_family_t sa_family, const bool v);
+PGM_GNUC_INTERNAL int pgm_sockaddr_tos (const SOCKET s, const sa_family_t sa_family, const int tos);
+PGM_GNUC_INTERNAL int pgm_sockaddr_join_group (const SOCKET s, const sa_family_t sa_family, const struct group_req* gr);
+PGM_GNUC_INTERNAL int pgm_sockaddr_leave_group (const SOCKET s, const sa_family_t sa_family, const struct group_req* gr);
+PGM_GNUC_INTERNAL int pgm_sockaddr_block_source (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
+PGM_GNUC_INTERNAL int pgm_sockaddr_unblock_source (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
+PGM_GNUC_INTERNAL int pgm_sockaddr_join_source_group (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
+PGM_GNUC_INTERNAL int pgm_sockaddr_leave_source_group (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
 #if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
 #	ifndef GROUP_FILTER_SIZE
 #		define GROUP_FILTER_SIZE(numsrc) (sizeof (struct group_filter)		\
@@ -102,12 +118,12 @@ PGM_GNUC_INTERNAL int pgm_sockaddr_leave_source_group (const int s, const sa_fam
 						 + ((numsrc)				\
 						    * sizeof (struct sockaddr_storage)))
 #	endif
-PGM_GNUC_INTERNAL int pgm_sockaddr_msfilter (const int s, const sa_family_t sa_family, const struct group_filter* gf_list);
+PGM_GNUC_INTERNAL int pgm_sockaddr_msfilter (const SOCKET s, const sa_family_t sa_family, const struct group_filter* gf_list);
 #endif
-PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_if (int s, const struct sockaddr* address, unsigned ifindex);
-PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_loop (const int s, const sa_family_t sa_family, const bool v);
-PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_hops (const int s, const sa_family_t sa_family, const unsigned hops);
-PGM_GNUC_INTERNAL void pgm_sockaddr_nonblocking (const int s, const bool v);
+PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_if (SOCKET s, const struct sockaddr* address, unsigned ifindex);
+PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_loop (const SOCKET s, const sa_family_t sa_family, const bool v);
+PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_hops (const SOCKET s, const sa_family_t sa_family, const unsigned hops);
+PGM_GNUC_INTERNAL void pgm_sockaddr_nonblocking (const SOCKET s, const bool v);
 
 PGM_GNUC_INTERNAL const char* pgm_inet_ntop (int af, const void*restrict src, char*restrict dst, socklen_t size);
 PGM_GNUC_INTERNAL int pgm_inet_pton (int af, const char*restrict src, void*restrict dst);

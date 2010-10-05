@@ -158,10 +158,12 @@ _pgm_getadaptersaddresses_nametoindex (
 	ULONG ifIndex;
 	DWORD dwSize = DEFAULT_BUFFER_SIZE, dwRet;
 	IP_ADAPTER_ADDRESSES *pAdapterAddresses = NULL, *adapter;
+	char szAdapterName[IF_NAMESIZE];
 
-/* first see if GetAdapterIndex is working
+/* first see if GetAdapterIndex is working,
  */
-	dwRet = GetAdapterIndex ((const LPWSTR)ifname, &ifIndex);
+	pgm_strncpy_s (szAdapterName, sizeof (szAdapterName), ifname, _TRUNCATE);
+	dwRet = GetAdapterIndex ((LPWSTR)szAdapterName, &ifIndex);
 	if (NO_ERROR == dwRet)
 		return ifIndex;
 
@@ -208,7 +210,7 @@ _pgm_getadaptersaddresses_nametoindex (
 		adapter;
 		adapter = adapter->Next)
 	{
-		if (0 == strcmp (ifname, adapter->AdapterName)) {
+		if (0 == strcmp (szAdapterName, adapter->AdapterName)) {
 			ifIndex = AF_INET6 == iffamily ? adapter->Ipv6IfIndex : adapter->IfIndex;
 			_pgm_heap_free (pAdapterAddresses);
 			return ifIndex;

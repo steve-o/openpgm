@@ -123,7 +123,7 @@ pgm_notify_init (
 	SOCKET listener;
 	int sockerr;
 	int addrlen = sizeof (addr);
-	const unsigned long one = 1;
+	unsigned long one = 1;
 
 	pgm_assert (NULL != notify);
 	notify->s[0] = notify->s[1] = INVALID_SOCKET;
@@ -159,9 +159,7 @@ pgm_notify_init (
 	pgm_assert (notify->s[0] != INVALID_SOCKET);
 
 // Set read-end to non-blocking mode
-#pragma warning( disable : 4090 )
 	sockerr = ioctlsocket (notify->s[0], FIONBIO, &one);
-#pragma warning( default : 4090 )
 	pgm_assert (sockerr != SOCKET_ERROR);
 
 // We don't need the listening socket anymore. Close it.

@@ -39,9 +39,9 @@ struct pgm_sock_t {
 	int				socket_type;
 	int				protocol;
 	pgm_tsi_t           		tsi;
-	uint16_t			dport;
-	uint16_t			udp_encap_ucast_port;
-	uint16_t			udp_encap_mcast_port;
+	in_port_t			dport;
+	in_port_t			udp_encap_ucast_port;
+	in_port_t			udp_encap_mcast_port;
 	uint32_t			rand_node_id;			/* node identifier */
 
 	pgm_rwlock_t			lock;				/* running / destroyed */
@@ -65,11 +65,11 @@ struct pgm_sock_t {
 
 	struct group_source_req		send_gsr;			/* multicast */
 	struct sockaddr_storage		send_addr;			/* unicast nla */
-	int				send_sock;
-	int				send_with_router_alert_sock;
+	SOCKET				send_sock;
+	SOCKET				send_with_router_alert_sock;
 	struct group_source_req 	recv_gsr[IP_MAX_MEMBERSHIPS];	/* sa_family = 0 terminated */
 	unsigned			recv_gsr_len;
-	int				recv_sock;
+	SOCKET				recv_sock;
 
 	size_t				max_apdu;
 	uint16_t			max_tpdu;

@@ -119,7 +119,7 @@ pgm_init (
 		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
 		DWORD cbBytesReturned;
 		const SOCKET sock = socket (AF_INET, SOCK_DGRAM, 0);
-		if (SOCKET_ERROR == sock) {
+		if (INVALID_SOCKET == sock) {
 			WSACleanup();
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_ENGINE,
@@ -204,11 +204,7 @@ pgm_init (
 	char* env;
 	size_t envlen;
 
-#	ifndef _WIN32
-	const int err = pgm_dupenv_s (&env, &envlen, "PGM_LOSS_RATE");
-#	else
 	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_LOSS_RATE");
-#	endif
 	if (0 == err && envlen > 0) {
 		const int loss_rate = atoi (env);
 		if (loss_rate > 0 && loss_rate <= 100) {

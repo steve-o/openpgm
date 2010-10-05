@@ -121,11 +121,7 @@ pgm_mem_init (void)
 	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, 1) > 0)
 		return;
 
-#ifndef _WIN32
-	const int err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
-#else
 	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
-#endif
 	if (0 == err && envlen > 0) {
 		flags = pgm_parse_debug_string (env, keys, PGM_N_ELEMENTS (keys));
 		free (env);

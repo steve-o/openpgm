@@ -74,7 +74,7 @@
 
 struct http_connection_t {
 	pgm_list_t	link_;
-	int		sock;
+	SOCKET		sock;
 	enum {
 		HTTP_STATE_READ,
 		HTTP_STATE_WRITE,
@@ -99,16 +99,15 @@ static char		http_address[INET6_ADDRSTRLEN];
 static char		http_username[LOGIN_NAME_MAX + 1];
 static int		http_pid;
 
+static SOCKET			http_sock = INVALID_SOCKET;
 #ifndef _WIN32
-static int			http_sock = -1;
 static pthread_t		http_thread;
 static void*			http_routine (void*);
 #else
-static int			http_sock = INVALID_SOCKET;
 static HANDLE			http_thread;
 static unsigned __stdcall	http_routine (void*);
 #endif
-static int			http_max_sock = -1;
+static SOCKET			http_max_sock = INVALID_SOCKET;
 static fd_set			http_readfds, http_writefds, http_exceptfds;
 static pgm_list_t*		http_socks = NULL;
 static pgm_notify_t		http_notify = PGM_NOTIFY_INIT;
@@ -145,7 +144,7 @@ static struct {
 static
 int
 http_sock_rcvtimeo (
-	int			sock,
+	SOCKET			sock,
 	int			seconds
 	)
 {
@@ -163,7 +162,7 @@ http_sock_rcvtimeo (
 static
 int
 http_sock_sndtimeo (
-	int			sock,
+	SOCKET			sock,
 	int			seconds
 	)
 {
@@ -180,7 +179,7 @@ http_sock_sndtimeo (
 
 bool
 pgm_http_init (
-	uint16_t		http_port,
+	in_port_t		http_port,
 	pgm_error_t**		error
 	)
 {
@@ -191,13 +190,13 @@ pgm_http_init (
 
 /* resolve and store relatively constant runtime information */
 	if (0 != gethostname (http_hostname, sizeof(http_hostname))) {
-		const int save_errno = errno;
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (save_errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Resolving hostname: %s"),
-			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 	struct addrinfo hints = {
@@ -208,11 +207,12 @@ pgm_http_init (
 	}, *res = NULL;
 	e = getaddrinfo (http_hostname, NULL, &hints, &res);
 	if (0 != e) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_eai_errno (e, errno),
 			     _("Resolving hostname address: %s"),
-			     gai_strerror (e));
+			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), e));
 		goto err_cleanup;
 	}
 	e = getnameinfo (res->ai_addr, res->ai_addrlen,
@@ -220,11 +220,12 @@ pgm_http_init (
 			 NULL, 0,
 			 NI_NUMERICHOST);
 	if (0 != e) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_eai_errno (e, errno),
 			     _("Resolving numeric hostname: %s"),
-			     gai_strerror (e));
+			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), e));
 		goto err_cleanup;
 	}
 	freeaddrinfo (res);
@@ -249,7 +250,7 @@ pgm_http_init (
 			     PGM_ERROR_DOMAIN_HTTP,
 			     pgm_error_from_win_errno (save_errno),
 			     _("Retrieving user name: %s"),
-			     pgm_win_strerror (winstr, sizeof(winstr), save_errno));
+			     pgm_win_strerror (winstr, sizeof (winstr), save_errno));
 		goto err_cleanup;
 	}
 	WideCharToMultiByte (CP_UTF8, 0, wusername, nSize + 1, http_username, sizeof(http_username), NULL, NULL);
@@ -257,60 +258,36 @@ pgm_http_init (
 	http_pid = getpid();
 
 /* create HTTP listen socket */
-	if ((http_sock = socket (AF_INET,  SOCK_STREAM, 0)) < 0) {
-#ifndef _WIN32
+	if (INVALID_SOCKET == (http_sock = socket (AF_INET,  SOCK_STREAM, 0))) {
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Creating HTTP socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_wsa_errno (save_errno),
-				_("Creating HTTP socket: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 	const int v = 1;
 	if (0 != setsockopt (http_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) {
-#ifndef _WIN32
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Enabling reuse of socket local address: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_wsa_errno (save_errno),
-				_("Enabling reuse of socket local address: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 	if (0 != http_sock_rcvtimeo (http_sock, HTTP_TIMEOUT) ||
 	    0 != http_sock_sndtimeo (http_sock, HTTP_TIMEOUT)) {
-#ifndef _WIN32
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Setting socket timeout: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_HTTP,
-				pgm_error_from_wsa_errno (save_errno),
-				_("Setting socket timeout: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 	struct sockaddr_in http_addr;
@@ -319,43 +296,26 @@ pgm_http_init (
 	http_addr.sin_addr.s_addr = INADDR_ANY;
 	http_addr.sin_port = htons (http_port);
 	if (0 != bind (http_sock, (struct sockaddr*)&http_addr, sizeof(http_addr))) {
+		const int save_errno = pgm_sock_errno();
+		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&http_addr, addr, sizeof(addr));
-#ifndef _WIN32
-		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Binding HTTP socket to address %s: %s"),
 			     addr,
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-			    PGM_ERROR_DOMAIN_HTTP,
-			    pgm_error_from_wsa_errno (save_errno),
-			    _("Binding HTTP socket to address %s: %s"),
-			    addr,
-			    pgm_wsastrerror (save_errno));
-#endif
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
-	if (listen (http_sock, HTTP_BACKLOG) < 0) {
-#ifndef _WIN32
+	if (0 != listen (http_sock, HTTP_BACKLOG)) {
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Listening to HTTP socket: %s"),
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_set_error (error,
-			    PGM_ERROR_DOMAIN_HTTP,
-			    pgm_error_from_wsa_errno (save_errno),
-			     _("Listening to HTTP socket: %s"),
-			    pgm_wsastrerror (save_errno));
-#endif
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 
@@ -364,12 +324,13 @@ pgm_http_init (
 
 /* create notification channel */
 	if (0 != pgm_notify_init (&http_notify)) {
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Creating HTTP notification channel: %s"),
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 
@@ -377,18 +338,19 @@ pgm_http_init (
 #ifndef _WIN32
 	const int status = pthread_create (&http_thread, NULL, &http_routine, NULL);
 	if (0 != status) {
+		const int save_errno = errno;
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_errno (save_errno),
 			     _("Creating HTTP thread: %s"),
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
 #else
 	http_thread = (HANDLE)_beginthreadex (NULL, 0, &http_routine, NULL, 0, NULL);
-	const int save_errno = errno;
 	if (0 == http_thread) {
+		const int save_errno = errno;
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
@@ -404,17 +366,10 @@ pgm_http_init (
 	return TRUE;
 
 err_cleanup:
-#ifndef _WIN32
-	if (-1 != http_sock) {
-		close (http_sock);
-		http_sock = -1;
-	}
-#else
 	if (INVALID_SOCKET != http_sock) {
 		closesocket (http_sock);
 		http_sock = INVALID_SOCKET;
 	}
-#endif /* _WIN32 */
 	if (pgm_notify_is_valid (&http_notify)) {
 		pgm_notify_destroy (&http_notify);
 	}
@@ -439,17 +394,10 @@ pgm_http_shutdown (void)
 #else
 	CloseHandle (http_thread);
 #endif
-#ifndef _WIN32
-	if (-1 != http_sock) {
-		close (http_sock);
-		http_sock = -1;
-	}
-#else
 	if (INVALID_SOCKET != http_sock) {
 		closesocket (http_sock);
 		http_sock = INVALID_SOCKET;
 	}
-#endif /* _WIN32 */
 	pgm_notify_destroy (&http_notify);
 	return TRUE;
 }
@@ -460,32 +408,27 @@ pgm_http_shutdown (void)
 static
 void
 http_accept (
-	int		listen_sock
+	SOCKET		listen_sock
 	)
 {
 /* new connection */
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
-	int new_sock = accept (listen_sock, (struct sockaddr*)&addr, &addrlen);
-	if (-1 == new_sock) {
-		if (EAGAIN == errno)
-			return;
-#ifndef _WIN32
+	SOCKET new_sock = accept (listen_sock, (struct sockaddr*)&addr, &addrlen);
+	if (INVALID_SOCKET == new_sock) {
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
+		if (EAGAIN == save_errno)
+			return;
 		pgm_warn (_("HTTP accept: %s"),
-			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-		const int save_errno = WSAGetLastError();
-		pgm_warn (_("HTTP accept: %s"),
-			pgm_wsastrerror (save_errno));
-#endif
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		return;
 	}
 
 #ifndef _WIN32
 /* out of bounds file descriptor for select() */
 	if (new_sock >= FD_SETSIZE) {
-		close (new_sock);
+		closesocket (new_sock);
 		pgm_warn (_("Rejected new HTTP client socket due to out of bounds file descriptor."));
 		return;
 	}
@@ -509,19 +452,12 @@ http_close (
 	struct http_connection_t*	connection
 	)
 {
-#ifndef _WIN32
-	if (0 != close (connection->sock)) {
+	if (SOCKET_ERROR == closesocket (connection->sock)) {
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_warn (_("Close HTTP client socket: %s"),
-			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 	}
-#else
-	if (0 != closesocket (connection->sock)) {
-		const int save_errno = WSAGetLastError();
-		pgm_warn (_("Close HTTP client socket: %s"),
-			pgm_wsastrerror (save_errno));
-	}
-#endif
 	switch (connection->state) {
 	case HTTP_STATE_READ:
 	case HTTP_STATE_FINWAIT:
@@ -541,7 +477,7 @@ http_close (
 /* find new highest fd */
 	if (connection->sock == http_max_sock)
 	{
-		http_max_sock = -1;
+		http_max_sock = INVALID_SOCKET;
 		for (pgm_list_t* list = http_socks; list; list = list->next)
 		{
 			struct http_connection_t* c = (void*)list;
@@ -570,17 +506,12 @@ http_read (
 		}
 		const ssize_t bytes_read = recv (connection->sock, &connection->buf[ connection->bufoff ], connection->buflen - connection->bufoff, 0);
 		if (bytes_read < 0) {
-			if (EINTR == errno || EAGAIN == errno)
-				return;
-#ifndef _WIN32
+			const int save_errno = pgm_sock_errno();
 			char errbuf[1024];
+			if (EINTR == save_errno || EAGAIN == save_errno)
+				return;
 			pgm_warn (_("HTTP client read: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-			const int save_errno = WSAGetLastError();
-			pgm_warn (_("HTTP client read: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			http_close (connection);
 			return;
 		}
@@ -640,17 +571,12 @@ http_write (
 	do {
 		const ssize_t bytes_written = send (connection->sock, &connection->buf[ connection->bufoff ], connection->buflen - connection->bufoff, 0);
 		if (bytes_written < 0) {
-			if (EINTR == errno || EAGAIN == errno)
-				return;
-#ifndef _WIN32
+			const int save_errno = pgm_sock_errno();
 			char errbuf[1024];
+			if (EINTR == save_errno || EAGAIN == save_errno)
+				return;
 			pgm_warn (_("HTTP client write: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-#else
-			const int save_errno = WSAGetLastError();
-			pgm_warn (_("HTTP client write: %s"),
-				pgm_wsastrerror (save_errno));
-#endif
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			http_close (connection);
 			return;
 		}
@@ -677,9 +603,12 @@ http_finwait (
 	)
 {
 	char buf[1024];
-	const ssize_t bytes_read = read (connection->sock, buf, sizeof(buf));
-	if (bytes_read < 0 && (EINTR == errno || EAGAIN == errno))
-		return;
+	const ssize_t bytes_read = recv (connection->sock, buf, sizeof(buf), 0);
+	if (bytes_read < 0) {
+		const int save_errno = pgm_sock_errno();
+		if (EINTR == save_errno || EAGAIN == save_errno)
+			return;
+	}
 	http_close (connection);
 }
 
@@ -735,7 +664,7 @@ http_set_static_response (
 #ifndef _MSC_VER
 				     "Content-Length: %zd\r\n"
 #else
-				     "Content-Length: %d\r\n"
+				     "Content-Length: %ld\r\n"
 #endif
 				     "Content-Type: %s\r\n"
 				     "Connection: close\r\n"
@@ -746,7 +675,7 @@ http_set_static_response (
 #ifndef _MSC_VER
 			   content_length,
 #else
-			   (int)content_length,
+			   (long)content_length,
 #endif
 			   connection->content_type
 			);
@@ -771,7 +700,7 @@ http_set_response (
 #ifndef _MSC_VER
 				     "Content-Length: %zd\r\n"
 #else
-				     "Content-Length: %d\r\n"
+				     "Content-Length: %ld\r\n"
 #endif
 				     "Content-Type: %s\r\n"
 				     "Connection: close\r\n"
@@ -782,7 +711,7 @@ http_set_response (
 #ifndef _MSC_VER
 			   content_length,
 #else
-			   (int)content_length,
+			   (long)content_length,
 #endif
 			   connection->content_type
 			);
@@ -808,8 +737,8 @@ http_routine (
 	PGM_GNUC_UNUSED	void*	arg
 	)
 {
-	const int notify_fd = pgm_notify_get_fd (&http_notify);
-	const int max_fd = MAX( notify_fd, http_sock );
+	const SOCKET notify_fd = pgm_notify_get_fd (&http_notify);
+	const SOCKET max_fd = MAX( notify_fd, http_sock );
 
 	FD_ZERO( &http_readfds );
 	FD_ZERO( &http_writefds );
@@ -819,12 +748,12 @@ http_routine (
 
 	for (;;)
 	{
-		int fds = MAX( http_max_sock, max_fd ) + 1;
+		SOCKET fds = MAX( http_max_sock, max_fd ) + 1;
 		fd_set readfds = http_readfds, writefds = http_writefds, exceptfds = http_exceptfds;
 
 		fds = select (fds, &readfds, &writefds, &exceptfds, NULL);
 /* signal interrupt */
-		if (PGM_UNLIKELY(fds < 0 && EINTR == errno))
+		if (PGM_UNLIKELY(SOCKET_ERROR == fds && EINTR == pgm_sock_errno()))
 			continue;
 /* terminate */
 		if (PGM_UNLIKELY(FD_ISSET( notify_fd, &readfds )))
@@ -1026,7 +955,7 @@ interfaces_callback (
 	}
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-		int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
+		unsigned i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
 		char rname[IF_NAMESIZE * 2 + 3];
 		char b[IF_NAMESIZE * 2 + 3];
 
@@ -1108,11 +1037,11 @@ transports_callback (
 				     NI_NUMERICHOST);
 			char gsi[ PGM_GSISTRLEN ];
 			pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
-			const uint16_t sport = ntohs (sock->tsi.sport);
-			const uint16_t dport = ntohs (sock->dport);
+			const in_port_t sport = ntohs (sock->tsi.sport);
+			const in_port_t dport = ntohs (sock->dport);
 			pgm_string_append_printf (response,	"<tr>"
 									"<td>%s</td>"
-									"<td>%i</td>"
+									"<td>%u</td>"
 									"<td><a href=\"/%s.%u\">%s</a></td>"
 									"<td><a href=\"/%s.%u\">%u</a></td>"
 								"</tr>",
@@ -1171,7 +1100,7 @@ default_callback (
 	tsi.sport = htons (tsi.sport);
 	if (count == 7)
 	{
-		int retval = http_tsi_response (connection, &tsi);
+		const int retval = http_tsi_response (connection, &tsi);
 		if (!retval) return;
 	}
 
@@ -1207,7 +1136,7 @@ http_tsi_response (
 		pgm_rwlock_reader_lock (&list_sock->peers_lock);
 		pgm_peer_t* receiver = pgm_hashtable_lookup (list_sock->peers_hashtable, tsi);
 		if (receiver) {
-			int retval = http_receiver_response (connection, receiver);
+			const int retval = http_receiver_response (connection, receiver);
 			pgm_rwlock_reader_unlock (&list_sock->peers_lock);
 			pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 			return retval;
@@ -1243,8 +1172,8 @@ http_tsi_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const uint16_t dport = ntohs (sock->dport);
-	const uint16_t sport = ntohs (sock->tsi.sport);
+	const in_port_t dport = ntohs (sock->dport);
+	const in_port_t sport = ntohs (sock->tsi.sport);
 
 	const pgm_time_t ihb_min = sock->spm_heartbeat_len ? sock->spm_heartbeat_interval[ 1 ] : 0;
 	const pgm_time_t ihb_max = sock->spm_heartbeat_len ? sock->spm_heartbeat_interval[ sock->spm_heartbeat_len - 1 ] : 0;
@@ -1258,7 +1187,7 @@ http_tsi_response (
 	pgm_string_t* response = http_create_response (title, HTTP_TAB_TRANSPORTS);
 	pgm_string_append_printf (response,	"<div class=\"heading\">"
 							"<strong>Transport: </strong>"
-							"%s.%hu"
+							"%s.%u"
 						"</div>",
 				  gsi, sport);
 
@@ -1562,8 +1491,8 @@ http_receiver_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const uint16_t sport = ntohs (peer->tsi.sport);
-	const uint16_t dport = ntohs (peer->sock->dport);	/* by definition must be the same */
+	const in_port_t sport = ntohs (peer->tsi.sport);
+	const in_port_t dport = ntohs (peer->sock->dport);	/* by definition must be the same */
 	const pgm_rxw_t* window = peer->window;
 	const uint32_t outstanding_naks = window->nak_backoff_queue.length +
 					  window->wait_ncf_queue.length +

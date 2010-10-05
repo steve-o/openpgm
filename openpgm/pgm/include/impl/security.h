@@ -37,13 +37,11 @@ PGM_BEGIN_DECLS
 
 #ifdef CONFIG_HAVE_FTIME
 static inline
-#	ifndef _WIN32
-int
-#	else
 errno_t
-#	endif
-#	ifndef _MSC_VER
+#	ifndef _WIN32
 pgm_ftime_s (struct timeb *timeptr)
+#	elif !defined( _MSC_VER )
+pgm_ftime_s (struct _timeb *timeptr)
 #	else
 pgm_ftime_s (struct __timeb64 *timeptr)
 #	endif
@@ -51,11 +49,13 @@ pgm_ftime_s (struct __timeb64 *timeptr)
 #	ifndef _WIN32
 	return ftime (timeptr);
 #	elif !defined( _MSC_VER )
-	return _ftime (timeptr);
+	_ftime (timeptr);
+	return 0;
 #	elif  defined( CONFIG_HAVE_SECURITY_ENHANCED_CRT )
 	return _ftime64_s (timeptr);
 #	else
-	return _ftime64 (timeptr);
+	_ftime64 (timeptr);
+	return 0;
 #	endif
 }
 #endif /* CONFIG_HAVE_FTIME */
@@ -65,11 +65,7 @@ pgm_ftime_s (struct __timeb64 *timeptr)
 #endif
 
 static inline
-#ifndef _WIN32
-int
-#else
 errno_t
-#endif
 pgm_strncpy_s (char *dest, size_t size, const char *src, size_t count)
 {
 #ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
@@ -110,7 +106,7 @@ pgm_vsnprintf_s (char *str, size_t size, size_t count, const char *format, va_li
 			str[size - 1] = 0;
 		return retval;
 	}
-	const int reval = _vsnprintf (str, count + 1, format, ap);
+	const int retval = _vsnprintf (str, count + 1, format, ap);
 	str[count] = 0;
 	return retval;
 #else
@@ -141,6 +137,9 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 	if (0 != strerror_s (buffer, size, errnum))
 		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error %d"), errnum);
 	return buffer;
+#elif defined( _WIN32 )
+	pgm_strncpy_s (buffer, size, strerror (errnum), _TRUNCATE);
+	return buffer;
 #elif (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && !defined( _GNU_SOURCE )
 /* XSI-compliant */
 	if (0 != strerror_r (errnum, buffer, size))
@@ -155,11 +154,7 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 /* Security-only APIs */
 
 static inline
-#ifndef _WIN32
-int
-#else
 errno_t
-#endif
 pgm_dupenv_s (char **buffer, size_t *size, const char* name)
 {
 #ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
@@ -191,7 +186,7 @@ static inline
 errno_t
 pgm_wcstombs_s (size_t *retval, char *dest, size_t size, const wchar_t *src, size_t count)
 {
-#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
+#	ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	size_t characters;
 	if (_TRUNCATE == count) {
 		characters = wcstombs (dest, src, size);
@@ -208,9 +203,9 @@ pgm_wcstombs_s (size_t *retval, char *dest, size_t size, const wchar_t *src, siz
 	}
 	*retval = characters;
 	return 0;
-#else
+#	else
 	return wcstombs_s (retval, dest, size, src, count);
-#endif
+#	endif
 }
 
 #endif /* _WIN32 */

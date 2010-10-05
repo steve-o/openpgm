@@ -302,6 +302,7 @@ async_create (
 	new_async->win32_mutex = CreateMutex (NULL, FALSE, NULL);
 	new_async->notify_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncNotify"));
 	new_async->destroy_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncDestroy"));
+/* expect warning on MinGW due to lack of native uintptr_t */
 	new_async->thread = (HANDLE)_beginthreadex (NULL, 0, &receiver_routine, new_async, 0, NULL);
 	if (0 == new_async->thread) goto err_destroy;
 #endif /* _WIN32 */
