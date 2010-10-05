@@ -31,19 +31,25 @@
 #endif
 
 #include <errno.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <net/if.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-
+#ifndef _WIN32
+#	include <netdb.h>
+#	include <net/if.h>
+#	include <sys/socket.h>
+#	include <sys/types.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
+#include <pgm/types.h>
+#include <pgm/macros.h>
 
 
 /* mock state */
@@ -79,7 +85,7 @@ static GList *mock_hosts = NULL, *mock_networks = NULL, *mock_interfaces = NULL;
 #define MOCK_INTERFACE		"eth0"
 #define MOCK_INTERFACE_INDEX	2
 #define MOCK_ADDRESS		"10.6.28.33"
-#define MOCK_GROUP		((in_addr_t) 0xefc00001) /* 239.192.0.1 */
+#define MOCK_GROUP		((long) 0xefc00001) /* 239.192.0.1 */
 #define MOCK_GROUP6_INIT	{ { { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }	/* ff08::1 */
 static const struct in6_addr mock_group6_addr = MOCK_GROUP6_INIT;
 #define MOCK_ADDRESS6		"2002:dce8:d28e::33"
@@ -105,7 +111,8 @@ int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct a
 void mock_freeaddrinfo (struct addrinfo*);
 int mock_gethostname (char*, size_t);
 struct netent* mock_getnetbyname (const char*);
-bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*, const socklen_t, struct pgm_error_t**);
+PGM_GNUC_INTERNAL bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*restrict, const socklen_t, struct pgm_error_t**restrict);
+
 
 #define pgm_getifaddrs		mock_pgm_getifaddrs
 #define pgm_freeifaddrs		mock_pgm_freeifaddrs
@@ -301,9 +308,9 @@ mock_teardown_net (void)
 
 	list = mock_interfaces;
 	while (list) {
-		struct mock_interface_t* interface = list->data;
-		g_free (interface->name);
-		g_slice_free1 (sizeof(struct mock_interface_t), interface);
+		struct mock_interface_t* interface_ = list->data;
+		g_free (interface_->name);
+		g_slice_free1 (sizeof(struct mock_interface_t), interface_);
 		list = list->next;
 	}
 	g_list_free (mock_interfaces);
@@ -337,11 +344,11 @@ mock_pgm_getifaddrs (
 	struct pgm_ifaddrs_t* ifa = calloc (n, sizeof(struct pgm_ifaddrs_t));
 	struct pgm_ifaddrs_t* ift = ifa;
 	while (list) {
-		struct mock_interface_t* interface = list->data;
-		ift->ifa_addr = (gpointer)&interface->addr;
-		ift->ifa_name = interface->name;
-		ift->ifa_flags = interface->flags;
-		ift->ifa_netmask = (gpointer)&interface->netmask;
+		struct mock_interface_t* interface_ = list->data;
+		ift->ifa_addr = (gpointer)&interface_->addr;
+		ift->ifa_name = interface_->name;
+		ift->ifa_flags = interface_->flags;
+		ift->ifa_netmask = (gpointer)&interface_->netmask;
 		list = list->next;
 		if (list) {
 			ift->ifa_next = ift + 1;
@@ -369,9 +376,9 @@ mock_pgm_if_nametoindex (
 {
 	GList* list = mock_interfaces;
 	while (list) {
-		const struct mock_interface_t* interface = list->data;
-		if (0 == strcmp (ifname, interface->name))
-			return interface->index;
+		const struct mock_interface_t* interface_ = list->data;
+		if (0 == strcmp (ifname, interface_->name))
+			return interface_->index;
 		list = list->next;
 	}
 	return 0;
@@ -385,9 +392,9 @@ mock_if_indextoname (
 {
 	GList* list = mock_interfaces;
 	while (list) {
-		const struct mock_interface_t* interface = list->data;
-		if (interface->index == ifindex) {
-			strcpy (ifname, interface->name);
+		const struct mock_interface_t* interface_ = list->data;
+		if (interface_->index == ifindex) {
+			strcpy (ifname, interface_->name);
 			return ifname;
 		}
 		list = list->next;
@@ -442,7 +449,11 @@ mock_getnameinfo (
 			    0 == memcmp (sa, &_host->address, salen))
 			{
 				if (hostlen < (1 + strlen(_host->canonical_hostname)))
+#ifdef EAI_OVERFLOW
 					return EAI_OVERFLOW;
+#else
+					return EAI_MEMORY;
+#endif
 				strncpy (host, _host->canonical_hostname, hostlen);
 				return 0;
 			}
@@ -475,7 +486,11 @@ mock_getaddrinfo (
 	struct addrinfo**	res
 	)
 {
+#ifdef AI_V4MAPPED
 	const int ai_flags  = hints ? hints->ai_flags  : (AI_V4MAPPED | AI_ADDRCONFIG);
+#else
+	const int ai_flags  = hints ? hints->ai_flags  : (AI_ADDRCONFIG);
+#endif
 	const int ai_family = hints ? hints->ai_family : AF_UNSPEC;
 	GList* list;
 	struct sockaddr_storage addr;
@@ -487,8 +502,12 @@ mock_getaddrinfo (
 	g_assert (NULL != node);
 	g_assert (NULL == service);
 	g_assert (!(ai_flags & AI_CANONNAME));
+#ifdef AI_NUMERICSERV
 	g_assert (!(ai_flags & AI_NUMERICSERV));
+#endif
+#ifdef AI_V4MAPPED
 	g_assert (!(ai_flags & AI_V4MAPPED));
+#endif
 
 	g_message ("mock_getaddrinfo (node:%s%s%s service:%s%s%s hints:%p res:%p)",
 		node ? "\"" : "", node ? node : "(null)", node ? "\"" : "",
@@ -504,10 +523,10 @@ mock_getaddrinfo (
 		has_ip4_config = has_ip6_config = FALSE;
 		list = mock_interfaces;
 		while (list) {
-			const struct mock_interface_t* interface = list->data;
-			if (AF_INET == ((struct sockaddr*)&interface->addr)->sa_family)
+			const struct mock_interface_t* interface_ = list->data;
+			if (AF_INET == ((struct sockaddr*)&interface_->addr)->sa_family)
 				has_ip4_config = TRUE;
-			else if (AF_INET6 == ((struct sockaddr*)&interface->addr)->sa_family)
+			else if (AF_INET6 == ((struct sockaddr*)&interface_->addr)->sa_family)
 				has_ip6_config = TRUE;
 			if (has_ip4_config && has_ip6_config)
 				break;
@@ -672,12 +691,12 @@ match_default_group (
 	)
 {
 	const struct sockaddr_in sa_default = {
-		.sin_family = AF_INET,
+		.sin_family	 = AF_INET,
 		.sin_addr.s_addr = g_htonl (MOCK_GROUP)
 	};
 	const struct sockaddr_in6 sa6_default = {
-		.sin6_family = AF_INET6,
-		.sin6_addr = MOCK_GROUP6_INIT
+		.sin6_family	 = AF_INET6,
+		.sin6_addr	 = MOCK_GROUP6_INIT
 	};
 	gboolean is_match = FALSE;
 
@@ -1052,23 +1071,23 @@ START_TEST (test_parse_transport_pass_004)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	if (mock_family == AF_INET6)
 	{
-		inet_pton (AF_INET6, "ff08::1", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		pgm_inet_pton (AF_INET6, "ff08::1", &((struct sockaddr_in6*)&addr)->sin6_addr);
 		((struct sockaddr*)&addr)->sa_family = mock_family;
 		((struct sockaddr_in6*)&addr)->sin6_port = 0;
 		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
 		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_recv_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
-		inet_pton (AF_INET6, "ff08::2", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		pgm_inet_pton (AF_INET6, "ff08::2", &((struct sockaddr_in6*)&addr)->sin6_addr);
 		((struct sockaddr*)&addr)->sa_family = mock_family;
 		((struct sockaddr_in6*)&addr)->sin6_port = 0;
 		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
 		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
 	} else {
-		inet_pton (AF_INET, "239.192.56.1", &((struct sockaddr_in*)&addr)->sin_addr);
+		pgm_inet_pton (AF_INET, "239.192.56.1", &((struct sockaddr_in*)&addr)->sin_addr);
 		((struct sockaddr*)&addr)->sa_family = AF_INET;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_recv_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
-		inet_pton (AF_INET, "239.192.56.2", &((struct sockaddr_in*)&addr)->sin_addr);
+		pgm_inet_pton (AF_INET, "239.192.56.2", &((struct sockaddr_in*)&addr)->sin_addr);
 		((struct sockaddr*)&addr)->sa_family = AF_INET;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
 	}
@@ -1097,32 +1116,32 @@ START_TEST (test_parse_transport_pass_005)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	if (mock_family == AF_INET6)
 	{
-		inet_pton (AF_INET6, "ff08::1", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		pgm_inet_pton (AF_INET6, "ff08::1", &((struct sockaddr_in6*)&addr)->sin6_addr);
 		((struct sockaddr*)&addr)->sa_family = mock_family;
 		((struct sockaddr_in6*)&addr)->sin6_port = 0;
 		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
 		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_recv_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
-		inet_pton (AF_INET6, "ff08::2", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		pgm_inet_pton (AF_INET6, "ff08::2", &((struct sockaddr_in6*)&addr)->sin6_addr);
 		((struct sockaddr*)&addr)->sa_family = mock_family;
 		((struct sockaddr_in6*)&addr)->sin6_port = 0;
 		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
 		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_recv_addrs[1].gsr_group, (struct sockaddr*)&addr), "group not match");
-		inet_pton (AF_INET6, "ff08::3", &((struct sockaddr_in6*)&addr)->sin6_addr);
+		pgm_inet_pton (AF_INET6, "ff08::3", &((struct sockaddr_in6*)&addr)->sin6_addr);
 		((struct sockaddr*)&addr)->sa_family = mock_family;
 		((struct sockaddr_in6*)&addr)->sin6_port = 0;
 		((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
 		((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
 	} else {
-		inet_pton (AF_INET, "239.192.56.1", &((struct sockaddr_in*)&addr)->sin_addr);
+		pgm_inet_pton (AF_INET, "239.192.56.1", &((struct sockaddr_in*)&addr)->sin_addr);
 		((struct sockaddr*)&addr)->sa_family = AF_INET;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_recv_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
-		inet_pton (AF_INET, "239.192.56.2", &((struct sockaddr_in*)&addr)->sin_addr);
+		pgm_inet_pton (AF_INET, "239.192.56.2", &((struct sockaddr_in*)&addr)->sin_addr);
 		((struct sockaddr*)&addr)->sa_family = AF_INET;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_recv_addrs[1].gsr_group, (struct sockaddr*)&addr), "group not match");
-		inet_pton (AF_INET, "239.192.56.3", &((struct sockaddr_in*)&addr)->sin_addr);
+		pgm_inet_pton (AF_INET, "239.192.56.3", &((struct sockaddr_in*)&addr)->sin_addr);
 		((struct sockaddr*)&addr)->sa_family = AF_INET;
 		fail_unless (0 == pgm_sockaddr_cmp ((struct sockaddr*)&res->ai_send_addrs[0].gsr_group, (struct sockaddr*)&addr), "group not match");
 	}
