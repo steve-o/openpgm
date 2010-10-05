@@ -23,18 +23,25 @@
 #define _BSD_SOURCE	1
 
 #include <errno.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-
+#ifndef _WIN32
+#	include <netdb.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#	include <net/if.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
+#include <pgm/types.h>
+#include <pgm/macros.h>
 
 
 /* mock state */
@@ -149,9 +156,9 @@ mock_teardown_net (void)
 
 	list = mock_interfaces;
 	while (list) {
-		struct mock_interface_t* interface = list->data;
-		g_free (interface->name);
-		g_slice_free1 (sizeof(struct mock_interface_t), interface);
+		struct mock_interface_t* interface_ = list->data;
+		g_free (interface_->name);
+		g_slice_free1 (sizeof(struct mock_interface_t), interface_);
 		list = list->next;
 	}
 	g_list_free (mock_interfaces);
@@ -185,11 +192,11 @@ mock_pgm_getifaddrs (
 	struct pgm_ifaddrs_t* ifa = calloc (n, sizeof(struct pgm_ifaddrs_t));
 	struct pgm_ifaddrs_t* ift = ifa;
 	while (list) {
-		struct mock_interface_t* interface = list->data;
-		ift->ifa_addr = (gpointer)&interface->addr;
-		ift->ifa_name = interface->name;
-		ift->ifa_flags = interface->flags;
-		ift->ifa_netmask = (gpointer)&interface->netmask;
+		struct mock_interface_t* interface_ = list->data;
+		ift->ifa_addr = (gpointer)&interface_->addr;
+		ift->ifa_name = interface_->name;
+		ift->ifa_flags = interface_->flags;
+		ift->ifa_netmask = (gpointer)&interface_->netmask;
 		list = list->next;
 		if (list) {
 			ift->ifa_next = ift + 1;
@@ -219,9 +226,9 @@ mock_pgm_if_nametoindex (
 {
 	GList* list = mock_interfaces;
 	while (list) {
-		const struct mock_interface_t* interface = list->data;
-		if (0 == strcmp (ifname, interface->name))
-			return interface->index;
+		const struct mock_interface_t* interface_ = list->data;
+		if (0 == strcmp (ifname, interface_->name))
+			return interface_->index;
 		list = list->next;
 	}
 	return 0;
