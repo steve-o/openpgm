@@ -298,6 +298,7 @@ if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
 if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 	print 'Enabling Check unit tests.';
 	conf.env['CHECK'] = 'true';
+	env['CHECK_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs check');
 else:
 	print 'Disabling Check unit tests.';
 	conf.env['CHECK'] = 'false';

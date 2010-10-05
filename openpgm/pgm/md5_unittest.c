@@ -117,7 +117,7 @@ START_TEST (test_finish_ctx_pass_001)
 	pgm_md5_init_ctx (&ctx);
 	pgm_md5_process_bytes (&ctx, buffer, strlen(buffer)+1);
 	pgm_md5_finish_ctx (&ctx, resblock);
-	sprintf (md5, "%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx-%02.2hhx%02.2hhx",
+	sprintf (md5, "%2.2hhx%2.2hhx-%2.2hhx%2.2hhx-%2.2hhx%2.2hhx-%2.2hhx%2.2hhx-%2.2hhx%2.2hhx-%2.2hhx%2.2hhx-%2.2hhx%2.2hhx-%2.2hhx%2.2hhx",
 		   resblock[0], resblock[1],
 		   resblock[2], resblock[3],
 		   resblock[4], resblock[5],

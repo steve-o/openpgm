@@ -25,6 +25,10 @@
 #ifndef _BSD_SOURCE
 #	define _BSD_SOURCE	1
 #endif
+/* GNU gai_strerror_r */
+#ifndef _GNU_SOURCE
+#	define _GNU_SOURCE	1
+#endif
 
 #include <errno.h>
 #include <netdb.h>
