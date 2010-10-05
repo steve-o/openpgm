@@ -26,6 +26,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef _WIN32
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
 
@@ -79,9 +83,16 @@ pgm_transport_pkt_offset2 (
 }
 
 int
+#ifdef _WIN32
+PASCAL
+#endif
 mock_gethostname (
 	char*		name,
+#ifndef _WIN32
 	size_t		len
+#else
+	int		len
+#endif
 	)
 {
 	if (mock_hostname == mock_toolong) {

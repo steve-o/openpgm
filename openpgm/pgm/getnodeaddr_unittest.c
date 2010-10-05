@@ -27,8 +27,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <unistd.h>
 
 #include <glib.h>
@@ -238,9 +243,9 @@ mock_teardown_net (void)
 
 	list = mock_interfaces;
 	while (list) {
-		struct mock_interface_t* interface = list->data;
-		g_free (interface->name);
-		g_slice_free1 (sizeof(struct mock_interface_t), interface);
+		struct mock_interface_t* interface_ = list->data;
+		g_free (interface_->name);
+		g_slice_free1 (sizeof(struct mock_interface_t), interface_);
 		list = list->next;
 	}
 	g_list_free (mock_interfaces);
@@ -277,11 +282,11 @@ mock_pgm_getifaddrs (
 	memset (ifa, 0, n * sizeof(struct pgm_ifaddrs_t));
 	struct pgm_ifaddrs_t* ift = ifa;
 	while (list) {
-		struct mock_interface_t* interface = list->data;
-		ift->ifa_addr = (gpointer)&interface->addr;
-		ift->ifa_name = interface->name;
-		ift->ifa_flags = interface->flags;
-		ift->ifa_netmask = (gpointer)&interface->netmask;
+		struct mock_interface_t* interface_ = list->data;
+		ift->ifa_addr = (gpointer)&interface_->addr;
+		ift->ifa_name = interface_->name;
+		ift->ifa_flags = interface_->flags;
+		ift->ifa_netmask = (gpointer)&interface_->netmask;
 		list = list->next;
 		if (list) {
 			ift->ifa_next = ift + 1;
@@ -349,7 +354,11 @@ mock_gethostbyname (
 		}
 		list = list->next;
 	}
+#ifndef _WIN32
 	h_errno = HOST_NOT_FOUND;
+#else
+	WSASetLastError (WSAHOST_NOT_FOUND);
+#endif
 	return NULL;
 }
 
@@ -362,7 +371,11 @@ mock_getaddrinfo (
 	struct addrinfo**	res
 	)
 {
+#ifdef AI_V4MAPPED
 	const int ai_flags  = hints ? hints->ai_flags  : (AI_V4MAPPED | AI_ADDRCONFIG);
+#else
+	const int ai_flags  = hints ? hints->ai_flags  : (AI_ADDRCONFIG);
+#endif
 	const int ai_family = hints ? hints->ai_family : AF_UNSPEC;
 	GList* list;
 	struct sockaddr_storage addr;
@@ -374,8 +387,12 @@ mock_getaddrinfo (
 	g_assert (NULL != node);
 	g_assert (NULL == service);
 	g_assert (!(ai_flags & AI_CANONNAME));
+#ifdef AI_NUMERICSERV
 	g_assert (!(ai_flags & AI_NUMERICSERV));
+#endif
+#ifdef AI_V4MAPPED
 	g_assert (!(ai_flags & AI_V4MAPPED));
+#endif
 
 	g_debug ("mock_getaddrinfo (node:\"%s\" service:%s hints:%p res:%p)",
 		node ? node : "(null)",
@@ -391,10 +408,10 @@ mock_getaddrinfo (
 		has_ip4_config = has_ip6_config = FALSE;
 		list = mock_interfaces;
 		while (list) {
-			const struct mock_interface_t* interface = list->data;
-			if (AF_INET == ((struct sockaddr*)&interface->addr)->sa_family)
+			const struct mock_interface_t* interface_ = list->data;
+			if (AF_INET == ((struct sockaddr*)&interface_->addr)->sa_family)
 				has_ip4_config = TRUE;
-			else if (AF_INET6 == ((struct sockaddr*)&interface->addr)->sa_family)
+			else if (AF_INET6 == ((struct sockaddr*)&interface_->addr)->sa_family)
 				has_ip6_config = TRUE;
 			if (has_ip4_config && has_ip6_config)
 				break;
