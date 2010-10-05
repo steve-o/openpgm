@@ -1065,7 +1065,7 @@ pgm_type_string (
 
 const char*
 pgm_udpport_string (
-	uint16_t		port
+	in_port_t		port
 	)
 {
 	static pgm_hashtable_t *services = NULL;

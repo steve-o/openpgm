@@ -566,7 +566,7 @@ wait_for_event (
 	pgm_sock_t* const	sock
 	)
 {
-	int n_fds = 3;
+	SOCKET n_fds = 3;
 
 /* pre-conditions */
 	pgm_assert (NULL != sock);
@@ -609,8 +609,8 @@ wait_for_event (
 		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
 #else
 		struct timeval tv_timeout = {
-			.tv_sec		= timeout > 1000000L ? timeout / 1000000UL : 0,
-			.tv_usec	= timeout > 1000000L ? timeout % 1000000UL : timeout
+			.tv_sec		= timeout > 1000000L ? (timeout / 1000000L) : 0,
+			.tv_usec	= timeout > 1000000L ? (timeout % 1000000L) : timeout
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif

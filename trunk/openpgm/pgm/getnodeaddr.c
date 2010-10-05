@@ -51,9 +51,9 @@ pgm_if_getnodeaddr (
 	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
 	pgm_return_val_if_fail (NULL != addr, FALSE);
 	if (AF_INET == family || AF_UNSPEC == family)
-		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in), FALSE);
+		pgm_return_val_if_fail (cnt >= (socklen_t)sizeof(struct sockaddr_in), FALSE);
 	else
-		pgm_return_val_if_fail (cnt >= sizeof(struct sockaddr_in6), FALSE);
+		pgm_return_val_if_fail (cnt >= (socklen_t)sizeof(struct sockaddr_in6), FALSE);
 
 	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
 		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);

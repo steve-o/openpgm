@@ -35,6 +35,7 @@
 #	else
 #		define sa_family_t	USHORT
 #	endif
+#	define in_port_t	uint16_t
 #endif
 
 #ifdef _MSC_VER
@@ -50,6 +51,10 @@
 /* g++ v3 and other ancient compilers */
 #	define bool		int
 #	include <stdint.h>
+#endif
+
+#ifndef _MSC_VER
+#	define errno_t		int
 #endif
 
 #if !defined(restrict) || (__STDC_VERSION__ < 199901L)

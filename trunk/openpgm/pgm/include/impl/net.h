@@ -30,7 +30,7 @@
 PGM_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL ssize_t pgm_sendto_hops (pgm_sock_t*restrict, bool, bool, int, const void*restrict, size_t, const struct sockaddr*restrict, socklen_t);
-PGM_GNUC_INTERNAL int pgm_set_nonblocking (int fd[2]);
+PGM_GNUC_INTERNAL int pgm_set_nonblocking (SOCKET fd[2]);
 
 static inline
 ssize_t
