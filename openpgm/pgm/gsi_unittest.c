@@ -83,16 +83,9 @@ pgm_transport_pkt_offset2 (
 }
 
 int
-#ifdef _WIN32
-PASCAL
-#endif
 mock_gethostname (
 	char*		name,
-#ifndef _WIN32
 	size_t		len
-#else
-	int		len
-#endif
 	)
 {
 	if (mock_hostname == mock_toolong) {

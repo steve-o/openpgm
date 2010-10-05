@@ -21,14 +21,19 @@
 
 
 #include <errno.h>
-#include <sys/socket.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
 
@@ -98,11 +103,12 @@ START_TEST (test_inet_network_pass_001)
 
 	g_message ("Resolved \"%s\" to \"%s\"",
 		   network, inet_ntoa (network_order));
-
+#ifdef DEBUG_INET_NETWORK
 {
 struct in_addr t = { .s_addr = g_htonl (inet_network (network)) };
 g_message ("inet_network (%s) = %s", network, inet_ntoa (t));
 }
+#endif
 
 	fail_unless (0 == strcmp (answer, inet_ntoa (network_order)));
 }
