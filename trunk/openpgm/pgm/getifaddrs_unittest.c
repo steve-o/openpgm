@@ -28,13 +28,18 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#endif
 #include <glib.h>
 #include <check.h>
 
 
 /* mock state */
+
+#define GETIFADDRS_DEBUG
+#include "getifaddrs.c"
 
 /* mock functions for external references */
 
@@ -46,10 +51,6 @@ pgm_pkt_offset (
 {
         return 0;
 }
-
-
-#define GETIFADDRS_DEBUG
-#include "getifaddrs.c"
 
 
 char*

@@ -93,10 +93,19 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['getifaddrs_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c'),
-			e.Object('list.c')] + tlog);
+			e.Object('list.c'),
+# mingw linking
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
+		] + tlog);
 	te.Program (['getnodeaddr_unittest.c',
 			e.Object('error.c'),
-			e.Object('sockaddr.c')] + tlog);
+			e.Object('sockaddr.c'),
+# mingw linking
+			e.Object('getifaddrs.c'),
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
+		] + tlog);
 	te.Program (['indextoaddr_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c')] + tlog);
