@@ -113,7 +113,6 @@ main (
 	char*		argv[]
 	)
 {
-	int e;
 	pgm_error_t* pgm_err = NULL;
 #ifdef CONFIG_WITH_HTTP
 	gboolean enable_http = FALSE;
@@ -213,7 +212,7 @@ main (
 	signal (SIGHUP,  SIG_IGN);
 #endif
 #ifdef G_OS_UNIX
-	e = pipe (g_quit_pipe);
+	const int e = pipe (g_quit_pipe);
 	g_assert (0 == e);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
@@ -513,7 +512,7 @@ receiver_thread (
 	int n_fds;
 	fd_set readfds;
 #else /* G_OS_WIN32 */
-	int n_handles = 3;
+	int n_handles = 3, recv_sock, pending_sock;
 #  if (__STDC_VERSION__ >= 199901L)
 	HANDLE waitHandles[n_handles];
 #  else
@@ -521,11 +520,14 @@ receiver_thread (
 #  endif
 	DWORD timeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_recv_fd (g_transport), recvEvent, FD_READ);
+	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
+	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_pending_fd (g_transport), pendingEvent, FD_READ);
+	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
+	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = g_quit_event;
 	waitHandles[1] = recvEvent;

@@ -148,15 +148,18 @@ main (
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3;
+	int n_handles = 3, recv_sock, pending_sock;
 	HANDLE waitHandles[ n_handles ];
 	DWORD dwTimeout, dwEvents;
 	WSAEVENT recvEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
 	recvEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_recv_fd (g_transport), recvEvent, FD_READ);
+	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
+	WSAEventSelect (recv_sock, recvEvent, FD_READ);
 	pendingEvent = WSACreateEvent ();
-	WSAEventSelect (pgm_transport_get_pending_fd (g_transport), pendingEvent, FD_READ);
+	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
+	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
 
 	waitHandles[0] = g_quit_event;
 	waitHandles[1] = recvEvent;
