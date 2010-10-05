@@ -27,9 +27,12 @@
 #define __PGM_IMPL_SOCKADDR_H__
 
 #ifndef _WIN32
+#	include <sys/types.h>
 #	include <sys/socket.h>
+#	include <netdb.h>
 #endif
 #include <pgm/types.h>
+#include <impl/security.h>
 #include <impl/wsastrerror.h>
 
 PGM_BEGIN_DECLS

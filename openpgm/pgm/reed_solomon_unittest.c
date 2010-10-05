@@ -117,10 +117,10 @@ START_TEST (test_encode_pass_001)
 	for (unsigned i = 0; i < k; i++) {
 		source_packets[i] = g_malloc0 (packet_len);
 		source_packets[i][0] = source[i];
-		g_message ("packet#%2.2d: 0x%02.2x '%c'", i, source[i], source[i]);
+		g_message ("packet#%2.2d: 0x%2.2x '%c'", i, source[i], source[i]);
 	}
 	pgm_rs_encode (&rs, (const pgm_gf8_t**)source_packets, parity_index, parity_packet, packet_len);
-	g_message ("parity-packet: %02.2x", parity_packet[0]);
+	g_message ("parity-packet: %2.2x", parity_packet[0]);
 	pgm_rs_destroy (&rs);
 }
 END_TEST
@@ -162,7 +162,7 @@ START_TEST (test_decode_parity_inline_pass_001)
 	const guint erased_index = 3;
 	source_packets[erased_index][0] = 'X';
 	for (unsigned i = 0; i < k; i++) {
-		g_message ("damaged-packet#%2.2d: 0x%02.2x '%c'",
+		g_message ("damaged-packet#%2.2d: 0x%2.2x '%c'",
 			   i, source_packets[i][0], source_packets[i][0]);
 	}
 	guint8 offsets[k];
@@ -176,7 +176,7 @@ START_TEST (test_decode_parity_inline_pass_001)
 	pgm_rs_decode_parity_inline (&rs, source_packets, offsets, packet_len);
 	pgm_rs_destroy (&rs);
 	for (unsigned i = 0; i < k; i++) {
-		g_message ("repaired-packet#%2.2d: 0x%02.2x '%c'",
+		g_message ("repaired-packet#%2.2d: 0x%2.2x '%c'",
 			   i, source_packets[i][0], source_packets[i][0]);
 	}
 }
@@ -219,7 +219,7 @@ START_TEST (test_decode_parity_appended_pass_001)
 	const guint erased_index = 3;
 	source_packets[erased_index][0] = 'X';
 	for (unsigned i = 0; i < k; i++) {
-		g_message ("damaged-packet#%2.2d: 0x%02.2x '%c'",
+		g_message ("damaged-packet#%2.2d: 0x%2.2x '%c'",
 			   i, source_packets[i][0], source_packets[i][0]);
 	}
 	guint8 offsets[k];
@@ -234,7 +234,7 @@ START_TEST (test_decode_parity_appended_pass_001)
 	pgm_rs_decode_parity_appended (&rs, source_packets, offsets, packet_len);
 	pgm_rs_destroy (&rs);
 	for (unsigned i = 0; i < k; i++) {
-		g_message ("repaired-packet#%2.2d: 0x%02.2x '%c'",
+		g_message ("repaired-packet#%2.2d: 0x%2.2x '%c'",
 			   i, source_packets[i][0], source_packets[i][0]);
 	}
 }
