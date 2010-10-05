@@ -26,12 +26,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <unistd.h>
-
+#ifndef _WIN32
+#	include <arpa/inet.h>
+#	include <netinet/in.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
 
@@ -351,10 +355,12 @@ make_master_suite (void)
 int
 main (void)
 {
+#ifndef _WIN32
 	if (0 != getuid()) {
 		fprintf (stderr, "This test requires super-user privileges to run.\n");
 		return EXIT_FAILURE;
 	}
+#endif
 
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());

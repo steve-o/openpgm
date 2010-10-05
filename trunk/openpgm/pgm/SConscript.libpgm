@@ -110,7 +110,13 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('error.c'),
 			e.Object('sockaddr.c')] + tlog);
 	te.Program (['inet_network_unittest.c',
-			e.Object('sockaddr.c')] + tlog);
+			e.Object('sockaddr.c'),
+# mingw linking
+			e.Object('error.c'),
+			e.Object('getifaddrs.c'),
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
+		] + tlog);
 	te.Program (['rate_control_unittest.c'] + tlog);
 	te.Program (['reed_solomon_unittest.c'] + tlog);
 	te.Program (['time_unittest.c',
