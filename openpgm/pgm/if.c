@@ -312,6 +312,7 @@ parse_interface (
 /* numeric host with scope id */
 	if (!check_addr)
 	{
+		char errbuf[1024];
 		struct addrinfo hints = {
 			.ai_family	= family,
 			.ai_socktype	= SOCK_STREAM,				/* not really, SOCK_RAW */
@@ -359,8 +360,9 @@ parse_interface (
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
 				     pgm_error_from_eai_errno (eai, errno),
-				     _("Numeric host resolution: %s"),
-				     gai_strerror (eai));
+				     _("Numeric host resolution: %s(%d)"),
+				     pgm_gai_strerror_s (errbuf, sizeof (errbuf), eai),
+				     eai);
 			return FALSE;
 		}
 	}
@@ -443,13 +445,13 @@ parse_interface (
 /* hostname lookup with potential DNS delay or error */
 	if (!check_addr)
 	{
+		char errbuf[1024];
 		struct addrinfo hints = {
 			.ai_family	= family,
 			.ai_socktype	= SOCK_STREAM,		/* not really, SOCK_RAW */
 			.ai_protocol	= IPPROTO_TCP,		/* not really, IPPROTO_PGM */
 			.ai_flags	= AI_ADDRCONFIG,	/* AI_V4MAPPED is unhelpful */
 		}, *res;
-
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
 		switch (eai) {
 		case 0:
@@ -492,7 +494,8 @@ parse_interface (
 				     PGM_ERROR_DOMAIN_IF,
 				     pgm_error_from_eai_errno (eai, errno),
 				     _("Internet host resolution: %s(%d)"),
-				     gai_strerror (eai), eai);
+				     pgm_gai_strerror_s (errbuf, sizeof (errbuf), eai),
+				     eai);
 			return FALSE;
 		}
 	}
@@ -794,11 +797,13 @@ parse_group (
 
 	const int eai = getaddrinfo (group, NULL, &hints, &res);
 	if (0 != eai) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_eai_errno (eai, errno),
-			     _("Resolving receive group: %s"),
-			     gai_strerror (eai));
+			     _("Resolving receive group: %s(%d)"),
+			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), eai),
+			     eai);
 		return FALSE;
 	}
 

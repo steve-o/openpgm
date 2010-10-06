@@ -93,11 +93,12 @@ pgm_if_getnodeaddr (
 		freeaddrinfo (res);
 		return TRUE;
 	} else if (EAI_NONAME != e) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_eai_errno (e, errno),
 			     _("Resolving hostname address: %s"),
-			     gai_strerror (e));
+			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), e));
 		return FALSE;
 	} else if (AF_UNSPEC == family) {
 		pgm_set_error (error,

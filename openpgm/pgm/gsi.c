@@ -97,18 +97,13 @@ pgm_gsi_create_from_hostname (
 	char hostname[NI_MAXHOST];
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
-#ifndef _WIN32
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
-#endif
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Resolving hostname: %s"),
-#ifndef _WIN32
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno)
-#else
-			     pgm_wsastrerror (WSAGetLastError())
-#endif
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno)
 				);
 		return FALSE;
 	}
@@ -134,18 +129,13 @@ pgm_gsi_create_from_addr (
 
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
-#ifndef _WIN32
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
-#endif
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Resolving hostname: %s"),
-#ifndef _WIN32
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno)
-#else
-			     pgm_wsastrerror (WSAGetLastError())
-#endif
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno)
 				);
 		return FALSE;
 	}
@@ -154,11 +144,12 @@ pgm_gsi_create_from_addr (
 	hints.ai_flags = AI_ADDRCONFIG;
 	retval = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 != retval) {
+		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     pgm_error_from_eai_errno (retval, errno),
 			     _("Resolving hostname address: %s"),
-			     gai_strerror (retval));
+			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), retval));
 		return FALSE;
 	}
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
