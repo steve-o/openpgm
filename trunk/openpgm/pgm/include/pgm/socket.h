@@ -161,11 +161,7 @@ int pgm_recv (pgm_sock_t*const restrict, void*restrict, const size_t, const int,
 int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const int, size_t*restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 
 bool pgm_getsockname (pgm_sock_t*const restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
-#ifndef _WIN32
 int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
-#else
-int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, SOCKET*const restrict);
-#endif
 #ifdef CONFIG_HAVE_POLL
 int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const int);
 #endif

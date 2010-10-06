@@ -2211,10 +2211,10 @@ pgm_select_info (
 	pgm_sock_t* const restrict sock,
 	fd_set*	    const restrict readfds,	/* blocking recv fds */
 	fd_set*	    const restrict writefds,	/* blocking send fds */
-	SOCKET*	    const restrict n_fds	/* in: max fds, out: max (in:fds, sock:fds) */
+	int*	    const restrict n_fds	/* in: max fds, out: max (in:fds, sock:fds) */
 	)
 {
-	SOCKET fds = 0;
+	int fds = 0;
 
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != n_fds);
@@ -2234,25 +2234,45 @@ pgm_select_info (
 		if (sock->can_send_data) {
 			const SOCKET rdata_fd = pgm_notify_get_fd (&sock->rdata_notify);
 			FD_SET(rdata_fd, readfds);
+#ifndef _WIN32
 			fds = MAX(fds, rdata_fd + 1);
+#else
+			fds++;
+#endif
 			if (is_congested) {
 				const SOCKET ack_fd = pgm_notify_get_fd (&sock->ack_notify);
 				FD_SET(ack_fd, readfds);
+#ifndef _WIN32
 				fds = MAX(fds, ack_fd + 1);
+#else
+				fds++;
+#endif
 			}
 		}
 		const SOCKET pending_fd = pgm_notify_get_fd (&sock->pending_notify);
 		FD_SET(pending_fd, readfds);
+#ifndef _WIN32
 		fds = MAX(fds, pending_fd + 1);
+#else
+		fds++;
+#endif
 	}
 
 	if (sock->can_send_data && writefds && !is_congested)
 	{
 		FD_SET(sock->send_sock, writefds);
+#ifndef _WIN32
 		fds = MAX(sock->send_sock + 1, fds);
+#else
+		fds++;
+#endif
 	}
 
+#ifndef _WIN32
 	return *n_fds = MAX(fds, *n_fds);
+#else
+	return *n_fds + fds;
+#endif
 }
 
 #ifdef CONFIG_HAVE_POLL

@@ -19,15 +19,28 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+#	define _GNU_SOURCE
+#endif
+
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
-#include <arpa/inet.h>
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>		/* _GNU_SOURCE for in6_pktinfo */
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
+
+#if !defined(ENOBUFS) && defined(WSAENOBUFS)
+#	define ENOBUFS		WSAENOBUFS
+#endif
 
 
 /* mock state */
@@ -78,6 +91,7 @@ static ssize_t mock_recvmsg (int, struct msghdr*, int);
 #define pgm_verify_spm			mock_pgm_verify_spm
 #define pgm_verify_nak			mock_pgm_verify_nak
 #define pgm_verify_ncf			mock_pgm_verify_ncf
+#define pgm_select_info			mock_pgm_select_info
 #define pgm_poll_info			mock_pgm_poll_info
 #define pgm_set_reset_error		mock_pgm_set_reset_error
 #define pgm_flush_peers_pending		mock_pgm_flush_peers_pending
@@ -104,6 +118,7 @@ static ssize_t mock_recvmsg (int, struct msghdr*, int);
 #define pgm_time_now			mock_pgm_time_now
 #define pgm_time_update_now		mock_pgm_time_update_now
 #define recvmsg				mock_recvmsg
+#define pgm_WSARecvMsg			mock_pgm_WSARecvMsg
 #define pgm_loss_rate			mock_pgm_loss_rate
 
 #define RECV_DEBUG
@@ -457,20 +472,27 @@ generate_msghdr (
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= iphdr->ip_src.s_addr
 	};
-	struct iovec iov = {
+	struct pgm_iovec iov = {
 		.iov_base		= packet,
 		.iov_len		= packet_len
 	};
+#ifdef CONFIG_HAVE_WSACMSGHDR
+	WSACMSGHDR* packet_cmsg = g_malloc0 (sizeof(WSACMSGHDR) + sizeof(struct in_pktinfo));
+#else
 	struct cmsghdr* packet_cmsg = g_malloc0 (sizeof(struct cmsghdr) + sizeof(struct in_pktinfo));
-	packet_cmsg->cmsg_len   = sizeof(struct cmsghdr) + sizeof(struct in_pktinfo);
+#endif
+	packet_cmsg->cmsg_len   = sizeof(*packet_cmsg) + sizeof(struct in_pktinfo);
 	packet_cmsg->cmsg_level = IPPROTO_IP;
 	packet_cmsg->cmsg_type  = IP_PKTINFO;
 	struct in_pktinfo packet_info = {
 		.ipi_ifindex		= 2,
+#ifndef _WIN32
 		.ipi_spec_dst		= iphdr->ip_src.s_addr,		/* local address */
+#endif
 		.ipi_addr		= iphdr->ip_dst.s_addr		/* destination address */
 	};
 	memcpy ((char*)(packet_cmsg + 1), &packet_info, sizeof(struct in_pktinfo));
+#ifndef _WIN32
 	struct msghdr packet_msg = {
 		.msg_name		= g_memdup (&addr, sizeof(addr)),	/* source address */
 		.msg_namelen		= sizeof(addr),
@@ -480,6 +502,15 @@ generate_msghdr (
 		.msg_controllen		= sizeof(struct cmsghdr) + sizeof(struct in_pktinfo),
 		.msg_flags		= 0
 	};
+#else
+	WSAMSG packet_msg = {
+		.name			= (LPSOCKADDR)g_memdup (&addr, sizeof(addr)),
+		.namelen		= sizeof(addr),
+		.lpBuffers		= (LPWSABUF)&iov,
+		.dwBufferCount		= 1,
+		.dwFlags		= 0
+	};
+#endif
 
 	struct mock_recvmsg_t* mr = g_malloc (sizeof(struct mock_recvmsg_t));
 	mr->mr_msg	= g_memdup (&packet_msg, sizeof(packet_msg));
@@ -558,6 +589,7 @@ mock_pgm_verify_ncf (
 }
 
 /** socket module */
+#ifdef CONFIG_HAVE_POLL
 int
 mock_pgm_poll_info (
 	pgm_sock_t* const	sock,
@@ -567,6 +599,17 @@ mock_pgm_poll_info (
 	)
 {
 }
+#else
+int
+mock_pgm_select_info (
+	pgm_sock_t* const	sock,
+	fd_set*const		readfds,
+	fd_set*const		writefds,
+	int*const		n_fds
+	)
+{
+}
+#endif
 
 pgm_peer_t*
 mock__pgm_peer_ref (
@@ -904,6 +947,7 @@ _mock_pgm_time_update_now (void)
 }
 
 /** libc */
+#ifndef _WIN32
 static
 ssize_t
 mock_recvmsg (
@@ -942,6 +986,47 @@ mock_recvmsg (
 	errno = mock_errno;
 	return mock_retval;
 }
+#else
+static
+int
+mock_WSARecvMsg (
+	SOCKET			s,
+	LPWSAMSG		lpMsg,
+	LPDWORD			lpdwNumberOfBytesRecvd,
+	LPWSAOVERLAPPED		lpOverlapped,
+	LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+	)
+{
+	g_assert (NULL != lpMsg);
+	g_assert (NULL != mock_recvmsg_list);
+
+	g_debug ("mock_WSARecvMsg (s:%d msg:%p recvd:%d ol:%p cr:%p)",
+		s, (gpointer)lpMsg, lpdwNumberOfBytesRecvd, (gpointer)lpOverlapped, (gpointer)lpCompletionRoutine);
+
+	struct mock_recvmsg_t* mr = mock_recvmsg_list->data;
+	WSAMSG* mock_msg	= mr->mr_msg;
+	ssize_t mock_retval	= mr->mr_retval;
+	int mock_errno		= mr->mr_errno;
+	mock_recvmsg_list = g_list_delete_link (mock_recvmsg_list, mock_recvmsg_list);
+	if (mock_msg) {
+		g_assert_cmpuint (mock_msg->namelen, <=, lpMsg->namelen);
+		g_assert_cmpuint (mock_msg->dwBufferCount, <=, lpMsg->dwBufferCount);
+		if (mock_msg->namelen)
+			memcpy (lpMsg->name, mock_msg->name, mock_msg->namelen);
+		if (mock_msg->dwBufferCount) {
+			for (unsigned i = 0; i < mock_msg->dwBufferCount; i++) {
+				g_assert (mock_msg->lpBuffers[i].len <= lpMsg->lpBuffers[i].len);
+				memcpy (lpMsg->lpBuffers[i].buf, mock_msg->lpBuffers[i].buf, mock_msg->lpBuffers[i].len);
+			}
+		}
+		lpMsg->dwFlags = mock_msg->dwFlags;
+	}
+	errno = mock_errno;
+	return mock_retval;
+}
+
+LPFN_WSARECVMSG mock_pgm_WSARecvMsg = mock_WSARecvMsg;
+#endif /* _WIN32 */
 
 
 /* mock functions for external references */
