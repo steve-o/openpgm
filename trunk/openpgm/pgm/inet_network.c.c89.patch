@@ -1,5 +1,5 @@
 --- inet_network.c	2010-05-21 11:32:20.000000000 +0800
-+++ inet_network.c89	2010-08-04 12:18:21.000000000 +0800
++++ inet_network.c89	2010-10-06 17:30:52.000000000 +0800
 @@ -70,6 +70,7 @@
  	pgm_debug ("pgm_inet_network (s:\"%s\" in:%p)",
  		 s, (const void*)in);
