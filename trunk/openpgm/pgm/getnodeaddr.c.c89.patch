@@ -1,5 +1,5 @@
---- getnodeaddr.c	2010-05-21 11:35:15.000000000 +0800
-+++ getnodeaddr.c89	2010-08-05 13:17:31.000000000 +0800
+--- getnodeaddr.c	2010-10-06 14:39:18.000000000 +0800
++++ getnodeaddr.c89	2010-10-06 14:58:01.000000000 +0800
 @@ -58,6 +58,7 @@
  	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
  		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
@@ -8,7 +8,7 @@
  	char hostname[NI_MAXHOST + 1];
  	struct hostent* he;
  
-@@ -75,15 +76,22 @@
+@@ -78,15 +79,22 @@
  		return FALSE;
  	}
  
@@ -38,7 +38,7 @@
  	if (0 == e) {
  		const socklen_t addrlen = res->ai_addrlen;
  		memcpy (addr, res->ai_addr, addrlen);
-@@ -125,7 +133,9 @@
+@@ -129,7 +137,9 @@
  				);
  		return FALSE;
  	}
@@ -48,7 +48,7 @@
  	struct pgm_ifaddrs_t *ifap, *ifa, *ifa6;
  	if (!pgm_getifaddrs (&ifap, error)) {
  		pgm_prefix_error (error,
-@@ -172,6 +182,8 @@
+@@ -176,6 +186,8 @@
  
  	memcpy (addr, ifa6->ifa_addr, pgm_sockaddr_len (ifa6->ifa_addr));
  	pgm_freeifaddrs (ifap);
