@@ -1,47 +1,92 @@
-73a74
-> 	{
-83a85
-> 	}
-93c95,97
-< 	for (unsigned i = 0; i < hash_table->size; i++)
----
-> 	{
-> 	unsigned i;
-> 	for (i = 0; i < hash_table->size; i++)
-94a99
-> 	}
-140a146
-> 	{
-142a149
-> 	}
-153a161
-> 	{
-155a164
-> 	}
-208c217,219
-< 	for (unsigned i = 0; i < hash_table->size; i++)
----
-> 	{
-> 	unsigned i;
-> 	for (i = 0; i < hash_table->size; i++)
-212a224
-> 	}
-226,228c238,244
-<   
-< 	for (unsigned i = 0; i < hash_table->size; i++)
-< 		for (pgm_hashnode_t *node = hash_table->nodes[i], *next; node; node = next)
----
->  
-> 	{
-> 	unsigned i; 
-> 	for (i = 0; i < hash_table->size; i++)
-> 		{
-> 		pgm_hashnode_t *node, *next;
-> 		for (node = hash_table->nodes[i]; node; node = next)
-230a247
-> 			{
-233a251,252
-> 			}
-> 		}
-234a254
-> 	}
+--- hashtable.c	2010-09-16 13:42:33.000000000 +0800
++++ hashtable.c89	2010-10-06 15:38:46.000000000 +0800
+@@ -71,6 +71,7 @@
+ 	pgm_return_val_if_fail (NULL != hash_func, NULL);
+ 	pgm_return_val_if_fail (NULL != key_equal_func, NULL);
+ 
++	{
+ 	pgm_hashtable_t *hash_table;
+   
+ 	hash_table = pgm_new (pgm_hashtable_t, 1);
+@@ -81,6 +82,7 @@
+ 	hash_table->nodes              = pgm_new0 (pgm_hashnode_t*, hash_table->size);
+   
+ 	return hash_table;
++	}
+ }
+ 
+ void
+@@ -90,8 +92,11 @@
+ {
+ 	pgm_return_if_fail (hash_table != NULL);
+ 
+-	for (unsigned i = 0; i < hash_table->size; i++)
++	{
++	unsigned i;
++	for (i = 0;i < hash_table->size; i++)
+ 		pgm_hash_nodes_destroy (hash_table->nodes[i]);
++	}
+ 	pgm_free (hash_table->nodes);
+ 	pgm_free (hash_table);
+ }
+@@ -138,8 +143,10 @@
+ {
+ 	pgm_return_val_if_fail (hash_table != NULL, NULL);
+   
++	{
+ 	const pgm_hashnode_t* node = *pgm_hashtable_lookup_node (hash_table, key, NULL);
+ 	return node ? node->value : NULL;
++	}
+ }
+ 
+ void*
+@@ -151,8 +158,10 @@
+ {
+ 	pgm_return_val_if_fail (hash_table != NULL, NULL);
+   
++	{
+ 	const pgm_hashnode_t* node = *pgm_hashtable_lookup_node (hash_table, key, hash_return);
+ 	return node ? node->value : NULL;
++	}
+ }
+ 
+ void
+@@ -205,11 +214,14 @@
+ {
+ 	pgm_return_if_fail (hash_table != NULL);
+ 
+-	for (unsigned i = 0; i < hash_table->size; i++)
++	{
++	unsigned i;
++	for (i = 0; i < hash_table->size; i++)
+ 	{
+ 		pgm_hash_nodes_destroy (hash_table->nodes[i]);
+ 		hash_table->nodes[i] = NULL;
+ 	}
++	}
+ 	hash_table->nnodes = 0;
+ 	PGM_HASHTABLE_RESIZE (hash_table);
+ }
+@@ -224,14 +236,20 @@
+ 					 HASHTABLE_MIN_SIZE, HASHTABLE_MAX_SIZE);
+ 	pgm_hashnode_t** new_nodes = pgm_new0 (pgm_hashnode_t*, new_size);
+   
+-	for (unsigned i = 0; i < hash_table->size; i++)
+-		for (pgm_hashnode_t *node = hash_table->nodes[i], *next; node; node = next)
++	{
++	unsigned i;
++	for (i = 0; i < hash_table->size; i++)
++	{
++		pgm_hashnode_t *node, *next;
++		for (node = hash_table->nodes[i]; node; node = next)
+ 		{
+ 			next = node->next;
+ 			const pgm_hash_t hash_val = node->key_hash % new_size;
+ 			node->next = new_nodes[hash_val];
+ 			new_nodes[hash_val] = node;
+ 		}
++	}
++	}
+   
+ 	pgm_free (hash_table->nodes);
+ 	hash_table->nodes = new_nodes;

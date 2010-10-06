@@ -1,5 +1,5 @@
 --- getnodeaddr.c	2010-10-06 14:39:18.000000000 +0800
-+++ getnodeaddr.c89	2010-10-06 14:58:01.000000000 +0800
++++ getnodeaddr.c89	2010-10-06 17:03:02.000000000 +0800
 @@ -58,6 +58,7 @@
  	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
  		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
@@ -28,10 +28,10 @@
 +	int e;
 +	struct addrinfo hints, *res;
 +	memset (&hints, 0, sizeof(hints));
-+	hints.ai_family		= family,
-+	hints.ai_socktype	= SOCK_STREAM,		/* not really */
-+	hints.ai_protocol	= IPPROTO_TCP,		/* not really */
-+	hints.ai_flags		= AI_ADDRCONFIG,
++	hints.ai_family		= family;
++	hints.ai_socktype	= SOCK_STREAM;		/* not really */
++	hints.ai_protocol	= IPPROTO_TCP;		/* not really */
++	hints.ai_flags		= AI_ADDRCONFIG;
  
 -	int e = getaddrinfo (hostname, NULL, &hints, &res);
 +	e = getaddrinfo (hostname, NULL, &hints, &res);
