@@ -24,11 +24,23 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
 #include <check.h>
 
 
 /* mock state */
+
+#ifndef _WIN32
+ssize_t mock_sendto (int, const void*, size_t, int, const struct sockaddr*, socklen_t);
+#else
+int mock_sendto (SOCKET, const char*, int, int, const struct sockaddr*, int);
+int mock_select (int, fd_set*, fd_set*, fd_set*, struct timeval*);
+#endif
+
 
 #define pgm_rate_check		mock_pgm_rate_check
 #define sendto			mock_sendto
@@ -147,6 +159,7 @@ mock_pgm_rate_check (
 	return TRUE;
 }
 
+#ifndef _WIN32
 ssize_t
 mock_sendto (
 	int			s,
@@ -156,6 +169,17 @@ mock_sendto (
 	const struct sockaddr*	to,
 	socklen_t		tolen
 	)
+#else
+int
+mock_sendto (
+	SOCKET			s,
+	const char*		buf,
+	int			len,
+	int			flags,
+	const struct sockaddr*	to,
+	int			tolen
+	)
+#endif
 {
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
@@ -192,6 +216,8 @@ mock_select (
 }
 #endif
 
+/* non-blocking API */
+#ifndef _WIN32
 int
 mock_fcntl (
 	int			fd,
@@ -214,6 +240,9 @@ mock_fcntl (
 	}
 	g_assert_not_reached();
 }
+#else
+/* ioctlsocket */
+#endif
 
 
 /* target:
