@@ -162,7 +162,7 @@ initialize_bucket_range (
 	pgm_histogram_t*	histogram
 	)
 {
-	const double log_max = log(histogram->declared_max);
+	const double log_max = log ((double)histogram->declared_max);
 	double log_ratio;
 	double log_next;
 	unsigned i = 1;
@@ -170,10 +170,10 @@ initialize_bucket_range (
 
 	set_bucket_range (histogram, i, current);
 	while (histogram->bucket_count > ++i) {
-		double log_current = log(current);
+		double log_current = log ((double)current);
 		log_ratio = (log_max - log_current) / (histogram->bucket_count - i);
 		log_next = log_current + log_ratio;
-		int next = floor(exp(log_next) + 0.5);
+		int next = (int)floor (exp (log_next) + 0.5);
 		if (next > current)
 			current = next;
 		else
@@ -310,9 +310,9 @@ write_ascii_header (
 				 histogram->histogram_name ? histogram->histogram_name : "(null)",
 				 sample_count);
 	if (sample_count > 0) {
-		const double average = sample_set->sum / sample_count;
-		const double variance = sample_set->square_sum / sample_count
-				  - average * average;
+		const double average  = (float)(sample_set->sum) / sample_count;
+		const double variance = (float)(sample_set->square_sum) / sample_count
+						- average * average;
 		const double standard_deviation = sqrt (variance);
 		pgm_string_append_printf (output,
 					 ", average = %.1f, standard deviation = %.1f",
@@ -329,7 +329,7 @@ write_ascii_bucket_graph (
 	)
 {
 	static const int k_line_length = 72;
-	int x_count = (k_line_length * (current_size / max_size) + 0.5);
+	int x_count = (int)(k_line_length * (current_size / max_size) + 0.5);
 	int x_remainder = k_line_length - x_count;
 	while (0 < x_count--)
 		pgm_string_append_c (output, '-');

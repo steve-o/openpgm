@@ -537,7 +537,7 @@ parse_interface (
 		if (check_addr &&
 		    (0 == pgm_sockaddr_cmp (ifa->ifa_addr, (const struct sockaddr*)&addr)))
 		{
-			strcpy (ir->ir_name, ifa->ifa_name);
+			pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 			ir->ir_flags = ifa->ifa_flags;
 			if (ir->ir_flags & IFF_LOOPBACK)
 				pgm_warn (_("Interface %s reports as a loopback device."), ir->ir_name);
@@ -556,7 +556,7 @@ parse_interface (
 			const struct in_addr ifaddr  = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
 			const struct in_addr netmask = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
 			if (is_in_net (&ifaddr, &in_addr, &netmask)) {
-				strcpy (ir->ir_name, ifa->ifa_name);
+				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
 				if (ir->ir_flags & IFF_LOOPBACK) {
 					pgm_warn (_("Skipping matching loopback network device %s."), ir->ir_name);
@@ -578,7 +578,7 @@ parse_interface (
 			const struct in6_addr ifaddr = ((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
 			if (is_in_net6 (&ifaddr, &in6_addr, &netmask)) {
-				strcpy (ir->ir_name, ifa->ifa_name);
+				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
 				if (ir->ir_flags & IFF_LOOPBACK) {
 					pgm_warn (_("Skipping matching loopback network device %s."), ir->ir_name);
@@ -619,7 +619,7 @@ skip_inet_network:
 			}
 
 			ir->ir_interface = ifindex;
-			strcpy (ir->ir_name, ifa->ifa_name);
+			pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 			continue;
 		}
@@ -1553,7 +1553,7 @@ pgm_getaddrinfo (
 	ai->ai_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
 	ai->ai_send_addrs_len = send_list_len;
 	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
-			
+
 	size_t i = 0;
 	while (recv_list) {
 		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));

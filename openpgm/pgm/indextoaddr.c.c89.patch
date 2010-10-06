@@ -1,5 +1,5 @@
 --- indextoaddr.c	2010-05-21 11:34:27.000000000 +0800
-+++ indextoaddr.c89	2010-08-04 12:06:20.000000000 +0800
++++ indextoaddr.c89	2010-10-06 17:23:50.000000000 +0800
 @@ -44,7 +44,9 @@
  
  	if (0 == ifindex)		/* any interface or address */

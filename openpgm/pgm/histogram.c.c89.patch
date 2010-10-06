@@ -1,5 +1,5 @@
---- histogram.c	2010-05-21 11:35:50.000000000 +0800
-+++ histogram.c89	2010-08-04 11:32:46.000000000 +0800
+--- histogram.c	2010-10-06 16:56:21.000000000 +0800
++++ histogram.c89	2010-10-06 17:01:34.000000000 +0800
 @@ -61,10 +61,12 @@
  		value = INT_MAX - 1;
  	if (value < 0)
@@ -41,14 +41,12 @@
  	return total;
  }
  
-@@ -173,12 +180,15 @@
- 		double log_current = log(current);
+@@ -173,12 +180,14 @@
+ 		double log_current = log ((double)current);
  		log_ratio = (log_max - log_current) / (histogram->bucket_count - i);
  		log_next = log_current + log_ratio;
--		int next = floor(exp(log_next) + 0.5);
 +		{
-+/* force cast to ignore float to int conversion warning */
-+		int next = (int)floor(exp(log_next) + 0.5);
+ 		int next = (int)floor (exp (log_next) + 0.5);
  		if (next > current)
  			current = next;
  		else
@@ -58,7 +56,7 @@
  	}
  	pgm_assert (histogram->bucket_count == i);
  }
-@@ -192,6 +202,7 @@
+@@ -192,6 +201,7 @@
  {
  	pgm_assert (histogram->ranges[0] <= value);
  	pgm_assert (histogram->ranges[ histogram->bucket_count ] > value);
@@ -66,7 +64,7 @@
  	unsigned under = 0;
  	unsigned over = histogram->bucket_count;
  	unsigned mid;
-@@ -209,6 +220,7 @@
+@@ -209,6 +219,7 @@
  	pgm_assert (histogram->ranges[ mid ] <= value &&
  		  histogram->ranges[ mid + 1] > value);
  	return mid;
@@ -74,7 +72,7 @@
  }
  
  static
-@@ -231,19 +243,21 @@
+@@ -231,19 +242,21 @@
  	pgm_string_t*	 restrict output
  	)
  {
@@ -103,7 +101,7 @@
  	double max_size = get_peak_bucket_size (histogram, &snapshot);
  	unsigned largest_non_empty_bucket = histogram->bucket_count - 1;
  	while (0 == snapshot.counts[ largest_non_empty_bucket ])
-@@ -253,8 +267,11 @@
+@@ -253,8 +266,11 @@
  		largest_non_empty_bucket--;
  	}
  
@@ -116,7 +114,7 @@
  	{
  		if (snapshot.counts[ i ]) {
  			pgm_string_t* bucket_range = get_ascii_bucket_range (histogram, i);
-@@ -264,16 +281,22 @@
+@@ -264,16 +280,22 @@
  				print_width = width;
  		}
  	}
@@ -140,7 +138,7 @@
  		if (0 == current &&
  		    i < histogram->bucket_count - 1 &&
  		    0 == snapshot.counts[ i + 1 ])
-@@ -288,12 +311,19 @@
+@@ -288,12 +310,19 @@
  			continue;
  		}
  
@@ -160,27 +158,7 @@
  }
  
  static
-@@ -310,8 +340,8 @@
- 				 histogram->histogram_name ? histogram->histogram_name : "(null)",
- 				 sample_count);
- 	if (sample_count > 0) {
--		const double average = sample_set->sum / sample_count;
--		const double variance = sample_set->square_sum / sample_count
-+		const double average = (double)sample_set->sum / sample_count;
-+		const double variance = (double)sample_set->square_sum / sample_count
- 				  - average * average;
- 		const double standard_deviation = sqrt (variance);
- 		pgm_string_append_printf (output,
-@@ -329,7 +359,7 @@
- 	)
- {
- 	static const int k_line_length = 72;
--	int x_count = (k_line_length * (current_size / max_size) + 0.5);
-+	int x_count = (int)(k_line_length * (current_size / max_size) + 0.5);
- 	int x_remainder = k_line_length - x_count;
- 	while (0 < x_count--)
- 		pgm_string_append_c (output, '-');
-@@ -375,11 +405,14 @@
+@@ -375,11 +404,14 @@
  	)
  {
  	double max_size = 0;
@@ -196,7 +174,7 @@
  	return max_size;
  }
  
-@@ -392,11 +425,13 @@
+@@ -392,11 +424,13 @@
  	)
  {
  	pgm_assert (histogram->ranges[ i + 1 ] > histogram->ranges[ i ]);
