@@ -115,7 +115,9 @@ pgm_vsnprintf_s (char *str, size_t size, size_t count, const char *format, va_li
 #endif
 }
 
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 static inline int pgm_snprintf_s (char*, size_t, size_t, const char*, ...) PGM_GNUC_PRINTF(4, 5);
+static inline int pgm_sscanf_s (const char*, const char*, ...) PGM_GNUC_SCANF(2, 3);
 
 static inline
 int
@@ -129,6 +131,23 @@ pgm_snprintf_s (char *str, size_t size, size_t count, const char *format, ...)
 	va_end (ap);
 	return retval;
 }
+
+static inline
+int
+pgm_sscanf_s (const char *buffer, const char *format, ...)
+{
+	va_list ap;
+	int retval;
+
+	va_start (ap, format);
+	retval = vsscanf (buffer, format, ap);
+	va_end (ap);
+	return retval;
+}
+#else
+#	define pgm_snprintf_s		_snprintf_s
+#	define pgm_sscanf_s		sscanf_s
+#endif /* CONFIG_HAVE_SECURITY_ENHANCED_CRT */
 
 static inline
 char*
