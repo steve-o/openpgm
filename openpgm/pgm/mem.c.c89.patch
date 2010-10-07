@@ -1,6 +1,6 @@
---- mem.c	2010-05-23 16:49:21.000000000 +0800
-+++ mem.c89	2010-08-05 12:19:31.000000000 +0800
-@@ -78,16 +78,24 @@
+--- mem.c	2010-10-07 11:09:54.000000000 +0800
++++ mem.c89	2010-10-07 11:10:38.000000000 +0800
+@@ -79,16 +79,24 @@
  	if (NULL == string)
  		return result;
  
@@ -27,7 +27,7 @@
  		fprintf (stderr, "\n");
  	}
  	else
-@@ -96,14 +104,18 @@
+@@ -97,14 +105,18 @@
  			const char* q = strpbrk (string, ":;, \t");
  			if (!q)
  				q = string + strlen (string);
@@ -47,99 +47,89 @@
  	return result;
  }
  
-@@ -117,10 +129,27 @@
+@@ -121,11 +133,13 @@
  	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, 1) > 0)
  		return;
  
 +	{
-+#ifdef _MSC_VER
-+/* _dupenv_s is recommended replacement for getenv which is not thread-safe */
-+	char *val;
-+	size_t len;
-+	errno_t err;
-+	unsigned flags;
-+	err = _dupenv_s (&val, &len, "PGM_DEBUG");
-+	if (err || 0 == len) {
-+		flags = 0;
-+	} else {
-+		flags = pgm_parse_debug_string (val, keys, PGM_N_ELEMENTS (keys));
-+		free (val);
+ 	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
+ 	if (0 == err && envlen > 0) {
+ 		flags = pgm_parse_debug_string (env, keys, PGM_N_ELEMENTS (keys));
+ 		free (env);
+ 	}
 +	}
-+#else
- 	const char *val = getenv ("PGM_DEBUG");
- 	const unsigned flags = !val ? 0 : pgm_parse_debug_string (val, keys, PGM_N_ELEMENTS (keys));
-+#endif
+ 
  	if (flags & 1)
  		pgm_mem_gc_friendly = TRUE;
-+	}
- }
- 
- void
-@@ -146,9 +175,15 @@
- 		if (mem)
+@@ -155,13 +169,13 @@
  			return mem;
  
+ #ifdef __GNUC__
 -		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu bytes",
-+#ifdef __PRETTY_FUNCTION__
 +		pgm_fatal ("file %s: line %d (%s): failed to allocate %lu bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
- 			n_bytes);
-+#else
-+		pgm_fatal ("file %s: line %d): failed to allocate %lu bytes",
-+			__FILE__, __LINE__,
-+			n_bytes);
-+#endif
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #else
+-		pgm_fatal ("file %s: line %d: failed to allocate %zu bytes",
++		pgm_fatal ("file %s: line %d: failed to allocate %lu bytes",
+ 			__FILE__, __LINE__,
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #endif
  		abort ();
  	}
- 	return NULL;
-@@ -163,9 +198,15 @@
- 	)
+@@ -178,13 +192,13 @@
  {
  	if (SIZE_OVERFLOWS (n_blocks, block_bytes)) {
+ #ifdef __GNUC__
 -		pgm_fatal ("file %s: line %d (%s): overflow allocating %zu*%zu bytes",
-+#ifdef __PRETTY_FUNCTION__
 +		pgm_fatal ("file %s: line %d (%s): overflow allocating %lu*%lu bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
- 			n_blocks, block_bytes);
-+#else
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #else
+-		pgm_fatal ("file %s: line %d: overflow allocating %zu*%zu bytes",
 +		pgm_fatal ("file %s: line %d: overflow allocating %lu*%lu bytes",
-+			__FILE__, __LINE__,
-+			n_blocks, block_bytes);
-+#endif
+ 			__FILE__, __LINE__,
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #endif
  	}
  	return pgm_malloc (n_blocks * block_bytes);
- }
-@@ -181,9 +222,15 @@
- 		if (mem)
+@@ -202,13 +216,13 @@
  			return mem;
  
+ #ifdef __GNUC__
 -		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu bytes",
-+#ifdef __PRETTY_FUNCTION__
 +		pgm_fatal ("file %s: line %d (%s): failed to allocate %lu bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
- 			n_bytes);
-+#else
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #else
+-		pgm_fatal ("file %s: line %d: failed to allocate %zu bytes",
 +		pgm_fatal ("file %s: line %d: failed to allocate %lu bytes",
-+			__FILE__, __LINE__,
-+			n_bytes);
-+#endif
+ 			__FILE__, __LINE__,
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #endif
  		abort ();
  	}
- 	return NULL;
-@@ -201,9 +248,15 @@
- 		if (mem)
+@@ -228,13 +242,13 @@
  			return mem;
  
+ #ifdef __GNUC__
 -		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu*%zu bytes",
-+#ifdef __PRETTY_FUNCTION__
 +		pgm_fatal ("file %s: line %d (%s): failed to allocate %lu*%lu bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
- 			n_blocks, block_bytes);
-+#else
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #else
+-		pgm_fatal ("file %s: line %d: failed to allocate %zu*%zu bytes",
 +		pgm_fatal ("file %s: line %d: failed to allocate %lu*%lu bytes",
-+			__FILE__, __LINE__,
-+			n_blocks, block_bytes);
-+#endif
+ 			__FILE__, __LINE__,
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #endif
  		abort ();
  	}
- 	return NULL;

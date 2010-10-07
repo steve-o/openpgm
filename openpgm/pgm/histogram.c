@@ -170,10 +170,15 @@ initialize_bucket_range (
 
 	set_bucket_range (histogram, i, current);
 	while (histogram->bucket_count > ++i) {
-		double log_current = log ((double)current);
+		const double log_current = log ((double)current);
 		log_ratio = (log_max - log_current) / (histogram->bucket_count - i);
 		log_next = log_current + log_ratio;
-		int next = (int)floor (exp (log_next) + 0.5);
+#ifdef __GNUC__	
+		const int next = floor (exp (log_next) + 0.5);
+#else
+/* bad-function-cast warning in GCC */
+		const int next = (int)(floor (exp (log_next) + 0.5));
+#endif
 		if (next > current)
 			current = next;
 		else

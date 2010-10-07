@@ -2072,8 +2072,13 @@ pgm_bind3 (
 /* setup rate control */
 		if (sock->txw_max_rte)
 		{
+#ifndef _MSC_VER
 			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zd bytes per second."),
 					sock->txw_max_rte);
+#else
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %ld bytes per second."),
+					(long)sock->txw_max_rte);
+#endif
 	
 			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_spm   = TRUE;	/* must always be set */
