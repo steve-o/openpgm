@@ -62,8 +62,8 @@ pgm_histogram_add (
 	if (value < 0)
 		value = 0;
 	const unsigned i = bucket_index (histogram, value);
-	pgm_assert (value >= histogram->ranges[ i ]);
-	pgm_assert (value  < histogram->ranges[ i + 1 ]);
+	pgm_assert_cmpint (value, >=, histogram->ranges[ i ]);
+	pgm_assert_cmpint (value,  <, histogram->ranges[ i + 1 ]);
 	accumulate (histogram, value, 1, i);
 }
 
@@ -107,9 +107,9 @@ sample_set_accumulate (
 	sample_set->counts[ i ] += count;
 	sample_set->sum += count * value;
 	sample_set->square_sum += (count * value) * (int64_t)value;
-	pgm_assert (sample_set->counts[ i ] >= 0);
-	pgm_assert (sample_set->sum >= 0);
-	pgm_assert (sample_set->square_sum >= 0);
+	pgm_assert_cmpint (sample_set->counts[ i ], >=, 0);
+	pgm_assert_cmpint (sample_set->sum, >=, 0);
+	pgm_assert_cmpint (sample_set->square_sum, >=, 0);
 }
 
 static
@@ -131,10 +131,10 @@ pgm_histogram_init (
 {
 	if (histogram->declared_min <= 0)
 		histogram->declared_min = 1;
-	pgm_assert (histogram->declared_min > 0);
+	pgm_assert_cmpint (histogram->declared_min, >, 0);
 	histogram->declared_max = INT_MAX - 1;
-	pgm_assert (histogram->declared_min <= histogram->declared_max);
-	pgm_assert (1 < histogram->bucket_count);
+	pgm_assert_cmpint (histogram->declared_min, <=, histogram->declared_max);
+	pgm_assert_cmpuint (1, <, histogram->bucket_count);
 	set_bucket_range (histogram, histogram->bucket_count, INT_MAX);
 	initialize_bucket_range (histogram);
 
@@ -185,7 +185,7 @@ initialize_bucket_range (
 			current++;
 		set_bucket_range (histogram, i, current);
 	}
-	pgm_assert (histogram->bucket_count == i);
+	pgm_assert_cmpuint (histogram->bucket_count, ==, i);
 }
 
 static
@@ -195,14 +195,14 @@ bucket_index (
 	const pgm_sample_t	value
 	)
 {
-	pgm_assert (histogram->ranges[0] <= value);
-	pgm_assert (histogram->ranges[ histogram->bucket_count ] > value);
+	pgm_assert_cmpint (histogram->ranges[0], <=, value);
+	pgm_assert_cmpint (histogram->ranges[ histogram->bucket_count ], >, value);
 	unsigned under = 0;
 	unsigned over = histogram->bucket_count;
 	unsigned mid;
 
 	do {
-		pgm_assert (over >= under);
+		pgm_assert_cmpuint (over, >=, under);
 		mid = ((unsigned)under + (unsigned)over) >> 1;
 		if (mid == under)
 			break;
@@ -211,8 +211,7 @@ bucket_index (
 		else
 			over = mid;
 	} while (TRUE);
-	pgm_assert (histogram->ranges[ mid ] <= value &&
-		  histogram->ranges[ mid + 1] > value);
+	pgm_assert (histogram->ranges[ mid ] <= value && histogram->ranges[ mid + 1] > value);
 	return mid;
 }
 
@@ -396,7 +395,7 @@ get_bucket_size (
 	const unsigned		i
 	)
 {
-	pgm_assert (histogram->ranges[ i + 1 ] > histogram->ranges[ i ]);
+	pgm_assert_cmpint (histogram->ranges[ i + 1 ], >, histogram->ranges[ i ]);
 	static const double kTransitionWidth = 5;
 	double denominator = histogram->ranges[ i + 1 ] - histogram->ranges[ i ];
 	if (denominator > kTransitionWidth)

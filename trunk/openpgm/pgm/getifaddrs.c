@@ -178,7 +178,7 @@ again:
 	struct lifreq* lifr      = lifc.lifc_req;
 	struct lifreq* lifr_end  = (struct lifreq *)&lifc.lifc_buf[lifc.lifc_len];
 
-	pgm_assert (IF_NAMESIZE >= LIFNAMSIZ);
+	pgm_assert_cmpuint (IF_NAMESIZE, >=, LIFNAMSIZ);
 
 	while (lifr < lifr_end)
 	{
@@ -363,7 +363,7 @@ _pgm_getifaddrs (
 	struct ifreq *ifr  = ifc.ifc_req;
 	struct ifreq *ifr_end = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
 
-	pgm_assert (IF_NAMESIZE >= sizeof(ifr->ifr_name));
+	pgm_assert_cmpuint (IF_NAMESIZE, >=, sizeof(ifr->ifr_name));
 
 	while (ifr < ifr_end)
 	{
@@ -592,7 +592,7 @@ _pgm_getadaptersinfo (
 
 /* address */
 			ift->_ifa.ifa_addr = (void*)&ift->_addr;
-			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
+			pgm_assert (1 == pgm_sockaddr_pton (pIPAddr->IpAddress.String, ift->_ifa.ifa_addr));
 
 /* name */
 			pgm_debug ("name:%s IPv4 index:%lu",
@@ -607,7 +607,7 @@ _pgm_getadaptersinfo (
 
 /* netmask */
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-			pgm_assert (pgm_sockaddr_pton (pIPAddr->IpMask.String, ift->_ifa.ifa_netmask));
+			pgm_assert (1 == pgm_sockaddr_pton (pIPAddr->IpMask.String, ift->_ifa.ifa_netmask));
 
 /* next */
 			if (k++ < (n - 1)) {

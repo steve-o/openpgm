@@ -26,6 +26,11 @@
 #ifndef __PGM_IMPL_MESSAGES_H__
 #define __PGM_IMPL_MESSAGES_H__
 
+#ifdef _MSC_VER
+#	include <pgm/wininttypes.h>
+#else
+#	include <inttypes.h>
+#endif
 #include <stdarg.h>
 #include <stdlib.h>
 #include <pgm/types.h>
@@ -213,20 +218,20 @@ static inline void pgm_fatal (const char* format, ...) {
 	} while (0)
 #	define pgm_assert_cmpint(n1, cmp, n2) \
 	do { \
-		const int _n1 = (n1), _n2 = (n2); \
+		const int64_t _n1 = (n1), _n2 = (n2); \
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
-			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%u %s %u)", \
+			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%" PRIi64 " %s %" PRIi64 ")", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
 	} while (0)
 #	define pgm_assert_cmpuint(n1, cmp, n2) \
 	do { \
-		const unsigned _n1 = (n1), _n2 = (n2); \
+		const uint64_t _n1 = (n1), _n2 = (n2); \
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
-			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%u %s %u)", \
+			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%" PRIu64 " %s %" PRIu64 ")", \
 				__FILE__, __LINE__, __PRETTY_FUNCTION__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
@@ -251,20 +256,20 @@ static inline void pgm_fatal (const char* format, ...) {
 	} while (0)
 #	define pgm_assert_cmpint(n1, cmp, n2) \
 	do { \
-		const int _n1 = (n1), _n2 = (n2); \
+		const int64_t _n1 = (n1), _n2 = (n2); \
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
-			pgm_fatal ("file %s: line %d: assertion failed (%s): (%u %s %u)", \
+			pgm_fatal ("file %s: line %d: assertion failed (%s): (%" PRIi64 " %s %" PRIi64 ")", \
 				__FILE__, __LINE__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
 	} while (0)
 #	define pgm_assert_cmpuint(n1, cmp, n2) \
 	do { \
-		const unsigned _n1 = (n1), _n2 = (n2); \
+		const uint64_t _n1 = (n1), _n2 = (n2); \
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
-			pgm_fatal ("file %s: line %d: assertion failed (%s): (%u %s %u)", \
+			pgm_fatal ("file %s: line %d: assertion failed (%s): (%" PRIu64 " %s %" PRIu64 ")", \
 				__FILE__, __LINE__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
