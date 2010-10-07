@@ -566,7 +566,7 @@ wait_for_event (
 	pgm_sock_t* const	sock
 	)
 {
-	SOCKET n_fds = 3;
+	int n_fds = 3;
 
 /* pre-conditions */
 	pgm_assert (NULL != sock);

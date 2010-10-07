@@ -77,19 +77,25 @@ log_level_text (
 void
 pgm_messages_init (void)
 {
+	char *log_mask, *min_log_level;
+	size_t len;
+	errno_t err;
+
 	if (pgm_atomic_exchange_and_add32 (&messages_ref_count, 1) > 0)
 		return;
 
 	pgm_mutex_init (&messages_mutex);
 
-	const char* log_mask = getenv ("PGM_LOG_MASK");
-	if (NULL != log_mask) {
+	err = pgm_dupenv_s (&log_mask, &len, "PGM_LOG_MASK");
+	if (!err && len > 0) {
 		unsigned int value = 0;
-		if (1 == sscanf (log_mask, "0x%4x", &value))
+		if (1 == pgm_sscanf_s (log_mask, "0x%4x", &value))
 			pgm_log_mask = value;
+		free (log_mask);
 	}
-	const char *min_log_level = getenv ("PGM_MIN_LOG_LEVEL");
-	if (NULL != min_log_level) {
+
+	err = pgm_dupenv_s (&min_log_level, &len, "PGM_MIN_LOG_LEVEL");
+	if (!err && len > 0) {
 		switch (min_log_level[0]) {
 		case 'D':	pgm_min_log_level = PGM_LOG_LEVEL_DEBUG; break;
 		case 'T':	pgm_min_log_level = PGM_LOG_LEVEL_TRACE; break;
@@ -100,6 +106,7 @@ pgm_messages_init (void)
 		case 'F':	pgm_min_log_level = PGM_LOG_LEVEL_FATAL; break;
 		default: break;
 		}
+		free (min_log_level);
 	}
 }
 

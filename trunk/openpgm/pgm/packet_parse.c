@@ -148,8 +148,7 @@ pgm_parse_raw (
 	}
 
 	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
-	if (PGM_UNLIKELY(ip_header_length < sizeof(struct pgm_ip)))
-	{
+	if (PGM_UNLIKELY(ip_header_length < sizeof(struct pgm_ip))) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_BOUNDS,

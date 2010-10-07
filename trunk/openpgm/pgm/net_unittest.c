@@ -154,8 +154,13 @@ mock_pgm_rate_check (
 	const bool		is_nonblocking
 	)
 {
+#ifndef _MSC_VER
 	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%zu is-nonblocking:%s)",
 		(gpointer)bucket, data_size, is_nonblocking ? "TRUE" : "FALSE");
+#else
+	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%lu is-nonblocking:%s)",
+		(gpointer)bucket, (unsigned long)data_size, is_nonblocking ? "TRUE" : "FALSE");
+#endif
 	return TRUE;
 }
 

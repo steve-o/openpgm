@@ -75,6 +75,7 @@
 
 /* printf() like function */
 #	define PGM_GNUC_PRINTF(format, args)	__attribute__((__format__ (__printf__, format, args)))
+#	define PGM_GNUC_SCANF(format, args)	__attribute__((__format__ (__scanf__, format, args)))
 #	define PGM_GNUC_FORMAT(format)		__attribute__((__format_arg__ (format)))
 
 /* Function will never return */
@@ -88,6 +89,8 @@
 
 #else /* !__GNUC__ */
 #	define PGM_GNUC_PRINTF(format, args)
+#	define PGM_GNUC_SCANF(format, args)
+#	define PGM_GNUC_FORMAT(format)
 #	define PGM_GNUC_NORETURN
 #	define PGM_GNUC_CONST
 #	define PGM_GNUC_UNUSED
