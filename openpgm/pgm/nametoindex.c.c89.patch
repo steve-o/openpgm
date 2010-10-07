@@ -1,5 +1,5 @@
---- nametoindex.c	2010-05-21 11:34:30.000000000 +0800
-+++ nametoindex.c89	2010-08-04 12:57:20.000000000 +0800
+--- nametoindex.c	2010-10-05 15:00:03.000000000 +0800
++++ nametoindex.c89	2010-10-07 12:35:12.000000000 +0800
 @@ -78,6 +78,7 @@
  
  	pgm_assert (AF_INET6 != iffamily);
@@ -60,7 +60,7 @@
  	ULONG ifIndex;
  	DWORD dwSize = DEFAULT_BUFFER_SIZE, dwRet;
  	IP_ADAPTER_ADDRESSES *pAdapterAddresses = NULL, *adapter;
-@@ -170,7 +179,9 @@
+@@ -172,7 +181,9 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.
   */
@@ -71,7 +71,7 @@
  	{
  		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
  		dwRet = GetAdaptersAddresses (AF_UNSPEC,
-@@ -188,6 +199,7 @@
+@@ -190,6 +201,7 @@
  			break;
  		}
  	}
@@ -79,7 +79,7 @@
  
  	switch (dwRet) {
  	case ERROR_SUCCESS:
-@@ -218,6 +230,7 @@
+@@ -220,6 +232,7 @@
  	if (pAdapterAddresses)
  		_pgm_heap_free (pAdapterAddresses);
  	return 0;
