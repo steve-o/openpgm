@@ -19,12 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define __STDC_FORMAT_MACROS
-#ifdef _MSC_VER
-#	include <pgm/wininttypes.h>
-#else
-#	include <inttypes.h>
-#endif
 #include <errno.h>
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -146,7 +140,7 @@ nak_rb_ivl (
 	pgm_assert (NULL != sock);
 	pgm_assert_cmpuint (sock->nak_bo_ivl, >, 1);
 
-	return pgm_rand_int_range (&sock->rand_, 1 /* us */, sock->nak_bo_ivl);
+	return pgm_rand_int_range (&sock->rand_, 1 /* us */, (int32_t)sock->nak_bo_ivl);
 }
 
 /* mark sequence as recovery failed.
@@ -168,7 +162,7 @@ cancel_skb (
 
 	pgm_trace (PGM_LOG_ROLE_RX_WINDOW, _("Lost data #%u due to cancellation."), skb->sequence);
 
-	const uint32_t fail_time = now - skb->tstamp;
+	const uint32_t fail_time = (uint32_t)(now - skb->tstamp);
 	if (!peer->max_fail_time)
 		peer->max_fail_time = peer->min_fail_time = fail_time;
 	else if (fail_time > peer->max_fail_time)
@@ -1302,7 +1296,7 @@ send_ack (
 	struct pgm_opt_pgmcc_feedback* opt_pgmcc_feedback = (struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
 	opt_pgmcc_feedback->opt_reserved = 0;
 
-	const uint32_t t = source->ack_last_tstamp + pgm_to_msecs( now - source->last_data_tstamp );
+	const uint32_t t = (uint32_t)(source->ack_last_tstamp + pgm_to_msecs( now - source->last_data_tstamp ));
 	opt_pgmcc_feedback->opt_tstamp = htonl (t);
 	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
 	opt_pgmcc_feedback->opt_loss_rate = htons ((uint16_t)source->window->data_loss);

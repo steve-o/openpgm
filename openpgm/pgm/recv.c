@@ -46,13 +46,24 @@
 #	define PGM_DISABLE_ASSERT
 #endif
 
-#ifdef _WIN32
-#	define cmsghdr wsacmsghdr
-#	define CMSG_FIRSTHDR(msg)	WSA_CMSG_FIRSTHDR(msg)
-#	define CMSG_NXTHDR(msg, cmsg)	WSA_CMSG_NXTHDR(msg, cmsg)
-#	define CMSG_DATA(cmsg)		WSA_CMSG_DATA(cmsg)
-#	define CMSG_SPACE(len)		WSA_CMSG_SPACE(len)
-#	define CMSG_LEN(len)		WSA_CMSG_LEN(len)
+#ifndef _WIN32
+#	define PGM_CMSG_FIRSTHDR(msg)		CMSG_FIRSTHDR(msg)
+#	define PGM_CMSG_NXTHDR(msg, cmsg)	CMSG_NXTHDR(msg, cmsg)
+#	define PGM_CMSG_DATA(cmsg)		CMSG_DATA(cmsg)
+#	define PGM_CMSG_SPACE(len)		CMSG_SPACE(len)
+#	define PGM_CMSG_LEN(len)		CMSG_LEN(len)
+#else
+#	define PGM_CMSG_FIRSTHDR(msg)		WSA_CMSG_FIRSTHDR(msg)
+#	define PGM_CMSG_NXTHDR(msg, cmsg)	WSA_CMSG_NXTHDR(msg, cmsg)
+#	define PGM_CMSG_DATA(cmsg)		WSA_CMSG_DATA(cmsg)
+#	define PGM_CMSG_SPACE(len)		WSA_CMSG_SPACE(len)
+#	define PGM_CMSG_LEN(len)		WSA_CMSG_LEN(len)
+#endif
+
+#ifdef CONFIG_HAVE_WSACMSGHDR
+#	define pgm_cmsghdr			wsacmsghdr
+#else
+#	define pgm_cmsghdr			cmsghdr
 #endif
 
 
@@ -108,7 +119,6 @@ recvskb (
 		.msg_controllen = sizeof(aux),
 		.msg_flags	= 0
 	};
-
 	ssize_t len = recvmsg (sock->recv_sock, &msg, flags);
 	if (len <= 0)
 		return len;
@@ -147,7 +157,7 @@ recvskb (
 	skb->sock		= sock;
 	skb->tstamp		= pgm_time_update_now();
 	skb->data		= skb->head;
-	skb->len		= len;
+	skb->len		= (uint16_t)len;
 	skb->zero_padded	= 0;
 	skb->tail		= (char*)skb->data + len;
 
@@ -174,7 +184,7 @@ recvskb (
 			if (IPPROTO_IP == cmsg->cmsg_level && 
 			    IP_PKTINFO == cmsg->cmsg_type)
 			{
-				const void* pktinfo		= CMSG_DATA(cmsg);
+				const void* pktinfo		= PGM_CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (PGM_UNLIKELY(NULL == pktinfo)) {
 					pgm_debug ("in_pktinfo is NULL");
@@ -193,7 +203,7 @@ recvskb (
 			if (IPPROTO_IP == cmsg->cmsg_level &&
 			    IP_RECVDSTADDR == cmsg->cmsg_type)
 			{
-				const void* recvdstaddr = CMSG_DATA(cmsg);
+				const void* recvdstaddr		= PGM_CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (PGM_UNLIKELY(NULL == recvdstaddr)) {
 					pgm_debug ("in_recvdstaddr is NULL");
@@ -215,7 +225,7 @@ recvskb (
 			if (IPPROTO_IPV6 == cmsg->cmsg_level && 
 			    IPV6_PKTINFO == cmsg->cmsg_type)
 			{
-				const void* pktinfo		= CMSG_DATA(cmsg);
+				const void* pktinfo		= PGM_CMSG_DATA(cmsg);
 /* discard on invalid address */
 				if (PGM_UNLIKELY(NULL == pktinfo)) {
 					pgm_debug ("in6_pktinfo is NULL");
@@ -549,7 +559,7 @@ on_pgm (
 	else if (PGM_IS_PEER (skb->pgm_header->pgm_type))
 		return on_peer (sock, skb, source);
 
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded PGM packet."));
+	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded unknown PGM packet."));
 	if (sock->can_send_data)
 		sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
 	return FALSE;
@@ -603,7 +613,7 @@ wait_for_event (
 		if (sock->can_send_data && !pgm_txw_retransmit_is_empty (sock->window))
 			timeout = 0;
 		else
-			timeout = pgm_timer_expiration (sock);
+			timeout = (int)pgm_timer_expiration (sock);
 		
 #ifdef CONFIG_HAVE_POLL
 		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
@@ -760,8 +770,7 @@ recv_again:
 		       sizeof(dst));
 	if (len < 0)
 	{
-#ifndef _WIN32
-		const int save_errno = errno;
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		if (PGM_LIKELY(EAGAIN == save_errno)) {
 			goto check_for_repeat;
@@ -769,21 +778,9 @@ recv_again:
 		status = PGM_IO_STATUS_ERROR;
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_RECV,
-			     pgm_error_from_errno (save_errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Transport socket error: %s"),
-			     pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
-#else
-		const int save_wsa_errno = WSAGetLastError ();
-		if (PGM_LIKELY(WSAEWOULDBLOCK == save_wsa_errno)) {
-			goto check_for_repeat;
-		}
-		status = PGM_IO_STATUS_ERROR;
-		pgm_set_error (error,
-			     PGM_ERROR_DOMAIN_RECV,
-			     pgm_error_from_wsa_errno (save_wsa_errno),
-			     _("Transport socket error: %s"),
-			     pgm_wsastrerror (save_wsa_errno));
-#endif /* !_WIN32 */
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto out;
 	}
 	else if (0 == len)
@@ -865,18 +862,13 @@ check_for_repeat:
 				pgm_rwlock_reader_unlock (&sock->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT: {
-#ifndef _WIN32
+				const int save_errno = pgm_sock_errno();
 				char errbuf[1024];
-#endif
 				pgm_set_error (error,
 						PGM_ERROR_DOMAIN_RECV,
-						pgm_error_from_errno (errno),
+						pgm_error_from_sock_errno (save_errno),
 						_("Waiting for event: %s"),
-#ifndef _WIN32
-						pgm_strerror_s (errbuf, sizeof (errbuf), errno)
-#else
-						pgm_wsastrerror (WSAGetLastError())	/* from select() */
-#endif
+						pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno)
 						);
 				pgm_mutex_unlock (&sock->receiver_mutex);
 				pgm_rwlock_reader_unlock (&sock->lock);

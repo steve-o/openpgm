@@ -1,13 +1,13 @@
---- histogram.c	2010-10-07 11:35:41.000000000 +0800
-+++ histogram.c89	2010-10-07 11:37:18.000000000 +0800
+--- histogram.c	2010-10-07 17:53:02.000000000 +0800
++++ histogram.c89	2010-10-07 17:53:39.000000000 +0800
 @@ -61,10 +61,12 @@
  		value = INT_MAX - 1;
  	if (value < 0)
  		value = 0;
 +	{
  	const unsigned i = bucket_index (histogram, value);
- 	pgm_assert (value >= histogram->ranges[ i ]);
- 	pgm_assert (value  < histogram->ranges[ i + 1 ]);
+ 	pgm_assert_cmpint (value, >=, histogram->ranges[ i ]);
+ 	pgm_assert_cmpint (value,  <, histogram->ranges[ i + 1 ]);
  	accumulate (histogram, value, 1, i);
 +	}
  }
@@ -57,25 +57,25 @@
  		set_bucket_range (histogram, i, current);
 +		}
  	}
- 	pgm_assert (histogram->bucket_count == i);
+ 	pgm_assert_cmpuint (histogram->bucket_count, ==, i);
  }
 @@ -197,6 +206,7 @@
  {
- 	pgm_assert (histogram->ranges[0] <= value);
- 	pgm_assert (histogram->ranges[ histogram->bucket_count ] > value);
+ 	pgm_assert_cmpint (histogram->ranges[0], <=, value);
+ 	pgm_assert_cmpint (histogram->ranges[ histogram->bucket_count ], >, value);
 +	{
  	unsigned under = 0;
  	unsigned over = histogram->bucket_count;
  	unsigned mid;
-@@ -214,6 +224,7 @@
- 	pgm_assert (histogram->ranges[ mid ] <= value &&
- 		  histogram->ranges[ mid + 1] > value);
+@@ -213,6 +223,7 @@
+ 	} while (TRUE);
+ 	pgm_assert (histogram->ranges[ mid ] <= value && histogram->ranges[ mid + 1] > value);
  	return mid;
 +	}
  }
  
  static
-@@ -236,19 +247,21 @@
+@@ -235,19 +246,21 @@
  	pgm_string_t*	 restrict output
  	)
  {
@@ -104,7 +104,7 @@
  	double max_size = get_peak_bucket_size (histogram, &snapshot);
  	unsigned largest_non_empty_bucket = histogram->bucket_count - 1;
  	while (0 == snapshot.counts[ largest_non_empty_bucket ])
-@@ -258,8 +271,11 @@
+@@ -257,8 +270,11 @@
  		largest_non_empty_bucket--;
  	}
  
@@ -117,7 +117,7 @@
  	{
  		if (snapshot.counts[ i ]) {
  			pgm_string_t* bucket_range = get_ascii_bucket_range (histogram, i);
-@@ -269,16 +285,22 @@
+@@ -268,16 +284,22 @@
  				print_width = width;
  		}
  	}
@@ -141,7 +141,7 @@
  		if (0 == current &&
  		    i < histogram->bucket_count - 1 &&
  		    0 == snapshot.counts[ i + 1 ])
-@@ -293,12 +315,19 @@
+@@ -292,12 +314,19 @@
  			continue;
  		}
  
@@ -161,7 +161,7 @@
  }
  
  static
-@@ -380,11 +409,14 @@
+@@ -379,11 +408,14 @@
  	)
  {
  	double max_size = 0;
@@ -177,10 +177,10 @@
  	return max_size;
  }
  
-@@ -397,11 +429,13 @@
+@@ -396,11 +428,13 @@
  	)
  {
- 	pgm_assert (histogram->ranges[ i + 1 ] > histogram->ranges[ i ]);
+ 	pgm_assert_cmpint (histogram->ranges[ i + 1 ], >, histogram->ranges[ i ]);
 +	{
  	static const double kTransitionWidth = 5;
  	double denominator = histogram->ranges[ i + 1 ] - histogram->ranges[ i ];

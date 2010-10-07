@@ -19,12 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define __STDC_FORMAT_MACROS
-#ifdef _MSC_VER
-#	include <pgm/wininttypes.h>
-#else
-#	include <inttypes.h>
-#endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
 #include <impl/txw.h>
