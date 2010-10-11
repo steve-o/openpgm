@@ -94,7 +94,6 @@ struct pgm_peer_t {
 	pgm_time_t			spmr_tstamp;
 
 	pgm_rxw_t*      restrict      	window;
-	pgm_sock_t*	restrict	sock;
 	pgm_list_t			peers_link;
 	pgm_slist_t			pending_link;
 
@@ -130,7 +129,7 @@ PGM_GNUC_INTERNAL bool pgm_peer_has_pending (pgm_peer_t*const) PGM_GNUC_WARN_UNU
 PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_sock_t*const, pgm_peer_t*const);
 PGM_GNUC_INTERNAL bool pgm_check_peer_state (pgm_sock_t*const, const pgm_time_t);
 PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_msgv_t*const restrict);
-PGM_GNUC_INTERNAL pgm_time_t pgm_min_receiver_expiry (pgm_time_t, pgm_sock_t*) PGM_GNUC_WARN_UNUSED_RESULT;
+PGM_GNUC_INTERNAL pgm_time_t pgm_min_receiver_expiry (pgm_sock_t*, pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_peer_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_data (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 PGM_GNUC_INTERNAL bool pgm_on_ncf (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict) PGM_GNUC_WARN_UNUSED_RESULT;

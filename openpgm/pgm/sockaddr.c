@@ -825,13 +825,40 @@ pgm_sockaddr_msfilter (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef MCAST_MSFILTER
+#	ifdef MCAST_MSFILTER
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
 	retval = setsockopt (s, recv_level, MCAST_MSFILTER, (const char*)gf_list, len);
-#elif defined(SIOCSMSFILTER)
-	retval = ioctlsocket (s, SIOCSMSFILTER, (const char*)gf_list);
-#endif
+#	elif defined(SIOCSMSFILTER)
+/* Windows Vista and later */
+	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
+	u_long* filter = pgm_alloca (len);
+	memcpy (filter, gf_list, len);
+	retval = ioctlsocket (s, SIOCSMSFILTER, filter);
+#	elif defined(IP_MSFILTER) || defined(SIO_SET_MULTICAST_FILTER)
+/* IPv4-only filter API */
+	if (AF_INET == sa_family) {
+		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gr_numsrc);
+		struct ip_msfilter* filter = pgm_alloca (len);
+		struct sockaddr_in sa4;
+		unsigned i;
+		memcpy (&sa4, &gf_list->gf_group, sizeof (sa4));
+		filter->imsf_multiaddr.s_addr = sa4.sin_addr.s_addr;
+		pgm_if_indextoaddr (gf_list->gf_interface, AF_INET, 0, (struct sockaddr*)&sa4, NULL);
+		filter->imsf_interface.s_addr = sa4.sin_addr.s_addr;
+		filter->imsf_fmode  = gf_list->gf_fmode;
+		filter->imsf_numsrc = gf_list->gf_numsrc;
+		for (i = 0; i < gf_list->gf_numsrc; i++) {
+			memcpy (&sa4, &gf_list->gf_slist[i], sizeof (sa4));
+			filter->imsf_slist[i].s_addr = sa4.sin_addr.s_addr;
+		}
+#		ifdef IP_MSFILTER
+		retval = ioctlsocket (s, IP_MSFILTER, (char*)filter);
+#		else
+		retval = ioctlsocket (s, SIO_SET_MULTICAST_FILTER, (u_long*)filter);
+#		endif
+	}
+#	endif
 	return retval;
 }
 #endif /* MCAST_MSFILTER || SIOCSMSFILTER */

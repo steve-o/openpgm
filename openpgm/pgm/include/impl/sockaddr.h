@@ -121,6 +121,12 @@ PGM_GNUC_INTERNAL int pgm_sockaddr_leave_source_group (const SOCKET s, const sa_
 						 + ((numsrc)				\
 						    * sizeof (struct sockaddr_storage)))
 #	endif
+#	ifndef IP_MSFILTER_SIZE
+#		define IP_MSFILTER_SIZE(numsrc) (sizeof (struct ip_msfilter)		\
+						- sizeof (struct in_addr)		\
+						+ ((numsrc)				\
+						   * sizeof (struct in_addr)))
+#	endif
 PGM_GNUC_INTERNAL int pgm_sockaddr_msfilter (const SOCKET s, const sa_family_t sa_family, const struct group_filter* gf_list);
 #endif
 PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_if (SOCKET s, const struct sockaddr* address, unsigned ifindex);

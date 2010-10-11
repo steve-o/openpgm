@@ -102,10 +102,10 @@ pgm_if_print_all (void)
 	{
 		const unsigned int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
 		char rname[IF_NAMESIZE * 2 + 3];
-		char b[IF_NAMESIZE * 2 + 3];
+		char buf[IF_NAMESIZE * 2 + 3];
 
 		pgm_if_indextoname (i, rname);
-		sprintf (b, "%s (%s)",
+		pgm_snprintf_s (buf, sizeof (buf), _TRUNCATE, "%s (%s)",
 			ifa->ifa_name ? ifa->ifa_name : "(null)", rname);
 
 		if (NULL == ifa->ifa_addr ||
@@ -114,7 +114,7 @@ pgm_if_print_all (void)
 		{
 			pgm_info (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
 				i,
-				b,
+				buf,
 				"",
 			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
 			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
@@ -124,16 +124,16 @@ pgm_if_print_all (void)
 			continue;
 		}
 
-		char s[INET6_ADDRSTRLEN];
+		char saddr[INET6_ADDRSTRLEN];
 		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
-			     s, sizeof(s),
+			     saddr, sizeof(saddr),
 			     NULL, 0,
 			     NI_NUMERICHOST);
 		pgm_info (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
 			i,
-			b,
+			buf,
 			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
-			s,
+			saddr,
 			(unsigned)pgm_sockaddr_scope_id(ifa->ifa_addr),
 			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
 			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
