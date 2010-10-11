@@ -47,9 +47,9 @@ static bool send_spmr (pgm_sock_t*const restrict, pgm_peer_t*const restrict);
 static bool send_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const uint32_t);
 static bool send_parity_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const unsigned, const unsigned);
 static bool send_nak_list (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const struct pgm_sqn_list_t*const restrict);
-static bool nak_rb_state (pgm_peer_t*, const pgm_time_t);
-static void nak_rpt_state (pgm_peer_t*, const pgm_time_t);
-static void nak_rdata_state (pgm_peer_t*, const pgm_time_t);
+static bool nak_rb_state (pgm_sock_t*, pgm_peer_t*, const pgm_time_t);
+static void nak_rpt_state (pgm_sock_t*, pgm_peer_t*, const pgm_time_t);
+static void nak_rdata_state (pgm_sock_t*, pgm_peer_t*, const pgm_time_t);
 static inline pgm_peer_t* _pgm_peer_ref (pgm_peer_t*);
 static bool on_general_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static bool on_dlr_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict);
@@ -62,11 +62,12 @@ next_ack_rb_expiry (
 	const pgm_rxw_t*	window
 	)
 {
+	const struct pgm_peer_t* peer;
+
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != window->ack_backoff_queue.tail);
 
-	const struct pgm_peer_t* peer = (const struct pgm_peer_t*)window->ack_backoff_queue.tail;
-	pgm_assert (peer->sock->use_pgmcc);
+	peer = (const struct pgm_peer_t*)window->ack_backoff_queue.tail;
 	return peer->ack_rb_expiry;
 }
 
@@ -76,11 +77,14 @@ next_nak_rb_expiry (
 	const pgm_rxw_t*	window
 	)
 {
+	const struct pgm_sk_buff_t* skb;
+	const pgm_rxw_state_t* state;
+
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != window->nak_backoff_queue.tail);
 
-	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->nak_backoff_queue.tail;
-	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
+	skb = (const struct pgm_sk_buff_t*)window->nak_backoff_queue.tail;
+	state = (const pgm_rxw_state_t*)&skb->cb;
 	return state->timer_expiry;
 }
 
@@ -90,11 +94,14 @@ next_nak_rpt_expiry (
 	const pgm_rxw_t*	window
 	)
 {
+	const struct pgm_sk_buff_t* skb;
+	const pgm_rxw_state_t* state;
+
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != window->wait_ncf_queue.tail);
 
-	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->wait_ncf_queue.tail;
-	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
+	skb = (const struct pgm_sk_buff_t*)window->wait_ncf_queue.tail;
+	state = (const pgm_rxw_state_t*)&skb->cb;
 	return state->timer_expiry;
 }
 
@@ -104,11 +111,14 @@ next_nak_rdata_expiry (
 	const pgm_rxw_t*	window
 	)
 {
+	const struct pgm_sk_buff_t* skb;
+	const pgm_rxw_state_t* state;
+
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != window->wait_data_queue.tail);
 
-	const struct pgm_sk_buff_t* skb = (const struct pgm_sk_buff_t*)window->wait_data_queue.tail;
-	const pgm_rxw_state_t* state = (const pgm_rxw_state_t*)&skb->cb;
+	skb = (const struct pgm_sk_buff_t*)window->wait_data_queue.tail;
+	state = (const pgm_rxw_state_t*)&skb->cb;
 	return state->timer_expiry;
 }
 
@@ -125,7 +135,7 @@ ack_rb_ivl (
 	pgm_assert (sock->use_pgmcc);
 	pgm_assert_cmpuint (sock->ack_bo_ivl, >, 1);
 
-	return pgm_rand_int_range (&sock->rand_, 1 /* us */, sock->ack_bo_ivl);
+	return pgm_rand_int_range (&sock->rand_, 1 /* us */, (int32_t)sock->ack_bo_ivl);
 }
 
 /* calculate NAK_RB_IVL as random time interval 1 - NAK_BO_IVL.
@@ -183,6 +193,7 @@ cancel_skb (
 static inline
 bool
 _pgm_is_acker (
+	const pgm_sock_t*	    restrict sock,
 	const pgm_peer_t*	    restrict peer,
 	const struct pgm_sk_buff_t* restrict skb
 	)
@@ -191,12 +202,11 @@ _pgm_is_acker (
 
 /* pre-conditions */
 	pgm_assert (NULL != peer);
-	pgm_assert (peer->sock->use_pgmcc);
 	pgm_assert (NULL != skb);
 	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
 
 	pgm_nla_to_sockaddr (&skb->pgm_opt_pgmcc_data->opt_nla_afi, (struct sockaddr*)&acker_nla);
-	return (0 == pgm_sockaddr_cmp ((struct sockaddr*)&acker_nla, (struct sockaddr*)&peer->sock->send_addr));
+	return (0 == pgm_sockaddr_cmp ((struct sockaddr*)&acker_nla, (const struct sockaddr*)&sock->send_addr));
 }
 
 /* is the source holding an acker election
@@ -240,7 +250,6 @@ _pgm_add_ack (
 	)
 {
 	pgm_assert (NULL != peer);
-	pgm_assert (peer->sock->use_pgmcc);
 
 	peer->ack_rb_expiry = ack_rb_expiry;
 	pgm_queue_push_head_link (&peer->window->ack_backoff_queue, &peer->ack_link);
@@ -256,7 +265,6 @@ _pgm_remove_ack (
 	)
 {
 	pgm_assert (NULL != peer);
-	pgm_assert (peer->sock->use_pgmcc);
 	pgm_assert (!pgm_queue_is_empty (&peer->window->ack_backoff_queue));
 
 	pgm_queue_unlink (&peer->window->ack_backoff_queue, &peer->ack_link);
@@ -315,12 +323,14 @@ get_pgm_options (
 	struct pgm_sk_buff_t* const	skb
 	)
 {
+	struct pgm_opt_header* opt_header;
+	bool found_opt = FALSE;
+
 /* pre-conditions */
 	pgm_assert (NULL != skb);
 	pgm_assert (NULL != skb->pgm_data);
 
-	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(skb->pgm_data + 1);
-	bool found_opt = FALSE;
+	opt_header = (struct pgm_opt_header*)(skb->pgm_data + 1);
 
 	pgm_assert (opt_header->opt_type   == PGM_OPT_LENGTH);
 	pgm_assert (opt_header->opt_length == sizeof(struct pgm_opt_length));
@@ -393,7 +403,6 @@ pgm_new_peer (
 
 	peer = pgm_new0 (pgm_peer_t, 1);
 	peer->expiry = now + sock->peer_expiry;
-	peer->sock = sock;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
 	memcpy (&peer->group_nla, dst_addr, dst_addrlen);
 	memcpy (&peer->local_nla, src_addr, src_addrlen);
@@ -412,8 +421,7 @@ pgm_new_peer (
 
 /* add peer to hash table and linked list */
 	pgm_rwlock_writer_lock (&sock->peers_lock);
-	pgm_peer_t* entry = _pgm_peer_ref (peer);
-	pgm_hashtable_insert (sock->peers_hashtable, &peer->tsi, entry);
+	pgm_hashtable_insert (sock->peers_hashtable, &peer->tsi, _pgm_peer_ref (peer));
 	peer->peers_link.data = peer;
 	sock->peers_list = pgm_list_prepend_link (sock->peers_list, &peer->peers_link);
 	pgm_rwlock_writer_unlock (&sock->peers_lock);
@@ -535,12 +543,14 @@ pgm_set_reset_error (
 	struct pgm_msgv_t* const restrict msgv
 	)
 {
+	struct pgm_sk_buff_t* error_skb;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
 	pgm_assert (NULL != msgv);
 
-	struct pgm_sk_buff_t* error_skb = pgm_alloc_skb (0);
+	error_skb = pgm_alloc_skb (0);
 	error_skb->sock	= sock;
 	error_skb->tstamp	= pgm_time_update_now ();
 	memcpy (&error_skb->tsi, &source->tsi, sizeof(pgm_tsi_t));
@@ -562,6 +572,9 @@ pgm_on_spm (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
+	const struct pgm_spm	*spm;
+	const struct pgm_spm6	*spm6;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -576,8 +589,8 @@ pgm_on_spm (
 		return FALSE;
 	}
 
-	const struct pgm_spm*  spm  = (struct pgm_spm*) skb->data;
-	const struct pgm_spm6* spm6 = (struct pgm_spm6*)skb->data;
+	spm  = (struct pgm_spm *)skb->data;
+	spm6 = (struct pgm_spm6*)skb->data;
 	const uint32_t spm_sqn = ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
@@ -604,13 +617,12 @@ pgm_on_spm (
 		}
 
 /* mark receiver window for flushing on next recv() */
-		const pgm_rxw_t* window = source->window;
-		if (window->cumulative_losses != source->last_cumulative_losses &&
+		if (source->window->cumulative_losses != source->last_cumulative_losses &&
 		    !source->pending_link.data)
 		{
 			sock->is_reset = TRUE;
-			source->lost_count = window->cumulative_losses - source->last_cumulative_losses;
-			source->last_cumulative_losses = window->cumulative_losses;
+			source->lost_count = source->window->cumulative_losses - source->last_cumulative_losses;
+			source->last_cumulative_losses = source->window->cumulative_losses;
 			pgm_peer_set_pending (sock, source);
 		}
 	}
@@ -624,9 +636,12 @@ pgm_on_spm (
 /* check whether peer can generate parity packets */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (AF_INET6 == source->nla.ss_family) ?
-							(const struct pgm_opt_length*)(spm6 + 1) :
-							(const struct pgm_opt_length*)(spm  + 1);
+		const struct pgm_opt_header* opt_header;
+		const struct pgm_opt_length* opt_len;
+
+		opt_len = (AF_INET6 == source->nla.ss_family) ?
+				(const struct pgm_opt_length*)(spm6 + 1) :
+				(const struct pgm_opt_length*)(spm  + 1);
 		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
@@ -640,12 +655,14 @@ pgm_on_spm (
 			return FALSE;
 		}
 /* TODO: check for > 16 options & past packet end */
-		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
+		opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_PARITY_PRM)
 			{
-				const struct pgm_opt_parity_prm* opt_parity_prm = (const struct pgm_opt_parity_prm*)(opt_header + 1);
+				const struct pgm_opt_parity_prm* opt_parity_prm;
+
+				opt_parity_prm = (const struct pgm_opt_parity_prm*)(opt_header + 1);
 				if (PGM_UNLIKELY((opt_parity_prm->opt_reserved & PGM_PARITY_PRM_MASK) == 0))
 				{
 					pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
@@ -693,6 +710,12 @@ pgm_on_peer_nak (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
+	const struct pgm_nak   *nak;
+	const struct pgm_nak6  *nak6;
+	struct sockaddr_storage nak_src_nla, nak_grp_nla;
+	bool			found_nak_grp = FALSE;
+	int			ncf_status;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != peer);
@@ -708,11 +731,10 @@ pgm_on_peer_nak (
 		return FALSE;
 	}
 
-	const struct pgm_nak*  nak  = (struct pgm_nak*) skb->data;
-	const struct pgm_nak6* nak6 = (struct pgm_nak6*)skb->data;
+	nak  = (struct pgm_nak *)skb->data;
+	nak6 = (struct pgm_nak6*)skb->data;
 		
 /* NAK_SRC_NLA must not contain our sock unicast NLA */
-	struct sockaddr_storage nak_src_nla;
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
 	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&sock->send_addr) == 0))
 	{
@@ -721,40 +743,41 @@ pgm_on_peer_nak (
 	}
 
 /* NAK_GRP_NLA contains one of our sock receive multicast groups: the sources send multicast group */ 
-	struct sockaddr_storage nak_grp_nla;
 	pgm_nla_to_sockaddr ((AF_INET6 == nak_src_nla.ss_family) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
-	bool found = FALSE;
 	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 	{
 		if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&sock->recv_gsr[i].gsr_group) == 0)
 		{
-			found = TRUE;
+			found_nak_grp = TRUE;
 			break;
 		}
 	}
 
-	if (PGM_UNLIKELY(!found)) {
+	if (PGM_UNLIKELY(!found_nak_grp)) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded multicast NAK on multicast group mismatch."));
 		return FALSE;
 	}
 
 /* handle as NCF */
-	int status = pgm_rxw_confirm (peer->window,
+	ncf_status = pgm_rxw_confirm (peer->window,
 				      ntohl (nak->nak_sqn),
 				      skb->tstamp,
 				      skb->tstamp + sock->nak_rdata_ivl,
 				      skb->tstamp + nak_rb_ivl(sock));
-	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
+	if (PGM_RXW_UPDATED == ncf_status || PGM_RXW_APPENDED == ncf_status)
 		peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
 
 /* check NAK list */
-	const uint32_t* nak_list = NULL;
-	unsigned nak_list_len = 0;
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (AF_INET6 == nak_src_nla.ss_family) ?
-							(const struct pgm_opt_length*)(nak6 + 1) :
-							(const struct pgm_opt_length*)(nak + 1);
+		const struct pgm_opt_header* opt_header;
+		const struct pgm_opt_length* opt_len;
+		const uint32_t* nak_list = NULL;
+		unsigned nak_list_len = 0;
+
+		opt_len = (AF_INET6 == nak_src_nla.ss_family) ?
+				(const struct pgm_opt_length*)(nak6 + 1) :
+				(const struct pgm_opt_length*)(nak + 1);
 		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed multicast NAK."));
@@ -768,7 +791,7 @@ pgm_on_peer_nak (
 			return FALSE;
 		}
 /* TODO: check for > 16 options & past packet end */
-		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
+		opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
@@ -778,28 +801,27 @@ pgm_on_peer_nak (
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
-	}
 
-	while (nak_list_len) {
-		status = pgm_rxw_confirm (peer->window,
-					  ntohl (*nak_list),
-					  skb->tstamp,
-					  skb->tstamp + sock->nak_rdata_ivl,
-					  skb->tstamp + nak_rb_ivl(sock));
-		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
-			peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
-		nak_list++;
-		nak_list_len--;
+		while (nak_list_len) {
+			ncf_status = pgm_rxw_confirm (peer->window,
+						      ntohl (*nak_list),
+						      skb->tstamp,
+						      skb->tstamp + sock->nak_rdata_ivl,
+						      skb->tstamp + nak_rb_ivl(sock));
+			if (PGM_RXW_UPDATED == ncf_status || PGM_RXW_APPENDED == ncf_status)
+				peer->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
+			nak_list++;
+			nak_list_len--;
+		}
 	}
 
 /* mark receiver window for flushing on next recv() */
-	const pgm_rxw_t* window = peer->window;
-	if (window->cumulative_losses != peer->last_cumulative_losses &&
+	if (peer->window->cumulative_losses != peer->last_cumulative_losses &&
 	    !peer->pending_link.data)
 	{
 		sock->is_reset = TRUE;
-		peer->lost_count = window->cumulative_losses - peer->last_cumulative_losses;
-		peer->last_cumulative_losses = window->cumulative_losses;
+		peer->lost_count = peer->window->cumulative_losses - peer->last_cumulative_losses;
+		peer->last_cumulative_losses = peer->window->cumulative_losses;
 		pgm_peer_set_pending (sock, peer);
 	}
 	return TRUE;
@@ -819,6 +841,11 @@ pgm_on_ncf (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
+	const struct pgm_nak   *ncf;
+	const struct pgm_nak6  *ncf6;
+	struct sockaddr_storage ncf_src_nla, ncf_grp_nla;
+	int			ncf_status;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -834,11 +861,10 @@ pgm_on_ncf (
 		return FALSE;
 	}
 
-	const struct pgm_nak*  ncf  = (struct pgm_nak*) skb->data;
-	const struct pgm_nak6* ncf6 = (struct pgm_nak6*)skb->data;
+	ncf  = (struct pgm_nak *)skb->data;
+	ncf6 = (struct pgm_nak6*)skb->data;
 		
 /* NCF_SRC_NLA may contain our sock unicast NLA, we don't really care */
-	struct sockaddr_storage ncf_src_nla;
 	pgm_nla_to_sockaddr (&ncf->nak_src_nla_afi, (struct sockaddr*)&ncf_src_nla);
 
 #if 0
@@ -850,7 +876,6 @@ pgm_on_ncf (
 #endif
 
 /* NCF_GRP_NLA contains our sock multicast group */ 
-	struct sockaddr_storage ncf_grp_nla;
 	pgm_nla_to_sockaddr ((AF_INET6 == ncf_src_nla.ss_family) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
 	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&sock->send_gsr.gsr_group) != 0))
 	{
@@ -860,14 +885,14 @@ pgm_on_ncf (
 
 	const pgm_time_t ncf_rdata_ivl = skb->tstamp + sock->nak_rdata_ivl;
 	const pgm_time_t ncf_rb_ivl    = skb->tstamp + nak_rb_ivl(sock);
-	int status = pgm_rxw_confirm (source->window,
+	ncf_status = pgm_rxw_confirm (source->window,
 				      ntohl (ncf->nak_sqn),
 				      skb->tstamp,
 				      ncf_rdata_ivl,
 				      ncf_rb_ivl);
-	if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
+	if (PGM_RXW_UPDATED == ncf_status || PGM_RXW_APPENDED == ncf_status)
 	{
-		const pgm_time_t ncf_ivl = (PGM_RXW_APPENDED == status) ? ncf_rb_ivl : ncf_rdata_ivl;
+		const pgm_time_t ncf_ivl = (PGM_RXW_APPENDED == ncf_status) ? ncf_rb_ivl : ncf_rdata_ivl;
 		pgm_timer_lock (sock);
 		if (pgm_time_after (sock->next_poll, ncf_ivl)) {
 			sock->next_poll = ncf_ivl;
@@ -877,13 +902,16 @@ pgm_on_ncf (
 	}
 
 /* check NCF list */
-	const uint32_t* ncf_list = NULL;
-	unsigned ncf_list_len = 0;
 	if (skb->pgm_header->pgm_options & PGM_OPT_PRESENT)
 	{
-		const struct pgm_opt_length* opt_len = (AF_INET6 == ncf_src_nla.ss_family) ?
-							(const struct pgm_opt_length*)(ncf6 + 1) :
-							(const struct pgm_opt_length*)(ncf  + 1);
+		const struct pgm_opt_header* opt_header;
+		const struct pgm_opt_length* opt_len;
+		const uint32_t* ncf_list = NULL;
+		unsigned ncf_list_len = 0;
+
+		opt_len = (AF_INET6 == ncf_src_nla.ss_family) ?
+				(const struct pgm_opt_length*)(ncf6 + 1) :
+				(const struct pgm_opt_length*)(ncf  + 1);
 		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH))
 		{
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed NCF."));
@@ -897,7 +925,7 @@ pgm_on_ncf (
 			return FALSE;
 		}
 /* TODO: check for > 16 options & past packet end */
-		const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)opt_len;
+		opt_header = (const struct pgm_opt_header*)opt_len;
 		do {
 			opt_header = (const struct pgm_opt_header*)((const char*)opt_header + opt_header->opt_length);
 			if ((opt_header->opt_type & PGM_OPT_MASK) == PGM_OPT_NAK_LIST)
@@ -907,30 +935,29 @@ pgm_on_ncf (
 				break;
 			}
 		} while (!(opt_header->opt_type & PGM_OPT_END));
-	}
 
-	pgm_debug ("NCF contains 1+%d sequence numbers.", ncf_list_len);
-	while (ncf_list_len)
-	{
-		status = pgm_rxw_confirm (source->window,
-					  ntohl (*ncf_list),
-					  skb->tstamp,
-					  ncf_rdata_ivl,
-					  ncf_rb_ivl);
-		if (PGM_RXW_UPDATED == status || PGM_RXW_APPENDED == status)
-			source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
-		ncf_list++;
-		ncf_list_len--;
+		pgm_debug ("NCF contains 1+%d sequence numbers.", ncf_list_len);
+		while (ncf_list_len)
+		{
+			ncf_status = pgm_rxw_confirm (source->window,
+						      ntohl (*ncf_list),
+						      skb->tstamp,
+						      ncf_rdata_ivl,
+						      ncf_rb_ivl);
+			if (PGM_RXW_UPDATED == ncf_status || PGM_RXW_APPENDED == ncf_status)
+				source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAKS_SUPPRESSED]++;
+			ncf_list++;
+			ncf_list_len--;
+		}
 	}
 
 /* mark receiver window for flushing on next recv() */
-	const pgm_rxw_t* window = source->window;
-	if (window->cumulative_losses != source->last_cumulative_losses &&
+	if (source->window->cumulative_losses != source->last_cumulative_losses &&
 	    !source->pending_link.data)
 	{
 		sock->is_reset = TRUE;
-		source->lost_count = window->cumulative_losses - source->last_cumulative_losses;
-		source->last_cumulative_losses = window->cumulative_losses;
+		source->lost_count = source->window->cumulative_losses - source->last_cumulative_losses;
+		source->last_cumulative_losses = source->window->cumulative_losses;
 		pgm_peer_set_pending (sock, source);
 	}
 	return TRUE;
@@ -949,7 +976,9 @@ send_spmr (
 	pgm_peer_t* const restrict source
 	)
 {
-	ssize_t sent;
+	char		  *buf;
+	struct pgm_header *header;
+	ssize_t		   sent;
 
 /* pre-conditions */
 	pgm_assert (NULL != sock);
@@ -959,8 +988,8 @@ send_spmr (
 		(const void*)sock, (const void*)source);
 
 	const size_t tpdu_length = sizeof(struct pgm_header);
-	char buf[ tpdu_length ];
-	struct pgm_header* header = (struct pgm_header*)buf;
+	buf = pgm_alloca (tpdu_length);
+	header = (struct pgm_header*)buf;
 	memcpy (header->pgm_gsi, &source->tsi.gsi, sizeof(pgm_gsi_t));
 /* dport & sport reversed communicating upstream */
 	header->pgm_sport	= sock->dport;
@@ -1011,6 +1040,13 @@ send_nak (
 	const uint32_t		   sequence
 	)
 {
+	size_t		   tpdu_length;
+	char		  *buf;
+	struct pgm_header *header;
+	struct pgm_nak	  *nak;
+	struct pgm_nak6   *nak6;
+	ssize_t		   sent;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -1018,13 +1054,13 @@ send_nak (
 	pgm_debug ("send_nak (sock:%p peer:%p sequence:%" PRIu32 ")",
 		(void*)sock, (void*)source, sequence);
 
-	size_t tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
-	char buf[ tpdu_length ];
-	struct pgm_header* header = (struct pgm_header*)buf;
-	struct pgm_nak*  nak  = (struct pgm_nak* )(header + 1);
-	struct pgm_nak6* nak6 = (struct pgm_nak6*)(header + 1);
+	buf = pgm_alloca (tpdu_length);
+	header = (struct pgm_header*)buf;
+	nak  = (struct pgm_nak *)(header + 1);
+	nak6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &source->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
@@ -1049,13 +1085,13 @@ send_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
-	const ssize_t sent = pgm_sendto (sock,
-					FALSE,			/* not rate limited */
-					TRUE,			/* with router alert */
-					header,
-					tpdu_length,
-					(struct sockaddr*)&source->nla,
-					pgm_sockaddr_len((struct sockaddr*)&source->nla));
+	sent = pgm_sendto (sock,
+			   FALSE,			/* not rate limited */
+			   TRUE,			/* with router alert */
+			   header,
+			   tpdu_length,
+			   (struct sockaddr*)&source->nla,
+			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
@@ -1078,6 +1114,13 @@ send_parity_nak (
 	const uint32_t		   nak_pkt_cnt	/* count of parity packets to request */
 	)
 {
+	size_t		   tpdu_length;
+	char		  *buf;
+	struct pgm_header *header;
+	struct pgm_nak	  *nak;
+	struct pgm_nak6   *nak6;
+	ssize_t		   sent;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -1086,13 +1129,13 @@ send_parity_nak (
 	pgm_debug ("send_parity_nak (sock:%p source:%p nak-tg-sqn:%" PRIu32 " nak-pkt-cnt:%" PRIu32 ")",
 		(void*)sock, (void*)source, nak_tg_sqn, nak_pkt_cnt);
 
-	size_t tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
+	tpdu_length = sizeof(struct pgm_header) + sizeof(struct pgm_nak);
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
-	char buf[ tpdu_length ];
-	struct pgm_header* header = (struct pgm_header*)buf;
-	struct pgm_nak*  nak  = (struct pgm_nak* )(header + 1);
-	struct pgm_nak6* nak6 = (struct pgm_nak6*)(header + 1);
+	buf = pgm_alloca (tpdu_length);
+	header = (struct pgm_header*)buf;
+	nak  = (struct pgm_nak *)(header + 1);
+	nak6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &source->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
@@ -1116,13 +1159,13 @@ send_parity_nak (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
-	const ssize_t sent = pgm_sendto (sock,
-					 FALSE,		/* not rate limited */
-					 TRUE,		/* with router alert */
-					 header,
-					 tpdu_length,
-					 (struct sockaddr*)&source->nla,
-					 pgm_sockaddr_len((struct sockaddr*)&source->nla));
+	sent = pgm_sendto (sock,
+			   FALSE,		/* not rate limited */
+			   TRUE,		/* with router alert */
+			   header,
+			   tpdu_length,
+			   (struct sockaddr*)&source->nla,
+			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
 		return FALSE;
 
@@ -1144,6 +1187,16 @@ send_nak_list (
 	const struct pgm_sqn_list_t* const restrict sqn_list
 	)
 {
+	size_t			 tpdu_length;
+	char			*buf;
+	struct pgm_header	*header;
+	struct pgm_nak		*nak;
+	struct pgm_nak6		*nak6;
+	struct pgm_opt_header	*opt_header;
+	struct pgm_opt_length	*opt_len;
+	struct pgm_opt_nak_list *opt_nak_list;
+	ssize_t			 sent;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -1163,7 +1216,7 @@ send_nak_list (
 		(const void*)sock, (const void*)source, list);
 #endif
 
-	size_t tpdu_length = sizeof(struct pgm_header) +
+	tpdu_length = sizeof(struct pgm_header) +
 			    sizeof(struct pgm_nak) +
 			    sizeof(struct pgm_opt_length) +		/* includes header */
 			    sizeof(struct pgm_opt_header) +
@@ -1171,12 +1224,12 @@ send_nak_list (
 			    ( (sqn_list->len-1) * sizeof(uint32_t) );
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
-	char buf[ tpdu_length ];
+	buf = pgm_alloca (tpdu_length);
 	if (PGM_UNLIKELY(pgm_mem_gc_friendly))
 		memset (buf, 0, tpdu_length);
-	struct pgm_header* header = (struct pgm_header*)buf;
-	struct pgm_nak*  nak  = (struct pgm_nak* )(header + 1);
-	struct pgm_nak6* nak6 = (struct pgm_nak6*)(header + 1);
+	header = (struct pgm_header*)buf;
+	nak  = (struct pgm_nak *)(header + 1);
+	nak6 = (struct pgm_nak6*)(header + 1);
 	memcpy (header->pgm_gsi, &source->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for a nak */
@@ -1194,21 +1247,24 @@ send_nak_list (
 
 /* group nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla,
-				(AF_INET6 == source->nla.ss_family) ? (char*)&nak6->nak6_grp_nla_afi : (char*)&nak->nak_grp_nla_afi);
-
+				(AF_INET6 == source->nla.ss_family) ?
+					(char*)&nak6->nak6_grp_nla_afi :
+					(char*)&nak->nak_grp_nla_afi);
 /* OPT_NAK_LIST */
-	struct pgm_opt_length* opt_len = (AF_INET6 == source->nla.ss_family) ? (struct pgm_opt_length*)(nak6 + 1) : (struct pgm_opt_length*)(nak + 1);
+	opt_len = (AF_INET6 == source->nla.ss_family) ?
+			(struct pgm_opt_length*)(nak6 + 1) :
+			(struct pgm_opt_length*)(nak  + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
 						sizeof(struct pgm_opt_nak_list) +
 						( (sqn_list->len-1) * sizeof(uint32_t) ) );
-	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+	opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
 				+ ( (sqn_list->len-1) * sizeof(uint32_t) );
-	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
+	opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;
 
 	for (unsigned i = 1; i < sqn_list->len; i++)
@@ -1217,13 +1273,13 @@ send_nak_list (
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
-	const ssize_t sent = pgm_sendto (sock,
-					FALSE,			/* not rate limited */
-					FALSE,			/* regular socket */
-					header,
-					tpdu_length,
-					(struct sockaddr*)&source->nla,
-					pgm_sockaddr_len((struct sockaddr*)&source->nla));
+	sent = pgm_sendto (sock,
+			   FALSE,			/* not rate limited */
+			   FALSE,			/* regular socket */
+			   header,
+			   tpdu_length,
+			   (struct sockaddr*)&source->nla,
+			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if ( sent != (ssize_t)tpdu_length )
 		return FALSE;
 
@@ -1240,31 +1296,39 @@ send_nak_list (
 static
 bool
 send_ack (
-	pgm_sock_t*           const restrict sock,
-	pgm_peer_t*           const restrict source,
-	const pgm_time_t		     now
+	pgm_sock_t*const restrict	sock,
+	pgm_peer_t*const restrict	source,
+	const pgm_time_t		now
 	)
 {
+	size_t			       tpdu_length;
+	char			      *buf;
+	struct pgm_header	      *header;
+	struct pgm_ack		      *ack;
+	struct pgm_opt_header	      *opt_header;
+	struct pgm_opt_length	      *opt_len;
+	struct pgm_opt_pgmcc_feedback *opt_pgmcc_feedback;
+	ssize_t			       sent;
+
 /* pre-conditions */
-	pgm_assert (NULL != sock);
-	pgm_assert (sock->use_pgmcc);
 	pgm_assert (NULL != source);
+	pgm_assert (sock->use_pgmcc);
 
 	pgm_debug ("send_ack (sock:%p source:%p now:%" PGM_TIME_FORMAT ")",
-		(const void*)sock, (const void*)source, now);
+		(void*)sock, (void*)source, now);
 
-	size_t tpdu_length = sizeof(struct pgm_header) +
+	tpdu_length = sizeof(struct pgm_header) +
 			     sizeof(struct pgm_ack) +
 			     sizeof(struct pgm_opt_length) +		/* includes header */
 			     sizeof(struct pgm_opt_header) +
 			     sizeof(struct pgm_opt_pgmcc_feedback);
 	if (AF_INET6 == sock->send_addr.ss_family)
 		tpdu_length += sizeof(struct pgm_opt6_pgmcc_feedback) - sizeof(struct pgm_opt_pgmcc_feedback);
-	char buf[ tpdu_length ];
+	buf = pgm_alloca (tpdu_length);
 	if (PGM_UNLIKELY(pgm_mem_gc_friendly))
 		memset (buf, 0, tpdu_length);
-	struct pgm_header* header = (struct pgm_header*)buf;
-	struct pgm_ack* ack = (struct pgm_ack*)(header + 1);
+	header = (struct pgm_header*)buf;
+	ack = (struct pgm_ack*)(header + 1);
 	memcpy (header->pgm_gsi, &source->tsi.gsi, sizeof(pgm_gsi_t));
 
 /* dport & sport swap over for an ack */
@@ -1279,7 +1343,7 @@ send_ack (
 	ack->ack_bitmap		= htonl (source->window->bitmap);
 
 /* OPT_PGMCC_FEEDBACK */
-	struct pgm_opt_length* opt_len = (struct pgm_opt_length*)(ack + 1);
+	opt_len = (struct pgm_opt_length*)(ack + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
@@ -1287,13 +1351,13 @@ send_ack (
 						(AF_INET6 == sock->send_addr.ss_family) ?
 							sizeof(struct pgm_opt6_pgmcc_feedback) :
 							sizeof(struct pgm_opt_pgmcc_feedback) );
-	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
+	opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_PGMCC_FEEDBACK | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) +
 				  ( (AF_INET6 == sock->send_addr.ss_family) ?
 					sizeof(struct pgm_opt6_pgmcc_feedback) :
 					sizeof(struct pgm_opt_pgmcc_feedback) );
-	struct pgm_opt_pgmcc_feedback* opt_pgmcc_feedback = (struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
+	opt_pgmcc_feedback = (struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
 	opt_pgmcc_feedback->opt_reserved = 0;
 
 	const uint32_t t = (uint32_t)(source->ack_last_tstamp + pgm_to_msecs( now - source->last_data_tstamp ));
@@ -1304,13 +1368,13 @@ send_ack (
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
-	const ssize_t sent = pgm_sendto (sock,
-					 FALSE,			/* not rate limited */
-					 FALSE,			/* regular socket */
-					 header,
-					 tpdu_length,
-					 (struct sockaddr*)&source->nla,
-					 pgm_sockaddr_len((struct sockaddr*)&source->nla));
+	sent = pgm_sendto (sock,
+			   FALSE,			/* not rate limited */
+			   FALSE,			/* regular socket */
+			   header,
+			   tpdu_length,
+			   (struct sockaddr*)&source->nla,
+			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
 	if ( sent != (ssize_t)tpdu_length )
 		return FALSE;
 
@@ -1326,37 +1390,38 @@ send_ack (
 static
 bool
 ack_rb_state (
-	pgm_peer_t*		peer,
+	pgm_sock_t*restrict	sock,
+	pgm_peer_t*restrict	peer,
 	const pgm_time_t	now
 	)
 {
+	pgm_queue_t*restrict	ack_backoff_queue;
+
 /* pre-conditions */
+	pgm_assert (NULL != sock);
 	pgm_assert (NULL != peer);
-	pgm_assert (peer->sock->use_pgmcc);
+	pgm_assert (NULL != peer->window);
+	pgm_assert (sock->use_pgmcc);
 
-	pgm_debug ("ack_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
-		(const void*)peer, now);
+	pgm_debug ("ack_rb_state (sock:%p peer:%p now:%" PGM_TIME_FORMAT ")",
+		(void*)sock, (void*)peer, now);
 
-	pgm_rxw_t* window = peer->window;
-	pgm_sock_t* sock = peer->sock;
-	pgm_list_t* list;
-
-	list = window->ack_backoff_queue.tail;
-	if (!list) {
-		pgm_assert (window->ack_backoff_queue.head == NULL);
+	ack_backoff_queue = &peer->window->ack_backoff_queue;
+	if (NULL == ack_backoff_queue->tail) {
+		pgm_assert (NULL == ack_backoff_queue->head);
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Backoff queue is empty in ack_rb_state."));
 		return TRUE;
 	} else {
-		pgm_assert (window->ack_backoff_queue.head != NULL);
+		pgm_assert (NULL != ack_backoff_queue->head);
 	}
 
 /* have not learned this peers NLA */
 	const bool is_valid_nla = (0 != peer->nla.ss_family);
 
-	while (list)
+	for (pgm_list_t *it = ack_backoff_queue->tail, *prev = it->prev;
+	     it;
+	     it = prev, prev = it->prev)
 	{
-		pgm_list_t* next_list_el = list->prev;
-
 /* check for ACK backoff expiration */
 		if (pgm_time_after_eq(now, peer->ack_rb_expiry))
 		{
@@ -1365,7 +1430,6 @@ ack_rb_state (
 
 			if (PGM_UNLIKELY(!is_valid_nla)) {
 				pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Unable to send ACK due to unknown NLA."));
-				list = next_list_el;
 				continue;
 			}
 
@@ -1378,25 +1442,23 @@ ack_rb_state (
 		{	/* packet expires some time later */
 			break;
 		}
-
-		list = next_list_el;
 	}
 
-	if (window->ack_backoff_queue.length == 0)
+	if (ack_backoff_queue->length == 0)
 	{
-		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.head == NULL);
-		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.tail == NULL);
+		pgm_assert ((struct rxw_packet*)ack_backoff_queue->head == NULL);
+		pgm_assert ((struct rxw_packet*)ack_backoff_queue->tail == NULL);
 	}
 	else
 	{
-		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.head != NULL);
-		pgm_assert ((struct rxw_packet*)window->ack_backoff_queue.tail != NULL);
+		pgm_assert ((struct rxw_packet*)ack_backoff_queue->head != NULL);
+		pgm_assert ((struct rxw_packet*)ack_backoff_queue->tail != NULL);
 	}
 
-	if (window->ack_backoff_queue.tail)
+	if (ack_backoff_queue->tail)
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."),
-			pgm_to_secsf(next_ack_rb_expiry(window) - now));
+			pgm_to_secsf(next_ack_rb_expiry(peer->window) - now));
 	}
 	else
 	{
@@ -1416,20 +1478,21 @@ ack_rb_state (
 static
 bool
 nak_rb_state (
-	pgm_peer_t*		peer,
+	pgm_sock_t*restrict	sock,
+	pgm_peer_t*restrict	peer,
 	const pgm_time_t	now
 	)
 {
+	pgm_queue_t*restrict	nak_backoff_queue;
+	unsigned		dropped_invalid = 0;
+
 /* pre-conditions */
+	pgm_assert (NULL != sock);
 	pgm_assert (NULL != peer);
+	pgm_assert (NULL != peer->window);
 
-	pgm_debug ("nak_rb_state (peer:%p now:%" PGM_TIME_FORMAT ")",
-		(const void*)peer, now);
-
-	pgm_rxw_t* window = peer->window;
-	pgm_sock_t* sock = peer->sock;
-	pgm_list_t* list;
-	struct pgm_sqn_list_t nak_list = { .len = 0 };
+	pgm_debug ("nak_rb_state (sock:%p peer:%p now:%" PGM_TIME_FORMAT ")",
+		(void*)sock, (void*)peer, now);
 
 /* send all NAKs first, lack of data is blocking contiguous processing and its 
  * better to get the notification out a.s.a.p. even though it might be waiting
@@ -1438,16 +1501,14 @@ nak_rb_state (
  * alternative: after each packet check for incoming data and return to the
  * event loop.  bias for shorter loops as retry count increases.
  */
-	list = window->nak_backoff_queue.tail;
-	if (!list) {
-		pgm_assert (window->nak_backoff_queue.head == NULL);
+	nak_backoff_queue = &peer->window->nak_backoff_queue;
+	if (NULL == nak_backoff_queue->tail) {
+		pgm_assert (NULL == nak_backoff_queue->head);
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Backoff queue is empty in nak_rb_state."));
 		return TRUE;
 	} else {
-		pgm_assert (window->nak_backoff_queue.head != NULL);
+		pgm_assert (NULL != nak_backoff_queue->head);
 	}
-
-	unsigned dropped_invalid = 0;
 
 /* have not learned this peers NLA */
 	const bool is_valid_nla = 0 != peer->nla.ss_family;
@@ -1457,20 +1518,21 @@ nak_rb_state (
 /* calculate current transmission group for parity enabled peers */
 	if (peer->has_ondemand_parity)
 	{
-		const uint32_t tg_sqn_mask = 0xffffffff << window->tg_sqn_shift;
+		const uint32_t tg_sqn_mask = 0xffffffff << peer->window->tg_sqn_shift;
 
 /* NAKs only generated previous to current transmission group */
-		const uint32_t current_tg_sqn = window->lead & tg_sqn_mask;
+		const uint32_t current_tg_sqn = peer->window->lead & tg_sqn_mask;
 
 		uint32_t nak_tg_sqn = 0;
 		uint32_t nak_pkt_cnt = 0;
 
 /* parity NAK generation */
 
-		while (list)
+		for (pgm_list_t *it = nak_backoff_queue->tail, *prev = it->prev;
+		     it;
+		     it = prev, prev = it->prev)
 		{
-			pgm_list_t* next_list_el = list->prev;
-			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
+			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
@@ -1478,10 +1540,9 @@ nak_rb_state (
 			{
 				if (PGM_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
-					pgm_rxw_lost (window, skb->sequence);
+					pgm_rxw_lost (peer->window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
 					pgm_peer_set_pending (sock, peer);
-					list = next_list_el;
 					continue;
 				}
 
@@ -1490,7 +1551,7 @@ nak_rb_state (
 				if (	(  nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
 					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
 				{
-					pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_NCF);
+					pgm_rxw_state (peer->window, skb, PGM_PKT_STATE_WAIT_NCF);
 
 					if (!nak_pkt_cnt++)
 						nak_tg_sqn = tg_sqn;
@@ -1519,8 +1580,6 @@ nak_rb_state (
 			{	/* packet expires some time later */
 				break;
 			}
-
-			list = next_list_el;
 		}
 
 		if (nak_pkt_cnt && !send_parity_nak (sock, peer, nak_tg_sqn, nak_pkt_cnt))
@@ -1528,13 +1587,15 @@ nak_rb_state (
 	}
 	else
 	{
+		struct pgm_sqn_list_t nak_list = { .len = 0 };
 
 /* select NAK generation */
 
-		while (list)
+		for (pgm_list_t *it = nak_backoff_queue->tail, *prev = it->prev;
+		     it;
+		     it = prev, prev = it->prev)
 		{
-			pgm_list_t* next_list_el = list->prev;
-			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
+			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
@@ -1542,14 +1603,13 @@ nak_rb_state (
 			{
 				if (PGM_UNLIKELY(!is_valid_nla)) {
 					dropped_invalid++;
-					pgm_rxw_lost (window, skb->sequence);
+					pgm_rxw_lost (peer->window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
 					pgm_peer_set_pending (sock, peer);
-					list = next_list_el;
 					continue;
 				}
 
-				pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_NCF);
+				pgm_rxw_state (peer->window, skb, PGM_PKT_STATE_WAIT_NCF);
 				nak_list.sqn[nak_list.len++] = skb->sequence;
 				state->nak_transmit_count++;
 
@@ -1583,8 +1643,6 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("nak_rpt_expiry in %f seconds."),
 			{	/* packet expires some time later */
 				break;
 			}
-
-			list = next_list_el;
 		}
 
 		if (sock->can_send_nak && nak_list.len)
@@ -1602,31 +1660,31 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("nak_rpt_expiry in %f seconds."),
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Dropped %u messages due to invalid NLA."), dropped_invalid);
 
 /* mark receiver window for flushing on next recv() */
-		if (window->cumulative_losses != peer->last_cumulative_losses &&
+		if (peer->window->cumulative_losses != peer->last_cumulative_losses &&
 		    !peer->pending_link.data)
 		{
 			sock->is_reset = TRUE;
-			peer->lost_count = window->cumulative_losses - peer->last_cumulative_losses;
-			peer->last_cumulative_losses = window->cumulative_losses;
+			peer->lost_count = peer->window->cumulative_losses - peer->last_cumulative_losses;
+			peer->last_cumulative_losses = peer->window->cumulative_losses;
 			pgm_peer_set_pending (sock, peer);
 		}
 	}
 
-	if (window->nak_backoff_queue.length == 0)
+	if (nak_backoff_queue->length == 0)
 	{
-		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.head == NULL);
-		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.tail == NULL);
+		pgm_assert ((struct rxw_packet*)nak_backoff_queue->head == NULL);
+		pgm_assert ((struct rxw_packet*)nak_backoff_queue->tail == NULL);
 	}
 	else
 	{
-		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.head != NULL);
-		pgm_assert ((struct rxw_packet*)window->nak_backoff_queue.tail != NULL);
+		pgm_assert ((struct rxw_packet*)nak_backoff_queue->head != NULL);
+		pgm_assert ((struct rxw_packet*)nak_backoff_queue->tail != NULL);
 	}
 
-	if (window->nak_backoff_queue.tail)
+	if (nak_backoff_queue->tail)
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."),
-			pgm_to_secsf(next_nak_rb_expiry(window) - now));
+			pgm_to_secsf(next_nak_rb_expiry(peer->window) - now));
 	}
 	else
 	{
@@ -1656,11 +1714,11 @@ pgm_check_peer_state (
 	if (!sock->peers_list)
 		return TRUE;
 
-	pgm_list_t* list = sock->peers_list;
-	do {
-		pgm_list_t* next = list->next;
-		pgm_peer_t* peer = list->data;
-		pgm_rxw_t* window = peer->window;
+	for (pgm_list_t *it = sock->peers_list, *next = it->next;
+	     it;
+	     it = next, next = it->next)
+	{
+		pgm_peer_t* peer = it->data;
 
 		if (peer->spmr_expiry)
 		{
@@ -1676,34 +1734,34 @@ pgm_check_peer_state (
 			}
 		}
 
-		if (window->ack_backoff_queue.tail)
+		if (peer->window->ack_backoff_queue.tail)
 		{
 			pgm_assert (sock->use_pgmcc);
 
-			if (pgm_time_after_eq (now, next_ack_rb_expiry (window)))
-				if (!ack_rb_state (peer, now)) {
+			if (pgm_time_after_eq (now, next_ack_rb_expiry (peer->window)))
+				if (!ack_rb_state (sock, peer, now)) {
 					return FALSE;
 				}
 		}
 
-		if (window->nak_backoff_queue.tail)
+		if (peer->window->nak_backoff_queue.tail)
 		{
-			if (pgm_time_after_eq (now, next_nak_rb_expiry (window)))
-				if (!nak_rb_state (peer, now)) {
+			if (pgm_time_after_eq (now, next_nak_rb_expiry (peer->window)))
+				if (!nak_rb_state (sock, peer, now)) {
 					return FALSE;
 				}
 		}
 		
-		if (window->wait_ncf_queue.tail)
+		if (peer->window->wait_ncf_queue.tail)
 		{
-			if (pgm_time_after_eq (now, next_nak_rpt_expiry (window)))
-				nak_rpt_state (peer, now);
+			if (pgm_time_after_eq (now, next_nak_rpt_expiry (peer->window)))
+				nak_rpt_state (sock, peer, now);
 		}
 
-		if (window->wait_data_queue.tail)
+		if (peer->window->wait_data_queue.tail)
 		{
-			if (pgm_time_after_eq (now, next_nak_rdata_expiry (window)))
-				nak_rdata_state (peer, now);
+			if (pgm_time_after_eq (now, next_nak_rdata_expiry (peer->window)))
+				nak_rdata_state (sock, peer, now);
 		}
 
 /* expired, remove from hash table and linked list */
@@ -1714,7 +1772,7 @@ pgm_check_peer_state (
 				pgm_trace (PGM_LOG_ROLE_SESSION,_("Peer expiration postponed due to committing data, tsi %s"), pgm_tsi_print (&peer->tsi));
 				peer->expiry += sock->peer_expiry;
 			}
-			else if (window->committed_count)
+			else if (peer->window->committed_count)
 			{
 				pgm_trace (PGM_LOG_ROLE_SESSION,_("Peer expiration postponed due to committed data, tsi %s"), pgm_tsi_print (&peer->tsi));
 				peer->expiry += sock->peer_expiry;
@@ -1730,8 +1788,7 @@ pgm_check_peer_state (
 			}
 		}
 
-		list = next;
-	} while (list);
+	}
 
 /* check for waiting contiguous packets */
 	if (sock->peers_pending && !sock->is_pending_read)
@@ -1751,24 +1808,24 @@ pgm_check_peer_state (
 
 pgm_time_t
 pgm_min_receiver_expiry (
-	pgm_time_t	expiration,		/* absolute time */
-	pgm_sock_t*	sock
+	pgm_sock_t*	sock,
+	pgm_time_t	expiration		/* absolute time */
 	)
 {
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 
-	pgm_debug ("pgm_min_receiver_expiry (expiration:%" PGM_TIME_FORMAT " sock:%p)",
-		expiration, (const void*)sock);
+	pgm_debug ("pgm_min_receiver_expiry (sock:%p expiration:%" PGM_TIME_FORMAT ")",
+		(void*)sock, expiration);
 
 	if (!sock->peers_list)
 		return expiration;
 
-	pgm_list_t* list = sock->peers_list;
-	do {
-		pgm_list_t* next = list->next;
-		pgm_peer_t* peer = (pgm_peer_t*)list->data;
-		pgm_rxw_t* window = peer->window;
+	for (pgm_list_t *it = sock->peers_list, *next = it->next;
+	     it;
+	     it = next, next = it->next)
+	{
+		pgm_peer_t* peer = it->data;
 	
 		if (peer->spmr_expiry)
 		{
@@ -1776,33 +1833,32 @@ pgm_min_receiver_expiry (
 				expiration = peer->spmr_expiry;
 		}
 
-		if (window->ack_backoff_queue.tail)
+		if (peer->window->ack_backoff_queue.tail)
 		{
 			pgm_assert (sock->use_pgmcc);
-			if (pgm_time_after_eq (expiration, next_ack_rb_expiry (window)))
-				expiration = next_ack_rb_expiry (window);
+			if (pgm_time_after_eq (expiration, next_ack_rb_expiry (peer->window)))
+				expiration = next_ack_rb_expiry (peer->window);
 		}
 
-		if (window->nak_backoff_queue.tail)
+		if (peer->window->nak_backoff_queue.tail)
 		{
-			if (pgm_time_after_eq (expiration, next_nak_rb_expiry (window)))
-				expiration = next_nak_rb_expiry (window);
+			if (pgm_time_after_eq (expiration, next_nak_rb_expiry (peer->window)))
+				expiration = next_nak_rb_expiry (peer->window);
 		}
 
-		if (window->wait_ncf_queue.tail)
+		if (peer->window->wait_ncf_queue.tail)
 		{
-			if (pgm_time_after_eq (expiration, next_nak_rpt_expiry (window)))
-				expiration = next_nak_rpt_expiry (window);
+			if (pgm_time_after_eq (expiration, next_nak_rpt_expiry (peer->window)))
+				expiration = next_nak_rpt_expiry (peer->window);
 		}
 
-		if (window->wait_data_queue.tail)
+		if (peer->window->wait_data_queue.tail)
 		{
-			if (pgm_time_after_eq (expiration, next_nak_rdata_expiry (window)))
-				expiration = next_nak_rdata_expiry (window);
+			if (pgm_time_after_eq (expiration, next_nak_rdata_expiry (peer->window)))
+				expiration = next_nak_rdata_expiry (peer->window);
 		}
 	
-		list = next;
-	} while (list);
+	}
 
 	return expiration;
 }
@@ -1813,30 +1869,34 @@ pgm_min_receiver_expiry (
 static
 void
 nak_rpt_state (
-	pgm_peer_t*		peer,
+	pgm_sock_t*restrict	sock,
+	pgm_peer_t*restrict	peer,
 	const pgm_time_t	now
 	)
 {
+	pgm_queue_t*	wait_ncf_queue;
+	unsigned	dropped_invalid = 0;
+	unsigned	dropped = 0;
+
 /* pre-conditions */
+	pgm_assert (NULL != sock);
 	pgm_assert (NULL != peer);
+	pgm_assert (NULL != peer->window);
 
-	pgm_debug ("nak_rpt_state (peer:%p now:%" PGM_TIME_FORMAT ")",
-		(void*)peer, now);
+	pgm_debug ("nak_rpt_state (sock:%p peer:%p now:%" PGM_TIME_FORMAT ")",
+		(void*)sock, (void*)peer, now);
 
-	pgm_rxw_t* window = peer->window;
-	pgm_sock_t* sock = peer->sock;
-	pgm_list_t* list = window->wait_ncf_queue.tail;
-
-	unsigned dropped_invalid = 0;
-	unsigned dropped = 0;
+	wait_ncf_queue = &peer->window->wait_ncf_queue;
 
 /* have not learned this peers NLA */
 	const bool is_valid_nla = 0 != peer->nla.ss_family;
 
-	while (list)
+	for (pgm_list_t *it = wait_ncf_queue->tail, *prev = it->prev;
+	     it;
+	     it = prev, prev = it->prev)
 	{
-		pgm_list_t* next_list_el	= list->prev;
-		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)list;
+		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
+		pgm_assert (NULL != skb);
 		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
 
 /* check this packet for state expiration */
@@ -1844,10 +1904,9 @@ nak_rpt_state (
 		{
 			if (PGM_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
-				pgm_rxw_lost (window, skb->sequence);
+				pgm_rxw_lost (peer->window, skb->sequence);
 /* mark receiver window for flushing on next recv() */
 				pgm_peer_set_pending (sock, peer);
-				list = next_list_el;
 				continue;
 			}
 
@@ -1862,7 +1921,7 @@ nak_rpt_state (
 /* retry */
 //				state->timer_expiry += nak_rb_ivl(sock);
 				state->timer_expiry = now + nak_rb_ivl (sock);
-				pgm_rxw_state (window, skb, PGM_PKT_STATE_BACK_OFF);
+				pgm_rxw_state (peer->window, skb, PGM_PKT_STATE_BACK_OFF);
 				pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("NCF retry #%u attempt %u/%u."), skb->sequence, state->ncf_retry_count, sock->nak_ncf_retries);
 			}
 		}
@@ -1874,18 +1933,17 @@ nak_rpt_state (
 			break;
 		}
 		
-		list = next_list_el;
 	}
 
-	if (window->wait_ncf_queue.length == 0)
+	if (wait_ncf_queue->length == 0)
 	{
-		pgm_assert ((pgm_rxw_state_t*)window->wait_ncf_queue.head == NULL);
-		pgm_assert ((pgm_rxw_state_t*)window->wait_ncf_queue.tail == NULL);
+		pgm_assert ((pgm_rxw_state_t*)wait_ncf_queue->head == NULL);
+		pgm_assert ((pgm_rxw_state_t*)wait_ncf_queue->tail == NULL);
 	}
 	else
 	{
-		pgm_assert ((pgm_rxw_state_t*)window->wait_ncf_queue.head != NULL);
-		pgm_assert ((pgm_rxw_state_t*)window->wait_ncf_queue.tail != NULL);
+		pgm_assert ((pgm_rxw_state_t*)wait_ncf_queue->head != NULL);
+		pgm_assert ((pgm_rxw_state_t*)wait_ncf_queue->tail != NULL);
 	}
 
 	if (PGM_UNLIKELY(dropped_invalid)) {
@@ -1901,31 +1959,33 @@ nak_rpt_state (
 				" lost %" PRIu32
 				" frag %" PRIu32),
 				dropped,
-				pgm_rxw_length (window),
-				window->nak_backoff_queue.length,
-				window->wait_ncf_queue.length,
-				window->wait_data_queue.length,
-				window->lost_count,
-				window->fragment_count);
+				pgm_rxw_length (peer->window),
+				peer->window->nak_backoff_queue.length,
+				peer->window->wait_ncf_queue.length,
+				peer->window->wait_data_queue.length,
+				peer->window->lost_count,
+				peer->window->fragment_count);
 	}
 
 /* mark receiver window for flushing on next recv() */
-	if (PGM_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
+	if (PGM_UNLIKELY(peer->window->cumulative_losses != peer->last_cumulative_losses &&
 	    !peer->pending_link.data))
 	{
 		sock->is_reset = TRUE;
-		peer->lost_count = window->cumulative_losses - peer->last_cumulative_losses;
-		peer->last_cumulative_losses = window->cumulative_losses;
+		peer->lost_count = peer->window->cumulative_losses - peer->last_cumulative_losses;
+		peer->last_cumulative_losses = peer->window->cumulative_losses;
 		pgm_peer_set_pending (sock, peer);
 	}
 
-	if (window->wait_ncf_queue.tail)
+	if (wait_ncf_queue->tail)
 	{
-		if (next_nak_rpt_expiry (window) > now)
+		if (next_nak_rpt_expiry (peer->window) > now)
 		{
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."), pgm_to_secsf (next_nak_rpt_expiry (window) - now));
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."),
+				pgm_to_secsf (next_nak_rpt_expiry (peer->window) - now));
 		} else {
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in -%f seconds."), pgm_to_secsf (now - next_nak_rpt_expiry (window)));
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in -%f seconds."),
+				pgm_to_secsf (now - next_nak_rpt_expiry (peer->window)));
 		}
 	}
 	else
@@ -1940,30 +2000,33 @@ nak_rpt_state (
 static
 void
 nak_rdata_state (
-	pgm_peer_t*		peer,
+	pgm_sock_t*restrict	sock,
+	pgm_peer_t*restrict	peer,
 	const pgm_time_t	now
 	)
 {
+	pgm_queue_t*	wait_data_queue;
+	unsigned	dropped_invalid = 0;
+	unsigned	dropped = 0;
+
 /* pre-conditions */
+	pgm_assert (NULL != sock);
 	pgm_assert (NULL != peer);
+	pgm_assert (NULL != peer->window);
 
-	pgm_debug ("nak_rdata_state (peer:%p now:%" PGM_TIME_FORMAT ")",
-		(const void*)peer, now);
+	pgm_debug ("nak_rdata_state (sock:%p peer:%p now:%" PGM_TIME_FORMAT ")",
+		(void*)sock, (void*)peer, now);
 
-	pgm_rxw_t* window = peer->window;
-	pgm_sock_t* sock = peer->sock;
-	pgm_list_t* list = window->wait_data_queue.tail;
-
-	unsigned dropped_invalid = 0;
-	unsigned dropped = 0;
+	wait_data_queue = &peer->window->wait_data_queue;
 
 /* have not learned this peers NLA */
 	const bool is_valid_nla = 0 != peer->nla.ss_family;
 
-	while (list)
+	for (pgm_list_t *it = wait_data_queue->tail, *prev = it->prev;
+	     it;
+	     it = prev, prev = it->prev)
 	{
-		pgm_list_t* next_list_el	= list->prev;
-		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)list;
+		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)it;
 		pgm_assert (NULL != rdata_skb);
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
 
@@ -1972,10 +2035,9 @@ nak_rdata_state (
 		{
 			if (PGM_UNLIKELY(!is_valid_nla)) {
 				dropped_invalid++;
-				pgm_rxw_lost (window, rdata_skb->sequence);
+				pgm_rxw_lost (peer->window, rdata_skb->sequence);
 /* mark receiver window for flushing on next recv() */
 				pgm_peer_set_pending (sock, peer);
-				list = next_list_el;
 				continue;
 			}
 
@@ -1984,13 +2046,12 @@ nak_rdata_state (
 				dropped++;
 				cancel_skb (sock, peer, rdata_skb, now);
 				peer->cumulative_stats[PGM_PC_RECEIVER_NAKS_FAILED_DATA_RETRIES_EXCEEDED]++;
-				list = next_list_el;
 				continue;
 			}
 
 //			rdata_state->timer_expiry += nak_rb_ivl(sock);
 			rdata_state->timer_expiry = now + nak_rb_ivl (sock);
-			pgm_rxw_state (window, rdata_skb, PGM_PKT_STATE_BACK_OFF);
+			pgm_rxw_state (peer->window, rdata_skb, PGM_PKT_STATE_BACK_OFF);
 
 /* retry back to back-off state */
 			pgm_trace(PGM_LOG_ROLE_RX_WINDOW,_("Data retry #%u attempt %u/%u."), rdata_skb->sequence, rdata_state->data_retry_count, sock->nak_data_retries);
@@ -2000,19 +2061,17 @@ nak_rdata_state (
 			break;
 		}
 		
-
-		list = next_list_el;
 	}
 
-	if (window->wait_data_queue.length == 0)
+	if (wait_data_queue->length == 0)
 	{
-		pgm_assert (NULL == (pgm_rxw_state_t*)window->wait_data_queue.head);
-		pgm_assert (NULL == (pgm_rxw_state_t*)window->wait_data_queue.tail);
+		pgm_assert (NULL == (pgm_rxw_state_t*)wait_data_queue->head);
+		pgm_assert (NULL == (pgm_rxw_state_t*)wait_data_queue->tail);
 	}
 	else
 	{
-		pgm_assert (NULL != (pgm_rxw_state_t*)window->wait_data_queue.head);
-		pgm_assert (NULL != (pgm_rxw_state_t*)window->wait_data_queue.tail);
+		pgm_assert (NULL != (pgm_rxw_state_t*)wait_data_queue->head);
+		pgm_assert (NULL != (pgm_rxw_state_t*)wait_data_queue->tail);
 	}
 
 	if (PGM_UNLIKELY(dropped_invalid)) {
@@ -2024,17 +2083,18 @@ nak_rdata_state (
 	}
 
 /* mark receiver window for flushing on next recv() */
-	if (PGM_UNLIKELY(window->cumulative_losses != peer->last_cumulative_losses &&
+	if (PGM_UNLIKELY(peer->window->cumulative_losses != peer->last_cumulative_losses &&
 	    !peer->pending_link.data))
 	{
 		sock->is_reset = TRUE;
-		peer->lost_count = window->cumulative_losses - peer->last_cumulative_losses;
-		peer->last_cumulative_losses = window->cumulative_losses;
+		peer->lost_count = peer->window->cumulative_losses - peer->last_cumulative_losses;
+		peer->last_cumulative_losses = peer->window->cumulative_losses;
 		pgm_peer_set_pending (sock, peer);
 	}
 
-	if (window->wait_data_queue.tail) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."), pgm_to_secsf (next_nak_rdata_expiry (window) - now));
+	if (peer->window->wait_data_queue.tail) {
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Next expiry set in %f seconds."),
+			pgm_to_secsf (next_nak_rdata_expiry (peer->window) - now));
 	} else {
 		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Wait data queue empty."));
 	}
@@ -2056,6 +2116,10 @@ pgm_on_data (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
+	unsigned	msg_count = 0;
+	pgm_time_t	ack_rb_expiry = 0;
+	bool		flush_naks = FALSE;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -2064,14 +2128,14 @@ pgm_on_data (
 	pgm_debug ("pgm_on_data (sock:%p source:%p skb:%p)",
 		(void*)sock, (void*)source, (void*)skb);
 
-	unsigned msg_count = 0;
 	const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl (sock);
-	pgm_time_t ack_rb_expiry = 0;
-	const unsigned tsdu_length = ntohs (skb->pgm_header->pgm_tsdu_length);
+	const uint_fast16_t tsdu_length = ntohs (skb->pgm_header->pgm_tsdu_length);
 
 	skb->pgm_data = skb->data;
 
-	const unsigned opt_total_length = (skb->pgm_header->pgm_options & PGM_OPT_PRESENT) ? ntohs(*(uint16_t*)( (char*)( skb->pgm_data + 1 ) + sizeof(uint16_t))) : 0;
+	const uint_fast16_t opt_total_length = (skb->pgm_header->pgm_options & PGM_OPT_PRESENT) ?
+		ntohs(*(uint16_t*)( (char*)( skb->pgm_data + 1 ) + sizeof(uint16_t))) :
+		0;
 
 /* advance data pointer to payload */
 	pgm_skb_pull (skb, sizeof(struct pgm_data) + opt_total_length);
@@ -2088,8 +2152,6 @@ pgm_on_data (
 	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
 
 /* skb reference is now invalid */
-	bool flush_naks = FALSE;
-
 	switch (add_status) {
 	case PGM_RXW_MISSING:
 		flush_naks = TRUE;
@@ -2124,7 +2186,7 @@ discarded:
 /* save source timestamp and local timestamp for RTT calculation */
 		source->ack_last_tstamp = ntohl (skb->pgm_opt_pgmcc_data->opt_tstamp);
 		source->last_data_tstamp = skb->tstamp;
-		if (_pgm_is_acker (source, skb))
+		if (_pgm_is_acker (sock, source, skb))
 		{
 			if (PGM_UNLIKELY(pgm_sockaddr_is_addr_unspecified ((struct sockaddr*)&source->nla)))
 			{
@@ -2178,6 +2240,10 @@ pgm_on_poll (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
+	struct pgm_poll		*poll4;
+	struct pgm_poll6	*poll6;
+	uint32_t		 poll_rand;
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
@@ -2187,15 +2253,18 @@ pgm_on_poll (
 		(void*)sock, (void*)source, (void*)skb);
 
 	if (PGM_UNLIKELY(!pgm_verify_poll (skb))) {
-		pgm_trace(PGM_LOG_ROLE_NETWORK,_("Discarded invalid POLL."));
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded invalid POLL."));
 		return FALSE;
 	}
 
-	struct pgm_poll*  poll4 = (struct pgm_poll*) skb->data;
-	struct pgm_poll6* poll6 = (struct pgm_poll6*)skb->data;
-	uint32_t poll_rand;
-	memcpy (&poll_rand, (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ? poll6->poll6_rand : poll4->poll_rand, sizeof(poll_rand));
-	const uint32_t poll_mask = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ? ntohl (poll6->poll6_mask) : ntohl (poll4->poll_mask);
+	poll4 = (struct pgm_poll *)skb->data;
+	poll6 = (struct pgm_poll6*)skb->data;
+	memcpy (&poll_rand, (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
+		poll6->poll6_rand :
+		poll4->poll_rand, sizeof(poll_rand));
+	const uint32_t poll_mask = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
+		ntohl (poll6->poll6_mask) :
+		ntohl (poll4->poll_mask);
 
 /* Check for probability match */
 	if (poll_mask &&
@@ -2250,13 +2319,15 @@ on_general_poll (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
-	struct pgm_poll*  poll4 = (struct pgm_poll*) skb->data;
+	struct pgm_poll*  poll4 = (struct pgm_poll *)skb->data;
 	struct pgm_poll6* poll6 = (struct pgm_poll6*)skb->data;
 
 /* TODO: cancel any pending poll-response */
 
 /* defer response based on provided back-off interval */
-	const uint32_t poll_bo_ivl = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ? ntohl (poll6->poll6_bo_ivl) : ntohl (poll4->poll_bo_ivl);
+	const uint32_t poll_bo_ivl = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
+		ntohl (poll6->poll6_bo_ivl) :
+		ntohl (poll4->poll_bo_ivl);
 	source->polr_expiry = skb->tstamp + pgm_rand_int_range (&sock->rand_, 0, poll_bo_ivl);
 	pgm_nla_to_sockaddr (&poll4->poll_nla_afi, (struct sockaddr*)&source->poll_nla);
 /* TODO: schedule poll-response */
