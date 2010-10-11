@@ -222,6 +222,7 @@ pgm_socket (
 	)
 {
 	pgm_sock_t* new_sock;
+	int socket_type;
 
 	pgm_return_val_if_fail (NULL != sock, FALSE);
 	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family, FALSE);
@@ -261,7 +262,6 @@ pgm_socket (
 	pgm_rwlock_init (&new_sock->lock);
 
 /* open sockets to implement PGM */
-	int socket_type;
 	if (IPPROTO_UDP == new_sock->protocol) {
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Opening UDP encapsulated sockets."));
 		socket_type = SOCK_DGRAM;
@@ -566,9 +566,9 @@ pgm_getsockopt (
 			break;
 		{
 			struct timeval* tv = optval;
-			const pgm_time_t usecs = pgm_timer_expiration (sock);
-			tv->tv_sec  = usecs / 1000000UL;
-			tv->tv_usec = usecs % 1000000UL;
+			const long usecs = (long)pgm_timer_expiration (sock);
+			tv->tv_sec  = usecs / 1000000L;
+			tv->tv_usec = usecs % 1000000L;
 		}
 		status = TRUE;
 		break;
@@ -581,9 +581,9 @@ pgm_getsockopt (
 			break;
 		{
 			struct timeval* tv = optval;
-			const pgm_time_t usecs = pgm_rate_remaining (&sock->rate_control, sock->blocklen);
-			tv->tv_sec  = usecs / 1000000UL;
-			tv->tv_usec = usecs % 1000000UL;
+			const long usecs = (long)pgm_rate_remaining (&sock->rate_control, sock->blocklen);
+			tv->tv_sec  = usecs / 1000000L;
+			tv->tv_usec = usecs % 1000000L;
 		}
 		status = TRUE;
 		break;
@@ -1804,38 +1804,38 @@ pgm_bind3 (
 		if (sock->use_pgmcc &&
 		    0 != pgm_notify_init (&sock->ack_notify))
 		{
-			const int save_errno = errno;
+			const int save_errno = pgm_sock_errno();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
-				       pgm_error_from_errno (save_errno),
+				       pgm_error_from_sock_errno (save_errno),
 				       _("Creating ACK notification channel: %s"),
-				       pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
+				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			pgm_rwlock_writer_unlock (&sock->lock);
 			return FALSE;
 		}
 		if (0 != pgm_notify_init (&sock->rdata_notify))
 		{
-			const int save_errno = errno;
+			const int save_errno = pgm_sock_errno();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
-				       pgm_error_from_errno (save_errno),
+				       pgm_error_from_sock_errno (save_errno),
 				       _("Creating RDATA notification channel: %s"),
-				       pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
+				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			pgm_rwlock_writer_unlock (&sock->lock);
 			return FALSE;
 		}
 	}
 	if (0 != pgm_notify_init (&sock->pending_notify))
 	{
-		const int save_errno = errno;
+		const int save_errno = pgm_sock_errno();
 		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
-			       pgm_error_from_errno (save_errno),
+			       pgm_error_from_sock_errno (save_errno),
 			       _("Creating waiting peer notification channel: %s"),
-			       pgm_strerror_s (errbuf, sizeof (errbuf), save_errno));
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
 	}
@@ -1846,7 +1846,7 @@ pgm_bind3 (
 
 	if (sock->udp_encap_ucast_port) {
 		const size_t udphdr_len = sizeof(struct pgm_udphdr);
-		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %zu bytes", udphdr_len);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %lu bytes", (unsigned long)udphdr_len);
 		sock->iphdr_len += udphdr_len;
 	}
 
@@ -2294,6 +2294,8 @@ pgm_poll_info (
 	const int			events		/* POLLIN, POLLOUT */
 	)
 {
+	int nfds = 0;
+
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != fds);
 	pgm_assert (NULL != n_fds);
@@ -2304,44 +2306,42 @@ pgm_poll_info (
 		return -1;
 	}
 
-	int moo = 0;
-
 /* we currently only support one incoming socket */
 	if (events & POLLIN)
 	{
-		pgm_assert ( (1 + moo) <= *n_fds );
-		fds[moo].fd = sock->recv_sock;
-		fds[moo].events = POLLIN;
-		moo++;
+		pgm_assert ( (1 + nfds) <= *n_fds );
+		fds[nfds].fd = sock->recv_sock;
+		fds[nfds].events = POLLIN;
+		nfds++;
 		if (sock->can_send_data) {
-			pgm_assert ( (1 + moo) <= *n_fds );
-			fds[moo].fd = pgm_notify_get_fd (&sock->rdata_notify);
-			fds[moo].events = POLLIN;
-			moo++;
+			pgm_assert ( (1 + nfds) <= *n_fds );
+			fds[nfds].fd = pgm_notify_get_fd (&sock->rdata_notify);
+			fds[nfds].events = POLLIN;
+			nfds++;
 		}
-		pgm_assert ( (1 + moo) <= *n_fds );
-		fds[moo].fd = pgm_notify_get_fd (&sock->pending_notify);
-		fds[moo].events = POLLIN;
-		moo++;
+		pgm_assert ( (1 + nfds) <= *n_fds );
+		fds[nfds].fd = pgm_notify_get_fd (&sock->pending_notify);
+		fds[nfds].events = POLLIN;
+		nfds++;
 	}
 
 /* ODATA only published on regular socket, no need to poll router-alert sock */
 	if (sock->can_send_data && events & POLLOUT)
 	{
-		pgm_assert ( (1 + moo) <= *n_fds );
+		pgm_assert ( (1 + nfds) <= *n_fds );
 		if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) {
 /* rx thread poll for ACK */
-			fds[moo].fd = pgm_notify_get_fd (&sock->ack_notify);
-			fds[moo].events = POLLIN;
+			fds[nfds].fd = pgm_notify_get_fd (&sock->ack_notify);
+			fds[nfds].events = POLLIN;
 		} else {
 /* kernel resource poll */
-			fds[moo].fd = sock->send_sock;
-			fds[moo].events = POLLOUT;
+			fds[nfds].fd = sock->send_sock;
+			fds[nfds].events = POLLOUT;
 		}
-		moo++;
+		nfds++;
 	}
 
-	return *n_fds = moo;
+	return *n_fds = nfds;
 }
 #endif /* CONFIG_HAVE_POLL */
 
@@ -2360,6 +2360,9 @@ pgm_epoll_ctl (
 	const int		events		/* EPOLLIN, EPOLLOUT */
 	)
 {
+	struct epoll_event event;
+	int retval = 0;
+
 	if (!(op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD))
 	{
 		errno = EINVAL;
@@ -2370,9 +2373,6 @@ pgm_epoll_ctl (
 		errno = EBADF;
 		return -1;
 	}
-
-	struct epoll_event event;
-	int retval = 0;
 
 	if (events & EPOLLIN)
 	{

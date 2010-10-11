@@ -1,13 +1,13 @@
---- if.c	2010-10-06 17:21:09.000000000 +0800
-+++ if.c89	2010-10-06 17:21:17.000000000 +0800
+--- if.c	2010-10-09 10:32:38.000000000 +0800
++++ if.c89.c	2010-10-09 10:31:45.000000000 +0800
 @@ -124,6 +124,7 @@
  			continue;
  		}
  
 +		{
- 		char s[INET6_ADDRSTRLEN];
+ 		char saddr[INET6_ADDRSTRLEN];
  		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
- 			     s, sizeof(s),
+ 			     saddr, sizeof(saddr),
 @@ -140,6 +141,7 @@
  			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
  			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "

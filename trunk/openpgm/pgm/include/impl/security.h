@@ -175,24 +175,24 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 
 static inline
 errno_t
-pgm_dupenv_s (char **buffer, size_t *size, const char* name)
+pgm_dupenv_s (char **buffer, size_t *count, const char* name)
 {
 #ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	const char *val = getenv (name);
 /* not found */
 	if (NULL == val) {
 		*buffer = NULL;
-		*size = 0;
+		*count = 0;
 		return 0;
 	}
 	*buffer = pgm_strdup (val);
 /* out of memory */
 	if (NULL == *buffer) {
 		*buffer = NULL;
-		*size = 0;
+		*count = 0;
 		return errno;	/* ENOMEM */
 	}
-	*size = strlen (*buffer) + 1;
+	*count = strlen (*buffer) + 1;
 	return 0;
 #else
 	return _dupenv_s (buffer, count, name);

@@ -129,7 +129,7 @@ pgm_timer_dispatch (
 	{
 		if (!pgm_check_peer_state (sock, now))
 			return FALSE;
-		next_expiration = pgm_min_receiver_expiry (now + sock->peer_expiry, sock);
+		next_expiration = pgm_min_receiver_expiry (sock, now + sock->peer_expiry);
 	}
 
 	if (sock->can_send_data)

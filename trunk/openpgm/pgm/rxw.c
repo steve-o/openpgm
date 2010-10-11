@@ -616,6 +616,7 @@ _pgm_rxw_add_placeholder (
 	)
 {
 	struct pgm_sk_buff_t* skb;
+	pgm_rxw_state_t* state;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -635,7 +636,7 @@ _pgm_rxw_add_placeholder (
 	window->data_loss = window->ack_c_p + pgm_fp16mul ((pgm_fp16 (1) - window->ack_c_p), window->data_loss);
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
-	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
+	state			= (pgm_rxw_state_t*)&skb->cb;
 	skb->tstamp		= now;
 	skb->sequence		= window->lead;
 	state->timer_expiry	= nak_rb_expiry;
@@ -725,14 +726,15 @@ _pgm_rxw_update_lead (
 	const pgm_time_t	nak_rb_expiry
 	)
 {
+	uint32_t lead;
+	unsigned lost = 0;
+
 /* pre-conditions */
 	pgm_assert (NULL != window);
 
 /* advertised lead is less than the current value */
 	if (PGM_UNLIKELY(pgm_uint32_lte (txw_lead, window->lead)))
 		return 0;
-
-	uint32_t lead;
 
 /* committed packets limit constrain the lead until they are released */
 	if (!_pgm_rxw_commit_is_empty (window) &&
@@ -745,8 +747,7 @@ _pgm_rxw_update_lead (
 	else
 		lead = txw_lead;
 
-	unsigned lost = 0;
-
+/* count lost sequences */
 	while (window->lead != lead)
 	{
 /* slow consumer or fast producer */
@@ -996,7 +997,7 @@ _pgm_rxw_insert (
 	}
 
 /* statistics */
-	const pgm_time_t fill_time = new_skb->tstamp - skb->tstamp;
+	const uint32_t fill_time = (uint32_t)(new_skb->tstamp - skb->tstamp);
 	PGM_HISTOGRAM_TIMES("Rx.RepairTime", fill_time);
 	PGM_HISTOGRAM_COUNTS("Rx.NakTransmits", state->nak_transmit_count);
 	PGM_HISTOGRAM_COUNTS("Rx.NcfRetries", state->ncf_retry_count);
@@ -1038,8 +1039,8 @@ _pgm_rxw_insert (
 
 /* replace place holder skb with incoming skb */
 	memcpy (new_skb->cb, skb->cb, sizeof(skb->cb));
-	pgm_rxw_state_t* rxw_state = (void*)new_skb->cb;
-	rxw_state->pkt_state = PGM_PKT_STATE_ERROR;
+	state = (void*)new_skb->cb;
+	state->pkt_state = PGM_PKT_STATE_ERROR;
 	_pgm_rxw_unlink (window, skb);
 	pgm_free_skb (skb);
 	const uint_fast32_t index_ = new_skb->sequence % pgm_rxw_max_length (window);
@@ -1063,26 +1064,26 @@ _pgm_rxw_shuffle_parity (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
-	uint_fast32_t index_;
+	struct pgm_sk_buff_t* restrict missing;
+	char cb[48];
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != skb);
 
-	struct pgm_sk_buff_t* restrict missing = _pgm_rxw_find_missing (window, skb->sequence);
+	missing = _pgm_rxw_find_missing (window, skb->sequence);
 	if (NULL == missing)
 		return;
 
 /* replace place holder skb with parity skb */
-	char cb[48];
 	_pgm_rxw_unlink (window, missing);
 	memcpy (cb, skb->cb, sizeof(skb->cb));
 	memcpy (skb->cb, missing->cb, sizeof(skb->cb));
 	memcpy (missing->cb, cb, sizeof(skb->cb));
-	index_ = skb->sequence % pgm_rxw_max_length (window);
-	window->pdata[index_] = skb;
-	index_ = missing->sequence % pgm_rxw_max_length (window);
-	window->pdata[index_] = missing;
+	const uint32_t parity_index = skb->sequence % pgm_rxw_max_length (window);
+	window->pdata[parity_index] = skb;
+	const uint32_t missing_index = missing->sequence % pgm_rxw_max_length (window);
+	window->pdata[missing_index] = missing;
 }
 
 /* skb advances the window lead.
@@ -1333,6 +1334,8 @@ _pgm_rxw_incoming_read (
 {
 	const struct pgm_msgv_t* msg_end;
 	struct pgm_sk_buff_t* skb;
+	ssize_t bytes_read = 0;
+	size_t  data_read  = 0;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -1344,9 +1347,6 @@ _pgm_rxw_incoming_read (
 		 (void*)window, (void*)pmsg, pmsglen);
 
 	msg_end = *pmsg + pmsglen - 1;
-	ssize_t bytes_read = 0;
-	size_t data_read = 0;
-
 	do {
 		skb = _pgm_rxw_peek (window, window->commit_lead);
 		pgm_assert (NULL != skb);
@@ -1399,13 +1399,23 @@ _pgm_rxw_reconstruct (
 	const uint32_t		tg_sqn		/* transmission group sequence */
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	pgm_rxw_state_t* state;
+	struct pgm_sk_buff_t	*skb;
+	pgm_rxw_state_t		*state;
+	struct pgm_sk_buff_t   **tg_skbs;
+	pgm_gf8_t	       **tg_data, **tg_opts;
+	uint8_t			*offsets;
+	uint8_t			 rs_h = 0;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
 	pgm_assert (1 == window->is_fec_available);
 	pgm_assert_cmpuint (_pgm_rxw_pkt_sqn (window, tg_sqn), ==, 0);
+
+/* use stack memory */
+	tg_skbs = pgm_newa (struct pgm_sk_buff_t*, window->rs.n);
+	tg_data = pgm_newa (pgm_gf8_t*, window->rs.n);
+	tg_opts = pgm_newa (pgm_gf8_t*, window->rs.n);
+	offsets = pgm_newa (uint8_t, window->rs.k);
 
 	skb = _pgm_rxw_peek (window, tg_sqn);
 	pgm_assert (NULL != skb);
@@ -1413,11 +1423,6 @@ _pgm_rxw_reconstruct (
 	const bool is_var_pktlen = skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN;
 	const bool is_op_encoded = skb->pgm_header->pgm_options & PGM_OPT_PRESENT;
 	const uint16_t parity_length = ntohs (skb->pgm_header->pgm_tsdu_length);
-	struct pgm_sk_buff_t* tg_skbs[ window->rs.n ];
-	pgm_gf8_t* tg_data[ window->rs.n ];
-	pgm_gf8_t* tg_opts[ window->rs.n ];
-	uint8_t offsets[ window->rs.k ];
-	uint8_t rs_h = 0;
 
 	for (uint32_t i = tg_sqn, j = 0; i != (tg_sqn + window->rs.k); i++, j++)
 	{
@@ -1490,10 +1495,12 @@ _pgm_rxw_reconstruct (
 /* swap parity skbs with reconstructed skbs */
 	for (uint_fast8_t i = 0; i < window->rs.k; i++)
 	{
+		struct pgm_sk_buff_t* repair_skb;
+
 		if (offsets[i] < window->rs.k)
 			continue;
 
-		struct pgm_sk_buff_t* repair_skb = tg_skbs[i];
+		repair_skb = tg_skbs[i];
 
 		if (is_var_pktlen)
 		{
@@ -1544,8 +1551,10 @@ _pgm_rxw_is_apdu_complete (
 	const uint32_t		first_sequence
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	pgm_rxw_state_t* state;
+	struct pgm_sk_buff_t	*skb;
+	unsigned		 contiguous_tpdus = 0;
+	size_t			 contiguous_size = 0;
+	bool			 check_parity = FALSE;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -1559,11 +1568,7 @@ _pgm_rxw_is_apdu_complete (
 	}
 
 	const size_t apdu_size = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
-	const uint32_t tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);
-	uint32_t sequence = first_sequence;
-	unsigned contiguous_tpdus = 0;
-	size_t contiguous_size = 0;
-	bool check_parity = FALSE;
+	const uint32_t  tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);
 
 	pgm_assert_cmpuint (apdu_size, >=, skb->len);
 
@@ -1573,8 +1578,9 @@ _pgm_rxw_is_apdu_complete (
 		return FALSE;
 	}
 
-	do {
-		state = (pgm_rxw_state_t*)&skb->cb;
+	for (uint32_t sequence = first_sequence; skb; sequence++)
+	{
+		pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
 
 		if (!check_parity &&
 		    PGM_PKT_STATE_HAVE_DATA != state->pkt_state)
@@ -1638,7 +1644,7 @@ _pgm_rxw_is_apdu_complete (
 		}
 
 		skb = _pgm_rxw_peek (window, ++sequence);
-	} while (skb);
+	}
 
 /* pending */
 	return FALSE;
@@ -1656,6 +1662,8 @@ _pgm_rxw_incoming_read_apdu (
 	)
 {
 	struct pgm_sk_buff_t *skb;
+	size_t		      contiguous_len = 0;
+	unsigned	      count = 0;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -1665,15 +1673,14 @@ _pgm_rxw_incoming_read_apdu (
 		(const void*)window, (const void*)pmsg);
 
 	skb = _pgm_rxw_peek (window, window->commit_lead);
-	size_t contiguous_len = 0;
+	pgm_assert (NULL != skb);
+
 	const size_t apdu_len = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
-	unsigned i = 0;
 	pgm_assert_cmpuint (apdu_len, >=, skb->len);
-	(*pmsg)->msgv_len = 0;
+
 	do {
 		_pgm_rxw_state (window, skb, PGM_PKT_STATE_COMMIT_DATA);
-		(*pmsg)->msgv_skb[i++] = skb;
-		(*pmsg)->msgv_len++;
+		(*pmsg)->msgv_skb[ count++ ] = skb;
 		contiguous_len += skb->len;
 		window->commit_lead++;
 		if (apdu_len == contiguous_len)
@@ -1681,12 +1688,13 @@ _pgm_rxw_incoming_read_apdu (
 		skb = _pgm_rxw_peek (window, window->commit_lead);
 	} while (apdu_len > contiguous_len);
 
+	(*pmsg)->msgv_len = count;
 	(*pmsg)++;
 
 /* post-conditions */
 	pgm_assert (!_pgm_rxw_commit_is_empty (window));
 
-return contiguous_len;
+	return contiguous_len;
 }
 
 /* returns transmission group sequence (TG_SQN) from sequence (SQN).
@@ -1766,11 +1774,13 @@ _pgm_rxw_state (
 	const int			     new_pkt_state
 	)
 {
-	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
+	pgm_rxw_state_t* state;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != skb);
+
+	state = (pgm_rxw_state_t*)&skb->cb;
 
 /* remove current state */
 	if (PGM_PKT_STATE_ERROR != state->pkt_state)
@@ -1842,13 +1852,14 @@ _pgm_rxw_unlink (
 	struct pgm_sk_buff_t* const restrict skb
 	)
 {
+	pgm_rxw_state_t* state;
 	pgm_queue_t* queue;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
 	pgm_assert (NULL != skb);
 
-	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
+	state = (pgm_rxw_state_t*)&skb->cb;
 
 	switch (state->pkt_state) {
 	case PGM_PKT_STATE_BACK_OFF:
@@ -2012,13 +2023,16 @@ _pgm_rxw_recovery_update (
 	const pgm_time_t	nak_rdata_expiry		/* pre-calculated expiry times */
 	)
 {
+	pgm_rxw_state_t* state;
+	struct pgm_sk_buff_t* skb;
+
 /* pre-conditions */
 	pgm_assert (NULL != window);
 
 /* fetch skb from window and bump expiration times */
-	struct pgm_sk_buff_t* skb = _pgm_rxw_peek (window, sequence);
+	skb = _pgm_rxw_peek (window, sequence);
 	pgm_assert (NULL != skb);
-	pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
+	state = (pgm_rxw_state_t*)&skb->cb;
 	switch (state->pkt_state) {
 	case PGM_PKT_STATE_BACK_OFF:
 	case PGM_PKT_STATE_WAIT_NCF:
@@ -2057,6 +2071,7 @@ _pgm_rxw_recovery_append (
 	)
 {
 	struct pgm_sk_buff_t* skb;
+	pgm_rxw_state_t* state;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -2084,7 +2099,7 @@ _pgm_rxw_recovery_append (
 	window->data_loss = window->ack_c_p + pgm_fp16mul (pgm_fp16 (1) - window->ack_c_p, window->data_loss);
 
 	skb			= pgm_alloc_skb (window->max_tpdu);
-	pgm_rxw_state_t* state	= (pgm_rxw_state_t*)&skb->cb;
+	state			= (pgm_rxw_state_t*)&skb->cb;
 	skb->tstamp		= now;
 	skb->sequence		= window->lead;
 	state->timer_expiry	= nak_rdata_expiry;

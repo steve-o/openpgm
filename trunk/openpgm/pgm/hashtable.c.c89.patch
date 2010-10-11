@@ -1,5 +1,5 @@
 --- hashtable.c	2010-09-16 13:42:33.000000000 +0800
-+++ hashtable.c89	2010-10-06 15:38:46.000000000 +0800
++++ hashtable.c89.c	2010-10-09 10:29:28.000000000 +0800
 @@ -71,6 +71,7 @@
  	pgm_return_val_if_fail (NULL != hash_func, NULL);
  	pgm_return_val_if_fail (NULL != key_equal_func, NULL);
@@ -67,7 +67,7 @@
  	hash_table->nnodes = 0;
  	PGM_HASHTABLE_RESIZE (hash_table);
  }
-@@ -224,14 +236,20 @@
+@@ -224,14 +236,22 @@
  					 HASHTABLE_MIN_SIZE, HASHTABLE_MAX_SIZE);
  	pgm_hashnode_t** new_nodes = pgm_new0 (pgm_hashnode_t*, new_size);
    
@@ -81,9 +81,11 @@
 +		for (node = hash_table->nodes[i]; node; node = next)
  		{
  			next = node->next;
++			{
  			const pgm_hash_t hash_val = node->key_hash % new_size;
  			node->next = new_nodes[hash_val];
  			new_nodes[hash_val] = node;
++			}
  		}
 +	}
 +	}
