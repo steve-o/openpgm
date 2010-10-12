@@ -1,5 +1,5 @@
---- rxw.c	2010-10-08 12:36:23.000000000 +0800
-+++ rxw.c89	2010-10-08 12:37:43.000000000 +0800
+--- rxw.c	2010-10-12 14:44:19.000000000 +0800
++++ rxw.c89.c	2010-10-12 17:28:23.000000000 +0800
 @@ -192,16 +192,12 @@
  		pgm_assert_cmpuint (max_rte, >, 0);
  	}
@@ -123,7 +123,7 @@
  
 -	for (uint32_t i = tg_sqn, j = 0; j < window->tg_size; i++, j++)
 +	{
-+	uint32_t i;
++	uint32_t i, j;
 +	for (i = tg_sqn, j = 0; j < window->tg_size; i++, j++)
  	{
  		skb = _pgm_rxw_peek (window, i);
@@ -265,18 +265,23 @@
  	pgm_rxw_state_t		*state;
  	struct pgm_sk_buff_t   **tg_skbs;
  	pgm_gf8_t	       **tg_data, **tg_opts;
-@@ -1424,7 +1459,9 @@
+@@ -1420,11 +1455,14 @@
+ 	skb = _pgm_rxw_peek (window, tg_sqn);
+ 	pgm_assert (NULL != skb);
+ 
++	{
+ 	const bool is_var_pktlen = skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN;
  	const bool is_op_encoded = skb->pgm_header->pgm_options & PGM_OPT_PRESENT;
  	const uint16_t parity_length = ntohs (skb->pgm_header->pgm_tsdu_length);
  
 -	for (uint32_t i = tg_sqn, j = 0; i != (tg_sqn + window->rs.k); i++, j++)
 +	{
-+	uint32_t i;
++	uint32_t i, j;
 +	for (i = tg_sqn, j = 0; i != (tg_sqn + window->rs.k); i++, j++)
  	{
  		skb = _pgm_rxw_peek (window, i);
  		pgm_assert (NULL != skb);
-@@ -1478,6 +1515,7 @@
+@@ -1478,6 +1516,7 @@
  		}
  
  	}
@@ -284,7 +289,7 @@
  
  /* reconstruct payload */
  	pgm_rs_decode_parity_appended (&window->rs,
-@@ -1493,7 +1531,9 @@
+@@ -1493,7 +1532,9 @@
  					       sizeof(struct pgm_opt_fragment));
  
  /* swap parity skbs with reconstructed skbs */
@@ -295,7 +300,7 @@
  	{
  		struct pgm_sk_buff_t* repair_skb;
  
-@@ -1508,17 +1548,22 @@
+@@ -1508,17 +1549,22 @@
  			if (pktlen > parity_length) {
  				pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Invalid encoded variable packet length in reconstructed packet, dropping entire transmission group."));
  				pgm_free_skb (repair_skb);
@@ -319,15 +324,16 @@
  		}
  
  #ifdef PGM_DISABLE_ASSERT
-@@ -1527,6 +1572,7 @@
+@@ -1527,6 +1573,8 @@
  		pgm_assert_cmpint (_pgm_rxw_insert (window, repair_skb), ==, PGM_RXW_INSERTED);
  #endif
  	}
 +	}
++	}
  }
  
  /* check every TPDU in an APDU and verify that the data has arrived
-@@ -1567,6 +1613,7 @@
+@@ -1567,6 +1615,7 @@
  		return FALSE;
  	}
  
@@ -335,7 +341,7 @@
  	const size_t apdu_size = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
  	const uint32_t  tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);
  
-@@ -1578,7 +1625,9 @@
+@@ -1578,7 +1627,9 @@
  		return FALSE;
  	}
  
@@ -346,7 +352,7 @@
  	{
  		pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
  
-@@ -1643,11 +1692,13 @@
+@@ -1643,11 +1694,13 @@
  			}
  		}
  
@@ -361,7 +367,7 @@
  }
  
  /* read one APDU consisting of one or more TPDUs.  target array is guaranteed
-@@ -1675,6 +1726,7 @@
+@@ -1675,6 +1728,7 @@
  	skb = _pgm_rxw_peek (window, window->commit_lead);
  	pgm_assert (NULL != skb);
  
@@ -369,7 +375,7 @@
  	const size_t apdu_len = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
  	pgm_assert_cmpuint (apdu_len, >=, skb->len);
  
-@@ -1695,6 +1747,7 @@
+@@ -1695,6 +1749,7 @@
  	pgm_assert (!_pgm_rxw_commit_is_empty (window));
  
  	return contiguous_len;
@@ -377,7 +383,7 @@
  }
  
  /* returns transmission group sequence (TG_SQN) from sequence (SQN).
-@@ -1710,8 +1763,10 @@
+@@ -1710,8 +1765,10 @@
  /* pre-conditions */
  	pgm_assert (NULL != window);
  
@@ -388,7 +394,7 @@
  }
  
  /* returns packet number (PKT_SQN) from sequence (SQN).
-@@ -1727,8 +1782,10 @@
+@@ -1727,8 +1784,10 @@
  /* pre-conditions */
  	pgm_assert (NULL != window);
  
@@ -399,15 +405,7 @@
  }
  
  /* returns TRUE when the sequence is the first of a transmission group.
-@@ -1908,6 +1965,7 @@
- 	state->pkt_state = PGM_PKT_STATE_ERROR;
- 	pgm_assert (((pgm_list_t*)skb)->next == NULL);
- 	pgm_assert (((pgm_list_t*)skb)->prev == NULL);
-+	}
- }
- 
- /* returns the pointer at the given index of the window.
-@@ -2104,8 +2162,10 @@
+@@ -2104,8 +2163,10 @@
  	skb->sequence		= window->lead;
  	state->timer_expiry	= nak_rdata_expiry;
  
@@ -418,7 +416,7 @@
  	_pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
  
  	return PGM_RXW_APPENDED;
-@@ -2147,7 +2207,7 @@
+@@ -2147,7 +2208,7 @@
  		"cumulative_losses = %" PRIu32 ", "
  		"bytes_delivered = %" PRIu32 ", "
  		"msgs_delivered = %" PRIu32 ", "
@@ -427,7 +425,7 @@
  		"alloc = %" PRIu32 ", "
  		"pdata = []"
  		"}",
-@@ -2190,7 +2250,7 @@
+@@ -2190,7 +2251,7 @@
  		window->cumulative_losses,
  		window->bytes_delivered,
  		window->msgs_delivered,

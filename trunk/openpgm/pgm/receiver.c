@@ -1311,6 +1311,7 @@ send_ack (
 	ssize_t			       sent;
 
 /* pre-conditions */
+	pgm_assert (NULL != sock);
 	pgm_assert (NULL != source);
 	pgm_assert (sock->use_pgmcc);
 
@@ -1932,7 +1933,6 @@ nak_rpt_state (
 				skb->sequence, pgm_to_secsf (state->timer_expiry - now));
 			break;
 		}
-		
 	}
 
 	if (wait_ncf_queue->length == 0)

@@ -1,6 +1,6 @@
 --- string.c	2010-10-12 12:08:37.000000000 +0800
-+++ string.c89.c	2010-10-12 12:08:25.000000000 +0800
-@@ -90,10 +90,12 @@
++++ string.c89.c	2010-10-12 15:52:39.000000000 +0800
+@@ -90,17 +90,20 @@
  	if (len < 0)
  		*string = NULL;
  #else
@@ -13,9 +13,12 @@
  	va_list args2;
  	va_copy (args2, args);
  #	endif
-@@ -101,6 +103,7 @@
- /* NB: must be able to handle NULL args, fails on GCC */
- 	len = vsprintf (*string, format, args2);
+-	*string = malloc (pgm_printf_string_upper_bound (format, args));
+-/* NB: must be able to handle NULL args, fails on GCC */
+-	len = vsprintf (*string, format, args2);
++	len = pgm_printf_string_upper_bound (format, args);
++	*string = malloc (len);
++	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
  	va_end (args2);
 +	}
  #endif
