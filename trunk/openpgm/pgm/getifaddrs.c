@@ -761,7 +761,7 @@ _pgm_getadaptersaddresses (
 			switch (unicast->Address.lpSockaddr->sa_family) {
 			case AF_INET:
 				if (0 == prefixLength) {
-					pgm_warn (_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
+					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
 					prefixLength = 32;
 				}
 				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( 0xffffffffU << ( 32 - prefixLength ) );
@@ -769,7 +769,7 @@ _pgm_getadaptersaddresses (
 
 			case AF_INET6:
 				if (0 == prefixLength) {
-					pgm_warn (_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
+					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
 					prefixLength = 128;
 				}
 				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
