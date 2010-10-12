@@ -40,14 +40,14 @@ pgm_timer_prepare (
 	pgm_sock_t* const	sock
 	)
 {
-	int32_t msec;
+	pgm_time_t	now, expiration;
+	int32_t		msec;
 
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (sock->can_send_data || sock->can_recv_data);
 
-	pgm_time_t now = pgm_time_update_now();
-	pgm_time_t expiration;
+	now = pgm_time_update_now();
 
 	if (sock->can_send_data)
 		expiration = sock->next_ambient_spm;
@@ -59,7 +59,7 @@ pgm_timer_prepare (
 /* advance time again to adjust for processing time out of the event loop, this
  * could cause further timers to expire even before checking for new wire data.
  */
-	msec = pgm_to_msecs ((int64_t)expiration - (int64_t)now);
+	msec = (int32_t)pgm_to_msecs ((int64_t)expiration - (int64_t)now);
 	if (msec < 0)
 		msec = 0;
 	else
@@ -182,7 +182,7 @@ printf ("ACK timeout, T:%u W:%u\n", pgm_fp8tou(sock->tokens), pgm_fp8tou(sock->c
 /* heartbeat timing is often high resolution so base times to last event */
 		if (spm_heartbeat_state && pgm_time_after_eq (now, next_heartbeat_spm))
 		{
-			unsigned new_heartbeat_state    = spm_heartbeat_state;
+			unsigned new_heartbeat_state = spm_heartbeat_state;
 			pgm_time_t new_heartbeat_spm = next_heartbeat_spm;
 			do {
 				new_heartbeat_spm += sock->spm_heartbeat_interval[new_heartbeat_state++];

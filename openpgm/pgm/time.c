@@ -223,16 +223,17 @@ pgm_time_init (
 #endif
 	)
 {
-	char* env;
-	size_t envlen;
+	char	*pgm_timer;
+	size_t	 envlen;
+	errno_t	 err;
 
 	if (pgm_atomic_exchange_and_add32 (&time_ref_count, 1) > 0)
 		return TRUE;
 
 /* current time */
-	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_TIMER");
+	err = pgm_dupenv_s (&pgm_timer, &envlen, "PGM_TIMER");
 	if (0 != err || 0 == envlen) {
-		env = pgm_strdup (
+		pgm_timer = pgm_strdup (
 #ifdef CONFIG_HAVE_TSC
 			"TSC"
 #else
@@ -243,7 +244,7 @@ pgm_time_init (
 
 	pgm_time_since_epoch = pgm_time_conv;
 
-	switch (env[0]) {
+	switch (pgm_timer[0]) {
 #ifdef CONFIG_HAVE_FTIME
 	case 'F':
 		pgm_minor (_("Using ftime() timer."));
@@ -293,7 +294,7 @@ pgm_time_init (
 	}
 
 /* clean environment copy */
-	free (env);
+	free (pgm_timer);
 
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
@@ -308,17 +309,18 @@ pgm_time_init (
 #ifdef CONFIG_HAVE_TSC
 	if (pgm_time_update_now == pgm_tsc_update)
 	{
+		char	*rdtsc_frequency;
+
 #ifdef CONFIG_HAVE_PROC
 /* attempt to parse clock ticks from kernel
  */
-		FILE* fp = fopen ("/proc/cpuinfo", "r");
-		char buffer[1024];
+		FILE	*fp = fopen ("/proc/cpuinfo", "r");
 		if (fp)
 		{
+			char buffer[1024];
 			while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
 			{
-				if (strstr (buffer, "cpu MHz"))
-				{
+				if (strstr (buffer, "cpu MHz")) {
 					const char *p = strchr (buffer, ':');
 					if (p) tsc_mhz = atoi (p + 1);
 					break;
@@ -330,7 +332,7 @@ pgm_time_init (
 		uint64_t frequency;
 		if (QueryPerformanceFrequency ((LARGE_INTEGER*)&frequency))
 		{
-			tsc_mhz = frequency / 1000;
+			tsc_mhz = (uint_fast32_t)(frequency / 1000);
 		}
 #endif /* !_WIN32 */
 
@@ -338,9 +340,11 @@ pgm_time_init (
  *
  * Value can be used to override kernel tick rate as well as internal calibration
  */
-		const char *env_mhz = getenv ("RDTSC_FREQUENCY");
-		if (env_mhz)
-			tsc_mhz = atoi (env_mhz);
+		err = pgm_dupenv_s (&rdtsc_frequency, &envlen, "RDTSC_FREQUENCY");
+		if (0 == err && envlen > 0) {
+			tsc_mhz = atoi (rdtsc_frequency);
+			free (rdtsc_frequency);
+		}
 
 #ifndef _WIN32
 /* calibrate */
@@ -406,21 +410,22 @@ err_cleanup:
 bool
 pgm_time_shutdown (void)
 {
+	bool retval = TRUE;
+
 	pgm_return_val_if_fail (pgm_atomic_read32 (&time_ref_count) > 0, FALSE);
 
 	if (pgm_atomic_exchange_and_add32 (&time_ref_count, (uint32_t)-1) != 1)
-		return TRUE;
+		return retval;
 
-	bool success = TRUE;
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
-		success = pgm_rtc_shutdown ();
+		retval = pgm_rtc_shutdown ();
 #endif
 #ifdef CONFIG_HAVE_HPET
 	if (pgm_time_update_now == pgm_hpet_update)
-		success = pgm_hpet_shutdown ();
+		retval = pgm_hpet_shutdown ();
 #endif
-	return success;
+	return retval;
 }
 
 #ifdef CONFIG_HAVE_GETTIMEOFDAY
@@ -428,10 +433,12 @@ static
 pgm_time_t
 pgm_gettimeofday_update (void)
 {
-	struct timeval gettimeofday_now;
-	static pgm_time_t last = 0;
+	struct timeval		gettimeofday_now;
+	pgm_time_t		now;
+	static pgm_time_t	last = 0;
+
 	gettimeofday (&gettimeofday_now, NULL);
-	const pgm_time_t now = secs_to_usecs (gettimeofday_now.tv_sec) + gettimeofday_now.tv_usec;
+	now = secs_to_usecs (gettimeofday_now.tv_sec) + gettimeofday_now.tv_usec;
 	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
@@ -444,10 +451,12 @@ static
 pgm_time_t
 pgm_clock_update (void)
 {
-	struct timespec clock_now;
-	static pgm_time_t last = 0;
+	struct timespec		clock_now;
+	pgm_time_t		now;
+	static pgm_time_t	last = 0;
+
 	clock_gettime (CLOCK_MONOTONIC, &clock_now);
-	const pgm_time_t now = secs_to_usecs (clock_now.tv_sec) + nsecs_to_usecs (clock_now.tv_nsec);
+	now = secs_to_usecs (clock_now.tv_sec) + nsecs_to_usecs (clock_now.tv_nsec);
 	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
@@ -460,16 +469,18 @@ static
 pgm_time_t
 pgm_ftime_update (void)
 {
-	static pgm_time_t last = 0;
 #ifndef _WIN32
-	struct timeb ftime_now;
+	struct timeb		ftime_now;
 #elif !defined( _MSC_VER )
-	struct _timeb ftime_now;
+	struct _timeb		ftime_now;
 #else
-	struct __timeb64 ftime_now;
+	struct __timeb64	ftime_now;
 #endif
+	pgm_time_t		now;
+	static pgm_time_t	last = 0;
+
 	pgm_ftime_s (&ftime_now);
-	const pgm_time_t now = secs_to_usecs (ftime_now.time) + msecs_to_usecs (ftime_now.millitm);
+	now = secs_to_usecs (ftime_now.time) + msecs_to_usecs (ftime_now.millitm);
 	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
@@ -568,16 +579,21 @@ pgm_time_t
 rdtsc (void)
 {
 #	ifndef _WIN32
+
 	uint32_t lo, hi;
 
 /* We cannot use "=A", since this would use %rax on x86_64 */
 	asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
 
 	return (pgm_time_t)hi << 32 | lo;
+
 #	else
+
 	uint64_t counter;
+
 	QueryPerformanceCounter ((LARGE_INTEGER*)&counter);
 	return (pgm_time_t)counter;
+
 #	endif
 }
 
@@ -597,14 +613,13 @@ pgm_tsc_init (
 #		ifdef CONFIG_HAVE_PROC
 /* Test for constant TSC from kernel
  */
-	FILE* fp = fopen ("/proc/cpuinfo", "r");
-	char buffer[1024], *flags = NULL;
+	FILE	*fp = fopen ("/proc/cpuinfo", "r");
+	char	buffer[1024], *flags = NULL;
 	if (fp)
 	{
 		while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
 		{
-			if (strstr (buffer, "flags"))
-			{
+			if (strstr (buffer, "flags")) {
 				flags = strchr (buffer, ':');
 				break;
 			}
@@ -624,15 +639,16 @@ pgm_tsc_init (
 		return TRUE;
 	}
 #		endif /* CONFIG_HAVE_PROC */
-	pgm_time_t start, stop;
-	const pgm_time_t calibration_usec = secs_to_usecs (4);
+
+	pgm_time_t		start, stop, elapsed;
+	const pgm_time_t	calibration_usec = secs_to_usecs (4);
+	struct timespec		req = {
+					.tv_sec  = 4,
+					.tv_nsec = 0
+				};
 
 	pgm_info (_("Running a benchmark to measure system clock frequency..."));
 
-	struct timespec req = {
-		.tv_sec  = 4,
-		.tv_nsec = 0
-	};
 	start = rdtsc();
 	while (-1 == nanosleep (&req, &req) && EINTR == errno);
 	stop = rdtsc();
@@ -649,13 +665,13 @@ pgm_tsc_init (
 	}
 
 /* TODO: this math needs to be scaled to reduce rounding errors */
-	const pgm_time_t tsc_diff = stop - start;
-	if (tsc_diff > calibration_usec) {
+	elapsed = stop - start;
+	if (elapsed > calibration_usec) {
 /* cpu > 1 Ghz */
-		tsc_mhz = tsc_diff / calibration_usec;
+		tsc_mhz = elapsed / calibration_usec;
 	} else {
 /* cpu < 1 Ghz */
-		tsc_mhz = -( calibration_usec / tsc_diff );
+		tsc_mhz = -( calibration_usec / elapsed );
 	}
 
 	pgm_info (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
@@ -676,8 +692,9 @@ static
 pgm_time_t
 pgm_tsc_update (void)
 {
-	static pgm_time_t last = 0;
-	const pgm_time_t now = tsc_to_us (rdtsc());
+	static pgm_time_t	last = 0;
+	const pgm_time_t	now = tsc_to_us (rdtsc());
+
 	if (PGM_UNLIKELY(now < last))
 		return last;
 	else

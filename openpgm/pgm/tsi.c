@@ -63,9 +63,10 @@ pgm_tsi_print (
 	const pgm_tsi_t*	tsi
 	)
 {
+	static char buf[PGM_TSISTRLEN];
+
 	pgm_return_val_if_fail (tsi != NULL, NULL);
 
-	static char buf[PGM_TSISTRLEN];
 	pgm_tsi_print_r (tsi, buf, sizeof(buf));
 	return buf;
 }

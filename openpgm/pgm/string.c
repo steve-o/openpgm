@@ -39,8 +39,8 @@ pgm_strdup (
 	const char*	str
 	)
 {
-	char* new_str;
-	size_t length;
+	char	*new_str;
+	size_t	 length;
 
 	if (PGM_LIKELY (NULL != str))
 	{
@@ -81,17 +81,25 @@ pgm_vasprintf (
 	va_list		     args
 	)
 {
+	int len;
+
 	pgm_return_val_if_fail (string != NULL, -1);
+
 #ifdef CONFIG_HAVE_VASPRINTF
-	const int len = vasprintf (string, format, args);
+	len = vasprintf (string, format, args);
 	if (len < 0)
 		*string = NULL;
 #else
+#	ifdef _MSC_VER
+/* can only copy on assignment, pointer to stack frame */
+	va_list args2 = args;
+#	else
 	va_list args2;
 	va_copy (args2, args);
+#	endif
 	*string = malloc (pgm_printf_string_upper_bound (format, args));
 /* NB: must be able to handle NULL args, fails on GCC */
-	const int len = vsprintf (*string, format, args);
+	len = vsprintf (*string, format, args2);
 	va_end (args2);
 #endif
 	return len;
@@ -104,6 +112,7 @@ pgm_strdup_vprintf (
 	)
 {
 	char *string = NULL;
+
 	pgm_vasprintf (&string, format, args);
 	return string;
 }
@@ -117,11 +126,13 @@ pgm_stpcpy (
 {
 	pgm_return_val_if_fail (dest != NULL, NULL);
 	pgm_return_val_if_fail (src != NULL, NULL);
+
 #ifdef CONFIG_HAVE_STPCPY
 	return stpcpy (dest, src);
 #else
-	char *d = dest;
-	const char *s = src;
+	char		*d = dest;
+	const char	*s = src;
+
 	do {
 		*d++ = *s;
 	} while (*s++ != '\0');
@@ -131,41 +142,38 @@ pgm_stpcpy (
 
 char*
 pgm_strconcat (
-	const char*	string1,
+	const char*	src,
 	...
 	)
 {
-	size_t	l;     
-	va_list args;
-	char*	s;
-	char*	concat;
-	char*	ptr;
+	size_t	 len;     
+	va_list	 args;
+	char	*dest, *s, *to;
 
-	if (!string1)
+	if (!src)
 		return NULL;
 
-	l = 1 + strlen (string1);
-	va_start (args, string1);
+	len = 1 + strlen (src);
+	va_start (args, src);
 	s = va_arg (args, char*);
 	while (s) {
-		l += strlen (s);
+		len += strlen (s);
 		s = va_arg (args, char*);
 	}
 	va_end (args);
 
-	concat = malloc (l);
-	ptr = concat;
+	dest = malloc (len);
 
-	ptr = pgm_stpcpy (ptr, string1);
-	va_start (args, string1);
+	to = pgm_stpcpy (dest, src);
+	va_start (args, src);
 	s = va_arg (args, char*);
 	while (s) {
-		ptr = pgm_stpcpy (ptr, s);
+		to = pgm_stpcpy (to, s);
 		s = va_arg (args, char*);
 	}
 	va_end (args);
 
-	return concat;
+	return dest;
 }
 
 /* Split a string with delimiter, result must be freed with pgm_strfreev().
@@ -178,10 +186,10 @@ pgm_strsplit (
 	int		     max_tokens
 	)
 {
-	pgm_slist_t *string_list = NULL, *slist;
-	char **str_array, *s;
-	unsigned n = 0;
-	const char *remainder;
+	pgm_slist_t	 *string_list = NULL, *slist;
+	char		**str_array, *s;
+	unsigned	  n = 0;
+	const char	 *remainder;
 
 	pgm_return_val_if_fail (string != NULL, NULL);
 	pgm_return_val_if_fail (delimiter != NULL, NULL);
@@ -199,7 +207,8 @@ pgm_strsplit (
 		while (--max_tokens && s)
 		{
 			const size_t len = s - remainder;
-			char *new_string = malloc (len + 1);
+			char* new_string = malloc (len + 1);
+
 			pgm_strncpy_s (new_string, len + 1, remainder, len);
 			string_list = pgm_slist_prepend (string_list, new_string);
 			n++;
@@ -343,7 +352,9 @@ pgm_string_sized_new (
 	size_t		init_size
 	)
 {
-	pgm_string_t* string = pgm_new (pgm_string_t, 1);
+	pgm_string_t* string;
+
+	string			= pgm_new (pgm_string_t, 1);
 	string->allocated_len	= 0;
 	string->len		= 0;
 	string->str		= NULL;
@@ -441,8 +452,8 @@ pgm_string_append_vprintf (
 	va_list		       args
 	)
 {
-	char *buf;
-	int len;
+	char	*buf;
+	int	 len;
 
 	pgm_return_if_fail (NULL != string);
 	pgm_return_if_fail (NULL != format);
