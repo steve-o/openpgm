@@ -1,36 +1,14 @@
---- time.c	2010-08-04 18:15:50.000000000 +0800
-+++ time.c89	2010-08-05 12:22:53.000000000 +0800
-@@ -232,7 +232,15 @@
- 		return TRUE;
- 
- /* current time */
-+#ifdef _MSC_VER
-+	{
-+        char* cfg = NULL;
-+        size_t len;
-+        errno_t err = _dupenv_s (&cfg, &len, "PGM_TIMER");
-+#else
-+	{
- 	const char *cfg = getenv ("PGM_TIMER");
-+#endif
- 	if (cfg == NULL) {
- #ifdef CONFIG_HAVE_TSC
- 		cfg = "TSC";
-@@ -292,6 +300,13 @@
- #endif
- 	}
- 
-+#ifdef _MSC_VER
-+/* cleanup after _dupenv_s() */
-+	if (!err && len > 0) {
-+		free (cfg);
-+	}
-+#endif
+--- time.c	2010-10-12 12:53:20.000000000 +0800
++++ time.c89.c	2010-10-12 12:47:15.000000000 +0800
+@@ -315,6 +315,7 @@
+ /* attempt to parse clock ticks from kernel
+  */
+ 		FILE	*fp = fopen ("/proc/cpuinfo", "r");
 +
- #ifdef CONFIG_HAVE_RTC
- 	if (pgm_time_update_now == pgm_rtc_update)
- 	{
-@@ -324,10 +339,12 @@
+ 		if (fp)
+ 		{
+ 			char buffer[1024];
+@@ -329,11 +330,13 @@
  			fclose (fp);
  		}
  #elif defined(_WIN32)
@@ -38,78 +16,41 @@
  		uint64_t frequency;
  		if (QueryPerformanceFrequency ((LARGE_INTEGER*)&frequency))
  		{
--			tsc_mhz = frequency / 1000;
-+			tsc_mhz = (uint_fast32_t)(frequency / 1000);
-+		}
+ 			tsc_mhz = (uint_fast32_t)(frequency / 1000);
  		}
++		}
  #endif /* !_WIN32 */
  
-@@ -335,10 +352,20 @@
-  *
-  * Value can be used to override kernel tick rate as well as internal calibration
-  */
-+		{
-+#ifdef _MSC_VER
-+	        char* env_mhz = NULL;
-+        	size_t len;
-+        	errno_t err = _dupenv_s (&env_mhz, &len, "RDTSC_FREQUENCY");
-+#else
- 		const char *env_mhz = getenv ("RDTSC_FREQUENCY");
-+#endif
- 		if (env_mhz)
- 			tsc_mhz = atoi (env_mhz);
+ /* e.g. export RDTSC_FREQUENCY=3200.000000
+@@ -584,7 +587,6 @@
+ 
+ /* We cannot use "=A", since this would use %rax on x86_64 */
+ 	asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
 -
-+#ifdef _MSC_VER
-+			free (env_mhz);
-+#endif
-+		}
- #ifndef _WIN32
- /* calibrate */
- 		if (0 >= tsc_mhz) {
-@@ -394,6 +421,7 @@
- err_cleanup:
- 	pgm_atomic_dec32 (&time_ref_count);
- 	return FALSE;
-+	}
- }
+ 	return (pgm_time_t)hi << 32 | lo;
  
- /* returns TRUE if shutdown succeeded, returns FALSE on error.
-@@ -407,6 +435,7 @@
- 	if (pgm_atomic_exchange_and_add32 (&time_ref_count, (uint32_t)-1) != 1)
- 		return TRUE;
- 
+ #	else
+@@ -615,6 +617,7 @@
+  */
+ 	FILE	*fp = fopen ("/proc/cpuinfo", "r");
+ 	char	buffer[1024], *flags = NULL;
++
+ 	if (fp)
+ 	{
+ 		while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
+@@ -744,11 +747,15 @@
+ /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
+  * the value must be <= 0x05f5e100 or 100ns.
+  */
 +	{
- 	bool success = TRUE;
- #ifdef CONFIG_HAVE_RTC
- 	if (pgm_time_update_now == pgm_rtc_update)
-@@ -417,6 +446,7 @@
- 		success = pgm_hpet_shutdown ();
+ 	const uint32_t hpet_period = *((uint32_t*)(hpet_ptr + HPET_COUNTER_CLK_PERIOD));
+ 	set_hpet_mul (hpet_period);
++	}
+ #if defined( __x86_64__ ) || defined( __amd64 )
++	{
+ 	const uint32_t hpet_caps = *((uint32_t*)(hpet_ptr + HPET_GENERAL_CAPS_REGISTER));
+ 	hpet_wrap = hpet_caps & HPET_COUNT_SIZE_CAP ? 0 : (1ULL << 32);
++	}
+ #else
+ 	hpet_wrap = 1ULL << 32;
  #endif
- 	return success;
-+	}
- }
- 
- #ifdef CONFIG_HAVE_GETTIMEOFDAY
-@@ -456,14 +486,21 @@
- pgm_time_t
- pgm_ftime_update (void)
- {
--	struct timeb ftime_now;
- 	static pgm_time_t last = 0;
-+#ifdef _MSC_VER
-+	struct __timeb64 ftime_now;
-+	_ftime64_s (&ftime_now);
-+#else
-+	struct timeb ftime_now;
- 	ftime (&ftime_now);
-+#endif
-+	{
- 	const pgm_time_t now = secs_to_usecs (ftime_now.time) + msecs_to_usecs (ftime_now.millitm);
- 	if (PGM_UNLIKELY(now < last))
- 		return last;
- 	else
- 		return last = now;
-+	}
- }
- #endif /* CONFIG_HAVE_FTIME */
- 
