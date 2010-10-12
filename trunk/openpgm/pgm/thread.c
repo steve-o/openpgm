@@ -46,13 +46,24 @@ static volatile uint32_t thread_ref_count = 0;
 			} \
 		} while (0)
 #	define posix_check_cmd(cmd) posix_check_err ((cmd), #cmd)
-#else
+#elif defined(__GNU__)
 #	define win32_check_err(err, name) \
 		do { \
 			const bool save_error = (err); \
 			if (PGM_UNLIKELY(!save_error)) { \
 				pgm_error ("file %s: line %d (%s): error '%s' during '%s'", \
 					__FILE__, __LINE__, __PRETTY_FUNCTION__, \
+					pgm_wsastrerror (GetLastError ()), name); \
+			} \
+		} while (0)
+#	define win32_check_cmd(cmd) win32_check_err ((cmd), #cmd)
+#else
+#	define win32_check_err(err, name) \
+		do { \
+			const bool save_error = (err); \
+			if (PGM_UNLIKELY(!save_error)) { \
+				pgm_error ("file %s: line %d: error '%s' during '%s'", \
+					__FILE__, __LINE__, \
 					pgm_wsastrerror (GetLastError ()), name); \
 			} \
 		} while (0)
@@ -92,11 +103,12 @@ pgm_mutex_init (
 	)
 {
 	pgm_assert (NULL != mutex);
+
 #ifndef _WIN32
 	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
 #else
 	HANDLE handle;
-	win32_check_cmd (handle = CreateMutex (NULL, FALSE, NULL));
+	win32_check_cmd (NULL != (handle = CreateMutex (NULL, FALSE, NULL)));
 	mutex->win32_mutex = handle;
 #endif /* !_WIN32 */
 }
@@ -107,6 +119,7 @@ pgm_mutex_trylock (
 	)
 {
 	pgm_assert (NULL != mutex);
+
 #ifndef _WIN32
 	const int result = pthread_mutex_trylock (&mutex->pthread_mutex);
 	if (EBUSY == result)
@@ -126,6 +139,7 @@ pgm_mutex_free (
 	)
 {
 	pgm_assert (NULL != mutex);
+
 #ifndef _WIN32
 	posix_check_cmd (pthread_mutex_destroy (&mutex->pthread_mutex));
 #else
@@ -139,6 +153,7 @@ pgm_spinlock_init (
 	)
 {
 	pgm_assert (NULL != spinlock);
+
 #ifndef _WIN32
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
 #else
@@ -152,6 +167,7 @@ pgm_spinlock_trylock (
 	)
 {
 	pgm_assert (NULL != spinlock);
+
 #ifndef _WIN32
 	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
 	if (EBUSY == result)
@@ -169,6 +185,7 @@ pgm_spinlock_free (
 	)
 {
 	pgm_assert (NULL != spinlock);
+
 #ifndef _WIN32
 /* ignore return value */
 	pthread_spin_destroy (&spinlock->pthread_spinlock);
@@ -183,6 +200,7 @@ pgm_cond_init (
 	)
 {
 	pgm_assert (NULL != cond);
+
 #ifndef _WIN32
 	posix_check_cmd (pthread_cond_init (&cond->pthread_cond, NULL));
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -201,6 +219,7 @@ pgm_cond_signal (
 	)
 {
 	pgm_assert (NULL != cond);
+
 #ifndef _WIN32
 	pthread_cond_signal (&cond->pthread_cond);
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -222,6 +241,7 @@ pgm_cond_broadcast (
 	)
 {
 	pgm_assert (NULL != cond);
+
 #ifndef _WIN32
 	pthread_cond_broadcast (&cond->pthread_cond);
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -244,6 +264,7 @@ pgm_cond_wait (
 {
 	pgm_assert (NULL != cond);
 	pgm_assert (NULL != mutex);
+
 	pthread_cond_wait (&cond->pthread_cond, mutex);
 }
 #else
@@ -255,6 +276,7 @@ pgm_cond_wait (
 {
 	pgm_assert (NULL != cond);
 	pgm_assert (NULL != spinlock);
+
 #	if defined(CONFIG_HAVE_WIN_COND)
 	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
 #	else
@@ -262,7 +284,7 @@ pgm_cond_wait (
 	HANDLE event = TlsGetValue (cond_event_tls);
 
 	if (!event) {
-		win32_check_cmd (event = CreateEvent (0, FALSE, FALSE, NULL));
+		win32_check_cmd (NULL != (event = CreateEvent (0, FALSE, FALSE, NULL)));
 		TlsSetValue (cond_event_tls, event);
 	}
 
@@ -302,6 +324,7 @@ pgm_cond_free (
 	)
 {
 	pgm_assert (NULL != cond);
+
 #ifndef _WIN32
 	posix_check_cmd (pthread_cond_destroy (&cond->pthread_cond));
 #elif defined(CONFIG_HAVE_WIN_COND)
@@ -318,6 +341,7 @@ pgm_rwlock_init (
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 #ifdef CONFIG_HAVE_WIN_SRW_LOCK
 	InitializeSRWLock (&rwlock->win32_lock);
 #elif !defined(_WIN32)
@@ -339,6 +363,7 @@ pgm_rwlock_free (
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 #ifdef CONFIG_HAVE_WIN_SRW_LOCK
 	/* nop */
 #elif !defined(_WIN32)
@@ -358,6 +383,7 @@ _pgm_rwlock_signal (
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 	if (rwlock->want_to_write)
 		pgm_cond_signal (&rwlock->write_cond);
 	else if (rwlock->want_to_read)
@@ -370,6 +396,7 @@ pgm_rwlock_reader_lock (
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->want_to_read++;
 	while (rwlock->have_writer || rwlock->want_to_write)
@@ -384,14 +411,15 @@ pgm_rwlock_reader_trylock (
 	pgm_rwlock_t*	rwlock
 	)
 {
+	bool status = FALSE;
+
 	pgm_assert (NULL != rwlock);
-	bool status;
+
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	if (!rwlock->have_writer && !rwlock->want_to_write) {
 		rwlock->read_counter++;
 		status = TRUE;
-	} else
-		status = FALSE;
+	}
 	LeaveCriticalSection (&rwlock->win32_spinlock);
 	return status;
 }
@@ -402,6 +430,7 @@ pgm_rwlock_reader_unlock(
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->read_counter--;
 	if (rwlock->read_counter == 0)
@@ -415,6 +444,7 @@ pgm_rwlock_writer_lock (
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->want_to_write++;
 	while (rwlock->have_writer || rwlock->read_counter)
@@ -429,14 +459,15 @@ pgm_rwlock_writer_trylock (
 	pgm_rwlock_t*	rwlock
 	)
 {
+	bool status = FALSE;
+
 	pgm_assert (NULL != rwlock);
-	bool status;
+
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	if (!rwlock->have_writer && !rwlock->read_counter) {
 		rwlock->have_writer = TRUE;
 		status = TRUE;
-	} else
-		status = FALSE;
+	}
 	LeaveCriticalSection (&rwlock->win32_spinlock);
 	return status;
 }
@@ -447,6 +478,7 @@ pgm_rwlock_writer_unlock (
 	)
 {
 	pgm_assert (NULL != rwlock);
+
 	EnterCriticalSection (&rwlock->win32_spinlock);
 	rwlock->have_writer = FALSE;
 	_pgm_rwlock_signal (rwlock);

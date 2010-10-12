@@ -1,39 +1,52 @@
-65a66,68
-> #ifdef _MSC_VER
-> 	return _vscprintf (format, args) + 1;
-> #else
-67a71
-> #endif
-80a85
-> 	{
-81a87
-> 	{
-85a92,94
-> #	ifdef _MSC_VER
-> 	va_list args2 = args;
-> #	else
-87a97
-> #	endif
-89a100
-> 	{
-93a105,106
-> 	}
-> 	}
-118a132
-> 	{
-124a139
-> 	}
-198a214,216
-> #ifdef _MSC_VER
-> 			strncpy_s (new_string, len + 1, remainder, len);
-> #else
-199a218
-> #endif
-233c252,254
-< 		for (unsigned i = 0; str_array[i] != NULL; i++)
----
-> 		{
-> 		unsigned i;
-> 		for (i = 0; str_array[i] != NULL; i++)
-234a256
-> 		}
+--- string.c	2010-10-12 12:08:37.000000000 +0800
++++ string.c89.c	2010-10-12 12:08:25.000000000 +0800
+@@ -90,10 +90,12 @@
+ 	if (len < 0)
+ 		*string = NULL;
+ #else
++	{
+ #	ifdef _MSC_VER
+ /* can only copy on assignment, pointer to stack frame */
+ 	va_list args2 = args;
+ #	else
++/* C99 va_copy macro */
+ 	va_list args2;
+ 	va_copy (args2, args);
+ #	endif
+@@ -101,6 +103,7 @@
+ /* NB: must be able to handle NULL args, fails on GCC */
+ 	len = vsprintf (*string, format, args2);
+ 	va_end (args2);
++	}
+ #endif
+ 	return len;
+ }
+@@ -130,13 +133,14 @@
+ #ifdef CONFIG_HAVE_STPCPY
+ 	return stpcpy (dest, src);
+ #else
++	{
+ 	char		*d = dest;
+ 	const char	*s = src;
+-
+ 	do {
+ 		*d++ = *s;
+ 	} while (*s++ != '\0');
+ 	return d - 1;
++	}
+ #endif
+ }
+ 
+@@ -242,8 +246,11 @@
+ {
+ 	if (PGM_LIKELY (NULL != str_array))
+ 	{
+-		for (unsigned i = 0; str_array[i] != NULL; i++)
++		{
++		unsigned i;
++		for (i = 0; str_array[i] != NULL; i++)
+ 			free (str_array[i]);
++		}
+ 
+ 		pgm_free (str_array);
+ 	}

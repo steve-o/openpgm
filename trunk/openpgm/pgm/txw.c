@@ -186,19 +186,11 @@ pgm_txw_create (
 		pgm_assert_cmpuint (rs_k, >, 0);
 	}
 
-#ifndef _MSC_VER
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd use-fec:%s rs(n):%u rs(k):%u)",
-		pgm_tsi_print (tsi),
-		tpdu_size, sqns, secs, max_rte,
-		use_fec ? "YES" : "NO",
-		rs_n, rs_k);
-#else
 	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %ld use-fec:%s rs(n):%u rs(k):%u)",
 		pgm_tsi_print (tsi),
 		tpdu_size, sqns, secs, (long)max_rte,
 		use_fec ? "YES" : "NO",
 		rs_n, rs_k);
-#endif
 
 /* calculate transmit window parameters */
 	pgm_assert (sqns || (tpdu_size && secs && max_rte));
@@ -354,8 +346,8 @@ pgm_txw_remove_tail (
 	pgm_txw_t* const	window
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	pgm_txw_state_t* state;
+	struct pgm_sk_buff_t	*skb;
+	pgm_txw_state_t		*state;
 
 	pgm_debug ("pgm_txw_remove_tail (window:%p)", (const void*)window);
 
@@ -447,8 +439,8 @@ pgm_txw_retransmit_push_parity (
 	const uint8_t		tg_sqn_shift
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	pgm_txw_state_t* state;
+	struct pgm_sk_buff_t	*skb;
+	pgm_txw_state_t		*state;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -501,8 +493,8 @@ pgm_txw_retransmit_push_selective (
 	const uint32_t		sequence
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	pgm_txw_state_t* state;
+	struct pgm_sk_buff_t	*skb;
+	pgm_txw_state_t		*state;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -544,21 +536,28 @@ pgm_txw_retransmit_try_peek (
 	pgm_txw_t* const	window
 	)
 {
+	struct pgm_sk_buff_t	*skb;
+	pgm_txw_state_t		*state;
+	bool			 is_var_pktlen = FALSE;
+	bool			 is_op_encoded = FALSE;
+	uint16_t		 parity_length = 0;
+	const pgm_gf8_t		*src[ window->rs.k ];
+	void			*data;
+
 /* pre-conditions */
 	pgm_assert (NULL != window);
 
 	pgm_debug ("retransmit_try_peek (window:%p)", (const void*)window);
 
 /* no lock required to detect presence of a request */
-	pgm_list_t* tail_link = pgm_queue_peek_tail_link (&window->retransmit_queue);
-	if (PGM_UNLIKELY(NULL == tail_link)) {
+	skb = (struct pgm_sk_buff_t*)pgm_queue_peek_tail_link (&window->retransmit_queue);
+	if (PGM_UNLIKELY(NULL == skb)) {
 		pgm_debug ("retransmit queue empty on peek.");
 		return NULL;
 	}
 
-	struct pgm_sk_buff_t* skb = (struct pgm_sk_buff_t*)tail_link;
 	pgm_assert (pgm_skb_is_valid (skb));
-	pgm_txw_state_t* state = (pgm_txw_state_t*)&skb->cb;
+	state = (pgm_txw_state_t*)&skb->cb;
 
 	if (!state->waiting_retransmit) {
 		pgm_assert (((const pgm_list_t*)skb)->next == NULL);
@@ -577,10 +576,6 @@ pgm_txw_retransmit_try_peek (
 	const uint8_t rs_h = state->pkt_cnt_sent % (window->rs.n - window->rs.k);
 	const uint32_t tg_sqn_mask = 0xffffffff << window->tg_sqn_shift;
 	const uint32_t tg_sqn = skb->sequence & tg_sqn_mask;
-	bool is_var_pktlen = FALSE;
-	bool is_op_encoded = FALSE;
-	uint16_t parity_length = 0;
-	const pgm_gf8_t* src[ window->rs.k ];
 	for (uint_fast8_t i = 0; i < window->rs.k; i++)
 	{
 		const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
@@ -644,18 +639,22 @@ pgm_txw_retransmit_try_peek (
 
 	skb->pgm_data->data_sqn	= htonl ( tg_sqn | rs_h );
 
-	void* data_bytes = skb->pgm_data + 1;
+	data = skb->pgm_data + 1;
 
 /* encode every option separately, currently only one applies: opt_fragment
  */
 	if (is_op_encoded)
 	{
+		struct pgm_opt_header	*opt_header;
+		struct pgm_opt_length	*opt_len;
+		struct pgm_opt_fragment	*opt_fragment, null_opt_fragment;
+		const pgm_gf8_t		*opt_src[ window->rs.k ];
+
 		skb->pgm_header->pgm_options |= PGM_OPT_PRESENT;
 
-		struct pgm_opt_fragment null_opt_fragment;
-		const pgm_gf8_t* opt_src[ window->rs.k ];
 		memset (&null_opt_fragment, 0, sizeof(null_opt_fragment));
 		*(uint8_t*)&null_opt_fragment |= PGM_OP_ENCODED_NULL;
+
 		for (uint_fast8_t i = 0; i < window->rs.k; i++)
 		{
 			const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
@@ -680,15 +679,15 @@ pgm_txw_retransmit_try_peek (
 /* add space for PGM options */
 		pgm_skb_put (skb, opt_total_length);
 
-		struct pgm_opt_length* opt_len		= data_bytes;
+		opt_len					= data;
 		opt_len->opt_type			= PGM_OPT_LENGTH;
 		opt_len->opt_length			= sizeof(struct pgm_opt_length);
 		opt_len->opt_total_length		= htons ( opt_total_length );
-		struct pgm_opt_header* opt_header 	= (struct pgm_opt_header*)(opt_len + 1);
+		opt_header			 	= (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
 		opt_header->opt_length			= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
 		opt_header->opt_reserved 		= PGM_OP_ENCODED;
-		struct pgm_opt_fragment* opt_fragment	= (struct pgm_opt_fragment*)(opt_header + 1);
+		opt_fragment				= (struct pgm_opt_fragment*)(opt_header + 1);
 
 /* The cast below is the correct way to handle the problem. 
  * The (void *) cast is to avoid a GCC warning like: 
@@ -701,14 +700,14 @@ pgm_txw_retransmit_try_peek (
 				(pgm_gf8_t*)((char*)opt_fragment + sizeof(struct pgm_opt_header)),
 				sizeof(struct pgm_opt_fragment) - sizeof(struct pgm_opt_header));
 
-		data_bytes = opt_fragment + 1;
+		data = opt_fragment + 1;
 	}
 
 /* encode payload */
 	pgm_rs_encode (&window->rs,
 			src,
 			window->rs.k + rs_h,
-			data_bytes,
+			data,
 			parity_length);
 
 /* calculate partial checksum */
@@ -725,8 +724,8 @@ pgm_txw_retransmit_remove_head (
 	pgm_txw_t* const	window
 	)
 {
-	struct pgm_sk_buff_t* skb;
-	pgm_txw_state_t* state;
+	struct pgm_sk_buff_t	*skb;
+	pgm_txw_state_t		*state;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
@@ -735,12 +734,7 @@ pgm_txw_retransmit_remove_head (
 		(const void*)window);
 
 /* tail link is valid without lock */
-	pgm_list_t* tail_link = pgm_queue_peek_tail_link (&window->retransmit_queue);
-
-/* link must be valid for pop */
-	pgm_assert (NULL != tail_link);
-
-	skb = (struct pgm_sk_buff_t*)tail_link;
+	skb = (struct pgm_sk_buff_t*)pgm_queue_peek_tail_link (&window->retransmit_queue);
 	pgm_assert (pgm_skb_is_valid (skb));
 	pgm_assert (pgm_tsi_is_null (&skb->tsi));
 	state = (pgm_txw_state_t*)&skb->cb;

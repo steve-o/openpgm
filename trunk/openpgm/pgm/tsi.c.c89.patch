@@ -1,6 +1,6 @@
---- tsi.c	2010-05-21 11:32:16.000000000 +0800
-+++ tsi.c89	2010-08-05 11:01:48.000000000 +0800
-@@ -46,11 +46,18 @@
+--- tsi.c	2010-10-12 13:17:11.000000000 +0800
++++ tsi.c89.c	2010-10-12 13:16:47.000000000 +0800
+@@ -46,11 +46,13 @@
  	pgm_return_val_if_fail (NULL != buf, -1);
  	pgm_return_val_if_fail (bufsize > 0, -1);
  
@@ -8,26 +8,9 @@
  	const uint8_t* gsi = (const uint8_t*)tsi;
  	const uint16_t source_port = tsi->sport;
  
-+#ifdef _MSC_VER
-+	return _snprintf_s (buf, bufsize, _TRUNCATE, "%i.%i.%i.%i.%i.%i.%i",
-+			 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
-+#else
- 	return snprintf (buf, bufsize, "%i.%i.%i.%i.%i.%i.%i",
- 			 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
-+#endif
+ 	return pgm_snprintf_s (buf, bufsize, _TRUNCATE, "%u.%u.%u.%u.%u.%u.%u",
+ 				 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
 +	}
  }
  
  /* transform TSI to ASCII string form.
-@@ -65,9 +72,11 @@
- {
- 	pgm_return_val_if_fail (tsi != NULL, NULL);
- 
-+	{
- 	static char buf[PGM_TSISTRLEN];
- 	pgm_tsi_print_r (tsi, buf, sizeof(buf));
- 	return buf;
-+	}
- }
- 
- /* create hash value of TSI for use with GLib hash tables.
