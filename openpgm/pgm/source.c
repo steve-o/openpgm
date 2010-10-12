@@ -1128,7 +1128,7 @@ send_odata (
 		pgmcc_data  = (struct pgm_opt_pgmcc_data *)(opt_header + 1);
 		pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
 
-		pgmcc_data->opt_tstamp = htonl (pgm_to_msecs (STATE(skb)->tstamp));
+		pgmcc_data->opt_tstamp = htonl ((uint32_t)pgm_to_msecs (STATE(skb)->tstamp));
 /* acker nla */
 		pgm_sockaddr_to_nla ((struct sockaddr*)&sock->acker_nla, (char*)&pgmcc_data->opt_nla_afi);
 		if (AF_INET6 == sock->acker_nla.ss_family)
@@ -1292,7 +1292,7 @@ send_odata_copy (
 //		pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
 
 		pgmcc_data->opt_reserved = 0;
-		pgmcc_data->opt_tstamp = htonl (pgm_to_msecs (STATE(skb)->tstamp));
+		pgmcc_data->opt_tstamp = htonl ((uint32_t)pgm_to_msecs (STATE(skb)->tstamp));
 /* acker nla */
 		pgm_sockaddr_to_nla ((struct sockaddr*)&sock->acker_nla, (char*)&pgmcc_data->opt_nla_afi);
 		data = (char*)opt_header + opt_header->opt_length;
@@ -1446,13 +1446,13 @@ send_odatav (
 
 /* unroll first iteration to make friendly branch prediction */
 	dst			= (char*)(STATE(skb)->pgm_data + 1);
-	STATE(unfolded_odata)	= pgm_csum_partial_copy ((const char*)vector[0].iov_base, dst, vector[0].iov_len, 0);
+	STATE(unfolded_odata)	= pgm_csum_partial_copy ((const char*)vector[0].iov_base, dst, (uint16_t)vector[0].iov_len, 0);
 
 /* iterate over one or more vector elements to perform scatter/gather checksum & copy */
 	for (unsigned i = 1; i < count; i++) {
 		dst += vector[i-1].iov_len;
-		const uint32_t unfolded_element = pgm_csum_partial_copy ((const char*)vector[i].iov_base, dst, vector[i].iov_len, 0);
-		STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, vector[i-1].iov_len);
+		const uint32_t unfolded_element = pgm_csum_partial_copy ((const char*)vector[i].iov_base, dst, (uint16_t)vector[i].iov_len, 0);
+		STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, (uint16_t)vector[i-1].iov_len);
 	}
 
 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
@@ -1729,14 +1729,14 @@ pgm_send (
 /* pass on non-fragment calls */
 	if (apdu_length <= sock->max_tsdu)
 	{
-		const int status = send_odata_copy (sock, apdu, apdu_length, bytes_written);
+		const int status = send_odata_copy (sock, apdu, (uint16_t)apdu_length, bytes_written);
 		pgm_mutex_unlock (&sock->source_mutex);
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
 	}
 	else
 	{
-		const int status = send_apdu (sock, apdu, apdu_length, bytes_written);
+		const int status = send_apdu (sock, apdu, (uint16_t)apdu_length, bytes_written);
 		pgm_mutex_unlock (&sock->source_mutex);
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
@@ -1800,7 +1800,7 @@ pgm_sendv (
 /* pass on zero length as cannot count vector lengths */
 	if (PGM_UNLIKELY(0 == count))
 	{
-		const int status = send_odata_copy (sock, NULL, count, bytes_written);
+		const int status = send_odata_copy (sock, NULL, 0, bytes_written);
 		pgm_mutex_unlock (&sock->source_mutex);
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
@@ -2143,7 +2143,7 @@ pgm_send_skbv (
 /* pass on zero length as cannot count vector lengths */
 	if (PGM_UNLIKELY(0 == count))
 	{
-		const int status = send_odata_copy (sock, NULL, count, bytes_written);
+		const int status = send_odata_copy (sock, NULL, 0, bytes_written);
 		pgm_mutex_unlock (&sock->source_mutex);
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return status;
