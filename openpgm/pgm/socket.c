@@ -718,21 +718,21 @@ pgm_getsockopt (
 	case PGM_NAK_BO_IVL:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->nak_bo_ivl;
+		*(int*restrict)optval = (int)sock->nak_bo_ivl;
 		status = TRUE;
 		break;
 
 	case PGM_NAK_RPT_IVL:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->nak_rpt_ivl;
+		*(int*restrict)optval = (int)sock->nak_rpt_ivl;
 		status = TRUE;
 		break;
 
 	case PGM_NAK_RDATA_IVL:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->nak_rdata_ivl;
+		*(int*restrict)optval = (int)sock->nak_rdata_ivl;
 		status = TRUE;
 		break;
 
@@ -767,7 +767,7 @@ pgm_getsockopt (
 	case PGM_USE_CR:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->crqst_ivl;
+		*(int*restrict)optval = (int)sock->crqst_ivl;
 		status = TRUE;
 		break;
 
@@ -776,7 +776,7 @@ pgm_getsockopt (
 			break;
 		{
 			struct pgm_pgmccinfo_t*restrict pgmccinfo = optval;
-			pgmccinfo->ack_bo_ivl = sock->ack_bo_ivl;
+			pgmccinfo->ack_bo_ivl = (int)sock->ack_bo_ivl;
 			pgmccinfo->ack_c      = sock->ack_c;
 			pgmccinfo->ack_c_p    = sock->ack_c_p;
 		}

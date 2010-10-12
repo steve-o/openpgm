@@ -171,7 +171,7 @@ recvskb (
 #ifdef CONFIG_HAVE_WSACMSGHDR
 		WSACMSGHDR* cmsg;
 #else
-		struct cmsghdr* cmsg;
+		struct pgm_cmsghdr* cmsg;
 #endif
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg != NULL;

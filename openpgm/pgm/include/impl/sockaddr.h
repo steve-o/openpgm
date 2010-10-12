@@ -129,7 +129,7 @@ PGM_GNUC_INTERNAL int pgm_sockaddr_leave_source_group (const SOCKET s, const sa_
 #	endif
 PGM_GNUC_INTERNAL int pgm_sockaddr_msfilter (const SOCKET s, const sa_family_t sa_family, const struct group_filter* gf_list);
 #endif
-PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_if (SOCKET s, const struct sockaddr* address, unsigned ifindex);
+PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_if (const SOCKET s, const struct sockaddr* address, const unsigned ifindex);
 PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_loop (const SOCKET s, const sa_family_t sa_family, const bool v);
 PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_hops (const SOCKET s, const sa_family_t sa_family, const unsigned hops);
 PGM_GNUC_INTERNAL void pgm_sockaddr_nonblocking (const SOCKET s, const bool v);
