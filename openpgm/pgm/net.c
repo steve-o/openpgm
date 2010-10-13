@@ -37,17 +37,6 @@
 #define NET_DEBUG
 
 
-#if !defined(ENETUNREACH) && defined(WSAENETUNREACH)
-#	define ENETUNREACH	WSAENETUNREACH
-#endif
-#if !defined(EHOSTUNREACH) && defined(WSAEHOSTUNREACH)
-#	define EHOSTUNREACH	WSAEHOSTUNREACH
-#endif
-#if !defined(ENOBUFS) && defined(WSAENOBUFS)
-#	define ENOBUFS		WSAENOBUFS
-#endif
-
-
 /* locked and rate regulated sendto
  *
  * on success, returns number of bytes sent.  on error, -1 is returned, and
@@ -91,7 +80,7 @@ pgm_sendto_hops (
 	if (use_rate_limit && 
 	    !pgm_rate_check (&sock->rate_control, len, sock->is_nonblocking))
 	{
-		errno = ENOBUFS;
+		pgm_set_last_sock_error (PGM_SOCK_ENOBUFS);
 		return (const ssize_t)-1;
 	}
 
@@ -103,11 +92,11 @@ pgm_sendto_hops (
 	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 	pgm_debug ("sendto returned %zd", sent);
 	if (sent < 0) {
-		int save_errno = pgm_sock_errno();
+		int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
-		if (PGM_UNLIKELY(errno != ENETUNREACH &&	/* Network is unreachable */
-		 		 errno != EHOSTUNREACH &&	/* No route to host */
-		    		 errno != EAGAIN)) 		/* would block on non-blocking send */
+		if (PGM_UNLIKELY(save_errno != PGM_SOCK_ENETUNREACH &&	/* Network is unreachable */
+		 		 save_errno != PGM_SOCK_EHOSTUNREACH &&	/* No route to host */
+		    		 save_errno != PGM_SOCK_EAGAIN))	/* would block on non-blocking send */
 		{
 #ifdef CONFIG_HAVE_POLL
 /* poll for cleared socket */
@@ -132,7 +121,7 @@ pgm_sendto_hops (
 				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 				if ( sent < 0 )
 				{
-					save_errno = pgm_sock_errno();
+					save_errno = pgm_get_last_sock_error();
 					pgm_warn (_("sendto() %s failed: %s"),
 						  inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
 						  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -145,7 +134,7 @@ pgm_sendto_hops (
 			}
 			else
 			{
-				save_errno = pgm_sock_errno();
+				save_errno = pgm_get_last_sock_error();
 				pgm_warn (_("blocked socket failed: %s"),
 					  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			}

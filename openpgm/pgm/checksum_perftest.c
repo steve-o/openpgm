@@ -475,7 +475,7 @@ START_TEST (test_64bit_csumcpy)
 }
 END_TEST
 
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__ || defined(_WIN64))
 START_TEST (test_vector)
 {
 	const unsigned iterations = 1000;
@@ -565,7 +565,7 @@ START_TEST (test_vector_csumcpy)
 		(guint64)((check - start) / iterations));
 }
 END_TEST
-#endif /* defined(__amd64) || defined(__x86_64__) */
+#endif /* defined(__amd64) || defined(__x86_64__) || defined(_WIN64) */
 
 
 
@@ -585,7 +585,7 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_100b, test_16bit);
 	tcase_add_test (tc_100b, test_32bit);
 	tcase_add_test (tc_100b, test_64bit);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_100b, test_vector);
 #endif
 
@@ -597,7 +597,7 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_200b, test_16bit);
 	tcase_add_test (tc_200b, test_32bit);
 	tcase_add_test (tc_200b, test_64bit);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_200b, test_vector);
 #endif
 
@@ -609,7 +609,7 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_1500b, test_16bit);
 	tcase_add_test (tc_1500b, test_32bit);
 	tcase_add_test (tc_1500b, test_64bit);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_1500b, test_vector);
 #endif
 
@@ -621,7 +621,7 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_9kb, test_16bit);
 	tcase_add_test (tc_9kb, test_32bit);
 	tcase_add_test (tc_9kb, test_64bit);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_9kb, test_vector);
 #endif
 
@@ -633,7 +633,7 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_64kb, test_16bit);
 	tcase_add_test (tc_64kb, test_32bit);
 	tcase_add_test (tc_64kb, test_64bit);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_64kb, test_vector);
 #endif
 
@@ -656,7 +656,7 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_100b, test_16bit_memcpy);
 	tcase_add_test (tc_100b, test_32bit_memcpy);
 	tcase_add_test (tc_100b, test_64bit_memcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_100b, test_vector_memcpy);
 #endif
 
@@ -668,7 +668,7 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_200b, test_16bit_memcpy);
 	tcase_add_test (tc_200b, test_32bit_memcpy);
 	tcase_add_test (tc_200b, test_64bit_memcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_200b, test_vector_memcpy);
 #endif
 
@@ -680,7 +680,7 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_1500b, test_16bit_memcpy);
 	tcase_add_test (tc_1500b, test_32bit_memcpy);
 	tcase_add_test (tc_1500b, test_64bit_memcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_1500b, test_vector_memcpy);
 #endif
 
@@ -692,7 +692,7 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_9kb, test_16bit_memcpy);
 	tcase_add_test (tc_9kb, test_32bit_memcpy);
 	tcase_add_test (tc_9kb, test_64bit_memcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_9kb, test_vector_memcpy);
 #endif
 
@@ -704,7 +704,7 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_64kb, test_16bit_memcpy);
 	tcase_add_test (tc_64kb, test_32bit_memcpy);
 	tcase_add_test (tc_64kb, test_64bit_memcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_64kb, test_vector_memcpy);
 #endif
 
@@ -727,7 +727,7 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_100b, test_16bit_csumcpy);
 	tcase_add_test (tc_100b, test_32bit_csumcpy);
 	tcase_add_test (tc_100b, test_64bit_csumcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_100b, test_vector_csumcpy);
 #endif
 
@@ -739,7 +739,7 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_200b, test_16bit_csumcpy);
 	tcase_add_test (tc_200b, test_32bit_csumcpy);
 	tcase_add_test (tc_200b, test_64bit_csumcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_200b, test_vector_csumcpy);
 #endif
 
@@ -751,7 +751,7 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_1500b, test_16bit_csumcpy);
 	tcase_add_test (tc_1500b, test_32bit_csumcpy);
 	tcase_add_test (tc_1500b, test_64bit_csumcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_1500b, test_vector_csumcpy);
 #endif
 
@@ -763,7 +763,7 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_9kb, test_16bit_csumcpy);
 	tcase_add_test (tc_9kb, test_32bit_csumcpy);
 	tcase_add_test (tc_9kb, test_64bit_csumcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_9kb, test_vector_csumcpy);
 #endif
 
@@ -775,7 +775,7 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_64kb, test_16bit_csumcpy);
 	tcase_add_test (tc_64kb, test_32bit_csumcpy);
 	tcase_add_test (tc_64kb, test_64bit_csumcpy);
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_64kb, test_vector_csumcpy);
 #endif
 

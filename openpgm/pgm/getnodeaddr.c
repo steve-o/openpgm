@@ -62,18 +62,13 @@ pgm_if_getnodeaddr (
 	struct hostent* he;
 
 	if (0 != gethostname (hostname, sizeof(hostname))) {
-#ifndef _WIN32
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
-#endif
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
-			     pgm_error_from_errno (errno),
+			     pgm_error_from_sock_errno (save_errno),
 			     _("Resolving hostname: %s"),
-#ifndef _WIN32
-			     pgm_strerror_s (errbuf, sizeof (errbuf), errno)
-#else
-			     pgm_wsastrerror (WSAGetLastError())
-#endif
+			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno)
 				);
 		return FALSE;
 	}

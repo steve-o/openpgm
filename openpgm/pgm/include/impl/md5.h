@@ -27,6 +27,7 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
+#pragma once
 #ifndef __PGM_IMPL_MD5_H__
 #define __PGM_IMPL_MD5_H__
 

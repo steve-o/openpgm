@@ -36,12 +36,6 @@
 #	define PGM_DISABLE_ASSERT
 #endif
 
-#if !defined(ENOBUFS) && defined(WSAENOBUFS)
-#	define ENOBUFS		WSAENOBUFS
-#endif
-#if !defined(ECONNRESET) && defined(WSAECONNRESET)
-#	define ECONNRESET	WSAECONNRESET
-#endif
 
 static bool send_spmr (pgm_sock_t*const restrict, pgm_peer_t*const restrict);
 static bool send_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const uint32_t);
@@ -1009,7 +1003,7 @@ send_spmr (
 				   tpdu_length,
 				   (struct sockaddr*)&sock->send_gsr.gsr_group,
 				   pgm_sockaddr_len ((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 
 /* send unicast SPMR with regular TTL */
@@ -1020,7 +1014,7 @@ send_spmr (
 			   tpdu_length,
 			   (struct sockaddr*)&source->local_nla,
 			   pgm_sockaddr_len ((struct sockaddr*)&source->local_nla));
-	if (sent < 0 && EAGAIN == errno)
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 
 	sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length * 2;
@@ -1092,7 +1086,7 @@ send_nak (
 			   tpdu_length,
 			   (struct sockaddr*)&source->nla,
 			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
@@ -1166,7 +1160,7 @@ send_parity_nak (
 			   tpdu_length,
 			   (struct sockaddr*)&source->nla,
 			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_PARITY_NAK_PACKETS_SENT]++;
@@ -1280,7 +1274,7 @@ send_nak_list (
 			   tpdu_length,
 			   (struct sockaddr*)&source->nla,
 			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
-	if ( sent != (ssize_t)tpdu_length )
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_SELECTIVE_NAK_PACKETS_SENT]++;
@@ -1376,7 +1370,7 @@ send_ack (
 			   tpdu_length,
 			   (struct sockaddr*)&source->nla,
 			   pgm_sockaddr_len((struct sockaddr*)&source->nla));
-	if ( sent != (ssize_t)tpdu_length )
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 
 	source->cumulative_stats[PGM_PC_RECEIVER_ACKS_SENT]++;
