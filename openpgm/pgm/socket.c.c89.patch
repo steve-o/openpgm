@@ -1,5 +1,5 @@
---- socket.c	2010-10-12 20:55:57.000000000 +0800
-+++ socket.c89.c	2010-10-12 20:56:18.000000000 +0800
+--- socket.c	2010-10-13 16:09:32.000000000 +0800
++++ socket.c89.c	2010-10-13 16:10:02.000000000 +0800
 @@ -244,7 +244,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
  
@@ -186,7 +186,7 @@
  	union {
  		struct sockaddr		sa;
  		struct sockaddr_in	s4;
-@@ -2065,6 +2094,7 @@
+@@ -2066,6 +2095,7 @@
  
  /* save send side address for broadcasting as source nla */
  	memcpy (&sock->send_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
@@ -194,7 +194,7 @@
  
  /* rx to nak processor notify channel */
  	if (sock->can_send_data)
-@@ -2072,13 +2102,8 @@
+@@ -2073,13 +2103,8 @@
  /* setup rate control */
  		if (sock->txw_max_rte)
  		{
@@ -208,7 +208,7 @@
  	
  			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
  			sock->is_controlled_spm   = TRUE;	/* must always be set */
-@@ -2103,6 +2128,8 @@
+@@ -2104,6 +2129,8 @@
  	pgm_rwlock_writer_unlock (&sock->lock);
  	pgm_debug ("PGM socket successfully bound.");
  	return TRUE;
@@ -217,7 +217,7 @@
  }
  
  bool
-@@ -2116,11 +2143,14 @@
+@@ -2117,11 +2144,14 @@
  #ifdef CONFIG_TARGET_WINE
  	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
  #endif
@@ -233,7 +233,7 @@
  	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
  /* shutdown */
  	if (PGM_UNLIKELY(!pgm_rwlock_writer_trylock (&sock->lock)))
-@@ -2230,6 +2260,7 @@
+@@ -2231,6 +2261,7 @@
  		return -1;
  	}
  
@@ -241,7 +241,7 @@
  	const bool is_congested = (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) ? TRUE : FALSE;
  
  	if (readfds)
-@@ -2254,6 +2285,7 @@
+@@ -2255,6 +2286,7 @@
  #endif
  			}
  		}
@@ -249,7 +249,7 @@
  		const SOCKET pending_fd = pgm_notify_get_fd (&sock->pending_notify);
  		FD_SET(pending_fd, readfds);
  #ifndef _WIN32
-@@ -2261,6 +2293,7 @@
+@@ -2262,6 +2294,7 @@
  #else
  		fds++;
  #endif
@@ -257,7 +257,7 @@
  	}
  
  	if (sock->can_send_data && writefds && !is_congested)
-@@ -2278,6 +2311,7 @@
+@@ -2279,6 +2312,7 @@
  #else
  	return *n_fds + fds;
  #endif
