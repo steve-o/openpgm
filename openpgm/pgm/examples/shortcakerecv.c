@@ -97,10 +97,10 @@ main (
 
 	setlocale (LC_ALL, "");
 
-#if !defined(_WIN32) || defined(CONFIG_TARGET_WINE)
+#ifndef _WIN32
 	puts ("いちごのショートケーキ");
 #else
-	_putws (L"いちごのショートケーキ");
+	puts ("ichigo no shōtokēki");
 #endif
 
 	if (!pgm_init (&pgm_err)) {
@@ -110,7 +110,14 @@ main (
 	}
 
 /* parse program arguments */
+#ifdef _WIN32
+	const char* binary_name = strrchr (argv[0], '\\');
+#else
 	const char* binary_name = strrchr (argv[0], '/');
+#endif
+	if (NULL == binary_name)	binary_name = argv[0];
+	else				binary_name++;
+
 	int c;
 	while ((c = getopt (argc, argv, "s:n:p:f:K:N:lih")) != -1)
 	{
