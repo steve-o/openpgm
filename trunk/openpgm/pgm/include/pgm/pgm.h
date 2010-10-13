@@ -19,8 +19,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#pragma once
 #ifndef __PGM_H__
 #define __PGM_H__
+
+#ifdef _MSC_VER
+/* library dependencies for Visual Studio application builds */
+#	pragma comment (lib, "libpgm")
+#	pragma comment (lib, "iphlpapi")
+#	pragma comment (lib, "ws2_32")
+#endif
 
 #include <pgm/atomic.h>
 #include <pgm/engine.h>

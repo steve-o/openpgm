@@ -24,6 +24,9 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _MSC_VER
+#	include <tchar.h>
+#endif
 #ifndef _WIN32
 #	include <unistd.h>
 #else
@@ -95,12 +98,11 @@ main (
 
 	setlocale (LC_ALL, "");
 
-#if !defined(_WIN32) || defined(CONFIG_TARGET_WINE)
+#if !defined(_WIN32)
 	puts ("プリン プリン");
 #else
-	_putws (L"プリン プリン");
+	puts ("purin purin");
 #endif
-
 	if (!pgm_init (&pgm_err)) {
 		fprintf (stderr, "Unable to start PGM engine: %s\n", pgm_err->message);
 		pgm_error_free (pgm_err);
@@ -109,10 +111,13 @@ main (
 
 /* parse program arguments */
 #ifdef _WIN32
-	const char* binary_name = strrchr (argv[0], '\\') + 1;
+	const char* binary_name = strrchr (argv[0], '\\');
 #else
-	const char* binary_name = strrchr (argv[0], '/') + 1;
+	const char* binary_name = strrchr (argv[0], '/');
 #endif
+	if (NULL == binary_name)	binary_name = argv[0];
+	else				binary_name++;
+
 	int c;
 	while ((c = getopt (argc, argv, "s:n:p:cf:K:N:lih")) != -1)
 	{

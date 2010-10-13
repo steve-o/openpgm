@@ -23,6 +23,7 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
+#pragma once
 #ifndef __PGM_IMPL_SOCKADDR_H__
 #define __PGM_IMPL_SOCKADDR_H__
 
@@ -44,18 +45,34 @@ PGM_BEGIN_DECLS
 #ifndef MSG_ERRQUEUE
 #	define MSG_ERRQUEUE		0x2000
 #endif
-#if !defined(EAFNOSUPPORT) && defined(WSAEAFNOSUPPORT)
-#	define EAFNOSUPPORT		WSAEAFNOSUPPORT
-#endif
 
 #ifndef _WIN32
 #	define SOCKET				int
 #	define INVALID_SOCKET			(int)-1
 #	define SOCKET_ERROR			(int)-1
+#	define PGM_SOCK_EAGAIN			EAGAIN
+#	define PGM_SOCK_ECONNRESET		ECONNRESET
+#	define PGM_SOCK_EHOSTUNREACH		EHOSTUNREACH
+#	define PGM_SOCK_EINTR			EINTR
+#	define PGM_SOCK_ENETUNREACH		ENETUNREACH
+#	define PGM_SOCK_ENOBUFS			ENOBUFS
 #	define closesocket			close
 #	define ioctlsocket			ioctl
-#	define pgm_sock_errno()			(errno)
 #	define pgm_error_from_sock_errno	pgm_error_from_errno
+
+static inline
+int
+pgm_get_last_sock_error (void)
+{
+	return errno;
+}
+
+static inline
+void
+pgm_set_last_sock_error (int errnum)
+{
+	errno = errnum;
+}
 
 static inline
 char*
@@ -73,7 +90,14 @@ pgm_gai_strerror_s (char* buffer, size_t size, int errnum)
 }
 
 #else
-#	define pgm_sock_errno()			WSAGetLastError()
+#	define PGM_SOCK_EAGAIN			WSAEWOULDBLOCK
+#	define PGM_SOCK_ECONNRESET		WSAECONNRESET
+#	define PGM_SOCK_EHOSTUNREACH		WSAEHOSTUNREACH
+#	define PGM_SOCK_EINTR			WSAEINTR
+#	define PGM_SOCK_ENETUNREACH		WSAENETUNREACH
+#	define PGM_SOCK_ENOBUFS			WSAENOBUFS
+#	define pgm_get_last_sock_error()	WSAGetLastError()
+#	define pgm_set_last_sock_error(e)	WSASetLastError(e)
 #	define pgm_error_from_sock_errno	pgm_error_from_wsa_errno
 
 static inline

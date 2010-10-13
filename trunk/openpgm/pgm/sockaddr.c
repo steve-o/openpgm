@@ -267,7 +267,7 @@ pgm_sockaddr_cmp (
  *
  * If no error occurs, pgm_sockaddr_hdrincl returns zero.  Otherwise, a value
  * of SOCKET_ERROR is returned, and a specific error code can be retrieved
- * by calling pgm_sock_errno().
+ * by calling pgm_get_last_sock_error().
  */
 
 int
@@ -314,7 +314,7 @@ pgm_sockaddr_hdrincl (
  *
  * If no error occurs, pgm_sockaddr_pktinfo returns zero.  Otherwise, a value
  * of SOCKET_ERROR is returned, and a specific error code can be retrieved
- * by calling pgm_sock_errno().
+ * by calling pgm_get_last_sock_error().
  */
 
 int
@@ -372,7 +372,7 @@ pgm_sockaddr_pktinfo (
  *
  * If no error occurs, pgm_sockaddr_router_alert returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
- * retrieved by calling pgm_sock_errno().
+ * retrieved by calling pgm_get_last_sock_error().
  */
 
 int
@@ -436,7 +436,7 @@ retval = 0;
  *
  * If no error occurs, pgm_sockaddr_tos returns zero.  Otherwise, a value of
  * SOCKET_ERROR is returned, and a specific error code can be retrieved by
- * calling pgm_sock_errno().
+ * calling pgm_get_last_sock_error().
  */
 
 int
@@ -484,7 +484,7 @@ pgm_sockaddr_tos (
  *
  * If no error occurs, pgm_sockaddr_join_group returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
- * retrieved by calling pgm_sock_errno().
+ * retrieved by calling pgm_get_last_sock_error().
  */
 
 int
@@ -708,7 +708,7 @@ pgm_sockaddr_unblock_source (
  *
  * If no error occurs, pgm_sockaddr_join_source_group returns zero.
  * Otherwise, a value of SOCKET_ERROR is returned, and a specific error
- * code can be retrieved by calling pgm_sock_errno().
+ * code can be retrieved by calling pgm_get_last_sock_error().
  */
 
 int
@@ -867,7 +867,7 @@ pgm_sockaddr_msfilter (
  *
  * If no error occurs, pgm_sockaddr_multicast_if returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
- * retrieved by calling pgm_sock_errno().
+ * retrieved by calling pgm_get_last_sock_error().
  */
 
 int
@@ -927,7 +927,7 @@ pgm_sockaddr_multicast_if (
  *
  * If no error occurs, pgm_sockaddr_multicast_loop returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
- * retrieved by calling pgm_sock_errno().
+ * retrieved by calling pgm_get_last_sock_error().
  */
 
 int
@@ -988,7 +988,7 @@ pgm_sockaddr_multicast_loop (
  *
  * If no error occurs, pgm_sockaddr_multicast_hops returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
- * retrieved by calling pgm_sock_errno().
+ * retrieved by calling pgm_get_last_sock_error().
  */
 
 int
@@ -1104,7 +1104,11 @@ pgm_inet_ntop (
 	}
 	}
 
+#ifndef _WIN32
 	errno = EAFNOSUPPORT;
+#else
+	WSASetLastError (WSAEAFNOSUPPORT);
+#endif
 	return NULL;
 }
 
