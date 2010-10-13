@@ -1059,9 +1059,11 @@ parse_receive_entity (
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
 
 /* scoped multicast groups are invalid on Windows */
+#ifdef _WIN32
 		if (AF_INET6 == recv_gsr->gsr_group.ss_family) {
 			((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = 0;
 		}
+#endif
 
 		*recv_list = pgm_list_append (*recv_list, recv_gsr);
 		pgm_free (primary_interface);
@@ -1134,9 +1136,11 @@ parse_receive_entity (
 		memcpy (&recv_gsr->gsr_source, &recv_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&recv_gsr->gsr_group));
 
 /* scoped multicast groups are invalid on Windows */
+#ifdef _WIN32
 		if (AF_INET6 == recv_gsr->gsr_group.ss_family) {
 			((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = 0;
 		}
+#endif
 
 		*recv_list = pgm_list_append (*recv_list, recv_gsr);
 		++j;
@@ -1220,9 +1224,11 @@ parse_send_entity (
 	memcpy (&send_gsr->gsr_source, &send_gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&send_gsr->gsr_group));
 
 /* scoped multicast groups are invalid on Windows */
+#ifdef _WIN32
 	if (AF_INET6 == send_gsr->gsr_group.ss_family) {
 		((struct sockaddr_in6*)&send_gsr->gsr_group)->sin6_scope_id = 0;
 	}
+#endif
 
 	*send_list = pgm_list_append (*send_list, send_gsr);
 	return TRUE;

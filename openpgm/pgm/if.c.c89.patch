@@ -1,5 +1,5 @@
---- if.c	2010-10-13 17:01:30.000000000 +0800
-+++ if.c89.c	2010-10-13 16:57:37.000000000 +0800
+--- if.c	2010-10-13 17:08:45.000000000 +0800
++++ if.c89.c	2010-10-13 17:09:46.000000000 +0800
 @@ -124,6 +124,7 @@
  			continue;
  		}
@@ -206,7 +206,7 @@
  		unsigned scope_id = 0;
  
  /* if using unspec default group check the interface for address family
-@@ -1066,11 +1088,13 @@
+@@ -1068,11 +1090,13 @@
  		*recv_list = pgm_list_append (*recv_list, recv_gsr);
  		pgm_free (primary_interface);
  		return TRUE;
@@ -220,7 +220,7 @@
  	int j = 0;	
  	char** tokens = pgm_strsplit (entity, ",", 10);
  	while (tokens && tokens[j])
-@@ -1145,6 +1169,8 @@
+@@ -1149,6 +1173,8 @@
  	pgm_strfreev (tokens);
  	pgm_free (primary_interface);
  	return TRUE;
@@ -229,7 +229,7 @@
  }
  
  static
-@@ -1174,6 +1200,7 @@
+@@ -1178,6 +1204,7 @@
  		(const void*)send_list,
  		(const void*)error);
  
@@ -237,7 +237,7 @@
  	struct group_source_req* send_gsr;
  	const struct interface_req* primary_interface = (struct interface_req*)(*interface_list)->data;
  
-@@ -1226,6 +1253,7 @@
+@@ -1232,6 +1259,7 @@
  
  	*send_list = pgm_list_append (*send_list, send_gsr);
  	return TRUE;
@@ -245,7 +245,7 @@
  }
  
  /* parse network parameter
-@@ -1358,6 +1386,7 @@
+@@ -1364,6 +1392,7 @@
  			}
  
  /* entity from b to p-1 */
@@ -253,7 +253,7 @@
  			char entity[1024];
  			pgm_strncpy_s (entity, sizeof (entity), b, p - b);
  
-@@ -1415,6 +1444,7 @@
+@@ -1421,6 +1450,7 @@
  
  			b = ++p;
  			continue;
@@ -261,7 +261,7 @@
  		}
  
  		p++;
-@@ -1564,6 +1594,7 @@
+@@ -1570,6 +1600,7 @@
  
  	if (!network_parse (network, family, &recv_list, &send_list, error))
  		return FALSE;
@@ -269,7 +269,7 @@
  	const size_t recv_list_len = pgm_list_length (recv_list);
  	const size_t send_list_len = pgm_list_length (send_list);
  	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
-@@ -1573,6 +1604,7 @@
+@@ -1579,6 +1610,7 @@
  	ai->ai_send_addrs_len = send_list_len;
  	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
  
@@ -277,7 +277,7 @@
  	size_t i = 0;
  	while (recv_list) {
  		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
-@@ -1587,6 +1619,8 @@
+@@ -1593,6 +1625,8 @@
  	}
  	*res = ai;
  	return TRUE;
