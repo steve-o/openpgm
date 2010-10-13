@@ -192,13 +192,8 @@ pgm_rxw_create (
 		pgm_assert_cmpuint (max_rte, >, 0);
 	}
 
-#ifndef _MSC_VER
 	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd ack-c_p %" PRIu32 ")",
 		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte, ack_c_p);
-#else
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %ld ack-c_p %" PRIu32 ")",
-		pgm_tsi_print (tsi), tpdu_size, sqns, secs, (long)max_rte, ack_c_p);
-#endif
 
 /* calculate receive window parameters */
 	pgm_assert (sqns || (secs && max_rte));

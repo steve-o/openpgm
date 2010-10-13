@@ -186,9 +186,9 @@ pgm_txw_create (
 		pgm_assert_cmpuint (rs_k, >, 0);
 	}
 
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %ld use-fec:%s rs(n):%u rs(k):%u)",
+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd use-fec:%s rs(n):%u rs(k):%u)",
 		pgm_tsi_print (tsi),
-		tpdu_size, sqns, secs, (long)max_rte,
+		tpdu_size, sqns, secs, max_rte,
 		use_fec ? "YES" : "NO",
 		rs_n, rs_k);
 
