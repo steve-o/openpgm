@@ -1913,12 +1913,13 @@ pgm_bind3 (
 		memset (&recv_addr.s4, 0, sizeof(struct sockaddr_in));
 		recv_addr.s4.sin_family = AF_INET;
 		recv_addr.s4.sin_addr.s_addr = INADDR_ANY;
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY"));
 	} else {
 		memset (&recv_addr.s6, 0, sizeof(struct sockaddr_in6));
 		recv_addr.s6.sin6_family = AF_INET6;
 		recv_addr.s6.sin6_addr = in6addr_any;
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to IN6ADDR_ANY"));
 	}
-	pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to INADDR_ANY"));
 #else
 	if (!pgm_if_indextoaddr (recv_req->ir_interface,
 			         sock->family,

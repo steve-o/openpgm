@@ -1,5 +1,5 @@
---- net.c	2010-10-12 21:39:48.000000000 +0800
-+++ net.c89.c	2010-10-12 21:40:14.000000000 +0800
+--- net.c	2010-10-13 16:38:12.000000000 +0800
++++ net.c89.c	2010-10-13 16:39:10.000000000 +0800
 @@ -62,19 +62,22 @@
  	pgm_assert( tolen > 0 );
  
@@ -56,7 +56,7 @@
  #endif /* CONFIG_HAVE_POLL */
  			if (ready > 0)
  			{
-@@ -147,6 +151,8 @@
+@@ -150,6 +154,8 @@
  	if (!use_router_alert && sock->can_send_data)
  		pgm_mutex_unlock (&sock->send_mutex);
  	return sent;
