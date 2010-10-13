@@ -121,16 +121,19 @@ pgm_sendto_hops (
 				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 				if ( sent < 0 )
 				{
+					char toaddr[INET6_ADDRSTRLEN];
 					save_errno = pgm_get_last_sock_error();
+					pgm_sockaddr_ntop (to, toaddr, sizeof(toaddr));
 					pgm_warn (_("sendto() %s failed: %s"),
-						  inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ),
-						  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
+						toaddr,
+						pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 				}
 			}
 			else if (ready == 0)
 			{
-				pgm_warn (_("sendto() %s failed: socket timeout."),
-					  inet_ntoa( ((const struct sockaddr_in*)to)->sin_addr ));
+				char toaddr[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop (to, toaddr, sizeof(toaddr));
+				pgm_warn (_("sendto() %s failed: socket timeout."), toaddr);
 			}
 			else
 			{
