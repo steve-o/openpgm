@@ -134,7 +134,7 @@ recvskb (
 	msg.Control.len		= sizeof(aux);
 	DWORD len;
 	if (SOCKET_ERROR == pgm_WSARecvMsg (sock->recv_sock, &msg, &len, NULL, NULL)) {
-		return -1;
+		return SOCKET_ERROR;
 	}
 #	endif /* !_WIN32 */
 #endif /* !CONFIG_TARGET_WINE */
@@ -144,12 +144,8 @@ recvskb (
 		const unsigned percent = pgm_rand_int_range (&sock->rand_, 0, 100);
 		if (percent <= pgm_loss_rate) {
 			pgm_debug ("Simulated packet loss");
-#	ifndef _WIN32
-			errno = EAGAIN;
-#	else
-			WSASetLastError (WSAEWOULDBLOCK);
-#	endif
-			return -1;
+			pgm_set_last_sock_error (PGM_SOCK_EAGAIN);
+			return SOCKET_ERROR;
 		}
 	}
 #endif
@@ -624,7 +620,7 @@ wait_for_event (
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
 #endif
-		if (PGM_UNLIKELY(-1 == ready)) {
+		if (PGM_UNLIKELY(SOCKET_ERROR == ready)) {
 			pgm_debug ("block returned errno=%i",errno);
 			return EFAULT;
 		} else if (ready > 0) {
@@ -770,9 +766,9 @@ recv_again:
 		       sizeof(dst));
 	if (len < 0)
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
-		if (PGM_LIKELY(EAGAIN == save_errno)) {
+		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno)) {
 			goto check_for_repeat;
 		}
 		status = PGM_IO_STATUS_ERROR;
@@ -862,7 +858,7 @@ check_for_repeat:
 				pgm_rwlock_reader_unlock (&sock->lock);
 				return PGM_IO_STATUS_EOF;
 			case EFAULT: {
-				const int save_errno = pgm_sock_errno();
+				const int save_errno = pgm_get_last_sock_error();
 				char errbuf[1024];
 				pgm_set_error (error,
 						PGM_ERROR_DOMAIN_RECV,

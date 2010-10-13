@@ -23,6 +23,7 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
+#pragma once
 #ifndef __PGM_IMPL_MATH_H__
 #define __PGM_IMPL_MATH_H__
 

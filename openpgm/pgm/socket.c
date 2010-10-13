@@ -276,7 +276,7 @@ pgm_socket (
 					   socket_type,
 					   new_sock->protocol)) == INVALID_SOCKET)
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
@@ -295,7 +295,7 @@ pgm_socket (
 					   socket_type,
 					   new_sock->protocol)) == INVALID_SOCKET)
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
@@ -309,7 +309,7 @@ pgm_socket (
 							     socket_type,
 							     new_sock->protocol)) == INVALID_SOCKET)
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
@@ -329,7 +329,7 @@ pgm_socket (
 		    SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
@@ -345,7 +345,7 @@ pgm_socket (
 		const sa_family_t recv_family = new_sock->family;
 		if (SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
 		{
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
@@ -365,7 +365,7 @@ pgm_socket (
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request IP headers."));
 			if (SOCKET_ERROR == pgm_sockaddr_hdrincl (new_sock->recv_sock, recv_family, TRUE))
 			{
-				const int save_errno = pgm_sock_errno();
+				const int save_errno = pgm_get_last_sock_error();
 				char errbuf[1024];
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_SOCKET,
@@ -381,7 +381,7 @@ pgm_socket (
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
 			if (SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
 			{
-				const int save_errno = pgm_sock_errno();
+				const int save_errno = pgm_get_last_sock_error();
 				char errbuf[1024];
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_SOCKET,
@@ -404,7 +404,7 @@ pgm_socket (
 err_destroy:
 	if (INVALID_SOCKET != new_sock->recv_sock) {
 		if (SOCKET_ERROR == closesocket (new_sock->recv_sock)) {
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_warn (_("Close on receive socket failed: %s"),
 				  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -413,7 +413,7 @@ err_destroy:
 	}
 	if (INVALID_SOCKET != new_sock->send_sock) {
 		if (SOCKET_ERROR == closesocket (new_sock->send_sock)) {
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_warn (_("Close on send socket failed: %s"),
 				  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -422,7 +422,7 @@ err_destroy:
 	}
 	if (INVALID_SOCKET != new_sock->send_with_router_alert_sock) {
 		if (SOCKET_ERROR == closesocket (new_sock->send_with_router_alert_sock)) {
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_warn (_("Close on IP Router Alert (RFC 2113) send socket failed: %s"),
 				  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -1804,7 +1804,7 @@ pgm_bind3 (
 		if (sock->use_pgmcc &&
 		    0 != pgm_notify_init (&sock->ack_notify))
 		{
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
@@ -1816,7 +1816,7 @@ pgm_bind3 (
 		}
 		if (0 != pgm_notify_init (&sock->rdata_notify))
 		{
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,
@@ -1829,7 +1829,7 @@ pgm_bind3 (
 	}
 	if (0 != pgm_notify_init (&sock->pending_notify))
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
@@ -1951,7 +1951,7 @@ pgm_bind3 (
 				      &recv_addr.sa,
 				      pgm_sockaddr_len (&recv_addr.sa)))
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
@@ -2000,7 +2000,7 @@ pgm_bind3 (
 				      (struct sockaddr*)&send_addr,
 				      pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
@@ -2042,7 +2042,7 @@ pgm_bind3 (
 				      (struct sockaddr*)&send_with_router_alert_addr,
 				      pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr)))
 	{
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
@@ -2142,7 +2142,7 @@ pgm_connect (
 		    !pgm_send_spm (sock, PGM_OPT_SYN) ||
 		    !pgm_send_spm (sock, PGM_OPT_SYN))
 		{
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_SOCKET,

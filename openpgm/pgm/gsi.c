@@ -97,7 +97,7 @@ pgm_gsi_create_from_hostname (
 	char hostname[NI_MAXHOST];
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
@@ -129,7 +129,7 @@ pgm_gsi_create_from_addr (
 
 	int retval = gethostname (hostname, sizeof(hostname));
 	if (0 != retval) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,

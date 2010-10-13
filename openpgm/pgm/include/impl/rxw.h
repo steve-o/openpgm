@@ -19,10 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef _MSC_VER
-#	pragma warning(disable: 4819)
-#endif
-
+#pragma once
 #ifndef __PGM_IMPL_RXW_H__
 #define __PGM_IMPL_RXW_H__
 

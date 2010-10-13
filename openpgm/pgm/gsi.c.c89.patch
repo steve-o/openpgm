@@ -1,5 +1,5 @@
---- gsi.c	2010-10-06 14:39:46.000000000 +0800
-+++ gsi.c89	2010-10-06 14:56:35.000000000 +0800
+--- gsi.c	2010-10-12 20:52:40.000000000 +0800
++++ gsi.c89.c	2010-10-12 20:52:34.000000000 +0800
 @@ -54,12 +54,14 @@
  	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
  	g_checksum_free (checksum);
@@ -38,7 +38,7 @@
 +	{
  	int retval = gethostname (hostname, sizeof(hostname));
  	if (0 != retval) {
- 		const int save_errno = pgm_sock_errno();
+ 		const int save_errno = pgm_get_last_sock_error();
 @@ -154,8 +159,11 @@
  	}
  	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));

@@ -35,10 +35,6 @@
 #	define PGM_DISABLE_ASSERT
 #endif
 
-#if !defined(ENOBUFS) && defined(WSAENOBUFS)
-#	define ENOBUFS	WSAENOBUFS
-#endif
-
 
 /* locals */
 static inline bool peer_is_source (const pgm_peer_t*) PGM_GNUC_CONST;
@@ -810,10 +806,16 @@ pgm_send_spm (
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-		sock->blocklen = tpdu_length;
-		return FALSE;
+	if (sent < 0) {
+		const int save_errno = pgm_get_last_sock_error();
+		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+		{
+			sock->blocklen = tpdu_length;
+			return FALSE;
+		}
+/* fall through silently on other errors */
 	}
+
 /* advance SPM sequence only on successful transmission */
 	sock->spm_sqn++;
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
@@ -896,8 +898,10 @@ send_ncf (
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
+/* fall through silently on other errors */
+			
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
@@ -1008,8 +1012,10 @@ send_ncf_list (
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno))
+	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
+/* fall through silently on other errors */
+	
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
 	return TRUE;
 }
@@ -1163,20 +1169,24 @@ retry_send:
 
 	sent = pgm_sendto (sock,
 			   sock->is_controlled_odata,	/* rate limited */
-			   FALSE,				/* regular socket */
+			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-		sock->is_apdu_eagain = TRUE;
-		sock->blocklen = tpdu_length;
-		if (EAGAIN == errno) {
+	if (sent < 0) {
+		const int save_errno = pgm_get_last_sock_error();
+		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+		{
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			if (PGM_SOCK_ENOBUFS == save_errno)
+				return PGM_IO_STATUS_RATE_LIMITED;
 			if (sock->use_pgmcc)
 				pgm_notify_clear (&sock->ack_notify);
 			return PGM_IO_STATUS_WOULD_BLOCK;
 		}
-		return PGM_IO_STATUS_RATE_LIMITED;
+/* fall through silently on other errors */
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1325,15 +1335,19 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-		sock->is_apdu_eagain = TRUE;
-		sock->blocklen = tpdu_length;
-		if (EAGAIN == errno) {
+	if (sent < 0) {
+		const int save_errno = pgm_get_last_sock_error();
+		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+		{
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			if (PGM_SOCK_ENOBUFS == save_errno)
+				return PGM_IO_STATUS_RATE_LIMITED;
 			if (sock->use_pgmcc)
 				pgm_notify_clear (&sock->ack_notify);
 			return PGM_IO_STATUS_WOULD_BLOCK;
 		}
-		return PGM_IO_STATUS_RATE_LIMITED;
+/* fall through silently on other errors */
 	}
 
 	if (sock->use_pgmcc) {
@@ -1472,15 +1486,19 @@ retry_send:
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-		sock->is_apdu_eagain = TRUE;
-		sock->blocklen = tpdu_length;
-		if (EAGAIN == errno) {
+	if (sent < 0) {
+		const int save_errno = pgm_get_last_sock_error();
+		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+		{
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			if (PGM_SOCK_ENOBUFS == save_errno)
+				return PGM_IO_STATUS_RATE_LIMITED;
 			if (sock->use_pgmcc)
 				pgm_notify_clear (&sock->ack_notify);
 			return PGM_IO_STATUS_WOULD_BLOCK;
 		}
-		return PGM_IO_STATUS_RATE_LIMITED;
+/* fall through silently on other errors */
 	}
 
 /* save unfolded odata for retransmissions */
@@ -1529,6 +1547,7 @@ send_apdu (
 	size_t		bytes_sent = 0;		/* counted at IP layer */
 	unsigned	packets_sent = 0;	/* IP packets */
 	size_t		data_bytes_sent = 0;
+	int		save_errno;
 
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != apdu);
@@ -1631,15 +1650,20 @@ retry_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		sent = pgm_sendto (sock,
 				   !STATE(is_rate_limited),	/* rate limit on blocking */
-				   FALSE,				/* regular socket */
+				   FALSE,			/* regular socket */
 				   STATE(skb)->head,
 				   tpdu_length,
 				   (struct sockaddr*)&sock->send_gsr.gsr_group,
 				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
-			goto blocked;
+		if (sent < 0) {
+			save_errno = pgm_get_last_sock_error();
+			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+			{
+				sock->is_apdu_eagain = TRUE;
+				sock->blocklen = tpdu_length;
+				goto blocked;
+			}
+/* fall through silently on other errors */
 		}
 
 /* save unfolded odata for retransmissions */
@@ -1647,7 +1671,7 @@ retry_send:
 
 		if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 			bytes_sent += tpdu_length + sock->iphdr_len;	/* as counted at IP layer */
-			packets_sent++;							/* IP packets */
+			packets_sent++;					/* IP packets */
 			data_bytes_sent += STATE(tsdu_length);
 		}
 
@@ -1681,12 +1705,11 @@ blocked:
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
-	if (EAGAIN == errno) {
-		if (sock->use_pgmcc)
-			pgm_notify_clear (&sock->ack_notify);
-		return PGM_IO_STATUS_WOULD_BLOCK;
-	}
-	return PGM_IO_STATUS_RATE_LIMITED;
+	if (PGM_SOCK_ENOBUFS == save_errno)
+		return PGM_IO_STATUS_RATE_LIMITED;
+	if (sock->use_pgmcc)
+		pgm_notify_clear (&sock->ack_notify);
+	return PGM_IO_STATUS_WOULD_BLOCK;
 }
 
 /* Send one APDU, whether it fits within one TPDU or more.
@@ -1775,6 +1798,7 @@ pgm_sendv (
 	unsigned	packets_sent = 0;
 	size_t		bytes_sent = 0;
 	size_t		data_bytes_sent = 0;
+	int		save_errno;
 
 	pgm_debug ("pgm_sendv (sock:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
 		(const void*)sock,
@@ -2033,15 +2057,20 @@ retry_one_apdu_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		sent = pgm_sendto (sock,
 				   !STATE(is_rate_limited),	/* rate limited on blocking */
-				   FALSE,				/* regular socket */
+				   FALSE,			/* regular socket */
 				   STATE(skb)->head,
 				   tpdu_length,
 				   (struct sockaddr*)&sock->send_gsr.gsr_group,
 				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
-			goto blocked;
+		if (sent < 0) {
+			save_errno = pgm_get_last_sock_error();
+			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+			{
+				sock->is_apdu_eagain = TRUE;
+				sock->blocklen = tpdu_length;
+				goto blocked;
+			}
+/* fall through silently on other errors */
 		}
 
 /* save unfolded odata for retransmissions */
@@ -2049,7 +2078,7 @@ retry_one_apdu_send:
 
 		if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 			bytes_sent += tpdu_length + sock->iphdr_len;	/* as counted at IP layer */
-			packets_sent++;							/* IP packets */
+			packets_sent++;					/* IP packets */
 			data_bytes_sent += STATE(tsdu_length);
 		}
 
@@ -2087,12 +2116,11 @@ blocked:
 	}
 	pgm_mutex_unlock (&sock->source_mutex);
 	pgm_rwlock_reader_unlock (&sock->lock);
-	if (EAGAIN == errno) {
-		if (sock->use_pgmcc)
-			pgm_notify_clear (&sock->ack_notify);
-		return PGM_IO_STATUS_WOULD_BLOCK;
-	}
-	return PGM_IO_STATUS_RATE_LIMITED;
+	if (PGM_SOCK_ENOBUFS == save_errno)
+		return PGM_IO_STATUS_RATE_LIMITED;
+	if (sock->use_pgmcc)
+		pgm_notify_clear (&sock->ack_notify);
+	return PGM_IO_STATUS_WOULD_BLOCK;
 }
 
 /* send PGM original data, transmit window owned scatter/gather IO vector.
@@ -2118,6 +2146,7 @@ pgm_send_skbv (
 	unsigned	packets_sent = 0;
 	size_t		bytes_sent = 0;
 	size_t		data_bytes_sent = 0;
+	int		save_errno;
 
 	pgm_debug ("pgm_send_skbv (sock:%p vector:%p count:%u is-one-apdu:%s bytes-written:%p)",
 		(const void*)sock,
@@ -2274,15 +2303,20 @@ retry_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		sent = pgm_sendto (sock,
 				   !STATE(is_rate_limited),	/* rate limited on blocking */
-				    FALSE,				/* regular socket */
+				    FALSE,			/* regular socket */
 				    STATE(skb)->head,
 				    tpdu_length,
 				    (struct sockaddr*)&sock->send_gsr.gsr_group,
 				    pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-		if (sent < 0 && (EAGAIN == errno || ENOBUFS == errno)) {
-			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
-			goto blocked;
+		if (sent < 0) {
+			save_errno = pgm_get_last_sock_error();
+			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+			{
+				sock->is_apdu_eagain = TRUE;
+				sock->blocklen = tpdu_length;
+				goto blocked;
+			}
+/* fall through silently on other errors */
 		}
 
 /* save unfolded odata for retransmissions */
@@ -2290,7 +2324,7 @@ retry_send:
 
 		if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 			bytes_sent += tpdu_length + sock->iphdr_len;	/* as counted at IP layer */
-			packets_sent++;							/* IP packets */
+			packets_sent++;					/* IP packets */
 			data_bytes_sent += STATE(tsdu_length);
 		}
 
@@ -2334,12 +2368,11 @@ blocked:
 	}
 	pgm_mutex_unlock (&sock->source_mutex);
 	pgm_rwlock_reader_unlock (&sock->lock);
-	if (EAGAIN == errno) {
-		if (sock->use_pgmcc)
-			pgm_notify_clear (&sock->ack_notify);
-		return PGM_IO_STATUS_WOULD_BLOCK;
-	}
-	return PGM_IO_STATUS_RATE_LIMITED;
+	if (PGM_SOCK_ENOBUFS == save_errno)
+		return PGM_IO_STATUS_RATE_LIMITED;
+	if (sock->use_pgmcc)
+		pgm_notify_clear (&sock->ack_notify);
+	return PGM_IO_STATUS_WOULD_BLOCK;
 }
 
 /* cleanup resuming send state helper 
@@ -2394,15 +2427,19 @@ send_rdata (
 
 	sent = pgm_sendto (sock,
 			   sock->is_controlled_rdata,	/* rate limited */
-			   TRUE,				/* with router alert */
+			   TRUE,			/* with router alert */
 			   header,
 			   tpdu_length,
 			   (struct sockaddr*)&sock->send_gsr.gsr_group,
 			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
-
-	if (sent < 0 && EAGAIN == errno) {
-		sock->blocklen = tpdu_length;
-		return FALSE;
+	if (sent < 0) {
+		const int save_errno = pgm_get_last_sock_error();
+		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
+		{
+			sock->blocklen = tpdu_length;
+			return FALSE;
+		}
+/* fall through silently on other errors */
 	}
 
 	const pgm_time_t now = pgm_time_update_now();

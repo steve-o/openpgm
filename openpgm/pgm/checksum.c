@@ -29,7 +29,7 @@ static uint16_t do_csum_8bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_16bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_32bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 

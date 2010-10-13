@@ -64,24 +64,26 @@ _pgm_getlifaddrs (
 {
 	const SOCKET sock = socket (AF_INET, SOCK_DGRAM, 0);
 	if (SOCKET_ERROR == sock) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Opening IPv4 datagram socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		return FALSE;
 	}
 
 /* process IPv6 interfaces */
 	const SOCKET sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (SOCKET_ERROR == sock6) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Opening IPv6 datagram socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		return FALSE;
 	}
@@ -91,12 +93,13 @@ again:
 	lifn.lifn_family = AF_INET;
 	lifn.lifn_flags  = 0;
 	if (SOCKET_ERROR == ioctlsocket (sock, SIOCGLIFNUM, &lifn)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("SIOCGLIFNUM failed on IPv4 socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		closesocket (sock6);
 		return FALSE;
@@ -118,12 +121,13 @@ again:
 	lifc.lifc_len    = lifn.lifn_count * sizeof(struct lifreq);
 	lifc.lifc_buf    = alloca (lifc.lifc_len);
 	if (SOCKET_ERROR == ioctlsocket (sock, SIOCGLIFCONF, &lifc)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("SIOCGLIFCONF failed on IPv4 socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		closesocket (sock6);
 		return FALSE;
@@ -134,12 +138,13 @@ again:
 	lifn.lifn_family = AF_INET6;
 	lifn.lifn_flags  = 0;
 	if (SOCKET_ERROR == ioctlsocket (sock6, SIOCGLIFNUM, &lifn)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("SIOCGLIFNUM failed on IPv6 socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		closesocket (sock6);
 		return FALSE;
@@ -154,12 +159,13 @@ again:
 	lifc6.lifc_len     = lifn.lifn_count * sizeof(struct lifreq);
 	lifc6.lifc_buf     = alloca (lifc6.lifc_len);
 	if (SOCKET_ERROR == ioctlsocket (sock6, SIOCGLIFCONF, &lifc6)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("SIOCGLIFCONF failed on IPv6 socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		closesocket (sock6);
 		return FALSE;
@@ -274,14 +280,16 @@ again:
 	}
 
 	if (SOCKET_ERROR == closesocket (sock6)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_warn (_("Closing IPv6 socket failed: %s"),
-			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 	}
 	if (SOCKET_ERROR == closesocket (sock)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_warn (_("Closing IPv4 socket failed: %s"),
-			pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 	}
 
 	*ifap = (struct pgm_ifaddrs_t*)ifa;
@@ -299,12 +307,13 @@ _pgm_getifaddrs (
 {
 	const SOCKET sock = socket (AF_INET, SOCK_DGRAM, 0);
 	if (SOCKET_ERROR == sock) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Opening IPv4 datagram socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		return FALSE;
 	}
 
@@ -314,12 +323,13 @@ _pgm_getifaddrs (
 	ifc.ifc_buf = buf;
 	ifc.ifc_len = sizeof(buf);
 	if (SOCKET_ERROR == ioctlsocket (sock, SIOCGIFCONF, &ifc)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("SIOCGIFCONF failed on IPv4 socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		return FALSE;
 	}
@@ -329,12 +339,13 @@ _pgm_getifaddrs (
 /* process IPv6 interfaces */
 	const SOCKET sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (SOCKET_ERROR == sock6) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("Opening IPv6 datagram socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		return FALSE;
 	}
@@ -344,12 +355,13 @@ _pgm_getifaddrs (
 	ifc6.ifc_buf = buf6;
 	ifc6.ifc_len = sizeof(buf6);
 	if (SOCKET_ERROR == ioctlsocket (sock6, SIOCGIFCONF, &ifc6)) {
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
+				pgm_error_from_sock_errno (save_errno),
 				_("SIOCGIFCONF failed on IPv6 socket: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		closesocket (sock);
 		closesocket (sock6);
 		return FALSE;
@@ -459,12 +471,20 @@ _pgm_getifaddrs (
 		++ifr;
 	}
 
-	if (SOCKET_ERROR == closesocket (sock6))
-		pgm_warn (_("Closing IPv6 socket failed: %s"), strerror(errno));
+	if (SOCKET_ERROR == closesocket (sock6)) {
+		const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
+		pgm_warn (_("Closing IPv6 socket failed: %s"),
+			pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
+	}
 #	endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
 
-	if (SOCKET_ERROR == closesocket (sock))
-		pgm_warn (_("Closing IPv4 socket failed: %s"), strerror(errno));
+	if (SOCKET_ERROR == closesocket (sock)) {
+		const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
+		pgm_warn (_("Closing IPv4 socket failed: %s"),
+			pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
+	}
 
 	*ifap = (struct pgm_ifaddrs_t*)ifa;
 	return TRUE;

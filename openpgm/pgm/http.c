@@ -190,7 +190,7 @@ pgm_http_init (
 
 /* resolve and store relatively constant runtime information */
 	if (0 != gethostname (http_hostname, sizeof(http_hostname))) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
@@ -259,7 +259,7 @@ pgm_http_init (
 
 /* create HTTP listen socket */
 	if (INVALID_SOCKET == (http_sock = socket (AF_INET,  SOCK_STREAM, 0))) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
@@ -270,7 +270,7 @@ pgm_http_init (
 	}
 	const int v = 1;
 	if (0 != setsockopt (http_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v))) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
@@ -281,7 +281,7 @@ pgm_http_init (
 	}
 	if (0 != http_sock_rcvtimeo (http_sock, HTTP_TIMEOUT) ||
 	    0 != http_sock_sndtimeo (http_sock, HTTP_TIMEOUT)) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 				PGM_ERROR_DOMAIN_HTTP,
@@ -296,7 +296,7 @@ pgm_http_init (
 	http_addr.sin_addr.s_addr = INADDR_ANY;
 	http_addr.sin_port = htons (http_port);
 	if (0 != bind (http_sock, (struct sockaddr*)&http_addr, sizeof(http_addr))) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		char addr[INET6_ADDRSTRLEN];
 		pgm_sockaddr_ntop ((struct sockaddr*)&http_addr, addr, sizeof(addr));
@@ -309,7 +309,7 @@ pgm_http_init (
 		goto err_cleanup;
 	}
 	if (0 != listen (http_sock, HTTP_BACKLOG)) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
@@ -324,7 +324,7 @@ pgm_http_init (
 
 /* create notification channel */
 	if (0 != pgm_notify_init (&http_notify)) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_HTTP,
@@ -416,9 +416,9 @@ http_accept (
 	socklen_t addrlen = sizeof(addr);
 	SOCKET new_sock = accept (listen_sock, (struct sockaddr*)&addr, &addrlen);
 	if (INVALID_SOCKET == new_sock) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
-		if (EAGAIN == save_errno)
+		if (PGM_SOCK_EAGAIN == save_errno)
 			return;
 		pgm_warn (_("HTTP accept: %s"),
 			pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -453,7 +453,7 @@ http_close (
 	)
 {
 	if (SOCKET_ERROR == closesocket (connection->sock)) {
-		const int save_errno = pgm_sock_errno();
+		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_warn (_("Close HTTP client socket: %s"),
 			pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -506,9 +506,9 @@ http_read (
 		}
 		const ssize_t bytes_read = recv (connection->sock, &connection->buf[ connection->bufoff ], connection->buflen - connection->bufoff, 0);
 		if (bytes_read < 0) {
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
-			if (EINTR == save_errno || EAGAIN == save_errno)
+			if (PGM_SOCK_EINTR == save_errno || PGM_SOCK_EAGAIN == save_errno)
 				return;
 			pgm_warn (_("HTTP client read: %s"),
 				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -571,9 +571,9 @@ http_write (
 	do {
 		const ssize_t bytes_written = send (connection->sock, &connection->buf[ connection->bufoff ], connection->buflen - connection->bufoff, 0);
 		if (bytes_written < 0) {
-			const int save_errno = pgm_sock_errno();
+			const int save_errno = pgm_get_last_sock_error();
 			char errbuf[1024];
-			if (EINTR == save_errno || EAGAIN == save_errno)
+			if (PGM_SOCK_EINTR == save_errno || PGM_SOCK_EAGAIN == save_errno)
 				return;
 			pgm_warn (_("HTTP client write: %s"),
 				pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
@@ -605,8 +605,8 @@ http_finwait (
 	char buf[1024];
 	const ssize_t bytes_read = recv (connection->sock, buf, sizeof(buf), 0);
 	if (bytes_read < 0) {
-		const int save_errno = pgm_sock_errno();
-		if (EINTR == save_errno || EAGAIN == save_errno)
+		const int save_errno = pgm_get_last_sock_error();
+		if (PGM_SOCK_EINTR == save_errno || PGM_SOCK_EAGAIN == save_errno)
 			return;
 	}
 	http_close (connection);
@@ -753,7 +753,7 @@ http_routine (
 
 		fds = select (fds, &readfds, &writefds, &exceptfds, NULL);
 /* signal interrupt */
-		if (PGM_UNLIKELY(SOCKET_ERROR == fds && EINTR == pgm_sock_errno()))
+		if (PGM_UNLIKELY(SOCKET_ERROR == fds && PGM_SOCK_EINTR == pgm_get_last_sock_error()))
 			continue;
 /* terminate */
 		if (PGM_UNLIKELY(FD_ISSET( notify_fd, &readfds )))
