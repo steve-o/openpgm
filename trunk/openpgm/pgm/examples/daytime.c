@@ -122,7 +122,14 @@ main (
 	}
 
 /* parse program arguments */
+#ifdef _WIN32
+	const char* binary_name = strrchr (argv[0], '\\');
+#else
 	const char* binary_name = strrchr (argv[0], '/');
+#endif
+	if (NULL == binary_name)	binary_name = argv[0];
+	else				binary_name++;
+
 	int c;
 	while ((c = getopt (argc, argv, "s:n:p:r:cf:N:K:P:lih")) != -1)
 	{

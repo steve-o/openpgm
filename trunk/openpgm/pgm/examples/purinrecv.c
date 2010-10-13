@@ -101,6 +101,7 @@ main (
 #if !defined(_WIN32)
 	puts ("プリン プリン");
 #else
+/* Windows consoles have incredibly limited Unicode support */
 	puts ("purin purin");
 #endif
 	if (!pgm_init (&pgm_err)) {
