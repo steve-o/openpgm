@@ -1,5 +1,5 @@
---- receiver.c	2010-10-13 13:55:38.000000000 +0800
-+++ receiver.c89.c	2010-10-13 13:57:16.000000000 +0800
+--- receiver.c	2010-10-13 17:14:22.000000000 +0800
++++ receiver.c89.c	2010-10-13 17:15:52.000000000 +0800
 @@ -166,6 +166,7 @@
  
  	pgm_trace (PGM_LOG_ROLE_RX_WINDOW, _("Lost data #%u due to cancellation."), skb->sequence);
@@ -256,7 +256,7 @@
 +	pgm_list_t *it, *prev;
 +	for (it = ack_backoff_queue->tail, prev = it->prev;
  	     it;
- 	     it = prev, prev = it->prev)
+ 	     it = prev, prev = it ? it->prev : NULL)
  	{
 @@ -1438,6 +1473,8 @@
  			break;
@@ -284,7 +284,7 @@
 +		pgm_list_t *it, *prev;
 +		for (it = nak_backoff_queue->tail, prev = it->prev;
  		     it;
- 		     it = prev, prev = it->prev)
+ 		     it = prev, prev = it ? it->prev : NULL)
  		{
 @@ -1542,6 +1582,7 @@
  				}
@@ -323,7 +323,7 @@
 +		pgm_list_t *it, *prev;
 +		for (it = nak_backoff_queue->tail, prev = it->prev;
  		     it;
- 		     it = prev, prev = it->prev)
+ 		     it = prev, prev = it ? it->prev : NULL)
  		{
 @@ -1639,6 +1685,7 @@
  				break;
@@ -350,7 +350,7 @@
 +	pgm_list_t *it, *next;
 +	for (it = sock->peers_list, next = it->next;
  	     it;
- 	     it = next, next = it->next)
+ 	     it = next, next = it ? it->next : NULL)
  	{
 @@ -1784,6 +1834,7 @@
  		}
@@ -369,7 +369,7 @@
 +	pgm_list_t *it, *next;
 +	for (it = sock->peers_list, next = it->next;
  	     it;
- 	     it = next, next = it->next)
+ 	     it = next, next = it ? it->next : NULL)
  	{
 @@ -1854,6 +1907,7 @@
  		}
@@ -391,7 +391,7 @@
 +	pgm_list_t *it, *prev;
 +	for (it = wait_ncf_queue->tail, prev = it->prev;
  	     it;
- 	     it = prev, prev = it->prev)
+ 	     it = prev, prev = it ? it->prev : NULL)
  	{
  		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
  		pgm_assert (NULL != skb);
@@ -428,7 +428,7 @@
 +	pgm_list_t *it, *prev;
 +	for (it = wait_data_queue->tail, prev = it->prev;
  	     it;
- 	     it = prev, prev = it->prev)
+ 	     it = prev, prev = it ? it->prev : NULL)
  	{
  		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)it;
  		pgm_assert (NULL != rdata_skb);
