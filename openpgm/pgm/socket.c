@@ -1846,7 +1846,7 @@ pgm_bind3 (
 
 	if (sock->udp_encap_ucast_port) {
 		const size_t udphdr_len = sizeof(struct pgm_udphdr);
-		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %lu bytes", (unsigned long)udphdr_len);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %zu bytes", udphdr_len);
 		sock->iphdr_len += udphdr_len;
 	}
 
@@ -2073,14 +2073,8 @@ pgm_bind3 (
 /* setup rate control */
 		if (sock->txw_max_rte)
 		{
-#ifndef _MSC_VER
 			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zd bytes per second."),
 					sock->txw_max_rte);
-#else
-			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %ld bytes per second."),
-					(long)sock->txw_max_rte);
-#endif
-	
 			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_spm   = TRUE;	/* must always be set */
 			sock->is_controlled_odata = TRUE;
