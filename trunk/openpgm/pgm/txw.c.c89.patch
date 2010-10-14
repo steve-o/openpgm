@@ -1,5 +1,5 @@
---- txw.c	2010-10-13 18:02:46.000000000 +0800
-+++ txw.c89.c	2010-10-13 18:02:57.000000000 +0800
+--- txw.c	2010-10-14 17:07:06.000000000 +0800
++++ txw.c89.c	2010-10-14 17:04:48.000000000 +0800
 @@ -186,14 +186,15 @@
  		pgm_assert_cmpuint (rs_k, >, 0);
  	}
@@ -53,34 +53,7 @@
  }
  
  static
-@@ -536,17 +542,19 @@
- 	pgm_txw_t* const	window
- 	)
- {
--	struct pgm_sk_buff_t	*skb;
--	pgm_txw_state_t		*state;
--	bool			 is_var_pktlen = FALSE;
--	bool			 is_op_encoded = FALSE;
--	uint16_t		 parity_length = 0;
--	const pgm_gf8_t		*src[ window->rs.k ];
--	void			*data;
-+	struct pgm_sk_buff_t	 *skb;
-+	pgm_txw_state_t		 *state;
-+	bool			  is_var_pktlen = FALSE;
-+	bool			  is_op_encoded = FALSE;
-+	uint16_t		  parity_length = 0;
-+	const pgm_gf8_t		**src;
-+	void			 *data;
- 
- /* pre-conditions */
- 	pgm_assert (NULL != window);
- 
-+	src = pgm_newa (pgm_gf8_t*, window->rs.k);
-+
- 	pgm_debug ("retransmit_try_peek (window:%p)", (const void*)window);
- 
- /* no lock required to detect presence of a request */
-@@ -573,10 +581,13 @@
+@@ -575,10 +581,13 @@
  	}
  
  /* generate parity packet to satisify request */	
@@ -95,7 +68,7 @@
  	{
  		const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
  		const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
-@@ -596,6 +607,7 @@
+@@ -598,6 +607,7 @@
  			is_op_encoded = TRUE;
  		}
  	}
@@ -103,7 +76,7 @@
  
  /* construct basic PGM header to be completed by send_rdata() */
  	skb = window->parity_buffer;
-@@ -615,7 +627,9 @@
+@@ -617,7 +627,9 @@
  	{
  		skb->pgm_header->pgm_options |= PGM_OPT_VAR_PKTLEN;
  
@@ -114,7 +87,7 @@
  		{
  			struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
  			const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
-@@ -629,6 +643,7 @@
+@@ -631,6 +643,7 @@
  				odata_skb->zero_padded = 1;
  			}
  		}
@@ -122,7 +95,7 @@
  		parity_length += 2;
  	}
  
-@@ -645,17 +660,21 @@
+@@ -647,17 +660,21 @@
   */
  	if (is_op_encoded)
  	{
@@ -149,7 +122,7 @@
  		{
  			const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
  
-@@ -670,8 +689,10 @@
+@@ -672,8 +689,10 @@
  				opt_src[i] = (pgm_gf8_t*)&null_opt_fragment;
  			}
  		}
@@ -160,7 +133,7 @@
  		const uint16_t opt_total_length = sizeof(struct pgm_opt_length) +
  						 sizeof(struct pgm_opt_header) +
  						 sizeof(struct pgm_opt_fragment);
-@@ -683,6 +704,7 @@
+@@ -685,6 +704,7 @@
  		opt_len->opt_type			= PGM_OPT_LENGTH;
  		opt_len->opt_length			= sizeof(struct pgm_opt_length);
  		opt_len->opt_total_length		= htons ( opt_total_length );
@@ -168,7 +141,7 @@
  		opt_header			 	= (struct pgm_opt_header*)(opt_len + 1);
  		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
  		opt_header->opt_length			= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-@@ -711,9 +733,12 @@
+@@ -713,9 +733,12 @@
  			parity_length);
  
  /* calculate partial checksum */

@@ -23,6 +23,8 @@
 #include <stdio.h>
 #ifndef _WIN32
 #	include <unistd.h>
+#else
+#	include <io.h>
 #endif
 #include <impl/framework.h>
 
