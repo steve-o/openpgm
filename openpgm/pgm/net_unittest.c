@@ -24,7 +24,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef _WIN32
+#ifndef _WIN32
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#else
 #	include <ws2tcpip.h>
 #	include <mswsock.h>
 #endif

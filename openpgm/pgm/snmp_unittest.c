@@ -72,7 +72,8 @@ START_TEST (test_init_fail_001)
 {
 	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_snmp_init (&err));
-	fail_unless (FALSE == pgm_snmp_init (&err));
+/* reference counting means this now passes */
+	fail_unless (TRUE == pgm_snmp_init (&err));
 }
 END_TEST
 

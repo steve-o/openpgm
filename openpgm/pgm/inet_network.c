@@ -292,7 +292,7 @@ pgm_sa6_network (
 
 #ifdef INET_NETWORK_DEBUG
 	char sdebug[INET6_ADDRSTRLEN];
-	pgm_sockaddr_ntop (sa6, sdebug, sizeof(sdebug));
+	pgm_sockaddr_ntop ((const struct sockaddr*)sa6, sdebug, sizeof(sdebug));
 	pgm_debug ("IPv6 network address: %s", sdebug);
 #endif
 
@@ -321,7 +321,7 @@ pgm_sa6_network (
 	}
 
 #ifdef INET_NETWORK_DEBUG
-	pgm_sockaddr_ntop (sa6, sdebug, sizeof(sdebug));
+	pgm_sockaddr_ntop ((const struct sockaddr*)sa6, sdebug, sizeof(sdebug));
 	pgm_debug ("effective IPv6 network address after subnet mask: %s", sdebug);
 #endif
 	return 0;

@@ -68,9 +68,13 @@ e.StaticSharedLibrary('libpgm-pic', src);
 
 if env['WITH_CHECK'] == 'true':
 	te = e.Clone();
+# add new suffix so we can re-use libpgm objects
+	te['SHOBJSUFFIX'] = '.libpgm' + te['SHOBJSUFFIX'];
+	te['OBJSUFFIX']   = '.libpgm' + te['OBJSUFFIX'];
+
 	te.MergeFlags(env['GLIB_FLAGS']);
 	te.MergeFlags(env['CHECK_FLAGS']);
-	newCCFLAGS = [];
+	newCCFLAGS = [	'-DSKB_DEBUG' ];
 	for flag in te['CCFLAGS']:
 		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
 			newCCFLAGS.append(flag);
@@ -152,10 +156,10 @@ if env['WITH_CHECK'] == 'true':
 # library
 	te.Program (['txw_unittest.c',
 			e.Object('tsi.c'),
-			e.Object('skbuff.c')] + tframework);
+			te.Object('skbuff.c')] + tframework);
 	te.Program (['rxw_unittest.c',
 			e.Object('tsi.c'),
-			e.Object('skbuff.c')] + tframework);
+			te.Object('skbuff.c')] + tframework);
 	te.Program (['engine_unittest.c',
 			e.Object('version.c')] + tframework);
 	te.Program (['gsi_unittest.c',
@@ -166,13 +170,13 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('if.c'),
 			e.Object('tsi.c')] + tframework);
 	te.Program (['source_unittest.c',
-			e.Object('skbuff.c')] + tframework);
+			te.Object('skbuff.c')] + tframework);
 	te.Program (['receiver_unittest.c',
 			e.Object('tsi.c')] + tframework);
 	te.Program (['recv_unittest.c',
 			e.Object('tsi.c'),
 			e.Object('gsi.c'),
-			e.Object('skbuff.c')] + tframework);
+			te.Object('skbuff.c')] + tframework);
 	te.Program (['net_unittest.c'] + tframework);
 	te.Program (['timer_unittest.c'] + tframework);
 	te.Program (['packet_parse_unittest.c'] + tframework);
