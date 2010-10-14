@@ -36,6 +36,7 @@ PGM_BEGIN_DECLS
 
 PGM_GNUC_INTERNAL int pgm_inet_network (const char*restrict, struct in_addr*restrict);
 PGM_GNUC_INTERNAL int pgm_inet6_network (const char*restrict, struct in6_addr*restrict);
+PGM_GNUC_INTERNAL int pgm_sa6_network (const char*restrict, struct sockaddr_in6*restrict);
 
 PGM_END_DECLS
 
