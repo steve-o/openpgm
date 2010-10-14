@@ -634,7 +634,6 @@ mock_pgm_new_peer (
 {
 	pgm_peer_t* peer = g_malloc0 (sizeof(pgm_peer_t));
 	peer->expiry = now + sock->peer_expiry;
-	peer->sock = sock;
 	memcpy (&peer->tsi, tsi, sizeof(pgm_tsi_t));
 	memcpy (&peer->group_nla, dst_addr, dst_addr_len);
 	memcpy (&peer->local_nla, src_addr, src_addr_len);

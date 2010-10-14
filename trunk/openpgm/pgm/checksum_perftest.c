@@ -475,7 +475,7 @@ START_TEST (test_64bit_csumcpy)
 }
 END_TEST
 
-#if defined(__amd64) || defined(__x86_64__ || defined(_WIN64))
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 START_TEST (test_vector)
 {
 	const unsigned iterations = 1000;

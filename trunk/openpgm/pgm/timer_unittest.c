@@ -67,11 +67,11 @@ generate_sock (void)
 
 size_t
 pgm_pkt_offset (
-        const bool                      can_fragment,
-        const sa_family_t		pgmcc_family	/* 0 = disable */
-        )
+	const bool		can_fragment,
+	const sa_family_t	pgmcc_family	/* 0 = disable */
+	)
 {
-        return 0;
+	return 0;
 }
 
 /** GLib */
@@ -179,8 +179,8 @@ _mock_pgm_time_update_now (void)
 PGM_GNUC_INTERNAL
 pgm_time_t
 mock_pgm_min_receiver_expiry (
-	pgm_time_t		expiration,
-	pgm_sock_t*	sock
+	pgm_sock_t*		sock,
+	pgm_time_t		expiration
 	)
 {
 	g_assert (NULL != sock);
@@ -190,7 +190,7 @@ mock_pgm_min_receiver_expiry (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_check_peer_state (
-	pgm_sock_t*	sock,
+	pgm_sock_t*		sock,
 	pgm_time_t		now
 	)
 {
@@ -202,7 +202,7 @@ mock_pgm_check_peer_state (
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_send_spm (
-	pgm_sock_t*	sock,
+	pgm_sock_t*		sock,
 	int			flags
 	)
 {
