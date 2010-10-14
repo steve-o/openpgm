@@ -1,16 +1,6 @@
---- messages.c	2010-10-09 10:33:47.000000000 +0800
-+++ messages.c89.c	2010-10-09 10:33:58.000000000 +0800
-@@ -19,6 +19,9 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
- 
-+#ifdef _MSC_VER
-+#	include <io.h>
-+#endif
- #include <stdarg.h>
- #include <stdio.h>
- #ifndef _WIN32
-@@ -166,14 +169,22 @@
+--- messages.c	2010-10-14 21:50:05.000000000 +0800
++++ messages.c89.c	2010-10-14 21:50:17.000000000 +0800
+@@ -168,14 +168,22 @@
  	char tbuf[1024];
  
  	pgm_mutex_lock (&messages_mutex);

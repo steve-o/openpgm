@@ -429,7 +429,7 @@ pgm_new_peer (
 
 /* copy any contiguous buffers in the peer list to the provided 
  * message vector.
- * returns -ENOBUFS if the vector is full, returns -ECONNRESET if
+ * returns -PGM_SOCK_ENOBUFS if the vector is full, returns -PGM_SOCK_ECONNRESET if
  * data loss is detected, returns 0 when all peers flushed.
  */
 
@@ -475,13 +475,13 @@ pgm_flush_peers_pending (
 			(*data_read)  ++;
 			peer->last_commit = sock->last_commit;
 			if (*pmsg > msg_end) {			/* commit full */
-				retval = -ENOBUFS;
+				retval = -PGM_SOCK_ENOBUFS;
 				break;
 			}
 		} else
 			peer->last_commit = 0;
 		if (PGM_UNLIKELY(sock->is_reset)) {
-			retval = -ECONNRESET;
+			retval = -PGM_SOCK_ECONNRESET;
 			break;
 		}
 /* clear this reference and move to next */
