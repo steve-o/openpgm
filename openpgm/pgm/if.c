@@ -145,6 +145,56 @@ pgm_if_print_all (void)
 	pgm_freeifaddrs (ifap);
 }
 
+/* Equivalent to the description of inet_lnaof(), extract the host
+ * address out of an IP address.
+ * 	hostaddr = inet_lnaof(addr)
+ *
+ * nb: lnaof = local network address of
+ *
+ * returns TRUE if host address is defined, FALSE if only network address.
+ */
+static inline
+bool
+pgm_inet_lnaof (
+	struct in_addr* restrict	dst,	/* host byte order */
+	const struct in_addr* restrict	src,
+	const struct in_addr* restrict	netmask
+	)
+{
+	bool has_lna = FALSE;
+
+	pgm_assert (NULL != dst);
+	pgm_assert (NULL != src);
+	pgm_assert (NULL != netmask);
+
+	dst->s_addr = src->s_addr & netmask->s_addr;
+	has_lna = (0 != (src->s_addr & ~netmask->s_addr));
+
+	return has_lna;
+}
+
+static inline
+bool
+pgm_inet6_lnaof (
+	struct in6_addr* restrict	dst,
+	const struct in6_addr* restrict	src,
+	const struct in6_addr* restrict	netmask
+	)
+{
+	bool has_lna = FALSE;
+
+	pgm_assert (NULL != dst);
+	pgm_assert (NULL != src);
+	pgm_assert (NULL != netmask);
+
+	for (unsigned i = 0; i < 16; i++) {
+		dst->s6_addr[i] = src->s6_addr[i] & netmask->s6_addr[i];
+		has_lna |= (0 != (src->s6_addr[i] & !netmask->s6_addr[i]));
+	}
+
+	return has_lna;
+}
+
 static inline
 bool
 is_in_net (
@@ -555,7 +605,12 @@ parse_interface (
 		{
 			const struct in_addr ifaddr  = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
 			const struct in_addr netmask = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
-			if (is_in_net (&ifaddr, &in_addr, &netmask)) {
+			struct in_addr lna;
+
+/* local network address must be null, otherwise should match an address is previous check */
+			if (!pgm_inet_lnaof (&lna, &in_addr, &netmask) &&
+				is_in_net (&ifaddr, &in_addr, &netmask))
+			{
 				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
 				if (ir->ir_flags & IFF_LOOPBACK) {
@@ -566,18 +621,35 @@ parse_interface (
 					pgm_warn (_("Skipping matching non-multicast capable network device %s."), ir->ir_name);
 					goto skip_inet_network;
 				}
+
+/* check for multiple interfaces on same network */
+				if (interface_matches++) {
+					char saddr[INET_ADDRSTRLEN];
+					pgm_set_error (error,
+						     PGM_ERROR_DOMAIN_IF,
+						     PGM_ERROR_NOTUNIQ,
+						     _("Multiple interfaces found with network address %s."),
+						     pgm_inet_ntop (AF_INET, &in_addr, saddr, sizeof(saddr)));
+					pgm_freeifaddrs (ifap);
+					return FALSE;
+				}
+
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
-				pgm_freeifaddrs (ifap);
-				return TRUE;
+				continue;
 			}
 		}
+/* IPv6 scopes are not supported in network addresses */
 		if (check_inet6_network &&
 		    AF_INET6 == ifa->ifa_addr->sa_family)
 		{
 			const struct in6_addr ifaddr = ((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
-			if (is_in_net6 (&ifaddr, &in6_addr, &netmask)) {
+			struct in6_addr lna;
+
+			if (!pgm_inet6_lnaof (&lna, &in6_addr, &netmask) &&
+				is_in_net6 (&ifaddr, &in6_addr, &netmask))
+			{
 				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
 				if (ir->ir_flags & IFF_LOOPBACK) {
@@ -588,10 +660,22 @@ parse_interface (
 					pgm_warn (_("Skipping matching non-multicast capable network device %s."), ir->ir_name);
 					goto skip_inet_network;
 				}
+
+/* check for multiple interfaces on same network */
+				if (interface_matches++) {
+					char saddr[INET6_ADDRSTRLEN];
+					pgm_set_error (error,
+						     PGM_ERROR_DOMAIN_IF,
+						     PGM_ERROR_NOTUNIQ,
+						     _("Multiple interfaces found with network address %s."),
+						     pgm_inet_ntop (AF_INET6, &in6_addr, saddr, sizeof(saddr)));
+					pgm_freeifaddrs (ifap);
+					return FALSE;
+				}
+
 				ir->ir_interface = ifindex;
 				memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
-				pgm_freeifaddrs (ifap);
-				return TRUE;
+				continue;
 			}
 		}
 skip_inet_network:
