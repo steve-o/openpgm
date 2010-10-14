@@ -169,9 +169,9 @@ recvskb (
 #else
 		struct pgm_cmsghdr* cmsg;
 #endif
-		for (cmsg = CMSG_FIRSTHDR(&msg);
+		for (cmsg = PGM_CMSG_FIRSTHDR(&msg);
 		     cmsg != NULL;
-		     cmsg = CMSG_NXTHDR(&msg, cmsg))
+		     cmsg = PGM_CMSG_NXTHDR(&msg, cmsg))
 		{
 /* both IP_PKTINFO and IP_RECVDSTADDR exist on OpenSolaris, so capture
  * each type if defined.

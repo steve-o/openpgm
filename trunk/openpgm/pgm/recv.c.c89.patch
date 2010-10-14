@@ -1,4 +1,4 @@
---- recv.c	2010-10-13 11:34:48.000000000 +0800
+--- recv.c	2010-10-14 22:17:30.000000000 +0800
 +++ recv.c89.c	2010-10-13 11:35:41.000000000 +0800
 @@ -47,12 +47,21 @@
  #endif
@@ -99,7 +99,7 @@
  	DWORD len;
  	if (SOCKET_ERROR == pgm_WSARecvMsg (sock->recv_sock, &msg, &len, NULL, NULL)) {
  		return SOCKET_ERROR;
-@@ -164,14 +179,10 @@
+@@ -164,11 +179,7 @@
  	if (sock->udp_encap_ucast_port ||
  	    AF_INET6 == pgm_sockaddr_family (src_addr))
  	{
@@ -108,14 +108,9 @@
 -#else
  		struct pgm_cmsghdr* cmsg;
 -#endif
--		for (cmsg = CMSG_FIRSTHDR(&msg);
-+		for (cmsg = PGM_CMSG_FIRSTHDR(&msg);
+ 		for (cmsg = PGM_CMSG_FIRSTHDR(&msg);
  		     cmsg != NULL;
--		     cmsg = CMSG_NXTHDR(&msg, cmsg))
-+		     cmsg = PGM_CMSG_NXTHDR(&msg, cmsg))
- 		{
- /* both IP_PKTINFO and IP_RECVDSTADDR exist on OpenSolaris, so capture
-  * each type if defined.
+ 		     cmsg = PGM_CMSG_NXTHDR(&msg, cmsg))
 @@ -186,6 +197,7 @@
  					pgm_debug ("in_pktinfo is NULL");
  					return -1;
