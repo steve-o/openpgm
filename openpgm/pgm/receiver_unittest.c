@@ -421,8 +421,8 @@ END_TEST
 /* target:
  *	pgm_time_t
  *	pgm_min_receiver_expiry (
- *		pgm_time_t		expiration,
- *		pgm_sock_t*		sock
+ *		pgm_sock_t*		sock,
+ *		pgm_time_t		expiration
  *		)
  */
 
@@ -431,14 +431,14 @@ START_TEST (test_min_receiver_expiry_pass_001)
 	pgm_sock_t* sock = generate_sock();
 	sock->is_bound = TRUE;
 	const pgm_time_t expiration = pgm_secs(1);
-	pgm_time_t next_expiration = pgm_min_receiver_expiry (expiration, sock);
+	pgm_time_t next_expiration = pgm_min_receiver_expiry (sock, expiration);
 }
 END_TEST
 
 START_TEST (test_min_receiver_expiry_fail_001)
 {
 	const pgm_time_t expiration = pgm_secs(1);
-	pgm_min_receiver_expiry (expiration, NULL);
+	pgm_min_receiver_expiry (NULL, expiration);
 	fail ("reached");
 }
 END_TEST

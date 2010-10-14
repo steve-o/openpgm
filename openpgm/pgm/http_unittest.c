@@ -64,7 +64,7 @@ START_TEST (test_init_fail_001)
 {
 	pgm_error_t* err = NULL;
 	fail_unless (TRUE == pgm_http_init (8080, &err));
-	fail_unless (FALSE == pgm_http_init (8080, &err));
+	fail_unless (TRUE == pgm_http_init (8080, &err));
 }
 END_TEST
 

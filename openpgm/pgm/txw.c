@@ -536,16 +536,18 @@ pgm_txw_retransmit_try_peek (
 	pgm_txw_t* const	window
 	)
 {
-	struct pgm_sk_buff_t	*skb;
-	pgm_txw_state_t		*state;
-	bool			 is_var_pktlen = FALSE;
-	bool			 is_op_encoded = FALSE;
-	uint16_t		 parity_length = 0;
-	const pgm_gf8_t		*src[ window->rs.k ];
-	void			*data;
+	struct pgm_sk_buff_t	 *skb;
+	pgm_txw_state_t		 *state;
+	bool			  is_var_pktlen = FALSE;
+	bool			  is_op_encoded = FALSE;
+	uint16_t		  parity_length = 0;
+	const pgm_gf8_t		**src;
+	void			 *data;
 
 /* pre-conditions */
 	pgm_assert (NULL != window);
+
+	src = pgm_newa (const pgm_gf8_t*, window->rs.k);
 
 	pgm_debug ("retransmit_try_peek (window:%p)", (const void*)window);
 
