@@ -23,8 +23,25 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/param.h>
 #include <glib.h>
 #include <check.h>
+
+#ifdef BYTE_ORDER
+#	define PGM_BYTE_ORDER		BYTE_ORDER
+#	define PGM_BIG_ENDIAN		BIG_ENDIAN
+#	define PGM_LITTLE_ENDIAN	LITTLE_ENDIAN
+#elif defined(__BYTE_ORDER)
+#	define PGM_BYTE_ORDER		__BYTE_ORDER
+#	define PGM_BIG_ENDIAN		__BIG_ENDIAN
+#	define PGM_LITTLE_ENDIAN	__LITTLE_ENDIAND
+#else
+#	error "BYTE_ORDER not supported."
+#endif
+
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
 
 
 /* mock state */
@@ -129,12 +146,12 @@ END_TEST
 START_TEST (test_partial_pass_001)
 {
 	const char source[]  = "i am not a string";
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if PGM_BYTE_ORDER == PGM_BIG_ENDIAN
 	const guint32 answer = 0x0000e025;	/* network order */
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#elif PGM_BYTE_ORDER == PGM_LITTLE_ENDIAN
 	const guint32 answer = 0xe0250000;	/* network order */
 #else
-#	error "__BYTE_ORDER not supported."
+#	error "PGM_BYTE_ORDER not supported."
 #endif
 
 	guint32 csum = pgm_csum_partial (source, sizeof(source), 0);
@@ -165,12 +182,12 @@ END_TEST
 START_TEST (test_partial_copy_pass_001)
 {
 	const char source[] = "i am not a string";
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if PGM_BYTE_ORDER == PGM_BIG_ENDIAN
 	const guint32 answer = 0x0000e025;	/* network order */
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#elif PGM_BYTE_ORDER == PGM_LITTLE_ENDIAN
 	const guint32 answer = 0xe0250000;	/* network order */
 #else
-#	error "__BYTE_ORDER not supported."
+#	error "BYTE_ORDER not supported."
 #endif
 
 	char dest[1024];
@@ -234,7 +251,9 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_inet);
 	tcase_add_test (tc_inet, test_inet_pass_001);
 	tcase_add_test (tc_inet, test_inet_pass_002);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_inet, test_inet_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_fold = tcase_create ("fold");
 	suite_add_tcase (s, tc_fold);
@@ -247,12 +266,16 @@ make_test_suite (void)
 	TCase* tc_partial = tcase_create ("partial");
 	suite_add_tcase (s, tc_partial);
 	tcase_add_test (tc_partial, test_partial_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_partial, test_partial_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_partial_copy = tcase_create ("partial-copy");
 	suite_add_tcase (s, tc_partial_copy);
 	tcase_add_test (tc_partial_copy, test_partial_copy_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_partial_copy, test_partial_copy_fail_001, SIGABRT);
+#endif
 	return s;
 }
 

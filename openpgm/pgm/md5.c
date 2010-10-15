@@ -40,7 +40,7 @@ static void* _pgm_md5_read_ctx (const struct pgm_md5_t*, void*restrict);
 static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 
 
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if defined(__BYTE_ORDER) && (__BYTE_ORDER == __BIG_ENDIAN)
 # define SWAP(n) \
 	(((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
 #else
