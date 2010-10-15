@@ -27,6 +27,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -203,19 +207,25 @@ make_test_suite (void)
 	TCase* tc_create = tcase_create ("create");
 	suite_add_tcase (s, tc_create);
 	tcase_add_test (tc_create, test_create_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_create, test_create_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_destroy = tcase_create ("destroy");
 	suite_add_tcase (s, tc_destroy);
 	tcase_add_test (tc_destroy, test_destroy_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_destroy, test_destroy_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_check = tcase_create ("check");
 	suite_add_tcase (s, tc_check);
 	tcase_add_test (tc_check, test_check_pass_001);
 	tcase_add_test (tc_check, test_check_pass_002);
 	tcase_add_test (tc_check, test_check_pass_003);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_check, test_check_fail_001, SIGABRT);
+#endif
 	return s;
 }
 
