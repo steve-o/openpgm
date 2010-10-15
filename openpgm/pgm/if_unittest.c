@@ -869,7 +869,7 @@ START_TEST (test_parse_transport_pass_001)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	fail_unless (match_default_group (mock_family, &res->ai_send_addrs[0]), "send address not match default group");
 	fail_unless (match_default_source (mock_family, &res->ai_send_addrs[0]), "send address not match default source");
-	pgm_freeaddrinfo (&res);
+	pgm_freeaddrinfo (res);
 }
 END_TEST
 
@@ -1001,7 +1001,7 @@ START_TEST (test_parse_transport_pass_002)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	fail_unless (match_default_group     (mock_family, &res->ai_send_addrs[0]), "send address not match default group");
 	fail_unless (match_default_interface (mock_family, &res->ai_send_addrs[0]), "send address not match default interface");
-	pgm_freeaddrinfo (&res);
+	pgm_freeaddrinfo (res);
 }
 END_TEST
 
@@ -1076,7 +1076,7 @@ START_TEST (test_parse_transport_pass_003)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	fail_unless (match_default_group     (mock_family, &res->ai_send_addrs[0]), "send address not match default group");
 	fail_unless (match_default_interface (mock_family, &res->ai_send_addrs[0]), "send address not match default interface");
-	pgm_freeaddrinfo (&res);
+	pgm_freeaddrinfo (res);
 }
 END_TEST
 
@@ -1122,7 +1122,7 @@ START_TEST (test_parse_transport_pass_004)
 	}
 	fail_unless (match_default_source (mock_family, &res->ai_recv_addrs[0]), "source not match");
 	fail_unless (match_default_source (mock_family, &res->ai_send_addrs[0]), "source not match");
-	pgm_freeaddrinfo (&res);
+	pgm_freeaddrinfo (res);
 }
 END_TEST
 
@@ -1177,7 +1177,7 @@ START_TEST (test_parse_transport_pass_005)
 	}
 	fail_unless (match_default_source (mock_family, &res->ai_recv_addrs[0]), "source not match");
 	fail_unless (match_default_source (mock_family, &res->ai_send_addrs[0]), "source not match");
-	pgm_freeaddrinfo (&res);
+	pgm_freeaddrinfo (res);
 }
 END_TEST
 
