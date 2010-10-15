@@ -26,6 +26,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -143,7 +147,9 @@ make_test_suite (void)
 	TCase* tc_print_packet = tcase_create ("print-packet");
 	suite_add_tcase (s, tc_print_packet);
 	tcase_add_test (tc_print_packet, test_print_packet_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_print_packet, test_print_packet_fail_001, SIGABRT);
+#endif
 	return s;
 }
 
