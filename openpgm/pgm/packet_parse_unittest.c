@@ -35,6 +35,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -332,37 +336,51 @@ make_test_suite (void)
 	TCase* tc_parse_raw = tcase_create ("parse-raw");
 	suite_add_tcase (s, tc_parse_raw);
 	tcase_add_test (tc_parse_raw, test_parse_raw_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_parse_raw, test_parse_raw_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_parse_udp_encap = tcase_create ("parse-udp-encap");
 	suite_add_tcase (s, tc_parse_udp_encap);
 	tcase_add_test (tc_parse_udp_encap, test_parse_udp_encap_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_parse_udp_encap, test_parse_udp_encap_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_verify_spm = tcase_create ("verify-spm");
 	suite_add_tcase (s, tc_verify_spm);
 	tcase_add_test (tc_verify_spm, test_verify_spm_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_verify_spm, test_verify_spm_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_verify_spmr = tcase_create ("verify-spmr");
 	suite_add_tcase (s, tc_verify_spmr);
 	tcase_add_test (tc_verify_spmr, test_verify_spmr_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_verify_spmr, test_verify_spmr_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_verify_nak = tcase_create ("verify-nak");
 	suite_add_tcase (s, tc_verify_nak);
 	tcase_add_test (tc_verify_nak, test_verify_nak_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_verify_nak, test_verify_nak_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_verify_nnak = tcase_create ("verify-nnak");
 	suite_add_tcase (s, tc_verify_nnak);
 	tcase_add_test (tc_verify_nnak, test_verify_nnak_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_verify_nnak, test_verify_nnak_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_verify_ncf = tcase_create ("verify-ncf");
 	suite_add_tcase (s, tc_verify_ncf);
 	tcase_add_test (tc_verify_ncf, test_verify_ncf_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_verify_ncf, test_verify_ncf_fail_001, SIGABRT);
+#endif
 	return s;
 }
 
