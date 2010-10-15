@@ -28,6 +28,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -114,6 +118,12 @@ START_TEST (test_init_pass_001)
 {
 	fail_unless (TRUE == pgm_init (NULL), "init failed");
 	fail_unless (TRUE == pgm_init (NULL), "init failed");
+
+#ifdef PGM_CHECK_NOFORK
+/* clean up state */
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+#endif
 }
 END_TEST
 
@@ -124,6 +134,13 @@ START_TEST (test_init_pass_003)
 	fail_unless (TRUE == pgm_time_init (&err), "time-init failed: %s", (err && err->message) ? err->message : "(null)");
 	fail_unless (TRUE == pgm_init (&err), "init failed: %s", (err && err->message) ? err->message : "(null)");
 	fail_unless (TRUE == pgm_init (&err), "init failed: %s", (err && err->message) ? err->message : "(null)");
+
+#ifdef PGM_CHECK_NOFORK
+/* clean up state */
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "time-shutdown failed");
+#endif
 }
 END_TEST
 

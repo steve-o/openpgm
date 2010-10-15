@@ -35,6 +35,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -231,7 +235,9 @@ make_test_suite (void)
 	TCase* tc_getifaddrs = tcase_create ("getifaddrs");
 	suite_add_tcase (s, tc_getifaddrs);
 	tcase_add_test (tc_getifaddrs, test_getifaddrs_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_getifaddrs, test_getifaddrs_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_freeifaddrs = tcase_create ("freeifaddrs");
 	suite_add_tcase (s, tc_freeifaddrs);
