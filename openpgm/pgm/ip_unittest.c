@@ -75,49 +75,75 @@ pgm_transport_pkt_offset2 (
 
 START_TEST (test_multicast_loop_pass_001)
 {
-	struct sockaddr_in addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr ("239.192.0.1");
+	struct sockaddr_in	multicast_group;
+	struct sockaddr_in	recv_addr;
+	struct sockaddr_in	send_addr;
+	struct sockaddr_in	if_addr;
 
-	int recv_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	fail_if (-1 == recv_sock, "socket failed");
-	struct sockaddr_in recv_addr;
-	memcpy (&recv_addr, &addr, sizeof(addr));
-	recv_addr.sin_port = 7500;
+	memset (&multicast_group, 0, sizeof(multicast_group));
+	multicast_group.sin_family = AF_INET;
+	multicast_group.sin_port = 0;
+	multicast_group.sin_addr.s_addr = inet_addr ("239.192.0.1");
+
+	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
+
+	SOCKET recv_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	fail_if (INVALID_SOCKET == recv_sock, "socket failed");
+	memcpy (&recv_addr, &multicast_group, sizeof(multicast_group));
+/* listen for UDP packets on port 7500 */
+	recv_addr.sin_port = htons (7500);
+#ifdef _WIN32
+/* Can only bind to interfaces */
+	recv_addr.sin_addr.s_addr = INADDR_ANY;
+#endif
 	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len ((struct sockaddr*)&recv_addr)), "bind failed");
+#ifndef NO_MCAST_JOIN_GROUP
 	struct group_req gr;
 	memset (&gr, 0, sizeof(gr));
-	((struct sockaddr*)&gr.gr_group)->sa_family = addr.sin_family;
-	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = addr.sin_addr.s_addr;
-	fail_unless (0 == setsockopt (recv_sock, SOL_IP, MCAST_JOIN_GROUP, (const char*)&gr, sizeof(gr)), "setsockopt failed");
-	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, FALSE), "multicast_loop failed");
+	((struct sockaddr*)&gr.gr_group)->sa_family = multicast_group.sin_family;
+	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = multicast_group.sin_addr.s_addr;
+	fail_unless (0 == setsockopt (recv_sock, SOL_IP, MCAST_JOIN_GROUP, (const char*)&gr, sizeof(gr)), "setsockopt(MCAST_JOIN_GROUP) failed");
+#else
+	struct ip_mreq mreq;
+	memset (&mreq, 0, sizeof(mreq));
+	mreq.imr_multiaddr.s_addr = multicast_group.sin_addr.s_addr;
+	mreq.imr_interface.s_addr = if_addr.sin_addr.s_addr;
+	fail_unless (0 == setsockopt (recv_sock, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq)), "setsockopt(IP_ADD_MEMBERSHIP) failed");
+#endif
+	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, TRUE), "multicast_loop failed");
 
-	int send_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	fail_if (-1 == send_sock, "socket failed");
-	struct sockaddr_in send_addr;
-	memcpy (&send_addr, &addr, sizeof(addr));
+	SOCKET send_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	fail_if (INVALID_SOCKET == send_sock, "socket failed");
+	memcpy (&send_addr, &multicast_group, sizeof(multicast_group));
+/* random port, default routing */
+	send_addr.sin_port = 0;
+	send_addr.sin_addr.s_addr = INADDR_ANY;
 	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)), "bind failed");
-        struct sockaddr_in if_addr;
-	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
 	fail_unless (0 == pgm_sockaddr_multicast_if (send_sock, (struct sockaddr*)&if_addr, 0), "multicast_if failed");
 	fail_unless (0 == pgm_sockaddr_multicast_loop (send_sock, AF_INET, TRUE), "multicast_loop failed");
 
 	const char data[] = "apple pie";
-	addr.sin_port = 7500;
-	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
-	if (-1 == bytes_sent)
-		g_message ("sendto: %s", strerror (errno));
+	send_addr.sin_port = htons (7500);
+	send_addr.sin_addr.s_addr = multicast_group.sin_addr.s_addr;
+	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
+	if (SOCKET_ERROR == bytes_sent) {
+		char errbuf[1024];
+		g_message ("sendto: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	fail_unless (sizeof(data) == bytes_sent, "sendto underrun");
 
 	char recv_data[1024];
 	ssize_t bytes_read = recv (recv_sock, recv_data, sizeof(recv_data), MSG_DONTWAIT);
-	if (-1 == bytes_read)
-		g_message ("sendto: %s", strerror (errno));
+	if (SOCKET_ERROR == bytes_read) {
+		char errbuf[1024];
+		g_message ("recv: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	fail_unless (sizeof(data) == bytes_read, "recv underrun");
 
-	fail_unless (0 == close (recv_sock), "close failed");
-	fail_unless (0 == close (send_sock), "close failed");
+	fail_unless (0 == closesocket (recv_sock), "closesocket failed");
+	fail_unless (0 == closesocket (send_sock), "closesocket failed");
 }
 END_TEST
 
@@ -128,52 +154,68 @@ END_TEST
 
 START_TEST (test_port_bind_pass_001)
 {
-	struct sockaddr_in addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr ("239.192.0.1");
+	struct sockaddr_in	multicast_group;
+	struct sockaddr_in	recv_addr;
+	struct sockaddr_in	send_addr;
+	struct sockaddr_in	if_addr;
 
-	int recv_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	fail_if (-1 == recv_sock, "socket failed");
-	struct sockaddr_in recv_addr;
-	memcpy (&recv_addr, &addr, sizeof(addr));
-	recv_addr.sin_port = 3056;
+	memset (&multicast_group, 0, sizeof(multicast_group));
+	multicast_group.sin_family = AF_INET;
+	multicast_group.sin_port = 0;
+	multicast_group.sin_addr.s_addr = inet_addr ("239.192.0.1");
+
+	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
+
+	SOCKET recv_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	fail_if (INVALID_SOCKET == recv_sock, "socket failed");
+	memcpy (&recv_addr, &multicast_group, sizeof(multicast_group));
+	recv_addr.sin_port = htons (3056);
+#ifdef _WIN32
+/* Can only bind to interfaces */
+	recv_addr.sin_addr.s_addr = INADDR_ANY;
+#endif
 	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len ((struct sockaddr*)&recv_addr)), "bind failed");
 	struct group_req gr;
 	memset (&gr, 0, sizeof(gr));
-	((struct sockaddr*)&gr.gr_group)->sa_family = addr.sin_family;
-	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = addr.sin_addr.s_addr;
-	((struct sockaddr_in*)&gr.gr_group)->sin_port = 3055;
+	((struct sockaddr*)&gr.gr_group)->sa_family = multicast_group.sin_family;
+	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = multicast_group.sin_addr.s_addr;
+	((struct sockaddr_in*)&gr.gr_group)->sin_port = htons (3055);
 	fail_unless (0 == setsockopt (recv_sock, SOL_IP, MCAST_JOIN_GROUP, (const char*)&gr, sizeof(gr)), "setsockopt failed");
-	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, FALSE), "multicast_loop failed");
+	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, TRUE), "multicast_loop failed");
 
-	int send_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	fail_if (-1 == send_sock, "socket failed");
-	struct sockaddr_in send_addr;
-	memcpy (&send_addr, &addr, sizeof(addr));
+	SOCKET send_sock = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	fail_if (INVALID_SOCKET == send_sock, "socket failed");
+	memcpy (&send_addr, &multicast_group, sizeof(multicast_group));
+	send_addr.sin_port = 0;
+	send_addr.sin_addr.s_addr = INADDR_ANY;
 	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)), "bind failed");
-        struct sockaddr_in if_addr;
-	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
 	fail_unless (0 == pgm_sockaddr_multicast_if (send_sock, (struct sockaddr*)&if_addr, 0), "multicast_if failed");
 	fail_unless (0 == pgm_sockaddr_multicast_loop (send_sock, AF_INET, TRUE), "multicast_loop failed");
 
 	const char data[] = "apple pie";
-	addr.sin_port = 3056;
-	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
-	if (-1 == bytes_sent)
-		g_message ("sendto: %s", strerror (errno));
+	send_addr.sin_port = htons (3056);
+	send_addr.sin_addr.s_addr = multicast_group.sin_addr.s_addr;
+	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
+	if (SOCKET_ERROR == bytes_sent) {
+		char errbuf[1024];
+		g_message ("sendto: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	fail_unless (sizeof(data) == bytes_sent, "sendto underrun");
 
 	char recv_data[1024];
 	ssize_t bytes_read = recv (recv_sock, recv_data, sizeof(recv_data), MSG_DONTWAIT);
-	if (-1 == bytes_read)
-		g_message ("recv: %s", strerror (errno));
+	if (SOCKET_ERROR == bytes_read) {
+		char errbuf[1024];
+		g_message ("recv: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	if (sizeof(data) != bytes_read)
 		g_message ("recv returned %d bytes expected %d.", bytes_read, sizeof(data));
 	fail_unless (sizeof(data) == bytes_read, "recv underrun");
 
-	fail_unless (0 == close (recv_sock), "close failed");
-	fail_unless (0 == close (send_sock), "close failed");
+	fail_unless (0 == closesocket (recv_sock), "closesocket failed");
+	fail_unless (0 == closesocket (send_sock), "closesocket failed");
 }
 END_TEST
 
@@ -186,47 +228,63 @@ END_TEST
 
 START_TEST (test_hop_limit_pass_001)
 {
-	struct sockaddr_in addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr ("239.192.0.1");
+	struct sockaddr_in	multicast_group;
+	struct sockaddr_in	recv_addr;
+	struct sockaddr_in	send_addr;
+	struct sockaddr_in	if_addr;
 
-	int recv_sock = socket (AF_INET, SOCK_RAW, 113);
-	fail_if (-1 == recv_sock, "socket failed");
-	struct sockaddr_in recv_addr;
-	memcpy (&recv_addr, &addr, sizeof(addr));
+	memset (&multicast_group, 0, sizeof(multicast_group));
+	multicast_group.sin_family = AF_INET;
+	multicast_group.sin_port = 0;
+	multicast_group.sin_addr.s_addr = inet_addr ("239.192.0.1");
+
+	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
+
+	SOCKET recv_sock = socket (AF_INET, SOCK_RAW, 113);
+	fail_if (INVALID_SOCKET == recv_sock, "socket failed");
+	memcpy (&recv_addr, &multicast_group, sizeof(multicast_group));
 	recv_addr.sin_port = 7500;
+#ifdef _WIN32
+/* Can only bind to interfaces */
+	recv_addr.sin_addr.s_addr = INADDR_ANY;
+#endif
 	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len ((struct sockaddr*)&recv_addr)), "bind failed");
 	struct group_req gr;
 	memset (&gr, 0, sizeof(gr));
-	((struct sockaddr*)&gr.gr_group)->sa_family = addr.sin_family;
-	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = addr.sin_addr.s_addr;
+	((struct sockaddr*)&gr.gr_group)->sa_family = multicast_group.sin_family;
+	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = multicast_group.sin_addr.s_addr;
 	fail_unless (0 == setsockopt (recv_sock, SOL_IP, MCAST_JOIN_GROUP, (const char*)&gr, sizeof(gr)), "setsockopt failed");
-	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, FALSE), "multicast_loop failed");
+	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, TRUE), "multicast_loop failed");
 	fail_unless (0 == pgm_sockaddr_hdrincl (recv_sock, AF_INET, TRUE), "hdrincl failed");
 
-	int send_sock = socket (AF_INET, SOCK_RAW, 113);
-	fail_if (-1 == send_sock, "socket failed");
-	struct sockaddr_in send_addr;
-	memcpy (&send_addr, &addr, sizeof(addr));
+	SOCKET send_sock = socket (AF_INET, SOCK_RAW, 113);
+	fail_if (INVALID_SOCKET == send_sock, "socket failed");
+	memcpy (&send_addr, &multicast_group, sizeof(multicast_group));
+	send_addr.sin_port = 0;
+	send_addr.sin_addr.s_addr = INADDR_ANY;
 	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)), "bind failed");
-        struct sockaddr_in if_addr;
-	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
 	fail_unless (0 == pgm_sockaddr_multicast_if (send_sock, (struct sockaddr*)&if_addr, 0), "multicast_if failed");
 	fail_unless (0 == pgm_sockaddr_multicast_loop (send_sock, AF_INET, TRUE), "multicast_loop failed");
 	fail_unless (0 == pgm_sockaddr_multicast_hops (send_sock, AF_INET, 16), "multicast_hops failed");
 
 	const char data[] = "apple pie";
-	addr.sin_port = 7500;
-	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
-	if (-1 == bytes_sent)
-		g_message ("sendto: %s", strerror (errno));
+	send_addr.sin_port = htons (7500);
+	send_addr.sin_addr.s_addr = multicast_group.sin_addr.s_addr;
+	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
+	if (SOCKET_ERROR == bytes_sent) {
+		char errbuf[1024];
+		g_message ("sendto: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	fail_unless (sizeof(data) == bytes_sent, "sendto underrun");
 
 	char recv_data[1024];
 	ssize_t bytes_read = recv (recv_sock, recv_data, sizeof(recv_data), MSG_DONTWAIT);
-	if (-1 == bytes_read)
-		g_message ("recv: %s", strerror (errno));
+	if (SOCKET_ERROR == bytes_read) {
+		char errbuf[1024];
+		g_message ("recv: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	const size_t pkt_len = sizeof(struct pgm_ip) + sizeof(data);
 	if (pkt_len != bytes_read)
 #ifndef _MSC_VER
@@ -239,8 +297,8 @@ START_TEST (test_hop_limit_pass_001)
 	fail_unless (4 == iphdr->ip_v, "Incorrect IP version, found %u expecting 4.", iphdr->ip_v);
 	fail_unless (16 == iphdr->ip_ttl, "hop count mismatch, found %u expecting 16.", iphdr->ip_ttl);
 
-	fail_unless (0 == close (recv_sock), "close failed");
-	fail_unless (0 == close (send_sock), "close failed");
+	fail_unless (0 == closesocket (recv_sock), "closesocket failed");
+	fail_unless (0 == closesocket (send_sock), "closesocket failed");
 }
 END_TEST
 
@@ -250,47 +308,63 @@ END_TEST
 
 START_TEST (test_router_alert_pass_001)
 {
-	struct sockaddr_in addr;
-	memset (&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr ("239.192.0.1");
+	struct sockaddr_in	multicast_group;
+	struct sockaddr_in	recv_addr;
+	struct sockaddr_in	send_addr;
+	struct sockaddr_in	if_addr;
 
-	int recv_sock = socket (AF_INET, SOCK_RAW, 113);
-	fail_if (-1 == recv_sock, "socket failed");
-	struct sockaddr_in recv_addr;
-	memcpy (&recv_addr, &addr, sizeof(addr));
-	recv_addr.sin_port = 7500;
+	memset (&multicast_group, 0, sizeof(multicast_group));
+	multicast_group.sin_family = AF_INET;
+	multicast_group.sin_port = 0;
+	multicast_group.sin_addr.s_addr = inet_addr ("239.192.0.1");
+
+	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
+
+	SOCKET recv_sock = socket (AF_INET, SOCK_RAW, 113);
+	fail_if (INVALID_SOCKET == recv_sock, "socket failed");
+	memcpy (&recv_addr, &multicast_group, sizeof(multicast_group));
+	recv_addr.sin_port = htons (7500);
+#ifdef _WIN32
+/* Can only bind to interfaces */
+	recv_addr.sin_addr.s_addr = INADDR_ANY;
+#endif
 	fail_unless (0 == bind (recv_sock, (struct sockaddr*)&recv_addr, pgm_sockaddr_len ((struct sockaddr*)&recv_addr)), "bind failed");
 	struct group_req gr;
 	memset (&gr, 0, sizeof(gr));
-	((struct sockaddr*)&gr.gr_group)->sa_family = addr.sin_family;
-	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = addr.sin_addr.s_addr;
+	((struct sockaddr*)&gr.gr_group)->sa_family = multicast_group.sin_family;
+	((struct sockaddr_in*)&gr.gr_group)->sin_addr.s_addr = multicast_group.sin_addr.s_addr;
 	fail_unless (0 == setsockopt (recv_sock, SOL_IP, MCAST_JOIN_GROUP, (const char*)&gr, sizeof(gr)), "setsockopt failed");
-	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, FALSE), "multicast_loop failed");
+	fail_unless (0 == pgm_sockaddr_multicast_loop (recv_sock, AF_INET, TRUE), "multicast_loop failed");
 	fail_unless (0 == pgm_sockaddr_hdrincl (recv_sock, AF_INET, TRUE), "hdrincl failed");
 
-	int send_sock = socket (AF_INET, SOCK_RAW, 113);
-	fail_if (-1 == send_sock, "socket failed");
-	struct sockaddr_in send_addr;
-	memcpy (&send_addr, &addr, sizeof(addr));
+	SOCKET send_sock = socket (AF_INET, SOCK_RAW, 113);
+	fail_if (INVALID_SOCKET == send_sock, "socket failed");
+	memcpy (&send_addr, &multicast_group, sizeof(multicast_group));
+	send_addr.sin_port = 0;
+	send_addr.sin_addr.s_addr = INADDR_ANY;
 	fail_unless (0 == bind (send_sock, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr)), "bind failed");
-        struct sockaddr_in if_addr;
-	fail_unless (TRUE == pgm_if_indextoaddr (0, AF_INET, 0, (struct sockaddr*)&if_addr, NULL), "if_indextoaddr failed");
 	fail_unless (0 == pgm_sockaddr_multicast_if (send_sock, (struct sockaddr*)&if_addr, 0), "multicast_if failed");
 	fail_unless (0 == pgm_sockaddr_multicast_loop (send_sock, AF_INET, TRUE), "multicast_loop failed");
 	fail_unless (0 == pgm_sockaddr_router_alert (send_sock, AF_INET, TRUE), "router_alert failed");
 
 	const char data[] = "apple pie";
-	addr.sin_port = 7500;
-	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
-	if (-1 == bytes_sent)
-		g_message ("sendto: %s", strerror (errno));
+	send_addr.sin_port = htons (7500);
+	send_addr.sin_addr.s_addr = multicast_group.sin_addr.s_addr;
+	ssize_t bytes_sent = sendto (send_sock, data, sizeof(data), 0, (struct sockaddr*)&send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
+	if (SOCKET_ERROR == bytes_sent) {
+		char errbuf[1024];
+		g_message ("sendto: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	fail_unless (sizeof(data) == bytes_sent, "sendto underrun");
 
 	char recv_data[1024];
 	ssize_t bytes_read = recv (recv_sock, recv_data, sizeof(recv_data), MSG_DONTWAIT);
-	if (-1 == bytes_read)
-		g_message ("recv: %s", strerror (errno));
+	if (SOCKET_ERROR == bytes_read) {
+		char errbuf[1024];
+		g_message ("recv: %s",
+			pgm_sock_strerror_s (errbuf, sizeof (errbuf), pgm_get_last_sock_error()));
+	}
 	const size_t ra_iphdr_len = sizeof(uint32_t) + sizeof(struct pgm_ip);
 	const size_t ra_pkt_len = ra_iphdr_len + sizeof(data);
 	if (ra_pkt_len != bytes_read)
@@ -333,8 +407,8 @@ START_TEST (test_router_alert_pass_001)
 	g_message ("Final IP header length = %lu", (unsigned long)((const char*)ipopt - (const char*)recv_data));
 #endif
 
-	fail_unless (0 == close (recv_sock), "close failed");
-	fail_unless (0 == close (send_sock), "close failed");
+	fail_unless (0 == closesocket (recv_sock), "closesocket failed");
+	fail_unless (0 == closesocket (send_sock), "closesocket failed");
 }
 END_TEST
 
@@ -381,6 +455,11 @@ main (void)
 		fprintf (stderr, "This test requires super-user privileges to run.\n");
 		return EXIT_FAILURE;
 	}
+#else
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
 #endif
 
 	SRunner* sr = srunner_create (make_master_suite ());
@@ -388,6 +467,9 @@ main (void)
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
