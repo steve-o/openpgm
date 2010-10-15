@@ -33,6 +33,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -67,7 +71,7 @@ static
 void
 mock_teardown (void)
 {
-// null
+	mock_hostname = NULL;
 }
 
 
@@ -89,7 +93,11 @@ mock_gethostname (
 	)
 {
 	if (mock_hostname == mock_toolong) {
+#ifndef _WIN32
 		errno = EINVAL;
+#else
+		WSASetLastError (WSAEFAULT);
+#endif
 		return -1;
 	}
 	strncpy (name, mock_hostname, len);
@@ -326,8 +334,10 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_equal, mock_setup_localhost, mock_teardown);
 	tcase_add_test (tc_equal, test_equal_pass_001);
 	tcase_add_test (tc_equal, test_equal_pass_002);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_equal, test_equal_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_equal, test_equal_fail_002, SIGABRT);
+#endif
 
 	return s;
 }
@@ -343,11 +353,25 @@ make_master_suite (void)
 int
 main (void)
 {
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
+#endif
+/* GSI depends upond PRNG which depends upon time */
+	g_assert (pgm_time_init(NULL));
+	pgm_rand_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_rand_shutdown();
+	g_assert (pgm_time_shutdown());
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
