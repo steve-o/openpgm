@@ -27,6 +27,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -802,21 +806,27 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_peer_unref);
 	tcase_add_checked_fixture (tc_peer_unref, mock_setup, NULL);
 	tcase_add_test (tc_peer_unref, test_peer_unref_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_peer_unref, test_peer_unref_fail_001, SIGABRT);
+#endif
 
 /* formally check-peer-nak-state */
 	TCase* tc_check_peer_state = tcase_create ("check-peer-state");
 	suite_add_tcase (s, tc_check_peer_state);
 	tcase_add_checked_fixture (tc_check_peer_state, mock_setup, NULL);
 	tcase_add_test (tc_check_peer_state, test_check_peer_state_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_check_peer_state, test_check_peer_state_fail_001, SIGABRT);
+#endif
 
 /* formally min-nak-expiry */
 	TCase* tc_min_receiver_expiry = tcase_create ("min-receiver-expiry");
 	suite_add_tcase (s, tc_min_receiver_expiry);
 	tcase_add_checked_fixture (tc_min_receiver_expiry, mock_setup, NULL);
 	tcase_add_test (tc_min_receiver_expiry, test_min_receiver_expiry_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_min_receiver_expiry, test_min_receiver_expiry_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_set_rxw_sqns = tcase_create ("set-rxw_sqns");
 	suite_add_tcase (s, tc_set_rxw_sqns);
