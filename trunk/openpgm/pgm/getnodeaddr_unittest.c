@@ -78,17 +78,7 @@ static int mock_gethostname (char*, size_t);
 static struct hostent* mock_gethostbyname (const char*);
 
 
-#define pgm_getifaddrs		mock_pgm_getifaddrs
-#define pgm_freeifaddrs		mock_pgm_freeifaddrs
-#define getaddrinfo		mock_getaddrinfo
-#define freeaddrinfo		mock_freeaddrinfo
-#define gethostname		mock_gethostname
-#define gethostbyname		mock_gethostbyname
-
-
-#define GETNODEADDR_DEBUG
-#include "getnodeaddr.c"
-
+/* needs real getaddrinfo */
 
 static
 gpointer
@@ -110,6 +100,18 @@ create_host (
 
 	return new_host;
 }
+
+#define pgm_getifaddrs		mock_pgm_getifaddrs
+#define pgm_freeifaddrs		mock_pgm_freeifaddrs
+#define getaddrinfo		mock_getaddrinfo
+#define freeaddrinfo		mock_freeaddrinfo
+#define gethostname		mock_gethostname
+#define gethostbyname		mock_gethostbyname
+
+
+#define GETNODEADDR_DEBUG
+#include "getnodeaddr.c"
+
 
 static
 gpointer
@@ -228,27 +230,39 @@ static
 void
 mock_teardown_net (void)
 {
-	GList* list;
+	GList *list;
 
+/* rollback APPEND_HOST */
 	list = mock_hosts;
 	while (list) {
 		struct mock_host_t* host = list->data;
 		g_free (host->canonical_hostname);
-		if (host->alias)
+		host->canonical_hostname = NULL;
+		if (host->alias) {
 			g_free (host->alias);
+			host->alias = NULL;
+		}
 		g_slice_free1 (sizeof(struct mock_host_t), host);
+		list->data = NULL;
 		list = list->next;
 	}
 	g_list_free (mock_hosts);
+	mock_hosts = NULL;
 
+/* rollback APPEND_INTERFACE */
 	list = mock_interfaces;
 	while (list) {
 		struct mock_interface_t* interface_ = list->data;
 		g_free (interface_->name);
+		interface_->name = NULL;
 		g_slice_free1 (sizeof(struct mock_interface_t), interface_);
+		list->data = NULL;
 		list = list->next;
 	}
 	g_list_free (mock_interfaces);
+	mock_interfaces = NULL;
+
+	mock_hostname = NULL;
 }
 
 
@@ -542,19 +556,7 @@ make_test_suite (void)
 {
 	Suite* s;
 
-{
-	mock_setup_net();
-
-	struct sockaddr_storage addr;
-	char saddr[INET6_ADDRSTRLEN];
-	pgm_error_t* err = NULL;
-	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
-	if (!success && err) {
-		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");
-	}
-}
 	s = suite_create (__FILE__);
-
 	TCase* tc_getnodeaddr = tcase_create ("getnodeaddr");
 	suite_add_tcase (s, tc_getnodeaddr);
 	tcase_add_checked_fixture (tc_getnodeaddr, mock_setup_net, mock_teardown_net);
@@ -579,11 +581,20 @@ make_master_suite (void)
 int
 main (void)
 {
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
+#endif
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
