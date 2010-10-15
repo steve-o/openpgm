@@ -78,7 +78,17 @@ static int mock_gethostname (char*, size_t);
 static struct hostent* mock_gethostbyname (const char*);
 
 
-/* needs real getaddrinfo */
+#define pgm_getifaddrs		mock_pgm_getifaddrs
+#define pgm_freeifaddrs		mock_pgm_freeifaddrs
+#define getaddrinfo		mock_getaddrinfo
+#define freeaddrinfo		mock_freeaddrinfo
+#define gethostname		mock_gethostname
+#define gethostbyname		mock_gethostbyname
+
+
+#define GETNODEADDR_DEBUG
+#include "getnodeaddr.c"
+
 
 static
 gpointer
@@ -100,18 +110,6 @@ create_host (
 
 	return new_host;
 }
-
-#define pgm_getifaddrs		mock_pgm_getifaddrs
-#define pgm_freeifaddrs		mock_pgm_freeifaddrs
-#define getaddrinfo		mock_getaddrinfo
-#define freeaddrinfo		mock_freeaddrinfo
-#define gethostname		mock_gethostname
-#define gethostbyname		mock_gethostbyname
-
-
-#define GETNODEADDR_DEBUG
-#include "getnodeaddr.c"
-
 
 static
 gpointer

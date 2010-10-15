@@ -286,34 +286,50 @@ mock_teardown_net (void)
 {
 	GList* list;
 
+/* rollback APPEND_HOST */
 	list = mock_hosts;
 	while (list) {
 		struct mock_host_t* host = list->data;
 		g_free (host->canonical_hostname);
-		if (host->alias)
+		host->canonical_hostname = NULL;
+		if (host->alias) {
 			g_free (host->alias);
+			host->alias = NULL;
+		}
 		g_slice_free1 (sizeof(struct mock_host_t), host);
+		list->data = NULL;
 		list = list->next;
 	}
 	g_list_free (mock_hosts);
+	mock_hosts = NULL;
 
+/* rollback APPEND_NETWORK */
 	list = mock_networks;
 	while (list) {
 		struct mock_network_t* network = list->data;
 		g_free (network->name);
+		network->name = NULL;
 		g_slice_free1 (sizeof(struct mock_network_t), network);
+		list->data = NULL;
 		list = list->next;
 	}
 	g_list_free (mock_networks);
+	mock_networks = NULL;
 
+/* rollback APPEND_INTERFACE */
 	list = mock_interfaces;
 	while (list) {
 		struct mock_interface_t* interface_ = list->data;
 		g_free (interface_->name);
+		interface_->name = NULL;
 		g_slice_free1 (sizeof(struct mock_interface_t), interface_);
+		list->data = NULL;
 		list = list->next;
 	}
 	g_list_free (mock_interfaces);
+	mock_interfaces = NULL;
+
+	mock_hostname = NULL;
 }
 
 /* mock functions for external references */
@@ -799,6 +815,7 @@ static const struct test_case_t cases_001[] = {
 	{ ";239.192.0.1;PGM.MCAST.NET",		";[ff08::1];IP6-PGM.MCAST.NET"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;ff08::1"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;[ff08::1]"		},
+#ifndef _WIN32
 	{ "pgm-private",			/* ‡ */ "pgm-ip6-private"			},
 	{ ";pgm-private",			/* ‡ */ ";pgm-ip6-private"			},
 	{ ";pgm-private;pgm-private",		/* ‡ */ ";pgm-ip6-private;pgm-ip6-private" 	},
@@ -808,6 +825,7 @@ static const struct test_case_t cases_001[] = {
 	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";[ff08::1];pgm-ip6-private" 		},
 	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;ff08::1" 		},
 	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;[ff08::1]" 		},
+#endif
 };
 
 START_TEST (test_parse_transport_pass_001)
@@ -851,6 +869,7 @@ START_TEST (test_parse_transport_pass_001)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	fail_unless (match_default_group (mock_family, &res->ai_send_addrs[0]), "send address not match default group");
 	fail_unless (match_default_source (mock_family, &res->ai_send_addrs[0]), "send address not match default source");
+	pgm_freeaddrinfo (&res);
 }
 END_TEST
 
@@ -874,8 +893,10 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_INTERFACE ";239.192.0.1;PGM.MCAST.NET",	/* † */ MOCK_INTERFACE ";[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;[ff08::1]"	},
+#ifndef _WIN32
 	{ MOCK_INTERFACE ";pgm-private",		/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private" },
 	{ MOCK_INTERFACE ";pgm-private;pgm-private",	/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private;pgm-ip6-private" },
+#endif
 	{ MOCK_ADDRESS,					MOCK_ADDRESS6			},
 	{ MOCK_ADDRESS,					"[" MOCK_ADDRESS6 "]"		},
 	{ MOCK_ADDRESS ";",				MOCK_ADDRESS6 ";"		},
@@ -894,6 +915,7 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_ADDRESS ";239.192.0.1;PGM.MCAST.NET",	"[" MOCK_ADDRESS6 "];[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	"[" MOCK_ADDRESS6 "];IP6-PGM.MCAST.NET;[ff08::1]"	},
+#ifndef _WIN32
 	{ MOCK_ADDRESS ";pgm-private",			MOCK_ADDRESS6 ";pgm-ip6-private" },
 	{ MOCK_ADDRESS ";pgm-private",			"[" MOCK_ADDRESS6 "];pgm-ip6-private" },
 	{ MOCK_ADDRESS ";pgm-private;pgm-private",	MOCK_ADDRESS6 ";pgm-ip6-private;pgm-ip6-private" },
@@ -913,6 +935,7 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_NETWORK ";PGM.MCAST.NET;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_NETWORK ";pgm-private",			/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private" },
 	{ MOCK_NETWORK ";pgm-private;pgm-private",	/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private;pgm-ip6-private" },
+#endif
 	{ MOCK_HOSTNAME,				MOCK_HOSTNAME6			},
 	{ MOCK_HOSTNAME ";",				MOCK_HOSTNAME6 ";"		},
 	{ MOCK_HOSTNAME ";;",				MOCK_HOSTNAME6 ";;"		},
@@ -926,8 +949,10 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_HOSTNAME ";239.192.0.1;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";[ff08::1];IP6-PGM.MCAST.NET" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;ff08::1" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;[ff08::1]" },
+#ifndef _WIN32
 	{ MOCK_HOSTNAME ";pgm-private",			MOCK_HOSTNAME6 ";pgm-ip6-private" },
 	{ MOCK_HOSTNAME ";pgm-private;pgm-private",	MOCK_HOSTNAME6 ";pgm-ip6-private;pgm-ip6-private" },
+#endif
 };
 
 START_TEST (test_parse_transport_pass_002)
@@ -976,6 +1001,7 @@ START_TEST (test_parse_transport_pass_002)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	fail_unless (match_default_group     (mock_family, &res->ai_send_addrs[0]), "send address not match default group");
 	fail_unless (match_default_interface (mock_family, &res->ai_send_addrs[0]), "send address not match default interface");
+	pgm_freeaddrinfo (&res);
 }
 END_TEST
 
@@ -1000,6 +1026,7 @@ static const struct test_case_t cases_003[] = {
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
+#ifndef _WIN32
 	{ MOCK_ADDRESS "/24;pgm-private",		/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private"			},
 	{ MOCK_ADDRESS "/24;pgm-private;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;pgm-ip6-private"	},
 	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ff08::1;pgm-ip6-private"		},
@@ -1008,6 +1035,7 @@ static const struct test_case_t cases_003[] = {
 	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;[ff08::1]"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;pgm-ip6-private"	},
 	{ MOCK_ADDRESS "/24;pgm-private;PGM.MCAST.NET",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;IP6-PGM.MCAST.NET"	},
+#endif
 };
 
 START_TEST (test_parse_transport_pass_003)
@@ -1048,6 +1076,7 @@ START_TEST (test_parse_transport_pass_003)
 	fail_unless (1 == res->ai_send_addrs_len, "not exactly one send address");
 	fail_unless (match_default_group     (mock_family, &res->ai_send_addrs[0]), "send address not match default group");
 	fail_unless (match_default_interface (mock_family, &res->ai_send_addrs[0]), "send address not match default interface");
+	pgm_freeaddrinfo (&res);
 }
 END_TEST
 
@@ -1093,6 +1122,7 @@ START_TEST (test_parse_transport_pass_004)
 	}
 	fail_unless (match_default_source (mock_family, &res->ai_recv_addrs[0]), "source not match");
 	fail_unless (match_default_source (mock_family, &res->ai_send_addrs[0]), "source not match");
+	pgm_freeaddrinfo (&res);
 }
 END_TEST
 
@@ -1147,6 +1177,7 @@ START_TEST (test_parse_transport_pass_005)
 	}
 	fail_unless (match_default_source (mock_family, &res->ai_recv_addrs[0]), "source not match");
 	fail_unless (match_default_source (mock_family, &res->ai_send_addrs[0]), "source not match");
+	pgm_freeaddrinfo (&res);
 }
 END_TEST
 
@@ -1465,7 +1496,9 @@ make_test_suite (void)
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_007);
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_008);
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_009);
+#ifndef _WIN32
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_010);
+#endif
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_011);
 
 /* IP version 4, ai_family = AF_INET */
@@ -1509,11 +1542,20 @@ make_master_suite (void)
 int
 main (void)
 {
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
+#endif
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
