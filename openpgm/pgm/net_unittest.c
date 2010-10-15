@@ -34,6 +34,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -377,16 +381,20 @@ make_test_suite (void)
 	TCase* tc_sendto = tcase_create ("sendto");
 	suite_add_tcase (s, tc_sendto);
 	tcase_add_test (tc_sendto, test_sendto_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_sendto, test_sendto_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_sendto, test_sendto_fail_002, SIGABRT);
 	tcase_add_test_raise_signal (tc_sendto, test_sendto_fail_003, SIGABRT);
 	tcase_add_test_raise_signal (tc_sendto, test_sendto_fail_004, SIGABRT);
 	tcase_add_test_raise_signal (tc_sendto, test_sendto_fail_005, SIGABRT);
+#endif
 
 	TCase* tc_set_nonblocking = tcase_create ("set-nonblocking");
 	suite_add_tcase (s, tc_set_nonblocking);
 	tcase_add_test (tc_set_nonblocking, test_set_nonblocking_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_set_nonblocking, test_set_nonblocking_fail_001, SIGABRT);
+#endif
 	return s;
 }
 
