@@ -36,6 +36,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -102,6 +106,8 @@ generate_sock (void)
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(1000) };
 	struct pgm_sock_t* sock = g_new0 (struct pgm_sock_t, 1);
 	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
+	sock->is_bound = FALSE;
+	sock->is_destroyed = FALSE;
 	((struct sockaddr*)&sock->send_addr)->sa_family = AF_INET;
 	((struct sockaddr_in*)&sock->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
 	((struct sockaddr*)&sock->send_gsr.gsr_group)->sa_family = AF_INET;
@@ -117,8 +123,7 @@ generate_sock (void)
 	sock->spm_heartbeat_interval = g_malloc0 (sizeof(guint) * (2+2));
 	sock->spm_heartbeat_interval[0] = pgm_secs(1);
 	pgm_spinlock_init (&sock->txw_spinlock);
-	sock->is_bound = FALSE;
-	sock->is_destroyed = FALSE;
+	pgm_rwlock_init (&sock->lock);
 	return sock;
 }
 
@@ -1166,13 +1171,17 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_send_spm);
 	tcase_add_checked_fixture (tc_send_spm, mock_setup, NULL);
 	tcase_add_test (tc_send_spm, test_send_spm_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_send_spm, test_send_spm_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_on_deferred_nak = tcase_create ("on-deferred-nak");
 	suite_add_tcase (s, tc_on_deferred_nak);
 	tcase_add_checked_fixture (tc_on_deferred_nak, mock_setup, NULL);
 	tcase_add_test (tc_on_deferred_nak, test_on_deferred_nak_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_on_deferred_nak, test_on_deferred_nak_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_on_spmr = tcase_create ("on-spmr");
 	suite_add_tcase (s, tc_on_spmr);
@@ -1180,7 +1189,9 @@ make_test_suite (void)
 	tcase_add_test (tc_on_spmr, test_on_spmr_pass_001);
 	tcase_add_test (tc_on_spmr, test_on_spmr_pass_002);
 	tcase_add_test (tc_on_spmr, test_on_spmr_fail_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_on_spmr, test_on_spmr_fail_002, SIGABRT);
+#endif
 
 	TCase* tc_on_nak = tcase_create ("on-nak");
 	suite_add_tcase (s, tc_on_nak);
@@ -1190,14 +1201,18 @@ make_test_suite (void)
 	tcase_add_test (tc_on_nak, test_on_nak_pass_003);
 	tcase_add_test (tc_on_nak, test_on_nak_pass_004);
 	tcase_add_test (tc_on_nak, test_on_nak_fail_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_on_nak, test_on_nak_fail_002, SIGABRT);
+#endif
 
 	TCase* tc_on_nnak = tcase_create ("on-nnak");
 	suite_add_tcase (s, tc_on_nnak);
 	tcase_add_checked_fixture (tc_on_nnak, mock_setup, NULL);
 	tcase_add_test (tc_on_nnak, test_on_nnak_pass_001);
 	tcase_add_test (tc_on_nnak, test_on_nnak_fail_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_on_nnak, test_on_nnak_fail_002, SIGABRT);
+#endif
 
 	TCase* tc_set_ambient_spm = tcase_create ("set-ambient-spm");
 	suite_add_tcase (s, tc_set_ambient_spm);
