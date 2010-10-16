@@ -170,6 +170,11 @@ generate_sock (void)
 {
 	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(TEST_PORT) };
 	struct pgm_sock_t* sock = g_new0 (struct pgm_sock_t, 1);
+	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
+	sock->is_bound = FALSE;
+	sock->is_connected = FALSE;
+	sock->is_destroyed = FALSE;
+	sock->is_reset = FALSE;
 	sock->family = AF_INET;
 	sock->protocol = IPPROTO_IP;
 	sock->recv_sock = socket (AF_INET, SOCK_RAW, 113);
@@ -177,16 +182,11 @@ generate_sock (void)
 	sock->send_with_router_alert_sock = socket (AF_INET, SOCK_RAW, 113);
 	((struct sockaddr*)&sock->send_addr)->sa_family = AF_INET;
 	((struct sockaddr_in*)&sock->send_addr)->sin_addr.s_addr = inet_addr ("127.0.0.2");
-	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
 	sock->dport = g_htons(TEST_PORT);
 	sock->window = g_new0 (pgm_txw_t, 1);
 	sock->iphdr_len = sizeof(struct pgm_ip);
-	pgm_rwlock_init (&sock->lock);
 	pgm_spinlock_init (&sock->txw_spinlock);
-	sock->is_bound = FALSE;
-	sock->is_connected = FALSE;
-	sock->is_destroyed = FALSE;
-	sock->is_reset = FALSE;
+	pgm_rwlock_init (&sock->lock);
 	return sock;
 }
 
@@ -364,12 +364,15 @@ START_TEST (test_create_pass_001)
 	const int pgm_sock_type = SOCK_SEQPACKET;
 /* PGM/IPv4 */
 	sock = NULL;
+printf ("sock1\n");
 	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
 /* PGM/UDP over IPv4 */
 	sock = NULL;
+printf ("sock2\n");
 	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_UDP, &err), "create failed");
 /* PGM/IPv6 */
 	sock = NULL;
+printf ("sock3\n");
 	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
 /* PGM/UDP over IPv6 */
 	sock = NULL;
@@ -1160,6 +1163,7 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_create);
 	tcase_add_checked_fixture (tc_create, mock_setup, mock_teardown);
 	tcase_add_test (tc_create, test_create_pass_001);
+#if 1
 	tcase_add_test (tc_create, test_create_fail_002);
 	tcase_add_test (tc_create, test_create_fail_003);
 	tcase_add_test (tc_create, test_create_fail_004);
@@ -1268,6 +1272,7 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_set_udp_multicast, mock_setup, mock_teardown);
 	tcase_add_test (tc_set_udp_multicast, test_set_udp_multicast_pass_001);
 	tcase_add_test (tc_set_udp_multicast, test_set_udp_multicast_fail_001);
+#endif
 
 	return s;
 }
@@ -1288,13 +1293,28 @@ main (void)
 		fprintf (stderr, "This test requires super-user privileges to run.\n");
 		return EXIT_FAILURE;
 	}
+#else
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
 #endif
-
+	g_assert (pgm_time_init (NULL));
+	pgm_messages_init();
+	pgm_thread_init();
+	pgm_rwlock_init (&pgm_sock_list_lock);
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_rwlock_free (&pgm_sock_list_lock);
+	pgm_thread_shutdown();
+	pgm_messages_shutdown();
+	g_assert (pgm_time_shutdown());
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
