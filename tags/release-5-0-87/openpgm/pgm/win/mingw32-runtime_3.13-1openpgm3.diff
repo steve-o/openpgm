@@ -1,0 +1,136 @@
+diff -urN include-original/mswsock.h include/mswsock.h
+--- include-original/mswsock.h	2009-08-21 22:41:22.000000000 +0800
++++ include/mswsock.h	2010-01-21 17:31:14.662159471 +0800
+@@ -83,23 +83,19 @@
+ } WSAMSG, *PWSAMSG, *LPWSAMSG;
+ 
+ 
+-/* According to MSDN docs, the WSAMSG.Control buffer starts with a
+-   cmsghdr header of the following form.  See also RFC 2292. */
+-
+-typedef struct wsacmsghdr {
+-	UINT	cmsg_len;
+-	INT	cmsg_level;
+- 	INT	cmsg_type;
+-	/* followed by UCHAR cmsg_data[]; */
+-} WSACMSGHDR;
+-
+-/* TODO: Standard Posix.1g macros as per RFC 2292, with WSA_uglification. */
+-#if 0
+-#define WSA_CMSG_FIRSTHDR(mhdr)
+-#define WSA_CMSG_NXTHDR(mhdr, cmsg)
+-#define WSA_CMSG_SPACE(length)
+-#define WSA_CMSG_LEN(length)
+-#endif
++ typedef struct _WSACMSGHDR {
++    SIZE_T cmsg_len;
++    INT cmsg_level;
++    INT cmsg_type;
++  } WSACMSGHDR,*PWSACMSGHDR,*LPWSACMSGHDR;
++
++#define WSA_CMSGHDR_ALIGN(length) (((length) + TYPE_ALIGNMENT(WSACMSGHDR)-1) & (~(TYPE_ALIGNMENT(WSACMSGHDR)-1)))
++#define WSA_CMSGDATA_ALIGN(length) (((length) + MAX_NATURAL_ALIGNMENT-1) & (~(MAX_NATURAL_ALIGNMENT-1)))
++#define WSA_CMSG_FIRSTHDR(msg) (((msg)->Control.len >= sizeof(WSACMSGHDR)) ? (LPWSACMSGHDR)(msg)->Control.buf : (LPWSACMSGHDR)NULL)
++#define WSA_CMSG_NXTHDR(msg,cmsg) ((!(cmsg)) ? WSA_CMSG_FIRSTHDR(msg) : ((((u_char *)(cmsg) + WSA_CMSGHDR_ALIGN((cmsg)->cmsg_len) + sizeof(WSACMSGHDR)) > (u_char *)((msg)->Control.buf) + (msg)->Control.len) ? (LPWSACMSGHDR)NULL : (LPWSACMSGHDR)((u_char *)(cmsg) + WSA_CMSGHDR_ALIGN((cmsg)->cmsg_len))))
++#define WSA_CMSG_DATA(cmsg) ((u_char *)(cmsg) + WSA_CMSGDATA_ALIGN(sizeof(WSACMSGHDR)))
++#define WSA_CMSG_SPACE(length) (WSA_CMSGDATA_ALIGN(sizeof(WSACMSGHDR) + WSA_CMSGHDR_ALIGN(length)))
++#define WSA_CMSG_LEN(length) (WSA_CMSGDATA_ALIGN(sizeof(WSACMSGHDR)) + length)
++
++typedef INT  (WINAPI * LPFN_WSARECVMSG)(SOCKET, LPWSAMSG, LPDWORD, LPWSAOVERLAPPED, LPWSAOVERLAPPED_COMPLETION_ROUTINE);
++
+ BOOL PASCAL DisconnectEx(SOCKET,LPOVERLAPPED,DWORD,DWORD);
+ int PASCAL WSARecvMsg(SOCKET,LPWSAMSG,LPDWORD,LPWSAOVERLAPPED,LPWSAOVERLAPPED_COMPLETION_ROUTINE);
+ 
+diff -urN include-original/ws2tcpip.h include/ws2tcpip.h
+--- include-original/ws2tcpip.h	2009-08-21 22:41:42.000000000 +0800
++++ include/ws2tcpip.h	2009-08-21 22:42:15.000000000 +0800
+@@ -78,6 +78,18 @@
+ 
+ #define UDP_NOCHECKSUM 1
+ 
++/* RFC 3768 */
++#define MCAST_JOIN_GROUP	41
++#define MCAST_LEAVE_GROUP	42
++#define MCAST_BLOCK_SOURCE	43
++#define MCAST_UNBLOCK_SOURCE	44
++#define MCAST_JOIN_SOURCE_GROUP	45
++#define MCAST_LEAVE_SOURCE_GROUP	46
++#define MCAST_MSFILTER		47
++
++#define MCAST_EXCLUDE   0
++#define MCAST_INCLUDE   1
++
+ /* INTERFACE_INFO iiFlags */
+ #define IFF_UP  1
+ #define IFF_BROADCAST   2
+@@ -104,6 +116,7 @@
+ #define AI_PASSIVE	1
+ #define AI_CANONNAME	2
+ #define AI_NUMERICHOST	4
++#define AI_ADDRCONFIG	0x20
+ 
+ /* getaddrinfo error codes */
+ #define EAI_AGAIN	WSATRY_AGAIN
+@@ -132,6 +145,25 @@
+ 	struct in_addr	imr_interface;
+ };
+ 
++struct group_req {
++	u_long		gr_interface;
++	struct sockaddr_storage gr_group;
++};
++
++struct group_source_req {
++	u_long		gsr_interface;
++	struct sockaddr_storage	gsr_group;
++	struct sockaddr_storage gsr_source;
++};
++
++struct group_filter {
++	u_long		gf_interface;
++	struct sockaddr_storage	gf_group;
++	u_long		gf_fmode;
++	u_long		gf_numsrc;
++	struct sockaddr_storage	gf_slist[1];
++};
++
+ struct ip_msfilter {
+ 	struct in_addr	imsf_multiaddr;
+ 	struct in_addr	imsf_interface;
+@@ -356,6 +388,13 @@
+ 	sockaddr_gen	iiNetmask;
+ } INTERFACE_INFO, *LPINTERFACE_INFO;
+ 
++typedef struct _INTERFACE_INFO_EX {
++	u_long		iiFlags;
++	SOCKET_ADDRESS	iiAddress;
++	SOCKET_ADDRESS	iiBroadcastAddress;
++	SOCKET_ADDRESS	iiNetmask;
++} INTERFACE_INFO_EX, *_LPINTERFACE_INFO_EX;
++
+ /*
+    The definition above can cause problems on NT4,prior to sp4.
+    To workaround, include the following struct and typedef and
+--- include-original/winnt.h	2009-08-21 22:41:42.000000000 +0800
++++ include/winnt.h	2010-01-21 17:33:56.366162880 +0800
+@@ -43,6 +43,20 @@
+ #define UNALIGNED
+ #endif
+ 
++#ifdef _WIN64
++#define MAX_NATURAL_ALIGNMENT sizeof(ULONGLONG)
++#define MEMORY_ALLOCATION_ALIGNMENT 16
++#else
++#define MAX_NATURAL_ALIGNMENT sizeof(DWORD)
++#define MEMORY_ALLOCATION_ALIGNMENT 8
++#endif
++
++#ifdef __cplusplus
++#define TYPE_ALIGNMENT(t) __alignof__ (t)
++#else
++#define TYPE_ALIGNMENT(t) FIELD_OFFSET(struct { char x; t test; },test)
++#endif
++
+ #ifndef DECLSPEC_ALIGN
+ #ifdef __GNUC__
+ #define DECLSPEC_ALIGN(x) __attribute__((aligned(x)))
