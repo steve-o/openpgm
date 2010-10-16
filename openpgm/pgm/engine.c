@@ -257,6 +257,8 @@ pgm_shutdown (void)
 		pgm_close ((pgm_sock_t*)pgm_sock_list->data, FALSE);
 	}
 
+	pgm_rwlock_free (&pgm_sock_list_lock);
+
 	pgm_time_shutdown();
 
 #ifdef _WIN32
