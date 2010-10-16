@@ -38,16 +38,13 @@
 #include <glib.h>
 #include <check.h>
 
-#if !defined(ENOBUFS) && defined(WSAENOBUFS)
-#	define ENOBUFS		WSAENOBUFS
-#endif
-
 
 /* mock state */
 
 #define TEST_NETWORK		""
 #define TEST_DPORT		7500
 #define TEST_SPORT		1000
+#define TEST_XPORT		1001
 #define TEST_SRC_ADDR		"127.0.0.1"
 #define TEST_END_ADDR		"127.0.0.2"
 #define TEST_GROUP_ADDR		"239.192.0.1"
@@ -68,7 +65,11 @@
 #define TEST_NAK_NCF_RETRIES	2
 
 struct mock_recvmsg_t {
+#ifndef _WIN32
 	struct msghdr*		mr_msg;
+#else
+	WSAMSG*			mr_msg;
+#endif
 	ssize_t			mr_retval;
 	int			mr_errno;
 };
@@ -137,19 +138,36 @@ mock_setup (void)
 	if (!g_thread_supported ()) g_thread_init (NULL);
 }
 
+/* cleanup test state */
+static
+void
+mock_teardown (void)
+{
+	mock_recvmsg_list = NULL;
+	mock_pgm_type = -1;
+	mock_reset_on_spmr = FALSE;
+	mock_data_on_spmr = FALSE;
+	mock_peer = NULL;
+	mock_data_list = NULL;
+	mock_pgm_loss_rate = 0;
+}
+
 static
 struct pgm_sock_t*
 generate_sock (void)
 {
-	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons(TEST_SPORT) };
+	const pgm_tsi_t tsi = { { 1, 2, 3, 4, 5, 6 }, g_htons((guint16)TEST_SPORT) };
 	struct pgm_sock_t* sock = g_new0 (struct pgm_sock_t, 1);
 	sock->window = g_new0 (pgm_txw_t, 1);
 	memcpy (&sock->tsi, &tsi, sizeof(pgm_tsi_t));
+	sock->is_nonblocking = TRUE;
 	sock->is_bound = TRUE;
+	sock->is_destroyed = FALSE;
+	sock->is_reset = FALSE;
 	sock->rx_buffer = pgm_alloc_skb (TEST_MAX_TPDU);
 	sock->max_tpdu = TEST_MAX_TPDU;
 	sock->rxw_sqns = TEST_RXW_SQNS;
-	sock->dport = g_htons(TEST_DPORT);
+	sock->dport = g_htons((guint16)TEST_DPORT);
 	sock->can_send_data = TRUE;
 	sock->can_send_nak = TRUE;
 	sock->can_recv_data = TRUE;
@@ -158,6 +176,8 @@ generate_sock (void)
 	sock->nak_bo_ivl = 100*1000;
 	pgm_notify_init (&sock->pending_notify);
 	pgm_notify_init (&sock->rdata_notify);
+	pgm_rwlock_init (&sock->lock);
+	pgm_rwlock_init (&sock->peers_lock);
 	return sock;
 }
 
@@ -187,7 +207,7 @@ generate_packet (void)
 
 /* add PGM header */
 	struct pgm_header* pgmhdr = (gpointer)(iphdr + 1);
-	pgmhdr->pgm_sport	= g_htons ((guint16)TEST_SPORT);
+	pgmhdr->pgm_sport	= g_htons ((guint16)TEST_XPORT);
 	pgmhdr->pgm_dport	= g_htons ((guint16)TEST_DPORT);
 	pgmhdr->pgm_options	= 0;
 	pgmhdr->pgm_gsi[0]	= 1;
@@ -476,11 +496,7 @@ generate_msghdr (
 		.iov_base		= packet,
 		.iov_len		= packet_len
 	};
-#ifdef CONFIG_HAVE_WSACMSGHDR
-	WSACMSGHDR* packet_cmsg = g_malloc0 (sizeof(WSACMSGHDR) + sizeof(struct in_pktinfo));
-#else
-	struct cmsghdr* packet_cmsg = g_malloc0 (sizeof(struct cmsghdr) + sizeof(struct in_pktinfo));
-#endif
+	struct pgm_cmsghdr* packet_cmsg = g_malloc0 (sizeof(struct pgm_cmsghdr) + sizeof(struct in_pktinfo));
 	packet_cmsg->cmsg_len   = sizeof(*packet_cmsg) + sizeof(struct in_pktinfo);
 	packet_cmsg->cmsg_level = IPPROTO_IP;
 	packet_cmsg->cmsg_type  = IP_PKTINFO;
@@ -506,10 +522,12 @@ generate_msghdr (
 	WSAMSG packet_msg = {
 		.name			= (LPSOCKADDR)g_memdup (&addr, sizeof(addr)),
 		.namelen		= sizeof(addr),
-		.lpBuffers		= (LPWSABUF)&iov,
+		.lpBuffers		= (LPWSABUF)g_memdup (&iov, sizeof(iov)),
 		.dwBufferCount		= 1,
 		.dwFlags		= 0
 	};
+	packet_msg.Control.buf = (char*)&packet_cmsg;
+	packet_msg.Control.len = sizeof(struct pgm_cmsghdr) + sizeof(struct in_pktinfo);
 #endif
 
 	struct mock_recvmsg_t* mr = g_malloc (sizeof(struct mock_recvmsg_t));
@@ -526,8 +544,8 @@ push_block_event (void)
 /* block */
 	struct mock_recvmsg_t* mr = g_malloc (sizeof(struct mock_recvmsg_t));
 	mr->mr_msg	= NULL;
-	mr->mr_errno	= EAGAIN;
-	mr->mr_retval	= -1;
+	mr->mr_errno	= PGM_SOCK_EAGAIN;
+	mr->mr_retval	= SOCKET_ERROR;
 	mock_recvmsg_list = g_list_append (mock_recvmsg_list, mr);
 }
 
@@ -693,7 +711,7 @@ mock_pgm_flush_peers_pending (
 		*bytes_read = len;
 		*data_read = count;
 		if (*pmsg > msg_end)
-			return -ENOBUFS;
+			return -PGM_SOCK_ENOBUFS;
 	}
 	return 0;
 }
@@ -980,6 +998,7 @@ mock_recvmsg (
 		}
 		if (mock_msg->msg_controllen)
 			memcpy (msg->msg_control, mock_msg->msg_control, mock_msg->msg_controllen);
+		msg->msg_controllen = mock_msg->msg_controllen;
 		msg->msg_flags = mock_msg->msg_flags;
 	}
 	errno = mock_errno;
@@ -1004,7 +1023,8 @@ mock_WSARecvMsg (
 
 	struct mock_recvmsg_t* mr = mock_recvmsg_list->data;
 	WSAMSG* mock_msg	= mr->mr_msg;
-	ssize_t mock_retval	= mr->mr_retval;
+/* only return 0 on success, not bytes received */
+	ssize_t mock_retval	= mr->mr_retval < 0 ? mr->mr_retval : 0;
 	int mock_errno		= mr->mr_errno;
 	mock_recvmsg_list = g_list_delete_link (mock_recvmsg_list, mock_recvmsg_list);
 	if (mock_msg) {
@@ -1018,9 +1038,16 @@ mock_WSARecvMsg (
 				memcpy (lpMsg->lpBuffers[i].buf, mock_msg->lpBuffers[i].buf, mock_msg->lpBuffers[i].len);
 			}
 		}
+		if (mr->mr_retval >= 0)
+			*lpdwNumberOfBytesRecvd = mr->mr_retval;
+		if (mock_msg->Control.len)
+			memcpy (lpMsg->Control.buf, mock_msg->Control.buf, mock_msg->Control.len);
+		lpMsg->Control.len = mock_msg->Control.len;
 		lpMsg->dwFlags = mock_msg->dwFlags;
+		g_debug ("namelen %d buffers %d", mock_msg->namelen, mock_msg->dwBufferCount);
 	}
-	errno = mock_errno;
+	g_debug ("returning %d (errno:%d)", mock_retval, mock_errno);
+	WSASetLastError (mock_errno);
 	return mock_retval;
 }
 
@@ -1063,7 +1090,7 @@ START_TEST (test_block_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1080,7 +1107,7 @@ START_TEST (test_data_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_ODATA == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1097,7 +1124,7 @@ START_TEST (test_spm_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_SPM == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1114,7 +1141,7 @@ START_TEST (test_nak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_NAK == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1131,7 +1158,7 @@ START_TEST (test_peer_nak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_NAK == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1148,7 +1175,7 @@ START_TEST (test_nnak_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_NNAK == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1165,7 +1192,7 @@ START_TEST (test_ncf_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_NCF == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1182,7 +1209,7 @@ START_TEST (test_spmr_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_SPMR == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1199,7 +1226,7 @@ START_TEST (test_peer_spmr_pass_001)
 	push_block_event ();
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (PGM_SPMR == mock_pgm_type, "unexpected PGM packet");
 }
 END_TEST
@@ -1225,14 +1252,14 @@ START_TEST (test_lost_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	if (err) {
 		g_message ("%s", err->message);
 		pgm_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1258,14 +1285,14 @@ START_TEST (test_abort_on_lost_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	if (err) {
 		g_message ("%s", err->message);
 		pgm_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1292,14 +1319,14 @@ START_TEST (test_then_lost_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	if (err) {
 		g_message ("%s", err->message);
 		pgm_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1327,14 +1354,14 @@ START_TEST (test_then_abort_on_lost_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	if (err) {
 		g_message ("%s", err->message);
 		pgm_error_free (err);
 		err = NULL;
 	}
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_RESET == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1369,11 +1396,11 @@ START_TEST (test_on_data_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)sizeof(source) == bytes_read, "unexpected data length");
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1405,11 +1432,11 @@ START_TEST (test_on_zero_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)0 == bytes_read, "unexpected data length");
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
@@ -1466,27 +1493,27 @@ START_TEST (test_on_many_data_pass_001)
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
 	gsize bytes_read;
 	pgm_error_t* err = NULL;
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)(strlen(source[0]) + 1) == bytes_read, "unexpected data length");
 	g_message ("#1 = \"%s\"", buffer);
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)(strlen(source[1]) + 1) == bytes_read, "unexpected data length");
 	g_message ("#2 = \"%s\"", buffer);
-	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_NORMAL == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 	fail_unless (NULL == err, "error raised");
 	fail_unless ((gsize)(strlen(source[2]) + 1) == bytes_read, "unexpected data length");
 	g_message ("#3 = \"%s\"", buffer);
 	push_block_event ();
-	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv faied");
+	fail_unless (PGM_IO_STATUS_TIMER_PENDING == pgm_recv (sock, buffer, sizeof(buffer), MSG_DONTWAIT, &bytes_read, &err), "recv failed");
 }
 END_TEST
 
 START_TEST (test_recv_fail_001)
 {
 	guint8 buffer[ TEST_TXW_SQNS * TEST_MAX_TPDU ];
-	fail_unless (PGM_IO_STATUS_ERROR == pgm_recv (NULL, buffer, sizeof(buffer), 0, NULL, NULL), "recv faied");
+	fail_unless (PGM_IO_STATUS_ERROR == pgm_recv (NULL, buffer, sizeof(buffer), 0, NULL, NULL), "recv failed");
 }
 END_TEST
 
@@ -1561,102 +1588,102 @@ make_test_suite (void)
 
 	TCase* tc_block = tcase_create ("block");
 	suite_add_tcase (s, tc_block);
-	tcase_add_checked_fixture (tc_block, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_block, mock_setup, mock_teardown);
 	tcase_add_test (tc_block, test_block_pass_001);
 
 	TCase* tc_data = tcase_create ("data");
 	suite_add_tcase (s, tc_data);
-	tcase_add_checked_fixture (tc_data, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_data, mock_setup, mock_teardown);
 	tcase_add_test (tc_data, test_data_pass_001);
 
 	TCase* tc_spm = tcase_create ("spm");
 	suite_add_tcase (s, tc_spm);
-	tcase_add_checked_fixture (tc_spm, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_spm, mock_setup, mock_teardown);
 	tcase_add_test (tc_spm, test_spm_pass_001);
 
 	TCase* tc_nak = tcase_create ("nak");
 	suite_add_tcase (s, tc_nak);
-	tcase_add_checked_fixture (tc_nak, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_nak, mock_setup, mock_teardown);
 	tcase_add_test (tc_nak, test_nak_pass_001);
 
 	TCase* tc_peer_nak = tcase_create ("peer-nak");
 	suite_add_tcase (s, tc_peer_nak);
-	tcase_add_checked_fixture (tc_peer_nak, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_peer_nak, mock_setup, mock_teardown);
 	tcase_add_test (tc_peer_nak, test_peer_nak_pass_001);
 
 	TCase* tc_nnak = tcase_create ("nnak");
 	suite_add_tcase (s, tc_nnak);
-	tcase_add_checked_fixture (tc_nnak, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_nnak, mock_setup, mock_teardown);
 	tcase_add_test (tc_nnak, test_nnak_pass_001);
 
 	TCase* tc_ncf = tcase_create ("ncf");
 	suite_add_tcase (s, tc_ncf);
-	tcase_add_checked_fixture (tc_ncf, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_ncf, mock_setup, mock_teardown);
 	tcase_add_test (tc_ncf, test_ncf_pass_001);
 
 	TCase* tc_spmr = tcase_create ("spmr");
 	suite_add_tcase (s, tc_spmr);
-	tcase_add_checked_fixture (tc_spmr, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_spmr, mock_setup, mock_teardown);
 	tcase_add_test (tc_spmr, test_spmr_pass_001);
 
 	TCase* tc_peer_spmr = tcase_create ("peer-spmr");
 	suite_add_tcase (s, tc_peer_spmr);
-	tcase_add_checked_fixture (tc_peer_spmr, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_peer_spmr, mock_setup, mock_teardown);
 	tcase_add_test (tc_peer_spmr, test_peer_spmr_pass_001);
 
 	TCase* tc_lost = tcase_create ("lost");
 	suite_add_tcase (s, tc_lost);
-	tcase_add_checked_fixture (tc_lost, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_lost, mock_setup, mock_teardown);
 	tcase_add_test (tc_lost, test_lost_pass_001);
 
 	TCase* tc_abort_on_lost = tcase_create ("abort-on-lost");
 	suite_add_tcase (s, tc_abort_on_lost);
-	tcase_add_checked_fixture (tc_abort_on_lost, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_abort_on_lost, mock_setup, mock_teardown);
 	tcase_add_test (tc_abort_on_lost, test_abort_on_lost_pass_001);
 
 	TCase* tc_then_lost = tcase_create ("then-lost");
 	suite_add_tcase (s, tc_then_lost);
-	tcase_add_checked_fixture (tc_then_lost, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_then_lost, mock_setup, mock_teardown);
 	tcase_add_test (tc_then_lost, test_then_lost_pass_001);
 
 	TCase* tc_then_abort_on_lost = tcase_create ("then-abort-on-lost");
 	suite_add_tcase (s, tc_then_abort_on_lost);
-	tcase_add_checked_fixture (tc_then_abort_on_lost, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_then_abort_on_lost, mock_setup, mock_teardown);
 	tcase_add_test (tc_then_abort_on_lost, test_then_abort_on_lost_pass_001);
 
 	TCase* tc_on_data = tcase_create ("on-data");
 	suite_add_tcase (s, tc_on_data);
-	tcase_add_checked_fixture (tc_on_data, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_on_data, mock_setup, mock_teardown);
 	tcase_add_test (tc_on_data, test_on_data_pass_001);
 
 	TCase* tc_on_zero = tcase_create ("on-zero");
 	suite_add_tcase (s, tc_on_zero);
-	tcase_add_checked_fixture (tc_on_zero, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_on_zero, mock_setup, mock_teardown);
 	tcase_add_test (tc_on_zero, test_on_zero_pass_001);
 
 	TCase* tc_on_many_data = tcase_create ("on-many-data");
 	suite_add_tcase (s, tc_on_many_data);
-	tcase_add_checked_fixture (tc_on_many_data, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_on_many_data, mock_setup, mock_teardown);
 	tcase_add_test (tc_on_many_data, test_on_many_data_pass_001);
 
 	TCase* tc_recv = tcase_create ("recv");
 	suite_add_tcase (s, tc_recv);
-	tcase_add_checked_fixture (tc_recv, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_recv, mock_setup, mock_teardown);
 	tcase_add_test (tc_recv, test_recv_fail_001);
 
 	TCase* tc_recvfrom = tcase_create ("recvfrom");
 	suite_add_tcase (s, tc_recvfrom);
-	tcase_add_checked_fixture (tc_recvfrom, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_recvfrom, mock_setup, mock_teardown);
 	tcase_add_test (tc_recvfrom, test_recvfrom_fail_001);
 
 	TCase* tc_recvmsg = tcase_create ("recvmsg");
 	suite_add_tcase (s, tc_recvmsg);
-	tcase_add_checked_fixture (tc_recvmsg, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_recvmsg, mock_setup, mock_teardown);
 	tcase_add_test (tc_recvmsg, test_recvmsg_fail_001);
 
 	TCase* tc_recvmsgv = tcase_create ("recvmsgv");
 	suite_add_tcase (s, tc_recvmsgv);
-	tcase_add_checked_fixture (tc_recvmsgv, mock_setup, NULL);
+	tcase_add_checked_fixture (tc_recvmsgv, mock_setup, mock_teardown);
 	tcase_add_test (tc_recvmsgv, test_recvmsgv_fail_001);
 
 	return s;
@@ -1673,11 +1700,26 @@ make_master_suite (void)
 int
 main (void)
 {
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
+#endif
+	g_assert (pgm_time_init (NULL));
+	pgm_rand_init();
+	pgm_messages_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_messages_shutdown();
+	pgm_rand_shutdown();
+	g_assert (pgm_time_shutdown());
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

@@ -61,7 +61,12 @@
 #endif
 
 #ifdef CONFIG_HAVE_WSACMSGHDR
-#	define pgm_cmsghdr			wsacmsghdr
+#	ifdef __GNU__
+/* as listed in MSDN */
+#		define pgm_cmsghdr			wsacmsghdr
+#	else
+#		define pgm_cmsghdr			_WSACMSGHDR
+#	endif
 #else
 #	define pgm_cmsghdr			cmsghdr
 #endif
@@ -164,11 +169,7 @@ recvskb (
 	if (sock->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
-#ifdef CONFIG_HAVE_WSACMSGHDR
-		WSACMSGHDR* cmsg;
-#else
 		struct pgm_cmsghdr* cmsg;
-#endif
 		for (cmsg = PGM_CMSG_FIRSTHDR(&msg);
 		     cmsg != NULL;
 		     cmsg = PGM_CMSG_NXTHDR(&msg, cmsg))
