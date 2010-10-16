@@ -27,6 +27,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -57,6 +61,10 @@ START_TEST (test_init_pass_001)
 {
 	fail_unless (TRUE == pgm_time_init (NULL), "init #1 failed");
 	fail_unless (TRUE == pgm_time_init (NULL), "init #2 failed");
+#ifdef PGM_CHECK_NOFORK
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #1 failed");
+	fail_unless (TRUE == pgm_time_shutdown (), "shutdown #2 failed");
+#endif
 }
 END_TEST
 

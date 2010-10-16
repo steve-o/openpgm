@@ -26,6 +26,10 @@
 #include <check.h>
 #include <glib.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock global */
 
@@ -1475,15 +1479,19 @@ make_basic_test_suite (void)
 	tcase_add_test (tc_create, test_create_pass_002);
 	tcase_add_test (tc_create, test_create_pass_003);
 	tcase_add_test (tc_create, test_create_pass_004);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_create, test_create_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_create, test_create_fail_002, SIGABRT);
 	tcase_add_test_raise_signal (tc_create, test_create_fail_003, SIGABRT);
 	tcase_add_test_raise_signal (tc_create, test_create_fail_004, SIGABRT);
+#endif
 
 	TCase* tc_destroy = tcase_create ("destroy");
 	suite_add_tcase (s, tc_destroy);
 	tcase_add_test (tc_destroy, test_destroy_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_destroy, test_destroy_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_add = tcase_create ("add");
 	suite_add_tcase (s, tc_add);
@@ -1492,49 +1500,67 @@ make_basic_test_suite (void)
 	tcase_add_test (tc_add, test_add_pass_003);
 	tcase_add_test (tc_add, test_add_pass_004);
 	tcase_add_test (tc_add, test_add_pass_005);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_add, test_add_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_add, test_add_fail_002, SIGABRT);
 	tcase_add_test_raise_signal (tc_add, test_add_fail_003, SIGABRT);
+#endif
 
 	TCase* tc_peek = tcase_create ("peek");
 	suite_add_tcase (s, tc_peek);
 	tcase_add_test (tc_peek, test_peek_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_peek, test_peek_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_max_length = tcase_create ("max-length");
 	suite_add_tcase (s, tc_max_length);
 	tcase_add_test (tc_max_length, test_max_length_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_max_length, test_max_length_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_length = tcase_create ("length");
 	suite_add_tcase (s, tc_length);
 	tcase_add_test (tc_length, test_length_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_length, test_length_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_size = tcase_create ("size");
 	suite_add_tcase (s, tc_size);
 	tcase_add_test (tc_size, test_size_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_size, test_size_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_is_empty = tcase_create ("is-empty");
 	suite_add_tcase (s, tc_is_empty);
 	tcase_add_test (tc_is_empty, test_is_empty_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_is_empty, test_is_empty_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_is_full = tcase_create ("is-full");
 	suite_add_tcase (s, tc_is_full);
 	tcase_add_test (tc_is_full, test_is_full_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_is_full, test_is_full_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_lead = tcase_create ("lead");
 	suite_add_tcase (s, tc_lead);
 	tcase_add_test (tc_lead, test_lead_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_lead, test_lead_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_next_lead = tcase_create ("next-lead");
 	suite_add_tcase (s, tc_next_lead);
 	tcase_add_test (tc_next_lead, test_next_lead_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_next_lead, test_next_lead_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_readv = tcase_create ("readv");
 	suite_add_tcase (s, tc_readv);
@@ -1544,36 +1570,48 @@ make_basic_test_suite (void)
 	tcase_add_test (tc_readv, test_readv_pass_004);
 	tcase_add_test (tc_readv, test_readv_pass_005);
 	tcase_add_test (tc_readv, test_readv_pass_006);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_001, SIGABRT);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_002, SIGABRT);
 	tcase_add_test_raise_signal (tc_readv, test_readv_fail_003, SIGABRT);
+#endif
 
 	TCase* tc_remove_commit = tcase_create ("remove-commit");
 	suite_add_tcase (s, tc_remove_commit);
 	tcase_add_test (tc_remove_commit, test_remove_commit_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_remove_commit, test_remove_commit_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_remove_trail = tcase_create ("remove-trail");
 	TCase* tc_update = tcase_create ("update");
 	suite_add_tcase (s, tc_update);
 	tcase_add_test (tc_update, test_update_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_update, test_update_fail_001, SIGABRT);
+#endif
 
         TCase* tc_confirm = tcase_create ("confirm");
 	suite_add_tcase (s, tc_confirm);
 	tcase_add_test (tc_confirm, test_confirm_pass_001);
 	tcase_add_test (tc_confirm, test_confirm_pass_002);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_confirm, test_confirm_fail_001, SIGABRT);
+#endif
 
         TCase* tc_lost = tcase_create ("lost");
 	suite_add_tcase (s, tc_lost);
 	tcase_add_test (tc_lost, test_lost_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_lost, test_lost_fail_001, SIGABRT);
+#endif
 
         TCase* tc_state = tcase_create ("state");
 	suite_add_tcase (s, tc_state);
 	tcase_add_test (tc_state, test_state_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_state, test_state_fail_001, SIGABRT);
+#endif
 
 	return s;
 }
