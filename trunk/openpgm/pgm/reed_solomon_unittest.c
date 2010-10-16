@@ -27,6 +27,10 @@
 #include <glib.h>
 #include <check.h>
 
+#ifdef _WIN32
+#	define PGM_CHECK_NOFORK		1
+#endif
+
 
 /* mock state */
 
@@ -259,27 +263,37 @@ make_test_suite (void)
 	TCase* tc_create = tcase_create ("create");
 	suite_add_tcase (s, tc_create);
 	tcase_add_test (tc_create, test_create_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_create, test_create_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_destroy = tcase_create ("destroy");
 	suite_add_tcase (s, tc_destroy);
 	tcase_add_test (tc_destroy, test_destroy_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_destroy, test_destroy_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_encode = tcase_create ("encode");
 	suite_add_tcase (s, tc_encode);
 	tcase_add_test (tc_encode, test_encode_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_encode, test_encode_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_decode_parity_inline = tcase_create ("decode-parity-inline");
 	suite_add_tcase (s, tc_decode_parity_inline);
 	tcase_add_test (tc_decode_parity_inline, test_decode_parity_inline_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_decode_parity_inline, test_decode_parity_inline_fail_001, SIGABRT);
+#endif
 
 	TCase* tc_decode_parity_appended = tcase_create ("decode-parity-appended");
 	suite_add_tcase (s, tc_decode_parity_appended);
 	tcase_add_test (tc_decode_parity_appended, test_decode_parity_appended_pass_001);
+#ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_decode_parity_appended, test_decode_parity_appended_fail_001, SIGABRT);
+#endif
 	return s;
 }
 
