@@ -24,7 +24,7 @@
 
 #include <errno.h>
 #include <glib.h>
-#include <impl/framework.h>
+#include <pgm/pgm.h>
 
 
 #define PGM_ASYNC_ERROR		pgm_async_error_quark ()
@@ -45,8 +45,13 @@ struct pgm_async_t {
 	pgm_sock_t*		sock;
 	GThread*		thread;
 	GAsyncQueue*		commit_queue;
-	pgm_notify_t		commit_notify;
-	pgm_notify_t		destroy_notify;
+#ifndef _WIN32
+	int			commit_pipe[2];
+	int			destroy_pipe[2];
+#else
+	HANDLE			commit_event;
+	HANDLE			destroy_event;
+#endif
 	gboolean		is_destroyed;
 	gboolean		is_nonblocking;
 };
@@ -65,11 +70,19 @@ int pgm_async_add_watch_full (pgm_async_t*, gint, pgm_eventfn_t, gpointer, GDest
 int pgm_async_add_watch (pgm_async_t*, pgm_eventfn_t, gpointer);
 GQuark pgm_async_error_quark (void);
 
+#ifndef _WIN32
 static inline int pgm_async_get_fd (pgm_async_t* async)
 {
 	g_return_val_if_fail (async != NULL, -EINVAL);
-	return pgm_notify_get_fd (&async->commit_notify);
+	return async->commit_pipe[0];
 }
+#else
+static inline HANDLE pgm_async_get_event (pgm_async_t* async)
+{
+	g_return_val_if_fail (async != NULL, NULL);
+	return async->commit_event;
+}
+#endif /* _WIN32 */
 
 G_END_DECLS
 

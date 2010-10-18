@@ -165,12 +165,14 @@ env = Environment(
 		 ],
 	LINKFLAGS = [	'-pipe'
 		    ],
-	LIBS = [
-			'iphlpapi.lib',
+	LIBS = [	'iphlpapi.lib',
 			'ws2_32.lib'
 		]
 )
 force_mingw(env);
+
+# Win32 regex
+env['REGEX_FLAGS'] = env.ParseFlags('-I/miru/projects/regex/include -L/miru/projects/regex/lib -lregex');
 
 # Branch prediction
 if env['BRANCH'] == 'profile':
