@@ -21,26 +21,37 @@
 
 
 #include <errno.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <arpa/inet.h>
-
+#ifndef _WIN32
+#	include <unistd.h>
+#	include <netdb.h>
+#	include <netinet/in.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
-
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/signal.h>
 #include <pgm/log.h>
-
 #include "dump-json.h"
+
+
+#ifndef _WIN32
+#	define closesocket	close
+#endif
+#ifndef MSG_DONTWAIT
+#	define MSG_DONTWAIT	0
+#endif
 
 
 /* globals */
@@ -52,8 +63,11 @@ static GIOChannel* g_io_channel = NULL;
 static GIOChannel* g_stdin_channel = NULL;
 static GMainLoop* g_loop = NULL;
 
-
+#ifndef _WIN32
 static void on_signal (int, gpointer);
+#else
+static BOOL on_console_ctrl (DWORD);
+#endif
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 
@@ -74,10 +88,14 @@ main (
 	puts ("monitor");
 
 /* setup signal handlers */
+#ifndef _WIN32
 	signal (SIGSEGV, on_sigsegv);
 	signal (SIGHUP, SIG_IGN);
 	pgm_signal_install (SIGINT, on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#else
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+#endif
 
 	g_filter.s_addr = 0;
 
@@ -116,6 +134,7 @@ main (
 	return 0;
 }
 
+#ifndef _WIN32
 static void
 on_signal (
 	int		signum,
@@ -126,6 +145,18 @@ on_signal (
 	g_message ("on_signal (signum:%d user-data:%p)", signum, user_data);
 	g_main_loop_quit (loop);
 }
+#else
+static
+BOOL
+on_console_ctrl (
+        DWORD           dwCtrlType
+        )
+{
+        g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
+        g_main_loop_quit (g_loop);
+        return TRUE;
+}
+#endif /* !_WIN32 */
 
 static gboolean
 on_startup (
@@ -167,25 +198,29 @@ on_startup (
 		int _e = errno;
 		perror("on_startup() failed");
 
+#ifndef _WIN32
 		if (_e == EPERM && 0 != getuid()) {
 			puts ("PGM protocol requires this program to run as superuser.");
 		}
+#endif
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
+#ifndef _WIN32
 /* drop out of setuid 0 */
 	if (0 == getuid()) {
 		puts ("dropping superuser privileges.");
 		setuid((gid_t)65534);
 		setgid((uid_t)65534);
 	}
+#endif
 
 	char _t = 1;
 	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
 	if (e < 0) {
 		perror("on_startup() failed");
-		close(sock);
+		closesocket(sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -193,11 +228,11 @@ on_startup (
 /* buffers */
 	int buffer_size = 0;
 	socklen_t len = 0;
-	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char*)&buffer_size, &len);
 	if (e == 0) {
 		printf ("receive buffer set at %i bytes.\n", buffer_size);
 	}
-	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char*)&buffer_size, &len);
 	if (e == 0) {
 		printf ("send buffer set at %i bytes.\n", buffer_size);
 	}
@@ -211,7 +246,7 @@ on_startup (
 	e = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
 	if (e < 0) {
 		perror("on_startup() failed");
-		close(sock);
+		closesocket(sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -223,10 +258,10 @@ on_startup (
 	printf ("listening on interface %s.\n", inet_ntoa(mreq.imr_interface));
 	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
 	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
-	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
 	if (e < 0) {
 		perror("on_startup() failed");
-		close(sock);
+		closesocket(sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
@@ -235,14 +270,22 @@ on_startup (
 /* multicast ttl */
 
 /* add socket to event manager */
+#ifdef G_OS_UNIX
 	g_io_channel = g_io_channel_unix_new (sock);
+#else
+	g_io_channel = g_io_channel_win32_new_socket (sock);
+#endif
 	printf ("socket opened with encoding %s.\n", g_io_channel_get_encoding(g_io_channel));
 
 	/* guint event = */ g_io_add_watch (g_io_channel, G_IO_IN | G_IO_PRI, on_io_data, NULL);
 	/* guint event = */ g_io_add_watch (g_io_channel, G_IO_ERR | G_IO_HUP | G_IO_NVAL, on_io_error, NULL);
 
 /* add stdin to event manager */
+#ifdef G_OS_UNIX
 	g_stdin_channel = g_io_channel_unix_new (fileno(stdin));
+#else
+	g_stdin_channel = g_io_channel_win32_new_fd (fileno(stdin));
+#endif
 	printf ("binding stdin with encoding %s.\n", g_io_channel_get_encoding(g_stdin_channel));
 
 	g_io_add_watch (g_stdin_channel, G_IO_IN | G_IO_PRI, on_stdin_data, NULL);

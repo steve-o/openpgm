@@ -21,19 +21,22 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <arpa/inet.h>
-
+#ifndef _WIN32
+#	include <netdb.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
 #include <glib.h>
-
 #include <impl/framework.h>
 #include <impl/packet_test.h>
-
 #include "dump-json.h"
 
 
@@ -459,11 +462,11 @@ print_spm (
 	char s[INET6_ADDRSTRLEN];
 	switch (g_ntohs(spm->spm_nla_afi)) {
 	case AFI_IP:
-		inet_ntop ( AF_INET, &spm->spm_nla, s, sizeof (s) );
+		pgm_inet_ntop ( AF_INET, &spm->spm_nla, s, sizeof (s) );
 		break;
 
 	case AFI_IP6:
-		inet_ntop ( AF_INET6, &spm6->spm6_nla, s, sizeof (s) );
+		pgm_inet_ntop ( AF_INET6, &spm6->spm6_nla, s, sizeof (s) );
 		opt_offset += sizeof(struct pgm_spm6) - sizeof(struct pgm_spm);
 		break;
 	}
@@ -902,12 +905,12 @@ generic_print_nak (
 /* source nla */
 	switch (nak_src_nla_afi) {
 	case AFI_IP:
-		inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
+		pgm_inet_ntop ( AF_INET, &nak->nak_src_nla, s, sizeof(s) );
 		nak_grp_nla_afi = g_ntohs (nak->nak_grp_nla_afi);
 		break;
 
 	case AFI_IP6:
-		inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
+		pgm_inet_ntop ( AF_INET6, &nak6->nak6_src_nla, s, sizeof(s) );
 		nak_grp_nla_afi = g_ntohs (nak6->nak6_grp_nla_afi);
 		opt_offset += sizeof(struct in6_addr) - sizeof(struct in_addr);
 		break;
@@ -921,12 +924,12 @@ generic_print_nak (
 		switch (nak_src_nla_afi) {
 /* IPv4 + IPv6 NLA */
 		case AFI_IP:
-			inet_ntop ( AF_INET6, &nak->nak_grp_nla, s, sizeof(s) );
+			pgm_inet_ntop ( AF_INET6, &nak->nak_grp_nla, s, sizeof(s) );
 			break;
 
 /* IPv6 + IPv6 NLA */
 		case AFI_IP6:
-			inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
+			pgm_inet_ntop ( AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s) );
 			break;
 		}
 		opt_offset += sizeof(struct in6_addr) - sizeof(struct in_addr);
@@ -936,12 +939,12 @@ generic_print_nak (
 		switch (nak_src_nla_afi) {
 /* IPv4 + IPv4 NLA */
 		case AFI_IP:
-			inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
+			pgm_inet_ntop ( AF_INET, &nak->nak_grp_nla, s, sizeof(s) );
 			break;
 
 /* IPv6 + IPv4 NLA */
 		case AFI_IP6:
-			inet_ntop ( AF_INET, &nak6->nak6_grp_nla, s, sizeof(s) );
+			pgm_inet_ntop ( AF_INET, &nak6->nak6_grp_nla, s, sizeof(s) );
 			break;
 		}
 		break;

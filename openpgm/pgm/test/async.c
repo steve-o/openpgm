@@ -22,10 +22,18 @@
 
 #include <stdio.h>
 #include <time.h>
-#include <unistd.h>
+#ifndef _WIN32
+#	include <unistd.h>
+#	include <fcntl.h>
+#endif
 #include <glib.h>
-#include <glib/gi18n-lib.h>
 #include <pgm/pgm.h>
+#ifndef _WIN32
+#	include <glib/gi18n-lib.h>
+#else
+/* Windows libintl borken */
+#	define _(String)	(String)
+#endif
 #include "async.h"
 
 
@@ -40,6 +48,10 @@
 
 
 /* globals */
+
+#ifndef MSG_DONTWAIT
+#	define MSG_DONTWAIT		0
+#endif
 
 
 /* global locals */
@@ -122,6 +134,24 @@ pgm_receiver_thread (
 	struct pgm_msgv_t msgv;
 	gsize bytes_read = 0;
 	struct timeval tv;
+#ifdef _WIN32
+	int n_handles = 3, recv_sock, pending_sock;
+        HANDLE waitHandles[ 3 ];
+        DWORD dwTimeout, dwEvents;
+        WSAEVENT recvEvent, pendingEvent;
+        socklen_t socklen = sizeof(int);
+
+        recvEvent = WSACreateEvent ();
+        pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
+        WSAEventSelect (recv_sock, recvEvent, FD_READ);
+        pendingEvent = WSACreateEvent ();
+        pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
+        WSAEventSelect (pending_sock, pendingEvent, FD_READ);
+
+        waitHandles[0] = async->destroy_event;
+        waitHandles[1] = recvEvent;
+        waitHandles[2] = pendingEvent;
+#endif
 
 	do {
 /* blocking read */
@@ -147,8 +177,15 @@ pgm_receiver_thread (
 /* prod pipe on edge */
 			g_async_queue_lock (async->commit_queue);
 			g_async_queue_push_unlocked (async->commit_queue, event);
-			if (g_async_queue_length_unlocked (async->commit_queue) == 1)
-				pgm_notify_send (&async->commit_notify);
+			if (g_async_queue_length_unlocked (async->commit_queue) == 1) {
+#ifndef _WIN32
+				const char one = '1';
+				const size_t writelen = write (async->commit_pipe[1], &one, sizeof(one));
+				g_assert (sizeof(one) == writelen);
+#else
+				SetEvent (async->commit_event);
+#endif
+			}
 			g_async_queue_unlock (async->commit_queue);
 			break;
 		}
@@ -169,21 +206,9 @@ pgm_receiver_thread (
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 		{
-#ifdef CONFIG_HAVE_POLL
-			const int timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			int n_fds = 3;
-			struct pollfd fds[1+n_fds];
-			memset (fds, 0, sizeof(fds));
-			fds[0].fd = pgm_notify_get_fd (&async->destroy_notify);
-			fds[0].events = POLLIN;
-			if (-1 == pgm_poll_info (async->sock, &fds[1], &n_fds, POLLIN)) {
-				g_trace ("poll_info returned errno=%i",errno);
-				goto cleanup;
-			}
-			const int ready = poll (fds, 1 + n_fds, timeout);
-#else /* HAVE_SELECT */
+#ifndef _WIN32
 			fd_set readfds;
-			int fd = pgm_notify_get_fd (&async->destroy_notify), n_fds = 1 + fd;
+			int fd = async->destroy_pipe[0], n_fds = 1 + fd;
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
 			if (-1 == pgm_select_info (async->sock, &readfds, NULL, &n_fds)) {
@@ -191,17 +216,21 @@ block:
 				goto cleanup;
 			}
 			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
-#endif
 			if (-1 == ready) {
 				g_trace ("block returned errno=%i",errno);
 				goto cleanup;
 			}
-#ifdef CONFIG_HAVE_POLL
-			if (ready > 0 && fds[0].revents)
-#else
 			if (ready > 0 && FD_ISSET(fd, &readfds))
-#endif
 				goto cleanup;
+#else
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+                        dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+                        switch (dwEvents) {
+                        case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
+                        case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+                        default: break;
+                        }
+#endif
 			break;
 		}
 
@@ -259,17 +288,18 @@ pgm_async_create (
 
 	new_async = g_new0 (pgm_async_t, 1);
 	new_async->sock = sock;
-	if (0 != pgm_notify_init (&new_async->commit_notify) ||
-	    0 != pgm_notify_init (&new_async->destroy_notify))
-	{
-		g_set_error (error,
-			     PGM_ASYNC_ERROR,
-			     pgm_async_error_from_errno (errno),
-			     _("Creating async notification channels: %s"),
-			     g_strerror (errno));
-		g_free (new_async);
-		return FALSE;
-	}
+#ifndef _WIN32
+	int e;
+	e = pipe (new_async->commit_pipe);
+	const int flags = fcntl (new_async->commit_pipe[0], F_GETFL);
+        fcntl (new_async->commit_pipe[0], F_SETFL, flags | O_NONBLOCK);
+	g_assert (0 == e);
+        e = pipe (new_async->destroy_pipe);
+	g_assert (0 == e);
+#else
+	new_async->commit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncCommit"));
+	new_async->destroy_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncDestroy"));
+#endif /* _WIN32 */
 	new_async->commit_queue = g_async_queue_new();
 /* setup new thread */
 	new_async->thread = g_thread_create_full (pgm_receiver_thread,
@@ -281,7 +311,15 @@ pgm_async_create (
 						  error);
 	if (NULL == new_async->thread) {
 		g_async_queue_unref (new_async->commit_queue);
-		pgm_notify_destroy (&new_async->commit_notify);
+#ifndef _WIN32
+		close (new_async->destroy_pipe[0]);
+		close (new_async->destroy_pipe[1]);
+		close (new_async->commit_pipe[0]);
+		close (new_async->commit_pipe[1]);
+#else
+		CloseHandle (new_async->destroy_event);
+		CloseHandle (new_async->commit_event);
+#endif
 		g_free (new_async);
 		return FALSE;
 	}
@@ -305,15 +343,28 @@ pgm_async_destroy (
 	g_return_val_if_fail (!async->is_destroyed, FALSE);
 
 	async->is_destroyed = TRUE;
-	pgm_notify_send (&async->destroy_notify);
+#ifndef _WIN32
+	const char one = '1';
+        const size_t writelen = write (async->destroy_pipe[1], &one, sizeof(one));
+        g_assert (sizeof(one) == writelen);
+#else
+	SetEvent (async->destroy_event);
+#endif
 	if (async->thread)
 		g_thread_join (async->thread);
 	if (async->commit_queue) {
 		g_async_queue_unref (async->commit_queue);
 		async->commit_queue = NULL;
 	}
-	pgm_notify_destroy (&async->destroy_notify);
-	pgm_notify_destroy (&async->commit_notify);
+#ifndef _WIN32
+	close (async->destroy_pipe[0]);
+        close (async->destroy_pipe[1]);
+        close (async->commit_pipe[0]);
+        close (async->commit_pipe[1]);
+#else
+	CloseHandle (async->destroy_event);
+        CloseHandle (async->commit_event);
+#endif
 	g_free (async);
 	return TRUE;
 }
@@ -331,7 +382,11 @@ pgm_async_create_watch (
         pgm_watch_t *watch = (pgm_watch_t*)source;
 
         watch->async = async;
+#ifndef _WIN32
         watch->pollfd.fd = pgm_async_get_fd (async);
+#else
+        watch->pollfd.fd = pgm_async_get_event (async);
+#endif
         watch->pollfd.events = G_IO_IN;
 
         g_source_add_poll (source, &watch->pollfd);
@@ -432,7 +487,12 @@ pgm_src_dispatch (
         pgm_async_t* async = watch->async;
 
 /* empty pipe */
-	pgm_notify_read (&async->commit_notify);
+#ifndef _WIN32
+	char tmp;
+	while (sizeof(tmp) == read (async->commit_pipe[0], &tmp, sizeof(tmp)));
+#else
+	ResetEvent (async->commit_event);
+#endif
 
 /* purge only one message from the asynchronous queue */
 	pgm_event_t* event = g_async_queue_try_pop (async->commit_queue);
@@ -477,20 +537,9 @@ pgm_async_recv (
 		g_async_queue_unlock (async->commit_queue);
 		if (flags & MSG_DONTWAIT || async->is_nonblocking)
 			return G_IO_STATUS_AGAIN;
-#ifdef CONFIG_HAVE_POLL
-		struct pollfd fds[1];
-		int ready;
-		do {
-			memset (fds, 0, sizeof(fds));
-			fds[0].fd = pgm_notify_get_fd (&async->commit_notify);
-			fds[0].events = POLLIN;
-			ready = poll (fds, G_N_ELEMENTS(fds), -1);
-			if (-1 == ready || async->is_destroyed)	/* errno = EINTR */
-				return G_IO_STATUS_ERROR;
-		} while (ready <= 0);
-#else
+#ifndef _WIN32
 		fd_set readfds;
-		int n_fds, ready, fd = pgm_notify_get_fd (&async->commit_notify);
+		int n_fds, ready, fd = async->commit_pipe[0];
 		do {
 			FD_ZERO(&readfds);
 			FD_SET(fd, &readfds);
@@ -499,8 +548,15 @@ pgm_async_recv (
 			if (-1 == ready || async->is_destroyed)	/* errno = EINTR */
 				return G_IO_STATUS_ERROR;
 		} while (ready <= 0);
+		char tmp;
+		while (sizeof(tmp) == read (async->commit_pipe[0], &tmp, sizeof(tmp)));
+#else
+		int n_handles = 1;
+		HANDLE waitHandles[ n_handles ];
+		waitHandles[0] = async->commit_event;
+		WaitForMultipleObjects (n_handles, waitHandles, FALSE, INFINITE);
+		ResetEvent (async->commit_event);
 #endif
-		pgm_notify_read (&async->commit_notify);
 		g_async_queue_lock (async->commit_queue);
 	}
 	event = g_async_queue_pop_unlocked (async->commit_queue);

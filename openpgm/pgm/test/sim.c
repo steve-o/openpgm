@@ -22,24 +22,27 @@
 
 #include <errno.h>
 #include <getopt.h>
-#include <netdb.h>
-#include <regex.h>
-#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-
+#ifndef _WIN32
+#	include <sched.h>
+#	include <unistd.h>
+#	include <netdb.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <netinet/in.h>
+#	include <netinet/ip.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
+#include <regex.h>
 #include <glib.h>
-
 #include <impl/framework.h>
 #include <impl/socket.h>
 #include <impl/sqn_list.h>
@@ -48,7 +51,6 @@
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
 #include <pgm/signal.h>
-
 #include "dump-json.h"
 #include "async.h"
 
@@ -91,8 +93,11 @@ static GHashTable*	g_sessions = NULL;
 static GMainLoop*	g_loop = NULL;
 static GIOChannel*	g_stdin_channel = NULL;
 
-
+#ifndef _WIN32
 static void on_signal (int, gpointer);
+#else
+static BOOL on_console_ctrl (DWORD);
+#endif
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 static void destroy_session (struct sim_session*);
@@ -132,7 +137,14 @@ main (
 	}
 
 /* parse program arguments */
-	const char* binary_name = strrchr (argv[0], '/');
+#ifdef _WIN32
+        const char* binary_name = strrchr (argv[0], '\\');
+#else
+        const char* binary_name = strrchr (argv[0], '/');
+#endif
+        if (NULL == binary_name)        binary_name = argv[0];
+        else                            binary_name++;
+
 	int c;
 	while ((c = getopt (argc, argv, "s:n:h")) != -1)
 	{
@@ -150,10 +162,14 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* setup signal handlers */
+#ifndef _WIN32
 	signal (SIGSEGV, on_sigsegv);
 	signal (SIGHUP,  SIG_IGN);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#else
+        SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+#endif /* !_WIN32 */
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -206,6 +222,7 @@ destroy_session (
 	g_free (sess);
 }
 
+#ifndef _WIN32
 static
 void
 on_signal (
@@ -217,6 +234,18 @@ on_signal (
 	g_message ("on_signal (signum:%d user-data:%p)", signum, user_data);
 	g_main_loop_quit (loop);
 }
+#else
+static
+BOOL
+on_console_ctrl (
+        DWORD           dwCtrlType
+        )
+{
+        g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
+        g_main_loop_quit (g_loop);
+        return TRUE;
+}
+#endif /* !_WIN32 */
 
 static
 gboolean
@@ -229,7 +258,11 @@ on_startup (
 	g_sessions = g_hash_table_new (g_str_hash, g_str_equal);
 
 /* add stdin to event manager */
+#ifdef G_OS_UNIX
 	g_stdin_channel = g_io_channel_unix_new (fileno(stdin));
+#else
+	g_stdin_channel = g_io_channel_win32_new_fd (fileno(stdin));
+#endif
 	printf ("binding stdin with encoding %s.\n", g_io_channel_get_encoding(g_stdin_channel));
 
 	g_io_add_watch (g_stdin_channel, G_IO_IN | G_IO_PRI, on_stdin_data, NULL);
@@ -288,14 +321,15 @@ fake_pgm_socket (
 
         if ((new_sock->recv_sock = socket (new_sock->family,
                                            socket_type,
-                                           new_sock->protocol)) == PGM_INVALID_SOCKET)
+                                           new_sock->protocol)) == INVALID_SOCKET)
         {
-                const int save_errno = pgm_sock_errno();
+                const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
                 pgm_set_error (error,
                                PGM_ERROR_DOMAIN_SOCKET,
                                pgm_error_from_sock_errno (save_errno),
                                "Creating receive socket: %s",
-                               pgm_sock_strerror (save_errno));
+                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
 #ifndef _WIN32
                 if (EPERM == save_errno) {
                         g_critical ("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'");
@@ -306,27 +340,29 @@ fake_pgm_socket (
 
 	if ((new_sock->send_sock = socket (new_sock->family,
                                            socket_type,
-                                           new_sock->protocol)) == PGM_INVALID_SOCKET)
+                                           new_sock->protocol)) == INVALID_SOCKET)
         {
-                const int save_errno = pgm_sock_errno();
+                const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
                 pgm_set_error (error,
                                PGM_ERROR_DOMAIN_SOCKET,
                                pgm_error_from_sock_errno (save_errno),
                                "Creating send socket: %s",
-                               pgm_sock_strerror (save_errno));
+                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 goto err_destroy;
         }
 
         if ((new_sock->send_with_router_alert_sock = socket (new_sock->family,
                                                              socket_type,
-                                                             new_sock->protocol)) == PGM_INVALID_SOCKET)
+                                                             new_sock->protocol)) == INVALID_SOCKET)
         {
-                const int save_errno = pgm_sock_errno();
+                const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
                 pgm_set_error (error,
                                PGM_ERROR_DOMAIN_SOCKET,
                                pgm_error_from_sock_errno (save_errno),
                                "Creating IP Router Alert (RFC 2113) send socket: %s",
-                               pgm_sock_strerror (save_errno));
+                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 goto err_destroy;
         }
 
@@ -336,29 +372,32 @@ fake_pgm_socket (
         return TRUE;
 
 err_destroy:
-        if (PGM_INVALID_SOCKET != new_sock->recv_sock) {
-                if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->recv_sock)) {
-                        const int save_errno = pgm_sock_errno();
+        if (INVALID_SOCKET != new_sock->recv_sock) {
+                if (SOCKET_ERROR == closesocket (new_sock->recv_sock)) {
+                        const int save_errno = pgm_get_last_sock_error();
+			char errbuf[1024];
                         g_warning ("Close on receive socket failed: %s",
-                                  pgm_sock_strerror (save_errno));
+                                  pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 }
-                new_sock->recv_sock = PGM_INVALID_SOCKET;
+                new_sock->recv_sock = INVALID_SOCKET;
         }
-        if (PGM_INVALID_SOCKET != new_sock->send_sock) {
-                if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->send_sock)) {
-                        const int save_errno = pgm_sock_errno();
+        if (INVALID_SOCKET != new_sock->send_sock) {
+                if (SOCKET_ERROR == closesocket (new_sock->send_sock)) {
+                        const int save_errno = pgm_get_last_sock_error();
+			char errbuf[1024];
                         g_warning ("Close on send socket failed: %s",
-                                  pgm_sock_strerror (save_errno));
+                                  pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 }
-                new_sock->send_sock = PGM_INVALID_SOCKET;
+                new_sock->send_sock = INVALID_SOCKET;
         }
-        if (PGM_INVALID_SOCKET != new_sock->send_with_router_alert_sock) {
-                if (PGM_SOCKET_ERROR == pgm_closesocket (new_sock->send_with_router_alert_sock)) {
-                        const int save_errno = pgm_sock_errno();
+        if (INVALID_SOCKET != new_sock->send_with_router_alert_sock) {
+                if (SOCKET_ERROR == closesocket (new_sock->send_with_router_alert_sock)) {
+                        const int save_errno = pgm_get_last_sock_error();
+			char errbuf[1024];
                         g_warning ("Close on IP Router Alert (RFC 2113) send socket failed: %s",
-                                  pgm_sock_strerror (save_errno));
+                                  pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 }
-                new_sock->send_with_router_alert_sock = PGM_INVALID_SOCKET;
+                new_sock->send_with_router_alert_sock = INVALID_SOCKET;
         }
         pgm_free (new_sock);
         return FALSE;
@@ -416,7 +455,6 @@ on_io_data (
 			inet_ntoa(((struct sockaddr_in*)&src_addr)->sin_addr));
 
 		pgm_peer_t* peer = g_new0 (pgm_peer_t, 1);
-		peer->sock = sock;
 		memcpy (&peer->tsi, &skb->tsi, sizeof(pgm_tsi_t));
 		((struct sockaddr_in*)&peer->nla)->sin_addr.s_addr = INADDR_ANY;
 		memcpy (&peer->local_nla, &src_addr, src_addr_len);
@@ -524,14 +562,15 @@ fake_pgm_bind3 (
                 {
 /* include IP header only for incoming data, only works for IPv4 */
                         puts ("Request IP headers.");
-                        if (PGM_SOCKET_ERROR == pgm_sockaddr_hdrincl (sock->recv_sock, recv_family, TRUE))
+                        if (SOCKET_ERROR == pgm_sockaddr_hdrincl (sock->recv_sock, recv_family, TRUE))
                         {
-                                const int save_errno = pgm_sock_errno();
+                                const int save_errno = pgm_get_last_sock_error();
+				char errbuf[1024];
                                 pgm_set_error (error,
                                                PGM_ERROR_DOMAIN_SOCKET,
                                                pgm_error_from_sock_errno (save_errno),
                                                "Enabling IP header in front of user data: %s",
-                                               pgm_sock_strerror (save_errno));
+                                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                                 return FALSE;
                         }
                 }
@@ -539,14 +578,15 @@ fake_pgm_bind3 (
                 {
                         pgm_assert (AF_INET6 == recv_family);
                         puts ("Request socket packet-info.");
-                        if (PGM_SOCKET_ERROR == pgm_sockaddr_pktinfo (sock->recv_sock, recv_family, TRUE))
+                        if (SOCKET_ERROR == pgm_sockaddr_pktinfo (sock->recv_sock, recv_family, TRUE))
                         {
-                                const int save_errno = pgm_sock_errno();
+                                const int save_errno = pgm_get_last_sock_error();
+				char errbuf[1024];
                                 pgm_set_error (error,
                                                PGM_ERROR_DOMAIN_SOCKET,
                                                pgm_error_from_sock_errno (save_errno),
                                                "Enabling receipt of control message per incoming datagram: %s",
-                                               pgm_sock_strerror (save_errno));
+                                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                                 return FALSE;
                         }
                 }
@@ -590,19 +630,20 @@ fake_pgm_bind3 (
 
 	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
         ((struct sockaddr_in*)&recv_addr)->sin_port = htons (sock->udp_encap_mcast_port);
-        if (PGM_SOCKET_ERROR == bind (sock->recv_sock,
+        if (SOCKET_ERROR == bind (sock->recv_sock,
                                       &recv_addr.sa,
                                       pgm_sockaddr_len (&recv_addr.sa)))
         {
+                const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
                 char addr[INET6_ADDRSTRLEN];
                 pgm_sockaddr_ntop ((struct sockaddr*)&recv_addr, addr, sizeof(addr));
-                const int save_errno = pgm_sock_errno();
                 pgm_set_error (error,
                                PGM_ERROR_DOMAIN_SOCKET,
                                pgm_error_from_sock_errno (save_errno),
                                "Binding receive socket to address %s: %s",
                                addr,
-                               pgm_sock_strerror (save_errno));
+                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 return FALSE;
         }
 
@@ -631,19 +672,20 @@ fake_pgm_bind3 (
         }
 
         memcpy (&send_with_router_alert_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
-        if (PGM_SOCKET_ERROR == bind (sock->send_sock,
+        if (SOCKET_ERROR == bind (sock->send_sock,
                                       (struct sockaddr*)&send_addr,
                                       pgm_sockaddr_len ((struct sockaddr*)&send_addr)))
         {
+                const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
                 char addr[INET6_ADDRSTRLEN];
                 pgm_sockaddr_ntop ((struct sockaddr*)&send_addr, addr, sizeof(addr));
-                const int save_errno = pgm_sock_errno();
                 pgm_set_error (error,
                                PGM_ERROR_DOMAIN_SOCKET,
                                pgm_error_from_sock_errno (save_errno),
                                "Binding send socket to address %s: %s",
                                addr,
-                               pgm_sock_strerror (save_errno));
+                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 return FALSE;
         }
 
@@ -668,19 +710,20 @@ fake_pgm_bind3 (
                 printf ("bind succeeded on send_gsr interface %s\n", s);
         }
 
-	if (PGM_SOCKET_ERROR == bind (sock->send_with_router_alert_sock,
+	if (SOCKET_ERROR == bind (sock->send_with_router_alert_sock,
                                       (struct sockaddr*)&send_with_router_alert_addr,
                                       pgm_sockaddr_len((struct sockaddr*)&send_with_router_alert_addr)))
         {
+                const int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
                 char addr[INET6_ADDRSTRLEN];
                 pgm_sockaddr_ntop ((struct sockaddr*)&send_with_router_alert_addr, addr, sizeof(addr));
-                const int save_errno = pgm_sock_errno();
                 pgm_set_error (error,
                                PGM_ERROR_DOMAIN_SOCKET,
                                pgm_error_from_sock_errno (save_errno),
                                "Binding IP Router Alert (RFC 2113) send socket to address %s: %s",
                                addr,
-                               pgm_sock_strerror (save_errno));
+                               pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
                 return FALSE;
         }
 
@@ -766,15 +809,15 @@ fake_pgm_close (
 /* flag existing calls */
         sock->is_destroyed = TRUE;
 /* cancel running blocking operations */
-	if (PGM_INVALID_SOCKET != sock->recv_sock) {
+	if (INVALID_SOCKET != sock->recv_sock) {
                 puts ("Closing receive socket.");
-		pgm_closesocket (sock->recv_sock);
-                sock->recv_sock = PGM_INVALID_SOCKET;
+		closesocket (sock->recv_sock);
+                sock->recv_sock = INVALID_SOCKET;
         }
-	if (PGM_INVALID_SOCKET != sock->send_sock) {
+	if (INVALID_SOCKET != sock->send_sock) {
                 puts ("Closing send socket.");
-                pgm_closesocket (sock->send_sock);
-                sock->send_sock = PGM_INVALID_SOCKET;
+                closesocket (sock->send_sock);
+                sock->send_sock = INVALID_SOCKET;
         }
 	if (sock->peers_hashtable) {
 		pgm_hashtable_destroy (sock->peers_hashtable);
@@ -788,10 +831,10 @@ fake_pgm_close (
                         sock->peers_list = next;
                 } while (sock->peers_list);
         }
-	if (PGM_INVALID_SOCKET != sock->send_with_router_alert_sock) {
+	if (INVALID_SOCKET != sock->send_with_router_alert_sock) {
                 puts ("Closing send with router alert socket.");
-                pgm_closesocket (sock->send_with_router_alert_sock);
-                sock->send_with_router_alert_sock = PGM_INVALID_SOCKET;
+                closesocket (sock->send_with_router_alert_sock);
+                sock->send_with_router_alert_sock = INVALID_SOCKET;
         }
         if (sock->spm_heartbeat_interval) {
                 puts ("freeing SPM heartbeat interval data.");
@@ -1270,10 +1313,23 @@ session_send (
 /* send message */
 	int status;
 	gsize stringlen = strlen(string) + 1;
-	int n_fds = 1;
-	struct pollfd fds[ n_fds ];
 	struct timeval tv;
-	int timeout;
+#ifndef _WIN32
+	int fds = 0;
+	fd_set writefds;
+#else
+	int n_handles = 1, send_sock;
+	HANDLE waitHandles[ n_handles ];
+	DWORD dwTimeout, dwEvents;
+	WSAEVENT sendEvent;
+        socklen_t socklen = sizeof(int);
+
+        sendEvent = WSACreateEvent ();
+        pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
+        WSAEventSelect (send_sock, sendEvent, FD_WRITE);
+
+        waitHandles[0] = sendEvent;
+#endif
 again:
 	if (is_brokn)
 		status = brokn_send (sess->sock, string, stringlen, NULL);
@@ -1297,10 +1353,14 @@ again:
 /* fall through */
 	case PGM_IO_STATUS_WOULD_BLOCK:
 block:
-		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-		memset (fds, 0, sizeof(fds));
-		pgm_poll_info (sess->sock, fds, &n_fds, POLLOUT);
-		poll (fds, n_fds, timeout /* ms */);
+#ifndef _WIN32
+		FD_ZERO(&writefds);
+		pgm_select_info (sess->sock, NULL, &writefds, &fds);
+		const int ready = select (1, NULL, &writefds, NULL, &tv);
+#else
+		dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+                dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+#endif
 		goto again;
 	default:
 		puts ("FAILED: pgm_send()");
@@ -1404,7 +1464,7 @@ net_send_data (
 
 	pgm_mutex_lock (&sock->send_mutex);
         retval = sendto (sock->send_sock,
-                                header,
+                                (const void*)header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&sock->send_gsr.gsr_group,
@@ -1515,7 +1575,7 @@ net_send_parity (
 
 	pgm_mutex_lock (&sock->send_mutex);
         retval = sendto (sock->send_sock,
-                                header,
+                                (const void*)header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&sock->send_gsr.gsr_group,
@@ -1596,7 +1656,7 @@ net_send_spm (
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
         retval = sendto (sock->send_sock,
-                                header,
+                                (const void*)header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&sock->send_gsr.gsr_group,
@@ -1665,7 +1725,7 @@ net_send_spmr (
 /* TTL 1 */
 	pgm_sockaddr_multicast_hops (sock->send_sock, sock->send_gsr.gsr_group.ss_family, 1);
         retval = sendto (sock->send_sock,
-                                header,
+                                (const void*)header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&sock->send_gsr.gsr_group,
@@ -1676,7 +1736,7 @@ net_send_spmr (
 	if (!pgm_tsi_equal (tsi, &sock->tsi))
 	{
 	        retval = sendto (sock->send_sock,
-	                                header,
+	                                (const void*)header,
 	                                tpdu_length,
 	                                0,            /* not expecting a reply */
 					(struct sockaddr*)&peer_nla,
@@ -1781,7 +1841,7 @@ net_send_ncf (
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
         retval = sendto (sock->send_with_router_alert_sock,
-                                header,
+                                (const void*)header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
 				(struct sockaddr*)&sock->send_gsr.gsr_group,
@@ -1880,7 +1940,7 @@ net_send_nak (
         header->pgm_checksum    = pgm_csum_fold (pgm_csum_partial ((char*)header, tpdu_length, 0));
 
         retval = sendto (sock->send_with_router_alert_sock,
-                                header,
+                                (const void*)header,
                                 tpdu_length,
                                 0,            /* not expecting a reply */
                                 (struct sockaddr*)&peer_nla,
@@ -2104,12 +2164,20 @@ on_stdin_data (
 			struct pgm_sqn_list_t sqn_list;
 			sqn_list.len = 0;
 			{
+#ifndef _WIN32
 				char* saveptr = NULL;
 				for (p = str + pmatch[5].rm_so; ; p = NULL) {
 					char* token = strtok_r (p, ",", &saveptr);
 					if (!token) break;
 					sqn_list.sqn[sqn_list.len++] = strtoul (token, NULL, 10);
 				}
+#else
+				for (p = str + pmatch[5].rm_so; ; p = NULL) {
+					char* token = strtok (p, ",");
+					if (!token) break;
+					sqn_list.sqn[sqn_list.len++] = strtoul (token, NULL, 10);
+				}
+#endif
 			}
 
 			if ( *(str + pmatch[2].rm_so) == 'a' )

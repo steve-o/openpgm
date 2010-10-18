@@ -20,24 +20,27 @@
  */
 
 #include <errno.h>
-#include <getopt.h>
-#include <netdb.h>
-#include <regex.h>
-#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-
+#ifndef _WIN32
+#	include <netdb.h>
+#	include <sched.h>
+#	include <unistd.h>
+#	include <sys/types.h>
+#	include <sys/socket.h>
+#	include <netinet/in.h>
+#	include <arpa/inet.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#endif
+#include <getopt.h>
+#include <regex.h>
 #include <glib.h>
-
 #include <pgm/pgm.h>
 #include <pgm/backtrace.h>
 #include <pgm/log.h>
@@ -74,8 +77,11 @@ static GHashTable*	g_sessions = NULL;
 static GMainLoop*	g_loop = NULL;
 static GIOChannel*	g_stdin_channel = NULL;
 
-
+#ifndef _WIN32
 static void on_signal (int, gpointer);
+#else
+static BOOL on_console_ctrl (DWORD);
+#endif
 static gboolean on_startup (gpointer);
 static gboolean on_mark (gpointer);
 static void destroy_session (gpointer, gpointer, gpointer);
@@ -114,7 +120,14 @@ main (
 	}
 
 /* parse program arguments */
+#ifdef _WIN32
+	const char* binary_name = strrchr (argv[0], '\\');
+#else
 	const char* binary_name = strrchr (argv[0], '/');
+#endif
+	if (NULL == binary_name)	binary_name = argv[0];
+	else				binary_name++;
+
 	int c;
 	while ((c = getopt (argc, argv, "s:n:h")) != -1)
 	{
@@ -132,10 +145,14 @@ main (
 	g_loop = g_main_loop_new (NULL, FALSE);
 
 /* setup signal handlers */
+#ifndef _WIN32
 	signal (SIGSEGV, on_sigsegv);
 	signal (SIGHUP,  SIG_IGN);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
+#else
+	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+#endif /* !_WIN32 */
 
 /* delayed startup */
 	g_message ("scheduling startup.");
@@ -196,6 +213,7 @@ destroy_session (
 	g_free (sess);
 }
 
+#ifndef _WIN32
 static
 void
 on_signal (
@@ -207,6 +225,18 @@ on_signal (
 	g_message ("on_signal (signum:%d user-data:%p)", signum, user_data);
 	g_main_loop_quit (loop);
 }
+#else
+static
+BOOL
+on_console_ctrl (
+	DWORD		dwCtrlType
+	)
+{
+	g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
+	g_main_loop_quit (g_loop);
+	return TRUE;
+}
+#endif /* !_WIN32 */
 
 static
 gboolean
@@ -219,7 +249,11 @@ on_startup (
 	g_sessions = g_hash_table_new (g_str_hash, g_str_equal);
 
 /* add stdin to event manager */
+#ifndef G_OS_WIN32
 	g_stdin_channel = g_io_channel_unix_new (fileno(stdin));
+#else
+	g_stdin_channel = g_io_channel_win32_new_fd (fileno(stdin));
+#endif
 	printf ("binding stdin with encoding %s.\n", g_io_channel_get_encoding(g_stdin_channel));
 
 	g_io_add_watch (g_stdin_channel, G_IO_IN | G_IO_PRI, on_stdin_data, NULL);
@@ -668,10 +702,24 @@ session_send (
 /* send message */
 	int status;
 	gsize stringlen = strlen(string) + 1;
+	struct timeval tv;
+#ifdef CONFIG_HAVE_POLL
 	int n_fds = 1;
 	struct pollfd fds[ n_fds ];
-	struct timeval tv;
 	int timeout;
+#else
+	int n_handles = 1, send_sock;
+	HANDLE waitHandles[ n_handles ];
+	DWORD timeout, dwEvents;
+        WSAEVENT sendEvent;
+        socklen_t socklen = sizeof(int);
+
+        sendEvent = WSACreateEvent ();
+        pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
+        WSAEventSelect (send_sock, sendEvent, FD_WRITE);
+
+	waitHandles[0] = sendEvent;
+#endif
 again:
 printf ("pgm_send (sock:%p string:\"%s\" stringlen:%" G_GSIZE_FORMAT " NULL)\n", (gpointer)sess->sock, string, stringlen);
 	status = pgm_send (sess->sock, string, stringlen, NULL);
@@ -693,15 +741,28 @@ printf ("pgm_send (sock:%p string:\"%s\" stringlen:%" G_GSIZE_FORMAT " NULL)\n",
 /* fall through */
 	case PGM_IO_STATUS_WOULD_BLOCK:
 block:
+#ifdef CONFIG_HAVE_POLL
 		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		memset (fds, 0, sizeof(fds));
 		pgm_poll_info (sess->sock, fds, &n_fds, POLLOUT);
 		poll (fds, n_fds, timeout /* ms */);
+#else
+		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+		dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, timeout);
+		switch (dwEvents) {
+		case WAIT_OBJECT_0+1: WSAResetEvent (sendEvent); break;
+		default: break;
+		}
+#endif
 		goto again;
 	default:
 		puts ("FAILED: pgm_send()");
 		break;
 	}
+
+#ifndef CONFIG_HAVE_POLL
+	WSACloseEvent (sendEvent);
+#endif
 }
 
 static
