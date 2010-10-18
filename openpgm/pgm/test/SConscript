@@ -4,8 +4,9 @@
 
 Import('env')
 e = env.Clone();
+e.Prepend(LIBS = ['libpgm', 'libpgmex']);
 e.MergeFlags(env['GLIB_FLAGS']);
-e.Append(LIBS = ['libpgm', 'libpgmex']);
+e.MergeFlags(env.get('REGEX_FLAGS',''));
 e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 
 e.Program(['monitor.c', 'dump-json.c'])
