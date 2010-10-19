@@ -97,6 +97,13 @@ main (
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif
 
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+        WSADATA wsaData;
+        g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+        g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
+#endif
+
 	g_filter.s_addr = 0;
 
 /* delayed startup */
@@ -130,6 +137,9 @@ main (
 	}
 
 	puts ("finished.");
+#ifdef _WIN32
+        WSACleanup();
+#endif
 	pgm_messages_shutdown();
 	return 0;
 }
@@ -193,48 +203,61 @@ on_startup (
 
 /* open socket for snooping */
 	puts ("opening raw socket.");
-	int sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
-	if (sock < 0) {
-		int _e = errno;
-		perror("on_startup() failed");
-
 #ifndef _WIN32
-		if (_e == EPERM && 0 != getuid()) {
+	int sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	if (-1 == sock) {
+		printf("socket failed: %s(%d)\n",
+			strerror(errno), errno);
+		if (EPERM == errno && 0 != getuid()) {
 			puts ("PGM protocol requires this program to run as superuser.");
 		}
-#endif
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
-
-#ifndef _WIN32
 /* drop out of setuid 0 */
 	if (0 == getuid()) {
 		puts ("dropping superuser privileges.");
 		setuid((gid_t)65534);
 		setgid((uid_t)65534);
 	}
+#else
+	SOCKET sock = socket(PF_INET, SOCK_RAW, ipproto_pgm);
+	if (INVALID_SOCKET == sock) {
+		printf("socket failed: (%d)\n",
+			WSAGetLastError());
+		g_main_loop_quit(g_loop);
+		return FALSE;
+	}
 #endif
 
-	char _t = 1;
-	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
-	if (e < 0) {
-		perror("on_startup() failed");
+#ifndef _WIN32
+	int optval = 1;
+#else
+	DWORD optval = 1;
+#endif
+	e = setsockopt(sock, IPPROTO_IP, IP_HDRINCL, (const char*)&optval, sizeof(optval));
+	if (-1 == e) {
+#ifndef _WIN32
+		printf("setsockopt(IP_HDRINCL) failed: %s(%d)\n",
+			strerror(errno), errno);
+#else
+		printf("setsockopt(IP_HDRINCL) failed: (%d)\n",
+			WSAGetLastError());
+#endif
 		closesocket(sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
 	}
 
 /* buffers */
-	int buffer_size = 0;
-	socklen_t len = 0;
-	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char*)&buffer_size, &len);
+	socklen_t len = sizeof(optval);
+	e = getsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char*)&optval, &len);
 	if (e == 0) {
-		printf ("receive buffer set at %i bytes.\n", buffer_size);
+		printf ("receive buffer set at %i bytes.\n", (int)optval);
 	}
-	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char*)&buffer_size, &len);
+	e = getsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, &len);
 	if (e == 0) {
-		printf ("send buffer set at %i bytes.\n", buffer_size);
+		printf ("send buffer set at %i bytes.\n", (int)optval);
 	}
 
 /* bind */
@@ -244,8 +267,14 @@ on_startup (
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	e = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
-	if (e < 0) {
-		perror("on_startup() failed");
+	if (-1 == e) {
+#ifndef _WIN32
+		printf("bind failed: %s(%d)\n",
+			strerror(errno), errno);
+#else
+		printf("bind failed: %d\n",
+			WSAGetLastError());
+#endif
 		closesocket(sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
@@ -259,8 +288,14 @@ on_startup (
 	mreq.imr_multiaddr.s_addr = inet_addr(g_network);
 	printf ("subscription on multicast address %s.\n", inet_ntoa(mreq.imr_multiaddr));
 	e = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
-	if (e < 0) {
-		perror("on_startup() failed");
+	if (-1 == e) {
+#ifndef _WIN32
+		printf("setsockopt(IP_ADD_MEMBERSHIP) failed: %s(%d)\n",
+			strerror(errno), errno);
+#else
+		printf("setsockopt(IP_ADD_MEMBERSHIP) failed: (%d)\n",
+			WSAGetLastError());
+#endif
 		closesocket(sock);
 		g_main_loop_quit(g_loop);
 		return FALSE;
