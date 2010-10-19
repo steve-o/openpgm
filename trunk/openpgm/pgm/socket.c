@@ -69,6 +69,139 @@ pgm_pkt_offset (
 	return pkt_size;
 }
 
+#ifdef _MSC_VER
+/* How to Determine Whether a Process or Thread Is Running As an Administrator
+ * http://msdn.microsoft.com/en-us/windows/ff420334.aspx
+ */
+
+static
+BOOL
+IsElevatedAdministrator (HANDLE hInputToken)
+{
+	BOOL fIsAdmin = FALSE;
+	HANDLE hTokenToCheck = NULL;
+	DWORD sidLen = SECURITY_MAX_SID_SIZE;
+	BYTE localAdminsGroupSid[SECURITY_MAX_SID_SIZE];
+   
+// If the caller supplies a token, duplicate it as an impersonation token, 
+// because CheckTokenMembership requires an impersonation token.
+	if (hInputToken &&
+	    !DuplicateToken (hInputToken, SecurityIdentification, &hTokenToCheck))
+	{
+		goto CLEANUP;
+	}
+
+	if (!CreateWellKnownSid (WinBuiltinAdministratorsSid, NULL, localAdminsGroupSid, &sidLen))
+		goto CLEANUP;
+
+// Now, determine whether the user is an administrator.
+	CheckTokenMembership (hTokenToCheck, localAdminsGroupSid, &fIsAdmin);
+
+CLEANUP:
+// Close the impersonation token only if we opened it.
+	if (hTokenToCheck) {
+		CloseHandle (hTokenToCheck);
+		hTokenToCheck = NULL;
+	}
+
+	return (fIsAdmin);
+}
+
+static
+BOOL
+IsMemberOfAdministratorsGroup (HANDLE hInputToken)
+{
+	BOOL fIsAdmin = FALSE;
+	HANDLE hTokenToCheck = NULL;
+	HANDLE hToken = hInputToken;
+	OSVERSIONINFO osver;
+	DWORD sidLen = SECURITY_MAX_SID_SIZE;
+	BYTE localAdminsGroupSid[SECURITY_MAX_SID_SIZE];
+
+// If the caller didn't supply a token, open the current thread's token 
+// (if present) or the token of the current process otherwise.
+	if (!hToken &&
+	    !OpenThreadToken (GetCurrentThread(),
+			      TOKEN_QUERY | TOKEN_DUPLICATE, 
+			      TRUE,
+			      &hToken) &&
+	    !OpenProcessToken (GetCurrentProcess(), 
+			       TOKEN_QUERY | TOKEN_DUPLICATE,
+			       &hToken))
+	{
+		goto CLEANUP;
+	}
+
+/* Determine whether the system is running Windows Vista or later 
+ * (major version >= 6) because they support linked tokens, but previous 
+ * versions do not.  If running Windows Vista or later and the token is a
+ * limited token, get its linked token and check it.  Otherwise, just 
+ * check the token we have.
+ */
+	osver.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+	if (!GetVersionEx (&osver))
+		goto CLEANUP;
+
+	if (osver.dwMajorVersion >= 6) {
+		TOKEN_ELEVATION_TYPE elevType;
+		DWORD cbSize;
+		if (!GetTokenInformation (hToken,
+					  TokenElevationType,
+					  &elevType, 
+					  sizeof(TOKEN_ELEVATION_TYPE),
+					  &cbSize))
+			goto CLEANUP;
+
+		if (TokenElevationTypeLimited == elevType &&
+		    !GetTokenInformation (hToken,
+					  TokenLinkedToken,
+					  &hTokenToCheck, 
+					  sizeof(HANDLE),
+					  &cbSize))
+			goto CLEANUP;
+	}
+
+/* CheckTokenMembership requires an impersonation token. If we just got a 
+ * linked token, it already is an impersonation token.  If we didn't get a 
+ * linked token, duplicate the original as an impersonation token for 
+ * CheckTokenMembership.
+ */
+	if (!hTokenToCheck &&
+	    !DuplicateToken (hToken,
+			     SecurityIdentification, 
+			     &hTokenToCheck))
+	{
+		goto CLEANUP;
+	}
+
+	if (!CreateWellKnownSid (WinBuiltinAdministratorsSid,
+				 NULL,
+				 localAdminsGroupSid,
+				 &sidLen))
+	{
+		goto CLEANUP;
+	}
+
+// Now, determine whether the user is an administrator.
+	CheckTokenMembership (hTokenToCheck, localAdminsGroupSid, &fIsAdmin);
+
+CLEANUP:
+// Close the thread/process token handle only if we opened it.  We open 
+// a token handle only when a caller passes NULL in the hInputToken 
+// parameter.
+	if (!hInputToken && hToken) {
+		CloseHandle (hToken);
+		hToken = NULL;  // Set variable to same state as resource.
+	}
+	if (hTokenToCheck) {
+		CloseHandle (hTokenToCheck);
+		hTokenToCheck = NULL;
+	}
+
+	return (fIsAdmin);
+}
+#endif /* _MSC_VER */
+
 /* destroy a pgm_sock object and contents, if last sock also destroy
  * associated event loop
  *
@@ -281,11 +414,26 @@ pgm_socket (
 		pgm_set_error (error,
 			       PGM_ERROR_DOMAIN_SOCKET,
 			       pgm_error_from_sock_errno (save_errno),
-			       _("Creating receive socket: %s"),
-			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
+			       _("Creating receive socket: %s(%d)"),
+			       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno),
+			       save_errno);
 #ifndef _WIN32
 		if (EPERM == save_errno) {
 			pgm_error (_("PGM protocol requires CAP_NET_RAW capability, e.g. sudo execcap 'cap_net_raw=ep'"));
+		}
+#else
+		if (WSAEACCES == save_errno) {
+#	ifdef _MSC_VER
+			if (IsMemberOfAdministratorsGroup (NULL))) {
+				if (!IsElevatedAdministrator (NULL))
+					pgm_error (_("PGM protocol requires approved process elevation via UAC."));
+				/* otherwise unknown permission error, fall through */
+			} else {
+				pgm_error (_("PGM protocol requires membership of the Administrators group."));
+			}
+#	else
+			pgm_error (_("PGM protocol requires membership of the Administrators group and approved process elevation if UAC is enabled."));
+#	endif /* _MSC_VER */
 		}
 #endif
 		goto err_destroy;
