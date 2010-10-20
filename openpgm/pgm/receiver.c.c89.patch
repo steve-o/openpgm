@@ -1,5 +1,5 @@
---- receiver.c	2010-10-14 21:54:32.000000000 +0800
-+++ receiver.c89.c	2010-10-14 21:55:38.000000000 +0800
+--- receiver.c	2010-10-20 21:48:21.000000000 +0800
++++ receiver.c89.c	2010-10-20 21:50:17.000000000 +0800
 @@ -166,6 +166,7 @@
  
  	pgm_trace (PGM_LOG_ROLE_RX_WINDOW, _("Lost data #%u due to cancellation."), skb->sequence);
@@ -154,7 +154,30 @@
  	const size_t tpdu_length = sizeof(struct pgm_header);
  	buf = pgm_alloca (tpdu_length);
  	header = (struct pgm_header*)buf;
-@@ -1019,6 +1040,7 @@
+@@ -995,16 +1016,19 @@
+ 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+ 
+ /* send multicast SPMR TTL 1 to our peers listening on the same groups */
+-	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
++	{
++	unsigned i;
++	for (i = 0; i < sock->recv_gsr_len; i++)
+ 		sent = pgm_sendto_hops (sock,
+-					FALSE,			/* not rate limited */
+-					FALSE,			/* regular socket */
++					FALSE,                  /* not rate limited */
++					FALSE,                  /* regular socket */
+ 					1,
+ 					header,
+ 					tpdu_length,
+ 					(struct sockaddr*)&sock->recv_gsr[i].gsr_group,
+ 					pgm_sockaddr_len ((struct sockaddr*)&sock->recv_gsr[i].gsr_group));
+ /* ignore errors on peer multicast */
++	}
+ 
+ /* send unicast SPMR with regular TTL */
+ 	sent = pgm_sendto (sock,
+@@ -1019,6 +1043,7 @@
  
  	sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT] += tpdu_length * 2;
  	return TRUE;
@@ -162,7 +185,7 @@
  }
  
  /* send selective NAK for one sequence number.
-@@ -1114,7 +1136,7 @@
+@@ -1114,7 +1139,7 @@
  	struct pgm_nak	  *nak;
  	struct pgm_nak6   *nak6;
  	ssize_t		   sent;
@@ -171,7 +194,7 @@
  /* pre-conditions */
  	pgm_assert (NULL != sock);
  	pgm_assert (NULL != source);
-@@ -1190,7 +1212,7 @@
+@@ -1190,7 +1215,7 @@
  	struct pgm_opt_length	*opt_len;
  	struct pgm_opt_nak_list *opt_nak_list;
  	ssize_t			 sent;
@@ -180,7 +203,7 @@
  /* pre-conditions */
  	pgm_assert (NULL != sock);
  	pgm_assert (NULL != source);
-@@ -1199,15 +1221,20 @@
+@@ -1199,15 +1224,20 @@
  	pgm_assert_cmpuint (sqn_list->len, <=, 63);
  
  #ifdef RECEIVER_DEBUG
@@ -202,7 +225,7 @@
  #endif
  
  	tpdu_length = sizeof(struct pgm_header) +
-@@ -1261,8 +1288,11 @@
+@@ -1261,8 +1291,11 @@
  	opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
  	opt_nak_list->opt_reserved = 0;
  
@@ -215,7 +238,7 @@
  
          header->pgm_checksum    = 0;
          header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
-@@ -1303,14 +1333,14 @@
+@@ -1303,14 +1336,14 @@
  	struct pgm_opt_length	      *opt_len;
  	struct pgm_opt_pgmcc_feedback *opt_pgmcc_feedback;
  	ssize_t			       sent;
@@ -233,7 +256,7 @@
  
  	tpdu_length = sizeof(struct pgm_header) +
  			     sizeof(struct pgm_ack) +
-@@ -1355,8 +1385,10 @@
+@@ -1355,8 +1388,10 @@
  	opt_pgmcc_feedback = (struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
  	opt_pgmcc_feedback->opt_reserved = 0;
  
@@ -244,7 +267,7 @@
  	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
  	opt_pgmcc_feedback->opt_loss_rate = htons ((uint16_t)source->window->data_loss);
  
-@@ -1411,9 +1443,12 @@
+@@ -1411,9 +1446,12 @@
  	}
  
  /* have not learned this peers NLA */
@@ -258,7 +281,7 @@
  	     it;
  	     it = prev, prev = it ? it->prev : NULL)
  	{
-@@ -1438,6 +1473,8 @@
+@@ -1438,6 +1476,8 @@
  			break;
  		}
  	}
@@ -267,7 +290,7 @@
  
  	if (ack_backoff_queue->length == 0)
  	{
-@@ -1506,6 +1543,7 @@
+@@ -1506,6 +1546,7 @@
  	}
  
  /* have not learned this peers NLA */
@@ -275,7 +298,7 @@
  	const bool is_valid_nla = 0 != peer->nla.ss_family;
  
  /* TODO: process BOTH selective and parity NAKs? */
-@@ -1523,7 +1561,9 @@
+@@ -1523,7 +1564,9 @@
  
  /* parity NAK generation */
  
@@ -286,7 +309,7 @@
  		     it;
  		     it = prev, prev = it ? it->prev : NULL)
  		{
-@@ -1542,6 +1582,7 @@
+@@ -1542,6 +1585,7 @@
  				}
  
  /* TODO: parity nak lists */
@@ -294,7 +317,7 @@
  				const uint32_t tg_sqn = skb->sequence & tg_sqn_mask;
  				if (	(  nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
  					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
-@@ -1570,23 +1611,28 @@
+@@ -1570,23 +1614,28 @@
  				{	/* different transmission group */
  					break;
  				}
@@ -325,7 +348,7 @@
  		     it;
  		     it = prev, prev = it ? it->prev : NULL)
  		{
-@@ -1639,6 +1685,7 @@
+@@ -1639,6 +1688,7 @@
  				break;
  			}
  		}
@@ -333,7 +356,7 @@
  
  		if (sock->can_send_nak && nak_list.len)
  		{
-@@ -1649,6 +1696,7 @@
+@@ -1649,6 +1699,7 @@
  		}
  
  	}
@@ -341,7 +364,7 @@
  
  	if (PGM_UNLIKELY(dropped_invalid))
  	{
-@@ -1709,7 +1757,9 @@
+@@ -1709,7 +1760,9 @@
  	if (!sock->peers_list)
  		return TRUE;
  
@@ -352,7 +375,7 @@
  	     it;
  	     it = next, next = it ? it->next : NULL)
  	{
-@@ -1784,6 +1834,7 @@
+@@ -1784,6 +1837,7 @@
  		}
  
  	}
@@ -360,7 +383,7 @@
  
  /* check for waiting contiguous packets */
  	if (sock->peers_pending && !sock->is_pending_read)
-@@ -1816,7 +1867,9 @@
+@@ -1816,7 +1870,9 @@
  	if (!sock->peers_list)
  		return expiration;
  
@@ -371,7 +394,7 @@
  	     it;
  	     it = next, next = it ? it->next : NULL)
  	{
-@@ -1854,6 +1907,7 @@
+@@ -1854,6 +1910,7 @@
  		}
  	
  	}
@@ -379,7 +402,7 @@
  
  	return expiration;
  }
-@@ -1884,14 +1938,18 @@
+@@ -1884,14 +1941,18 @@
  	wait_ncf_queue = &peer->window->wait_ncf_queue;
  
  /* have not learned this peers NLA */
@@ -399,7 +422,7 @@
  		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
  
  /* check this packet for state expiration */
-@@ -1927,6 +1985,8 @@
+@@ -1927,6 +1988,8 @@
  				skb->sequence, pgm_to_secsf (state->timer_expiry - now));
  			break;
  		}
@@ -408,7 +431,7 @@
  	}
  
  	if (wait_ncf_queue->length == 0)
-@@ -1986,6 +2046,7 @@
+@@ -1986,6 +2049,7 @@
  	{
  		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Wait ncf queue empty."));
  	}
@@ -416,7 +439,7 @@
  }
  
  /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
-@@ -2014,14 +2075,18 @@
+@@ -2014,14 +2078,18 @@
  	wait_data_queue = &peer->window->wait_data_queue;
  
  /* have not learned this peers NLA */
@@ -436,7 +459,7 @@
  		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
  
  /* check this packet for state expiration */
-@@ -2055,6 +2120,8 @@
+@@ -2055,6 +2123,8 @@
  			break;
  		}
  		
@@ -445,7 +468,7 @@
  	}
  
  	if (wait_data_queue->length == 0)
-@@ -2092,6 +2159,7 @@
+@@ -2092,6 +2162,7 @@
  	} else {
  		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Wait data queue empty."));
  	}
@@ -453,7 +476,7 @@
  }
  
  /* ODATA or RDATA packet with any of the following options:
-@@ -2122,11 +2190,13 @@
+@@ -2122,11 +2193,13 @@
  	pgm_debug ("pgm_on_data (sock:%p source:%p skb:%p)",
  		(void*)sock, (void*)source, (void*)skb);
  
@@ -467,7 +490,7 @@
  	const uint_fast16_t opt_total_length = (skb->pgm_header->pgm_options & PGM_OPT_PRESENT) ?
  		ntohs(*(uint16_t*)( (char*)( skb->pgm_data + 1 ) + sizeof(uint16_t))) :
  		0;
-@@ -2143,6 +2213,7 @@
+@@ -2143,6 +2216,7 @@
  		ack_rb_expiry = skb->tstamp + ack_rb_ivl (sock);
  	}
  
@@ -475,7 +498,7 @@
  	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
  
  /* skb reference is now invalid */
-@@ -2220,6 +2291,9 @@
+@@ -2220,6 +2294,9 @@
  		pgm_timer_unlock (sock);
  	}
  	return TRUE;
@@ -485,7 +508,7 @@
  }
  
  /* POLLs are generated by PGM Parents (Sources or Network Elements).
-@@ -2256,6 +2330,7 @@
+@@ -2256,6 +2333,7 @@
  	memcpy (&poll_rand, (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
  		poll6->poll6_rand :
  		poll4->poll_rand, sizeof(poll_rand));
@@ -493,7 +516,7 @@
  	const uint32_t poll_mask = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
  		ntohl (poll6->poll6_mask) :
  		ntohl (poll4->poll_mask);
-@@ -2271,6 +2346,7 @@
+@@ -2271,6 +2349,7 @@
  /* scoped per path nla
   * TODO: manage list of pollers per peer
   */
@@ -501,7 +524,7 @@
  	const uint32_t poll_sqn   = ntohl (poll4->poll_sqn);
  	const uint16_t poll_round = ntohs (poll4->poll_round);
  
-@@ -2285,6 +2361,7 @@
+@@ -2285,6 +2364,7 @@
  	source->last_poll_sqn   = poll_sqn;
  	source->last_poll_round = poll_round;
  
@@ -509,7 +532,7 @@
  	const uint16_t poll_s_type = ntohs (poll4->poll_s_type);
  
  /* Check poll type */
-@@ -2301,6 +2378,9 @@
+@@ -2301,6 +2381,9 @@
  	}
  
  	return FALSE;
