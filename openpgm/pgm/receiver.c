@@ -994,17 +994,17 @@ send_spmr (
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
 
-/* send multicast SPMR TTL 1 */
-	sent = pgm_sendto_hops (sock,
-				   FALSE,			/* not rate limited */
-				   FALSE,			/* regular socket */
-				   1,
-				   header,
-				   tpdu_length,
-				   (struct sockaddr*)&sock->send_gsr.gsr_group,
-				   pgm_sockaddr_len ((struct sockaddr*)&sock->send_gsr.gsr_group));
-	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
-		return FALSE;
+/* send multicast SPMR TTL 1 to our peers listening on the same groups */
+	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
+		sent = pgm_sendto_hops (sock,
+					FALSE,			/* not rate limited */
+					FALSE,			/* regular socket */
+					1,
+					header,
+					tpdu_length,
+					(struct sockaddr*)&sock->recv_gsr[i].gsr_group,
+					pgm_sockaddr_len ((struct sockaddr*)&sock->recv_gsr[i].gsr_group));
+/* ignore errors on peer multicast */
 
 /* send unicast SPMR with regular TTL */
 	sent = pgm_sendto (sock,
