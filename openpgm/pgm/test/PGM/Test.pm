@@ -50,7 +50,7 @@ sub connect {
 		print "$self->{tag}: opening local connection\n";
 		$self->{pid} = open2 ($self->{in},
 				      $self->{out},
-				      "uname -a && sudo $self->{cmd}")
+				      "uname -a && $self->{cmd}")
 			or croak "open2 failed $!";
 	}
 	else
@@ -59,7 +59,7 @@ sub connect {
 		$self->{pid} = sshopen2 ($self->{host},
 					 $self->{in},
 					 $self->{out},
-					 "uname -a && sudo $self->{cmd}")
+					 "uname -a && $self->{cmd}")
 			or croak "SSH failed: $!";
 	}
 
