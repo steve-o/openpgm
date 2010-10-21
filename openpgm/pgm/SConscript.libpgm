@@ -22,6 +22,7 @@ src = Split("""
 		time.c
 		if.c
 		getifaddrs.c
+		getnetbyname.c
 		getnodeaddr.c
 		indextoaddr.c
 		indextoname.c
