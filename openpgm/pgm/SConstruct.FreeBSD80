@@ -215,6 +215,7 @@ Import('env')
 
 # vanilla environment
 if env['WITH_GLIB'] == 'true':
+# You may need to add -I${includedir} to Cflags in glib-2.0.pc for gi18n-lib
 	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
 else:
 	env['GLIB_FLAGS'] = '';
