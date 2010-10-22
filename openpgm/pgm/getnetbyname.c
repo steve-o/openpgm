@@ -84,7 +84,7 @@ pgm_getnetbyname (
 	char **cp;
 
 	pgm_setnetent ();
-	while (p = pgm_getnetent()) {
+	while (NULL != (p = pgm_getnetent())) {
 		if (!strncmp (p->n_name, name, 1024))
 			break;
 		for (cp = p->n_aliases; *cp != 0; cp++)

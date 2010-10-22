@@ -197,7 +197,15 @@ verify_ip_header (
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
+#ifndef CONFIG_HOST_ORDER_IP_LEN
 	guint packet_length = g_ntohs(ip->ip_len);	/* total packet length */
+#else
+	guint packet_length = ip->ip_len;
+#endif
+	if (len == packet_length + ip_header_length) {
+		packet_length += ip_header_length;
+	}
+
 	if (len < packet_length) {			/* redundant: often handled in kernel */
 		printf ("\t\"message\": \"IP: truncated IP packet: header reports %i actual length %i bytes.\",\n", (int)len, (int)packet_length);
 		return -1;
@@ -211,12 +219,14 @@ verify_ip_header (
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
-	int sum = pgm_inet_checksum((char*)ip, ip_header_length, 0);
+#ifdef PGM_CHECK_IN_CKSUM
+	int sum = in_cksum((char*)ip, ip_header_length, 0);
 	if (sum != 0) {
-		int ip_sum = g_ntohs(ip->ip_sum);
+		const int ip_sum = g_ntohs(ip->ip_sum);
 		printf ("\t\"message\": \"IP: IP header checksum incorrect: 0x%x.\",\n", ip_sum);
 		return -2;
 	}
+#endif
 
 	if (ip->ip_p != IPPROTO_PGM) {
 		printf ("\t\"message\": \"IP: packet IP protocol not PGM: %i.\",\n", ip->ip_p);
@@ -224,7 +234,11 @@ verify_ip_header (
 	}
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
+#ifndef CONFIG_HOST_ORDER_IP_OFF
 	int offset = g_ntohs(ip->ip_off);
+#else
+	int offset = ip->ip_off;
+#endif
 	if ((offset & 0x1fff) != 0) {
 		printf ("\t\"message\": \"IP: fragmented IP packet, ignoring.\",\n");
 		return -1;
@@ -249,7 +263,11 @@ print_ip_header (
 		ip->ip_tos & 0x3
 		);
 	printf ("\t\t\"length\": %i,\n",
+#ifndef CONFIG_HOST_ORDER_IP_LEN
 		g_ntohs(ip->ip_len)
+#else
+		ip->ip_len
+#endif
 		);
 	printf ("\t\t\"fragmentId\": %i,\n",
 		g_ntohs(ip->ip_id)

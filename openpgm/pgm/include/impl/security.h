@@ -161,14 +161,14 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 #elif defined( _WIN32 )
 	pgm_strncpy_s (buffer, size, strerror (errnum), _TRUNCATE);
 	return buffer;
-#elif (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && !defined( _GNU_SOURCE )
+#elif defined( CONFIG_HAVE_GNU_STRERROR_R )
+/* GNU-specific, failure is noted within buffer contents */
+	return strerror_r (errnum, buffer, size);
+#else
 /* XSI-compliant */
 	if (0 != strerror_r (errnum, buffer, size))
 		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error %d"), errnum);
 	return buffer;
-#else
-/* GNU-specific, failure is noted within buffer contents */
-	return strerror_r (errnum, buffer, size);
 #endif
 }
 
