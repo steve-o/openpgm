@@ -78,6 +78,7 @@ sub disconnect {
 		print $out "quit\n";
 		while (readline($self->{in})) {
 			chomp;
+			s/\r//;
 			print "$self->{tag} [$_]\n" if (!$quiet);
 		}
 		alarm 0;
@@ -122,6 +123,7 @@ sub wait_for_ready {
 
 	while (readline($self->{in})) {
 		chomp;
+		s/\r//;
 		print "$self->{tag} [$_]\n";
 		last if /^READY/;
 	}
@@ -135,6 +137,7 @@ sub wait_for_block {
 
 	while (<$fh>) {
 		chomp();
+		s/\r//;
 		my $l = $_;
 		if ($state == 0) {
 			if ($l =~ /^{$/) {
@@ -236,6 +239,7 @@ sub wait_for_data {
 		alarm $timeout;
 		while (<$fh>) {
 			chomp;
+			s/\r//;
 			if (/^DATA: (.+)$/) {
 				$data = $1;
 				last;
