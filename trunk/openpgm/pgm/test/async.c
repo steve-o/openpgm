@@ -215,7 +215,7 @@ block:
 				g_trace ("select_info returned errno=%i",errno);
 				goto cleanup;
 			}
-			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
+			const int ready = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 			if (-1 == ready) {
 				g_trace ("block returned errno=%i",errno);
 				goto cleanup;

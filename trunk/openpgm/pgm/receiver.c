@@ -1414,9 +1414,11 @@ ack_rb_state (
 	const bool is_valid_nla = (0 != peer->nla.ss_family);
 
 	for (pgm_list_t *it = ack_backoff_queue->tail, *prev = it->prev;
-	     it;
-	     it = prev, prev = it ? it->prev : NULL)
+	     NULL != it;
+	     it = prev)
 	{
+		prev = it->prev;
+
 /* check for ACK backoff expiration */
 		if (pgm_time_after_eq(now, peer->ack_rb_expiry))
 		{
@@ -1524,11 +1526,13 @@ nak_rb_state (
 /* parity NAK generation */
 
 		for (pgm_list_t *it = nak_backoff_queue->tail, *prev = it->prev;
-		     it;
-		     it = prev, prev = it ? it->prev : NULL)
+		     NULL != it;
+		     it = prev)
 		{
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
+
+			prev = it->prev;
 
 /* check this packet for state expiration */
 			if (pgm_time_after_eq (now, state->timer_expiry))
@@ -1587,11 +1591,13 @@ nak_rb_state (
 /* select NAK generation */
 
 		for (pgm_list_t *it = nak_backoff_queue->tail, *prev = it->prev;
-		     it;
-		     it = prev, prev = it ? it->prev : NULL)
+		     NULL != it;
+		     it = prev)
 		{
 			struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
 			pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
+
+			prev = it->prev;
 
 /* check this packet for state expiration */
 			if (pgm_time_after_eq(now, state->timer_expiry))
@@ -1710,10 +1716,12 @@ pgm_check_peer_state (
 		return TRUE;
 
 	for (pgm_list_t *it = sock->peers_list, *next = it->next;
-	     it;
-	     it = next, next = it ? it->next : NULL)
+	     NULL != it;
+	     it = next)
 	{
 		pgm_peer_t* peer = it->data;
+
+		next = it->next;
 
 		if (peer->spmr_expiry)
 		{
@@ -1817,10 +1825,12 @@ pgm_min_receiver_expiry (
 		return expiration;
 
 	for (pgm_list_t *it = sock->peers_list, *next = it->next;
-	     it;
-	     it = next, next = it ? it->next : NULL)
+	     NULL != it;
+	     it = next)
 	{
 		pgm_peer_t* peer = it->data;
+
+		next = it->next;
 	
 		if (peer->spmr_expiry)
 		{
@@ -1887,12 +1897,14 @@ nak_rpt_state (
 	const bool is_valid_nla = 0 != peer->nla.ss_family;
 
 	for (pgm_list_t *it = wait_ncf_queue->tail, *prev = it->prev;
-	     it;
-	     it = prev, prev = it ? it->prev : NULL)
+	     NULL != it;
+	     it = prev)
 	{
 		struct pgm_sk_buff_t* skb	= (struct pgm_sk_buff_t*)it;
 		pgm_assert (NULL != skb);
 		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
+
+		prev = it->prev;
 
 /* check this packet for state expiration */
 		if (pgm_time_after_eq (now, state->timer_expiry))
@@ -2017,12 +2029,14 @@ nak_rdata_state (
 	const bool is_valid_nla = 0 != peer->nla.ss_family;
 
 	for (pgm_list_t *it = wait_data_queue->tail, *prev = it->prev;
-	     it;
-	     it = prev, prev = it ? it->prev : NULL)
+	     NULL != it;
+	     it = prev)
 	{
 		struct pgm_sk_buff_t* rdata_skb	= (struct pgm_sk_buff_t*)it;
 		pgm_assert (NULL != rdata_skb);
 		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
+
+		prev = it->prev;
 
 /* check this packet for state expiration */
 		if (pgm_time_after_eq (now, rdata_state->timer_expiry))
