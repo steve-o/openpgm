@@ -1,5 +1,5 @@
---- rxw.c	2010-10-13 18:04:57.000000000 +0800
-+++ rxw.c89.c	2010-10-12 17:28:23.000000000 +0800
+--- rxw.c	2010-10-23 11:19:12.000000000 +0800
++++ rxw.c89.c	2010-10-23 11:25:24.000000000 +0800
 @@ -192,11 +192,12 @@
  		pgm_assert_cmpuint (max_rte, >, 0);
  	}
@@ -253,7 +253,7 @@
  }
  
  /* flush packets but instead of calling on_data append the contiguous data packets
-@@ -1394,7 +1434,7 @@
+@@ -1397,7 +1437,7 @@
  	const uint32_t		tg_sqn		/* transmission group sequence */
  	)
  {
@@ -262,7 +262,7 @@
  	pgm_rxw_state_t		*state;
  	struct pgm_sk_buff_t   **tg_skbs;
  	pgm_gf8_t	       **tg_data, **tg_opts;
-@@ -1415,11 +1455,14 @@
+@@ -1418,11 +1458,14 @@
  	skb = _pgm_rxw_peek (window, tg_sqn);
  	pgm_assert (NULL != skb);
  
@@ -278,7 +278,7 @@
  	{
  		skb = _pgm_rxw_peek (window, i);
  		pgm_assert (NULL != skb);
-@@ -1473,6 +1516,7 @@
+@@ -1476,6 +1519,7 @@
  		}
  
  	}
@@ -286,7 +286,7 @@
  
  /* reconstruct payload */
  	pgm_rs_decode_parity_appended (&window->rs,
-@@ -1488,7 +1532,9 @@
+@@ -1491,7 +1535,9 @@
  					       sizeof(struct pgm_opt_fragment));
  
  /* swap parity skbs with reconstructed skbs */
@@ -297,7 +297,7 @@
  	{
  		struct pgm_sk_buff_t* repair_skb;
  
-@@ -1503,17 +1549,22 @@
+@@ -1506,17 +1552,22 @@
  			if (pktlen > parity_length) {
  				pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Invalid encoded variable packet length in reconstructed packet, dropping entire transmission group."));
  				pgm_free_skb (repair_skb);
@@ -321,7 +321,7 @@
  		}
  
  #ifdef PGM_DISABLE_ASSERT
-@@ -1522,6 +1573,8 @@
+@@ -1525,6 +1576,8 @@
  		pgm_assert_cmpint (_pgm_rxw_insert (window, repair_skb), ==, PGM_RXW_INSERTED);
  #endif
  	}
@@ -330,7 +330,7 @@
  }
  
  /* check every TPDU in an APDU and verify that the data has arrived
-@@ -1562,6 +1615,7 @@
+@@ -1565,6 +1618,7 @@
  		return FALSE;
  	}
  
@@ -338,24 +338,18 @@
  	const size_t apdu_size = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
  	const uint32_t  tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);
  
-@@ -1573,7 +1627,9 @@
+@@ -1576,7 +1630,9 @@
  		return FALSE;
  	}
  
--	for (uint32_t sequence = first_sequence; skb; sequence++)
+-	for (uint32_t sequence = first_sequence;
 +	{
 +	uint32_t sequence = first_sequence;
-+	for (sequence = first_sequence; skb; sequence++)
++	for (sequence = first_sequence;
+ 	     skb;
+ 	     skb = _pgm_rxw_peek (window, ++sequence))
  	{
- 		pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
- 
-@@ -1638,11 +1694,13 @@
- 			}
- 		}
- 
--		skb = _pgm_rxw_peek (window, ++sequence);
-+		skb = _pgm_rxw_peek (window, sequence + 1);
- 	}
+@@ -1648,6 +1704,8 @@
  
  /* pending */
  	return FALSE;
@@ -364,7 +358,7 @@
  }
  
  /* read one APDU consisting of one or more TPDUs.  target array is guaranteed
-@@ -1670,6 +1728,7 @@
+@@ -1675,6 +1733,7 @@
  	skb = _pgm_rxw_peek (window, window->commit_lead);
  	pgm_assert (NULL != skb);
  
@@ -372,7 +366,7 @@
  	const size_t apdu_len = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
  	pgm_assert_cmpuint (apdu_len, >=, skb->len);
  
-@@ -1690,6 +1749,7 @@
+@@ -1695,6 +1754,7 @@
  	pgm_assert (!_pgm_rxw_commit_is_empty (window));
  
  	return contiguous_len;
@@ -380,7 +374,7 @@
  }
  
  /* returns transmission group sequence (TG_SQN) from sequence (SQN).
-@@ -1705,8 +1765,10 @@
+@@ -1710,8 +1770,10 @@
  /* pre-conditions */
  	pgm_assert (NULL != window);
  
@@ -391,7 +385,7 @@
  }
  
  /* returns packet number (PKT_SQN) from sequence (SQN).
-@@ -1722,8 +1784,10 @@
+@@ -1727,8 +1789,10 @@
  /* pre-conditions */
  	pgm_assert (NULL != window);
  
@@ -402,7 +396,7 @@
  }
  
  /* returns TRUE when the sequence is the first of a transmission group.
-@@ -2099,8 +2163,10 @@
+@@ -2104,8 +2168,10 @@
  	skb->sequence		= window->lead;
  	state->timer_expiry	= nak_rdata_expiry;
  
@@ -413,7 +407,7 @@
  	_pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
  
  	return PGM_RXW_APPENDED;
-@@ -2142,7 +2208,7 @@
+@@ -2147,7 +2213,7 @@
  		"cumulative_losses = %" PRIu32 ", "
  		"bytes_delivered = %" PRIu32 ", "
  		"msgs_delivered = %" PRIu32 ", "
@@ -422,7 +416,7 @@
  		"alloc = %" PRIu32 ", "
  		"pdata = []"
  		"}",
-@@ -2185,7 +2251,7 @@
+@@ -2190,7 +2256,7 @@
  		window->cumulative_losses,
  		window->bytes_delivered,
  		window->msgs_delivered,
