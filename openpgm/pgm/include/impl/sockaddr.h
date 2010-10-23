@@ -54,6 +54,7 @@ PGM_BEGIN_DECLS
 #	define PGM_SOCK_ECONNRESET		ECONNRESET
 #	define PGM_SOCK_EHOSTUNREACH		EHOSTUNREACH
 #	define PGM_SOCK_EINTR			EINTR
+#	define PGM_SOCK_EINVAL			EINVAL
 #	define PGM_SOCK_ENETUNREACH		ENETUNREACH
 #	define PGM_SOCK_ENOBUFS			ENOBUFS
 #	define closesocket			close
@@ -94,6 +95,7 @@ pgm_gai_strerror_s (char* buffer, size_t size, int errnum)
 #	define PGM_SOCK_ECONNRESET		WSAECONNRESET
 #	define PGM_SOCK_EHOSTUNREACH		WSAEHOSTUNREACH
 #	define PGM_SOCK_EINTR			WSAEINTR
+#	define PGM_SOCK_EINVAL			WSAEINVAL
 #	define PGM_SOCK_ENETUNREACH		WSAENETUNREACH
 #	define PGM_SOCK_ENOBUFS			WSAENOBUFS
 #	define pgm_get_last_sock_error()	WSAGetLastError()

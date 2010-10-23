@@ -135,22 +135,18 @@ pgm_receiver_thread (
 	gsize bytes_read = 0;
 	struct timeval tv;
 #ifdef _WIN32
-	int n_handles = 3, recv_sock, pending_sock;
-        HANDLE waitHandles[ 3 ];
+	int cEvents = 3, recv_sock, pending_sock;
+	WSAEVENT waitEvents[ cEvents ];
         DWORD dwTimeout, dwEvents;
-        WSAEVENT recvEvent, pendingEvent;
         socklen_t socklen = sizeof(int);
 
-        recvEvent = WSACreateEvent ();
+	waitEvents[0] = async->destroy_event;
+	waitEvents[1] = WSACreateEvent();
+	waitEvents[2] = WSACreateEvent();
         pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-        WSAEventSelect (recv_sock, recvEvent, FD_READ);
-        pendingEvent = WSACreateEvent ();
+        WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
         pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-        WSAEventSelect (pending_sock, pendingEvent, FD_READ);
-
-        waitHandles[0] = async->destroy_event;
-        waitHandles[1] = recvEvent;
-        waitHandles[2] = pendingEvent;
+        WSAEventSelect (pending_sock, waitEvents[2], FD_READ);
 #endif
 
 	do {
@@ -183,7 +179,7 @@ pgm_receiver_thread (
 				const size_t writelen = write (async->commit_pipe[1], &one, sizeof(one));
 				g_assert (sizeof(one) == writelen);
 #else
-				SetEvent (async->commit_event);
+				WSASetEvent (async->commit_event);
 #endif
 			}
 			g_async_queue_unlock (async->commit_queue);
@@ -224,7 +220,7 @@ block:
 				goto cleanup;
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-                        dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+                        dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
                         switch (dwEvents) {
                         case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
                         case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
@@ -297,8 +293,8 @@ pgm_async_create (
         e = pipe (new_async->destroy_pipe);
 	g_assert (0 == e);
 #else
-	new_async->commit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncCommit"));
-	new_async->destroy_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncDestroy"));
+	new_async->commit_event = WSACreateEvent ();
+	new_async->destroy_event = WSACreateEvent ();
 #endif /* _WIN32 */
 	new_async->commit_queue = g_async_queue_new();
 /* setup new thread */
@@ -317,8 +313,8 @@ pgm_async_create (
 		close (new_async->commit_pipe[0]);
 		close (new_async->commit_pipe[1]);
 #else
-		CloseHandle (new_async->destroy_event);
-		CloseHandle (new_async->commit_event);
+		WSACloseEvent (new_async->destroy_event);
+		WSACloseEvent (new_async->commit_event);
 #endif
 		g_free (new_async);
 		return FALSE;
@@ -348,7 +344,7 @@ pgm_async_destroy (
         const size_t writelen = write (async->destroy_pipe[1], &one, sizeof(one));
         g_assert (sizeof(one) == writelen);
 #else
-	SetEvent (async->destroy_event);
+	WSASetEvent (async->destroy_event);
 #endif
 	if (async->thread)
 		g_thread_join (async->thread);
@@ -362,8 +358,8 @@ pgm_async_destroy (
         close (async->commit_pipe[0]);
         close (async->commit_pipe[1]);
 #else
-	CloseHandle (async->destroy_event);
-        CloseHandle (async->commit_event);
+	WSACloseEvent (async->destroy_event);
+        WSACloseEvent (async->commit_event);
 #endif
 	g_free (async);
 	return TRUE;
@@ -491,7 +487,7 @@ pgm_src_dispatch (
 	char tmp;
 	while (sizeof(tmp) == read (async->commit_pipe[0], &tmp, sizeof(tmp)));
 #else
-	ResetEvent (async->commit_event);
+	WSAResetEvent (async->commit_event);
 #endif
 
 /* purge only one message from the asynchronous queue */
@@ -551,11 +547,11 @@ pgm_async_recv (
 		char tmp;
 		while (sizeof(tmp) == read (async->commit_pipe[0], &tmp, sizeof(tmp)));
 #else
-		int n_handles = 1;
-		HANDLE waitHandles[ n_handles ];
-		waitHandles[0] = async->commit_event;
-		WaitForMultipleObjects (n_handles, waitHandles, FALSE, INFINITE);
-		ResetEvent (async->commit_event);
+		DWORD cEvents = 1;
+		WSAEVENT waitEvents[ cEvents ];
+		waitEvents[0] = async->commit_event;
+		WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, INFINITE, FALSE);
+		WSAResetEvent (async->commit_event);
 #endif
 		g_async_queue_lock (async->commit_queue);
 	}

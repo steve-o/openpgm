@@ -1318,17 +1318,15 @@ session_send (
 	int fds = 0;
 	fd_set writefds;
 #else
-	int n_handles = 1, send_sock;
-	HANDLE waitHandles[ n_handles ];
+	int send_sock;
+	DWORD cEvents = 1;
+	WSAEVENT waitEvents[ cEvents ];
 	DWORD dwTimeout, dwEvents;
-	WSAEVENT sendEvent;
         socklen_t socklen = sizeof(int);
 
-        sendEvent = WSACreateEvent ();
+        waitEvents[0] = WSACreateEvent ();
         pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
-        WSAEventSelect (send_sock, sendEvent, FD_WRITE);
-
-        waitHandles[0] = sendEvent;
+        WSAEventSelect (send_sock, waitEvents[0], FD_WRITE);
 #endif
 again:
 	if (is_brokn)
@@ -1359,7 +1357,7 @@ block:
 		const int ready = select (1, NULL, &writefds, NULL, &tv);
 #else
 		dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-                dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+                dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 #endif
 		goto again;
 	default:
