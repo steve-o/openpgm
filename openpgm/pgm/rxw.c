@@ -1351,7 +1351,10 @@ _pgm_rxw_incoming_read (
 			bytes_read += _pgm_rxw_incoming_read_apdu (window, pmsg);
 			data_read  ++;
 		}
-		else break;
+		else
+		{
+			break;
+		}
 	} while (*pmsg <= msg_end && !_pgm_rxw_incoming_is_empty (window));
 
 	window->bytes_delivered += bytes_read;
@@ -1573,7 +1576,9 @@ _pgm_rxw_is_apdu_complete (
 		return FALSE;
 	}
 
-	for (uint32_t sequence = first_sequence; skb; sequence++)
+	for (uint32_t sequence = first_sequence;
+	     skb;
+	     skb = _pgm_rxw_peek (window, ++sequence))
 	{
 		pgm_rxw_state_t* state = (pgm_rxw_state_t*)&skb->cb;
 
@@ -1589,7 +1594,9 @@ _pgm_rxw_is_apdu_complete (
 					contiguous_tpdus += window->commit_lead - tg_sqn;
 			}
 			else
+			{
 				return FALSE;
+			}
 		}
 
 		if (check_parity)
@@ -1637,8 +1644,6 @@ _pgm_rxw_is_apdu_complete (
 				return FALSE;
 			}
 		}
-
-		skb = _pgm_rxw_peek (window, ++sequence);
 	}
 
 /* pending */
