@@ -241,9 +241,9 @@ main (
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
 #else
-	SetEvent (g_quit_event);
+	WSASetEvent (g_quit_event);
 	g_thread_join (g_thread);
-	CloseHandle (g_quit_event);
+	WSACloseEvent (g_quit_event);
 #endif
 
 	g_main_loop_unref (g_loop);
