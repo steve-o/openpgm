@@ -154,14 +154,14 @@ main (
 	DWORD dwTimeout, dwEvents;
 	socklen_t socklen = sizeof (SOCKET);
 
-	waitHandles[0] = g_quit_event;
-	waitHandles[1] = WSACreateEvent();
-	waitHandles[2] = WSACreateEvent();
+	waitEvents[0] = g_quit_event;
+	waitEvents[1] = WSACreateEvent();
+	waitEvents[2] = WSACreateEvent();
 	g_assert (2 == PGM_RECV_SOCKET_READ_COUNT);
 	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, waitHandles[1], FD_READ);
+	WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
 	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, waitHandles[2], FD_READ);
+	WSAEventSelect (pending_sock, waitEvents[2], FD_READ);
 #endif /* !G_OS_UNIX */
 	g_message ("entering PGM message loop ... ");
 	do {

@@ -748,7 +748,7 @@ block:
 		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, timeout, FALSE);
 		switch (dwEvents) {
-		case WAIT_OBJECT_0+1: WSAResetEvent (sendEvent); break;
+		case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[0]); break;
 		default: break;
 		}
 #endif
@@ -759,7 +759,7 @@ block:
 	}
 
 #ifndef CONFIG_HAVE_POLL
-	WSACloseEvent (sendEvent);
+	WSACloseEvent (waitEvents[0]);
 #endif
 }
 
