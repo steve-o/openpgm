@@ -40,8 +40,8 @@ struct async_t {
 	pthread_mutex_t		pthread_mutex;
 #else
 	HANDLE			thread;
-	HANDLE			notify_event;
-	HANDLE			destroy_event;
+	WSAEVENT		notifyEvent;
+	WSAEVENT		destroyEvent;
 	HANDLE			win32_mutex;
 #endif
 	struct async_event_t    *head, *tail;
@@ -56,7 +56,7 @@ ssize_t async_recv (async_t*const restrict, void* restrict, size_t);
 ssize_t async_recvfrom (async_t*const restrict, void*restrict, size_t, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
 
 #ifndef _WIN32
-static inline int async_get_fd (async_t* async)
+static inline int async_get_socket (async_t* async)
 {
 	if (NULL == async) {
 		errno = EINVAL;
@@ -65,13 +65,13 @@ static inline int async_get_fd (async_t* async)
 	return async->notify_pipe[0];
 }
 #else
-static inline HANDLE async_get_event (async_t* async)
+static inline WSAEVENT async_get_event (async_t* async)
 {
 	if (NULL == async) {
-		errno = EINVAL;
+		WSASetLastError (WSAEINVAL);
 		return NULL;
 	}
-	return async->notify_event;
+	return async->notifyEvent;
 }
 #endif /* _WIN32 */
 

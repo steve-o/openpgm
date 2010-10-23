@@ -144,6 +144,14 @@ enum {
 	PGM_IO_STATUS_CONGESTION	/* would-block waiting on ACK or timeout */
 };
 
+/* Socket count for event handlers */
+#define PGM_SEND_SOCKET_READ_COUNT		3
+#define PGM_SEND_SOCKET_WRITE_COUNT		1
+#define PGM_RECV_SOCKET_READ_COUNT		2
+#define PGM_RECV_SOCKET_WRITE_COUNT		0
+#define PGM_BUS_SOCKET_READ_COUNT		PGM_SEND_SOCKET_READ_COUNT
+#define PGM_BUS_SOCKET_WRITE_COUNT		PGM_SEND_SOCKET_WRITE_COUNT
+
 bool pgm_socket (pgm_sock_t**restrict, const sa_family_t, const int, const int, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_bind (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_bind3 (pgm_sock_t*restrict, const struct pgm_sockaddr_t*const restrict, const socklen_t, const struct pgm_interface_req_t*const, const socklen_t, const struct pgm_interface_req_t*const, const socklen_t, pgm_error_t**restrict) PGM_GNUC_WARN_UNUSED_RESULT;

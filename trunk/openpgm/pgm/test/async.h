@@ -49,8 +49,8 @@ struct pgm_async_t {
 	int			commit_pipe[2];
 	int			destroy_pipe[2];
 #else
-	HANDLE			commit_event;
-	HANDLE			destroy_event;
+	WSAEVENT		commit_event;
+	WSAEVENT		destroy_event;
 #endif
 	gboolean		is_destroyed;
 	gboolean		is_nonblocking;

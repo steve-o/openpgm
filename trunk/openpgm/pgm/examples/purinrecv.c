@@ -57,7 +57,7 @@ static bool		is_terminated = FALSE;
 static int		terminate_pipe[2];
 static void on_signal (int);
 #else
-static HANDLE		terminate_event;
+static WSAEVENT		terminateEvent;
 static BOOL on_console_ctrl (DWORD);
 #endif
 #ifndef _MSC_VER
@@ -156,7 +156,7 @@ main (
 	signal (SIGINT,  on_signal);
 	signal (SIGTERM, on_signal);
 #else
-	terminate_event = CreateEvent (NULL, TRUE, FALSE, TEXT("TerminateEvent"));
+	terminateEvent = WSACreateEvent();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif /* !_WIN32 */
 
@@ -170,22 +170,20 @@ main (
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3, recv_sock, pending_sock;
-	HANDLE waitHandles[ 3 ];
+	SOCKET recv_sock, pending_sock;
+	DWORD cEvents = PGM_RECV_SOCKET_READ_COUNT + 1;
+	WSAEVENT waitEvents[ PGM_RECV_SOCKET_READ_COUNT + 1 ];
 	DWORD dwTimeout, dwEvents;
-	WSAEVENT recvEvent, pendingEvent;
-	socklen_t socklen = sizeof(int);
+	socklen_t socklen = sizeof (SOCKET);
 
-	recvEvent = WSACreateEvent ();
+	waitEvents[0] = terminateEvent;
+	waitEvents[1] = WSACreateEvent();
+	waitEvents[2] = WSACreateEvent();
+	assert (2 == PGM_RECV_SOCKET_READ_COUNT);
 	pgm_getsockopt (sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, recvEvent, FD_READ);
-	pendingEvent = WSACreateEvent ();
+	WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
 	pgm_getsockopt (sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
-
-	waitHandles[0] = terminate_event;
-	waitHandles[1] = recvEvent;
-	waitHandles[2] = pendingEvent;
+	WSAEventSelect (pending_sock, waitEvents[2], FD_READ);
 #endif /* !_WIN32 */
 	puts ("Entering PGM message loop ... ");
 	do {
@@ -228,10 +226,10 @@ block:
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (waitEvents[2]); break;
 			default: break;
 			}
 #endif /* !_WIN32 */
@@ -255,9 +253,9 @@ block:
 	close (terminate_pipe[0]);
 	close (terminate_pipe[1]);
 #else
-	WSACloseEvent (recvEvent);
-	WSACloseEvent (pendingEvent);
-	CloseHandle (terminate_event);
+	WSACloseEvent (waitEvents[0]);
+	WSACloseEvent (waitEvents[1]);
+	WSACloseEvent (waitEvents[2]);
 #endif /* !_WIN32 */
 
 	if (sock) {
@@ -294,7 +292,7 @@ on_console_ctrl (
 {
 	printf ("on_console_ctrl (dwCtrlType:%lu)\n", (unsigned long)dwCtrlType);
 	is_terminated = TRUE;
-	SetEvent (terminate_event);
+	WSASetEvent (terminateEvent);
 	return TRUE;
 }
 #endif /* !_WIN32 */

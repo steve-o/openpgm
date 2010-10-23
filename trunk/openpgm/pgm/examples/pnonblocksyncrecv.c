@@ -117,11 +117,7 @@ main (
 	}
 
 	g_quit = FALSE;
-#ifdef G_OS_UNIX
 	e = pipe (g_quit_pipe);
-#else
-	e = _pipe (g_quit_pipe, 4096, _O_BINARY | _O_NOINHERIT);
-#endif
 	g_assert (0 == e);
 
 /* setup signal handlers */

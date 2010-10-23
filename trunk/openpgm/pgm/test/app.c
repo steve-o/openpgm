@@ -708,17 +708,15 @@ session_send (
 	struct pollfd fds[ n_fds ];
 	int timeout;
 #else
-	int n_handles = 1, send_sock;
-	HANDLE waitHandles[ n_handles ];
+	int send_sock;
+	DWORD cEvents = 1;
+	WSAEVENT waitEvents[ cEvents ];
 	DWORD timeout, dwEvents;
-        WSAEVENT sendEvent;
         socklen_t socklen = sizeof(int);
 
-        sendEvent = WSACreateEvent ();
+        waitEvents[0] = WSACreateEvent ();
         pgm_getsockopt (sess->sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
-        WSAEventSelect (send_sock, sendEvent, FD_WRITE);
-
-	waitHandles[0] = sendEvent;
+        WSAEventSelect (send_sock, waitEvents[0], FD_WRITE);
 #endif
 again:
 printf ("pgm_send (sock:%p string:\"%s\" stringlen:%" G_GSIZE_FORMAT " NULL)\n", (gpointer)sess->sock, string, stringlen);
@@ -748,7 +746,7 @@ block:
 		poll (fds, n_fds, timeout /* ms */);
 #else
 		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-		dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, timeout);
+		dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, timeout, FALSE);
 		switch (dwEvents) {
 		case WAIT_OBJECT_0+1: WSAResetEvent (sendEvent); break;
 		default: break;

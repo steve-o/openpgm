@@ -57,7 +57,7 @@ static bool		is_terminated = FALSE;
 static int		terminate_pipe[2];
 static void on_signal (int);
 #else
-static HANDLE		terminate_event;
+static WSAEVENT		terminateEvent;
 static BOOL on_console_ctrl (DWORD);
 #endif
 #ifndef _MSC_VER
@@ -154,7 +154,7 @@ main (
 	signal (SIGINT,  on_signal);
 	signal (SIGTERM, on_signal);
 #else
-	terminate_event = CreateEvent (NULL, TRUE, FALSE, TEXT("TerminateEvent"));
+	terminateEvent = WSACreateEvent ();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif /* !_WIN32 */
 
@@ -165,18 +165,15 @@ main (
 
 /* dispatch loop */
 #ifndef _WIN32
-	int fds, read_fd = async_get_fd (async);
+	int fds, read_fd = async_get_socket (async);
 	fd_set readfds;
 #else
-	int n_handles = 2;
-	HANDLE waitHandles[ 2 ];
+	DWORD cEvents = 2;
+	WSAEVENT waitEvents[ 2 ];
 	DWORD dwEvents;
-	WSAEVENT recvEvent;
 
-	recvEvent = async_get_event (async);
-
-	waitHandles[0] = terminate_event;
-	waitHandles[1] = recvEvent;
+	waitEvents[0] = terminateEvent;
+	waitEvents[1] = async_get_event (async);
 #endif /* !_WIN32 */
 	puts ("Entering PGM message loop ... ");
 	do {
@@ -198,9 +195,9 @@ main (
 			FD_SET(read_fd, &readfds);
 			fds = select (fds, &readfds, NULL, NULL, NULL);
 #else
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, INFINITE);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, INFINITE, FALSE);
 			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: ResetEvent (recvEvent); break;
+			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
 			default: break;
 			}
 #endif /* _WIN32 */
@@ -214,7 +211,7 @@ main (
 	close (terminate_pipe[0]);
 	close (terminate_pipe[1]);
 #else
-	CloseHandle (terminate_event);
+	WSACloseEvent (terminateEvent);
 #endif /* !_WIN32 */
 
 	if (async) {
@@ -257,7 +254,7 @@ on_console_ctrl (
 {
 	printf ("on_console_ctrl (dwCtrlType:%lu)\n", (unsigned long)dwCtrlType);
 	is_terminated = TRUE;
-	SetEvent (terminate_event);
+	WSASetEvent (terminateEvent);
 	return TRUE;
 }
 #endif /* !_WIN32 */

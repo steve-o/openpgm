@@ -1,5 +1,5 @@
---- socket.c	2010-10-19 15:31:09.000000000 +0800
-+++ socket.c89.c	2010-10-19 15:36:07.000000000 +0800
+--- socket.c	2010-10-23 17:21:24.000000000 +0800
++++ socket.c89.c	2010-10-23 17:20:09.000000000 +0800
 @@ -377,7 +377,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
  
@@ -48,6 +48,18 @@
  #endif
  	}
  	else
+@@ -647,9 +653,9 @@
+ 
+ /* maximum payload size for an APDU */
+ 	case PGM_PDU:
+-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
++		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
+ 			break;
+-		*(int*restrict)optval = sock->max_apdu;
++		*(SOCKET*restrict)optval = sock->max_apdu;
+ 		status = TRUE;
+ 		break;
+ 
 @@ -758,8 +764,11 @@
  		{
  			int*restrict intervals = (int*restrict)optval;
@@ -240,23 +252,23 @@
  	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
  /* shutdown */
  	if (PGM_UNLIKELY(!pgm_rwlock_writer_trylock (&sock->lock)))
-@@ -2373,6 +2408,7 @@
- 		return -1;
+@@ -2372,6 +2407,7 @@
+ 		return SOCKET_ERROR;
  	}
  
 +	{
  	const bool is_congested = (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) ? TRUE : FALSE;
  
  	if (readfds)
-@@ -2397,6 +2433,7 @@
+@@ -2400,6 +2436,7 @@
  #endif
  			}
  		}
 +		{
- 		const SOCKET pending_fd = pgm_notify_get_fd (&sock->pending_notify);
+ 		const SOCKET pending_fd = pgm_notify_get_socket (&sock->pending_notify);
  		FD_SET(pending_fd, readfds);
  #ifndef _WIN32
-@@ -2404,6 +2441,7 @@
+@@ -2407,6 +2444,7 @@
  #else
  		fds++;
  #endif
@@ -264,7 +276,7 @@
  	}
  
  	if (sock->can_send_data && writefds && !is_congested)
-@@ -2421,6 +2459,7 @@
+@@ -2424,6 +2462,7 @@
  #else
  	return *n_fds + fds;
  #endif

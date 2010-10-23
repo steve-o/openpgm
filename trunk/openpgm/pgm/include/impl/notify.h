@@ -41,6 +41,7 @@ typedef struct pgm_notify_t pgm_notify_t;
 #endif
 #include <pgm/types.h>
 #include <impl/messages.h>
+#include <impl/sockaddr.h>
 
 PGM_BEGIN_DECLS
 
@@ -280,8 +281,8 @@ pgm_notify_clear (
 }
 
 static inline
-int
-pgm_notify_get_fd (
+SOCKET
+pgm_notify_get_socket (
 	pgm_notify_t*	notify
 	)
 {

@@ -136,7 +136,7 @@ static gboolean		g_quit;
 static int		g_quit_pipe[2];
 static void on_signal (int, gpointer);
 #else
-static HANDLE		g_quit_event;
+static WSAEVENT		g_quit_event;
 static BOOL on_console_ctrl (DWORD);
 #endif
 
@@ -279,7 +279,7 @@ main (
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 #else
-	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
+	g_quit_event = WSACreateEvent();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif /* !G_OS_UNIX */
 
@@ -309,11 +309,11 @@ main (
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
 #else
-	SetEvent (g_quit_event);
+	WSASetEvent (g_quit_event);
 	if (PGMPING_MODE_SOURCE == g_mode || PGMPING_MODE_INITIATOR == g_mode)
 		g_thread_join (g_sender_thread);
 	g_thread_join (g_receiver_thread);
-	CloseHandle (g_quit_event);
+	WSACloseEvent (g_quit_event);
 #endif
 
 	g_main_loop_unref (g_loop);
@@ -786,8 +786,8 @@ sender_thread (
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
-	int n_fds = 2;
-	struct pollfd fds[ 2 + 1 ];
+	int n_fds = MAX(PGM_BUS_SOCKET_WRITE_COUNT, PGM_BUS_SOCKET_READ_COUNT);
+	struct pollfd fds[ n_fds + 1 ];
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	gethostname (hostname, sizeof(hostname));
@@ -960,8 +960,8 @@ receiver_thread (
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
-	int n_fds = 3;
-	struct pollfd fds[ 3 + 1 ];
+	int n_fds = PGM_BUS_SOCKET_READ_COUNT;
+	struct pollfd fds[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	memset (&lost_tsi, 0, sizeof(lost_tsi));
