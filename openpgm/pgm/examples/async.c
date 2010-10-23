@@ -145,22 +145,20 @@ receiver_routine (
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3, recv_sock, pending_sock;
-	HANDLE waitHandles[ 3 ];
+	SOCKET recv_sock, pending_sock;
+	DWORD cEvents = PGM_RECV_SOCKET_READ_COUNT + 1;
+	WSAEVENT waitEvents[ PGM_RECV_SOCKET_READ_COUNT + 1 ];
 	DWORD dwTimeout, dwEvents;
-	WSAEVENT recvEvent, pendingEvent;
-	socklen_t socklen = sizeof(int);
+	socklen_t socklen = sizeof (SOCKET);
 
-	recvEvent = WSACreateEvent ();
+	waitHandles[0] = async->destroyEvent;
+	waitHandles[1] = WSACreateEvent();
+	waitHandles[2] = WSACreateEvent();
+	assert (2 == PGM_RECV_SOCKET_READ_COUNT);
 	pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, recvEvent, FD_READ);
-	pendingEvent = WSACreateEvent ();
+	WSAEventSelect (recv_sock, waitHandles[1], FD_READ);
 	pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
-
-	waitHandles[0] = async->destroy_event;
-	waitHandles[1] = recvEvent;
-	waitHandles[2] = pendingEvent;
+	WSAEventSelect (pending_sock, waitHandles[2], FD_READ);
 #endif /* !_WIN32 */
 
 /* dispatch loop */
@@ -205,10 +203,10 @@ block:
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.
 tv_usec / 1000));
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (waitEvents[2]); break;
 			default: break;
 			}
 #endif /* !_WIN32 */
@@ -224,8 +222,8 @@ tv_usec / 1000));
 #ifndef _WIN32
 	return NULL;
 #else
-	WSACloseEvent (recvEvent);
-	WSACloseEvent (pendingEvent);
+	WSACloseEvent (waitEvents[1]);
+	WSACloseEvent (waitEvents[2]);
 	_endthread();
 	return 0;
 #endif /* !_WIN32 */
@@ -260,7 +258,7 @@ on_data (
 	WaitForSingleObject (async->win32_mutex, INFINITE);
 	async_push_event (async, event);
 	if (1 == async->length) {
-		SetEvent (async->notify_event);
+		WSASetEvent (async->notifyEvent);
 	}
 	ReleaseMutex (async->win32_mutex);
 #endif /* _WIN32 */
@@ -300,8 +298,8 @@ async_create (
 	if (0 != status) goto err_destroy;
 #else
 	new_async->win32_mutex = CreateMutex (NULL, FALSE, NULL);
-	new_async->notify_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncNotify"));
-	new_async->destroy_event = CreateEvent (NULL, TRUE, FALSE, TEXT("AsyncDestroy"));
+	new_async->notifyEvent = WSACreateEvent();
+	new_async->destroyEvent = WSACreateEvent();
 /* expect warning on MinGW due to lack of native uintptr_t */
 	new_async->thread = (HANDLE)_beginthreadex (NULL, 0, &receiver_routine, new_async, 0, NULL);
 	if (0 == new_async->thread) goto err_destroy;
@@ -319,13 +317,17 @@ err_destroy:
 	close (new_async->notify_pipe[1]);
 	pthread_mutex_destroy (&new_async->pthread_mutex);
 #else
-	CloseHandle (new_async->destroy_event);
-	CloseHandle (new_async->notify_event);
+	WSACloseEvent (new_async->destroyEvent);
+	WSACloseEvent (new_async->notifyEvent);
 	CloseHandle (new_async->win32_mutex);
 #endif /* _WIN32 */
 	if (new_async)
 		free (new_async);
+#ifndef _WIN32
 	return -1;
+#else
+	return INVALID_SOCKET;
+#endif
 }
 
 /* Destroy asynchronous receiver, there must be no active queue consumer.
@@ -355,11 +357,11 @@ async_destroy (
 	close (async->notify_pipe[1]);
 	pthread_mutex_destroy (&async->pthread_mutex);
 #else
-	SetEvent (async->destroy_event);
+	WSASetEvent (async->destroyEvent);
 	WaitForSingleObject (async->thread, INFINITE);
 	CloseHandle (async->thread);
-	CloseHandle (async->destroy_event);
-	CloseHandle (async->notify_event);
+	WSACloseEvent (async->destroyEvent);
+	WSACloseEvent (async->notifyEvent);
 	CloseHandle (async->win32_mutex);
 #endif /* !_WIN32 */
 	while (async->head) {
@@ -389,8 +391,13 @@ async_recvfrom (
 	struct async_event_t* event;
 
 	if (NULL == async || NULL == buf || async->is_destroyed) {
+#ifndef _WIN32
 		errno = EINVAL;
 		return -1;
+#else
+		WSASetLastError (WSAEINVAL);
+		return SOCKET_ERROR;
+#endif
 	}
 
 #ifndef _WIN32
@@ -409,10 +416,10 @@ async_recvfrom (
 	WaitForSingleObject (async->win32_mutex, INFINITE);
 	if (0 == async->length) {
 /* clear event */
-		ResetEvent (async->notify_event);
+		WSAResetEvent (async->notifyEvent);
 		ReleaseMutex (async->win32_mutex);
-		errno = EAGAIN;
-		return -1;
+		WSASetLastError (WSAEWOULDBLOCK);
+		return SOCKET_ERROR;
 	}
 	event = async_pop_event (async);
 	ReleaseMutex (async->win32_mutex);

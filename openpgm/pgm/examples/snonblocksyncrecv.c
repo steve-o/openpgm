@@ -62,7 +62,7 @@ static gboolean		g_quit;
 static int		g_quit_pipe[2];
 static void on_signal (int);
 #else
-static HANDLE		g_quit_event;
+static WSAEVENT		g_quit_event;
 static BOOL on_console_ctrl (DWORD);
 #endif
 
@@ -134,7 +134,7 @@ main (
 	signal (SIGINT,  on_signal);
 	signal (SIGTERM, on_signal);
 #else
-	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
+	g_quit_event = WSACreateEvent();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 #endif /* !G_OS_UNIX */
 
@@ -148,22 +148,20 @@ main (
 	int fds;
 	fd_set readfds;
 #else
-	int n_handles = 3, recv_sock, pending_sock;
-	HANDLE waitHandles[ n_handles ];
+	SOCKET recv_sock, pending_sock;
+	DWORD cEvents = PGM_RECV_SOCKET_READ_COUNT + 1;
+	WSAEVENT waitEvents[ cEvents ];
 	DWORD dwTimeout, dwEvents;
-	WSAEVENT recvEvent, pendingEvent;
-	socklen_t socklen = sizeof(int);
-
-	recvEvent = WSACreateEvent ();
-	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, recvEvent, FD_READ);
-	pendingEvent = WSACreateEvent ();
-	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
+	socklen_t socklen = sizeof (SOCKET);
 
 	waitHandles[0] = g_quit_event;
-	waitHandles[1] = recvEvent;
-	waitHandles[2] = pendingEvent;
+	waitHandles[1] = WSACreateEvent();
+	waitHandles[2] = WSACreateEvent();
+	g_assert (2 == PGM_RECV_SOCKET_READ_COUNT);
+	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
+	WSAEventSelect (recv_sock, waitHandles[1], FD_READ);
+	pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
+	WSAEventSelect (pending_sock, waitHandles[2], FD_READ);
 #endif /* !G_OS_UNIX */
 	g_message ("entering PGM message loop ... ");
 	do {
@@ -207,10 +205,10 @@ block:
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, dwTimeout);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (waitEvents[2]); break;
 			default: break;
 			}
 #endif /* !G_OS_UNIX */
@@ -234,9 +232,9 @@ block:
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
 #else
-	WSACloseEvent (recvEvent);
-	WSACloseEvent (pendingEvent);
-	CloseHandle (g_quit_event);
+	WSACloseEvent (waitEvents[0]);
+	WSACloseEvent (waitEvents[1]);
+	WSACloseEvent (waitEvents[2]);
 #endif /* !G_OS_UNIX */
 
 	if (g_sock) {
@@ -272,7 +270,7 @@ on_console_ctrl (
 	)
 {
 	g_message ("on_console_ctrl (dwCtrlType:%lu)", (unsigned long)dwCtrlType);
-	SetEvent (g_quit_event);
+	WSASetEvent (g_quit_event);
 	return TRUE;
 }
 #endif /* !G_OS_UNIX */

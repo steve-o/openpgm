@@ -657,9 +657,9 @@ pgm_getsockopt (
 	case PGM_SEND_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
 			break;
-		*(int*)optval = sock->send_sock;
+		*(SOCKET*restrict)optval = sock->send_sock;
 		status = TRUE;
 		break;
 
@@ -667,9 +667,9 @@ pgm_getsockopt (
 	case PGM_RECV_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
 			break;
-		*(int*)optval = sock->recv_sock;
+		*(SOCKET*restrict)optval = sock->recv_sock;
 		status = TRUE;
 		break;
 
@@ -677,9 +677,9 @@ pgm_getsockopt (
 	case PGM_REPAIR_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
 			break;
-		*(int*)optval = pgm_notify_get_fd (&sock->rdata_notify);
+		*(SOCKET*restrict)optval = pgm_notify_get_socket (&sock->rdata_notify);
 		status = TRUE;
 		break;
 
@@ -687,9 +687,9 @@ pgm_getsockopt (
 	case PGM_PENDING_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
 			break;
-		*(int*)optval = pgm_notify_get_fd (&sock->pending_notify);
+		*(SOCKET*restrict)optval = pgm_notify_get_socket (&sock->pending_notify);
 		status = TRUE;
 		break;
 
@@ -697,11 +697,11 @@ pgm_getsockopt (
 	case PGM_ACK_SOCK:
 		if (PGM_UNLIKELY(!sock->is_connected))
 			break;
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
 			break;
 		if (PGM_UNLIKELY(!sock->use_pgmcc))
 			break;
-		*(int*)optval = pgm_notify_get_fd (&sock->ack_notify);
+		*(SOCKET*restrict)optval = pgm_notify_get_socket (&sock->ack_notify);
 		status = TRUE;
 		break;
 
@@ -2340,7 +2340,7 @@ pgm_getsockname (
 	pgm_assert (sizeof(struct pgm_sockaddr_t) == *addrlen);
 
 	if (!sock->is_bound) {
-		errno = EBADF;
+		pgm_set_last_sock_error (PGM_SOCK_EINVAL);
 		return FALSE;
 	}
 
@@ -2367,10 +2367,9 @@ pgm_select_info (
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != n_fds);
 
-	if (!sock->is_bound || sock->is_destroyed)
-	{
-		errno = EBADF;
-		return -1;
+	if (!sock->is_bound || sock->is_destroyed) {
+		pgm_set_last_sock_error (PGM_SOCK_EINVAL);
+		return SOCKET_ERROR;
 	}
 
 	const bool is_congested = (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) ? TRUE : FALSE;
@@ -2378,9 +2377,13 @@ pgm_select_info (
 	if (readfds)
 	{
 		FD_SET(sock->recv_sock, readfds);
+#ifndef _WIN32
 		fds = sock->recv_sock + 1;
+#else
+		fds = 1;
+#endif
 		if (sock->can_send_data) {
-			const SOCKET rdata_fd = pgm_notify_get_fd (&sock->rdata_notify);
+			const SOCKET rdata_fd = pgm_notify_get_socket (&sock->rdata_notify);
 			FD_SET(rdata_fd, readfds);
 #ifndef _WIN32
 			fds = MAX(fds, rdata_fd + 1);
@@ -2388,7 +2391,7 @@ pgm_select_info (
 			fds++;
 #endif
 			if (is_congested) {
-				const SOCKET ack_fd = pgm_notify_get_fd (&sock->ack_notify);
+				const SOCKET ack_fd = pgm_notify_get_socket (&sock->ack_notify);
 				FD_SET(ack_fd, readfds);
 #ifndef _WIN32
 				fds = MAX(fds, ack_fd + 1);
@@ -2397,7 +2400,7 @@ pgm_select_info (
 #endif
 			}
 		}
-		const SOCKET pending_fd = pgm_notify_get_fd (&sock->pending_notify);
+		const SOCKET pending_fd = pgm_notify_get_socket (&sock->pending_notify);
 		FD_SET(pending_fd, readfds);
 #ifndef _WIN32
 		fds = MAX(fds, pending_fd + 1);
@@ -2445,8 +2448,8 @@ pgm_poll_info (
 
 	if (!sock->is_bound || sock->is_destroyed)
 	{
-		errno = EBADF;
-		return -1;
+		pgm_set_last_sock_error (PGM_SOCK_EINVAL);
+		return SOCKET_ERROR;
 	}
 
 /* we currently only support one incoming socket */
@@ -2458,12 +2461,12 @@ pgm_poll_info (
 		nfds++;
 		if (sock->can_send_data) {
 			pgm_assert ( (1 + nfds) <= *n_fds );
-			fds[nfds].fd = pgm_notify_get_fd (&sock->rdata_notify);
+			fds[nfds].fd = pgm_notify_get_socket (&sock->rdata_notify);
 			fds[nfds].events = POLLIN;
 			nfds++;
 		}
 		pgm_assert ( (1 + nfds) <= *n_fds );
-		fds[nfds].fd = pgm_notify_get_fd (&sock->pending_notify);
+		fds[nfds].fd = pgm_notify_get_socket (&sock->pending_notify);
 		fds[nfds].events = POLLIN;
 		nfds++;
 	}
@@ -2474,7 +2477,7 @@ pgm_poll_info (
 		pgm_assert ( (1 + nfds) <= *n_fds );
 		if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) {
 /* rx thread poll for ACK */
-			fds[nfds].fd = pgm_notify_get_fd (&sock->ack_notify);
+			fds[nfds].fd = pgm_notify_get_socket (&sock->ack_notify);
 			fds[nfds].events = POLLIN;
 		} else {
 /* kernel resource poll */
@@ -2508,13 +2511,13 @@ pgm_epoll_ctl (
 
 	if (!(op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD))
 	{
-		errno = EINVAL;
-		return -1;
+		pgm_set_last_sock_error (PGM_SOCK_EINVAL);
+		return SOCKET_ERROR;
 	}
 	else if (!sock->is_bound || sock->is_destroyed)
 	{
-		errno = EBADF;
-		return -1;
+		pgm_set_last_sock_error (PGM_SOCK_EINVAL);
+		return SOCKET_ERROR;
 	}
 
 	if (events & EPOLLIN)
@@ -2525,11 +2528,11 @@ pgm_epoll_ctl (
 		if (retval)
 			goto out;
 		if (sock->can_send_data) {
-			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&sock->rdata_notify), &event);
+			retval = epoll_ctl (epfd, op, pgm_notify_get_socket (&sock->rdata_notify), &event);
 			if (retval)
 				goto out;
 		}
-		retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&sock->pending_notify), &event);
+		retval = epoll_ctl (epfd, op, pgm_notify_get_socket (&sock->pending_notify), &event);
 		if (retval)
 			goto out;
 
@@ -2558,7 +2561,7 @@ pgm_epoll_ctl (
 /* rx thread poll for ACK */
 			event.events = EPOLLIN | (events & (EPOLLONESHOT));
 			event.data.ptr = sock;
-			retval = epoll_ctl (epfd, op, pgm_notify_get_fd (&sock->ack_notify), &event);
+			retval = epoll_ctl (epfd, op, pgm_notify_get_socket (&sock->ack_notify), &event);
 		}
 
 		if (enable_send_socket)
