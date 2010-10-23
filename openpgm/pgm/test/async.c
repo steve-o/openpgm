@@ -222,8 +222,8 @@ block:
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
                         dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
                         switch (dwEvents) {
-                        case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
-                        case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
+                        case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
+                        case WAIT_OBJECT_0+2: WSAResetEvent (waitEvents[2]); break;
                         default: break;
                         }
 #endif
@@ -254,6 +254,10 @@ block:
 	} while (!async->is_destroyed);
 
 cleanup:
+#ifdef _WIN32
+	WSACloseEvent (waitEvents[1]);
+	WSACloseEvent (waitEvents[2]);
+#endif
 	g_async_queue_unref (async->commit_queue);
 	return NULL;
 }
