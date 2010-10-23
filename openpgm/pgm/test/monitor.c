@@ -87,6 +87,9 @@ main (
 	log_init ();
 	puts ("monitor");
 
+/* dispatch loop */
+	g_loop = g_main_loop_new(NULL, FALSE);
+
 /* setup signal handlers */
 #ifndef _WIN32
 	signal (SIGSEGV, on_sigsegv);
@@ -109,9 +112,6 @@ main (
 /* delayed startup */
 	puts ("scheduling startup.");
 	g_timeout_add(0, (GSourceFunc)on_startup, NULL);
-
-/* dispatch loop */
-	g_loop = g_main_loop_new(NULL, FALSE);
 
 	puts ("entering main event loop ... ");
 	g_main_loop_run(g_loop);
