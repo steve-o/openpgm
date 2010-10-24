@@ -98,6 +98,7 @@ main (
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 #else
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif
 
 #ifdef _WIN32
