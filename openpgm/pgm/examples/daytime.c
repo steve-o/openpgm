@@ -190,6 +190,7 @@ main (
 #else
 	terminateEvent = WSACreateEvent();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif /* !_WIN32 */
 
 	if (!on_startup()) {

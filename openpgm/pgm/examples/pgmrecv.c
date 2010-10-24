@@ -219,6 +219,7 @@ main (
 #else
 	g_quit_event = CreateEvent (NULL, TRUE, FALSE, TEXT("QuitEvent"));
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif
 
 /* delayed startup */
