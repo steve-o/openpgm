@@ -322,17 +322,27 @@ pgm_time_init (
 			{
 				if (strstr (buffer, "cpu MHz")) {
 					const char *p = strchr (buffer, ':');
-					if (p) tsc_mhz = atoi (p + 1);
+					if (p) tsc_mhz = atoi (p + 1) * 1000;
 					break;
 				}
 			}
 			fclose (fp);
 		}
 #elif defined(_WIN32)
-		uint64_t frequency;
-		if (QueryPerformanceFrequency ((LARGE_INTEGER*)&frequency))
+		LARGE_INTEGER frequency;
+		if (QueryPerformanceFrequency (&frequency))
 		{
-			tsc_mhz = (uint_fast32_t)(frequency / 1000);
+			tsc_mhz = (uint_fast32_t)(frequency.QuadPart / 1000);
+		}
+		else
+		{
+			const DWORD save_errno = GetLastError();
+			char winstr[1024];
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TIME,
+				       PGM_ERROR_FAILED,
+				       _("No supported high-resolution performance counter: %s"),
+				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
 		}
 #endif /* !_WIN32 */
 
@@ -342,7 +352,7 @@ pgm_time_init (
  */
 		err = pgm_dupenv_s (&rdtsc_frequency, &envlen, "RDTSC_FREQUENCY");
 		if (0 == err && envlen > 0) {
-			tsc_mhz = atoi (rdtsc_frequency);
+			tsc_mhz = atoi (rdtsc_frequency) * 1000;
 			free (rdtsc_frequency);
 		}
 
@@ -356,7 +366,7 @@ pgm_time_init (
 			}
 		}
 #endif
-		set_tsc_mul (tsc_mhz * 1000);
+		set_tsc_mul (tsc_mhz);
 	}
 #endif /* CONFIG_HAVE_TSC */
 
@@ -589,10 +599,10 @@ rdtsc (void)
 
 #	else
 
-	uint64_t counter;
+	LARGE_INTEGER counter;
 
-	QueryPerformanceCounter ((LARGE_INTEGER*)&counter);
-	return (pgm_time_t)counter;
+	QueryPerformanceCounter (&counter);
+	return (pgm_time_t)counter.QuadPart;
 
 #	endif
 }
@@ -668,17 +678,17 @@ pgm_tsc_init (
 	elapsed = stop - start;
 	if (elapsed > calibration_usec) {
 /* cpu > 1 Ghz */
-		tsc_mhz = elapsed / calibration_usec;
+		tsc_mhz = (elapsed * 1000) / calibration_usec;
 	} else {
 /* cpu < 1 Ghz */
-		tsc_mhz = -( calibration_usec / elapsed );
+		tsc_mhz = -( (calibration_usec * 1000) / elapsed );
 	}
 
 	pgm_info (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %" PRIuFAST32 " on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server."),
-		   tsc_mhz);
+		   tsc_mhz / 1000);
 	return TRUE;
 }
 #	endif
