@@ -1,5 +1,5 @@
---- mem.c	2010-10-07 11:09:54.000000000 +0800
-+++ mem.c89	2010-10-07 11:10:38.000000000 +0800
+--- mem.c	2010-10-24 12:04:13.000000000 +0800
++++ mem.c89.c	2010-10-24 12:38:55.000000000 +0800
 @@ -79,16 +79,24 @@
  	if (NULL == string)
  		return result;
@@ -61,72 +61,56 @@
  
  	if (flags & 1)
  		pgm_mem_gc_friendly = TRUE;
-@@ -155,13 +169,13 @@
- 			return mem;
- 
+@@ -157,11 +171,11 @@
  #ifdef __GNUC__
--		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu bytes",
-+		pgm_fatal ("file %s: line %d (%s): failed to allocate %lu bytes",
+ 		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
 -			n_bytes);
 +			(unsigned long)n_bytes);
  #else
--		pgm_fatal ("file %s: line %d: failed to allocate %zu bytes",
-+		pgm_fatal ("file %s: line %d: failed to allocate %lu bytes",
+ 		pgm_fatal ("file %s: line %d: failed to allocate %" PRIzu " bytes",
  			__FILE__, __LINE__,
 -			n_bytes);
 +			(unsigned long)n_bytes);
  #endif
  		abort ();
  	}
-@@ -178,13 +192,13 @@
- {
- 	if (SIZE_OVERFLOWS (n_blocks, block_bytes)) {
+@@ -180,11 +194,11 @@
  #ifdef __GNUC__
--		pgm_fatal ("file %s: line %d (%s): overflow allocating %zu*%zu bytes",
-+		pgm_fatal ("file %s: line %d (%s): overflow allocating %lu*%lu bytes",
+ 		pgm_fatal ("file %s: line %d (%s): overflow allocating %" PRIzu "*%" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
 -			n_blocks, block_bytes);
 +			(unsigned long)n_blocks, (unsigned long)block_bytes);
  #else
--		pgm_fatal ("file %s: line %d: overflow allocating %zu*%zu bytes",
-+		pgm_fatal ("file %s: line %d: overflow allocating %lu*%lu bytes",
+ 		pgm_fatal ("file %s: line %d: overflow allocating %" PRIzu "*%" PRIzu " bytes",
  			__FILE__, __LINE__,
 -			n_blocks, block_bytes);
 +			(unsigned long)n_blocks, (unsigned long)block_bytes);
  #endif
  	}
  	return pgm_malloc (n_blocks * block_bytes);
-@@ -202,13 +216,13 @@
- 			return mem;
- 
+@@ -204,11 +218,11 @@
  #ifdef __GNUC__
--		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu bytes",
-+		pgm_fatal ("file %s: line %d (%s): failed to allocate %lu bytes",
+ 		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
 -			n_bytes);
 +			(unsigned long)n_bytes);
  #else
--		pgm_fatal ("file %s: line %d: failed to allocate %zu bytes",
-+		pgm_fatal ("file %s: line %d: failed to allocate %lu bytes",
+ 		pgm_fatal ("file %s: line %d: failed to allocate %" PRIzu " bytes",
  			__FILE__, __LINE__,
 -			n_bytes);
 +			(unsigned long)n_bytes);
  #endif
  		abort ();
  	}
-@@ -228,13 +242,13 @@
- 			return mem;
- 
+@@ -230,11 +244,11 @@
  #ifdef __GNUC__
--		pgm_fatal ("file %s: line %d (%s): failed to allocate %zu*%zu bytes",
-+		pgm_fatal ("file %s: line %d (%s): failed to allocate %lu*%lu bytes",
+ 		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu "*%" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
 -			n_blocks, block_bytes);
 +			(unsigned long)n_blocks, (unsigned long)block_bytes);
  #else
--		pgm_fatal ("file %s: line %d: failed to allocate %zu*%zu bytes",
-+		pgm_fatal ("file %s: line %d: failed to allocate %lu*%lu bytes",
+ 		pgm_fatal ("file %s: line %d: failed to allocate %" PRIzu "*%" PRIzu " bytes",
  			__FILE__, __LINE__,
 -			n_blocks, block_bytes);
 +			(unsigned long)n_blocks, (unsigned long)block_bytes);

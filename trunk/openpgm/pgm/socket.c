@@ -1990,11 +1990,11 @@ pgm_bind3 (
 
 /* determine IP header size for rate regulation engine & stats */
 	sock->iphdr_len = (AF_INET == sock->family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
-	pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %zu bytes", sock->iphdr_len);
+	pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %" PRIzu " bytes", sock->iphdr_len);
 
 	if (sock->udp_encap_ucast_port) {
 		const size_t udphdr_len = sizeof(struct pgm_udphdr);
-		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %zu bytes", udphdr_len);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %" PRIzu " bytes", udphdr_len);
 		sock->iphdr_len += udphdr_len;
 	}
 
@@ -2221,7 +2221,7 @@ pgm_bind3 (
 /* setup rate control */
 		if (sock->txw_max_rte)
 		{
-			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zd bytes per second."),
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
 					sock->txw_max_rte);
 			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_spm   = TRUE;	/* must always be set */

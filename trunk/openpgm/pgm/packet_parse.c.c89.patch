@@ -1,5 +1,5 @@
---- packet_parse.c	2010-10-07 15:54:57.000000000 +0800
-+++ packet_parse.c89	2010-10-07 15:55:09.000000000 +0800
+--- packet_parse.c	2010-10-24 12:05:09.000000000 +0800
++++ packet_parse.c89.c	2010-10-24 12:46:22.000000000 +0800
 @@ -116,6 +116,7 @@
   */
  
@@ -18,9 +18,8 @@
  		pgm_set_error (error,
  			     PGM_ERROR_DOMAIN_PACKET,
  			     PGM_ERROR_BOUNDS,
--			     _("IP header reports an invalid header length %zu bytes."),
+ 			     _("IP header reports an invalid header length %" PRIzu " bytes."),
 -			     ip_header_length);
-+			     _("IP header reports an invalid header length %lu bytes."),
 +			     (unsigned long)ip_header_length);
  		return FALSE;
  	}
@@ -29,13 +28,11 @@
  #ifndef CONFIG_HOST_ORDER_IP_LEN
  	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
  #else
-@@ -171,14 +174,15 @@
- 		pgm_set_error (error,
+@@ -172,13 +175,14 @@
  			     PGM_ERROR_DOMAIN_PACKET,
  			     PGM_ERROR_BOUNDS,
--			     _("IP packet received at %" PRIu16 " bytes whilst IP header reports %zu bytes."),
+ 			     _("IP packet received at %" PRIu16 " bytes whilst IP header reports %" PRIzu " bytes."),
 -			     skb->len, packet_length);
-+			     _("IP packet received at %" PRIu16 " bytes whilst IP header reports %lu bytes."),
 +			     skb->len, (unsigned long)packet_length);
  		return FALSE;
  	}
@@ -70,13 +67,11 @@
  }
  
  bool
-@@ -243,8 +253,8 @@
- 		pgm_set_error (error,
+@@ -244,7 +254,7 @@
  			     PGM_ERROR_DOMAIN_PACKET,
  			     PGM_ERROR_BOUNDS,
--			     _("UDP payload too small for PGM packet at %" PRIu16 " bytes, expecting at least %zu bytes."),
+ 			     _("UDP payload too small for PGM packet at %" PRIu16 " bytes, expecting at least %" PRIzu " bytes."),
 -			     skb->len, sizeof(struct pgm_header));
-+			     _("UDP payload too small for PGM packet at %" PRIu16 " bytes, expecting at least %lu bytes."),
 +			     skb->len, (unsigned long)sizeof(struct pgm_header));
  		return FALSE;
  	}

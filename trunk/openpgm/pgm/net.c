@@ -64,7 +64,7 @@ pgm_sendto_hops (
 #ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
+	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
 		(const void*)sock,
 		use_rate_limit ? "TRUE" : "FALSE",
 		use_router_alert ? "TRUE" : "FALSE",
@@ -90,7 +90,7 @@ pgm_sendto_hops (
 		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, hops);
 
 	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
-	pgm_debug ("sendto returned %zd", sent);
+	pgm_debug ("sendto returned %" PRIzd, sent);
 	if (sent < 0) {
 		int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];

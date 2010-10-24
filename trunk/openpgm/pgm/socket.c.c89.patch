@@ -1,5 +1,5 @@
---- socket.c	2010-10-23 17:21:24.000000000 +0800
-+++ socket.c89.c	2010-10-23 17:20:09.000000000 +0800
+--- socket.c	2010-10-24 12:02:35.000000000 +0800
++++ socket.c89.c	2010-10-24 12:51:32.000000000 +0800
 @@ -377,7 +377,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
  
@@ -182,13 +182,13 @@
  
  /* determine IP header size for rate regulation engine & stats */
  	sock->iphdr_len = (AF_INET == sock->family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
--	pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %zu bytes", sock->iphdr_len);
-+	pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %lu bytes", (unsigned long)sock->iphdr_len);
+-	pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %" PRIzu " bytes", sock->iphdr_len);
++	pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %" PRIzu " bytes", (unsigned long)sock->iphdr_len);
  
  	if (sock->udp_encap_ucast_port) {
  		const size_t udphdr_len = sizeof(struct pgm_udphdr);
--		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %zu bytes", udphdr_len);
-+		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %lu bytes", (unsigned long)udphdr_len);
+-		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %" PRIzu " bytes", udphdr_len);
++		pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming UDP header size of %" PRIzu " bytes", (unsigned long)udphdr_len);
  		sock->iphdr_len += udphdr_len;
  	}
  
@@ -216,13 +216,11 @@
  
  /* rx to nak processor notify channel */
  	if (sock->can_send_data)
-@@ -2221,8 +2251,8 @@
- /* setup rate control */
+@@ -2222,7 +2252,7 @@
  		if (sock->txw_max_rte)
  		{
--			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %zd bytes per second."),
+ 			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
 -					sock->txw_max_rte);
-+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %ld bytes per second."),
 +					(long)sock->txw_max_rte);
  			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
  			sock->is_controlled_spm   = TRUE;	/* must always be set */

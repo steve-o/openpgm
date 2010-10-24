@@ -287,11 +287,7 @@ START_TEST (test_hop_limit_pass_001)
 	}
 	const size_t pkt_len = sizeof(struct pgm_ip) + sizeof(data);
 	if (pkt_len != bytes_read)
-#ifndef _MSC_VER
-		g_message ("recv returned %zd bytes expected %zu.", bytes_read, pkt_len);
-#else
-		g_message ("recv returned %ld bytes expected %lu.", (long)bytes_read, (unsigned long)pkt_len);
-#endif
+		g_message ("recv returned %" PRIzd " bytes expected %" PRIzu ".", bytes_read, pkt_len);
 	fail_unless (pkt_len == bytes_read, "recv underrun");
 	const struct pgm_ip* iphdr = (void*)recv_data;
 	fail_unless (4 == iphdr->ip_v, "Incorrect IP version, found %u expecting 4.", iphdr->ip_v);
@@ -368,28 +364,15 @@ START_TEST (test_router_alert_pass_001)
 	const size_t ra_iphdr_len = sizeof(uint32_t) + sizeof(struct pgm_ip);
 	const size_t ra_pkt_len = ra_iphdr_len + sizeof(data);
 	if (ra_pkt_len != bytes_read)
-#ifndef _MSC_VER
-		g_message ("recv returned %zd bytes expected %zu.", bytes_read, ra_pkt_len);
-#else
-		g_message ("recv returned %ld bytes expected %lu.", (long)bytes_read, (unsigned long)ra_pkt_len);
-#endif
+		g_message ("recv returned %" PRIzd " bytes expected %" PRIzu ".", bytes_read, ra_pkt_len);
 	fail_unless (ra_pkt_len == bytes_read, "recv underrun");
 	const struct pgm_ip* iphdr = (void*)recv_data;
 	fail_unless (4 == iphdr->ip_v, "Incorrect IP version, found %u expecting 4.", iphdr->ip_v);
 	if (ra_iphdr_len != (iphdr->ip_hl << 2)) {
-#ifndef _MSC_VER
-		g_message ("IP header length mismatch, found %zu expecting %zu.",
+		g_message ("IP header length mismatch, found %" PRIzu " expecting %" PRIzu ".",
 			(size_t)(iphdr->ip_hl << 2), ra_iphdr_len);
-#else
-		g_message ("IP header length mismatch, found %lu expecting %lu.",
-			(long)(iphdr->ip_hl << 2), (unsigned long)ra_iphdr_len);
-#endif
 	}
-#ifndef _MSC_VER
-	g_message ("IP header length = %zu", (size_t)(iphdr->ip_hl << 2));
-#else
-	g_message ("IP header length = %lu", (unsigned long)(iphdr->ip_hl << 2));
-#endif
+	g_message ("IP header length = %" PRIzu, (size_t)(iphdr->ip_hl << 2));
 	const uint32_t* ipopt = (const void*)&recv_data[ iphdr->ip_hl << 2 ];
 	const uint32_t ipopt_ra = ((uint32_t)PGM_IPOPT_RA << 24) | (0x04 << 16);
 	const uint32_t router_alert = htonl(ipopt_ra);
@@ -401,11 +384,7 @@ START_TEST (test_router_alert_pass_001)
 		fail_unless (router_alert == *ipopt, "IP router alert option not found.");
 		g_message ("IP option router alert found before end of IP header length.");
 	}
-#ifndef _MSC_VER
-	g_message ("Final IP header length = %zu", (size_t)((const char*)ipopt - (const char*)recv_data));
-#else
-	g_message ("Final IP header length = %lu", (unsigned long)((const char*)ipopt - (const char*)recv_data));
-#endif
+	g_message ("Final IP header length = %" PRIzu, (size_t)((const char*)ipopt - (const char*)recv_data));
 
 	fail_unless (0 == closesocket (recv_sock), "closesocket failed");
 	fail_unless (0 == closesocket (send_sock), "closesocket failed");

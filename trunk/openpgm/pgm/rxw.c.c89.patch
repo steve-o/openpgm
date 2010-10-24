@@ -1,12 +1,10 @@
---- rxw.c	2010-10-23 11:19:12.000000000 +0800
-+++ rxw.c89.c	2010-10-23 11:25:24.000000000 +0800
-@@ -192,11 +192,12 @@
- 		pgm_assert_cmpuint (max_rte, >, 0);
+--- rxw.c	2010-10-24 12:01:50.000000000 +0800
++++ rxw.c89.c	2010-10-24 12:47:40.000000000 +0800
+@@ -193,10 +193,11 @@
  	}
  
--	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd ack-c_p %" PRIu32 ")",
+ 	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %" PRIzd " ack-c_p %" PRIu32 ")",
 -		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte, ack_c_p);
-+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %ld ack-c_p %" PRIu32 ")",
 +		pgm_tsi_print (tsi), tpdu_size, sqns, secs, (long)max_rte, ack_c_p);
  
  /* calculate receive window parameters */
@@ -407,15 +405,6 @@
  	_pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
  
  	return PGM_RXW_APPENDED;
-@@ -2147,7 +2213,7 @@
- 		"cumulative_losses = %" PRIu32 ", "
- 		"bytes_delivered = %" PRIu32 ", "
- 		"msgs_delivered = %" PRIu32 ", "
--		"size = %zu, "
-+		"size = %lu, "
- 		"alloc = %" PRIu32 ", "
- 		"pdata = []"
- 		"}",
 @@ -2190,7 +2256,7 @@
  		window->cumulative_losses,
  		window->bytes_delivered,

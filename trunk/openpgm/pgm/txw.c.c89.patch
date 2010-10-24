@@ -1,11 +1,8 @@
---- txw.c	2010-10-14 17:07:06.000000000 +0800
-+++ txw.c89.c	2010-10-14 17:04:48.000000000 +0800
-@@ -186,14 +186,15 @@
- 		pgm_assert_cmpuint (rs_k, >, 0);
- 	}
+--- txw.c	2010-10-24 12:02:04.000000000 +0800
++++ txw.c89.c	2010-10-24 12:49:31.000000000 +0800
+@@ -188,12 +188,13 @@
  
--	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd use-fec:%s rs(n):%u rs(k):%u)",
-+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %ld use-fec:%s rs(n):%u rs(k):%u)",
+ 	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %" PRIzd " use-fec:%s rs(n):%u rs(k):%u)",
  		pgm_tsi_print (tsi),
 -		tpdu_size, sqns, secs, max_rte,
 +		tpdu_size, sqns, secs, (long)max_rte,
