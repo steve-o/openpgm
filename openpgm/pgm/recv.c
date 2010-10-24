@@ -662,7 +662,7 @@ pgm_recvmsgv (
 {
 	int status = PGM_IO_STATUS_WOULD_BLOCK;
 
-	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%zu flags:%d bytes-read:%p error:%p)",
+	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%" PRIzu " flags:%d bytes-read:%p error:%p)",
 		(void*)sock, (void*)msg_start, msg_len, flags, (void*)_bytes_read, (void*)error);
 
 /* parameters */
@@ -995,7 +995,7 @@ pgm_recvfrom (
 		pgm_return_val_if_fail (sizeof (struct pgm_sockaddr_t) == *fromlen, PGM_IO_STATUS_ERROR);
 	}
 
-	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p from:%p from:%p error:%p)",
+	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%" PRIzu " flags:%d bytes-read:%p from:%p from:%p error:%p)",
 		(const void*)sock, buf, buflen, flags, (const void*)_bytes_read, (const void*)from, (const void*)fromlen, (const void*)error);
 
 	const int status = pgm_recvmsg (sock, &msgv, flags & ~(MSG_ERRQUEUE), &bytes_read, error);
@@ -1015,7 +1015,7 @@ pgm_recvfrom (
 	while (bytes_copied < bytes_read) {
 		size_t copy_len = pskb->len;
 		if (bytes_copied + copy_len > buflen) {
-			pgm_warn (_("APDU truncated, original length %zu bytes."),
+			pgm_warn (_("APDU truncated, original length %" PRIzu " bytes."),
 				bytes_read);
 			copy_len = buflen - bytes_copied;
 			bytes_read = buflen;
@@ -1047,7 +1047,7 @@ pgm_recv (
 	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
 	if (PGM_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
 
-	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p error:%p)",
+	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%" PRIzu " flags:%d bytes-read:%p error:%p)",
 		(const void*)sock, buf, buflen, flags, (const void*)bytes_read, (const void*)error);
 
 	return pgm_recvfrom (sock, buf, buflen, flags, bytes_read, NULL, NULL, error);

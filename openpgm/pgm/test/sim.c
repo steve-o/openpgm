@@ -536,11 +536,11 @@ fake_pgm_bind3 (
 
 /* determine IP header size for rate regulation engine & stats */
         sock->iphdr_len = (AF_INET == sock->family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
-        pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %zu bytes", sock->iphdr_len);
+        pgm_trace (PGM_LOG_ROLE_NETWORK,"Assuming IP header size of %" PRIzu " bytes", sock->iphdr_len);
 
         if (sock->udp_encap_ucast_port) {
                 const size_t udphdr_len = sizeof(struct pgm_udphdr);
-                printf ("Assuming UDP header size of %zu bytes\n", udphdr_len);
+                printf ("Assuming UDP header size of %" PRIzu " bytes\n", udphdr_len);
                 sock->iphdr_len += udphdr_len;
         }
 

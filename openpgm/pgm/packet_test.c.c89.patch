@@ -1,12 +1,10 @@
---- packet_test.c	2010-10-07 15:55:34.000000000 +0800
-+++ packet_test.c89.c	2010-10-09 10:35:00.000000000 +0800
-@@ -60,12 +60,13 @@
- /* minimum size should be IP header plus PGM header */
+--- packet_test.c	2010-10-24 12:05:26.000000000 +0800
++++ packet_test.c89.c	2010-10-24 12:43:34.000000000 +0800
+@@ -61,11 +61,12 @@
  	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
  	{
--		printf ("Packet size too small: %zu bytes, expecting at least %zu bytes.\n",
+ 		printf ("Packet size too small: %" PRIzu " bytes, expecting at least %" PRIzu " bytes.\n",
 -			len, sizeof(struct pgm_ip) + sizeof(struct pgm_header));
-+		printf ("Packet size too small: %lu bytes, expecting at least %lu bytes.\n",
 +			(unsigned long)len, (unsigned long)(sizeof(struct pgm_ip) + sizeof(struct pgm_header)));
  		return FALSE;
  	}
@@ -44,8 +42,8 @@
  		(offset & 0x1fff) * 8,
  		((offset & IP_DF) ? "DF" : ""),
  		((offset & IP_MF) ? "+" : ""));
--	printf (", length %zu", packet_length);
-+	printf (", length %lu", (unsigned long)packet_length);
+-	printf (", length %" PRIzu "", packet_length);
++	printf (", length %" PRIzu "", (unsigned long)packet_length);
  
  /* IP options */
  	if ((ip_header_length - sizeof(struct pgm_ip)) > 0) {
