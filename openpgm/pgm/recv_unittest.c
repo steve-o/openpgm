@@ -85,7 +85,9 @@ GList* mock_data_list = NULL;
 unsigned mock_pgm_loss_rate = 0;
 
 
+#ifndef _WIN32
 static ssize_t mock_recvmsg (int, struct msghdr*, int);
+#endif
 
 #define pgm_parse_raw			mock_pgm_parse_raw
 #define pgm_parse_udp_encap		mock_pgm_parse_udp_encap
