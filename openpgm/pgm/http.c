@@ -661,22 +661,14 @@ http_set_static_response (
 	pgm_string_printf (response, "HTTP/1.0 %d %s\r\n"
 				     "Server: OpenPGM HTTP Server %u.%u.%u\r\n"
 			   	     "Last-Modified: Fri, 1 Jan 2010, 00:00:01 GMT\r\n"
-#ifndef _MSC_VER
-				     "Content-Length: %zd\r\n"
-#else
-				     "Content-Length: %ld\r\n"
-#endif
+				     "Content-Length: %" PRIzd "\r\n"
 				     "Content-Type: %s\r\n"
 				     "Connection: close\r\n"
 				     "\r\n",
 			   connection->status_code,
 			   connection->status_text,
 			   pgm_major_version, pgm_minor_version, pgm_micro_version,
-#ifndef _MSC_VER
 			   content_length,
-#else
-			   (long)content_length,
-#endif
 			   connection->content_type
 			);
 	pgm_string_append (response, content);
@@ -697,22 +689,14 @@ http_set_response (
 	pgm_string_t* response = pgm_string_new (NULL);
 	pgm_string_printf (response, "HTTP/1.0 %d %s\r\n"
 				     "Server: OpenPGM HTTP Server %u.%u.%u\r\n"
-#ifndef _MSC_VER
-				     "Content-Length: %zd\r\n"
-#else
-				     "Content-Length: %ld\r\n"
-#endif
+				     "Content-Length: %" PRIzd "\r\n"
 				     "Content-Type: %s\r\n"
 				     "Connection: close\r\n"
 				     "\r\n",
 			   connection->status_code,
 			   connection->status_text,
 			   pgm_major_version, pgm_minor_version, pgm_micro_version,
-#ifndef _MSC_VER
 			   content_length,
-#else
-			   (long)content_length,
-#endif
 			   connection->content_type
 			);
 	pgm_string_append (response, content);

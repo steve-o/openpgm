@@ -32,6 +32,7 @@
 #else
 #	include <inttypes.h>
 #endif
+#include <pgm/zinttypes.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <pgm/types.h>

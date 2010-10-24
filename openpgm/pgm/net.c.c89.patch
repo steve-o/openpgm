@@ -1,15 +1,14 @@
---- net.c	2010-10-13 16:38:12.000000000 +0800
-+++ net.c89.c	2010-10-13 16:39:10.000000000 +0800
-@@ -62,19 +62,22 @@
+--- net.c	2010-10-24 12:01:26.000000000 +0800
++++ net.c89.c	2010-10-24 12:50:15.000000000 +0800
+@@ -62,6 +62,7 @@
  	pgm_assert( tolen > 0 );
  
  #ifdef NET_DEBUG
 +	{
  	char saddr[INET_ADDRSTRLEN];
  	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
--	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%zu to:%s [toport:%d] tolen:%d)",
-+	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%lu to:%s [toport:%d] tolen:%d)",
- 		(const void*)sock,
+ 	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
+@@ -69,12 +70,14 @@
  		use_rate_limit ? "TRUE" : "FALSE",
  		use_router_alert ? "TRUE" : "FALSE",
  		(const void*)buf,
@@ -31,8 +30,8 @@
  
 +	{
  	ssize_t sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
--	pgm_debug ("sendto returned %zd", sent);
-+	pgm_debug ("sendto returned %ld", (long)sent);
+-	pgm_debug ("sendto returned %" PRIzd, sent);
++	pgm_debug ("sendto returned %" PRIzd, (long)sent);
  	if (sent < 0) {
  		int save_errno = pgm_get_last_sock_error();
  		char errbuf[1024];

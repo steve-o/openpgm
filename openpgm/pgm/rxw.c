@@ -192,7 +192,7 @@ pgm_rxw_create (
 		pgm_assert_cmpuint (max_rte, >, 0);
 	}
 
-	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %zd ack-c_p %" PRIu32 ")",
+	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %" PRIzd " ack-c_p %" PRIu32 ")",
 		pgm_tsi_print (tsi), tpdu_size, sqns, secs, max_rte, ack_c_p);
 
 /* calculate receive window parameters */
@@ -2147,7 +2147,7 @@ pgm_rxw_dump (
 		"cumulative_losses = %" PRIu32 ", "
 		"bytes_delivered = %" PRIu32 ", "
 		"msgs_delivered = %" PRIu32 ", "
-		"size = %zu, "
+		"size = %" PRIzu ", "
 		"alloc = %" PRIu32 ", "
 		"pdata = []"
 		"}",

@@ -146,7 +146,7 @@ pgm_parse_raw (
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_BOUNDS,
-			     _("IP header reports an invalid header length %zu bytes."),
+			     _("IP header reports an invalid header length %" PRIzu " bytes."),
 			     ip_header_length);
 		return FALSE;
 	}
@@ -171,7 +171,7 @@ pgm_parse_raw (
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_BOUNDS,
-			     _("IP packet received at %" PRIu16 " bytes whilst IP header reports %zu bytes."),
+			     _("IP packet received at %" PRIu16 " bytes whilst IP header reports %" PRIzu " bytes."),
 			     skb->len, packet_length);
 		return FALSE;
 	}
@@ -243,7 +243,7 @@ pgm_parse_udp_encap (
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_BOUNDS,
-			     _("UDP payload too small for PGM packet at %" PRIu16 " bytes, expecting at least %zu bytes."),
+			     _("UDP payload too small for PGM packet at %" PRIu16 " bytes, expecting at least %" PRIzu " bytes."),
 			     skb->len, sizeof(struct pgm_header));
 		return FALSE;
 	}

@@ -1726,7 +1726,7 @@ pgm_send (
 	size_t*	       	       restrict	bytes_written
 	)
 {
-	pgm_debug ("pgm_send (sock:%p apdu:%p apdu-length:%zu bytes-written:%p)",
+	pgm_debug ("pgm_send (sock:%p apdu:%p apdu-length:%" PRIzu " bytes-written:%p)",
 		(void*)sock, apdu, apdu_length, (void*)bytes_written);
 
 /* parameters */

@@ -1,5 +1,5 @@
---- source.c	2010-10-13 11:32:44.000000000 +0800
-+++ source.c89.c	2010-10-13 11:33:32.000000000 +0800
+--- source.c	2010-10-24 12:06:04.000000000 +0800
++++ source.c89.c	2010-10-24 12:42:03.000000000 +0800
 @@ -114,11 +114,13 @@
  	)
  {
@@ -398,13 +398,11 @@
  }
  
  /* Send one APDU, whether it fits within one TPDU or more.
-@@ -1726,8 +1786,8 @@
- 	size_t*	       	       restrict	bytes_written
+@@ -1727,7 +1787,7 @@
  	)
  {
--	pgm_debug ("pgm_send (sock:%p apdu:%p apdu-length:%zu bytes-written:%p)",
+ 	pgm_debug ("pgm_send (sock:%p apdu:%p apdu-length:%" PRIzu " bytes-written:%p)",
 -		(void*)sock, apdu, apdu_length, (void*)bytes_written);
-+	pgm_debug ("pgm_send (sock:%p apdu:%p apdu-length:%lu bytes-written:%p)",
 +		(void*)sock, apdu, (unsigned long)apdu_length, (void*)bytes_written);
  
  /* parameters */

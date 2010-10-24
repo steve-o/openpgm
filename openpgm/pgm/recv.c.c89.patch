@@ -1,5 +1,5 @@
---- recv.c	2010-10-19 12:49:13.000000000 +0800
-+++ recv.c89.c	2010-10-13 11:35:41.000000000 +0800
+--- recv.c	2010-10-24 12:05:52.000000000 +0800
++++ recv.c89.c	2010-10-24 12:45:13.000000000 +0800
 @@ -47,12 +47,21 @@
  #endif
  
@@ -232,13 +232,11 @@
  	} while (pgm_timer_check (sock));
  	pgm_debug ("state generated event");
  	return EINTR;
-@@ -662,8 +701,8 @@
- {
+@@ -663,7 +702,7 @@
  	int status = PGM_IO_STATUS_WOULD_BLOCK;
  
--	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%zu flags:%d bytes-read:%p error:%p)",
+ 	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%" PRIzu " flags:%d bytes-read:%p error:%p)",
 -		(void*)sock, (void*)msg_start, msg_len, flags, (void*)_bytes_read, (void*)error);
-+	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%lu flags:%d bytes-read:%p error:%p)",
 +		(void*)sock, (void*)msg_start, (unsigned long)msg_len, flags, (void*)_bytes_read, (void*)error);
  
  /* parameters */
@@ -334,13 +332,11 @@
  }
  
  /* read one contiguous apdu and return as a IO scatter/gather array.  msgv is owned by
-@@ -995,13 +1052,15 @@
- 		pgm_return_val_if_fail (sizeof (struct pgm_sockaddr_t) == *fromlen, PGM_IO_STATUS_ERROR);
+@@ -996,12 +1053,14 @@
  	}
  
--	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p from:%p from:%p error:%p)",
+ 	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%" PRIzu " flags:%d bytes-read:%p from:%p from:%p error:%p)",
 -		(const void*)sock, buf, buflen, flags, (const void*)_bytes_read, (const void*)from, (const void*)fromlen, (const void*)error);
-+	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%lu flags:%d bytes-read:%p from:%p from:%p error:%p)",
 +		(const void*)sock, buf, (unsigned long)buflen, flags, (const void*)_bytes_read, (const void*)from, (const void*)fromlen, (const void*)error);
  
 +	{
@@ -352,13 +348,11 @@
  	size_t bytes_copied = 0;
  	struct pgm_sk_buff_t** skb = msgv.msgv_skb;
  	struct pgm_sk_buff_t* pskb = *skb;
-@@ -1015,8 +1074,8 @@
- 	while (bytes_copied < bytes_read) {
+@@ -1016,7 +1075,7 @@
  		size_t copy_len = pskb->len;
  		if (bytes_copied + copy_len > buflen) {
--			pgm_warn (_("APDU truncated, original length %zu bytes."),
+ 			pgm_warn (_("APDU truncated, original length %" PRIzu " bytes."),
 -				bytes_read);
-+			pgm_warn (_("APDU truncated, original length %lu bytes."),
 +				(unsigned long)bytes_read);
  			copy_len = buflen - bytes_copied;
  			bytes_read = buflen;
@@ -372,13 +366,11 @@
  }
  
  /* Basic recv operation, copying data from window to application.
-@@ -1047,8 +1108,8 @@
- 	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
+@@ -1048,7 +1109,7 @@
  	if (PGM_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
  
--	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%zu flags:%d bytes-read:%p error:%p)",
+ 	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%" PRIzu " flags:%d bytes-read:%p error:%p)",
 -		(const void*)sock, buf, buflen, flags, (const void*)bytes_read, (const void*)error);
-+	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%lu flags:%d bytes-read:%p error:%p)",
 +		(const void*)sock, buf, (unsigned long)buflen, flags, (const void*)bytes_read, (const void*)error);
  
  	return pgm_recvfrom (sock, buf, buflen, flags, bytes_read, NULL, NULL, error);
