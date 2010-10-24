@@ -158,6 +158,7 @@ main (
 #else
 	terminateEvent = WSACreateEvent();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif /* !_WIN32 */
 
 	if (!on_startup()) {
@@ -464,18 +465,20 @@ on_data (
 /* protect against non-null terminated strings */
 	char buf[1024], tsi[PGM_TSISTRLEN];
 	const size_t buflen = MIN(sizeof(buf) - 1, len);
-#ifndef _MSC_VER
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	strncpy (buf, (const char*)data, buflen);
 	buf[buflen] = '\0';
+#else
+	strncpy_s (buf, buflen, (const char*)data, _TRUNCATE);
+#endif
 	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
+#ifndef _WIN32
 	printf ("\"%s\" (%zu bytes from %s)\n",
 			buf, len, tsi);
 #else
-	strncpy_s (buf, buflen, (const char*)data, _TRUNCATE);
-	pgm_tsi_print_r (&from->sa_addr, tsi, sizeof(tsi));
 /* Microsoft CRT will crash on %zu */
-	printf ("\"%s\" (%u bytes from %s)\n",
-			buf, (unsigned)len, tsi);
+	printf ("\"%s\" (%lu bytes from %s)\n",
+			buf, (unsigned long)len, tsi);
 #endif
 	return 0;
 }

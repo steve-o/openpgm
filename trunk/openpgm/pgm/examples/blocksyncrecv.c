@@ -119,6 +119,7 @@ main (
 	signal(SIGTERM, on_signal);
 #else
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
+	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif
 
 	on_startup();
