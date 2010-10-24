@@ -370,8 +370,8 @@ pgm_on_nak (
 	}
 
 /* nak list numbers */
-	if (PGM_UNLIKELY(nak_list_len > 63)) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on too long sequence list."));
+	if (PGM_UNLIKELY(nak_list_len > 62)) {
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on sequence list overrun, %d rported NAKs."), nak_list_len);
 		return FALSE;
 	}
 		
@@ -961,7 +961,7 @@ send_ncf_list (
 
 	tpdu_length = sizeof(struct pgm_header) +
 			     sizeof(struct pgm_opt_length) +		/* includes header */
-			     sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
+			     sizeof(struct pgm_opt_header) + sizeof(uint8_t) +
 			     ( (sqn_list->len-1) * sizeof(uint32_t) );
 	tpdu_length += (AF_INET == nak_src_nla->sa_family) ? sizeof(struct pgm_nak) : sizeof(struct pgm_nak6);
 	buf = pgm_alloca (tpdu_length);
@@ -989,12 +989,12 @@ send_ncf_list (
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
-						sizeof(struct pgm_opt_nak_list) +
+						sizeof(uint8_t) +
 						( (sqn_list->len-1) * sizeof(uint32_t) ) );
 	opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) +
-				  sizeof(struct pgm_opt_nak_list) +
+				  sizeof(uint8_t) +
 				  ( (sqn_list->len-1) * sizeof(uint32_t) );
 	opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;

@@ -1214,7 +1214,7 @@ send_nak_list (
 			    sizeof(struct pgm_nak) +
 			    sizeof(struct pgm_opt_length) +		/* includes header */
 			    sizeof(struct pgm_opt_header) +
-			    sizeof(struct pgm_opt_nak_list) +
+			    sizeof(uint8_t) +
 			    ( (sqn_list->len-1) * sizeof(uint32_t) );
 	if (AF_INET6 == source->nla.ss_family)
 		tpdu_length += sizeof(struct pgm_nak6) - sizeof(struct pgm_nak);
@@ -1252,11 +1252,11 @@ send_nak_list (
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
-						sizeof(struct pgm_opt_nak_list) +
+						sizeof(uint8_t) +
 						( (sqn_list->len-1) * sizeof(uint32_t) ) );
 	opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
-	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list)
+	opt_header->opt_length	= sizeof(struct pgm_opt_header) + sizeof(uint8_t)
 				+ ( (sqn_list->len-1) * sizeof(uint32_t) );
 	opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	opt_nak_list->opt_reserved = 0;
