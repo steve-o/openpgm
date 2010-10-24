@@ -1,5 +1,5 @@
---- source.c	2010-10-24 12:06:04.000000000 +0800
-+++ source.c89.c	2010-10-24 12:42:03.000000000 +0800
+--- source.c	2010-10-24 21:12:50.000000000 +0800
++++ source.c89.c	2010-10-24 21:13:20.000000000 +0800
 @@ -114,11 +114,13 @@
  	)
  {
@@ -38,8 +38,13 @@
  	const bool is_parity = skb->pgm_header->pgm_options & PGM_OPT_PARITY;
  	if (is_parity) {
  		sock->cumulative_stats[PGM_PC_SOURCE_PARITY_NAKS_RECEIVED]++;
-@@ -374,12 +379,15 @@
- 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on too long sequence list."));
+@@ -370,16 +375,19 @@
+ 	}
+ 
+ /* nak list numbers */
+-	if (PGM_UNLIKELY(nak_list_len > 62)) {
++	if (PGM_UNLIKELY(nak_list_len > 63)) {
+ 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on sequence list overrun, %d rported NAKs."), nak_list_len);
  		return FALSE;
  	}
 -		

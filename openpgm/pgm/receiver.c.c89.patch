@@ -1,5 +1,5 @@
---- receiver.c	2010-10-23 12:41:36.000000000 +0800
-+++ receiver.c89.c	2010-10-23 17:32:52.000000000 +0800
+--- receiver.c	2010-10-24 21:11:37.000000000 +0800
++++ receiver.c89.c	2010-10-24 21:12:19.000000000 +0800
 @@ -166,6 +166,7 @@
  
  	pgm_trace (PGM_LOG_ROLE_RX_WINDOW, _("Lost data #%u due to cancellation."), skb->sequence);
