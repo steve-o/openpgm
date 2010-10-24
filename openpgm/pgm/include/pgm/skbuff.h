@@ -52,6 +52,7 @@ struct pgm_sk_buff_t {
 
 	uint16_t			len;		/* actual data */
 	unsigned			zero_padded:1;
+	unsigned			__padding2:31;	/* fix bit field */
 
 	struct pgm_header*		pgm_header;
 	struct pgm_opt_fragment* 	pgm_opt_fragment;
