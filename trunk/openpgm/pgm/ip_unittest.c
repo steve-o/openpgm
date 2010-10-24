@@ -38,6 +38,7 @@
 #endif
 #include <glib.h>
 #include <check.h>
+#include <pgm/zinttypes.h>
 
 
 /* getsockopt(3SOCKET)
