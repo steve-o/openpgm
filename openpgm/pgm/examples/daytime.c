@@ -517,12 +517,12 @@ block:
 			pgm_select_info (nak_sock, &readfds, NULL, &fds);
 			fds = select (fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #else
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
-			case WAIT_OBJECT_0+2: WSAResetEvent (waitEvents[2]); break;
-			case WAIT_OBJECT_0+3: WSAResetEvent (waitEvents[3]); break;
+			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
+			case WSA_WAIT_EVENT_0+2: WSAResetEvent (waitEvents[2]); break;
+			case WSA_WAIT_EVENT_0+3: WSAResetEvent (waitEvents[3]); break;
 			default: break;
 			}
 #endif /* !_WIN32 */

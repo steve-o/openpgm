@@ -1357,7 +1357,7 @@ block:
 		pgm_select_info (sess->sock, NULL, &writefds, &fds);
 		const int ready = select (1, NULL, &writefds, NULL, &tv);
 #else
-		dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+		dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
                 dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 #endif
 		goto again;

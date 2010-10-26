@@ -135,10 +135,11 @@ pgm_receiver_thread (
 	gsize bytes_read = 0;
 	struct timeval tv;
 #ifdef _WIN32
-	int cEvents = 3, recv_sock, pending_sock;
+	SOCKET recv_sock, pending_sock;
+	DWORD cEvents = 3;
 	WSAEVENT waitEvents[ cEvents ];
         DWORD dwTimeout, dwEvents;
-        socklen_t socklen = sizeof(int);
+        socklen_t socklen = sizeof (SOCKET);
 
 	waitEvents[0] = async->destroy_event;
 	waitEvents[1] = WSACreateEvent();
@@ -219,11 +220,11 @@ block:
 			if (ready > 0 && FD_ISSET(fd, &readfds))
 				goto cleanup;
 #else
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
                         dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
                         switch (dwEvents) {
-                        case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
-                        case WAIT_OBJECT_0+2: WSAResetEvent (waitEvents[2]); break;
+                        case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
+                        case WSA_WAIT_EVENT_0+2: WSAResetEvent (waitEvents[2]); break;
                         default: break;
                         }
 #endif
@@ -554,7 +555,7 @@ pgm_async_recv (
 		DWORD cEvents = 1;
 		WSAEVENT waitEvents[ cEvents ];
 		waitEvents[0] = async->commit_event;
-		WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, INFINITE, FALSE);
+		WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, WSA_INFINITE, FALSE);
 		WSAResetEvent (async->commit_event);
 #endif
 		g_async_queue_lock (async->commit_queue);
