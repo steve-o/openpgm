@@ -166,7 +166,10 @@ env = Environment(
 			'm',
 # clock_gettime()
 			'rt'
-		]
+		],
+	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/gcc32/include',
+	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/gcc32/lib/libprotobuf.a',
+	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.3.0/gcc32/bin/protoc'
 )
 
 # Branch prediction

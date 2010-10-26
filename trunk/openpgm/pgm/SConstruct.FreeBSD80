@@ -168,7 +168,10 @@ env = Environment(
 			'compat',
 # POSIX threads
 			'pthread'
-		]
+		],
+	PROTOBUF_CCFLAGS = '-I/usr/local/include/google/protobuf',
+	PROTOBUF_LIBS = '/usr/local/lib/libprotobuf.a',
+	PROTOBUF_PROTOC = 'protoc'
 )
 
 # Branch prediction

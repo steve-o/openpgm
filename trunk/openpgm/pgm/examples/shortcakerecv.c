@@ -196,9 +196,9 @@ main (
 			FD_SET(read_fd, &readfds);
 			fds = select (fds, &readfds, NULL, NULL, NULL);
 #else
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, INFINITE, FALSE);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, WSA_INFINITE, FALSE);
 			switch (dwEvents) {
-			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
+			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
 			default: break;
 			}
 #endif /* _WIN32 */
