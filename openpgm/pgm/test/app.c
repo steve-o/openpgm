@@ -746,10 +746,10 @@ block:
 		pgm_poll_info (sess->sock, fds, &n_fds, POLLOUT);
 		poll (fds, n_fds, timeout /* ms */);
 #else
-		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, timeout, FALSE);
 		switch (dwEvents) {
-		case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[0]); break;
+		case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[0]); break;
 		default: break;
 		}
 #endif

@@ -38,21 +38,26 @@
 #include <cstdlib>
 #include <cstring>
 
-#include <inttypes.h>
 #include <math.h>
-#include <unistd.h>
 #include <time.h>
-#include <sys/time.h>
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
 #include <sys/types.h>
 #ifndef _WIN32
+#	include <inttypes.h>
+#	include <unistd.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
 #	include <sched.h>
 #	include <sys/socket.h>
 #	include <arpa/inet.h>
+#	include <sys/time.h>
+#else
+#	include <ws2tcpip.h>
+#	include <mswsock.h>
+#	include <pgm/wininttypes.h>
+#	include "getopt.h"
 #endif
 #include <glib.h>
 #include <pgm/pgm.h>
@@ -63,10 +68,14 @@
 #	include <pgm/snmp.h>
 #endif
 
+#ifndef MSG_ERRQUEUE
+#	define MSG_ERRQUEUE		0x2000
+#endif
+
 /* PGM internal time keeper */
-typedef pgm_time_t (*pgm_time_update_func)(void);
-extern pgm_time_update_func pgm_time_update_now;
 extern "C" {
+	typedef pgm_time_t (*pgm_time_update_func)(void);
+	extern pgm_time_update_func pgm_time_update_now;
 	size_t pgm_pkt_offset (bool, sa_family_t);
 }
 
@@ -122,7 +131,7 @@ static double		g_latency_max = 0.0;
 #ifdef INFINITY
 static double		g_latency_min = INFINITY;
 #else
-static double		g_latency_min = INT64_MAX;
+static double		g_latency_min = (double)INT64_MAX;
 #endif
 static double		g_latency_running_average = 0.0;
 static guint64		g_out_total = 0;
@@ -188,8 +197,10 @@ main (
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 	setlocale (LC_ALL, "");
+#ifndef _WIN32
 	setenv ("PGM_TIMER", "GTOD", 1);
 	setenv ("PGM_SLEEP", "USLEEP", 1);
+#endif
 
 	log_init ();
 	g_message ("pgmping");
@@ -255,10 +266,10 @@ main (
 		if (!pgm_snmp_init (&pgm_err)) {
 			g_error ("Unable to start SNMP interface: %s", pgm_err->message);
 			pgm_error_free (pgm_err);
-#ifdef CONFIG_WITH_HTTP
+#	ifdef CONFIG_WITH_HTTP
 			if (enable_http)
 				pgm_http_shutdown ();
-#endif
+#	endif
 			pgm_shutdown ();
 			return EXIT_FAILURE;
 		}
@@ -270,11 +281,11 @@ main (
 	g_quit = FALSE;
 
 /* setup signal handlers */
-	signal (SIGSEGV, on_sigsegv);
-#ifdef SIGHUP
-	signal (SIGHUP,  SIG_IGN);
-#endif
 #ifdef G_OS_UNIX
+	signal (SIGSEGV, on_sigsegv);
+#	ifdef SIGHUP
+	signal (SIGHUP,  SIG_IGN);
+#	endif
 	pipe (g_quit_pipe);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
@@ -756,7 +767,7 @@ sender_thread (
 	const long payload_len = 1000;
 	char payload[payload_len];
 	gpointer buffer = NULL;
-	guint64 latency, now, last;
+	guint64 latency, now, last = 0;
 
 #ifdef CONFIG_HAVE_EPOLL
 	const long ev_len = 1;
@@ -787,8 +798,23 @@ sender_thread (
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
+/* does not include ACKs */
 	int n_fds = MAX(PGM_BUS_SOCKET_WRITE_COUNT, PGM_BUS_SOCKET_READ_COUNT);
 	struct pollfd fds[ n_fds + 1 ];
+#elif defined(_WIN32)
+/* does not include ACKs */
+	SOCKET send_sock;
+	DWORD cEvents = PGM_BUS_SOCKET_WRITE_COUNT + 1;
+	WSAEVENT waitEvents[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
+	socklen_t socklen = sizeof (SOCKET);
+
+	waitEvents[0] = g_quit_event;
+	waitEvents[1] = WSACreateEvent();
+	g_assert (1 == PGM_BUS_SOCKET_WRITE_COUNT);
+	pgm_getsockopt (tx_sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
+	WSAEventSelect (send_sock, waitEvents[1], FD_WRITE);
+#else
+#	error "No supported event manager."
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	gethostname (hostname, sizeof(hostname));
@@ -824,7 +850,8 @@ sender_thread (
 			const unsigned int usec = g_odata_interval - (now - last);
 			usleep (usec);
 #else
-			const DWORD msec = usecs_to_msecs (g_odata_interval - (now - last));
+#	define usecs_to_msecs(t)	( (t) / 1000 )
+			const DWORD msec = (DWORD)usecs_to_msecs (g_odata_interval - (now - last));
 			Sleep (msec);
 #endif
 			now = pgm_time_update_now();
@@ -834,7 +861,11 @@ sender_thread (
 		ping.SerializeToArray (skb->data, skb->len);
 
 		struct timeval tv;
+#ifndef _WIN32
 		int timeout;
+#else
+		DWORD dwTimeout, dwEvents;
+#endif
 		size_t bytes_written;
 		int status;
 again:
@@ -849,9 +880,11 @@ again:
 				g_error ("getting PGM_RATE_REMAIN failed");
 				break;
 			}
+#ifndef _WIN32
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
 /* busy wait under 2ms */
 			if (timeout < 2) timeout = 0;
+#endif
 #ifdef CONFIG_HAVE_EPOLL
 			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
@@ -860,6 +893,13 @@ again:
 			fds[0].events = POLLIN;
 			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
+#elif defined(_WIN32)
+			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
+			switch (dwEvents) {
+			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
+			default: break;
+			}
 #endif /* !CONFIG_HAVE_EPOLL */
 			if (G_UNLIKELY(g_quit))
 				break;
@@ -900,6 +940,12 @@ again:
 			fds[0].events = POLLIN;
 			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLOUT);
 			poll (fds, 1 + n_fds, -1 /* ms */);
+#elif defined(_WIN32)
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, WSA_INFINITE, FALSE);
+			switch (dwEvents) {
+			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
+			default: break;
+			}
 #endif /* !CONFIG_HAVE_EPOLL */
 			goto again;
 		}
@@ -919,6 +965,9 @@ again:
 
 #ifdef CONFIG_HAVE_EPOLL
 	close (efd_again);
+#endif
+#ifdef _WIN32
+	WSACloseEvent (waitEvents[1]);
 #endif
 	return NULL;
 }
@@ -963,13 +1012,34 @@ receiver_thread (
 #elif defined(CONFIG_HAVE_POLL)
 	int n_fds = PGM_BUS_SOCKET_READ_COUNT;
 	struct pollfd fds[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
+#elif defined(_WIN32)
+	SOCKET recv_sock, repair_sock, pending_sock;
+	DWORD cEvents = PGM_BUS_SOCKET_READ_COUNT + 1;
+	WSAEVENT waitEvents[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
+	socklen_t socklen = sizeof (SOCKET);
+
+	waitEvents[0] = g_quit_event;
+	waitEvents[1] = WSACreateEvent();
+	waitEvents[2] = WSACreateEvent();
+	waitEvents[3] = WSACreateEvent();
+	g_assert (3 == PGM_BUS_SOCKET_READ_COUNT);
+	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
+	WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
+	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_REPAIR_SOCK, &repair_sock, &socklen);
+	WSAEventSelect (repair_sock, waitEvents[2], FD_READ);
+	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
+	WSAEventSelect (pending_sock, waitEvents[3], FD_READ);
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	memset (&lost_tsi, 0, sizeof(lost_tsi));
 
 	do {
 		struct timeval tv;
+#ifndef _WIN32
 		int timeout;
+#else
+		DWORD dwTimeout, dwEvents;
+#endif
 		size_t len;
 		pgm_error_t* pgm_err = NULL;
 		const int status = pgm_recvmsgv (rx_sock,
@@ -1017,9 +1087,11 @@ receiver_thread (
 		case PGM_IO_STATUS_WOULD_BLOCK:
 //g_message ("would block");
 block:
+#ifndef _WIN32
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 /* busy wait under 2ms */
 			if (timeout > 0 && timeout < 2) timeout = 0;
+#endif
 #ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
@@ -1028,6 +1100,14 @@ block:
 			fds[0].events = POLLIN;
 			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
+#elif defined(_WIN32)
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
+			if ((WSA_WAIT_FAILED != dwEvents) && (WSA_WAIT_TIMEOUT != dwEvents)) {
+				const DWORD Index = dwEvents - WSA_WAIT_EVENT_0;
+/* Do not reset quit event */
+				if (Index > 0) WSAResetEvent (waitEvents[Index]);
+			}
 #endif /* !CONFIG_HAVE_EPOLL */
 			break;
 		case PGM_IO_STATUS_RESET:
@@ -1055,6 +1135,11 @@ block:
 
 #ifdef CONFIG_HAVE_EPOLL
 	close (efd);
+#endif
+#ifdef _WIN32
+	WSACloseEvent (waitEvents[1]);
+	WSACloseEvent (waitEvents[2]);
+	WSACloseEvent (waitEvents[3]);
 #endif
 	return NULL;
 }
@@ -1213,7 +1298,7 @@ on_mark (
 #ifdef INFINITY
 		g_latency_min		= INFINITY;
 #else
-		g_latency_min		= INT64_MAX;
+		g_latency_min		= (double)INT64_MAX;
 #endif
 		g_latency_max		= 0.0;
 		g_out_total		= 0;

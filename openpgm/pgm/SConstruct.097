@@ -150,9 +150,9 @@ env = Environment(ENV = os.environ,
 # clock_gettime()
 			'rt'
 		],
-	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.1.0/src',
-	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.1.0/src/.libs/libprotobuf.a',
-	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.1.0/src/protoc'
+	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/gcc64/include',
+	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/lib/libprotobuf.a',
+	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/bin/protoc'
 )
 opt.Update (env)
 
