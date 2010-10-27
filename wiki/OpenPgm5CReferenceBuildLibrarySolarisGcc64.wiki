@@ -60,11 +60,12 @@ Optionally, install the remaining library dependencies, primarily GLib and pkg-c
 </pre>
 If you have subversion installed (requires a significant amount of dependencies), checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide], otherwise download the latest tarball.
 <pre>
- $ *svn checkout -r 1135 http://openpgm.googlecode.com/svn/trunk * 
+ $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-5-0-91 libpgm-5.0.91 *
+ $ *wget http://openpgm.googlecode.com/files/libpgm-5.0.91.tar.gz *
 </pre>
 Build.
 <pre>
- $ *cd trunk/openpgm/pgm* 
+ $ *cd libpgm-5.0.91/openpgm/pgm* 
  $ *scons -f SConstruct.Solaris.gcc64 WITH_GLIB=true* 
 </pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug-SunOS-sun4u-gcc64</tt>.

@@ -8,11 +8,11 @@ First install all the C compiler dependencies, SCons, and Subversion.
 </pre>
 Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide].
 <pre>
- $ *svn checkout -r 1135 http://openpgm.googlecode.com/svn/trunk *
+ $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-5-0-91 libpgm-5.0.91 *
 </pre>
 Build.
 <pre>
- $ *cd trunk/openpgm/pgm* 
+ $ *cd libpgm-5.0.91/openpgm/pgm* 
  $ *scons -f SConstruct.clang* 
 </pre>
 By default SCons is configured to build a debug tree in <tt>./ref/debug-Linux-x86_64-clang</tt> or <tt>./ref/debug-Linux-i686-clang</tt> dependent upon your machine.

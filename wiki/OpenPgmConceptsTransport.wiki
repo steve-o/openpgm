@@ -67,6 +67,7 @@ Notes:
   * Linux does not support IPv6 NSS network names and any query will return <tt>INADDR_BROADCAST</tt>.
   * Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP or network address should be specified instead.
   * A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast this address for repairs in effect disabling PGM reliability.  Ensure that the hostname resolves to an Ethernet link or specify the Ethernet network as the first entity.
+  * On Linux incoming multicast packets are multiplexed to all listeners regardless of the group joined on the socket.  For example when _application A_ joins groups 239.192.0.1 and 239.192.0.2, whilst _application B_ joins only 239.192.0.1, both will receive packets sent to 239.192.0.2.
 
 
 ===== Part Two—Receive Groups =====
@@ -105,8 +106,11 @@ If implementing a system with multiple PGM channels it might be easier to consid
 
 With a small number of transports one should choose a unique multicast group address and UDP-port for each.  Multicast filtering occurs at the address level such that all packets for any port will be passed to the operating system which then performs the port filtering.  All benefit of network filtering be lost if only using multiple ports on the same multicast group address.
 
+Be aware that on Linux it is the node that joins multicast groups, viewable via <tt>netstat -g</tt>, incoming packets are multiplexed to all matching port listeners.  This means it is insufficient to simply change the multicast address for different data streams unless the node is guaranteed to only join one stream at any time.
+
 Multiple applications on one host need to enable multicast loop for port sharing, example settings:
 
   * Application A: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
   * Application B: network ";239.192.0.1", sport 0, dport 7500, udp-port 3055.
 
+Note that Windows and POSIX differ on which socket side needs to enable multicast loop, it is therefore recommended for portability to set for both publisher and subscriber.
