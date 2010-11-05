@@ -797,7 +797,7 @@ pgm_send_spm (
 
 /* checksum optional for SPMs */
 	header->pgm_checksum = 0;
-	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+	header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   flags != PGM_OPT_SYN && sock->is_controlled_spm,	/* rate limited */
@@ -818,7 +818,7 @@ pgm_send_spm (
 
 /* advance SPM sequence only on successful transmission */
 	sock->spm_sqn++;
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)tpdu_length);
 	return TRUE;
 }
 
@@ -889,7 +889,7 @@ send_ncf (
 						(char*)&ncf6->nak6_grp_nla_afi :
 						(char*)&ncf->nak_grp_nla_afi );
         header->pgm_checksum = 0;
-        header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+        header->pgm_checksum = pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
@@ -902,7 +902,7 @@ send_ncf (
 		return FALSE;
 /* fall through silently on other errors */
 			
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)tpdu_length);
 	return TRUE;
 }
 
@@ -987,10 +987,10 @@ send_ncf_list (
 	opt_len = (AF_INET6 == nak_src_nla->sa_family) ? (struct pgm_opt_length*)(ncf6 + 1) : (struct pgm_opt_length*)(ncf + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
-	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+	opt_len->opt_total_length = htons ((uint16_t)(sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
 						sizeof(uint8_t) +
-						( (sqn_list->len-1) * sizeof(uint32_t) ) );
+						( (sqn_list->len-1) * sizeof(uint32_t) )));
 	opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_NAK_LIST | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) +
@@ -1003,7 +1003,7 @@ send_ncf_list (
 		opt_nak_list->opt_sqn[i-1] = htonl (sqn_list->sqn[i]);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
@@ -1016,7 +1016,7 @@ send_ncf_list (
 		return FALSE;
 /* fall through silently on other errors */
 	
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)tpdu_length);
 	return TRUE;
 }
 
@@ -1120,11 +1120,11 @@ send_odata (
 		opt_len = data;
 		opt_len->opt_type	= PGM_OPT_LENGTH;
 		opt_len->opt_length	= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+		opt_len->opt_total_length = htons ((uint16_t)(sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
 							((AF_INET6 == sock->acker_nla.ss_family) ?
 								sizeof(struct pgm_opt6_pgmcc_data) :
-								sizeof(struct pgm_opt_pgmcc_data))   );
+								sizeof(struct pgm_opt_pgmcc_data))  ));
 		opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
 		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
@@ -1143,8 +1143,8 @@ send_odata (
 			data = (char*)pgmcc_data  + sizeof(struct pgm_opt_pgmcc_data);
 	}
 	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
-	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-	STATE(unfolded_odata)			= pgm_csum_partial (data, tsdu_length, 0);
+	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
+	STATE(unfolded_odata)			= pgm_csum_partial (data, (uint16_t)tsdu_length, 0);
         STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
@@ -1202,7 +1202,7 @@ retry_send:
 	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + sock->iphdr_len);
+		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	}
 
 /* check for end of transmission group */
@@ -1259,8 +1259,8 @@ send_odata_copy (
 	STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 	STATE(skb)->sock = sock;
 	STATE(skb)->tstamp = pgm_time_update_now();
-	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, pgmcc_family));
-	pgm_skb_put (STATE(skb), tsdu_length);
+	pgm_skb_reserve (STATE(skb), (uint16_t)pgm_pkt_offset (FALSE, pgmcc_family));
+	pgm_skb_put (STATE(skb), (uint16_t)tsdu_length);
 
 	STATE(skb)->pgm_header	= (struct pgm_header*)STATE(skb)->head;
 	STATE(skb)->pgm_data	= (struct pgm_data*)(STATE(skb)->pgm_header + 1);
@@ -1287,11 +1287,11 @@ send_odata_copy (
 		opt_len = data;
 		opt_len->opt_type	= PGM_OPT_LENGTH;
 		opt_len->opt_length	= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+		opt_len->opt_total_length = htons ((uint16_t)(sizeof(struct pgm_opt_length) +
 							sizeof(struct pgm_opt_header) +
 							((AF_INET6 == sock->acker_nla.ss_family) ?
 								sizeof(struct pgm_opt6_pgmcc_data) :
-								sizeof(struct pgm_opt_pgmcc_data))   );
+								sizeof(struct pgm_opt_pgmcc_data))  ));
 		opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
 		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
@@ -1308,9 +1308,9 @@ send_odata_copy (
 		data = (char*)opt_header + opt_header->opt_length;
 	}
 	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
-	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-	STATE(unfolded_odata)			= pgm_csum_partial_copy (tsdu, data, tsdu_length, 0);
-	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
+	STATE(unfolded_odata)			= pgm_csum_partial_copy (tsdu, data, (uint16_t)tsdu_length, 0);
+	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 	pgm_spinlock_lock (&sock->txw_spinlock);
@@ -1366,7 +1366,7 @@ retry_send:
 	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + sock->iphdr_len);
+		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	}
 
 /* check for end of transmission group */
@@ -1438,8 +1438,8 @@ send_odatav (
 	STATE(skb)->sock = sock;
 	STATE(skb)->tstamp = pgm_time_update_now();
 	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
-	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, pgmcc_family));
-	pgm_skb_put (STATE(skb), STATE(tsdu_length));
+	pgm_skb_reserve (STATE(skb), (uint16_t)pgm_pkt_offset (FALSE, pgmcc_family));
+	pgm_skb_put (STATE(skb), (uint16_t)STATE(tsdu_length));
 
 	STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
 	STATE(skb)->pgm_data    = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
@@ -1448,7 +1448,7 @@ send_odatav (
 	STATE(skb)->pgm_header->pgm_dport	= sock->dport;
 	STATE(skb)->pgm_header->pgm_type	= PGM_ODATA;
 	STATE(skb)->pgm_header->pgm_options	= 0;
-	STATE(skb)->pgm_header->pgm_tsdu_length = htons (STATE(tsdu_length));
+	STATE(skb)->pgm_header->pgm_tsdu_length = htons ((uint16_t)STATE(tsdu_length));
 
 /* ODATA */
 	STATE(skb)->pgm_data->data_sqn		= htonl (pgm_txw_next_lead(sock->window));
@@ -1456,7 +1456,7 @@ send_odatav (
 
 	STATE(skb)->pgm_header->pgm_checksum	= 0;
 	const size_t   pgm_header_len		= (char*)(STATE(skb)->pgm_data + 1) - (char*)STATE(skb)->pgm_header;
-	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
+	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
 
 /* unroll first iteration to make friendly branch prediction */
 	dst			= (char*)(STATE(skb)->pgm_data + 1);
@@ -1469,7 +1469,7 @@ send_odatav (
 		STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, (uint16_t)vector[i-1].iov_len);
 	}
 
-	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 	pgm_spinlock_lock (&sock->txw_spinlock);
@@ -1510,7 +1510,7 @@ retry_send:
 	if (PGM_LIKELY((size_t)sent == STATE(skb)->len)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
-		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + sock->iphdr_len);
+		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	}
 
 /* check for end of transmission group */
@@ -1567,7 +1567,7 @@ send_apdu (
 		size_t offset_	   = 0;
 
 		do {
-			const uint_fast16_t tsdu_length = MIN( source_max_tsdu (sock, TRUE), apdu_length - offset_ );
+			const uint_fast16_t tsdu_length = (uint_fast16_t)MIN( source_max_tsdu (sock, TRUE), apdu_length - offset_ );
 			tpdu_length += sock->iphdr_len + header_length + tsdu_length;
 			offset_ += tsdu_length;
 		} while (offset_ < apdu_length);
@@ -1599,8 +1599,8 @@ send_apdu (
 		STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 		STATE(skb)->sock = sock;
 		STATE(skb)->tstamp = pgm_time_update_now();
-		pgm_skb_reserve (STATE(skb), header_length);
-		pgm_skb_put (STATE(skb), STATE(tsdu_length));
+		pgm_skb_reserve (STATE(skb), (uint16_t)header_length);
+		pgm_skb_put (STATE(skb), (uint16_t)STATE(tsdu_length));
 
 		STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->head;
 		STATE(skb)->pgm_data    = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
@@ -1609,7 +1609,7 @@ send_apdu (
 		STATE(skb)->pgm_header->pgm_dport	= sock->dport;
 		STATE(skb)->pgm_header->pgm_type	= PGM_ODATA;
 		STATE(skb)->pgm_header->pgm_options	= PGM_OPT_PRESENT;
-		STATE(skb)->pgm_header->pgm_tsdu_length = htons (STATE(tsdu_length));
+		STATE(skb)->pgm_header->pgm_tsdu_length = htons ((uint16_t)STATE(tsdu_length));
 
 /* ODATA */
 		STATE(skb)->pgm_data->data_sqn		= htonl (pgm_txw_next_lead(sock->window));
@@ -1619,9 +1619,9 @@ send_apdu (
 		opt_len					= (struct pgm_opt_length*)(STATE(skb)->pgm_data + 1);
 		opt_len->opt_type			= PGM_OPT_LENGTH;
 		opt_len->opt_length			= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length		= htons (	sizeof(struct pgm_opt_length) +
+		opt_len->opt_total_length		= htons ((uint16_t)(sizeof(struct pgm_opt_length) +
 									sizeof(struct pgm_opt_header) +
-									sizeof(struct pgm_opt_fragment) );
+									sizeof(struct pgm_opt_fragment)));
 /* OPT_FRAGMENT */
 		opt_header				= (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
@@ -1630,15 +1630,15 @@ send_apdu (
 		STATE(skb)->pgm_opt_fragment			= (struct pgm_opt_fragment*)(opt_header + 1);
 		STATE(skb)->pgm_opt_fragment->opt_reserved	= 0;
 		STATE(skb)->pgm_opt_fragment->opt_sqn		= htonl (STATE(first_sqn));
-		STATE(skb)->pgm_opt_fragment->opt_frag_off	= htonl (STATE(data_bytes_offset));
-		STATE(skb)->pgm_opt_fragment->opt_frag_len	= htonl (apdu_length);
+		STATE(skb)->pgm_opt_fragment->opt_frag_off	= htonl ((uint32_t)STATE(data_bytes_offset));
+		STATE(skb)->pgm_opt_fragment->opt_frag_len	= htonl ((uint32_t)apdu_length);
 
 /* TODO: the assembly checksum & copy routine is faster than memcpy & pgm_cksum on >= opteron hardware */
 		STATE(skb)->pgm_header->pgm_checksum	= 0;
 		const size_t   pgm_header_len		= (char*)(STATE(skb)->pgm_opt_fragment + 1) - (char*)STATE(skb)->pgm_header;
-		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
-		STATE(unfolded_odata)			= pgm_csum_partial_copy ((const char*)apdu + STATE(data_bytes_offset), STATE(skb)->pgm_opt_fragment + 1, STATE(tsdu_length), 0);
-		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
+		STATE(unfolded_odata)			= pgm_csum_partial_copy ((const char*)apdu + STATE(data_bytes_offset), STATE(skb)->pgm_opt_fragment + 1, (uint16_t)STATE(tsdu_length), 0);
+		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 		pgm_spinlock_lock (&sock->txw_spinlock);
@@ -1691,7 +1691,7 @@ retry_send:
 	sock->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
 
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
@@ -1701,7 +1701,7 @@ retry_send:
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
@@ -1891,7 +1891,7 @@ pgm_sendv (
 		size_t offset_	   = 0;
 
 		do {
-			const uint_fast16_t tsdu_length = MIN( source_max_tsdu (sock, TRUE), STATE(apdu_length) - offset_ );
+			const uint_fast16_t tsdu_length = (uint_fast16_t)MIN( source_max_tsdu (sock, TRUE), STATE(apdu_length) - offset_ );
 			tpdu_length += sock->iphdr_len + header_length + tsdu_length;
 			offset_     += tsdu_length;
 		} while (offset_ < STATE(apdu_length));
@@ -1969,8 +1969,8 @@ retry_send:
 		STATE(skb) = pgm_alloc_skb (sock->max_tpdu);
 		STATE(skb)->sock = sock;
 		STATE(skb)->tstamp = pgm_time_update_now();
-		pgm_skb_reserve (STATE(skb), header_length);
-		pgm_skb_put (STATE(skb), STATE(tsdu_length));
+		pgm_skb_reserve (STATE(skb), (uint16_t)header_length);
+		pgm_skb_put (STATE(skb), (uint16_t)STATE(tsdu_length));
 
 		STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->head;
 		STATE(skb)->pgm_data    = (struct pgm_data*)(STATE(skb)->pgm_header + 1);
@@ -1979,7 +1979,7 @@ retry_send:
 		STATE(skb)->pgm_header->pgm_dport	= sock->dport;
 		STATE(skb)->pgm_header->pgm_type	= PGM_ODATA;
 		STATE(skb)->pgm_header->pgm_options	= PGM_OPT_PRESENT;
-		STATE(skb)->pgm_header->pgm_tsdu_length = htons (STATE(tsdu_length));
+		STATE(skb)->pgm_header->pgm_tsdu_length = htons ((uint16_t)STATE(tsdu_length));
 
 /* ODATA */
 		STATE(skb)->pgm_data->data_sqn		= htonl (pgm_txw_next_lead(sock->window));
@@ -1989,9 +1989,9 @@ retry_send:
 		opt_len					= (struct pgm_opt_length*)(STATE(skb)->pgm_data + 1);
 		opt_len->opt_type			= PGM_OPT_LENGTH;
 		opt_len->opt_length			= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length		= htons (	sizeof(struct pgm_opt_length) +
+		opt_len->opt_total_length		= htons ((uint16_t)(sizeof(struct pgm_opt_length) +
 									sizeof(struct pgm_opt_header) +
-									sizeof(struct pgm_opt_fragment) );
+									sizeof(struct pgm_opt_fragment)));
 /* OPT_FRAGMENT */
 		opt_header				= (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
@@ -2000,13 +2000,13 @@ retry_send:
 		STATE(skb)->pgm_opt_fragment			= (struct pgm_opt_fragment*)(opt_header + 1);
 		STATE(skb)->pgm_opt_fragment->opt_reserved	= 0;
 		STATE(skb)->pgm_opt_fragment->opt_sqn		= htonl (STATE(first_sqn));
-		STATE(skb)->pgm_opt_fragment->opt_frag_off	= htonl (STATE(data_bytes_offset));
-		STATE(skb)->pgm_opt_fragment->opt_frag_len	= htonl (STATE(apdu_length));
+		STATE(skb)->pgm_opt_fragment->opt_frag_off	= htonl ((uint32_t)STATE(data_bytes_offset));
+		STATE(skb)->pgm_opt_fragment->opt_frag_len	= htonl ((uint32_t)STATE(apdu_length));
 
 /* checksum & copy */
 		STATE(skb)->pgm_header->pgm_checksum	= 0;
 		const size_t   pgm_header_len		= (char*)(STATE(skb)->pgm_opt_fragment + 1) - (char*)STATE(skb)->pgm_header;
-		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
+		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
 
 /* iterate over one or more vector elements to perform scatter/gather checksum & copy
  *
@@ -2019,7 +2019,7 @@ retry_send:
 		src_length	= vector[STATE(vector_index)].iov_len - STATE(vector_offset);
 		dst_length	= 0;
 		copy_length	= MIN( STATE(tsdu_length), src_length );
-		STATE(unfolded_odata)	= pgm_csum_partial_copy (src, dst, copy_length, 0);
+		STATE(unfolded_odata)	= pgm_csum_partial_copy (src, dst, (uint16_t)copy_length, 0);
 
 		for(;;)
 		{
@@ -2042,11 +2042,11 @@ retry_send:
 			dst	       += copy_length;
 			src_length	= vector[STATE(vector_index)].iov_len - STATE(vector_offset);
 			copy_length	= MIN( STATE(tsdu_length) - dst_length, src_length );
-			const uint32_t unfolded_element = pgm_csum_partial_copy (src, dst, copy_length, 0);
-			STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, dst_length);
+			const uint32_t unfolded_element = pgm_csum_partial_copy (src, dst, (uint16_t)copy_length, 0);
+			STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, (uint16_t)dst_length);
 		}
 
-		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 		pgm_spinlock_lock (&sock->txw_spinlock);
@@ -2098,7 +2098,7 @@ retry_one_apdu_send:
 	sock->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
 
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
@@ -2110,7 +2110,7 @@ retry_one_apdu_send:
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
@@ -2250,7 +2250,7 @@ pgm_send_skbv (
 		STATE(skb)->pgm_header->pgm_dport	= sock->dport;
 		STATE(skb)->pgm_header->pgm_type	= PGM_ODATA;
 		STATE(skb)->pgm_header->pgm_options	= is_one_apdu ? PGM_OPT_PRESENT : 0;
-		STATE(skb)->pgm_header->pgm_tsdu_length = htons (STATE(tsdu_length));
+		STATE(skb)->pgm_header->pgm_tsdu_length = htons ((uint16_t)STATE(tsdu_length));
 
 /* ODATA */
 		STATE(skb)->pgm_data->data_sqn		= htonl (pgm_txw_next_lead(sock->window));
@@ -2265,9 +2265,9 @@ pgm_send_skbv (
 			opt_len					= (struct pgm_opt_length*)(STATE(skb)->pgm_data + 1);
 			opt_len->opt_type			= PGM_OPT_LENGTH;
 			opt_len->opt_length			= sizeof(struct pgm_opt_length);
-			opt_len->opt_total_length		= htons (	sizeof(struct pgm_opt_length) +
+			opt_len->opt_total_length		= htons ((uint16_t)(sizeof(struct pgm_opt_length) +
 										sizeof(struct pgm_opt_header) +
-										sizeof(struct pgm_opt_fragment) );
+										sizeof(struct pgm_opt_fragment)));
 /* OPT_FRAGMENT */
 			opt_header				= (struct pgm_opt_header*)(opt_len + 1);
 			opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
@@ -2276,8 +2276,8 @@ pgm_send_skbv (
 			STATE(skb)->pgm_opt_fragment			= (struct pgm_opt_fragment*)(opt_header + 1);
 			STATE(skb)->pgm_opt_fragment->opt_reserved	= 0;
 			STATE(skb)->pgm_opt_fragment->opt_sqn		= htonl (STATE(first_sqn));
-			STATE(skb)->pgm_opt_fragment->opt_frag_off	= htonl (STATE(data_bytes_offset));
-			STATE(skb)->pgm_opt_fragment->opt_frag_len	= htonl (STATE(apdu_length));
+			STATE(skb)->pgm_opt_fragment->opt_frag_off	= htonl ((uint32_t)STATE(data_bytes_offset));
+			STATE(skb)->pgm_opt_fragment->opt_frag_len	= htonl ((uint32_t)STATE(apdu_length));
 
 			pgm_assert (STATE(skb)->data == (STATE(skb)->pgm_opt_fragment + 1));
 		}
@@ -2290,9 +2290,9 @@ pgm_send_skbv (
 		STATE(skb)->pgm_header->pgm_checksum	= 0;
 		pgm_assert ((char*)STATE(skb)->data > (char*)STATE(skb)->pgm_header);
 		const size_t header_length		= (char*)STATE(skb)->data - (char*)STATE(skb)->pgm_header;
-		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, header_length, 0);
-		STATE(unfolded_odata)			= pgm_csum_partial ((char*)STATE(skb)->data, STATE(tsdu_length), 0);
-		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), header_length));
+		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)header_length, 0);
+		STATE(unfolded_odata)			= pgm_csum_partial ((char*)STATE(skb)->data, (uint16_t)STATE(tsdu_length), 0);
+		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)header_length));
 
 /* add to transmit window, skb::data set to payload */
 		pgm_spinlock_lock (&sock->txw_spinlock);
@@ -2350,7 +2350,7 @@ retry_send:
 	sock->is_apdu_eagain = FALSE;
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
 
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	if (bytes_written)
@@ -2362,7 +2362,7 @@ retry_send:
 blocked:
 	if (bytes_sent) {
 		reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], bytes_sent);
+		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
 	}
@@ -2412,9 +2412,9 @@ send_rdata (
 
         header->pgm_checksum		= 0;
 	const size_t header_length	= tpdu_length - ntohs(header->pgm_tsdu_length);
-	const uint32_t unfolded_header	= pgm_csum_partial (header, header_length, 0);
+	const uint32_t unfolded_header	= pgm_csum_partial (header, (uint16_t)header_length, 0);
 	const uint32_t unfolded_odata	= pgm_txw_get_unfolded_checksum (skb);
-	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, header_length));
+	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, (uint16_t)header_length));
 
 /* congestion control */
 	if (sock->use_pgmcc &&
@@ -2459,7 +2459,7 @@ send_rdata (
 	pgm_txw_inc_retransmit_count (skb);
 	sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_BYTES_RETRANSMITTED] += ntohs(header->pgm_tsdu_length);
 	sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_MSGS_RETRANSMITTED]++;	/* impossible to determine APDU count */
-	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length + sock->iphdr_len);
+	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	return TRUE;
 }
 

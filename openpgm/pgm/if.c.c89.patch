@@ -1,5 +1,5 @@
---- if.c	2010-10-14 16:01:36.000000000 +0800
-+++ if.c89.c	2010-10-14 16:02:20.000000000 +0800
+--- if.c	2010-11-05 06:10:04.000000000 +0800
++++ if.c89.c	2010-11-05 06:09:37.000000000 +0800
 @@ -124,6 +124,7 @@
  			continue;
  		}
@@ -143,7 +143,7 @@
 +		}
  	}
  
- #ifndef _WIN32
+ #if !defined(_WIN32) && !defined(__CYGWIN__)
 @@ -496,12 +518,13 @@
  	if (!check_addr)
  	{
@@ -329,7 +329,7 @@
  	const size_t send_list_len = pgm_list_length (send_list);
  	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
 @@ -1663,6 +1704,7 @@
- 	ai->ai_send_addrs_len = send_list_len;
+ 	ai->ai_send_addrs_len = (uint32_t)send_list_len;
  	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
  
 +	{

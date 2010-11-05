@@ -1,5 +1,14 @@
---- md5.c	2010-09-20 12:06:01.000000000 +0800
-+++ md5.c89	2010-10-06 17:38:34.000000000 +0800
+--- md5.c	2010-10-15 11:03:08.000000000 +0800
++++ md5.c89.c	2010-11-05 06:43:53.000000000 +0800
+@@ -40,7 +40,7 @@
+ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
+ 
+ 
+-#if defined(__BYTE_ORDER) && (__BYTE_ORDER == __BIG_ENDIAN)
++#if __BYTE_ORDER == __BIG_ENDIAN
+ # define SWAP(n) \
+ 	(((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
+ #else
 @@ -92,6 +92,7 @@
  	pgm_assert (len > 0);
  	pgm_assert (NULL != ctx);
@@ -8,6 +17,15 @@
  	uint32_t correct_words[16];
  	const uint32_t *words = buffer;
  	const size_t nwords = len / sizeof (uint32_t);
+@@ -104,7 +105,7 @@
+ /* First increment the byte count.  RFC 1321 specifies the possible
+    length of the file up to 2^64 bits.  Here we only compute the
+    number of bytes.  Do a double word increment.  */
+-	ctx->total[0] += len;
++	ctx->total[0] += (uint32_t)len;
+ 	if (ctx->total[0] < len)
+ 		++ctx->total[1];
+ 
 @@ -243,6 +244,7 @@
  	ctx->B = B;
  	ctx->C = C;
@@ -16,6 +34,15 @@
  }
  
  void
+@@ -297,7 +299,7 @@
+ 			left_over -= 64;
+ 			memcpy (ctx->buffer, &ctx->buffer[64], left_over);
+ 		}
+-		ctx->buflen = left_over;
++		ctx->buflen = (uint32_t)left_over;
+ 	}
+ }
+ 
 @@ -343,6 +345,7 @@
  	pgm_assert (NULL != resbuf);
  

@@ -1,5 +1,5 @@
---- packet_test.c	2010-10-24 12:05:26.000000000 +0800
-+++ packet_test.c89.c	2010-10-24 12:43:34.000000000 +0800
+--- packet_test.c	2010-11-05 06:21:15.000000000 +0800
++++ packet_test.c89.c	2010-11-05 06:21:02.000000000 +0800
 @@ -61,11 +61,12 @@
  	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
  	{
@@ -52,7 +52,7 @@
  /* packets that fail checksum will generally not be passed upstream except with rfc3828
   */
 +	{
- 	const uint16_t ip_sum = pgm_inet_checksum(data, packet_length, 0);
+ 	const uint16_t ip_sum = pgm_inet_checksum(data, (uint16_t)packet_length, 0);
  	if (ip_sum != 0) {
  		const uint16_t encoded_ip_sum = ntohs(ip->ip_sum);
 @@ -170,6 +175,7 @@
