@@ -1,5 +1,5 @@
---- source.c	2010-10-24 21:12:50.000000000 +0800
-+++ source.c89.c	2010-10-24 21:13:20.000000000 +0800
+--- source.c	2010-11-05 07:15:07.000000000 +0800
++++ source.c89.c	2010-11-05 07:16:00.000000000 +0800
 @@ -114,11 +114,13 @@
  	)
  {
@@ -196,7 +196,7 @@
  /* fall through silently on other errors */
 -			
 +
- 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+ 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)tpdu_length);
  	return TRUE;
  }
 @@ -940,16 +966,20 @@
@@ -241,14 +241,14 @@
 +	}
  
          header->pgm_checksum    = 0;
-         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 @@ -1015,7 +1049,7 @@
  	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
  		return FALSE;
  /* fall through silently on other errors */
 -	
 +
- 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], tpdu_length);
+ 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)tpdu_length);
  	return TRUE;
  }
 @@ -1031,6 +1065,7 @@
@@ -275,14 +275,19 @@
  	const uint16_t    tsdu_length  = skb->len;
  	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
  	const size_t      tpdu_length  = tsdu_length + pgm_pkt_offset (FALSE, pgmcc_family);
-@@ -1142,6 +1179,7 @@
+@@ -1142,10 +1179,11 @@
  		else
  			data = (char*)pgmcc_data  + sizeof(struct pgm_opt_pgmcc_data);
  	}
 +	{
  	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
- 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
- 	STATE(unfolded_odata)			= pgm_csum_partial (data, tsdu_length, 0);
+ 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
+ 	STATE(unfolded_odata)			= pgm_csum_partial (data, (uint16_t)tsdu_length, 0);
+-        STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
++        STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
+ 
+ /* add to transmit window, skb::data set to payload */
+ 	pgm_spinlock_lock (&sock->txw_spinlock);
 @@ -1218,6 +1256,8 @@
  	if (bytes_written)
  		*bytes_written = tsdu_length;
@@ -306,8 +311,8 @@
  	}
 +	{
  	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
- 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
- 	STATE(unfolded_odata)			= pgm_csum_partial_copy (tsdu, data, tsdu_length, 0);
+ 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
+ 	STATE(unfolded_odata)			= pgm_csum_partial_copy (tsdu, data, (uint16_t)tsdu_length, 0);
 @@ -1381,6 +1423,8 @@
  	if (bytes_written)
  		*bytes_written = tsdu_length;
@@ -340,9 +345,9 @@
  	STATE(skb)->tstamp = pgm_time_update_now();
 +	{
  	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
- 	pgm_skb_reserve (STATE(skb), pgm_pkt_offset (FALSE, pgmcc_family));
+ 	pgm_skb_reserve (STATE(skb), (uint16_t)pgm_pkt_offset (FALSE, pgmcc_family));
 +	}
- 	pgm_skb_put (STATE(skb), STATE(tsdu_length));
+ 	pgm_skb_put (STATE(skb), (uint16_t)STATE(tsdu_length));
  
  	STATE(skb)->pgm_header  = (struct pgm_header*)STATE(skb)->data;
 @@ -1455,6 +1504,7 @@
@@ -351,7 +356,7 @@
  	STATE(skb)->pgm_header->pgm_checksum	= 0;
 +	{
  	const size_t   pgm_header_len		= (char*)(STATE(skb)->pgm_data + 1) - (char*)STATE(skb)->pgm_header;
- 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
+ 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
  
 @@ -1463,13 +1513,19 @@
  	STATE(unfolded_odata)	= pgm_csum_partial_copy ((const char*)vector[0].iov_base, dst, (uint16_t)vector[0].iov_len, 0);
@@ -369,11 +374,20 @@
 +	}
  	}
  
- 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+ 	STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 +	}
  
  /* add to transmit window, skb::data set to payload */
  	pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -1508,7 +1564,7 @@
+ 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+ 
+ 	if (PGM_LIKELY((size_t)sent == STATE(skb)->len)) {
+-		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
++		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)STATE(tsdu_length);
+ 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
+ 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
+ 	}
 @@ -1552,6 +1608,7 @@
  	pgm_assert (NULL != sock);
  	pgm_assert (NULL != apdu);
@@ -388,14 +402,31 @@
  		STATE(skb)->pgm_header->pgm_checksum	= 0;
 +		{
  		const size_t   pgm_header_len		= (char*)(STATE(skb)->pgm_opt_fragment + 1) - (char*)STATE(skb)->pgm_header;
- 		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
- 		STATE(unfolded_odata)			= pgm_csum_partial_copy ((const char*)apdu + STATE(data_bytes_offset), STATE(skb)->pgm_opt_fragment + 1, STATE(tsdu_length), 0);
- 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+ 		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
+ 		STATE(unfolded_odata)			= pgm_csum_partial_copy ((const char*)apdu + STATE(data_bytes_offset), STATE(skb)->pgm_opt_fragment + 1, (uint16_t)STATE(tsdu_length), 0);
+ 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 +		}
  
  /* add to transmit window, skb::data set to payload */
  		pgm_spinlock_lock (&sock->txw_spinlock);
-@@ -1710,6 +1769,7 @@
+@@ -1693,7 +1752,7 @@
+ 
+ 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
+ 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+-	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
++	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)data_bytes_sent;
+ 	if (bytes_written)
+ 		*bytes_written = apdu_length;
+ 	return PGM_IO_STATUS_NORMAL;
+@@ -1703,13 +1762,14 @@
+ 		reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+ 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
+ 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+-		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
++		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)data_bytes_sent;
+ 	}
+ 	if (PGM_SOCK_ENOBUFS == save_errno)
+ 		return PGM_IO_STATUS_RATE_LIMITED;
  	if (sock->use_pgmcc)
  		pgm_notify_clear (&sock->ack_notify);
  	return PGM_IO_STATUS_WOULD_BLOCK;
@@ -445,19 +476,19 @@
  		STATE(skb)->pgm_header->pgm_checksum	= 0;
 +		{
  		const size_t   pgm_header_len		= (char*)(STATE(skb)->pgm_opt_fragment + 1) - (char*)STATE(skb)->pgm_header;
- 		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, pgm_header_len, 0);
+ 		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
  
 @@ -2042,11 +2107,14 @@
  			dst	       += copy_length;
  			src_length	= vector[STATE(vector_index)].iov_len - STATE(vector_offset);
  			copy_length	= MIN( STATE(tsdu_length) - dst_length, src_length );
 +			{
- 			const uint32_t unfolded_element = pgm_csum_partial_copy (src, dst, copy_length, 0);
- 			STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, dst_length);
+ 			const uint32_t unfolded_element = pgm_csum_partial_copy (src, dst, (uint16_t)copy_length, 0);
+ 			STATE(unfolded_odata) = pgm_csum_block_add (STATE(unfolded_odata), unfolded_element, (uint16_t)dst_length);
 +			}
  		}
  
- 		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+ 		STATE(skb)->pgm_header->pgm_checksum = pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 +		}
  
  /* add to transmit window, skb::data set to payload */
@@ -471,6 +502,24 @@
  	pgm_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
  
  	sock->is_apdu_eagain = FALSE;
+@@ -2100,7 +2170,7 @@
+ 
+ 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
+ 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+-	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
++	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)data_bytes_sent;
+ 	if (bytes_written)
+ 		*bytes_written = STATE(apdu_length);
+ 	pgm_mutex_unlock (&sock->source_mutex);
+@@ -2112,7 +2182,7 @@
+ 		reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+ 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
+ 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+-		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
++		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)data_bytes_sent;
+ 	}
+ 	pgm_mutex_unlock (&sock->source_mutex);
+ 	pgm_rwlock_reader_unlock (&sock->lock);
 @@ -2185,6 +2255,7 @@
  		return status;
  	}
@@ -525,22 +574,40 @@
  		pgm_assert ((char*)STATE(skb)->data > (char*)STATE(skb)->pgm_header);
 +		{
  		const size_t header_length		= (char*)STATE(skb)->data - (char*)STATE(skb)->pgm_header;
- 		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, header_length, 0);
- 		STATE(unfolded_odata)			= pgm_csum_partial ((char*)STATE(skb)->data, STATE(tsdu_length), 0);
- 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), header_length));
+ 		const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)header_length, 0);
+ 		STATE(unfolded_odata)			= pgm_csum_partial ((char*)STATE(skb)->data, (uint16_t)STATE(tsdu_length), 0);
+ 		STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)header_length));
 +		}
  
  /* add to transmit window, skb::data set to payload */
  		pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -2352,7 +2434,7 @@
+ 
+ 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
+ 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+-	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
++	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)data_bytes_sent;
+ 	if (bytes_written)
+ 		*bytes_written = data_bytes_sent;
+ 	pgm_mutex_unlock (&sock->source_mutex);
+@@ -2364,7 +2446,7 @@
+ 		reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+ 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
+ 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
+-		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
++		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += (uint32_t)data_bytes_sent;
+ 	}
+ 	pgm_mutex_unlock (&sock->source_mutex);
+ 	pgm_rwlock_reader_unlock (&sock->lock);
 @@ -2411,10 +2493,12 @@
          rdata->data_trail		= htonl (pgm_txw_trail(sock->window));
  
          header->pgm_checksum		= 0;
 +	{
  	const size_t header_length	= tpdu_length - ntohs(header->pgm_tsdu_length);
- 	const uint32_t unfolded_header	= pgm_csum_partial (header, header_length, 0);
+ 	const uint32_t unfolded_header	= pgm_csum_partial (header, (uint16_t)header_length, 0);
  	const uint32_t unfolded_odata	= pgm_txw_get_unfolded_checksum (skb);
- 	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, header_length));
+ 	header->pgm_checksum		= pgm_csum_fold (pgm_csum_block_add (unfolded_header, unfolded_odata, (uint16_t)header_length));
 +	}
  
  /* congestion control */

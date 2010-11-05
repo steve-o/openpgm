@@ -93,6 +93,9 @@ env = Environment(ENV = os.environ,
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
+# POSIX spinlocks
+			'-DCONFIG_HAVE_POSIX_SPINLOCK',
+# NSS protocol lookup
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
 # variadic macros

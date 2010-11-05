@@ -262,7 +262,7 @@ write_ascii (
 	{
 		if (snapshot.counts[ i ]) {
 			pgm_string_t* bucket_range = get_ascii_bucket_range (histogram, i);
-			const int width = bucket_range->len + 1;
+			const int width = (int)(bucket_range->len + 1);
 			pgm_string_free (bucket_range, TRUE);
 			if (width > print_width)
 				print_width = width;

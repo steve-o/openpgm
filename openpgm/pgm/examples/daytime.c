@@ -36,6 +36,9 @@
 #	include "getopt.h"
 #	define snprintf		_snprintf
 #endif
+#ifdef __APPLE__
+#	include <pgm/in.h>
+#endif
 #include <pgm/pgm.h>
 
 

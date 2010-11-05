@@ -145,7 +145,7 @@ static gboolean		g_quit;
 static int		g_quit_pipe[2];
 static void on_signal (int, gpointer);
 #else
-static WSAEVENT		g_quit_event;
+static SOCKET		g_quit_socket[2];
 static BOOL on_console_ctrl (DWORD);
 #endif
 
@@ -290,7 +290,19 @@ main (
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 #else
-	g_quit_event = WSACreateEvent();
+	SOCKET s = socket (AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in addr;
+	int addrlen = sizeof (addr);
+	memset (&addr, 0, sizeof (addr));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = inet_addr ("127.0.0.1");
+	bind (s, (const struct sockaddr*)&addr, sizeof (addr));
+	getsockname (s, (struct sockaddr*)&addr, &addrlen);
+	listen (s, 1);
+	g_quit_socket[1] = socket (AF_INET, SOCK_STREAM, 0);
+	connect (g_quit_socket[1], (struct sockaddr*)&addr, addrlen);
+	g_quit_socket[0] = accept (s, NULL, NULL);
+	closesocket (s);
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif /* !G_OS_UNIX */
@@ -321,11 +333,13 @@ main (
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
 #else
-	WSASetEvent (g_quit_event);
+	const char one = '1';
+	send (g_quit_socket[1], &one, sizeof(one), 0);
 	if (PGMPING_MODE_SOURCE == g_mode || PGMPING_MODE_INITIATOR == g_mode)
 		g_thread_join (g_sender_thread);
 	g_thread_join (g_receiver_thread);
-	WSACloseEvent (g_quit_event);
+	closesocket (g_quit_socket[0]);
+	closesocket (g_quit_socket[1]);
 #endif
 
 	g_main_loop_unref (g_loop);
@@ -452,15 +466,19 @@ on_startup (
 /* set PGM parameters */
 /* common */
 	{
-		const int bufsize  = 1024 * 1024,
+#ifndef __FreeBSD__
+		const int txbufsize = 1024 * 1024, rxbufsize = 1024 * 1024,
+#else
+		const int txbufsize = 256 * 1024, rxbufsize = 256 * 1024,
+#endif
 			  max_tpdu = g_max_tpdu;
 
-		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize))) {
-			g_error ("setting SO_RCVBUF = %d", bufsize);
+		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_RCVBUF, &rxbufsize, sizeof(rxbufsize))) {
+			g_error ("setting SO_RCVBUF = %d", rxbufsize);
 			goto err_abort;
 		}
-		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize))) {
-			g_error ("setting SO_SNDBUF = %d", bufsize);
+		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_SNDBUF, &txbufsize, sizeof(txbufsize))) {
+			g_error ("setting SO_SNDBUF = %d", txbufsize);
 			goto err_abort;
 		}
 		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_MTU, &max_tpdu, sizeof(max_tpdu))) {
@@ -496,7 +514,8 @@ on_startup (
 			g_error ("setting PGM_TXW_SQNS = %d", txw_sqns);
 			goto err_abort;
 		}
-		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &txw_max_rte, sizeof(txw_max_rte))) {
+		if (txw_max_rte > 0 &&
+		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &txw_max_rte, sizeof(txw_max_rte))) {
 			g_error ("setting PGM_TXW_MAX_RTE = %d", txw_max_rte);
 			goto err_abort;
 		}
@@ -799,22 +818,24 @@ sender_thread (
 	}
 #elif defined(CONFIG_HAVE_POLL)
 /* does not include ACKs */
-	int n_fds = MAX(PGM_BUS_SOCKET_WRITE_COUNT, PGM_BUS_SOCKET_READ_COUNT);
-	struct pollfd fds[ n_fds + 1 ];
-#elif defined(_WIN32)
+	int n_fds = PGM_BUS_SOCKET_WRITE_COUNT;
+	struct pollfd fds[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
+#elif defined(CONFIG_HAVE_WSAPOLL)
+	ULONG n_fds = PGM_BUS_SOCKET_WRITE_COUNT;
+	WSAPOLLFD fds[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
+#elif defined(CONFIG_WSA_WAIT)
 /* does not include ACKs */
 	SOCKET send_sock;
 	DWORD cEvents = PGM_BUS_SOCKET_WRITE_COUNT + 1;
 	WSAEVENT waitEvents[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
 	socklen_t socklen = sizeof (SOCKET);
 
-	waitEvents[0] = g_quit_event;
+	waitEvents[0] = WSACreateEvent();
+	WSAEventSelect (g_quit_socket[0], waitEvents[0], FD_READ);
 	waitEvents[1] = WSACreateEvent();
 	g_assert (1 == PGM_BUS_SOCKET_WRITE_COUNT);
 	pgm_getsockopt (tx_sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
 	WSAEventSelect (send_sock, waitEvents[1], FD_WRITE);
-#else
-#	error "No supported event manager."
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	gethostname (hostname, sizeof(hostname));
@@ -852,7 +873,9 @@ sender_thread (
 #else
 #	define usecs_to_msecs(t)	( (t) / 1000 )
 			const DWORD msec = (DWORD)usecs_to_msecs (g_odata_interval - (now - last));
-			Sleep (msec);
+/* Avoid yielding on Windows XP/2000 */ 
+			if (msec > 0)
+				Sleep (msec);
 #endif
 			now = pgm_time_update_now();
 		}
@@ -861,10 +884,15 @@ sender_thread (
 		ping.SerializeToArray (skb->data, skb->len);
 
 		struct timeval tv;
-#ifndef _WIN32
+#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 		int timeout;
-#else
+#elif defined(CONFIG_HAVE_WSAPOLL)
+		DWORD dwTimeout;
+#elif defined(CONFIG_WSA_WAIT)
 		DWORD dwTimeout, dwEvents;
+#else
+		int n_fds;
+		fd_set readfds, writefds;
 #endif
 		size_t bytes_written;
 		int status;
@@ -880,26 +908,50 @@ again:
 				g_error ("getting PGM_RATE_REMAIN failed");
 				break;
 			}
-#ifndef _WIN32
+#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
 /* busy wait under 2ms */
 			if (timeout < 2) timeout = 0;
+#elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
+			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+/* busy wait under 2ms */
+			if (dwTimeout < 2) dwTimeout = 0;
 #endif
-#ifdef CONFIG_HAVE_EPOLL
+#if defined(CONFIG_HAVE_EPOLL)
 			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
+			n_fds = G_N_ELEMENTS(fds) - 1;
 			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
-#elif defined(_WIN32)
-			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+#elif defined(CONFIG_HAVE_WSAPOLL)
+			ZeroMemory (fds, sizeof(WSAPOLLFD) * (n_fds + 1));
+			fds[0].fd = g_quit_socket[0];
+			fds[0].events = POLLRDNORM;
+			n_fds = G_N_ELEMENTS(fds) - 1;
+			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLRDNORM);
+			WSAPoll (fds, 1 + n_fds, dwTimeout /* ms */);
+#elif defined(CONFIG_WSA_WAIT)
+/* only wait for quit or timeout events */
+			cEvents = 1;
 			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 			switch (dwEvents) {
 			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
 			default: break;
 			}
+#else
+			FD_ZERO(&readfds);
+#	ifndef _WIN32
+			FD_SET(g_quit_pipe[0], &readfds);
+			n_fds = g_quit_pipe[0] + 1;		/* highest fd + 1 */
+#	else
+			FD_SET(g_quit_socket[0], &readfds);
+			n_fds = 1;				/* count of fds */
+#	endif
+			pgm_select_info (g_sock, &readfds, NULL, &n_fds);
+			n_fds = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #endif /* !CONFIG_HAVE_EPOLL */
 			if (G_UNLIKELY(g_quit))
 				break;
@@ -938,14 +990,35 @@ again:
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
+			n_fds = G_N_ELEMENTS(fds) - 1;
 			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLOUT);
 			poll (fds, 1 + n_fds, -1 /* ms */);
-#elif defined(_WIN32)
+#elif defined(CONFIG_HAVE_WSAPOLL)
+			ZeroMemory (fds, sizeof(WSAPOLLFD) * (n_fds + 1));
+			fds[0].fd = g_quit_socket[0];
+			fds[0].events = POLLRDNORM;
+			n_fds = G_N_ELEMENTS(fds) - 1;
+			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLWRNORM);
+			WSAPoll (fds, 1 + n_fds, -1 /* ms */);
+#elif defined(CONFIG_WSA_WAIT)
+			cEvents = PGM_BUS_SOCKET_WRITE_COUNT + 1;
 			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, WSA_INFINITE, FALSE);
 			switch (dwEvents) {
 			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
 			default: break;
 			}
+#else
+			FD_ZERO(&readfds);
+#	ifndef _WIN32
+			FD_SET(g_quit_pipe[0], &readfds);
+			n_fds = g_quit_pipe[0] + 1;		/* highest fd + 1 */
+#	else
+			FD_SET(g_quit_socket[0], &readfds);
+			n_fds = 1;				/* count of fds */
+#	endif
+			pgm_select_info (g_sock, &readfds, &writefds, &n_fds);
+			n_fds = select (n_fds, &readfds, &writefds, NULL, NULL);
+			
 #endif /* !CONFIG_HAVE_EPOLL */
 			goto again;
 		}
@@ -963,10 +1036,10 @@ again:
 		g_msg_sent++;
 	} while (!g_quit);
 
-#ifdef CONFIG_HAVE_EPOLL
+#if defined(CONFIG_HAVE_EPOLL)
 	close (efd_again);
-#endif
-#ifdef _WIN32
+#elif defined(CONFIG_WSA_WAIT)
+	WSACloseEvent (waitEvents[0]);
 	WSACloseEvent (waitEvents[1]);
 #endif
 	return NULL;
@@ -1012,17 +1085,21 @@ receiver_thread (
 #elif defined(CONFIG_HAVE_POLL)
 	int n_fds = PGM_BUS_SOCKET_READ_COUNT;
 	struct pollfd fds[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
-#elif defined(_WIN32)
+#elif defined(CONFIG_HAVE_WSAPOLL)
+	ULONG n_fds = PGM_BUS_SOCKET_READ_COUNT;
+	WSAPOLLFD fds[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
+#elif defined(CONFIG_WSA_WAIT)
 	SOCKET recv_sock, repair_sock, pending_sock;
 	DWORD cEvents = PGM_BUS_SOCKET_READ_COUNT + 1;
 	WSAEVENT waitEvents[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
 	socklen_t socklen = sizeof (SOCKET);
 
-	waitEvents[0] = g_quit_event;
+	waitEvents[0] = WSACreateEvent();;
 	waitEvents[1] = WSACreateEvent();
 	waitEvents[2] = WSACreateEvent();
 	waitEvents[3] = WSACreateEvent();
 	g_assert (3 == PGM_BUS_SOCKET_READ_COUNT);
+	WSAEventSelect (g_quit_socket[0], waitEvents[0], FD_READ);
 	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
 	WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
 	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_REPAIR_SOCK, &repair_sock, &socklen);
@@ -1035,10 +1112,15 @@ receiver_thread (
 
 	do {
 		struct timeval tv;
-#ifndef _WIN32
+#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 		int timeout;
-#else
+#elif defined(CONFIG_HAVE_WSAPOLL)
+		DWORD dwTimeout;
+#elif defined(CONFIG_WSA_WAIT)
 		DWORD dwTimeout, dwEvents;
+#else
+		int n_fds;
+		fd_set readfds;
 #endif
 		size_t len;
 		pgm_error_t* pgm_err = NULL;
@@ -1087,10 +1169,14 @@ receiver_thread (
 		case PGM_IO_STATUS_WOULD_BLOCK:
 //g_message ("would block");
 block:
-#ifndef _WIN32
+#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 /* busy wait under 2ms */
 			if (timeout > 0 && timeout < 2) timeout = 0;
+#elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+/* busy wait under 2ms */
+			if (dwTimeout < 2) dwTimeout = 0;
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
@@ -1100,14 +1186,34 @@ block:
 			fds[0].events = POLLIN;
 			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
-#elif defined(_WIN32)
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+#elif defined(CONFIG_HAVE_WSAPOLL)
+			ZeroMemory (fds, sizeof(fds));
+			fds[0].fd = g_quit_socket[0];
+			fds[0].events = POLLRDNORM;
+			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLRDNORM);
+			WSAPoll (fds, 1 + n_fds, dwTimeout /* ms */);
+#elif defined(CONFIG_WSA_WAIT)
+#	ifdef CONFIG_HAVE_IOCP
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, TRUE);
+			if (WSA_WAIT_IO_COMPLETION == dwEvents)
+#	endif
 			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
 			if ((WSA_WAIT_FAILED != dwEvents) && (WSA_WAIT_TIMEOUT != dwEvents)) {
 				const DWORD Index = dwEvents - WSA_WAIT_EVENT_0;
 /* Do not reset quit event */
 				if (Index > 0) WSAResetEvent (waitEvents[Index]);
 			}
+#else
+			FD_ZERO(&readfds);
+#	ifndef _WIN32
+			FD_SET(g_quit_pipe[0], &readfds);
+			n_fds = g_quit_pipe[0] + 1;		/* highest fd + 1 */
+#	else
+			FD_SET(g_quit_socket[0], &readfds);
+			n_fds = 1;				/* count of fds */
+#	endif
+			pgm_select_info (g_sock, &readfds, NULL, &n_fds);
+			n_fds = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #endif /* !CONFIG_HAVE_EPOLL */
 			break;
 		case PGM_IO_STATUS_RESET:
@@ -1133,10 +1239,10 @@ block:
 		}
 	} while (!g_quit);
 
-#ifdef CONFIG_HAVE_EPOLL
+#if defined(CONFIG_HAVE_EPOLL)
 	close (efd);
-#endif
-#ifdef _WIN32
+#elif defined(CONFIG_WSA_WAIT)
+	WSACloseEvent (waitEvents[0]);
 	WSACloseEvent (waitEvents[1]);
 	WSACloseEvent (waitEvents[2]);
 	WSACloseEvent (waitEvents[3]);

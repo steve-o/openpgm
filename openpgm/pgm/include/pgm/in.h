@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * Compiler feature flags.
+ * Sections 5 and 8.2 of RFC 3768: Multicast group request
  *
  * Copyright (c) 2010 Miru Limited.
  *
@@ -19,29 +19,31 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined (__PGM_IMPL_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
-#       error "Only <framework.h> can be included directly."
-#endif
-
 #pragma once
-#ifndef __PGM_IMPL_FEATURES_H__
-#define __PGM_IMPL_FEATURES_H__
+#ifndef __PGM_IN_H__
+#define __PGM_IN_H__
 
-#if defined(_POSIX_C_SOURCE) || defined(__POSIX_VISIBLE)
-#	if (_POSIX_C_SOURCE - 0) >= 200112L || (__POSIX_VISIBLE - 0) >= 200112L
-#		define CONFIG_HAVE_FTIME		1
-#		define CONFIG_HAVE_GETTIMEOFDAY		1
-#	endif
-#	if (_POSIX_C_SOURCE - 0) >= 199309L || (__POSIX_VISIBLE - 0) >= 199309L
-#		define CONFIG_HAVE_CLOCK_GETTIME	1
-#	endif
-#endif
-#if defined(_WIN32)
-#	define CONFIG_HAVE_FTIME		1
-#endif
-#if defined(__APPLE__)
-#	define CONFIG_HAVE_FTIME		1
-#	define CONFIG_HAVE_GETTIMEOFDAY		1
-#endif
+#include <sys/types.h>
+#include <sys/socket.h>
 
-#endif /* __PGM_IMPL_FEATURES_H__ */
+/* sections 5 and 8.2 of RFC 3768: Multicast group request */
+struct group_req
+{
+	uint32_t		gr_interface;	/* interface index */
+	struct sockaddr_storage	gr_group;	/* group address */
+};
+
+struct group_source_req
+{
+	uint32_t		gsr_interface;	/* interface index */
+	struct sockaddr_storage	gsr_group;	/* group address */
+	struct sockaddr_storage	gsr_source;	/* group source */
+};
+
+PGM_BEGIN_DECLS
+
+/* nc */
+
+PGM_END_DECLS
+
+#endif /* __PGM_IN_H__ */

@@ -32,6 +32,9 @@
 #	include <sys/socket.h>
 #	include <netdb.h>
 #endif
+#ifdef __APPLE__
+#	include <pgm/in.h>
+#endif
 #include <pgm/types.h>
 #include <impl/security.h>
 #include <impl/wsastrerror.h>

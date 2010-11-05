@@ -31,6 +31,9 @@
 #else
 #	include <process.h>
 #endif
+#ifdef __APPLE__
+#	include <pgm/in.h>
+#endif
 #include <pgm/pgm.h>
 
 #include "async.h"

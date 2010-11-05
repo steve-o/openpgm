@@ -1263,7 +1263,7 @@ START_TEST (test_parse_transport_fail_006)
 {
         const char* s = ";";
 	struct pgm_addrinfo_t hints = {
-		.ai_family	= AF_IPX
+		.ai_family	= AF_SNA
 	}, *res = NULL;
 	pgm_error_t* err = NULL;
 
