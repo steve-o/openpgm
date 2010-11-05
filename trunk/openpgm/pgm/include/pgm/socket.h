@@ -172,7 +172,9 @@ int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const 
 bool pgm_getsockname (pgm_sock_t*const restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
 int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
 #ifdef CONFIG_HAVE_POLL
-int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const int);
+int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const short);
+#elif defined(CONFIG_HAVE_WSAPOLL)
+int pgm_poll_info (pgm_sock_t*const restrict, WSAPOLLFD*const restrict, ULONG*const restrict, const short);
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);

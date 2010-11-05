@@ -140,7 +140,7 @@ pgm_print_packet (
 
 /* packets that fail checksum will generally not be passed upstream except with rfc3828
  */
-	const uint16_t ip_sum = pgm_inet_checksum(data, packet_length, 0);
+	const uint16_t ip_sum = pgm_inet_checksum(data, (uint16_t)packet_length, 0);
 	if (ip_sum != 0) {
 		const uint16_t encoded_ip_sum = ntohs(ip->ip_sum);
 		printf (", bad cksum! %i", encoded_ip_sum);

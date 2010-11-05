@@ -417,7 +417,7 @@ parse_interface (
 		}
 	}
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 /* network name into network address, can be expensive with NSS network lookup
  *
  * Only Class A, B or C networks are supported, partitioned networks
@@ -802,7 +802,7 @@ parse_group (
 		return TRUE;
 	}
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__CYGWIN__)
 /* NSS network */
 	const struct netent* ne = getnetbyname (group);
 /* ne::n_net in host byte order */
@@ -1658,9 +1658,9 @@ pgm_getaddrinfo (
 	const size_t send_list_len = pgm_list_length (send_list);
 	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
 			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
-	ai->ai_recv_addrs_len = recv_list_len;
+	ai->ai_recv_addrs_len = (uint32_t)recv_list_len;
 	ai->ai_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
-	ai->ai_send_addrs_len = send_list_len;
+	ai->ai_send_addrs_len = (uint32_t)send_list_len;
 	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
 
 	size_t i = 0;

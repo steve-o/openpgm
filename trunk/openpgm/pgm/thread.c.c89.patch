@@ -1,5 +1,5 @@
---- thread.c	2010-10-12 12:23:26.000000000 +0800
-+++ thread.c89.c	2010-10-12 12:22:35.000000000 +0800
+--- thread.c	2010-11-05 05:13:54.000000000 +0800
++++ thread.c89.c	2010-11-05 05:13:36.000000000 +0800
 @@ -107,9 +107,11 @@
  #ifndef _WIN32
  	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
@@ -32,10 +32,10 @@
  #endif /* !_WIN32 */
  }
  
-@@ -169,11 +175,13 @@
+@@ -171,11 +177,13 @@
  	pgm_assert (NULL != spinlock);
  
- #ifndef _WIN32
+ #ifdef CONFIG_HAVE_POSIX_SPINLOCK
 +	{
  	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
  	if (EBUSY == result)
@@ -43,10 +43,10 @@
  	posix_check_err (result, "pthread_spinlock_trylock");
  	return TRUE;
 +	}
- #else
+ #elif defined(_WIN32)
  	return TryEnterCriticalSection (&spinlock->win32_spinlock);
- #endif /* !_WIN32 */
-@@ -248,8 +256,11 @@
+ #else	/* GCC atomics */
+@@ -256,8 +264,11 @@
  	WakeAllConditionVariable (&cond->win32_cond);
  #else
  	EnterCriticalSection (&cond->win32_spinlock);
@@ -59,7 +59,7 @@
  	cond->len = 0;
  	LeaveCriticalSection (&cond->win32_spinlock);
  #endif /* !_WIN32 */
-@@ -280,6 +291,7 @@
+@@ -288,6 +299,7 @@
  #	if defined(CONFIG_HAVE_WIN_COND)
  	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
  #	else
@@ -67,7 +67,7 @@
  	DWORD status;
  	HANDLE event = TlsGetValue (cond_event_tls);
  
-@@ -303,7 +315,9 @@
+@@ -311,7 +323,9 @@
  
  	if (WAIT_TIMEOUT == status) {
  		EnterCriticalSection (&cond->win32_spinlock);
@@ -78,7 +78,7 @@
  			if (cond->phandle[ i ] == event) {
  				if (i != cond->len - 1)
  					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
-@@ -311,9 +325,11 @@
+@@ -319,9 +333,11 @@
  				break;
  			}
  		}
@@ -90,7 +90,16 @@
  #	endif /* !CONFIG_HAVE_WIN_COND */
  }
  #endif /* !_WIN32 */
-@@ -414,7 +430,7 @@
+@@ -351,7 +367,7 @@
+ 	pgm_assert (NULL != rwlock);
+ 
+ #ifdef CONFIG_HAVE_WIN_SRW_LOCK
+-	InitializeSRWLock (&rwlock->win32_lock);
++	InitializeSRWLock (&rwlock->win32_rwlock);
+ #elif !defined(_WIN32)
+ 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
+ #else
+@@ -422,7 +438,7 @@
  	bool status = FALSE;
  
  	pgm_assert (NULL != rwlock);

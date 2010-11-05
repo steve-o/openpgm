@@ -413,8 +413,13 @@ pgm_sockaddr_router_alert (
 	const int optlen = v ? sizeof(router_alert) : 0;
 #	else
 /* manually set the IP option */
+#		ifndef _WIN32
 	const int ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
 	const int router_alert = htonl (ipopt_ra);
+#		else
+	const DWORD ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
+	const DWORD router_alert = htonl (ipopt_ra);
+#		endif
 	const int optlen = v ? sizeof(router_alert) : 0;
 #	endif
 
@@ -423,7 +428,6 @@ pgm_sockaddr_router_alert (
 /* Linux:ip(7) "The maximum option size for IPv4 is 40 bytes."
  */
 		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&router_alert, optlen);
-retval = 0;
 		break;
 
 	default: break;

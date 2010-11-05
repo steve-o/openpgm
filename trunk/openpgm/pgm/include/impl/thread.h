@@ -50,10 +50,12 @@ struct pgm_mutex_t {
 };
 
 struct pgm_spinlock_t {
-#ifndef _WIN32
+#ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spinlock_t	pthread_spinlock;
-#else
+#elif defined(_WIN32)
 	CRITICAL_SECTION	win32_spinlock;
+#else
+	volatile uint32_t	taken;
 #endif
 };
 
@@ -74,8 +76,7 @@ struct pgm_rwlock_t {
 #ifndef _WIN32
 	pthread_rwlock_t	pthread_rwlock;
 #elif CONFIG_HAVE_WIN_SRW_LOCK
-	SRWLOCK			win32_lock;
-	pthread_rwlock_t	pthread_rwlock;
+	SRWLOCK			win32_rwlock;
 #else
 	CRITICAL_SECTION	win32_spinlock;
 	pgm_cond_t		read_cond;
@@ -112,19 +113,26 @@ PGM_GNUC_INTERNAL void pgm_spinlock_free (pgm_spinlock_t*);
 PGM_GNUC_INTERNAL bool pgm_spinlock_trylock (pgm_spinlock_t*);
 
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
-#ifndef _WIN32
+#ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spin_lock (&spinlock->pthread_spinlock);
-#else
+#elif defined(_WIN32)
 	EnterCriticalSection (&spinlock->win32_spinlock);
-#endif /* !_WIN32 */
+#else /* GCC atomics */
+	uint32_t prev;
+	do {
+		prev = __sync_lock_test_and_set (&spinlock->taken, 1);
+	} while (prev);
+#endif
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
-#ifndef _WIN32
+#ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
-#else
+#elif defined(_WIN32)
 	LeaveCriticalSection (&spinlock->win32_spinlock);
-#endif /* !_WIN32 */
+#else /* GCC atomics */
+	spinlock->taken = 0;
+#endif
 }
 
 PGM_GNUC_INTERNAL void pgm_cond_init (pgm_cond_t*);
@@ -158,22 +166,22 @@ static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
 }
 #elif defined(CONFIG_HAVE_WIN_SRW_LOCK)
 static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
-	AcquireSRWLockShared (&rwlock->win32_lock);
+	AcquireSRWLockShared (&rwlock->win32_rwlock);
 }
 static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
-	return TryAcquireSRWLockShared (&rwlock->win32_lock);
+	return TryAcquireSRWLockShared (&rwlock->win32_rwlock);
 }
 static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
-	ReleaseSRWLockShared (&rwlock->win32_lock);
+	ReleaseSRWLockShared (&rwlock->win32_rwlock);
 }
 static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
-	AcquireSRWLockExclusive (&rwlock->win32_lock);
+	AcquireSRWLockExclusive (&rwlock->win32_rwlock);
 }
 static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
-	return AcquireSRWLockExclusive (&rwlock->win32_lock);
+	return TryAcquireSRWLockExclusive (&rwlock->win32_rwlock);
 }
 static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
-	ReleaseSRWLockExclusive (&rwlock->win32_lock);
+	ReleaseSRWLockExclusive (&rwlock->win32_rwlock);
 }
 #else
 PGM_GNUC_INTERNAL void pgm_rwlock_reader_lock (pgm_rwlock_t*);
