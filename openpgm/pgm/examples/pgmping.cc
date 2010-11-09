@@ -913,9 +913,8 @@ again:
 /* busy wait under 2ms */
 			if (timeout < 2) timeout = 0;
 #elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
-			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
-/* busy wait under 2ms */
-			if (dwTimeout < 2) dwTimeout = 0;
+/* round up wait */
+			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 999) / 1000);
 #endif
 #if defined(CONFIG_HAVE_EPOLL)
 			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
@@ -1170,13 +1169,12 @@ receiver_thread (
 //g_message ("would block");
 block:
 #if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
-			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000));
 /* busy wait under 2ms */
 			if (timeout > 0 && timeout < 2) timeout = 0;
 #elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-/* busy wait under 2ms */
-			if (dwTimeout < 2) dwTimeout = 0;
+/* round up wait */
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + ((tv.tv_usec + 999) / 1000));
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
