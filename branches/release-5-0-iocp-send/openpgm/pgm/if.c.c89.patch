@@ -1,0 +1,347 @@
+--- if.c	2010-11-05 06:10:04.000000000 +0800
++++ if.c89.c	2010-11-05 06:09:37.000000000 +0800
+@@ -124,6 +124,7 @@
+ 			continue;
+ 		}
+ 
++		{
+ 		char saddr[INET6_ADDRSTRLEN];
+ 		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
+ 			     saddr, sizeof(saddr),
+@@ -140,6 +141,7 @@
+ 			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
+ 			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
+ 			);
++		}
+ 	}
+ 
+ 	pgm_freeifaddrs (ifap);
+@@ -187,10 +189,13 @@
+ 	pgm_assert (NULL != src);
+ 	pgm_assert (NULL != netmask);
+ 
+-	for (unsigned i = 0; i < 16; i++) {
++	{
++	unsigned i;
++	for (i = 0; i < 16; i++) {
+ 		dst->s6_addr[i] = src->s6_addr[i] & netmask->s6_addr[i];
+ 		has_lna |= (0 != (src->s6_addr[i] & !netmask->s6_addr[i]));
+ 	}
++	}
+ 
+ 	return has_lna;
+ }
+@@ -208,14 +213,17 @@
+ 	pgm_assert (NULL != netmask);
+ 
+ #ifdef IF_DEBUG
+-	const struct in_addr taddr    = { .s_addr = htonl (addr->s_addr) };
+-	const struct in_addr tnetaddr = { .s_addr = htonl (netaddr->s_addr) };
+-	const struct in_addr tnetmask = { .s_addr = htonl (netmask->s_addr) };
++	{
+ 	char saddr[INET_ADDRSTRLEN], snetaddr[INET_ADDRSTRLEN], snetmask[INET_ADDRSTRLEN];
++	struct in_addr taddr, tnetaddr, tnetmask;
++	taddr.s_addr	= htonl (addr->s_addr);
++	tnetaddr.s_addr	= htonl (netaddr->s_addr);
++	tnetmask.s_addr	= htonl (netmask->s_addr);
+ 	pgm_debug ("is_in_net (addr:%s netaddr:%s netmask:%s)",
+ 		 pgm_inet_ntop (AF_INET, &taddr,    saddr,    sizeof(saddr)),
+ 		 pgm_inet_ntop (AF_INET, &tnetaddr, snetaddr, sizeof(snetaddr)),
+ 		 pgm_inet_ntop (AF_INET, &tnetmask, snetmask, sizeof(snetmask)));
++	}
+ #endif
+ 
+ 	if ((addr->s_addr & netmask->s_addr) == (netaddr->s_addr & netmask->s_addr))
+@@ -236,16 +244,21 @@
+ 	pgm_assert (NULL != netmask);
+ 
+ #ifdef IF_DEBUG
++	{
+ 	char saddr[INET6_ADDRSTRLEN], snetaddr[INET6_ADDRSTRLEN], snetmask[INET6_ADDRSTRLEN];
+ 	pgm_debug ("is_in_net6 (addr:%s netaddr:%s netmask:%s)",
+ 		 pgm_inet_ntop (AF_INET6, addr, saddr, sizeof(saddr)),
+ 		 pgm_inet_ntop (AF_INET6, netaddr, snetaddr, sizeof(snetaddr)),
+ 		 pgm_inet_ntop (AF_INET6, netmask, snetmask, sizeof(snetmask)));
++	}
+ #endif
+ 
+-	for (unsigned i = 0; i < 16; i++)
++	{
++	unsigned i;
++	for (i = 0; i < 16; i++)
+ 		if ((addr->s6_addr[i] & netmask->s6_addr[i]) != (netaddr->s6_addr[i] & netmask->s6_addr[i]))
+ 			return FALSE;
++	}
+ 	return TRUE;
+ }
+ 
+@@ -319,8 +332,11 @@
+ 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
+ 	{
+ #ifdef IF_DEBUG
+-		struct in_addr t = { .s_addr = htonl (in_addr.s_addr) };
++		{
++		struct in_addr t;
++		t.s_addr = htonl (in_addr.s_addr);
+ 		pgm_debug ("IPv4 network address: %s", inet_ntoa (t));
++		}
+ #endif
+ 		if (IN_MULTICAST(in_addr.s_addr)) {
+ 			pgm_set_error (error,
+@@ -330,11 +346,13 @@
+ 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
+ 			return FALSE;
+ 		}
++		{
+ 		struct sockaddr_in s4;
+ 		memset (&s4, 0, sizeof(s4));
+ 		s4.sin_family = AF_INET;
+ 		s4.sin_addr.s_addr = htonl (in_addr.s_addr);
+ 		memcpy (&addr, &s4, sizeof(s4));
++		}
+ 
+ 		check_inet_network = TRUE;
+ 		check_addr = TRUE;
+@@ -349,11 +367,13 @@
+ 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
+ 			return FALSE;
+ 		}
++		{
+ 		struct sockaddr_in6 s6;
+ 		memset (&s6, 0, sizeof(s6));
+ 		s6.sin6_family = AF_INET6;
+ 		s6.sin6_addr = in6_addr;
+ 		memcpy (&addr, &s6, sizeof(s6));
++		}
+ 
+ 		check_inet6_network = TRUE;
+ 		check_addr = TRUE;
+@@ -363,12 +383,13 @@
+ 	if (!check_addr)
+ 	{
+ 		char errbuf[1024];
+-		struct addrinfo hints = {
+-			.ai_family	= family,
+-			.ai_socktype	= SOCK_STREAM,				/* not really, SOCK_RAW */
+-			.ai_protocol	= IPPROTO_TCP,				/* not really, IPPROTO_PGM */
+-			.ai_flags	= AI_ADDRCONFIG | AI_NUMERICHOST	/* AI_V4MAPPED is unhelpful */
+-		}, *res;
++		struct addrinfo hints, *res;
++		memset (&hints, 0, sizeof(hints));
++		hints.ai_family		= family;
++		hints.ai_socktype	= SOCK_STREAM;				/* not really, SOCK_RAW */
++		hints.ai_protocol	= IPPROTO_TCP;				/* not really, IPPROTO_PGM */
++		hints.ai_flags		= AI_ADDRCONFIG | AI_NUMERICHOST;	/* AI_V4MAPPED is unhelpful */
++		{
+ 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
+ 		switch (eai) {
+ 		case 0:
+@@ -415,6 +436,7 @@
+ 				     eai);
+ 			return FALSE;
+ 		}
++		}
+ 	}
+ 
+ #if !defined(_WIN32) && !defined(__CYGWIN__)
+@@ -496,12 +518,13 @@
+ 	if (!check_addr)
+ 	{
+ 		char errbuf[1024];
+-		struct addrinfo hints = {
+-			.ai_family	= family,
+-			.ai_socktype	= SOCK_STREAM,		/* not really, SOCK_RAW */
+-			.ai_protocol	= IPPROTO_TCP,		/* not really, IPPROTO_PGM */
+-			.ai_flags	= AI_ADDRCONFIG,	/* AI_V4MAPPED is unhelpful */
+-		}, *res;
++		struct addrinfo hints, *res;
++		memset (&hints, 0, sizeof(hints));
++		hints.ai_family		= family;
++		hints.ai_socktype	= SOCK_STREAM;		/* not really, SOCK_RAW */
++		hints.ai_protocol	= IPPROTO_TCP;		/* not really, IPPROTO_PGM */
++		hints.ai_flags		= AI_ADDRCONFIG;	/* AI_V4MAPPED is unhelpful */
++		{
+ 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
+ 		switch (eai) {
+ 		case 0:
+@@ -548,6 +571,7 @@
+ 				     eai);
+ 			return FALSE;
+ 		}
++		}
+ 	}
+ 
+ /* iterate through interface list and match device name, ip or net address */
+@@ -580,6 +604,7 @@
+ 			continue;
+ 		}
+ 
++		{
+ 		const unsigned ifindex = pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
+ 		pgm_assert (0 != ifindex);
+ 
+@@ -603,9 +628,9 @@
+ 		if (check_inet_network &&
+ 		    AF_INET == ifa->ifa_addr->sa_family)
+ 		{
+-			const struct in_addr ifaddr  = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
+-			const struct in_addr netmask = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
+-			struct in_addr lna;
++			struct in_addr ifaddr, netmask, lna;
++			ifaddr.s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr);
++			netmask.s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr);
+ 
+ /* local network address must be null, otherwise should match an address is previous check */
+ 			if (!pgm_inet_lnaof (&lna, &in_addr, &netmask) &&
+@@ -707,7 +732,7 @@
+ 			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
+ 			continue;
+ 		}
+-
++		}
+ 	}
+ 
+ 	if (0 == interface_matches) {
+@@ -872,13 +897,14 @@
+ #endif /* _WIN32 */
+ 
+ /* lookup group through name service */
+-	struct addrinfo hints = {
+-		.ai_family	= family,
+-		.ai_socktype	= SOCK_STREAM,		/* not really, SOCK_RAW */
+-		.ai_protocol	= IPPROTO_TCP,		/* not really, IPPROTO_PGM */
+-		.ai_flags	= AI_ADDRCONFIG,	/* AI_V4MAPPED is unhelpful */
+-	}, *res;
+-
++	{
++	struct addrinfo hints, *res;
++	memset (&hints, 0, sizeof(hints));
++	hints.ai_family		= family;
++	hints.ai_socktype	= SOCK_STREAM;		/* not really, SOCK_RAW */
++	hints.ai_protocol	= IPPROTO_TCP;		/* not really, IPPROTO_PGM */
++	hints.ai_flags		= AI_ADDRCONFIG;	/* AI_V4MAPPED is unhelpful */
++	{
+ 	const int eai = getaddrinfo (group, NULL, &hints, &res);
+ 	if (0 != eai) {
+ 		char errbuf[1024];
+@@ -906,6 +932,8 @@
+ 		     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
+ 	freeaddrinfo (res);
+ 	return FALSE;
++	}
++	}
+ }
+ 
+ /* parse an interface entity from a network parameter.
+@@ -959,6 +987,7 @@
+ 	}
+ 
+ /* check interface name length limit */
++	{
+ 	char** tokens = pgm_strsplit (entity, ",", 10);
+ 	int j = 0;
+ 	while (tokens && tokens[j])
+@@ -993,6 +1022,7 @@
+ 
+ 	pgm_strfreev (tokens);
+ 	*interface_list = source_list;
++	}
+ 	return TRUE;
+ }
+ 
+@@ -1035,6 +1065,7 @@
+ 		(const void*)recv_list,
+ 		(const void*)error);
+ 
++	{
+ 	struct group_source_req* recv_gsr;
+ 	struct interface_req* primary_interface = (struct interface_req*)pgm_memdup ((*interface_list)->data, sizeof(struct interface_req));
+ 
+@@ -1047,6 +1078,7 @@
+ 		recv_gsr->gsr_group.ss_family = family;
+ 
+ /* track IPv6 scope from any resolved interface */
++		{
+ 		unsigned scope_id = 0;
+ 
+ /* if using unspec default group check the interface for address family
+@@ -1152,11 +1184,13 @@
+ 		*recv_list = pgm_list_append (*recv_list, recv_gsr);
+ 		pgm_free (primary_interface);
+ 		return TRUE;
++		}
+ 	}
+ 
+ /* parse one or more multicast receive groups.
+  */
+ 
++	{
+ 	int j = 0;	
+ 	char** tokens = pgm_strsplit (entity, ",", 10);
+ 	while (tokens && tokens[j])
+@@ -1233,6 +1267,8 @@
+ 	pgm_strfreev (tokens);
+ 	pgm_free (primary_interface);
+ 	return TRUE;
++	}
++	}
+ }
+ 
+ static
+@@ -1262,6 +1298,7 @@
+ 		(const void*)send_list,
+ 		(const void*)error);
+ 
++	{
+ 	struct group_source_req* send_gsr;
+ 	const struct interface_req* primary_interface = (struct interface_req*)(*interface_list)->data;
+ 
+@@ -1316,6 +1353,7 @@
+ 
+ 	*send_list = pgm_list_append (*send_list, send_gsr);
+ 	return TRUE;
++	}
+ }
+ 
+ /* parse network parameter
+@@ -1448,6 +1486,7 @@
+ 			}
+ 
+ /* entity from b to p-1 */
++			{
+ 			char entity[1024];
+ 			pgm_strncpy_s (entity, sizeof (entity), b, p - b);
+ 
+@@ -1505,6 +1544,7 @@
+ 
+ 			b = ++p;
+ 			continue;
++			}
+ 		}
+ 
+ 		p++;
+@@ -1654,6 +1694,7 @@
+ 
+ 	if (!network_parse (network, family, &recv_list, &send_list, error))
+ 		return FALSE;
++	{
+ 	const size_t recv_list_len = pgm_list_length (recv_list);
+ 	const size_t send_list_len = pgm_list_length (send_list);
+ 	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
+@@ -1663,6 +1704,7 @@
+ 	ai->ai_send_addrs_len = (uint32_t)send_list_len;
+ 	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
+ 
++	{
+ 	size_t i = 0;
+ 	while (recv_list) {
+ 		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
+@@ -1677,6 +1719,8 @@
+ 	}
+ 	*res = ai;
+ 	return TRUE;
++	}
++	}
+ }
+ 
+ void

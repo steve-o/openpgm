@@ -1,0 +1,53 @@
+diff -urN include-original/./ws2tcpip.h x86_64-w64-mingw32/include/./ws2tcpip.h
+--- include-original/./ws2tcpip.h	2009-09-10 13:36:49.000000000 +0800
++++ x86_64-w64-mingw32/include/./ws2tcpip.h	2010-01-21 14:59:13.000000000 +0800
+@@ -12,6 +12,25 @@
+ 
+ #include <ws2ipdef.h>
+ 
++struct group_req {
++	u_long		gr_interface;
++	struct sockaddr_storage gr_group;
++};
++
++struct group_source_req {
++	u_long		gsr_interface;
++	struct sockaddr_storage	gsr_group;
++	struct sockaddr_storage gsr_source;
++};
++
++struct group_filter {
++	u_long		gf_interface;
++	struct sockaddr_storage	gf_group;
++	u_long		gf_fmode;
++	u_long		gf_numsrc;
++	struct sockaddr_storage	gf_slist[1];
++};
++
+ struct ip_msfilter {
+   struct in_addr imsf_multiaddr;
+   struct in_addr imsf_interface;
+@@ -22,6 +41,15 @@
+ 
+ #define IP_MSFILTER_SIZE(numsrc) (sizeof(struct ip_msfilter)-sizeof(struct in_addr) + (numsrc)*sizeof(struct in_addr))
+ 
++/* RFC 3768 */
++#define MCAST_JOIN_GROUP	41
++#define MCAST_LEAVE_GROUP	42
++#define MCAST_BLOCK_SOURCE	43
++#define MCAST_UNBLOCK_SOURCE	44
++#define MCAST_JOIN_SOURCE_GROUP	45
++#define MCAST_LEAVE_SOURCE_GROUP	46
++#define MCAST_MSFILTER		47
++
+ #define MCAST_INCLUDE 0
+ #define MCAST_EXCLUDE 1
+ 
+@@ -277,6 +305,7 @@
+ #define AI_PASSIVE 0x1
+ #define AI_CANONNAME 0x2
+ #define AI_NUMERICHOST 0x4
++#define AI_ADDRCONFIG	0x20
+ 
+ #ifdef __cplusplus
+ extern "C" {

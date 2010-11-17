@@ -1,0 +1,110 @@
+--- thread.c	2010-11-05 05:13:54.000000000 +0800
++++ thread.c89.c	2010-11-05 05:13:36.000000000 +0800
+@@ -107,9 +107,11 @@
+ #ifndef _WIN32
+ 	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
+ #else
++	{
+ 	HANDLE handle;
+ 	win32_check_cmd (NULL != (handle = CreateMutex (NULL, FALSE, NULL)));
+ 	mutex->win32_mutex = handle;
++	}
+ #endif /* !_WIN32 */
+ }
+ 
+@@ -121,15 +123,19 @@
+ 	pgm_assert (NULL != mutex);
+ 
+ #ifndef _WIN32
++	{
+ 	const int result = pthread_mutex_trylock (&mutex->pthread_mutex);
+ 	if (EBUSY == result)
+ 		return FALSE;
+ 	posix_check_err (result, "pthread_mutex_trylock");
+ 	return TRUE;
++	}
+ #else
++	{
+ 	DWORD result;
+ 	win32_check_cmd (WAIT_FAILED != (result = WaitForSingleObject (mutex->win32_mutex, 0)));
+ 	return WAIT_TIMEOUT != result;
++	}
+ #endif /* !_WIN32 */
+ }
+ 
+@@ -171,11 +177,13 @@
+ 	pgm_assert (NULL != spinlock);
+ 
+ #ifdef CONFIG_HAVE_POSIX_SPINLOCK
++	{
+ 	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
+ 	if (EBUSY == result)
+ 		return FALSE;
+ 	posix_check_err (result, "pthread_spinlock_trylock");
+ 	return TRUE;
++	}
+ #elif defined(_WIN32)
+ 	return TryEnterCriticalSection (&spinlock->win32_spinlock);
+ #else	/* GCC atomics */
+@@ -256,8 +264,11 @@
+ 	WakeAllConditionVariable (&cond->win32_cond);
+ #else
+ 	EnterCriticalSection (&cond->win32_spinlock);
+-	for (unsigned i = 0; i < cond->len; i++)
++	{
++	unsigned i;
++	for (i = 0; i < cond->len; i++)
+ 		SetEvent (cond->phandle[ i ]);
++	}
+ 	cond->len = 0;
+ 	LeaveCriticalSection (&cond->win32_spinlock);
+ #endif /* !_WIN32 */
+@@ -288,6 +299,7 @@
+ #	if defined(CONFIG_HAVE_WIN_COND)
+ 	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
+ #	else
++	{
+ 	DWORD status;
+ 	HANDLE event = TlsGetValue (cond_event_tls);
+ 
+@@ -311,7 +323,9 @@
+ 
+ 	if (WAIT_TIMEOUT == status) {
+ 		EnterCriticalSection (&cond->win32_spinlock);
+-		for (unsigned i = 0; i < cond->len; i++) {
++		{
++		unsigned i;
++		for (i = 0; i < cond->len; i++) {
+ 			if (cond->phandle[ i ] == event) {
+ 				if (i != cond->len - 1)
+ 					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
+@@ -319,9 +333,11 @@
+ 				break;
+ 			}
+ 		}
++		}
+ 		win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, 0)));
+ 		LeaveCriticalSection (&cond->win32_spinlock);
+ 	}
++	}
+ #	endif /* !CONFIG_HAVE_WIN_COND */
+ }
+ #endif /* !_WIN32 */
+@@ -351,7 +367,7 @@
+ 	pgm_assert (NULL != rwlock);
+ 
+ #ifdef CONFIG_HAVE_WIN_SRW_LOCK
+-	InitializeSRWLock (&rwlock->win32_lock);
++	InitializeSRWLock (&rwlock->win32_rwlock);
+ #elif !defined(_WIN32)
+ 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
+ #else
+@@ -422,7 +438,7 @@
+ 	bool status = FALSE;
+ 
+ 	pgm_assert (NULL != rwlock);
+-
++	
+ 	EnterCriticalSection (&rwlock->win32_spinlock);
+ 	if (!rwlock->have_writer && !rwlock->want_to_write) {
+ 		rwlock->read_counter++;
