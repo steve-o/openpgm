@@ -38,8 +38,17 @@ struct pgm_sk_buff_t;
 
 PGM_BEGIN_DECLS
 
+typedef enum tag_IO_OPERATION {
+	IO_OPERATION_SEND,
+	IO_OPERATION_RECV,
+	IO_OPERATION_SHUTDOWN
+} IO_OPERATION, *PIO_OPERATION;
+
 struct pgm_sk_buff_t {
 	pgm_list_t			link_;
+
+	WSAOVERLAPPED			Overlapped;
+	IO_OPERATION			IOOperation;
 
 	pgm_sock_t* restrict		sock;
 	pgm_time_t			tstamp;
@@ -88,7 +97,17 @@ pgm_alloc_skb (
 {
 	struct pgm_sk_buff_t* skb;
 
+/*	if (NULL == hHeap)
+		hHeap = HeapCreate (0, 0, 0);
+	HeapLock (hHeap);
+	skb = (struct pgm_sk_buff_t*)HeapAlloc (hHeap, 0, size + sizeof(struct pgm_sk_buff_t));
+	HeapUnlock (hHeap); */
+//	skb = (struct pgm_sk_buff_t*)Alloc (size + sizeof(struct pgm_sk_buff_t));
 	skb = (struct pgm_sk_buff_t*)pgm_malloc (size + sizeof(struct pgm_sk_buff_t));
+/*	skb = (struct pgm_sk_buff_t*)VirtualAlloc (NULL,
+						   size + sizeof(struct pgm_sk_buff_t),
+						   MEM_COMMIT | MEM_RESERVE,
+						   PAGE_READWRITE);*/
 /* Requires fast FSB to test
 	pgm_prefetchw (skb);
  */
@@ -123,8 +142,14 @@ pgm_free_skb (
 	struct pgm_sk_buff_t*const skb
 	)
 {
-	if (pgm_atomic_exchange_and_add32 (&skb->users, (uint32_t)-1) == 1)
+	if (pgm_atomic_exchange_and_add32 (&skb->users, (uint32_t)-1) == 1) {
 		pgm_free (skb);
+//		VirtualFree ((LPVOID)skb, 0, MEM_RELEASE);
+/*		HeapLock (hHeap);
+		HeapFree (hHeap, 0, (LPVOID)skb);
+		HeapUnlock (hHeap); */
+//		Free ((void*)skb);
+	}
 }
 
 /* add data */

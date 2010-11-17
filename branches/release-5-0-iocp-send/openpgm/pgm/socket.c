@@ -28,6 +28,7 @@
 #	include <sys/epoll.h>
 #endif
 #include <stdio.h>
+#include <process.h>
 #include <impl/i18n.h>
 #include <impl/framework.h>
 #include <impl/socket.h>
@@ -201,6 +202,43 @@ CLEANUP:
 	return (fIsAdmin);
 }
 #endif /* _MSC_VER */
+
+static
+unsigned
+__stdcall
+iocp_routine (
+	void*		arg
+	)
+{
+	HANDLE CompletionPort = (HANDLE)arg;
+
+	while (TRUE) {
+		DWORD dwNumberOfBytes = 0;
+		pgm_sock_t* sock = NULL;
+		LPOVERLAPPED lpOverlapped = NULL;
+		struct pgm_sk_buff_t* skb = NULL;
+		BOOL bSuccess = GetQueuedCompletionStatus (CompletionPort,
+							   &dwNumberOfBytes,
+							   (PDWORD_PTR)&sock,
+							   &lpOverlapped,
+							   INFINITE);
+		if (!bSuccess) {
+			printf ("GetQueuedCompletionStatus failed: %d\n", GetLastError());
+			break;
+		}
+
+		skb = (char*)lpOverlapped - offsetof(struct pgm_sk_buff_t, Overlapped);
+		if (IO_OPERATION_SHUTDOWN == skb->IOOperation) {
+			pgm_free_skb (skb);
+			break;
+		}
+
+		pgm_free_skb (skb);
+	}
+
+	_endthread();
+	return 0;
+}
 
 /* destroy a pgm_sock object and contents, if last sock also destroy
  * associated event loop
@@ -439,9 +477,11 @@ pgm_socket (
 		goto err_destroy;
 	}
 
-	if ((new_sock->send_sock = socket (new_sock->family,
-					   socket_type,
-					   new_sock->protocol)) == INVALID_SOCKET)
+	if ((new_sock->send_sock = WSASocket (new_sock->family,
+					      socket_type,
+					      new_sock->protocol,
+					      NULL,
+					      WSA_FLAG_OVERLAPPED)) == INVALID_SOCKET)
 	{
 		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
@@ -539,6 +579,39 @@ pgm_socket (
 				goto err_destroy;
 			}
 		}
+	}
+
+/* IOCP */
+	new_sock->iocp_port = CreateIoCompletionPort (INVALID_HANDLE_VALUE, NULL, 0, 0);
+	if (NULL == new_sock->iocp_port) {
+		pgm_warn ("CreateIoCompletionPort failed: %d", GetLastError());
+		goto err_destroy;
+	}
+	new_sock->iocp_port = CreateIoCompletionPort ((HANDLE)new_sock->send_sock, new_sock->iocp_port, (DWORD_PTR)new_sock, 0);
+	if (NULL == new_sock->iocp_port) {
+		pgm_warn ("CreateIoCompletionPort failed: %d", GetLastError());
+		goto err_destroy;
+	}
+/* expect warning on MinGW due to lack of native uintptr_t */
+	new_sock->iocp_thread = (HANDLE)_beginthreadex (NULL, 0, &iocp_routine, new_sock->iocp_port, 0, NULL);
+	if (0 == new_sock->iocp_thread) {
+		pgm_warn ("_beginthreadex failed: %d", GetLastError());
+		CloseHandle (new_sock->iocp_port);
+		goto err_destroy;
+	}
+/* 2nd iocp thread */
+	new_sock->iocp_thread = (HANDLE)_beginthreadex (NULL, 0, &iocp_routine, new_sock->iocp_port, 0, NULL);
+	if (0 == new_sock->iocp_thread) {
+		pgm_warn ("_beginthreadex failed: %d", GetLastError());
+		CloseHandle (new_sock->iocp_port);
+		goto err_destroy;
+	}
+/* 3rd iocp thread */
+	new_sock->iocp_thread = (HANDLE)_beginthreadex (NULL, 0, &iocp_routine, new_sock->iocp_port, 0, NULL);
+	if (0 == new_sock->iocp_thread) {
+		pgm_warn ("_beginthreadex failed: %d", GetLastError());
+		CloseHandle (new_sock->iocp_port);
+		goto err_destroy;
 	}
 
 	*sock = new_sock;
@@ -1040,9 +1113,13 @@ pgm_setsockopt (
  * operating system and sysctl dependent maximum, minimum on Linux 256 (doubled).
  */
 	case SO_SNDBUF:
-		if (SOCKET_ERROR == setsockopt (sock->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen) ||
+{
+const int zeroval = 0;
+const int zerolen = sizeof (zeroval);
+		if (SOCKET_ERROR == setsockopt (sock->send_sock, SOL_SOCKET, SO_SNDBUF, (const char*)&zeroval, zerolen) ||
 		    SOCKET_ERROR == setsockopt (sock->send_with_router_alert_sock, SOL_SOCKET, SO_SNDBUF, (const char*)optval, optlen))
 			break;
+}
 		status = TRUE;
 		break;
 
@@ -1453,7 +1530,7 @@ pgm_setsockopt (
 			break;
 		sock->is_nonblocking = (0 != *(const int*)optval);
 		pgm_sockaddr_nonblocking (sock->recv_sock, sock->is_nonblocking);
-		pgm_sockaddr_nonblocking (sock->send_sock, sock->is_nonblocking);
+//		pgm_sockaddr_nonblocking (sock->send_sock, sock->is_nonblocking);
 		pgm_sockaddr_nonblocking (sock->send_with_router_alert_sock, sock->is_nonblocking);
 		status = TRUE;
 		break;

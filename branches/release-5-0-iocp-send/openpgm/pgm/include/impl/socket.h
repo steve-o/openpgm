@@ -136,6 +136,9 @@ struct pgm_sock_t {
 		bool				is_rate_limited;
 	} pkt_dontwait_state;
 
+	HANDLE				iocp_port;
+	HANDLE				iocp_thread;
+
 	uint32_t			spm_sqn;
 	unsigned			spm_ambient_interval;	    /* microseconds */
 	unsigned* restrict		spm_heartbeat_interval;     /* zero terminated, zero lead-pad */

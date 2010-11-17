@@ -1167,13 +1167,13 @@ retry_send:
 		return PGM_IO_STATUS_CONGESTION;	/* peer expiration to re-elect ACKer */
 	}
 
-	sent = pgm_sendto (sock,
-			   sock->is_controlled_odata,	/* rate limited */
-			   FALSE,			/* regular socket */
-			   STATE(skb)->head,
-			   tpdu_length,
-			   (struct sockaddr*)&sock->send_gsr.gsr_group,
-			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+	sent = pgm_skb_sendto (sock,
+			       sock->is_controlled_odata,	/* rate limited */
+			       FALSE,			/* regular socket */
+			       STATE(skb),
+			       tpdu_length,
+			       (struct sockaddr*)&sock->send_gsr.gsr_group,
+			       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 	if (sent < 0) {
 		const int save_errno = pgm_get_last_sock_error();
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
@@ -1328,13 +1328,13 @@ retry_send:
 		return PGM_IO_STATUS_CONGESTION;
 	}
 
-	sent = pgm_sendto (sock,
-			   sock->is_controlled_odata,	/* rate limited */
-			   FALSE,			/* regular socket */
-			   STATE(skb)->head,
-			   tpdu_length,
-			   (struct sockaddr*)&sock->send_gsr.gsr_group,
-			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+	sent = pgm_skb_sendto (sock,
+			       sock->is_controlled_odata,	/* rate limited */
+			       FALSE,			/* regular socket */
+			       STATE(skb),
+			       tpdu_length,
+			       (struct sockaddr*)&sock->send_gsr.gsr_group,
+			       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 	if (sent < 0) {
 		const int save_errno = pgm_get_last_sock_error();
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
@@ -1479,13 +1479,13 @@ send_odatav (
 retry_send:
 	pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
 	tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
-	sent = pgm_sendto (sock,
-			   sock->is_controlled_odata,	/* rate limited */
-			   FALSE,			/* regular socket */
-			   STATE(skb)->head,
-			   tpdu_length,
-			   (struct sockaddr*)&sock->send_gsr.gsr_group,
-			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+	sent = pgm_skb_sendto (sock,
+			       sock->is_controlled_odata,	/* rate limited */
+			       FALSE,			/* regular socket */
+			       STATE(skb),
+			       tpdu_length,
+			       (struct sockaddr*)&sock->send_gsr.gsr_group,
+			       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 	if (sent < 0) {
 		const int save_errno = pgm_get_last_sock_error();
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
@@ -1648,13 +1648,13 @@ send_apdu (
 retry_send:
 		pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
-		sent = pgm_sendto (sock,
-				   !STATE(is_rate_limited),	/* rate limit on blocking */
-				   FALSE,			/* regular socket */
-				   STATE(skb)->head,
-				   tpdu_length,
-				   (struct sockaddr*)&sock->send_gsr.gsr_group,
-				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+		sent = pgm_skb_sendto (sock,
+				       !STATE(is_rate_limited),	/* rate limit on blocking */
+				       FALSE,			/* regular socket */
+				       STATE(skb),
+				       tpdu_length,
+				       (struct sockaddr*)&sock->send_gsr.gsr_group,
+				       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 		if (sent < 0) {
 			save_errno = pgm_get_last_sock_error();
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
@@ -2055,13 +2055,13 @@ retry_send:
 
 retry_one_apdu_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
-		sent = pgm_sendto (sock,
-				   !STATE(is_rate_limited),	/* rate limited on blocking */
-				   FALSE,			/* regular socket */
-				   STATE(skb)->head,
-				   tpdu_length,
-				   (struct sockaddr*)&sock->send_gsr.gsr_group,
-				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+		sent = pgm_skb_sendto (sock,
+				       !STATE(is_rate_limited),	/* rate limited on blocking */
+				       FALSE,			/* regular socket */
+				       STATE(skb),
+				       tpdu_length,
+				       (struct sockaddr*)&sock->send_gsr.gsr_group,
+				       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 		if (sent < 0) {
 			save_errno = pgm_get_last_sock_error();
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
@@ -2301,13 +2301,13 @@ pgm_send_skbv (
 retry_send:
 		pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
-		sent = pgm_sendto (sock,
-				   !STATE(is_rate_limited),	/* rate limited on blocking */
-				    FALSE,			/* regular socket */
-				    STATE(skb)->head,
-				    tpdu_length,
-				    (struct sockaddr*)&sock->send_gsr.gsr_group,
-				    pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+		sent = pgm_skb_sendto (sock,
+				       !STATE(is_rate_limited),	/* rate limited on blocking */
+				       FALSE,			/* regular socket */
+				       STATE(skb),
+				       tpdu_length,
+				       (struct sockaddr*)&sock->send_gsr.gsr_group,
+				       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 		if (sent < 0) {
 			save_errno = pgm_get_last_sock_error();
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
