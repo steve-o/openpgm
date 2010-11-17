@@ -1,5 +1,5 @@
---- source.c	2010-11-05 07:15:07.000000000 +0800
-+++ source.c89.c	2010-11-05 07:16:00.000000000 +0800
+--- source.c	2010-11-11 00:16:57.000000000 +0800
++++ source.c89.c	2010-11-18 03:47:19.000000000 +0800
 @@ -114,11 +114,13 @@
  	)
  {
@@ -38,12 +38,7 @@
  	const bool is_parity = skb->pgm_header->pgm_options & PGM_OPT_PARITY;
  	if (is_parity) {
  		sock->cumulative_stats[PGM_PC_SOURCE_PARITY_NAKS_RECEIVED]++;
-@@ -370,16 +375,19 @@
- 	}
- 
- /* nak list numbers */
--	if (PGM_UNLIKELY(nak_list_len > 62)) {
-+	if (PGM_UNLIKELY(nak_list_len > 63)) {
+@@ -374,12 +379,15 @@
  		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on sequence list overrun, %d rported NAKs."), nak_list_len);
  		return FALSE;
  	}
@@ -288,6 +283,25 @@
  
  /* add to transmit window, skb::data set to payload */
  	pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -1168,12 +1206,12 @@
+ 	}
+ 
+ 	sent = pgm_skb_sendto (sock,
+-			       sock->is_controlled_odata,	/* rate limited */
+-			       FALSE,			/* regular socket */
+-			       STATE(skb),
+-			       tpdu_length,
+-			       (struct sockaddr*)&sock->send_gsr.gsr_group,
+-			       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
++			   sock->is_controlled_odata,	/* rate limited */
++			   FALSE,			/* regular socket */
++			   STATE(skb),
++			   tpdu_length,
++			   (struct sockaddr*)&sock->send_gsr.gsr_group,
++			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+ 	if (sent < 0) {
+ 		const int save_errno = pgm_get_last_sock_error();
+ 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 @@ -1218,6 +1256,8 @@
  	if (bytes_written)
  		*bytes_written = tsdu_length;
@@ -313,6 +327,25 @@
  	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
  	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
  	STATE(unfolded_odata)			= pgm_csum_partial_copy (tsdu, data, (uint16_t)tsdu_length, 0);
+@@ -1329,12 +1371,12 @@
+ 	}
+ 
+ 	sent = pgm_skb_sendto (sock,
+-			       sock->is_controlled_odata,	/* rate limited */
+-			       FALSE,			/* regular socket */
+-			       STATE(skb),
+-			       tpdu_length,
+-			       (struct sockaddr*)&sock->send_gsr.gsr_group,
+-			       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
++			   sock->is_controlled_odata,	/* rate limited */
++			   FALSE,			/* regular socket */
++			   STATE(skb),
++			   tpdu_length,
++			   (struct sockaddr*)&sock->send_gsr.gsr_group,
++			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+ 	if (sent < 0) {
+ 		const int save_errno = pgm_get_last_sock_error();
+ 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 @@ -1381,6 +1423,8 @@
  	if (bytes_written)
  		*bytes_written = tsdu_length;
@@ -379,6 +412,25 @@
  
  /* add to transmit window, skb::data set to payload */
  	pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -1480,12 +1536,12 @@
+ 	pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
+ 	tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
+ 	sent = pgm_skb_sendto (sock,
+-			       sock->is_controlled_odata,	/* rate limited */
+-			       FALSE,			/* regular socket */
+-			       STATE(skb),
+-			       tpdu_length,
+-			       (struct sockaddr*)&sock->send_gsr.gsr_group,
+-			       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
++			   sock->is_controlled_odata,	/* rate limited */
++			   FALSE,			/* regular socket */
++			   STATE(skb),
++			   tpdu_length,
++			   (struct sockaddr*)&sock->send_gsr.gsr_group,
++			   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+ 	if (sent < 0) {
+ 		const int save_errno = pgm_get_last_sock_error();
+ 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 @@ -1508,7 +1564,7 @@
  	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
  
@@ -409,6 +461,25 @@
  
  /* add to transmit window, skb::data set to payload */
  		pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -1649,12 +1708,12 @@
+ 		pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
+ 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
+ 		sent = pgm_skb_sendto (sock,
+-				       !STATE(is_rate_limited),	/* rate limit on blocking */
+-				       FALSE,			/* regular socket */
+-				       STATE(skb),
+-				       tpdu_length,
+-				       (struct sockaddr*)&sock->send_gsr.gsr_group,
+-				       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
++				   !STATE(is_rate_limited),	/* rate limit on blocking */
++				   FALSE,			/* regular socket */
++				   STATE(skb),
++				   tpdu_length,
++				   (struct sockaddr*)&sock->send_gsr.gsr_group,
++				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+ 		if (sent < 0) {
+ 			save_errno = pgm_get_last_sock_error();
+ 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 @@ -1693,7 +1752,7 @@
  
  	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
@@ -493,6 +564,25 @@
  
  /* add to transmit window, skb::data set to payload */
  		pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -2056,12 +2124,12 @@
+ retry_one_apdu_send:
+ 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
+ 		sent = pgm_skb_sendto (sock,
+-				       !STATE(is_rate_limited),	/* rate limited on blocking */
+-				       FALSE,			/* regular socket */
+-				       STATE(skb),
+-				       tpdu_length,
+-				       (struct sockaddr*)&sock->send_gsr.gsr_group,
+-				       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
++				   !STATE(is_rate_limited),	/* rate limited on blocking */
++				   FALSE,			/* regular socket */
++				   STATE(skb),
++				   tpdu_length,
++				   (struct sockaddr*)&sock->send_gsr.gsr_group,
++				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+ 		if (sent < 0) {
+ 			save_errno = pgm_get_last_sock_error();
+ 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 @@ -2093,6 +2161,8 @@
  		}
  
@@ -581,6 +671,25 @@
  
  /* add to transmit window, skb::data set to payload */
  		pgm_spinlock_lock (&sock->txw_spinlock);
+@@ -2302,12 +2384,12 @@
+ 		pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
+ 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
+ 		sent = pgm_skb_sendto (sock,
+-				       !STATE(is_rate_limited),	/* rate limited on blocking */
+-				       FALSE,			/* regular socket */
+-				       STATE(skb),
+-				       tpdu_length,
+-				       (struct sockaddr*)&sock->send_gsr.gsr_group,
+-				       pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
++				   !STATE(is_rate_limited),	/* rate limited on blocking */
++				    FALSE,			/* regular socket */
++				    STATE(skb),
++				    tpdu_length,
++				    (struct sockaddr*)&sock->send_gsr.gsr_group,
++				    pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+ 		if (sent < 0) {
+ 			save_errno = pgm_get_last_sock_error();
+ 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 @@ -2352,7 +2434,7 @@
  
  	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);

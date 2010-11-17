@@ -36,7 +36,57 @@
 
 #define NET_DEBUG
 
+ssize_t
+pgm_skb_sendto_hops (
+	pgm_sock_t*	       restrict sock,
+	bool				use_rate_limit,
+	bool				use_router_alert,
+	int				hops,			/* -1 == system default */
+	struct pgm_sk_buff_t*  restrict	skb,
+	size_t				len,
+	const struct sockaddr* restrict	to,
+	socklen_t			tolen
+	)
+{
+	const SOCKET send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
 
+	if (use_rate_limit && 
+	    !pgm_rate_check (&sock->rate_control, skb->len, sock->is_nonblocking))
+	{
+		pgm_set_last_sock_error (PGM_SOCK_ENOBUFS);
+		return (const ssize_t)-1;
+	}
+
+//	if (!use_router_alert && sock->can_send_data)
+//		pgm_mutex_lock (&sock->send_mutex);
+//	if (-1 != hops)
+//		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, hops);
+
+/* stack-based WSABUF */
+	WSABUF DataBuf;
+	DataBuf.len = len;
+	DataBuf.buf = (char*)skb->head;
+
+	pgm_skb_get (skb);
+	skb->IOOperation = IO_OPERATION_SEND;
+
+	int rc = WSASendTo (send_sock, &DataBuf, 1, NULL, 0, to, (socklen_t)tolen, (LPWSAOVERLAPPED)&skb->Overlapped, NULL);
+	if (SOCKET_ERROR == rc && WSA_IO_PENDING != WSAGetLastError()) {
+		int save_errno = pgm_get_last_sock_error();
+		char errbuf[1024];
+		pgm_warn (_("blocked socket failed: %s"),
+			  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
+		pgm_free_skb (skb);
+	}
+
+/* revert to default value hop limit */
+//	if (-1 != hops)
+//		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, sock->hops);
+//	if (!use_router_alert && sock->can_send_data)
+//		pgm_mutex_unlock (&sock->send_mutex);
+	return 0;
+}
+	
 /* locked and rate regulated sendto
  *
  * on success, returns number of bytes sent.  on error, -1 is returned, and

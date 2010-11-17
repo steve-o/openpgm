@@ -871,7 +871,7 @@ sender_thread (
 			const unsigned int usec = g_odata_interval - (now - last);
 			usleep (usec);
 #else
-#	define usecs_to_msecs(t)	( (t) / 1000 )
+#	define usecs_to_msecs(t)	( ((t) + 999) / 1000 )
 			const DWORD msec = (DWORD)usecs_to_msecs (g_odata_interval - (now - last));
 /* Avoid yielding on Windows XP/2000 */ 
 			if (msec > 0)
