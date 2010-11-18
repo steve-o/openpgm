@@ -1152,6 +1152,22 @@ send_odata (
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
 
+/* check rate limit at last moment */
+	STATE(is_rate_limited) = FALSE;
+	if (sock->is_nonblocking && sock->is_controlled_odata)
+	{
+		if (!pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
+				      &sock->odata_rate_control,	/* original data limit */
+				      tpdu_length - sock->iphdr_len,
+				      sock->is_nonblocking))
+		{
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			return PGM_IO_STATUS_RATE_LIMITED;
+		}
+		STATE(is_rate_limited) = TRUE;
+	}
+
 /* the transmit window MUST check the user count to ensure it does not 
  * attempt to send a repair-data packet based on in transit original data.
  */
@@ -1168,7 +1184,7 @@ retry_send:
 	}
 
 	sent = pgm_sendto (sock,
-			   sock->is_controlled_odata,	/* rate limited */
+			   !STATE(is_rate_limited),	/* rate limit on blocking */
 			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
@@ -1316,6 +1332,22 @@ send_odata_copy (
 	pgm_spinlock_lock (&sock->txw_spinlock);
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
+
+/* check rate limit at last moment */
+	STATE(is_rate_limited) = FALSE;
+	if (sock->is_nonblocking && sock->is_controlled_odata)
+	{
+		if (!pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
+				      &sock->odata_rate_control,	/* original data limit */
+				      tpdu_length - sock->iphdr_len,
+				      sock->is_nonblocking))
+		{
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			return PGM_IO_STATUS_RATE_LIMITED;
+		}
+		STATE(is_rate_limited) = TRUE;
+	}
 retry_send:
 
 /* congestion control */
@@ -1329,7 +1361,7 @@ retry_send:
 	}
 
 	sent = pgm_sendto (sock,
-			   sock->is_controlled_odata,	/* rate limited */
+			   !STATE(is_rate_limited),	/* rate limit on blocking */
 			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
@@ -1476,11 +1508,27 @@ send_odatav (
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
 
+/* check rate limit at last moment */
+	STATE(is_rate_limited) = FALSE;
+	if (sock->is_nonblocking && sock->is_controlled_odata)
+	{
+		if (!pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
+				      &sock->odata_rate_control,	/* original data limit */
+				      tpdu_length - sock->iphdr_len,
+				      sock->is_nonblocking))
+		{
+			sock->is_apdu_eagain = TRUE;
+			sock->blocklen = tpdu_length;
+			return PGM_IO_STATUS_RATE_LIMITED;
+		}
+		STATE(is_rate_limited) = TRUE;
+	}
+
 retry_send:
 	pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
 	tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 	sent = pgm_sendto (sock,
-			   sock->is_controlled_odata,	/* rate limited */
+			   !STATE(is_rate_limited),	/* rate limit on blocking */
 			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
@@ -1573,9 +1621,10 @@ send_apdu (
 		} while (offset_ < apdu_length);
 
 /* calculation includes one iphdr length already */
-		if (!pgm_rate_check (&sock->rate_control,
-				     tpdu_length - sock->iphdr_len,
-				     sock->is_nonblocking))
+		if (!pgm_rate_check2 (&sock->rate_control,
+				      &sock->odata_rate_control,
+				      tpdu_length - sock->iphdr_len,
+				      sock->is_nonblocking))
 		{
 			sock->blocklen = tpdu_length;
 			return PGM_IO_STATUS_RATE_LIMITED;
@@ -1882,33 +1931,6 @@ pgm_sendv (
 		}
 	}
 
-/* if non-blocking calculate total wire size and check rate limit */
-	STATE(is_rate_limited) = FALSE;
-	if (sock->is_nonblocking && sock->is_controlled_odata)
-        {
-		const size_t header_length = pgm_pkt_offset (TRUE, pgmcc_family);
-                size_t tpdu_length = 0;
-		size_t offset_	   = 0;
-
-		do {
-			const uint_fast16_t tsdu_length = (uint_fast16_t)MIN( source_max_tsdu (sock, TRUE), STATE(apdu_length) - offset_ );
-			tpdu_length += sock->iphdr_len + header_length + tsdu_length;
-			offset_     += tsdu_length;
-		} while (offset_ < STATE(apdu_length));
-
-/* calculation includes one iphdr length already */
-                if (!pgm_rate_check (&sock->rate_control,
-				     tpdu_length - sock->iphdr_len,
-				     sock->is_nonblocking))
-		{
-			sock->blocklen = tpdu_length;
-			pgm_mutex_unlock (&sock->source_mutex);
-			pgm_rwlock_reader_unlock (&sock->lock);
-			return PGM_IO_STATUS_RATE_LIMITED;
-		}
-		STATE(is_rate_limited) = TRUE;
-        }
-
 /* non-fragmented packets can be forwarded onto basic send() */
 	if (!is_one_apdu)
 	{
@@ -1947,6 +1969,34 @@ retry_send:
 		pgm_rwlock_reader_unlock (&sock->lock);
 		return PGM_IO_STATUS_NORMAL;
 	}
+
+/* if non-blocking calculate total wire size and check rate limit */
+	STATE(is_rate_limited) = FALSE;
+	if (sock->is_nonblocking && sock->is_controlled_odata)
+        {
+		const size_t header_length = pgm_pkt_offset (TRUE, pgmcc_family);
+                size_t tpdu_length = 0;
+		size_t offset_	   = 0;
+
+		do {
+			const uint_fast16_t tsdu_length = (uint_fast16_t)MIN( source_max_tsdu (sock, TRUE), STATE(apdu_length) - offset_ );
+			tpdu_length += sock->iphdr_len + header_length + tsdu_length;
+			offset_     += tsdu_length;
+		} while (offset_ < STATE(apdu_length));
+
+/* calculation includes one iphdr length already */
+                if (!pgm_rate_check2 (&sock->rate_control,
+				      &sock->odata_rate_control,
+				      tpdu_length - sock->iphdr_len,
+				      sock->is_nonblocking))
+		{
+			sock->blocklen = tpdu_length;
+			pgm_mutex_unlock (&sock->source_mutex);
+			pgm_rwlock_reader_unlock (&sock->lock);
+			return PGM_IO_STATUS_RATE_LIMITED;
+		}
+		STATE(is_rate_limited) = TRUE;
+        }
 
 	STATE(data_bytes_offset)	= 0;
 	STATE(vector_index)		= 0;
@@ -2200,9 +2250,10 @@ pgm_send_skbv (
 			total_tpdu_length += sock->iphdr_len + pgm_pkt_offset (is_one_apdu, pgmcc_family) + vector[i]->len;
 
 /* calculation includes one iphdr length already */
-		if (!pgm_rate_check (&sock->rate_control,
-				     total_tpdu_length - sock->iphdr_len,
-				     sock->is_nonblocking))
+		if (!pgm_rate_check2 (&sock->rate_control,
+				      &sock->odata_rate_control,
+				      total_tpdu_length - sock->iphdr_len,
+				      sock->is_nonblocking))
 		{
 			sock->blocklen = total_tpdu_length;
 			pgm_mutex_unlock (&sock->source_mutex);
@@ -2403,6 +2454,17 @@ send_rdata (
 
 	tpdu_length = (char*)skb->tail - (char*)skb->head;
 
+/* rate check including rdata specific limits */
+	if (sock->is_controlled_rdata &&
+	    !pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
+			      &sock->rdata_rate_control,	/* repair data limit */
+			      tpdu_length - sock->iphdr_len,
+			      sock->is_nonblocking))
+	{
+		sock->blocklen = tpdu_length;
+		return FALSE;
+	}
+
 /* update previous odata/rdata contents */
 	header				= skb->pgm_header;
 	rdata				= skb->pgm_data;
@@ -2426,7 +2488,7 @@ send_rdata (
 	}
 
 	sent = pgm_sendto (sock,
-			   sock->is_controlled_rdata,	/* rate limited */
+			   FALSE,			/* already rate limited */
 			   TRUE,			/* with router alert */
 			   header,
 			   tpdu_length,
