@@ -99,6 +99,8 @@ static int		g_odata_interval = 0;
 static guint32		g_payload = 0;
 static int		g_max_tpdu = 1500;
 static int		g_max_rte = 16*1000*1000;
+static int		g_odata_rte = 0;	/* 0 = disabled */
+static int		g_rdata_rte = 0;	/* 0 = disabled */
 static int		g_sqns = 200;
 
 static gboolean		g_use_pgmcc = FALSE;
@@ -173,6 +175,8 @@ usage (const char* bin)
 	fprintf (stderr, "  -l              : Listen-only mode\n");
 	fprintf (stderr, "  -e              : Relect mode\n");
         fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
+        fprintf (stderr, "  -O <rate>       : Regulate ODATA packets to rate bps\n");
+        fprintf (stderr, "  -D <rate>       : Regulate RDATA packets to rate bps\n");
 	fprintf (stderr, "  -c              : Enable PGMCC\n");
         fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
         fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
@@ -216,13 +220,15 @@ main (
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:m:old:r:cfeK:N:HSh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:old:r:O:D:cfeK:N:HSh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
 		case 'r':	g_max_rte = atoi (optarg); break;
+		case 'O':	g_odata_rte = atoi (optarg); break;
+		case 'D':	g_rdata_rte = atoi (optarg); break;
 
 		case 'c':	g_use_pgmcc = TRUE; break;
 
@@ -495,6 +501,8 @@ on_startup (
 		const int send_only	  = (PGMPING_MODE_SOURCE == g_mode) ? 1 : 0,
 			  txw_sqns	  = g_sqns * 4,
 			  txw_max_rte	  = g_max_rte,
+			  odata_max_rte	  = g_odata_rte,
+			  rdata_max_rte	  = g_rdata_rte,
 			  ambient_spm	  = pgm_secs (30),
 			  heartbeat_spm[] = { pgm_msecs (100),
 					      pgm_msecs (100),
@@ -517,6 +525,16 @@ on_startup (
 		if (txw_max_rte > 0 &&
 		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &txw_max_rte, sizeof(txw_max_rte))) {
 			g_error ("setting PGM_TXW_MAX_RTE = %d", txw_max_rte);
+			goto err_abort;
+		}
+		if (odata_max_rte > 0 &&
+		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_ODATA_MAX_RTE, &odata_max_rte, sizeof(odata_max_rte))) {
+			g_error ("setting PGM_ODATA_MAX_RTE = %d", odata_max_rte);
+			goto err_abort;
+		}
+		if (rdata_max_rte > 0 &&
+		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_RDATA_MAX_RTE, &rdata_max_rte, sizeof(rdata_max_rte))) {
+			g_error ("setting PGM_RDATA_MAX_RTE = %d", rdata_max_rte);
 			goto err_abort;
 		}
 		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm))) {
@@ -871,7 +889,7 @@ sender_thread (
 			const unsigned int usec = g_odata_interval - (now - last);
 			usleep (usec);
 #else
-#	define usecs_to_msecs(t)	( (t) / 1000 )
+#	define usecs_to_msecs(t)	( ((t) + 999) / 1000 )
 			const DWORD msec = (DWORD)usecs_to_msecs (g_odata_interval - (now - last));
 /* Avoid yielding on Windows XP/2000 */ 
 			if (msec > 0)
