@@ -1,6 +1,6 @@
---- rate_control.c	2010-08-04 15:58:08.000000000 +0800
-+++ rate_control.c89	2010-10-07 12:57:41.000000000 +0800
-@@ -77,7 +77,7 @@
+--- rate_control.c	2010-11-19 05:58:32.000000000 +0800
++++ rate_control.c89.c	2010-11-19 05:57:03.000000000 +0800
+@@ -205,7 +205,7 @@
  	const bool		is_nonblocking
  	)
  {
@@ -9,15 +9,15 @@
  
  /* pre-conditions */
  	pgm_assert (NULL != bucket);
-@@ -87,6 +87,7 @@
+@@ -215,6 +215,7 @@
  		return TRUE;
  
  	pgm_spinlock_lock (&bucket->spinlock);
 +	{
  	pgm_time_t now = pgm_time_update_now();
- 	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
  
-@@ -95,7 +96,9 @@
+ 	if (bucket->rate_per_msec)
+@@ -223,7 +224,9 @@
  		if (time_since_last_rate_check > pgm_msecs(1)) 
  			new_rate_limit = bucket->rate_per_msec;
  		else {
@@ -27,7 +27,7 @@
  			if (new_rate_limit > bucket->rate_per_msec)
  				new_rate_limit = bucket->rate_per_msec;
  		}
-@@ -105,7 +108,9 @@
+@@ -234,7 +237,9 @@
  		if (time_since_last_rate_check > pgm_secs(1)) 
  			new_rate_limit = bucket->rate_per_sec;
  		else {
@@ -37,7 +37,7 @@
  			if (new_rate_limit > bucket->rate_per_sec)
  				new_rate_limit = bucket->rate_per_sec;
  		}
-@@ -132,6 +137,7 @@
+@@ -260,6 +265,7 @@
  	} 
  	pgm_spinlock_unlock (&bucket->spinlock);
  	return TRUE;
@@ -45,7 +45,7 @@
  }
  
  pgm_time_t
-@@ -147,12 +153,14 @@
+@@ -327,12 +333,14 @@
  		return 0;
  
  	pgm_spinlock_lock (&bucket->spinlock);

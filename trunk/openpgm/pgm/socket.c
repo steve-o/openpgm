@@ -729,7 +729,7 @@ pgm_getsockopt (
 			break;
 		{
 			struct timeval* tv = optval;
-			const long usecs = (long)pgm_rate_remaining (&sock->rate_control, sock->blocklen);
+			const long usecs = (long)pgm_rate_remaining2 (&sock->rate_control, &sock->odata_rate_control, sock->blocklen);
 			tv->tv_sec  = usecs / 1000000L;
 			tv->tv_usec = usecs % 1000000L;
 		}
@@ -800,6 +800,34 @@ pgm_getsockopt (
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*restrict)optval = (int)sock->txw_max_rte;
+		status = TRUE;
+		break;
+
+	case PGM_ODATA_MAX_RTE:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = (int)sock->odata_max_rte;
+		status = TRUE;
+		break;
+
+	case PGM_RDATA_MAX_RTE:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = (int)sock->rdata_max_rte;
+		status = TRUE;
+		break;
+
+	case PGM_UNCONTROLLED_ODATA:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->is_controlled_odata ? 0 : 1;
+		status = TRUE;
+		break;
+
+	case PGM_UNCONTROLLED_RDATA:
+		if (PGM_UNLIKELY(*optlen != sizeof (int)))
+			break;
+		*(int*restrict)optval = sock->is_controlled_rdata ? 0 : 1;
 		status = TRUE;
 		break;
 
@@ -1209,6 +1237,55 @@ pgm_setsockopt (
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->txw_max_rte = *(const int*)optval;
+/* default to controlling SPM, ODATA, and RDATA packets. */
+		sock->is_controlled_odata = TRUE;
+		sock->is_controlled_rdata = TRUE;
+		status = TRUE;
+		break;
+
+/* maximum original data rate.
+ * 0 < odata_max_rte < txw_max_rte
+ */
+	case PGM_ODATA_MAX_RTE:
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
+			break;
+		sock->odata_max_rte = *(const int*)optval;
+		status = TRUE;
+		break;
+
+/* maximum repair data rate.
+ * 0 < rdata_max_rte < txw_max_rte
+ */
+	case PGM_RDATA_MAX_RTE:
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
+			break;
+		sock->rdata_max_rte = *(const int*)optval;
+		status = TRUE;
+		break;
+
+/* ignore rate limit for original data packets, i.e. only apply to repairs.
+ */
+	case PGM_UNCONTROLLED_ODATA:
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
+			break;
+		sock->is_controlled_odata = (0 == *(const int*)optval);
+		status = TRUE;
+		break;
+
+/* ignore rate limit for repair data packets, i.e. only apply to original data.
+ */
+	case PGM_UNCONTROLLED_RDATA:
+		if (PGM_UNLIKELY(optlen != sizeof (int)))
+			break;
+		if (PGM_UNLIKELY(*(const int*)optval <= 0))
+			break;
+		sock->is_controlled_rdata = (0 == *(const int*)optval);
 		status = TRUE;
 		break;
 
@@ -2219,20 +2296,25 @@ pgm_bind3 (
 	if (sock->can_send_data)
 	{
 /* setup rate control */
-		if (sock->txw_max_rte)
-		{
+		if (sock->txw_max_rte > 0) {
 			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
 					sock->txw_max_rte);
 			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_spm   = TRUE;	/* must always be set */
-			sock->is_controlled_odata = TRUE;
-			sock->is_controlled_rdata = TRUE;
-		}
-		else
-		{
+		} else
 			sock->is_controlled_spm   = FALSE;
-			sock->is_controlled_odata = FALSE;
-			sock->is_controlled_rdata = FALSE;
+
+		if (sock->odata_max_rte > 0) {
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting ODATA rate regulation to %" PRIzd " bytes per second."),
+					sock->odata_max_rte);
+			pgm_rate_create (&sock->odata_rate_control, sock->odata_max_rte, sock->iphdr_len, sock->max_tpdu);
+			sock->is_controlled_odata = TRUE;
+		}
+		if (sock->rdata_max_rte > 0) {
+			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting RDATA rate regulation to %" PRIzd " bytes per second."),
+					sock->rdata_max_rte);
+			pgm_rate_create (&sock->rdata_rate_control, sock->rdata_max_rte, sock->iphdr_len, sock->max_tpdu);
+			sock->is_controlled_rdata = TRUE;
 		}
 	}
 
