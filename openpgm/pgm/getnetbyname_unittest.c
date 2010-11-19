@@ -33,7 +33,7 @@
 /* mock state */
 
 #ifndef _WIN32
-#	define CONFIG_HAVE_GETNETENT
+#	define COMPARE_GETNETENT
 #endif
 
 #define GETNETBYNAME_DEBUG
@@ -82,26 +82,26 @@ END_TEST
 
 /* target:
  *	struct pgm_netent_t*
- *	pgm_getnetent (void)
+ *	_pgm_compat_getnetent (void)
  */
 
 START_TEST (test_getnetent_pass_001)
 {
 	int i = 1;
 	struct pgm_netent_t* ne;
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 	struct netent* nne;
 #endif
 
-	pgm_setnetent();
-#ifdef CONFIG_HAVE_GETNETENT
+	_pgm_compat_setnetent();
+#ifdef COMPARE_GETNETENT
 	setnetent (0);
 #endif
-	while (ne = pgm_getnetent()) {
+	while (ne = _pgm_compat_getnetent()) {
 		char buffer[1024];
 		char **p;
 
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 		nne = getnetent();
 		if (NULL == nne)
 			g_warning ("native ne = (null");
@@ -110,7 +110,7 @@ START_TEST (test_getnetent_pass_001)
 /* official network name */
 		fail_if (NULL == ne->n_name);
 		g_debug ("%-6dn_name = %s", i++, ne->n_name);
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 		if (NULL != nne)
 			fail_unless (0 == strcmp (ne->n_name, nne->n_name));
 #endif
@@ -127,7 +127,7 @@ START_TEST (test_getnetent_pass_001)
 		} else
 			strcpy (buffer, "(nil)");
 		g_debug ("      n_aliases = %s", buffer);
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 		if (NULL != nne) {
 			char nbuffer[1024];
 
@@ -150,7 +150,7 @@ START_TEST (test_getnetent_pass_001)
 		if (AF_INET == ne->n_addrtype) {
 			struct sockaddr_in sin;
 			g_debug ("      n_addrtype = AF_INET");
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 			fail_unless (ne->n_addrtype == nne->n_addrtype);
 #endif
 			fail_unless (sizeof (struct in_addr) == ne->n_length);
@@ -164,13 +164,13 @@ START_TEST (test_getnetent_pass_001)
 						       NULL, 0,
 						       NI_NUMERICHOST));
 			g_debug ("      n_net = %s", buffer);
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 			fail_unless (0 == memcmp (ne->n_net, &nne->n_net, sizeof (struct in_addr)));
 #endif
 		} else {
 			struct sockaddr_in6 sin6;
 			g_debug ("      n_addrtype = AF_INET6");
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef COMPARE_GETNETENT
 			if (ne->n_addrtype != nne->n_addrtype)
 				g_warning ("native address type not AF_INET6");
 #endif
@@ -186,8 +186,8 @@ START_TEST (test_getnetent_pass_001)
 			g_debug ("      n_net = %s", buffer);
 		}
 	}
-	pgm_endnetent();
-#ifdef CONFIG_HAVE_GETNETENT
+	_pgm_compat_endnetent();
+#ifdef COMPARE_GETNETENT
 	endnetent();
 #endif
 }
@@ -222,11 +222,22 @@ make_master_suite (void)
 int
 main (void)
 {
+#ifdef _WIN32
+	WORD wVersionRequested = MAKEWORD (2, 2);
+	WSADATA wsaData;
+	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
+	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
+#endif
+	pgm_messages_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_messages_shutdown();
+#ifdef _WIN32
+	WSACleanup();
+#endif
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
