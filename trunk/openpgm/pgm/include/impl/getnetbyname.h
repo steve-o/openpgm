@@ -39,7 +39,7 @@ struct pgm_netent_t
 	char**	n_aliases;	/* Alias list */
 	int	n_addrtype;	/* Net address type, AF_INET or AF_INET6 */
 	int	n_length;
-	char*	n_net;		/* Network address */
+	char	n_net[16];	/* Network address */
 };
 
 struct pgm_netent_t* pgm_getnetbyname (const char*);
