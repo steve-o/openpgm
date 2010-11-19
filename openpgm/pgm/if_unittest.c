@@ -81,7 +81,7 @@ static GList *mock_hosts = NULL, *mock_networks = NULL, *mock_interfaces = NULL;
 #define MOCK_NETWORK		"private"		/* /etc/networks */
 #define MOCK_NETWORK6		"ip6-private"
 #define MOCK_PGM_NETWORK	"pgm-private"
-#define MOCK_PGM_NETWORK6	"pgm-ip6-private"
+#define MOCK_PGM_NETWORK6	"ip6-pgm-private"
 #define MOCK_INTERFACE		"eth0"
 #define MOCK_INTERFACE_INDEX	2
 #define MOCK_ADDRESS		"10.6.28.33"
@@ -110,7 +110,7 @@ int mock_getnameinfo (const struct sockaddr*, socklen_t, char*, size_t, char*, s
 int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
 void mock_freeaddrinfo (struct addrinfo*);
 int mock_gethostname (char*, size_t);
-struct netent* mock_getnetbyname (const char*);
+struct pgm_netent_t* mock_pgm_getnetbyname (const char*);
 PGM_GNUC_INTERNAL bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*restrict, const socklen_t, struct pgm_error_t**restrict);
 
 
@@ -122,7 +122,7 @@ PGM_GNUC_INTERNAL bool mock_pgm_if_getnodeaddr (const sa_family_t, struct sockad
 #define getaddrinfo		mock_getaddrinfo
 #define freeaddrinfo		mock_freeaddrinfo
 #define gethostname		mock_gethostname
-#define getnetbyname		mock_getnetbyname
+#define pgm_getnetbyname	mock_pgm_getnetbyname
 #define pgm_if_getnodeaddr	mock_pgm_if_getnodeaddr
 
 
@@ -264,9 +264,9 @@ mock_setup_net (void)
 	APPEND_NETWORK(	"loopback",	"127.0.0.0");
 	APPEND_NETWORK(	"private",	"10.6.28.0");
 	APPEND_NETWORK(	"private2",	"172.16.90.0");
+#ifndef CONFIG_HAVE_GETNETENT
 	APPEND_NETWORK( "pgm-private",	"239.192.0.1");
-#ifdef CONFIG_HAVE_IP6_NETWORKS
-	APPEND_NETWORK(	"ip6-private",	"2002:dce8:d28e:0:0:0");
+	APPEND_NETWORK(	"ip6-private",	"2002:dce8:d28e::");
 	APPEND_NETWORK( "ip6-pgm-private","ff08::1");
 #endif
 
@@ -617,12 +617,12 @@ mock_gethostname (
 	return 0;
 }
 
-struct netent*
-mock_getnetbyname (
+struct pgm_netent_t*
+mock_pgm_getnetbyname (
 	const char*		name
 	)
 {
-	static struct netent ne;
+	static struct pgm_netent_t ne;
 	GList* list = mock_networks;
 
 	if (NULL == name)
@@ -633,8 +633,14 @@ mock_getnetbyname (
 		if (strcmp (network->name, name) == 0) {
 			ne.n_name	= network->name;
 			ne.n_aliases	= network->aliases;
-			ne.n_addrtype	= AF_INET;
-			ne.n_net	= g_ntohl (((struct sockaddr_in*)&network->number)->sin_addr.s_addr);
+			ne.n_addrtype	= network->number.ss_family;
+			if (AF_INET == network->number.ss_family) {
+				ne.n_length = sizeof (struct in_addr);
+				((struct in_addr*)ne.n_net)->s_addr = g_ntohl (((struct sockaddr_in*)&network->number)->sin_addr.s_addr);
+			} else {
+				ne.n_length = sizeof (struct in_addr);
+				*((struct in6_addr*)ne.n_net) = ((struct sockaddr_in6*)&network->number)->sin6_addr;
+			}
 			return &ne;
 		}
 		list = list->next;
@@ -815,16 +821,16 @@ static const struct test_case_t cases_001[] = {
 	{ ";239.192.0.1;PGM.MCAST.NET",		";[ff08::1];IP6-PGM.MCAST.NET"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;ff08::1"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;[ff08::1]"		},
-#ifndef _WIN32
-	{ "pgm-private",			/* ‡ */ "pgm-ip6-private"			},
-	{ ";pgm-private",			/* ‡ */ ";pgm-ip6-private"			},
-	{ ";pgm-private;pgm-private",		/* ‡ */ ";pgm-ip6-private;pgm-ip6-private" 	},
-	{ ";PGM.MCAST.NET;pgm-private",		/* ‡ */ ";IP6-PGM.MCAST.NET;pgm-ip6-private" 	},
-	{ ";pgm-private;PGM.MCAST.NET",		/* ‡ */ ";pgm-ip6-private;IP6-PGM.MCAST.NET" 	},
-	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";ff08::1;pgm-ip6-private" 		},
-	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";[ff08::1];pgm-ip6-private" 		},
-	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;ff08::1" 		},
-	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";pgm-ip6-private;[ff08::1]" 		},
+#ifndef CONFIG_HAVE_GETNETENT
+	{ "pgm-private",			/* ‡ */ "ip6-pgm-private"			},
+	{ ";pgm-private",			/* ‡ */ ";ip6-pgm-private"			},
+	{ ";pgm-private;pgm-private",		/* ‡ */ ";ip6-pgm-private;ip6-pgm-private" 	},
+	{ ";PGM.MCAST.NET;pgm-private",		/* ‡ */ ";IP6-PGM.MCAST.NET;ip6-pgm-private" 	},
+	{ ";pgm-private;PGM.MCAST.NET",		/* ‡ */ ";ip6-pgm-private;IP6-PGM.MCAST.NET" 	},
+	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";ff08::1;ip6-pgm-private" 		},
+	{ ";239.192.0.1;pgm-private",		/* ‡ */ ";[ff08::1];ip6-pgm-private" 		},
+	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";ip6-pgm-private;ff08::1" 		},
+	{ ";pgm-private;239.192.0.1",		/* ‡ */ ";ip6-pgm-private;[ff08::1]" 		},
 #endif
 };
 
@@ -846,7 +852,7 @@ START_TEST (test_parse_transport_pass_001)
 /* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
  *   pgm_if_parse_transport will fail.
  */
-#ifndef CONFIG_HAVE_IP6_NETWORKS
+#ifdef CONFIG_HAVE_GETNETENT
 	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
 	{
 		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
@@ -893,9 +899,9 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_INTERFACE ";239.192.0.1;PGM.MCAST.NET",	/* † */ MOCK_INTERFACE ";[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;[ff08::1]"	},
-#ifndef _WIN32
-	{ MOCK_INTERFACE ";pgm-private",		/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private" },
-	{ MOCK_INTERFACE ";pgm-private;pgm-private",	/* ‡ */ MOCK_INTERFACE ";pgm-ip6-private;pgm-ip6-private" },
+#ifndef CONFIG_HAVE_GETNETENT
+	{ MOCK_INTERFACE ";pgm-private",		/* ‡ */ MOCK_INTERFACE ";ip6-pgm-private" },
+	{ MOCK_INTERFACE ";pgm-private;pgm-private",	/* ‡ */ MOCK_INTERFACE ";ip6-pgm-private;ip6-pgm-private" },
 #endif
 	{ MOCK_ADDRESS,					MOCK_ADDRESS6			},
 	{ MOCK_ADDRESS,					"[" MOCK_ADDRESS6 "]"		},
@@ -915,11 +921,11 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_ADDRESS ";239.192.0.1;PGM.MCAST.NET",	"[" MOCK_ADDRESS6 "];[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	"[" MOCK_ADDRESS6 "];IP6-PGM.MCAST.NET;[ff08::1]"	},
-#ifndef _WIN32
-	{ MOCK_ADDRESS ";pgm-private",			MOCK_ADDRESS6 ";pgm-ip6-private" },
-	{ MOCK_ADDRESS ";pgm-private",			"[" MOCK_ADDRESS6 "];pgm-ip6-private" },
-	{ MOCK_ADDRESS ";pgm-private;pgm-private",	MOCK_ADDRESS6 ";pgm-ip6-private;pgm-ip6-private" },
-	{ MOCK_ADDRESS ";pgm-private;pgm-private",	"[" MOCK_ADDRESS6 "];pgm-ip6-private;pgm-ip6-private" },
+#ifndef CONFIG_HAVE_GETNETENT
+	{ MOCK_ADDRESS ";pgm-private",			MOCK_ADDRESS6 ";ip6-pgm-private" },
+	{ MOCK_ADDRESS ";pgm-private",			"[" MOCK_ADDRESS6 "];ip6-pgm-private" },
+	{ MOCK_ADDRESS ";pgm-private;pgm-private",	MOCK_ADDRESS6 ";ip6-pgm-private;ip6-pgm-private" },
+	{ MOCK_ADDRESS ";pgm-private;pgm-private",	"[" MOCK_ADDRESS6 "];ip6-pgm-private;ip6-pgm-private" },
 	{ MOCK_NETWORK,					/* ‡ */ MOCK_NETWORK6			},
 	{ MOCK_NETWORK ";",				/* ‡ */ MOCK_NETWORK6 ";"		},
 	{ MOCK_NETWORK ";;",				/* ‡ */ MOCK_NETWORK6 ";;"		},
@@ -933,8 +939,8 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_NETWORK ";239.192.0.1;PGM.MCAST.NET",	/* ‡ */ MOCK_NETWORK6 ";[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_NETWORK ";PGM.MCAST.NET;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_NETWORK ";PGM.MCAST.NET;239.192.0.1",	/* ‡ */ MOCK_NETWORK6 ";IP6-PGM.MCAST.NET;[ff08::1]"	},
-	{ MOCK_NETWORK ";pgm-private",			/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private" },
-	{ MOCK_NETWORK ";pgm-private;pgm-private",	/* ‡ */ MOCK_NETWORK6 ";pgm-ip6-private;pgm-ip6-private" },
+	{ MOCK_NETWORK ";pgm-private",			/* ‡ */ MOCK_NETWORK6 ";ip6-pgm-private" },
+	{ MOCK_NETWORK ";pgm-private;pgm-private",	/* ‡ */ MOCK_NETWORK6 ";ip6-pgm-private;ip6-pgm-private" },
 #endif
 	{ MOCK_HOSTNAME,				MOCK_HOSTNAME6			},
 	{ MOCK_HOSTNAME ";",				MOCK_HOSTNAME6 ";"		},
@@ -949,9 +955,9 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_HOSTNAME ";239.192.0.1;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";[ff08::1];IP6-PGM.MCAST.NET" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;ff08::1" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;[ff08::1]" },
-#ifndef _WIN32
-	{ MOCK_HOSTNAME ";pgm-private",			MOCK_HOSTNAME6 ";pgm-ip6-private" },
-	{ MOCK_HOSTNAME ";pgm-private;pgm-private",	MOCK_HOSTNAME6 ";pgm-ip6-private;pgm-ip6-private" },
+#ifndef CONFIG_HAVE_GETNETENT
+	{ MOCK_HOSTNAME ";pgm-private",			MOCK_HOSTNAME6 ";ip6-pgm-private" },
+	{ MOCK_HOSTNAME ";pgm-private;pgm-private",	MOCK_HOSTNAME6 ";ip6-pgm-private;ip6-pgm-private" },
 #endif
 };
 
@@ -973,7 +979,7 @@ START_TEST (test_parse_transport_pass_002)
 /* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
  *   pgm_if_parse_transport will fail.
  */
-#ifndef CONFIG_HAVE_IP6_NETWORKS
+#ifdef CONFIG_HAVE_GETNETENT
 	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
 	{
 		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
@@ -1026,15 +1032,15 @@ static const struct test_case_t cases_003[] = {
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
-#ifndef _WIN32
-	{ MOCK_ADDRESS "/24;pgm-private",		/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private"			},
-	{ MOCK_ADDRESS "/24;pgm-private;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;pgm-ip6-private"	},
-	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ff08::1;pgm-ip6-private"		},
-	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;[ff08::1];pgm-ip6-private"		},
-	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;ff08::1"		},
-	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;[ff08::1]"		},
-	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;pgm-ip6-private"	},
-	{ MOCK_ADDRESS "/24;pgm-private;PGM.MCAST.NET",	/* ‡ */ MOCK_ADDRESS6 "/64;pgm-ip6-private;IP6-PGM.MCAST.NET"	},
+#ifndef CONFIG_HAVE_GETNETENT
+	{ MOCK_ADDRESS "/24;pgm-private",		/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private"			},
+	{ MOCK_ADDRESS "/24;pgm-private;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private;ip6-pgm-private"	},
+	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ff08::1;ip6-pgm-private"		},
+	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;[ff08::1];ip6-pgm-private"		},
+	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private;ff08::1"		},
+	{ MOCK_ADDRESS "/24;pgm-private;239.192.0.1",	/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private;[ff08::1]"		},
+	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;ip6-pgm-private"	},
+	{ MOCK_ADDRESS "/24;pgm-private;PGM.MCAST.NET",	/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private;IP6-PGM.MCAST.NET"	},
 #endif
 };
 
@@ -1056,7 +1062,7 @@ START_TEST (test_parse_transport_pass_003)
 /* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
  *   pgm_if_parse_transport will fail.
  */
-#ifndef CONFIG_HAVE_IP6_NETWORKS
+#ifdef CONFIG_HAVE_GETNETENT
 	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
 	{
 		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
