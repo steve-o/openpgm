@@ -417,7 +417,6 @@ parse_interface (
 		}
 	}
 
-#if !defined(_WIN32) && !defined(__CYGWIN__)
 /* network name into network address, can be expensive with NSS network lookup
  *
  * Only Class A, B or C networks are supported, partitioned networks
@@ -425,7 +424,7 @@ parse_interface (
  */
 	if (!(check_inet_network || check_inet6_network))
 	{
-		const struct netent* ne = getnetbyname (ifname);
+		const struct pgm_netent_t* ne = pgm_getnetbyname (ifname);
 /* ne::n_net in host byte order */
 
 		if (ne) {
@@ -440,7 +439,7 @@ parse_interface (
 					return FALSE;
 				}
 /* ne->n_net in network order */
-				in_addr.s_addr = ne->n_net;
+				in_addr.s_addr = ((const struct in_addr*)ne->n_net)->s_addr;
 				if (IN_MULTICAST(in_addr.s_addr)) {
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_IF,
@@ -452,12 +451,12 @@ parse_interface (
 				check_inet_network = TRUE;
 				break;
 			case AF_INET6:
-#ifndef CONFIG_HAVE_IP6_NETWORKS
+#ifdef CONFIG_HAVE_GETNETENT
 				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NODEV,
-					     _("Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."),
-					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
+					       PGM_ERROR_DOMAIN_IF,
+					       PGM_ERROR_NODEV,
+					       _("Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."),
+					       ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 				return FALSE;
 #else
 				if (AF_INET == family) {
@@ -468,7 +467,7 @@ parse_interface (
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
-				if (IN6_IS_ADDR_MULTICAST(&ne->n_net)) {
+				if (IN6_IS_ADDR_MULTICAST((struct in6_addr*)ne->n_net)) {
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_IF,
 						     PGM_ERROR_XDEV,
@@ -476,7 +475,7 @@ parse_interface (
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
-				in6_addr = *(const struct in6_addr*)&ne->n_net;
+				in6_addr = *(const struct in6_addr*)ne->n_net;
 				check_inet6_network = TRUE;
 				break;
 #endif
@@ -490,7 +489,6 @@ parse_interface (
 			}
 		}
 	}
-#endif /* _WIN32 */
 
 /* hostname lookup with potential DNS delay or error */
 	if (!check_addr)
@@ -802,9 +800,8 @@ parse_group (
 		return TRUE;
 	}
 
-#if !defined(_WIN32) && !defined(__CYGWIN__)
 /* NSS network */
-	const struct netent* ne = getnetbyname (group);
+	const struct pgm_netent_t* ne = pgm_getnetbyname (group);
 /* ne::n_net in host byte order */
 	if (ne) {
 		switch (ne->n_addrtype) {
@@ -817,9 +814,9 @@ parse_group (
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
-			if (IN_MULTICAST(ne->n_net)) {
+			if (IN_MULTICAST(((const struct in_addr*)ne->n_net)->s_addr)) {
 				addr->sa_family = AF_INET;
-				((struct sockaddr_in*)addr)->sin_addr.s_addr = htonl (ne->n_net);
+				((struct sockaddr_in*)addr)->sin_addr.s_addr = htonl (((const struct in_addr*)ne->n_net)->s_addr);
 				return TRUE;
 			}
 			pgm_set_error (error,
@@ -829,7 +826,7 @@ parse_group (
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 		case AF_INET6:
-#ifndef CONFIG_HAVE_IP6_NETWORKS
+#ifdef CONFIG_HAVE_GETNETENT
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
 				     PGM_ERROR_NODEV,
@@ -845,12 +842,12 @@ parse_group (
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
-			if (IN6_IS_ADDR_MULTICAST(&ne->n_net)) {
+			if (IN6_IS_ADDR_MULTICAST((struct in6_addr*)ne->n_net)) {
 				addr->sa_family = AF_INET6;
 				((struct sockaddr_in6*)addr)->sin6_addr = *(const struct in6_addr*)ne->n_net;
-				((struct sockaddr_in6*)&addr)->sin6_port = 0;
-				((struct sockaddr_in6*)&addr)->sin6_flowinfo = 0;
-				((struct sockaddr_in6*)&addr)->sin6_scope_id = 0;
+				((struct sockaddr_in6*)addr)->sin6_port = 0;
+				((struct sockaddr_in6*)addr)->sin6_flowinfo = 0;
+				((struct sockaddr_in6*)addr)->sin6_scope_id = 0;
 				return TRUE;
 			}
 			pgm_set_error (error,
@@ -859,7 +856,7 @@ parse_group (
 				     _("IP address class conflict when resolving network name %s%s%s, expected IPv6 multicast."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
-#endif /* CONFIG_HAVE_IP6_NETWORKS */
+#endif /* CONFIG_HAVE_GETNETENT */
 		default:
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
@@ -869,7 +866,6 @@ parse_group (
 			return FALSE;
 		}
 	}
-#endif /* _WIN32 */
 
 /* lookup group through name service */
 	struct addrinfo hints = {
