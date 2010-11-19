@@ -40,30 +40,49 @@ static char line[BUFSIZ+1];
 static char *net_aliases[MAXALIASES];
 static struct pgm_netent_t net;
 
-static void pgm_setnetent (void);
-static struct pgm_netent_t *pgm_getnetent (void);
-static void pgm_endnetent (void);
+static void _pgm_compat_setnetent (void);
+static struct pgm_netent_t *_pgm_compat_getnetent (void);
+static void _pgm_compat_endnetent (void);
+static struct pgm_netent_t* _pgm_compat_getnetbyname (const char*);
 
 
 static
 void
-pgm_setnetent (void)
+_pgm_compat_setnetent (void)
 {
 	if (NULL == netfh) {
-		pgm_debug ("opening netdb file \"%s\"", netdb);
+#ifdef _WIN32
+		char expanded[MAX_PATH];
+		if (0 == ExpandEnvironmentStrings (netdb, expanded, sizeof (expanded))) {
+			const DWORD save_errno = GetLastError();
+			char winstr[1024];
+			pgm_warn (_("Cannot expand netdb path \"%s\": %s"),
+				  netdb,
+				  pgm_win_strerror (winstr, sizeof (winstr), save_errno));
+			return;
+		}
+#endif
+#ifndef _WIN32
 		netfh = fopen (netdb, "r");
+#else
+		netfh = fopen (expanded, "r");
+#endif
+		if (NULL == netfh) {
+			char errbuf[1024];
+			pgm_warn (_("Opening netdb file \"%s\" failed: %s"),
+				  netdb,
+				  pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+		}
 	} else {
-		pgm_debug ("rewinding open netdb");
 		rewind (netfh);
 	}
 }
 
 static
 void
-pgm_endnetent (void)
+_pgm_compat_endnetent (void)
 {
 	if (NULL != netfh) {
-		pgm_debug ("closing netdb");
 		fclose (netfh);
 		netfh = NULL;
 	}
@@ -74,13 +93,15 @@ pgm_endnetent (void)
 
 static
 struct pgm_netent_t*
-pgm_getnetent (void)
+_pgm_compat_getnetent (void)
 {
 	char *p, *cp, **q;
 
-	if (NULL == netfh &&
-	    NULL == (netfh = fopen (netdb, "r")))
-		return NULL;
+	if (NULL == netfh) {
+		_pgm_compat_setnetent();
+		if (NULL == netfh)
+			return NULL;
+	}
 
 again:
 	if (NULL == (p = fgets (line, BUFSIZ, netfh)))
@@ -128,7 +149,7 @@ again:
 		}
 	}
 	*q = NULL;
-	return (&net);
+	return &net;
 }
 
 /* Lookup network by name in the /etc/networks database.
@@ -136,8 +157,9 @@ again:
  * returns 0 on success, returns -1 on invalid address.
  */
 
+static
 struct pgm_netent_t*
-pgm_getnetbyname (
+_pgm_compat_getnetbyname (
 	const char*	name
 	)
 {
@@ -147,8 +169,8 @@ pgm_getnetbyname (
 	if (NULL == name)
 		return NULL;
 
-	pgm_setnetent ();
-	while (NULL != (p = pgm_getnetent())) {
+	_pgm_compat_setnetent ();
+	while (NULL != (p = _pgm_compat_getnetent())) {
 		if (!strncmp (p->n_name, name, BUFSIZ))
 			break;
 		for (cp = p->n_aliases; *cp != 0; cp++)
@@ -156,8 +178,54 @@ pgm_getnetbyname (
 				goto found;
 	}
 found:
-	pgm_endnetent();
+	_pgm_compat_endnetent();
 	return p;
+}
+
+#ifdef CONFIG_HAVE_GETNETENT
+static
+struct pgm_netent_t*
+_pgm_native_getnetbyname (
+	const char*	name
+	)
+{
+	struct netent *ne;
+	char **cp;
+
+	if (NULL == name)
+		return NULL;
+
+	setnetent (0);
+	while (NULL != (ne = getnetent())) {
+		if (!strncmp (ne->n_name, name, BUFSIZ))
+			break;
+		for (cp = ne->n_aliases; *cp != 0; cp++)
+			if (!strncmp (*cp, name, BUFSIZ))
+				goto found;
+	}
+	endnetent();
+	return NULL;
+found:
+	net.n_name     = ne->n_name;
+	net.n_aliases  = ne->n_aliases;
+	net.n_addrtype = ne->n_addrtype;
+	net.n_length   = sizeof (ne->n_net);
+	memcpy (net.n_net, &ne->n_net, net.n_length);
+	endnetent();
+	return &net;
+}
+#endif
+
+struct pgm_netent_t*
+pgm_getnetbyname (
+	const char*	name
+	)
+{
+#ifdef CONFIG_HAVE_GETNETENT
+	return _pgm_native_getnetbyname (name);
+#else
+	return _pgm_compat_getnetbyname (name);
+#endif
 }
 
 /* eof */
