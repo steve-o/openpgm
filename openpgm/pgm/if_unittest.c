@@ -633,13 +633,18 @@ mock_pgm_getnetbyname (
 		if (strcmp (network->name, name) == 0) {
 			ne.n_name	= network->name;
 			ne.n_aliases	= network->aliases;
-			ne.n_addrtype	= network->number.ss_family;
 			if (AF_INET == network->number.ss_family) {
-				ne.n_length = sizeof (struct in_addr);
-				((struct in_addr*)ne.n_net)->s_addr = g_ntohl (((struct sockaddr_in*)&network->number)->sin_addr.s_addr);
+				struct sockaddr_in sa;
+				memset (&sa, 0, sizeof (sa));
+				sa.sin_family = network->number.ss_family;
+				sa.sin_addr.s_addr = g_ntohl (((struct sockaddr_in*)&network->number)->sin_addr.s_addr);
+				memcpy (&ne.n_net, &sa, sizeof (sa));
 			} else {
-				ne.n_length = sizeof (struct in_addr);
-				*((struct in6_addr*)ne.n_net) = ((struct sockaddr_in6*)&network->number)->sin6_addr;
+				struct sockaddr_in6 sa6;
+				memset (&sa6, 0, sizeof (sa6));
+				sa6.sin6_family = network->number.ss_family;
+				sa6.sin6_addr = ((struct sockaddr_in6*)&network->number)->sin6_addr;
+				memcpy (&ne.n_net, &sa6, sizeof (sa6));
 			}
 			return &ne;
 		}

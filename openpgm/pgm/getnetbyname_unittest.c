@@ -146,40 +146,32 @@ START_TEST (test_getnetent_pass_001)
 #endif
 
 /* net address type */
-		fail_unless (AF_INET == ne->n_addrtype || AF_INET6 == ne->n_addrtype);
-		if (AF_INET == ne->n_addrtype) {
-			struct sockaddr_in sin;
+		fail_unless (AF_INET == ne->n_net.ss_family || AF_INET6 == ne->n_net.ss_family);
+		if (AF_INET == ne->n_net.ss_family) {
+			struct sockaddr_in sa;
 			g_debug ("      n_addrtype = AF_INET");
 #ifdef COMPARE_GETNETENT
-			fail_unless (ne->n_addrtype == nne->n_addrtype);
+			fail_unless (ne->n_net.ss_family == nne->n_addrtype);
 #endif
-			fail_unless (sizeof (struct in_addr) == ne->n_length);
-			g_debug ("      n_length = %d", ne->n_length);
 /* network number */
-			memset (&sin, 0, sizeof (sin));
-			sin.sin_family = ne->n_addrtype;
-			sin.sin_addr.s_addr = ((struct in_addr*)ne->n_net)->s_addr;
-			fail_unless (0 == getnameinfo ((struct sockaddr*)&sin, sizeof (sin),
+			memcpy (&sa, &ne->n_net, sizeof (sa));
+			fail_unless (0 == getnameinfo ((struct sockaddr*)&sa, sizeof (sa),
 						       buffer, sizeof (buffer),
 						       NULL, 0,
 						       NI_NUMERICHOST));
 			g_debug ("      n_net = %s", buffer);
 #ifdef COMPARE_GETNETENT
-			fail_unless (0 == memcmp (ne->n_net, &nne->n_net, sizeof (struct in_addr)));
+			fail_unless (0 == memcmp (&sa.sin_addr, &nne->n_net, sizeof (struct in_addr)));
 #endif
 		} else {
-			struct sockaddr_in6 sin6;
+			struct sockaddr_in6 sa6;
 			g_debug ("      n_addrtype = AF_INET6");
 #ifdef COMPARE_GETNETENT
-			if (ne->n_addrtype != nne->n_addrtype)
+			if (ne->n_net.ss_family != nne->n_addrtype)
 				g_warning ("native address type not AF_INET6");
 #endif
-			fail_unless (sizeof (struct in6_addr) == ne->n_length);
-			g_debug ("      n_length = %d", ne->n_length);
-			memset (&sin6, 0, sizeof (sin6));
-			sin6.sin6_family = ne->n_addrtype;
-			sin6.sin6_addr = *(struct in6_addr*)ne->n_net;
-			fail_unless (0 == getnameinfo ((struct sockaddr*)&sin6, sizeof (sin6),
+			memcpy (&sa6, &ne->n_net, sizeof (sa6));
+			fail_unless (0 == getnameinfo ((struct sockaddr*)&sa6, sizeof (sa6),
 						       buffer, sizeof (buffer),
 						       NULL, 0,
 						       NI_NUMERICHOST));

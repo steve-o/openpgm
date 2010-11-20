@@ -95,6 +95,7 @@ static
 struct pgm_netent_t*
 _pgm_compat_getnetent (void)
 {
+	struct in_addr sin;
 	char *p, *cp, **q;
 
 	if (NULL == netfh) {
@@ -122,13 +123,13 @@ again:
 	p = strpbrk (cp, " \t");
 	if (NULL != p)
 		*p++ = '\0';
-	if (0 == pgm_inet_network (cp, (struct in_addr*)net.n_net)) {
-		net.n_addrtype = AF_INET;
-		net.n_length = sizeof (struct in_addr);
-	} else if (0 == pgm_inet6_network (cp, (struct in6_addr*)net.n_net)) {
-		net.n_addrtype = AF_INET6;
-		net.n_length = sizeof (struct in6_addr);
-	} else {
+	if (0 == pgm_inet_network (cp, &sin)) {
+		struct sockaddr_in sa;
+		memset (&sa, 0, sizeof (sa));
+		sa.sin_family = AF_INET;
+		sa.sin_addr.s_addr = sin.s_addr;
+		memcpy (&net.n_net, &sa, sizeof (sa));
+	} else if (0 != pgm_sa6_network (cp, (struct sockaddr_in6*)&net.n_net)) {
 /* cannot resolve address, fail instead of returning junk address */
 		return NULL;
 	}
@@ -189,6 +190,7 @@ _pgm_native_getnetbyname (
 	const char*	name
 	)
 {
+	struct sockaddr_in sa;
 	struct netent *ne;
 	char **cp;
 
@@ -206,11 +208,12 @@ _pgm_native_getnetbyname (
 	endnetent();
 	return NULL;
 found:
-	net.n_name     = ne->n_name;
-	net.n_aliases  = ne->n_aliases;
-	net.n_addrtype = ne->n_addrtype;
-	net.n_length   = sizeof (ne->n_net);
-	memcpy (net.n_net, &ne->n_net, net.n_length);
+	net.n_name = ne->n_name;
+	net.n_aliases = ne->n_aliases;
+	memset (&sa, 0, sizeof (sa));
+	sa->sin_family = ne->n_addrtype;
+	sa->sin_addr.s_addr = ne->n_net;
+	memcpy (&net.n_net, &sa, sizeof (sa));
 	endnetent();
 	return &net;
 }
