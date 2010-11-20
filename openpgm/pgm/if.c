@@ -285,7 +285,7 @@ parse_interface (
 	bool check_ifname = FALSE;
 	char literal[1024];
 	struct in_addr in_addr;
-	struct in6_addr in6_addr;
+	struct sockaddr_in6 sa6_addr;
 	struct pgm_ifaddrs_t *ifap, *ifa;
 	struct sockaddr_storage addr;
 	unsigned interface_matches = 0;
@@ -339,9 +339,9 @@ parse_interface (
 		check_inet_network = TRUE;
 		check_addr = TRUE;
 	}
-	if (AF_INET  != family && 0 == pgm_inet6_network (ifname, &in6_addr))
+	if (AF_INET  != family && 0 == pgm_sa6_network (ifname, &sa6_addr))
 	{
-		if (IN6_IS_ADDR_MULTICAST(&in6_addr)) {
+		if (IN6_IS_ADDR_MULTICAST(&sa6_addr.sin6_addr)) {
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
 				     PGM_ERROR_XDEV,
@@ -349,11 +349,7 @@ parse_interface (
 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
 		}
-		struct sockaddr_in6 s6;
-		memset (&s6, 0, sizeof(s6));
-		s6.sin6_family = AF_INET6;
-		s6.sin6_addr = in6_addr;
-		memcpy (&addr, &s6, sizeof(s6));
+		memcpy (&addr, &sa6_addr, sizeof (sa6_addr));
 
 		check_inet6_network = TRUE;
 		check_addr = TRUE;
@@ -428,8 +424,9 @@ parse_interface (
 /* ne::n_net in host byte order */
 
 		if (ne) {
-			switch (ne->n_addrtype) {
-			case AF_INET:
+			switch (ne->n_net.ss_family) {
+			case AF_INET: {
+				struct sockaddr_in sa;
 				if (AF_INET6 == family) {
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_IF,
@@ -438,8 +435,9 @@ parse_interface (
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
+				memcpy (&sa, &ne->n_net, sizeof (sa));
 /* ne->n_net in network order */
-				in_addr.s_addr = ((const struct in_addr*)ne->n_net)->s_addr;
+				in_addr.s_addr = sa.sin_addr.s_addr;
 				if (IN_MULTICAST(in_addr.s_addr)) {
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_IF,
@@ -449,8 +447,10 @@ parse_interface (
 					return FALSE;
 				}
 				check_inet_network = TRUE;
+				check_addr = TRUE;
 				break;
-			case AF_INET6:
+			}
+			case AF_INET6: {
 #ifdef CONFIG_HAVE_GETNETENT
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_IF,
@@ -467,7 +467,8 @@ parse_interface (
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
-				if (IN6_IS_ADDR_MULTICAST((struct in6_addr*)ne->n_net)) {
+				memcpy (&sa6_addr, &ne->n_net, sizeof (sa6_addr));
+				if (IN6_IS_ADDR_MULTICAST(&sa6_addr.sin6_addr)) {
 					pgm_set_error (error,
 						     PGM_ERROR_DOMAIN_IF,
 						     PGM_ERROR_XDEV,
@@ -475,10 +476,11 @@ parse_interface (
 						     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 					return FALSE;
 				}
-				in6_addr = *(const struct in6_addr*)ne->n_net;
 				check_inet6_network = TRUE;
+				check_addr = TRUE;
 				break;
 #endif
+			}
 			default:
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_IF,
@@ -637,16 +639,18 @@ parse_interface (
 				continue;
 			}
 		}
-/* IPv6 scopes are not supported in network addresses */
 		if (check_inet6_network &&
-		    AF_INET6 == ifa->ifa_addr->sa_family)
+		    AF_INET6 == ifa->ifa_addr->sa_family &&
+/* no specified scope or matching scope */
+		    (	0 == sa6_addr.sin6_scope_id ||
+			((struct sockaddr_in6*)ifa->ifa_addr)->sin6_scope_id == sa6_addr.sin6_scope_id)	)
 		{
 			const struct in6_addr ifaddr = ((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
 			const struct in6_addr netmask = ((struct sockaddr_in6*)ifa->ifa_netmask)->sin6_addr;
 			struct in6_addr lna;
 
-			if (!pgm_inet6_lnaof (&lna, &in6_addr, &netmask) &&
-				is_in_net6 (&ifaddr, &in6_addr, &netmask))
+			if (!pgm_inet6_lnaof (&lna, &sa6_addr.sin6_addr, &netmask) &&
+				is_in_net6 (&ifaddr, &sa6_addr.sin6_addr, &netmask))
 			{
 				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
@@ -662,11 +666,12 @@ parse_interface (
 /* check for multiple interfaces on same network */
 				if (interface_matches++) {
 					char saddr[INET6_ADDRSTRLEN];
+					pgm_sockaddr_ntop ((struct sockaddr*)&sa6_addr, saddr, sizeof (saddr));
 					pgm_set_error (error,
-						     PGM_ERROR_DOMAIN_IF,
-						     PGM_ERROR_NOTUNIQ,
-						     _("Multiple interfaces found with network address %s."),
-						     pgm_inet_ntop (AF_INET6, &in6_addr, saddr, sizeof(saddr)));
+						       PGM_ERROR_DOMAIN_IF,
+						       PGM_ERROR_NOTUNIQ,
+						       _("Multiple interfaces found with network address %s."),
+						       saddr);
 					pgm_freeifaddrs (ifap);
 					return FALSE;
 				}
@@ -804,8 +809,9 @@ parse_group (
 	const struct pgm_netent_t* ne = pgm_getnetbyname (group);
 /* ne::n_net in host byte order */
 	if (ne) {
-		switch (ne->n_addrtype) {
-		case AF_INET:
+		switch (ne->n_net.ss_family) {
+		case AF_INET: {
+			struct sockaddr_in sa;
 			if (AF_INET6 == family) {
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_IF,
@@ -814,9 +820,10 @@ parse_group (
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
-			if (IN_MULTICAST(((const struct in_addr*)ne->n_net)->s_addr)) {
-				addr->sa_family = AF_INET;
-				((struct sockaddr_in*)addr)->sin_addr.s_addr = htonl (((const struct in_addr*)ne->n_net)->s_addr);
+			memcpy (&sa, &ne->n_net, sizeof (sa));
+			if (IN_MULTICAST(sa.sin_addr.s_addr)) {
+				addr->sa_family = ne->n_net.ss_family;
+				((struct sockaddr_in*)addr)->sin_addr.s_addr = htonl (sa.sin_addr.s_addr);
 				return TRUE;
 			}
 			pgm_set_error (error,
@@ -825,7 +832,8 @@ parse_group (
 				     _("IP address class conflict when resolving network name %s%s%s, expected IPv4 multicast."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
-		case AF_INET6:
+		}
+		case AF_INET6: {
 #ifdef CONFIG_HAVE_GETNETENT
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
@@ -834,6 +842,7 @@ parse_group (
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 #else
+			struct sockaddr_in6 sa6;
 			if (AF_INET == family) {
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_IF,
@@ -842,12 +851,9 @@ parse_group (
 					     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 				return FALSE;
 			}
-			if (IN6_IS_ADDR_MULTICAST((struct in6_addr*)ne->n_net)) {
-				addr->sa_family = AF_INET6;
-				((struct sockaddr_in6*)addr)->sin6_addr = *(const struct in6_addr*)ne->n_net;
-				((struct sockaddr_in6*)addr)->sin6_port = 0;
-				((struct sockaddr_in6*)addr)->sin6_flowinfo = 0;
-				((struct sockaddr_in6*)addr)->sin6_scope_id = 0;
+			memcpy (&sa6, &ne->n_net, sizeof (sa6));
+			if (IN6_IS_ADDR_MULTICAST(&sa6.sin6_addr)) {
+				memcpy (addr, &sa6, sizeof (sa6));
 				return TRUE;
 			}
 			pgm_set_error (error,
@@ -857,6 +863,7 @@ parse_group (
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
 #endif /* CONFIG_HAVE_GETNETENT */
+		}
 		default:
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
