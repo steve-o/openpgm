@@ -139,10 +139,16 @@ static double		g_latency_running_average = 0.0;
 static guint64		g_out_total = 0;
 static guint64		g_in_total = 0;
 
+#ifdef CONFIG_WITH_HEATMAP
+static FILE*		g_heatmap_file = NULL;
+static GHashTable*	g_heatmap_slice = NULL;		/* acting as sparse array */
+static uint		g_heatmap_resolution = 10;	/* microseconds */
+#endif
+
 static GMainLoop*	g_loop = NULL;
 static GThread*		g_sender_thread = NULL;
 static GThread*		g_receiver_thread = NULL;
-static gboolean		g_quit;
+static gboolean		g_quit = FALSE;
 #ifdef G_OS_UNIX
 static int		g_quit_pipe[2];
 static void on_signal (int, gpointer);
@@ -181,6 +187,9 @@ usage (const char* bin)
         fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
         fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
         fprintf (stderr, "  -N <n>\n");
+#ifdef CONFIG_WITH_HEATMAP
+	fprintf (stderr, "  -M <filename>   : Generate latency heap map\n");
+#endif
         fprintf (stderr, "  -H              : Enable HTTP administrative interface\n");
         fprintf (stderr, "  -S              : Enable SNMP interface\n");
 	exit (1);
@@ -220,7 +229,7 @@ main (
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:m:old:r:O:D:cfeK:N:HSh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:old:r:O:D:cfeK:N:M:HSh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
@@ -235,6 +244,12 @@ main (
 		case 'f':	g_use_fec = TRUE; break;
 		case 'K':	g_rs_k = atoi (optarg); break;
 		case 'N':	g_rs_n = atoi (optarg); break;
+
+#ifdef CONFIG_WITH_HEATMAP
+		case 'M':	g_heatmap_file = fopen (optarg, "w"); break;
+#else
+		case 'M':	g_warning ("Heat map support not compiled in."); break;
+#endif
 
 		case 'H':	enable_http = TRUE; break;
 		case 'S':	enable_snmpx = TRUE; break;
@@ -256,6 +271,12 @@ main (
 		g_error ("Invalid Reed-Solomon parameters.");
 		usage (binary_name);
 	}
+
+#ifdef CONFIG_WITH_HEATMAP
+	if (NULL != g_heatmap_file) {
+		g_heatmap_slice = g_hash_table_new (g_direct_hash, g_direct_equal);
+	}
+#endif
 
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {
@@ -283,8 +304,6 @@ main (
 #endif
 
 	g_loop = g_main_loop_new (NULL, FALSE);
-
-	g_quit = FALSE;
 
 /* setup signal handlers */
 #ifdef G_OS_UNIX
@@ -364,6 +383,15 @@ main (
 #ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
 		pgm_snmp_shutdown();
+#endif
+
+#ifdef CONFIG_WITH_HEATMAP
+	if (NULL != g_heatmap_file) {
+		fclose (g_heatmap_file);
+		g_heatmap_file = NULL;
+		g_hash_table_destroy (g_heatmap_slice);
+		g_heatmap_slice = NULL;
+	}
 #endif
 
 	google::protobuf::ShutdownProtobufLibrary();
@@ -475,7 +503,7 @@ on_startup (
 #ifndef __FreeBSD__
 		const int txbufsize = 1024 * 1024, rxbufsize = 1024 * 1024,
 #else
-		const int txbufsize = 256 * 1024, rxbufsize = 256 * 1024,
+		const int txbufsize = 128 * 1024, rxbufsize = 128 * 1024,
 #endif
 			  max_tpdu = g_max_tpdu;
 
@@ -1343,7 +1371,7 @@ g_message ("would block");
 					   pgm_to_msecsf(last_time - send_time));
 				goto next_msg;
 			}
-			g_latency_current	= pgm_to_secs(recv_time - send_time);
+			g_latency_current	= pgm_to_secs (recv_time - send_time);
 			g_latency_seqno		= seqno;
 
 			const double elapsed    = pgm_to_usecsf (recv_time - send_time);
@@ -1358,6 +1386,20 @@ g_message ("would block");
 			g_latency_running_average += elapsed;
 			g_latency_count++;
 			last_time = recv_time;
+
+#ifdef CONFIG_WITH_HEATMAP
+/* update heatmap slice */
+			if (NULL != g_heatmap_file) {
+				const guintptr key = (guintptr)((pgm_to_usecs (recv_time - send_time) + (g_heatmap_resolution - 1)) / g_heatmap_resolution) * g_heatmap_resolution;
+				guint32* value = (guint32*)g_hash_table_lookup (g_heatmap_slice, (const void*)key);
+				if (NULL == value) {
+					value = g_new (guint32, 1);
+					*value = 1;
+					g_hash_table_insert (g_heatmap_slice, (void*)key, (void*)value);
+				} else
+					(*value)++;
+			}
+#endif
 		}
 
 /* move onto next apdu */
@@ -1425,6 +1467,26 @@ on_mark (
 		g_latency_max		= 0.0;
 		g_out_total		= 0;
 		g_in_total		= 0;
+
+#ifdef CONFIG_WITH_HEATMAP
+/* serialize heatmap slice */
+		if (NULL != g_heatmap_file) {
+			GHashTableIter iter;
+			guintptr key;
+			guint32* value;
+			const guint32 slice_size = g_htonl ((guint32)g_hash_table_size (g_heatmap_slice));
+			fwrite (&slice_size, sizeof (slice_size), 1, g_heatmap_file);
+			g_hash_table_iter_init (&iter, g_heatmap_slice);
+			while (g_hash_table_iter_next (&iter, (void**)&key, (void**)&value)) {
+				guint32 words[2];
+				words[0] = g_htonl ((guint32)key);
+				words[1] = g_htonl (*value);
+				fwrite (words, sizeof (guint32), 2, g_heatmap_file);
+				g_free (value);
+				g_hash_table_iter_remove (&iter);
+			}
+		}
+#endif
 	}
 
 	return TRUE;
