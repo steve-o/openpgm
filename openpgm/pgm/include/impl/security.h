@@ -172,6 +172,22 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 #endif
 }
 
+static inline
+errno_t
+pgm_fopen_s (FILE **pFile, const char *filename, const char *mode)
+{
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
+	FILE* stream;
+
+	if (NULL == (stream = fopen (filename, mode)))
+		return errno;
+	*pFile = stream;
+	return 0;
+#else
+	return fopen_s (pFile, filename, mode);
+#endif
+}
+
 /* Security-only APIs */
 
 static inline
