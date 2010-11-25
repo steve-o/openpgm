@@ -51,9 +51,10 @@ void
 _pgm_compat_setnetent (void)
 {
 	if (NULL == netfh) {
+		errno_t err;
 #ifdef _WIN32
 		char expanded[MAX_PATH];
-		if (0 == ExpandEnvironmentStrings (netdb, expanded, sizeof (expanded))) {
+		if (0 == ExpandEnvironmentStrings ((LPCWSTR)netdb, (LPWSTR)expanded, sizeof (expanded))) {
 			const DWORD save_errno = GetLastError();
 			char winstr[1024];
 			pgm_warn (_("Cannot expand netdb path \"%s\": %s"),
@@ -62,16 +63,18 @@ _pgm_compat_setnetent (void)
 			return;
 		}
 #endif
+		err = pgm_fopen_s (&netfh,
 #ifndef _WIN32
-		netfh = fopen (netdb, "r");
+				   netdb,
 #else
-		netfh = fopen (expanded, "r");
+				   expanded,
 #endif
-		if (NULL == netfh) {
+				   "r");
+		if (0 != netfh) {
 			char errbuf[1024];
 			pgm_warn (_("Opening netdb file \"%s\" failed: %s"),
 				  netdb,
-				  pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+				  pgm_strerror_s (errbuf, sizeof (errbuf), err));
 		}
 	} else {
 		rewind (netfh);

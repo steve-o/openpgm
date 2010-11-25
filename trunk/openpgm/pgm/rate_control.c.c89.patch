@@ -1,6 +1,55 @@
 --- rate_control.c	2010-11-19 05:58:32.000000000 +0800
-+++ rate_control.c89.c	2010-11-19 05:57:03.000000000 +0800
-@@ -205,7 +205,7 @@
++++ rate_control.c89.c	2010-11-25 12:58:34.000000000 +0800
+@@ -78,7 +78,7 @@
+ 	const bool		is_nonblocking
+ 	)
+ {
+-	int64_t new_major_limit, new_minor_limit;
++	ssize_t new_major_limit, new_minor_limit;
+ 	pgm_time_t now;
+ 
+ /* pre-conditions */
+@@ -100,7 +100,9 @@
+ 			if (time_since_last_rate_check > pgm_msecs(1)) 
+ 				new_major_limit = major_bucket->rate_per_msec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_major_limit = major_bucket->rate_limit + ((major_bucket->rate_per_msec * time_since_last_rate_check) / 1000UL);
++#pragma warning( default : 4244 )
+ 				if (new_major_limit > major_bucket->rate_per_msec)
+ 					new_major_limit = major_bucket->rate_per_msec;
+ 			}
+@@ -111,7 +113,9 @@
+ 			if (time_since_last_rate_check > pgm_secs(1)) 
+ 				new_major_limit = major_bucket->rate_per_sec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_major_limit = major_bucket->rate_limit + ((major_bucket->rate_per_sec * time_since_last_rate_check) / 1000000UL);
++#pragma warning( default : 4244 )
+ 				if (new_major_limit > major_bucket->rate_per_sec)
+ 					new_major_limit = major_bucket->rate_per_sec;
+ 			}
+@@ -148,7 +152,9 @@
+ 			if (time_since_last_rate_check > pgm_msecs(1)) 
+ 				new_minor_limit = minor_bucket->rate_per_msec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_minor_limit = minor_bucket->rate_limit + ((minor_bucket->rate_per_msec * time_since_last_rate_check) / 1000UL);
++#pragma warning( default : 4244 )
+ 				if (new_minor_limit > minor_bucket->rate_per_msec)
+ 					new_minor_limit = minor_bucket->rate_per_msec;
+ 			}
+@@ -159,7 +165,9 @@
+ 			if (time_since_last_rate_check > pgm_secs(1)) 
+ 				new_minor_limit = minor_bucket->rate_per_sec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_minor_limit = minor_bucket->rate_limit + ((minor_bucket->rate_per_sec * time_since_last_rate_check) / 1000000UL);
++#pragma warning( default : 4244 )
+ 				if (new_minor_limit > minor_bucket->rate_per_sec)
+ 					new_minor_limit = minor_bucket->rate_per_sec;
+ 			}
+@@ -205,7 +213,7 @@
  	const bool		is_nonblocking
  	)
  {
@@ -9,7 +58,7 @@
  
  /* pre-conditions */
  	pgm_assert (NULL != bucket);
-@@ -215,6 +215,7 @@
+@@ -215,6 +223,7 @@
  		return TRUE;
  
  	pgm_spinlock_lock (&bucket->spinlock);
@@ -17,7 +66,7 @@
  	pgm_time_t now = pgm_time_update_now();
  
  	if (bucket->rate_per_msec)
-@@ -223,7 +224,9 @@
+@@ -223,7 +232,9 @@
  		if (time_since_last_rate_check > pgm_msecs(1)) 
  			new_rate_limit = bucket->rate_per_msec;
  		else {
@@ -27,7 +76,7 @@
  			if (new_rate_limit > bucket->rate_per_msec)
  				new_rate_limit = bucket->rate_per_msec;
  		}
-@@ -234,7 +237,9 @@
+@@ -234,7 +245,9 @@
  		if (time_since_last_rate_check > pgm_secs(1)) 
  			new_rate_limit = bucket->rate_per_sec;
  		else {
@@ -37,7 +86,7 @@
  			if (new_rate_limit > bucket->rate_per_sec)
  				new_rate_limit = bucket->rate_per_sec;
  		}
-@@ -260,6 +265,7 @@
+@@ -260,6 +273,7 @@
  	} 
  	pgm_spinlock_unlock (&bucket->spinlock);
  	return TRUE;
@@ -45,7 +94,7 @@
  }
  
  pgm_time_t
-@@ -327,12 +333,14 @@
+@@ -327,12 +341,14 @@
  		return 0;
  
  	pgm_spinlock_lock (&bucket->spinlock);
