@@ -70,7 +70,7 @@ _pgm_compat_setnetent (void)
 				   expanded,
 #endif
 				   "r");
-		if (0 != netfh) {
+		if (0 != err) {
 			char errbuf[1024];
 			pgm_warn (_("Opening netdb file \"%s\" failed: %s"),
 				  netdb,
