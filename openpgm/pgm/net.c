@@ -45,8 +45,9 @@
 
 ssize_t
 pgm_sendto_hops (
-	pgm_sock_t*			sock,
+	pgm_sock_t*	       restrict	sock,
 	bool				use_rate_limit,
+	pgm_rate_t*	       restrict	minor_rate_control,
 	bool				use_router_alert,
 	int				hops,			/* -1 == system default */
 	const void*	       restrict	buf,
@@ -64,9 +65,10 @@ pgm_sendto_hops (
 #ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
+	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s minor_rate_limit:%p use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
 		(const void*)sock,
 		use_rate_limit ? "TRUE" : "FALSE",
+		(const void*)minor_rate_limit,
 		use_router_alert ? "TRUE" : "FALSE",
 		(const void*)buf,
 		len,
@@ -77,11 +79,24 @@ pgm_sendto_hops (
 
 	const SOCKET send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
 
-	if (use_rate_limit && 
-	    !pgm_rate_check (&sock->rate_control, len, sock->is_nonblocking))
+	if (use_rate_limit)
 	{
-		pgm_set_last_sock_error (PGM_SOCK_ENOBUFS);
-		return (const ssize_t)-1;
+		if (NULL == minor_rate_control)
+		{
+			if (!pgm_rate_check (&sock->rate_control, len, sock->is_nonblocking))
+			{
+				pgm_set_last_sock_error (PGM_SOCK_ENOBUFS);
+				return (const ssize_t)-1;
+			}
+		}
+		else
+		{
+			if (!pgm_rate_check2 (&sock->rate_control, minor_rate_control, len, sock->is_nonblocking))
+			{
+				pgm_set_last_sock_error (PGM_SOCK_ENOBUFS);
+				return (const ssize_t)-1;
+			}
+		}
 	}
 
 	if (!use_router_alert && sock->can_send_data)

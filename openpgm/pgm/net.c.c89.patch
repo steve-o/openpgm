@@ -1,15 +1,27 @@
---- net.c	2010-10-24 12:01:26.000000000 +0800
-+++ net.c89.c	2010-11-05 06:18:17.000000000 +0800
-@@ -62,6 +62,7 @@
+--- net.c	2010-11-27 11:25:45.000000000 +0800
++++ net.c89.c	2010-11-27 11:41:36.000000000 +0800
+@@ -47,7 +47,7 @@
+ pgm_sendto_hops (
+ 	pgm_sock_t*	       restrict	sock,
+ 	bool				use_rate_limit,
+-	pgm_rate_t*	       restrict	minor_rate_control,
++	pgm_rate_t*	       restrict minor_rate_control,
+ 	bool				use_router_alert,
+ 	int				hops,			/* -1 == system default */
+ 	const void*	       restrict	buf,
+@@ -63,20 +63,23 @@
  	pgm_assert( tolen > 0 );
  
  #ifdef NET_DEBUG
 +	{
  	char saddr[INET_ADDRSTRLEN];
  	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
- 	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
-@@ -69,12 +70,14 @@
+-	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s minor_rate_limit:%p use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
++	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s minor_rate_control:%p use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
+ 		(const void*)sock,
  		use_rate_limit ? "TRUE" : "FALSE",
+-		(const void*)minor_rate_limit,
++		(const void*)minor_rate_control,
  		use_router_alert ? "TRUE" : "FALSE",
  		(const void*)buf,
 -		len,
@@ -23,8 +35,8 @@
 +	{
  	const SOCKET send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
  
- 	if (use_rate_limit && 
-@@ -89,15 +92,17 @@
+ 	if (use_rate_limit)
+@@ -104,15 +107,17 @@
  	if (-1 != hops)
  		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, hops);
  
@@ -46,7 +58,7 @@
  #ifdef CONFIG_HAVE_POLL
  /* poll for cleared socket */
  			struct pollfd p = {
-@@ -108,18 +113,23 @@
+@@ -123,18 +128,23 @@
  			const int ready = poll (&p, 1, 500 /* ms */);
  #else
  			fd_set writefds;
@@ -77,7 +89,7 @@
  				{
  					char toaddr[INET6_ADDRSTRLEN];
  					save_errno = pgm_get_last_sock_error();
-@@ -149,7 +159,9 @@
+@@ -164,7 +174,9 @@
  		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, sock->hops);
  	if (!use_router_alert && sock->can_send_data)
  		pgm_mutex_unlock (&sock->send_mutex);
