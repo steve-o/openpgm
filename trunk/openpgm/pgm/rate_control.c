@@ -283,11 +283,12 @@ pgm_rate_remaining2 (
 	{
 		pgm_spinlock_lock (&major_bucket->spinlock);
 		now = pgm_time_update_now();
-		{
 		const int64_t bucket_bytes = major_bucket->rate_limit + pgm_to_secs (major_bucket->rate_per_sec * (now - major_bucket->last_rate_check)) - n;
 
-		if (bucket_bytes < 0)
-			remaining = major_bucket->rate_per_sec / -bucket_bytes;
+		if (bucket_bytes < 0) {
+			const int64_t outstanding_bytes = -bucket_bytes;
+			const pgm_time_t major_remaining = (1000000UL * outstanding_bytes) / major_bucket->rate_per_sec;
+			remaining = major_remaining;
 		}
 	}
 	else
@@ -301,8 +302,9 @@ pgm_rate_remaining2 (
 		const int64_t bucket_bytes = minor_bucket->rate_limit + pgm_to_secs (minor_bucket->rate_per_sec * (now - minor_bucket->last_rate_check)) - n;
 
 		if (bucket_bytes < 0) {
-			const pgm_time_t minor_remaining = minor_bucket->rate_per_sec / -bucket_bytes;
-			remaining = MAX(remaining, minor_remaining);
+			const int64_t outstanding_bytes = -bucket_bytes;
+			const pgm_time_t minor_remaining = (1000000UL * outstanding_bytes) / minor_bucket->rate_per_sec;
+			remaining = remaining > 0 ? MIN(remaining, minor_remaining) : minor_remaining;
 		}
 	}
 
@@ -332,7 +334,13 @@ pgm_rate_remaining (
 	const int64_t bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
 	pgm_spinlock_unlock (&bucket->spinlock);
 
-	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
+	if (bucket_bytes >= 0)
+		return 0;
+
+	const int64_t outstanding_bytes = -bucket_bytes;
+	const pgm_time_t remaining = (1000000UL * outstanding_bytes) / bucket->rate_per_sec;
+
+	return remaining;
 }
 
 /* eof */
