@@ -801,6 +801,7 @@ pgm_send_spm (
 
 	sent = pgm_sendto (sock,
 			   flags != PGM_OPT_SYN && sock->is_controlled_spm,	/* rate limited */
+			   NULL,
 			   TRUE,		/* with router alert */
 			   buf,
 			   tpdu_length,
@@ -893,6 +894,7 @@ send_ncf (
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
+			   NULL,
 			   TRUE,			/* with router alert */
 			   buf,
 			   tpdu_length,
@@ -1007,6 +1009,7 @@ send_ncf_list (
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
+			   NULL,
 			   TRUE,			/* with router alert */
 			   buf,
 			   tpdu_length,
@@ -1185,6 +1188,7 @@ retry_send:
 
 	sent = pgm_sendto (sock,
 			   !STATE(is_rate_limited),	/* rate limit on blocking */
+			   &sock->odata_rate_control,
 			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
@@ -1362,6 +1366,7 @@ retry_send:
 
 	sent = pgm_sendto (sock,
 			   !STATE(is_rate_limited),	/* rate limit on blocking */
+			   &sock->odata_rate_control,
 			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
@@ -1529,6 +1534,7 @@ retry_send:
 	tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 	sent = pgm_sendto (sock,
 			   !STATE(is_rate_limited),	/* rate limit on blocking */
+			   &sock->odata_rate_control,
 			   FALSE,			/* regular socket */
 			   STATE(skb)->head,
 			   tpdu_length,
@@ -1699,6 +1705,7 @@ retry_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		sent = pgm_sendto (sock,
 				   !STATE(is_rate_limited),	/* rate limit on blocking */
+			   	   &sock->odata_rate_control,
 				   FALSE,			/* regular socket */
 				   STATE(skb)->head,
 				   tpdu_length,
@@ -2107,6 +2114,7 @@ retry_one_apdu_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		sent = pgm_sendto (sock,
 				   !STATE(is_rate_limited),	/* rate limited on blocking */
+			   	   &sock->odata_rate_control,
 				   FALSE,			/* regular socket */
 				   STATE(skb)->head,
 				   tpdu_length,
@@ -2354,11 +2362,12 @@ retry_send:
 		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		sent = pgm_sendto (sock,
 				   !STATE(is_rate_limited),	/* rate limited on blocking */
-				    FALSE,			/* regular socket */
-				    STATE(skb)->head,
-				    tpdu_length,
-				    (struct sockaddr*)&sock->send_gsr.gsr_group,
-				    pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
+			   	   &sock->odata_rate_control,
+				   FALSE,			/* regular socket */
+				   STATE(skb)->head,
+				   tpdu_length,
+				   (struct sockaddr*)&sock->send_gsr.gsr_group,
+				   pgm_sockaddr_len((struct sockaddr*)&sock->send_gsr.gsr_group));
 		if (sent < 0) {
 			save_errno = pgm_get_last_sock_error();
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
@@ -2489,6 +2498,7 @@ send_rdata (
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* already rate limited */
+			   &sock->rdata_rate_control,
 			   TRUE,			/* with router alert */
 			   header,
 			   tpdu_length,

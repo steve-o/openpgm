@@ -105,6 +105,8 @@ int main (void) {
 					(unsigned)(j * yrange_ivl));
 				j++;
 			}
+			if ((j * yrange_ivl) >= yrange_max)
+				goto end_slice;
 			printf ("%u %u %u\n",
 				(unsigned)slice,
 				(unsigned)(j * yrange_ivl),

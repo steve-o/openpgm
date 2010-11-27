@@ -145,7 +145,11 @@ env = Environment(ENV = os.environ,
 # Wine limited API support
 #			'-DCONFIG_TARGET_WINE',
 # GNU getopt
-			'-DCONFIG_HAVE_GETOPT'
+			'-DCONFIG_HAVE_GETOPT',
+# temporary for pgmping
+#			'-DCONFIG_WITH_HEATMAP',
+#			'-DCONFIG_WITH_BUSYWAIT',
+#			'-DCONFIG_HAVE_SCHEDPARAM'
 		 ],
 	LINKFLAGS = [	'-pipe'
 		    ],

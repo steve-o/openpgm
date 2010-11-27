@@ -21,6 +21,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* MSVC secure CRT */
+#define _CRT_SECURE_NO_WARNINGS		1
+
 /* c99 compatibility for c++ */
 #define __STDC_LIMIT_MACROS
 
@@ -142,7 +145,8 @@ static guint64		g_in_total = 0;
 #ifdef CONFIG_WITH_HEATMAP
 static FILE*		g_heatmap_file = NULL;
 static GHashTable*	g_heatmap_slice = NULL;		/* acting as sparse array */
-static uint		g_heatmap_resolution = 10;	/* microseconds */
+static GMutex*		g_heatmap_lock = NULL;
+static guint		g_heatmap_resolution = 10;	/* microseconds */
 #endif
 
 static GMainLoop*	g_loop = NULL;
@@ -275,6 +279,7 @@ main (
 #ifdef CONFIG_WITH_HEATMAP
 	if (NULL != g_heatmap_file) {
 		g_heatmap_slice = g_hash_table_new (g_direct_hash, g_direct_equal);
+		g_heatmap_lock = g_mutex_new ();
 	}
 #endif
 
@@ -389,6 +394,8 @@ main (
 	if (NULL != g_heatmap_file) {
 		fclose (g_heatmap_file);
 		g_heatmap_file = NULL;
+		g_mutex_free (g_heatmap_lock);
+		g_heatmap_lock = NULL;
 		g_hash_table_destroy (g_heatmap_slice);
 		g_heatmap_slice = NULL;
 	}
@@ -495,15 +502,25 @@ on_startup (
 		}
 	}
 
+#ifndef CONFIG_HAVE_SCHEDPARAM
 	pgm_drop_superuser();
+#endif
+#ifdef CONFIG_PRIORITY_CLASS
+/* Any priority above normal usually yields worse performance than expected */
+	if (!SetPriorityClass (GetCurrentProcess(), NORMAL_PRIORITY_CLASS))
+	{
+		g_warning ("setting priority class (%d)", GetLastError());
+	}
+#endif
 
 /* set PGM parameters */
 /* common */
 	{
-#ifndef __FreeBSD__
-		const int txbufsize = 1024 * 1024, rxbufsize = 1024 * 1024,
-#else
+#if defined(__FreeBSD__)
+/* FreeBSD defaults to low maximum socket size */
 		const int txbufsize = 128 * 1024, rxbufsize = 128 * 1024,
+#else
+		const int txbufsize = 1024 * 1024, rxbufsize = 1024 * 1024,
 #endif
 			  max_tpdu = g_max_tpdu;
 
@@ -888,6 +905,21 @@ sender_thread (
 	subject.append(hostname);
 	memset (payload, 0, sizeof(payload));
 
+#ifdef CONFIG_HAVE_SCHEDPARAM
+/* realtime scheduling */
+	pthread_t thread_id = pthread_self ();
+	int policy;
+	struct sched_param param;
+
+	if (0 == pthread_getschedparam (thread_id, &policy, &param)) {
+		policy = SCHED_FIFO;
+		param.sched_priority = 50;
+		if (0 != pthread_setschedparam (thread_id, policy, &param))
+			g_warning ("Cannot set thread scheduling parameters.");
+	} else
+		g_warning ("Cannot get thread scheduling parameters.");
+#endif
+
 	ping.mutable_subscription_header()->set_subject (subject);
 	ping.mutable_market_data_header()->set_msg_type (example::MarketDataHeader::MSG_VERIFY);
 	ping.mutable_market_data_header()->set_rec_type (example::MarketDataHeader::PING);
@@ -957,10 +989,22 @@ again:
 #if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
 /* busy wait under 2ms */
-			if (timeout < 2) timeout = 0;
+#	ifdef CONFIG_BUSYWAIT
+			if (timeout < 2)
+				goto again;
+#	else
+			if (0 == timeout)
+				goto again;
+#	endif
 #elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
 /* round up wait */
+#	ifdef CONFIG_BUSYWAIT
+			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
+#	else
 			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 999) / 1000);
+#	endif
+			if (0 == dwTimeout)
+				goto again;
 #endif
 #if defined(CONFIG_HAVE_EPOLL)
 			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
@@ -1079,7 +1123,7 @@ again:
 		}
 		g_out_total += bytes_written;
 		g_msg_sent++;
-	} while (!g_quit);
+	} while (G_LIKELY(!g_quit));
 
 #if defined(CONFIG_HAVE_EPOLL)
 	close (efd_again);
@@ -1153,6 +1197,21 @@ receiver_thread (
 	WSAEventSelect (pending_sock, waitEvents[3], FD_READ);
 #endif /* !CONFIG_HAVE_EPOLL */
 
+#ifdef CONFIG_HAVE_SCHEDPARAM
+/* realtime scheduling */
+	pthread_t thread_id = pthread_self ();
+	int policy;
+	struct sched_param param;
+
+	if (0 == pthread_getschedparam (thread_id, &policy, &param)) {
+		policy = SCHED_FIFO;
+		param.sched_priority = 50;
+		if (0 != pthread_setschedparam (thread_id, policy, &param))
+			g_warning ("Cannot set thread scheduling parameters.");
+	} else
+		g_warning ("Cannot get thread scheduling parameters.");
+#endif
+
 	memset (&lost_tsi, 0, sizeof(lost_tsi));
 
 	do {
@@ -1168,13 +1227,17 @@ receiver_thread (
 		fd_set readfds;
 #endif
 		size_t len;
-		pgm_error_t* pgm_err = NULL;
-		const int status = pgm_recvmsgv (rx_sock,
-					         msgv,
-					         G_N_ELEMENTS(msgv),
-					         MSG_ERRQUEUE,
-					         &len,
-					         &pgm_err);
+		pgm_error_t* pgm_err;
+		int status;
+
+again:
+		pgm_err = NULL;
+		status = pgm_recvmsgv (rx_sock,
+				       msgv,
+				       G_N_ELEMENTS(msgv),
+				       MSG_ERRQUEUE,
+				       &len,
+				       &pgm_err);
 		if (lost_count) {
 			pgm_time_t elapsed = pgm_time_update_now() - lost_tstamp;
 			if (elapsed >= pgm_secs(1)) {
@@ -1217,10 +1280,22 @@ block:
 #if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000));
 /* busy wait under 2ms */
-			if (timeout > 0 && timeout < 2) timeout = 0;
+#	ifdef CONFIG_BUSYWAIT
+			if (timeout >= 0 && timeout < 2)
+				goto again;
+#	else
+			if (0 == timeout)
+				goto again;
+#	endif
 #elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
 /* round up wait */
+#	ifdef CONFIG_BUSYWAIT
+			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000));
+#	else
 			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + ((tv.tv_usec + 999) / 1000));
+#	endif
+			if (0 == dwTimeout)
+				goto again;
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
@@ -1281,7 +1356,7 @@ block:
 			}
 			break;
 		}
-	} while (!g_quit);
+	} while (G_LIKELY(!g_quit));
 
 #if defined(CONFIG_HAVE_EPOLL)
 	close (efd);
@@ -1319,11 +1394,13 @@ again:
 			status = pgm_send (g_sock, pskb->data, pskb->len, NULL);
 			switch (status) {
 			case PGM_IO_STATUS_RATE_LIMITED:
-g_message ("ratelimit"); goto again;
+//g_message ("reflector ratelimit");
+				goto again;
 			case PGM_IO_STATUS_CONGESTION:
-g_message ("congestion"); goto again;
+g_message ("reflector congestion");
+				goto again;
 			case PGM_IO_STATUS_WOULD_BLOCK:
-g_message ("would block");
+//g_message ("reflector would block");
 /* busy wait always as reflector */
 				goto again;
 
@@ -1391,13 +1468,15 @@ g_message ("would block");
 /* update heatmap slice */
 			if (NULL != g_heatmap_file) {
 				const guintptr key = (guintptr)((pgm_to_usecs (recv_time - send_time) + (g_heatmap_resolution - 1)) / g_heatmap_resolution) * g_heatmap_resolution;
+				g_mutex_lock (g_heatmap_lock);
 				guint32* value = (guint32*)g_hash_table_lookup (g_heatmap_slice, (const void*)key);
 				if (NULL == value) {
-					value = g_new (guint32, 1);
+					value = g_slice_new (guint32);
 					*value = 1;
 					g_hash_table_insert (g_heatmap_slice, (void*)key, (void*)value);
 				} else
 					(*value)++;
+				g_mutex_unlock (g_heatmap_lock);
 			}
 #endif
 		}
@@ -1472,19 +1551,22 @@ on_mark (
 /* serialize heatmap slice */
 		if (NULL != g_heatmap_file) {
 			GHashTableIter iter;
-			guintptr key;
-			guint32* value;
-			const guint32 slice_size = g_htonl ((guint32)g_hash_table_size (g_heatmap_slice));
+			gpointer key, value;
+			guint32 slice_size;
+
+			g_mutex_lock (g_heatmap_lock);
+			slice_size = g_htonl ((guint32)g_hash_table_size (g_heatmap_slice));
 			fwrite (&slice_size, sizeof (slice_size), 1, g_heatmap_file);
 			g_hash_table_iter_init (&iter, g_heatmap_slice);
-			while (g_hash_table_iter_next (&iter, (void**)&key, (void**)&value)) {
+			while (g_hash_table_iter_next (&iter, &key, &value)) {
 				guint32 words[2];
-				words[0] = g_htonl ((guint32)key);
-				words[1] = g_htonl (*value);
+				words[0] = g_htonl ((guint32)(guintptr)key);
+				words[1] = g_htonl (*(guint32*)value);
 				fwrite (words, sizeof (guint32), 2, g_heatmap_file);
-				g_free (value);
+				g_slice_free (guint32, value);
 				g_hash_table_iter_remove (&iter);
 			}
+			g_mutex_unlock (g_heatmap_lock);
 		}
 #endif
 	}
