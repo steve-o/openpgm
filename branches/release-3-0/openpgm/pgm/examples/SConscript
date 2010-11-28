@@ -60,11 +60,11 @@ if e['WITH_GLIB'] == 'true':
 		ep['CCFLAGS'] = newCCFLAGS;
 		ep.Append(CPPPATH = '.');
 		ep.Append(CCFLAGS = ep['PROTOBUF_CCFLAGS']);
-		ep.Depends('pgmping.cc', ['ping.pb.cc', 'ping.pb.h']);
 		protobuf = Builder(action = 'cd ${SOURCE.dir} && %s ${SOURCE.file} --cpp_out=../${TARGET.dir}' % ep['PROTOBUF_PROTOC'])
 		ep.Append(BUILDERS = {'Protobuf' : protobuf})
-		ep.Protobuf('ping.pb.cc', 'ping.proto')
 		ep.Program(['pgmping.cc', 'ping.pb.cc', ep['PROTOBUF_LIBS']])
+		protobuf = ep.Protobuf('ping.pb.cc', 'ping.proto')
+		ep.Requires(ep.Object('pgmping.cc'), protobuf);
 
 # Vanilla example
 p.Program(['purinsend.c'] + getopt)
