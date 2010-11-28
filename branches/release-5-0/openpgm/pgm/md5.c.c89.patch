@@ -1,0 +1,34 @@
+--- md5.c	2010-09-20 12:06:01.000000000 +0800
++++ md5.c89	2010-10-06 17:38:34.000000000 +0800
+@@ -92,6 +92,7 @@
+ 	pgm_assert (len > 0);
+ 	pgm_assert (NULL != ctx);
+ 
++	{
+ 	uint32_t correct_words[16];
+ 	const uint32_t *words = buffer;
+ 	const size_t nwords = len / sizeof (uint32_t);
+@@ -243,6 +244,7 @@
+ 	ctx->B = B;
+ 	ctx->C = C;
+ 	ctx->D = D;
++	}
+ }
+ 
+ void
+@@ -343,6 +345,7 @@
+ 	pgm_assert (NULL != resbuf);
+ 
+ /* Take yet unprocessed bytes into account.  */
++	{
+ 	const uint32_t bytes = ctx->buflen;
+ 	size_t pad;
+ 
+@@ -363,6 +366,7 @@
+ 	_pgm_md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
+ 
+ 	return _pgm_md5_read_ctx (ctx, resbuf);
++	}
+ }
+ 
+ /* eof */

@@ -1,0 +1,58 @@
+--- time.c	2010-10-24 17:47:52.000000000 +0800
++++ time.c89.c	2010-10-24 17:55:20.000000000 +0800
+@@ -315,6 +315,7 @@
+ /* attempt to parse clock ticks from kernel
+  */
+ 		FILE	*fp = fopen ("/proc/cpuinfo", "r");
++
+ 		if (fp)
+ 		{
+ 			char buffer[1024];
+@@ -329,6 +330,7 @@
+ 			fclose (fp);
+ 		}
+ #elif defined(_WIN32)
++		{
+ 		LARGE_INTEGER frequency;
+ 		if (QueryPerformanceFrequency (&frequency))
+ 		{
+@@ -344,6 +346,7 @@
+ 				       _("No supported high-resolution performance counter: %s"),
+ 				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
+ 		}
++		}
+ #endif /* !_WIN32 */
+ 
+ /* e.g. export RDTSC_FREQUENCY=3200.000000
+@@ -594,7 +597,6 @@
+ 
+ /* We cannot use "=A", since this would use %rax on x86_64 */
+ 	asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
+-
+ 	return (pgm_time_t)hi << 32 | lo;
+ 
+ #	else
+@@ -625,6 +627,7 @@
+  */
+ 	FILE	*fp = fopen ("/proc/cpuinfo", "r");
+ 	char	buffer[1024], *flags = NULL;
++
+ 	if (fp)
+ 	{
+ 		while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
+@@ -754,11 +757,15 @@
+ /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
+  * the value must be <= 0x05f5e100 or 100ns.
+  */
++	{
+ 	const uint32_t hpet_period = *((uint32_t*)(hpet_ptr + HPET_COUNTER_CLK_PERIOD));
+ 	set_hpet_mul (hpet_period);
++	}
+ #if defined( __x86_64__ ) || defined( __amd64 )
++	{
+ 	const uint32_t hpet_caps = *((uint32_t*)(hpet_ptr + HPET_GENERAL_CAPS_REGISTER));
+ 	hpet_wrap = hpet_caps & HPET_COUNT_SIZE_CAP ? 0 : (1ULL << 32);
++	}
+ #else
+ 	hpet_wrap = 1ULL << 32;
+ #endif
