@@ -181,7 +181,14 @@ pgm_rate_remaining (
 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 	const gint bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - packetlen;
 	g_static_mutex_unlock (&bucket->mutex);
-	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
+
+	if (bucket_bytes >= 0)
+		return 0;
+
+	const int64_t outstanding_bytes = -bucket_bytes;
+	const pgm_time_t remaining = (1000000UL * outstanding_bytes) / bucket->rate_per_sec;
+
+	return remaining;
 }
 
 /* eof */

@@ -134,7 +134,10 @@ env = Environment(
 		 ],
 	LINKFLAGS = [	'-pipe',
 			'-lm'
-		    ]
+		    ],
+	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.1.0/src',
+	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.1.0/src/.libs/libprotobuf.a',
+	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.1.0/src/protoc'
 )
 
 # Branch prediction
