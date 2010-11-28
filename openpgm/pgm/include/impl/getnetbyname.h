@@ -37,7 +37,9 @@ struct pgm_netent_t
 {
 	char*	n_name;		/* Official network name */
 	char**	n_aliases;	/* Alias list */
-	struct sockaddr_storage n_net;	/* Network address */
+	int	n_addrtype;	/* Net address type, AF_INET or AF_INET6 */
+	int	n_length;
+	char*	n_net;		/* Network address */
 };
 
 struct pgm_netent_t* pgm_getnetbyname (const char*);

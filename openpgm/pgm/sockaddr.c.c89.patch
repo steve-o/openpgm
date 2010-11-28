@@ -1,14 +1,5 @@
---- sockaddr.c	2010-10-26 15:56:31.000000000 +0800
-+++ sockaddr.c89.c	2010-11-05 06:29:30.000000000 +0800
-@@ -134,7 +134,7 @@
- 	)
- {
- 	return getnameinfo (sa, pgm_sockaddr_len (sa),
--			    host, hostlen,
-+			    host, (DWORD)hostlen,
- 			    NULL, 0,
- 			    NI_NUMERICHOST);
- }
+--- sockaddr.c	2010-10-12 20:55:08.000000000 +0800
++++ sockaddr.c89.c	2010-10-12 20:55:22.000000000 +0800
 @@ -145,12 +145,13 @@
  	struct sockaddr* restrict dst		/* will error on wrong size */
  	)
@@ -37,7 +28,7 @@
  }
  
  /* returns tri-state value: 1 if sa is multicast, 0 if sa is not multicast, -1 on error
-@@ -1127,13 +1129,14 @@
+@@ -1123,13 +1125,14 @@
  	pgm_assert (NULL != src);
  	pgm_assert (NULL != dst);
  
@@ -59,7 +50,7 @@
  	const int e = getaddrinfo (src, NULL, &hints, &result);
  	if (0 != e) {
  		return 0;	/* error */
-@@ -1164,6 +1167,8 @@
+@@ -1160,6 +1163,8 @@
  
  	freeaddrinfo (result);
  	return 1;	/* success */

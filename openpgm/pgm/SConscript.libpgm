@@ -103,15 +103,6 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('indextoaddr.c'),
 			e.Object('nametoindex.c')
 		] + tlog);
-	te.Program (['getnetbyname_unittest.c',
-			e.Object('inet_network.c'),
-			e.Object('sockaddr.c'),
-# mingw linking
-			e.Object('error.c'),
-			e.Object('getifaddrs.c'),
-			e.Object('indextoaddr.c'),
-			e.Object('nametoindex.c')
-		] + tlog);
 	te.Program (['getnodeaddr_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c'),
@@ -140,7 +131,6 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('error.c'),
 			e.Object('galois_tables.c'),
 			e.Object('getifaddrs.c'),
-			e.Object('getnetbyname.c'),
 			e.Object('getnodeaddr.c'),
 			e.Object('hashtable.c'),
 			e.Object('histogram.c'),

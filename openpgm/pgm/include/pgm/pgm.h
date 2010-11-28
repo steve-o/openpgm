@@ -26,9 +26,8 @@
 #ifdef _MSC_VER
 /* library dependencies for Visual Studio application builds */
 #	pragma comment (lib, "libpgm")
-#	pragma comment (lib, "ws2_32")
 #	pragma comment (lib, "iphlpapi")
-#	pragma comment (lib, "winmm")
+#	pragma comment (lib, "ws2_32")
 #endif
 
 #include <pgm/atomic.h>

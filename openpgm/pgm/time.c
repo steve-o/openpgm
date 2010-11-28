@@ -23,8 +23,7 @@
 #include <stdlib.h>
 #ifdef _WIN32
 #	define WIN32_LEAN_AND_MEAN
-#	include <windows.h>
-#	include <mmsystem.h>
+#	include "windows.h"
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -57,10 +56,6 @@ pgm_time_since_epoch_func	pgm_time_since_epoch PGM_GNUC_READ_MOSTLY;
 
 static volatile uint32_t	time_ref_count = 0;
 static pgm_time_t		rel_offset PGM_GNUC_READ_MOSTLY = 0;
-
-#ifdef _WIN32
-static UINT			wTimerRes = 0;
-#endif
 
 static void			pgm_time_conv (const pgm_time_t*const restrict, time_t*restrict);
 static void			pgm_time_conv_from_reset (const pgm_time_t*const restrict, time_t*restrict);
@@ -411,21 +406,6 @@ pgm_time_init (
 	rel_offset = 0;
 #endif
 
-/* update Windows timer resolution to 1ms */
-#ifdef _WIN32
-	TIMECAPS tc;
-	if (TIMERR_NOERROR == timeGetDevCaps (&tc, sizeof (TIMECAPS)))
-	{
-		wTimerRes = min (max (tc.wPeriodMin, 1 /* ms */), tc.wPeriodMax);
-		timeBeginPeriod (wTimerRes);
-		pgm_debug ("Set timer resolution to %ums.", wTimerRes);
-	}
-	else
-	{
-		pgm_warn (_("Unable to determine timer device resolution."));
-	}
-#endif
-
 	return TRUE;
 #ifndef _WIN32
 err_cleanup:
@@ -446,10 +426,6 @@ pgm_time_shutdown (void)
 
 	if (pgm_atomic_exchange_and_add32 (&time_ref_count, (uint32_t)-1) != 1)
 		return retval;
-
-#ifdef _WIN32
-	timeEndPeriod (wTimerRes);
-#endif
 
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)

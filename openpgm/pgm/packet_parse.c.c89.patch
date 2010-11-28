@@ -1,5 +1,5 @@
 --- packet_parse.c	2010-10-24 12:05:09.000000000 +0800
-+++ packet_parse.c89.c	2010-11-05 06:19:56.000000000 +0800
++++ packet_parse.c89.c	2010-10-24 12:46:22.000000000 +0800
 @@ -116,6 +116,7 @@
   */
  
@@ -56,12 +56,9 @@
  #ifndef CONFIG_HOST_ORDER_IP_OFF
  	const uint16_t offset = ntohs (ip->ip_off);
  #else
-@@ -227,8 +233,12 @@
- 
- /* advance DATA pointer to PGM packet */
+@@ -229,6 +235,10 @@
  	skb->data	= skb->pgm_header;
--	skb->len       -= ip_header_length;
-+	skb->len	= (uint16_t)(skb->len - ip_header_length);
+ 	skb->len       -= ip_header_length;
  	return pgm_parse (skb, error);
 +	}
 +	}

@@ -1,5 +1,5 @@
---- if.c	2010-11-20 11:24:19.000000000 +0800
-+++ if.c89.c	2010-11-25 12:56:06.000000000 +0800
+--- if.c	2010-10-14 16:01:36.000000000 +0800
++++ if.c89.c	2010-10-14 16:02:20.000000000 +0800
 @@ -124,6 +124,7 @@
  			continue;
  		}
@@ -102,7 +102,21 @@
  
  		check_inet_network = TRUE;
  		check_addr = TRUE;
-@@ -359,12 +377,13 @@
+@@ -349,11 +367,13 @@
+ 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
+ 			return FALSE;
+ 		}
++		{
+ 		struct sockaddr_in6 s6;
+ 		memset (&s6, 0, sizeof(s6));
+ 		s6.sin6_family = AF_INET6;
+ 		s6.sin6_addr = in6_addr;
+ 		memcpy (&addr, &s6, sizeof(s6));
++		}
+ 
+ 		check_inet6_network = TRUE;
+ 		check_addr = TRUE;
+@@ -363,12 +383,13 @@
  	if (!check_addr)
  	{
  		char errbuf[1024];
@@ -122,15 +136,15 @@
  		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
  		switch (eai) {
  		case 0:
-@@ -411,6 +430,7 @@
+@@ -415,6 +436,7 @@
  				     eai);
  			return FALSE;
  		}
 +		}
  	}
  
- /* network name into network address, can be expensive with NSS network lookup
-@@ -496,12 +516,13 @@
+ #ifndef _WIN32
+@@ -496,12 +518,13 @@
  	if (!check_addr)
  	{
  		char errbuf[1024];
@@ -150,7 +164,7 @@
  		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
  		switch (eai) {
  		case 0:
-@@ -548,6 +569,7 @@
+@@ -548,6 +571,7 @@
  				     eai);
  			return FALSE;
  		}
@@ -158,7 +172,7 @@
  	}
  
  /* iterate through interface list and match device name, ip or net address */
-@@ -580,6 +602,7 @@
+@@ -580,6 +604,7 @@
  			continue;
  		}
  
@@ -166,7 +180,7 @@
  		const unsigned ifindex = pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
  		pgm_assert (0 != ifindex);
  
-@@ -603,9 +626,9 @@
+@@ -603,9 +628,9 @@
  		if (check_inet_network &&
  		    AF_INET == ifa->ifa_addr->sa_family)
  		{
@@ -179,7 +193,7 @@
  
  /* local network address must be null, otherwise should match an address is previous check */
  			if (!pgm_inet_lnaof (&lna, &in_addr, &netmask) &&
-@@ -710,7 +733,7 @@
+@@ -707,7 +732,7 @@
  			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
  			continue;
  		}
@@ -188,19 +202,8 @@
  	}
  
  	if (0 == interface_matches) {
-@@ -806,6 +829,7 @@
- 	}
- 
- /* NSS network */
-+	{
- 	const struct pgm_netent_t* ne = pgm_getnetbyname (group);
- /* ne::n_net in host byte order */
- 	if (ne) {
-@@ -873,15 +897,17 @@
- 			return FALSE;
- 		}
- 	}
-+	}
+@@ -872,13 +897,14 @@
+ #endif /* _WIN32 */
  
  /* lookup group through name service */
 -	struct addrinfo hints = {
@@ -221,7 +224,7 @@
  	const int eai = getaddrinfo (group, NULL, &hints, &res);
  	if (0 != eai) {
  		char errbuf[1024];
-@@ -909,6 +935,8 @@
+@@ -906,6 +932,8 @@
  		     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
  	freeaddrinfo (res);
  	return FALSE;
@@ -230,7 +233,7 @@
  }
  
  /* parse an interface entity from a network parameter.
-@@ -962,6 +990,7 @@
+@@ -959,6 +987,7 @@
  	}
  
  /* check interface name length limit */
@@ -238,7 +241,7 @@
  	char** tokens = pgm_strsplit (entity, ",", 10);
  	int j = 0;
  	while (tokens && tokens[j])
-@@ -996,6 +1025,7 @@
+@@ -993,6 +1022,7 @@
  
  	pgm_strfreev (tokens);
  	*interface_list = source_list;
@@ -246,7 +249,7 @@
  	return TRUE;
  }
  
-@@ -1038,6 +1068,7 @@
+@@ -1035,6 +1065,7 @@
  		(const void*)recv_list,
  		(const void*)error);
  
@@ -254,7 +257,7 @@
  	struct group_source_req* recv_gsr;
  	struct interface_req* primary_interface = (struct interface_req*)pgm_memdup ((*interface_list)->data, sizeof(struct interface_req));
  
-@@ -1050,6 +1081,7 @@
+@@ -1047,6 +1078,7 @@
  		recv_gsr->gsr_group.ss_family = family;
  
  /* track IPv6 scope from any resolved interface */
@@ -262,7 +265,7 @@
  		unsigned scope_id = 0;
  
  /* if using unspec default group check the interface for address family
-@@ -1155,11 +1187,13 @@
+@@ -1152,11 +1184,13 @@
  		*recv_list = pgm_list_append (*recv_list, recv_gsr);
  		pgm_free (primary_interface);
  		return TRUE;
@@ -276,7 +279,7 @@
  	int j = 0;	
  	char** tokens = pgm_strsplit (entity, ",", 10);
  	while (tokens && tokens[j])
-@@ -1236,6 +1270,8 @@
+@@ -1233,6 +1267,8 @@
  	pgm_strfreev (tokens);
  	pgm_free (primary_interface);
  	return TRUE;
@@ -285,7 +288,7 @@
  }
  
  static
-@@ -1265,6 +1301,7 @@
+@@ -1262,6 +1298,7 @@
  		(const void*)send_list,
  		(const void*)error);
  
@@ -293,7 +296,7 @@
  	struct group_source_req* send_gsr;
  	const struct interface_req* primary_interface = (struct interface_req*)(*interface_list)->data;
  
-@@ -1319,6 +1356,7 @@
+@@ -1316,6 +1353,7 @@
  
  	*send_list = pgm_list_append (*send_list, send_gsr);
  	return TRUE;
@@ -301,7 +304,7 @@
  }
  
  /* parse network parameter
-@@ -1451,6 +1489,7 @@
+@@ -1448,6 +1486,7 @@
  			}
  
  /* entity from b to p-1 */
@@ -309,7 +312,7 @@
  			char entity[1024];
  			pgm_strncpy_s (entity, sizeof (entity), b, p - b);
  
-@@ -1508,6 +1547,7 @@
+@@ -1505,6 +1544,7 @@
  
  			b = ++p;
  			continue;
@@ -317,7 +320,7 @@
  		}
  
  		p++;
-@@ -1657,6 +1697,7 @@
+@@ -1654,6 +1694,7 @@
  
  	if (!network_parse (network, family, &recv_list, &send_list, error))
  		return FALSE;
@@ -325,15 +328,15 @@
  	const size_t recv_list_len = pgm_list_length (recv_list);
  	const size_t send_list_len = pgm_list_length (send_list);
  	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
-@@ -1666,6 +1707,7 @@
- 	ai->ai_send_addrs_len = (uint32_t)send_list_len;
+@@ -1663,6 +1704,7 @@
+ 	ai->ai_send_addrs_len = send_list_len;
  	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
  
 +	{
  	size_t i = 0;
  	while (recv_list) {
  		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
-@@ -1680,6 +1722,8 @@
+@@ -1677,6 +1719,8 @@
  	}
  	*res = ai;
  	return TRUE;

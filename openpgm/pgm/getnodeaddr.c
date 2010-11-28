@@ -83,7 +83,7 @@ pgm_if_getnodeaddr (
 
 	int e = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 == e) {
-		const socklen_t addrlen = (socklen_t)res->ai_addrlen;
+		const socklen_t addrlen = res->ai_addrlen;
 		memcpy (addr, res->ai_addr, addrlen);
 		freeaddrinfo (res);
 		return TRUE;

@@ -1,5 +1,5 @@
---- getnodeaddr.c	2010-11-05 06:07:19.000000000 +0800
-+++ getnodeaddr.c89.c	2010-11-05 06:07:03.000000000 +0800
+--- getnodeaddr.c	2010-10-12 20:58:37.000000000 +0800
++++ getnodeaddr.c89.c	2010-10-12 20:59:26.000000000 +0800
 @@ -58,6 +58,7 @@
  	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
  		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
@@ -36,7 +36,7 @@
 -	int e = getaddrinfo (hostname, NULL, &hints, &res);
 +	e = getaddrinfo (hostname, NULL, &hints, &res);
  	if (0 == e) {
- 		const socklen_t addrlen = (socklen_t)res->ai_addrlen;
+ 		const socklen_t addrlen = res->ai_addrlen;
  		memcpy (addr, res->ai_addr, addrlen);
 @@ -124,7 +132,9 @@
  				);

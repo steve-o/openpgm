@@ -30,9 +30,6 @@
 #	include "getopt.h"
 #	define snprintf		_snprintf
 #endif
-#ifdef __APPLE__
-#	include <pgm/in.h>
-#endif
 #include <pgm/pgm.h>
 
 #include "async.h"
@@ -199,9 +196,9 @@ main (
 			FD_SET(read_fd, &readfds);
 			fds = select (fds, &readfds, NULL, NULL, NULL);
 #else
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, WSA_INFINITE, FALSE);
+			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, INFINITE, FALSE);
 			switch (dwEvents) {
-			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
+			case WAIT_OBJECT_0+1: WSAResetEvent (waitEvents[1]); break;
 			default: break;
 			}
 #endif /* _WIN32 */

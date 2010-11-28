@@ -25,9 +25,6 @@
 struct async_event_t;
 
 #include <errno.h>
-#ifdef __APPLE__
-#	include <pgm/in.h>
-#endif
 #include <pgm/pgm.h>
 
 #ifdef  __cplusplus

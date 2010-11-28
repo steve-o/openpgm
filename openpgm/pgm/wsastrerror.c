@@ -357,7 +357,7 @@ pgm_win_strerror (
 	const int	win_errno
 	)
 {
-	const DWORD nSize = (DWORD)buflen;
+	const DWORD nSize = buflen;
 	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM,
 		       NULL,		/* source */
 		       win_errno,	/* message id */

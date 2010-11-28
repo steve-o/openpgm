@@ -504,7 +504,7 @@ generate_msghdr (
 	packet_cmsg->cmsg_type  = IP_PKTINFO;
 	struct in_pktinfo packet_info = {
 		.ipi_ifindex		= 2,
-#if !defined(_WIN32) && !defined(__CYGWIN__)
+#ifndef _WIN32
 		.ipi_spec_dst		= iphdr->ip_src.s_addr,		/* local address */
 #endif
 		.ipi_addr		= iphdr->ip_dst.s_addr		/* destination address */
@@ -615,7 +615,7 @@ mock_pgm_poll_info (
 	pgm_sock_t* const	sock,
 	struct pollfd*		fds,
 	int*			n_fds,
-	short			events
+	int			events
 	)
 {
 }
