@@ -125,8 +125,7 @@ pgm_rate_check (
 		do {
 			pgm_thread_yield();
 			now = pgm_time_update_now();
-			time_since_last_rate_check = now - bucket->last_rate_check;
-			sleep_amount = (ssize_t)pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check);
+			sleep_amount = (ssize_t)pgm_to_secs (bucket->rate_per_sec * (now - bucket->last_rate_check));
 		} while (sleep_amount + bucket->rate_limit < 0);
 		bucket->rate_limit += sleep_amount;
 		bucket->last_rate_check = now;
