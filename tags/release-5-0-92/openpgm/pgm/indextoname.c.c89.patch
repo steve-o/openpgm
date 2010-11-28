@@ -1,0 +1,25 @@
+--- indextoname.c	2010-05-21 11:35:23.000000000 +0800
++++ indextoname.c89	2010-10-06 17:27:08.000000000 +0800
+@@ -40,12 +40,20 @@
+ #else
+ 	pgm_return_val_if_fail (NULL != ifname, NULL);
+ 
+-	MIB_IFROW ifRow = { .dwIndex = ifindex };
++	{
++	MIB_IFROW ifRow;
++	ifRow.dwIndex = ifindex;
++	{
+ 	const DWORD dwRetval = GetIfEntry (&ifRow);
+ 	if (NO_ERROR != dwRetval)
+ 		return NULL;
+-	strcpy (ifname, (char*)ifRow.wszName);
++	{
++	int i;
++	pgm_wcstombs_s (&i, ifname, IF_NAMESIZE, ifRow.wszName, _TRUNCATE);
++	}
+ 	return ifname;
++	}
++	}
+ #endif /* _WIN32 */
+ }
+ 
