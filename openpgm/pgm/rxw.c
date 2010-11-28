@@ -197,7 +197,7 @@ pgm_rxw_create (
 
 /* calculate receive window parameters */
 	pgm_assert (sqns || (secs && max_rte));
-	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
+	const unsigned alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
 	window = pgm_malloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 
 	window->tsi		= tsi;
@@ -1233,7 +1233,7 @@ pgm_rxw_readv (
 	state = (pgm_rxw_state_t*)&skb->cb;
 	switch (state->pkt_state) {
 	case PGM_PKT_STATE_HAVE_DATA:
-		bytes_read = _pgm_rxw_incoming_read (window, pmsg, (unsigned)(msg_end - *pmsg + 1));
+		bytes_read = _pgm_rxw_incoming_read (window, pmsg, msg_end - *pmsg + 1);
 		break;
 
 	case PGM_PKT_STATE_LOST_DATA:

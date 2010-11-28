@@ -47,9 +47,7 @@ struct pgm_rate_t {
 
 PGM_GNUC_INTERNAL void pgm_rate_create (pgm_rate_t*, const ssize_t, const size_t, const uint16_t);
 PGM_GNUC_INTERNAL void pgm_rate_destroy (pgm_rate_t*);
-PGM_GNUC_INTERNAL bool pgm_rate_check2 (pgm_rate_t*, pgm_rate_t*, const size_t, const bool);
 PGM_GNUC_INTERNAL bool pgm_rate_check (pgm_rate_t*, const size_t, const bool);
-PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining2 (pgm_rate_t*, pgm_rate_t*, const size_t);
 PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (pgm_rate_t*, const size_t);
 
 PGM_END_DECLS

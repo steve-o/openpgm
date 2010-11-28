@@ -19,21 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* MSVC secure CRT */
-#define _CRT_SECURE_NO_WARNINGS		1
-
+#include <unistd.h>
 #include <stdio.h>
-#include <time.h>
 #include <glib.h>
 #ifndef G_OS_WIN32
-#	include <unistd.h>
 #	include <netdb.h>
-#	include <sys/types.h>
-#	include <sys/uio.h>
-#else
-#	define WIN32_LEAN_AND_MEAN
-#	include <windows.h>
-#	include <io.h>
 #endif
 #include <pgm/pgm.h>
 #include "pgm/log.h"
@@ -57,16 +47,13 @@ bool
 log_init ( void )
 {
 /* time zone offset */
-	time_t t;
-	struct tm sgmt, *gmt = &sgmt, *loc;
-	int dir;
-
-	t = time (NULL);
-	*gmt = *gmtime (&t);
-	loc = localtime (&t);
+	time_t t = time(NULL);
+	struct tm sgmt, *gmt = &sgmt;
+	*gmt = *gmtime(&t);
+	struct tm* loc = localtime(&t);
 	log_timezone = (loc->tm_hour - gmt->tm_hour) * 60 * 60 +
 		     (loc->tm_min  - gmt->tm_min) * 60;
-	dir = loc->tm_year - gmt->tm_year;
+	int dir = loc->tm_year - gmt->tm_year;
 	if (!dir) dir = loc->tm_yday - gmt->tm_yday;
 	log_timezone += dir * 24 * 60 * 60;
 //	printf ("timezone offset %u seconds.\n", log_timezone);
@@ -89,56 +76,53 @@ glib_log_handler (
 	G_GNUC_UNUSED gpointer		unused_data
 	)
 {
-	time_t now;
-	struct tm* time_ptr;
-	char tbuf[1024];
-
 #ifdef G_OS_UNIX
 	struct iovec iov[7];
 	struct iovec* v = iov;
-
+	time_t now;
 	time (&now);
-	time_ptr = localtime (&now);
-	strftime (tbuf, sizeof (tbuf), TIME_FORMAT, time_ptr);
+	const struct tm* time_ptr = localtime(&now);
+	char tbuf[1024];
+	strftime(tbuf, sizeof(tbuf), TIME_FORMAT, time_ptr);
 	v->iov_base = tbuf;
-	v->iov_len = strlen (tbuf);
+	v->iov_len = strlen(tbuf);
 	v++;
 	v->iov_base = log_hostname;
-	v->iov_len = strlen (log_hostname);
+	v->iov_len = strlen(log_hostname);
 	v++;
 	if (log_domain) {
 		v->iov_base = " ";
 		v->iov_len = 1;
 		v++;
 		v->iov_base = log_domain;
-		v->iov_len = strlen (log_domain);
+		v->iov_len = strlen(log_domain);
 		v++;
 	}
 	v->iov_base = ": ";
 	v->iov_len = 2;
 	v++;
 	v->iov_base = message;
-	v->iov_len = strlen (message);
+	v->iov_len = strlen(message);
 	v++;
 	v->iov_base = "\n";
 	v->iov_len = 1;
 	v++;
 	writev (STDOUT_FILENO, iov, v - iov);
 #else
-	const int stdout_fileno = _fileno (stdout);
-
+	time_t now;
 	time (&now);
-	time_ptr = localtime (&now);
-	strftime (tbuf, sizeof (tbuf), TIME_FORMAT, time_ptr);
-	_write (stdout_fileno, tbuf, strlen (tbuf));
-	_write (stdout_fileno, log_hostname, strlen (log_hostname));
+	const struct tm* time_ptr = localtime(&now);
+	char s[1024];
+	strftime(s, sizeof(s), TIME_FORMAT, time_ptr);
+	write (STDOUT_FILENO, s, strlen(s));
+	write (STDOUT_FILENO, log_hostname, strlen(log_hostname));
 	if (log_domain) {
-		_write (stdout_fileno, " ", 1);
-		_write (stdout_fileno, log_domain, strlen (log_domain));
+		write (STDOUT_FILENO, " ", 1);
+		write (STDOUT_FILENO, log_domain, strlen(log_domain));
 	}
-	_write (stdout_fileno, ": ", 2);
-	_write (stdout_fileno, message, strlen (message));
-	_write (stdout_fileno, "\n", 1);
+	write (STDOUT_FILENO, ": ", 2);
+	write (STDOUT_FILENO, message, strlen(message));
+	write (STDOUT_FILENO, "\n", 1);
 #endif
 }
 

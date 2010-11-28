@@ -21,9 +21,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* MSVC secure CRT */
-#define _CRT_SECURE_NO_WARNINGS		1
-
 /* c99 compatibility for c++ */
 #define __STDC_LIMIT_MACROS
 
@@ -41,26 +38,21 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <inttypes.h>
 #include <math.h>
+#include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
 #include <sys/types.h>
 #ifndef _WIN32
-#	include <inttypes.h>
-#	include <unistd.h>
 #	include <netdb.h>
 #	include <netinet/in.h>
 #	include <sched.h>
 #	include <sys/socket.h>
 #	include <arpa/inet.h>
-#	include <sys/time.h>
-#else
-#	include <ws2tcpip.h>
-#	include <mswsock.h>
-#	include <pgm/wininttypes.h>
-#	include "getopt.h"
 #endif
 #include <glib.h>
 #include <pgm/pgm.h>
@@ -71,14 +63,10 @@
 #	include <pgm/snmp.h>
 #endif
 
-#ifndef MSG_ERRQUEUE
-#	define MSG_ERRQUEUE		0x2000
-#endif
-
 /* PGM internal time keeper */
+typedef pgm_time_t (*pgm_time_update_func)(void);
+extern pgm_time_update_func pgm_time_update_now;
 extern "C" {
-	typedef pgm_time_t (*pgm_time_update_func)(void);
-	extern pgm_time_update_func pgm_time_update_now;
 	size_t pgm_pkt_offset (bool, sa_family_t);
 }
 
@@ -102,8 +90,6 @@ static int		g_odata_interval = 0;
 static guint32		g_payload = 0;
 static int		g_max_tpdu = 1500;
 static int		g_max_rte = 16*1000*1000;
-static int		g_odata_rte = 0;	/* 0 = disabled */
-static int		g_rdata_rte = 0;	/* 0 = disabled */
 static int		g_sqns = 200;
 
 static gboolean		g_use_pgmcc = FALSE;
@@ -136,28 +122,21 @@ static double		g_latency_max = 0.0;
 #ifdef INFINITY
 static double		g_latency_min = INFINITY;
 #else
-static double		g_latency_min = (double)INT64_MAX;
+static double		g_latency_min = INT64_MAX;
 #endif
 static double		g_latency_running_average = 0.0;
 static guint64		g_out_total = 0;
 static guint64		g_in_total = 0;
 
-#ifdef CONFIG_WITH_HEATMAP
-static FILE*		g_heatmap_file = NULL;
-static GHashTable*	g_heatmap_slice = NULL;		/* acting as sparse array */
-static GMutex*		g_heatmap_lock = NULL;
-static guint		g_heatmap_resolution = 10;	/* microseconds */
-#endif
-
 static GMainLoop*	g_loop = NULL;
 static GThread*		g_sender_thread = NULL;
 static GThread*		g_receiver_thread = NULL;
-static gboolean		g_quit = FALSE;
+static gboolean		g_quit;
 #ifdef G_OS_UNIX
 static int		g_quit_pipe[2];
 static void on_signal (int, gpointer);
 #else
-static SOCKET		g_quit_socket[2];
+static WSAEVENT		g_quit_event;
 static BOOL on_console_ctrl (DWORD);
 #endif
 
@@ -185,15 +164,10 @@ usage (const char* bin)
 	fprintf (stderr, "  -l              : Listen-only mode\n");
 	fprintf (stderr, "  -e              : Relect mode\n");
         fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
-        fprintf (stderr, "  -O <rate>       : Regulate ODATA packets to rate bps\n");
-        fprintf (stderr, "  -D <rate>       : Regulate RDATA packets to rate bps\n");
 	fprintf (stderr, "  -c              : Enable PGMCC\n");
         fprintf (stderr, "  -f <type>       : Enable FEC with either proactive or ondemand parity\n");
         fprintf (stderr, "  -K <k>          : Configure Reed-Solomon code (n, k)\n");
         fprintf (stderr, "  -N <n>\n");
-#ifdef CONFIG_WITH_HEATMAP
-	fprintf (stderr, "  -M <filename>   : Generate latency heap map\n");
-#endif
         fprintf (stderr, "  -H              : Enable HTTP administrative interface\n");
         fprintf (stderr, "  -S              : Enable SNMP interface\n");
 	exit (1);
@@ -214,10 +188,8 @@ main (
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 	setlocale (LC_ALL, "");
-#ifndef _WIN32
 	setenv ("PGM_TIMER", "GTOD", 1);
 	setenv ("PGM_SLEEP", "USLEEP", 1);
-#endif
 
 	log_init ();
 	g_message ("pgmping");
@@ -233,27 +205,19 @@ main (
 /* parse program arguments */
 	const char* binary_name = g_get_prgname();
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:m:old:r:O:D:cfeK:N:M:HSh")) != -1)
+	while ((c = getopt (argc, argv, "s:n:p:m:old:r:cfeK:N:HSh")) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
 		case 's':	g_port = atoi (optarg); break;
 		case 'p':	g_udp_encap_port = atoi (optarg); break;
 		case 'r':	g_max_rte = atoi (optarg); break;
-		case 'O':	g_odata_rte = atoi (optarg); break;
-		case 'D':	g_rdata_rte = atoi (optarg); break;
 
 		case 'c':	g_use_pgmcc = TRUE; break;
 
 		case 'f':	g_use_fec = TRUE; break;
 		case 'K':	g_rs_k = atoi (optarg); break;
 		case 'N':	g_rs_n = atoi (optarg); break;
-
-#ifdef CONFIG_WITH_HEATMAP
-		case 'M':	g_heatmap_file = fopen (optarg, "w"); break;
-#else
-		case 'M':	g_warning ("Heat map support not compiled in."); break;
-#endif
 
 		case 'H':	enable_http = TRUE; break;
 		case 'S':	enable_snmpx = TRUE; break;
@@ -276,13 +240,6 @@ main (
 		usage (binary_name);
 	}
 
-#ifdef CONFIG_WITH_HEATMAP
-	if (NULL != g_heatmap_file) {
-		g_heatmap_slice = g_hash_table_new (g_direct_hash, g_direct_equal);
-		g_heatmap_lock = g_mutex_new ();
-	}
-#endif
-
 #ifdef CONFIG_WITH_HTTP
 	if (enable_http) {
 		if (!pgm_http_init (PGM_HTTP_DEFAULT_SERVER_PORT, &pgm_err)) {
@@ -298,10 +255,10 @@ main (
 		if (!pgm_snmp_init (&pgm_err)) {
 			g_error ("Unable to start SNMP interface: %s", pgm_err->message);
 			pgm_error_free (pgm_err);
-#	ifdef CONFIG_WITH_HTTP
+#ifdef CONFIG_WITH_HTTP
 			if (enable_http)
 				pgm_http_shutdown ();
-#	endif
+#endif
 			pgm_shutdown ();
 			return EXIT_FAILURE;
 		}
@@ -310,29 +267,19 @@ main (
 
 	g_loop = g_main_loop_new (NULL, FALSE);
 
+	g_quit = FALSE;
+
 /* setup signal handlers */
-#ifdef G_OS_UNIX
 	signal (SIGSEGV, on_sigsegv);
-#	ifdef SIGHUP
+#ifdef SIGHUP
 	signal (SIGHUP,  SIG_IGN);
-#	endif
+#endif
+#ifdef G_OS_UNIX
 	pipe (g_quit_pipe);
 	pgm_signal_install (SIGINT,  on_signal, g_loop);
 	pgm_signal_install (SIGTERM, on_signal, g_loop);
 #else
-	SOCKET s = socket (AF_INET, SOCK_STREAM, 0);
-	struct sockaddr_in addr;
-	int addrlen = sizeof (addr);
-	memset (&addr, 0, sizeof (addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr ("127.0.0.1");
-	bind (s, (const struct sockaddr*)&addr, sizeof (addr));
-	getsockname (s, (struct sockaddr*)&addr, &addrlen);
-	listen (s, 1);
-	g_quit_socket[1] = socket (AF_INET, SOCK_STREAM, 0);
-	connect (g_quit_socket[1], (struct sockaddr*)&addr, addrlen);
-	g_quit_socket[0] = accept (s, NULL, NULL);
-	closesocket (s);
+	g_quit_event = WSACreateEvent();
 	SetConsoleCtrlHandler ((PHANDLER_ROUTINE)on_console_ctrl, TRUE);
 	setvbuf (stdout, (char *) NULL, _IONBF, 0);
 #endif /* !G_OS_UNIX */
@@ -363,13 +310,11 @@ main (
 	close (g_quit_pipe[0]);
 	close (g_quit_pipe[1]);
 #else
-	const char one = '1';
-	send (g_quit_socket[1], &one, sizeof(one), 0);
+	WSASetEvent (g_quit_event);
 	if (PGMPING_MODE_SOURCE == g_mode || PGMPING_MODE_INITIATOR == g_mode)
 		g_thread_join (g_sender_thread);
 	g_thread_join (g_receiver_thread);
-	closesocket (g_quit_socket[0]);
-	closesocket (g_quit_socket[1]);
+	WSACloseEvent (g_quit_event);
 #endif
 
 	g_main_loop_unref (g_loop);
@@ -388,17 +333,6 @@ main (
 #ifdef CONFIG_WITH_SNMP
 	if (enable_snmpx)
 		pgm_snmp_shutdown();
-#endif
-
-#ifdef CONFIG_WITH_HEATMAP
-	if (NULL != g_heatmap_file) {
-		fclose (g_heatmap_file);
-		g_heatmap_file = NULL;
-		g_mutex_free (g_heatmap_lock);
-		g_heatmap_lock = NULL;
-		g_hash_table_destroy (g_heatmap_slice);
-		g_heatmap_slice = NULL;
-	}
 #endif
 
 	google::protobuf::ShutdownProtobufLibrary();
@@ -502,34 +436,20 @@ on_startup (
 		}
 	}
 
-#ifndef CONFIG_HAVE_SCHEDPARAM
 	pgm_drop_superuser();
-#endif
-#ifdef CONFIG_PRIORITY_CLASS
-/* Any priority above normal usually yields worse performance than expected */
-	if (!SetPriorityClass (GetCurrentProcess(), NORMAL_PRIORITY_CLASS))
-	{
-		g_warning ("setting priority class (%d)", GetLastError());
-	}
-#endif
 
 /* set PGM parameters */
 /* common */
 	{
-#if defined(__FreeBSD__)
-/* FreeBSD defaults to low maximum socket size */
-		const int txbufsize = 128 * 1024, rxbufsize = 128 * 1024,
-#else
-		const int txbufsize = 1024 * 1024, rxbufsize = 1024 * 1024,
-#endif
+		const int bufsize  = 1024 * 1024,
 			  max_tpdu = g_max_tpdu;
 
-		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_RCVBUF, &rxbufsize, sizeof(rxbufsize))) {
-			g_error ("setting SO_RCVBUF = %d", rxbufsize);
+		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize))) {
+			g_error ("setting SO_RCVBUF = %d", bufsize);
 			goto err_abort;
 		}
-		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_SNDBUF, &txbufsize, sizeof(txbufsize))) {
-			g_error ("setting SO_SNDBUF = %d", txbufsize);
+		if (!pgm_setsockopt (g_sock, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize))) {
+			g_error ("setting SO_SNDBUF = %d", bufsize);
 			goto err_abort;
 		}
 		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_MTU, &max_tpdu, sizeof(max_tpdu))) {
@@ -546,8 +466,6 @@ on_startup (
 		const int send_only	  = (PGMPING_MODE_SOURCE == g_mode) ? 1 : 0,
 			  txw_sqns	  = g_sqns * 4,
 			  txw_max_rte	  = g_max_rte,
-			  odata_max_rte	  = g_odata_rte,
-			  rdata_max_rte	  = g_rdata_rte,
 			  ambient_spm	  = pgm_secs (30),
 			  heartbeat_spm[] = { pgm_msecs (100),
 					      pgm_msecs (100),
@@ -567,19 +485,8 @@ on_startup (
 			g_error ("setting PGM_TXW_SQNS = %d", txw_sqns);
 			goto err_abort;
 		}
-		if (txw_max_rte > 0 &&
-		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &txw_max_rte, sizeof(txw_max_rte))) {
+		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TXW_MAX_RTE, &txw_max_rte, sizeof(txw_max_rte))) {
 			g_error ("setting PGM_TXW_MAX_RTE = %d", txw_max_rte);
-			goto err_abort;
-		}
-		if (odata_max_rte > 0 &&
-		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_ODATA_MAX_RTE, &odata_max_rte, sizeof(odata_max_rte))) {
-			g_error ("setting PGM_ODATA_MAX_RTE = %d", odata_max_rte);
-			goto err_abort;
-		}
-		if (rdata_max_rte > 0 &&
-		    !pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_RDATA_MAX_RTE, &rdata_max_rte, sizeof(rdata_max_rte))) {
-			g_error ("setting PGM_RDATA_MAX_RTE = %d", rdata_max_rte);
 			goto err_abort;
 		}
 		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_AMBIENT_SPM, &ambient_spm, sizeof(ambient_spm))) {
@@ -849,7 +756,7 @@ sender_thread (
 	const long payload_len = 1000;
 	char payload[payload_len];
 	gpointer buffer = NULL;
-	guint64 latency, now, last = 0;
+	guint64 latency, now, last;
 
 #ifdef CONFIG_HAVE_EPOLL
 	const long ev_len = 1;
@@ -880,45 +787,13 @@ sender_thread (
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
-/* does not include ACKs */
-	int n_fds = PGM_BUS_SOCKET_WRITE_COUNT;
-	struct pollfd fds[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
-#elif defined(CONFIG_HAVE_WSAPOLL)
-	ULONG n_fds = PGM_BUS_SOCKET_WRITE_COUNT;
-	WSAPOLLFD fds[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
-#elif defined(CONFIG_WSA_WAIT)
-/* does not include ACKs */
-	SOCKET send_sock;
-	DWORD cEvents = PGM_BUS_SOCKET_WRITE_COUNT + 1;
-	WSAEVENT waitEvents[ PGM_BUS_SOCKET_WRITE_COUNT + 1 ];
-	socklen_t socklen = sizeof (SOCKET);
-
-	waitEvents[0] = WSACreateEvent();
-	WSAEventSelect (g_quit_socket[0], waitEvents[0], FD_READ);
-	waitEvents[1] = WSACreateEvent();
-	g_assert (1 == PGM_BUS_SOCKET_WRITE_COUNT);
-	pgm_getsockopt (tx_sock, IPPROTO_PGM, PGM_SEND_SOCK, &send_sock, &socklen);
-	WSAEventSelect (send_sock, waitEvents[1], FD_WRITE);
+	int n_fds = MAX(PGM_BUS_SOCKET_WRITE_COUNT, PGM_BUS_SOCKET_READ_COUNT);
+	struct pollfd fds[ n_fds + 1 ];
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	gethostname (hostname, sizeof(hostname));
 	subject.append(hostname);
 	memset (payload, 0, sizeof(payload));
-
-#ifdef CONFIG_HAVE_SCHEDPARAM
-/* realtime scheduling */
-	pthread_t thread_id = pthread_self ();
-	int policy;
-	struct sched_param param;
-
-	if (0 == pthread_getschedparam (thread_id, &policy, &param)) {
-		policy = SCHED_FIFO;
-		param.sched_priority = 50;
-		if (0 != pthread_setschedparam (thread_id, policy, &param))
-			g_warning ("Cannot set thread scheduling parameters.");
-	} else
-		g_warning ("Cannot get thread scheduling parameters.");
-#endif
 
 	ping.mutable_subscription_header()->set_subject (subject);
 	ping.mutable_market_data_header()->set_msg_type (example::MarketDataHeader::MSG_VERIFY);
@@ -949,11 +824,8 @@ sender_thread (
 			const unsigned int usec = g_odata_interval - (now - last);
 			usleep (usec);
 #else
-#	define usecs_to_msecs(t)	( ((t) + 999) / 1000 )
-			const DWORD msec = (DWORD)usecs_to_msecs (g_odata_interval - (now - last));
-/* Avoid yielding on Windows XP/2000 */ 
-			if (msec > 0)
-				Sleep (msec);
+			const DWORD msec = usecs_to_msecs (g_odata_interval - (now - last));
+			Sleep (msec);
 #endif
 			now = pgm_time_update_now();
 		}
@@ -962,16 +834,7 @@ sender_thread (
 		ping.SerializeToArray (skb->data, skb->len);
 
 		struct timeval tv;
-#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 		int timeout;
-#elif defined(CONFIG_HAVE_WSAPOLL)
-		DWORD dwTimeout;
-#elif defined(CONFIG_WSA_WAIT)
-		DWORD dwTimeout, dwEvents;
-#else
-		int n_fds;
-		fd_set readfds, writefds;
-#endif
 		size_t bytes_written;
 		int status;
 again:
@@ -986,61 +849,17 @@ again:
 				g_error ("getting PGM_RATE_REMAIN failed");
 				break;
 			}
-#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 			timeout = (tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
 /* busy wait under 2ms */
-#	ifdef CONFIG_BUSYWAIT
-			if (timeout < 2)
-				goto again;
-#	else
-			if (0 == timeout)
-				goto again;
-#	endif
-#elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
-/* round up wait */
-#	ifdef CONFIG_BUSYWAIT
-			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000);
-#	else
-			dwTimeout = (DWORD)(tv.tv_sec * 1000) + ((tv.tv_usec + 999) / 1000);
-#	endif
-			if (0 == dwTimeout)
-				goto again;
-#endif
-#if defined(CONFIG_HAVE_EPOLL)
+			if (timeout < 2) timeout = 0;
+#ifdef CONFIG_HAVE_EPOLL
 			const int ready = epoll_wait (efd_again, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
-			n_fds = G_N_ELEMENTS(fds) - 1;
 			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
-#elif defined(CONFIG_HAVE_WSAPOLL)
-			ZeroMemory (fds, sizeof(WSAPOLLFD) * (n_fds + 1));
-			fds[0].fd = g_quit_socket[0];
-			fds[0].events = POLLRDNORM;
-			n_fds = G_N_ELEMENTS(fds) - 1;
-			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLRDNORM);
-			WSAPoll (fds, 1 + n_fds, dwTimeout /* ms */);
-#elif defined(CONFIG_WSA_WAIT)
-/* only wait for quit or timeout events */
-			cEvents = 1;
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
-			switch (dwEvents) {
-			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
-			default: break;
-			}
-#else
-			FD_ZERO(&readfds);
-#	ifndef _WIN32
-			FD_SET(g_quit_pipe[0], &readfds);
-			n_fds = g_quit_pipe[0] + 1;		/* highest fd + 1 */
-#	else
-			FD_SET(g_quit_socket[0], &readfds);
-			n_fds = 1;				/* count of fds */
-#	endif
-			pgm_select_info (g_sock, &readfds, NULL, &n_fds);
-			n_fds = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #endif /* !CONFIG_HAVE_EPOLL */
 			if (G_UNLIKELY(g_quit))
 				break;
@@ -1079,35 +898,8 @@ again:
 			memset (fds, 0, sizeof(fds));
 			fds[0].fd = g_quit_pipe[0];
 			fds[0].events = POLLIN;
-			n_fds = G_N_ELEMENTS(fds) - 1;
 			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLOUT);
 			poll (fds, 1 + n_fds, -1 /* ms */);
-#elif defined(CONFIG_HAVE_WSAPOLL)
-			ZeroMemory (fds, sizeof(WSAPOLLFD) * (n_fds + 1));
-			fds[0].fd = g_quit_socket[0];
-			fds[0].events = POLLRDNORM;
-			n_fds = G_N_ELEMENTS(fds) - 1;
-			pgm_poll_info (tx_sock, &fds[1], &n_fds, POLLWRNORM);
-			WSAPoll (fds, 1 + n_fds, -1 /* ms */);
-#elif defined(CONFIG_WSA_WAIT)
-			cEvents = PGM_BUS_SOCKET_WRITE_COUNT + 1;
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, WSA_INFINITE, FALSE);
-			switch (dwEvents) {
-			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
-			default: break;
-			}
-#else
-			FD_ZERO(&readfds);
-#	ifndef _WIN32
-			FD_SET(g_quit_pipe[0], &readfds);
-			n_fds = g_quit_pipe[0] + 1;		/* highest fd + 1 */
-#	else
-			FD_SET(g_quit_socket[0], &readfds);
-			n_fds = 1;				/* count of fds */
-#	endif
-			pgm_select_info (g_sock, &readfds, &writefds, &n_fds);
-			n_fds = select (n_fds, &readfds, &writefds, NULL, NULL);
-			
 #endif /* !CONFIG_HAVE_EPOLL */
 			goto again;
 		}
@@ -1123,13 +915,10 @@ again:
 		}
 		g_out_total += bytes_written;
 		g_msg_sent++;
-	} while (G_LIKELY(!g_quit));
+	} while (!g_quit);
 
-#if defined(CONFIG_HAVE_EPOLL)
+#ifdef CONFIG_HAVE_EPOLL
 	close (efd_again);
-#elif defined(CONFIG_WSA_WAIT)
-	WSACloseEvent (waitEvents[0]);
-	WSACloseEvent (waitEvents[1]);
 #endif
 	return NULL;
 }
@@ -1174,70 +963,21 @@ receiver_thread (
 #elif defined(CONFIG_HAVE_POLL)
 	int n_fds = PGM_BUS_SOCKET_READ_COUNT;
 	struct pollfd fds[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
-#elif defined(CONFIG_HAVE_WSAPOLL)
-	ULONG n_fds = PGM_BUS_SOCKET_READ_COUNT;
-	WSAPOLLFD fds[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
-#elif defined(CONFIG_WSA_WAIT)
-	SOCKET recv_sock, repair_sock, pending_sock;
-	DWORD cEvents = PGM_BUS_SOCKET_READ_COUNT + 1;
-	WSAEVENT waitEvents[ PGM_BUS_SOCKET_READ_COUNT + 1 ];
-	socklen_t socklen = sizeof (SOCKET);
-
-	waitEvents[0] = WSACreateEvent();;
-	waitEvents[1] = WSACreateEvent();
-	waitEvents[2] = WSACreateEvent();
-	waitEvents[3] = WSACreateEvent();
-	g_assert (3 == PGM_BUS_SOCKET_READ_COUNT);
-	WSAEventSelect (g_quit_socket[0], waitEvents[0], FD_READ);
-	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
-	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_REPAIR_SOCK, &repair_sock, &socklen);
-	WSAEventSelect (repair_sock, waitEvents[2], FD_READ);
-	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, waitEvents[3], FD_READ);
 #endif /* !CONFIG_HAVE_EPOLL */
-
-#ifdef CONFIG_HAVE_SCHEDPARAM
-/* realtime scheduling */
-	pthread_t thread_id = pthread_self ();
-	int policy;
-	struct sched_param param;
-
-	if (0 == pthread_getschedparam (thread_id, &policy, &param)) {
-		policy = SCHED_FIFO;
-		param.sched_priority = 50;
-		if (0 != pthread_setschedparam (thread_id, policy, &param))
-			g_warning ("Cannot set thread scheduling parameters.");
-	} else
-		g_warning ("Cannot get thread scheduling parameters.");
-#endif
 
 	memset (&lost_tsi, 0, sizeof(lost_tsi));
 
 	do {
 		struct timeval tv;
-#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
 		int timeout;
-#elif defined(CONFIG_HAVE_WSAPOLL)
-		DWORD dwTimeout;
-#elif defined(CONFIG_WSA_WAIT)
-		DWORD dwTimeout, dwEvents;
-#else
-		int n_fds;
-		fd_set readfds;
-#endif
 		size_t len;
-		pgm_error_t* pgm_err;
-		int status;
-
-again:
-		pgm_err = NULL;
-		status = pgm_recvmsgv (rx_sock,
-				       msgv,
-				       G_N_ELEMENTS(msgv),
-				       MSG_ERRQUEUE,
-				       &len,
-				       &pgm_err);
+		pgm_error_t* pgm_err = NULL;
+		const int status = pgm_recvmsgv (rx_sock,
+					         msgv,
+					         G_N_ELEMENTS(msgv),
+					         MSG_ERRQUEUE,
+					         &len,
+					         &pgm_err);
 		if (lost_count) {
 			pgm_time_t elapsed = pgm_time_update_now() - lost_tstamp;
 			if (elapsed >= pgm_secs(1)) {
@@ -1277,26 +1017,9 @@ again:
 		case PGM_IO_STATUS_WOULD_BLOCK:
 //g_message ("would block");
 block:
-#if defined(CONFIG_HAVE_EPOLL) || defined(CONFIG_HAVE_POLL)
-			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000));
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 /* busy wait under 2ms */
-#	ifdef CONFIG_BUSYWAIT
-			if (timeout >= 0 && timeout < 2)
-				goto again;
-#	else
-			if (0 == timeout)
-				goto again;
-#	endif
-#elif defined(CONFIG_HAVE_WSAPOLL) || defined(CONFIG_WSA_WAIT)
-/* round up wait */
-#	ifdef CONFIG_BUSYWAIT
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + ((tv.tv_usec + 500) / 1000));
-#	else
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : (DWORD)((tv.tv_sec * 1000) + ((tv.tv_usec + 999) / 1000));
-#	endif
-			if (0 == dwTimeout)
-				goto again;
-#endif
+			if (timeout > 0 && timeout < 2) timeout = 0;
 #ifdef CONFIG_HAVE_EPOLL
 			epoll_wait (efd, events, G_N_ELEMENTS(events), timeout /* ms */);
 #elif defined(CONFIG_HAVE_POLL)
@@ -1305,34 +1028,6 @@ block:
 			fds[0].events = POLLIN;
 			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLIN);
 			poll (fds, 1 + n_fds, timeout /* ms */);
-#elif defined(CONFIG_HAVE_WSAPOLL)
-			ZeroMemory (fds, sizeof(fds));
-			fds[0].fd = g_quit_socket[0];
-			fds[0].events = POLLRDNORM;
-			pgm_poll_info (g_sock, &fds[1], &n_fds, POLLRDNORM);
-			WSAPoll (fds, 1 + n_fds, dwTimeout /* ms */);
-#elif defined(CONFIG_WSA_WAIT)
-#	ifdef CONFIG_HAVE_IOCP
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, TRUE);
-			if (WSA_WAIT_IO_COMPLETION == dwEvents)
-#	endif
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
-			if ((WSA_WAIT_FAILED != dwEvents) && (WSA_WAIT_TIMEOUT != dwEvents)) {
-				const DWORD Index = dwEvents - WSA_WAIT_EVENT_0;
-/* Do not reset quit event */
-				if (Index > 0) WSAResetEvent (waitEvents[Index]);
-			}
-#else
-			FD_ZERO(&readfds);
-#	ifndef _WIN32
-			FD_SET(g_quit_pipe[0], &readfds);
-			n_fds = g_quit_pipe[0] + 1;		/* highest fd + 1 */
-#	else
-			FD_SET(g_quit_socket[0], &readfds);
-			n_fds = 1;				/* count of fds */
-#	endif
-			pgm_select_info (g_sock, &readfds, NULL, &n_fds);
-			n_fds = select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_WOULD_BLOCK == status ? NULL : &tv);
 #endif /* !CONFIG_HAVE_EPOLL */
 			break;
 		case PGM_IO_STATUS_RESET:
@@ -1356,15 +1051,10 @@ block:
 			}
 			break;
 		}
-	} while (G_LIKELY(!g_quit));
+	} while (!g_quit);
 
-#if defined(CONFIG_HAVE_EPOLL)
+#ifdef CONFIG_HAVE_EPOLL
 	close (efd);
-#elif defined(CONFIG_WSA_WAIT)
-	WSACloseEvent (waitEvents[0]);
-	WSACloseEvent (waitEvents[1]);
-	WSACloseEvent (waitEvents[2]);
-	WSACloseEvent (waitEvents[3]);
 #endif
 	return NULL;
 }
@@ -1394,13 +1084,11 @@ again:
 			status = pgm_send (g_sock, pskb->data, pskb->len, NULL);
 			switch (status) {
 			case PGM_IO_STATUS_RATE_LIMITED:
-//g_message ("reflector ratelimit");
-				goto again;
+g_message ("ratelimit"); goto again;
 			case PGM_IO_STATUS_CONGESTION:
-g_message ("reflector congestion");
-				goto again;
+g_message ("congestion"); goto again;
 			case PGM_IO_STATUS_WOULD_BLOCK:
-//g_message ("reflector would block");
+g_message ("would block");
 /* busy wait always as reflector */
 				goto again;
 
@@ -1448,7 +1136,7 @@ g_message ("reflector congestion");
 					   pgm_to_msecsf(last_time - send_time));
 				goto next_msg;
 			}
-			g_latency_current	= pgm_to_secs (recv_time - send_time);
+			g_latency_current	= pgm_to_secs(recv_time - send_time);
 			g_latency_seqno		= seqno;
 
 			const double elapsed    = pgm_to_usecsf (recv_time - send_time);
@@ -1463,22 +1151,6 @@ g_message ("reflector congestion");
 			g_latency_running_average += elapsed;
 			g_latency_count++;
 			last_time = recv_time;
-
-#ifdef CONFIG_WITH_HEATMAP
-/* update heatmap slice */
-			if (NULL != g_heatmap_file) {
-				const guintptr key = (guintptr)((pgm_to_usecs (recv_time - send_time) + (g_heatmap_resolution - 1)) / g_heatmap_resolution) * g_heatmap_resolution;
-				g_mutex_lock (g_heatmap_lock);
-				guint32* value = (guint32*)g_hash_table_lookup (g_heatmap_slice, (const void*)key);
-				if (NULL == value) {
-					value = g_slice_new (guint32);
-					*value = 1;
-					g_hash_table_insert (g_heatmap_slice, (void*)key, (void*)value);
-				} else
-					(*value)++;
-				g_mutex_unlock (g_heatmap_lock);
-			}
-#endif
 		}
 
 /* move onto next apdu */
@@ -1541,34 +1213,11 @@ on_mark (
 #ifdef INFINITY
 		g_latency_min		= INFINITY;
 #else
-		g_latency_min		= (double)INT64_MAX;
+		g_latency_min		= INT64_MAX;
 #endif
 		g_latency_max		= 0.0;
 		g_out_total		= 0;
 		g_in_total		= 0;
-
-#ifdef CONFIG_WITH_HEATMAP
-/* serialize heatmap slice */
-		if (NULL != g_heatmap_file) {
-			GHashTableIter iter;
-			gpointer key, value;
-			guint32 slice_size;
-
-			g_mutex_lock (g_heatmap_lock);
-			slice_size = g_htonl ((guint32)g_hash_table_size (g_heatmap_slice));
-			fwrite (&slice_size, sizeof (slice_size), 1, g_heatmap_file);
-			g_hash_table_iter_init (&iter, g_heatmap_slice);
-			while (g_hash_table_iter_next (&iter, &key, &value)) {
-				guint32 words[2];
-				words[0] = g_htonl ((guint32)(guintptr)key);
-				words[1] = g_htonl (*(guint32*)value);
-				fwrite (words, sizeof (guint32), 2, g_heatmap_file);
-				g_slice_free (guint32, value);
-				g_hash_table_iter_remove (&iter);
-			}
-			g_mutex_unlock (g_heatmap_lock);
-		}
-#endif
 	}
 
 	return TRUE;

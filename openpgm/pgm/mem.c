@@ -98,7 +98,7 @@ pgm_parse_debug_string (
 			if (!q)
 				q = string + strlen (string);
 			for (unsigned i = 0; i < nkeys; i++)
-				if (debug_key_matches (keys[i].key, string, (unsigned)(q - string)))
+				if (debug_key_matches (keys[i].key, string, q - string))
 					result |= keys[i].value;
 			string = q;
 			if (*string)

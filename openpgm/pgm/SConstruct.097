@@ -93,13 +93,8 @@ env = Environment(ENV = os.environ,
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
-# POSIX spinlocks
-			'-DCONFIG_HAVE_POSIX_SPINLOCK',
-# NSS protocol lookup
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
-# NSS networks lookup, IPv4 only
-#			'-DCONFIG_HAVE_GETNETENT',
 # variadic macros
  			'-DCONFIG_HAVE_ISO_VARARGS',
 #			'-DCONFIG_HAVE_GNUC_VARARGS',
@@ -145,11 +140,7 @@ env = Environment(ENV = os.environ,
 # Wine limited API support
 #			'-DCONFIG_TARGET_WINE',
 # GNU getopt
-			'-DCONFIG_HAVE_GETOPT',
-# temporary for pgmping
-#			'-DCONFIG_WITH_HEATMAP',
-#			'-DCONFIG_WITH_BUSYWAIT',
-#			'-DCONFIG_HAVE_SCHEDPARAM'
+			'-DCONFIG_HAVE_GETOPT'
 		 ],
 	LINKFLAGS = [	'-pipe'
 		    ],
@@ -159,9 +150,9 @@ env = Environment(ENV = os.environ,
 # clock_gettime()
 			'rt'
 		],
-	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/gcc64/include',
-	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/lib/libprotobuf.a',
-	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/bin/protoc'
+	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.1.0/src',
+	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.1.0/src/.libs/libprotobuf.a',
+	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.1.0/src/protoc'
 )
 opt.Update (env)
 
