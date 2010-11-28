@@ -88,10 +88,10 @@ pgm_rate_check (
 
 	pgm_spinlock_lock (&bucket->spinlock);
 	pgm_time_t now = pgm_time_update_now();
-	pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 
 	if (bucket->rate_per_msec)
 	{
+		const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 		if (time_since_last_rate_check > pgm_msecs(1)) 
 			new_rate_limit = bucket->rate_per_msec;
 		else {
@@ -102,6 +102,7 @@ pgm_rate_check (
 	}
 	else
 	{
+		const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
 		if (time_since_last_rate_check > pgm_secs(1)) 
 			new_rate_limit = bucket->rate_per_sec;
 		else {
@@ -152,7 +153,13 @@ pgm_rate_remaining (
 	const int64_t bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
 	pgm_spinlock_unlock (&bucket->spinlock);
 
-	return bucket_bytes >= 0 ? 0 : (bucket->rate_per_sec / -bucket_bytes);
+	if (bucket_bytes >= 0)
+		return 0;
+
+	const int64_t outstanding_bytes = -bucket_bytes;
+	const pgm_time_t remaining = (1000000UL * outstanding_bytes) / bucket->rate_per_sec;
+
+	return remaining;
 }
 
 /* eof */
