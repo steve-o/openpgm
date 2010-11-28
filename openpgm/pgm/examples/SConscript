@@ -55,10 +55,10 @@ if e['WITH_PROTOBUF'] == 'true':
 	ge['CCFLAGS'] = newCCFLAGS;
 	ge.Append(CPPPATH = '.');
 	ge.Append(CCFLAGS = ge['PROTOBUF_CCFLAGS']);
-	ge.Depends('pgmping.cc', ['ping.pb.cc', 'ping.pb.h']);
 	protobuf = Builder(action = 'cd ${SOURCE.dir} && %s ${SOURCE.file} --cpp_out=../${TARGET.dir}' % ge['PROTOBUF_PROTOC'])
 	ge.Append(BUILDERS = {'Protobuf' : protobuf})
-	ge.Protobuf('ping.pb.cc', 'ping.proto')
 	ge.Program(['pgmping.cc', 'ping.pb.cc', ge['PROTOBUF_LIBS']])
+	protobuf = ge.Protobuf('ping.pb.cc', 'ping.proto')
+	ge.Requires(ge.Object('pgmping.cc'), protobuf);
 
 # end of file
