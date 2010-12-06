@@ -44,6 +44,7 @@
 #	define bool		BOOL
 #	define ssize_t		SSIZE_T
 #	define inline		__inline
+#	define restrict		__restrict
 #elif !defined(__cplusplus) || (__GNUC__ >= 4)
 /* g++ v4 handles C99 headers without complaints */
 #	include <stdbool.h>
@@ -58,7 +59,7 @@
 #	define errno_t		int
 #endif
 
-#if !defined(restrict) || (__STDC_VERSION__ < 199901L)
+#if !defined(restrict) || (defined(__STDC_VERSION__) && __STDC_VERSION__ < 199901L)
 /* C89 ANSI standard */
 #	define restrict
 #endif
