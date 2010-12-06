@@ -127,7 +127,7 @@ PGM_GNUC_INTERNAL pgm_peer_t* pgm_new_peer (pgm_sock_t*const restrict, const pgm
 PGM_GNUC_INTERNAL void pgm_peer_unref (pgm_peer_t*);
 PGM_GNUC_INTERNAL int pgm_flush_peers_pending (pgm_sock_t*const restrict, struct pgm_msgv_t**restrict, const struct pgm_msgv_t*const, size_t*const restrict, unsigned*const restrict);
 PGM_GNUC_INTERNAL bool pgm_peer_has_pending (pgm_peer_t*const) PGM_GNUC_WARN_UNUSED_RESULT;
-PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_sock_t*const, pgm_peer_t*const);
+PGM_GNUC_INTERNAL void pgm_peer_set_pending (pgm_sock_t*const restrict, pgm_peer_t*const restrict);
 PGM_GNUC_INTERNAL bool pgm_check_peer_state (pgm_sock_t*const, const pgm_time_t);
 PGM_GNUC_INTERNAL void pgm_set_reset_error (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_msgv_t*const restrict);
 PGM_GNUC_INTERNAL pgm_time_t pgm_min_receiver_expiry (pgm_sock_t*, pgm_time_t) PGM_GNUC_WARN_UNUSED_RESULT;

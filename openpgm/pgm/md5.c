@@ -32,7 +32,7 @@
 /* locals */
 
 static void _pgm_md5_process_block (struct pgm_md5_t*restrict, const void*restrict, size_t);
-static void* _pgm_md5_read_ctx (const struct pgm_md5_t*, void*restrict);
+static void* _pgm_md5_read_ctx (const struct pgm_md5_t*restrict, void*restrict);
 
 
 /* This array contains the bytes used to pad the buffer to the next

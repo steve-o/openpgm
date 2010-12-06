@@ -71,7 +71,7 @@ static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t*const);
 static void _pgm_rxw_state (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const int);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static inline ssize_t _pgm_rxw_incoming_read (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict, uint32_t);
-static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t*const restrict, const uint32_t);
+static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t*const, const uint32_t);
 static inline ssize_t _pgm_rxw_incoming_read_apdu (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict);
 static inline int _pgm_rxw_recovery_update (pgm_rxw_t*const, const uint32_t, const pgm_time_t);
 static inline int _pgm_rxw_recovery_append (pgm_rxw_t*const, const pgm_time_t, const pgm_time_t);

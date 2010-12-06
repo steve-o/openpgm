@@ -1042,11 +1042,11 @@ pgm_getsockopt (
 
 bool
 pgm_setsockopt (
-	pgm_sock_t* const	sock,
-	const int		level,		/* IPPROTO_PGM or SOL_SOCKET */
-	const int		optname,
-	const void*		optval,
-	const socklen_t		optlen
+	pgm_sock_t* const restrict sock,
+	const int		   level,		/* IPPROTO_PGM or SOL_SOCKET */
+	const int		   optname,
+	const void*	  restrict optval,
+	const socklen_t		   optlen
 	)
 {
 	bool status = FALSE;
