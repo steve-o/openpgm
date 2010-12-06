@@ -55,7 +55,7 @@ struct pgm_md5_t
 
 PGM_GNUC_INTERNAL void pgm_md5_init_ctx (struct pgm_md5_t*);
 PGM_GNUC_INTERNAL void pgm_md5_process_bytes (struct pgm_md5_t*restrict, const void*restrict, size_t);
-PGM_GNUC_INTERNAL void* pgm_md5_finish_ctx (struct pgm_md5_t*, void*);
+PGM_GNUC_INTERNAL void* pgm_md5_finish_ctx (struct pgm_md5_t*restrict, void*restrict);
 
 PGM_END_DECLS
 

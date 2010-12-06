@@ -19,6 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* MSVC secure CRT */
+#define _CRT_SECURE_NO_WARNINGS		1
+
 #include <assert.h>
 #include <locale.h>
 #include <signal.h>

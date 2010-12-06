@@ -85,8 +85,8 @@ pgm_histogram_write_html_graph_all (
 static
 void
 pgm_histogram_write_html_graph (
-	pgm_histogram_t*	histogram,
-	pgm_string_t*		string
+	pgm_histogram_t* restrict histogram,
+	pgm_string_t*	 restrict string
 	)
 {
 	pgm_string_append (string, "<PRE>");
