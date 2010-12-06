@@ -32,7 +32,6 @@
 
 /* c99 compatibility for c++ */
 #define __STDC_FORMAT_MACROS
-#define restrict
 
 #include <cerrno>
 #include <clocale>
