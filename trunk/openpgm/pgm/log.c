@@ -47,7 +47,7 @@ static int log_timezone PGM_GNUC_READ_MOSTLY = 0;
 static char log_hostname[NI_MAXHOST + 1] PGM_GNUC_READ_MOSTLY;
 
 static void glib_log_handler (const gchar*, GLogLevelFlags, const gchar*, gpointer);
-static void pgm_log_handler (const int, const char*, void*);
+static void pgm_log_handler (const int, const char*restrict, void*restrict);
 
 
 /* calculate time zone offset in seconds
@@ -144,9 +144,9 @@ glib_log_handler (
 
 static void
 pgm_log_handler (
-	const int		pgm_log_level,
-	const char*		message,
-	G_GNUC_UNUSED void*	closure
+	const int		    pgm_log_level,
+	const char*	   restrict message,
+	G_GNUC_UNUSED void*restrict closure
 	)
 {
 	GLogLevelFlags glib_log_level;
