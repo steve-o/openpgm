@@ -171,7 +171,7 @@ pgm_rxw_t*
 pgm_rxw_create (
 	const pgm_tsi_t*const	tsi,
 	const uint16_t		tpdu_size,
-	const unsigned		sqns,		/* transmit window size in sequence numbers */
+	const unsigned		sqns,		/* receive window size in sequence numbers */
 	const unsigned		secs,		/* size in seconds */
 	const ssize_t		max_rte,	/* max bandwidth */
 	const uint32_t		ack_c_p
