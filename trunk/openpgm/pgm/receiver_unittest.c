@@ -154,6 +154,7 @@ ssize_t
 mock_pgm_sendto_hops (
 	pgm_sock_t*			sock,
 	bool				use_rate_limit,
+	pgm_rate_t*			minor_rate_control,
 	bool				use_router_alert,
 	int				hops,
 	const void*			buf,

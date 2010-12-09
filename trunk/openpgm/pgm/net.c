@@ -65,10 +65,10 @@ pgm_sendto_hops (
 #ifdef NET_DEBUG
 	char saddr[INET_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s minor_rate_limit:%p use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
+	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s minor_rate_control:%p use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
 		(const void*)sock,
 		use_rate_limit ? "TRUE" : "FALSE",
-		(const void*)minor_rate_limit,
+		(const void*)minor_rate_control,
 		use_router_alert ? "TRUE" : "FALSE",
 		(const void*)buf,
 		len,
@@ -108,7 +108,6 @@ pgm_sendto_hops (
 	pgm_debug ("sendto returned %" PRIzd, sent);
 	if (sent < 0) {
 		int save_errno = pgm_get_last_sock_error();
-		char errbuf[1024];
 		if (PGM_UNLIKELY(save_errno != PGM_SOCK_ENETUNREACH &&	/* Network is unreachable */
 		 		 save_errno != PGM_SOCK_EHOSTUNREACH &&	/* No route to host */
 		    		 save_errno != PGM_SOCK_EAGAIN))	/* would block on non-blocking send */
@@ -125,6 +124,11 @@ pgm_sendto_hops (
 			fd_set writefds;
 			FD_ZERO(&writefds);
 			FD_SET(send_sock, &writefds);
+#	ifndef _WIN32
+			const int n_fds = send_sock + 1;	/* largest fd + 1 */
+#	else
+			const int n_fds = 1;			/* count of fds */
+#	endif
 			struct timeval tv = {
 				.tv_sec  = 0,
 				.tv_usec = 500 /* ms */ * 1000
@@ -136,6 +140,7 @@ pgm_sendto_hops (
 				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 				if ( sent < 0 )
 				{
+					char errbuf[1024];
 					char toaddr[INET6_ADDRSTRLEN];
 					save_errno = pgm_get_last_sock_error();
 					pgm_sockaddr_ntop (to, toaddr, sizeof(toaddr));
@@ -152,6 +157,7 @@ pgm_sendto_hops (
 			}
 			else
 			{
+				char errbuf[1024];
 				save_errno = pgm_get_last_sock_error();
 				pgm_warn (_("blocked socket failed: %s"),
 					  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));

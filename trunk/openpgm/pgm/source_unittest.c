@@ -378,7 +378,7 @@ mock_pgm_rs_encode (
 	uint16_t			len
 	)
 {
-	g_debug ("mock_pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%" G_GSIZE_FORMAT ")",
+	g_debug ("mock_pgm_rs_encode (rs:%p src:%p offset:%u dst:%p len:%u)",
 		rs, src, offset, dst, len);
 }
 
@@ -391,7 +391,7 @@ mock_pgm_rate_check (
 	)
 {
 	g_debug ("mock_pgm_rate_check (bucket:%p data-size:%u is-nonblocking:%s)",
-		bucket, data_size, is_nonblocking ? "TRUE" : "FALSE");
+		bucket, (unsigned)data_size, is_nonblocking ? "TRUE" : "FALSE");
 	return TRUE;
 }
 
@@ -471,6 +471,7 @@ ssize_t
 mock_pgm_sendto_hops (
 	pgm_sock_t*			sock,
 	bool				use_rate_limit,
+	pgm_rate_t*			minor_rate_control,
 	bool				use_router_alert,
 	int				level,
 	const void*			buf,
@@ -481,13 +482,14 @@ mock_pgm_sendto_hops (
 {
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	g_debug ("mock_pgm_sendto (sock:%p use-rate-limit:%s use-router-alert:%s level:%d buf:%p len:%d to:%s tolen:%d)",
+	g_debug ("mock_pgm_sendto (sock:%p use-rate-limit:%s minor-rate-control:%p use-router-alert:%s level:%d buf:%p len:%u to:%s tolen:%d)",
 		(gpointer)sock,
 		use_rate_limit ? "YES" : "NO",
+		(gpointer)minor_rate_control,
 		use_router_alert ? "YES" : "NO",
 		level,
 		buf,
-		len,
+		(unsigned)len,
 		saddr,
 		tolen);
 	return len;
