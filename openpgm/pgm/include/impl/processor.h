@@ -28,18 +28,16 @@
 #define __PGM_IMPL_PROCESSOR_H__
 
 /* Memory prefetch */
-#if defined( sun )
-static inline void pgm_prefetch (const void *x)
+#if defined( __sun )
+#	include <sun_prefetch.h>
+
+static inline void pgm_prefetch (void *x)
 {
-	asm volatile (	"prefetch [%0], #one_write"
-		      : /* nil */
-		      : "r" (x));
+	sun_prefetch_read_many (x);
 }
-static inline void pgm_prefetchw (const void *x)
+static inline void pgm_prefetchw (void *x)
 {
-	asm volatile (	"prefetch [%0], #n_writes"
-		      : /* nil */
-		      : "r" (x));
+	sun_prefetch_write_many (x);
 }
 #elif defined(__GNUC__) && (__GNUC__ > 2) && defined(__OPTIMIZE__)
 static inline void pgm_prefetch (const void *x)
