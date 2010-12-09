@@ -30,10 +30,10 @@
 #define MAXALIASES	35
 
 #ifndef _WIN32
-static char netdb[] = "/etc/networks";
+#	define PATH_NETWORKS	"/etc/networks"
 #else
 /* NB: 32-bit applications may read %systemroot%\SysWOW64\drivers\etc */
-static char netdb[] = "%systemroot%\\system32\\drivers\\etc\\networks";
+#	define PATH_NETWORKS	"%systemroot%\\system32\\drivers\\etc\\networks"
 #endif
 static FILE* netfh = NULL;
 static char line[BUFSIZ+1];
@@ -51,8 +51,17 @@ void
 _pgm_compat_setnetent (void)
 {
 	if (NULL == netfh) {
+		char*	netdb;
+		size_t	envlen;
 		errno_t err;
+
+/* permit path override */
+		err = pgm_dupenv_s (&netdb, &envlen, "PGM_NETDB");
+		if (0 != err || 0 == envlen) {
+			netdb = pgm_strdup (PATH_NETWORKS);
+		}
 #ifdef _WIN32
+	{
 		char expanded[MAX_PATH];
 		if (0 == ExpandEnvironmentStrings ((LPCWSTR)netdb, (LPWSTR)expanded, sizeof (expanded))) {
 			const DWORD save_errno = GetLastError();
@@ -60,22 +69,23 @@ _pgm_compat_setnetent (void)
 			pgm_warn (_("Cannot expand netdb path \"%s\": %s"),
 				  netdb,
 				  pgm_win_strerror (winstr, sizeof (winstr), save_errno));
-			return;
+/* fall through on original string */
+		} else {
+			free (netdb);
+			netdb = pgm_strdup (expanded);
 		}
+	}
 #endif
-		err = pgm_fopen_s (&netfh,
-#ifndef _WIN32
-				   netdb,
-#else
-				   expanded,
-#endif
-				   "r");
+		err = pgm_fopen_s (&netfh, netdb, "r");
 		if (0 != err) {
 			char errbuf[1024];
 			pgm_warn (_("Opening netdb file \"%s\" failed: %s"),
 				  netdb,
 				  pgm_strerror_s (errbuf, sizeof (errbuf), err));
 		}
+
+		free (netdb);
+
 	} else {
 		rewind (netfh);
 	}

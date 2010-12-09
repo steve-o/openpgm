@@ -47,6 +47,7 @@
 #include <impl/getifaddrs.h>
 #include <impl/getnetbyname.h>
 #include <impl/getnodeaddr.h>
+#include <impl/getprotobyname.h>
 #include <impl/hashtable.h>
 #include <impl/histogram.h>
 #include <impl/indextoaddr.h>

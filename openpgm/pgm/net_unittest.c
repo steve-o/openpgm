@@ -190,8 +190,8 @@ mock_sendto (
 {
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
-	g_debug ("mock_sendto (s:%i buf:%p len:%d flags:%s to:%s tolen:%d)",
-		s, buf, len, flags_string (flags), saddr, tolen);
+	g_debug ("mock_sendto (s:%i buf:%p len:%u flags:%s to:%s tolen:%d)",
+		s, buf, (unsigned)len, flags_string (flags), saddr, tolen);
 	return len;
 }
 
@@ -257,6 +257,7 @@ mock_fcntl (
  *	pgm_sendto (
  *		pgm_sock_t*		sock,
  *		bool			use_rate_limit,
+ *		pgm_rate_t*		minor_rate_control,
  *		bool			use_router_alert,
  *		const void*		buf,
  *		size_t			len,
@@ -273,7 +274,7 @@ START_TEST (test_sendto_pass_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, NULL, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail_unless (sizeof(buf) == len, "sendto underrun");
 }
 END_TEST
@@ -285,7 +286,7 @@ START_TEST (test_sendto_fail_001)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (NULL, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (NULL, FALSE, NULL, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
@@ -298,7 +299,7 @@ START_TEST (test_sendto_fail_002)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, NULL, FALSE, NULL, sizeof(buf), (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
@@ -311,7 +312,7 @@ START_TEST (test_sendto_fail_003)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, NULL, FALSE, buf, 0, (struct sockaddr*)&addr, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
@@ -324,7 +325,7 @@ START_TEST (test_sendto_fail_004)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
+	gssize len = pgm_sendto (sock, FALSE, NULL, FALSE, buf, sizeof(buf), NULL, sizeof(addr));
 	fail ("reached");
 }
 END_TEST
@@ -337,7 +338,7 @@ START_TEST (test_sendto_fail_005)
 		.sin_family		= AF_INET,
 		.sin_addr.s_addr	= inet_addr ("172.12.90.1")
 	};
-	gssize len = pgm_sendto (sock, FALSE, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
+	gssize len = pgm_sendto (sock, FALSE, NULL, FALSE, buf, sizeof(buf), (struct sockaddr*)&addr, 0);
 	fail ("reached");
 }
 END_TEST
