@@ -238,10 +238,18 @@ pgm_getnetbyname (
 	)
 {
 #ifdef CONFIG_HAVE_GETNETENT
-	return _pgm_native_getnetbyname (name);
-#else
-	return _pgm_compat_getnetbyname (name);
+	char*   netdb;
+	size_t  envlen;
+	errno_t err;
+
+	err = pgm_dupenv_s (&netdb, &envlen, "PGM_NETDB");
+	free (netdb);
+	if (0 != err || 0 == envlen) {
+/* default use native implementation */
+		return _pgm_native_getnetbyname (name);
+	}
 #endif
+	return _pgm_compat_getnetbyname (name);
 }
 
 /* eof */
