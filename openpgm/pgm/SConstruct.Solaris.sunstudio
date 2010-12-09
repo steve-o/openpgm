@@ -92,6 +92,9 @@ env = Environment(
 	variables = vars,
 	ENV = os.environ,
 	CCFLAGS = [	'-v',
+			'+w',
+# strict ISO C
+			'-Xc',
 # C99
 			'-xc99=all',
 			'-D_XOPEN_SOURCE=600',

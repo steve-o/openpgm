@@ -21,7 +21,7 @@
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
-#ifdef sun
+#if defined( __sun )
 #	include <atomic.h>
 #endif
 #include <pgm/types.h>
@@ -47,7 +47,7 @@ pgm_atomic_exchange_and_add32 (
 			"xaddl %0, %1"
 		      :: "r" (result), "m" (*atomic)  );
 	return result;
-#elif defined( sun )
+#elif defined( __sun )
 	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
 	return nv - val;
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
@@ -76,7 +76,7 @@ pgm_atomic_add32 (
 	asm volatile (	"lock\n\t"
 			"addl %1, %0"
 		      :: "r" (val), "m" (*atomic)  );
-#elif defined( sun )
+#elif defined( __sun )
 	atomic_add_32 (atomic, (int32_t)val);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	__sync_fetch_and_add (atomic, val);
@@ -93,7 +93,7 @@ pgm_atomic_inc32 (
 {
 #if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || ((defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 )))
 	pgm_atomic_add32 (atomic, 1);
-#elif defined( sun )
+#elif defined( __sun )
 	atomic_inc_32 (atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
@@ -110,7 +110,7 @@ pgm_atomic_dec32 (
 {
 #if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || ((defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 )))
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
-#elif defined( sun )
+#elif defined( __sun )
 	atomic_dec_32 (atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
