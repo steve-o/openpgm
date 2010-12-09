@@ -24,6 +24,7 @@ src = Split("""
 		getifaddrs.c
 		getnetbyname.c
 		getnodeaddr.c
+		getprotobyname.c
 		indextoaddr.c
 		indextoname.c
 		nametoindex.c
@@ -120,6 +121,14 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('indextoaddr.c'),
 			e.Object('nametoindex.c')
 		] + tlog);
+	te.Program (['getprotobyname_unittest.c',
+			e.Object('sockaddr.c'),
+# mingw linking
+			e.Object('error.c'),
+			e.Object('getifaddrs.c'),
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
+		] + tlog);
 	te.Program (['indextoaddr_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c')] + tlog);
@@ -142,6 +151,7 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('getifaddrs.c'),
 			e.Object('getnetbyname.c'),
 			e.Object('getnodeaddr.c'),
+			e.Object('getprotobyname.c'),
 			e.Object('hashtable.c'),
 			e.Object('histogram.c'),
 			e.Object('indextoaddr.c'),

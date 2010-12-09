@@ -80,8 +80,8 @@ START_TEST (test_inet_pass_001)
 	guint16 csum = pgm_inet_checksum (source, sizeof(source), 0);
 /* function calculates answer in host order */
 	csum = g_htons (csum);
-	g_message ("IP checksum of \"%s\" (%d) is %u (%u)",
-		source, sizeof(source), csum, answer);
+	g_message ("IP checksum of \"%s\" (%u) is %u (%u)",
+		source, (unsigned)sizeof(source), csum, answer);
 
 	fail_unless (answer == csum, "checksum mismatch");
 }

@@ -1456,8 +1456,11 @@ send_odatav (
 		return send_odata_copy (sock, NULL, 0, bytes_written);
 
 /* continue if blocked on send */
-	if (sock->is_apdu_eagain)
+	if (sock->is_apdu_eagain) {
+		pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
+		tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 		goto retry_send;
+	}
 
 	STATE(tsdu_length) = 0;
 	for (unsigned i = 0; i < count; i++)
@@ -1513,6 +1516,9 @@ send_odatav (
 	pgm_txw_add (sock->window, STATE(skb));
 	pgm_spinlock_unlock (&sock->txw_spinlock);
 
+	pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
+	tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
+
 /* check rate limit at last moment */
 	STATE(is_rate_limited) = FALSE;
 	if (sock->is_nonblocking && sock->is_controlled_odata)
@@ -1530,8 +1536,6 @@ send_odatav (
 	}
 
 retry_send:
-	pgm_assert ((char*)STATE(skb)->tail > (char*)STATE(skb)->head);
-	tpdu_length = (char*)STATE(skb)->tail - (char*)STATE(skb)->head;
 	sent = pgm_sendto (sock,
 			   !STATE(is_rate_limited),	/* rate limit on blocking */
 			   &sock->odata_rate_control,

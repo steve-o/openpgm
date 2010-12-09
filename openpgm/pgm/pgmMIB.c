@@ -23,14 +23,23 @@
 
 /* locals */
 
+struct pgm_snmp_data_context_t {
+	pgm_sock_t*	sock;
+	pgm_peer_t*	peer;
+};
+
+typedef struct pgm_snmp_data_context_t pgm_snmp_data_context_t;
+
 struct pgm_snmp_context_t {
 	pgm_slist_t*	list;
 	pgm_list_t*	node;
 	int		index;		/* table index */
 	unsigned 	instance;	/* unique number per node */
+	pgm_snmp_data_context_t	data_context;
 };
 
 typedef struct pgm_snmp_context_t pgm_snmp_context_t;
+
 
 static const oid snmptrap_oid[] = {1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0};
 
@@ -148,11 +157,11 @@ initialize_table_pgmSourceTable (void)
 	reg = netsnmp_create_handler_registration ("pgmSourceTable",	pgmSourceTable_handler,
 						   pgmSourceTable_oid,	OID_LENGTH( pgmSourceTable_oid ),
 						   HANDLER_CAN_RONLY);
-	if (!reg)
+	if (NULL == reg)
 		goto error;
 
 	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
-	if (!table_info)
+	if (NULL == table_info)
 		goto error;
 
 	table_info->min_column = COLUMN_PGMSOURCESOURCEADDRESS;
@@ -164,7 +173,7 @@ initialize_table_pgmSourceTable (void)
 					  0);
 
 	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
-	if (!iinfo)
+	if (NULL == iinfo)
 		goto error;
 
 	iinfo->get_first_data_point 	= pgmSourceTable_get_first_data_point;
@@ -215,7 +224,7 @@ pgmSourceTable_get_first_data_point(
 
 	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
 
-	if (!pgm_sock_list) {
+	if (NULL == pgm_sock_list) {
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
@@ -253,7 +262,7 @@ pgmSourceTable_get_next_data_point(
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
-	if (!context->list)
+	if (NULL == context->list)
 		return NULL;
 
 	pgm_sock_t* sock = context->list->data;
@@ -327,16 +336,14 @@ pgmSourceTable_handler (
 		     request = request->next)
 		{
 			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context (request);
-
-			if (!sock) {
+			if (NULL == sock) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
 
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info (request);
-
-			if (!table_info) {
+			if (NULL == table_info) {
 				snmp_log (LOG_ERR, "pgmSourceTable_handler: empty table request info.\n");
 				continue;
 			}
@@ -428,11 +435,11 @@ initialize_table_pgmSourceConfigTable(void)
 	reg = netsnmp_create_handler_registration ("pgmSourceConfigTable",	pgmSourceConfigTable_handler,
 						   pgmSourceConfigTable_oid,	OID_LENGTH( pgmSourceConfigTable_oid ),
 						   HANDLER_CAN_RONLY);
-	if (!reg)
+	if (NULL == reg)
 		goto error;
 
 	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
-	if (!table_info)
+	if (NULL == table_info)
 		goto error;
 
 	table_info->min_column = COLUMN_PGMSOURCETTL;
@@ -444,7 +451,7 @@ initialize_table_pgmSourceConfigTable(void)
 					  0);
 
 	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
-	if (!iinfo)
+	if (NULL == iinfo)
 		goto error;
 
 	iinfo->get_first_data_point 	= pgmSourceConfigTable_get_first_data_point;
@@ -495,7 +502,7 @@ pgmSourceConfigTable_get_first_data_point(
 
 	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
 
-	if (!pgm_sock_list) {
+	if (NULL == pgm_sock_list) {
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
@@ -533,7 +540,7 @@ pgmSourceConfigTable_get_next_data_point(
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
-	if (!context->list)
+	if (NULL == context->list)
 		return NULL;
 
 	pgm_sock_t* sock = context->list->data;
@@ -607,16 +614,14 @@ pgmSourceConfigTable_handler (
 		     request = request->next)
 		{
 			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context (request);
-
-			if (!sock) {
+			if (NULL == sock) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
 
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info (request);
-
-			if (!table_info) {
+			if (NULL == table_info) {
 				snmp_log (LOG_ERR, "pgmSourceTable_handler: empty table request info.\n");
 				continue;
 			}
@@ -793,11 +798,11 @@ initialize_table_pgmSourcePerformanceTable (void)
 	reg = netsnmp_create_handler_registration ("pgmSourcePerformanceTable",		pgmSourcePerformanceTable_handler,
 						   pgmSourcePerformanceTable_oid,	OID_LENGTH( pgmSourcePerformanceTable_oid ),
 						   HANDLER_CAN_RONLY);
-	if (!reg)
+	if (NULL == reg)
 		goto error;
 
 	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
-	if (!table_info)
+	if (NULL == table_info)
 		goto error;
 
 	table_info->min_column = COLUMN_PGMSOURCEDATABYTESSENT;
@@ -809,7 +814,7 @@ initialize_table_pgmSourcePerformanceTable (void)
 					  0);
 
 	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
-	if (!iinfo)
+	if (NULL == iinfo)
 		goto error;
 
 	iinfo->get_first_data_point 	= pgmSourcePerformanceTable_get_first_data_point;
@@ -860,7 +865,7 @@ pgmSourcePerformanceTable_get_first_data_point (
 
 	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
 
-	if (!pgm_sock_list) {
+	if (NULL == pgm_sock_list) {
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
@@ -898,7 +903,7 @@ pgmSourcePerformanceTable_get_next_data_point (
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
-	if (!context->list)
+	if (NULL == context->list)
 		return NULL;
 
 	pgm_sock_t* sock = context->list->data;
@@ -972,8 +977,7 @@ pgmSourcePerformanceTable_handler (
 		     request = request->next)
 		{
 			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context (request);
-
-			if (!sock) {
+			if (NULL == sock) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
@@ -982,8 +986,7 @@ pgmSourcePerformanceTable_handler (
 
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info (request);
-
-			if (!table_info) {
+			if (NULL == table_info) {
 				snmp_log (LOG_ERR, "pgmSourceTable_handler: empty table request info.\n");
 				continue;
 			}
@@ -1334,11 +1337,11 @@ initialize_table_pgmReceiverTable(void)
 	reg = netsnmp_create_handler_registration ("pgmReceiverTable",		pgmReceiverTable_handler,
 						   pgmReceiverTable_oid,	OID_LENGTH( pgmReceiverTable_oid ),
 						   HANDLER_CAN_RONLY);
-	if (!reg)
+	if (NULL == reg)
 		goto error;
 
 	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
-	if (!table_info)
+	if (NULL == table_info)
 		goto error;
 
 	table_info->min_column = COLUMN_PGMRECEIVERGROUPADDRESS;
@@ -1351,7 +1354,7 @@ initialize_table_pgmReceiverTable(void)
 					  0);
 
 	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
-	if (!iinfo)
+	if (NULL == iinfo)
 		goto error;
 
 	iinfo->get_first_data_point 	= pgmReceiverTable_get_first_data_point;
@@ -1402,7 +1405,7 @@ pgmReceiverTable_get_first_data_point (
 
 	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
 
-	if (!pgm_sock_list) {
+	if (NULL == pgm_sock_list) {
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
@@ -1428,13 +1431,14 @@ pgmReceiverTable_get_first_data_point (
 	}
 
 /* no node found */
-	if (!context->node) {
+	if (NULL == context->node) {
 		pgm_free (context);
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
 
 	*my_loop_context = context; 
+	*my_data_context = &context->data_context;
 
 /* pass on for generic row access */
 	return pgmReceiverTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
@@ -1462,17 +1466,20 @@ pgmReceiverTable_get_next_data_point (
 		(const void*)mydata);
 
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
+	pgm_snmp_data_context_t* data_context = (pgm_snmp_data_context_t*)*my_data_context;
 	netsnmp_variable_list *idx = put_index_data;
 
-	if (!context->list)
+	if (NULL == context->list)
 		return NULL;
 
 	pgm_sock_t* sock = context->list->data;
+	data_context->sock = sock;
 
-	if (!context->node)
+	if (NULL == context->node)
 		return NULL;
 
 	pgm_peer_t* peer = context->node->data;
+	data_context->peer = peer;
 
 /* pgmReceiverGlobalId */
 	char gsi[ PGM_GSISTRLEN ];
@@ -1489,16 +1496,14 @@ pgmReceiverTable_get_next_data_point (
 	const unsigned instance = context->instance++;
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&instance, sizeof(instance));
 
-/* set data context to pass to handler callback */
-	*my_data_context = peer;
-
 /* hunt for next valid node */
 	if (context->node->next) {
 		context->node = context->node->next;
-	} else {
+	}
+	else
+	{
 		context->node = NULL;
-		while (context->list->next)
-		{
+		while (context->list->next) {
 			pgm_rwlock_reader_unlock (&sock->peers_lock);
 			context->list = context->list->next;
 			sock = context->list->data;
@@ -1573,12 +1578,14 @@ pgmReceiverTable_handler (
 		     request;
 		     request = request->next)
 		{
-			const pgm_peer_t* peer = (pgm_peer_t*)netsnmp_extract_iterator_context (request);
-
-			if (!peer) {
+			const pgm_snmp_data_context_t* data_context = (pgm_snmp_data_context_t*)netsnmp_extract_iterator_context (request);
+			if (!data_context) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
+
+			const pgm_sock_t* sock = data_context->sock;
+			const pgm_peer_t* peer = data_context->peer;
 
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info(request);
@@ -1606,7 +1613,7 @@ pgmReceiverTable_handler (
 /* by definition same as sock */
 			case COLUMN_PGMRECEIVERDESTPORT:
 				{
-					const unsigned dport = ntohs (peer->sock->dport);
+					const unsigned dport = ntohs (sock->dport);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&dport, sizeof(dport) );
 				}
@@ -1695,11 +1702,11 @@ initialize_table_pgmReceiverConfigTable(void)
 	reg = netsnmp_create_handler_registration ("pgmReceiverConfigTable",	pgmReceiverConfigTable_handler,
 						   pgmReceiverConfigTable_oid,	OID_LENGTH(pgmReceiverConfigTable_oid),
 						   HANDLER_CAN_RONLY);
-	if (!reg)
+	if (NULL == reg)
 		goto error;
 
 	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
-	if (!table_info)
+	if (NULL == table_info)
 		goto error;
 
 	table_info->min_column = COLUMN_PGMRECEIVERNAKBACKOFFIVL;
@@ -1712,7 +1719,7 @@ initialize_table_pgmReceiverConfigTable(void)
 					  0);
 
 	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
-	if (!iinfo)
+	if (NULL == iinfo)
 		goto error;
 
 	iinfo->get_first_data_point 	= pgmReceiverConfigTable_get_first_data_point;
@@ -1763,7 +1770,7 @@ pgmReceiverConfigTable_get_first_data_point(
 
 	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
 
-	if (!pgm_sock_list) {
+	if (NULL == pgm_sock_list) {
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
@@ -1787,13 +1794,14 @@ pgmReceiverConfigTable_get_first_data_point(
 	}
 
 /* no node found */
-	if (!context->node) {
+	if (NULL == context->node) {
 		pgm_free (context);
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
 
 	*my_loop_context = context; 
+	*my_data_context = NULL;
 
 /* pass on for generic row access */
 	return pgmReceiverConfigTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
@@ -1823,12 +1831,13 @@ pgmReceiverConfigTable_get_next_data_point(
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
 	netsnmp_variable_list *idx = put_index_data;
 
-	if (!context->list)
+	if (NULL == context->list)
 		return NULL;
 
 	pgm_sock_t* sock = context->list->data;
+	*my_data_context = sock;
 
-	if (!context->node)
+	if (NULL == context->node)
 		return NULL;
 
 	pgm_peer_t* peer = context->node->data;
@@ -1848,16 +1857,14 @@ pgmReceiverConfigTable_get_next_data_point(
 	const unsigned instance = context->instance++;
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&instance, sizeof(instance));
 
-/* set data context to pass to handler callback */
-	*my_data_context = peer;
-
 /* hunt for next valid node */
 	if (context->node->next) {
 		context->node = context->node->next;
-	} else {
+	}
+	else
+	{
 		context->node = NULL;
-		while (context->list->next)
-		{
+		while (context->list->next) {
 			pgm_rwlock_reader_unlock (&sock->peers_lock);
 			context->list = context->list->next;
 			sock = context->list->data;
@@ -1932,9 +1939,8 @@ pgmReceiverConfigTable_handler (
 		     request;
 		     request = request->next)
 		{
-			const pgm_peer_t* peer = (pgm_peer_t*)netsnmp_extract_iterator_context(request);
-
-			if (peer == NULL) {
+			const pgm_sock_t* sock = (pgm_sock_t*)netsnmp_extract_iterator_context(request);
+			if (NULL == sock) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
@@ -1942,7 +1948,7 @@ pgmReceiverConfigTable_handler (
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info(request);
 
-			if (table_info == NULL) {
+			if (NULL == table_info) {
 				snmp_log (LOG_ERR, "pgmReceiverTable_handler: empty table request info.\n");
 				continue;
 			}
@@ -1952,7 +1958,7 @@ pgmReceiverConfigTable_handler (
 /* nak_bo_ivl from sock */
 			case COLUMN_PGMRECEIVERNAKBACKOFFIVL:
 				{
-					const unsigned nak_bo_ivl = peer->sock->nak_bo_ivl;
+					const unsigned nak_bo_ivl = sock->nak_bo_ivl;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_bo_ivl, sizeof(nak_bo_ivl) );
 				}
@@ -1961,7 +1967,7 @@ pgmReceiverConfigTable_handler (
 /* nak_rpt_ivl from sock */
 			case COLUMN_PGMRECEIVERNAKREPEATIVL:
 				{
-					const unsigned nak_rpt_ivl = peer->sock->nak_rpt_ivl;
+					const unsigned nak_rpt_ivl = sock->nak_rpt_ivl;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_rpt_ivl, sizeof(nak_rpt_ivl) );
 				}
@@ -1970,7 +1976,7 @@ pgmReceiverConfigTable_handler (
 /* nak_ncf_retries from sock */
 			case COLUMN_PGMRECEIVERNAKNCFRETRIES:
 				{
-					const unsigned nak_ncf_retries = peer->sock->nak_ncf_retries;
+					const unsigned nak_ncf_retries = sock->nak_ncf_retries;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_ncf_retries, sizeof(nak_ncf_retries) );
 				}
@@ -1979,7 +1985,7 @@ pgmReceiverConfigTable_handler (
 /* nak_rdata_ivl from sock */
 			case COLUMN_PGMRECEIVERNAKRDATAIVL:
 				{
-					const unsigned nak_rdata_ivl = peer->sock->nak_rdata_ivl;
+					const unsigned nak_rdata_ivl = sock->nak_rdata_ivl;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_rdata_ivl, sizeof(nak_rdata_ivl) );
 				}
@@ -1988,7 +1994,7 @@ pgmReceiverConfigTable_handler (
 /* nak_data_retries from sock */
 			case COLUMN_PGMRECEIVERNAKDATARETRIES:
 				{
-					const unsigned nak_data_retries = peer->sock->nak_data_retries;
+					const unsigned nak_data_retries = sock->nak_data_retries;
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&nak_data_retries, sizeof(nak_data_retries) );
 				}
@@ -2084,11 +2090,11 @@ initialize_table_pgmReceiverPerformanceTable (void)
 	reg = netsnmp_create_handler_registration ("pgmReceiverPerformanceTable",	pgmReceiverPerformanceTable_handler,
 						   pgmReceiverPerformanceTable_oid,	OID_LENGTH( pgmReceiverPerformanceTable_oid ),
 						   HANDLER_CAN_RONLY);
-	if (!reg)
+	if (NULL == reg)
 		goto error;
 
 	table_info = SNMP_MALLOC_TYPEDEF( netsnmp_table_registration_info );
-	if (!table_info)
+	if (NULL == table_info)
 		goto error;
 
 	table_info->min_column = COLUMN_PGMRECEIVERDATABYTESRECEIVED;
@@ -2101,7 +2107,7 @@ initialize_table_pgmReceiverPerformanceTable (void)
 					  0);
 
 	iinfo = SNMP_MALLOC_TYPEDEF( netsnmp_iterator_info );
-	if (!iinfo)
+	if (NULL == iinfo)
 		goto error;
 
 	iinfo->get_first_data_point 	= pgmReceiverPerformanceTable_get_first_data_point;
@@ -2152,7 +2158,7 @@ pgmReceiverPerformanceTable_get_first_data_point (
 
 	pgm_rwlock_reader_lock (&pgm_sock_list_lock);
 
-	if (!pgm_sock_list) {
+	if (NULL == pgm_sock_list) {
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
@@ -2176,13 +2182,14 @@ pgmReceiverPerformanceTable_get_first_data_point (
 	}
 
 /* no node found */
-	if (!context->node) {
+	if (NULL == context->node) {
 		pgm_free (context);
 		pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 		return NULL;
 	}
 
 	*my_loop_context = context; 
+	*my_data_context = &context->data_context;
 
 /* pass on for generic row access */
 	return pgmReceiverPerformanceTable_get_next_data_point (my_loop_context, my_data_context, put_index_data, mydata);
@@ -2210,17 +2217,20 @@ pgmReceiverPerformanceTable_get_next_data_point (
 		(const void*)mydata);
 
 	pgm_snmp_context_t* context = (pgm_snmp_context_t*)*my_loop_context;
+	pgm_snmp_data_context_t* data_context = (pgm_snmp_data_context_t*)*my_data_context;
 	netsnmp_variable_list *idx = put_index_data;
 
-	if (!context->list)
+	if (NULL == context->list)
 		return NULL;
 
 	pgm_sock_t* sock = context->list->data;
+	data_context->sock = sock;
 
-	if (!context->node)
+	if (NULL == context->node)
 		return NULL;
 
 	pgm_peer_t* peer = context->node->data;
+	data_context->peer = peer;
 
 /* pgmReceiverGlobalId */
 	char gsi[ PGM_GSISTRLEN ];
@@ -2237,16 +2247,14 @@ pgmReceiverPerformanceTable_get_next_data_point (
 	const unsigned instance = context->instance++;
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&instance, sizeof(instance));
 
-/* set data context to pass to handler callback */
-	*my_data_context = peer;
-
 /* hunt for next valid node */
 	if (context->node->next) {
 		context->node = context->node->next;
-	} else {
+	}
+	else
+	{
 		context->node = NULL;
-		while (context->list->next)
-		{
+		while (context->list->next) {
 			pgm_rwlock_reader_unlock (&sock->peers_lock);
 			context->list = context->list->next;
 			sock = context->list->data;
@@ -2320,19 +2328,20 @@ pgmReceiverPerformanceTable_handler (
 		     request;
 		     request = request->next)
 		{
-			const pgm_peer_t* peer = (pgm_peer_t*)netsnmp_extract_iterator_context (request);
-
-			if (!peer) {
+			const pgm_snmp_data_context_t* data_context = (pgm_snmp_data_context_t*)netsnmp_extract_iterator_context (request);
+			if (NULL == data_context) {
 				netsnmp_set_request_error (reqinfo, request, SNMP_NOSUCHINSTANCE);
 				continue;
 			}
 
-			const pgm_rxw_t* window = (const pgm_rxw_t*)peer->window;
+			const pgm_sock_t* sock = data_context->sock;
+			const pgm_peer_t* peer = data_context->peer;
+			const pgm_rxw_t* window = peer->window;
 
 			netsnmp_variable_list *var = request->requestvb;
 			netsnmp_table_request_info* table_info = netsnmp_extract_table_info (request);
 
-			if (!table_info) {
+			if (NULL == table_info) {
 				snmp_log (LOG_ERR, "pgmReceiverTable_handler: empty table request info.\n");
 				continue;
 			}
@@ -2402,7 +2411,7 @@ pgmReceiverPerformanceTable_handler (
 /* bogus: same as source checksum errors */	
 			case COLUMN_PGMRECEIVERCKSUMERRORS:
 				{
-					const unsigned cksum_errors = peer->sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
+					const unsigned cksum_errors = sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS];
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&cksum_errors, sizeof(cksum_errors) );
 				}
@@ -2458,7 +2467,7 @@ pgmReceiverPerformanceTable_handler (
 		
 			case COLUMN_PGMRECEIVERBYTESDELIVEREDTOAPP:
 				{
-					const unsigned bytes_delivered =window->bytes_delivered;
+					const unsigned bytes_delivered = window->bytes_delivered;
 					snmp_set_var_typed_value (var, ASN_COUNTER, /* ASN_COUNTER32 */
 								  (const u_char*)&bytes_delivered, sizeof(bytes_delivered) );
 				}

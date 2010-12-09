@@ -150,43 +150,14 @@ pgm_init (
 #endif /* _WIN32 */
 
 /* find PGM protocol id overriding default value, use first value from NIS */
-#ifdef CONFIG_HAVE_GETPROTOBYNAME_R
-	char b[1024];
-	struct protoent protobuf;
-	const struct protoent* proto = getprotobyname_r ("pgm", &protobuf, b, sizeof(b));
-	if (NULL != proto) {
-		if (proto->p_proto != pgm_ipproto_pgm) {
-			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
-				proto->p_proto);
-			pgm_ipproto_pgm = proto->p_proto;
-		}
-	}
-#elif defined(CONFIG_HAVE_GETPROTOBYNAME_R2)
-	char b[1024];
-	struct protoent protobuf, *proto;
-	const int e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
-	if (e != -1 && proto != NULL) {
-		if (proto->p_proto != pgm_ipproto_pgm) {
-			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
-				proto->p_proto);
-			pgm_ipproto_pgm = proto->p_proto;
-		}
-	}
-#else
-	const struct protoent *proto = getprotobyname ("pgm");
+	const struct pgm_protoent_t *proto = pgm_getprotobyname ("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != pgm_ipproto_pgm) {
-#ifndef _WIN32
-			pgm_minor (_("Setting PGM protocol number to %i from /etc/protocols."),
+			pgm_minor (_("Setting PGM protocol number to %i from the protocols database."),
 				proto->p_proto);
-#else
-			pgm_minor (_("Setting PGM protocol number to %i from %%SYSTEMROOT%%\\system32\\drivers\\etc\\protocols."),
-				proto->p_proto);
-#endif
 			pgm_ipproto_pgm = proto->p_proto;
 		}
 	}
-#endif
 
 /* ensure timing enabled */
 	pgm_error_t* sub_error = NULL;
