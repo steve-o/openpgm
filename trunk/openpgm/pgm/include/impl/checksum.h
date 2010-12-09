@@ -39,23 +39,23 @@ uint32_t pgm_compat_csum_partial_copy (const void*restrict, void*restrict, uint1
 
 static inline uint32_t add32_with_carry (uint32_t, uint32_t) PGM_GNUC_CONST;
 
-#if defined(__x86_64__) || defined(__i386__) || defined(__i386) || defined(__amd64)
+#if defined( __x86_64__ ) || defined( __i386__ ) || defined( __i386 ) || defined( __amd64 )
 static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
-	asm("addl %2, %0 \n\t"
-	    "adcl $0, %0"
-	    : "=r" (a)			/* output operands */
-	    : "0" (a), "r" (b));	/* input operands */
+	__asm (	"addl %2, %0 \n\t"
+		"adcl $0, %0"
+		: "=r" (a)			/* output operands */
+		: "0" (a), "r" (b));	/* input operands */
 	return a;
 }
-#elif defined(__sparc__) || defined(__sparc) || defined(__sparcv9)
+#elif defined( __sparc__ ) || defined( __sparc ) || defined( __sparcv9 )
 static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
-	asm("addcc %2, %0, %0 \n\t"
-	    "addx %0, %%g0, %0"
-	    : "=r" (a)			/* output operands */
-	    : "0" (a), "r" (b)		/* input operands */
-	    : "cc");			/* list of clobbered registers */
+	__asm (	"addcc %2, %0, %0 \n\t"
+		"addx %0, %%g0, %0"
+		: "=r" (a)			/* output operands */
+		: "0" (a), "r" (b)		/* input operands */
+		: "cc");			/* list of clobbered registers */
 	return a;
 }
 #else

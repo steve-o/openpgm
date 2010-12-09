@@ -107,7 +107,7 @@ enum pgm_type_e {
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
 /* byte alignment for packet memory maps */
-#if defined( __GNUC__ ) && !defined( sun )
+#if defined( __GNUC__ ) && !defined( __sun )
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -448,7 +448,7 @@ struct pgm_opt6_path_nla {
 };
 
 
-#if defined( __GNUC__ ) && !defined( sun )
+#if defined( __GNUC__ ) && !defined( __sun )
 #	pragma pack(pop)
 #else
 #	pragma pack()

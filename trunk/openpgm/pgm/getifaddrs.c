@@ -24,7 +24,7 @@
 #	include <sys/types.h>
 #	include <ifaddrs.h>
 #endif
-#if defined( sun )
+#if defined( __sun )
 #	include <sys/sockio.h>
 #endif
 #if defined( _WIN32 )
