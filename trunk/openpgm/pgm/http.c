@@ -1120,7 +1120,7 @@ http_tsi_response (
 		pgm_rwlock_reader_lock (&list_sock->peers_lock);
 		pgm_peer_t* receiver = pgm_hashtable_lookup (list_sock->peers_hashtable, tsi);
 		if (receiver) {
-			const int retval = http_receiver_response (list_sock, connection, receiver);
+			const int retval = http_receiver_response (connection, list_sock, receiver);
 			pgm_rwlock_reader_unlock (&list_sock->peers_lock);
 			pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 			return retval;

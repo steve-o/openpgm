@@ -28,7 +28,7 @@
 #define __PGM_IMPL_PROCESSOR_H__
 
 /* Memory prefetch */
-#if defined( __sun )
+#if defined( __SUNPRO_C ) || defined( __SUNPRO_CC )
 #	include <sun_prefetch.h>
 
 static inline void pgm_prefetch (void *x)
