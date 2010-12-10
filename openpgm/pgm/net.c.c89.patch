@@ -1,4 +1,4 @@
---- net.c	2010-12-09 12:55:02.000000000 +0800
+--- net.c	2010-12-10 17:37:33.000000000 +0800
 +++ net.c89.c	2010-12-09 12:55:21.000000000 +0800
 @@ -63,6 +63,7 @@
  	pgm_assert( tolen > 0 );
@@ -59,7 +59,7 @@
 -				.tv_sec  = 0,
 -				.tv_usec = 500 /* ms */ * 1000
 -			};
--			const int ready = select (1, NULL, &writefds, NULL, &tv);
+-			const int ready = select (n_fds, NULL, &writefds, NULL, &tv);
 +			tv.tv_sec  = 0;
 +			tv.tv_usec = 500 /* ms */ * 1000;
 +			ready = select (n_fds, NULL, &writefds, NULL, &tv);
