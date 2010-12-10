@@ -41,7 +41,7 @@ uint32_t pgm_compat_csum_partial_copy (const void*restrict, void*restrict, uint1
 
 static inline uint32_t add32_with_carry (uint32_t, uint32_t) PGM_GNUC_CONST;
 
-#if defined( __x86_64__ ) || defined( __i386__ ) || defined( __i386 ) || defined( __amd64 )
+#if defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
 	__asm (	"addl %2, %0 \n\t"

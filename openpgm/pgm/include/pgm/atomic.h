@@ -37,18 +37,18 @@ pgm_atomic_exchange_and_add32 (
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint32_t result;
-	__asm volatile ("lock\n\t"
-			"xaddl %0, %1"
-		      : "=r" (result), "=m" (*atomic)
-		      : "0" (val), "m" (*atomic)
-		      : "memory", "cc"  );
+	__asm volatile (  "lock\n\t"
+		   	  "xaddl %0, %1"
+		        : "=r" (result), "=m" (*atomic)
+		        : "0" (val), "m" (*atomic)
+		        : "memory", "cc"  );
 	return result;
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
 /* Sun C++ compiler wants __asm__ not __asm */
 	uint32_t result = val;
 	__asm__ volatile ("lock\n\t"
-			"xaddl %0, %1"
-		      :: "r" (result), "m" (*atomic)  );
+			  "xaddl %0, %1"
+		       :: "r" (result), "m" (*atomic)  );
 	return result;
 #elif defined( __sun )
 	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
@@ -70,15 +70,16 @@ pgm_atomic_add32 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm volatile ("lock\n\t"
-			"addl %1, %0"
-		      : "=m" (*atomic)
-		      : "ir" (val), "m" (*atomic)
-		      : "memory", "cc"  );
+	__asm volatile (  "lock\n\t"
+			  "addl %1, %0"
+		        : "=m" (*atomic)
+		        : "ir" (val), "m" (*atomic)
+		        : "memory", "cc"  );
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
+/* Sun C++ compiler wants __asm__ not __asm */
 	__asm__ volatile ("lock\n\t"
-			"addl %1, %0"
-		      :: "r" (val), "m" (*atomic)  );
+			  "addl %1, %0"
+		       :: "r" (val), "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_add_32 (atomic, (int32_t)val);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
