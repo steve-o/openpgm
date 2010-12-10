@@ -3,7 +3,9 @@
  *  : mib2c.column_defines.conf,v 5.1 2002/05/08 05:42:47 hardaker Exp $
  */
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef PGMMIB_COLUMNS_H
 #define PGMMIB_COLUMNS_H
 

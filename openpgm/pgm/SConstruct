@@ -101,7 +101,9 @@ env = Environment(
 				'-Wmissing-format-attribute',
 				'-Wredundant-decls',
 				'-Wnested-externs',
-				'-Winline',
+#				'-Winline',
+				'-Wno-inline',
+				'-Wno-unused-function',
 			'-pedantic',
 # C99
 			'-std=gnu99',

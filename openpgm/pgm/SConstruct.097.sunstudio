@@ -73,7 +73,13 @@ env = conf.Finish();
 # Platform specifics
 
 env = Environment(ENV = os.environ,
-	CCFLAGS = [	'-v',
+	CCFLAGS = [
+# strict C
+			'-v',
+# enable warnings
+			'+w',
+# strict ISO C
+			'-Xc',
 # C99
 			'-xc99=all',
 			'-D_XOPEN_SOURCE=600',

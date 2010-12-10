@@ -94,7 +94,8 @@ env = Environment(
 				'-Wpointer-arith',
 				'-Wbad-function-cast',
 				'-Wcast-qual',
-				'-Wcast-align',
+#				'-Wcast-align',
+				'-Wno-cast-align',
 				'-Wwrite-strings',
 				'-Waggregate-return',
 				'-Wstrict-prototypes',
@@ -106,6 +107,7 @@ env = Environment(
 				'-Wredundant-decls',
 				'-Wnested-externs',
 				'-Winline',
+				'-Wno-unused-function',
 #			'-pedantic',
 # C99
 			'-std=gnu99',

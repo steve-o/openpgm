@@ -2,7 +2,7 @@
  *
  * Windows interface index to interface name function.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,9 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_IMPL_INDEXTONAME_H__
 #define __PGM_IMPL_INDEXTONAME_H__
 

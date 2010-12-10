@@ -21,7 +21,7 @@ opt.AddOptions (
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_CC', 'C++ Examples', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_CC', 'C++ Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
@@ -144,7 +144,6 @@ env = Environment(ENV = os.environ,
 			'-std=c99',
 			'-D_XOPEN_SOURCE=600',
 			'-D_BSD_SOURCE',
-			'-gcc-version=420',
 # re-entrant libc
 			'-D_REENTRANT',
 # POSIX spinlocks
