@@ -23,7 +23,9 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_IMPL_TSI_H__
 #define __PGM_IMPL_TSI_H__
 

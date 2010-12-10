@@ -23,7 +23,9 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_IMPL_CHECKSUM_H__
 #define __PGM_IMPL_CHECKSUM_H__
 
@@ -45,7 +47,7 @@ static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 	__asm (	"addl %2, %0 \n\t"
 		"adcl $0, %0"
 		: "=r" (a)			/* output operands */
-		: "0" (a), "r" (b));	/* input operands */
+		: "0" (a), "r" (b));		/* input operands */
 	return a;
 }
 #elif defined( __sparc__ ) || defined( __sparc ) || defined( __sparcv9 )

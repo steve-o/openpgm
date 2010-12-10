@@ -3,7 +3,9 @@
  *  : mib2c.column_enums.conf,v 5.2 2003/02/22 04:09:25 hardaker Exp $
  */
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef PGMMIB_ENUMS_H
 #define PGMMIB_ENUMS_H
 
