@@ -1,5 +1,5 @@
---- net.c	2010-10-24 12:01:26.000000000 +0800
-+++ net.c89.c	2010-10-24 12:50:15.000000000 +0800
+--- net.c	2010-12-10 20:52:32.000000000 +0800
++++ net.c89.c	2010-12-10 20:54:29.000000000 +0800
 @@ -62,6 +62,7 @@
  	pgm_assert( tolen > 0 );
  
@@ -34,28 +34,36 @@
 +	pgm_debug ("sendto returned %" PRIzd, (long)sent);
  	if (sent < 0) {
  		int save_errno = pgm_get_last_sock_error();
- 		char errbuf[1024];
-@@ -107,14 +111,14 @@
+ 		if (PGM_UNLIKELY(save_errno != PGM_SOCK_ENETUNREACH &&	/* Network is unreachable */
+@@ -106,19 +110,20 @@
  			};
  			const int ready = poll (&p, 1, 500 /* ms */);
  #else
 +			int ready;
  			fd_set writefds;
 +			struct timeval tv;
++			int n_fds;
  			FD_ZERO(&writefds);
  			FD_SET(send_sock, &writefds);
+ #	ifndef _WIN32
+-			const int n_fds = send_sock + 1;	/* largest fd + 1 */
++			n_fds = send_sock + 1;		/* largest fd + 1 */
+ #	else
+-			const int n_fds = 1;			/* count of fds */
++			n_fds = 1;			/* count of fds */
+ #	endif
 -			struct timeval tv = {
 -				.tv_sec  = 0,
 -				.tv_usec = 500 /* ms */ * 1000
 -			};
--			const int ready = select (1, NULL, &writefds, NULL, &tv);
+-			const int ready = select (n_fds, NULL, &writefds, NULL, &tv);
 +			tv.tv_sec  = 0;
 +			tv.tv_usec = 500 /* ms */ * 1000;
-+			ready = select (1, NULL, &writefds, NULL, &tv);
++			ready = select (n_fds, NULL, &writefds, NULL, &tv);
  #endif /* CONFIG_HAVE_POLL */
  			if (ready > 0)
  			{
-@@ -150,6 +154,8 @@
+@@ -156,6 +161,8 @@
  	if (!use_router_alert && sock->can_send_data)
  		pgm_mutex_unlock (&sock->send_mutex);
  	return sent;

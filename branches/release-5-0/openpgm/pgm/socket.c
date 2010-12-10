@@ -424,7 +424,7 @@ pgm_socket (
 #else
 		if (WSAEACCES == save_errno) {
 #	ifdef _MSC_VER
-			if (IsMemberOfAdministratorsGroup (NULL))) {
+			if (IsMemberOfAdministratorsGroup (NULL)) {
 				if (!IsElevatedAdministrator (NULL))
 					pgm_error (_("PGM protocol requires approved process elevation via UAC."));
 				/* otherwise unknown permission error, fall through */
@@ -649,7 +649,7 @@ pgm_getsockopt (
 	case PGM_PDU:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->max_apdu;
+		*(int*restrict)optval = (int)sock->max_apdu;
 		status = TRUE;
 		break;
 
@@ -769,7 +769,7 @@ pgm_getsockopt (
 			break;
 		if (!sock->is_bound)
 			break;
-		*(int*restrict)optval = pgm_txw_max_length (sock->window) * sock->max_tpdu;
+		*(int*restrict)optval = (int)(pgm_txw_max_length (sock->window) * sock->max_tpdu);
 		status = TRUE;
 		break;
 
@@ -777,7 +777,7 @@ pgm_getsockopt (
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		if (sock->is_bound)
-			*(int*restrict)optval = pgm_txw_max_length (sock->window);
+			*(int*restrict)optval = (int)pgm_txw_max_length (sock->window);
 		else
 			*(int*restrict)optval = sock->txw_sqns;
 		status = TRUE;
@@ -790,7 +790,7 @@ pgm_getsockopt (
 		if (sock->is_bound && (0 == sock->txw_max_rte))
 			break;
 		if (sock->is_bound)
-			*(int*restrict)optval = (pgm_txw_max_length (sock->window) * sock->max_tpdu) / sock->txw_max_rte;
+			*(int*restrict)optval = (int)((pgm_txw_max_length (sock->window) * sock->max_tpdu) / sock->txw_max_rte);
 		else
 			*(int*restrict)optval = sock->txw_secs;
 		status = TRUE;
@@ -799,7 +799,7 @@ pgm_getsockopt (
 	case PGM_TXW_MAX_RTE:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->txw_max_rte;
+		*(int*restrict)optval = (int)sock->txw_max_rte;
 		status = TRUE;
 		break;
 
@@ -823,7 +823,7 @@ pgm_getsockopt (
 		if (!sock->is_bound)
 			break;
 		{
-			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : ( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
+			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : (unsigned)( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
 			*(int*restrict)optval = rxw_sqns * sock->max_tpdu;
 		}
 		status = TRUE;
@@ -833,7 +833,7 @@ pgm_getsockopt (
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		if (sock->is_bound) {
-			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : ( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
+			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : (unsigned)( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
 			*(int*restrict)optval = rxw_sqns;
 		} else {
 			*(int*restrict)optval = sock->rxw_sqns;
@@ -848,8 +848,8 @@ pgm_getsockopt (
 		if (sock->is_bound && (0 == sock->rxw_max_rte))
 			break;
 		if (sock->is_bound) {
-			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : ( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
-			*(int*restrict)optval = (rxw_sqns * sock->max_tpdu) / sock->rxw_max_rte;
+			const unsigned rxw_sqns = sock->rxw_sqns ? sock->rxw_sqns : (unsigned)( (sock->rxw_secs * sock->rxw_max_rte) / sock->max_tpdu );
+			*(int*restrict)optval = (int)((rxw_sqns * sock->max_tpdu) / sock->rxw_max_rte);
 		} else {
 			*(int*restrict)optval = sock->rxw_secs;
 		}
@@ -859,7 +859,7 @@ pgm_getsockopt (
 	case PGM_RXW_MAX_RTE:
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
-		*(int*restrict)optval = sock->rxw_max_rte;
+		*(int*restrict)optval = (int)sock->rxw_max_rte;
 		status = TRUE;
 		break;
 
@@ -1014,11 +1014,11 @@ pgm_getsockopt (
 
 bool
 pgm_setsockopt (
-	pgm_sock_t* const	sock,
-	const int		level,		/* IPPROTO_PGM or SOL_SOCKET */
-	const int		optname,
-	const void*		optval,
-	const socklen_t		optlen
+	pgm_sock_t* const restrict sock,
+	const int		   level,		/* IPPROTO_PGM or SOL_SOCKET */
+	const int		   optname,
+	const void*	  restrict optval,
+	const socklen_t		   optlen
 	)
 {
 	bool status = FALSE;
@@ -1999,8 +1999,8 @@ pgm_bind3 (
 	}
 
 	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
-	sock->max_tsdu = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, pgmcc_family);
-	sock->max_tsdu_fragment = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, pgmcc_family);
+	sock->max_tsdu = (uint16_t)(sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, pgmcc_family));
+	sock->max_tsdu_fragment = (uint16_t)(sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, pgmcc_family));
 	const unsigned max_fragments = sock->txw_sqns ? MIN( PGM_MAX_FRAGMENTS, sock->txw_sqns ) : PGM_MAX_FRAGMENTS;
 	sock->max_apdu = MIN( PGM_MAX_APDU, max_fragments * sock->max_tsdu_fragment );
 
@@ -2219,7 +2219,7 @@ pgm_bind3 (
 	if (sock->can_send_data)
 	{
 /* setup rate control */
-		if (sock->txw_max_rte)
+		if (sock->txw_max_rte > 0)
 		{
 			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
 					sock->txw_max_rte);

@@ -1,5 +1,5 @@
---- mem.c	2010-10-24 12:04:13.000000000 +0800
-+++ mem.c89.c	2010-10-24 12:38:55.000000000 +0800
+--- mem.c	2010-12-10 20:43:35.000000000 +0800
++++ mem.c89.c	2010-12-10 20:44:07.000000000 +0800
 @@ -79,16 +79,24 @@
  	if (NULL == string)
  		return result;
@@ -35,7 +35,7 @@
 +			{
 +			unsigned i;
 +			for (i = 0; i < nkeys; i++)
- 				if (debug_key_matches (keys[i].key, string, q - string))
+ 				if (debug_key_matches (keys[i].key, string, (unsigned)(q - string)))
  					result |= keys[i].value;
 +			}
  			string = q;

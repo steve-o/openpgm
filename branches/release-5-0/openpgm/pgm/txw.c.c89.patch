@@ -1,5 +1,5 @@
---- txw.c	2010-10-24 12:02:04.000000000 +0800
-+++ txw.c89.c	2010-10-24 12:49:31.000000000 +0800
+--- txw.c	2010-12-10 20:57:57.000000000 +0800
++++ txw.c89.c	2010-12-10 20:58:23.000000000 +0800
 @@ -188,12 +188,13 @@
  
  	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %" PRIzd " use-fec:%s rs(n):%u rs(k):%u)",
@@ -12,7 +12,7 @@
  /* calculate transmit window parameters */
  	pgm_assert (sqns || (tpdu_size && secs && max_rte));
 +	{
- 	const unsigned alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
+ 	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
  	window = pgm_malloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
  	window->tsi = tsi;
 @@ -225,6 +226,7 @@

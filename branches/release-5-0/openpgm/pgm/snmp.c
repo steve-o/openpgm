@@ -35,7 +35,7 @@
 
 bool				pgm_agentx_subagent = TRUE;
 char*				pgm_agentx_socket = NULL;
-char*				pgm_snmp_appname = "PGM";
+const char*			pgm_snmp_appname = "PGM";
 
 /* locals */
 
@@ -191,7 +191,7 @@ snmp_routine (
 	PGM_GNUC_UNUSED	void*	arg
 	)
 {
-	const int notify_fd = pgm_notify_get_fd (&snmp_notify);
+	const SOCKET notify_fd = pgm_notify_get_socket (&snmp_notify);
 
 	for (;;)
 	{
@@ -202,8 +202,8 @@ snmp_routine (
 		FD_ZERO(&fdset);
 		snmp_select_info (&fds, &fdset, &timeout, &block);
 		FD_SET(notify_fd, &fdset);
-		if (notify_fd+1 > fds)
-			fds = notify_fd+1;
+		if ((notify_fd + 1) > fds)
+			fds = notify_fd + 1;
 		fds = select (fds, &fdset, NULL, NULL, block ? NULL : &timeout);
 		if (FD_ISSET(notify_fd, &fdset))
 			break;

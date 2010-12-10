@@ -41,9 +41,9 @@ static bool send_spmr (pgm_sock_t*const restrict, pgm_peer_t*const restrict);
 static bool send_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const uint32_t);
 static bool send_parity_nak (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const unsigned, const unsigned);
 static bool send_nak_list (pgm_sock_t*const restrict, pgm_peer_t*const restrict, const struct pgm_sqn_list_t*const restrict);
-static bool nak_rb_state (pgm_sock_t*, pgm_peer_t*, const pgm_time_t);
-static void nak_rpt_state (pgm_sock_t*, pgm_peer_t*, const pgm_time_t);
-static void nak_rdata_state (pgm_sock_t*, pgm_peer_t*, const pgm_time_t);
+static bool nak_rb_state (pgm_sock_t*restrict, pgm_peer_t*restrict, const pgm_time_t);
+static void nak_rpt_state (pgm_sock_t*restrict, pgm_peer_t*restrict, const pgm_time_t);
+static void nak_rdata_state (pgm_sock_t*restrict, pgm_peer_t*restrict, const pgm_time_t);
 static inline pgm_peer_t* _pgm_peer_ref (pgm_peer_t*);
 static bool on_general_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static bool on_dlr_poll (pgm_sock_t*const restrict, pgm_peer_t*const restrict, struct pgm_sk_buff_t*const restrict);
@@ -460,7 +460,7 @@ pgm_flush_peers_pending (
 		pgm_peer_t* peer = sock->peers_pending->data;
 		if (peer->last_commit && peer->last_commit < sock->last_commit)
 			pgm_rxw_remove_commit (peer->window);
-		const ssize_t peer_bytes = pgm_rxw_readv (peer->window, pmsg, msg_end - *pmsg + 1);
+		const ssize_t peer_bytes = pgm_rxw_readv (peer->window, pmsg, (unsigned)(msg_end - *pmsg + 1));
 
 		if (peer->last_cumulative_losses != ((pgm_rxw_t*)peer->window)->cumulative_losses)
 		{
@@ -992,7 +992,7 @@ send_spmr (
 	header->pgm_options	= 0;
 	header->pgm_tsdu_length	= 0;
 	header->pgm_checksum	= 0;
-	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 /* send multicast SPMR TTL 1 to our peers listening on the same groups */
 	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
@@ -1077,7 +1077,7 @@ send_nak (
 				(AF_INET6 == source->nla.ss_family) ? (char*)&nak6->nak6_grp_nla_afi : (char*)&nak->nak_grp_nla_afi);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
@@ -1151,7 +1151,7 @@ send_parity_nak (
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->group_nla,
 				(AF_INET6 == source->nla.ss_family) ? (char*)&nak6->nak6_grp_nla_afi : (char*)&nak->nak_grp_nla_afi );
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   FALSE,		/* not rate limited */
@@ -1265,7 +1265,7 @@ send_nak_list (
 		opt_nak_list->opt_sqn[i-1] = htonl (sqn_list->sqn[i]);
 
         header->pgm_checksum    = 0;
-        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+        header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
@@ -1361,7 +1361,7 @@ send_ack (
 	opt_pgmcc_feedback->opt_loss_rate = htons ((uint16_t)source->window->data_loss);
 
 	header->pgm_checksum	= 0;
-	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */

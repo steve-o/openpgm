@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #ifdef _WIN32
 #	define WIN32_LEAN_AND_MEAN
-#	include "windows.h"
+#	include <windows.h>
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>

@@ -71,7 +71,7 @@ static uint32_t _pgm_rxw_remove_trail (pgm_rxw_t*const);
 static void _pgm_rxw_state (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict, const int);
 static inline void _pgm_rxw_shuffle_parity (pgm_rxw_t*const restrict, struct pgm_sk_buff_t*const restrict);
 static inline ssize_t _pgm_rxw_incoming_read (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict, uint32_t);
-static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t*const restrict, const uint32_t);
+static bool _pgm_rxw_is_apdu_complete (pgm_rxw_t*const, const uint32_t);
 static inline ssize_t _pgm_rxw_incoming_read_apdu (pgm_rxw_t*const restrict, struct pgm_msgv_t**restrict);
 static inline int _pgm_rxw_recovery_update (pgm_rxw_t*const, const uint32_t, const pgm_time_t);
 static inline int _pgm_rxw_recovery_append (pgm_rxw_t*const, const pgm_time_t, const pgm_time_t);
@@ -171,7 +171,7 @@ pgm_rxw_t*
 pgm_rxw_create (
 	const pgm_tsi_t*const	tsi,
 	const uint16_t		tpdu_size,
-	const unsigned		sqns,		/* transmit window size in sequence numbers */
+	const unsigned		sqns,		/* receive window size in sequence numbers */
 	const unsigned		secs,		/* size in seconds */
 	const ssize_t		max_rte,	/* max bandwidth */
 	const uint32_t		ack_c_p
@@ -197,7 +197,7 @@ pgm_rxw_create (
 
 /* calculate receive window parameters */
 	pgm_assert (sqns || (secs && max_rte));
-	const unsigned alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
+	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
 	window = pgm_malloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 
 	window->tsi		= tsi;
@@ -1233,7 +1233,7 @@ pgm_rxw_readv (
 	state = (pgm_rxw_state_t*)&skb->cb;
 	switch (state->pkt_state) {
 	case PGM_PKT_STATE_HAVE_DATA:
-		bytes_read = _pgm_rxw_incoming_read (window, pmsg, msg_end - *pmsg + 1);
+		bytes_read = _pgm_rxw_incoming_read (window, pmsg, (unsigned)(msg_end - *pmsg + 1));
 		break;
 
 	case PGM_PKT_STATE_LOST_DATA:
