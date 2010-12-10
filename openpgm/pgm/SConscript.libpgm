@@ -93,16 +93,27 @@ if env['WITH_CHECK'] == 'true':
 		];
 # framework
 	te.Program (['atomic_unittest.c']);
-	te.Program (['checksum_unittest.c'] + tlog);
-	te.Program (['error_unittest.c'] + tlog);
-	te.Program (['md5_unittest.c'] + tlog);
+	te.Program (['checksum_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
+	te.Program (['error_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
+	te.Program (['md5_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
 	te.Program (['getifaddrs_unittest.c',
 			e.Object('error.c'),
 			e.Object('sockaddr.c'),
 			e.Object('list.c'),
 # mingw linking
 			e.Object('indextoaddr.c'),
-			e.Object('nametoindex.c')
+			e.Object('nametoindex.c'),
+# sunpro linking
+			e.Object('skbuff.c')
 		] + tlog);
 	te.Program (['getnetbyname_unittest.c',
 			e.Object('inet_network.c'),
@@ -111,7 +122,9 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('error.c'),
 			e.Object('getifaddrs.c'),
 			e.Object('indextoaddr.c'),
-			e.Object('nametoindex.c')
+			e.Object('nametoindex.c'),
+# sunpro linking
+			e.Object('skbuff.c')
 		] + tlog);
 	te.Program (['getnodeaddr_unittest.c',
 			e.Object('error.c'),
@@ -119,7 +132,9 @@ if env['WITH_CHECK'] == 'true':
 # mingw linking
 			e.Object('getifaddrs.c'),
 			e.Object('indextoaddr.c'),
-			e.Object('nametoindex.c')
+			e.Object('nametoindex.c'),
+# sunpro linking
+			e.Object('skbuff.c')
 		] + tlog);
 	te.Program (['getprotobyname_unittest.c',
 			e.Object('sockaddr.c'),
@@ -127,23 +142,39 @@ if env['WITH_CHECK'] == 'true':
 			e.Object('error.c'),
 			e.Object('getifaddrs.c'),
 			e.Object('indextoaddr.c'),
-			e.Object('nametoindex.c')
+			e.Object('nametoindex.c'),
+# sunpro linking
+			e.Object('skbuff.c')
 		] + tlog);
 	te.Program (['indextoaddr_unittest.c',
 			e.Object('error.c'),
-			e.Object('sockaddr.c')] + tlog);
+			e.Object('sockaddr.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
 	te.Program (['inet_network_unittest.c',
 			e.Object('sockaddr.c'),
 # mingw linking
 			e.Object('error.c'),
 			e.Object('getifaddrs.c'),
 			e.Object('indextoaddr.c'),
-			e.Object('nametoindex.c')
+			e.Object('nametoindex.c'),
+# sunpro linking
+			e.Object('skbuff.c')
 		] + tlog);
-	te.Program (['rate_control_unittest.c'] + tlog);
-	te.Program (['reed_solomon_unittest.c'] + tlog);
+	te.Program (['rate_control_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
+	te.Program (['reed_solomon_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
 	te.Program (['time_unittest.c',
-			e.Object('error.c')] + tlog);
+			e.Object('error.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
 # collate
 	tframework = [	e.Object('checksum.c'),
 			e.Object('error.c'),
@@ -177,36 +208,76 @@ if env['WITH_CHECK'] == 'true':
 # library
 	te.Program (['txw_unittest.c',
 			e.Object('tsi.c'),
-			te.Object('skbuff.c')] + tframework);
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['rxw_unittest.c',
 			e.Object('tsi.c'),
-			te.Object('skbuff.c')] + tframework);
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['engine_unittest.c',
-			e.Object('version.c')] + tframework);
+			e.Object('version.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['gsi_unittest.c',
-			e.Object('if.c')] + tframework);
-	te.Program (['tsi_unittest.c'] + tframework);
-	te.Program (['if_unittest.c'] + tframework);
+			e.Object('if.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
+	te.Program (['tsi_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
+	te.Program (['if_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['socket_unittest.c',
 			e.Object('if.c'),
-			e.Object('tsi.c')] + tframework);
+			e.Object('tsi.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['source_unittest.c',
-			te.Object('skbuff.c')] + tframework);
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['receiver_unittest.c',
-			e.Object('tsi.c')] + tframework);
+			e.Object('tsi.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['recv_unittest.c',
 			e.Object('tsi.c'),
 			e.Object('gsi.c'),
-			te.Object('skbuff.c')] + tframework);
-	te.Program (['net_unittest.c'] + tframework);
-	te.Program (['timer_unittest.c'] + tframework);
-	te.Program (['packet_parse_unittest.c'] + tframework);
-	te.Program (['packet_test_unittest.c'] + tframework);
+			e.Object('skbuff.c')
+		] + tframework);
+	te.Program (['net_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
+	te.Program (['timer_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
+	te.Program (['packet_parse_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
+	te.Program (['packet_test_unittest.c',
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
 	te.Program (['ip_unittest.c',
-			e.Object('if.c')] + tframework);
+			e.Object('if.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tframework);
 # performance tests
 	te.Program (['checksum_perftest.c',
 			e.Object('time.c'),
-			e.Object('error.c')] + tlog);
+			e.Object('error.c'),
+# sunpro linking
+			e.Object('skbuff.c')
+		] + tlog);
 
 # end of file

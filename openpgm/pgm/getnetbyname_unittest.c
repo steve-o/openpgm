@@ -62,13 +62,13 @@ START_TEST (test_getnetbyname_pass_001)
 {
 	const char loopback[] = "loopback";
 
-	fail_if (NULL == pgm_getnetbyname (loopback));
+	fail_if (NULL == pgm_getnetbyname (loopback), "getnetbyname failed");
 }
 END_TEST
 
 START_TEST (test_getnetbyname_fail_001)
 {
-	fail_unless (NULL == pgm_getnetbyname (NULL));
+	fail_unless (NULL == pgm_getnetbyname (NULL), "getnetbyname failed");
 }
 END_TEST
 
@@ -76,7 +76,7 @@ START_TEST (test_getnetbyname_fail_002)
 {
 	const char unknown[] = "qwertyuiop";
 
-	fail_unless (NULL == pgm_getnetbyname (unknown));
+	fail_unless (NULL == pgm_getnetbyname (unknown), "getnetbyname failed");
 }
 END_TEST
 
@@ -108,15 +108,15 @@ START_TEST (test_getnetent_pass_001)
 #endif
 
 /* official network name */
-		fail_if (NULL == ne->n_name);
+		fail_if (NULL == ne->n_name, "no official name");
 		g_debug ("%-6dn_name = %s", i++, ne->n_name);
 #ifdef COMPARE_GETNETENT
 		if (NULL != nne)
-			fail_unless (0 == strcmp (ne->n_name, nne->n_name));
+			fail_unless (0 == strcmp (ne->n_name, nne->n_name), "official name mismatch");
 #endif
 
 /* alias list */
-		fail_if (NULL == ne->n_aliases);
+		fail_if (NULL == ne->n_aliases, "invalid aliases pointer");
 		p = ne->n_aliases;
 		if (*p) {
 			strcpy (buffer, *p++);
@@ -131,7 +131,7 @@ START_TEST (test_getnetent_pass_001)
 		if (NULL != nne) {
 			char nbuffer[1024];
 
-			fail_if (NULL == nne->n_aliases);
+			fail_if (NULL == nne->n_aliases, "invalid aliases pointer");
 			p = nne->n_aliases;
 			if (*p) {
 				strcpy (nbuffer, *p++);
@@ -141,27 +141,27 @@ START_TEST (test_getnetent_pass_001)
 				}
 			} else
 				strcpy (nbuffer, "(nil)");
-			fail_unless (0 == strcmp (buffer, nbuffer));
+			fail_unless (0 == strcmp (buffer, nbuffer), "aliases mismatch");
 		}
 #endif
 
 /* net address type */
-		fail_unless (AF_INET == ne->n_net.ss_family || AF_INET6 == ne->n_net.ss_family);
+		fail_unless (AF_INET == ne->n_net.ss_family || AF_INET6 == ne->n_net.ss_family, "invalid address family");
 		if (AF_INET == ne->n_net.ss_family) {
 			struct sockaddr_in sa;
 			g_debug ("      n_addrtype = AF_INET");
 #ifdef COMPARE_GETNETENT
-			fail_unless (ne->n_net.ss_family == nne->n_addrtype);
+			fail_unless (ne->n_net.ss_family == nne->n_addrtype, "address family mismatch");
 #endif
 /* network number */
 			memcpy (&sa, &ne->n_net, sizeof (sa));
 			fail_unless (0 == getnameinfo ((struct sockaddr*)&sa, sizeof (sa),
 						       buffer, sizeof (buffer),
 						       NULL, 0,
-						       NI_NUMERICHOST));
+						       NI_NUMERICHOST), "getnameinfo failed");
 			g_debug ("      n_net = %s", buffer);
 #ifdef COMPARE_GETNETENT
-			fail_unless (0 == memcmp (&sa.sin_addr, &nne->n_net, sizeof (struct in_addr)));
+			fail_unless (0 == memcmp (&sa.sin_addr, &nne->n_net, sizeof (struct in_addr)), "network address mismatch");
 #endif
 		} else {
 			struct sockaddr_in6 sa6;
@@ -174,7 +174,7 @@ START_TEST (test_getnetent_pass_001)
 			fail_unless (0 == getnameinfo ((struct sockaddr*)&sa6, sizeof (sa6),
 						       buffer, sizeof (buffer),
 						       NULL, 0,
-						       NI_NUMERICHOST));
+						       NI_NUMERICHOST), "getnameinfo failed");
 			g_debug ("      n_net = %s", buffer);
 		}
 	}

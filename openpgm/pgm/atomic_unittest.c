@@ -47,10 +47,10 @@
 START_TEST (test_int32_exchange_and_add_pass_001)
 {
 	volatile uint32_t atomic = 0;
-	fail_unless (0 == pgm_atomic_exchange_and_add32 (&atomic, 5));
-	fail_unless (5 == atomic);
-	fail_unless (5 == pgm_atomic_exchange_and_add32 (&atomic, (uint32_t)-10));
-	fail_unless ((uint32_t)-5 == atomic);
+	fail_unless (0 == pgm_atomic_exchange_and_add32 (&atomic, 5), "xadd failed");
+	fail_unless (5 == atomic, "xadd failed");
+	fail_unless (5 == pgm_atomic_exchange_and_add32 (&atomic, (uint32_t)-10), "xadd failed");
+	fail_unless ((uint32_t)-5 == atomic, "xadd failed");
 }
 END_TEST
 
@@ -66,9 +66,9 @@ START_TEST (test_int32_add_pass_001)
 {
 	volatile uint32_t atomic = (uint32_t)-5;
 	pgm_atomic_add32 (&atomic, 20);
-	fail_unless (15 == atomic);
+	fail_unless (15 == atomic, "add failed");
 	pgm_atomic_add32 (&atomic, (uint32_t)-35);
-	fail_unless ((uint32_t)-20 == atomic);
+	fail_unless ((uint32_t)-20 == atomic, "add failed");
 }
 END_TEST
 
@@ -77,11 +77,11 @@ START_TEST (test_int32_add_pass_002)
 {
 	volatile uint32_t atomic = 0;
 	pgm_atomic_add32 (&atomic, UINT32_MAX/2);
-	fail_unless ((UINT32_MAX/2) == atomic);
+	fail_unless ((UINT32_MAX/2) == atomic, "add failed");
 	pgm_atomic_add32 (&atomic, UINT32_MAX - (UINT32_MAX/2));
-	fail_unless (UINT32_MAX == atomic);
+	fail_unless (UINT32_MAX == atomic, "add failed");
 	pgm_atomic_add32 (&atomic, 1);
-	fail_unless (0 == atomic);
+	fail_unless (0 == atomic, "add failed");
 }
 END_TEST
 
@@ -95,7 +95,7 @@ END_TEST
 START_TEST (test_int32_get_pass_001)
 {
 	volatile uint32_t atomic = (uint32_t)-20;
-	fail_unless ((uint32_t)-20 == pgm_atomic_read32 (&atomic));
+	fail_unless ((uint32_t)-20 == pgm_atomic_read32 (&atomic), "read failed");
 }
 END_TEST
 
@@ -111,7 +111,7 @@ START_TEST (test_int32_set_pass_001)
 {
 	volatile uint32_t atomic = (uint32_t)-20;
 	pgm_atomic_write32 (&atomic, 5);
-	fail_unless (5 == atomic);
+	fail_unless (5 == atomic, "write failed");
 }
 END_TEST
 

@@ -78,7 +78,9 @@ if env['WITH_CHECK'] == 'true':
 # sockets
 			te.Object('tsi.c'),
 			te.Object('gsi.c'),
-			te.Object('version.c')
-			]);
+			te.Object('version.c'),
+# sunpro linking
+			te.Object('skbuff.c')
+		]);
 
 # end of file

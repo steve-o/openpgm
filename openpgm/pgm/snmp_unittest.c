@@ -32,7 +32,7 @@
 static pgm_rwlock_t     mock_pgm_sock_list_lock;
 static pgm_slist_t*     mock_pgm_sock_list;
 
-static
+PGM_GNUC_INTERNAL
 bool
 mock_pgm_mib_init (
 	pgm_error_t**	error
@@ -62,8 +62,8 @@ mock_pgm_mib_init (
 START_TEST (test_init_pass_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_snmp_init (&err));
-	fail_unless (NULL == err);
+	fail_unless (TRUE == pgm_snmp_init (&err), "init failed");
+	fail_unless (NULL == err, "init failed");
 }
 END_TEST
 
@@ -71,9 +71,9 @@ END_TEST
 START_TEST (test_init_fail_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_snmp_init (&err));
+	fail_unless (TRUE == pgm_snmp_init (&err), "init failed");
 /* reference counting means this now passes */
-	fail_unless (TRUE == pgm_snmp_init (&err));
+	fail_unless (TRUE == pgm_snmp_init (&err), "init failed");
 }
 END_TEST
 
@@ -85,9 +85,9 @@ END_TEST
 START_TEST (test_shutdown_pass_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_snmp_init (&err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_snmp_shutdown ());
+	fail_unless (TRUE == pgm_snmp_init (&err), "init failed");
+	fail_unless (NULL == err, "init failed");
+	fail_unless (TRUE == pgm_snmp_shutdown (), "shutdown failed");
 }
 END_TEST
 
@@ -96,19 +96,19 @@ END_TEST
 START_TEST (test_shutdown_pass_002)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_snmp_init (&err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_snmp_shutdown ());
-	fail_unless (TRUE == pgm_snmp_init (&err));
-	fail_unless (NULL == err);
-	fail_unless (TRUE == pgm_snmp_shutdown ());
+	fail_unless (TRUE == pgm_snmp_init (&err), "init failed");
+	fail_unless (NULL == err, "init failed");
+	fail_unless (TRUE == pgm_snmp_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_snmp_init (&err), "init failed");
+	fail_unless (NULL == err, "init failed");
+	fail_unless (TRUE == pgm_snmp_shutdown (), "shutdown failed");
 }
 END_TEST
 
 /* no running server */
 START_TEST (test_shutdown_fail_001)
 {
-	fail_unless (FALSE == pgm_snmp_shutdown ());
+	fail_unless (FALSE == pgm_snmp_shutdown (), "shutdown failed");
 }
 END_TEST
 

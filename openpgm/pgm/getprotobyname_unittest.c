@@ -58,13 +58,13 @@ START_TEST (test_getprotobyname_pass_001)
 {
 	const char ipv6[] = "ipv6";
 
-	fail_if (NULL == pgm_getprotobyname (ipv6));
+	fail_if (NULL == pgm_getprotobyname (ipv6), "getprotobyname failed");
 }
 END_TEST
 
 START_TEST (test_getprotobyname_fail_001)
 {
-	fail_unless (NULL == pgm_getprotobyname (NULL));
+	fail_unless (NULL == pgm_getprotobyname (NULL), "getprotobyname failed");
 }
 END_TEST
 
@@ -72,7 +72,7 @@ START_TEST (test_getprotobyname_fail_002)
 {
 	const char unknown[] = "qwertyuiop";
 
-	fail_unless (NULL == pgm_getprotobyname (unknown));
+	fail_unless (NULL == pgm_getprotobyname (unknown), "getprotobyname failed");
 }
 END_TEST
 

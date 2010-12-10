@@ -1419,9 +1419,9 @@ static const struct test_case_net_t cases_004[] = {
 START_TEST (test_is_in_net_pass_001)
 {
 	struct in_addr addr, netaddr, netmask;
-	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].addr,    &addr));
-	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].netaddr, &netaddr));
-	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].netmask, &netmask));
+	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].addr,    &addr), "inet_pton failed");
+	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].netaddr, &netaddr), "inet_pton failed");
+	fail_unless (pgm_inet_pton (AF_INET, cases_004[_i].netmask, &netmask), "inet_pton failed");
 	const gboolean answer =		     cases_004[_i].answer;
 
 	addr.s_addr    = g_ntohl (addr.s_addr);
@@ -1433,7 +1433,7 @@ START_TEST (test_is_in_net_pass_001)
 		result ? "TRUE" : "FALSE",
 		answer ? "TRUE" : "FALSE");
 
-	fail_unless (answer == result);
+	fail_unless (answer == result, "unexpected result");
 }
 END_TEST
 
@@ -1447,9 +1447,9 @@ static const struct test_case_net_t cases_005[] = {
 START_TEST (test_is_in_net6_pass_001)
 {
 	struct in6_addr addr, netaddr, netmask;
-	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].addr,    &addr));
-	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].netaddr, &netaddr));
-	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].netmask, &netmask));
+	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].addr,    &addr), "inet_pton failed");
+	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].netaddr, &netaddr), "inet_pton failed");
+	fail_unless (pgm_inet_pton (AF_INET6, cases_005[_i].netmask, &netmask), "inet_pton failed");
 	const gboolean answer =		      cases_005[_i].answer;
 
 	gboolean result = is_in_net6 (&addr, &netaddr, &netmask);
@@ -1458,7 +1458,7 @@ START_TEST (test_is_in_net6_pass_001)
 		result ? "TRUE" : "FALSE",
 		answer ? "TRUE" : "FALSE");
 
-	fail_unless (answer == result);
+	fail_unless (answer == result, "unexpected result");
 }
 END_TEST
 

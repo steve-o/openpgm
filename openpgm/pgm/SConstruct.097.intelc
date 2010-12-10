@@ -138,6 +138,7 @@ env = Environment(ENV = os.environ,
 #   e.g. uint16_t j = 1, i = ~j;
 				'-wd2259',
 
+			'-strict-ansi',
 #			'-pedantic',
 # C99
 			'-std=c99',
