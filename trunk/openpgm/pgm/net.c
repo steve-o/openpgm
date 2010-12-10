@@ -133,7 +133,7 @@ pgm_sendto_hops (
 				.tv_sec  = 0,
 				.tv_usec = 500 /* ms */ * 1000
 			};
-			const int ready = select (1, NULL, &writefds, NULL, &tv);
+			const int ready = select (n_fds, NULL, &writefds, NULL, &tv);
 #endif /* CONFIG_HAVE_POLL */
 			if (ready > 0)
 			{
