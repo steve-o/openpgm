@@ -215,7 +215,7 @@ mock_pgm_time_since_epoch (
 START_TEST (test_init_pass_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_mib_init (&err));
+	fail_unless (TRUE == pgm_mib_init (&err), "mib_init failed");
 }
 END_TEST
 
