@@ -23,7 +23,9 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_IMPL_PROCESSOR_H__
 #define __PGM_IMPL_PROCESSOR_H__
 
@@ -31,30 +33,19 @@
 #if defined( __SUNPRO_C ) || defined( __SUNPRO_CC )
 #	include <sun_prefetch.h>
 
-static inline void pgm_prefetch (void *x)
-{
-	sun_prefetch_read_many (x);
-}
-static inline void pgm_prefetchw (void *x)
-{
-	sun_prefetch_write_many (x);
-}
+#	define pgm_prefetch(addr)	sun_prefetch_read_many ((void*)addr)
+#	define pgm_prefetchw(addr)	sun_prefetch_write_many (addr)
+
 #elif defined(__GNUC__) && (__GNUC__ > 2) && defined(__OPTIMIZE__)
-static inline void pgm_prefetch (const void *x)
-{
-	__builtin_prefetch (x, 0 /* read */, 0 /* no temporal locality */);
-}
-static inline void pgm_prefetchw (const void *x)
-{
-	__builtin_prefetch (x, 1 /* write */, 3 /* high temporal */);
-}
+
+#	define pgm_prefetch(addr)	__builtin_prefetch (addr, 0 /* read */, 0 /* no temporal locality */)
+#	define pgm_prefetchw(addr)	__builtin_prefetch (addr, 1 /* write */, 3 /* high temporal */)
+
 #else
-static inline void pgm_prefetch (PGM_GNUC_UNUSED const void *x)
-{
-}
-static inline void pgm_prefetchw (PGM_GNUC_UNUSED const void *x)
-{
-}
+
+#	define pgm_prefetch(addr)	(addr)
+#	define pgm_prefetchw(addr)	(addr)
+
 #endif
 
 #endif /* __PGM_IMPL_PROCESSOR_H__ */

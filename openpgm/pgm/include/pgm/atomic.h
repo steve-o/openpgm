@@ -17,7 +17,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
@@ -42,8 +44,9 @@ pgm_atomic_exchange_and_add32 (
 		      : "memory", "cc"  );
 	return result;
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
+/* Sun C++ compiler wants __asm__ not __asm */
 	uint32_t result = val;
-	asm volatile (	"lock\n\t"
+	__asm__ volatile ("lock\n\t"
 			"xaddl %0, %1"
 		      :: "r" (result), "m" (*atomic)  );
 	return result;
@@ -73,7 +76,7 @@ pgm_atomic_add32 (
 		      : "ir" (val), "m" (*atomic)
 		      : "memory", "cc"  );
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-	asm volatile (	"lock\n\t"
+	__asm__ volatile ("lock\n\t"
 			"addl %1, %0"
 		      :: "r" (val), "m" (*atomic)  );
 #elif defined( __sun )

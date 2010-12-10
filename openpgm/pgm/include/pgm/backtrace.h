@@ -2,7 +2,7 @@
  * 
  * Dump back trace to stderr and try gdb.
  *
- * Copyright (c) 2006 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,7 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_BACKTRACE_H__
 #define __PGM_BACKTRACE_H__
 

@@ -19,7 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#pragma once
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
 #ifndef __PGM_LIST_H__
 #define __PGM_LIST_H__
 
