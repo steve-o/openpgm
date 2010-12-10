@@ -61,10 +61,16 @@ if env['WITH_CHECK'] == 'true':
 			te.Object('wsastrerror.c')
 		];
 # snmp
-	te.Program (['snmp_unittest.c'] + tframework);
+	te.Program (['snmp_unittest.c',
+# sunpro linking
+			te.Object('skbuff.c')
+		] + tframework);
 	te.Program (['pgmMIB_unittest.c',
 			te.Object('snmp.c'),
-			te.Object('gsi.c')] + tframework);
+			te.Object('gsi.c'),
+# sunpro linking
+			te.Object('skbuff.c')
+		] + tframework);
 
 
 # end of file

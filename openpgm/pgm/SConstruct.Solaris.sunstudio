@@ -91,7 +91,10 @@ env = conf.Finish();
 env = Environment(
 	variables = vars,
 	ENV = os.environ,
-	CCFLAGS = [	'-v',
+	CCFLAGS = [
+# strict C
+			'-v',
+# enable warnings
 			'+w',
 # strict ISO C
 			'-Xc',

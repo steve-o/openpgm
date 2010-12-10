@@ -27,11 +27,11 @@
 #include <glib.h>
 #include <check.h>
 
-#ifdef BYTE_ORDER
+#if defined( BYTE_ORDER ) || (defined( __sun ) && defined( _BIT_FIELDS_LTOH ))
 #	define PGM_BYTE_ORDER		BYTE_ORDER
 #	define PGM_BIG_ENDIAN		BIG_ENDIAN
 #	define PGM_LITTLE_ENDIAN	LITTLE_ENDIAN
-#elif defined(__BYTE_ORDER)
+#elif defined( __BYTE_ORDER ) || (defined( __sun ) && defined( _BIT_FIELDS_HTOL ))
 #	define PGM_BYTE_ORDER		__BYTE_ORDER
 #	define PGM_BIG_ENDIAN		__BIG_ENDIAN
 #	define PGM_LITTLE_ENDIAN	__LITTLE_ENDIAND
