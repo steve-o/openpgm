@@ -34,7 +34,7 @@ static DWORD cond_event_tls = TLS_OUT_OF_INDEXES;
 static volatile uint32_t thread_ref_count = 0;
 
 
-#ifndef _WIN32
+#if !defined( _WIN32 ) && defined( __GNU__ )
 #	define posix_check_err(err, name) \
 		do { \
 			const int save_error = (err); \
@@ -46,7 +46,19 @@ static volatile uint32_t thread_ref_count = 0;
 			} \
 		} while (0)
 #	define posix_check_cmd(cmd) posix_check_err ((cmd), #cmd)
-#elif defined(__GNU__)
+#elif !defined( _WIN32 ) && !defined( __GNU__ )
+#	define posix_check_err(err, name) \
+		do { \
+			const int save_error = (err); \
+			if (PGM_UNLIKELY(save_error)) { \
+				char errbuf[1024]; \
+				pgm_error ("file %s: line %d): error '%s' during '%s'", \
+					__FILE__, __LINE__, \
+					pgm_strerror_s (errbuf, sizeof (errbuf), save_error), name); \
+			} \
+		} while (0)
+#	define posix_check_cmd(cmd) posix_check_err ((cmd), #cmd)
+#elif defined( _WIN32 ) && defined( __GNU__ )
 #	define win32_check_err(err, name) \
 		do { \
 			const bool save_error = (err); \
@@ -57,7 +69,7 @@ static volatile uint32_t thread_ref_count = 0;
 			} \
 		} while (0)
 #	define win32_check_cmd(cmd) win32_check_err ((cmd), #cmd)
-#else
+#elif defined( _WIN32 ) && !defined( __GNU__ )
 #	define win32_check_err(err, name) \
 		do { \
 			const bool save_error = (err); \
@@ -68,6 +80,8 @@ static volatile uint32_t thread_ref_count = 0;
 			} \
 		} while (0)
 #	define win32_check_cmd(cmd) win32_check_err ((cmd), #cmd)
+#else
+#	error "Uncaught error handling scenario."
 #endif /* !_WIN32 */
 
 

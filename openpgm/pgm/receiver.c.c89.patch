@@ -1,5 +1,5 @@
---- receiver.c	2010-10-24 21:11:37.000000000 +0800
-+++ receiver.c89.c	2010-10-24 21:12:19.000000000 +0800
+--- receiver.c	2010-12-10 21:02:46.000000000 +0800
++++ receiver.c89.c	2010-12-10 21:04:45.000000000 +0800
 @@ -166,6 +166,7 @@
  
  	pgm_trace (PGM_LOG_ROLE_RX_WINDOW, _("Lost data #%u due to cancellation."), skb->sequence);
@@ -51,7 +51,7 @@
  		if (peer->last_commit && peer->last_commit < sock->last_commit)
  			pgm_rxw_remove_commit (peer->window);
 +		{
- 		const ssize_t peer_bytes = pgm_rxw_readv (peer->window, pmsg, msg_end - *pmsg + 1);
+ 		const ssize_t peer_bytes = pgm_rxw_readv (peer->window, pmsg, (unsigned)(msg_end - *pmsg + 1));
  
  		if (peer->last_cumulative_losses != ((pgm_rxw_t*)peer->window)->cumulative_losses)
 @@ -486,6 +493,7 @@
@@ -155,7 +155,7 @@
  	buf = pgm_alloca (tpdu_length);
  	header = (struct pgm_header*)buf;
 @@ -995,16 +1016,19 @@
- 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+ 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
  
  /* send multicast SPMR TTL 1 to our peers listening on the same groups */
 -	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
@@ -237,7 +237,7 @@
 +	}
  
          header->pgm_checksum    = 0;
-         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, tpdu_length, 0));
+         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
 @@ -1303,14 +1336,14 @@
  	struct pgm_opt_length	      *opt_len;
  	struct pgm_opt_pgmcc_feedback *opt_pgmcc_feedback;

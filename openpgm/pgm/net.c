@@ -45,7 +45,7 @@
 
 ssize_t
 pgm_sendto_hops (
-	pgm_sock_t*			sock,
+	pgm_sock_t*	       restrict	sock,
 	bool				use_rate_limit,
 	bool				use_router_alert,
 	int				hops,			/* -1 == system default */
@@ -93,7 +93,6 @@ pgm_sendto_hops (
 	pgm_debug ("sendto returned %" PRIzd, sent);
 	if (sent < 0) {
 		int save_errno = pgm_get_last_sock_error();
-		char errbuf[1024];
 		if (PGM_UNLIKELY(save_errno != PGM_SOCK_ENETUNREACH &&	/* Network is unreachable */
 		 		 save_errno != PGM_SOCK_EHOSTUNREACH &&	/* No route to host */
 		    		 save_errno != PGM_SOCK_EAGAIN))	/* would block on non-blocking send */
@@ -110,17 +109,23 @@ pgm_sendto_hops (
 			fd_set writefds;
 			FD_ZERO(&writefds);
 			FD_SET(send_sock, &writefds);
+#	ifndef _WIN32
+			const int n_fds = send_sock + 1;	/* largest fd + 1 */
+#	else
+			const int n_fds = 1;			/* count of fds */
+#	endif
 			struct timeval tv = {
 				.tv_sec  = 0,
 				.tv_usec = 500 /* ms */ * 1000
 			};
-			const int ready = select (1, NULL, &writefds, NULL, &tv);
+			const int ready = select (n_fds, NULL, &writefds, NULL, &tv);
 #endif /* CONFIG_HAVE_POLL */
 			if (ready > 0)
 			{
 				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);
 				if ( sent < 0 )
 				{
+					char errbuf[1024];
 					char toaddr[INET6_ADDRSTRLEN];
 					save_errno = pgm_get_last_sock_error();
 					pgm_sockaddr_ntop (to, toaddr, sizeof(toaddr));
@@ -137,6 +142,7 @@ pgm_sendto_hops (
 			}
 			else
 			{
+				char errbuf[1024];
 				save_errno = pgm_get_last_sock_error();
 				pgm_warn (_("blocked socket failed: %s"),
 					  pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));

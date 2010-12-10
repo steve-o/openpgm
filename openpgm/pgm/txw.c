@@ -194,7 +194,7 @@ pgm_txw_create (
 
 /* calculate transmit window parameters */
 	pgm_assert (sqns || (tpdu_size && secs && max_rte));
-	const unsigned alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
+	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
 	window = pgm_malloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
 	window->tsi = tsi;
 

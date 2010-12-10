@@ -174,7 +174,7 @@ pgm_skb_headroom (
 	const struct pgm_sk_buff_t*const skb
 	)
 {
-	return (char*)skb->data - (char*)skb->head;
+	return (uint16_t)((char*)skb->data - (char*)skb->head);
 }
 
 static inline
@@ -183,7 +183,7 @@ pgm_skb_tailroom (
 	const struct pgm_sk_buff_t*const skb
 	)
 {
-	return (char*)skb->end - (char*)skb->tail;
+	return (uint16_t)((char*)skb->end - (char*)skb->tail);
 }
 
 /* reserve space to add data */

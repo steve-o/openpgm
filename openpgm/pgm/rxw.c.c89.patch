@@ -1,5 +1,5 @@
---- rxw.c	2010-10-24 12:01:50.000000000 +0800
-+++ rxw.c89.c	2010-10-24 12:47:40.000000000 +0800
+--- rxw.c	2010-12-10 20:55:25.000000000 +0800
++++ rxw.c89.c	2010-12-10 20:57:13.000000000 +0800
 @@ -193,10 +193,11 @@
  	}
  
@@ -10,7 +10,7 @@
  /* calculate receive window parameters */
  	pgm_assert (sqns || (secs && max_rte));
 +	{
- 	const unsigned alloc_sqns = sqns ? sqns : ( (secs * max_rte) / tpdu_size );
+ 	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
  	window = pgm_malloc0 (sizeof(pgm_rxw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
  
 @@ -232,6 +233,7 @@

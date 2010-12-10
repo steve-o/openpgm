@@ -114,21 +114,21 @@ static pgm_notify_t		http_notify = PGM_NOTIFY_INIT;
 static volatile uint32_t	http_ref_count = 0;
 
 
-static int http_tsi_response (struct http_connection_t*, pgm_tsi_t*);
-static void http_each_receiver (pgm_peer_t*, pgm_string_t*);
-static int http_receiver_response (struct http_connection_t*, pgm_peer_t*);
+static int http_tsi_response (struct http_connection_t*restrict, const pgm_tsi_t*restrict);
+static void http_each_receiver (const pgm_sock_t*restrict, const pgm_peer_t*restrict, pgm_string_t*restrict);
+static int http_receiver_response (struct http_connection_t*restrict, const pgm_sock_t*restrict, const pgm_peer_t*restrict);
 
-static void default_callback (struct http_connection_t*, const char*);
-static void robots_callback (struct http_connection_t*, const char*);
-static void css_callback (struct http_connection_t*, const char*);
-static void index_callback (struct http_connection_t*, const char*);
-static void interfaces_callback (struct http_connection_t*, const char*);
-static void transports_callback (struct http_connection_t*, const char*);
-static void histograms_callback (struct http_connection_t*, const char*);
+static void default_callback (struct http_connection_t*restrict, const char*restrict);
+static void robots_callback (struct http_connection_t*restrict, const char*restrict);
+static void css_callback (struct http_connection_t*restrict, const char*restrict);
+static void index_callback (struct http_connection_t*restrict, const char*restrict);
+static void interfaces_callback (struct http_connection_t*restrict, const char*restrict);
+static void transports_callback (struct http_connection_t*restrict, const char*restrict);
+static void histograms_callback (struct http_connection_t*restrict, const char*restrict);
 
 static struct {
 	const char*	path;
-	void	      (*callback) (struct http_connection_t*, const char*);
+	void	      (*callback) (struct http_connection_t*restrict, const char*restrict);
 } http_directory[] = {
 	{ "/robots.txt",	robots_callback },
 	{ "/base.css",		css_callback },
@@ -628,9 +628,9 @@ http_process (
 static
 void
 http_set_status (
-	struct http_connection_t*	connection,
-	int				status_code,
-	const char*			status_text
+	struct http_connection_t*restrict connection,
+	int				  status_code,
+	const char*		 restrict status_text
 	)
 {
 	connection->status_code = status_code;
@@ -640,8 +640,8 @@ http_set_status (
 static
 void
 http_set_content_type (
-	struct http_connection_t*	connection,
-	const char*			content_type
+	struct http_connection_t*restrict connection,
+	const char*		 restrict content_type
 	)
 {
 	connection->content_type = content_type;
@@ -652,9 +652,9 @@ http_set_content_type (
 static
 void
 http_set_static_response (
-	struct http_connection_t*	connection,
-	const char*			content,
-	size_t				content_length
+	struct http_connection_t*restrict connection,
+	const char*		 restrict content,
+	size_t				  content_length
 	)
 {
 	pgm_string_t* response = pgm_string_new (NULL);
@@ -681,9 +681,9 @@ http_set_static_response (
 static
 void
 http_set_response (
-	struct http_connection_t*	connection,
-	char*				content,
-	size_t				content_length
+	struct http_connection_t*restrict connection,
+	char*			 restrict content,
+	size_t				  content_length
 	)
 {
 	pgm_string_t* response = pgm_string_new (NULL);
@@ -721,8 +721,8 @@ http_routine (
 	PGM_GNUC_UNUSED	void*	arg
 	)
 {
-	const SOCKET notify_fd = pgm_notify_get_fd (&http_notify);
-	const SOCKET max_fd = MAX( notify_fd, http_sock );
+	const SOCKET notify_fd = pgm_notify_get_socket (&http_notify);
+	const int max_fd = MAX( notify_fd, http_sock );
 
 	FD_ZERO( &http_readfds );
 	FD_ZERO( &http_writefds );
@@ -732,7 +732,7 @@ http_routine (
 
 	for (;;)
 	{
-		SOCKET fds = MAX( http_max_sock, max_fd ) + 1;
+		int fds = MAX( http_max_sock, max_fd ) + 1;
 		fd_set readfds = http_readfds, writefds = http_writefds, exceptfds = http_exceptfds;
 
 		fds = select (fds, &readfds, &writefds, &exceptfds, NULL);
@@ -847,8 +847,8 @@ http_create_response (
 static
 void
 http_finalize_response (
-	struct http_connection_t*	connection,
-	pgm_string_t*			response
+	struct http_connection_t*restrict connection,
+	pgm_string_t*		 restrict response
 	)
 {
 	pgm_string_append (response,	"</div>"
@@ -865,8 +865,8 @@ http_finalize_response (
 static
 void
 robots_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	struct http_connection_t*restrict connection,
+	PGM_GNUC_UNUSED const char*restrict path
         )
 {
 	http_set_content_type (connection, "text/plain");
@@ -876,8 +876,8 @@ robots_callback (
 static
 void
 css_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	struct http_connection_t*restrict connection,
+	PGM_GNUC_UNUSED const char*restrict path
         )
 {       
 	http_set_content_type (connection, "text/css");
@@ -887,8 +887,8 @@ css_callback (
 static
 void
 index_callback (
-	struct http_connection_t*	connection,
-	const char*			path
+	struct http_connection_t*restrict connection,
+	const char*		 restrict path
         )
 {
 	if (strlen (path) > 1) {
@@ -924,8 +924,8 @@ index_callback (
 static
 void
 interfaces_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	struct http_connection_t*restrict connection,
+	PGM_GNUC_UNUSED const char*restrict path
         )
 {
 	pgm_string_t* response = http_create_response ("Interfaces", HTTP_TAB_INTERFACES);
@@ -989,8 +989,8 @@ interfaces_callback (
 static
 void
 transports_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	struct http_connection_t*restrict connection,
+	PGM_GNUC_UNUSED const char*restrict path
         )
 {
 	pgm_string_t* response = http_create_response ("Transports", HTTP_TAB_TRANSPORTS);
@@ -1056,8 +1056,8 @@ transports_callback (
 static
 void
 histograms_callback (
-	struct http_connection_t*	connection,
-	PGM_GNUC_UNUSED const char*	path
+	struct http_connection_t*restrict connection,
+	PGM_GNUC_UNUSED const char*restrict path
         )
 {
 	pgm_string_t* response = http_create_response ("Histograms", HTTP_TAB_HISTOGRAMS);
@@ -1068,8 +1068,8 @@ histograms_callback (
 static
 void
 default_callback (
-	struct http_connection_t*	connection,
-	const char*			path
+	struct http_connection_t*restrict connection,
+	const char*		 restrict path
         )
 {
 	pgm_tsi_t tsi;
@@ -1095,8 +1095,8 @@ default_callback (
 static
 int
 http_tsi_response (
-	struct http_connection_t*	connection,
-	pgm_tsi_t*			tsi
+	struct http_connection_t*restrict connection,
+	const pgm_tsi_t*	 restrict tsi
 	)
 {
 /* first verify this is a valid TSI */
@@ -1120,7 +1120,7 @@ http_tsi_response (
 		pgm_rwlock_reader_lock (&list_sock->peers_lock);
 		pgm_peer_t* receiver = pgm_hashtable_lookup (list_sock->peers_hashtable, tsi);
 		if (receiver) {
-			const int retval = http_receiver_response (connection, receiver);
+			const int retval = http_receiver_response (connection, list_sock, receiver);
 			pgm_rwlock_reader_unlock (&list_sock->peers_lock);
 			pgm_rwlock_reader_unlock (&pgm_sock_list_lock);
 			return retval;
@@ -1195,7 +1195,7 @@ http_tsi_response (
 		pgm_list_t* peers_list = sock->peers_list;
 		while (peers_list) {
 			pgm_list_t* next = peers_list->next;
-			http_each_receiver (peers_list->data, response);
+			http_each_receiver (sock, peers_list->data, response);
 			peers_list = next;
 		}
 		pgm_rwlock_reader_unlock (&sock->peers_lock);
@@ -1319,8 +1319,8 @@ http_tsi_response (
 						"</table>\n",
 						sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT],
 						sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT],
-						window ? pgm_txw_size (window) : 0,	/* minus IP & any UDP header */
-						window ? pgm_txw_length (window) : 0,
+						window ? (uint32_t)pgm_txw_size (window) : 0,	/* minus IP & any UDP header */
+						window ? (uint32_t)pgm_txw_length (window) : 0,
 						sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT],
 						sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED],
 						sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
@@ -1343,24 +1343,25 @@ http_tsi_response (
 static
 void
 http_each_receiver (
-	pgm_peer_t*		peer,
-	pgm_string_t*		response
+	const pgm_sock_t*	restrict sock,
+	const pgm_peer_t*	restrict peer,
+	pgm_string_t*		restrict response
 	)
 {
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->group_nla),
+	getnameinfo ((const struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->group_nla),
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len ((struct sockaddr*)&peer->nla),
+	getnameinfo ((const struct sockaddr*)&peer->nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->nla),
 		     source_address, sizeof(source_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char last_hop[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->local_nla),
+	getnameinfo ((const struct sockaddr*)&peer->local_nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->local_nla),
 		     last_hop, sizeof(last_hop),
 		     NULL, 0,
 		     NI_NUMERICHOST);
@@ -1368,8 +1369,8 @@ http_each_receiver (
 	char gsi[ PGM_GSISTRLEN + sizeof(".00000") ];
 	pgm_gsi_print_r (&peer->tsi.gsi, gsi, sizeof(gsi));
 
-	const int sport = ntohs (peer->tsi.sport);
-	const int dport = ntohs (peer->sock->dport);	/* by definition must be the same */
+	const uint16_t sport = ntohs (peer->tsi.sport);
+	const uint16_t dport = ntohs (sock->dport);	/* by definition must be the same */
 	pgm_string_append_printf (response,	"<tr>"
 							"<td>%s</td>"
 							"<td>%u</td>"
@@ -1390,8 +1391,8 @@ http_each_receiver (
 static
 int
 http_time_summary (
-	const time_t* 		activity_time,
-	char* 			sz
+	const time_t*	restrict activity_time,
+	char* 		restrict sz
 	)
 {
 	time_t now_time = time (NULL);
@@ -1446,8 +1447,9 @@ http_time_summary (
 static
 int
 http_receiver_response (
-	struct http_connection_t*	connection,
-	pgm_peer_t*			peer
+	struct http_connection_t*restrict connection,
+	const pgm_sock_t*	 restrict sock,
+	const pgm_peer_t*	 restrict peer
 	)
 {
 	char gsi[ PGM_GSISTRLEN ];
@@ -1458,25 +1460,25 @@ http_receiver_response (
 		 ntohs (peer->tsi.sport));
 
 	char group_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->group_nla),
+	getnameinfo ((const struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->group_nla),
 		     group_address, sizeof(group_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char source_address[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->nla, pgm_sockaddr_len ((struct sockaddr*)&peer->nla),
+	getnameinfo ((const struct sockaddr*)&peer->nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->nla),
 		     source_address, sizeof(source_address),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	char last_hop[INET6_ADDRSTRLEN];
-	getnameinfo ((struct sockaddr*)&peer->local_nla, pgm_sockaddr_len ((struct sockaddr*)&peer->local_nla),
+	getnameinfo ((const struct sockaddr*)&peer->local_nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->local_nla),
 		     last_hop, sizeof(last_hop),
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
 	const in_port_t sport = ntohs (peer->tsi.sport);
-	const in_port_t dport = ntohs (peer->sock->dport);	/* by definition must be the same */
+	const in_port_t dport = ntohs (sock->dport);	/* by definition must be the same */
 	const pgm_rxw_t* window = peer->window;
 	const uint32_t outstanding_naks = window->nak_backoff_queue.length +
 					  window->wait_ncf_queue.length +
@@ -1544,12 +1546,12 @@ http_receiver_response (
 						"</tr>"
 						"</table>\n"
 						"</div>",
-						pgm_to_msecs(peer->sock->nak_bo_ivl),
-						pgm_to_msecs(peer->sock->nak_rpt_ivl),
-						peer->sock->nak_ncf_retries,
-						pgm_to_msecs(peer->sock->nak_rdata_ivl),
-						peer->sock->nak_data_retries,
-						peer->sock->hops);
+						pgm_to_msecs (sock->nak_bo_ivl),
+						pgm_to_msecs (sock->nak_rpt_ivl),
+						sock->nak_ncf_retries,
+						pgm_to_msecs (sock->nak_rdata_ivl),
+						sock->nak_data_retries,
+						sock->hops);
 
 	pgm_string_append_printf (response,	"\n<h2>Performance information</h2>"
 						"\n<table>"
@@ -1631,7 +1633,7 @@ http_receiver_response (
 						peer->cumulative_stats[PGM_PC_RECEIVER_DATA_MSGS_RECEIVED],
 						peer->cumulative_stats[PGM_PC_RECEIVER_NAK_FAILURES],
 						peer->cumulative_stats[PGM_PC_RECEIVER_BYTES_RECEIVED],
-						peer->sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
+						sock->cumulative_stats[PGM_PC_SOURCE_CKSUM_ERRORS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_SPMS],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_ODATA],
 						peer->cumulative_stats[PGM_PC_RECEIVER_MALFORMED_RDATA],
