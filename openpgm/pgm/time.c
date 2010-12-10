@@ -617,7 +617,7 @@ rdtsc (void)
 	uint32_t lo, hi;
 
 /* We cannot use "=A", since this would use %rax on x86_64 */
-	asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
+	__asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
 
 	return (pgm_time_t)hi << 32 | lo;
 

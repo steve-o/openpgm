@@ -35,7 +35,7 @@ pgm_atomic_exchange_and_add32 (
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint32_t result;
-	asm volatile (	"lock\n\t"
+	__asm volatile ("lock\n\t"
 			"xaddl %0, %1"
 		      : "=r" (result), "=m" (*atomic)
 		      : "0" (val), "m" (*atomic)
@@ -67,7 +67,7 @@ pgm_atomic_add32 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	asm volatile (	"lock\n\t"
+	__asm volatile ("lock\n\t"
 			"addl %1, %0"
 		      : "=m" (*atomic)
 		      : "ir" (val), "m" (*atomic)
