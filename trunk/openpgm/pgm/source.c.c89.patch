@@ -1,4 +1,4 @@
---- source.c	2010-12-08 17:03:12.000000000 +0800
+--- source.c	2010-12-10 21:17:34.000000000 +0800
 +++ source.c89.c	2010-12-08 17:03:56.000000000 +0800
 @@ -114,11 +114,13 @@
  	)
@@ -270,7 +270,7 @@
  	const uint16_t    tsdu_length  = skb->len;
  	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
  	const size_t      tpdu_length  = tsdu_length + pgm_pkt_offset (FALSE, pgmcc_family);
-@@ -1145,10 +1182,11 @@
+@@ -1145,6 +1182,7 @@
  		else
  			data = (char*)pgmcc_data  + sizeof(struct pgm_opt_pgmcc_data);
  	}
@@ -278,11 +278,6 @@
  	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
  	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
  	STATE(unfolded_odata)			= pgm_csum_partial (data, (uint16_t)tsdu_length, 0);
--        STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
-+        STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
- 
- /* add to transmit window, skb::data set to payload */
- 	pgm_spinlock_lock (&sock->txw_spinlock);
 @@ -1238,6 +1276,8 @@
  	if (bytes_written)
  		*bytes_written = tsdu_length;
