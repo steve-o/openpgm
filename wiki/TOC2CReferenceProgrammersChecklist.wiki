@@ -5,5 +5,6 @@
     * [OpenPgm2CReferenceProgrammingEnvironment Programming Environment]
     * [OpenPgmCReferenceIncludeTheseHeaderFiles Include these Header Files]
     * [OpenPgm2CReferenceSetTheseParameters Set these Parameters]
+    * [OpenPgm2CReferenceEvents Dispatch Protocol Events]
     * [OpenPgmCReferenceLinkTheseLibraryFiles Link these Library Files]
     * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]

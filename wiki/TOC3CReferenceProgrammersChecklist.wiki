@@ -5,5 +5,6 @@
     * [OpenPgm3CReferenceProgrammingEnvironment Programming Environment]
     * [OpenPgm3CReferenceIncludeTheseHeaderFiles Include these Header Files]
     * [OpenPgm3CReferenceSetTheseParameters Set these Parameters]
+    * [OpenPgm3CReferenceEvents Dispatch Protocol Events]
     * [OpenPgm3CReferenceLinkTheseLibraryFiles Link these Library Files]
     * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]

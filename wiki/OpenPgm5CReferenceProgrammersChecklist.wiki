@@ -9,5 +9,6 @@ This section presents important general information for programmers using OpenPG
   * [OpenPgm5CReferenceProgrammingEnvironment Programming Environment]
   * [OpenPgm5CReferenceIncludeTheseHeaderFiles Include these Header Files]
   * [OpenPgm5CReferenceSetTheseParameters Set these Parameters]
+  * [OpenPgm5CReferenceEvents Dispatch Protocol Events]
   * [OpenPgm5CReferenceLinkTheseLibraryFiles Link these Library Files]
   * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]
