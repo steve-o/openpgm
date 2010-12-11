@@ -1148,7 +1148,7 @@ send_odata (
 	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
 	STATE(unfolded_odata)			= pgm_csum_partial (data, (uint16_t)tsdu_length, 0);
-        STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), pgm_header_len));
+        STATE(skb)->pgm_header->pgm_checksum	= pgm_csum_fold (pgm_csum_block_add (unfolded_header, STATE(unfolded_odata), (uint16_t)pgm_header_len));
 
 /* add to transmit window, skb::data set to payload */
 	pgm_spinlock_lock (&sock->txw_spinlock);
