@@ -1,6 +1,6 @@
---- thread.c	2010-11-05 05:13:54.000000000 +0800
-+++ thread.c89.c	2010-11-05 05:13:36.000000000 +0800
-@@ -107,9 +107,11 @@
+--- thread.c	2010-12-13 16:22:59.000000000 +0800
++++ thread.c89.c	2010-12-13 16:21:44.000000000 +0800
+@@ -121,9 +121,11 @@
  #ifndef _WIN32
  	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
  #else
@@ -12,7 +12,7 @@
  #endif /* !_WIN32 */
  }
  
-@@ -121,15 +123,19 @@
+@@ -135,15 +137,19 @@
  	pgm_assert (NULL != mutex);
  
  #ifndef _WIN32
@@ -32,7 +32,7 @@
  #endif /* !_WIN32 */
  }
  
-@@ -171,11 +177,13 @@
+@@ -185,11 +191,13 @@
  	pgm_assert (NULL != spinlock);
  
  #ifdef CONFIG_HAVE_POSIX_SPINLOCK
@@ -46,7 +46,7 @@
  #elif defined(_WIN32)
  	return TryEnterCriticalSection (&spinlock->win32_spinlock);
  #else	/* GCC atomics */
-@@ -256,8 +264,11 @@
+@@ -270,8 +278,11 @@
  	WakeAllConditionVariable (&cond->win32_cond);
  #else
  	EnterCriticalSection (&cond->win32_spinlock);
@@ -59,7 +59,7 @@
  	cond->len = 0;
  	LeaveCriticalSection (&cond->win32_spinlock);
  #endif /* !_WIN32 */
-@@ -288,6 +299,7 @@
+@@ -302,6 +313,7 @@
  #	if defined(CONFIG_HAVE_WIN_COND)
  	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
  #	else
@@ -67,7 +67,7 @@
  	DWORD status;
  	HANDLE event = TlsGetValue (cond_event_tls);
  
-@@ -311,7 +323,9 @@
+@@ -325,7 +337,9 @@
  
  	if (WAIT_TIMEOUT == status) {
  		EnterCriticalSection (&cond->win32_spinlock);
@@ -78,7 +78,7 @@
  			if (cond->phandle[ i ] == event) {
  				if (i != cond->len - 1)
  					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
-@@ -319,9 +333,11 @@
+@@ -333,9 +347,11 @@
  				break;
  			}
  		}
@@ -90,16 +90,7 @@
  #	endif /* !CONFIG_HAVE_WIN_COND */
  }
  #endif /* !_WIN32 */
-@@ -351,7 +367,7 @@
- 	pgm_assert (NULL != rwlock);
- 
- #ifdef CONFIG_HAVE_WIN_SRW_LOCK
--	InitializeSRWLock (&rwlock->win32_lock);
-+	InitializeSRWLock (&rwlock->win32_rwlock);
- #elif !defined(_WIN32)
- 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
- #else
-@@ -422,7 +438,7 @@
+@@ -436,7 +452,7 @@
  	bool status = FALSE;
  
  	pgm_assert (NULL != rwlock);
