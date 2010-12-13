@@ -357,7 +357,7 @@ pgm_rwlock_init (
 	pgm_assert (NULL != rwlock);
 
 #ifdef CONFIG_HAVE_WIN_SRW_LOCK
-	InitializeSRWLock (&rwlock->win32_lock);
+	InitializeSRWLock (&rwlock->win32_rwlock);
 #elif !defined(_WIN32)
 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
 #else
