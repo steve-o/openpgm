@@ -213,12 +213,13 @@ START_TEST (test_check2_pass_001)
 
 /* major-only */
 	memset (&major, 0, sizeof(major));
+	memset (&minor, 0, sizeof(minor));
 	mock_pgm_time_now = 1;
 	pgm_rate_create (&major, 2*1010, 10, 1500);
 	mock_pgm_time_now += pgm_secs(2);
-	fail_unless (TRUE == pgm_rate_check2 (&major, &minor, 1000, TRUE), "rate_check2:major failed");
-	fail_unless (TRUE == pgm_rate_check2 (&major, &minor, 1000, TRUE), "rate_check2:major failed");
-	fail_unless (FALSE == pgm_rate_check2 (&major, &minor, 1000, TRUE), "rate_check2:major failed");
+	fail_unless (TRUE == pgm_rate_check2 (&major, &minor, 1000, TRUE), "rate_check2:major#1 failed");
+	fail_unless (TRUE == pgm_rate_check2 (&major, &minor, 1000, TRUE), "rate_check2:major#2 failed");
+	fail_unless (FALSE == pgm_rate_check2 (&major, &minor, 1000, TRUE), "rate_check2:major#3 failed");
 	pgm_rate_destroy (&major);
 
 /* minor-only */
