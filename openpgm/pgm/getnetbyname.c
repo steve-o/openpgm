@@ -102,6 +102,8 @@ _pgm_compat_endnetent (void)
 }
 
 /* link-local 169.254.0.0 alias1 alias2
+ *
+ * returns address in host-byte order
  */
 
 static
@@ -136,11 +138,12 @@ again:
 	p = strpbrk (cp, " \t");
 	if (NULL != p)
 		*p++ = '\0';
+/* returns address in network order */
 	if (0 == pgm_inet_network (cp, &sin)) {
 		struct sockaddr_in sa;
 		memset (&sa, 0, sizeof (sa));
 		sa.sin_family = AF_INET;
-		sa.sin_addr.s_addr = sin.s_addr;
+		sa.sin_addr.s_addr = ntohl (sin.s_addr);
 		memcpy (&net.n_net, &sa, sizeof (sa));
 	} else if (0 != pgm_sa6_network (cp, (struct sockaddr_in6*)&net.n_net)) {
 /* cannot resolve address, fail instead of returning junk address */
@@ -205,7 +208,8 @@ _pgm_native_getnetbyname (
 {
 	struct sockaddr_in sa;
 	struct netent *ne;
-	char **cp;
+	char **cp, **q, **r;
+	size_t len;
 
 	if (NULL == name)
 		return NULL;
@@ -221,16 +225,38 @@ _pgm_native_getnetbyname (
 	endnetent();
 	return NULL;
 found:
-	net.n_name = ne->n_name;
-	net.n_aliases = ne->n_aliases;
+/* copy result into own global static buffer */
+	len = strlen (ne->n_name) + 1;
+	if (len > BUFSIZ)
+		return NULL;
+	net.n_name = memcpy (line, ne->n_name, len);
+	q = net.n_aliases = net_aliases;
+	r = ne->n_aliases;
+	while (*r) {
+		const size_t alias_len = strlen (*r) + 1;
+		if ((len + alias_len) > BUFSIZ)
+			break;
+		*q++ = memcpy (line + len, *r++, alias_len);
+		len += alias_len;
+	}
+	*q = NULL;
+	if (AF_INET != ne->n_addrtype)
+		return NULL;
 	memset (&sa, 0, sizeof (sa));
 	sa->sin_family = ne->n_addrtype;
-	sa->sin_addr.s_addr = ne->n_net;
+	sa->sin_addr.s_addr = ntohl (pgm_inet_makeaddr (ne->n_net));
 	memcpy (&net.n_net, &sa, sizeof (sa));
 	endnetent();
 	return &net;
 }
 #endif
+
+/* returns addresses in CIDR format in host-byte order, native implementations
+ * use pre-CIDR aligned format.
+ *
+ * ::getnetbyname(loopback)   = 0.0.0.127
+ * pgm_getnetbyname(loopback) = 127.0.0.0
+ */
 
 struct pgm_netent_t*
 pgm_getnetbyname (

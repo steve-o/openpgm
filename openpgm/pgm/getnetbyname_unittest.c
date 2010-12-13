@@ -149,6 +149,8 @@ START_TEST (test_getnetent_pass_001)
 		fail_unless (AF_INET == ne->n_net.ss_family || AF_INET6 == ne->n_net.ss_family, "invalid address family");
 		if (AF_INET == ne->n_net.ss_family) {
 			struct sockaddr_in sa;
+			struct in_addr net;
+
 			g_debug ("      n_addrtype = AF_INET");
 #ifdef COMPARE_GETNETENT
 			fail_unless (ne->n_net.ss_family == nne->n_addrtype, "address family mismatch");
@@ -161,7 +163,8 @@ START_TEST (test_getnetent_pass_001)
 						       NI_NUMERICHOST), "getnameinfo failed");
 			g_debug ("      n_net = %s", buffer);
 #ifdef COMPARE_GETNETENT
-			fail_unless (0 == memcmp (&sa.sin_addr, &nne->n_net, sizeof (struct in_addr)), "network address mismatch");
+			net = pgm_inet_makeaddr (nne->n_net, 0);
+			fail_unless (0 == memcmp (&sa.sin_addr, &net, sizeof (struct in_addr)), "network address mismatch");
 #endif
 		} else {
 			struct sockaddr_in6 sa6;

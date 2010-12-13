@@ -333,5 +333,28 @@ default_none:
 	return -1;
 }
 
+/* create an internet address from network & host.
+ */
+
+struct in_addr
+pgm_inet_makeaddr (
+	uint32_t	net,
+	uint32_t	host
+	)
+{
+	uint32_t addr;
+
+	if (net < 128)
+		addr = (net << IN_CLASSA_NSHIFT) | (host & IN_CLASSA_HOST);
+	else if (net < 65536)
+		addr = (net << IN_CLASSB_NSHIFT) | (host & IN_CLASSB_HOST);
+	else if (net < 16777216UL)
+		addr = (net << IN_CLASSC_NSHIFT) | (host & IN_CLASSC_HOST);
+	else
+		addr = net | host;
+	addr = htonl (addr);
+	return (*(struct in_addr*)&addr);
+}
+
 /* eof */
 
