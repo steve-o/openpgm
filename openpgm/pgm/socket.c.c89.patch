@@ -1,5 +1,5 @@
---- socket.c	2010-10-24 12:02:35.000000000 +0800
-+++ socket.c89.c	2010-10-24 12:51:32.000000000 +0800
+--- socket.c	2010-12-10 19:34:45.000000000 +0800
++++ socket.c89.c	2010-12-13 18:27:08.000000000 +0800
 @@ -377,7 +377,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
  
@@ -10,15 +10,6 @@
  
  /* source-side */
  	pgm_mutex_init (&new_sock->source_mutex);
-@@ -424,7 +426,7 @@
- #else
- 		if (WSAEACCES == save_errno) {
- #	ifdef _MSC_VER
--			if (IsMemberOfAdministratorsGroup (NULL))) {
-+			if (IsMemberOfAdministratorsGroup (NULL)) {
- 				if (!IsElevatedAdministrator (NULL))
- 					pgm_error (_("PGM protocol requires approved process elevation via UAC."));
- 				/* otherwise unknown permission error, fall through */
 @@ -472,6 +474,7 @@
  /* Stevens: "SO_REUSEADDR has datatype int."
   */
@@ -48,18 +39,6 @@
  #endif
  	}
  	else
-@@ -647,9 +653,9 @@
- 
- /* maximum payload size for an APDU */
- 	case PGM_PDU:
--		if (PGM_UNLIKELY(*optlen != sizeof (int)))
-+		if (PGM_UNLIKELY(*optlen != sizeof (SOCKET)))
- 			break;
--		*(int*restrict)optval = sock->max_apdu;
-+		*(SOCKET*restrict)optval = sock->max_apdu;
- 		status = TRUE;
- 		break;
- 
 @@ -758,8 +764,11 @@
  		{
  			int*restrict intervals = (int*restrict)optval;
@@ -194,8 +173,8 @@
  
 +	{
  	const sa_family_t pgmcc_family = sock->use_pgmcc ? sock->family : 0;
- 	sock->max_tsdu = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, pgmcc_family);
- 	sock->max_tsdu_fragment = sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, pgmcc_family);
+ 	sock->max_tsdu = (uint16_t)(sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (FALSE, pgmcc_family));
+ 	sock->max_tsdu_fragment = (uint16_t)(sock->max_tpdu - sock->iphdr_len - pgm_pkt_offset (TRUE, pgmcc_family));
 +	{
  	const unsigned max_fragments = sock->txw_sqns ? MIN( PGM_MAX_FRAGMENTS, sock->txw_sqns ) : PGM_MAX_FRAGMENTS;
  	sock->max_apdu = MIN( PGM_MAX_APDU, max_fragments * sock->max_tsdu_fragment );
@@ -217,7 +196,7 @@
  /* rx to nak processor notify channel */
  	if (sock->can_send_data)
 @@ -2222,7 +2252,7 @@
- 		if (sock->txw_max_rte)
+ 		if (sock->txw_max_rte > 0)
  		{
  			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
 -					sock->txw_max_rte);
