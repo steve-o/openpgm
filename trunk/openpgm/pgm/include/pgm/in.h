@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <pgm/types.h>
 
 /* sections 5 and 8.2 of RFC 3768: Multicast group request */
 struct group_req

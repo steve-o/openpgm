@@ -473,6 +473,7 @@ pgm_socket (
  */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
 		const int v = 1;
+#ifndef SO_REUSEPORT
 		if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
@@ -486,6 +487,21 @@ pgm_socket (
 				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			goto err_destroy;
 		}
+#else
+		if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&v, sizeof(v)) ||
+		    SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&v, sizeof(v)) ||
+		    SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&v, sizeof(v)))
+		{
+			const int save_errno = pgm_get_last_sock_error();
+			char errbuf[1024];
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_SOCKET,
+				       pgm_error_from_sock_errno (save_errno),
+				       _("Enabling reuse of duplicate socket address and port bindings: %s"),
+				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
+			goto err_destroy;
+		}
+#endif
 
 /* request extra packet information to determine destination address on each packet */
 #ifndef CONFIG_TARGET_WINE
