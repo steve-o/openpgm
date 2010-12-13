@@ -28,18 +28,6 @@
 
 //#define MD5_DEBUG
 
-#if defined( BYTE_ORDER ) || (defined( __sun ) && defined( _BIT_FIELDS_LTOH ))
-#	define PGM_BYTE_ORDER		BYTE_ORDER
-#	define PGM_BIG_ENDIAN		BIG_ENDIAN
-#	define PGM_LITTLE_ENDIAN	LITTLE_ENDIAN
-#elif defined( __BYTE_ORDER ) || (defined( __sun ) && defined( _BIT_FIELDS_HTOL ))
-#	define PGM_BYTE_ORDER		__BYTE_ORDER
-#	define PGM_BIG_ENDIAN		__BIG_ENDIAN
-#	define PGM_LITTLE_ENDIAN	__LITTLE_ENDIAN
-#else
-#	error "BYTE_ORDER not supported."
-#endif
-
 
 /* locals */
 
@@ -52,11 +40,11 @@ static void* _pgm_md5_read_ctx (const struct pgm_md5_t*restrict, void*restrict);
 static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 
 
-#if PGM_BYTE_ORDER == PGM_BIG_ENDIAN
-#	define SWAP(n) \
-		(((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
-#else
+#if (defined( __sun ) && defined( _BIT_FIELDS_LTOH )) || \
+	(!defined( __sun ) && __BYTE_ORDER == __LITTLE_ENDIAN)
 #	define SWAP(n) (n)
+#else
+#	define SWAP(n) (((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
 #endif
 
 
