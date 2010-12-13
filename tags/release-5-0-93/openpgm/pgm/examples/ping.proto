@@ -1,0 +1,47 @@
+package example;
+
+message SubscriptionHeader {
+	required string subject = 1;
+}
+
+message MarketDataHeader {
+	enum MsgType {
+		MSG_VERIFY = 0;
+		MSG_UPDATE = 1;
+		MSG_CORRECT = 2;
+		MSG_CLOSING = 3;
+		MSG_DROP = 4;
+		MSG_AGGREGATE = 5;
+		MSG_STATUS = 6;
+		MSG_CANCEL = 7;
+		MSG_INITIAL = 8;
+	}
+	required MsgType msg_type = 1;
+	enum RecType {
+		PING = 1;
+	}
+	required RecType rec_type = 2;
+	enum RecStatus {
+		STATUS_OK = 0;
+		STATUS_BAD_NAME = 1;
+		STATUS_BAD_LINE = 2;
+		STATUS_CACHE_FULL = 3;
+		STATUS_PERMISSION_DENIED = 4;
+		STATUS_PREEMPTED = 5;
+		STATUS_BAD_ACCESS = 6;
+		STATUS_TEMP_UNAVAIL = 7;
+		STATUS_REASSIGN = 8;
+		STATUS_NOSUBSCRIBERS = 9;
+		STATUS_EXPIRED = 10;
+	}
+	required RecStatus rec_status = 3;
+}
+
+message Ping {
+	required SubscriptionHeader subscription_header = 1;
+	required MarketDataHeader market_data_header = 2;
+	required fixed64 time = 3;
+	required fixed64 seqno = 4;
+	required fixed64 latency = 5;
+	required bytes payload = 6;
+}
