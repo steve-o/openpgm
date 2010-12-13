@@ -1,5 +1,5 @@
---- thread.c	2010-12-10 20:58:47.000000000 +0800
-+++ thread.c89.c	2010-12-10 21:00:46.000000000 +0800
+--- thread.c	2010-12-13 18:02:10.000000000 +0800
++++ thread.c89.c	2010-12-13 18:02:31.000000000 +0800
 @@ -121,9 +121,11 @@
  #ifndef _WIN32
  	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
